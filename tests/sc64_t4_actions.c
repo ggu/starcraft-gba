@@ -19,6 +19,25 @@ test_creation_count_exhaustive(void)
 }
 
 static void
+test_creation_property_index(void)
+{
+    for (u32 number = 1; number <= 64; ++number) {
+        unsigned index = 0xdeadbeefu;
+        assert(sc64_t4_creation_property_index(number, &index));
+        assert(index == number - 1);
+    }
+    unsigned index = 0x12345678u;
+    assert(!sc64_t4_creation_property_index(0, &index));
+    assert(index == 0x12345678u);
+    assert(!sc64_t4_creation_property_index(65, &index));
+    assert(index == 0x12345678u);
+    assert(!sc64_t4_creation_property_index(UINT32_MAX, &index));
+    assert(index == 0x12345678u);
+    assert(!sc64_t4_creation_property_index(1, NULL));
+    assert(!sc64_t4_creation_property_index(0, NULL));
+}
+
+static void
 test_doodad_initial_flags(void)
 {
     unsigned enabled = 7;
@@ -109,6 +128,7 @@ int
 main(void)
 {
     test_creation_count_exhaustive();
+    test_creation_property_index();
     test_doodad_initial_flags();
     test_doodad_state_transition_exhaustive();
     puts("sc64 T4 native action operand tests passed");

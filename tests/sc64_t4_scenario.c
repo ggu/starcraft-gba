@@ -26,7 +26,7 @@ int main(void)
     uint64_t trig = UINT64_C(0xcbf29ce484222325);
     uint64_t mrgn = trig, thg2 = trig;
     unsigned conditions = 0, actions = 0, units = 0, sprites = 0, disabled = 0;
-    unsigned creates = 0, toggles = 0;
+    unsigned creates = 0, toggles = 0, property_creates = 0;
     const u32 little_endian = 1;
     assert(*(const u8 *)&little_endian == 1);
     assert(sc64_t4_scenario.trigger_count == 38);
@@ -71,6 +71,12 @@ int main(void)
                 unsigned amount;
                 assert(sc64_t4_creation_count(t->actions[slot].modifier, &amount));
                 creates += amount;
+                if (t->actions[slot].argument) {
+                    unsigned index;
+                    assert(sc64_t4_creation_property_index(t->actions[slot].argument, &index));
+                    assert(sc64_t4_source_setup.property_used[index]);
+                    property_creates += amount;
+                }
             } else if (t->actions[slot].opcode == 42) {
                 unsigned enabled;
                 assert(sc64_t4_doodad_set_state(0, 1, t->actions[slot].modifier, &enabled));
@@ -101,7 +107,7 @@ int main(void)
     assert(thg2 == UINT64_C(0x6ed0b13b1503a24e));
     assert(conditions == 48 && actions == 141);
     assert(units == 26 && sprites == 6 && disabled == 2);
-    assert(creates == 5 && toggles == 20);
+    assert(creates == 5 && property_creates == 1 && toggles == 20);
     Sc64T4TriggerState state;
     assert(sc64_t4_trigger_init(&state, &sc64_t4_scenario, 0, 1));
     assert(sc64_t4_trigger_state_valid(&state, &sc64_t4_scenario));

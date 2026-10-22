@@ -55,3 +55,10 @@ that zero processes all matching actors within the GBA's bounded pools.
 Destination placement and exact native candidate order remain separate work.
 The native action table's RAM address maps to ROM offset `0xC8164` in this
 image; entries 11 and 42 provide independent anchors for that mapping.
+
+The 1,280-byte property loader at `0x8002C394` copies its section to
+`0x800C7654`; `0x80085EDC` then converts 64 records in place at a 20-byte
+stride. The create-property path validates an action number in 1–64 and
+addresses `0x800C7640 + number*20`, so number 1 selects source UPRP entry 0.
+The authored index helper follows that mapping. Applying the individual
+property override fields to live actors remains unimplemented.

@@ -23,6 +23,17 @@ sc64_t4_creation_count(unsigned raw_count, unsigned *count)
     return 1;
 }
 
+/* CUP operands name property records 1..64, while the retained runtime table
+ * is indexed 0..63. Zero requests default creation with no explicit property;
+ * the caller handles that case. Return 1 only for an explicit valid record. */
+static int
+sc64_t4_creation_property_index(u32 number, unsigned *index)
+{
+    if (!number || number > 64 || !index) return 0;
+    *index = (unsigned)(number - 1);
+    return 1;
+}
+
 /* Initial THG2 sprites and records carrying the unit-disabled bit do not
  * begin as enabled unit-state actors. Other flag bits remain uninterpreted. */
 static int

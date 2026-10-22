@@ -837,6 +837,35 @@ The actor/storage ARM probe still passes both unchanged memory guards. These
 checks remain import, rule and storage evidence, with no new T4 playability
 or frame-rate claim. The default and unified ROM hashes remain unchanged.
 
+## T4 world-effect callback fixtures (2026-10-23)
+
+`make test-sc64-t4-effects` exercises the separate callback adapter against
+synthetic live engine states under ASan/UBSan. Bring uses validated 1-based
+location IDs and source actor bounds; Command ignores its unused location
+operand. Unsupported owner/type/geometry queries leave the output untouched.
+Removal selects actors before mutation, recomputes supply and clears only
+the appropriate stale attack/build/gas targets, preserving mineral indices.
+Camera and presentation state affect only the human context.
+
+MoveLocation preserves and clips location 30's extent. Move Unit teleports
+all matching Men using an authored bounded nearest-fit search at the
+destination, clearing old orders/path state. One fixture leaves only one
+feasible destination for two actors: failure to place the second returns a
+retry with both actors unmoved. Candidate order and placement are GBA
+policies, not a reproduction of the native placement algorithm.
+
+Creation and doodad effects are stubbed at the callback boundary in this
+fixture. The separate property-index helper and private scenario test verify
+that action numbers 1–64 map to UPRP slots 0–63; the source requests one
+property-backed creation among five total. Applying those property overrides
+is still required. An ARM compile-only check covers the callbacks and schema,
+with the same stub boundaries; it is not a full runtime link or memory result.
+The game does not call these callbacks or persist their state yet. Door/trap
+integration, scheduler/SRAM integration and a controller completion proof
+still gate T4, with no new gameplay or performance result claimed.
+The default build/tests pass, including 89 Python checks; its ROM hash is
+unchanged. Unified build/tests also passed during this milestone.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

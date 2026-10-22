@@ -115,6 +115,18 @@ controller completion proof remain required. T4-only door/trap rules and a
 private source-frame accessor are available for that integration; neither
 door animation/collision nor trap firing is connected yet.
 
+World-effect callbacks have a separate internal fixture:
+
+```sh
+make test-sc64-t4-effects
+```
+
+This requires the same private prepared inputs. It runs queries, removals,
+location movement and bounded group teleport effects against synthetic engine
+states, with creation and doodad calls stubbed at their callback boundaries.
+It does not start the T4 trigger scheduler, save that state or prove mission
+completion. The runtime still does not include these callbacks.
+
 ## Troubleshooting
 
 - If `doctor` reports a missing required tool, install that tool and confirm its command is on `PATH`. ARM GCC also needs the matching `arm-none-eabi-objcopy` and `arm-none-eabi-size` commands. On a custom toolchain prefix, set `PREFIX` to the prefix used by all three commands.
