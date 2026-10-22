@@ -215,6 +215,22 @@ releases and stay in an ignored local trace. Loss or the simulation/input
 budget ending returns failure. This host result is not an ARM or physical
 GBA frame-rate measurement.
 
+The matching full ARM replay also passes. ROM hash prefix `b6d5b616` replays
+all 1,388 inputs from fresh HOME through scheduler tick 71,186, winning at
+mission frame 70,833. Its final roster, resources, completion flag, Z3 state
+and 250-HP Mature Chrysalis match the host proof. It observes up to 95 live
+units. Hardware-timer deltas over 69,659 counted simulation frames give a
+mean of 16.69 fps; the worst complete observed interval is 9.03 fps. Initial
+HOME/start and final-result intervals are excluded, and counted intervals
+use actual simulation-frame deltas so command-menu pauses do not inflate
+the rate. The mean was independently recomputed from the recorded frame and
+cycle totals. This establishes completion on the emulator CPU model, while
+the near-30-fps target and physical GBA validation remain unmet.
+
+The source-only suite now includes 47 Python checks. Nine replay checks
+cover tick conversion, queue capacity derived from ELF symbols, malformed
+input transitions, unsupported event kinds and frozen-proof validation.
+
 The result adapter retains source predicate/action order but uses explicit
 presentation policies for unresolved timing: 30/15-tick waits, 90-tick
 transmission/text holds and a 13-tick silent loss-audio placeholder. It does

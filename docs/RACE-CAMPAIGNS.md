@@ -70,6 +70,11 @@ attacks on enemy structures. It wins with the Chrysalis intact. This is a
 host gameplay regression; ARM full-mission timing and physical GBA validation
 remain separate checks.
 
+The matching ARM replay also wins and matches the host's final state. It
+averages 16.69 fps during counted play, with much slower crowded intervals.
+The mission stays experimental while that performance gap is addressed;
+physical GBA testing remains pending.
+
 To replay that host test's complete input trace on the current experimental
 ARM build, run this after the build/test command above:
 
