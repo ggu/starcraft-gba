@@ -97,7 +97,7 @@ int main(void) {
     frame_input(0);
     assert(screen == SCREEN_PLAY && frame == saved_frame + 1);
     assert(race_t3.elapsed_ticks == (u32)frame);
-    assert(race_campaign.elapsed_frames == frame);
+    assert(race_campaign.elapsed_frames == (u32)frame);
     puts("T3 controller pause/save/reload/resume continuity passes.");
     return 0;
 }

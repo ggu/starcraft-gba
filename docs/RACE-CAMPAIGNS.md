@@ -4,10 +4,11 @@ The Terran, Zerg, and Protoss profiles build three separate GBA ROMs from the
 same game engine. Each standard ROM offers one race's first two playable
 missions. Separate experimental targets add the third mission for each race.
 The opt-in combined Terran T4 build adds Terran 4 through the normal campaign
-menu; a separate internal T4 replay target remains available for development.
-Across the current experimental campaign builds, Terran 1–4, Zerg 1–3 and
+menu; the experimental combined T1–T5 candidate is documented below. Separate
+internal replay targets remain available for development.
+Across the current experimental campaign builds, Terran 1–5, Zerg 1–3 and
 Protoss 1–3 are playable. The catalog records all 30 original campaign slots;
-the remaining 20 missions still need scenario and gameplay implementation.
+the remaining 19 missions still need scenario and gameplay implementation.
 
 These are source-only profiles. The repository contains the engine, menu code, conversion tools, and authored Outpost map, but it does not contain a StarCraft 64 ROM or converted proprietary maps and graphics. To prepare a profile, supply a supported USA ROM that you are entitled to use:
 
@@ -29,7 +30,7 @@ frontend variants without requiring those inputs.
 
 ## Campaign progress
 
-Each standard fixed-race campaign presents its two implemented missions and advances from the first to the second after a win. Experimental targets add missions without changing those standard builds. The catalog reserves identifiers for ten missions per race so later stages can add missions without renumbering the original six shared campaign entries. Across the experimental Terran, Zerg and Protoss builds, 10 of 30 missions are playable; the remaining 20 are not available in the menu. The full campaign remains unfinished.
+Each standard fixed-race campaign presents its two implemented missions and advances from the first to the second after a win. Experimental targets add missions without changing those standard builds. The catalog reserves identifiers for ten missions per race so later stages can add missions without renumbering the original six shared campaign entries. Across the experimental Terran, Zerg and Protoss builds, 11 of 30 missions are playable; the remaining 19 are not available in the menu. The full campaign remains unfinished.
 
 Terran 3, Desperate Alliance, has an experimental runtime behind
 `SC64_T3_ENABLED`. After preparing a race profile, build and check it with:
@@ -213,14 +214,33 @@ combat. Sanitizer fixtures cover region-gated resource grants, the rebel-base
 sequence, and original victory/defeat predicates through direct world setup.
 These are engine checks, not ordinary-controller completion evidence.
 
-The public catalog still excludes T5 pending a controller-completed mission.
-Its internal ARM probe automatically enters the mission and supports separate
-generation-14 saves, including trigger, mine, cargo and add-on validation.
-Host checks demonstrate paid Dropship transport and a landing; the ARM
-evidence covers the opening and a save/load across fresh emulator processes.
-See [the probe workflow](DEVELOPMENT.md#internal-t5-runtime-probe) for commands
-and remaining fidelity limits. Ten missions across the three race campaigns
-are currently playable; the other 20 remain unavailable.
+The standard race profiles and combined T1–T4 ROM still exclude T5. The
+experimental combined T1–T5 build has a normal-menu entry and its controller
+win and fresh-process generation-14 save check pass. T5 is counted in the
+experimental campaign total, while the standard ROMs remain unchanged. See
+[the development workflow](DEVELOPMENT.md#combined-terran-t1t5-experimental-candidate)
+for the candidate build and evidence.
+
+## Combined Terran T1–T5 experimental candidate
+
+After preparing the local Terran inputs, build and run the focused host checks
+with:
+
+```sh
+make terran-t5 test-sc64-t5-combined
+```
+
+This creates `build/StarCraft-Terran-T5-GBA.gba` and adds Antigan Revolt to the
+ordinary campaign menu. It is a distinct save profile: generation 14 is not
+compatible with the combined T1–T4 generation 11, so keep separate save files.
+
+A repeated controller-driven host run wins at input tick 121,547 and game
+frame 121,261, with both heroes and the command center alive, no enemy
+buildings remaining, and no trigger faults. The normal-menu ARM replay also
+wins at frame 121,261; the fresh-process generation-14 save/load check passes.
+The ARM run averages 20.85 effective fps, with an 11.95-fps worst counted
+observer interval, below the 30-fps target. This is emulator evidence, not
+physical-GBA performance validation.
 
 ## Current limits
 
@@ -331,7 +351,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Standard builds enable two campaign missions per race. The experimental builds above make 10 missions playable across the three races; the other 20 still need scenario and gameplay implementation.
+- Standard builds enable two campaign missions per race. The experimental builds above make 11 missions playable across the three races; the other 19 still need scenario and gameplay implementation.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build these three profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

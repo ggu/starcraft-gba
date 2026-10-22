@@ -263,8 +263,8 @@ of independently selected Zerg, Protoss and Terran races on the earlier
 `181a5063` build averaged 29.48 fps (observed intervals 28.58–29.86). This is
 historical bounded-scenario evidence, not a measurement of the current ROM, a
 full-battle worst case or a campaign performance result. Across current
-experimental progression builds, Terran 1–4, Zerg 1–3 and Protoss 1–3 are
-playable; the remaining 20 catalogued missions are unavailable.
+experimental progression builds, Terran 1–5, Zerg 1–3 and Protoss 1–3 are
+playable; the remaining 19 catalogued missions are unavailable.
 `SC64_DIAGNOSTIC_UPDATE` exposes rescue, trigger and trap counters;
 `SC64_DIAGNOSTIC_TERRAIN` exposes terrain reuse/event and minimap counters.
 These are instrumentation, not separate performance results.
@@ -301,9 +301,10 @@ python3 tools/sc64_t4_controller_replay.py \
 Antigan Revolt (Terran global mission ID 8) has an import-only data path. The
 private importer retains its 96×96 Badlands map and all 168 non-start UNIT
 rows: 79 units, 48 buildings and 41 mineral fields. Four start markers are
-excluded from the live placement rows. This does not add a mission to the
-catalog or make T5 loadable/playable. Across all three race campaigns, 10 of
-the 30 missions are playable and 20 still need implementation.
+excluded from the live placement rows. Import checks alone do not add a mission
+to the catalog or establish playability; the experimental combined T1–T5
+runtime candidate and its qualification are described below. Eleven of the
+30 missions are currently qualified as playable.
 
 After preparing the local ROM-derived input, regenerate the race tables, then
 the T5 scenario tables and run the focused source/import checks:
@@ -350,7 +351,8 @@ grant, rescue conversion, mine and hero combat, and mission outcome rules.
 They do not demonstrate ordinary-controller completion.
 
 The probe ROM automatically enters global mission 8 for a bounded neutral-input
-ARM run. Its catalog entry stays unavailable pending controller completion.
+ARM run. Its internal entry remains separate from the combined normal-menu
+campaign build described below.
 The probe uses save generation 14; the normal T1–T4 build keeps generation 11.
 Use separate save files for these profiles. T5 shares the existing 16,328-byte
 SRAM payload with T4: four active trigger contexts are stored, and omitted
@@ -382,9 +384,10 @@ python3 tools/sc64_t5_controller_replay.py --trace /path/to/private-controller-t
 ```
 
 That diagnostic ROM starts at HOME and uses the ordinary campaign menus.
-The standard race and combined Terran builds keep T5 unavailable. The replay
-helper writes controller/scheduler inputs and reads mission state; its timing
-uses the GBA hardware clock. Private traces, reports and captures stay local.
+Standard race builds and the combined Terran T1–T4 build keep T5 unavailable.
+The replay helper writes controller/scheduler inputs and reads mission state;
+its timing uses the GBA hardware clock. Private traces, reports and captures
+stay local.
 
 For a diagnostic update-stage breakdown, build `make sc64-t5-profile` and pass
 `--rom build/StarCraft-T5-Profile.gba --elf build/starcraft-t5-profile.elf`
@@ -415,14 +418,69 @@ animation timing, THG2 sprite decorations, and original AI bytecode are still
 absent. The mine's
 source-based targeting and splash retain documented integer/timing/movement
 approximations; ordinary hero movement and sight still use the compact engine
-policies. T5 is an internal development stage; the playable mission count
-remains 10 of 30.
+policies. T5 remains an experimental profile, but its normal-menu ARM win and
+fresh-process save check have passed. The qualified playable mission count is
+11 of 30.
 
 The import-only T5 checks cover retained rows, metadata and digests, bounded source actor
 rules, and isolated SetResources arithmetic. The actor facts do not establish
 cloak or mine-arming behavior, and the resource helper intentionally does not
 interpret player-group selection. Those isolated fixtures do not claim T5 runtime,
 mission completion, or playability.
+
+### Combined Terran T1–T5 experimental candidate
+
+With the local Terran and T5 private inputs prepared, build the experimental
+combined profile and run its focused host checks:
+
+```sh
+make terran-t5 test-sc64-t5-combined
+```
+
+The ROM is `build/StarCraft-Terran-T5-GBA.gba`; its matching ELF is
+`build/starcraft-t5-combined.elf`. It exposes Antigan Revolt through the normal
+campaign menu. The ROM uses save generation 14, distinct from combined T1–T4
+generation 11. Use separate save files.
+
+The full controller-driven host trace
+`.local/sc64/t5/controller-wave20-visible-clusters-200k.json` wins at input
+tick 121,547 and game frame 121,261. Repeating the run produces the same
+trace; both heroes and the command center survive, all enemy buildings are
+destroyed, and no trigger faults are reported. This validates the host
+controller scenario. The frozen normal-menu ARM replay also wins at frame
+121,261 with both heroes and the command center alive, no enemy units or
+buildings, and no trigger faults. It averages 20.85 effective fps over 120,714
+counted frames; the worst counted observer interval is 11.95 fps. This is
+below the 30-fps target and is emulator timing, not physical GBA validation.
+
+Generate the private winning trace, then repeat the ordinary-menu ARM replay
+and fresh-process save check with:
+
+```sh
+make build/sc64-t5-controller-probe
+./build/sc64-t5-controller-probe --limit 200000 \
+  --trace .local/sc64/t5/controller-wave20-visible-clusters-200k.json
+python3 tools/sc64_t5_controller_replay.py \
+  --trace .local/sc64/t5/controller-wave20-visible-clusters-200k.json \
+  --rom build/StarCraft-Terran-T5-GBA.gba \
+  --elf build/starcraft-t5-combined.elf
+python3 tools/sc64_t5_save_smoke.py \
+  --rom build/StarCraft-Terran-T5-GBA.gba \
+  --elf build/starcraft-t5-combined.elf \
+  --menu-entry --output .local/sc64/t5/combined-save-menu
+```
+
+The fresh-process save check passes with generation 14 and the 16,328-byte
+payload. It resumes frame 123 at frame 123 and continues to frame 183 without
+player-context faults. The ROM SHA-256 is
+`9344a66258c3a37e24c61eca04f3b9e95414999d8496f9ea3865f1416ad4ba7b`; ELF
+SHA-256 for the frozen replay ELF is
+`1a9d2b9a6a8bebdd144502aa57c445f4a150202558a694db4a16b53143141f3a`.
+Rebuilding produces the same ROM; GCC's temporary object filename can change
+the ELF's nonloaded string table and hash without changing code or layouts.
+The build stays opt-in and does not change the standard race ROMs or combined
+T1–T4 target. Across current experimental builds, 11 of 30 missions are
+qualified as playable; 19 remain unavailable.
 
 ## Troubleshooting
 

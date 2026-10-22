@@ -435,6 +435,32 @@ build/StarCraft-T5-Controller-Replay.gba: build/starcraft-t5-controller-replay.e
 	$(PYTHON) tools/fix_rom.py $@ 'SC T5 MENU' SCT5
 .PHONY: sc64-t5-controller-replay
 sc64-t5-controller-replay: build/StarCraft-T5-Controller-Replay.gba
+build/starcraft-t5-combined.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(T5_CONTROLLER_REPLAY_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-t5-combined.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Terran-T5-GBA.gba: build/starcraft-t5-combined.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC TERRAN T5' SCT5
+.PHONY: terran-t5
+terran-t5: build/StarCraft-Terran-T5-GBA.gba
+define T5_COMBINED_TEST
+build/test-sc64-t5-$(1): $(2) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_CONTROLLER_REPLAY_FLAGS) $$< common/gba.c -o $$@
+endef
+$(eval $(call T5_COMBINED_TEST,t3-run,tests/sc64_t3_run.c))
+$(eval $(call T5_COMBINED_TEST,t3-save,tests/sc64_t3_save.c))
+$(eval $(call T5_COMBINED_TEST,t3-resume,tests/sc64_t3_resume.c))
+$(eval $(call T5_COMBINED_TEST,t4-run,tests/sc64_t4_campaign_run.c))
+$(eval $(call T5_COMBINED_TEST,t4-save,tests/sc64_t4_scenario_save.c))
+$(eval $(call T5_COMBINED_TEST,skirmish,tests/sc64_split_run.c))
+.PHONY: test-sc64-t5-combined
+test-sc64-t5-combined: $(addprefix build/test-sc64-t5-,t3-run t3-save t3-resume t4-run t4-save skirmish)
+	./build/test-sc64-t5-t3-run
+	./build/test-sc64-t5-t3-save
+	./build/test-sc64-t5-t3-resume
+	./build/test-sc64-t5-t4-run --limit 30000 --trace .local/sc64/t5/combined-t4-controller.json
+	./build/test-sc64-t5-t4-save
+	./build/test-sc64-t5-skirmish
 build/starcraft-t5-profile.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(T5_CONTROLLER_REPLAY_FLAGS) -DSC64_DIAGNOSTIC_UPDATE $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-t5-profile.map -lgcc -o $@
 	$(SIZE) $@

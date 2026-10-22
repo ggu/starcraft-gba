@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Verify T5 SRAM persistence through normal controller input on the ARM ROM.
 
-The internal T5 probe auto-enters mission 8 for engine testing. This tool
-uses only Start/B/L controller input after launch; all game-state inspection
-is read-only through mGBA's RSP debugger. It pauses, saves to mGBA's SRAM file,
-loads that file in a fresh process, compares the saved gameplay state, then
-checks that play advances without trigger faults.
+The internal T5 probe auto-enters mission 8 for engine testing; --menu-entry
+launches the combined ROM through its ordinary campaign controls instead.
+The tool pauses, saves to mGBA's SRAM file, loads that file in a fresh process,
+compares the saved gameplay state, then checks that play advances without
+trigger faults. It uses controller input for play and read-only RSP inspection
+for game state.
 """
 from __future__ import annotations
 
@@ -31,6 +32,9 @@ SLOT_BYTES = 16384
 DEFAULT_GENERATION = 14  # Cargo orders share the existing payload with a new identity.
 KEY_B, KEY_L, KEY_START = 2, 512, 8
 SCREEN_PLAY, SCREEN_PAUSE = 1, 2
+SCREEN_TITLE = 0
+FRONT_HOME = 0
+MENU_ENTRY_BUTTONS = (1, 16, 16, 1, 1)  # A, RIGHT, RIGHT, briefing A, deploy A
 
 DEFAULT_ROM = ROOT / "build" / "StarCraft-T5-Engine-Probe.gba"
 DEFAULT_ELF = ROOT / "build" / "starcraft-t5-engine-probe.elf"
@@ -69,6 +73,12 @@ def press(rsp, inject: int, key: int, ticks: int = 2) -> None:
     rsp.tick(ticks)
     rsp.write(inject, b"\0\0")
     rsp.tick(2)
+
+
+def enter_t5_campaign_menu(rsp, inject: int) -> None:
+    """Use ordinary HOME → Terran mission 5 → briefing → deploy controls."""
+    for key in MENU_ENTRY_BUTTONS:
+        press(rsp, inject, key)
 
 
 def field_int(raw: bytes, base: int, fields: dict[str, int], name: str,
@@ -188,7 +198,8 @@ def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int],
         "buildings": persisted_rows(rsp, sym["b"], 64, building_size, building_fields),
         "mineral_fields": minerals_state,
     }
-def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_GENERATION) -> dict:
+def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_GENERATION,
+        menu_entry: bool = False) -> dict:
     if not rom.is_file() or not elf.is_file():
         raise RuntimeError(f"Build the T5 probe ROM/ELF first: {rom} and {elf}")
     if generation not in (13, 14):
@@ -199,6 +210,8 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
     sizes = symbol_sizes(elf)
     required = ("game_update", "demo_inject_keys", "screen", "race_t5", "race_campaign",
                 "u", "b", "m", "explored", "geysers")
+    if menu_entry:
+        required += ("race_front",)
     missing = [name for name in required if name not in sym]
     if missing:
         raise RuntimeError(f"T5 probe ELF is missing symbols: {', '.join(missing)}")
@@ -210,6 +223,8 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
         raise RuntimeError("T5 probe ELF has unexpected runtime/entity bank sizes")
     layouts = {name: dwarf_struct(elf, name) for name in
                ("Unit", "Building", "Mineral", "Sc64RaceCampaignState", "Sc64T5RuntimeState")}
+    if menu_entry:
+        layouts["Sc64Frontend"] = dwarf_struct(elf, "Sc64Frontend")
     runtime_size = layouts["Sc64T5RuntimeState"][0]
     if runtime_size != 1340:
         raise RuntimeError("T5 runtime or geyser layout differs from the validated save schema")
@@ -225,6 +240,11 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
     proc, sock, rsp, log = running
     source_saves = out / "saves" / first_name
     try:
+        if menu_entry:
+            front_page = read_i32(rsp, sym["race_front"] + layouts["Sc64Frontend"][1]["page"])
+            if read_i32(rsp, sym["screen"]) != SCREEN_TITLE or front_page != FRONT_HOME:
+                raise RuntimeError("normal T5 save smoke did not start at HOME")
+            enter_t5_campaign_menu(rsp, sym["demo_inject_keys"])
         initial = snapshot(rsp, sym, sizes, layouts)
         if (initial["screen"], initial["mode"], initial["mission"], initial["geometry"]) != (
                 SCREEN_PLAY, 0, 8, [96, 96]):
@@ -259,6 +279,11 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
     running = start(second_name, rom, out, sym)
     proc, sock, rsp, log = running
     try:
+        if menu_entry:
+            front_page = read_i32(rsp, sym["race_front"] + layouts["Sc64Frontend"][1]["page"])
+            if read_i32(rsp, sym["screen"]) != SCREEN_TITLE or front_page != FRONT_HOME:
+                raise RuntimeError("fresh normal T5 save process did not start at HOME")
+            enter_t5_campaign_menu(rsp, sym["demo_inject_keys"])
         fresh = snapshot(rsp, sym, sizes, layouts)
         if (fresh["screen"], fresh["mode"], fresh["mission"]) != (SCREEN_PLAY, 0, 8):
             raise RuntimeError("fresh T5 probe process did not enter the internal mission")
@@ -312,8 +337,10 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             "continuation_ticks": 60,
             "faults_after_continue": fault_bytes,
             "mission": 8,
-            "entry": "internal-probe-auto-entry",
-            "controller_inputs": ["START", "B", "START", "L"],
+            "entry": "normal-campaign-menu" if menu_entry else "internal-probe-auto-entry",
+            "controller_inputs": (["HOME:A", "CAMPAIGN:RIGHT", "MISSION:RIGHT",
+                                   "BRIEFING:A", "DEPLOY:A", "START", "B", "START", "L"]
+                                  if menu_entry else ["START", "B", "START", "L"]),
             "exact_load_state_match": True,
             "save_load_verified": True,
             "campaign_clock_matches_frame": campaign_elapsed == continued["frame"],
@@ -336,8 +363,11 @@ def main() -> None:
                         help="normal play ticks before pausing and saving (1..10000)")
     parser.add_argument("--generation", type=int, choices=(13, 14), default=DEFAULT_GENERATION,
                         help="SRAM generation; 13 checks the historical pre-cargo build")
+    parser.add_argument("--menu-entry", action="store_true",
+                        help="launch T5 from HOME through ordinary campaign/mission/briefing controls")
     args = parser.parse_args()
-    print(json.dumps(run(args.rom, args.elf, args.output, args.ticks, args.generation), indent=2))
+    print(json.dumps(run(args.rom, args.elf, args.output, args.ticks, args.generation,
+                         args.menu_entry), indent=2))
 
 
 if __name__ == "__main__":

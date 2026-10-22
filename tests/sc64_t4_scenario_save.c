@@ -196,8 +196,13 @@ static void non_t4_saves_zero_the_optional_state(void)
 int main(void)
 {
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+#ifdef SC64_T5_RUNTIME
+    _Static_assert(SC64_RACE_SAVE_GENERATION == 14u,
+                   "combined T3/T4/T5 saves require a distinct generation");
+#else
     _Static_assert(SC64_RACE_SAVE_GENERATION == 11u,
                    "combined T3/T4 saves require a distinct generation");
+#endif
     _Static_assert(sizeof(RaceSave) <= 16368,
                    "combined payload must fit one SRAM record");
     _Static_assert(sizeof(Sc64CombinedRouteSaveScratch) >= sizeof(RaceSave),

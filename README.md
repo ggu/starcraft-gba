@@ -46,9 +46,10 @@ Zerg, and Protoss ROMs with shared map-select skirmishes, any human race, and
 one to three opponents with independently selected races. Each currently
 contains its first two campaign missions. Separate experimental builds add
 Terran 3, Zerg 3 and Protoss 3; the combined `terran-t4` build adds Terran 4
-through the normal campaign menu. Across these experimental profiles, 10 of
-the 30 catalogued missions are playable and the remaining 20 are unavailable.
-The standard builds remain unchanged.
+through the normal campaign menu. The opt-in `terran-t5` build adds Antigan
+Revolt through the normal campaign menu. Across these experimental profiles,
+11 of the 30 catalogued missions are playable and the remaining 19 are
+unavailable. The standard builds remain unchanged.
 
 ## Contributing and provenance
 

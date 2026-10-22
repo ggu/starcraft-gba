@@ -1500,6 +1500,39 @@ transport-query/render sanitizer checks pass. The combined T1–T4 ROM retains
 its previous hash. Revolution remains internal; 10 of 30 campaign missions
 are playable and physical GBA qualification remains outstanding.
 
+## Combined Terran T1–T5 normal-menu completion (2026-10-23)
+
+The opt-in `make terran-t5` target builds the 4 MiB
+`build/StarCraft-Terran-T5-GBA.gba`. The frozen build wins Antigan Revolt
+through the ordinary campaign menu. Its controller replay ends at input tick 121,556
+and game frame 121,261, with phase 3, human outcome 1, completion bit 256,
+zero trigger faults, both heroes alive, and one completed human command center
+alive. The final world has 24 Marines, 20 Wraiths, 55 SIDE units and 20 SIDE
+buildings, with no enemy units or buildings. The run averages 20.85 effective
+fps over 120,714 counted live frames; the worst counted observer interval is
+11.95 fps over nine frames (12,640,305 hardware cycles). This remains below
+the 30-fps target and is emulator evidence, not physical GBA validation.
+
+The fresh-process menu save test passes with generation 14 and the 16,328-byte
+payload. It saves at frame 123, restores at frame 123 in a new emulator process,
+continues to frame 183, and reports no source-player context faults. The
+combined T1–T4 profile remains generation 11 and requires a separate save file.
+
+The candidate ROM SHA-256 is
+`9344a66258c3a37e24c61eca04f3b9e95414999d8496f9ea3865f1416ad4ba7b`; its ELF
+SHA-256 is `1a9d2b9a6a8bebdd144502aa57c445f4a150202558a694db4a16b53143141f3a`.
+Text/data/BSS are 2,240,544/388/243,216 bytes; IWRAM ends at `0x03004f90` and
+BSS at `0x0203b798`, within the existing guards. A repeated Make-built full
+host run is byte-identical and wins at tick 121,547/frame 121,261. Its private
+trace SHA-256 is
+`021979e685d8be2a9496e764fedbe357b5e3f9a4c7baf404ec674d3a083240df`.
+The asset-free Python
+suite (133 tests), default build/tests, unified build/tests, combined runtime
+matrix, and all 18 skirmish launch combinations pass. This opt-in result raises
+the experimental campaign total to 11 playable missions out of 30: Terran
+1–5, Zerg 1–3 and Protoss 1–3. The standard race ROMs and combined T1–T4 ROM
+remain unchanged; 19 catalog missions remain unavailable.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

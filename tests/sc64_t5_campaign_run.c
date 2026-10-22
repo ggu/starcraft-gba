@@ -22,7 +22,8 @@ static void checkpoint(const char *kind);
 static int controller_wraith_queue_count(void);
 static int controller_wraith_count(void);
 static int controller_isolate_one_wraith(void);
-static int controller_select_visible_type_group(int type, int *out_count);
+static int controller_select_visible_type_group(int type, int after_slot,
+                                                int *out_count, int *out_seed);
 static int controller_marine_count(void);
 static int controller_wait_building(int slot, int ticks);
 static void tap(u16 key);
@@ -388,6 +389,16 @@ static int controller_order_actor(int slot, int x, int y, int attack_move)
     if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive || u[slot].owner != SIDE)
         return 0;
     if (!controller_normalize_field()) return 0;
+    /* L cycles units, but on a selected Barracks it cancels the training
+       queue instead of clearing the producer. A normal drag selection clears
+       that sticky building selection; a click then selects just this actor. */
+    if (selected_building >= 0) {
+        if (!select_human_group()) return 0;
+        move_cursor(u[slot].x, u[slot].y);
+        tap(KEY_A);
+        return u[slot].alive && u[slot].selected && selected_count() == 1 &&
+               selected_building < 0;
+    }
     int selected = 0;
     for (int retry = 0; retry <= MAX_UNITS && screen == SCREEN_PLAY &&
          !won && !lost; ++retry) {
@@ -420,6 +431,8 @@ static int controller_select_unit(int slot)
     if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive || u[slot].owner != SIDE)
         return 0;
     if (!controller_normalize_field()) return 0;
+    if (selected_building >= 0) tap(KEY_L);
+    if (selected_building >= 0) return 0;
     for (int retry = 0; retry <= MAX_UNITS && screen == SCREEN_PLAY &&
          !won && !lost && host_ticks < (u32)run_limit; ++retry) {
         if (u[slot].selected && selected_count() == 1 && selected_building < 0)
@@ -1072,45 +1085,58 @@ static int controller_order_paid_wraiths(void)
        Hold the force at the home rally until a useful group has formed. */
     if (live < 12) return 0;
 
-    int cx = 0, cy = 0, members = 0;
-    for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_WRAITH &&
-            !SC64_TRANSPORT_LOADED(&u[i])) {
-            cx += u[i].x; cy += u[i].y; ++members;
+    unsigned char handled[MAX_UNITS] = {0};
+    int last_seed = -1, newly_ordered = 0, groups = 0;
+    /* A double-tap selects only same-type units in the current viewport. Pan
+       to successive slot clusters and give each visible group an order. */
+    for (; groups < 4 && host_ticks < (u32)run_limit &&
+           screen == SCREEN_PLAY && !won && !lost; ++groups) {
+        int selected_wraiths = 0, seed = -1;
+        if (!controller_select_visible_type_group(U_WRAITH, last_seed,
+                                                  &selected_wraiths, &seed) ||
+            selected_wraiths < 1 || seed <= last_seed) {
+            if (!groups)
+                fprintf(stderr, "T5 Wraith group selection rejected: live=%d selected=%d seed=%d after=%d count=%d building=%d\n",
+                        live, selected_wraiths, seed, last_seed,
+                        selected_count(), selected_building);
+            break;
         }
-    if (!members) return 0;
-    cx /= members; cy /= members;
-    if (!controller_isolate_one_wraith()) return 0;
-    int target = -1, best = 0x7fffffff;
-    for (int j = 0; j < MAX_BUILDINGS; ++j) {
-        if (!b[j].alive || b[j].owner != ENEMY) continue;
-        int d = dist2(cx, cy, b[j].x, b[j].y);
-        if (d < best) { best = d; target = j; }
+        int cx = 0, cy = 0, members = 0, new_members = 0;
+        for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].selected) {
+            if (u[i].owner != SIDE || u[i].type != U_WRAITH ||
+                SC64_TRANSPORT_LOADED(&u[i])) {
+                fprintf(stderr, "T5 Wraith group rejected mixed slot=%d owner=%d type=%d\n",
+                        i, u[i].owner, u[i].type);
+                return newly_ordered;
+            }
+            cx += u[i].x; cy += u[i].y; ++members;
+            if (!handled[i]) { handled[i] = 1; ++new_members; }
+        }
+        if (!members || !new_members) break;
+        cx /= members; cy /= members;
+        int target = -1, best = 0x7fffffff;
+        for (int j = 0; j < MAX_BUILDINGS; ++j) {
+            if (!b[j].alive || b[j].owner != ENEMY) continue;
+            int d = dist2(cx, cy, b[j].x, b[j].y);
+            if (d < best) { best = d; target = j; }
+        }
+        if (target < 0) break;
+        fprintf(stderr, "T5 Wraith cluster order: wing=%d new=%d selected=%d seed=%d target=%d at %d,%d tick=%u\n",
+                live, new_members, selected_wraiths, seed, target,
+                b[target].x, b[target].y, (unsigned)host_ticks);
+        if (trace_file) checkpoint("wraith-wing-before-attack");
+        tap(KEY_B);
+        tap(KEY_DOWN);
+        tap(KEY_A);
+        move_cursor(b[target].x, b[target].y);
+        tap(KEY_A);
+        if (trace_file) checkpoint("wraith-wing-attack-issued");
+        newly_ordered += new_members;
+        last_seed = seed;
+        wait_frames(180);
     }
-    if (target < 0) return 0;
-    int selected_wraiths = 0;
-    if (!controller_select_visible_type_group(U_WRAITH, &selected_wraiths) ||
-        selected_wraiths < 2) {
-        fprintf(stderr, "T5 Wraith double-tap selection rejected: live=%d selected=%d count=%d building=%d\n",
-                live, selected_wraiths, selected_count(), selected_building);
-        return 0;
-    }
-    fprintf(stderr, "T5 Wraith mass order: wing=%d queued=%d selected=%d target=%d at %d,%d enemy-buildings-before=%d\n",
-            live, controller_wraith_queue_count(), selected_wraiths, target,
-            b[target].x, b[target].y, owner_buildings(ENEMY));
-    if (trace_file) checkpoint("wraith-wing-before-attack");
-    tap(KEY_B);
-    tap(KEY_DOWN);
-    tap(KEY_A);
-    move_cursor(b[target].x, b[target].y);
-    tap(KEY_A);
-    fprintf(stderr, "T5 Wraith mass ATTACK MOVE issued: selected=%d live=%d queued=%d enemy-buildings-after-order=%d\n",
-            selected_count(), controller_wraith_count(), controller_wraith_queue_count(),
-            owner_buildings(ENEMY));
-    if (trace_file) checkpoint("wraith-wing-attack-issued");
-    wait_frames(1000);
-    if (trace_file) checkpoint("wraith-wing-after-attack");
-    return selected_wraiths;
+    if (trace_file && newly_ordered) checkpoint("wraith-wing-after-attack");
+    return newly_ordered;
 }
 
 static int controller_marine_count(void)
@@ -1122,22 +1148,166 @@ static int controller_marine_count(void)
     return count;
 }
 
-static int controller_select_visible_type_group(int type, int *out_count)
+static void controller_scv_counts(int *mineral_workers, int *gas_workers,
+                                  int *idle_workers, int *other_workers,
+                                  int *live_workers)
+{
+    int mineral = 0, gas_count = 0, idle = 0, other = 0, live = 0;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_SCV ||
+            SC64_TRANSPORT_LOADED(&u[i])) continue;
+        ++live;
+        if (u[i].order == ORDER_MINE && u[i].target >= 0 &&
+            u[i].target < MAX_MINERALS &&
+            (m[u[i].target].amount > 0 || u[i].carry > 0)) ++mineral;
+        else if (u[i].order == ORDER_GAS && u[i].target >= 0 &&
+                 u[i].target < MAX_BUILDINGS && b[u[i].target].alive &&
+                 b[u[i].target].owner == SIDE && b[u[i].target].type == B_REFINERY) ++gas_count;
+        else if (u[i].order == ORDER_IDLE) ++idle;
+        else ++other;
+    }
+    if (mineral_workers) *mineral_workers = mineral;
+    if (gas_workers) *gas_workers = gas_count;
+    if (idle_workers) *idle_workers = idle;
+    if (other_workers) *other_workers = other;
+    if (live_workers) *live_workers = live;
+}
+
+static void controller_log_scv_mineral_targets(const char *label)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV &&
+            u[i].order == ORDER_MINE && u[i].target >= 0 &&
+            u[i].target < MAX_MINERALS)
+            fprintf(stderr, "T5 %s ORDER_MINE SCV=%d patch=%d source=%d,%d remaining=%d carry=%d\n",
+                    label, i, u[i].target, m[u[i].target].x, m[u[i].target].y,
+                    m[u[i].target].amount, u[i].carry);
+}
+
+static int controller_count_queued_type(int type)
+{
+    int count = 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE)
+            for (int j = 0; j < b[i].queue_count; ++j)
+                if (b[i].queue[(b[i].queue_head + j) % 5] == type) ++count;
+    return count;
+}
+
+static int controller_reassign_excess_gas_to_minerals(int keep_gas_workers)
+{
+    int mineral_workers, gas_workers, idle_workers, other_workers, live_workers;
+    int moved = 0;
+    if (keep_gas_workers < 0) keep_gas_workers = 0;
+    controller_scv_counts(&mineral_workers, &gas_workers, &idle_workers,
+                          &other_workers, &live_workers);
+    for (int i = 0; i < MAX_UNITS && gas_workers > keep_gas_workers &&
+         host_ticks < (u32)run_limit; ++i) {
+        if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_SCV ||
+            u[i].order != ORDER_GAS || u[i].target < 0 || u[i].target >= MAX_BUILDINGS ||
+            !b[u[i].target].alive || b[u[i].target].type != B_REFINERY) continue;
+        int patch = -1, best_score = 0x7fffffff, command = -1;
+        for (int j = 0; j < MAX_BUILDINGS; ++j)
+            if (b[j].alive && b[j].owner == SIDE && b[j].type == B_COMMAND) {
+                command = j; break;
+            }
+        if (command < 0) break;
+        for (int j = 0; j < MAX_MINERALS; ++j) if (m[j].amount > 0) {
+            int cc_d = dist2(m[j].x, m[j].y, b[command].x, b[command].y);
+            if (cc_d > 256 * 256) continue;
+            int score = dist2(u[i].x, u[i].y, m[j].x, m[j].y) + cc_d / 4;
+            if (score < best_score) { best_score = score; patch = j; }
+        }
+        if (patch < 0) break;
+        int before = minerals;
+        fprintf(stderr, "T5 reassigning excess gas SCV=%d to mineral patch=%d at %d,%d gas-workers=%d keep=%d\n",
+                i, patch, m[patch].x, m[patch].y, gas_workers, keep_gas_workers);
+        if (!controller_order_actor(i, m[patch].x, m[patch].y, 0)) continue;
+        for (int t = 0; t < 1200 && host_ticks < (u32)run_limit &&
+             screen == SCREEN_PLAY && !won && !lost; ++t) {
+            if (u[i].order == ORDER_MINE && u[i].target >= 0 &&
+                u[i].target < MAX_MINERALS && m[u[i].target].amount > 0) break;
+            step(0);
+        }
+        if (u[i].alive && u[i].order == ORDER_MINE && u[i].target >= 0 &&
+            u[i].target < MAX_MINERALS && m[u[i].target].amount > 0) {
+            ++moved; --gas_workers;
+            fprintf(stderr, "T5 mineral assignment verified SCV=%d patch=%d amount=%d wallet=%d->%d\n",
+                    i, u[i].target, m[u[i].target].amount, before, minerals);
+        } else {
+            fprintf(stderr, "T5 mineral assignment incomplete SCV=%d order=%d target=%d xy=%d,%d\n",
+                    i, u[i].order, u[i].target, u[i].x, u[i].y);
+        }
+    }
+    controller_scv_counts(&mineral_workers, &gas_workers, &idle_workers,
+                          &other_workers, &live_workers);
+    fprintf(stderr, "T5 SCV economy verified live=%d mineral=%d gas=%d idle=%d other=%d moved=%d wallet=%d\n",
+            live_workers, mineral_workers, gas_workers, idle_workers, other_workers,
+            moved, minerals);
+    return moved;
+}
+
+static int controller_queue_home_reinforcements(void)
+{
+    int marines = controller_marine_count() + controller_count_queued_type(U_MARINE);
+    const int marine_reserve_target = 24;
+    int scvs = 0, active_near_command = 0, command = find_side_building(B_COMMAND, 1);
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV &&
+            !SC64_TRANSPORT_LOADED(&u[i])) ++scvs;
+    if (command >= 0)
+        for (int i = 0; i < MAX_MINERALS; ++i)
+            if (m[i].amount > 0 && dist2(m[i].x, m[i].y,
+                                        b[command].x, b[command].y) <= 256 * 256)
+                ++active_near_command;
+    int queued = 0;
+        if (marines < marine_reserve_target && minerals >= unit_cost(U_MARINE) &&
+        reserved_supply() + unit_supply(U_MARINE) <= supply_cap) {
+        int barracks = find_side_building(B_BARRACKS, 1);
+        if (barracks >= 0 && b[barracks].queue_count < 5 &&
+            controller_select_building(barracks)) {
+            int before = b[barracks].queue_count;
+            tap(KEY_A);
+            if (b[barracks].queue_count > before) {
+                ++queued;
+                fprintf(stderr, "T5 replenished paid Marine queue=%d live=%d/%d\n",
+                        controller_count_queued_type(U_MARINE), controller_marine_count(), marine_reserve_target);
+            }
+        }
+    }
+    if (scvs < 8 && active_near_command > 0 && minerals >= unit_cost(U_SCV) &&
+        reserved_supply() + unit_supply(U_SCV) <= supply_cap) {
+        if (command >= 0 && b[command].queue_count < 5 &&
+            controller_select_building(command)) {
+            int before = b[command].queue_count;
+            tap(KEY_A);
+            if (b[command].queue_count > before) {
+                ++queued;
+                fprintf(stderr, "T5 replenished paid SCV queue=%d workers=%d/8\n",
+                        controller_count_queued_type(U_SCV), scvs);
+            }
+        }
+    }
+    return queued;
+}
+
+static int controller_select_visible_type_group(int type, int after_slot,
+                                                int *out_count, int *out_seed)
 {
     int seed = -1, expected = 0;
     if (out_count) *out_count = 0;
+    if (out_seed) *out_seed = -1;
     if (!controller_normalize_field()) return 0;
-    /* Paid production leaves its Starport selected. In that state A on a
-       unit click is consumed as another queue command, so clear the producer
-       with the normal L cycle before beginning the double tap. */
-    if (selected_building >= 0) tap(KEY_L);
-    if (selected_building >= 0) return 0;
-    for (int i = 0; i < MAX_UNITS; ++i)
+    /* L on a selected Barracks cancels its queue without clearing selection.
+       A normal drag box clears any producer first, after which the usual
+       double-tap on the isolated seed groups this type. */
+    if (selected_building >= 0 && !select_human_group()) return 0;
+    for (int i = after_slot + 1; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == type &&
             !SC64_TRANSPORT_LOADED(&u[i])) { seed = i; break; }
     if (seed < 0) return 0;
     int cursor_unit = -1, click_x = -1, click_y = -1, click_target = -1;
-    for (; seed < MAX_UNITS && cursor_unit < 0; ++seed) {
+    for (; seed >= 0 && seed < MAX_UNITS && cursor_unit < 0; ++seed) {
         if (!u[seed].alive || u[seed].owner != SIDE || u[seed].type != type ||
             SC64_TRANSPORT_LOADED(&u[seed])) continue;
         /* A rally next to the Starport can put units inside its 26px click
@@ -1156,6 +1326,13 @@ static int controller_select_visible_type_group(int type, int *out_count)
                         if (d <= 26 * 26) blocked = 1;
                         if (d < clearance) clearance = d;
                     }
+                /* Field interaction prioritizes boarding when a friendly
+                   Dropship is within 18px of the cursor, before unit selection. */
+                for (int ui = 0; ui < MAX_UNITS; ++ui)
+                    if (u[ui].alive && u[ui].owner == SIDE &&
+                        u[ui].type == U_DROPSHIP &&
+                        dist2(px, py, u[ui].x, u[ui].y) < 18 * 18)
+                        blocked = 1;
                 if (blocked || clearance <= best_clearance) continue;
                 move_cursor(px, py);
                 int picked = selection_target();
@@ -1192,6 +1369,7 @@ static int controller_select_visible_type_group(int type, int *out_count)
         else ++other;
     }
     if (out_count) *out_count = selected;
+    if (out_seed) *out_seed = cursor_unit;
     if (selected != expected || selected_count() != expected || other || selected_building >= 0)
         fprintf(stderr, "T5 type-group selection mismatch type=%d expected=%d selected=%d other=%d count=%d building=%d click=%d,%d tick=%u\n",
                 type, expected, selected, other, selected_count(), selected_building,
@@ -1203,7 +1381,7 @@ static int controller_select_visible_type_group(int type, int *out_count)
 static int controller_hold_visible_marines(void)
 {
     int selected = 0;
-    if (!controller_select_visible_type_group(U_MARINE, &selected)) {
+    if (!controller_select_visible_type_group(U_MARINE, -1, &selected, NULL)) {
         fprintf(stderr, "T5 reserve Marines not grouped: live=%d visible-selected=%d\n",
                 controller_marine_count(), selected);
         return 0;
@@ -1214,6 +1392,103 @@ static int controller_hold_visible_marines(void)
     fprintf(stderr, "T5 held visible Marine defenders=%d total-live=%d\n",
             selected, controller_marine_count());
     return 1;
+}
+
+static int controller_select_type_box_group(int type, int *out_count)
+{
+    int left = WORLD_W, top = WORLD_H, right = -1, bottom = -1, members = 0;
+    if (out_count) *out_count = 0;
+    if (!controller_normalize_field()) return 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == type &&
+            !SC64_TRANSPORT_LOADED(&u[i]) && sc64_t4_unit_selectable(u[i].type)) {
+            if (u[i].x < left) left = u[i].x;
+            if (u[i].x > right) right = u[i].x;
+            if (u[i].y < top) top = u[i].y;
+            if (u[i].y > bottom) bottom = u[i].y;
+            ++members;
+        }
+    if (!members) return 0;
+    left = clamp_world(left - 8, WORLD_W); top = clamp_world(top - 8, WORLD_H);
+    right = clamp_world(right + 8, WORLD_W); bottom = clamp_world(bottom + 8, WORLD_H);
+    /* Do not let the diagnostic drag include heroes, workers, or the carrier. */
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && !SC64_TRANSPORT_LOADED(&u[i]) &&
+            sc64_t4_unit_selectable(u[i].type) && u[i].type != type &&
+            u[i].x >= left && u[i].x <= right && u[i].y >= top && u[i].y <= bottom) {
+            fprintf(stderr, "T5 type-box rejected mixed actor type=%d slot=%d at=%d,%d\n",
+                    u[i].type, i, u[i].x, u[i].y);
+            return 0;
+        }
+    move_cursor(left, top);
+    step(KEY_L);
+    int end_x = snap4_local(cx, right, WORLD_W);
+    int end_y = snap4_local(cy, bottom, WORLD_H);
+    for (int guard = 0; (cx != end_x || cy != end_y) && guard < 1000 &&
+         host_ticks < (u32)run_limit; ++guard) {
+        u16 held = KEY_L | KEY_R;
+        if (cx < end_x) held |= KEY_RIGHT;
+        if (cx > end_x) held |= KEY_LEFT;
+        if (cy < end_y) held |= KEY_DOWN;
+        if (cy > end_y) held |= KEY_UP;
+        step(held);
+    }
+    step(0);
+    int selected = 0, other = 0;
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].selected) {
+        if (u[i].owner == SIDE && u[i].type == type && !SC64_TRANSPORT_LOADED(&u[i])) ++selected;
+        else ++other;
+    }
+    if (out_count) *out_count = selected;
+    if (selected != members || other || selected_building >= 0 || selected_count() != members) {
+        fprintf(stderr, "T5 type-box selection mismatch type=%d members=%d selected=%d other=%d building=%d count=%d rect=%d,%d..%d,%d\n",
+                type, members, selected, other, selected_building, selected_count(),
+                left, top, right, bottom);
+        return 0;
+    }
+    return 1;
+}
+
+/* Defensive orders stay on the real controller path: select visible Marines
+ * by the ordinary double-tap, then use the normal Attack command on an
+ * actual hostile that has approached the owned Command Center. */
+static int controller_defend_command_center(void)
+{
+    static u32 last_order_tick;
+    int command = find_side_building(B_COMMAND, 1);
+    if (command < 0) return 0;
+    int target = -1, best = 300 * 300;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive || !owners_hostile(SIDE, u[i].owner)) continue;
+        int d = dist2(u[i].x, u[i].y, b[command].x, b[command].y);
+        if (d < best) { best = d; target = i; }
+    }
+    if (target < 0 || host_ticks - last_order_tick < 1200) return 0;
+    fprintf(stderr, "T5 CC pressure tick=%u hp=%d nearest-hostile slot=%d raw=%d owner=%d xy=%d,%d d2=%d\n",
+            (unsigned)host_ticks, b[command].hp, target, u[target].raw_type,
+            u[target].owner, u[target].x, u[target].y, best);
+    int listed = 0;
+    for (int i = 0; i < MAX_UNITS && listed < 8; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].raw_type == 0) {
+            fprintf(stderr, "T5 CC defense Marine slot=%d xy=%d,%d hp=%d d2=%d selected=%d\n",
+                    i, u[i].x, u[i].y, u[i].hp,
+                    dist2(u[i].x, u[i].y, b[command].x, b[command].y), u[i].selected);
+            ++listed;
+        }
+    int selected = 0;
+    if (!controller_select_visible_type_group(U_MARINE, -1, &selected, NULL) || selected < 1) {
+        fprintf(stderr, "T5 CC defense could not select Marine same-type group count=%d building=%d mode=%d menu=%d\n",
+                selected, selected_building, mode, menu_open);
+        last_order_tick = host_ticks;
+        return 0;
+    }
+    tap(KEY_B); tap(KEY_DOWN); tap(KEY_A); /* normal Attack mode */
+    move_cursor(u[target].x, u[target].y);
+    tap(KEY_A);
+    fprintf(stderr, "T5 CC defense Attack-Move issued selected-Marines=%d target=%d remaining-hp=%d\n",
+            selected, target, u[target].hp);
+    last_order_tick = host_ticks;
+    return selected;
 }
 
 static int controller_safe_home_point(int actor, int *out_x, int *out_y)
@@ -1324,11 +1599,19 @@ static int controller_park_kerrigan_safely(void)
 
 static int controller_assign_idle_scvs_to_gas(int maximum)
 {
-    int assigned = 0;
-    for (int ref = 0; ref < MAX_BUILDINGS && assigned < maximum; ++ref) {
+    int existing = 0, assigned = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV &&
+            u[i].order == ORDER_GAS && u[i].target >= 0 &&
+            u[i].target < MAX_BUILDINGS && b[u[i].target].alive &&
+            b[u[i].target].owner == SIDE && b[u[i].target].type == B_REFINERY)
+            ++existing;
+    if (maximum <= existing) return 0;
+    int needed = maximum - existing;
+    for (int ref = 0; ref < MAX_BUILDINGS && assigned < needed; ++ref) {
         if (!b[ref].alive || b[ref].owner != SIDE || b[ref].type != B_REFINERY ||
             !building_complete(ref)) continue;
-        for (int i = 0; i < MAX_UNITS && assigned < maximum; ++i) {
+        for (int i = 0; i < MAX_UNITS && assigned < needed; ++i) {
             if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_SCV ||
                 (u[i].order != ORDER_IDLE && u[i].order != ORDER_MINE)) continue;
             if (!controller_select_unit(i)) continue;
@@ -1336,11 +1619,85 @@ static int controller_assign_idle_scvs_to_gas(int maximum)
             tap(KEY_A); /* ordinary worker interaction assigns this Refinery */
             if (u[i].order == ORDER_GAS && u[i].target == ref) {
                 ++assigned;
-                fprintf(stderr, "T5 assigned SCV slot=%d to owned Refinery=%d\n", i, ref);
+                fprintf(stderr, "T5 assigned SCV slot=%d to owned Refinery=%d total-gas=%d/%d\n",
+                        i, ref, existing + assigned, maximum);
             }
         }
     }
-    if (!assigned) fprintf(stderr, "T5 no idle/mining SCV could be assigned to an owned Refinery\n");
+    if (!assigned && existing < maximum)
+        fprintf(stderr, "T5 no idle/mining SCV could be assigned to an owned Refinery total=%d/%d\n",
+                existing, maximum);
+    return assigned;
+}
+
+static int controller_assign_idle_scvs_to_minerals(int maximum)
+{
+    int command = find_side_building(B_COMMAND, 1), assigned = 0;
+    int idle_seen = 0, active_fields = 0, nearby_fields = 0;
+    for (int j = 0; j < MAX_MINERALS; ++j) if (m[j].amount > 0) {
+        ++active_fields;
+        if (command >= 0 && dist2(m[j].x, m[j].y, b[command].x, b[command].y) <= 256 * 256)
+            ++nearby_fields;
+    }
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV &&
+            !SC64_TRANSPORT_LOADED(&u[i]) && u[i].order == ORDER_IDLE) ++idle_seen;
+    if (maximum <= 0) return 0;
+    if (command < 0) {
+        fprintf(stderr, "T5 mineral retarget skipped: no completed owned Command Center; idle=%d active-fields=%d\n",
+                idle_seen, active_fields);
+        return 0;
+    }
+    if (idle_seen)
+        fprintf(stderr, "T5 mineral retarget check: CC=%d at=%d,%d idle=%d active-fields=%d within-256=%d\n",
+                command, b[command].x, b[command].y, idle_seen, active_fields, nearby_fields);
+    for (int i = 0; i < MAX_UNITS && assigned < maximum &&
+         host_ticks < (u32)run_limit; ++i) {
+        if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_SCV ||
+            SC64_TRANSPORT_LOADED(&u[i]) || u[i].order != ORDER_IDLE) continue;
+        int patch = -1, best_score = 0x7fffffff;
+        for (int j = 0; j < MAX_MINERALS; ++j) if (m[j].amount > 0) {
+            int cc_d = dist2(m[j].x, m[j].y, b[command].x, b[command].y);
+            int worker_d = dist2(m[j].x, m[j].y, u[i].x, u[i].y);
+            if (cc_d > 256 * 256 || worker_d > 288 * 288) continue;
+            int score = worker_d + cc_d / 4;
+            if (score < best_score) { best_score = score; patch = j; }
+        }
+        if (patch < 0) {
+            int active = 0, nearest = -1, nearest_d = 0x7fffffff;
+            for (int j = 0; j < MAX_MINERALS; ++j) if (m[j].amount > 0) {
+                int d = dist2(m[j].x, m[j].y, b[command].x, b[command].y);
+                ++active;
+                if (d < nearest_d) { nearest_d = d; nearest = j; }
+            }
+            fprintf(stderr, "T5 no nearby mineral assignment for idle-SCV=%d xy=%d,%d active-fields=%d nearest-patch=%d d2=%d\n",
+                    i, u[i].x, u[i].y, active, nearest, nearest_d);
+            continue;
+        }
+        int before = minerals;
+        if (dist2(u[i].x, u[i].y, m[patch].x, m[patch].y) > 7 * 7 &&
+            !controller_order_actor(i, m[patch].x, m[patch].y, 0)) {
+            fprintf(stderr, "T5 could not issue mineral MOVE idle-SCV=%d order=%d target=%d building=%d mode=%d\n",
+                    i, u[i].order, u[i].target, selected_building, mode);
+            continue;
+        }
+        for (int t = 0; t < 1200 && host_ticks < (u32)run_limit &&
+             screen == SCREEN_PLAY && !won && !lost; ++t) {
+            if (u[i].order == ORDER_MINE && u[i].target >= 0 &&
+                u[i].target < MAX_MINERALS && m[u[i].target].amount > 0) break;
+            step(0);
+        }
+        if (u[i].alive && u[i].owner == SIDE && u[i].order == ORDER_MINE &&
+            u[i].target >= 0 && u[i].target < MAX_MINERALS && m[u[i].target].amount > 0) {
+            ++assigned;
+            fprintf(stderr, "T5 mineral assignment verified idle-SCV=%d patch=%d source=%d,%d amount=%d wallet=%d->%d\n",
+                    i, u[i].target, m[u[i].target].x, m[u[i].target].y,
+                    m[u[i].target].amount, before, minerals);
+        } else {
+            fprintf(stderr, "T5 idle-SCV mineral assignment failed slot=%d order=%d target=%d xy=%d,%d\n",
+                    i, u[i].order, u[i].target, u[i].x, u[i].y);
+        }
+    }
     return assigned;
 }
 
@@ -1505,6 +1862,20 @@ static void wait_frames(int amount)
 static void checkpoint(const char *kind)
 {
     unsigned faults = 0;
+    int scv_minerals, scv_gas, scv_idle, scv_other, scv_live;
+    controller_scv_counts(&scv_minerals, &scv_gas, &scv_idle, &scv_other, &scv_live);
+    int owned_command_centers = 0, active_minerals = 0, nearby_active_minerals = 0;
+    int command = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_COMMAND && building_complete(i)) {
+            if (command < 0) command = i;
+            ++owned_command_centers;
+        }
+    for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0) {
+        ++active_minerals;
+        if (command >= 0 && dist2(m[i].x, m[i].y, b[command].x, b[command].y) <= 256 * 256)
+            ++nearby_active_minerals;
+    }
     if (!trace_passenger_snapshot_valid && !strcmp(kind, "dropship-landed")) {
         for (int i = 0; i < trace_passenger_count; ++i) {
             int slot = trace_passenger_slots[i];
@@ -1532,7 +1903,10 @@ static void checkpoint(const char *kind)
             "\"won\":%d,\"lost\":%d,\"faults\":%u,\"switch4\":%u,\"switch6\":%u,"
             "\"objective\":%u,\"side_units\":%d,\"enemy_units\":%d,"
             "\"side_buildings\":%d,\"enemy_buildings\":%d,\"kerrigan_alive\":%d,"
-            "\"raynor_alive\":%d,\"marine_defenders\":%d,"
+            "\"raynor_alive\":%d,\"marine_defenders\":%d,\"marine_queued\":%d,"
+            "\"scv_live\":%d,\"scv_mineral_workers\":%d,\"scv_gas_workers\":%d,"
+            "\"scv_idle_workers\":%d,\"scv_other_workers\":%d,"
+            "\"owned_command_centers\":%d,\"active_minerals\":%d,\"nearby_active_minerals\":%d,"
             "\"supply_used\":%d,\"supply_cap\":%d,"
             "\"paid_wraith_alive\":%d,\"paid_wraith_queued\":%d,"
             "\"minerals\":%d,\"gas\":%d,\"enemy_minerals\":%d,\"enemy_gas\":%d,"
@@ -1549,7 +1923,10 @@ static void checkpoint(const char *kind)
             !!(race_t5.switches.bits[0] & 0x40), race_campaign.objective_stage,
             owner_units(SIDE), owner_units(ENEMY), owner_buildings(SIDE),
             owner_buildings(ENEMY), kerrigan_alive(), raynor_alive(),
-            controller_marine_count(), reserved_supply(), supply_cap,
+            controller_marine_count(), controller_count_queued_type(U_MARINE),
+            scv_live, scv_minerals, scv_gas, scv_idle, scv_other,
+            owned_command_centers, active_minerals, nearby_active_minerals,
+            reserved_supply(), supply_cap,
             controller_wraith_count(), controller_wraith_queue_count(), minerals, gas,
             race_minerals[ENEMY], race_gas[ENEMY], trace_starport_slot,
             trace_starport_slot >= 0 && trace_starport_slot < MAX_BUILDINGS ?
@@ -1807,8 +2184,8 @@ int main(int argc, char **argv)
                        by the pre-existing garrison, while keeping the Marines
                        and heroes in the home defense. */
                     int depots_built = 0;
-                    while (depots_built < 4 && supply_cap - reserved_supply() <
-                           12 * unit_supply(U_WRAITH) && screen == SCREEN_PLAY &&
+                    while (depots_built < 8 && supply_cap - reserved_supply() <
+                           20 * unit_supply(U_WRAITH) && screen == SCREEN_PLAY &&
                            !won && !lost && host_ticks < (u32)run_limit) {
                         int depot = -1;
                         if (!controller_build_supply_depot(&depot)) break;
@@ -1818,14 +2195,37 @@ int main(int argc, char **argv)
                     fprintf(stderr, "T5 Wraith production capacity: used=%d cap=%d live=%d queued=%d depots-added=%d\n",
                             reserved_supply(), supply_cap, controller_wraith_count(),
                             controller_wraith_queue_count(), depots_built);
+                    int mineral_wallet_before = minerals;
+                    int mineral_assignments = controller_assign_idle_scvs_to_minerals(3);
+                    wait_frames(600);
+                    int scv_mineral_workers, scv_gas_workers, scv_idle_workers;
+                    int scv_other_workers, scv_live_workers;
+                    controller_scv_counts(&scv_mineral_workers, &scv_gas_workers,
+                                          &scv_idle_workers, &scv_other_workers,
+                                          &scv_live_workers);
+                    fprintf(stderr, "T5 mineral income preflight assignments=%d SCVs=%d mineral=%d gas=%d idle=%d other=%d wallet=%d->%d\n",
+                            mineral_assignments, scv_live_workers, scv_mineral_workers,
+                            scv_gas_workers, scv_idle_workers, scv_other_workers,
+                            mineral_wallet_before, minerals);
+                    controller_log_scv_mineral_targets("preflight");
                     u32 last_wraith_order_tick = 0;
-                    for (unsigned tick = 0; tick < 50000 && owner_buildings(ENEMY) &&
+                    for (unsigned tick = 0; tick < 100000 && owner_buildings(ENEMY) &&
                          screen == SCREEN_PLAY && !won && !lost &&
                          host_ticks < (u32)run_limit; ++tick) {
                         step(0);
                         if (tick % 300 == 0) {
                             (void)controller_assign_idle_scvs_to_gas(3);
                             (void)controller_queue_paid_wraith(starport);
+                            (void)controller_queue_home_reinforcements();
+                            (void)controller_defend_command_center();
+                        }
+                        if (tick % 1800 == 0) {
+                            int retargeted = controller_assign_idle_scvs_to_minerals(2);
+                            if (retargeted)
+                                fprintf(stderr, "T5 maintenance mineral retargets=%d tick=%u\n",
+                                        retargeted, (unsigned)host_ticks);
+                            if (gas > 2000)
+                                (void)controller_reassign_excess_gas_to_minerals(2);
                         }
                         if (controller_wraith_count() >= 12 &&
                             host_ticks - last_wraith_order_tick >= 1200) {

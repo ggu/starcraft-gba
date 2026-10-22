@@ -293,6 +293,15 @@ def validate_trace(trace: object, capacity: int) -> dict:
             require_int_fields(row, OBS_FIELDS, "final")
             require_optional_int_fields(row, OPTIONAL_OBS_FIELDS, "final")
             validate_aux_snapshot(row, "final")
+            if kind == "won" and (row["won"] != 1 or row["lost"] != 0 or
+                                   row["screen"] != SCREEN_RESULT or row["faults"] != 0):
+                raise ValueError("won final observation must report a clean runtime win")
+            if kind == "lost" and (row["lost"] != 1 or row["won"] != 0 or
+                                    row["screen"] != SCREEN_RESULT or row["faults"] != 0):
+                raise ValueError("lost final observation must report a clean runtime loss")
+            if kind == "limit" and (row["won"] != 0 or row["lost"] != 0 or
+                                     row["screen"] != SCREEN_PLAY or row["faults"] != 0):
+                raise ValueError("limit final observation must remain active without outcome or faults")
             final = row
             final_source_tick = tick
         else:
@@ -311,10 +320,10 @@ def validate_trace(trace: object, capacity: int) -> dict:
     assert final_source_tick is not None
     if final_source_tick < prior_input_tick:
         raise ValueError("T5 final observation precedes a controller transition")
-    if final_source_tick != trace["tick_limit"]:
-        raise ValueError("T5 final observation must match the declared tick_limit")
-    if final is not None and final.get("kind") != "limit":
-        raise ValueError("the frozen T5 controller trace is an unfinished limit run, not a completion proof")
+    if final is not None and final["kind"] == "limit" and final_source_tick != trace["tick_limit"]:
+        raise ValueError("T5 limit observation must match the declared tick_limit")
+    if final_source_tick > trace["tick_limit"]:
+        raise ValueError("T5 terminal observation exceeds the declared tick budget")
     if final_source_tick > scheduler.MAX_U32 - ENTRY_TICKS:
         raise ValueError("T5 source trace is too long to offset by the menu entry")
 
@@ -972,6 +981,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         if not prefix:
             verify_final(plan["final"], final)
             report["verified_win"] = report["status"] == "won"
+            report["completed"] = report["verified_win"]
         _atomic_json(report_path, report)
         return report
     finally:

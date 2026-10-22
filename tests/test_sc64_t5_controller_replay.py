@@ -200,7 +200,7 @@ class T5ReplayValidationTests(unittest.TestCase):
     def test_rejects_final_observation_beyond_declared_limit(self):
         trace = sample_trace()
         trace["events"][-1]["host_tick"] = trace["tick_limit"] + 1
-        with self.assertRaisesRegex(ValueError, "final observation must match"):
+        with self.assertRaisesRegex(ValueError, "limit observation must match"):
             replay.validate_trace(trace, 256)
 
     def test_rejects_wrong_entry_or_mission_and_bad_start(self):
@@ -239,7 +239,7 @@ class T5ReplayValidationTests(unittest.TestCase):
             replay.validate_trace(trace, 256)
         trace = sample_trace()
         trace["events"][-1]["kind"] = "won"
-        with self.assertRaisesRegex(ValueError, "unfinished limit run"):
+        with self.assertRaisesRegex(ValueError, "clean runtime win"):
             replay.validate_trace(trace, 256)
 
     def test_accepts_current_wraith_strategy_checkpoints_and_optional_actor_counts(self):
@@ -292,6 +292,73 @@ class T5ReplayValidationTests(unittest.TestCase):
         state["race_mode"] = 0
         state["race_selected_mission"] = 8
         replay.verify_final(plan["final"], state)
+
+    def test_accepts_verified_terminal_win_or_loss_before_budget(self):
+        for kind, won, lost, phase, outcome, completed in (
+                ("won", 1, 0, 3, 1, 1 << replay.MISSION_T5),
+                ("lost", 0, 1, 4, 2, 0)):
+            with self.subTest(kind=kind):
+                trace = sample_trace()
+                final = trace["events"][-1]
+                final.update({"kind": kind, "host_tick": 1100, "frame": 1100,
+                              "elapsed": 1100, "screen": replay.SCREEN_RESULT,
+                              "won": won, "lost": lost})
+                plan = replay.validate_trace(trace, capacity=256)
+                self.assertEqual(plan["source_tick_limit"], 1200)
+                self.assertEqual(plan["stop_tick"], 1100 + replay.ENTRY_TICKS)
+                self.assertEqual(plan["final"]["kind"], kind)
+                state = dict(plan["final"], phase=phase, human_outcome=outcome,
+                             outcomes=outcome, race_completed=completed)
+                state["race_campaign"] = {
+                    "mission": replay.MISSION_T5, "elapsed_frames": 1100,
+                    "phase": phase,
+                }
+                replay.verify_final(plan["final"], state)
+
+    def test_rejects_terminal_over_budget_and_nonexact_limit(self):
+        trace = sample_trace()
+        trace["events"][-1].update({"kind": "won", "host_tick": 1201,
+                                    "frame": 1201, "elapsed": 1201,
+                                    "screen": replay.SCREEN_RESULT,
+                                    "won": 1, "lost": 0})
+        with self.assertRaisesRegex(ValueError, "exceeds the declared tick budget"):
+            replay.validate_trace(trace, 256)
+
+        trace = sample_trace()
+        trace["events"][-1]["host_tick"] = 1199
+        trace["events"][-1].update({"frame": 1199, "elapsed": 1199})
+        with self.assertRaisesRegex(ValueError, "limit observation must match"):
+            replay.validate_trace(trace, 256)
+
+    def test_terminal_labels_require_matching_source_outcome(self):
+        for kind, fields in (("won", {"won": 0, "lost": 0}),
+                             ("lost", {"won": 0, "lost": 0})):
+            trace = sample_trace()
+            trace["events"][-1].update({"kind": kind, "screen": replay.SCREEN_RESULT,
+                                        **fields})
+            with self.subTest(kind=kind), self.assertRaisesRegex(ValueError, "final observation"):
+                replay.validate_trace(trace, 256)
+
+    def test_runtime_rejects_fake_win_and_fake_loss(self):
+        for kind, won, lost, phase, outcome, completed in (
+                ("won", 1, 0, 3, 1, 0),  # missing completion bit
+                ("lost", 0, 1, 4, 2, 0)):
+            trace = sample_trace()
+            trace["events"][-1].update({"kind": kind, "host_tick": 1100,
+                                        "frame": 1100, "elapsed": 1100,
+                                        "screen": replay.SCREEN_RESULT,
+                                        "won": won, "lost": lost})
+            plan = replay.validate_trace(trace, 256)
+            state = dict(plan["final"], phase=phase, human_outcome=outcome,
+                         outcomes=outcome, race_completed=completed)
+            state["race_campaign"] = {
+                "mission": replay.MISSION_T5, "elapsed_frames": 1100,
+                "phase": phase,
+            }
+            if kind == "lost":
+                state["lost"] = 0
+            with self.subTest(kind=kind), self.assertRaises(RuntimeError):
+                replay.verify_final(plan["final"], state)
 
     def test_accepts_optional_tech_and_transport_snapshots_without_comparing_them(self):
         trace = sample_trace()
