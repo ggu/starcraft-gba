@@ -64,6 +64,12 @@ The Mature Chrysalis is a stationary structure with 250 HP and one armor;
 the Young Chrysalis in the first two missions remains a separate powerup.
 The 128-unit engine reserves sixteen slots from enemy training for the player.
 
+The controller-only host test completes the mission by building an Extractor
+and Hydralisk Den, assigning gas workers and combining forward defense with
+attacks on enemy structures. It wins with the Chrysalis intact. This is a
+host gameplay regression; ARM full-mission timing and physical GBA validation
+remain separate checks.
+
 Enemy pressure uses paid Marines every two minutes and small attacks from
 the imported guards every three minutes. This is an authored substitute for
 the source AI script. Result actions use explicit presentation timing policies:

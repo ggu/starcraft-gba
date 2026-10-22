@@ -202,6 +202,19 @@ The Z3 link uses 388 bytes of data and 240,240 bytes of BSS. Its IWRAM ends at
 SRAM payload fits one bounded record. Eight asset-free frontend variants
 exercise Z3 with and without T3 across unified and fixed-race profiles.
 
+The full controller-only host runner is now part of
+`make test-sc64-z3-runtime`. Its hybrid policy builds an Extractor and
+Hydralisk Den through the UI, assigns three Drones to gas, caps queued worker
+production, protects a forward waypoint and attacks enemy structures. A
+fresh ASan/UBSan run wins at frame 70,833 with the Mature Chrysalis at 250 HP,
+79 human units/eight buildings and three enemy units/one building. The
+remaining enemy presence of four satisfies the source at-most-six predicate.
+All gameplay mutations come from `game_update` controller input; the policy
+reads state to choose actions. Its 1,388 held-input transitions include key
+releases and stay in an ignored local trace. Loss or the simulation/input
+budget ending returns failure. This host result is not an ARM or physical
+GBA frame-rate measurement.
+
 The result adapter retains source predicate/action order but uses explicit
 presentation policies for unresolved timing: 30/15-tick waits, 90-tick
 transmission/text holds and a 13-tick silent loss-audio placeholder. It does
@@ -281,12 +294,29 @@ The synthetic fixture checks the final grid cell, minimap/target/path indexes,
 mineral slots 32–47 and full fog-buffer persistence. It does not validate
 loading a real 128-column mission's geometry or gameplay.
 
-A separate opt-in collision-candidate experiment is available with
-`SC64_COLLISION_CACHE_ENABLED`. `make test-sc64-race-collision` passes 959,570
-full-scan differential checks, including dense overflow fallback, same-cell
-movement invalidation, flight classes and dead neighbors. It adds about 272
-aligned bytes of runtime storage and remains disabled in standard builds
-pending ARM performance measurements.
+`make test-sc64-race-collision` checks the race collision buckets against a
+complete overlap scan over 959,577 candidates, including dense formations,
+same-cell movement, flight classes, edge coordinates and dead neighbors.
+
+## Collision reuse experiment (2026-10-22)
+
+A bounded nearby-actor cache passed the full T3 host survival run with a
+byte-identical controller trace. In ARM testing, both it and the matching
+plain build loaded the same controller-created SRAM at frame 50,004 and won
+at frame 54,000. Observed entity, resource and campaign states matched at
+every checkpoint. The three complete 1,000-tick live intervals measured:
+
+| Build | ROM hash prefix | Mean fps | Crowded interval fps |
+| --- | --- | ---: | --- |
+| Plain storage-preparation build | `bb229ac8` | 20.13 | 19.17, 19.16 |
+| Cold candidate-cache helper | `45808a51` | 16.13 | 14.76, 14.89 |
+
+The ending result interval is excluded. The cache was removed because it
+increased CPU cost. A revision keeping its predicate in IWRAM passed host
+differential checks but exceeded the stack-preserving code guard; that
+revision was not run as a ROM. The original bucket implementation and the
+expanded race collision tests remain. These are emulator measurements from
+a specific late-mission checkpoint, not physical GBA results.
 
 ## Known limits
 

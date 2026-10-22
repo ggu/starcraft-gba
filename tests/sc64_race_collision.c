@@ -1,4 +1,4 @@
-/* Differential tests for bounded candidate reuse in race collision checks. */
+/* Race collision buckets compared with the complete overlap scan. */
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -73,14 +73,12 @@ randomized_states(unsigned int *checks)
             static const int steering_delta[3] = {-2, 0, 2};
             int step;
             if (!q->alive) continue;
-            /* One lazy build, followed by the full eight steering candidates. */
+            /* Check all neighboring steering candidates in succession. */
             for (step = 0; step < 9; ++step) {
                 int nx = q->x + steering_delta[step % 3];
                 int ny = q->y + steering_delta[step / 3];
                 check_candidate(q, nx, ny, checks);
             }
-            if (q->type != U_CHRYSALIS && !IS_WORKER(q->type))
-                assert(sc64_collision_candidate_valid);
             if ((i % 11) == 0) {
                 int neighbor = (i + 17) % MAX_UNITS;
                 u[neighbor].alive = 0;
@@ -91,12 +89,10 @@ randomized_states(unsigned int *checks)
                 if (nx < 0 || nx >= WORLD_W) nx = q->x;
                 q->x = nx;
                 sc64_unit_bucket_move(q);
-                assert(!sc64_collision_candidate_valid);
                 check_candidate(q, q->x + 2, q->y, checks);
             }
         }
         sc64_unit_buckets_end();
-        assert(!sc64_collision_candidate_valid);
     }
 }
 
@@ -111,16 +107,13 @@ movement_invalidation(unsigned int *checks)
     neighbor->x = 106; neighbor->y = 100;
     sc64_unit_buckets_begin();
     check_candidate(q, 101, 100, checks);
-    assert(sc64_collision_candidate_valid);
     /* A same-cell move changes collision results and must invalidate. */
     neighbor->x = 104;
     sc64_unit_bucket_move(neighbor);
-    assert(!sc64_collision_candidate_valid);
     check_candidate(q, 101, 100, checks);
     /* Cross-cell movement must invalidate before bucket relinking too. */
     q->x = 119;
     sc64_unit_bucket_move(q);
-    assert(!sc64_collision_candidate_valid);
     check_candidate(q, 117, 100, checks);
     sc64_unit_buckets_end();
     /* Inactive index uses the existing full-scan fallback. */
@@ -152,8 +145,14 @@ edge_overflow_and_passthrough(unsigned int *checks)
     u[0].x = 100; u[0].y = 100;
     sc64_unit_buckets_begin();
     check_candidate(&u[0], 101, 100, checks);
-    assert(!sc64_collision_candidate_valid); /* no truncated cached subset */
-    check_candidate(&u[0], 102, 100, checks); /* overflow rescans bucket */
+    {
+        int step;
+        for (step = 0; step < 8; ++step) {
+            int nx = u[0].x + ((step & 1) ? 2 : -2);
+            int ny = u[0].y + ((step & 2) ? 2 : -2);
+            check_candidate(&u[0], nx, ny, checks);
+        }
+    }
     sc64_unit_buckets_end();
 
     memset(u, 0, sizeof(u));
@@ -170,19 +169,9 @@ int
 main(void)
 {
     unsigned int checks = 0;
-    size_t cache_bytes = sizeof(sc64_collision_candidates) +
-        sizeof(sc64_collision_candidate_count) +
-        sizeof(sc64_collision_candidate_q) +
-        sizeof(sc64_collision_candidate_qx) +
-        sizeof(sc64_collision_candidate_qy) +
-        sizeof(sc64_collision_candidate_type) +
-        sizeof(sc64_collision_candidate_valid);
-    assert(sizeof(sc64_collision_candidates) <= 32u * 8u);
-    assert(cache_bytes <= 400u);
     randomized_states(&checks);
     movement_invalidation(&checks);
     edge_overflow_and_passthrough(&checks);
-    printf("Race collision candidate cache matches full scan (%u checks; %lu bytes).\n",
-           checks, (unsigned long)cache_bytes);
+    printf("Race collision buckets match full scan (%u checks).\n", checks);
     return 0;
 }
