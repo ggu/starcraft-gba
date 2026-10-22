@@ -27,6 +27,42 @@ static int sc64_terrain_cache_camx, sc64_terrain_cache_camy;
 static int sc64_terrain_cache_mission;
 static unsigned int sc64_terrain_cache_static_key;
 static int sc64_terrain_cache_mask_count;
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+/* Cumulative counters for one diagnostic boot/replay. Pixel counts describe
+ * copies from the saved terrain buffer; tile counts describe cache-mask cells
+ * checked and marked dirty. These objects and increments disappear otherwise. */
+static volatile u32 sc64_terrain_diag_invalid_cache;
+static volatile u32 sc64_terrain_diag_mission_change;
+static volatile u32 sc64_terrain_diag_static_key_change;
+static volatile u32 sc64_terrain_diag_camera_oversize;
+static volatile u32 sc64_terrain_diag_camera_change;
+static volatile u32 sc64_terrain_diag_invalid_view;
+static volatile u32 sc64_terrain_diag_invalid_mask;
+static volatile u32 sc64_terrain_diag_blit_failure;
+static volatile u32 sc64_terrain_diag_capture_failure;
+static volatile u32 sc64_terrain_diag_reused_pixels;
+static volatile u32 sc64_terrain_diag_captured_pixels;
+static volatile u32 sc64_terrain_diag_captured_tiles;
+static volatile u32 sc64_terrain_diag_tiles_checked;
+static volatile u32 sc64_terrain_diag_dirty_tiles;
+#define SC64_TERRAIN_DIAG_ADD(counter, amount) ((counter) += (u32)(amount))
+#define SC64_TERRAIN_DIAG_REJECT() do { \
+    if (!sc64_terrain_cache_valid) SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_cache, 1); \
+    else if (sc64_terrain_cache_mission != sc64_terrain_cache_mission_key()) \
+        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_mission_change, 1); \
+    else if (sc64_terrain_cache_static_key != (unsigned int)(SC64_TERRAIN_STATIC_KEY)) \
+        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_static_key_change, 1); \
+} while (0)
+#define SC64_TERRAIN_DIAG_REJECT_AT(x, y) do { \
+    if (!sc64_terrain_cache_valid) SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_cache, 1); \
+    else if (sc64_terrain_cache_mission != sc64_terrain_cache_mission_key()) \
+        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_mission_change, 1); \
+    else if (sc64_terrain_cache_static_key != (unsigned int)(SC64_TERRAIN_STATIC_KEY)) \
+        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_static_key_change, 1); \
+    else if ((x) != sc64_terrain_cache_camx || (y) != sc64_terrain_cache_camy) \
+        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_camera_change, 1); \
+} while (0)
+#endif
 #ifdef SC64_TERRAIN_SCROLL
 /* dirty[] is indexed for the camera currently being rendered; mask[] and
  * camx/camy continue to describe the last captured framebuffer until store. */
@@ -78,28 +114,50 @@ sc64_terrain_cached(int x, int y)
     sc64_terrain_cache_reused_base = 0;
     if (!sc64_terrain_cache_valid ||
         sc64_terrain_cache_mission != sc64_terrain_cache_mission_key() ||
-        sc64_terrain_cache_static_key != (unsigned int)(SC64_TERRAIN_STATIC_KEY))
+        sc64_terrain_cache_static_key != (unsigned int)(SC64_TERRAIN_STATIC_KEY)) {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+        SC64_TERRAIN_DIAG_REJECT();
+#endif
         return 0;
+    }
     dx = x - sc64_terrain_cache_camx;
     dy = y - sc64_terrain_cache_camy;
     if ((dx != 0 || dy != 0) &&
         ((dx < 0 ? -dx : dx) >= 240 ||
-         (dy < 0 ? -dy : dy) >= SC64_TERRAIN_CACHE_HEIGHT))
+         (dy < 0 ? -dy : dy) >= SC64_TERRAIN_CACHE_HEIGHT)) {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_camera_oversize, 1);
+#endif
         return 0;
+    }
     if (!sc64_terrain_cache_view(sc64_terrain_cache_camx, sc64_terrain_cache_camy,
-                                 &old_col0, &old_row0, &old_col1, &old_row1))
+                                 &old_col0, &old_row0, &old_col1, &old_row1)) {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_view, 1);
+#endif
         return 0;
+    }
     if (dx == 0 && dy == 0) {
         if ((old_col1 - old_col0) * (old_row1 - old_row0) !=
             sc64_terrain_cache_mask_count) {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+            SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_mask, 1);
+#endif
             sc64_terrain_cache_valid = 0;
             return 0;
         }
         if (!gfx_blit_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
                            sc64_terrain_cache_pixels)) {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+            SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_blit_failure, 1);
+#endif
             sc64_terrain_cache_valid = 0;
             return 0;
         }
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_reused_pixels,
+                              240 * SC64_TERRAIN_CACHE_HEIGHT);
+#endif
         sc64_terrain_cache_view_camx = x;
         sc64_terrain_cache_view_camy = y;
         sc64_terrain_cache_reused_base = 1;
@@ -109,6 +167,11 @@ sc64_terrain_cached(int x, int y)
                 u8 state = (SC64_GRID_GET(visible, cell) ? 1 : 0) |
                            (SC64_GRID_GET(explored, cell) ? 2 : 0);
                 sc64_terrain_cache_dirty[i] = sc64_terrain_cache_mask[i] != state;
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+                SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_tiles_checked, 1);
+                if (sc64_terrain_cache_dirty[i])
+                    SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_dirty_tiles, 1);
+#endif
                 if (sc64_terrain_cache_dirty[i]) unchanged = 0;
                 i++;
             }
@@ -116,19 +179,34 @@ sc64_terrain_cached(int x, int y)
         else sc64_terrain_partial++;
         return unchanged;
     }
-    if (!sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1))
+    if (!sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1)) {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_view, 1);
+#endif
         return 0;
+    }
     if ((old_col1 - old_col0) * (old_row1 - old_row0) !=
         sc64_terrain_cache_mask_count) {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_mask, 1);
+#endif
         sc64_terrain_cache_valid = 0;
         return 0;
     }
     if (!gfx_blit_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
                                 sc64_terrain_cache_pixels, 240,
                                 SC64_TERRAIN_CACHE_HEIGHT, dx, dy)) {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_blit_failure, 1);
+#endif
         sc64_terrain_cache_valid = 0;
         return 0;
     }
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+    SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_reused_pixels,
+        (240 - (dx < 0 ? -dx : dx)) *
+        (SC64_TERRAIN_CACHE_HEIGHT - (dy < 0 ? -dy : dy)));
+#endif
     sc64_terrain_cache_view_camx = x;
     sc64_terrain_cache_view_camy = y;
     sc64_terrain_cache_reused_base = 1;
@@ -155,6 +233,11 @@ sc64_terrain_cached(int x, int y)
                 top < sc64_terrain_cache_camy ||
                 bottom > sc64_terrain_cache_camy + SC64_TERRAIN_CACHE_HEIGHT ||
                 sc64_terrain_cache_mask[old_index < 0 ? 0 : old_index] != state;
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+            SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_tiles_checked, 1);
+            if (sc64_terrain_cache_dirty[i])
+                SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_dirty_tiles, 1);
+#endif
             if (sc64_terrain_cache_dirty[i]) unchanged = 0;
             i++;
         }
@@ -168,18 +251,44 @@ sc64_terrain_cached(int x, int y)
     if (!sc64_terrain_cache_valid ||
         x != sc64_terrain_cache_camx || y != sc64_terrain_cache_camy ||
         sc64_terrain_cache_mission != sc64_terrain_cache_mission_key() ||
-        sc64_terrain_cache_static_key != (unsigned int)(SC64_TERRAIN_STATIC_KEY))
+        sc64_terrain_cache_static_key != (unsigned int)(SC64_TERRAIN_STATIC_KEY)) {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+        SC64_TERRAIN_DIAG_REJECT_AT(x, y);
+#endif
         return 0;
+    }
     if (!gfx_blit_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
                        sc64_terrain_cache_pixels)) {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_blit_failure, 1);
+#endif
         sc64_terrain_cache_valid = 0;
         return 0;
     }
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+    SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_reused_pixels,
+                          240 * SC64_TERRAIN_CACHE_HEIGHT);
+#endif
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+    {
+        int view_ok = sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1);
+        if (!view_ok ||
+            (col1 - col0) * (row1 - row0) != sc64_terrain_cache_mask_count) {
+            if (!view_ok)
+                SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_view, 1);
+            else
+                SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_mask, 1);
+            sc64_terrain_cache_valid = 0;
+            return 0;
+        }
+    }
+#else
     if (!sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1) ||
         (col1 - col0) * (row1 - row0) != sc64_terrain_cache_mask_count) {
         sc64_terrain_cache_valid = 0;
         return 0;
     }
+#endif
     sc64_terrain_cache_reused_base = 1;
     for (row = row0; row < row1; row++)
         for (col = col0; col < col1; col++) {
@@ -187,6 +296,11 @@ sc64_terrain_cached(int x, int y)
             u8 state = (SC64_GRID_GET(visible, cell) ? 1 : 0) |
                        (SC64_GRID_GET(explored, cell) ? 2 : 0);
             sc64_terrain_cache_dirty[i] = sc64_terrain_cache_mask[i] != state;
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+            SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_tiles_checked, 1);
+            if (sc64_terrain_cache_dirty[i])
+                SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_dirty_tiles, 1);
+#endif
             if (sc64_terrain_cache_dirty[i]) unchanged = 0;
             i++;
         }
@@ -222,6 +336,12 @@ sc64_terrain_store(int x, int y)
     if (!sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1) ||
         !gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
                        sc64_terrain_cache_pixels)) {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+        if (!sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1))
+            SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_view, 1);
+        else
+            SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_capture_failure, 1);
+#endif
         sc64_terrain_cache_valid = 0;
         sc64_terrain_cache_reused_base = 0;
         return 0;
@@ -234,6 +354,11 @@ sc64_terrain_store(int x, int y)
                 (SC64_GRID_GET(explored, cell) ? 2 : 0);
         }
     sc64_terrain_cache_mask_count = i;
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+    SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_captured_pixels,
+                          240 * SC64_TERRAIN_CACHE_HEIGHT);
+    SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_captured_tiles, i);
+#endif
     sc64_terrain_cache_camx = x;
     sc64_terrain_cache_camy = y;
     sc64_terrain_cache_mission = sc64_terrain_cache_mission_key();

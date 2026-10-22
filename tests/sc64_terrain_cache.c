@@ -9,6 +9,7 @@ static int campaign_mission;
 #endif
 #else
 typedef uint8_t u8;
+typedef uint32_t u32;
 #endif
 enum { MAP_COLS = 64, MAP_ROWS = 64, MAP_CELLS = MAP_COLS * MAP_ROWS };
 #define WORLD_W (MAP_COLS * 16)
@@ -70,6 +71,81 @@ fill_band(u8 value)
     memset(pixels + SC64_TERRAIN_CACHE_Y * 240, value,
            SC64_TERRAIN_CACHE_HEIGHT * 240);
 }
+
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+static void
+test_diagnostic_counters(void)
+{
+    memset(visible, 0, sizeof(visible));
+    memset(explored, 0, sizeof(explored));
+    sc64_terrain_cache_valid = 0;
+    sc64_terrain_cache_reused_base = 0;
+    sc64_terrain_requests = sc64_terrain_hits = sc64_terrain_partial = 0;
+    sc64_terrain_diag_invalid_cache = 0;
+    sc64_terrain_diag_mission_change = 0;
+    sc64_terrain_diag_static_key_change = 0;
+    sc64_terrain_diag_camera_oversize = 0;
+    sc64_terrain_diag_camera_change = 0;
+    sc64_terrain_diag_invalid_view = 0;
+    sc64_terrain_diag_invalid_mask = 0;
+    sc64_terrain_diag_blit_failure = 0;
+    sc64_terrain_diag_capture_failure = 0;
+    sc64_terrain_diag_reused_pixels = 0;
+    sc64_terrain_diag_captured_pixels = 0;
+    sc64_terrain_diag_captured_tiles = 0;
+    sc64_terrain_diag_tiles_checked = 0;
+    sc64_terrain_diag_dirty_tiles = 0;
+    test_static_key = 3;
+#ifdef SC64_TERRAN_CAMPAIGN
+    campaign_mission = 0;
+#endif
+
+    assert(!sc64_terrain_cached(0, 0));
+    assert(sc64_terrain_diag_invalid_cache == 1);
+    fill_band(0x41);
+    assert(sc64_terrain_store(0, 0));
+    assert(sc64_terrain_diag_captured_pixels == 240u * SC64_TERRAIN_CACHE_HEIGHT);
+    assert(sc64_terrain_diag_captured_tiles == (u32)sc64_terrain_cache_mask_count);
+    assert(sc64_terrain_cached(0, 0));
+    assert(sc64_terrain_diag_reused_pixels == 240u * SC64_TERRAIN_CACHE_HEIGHT);
+    assert(sc64_terrain_diag_tiles_checked == (u32)sc64_terrain_cache_mask_count);
+    assert(sc64_terrain_diag_dirty_tiles == 0);
+
+    visible[0] = 1;
+    assert(!sc64_terrain_cached(0, 0));
+    assert(sc64_terrain_diag_dirty_tiles == 1);
+    assert(sc64_terrain_diag_tiles_checked == 2u * (u32)sc64_terrain_cache_mask_count);
+
+    test_static_key++;
+    assert(!sc64_terrain_cached(0, 0));
+    assert(sc64_terrain_diag_static_key_change == 1);
+    assert(sc64_terrain_store(0, 0));
+#ifdef SC64_TERRAIN_SCROLL
+    assert(!sc64_terrain_cached(240, 0));
+    assert(sc64_terrain_diag_camera_oversize == 1);
+    assert(sc64_terrain_store(0, 0));
+    sc64_terrain_cache_camx = -1;
+    assert(!sc64_terrain_cached(1, 0));
+    assert(sc64_terrain_diag_invalid_view == 1);
+#else
+    assert(!sc64_terrain_cached(1, 0));
+    assert(sc64_terrain_diag_camera_change == 1);
+#endif
+
+    assert(sc64_terrain_store(0, 0));
+    ++sc64_terrain_cache_mask_count;
+    assert(!sc64_terrain_cached(0, 0));
+    assert(sc64_terrain_diag_invalid_mask == 1);
+#ifdef SC64_TERRAN_CAMPAIGN
+    assert(sc64_terrain_store(0, 0));
+    campaign_mission++;
+    assert(!sc64_terrain_cached(0, 0));
+    assert(sc64_terrain_diag_mission_change == 1);
+    campaign_mission = 0;
+#endif
+    read_calls = blit_calls = 0;
+}
+#endif
 
 static void
 test_restore_preserves_surrounding_pixels(void)
@@ -162,6 +238,9 @@ test_static_object_key_invalidates_full_base(void)
 int
 main(void)
 {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+    test_diagnostic_counters();
+#endif
     test_restore_preserves_surrounding_pixels();
     test_camera_and_fog_invalidation();
     test_edge_viewport_and_campaign_mission_key();
@@ -219,8 +298,10 @@ static void
 test_scroll_differential(void)
 {
     static const int cameras[][2] = {
-        {0, 0}, {1, 1}, {2, 3}, {7, 8}, {15, 15}, {16, 16},
-        {17, 31}, {31, 17}, {63, 79}, {64, 80}, {80, 64},
+        /* Consecutive 1/2/3-pixel shifts exercise byte alignment variants
+         * in gfx_blit_window. */
+        {0, 0}, {1, 1}, {3, 3}, {6, 6}, {2, 3}, {7, 8},
+        {15, 15}, {16, 16}, {17, 31}, {31, 17}, {63, 79}, {64, 80}, {80, 64},
         {48, 48}, {239, 107}, {478, 213}, {238, 106},
         {WORLD_W - 240, WORLD_H - SC64_TERRAIN_CACHE_HEIGHT},
         {WORLD_W - 241, WORLD_H - SC64_TERRAIN_CACHE_HEIGHT - 1},
