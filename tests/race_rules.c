@@ -84,6 +84,16 @@ int main(void)
     assert(sc64_race_raw_building(B_HIVE) == 133);
     assert(sc64_race_building_rule(B_HIVE)->hp == 2500);
     assert(sc64_race_building_armor(B_HIVE) == 1);
+    for (int n = 0; n < 3; ++n) {
+        static const int halls[] = { B_HATCHERY, B_LAIR, B_HIVE };
+        int hall = halls[n];
+        assert(sc64_race_is_zerg_townhall(hall));
+        assert(sc64_race_producer_compatible(hall, B_HATCHERY));
+        assert(sc64_race_building_rule(hall)->supply_provided == 2);
+        assert(sc64_race_building_rule(hall)->flags & SC_RACE_F_PRODUCER);
+    }
+    assert(!sc64_race_is_zerg_townhall(B_GREATER_SPIRE));
+    assert(!sc64_race_producer_compatible(B_NEXUS, B_HATCHERY));
     assert(sc64_race_building_from_raw(137) == B_GREATER_SPIRE);
     assert(sc64_race_raw_building(B_GREATER_SPIRE) == 137);
     assert(sc64_race_building_rule(B_GREATER_SPIRE)->hp == 1000);

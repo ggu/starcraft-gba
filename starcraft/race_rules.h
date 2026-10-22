@@ -120,7 +120,7 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     [B_SUNKEN_COLONY] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 50, 0, 300, 300, SC_PR_SPAWNING_POOL },
     [B_SPIRE] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_CONSUMES_WORKER, U_DRONE, 0, 200, 150, 1800, 600, SC_PR_SPAWNING_POOL },
     [B_CEREBRATE] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 0, 0, 0, 1500, 0 },
-    [B_LAIR] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER, U_DRONE, 0, 150, 100, 1500, 1800, SC_PR_SPAWNING_POOL },
+    [B_LAIR] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_PROVIDES_SUPPLY, U_DRONE, 2, 150, 100, 1500, 1800, SC_PR_SPAWNING_POOL },
     [B_STARGATE] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_REQUIRES_POWER, U_PROBE, 0, 150, 150, 1050, 600, SC_PR_CYBERNETICS_CORE | SC_PR_PYLON },
     [B_STARPORT] = { R_TER, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER, U_SCV, 0, 150, 100, 1050, 1300, 0 },
     [B_MISSILE_TURRET] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 75, 0, 450, 200, 0 },
@@ -130,7 +130,7 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     [B_ROBOTICS_FACILITY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_REQUIRES_POWER, U_PROBE, 0, 200, 200, 1200, 500, SC_PR_CYBERNETICS_CORE | SC_PR_PYLON },
     /* BWAPI raw 150 Mature Chrysalis: static mission building, not a unit. */
     [B_MATURE_CHRYSALIS] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 0, 0, 0, 250, 0 },
-    [B_HIVE] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER, U_DRONE, 0, 200, 150, 1800, 2500, 0 },
+    [B_HIVE] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_PROVIDES_SUPPLY, U_DRONE, 2, 200, 150, 1800, 2500, 0 },
     [B_GREATER_SPIRE] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 100, 150, 1800, 1000, 0 }
 };
 
@@ -142,6 +142,12 @@ static inline int sc64_race_is_worker(int type)
 { const Sc64RaceUnitRule *r = sc64_race_unit_rule(type); return r && (r->flags & SC_RACE_F_WORKER); }
 static inline unsigned short sc64_race_unit_supply_provided(int type)
 { return type == U_OVERLORD ? 16 : 0; }
+/* A completed Hatchery, Lair, or Hive is a Zerg town hall. Lairs and Hives
+ * retain the Hatchery's supply, larva, creep, and larva-unit production roles. */
+static inline int sc64_race_is_zerg_townhall(int type)
+{ return type == B_HATCHERY || type == B_LAIR || type == B_HIVE; }
+static inline int sc64_race_producer_compatible(int building, int producer)
+{ return producer == B_HATCHERY ? sc64_race_is_zerg_townhall(building) : building == producer; }
 
 static const char *const sc64_race_names[3] = { "TERRAN", "ZERG", "PROTOSS" };
 static inline const char *sc64_race_unit_name(int type)

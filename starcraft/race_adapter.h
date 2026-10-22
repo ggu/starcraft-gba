@@ -108,7 +108,9 @@ static int race_owner_has_prereq(int owner, unsigned short prereq)
     if (!prereq) return 1;
     for (i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) && b[i].owner == owner) {
         switch (b[i].type) {
-        case B_HATCHERY: if (prereq & SC_PR_HATCHERY) prereq &= (unsigned short)~SC_PR_HATCHERY; break;
+        case B_HATCHERY: case B_LAIR: case B_HIVE:
+            if (prereq & SC_PR_HATCHERY) prereq &= (unsigned short)~SC_PR_HATCHERY;
+            break;
         case B_SPAWNING_POOL: if (prereq & SC_PR_SPAWNING_POOL) prereq &= (unsigned short)~SC_PR_SPAWNING_POOL; break;
         case B_HYDRALISK_DEN: if (prereq & SC_PR_HYDRALISK_DEN) prereq &= (unsigned short)~SC_PR_HYDRALISK_DEN; break;
         case B_NEXUS: if (prereq & SC_PR_NEXUS) prereq &= (unsigned short)~SC_PR_NEXUS; break;
@@ -154,7 +156,7 @@ static int race_site_creep(int owner, int x, int y)
     int i;
     for (i = 0; i < MAX_BUILDINGS; ++i)
         if (building_complete(i) && b[i].owner == owner &&
-            (b[i].type == B_HATCHERY || b[i].type == B_LAIR) &&
+            sc64_race_is_zerg_townhall(b[i].type) &&
             dist2(x, y, b[i].x, b[i].y) <= 160 * 160) return 1;
     return 0;
 }
@@ -164,6 +166,9 @@ static int race_can_site(int owner, int type, int x, int y)
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     int race = race_owner_identity(owner);
     if (!r || r->race != race || !race_owner_has_prereq(owner, r->prereq)) return 0;
+    /* Imported Lairs/Hives and Greater Spires are recognized structures,
+       but this adapter does not implement their morph/build operations. */
+    if (type == B_LAIR || type == B_HIVE || type == B_GREATER_SPIRE) return 0;
     if ((r->flags & SC_RACE_F_REQUIRES_POWER) && !race_site_powered(owner, x, y)) return 0;
     if (race == R_ZERG && type != B_HATCHERY && type != B_EXTRACTOR && !race_site_creep(owner, x, y)) return 0;
     if (type == B_EXTRACTOR || type == B_ASSIMILATOR) {
@@ -189,8 +194,8 @@ static int race_queue_unit(int owner, int producer, int type)
     const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
     Sc64RaceBank bank;
     if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) || !building_complete(producer) ||
-        b[producer].owner != owner || b[producer].type != r->producer || b[producer].queue_count >= 5 ||
-        !race_owner_has_prereq(owner, r->prereq) || !race_owner_has_type(owner, r->producer)) return 0;
+        b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type, r->producer) || b[producer].queue_count >= 5 ||
+        !race_owner_has_prereq(owner, r->prereq)) return 0;
     {
         const Sc64RaceBuildingRule *br = sc64_race_building_rule(b[producer].type);
         if (br && (br->flags & SC_RACE_F_REQUIRES_POWER) &&
@@ -270,7 +275,8 @@ static void race_tick_state(void)
 {
     int i,used=0,cap=0;
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && !b[i].under_construction &&
-        b[i].owner >= 0 && b[i].owner < 5 && race_owner_identity(b[i].owner) == R_ZERG && b[i].type == B_HATCHERY) {
+        b[i].owner >= 0 && b[i].owner < 5 && race_owner_identity(b[i].owner) == R_ZERG &&
+        sc64_race_is_zerg_townhall(b[i].type)) {
         if (b[i].larva < 3 && ++b[i].larva_timer >= 428) {
             b[i].larva_timer = 0;
             if (b[i].larva < 3) ++b[i].larva;
@@ -310,7 +316,7 @@ static void race_complete_building(int i)
     b[i].hp = b[i].maxhp;
     b[i].build_progress = 0;
     if (r && r->supply_provided && b[i].owner == SIDE) supply_cap += r->supply_provided;
-    if (b[i].type == B_HATCHERY) b[i].larva = 3;
+    if (sc64_race_is_zerg_townhall(b[i].type)) b[i].larva = 3;
 }
 
 static void race_tick_buildings(void)
@@ -488,7 +494,8 @@ static void race_tick_ai(void)
             else if (sc64_race_unit_damage(u[i].type) > 0) ++army;
         }
         for (i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) && b[i].owner == owner &&
-            b[i].type == (race == R_ZERG ? B_HATCHERY : race == R_PROTOSS ? B_NEXUS : B_COMMAND)) { producer = i; break; }
+            sc64_race_producer_compatible(b[i].type,
+                race == R_ZERG ? B_HATCHERY : race == R_PROTOSS ? B_NEXUS : B_COMMAND)) { producer = i; break; }
         /* Supply expansion is paid and finished before it raises the cap.
            Do not let worker queues permanently starve the Zerg combat army. */
         if(race_owner_supply_cap(owner)-race_owner_reserved_supply(owner)<=4) {
@@ -569,7 +576,7 @@ static void race_tick_ai(void)
             (race_owner_has_type(owner, B_HYDRALISK_DEN) ? U_HYDRALISK : U_ZERGLING) :
             race == R_PROTOSS ? (race_owner_has_type(owner, B_CYBERNETICS_CORE) ? U_DRAGOON : U_ZEALOT) : U_MARINE;
         for (i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) && b[i].owner == owner &&
-            b[i].type == sc64_race_unit_rule(unit_type)->producer && b[i].queue_count < 2) {
+            sc64_race_producer_compatible(b[i].type, sc64_race_unit_rule(unit_type)->producer) && b[i].queue_count < 2) {
             if(race_owner_minerals(owner)-reserve >= sc64_race_unit_rule(unit_type)->minerals)
                 race_queue_unit(owner, i, unit_type);
             break;

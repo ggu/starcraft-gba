@@ -231,6 +231,18 @@ The source-only suite now includes 47 Python checks. Nine replay checks
 cover tick conversion, queue capacity derived from ELF symbols, malformed
 input transitions, unsupported event kinds and frozen-proof validation.
 
+The replay helper also accepts a bounded `--ticks` prefix and optional
+`--save-at-end`. A 59,000-tick diagnostic replay (`3a45b44f` ROM hash prefix)
+remained in live play at frame 58,707, then used START/B to save frame 58,708
+and flushed a 32-KiB SRAM file on normal emulator shutdown. Prefix reports
+identify themselves as prefixes and skip the full-win assertion. Diagnostic
+cycle counters are last-tick samples; only the cumulative route counters
+produce interval deltas. At tick 59,000 the preceding interval had 2,381 route
+hits and 1,097 field builds, identifying substantial late-battle cache churn.
+These diagnostic timings include instrumentation overhead. The generic
+split profiler now decodes Z3 model/action state in loaded-save snapshots
+and observations. The asset-free suite includes 51 Python checks.
+
 The result adapter retains source predicate/action order but uses explicit
 presentation policies for unresolved timing: 30/15-tick waits, 90-tick
 transmission/text holds and a 13-tick silent loss-audio placeholder. It does
@@ -340,6 +352,27 @@ differential checks but exceeded the stack-preserving code guard; that
 revision was not run as a ROM. The original bucket implementation and the
 expanded race collision tests remain. These are emulator measurements from
 a specific late-mission checkpoint, not physical GBA results.
+
+## HUD and town-hall follow-up (2026-10-22)
+
+The resource and command HUD bands now invalidate independently. Wallet and
+supply updates can refresh the top strip while restoring the command panel.
+Full or empty health bars use one opaque fill and avoid the intermediate-value
+division. A scalar framebuffer oracle covers health-bar values and clipping;
+unified, T3 and Z3 fixtures compare cached HUD pixels against forced redraws
+across resources, queued supply, selection, construction, commands, messages,
+timers and the dynamic minimap. No frame-rate gain is claimed from host tests.
+
+Completed imported Hatcheries, Lairs and Hives share doubled supply of two,
+larva production, creep, prerequisite and producer compatibility. The host
+fixture checks paid Drone/Overlord/Zergling/Hydralisk queues, regrowth and
+caps, incomplete and cross-faction rejection, and actual mineral/gas returns.
+Ordinary placement still has no Lair/Hive/Greater Spire morph operation.
+This supports later campaign integration; it does not enable Higher Ground.
+
+Default build/tests, unified build/tests, all three race-profile suites and
+the T3/Z3 runtime suites pass. The plain Z3 link ends IWRAM at `0x03004ea8`;
+the large-map probe ends at `0x03004f68`, within the unchanged stack guard.
 
 ## Known limits
 

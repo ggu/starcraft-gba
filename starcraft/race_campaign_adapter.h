@@ -139,7 +139,7 @@ race_campaign_ai_tick(void)
     }
     for (i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) && b[i].owner == ENEMY) {
         if (base_x < 0) { base_x = b[i].x; base_y = b[i].y; }
-        if (enemy_race == R_ZERG && b[i].type == B_HATCHERY) producer = i;
+        if (enemy_race == R_ZERG && sc64_race_is_zerg_townhall(b[i].type)) producer = i;
         else if (enemy_race == R_PROTOSS && b[i].type == B_NEXUS) producer = i;
         else if (enemy_race == R_TER && b[i].type == B_COMMAND) producer = i;
     }

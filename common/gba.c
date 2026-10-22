@@ -421,7 +421,14 @@ static HOT void glyph_row(int x,int y,u8 bits,u8 color) {
 }
 HOT void gfx_text(int x,int y,const char*t,u8 c){int origin=x;for(;*t;t++){u8 ch=(u8)*t;if(ch=='\n'){x=origin;y+=9;continue;}if(ch>='a'&&ch<='z')ch-=32;if(ch>=32&&ch<128&&x>-6&&x<240)for(int row=0;row<7;row++)glyph_row(x,y+row,font[ch-32][row],c);x+=6;}}
 HOT void gfx_num(int x,int y,int n,u8 c){char b[12];int i=0;u32 v;if(n<0){gfx_text(x,y,"-",c);x+=6;v=0u-(u32)n;}else v=(u32)n;do{b[i++]='0'+v%10;v/=10;}while(v&&i<11);for(int j=0;j<i;j++){char z[2]={b[i-j-1],0};gfx_text(x+j*6,y,z,c);}}
-HOT void gfx_bar(int x,int y,int w,int h,int v,int max,u8 c,u8 empty){gfx_rect(x,y,w,h,empty);if(max>0)gfx_rect(x,y,w*clampi(v,0,max)/max,h,c);}
+HOT void gfx_bar(int x,int y,int w,int h,int v,int max,u8 c,u8 empty){
+    if(max<=0||v<=0){gfx_rect(x,y,w,h,empty);return;}
+    /* A full bar is just the foreground rectangle; the empty fill is entirely
+       covered, so skip both the overdraw and the old width multiplication. */
+    if(v>=max){gfx_rect(x,y,w,h,c);return;}
+    gfx_rect(x,y,w,h,empty);
+    gfx_rect(x,y,w*clampi(v,0,max)/max,h,c);
+}
 u32 rng_next(u32*s){u32 x=*s;if(!x)x=0x6d2b79f5u;x^=x<<13;x^=x>>17;x^=x<<5;*s=x;return x;}
 static u32 hash_bytes(const u8*p,u32 n){u32 h=2166136261u;while(n--){h^=*p++;h*=16777619u;}return h;}
 #ifdef GBA_HOST

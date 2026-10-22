@@ -2365,7 +2365,7 @@ owner_command_center(int owner)
     for (i = 0; i < MAX_BUILDINGS; i++)
         if (b[i].alive && b[i].owner == owner && (b[i].type == B_COMMAND
 #ifdef SC64_RACES
-        ||b[i].type==B_HATCHERY||b[i].type==B_LAIR||b[i].type==B_NEXUS
+        ||sc64_race_is_zerg_townhall(b[i].type)||b[i].type==B_NEXUS
 #endif
         ) && !b[i].under_construction) return i;
     return -1;
@@ -4059,9 +4059,8 @@ unit_name(int type)
 }
 
 static void
-draw_hud_contents(void)
+draw_hud_resources(void)
 {
-    int i, n = selected_count();
     gfx_rect(0, 0, 240, 12, C_PANEL);
     gfx_text(3, 3, "MIN", C_GOLD);
     gfx_num(24, 3, minerals, C_WHITE);
@@ -4077,6 +4076,12 @@ draw_hud_contents(void)
         C_WHITE);
     gfx_text(165, 3, "/", C_WHITE);
     gfx_num(173, 3, supply_cap / 2, C_WHITE);
+}
+
+static void
+draw_hud_commands(void)
+{
+    int i, n = selected_count();
     gfx_rect(0, 121, 240, 39, C_PANEL);
     gfx_line(0, 120, 240, 120, C_EDGE);
     if (box_state == 2) {
@@ -4201,7 +4206,7 @@ sc64_hud_changed(void)
 {
     int values[24] = {minerals, gas, supply_used, supply_cap, mode, selected_building,
         train_type, mission_unsupported_count};
-    int i, first = -1, changed = !sc64_hud_valid;
+    int i, first = -1, changed = sc64_hud_valid ? 0 : 3;
     for (i = 0; i < MAX_UNITS; i++) if (u[i].alive && u[i].owner == SIDE) {
         if (u[i].selected) { values[8]++; if (first < 0) first = i; }
         if (u[i].type == U_MARINE) values[9]++;
@@ -4233,7 +4238,9 @@ sc64_hud_changed(void)
     for (i = 0; i < skirmish_bots; i++) values[19] += skirmish_owner_alive(skirmish_owner_ids[i]);
 #endif
     for (i = 0; i < 24; i++) {
-        if (sc64_hud_previous[i] != values[i]) changed = 1;
+        /* Wallet and supply changes only affect the top band. Commands,
+           selection and objectives can retain their independently cached art. */
+        if (sc64_hud_previous[i] != values[i]) changed |= i < 4 || i == 23 ? 1 : 2;
         sc64_hud_previous[i] = values[i];
     }
     return changed;
@@ -4244,17 +4251,19 @@ static void
 draw_hud(void)
 {
 #ifdef SC64_IMPORTED_MISSION
-    if (sc64_hud_changed()) {
-        draw_hud_contents();
+    int changed = sc64_hud_changed();
+    if (changed & 1) {
+        draw_hud_resources();
         gfx_read_band(0, 12, sc64_hud_top);
+    } else gfx_blit_band(0, 12, sc64_hud_top);
+    if (changed & 2) {
+        draw_hud_commands();
         gfx_read_band(120, 40, sc64_hud_bottom);
-        sc64_hud_valid = 1;
-    } else {
-        gfx_blit_band(0, 12, sc64_hud_top);
-        gfx_blit_band(120, 40, sc64_hud_bottom);
-    }
+    } else gfx_blit_band(120, 40, sc64_hud_bottom);
+    sc64_hud_valid = 1;
 #else
-    draw_hud_contents();
+    draw_hud_resources();
+    draw_hud_commands();
 #endif
     draw_minimap();
 #ifdef SC64_RACES

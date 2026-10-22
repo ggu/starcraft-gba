@@ -22,7 +22,7 @@ UNIFIED_FLAGS := $(RACES_FLAGS) -DSC64_UNIFIED
 RACE_CAMPAIGN_FLAGS := $(UNIFIED_FLAGS) -DSC64_IMPORTED_SKIRMISH -I.local/sc64/skirmish/generated
 RACE_CAMPAIGN_INPUTS := $(RACES_INPUTS) .local/sc64/skirmish/generated/sc64_skirmish_generated.h
 T3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_T3_ENABLED -DSC64_CAMPAIGN_RACE=0 $(T3_EXTRA_FLAGS)
-Z3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_Z3_ENABLED -DSC64_CAMPAIGN_RACE=1
+Z3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_Z3_ENABLED -DSC64_CAMPAIGN_RACE=1 $(Z3_EXTRA_FLAGS)
 LARGE_PROBE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_CAMPAIGN_RACE=2
 
 .PHONY: all clean test verify probe sc64 backwater skirmish campaign races unified \
@@ -137,10 +137,13 @@ build/test-sc64-t3-targets: tests/sc64_targets.c $(STARCRAFT) $(wildcard starcra
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(T3_FLAGS) $< common/gba.c -o $@
 build/test-sc64-t3-resume: tests/sc64_t3_resume.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(T3_FLAGS) $< common/gba.c -o $@
-test-sc64-t3-runtime: test-sc64-t3-import build/test-sc64-t3-run build/test-sc64-t3-save build/test-sc64-t3-targets build/test-sc64-t3-resume
+build/test-sc64-t3-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(T3_FLAGS) $< common/gba.c -o $@
+test-sc64-t3-runtime: test-sc64-t3-import build/test-sc64-t3-run build/test-sc64-t3-save build/test-sc64-t3-targets build/test-sc64-t3-resume build/test-sc64-t3-hud
 	./build/test-sc64-t3-targets
 	./build/test-sc64-t3-save
 	./build/test-sc64-t3-resume
+	./build/test-sc64-t3-hud
 	./build/test-sc64-t3-run
 
 # Staged New Dominion runtime has its own ROM and save identity.
@@ -159,9 +162,12 @@ build/test-sc64-z3-save: tests/sc64_z3_save.c $(STARCRAFT) $(wildcard starcraft/
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z3_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z3-controller: tests/sc64_z3_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z3_FLAGS) $< common/gba.c -o $@
-test-sc64-z3-runtime: test-sc64-z3-import build/test-sc64-z3-run build/test-sc64-z3-save build/test-sc64-z3-controller
+build/test-sc64-z3-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z3_FLAGS) $< common/gba.c -o $@
+test-sc64-z3-runtime: test-sc64-z3-import build/test-sc64-z3-run build/test-sc64-z3-save build/test-sc64-z3-controller build/test-sc64-z3-hud
 	./build/test-sc64-z3-run
 	./build/test-sc64-z3-save
+	./build/test-sc64-z3-hud
 	./build/test-sc64-z3-controller --policy hybrid --trace .local/sc64/z3-controller-asan-win.json
 
 build/test-sc64-frontend-terran: RACE_FRONTEND_ID=0
@@ -442,7 +448,11 @@ build/test-unified-frontend: tests/sc64_frontend.c starcraft/sc64_frontend.h sta
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST -DSC64_UNIFIED -Icommon tests/sc64_frontend.c -o $@
 build/test-unified-targets: tests/sc64_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
-test-unified: build/test-unified build/test-unified-frontend build/test-unified-menu build/test-unified-engine build/test-unified-factions build/test-unified-campaign build/test-unified-targets
+build/test-sc64-zerg-townhalls: tests/sc64_zerg_townhalls.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
+build/test-unified-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
+test-unified: build/test-unified build/test-unified-frontend build/test-unified-menu build/test-unified-engine build/test-unified-factions build/test-unified-campaign build/test-unified-targets build/test-sc64-zerg-townhalls build/test-unified-hud
 	./build/test-unified
 	./build/test-unified-frontend
 	./build/test-unified-menu
@@ -450,6 +460,8 @@ test-unified: build/test-unified build/test-unified-frontend build/test-unified-
 	./build/test-unified-factions
 	./build/test-unified-campaign
 	./build/test-unified-targets
+	./build/test-sc64-zerg-townhalls
+	./build/test-unified-hud
 
 clean:
 	rm -rf build
