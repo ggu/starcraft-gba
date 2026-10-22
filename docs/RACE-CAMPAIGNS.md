@@ -168,8 +168,8 @@ Jacobs Installation through the ordinary menu. The earlier `181a5063` emulator r
 23.15 effective fps over 7,971 counted live frames, with a worst counted
 interval of 20.71 fps; this is below the 30-fps target and is not physical GBA
 timing. See [Validation](VALIDATION.md) for the ROM/ELF identities and other
-reproducible measurements. The combined build does not add the remaining 20
-missions.
+reproducible measurements. This T1–T4 build excludes later Terran missions;
+the separate T1–T5 target is described below.
 
 The current combined default enables `SC64_UNARMED_QUERY_SKIP`. Its frozen
 2 MiB ROM SHA-256 is
