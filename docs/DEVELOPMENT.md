@@ -338,6 +338,7 @@ to the engine. With both T4 and T5 private scenario headers prepared, run:
 make test-sc64-t5-engine test-sc64-t5-world test-sc64-t5-combat test-sc64-t5-save
 make test-sc64-transport-rules test-sc64-t5-tech
 make test-sc64-transport-engine test-sc64-transport-queries
+make test-sc64-t5-render
 make sc64-t5-engine-probe
 python3 tools/sc64_t5_engine_probe.py --ticks 3000
 python3 tools/sc64_t5_save_smoke.py
@@ -360,9 +361,18 @@ Reports and captures remain under ignored local output directories.
 
 `make sc64-t5-controller-probe` runs a bounded 60,000-tick host controller
 attempt and writes its private trace under `.local/sc64/t5/`. It exercises
-the rescue/base sequence, paid production and an attempted Dropship assault.
-Its private checkpoints record loaded cargo and transport failures. Ending at its limit is an
-unfinished attempt, not a mission-completion test. The separate
+the rescue/base sequence, paid tech and supply construction, safe hero
+positioning, and grouped Wraith attacks. Its input budget is enforced at each
+step. Selection helpers cancel stale command modes, use the actual cursor
+lattice for construction, and isolate a clickable group seed when necessary.
+Private checkpoints include live Marine/Wraith counts and hero survival;
+the replay reads those optional counts from the ARM actor pool. Queue/supply
+diagnostics in a host trace are not independently verified by the ARM helper.
+Ending at its limit is an unfinished attempt, not a mission-completion test.
+For a longer bounded attempt, use `./build/sc64-t5-controller-probe --limit
+75000 --trace .local/sc64/t5/controller-probe.json` after building the target.
+The earlier ferry policy and evidence are retained in prior source revisions.
+The separate
 `SC64_T5_CAMPAIGN_ENTRY` menu flag is covered by asset-free frontend checks
 and enabled only in the internal replay target:
 
@@ -382,6 +392,9 @@ to the same replay helper. It adds update timing counters, including rescue
 contact, mines, and trigger/AI work. These counters add measurement overhead;
 use the ordinary replay ROM for final performance measurements. `--ticks`
 limits a run to a prefix, which does not establish a complete mission win.
+The renderer fixture compares T5 cached frames with cleared fresh renders
+across timer boundaries, visible buildings/minerals, depletion, fog and camera
+movement. Its key reuse adds no persistent runtime storage.
 
 The internal T5 profile now supports paid Starport/Control Tower/Dropship
 production and eight-point cargo capacity. Select ground troops and press A

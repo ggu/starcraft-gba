@@ -81,6 +81,15 @@ class T5ReplayValidationTests(unittest.TestCase):
                 {"raw_type": 20, "alive": 1}]
         self.assertEqual([replay._row_alive(row) for row in rows], [True, False, True])
 
+    def test_live_optional_counts_come_from_actor_rows(self):
+        rows = [pool_unit(0, 0, owner=0), pool_unit(1, 0, owner=0),
+                pool_unit(2, 0, owner=0, order=replay._ORDER_TRANSPORTED),
+                pool_unit(3, 8, owner=0), pool_unit(4, 8, owner=1),
+                pool_unit(5, 19, owner=2), pool_unit(6, 19, owner=1, alive=0)]
+        self.assertEqual(replay.live_controller_counts(rows), {
+            "raynor_alive": 1, "marine_defenders": 2, "paid_wraith_alive": 1,
+        })
+
     def test_untracked_host_slots_do_not_assert_world_absence(self):
         expected = add_aux_snapshot(observation("periodic", 500))
         expected.update({"starport_slot": -1, "starport_raw": -1,
@@ -188,6 +197,12 @@ class T5ReplayValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cannot exceed"):
             replay.scheduler.run_length(plan, 1210)
 
+    def test_rejects_final_observation_beyond_declared_limit(self):
+        trace = sample_trace()
+        trace["events"][-1]["host_tick"] = trace["tick_limit"] + 1
+        with self.assertRaisesRegex(ValueError, "final observation must match"):
+            replay.validate_trace(trace, 256)
+
     def test_rejects_wrong_entry_or_mission_and_bad_start(self):
         for field, value in (("entry", "t5-probe"), ("mission", 7), ("trace_schema", 2)):
             trace = sample_trace()
@@ -225,6 +240,37 @@ class T5ReplayValidationTests(unittest.TestCase):
         trace = sample_trace()
         trace["events"][-1]["kind"] = "won"
         with self.assertRaisesRegex(ValueError, "unfinished limit run"):
+            replay.validate_trace(trace, 256)
+
+    def test_accepts_current_wraith_strategy_checkpoints_and_optional_actor_counts(self):
+        trace = sample_trace()
+        kinds = ("heroes-held-safe-home", "paid-supply-depot-complete",
+                 "wraith-seed-isolated", "wraith-wing-gathering",
+                 "wraith-wing-progress", "wraith-wing-before-attack",
+                 "wraith-wing-attack-issued", "wraith-wing-after-attack",
+                 "wraith-wing-assault")
+        for index, kind in enumerate(kinds):
+            tick = 510 + index
+            trace["events"].append(observation(kind, tick, frame=tick, elapsed=tick,
+                                               raynor_alive=1, marine_defenders=16,
+                                               paid_wraith_alive=index))
+        trace["events"].sort(key=lambda event: event["host_tick"])
+        plan = replay.validate_trace(trace, 256)
+        found = [row["kind"] for row in plan["checkpoints"] if row["kind"] in kinds]
+        self.assertEqual(found, list(kinds))
+        row = next(row for row in plan["checkpoints"] if row["kind"] == "wraith-wing-gathering")
+        actual = {**OBS, "frame": row["frame"], "elapsed": row["elapsed"],
+                  "raynor_alive": 1, "marine_defenders": 16, "paid_wraith_alive": 3}
+        replay.compare_observation(row, actual, "wraith-counts")
+        actual["paid_wraith_alive"] = 2
+        with self.assertRaisesRegex(RuntimeError, "paid_wraith_alive mismatch"):
+            replay.compare_observation(row, actual, "wraith-counts")
+
+    def test_optional_actor_counts_are_typed_and_old_traces_may_omit_them(self):
+        self.assertTrue(replay.validate_trace(sample_trace(), 256)["checkpoints"])
+        trace = sample_trace()
+        trace["events"][2]["marine_defenders"] = True
+        with self.assertRaisesRegex(ValueError, "marine_defenders must be an integer"):
             replay.validate_trace(trace, 256)
 
     def test_rejects_overcapacity_observer_page(self):

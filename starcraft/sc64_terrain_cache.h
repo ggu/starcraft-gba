@@ -46,18 +46,18 @@ static volatile u32 sc64_terrain_diag_captured_tiles;
 static volatile u32 sc64_terrain_diag_tiles_checked;
 static volatile u32 sc64_terrain_diag_dirty_tiles;
 #define SC64_TERRAIN_DIAG_ADD(counter, amount) ((counter) += (u32)(amount))
-#define SC64_TERRAIN_DIAG_REJECT() do { \
+#define SC64_TERRAIN_DIAG_REJECT(key) do { \
     if (!sc64_terrain_cache_valid) SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_cache, 1); \
     else if (sc64_terrain_cache_mission != sc64_terrain_cache_mission_key()) \
         SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_mission_change, 1); \
-    else if (sc64_terrain_cache_static_key != (unsigned int)(SC64_TERRAIN_STATIC_KEY)) \
+    else if (sc64_terrain_cache_static_key != (unsigned int)(key)) \
         SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_static_key_change, 1); \
 } while (0)
-#define SC64_TERRAIN_DIAG_REJECT_AT(x, y) do { \
+#define SC64_TERRAIN_DIAG_REJECT_AT(x, y, key) do { \
     if (!sc64_terrain_cache_valid) SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_cache, 1); \
     else if (sc64_terrain_cache_mission != sc64_terrain_cache_mission_key()) \
         SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_mission_change, 1); \
-    else if (sc64_terrain_cache_static_key != (unsigned int)(SC64_TERRAIN_STATIC_KEY)) \
+    else if (sc64_terrain_cache_static_key != (unsigned int)(key)) \
         SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_static_key_change, 1); \
     else if ((x) != sc64_terrain_cache_camx || (y) != sc64_terrain_cache_camy) \
         SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_camera_change, 1); \
@@ -103,8 +103,15 @@ sc64_terrain_cache_view(int x, int y, int *col0, int *row0,
             (*col1 - *col0) * (*row1 - *row0) <= SC64_TERRAIN_CACHE_CELLS);
 }
 
+#ifdef SC64_T5_RUNTIME
+#define SC64_TERRAIN_CACHE_KEY static_key
+static int
+sc64_terrain_cached_key(int x, int y, unsigned int static_key)
+#else
+#define SC64_TERRAIN_CACHE_KEY (unsigned int)(SC64_TERRAIN_STATIC_KEY)
 static int
 sc64_terrain_cached(int x, int y)
+#endif
 {
 #ifdef SC64_TERRAIN_SCROLL
     int old_col0, old_row0, old_col1, old_row1;
@@ -114,9 +121,9 @@ sc64_terrain_cached(int x, int y)
     sc64_terrain_cache_reused_base = 0;
     if (!sc64_terrain_cache_valid ||
         sc64_terrain_cache_mission != sc64_terrain_cache_mission_key() ||
-        sc64_terrain_cache_static_key != (unsigned int)(SC64_TERRAIN_STATIC_KEY)) {
+        sc64_terrain_cache_static_key != SC64_TERRAIN_CACHE_KEY) {
 #ifdef SC64_DIAGNOSTIC_TERRAIN
-        SC64_TERRAIN_DIAG_REJECT();
+        SC64_TERRAIN_DIAG_REJECT(SC64_TERRAIN_CACHE_KEY);
 #endif
         return 0;
     }
@@ -251,9 +258,9 @@ sc64_terrain_cached(int x, int y)
     if (!sc64_terrain_cache_valid ||
         x != sc64_terrain_cache_camx || y != sc64_terrain_cache_camy ||
         sc64_terrain_cache_mission != sc64_terrain_cache_mission_key() ||
-        sc64_terrain_cache_static_key != (unsigned int)(SC64_TERRAIN_STATIC_KEY)) {
+        sc64_terrain_cache_static_key != SC64_TERRAIN_CACHE_KEY) {
 #ifdef SC64_DIAGNOSTIC_TERRAIN
-        SC64_TERRAIN_DIAG_REJECT_AT(x, y);
+        SC64_TERRAIN_DIAG_REJECT_AT(x, y, SC64_TERRAIN_CACHE_KEY);
 #endif
         return 0;
     }
@@ -309,6 +316,7 @@ sc64_terrain_cached(int x, int y)
     return unchanged;
 #endif
 }
+#undef SC64_TERRAIN_CACHE_KEY
 
 static int
 sc64_terrain_tile_clean(int col, int row)
@@ -329,8 +337,15 @@ sc64_terrain_tile_clean(int col, int row)
     return !sc64_terrain_cache_dirty[i];
 }
 
+#ifdef SC64_T5_RUNTIME
+#define SC64_TERRAIN_CACHE_KEY static_key
+static int
+sc64_terrain_store_key(int x, int y, unsigned int static_key)
+#else
+#define SC64_TERRAIN_CACHE_KEY (unsigned int)(SC64_TERRAIN_STATIC_KEY)
 static int
 sc64_terrain_store(int x, int y)
+#endif
 {
     int col0, row0, col1, row1, col, row, i = 0;
     if (!sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1) ||
@@ -362,11 +377,12 @@ sc64_terrain_store(int x, int y)
     sc64_terrain_cache_camx = x;
     sc64_terrain_cache_camy = y;
     sc64_terrain_cache_mission = sc64_terrain_cache_mission_key();
-    sc64_terrain_cache_static_key = (unsigned int)(SC64_TERRAIN_STATIC_KEY);
+    sc64_terrain_cache_static_key = SC64_TERRAIN_CACHE_KEY;
     sc64_terrain_cache_valid = 1;
     sc64_terrain_cache_reused_base = 0;
     return 1;
 }
+#undef SC64_TERRAIN_CACHE_KEY
 
 #ifdef SC64_TERRAIN_LOCAL_GRID_GET
 #undef SC64_GRID_GET

@@ -44,6 +44,10 @@ TRACE_CHECKPOINTS = frozenset({
     "before-starport-tech", "starport-complete", "control-tower-complete",
     "dropship-complete", "dropship-loaded", "dropship-landed", "dropship-unloaded",
     "dropship-destroyed-in-transit", "dropship-landing-assault", "dropship-assault-result",
+    "heroes-held-safe-home", "heroes-parked-home", "paid-supply-depot-complete",
+    "wraith-seed-isolated", "wraith-wing-gathering", "wraith-wing-progress",
+    "wraith-wing-before-attack", "wraith-wing-attack-issued",
+    "wraith-wing-after-attack", "wraith-wing-assault",
 })
 OBS_FIELDS = (
     "frame", "elapsed", "screen", "race_mode", "race_selected_mission",
@@ -51,6 +55,7 @@ OBS_FIELDS = (
     "side_units", "enemy_units", "side_buildings", "enemy_buildings",
     "kerrigan_alive", "minerals", "gas", "enemy_minerals", "enemy_gas",
 )
+OPTIONAL_OBS_FIELDS = ("raynor_alive", "marine_defenders", "paid_wraith_alive")
 
 
 def menu_prefix() -> list[tuple[int, int]]:
@@ -64,6 +69,12 @@ def require_int_fields(row: dict, fields: tuple[str, ...], label: str) -> None:
         if field not in row:
             raise ValueError(f"{label} event is missing required field {field}")
         if type(row[field]) is not int:
+            raise ValueError(f"{label} field {field} must be an integer")
+
+
+def require_optional_int_fields(row: dict, fields: tuple[str, ...], label: str) -> None:
+    for field in fields:
+        if field in row and type(row[field]) is not int:
             raise ValueError(f"{label} field {field} must be an integer")
 
 
@@ -264,12 +275,14 @@ def validate_trace(trace: object, capacity: int) -> dict:
             if source_inputs:
                 raise ValueError("T5 start observation must precede source controller inputs")
             require_int_fields(row, OBS_FIELDS, "start")
+            require_optional_int_fields(row, OPTIONAL_OBS_FIELDS, "start")
             validate_aux_snapshot(row, "start")
             start = row
         elif kind in TRACE_CHECKPOINTS - {"start"}:
             if start is None or final is not None:
                 raise ValueError(f"{kind} checkpoint must follow start and precede final")
             require_int_fields(row, OBS_FIELDS, kind)
+            require_optional_int_fields(row, OPTIONAL_OBS_FIELDS, kind)
             validate_aux_snapshot(row, kind)
             if checkpoints and tick < checkpoints[-1]["host_tick"]:
                 raise ValueError("T5 observation checkpoints must be ordered")
@@ -278,6 +291,7 @@ def validate_trace(trace: object, capacity: int) -> dict:
             if start is None or final is not None or i != len(rows) - 1:
                 raise ValueError("T5 trace must end with exactly one final outcome observation")
             require_int_fields(row, OBS_FIELDS, "final")
+            require_optional_int_fields(row, OPTIONAL_OBS_FIELDS, "final")
             validate_aux_snapshot(row, "final")
             final = row
             final_source_tick = tick
@@ -412,6 +426,17 @@ def _row_alive(row: dict) -> bool:
     return bool(row.get("alive", True))
 
 
+def live_controller_counts(unit_rows: list[dict]) -> dict[str, int]:
+    """Derive only the extra actor counts the controller trace exposes."""
+    return {
+        "raynor_alive": int(any(row["alive"] and row["raw_type"] == 19 for row in unit_rows)),
+        "marine_defenders": sum(1 for row in unit_rows if row["alive"] and row["owner"] == 0 and
+                                 row["raw_type"] == 0 and row["order"] != _ORDER_TRANSPORTED),
+        "paid_wraith_alive": sum(1 for row in unit_rows if row["alive"] and row["owner"] == 0 and
+                                  row["raw_type"] == 8 and row["order"] != _ORDER_TRANSPORTED),
+    }
+
+
 def replay_aux_state(rsp, sym: dict[str, int], bank: dict, buildings: dict) -> dict:
     """Read current tech, transport, and passenger state from the ARM world."""
     building_rows = buildings["entities"]
@@ -544,8 +569,6 @@ def t5_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
     state["enemy_buildings"] = buildings["by_owner"].get("1", 0)
     state["kerrigan_alive"] = int(any(_row_alive(row) and row["raw_type"] == 16
                                      for row in state["units"]["entities"]))
-    state["raynor_alive"] = int(any(_row_alive(row) and row["raw_type"] == 19
-                                    for row in state["units"]["entities"]))
     state["human_outcome"] = players[0]["outcome"]
     state["faults"] = sum(bool(p["fault"]) for p in players)
     state["outcomes"] = sum(bool(p["outcome"]) for p in players)
@@ -558,11 +581,13 @@ def t5_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
     state["enemy_minerals"] = state["race_minerals"][1]
     state["enemy_gas"] = state["race_gas"][1]
     state["replay_aux"] = replay_aux_state(rsp, sym, bank, state["buildings"])
+    live_rows = state["replay_aux"]["_unit_rows"]
+    state.update(live_controller_counts(live_rows))
     return state
 
 
 def compare_observation(expected: dict, actual: dict, label: str) -> None:
-    for field in OBS_FIELDS:
+    for field in (*OBS_FIELDS, *OPTIONAL_OBS_FIELDS):
         if field in expected and expected[field] != actual.get(field):
             raise RuntimeError(f"{label} {field} mismatch: expected {expected[field]!r}, "
                                f"observed {actual.get(field)!r}")

@@ -4464,10 +4464,18 @@ draw_map(void)
 #ifdef SC64_IMPORTED_MISSION
     u32 profile_stage_start;
 #endif
+#if defined(SC64_T5_RUNTIME) && defined(SC64_IMPORTED_MISSION)
+    unsigned int terrain_static_key;
+#endif
     camx = viewport_left();
     camy = viewport_top();
 #ifdef SC64_IMPORTED_MISSION
     profile_stage_start = gba_clock();
+#endif
+#if defined(SC64_T5_RUNTIME) && defined(SC64_IMPORTED_MISSION)
+    /* The key is unchanged between cache lookup and capture; compute the
+     * roster/visibility snapshot once and pass it through both operations. */
+    terrain_static_key = sc64_static_objects_key();
 #endif
 #ifdef SC64_IMPORTED_MISSION
     col0 = limit(camx / 16, 0, MAP_COLS - 1);
@@ -4478,7 +4486,11 @@ draw_map(void)
     /* Each tile gets one terrain/fog pass. Unknown space stays black from
      * gfx_begin, so it needs no second opaque fill after sprites are drawn. */
 #ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_T5_RUNTIME
+    if (!sc64_terrain_cached_key(camx, camy, terrain_static_key)) {
+#else
     if (!sc64_terrain_cached(camx, camy)) {
+#endif
 #endif
     for (row = row0; row < row1; row++)
 	for (col = col0; col < col1; col++) {
@@ -4574,7 +4586,11 @@ draw_map(void)
     for (i = 0; i < MAX_BUILDINGS; i++)
         if (b[i].alive)
             draw_building_art(&b[i]);
+#ifdef SC64_T5_RUNTIME
+    sc64_terrain_store_key(camx, camy, terrain_static_key);
+#else
     sc64_terrain_store(camx, camy);
+#endif
     }
     sc64_background_cycles = gba_clock() - profile_stage_start;
     profile_stage_start = gba_clock();
@@ -4960,7 +4976,14 @@ sc64_hud_changed(void)
 #endif
     /* race_tick_state has already counted live supply before rendering. */
     values[23]=supply_used+race_owner_queued_supply(SIDE);
-    values[21]=race_selected_mission;values[22]=frame/30;
+    values[21]=race_selected_mission;
+#ifdef SC64_T5_RUNTIME
+    /* T5 has no HUD text driven by the elapsed frame counter. Keep the
+     * once-per-second invalidation for timed missions such as T1 and T3. */
+    values[22]=race_t5_active()?0:frame/30;
+#else
+    values[22]=frame/30;
+#endif
 #endif
 #ifdef SC64_BACKWATER
 #ifdef SC64_TERRAN_CAMPAIGN

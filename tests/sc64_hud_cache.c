@@ -7,6 +7,11 @@
 enum { HUD_TOP = 1, HUD_BOTTOM = 2, FB_PIXELS = 240 * 160 };
 static u8 cached_pixels[FB_PIXELS];
 static u8 full_pixels[FB_PIXELS];
+#ifdef SC64_T5_RUNTIME
+static u8 cached_game_frame[FB_PIXELS];
+static u8 fresh_game_frame[FB_PIXELS];
+static u8 t5_frame29_bottom[240 * 40];
+#endif
 
 static void
 fixture(void)
@@ -195,6 +200,123 @@ test_mission_message_timer_and_minimap_stay_pixel_exact(void)
     assert_cached_matches_full();
 }
 
+#ifdef SC64_T5_RUNTIME
+static void
+capture_game_frame(u8 *out)
+{
+    for (int y = 0; y < 160; ++y)
+        for (int x = 0; x < 240; ++x)
+            out[y * 240 + x] = gfx_test_pixel(x, y);
+}
+
+static void
+assert_cached_game_matches_fresh(void)
+{
+    /* Poison both buffers for the cache candidate, then independently clear
+       the oracle buffer so preserve-mode holes cannot match by accident. */
+    gfx_begin(0xe7); gfx_end();
+    gfx_begin(0xe7); gfx_end();
+    game_render();
+    capture_game_frame(cached_game_frame);
+
+    sc64_terrain_cache_valid = 0;
+    sc64_hud_valid = 0;
+    gfx_begin(C_BLACK);
+    game_render();
+    capture_game_frame(fresh_game_frame);
+    assert(memcmp(cached_game_frame, fresh_game_frame,
+                  sizeof(cached_game_frame)) == 0);
+}
+
+static void
+test_t5_static_cache_key_and_hud_timer_are_pixel_exact(void)
+{
+    game_init();
+    race_mode = 0;
+    race_selected_mission = SC64_T5_GLOBAL_ID;
+    init_state();
+    assert(race_t5_active());
+    assert(screen == SCREEN_PLAY);
+    mode = MODE_NORMAL;
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    memset(m, 0, sizeof(m));
+    cx = 120; cy = 54; /* Top-left map edge. */
+    SC64_GRID_CLEAR(visible);
+    SC64_GRID_CLEAR(explored);
+    for (int row = 0; row < 12; ++row)
+        for (int col = 0; col < 18; ++col) {
+            int cell = col + row * MAP_COLS;
+            SC64_GRID_SET(explored, cell, 1);
+            if ((row + col) & 1) SC64_GRID_SET(visible, cell, 1);
+        }
+
+    /* Place actual drawable static objects in the visible viewport. This is
+       render-fixture state only; no gameplay or campaign proof is implied. */
+    m[0].amount = 50; m[0].x = 120; m[0].y = 64; m[0].style = 0;
+    int mineral_cell = (m[0].x / 16) + (m[0].y / 16) * MAP_COLS;
+    SC64_GRID_SET(visible, mineral_cell, 1);
+    SC64_GRID_SET(explored, mineral_cell, 1);
+    int building_slot = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (!b[i].alive) { building_slot = i; break; }
+    assert(building_slot >= 0);
+    b[building_slot].alive = 1;
+    b[building_slot].owner = ENEMY;
+    b[building_slot].type = B_COMMAND;
+    b[building_slot].raw_type = -1;
+    b[building_slot].x = 136; b[building_slot].y = 80;
+    b[building_slot].hp = b[building_slot].maxhp = 100;
+    int building_cell = (b[building_slot].x / 16) +
+                        (b[building_slot].y / 16) * MAP_COLS;
+    SC64_GRID_SET(explored, building_cell, 1);
+    SC64_GRID_SET(visible, building_cell, 0);
+
+    frame = 29;
+    sc64_terrain_cache_valid = 0;
+    sc64_hud_valid = 0;
+    assert_cached_game_matches_fresh();
+    assert(sc64_hud_changed() == 0);
+    memcpy(t5_frame29_bottom, &fresh_game_frame[120 * 240],
+           sizeof(t5_frame29_bottom));
+    frame = 30;
+    assert(sc64_hud_changed() == 0);
+    assert_cached_game_matches_fresh();
+    assert(memcmp(t5_frame29_bottom, &fresh_game_frame[120 * 240],
+                  sizeof(t5_frame29_bottom)) == 0);
+
+    /* Fog, camera, resources, and visible static-object state still key their
+       respective cached pixels correctly after the one-key-per-draw change. */
+    u8 before_object_change[FB_PIXELS];
+    memcpy(before_object_change, fresh_game_frame, sizeof(before_object_change));
+    SC64_GRID_SET(visible, building_cell, 1);
+    assert_cached_game_matches_fresh();
+    assert(memcmp(before_object_change, fresh_game_frame,
+                  sizeof(before_object_change)) != 0);
+
+    memcpy(before_object_change, fresh_game_frame, sizeof(before_object_change));
+    m[0].amount = 0; /* Deplete/remove the visible mineral patch. */
+    assert_cached_game_matches_fresh();
+    assert(memcmp(before_object_change, fresh_game_frame,
+                  sizeof(before_object_change)) != 0);
+
+    minerals += 73; gas += 19;
+    assert_cached_game_matches_fresh();
+
+    /* Switch the building from visible to explored-only, then pan inward from
+       the map edge while checking the cached result against a cleared redraw. */
+    SC64_GRID_SET(visible, building_cell, 0);
+    assert_cached_game_matches_fresh();
+    cx += 16; cy += 16;
+    assert_cached_game_matches_fresh();
+
+    /* The explored bit also affects the tile's fog art independently of the
+       building's own visibility. */
+    SC64_GRID_SET(explored, building_cell, 0);
+    assert_cached_game_matches_fresh();
+}
+#endif
+
 #if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
 /* Direct model-state render fixture: mission 22's sequence is part of the
    bottom-band cache key because its pending transmission changes the footer. */
@@ -225,6 +347,9 @@ main(void)
     test_wallet_and_queued_supply_invalidate_top_only();
     test_selection_building_box_and_modes_invalidate_bottom();
     test_mission_message_timer_and_minimap_stay_pixel_exact();
+#ifdef SC64_T5_RUNTIME
+    test_t5_static_cache_key_and_hud_timer_are_pixel_exact();
+#endif
 #if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     test_p3_sequence_invalidates_bottom_and_matches_redraw();
 #endif

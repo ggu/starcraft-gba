@@ -393,6 +393,11 @@ build/test-sc64-t5-availability-engine: tests/sc64_t5_availability_engine.c $(ST
 .PHONY: test-sc64-t5-availability-engine
 test-sc64-t5-availability-engine: build/test-sc64-t5-availability-engine
 	./build/test-sc64-t5-availability-engine
+build/test-sc64-t5-render: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-t5-render
+test-sc64-t5-render: build/test-sc64-t5-render
+	./build/test-sc64-t5-render
 build/test-sc64-t5-world build/test-sc64-t5-engine build/sc64-t5-controller-probe build/test-sc64-t5-save build/test-sc64-t5-tech build/test-sc64-transport-engine build/test-sc64-transport-queries build/test-sc64-t5-combat build/starcraft-t5-engine-probe.elf build/starcraft-t5-controller-replay.elf: $(T5_AVAILABILITY_HEADER)
 build/test-sc64-t5-tech: tests/sc64_t5_tech.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@

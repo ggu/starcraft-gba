@@ -1454,6 +1454,52 @@ controller checks and all 18 skirmish launch combinations pass. The combined
 T1–T4 ROM retains its earlier hash. Revolution remains internal and the
 playable campaign total remains 10/30.
 
+## T5 render keys and bounded grouped air assault (2026-10-23)
+
+The T5 profile now computes the static-object key once per map draw and
+passes it to terrain-cache lookup and capture. It also avoids invalidating
+the command-band cache solely for elapsed seconds in Revolution, whose HUD
+does not display a timer. Other profiles retain their existing cache paths;
+T1/T3 timer invalidation is preserved within the T5 build. No persistent RAM
+or save fields are added.
+
+`make test-sc64-t5-render` compares actual cached frames with separately
+cleared fresh renders. Fixtures cover the 29-to-30-frame boundary, on-screen
+building visibility/exploration, mineral depletion, camera edge/panning and
+ordinary HUD invalidation. On the common 10,000-input-tick ferry prefix, all
+23 reported gameplay observations match the preceding build and effective
+fps improves from 27.03 to 27.26. The new run continues to 10,009 ticks and
+reports 27.25 fps overall. These are prefix measurements.
+
+The controller probe also enforces its input budget inside each step, clears
+stale construction/menu modes before selection, places paid Depots on the
+actual cursor lattice, and uses a normal L-cycle/MOVE to isolate a group seed.
+It clears producer selection before same-type double taps so a click is not
+consumed as another training command. These are probe input-policy changes;
+the engine's selection, damage and economy rules are unchanged.
+
+A 75,000-input-tick host attempt pays for two additional Depots and a Wraith
+wing, then issues grouped attacks. The normal-menu ARM replay matches its
+checkpoints through 75,009 input ticks, including optional Raynor, Marine and
+Wraith observations decoded from the live unit pool. Enemy buildings fall
+from 21 to 16. It ends in active play at frame 74,801 with both heroes alive,
+19 SIDE buildings, 16 Marines, nine Wraiths and no trigger faults. It averages
+22.25 effective fps; the worst counted observer interval is 14.33 fps. This
+is a different, larger-army workload from the earlier ferry benchmark. It is
+not a full mission win or near-30-fps battle qualification.
+
+The 4 MiB ordinary replay ROM has SHA-256
+`936a486fea32322901bf0a8c44b44cf63655a454b8b73a46bf6b65a84bf122af`
+and ELF SHA-256
+`8df18dc44f61d4211f3d491b12e396e48e10dbaee11e5c304d0551f857f12c8b`.
+Text/data/BSS are 2,240,544/388/243,216 bytes. IWRAM ends at `0x03004f90`
+and BSS at `0x0203b798`; both existing reserve guards pass. Default checks
+(128 Python tests), unified checks, combined T3/T4 runtime/save/controller
+checks, all 18 skirmish launch combinations and focused T5 engine/world/save/
+transport-query/render sanitizer checks pass. The combined T1–T4 ROM retains
+its previous hash. Revolution remains internal; 10 of 30 campaign missions
+are playable and physical GBA qualification remains outstanding.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.
