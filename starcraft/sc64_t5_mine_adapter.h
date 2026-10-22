@@ -123,13 +123,16 @@ sc64_t5_mine_find_target(const Unit *mine)
        centers with an acquisition square; this is the bounded slot-order
        policy used by this runtime adapter. */
     for (int i = 0; i < MAX_UNITS; ++i) {
+        const Unit *candidate = &u[i];
         int dx, dy, d;
-        if (!sc64_t5_mine_unit_targetable(mine, &u[i])) continue;
-        dx = u[i].x * 2 - mx; dy = u[i].y * 2 - my;
+        if (!candidate->alive) continue;
+        dx = candidate->x * 2 - mx;
+        dy = candidate->y * 2 - my;
         if (dx < -SC64_T5_MINE_ACQUIRE_SOURCE_PX ||
             dx > SC64_T5_MINE_ACQUIRE_SOURCE_PX ||
             dy < -SC64_T5_MINE_ACQUIRE_SOURCE_PX ||
             dy > SC64_T5_MINE_ACQUIRE_SOURCE_PX) continue;
+        if (!sc64_t5_mine_unit_targetable(mine, candidate)) continue;
         d = dx * dx + dy * dy;
         if (d < best) { best = d; selected = i; }
     }

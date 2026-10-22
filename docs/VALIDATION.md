@@ -1415,6 +1415,45 @@ Revolution remains internal pending controller completion and further
 performance work. The playable total remains 10/30; physical GBA validation
 is still outstanding.
 
+## T5 mine acquisition cost (2026-10-23)
+
+Diagnostic stage counters isolate rescue contact, mine updates and the
+trigger/AI runner. On the same 10,009-input-tick controller prefix, mine
+processing accounts for 73,342 cycles at frame 9,977 of the baseline build.
+Moving dead/out-of-square rejection before the unchanged targetability
+predicate reduces that observation to 25,521 cycles. Candidate order,
+inclusive square bounds and strict nearest-distance ties are unchanged.
+All 24 reported gameplay observations, including actor/building records,
+match across these two diagnostic runs. The instrumented prefix improves
+from 22.60 to 27.03 effective fps; it is a diagnostic comparison, not a final
+ordinary-ROM or complete-mission measurement.
+
+An old-order full-scan oracle matches the optimized selection across 1,200
+seeded rosters containing dead, airborne, hovering, invincible, loaded and
+different-owner actors. Explicit fixtures check boundary targets, square
+corners and equal-distance slot ties. T5 combat/engine/world/availability and
+transport query sanitizer checks pass. No runtime cache, persistent state,
+save generation or additional RAM is introduced.
+
+The ordinary ROM then completes the same 60,009-input-tick menu/ferry replay.
+All 122 reported gameplay observations match the production-restricted
+baseline, including live actor/building records, source trigger state,
+wallets and cargo observations. Mean effective fps rises from 20.97 to 25.13;
+the worst counted observer interval rises from 15.54 to 16.66 fps. It ends at
+frame 59,816 in active play with 21 enemy buildings and no trigger faults.
+This is still an unfinished mission, with performance below the 30-fps target.
+
+The optimized 4 MiB normal-menu ROM has SHA-256
+`c30dbc425c0ec6336d75783320581b14a57cf140a1d47f3e51a0b65aaf4cd011`
+and ELF SHA-256
+`865b96468d6139cc5fe4e12c41428f51280cb89396caee92c9c66e9b6d033508`.
+Text/data/BSS are 2,240,552/388/243,216 bytes. IWRAM and BSS still end at
+`0x03004f78` and `0x0203b798`; both reserve guards are unchanged. Default
+build/tests (124 Python tests), unified checks, combined T3/T4 runtime/save/
+controller checks and all 18 skirmish launch combinations pass. The combined
+T1–T4 ROM retains its earlier hash. Revolution remains internal and the
+playable campaign total remains 10/30.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.
