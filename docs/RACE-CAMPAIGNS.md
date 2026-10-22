@@ -70,6 +70,19 @@ attacks on enemy structures. It wins with the Chrysalis intact. This is a
 host gameplay regression; ARM full-mission timing and physical GBA validation
 remain separate checks.
 
+To replay that host test's complete input trace on the current experimental
+ARM build, run this after the build/test command above:
+
+```sh
+python3 tools/sc64_z3_controller_replay.py
+```
+
+The helper validates the current proof trace and derives the controller queue
+capacity from the ELF. It starts from a fresh HOME screen, schedules inputs
+and checks the final mission, roster, resources and objective state. Reports,
+saves and captures stay local in ignored output directories. Use `--rom`,
+`--elf`, `--trace` and `--out` to retain a frozen build and separate runs.
+
 Enemy pressure uses paid Marines every two minutes and small attacks from
 the imported guards every three minutes. This is an authored substitute for
 the source AI script. Result actions use explicit presentation timing policies:
