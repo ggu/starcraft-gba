@@ -69,6 +69,14 @@ static void round_trip_and_atomic_validation(void)
     race_t4.switches.bits[31] = 0x80; /* Highest shared switch index. */
     for (unsigned p = 0; p < 8; ++p)
         if (p != 5) race_t4.player[p].elapsed_ticks = frame;
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+    build_path_grid();
+    int route_goal = -1;
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        if (SC64_GRID_GET(path_walkable, cell)) { route_goal = cell; break; }
+    assert(route_goal >= 0 && sc64_route_slot(route_goal) >= 0);
+    assert(sc64_route_builds > 0); /* The shared scratch has held a BFS queue. */
+#endif
     assert(race_save_game());
     assert(race_t4_save_candidate_valid(&race_data, race_cols, race_rows));
     good_save = race_data;
@@ -90,6 +98,25 @@ static void round_trip_and_atomic_validation(void)
     assert(memcmp(saved_units, u, sizeof(u)) == 0);
     assert(memcmp(saved_buildings, b, sizeof(b)) == 0);
     assert(memcmp(&saved_t4, &race_t4, sizeof(race_t4)) == 0);
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+    /* Dropping the inactive instance is valid only for its exact canonical
+     * source state. A rejected save must leave the preceding SRAM record. */
+    ++race_t4.player[5].elapsed_ticks;
+    assert(!race_save_game());
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    memset(&race_t4, 0, sizeof(race_t4));
+    assert(race_load_game());
+    assert(memcmp(saved_units, u, sizeof(u)) == 0);
+    assert(memcmp(saved_buildings, b, sizeof(b)) == 0);
+    assert(memcmp(&saved_t4, &race_t4, sizeof(race_t4)) == 0);
+    build_path_grid();
+    sc64_routes_reset();
+    route_goal = -1;
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        if (SC64_GRID_GET(path_walkable, cell)) { route_goal = cell; break; }
+    assert(route_goal >= 0 && sc64_route_slot(route_goal) >= 0);
+#endif
 
     for (unsigned d = 0; d < sc64_t4_scenario.doodad_count; ++d) {
         unsigned slot = race_t4.doodad_slot[d];
@@ -168,6 +195,15 @@ static void non_t4_saves_zero_the_optional_state(void)
 
 int main(void)
 {
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+    _Static_assert(SC64_RACE_SAVE_GENERATION == 11u,
+                   "combined T3/T4 saves require a distinct generation");
+    _Static_assert(sizeof(RaceSave) <= 16368,
+                   "combined payload must fit one SRAM record");
+    _Static_assert(sizeof(Sc64CombinedRouteSaveScratch) >= sizeof(RaceSave),
+                   "route BFS storage must cover the typed save scratch");
+    assert((void *)&race_data == (void *)&sc64_combined_route_save_scratch);
+#endif
     start_fixture();
     round_trip_and_atomic_validation();
     non_t4_saves_zero_the_optional_state();

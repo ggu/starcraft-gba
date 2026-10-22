@@ -1,6 +1,14 @@
 #ifndef SC64_CAMPAIGN_CATALOG_H
 #define SC64_CAMPAIGN_CATALOG_H
 
+#ifdef SC64_T4_CAMPAIGN_ENTRY
+#if !defined(SC64_T3_ENABLED) || !defined(SC64_T4_SCENARIO_RUNTIME) || \
+    !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || \
+    SC64_CAMPAIGN_RACE != 0
+#error "SC64_T4_CAMPAIGN_ENTRY requires the combined unified Terran T3/T4 profile"
+#endif
+#endif
+
 /* Asset-free metadata for the ten original missions in each campaign.
  * Global IDs 0..5 are a save/loader contract and must not be reordered. */
 enum {
@@ -33,7 +41,13 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
      0,
 #endif
      "DESPERATE ALLIANCE"},
-    {7, SC64_FACTION_TERRAN, 4, 0, "THE JACOBS INSTALLATION"},
+    {7, SC64_FACTION_TERRAN, 4,
+#ifdef SC64_T4_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "THE JACOBS INSTALLATION"},
     {8, SC64_FACTION_TERRAN, 5, 0, "REVOLUTION"},
     {9, SC64_FACTION_TERRAN, 6, 0, "NORAD II"},
     {10, SC64_FACTION_TERRAN, 7, 0, "THE TRUMP CARD"},

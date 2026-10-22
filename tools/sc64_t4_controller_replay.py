@@ -31,6 +31,7 @@ from emulator_smoke import ROOT, capture, symbol_sizes, symbols
 MISSION_T4 = 7
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_RESULT = 0, 1, 3
 KEY_A, KEY_SELECT, KEY_START = 1, 4, 8
+KEY_RIGHT, KEY_DOWN = 16, 128
 DEFAULT_TRACE = ROOT / ".local/sc64/t4-controller-attempt.json"
 DEFAULT_OUTPUT = ROOT / "build/emulator/sc64-t4-controller-replay"
 TRIGGER_BYTES = 144
@@ -38,13 +39,26 @@ T4_STATE_BYTES = 1268
 T4_PLAYERS = 8
 T4_TRIGGER_LIMIT = 64
 CHECKPOINT_TICKS = scheduler.CHECKPOINT_TICKS
-T4_CYCLE_NAMES = ("sc64_t4_rescue_cycles", "sc64_t4_script_cycles", "sc64_t4_trap_cycles")
+T4_CYCLE_NAMES = ("sc64_t4_rescue_cycles", "sc64_t4_script_cycles", "sc64_t4_trap_cycles",
+                  "sc64_hud_minimap_cycles")
+
+
+def profile_label(entry: str) -> str:
+    """Name the user-visible T4 entry route in reports and progress files."""
+    return "terran-t4-campaign-menu" if entry == "campaign-menu" else "terran-t4-internal"
 
 
 def profile_counters(rsp, sym: dict[str, int]) -> tuple[dict, dict]:
     cycles, routes = scheduler.profile_counters(rsp, sym)
     cycles.update({name: profile.u32(rsp, sym[name]) for name in T4_CYCLE_NAMES if name in sym})
     return cycles, routes
+
+
+def terrain_counters(rsp, sym: dict[str, int]) -> dict[str, int]:
+    """Optional cumulative event/pixel/tile counts, separate from cycle samples."""
+    return {name: profile.u32(rsp, address) for name, address in sym.items()
+            if name.startswith("sc64_terrain_diag_") or
+            name in ("sc64_terrain_requests", "sc64_terrain_hits", "sc64_terrain_partial")}
 
 
 def validate_trace(trace: object, capacity: int, *, windowed: bool = True) -> dict:
@@ -57,6 +71,14 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = True) -> di
         raise ValueError("trace schema must be an object with schema=1")
     if type(trace.get("mission")) is not int or trace["mission"] != MISSION_T4:
         raise ValueError("trace mission must be T4 internal global ID 7")
+    entry = trace.get("entry", "internal-chord")
+    if entry not in ("internal-chord", "campaign-menu"):
+        raise ValueError("trace entry must be 'internal-chord' or 'campaign-menu'")
+    entry_prefix = ([(1, KEY_START | KEY_SELECT), (2, 0), (3, KEY_A)]
+                    if entry == "internal-chord" else
+                    [(1, KEY_A), (2, 0), (3, KEY_RIGHT), (4, 0), (5, KEY_DOWN),
+                     (6, 0), (7, KEY_A), (8, 0), (9, KEY_A)])
+    launch_tick = 3 if entry == "internal-chord" else 9
     if not isinstance(trace.get("policy"), str) or not trace["policy"]:
         raise ValueError("trace policy must be a nonempty string")
     rows = trace.get("events")
@@ -64,9 +86,11 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = True) -> di
         raise ValueError("trace events must be a nonempty array")
 
     inputs: list[tuple[int, int]] = []
+    input_transitions: list[tuple[int, int]] = []
     previous_tick, previous_held = 0, 0
     previous_event_tick = 0
     start = final = None
+    start_input_count = None
     periodic: list[dict] = []
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
@@ -87,13 +111,15 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = True) -> di
             if type(pressed) is not int or pressed != (held & ~previous_held):
                 raise ValueError(f"input event {index} pressed does not match held transition")
             inputs.append((tick - 1, held))
+            input_transitions.append((tick, held))
             previous_tick, previous_held = tick, held
         elif kind == "start":
             if start is not None or final is not None:
                 raise ValueError("trace must contain exactly one start event before its final event")
-            if len(inputs) < 3:
-                raise ValueError("start event must follow the HOME chord and A deploy inputs")
+            if len(inputs) != len(entry_prefix):
+                raise ValueError("start event must immediately follow the exact entry controls")
             start = row
+            start_input_count = len(inputs)
         elif kind == "periodic":
             if start is None or final is not None:
                 raise ValueError("periodic checkpoints must occur after start and before final")
@@ -109,10 +135,10 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = True) -> di
         else:
             raise ValueError(f"trace event {index} has unsupported kind {kind!r}")
 
-    if not inputs or inputs[0] != (0, KEY_START | KEY_SELECT):
-        raise ValueError("first controller input must hold START+SELECT at host_tick=1")
-    if len(inputs) < 3 or inputs[1][1] != 0 or inputs[2][1] != KEY_A:
-        raise ValueError("trace must release the HOME chord and deploy from briefing with A")
+    if input_transitions[:len(entry_prefix)] != entry_prefix:
+        raise ValueError(f"trace input prefix does not match {entry} entry controls")
+    if start_input_count != len(entry_prefix):
+        raise ValueError("start event must follow exactly the whitelisted entry controls")
     if start is None or final is None or rows[-1] is not final:
         raise ValueError("trace requires start and final outcome events")
     required_observation = ("frame", "elapsed", "screen", "won", "lost", "race_mode",
@@ -123,8 +149,9 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = True) -> di
     for checkpoint in periodic:
         require_trace_fields(checkpoint, required_observation, "periodic")
     require_trace_fields(final, required_observation, "final")
-    if start["host_tick"] != 3 or start["frame"] != 0 or start["elapsed"] != 0:
-        raise ValueError("start event must record launch at host_tick=3 and frame/elapsed zero")
+    if start["host_tick"] != launch_tick or start["frame"] != 0 or start["elapsed"] != 0:
+        raise ValueError(f"start event must record {entry} launch at host_tick={launch_tick} "
+                         "and frame/elapsed zero")
     if start["screen"] != SCREEN_PLAY:
         raise ValueError("start event must capture live PLAY after normal menu deployment")
     if start["race_mode"] != 0 or start["race_selected_mission"] != MISSION_T4:
@@ -163,7 +190,8 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = True) -> di
         raise ValueError("final event phase contradicts its outcome label")
 
     event_list = scheduler.scheduler_events({"inputs": inputs})
-    plan = {"inputs": event_list, "input_count": len(inputs), "stop_tick": stop_tick,
+    plan = {"inputs": event_list, "input_count": len(inputs), "entry": entry,
+            "start_tick": launch_tick, "stop_tick": stop_tick,
             "start": start, "final": final, "periodic": periodic,
             "scheduler_mode": "windowed"}
     pages = scheduler.make_schedule_pages(plan, stop_tick, capacity)
@@ -426,18 +454,26 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
     scheduler.check_debugger_port_free()
     proc = sock = rsp = log = None
     observations: list[dict] = []
+    previous_terrain: dict[str, int] = {}
 
     def save_report(report: dict) -> None:
         _atomic_json(report_path, report)
 
     def record(checkpoint: dict) -> None:
+        nonlocal previous_terrain
+        terrain = terrain_counters(rsp, sym)
+        if terrain:
+            checkpoint["terrain_counters"] = terrain
+            checkpoint["terrain_interval"] = scheduler.route_counter_deltas(terrain, previous_terrain)
+            previous_terrain = terrain
         observations.append(checkpoint)
         with history_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(checkpoint, separators=(",", ":")) + "\n")
             stream.flush()
             os.fsync(stream.fileno())
 
-    configuration = {"mission": MISSION_T4, "trace": str(trace_path), "trace_sha256": trace_hash,
+    configuration = {"mission": MISSION_T4, "entry": plan["entry"],
+                     "trace": str(trace_path), "trace_sha256": trace_hash,
                      "input_transitions": plan["input_count"], "scheduler_mode": mode,
                      "scheduler_capacity": capacity,
                      "peak_page_transitions": requested_peak_page_transitions,
@@ -482,7 +518,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                 "demo_peak_cycles": profile.u32(rsp, sym["demo_peak_cycles"]),
                 "demo_tick_buckets": previous_buckets, **previous})
         capture(rsp, run_dir / "home.png")
-        profile.write_progress(run_dir / "progress.json", profile="terran-t4-internal",
+        profile.write_progress(run_dir / "progress.json", profile=profile_label(plan["entry"]),
                                rom=rom, elf=elf, rom_sha256=rom_hash, elf_sha256=elf_hash,
                                configuration=configuration, requested_ticks=requested,
                                checkpoint_interval=CHECKPOINT_TICKS, latest_checkpoint=observations[0])
@@ -530,7 +566,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
             if completed in (1000, 10000, 30000, 50000, requested):
                 checkpoint["capture"] = capture(rsp, run_dir / f"checkpoint-{completed:06d}.png")
             record(checkpoint)
-            profile.write_progress(run_dir / "progress.json", profile="terran-t4-internal",
+            profile.write_progress(run_dir / "progress.json", profile=profile_label(plan["entry"]),
                                    rom=rom, elf=elf, rom_sha256=rom_hash, elf_sha256=elf_hash,
                                    configuration=configuration, requested_ticks=requested,
                                    checkpoint_interval=CHECKPOINT_TICKS, latest_checkpoint=checkpoint)
@@ -543,7 +579,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
 
         final = observations[-1]
         status = "prefix" if prefix else plan["final"]["kind"]
-        report = {"profile": "terran-t4-internal", "status": status, "mission": MISSION_T4,
+        report = {"profile": profile_label(plan["entry"]), "entry": plan["entry"],
+                  "status": status, "mission": MISSION_T4,
                   "rom": str(rom), "elf": str(elf), "trace": str(trace_path),
                   "rom_sha256": rom_hash, "elf_sha256": elf_hash, "trace_sha256": trace_hash,
                   "input_transitions": plan["input_count"], "scheduler_mode": mode,
@@ -565,7 +602,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
             except Exception as exc:
                 report.update({"status": "verification_failed", "verification_failed": str(exc)})
                 save_report(report)
-                profile.write_progress(run_dir / "progress.json", profile="terran-t4-internal",
+                profile.write_progress(run_dir / "progress.json", profile=profile_label(plan["entry"]),
                                        rom=rom, elf=elf, rom_sha256=rom_hash, elf_sha256=elf_hash,
                                        configuration=configuration, requested_ticks=requested,
                                        checkpoint_interval=CHECKPOINT_TICKS, latest_checkpoint=final,
@@ -573,7 +610,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                 raise
             report["verified_win"] = report["status"] == "won"
         save_report(report)
-        profile.write_progress(run_dir / "progress.json", profile="terran-t4-internal",
+        profile.write_progress(run_dir / "progress.json", profile=profile_label(plan["entry"]),
                                rom=rom, elf=elf, rom_sha256=rom_hash, elf_sha256=elf_hash,
                                configuration=configuration, requested_ticks=requested,
                                checkpoint_interval=CHECKPOINT_TICKS, latest_checkpoint=final,
@@ -600,8 +637,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--trace", type=Path, default=DEFAULT_TRACE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--rom", type=Path, help="internal T4 replay ROM override")
-    parser.add_argument("--elf", type=Path, help="internal T4 replay ELF override")
+    parser.add_argument("--rom", type=Path, help="T4 internal or campaign-menu ROM override")
+    parser.add_argument("--elf", type=Path, help="T4 internal or campaign-menu ELF override")
     parser.add_argument("--ticks", type=int, help="replay a positive controller-trace prefix")
     return parser
 

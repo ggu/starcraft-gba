@@ -25,6 +25,10 @@ int memcmp(const void *a, const void *b, size_t n);
 #if defined(SC64_T4_SCENARIO_RUNTIME) && !defined(SC64_T4_RUNTIME)
 #error "SC64_T4_SCENARIO_RUNTIME requires the T4 actor/world profile"
 #endif
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME) && \
+    (!defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 0)
+#error "Combined T3/T4 runtime is an experimental unified Terran profile"
+#endif
 
 #if defined(SC64_RACES)
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
@@ -32,7 +36,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_T4_SCENARIO_RUNTIME)
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 11u
+#elif defined(SC64_T4_SCENARIO_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 10u
 #elif defined(SC64_T4_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 9u
@@ -302,6 +308,9 @@ typedef struct {
 typedef struct {
     int x0, y0, x1, y1, life, color;
 } Tracer;
+#ifdef SC64_RACES
+#include "sc64_race_save_types.h"
+#endif
 #ifndef SC64_RACES
 typedef struct {
     u32 version;
@@ -361,7 +370,16 @@ static u8 explored[SC64_GRID_STORAGE_BYTES];
 static u8 visible[SC64_GRID_STORAGE_BYTES];
 static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 #ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+typedef union {
+    u16 bfs_queue[MAP_CELLS];
+    RaceSave save;
+} Sc64CombinedRouteSaveScratch;
+static Sc64CombinedRouteSaveScratch sc64_combined_route_save_scratch;
+#define bfs_queue sc64_combined_route_save_scratch.bfs_queue
+#else
 static u16 bfs_queue[MAP_CELLS];
+#endif
 static void sc64_routes_reset(void);
 #else
 static int bfs_prev[MAP_CELLS], bfs_queue[MAP_CELLS];
@@ -463,6 +481,9 @@ static u32 seed;
 volatile u32 sc64_orders_cycles, sc64_sight_cycles, sc64_other_cycles;
 volatile u32 sc64_map_cycles, sc64_hud_cycles;
 volatile u32 sc64_background_cycles, sc64_building_cycles, sc64_unit_draw_cycles;
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+volatile u32 sc64_hud_minimap_cycles;
+#endif
 #if defined(SC64_DIAGNOSTIC_UPDATE)
 volatile u32 sc64_update_mission_cycles, sc64_update_production_cycles;
 volatile u32 sc64_update_race_state_cycles, sc64_update_defenses_cycles;
@@ -916,7 +937,13 @@ invalidate_path_grid(void)
 #endif
 }
 
+#if defined(SC64_T4_RUNTIME) && defined(SC64_VISIBILITY_SPANS)
+/* Rebuilds follow map/door changes. Keep the larger span visibility path in
+ * IWRAM and this occasional full-grid rebuild in ROM within the same reserve. */
+static void
+#else
 static void GBA_HOT
+#endif
 build_path_grid(void)
 {
     int col, row, i;
@@ -4714,7 +4741,13 @@ draw_hud(void)
     draw_hud_resources();
     draw_hud_commands();
 #endif
+#if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_TERRAIN)
+    u32 minimap_start = gba_clock();
+#endif
     draw_minimap();
+#if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_TERRAIN)
+    sc64_hud_minimap_cycles = gba_clock() - minimap_start;
+#endif
 #ifdef SC64_RACES
     if(!race_mode&&race_campaign.message_ticks) {
         gfx_rect(2,94,236,24,C_PANEL);

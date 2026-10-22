@@ -25,6 +25,7 @@ TARGETS = {
     "--protoss": ("StarCraft-Protoss-GBA", "starcraft-protoss", "SCP2", "SC PROTOSS"),
     "--protoss-p3": ("StarCraft-Protoss-P3-GBA", "starcraft-protoss-p3", "SCP3", "SC PROTOSS3"),
     "--t4-internal": ("StarCraft-T4-Internal-GBA", "starcraft-t4-replay", "SCT4", "SC64 T4 TEST"),
+    "--terran-t4": ("StarCraft-Terran-T4-GBA", "starcraft-t4-combined", "SCT5", "SC TERRAN T4"),
 }
 
 

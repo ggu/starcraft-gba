@@ -1,6 +1,6 @@
 /* Bounded ordinary-controller attempt at Jacobs Installation. Enter through
- * the private HOME chord and deploy through briefing; all gameplay changes
- * after launch are ordinary game_update controller inputs. */
+ * the campaign menu or gated internal shortcut and deploy via briefing; all gameplay
+ * changes after launch are ordinary game_update controller inputs. */
 #include "../starcraft/game.c"
 #include <assert.h>
 #include <stdio.h>
@@ -486,7 +486,13 @@ static void checkpoint(const char *kind)
 static int launch_gated_t4(void)
 {
     game_init();
-    step(KEY_START | KEY_SELECT);
+    step(KEY_A);
+    step(0);
+    step(KEY_RIGHT);
+    step(0);
+    step(KEY_DOWN);
+    step(0);
+    step(KEY_A);
     step(0);
     step(KEY_A);
     deployed = 1;
@@ -517,7 +523,7 @@ int main(int argc, char **argv)
     if (!trace_path) trace_path = ".local/sc64/t4-controller-attempt.json";
     trace_file = fopen(trace_path, "w");
     assert(trace_file);
-    fprintf(trace_file, "{\"schema\":1,\"mission\":7,\"policy\":\"armed-raw20-attack-move-source-gates\",\"events\":[\n");
+    fprintf(trace_file, "{\"schema\":1,\"mission\":7,\"entry\":\"campaign-menu\",\"policy\":\"armed-raw20-attack-move-source-gates\",\"events\":[\n");
     gba_init();
     prior_keys = 0;
     if (!launch_gated_t4()) {

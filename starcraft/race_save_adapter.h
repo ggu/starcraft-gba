@@ -1,45 +1,78 @@
 #ifndef SC64_RACE_SAVE_ADAPTER_H
 #define SC64_RACE_SAVE_ADAPTER_H
-/* Only the persisted units/buildings need 32-bit engine coordinates while
-   running. Their bounded integer fields fit 16 bits on cartridge SRAM. */
-#define RACE_UNIT_WORDS (sizeof(Unit)/sizeof(int))
-#define RACE_BUILD_WORDS (sizeof(Building)/sizeof(int))
-typedef struct {
-    u32 version;
-    s16 units[MAX_UNITS][RACE_UNIT_WORDS];
-    s16 buildings[MAX_BUILDINGS][RACE_BUILD_WORDS];
-    Mineral minerals_map[MAX_MINERALS];
-    u8 fog[(MAP_CELLS+7)/8];
-    int state[32],players[5],ore[5],vespene[5];
-    Geyser geysers[4];
-    Sc64RaceCampaignState campaign;
-#ifdef SC64_UNIFIED
-    Sc64BackwaterState backwater;
-    u8 invincible_units[MAX_UNITS],invincible_buildings[MAX_BUILDINGS];
-#endif
-#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)
-    Sc64T3State t3;
-    u16 t3_buildings_killed;
-#endif
-#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
-    Sc64Z3State z3;
-    u16 z3_action_ticks;
-#endif
-#if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
-    Sc64P3State p3;
-    u16 p3_action_ticks;
-#endif
+#ifdef SC64_T3_ENABLED
 #ifdef SC64_T4_SCENARIO_RUNTIME
-    Sc64T4RuntimeState t4;
-#endif
-} RaceSave;
-_Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
+#define race_data sc64_combined_route_save_scratch.save
+#else
 static RaceSave race_data;
+#endif
+#else
+static RaceSave race_data;
+#endif
+#ifdef SC64_T3_ENABLED
+#ifdef SC64_T4_SCENARIO_RUNTIME
+static int
+race_t4_save_pack(Sc64T4SaveState *dst, const Sc64T4RuntimeState *src)
+{
+    Sc64T4TriggerState inactive;
+    if (!dst || !src ||
+        !sc64_t4_trigger_init(&inactive, &sc64_t4_scenario, 5,
+                              sc64_t4_source_force(5)) ||
+        memcmp(&src->player[5], &inactive, sizeof(inactive)) != 0) return 0;
+    memset(dst, 0, sizeof(*dst));
+    memcpy(dst->player, src->player, 5 * sizeof(dst->player[0]));
+    dst->player[5] = src->player[6];
+    dst->player[6] = src->player[7];
+    dst->switches = src->switches;
+    memcpy(dst->location30, src->location30, sizeof(dst->location30));
+    dst->message_ticks = src->message_ticks;
+    dst->ping_x = src->ping_x;
+    dst->ping_y = src->ping_y;
+    dst->ping_ticks = src->ping_ticks;
+    dst->location30_moved = src->location30_moved;
+    dst->message = src->message;
+    dst->active_mask = src->active_mask;
+    memcpy(dst->doodad_slot, src->doodad_slot, sizeof(dst->doodad_slot));
+    memcpy(dst->doodad_enabled, src->doodad_enabled, sizeof(dst->doodad_enabled));
+    return 1;
+}
+
+static int
+race_t4_save_expand(Sc64T4RuntimeState *dst, const Sc64T4SaveState *src)
+{
+    Sc64T4TriggerState inactive;
+    if (!dst || !src ||
+        !sc64_t4_trigger_init(&inactive, &sc64_t4_scenario, 5,
+                              sc64_t4_source_force(5))) return 0;
+    memset(dst, 0, sizeof(*dst));
+    memcpy(dst->player, src->player, 5 * sizeof(src->player[0]));
+    dst->player[5] = inactive;
+    dst->player[6] = src->player[5];
+    dst->player[7] = src->player[6];
+    dst->switches = src->switches;
+    memcpy(dst->location30, src->location30, sizeof(dst->location30));
+    dst->message_ticks = src->message_ticks;
+    dst->ping_x = src->ping_x;
+    dst->ping_y = src->ping_y;
+    dst->ping_ticks = src->ping_ticks;
+    dst->location30_moved = src->location30_moved;
+    dst->message = src->message;
+    dst->active_mask = src->active_mask;
+    memcpy(dst->doodad_slot, src->doodad_slot, sizeof(dst->doodad_slot));
+    memcpy(dst->doodad_enabled, src->doodad_enabled, sizeof(dst->doodad_enabled));
+    return 1;
+}
+#endif
+#endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 static int
 race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
 {
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+    const Sc64T4SaveState *state;
+#else
     const Sc64T4RuntimeState *state;
+#endif
     unsigned next_building = 8;
     if (!candidate) return 0;
     state = &candidate->t4;
@@ -77,15 +110,30 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
     } else if (state->location30[0] || state->location30[1] ||
                state->location30[2] || state->location30[3]) return 0;
     for (unsigned player = 0; player < 8; ++player) {
-        const Sc64T4TriggerState *p = &state->player[player];
+        const Sc64T4TriggerState *p;
         unsigned force = sc64_t4_source_force((int)player);
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+        if (player == 5) {
+            Sc64T4TriggerState initial;
+            if (!sc64_t4_trigger_init(&initial, &sc64_t4_scenario, player, force) ||
+                !sc64_t4_trigger_state_valid(&initial, &sc64_t4_scenario)) return 0;
+            continue;
+        }
+        p = &state->player[player < 5 ? player : player - 1];
+#else
+        p = &state->player[player];
+#endif
         if (!sc64_t4_trigger_state_valid(p, &sc64_t4_scenario) ||
             p->owner != player || p->force != force) return 0;
+#if !defined(SC64_T3_ENABLED) || !defined(SC64_UNIFIED)
         if (player == 5) {
             Sc64T4TriggerState initial;
             if (!sc64_t4_trigger_init(&initial, &sc64_t4_scenario, player, force) ||
                 memcmp(p, &initial, sizeof(initial)) != 0) return 0;
-        } else if (p->elapsed_ticks != candidate->campaign.elapsed_frames) {
+            continue;
+        }
+#endif
+        if (p->elapsed_ticks != candidate->campaign.elapsed_frames) {
             return 0;
         }
     }
@@ -148,6 +196,11 @@ static int race_save_game(void) {
             b[i].raw_type!=sc64_race_raw_building(b[i].type) || b[i].under_construction ||
             b[i].queue_count || b[i].shield || !invincible_buildings[i]))return 0;
 #endif
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+    /* The save shares storage with the transient route queue. Clear all
+     * padding and optional fields before serializing this record. */
+    memset(&race_data, 0, sizeof(race_data));
+#endif
     race_data.version=SAVE_VERSION;
     for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
         int n;memcpy(&n,(u8*)&u[i]+j*sizeof(int),sizeof(n));race_data.units[i][j]=(s16)n;
@@ -206,7 +259,13 @@ static int race_save_game(void) {
     }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
-    if (race_t4_active()) race_data.t4 = race_t4;
+    if (race_t4_active()) {
+#ifdef SC64_T3_ENABLED
+        if (!race_t4_save_pack(&race_data.t4, &race_t4)) return 0;
+#else
+        race_data.t4 = race_t4;
+#endif
+    }
     else memset(&race_data.t4, 0, sizeof(race_data.t4));
     if (race_t4_active() &&
         !race_t4_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
@@ -214,6 +273,10 @@ static int race_save_game(void) {
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);toast(7);return 1;
 }
 static int race_load_game(void) {
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+    Sc64T4RuntimeState expanded_t4;
+    int expanded_t4_valid = 0;
+#endif
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
     const int *v=race_data.state;
     if(v[0]<0||v[0]>1||v[1]<0||v[1]>2||v[2]<0||v[2]>=SC64_RACE_MAP_COUNT||v[4]<1||v[4]>3||
@@ -392,11 +455,18 @@ static int race_load_game(void) {
 #ifdef SC64_T4_SCENARIO_RUNTIME
     if (!v[0] && v[2] == SC64_T4_GLOBAL_ID) {
         if (!race_t4_save_candidate_valid(&race_data, width, height)) return 0;
+#ifdef SC64_T3_ENABLED
+        if (!race_t4_save_expand(&expanded_t4, &race_data.t4)) return 0;
+        expanded_t4_valid = 1;
+#endif
     } else {
         const u8 *t4 = (const u8 *)&race_data.t4;
         for (unsigned i = 0; i < sizeof(race_data.t4); ++i)
             if (t4[i]) return 0;
     }
+#endif
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+    if (!v[0] && v[2] == SC64_T4_GLOBAL_ID && !expanded_t4_valid) return 0;
 #endif
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];
 #ifdef SC64_IMPORTED_SKIRMISH
@@ -459,9 +529,13 @@ static int race_load_game(void) {
     }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
-    if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID)
+    if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID) {
+#ifdef SC64_T3_ENABLED
+        race_t4 = expanded_t4;
+#else
         race_t4 = race_data.t4;
-    else
+#endif
+    } else
         memset(&race_t4, 0, sizeof(race_t4));
 #endif
     memset(tracers,0,sizeof(tracers));mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;

@@ -14,7 +14,7 @@ replay = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(replay)
 
 
-def trace(final_kind: str = "limit") -> dict:
+def trace(final_kind: str = "limit", entry: str = "internal-chord") -> dict:
     def observed(kind: str, tick: int, frame: int, screen: int, *, won: int = 0, lost: int = 0,
                  outcomes: int = 0, human_outcome: int = 0, objective: int = 0,
                  phase: int = 1) -> dict:
@@ -27,32 +27,52 @@ def trace(final_kind: str = "limit") -> dict:
                 "raynor_alive": 1, "human_outcome": human_outcome,
                 "side_units": 12, "enemy_units": 5}
 
-    rows = [
-        {"kind": "input", "host_tick": 1, "held": replay.KEY_START | replay.KEY_SELECT,
-         "pressed": replay.KEY_START | replay.KEY_SELECT},
-        {"kind": "input", "host_tick": 2, "held": 0, "pressed": 0},
-        {"kind": "input", "host_tick": 3, "held": replay.KEY_A, "pressed": replay.KEY_A},
-        observed("start", 3, 0, replay.SCREEN_PLAY),
-        observed("periodic", 1000, 997, replay.SCREEN_PLAY),
-    ]
+    if entry == "campaign-menu":
+        held_states = [(1, replay.KEY_A), (2, 0), (3, replay.KEY_RIGHT), (4, 0),
+                       (5, replay.KEY_DOWN), (6, 0), (7, replay.KEY_A), (8, 0),
+                       (9, replay.KEY_A)]
+        start_tick = 9
+    else:
+        held_states = [(1, replay.KEY_START | replay.KEY_SELECT), (2, 0),
+                       (3, replay.KEY_A)]
+        start_tick = 3
+    rows = []
+    previous_held = 0
+    for tick, held in held_states:
+        rows.append({"kind": "input", "host_tick": tick, "held": held,
+                     "pressed": held & ~previous_held})
+        previous_held = held
+    rows.append(observed("start", start_tick, 0, replay.SCREEN_PLAY))
+    if entry == "campaign-menu":
+        rows.append({"kind": "input", "host_tick": 10, "held": 0, "pressed": 0})
+    rows.append(observed("periodic", 1000, 1000 - start_tick, replay.SCREEN_PLAY))
     if final_kind == "won":
-        rows.append(observed("won", 1001, 998, replay.SCREEN_RESULT,
+        rows.append(observed("won", 1001, 1001 - start_tick, replay.SCREEN_RESULT,
                              won=1, outcomes=1, human_outcome=1, objective=1, phase=3))
     elif final_kind == "lost":
-        rows.append(observed("lost", 1001, 998, replay.SCREEN_RESULT,
+        rows.append(observed("lost", 1001, 1001 - start_tick, replay.SCREEN_RESULT,
                              lost=1, outcomes=1, human_outcome=2, phase=4))
     else:
-        rows.append(observed("limit", 1001, 998, replay.SCREEN_PLAY))
-    return {"schema": 1, "mission": 7, "policy": "synthetic-controller-trace", "events": rows}
+        rows.append(observed("limit", 1001, 1001 - start_tick, replay.SCREEN_PLAY))
+    value = {"schema": 1, "mission": 7, "policy": "synthetic-controller-trace", "events": rows}
+    if entry != "internal-chord":
+        value["entry"] = entry
+    return value
 
 
 class ReplayValidationTests(unittest.TestCase):
+    def test_report_profile_name_tracks_entry_route(self):
+        self.assertEqual(replay.profile_label("internal-chord"), "terran-t4-internal")
+        self.assertEqual(replay.profile_label("campaign-menu"), "terran-t4-campaign-menu")
+
     def test_valid_final_outcomes_and_checkpoint_alignment(self):
         for kind in ("won", "lost", "limit"):
             with self.subTest(kind=kind):
                 plan = replay.validate_trace(trace(kind), capacity=256)
                 self.assertEqual(plan["stop_tick"], 1001)
                 self.assertEqual(plan["input_count"], 3)
+                self.assertEqual(plan["entry"], "internal-chord")
+                self.assertEqual(plan["start_tick"], 3)
                 self.assertEqual(plan["peak_page_transitions"], 3)
                 self.assertEqual(plan["final"]["kind"], kind)
 
@@ -73,12 +93,43 @@ class ReplayValidationTests(unittest.TestCase):
         bad = trace()
         bad["events"][0]["held"] = replay.KEY_START
         bad["events"][0]["pressed"] = replay.KEY_START
-        with self.assertRaisesRegex(ValueError, r"START\+SELECT"):
+        with self.assertRaisesRegex(ValueError, "input prefix"):
             replay.validate_trace(bad, capacity=256)
         bad = trace()
         bad["events"][2]["held"] = replay.KEY_B if hasattr(replay, "KEY_B") else 2
         bad["events"][2]["pressed"] = bad["events"][2]["held"]
-        with self.assertRaisesRegex(ValueError, "briefing"):
+        with self.assertRaisesRegex(ValueError, "input prefix"):
+            replay.validate_trace(bad, capacity=256)
+
+    def test_campaign_menu_entry_has_exact_page_and_briefing_prefix(self):
+        value = trace(entry="campaign-menu")
+        plan = replay.validate_trace(value, capacity=256)
+        self.assertEqual(plan["entry"], "campaign-menu")
+        self.assertEqual(plan["start_tick"], 9)
+        self.assertEqual(plan["input_count"], 10)  # nine navigation inputs and tick-10 release
+        self.assertEqual(plan["start"]["host_tick"], 9)
+        self.assertEqual(plan["start"]["frame"], 0)
+
+        bad = trace(entry="campaign-menu")
+        bad["entry"] = "arbitrary-mode"
+        with self.assertRaisesRegex(ValueError, "entry must"):
+            replay.validate_trace(bad, capacity=256)
+
+        bad = trace(entry="campaign-menu")
+        bad["events"][2]["held"] = 32  # LEFT instead of RIGHT; wrong page
+        bad["events"][2]["pressed"] = 32
+        with self.assertRaisesRegex(ValueError, "input prefix"):
+            replay.validate_trace(bad, capacity=256)
+
+        bad = trace(entry="campaign-menu")
+        bad["events"][1]["held"] = replay.KEY_A  # omit required release after HOME A
+        bad["events"][1]["pressed"] = 0
+        with self.assertRaisesRegex(ValueError, "held-state transition"):
+            replay.validate_trace(bad, capacity=256)
+
+        bad = trace(entry="campaign-menu")
+        bad["events"][9]["host_tick"] = 10
+        with self.assertRaisesRegex(ValueError, "host_tick=9"):
             replay.validate_trace(bad, capacity=256)
 
     def test_rejects_inconsistent_terminal_labels_and_capacity_overflow(self):

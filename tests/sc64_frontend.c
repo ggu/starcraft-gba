@@ -113,12 +113,21 @@ static void test_campaign_catalog_contract(void) {
     assert(sc64_catalog_is_playable(5));
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
     assert(sc64_catalog_is_playable(6));
+    assert(sc64_catalog_mission_allowed(6, SC64_FACTION_TERRAN));
+    assert(sc64_catalog_get(6)->title[0] == 'D');
+#ifdef SC64_T4_CAMPAIGN_ENTRY
+    assert(sc64_catalog_playable_count(SC64_FACTION_TERRAN) == 4);
+    assert(sc64_catalog_playable_at(SC64_FACTION_TERRAN, 3) == 7);
+    assert(sc64_catalog_playable_ordinal(SC64_FACTION_TERRAN, 7) == 3);
+    assert(sc64_catalog_available_next(SC64_FACTION_TERRAN, 6) == 7);
+    assert(sc64_catalog_available_next(SC64_FACTION_TERRAN, 7) == -1);
+    assert(sc64_catalog_mission_allowed(7, SC64_FACTION_TERRAN));
+#else
     assert(sc64_catalog_playable_count(SC64_FACTION_TERRAN) == 3);
     assert(sc64_catalog_playable_at(SC64_FACTION_TERRAN, 2) == 6);
     assert(sc64_catalog_playable_ordinal(SC64_FACTION_TERRAN, 6) == 2);
     assert(sc64_catalog_available_next(SC64_FACTION_TERRAN, 5) == 6);
-    assert(sc64_catalog_mission_allowed(6, SC64_FACTION_TERRAN));
-    assert(sc64_catalog_get(6)->title[0] == 'D');
+#endif
 #else
     assert(!sc64_catalog_is_playable(6));
     assert(sc64_catalog_playable_count(SC64_FACTION_TERRAN) == 2);
@@ -230,8 +239,27 @@ static void test_t3_paging_retention_and_reset(void) {
 #ifdef SC64_CAMPAIGN_RACE
 #if SC64_CAMPAIGN_RACE == 0
     assert(f.faction == SC_FRONT_TERRAN && f.mission == 6 && f.mission_page == 1);
+#ifdef SC64_T4_CAMPAIGN_ENTRY
+    /* T4 follows T3 by catalog ordinal and occupies row 1 on page 1. */
+    assert(sc64_catalog_available_next(SC64_FACTION_TERRAN, f.mission) == 7);
+    press(&f, KEY_A);
+    assert(f.page == SC_FRONT_MISSION && f.mission_page == 1 && f.row == 0);
+    press(&f, KEY_DOWN);
+    assert(f.row == 1);
+    press(&f, KEY_A);
+    assert(f.page == SC_FRONT_BRIEFING && f.mission == 7);
+    press(&f, KEY_B);
+    assert(f.page == SC_FRONT_MISSION && f.mission_page == 1 && f.row == 1);
+    assert(press(&f, KEY_A) == SC_FRONT_NONE && f.page == SC_FRONT_BRIEFING);
+    assert(press(&f, KEY_A) == SC_FRONT_START_CAMPAIGN);
+    assert(f.mission == 7);
+#endif
     sc64_frontend_reset(&f, 30, SC_FRONT_RACE_TERRAN, 1, 99);
+#ifdef SC64_T4_CAMPAIGN_ENTRY
+    assert(f.faction == SC_FRONT_TERRAN && f.mission == 4 && f.completed == 7);
+#else
     assert(f.faction == SC_FRONT_TERRAN && f.mission == 4 && f.completed == 6);
+#endif
 #elif SC64_CAMPAIGN_RACE == 1
     assert(f.faction == SC_FRONT_ZERG && f.mission == 0);
 #elif SC64_CAMPAIGN_RACE == 2
