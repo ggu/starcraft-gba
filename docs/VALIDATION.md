@@ -142,6 +142,12 @@ menu, resets to HOME, loads with L, and verifies exact serialized state before
 resuming the simulation. It runs under ASan/UBSan as part of
 `make test-sc64-t3-runtime`.
 
+The matching ARM ROM also passes `tools/sc64_split_smoke.py --profile terran
+--mission 6 --rom build/StarCraft-Terran-T3-GBA.gba
+--elf build/starcraft-terran-t3.elf`: normal menu launch, 1,000 live ticks,
+pause stability, SRAM save, a separate mGBA process loading with HOME L,
+exact restored model/resources/alive-entity state, and resumed live ticks.
+
 The latest ARM link uses 388 bytes of data and 246,656 bytes of BSS, leaving
 6,908 bytes below the EWRAM guard. Its IWRAM code ends at `0x03004e80`, below
 the `0x03005000` guard that reserves stack space. Default, unified, three
