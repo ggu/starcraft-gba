@@ -173,7 +173,7 @@ static inline void sc64_frontend_reset(Sc64Frontend *f, int mission,
     f->page = SC_FRONT_HOME;
     f->row = 0;
 #ifdef SC64_UNIFIED
-#if defined(SC64_T3_ENABLED)
+#if defined(SC64_T3_ENABLED) || defined(SC64_Z3_ENABLED)
     f->mission = mission;
 #else
     f->mission = sc64_front_clamp(mission, 0, 5);
@@ -194,7 +194,9 @@ static inline void sc64_frontend_reset(Sc64Frontend *f, int mission,
                                SC_FRONT_RACE_PROTOSS);
     f->bots = sc64_front_clamp(bots, 1, 3);
 #ifdef SC64_UNIFIED
-#if defined(SC64_T3_ENABLED)
+#if defined(SC64_Z3_ENABLED)
+    f->completed = sc64_front_clamp(completed, -1, 14);
+#elif defined(SC64_T3_ENABLED)
     f->completed = sc64_front_clamp(completed, -1, 6);
 #else
     f->completed = sc64_front_clamp(completed, -1, 5);

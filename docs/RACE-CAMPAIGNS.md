@@ -49,13 +49,28 @@ performance and gameplay checks continue. The final assault still needs
 performance work; see the measured builds in [Validation](VALIDATION.md).
 The full 30-mission campaign remains in progress.
 
-Zerg 3, The New Dominion, has a map-import fixture and standalone trigger
-model. It is not enabled for play. After preparing the local data, run
-`make test-sc64-z3-import` to check its complete retained roster and terrain.
-The source-only suite checks the victory/loss predicates, action order and
-stable global mission ID 14. Runtime presentation, enemy behavior, save
-integration and gameplay validation are the next stage. Dropship type support
-does not yet include transport or cargo mechanics.
+Zerg 3, The New Dominion, also has an experimental build:
+
+```sh
+make zerg-z3 test-sc64-z3-runtime
+```
+
+`build/StarCraft-Zerg-Z3-GBA.gba` adds New Dominion on page two of the Zerg
+campaign. Protect the Mature Chrysalis and eliminate the Terran presence.
+The source victory gates are at most six remaining enemy units/buildings
+combined, or no enemy buildings. Losing the Chrysalis starts defeat.
+All 59 units, 32 buildings, 28 mineral fields and three geysers are retained.
+The 128-unit engine reserves sixteen slots from enemy training for the player.
+
+Enemy pressure uses paid Marines every two minutes and small attacks from
+the imported guards every three minutes. This is an authored substitute for
+the source AI script. Result actions use explicit presentation timing policies:
+30/15-tick waits, 90-tick transmission/text holds and a 13-tick loss-audio
+placeholder. Original dialogue/audio and Dropship transport are absent.
+The experimental save identity rejects older Zerg saves and retains the
+pending action cursor and timer. Standard Zerg builds still enable only
+their first two missions. See [Validation](VALIDATION.md) for what has been
+tested and what remains pending.
 
 After local preparation, `make test-sc64-t3-import` checks every retained T3
 record, its runtime type mapping, coordinate bounds and terrain indices. It

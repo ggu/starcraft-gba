@@ -144,6 +144,7 @@ static inline int sc64_z3_state_valid(const Sc64Z3State *s)
         !(s->fired & SC64_Z3_F_SEQUENCE_ACTION)) return 0;
     if (s->outcome == SC64_Z3_RUNNING) {
         if (s->sequence >= SC64_Z3_SEQ_DONE_WIN ||
+            (s->switch7 && s->sequence == SC64_Z3_SEQ_NONE) ||
             ((s->sequence != SC64_Z3_SEQ_NONE) !=
              !!(s->fired & SC64_Z3_F_SEQUENCE_ACTION))) return 0;
     } else if (!(s->fired & SC64_Z3_F_SEQUENCE_ACTION) ||

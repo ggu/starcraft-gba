@@ -21,6 +21,10 @@ typedef struct {
     Sc64T3State t3;
     u16 t3_buildings_killed;
 #endif
+#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
+    Sc64Z3State z3;
+    u16 z3_action_ticks;
+#endif
 } RaceSave;
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
 static RaceSave race_data;
@@ -62,6 +66,13 @@ static int race_save_game(void) {
         race_data.t3_buildings_killed=0;
     }
 #endif
+#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
+    memset(&race_data.z3,0,sizeof(race_data.z3));race_data.z3_action_ticks=0;
+    if(!race_mode&&race_selected_mission==14) {
+        race_data.z3=race_z3;
+        race_data.z3_action_ticks=race_z3_action_ticks;
+    }
+#endif
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);toast(7);return 1;
 }
 static int race_load_game(void) {
@@ -71,6 +82,22 @@ static int race_load_game(void) {
        v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||v[16]<0||v[16]>4)return 0;
 #ifdef SC64_CAMPAIGN_RACE
     if(!v[0]&&!sc64_catalog_mission_allowed(v[2],SC64_CAMPAIGN_RACE))return 0;
+#endif
+#ifdef SC64_UNIFIED
+    if(!sc64_catalog_mission_allowed(v[2],
+#ifdef SC64_CAMPAIGN_RACE
+                                   SC64_CAMPAIGN_RACE
+#else
+                                   -1
+#endif
+                                   )||!sc64_race_maps[v[2]].width)return 0;
+    if((unsigned)v[3]&~sc64_catalog_playable_mask(
+#ifdef SC64_CAMPAIGN_RACE
+                                               SC64_CAMPAIGN_RACE
+#else
+                                               -1
+#endif
+                                               ))return 0;
 #endif
     int width=v[0]?64:sc64_race_maps[v[2]].width;
     int height=v[0]?64:sc64_race_maps[v[2]].height;
@@ -146,6 +173,30 @@ static int race_load_game(void) {
         } else return 0;
     }
 #endif
+#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
+    if(!v[0]&&v[2]==14) {
+        u8 phase=race_data.campaign.phase;
+        if(!sc64_z3_state_valid(&race_data.z3)||
+           race_data.campaign.elapsed_frames!=(u32)v[7]||
+           race_data.campaign.objective_stage!=race_data.z3.switch7)return 0;
+        u16 duration=race_z3_action_duration(&race_data.z3);
+        if(duration ? (!race_data.z3_action_ticks||race_data.z3_action_ticks>duration) :
+                      race_data.z3_action_ticks!=0)return 0;
+        if(race_data.z3.outcome==SC64_Z3_RUNNING) {
+            if(v[18]||v[19]||phase!=SC64_RACE_PHASE_ACTIVE||
+               (race_data.campaign.objective_flags&SC64_RACE_OBJECTIVE_PRIMARY))return 0;
+        } else if(race_data.z3.outcome==SC64_Z3_WON) {
+            if(!v[18]||v[19]||phase!=SC64_RACE_PHASE_COMPLETE||
+               !(race_data.campaign.objective_flags&SC64_RACE_OBJECTIVE_PRIMARY))return 0;
+        } else {
+            if(v[18]||!v[19]||phase!=SC64_RACE_PHASE_FAILED||
+               (race_data.campaign.objective_flags&SC64_RACE_OBJECTIVE_PRIMARY))return 0;
+        }
+    } else {
+        if(race_data.z3.fired||race_data.z3.switch7||race_data.z3.outcome||
+           race_data.z3.sequence||race_data.z3.transmission||race_data.z3_action_ticks)return 0;
+    }
+#endif
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];
 #ifdef SC64_IMPORTED_SKIRMISH
     race_skirmish_map=v[20];for(int i=0;i<3;i++)race_bot_races[i]=v[21+i];
@@ -183,6 +234,13 @@ static int race_load_game(void) {
     } else {
         memset(&race_t3,0,sizeof(race_t3));
         race_t3_buildings_killed=0;
+    }
+#endif
+#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
+    if(!race_mode&&race_selected_mission==14) {
+        race_z3=race_data.z3;race_z3_action_ticks=race_data.z3_action_ticks;
+    } else {
+        memset(&race_z3,0,sizeof(race_z3));race_z3_action_ticks=0;
     }
 #endif
     memset(tracers,0,sizeof(tracers));mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;

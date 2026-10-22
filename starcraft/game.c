@@ -5,9 +5,14 @@ void *memset(void *dst, int value, size_t n);
 #if defined(SC64_RACES)
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #define MAX_UNITS 160
-#define SC64_RACE_SAVE_GENERATION 3u
 #else
 #define MAX_UNITS 128
+#endif
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+#define SC64_RACE_SAVE_GENERATION 4u
+#elif defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+#define SC64_RACE_SAVE_GENERATION 3u
+#else
 #define SC64_RACE_SAVE_GENERATION 2u
 #endif
 #define MAX_BUILDINGS 64
@@ -19,7 +24,9 @@ void *memset(void *dst, int value, size_t n);
 #elif defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 2
 #define SAVE_VERSION (0x53435030u + SC64_RACE_SAVE_GENERATION)
 #elif defined(SC64_UNIFIED)
-#ifdef SC64_T3_ENABLED
+#if defined(SC64_Z3_ENABLED)
+#define SAVE_VERSION 0x53435533u
+#elif defined(SC64_T3_ENABLED)
 #define SAVE_VERSION 0x53435532u
 #else
 #define SAVE_VERSION 0x53435531u
@@ -137,6 +144,9 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 #ifdef SC64_RACES
 #include "race_rules.h"
 #include "race_missions.h"
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+#include "sc64_z3.h"
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #include "sc64_t3.h"
 _Static_assert(MAX_UNITS >= 138, "T3 must retain its complete starting roster");
@@ -306,6 +316,11 @@ static Sc64RaceCampaignState race_campaign;
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 static Sc64T3State race_t3;
 static u16 race_t3_buildings_killed;
+#endif
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+static Sc64Z3State race_z3;
+static u16 race_z3_action_ticks;
+static u16 race_z3_action_duration(const Sc64Z3State *s);
 #endif
 static int race_queue_unit(int owner,int building,int type);
 static int race_start_build(int owner,int worker,int type,int x,int y);
@@ -1040,10 +1055,13 @@ move_toward(Unit * q, int tx, int ty)
 
 #ifdef SC64_RACES
 static int race_can_attack(int attacker,int target);
+static inline void race_attack_profile(int attacker, int *ground, int *air);
+static inline int race_can_attack_profiled(int target, int ground, int air);
 static int GBA_HOT __attribute__((noinline))
 sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
 {
     int best = -1, best_distance = max_distance * max_distance, d;
+    int ground, air;
     int cols = (WORLD_W + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
     int rows = (WORLD_H + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
     int col0 = (x - max_distance) / SC64_TARGET_CELL_SIZE;
@@ -1051,6 +1069,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
     int col1 = (x + max_distance) / SC64_TARGET_CELL_SIZE;
     int row1 = (y + max_distance) / SC64_TARGET_CELL_SIZE;
     int p, col, row;
+    race_attack_profile(attacker, &ground, &air);
     if (col0 < 0) col0 = 0;
     if (row0 < 0) row0 = 0;
     if (col1 >= cols) col1 = cols - 1;
@@ -1074,7 +1093,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
                     }
                     if (FAST_ABS(x - candidate_x) >= max_distance ||
                         FAST_ABS(y - candidate_y) >= max_distance ||
-                        !race_can_attack(attacker, entity)) continue;
+                        !race_can_attack_profiled(entity, ground, air)) continue;
                     d = dist2(x, y, candidate_x, candidate_y);
                     if (d < best_distance ||
                         (best >= 0 && d == best_distance && entity < best)) {
@@ -1090,13 +1109,15 @@ static int __attribute__((noinline))
 nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
 {
     int i, best = -1, best_distance = max_distance * max_distance, d;
+    int ground, air;
+    race_attack_profile(attacker, &ground, &air);
     if (target_lists_valid) {
         int p;
         for (p = 0; p < 5; ++p) {
             if (!owners_hostile(owner, p)) continue;
             for (i = target_unit_head[p]; i >= 0; i = target_unit_next[i]) {
                 if (!u[i].alive || FAST_ABS(x-u[i].x)>=max_distance || FAST_ABS(y-u[i].y)>=max_distance)continue;
-                if(!race_can_attack(attacker,i))continue;
+                if(!race_can_attack_profiled(i, ground, air))continue;
                 d = dist2(x, y, u[i].x, u[i].y);
                 if (d < best_distance || (best >= 0 && d == best_distance && i < best)) {
                     best_distance = d;
@@ -1109,7 +1130,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
             for (i = target_building_head[p]; i >= 0; i = target_building_next[i]) {
                 int candidate = MAX_UNITS + i;
                 if (!b[i].alive || FAST_ABS(x-b[i].x)>=max_distance || FAST_ABS(y-b[i].y)>=max_distance)continue;
-                if(!race_can_attack(attacker,MAX_UNITS+i))continue;
+                if(!race_can_attack_profiled(MAX_UNITS+i, ground, air))continue;
                 d = dist2(x, y, b[i].x, b[i].y);
                 if (d < best_distance || (best >= 0 && d == best_distance && candidate < best)) {
                     best_distance = d;
@@ -1123,7 +1144,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
 	if (!u[i].alive
 	    || FAST_ABS(x - u[i].x) >= max_distance ||
 	    FAST_ABS(y - u[i].y) >= max_distance || !owners_hostile(owner, u[i].owner)
-                    || !race_can_attack(attacker,i)
+                    || !race_can_attack_profiled(i, ground, air)
                     )
 	    continue;
 	d = dist2(x, y, u[i].x, u[i].y);
@@ -1136,7 +1157,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
 	if (!b[i].alive
 	    || FAST_ABS(x - b[i].x) >= max_distance ||
 	    FAST_ABS(y - b[i].y) >= max_distance || !owners_hostile(owner, b[i].owner)
-                    || !race_can_attack(attacker,MAX_UNITS+i)
+                    || !race_can_attack_profiled(MAX_UNITS+i, ground, air)
                     )
 	    continue;
 	d = dist2(x, y, b[i].x, b[i].y);
@@ -1829,6 +1850,9 @@ void
 game_init(void)
 {
 #ifdef SC64_RACES
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+    memset(&race_z3,0,sizeof(race_z3));race_z3_action_ticks=0;
+#endif
     race_mode=0;race_completed=0;race_bots=2;race_skirmish_map=0;
 #ifdef SC64_CAMPAIGN_RACE
     race_human=SC64_CAMPAIGN_RACE;
@@ -4082,6 +4106,10 @@ draw_hud_contents(void)
             gfx_text(5,149,race_t3.objective?"HOLD / KILL HATCHERY":"HOLD BASE",C_GOLD);
             gfx_text(137,149,timer,C_WHITE);
         }
+#endif
+#ifdef SC64_Z3_ENABLED
+        else if(race_selected_mission==14)
+            gfx_text(5,149,race_z3.sequence?"CHRYSALIS / MISSION REPORT":"PROTECT CHRYSALIS / CLEAR TERRAN",C_GOLD);
 #endif
 #endif
         if(race_selected_mission==3&&race_campaign.elapsed_frames<27000u) {

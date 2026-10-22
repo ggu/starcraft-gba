@@ -128,10 +128,10 @@ Hardware-timer measurements distinguish these local ROMs:
 | --- | ---: | ---: | ---: | --- |
 | Initial runtime (`b208a7a7` ROM hash prefix) | 54,000 | 53,000 | 19.20 | Survival win |
 | Intermediate optimization (`c7487a79`) | 54,000 | 53,000 | 27.91 | Survival win |
-| Final optimized build (`69f7ea7e`) | 54,000 | 53,000 | 27.97 | Survival win |
+| Validated target-index build (`69f7ea7e`) | 54,000 | 53,000 | 27.97 | Survival win |
 
 The result-ending interval is excluded from full-run means because the exact
-finish point within that interval is unknown. The final build completes the
+finish point within that interval is unknown. That build completes the
 full mission with the same observed campaign progression, but its final
 assault still drops to about 19 fps. T3 stays opt-in while that slowdown is
 addressed. These emulator measurements do not establish physical GBA performance.
@@ -148,7 +148,7 @@ The matching ARM ROM also passes `tools/sc64_split_smoke.py --profile terran
 pause stability, SRAM save, a separate mGBA process loading with HOME L,
 exact restored model/resources/alive-entity state, and resumed live ticks.
 
-The latest ARM link uses 388 bytes of data and 246,656 bytes of BSS, leaving
+The validated `69f7ea7e` link uses 388 bytes of data and 246,656 bytes of BSS, leaving
 6,908 bytes below the EWRAM guard. Its IWRAM code ends at `0x03004e80`, below
 the `0x03005000` guard that reserves stack space. Default, unified, three
 race-profile and T3 host suites pass. Four T3-enabled frontend variants are
@@ -161,7 +161,7 @@ Rebuild with plain `make -B terran-t3` before measuring final frame rate.
 The profiler atomically publishes each observer snapshot in ignored
 `progress.json` and writes the complete `profile.json` at completion.
 
-## New Dominion preparation (2026-10-22)
+## Experimental New Dominion (2026-10-22)
 
 The asset-free suite includes the Z3 trigger model and a compiled matrix for
 the generated map table. The matrix checks stable mission IDs, profile guards
@@ -176,7 +176,59 @@ start markers excluded. Every retained placement has a supported runtime
 mapping; the two Dropships now have a distinct flying, unarmed unit identity.
 The fixture also checks coordinates, terrain indices and unavailable map
 slots. Cargo behavior and the source enemy AI script remain unimplemented.
-This preparation does not enable a playable Z3 mission.
+
+The separate `make zerg-z3` build enables the mission at global ID 14, with
+an authored bounded enemy-pressure adapter and persisted result-action state.
+Its initial 5,000-tick ARM run (`b4427d56` ROM hash prefix) remained on the play
+screen and averaged 29.22 fps. It observed up to 60 live units, including one
+paid Marine produced by the adapter. This is opening/performance evidence;
+it is not a controller-played mission completion or physical GBA measurement.
+
+`make test-sc64-z3-runtime` passes under ASan/UBSan. Its controller path
+checks the complete opening roster and source resource grants, 1,000 live
+ticks, pause stability, exact save/load continuity and resumed play. Separate
+fixtures deliberately change scenario state to check both win predicates,
+the raw-150 loss sequence and the enemy-production reserve. Those fixtures
+are rule integration checks, not controller-played victories. Checksum-valid
+invalid saves are rejected before live state changes, including inconsistent
+action timers, phases and objectives, unavailable map IDs, cross-profile
+completion bits and stale Z3 state on other missions.
+
+The Z3 link uses 388 bytes of data and 240,240 bytes of BSS. Its IWRAM ends at
+`0x03004f88`, below the stack-reserving `0x03005000` guard. Its 12,284-byte
+SRAM payload fits one bounded record. Eight asset-free frontend variants
+exercise Z3 with and without T3 across unified and fixed-race profiles.
+
+The result adapter retains source predicate/action order but uses explicit
+presentation policies for unresolved timing: 30/15-tick waits, 90-tick
+transmission/text holds and a 13-tick silent loss-audio placeholder. It does
+not play the original transmission dialogue or audio. The two imported
+Dropships remain unarmed flying targets without cargo mechanics.
+Once a result sequence starts, this adapter serializes its actions and stops
+reevaluating victory/loss predicates. Concurrent source-trigger behavior is
+unresolved; this serialization is also an explicit adapter policy.
+
+## Query and three-AI regression (2026-10-22)
+
+Attacker ground/air eligibility is computed once per target query. Its
+candidate predicate is checked against the original attack predicate for
+every supported attacker and randomized mixed rosters, including scenario
+flags, the carried Chrysalis, Beacon exclusions, exact range bounds and ties.
+The complete host T3 survival trace remains byte-identical to the earlier
+target-index baseline.
+
+Three 10,000-tick, three-opponent ARM runs after this change measured:
+
+| Profile | ROM hash prefix | Map | Human | Mean fps | Peak observed units |
+| --- | --- | --- | --- | ---: | ---: |
+| Terran | `44a9917c` | Blood Bath | Terran | 29.57 | 50 |
+| Zerg | `d746205d` | Blood Bath | Zerg | 29.61 | 42 |
+| Protoss | `3962579a` | Outpost | Protoss | 29.41 | 45 |
+
+All remained on the play screen. These bounded-population runs do not prove
+full-pool or physical GBA performance. The new T3 link (`982062b4`) passes
+the memory guards and ends IWRAM at `0x03004f80`; its full ARM survival timing
+run is still pending. The previously completed run remains identified above.
 
 ## Known limits
 

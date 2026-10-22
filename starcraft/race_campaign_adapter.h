@@ -23,6 +23,9 @@ enum {
 #ifdef SC64_T3_ENABLED
     ,SC64_RACE_MISSION_T3
 #endif
+#ifdef SC64_Z3_ENABLED
+    ,SC64_RACE_MISSION_Z3 = 14
+#endif
 #endif
 };
 
@@ -79,6 +82,9 @@ race_campaign_set_message(int id)
 
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #include "sc64_t3_adapter.h"
+#endif
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+#include "sc64_z3_adapter.h"
 #endif
 
 static void
@@ -198,11 +204,30 @@ race_campaign_init(void)
     memset(invincible_units,0,sizeof(invincible_units));memset(invincible_buildings,0,sizeof(invincible_buildings));
     backwater_message_trigger=backwater_message_action=backwater_message_ticks=0;
 #endif
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+    memset(&race_z3,0,sizeof(race_z3));race_z3_action_ticks=0;
+#endif
     if (race_mode) {
         race_skirmish_init();
         return;
     }
     race_selected_mission = limit(race_selected_mission, 0, SC64_RACE_MAP_COUNT - 1);
+#ifdef SC64_UNIFIED
+    if (!sc64_catalog_mission_allowed(race_selected_mission,
+#ifdef SC64_CAMPAIGN_RACE
+                                     SC64_CAMPAIGN_RACE
+#else
+                                     -1
+#endif
+                                     ) || !sc64_race_maps[race_selected_mission].width)
+        race_selected_mission = sc64_frontend_first_mission(
+#ifdef SC64_CAMPAIGN_RACE
+            SC64_CAMPAIGN_RACE
+#else
+            SC_FRONT_TERRAN
+#endif
+        );
+#endif
     map = &sc64_race_maps[race_selected_mission];
     race_cols = map->width;
     race_rows = map->height;
@@ -327,6 +352,9 @@ race_campaign_init(void)
 #ifdef SC64_T3_ENABLED
     case SC64_RACE_MISSION_T3: minerals=100;gas=0;break;
 #endif
+#ifdef SC64_Z3_ENABLED
+    case SC64_RACE_MISSION_Z3: minerals=SC64_Z3_MISSION_ORE;gas=SC64_Z3_MISSION_GAS;break;
+#endif
 #endif
     default: minerals = 170; break;
     }
@@ -346,6 +374,9 @@ race_campaign_init(void)
         race_t3_init();
     }
 #endif
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+    if (race_selected_mission == SC64_RACE_MISSION_Z3) race_z3_init();
+#endif
     race_campaign_assign_mining();
     if (race_selected_mission == SC64_RACE_MISSION_Z1)
         race_campaign_set_message(1);
@@ -359,7 +390,10 @@ race_campaign_init(void)
     else if (race_selected_mission==SC64_RACE_MISSION_T1) race_campaign_set_message(10);
     else if (race_selected_mission==SC64_RACE_MISSION_T2) race_campaign_set_message(11);
 #ifdef SC64_T3_ENABLED
-    else race_campaign_set_message(14);
+    else if (race_selected_mission==SC64_RACE_MISSION_T3) race_campaign_set_message(14);
+#endif
+#ifdef SC64_Z3_ENABLED
+    else if (race_selected_mission==SC64_RACE_MISSION_Z3) race_campaign_set_message(20);
 #endif
 #endif
     update_exploration();
@@ -445,7 +479,10 @@ race_campaign_tick(void)
     }
 #endif
 #ifdef SC64_UNIFIED
-    if(mission>=SC64_RACE_MISSION_T1){race_terran_tick();return;}
+#ifdef SC64_Z3_ENABLED
+    if(mission==SC64_RACE_MISSION_Z3){race_z3_campaign_tick();return;}
+#endif
+    if(mission==SC64_RACE_MISSION_T1||mission==SC64_RACE_MISSION_T2){race_terran_tick();return;}
 #endif
     race_campaign_ai_tick();
 
@@ -610,6 +647,10 @@ static int race_campaign_lost(void)
 static const char *
 race_campaign_objective_text(void)
 {
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+    if (race_campaign.mission == SC64_RACE_MISSION_Z3)
+        return race_z3_objective_text();
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
     if (race_campaign.mission == SC64_RACE_MISSION_T3)
         return race_t3_objective_text();
@@ -627,13 +668,17 @@ race_campaign_objective_text(void)
 #endif
 #endif
     };
-    int mission = limit(race_campaign.mission, 0, SC64_RACE_MAP_COUNT - 1);
+    int mission = limit(race_campaign.mission, 0, (int)(sizeof(objectives)/sizeof(objectives[0])) - 1);
     return objectives[mission];
 }
 
 static const char *
 race_campaign_victory_text(void)
 {
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+    if (race_campaign.mission == SC64_RACE_MISSION_Z3)
+        return race_z3_victory_text();
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
     if (race_campaign.mission == SC64_RACE_MISSION_T3)
         return race_t3_victory_text();
@@ -648,7 +693,7 @@ race_campaign_victory_text(void)
 #endif
 #endif
     };
-    return titles[limit(race_campaign.mission, 0, SC64_RACE_MAP_COUNT - 1)];
+    return titles[limit(race_campaign.mission, 0, (int)(sizeof(titles)/sizeof(titles[0])) - 1)];
 }
 
 static const char *
@@ -674,7 +719,8 @@ race_campaign_message_text(void)
         "Ten minutes remain. Keep the Terran buildings alive.",
         "Five minutes remain. Keep the Terran buildings alive.",
         "One minute remains. Hold the line.",
-        "The Hatchery objective is open. Destroy the Zerg Hatchery or survive the countdown."
+        "The Hatchery objective is open. Destroy the Zerg Hatchery or survive the countdown.",
+        "Protect the Chrysalis and eliminate the Terran presence."
 #endif
     };
     return race_campaign.message < sizeof(messages) / sizeof(messages[0]) ?

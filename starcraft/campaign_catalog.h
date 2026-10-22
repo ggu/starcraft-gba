@@ -40,7 +40,13 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
     {11, SC64_FACTION_TERRAN, 8, 0, "THE BIG PUSH"},
     {12, SC64_FACTION_TERRAN, 9, 0, "NEW GETTYSBURG"},
     {13, SC64_FACTION_TERRAN, 10, 0, "THE HAMMER FALLS"},
-    {14, SC64_FACTION_ZERG, 3, 0, "THE NEW DOMINION"},
+    {14, SC64_FACTION_ZERG, 3,
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+     1,
+#else
+     0,
+#endif
+     "THE NEW DOMINION"},
     {15, SC64_FACTION_ZERG, 4, 0, "AGENT OF THE SWARM"},
     {16, SC64_FACTION_ZERG, 5, 0, "THE AMERIGO"},
     {17, SC64_FACTION_ZERG, 6, 0, "THE DARK TEMPLAR"},
@@ -94,6 +100,13 @@ static inline int sc64_catalog_is_playable(int id) {
 static inline int sc64_catalog_mission_allowed(int id, int profile_race) {
     const Sc64MissionInfo *m = sc64_catalog_get(id);
     return m && m->playable && (profile_race < 0 || m->faction == profile_race);
+}
+
+static inline unsigned sc64_catalog_playable_mask(int profile_race) {
+    unsigned mask = 0;
+    for (int i = 0; i < SC64_BASE_MISSION_COUNT; ++i)
+        if (sc64_catalog_mission_allowed(i, profile_race)) mask |= 1u << i;
+    return mask;
 }
 
 static inline int sc64_catalog_available_next(int faction, int mission) {

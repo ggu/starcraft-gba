@@ -22,6 +22,7 @@ UNIFIED_FLAGS := $(RACES_FLAGS) -DSC64_UNIFIED
 RACE_CAMPAIGN_FLAGS := $(UNIFIED_FLAGS) -DSC64_IMPORTED_SKIRMISH -I.local/sc64/skirmish/generated
 RACE_CAMPAIGN_INPUTS := $(RACES_INPUTS) .local/sc64/skirmish/generated/sc64_skirmish_generated.h
 T3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_T3_ENABLED -DSC64_CAMPAIGN_RACE=0 $(T3_EXTRA_FLAGS)
+Z3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_Z3_ENABLED -DSC64_CAMPAIGN_RACE=1
 
 .PHONY: all clean test verify probe sc64 backwater skirmish campaign races unified \
 	verify-sc64 verify-backwater verify-skirmish verify-campaign verify-races verify-unified \
@@ -113,6 +114,24 @@ test-sc64-t3-runtime: test-sc64-t3-import build/test-sc64-t3-run build/test-sc64
 	./build/test-sc64-t3-resume
 	./build/test-sc64-t3-run
 
+# Staged New Dominion runtime has its own ROM and save identity.
+.PHONY: zerg-z3 test-sc64-z3-runtime
+build/starcraft-zerg-z3.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z3_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z3.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z3-GBA.gba: build/starcraft-zerg-z3.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z3' SCZ3
+zerg-z3: build/StarCraft-Zerg-Z3-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z3
+build/test-sc64-z3-run: tests/sc64_z3_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z3_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z3-save: tests/sc64_z3_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z3_FLAGS) $< common/gba.c -o $@
+test-sc64-z3-runtime: test-sc64-z3-import build/test-sc64-z3-run build/test-sc64-z3-save
+	./build/test-sc64-z3-run
+	./build/test-sc64-z3-save
+
 build/test-sc64-frontend-terran: RACE_FRONTEND_ID=0
 build/test-sc64-frontend-zerg: RACE_FRONTEND_ID=1
 build/test-sc64-frontend-protoss: RACE_FRONTEND_ID=2
@@ -129,6 +148,17 @@ $(RACE_T3_FRONTEND_TESTS): tests/sc64_frontend.c starcraft/sc64_frontend.h starc
 build/test-sc64-frontend-t3-unified: tests/sc64_frontend.c starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_T3_ENABLED -Icommon tests/sc64_frontend.c -o $@
 
+build/test-sc64-frontend-z3-terran build/test-sc64-frontend-z3-t3-terran: RACE_FRONTEND_ID=0
+build/test-sc64-frontend-z3-zerg build/test-sc64-frontend-z3-t3-zerg: RACE_FRONTEND_ID=1
+build/test-sc64-frontend-z3-protoss build/test-sc64-frontend-z3-t3-protoss: RACE_FRONTEND_ID=2
+RACE_Z3_FRONTEND_TESTS := build/test-sc64-frontend-z3-terran build/test-sc64-frontend-z3-zerg build/test-sc64-frontend-z3-protoss build/test-sc64-frontend-z3-t3-terran build/test-sc64-frontend-z3-t3-zerg build/test-sc64-frontend-z3-t3-protoss
+RACE_Z3_UNIFIED_TESTS := build/test-sc64-frontend-z3-unified build/test-sc64-frontend-z3-t3-unified
+build/test-sc64-frontend-z3-t3-terran build/test-sc64-frontend-z3-t3-zerg build/test-sc64-frontend-z3-t3-protoss build/test-sc64-frontend-z3-t3-unified: Z3_FRONT_EXTRA=-DSC64_T3_ENABLED
+$(RACE_Z3_FRONTEND_TESTS): tests/sc64_z3_frontend.c starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_Z3_ENABLED -DSC64_IMPORTED_SKIRMISH -DSC64_CAMPAIGN_RACE=$(RACE_FRONTEND_ID) $(Z3_FRONT_EXTRA) -Icommon $< -o $@
+$(RACE_Z3_UNIFIED_TESTS): tests/sc64_z3_frontend.c starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_Z3_ENABLED -DSC64_IMPORTED_SKIRMISH $(Z3_FRONT_EXTRA) -Icommon $< -o $@
+
 build/test-race-routes: tests/race_routes.c starcraft/sc64_routes.h | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -Wall -Wextra -Werror -I. tests/race_routes.c -o $@
 
@@ -144,7 +174,7 @@ build/test-terrain-cache: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cach
 build/test-collision: tests/sc64_collision.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -DSC64_SKIRMISH -Icommon tests/sc64_collision.c common/gba.c -o $@
 
-test-starcraft: build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-race-rules-z3 build/test-skirmish-ai build/test-sc64-frontend build/test-sc64-bitgrid build/test-sc64-map-math build/test-sc64-t3-rules build/test-sc64-z3-rules $(RACE_FRONTEND_TESTS) $(RACE_T3_FRONTEND_TESTS) build/test-sc64-frontend-t3-unified build/test-race-routes build/test-race-routes-96 build/test-race-routes-rect build/test-terrain-cache build/test-collision
+test-starcraft: build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-race-rules-z3 build/test-skirmish-ai build/test-sc64-frontend build/test-sc64-bitgrid build/test-sc64-map-math build/test-sc64-t3-rules build/test-sc64-z3-rules $(RACE_FRONTEND_TESTS) $(RACE_T3_FRONTEND_TESTS) $(RACE_Z3_FRONTEND_TESTS) $(RACE_Z3_UNIFIED_TESTS) build/test-sc64-frontend-t3-unified build/test-race-routes build/test-race-routes-96 build/test-race-routes-rect build/test-terrain-cache build/test-collision
 	./build/test-starcraft
 	./build/test-starcraft-selection
 	./build/test-race-rules
@@ -162,6 +192,7 @@ test-starcraft: build/test-starcraft build/test-starcraft-selection build/test-r
 	./build/test-sc64-frontend-t3-zerg
 	./build/test-sc64-frontend-t3-protoss
 	./build/test-sc64-frontend-t3-unified
+	@for check in $(RACE_Z3_FRONTEND_TESTS) $(RACE_Z3_UNIFIED_TESTS); do ./$$check || exit; done
 	./build/test-race-routes
 	./build/test-race-routes-96
 	./build/test-race-routes-rect

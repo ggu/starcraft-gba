@@ -179,6 +179,11 @@ test_adversarial_noncanonical_or_unreachable_saves(void)
     assert(!sc64_z3_state_valid(&s));
 
     sc64_z3_init(&s);
+    s.switch7 = 1;
+    s.fired |= SC64_Z3_F_SWITCH_7;
+    assert(!sc64_z3_state_valid(&s)); /* a set gate starts a result sequence */
+
+    sc64_z3_init(&s);
     s.sequence = SC64_Z3_SEQ_WIN_TX_1; /* no win gate / sequence marker */
     assert(!sc64_z3_state_valid(&s));
 
