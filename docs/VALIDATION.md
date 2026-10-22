@@ -35,6 +35,19 @@ To validate play in mGBA, use `./dev play starcraft` for the default game or `./
   any ROM or extracted assets. Its remote result is separate from these local
   checks.
 
+## Contributor onboarding checks (2026-10-22)
+
+The documented no-ROM workflow is `./dev doctor`, `./dev build`, then
+`./dev test`. The default doctor reports mGBA as optional; `--emulator` makes
+it required. Five regression checks cover missing build tools, optional or
+invalid emulator configuration, and `--help` on eight emulator entry points
+without an emulator or private inputs. There are now 26 Python checks in the
+asset-free suite. The CI workflow runs these same wrapper commands.
+
+The optional unified host suite also passes. A real mGBA default-skirmish
+smoke run verifies controller input and SRAM saving, and the unified Wasteland
+1,000-tick opening profile runs through the corrected emulator launcher.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

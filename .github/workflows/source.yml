@@ -21,7 +21,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi binutils-arm-none-eabi clang make python3
+      - name: Check required tools (emulator optional)
+        run: ./dev doctor
       - name: Build and verify original-art skirmish
-        run: make verify
+        run: ./dev build
       - name: Run host rule and renderer tests
-        run: make test
+        run: ./dev test

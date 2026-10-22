@@ -15,7 +15,7 @@ import struct
 import subprocess
 import shutil
 import time
-from emulator_smoke import ROOT, MGBA, RSP, symbols, capture
+from emulator_smoke import ROOT, RSP, symbols, capture, require_mgba
 
 
 def hardware_clock(r: RSP) -> int:
@@ -49,6 +49,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--trace', type=Path, default=ROOT / 'build/sc64-completion-input.json')
     args = p.parse_args()
+    mgba = require_mgba()
     trace_bytes = args.trace.read_bytes()
     trace = json.loads(trace_bytes)
     ticks = trace['total_ticks']
@@ -75,7 +76,7 @@ def main() -> None:
     log = (out / 'sc64-completion.log').open('ab')
     # Accelerate host playback only. Performance below is derived from the
     # emulated 16.78 MHz hardware timer, independently of desktop playback rate.
-    proc = subprocess.Popen([str(MGBA), '-g', '-C', 'mute=1', '-C', 'audioSync=0', '-C', 'videoSync=0', '-C', 'fpsTarget=600',
+    proc = subprocess.Popen([mgba, '-g', '-C', 'mute=1', '-C', 'audioSync=0', '-C', 'videoSync=0', '-C', 'fpsTarget=600',
                              '-C', f'savegamePath={save_dir}', str(replay_rom)], stdout=log, stderr=log)
     connection = None
     try:

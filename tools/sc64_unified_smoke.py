@@ -7,6 +7,7 @@ import json
 import pathlib
 import socket
 import struct
+import argparse
 
 import sc64_menu_smoke as menu
 from emulator_smoke import symbol_sizes
@@ -258,6 +259,7 @@ def skirmish_scenario(race: int, bots: int, sym: dict[str, int]) -> dict:
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
     if not ROM.is_file() or not ELF.is_file():
         raise RuntimeError("Build the unified StarCraft64 ROM and ELF first")
     ensure_port_free()

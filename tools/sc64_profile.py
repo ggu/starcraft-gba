@@ -16,7 +16,7 @@ import struct
 import subprocess
 import time
 
-from emulator_smoke import ROOT, MGBA, RSP, symbols, symbol_sizes, capture
+from emulator_smoke import ROOT, RSP, symbols, symbol_sizes, capture, require_mgba
 
 
 CPU_HZ = 16_777_216
@@ -132,6 +132,7 @@ def read_ai_bank(rsp: RSP, sym: dict[str, int], sizes: dict[str, int]) -> list[d
 
 def run(profile_name: str, ticks: int = 6000, checkpoint: int = 1000,
         fps_target: int = 600, trace_path: Path | None = None, bots: int = 2) -> dict:
+    mgba = require_mgba()
     stems = {
         'backwater': ('StarCraft64-Backwater-GBA', 'starcraft64-backwater'),
         'skirmish': ('StarCraft64-Skirmish-GBA', 'starcraft64-skirmish'),
@@ -177,7 +178,7 @@ def run(profile_name: str, ticks: int = 6000, checkpoint: int = 1000,
         probe.close()
 
     proc = subprocess.Popen([
-        str(MGBA), '-g', '-C', 'mute=1', '-C', 'audioSync=0', '-C', 'videoSync=0',
+        mgba, '-g', '-C', 'mute=1', '-C', 'audioSync=0', '-C', 'videoSync=0',
         '-C', f'fpsTarget={fps_target}', '-C', f'savegamePath={save_dir}', str(rom),
     ], stdout=log, stderr=log)
     connection = None

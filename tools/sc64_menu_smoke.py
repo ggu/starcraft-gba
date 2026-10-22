@@ -2,6 +2,7 @@
 """Exercise the Races title menus and captures on the ARM ROM in mGBA."""
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import pathlib
@@ -10,7 +11,7 @@ import struct
 import subprocess
 import time
 
-from emulator_smoke import MGBA, ROOT, RSP, capture, symbols
+from emulator_smoke import ROOT, RSP, capture, require_mgba, symbols
 
 KEY_A, KEY_B, KEY_RIGHT, KEY_DOWN = 1, 2, 16, 128
 SCREEN_TITLE, SCREEN_PLAY = 0, 1
@@ -39,11 +40,12 @@ def world_palette_restored(rsp: RSP, sym: dict[str, int]) -> bool:
 
 def start_emulator(name: str, rom: pathlib.Path, out: pathlib.Path,
                    sym: dict[str, int]):
+    mgba = require_mgba()
     save_dir = out / "saves" / name
     save_dir.mkdir(parents=True, exist_ok=True)
     log = (out / f"{name}.log").open("ab")
     proc = subprocess.Popen(
-        [str(MGBA), "-g", "-C", "mute=1", "-C", "audioSync=0", "-C",
+        [mgba, "-g", "-C", "mute=1", "-C", "audioSync=0", "-C",
          "videoSync=0", "-C", f"savegamePath={save_dir}", str(rom)],
         stdout=log, stderr=log)
     sock = None
@@ -166,6 +168,7 @@ def run_scenario(name: str, custom: bool, rom: pathlib.Path,
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
     rom = ROOT / "build" / "StarCraft64-Races-GBA.gba"
     elf = ROOT / "build" / "starcraft64-races.elf"
     if not rom.is_file() or not elf.is_file():

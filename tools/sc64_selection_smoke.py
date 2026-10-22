@@ -19,7 +19,7 @@ import sys
 
 TOOLS_DIR = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(TOOLS_DIR))
-from emulator_smoke import MGBA, ROOT, RSP, capture, symbols
+from emulator_smoke import ROOT, RSP, capture, require_mgba, symbols
 
 
 KEY_A = 1
@@ -160,6 +160,7 @@ def in_bounds(unit: dict[str, int], bounds: tuple[int, int, int, int]) -> bool:
 
 
 def validate(rom: pathlib.Path, elf: pathlib.Path, out: pathlib.Path) -> dict:
+    mgba = require_mgba()
     if not rom.is_file() or not elf.is_file():
         raise FileNotFoundError(f"ROM/ELF not found: {rom}, {elf}")
     sym = symbols(elf)
@@ -178,7 +179,7 @@ def validate(rom: pathlib.Path, elf: pathlib.Path, out: pathlib.Path) -> dict:
 
     log = (out / "mgba.log").open("ab")
     proc = subprocess.Popen([
-        str(MGBA), "-g", "-C", "mute=1", "-C", "audioSync=0", "-C", "videoSync=0",
+        mgba, "-g", "-C", "mute=1", "-C", "audioSync=0", "-C", "videoSync=0",
         "-C", f"savegamePath={save_dir}", str(rom),
     ], stdout=log, stderr=log)
     sock = None

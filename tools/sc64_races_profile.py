@@ -20,7 +20,7 @@ import sys
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from emulator_smoke import ROOT, MGBA, RSP, capture, symbol_sizes, symbols
+from emulator_smoke import ROOT, RSP, capture, require_mgba, symbol_sizes, symbols
 
 CPU_HZ = 16_777_216
 MAX_UNITS = 128
@@ -280,6 +280,7 @@ def run(profile: str, *, ticks: int = 10000, checkpoint: int = 1000,
         fps_target: int = 600, trace_path: Path | None = None,
         bots: int = 2, human_race: str = 'zerg', save_load: bool = False,
         fresh_load_save: Path | None = None, unified: bool = False) -> dict:
+    mgba = require_mgba()
     if profile not in PROFILES:
         raise ValueError(f'Unsupported races profile {profile!r}')
     if profile in ('t1', 't2') and not unified:
@@ -361,7 +362,7 @@ def run(profile: str, *, ticks: int = 10000, checkpoint: int = 1000,
     finally:
         guard.close()
 
-    proc = subprocess.Popen([str(MGBA), '-g', '-C', 'mute=1', '-C', 'audioSync=0',
+    proc = subprocess.Popen([mgba, '-g', '-C', 'mute=1', '-C', 'audioSync=0',
                              '-C', 'videoSync=0', '-C', f'fpsTarget={fps_target}',
                              '-C', f'savegamePath={save_dir}', str(rom)],
                             stdout=log, stderr=log)

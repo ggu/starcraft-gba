@@ -46,6 +46,7 @@ def check_port_free():
 
 
 def run(snapshot_path, output_dir):
+    mgba = emulator_smoke.require_mgba()
     rom = ROOT / "build" / "StarCraft64-Terran-Campaign-GBA.gba"
     elf = ROOT / "build" / "starcraft64-campaign.elf"
     if not rom.is_file() or not elf.is_file():
@@ -77,7 +78,7 @@ def run(snapshot_path, output_dir):
     try:
         check_port_free()
         proc = subprocess.Popen([
-            str(emulator_smoke.MGBA), "-g", "-C", "mute=1", "-C", "audioSync=0",
+            mgba, "-g", "-C", "mute=1", "-C", "audioSync=0",
             "-C", "videoSync=0", "-C", f"savegamePath={save_dir}", str(rom),
         ], stdout=log_handle, stderr=log_handle)
         deadline = time.monotonic() + 12

@@ -11,8 +11,14 @@ def find_mgba():
  for name in ('mGBA','mgba'):
   found=shutil.which(name)
   if found:return found
- fallback=pathlib.Path.home()/'Applications/mGBA.app/Contents/MacOS/mGBA'
- return str(fallback) if fallback.is_file() and os.access(fallback,os.X_OK) else None
+ for fallback in (pathlib.Path.home()/'Applications/mGBA.app/Contents/MacOS/mGBA',
+                  pathlib.Path('/Applications/mGBA.app/Contents/MacOS/mGBA')):
+  if fallback.is_file() and os.access(fallback,os.X_OK):return str(fallback)
+ return None
+def require_mgba():
+ mgba=find_mgba()
+ if not mgba:raise RuntimeError('mGBA was not found; install it or set MGBA to its executable path')
+ return mgba
 class RSP:
  def __init__(self,s):self.s=s;self.buf=b''
  def packet(self,msg):
@@ -68,8 +74,7 @@ def run(name,steps=60,load=False,save=False,hold_a=False,bots=2):
  stem={'starcraft':'StarCraft-GBA','starcraft64':'StarCraft64-Wasteland-GBA','backwater':'StarCraft64-Backwater-GBA','skirmish':'StarCraft64-Skirmish-GBA','campaign':'StarCraft64-Terran-Campaign-GBA','races':'StarCraft64-Races-GBA','unified':'StarCraft64-GBA','probe':'probe'}[name]
  elf_name={'backwater':'starcraft64-backwater','skirmish':'starcraft64-skirmish','campaign':'starcraft64-campaign','races':'starcraft64-races','unified':'starcraft64-unified'}.get(name,name)
  rom=ROOT/'build'/f'{stem}.gba';elf=ROOT/'build'/f'{elf_name}.elf';sym=symbols(elf);sizes=symbol_sizes(elf)
- mgba=find_mgba()
- if not mgba:raise RuntimeError('mGBA was not found; install it or set MGBA to its executable path')
+ mgba=require_mgba()
  out=ROOT/'build'/'emulator';out.mkdir(exist_ok=True)
  # Do not attach to or stop someone else's debugger.
  check=socket.socket()

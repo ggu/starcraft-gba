@@ -1,0 +1,34 @@
+# Agent guidance
+
+## Project map
+
+- The default original-art skirmish is in `starcraft/game.c` and its supporting headers in `starcraft/`. Start there for game behavior.
+- GBA startup, memory setup, display, and input support are in `common/`.
+- Optional ROM-derived modes compile the same StarCraft sources under `SC64_*` flags. Campaign, race, and profile adapters live in headers such as `starcraft/race_campaign_adapter.h`, `starcraft/race_adapter.h`, `starcraft/sc64_backwater_adapter.h`, and `starcraft/skirmish_adapter.h`. Imported maps, art, and generated headers stay in ignored local folders.
+- Host-side rule and behavior checks are in `tests/`. Build and verification recipes are in `Makefile`; the `dev` wrapper provides the documented workflows. Import, conversion, replay, and smoke-check utilities live in `tools/`.
+- Read `CONTRIBUTING.md` before changing asset handling or licensing, and `docs/DEVELOPMENT.md` for setup and profile-specific commands.
+
+## Make changes safely
+
+- Keep runtime data and work bounded for GBA memory and CPU limits. Use integer arithmetic, fixed-size storage and explicit limits; avoid unbounded allocation in game code.
+- Preserve the default profile's independence from game ROMs and imported data. Never add ROMs, extracted game data, generated asset headers, or proprietary screenshots to the source tree.
+- Keep the pinned reference revisions and imported reference checkout unchanged. Do not silently change the project's pending license status or the optional importer's GPL-3.0-or-later license.
+- Keep claims about original StarCraft fidelity and hardware performance within the limits documented in `starcraft/README.md` and `docs/VALIDATION.md`.
+
+## Verify changes
+
+For the default profile, run:
+
+```sh
+./dev build
+./dev test
+```
+
+`./dev build` builds and verifies `build/StarCraft-GBA.gba`. `./dev test` runs the asset-free host checks. When a change affects optional unified code, and its ignored generated inputs are already available, also run:
+
+```sh
+make unified
+make test-unified
+```
+
+Do not fetch or generate private game inputs just to complete a default-profile task. If an optional check cannot run because its local inputs are absent, say so in the handoff and report the default checks completed.
