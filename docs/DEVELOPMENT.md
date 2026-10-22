@@ -132,8 +132,9 @@ The internal Jacobs Installation runtime binds all 95 imported UNIT rows and
 26 unit-backed THG2 props into the fixed pools: 121 initial actors total
 (87 units and 34 buildings). It evaluates the 20 retained doodad-state
 actions, handles supported creation and map-revealer actions, updates door
-collision/path blocking, and runs the bounded trigger contexts. The frontend
-catalog still excludes T4, so this integration is not a new playable release.
+collision/path blocking, and runs the bounded trigger contexts. Standard
+profiles still exclude T4; the combined Terran experiment described below is
+the opt-in normal-menu build.
 
 Door presentation uses an authored immediate-state policy: enabled/closed
 doors draw source frame 0, disabled/open doors draw frame 9; the paired right
@@ -179,8 +180,8 @@ make sc64-t4-replay test-sc64-t4-frontend-entry test-sc64-t4-ping \
 
 `build/StarCraft-T4-Internal-GBA.gba` has an explicit
 `SC64_T4_REPLAY_ENTRY` flag. On HOME, press START+SELECT together to open the
-T4 briefing, then A to deploy. The ordinary catalog still lists two Terran
-missions. The on/off frontend fixtures exercise this distinction without
+T4 briefing, then A to deploy. Standard Terran builds still list only their
+first two missions. The on/off frontend fixtures exercise this distinction without
 private inputs. The ping fixture checks the live minimap marker, pulse,
 clipping and expiry. The controller runner records input attempts under ignored
 `.local/` storage and exits successfully only on a win; a limit/failed attempt
@@ -215,6 +216,68 @@ and static-key culling for this internal profile. For a comparison build, use
 before rebuilding the optimized default.
 Diagnostic builds with `SC64_DIAGNOSTIC_UPDATE` expose separate rescue, trigger
 and trap cycle counters, which the controller replay report records when present.
+
+## Combined Terran T1–T4 experimental campaign
+
+The combined target builds Terran missions 1–4 together, including T3 and
+Jacobs Installation (global mission ID 7). It requires the same local Terran
+preparation and private generated T4 data as the internal runtime:
+
+```sh
+make terran-t4
+make test-sc64-t3t4-runtime test-sc64-t3t4-save \
+  test-sc64-t3t4-skirmish test-sc64-t3t4-controller \
+  test-sc64-t4-campaign-frontend
+```
+
+The combined runtime suite also covers the T3 survival win, save/resume and
+HUD behavior. The skirmish fixture exercises the map/race/opponent setup
+matrix for this profile.
+
+This produces `build/StarCraft-Terran-T4-GBA.gba`. T4 is reached from the
+ordinary campaign menu: press A from HOME, move RIGHT to page two, move DOWN
+to Jacobs Installation, press A for its briefing, then A again to deploy.
+The distinct `sc64-t4-replay` build still uses START+SELECT on HOME as an
+internal development shortcut. The standard campaign catalog remains
+unchanged; the internal replay target retains its separate entry and save
+identity.
+
+The combined ROM has save generation 11. It rejects saves from older
+generations, including generation 10 used by the standalone internal T4
+target, so use a separate save file. Its host and ARM controller runs both
+complete the mission through the normal campaign entry. On the recorded mGBA
+run, the win occurs at frame 9,331 (host tick 9,378); 160 input transitions
+peak at 62 per scheduler page, and 11 observations match. The run averages
+23.15 effective fps over 7,971 counted live frames, with a worst observed
+interval of 20.71 fps. This remains below the 30-fps goal and is emulator
+timing, not a physical GBA result. The ROM is 2 MiB; ROM SHA-256 is
+`181a5063515a362970ce5902561ddbb61410ad43d91c248160d03439244c78bb`, and ELF
+SHA-256 is
+`5fc7296475ac58c2f20f624ca4bcc7a127b0bb27e01dbeabd6858e7f3a6da5cd`.
+The ELF has 1,857,188 bytes of text, 388 bytes of data and 241,872 bytes of
+BSS; BSS ends at `0x0203b258` and IWRAM at `0x03004ec8`, within the existing
+guards.
+
+A separate 10,000-tick neutral skirmish run on Blood Bath with three opponents
+of independently selected Zerg, Protoss and Terran races averages 29.48 fps
+(observed intervals 28.58–29.86). This is bounded skirmish evidence, not a
+full-battle worst case or a campaign performance result. Across current
+experimental progression builds, Terran 1–4, Zerg 1–3 and Protoss 1–3 are
+playable; the remaining 20 catalogued missions are unavailable.
+`SC64_DIAGNOSTIC_UPDATE` exposes rescue, trigger and trap counters;
+`SC64_DIAGNOSTIC_TERRAIN` exposes terrain reuse/event and minimap counters.
+These are instrumentation, not separate performance results.
+
+To replay the recorded normal-menu controller trace against the combined ROM,
+pass the matching ROM and ELF explicitly because the helper defaults to the
+separate internal T4 target:
+
+```sh
+python3 tools/sc64_t4_controller_replay.py \
+  --trace .local/sc64/t3t4-controller-smoke.json \
+  --rom build/StarCraft-Terran-T4-GBA.gba \
+  --elf build/starcraft-t4-combined.elf
+```
 
 ## Troubleshooting
 

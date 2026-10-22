@@ -1063,13 +1063,74 @@ matches the recorded actor/objective/result checks through the final source
 victory: human outcome 1, phase 3, primary objective set, Raynor alive, no
 trigger faults and `verified_win: true`.
 
-The completed replay averages 23.12 effective fps over 7,971 counted live play
-frames, with a worst counted interval of 20.49 fps. This establishes controller
-completion in the adaptation, not near-30-fps performance or native fidelity.
+The completed internal replay averages 23.12 effective fps over 7,971 counted
+live play frames, with a worst counted interval of 20.49 fps. This establishes
+controller completion in the adaptation, not near-30-fps performance or native
+fidelity.
 Default build/tests (101 Python checks), unified build/tests and the focused
 T4 actor, runtime, save, combat, trap, prop and ping fixtures pass. Standard
-default/unified hashes remain unchanged. The ordinary T4 catalog entry stays
-gated; the internal briefing/deploy route remains available for development.
+default/unified hashes remain unchanged. Standard Terran and the separate
+internal replay builds keep T4 gated; the combined campaign build below has a
+normal-menu T4 entry.
+
+## Combined Terran T1–T4 campaign (2026-10-23)
+
+`make terran-t4` builds `build/StarCraft-Terran-T4-GBA.gba`, an opt-in ROM
+containing Terran 1–4 in one campaign. Jacobs Installation (global ID 7) is
+selected through the ordinary campaign menu: HOME, A, RIGHT to page two, DOWN
+to T4, A for briefing, then A to deploy. The separate `sc64-t4-replay` target
+retains its internal START+SELECT shortcut. The standard campaign catalog
+remains unchanged; the standalone replay target keeps a separate internal
+entry and save identity.
+
+The combined campaign uses save generation 11 and rejects earlier save
+generations, including generation 10 from the internal T4 build. Its
+save payload is 16,328 bytes; host save/load and rejection checks pass. A
+normal-controller save made by pressing START and then B at frame 1,004 was
+loaded by pressing L from HOME in a fresh ARM emulator process. It resumed at
+frame 1,004 and continued through frame 2,005 on the play screen. Its SRAM
+SHA-256 is
+`69e94f1f93e817a0dd90ea881b54080cc070a2a859c4b5ecc85cd93aade5fc89`.
+
+The normal-menu controller run wins at frame 9,331 (host tick 9,378). Its 160
+input transitions peak at 62 per scheduler page, and the ARM replay matches 11
+observations. The 2 MiB ROM SHA-256 is
+`181a5063515a362970ce5902561ddbb61410ad43d91c248160d03439244c78bb`; ELF
+SHA-256 is
+`5fc7296475ac58c2f20f624ca4bcc7a127b0bb27e01dbeabd6858e7f3a6da5cd`. The ELF
+contains 1,857,188 bytes of text, 388 bytes of data and 241,872 bytes of BSS.
+BSS ends at `0x0203b258`; IWRAM ends at `0x03004ec8`. Both existing linker
+guards pass.
+
+Across 7,971 counted live frames, the mGBA replay averages 23.15 effective fps
+with a worst interval of 20.71 fps. This is below the 30-fps target and is
+emulator timing, not physical GBA evidence. A separate 10,000-tick neutral
+Blood Bath skirmish on the same ROM, with Terran human and three independently
+selected Zerg, Protoss and Terran opponents, averages 29.48 fps (intervals
+28.58–29.86). That bounded skirmish does not measure full-battle worst case or
+campaign performance.
+
+This build joins the current experimental progression: Terran 1–4, Zerg 1–3
+and Protoss 1–3 are playable in their respective builds; 20 of the 30
+catalogued missions remain unavailable. Physical GBA validation and the
+near-30-fps campaign target remain outstanding.
+
+The asset-free Python suite has 103 passing checks. Default build/tests,
+unified build/tests, standard race-profile regressions, combined T3 runtime
+and save/resume checks, campaign-menu fixtures and the bounded skirmish test
+pass. The combined controller replay is separate from those host checks; its
+matching ARM observations are listed above.
+
+## Internal T4 visibility-span comparison (2026-10-23)
+
+On a separate internal T4 optimization comparison, the `SC64_VISIBILITY_SPANS`
+candidate identified by ROM prefix `caa5de31` averaged 23.41 effective fps,
+compared with 23.12 for the comparison build on the same trace. All 11 gameplay
+observations and three PNG captures matched. The gain is modest and is
+separate from the combined campaign measurement above. This is a
+release-candidate optimization comparison, not a diagnostic-counter run or a
+claim of near-30-fps operation. The candidate links with IWRAM ending at
+`0x03004ec0` and 251,912 bytes of BSS; both unchanged guards pass.
 
 ## Known limits
 

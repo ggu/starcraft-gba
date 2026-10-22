@@ -1,6 +1,13 @@
 # Fixed-race campaign builds
 
-The Terran, Zerg, and Protoss profiles build three separate GBA ROMs from the same game engine. Each standard ROM offers one race's first two playable missions. Separate experimental targets add the third mission of each race. Terran 4 also has an internal runtime with a verified controller win. The catalog records all 30 original campaign slots; the remaining 20 missions still need scenario and gameplay implementation.
+The Terran, Zerg, and Protoss profiles build three separate GBA ROMs from the
+same game engine. Each standard ROM offers one race's first two playable
+missions. Separate experimental targets add the third mission for each race.
+The opt-in combined Terran T4 build adds Terran 4 through the normal campaign
+menu; a separate internal T4 replay target remains available for development.
+Across the current experimental campaign builds, Terran 1–4, Zerg 1–3 and
+Protoss 1–3 are playable. The catalog records all 30 original campaign slots;
+the remaining 20 missions still need scenario and gameplay implementation.
 
 These are source-only profiles. The repository contains the engine, menu code, conversion tools, and authored Outpost map, but it does not contain a StarCraft 64 ROM or converted proprietary maps and graphics. To prepare a profile, supply a supported USA ROM that you are entitled to use:
 
@@ -22,7 +29,7 @@ frontend variants without requiring those inputs.
 
 ## Campaign progress
 
-Each fixed-race campaign presents only its two implemented missions and advances from the first to the second after a win. The catalog reserves identifiers for ten missions per race so future stages can add missions without renumbering the original six shared campaign entries. That catalog does not make later missions available: the current builds do not have their scenario content and implementations. The full 30-mission campaign remains unfinished.
+Each standard fixed-race campaign presents its two implemented missions and advances from the first to the second after a win. Experimental targets add missions without changing those standard builds. The catalog reserves identifiers for ten missions per race so later stages can add missions without renumbering the original six shared campaign entries. Across the experimental Terran, Zerg and Protoss builds, 10 of 30 missions are playable; the remaining 20 are not available in the menu. The full campaign remains unfinished.
 
 Terran 3, Desperate Alliance, has an experimental runtime behind
 `SC64_T3_ENABLED`. After preparing a race profile, build and check it with:
@@ -43,11 +50,11 @@ AI scripts; trigger-created extraction units are not implemented. Sixteen unit
 slots are reserved from enemy production for the player. The new save layout
 rejects older saves; use a separate save file for the experimental ROM.
 
-A controller-only host run completes the full survival objective. The
-production Terran build still contains its first two missions while ARM
-performance and gameplay checks continue. The final assault still needs
-performance work; see the measured builds in [Validation](VALIDATION.md).
-The full 30-mission campaign remains in progress.
+A controller-only host run completes the full survival objective. The standard
+`terran` build still contains only its first two missions. The combined T4
+experimental target described below includes this third mission and Jacobs
+Installation in the normal campaign flow. Performance remains below the
+30-fps target; see the measured builds in [Validation](VALIDATION.md).
 
 Zerg 3, The New Dominion, also has an experimental build:
 
@@ -130,18 +137,43 @@ timer, alternate objective, defeat policy and invalid-state handling.
 
 The engine and its gameplay limits are shared across all three ROMs. These profiles select a campaign identity at build time; they are not separate ports of the original N64 game. The current engine is a bounded GBA adaptation with incomplete campaign triggers, enemy strategy, unit systems, and presentation. It does not interpret arbitrary scenario triggers or execute the original AI scripts. See [SC64 unified profile](SC64-UNIFIED.md) for more detail on shared mechanics and limitations.
 
-Jacobs Installation (Terran 4) remains an internal development build. After
-preparing its local inputs as described in [Development](DEVELOPMENT.md), use
-`make sc64-t4-replay`. On HOME, START+SELECT opens its briefing; A deploys.
-Its normal-controller host and ARM tests win at frame 9,331. The complete ARM
-replay averages 23.12 effective fps with a worst counted interval of 20.49 fps;
-it remains outside the ordinary catalog while performance work continues.
-Older internal T4 saves are rejected by generation 10. This is a bounded
-adaptation with the compatibility limits in [Validation](VALIDATION.md).
+The separate internal Jacobs Installation replay target remains available for
+development. After preparing its local inputs as described in
+[Development](DEVELOPMENT.md), use `make sc64-t4-replay`. On HOME,
+START+SELECT opens its briefing; A deploys. This internal target uses save
+generation 10 and remains distinct from both the standard builds and the
+combined campaign target below. It is a bounded adaptation with the
+compatibility limits in [Validation](VALIDATION.md).
+
+## Combined Terran T1–T4 experiment
+
+After preparing the local Terran inputs, build the combined campaign ROM with:
+
+```sh
+make terran-t4
+```
+
+This creates `build/StarCraft-Terran-T4-GBA.gba`. It exposes Terran missions
+1–4 through the normal campaign menu: HOME → A → mission list, RIGHT to the
+second page, DOWN to Jacobs Installation, A for its briefing, then A to deploy.
+Terran 3 and Terran 4 share the same campaign progression and saved completion
+state. The standard Terran ROM remains unchanged, while `sc64-t4-replay`
+continues to use its separate internal START+SELECT entry.
+
+The combined ROM uses save generation 11 and rejects saves from earlier
+generations, including generation 10 from the internal T4 target. Keep separate
+save files for these builds. Its controller-only host and ARM runs complete
+Jacobs Installation through the ordinary menu. The emulator replay averages
+23.15 effective fps over 7,971 counted live frames, with a worst counted
+interval of 20.71 fps; this is below the 30-fps target and is not physical GBA
+timing. See [Validation](VALIDATION.md) for the ROM/ELF identities and other
+reproducible measurements. The combined build does not add the remaining 20
+missions.
 
 ## Custom skirmishes
 
-All three builds include the same map-select skirmish setup and the same two maps:
+The standard fixed-race ROMs and combined Terran T4 ROM include the same
+map-select skirmish setup and the same two maps:
 
 | Map | Source and adaptation |
 | --- | --- |
@@ -149,6 +181,12 @@ All three builds include the same map-select skirmish setup and the same two map
 | Blood Bath | Imported from the supplied ROM. |
 
 The human player can choose Terran, Zerg, or Protoss independently of the campaign race used by that ROM. Choose one, two, or three computer opponents, then set each opponent's race independently. The engine and available gameplay mechanics remain shared among the profiles.
+
+On the combined Terran T4 ROM, a 10,000-tick neutral Blood Bath run with a
+Terran human and three independently selected Zerg, Protoss and Terran
+opponents averaged 29.48 effective fps in mGBA; observed intervals ranged
+from 28.58 to 29.86 fps. This bounded skirmish sample is not a full-battle
+worst-case or campaign-performance result.
 
 Imported skirmish data is fitted to the engine's bounded resource storage. The packer selects at most 32 distinct mineral patches, distributing the nearest available patches among the selected starts, with a target of up to eight per start. It validates map connectivity, source geyser placements, and resource-building footprints. The imported map keeps its source terrain and resource locations.
 
@@ -208,8 +246,9 @@ and the three captured screens. The earlier baseline's final-report error is
 documented in [Validation](VALIDATION.md); it does not affect the current
 complete report.
 
-Jacobs Installation (Terran 4, global ID 7) has an import-only data stage.
-Regenerate the private race tables, then run its fixture:
+The private Jacobs Installation import fixture remains available for verifying
+the source records independently of the runtime. Regenerate the private race
+tables, then run it:
 
 ```sh
 python3 tools/sc64_races_pack.py --rom /path/to/StarCraft64-USA.z64
@@ -218,9 +257,11 @@ make test-sc64-t4-import
 
 The fixture checks all 95 non-start placements and the full 128×128 Installation
 terrain. Eight special Terran Beacons retain their raw type and use dedicated
-internal actor and save handling. The importer retains the framed location, doodad, sprite and
-trigger records with hashes under ignored `.local/sc64/races/generated/t4/`.
-This import stage does not expose the mission in the catalog.
+internal actor and save handling. The importer retains the framed location,
+doodad, sprite and trigger records with hashes under ignored
+`.local/sc64/races/generated/t4/`. The import fixture does not itself expose
+the mission; the combined experimental build above is the opt-in normal-menu
+entry.
 
 `make test-sc64-t4-storage sc64-t4-storage-probe` separately checks the T4-only
 128×128 storage profile and links `build/starcraft-t4-storage-probe.elf`.

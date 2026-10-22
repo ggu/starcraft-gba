@@ -44,8 +44,11 @@ The first preparation fetches the pinned `sc64-maps` extractor into ignored `ref
 The [race campaign profiles](docs/RACE-CAMPAIGNS.md) build separate Terran,
 Zerg, and Protoss ROMs with shared map-select skirmishes, any human race, and
 one to three opponents with independently selected races. Each currently
-contains its first two campaign missions; the remaining 24 missions are planned
-for later stages and are unavailable in the menu.
+contains its first two campaign missions. Separate experimental builds add
+Terran 3, Zerg 3 and Protoss 3; the combined `terran-t4` build adds Terran 4
+through the normal campaign menu. Across these experimental profiles, 10 of
+the 30 catalogued missions are playable and the remaining 20 are unavailable.
+The standard builds remain unchanged.
 
 ## Contributing and provenance
 
