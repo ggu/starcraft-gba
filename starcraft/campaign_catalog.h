@@ -26,7 +26,13 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
     {3, SC64_FACTION_PROTOSS, 2, 1, "INTO THE FLAMES"},
     {4, SC64_FACTION_TERRAN, 1, 1, "WASTELAND"},
     {5, SC64_FACTION_TERRAN, 2, 1, "BACKWATER"},
-    {6, SC64_FACTION_TERRAN, 3, 0, "DESPERATE ALLIANCE"},
+    {6, SC64_FACTION_TERRAN, 3,
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+     1,
+#else
+     0,
+#endif
+     "DESPERATE ALLIANCE"},
     {7, SC64_FACTION_TERRAN, 4, 0, "THE JACOBS INSTALLATION"},
     {8, SC64_FACTION_TERRAN, 5, 0, "REVOLUTION"},
     {9, SC64_FACTION_TERRAN, 6, 0, "NORAD II"},
@@ -113,6 +119,16 @@ static inline int sc64_catalog_playable_at(int faction, int ordinal) {
         if (sc64_campaign_catalog[i].faction == faction && sc64_campaign_catalog[i].playable) {
             if (!ordinal--) return i;
         }
+    return -1;
+}
+
+static inline int sc64_catalog_playable_ordinal(int faction, int mission) {
+    int ordinal = 0;
+    for (int i = 0; i < SC64_BASE_MISSION_COUNT; ++i) {
+        if (sc64_campaign_catalog[i].faction != faction || !sc64_campaign_catalog[i].playable) continue;
+        if (i == mission) return ordinal;
+        ++ordinal;
+    }
     return -1;
 }
 

@@ -17,6 +17,10 @@ typedef struct {
     Sc64BackwaterState backwater;
     u8 invincible_units[MAX_UNITS],invincible_buildings[MAX_BUILDINGS];
 #endif
+#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)
+    Sc64T3State t3;
+    u16 t3_buildings_killed;
+#endif
 } RaceSave;
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
 static RaceSave race_data;
@@ -48,6 +52,15 @@ static int race_save_game(void) {
     race_data.backwater=backwater;
     memcpy(race_data.invincible_units,invincible_units,sizeof(invincible_units));
     memcpy(race_data.invincible_buildings,invincible_buildings,sizeof(invincible_buildings));
+#endif
+#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)
+    if(!race_mode&&race_selected_mission==6) {
+        race_data.t3=race_t3;
+        race_data.t3_buildings_killed=race_t3_buildings_killed;
+    } else {
+        memset(&race_data.t3,0,sizeof(race_data.t3));
+        race_data.t3_buildings_killed=0;
+    }
 #endif
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);toast(7);return 1;
 }
@@ -110,6 +123,29 @@ static int race_load_game(void) {
     for(int i=0;i<MAX_UNITS;i++)if(race_data.invincible_units[i]>1)return 0;
     for(int i=0;i<MAX_BUILDINGS;i++)if(race_data.invincible_buildings[i]>1)return 0;
 #endif
+#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)
+    if(!v[0]&&v[2]==6) {
+        u8 phase=race_data.campaign.phase;
+        u32 t3_elapsed=race_data.t3.elapsed_ticks;
+        if(!sc64_t3_state_valid(&race_data.t3))return 0;
+        if(race_data.campaign.elapsed_frames!=t3_elapsed||(u32)v[7]!=t3_elapsed||
+           race_data.campaign.objective_stage!=race_data.t3.objective)return 0;
+        /* The optional objective can only be set after at least one building
+           kill. Kills after the 120-second trigger window remain valid even
+           when the alternate objective was never revealed. */
+        if(race_data.t3.objective&&race_data.t3_buildings_killed==0)return 0;
+        if(race_data.t3.outcome==SC64_T3_RUNNING) {
+            if(v[18]||v[19]||phase!=SC64_RACE_PHASE_ACTIVE||
+               (race_data.campaign.objective_flags&SC64_RACE_OBJECTIVE_PRIMARY))return 0;
+        } else if(race_data.t3.outcome==SC64_T3_WON) {
+            if(!v[18]||v[19]||phase!=SC64_RACE_PHASE_COMPLETE||
+               !(race_data.campaign.objective_flags&SC64_RACE_OBJECTIVE_PRIMARY))return 0;
+        } else if(race_data.t3.outcome==SC64_T3_LOST) {
+            if(v[18]||!v[19]||phase!=SC64_RACE_PHASE_FAILED||
+               (race_data.campaign.objective_flags&SC64_RACE_OBJECTIVE_PRIMARY))return 0;
+        } else return 0;
+    }
+#endif
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];
 #ifdef SC64_IMPORTED_SKIRMISH
     race_skirmish_map=v[20];for(int i=0;i<3;i++)race_bot_races[i]=v[21+i];
@@ -139,6 +175,15 @@ static int race_load_game(void) {
     memcpy(invincible_units,race_data.invincible_units,sizeof(invincible_units));
     memcpy(invincible_buildings,race_data.invincible_buildings,sizeof(invincible_buildings));
     backwater_message_ticks=0;
+#endif
+#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)
+    if(!race_mode&&race_selected_mission==6) {
+        race_t3=race_data.t3;
+        race_t3_buildings_killed=race_data.t3_buildings_killed;
+    } else {
+        memset(&race_t3,0,sizeof(race_t3));
+        race_t3_buildings_killed=0;
+    }
 #endif
     memset(tracers,0,sizeof(tracers));mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
     invalidate_path_grid();sc64_visibility_reset();update_exploration();reset_selection_gestures();

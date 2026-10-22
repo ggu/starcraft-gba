@@ -106,7 +106,21 @@ static void test_campaign_catalog_contract(void) {
     assert(sc64_catalog_mission_at(SC64_FACTION_ZERG, 2) == 14);
     assert(sc64_catalog_mission_at(SC64_FACTION_PROTOSS, 2) == 22);
     assert(sc64_catalog_mission_count(SC64_FACTION_TERRAN) == 10);
-    assert(sc64_catalog_is_playable(5) && !sc64_catalog_is_playable(6));
+    assert(sc64_catalog_is_playable(5));
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+    assert(sc64_catalog_is_playable(6));
+    assert(sc64_catalog_playable_count(SC64_FACTION_TERRAN) == 3);
+    assert(sc64_catalog_playable_at(SC64_FACTION_TERRAN, 2) == 6);
+    assert(sc64_catalog_playable_ordinal(SC64_FACTION_TERRAN, 6) == 2);
+    assert(sc64_catalog_available_next(SC64_FACTION_TERRAN, 5) == 6);
+    assert(sc64_catalog_mission_allowed(6, SC64_FACTION_TERRAN));
+    assert(sc64_catalog_get(6)->title[0] == 'D');
+#else
+    assert(!sc64_catalog_is_playable(6));
+    assert(sc64_catalog_playable_count(SC64_FACTION_TERRAN) == 2);
+    assert(sc64_catalog_playable_ordinal(SC64_FACTION_TERRAN, 6) == -1);
+    assert(sc64_catalog_available_next(SC64_FACTION_TERRAN, 5) == -1);
+#endif
     assert(sc64_catalog_mission_allowed(4, SC64_FACTION_TERRAN));
     assert(!sc64_catalog_mission_allowed(4, SC64_FACTION_ZERG));
     assert(sc64_catalog_available_next(SC64_FACTION_ZERG, 0) == 1);
@@ -178,6 +192,57 @@ static void test_unified_skirmish_all_races(void) {
 }
 #endif
 
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+static void test_t3_paging_retention_and_reset(void) {
+    Sc64Frontend f;
+#ifndef SC64_CAMPAIGN_RACE
+    sc64_frontend_reset(&f, 5, SC_FRONT_RACE_TERRAN, 1, 5);
+    assert(f.mission == 5 && f.mission_page == 0);
+    press(&f, KEY_A);
+    assert(f.page == SC_FRONT_CAMPAIGN && f.faction == SC_FRONT_TERRAN);
+    press(&f, KEY_A);
+    assert(f.page == SC_FRONT_MISSION && f.mission_page == 0 && f.row == 1);
+    press(&f, KEY_RIGHT);
+    assert(f.mission_page == 1 && f.row == 0);
+    assert(sc64_front_mission_rows(&f) == 1);
+    assert(sc64_catalog_playable_at(SC64_FACTION_TERRAN,
+                                    f.mission_page * 2 + f.row) == 6);
+    press(&f, KEY_DOWN);
+    assert(f.row == 0);
+    press(&f, KEY_A);
+    assert(f.page == SC_FRONT_BRIEFING && f.mission == 6);
+    press(&f, KEY_B);
+    assert(f.page == SC_FRONT_MISSION && f.mission_page == 1 && f.row == 0);
+    press(&f, KEY_A);
+    assert(f.page == SC_FRONT_BRIEFING && f.mission == 6);
+    assert(press(&f, KEY_A) == SC_FRONT_START_CAMPAIGN);
+    press(&f, KEY_B);
+    assert(f.page == SC_FRONT_MISSION && f.mission_page == 1 && f.row == 0);
+    press(&f, KEY_B);
+    assert(f.page == SC_FRONT_CAMPAIGN && f.row == SC_FRONT_TERRAN);
+#endif
+
+    sc64_frontend_reset(&f, 6, SC_FRONT_RACE_TERRAN, 1, 6);
+#ifdef SC64_CAMPAIGN_RACE
+#if SC64_CAMPAIGN_RACE == 0
+    assert(f.faction == SC_FRONT_TERRAN && f.mission == 6 && f.mission_page == 1);
+    sc64_frontend_reset(&f, 30, SC_FRONT_RACE_TERRAN, 1, 99);
+    assert(f.faction == SC_FRONT_TERRAN && f.mission == 4 && f.completed == 6);
+#elif SC64_CAMPAIGN_RACE == 1
+    assert(f.faction == SC_FRONT_ZERG && f.mission == 0);
+#elif SC64_CAMPAIGN_RACE == 2
+    assert(f.faction == SC_FRONT_PROTOSS && f.mission == 2);
+#endif
+#else
+    assert(f.faction == SC_FRONT_TERRAN && f.mission == 6 && f.mission_page == 1);
+    sc64_frontend_reset(&f, 30, SC_FRONT_RACE_TERRAN, 1, 99);
+    assert(f.faction == SC_FRONT_ZERG && f.mission == 0 && f.completed == 6);
+#endif
+    assert(sc64_catalog_playable_count(SC64_FACTION_ZERG) == 2);
+    assert(sc64_catalog_playable_count(SC64_FACTION_PROTOSS) == 2);
+}
+#endif
+
 int main(void) {
 #ifdef SC64_CAMPAIGN_RACE
     Sc64Frontend f;
@@ -211,6 +276,9 @@ int main(void) {
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 6);
     assert(press(&f, KEY_A) == SC_FRONT_START_SKIRMISH);
 #endif
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+    test_t3_paging_retention_and_reset();
+#endif
 #else
     test_reset_and_home();
     test_campaign_pages_and_retention();
@@ -231,6 +299,9 @@ int main(void) {
 #if defined(SC64_UNIFIED) && !defined(SC64_CAMPAIGN_RACE)
     test_unified_campaign_mission_mapping();
     test_unified_skirmish_all_races();
+#if defined(SC64_T3_ENABLED)
+    test_t3_paging_retention_and_reset();
+#endif
 #endif
     puts("sc64 frontend input: ok");
     return 0;

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Controller-smoke the three split race/campaign ARM ROMs in mGBA.
 
-By default exercises both missions plus 27 map/faction/AI-count launches per
-profile. `--map`, `--race`, and `--bots` can narrow skirmishes; `--ticks 10000`
-adds a bounded live-economy run to every selected launch.
+By default exercises every enabled campaign mission plus 27 map/faction/AI-count
+launches per profile. `--map`, `--race`, and `--bots` can narrow skirmishes;
+`--ticks 10000` adds a bounded live-economy run to every selected launch.
 """
 from __future__ import annotations
 import argparse
@@ -19,13 +19,14 @@ import time
 
 import sc64_menu_smoke as menu
 from emulator_smoke import ROOT
+from sc64_campaign_metadata import read_campaign_metadata
 
 KEY_A, KEY_B, KEY_START, KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_L = 1, 2, 8, 32, 16, 64, 128, 512
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSE = 0, 1, 2
 FRONT_HOME, FRONT_CAMPAIGN, FRONT_MISSION, FRONT_BRIEFING, FRONT_SKIRMISH = range(5)
 R_TERRAN, R_ZERG, R_PROTOSS = range(3)
 PROFILE_IDS = {"terran": R_TERRAN, "zerg": R_ZERG, "protoss": R_PROTOSS}
-CAMPAIGN_FIRST = {"terran": 4, "zerg": 0, "protoss": 2}
+MISSIONS_PER_PAGE = 2
 FRONT_FIELDS: dict[str, int] = {}
 MAP_DIMS = ((64, 64), (64, 64))
 
@@ -90,7 +91,7 @@ def frontend_offsets(elf: pathlib.Path) -> dict[str, int]:
             if offset_match:
                 fields[member] = int(offset_match.group(1))
                 member = None
-    required = {"page", "row", "race", "bots", "map", "bot_races"}
+    required = {"page", "row", "mission", "mission_page", "race", "bots", "map", "bot_races"}
     missing = required - fields.keys()
     if missing:
         raise RuntimeError(f"{elf}: DWARF is missing Sc64Frontend fields: {sorted(missing)}")
@@ -102,7 +103,8 @@ def state(rsp, sym: dict[str, int]) -> dict:
     return {"screen": i32(rsp, sym["screen"]), "page": i32(rsp, front + FRONT_FIELDS["page"]),
             "row": i32(rsp, front + FRONT_FIELDS["row"]),
             "faction": i32(rsp, front + FRONT_FIELDS.get("faction", 16)),
-            "mission": i32(rsp, front + FRONT_FIELDS.get("mission", 20)),
+            "mission": i32(rsp, front + FRONT_FIELDS["mission"]),
+            "mission_page": i32(rsp, front + FRONT_FIELDS["mission_page"]),
             "race": i32(rsp, front + FRONT_FIELDS["race"]),
             "bots": i32(rsp, front + FRONT_FIELDS["bots"]),
             "map": i32(rsp, front + FRONT_FIELDS["map"]),
@@ -171,24 +173,39 @@ def press_start(rsp, sym, map_id: int, race: int, bots: int) -> dict:
     return got
 
 
-def campaign_launch(rsp, sym, profile: str, local_mission: int) -> dict:
+def campaign_launch(rsp, sym, profile: str, mission_id: int, ordinal: int,
+                    mission_count: int) -> dict:
     key(rsp, sym, KEY_A)  # HOME opens the fixed-faction mission page.
     front = state(rsp, sym)
     if front["page"] != FRONT_MISSION:
         raise RuntimeError(f"{profile}: campaign did not open its mission list: {front}")
-    if local_mission:
-        key(rsp, sym, KEY_DOWN)
+    wanted_page = ordinal // MISSIONS_PER_PAGE
+    page_count = (mission_count + MISSIONS_PER_PAGE - 1) // MISSIONS_PER_PAGE
+    if page_count < 1 or wanted_page >= page_count:
+        raise RuntimeError(f"{profile}: invalid campaign ordinal {ordinal}/{mission_count}")
+    for _ in range(page_count):
+        current_page = state(rsp, sym)["mission_page"]
+        if current_page == wanted_page:
+            break
+        step = KEY_RIGHT if current_page < wanted_page else KEY_LEFT
+        key(rsp, sym, step)
+        if state(rsp, sym)["mission_page"] == current_page:
+            raise RuntimeError(f"{profile}: mission page did not advance: {state(rsp, sym)}")
+    if state(rsp, sym)["mission_page"] != wanted_page:
+        raise RuntimeError(f"{profile}: could not select mission page {wanted_page}")
+    wanted_row = ordinal % MISSIONS_PER_PAGE
+    to_row(rsp, sym, wanted_row)
     key(rsp, sym, KEY_A)  # briefing
-    if state(rsp, sym)["page"] != FRONT_BRIEFING:
-        raise RuntimeError(f"{profile}: mission did not open briefing")
+    briefing = state(rsp, sym)
+    if briefing["page"] != FRONT_BRIEFING or briefing["mission"] != mission_id:
+        raise RuntimeError(f"{profile}: mission {mission_id} did not open briefing: {briefing}")
     key(rsp, sym, KEY_A)
-    mission = CAMPAIGN_FIRST[profile] + local_mission
     got = {"screen": i32(rsp, sym["screen"]), "mode": i32(rsp, sym["race_mode"]),
            "human": i32(rsp, sym["race_human"]),
            "mission": i32(rsp, sym["race_selected_mission"]),
            "width": i32(rsp, sym["race_cols"]), "height": i32(rsp, sym["race_rows"])}
     if (got["screen"], got["mode"], got["human"], got["mission"]) != (
-            SCREEN_PLAY, 0, PROFILE_IDS[profile], mission):
+            SCREEN_PLAY, 0, PROFILE_IDS[profile], mission_id):
         raise RuntimeError(f"{profile}: campaign launch mismatch: {got}")
     return got
 
@@ -200,6 +217,10 @@ def run_one(profile: str, rom: pathlib.Path, elf: pathlib.Path,
         raise RuntimeError(f"{profile}: build both ROM and ELF first ({rom}, {elf})")
     global FRONT_FIELDS
     FRONT_FIELDS = frontend_offsets(elf)
+    campaign = read_campaign_metadata(rom, elf, profile)
+    mission_ids = campaign["enabled_mission_ids"]
+    if not mission_ids:
+        raise RuntimeError(f"{profile}: ELF catalog has no enabled campaign missions")
     sym = menu.symbols(elf)
     required = ("game_update", "race_front", "demo_inject_keys", "screen", "race_mode",
                 "race_human", "race_bots", "race_selected_mission", "race_skirmish_map",
@@ -213,14 +234,15 @@ def run_one(profile: str, rom: pathlib.Path, elf: pathlib.Path,
     selected_races = [race] if race is not None else range(3)
     selected_bots = [bots] if bots is not None else range(1, 4)
     records = []
-    for local_mission in range(2):
-        name = f"campaign-{local_mission}"
+    for ordinal, mission_id in enumerate(mission_ids):
+        name = f"campaign-{mission_id}"
         running = start_emulator(name, rom, out, sym)
         proc, sock, rsp, log = running
         try:
-            got = campaign_launch(rsp, sym, profile, local_mission)
-            records.append({"kind": "campaign", **got})
-            print(f"{profile} campaign mission={local_mission}: ok", flush=True)
+            got = campaign_launch(rsp, sym, profile, mission_id, ordinal, len(mission_ids))
+            records.append({"kind": "campaign", "ordinal": ordinal,
+                            "mission_id": mission_id, **got})
+            print(f"{profile} campaign mission={mission_id} ordinal={ordinal}: ok", flush=True)
         finally:
             menu.stop_emulator(proc, sock, log)
     for mid in selected_maps:
@@ -276,7 +298,8 @@ def run_one(profile: str, rom: pathlib.Path, elf: pathlib.Path,
                 finally:
                     if proc is not None:
                         menu.stop_emulator(proc, sock, log)
-    return {"profile": profile, "rom_sha256": hashlib.sha256(rom.read_bytes()).hexdigest(),
+    return {"profile": profile, "campaign_catalog": campaign,
+            "rom_sha256": hashlib.sha256(rom.read_bytes()).hexdigest(),
             "elf_sha256": hashlib.sha256(elf.read_bytes()).hexdigest(), "runs": records}
 
 

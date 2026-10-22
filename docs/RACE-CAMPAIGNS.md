@@ -24,13 +24,29 @@ frontend variants without requiring those inputs.
 
 Each fixed-race campaign presents only its two implemented missions and advances from the first to the second after a win. The catalog reserves identifiers for ten missions per race so future stages can add missions without renumbering the original six shared campaign entries. That catalog does not make later missions available: the current builds do not have their scenario content and implementations. The full 30-mission campaign remains unfinished.
 
-Preparation for Terran 3, Desperate Alliance, includes a bounded rules model
-and an optional importer path behind `SC64_T3_ENABLED`. The imported starting
-roster is retained in full, and Vulture rules and Engineering Bay identifiers
-are supported. The production build flags leave this mission disabled until
-its runtime, complete-roster capacity, objectives, AI, saves and controller
-completion have been integrated and checked. The standalone model is not a
-playable mission or a general CHK interpreter.
+Terran 3, Desperate Alliance, has an experimental runtime behind
+`SC64_T3_ENABLED`. After preparing a race profile, build and check it with:
+
+```sh
+make terran-t3 test-sc64-t3-runtime
+```
+
+This produces `build/StarCraft-Terran-T3-GBA.gba`. Its campaign menu has
+Desperate Alliance on page two. It imports all 138 starting units, 31 buildings,
+25 mineral fields and two geysers into a 160-unit engine. Keep a Terran building
+alive for the 30-minute countdown. Killing a Zerg building with at least two
+minutes remaining unlocks an alternative win by destroying the Hatchery.
+
+The enemy uses imported guards, bounded paid production, periodic small
+attacks and a final assault. This is an authored approximation of the original
+AI scripts; trigger-created extraction units are not implemented. Sixteen unit
+slots are reserved from enemy production for the player. The new save layout
+rejects older saves; use a separate save file for the experimental ROM.
+
+A controller-only host run completes the full survival objective. The
+production Terran build still contains its first two missions while ARM
+performance and gameplay checks continue; the experimental runtime does not
+yet meet the near-30-fps target. The full 30-mission campaign remains in progress.
 
 After local preparation, `make test-sc64-t3-import` checks every retained T3
 record, its runtime type mapping, coordinate bounds and terrain indices. It

@@ -20,6 +20,9 @@ enum {
     SC64_RACE_MISSION_P2
 #ifdef SC64_UNIFIED
     ,SC64_RACE_MISSION_T1, SC64_RACE_MISSION_T2
+#ifdef SC64_T3_ENABLED
+    ,SC64_RACE_MISSION_T3
+#endif
 #endif
 };
 
@@ -73,6 +76,10 @@ race_campaign_set_message(int id)
     race_campaign.message_ticks = 180;
     toast(0);
 }
+
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+#include "sc64_t3_adapter.h"
+#endif
 
 static void
 race_campaign_assign_mining(void)
@@ -317,6 +324,9 @@ race_campaign_init(void)
 #ifdef SC64_UNIFIED
     case SC64_RACE_MISSION_T1: minerals=0;break;
     case SC64_RACE_MISSION_T2: backwater_init();break;
+#ifdef SC64_T3_ENABLED
+    case SC64_RACE_MISSION_T3: minerals=100;gas=0;break;
+#endif
 #endif
     default: minerals = 170; break;
     }
@@ -327,6 +337,15 @@ race_campaign_init(void)
     cx = limit(cx, 120, map->width * 16 - 120);
     cy = limit(cy, 54, map->height * 16 - 54);
     camx = camy = 0;
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+    if (race_selected_mission == SC64_RACE_MISSION_T3) {
+        /* T3 TRIG 0 centers on MRGN 14 (the damaged Vulture area), at half
+         * the CHK pixel coordinates used by imported map records. */
+        cx = 544;
+        cy = 1384;
+        race_t3_init();
+    }
+#endif
     race_campaign_assign_mining();
     if (race_selected_mission == SC64_RACE_MISSION_Z1)
         race_campaign_set_message(1);
@@ -337,7 +356,11 @@ race_campaign_init(void)
     else if(race_selected_mission==SC64_RACE_MISSION_P2)
         race_campaign_set_message(5);
 #ifdef SC64_UNIFIED
-    else race_campaign_set_message(race_selected_mission==SC64_RACE_MISSION_T1?10:11);
+    else if (race_selected_mission==SC64_RACE_MISSION_T1) race_campaign_set_message(10);
+    else if (race_selected_mission==SC64_RACE_MISSION_T2) race_campaign_set_message(11);
+#ifdef SC64_T3_ENABLED
+    else race_campaign_set_message(14);
+#endif
 #endif
     update_exploration();
 }
@@ -415,6 +438,12 @@ race_campaign_tick(void)
         race_campaign.phase == SC64_RACE_PHASE_FAILED) return;
     if (race_campaign.message_ticks) --race_campaign.message_ticks;
     ++race_campaign.elapsed_frames;
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+    if (mission == SC64_RACE_MISSION_T3) {
+        race_t3_campaign_tick();
+        return;
+    }
+#endif
 #ifdef SC64_UNIFIED
     if(mission>=SC64_RACE_MISSION_T1){race_terran_tick();return;}
 #endif
@@ -581,6 +610,10 @@ static int race_campaign_lost(void)
 static const char *
 race_campaign_objective_text(void)
 {
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+    if (race_campaign.mission == SC64_RACE_MISSION_T3)
+        return race_t3_objective_text();
+#endif
     static const char *const objectives[] = {
         "Build a Spawning Pool and Hydralisk Den; protect the Chrysalis, then clear Terran buildings.",
         "Recover the Chrysalis and move it to the Warp Point.",
@@ -589,6 +622,9 @@ race_campaign_objective_text(void)
 #ifdef SC64_UNIFIED
         ,"Find Raynor; build a Barracks and train ten Marines.",
         "Destroy the Infested Command Center. Raynor must survive."
+#ifdef SC64_T3_ENABLED
+        ,"Survive the countdown, or unlock and complete the Zerg Hatchery objective."
+#endif
 #endif
     };
     int mission = limit(race_campaign.mission, 0, SC64_RACE_MAP_COUNT - 1);
@@ -598,11 +634,18 @@ race_campaign_objective_text(void)
 static const char *
 race_campaign_victory_text(void)
 {
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+    if (race_campaign.mission == SC64_RACE_MISSION_T3)
+        return race_t3_victory_text();
+#endif
     static const char *const titles[] = {
         "AMONG THE RUINS CLEARED", "CHRYSALIS DELIVERED",
         "FIRST STRIKE COMPLETE", "CEREBRATE DESTROYED"
 #ifdef SC64_UNIFIED
         ,"WASTELAND SECURED", "BACKWATER SECURED"
+#ifdef SC64_T3_ENABLED
+        ,"THE DESPERATE ALLIANCE SURVIVED"
+#endif
 #endif
     };
     return titles[limit(race_campaign.mission, 0, SC64_RACE_MAP_COUNT - 1)];
@@ -625,7 +668,13 @@ race_campaign_message_text(void)
         ,"Build your outpost and find Jim Raynor.",
         "Rescue the outpost and destroy the Infested Command Center.",
         "Opening supplies received. Find Jim Raynor.",
-        "Raynor has joined. Build a Barracks and train ten Marines."
+        "Raynor has joined. Build a Barracks and train ten Marines.",
+        "Hold the Terran base. Destroy a Zerg building before the final two minutes to reveal another objective.",
+        "The enemy has begun its assault. Hold your buildings until the countdown ends.",
+        "Ten minutes remain. Keep the Terran buildings alive.",
+        "Five minutes remain. Keep the Terran buildings alive.",
+        "One minute remains. Hold the line.",
+        "The Hatchery objective is open. Destroy the Zerg Hatchery or survive the countdown."
 #endif
     };
     return race_campaign.message < sizeof(messages) / sizeof(messages[0]) ?

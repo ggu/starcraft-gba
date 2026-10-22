@@ -96,9 +96,26 @@ geysers. It also checks every placement coordinate and terrain lookup index.
 Vulture rules and Engineering Bay raw-ID round trips have regression coverage.
 
 Default, unified and all three split-profile build/host suites pass after
-these additions. T3 remains disabled in production flags: complete-roster
-runtime capacity, scenario integration, controller completion and emulator
-performance checks are still required before it becomes playable.
+these additions. T3 remains disabled in production flags.
+
+## Experimental Desperate Alliance runtime (2026-10-22)
+
+`make terran-t3 test-sc64-t3-runtime` builds the opt-in ARM ROM and checks its
+runtime under ASan/UBSan. The controller harness selects T3 through the actual
+mission list and briefing, verifies the complete 138-unit/31-building roster,
+and wins by survival after 54,000 live mission ticks. It renders the opening,
+periodic checkpoints and result. The run includes paid Zergling production,
+periodic attacks and the final combat-unit assault; it makes no direct writes
+to mission state. The alternate victory and loss policies have separate model
+coverage; they have not yet been completed through live controller play.
+
+The save test fills all 160 unit slots, round-trips the 14,052-byte payload,
+rejects checksum-valid inconsistent mission/timer/result records before any
+live-state mutation, and rejects the prior save version. The experimental ARM
+link uses 388 bytes of data and 242,096 bytes of BSS, leaving 11,468 bytes below
+the EWRAM linker guard. Physical GBA testing remains pending. Initial full-roster
+ARM timing samples fall below the near-30-fps target, so production enablement
+and performance claims remain pending optimization and another measured run.
 
 ## Known limits
 

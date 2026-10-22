@@ -104,13 +104,21 @@ static void front_uplink(void)
 static void front_briefing(void)
 {
 #ifdef SC64_UNIFIED
+#if defined(SC64_T3_ENABLED)
+    static const char *lines[7][5]={
+#else
     static const char *lines[6][5]={
+#endif
         {"CREATE SPAWNING POOL","CREATE HYDRALISK DEN","PROTECT THE CHRYSALIS","DESTROY TERRAN BASE",""},
         {"ESCORT THE CHRYSALIS","TO THE WARP POINT","","KEEP THE CARRIER","ALIVE"},
         {"RESCUE FENIX","RECLAIM THE BASE","","DESTROY THE ZERG","FENIX MUST SURVIVE"},
         {"WAIT FOR FENIX","DESTROY THE CEREBRATE","","FENIX MUST SURVIVE",""},
         {"FIND JIM RAYNOR","TRAIN 10 MARINES","BUILD A BARRACKS","KEEP RAYNOR ALIVE",""},
-        {"DESTROY THE INFESTED","COMMAND CENTER","RAYNOR MUST SURVIVE","",""}};
+        {"DESTROY THE INFESTED","COMMAND CENTER","RAYNOR MUST SURVIVE","",""}
+#if defined(SC64_T3_ENABLED)
+        ,{"SURVIVE 30 MINUTES","PROTECT YOUR BASE","OPTIONAL OBJECTIVE","DESTROY ZERG HATCHERY",""}
+#endif
+    };
 #else
     static const char *lines[4][5]={
         {"CREATE SPAWNING POOL","CREATE HYDRALISK DEN","PROTECT THE CHRYSALIS","DESTROY TERRAN BASE",""},
@@ -121,7 +129,11 @@ static void front_briefing(void)
     static const char *generic_lines[5]={"COMPLETE THE MISSION","FOLLOW THE BRIEFING","","",""};
     const char *const *mission_lines = race_front.mission <
 #ifdef SC64_UNIFIED
+#if defined(SC64_T3_ENABLED)
+        7 ? lines[race_front.mission] : generic_lines;
+#else
         6 ? lines[race_front.mission] : generic_lines;
+#endif
 #else
         4 ? lines[race_front.mission] : generic_lines;
 #endif

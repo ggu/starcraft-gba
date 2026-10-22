@@ -21,6 +21,7 @@ RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_gener
 UNIFIED_FLAGS := $(RACES_FLAGS) -DSC64_UNIFIED
 RACE_CAMPAIGN_FLAGS := $(UNIFIED_FLAGS) -DSC64_IMPORTED_SKIRMISH -I.local/sc64/skirmish/generated
 RACE_CAMPAIGN_INPUTS := $(RACES_INPUTS) .local/sc64/skirmish/generated/sc64_skirmish_generated.h
+T3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_T3_ENABLED -DSC64_CAMPAIGN_RACE=0
 
 .PHONY: all clean test verify probe sc64 backwater skirmish campaign races unified \
 	verify-sc64 verify-backwater verify-skirmish verify-campaign verify-races verify-unified \
@@ -75,6 +76,23 @@ build/test-sc64-t3-import: tests/sc64_t3_import.c starcraft/race_rules.h starcra
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_T3_ENABLED -DSC64_CAMPAIGN_RACE=0 -Istarcraft -I.local/sc64/races/generated tests/sc64_t3_import.c -o $@
 test-sc64-t3-import: build/test-sc64-t3-import
 	./build/test-sc64-t3-import
+
+# Staged T3 runtime remains opt-in until controller and timing checks pass.
+.PHONY: terran-t3 test-sc64-t3-runtime
+build/starcraft-terran-t3.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(T3_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran-t3.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Terran-T3-GBA.gba: build/starcraft-terran-t3.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC TERRAN T3' SCT3
+terran-t3: build/StarCraft-Terran-T3-GBA.gba
+build/test-sc64-t3-run: tests/sc64_t3_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(T3_FLAGS) $< common/gba.c -o $@
+build/test-sc64-t3-save: tests/sc64_t3_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(T3_FLAGS) $< common/gba.c -o $@
+test-sc64-t3-runtime: test-sc64-t3-import build/test-sc64-t3-run build/test-sc64-t3-save
+	./build/test-sc64-t3-save
+	./build/test-sc64-t3-run
 
 build/test-sc64-frontend-terran: RACE_FRONTEND_ID=0
 build/test-sc64-frontend-zerg: RACE_FRONTEND_ID=1

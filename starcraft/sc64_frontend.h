@@ -160,6 +160,11 @@ static inline int sc64_front_mission_rows(const Sc64Frontend *f) {
     return remaining > 1 ? 2 : 1;
 }
 
+static inline int sc64_front_mission_ordinal(const Sc64Frontend *f) {
+    return f ? sc64_catalog_playable_ordinal(sc64_front_catalog_faction(f->faction),
+                                              f->mission) : -1;
+}
+
 static inline void sc64_frontend_reset(Sc64Frontend *f, int mission,
                                         int race, int bots, int completed) {
     if (!f) return;
@@ -168,21 +173,32 @@ static inline void sc64_frontend_reset(Sc64Frontend *f, int mission,
     f->page = SC_FRONT_HOME;
     f->row = 0;
 #ifdef SC64_UNIFIED
+#if defined(SC64_T3_ENABLED)
+    f->mission = mission;
+#else
     f->mission = sc64_front_clamp(mission, 0, 5);
+#endif
 #else
     f->mission = sc64_front_clamp(mission, 0, 3);
 #endif
 #ifdef SC64_CAMPAIGN_RACE
     f->faction = sc64_front_campaign_faction_at(0);
-    f->mission = sc64_catalog_playable_at(sc64_front_catalog_faction(f->faction), 0);
+    if (!sc64_catalog_mission_allowed(f->mission, sc64_front_catalog_faction(f->faction)))
+        f->mission = sc64_catalog_playable_at(sc64_front_catalog_faction(f->faction), 0);
 #else
     f->faction = sc64_frontend_mission_faction(f->mission);
+    if (!sc64_catalog_mission_allowed(f->mission, sc64_front_catalog_faction(f->faction)))
+        f->mission = sc64_catalog_playable_at(sc64_front_catalog_faction(f->faction), 0);
 #endif
     f->race = sc64_front_clamp(race, SC_FRONT_RACE_TERRAN,
                                SC_FRONT_RACE_PROTOSS);
     f->bots = sc64_front_clamp(bots, 1, 3);
 #ifdef SC64_UNIFIED
+#if defined(SC64_T3_ENABLED)
+    f->completed = sc64_front_clamp(completed, -1, 6);
+#else
     f->completed = sc64_front_clamp(completed, -1, 5);
+#endif
 #else
     f->completed = sc64_front_clamp(completed, -1, 3);
 #endif
@@ -192,7 +208,9 @@ static inline void sc64_frontend_reset(Sc64Frontend *f, int mission,
         if (ai == f->race) ai = (ai + 1) % 3;
         f->bot_races[i] = ai;
     }
-    f->mission_page = 0;
+    int mission_ordinal = sc64_front_mission_ordinal(f);
+    f->mission_page = mission_ordinal < 0 ? 0 : mission_ordinal / 2;
+    f->row = 0;
 }
 
 static inline int sc64_front_wrap(int v, int count) {
@@ -225,7 +243,14 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
             f->row = sc64_front_campaign_row(f->faction);
 #endif
             break;
-        case SC_FRONT_BRIEFING: f->page = SC_FRONT_MISSION; f->row = f->mission % 2; break;
+        case SC_FRONT_BRIEFING:
+            f->page = SC_FRONT_MISSION;
+            {
+                int ordinal = sc64_front_mission_ordinal(f);
+                f->mission_page = ordinal < 0 ? 0 : ordinal / 2;
+                f->row = ordinal < 0 ? 0 : ordinal % 2;
+            }
+            break;
         case SC_FRONT_SKIRMISH: f->page = SC_FRONT_HOME; f->row = 1; break;
         default: f->page = SC_FRONT_HOME; f->row = 0; break;
         }
@@ -288,7 +313,11 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
 #ifdef SC64_CAMPAIGN_RACE
             f->faction = sc64_front_campaign_faction_at(0);
             f->page = SC_FRONT_MISSION;
-            f->row = 0;
+            {
+                int ordinal = sc64_front_mission_ordinal(f);
+                f->mission_page = ordinal < 0 ? 0 : ordinal / 2;
+                f->row = ordinal < 0 ? 0 : ordinal % 2;
+            }
 #else
             f->page = SC_FRONT_CAMPAIGN;
             f->row = sc64_front_campaign_row(f->faction);
@@ -305,8 +334,12 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
         f->page = SC_FRONT_MISSION;
 #ifdef SC64_UNIFIED
         f->mission_page = 0;
-        f->row = sc64_frontend_mission_faction(f->mission) == f->faction ?
-                 (sc64_catalog_playable_at(sc64_front_catalog_faction(f->faction), 1) == f->mission ? 1 : 0) : 0;
+        {
+            int ordinal = sc64_catalog_playable_ordinal(sc64_front_catalog_faction(f->faction),
+                                                         f->mission);
+            f->row = ordinal >= 0 ? ordinal % 2 : 0;
+            f->mission_page = ordinal >= 0 ? ordinal / 2 : 0;
+        }
 #else
         f->row = f->mission / 2 == f->faction ? f->mission % 2 : 0;
 #endif

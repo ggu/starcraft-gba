@@ -58,7 +58,9 @@ def u32(rsp, address: int) -> int:
     return int.from_bytes(rsp.read(address, 4), "little")
 
 
-def observe(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict) -> dict:
+def observe(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
+            campaign_layout: tuple[int, dict[str, int]] | None = None,
+            t3_layout: tuple[int, dict[str, int]] | None = None) -> dict:
     units = races.read_entities(rsp, sym["u"], bank["unit_capacity"],
                                 bank["unit_stride_bytes"], bank["unit_offsets"])
     buildings = races.read_entities(rsp, sym["b"], bank["building_capacity"],
@@ -66,7 +68,8 @@ def observe(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict) -> dict
                                     building=True)
     state = {name: u32(rsp, sym[name]) for name in
              ("screen", "frame", "won", "lost", "race_mode", "race_human", "race_bots",
-              "race_skirmish_map", "race_cols", "race_rows", "minerals", "gas") if name in sym}
+              "race_skirmish_map", "race_selected_mission", "race_cols", "race_rows",
+              "minerals", "gas") if name in sym}
     state["units"] = units
     state["buildings"] = buildings
     refinery_counts: dict[str, int] = {}
@@ -81,11 +84,31 @@ def observe(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict) -> dict
             size = sizes.get(name, 0)
             if size and size % 4 == 0:
                 state[name] = list(struct.unpack("<" + "i" * (size // 4), rsp.read(sym[name], size)))
+    if campaign_layout and "race_campaign" in sym:
+        size, offsets = campaign_layout
+        state["race_campaign"] = races.campaign_state(rsp, sym["race_campaign"], size, offsets)
+    if "race_t3_buildings_killed" in sym:
+        counter_size = sizes.get("race_t3_buildings_killed", 0)
+        if counter_size != 2:
+            raise RuntimeError(f"race_t3_buildings_killed has unexpected size {counter_size}")
+        state["race_t3_buildings_killed"] = int.from_bytes(
+            rsp.read(sym["race_t3_buildings_killed"], 2), "little")
+    if t3_layout and "race_t3" in sym:
+        size, offsets = t3_layout
+        widths = {"elapsed_ticks": 4, "remaining_ticks": 4, "fired": 2,
+                  "outcome": 1, "objective": 1}
+        raw = rsp.read(sym["race_t3"], size)
+        state["race_t3"] = {
+            field: int.from_bytes(raw[offsets[field]:offsets[field] + width], "little")
+            for field, width in widths.items() if field in offsets
+        }
     return state
 
 
 def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
-        checkpoint: int, output: Path) -> dict:
+        checkpoint: int, output: Path, mission: int | None = None,
+        rom_path: Path | None = None, elf_path: Path | None = None,
+        require_win: bool = False) -> dict:
     if ticks < 1:
         raise ValueError("ticks must be positive")
     # The target's main loop checkpoints at every 1000 ticks and at the exact
@@ -95,8 +118,8 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
     if ticks > 0xFFFFFFFF:
         raise ValueError("ticks exceeds the 32-bit controller scheduler length")
 
-    rom = ROOT / "build" / f"StarCraft-{profile.capitalize()}-GBA.gba"
-    elf = ROOT / "build" / f"starcraft-{profile}.elf"
+    rom = rom_path or ROOT / "build" / f"StarCraft-{profile.capitalize()}-GBA.gba"
+    elf = elf_path or ROOT / "build" / f"starcraft-{profile}.elf"
     if not rom.is_file() or not elf.is_file():
         raise RuntimeError(f"{profile}: build both ROM and ELF first ({rom}, {elf})")
     # The split UI helpers inspect the appended Sc64Frontend fields through
@@ -104,6 +127,26 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
     split.FRONT_FIELDS = split.frontend_offsets(elf)
     sym, sizes = symbols(elf), symbol_sizes(elf)
     bank = races.race_bank_profile(elf, sizes)
+    campaign = None
+    campaign_layout = None
+    t3_layout = None
+    mission_ordinal = None
+    if mission is not None:
+        campaign = split.read_campaign_metadata(rom, elf, profile)
+        mission_ids = campaign["enabled_mission_ids"]
+        if mission not in mission_ids:
+            raise ValueError(f"mission {mission} is not enabled for {profile}; available IDs: {mission_ids}")
+        mission_ordinal = mission_ids.index(mission)
+        campaign_layout = races.dwarf_struct(elf, "Sc64RaceCampaignState")
+        if "race_selected_mission" not in sym or "race_campaign" not in sym:
+            raise RuntimeError(f"{profile}: campaign ELF lacks mission/campaign state symbols")
+        if mission == 6:
+            if "race_t3" not in sym or "race_t3_buildings_killed" not in sym:
+                raise RuntimeError("T3 campaign ELF lacks its model state or building-kill counter")
+            t3_layout = races.dwarf_struct(elf, "Sc64T3State")
+            required_t3_fields = {"elapsed_ticks", "remaining_ticks", "fired", "outcome", "objective"}
+            if required_t3_fields - t3_layout[1].keys() or t3_layout[0] < 12:
+                raise RuntimeError(f"T3 DWARF layout is incomplete: {t3_layout}")
     required = (
         "game_update", "demo_schedule_events", "demo_schedule_count", "demo_schedule_length",
         "demo_schedule_tick", "demo_replay_checkpoint", "demo_tick_buckets", "demo_last_cycles",
@@ -118,17 +161,24 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
     if capacity < 1:
         raise RuntimeError("controller event queue has no capacity")
 
-    out = output / f"{profile}-map{map_id}-race{race}-bots{bots}-{time.time_ns()}"
+    scenario = f"mission{mission}" if mission is not None else f"map{map_id}-race{race}-bots{bots}"
+    out = output / f"{profile}-{scenario}-{time.time_ns()}"
     out.mkdir(parents=True, exist_ok=False)
     label = out.name
     check_debugger_port_free()
     proc = sock = rsp = log = None
     try:
         proc, sock, rsp, log = split.start_emulator(label, rom, out, sym)
-        launch = split.press_start(rsp, sym, map_id, race, bots)
+        if mission is None:
+            launch = split.press_start(rsp, sym, map_id, race, bots)
+        else:
+            launch = split.campaign_launch(rsp, sym, profile, mission, mission_ordinal,
+                                           len(campaign["enabled_mission_ids"]))
         launch_state = split.state(rsp, sym)
         if launch_state["screen"] != SCREEN_PLAY:
-            raise RuntimeError(f"skirmish did not enter live play: {launch_state}")
+            raise RuntimeError(f"scenario did not enter live play: {launch_state}")
+        if mission is not None and launch_state["mission"] != mission:
+            raise RuntimeError(f"campaign launch selected mission {launch_state['mission']} instead of {mission}")
 
         # main.c has already sampled schedule_count==0 for the current
         # game_update iteration. It finishes normally, then sees this queue
@@ -159,7 +209,7 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
         def record_checkpoint(tick: int, interval_cycles: int,
                               before_buckets: tuple[int, ...], before_routes: dict[str, int]) -> dict:
             buckets = struct.unpack("<8I", rsp.read(sym["demo_tick_buckets"], 32))
-            state = observe(rsp, sym, sizes, bank)
+            state = observe(rsp, sym, sizes, bank, campaign_layout, t3_layout)
             current_routes = {key: u32(rsp, sym[key]) for key in before_routes}
             cycles = ({key: u32(rsp, sym[key]) for key in PROFILE_CYCLE_NAMES if key in sym}
                       if state["screen"] == SCREEN_PLAY else None)
@@ -185,7 +235,7 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
 
         # Tick zero is a genuine PLAY snapshot and the baseline for all
         # interval counters; it is excluded from the measured intervals.
-        zero = observe(rsp, sym, sizes, bank)
+        zero = observe(rsp, sym, sizes, bank, campaign_layout, t3_layout)
         if zero["screen"] != SCREEN_PLAY:
             raise RuntimeError(f"tick-zero observer is not on the live game screen: {zero['screen']}")
         zero_capture = capture(rsp, out / "tick-000000.png")
@@ -220,7 +270,7 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
                 record["game_ended_by_tick"] = completed
                 ended_early = completed < ticks
             observations.append(record)
-            print(f"{profile} map={map_id} race={race} bots={bots} tick={completed}/{ticks} "
+            print(f"{profile} {scenario} tick={completed}/{ticks} "
                   f"screen={record['screen']} frame={record.get('frame')} "
                   f"interval-fps={record['interval_effective_fps'] if record['interval_effective_fps'] is not None else 'n/a'}",
                   flush=True)
@@ -236,9 +286,13 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
             "rom": str(rom), "elf": str(elf),
             "rom_sha256": hashlib.sha256(rom.read_bytes()).hexdigest(),
             "elf_sha256": hashlib.sha256(elf.read_bytes()).hexdigest(),
-            "configuration": {"map": map_id, "human_race": race, "opponents": bots,
-                              "bot_races": launch["bot_races"][:bots],
-                              "width": launch["width"], "height": launch["height"]},
+            "configuration": ({"mission": mission, "mission_ordinal": mission_ordinal,
+                               "width": launch["width"], "height": launch["height"]}
+                              if mission is not None else
+                              {"map": map_id, "human_race": race, "opponents": bots,
+                               "bot_races": launch["bot_races"][:bots],
+                               "width": launch["width"], "height": launch["height"]}),
+            "campaign_catalog": campaign,
             "requested_ticks": ticks, "observed_ticks": last_tick,
             "counted_live_play_ticks": counted_play_ticks,
             "checkpoint_interval": checkpoint,
@@ -265,6 +319,10 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
                           "observed_ticks": last_tick,
                           "mean_live_play_effective_fps": result["mean_live_play_effective_fps"],
                           "result": str(report)}, indent=2))
+        if require_win and not (observations[-1].get("screen") == SCREEN_RESULT and
+                                observations[-1].get("won") == 1 and
+                                observations[-1].get("lost") == 0):
+            raise RuntimeError(f"--require-win: final observed result did not win; report: {report}")
         return result
     finally:
         if proc is not None:
@@ -292,6 +350,12 @@ def main() -> None:
     parser.add_argument("--race", type=int, choices=range(3), default=0,
                         help="human race: 0 Terran, 1 Zerg, 2 Protoss")
     parser.add_argument("--bots", type=int, choices=range(1, 4), default=1)
+    parser.add_argument("--mission", type=int,
+                        help="profile one enabled campaign mission by its global catalog ID; default is skirmish")
+    parser.add_argument("--rom", type=Path, help="override the profile's default GBA ROM")
+    parser.add_argument("--elf", type=Path, help="override the profile's default ELF")
+    parser.add_argument("--require-win", action="store_true",
+                        help="exit with failure unless the final observed screen is a won result")
     parser.add_argument("--ticks", type=int, default=10000)
     parser.add_argument("--checkpoint", type=int, default=1000)
     parser.add_argument("--out", type=Path, default=ROOT / "build/emulator/sc64-split-profile")
@@ -302,7 +366,8 @@ def main() -> None:
         parser.error("the current ROM observer checkpoints every 1000 ticks")
     try:
         run(args.profile, args.map, args.race, args.bots, args.ticks,
-            args.checkpoint, args.out)
+            args.checkpoint, args.out, mission=args.mission,
+            rom_path=args.rom, elf_path=args.elf, require_win=args.require_win)
     except (OSError, RuntimeError, ValueError, AssertionError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f"sc64_split_profile: {exc}\n")
 

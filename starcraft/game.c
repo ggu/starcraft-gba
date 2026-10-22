@@ -3,17 +3,27 @@ void *memcpy(void *dst, const void *src, size_t n);
 void *memset(void *dst, int value, size_t n);
 
 #if defined(SC64_RACES)
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+#define MAX_UNITS 160
+#define SC64_RACE_SAVE_GENERATION 3u
+#else
 #define MAX_UNITS 128
+#define SC64_RACE_SAVE_GENERATION 2u
+#endif
 #define MAX_BUILDINGS 64
 #define MAX_MINERALS 32
 #if defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 0
-#define SAVE_VERSION 0x53435432u
+#define SAVE_VERSION (0x53435430u + SC64_RACE_SAVE_GENERATION)
 #elif defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 1
-#define SAVE_VERSION 0x53435a32u
+#define SAVE_VERSION (0x53435a30u + SC64_RACE_SAVE_GENERATION)
 #elif defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 2
-#define SAVE_VERSION 0x53435032u
+#define SAVE_VERSION (0x53435030u + SC64_RACE_SAVE_GENERATION)
 #elif defined(SC64_UNIFIED)
+#ifdef SC64_T3_ENABLED
+#define SAVE_VERSION 0x53435532u
+#else
 #define SAVE_VERSION 0x53435531u
+#endif
 #else
 #define SAVE_VERSION 0x53435231u
 #endif
@@ -127,6 +137,11 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 #ifdef SC64_RACES
 #include "race_rules.h"
 #include "race_missions.h"
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+#include "sc64_t3.h"
+_Static_assert(MAX_UNITS >= 138, "T3 must retain its complete starting roster");
+_Static_assert(MAX_UNITS + MAX_BUILDINGS <= 255, "Visibility source counts require wider storage");
+#endif
 #else
 enum {
     U_SCV, U_MARINE, U_FIREBAT, U_MEDIC, U_ZERGLING, U_HYDRALISK, U_RAYNOR
@@ -285,6 +300,10 @@ static void race_frontend_reset(void)
 }
 static int race_player[5],race_minerals[5],race_gas[5];
 static Sc64RaceCampaignState race_campaign;
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+static Sc64T3State race_t3;
+static u16 race_t3_buildings_killed;
+#endif
 static int race_queue_unit(int owner,int building,int type);
 static int race_start_build(int owner,int worker,int type,int x,int y);
 static int race_can_site(int owner,int type,int x,int y);
@@ -894,6 +913,7 @@ move_toward(Unit * q, int tx, int ty)
 {
 	int nx, ny, speed = q->type == U_ZERGLING || q->type == U_FIREBAT || q->type == U_RAYNOR ? 2 : 1;
 #ifdef SC64_RACES
+    if(q->type==U_VULTURE)speed=2;
     if(sc64_race_unit_flying(q->type)) {
         q->x=limit(q->x+(tx>q->x?speed:tx<q->x?-speed:0),0,WORLD_W-1);
         q->y=limit(q->y+(ty>q->y?speed:ty<q->y?-speed:0),0,WORLD_H-1);
@@ -1115,6 +1135,11 @@ hit_target(int target, int damage, int source_type, int source_owner)
     q->hp -= damage > 1 ? damage - 1 : 1;
 #endif
 	if (q->hp <= 0) {
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+            if(q->alive && !race_mode && race_selected_mission==6 &&
+               q->owner==ENEMY && source_owner==SIDE && race_t3_buildings_killed<65535u)
+                ++race_t3_buildings_killed;
+#endif
 	    if (q->type == B_COMMAND && q->owner == SIDE) {
 #ifndef SC64_IMPORTED_MISSION
 		lost = 1;
@@ -2304,7 +2329,7 @@ static void GBA_HOT
 update_orders(void)
 {
     int i, target;
-#ifndef SC64_SKIRMISH
+#if !defined(SC64_SKIRMISH) && !defined(SC64_RACES)
     int cc;
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
@@ -3866,7 +3891,23 @@ draw_hud_contents(void)
     if(race_mode)gfx_text(5,149,"DESTROY ALL ENEMY BUILDINGS",C_GOLD);
     else {
         static const char *const objective[4]={"POOL + DEN / CLEAR TERRAN BASE","DRONE: CARRY CHRYSALIS TO WARP","MEET FENIX / CLEAR ZERG BASE","PROTECT FENIX / KILL CEREBRATE"};
-        gfx_text(5,149,objective[race_selected_mission],C_GOLD);
+        if(race_selected_mission<4)
+            gfx_text(5,149,objective[race_selected_mission],C_GOLD);
+#ifdef SC64_UNIFIED
+        else if(race_selected_mission==4)
+            gfx_text(5,149,"FIND RAYNOR / BUILD OUTPOST",C_GOLD);
+        else if(race_selected_mission==5)
+            gfx_text(5,149,"DESTROY INFESTED BASE",C_GOLD);
+#ifdef SC64_T3_ENABLED
+        else if(race_selected_mission==6) {
+            unsigned seconds=(race_t3.remaining_ticks+29u)/30u;
+            char timer[6]={(char)('0'+seconds/600u),(char)('0'+seconds/60u%10u),':',
+                (char)('0'+seconds/10u%6u),(char)('0'+seconds%10u),0};
+            gfx_text(5,149,race_t3.objective?"HOLD / KILL HATCHERY":"HOLD BASE",C_GOLD);
+            gfx_text(137,149,timer,C_WHITE);
+        }
+#endif
+#endif
         if(race_selected_mission==3&&race_campaign.elapsed_frames<27000u) {
             gfx_text(170,126,"ETA",C_CYAN);
             gfx_num(194,126,(27000u-race_campaign.elapsed_frames+29u)/30u,C_WHITE);
