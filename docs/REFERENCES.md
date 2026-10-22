@@ -7,6 +7,7 @@ These pinned repositories were consulted during implementation. The default Star
 | [OpenBW](https://github.com/OpenBW/openbw) | `4b046d5f65302b10cb0a745f0fecd37ec85b20a8` | Behavioral and file-format research. The inspected snapshot had no root license file; do not copy implementation code. |
 | [BWAPI](https://github.com/bwapi/bwapi) | `d727fed68558c506163048ea889131d8cbb33915` | Unit and weapon identities and default numeric values. Its repository includes LGPL-3.0 with additional permission notices. |
 | [sc64-maps](https://github.com/dmang-dev/sc64-maps) | `09b57f787a247107d1de82b8c5eab2734667ea1d` | Optional StarCraft 64 BOLT extraction tools; GPL-3.0-or-later. |
+| [StarCraft64-recomp](https://github.com/n0madic/StarCraft64-recomp) | `425f409e02edacf897354cd0872c61ce67a9067a` | Optional exact-ROM native-code research through its N64Recomp recipe. Generated game code remains private; no implementation is incorporated here. |
 
 ## StarCraft mechanics and values
 
@@ -19,3 +20,22 @@ Build times and weapon cooldowns are simulation-frame counts. The default skirmi
 ## Optional StarCraft 64 missions
 
 The optional unified profile reads map and graphics data from a user-supplied verified USA N64 ROM through `references/sc64-maps/extract_sc64_maps.py` at the pinned `sc64-maps` commit. The local adapter is `tools/sc64_import.py`; terrain, sprite, and race packing is implemented in `tools/sc64_assets.py`, `tools/sc64_sprites.py`, `tools/sc64_races_pack.py`, and `tools/sc64_race_sprites.py`. Imported outputs remain local. The result is an authored GBA engine and mission adaptation, not a port of the N64 engine. See [the unified guide](SC64-UNIFIED.md).
+
+T4's numeric trigger, location and THG2 records are preserved by
+`tools/sc64_t4_scenario_pack.py`. It emits private immutable tables, including
+unused slots and opaque bytes. The authored trigger runner uses a documented
+30 Hz timing policy; its synthetic tests establish ordering and resumability,
+not equivalence to the N64 scheduler. Native trigger research uses the separate
+recompilation recipe above with the verified local ROM. Handler behavior alone
+does not prove how raw CHK operands are converted into native runtime records;
+that conversion must be traced before binding uncertain action operands.
+
+For the USA image, native converter `0x8002C3EC` walks 20-byte conditions and
+32-byte raw actions, packing actions into 28-byte runtime records. It preserves
+the opcode/modifier/flags bytes. The action table at `0x800C7564` dispatches
+opcode 42 to `0x80084AB4`: raw states 0 and 6 toggle, 4 enables and 5 disables.
+Opcode 11 at `0x800819EC` defaults a zero count to one creation. These are
+behavioral facts transcribed into the authored helpers in
+`starcraft/sc64_t4_actions.h`; native instructions and generated C remain
+private. Exact actor selection, animation and collision transitions still
+need separate evidence and tests.

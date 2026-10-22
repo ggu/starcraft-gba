@@ -146,6 +146,7 @@ def prepare(rom: Path, profile: str) -> None:
         run([sys.executable, str(ROOT / "tools/sc64_campaign_pack.py"), "--rom", str(private_rom)])
     elif profile in ("races", "unified", "terran", "zerg", "protoss"):
         run([sys.executable, str(ROOT / "tools/sc64_races_pack.py")])
+        run([sys.executable, str(ROOT / "tools/sc64_t4_scenario_pack.py")])
         run([sys.executable, str(ROOT / "tools/sc64_race_sprites.py")])
         run([sys.executable, str(ROOT / "tools/sc64_menu_assets.py")])
         if profile in ("terran", "zerg", "protoss"):

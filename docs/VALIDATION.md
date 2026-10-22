@@ -758,6 +758,56 @@ rescue handling; doors, traps, teleports and triggers still prevent T4 playabili
 At that storage stage, default build/tests (80 Python checks), unified build/tests and the existing
 128×96 storage fixture pass. Default and unified ROM hashes remain unchanged.
 
+## T4 numeric scenario and execution core (2026-10-23)
+
+`tools/sc64_t4_scenario_pack.py` validates the retained record framing and
+manifest hashes before emitting private immutable C tables. It preserves all
+255 location records, 38 trigger records with fixed 16/64 condition/action
+slots, player enables, execution flags, action cursor and opaque trailing
+bytes, plus all 32 THG2 records. An independent C fixture reconstructs the
+complete TRIG, MRGN and THG2 payloads and checks canonical digests. The data
+contains 48 nonzero conditions and 141 nonzero actions. THG2 contains 26
+unit-backed entries and six sprite entries; two unit entries start disabled.
+Source arrays and generated headers remain ignored.
+
+Native record-conversion and dispatch research resolved two operands used by
+the source: opcode 42 state 0 toggles, and opcode 11 count 0 creates one unit.
+The pure action fixtures check count bytes, enable/disable/toggle states and
+all 16-bit THG2 flag words, including rejection of sprite-only entries.
+Applied to the private scenario operands, those helpers identify 20 toggles
+and five requested creations. They do not apply effects to the game world.
+Provenance and the native addresses are in [References](REFERENCES.md).
+
+The asset-free trigger runner checks source order, conditions, global switch
+indices 0–255, one-shot/preserved execution, shared waits within each player,
+independent player clocks, and retry without repeating completed effects.
+Synthetic fixtures compare independent resumed state, switch banks and effect
+logs through waits and allocation retries. Malformed state and unsupported
+conditions/actions are rejected. A disabled final action slot still finishes
+the trigger. The bounded state costs 144 bytes per player and 32 shared switch
+bytes. The nominal 30 Hz clock and 30-tick condition pass are authored GBA
+policies; they have not been compared with the N64 scheduler.
+The shared-wait fixtures also retain a completed marker when an earlier
+source-ordered trigger starts a new wait first. Callback return values must
+match their documented success/retry contract; other values fault without
+advancing the action cursor.
+
+The query core checks source-pixel actor bounds and rectangle overlap, exact
+edge exclusion, current owner/force membership after rescue, inactive slots,
+and unsupported selectors. Integer overflow inputs and feature-off includes
+are checked. These are helper tests, not movement or mission-completion tests.
+
+The execution core is not wired into T4 gameplay or SRAM yet. Doors/traps,
+teleports, unit creation/properties, objective effects and controller
+completion remain required. No additional gameplay, ARM memory or frame-rate
+claim follows from these fixtures.
+
+Default build/tests (87 Python checks), unified build/tests and the existing
+T4 actor/storage checks pass. Default and unified ROM hashes remain unchanged.
+A separate ARM compilation checks the new core schemas and state-size
+assertions; the core still needs a full engine link and gameplay validation
+when it is connected to the mission.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

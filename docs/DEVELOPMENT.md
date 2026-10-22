@@ -96,6 +96,21 @@ scenario still lacks implemented doors, traps, teleports, trigger objectives
 and completion behavior. See [Validation](VALIDATION.md) for the exact test
 coverage and limits.
 
+The private numeric scenario import and the asset-free trigger/query core have
+separate checks:
+
+```sh
+make sc64-t4-scenario test-sc64-t4-scenario
+make test-sc64-t4-triggers test-sc64-t4-queries test-sc64-t4-actions
+```
+
+The first line needs the retained records produced by local race preparation.
+It reconstructs the full source sections from the generated C schema and
+checks their canonical digests. The second line needs no ROM or generated
+data and is included in `./dev test`. The runner is not connected to T4
+gameplay yet: world effects, SRAM integration, door/teleport behavior and a
+controller completion proof remain required.
+
 ## Troubleshooting
 
 - If `doctor` reports a missing required tool, install that tool and confirm its command is on `PATH`. ARM GCC also needs the matching `arm-none-eabi-objcopy` and `arm-none-eabi-size` commands. On a custom toolchain prefix, set `PREFIX` to the prefix used by all three commands.

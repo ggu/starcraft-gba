@@ -231,6 +231,15 @@ ordering. The T4 catalog remains disabled and the scenario is not playable.
 Door and trap collision/state, teleports, trigger actions, objective behavior
 and completion still need implementation. No T4 frame-rate result is claimed.
 
+The next source-only foundation preserves all numeric trigger/location/THG2
+operands in private immutable C tables. `make test-sc64-t4-scenario` checks the
+complete reconstructed source sections; `make test-sc64-t4-triggers
+test-sc64-t4-queries test-sc64-t4-actions` checks the asset-free core. The runner
+supports source ordering, shared per-player waits, a global switch bank,
+preserve/retry behavior and validated resumable state. It is not wired into
+the mission yet, and does not make T4 playable. Unknown effects stop at their
+action cursor instead of being treated as completed.
+
 `make test-sc64-large-map sc64-large-probe` checks the opt-in
 `SC64_LARGE_MAPS` storage layout, including packed fog/path grids, larger
 target indexing and 48 mineral slots. The ARM probe links the existing Protoss

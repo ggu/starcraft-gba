@@ -8,6 +8,7 @@ This project uses external projects as research references. Their source checkou
 | [OpenBW](https://github.com/OpenBW/openbw) | `4b046d5f65302b10cb0a745f0fecd37ec85b20a8` | No root license file was present in the inspected snapshot. Used as a behavioral and format reference; do not copy its implementation. |
 | [GPTP](https://github.com/BoomerangAide/GPTP) | `ce321f0fa83174aee741b91f1b2eaec30300773e` | Behavioral reference for Rescue Passive query/transfer rules. Its implementation is not included in this project. |
 | [sc64-maps](https://github.com/dmang-dev/sc64-maps) | `09b57f787a247107d1de82b8c5eab2734667ea1d` | GPL-3.0-or-later extraction tools. Used by optional ROM preparation. Its source is external and is not bundled here. |
+| [StarCraft64-recomp](https://github.com/n0madic/StarCraft64-recomp) | `425f409e02edacf897354cd0872c61ce67a9067a` | Optional native-behavior research recipe. Original project files use MIT; its BOLT tools identify GPL-3.0-or-later. Neither its implementation nor ROM-derived recompiled code is bundled here. |
 
 `tools/sc64_import.py` is marked `GPL-3.0-or-later` in its file header and imports the external `sc64-maps` extractor. The full GPL text is included at [LICENSES/GPL-3.0-or-later.txt](LICENSES/GPL-3.0-or-later.txt). Preserve that notice and license when redistributing the importer. Optional generated outputs are derived from user-supplied game data and are not distributed by this project.
 
