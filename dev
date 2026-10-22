@@ -1,0 +1,207 @@
+#!/usr/bin/env python3
+"""Portable build, test, launch, and local StarCraft 64 preparation commands."""
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parent
+REFERENCE = ROOT / "references" / "sc64-maps"
+REFERENCE_URL = "https://github.com/dmang-dev/sc64-maps.git"
+REFERENCE_COMMIT = "09b57f787a247107d1de82b8c5eab2734667ea1d"
+GAMES = {
+    "starcraft": ("build/StarCraft-GBA.gba", "build/StarCraft-GBA.gba"),
+    "unified": ("unified", "build/StarCraft64-GBA.gba"),
+    "races": ("races", "build/StarCraft64-Races-GBA.gba"),
+    "wasteland": ("verify-sc64", "build/StarCraft64-Wasteland-GBA.gba"),
+    "backwater": ("backwater", "build/StarCraft64-Backwater-GBA.gba"),
+    "skirmish": ("skirmish", "build/StarCraft64-Skirmish-GBA.gba"),
+    "campaign": ("campaign", "build/StarCraft64-Terran-Campaign-GBA.gba"),
+}
+SC64_PROFILES = ("wasteland", "backwater", "skirmish", "campaign", "races", "unified")
+
+
+def run(command: list[str], *, cwd: Path = ROOT) -> None:
+    subprocess.run(command, cwd=cwd, check=True)
+
+
+def locate_mgba() -> str | None:
+    configured = os.environ.get("MGBA")
+    if configured:
+        candidate = shutil.which(configured) or configured
+        if Path(candidate).is_file() and os.access(candidate, os.X_OK):
+            return candidate
+        raise RuntimeError(f"MGBA is set but does not name an executable: {configured}")
+    for name in ("mGBA", "mgba"):
+        candidate = shutil.which(name)
+        if candidate:
+            return candidate
+    fallback = Path.home() / "Applications/mGBA.app/Contents/MacOS/mGBA"
+    if fallback.is_file() and os.access(fallback, os.X_OK):
+        return str(fallback)
+    return None
+
+
+def doctor() -> int:
+    checks = [
+        ("ARM GCC", shutil.which(os.environ.get("PREFIX", "arm-none-eabi-") + "gcc")),
+        ("ARM objcopy", shutil.which(os.environ.get("PREFIX", "arm-none-eabi-") + "objcopy")),
+        ("Make", shutil.which("make")),
+        ("Clang", shutil.which(os.environ.get("CLANG", "clang"))),
+        ("Python 3", sys.executable),
+        ("mGBA", locate_mgba()),
+    ]
+    failed = False
+    for label, path in checks:
+        if path:
+            print(f"OK      {label}: {path}")
+        else:
+            print(f"MISSING {label}")
+            failed = True
+    return int(failed)
+
+
+def build(game: str) -> None:
+    make_target, _ = GAMES[game]
+    run(["make", make_target])
+
+
+def play(game: str) -> int:
+    build(game)
+    _, relative_rom = GAMES[game]
+    rom = ROOT / relative_rom
+    if not rom.is_file():
+        raise RuntimeError(f"Expected ROM was not built: {rom}")
+    mgba = locate_mgba()
+    if not mgba:
+        raise RuntimeError("mGBA was not found; install it or set MGBA to its executable path")
+
+    local = ROOT / ".local" / "play" / game
+    saves, states, screenshots = (local / name for name in ("saves", "states", "screenshots"))
+    for directory in (saves, states, screenshots):
+        directory.mkdir(parents=True, exist_ok=True)
+    log_path = local / "mgba.log"
+    command = [mgba, "-C", f"savegamePath={saves}", "-C", f"savestatePath={states}",
+               "-C", f"screenshotPath={screenshots}", str(rom)]
+    with log_path.open("ab") as log:
+        process = subprocess.Popen(command, stdin=subprocess.DEVNULL,
+                                   stdout=log, stderr=subprocess.STDOUT,
+                                   start_new_session=True, close_fds=True)
+    print(f"Launched {game} in mGBA (PID {process.pid})")
+    print(f"ROM: {rom}\nLog: {log_path}")
+    return 0
+
+
+def ensure_extractor() -> None:
+    if REFERENCE.exists():
+        if not (REFERENCE / ".git").is_dir():
+            raise RuntimeError(f"Reference path exists but is not a Git checkout: {REFERENCE}")
+        head = subprocess.check_output(["git", "-C", str(REFERENCE), "rev-parse", "HEAD"], text=True).strip()
+        dirty = subprocess.check_output(["git", "-C", str(REFERENCE), "status", "--porcelain"], text=True).strip()
+        if head != REFERENCE_COMMIT or dirty:
+            raise RuntimeError(f"{REFERENCE} must be clean at {REFERENCE_COMMIT}; found {head}" +
+                               (" with local edits" if dirty else ""))
+        return
+    REFERENCE.parent.mkdir(parents=True, exist_ok=True)
+    run(["git", "clone", "--no-checkout", REFERENCE_URL, str(REFERENCE)])
+    run(["git", "-C", str(REFERENCE), "checkout", "--detach", REFERENCE_COMMIT])
+    head = subprocess.check_output(["git", "-C", str(REFERENCE), "rev-parse", "HEAD"], text=True).strip()
+    dirty = subprocess.check_output(["git", "-C", str(REFERENCE), "status", "--porcelain"], text=True).strip()
+    if head != REFERENCE_COMMIT or dirty:
+        raise RuntimeError(f"Pinned extractor checkout verification failed: {head}")
+
+
+def prepare(rom: Path, profile: str) -> None:
+    rom = rom.expanduser().resolve()
+    if not rom.is_file():
+        raise RuntimeError(f"User-supplied ROM does not exist: {rom}")
+    ensure_extractor()
+    base_profile = "wasteland" if profile == "wasteland" else "backwater"
+    run([sys.executable, str(ROOT / "tools/sc64_workspace.py"), "prepare",
+         "--rom", str(rom), "--profile", base_profile])
+    private_rom = ROOT / ".local/sc64/rom/StarCraft64-USA.z64"
+    if profile == "campaign":
+        run([sys.executable, str(ROOT / "tools/sc64_campaign_pack.py"), "--rom", str(private_rom)])
+    elif profile in ("races", "unified"):
+        run([sys.executable, str(ROOT / "tools/sc64_races_pack.py")])
+        run([sys.executable, str(ROOT / "tools/sc64_race_sprites.py")])
+        run([sys.executable, str(ROOT / "tools/sc64_menu_assets.py")])
+    print(f"Prepared local StarCraft 64 data for profile '{profile}'. Generated files stay under .local/.")
+
+
+def status(profile: str) -> int:
+    base = "wasteland" if profile == "wasteland" else "backwater"
+    generated = ROOT / ".local/sc64" / ("generated" if base == "wasteland" else "backwater/generated")
+    paths = [
+        ("Verified USA ROM", ROOT / ".local/sc64/rom/StarCraft64-USA.z64"),
+        ("Mission data", generated / "sc64_mission_generated.h"),
+        ("Terrain and palette", generated / "sc64_assets_generated.h"),
+        ("Sprite data", generated / "sc64_sprites_generated.h"),
+    ]
+    if profile == "campaign":
+        paths.append(("Campaign data", ROOT / ".local/sc64/campaign/generated/sc64_campaign_generated.h"))
+    if profile in ("races", "unified"):
+        race = ROOT / ".local/sc64/races/generated"
+        paths.extend((label, race / name) for label, name in (
+            ("Race maps", "sc64_races_generated.h"),
+            ("Race sprites", "sc64_race_sprites_generated.h"),
+            ("Menu artwork", "sc64_menu_generated.h"),
+        ))
+    _, rom_rel = GAMES[profile]
+    paths.append(("Built ROM", ROOT / rom_rel))
+    for label, path in paths:
+        print(f"{'READY  ' if path.is_file() else 'MISSING'} {label}: {path}")
+    return int(any(not path.is_file() for _, path in paths))
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("doctor", help="check build and emulator tools")
+    commands.add_parser("build", help="build and verify the default StarCraft ROM")
+    commands.add_parser("test", help="run asset-free StarCraft host tests")
+    play_parser = commands.add_parser("play", help="build and launch a StarCraft profile in mGBA")
+    play_parser.add_argument("game", nargs="?", choices=GAMES, default="starcraft")
+    sc64 = commands.add_parser("sc64", help="prepare or inspect optional local StarCraft 64 profiles")
+    sc64.add_argument("action", choices=("prepare", "status", "build", "test", "play"))
+    sc64.add_argument("--rom", type=Path, help="user-supplied USA N64 ROM (or ZIP) for prepare")
+    sc64.add_argument("--profile", choices=SC64_PROFILES, default="unified")
+    args = parser.parse_args()
+    try:
+        if args.command == "doctor":
+            return doctor()
+        if args.command == "build":
+            build("starcraft")
+            return 0
+        if args.command == "test":
+            run(["make", "test"])
+            return 0
+        if args.command == "play":
+            return play(args.game)
+        if args.action == "prepare":
+            if args.rom is None:
+                raise RuntimeError("sc64 prepare requires --rom PATH; the ROM is not downloaded")
+            prepare(args.rom, args.profile)
+        elif args.action == "status":
+            return status(args.profile)
+        elif args.action == "build":
+            build(args.profile)
+        elif args.action == "test":
+            target = {"unified": "test-unified", "races": "test-races",
+                      "wasteland": "test-sc64", "backwater": "test-backwater",
+                      "skirmish": "test-skirmish", "campaign": "test-campaign"}[args.profile]
+            run(["make", target])
+        else:
+            return play(args.profile)
+        return 0
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

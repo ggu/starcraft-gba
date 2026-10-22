@@ -1,0 +1,187 @@
+{
+  "source_commit": "d727fed68558c506163048ea889131d8cbb33915",
+  "unit_source": "references/bwapi/bwapi/BWAPILIB/Source/UnitType.cpp",
+  "unit_enum_source": "references/bwapi/bwapi/include/BWAPI/UnitType.h",
+  "weapon_source": "references/bwapi/bwapi/BWAPILIB/Source/WeaponType.cpp",
+  "weapon_enum_source": "references/bwapi/bwapi/include/BWAPI/WeaponType.h",
+  "notes": [
+    "BWAPI defaults are integer-valued. Supply is doubled internally; divide by two for UI supply.",
+    "Weapon ranges are pixels; 32 pixels per terrain tile.",
+    "Weapon damage is base damage per hit; inspect damage type and weapon factor for final target damage.",
+    "These reference facts are for implementation research; do not copy BWAPI implementation code or bundle Blizzard assets."
+  ],
+  "units": [
+    {
+      "name": "Terran_SCV",
+      "bwapi_enum_id": 7,
+      "hp": 60,
+      "armor": 0,
+      "minerals": 50,
+      "gas": 0,
+      "build_time_frames": 300,
+      "supply_required_internal_doubled": 2,
+      "supply_provided_internal_doubled": 0,
+      "weapon": {
+        "name": "Fusion_Cutter",
+        "bwapi_enum_id": 13,
+        "damage": 5,
+        "damage_bonus": 1,
+        "cooldown_frames": 15,
+        "max_range_pixels": 10
+      }
+    },
+    {
+      "name": "Terran_Marine",
+      "bwapi_enum_id": 0,
+      "hp": 40,
+      "armor": 0,
+      "minerals": 50,
+      "gas": 0,
+      "build_time_frames": 360,
+      "supply_required_internal_doubled": 2,
+      "supply_provided_internal_doubled": 0,
+      "weapon": {
+        "name": "Gauss_Rifle",
+        "bwapi_enum_id": 0,
+        "damage": 6,
+        "damage_bonus": 1,
+        "cooldown_frames": 15,
+        "max_range_pixels": 128
+      }
+    },
+    {
+      "name": "Terran_Firebat",
+      "bwapi_enum_id": 32,
+      "hp": 50,
+      "armor": 1,
+      "minerals": 50,
+      "gas": 25,
+      "build_time_frames": 360,
+      "supply_required_internal_doubled": 2,
+      "supply_provided_internal_doubled": 0,
+      "weapon": {
+        "name": "Flame_Thrower",
+        "bwapi_enum_id": 25,
+        "damage": 8,
+        "damage_bonus": 1,
+        "cooldown_frames": 22,
+        "max_range_pixels": 32
+      }
+    },
+    {
+      "name": "Terran_Medic",
+      "bwapi_enum_id": 34,
+      "hp": 60,
+      "armor": 1,
+      "minerals": 50,
+      "gas": 25,
+      "build_time_frames": 450,
+      "supply_required_internal_doubled": 2,
+      "supply_provided_internal_doubled": 0
+    },
+    {
+      "name": "Zerg_Zergling",
+      "bwapi_enum_id": 37,
+      "hp": 35,
+      "armor": 0,
+      "minerals": 50,
+      "gas": 0,
+      "build_time_frames": 420,
+      "supply_required_internal_doubled": 1,
+      "supply_provided_internal_doubled": 0,
+      "weapon": {
+        "name": "Claws",
+        "bwapi_enum_id": 35,
+        "damage": 5,
+        "damage_bonus": 1,
+        "cooldown_frames": 8,
+        "max_range_pixels": 15
+      }
+    },
+    {
+      "name": "Zerg_Hydralisk",
+      "bwapi_enum_id": 38,
+      "hp": 80,
+      "armor": 0,
+      "minerals": 75,
+      "gas": 25,
+      "build_time_frames": 420,
+      "supply_required_internal_doubled": 2,
+      "supply_provided_internal_doubled": 0,
+      "weapon": {
+        "name": "Needle_Spines",
+        "bwapi_enum_id": 38,
+        "damage": 10,
+        "damage_bonus": 1,
+        "cooldown_frames": 15,
+        "max_range_pixels": 128
+      }
+    },
+    {
+      "name": "Terran_Command_Center",
+      "bwapi_enum_id": 106,
+      "hp": 1500,
+      "armor": 1,
+      "minerals": 400,
+      "gas": 0,
+      "build_time_frames": 1800,
+      "supply_required_internal_doubled": 0,
+      "supply_provided_internal_doubled": 20
+    },
+    {
+      "name": "Terran_Barracks",
+      "bwapi_enum_id": 111,
+      "hp": 1000,
+      "armor": 1,
+      "minerals": 150,
+      "gas": 0,
+      "build_time_frames": 1200,
+      "supply_required_internal_doubled": 0,
+      "supply_provided_internal_doubled": 0
+    },
+    {
+      "name": "Terran_Supply_Depot",
+      "bwapi_enum_id": 109,
+      "hp": 500,
+      "armor": 1,
+      "minerals": 100,
+      "gas": 0,
+      "build_time_frames": 600,
+      "supply_required_internal_doubled": 0,
+      "supply_provided_internal_doubled": 16
+    },
+    {
+      "name": "Terran_Refinery",
+      "bwapi_enum_id": 110,
+      "hp": 750,
+      "armor": 1,
+      "minerals": 100,
+      "gas": 0,
+      "build_time_frames": 600,
+      "supply_required_internal_doubled": 0,
+      "supply_provided_internal_doubled": 0
+    },
+    {
+      "name": "Zerg_Hatchery",
+      "bwapi_enum_id": 131,
+      "hp": 1250,
+      "armor": 1,
+      "minerals": 300,
+      "gas": 0,
+      "build_time_frames": 1800,
+      "supply_required_internal_doubled": 0,
+      "supply_provided_internal_doubled": 2
+    },
+    {
+      "name": "Zerg_Spawning_Pool",
+      "bwapi_enum_id": 142,
+      "hp": 750,
+      "armor": 1,
+      "minerals": 200,
+      "gas": 0,
+      "build_time_frames": 1200,
+      "supply_required_internal_doubled": 0,
+      "supply_provided_internal_doubled": 0
+    }
+  ]
+}
