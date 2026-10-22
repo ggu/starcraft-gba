@@ -26,8 +26,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #error "SC64_T4_SCENARIO_RUNTIME requires the T4 actor/world profile"
 #endif
 #if defined(SC64_T5_RUNTIME) && \
-    (!defined(SC64_T5_ENABLED) || !defined(SC64_T4_SCENARIO_RUNTIME))
-#error "SC64_T5_RUNTIME requires T5 data and the shared T4 trigger core"
+    (!defined(SC64_T5_ENABLED) || !defined(SC64_T4_SCENARIO_RUNTIME) || \
+     !defined(SC64_T3_ENABLED))
+#error "SC64_T5_RUNTIME requires T5 data and the combined T3/T4 storage profile"
 #endif
 #if defined(SC64_T5_PROBE_ENTRY) && !defined(SC64_T5_RUNTIME)
 #error "The internal T5 probe entry requires its runtime"
@@ -44,7 +45,7 @@ int memcmp(const void *a, const void *b, size_t n);
 #define MAX_UNITS 128
 #endif
 #if defined(SC64_T5_RUNTIME)
-#define SC64_RACE_SAVE_GENERATION 12u
+#define SC64_RACE_SAVE_GENERATION 13u
 #elif defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 11u
 #elif defined(SC64_T4_SCENARIO_RUNTIME)

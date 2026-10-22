@@ -61,8 +61,8 @@ static void roster(void)
     for (int i = 0; i < MAX_UNITS; ++i) assert(!u[i].alive || used_u[i]);
     for (int i = 0; i < MAX_BUILDINGS; ++i) assert(!b[i].alive || used_b[i]);
     assert(minerals == 0 && gas == 0);
-    /* This internal stage refuses to emit a save that loses its new state. */
-    assert(!race_save_game());
+    /* The compact mission payload must preserve this initial engine state. */
+    assert(race_save_game());
     static Unit before_units[MAX_UNITS];
     static Building before_buildings[MAX_BUILDINGS];
     Sc64T5RuntimeState before_runtime = race_t5;

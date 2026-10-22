@@ -23,6 +23,22 @@ typedef struct {
 _Static_assert(sizeof(Sc64T4SaveState) == 1124, "compact combined T4 save state");
 #endif
 
+#ifdef SC64_T5_RUNTIME
+/* Only source slots 0, 2, 3 and 6 execute T5 triggers. Inactive contexts are
+ * canonical-checked when packing and reconstructed when loading. The same
+ * payload region stores T4 or T5; unused union bytes must remain zero. */
+typedef struct {
+    Sc64T4TriggerState player[4]; /* source slots 0, 2, 3, 6 */
+    Sc64T4TriggerSwitches switches;
+    Sc64ResourceActionState resources[8];
+    Sc64T5AiState ai;
+    u16 message_ticks;
+    u16 ping_x, ping_y, ping_ticks;
+    u8 message, active_mask;
+} Sc64T5SaveState;
+_Static_assert(sizeof(Sc64T5SaveState) == 764, "compact T5 save state budget");
+#endif
+
 typedef struct {
     u32 version;
     s16 units[MAX_UNITS][RACE_UNIT_WORDS];
@@ -50,12 +66,22 @@ typedef struct {
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+#ifdef SC64_T5_RUNTIME
+    union {
+        Sc64T4SaveState t4;
+        Sc64T5SaveState t5;
+    };
+#else
     Sc64T4SaveState t4;
+#endif
 #else
     Sc64T4RuntimeState t4;
 #endif
 #endif
 } RaceSave;
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
+#ifdef SC64_T5_RUNTIME
+_Static_assert(sizeof(RaceSave) == 16328, "T5 shares the existing SRAM payload");
+#endif
 
 #endif

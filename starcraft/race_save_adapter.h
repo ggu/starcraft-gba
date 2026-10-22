@@ -177,6 +177,9 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
     return 1;
 }
 #endif
+#ifdef SC64_T5_RUNTIME
+#include "sc64_t5_save_adapter.h"
+#endif
 static int sc64_race_storage_geometry_valid(int width, int height) {
 #ifdef SC64_T4_RUNTIME
     return width >= 1 && width <= 128 && height >= 1 && height <= 128;
@@ -187,9 +190,6 @@ static int sc64_race_storage_geometry_valid(int width, int height) {
 #endif
 }
 static int race_save_game(void) {
-#ifdef SC64_T5_RUNTIME
-    if (race_t5_active()) return 0;
-#endif
 #ifdef SC64_T4_RUNTIME
     /* T4 props with intrinsic invincibility have 100000 source HP. Their
      * health words use canonical zero encoding instead of truncating to s16. */
@@ -262,6 +262,12 @@ static int race_save_game(void) {
     }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active()) {
+        if (!race_t5_save_pack(&race_data.t5, &race_t5) ||
+            !race_t5_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
+    } else
+#endif
     if (race_t4_active()) {
 #ifdef SC64_T3_ENABLED
         if (!race_t4_save_pack(&race_data.t4, &race_t4)) return 0;
@@ -280,19 +286,21 @@ static int race_load_game(void) {
     Sc64T4RuntimeState expanded_t4;
     int expanded_t4_valid = 0;
 #endif
+#ifdef SC64_T5_RUNTIME
+    Sc64T5RuntimeState expanded_t5;
+    int expanded_t5_valid = 0;
+#endif
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
     const int *v=race_data.state;
-#ifdef SC64_T5_RUNTIME
-    /* The internal T5 stage has no persisted AI/trigger schema yet. Reject
-     * it before mutating any live state. Its catalog entry remains gated. */
-    if (!v[0] && v[2] == SC64_T5_GLOBAL_ID) return 0;
-#endif
     if(v[0]<0||v[0]>1||v[1]<0||v[1]>2||v[2]<0||v[2]>=SC64_RACE_MAP_COUNT||v[4]<1||v[4]>3||
        v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||v[16]<0||v[16]>4)return 0;
 #ifdef SC64_CAMPAIGN_RACE
     if(!v[0]&&!sc64_catalog_mission_allowed(v[2],SC64_CAMPAIGN_RACE)
 #ifdef SC64_T4_RUNTIME
        &&v[2]!=SC64_T4_GLOBAL_ID
+#endif
+#ifdef SC64_T5_RUNTIME
+       &&v[2]!=SC64_T5_GLOBAL_ID
 #endif
        )return 0;
 #endif
@@ -307,6 +315,9 @@ static int race_load_game(void) {
 #ifdef SC64_T4_RUNTIME
         &&v[2]!=SC64_T4_GLOBAL_ID
 #endif
+#ifdef SC64_T5_RUNTIME
+        &&v[2]!=SC64_T5_GLOBAL_ID
+#endif
         )||!sc64_race_maps[v[2]].width)return 0;
     if((unsigned)v[3]&~sc64_catalog_playable_mask(
 #ifdef SC64_CAMPAIGN_RACE
@@ -314,7 +325,11 @@ static int race_load_game(void) {
 #else
                                                -1
 #endif
-                                               ))return 0;
+                                               )
+#ifdef SC64_T5_RUNTIME
+       & ~(1u << SC64_T5_GLOBAL_ID)
+#endif
+       )return 0;
 #endif
     int width=v[0]?64:sc64_race_maps[v[2]].width;
     int height=v[0]?64:sc64_race_maps[v[2]].height;
@@ -461,6 +476,13 @@ static int race_load_game(void) {
     }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
+#ifdef SC64_T5_RUNTIME
+    if (!v[0] && v[2] == SC64_T5_GLOBAL_ID) {
+        if (!race_t5_save_candidate_valid(&race_data, width, height) ||
+            !race_t5_save_expand(&expanded_t5, &race_data.t5)) return 0;
+        expanded_t5_valid = 1;
+    } else
+#endif
     if (!v[0] && v[2] == SC64_T4_GLOBAL_ID) {
         if (!race_t4_save_candidate_valid(&race_data, width, height)) return 0;
 #ifdef SC64_T3_ENABLED
@@ -545,6 +567,10 @@ static int race_load_game(void) {
 #endif
     } else
         memset(&race_t4, 0, sizeof(race_t4));
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (expanded_t5_valid) race_t5 = expanded_t5;
+    else memset(&race_t5, 0, sizeof(race_t5));
 #endif
     memset(tracers,0,sizeof(tracers));mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
     invalidate_path_grid();sc64_visibility_reset();update_exploration();reset_selection_gestures();

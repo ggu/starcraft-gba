@@ -1219,12 +1219,31 @@ combined T1–T4 ROM remains byte-identical with SHA-256 `d867886700a4c0a7351165
 The Git source audit passes. No imported assets, binaries, captures, source
 scenario records or saves are indexed.
 
-T5 remains gated pending persistence and ordinary-controller completion.
+At this stage T5 remained gated pending persistence and ordinary-controller completion.
 Opaque AI scripts are explicit authored substitutes. Cloak, mine detection
 and animation fidelity, unique hero art, THG2 sprite decorations and full
 source movement/sight policies remain incomplete. Mine damage and movement
 retain the documented integer and 30 Hz approximations. Physical GBA
 validation and near-30-fps full-campaign performance remain outstanding.
+
+## T5 compact persistence (2026-10-23)
+
+The internal T5 profile uses save generation 13 and retains the combined
+profile's 16,328-byte payload. T4 and T5 share the scenario region in SRAM.
+T5 stores its four executing source-player contexts in 764 bytes, including
+switches, resource-action snapshots, accepted AI requests and presentation
+timers. Omitted contexts must match their initial state and are reconstructed
+on load. Unused payload bytes must be zero. The normal T1–T4 build retains
+generation 11 and its existing ROM hash.
+
+`make test-sc64-t5-save` runs against the real engine under ASan/UBSan and
+`-Werror`. It checks round trips, active trigger-Wait continuation, both
+active mine phases, pause-menu commands and other mission saves. Corrupted
+candidates are rejected before live world mutation. Validation ties the
+campaign and AI clocks to the saved frame and reconstructs accepted scripts,
+switches and exact resource grants from completed action prefixes. The tests
+use direct actor placement for some trigger states; they do not demonstrate
+controller completion.
 
 ## Known limits
 

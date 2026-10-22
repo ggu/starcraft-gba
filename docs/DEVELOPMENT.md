@@ -327,7 +327,7 @@ The separate internal runtime profile now binds the retained trigger program
 to the engine. With both T4 and T5 private scenario headers prepared, run:
 
 ```sh
-make test-sc64-t5-engine test-sc64-t5-world test-sc64-t5-combat
+make test-sc64-t5-engine test-sc64-t5-world test-sc64-t5-combat test-sc64-t5-save
 make sc64-t5-engine-probe
 python3 tools/sc64_t5_engine_probe.py --ticks 3000
 ```
@@ -338,9 +338,13 @@ grant, rescue conversion, mine and hero combat, and mission outcome rules.
 They do not demonstrate ordinary-controller completion.
 
 The probe ROM automatically enters global mission 8 for a bounded neutral-input
-ARM run. Its catalog entry stays unavailable, and active T5 saves are refused
-until a complete persistence format is implemented. The probe uses a separate
-generation-12 save identity; the normal T1–T4 build keeps generation 11.
+ARM run. Its catalog entry stays unavailable pending controller completion.
+The probe uses save generation 13; the normal T1–T4 build keeps generation 11.
+Use separate save files for these profiles. T5 shares the existing 16,328-byte
+SRAM payload with T4: four active trigger contexts are stored, and omitted
+contexts are checked against their initial state and reconstructed on load.
+The save checks cover trigger waits, mine continuation, executed resource/AI
+actions, invalid-state rejection before world mutation, and other mission saves.
 Reports and captures remain under ignored local output directories.
 
 Opaque AI scripts use explicit GBA policies: rescue conversion, passive guards,
@@ -353,10 +357,10 @@ approximations; ordinary hero movement and sight still use the compact engine
 policies. T5 is an internal development stage; the playable mission count
 remains 10 of 30.
 
-The T5 checks cover retained rows, metadata and digests, bounded source actor
+The import-only T5 checks cover retained rows, metadata and digests, bounded source actor
 rules, and isolated SetResources arithmetic. The actor facts do not establish
 cloak or mine-arming behavior, and the resource helper intentionally does not
-interpret player-group selection. These fixtures do not claim T5 runtime,
+interpret player-group selection. Those isolated fixtures do not claim T5 runtime,
 mission completion, or playability.
 
 ## Troubleshooting

@@ -34,7 +34,7 @@ T4_SCENARIO_FLAGS := $(T4_STORAGE_FLAGS) -DSC64_T4_SCENARIO_RUNTIME
 T4_RUNTIME_FLAGS := $(T4_SCENARIO_FLAGS) $(T4_OPTIMIZATION_FLAGS)
 T4_REPLAY_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T4_REPLAY_ENTRY
 T4_COMBINED_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T3_ENABLED -DSC64_T4_CAMPAIGN_ENTRY
-T5_PROBE_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T3_ENABLED -DSC64_T5_ENABLED -DSC64_T5_RUNTIME
+T5_PROBE_FLAGS := $(T4_COMBINED_FLAGS) -DSC64_T5_ENABLED -DSC64_T5_RUNTIME
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
 T4_SCENARIO_RECORDS := .local/sc64/races/generated/t4/records
 T5_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t5_scenario_generated.h
@@ -347,6 +347,11 @@ build/test-sc64-t5-engine: tests/sc64_t5_engine.c $(STARCRAFT) $(wildcard starcr
 .PHONY: test-sc64-t5-engine
 test-sc64-t5-engine: build/test-sc64-t5-engine
 	./build/test-sc64-t5-engine
+build/test-sc64-t5-save: tests/sc64_t5_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-t5-save
+test-sc64-t5-save: build/test-sc64-t5-save
+	./build/test-sc64-t5-save
 build/test-sc64-t5-combat: tests/sc64_t5_combat.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-t5-combat
