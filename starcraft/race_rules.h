@@ -20,6 +20,10 @@ enum {
     /* Raw 20 is Hero_Jim_Raynor_Marine; raw 19 remains the old Vulture actor. */
     U_RAYNOR_MARINE,
 #endif
+#ifdef SC64_T5_RUNTIME
+    /* T5 distinguishes the raw-19 Raynor Vulture from legacy U_RAYNOR. */
+    U_KERRIGAN, U_RAYNOR_VULTURE, U_SPIDER_MINE,
+#endif
     SC_RU_COUNT
 };
 enum {
@@ -121,6 +125,12 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     /* Scenario hero: zero source supply and producer 255 make it untrainable. */
     , [U_RAYNOR_MARINE] = { R_TER, 0, 255, 0, 0, 0, 0, 200, 0, 0 }
 #endif
+#ifdef SC64_T5_RUNTIME
+    , [U_KERRIGAN] = { R_TER, 0, 255, 0, 0, 0, 0, 250, 0, 0 }
+    , [U_RAYNOR_VULTURE] = { R_TER, 0, 255, 0, 0, 0, 0, 300, 0, 0 }
+    /* Deployed scenario actor, not an ordinary attack-order unit or product. */
+    , [U_SPIDER_MINE] = { R_TER, 0, 255, 0, 0, 0, 0, 20, 0, 0 }
+#endif
 };
 
 static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
@@ -207,6 +217,9 @@ static inline const char *sc64_race_unit_name(int type)
         ,"GHOST","CIVILIAN","RHYNADON","RAGNASAUR","MAP REVEALER","DATA DISK",
         "RAYNOR MARINE"
 #endif
+#ifdef SC64_T5_RUNTIME
+        ,"KERRIGAN","RAYNOR VULTURE","SPIDER MINE"
+#endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
 }
@@ -262,6 +275,15 @@ static inline unsigned sc64_race_t4_actor_flags(int type)
         return SC64_T4_ACTOR_SELECTABLE | SC64_T4_ACTOR_MOVABLE |
                SC64_T4_ACTOR_COLLIDABLE | SC64_T4_ACTOR_DRAWABLE |
                SC64_T4_ACTOR_MEN | (type == U_GHOST ? SC64_T4_ACTOR_WEAPON : 0);
+#ifdef SC64_T5_RUNTIME
+    case U_KERRIGAN: case U_RAYNOR_VULTURE:
+        return SC64_T4_ACTOR_SELECTABLE | SC64_T4_ACTOR_MOVABLE |
+               SC64_T4_ACTOR_COLLIDABLE | SC64_T4_ACTOR_DRAWABLE |
+               SC64_T4_ACTOR_MEN | SC64_T4_ACTOR_WEAPON;
+    case U_SPIDER_MINE:
+        /* The autonomous arming/movement behavior is not implemented yet. */
+        return SC64_T4_ACTOR_DRAWABLE;
+#endif
     case U_RHYNADON: case U_RAGNASAUR:
         return SC64_T4_ACTOR_MOVABLE | SC64_T4_ACTOR_COLLIDABLE |
                SC64_T4_ACTOR_DRAWABLE | SC64_T4_ACTOR_MEN;
@@ -391,6 +413,9 @@ static inline int sc64_race_t4_source_size(int raw_type)
     case 41: case 43: case 47: case 64: case 65: case 77: case 79:
     case 89: case 95:
         return SC64_T4_SIZE_SMALL;
+#ifdef SC64_T5_RUNTIME
+    case 13: case 16: return SC64_T4_SIZE_SMALL;
+#endif
     case 2: case 19: case 38: case 45: case 53:
         return SC64_T4_SIZE_MEDIUM;
     /* All currently supported canonical building raws are Large except the
@@ -453,6 +478,9 @@ static inline int sc64_race_unit_damage(int type)
     case U_GHOST: return 10;
     case U_RAYNOR_MARINE: return 18;
 #endif
+#ifdef SC64_T5_RUNTIME
+    case U_KERRIGAN: case U_RAYNOR_VULTURE: return 30;
+#endif
     case U_MARINE: return 6; case U_FIREBAT: return 8;
     case U_ZERGLING: return 5; case U_HYDRALISK: return 10;
     case U_ZEALOT: return 8; case U_DRAGOON: return 20;
@@ -475,6 +503,10 @@ static inline int sc64_race_unit_range(int type)
     case U_GHOST: return 224;
     case U_RAYNOR_MARINE: return 160;
 #endif
+#ifdef SC64_T5_RUNTIME
+    case U_KERRIGAN: return 192;
+    case U_RAYNOR_VULTURE: return 160;
+#endif
     case U_GOLIATH: return 192;
     case U_TANK: return 224;
     case U_MARINE: case U_HYDRALISK: case U_DRAGOON: case U_SCOUT:
@@ -495,6 +527,9 @@ static inline int sc64_race_unit_cooldown(int type)
 #ifdef SC64_T4_RUNTIME
     case U_GHOST: return 22;
     case U_RAYNOR_MARINE: return 15;
+#endif
+#ifdef SC64_T5_RUNTIME
+    case U_KERRIGAN: case U_RAYNOR_VULTURE: return 22;
 #endif
     case U_VULTURE: return 30;
     case U_HYDRALISK: return 15; case U_FIREBAT: return 22;
@@ -527,6 +562,9 @@ static inline int sc64_race_unit_can_attack_air(int type)
 #ifdef SC64_T4_RUNTIME
     case U_GHOST: case U_RAYNOR_MARINE:
 #endif
+#ifdef SC64_T5_RUNTIME
+    case U_KERRIGAN:
+#endif
         return 1;
     default: return 0;
     }
@@ -541,6 +579,10 @@ static inline int sc64_race_unit_damage_vs(int type, int target_flying)
 {
 #ifdef SC64_T4_RUNTIME
     if (type == U_GHOST) return 10;
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (type == U_KERRIGAN) return 30;
+    if (type == U_RAYNOR_VULTURE) return target_flying ? 0 : 30;
 #endif
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     /* Pinned BWAPI Suicide_Scourge: 110 normal damage, cooldown 1, 3px
@@ -560,6 +602,10 @@ static inline int sc64_race_unit_range_vs(int type, int target_flying)
 #ifdef SC64_T4_RUNTIME
     if (type == U_GHOST) return 224;
 #endif
+#ifdef SC64_T5_RUNTIME
+    if (type == U_KERRIGAN) return 192;
+    if (type == U_RAYNOR_VULTURE) return target_flying ? 0 : 160;
+#endif
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     if (type == U_SCOURGE) return target_flying ? 3 : 0;
 #endif
@@ -574,6 +620,9 @@ static inline int sc64_race_unit_cooldown_vs(int type, int target_flying)
 {
 #ifdef SC64_T4_RUNTIME
     if (type == U_GHOST) return 22;
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (type == U_KERRIGAN || type == U_RAYNOR_VULTURE) return 22;
 #endif
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     if (type == U_SCOURGE) return target_flying ? 1 : 0;
@@ -591,6 +640,9 @@ static inline int sc64_race_unit_armor(int type)
     switch (type) {
 #ifdef SC64_T4_RUNTIME
     case U_RAYNOR_MARINE: return 3;
+#endif
+#ifdef SC64_T5_RUNTIME
+    case U_KERRIGAN: case U_RAYNOR_VULTURE: return 3;
 #endif
     case U_FIREBAT: case U_GOLIATH: case U_TANK: case U_SIEGE_TANK: case U_DROPSHIP:
     case U_ZEALOT: case U_DRAGOON: return 1;
@@ -627,6 +679,10 @@ static inline int sc64_race_raw_unit(int type)
     case U_RAYNOR: return 19; case U_RAYNOR_MARINE: return 20;
 #else
     case U_RAYNOR: return 20;
+#endif
+#ifdef SC64_T5_RUNTIME
+    case U_KERRIGAN: return 16; case U_RAYNOR_VULTURE: return 19;
+    case U_SPIDER_MINE: return 13;
 #endif
     case U_ZERGLING: return 37;
     case U_HYDRALISK: return 38; case U_DRONE: return 41; case U_OVERLORD: return 42;
@@ -687,8 +743,13 @@ static inline int sc64_race_unit_from_raw(int raw)
 #else
     case 20: return U_RAYNOR;
 #endif
-#ifdef SC64_UNIFIED
-    case 19: return U_RAYNOR; /* Terran tutorial's Raynor Vulture. */
+#if defined(SC64_UNIFIED) || defined(SC64_T5_RUNTIME)
+    case 19:
+#ifdef SC64_T5_RUNTIME
+        return U_RAYNOR_VULTURE;
+#else
+        return U_RAYNOR; /* Existing unified profiles' Raynor Vulture. */
+#endif
 #endif
     case 37: return U_ZERGLING; case 38: return U_HYDRALISK;
     case 41: return U_DRONE; case 42: return U_OVERLORD; case 45: return U_QUEEN;
@@ -708,6 +769,9 @@ static inline int sc64_race_unit_from_raw(int raw)
     case 1: return U_GHOST; case 15: return U_CIVILIAN;
     case 89: return U_RHYNADON; case 95: return U_RAGNASAUR;
     case 101: return U_MAP_REVEALER; case 218: return U_DATA_DISK;
+#endif
+#ifdef SC64_T5_RUNTIME
+    case 13: return U_SPIDER_MINE; case 16: return U_KERRIGAN;
 #endif
     default: return -1;
     }
