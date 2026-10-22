@@ -19,6 +19,26 @@ int main(void)
     assert(sc64_race_unit_range_vs(U_GOLIATH, 1) == 160);
     assert(sc64_race_unit_armor(U_FENIX_DRAGOON) == 3);
     assert(sc64_race_unit_armor(U_GOLIATH) == 1);
+    /* BWAPI Terran Vulture: 75/0, 80 HP, 2 supply, factory, 450 frames. */
+    assert(U_VULTURE == SC_RU_COUNT - 1);
+    assert(sc64_race_unit_rule(U_VULTURE)->race == R_TER);
+    assert(sc64_race_unit_rule(U_VULTURE)->producer == B_FACTORY);
+    assert(sc64_race_unit_rule(U_VULTURE)->minerals == 75);
+    assert(sc64_race_unit_rule(U_VULTURE)->gas == 0);
+    assert(sc64_race_unit_rule(U_VULTURE)->build_frames == 450);
+    assert(sc64_race_unit_rule(U_VULTURE)->hp == 80);
+    assert(sc64_race_unit_rule(U_VULTURE)->supply == 4);
+    assert(sc64_race_unit_armor(U_VULTURE) == 0);
+    assert(sc64_race_unit_damage_vs(U_VULTURE, 0) == 20);
+    assert(sc64_race_unit_damage_vs(U_VULTURE, 1) == 0);
+    assert(sc64_race_unit_range_vs(U_VULTURE, 0) == 160);
+    assert(sc64_race_unit_range_vs(U_VULTURE, 1) == 0);
+    assert(sc64_race_unit_cooldown_vs(U_VULTURE, 0) == 30);
+    assert(sc64_race_raw_unit(U_VULTURE) == 2);
+    assert(sc64_race_unit_from_raw(2) == U_VULTURE);
+    assert(sc64_race_raw_building(B_ENG_BAY) == 122);
+    assert(sc64_race_building_from_raw(122) == B_ENG_BAY);
+    assert(sc64_race_building_from_raw(118) == -1);
     assert(sc64_race_building_armor(B_SUNKEN_COLONY) == 2);
     assert(sc64_race_building_armor(B_PYLON) == 0);
     assert(sc64_race_unit_from_raw(30) == U_SIEGE_TANK);

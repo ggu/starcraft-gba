@@ -12,7 +12,8 @@ enum {
     U_SCV, U_MARINE, U_FIREBAT, U_MEDIC, U_ZERGLING, U_HYDRALISK, U_RAYNOR,
     U_DRONE, U_OVERLORD, U_PROBE, U_ZEALOT, U_DRAGOON, U_SCOUT, U_TASSADAR,
     U_FENIX, U_CHRYSALIS, U_QUEEN, U_GOLIATH, U_TANK, U_WRAITH,
-    U_MUTALISK, U_HUNTER_KILLER, U_REAVER, U_FENIX_DRAGOON, U_SIEGE_TANK, SC_RU_COUNT
+    U_MUTALISK, U_HUNTER_KILLER, U_REAVER, U_FENIX_DRAGOON, U_SIEGE_TANK,
+    U_VULTURE, SC_RU_COUNT
 };
 enum {
     B_COMMAND, B_BARRACKS, B_DEPOT, B_REFINERY, B_ACADEMY, B_ENG_BAY,
@@ -84,7 +85,8 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     [U_FENIX_DRAGOON] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 0, 300, 100, 1500, 240, 240, 0 },
     /* Siege Mode is an existing Tank transformed in place, not a factory
      * product; its source-type conversion therefore has no training cost. */
-    [U_SIEGE_TANK] = { R_TER, 0, B_FACTORY, 4, 0, 0, 0, 150, 0, 0 }
+    [U_SIEGE_TANK] = { R_TER, 0, B_FACTORY, 4, 0, 0, 0, 150, 0, 0 },
+    [U_VULTURE] = { R_TER, 0, B_FACTORY, 4, 75, 0, 450, 80, 0, 0 }
 };
 
 static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
@@ -138,7 +140,8 @@ static inline const char *sc64_race_unit_name(int type)
         "SCV","MARINE","FIREBAT","MEDIC","ZERGLING","HYDRALISK","RAYNOR",
         "DRONE","OVERLORD","PROBE","ZEALOT","DRAGOON","SCOUT","TASSADAR",
         "FENIX","CHRYSALIS","QUEEN","GOLIATH","SIEGE TANK","WRAITH",
-        "MUTALISK","HUNTER KILLER","REAVER","FENIX DRAGOON","SIEGE TANK"
+        "MUTALISK","HUNTER KILLER","REAVER","FENIX DRAGOON","SIEGE TANK",
+        "VULTURE"
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
 }
@@ -181,6 +184,7 @@ static inline int sc64_race_unit_damage(int type)
     case U_FENIX: return 20; case U_FENIX_DRAGOON: return 45;
     case U_TASSADAR: return 20; case U_SCOUT: return 8;
     case U_SIEGE_TANK: return 50;
+    case U_VULTURE: return 20;
     default: return 0;
     }
 }
@@ -188,7 +192,7 @@ static inline int sc64_race_unit_damage(int type)
 static inline int sc64_race_unit_range(int type)
 {
     switch (type) {
-    case U_WRAITH: return 160;
+    case U_WRAITH: case U_VULTURE: return 160;
     case U_GOLIATH: return 192;
     case U_TANK: return 224;
     case U_MARINE: case U_HYDRALISK: case U_DRAGOON: case U_SCOUT:
@@ -206,6 +210,7 @@ static inline int sc64_race_unit_cooldown(int type)
 {
     switch (type) {
     case U_ZERGLING: return 8; case U_MARINE: return 15;
+    case U_VULTURE: return 30;
     case U_HYDRALISK: return 15; case U_FIREBAT: return 22;
     case U_ZEALOT: return 22; case U_DRAGOON: return 30;
     case U_GOLIATH: return 22; case U_TANK: return 37;
@@ -224,6 +229,7 @@ static inline int sc64_race_unit_flying(int type)
  * expose the number of simultaneous blade hits so armor is applied per hit. */
 static inline int sc64_race_unit_damage_vs(int type, int target_flying)
 {
+    if (type == U_VULTURE && target_flying) return 0;
     if (target_flying) {
         if (type == U_GOLIATH) return 10;
         if (type == U_WRAITH) return 20;
@@ -233,6 +239,7 @@ static inline int sc64_race_unit_damage_vs(int type, int target_flying)
 }
 static inline int sc64_race_unit_range_vs(int type, int target_flying)
 {
+    if (type == U_VULTURE && target_flying) return 0;
     if (type == U_GOLIATH) return target_flying ? 160 : 192;
     if (type == U_TANK || type == U_SIEGE_TANK) return target_flying ? 0 : sc64_race_unit_range(type);
     if (type == U_WRAITH) return 160;
@@ -290,6 +297,7 @@ static inline int sc64_race_raw_unit(int type)
     case U_TASSADAR: return 79; case U_REAVER: return 83; case U_GOLIATH: return 3;
     case U_TANK: return 5; case U_SIEGE_TANK: return 30;
     case U_WRAITH: return 8; case U_CHRYSALIS: return 216;
+    case U_VULTURE: return 2;
     default: return -1;
     }
 }
@@ -299,7 +307,7 @@ static inline int sc64_race_raw_building(int type)
     switch (type) {
     case B_COMMAND: return 106; case B_BARRACKS: return 111;
     case B_DEPOT: return 109; case B_REFINERY: return 110; case B_ACADEMY: return 112;
-    case B_ENG_BAY: return 118; case B_BUNKER: return 125;
+    case B_ENG_BAY: return 122; case B_BUNKER: return 125;
     case B_INFESTED_COMMAND: return 130; case B_HATCHERY: return 131; case B_LAIR: return 132;
     case B_HYDRALISK_DEN: return 135; case B_EVOLUTION_CHAMBER: return 139;
     case B_SPIRE: return 141; case B_SPAWNING_POOL: return 142; case B_CREEP_COLONY: return 143;
@@ -330,6 +338,7 @@ static inline int sc64_race_unit_from_raw(int raw)
     case 70: return U_SCOUT; case 77: return U_FENIX;
     case 78: return U_FENIX_DRAGOON; case 83: return U_REAVER;
     case 79: return U_TASSADAR; case 150: return U_CHRYSALIS;
+    case 2: return U_VULTURE;
     case 3: return U_GOLIATH; case 5: return U_TANK; case 30: return U_SIEGE_TANK;
     case 8: return U_WRAITH; case 43: return U_MUTALISK;
     case 53: return U_HUNTER_KILLER; case 216: return U_CHRYSALIS;
@@ -346,6 +355,7 @@ static inline int sc64_race_building_from_raw(int raw)
     case 112: return B_ACADEMY; case 125: return B_BUNKER;
     case 130: return B_INFESTED_COMMAND;
 #endif
+    case 122: return B_ENG_BAY;
     case 131: return B_HATCHERY; case 132: return B_LAIR;
     case 135: return B_HYDRALISK_DEN; case 139: return B_EVOLUTION_CHAMBER;
     case 141: return B_SPIRE; case 142: return B_SPAWNING_POOL;

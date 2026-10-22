@@ -30,6 +30,9 @@ MISSIONS = [
     # depend on the original indices remaining Z1/Z2/P1/P2 = 0..3.
     ('T1', '008/00A', 'Wasteland'),
     ('T2', '008/00B', 'Backwater Station'),
+    # T3 is emitted into the private header, but its data and map count are
+    # compiled only by unified builds that explicitly enable stage 3.
+    ('T3', '008/00C', 'Desperate Alliance'),
 ]
 
 
@@ -86,7 +89,9 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
         '/* Source: references/sc64-maps/extract_sc64_maps.py @ ' + UPSTREAM_COMMIT + ' */\n',
         '#ifndef SC64_RACES_GENERATED_H\n#define SC64_RACES_GENERATED_H\n',
         '#include "sc64_types.h"\n',
-        '#ifdef SC64_UNIFIED\n#define SC64_RACE_MAP_COUNT 6\n'
+        '#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)\n'
+        '#define SC64_RACE_MAP_COUNT 7\n'
+        '#elif defined(SC64_UNIFIED)\n#define SC64_RACE_MAP_COUNT 6\n'
         '#else\n#define SC64_RACE_MAP_COUNT 4\n#endif\n',
         'typedef struct {\n'
         '    unsigned short width, height;\n'
@@ -156,6 +161,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
         # Terran campaign payload. Unified builds opt into both map datasets.
         if map_index == 4:
             lines.append('#ifdef SC64_UNIFIED\n')
+        elif map_index == 6:
+            lines.append('#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)\n')
         campaign_race = 1 if map_index < 2 else 2 if map_index < 4 else 0
         campaign_guard = f'!defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE == {campaign_race}'
         lines.append(f'#if {campaign_guard}\n')
@@ -176,6 +183,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
         lines.append('#endif /* selected campaign assets */\n')
         if map_index == 5:
             lines.append('#endif /* SC64_UNIFIED */\n')
+        elif map_index == 6:
+            lines.append('#endif /* SC64_UNIFIED && SC64_T3_ENABLED */\n')
         descriptors.append(f'#if {campaign_guard}\n'
             f'    {{{info.width}u,{info.height}u,{tileset}u,{human_slot}u,sc64_race_{name}_owner_modes,sc64_race_{name}_owner_races,{unit_name},{len(units)}u,sc64_race_{name}_tiles,{len(tiles)}u,sc64_race_{name}_lookup,sc64_race_{name}_blocked,"{info.name}","{mission_id}"}},\n'
             '#else\n    {0}, /* campaign omitted from this cartridge */\n#endif\n')
@@ -195,6 +204,24 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             'terrain_assets_sha256': {k: hashlib.sha256(v).hexdigest() for k, v in sources.items()},
         })
         if map_index >= 4:
+            source_units = importer.unit_rows(sections.get(b'UNIT', b''))
+            source_categories = Counter(
+                'start_marker' if u['source_type'] == 214 else
+                'mineral' if u['source_type'] in (176, 177, 178) else
+                'geyser' if u['source_type'] == 188 else
+                'building' if 106 <= u['source_type'] < 176 else
+                'unit'
+                for u in source_units
+            )
+            reports[-1]['source_unit_records'] = len(source_units)
+            reports[-1]['runtime_unit_records'] = len(units)
+            reports[-1]['excluded_start_markers'] = source_categories['start_marker']
+            reports[-1]['source_categories'] = {
+                'unit_placements': source_categories['unit'],
+                'building_placements': source_categories['building'],
+                'mineral_fields': source_categories['mineral'],
+                'geysers': source_categories['geyser'],
+            }
             reports[-1]['runtime_unit_locations'] = [
                 {'source_type': u['source_type'], 'owner_raw': u['owner_raw'],
                  'x': u['x_source_px'] // 2, 'y': u['y_source_px'] // 2,
@@ -210,7 +237,9 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
     lines.extend([
         'static const Sc64RaceMap sc64_race_maps[SC64_RACE_MAP_COUNT] = {\n',
         *descriptors[:4],
-        '#ifdef SC64_UNIFIED\n', *descriptors[4:], '#endif /* SC64_UNIFIED */\n',
+        '#ifdef SC64_UNIFIED\n', *descriptors[4:6], '#endif /* SC64_UNIFIED */\n',
+        '#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)\n',
+        *descriptors[6:], '#endif /* SC64_UNIFIED && SC64_T3_ENABLED */\n',
         '};\n', '#endif\n',
     ])
     content = ''.join(lines)

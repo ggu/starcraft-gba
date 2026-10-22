@@ -80,6 +80,26 @@ tables contain only the selected race's two missions. All 30 mission slots
 have stable catalog IDs, but only the original six missions are playable in
 this stage. See [race campaign builds](RACE-CAMPAIGNS.md).
 
+## Campaign preparation checks (2026-10-22)
+
+The source-only suite also checks bounded bit grids against a byte-array
+oracle and coordinate conversion against division for all supported 64, 96
+and 128 tile dimensions, including rectangular maps. These helpers are
+preparation; the production runtime still has its existing map limits.
+
+The standalone Desperate Alliance rules model passes its full 54,000-tick
+countdown, alternate Hatchery objective, pause, defeat policy, save-copy
+continuity and invalid-state tests under ASan/UBSan. The private-input
+`make test-sc64-t3-import` check confirms all 196 non-start-marker records
+are retained and mapped: 138 units, 31 buildings, 25 mineral fields and two
+geysers. It also checks every placement coordinate and terrain lookup index.
+Vulture rules and Engineering Bay raw-ID round trips have regression coverage.
+
+Default, unified and all three split-profile build/host suites pass after
+these additions. T3 remains disabled in production flags: complete-roster
+runtime capacity, scenario integration, controller completion and emulator
+performance checks are still required before it becomes playable.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

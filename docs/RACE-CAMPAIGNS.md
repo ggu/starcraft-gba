@@ -24,6 +24,19 @@ frontend variants without requiring those inputs.
 
 Each fixed-race campaign presents only its two implemented missions and advances from the first to the second after a win. The catalog reserves identifiers for ten missions per race so future stages can add missions without renumbering the original six shared campaign entries. That catalog does not make later missions available: the current builds do not have their scenario content and implementations. The full 30-mission campaign remains unfinished.
 
+Preparation for Terran 3, Desperate Alliance, includes a bounded rules model
+and an optional importer path behind `SC64_T3_ENABLED`. The imported starting
+roster is retained in full, and Vulture rules and Engineering Bay identifiers
+are supported. The production build flags leave this mission disabled until
+its runtime, complete-roster capacity, objectives, AI, saves and controller
+completion have been integrated and checked. The standalone model is not a
+playable mission or a general CHK interpreter.
+
+After local preparation, `make test-sc64-t3-import` checks every retained T3
+record, its runtime type mapping, coordinate bounds and terrain indices. It
+does not launch the mission. The asset-free `./dev test` checks the standalone
+timer, alternate objective, defeat policy and invalid-state handling.
+
 The engine and its gameplay limits are shared across all three ROMs. These profiles select a campaign identity at build time; they are not separate ports of the original N64 game. The current engine is a bounded GBA adaptation with incomplete campaign triggers, enemy strategy, unit systems, and presentation. It does not interpret arbitrary scenario triggers or execute the original AI scripts. See [SC64 unified profile](SC64-UNIFIED.md) for more detail on shared mechanics and limitations.
 
 ## Custom skirmishes

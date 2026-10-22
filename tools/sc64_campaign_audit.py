@@ -28,7 +28,8 @@ READINESS = {path: 'reduced GBA mission implementation' for path in
              ('008/00A', '008/00B', '008/014', '008/015', '008/01E', '008/01F')}
 SELECTOR_LABELS = {229: 'Any Unit', 230: 'Men', 231: 'Buildings', 232: 'Factories'}
 KNOWN_UNIT_LABELS = {0: 'Terran Marine', 7: 'Terran SCV', 37: 'Zerg Zergling',
-                     101: 'Protoss Observer', 106: 'Terran Command Center',
+                     84: 'Protoss Observer', 101: 'Special Map Revealer',
+                     106: 'Terran Command Center',
                      109: 'Terran Supply Depot', 111: 'Terran Barracks',
                      131: 'Zerg Hatchery', 176: 'Mineral Field 1',
                      177: 'Mineral Field 2', 178: 'Mineral Field 3', 188: 'Vespene Geyser'}
