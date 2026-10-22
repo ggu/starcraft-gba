@@ -1262,6 +1262,22 @@ A separate 3,000-tick neutral-input ARM run averages 28.19 effective fps
 (intervals 27.72, 28.46 and 28.41) with no trigger faults. This measures the
 opening area, not a campaign completion or full battle.
 
+## T5 controller route and transport requirement (2026-10-23)
+
+The bounded host controller probe runs 60,000 input ticks under ASan/UBSan.
+It rescues Kerrigan, executes the rebel-base trigger sequence and the gated
+enemy grant, then queues SCVs and Marines with paid normal-controller orders.
+It ends in live play at frame 59,918 with Kerrigan alive and no trigger faults;
+21 enemy buildings remain. This is an unfinished controller route.
+
+A terrain audit of the verified `008/00E` map finds the remaining enemy base
+in a separate ground component using both the coarse GBA grid and the source
+VF4 minitile walk masks. Ground routing alone cannot complete this route.
+Air transport remains required work; the terrain has not been altered to
+bridge the islands. The five-mission menu has guarded asset-free tests,
+including its single-row third page, but the T5 entry flag stays off in ROM
+targets. The playable campaign total remains 10 of 30.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

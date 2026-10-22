@@ -227,6 +227,8 @@ static inline void sc64_frontend_reset(Sc64Frontend *f, int mission,
     f->completed = sc64_front_clamp(completed, -1, 22);
 #elif defined(SC64_Z3_ENABLED)
     f->completed = sc64_front_clamp(completed, -1, 14);
+#elif defined(SC64_T5_CAMPAIGN_ENTRY)
+    f->completed = sc64_front_clamp(completed, -1, 8);
 #elif defined(SC64_T4_CAMPAIGN_ENTRY)
     f->completed = sc64_front_clamp(completed, -1, 7);
 #elif defined(SC64_T3_ENABLED)

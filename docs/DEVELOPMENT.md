@@ -348,6 +348,13 @@ The save checks cover trigger waits, mine continuation, executed resource/AI
 actions, invalid-state rejection before world mutation, and other mission saves.
 Reports and captures remain under ignored local output directories.
 
+`make sc64-t5-controller-probe` runs a bounded 60,000-tick host controller
+attempt and writes its private trace under `.local/sc64/t5/`. It exercises
+the rescue/base sequence and paid production. Ending at its limit is an
+unfinished attempt, not a mission-completion test. The separate
+`SC64_T5_CAMPAIGN_ENTRY` menu flag is covered by asset-free frontend checks
+but is not enabled by any ROM target yet.
+
 Opaque AI scripts use explicit GBA policies: rescue conversion, passive guards,
 clear-combat orders, paid production and small periodic attack groups. Hero
 art reuses existing Ghost/Vulture frames. Cloaking, full mine visibility and

@@ -294,6 +294,19 @@ build/test-sc64-t4-campaign-entry-off: tests/sc64_t4_campaign_frontend.c starcra
 test-sc64-t4-campaign-frontend: build/test-sc64-t4-campaign-entry-on build/test-sc64-t4-campaign-entry-off
 	./build/test-sc64-t4-campaign-entry-on
 	./build/test-sc64-t4-campaign-entry-off
+
+# This flag is exercised only by asset-free frontend checks until the T5
+# runtime has a complete controller route. Existing ROM profiles stay gated.
+T5_FRONTEND_TEST_FLAGS := -DSC64_T3_ENABLED -DSC64_UNIFIED -DSC64_CAMPAIGN_RACE=0 -DSC64_T4_SCENARIO_RUNTIME -DSC64_T4_RUNTIME -DSC64_T4_CAMPAIGN_ENTRY -DSC64_T5_ENABLED -DSC64_T5_RUNTIME -DSC64_IMPORTED_SKIRMISH
+build/test-sc64-t5-campaign-entry-on: tests/sc64_t5_campaign_frontend.c starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $(T5_FRONTEND_TEST_FLAGS) -DSC64_T5_CAMPAIGN_ENTRY $< -o $@
+build/test-sc64-t5-campaign-entry-off: tests/sc64_t5_campaign_frontend.c starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $(T5_FRONTEND_TEST_FLAGS) $< -o $@
+.PHONY: test-sc64-t5-campaign-frontend
+test-sc64-t5-campaign-frontend: build/test-sc64-t5-campaign-entry-on build/test-sc64-t5-campaign-entry-off
+	./build/test-sc64-t5-campaign-entry-on
+	./build/test-sc64-t5-campaign-entry-off
+test-starcraft: test-sc64-t5-campaign-frontend
 .PHONY: test-sc64-t4-frontend-entry
 test-sc64-t4-frontend-entry: build/test-sc64-t4-entry-on build/test-sc64-t4-entry-off
 	./build/test-sc64-t4-entry-on
@@ -347,6 +360,11 @@ build/test-sc64-t5-engine: tests/sc64_t5_engine.c $(STARCRAFT) $(wildcard starcr
 .PHONY: test-sc64-t5-engine
 test-sc64-t5-engine: build/test-sc64-t5-engine
 	./build/test-sc64-t5-engine
+build/sc64-t5-controller-probe: tests/sc64_t5_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) -DSC64_T5_PROBE_ENTRY $< common/gba.c -o $@
+.PHONY: sc64-t5-controller-probe
+sc64-t5-controller-probe: build/sc64-t5-controller-probe
+	./build/sc64-t5-controller-probe --limit 60000 --trace .local/sc64/t5/controller-probe.json
 build/test-sc64-t5-save: tests/sc64_t5_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-t5-save
