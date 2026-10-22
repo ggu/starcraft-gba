@@ -92,6 +92,18 @@ void gfx_begin(u8 color) {
  while(REG32(0x040000dc)&0x80000000){}
 #endif
 }
+/* Select the next backbuffer without clearing it. Only renderers proven to
+ * overwrite every pixel may use this; partial scenes need gfx_begin(). */
+#if defined(SC64_NO_FRAME_CLEAR) || defined(GBA_HOST)
+void gfx_begin_preserve(void) {
+ draw_start=gba_clock();
+#ifdef GBA_HOST
+ pixels=host_fb[front^1];
+#else
+ pixels=(volatile u16*)(front?0x06000000:0x0600a000);
+#endif
+}
+#endif
 /* Copy an exact full-width band between Mode 4 pixels and aligned linear
    indexed-pixel storage. The GBA DMA path uses whole 32-bit words only. */
 static int gfx_band_valid(int y,int height,const void *buffer) {

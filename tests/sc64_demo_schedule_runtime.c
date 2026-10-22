@@ -3,11 +3,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#if !defined(SC64_Z3_WINDOWED_SCHEDULE) && !defined(SC64_P3_WINDOWED_SCHEDULE)
+/* Preserve the original standalone test invocation; the P3 target supplies
+ * its profile flags on the compiler command line. */
 #define SC64_RACES
 #define SC64_UNIFIED
 #define SC64_Z3_ENABLED
 #define SC64_CAMPAIGN_RACE 1
 #define SC64_Z3_WINDOWED_SCHEDULE
+#endif
 #define main scheduled_main
 #include "../common/main.c"
 #undef main
@@ -114,6 +118,10 @@ int main(void)
     assert(sizeof(demo_schedule_events) == 256u * 8u);
     run_case(1);
     run_case(0);
-    puts("Actual main loop preserves paged/legacy held keys, edges and empty windows.");
+#ifdef SC64_P3_WINDOWED_SCHEDULE
+    puts("P3 actual main loop preserves paged/legacy held keys, edges and empty windows.");
+#else
+    puts("Z3 actual main loop preserves paged/legacy held keys, edges and empty windows.");
+#endif
     return 0;
 }

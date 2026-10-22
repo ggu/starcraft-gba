@@ -423,6 +423,11 @@ static u32 seed;
 volatile u32 sc64_orders_cycles, sc64_sight_cycles, sc64_other_cycles;
 volatile u32 sc64_map_cycles, sc64_hud_cycles;
 volatile u32 sc64_background_cycles, sc64_building_cycles, sc64_unit_draw_cycles;
+#if defined(SC64_DIAGNOSTIC_UPDATE)
+volatile u32 sc64_update_mission_cycles, sc64_update_production_cycles;
+volatile u32 sc64_update_race_state_cycles, sc64_update_defenses_cycles;
+volatile u32 sc64_update_research_cycles, sc64_update_remainder_cycles;
+#endif
 #include "sc64_visibility.h"
 #endif
 #ifdef SC64_DIAGNOSTIC_ORDERS
@@ -3210,6 +3215,9 @@ game_update(u16 held, u16 pressed)
 {
 #ifdef SC64_IMPORTED_MISSION
     u32 profile_start, profile_orders_end, profile_sight_start;
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    u32 sc64_update_stage_start, sc64_update_remainder_start;
+#endif
 #endif
     int speed = (held & KEY_R) ? 4 : 2;
     if (screen != SCREEN_PLAY) reset_selection_gestures();
@@ -3363,15 +3371,45 @@ game_update(u16 held, u16 pressed)
 #ifdef SC64_IMPORTED_MISSION
     profile_orders_end = gba_clock();
     sc64_orders_cycles = profile_orders_end - profile_start;
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    sc64_update_mission_cycles = 0;
+    sc64_update_production_cycles = 0;
+    sc64_update_race_state_cycles = 0;
+    sc64_update_defenses_cycles = 0;
+    sc64_update_research_cycles = 0;
+    sc64_update_remainder_cycles = 0;
+    sc64_update_stage_start = gba_clock();
+#endif
 #endif
 #ifdef SC64_IMPORTED_MISSION
     update_imported_mission();
 #endif
+#if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
+    sc64_update_mission_cycles = gba_clock() - sc64_update_stage_start;
+    sc64_update_stage_start = gba_clock();
+#endif
     update_production();
+#if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
+    sc64_update_production_cycles = gba_clock() - sc64_update_stage_start;
+    sc64_update_stage_start = gba_clock();
+#endif
 #ifdef SC64_RACES
-    race_tick_state();race_tick_defenses();
+    race_tick_state();
+#if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
+    sc64_update_race_state_cycles = gba_clock() - sc64_update_stage_start;
+    sc64_update_stage_start = gba_clock();
+#endif
+    race_tick_defenses();
+#if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
+    sc64_update_defenses_cycles = gba_clock() - sc64_update_stage_start;
+    sc64_update_stage_start = gba_clock();
+#endif
 #endif
     tick_research();
+#if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
+    sc64_update_research_cycles = gba_clock() - sc64_update_stage_start;
+    sc64_update_remainder_start = gba_clock();
+#endif
     if (frame % 30 == 0)
 	economy();
     if (frame % 90 == 0) {
@@ -3387,6 +3425,9 @@ game_update(u16 held, u16 pressed)
 #ifdef SC64_IMPORTED_MISSION
     profile_sight_start = gba_clock();
     sc64_other_cycles = profile_sight_start - profile_orders_end;
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    sc64_update_remainder_cycles = profile_sight_start - sc64_update_remainder_start;
+#endif
 #endif
     update_exploration();
 #ifdef SC64_IMPORTED_MISSION
@@ -4378,7 +4419,15 @@ game_render(void)
 #ifdef SC64_IMPORTED_MISSION
     u32 profile_start;
 #endif
+#if defined(SC64_IMPORTED_MISSION) && defined(SC64_NO_FRAME_CLEAR)
+    /* Imported live scenes overwrite every pixel in the map and HUD bands.
+     * Title pages retain the regular clear; coverage fixtures exercise live,
+     * paused and result scenes over poisoned backbuffers. */
+    if (screen == SCREEN_TITLE) gfx_begin(C_BLACK);
+    else gfx_begin_preserve();
+#else
     gfx_begin(C_BLACK);
+#endif
     if (screen == SCREEN_TITLE)
 	draw_title();
     else {

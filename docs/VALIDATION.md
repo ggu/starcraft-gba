@@ -535,6 +535,56 @@ Higher Ground remains experimental: the source AI interpreter, original
 transmission dialogue/audio, a full controller win, near-30-fps performance
 and physical GBA validation are not complete.
 
+## Higher Ground controller win and defense optimization (2026-10-23)
+
+The complete normal-controller host policy wins Higher Ground at frame
+151,088 (scheduler tick 152,107) under ASan/UBSan. It uses the menus to build
+Pylons, Gateways, an Assimilator and Cybernetics Core, assigns gas workers,
+trains Zealots/Dragoons, defends the base and attacks both Zerg colonies. All
+38 hostile buildings are destroyed; 14 player units, 11 player buildings and
+seven Force 2 units remain. The final wallets are 44 minerals and 1,048 gas.
+No unit, building, resource or objective state is written by the policy.
+The original and optimized host builds produce the same complete trace:
+5,809 input transitions, SHA-256
+`490656dd167127e879126a2690ac32691e2a6f0d25ddb9f4b65b8f7de8a4a462`.
+
+P3's 24 complete defensive buildings previously scanned all 128 unit slots
+per frame, including allied forces. An opt-in P3 path builds two sorted
+candidate lists once per call and retains the original slot order, strict
+range, air/ground, invincibility, cooldown, tie and per-hit death behavior.
+Randomized and dense differential fixtures compare the complete world and
+tracers with the original scan. A diagnostic same-save comparison reduced
+defense time from 120,824 to 30,857 cycles at the last observed frame, raising
+effective performance from 19.72 to 28.92 fps over 1,000 scheduler ticks.
+Both checkpoints match the baseline's reported gameplay fields and RGB pixels.
+
+The live renderer can now select its backbuffer without clearing pixels that
+the map/HUD immediately replace. Forty-seven scene/cache fixtures and seven
+actual-render transitions match a cleared reference over poisoned buffers,
+including both pages, camera edges, fog, overlays, pause, results and title.
+The title keeps its regular clear. In the same diagnostic scene, removal of
+the redundant DMA clear and rejection of a slower minimap batching experiment
+reduced draw time from 302,255 to 268,129 cycles. The minimap experiment is not
+enabled or retained in production source. These changes preserve state and
+pixels; a full-mission performance result is still pending.
+
+The P3 paged scheduler reuses the Z3 implementation, preserving held buttons
+and press edges across empty windows. The actual-main fixture passes for
+both profiles and legacy count-only scheduling. Its 256-entry queue admits
+the host proof trace's peak of 90 transitions per page. The final P3 image is
+SHA-256 `9cc2691671d948fccac09ab9187055a50a0c5a539b130ab48bc33e3bbe2fefea`;
+it uses 235,800 BSS bytes, ends IWRAM at `0x03004e80` and BSS at `0x02039aa0`,
+within both unchanged guards. The canonical rebuild matches this frozen ROM
+byte for byte. Default, unified and Z3 ROM hashes remain unchanged.
+
+Default build/tests, unified build/tests, the full P3 suite and 65 Python
+checks pass. The P3 replay tool validates input transitions, ELF queue limits,
+catalog availability and final quest/roster/wallet state. Its SRAM checks use
+the human globals as the authoritative wallet; the owner arrays may retain
+their initialization values for SIDE. The complete ARM controller replay is
+running separately. A host win and this bounded 28.92-fps scene do not certify
+the full ARM mission, its frame rate, or physical GBA performance.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

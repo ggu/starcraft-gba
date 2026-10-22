@@ -38,6 +38,9 @@ PROFILE_CYCLE_NAMES = (
     "sc64_sight_cycles", "sc64_other_cycles", "sc64_map_cycles",
     "sc64_hud_cycles", "sc64_background_cycles", "sc64_building_cycles",
     "sc64_unit_draw_cycles",
+    "sc64_update_mission_cycles", "sc64_update_production_cycles",
+    "sc64_update_race_state_cycles", "sc64_update_defenses_cycles",
+    "sc64_update_research_cycles", "sc64_update_remainder_cycles",
 )
 REFINERY_TYPES = {3: "terran_refinery", 17: "protoss_assimilator", 20: "zerg_extractor"}
 

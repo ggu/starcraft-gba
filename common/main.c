@@ -1,10 +1,23 @@
 #include "gba.h"
-#ifdef SC64_Z3_WINDOWED_SCHEDULE
+#if defined(SC64_Z3_WINDOWED_SCHEDULE) && defined(SC64_P3_WINDOWED_SCHEDULE)
+#error "Z3 and P3 windowed scheduler profiles are mutually exclusive"
+#endif
+#if defined(SC64_Z3_WINDOWED_SCHEDULE) || defined(SC64_P3_WINDOWED_SCHEDULE)
 #include "demo_schedule.h"
+#define SC64_WINDOWED_SCHEDULE 1
+#endif
+#ifdef SC64_Z3_WINDOWED_SCHEDULE
 #if !defined(SC64_RACES) || !defined(SC64_UNIFIED) || \
     !defined(SC64_Z3_ENABLED) || !defined(SC64_CAMPAIGN_RACE) || \
     SC64_CAMPAIGN_RACE != 1
 #error "SC64_Z3_WINDOWED_SCHEDULE requires the unified Zerg campaign profile"
+#endif
+#endif
+#ifdef SC64_P3_WINDOWED_SCHEDULE
+#if !defined(SC64_RACES) || !defined(SC64_UNIFIED) || \
+    !defined(SC64_P3_ENABLED) || !defined(SC64_P3_RUNTIME) || \
+    !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 2
+#error "SC64_P3_WINDOWED_SCHEDULE requires the unified Protoss P3 runtime profile"
 #endif
 #endif
 volatile u32 demo_frame;
@@ -17,7 +30,7 @@ volatile u32 demo_tick_buckets[8];
 /* Optional debugger-fed controller events. Disabled in ordinary play. This
  * avoids a debugger round trip every tick during full-mission ARM replays. */
 #if defined(SC64_BACKWATER) || defined(D2_DEN_OF_EVIL) || defined(SC64_RACES)
-#ifdef SC64_Z3_WINDOWED_SCHEDULE
+#ifdef SC64_WINDOWED_SCHEDULE
 #define DEMO_SCHEDULE_CAPACITY DEMO_SCHEDULE_WINDOW_CAPACITY
 #else
 #define DEMO_SCHEDULE_CAPACITY 2048
@@ -27,7 +40,7 @@ volatile u32 demo_tick_buckets[8];
 #endif
 volatile u32 demo_schedule_events[DEMO_SCHEDULE_CAPACITY][2];
 volatile u32 demo_schedule_count, demo_schedule_length, demo_schedule_tick;
-#ifdef SC64_Z3_WINDOWED_SCHEDULE
+#ifdef SC64_WINDOWED_SCHEDULE
 volatile u32 demo_schedule_active, demo_schedule_index;
 #endif
 __attribute__((noinline)) void demo_replay_checkpoint(void) {
@@ -41,7 +54,7 @@ int main(void) {
     gba_init();
     game_init();
     u16 previous=0;
-#ifdef SC64_Z3_WINDOWED_SCHEDULE
+#ifdef SC64_WINDOWED_SCHEDULE
     u16 schedule_keys=0;
 #else
     u32 schedule_index=0;
@@ -49,7 +62,7 @@ int main(void) {
 #endif
     for (;;) {
         u32 schedule_count=demo_schedule_count;
-#ifdef SC64_Z3_WINDOWED_SCHEDULE
+#ifdef SC64_WINDOWED_SCHEDULE
         u32 schedule_active=demo_schedule_active;
         u32 schedule_enabled=schedule_active || schedule_count;
         if(schedule_enabled && !demo_schedule_tick && !demo_schedule_index)
@@ -60,7 +73,7 @@ int main(void) {
 #endif
         u32 start=gba_clock();
         u16 held=gba_keys() | demo_inject_keys;
-#ifdef SC64_Z3_WINDOWED_SCHEDULE
+#ifdef SC64_WINDOWED_SCHEDULE
         if(schedule_enabled) {
             held=demo_schedule_window_held(demo_schedule_events,schedule_count,
                                            &demo_schedule_index,
@@ -88,7 +101,7 @@ int main(void) {
         if(demo_last_cycles>demo_peak_cycles)demo_peak_cycles=demo_last_cycles;
         previous=held;
         demo_frame++;
-#ifdef SC64_Z3_WINDOWED_SCHEDULE
+#ifdef SC64_WINDOWED_SCHEDULE
         if(schedule_enabled) {
             demo_schedule_tick++;
             if(demo_schedule_tick%1000u==0 || demo_schedule_tick==demo_schedule_length) {

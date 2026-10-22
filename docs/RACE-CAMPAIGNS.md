@@ -161,11 +161,31 @@ mining assignments and periodic small guard attacks. Original transmission
 dialogue/audio are absent; their holds use documented adapter timings. Scourge
 combat has an air-only suicide attack with fixed source-backed damage. This
 profile has a separate save generation, including quest actions and their
-remaining hold time. Its full-roster controller smoke test can build a paid
-Pylon and queue a Probe, and a fresh ARM emulator process has restored and
-continued a normal controller-created save. A full controller win remains
-unproven. The opening measured 19.86 fps and the reload tail 19.72 fps; the
-near-30-fps target and physical GBA validation remain unmet.
+remaining hold time. A controller-only ASan/UBSan host run now completes the
+mission at frame 151,088 after building a gas economy, Cybernetics Core and
+Gateway army, then destroying all 38 hostile buildings. It retains 14 units
+and 11 buildings. The frozen 5,809-transition input trace fits the paged
+256-entry debugger queue, with at most 90 transitions per 1,000-tick page.
+After the build/test command, replay it with:
+
+```sh
+python3 tools/sc64_p3_controller_replay.py --trace .local/sc64/p3-controller-asan-win.json
+```
+
+The helper supports frozen `--rom`/`--elf` paths, separate `--output` folders,
+and bounded `--ticks` prefixes with optional normal-control `--save-at-end`.
+It verifies the final quest model, completion bit, roster and global wallets.
+The complete ARM replay is still being validated. A fresh ARM process has
+already restored and continued a normal controller-created save. In that same
+saved scene, filtering defense candidates raised effective performance from
+19.72 to 28.92 fps with identical reported gameplay state and captured pixels.
+That is a bounded scene comparison, not a full-mission frame-rate result.
+The near-30-fps mission target and physical GBA validation remain unmet.
+
+P3 enables sorted defense candidate lists, a paged debugger input queue and
+clear-free live rendering after full-frame coverage checks. For an unoptimized
+comparison build, use `make -B protoss-p3 P3_OPTIMIZATION_FLAGS=`; retain ROM/ELF
+pairs separately, then restore the default with `make -B protoss-p3`.
 
 `make test-sc64-large-map sc64-large-probe` checks the opt-in
 `SC64_LARGE_MAPS` storage layout, including packed fog/path grids, larger
