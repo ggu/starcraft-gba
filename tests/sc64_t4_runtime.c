@@ -171,6 +171,6 @@ int main(void)
     door_collision_restores_source_terrain();
     real_update_pause_save_resume();
     script_win_and_hero_loss();
-    puts("T4 full-world/update/save and synthetic source-script outcomes pass; controller completion remains unproven");
+    puts("T4 full-world/update/save and synthetic outcomes pass; this fixture excludes controller-completion proof");
     return 0;
 }

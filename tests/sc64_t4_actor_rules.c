@@ -30,7 +30,14 @@ int main(void)
     assert(sc64_race_unit_can_attack_air(U_MARINE));
     assert(!sc64_race_unit_can_attack_air(U_VULTURE));
 #else
-    assert(SC_RU_COUNT == 34);
+    assert(SC_RU_COUNT == 35);
+    assert(U_DATA_DISK == 33 && U_RAYNOR_MARINE == 34);
+    assert(sc64_race_unit_from_raw(20) == U_RAYNOR_MARINE);
+    assert(sc64_race_raw_unit(U_RAYNOR_MARINE) == 20);
+    assert(sc64_race_unit_damage_vs(U_RAYNOR_MARINE, 0) == 18);
+    assert(sc64_race_unit_can_attack_air(U_RAYNOR_MARINE));
+    assert(sc64_race_unit_rule(U_RAYNOR_MARINE)->supply == 0);
+    assert(sc64_race_unit_rule(U_RAYNOR_MARINE)->producer == 255);
     assert(SC_RB_COUNT == 44);
     assert(sc64_race_unit_from_raw(1) == U_GHOST);
     assert(sc64_race_unit_from_raw(15) == U_CIVILIAN);

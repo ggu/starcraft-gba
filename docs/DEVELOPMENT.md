@@ -139,9 +139,18 @@ Door presentation uses an authored immediate-state policy: enabled/closed
 doors draw source frame 0, disabled/open doors draw frame 9; the paired right
 door types are mirrored. Traps draw static frame 0 when enabled and are hidden
 when disabled. Door animation timing and trap animation are not reproduced.
+Disabling a trap suppresses firing and drawing but leaves its actor targetable;
+native T4 initial targetability has not been established. This is an authored
+compatibility policy, alongside the immediate door endpoints.
 These visual choices are bounded compatibility policies, not proof of native
-N64 IScript behavior. The runtime save generation is version 9 and persists
+N64 IScript behavior. The runtime save generation is version 10 and persists
 the trigger and doodad state.
+
+T4 distinguishes raw-20 Marine Raynor from the older raw-19 Vulture alias.
+Marine Raynor has the pinned source weapon and armor rules; older T4 saves
+are rejected after this compact actor-type change. To check acquisition and
+damage against trap, ground and air targets, run
+`make test-sc64-t4-raynor-combat` after local preparation.
 
 After preparing the local T4 inputs, the focused host checks and ARM link probe
 are:

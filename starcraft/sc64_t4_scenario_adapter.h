@@ -144,7 +144,8 @@ race_t4_tick(void)
         race_campaign.phase = SC64_RACE_PHASE_COMPLETE;
         race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_PRIMARY;
         won = 1;
-        /* The frontend/completion mask remain gated until controller proof. */
+        /* Shared game_update records the win; the ordinary frontend remains
+         * gated while release/performance work continues. */
     }
 #ifdef SC64_DIAGNOSTIC_UPDATE
     sc64_t4_script_cycles = gba_clock() - t4_script_start;

@@ -17,6 +17,8 @@ enum {
 #ifdef SC64_T4_RUNTIME
     /* T4-only actor IDs: props and neutral actors must not alias a combat unit. */
     U_GHOST, U_CIVILIAN, U_RHYNADON, U_RAGNASAUR, U_MAP_REVEALER, U_DATA_DISK,
+    /* Raw 20 is Hero_Jim_Raynor_Marine; raw 19 remains the old Vulture actor. */
+    U_RAYNOR_MARINE,
 #endif
     SC_RU_COUNT
 };
@@ -115,6 +117,9 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     , [U_RAGNASAUR]    = { R_TER, 0, 0, 0, 0, 0, 0, 60, 0, 0 }
     , [U_MAP_REVEALER] = { R_TER, 0, 0, 0, 0, 0, 0, 1, 0, 0 }
     , [U_DATA_DISK]    = { R_TER, 0, 0, 0, 0, 0, 0, 800, 0, 0 }
+    /* BWAPI raw 20: 200 HP, 3 armor, Hero Jim Raynor Marine. */
+    /* Scenario hero: zero source supply and producer 255 make it untrainable. */
+    , [U_RAYNOR_MARINE] = { R_TER, 0, 255, 0, 0, 0, 0, 200, 0, 0 }
 #endif
 };
 
@@ -199,7 +204,8 @@ static inline const char *sc64_race_unit_name(int type)
         "MUTALISK","HUNTER KILLER","REAVER","FENIX DRAGOON","SIEGE TANK",
         "VULTURE","DROPSHIP","SCOURGE"
 #ifdef SC64_T4_RUNTIME
-        ,"GHOST","CIVILIAN","RHYNADON","RAGNASAUR","MAP REVEALER","DATA DISK"
+        ,"GHOST","CIVILIAN","RHYNADON","RAGNASAUR","MAP REVEALER","DATA DISK",
+        "RAYNOR MARINE"
 #endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
@@ -445,6 +451,7 @@ static inline int sc64_race_unit_damage(int type)
     case U_SCV: case U_DRONE: case U_PROBE: return 5;
 #ifdef SC64_T4_RUNTIME
     case U_GHOST: return 10;
+    case U_RAYNOR_MARINE: return 18;
 #endif
     case U_MARINE: return 6; case U_FIREBAT: return 8;
     case U_ZERGLING: return 5; case U_HYDRALISK: return 10;
@@ -466,6 +473,7 @@ static inline int sc64_race_unit_range(int type)
     case U_WRAITH: case U_VULTURE: return 160;
 #ifdef SC64_T4_RUNTIME
     case U_GHOST: return 224;
+    case U_RAYNOR_MARINE: return 160;
 #endif
     case U_GOLIATH: return 192;
     case U_TANK: return 224;
@@ -486,6 +494,7 @@ static inline int sc64_race_unit_cooldown(int type)
     case U_ZERGLING: return 8; case U_MARINE: return 15;
 #ifdef SC64_T4_RUNTIME
     case U_GHOST: return 22;
+    case U_RAYNOR_MARINE: return 15;
 #endif
     case U_VULTURE: return 30;
     case U_HYDRALISK: return 15; case U_FIREBAT: return 22;
@@ -516,7 +525,7 @@ static inline int sc64_race_unit_can_attack_air(int type)
     case U_DRAGOON: case U_FENIX_DRAGOON: case U_GOLIATH:
     case U_WRAITH: case U_MUTALISK: case U_SCOUT:
 #ifdef SC64_T4_RUNTIME
-    case U_GHOST:
+    case U_GHOST: case U_RAYNOR_MARINE:
 #endif
         return 1;
     default: return 0;
@@ -580,6 +589,9 @@ static inline int sc64_race_unit_hits_vs(int type, int target_flying)
 static inline int sc64_race_unit_armor(int type)
 {
     switch (type) {
+#ifdef SC64_T4_RUNTIME
+    case U_RAYNOR_MARINE: return 3;
+#endif
     case U_FIREBAT: case U_GOLIATH: case U_TANK: case U_SIEGE_TANK: case U_DROPSHIP:
     case U_ZEALOT: case U_DRAGOON: return 1;
     case U_FENIX_DRAGOON: return 3;
@@ -610,7 +622,13 @@ static inline int sc64_race_raw_unit(int type)
 {
     switch (type) {
     case U_MARINE: return 0; case U_SCV: return 7; case U_FIREBAT: return 32;
-    case U_MEDIC: return 34; case U_RAYNOR: return 20; case U_ZERGLING: return 37;
+    case U_MEDIC: return 34;
+#ifdef SC64_T4_RUNTIME
+    case U_RAYNOR: return 19; case U_RAYNOR_MARINE: return 20;
+#else
+    case U_RAYNOR: return 20;
+#endif
+    case U_ZERGLING: return 37;
     case U_HYDRALISK: return 38; case U_DRONE: return 41; case U_OVERLORD: return 42;
     case U_MUTALISK: return 43; case U_QUEEN: return 45; case U_HUNTER_KILLER: return 53;
     case U_PROBE: return 64; case U_ZEALOT: return 65; case U_DRAGOON: return 66;
@@ -663,7 +681,12 @@ static inline int sc64_race_unit_from_raw(int raw)
 {
     switch (raw) {
     case 0: return U_MARINE; case 7: return U_SCV; case 32: return U_FIREBAT;
-    case 34: return U_MEDIC; case 20: return U_RAYNOR;
+    case 34: return U_MEDIC;
+#ifdef SC64_T4_RUNTIME
+    case 20: return U_RAYNOR_MARINE;
+#else
+    case 20: return U_RAYNOR;
+#endif
 #ifdef SC64_UNIFIED
     case 19: return U_RAYNOR; /* Terran tutorial's Raynor Vulture. */
 #endif

@@ -1026,6 +1026,51 @@ build/tests and focused T4 runtime/save/trap/prop/ping checks pass. Default
 and unified hashes are unchanged. Full mission completion and near-30-fps
 operation remain unproven.
 
+## T4 Raynor Marine combat identity (2026-10-23)
+
+The imported raw-20 hero previously shared the legacy raw-19 Raynor type,
+which has no weapon entry in this compact ruleset. Consequently attack-move
+could not acquire or damage either traps or ordinary hostile units. T4 now
+maps raw 20 to a distinct Marine Raynor type with the pinned source's 200 HP,
+3 armor, 18-damage ground/air Gauss Rifle, 160-source-pixel range and 15-frame
+weapon cooldown, zero supply and no production building. Existing range and
+cooldown scaling applies at the engine boundary. Movement retains the engine's
+one-pixel Marine approximation rather than reproducing the reference's top
+speed/acceleration; the raw-19 alias keeps its previous behavior.
+
+The focused ASan/UBSan engine fixture covers the distinct mappings and
+movement classes, target acquisition and actual damage against a gun trap,
+ground unit and flying unit, plus friendly and invincible target guards.
+Non-T4 rule fixtures retain the legacy mapping. T4 scenario save generation
+advances from 9 to 10 and the actor-only profile from 8 to 9, rejecting older
+records rather than interpreting the changed compact identity.
+
+The internal ARM link passes the unchanged reserve guards with 1,512,148 text
+bytes, 388 data bytes and 251,912 BSS bytes. IWRAM ends at `0x03004fc8` and BSS
+at `0x0203d990`. Its ROM SHA-256 is
+`63474ac9ffdb559aa01478be2edc5b9b010aa7132694a00458cfb47c66e9a0f5`.
+The earlier performance comparisons refer to their recorded ROM hashes;
+this combat fix changes gameplay.
+
+The cleaned normal-controller policy verifies its selected actors, uses the
+ordinary L-cycle selection control and attack-move commands, and derives gate
+and objective targets from the local source records. It wins in both the host
+and the final ARM build at frame 9,331 (host tick 9,372). The final private trace
+SHA-256 is `ba147b738e47bb684608bd8bdcb48c32b43ee499856933ee4b5a181c12510058`;
+it has 154 input transitions, nine periodic checkpoints and a peak of 56
+transitions per scheduler page. The ARM replay retains 11 observations and
+matches the recorded actor/objective/result checks through the final source
+victory: human outcome 1, phase 3, primary objective set, Raynor alive, no
+trigger faults and `verified_win: true`.
+
+The completed replay averages 23.12 effective fps over 7,971 counted live play
+frames, with a worst counted interval of 20.49 fps. This establishes controller
+completion in the adaptation, not near-30-fps performance or native fidelity.
+Default build/tests (101 Python checks), unified build/tests and the focused
+T4 actor, runtime, save, combat, trap, prop and ping fixtures pass. Standard
+default/unified hashes remain unchanged. The ordinary T4 catalog entry stays
+gated; the internal briefing/deploy route remains available for development.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

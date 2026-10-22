@@ -33,9 +33,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #define MAX_UNITS 128
 #endif
 #if defined(SC64_T4_SCENARIO_RUNTIME)
-#define SC64_RACE_SAVE_GENERATION 9u
+#define SC64_RACE_SAVE_GENERATION 10u
 #elif defined(SC64_T4_RUNTIME)
-#define SC64_RACE_SAVE_GENERATION 8u
+#define SC64_RACE_SAVE_GENERATION 9u
 #elif defined(SC64_P3_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 7u
 #elif defined(SC64_LARGE_MAPS)
@@ -1823,6 +1823,9 @@ imported_unit_type(int raw)
     if (raw == 0) return U_MARINE;
     if (raw == 7) return U_SCV;
     if (raw == 19) return U_RAYNOR;
+#ifdef SC64_T4_RUNTIME
+    if (raw == 20) return U_RAYNOR_MARINE;
+#endif
     if (raw == 37) return U_ZERGLING;
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
     if (raw == 32) return U_FIREBAT;

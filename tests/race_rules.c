@@ -36,6 +36,12 @@ int main(void)
     assert(sc64_race_unit_cooldown_vs(U_VULTURE, 0) == 30);
     assert(sc64_race_raw_unit(U_VULTURE) == 2);
     assert(sc64_race_unit_from_raw(2) == U_VULTURE);
+    /* The non-T4 compact ruleset retains its legacy Raynor alias. */
+    assert(sc64_race_unit_from_raw(20) == U_RAYNOR);
+    assert(sc64_race_raw_unit(U_RAYNOR) == 20);
+#ifdef SC64_UNIFIED
+    assert(sc64_race_unit_from_raw(19) == U_RAYNOR);
+#endif
     /* Pinned BWAPI raw 11: Dropship is a distinct flying, unarmed unit.
      * Transport/cargo behavior is deliberately outside this rules contract. */
     assert(sc64_race_unit_rule(U_DROPSHIP)->race == R_TER);

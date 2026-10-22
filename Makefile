@@ -266,6 +266,13 @@ build/test-sc64-t4-roster: tests/sc64_t4_roster.c $(STARCRAFT) $(wildcard starcr
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T4_STORAGE_FLAGS) $< common/gba.c -o $@
 build/test-sc64-t4-actor-engine: tests/sc64_t4_actor_engine.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T4_STORAGE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-t4-raynor-combat: tests/sc64_t4_raynor_combat.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T4_STORAGE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-t4-raynor-combat
+test-sc64-t4-raynor-combat: build/test-sc64-t4-raynor-combat build/test-race-rules build/test-race-rules-z3
+	./build/test-sc64-t4-raynor-combat
+	./build/test-race-rules
+	./build/test-race-rules-z3
 build/test-sc64-t4-rescue: tests/sc64_t4_rescue.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T4_STORAGE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-t4-actors

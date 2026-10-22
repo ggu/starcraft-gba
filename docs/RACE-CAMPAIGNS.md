@@ -1,6 +1,6 @@
 # Fixed-race campaign builds
 
-The Terran, Zerg, and Protoss profiles build three separate GBA ROMs from the same game engine. Each standard ROM offers one race's first two playable missions. Separate experimental targets add the third mission of each race, as described below. The catalog records all 30 original campaign slots; the remaining 21 missions still need scenario and gameplay implementation.
+The Terran, Zerg, and Protoss profiles build three separate GBA ROMs from the same game engine. Each standard ROM offers one race's first two playable missions. Separate experimental targets add the third mission of each race. Terran 4 also has an internal runtime with a verified controller win. The catalog records all 30 original campaign slots; the remaining 20 missions still need scenario and gameplay implementation.
 
 These are source-only profiles. The repository contains the engine, menu code, conversion tools, and authored Outpost map, but it does not contain a StarCraft 64 ROM or converted proprietary maps and graphics. To prepare a profile, supply a supported USA ROM that you are entitled to use:
 
@@ -129,6 +129,15 @@ does not launch the mission. The asset-free `./dev test` checks the standalone
 timer, alternate objective, defeat policy and invalid-state handling.
 
 The engine and its gameplay limits are shared across all three ROMs. These profiles select a campaign identity at build time; they are not separate ports of the original N64 game. The current engine is a bounded GBA adaptation with incomplete campaign triggers, enemy strategy, unit systems, and presentation. It does not interpret arbitrary scenario triggers or execute the original AI scripts. See [SC64 unified profile](SC64-UNIFIED.md) for more detail on shared mechanics and limitations.
+
+Jacobs Installation (Terran 4) remains an internal development build. After
+preparing its local inputs as described in [Development](DEVELOPMENT.md), use
+`make sc64-t4-replay`. On HOME, START+SELECT opens its briefing; A deploys.
+Its normal-controller host and ARM tests win at frame 9,331. The complete ARM
+replay averages 23.12 effective fps with a worst counted interval of 20.49 fps;
+it remains outside the ordinary catalog while performance work continues.
+Older internal T4 saves are rejected by generation 10. This is a bounded
+adaptation with the compatibility limits in [Validation](VALIDATION.md).
 
 ## Custom skirmishes
 
