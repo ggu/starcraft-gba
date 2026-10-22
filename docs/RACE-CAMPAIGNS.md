@@ -202,16 +202,22 @@ This bounded sample does not establish full-battle or campaign performance.
 
 Imported skirmish data is fitted to the engine's bounded resource storage. The packer selects at most 32 distinct mineral patches, distributing the nearest available patches among the selected starts, with a target of up to eight per start. It validates map connectivity, source geyser placements, and resource-building footprints. The imported map keeps its source terrain and resource locations.
 
-## T5 source import only
+## T5 internal runtime stage
 
 Antigan Revolt is reserved at Terran global mission ID 8. Its import path
 retains the full 96×96 Badlands terrain and 168 non-start UNIT rows: 79 units,
 48 buildings and 41 mineral fields. Four start markers are not emitted as live
-placements. The catalog and runtime do not enable this mission. The new actor
-rules and one-player SetResources arithmetic have asset-free regression tests;
-neither proves mission behavior. Cloak, mine arming and player-group selection
-are not implemented by those helpers. Ten missions across the three race
-campaigns are currently playable; the other 20 remain unavailable.
+placements. An internal runtime now binds the retained trigger program to
+bounded world queries/actions, rescue conversion, paid AI policies and mine
+combat. Sanitizer fixtures cover region-gated resource grants, the rebel-base
+sequence, and original victory/defeat predicates through direct world setup.
+These are engine checks, not ordinary-controller completion evidence.
+
+The public catalog still excludes T5. Its internal ARM probe automatically
+enters the mission and refuses T5 saves until persistence is implemented.
+See [the probe workflow](DEVELOPMENT.md#internal-t5-runtime-probe) for commands
+and remaining fidelity limits. Ten missions across the three race campaigns
+are currently playable; the other 20 remain unavailable.
 
 ## Current limits
 

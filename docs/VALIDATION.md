@@ -1186,6 +1186,46 @@ trigger contexts for all eight source slots. Default checks pass, including
 Their ROM hashes are unchanged. Combined T3 survival, T4 completion,
 save/resume, targeting and all 18 skirmish launch combinations pass as well.
 
+## T5 internal engine runtime (2026-10-23)
+
+The opt-in `SC64_T5_RUNTIME` stage loads the complete imported roster and
+binds the retained T5 program to its own source-player contexts, switches,
+queries and world effects. It is separate from the playable campaign catalog.
+`make test-sc64-t5-engine test-sc64-t5-world test-sc64-t5-combat` passes with
+ASan/UBSan and `-Werror`. Direct-state fixtures cover all 168 placements,
+the initial human grant and region-gated enemy grant, Kerrigan rescue and the
+rebel-base scripted sequence, source building-based victory, defeat predicates,
+atomic rejection of unsupported T5 saves, paid AI production and rescue policy,
+and actual hero/mine combat. These fixtures do not establish controller
+completion or full mission balance.
+
+The 4 MiB internal auto-entry ARM probe has ROM SHA-256
+`3c747e68fbde8237439a5a7a1cf4d228e9ccdacbe2a7abbfe9e1b6e6c2f57e5f`
+and ELF SHA-256
+`d1ea2951ee8c380b806231b117609377a09807311410772b15fce152719ff54a`.
+Run `make sc64-t5-engine-probe`, then
+`python3 tools/sc64_t5_engine_probe.py --ticks 3000`.
+A 3,000-tick neutral-input mGBA run remains in play at every checkpoint with
+no trigger faults. It averages 28.19 effective fps, with 1,000-tick intervals
+of 27.72, 28.46 and 28.41 fps. This is an opening-area engine probe; it does
+not cover a completed campaign or a full battle. The ARM link has 2,231,124
+text bytes, 388 data bytes and 243,208 BSS bytes. IWRAM ends at `0x03004fe8`
+and BSS at `0x0203b790`; the unchanged reserve guards pass.
+
+Default build/tests (including 105 Python tests), unified build/tests, combined
+T3 survival/save/resume/target/HUD checks, T4 controller/save checks, all 18
+skirmish launch combinations and T5 import/scenario checks pass. The playable
+combined T1–T4 ROM remains byte-identical with SHA-256 `d867886700a4c0a7351165f135ab720f37a6442327d529074775f4ac29d45077`.
+The Git source audit passes. No imported assets, binaries, captures, source
+scenario records or saves are indexed.
+
+T5 remains gated pending persistence and ordinary-controller completion.
+Opaque AI scripts are explicit authored substitutes. Cloak, mine detection
+and animation fidelity, unique hero art, THG2 sprite decorations and full
+source movement/sight policies remain incomplete. Mine damage and movement
+retain the documented integer and 30 Hz approximations. Physical GBA
+validation and near-30-fps full-campaign performance remain outstanding.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

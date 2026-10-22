@@ -315,6 +315,44 @@ make test-sc64-t5-import test-sc64-t5-scenario \
   test-sc64-t5-actor-rules test-sc64-resource-actions
 ```
 
+`make test-sc64-t5-actors test-sc64-t5-ai` also runs asset-free sanitizer
+checks for distinct Kerrigan, Raynor Vulture and Spider Mine actor rules,
+source bounding boxes, weapon upgrades, and the opaque AI-script dispatch
+boundary. Dispatch records accepted requests; it does not execute the original
+script bodies. The mine remains excluded from ordinary weapon targeting.
+
+### Internal T5 runtime probe
+
+The separate internal runtime profile now binds the retained trigger program
+to the engine. With both T4 and T5 private scenario headers prepared, run:
+
+```sh
+make test-sc64-t5-engine test-sc64-t5-world test-sc64-t5-combat
+make sc64-t5-engine-probe
+python3 tools/sc64_t5_engine_probe.py --ticks 3000
+```
+
+The first command runs sanitizer fixtures against the real engine. They use
+direct world setup to check the full roster, region-gated enemy resource
+grant, rescue conversion, mine and hero combat, and mission outcome rules.
+They do not demonstrate ordinary-controller completion.
+
+The probe ROM automatically enters global mission 8 for a bounded neutral-input
+ARM run. Its catalog entry stays unavailable, and active T5 saves are refused
+until a complete persistence format is implemented. The probe uses a separate
+generation-12 save identity; the normal T1–T4 build keeps generation 11.
+Reports and captures remain under ignored local output directories.
+
+Opaque AI scripts use explicit GBA policies: rescue conversion, passive guards,
+clear-combat orders, paid production and small periodic attack groups. Hero
+art reuses existing Ghost/Vulture frames. Cloaking, full mine visibility and
+animation timing, THG2 sprite decorations, and original AI bytecode are still
+absent. The mine's
+source-based targeting and splash retain documented integer/timing/movement
+approximations; ordinary hero movement and sight still use the compact engine
+policies. T5 is an internal development stage; the playable mission count
+remains 10 of 30.
+
 The T5 checks cover retained rows, metadata and digests, bounded source actor
 rules, and isolated SetResources arithmetic. The actor facts do not establish
 cloak or mine-arming behavior, and the resource helper intentionally does not

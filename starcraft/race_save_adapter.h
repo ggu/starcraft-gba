@@ -187,6 +187,9 @@ static int sc64_race_storage_geometry_valid(int width, int height) {
 #endif
 }
 static int race_save_game(void) {
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active()) return 0;
+#endif
 #ifdef SC64_T4_RUNTIME
     /* T4 props with intrinsic invincibility have 100000 source HP. Their
      * health words use canonical zero encoding instead of truncating to s16. */
@@ -279,6 +282,11 @@ static int race_load_game(void) {
 #endif
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
     const int *v=race_data.state;
+#ifdef SC64_T5_RUNTIME
+    /* The internal T5 stage has no persisted AI/trigger schema yet. Reject
+     * it before mutating any live state. Its catalog entry remains gated. */
+    if (!v[0] && v[2] == SC64_T5_GLOBAL_ID) return 0;
+#endif
     if(v[0]<0||v[0]>1||v[1]<0||v[1]>2||v[2]<0||v[2]>=SC64_RACE_MAP_COUNT||v[4]<1||v[4]>3||
        v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||v[16]<0||v[16]>4)return 0;
 #ifdef SC64_CAMPAIGN_RACE

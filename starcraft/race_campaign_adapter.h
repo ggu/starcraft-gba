@@ -35,6 +35,14 @@ enum {
 static int
 race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 {
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active()) {
+        if (raw_owner == SC64_T5_SOURCE_HUMAN) return SIDE;
+        if (raw_owner == SC64_T5_SOURCE_ENEMY) return ENEMY;
+        if (raw_owner == SC64_T5_SOURCE_RESCUE) return RESCUABLE;
+        return NEUTRAL;
+    }
+#endif
 #ifdef SC64_T4_RUNTIME
     if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID)
         return sc64_t4_runtime_owner(raw_owner);
@@ -231,6 +239,9 @@ race_campaign_init(void)
 #ifdef SC64_T4_SCENARIO_RUNTIME
     memset(&race_t4, 0, sizeof(race_t4));
 #endif
+#ifdef SC64_T5_RUNTIME
+    memset(&race_t5, 0, sizeof(race_t5));
+#endif
     if (race_mode) {
         race_skirmish_init();
         return;
@@ -248,6 +259,9 @@ race_campaign_init(void)
          /* Internal world-loading probe. The frontend catalog remains gated
           * until the scenario has a complete ordinary-controller proof. */
          && race_selected_mission != SC64_T4_GLOBAL_ID
+#endif
+#ifdef SC64_T5_RUNTIME
+         && race_selected_mission != SC64_T5_GLOBAL_ID
 #endif
          ) || !sc64_race_maps[race_selected_mission].width)
         race_selected_mission = sc64_frontend_first_mission(
@@ -307,6 +321,9 @@ race_campaign_init(void)
         if (race_selected_mission == SC64_T4_GLOBAL_ID)
             owner = race_campaign_owner(map, i);
 #endif
+#ifdef SC64_T5_RUNTIME
+        if (race_t5_active()) owner = race_campaign_owner(map, i);
+#endif
 #ifdef SC64_P3_RUNTIME
         if (race_selected_mission == SC64_P3_GLOBAL_ID)
             owner = race_campaign_owner(map, i);
@@ -342,9 +359,18 @@ race_campaign_init(void)
         if (src->owner == human_owner) owner = SIDE;
 #ifdef SC64_UNIFIED
         /* Terran Raynor starts neutral and joins on contact, as in the existing adapter. */
-        if(race_selected_mission>=SC64_RACE_MISSION_T1&&raw==19)owner=NEUTRAL;
+        if(race_selected_mission>=SC64_RACE_MISSION_T1&&raw==19
+#ifdef SC64_T5_RUNTIME
+           && !race_t5_active()
+#endif
+           )owner=NEUTRAL;
 #endif
         type = sc64_race_unit_from_raw(raw);
+#ifdef SC64_T5_RUNTIME
+        /* Earlier adapters use the established Raynor actor. Raw 19 gains
+         * its distinct Vulture rules only in the T5 scenario. */
+        if (raw == 19 && !race_t5_active()) type = U_RAYNOR;
+#endif
         if (type >= 0) {
             slot = spawn_unit(owner, type, x, y);
             if (slot < 0) continue;
@@ -381,6 +407,9 @@ race_campaign_init(void)
     }
 
     switch (race_selected_mission) {
+#ifdef SC64_T5_RUNTIME
+    case SC64_T5_GLOBAL_ID: minerals = gas = 0; break;
+#endif
 #ifdef SC64_T4_RUNTIME
     case SC64_T4_GLOBAL_ID: minerals = gas = 0; break;
 #endif
@@ -427,6 +456,9 @@ race_campaign_init(void)
     race_campaign_assign_mining();
 #ifdef SC64_T4_SCENARIO_RUNTIME
     if (race_t4_active() && !race_t4_init()) screen = SCREEN_PAUSE;
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active() && !race_t5_init()) screen = SCREEN_PAUSE;
 #endif
     if (race_selected_mission == SC64_RACE_MISSION_Z1)
         race_campaign_set_message(1);
@@ -525,6 +557,14 @@ race_campaign_tick(void)
         race_campaign.phase == SC64_RACE_PHASE_FAILED) return;
     if (race_campaign.message_ticks) --race_campaign.message_ticks;
     ++race_campaign.elapsed_frames;
+#ifdef SC64_T5_RUNTIME
+    if (mission == SC64_T5_GLOBAL_ID) {
+        race_t5_world_tick();
+        race_t5_mines_tick();
+        if (!race_t5_tick()) screen = SCREEN_PAUSE;
+        return;
+    }
+#endif
 #ifdef SC64_T4_RUNTIME
     if (mission == SC64_T4_GLOBAL_ID) {
 #if defined(SC64_DIAGNOSTIC_UPDATE) && defined(SC64_T4_SCENARIO_RUNTIME)
@@ -721,6 +761,10 @@ static int race_campaign_lost(void)
 static const char *
 race_campaign_objective_text(void)
 {
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active())
+        return "Reach the rebel base and destroy Confederate buildings. Kerrigan and Raynor must survive.";
+#endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
     if (race_t4_active()) return "Find the data disks. Raynor must survive.";
 #endif
@@ -756,6 +800,9 @@ race_campaign_objective_text(void)
 static const char *
 race_campaign_victory_text(void)
 {
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active()) return "ANTIGAN REVOLT COMPLETE";
+#endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
     if (race_t4_active()) return "JACOBS DATA RECOVERED";
 #endif
@@ -787,6 +834,9 @@ race_campaign_victory_text(void)
 static const char *
 race_campaign_message_text(void)
 {
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active()) return race_campaign_objective_text();
+#endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
     if (race_t4_active()) return (race_t4.switches.bits[0] & 16) ?
         "Data located. Keep Raynor alive until the mission report." :

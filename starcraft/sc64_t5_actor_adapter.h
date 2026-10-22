@@ -82,5 +82,23 @@ static inline int sc64_t5_concussive_hp_damage(int raw_target, int damage,
     return sc64_race_t4_ghost_hp_damage(raw_target, damage, armor);
 }
 
+/* Integer GBA policy for Explosive damage after shield absorption: subtract
+ * armor, then Small 1/2, Medium 3/4, Large full, minimum one integer HP.
+ * BW retains fractional HP; this bounded representation rounds down. */
+static inline int sc64_t5_explosive_hp_damage(int raw_target, int damage,
+                                               int armor)
+{
+    if (damage < 0) damage = 0;
+    if (damage > 100000) damage = 100000;
+    if (armor < 0) armor = 0;
+    if (armor > 100000) armor = 100000;
+    damage -= armor;
+    if (damage < 1) return 1;
+    int size = sc64_race_t4_source_size(raw_target);
+    if (size == SC64_T4_SIZE_SMALL) damage /= 2;
+    else if (size == SC64_T4_SIZE_MEDIUM) damage = damage * 3 / 4;
+    return damage < 1 ? 1 : damage;
+}
+
 #endif /* SC64_T5_RUNTIME */
 #endif

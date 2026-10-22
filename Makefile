@@ -34,6 +34,7 @@ T4_SCENARIO_FLAGS := $(T4_STORAGE_FLAGS) -DSC64_T4_SCENARIO_RUNTIME
 T4_RUNTIME_FLAGS := $(T4_SCENARIO_FLAGS) $(T4_OPTIMIZATION_FLAGS)
 T4_REPLAY_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T4_REPLAY_ENTRY
 T4_COMBINED_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T3_ENABLED -DSC64_T4_CAMPAIGN_ENTRY
+T5_PROBE_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T3_ENABLED -DSC64_T5_ENABLED -DSC64_T5_RUNTIME
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
 T4_SCENARIO_RECORDS := .local/sc64/races/generated/t4/records
 T5_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t5_scenario_generated.h
@@ -318,6 +319,47 @@ test-sc64-resource-actions: build/test-sc64-resource-actions
 	./build/test-sc64-resource-actions
 build/test-sc64-t5-actor-rules: tests/sc64_t5_actor_rules.c starcraft/sc64_t5_actor_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-t5-actor-engine: tests/sc64_t5_actor_engine.c starcraft/race_rules.h starcraft/sc64_t5_actor_adapter.h starcraft/sc64_t5_actor_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DSC64_T4_RUNTIME -DSC64_T5_RUNTIME $< -o $@
+.PHONY: test-sc64-t5-actors
+test-sc64-t5-actors: build/test-sc64-t5-actor-rules build/test-sc64-t5-actor-engine
+	./build/test-sc64-t5-actor-rules
+	./build/test-sc64-t5-actor-engine
+test-starcraft: test-sc64-t5-actors
+build/test-sc64-t5-ai: tests/sc64_t5_ai.c starcraft/sc64_t5_ai.h starcraft/sc64_t4_triggers.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-t5-ai
+test-sc64-t5-ai: build/test-sc64-t5-ai
+	./build/test-sc64-t5-ai
+test-starcraft: test-sc64-t5-ai
+build/test-sc64-t5-world: tests/sc64_t5_world.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-t5-mines: tests/sc64_t5_mines.c starcraft/sc64_t5_mine_adapter.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-t5-world test-sc64-t5-mines
+test-sc64-t5-world: build/test-sc64-t5-world
+	./build/test-sc64-t5-world
+test-sc64-t5-mines: build/test-sc64-t5-mines
+	./build/test-sc64-t5-mines
+test-starcraft: test-sc64-t5-mines
+build/test-sc64-t5-engine: tests/sc64_t5_engine.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-t5-engine
+test-sc64-t5-engine: build/test-sc64-t5-engine
+	./build/test-sc64-t5-engine
+build/test-sc64-t5-combat: tests/sc64_t5_combat.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-t5-combat
+test-sc64-t5-combat: build/test-sc64-t5-combat
+	./build/test-sc64-t5-combat
+build/starcraft-t5-engine-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(T5_PROBE_FLAGS) -DSC64_T5_PROBE_ENTRY $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-t5-engine-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-T5-Engine-Probe.gba: build/starcraft-t5-engine-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC T5 PROBE' SCT5
+.PHONY: sc64-t5-engine-probe
+sc64-t5-engine-probe: build/StarCraft-T5-Engine-Probe.gba
 .PHONY: test-sc64-t5-actor-rules
 test-sc64-t5-actor-rules: build/test-sc64-t5-actor-rules
 	./build/test-sc64-t5-actor-rules

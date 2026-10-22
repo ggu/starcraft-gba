@@ -25,6 +25,13 @@ int memcmp(const void *a, const void *b, size_t n);
 #if defined(SC64_T4_SCENARIO_RUNTIME) && !defined(SC64_T4_RUNTIME)
 #error "SC64_T4_SCENARIO_RUNTIME requires the T4 actor/world profile"
 #endif
+#if defined(SC64_T5_RUNTIME) && \
+    (!defined(SC64_T5_ENABLED) || !defined(SC64_T4_SCENARIO_RUNTIME))
+#error "SC64_T5_RUNTIME requires T5 data and the shared T4 trigger core"
+#endif
+#if defined(SC64_T5_PROBE_ENTRY) && !defined(SC64_T5_RUNTIME)
+#error "The internal T5 probe entry requires its runtime"
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME) && \
     (!defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 0)
 #error "Combined T3/T4 runtime is an experimental unified Terran profile"
@@ -36,7 +43,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+#if defined(SC64_T5_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 12u
+#elif defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 11u
 #elif defined(SC64_T4_SCENARIO_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 10u
@@ -233,6 +242,11 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #include "sc64_t4_runtime.h"
 #include "sc64_t4_scenario_generated.h"
+#ifdef SC64_T5_RUNTIME
+#include "sc64_t5_runtime.h"
+#include "sc64_t5_actor_adapter.h"
+#include "sc64_t5_scenario_generated.h"
+#endif
 #endif
 #ifndef SC64_T4_GLOBAL_ID7
 #define SC64_T4_GLOBAL_ID7 7
@@ -438,6 +452,14 @@ static int race_t4_init(void), race_t4_tick(void);
 static void race_t4_traps_tick(void);
 static int race_t4_create_action(const Sc64T4Action *action, unsigned owner);
 static int race_t4_doodad_action(const Sc64T4Action *action, unsigned owner);
+#endif
+#ifdef SC64_T5_RUNTIME
+static Sc64T5RuntimeState race_t5;
+static int race_t5_active(void)
+{ return !race_mode && race_selected_mission == SC64_T5_GLOBAL_ID; }
+static int race_t5_init(void), race_t5_tick(void);
+static void race_t5_world_tick(void);
+static void race_t5_mines_tick(void);
 #endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 static Sc64T3State race_t3;
@@ -1608,20 +1630,37 @@ hit_target(int target, int damage, int source_type, int source_owner)
 	tx = u[target].x;
 	ty = u[target].y;
 #ifdef SC64_T4_RUNTIME
-        if (source_type == U_GHOST) {
+        if (source_type == U_GHOST
+#ifdef SC64_T5_RUNTIME
+            || source_type == U_KERRIGAN || source_type == U_RAYNOR_VULTURE
+#endif
+            ) {
             int armor = u[target].armor +
                 (u[target].owner == SIDE ? armor_level : 0);
             int raw = u[target].raw_type >= 0 ? u[target].raw_type :
                       sc64_race_raw_unit(u[target].type);
             damage = sc64_race_t4_ghost_hp_damage(raw, damage, armor);
-        } else
+        }
+#ifdef SC64_T5_RUNTIME
+        else if (source_type == U_SPIDER_MINE) {
+            int raw = u[target].raw_type >= 0 ? u[target].raw_type :
+                      sc64_race_raw_unit(u[target].type);
+            damage = sc64_t5_explosive_hp_damage(raw, damage,
+                     u[target].armor + (u[target].owner == SIDE ? armor_level : 0));
+        }
+#endif
+        else
 #endif
 	damage -= u[target].armor + (u[target].owner == SIDE ? armor_level : 0);
 #ifndef SC64_T4_RUNTIME
 	if (damage < 1)
 	    damage = 1;
 #else
+#ifdef SC64_T5_RUNTIME
+        if (damage < 1) damage = 1;
+#else
         if (source_type != U_GHOST && damage < 1) damage = 1;
+#endif
 #endif
 	u[target].hp -= damage;
 	if (u[target].hp <= 0) {
@@ -1646,7 +1685,11 @@ hit_target(int target, int damage, int source_type, int source_owner)
 	ty = q->y;
 	#ifdef SC64_RACES
 #ifdef SC64_T4_RUNTIME
-    if (source_type == U_GHOST) {
+    if (source_type == U_GHOST
+#ifdef SC64_T5_RUNTIME
+        || source_type == U_KERRIGAN || source_type == U_RAYNOR_VULTURE
+#endif
+        ) {
         int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_building(q->type);
         damage = sc64_race_t4_ghost_hp_damage(raw, damage,
             sc64_race_building_armor(q->type));
@@ -2245,6 +2288,12 @@ game_init(void)
         frame = 0;
     }
 #endif
+#ifdef SC64_T5_PROBE_ENTRY
+    /* Internal engine/performance probe only. Ordinary campaign selection
+     * still uses the gated public catalog. */
+    race_selected_mission = SC64_T5_GLOBAL_ID;
+    init_state();
+#endif
 }
 
 static int
@@ -2835,6 +2884,11 @@ tick_combat(Unit * q, int target)
     else
 #endif
         damage=sc64_race_unit_damage_vs(q->type,flying)+(q->owner==SIDE?weapons_level:0);
+#ifdef SC64_T5_RUNTIME
+    if (q->type == U_KERRIGAN || q->type == U_RAYNOR_VULTURE)
+        damage = sc64_t5_actor_weapon_damage(q->type,
+                     q->owner == SIDE ? weapons_level : 0, flying);
+#endif
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
     #ifndef SC64_RACES
@@ -2942,6 +2996,11 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
+	#ifdef SC64_T5_RUNTIME
+        /* Preplaced mines own their arm/acquire/chase state. The ordinary
+         * actor loop must not clear their target or consume their timer. */
+        if (q->type == U_SPIDER_MINE) continue;
+	#endif
 	#ifdef SC64_T4_RUNTIME
         if (sc64_race_t4_actor_flags(q->type) &&
             !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_MOVABLE)) {
@@ -3851,9 +3910,20 @@ draw_unit(Unit * q)
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
 	return;
 #ifdef SC64_HAS_SPRITES
+#ifdef SC64_T5_RUNTIME
+    /* This probe reuses the verified Ghost/Vulture sprite frames for their
+     * hero variants; unique hero art is not present in the current bank. */
+    int sprite_raw = q->raw_type;
+    if (q->type == U_KERRIGAN) sprite_raw = 1;
+    if (q->type == U_RAYNOR_VULTURE) sprite_raw = 2;
+#endif
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
+#ifdef SC64_T5_RUNTIME
+        sprite_raw>=0?sc64_race_unit_sprite(sprite_raw):
+#else
         q->raw_type>=0?sc64_race_unit_sprite(q->raw_type):
+#endif
 #endif
         mission_unit_sprite(q->type);
     int sprite_x = sprite ? x - sprite->canvas_w / 2 + sprite->offset_x : x - 4;
@@ -5205,6 +5275,11 @@ game_self_test(void)
 #include "sc64_t4_scenario_adapter.h"
 #include "sc64_t4_trap_adapter.h"
 #endif
+#endif
+#ifdef SC64_T5_RUNTIME
+#include "sc64_t5_world_adapter.h"
+#include "sc64_t5_mine_adapter.h"
+#include "sc64_t5_scenario_adapter.h"
 #endif
 #include "race_campaign_adapter.h"
 #include "race_save_adapter.h"
