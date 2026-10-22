@@ -175,34 +175,29 @@ python3 tools/sc64_p3_controller_replay.py --trace .local/sc64/p3-controller-asa
 The helper supports frozen `--rom`/`--elf` paths, separate `--output` folders,
 and bounded `--ticks` prefixes with optional normal-control `--save-at-end`.
 It verifies the final quest model, completion bit, roster and global wallets.
-The complete ARM input replay reached mission clear at the same frame and its
-retained final state passes the corrected quest, roster and wallet checks.
-The original report verifier confused Gateway presence with Gateway count;
-that reporting error left no complete checkpoint history or exact full-run
-frame-rate aggregate. Future runs retain each checkpoint before verification.
-A fresh ARM process has also restored and continued a normal controller-created save. In that same
+The current default completes the full 152,107-tick ARM input replay at the
+same frame, with 154 retained observations and verified final quest, roster
+and wallet state. It averages 23.28 effective fps over 150,004 counted live
+frames; the worst observed interval is 17.72 fps. The final captured result
+matches the earlier baseline's RGB pixels. A fresh ARM process has also
+restored and continued a normal controller-created save. In that same
 saved scene, filtering defense candidates raised effective performance from
 19.72 to 28.92 fps with identical reported gameplay state and captured pixels.
 That is a bounded scene comparison, not a full-mission frame-rate result.
 The near-30-fps mission target and physical GBA validation remain unmet.
 
 P3 enables sorted defense candidate lists, a paged debugger input queue and
-clear-free live rendering after full-frame coverage checks. For an unoptimized
+clear-free live rendering after full-frame coverage checks, terrain reuse
+across small camera moves, exact drawable-object keys and visibility spans.
+For an unoptimized
 comparison build, use `make -B protoss-p3 P3_OPTIMIZATION_FLAGS=`; retain ROM/ELF
 pairs separately, then restore the default with `make -B protoss-p3`.
 
-Optional rendering experiments reuse the cached terrain when the camera moves,
-track only drawable static objects and use packed visibility spans:
-
-```sh
-make -B protoss-p3 P3_EXTRA_FLAGS='-DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS'
-```
-
-A 10,000-tick
-controller prefix improved from 21.53 to 23.39 effective fps, matching all 11
-reported gameplay checkpoints and the three captured screens. The full
-completion replay for this candidate is still being validated; these flags
-are not yet the default.
+The same 10,000-tick controller prefix improves from 21.53 to 23.39 effective
+fps with the current default, matching all 11 reported gameplay checkpoints
+and the three captured screens. The earlier baseline's final-report error is
+documented in [Validation](VALIDATION.md); it does not affect the current
+complete report.
 
 Jacobs Installation (Terran 4, global ID 7) has an import-only data stage.
 Regenerate the private race tables, then run its fixture:

@@ -643,6 +643,33 @@ the flags remain opt-in. Default build/tests (79 Python checks), unified
 build/tests and the full P3 suite with all three flags pass. The host policy
 still wins at frame 151,088. Default and unified ROM hashes are unchanged.
 
+## Higher Ground complete scroll/span replay (2026-10-23)
+
+The `d5ebd9cc03705546d9f6fba301991110d1d02daa9f1e6b539047cdec84877f67`
+candidate completed all 152,107 scheduler ticks and passed the final victory
+contract at game frame 151,088. Its durable report and JSONL history retain
+154 observations. The final model is fired 31, outcome 1, sequence 5 with no
+pending transmission or hold; all 38 hostile buildings are destroyed, and
+14 player units, 11 player buildings and seven Force 2 units remain. Global
+wallets are 44 minerals and 1,048 gas. The final result's RGB pixels match the
+earlier `9cc26916` baseline.
+
+The complete run averages 23.28 effective fps over 150,004 counted live frames;
+its worst observed interval is 17.72 fps. Initial HOME and result-transition
+intervals are excluded as specified by the report. The report validates its
+full checkpoint structure, but the old baseline has no complete history, so
+full-run checkpoint equality is not claimed. The shared opening prefix and
+the final contract/pixels supply the cross-build comparisons described above.
+The canonical default P3 rebuild matches the frozen candidate byte for byte.
+Terrain scrolling, drawable-object keys and visibility spans are now P3
+defaults. Near-30-fps mission performance and physical hardware proof remain
+outstanding.
+
+A separate RAM-composed minimap experiment matched 401 renderer fixtures,
+all 11 opening checkpoints and three RGB captures, but regressed the same
+10,000-tick prefix from 23.39 to 22.82 fps. Its last observed HUD time rose
+from 82,595 to 98,684 cycles. The experiment was removed rather than enabled.
+
 ## Jacobs Installation import stage (2026-10-23)
 
 The private race-map packer now imports T4 from the verified USA ROM using the
