@@ -27,7 +27,13 @@ static int
 sc64_terrain_cache_mission_key(void)
 {
 #ifdef SC64_RACES
-    return race_mode?100:race_selected_mission;
+    return race_mode?
+#ifdef SC64_IMPORTED_SKIRMISH
+        100+race_skirmish_map
+#else
+        100
+#endif
+        :race_selected_mission;
 #elif defined(SC64_TERRAN_CAMPAIGN)
     return campaign_mission;
 #else

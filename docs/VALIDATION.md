@@ -48,6 +48,38 @@ The optional unified host suite also passes. A real mGBA default-skirmish
 smoke run verifies controller input and SRAM saving, and the unified Wasteland
 1,000-tick opening profile runs through the corrected emulator launcher.
 
+## Race campaign stage 1 (2026-10-22)
+
+`./dev build`, `./dev test`, `make unified test-unified`, and
+`make race-campaigns test-race-campaigns` pass with the prepared local inputs.
+The asset-free suite includes the three fixed-race frontend variants and
+33 Python checks. The split-profile host tests launch every combination of
+two maps, three human races, and one to three opponents, round-trip those
+selections through SRAM, reject invalid records, and run 10,000 ticks of
+mining, construction, gas gathering, and AI production per profile.
+
+`tools/sc64_split_smoke.py --profile all` passed all 60 distinct ARM menu
+launches in mGBA: six campaign launches and 54 skirmishes. Separate emulator
+processes and copied save files exercise fresh SRAM loading. Reports and
+captures stay in unique ignored `build/emulator/` directories.
+
+Three controller-neutral, three-opponent runs of
+`tools/sc64_split_profile.py --ticks 10000` measured the following live-play
+rates using chained GBA hardware timers:
+
+| ROM profile | Map | Human race | Mean fps | Maximum live units observed |
+| --- | --- | --- | ---: | ---: |
+| Terran | Blood Bath | Terran | 29.53 | 50 |
+| Zerg | Blood Bath | Zerg | 29.58 | 42 |
+| Protoss | Outpost | Protoss | 29.38 | 45 |
+
+All 30,000 measured ticks remained on the play screen. These results cover
+those scenarios and populations; they do not establish full-pool or physical
+GBA performance. The three ROMs are 2 MiB each, and the linked campaign tile
+tables contain only the selected race's two missions. All 30 mission slots
+have stable catalog IDs, but only the original six missions are playable in
+this stage. See [race campaign builds](RACE-CAMPAIGNS.md).
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

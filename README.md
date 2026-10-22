@@ -41,6 +41,12 @@ make test-unified
 
 The first preparation fetches the pinned `sc64-maps` extractor into ignored `references/`, so Git and network access are needed. ROMs, extracted data, generated headers, captures containing imported art, and saves stay in ignored local directories; do not commit or distribute them. Contributors can work on the default skirmish without this profile. See [the unified guide](docs/SC64-UNIFIED.md) and [development](docs/DEVELOPMENT.md) for details and troubleshooting.
 
+The [race campaign profiles](docs/RACE-CAMPAIGNS.md) build separate Terran,
+Zerg, and Protoss ROMs with shared map-select skirmishes, any human race, and
+one to three opponents with independently selected races. Each currently
+contains its first two campaign missions; the remaining 24 missions are planned
+for later stages and are unavailable in the menu.
+
 ## Contributing and provenance
 
 AI agents should start with [AGENTS.md](AGENTS.md), which maps the source,

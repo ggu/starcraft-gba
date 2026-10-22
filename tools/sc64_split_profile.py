@@ -1,0 +1,311 @@
+#!/usr/bin/env python3
+"""Measure a fixed neutral-input interval on one split StarCraft64 ROM.
+
+The run is driven through the normal title UI, then the debugger installs one
+tick-zero neutral controller event. GBA timer deltas and game snapshots are
+read only at the scheduler's bounded checkpoints.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import socket
+import struct
+import subprocess
+import sys
+import time
+
+TOOLS = Path(__file__).resolve().parent
+if str(TOOLS) not in sys.path:
+    sys.path.insert(0, str(TOOLS))
+
+import sc64_menu_smoke as menu
+import sc64_races_profile as races
+import sc64_split_smoke as split
+from emulator_smoke import ROOT, capture, symbol_sizes, symbols
+
+CPU_HZ = 16_777_216
+SCREEN_PLAY = 1
+SCREEN_RESULT = 3
+PROFILE_CYCLE_NAMES = (
+    "demo_update_cycles", "gfx_draw_cycles", "sc64_orders_cycles",
+    "sc64_sight_cycles", "sc64_other_cycles", "sc64_map_cycles",
+    "sc64_hud_cycles", "sc64_background_cycles", "sc64_building_cycles",
+    "sc64_unit_draw_cycles",
+)
+REFINERY_TYPES = {3: "terran_refinery", 17: "protoss_assimilator", 20: "zerg_extractor"}
+
+
+def hardware_clock(rsp) -> int:
+    """Read the 32-bit chained GBA timer used by gba_clock()."""
+    timer = rsp.read(0x04000108, 8)
+    return int.from_bytes(timer[:2], "little") | (int.from_bytes(timer[4:6], "little") << 16)
+
+
+def check_debugger_port_free() -> None:
+    guard = socket.socket()
+    try:
+        guard.bind(("127.0.0.1", 2345))
+    except OSError as exc:
+        raise RuntimeError("mGBA debugger port 2345 is already in use; leaving the existing emulator untouched") from exc
+    finally:
+        guard.close()
+
+
+def u32(rsp, address: int) -> int:
+    return int.from_bytes(rsp.read(address, 4), "little")
+
+
+def observe(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict) -> dict:
+    units = races.read_entities(rsp, sym["u"], bank["unit_capacity"],
+                                bank["unit_stride_bytes"], bank["unit_offsets"])
+    buildings = races.read_entities(rsp, sym["b"], bank["building_capacity"],
+                                    bank["building_stride_bytes"], bank["building_offsets"],
+                                    building=True)
+    state = {name: u32(rsp, sym[name]) for name in
+             ("screen", "frame", "won", "lost", "race_mode", "race_human", "race_bots",
+              "race_skirmish_map", "race_cols", "race_rows", "minerals", "gas") if name in sym}
+    state["units"] = units
+    state["buildings"] = buildings
+    refinery_counts: dict[str, int] = {}
+    for building in buildings["entities"]:
+        refinery_name = REFINERY_TYPES.get(building["type"])
+        if refinery_name:
+            owner = str(building["owner"])
+            refinery_counts[owner] = refinery_counts.get(owner, 0) + 1
+    state["refineries_by_owner"] = refinery_counts
+    for name in ("race_minerals", "race_gas"):
+        if name in sym:
+            size = sizes.get(name, 0)
+            if size and size % 4 == 0:
+                state[name] = list(struct.unpack("<" + "i" * (size // 4), rsp.read(sym[name], size)))
+    return state
+
+
+def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
+        checkpoint: int, output: Path) -> dict:
+    if ticks < 1:
+        raise ValueError("ticks must be positive")
+    # The target's main loop checkpoints at every 1000 ticks and at the exact
+    # requested endpoint; keep the CLI explicit if that schedule changes.
+    if checkpoint != 1000:
+        raise ValueError("this ROM scheduler checkpoints at fixed 1000-tick intervals")
+    if ticks > 0xFFFFFFFF:
+        raise ValueError("ticks exceeds the 32-bit controller scheduler length")
+
+    rom = ROOT / "build" / f"StarCraft-{profile.capitalize()}-GBA.gba"
+    elf = ROOT / "build" / f"starcraft-{profile}.elf"
+    if not rom.is_file() or not elf.is_file():
+        raise RuntimeError(f"{profile}: build both ROM and ELF first ({rom}, {elf})")
+    # The split UI helpers inspect the appended Sc64Frontend fields through
+    # DWARF offsets. Populate their shared offset table before starting UI.
+    split.FRONT_FIELDS = split.frontend_offsets(elf)
+    sym, sizes = symbols(elf), symbol_sizes(elf)
+    bank = races.race_bank_profile(elf, sizes)
+    required = (
+        "game_update", "demo_schedule_events", "demo_schedule_count", "demo_schedule_length",
+        "demo_schedule_tick", "demo_replay_checkpoint", "demo_tick_buckets", "demo_last_cycles",
+        "demo_peak_cycles", "u", "b", "screen", "frame", "won", "lost", "race_mode",
+        "race_human", "race_bots", "race_skirmish_map", "race_cols", "race_rows",
+        "race_bot_races", "race_minerals", "race_gas", "minerals", "gas",
+    )
+    missing = [name for name in required if name not in sym]
+    if missing:
+        raise RuntimeError(f"{profile}: ELF is missing symbols: {', '.join(missing)}")
+    capacity = sizes.get("demo_schedule_events", 0) // 8
+    if capacity < 1:
+        raise RuntimeError("controller event queue has no capacity")
+
+    out = output / f"{profile}-map{map_id}-race{race}-bots{bots}-{time.time_ns()}"
+    out.mkdir(parents=True, exist_ok=False)
+    label = out.name
+    check_debugger_port_free()
+    proc = sock = rsp = log = None
+    try:
+        proc, sock, rsp, log = split.start_emulator(label, rom, out, sym)
+        launch = split.press_start(rsp, sym, map_id, race, bots)
+        launch_state = split.state(rsp, sym)
+        if launch_state["screen"] != SCREEN_PLAY:
+            raise RuntimeError(f"skirmish did not enter live play: {launch_state}")
+
+        # main.c has already sampled schedule_count==0 for the current
+        # game_update iteration. It finishes normally, then sees this queue
+        # at the next loop's tick zero and stops at the no-op observer.
+        neutral_event = struct.pack("<2I", 0, 0)
+        rsp.write(sym["demo_schedule_events"], neutral_event)
+        rsp.write(sym["demo_schedule_length"], struct.pack("<I", ticks))
+        rsp.write(sym["demo_schedule_count"], struct.pack("<I", 1))
+        update = sym["game_update"] & ~1
+        checkpoint_addr = sym["demo_replay_checkpoint"] & ~1
+        if rsp.cmd(f"z1,{update:x},2") != "OK":
+            raise RuntimeError("failed to remove game_update breakpoint")
+        if rsp.cmd(f"Z1,{checkpoint_addr:x},2") != "OK":
+            raise RuntimeError("failed to install observer checkpoint breakpoint")
+        rsp.tick()
+        if u32(rsp, sym["demo_schedule_tick"]) != 0:
+            raise RuntimeError("scheduler did not stop at neutral tick zero")
+
+        last_tick = 0
+        last_clock = hardware_clock(rsp)
+        prior_buckets = struct.unpack("<8I", rsp.read(sym["demo_tick_buckets"], 32))
+        prior_routes = {key: u32(rsp, sym[key]) for key in ("sc64_route_hits", "sc64_route_builds")
+                        if key in sym}
+        observations = []
+        total_play_cycles = 0
+        counted_play_ticks = 0
+
+        def record_checkpoint(tick: int, interval_cycles: int,
+                              before_buckets: tuple[int, ...], before_routes: dict[str, int]) -> dict:
+            buckets = struct.unpack("<8I", rsp.read(sym["demo_tick_buckets"], 32))
+            state = observe(rsp, sym, sizes, bank)
+            current_routes = {key: u32(rsp, sym[key]) for key in before_routes}
+            cycles = ({key: u32(rsp, sym[key]) for key in PROFILE_CYCLE_NAMES if key in sym}
+                      if state["screen"] == SCREEN_PLAY else None)
+            interval_fps = (round(CPU_HZ * (tick - last_tick) / max(1, interval_cycles), 2)
+                            if state["screen"] == SCREEN_PLAY else None)
+            result = {
+                "tick": tick,
+                "interval_ticks": tick - last_tick,
+                "interval_cycles": interval_cycles,
+                "interval_effective_fps": interval_fps,
+                "hardware_frames_per_tick_histogram": [(a - b) & 0xFFFFFFFF
+                                                        for a, b in zip(buckets, before_buckets)],
+                "demo_last_cycles": (u32(rsp, sym["demo_last_cycles"])
+                                      if state["screen"] == SCREEN_PLAY else None),
+                "demo_peak_cycles_session": u32(rsp, sym["demo_peak_cycles"]),
+                "profile_cycles_last_tick": cycles,
+                "route_counters": current_routes,
+                "route_interval": {key: (current_routes[key] - before_routes[key]) & 0xFFFFFFFF
+                                   for key in current_routes},
+                **state,
+            }
+            return result
+
+        # Tick zero is a genuine PLAY snapshot and the baseline for all
+        # interval counters; it is excluded from the measured intervals.
+        zero = observe(rsp, sym, sizes, bank)
+        if zero["screen"] != SCREEN_PLAY:
+            raise RuntimeError(f"tick-zero observer is not on the live game screen: {zero['screen']}")
+        zero_capture = capture(rsp, out / "tick-000000.png")
+        peak_at_tick_zero = u32(rsp, sym["demo_peak_cycles"])
+        observations.append({"tick": 0, "interval_ticks": 0, "interval_cycles": 0,
+                             "hardware_frames_per_tick_histogram": [0] * 8,
+                             "route_counters": prior_routes,
+                             "capture": zero_capture, **zero})
+
+        ended_early = False
+        while last_tick < ticks:
+            rsp.tick()
+            completed = u32(rsp, sym["demo_schedule_tick"])
+            expected = min(ticks, last_tick + checkpoint)
+            if completed != expected:
+                raise RuntimeError(f"expected observer at tick {expected}, got {completed}")
+            now = hardware_clock(rsp)
+            elapsed = (now - last_clock) & 0xFFFFFFFF
+            record = record_checkpoint(completed, elapsed, prior_buckets, prior_routes)
+            record["demo_peak_cycles_new_high_since_tick_zero"] = (
+                record["demo_peak_cycles_session"] if record["screen"] == SCREEN_PLAY and
+                record["demo_peak_cycles_session"] > peak_at_tick_zero else None)
+            if record["screen"] not in (SCREEN_PLAY, SCREEN_RESULT):
+                raise RuntimeError(f"run left live play at tick {completed} (screen={record['screen']})")
+            if record["screen"] == SCREEN_PLAY:
+                total_play_cycles += elapsed
+                counted_play_ticks += completed - last_tick
+                record["counted_as_live_play"] = True
+                record["capture"] = capture(rsp, out / f"tick-{completed:06d}.png")
+            else:
+                record["counted_as_live_play"] = False
+                record["game_ended_by_tick"] = completed
+                ended_early = completed < ticks
+            observations.append(record)
+            print(f"{profile} map={map_id} race={race} bots={bots} tick={completed}/{ticks} "
+                  f"screen={record['screen']} frame={record.get('frame')} "
+                  f"interval-fps={record['interval_effective_fps'] if record['interval_effective_fps'] is not None else 'n/a'}",
+                  flush=True)
+            last_tick = completed
+            last_clock = now
+            prior_buckets = struct.unpack("<8I", rsp.read(sym["demo_tick_buckets"], 32))
+            prior_routes = record["route_counters"]
+            if ended_early or record["screen"] != SCREEN_PLAY:
+                break
+
+        result = {
+            "profile": profile,
+            "rom": str(rom), "elf": str(elf),
+            "rom_sha256": hashlib.sha256(rom.read_bytes()).hexdigest(),
+            "elf_sha256": hashlib.sha256(elf.read_bytes()).hexdigest(),
+            "configuration": {"map": map_id, "human_race": race, "opponents": bots,
+                              "bot_races": launch["bot_races"][:bots],
+                              "width": launch["width"], "height": launch["height"]},
+            "requested_ticks": ticks, "observed_ticks": last_tick,
+            "counted_live_play_ticks": counted_play_ticks,
+            "checkpoint_interval": checkpoint,
+            "tick_zero_peak_cycles_session_baseline": peak_at_tick_zero,
+            "mean_live_play_effective_fps": round(CPU_HZ * counted_play_ticks /
+                                                   max(1, total_play_cycles), 2),
+            "game_ended_early": ended_early,
+            "measurement_notes": [
+                "FPS uses GBA hardware timer deltas at observer checkpoints, not host wall time.",
+                "Only intervals ending on SCREEN_PLAY contribute to the live-play mean.",
+                "An interval ending on SCREEN_RESULT is excluded because its in-interval finish time is unknown.",
+                "demo_peak_cycles_session is lifetime-wide; its tick-zero value may include title-menu work.",
+            ],
+            "unit_bank": {key: bank[key] for key in
+                          ("unit_bank_bytes", "unit_capacity", "unit_stride_bytes", "unit_words", "unit_offsets")},
+            "building_bank": {key: bank[key] for key in
+                              ("building_bank_bytes", "building_capacity", "building_stride_bytes",
+                               "building_words", "building_offsets")},
+            "checkpoints": observations,
+        }
+        report = out / "profile.json"
+        report.write_text(json.dumps(result, indent=2) + "\n")
+        print(json.dumps({"profile": profile, "configuration": result["configuration"],
+                          "observed_ticks": last_tick,
+                          "mean_live_play_effective_fps": result["mean_live_play_effective_fps"],
+                          "result": str(report)}, indent=2))
+        return result
+    finally:
+        if proc is not None:
+            if sock is not None:
+                try:
+                    menu.stop_emulator(proc, sock, log)
+                    proc = None
+                except Exception:
+                    pass
+            if proc is not None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=3)
+                except Exception:
+                    proc.kill()
+                    proc.wait()
+                if log is not None and not log.closed:
+                    log.close()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--profile", choices=("terran", "zerg", "protoss"), default="terran")
+    parser.add_argument("--map", type=int, choices=range(2), default=0)
+    parser.add_argument("--race", type=int, choices=range(3), default=0,
+                        help="human race: 0 Terran, 1 Zerg, 2 Protoss")
+    parser.add_argument("--bots", type=int, choices=range(1, 4), default=1)
+    parser.add_argument("--ticks", type=int, default=10000)
+    parser.add_argument("--checkpoint", type=int, default=1000)
+    parser.add_argument("--out", type=Path, default=ROOT / "build/emulator/sc64-split-profile")
+    args = parser.parse_args()
+    if args.ticks < 1:
+        parser.error("--ticks must be positive")
+    if args.checkpoint != 1000:
+        parser.error("the current ROM observer checkpoints every 1000 ticks")
+    try:
+        run(args.profile, args.map, args.race, args.bots, args.ticks,
+            args.checkpoint, args.out)
+    except (OSError, RuntimeError, ValueError, AssertionError, subprocess.CalledProcessError) as exc:
+        parser.exit(1, f"sc64_split_profile: {exc}\n")
+
+
+if __name__ == "__main__":
+    main()

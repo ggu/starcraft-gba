@@ -33,7 +33,11 @@ static int race_save_game(void) {
     memcpy(race_data.minerals_map,m,sizeof(m));
     int state[]={race_mode,race_human,race_selected_mission,race_completed,race_bots,minerals,gas,
         frame,cx,cy,train_type,weapons_level,armor_level,weapons_research,armor_research,
-        (int)seed,geyser_count,mission_objective_stage,won,lost};
+        (int)seed,geyser_count,mission_objective_stage,won,lost
+#ifdef SC64_IMPORTED_SKIRMISH
+        ,race_skirmish_map,race_bot_races[0],race_bot_races[1],race_bot_races[2]
+#endif
+        };
     memcpy(race_data.state,state,sizeof(state));
     memcpy(race_data.players,race_player,sizeof(race_player));
     memcpy(race_data.ore,race_minerals,sizeof(race_minerals));
@@ -52,8 +56,17 @@ static int race_load_game(void) {
     const int *v=race_data.state;
     if(v[0]<0||v[0]>1||v[1]<0||v[1]>2||v[2]<0||v[2]>=SC64_RACE_MAP_COUNT||v[4]<1||v[4]>3||
        v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||v[16]<0||v[16]>4)return 0;
+#ifdef SC64_CAMPAIGN_RACE
+    if(!v[0]&&!sc64_catalog_mission_allowed(v[2],SC64_CAMPAIGN_RACE))return 0;
+#endif
     int width=v[0]?64:sc64_race_maps[v[2]].width;
     int height=v[0]?64:sc64_race_maps[v[2]].height;
+#ifdef SC64_IMPORTED_SKIRMISH
+    if(v[20]<0||v[20]>SC64_SKIRMISH_IMPORTED_COUNT)return 0;
+    for(int i=21;i<24;i++)if(v[i]<0||v[i]>2)return 0;
+    if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
+#endif
+    if(width<1||height<1||width>96||height>96)return 0;
     if(v[8]<0||v[8]>=width*16||v[9]<0||v[9]>=height*16||v[11]<0||v[11]>2||
        v[12]<0||v[12]>2||v[18]<0||v[18]>1||v[19]<0||v[19]>1)return 0;
     for(int i=0;i<5;i++)if(race_data.players[i]<-1||race_data.players[i]>2||
@@ -98,11 +111,15 @@ static int race_load_game(void) {
     for(int i=0;i<MAX_BUILDINGS;i++)if(race_data.invincible_buildings[i]>1)return 0;
 #endif
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];
+#ifdef SC64_IMPORTED_SKIRMISH
+    race_skirmish_map=v[20];for(int i=0;i<3;i++)race_bot_races[i]=v[21+i];
+#endif
     minerals=v[5];gas=v[6];frame=v[7];cx=v[8];cy=v[9];train_type=v[10];
     weapons_level=v[11];armor_level=v[12];weapons_research=v[13];armor_research=v[14];seed=(u32)v[15];
     geyser_count=v[16];mission_objective_stage=v[17];won=v[18];lost=v[19];
     race_cols=race_mode?64:sc64_race_maps[race_selected_mission].width;
     race_rows=race_mode?64:sc64_race_maps[race_selected_mission].height;
+    if(race_mode)race_skirmish_geometry();
     for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
         int n=j==offsetof(Unit,flags)/sizeof(int)?(u16)race_data.units[i][j]:race_data.units[i][j];
         memcpy((u8*)&u[i]+j*sizeof(int),&n,sizeof(n));

@@ -6,7 +6,13 @@ void *memset(void *dst, int value, size_t n);
 #define MAX_UNITS 128
 #define MAX_BUILDINGS 64
 #define MAX_MINERALS 32
-#ifdef SC64_UNIFIED
+#if defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 0
+#define SAVE_VERSION 0x53435432u
+#elif defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 1
+#define SAVE_VERSION 0x53435a32u
+#elif defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 2
+#define SAVE_VERSION 0x53435032u
+#elif defined(SC64_UNIFIED)
 #define SAVE_VERSION 0x53435531u
 #else
 #define SAVE_VERSION 0x53435231u
@@ -44,6 +50,11 @@ void *memset(void *dst, int value, size_t n);
 #ifdef SC64_RACES
 #include "sc64_races_generated.h"
 #include "sc64_frontend.h"
+#ifdef SC64_IMPORTED_SKIRMISH
+#include "sc64_skirmish_generated.h"
+_Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
+               "Skirmish menu and imported map pack disagree");
+#endif
 #endif
 #ifdef SC64_HAS_SPRITES
 #include "sc64_sprites_generated.h"
@@ -258,6 +269,8 @@ static int skirmish_bot_index(int owner);
 #endif
 #ifdef SC64_RACES
 static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race_bots=2;
+static int race_skirmish_map;
+static int race_bot_races[3]={R_ZERG,R_PROTOSS,R_TER};
 static Sc64Frontend race_front;
 static unsigned race_front_transition;
 static int race_front_load_error;
@@ -266,6 +279,8 @@ static void race_frontend_reset(void)
     int completed=-1;
     for(int i=0;i<SC64_RACE_MAP_COUNT;i++)if(race_completed&(1<<i))completed=i;
     sc64_frontend_reset(&race_front,race_selected_mission,race_human,race_bots,completed);
+    race_front.map=race_skirmish_map;
+    for(int i=0;i<3;i++)race_front.bot_races[i]=race_bot_races[i];
     race_front_transition=0;race_front_load_error=0;
 }
 static int race_player[5],race_minerals[5],race_gas[5];
@@ -277,6 +292,7 @@ static int race_site_powered(int owner,int x,int y);
 static int race_builder_arrived(int worker);
 static void race_tick_buildings(void),race_tick_state(void),race_tick_ai(void),race_tick_defenses(void);
 static void race_skirmish_init(void),race_skirmish_outcome(void);
+static void race_skirmish_geometry(void);
 static int race_owner_supply(int owner),race_owner_supply_cap(int owner),race_owner_reserved_supply(int owner);
 static void race_add_owner_resources(int owner,int ore,int vespene);
 static int race_save_game(void),race_load_game(void);
@@ -609,6 +625,9 @@ terrain_blocked(int col, int row)
 #ifdef SC64_RACES
     if(col<0||row<0||col>=MAP_COLS||row>=MAP_ROWS)return 1;
     if(!race_mode)return sc64_race_maps[race_selected_mission].blocked[col+row*MAP_COLS]!=0;
+#ifdef SC64_IMPORTED_SKIRMISH
+    if(race_skirmish_map>0)return sc64_skirmish_maps[race_skirmish_map-1].blocked[col+row*MAP_COLS]!=0;
+#endif
     return (col==31&&row>3&&row<60&&!(row>=14&&row<=18)&&!(row>=45&&row<=49))||
            (row==31&&col>3&&col<60&&!(col>=14&&col<=18)&&!(col>=45&&col<=49));
 #else
@@ -1627,12 +1646,16 @@ void
 game_init(void)
 {
 #ifdef SC64_RACES
-    race_mode=0;race_completed=0;race_bots=2;
-#ifdef SC64_UNIFIED
+    race_mode=0;race_completed=0;race_bots=2;race_skirmish_map=0;
+#ifdef SC64_CAMPAIGN_RACE
+    race_human=SC64_CAMPAIGN_RACE;
+    race_selected_mission=sc64_frontend_first_mission(SC64_CAMPAIGN_RACE);
+#elif defined(SC64_UNIFIED)
     race_human=R_TER;race_selected_mission=4;
 #else
     race_human=R_ZERG;race_selected_mission=0;
 #endif
+    for(int i=0;i<3;i++)race_bot_races[i]=(race_human+i+1)%3;
     race_frontend_reset();
 #endif
     reset_selection_gestures();
@@ -2860,6 +2883,8 @@ game_update(u16 held, u16 pressed)
             race_selected_mission=race_front.mission;
             race_human=race_mode?race_front.race:sc64_race_maps[race_selected_mission].owner_races[sc64_race_maps[race_selected_mission].human_slot];
             race_bots=race_front.bots;
+            race_skirmish_map=race_front.map;
+            for(int i=0;i<3;i++)race_bot_races[i]=race_front.bot_races[i];
             sc64_display_palette(sc64_palette+32);
             audio_tone(880,5,3);
             init_state();
@@ -2891,7 +2916,10 @@ game_update(u16 held, u16 pressed)
     if (screen == SCREEN_RESULT) {
 	if (pressed & KEY_A) {
 #ifdef SC64_RACES
-            if(won&&!race_mode&&!(race_selected_mission&1))race_selected_mission++;
+            if(won&&!race_mode){
+                int next=sc64_catalog_available_next(sc64_catalog_mission_faction(race_selected_mission),race_selected_mission);
+                if(next>=0)race_selected_mission=next;
+            }
 #endif
 #ifdef SC64_TERRAN_CAMPAIGN
             if (won && campaign_mission == 0) {
@@ -3504,7 +3532,13 @@ draw_map(void)
 #ifdef SC64_HAS_TERRAIN_ART
 	    gfx_blit16(x, y,
 #ifdef SC64_RACES
-                race_mode ? sc64_tile_pixels[0] : sc64_race_maps[race_selected_mission].tile_pixels[sc64_race_maps[race_selected_mission].tile_lookup[idx]]
+                race_mode ?
+#ifdef SC64_IMPORTED_SKIRMISH
+                    (race_skirmish_map>0?sc64_skirmish_maps[race_skirmish_map-1].tile_pixels[sc64_skirmish_maps[race_skirmish_map-1].tile_lookup[idx]]:sc64_tile_pixels[0])
+#else
+                    sc64_tile_pixels[0]
+#endif
+                    :sc64_race_maps[race_selected_mission].tile_pixels[sc64_race_maps[race_selected_mission].tile_lookup[idx]]
 #elif defined(SC64_TERRAN_CAMPAIGN)
                 sc64_campaign_maps[campaign_mission].pixels[
                   sc64_campaign_maps[campaign_mission].lookup[idx]]
@@ -3522,7 +3556,7 @@ draw_map(void)
             /* The compact arena has authored barriers; make collision visible. */
             if (
 #ifdef SC64_RACES
-                race_mode &&
+                race_mode && race_skirmish_map==0 &&
 #endif
                 terrain_blocked(col, row)) {
                 gfx_rect(x, y, 16, 16, C_STONE);
@@ -3731,7 +3765,7 @@ draw_result(void)
     gfx_text(53, 68, won ? "ZERG BASE ELIMINATED" : "COMMAND CENTER DESTROYED", C_WHITE);
 #endif
     #ifdef SC64_RACES
-    gfx_text(39,86,won&&!race_mode&&!(race_selected_mission&1)?"A NEXT MISSION B TITLE":"A RETRY B TITLE SCREEN",C_CYAN);
+    gfx_text(39,86,won&&!race_mode&&sc64_catalog_available_next(sc64_catalog_mission_faction(race_selected_mission),race_selected_mission)>=0?"A NEXT MISSION B TITLE":"A RETRY B TITLE SCREEN",C_CYAN);
 #else
     gfx_text(47, 86, "A RETRY    B TITLE SCREEN", C_CYAN);
 #endif

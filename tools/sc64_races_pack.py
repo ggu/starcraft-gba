@@ -156,6 +156,9 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
         # Terran campaign payload. Unified builds opt into both map datasets.
         if map_index == 4:
             lines.append('#ifdef SC64_UNIFIED\n')
+        campaign_race = 1 if map_index < 2 else 2 if map_index < 4 else 0
+        campaign_guard = f'!defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE == {campaign_race}'
+        lines.append(f'#if {campaign_guard}\n')
         unit_name = f'sc64_race_{name}_units'
         lines.append(f'static const Sc64ImportedUnit {unit_name}[{len(units)}] = {{\n')
         for unit in units:
@@ -170,9 +173,12 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
         lines.append(f'static const unsigned char sc64_race_{name}_tiles[{len(tiles)}][256] __attribute__((aligned(4))) = {{\n')
         lines.extend('{' + ','.join(map(str, tile)) + '},\n' for tile in tiles)
         lines.append('};\n')
+        lines.append('#endif /* selected campaign assets */\n')
         if map_index == 5:
             lines.append('#endif /* SC64_UNIFIED */\n')
-        descriptors.append(f'    {{{info.width}u,{info.height}u,{tileset}u,{human_slot}u,sc64_race_{name}_owner_modes,sc64_race_{name}_owner_races,{unit_name},{len(units)}u,sc64_race_{name}_tiles,{len(tiles)}u,sc64_race_{name}_lookup,sc64_race_{name}_blocked,"{info.name}","{mission_id}"}},\n')
+        descriptors.append(f'#if {campaign_guard}\n'
+            f'    {{{info.width}u,{info.height}u,{tileset}u,{human_slot}u,sc64_race_{name}_owner_modes,sc64_race_{name}_owner_races,{unit_name},{len(units)}u,sc64_race_{name}_tiles,{len(tiles)}u,sc64_race_{name}_lookup,sc64_race_{name}_blocked,"{info.name}","{mission_id}"}},\n'
+            '#else\n    {0}, /* campaign omitted from this cartridge */\n#endif\n')
         triggers = importer.trigger_rows(sections.get(b'TRIG', b''), sections.get(b'STR ', b''), x)
         objectives = [a.get('text') for tr in triggers for a in tr['actions'] if a['opcode'] == 12 and a.get('text')]
         reports.append({

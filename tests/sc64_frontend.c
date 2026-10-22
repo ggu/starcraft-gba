@@ -8,11 +8,17 @@ static int press(Sc64Frontend *f, unsigned key) {
     return action;
 }
 
+#ifndef SC64_CAMPAIGN_RACE
 static void test_reset_and_home(void) {
     Sc64Frontend f;
     sc64_frontend_reset(&f, 3, 8, 0, 99);
     assert(f.page == SC_FRONT_HOME && f.row == 0);
-    assert(f.mission == 3 && f.faction == SC_FRONT_PROTOSS);
+    assert(f.mission == 3 && f.faction ==
+#ifdef SC64_CAMPAIGN_RACE
+           SC_FRONT_TERRAN);
+#else
+           SC_FRONT_PROTOSS);
+#endif
     assert(f.race == SC_FRONT_RACE_PROTOSS && f.bots == 1 &&
 #ifdef SC64_UNIFIED
            f.completed == 5);
@@ -20,7 +26,11 @@ static void test_reset_and_home(void) {
            f.completed == 3);
 #endif
     assert(press(&f, KEY_A) == SC_FRONT_NONE);
+#ifdef SC64_CAMPAIGN_RACE
+    assert(f.page == SC_FRONT_MISSION && f.faction == SC_FRONT_TERRAN);
+#else
     assert(f.page == SC_FRONT_CAMPAIGN && f.faction == SC_FRONT_PROTOSS);
+#endif
     assert(press(&f, KEY_B) == SC_FRONT_NONE && f.page == SC_FRONT_HOME);
     assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 1);
     assert(press(&f, KEY_A) == SC_FRONT_NONE && f.page == SC_FRONT_SKIRMISH);
@@ -82,8 +92,28 @@ static void test_wrap_edges_and_ticks(void) {
     assert(press(&f, KEY_UP) == SC_FRONT_NONE && f.row == 1);
     assert(press(&f, KEY_UP) == SC_FRONT_NONE && f.row == 0);
 }
+#endif
 
-#ifdef SC64_UNIFIED
+static void test_campaign_catalog_contract(void) {
+    assert(SC64_BASE_MISSION_COUNT == 30);
+    assert(sc64_catalog_mission_faction(0) == SC64_FACTION_ZERG);
+    assert(sc64_catalog_mission_faction(1) == SC64_FACTION_ZERG);
+    assert(sc64_catalog_mission_faction(2) == SC64_FACTION_PROTOSS);
+    assert(sc64_catalog_mission_faction(3) == SC64_FACTION_PROTOSS);
+    assert(sc64_catalog_mission_faction(4) == SC64_FACTION_TERRAN);
+    assert(sc64_catalog_mission_faction(5) == SC64_FACTION_TERRAN);
+    assert(sc64_catalog_mission_at(SC64_FACTION_TERRAN, 2) == 6);
+    assert(sc64_catalog_mission_at(SC64_FACTION_ZERG, 2) == 14);
+    assert(sc64_catalog_mission_at(SC64_FACTION_PROTOSS, 2) == 22);
+    assert(sc64_catalog_mission_count(SC64_FACTION_TERRAN) == 10);
+    assert(sc64_catalog_is_playable(5) && !sc64_catalog_is_playable(6));
+    assert(sc64_catalog_mission_allowed(4, SC64_FACTION_TERRAN));
+    assert(!sc64_catalog_mission_allowed(4, SC64_FACTION_ZERG));
+    assert(sc64_catalog_available_next(SC64_FACTION_ZERG, 0) == 1);
+    assert(sc64_catalog_available_next(SC64_FACTION_ZERG, 1) == -1);
+}
+
+#if defined(SC64_UNIFIED) && !defined(SC64_CAMPAIGN_RACE)
 static void test_unified_campaign_mission_mapping(void) {
     Sc64Frontend f;
     const int expected_faction[6]={SC_FRONT_ZERG,SC_FRONT_ZERG,
@@ -118,7 +148,7 @@ static void test_unified_campaign_mission_mapping(void) {
     }
 
     /* Campaign rows are Terran, Zerg, Protoss, while IDs remain stable. */
-    sc64_frontend_reset(&f, 0, SC_FRONT_RACE_TERRAN, 1, -1);
+    sc64_frontend_reset(&f, 0, SC_FRONT_RACE_TERRAN, 3, -1);
     press(&f, KEY_A);
     assert(f.page==SC_FRONT_CAMPAIGN && f.row==1);
     press(&f, KEY_LEFT);
@@ -149,11 +179,56 @@ static void test_unified_skirmish_all_races(void) {
 #endif
 
 int main(void) {
+#ifdef SC64_CAMPAIGN_RACE
+    Sc64Frontend f;
+    const int profile_faction = SC64_CAMPAIGN_RACE == 0 ? SC_FRONT_TERRAN :
+                                SC64_CAMPAIGN_RACE == 1 ? SC_FRONT_ZERG : SC_FRONT_PROTOSS;
+    sc64_frontend_reset(&f, 0, SC_FRONT_RACE_TERRAN, 3, -1);
+    assert(f.faction == profile_faction);
+    assert(sc64_front_campaign_count() == 1);
+    assert(sc64_front_campaign_faction_at(0) == profile_faction);
+    assert(f.mission == sc64_frontend_first_mission(profile_faction));
+    assert(press(&f, KEY_A) == SC_FRONT_NONE && f.page == SC_FRONT_MISSION);
+    assert(f.faction == profile_faction);
+#ifdef SC64_IMPORTED_SKIRMISH
+    assert(press(&f, KEY_B) == SC_FRONT_NONE && f.page == SC_FRONT_CAMPAIGN);
+    assert(f.row == 0 && f.faction == profile_faction);
+#endif
+#ifdef SC64_IMPORTED_SKIRMISH
+    f.page = SC_FRONT_SKIRMISH; f.race = SC_FRONT_RACE_TERRAN; f.bots = 3; f.row = 0;
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.map == 1);
+    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 1);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.race == 1);
+    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 2);
+    assert(press(&f, KEY_LEFT) == SC_FRONT_NONE && f.bots == 2);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bots == 3);
+    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 3);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[0] == 2);
+    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 4);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[1] == 0);
+    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 5);
+    assert(press(&f, KEY_RIGHT) == SC_FRONT_NONE && f.bot_races[2] == 2);
+    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 6);
+    assert(press(&f, KEY_A) == SC_FRONT_START_SKIRMISH);
+#endif
+#else
     test_reset_and_home();
     test_campaign_pages_and_retention();
     test_skirmish_setup_and_quickload();
     test_wrap_edges_and_ticks();
-#ifdef SC64_UNIFIED
+#ifdef SC64_IMPORTED_SKIRMISH
+    {
+        Sc64Frontend f;
+        sc64_frontend_reset(&f,0,0,1,-1);
+        press(&f,KEY_DOWN); press(&f,KEY_A);
+        assert(f.page==SC_FRONT_SKIRMISH && f.map==SC64_MAP_OUTPOST);
+        assert(press(&f,KEY_RIGHT)==SC_FRONT_NONE && f.map==SC64_MAP_BLOOD_BATH);
+        assert(press(&f,KEY_RIGHT)==SC_FRONT_NONE && f.map==SC64_MAP_OUTPOST);
+    }
+#endif
+#endif
+    test_campaign_catalog_contract();
+#if defined(SC64_UNIFIED) && !defined(SC64_CAMPAIGN_RACE)
     test_unified_campaign_mission_mapping();
     test_unified_skirmish_all_races();
 #endif

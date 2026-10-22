@@ -19,12 +19,16 @@ CAMPAIGN_INPUTS := $(BACKWATER_INPUTS) .local/sc64/campaign/generated/sc64_campa
 RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -I.local/sc64/races/generated
 RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h
 UNIFIED_FLAGS := $(RACES_FLAGS) -DSC64_UNIFIED
+RACE_CAMPAIGN_FLAGS := $(UNIFIED_FLAGS) -DSC64_IMPORTED_SKIRMISH -I.local/sc64/skirmish/generated
+RACE_CAMPAIGN_INPUTS := $(RACES_INPUTS) .local/sc64/skirmish/generated/sc64_skirmish_generated.h
 
 .PHONY: all clean test verify probe sc64 backwater skirmish campaign races unified \
 	verify-sc64 verify-backwater verify-skirmish verify-campaign verify-races verify-unified \
 	test-starcraft test-sc64 test-backwater test-skirmish test-skirmish-match \
 	test-campaign test-races test-races-controller test-race-routes test-race-route-sizes \
-	test-races-menu test-unified test-collision test-terrain-cache
+	test-races-menu test-unified test-collision test-terrain-cache race-campaigns \
+	terran zerg protoss verify-terran verify-zerg verify-protoss verify-race-campaigns \
+	test-terran test-zerg test-protoss test-race-campaigns
 
 # The public default uses only original-art StarCraft sources.
 all: verify
@@ -54,8 +58,15 @@ build/test-race-rules: tests/race_rules.c starcraft/race_rules.h starcraft/race_
 build/test-skirmish-ai: tests/skirmish_ai.c starcraft/skirmish_ai.h | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined tests/skirmish_ai.c -o $@
 
-build/test-sc64-frontend: tests/sc64_frontend.c starcraft/sc64_frontend.h common/gba.h | build
+build/test-sc64-frontend: tests/sc64_frontend.c starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon tests/sc64_frontend.c -o $@
+
+build/test-sc64-frontend-terran: RACE_FRONTEND_ID=0
+build/test-sc64-frontend-zerg: RACE_FRONTEND_ID=1
+build/test-sc64-frontend-protoss: RACE_FRONTEND_ID=2
+RACE_FRONTEND_TESTS := build/test-sc64-frontend-terran build/test-sc64-frontend-zerg build/test-sc64-frontend-protoss
+$(RACE_FRONTEND_TESTS): tests/sc64_frontend.c starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_IMPORTED_SKIRMISH -DSC64_CAMPAIGN_RACE=$(RACE_FRONTEND_ID) -Icommon tests/sc64_frontend.c -o $@
 
 build/test-race-routes: tests/race_routes.c starcraft/sc64_routes.h | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -Wall -Wextra -Werror -I. tests/race_routes.c -o $@
@@ -72,12 +83,15 @@ build/test-terrain-cache: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cach
 build/test-collision: tests/sc64_collision.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -DSC64_SKIRMISH -Icommon tests/sc64_collision.c common/gba.c -o $@
 
-test-starcraft: build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-skirmish-ai build/test-sc64-frontend build/test-race-routes build/test-race-routes-96 build/test-race-routes-rect build/test-terrain-cache build/test-collision
+test-starcraft: build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-skirmish-ai build/test-sc64-frontend $(RACE_FRONTEND_TESTS) build/test-race-routes build/test-race-routes-96 build/test-race-routes-rect build/test-terrain-cache build/test-collision
 	./build/test-starcraft
 	./build/test-starcraft-selection
 	./build/test-race-rules
 	./build/test-skirmish-ai
 	./build/test-sc64-frontend
+	./build/test-sc64-frontend-terran
+	./build/test-sc64-frontend-zerg
+	./build/test-sc64-frontend-protoss
 	./build/test-race-routes
 	./build/test-race-routes-96
 	./build/test-race-routes-rect
@@ -219,6 +233,53 @@ test-races-menu: build/test-sc64-frontend build/test-sc64-menu
 	./build/test-sc64-frontend
 	./build/test-sc64-menu
 
+# Split race-campaign ROMs use the shared race engine, with isolated save IDs.
+race-campaigns: verify-terran verify-zerg verify-protoss
+terran: verify-terran
+zerg: verify-zerg
+protoss: verify-protoss
+build/starcraft-terran.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=0 $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Terran-GBA.gba: build/starcraft-terran.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC TERRAN' SCT2
+verify-terran: build/StarCraft-Terran-GBA.gba
+	$(PYTHON) tools/verify_roms.py --terran
+build/test-terran: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=0 tests/sc64_split_run.c common/gba.c -o $@
+test-terran: build/test-terran
+	./build/test-terran
+
+build/starcraft-zerg.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=1 $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-GBA.gba: build/starcraft-zerg.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG' SCZ2
+verify-zerg: build/StarCraft-Zerg-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg
+build/test-zerg: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=1 tests/sc64_split_run.c common/gba.c -o $@
+test-zerg: build/test-zerg
+	./build/test-zerg
+
+build/starcraft-protoss.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=2 $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-GBA.gba: build/starcraft-protoss.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS' SCP2
+verify-protoss: build/StarCraft-Protoss-GBA.gba
+	$(PYTHON) tools/verify_roms.py --protoss
+build/test-protoss: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=2 tests/sc64_split_run.c common/gba.c -o $@
+test-protoss: build/test-protoss
+	./build/test-protoss
+
+test-race-campaigns: test-terran test-zerg test-protoss
+verify-race-campaigns: verify-terran verify-zerg verify-protoss
+
 unified: verify-unified
 build/starcraft64-unified.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(UNIFIED_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft64-unified.map -lgcc -o $@
@@ -238,7 +299,7 @@ build/test-unified-campaign: tests/race_campaign_run.c $(STARCRAFT) $(wildcard s
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) tests/race_campaign_run.c common/gba.c -o $@
 build/test-unified-menu: tests/sc64_menu_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) tests/sc64_menu_run.c common/gba.c -o $@
-build/test-unified-frontend: tests/sc64_frontend.c starcraft/sc64_frontend.h common/gba.h | build
+build/test-unified-frontend: tests/sc64_frontend.c starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST -DSC64_UNIFIED -Icommon tests/sc64_frontend.c -o $@
 test-unified: build/test-unified build/test-unified-frontend build/test-unified-menu build/test-unified-engine build/test-unified-factions build/test-unified-campaign
 	./build/test-unified
