@@ -125,6 +125,35 @@ def scheduler_events(plan: dict) -> list[tuple[int, int]]:
     return list(plan["inputs"])
 
 
+def run_length(plan: dict, ticks: int | None, save_at_end: bool = False) -> tuple[int, bool]:
+    """Validate a requested bounded replay length before any emulator work."""
+    stop = plan["stop_tick"]
+    if ticks is None:
+        if save_at_end:
+            raise ValueError("--save-at-end requires a --ticks prefix")
+        return stop, False
+    if type(ticks) is not int or ticks < 1 or ticks > MAX_U32:
+        raise ValueError("--ticks must be a positive 32-bit integer")
+    if ticks > stop:
+        raise ValueError(f"--ticks cannot exceed trace stop tick {stop}")
+    if save_at_end and ticks >= stop:
+        raise ValueError("--save-at-end requires a prefix ending before the trace stop tick")
+    return ticks, True
+
+
+def route_counter_deltas(current: dict[str, int], previous: dict[str, int]) -> dict[str, int]:
+    """Compute unsigned 32-bit interval deltas for cumulative route counters."""
+    return {key: (value - previous[key]) & MAX_U32
+            for key, value in current.items() if key in previous}
+
+
+def profile_counters(rsp, sym: dict[str, int]) -> tuple[dict[str, int], dict[str, int]]:
+    cycles = {key: profile.u32(rsp, sym[key]) for key in profile.PROFILE_CYCLE_NAMES if key in sym}
+    routes = {key: profile.u32(rsp, sym[key])
+              for key in ("sc64_route_hits", "sc64_route_builds") if key in sym}
+    return cycles, routes
+
+
 def check_debugger_port_free() -> None:
     probe = socket.socket()
     try:
@@ -204,7 +233,8 @@ def verify_final(trace_final: dict, state: dict) -> None:
 
 
 def run(trace_path: Path, output: Path, rom_path: Path | None = None,
-        elf_path: Path | None = None) -> dict:
+        elf_path: Path | None = None, ticks: int | None = None,
+        save_at_end: bool = False) -> dict:
     trace = json.loads(trace_path.read_text(encoding="utf-8"))
     rom = rom_path or ROOT / "build/StarCraft-Zerg-Z3-GBA.gba"
     elf = elf_path or ROOT / "build/starcraft-zerg-z3.elf"
@@ -213,6 +243,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
     sym, sizes = symbols(elf), symbol_sizes(elf)
     capacity = schedule_capacity(sizes)
     plan = validate_trace(trace, capacity)
+    requested_ticks, is_prefix = run_length(plan, ticks, save_at_end)
     campaign_meta = split.read_campaign_metadata(rom, elf, "zerg")
     if MISSION_Z3 not in campaign_meta["enabled_mission_ids"]:
         raise RuntimeError("Zerg-Z3 ELF does not enable global mission 14")
@@ -249,7 +280,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         queue = b"".join(struct.pack("<2I", tick, held) for tick, held in scheduler_events(plan))
         for offset in range(0, len(queue), 256):
             rsp.write(sym["demo_schedule_events"] + offset, queue[offset:offset + 256])
-        rsp.write(sym["demo_schedule_length"], struct.pack("<I", plan["stop_tick"]))
+        rsp.write(sym["demo_schedule_length"], struct.pack("<I", requested_ticks))
         rsp.write(sym["demo_schedule_count"], struct.pack("<I", plan["input_count"]))
         update = sym["game_update"] & ~1
         checkpoint_addr = sym["demo_replay_checkpoint"] & ~1
@@ -266,26 +297,36 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         timer = profile.hardware_clock(rsp)
         last_tick = 0
         last_state = campaign_snapshot(rsp, sym, sizes, bank, campaign_layout, z3_layout)
+        last_cycles, last_routes = profile_counters(rsp, sym)
         last_clock = timer
         observations = []
         counted_frames = 0
         counted_cycles = 0
 
-        def record(tick: int, elapsed_cycles: int, state: dict) -> dict:
-            nonlocal counted_frames, counted_cycles
+        def record(tick: int, elapsed_cycles: int, state: dict,
+                   cycle_values: dict[str, int], route_values: dict[str, int]) -> dict:
+            nonlocal counted_frames, counted_cycles, last_routes
             frame_delta = (state["frame"] - last_state["frame"]) & MAX_U32
             counted = last_state["screen"] == SCREEN_PLAY and state["screen"] == SCREEN_PLAY and frame_delta > 0
             fps = round(CPU_HZ * frame_delta / max(1, elapsed_cycles), 2) if counted else None
             if counted:
                 counted_frames += frame_delta
                 counted_cycles += elapsed_cycles
+            route_delta = route_counter_deltas(route_values, last_routes)
+            last_routes = route_values
             return {"tick": tick, "scheduler_tick": tick, "host_tick": tick,
                     "elapsed_hardware_cycles": elapsed_cycles,
                     "frame_delta": frame_delta, "counted_live_play_interval": counted,
-                    "effective_fps": fps, **state}
+                    "effective_fps": fps,
+                    "profile_cycles_last_tick": cycle_values,
+                    "route_counters": route_values,
+                    "route_interval": route_delta, **state}
 
         home_capture = capture(rsp, run_dir / "home.png")
         observations.append({"tick": 0, "scheduler_tick": 0, "host_tick": 0, "effective_fps": None,
+                             "profile_cycles_last_tick": last_cycles,
+                             "route_counters": last_routes,
+                             "route_interval": {key: 0 for key in last_routes},
                              "counted_live_play_interval": False, "capture": home_capture, **last_state})
         profile.write_progress(run_dir / "progress.json", profile="zerg-z3", rom=rom, elf=elf,
                                rom_sha256=rom_hash, elf_sha256=elf_hash,
@@ -293,21 +334,24 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                                               "trace_sha256": trace_hash,
                                               "input_transitions": plan["input_count"],
                                               "scheduler_capacity": capacity,
-                                              "stop_tick": plan["stop_tick"]},
-                               requested_ticks=plan["stop_tick"], checkpoint_interval=CHECKPOINT_TICKS,
+                                              "trace_stop_tick": plan["stop_tick"],
+                                              "requested_ticks": requested_ticks,
+                                              "prefix": is_prefix},
+                               requested_ticks=requested_ticks, checkpoint_interval=CHECKPOINT_TICKS,
                                latest_checkpoint=observations[-1])
 
-        while last_tick < plan["stop_tick"]:
+        while last_tick < requested_ticks:
             rsp.tick()
             completed = profile.u32(rsp, sym["demo_schedule_tick"])
-            expected = min(plan["stop_tick"], last_tick + CHECKPOINT_TICKS)
+            expected = min(requested_ticks, last_tick + CHECKPOINT_TICKS)
             if completed != expected:
                 raise RuntimeError(f"expected checkpoint tick {expected}, observed {completed}")
             now = profile.hardware_clock(rsp)
             elapsed = (now - last_clock) & MAX_U32
             state = campaign_snapshot(rsp, sym, sizes, bank, campaign_layout, z3_layout)
-            checkpoint = record(completed, elapsed, state)
-            if completed in (1000, 10000, 30000, 50000, plan["stop_tick"]):
+            cycle_values, route_values = profile_counters(rsp, sym)
+            checkpoint = record(completed, elapsed, state, cycle_values, route_values)
+            if completed in (1000, 10000, 30000, 50000, requested_ticks):
                 checkpoint["capture"] = capture(rsp, run_dir / f"checkpoint-{completed:06d}.png")
             observations.append(checkpoint)
             profile.write_progress(run_dir / "progress.json", profile="zerg-z3", rom=rom, elf=elf,
@@ -316,22 +360,28 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                                                   "trace_sha256": trace_hash,
                                                   "input_transitions": plan["input_count"],
                                                   "scheduler_capacity": capacity,
-                                                  "stop_tick": plan["stop_tick"]},
-                                   requested_ticks=plan["stop_tick"], checkpoint_interval=CHECKPOINT_TICKS,
+                                                  "trace_stop_tick": plan["stop_tick"],
+                                                  "requested_ticks": requested_ticks,
+                                                  "prefix": is_prefix},
+                                   requested_ticks=requested_ticks, checkpoint_interval=CHECKPOINT_TICKS,
                                    latest_checkpoint=checkpoint)
-            print(f"zerg-z3 Z3 tick={completed}/{plan['stop_tick']} screen={state['screen']} "
+            print(f"zerg-z3 Z3 tick={completed}/{requested_ticks} screen={state['screen']} "
                   f"frame={state['frame']} fps={checkpoint['effective_fps'] if checkpoint['effective_fps'] is not None else 'n/a'}",
                   flush=True)
             last_tick, last_state, last_clock = completed, state, now
 
         final = observations[-1]
-        verify_final(plan["final"], final)
+        if not is_prefix:
+            verify_final(plan["final"], final)
         mean_fps = round(CPU_HZ * counted_frames / max(1, counted_cycles), 2)
-        report = {"profile": "zerg-z3", "mission": MISSION_Z3,
+        report = {"status": "prefix" if is_prefix else "won",
+                  "profile": "zerg-z3", "mission": MISSION_Z3,
                   "rom": str(rom), "elf": str(elf), "trace": str(trace_path),
                   "rom_sha256": rom_hash, "elf_sha256": elf_hash, "trace_sha256": trace_hash,
                   "controller_input_count": plan["input_count"], "controller_capacity": capacity,
-                  "scheduler_stop_tick": plan["stop_tick"], "final_host_tick": final["scheduler_tick"],
+                  "trace_stop_tick": plan["stop_tick"], "requested_ticks": requested_ticks,
+                  "observed_ticks": final["tick"], "prefix": is_prefix,
+                  "final_host_tick": final["scheduler_tick"],
                   "final_frame": final["frame"], "counted_play_frames": counted_frames,
                   "mean_live_play_effective_fps": mean_fps,
                   "timer_method": "GBA chained hardware timers at 1000-tick and exact-final observers",
@@ -340,8 +390,24 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                   "capacity_source": "ELF symbol size demo_schedule_events / 8 bytes per event",
                   "initial_home": initial, "initial_neutral_home": initial_after_neutral,
                   "captures": {"home": str(run_dir / "home.png"),
-                               "final": str(run_dir / f"checkpoint-{plan['stop_tick']:06d}.png")},
+                               "final": str(run_dir / f"checkpoint-{requested_ticks:06d}.png")},
                   "checkpoints": observations}
+        if not is_prefix:
+            report["verified_win"] = True
+        if save_at_end:
+            if final["screen"] != SCREEN_PLAY:
+                raise RuntimeError("--save-at-end requires the prefix to end during live PLAY")
+            saved = profile.save_live_checkpoint(rsp, sym, tick=final["tick"])
+            menu.stop_emulator(proc, sock, log)
+            proc = sock = log = None
+            save_dir = run_dir / "saves" / run_dir.name
+            saves = list(save_dir.glob("*.sav"))
+            if len(saves) != 1:
+                raise RuntimeError(f"checkpoint did not flush exactly one SRAM file: {saves}")
+            saved_path = profile.checked_sram(saves[0])
+            saved.update({"path": str(saved_path),
+                          "sha256": hashlib.sha256(saved_path.read_bytes()).hexdigest()})
+            report["checkpoint_save"] = saved
         report_path = run_dir / "profile.json"
         report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         profile.write_progress(run_dir / "progress.json", profile="zerg-z3", rom=rom, elf=elf,
@@ -350,11 +416,16 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                                               "trace_sha256": trace_hash,
                                               "input_transitions": plan["input_count"],
                                               "scheduler_capacity": capacity,
-                                              "stop_tick": plan["stop_tick"]},
-                               requested_ticks=plan["stop_tick"], checkpoint_interval=CHECKPOINT_TICKS,
-                               latest_checkpoint=final, status="finished", final_report=str(report_path))
-        print(json.dumps({"status": "won", "final_frame": final["frame"],
-                          "effective_fps": mean_fps, "report": str(report_path)}, indent=2), flush=True)
+                                              "trace_stop_tick": plan["stop_tick"],
+                                              "requested_ticks": requested_ticks,
+                                              "prefix": is_prefix},
+                               requested_ticks=requested_ticks, checkpoint_interval=CHECKPOINT_TICKS,
+                               latest_checkpoint=final, status="prefix" if is_prefix else "finished",
+                               final_report=str(report_path))
+        print(json.dumps({"status": report["status"], "observed_ticks": final["tick"],
+                          "final_frame": final["frame"], "effective_fps": mean_fps,
+                          "checkpoint_save": report.get("checkpoint_save"),
+                          "report": str(report_path)}, indent=2), flush=True)
         return report
     finally:
         if proc is not None:
@@ -381,6 +452,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rom", type=Path, help="override the default Zerg-Z3 ROM")
     parser.add_argument("--elf", type=Path, help="override the default Zerg-Z3 ELF")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--ticks", type=int, help="stop after this many scheduled host ticks (bounded prefix)")
+    parser.add_argument("--save-at-end", action="store_true",
+                        help="pause and save SRAM after a live-play prefix; requires --ticks")
     return parser
 
 
@@ -388,7 +462,7 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
     try:
-        run(args.trace, args.out, args.rom, args.elf)
+        run(args.trace, args.out, args.rom, args.elf, args.ticks, args.save_at_end)
     except (OSError, RuntimeError, ValueError, AssertionError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f"sc64_z3_controller_replay: {exc}\n")
 

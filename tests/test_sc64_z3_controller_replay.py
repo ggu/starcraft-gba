@@ -110,6 +110,29 @@ class TraceValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "symbol size"):
             replay.schedule_capacity({"demo_schedule_events": 17})
 
+    def test_prefix_length_and_save_options_are_bounded(self):
+        plan = replay.validate_trace(valid_trace(), 16)
+        self.assertEqual(replay.run_length(plan, None), (71186, False))
+        self.assertEqual(replay.run_length(plan, 2500), (2500, True))
+        with self.assertRaisesRegex(ValueError, "positive 32-bit"):
+            replay.run_length(plan, 0)
+        with self.assertRaisesRegex(ValueError, "positive 32-bit"):
+            replay.run_length(plan, 0x1_0000_0000)
+        with self.assertRaisesRegex(ValueError, "cannot exceed"):
+            replay.run_length(plan, 71187)
+        with self.assertRaisesRegex(ValueError, "requires a --ticks"):
+            replay.run_length(plan, None, save_at_end=True)
+        with self.assertRaisesRegex(ValueError, "before the trace stop"):
+            replay.run_length(plan, 71186, save_at_end=True)
+        self.assertEqual(replay.run_length(plan, 1000, save_at_end=True), (1000, True))
+
+    def test_route_interval_delta_handles_u32_wrap(self):
+        self.assertEqual(replay.route_counter_deltas({"sc64_route_hits": 5,
+                                                       "sc64_route_builds": 10},
+                                                      {"sc64_route_hits": 0xFFFFFFFE,
+                                                       "sc64_route_builds": 8}),
+                         {"sc64_route_hits": 7, "sc64_route_builds": 2})
+
 
 if __name__ == "__main__":
     unittest.main()
