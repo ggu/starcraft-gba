@@ -10,6 +10,33 @@ static Building saved_buildings[MAX_BUILDINGS];
 static Sc64T4RuntimeState saved_t4;
 static RaceSave good_save;
 
+static int saved_building_word(const RaceSave *save, unsigned slot, unsigned word)
+{
+#ifdef SC64_T6_STORAGE
+    Building row;
+    int result;
+    assert(sc64_building_save_decode(&row, &save->buildings[slot]));
+    memcpy(&result, (const u8 *)&row + word * sizeof(int), sizeof(result));
+    return result;
+#else
+    return save->buildings[slot][word];
+#endif
+}
+
+static void corrupt_building_word(RaceSave *save, unsigned slot, unsigned word,
+                                  int value)
+{
+#ifdef SC64_T6_STORAGE
+    Building row;
+    assert(sc64_building_save_decode(&row, &save->buildings[slot]));
+    memcpy((u8 *)&row + word * sizeof(int), &value, sizeof(value));
+    assert(sc64_building_save_encode(&save->buildings[slot], &row,
+                                     race_cols * 16u, race_rows * 16u));
+#else
+    save->buildings[slot][word] = (s16)value;
+#endif
+}
+
 static void make_runtime_state(void)
 {
     memset(&race_t4, 0, sizeof(race_t4));
@@ -83,10 +110,14 @@ static void round_trip_and_atomic_validation(void)
     assert(race_data.t4.switches.bits[31] == 0x80);
     assert(race_data.t4.player[0].elapsed_ticks == (u32)frame);
     assert(race_data.t4.active_mask == 0xdf);
-    assert(race_data.buildings[changed_building]
-           [offsetof(Building,hp)/sizeof(int)] ==
+    assert(saved_building_word(&race_data, changed_building,
+                              offsetof(Building,hp)/sizeof(int)) ==
+#ifdef SC64_T6_STORAGE
+           b[changed_building].hp);
+#else
            (sc64_race_t4_building_intrinsically_invincible(b[changed_building].type) ?
             0 : b[changed_building].hp));
+#endif
 
     memcpy(saved_units, u, sizeof(u));
     memcpy(saved_buildings, b, sizeof(b));
@@ -135,8 +166,13 @@ static void round_trip_and_atomic_validation(void)
         if (slot != 255 && sc64_race_t4_is_door(b[slot].type)) {
             b[slot].alive = 0;
             assert(race_save_game());
-            assert(race_data.buildings[slot]
-                   [offsetof(Building,hp)/sizeof(int)] == 0);
+            assert(saved_building_word(&race_data, slot,
+                                      offsetof(Building,hp)/sizeof(int)) ==
+#ifdef SC64_T6_STORAGE
+                   100000);
+#else
+                   0);
+#endif
             good_save = race_data;
             assert(race_load_game());
             assert(!b[slot].alive && b[slot].hp == 100000 && b[slot].maxhp == 100000);
@@ -164,11 +200,12 @@ static void round_trip_and_atomic_validation(void)
         if (bad == 3) corrupt.t4.doodad_slot[0] ^= 1;
         if (bad == 4) corrupt.t4.location30_moved = 1; /* Empty extents. */
         if (bad == 5) corrupt.t4.ping_ticks = 91;
-        if (bad == 6) corrupt.buildings[8]
-            [offsetof(Building,raw_type)/sizeof(int)]++;
+        if (bad == 6) corrupt_building_word(&corrupt, 8,
+            offsetof(Building,raw_type)/sizeof(int),
+            saved_building_word(&corrupt, 8, offsetof(Building,raw_type)/sizeof(int)) + 1);
         if (bad == 7) corrupt.t4.doodad_enabled[sprite_row] = 1;
-        if (bad == 8) corrupt.buildings[trap_slot]
-            [offsetof(Building,queue_progress)/sizeof(int)] = 29;
+        if (bad == 8) corrupt_building_word(&corrupt, trap_slot,
+            offsetof(Building,queue_progress)/sizeof(int), 29);
         save_write(&corrupt, sizeof(corrupt), SAVE_VERSION);
         assert(!race_load_game());
         assert(memcmp(saved_units, u, sizeof(u)) == 0);
@@ -196,7 +233,10 @@ static void non_t4_saves_zero_the_optional_state(void)
 int main(void)
 {
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_T6_STORAGE
+    _Static_assert(SC64_RACE_SAVE_GENERATION == 15u,
+                   "expanded combined storage requires a distinct generation");
+#elif defined(SC64_T5_RUNTIME)
     _Static_assert(SC64_RACE_SAVE_GENERATION == 14u,
                    "combined T3/T4/T5 saves require a distinct generation");
 #else

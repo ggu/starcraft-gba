@@ -20,6 +20,7 @@ ROM = ROOT / '.local/sc64/rom/StarCraft64-USA.z64'
 BASE = ROOT / '.local/sc64/backwater/generated'
 OUTPUT = ROOT / '.local/sc64/races/generated/sc64_races_generated.h'
 ROM_SHA1 = 'a36d91b5aac7bb95df0d7de5f9814f5270e25c2b'
+T6_CHK_SHA256 = 'f07f21939bb8dbeeb6e3933fc632a04ff13bc1617ac5f8ae224c0ff978623f35'
 UPSTREAM_COMMIT = '09b57f787a247107d1de82b8c5eab2734667ea1d'
 MISSIONS = [
     ('Z1', '008/014', 'Among the Ruins'),
@@ -38,11 +39,12 @@ MISSIONS = [
     ('Z3', '008/016', 'The New Dominion'),
     # P3 is a private import until large-map runtime support is ready (ID 22).
     ('P3', '008/020', 'Higher Ground'),
-    # T4 is an import-only data stage until 128x128 runtime/trigger support
-    # lands. It occupies its stable campaign ID 7, ahead of the later Z3 IDs.
+    # T4 occupies stable campaign ID 7, ahead of the later Z3 IDs.
     ('T4', '008/00D', 'The Jacobs Installation'),
-    # T5 is import-only as well; its descriptor occupies global ID 8.
+    # T5's descriptor occupies stable global ID 8.
     ('T5', '008/00E', 'The Antigan Revolt'),
+    # T6 is import-only at stable global ID 9 until runtime qualification.
+    ('T6', '008/00F', 'The Norad II'),
 ]
 BUILDING_RAW_IDS = {
     106, 109, 110, 111, 112, 113, 114, 122, 124, 125, 130, 131, 132,
@@ -84,6 +86,8 @@ def emit_map_count() -> str:
         '#define SC64_RACE_MAP_COUNT 23\n'
         '#elif defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
         '#define SC64_RACE_MAP_COUNT 15\n'
+        '#elif defined(SC64_UNIFIED) && defined(SC64_T6_ENABLED)\n'
+        '#define SC64_RACE_MAP_COUNT 10\n'
         '#elif defined(SC64_UNIFIED) && defined(SC64_T5_ENABLED)\n'
         '#define SC64_RACE_MAP_COUNT 9\n'
         '#elif defined(SC64_UNIFIED) && defined(SC64_T4_ENABLED)\n'
@@ -98,7 +102,7 @@ def emit_map_count() -> str:
 
 def campaign_guard_for_map(map_index: int) -> str:
     """Return the profile guard used around one map's data and descriptor."""
-    if map_index in (9, 10):
+    if map_index in (9, 10, 11):
         return 'defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 0'
     if map_index < 2 or map_index == 7:
         race = 1
@@ -113,26 +117,36 @@ def emit_descriptor_table(descriptors: list[str]) -> str:
     """Emit stable direct-ID descriptor slots, with disabled IDs zeroed.
 
     ``descriptors`` uses packer order: four race missions, T1, T2, T3, Z3,
-    P3, T4, T5.
+    P3, T4, T5, T6.
     The per-descriptor race guards are carried inside each supplied token.
     """
-    if len(descriptors) != 11:
-        raise ValueError('expected descriptors for map indices 0..10')
+    if len(descriptors) != 12:
+        raise ValueError('expected descriptors for map indices 0..11')
     return ''.join([
         'static const Sc64RaceMap sc64_race_maps[SC64_RACE_MAP_COUNT] = {\n',
         *descriptors[:4],
         '#ifdef SC64_UNIFIED\n', *descriptors[4:6], '#endif /* SC64_UNIFIED */\n',
         '#if defined(SC64_UNIFIED)\n',
         '#ifdef SC64_T3_ENABLED\n', descriptors[6],
-        '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED) || defined(SC64_T4_ENABLED) || defined(SC64_T5_ENABLED)\n'
+        '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED) || defined(SC64_T4_ENABLED) || defined(SC64_T5_ENABLED) || defined(SC64_T6_ENABLED)\n'
         '    {0}, /* global ID 6 unavailable */\n',
         '#endif\n',
         '#ifdef SC64_T4_ENABLED\n', descriptors[9],
-        '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED) || defined(SC64_T5_ENABLED)\n'
+        '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED) || defined(SC64_T5_ENABLED) || defined(SC64_T6_ENABLED)\n'
         '    {0}, /* global ID 7 unavailable */\n#endif\n',
+        '#ifndef SC64_T5_ENABLED\n'
+        '#ifdef SC64_T6_ENABLED\n'
+        '    {0}, /* global ID 8 unavailable */\n'
+        '#endif\n#endif\n',
         '#ifdef SC64_T5_ENABLED\n', descriptors[10], '#endif\n',
+        '#ifdef SC64_T6_ENABLED\n', descriptors[11], '#endif\n',
         '#if defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED)\n',
-        '#ifdef SC64_T5_ENABLED\n',
+        '#ifdef SC64_T6_ENABLED\n',
+        '    {0}, /* global ID 10 is unavailable */\n'
+        '    {0}, /* global ID 11 is unavailable */\n'
+        '    {0}, /* global ID 12 is unavailable */\n'
+        '    {0}, /* global ID 13 is unavailable */\n'
+        '#elif defined(SC64_T5_ENABLED)\n',
         '    {0}, /* global ID 9 is unavailable */\n'
         '    {0}, /* global ID 10 is unavailable */\n'
         '    {0}, /* global ID 11 is unavailable */\n'
@@ -145,7 +159,7 @@ def emit_descriptor_table(descriptors: list[str]) -> str:
         '    {0}, /* global ID 11 is unavailable */\n'
         '    {0}, /* global ID 12 is unavailable */\n'
         '    {0}, /* global ID 13 is unavailable */\n',
-        '#endif /* SC64_T5_ENABLED */\n',
+        '#endif /* T5/T6 unavailable slots */\n',
         '#endif\n',
         '#ifdef SC64_Z3_ENABLED\n', descriptors[7],
         '#elif defined(SC64_P3_ENABLED)\n    {0}, /* global ID 14 unavailable */\n',
@@ -356,6 +370,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             lines.append('#if defined(SC64_UNIFIED) && defined(SC64_T4_ENABLED)\n')
         elif map_index == 10:
             lines.append('#if defined(SC64_UNIFIED) && defined(SC64_T5_ENABLED)\n')
+        elif map_index == 11:
+            lines.append('#if defined(SC64_UNIFIED) && defined(SC64_T6_ENABLED)\n')
         campaign_guard = campaign_guard_for_map(map_index)
         lines.append(f'#if {campaign_guard}\n')
         unit_name = f'sc64_race_{name}_units'
@@ -385,6 +401,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             lines.append('#endif /* SC64_UNIFIED && SC64_T4_ENABLED */\n')
         elif map_index == 10:
             lines.append('#endif /* SC64_UNIFIED && SC64_T5_ENABLED */\n')
+        elif map_index == 11:
+            lines.append('#endif /* SC64_UNIFIED && SC64_T6_ENABLED */\n')
         descriptors.append(f'#if {campaign_guard}\n'
             f'    {{{info.width}u,{info.height}u,{tileset}u,{human_slot}u,sc64_race_{name}_owner_modes,sc64_race_{name}_owner_races,{unit_name},{len(units)}u,sc64_race_{name}_tiles,{len(tiles)}u,sc64_race_{name}_lookup,sc64_race_{name}_blocked,"{info.name}","{mission_id}"}},\n'
             '#else\n    {0}, /* campaign omitted from this cartridge */\n#endif\n')
@@ -412,6 +430,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                 'geyser' if u['source_type'] == 188 else
                 'building' if (u['source_type'] in BUILDING_RAW_IDS or
                                (map_index == 10 and u['source_type'] == 195)) else
+                'building' if map_index == 11 and u['source_type'] in (126, 138) else
                 'unclassified' if map_index == 9 and u['source_type'] == 195 else
                 'unit'
                 for u in source_units
@@ -575,6 +594,59 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                 scenario = scenario_packer.parse_source(
                     output.parent / 't5' / 'records',
                     output.parent / 't5' / 'manifest.json', profile='t5')
+                reports[-1]['scenario_source_counts'] = {
+                    'locations': len(scenario['locations']),
+                    'triggers': len(scenario['triggers']),
+                    'doodads': len(scenario['doodads']),
+                    'properties': len(scenario['properties']),
+                    'active_conditions': scenario['active_condition_count'],
+                    'active_actions': scenario['active_action_count'],
+                }
+            if map_index == 11:
+                if hashlib.sha256(chk).hexdigest() != T6_CHK_SHA256:
+                    raise ValueError('T6 CHK hash does not match the audited 008/00F source')
+                expected = {'unit_placements': 105, 'building_placements': 73,
+                            'mineral_fields': 35, 'geysers': 3}
+                actual = {'unit_placements': source_categories['unit'],
+                          'building_placements': source_categories['building'],
+                          'mineral_fields': source_categories['mineral'],
+                          'geysers': source_categories['geyser']}
+                if (info.width, info.height, tileset, human_slot) != (96, 96, 0, 0):
+                    raise ValueError('T6 dimensions, Badlands tileset, or human slot changed')
+                if len(source_units) != 221 or len(units) != 216 or source_categories['start_marker'] != 5:
+                    raise ValueError('T6 importer skipped or duplicated UNIT/start-marker rows')
+                if actual != expected:
+                    raise ValueError(f'T6 source UNIT categories changed: {actual}')
+                if force_assignments[:8] != [0, 3, 1, 3, 2, 3, 1, 3]:
+                    raise ValueError('T6 source force assignments no longer match audited CHK')
+                if list(owners[:8]) != [6, 5, 3, 0, 5, 0, 7, 0]:
+                    raise ValueError('T6 source owner assignments no longer match audited CHK')
+                reports[-1]['global_mission_id'] = 9
+                reports[-1]['raw_type_counts_by_owner_slot'] = {
+                    str(owner): {str(raw): count for (raw, slot), count in
+                                 Counter((u['source_type'], u['owner_raw'])
+                                         for u in units).items() if slot == owner}
+                    for owner in sorted({u['owner_raw'] for u in units})
+                }
+                reports[-1]['runtime_unit_rows_are_all_non_start_source_rows'] = True
+                reports[-1]['source_actor_identity_notes'] = {
+                    'raw_126': 'Special_Crashed_Norad_II; source building classification',
+                    'raw_138': 'Queens_Nest; source building classification',
+                    'raw_195': 'Terran Beacon; source UNIT category but runtime building pool classification',
+                    'runtime_pool_counts_if_all_source_types_map': {
+                        'ordinary_units': 104, 'buildings': 74,
+                    },
+                }
+                reports[-1]['t6_import_only'] = True
+                reports[-1]['runtime_or_catalog_enabled'] = False
+                reports[-1]['source_record_retention'] = retain_source_records(
+                    chk, output.parent / 't6' / 'records', map_path=path,
+                    retain_puni=True)
+                scenario_packer = load(
+                    'sc64_t6_scenario_source', ROOT / 'tools/sc64_t4_scenario_pack.py')
+                scenario = scenario_packer.parse_source(
+                    output.parent / 't6' / 'records',
+                    output.parent / 't6' / 'manifest.json', profile='t6')
                 reports[-1]['scenario_source_counts'] = {
                     'locations': len(scenario['locations']),
                     'triggers': len(scenario['triggers']),

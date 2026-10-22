@@ -377,8 +377,13 @@ static void other_modes_clear_union(void)
 
 int main(void)
 {
+#ifdef SC64_T6_STORAGE
+    _Static_assert(SC64_RACE_SAVE_GENERATION == 15u,
+                   "expanded T5 storage uses its own save generation");
+#else
     _Static_assert(SC64_RACE_SAVE_GENERATION == 14u,
                    "T5 persistence uses its own save generation");
+#endif
     _Static_assert(sizeof(Sc64T5SaveState) <= 1124,
                    "T5 state must fit the compact scenario union");
     start_t5(); active_runtime_roundtrip(); malformed_records_are_atomic();

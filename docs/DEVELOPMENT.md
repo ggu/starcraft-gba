@@ -482,6 +482,50 @@ The build stays opt-in and does not change the standard race ROMs or combined
 T1–T4 target. Across current experimental builds, 11 of 30 missions are
 qualified as playable; 19 remain unavailable.
 
+## T6 packed storage foundation (internal only)
+
+The T6 storage probe exercises capacity for the retained Norad II source map;
+it does not add Norad II to the campaign catalog or implement its mission.
+First prepare the usual local Terran inputs with `./dev sc64 prepare --rom
+"/path/to/StarCraft 64 ROM or ZIP" --profile terran`, then run:
+
+```sh
+make sc64-t6-prepare
+make sc64-t6-storage-probe
+make test-sc64-t6-import test-sc64-t6-scenario test-sc64-t6-actors
+make test-sc64-compact-building-save test-sc64-t6-storage test-sc64-t6-combined
+```
+
+The dedicated preparation command retains the T6 records and adds its gated
+source sprites. Run it again after ordinary profile preparation, which omits
+T6 sprites. A storage build rejects incomplete T6 preparation.
+
+The import retains the 96×96 map and all 216 non-start UNIT placements,
+including 35 mineral fields and three geysers. The source parser classifies 105 UNIT rows as
+units and 73 as buildings; runtime mapping moves raw type 195 from the source
+UNIT category into the building pool, yielding 104 ordinary units and 74
+buildings. The storage probe keeps pools of 160 units, 80 buildings, and 48
+minerals. Packed building rows reduce the save record to 15,384 bytes and use
+save generation 15, separate from T5 generation 14.
+
+To repeat the ARM persistence check through ordinary campaign controls:
+
+```sh
+python3 tools/sc64_t5_save_smoke.py \
+  --rom build/StarCraft-T6-Storage-Probe.gba \
+  --elf build/starcraft-t6-storage-probe.elf \
+  --menu-entry --generation 15 --output .local/sc64/t6/storage-arm-save
+```
+
+The frozen ARM storage probe passes the existing memory guards: text/data/BSS
+are 2,474,724/388/245,632 bytes, IWRAM ends at `0x03004f90`, and BSS ends at
+`0x0203c108`. A fresh-process ordinary-menu T5 save test on that build saves at
+frame 123, reloads at frame 123, and continues to frame 183 with all eight
+source-player contexts fault-free and campaign/AI clocks aligned. This proves
+the new save layout on the existing T5 scenario only. T6 trigger execution,
+campaign runtime, controller completion, and performance qualification remain
+future work; the playable campaign count remains 11 of 30.
+
 ## Troubleshooting
 
 - If `doctor` reports a missing required tool, install that tool and confirm its command is on `PATH`. ARM GCC also needs the matching `arm-none-eabi-objcopy` and `arm-none-eabi-size` commands. On a custom toolchain prefix, set `PREFIX` to the prefix used by all three commands.

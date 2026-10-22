@@ -30,6 +30,7 @@ SRAM_BASE = 0x0E000000
 SRAM_BYTES = 32768
 SLOT_BYTES = 16384
 DEFAULT_GENERATION = 14  # Cargo orders share the existing payload with a new identity.
+STORAGE_SCHEMAS = {13: (64, 16328), 14: (64, 16328), 15: (80, 15384)}
 KEY_B, KEY_L, KEY_START = 2, 512, 8
 SCREEN_PLAY, SCREEN_PAUSE = 1, 2
 SCREEN_TITLE = 0
@@ -141,7 +142,8 @@ def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int],
     # Compare the serialized entity banks word for word. State outside those
     # banks, such as renderer caches, is not part of the save payload.
     invincible_units = rsp.read(sym["invincible_units"], 160)
-    invincible_buildings = rsp.read(sym["invincible_buildings"], 64)
+    building_count = sizes["b"] // building_size
+    invincible_buildings = rsp.read(sym["invincible_buildings"], building_count)
     minerals_raw = rsp.read(sym["m"], 48 * mineral_size)
     mineral_words = mineral_size // 4
     minerals_state = [[int.from_bytes(minerals_raw[slot * mineral_size + i * 4:
@@ -195,15 +197,16 @@ def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int],
         "geysers": rsp.read(sym["geysers"], 4 * 8).hex(),
         "fog": rsp.read(sym["explored"], sizes["explored"]).hex(),
         "units": persisted_rows(rsp, sym["u"], 160, unit_size, unit_fields),
-        "buildings": persisted_rows(rsp, sym["b"], 64, building_size, building_fields),
+        "buildings": persisted_rows(rsp, sym["b"], building_count, building_size, building_fields),
         "mineral_fields": minerals_state,
     }
 def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_GENERATION,
         menu_entry: bool = False) -> dict:
     if not rom.is_file() or not elf.is_file():
         raise RuntimeError(f"Build the T5 probe ROM/ELF first: {rom} and {elf}")
-    if generation not in (13, 14):
-        raise ValueError("supported T5 save generations are 13 and 14")
+    if generation not in STORAGE_SCHEMAS:
+        raise ValueError("supported T5 save generations are 13, 14 and 15")
+    building_count, expected_payload = STORAGE_SCHEMAS[generation]
     if ticks < 1 or ticks > 10000:
         raise ValueError("--ticks must be between 1 and 10000")
     sym = symbols(elf)
@@ -215,7 +218,7 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
     missing = [name for name in required if name not in sym]
     if missing:
         raise RuntimeError(f"T5 probe ELF is missing symbols: {', '.join(missing)}")
-    expected_sizes = {"race_t5": 1340, "u": 160 * 108, "b": 64 * 100,
+    expected_sizes = {"race_t5": 1340, "u": 160 * 108, "b": building_count * 100,
                       "m": 48 * 16, "geysers": 4 * 8}
     bad_sizes = {name: (sizes.get(name), expected) for name, expected in expected_sizes.items()
                  if sizes.get(name) != expected}
@@ -229,8 +232,8 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
     if runtime_size != 1340:
         raise RuntimeError("T5 runtime or geyser layout differs from the validated save schema")
     save_size, _ = dwarf_struct(elf, "RaceSave")
-    if save_size != 16328:
-        raise RuntimeError(f"expected 16328-byte T5 payload, got {save_size}")
+    if save_size != expected_payload:
+        raise RuntimeError(f"expected {expected_payload}-byte generation-{generation} payload, got {save_size}")
 
     out.mkdir(parents=True, exist_ok=True)
     out = out / f"run-{time.time_ns()}"
@@ -331,6 +334,7 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             "save_file_sha256": hashlib.sha256(saved_sram).hexdigest(),
             "save_records": records,
             "save_generation": generation,
+            "building_capacity": building_count,
             "saved_frame": paused["frame"],
             "loaded_frame": restored["frame"],
             "continued_frame": continued["frame"],
@@ -361,8 +365,8 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--ticks", type=int, default=120,
                         help="normal play ticks before pausing and saving (1..10000)")
-    parser.add_argument("--generation", type=int, choices=(13, 14), default=DEFAULT_GENERATION,
-                        help="SRAM generation; 13 checks the historical pre-cargo build")
+    parser.add_argument("--generation", type=int, choices=tuple(STORAGE_SCHEMAS), default=DEFAULT_GENERATION,
+                        help="SRAM generation; 13 is pre-cargo, 14 is T1-T5, 15 is the expanded storage probe")
     parser.add_argument("--menu-entry", action="store_true",
                         help="launch T5 from HOME through ordinary campaign/mission/briefing controls")
     args = parser.parse_args()

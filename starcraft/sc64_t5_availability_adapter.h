@@ -56,17 +56,29 @@ static int race_t5_candidate_queues_available(const RaceSave *candidate)
     if (candidate->state[0] != 0 || candidate->state[2] != SC64_T5_GLOBAL_ID)
         return 1;
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
+#ifdef SC64_T6_STORAGE
+        Building decoded;
+        if (!sc64_building_save_decode(&decoded, &candidate->buildings[i])) return 0;
+        const Building *row = &decoded;
+        int alive = row->alive, owner = row->owner, raw_owner = row->raw_owner;
+        int count = row->queue_count, head = row->queue_head;
+#else
         const s16 *row = candidate->buildings[i];
         int alive = row[offsetof(Building, alive) / sizeof(int)];
         int owner = row[offsetof(Building, owner) / sizeof(int)];
         int raw_owner = row[offsetof(Building, raw_owner) / sizeof(int)];
         int count = row[offsetof(Building, queue_count) / sizeof(int)];
         int head = row[offsetof(Building, queue_head) / sizeof(int)];
+#endif
         if (!alive) continue;
         if (count < 0 || count > 5 || head < 0 || head > 4) return 0;
         for (int q = 0; q < count; ++q) {
+#ifdef SC64_T6_STORAGE
+            int type = row->queue[(head + q) % 5];
+#else
             int type = row[offsetof(Building, queue) / sizeof(int) +
                            (head + q) % 5];
+#endif
             int source_slot, raw;
             if (type < 0 || type >= SC_RU_COUNT) return 0;
             source_slot = race_t5_product_source_slot(owner, raw_owner);

@@ -36,11 +36,14 @@ T4_REPLAY_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T4_REPLAY_ENTRY
 T4_COMBINED_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T3_ENABLED -DSC64_T4_CAMPAIGN_ENTRY
 T5_PROBE_FLAGS := $(T4_COMBINED_FLAGS) -DSC64_T5_ENABLED -DSC64_T5_RUNTIME
 T5_CONTROLLER_REPLAY_FLAGS := $(T5_PROBE_FLAGS) -DSC64_T5_CAMPAIGN_ENTRY
+T6_STORAGE_FLAGS := $(T5_CONTROLLER_REPLAY_FLAGS) -DSC64_T6_ENABLED -DSC64_T6_STORAGE
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
 T4_SCENARIO_RECORDS := .local/sc64/races/generated/t4/records
 T5_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t5_scenario_generated.h
 T5_AVAILABILITY_HEADER := .local/sc64/races/generated/sc64_t5_availability_generated.h
 T5_SCENARIO_RECORDS := .local/sc64/races/generated/t5/records
+T6_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t6_scenario_generated.h
+T6_SCENARIO_RECORDS := .local/sc64/races/generated/t6/records
 
 .PHONY: all clean test verify probe sc64 backwater skirmish campaign races unified \
 	verify-sc64 verify-backwater verify-skirmish verify-campaign verify-races verify-unified \
@@ -455,12 +458,70 @@ $(eval $(call T5_COMBINED_TEST,t4-save,tests/sc64_t4_scenario_save.c))
 $(eval $(call T5_COMBINED_TEST,skirmish,tests/sc64_split_run.c))
 .PHONY: test-sc64-t5-combined
 test-sc64-t5-combined: $(addprefix build/test-sc64-t5-,t3-run t3-save t3-resume t4-run t4-save skirmish)
+	mkdir -p .local/sc64/t5
 	./build/test-sc64-t5-t3-run
 	./build/test-sc64-t5-t3-save
 	./build/test-sc64-t5-t3-resume
 	./build/test-sc64-t5-t4-run --limit 30000 --trace .local/sc64/t5/combined-t4-controller.json
 	./build/test-sc64-t5-t4-save
 	./build/test-sc64-t5-skirmish
+build/starcraft-t6-storage-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(T6_STORAGE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-t6-storage-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-T6-Storage-Probe.gba: build/starcraft-t6-storage-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC T6 STORE' SCT6
+.PHONY: sc64-t6-prepare sc64-t6-storage-probe
+sc64-t6-prepare:
+	$(PYTHON) tools/sc64_races_pack.py
+	$(PYTHON) tools/sc64_t4_scenario_pack.py --profile t6
+	$(PYTHON) tools/sc64_race_sprites.py --include-t6
+sc64-t6-storage-probe: build/StarCraft-T6-Storage-Probe.gba
+build/test-sc64-t6-import: tests/sc64_t6_import.c $(RACES_INPUTS) $(wildcard starcraft/*.h) Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $(T6_STORAGE_FLAGS) $< -o $@
+build/test-sc64-t6-scenario: tests/sc64_t6_scenario.c $(T6_SCENARIO_HEADER) $(wildcard starcraft/*.h) Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -Icommon -Istarcraft -I.local/sc64/races/generated -DSC64_T4_RUNTIME -DSC64_T6_ENABLED $< -o $@
+.PHONY: sc64-t6-scenario test-sc64-t6-import test-sc64-t6-scenario
+sc64-t6-scenario:
+	$(PYTHON) tools/sc64_t4_scenario_pack.py --profile t6
+test-sc64-t6-import: build/test-sc64-t6-import
+	./build/test-sc64-t6-import
+test-sc64-t6-scenario: build/test-sc64-t6-scenario
+	./build/test-sc64-t6-scenario
+build/test-sc64-compact-building-save: tests/sc64_compact_building_save.c starcraft/sc64_compact_building_save.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-compact-building-save
+test-sc64-compact-building-save: build/test-sc64-compact-building-save
+	./build/test-sc64-compact-building-save
+test-starcraft: test-sc64-compact-building-save
+build/test-sc64-t6-storage: tests/sc64_t6_storage_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T6_STORAGE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-t6-storage
+test-sc64-t6-storage: build/test-sc64-t6-storage
+	./build/test-sc64-t6-storage
+define T6_STORAGE_TEST
+build/test-sc64-t6-$(1): $(2) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T6_STORAGE_FLAGS) $(3) $$< common/gba.c -o $$@
+endef
+$(eval $(call T6_STORAGE_TEST,t3-run,tests/sc64_t3_run.c))
+$(eval $(call T6_STORAGE_TEST,t3-save,tests/sc64_t3_save.c))
+$(eval $(call T6_STORAGE_TEST,t3-resume,tests/sc64_t3_resume.c))
+$(eval $(call T6_STORAGE_TEST,t4-run,tests/sc64_t4_campaign_run.c))
+$(eval $(call T6_STORAGE_TEST,t4-save,tests/sc64_t4_scenario_save.c))
+$(eval $(call T6_STORAGE_TEST,t5-save,tests/sc64_t5_save.c))
+$(eval $(call T6_STORAGE_TEST,skirmish,tests/sc64_split_run.c))
+$(eval $(call T6_STORAGE_TEST,t5-run,tests/sc64_t5_campaign_run.c,-DSC64_T5_PROBE_ENTRY))
+.PHONY: test-sc64-t6-combined
+test-sc64-t6-combined: $(addprefix build/test-sc64-t6-,t3-run t3-save t3-resume t4-run t4-save t5-save skirmish t5-run)
+	mkdir -p .local/sc64/t6
+	./build/test-sc64-t6-t3-run
+	./build/test-sc64-t6-t3-save
+	./build/test-sc64-t6-t3-resume
+	./build/test-sc64-t6-t4-run --limit 30000 --trace .local/sc64/t6/storage-t4-controller.json
+	./build/test-sc64-t6-t4-save
+	./build/test-sc64-t6-t5-save
+	./build/test-sc64-t6-skirmish
+	./build/test-sc64-t6-t5-run --limit 200000 --trace .local/sc64/t6/storage-t5-controller.json
 build/starcraft-t5-profile.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(T5_CONTROLLER_REPLAY_FLAGS) -DSC64_DIAGNOSTIC_UPDATE $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-t5-profile.map -lgcc -o $@
 	$(SIZE) $@
@@ -472,6 +533,15 @@ sc64-t5-profile: build/StarCraft-T5-Profile.gba
 .PHONY: test-sc64-t5-actor-rules
 test-sc64-t5-actor-rules: build/test-sc64-t5-actor-rules
 	./build/test-sc64-t5-actor-rules
+build/test-sc64-t6-actors-on: tests/sc64_t6_actors.c starcraft/race_rules.h starcraft/sc64_t6_actor_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_T4_RUNTIME -DSC64_T5_RUNTIME -DSC64_T6_ENABLED $< -o $@
+build/test-sc64-t6-actors-off: tests/sc64_t6_actors.c starcraft/race_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_T4_RUNTIME -DSC64_T5_RUNTIME $< -o $@
+.PHONY: test-sc64-t6-actors
+test-sc64-t6-actors: build/test-sc64-t6-actors-on build/test-sc64-t6-actors-off
+	./build/test-sc64-t6-actors-on
+	./build/test-sc64-t6-actors-off
+test-starcraft: test-sc64-t6-actors
 build/test-sc64-t4-actor-rules: tests/sc64_t4_actor_rules.c starcraft/race_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_T4_RUNTIME -I. $< -o $@
 build/test-sc64-t4-world: tests/sc64_t4_world.c starcraft/sc64_t4_world.h Makefile | build

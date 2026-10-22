@@ -1,11 +1,12 @@
 import tempfile
+import subprocess
 import unittest
 from pathlib import Path
 
 from tools.sc64_race_sprites import (
     MISSION_RAW_TYPES, RACE_UNIT_IDS, T4_EXPECTED_VISIBLE_RAW_TYPES,
     T4_INVISIBLE_RAW_TYPES, T4_UNIT_IDS, asset_manifest_sha256, write_header,
-    T4_BUILDING_IDS,
+    T4_BUILDING_IDS, T6_UNIT_IDS,
 )
 
 
@@ -100,6 +101,43 @@ class RaceSpritePackTests(unittest.TestCase):
         self.assertNotIn('SC64_T4_ENABLED', text)
         self.assertNotIn('sc64_race_unit_sprite_mode', text)
         self.assertNotIn('case 218:', text)
+
+    def test_crashed_norad_lookup_is_available_only_in_t6_profile(self):
+        frame = {'pixels': bytes((9,)), 'alpha': bytes((1,)), 'width': 1,
+                 'height': 1, 'x': 0, 'y': 0, 'frame_width': 1,
+                 'frame_height': 1}
+        selected = [{'name': name, 'frame': frame} for name in RACE_UNIT_IDS]
+        t6 = [{'name': name, 'frame': frame} for name in T6_UNIT_IDS]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            write_header(root / 'sprites.h', selected, bytes(range(256)),
+                         t6_selected=t6)
+            (root / 'check.c').write_text('''#include <assert.h>
+#include "sprites.h"
+int main(void) {
+    const Sc64SpriteFrame *ship = sc64_race_unit_sprite(126);
+#ifdef SC64_T6_ENABLED
+#ifndef SC64_T6_SPRITE_SET_COMPLETE
+#error "complete T6 preparation must advertise its sprite set"
+#endif
+    assert(ship && ship->w == 1 && ship->pixels[0] == 9);
+    assert(sc64_race_unit_sprite(19));
+    assert(sc64_race_unit_sprite(115));
+#else
+    assert(!ship);
+#endif
+    assert(sc64_race_unit_sprite(138)); /* shared Queen's Nest art */
+    assert(!sc64_race_unit_sprite(29)); /* flying Norad hero is distinct */
+    return 0;
+}
+''')
+            for enabled in (False, True):
+                command = ['clang', '-std=c11', str(root / 'check.c'),
+                           '-o', str(root / 'check')]
+                if enabled:
+                    command.append('-DSC64_T6_ENABLED')
+                subprocess.run(command, check=True, capture_output=True)
+                subprocess.run([str(root / 'check')], check=True, capture_output=True)
 
 
 if __name__ == '__main__':

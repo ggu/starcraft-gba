@@ -33,6 +33,10 @@ int memcmp(const void *a, const void *b, size_t n);
 #if defined(SC64_T5_PROBE_ENTRY) && !defined(SC64_T5_RUNTIME)
 #error "The internal T5 probe entry requires its runtime"
 #endif
+#if defined(SC64_T6_STORAGE) && \
+    (!defined(SC64_T6_ENABLED) || !defined(SC64_T5_RUNTIME))
+#error "T6 storage requires T6 data and the combined T1-T5 runtime"
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME) && \
     (!defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 0)
 #error "Combined T3/T4 runtime is an experimental unified Terran profile"
@@ -44,7 +48,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_T5_RUNTIME)
+#if defined(SC64_T6_STORAGE)
+#define SC64_RACE_SAVE_GENERATION 15u
+#elif defined(SC64_T5_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 14u
 #elif defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 11u
@@ -63,7 +69,11 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define SC64_RACE_SAVE_GENERATION 2u
 #endif
+#ifdef SC64_T6_STORAGE
+#define MAX_BUILDINGS 80
+#else
 #define MAX_BUILDINGS 64
+#endif
 #if defined(SC64_LARGE_MAPS)
 #define MAX_MINERALS 48
 #else
@@ -133,6 +143,11 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #include "sc64_sprites_generated.h"
 #ifdef SC64_RACES
 #include "sc64_race_sprites_generated.h"
+#endif
+#endif
+#ifdef SC64_T6_STORAGE
+#if SC64_RACE_MAP_COUNT < 10 || !defined(SC64_T6_SPRITE_SET_COMPLETE)
+#error "Run make sc64-t6-prepare before building the T6 storage profile"
 #endif
 #endif
 #define SC64_HAS_VERIFIED_COLLISION 1

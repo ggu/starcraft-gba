@@ -102,6 +102,55 @@ def fixture_t5_records(root):
     return records_dir
 
 
+def fixture_t6_records(root):
+    """Synthetic source-shaped T6 records, including authenticated PUNI."""
+    records_dir = root / 'records'
+    records_dir.mkdir(parents=True)
+    locations = struct.pack('<IIIIHH', 1, 2, 3, 4, 5, 6) * 64
+    triggers = bytearray(2400 * 20)
+    for index in range(31):
+        trigger, slot = divmod(index, 16)
+        triggers[trigger * 2400 + slot * 20 + 15] = 2
+    for index in range(75):
+        trigger, slot = divmod(index, 64)
+        triggers[trigger * 2400 + 320 + slot * 32 + 26] = 11
+    doodads = struct.pack('<HHHBBH', 1, 2, 3, 4, 5, 6) * 54
+    payloads = {
+        'MRGN': locations, 'TRIG': bytes(triggers), 'THG2': doodads,
+        'FORC': bytes([0, 3, 1, 3, 2, 3, 1, 3] + [0] * 12),
+        'OWNR': bytes([6, 5, 3, 0, 5, 0, 7, 0, 0, 0, 0, 0]),
+        'SIDE': bytes([1, 0, 1, 1, 0, 2, 1, 2, 7, 7, 7, 4]),
+        'UPRP': bytes(64 * 20), 'UPUS': bytes(64), 'PUNI': bytes(5700),
+    }
+    manifest_records = {}
+    for name, (filename, tag, _) in PACKER.REQUIRED.items():
+        payload = payloads[name]
+        data = framed(tag, payload)
+        (records_dir / filename).write_bytes(data)
+        manifest_records[name] = {
+            'file': filename, 'record_bytes': len(data), 'payload_bytes': len(payload),
+            'record_sha256': hashlib.sha256(data).hexdigest(),
+            'payload_sha256': hashlib.sha256(payload).hexdigest(),
+        }
+    puni = framed(b'PUNI', payloads['PUNI'])
+    (records_dir / 'PUNI.bin').write_bytes(puni)
+    manifest_records['PUNI'] = {
+        'file': 'PUNI.bin', 'record_bytes': len(puni),
+        'payload_bytes': len(payloads['PUNI']),
+        'record_sha256': hashlib.sha256(puni).hexdigest(),
+        'payload_sha256': hashlib.sha256(payloads['PUNI']).hexdigest(),
+    }
+    manifest = {
+        'schema': 1, 'source_map_path': '008/00F',
+        'source_rom_sha1': PACKER.VERIFIED_ROM_SHA1,
+        'source_chk_sha256': 'b' * 64,
+        'extractor_commit': 'synthetic-test-fixture', 'records': manifest_records,
+    }
+    manifest_path = root / 'manifest.json'
+    manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
+    return records_dir, manifest_path
+
+
 class T4ScenarioPackTests(unittest.TestCase):
     def test_decodes_all_fields_and_preserves_source_slots(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -303,6 +352,43 @@ class T4ScenarioPackTests(unittest.TestCase):
             self.assertEqual(PACKER.parse_source(
                 records, manifest, profile='t5', expected_active_actions=None)
                 ['active_action_count'], 68)
+
+    def test_t6_schema_requires_full_source_counts_and_puni(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            records, manifest = fixture_t6_records(root)
+            parsed = PACKER.parse_source(records, manifest, profile='t6')
+            self.assertEqual((len(parsed['locations']), len(parsed['triggers']),
+                              len(parsed['doodads']), len(parsed['properties']),
+                              parsed['active_condition_count'], parsed['active_action_count']),
+                             (64, 20, 54, 64, 31, 75))
+            self.assertIn('PUNI', parsed['source_record_sha256'])
+            with self.assertRaisesRegex(ValueError, 'T5'):
+                PACKER.parse_source(records, manifest, profile='t5')
+
+            generated = root / 'scenario_t6.h'
+            generated.write_text(PACKER.emit_header(parsed, profile='t6'), encoding='ascii')
+            source = root / 'check_t6.c'
+            source.write_text(
+                '#include "scenario_t6.h"\n'
+                'int main(void) { return !(sc64_t6_scenario.location_count == 64 && '
+                'sizeof(sc64_t6_triggers)/sizeof(sc64_t6_triggers[0]) == 20 && '
+                'sc64_t6_source_setup.force_by_slot[6] == 1); }\n', encoding='ascii')
+            result = subprocess.run(
+                ['cc', '-std=c11', '-Wall', '-Wextra', '-Werror',
+                 '-DSC64_T4_RUNTIME', '-DSC64_T6_ENABLED',
+                 '-I', str(ROOT / 'starcraft'), '-I', str(root),
+                 str(source), '-o', str(root / 'check_t6')],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(subprocess.run([str(root / 'check_t6')]).returncode, 0)
+
+            # The PUNI record is a required retained T6 section and its
+            # manifest digest is checked before any decoded output is accepted.
+            bad = (records / 'PUNI.bin').read_bytes()
+            (records / 'PUNI.bin').write_bytes(bad[:-1] + bytes([bad[-1] ^ 1]))
+            with self.assertRaisesRegex(ValueError, 'PUNI record integrity'):
+                PACKER.parse_source(records, manifest, profile='t6')
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

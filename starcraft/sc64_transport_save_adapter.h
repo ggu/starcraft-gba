@@ -10,7 +10,11 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
     u8 attached[MAX_BUILDINGS] = { 0 };
     if (!candidate || width < 1 || height < 1) return 0;
 #define CARGO_U(i, field) candidate->units[(i)][offsetof(Unit, field) / sizeof(int)]
+#ifdef SC64_T6_STORAGE
+#define CARGO_B(i, field) saved_building.field
+#else
 #define CARGO_B(i, field) candidate->buildings[(i)][offsetof(Building, field) / sizeof(int)]
+#endif
     for (int i = 0; i < MAX_UNITS; ++i) {
         if (!CARGO_U(i, alive)) continue;
         int order = CARGO_U(i, order), carrier = CARGO_U(i, target);
@@ -46,6 +50,11 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
         }
     }
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
+#ifdef SC64_T6_STORAGE
+        Building saved_building;
+        if (!sc64_building_save_decode(&saved_building, &candidate->buildings[i]))
+            return 0;
+#endif
         if (!CARGO_B(i, alive) || CARGO_B(i, type) != B_CONTROL_TOWER) continue;
         if (CARGO_B(i, raw_type) != 115 || CARGO_B(i, maxhp) != 500 ||
             CARGO_B(i, level) < 0 || CARGO_B(i, level) > MAX_BUILDINGS ||

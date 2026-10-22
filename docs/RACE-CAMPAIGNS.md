@@ -242,6 +242,23 @@ The ARM run averages 20.85 effective fps, with an 11.95-fps worst counted
 observer interval, below the 30-fps target. This is emulator evidence, not
 physical-GBA performance validation.
 
+## T6 packed storage foundation (not playable)
+
+The internal T6 storage probe retains the Norad II map's 96×96 terrain and
+216 non-start UNIT placements, including 35 mineral fields and three geysers. The importer
+classifies 105 source UNIT rows as units and 73 as buildings; raw type 195 is
+stored as a runtime building, so the mapped roster is 104 units and 74
+buildings. The probe supports pools of 160 units, 80 buildings, and 48
+minerals. Packed building rows use a 15,384-byte save record and generation
+15, distinct from T5 generation 14.
+See [the preparation and verification commands](DEVELOPMENT.md#t6-packed-storage-foundation-internal-only).
+
+Generation-15 persistence has passed a fresh-process T5 normal-menu save and
+resume check on the frozen storage-probe build. This does not exercise T6
+mission logic: its trigger runtime, controller completion, and performance
+remain unimplemented/unverified. T6 is not in the campaign menu. The campaign
+therefore remains at 11 playable missions out of 30, with 19 unavailable.
+
 ## Current limits
 
 Higher Ground (Protoss 3, global catalog ID 22) now has an experimental runtime.

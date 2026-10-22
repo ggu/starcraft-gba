@@ -1,6 +1,10 @@
 #ifndef SC64_RACE_RULES_H
 #define SC64_RACE_RULES_H
 
+#ifdef SC64_T6_ENABLED
+#include "sc64_t6_actor_rules.h"
+#endif
+
 /* Compact authored rules for the skirmish races. Resource costs, build times,
  * HP/shields and doubled supply were checked against BWAPI's public default
  * tables (pinned d727fed68558c506163048ea889131d8cbb33915,
@@ -46,6 +50,9 @@ enum {
 #ifdef SC64_T5_RUNTIME
     /* Raw 115: the attached Terran Control Tower add-on. */
     B_CONTROL_TOWER,
+#endif
+#ifdef SC64_T6_ENABLED
+    B_CRASHED_NORAD_II, B_QUEENS_NEST,
 #endif
     SC_RB_COUNT
 };
@@ -211,6 +218,15 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
        This is a Starport add-on, not an SCV-built structure. */
     , [B_CONTROL_TOWER] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 500, 0 }
 #endif
+#ifdef SC64_T6_ENABLED
+    /* The crashed ship is scenario-only, never a worker construction product. */
+    , [B_CRASHED_NORAD_II] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0,
+                              SC64_T6_CRASHED_NORAD_HP, 0 }
+    , [B_QUEENS_NEST] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_CONSUMES_WORKER,
+                         U_DRONE, 0, SC64_T6_QUEENS_NEST_MINERALS,
+                         SC64_T6_QUEENS_NEST_GAS, SC64_T6_QUEENS_NEST_BUILD_FRAMES,
+                         SC64_T6_QUEENS_NEST_HP, 0 }
+#endif
 };
 
 static inline const Sc64RaceUnitRule *sc64_race_unit_rule(int type)
@@ -264,6 +280,9 @@ static inline const char *sc64_race_building_name(int type)
 #endif
 #ifdef SC64_T5_RUNTIME
         ,"CONTROL TOWER"
+#endif
+#ifdef SC64_T6_ENABLED
+        ,"CRASHED NORAD II","QUEEN'S NEST"
 #endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
@@ -456,6 +475,10 @@ static inline int sc64_race_t4_source_size(int raw_type)
         return SC64_T4_SIZE_LARGE;
     case 101: case 194: case 195: case 216: case 218:
         return SC64_T4_SIZE_INDEPENDENT;
+#ifdef SC64_T6_ENABLED
+    case SC64_T6_CRASHED_NORAD_RAW: case SC64_T6_QUEENS_NEST_RAW:
+        return SC64_T4_SIZE_LARGE;
+#endif
     default:
         return SC64_T4_SIZE_UNKNOWN;
     }
@@ -696,6 +719,9 @@ static inline int sc64_race_building_armor(int type)
 #ifdef SC64_T5_RUNTIME
     case B_CONTROL_TOWER: return 1;
 #endif
+#ifdef SC64_T6_ENABLED
+    case B_CRASHED_NORAD_II: case B_QUEENS_NEST: return 1;
+#endif
     default: return 0;
     }
 }
@@ -751,6 +777,10 @@ static inline int sc64_race_raw_building(int type)
     case B_STARPORT: return 114; case B_MISSILE_TURRET: return 124; case B_ZERG_BEACON: return 194;
 #ifdef SC64_T5_RUNTIME
     case B_CONTROL_TOWER: return 115;
+#endif
+#ifdef SC64_T6_ENABLED
+    case B_CRASHED_NORAD_II: return SC64_T6_CRASHED_NORAD_RAW;
+    case B_QUEENS_NEST: return SC64_T6_QUEENS_NEST_RAW;
 #endif
 #ifdef SC64_T4_RUNTIME
     case B_TERRAN_BEACON: return 195;
@@ -843,6 +873,10 @@ static inline int sc64_race_building_from_raw(int raw)
 #endif
 #ifdef SC64_T5_RUNTIME
     case 115: return B_CONTROL_TOWER;
+#endif
+#ifdef SC64_T6_ENABLED
+    case SC64_T6_CRASHED_NORAD_RAW: return B_CRASHED_NORAD_II;
+    case SC64_T6_QUEENS_NEST_RAW: return B_QUEENS_NEST;
 #endif
     default: return -1;
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile private T4/T5 location, trigger and THG2 records into immutable C data.
+"""Compile private T4/T5/T6 location, trigger and THG2 records into immutable C data.
 
 Source CHK records and generated headers belong under ignored .local storage.
 This tool contains only schema and validation logic, never scenario operands or
@@ -24,6 +24,10 @@ DEFAULT_T5_BASE = ROOT / '.local/sc64/races/generated/t5'
 DEFAULT_T5_RECORDS = DEFAULT_T5_BASE / 'records'
 DEFAULT_T5_MANIFEST = DEFAULT_T5_BASE / 'manifest.json'
 DEFAULT_T5_OUTPUT = ROOT / '.local/sc64/races/generated/sc64_t5_scenario_generated.h'
+DEFAULT_T6_BASE = ROOT / '.local/sc64/races/generated/t6'
+DEFAULT_T6_RECORDS = DEFAULT_T6_BASE / 'records'
+DEFAULT_T6_MANIFEST = DEFAULT_T6_BASE / 'manifest.json'
+DEFAULT_T6_OUTPUT = ROOT / '.local/sc64/races/generated/sc64_t6_scenario_generated.h'
 VERIFIED_ROM_SHA1 = 'a36d91b5aac7bb95df0d7de5f9814f5270e25c2b'
 REQUIRED = {
     'MRGN': ('MRGN.bin', b'MRGN', 20),
@@ -70,6 +74,9 @@ def parse_source(records_dir: Path = DEFAULT_RECORDS,
     schemas = {
         't4': ('008/00D', 255, 38, 32, 64, 48, 141),
         't5': ('008/00E', 64, 16, 14, 64, 18, 68),
+        # Counts are read from the verified retained records; PUNI remains a
+        # private source record and is checked below rather than emitted.
+        't6': ('008/00F', 64, 20, 54, 64, 31, 75),
     }
     if profile not in schemas:
         raise ValueError(f'unsupported private scenario profile: {profile}')
@@ -121,6 +128,24 @@ def parse_source(records_dir: Path = DEFAULT_RECORDS,
             raise ValueError(f'{name} payload has a partial source record')
         payloads[name] = payload
         framed[name] = data
+
+    if profile == 't6':
+        metadata = records.get('PUNI')
+        if not isinstance(metadata, dict) or metadata.get('file') != 'PUNI.bin':
+            raise ValueError('T6 manifest has no valid PUNI record entry')
+        try:
+            puni_data = (records_dir / 'PUNI.bin').read_bytes()
+        except OSError as exc:
+            raise ValueError(f'cannot read T6 PUNI record: {exc}') from exc
+        puni_payload = _framed_record(puni_data, b'PUNI', 'PUNI')
+        if len(puni_payload) != 5700:
+            raise ValueError(f'T6 PUNI payload must be exactly 5700 bytes; found {len(puni_payload)}')
+        if (metadata.get('record_bytes') != len(puni_data) or
+                metadata.get('payload_bytes') != len(puni_payload) or
+                metadata.get('record_sha256') != _sha256(puni_data) or
+                metadata.get('payload_sha256') != _sha256(puni_payload)):
+            raise ValueError('T6 PUNI record integrity check failed')
+        framed['PUNI'] = puni_data
 
     location_payload = payloads['MRGN']
     trigger_payload = payloads['TRIG']
@@ -238,12 +263,15 @@ def _bytes(data: bytes) -> str:
 
 def emit_header(data: dict, *, profile: str = 't4') -> str:
     """Render the validated records as immutable, fixed-slot ROM arrays."""
-    if profile not in ('t4', 't5'):
+    if profile not in ('t4', 't5', 't6'):
         raise ValueError(f'unsupported private scenario profile: {profile}')
     prefix = f'sc64_{profile}'
-    guard = 'SC64_T4_SCENARIO_GENERATED_H' if profile == 't4' else 'SC64_T5_SCENARIO_GENERATED_H'
-    runtime_guard = 'SC64_T4_RUNTIME' if profile == 't4' else 'defined(SC64_T4_RUNTIME) && defined(SC64_T5_ENABLED)'
-    runtime_open = '#ifdef SC64_T4_RUNTIME\n' if profile == 't4' else f'#if {runtime_guard}\n'
+    guard = f'SC64_{profile.upper()}_SCENARIO_GENERATED_H'
+    runtime_guard = ('SC64_T4_RUNTIME' if profile == 't4' else
+                     'defined(SC64_T4_RUNTIME) && defined(SC64_T5_ENABLED)' if profile == 't5' else
+                     'defined(SC64_T4_RUNTIME) && defined(SC64_T6_ENABLED)')
+    runtime_open = ('#ifdef SC64_T4_RUNTIME\n' if profile == 't4' else
+                    f'#if {runtime_guard}\n')
     locations = data['locations']
     conditions = data['conditions']
     actions = data['actions']
@@ -316,14 +344,17 @@ def emit_header(data: dict, *, profile: str = 't4') -> str:
 
 def pack(records_dir: Path | None = None, manifest: Path | None = None,
          output: Path | None = None, *, profile: str = 't4') -> dict:
-    if profile not in ('t4', 't5'):
+    if profile not in ('t4', 't5', 't6'):
         raise ValueError(f'unsupported private scenario profile: {profile}')
     if records_dir is None:
-        records_dir = DEFAULT_RECORDS if profile == 't4' else DEFAULT_T5_RECORDS
+        records_dir = {'t4': DEFAULT_RECORDS, 't5': DEFAULT_T5_RECORDS,
+                       't6': DEFAULT_T6_RECORDS}[profile]
     if manifest is None:
-        manifest = DEFAULT_MANIFEST if profile == 't4' else DEFAULT_T5_MANIFEST
+        manifest = {'t4': DEFAULT_MANIFEST, 't5': DEFAULT_T5_MANIFEST,
+                    't6': DEFAULT_T6_MANIFEST}[profile]
     if output is None:
-        output = DEFAULT_OUTPUT if profile == 't4' else DEFAULT_T5_OUTPUT
+        output = {'t4': DEFAULT_OUTPUT, 't5': DEFAULT_T5_OUTPUT,
+                  't6': DEFAULT_T6_OUTPUT}[profile]
     data = parse_source(records_dir, manifest, profile=profile)
     content = emit_header(data, profile=profile)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -341,7 +372,7 @@ def pack(records_dir: Path | None = None, manifest: Path | None = None,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--profile', choices=('t4', 't5'), default='t4')
+    parser.add_argument('--profile', choices=('t4', 't5', 't6'), default='t4')
     parser.add_argument('--records-dir', type=Path)
     parser.add_argument('--manifest', type=Path)
     parser.add_argument('--output', type=Path)

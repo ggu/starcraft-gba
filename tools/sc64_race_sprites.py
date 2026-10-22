@@ -78,6 +78,11 @@ T4_BUILDING_IDS = {
 }
 T4_INVISIBLE_RAW_TYPES = (101,)
 T4_EXPECTED_VISIBLE_RAW_TYPES = (0, 1, 2, 3, 7, 15, 20, 32, 37, 89, 95, 195, 218)
+# The crashed objective is not raw-29 Hero_Norad_II. Raw-19 Raynor and the
+# Control Tower also need their own art for T6's hero/transport route.
+# Queen's Nest (138) already has a shared source sprite above.
+T6_UNIT_IDS = {'crashed_norad_ii': 126, 'raynor_vulture_t6': 19,
+               'control_tower_t6': 115}
 
 
 def asset_manifest_sha256(assets: list[dict]) -> str:
@@ -105,7 +110,8 @@ for _raw in MISSION_RAW_TYPES:
 
 def write_header(path: Path, selected: list[dict], remap: bytes,
                  t4_selected: list[dict] | None = None,
-                 t4_building_selected: list[dict] | None = None) -> None:
+                 t4_building_selected: list[dict] | None = None,
+                 t6_selected: list[dict] | None = None) -> None:
     lines = [
         '/* Generated from the verified USA ROM; private local asset. */',
         '#ifndef SC64_RACE_SPRITES_GENERATED_H',
@@ -141,6 +147,13 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
             for frame_index, frame in enumerate(item['frames']):
                 append_asset({'name': f'{item["name"]}_frame_{frame_index}', 'frame': frame})
         lines.append('#endif /* SC64_T4_ENABLED */')
+    if t6_selected:
+        lines.append('#ifdef SC64_T6_ENABLED')
+        if {item['name'] for item in t6_selected} == set(T6_UNIT_IDS):
+            lines.append('#define SC64_T6_SPRITE_SET_COMPLETE 1')
+        for item in t6_selected:
+            append_asset(item)
+        lines.append('#endif /* SC64_T6_ENABLED */')
     lines += ['static inline const Sc64SpriteFrame *sc64_race_unit_sprite(unsigned short raw_type) {',
               '    switch (raw_type) {']
     seen = set()
@@ -154,6 +167,11 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
         for item in t4_selected:
             lines.append(f'    case {T4_UNIT_IDS[item["name"]]}: return &sc64_race_sprite_{item["name"]};')
         lines.append('#endif /* SC64_T4_ENABLED */')
+    if t6_selected:
+        lines.append('#ifdef SC64_T6_ENABLED')
+        for item in t6_selected:
+            lines.append(f'    case {T6_UNIT_IDS[item["name"]]}: return &sc64_race_sprite_{item["name"]};')
+        lines.append('#endif /* SC64_T6_ENABLED */')
     lines += ['    default: return (const Sc64SpriteFrame *)0;', '    }', '}', '#endif']
     if t4_selected:
         # A null sprite means "use the generic fallback" in game.c, so it
@@ -189,7 +207,8 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
 
 
 def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
-             remap_path: Path = PALETTE_REMAP, include_t4: bool = True) -> dict:
+             remap_path: Path = PALETTE_REMAP, include_t4: bool = True,
+             include_t6: bool = False) -> dict:
     raw = rom.read_bytes()
     extractor = base.load_extractor(base.UPSTREAM)
     normalized = extractor.load_rom(str(rom))
@@ -203,9 +222,10 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
     refs = base.resolve_grp_indices(archive, RACE_UNIT_IDS)
     t4_refs = base.resolve_grp_indices(archive, T4_UNIT_IDS) if include_t4 else {}
     t4_building_refs = base.resolve_grp_indices(archive, T4_BUILDING_IDS) if include_t4 else {}
+    t6_refs = base.resolve_grp_indices(archive, T6_UNIT_IDS) if include_t6 else {}
     palette = base.decode_rgba5551_palette(base._entry_payload(archive, '00B/004'))
     entries = {entry.path: entry for entry in archive.entries()}
-    selected, t4_selected, t4_building_selected, manifest_assets = [], [], [], []
+    selected, t4_selected, t4_building_selected, t6_selected, manifest_assets = [], [], [], [], []
     out.mkdir(parents=True, exist_ok=True)
     def load_asset(name, ref, target):
         grp_data = archive.read(entries[ref['bolt_path']])
@@ -240,7 +260,12 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
                                                frame_list[0]['frame_width'], frame_list[0]['frame_height']],
                                 'opaque_pixels': sum(frame_list[0]['alpha']),
                                 'preview': preview.name})
-    write_header(header, selected, remap, t4_selected, t4_building_selected)
+    legacy_asset_count = len(manifest_assets)
+    for name, ref in t6_refs.items():
+        load_asset(name, ref, t6_selected)
+    if include_t6 and {int(ref['unit_id']) for ref in t6_refs.values()} != set(T6_UNIT_IDS.values()):
+        raise ValueError('T6 source GRPs did not resolve')
+    write_header(header, selected, remap, t4_selected, t4_building_selected, t6_selected)
     mapped_raw_types = set(RACE_UNIT_IDS.values()) | set(T4_UNIT_IDS.values()) | set(T4_BUILDING_IDS.values())
     actual_sprite_raw_types = ({int(ref['unit_id']) for ref in refs.values()} |
                                {int(ref['unit_id']) for ref in t4_refs.values()})
@@ -264,9 +289,12 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
               't4_expected_visible_raw_types': list(T4_EXPECTED_VISIBLE_RAW_TYPES) if include_t4 else [],
               'resolved_t4_visible_raw_types': sorted(set(T4_EXPECTED_VISIBLE_RAW_TYPES) & actual_sprite_raw_types) if include_t4 else [],
               'base_assets_manifest_sha256': asset_manifest_sha256(manifest_assets[:len(selected)]),
-              't4_assets_manifest_sha256': asset_manifest_sha256(manifest_assets[len(selected):]) if include_t4 else asset_manifest_sha256([]),
+              't4_assets_manifest_sha256': asset_manifest_sha256(manifest_assets[len(selected):legacy_asset_count]) if include_t4 else asset_manifest_sha256([]),
               'assets': manifest_assets,
               'generated_header': str(header)}
+    if include_t6:
+        report['t6_raw_unit_ids'] = T6_UNIT_IDS
+        report['t6_assets_manifest_sha256'] = asset_manifest_sha256(manifest_assets[legacy_asset_count:])
     (out / 'manifest.json').write_text(json.dumps(report, indent=2) + '\n')
     return report
 
@@ -279,10 +307,12 @@ def main() -> int:
     parser.add_argument('--remap', type=Path, default=PALETTE_REMAP)
     parser.add_argument('--base-only', action='store_true',
                         help='omit the SC64_T4_ENABLED-gated T4 sprite payloads')
+    parser.add_argument('--include-t6', action='store_true',
+                        help='include SC64_T6_ENABLED-gated Norad, Raynor and Control Tower source sprites')
     args = parser.parse_args()
     try:
         report = generate(args.rom, args.out, args.header, args.remap,
-                          include_t4=not args.base_only)
+                          include_t4=not args.base_only, include_t6=args.include_t6)
     except (OSError, ValueError, RuntimeError, KeyError) as exc:
         print(f'sc64_race_sprites: {exc}', file=sys.stderr)
         return 1

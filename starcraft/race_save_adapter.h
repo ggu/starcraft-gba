@@ -9,6 +9,14 @@ static RaceSave race_data;
 #else
 static RaceSave race_data;
 #endif
+#ifdef SC64_T6_STORAGE
+static int
+race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *out)
+{
+    if (!candidate || !out || slot >= MAX_BUILDINGS) return 0;
+    return sc64_building_save_decode(out, &candidate->buildings[slot]);
+}
+#endif
 #ifdef SC64_T3_ENABLED
 #ifdef SC64_T4_SCENARIO_RUNTIME
 static int
@@ -150,6 +158,16 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
         }
         if (expected_slot >= MAX_BUILDINGS) return 0;
         type = sc64_race_building_from_raw(row->type);
+#ifdef SC64_T6_STORAGE
+        Building saved;
+        if (!race_save_decode_building(candidate, expected_slot, &saved)) return 0;
+        if (type < 0 ||
+            saved.type != type || saved.raw_type != row->type ||
+            saved.raw_owner != row->owner || saved.x != row->x / 2 ||
+            saved.y != row->y / 2 ||
+            candidate->invincible_buildings[expected_slot] !=
+                (unsigned char)sc64_race_t4_building_intrinsically_invincible(type)) return 0;
+#else
         if (type < 0 ||
             candidate->buildings[expected_slot][offsetof(Building,type)/sizeof(int)] != type ||
             candidate->buildings[expected_slot][offsetof(Building,raw_type)/sizeof(int)] != row->type ||
@@ -158,12 +176,23 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
             candidate->buildings[expected_slot][offsetof(Building,y)/sizeof(int)] != row->y / 2 ||
             candidate->invincible_buildings[expected_slot] !=
                 (unsigned char)sc64_race_t4_building_intrinsically_invincible(type)) return 0;
+#endif
         {
             int owner = sc64_race_t4_is_door(type) ? SC64_T4_OWNER_NEUTRAL :
                         sc64_t4_runtime_owner(row->owner);
+#ifdef SC64_T6_STORAGE
+            if (owner < 0 || saved.owner != owner) return 0;
+#else
             if (owner < 0 || candidate->buildings[expected_slot]
                     [offsetof(Building,owner)/sizeof(int)] != owner) return 0;
+#endif
         }
+#ifdef SC64_T6_STORAGE
+        if (sc64_race_t4_is_door(type) &&
+            saved.queue_progress != 0) return 0;
+        if (sc64_race_t4_is_trap(type) &&
+            (saved.queue_progress < 0 || saved.queue_progress > 28)) return 0;
+#else
         if (sc64_race_t4_is_door(type) &&
             candidate->buildings[expected_slot]
                 [offsetof(Building,queue_progress)/sizeof(int)] != 0) return 0;
@@ -172,6 +201,7 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
                 [offsetof(Building,queue_progress)/sizeof(int)] < 0 ||
              candidate->buildings[expected_slot]
                 [offsetof(Building,queue_progress)/sizeof(int)] > 28)) return 0;
+#endif
     }
     if (next_building != 34) return 0;
     return 1;
@@ -192,8 +222,8 @@ static int sc64_race_storage_geometry_valid(int width, int height) {
 }
 static int race_save_game(void) {
 #ifdef SC64_T4_RUNTIME
-    /* T4 props with intrinsic invincibility have 100000 source HP. Their
-     * health words use canonical zero encoding instead of truncating to s16. */
+    /* T4 props with intrinsic invincibility have 100000 source HP. Legacy
+     * s16 rows canonicalize that value; the T6 packed codec preserves it. */
     for(int i=0;i<MAX_BUILDINGS;i++)
         if(sc64_race_t4_building_intrinsically_invincible(b[i].type) &&
            (b[i].hp!=100000 || b[i].maxhp!=100000 ||
@@ -209,6 +239,12 @@ static int race_save_game(void) {
     for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
         int n;memcpy(&n,(u8*)&u[i]+j*sizeof(int),sizeof(n));race_data.units[i][j]=(s16)n;
     }
+#ifdef SC64_T6_STORAGE
+    for(int i=0;i<MAX_BUILDINGS;i++)
+        if(!sc64_building_save_encode(&race_data.buildings[i], &b[i],
+                                     (unsigned)(race_cols * 16),
+                                     (unsigned)(race_rows * 16))) return 0;
+#else
     for(int i=0;i<MAX_BUILDINGS;i++)for(unsigned j=0;j<RACE_BUILD_WORDS;j++) {
         int n;memcpy(&n,(u8*)&b[i]+j*sizeof(int),sizeof(n));
 #ifdef SC64_T4_RUNTIME
@@ -218,6 +254,7 @@ static int race_save_game(void) {
 #endif
         race_data.buildings[i][j]=(s16)n;
     }
+#endif
     memset(race_data.fog,0,sizeof(race_data.fog));
     for(int i=0;i<MAP_CELLS;i++)if(SC64_GRID_GET(explored,i))race_data.fog[i>>3]|=1u<<(i&7);
     memcpy(race_data.minerals_map,m,sizeof(m));
@@ -349,7 +386,11 @@ static int race_load_game(void) {
     for(int i=0;i<5;i++)if(race_data.players[i]<-1||race_data.players[i]>2||
         race_data.ore[i]<0||race_data.ore[i]>65535||race_data.vespene[i]<0||race_data.vespene[i]>65535)return 0;
 #define RACE_U(i,f) race_data.units[i][offsetof(Unit,f)/sizeof(int)]
+#ifdef SC64_T6_STORAGE
+#define RACE_B(i,f) candidate_building.f
+#else
 #define RACE_B(i,f) race_data.buildings[i][offsetof(Building,f)/sizeof(int)]
+#endif
     for(int i=0;i<MAX_UNITS;i++) {
         if(RACE_U(i,alive)<0||RACE_U(i,alive)>1)return 0;
         if(!RACE_U(i,alive))continue;
@@ -369,11 +410,20 @@ static int race_load_game(void) {
            ((order==ORDER_GAS||order==ORDER_BUILD)&&(target<0||target>=MAX_BUILDINGS)))return 0;
     }
     for(int i=0;i<MAX_BUILDINGS;i++) {
+#ifdef SC64_T6_STORAGE
+        Building candidate_building;
+        if(!sc64_building_save_decode(&candidate_building,
+                                     &race_data.buildings[i])) return 0;
+#endif
         if(RACE_B(i,alive)<0||RACE_B(i,alive)>1)return 0;
 #ifdef SC64_T4_RUNTIME
         if(RACE_B(i,type)>=0&&RACE_B(i,type)<SC_RB_COUNT&&
            sc64_race_t4_building_intrinsically_invincible(RACE_B(i,type))&&
+#ifdef SC64_T6_STORAGE
+           (RACE_B(i,hp)!=100000||RACE_B(i,maxhp)!=100000||
+#else
            (RACE_B(i,hp)!=0||RACE_B(i,maxhp)!=0||
+#endif
             RACE_B(i,raw_type)!=sc64_race_raw_building(RACE_B(i,type))||
             RACE_B(i,under_construction)!=0||RACE_B(i,queue_count)!=0||
             RACE_B(i,shield)!=0||race_data.invincible_buildings[i]!=1))return 0;
@@ -382,7 +432,7 @@ static int race_load_game(void) {
 #ifdef SC64_T4_RUNTIME
         int health_ok=RACE_B(i,hp)>0&&RACE_B(i,maxhp)>0&&RACE_B(i,hp)<=RACE_B(i,maxhp);
         if(sc64_race_t4_building_intrinsically_invincible(RACE_B(i,type)))
-            health_ok=1; /* Canonical zero was validated above. */
+            health_ok=1; /* The profile-specific exact prop value was checked above. */
 #endif
         if(RACE_B(i,type)<0||RACE_B(i,type)>=SC_RB_COUNT||RACE_B(i,owner)<0||RACE_B(i,owner)>4||
 #ifdef SC64_T4_RUNTIME
@@ -395,7 +445,11 @@ static int race_load_game(void) {
             RACE_B(i,queue_progress)<0||RACE_B(i,build_progress)<-1||RACE_B(i,shield)<0||
             RACE_B(i,larva)<0||RACE_B(i,larva)>3||RACE_B(i,shield_remainder)<0||RACE_B(i,shield_remainder)>=1280)return 0;
         for(int j=0;j<RACE_B(i,queue_count);j++) {
+#ifdef SC64_T6_STORAGE
+            int type=candidate_building.queue[(RACE_B(i,queue_head)+j)%5];
+#else
             int type=race_data.buildings[i][offsetof(Building,queue)/sizeof(int)+(RACE_B(i,queue_head)+j)%5];
+#endif
             if(type<0||type>=SC_RU_COUNT)return 0;
         }
     }
@@ -527,10 +581,16 @@ static int race_load_game(void) {
         int n=j==offsetof(Unit,flags)/sizeof(int)?(u16)race_data.units[i][j]:race_data.units[i][j];
         memcpy((u8*)&u[i]+j*sizeof(int),&n,sizeof(n));
     }
+#ifdef SC64_T6_STORAGE
+    for(int i=0;i<MAX_BUILDINGS;i++) {
+        if(!sc64_building_save_decode(&b[i], &race_data.buildings[i])) return 0;
+    }
+#else
     for(int i=0;i<MAX_BUILDINGS;i++)for(unsigned j=0;j<RACE_BUILD_WORDS;j++) {
         int n=j==offsetof(Building,flags)/sizeof(int)?(u16)race_data.buildings[i][j]:race_data.buildings[i][j];
         memcpy((u8*)&b[i]+j*sizeof(int),&n,sizeof(n));
     }
+#endif
 #ifdef SC64_T4_RUNTIME
     for(int i=0;i<MAX_BUILDINGS;i++)
         if(sc64_race_t4_building_intrinsically_invincible(b[i].type))

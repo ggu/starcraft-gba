@@ -1533,6 +1533,36 @@ the experimental campaign total to 11 playable missions out of 30: Terran
 1–5, Zerg 1–3 and Protoss 1–3. The standard race ROMs and combined T1–T4 ROM
 remain unchanged; 19 catalog missions remain unavailable.
 
+## T6 packed storage foundation (2026-10-23)
+
+The internal storage probe retains Norad II's 96×96 map and 216 non-start
+UNIT placements, including 35 mineral fields and three geysers. Source UNIT
+classification is 105 units and 73 buildings; runtime type mapping moves raw
+195 into the building pool, for 104 ordinary units and 74 buildings. The
+probe supports 160 units, 80 buildings and 48 minerals. Its packed building
+records produce a 15,384-byte save payload at generation 15, separate from
+T5 generation 14.
+
+The frozen ARM ROM is
+`25fafeb17da140868c2614ffd1bf300531bd9819a56664793df2481c9a828d4b`, with
+ELF `7873ffa8b199307f4d965741192ef6e47e904a827b5e1cd90a38f6a7f9f2d8ef`.
+Text/data/BSS are 2,474,724/388/245,632 bytes; IWRAM ends at `0x03004f90`
+and BSS at `0x0203c108`, within the existing guards. The fresh-process
+ordinary-menu T5 save test passes on this build: it saves at frame 123,
+restores at frame 123, continues to frame 183, and reports zero context faults
+with aligned campaign and AI clocks.
+
+The storage/import/scenario/actor and combined regression targets passed:
+T3 completion/save/resume, T4 controller completion and exact source-prop save
+validation, T5 persistence/mine checks, and all 18 skirmish launch/save
+combinations. The full T5 host controller run wins at frame 121,261 and its
+input trace is byte-identical to the generation-14 proof. Default checks
+(135 Python tests), unified checks, and the legacy combined T5 checks pass.
+The existing T4 and T5 ROM hashes remain unchanged. This is storage evidence
+only: T6 mission triggers, runtime, controller completion,
+and performance are not implemented or qualified. T6 remains unavailable and
+the current campaign count remains 11 of 30, with 19 missions unavailable.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

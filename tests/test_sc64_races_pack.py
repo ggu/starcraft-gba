@@ -58,10 +58,16 @@ class RaceMapTableEmissionTests(unittest.TestCase):
             '    {8}, /* T5: import-only, fixed global ID 8 */\n'
             '#else\n    {0},\n#endif\n'
         )
+        t6_guard = campaign_guard_for_map(11)
+        rows.append(
+            f'#if defined(SC64_UNIFIED) && defined(SC64_T6_ENABLED) && ({t6_guard})\n'
+            '    {9}, /* T6: import-only, fixed global ID 9 */\n'
+            '#else\n    {0},\n#endif\n'
+        )
         return rows
 
     def compile_case(self, flags, expected_count, expected_t3, expected_z3, expected_p3,
-                     expected_t4=0, expected_t5=0):
+                     expected_t4=0, expected_t5=0, expected_t6=0):
         source = (
             'typedef struct { int id; } Sc64RaceMap;\n'
             + emit_map_count()
@@ -74,7 +80,8 @@ class RaceMapTableEmissionTests(unittest.TestCase):
             + ' if (SC64_RACE_MAP_COUNT >= 15) {\n'
             + f'  if (sc64_race_maps[7].id != {expected_t4}) return 4;\n'
             + f'  if (sc64_race_maps[8].id != {expected_t5}) return 10;\n'
-            + f'  for (int i = {9 if expected_t5 else 8}; i <= 13; ++i) if (sc64_race_maps[i].id != 0) return 5;\n'
+            + f'  if (sc64_race_maps[9].id != {expected_t6}) return 11;\n'
+            + f'  for (int i = {10 if expected_t6 else 9 if expected_t5 else 8}; i <= 13; ++i) if (sc64_race_maps[i].id != 0) return 5;\n'
             + f'  if (sc64_race_maps[14].id != {expected_z3}) return 5;\n'
             + ' } else if (SC64_RACE_MAP_COUNT > 7) {\n'
             + f'  if (sc64_race_maps[7].id != {expected_t4}) return 8;\n'
@@ -83,6 +90,7 @@ class RaceMapTableEmissionTests(unittest.TestCase):
         source = source.replace(
             ' return 0;\n}\n',
             f' if (SC64_RACE_MAP_COUNT > 8 && sc64_race_maps[8].id != {expected_t5}) return 9;\n'
+            f' if (SC64_RACE_MAP_COUNT > 9 && sc64_race_maps[9].id != {expected_t6}) return 11;\n'
             ' return 0;\n}\n')
         if expected_count == 23:
             source = source.replace(
@@ -109,7 +117,10 @@ class RaceMapTableEmissionTests(unittest.TestCase):
                          '!defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE == 2')
         self.assertEqual(campaign_guard_for_map(9),
                          'defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 0')
+        self.assertEqual(campaign_guard_for_map(11),
+                         'defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 0')
         self.compile_case([], 4, 0, 0, 0)
+        self.compile_case(['-DSC64_T6_ENABLED'], 4, 0, 0, 0)
         self.compile_case(['-DSC64_UNIFIED'], 6, 0, 0, 0)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_T3_ENABLED'], 7, 6, 0, 0)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_Z3_ENABLED'], 15, 0, 14, 0)
@@ -145,6 +156,22 @@ class RaceMapTableEmissionTests(unittest.TestCase):
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_T5_ENABLED',
                            '-DSC64_P3_ENABLED', '-DSC64_CAMPAIGN_RACE=2'],
                           23, 0, 0, 22, 0, 0)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T6_ENABLED',
+                           '-DSC64_CAMPAIGN_RACE=0'], 10, 0, 0, 0, 0, 0, 9)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T6_ENABLED',
+                           '-DSC64_CAMPAIGN_RACE=1'], 10, 0, 0, 0)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T5_ENABLED',
+                           '-DSC64_T6_ENABLED', '-DSC64_CAMPAIGN_RACE=0'],
+                          10, 0, 0, 0, 0, 8, 9)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T6_ENABLED',
+                           '-DSC64_Z3_ENABLED', '-DSC64_CAMPAIGN_RACE=1'],
+                          15, 0, 14, 0)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T6_ENABLED',
+                           '-DSC64_P3_ENABLED', '-DSC64_CAMPAIGN_RACE=2'],
+                          23, 0, 0, 22)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T6_ENABLED',
+                           '-DSC64_Z3_ENABLED', '-DSC64_CAMPAIGN_RACE=0'],
+                          15, 0, 0, 0, 0, 0, 9)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_Z3_ENABLED',
                            '-DSC64_CAMPAIGN_RACE=0'], 15, 0, 0, 0)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_T3_ENABLED',

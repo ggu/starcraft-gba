@@ -6,6 +6,10 @@
 #define RACE_UNIT_WORDS (sizeof(Unit)/sizeof(int))
 #define RACE_BUILD_WORDS (sizeof(Building)/sizeof(int))
 
+#ifdef SC64_T6_STORAGE
+#include "sc64_compact_building_save.h"
+#endif
+
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
 /* Source player 5 is inactive in the T4 scenario. The save validator requires
  * it to equal its canonical initial state, so store the seven active players
@@ -42,7 +46,11 @@ _Static_assert(sizeof(Sc64T5SaveState) == 764, "compact T5 save state budget");
 typedef struct {
     u32 version;
     s16 units[MAX_UNITS][RACE_UNIT_WORDS];
+#ifdef SC64_T6_STORAGE
+    Sc64PackedBuildingSave buildings[MAX_BUILDINGS];
+#else
     s16 buildings[MAX_BUILDINGS][RACE_BUILD_WORDS];
+#endif
     Mineral minerals_map[MAX_MINERALS];
     u8 fog[(MAP_CELLS+7)/8];
     int state[32],players[5],ore[5],vespene[5];
@@ -80,7 +88,10 @@ typedef struct {
 #endif
 } RaceSave;
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_T6_STORAGE
+_Static_assert(sizeof(RaceSave) == 15384, "generation-15 expanded storage payload");
+#endif
+#if defined(SC64_T5_RUNTIME) && !defined(SC64_T6_STORAGE)
 _Static_assert(sizeof(RaceSave) == 16328, "T5 shares the existing SRAM payload");
 #endif
 
