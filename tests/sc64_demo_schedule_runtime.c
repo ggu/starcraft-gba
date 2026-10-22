@@ -3,9 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#if !defined(SC64_Z3_WINDOWED_SCHEDULE) && !defined(SC64_P3_WINDOWED_SCHEDULE)
-/* Preserve the original standalone test invocation; the P3 target supplies
- * its profile flags on the compiler command line. */
+#if !defined(SC64_Z3_WINDOWED_SCHEDULE) && !defined(SC64_P3_WINDOWED_SCHEDULE) && \
+    !defined(SC64_T4_WINDOWED_SCHEDULE)
+/* Preserve the original standalone test invocation. Profile-specific targets
+ * supply their scheduler and campaign flags on the compiler command line. */
 #define SC64_RACES
 #define SC64_UNIFIED
 #define SC64_Z3_ENABLED
@@ -120,6 +121,8 @@ int main(void)
     run_case(0);
 #ifdef SC64_P3_WINDOWED_SCHEDULE
     puts("P3 actual main loop preserves paged/legacy held keys, edges and empty windows.");
+#elif defined(SC64_T4_WINDOWED_SCHEDULE)
+    puts("T4 actual main loop preserves paged/legacy held keys, edges and empty windows.");
 #else
     puts("Z3 actual main loop preserves paged/legacy held keys, edges and empty windows.");
 #endif

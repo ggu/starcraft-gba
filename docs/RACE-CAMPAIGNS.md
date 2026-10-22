@@ -219,6 +219,14 @@ trigger records with hashes under ignored `.local/sc64/races/generated/t4/`.
 This stage does not expose the mission in the catalog: doors, teleports,
 rescue behavior and mission triggers still need implementation.
 
+`make test-sc64-t4-storage sc64-t4-storage-probe` separately checks the T4-only
+128×128 storage profile and links `build/starcraft-t4-storage-probe.elf`.
+It uses packed fog/path grids, 14 route fields, a full-height targeting index
+and the shared 256-event debugger queue. It has a distinct save generation.
+The tests cover the bottom-right cell and max-size fog persistence using an
+existing available mission; they do not load or complete Jacobs Installation.
+This probe produces an ELF for memory validation, with no playable T4 ROM.
+
 `make test-sc64-large-map sc64-large-probe` checks the opt-in
 `SC64_LARGE_MAPS` storage layout, including packed fog/path grids, larger
 target indexing and 48 mineral slots. The ARM probe links the existing Protoss

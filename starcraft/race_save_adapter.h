@@ -33,7 +33,9 @@ typedef struct {
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
 static RaceSave race_data;
 static int sc64_race_storage_geometry_valid(int width, int height) {
-#ifdef SC64_LARGE_MAPS
+#ifdef SC64_T4_RUNTIME
+    return width >= 1 && width <= 128 && height >= 1 && height <= 128;
+#elif defined(SC64_LARGE_MAPS)
     return width >= 1 && width <= 128 && height >= 1 && height <= 96;
 #else
     return width >= 1 && width <= 96 && height >= 1 && height <= 96;

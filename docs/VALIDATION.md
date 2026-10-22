@@ -661,6 +661,37 @@ output directory is created. No extracted records or generated arrays are
 committed. The catalog and runtime do not enable T4. Door/trap collision,
 teleports, rescue behavior and mission scripting remain to be implemented.
 
+## Jacobs Installation storage integration (2026-10-23)
+
+`make test-sc64-t4-storage sc64-t4-storage-probe` checks the separately gated
+128×128 profile and links the full ARM engine without exposing T4 in the
+catalog. Fourteen packed route fields consume 86,016 bytes. The target index
+uses 32×32 cells, and the minimap scales 128 rows into its existing 24 rows.
+The latter is checked against exact coordinate arithmetic: the previous
+96-row shortcut was invalid for this new geometry. Save geometry validation
+accepts 128×128 only in T4, whose generation 8 is distinct from other profiles.
+
+The host integration checks the bottom-right cell in exploration, visibility,
+path walkability, target indexing and minimap occupancy, plus persistence of
+the last packed fog bit through an available Terran mission's save/load.
+It is a storage fixture, not a Jacobs Installation load/resume proof. Packed
+grid guard-byte tests cover all 16,384 cells. Route tests check packed values
+through cell 16,383 and boundary BFS paths; both ordinary and span visibility
+paths match the byte-grid reference at 128×128 under ASan/UBSan.
+
+T4 now uses the supported paged scheduler with 256 entries; the unchanged
+2,048-entry queue would exceed the EWRAM guard. The actual-main fixture checks
+held keys, press edges, empty pages and legacy count-only use for T4 as well
+as Z3/P3. Wrong-profile and missing-prerequisite compiler probes reject invalid
+configurations. The integrated ARM probe uses 249,304 BSS bytes and 364 data
+bytes, ends IWRAM at `0x03004e68` and BSS at `0x0203cf48`, and passes both
+unchanged linker assertions. This is an ARM link/storage result, not gameplay
+or frame-rate evidence. Unsupported actors and door/rescue/trigger behavior
+still prevent T4 playability.
+
+Default build/tests (80 Python checks), unified build/tests and the existing
+128×96 storage fixture pass. Default and unified ROM hashes remain unchanged.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

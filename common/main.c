@@ -1,8 +1,10 @@
 #include "gba.h"
-#if defined(SC64_Z3_WINDOWED_SCHEDULE) && defined(SC64_P3_WINDOWED_SCHEDULE)
-#error "Z3 and P3 windowed scheduler profiles are mutually exclusive"
+#if (defined(SC64_Z3_WINDOWED_SCHEDULE) + defined(SC64_P3_WINDOWED_SCHEDULE) + \
+     defined(SC64_T4_WINDOWED_SCHEDULE)) > 1
+#error "Z3, P3 and T4 windowed scheduler profiles are mutually exclusive"
 #endif
-#if defined(SC64_Z3_WINDOWED_SCHEDULE) || defined(SC64_P3_WINDOWED_SCHEDULE)
+#if defined(SC64_Z3_WINDOWED_SCHEDULE) || defined(SC64_P3_WINDOWED_SCHEDULE) || \
+    defined(SC64_T4_WINDOWED_SCHEDULE)
 #include "demo_schedule.h"
 #define SC64_WINDOWED_SCHEDULE 1
 #endif
@@ -18,6 +20,14 @@
     !defined(SC64_P3_ENABLED) || !defined(SC64_P3_RUNTIME) || \
     !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 2
 #error "SC64_P3_WINDOWED_SCHEDULE requires the unified Protoss P3 runtime profile"
+#endif
+#endif
+#ifdef SC64_T4_WINDOWED_SCHEDULE
+#if !defined(SC64_T4_RUNTIME) || !defined(SC64_T4_ENABLED) || \
+    !defined(SC64_RACES) || !defined(SC64_UNIFIED) || \
+    !defined(SC64_LARGE_MAPS) || !defined(SC64_ROUTE_PACK3) || \
+    !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 0
+#error "SC64_T4_WINDOWED_SCHEDULE requires the unified Terran T4 packed large-map profile"
 #endif
 #endif
 volatile u32 demo_frame;

@@ -16,8 +16,14 @@
 #if defined(SC64_ROUTE_PACK3) && !defined(SC64_RACES)
 #error "SC64_ROUTE_PACK3 is only supported by race route fields"
 #endif
+#if defined(SC64_T4_RUNTIME) && (!defined(SC64_RACES) || !defined(SC64_LARGE_MAPS) || \
+                                !defined(SC64_ROUTE_PACK3))
+#error "SC64_T4_RUNTIME requires large packed race routes"
+#endif
 #ifdef SC64_RACES
-#ifdef SC64_LARGE_MAPS
+#ifdef SC64_T4_RUNTIME
+#define SC64_ROUTE_SLOTS 14
+#elif defined(SC64_LARGE_MAPS)
 #ifdef SC64_ROUTE_PACK3
 #define SC64_ROUTE_SLOTS 20
 #else

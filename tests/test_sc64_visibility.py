@@ -16,7 +16,11 @@ typedef uint16_t u16;
 #define GBA_HOT
 #ifdef SC64_LARGE_MAPS
 #define MAP_COLS 128
+#ifdef SC64_T4_RUNTIME
+#define MAP_ROWS 128
+#else
 #define MAP_ROWS 96
+#endif
 #else
 #define MAP_COLS 64
 #define MAP_ROWS 64
@@ -277,6 +281,18 @@ class VisibilityTests(unittest.TestCase):
                 result = subprocess.run([str(binary)], check=True, text=True,
                                         capture_output=True)
                 self.assertIn("matches full recomputation", result.stdout)
+            for spans, span_flags in (("baseline", []),
+                                      ("spans", ["-DSC64_VISIBILITY_SPANS"])):
+                with self.subTest(variant=f"t4-128x128-packed-{spans}"):
+                    binary = Path(temp) / f"visibility-t4-128x128-{spans}"
+                    subprocess.run([
+                        "clang", "-std=c11", "-O1", "-fsanitize=address,undefined",
+                        "-DSC64_RACES", "-DSC64_LARGE_MAPS", "-DSC64_T4_RUNTIME",
+                        *span_flags, "-I", str(ROOT), str(source), "-o", str(binary),
+                    ], check=True)
+                    result = subprocess.run([str(binary)], check=True, text=True,
+                                            capture_output=True)
+                    self.assertIn("matches full recomputation", result.stdout)
 
 
 if __name__ == "__main__":

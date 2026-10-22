@@ -37,7 +37,12 @@ sc64_minimap_cell(int cell)
     int col = sc64_cell_col(cell), row = sc64_cell_row(cell);
     int mx = race_cols == 64 ? (col * 3) >> 3 :
              race_cols == 128 ? (col * 3) >> 4 : col >> 2;
+#ifdef SC64_T4_RUNTIME
+    int my = race_rows == 64 ? (row * 3) >> 3 :
+             race_rows == 128 ? (row * 3) >> 4 : row >> 2;
+#else
     int my = race_rows == 64 ? (row * 3) >> 3 : row >> 2;
+#endif
     return mx + my * 24;
 #else
     int col=sc64_cell_col(cell), row=sc64_cell_row(cell);

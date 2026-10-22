@@ -132,12 +132,39 @@ static void test_pack_unpack(void)
     for (unsigned i = 0; i < sizeof(packed); ++i) assert(packed[i] == 0xB4);
 }
 
+static void test_t4_full_map_grid(void)
+{
+    enum { cells = 128 * 128, bytes = cells / 8 };
+    u8 packed[bytes + 2], oracle[cells], unpacked[cells + 2];
+    memset(packed, 0xC7, sizeof(packed));
+    memset(oracle, 0, sizeof(oracle));
+    memset(unpacked, 0xD8, sizeof(unpacked));
+    sc64_bitgrid_clear(packed + 1, cells);
+    assert(packed[0] == 0xC7 && packed[bytes + 1] == 0xC7);
+    assert(sc64_bitgrid_set(packed + 1, cells, 0, 1));
+    assert(sc64_bitgrid_set(packed + 1, cells, cells - 1, 1));
+    oracle[0] = oracle[cells - 1] = 1;
+    for (int cell = 1; cell < cells - 1; cell += 2) {
+        assert(sc64_bitgrid_set(packed + 1, cells, cell, 1));
+        oracle[cell] = 1;
+    }
+    sc64_bitgrid_unpack(unpacked + 1, packed + 1, cells);
+    assert(unpacked[0] == 0xD8 && unpacked[cells + 1] == 0xD8);
+    for (int cell = 0; cell < cells; ++cell)
+        assert(unpacked[cell + 1] == oracle[cell]);
+    assert(sc64_bitgrid_get(packed + 1, cells, cells - 1) == 1);
+    assert(sc64_bitgrid_get(packed + 1, cells, cells) == 0);
+    assert(!sc64_bitgrid_set(packed + 1, cells, cells, 1));
+    assert(packed[0] == 0xC7 && packed[bytes + 1] == 0xC7);
+}
+
 int main(void)
 {
     test_bounds();
     test_cell_counts();
     test_random_oracle();
     test_pack_unpack();
+    test_t4_full_map_grid();
     puts("sc64 bitgrid: ok");
     return 0;
 }

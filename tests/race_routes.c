@@ -11,6 +11,11 @@ typedef uint8_t u8; typedef uint16_t u16; typedef uint32_t u32; typedef int8_t s
 #define RACE_TEST_ROWS 64
 #endif
 enum { MAP_COLS=RACE_TEST_COLS,MAP_ROWS=RACE_TEST_ROWS,MAP_CELLS=MAP_COLS*MAP_ROWS };
+#ifdef SC64_T4_RUNTIME
+_Static_assert(MAP_COLS==128 && MAP_ROWS==128 && MAP_CELLS==16384,
+               "T4 route fixture uses the full 128x128 grid");
+_Static_assert(((MAP_CELLS+7)/8)==2048, "T4 fog/path grids use 2048 bytes");
+#endif
 static u8 path_walkable[MAP_CELLS];
 static u16 bfs_queue[MAP_CELLS];
 static int path_grid_valid = 1;
@@ -33,12 +38,20 @@ static u8 packed_walkable[(MAP_CELLS + 7) / 8];
 
 #ifdef SC64_ROUTE_PACK3
 _Static_assert(sizeof(sc64_route_field) == (SC64_ROUTE_SLOTS*SC64_ROUTE_BYTES), "3-bit route fields fit packed byte storage");
+#ifdef SC64_T4_RUNTIME
+_Static_assert(SC64_ROUTE_BYTES==6144 && sizeof(sc64_route_field)==86016,
+               "T4 uses fourteen 6144-byte route fields");
+#endif
 #else
 _Static_assert(sizeof(sc64_route_field) == (SC64_ROUTE_SLOTS*MAP_CELLS/2), "route fields hold two cells per byte");
 #endif
 #ifdef SC64_ROUTE_PACK3
 #if defined(SC64_LARGE_MAPS)
+#if defined(SC64_T4_RUNTIME)
+_Static_assert(SC64_ROUTE_SLOTS==14, "T4 128x128 PACK3 cache capacity");
+#else
 _Static_assert(SC64_ROUTE_SLOTS==20, "large PACK3 race cache capacity");
+#endif
 #elif defined(SC64_T3_ENABLED)
 _Static_assert(SC64_ROUTE_SLOTS==22, "T3 PACK3 cache capacity");
 #else
@@ -160,6 +173,21 @@ int main(void)
         sc64_route_put(0,cell,(cell*5+3)&7);
     for(int cell=0;cell<MAP_CELLS;cell++)
         assert(sc64_route_get(0,cell)==((cell*5+3)&7));
+#endif
+#ifdef SC64_T4_RUNTIME
+    memset(path_walkable,1,sizeof(path_walkable));
+    reset_routes();
+    int edge_x,edge_y,edge_goal=MAP_CELLS-1;
+    assert(sc64_route_next(8,8,(MAP_COLS-1)*16+8,(MAP_ROWS-1)*16+8,
+                           &edge_x,&edge_y));
+    int edge_slot=-1;
+    for(int slot=0;slot<SC64_ROUTE_SLOTS;slot++)
+        if(sc64_route_valid[slot]&&sc64_route_goal[slot]==edge_goal)edge_slot=slot;
+    assert(edge_slot>=0);
+    assert(sc64_route_get(edge_slot,edge_goal)==0);
+    assert(sc64_route_get(edge_slot,0)!=SC64_ROUTE_UNREACHABLE);
+    assert(edge_x/16+edge_y/16*MAP_COLS==1 ||
+           edge_x/16+edge_y/16*MAP_COLS==MAP_COLS);
 #endif
     for(int map=0;map<4;map++) {
         for(int c=0;c<MAP_CELLS;c++) path_walkable[c]=(random32()%100)<72;

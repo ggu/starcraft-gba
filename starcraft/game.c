@@ -14,13 +14,23 @@ void *memset(void *dst, int value, size_t n);
 #endif
 #endif
 
+#ifdef SC64_T4_RUNTIME
+#if !defined(SC64_T4_ENABLED) || !defined(SC64_UNIFIED) || !defined(SC64_RACES) || \
+    !defined(SC64_LARGE_MAPS) || \
+    !defined(SC64_ROUTE_PACK3) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 0
+#error "SC64_T4_RUNTIME requires the unified Terran 128x128 packed-map profile"
+#endif
+#endif
+
 #if defined(SC64_RACES)
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #define MAX_UNITS 160
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_P3_RUNTIME)
+#if defined(SC64_T4_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 8u
+#elif defined(SC64_P3_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 7u
 #elif defined(SC64_LARGE_MAPS)
 #define SC64_RACE_SAVE_GENERATION 6u
@@ -121,7 +131,9 @@ static int race_cols=64,race_rows=64;
 #define MAP_ROWS 16
 #endif
 #ifdef SC64_RACES
-#ifdef SC64_LARGE_MAPS
+#ifdef SC64_T4_RUNTIME
+#define MAP_CELLS (128*128)
+#elif defined(SC64_LARGE_MAPS)
 #define MAP_CELLS (128*96)
 #else
 #define MAP_CELLS (96*96)
