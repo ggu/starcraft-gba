@@ -12,7 +12,7 @@
 
 - Keep runtime data and work bounded for GBA memory and CPU limits. Use integer arithmetic, fixed-size storage and explicit limits; avoid unbounded allocation in game code.
 - Preserve the default profile's independence from game ROMs and imported data. Never add ROMs, extracted game data, generated asset headers, or proprietary screenshots to the source tree.
-- Keep the pinned reference revisions and imported reference checkout unchanged. Do not silently change the project's pending license status or the optional importer's GPL-3.0-or-later license.
+- Keep the pinned reference revisions and imported reference checkout unchanged. Preserve the project's GPL-3.0-or-later license and existing third-party and file-level notices; do not relicense code without the owner's authorization.
 - Keep claims about original StarCraft fidelity and hardware performance within the limits documented in `starcraft/README.md` and `docs/VALIDATION.md`.
 
 ## Verify changes

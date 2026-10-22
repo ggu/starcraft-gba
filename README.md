@@ -9,15 +9,12 @@ The optional unified profile adds six reduced campaign missions—two each for T
 Install the [required tools](docs/DEVELOPMENT.md#install-the-tools) first.
 Building and testing need no emulator or commercial game files.
 
-The repository is currently private, so your GitHub account needs read access.
-Use your authenticated HTTPS or SSH Git setup:
+Clone the public source repository; no GitHub account is needed to download it:
 
 ```sh
 git clone https://github.com/ggu/starcraft-gba.git
 cd starcraft-gba
 ```
-
-If GitHub reports that the private repository cannot be found, first confirm that your account has access. For HTTPS, authenticate with `gh auth login` and configure Git to use it with `gh auth setup-git`. Or clone using the repository's SSH URL after setting up an SSH key with GitHub.
 
 From the repository root, run:
 
@@ -53,7 +50,13 @@ it independent of game assets, and run ./dev build and ./dev test."
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the asset-free workflow and contribution boundaries. Gameplay references and pinned commits are in [docs/REFERENCES.md](docs/REFERENCES.md); third-party code and data provenance are summarized in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-No project-wide license has been selected yet. The license for the authored project files is pending the owner's decision. The optional importer is separately marked GPL-3.0-or-later; see [LICENSES/GPL-3.0-or-later.txt](LICENSES/GPL-3.0-or-later.txt) and the notices. A source license does not grant rights to StarCraft or StarCraft 64 game content.
+## License
+
+Copyright (C) 2026 StarCraft GBA contributors.
+
+The project-authored files in this repository are free software: you may redistribute and modify them under the GNU General Public License, version 3 or, at your option, any later version (`GPL-3.0-or-later`). They are provided without warranty; see [LICENSE](LICENSE) for the full terms.
+
+Preserve existing file-level copyright and license notices. Third-party material and external dependencies retain their own terms, as described in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). This license grants no rights to StarCraft or StarCraft 64 ROMs, artwork, maps, sounds, or other game content.
 
 ## Validation
 

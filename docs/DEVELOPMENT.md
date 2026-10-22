@@ -79,7 +79,7 @@ See [SC64 unified](SC64-UNIFIED.md) for implemented missions and limitations, an
 ## Troubleshooting
 
 - If `doctor` reports a missing required tool, install that tool and confirm its command is on `PATH`. ARM GCC also needs the matching `arm-none-eabi-objcopy` and `arm-none-eabi-size` commands. On a custom toolchain prefix, set `PREFIX` to the prefix used by all three commands.
-- If cloning a private repository reports “Repository not found,” check that your GitHub account was granted access. For HTTPS, run `gh auth login` and `gh auth setup-git`; alternatively configure a GitHub SSH key and use the SSH clone URL.
+- Cloning the public repository over HTTPS needs no GitHub login. If cloning fails, check the repository URL and network access. Pushing changes requires write access and authentication; for HTTPS, use `gh auth login` and `gh auth setup-git`, or configure a GitHub SSH key for SSH.
 - If `./dev sc64 prepare` rejects the ROM, make sure it is the supported USA image and that a ZIP contains exactly one 32 MiB N64 image. The normalized SHA-1 must match the value above. The project cannot supply or identify a ROM for you.
 - If an optional profile build says generated headers are missing, prepare that profile first with `./dev sc64 prepare --rom PATH --profile PROFILE`. These generated inputs are private local data and are not checked into the repository.
 - If `./dev play` cannot find mGBA, install it or set `MGBA` to the executable path. For example, on Ubuntu: `MGBA=/usr/games/mgba ./dev play starcraft`.
