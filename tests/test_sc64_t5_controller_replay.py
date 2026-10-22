@@ -60,11 +60,94 @@ def add_aux_snapshot(row: dict, *, transport: bool = True) -> dict:
             "transport_ship_xy": [-1, -1], "transport_cargo_space": -1,
             "transport_landing": [-1, -1], "transport_landed_count": -1,
             "transport_loaded": [],
+            "transport_landed": [],
+            "transport_passenger_snapshot_tick": row["host_tick"],
+            "transport_passengers": [],
         })
     return row
 
 
+def pool_unit(slot: int, raw: int, *, owner: int = 0, alive: int = 1,
+              x: int = 512, y: int = 512, order: int = 0, target: int = -1,
+              tx: int = -1, ty: int = -1, hp: int = 100) -> dict:
+    return {"slot": slot, "raw_type": raw, "owner": owner, "alive": alive,
+            "x": x, "y": y, "order": order, "target": target,
+            "tx": tx, "ty": ty, "hp": hp}
+
+
 class T5ReplayValidationTests(unittest.TestCase):
+    def test_profile_entities_are_live_even_without_alive_member(self):
+        rows = [{"raw_type": 16}, {"raw_type": 19, "alive": 0},
+                {"raw_type": 20, "alive": 1}]
+        self.assertEqual([replay._row_alive(row) for row in rows], [True, False, True])
+
+    def test_untracked_host_slots_do_not_assert_world_absence(self):
+        expected = add_aux_snapshot(observation("periodic", 500))
+        expected.update({"starport_slot": -1, "starport_raw": -1,
+                         "control_tower_slot": -1, "control_tower_raw": -1,
+                         "transport_ship_slot": -1, "transport_ship_raw": -1})
+        actual = {"replay_aux": {
+            "starport_slot": 3, "starport_raw": 114, "starport_complete": 1,
+            "control_tower_slot": 4, "control_tower_raw": 115, "control_tower_complete": 1,
+            "transport_ship_slot": 12, "transport_ship_raw": 11,
+            "transport_ship_alive": 1, "transport_ship_hp": 150,
+            "transport_ship_xy": [400, 500], "transport_cargo_space": 0,
+            "transport_landing": [-1, -1], "transport_landed_count": -1,
+            "transport_loaded": [],
+            "_building_rows": [
+                {"slot": 3, "owner": 0, "raw_type": 114, "under_construction": 0},
+                {"slot": 4, "owner": 0, "raw_type": 115, "under_construction": 0},
+            ],
+            "_unit_rows": [pool_unit(12, 11, x=400, y=500)],
+        }}
+        replay.compare_aux_observation(expected, actual, "untracked")
+        expected["starport_slot"] = 2
+        with self.assertRaisesRegex(RuntimeError, "starport identity/state mismatch"):
+            replay.compare_aux_observation(expected, actual, "tracked")
+
+    def test_replay_aux_reads_live_unit_pool_without_host_trace_symbols(self):
+        class Rsp:
+            def __init__(self, memory: dict[int, bytes]):
+                self.memory = memory
+
+            def read(self, address: int, count: int) -> bytes:
+                data = self.memory[address]
+                return data[:count]
+
+        fields = {name: i * 4 for i, name in enumerate(
+            ("x", "y", "hp", "owner", "type", "alive", "order", "tx", "ty", "target", "raw_type"))}
+        stride, capacity, base = 44, 160, 0x1000
+        pool = bytearray(stride * capacity)
+
+        def put(slot: int, **values: int) -> None:
+            for name, value in values.items():
+                off = slot * stride + fields[name]
+                pool[off:off + 4] = int(value).to_bytes(4, "little", signed=True)
+
+        # The live ship target and cargo come entirely from game state. No
+        # host trace_* globals or pre-recorded passenger arrays are consulted.
+        put(12, x=800, y=900, hp=150, owner=0, type=11, alive=1,
+            order=9, tx=664, ty=1336, target=-1, raw_type=11)
+        put(20, x=800, y=900, hp=40, owner=0, type=0, alive=1,
+            order=replay._ORDER_TRANSPORTED, tx=-1, ty=-1, target=12, raw_type=0)
+        rsp = Rsp({base: bytes(pool)})
+        bank = {"unit_capacity": capacity, "unit_stride_bytes": stride,
+                "unit_offsets": fields}
+        buildings = {"entities": [
+            {"slot": 3, "owner": 0, "raw_type": 114, "under_construction": 0},
+            {"slot": 4, "owner": 0, "raw_type": 115, "under_construction": 1},
+        ]}
+        aux = replay.replay_aux_state(rsp, {"u": base}, bank, buildings)
+        self.assertEqual(aux["starport_slot"], 3)
+        self.assertEqual(aux["starport_complete"], 1)
+        self.assertEqual(aux["control_tower_complete"], 0)
+        self.assertEqual(aux["transport_ship_slot"], 12)
+        self.assertEqual(aux["transport_ship_xy"], [800, 900])
+        self.assertEqual(aux["transport_landing"], [664, 1336])
+        self.assertEqual(aux["transport_loaded"], [{"slot": 20, "raw_type": 0}])
+        self.assertEqual(aux["transport_cargo_space"], 1)
+        self.assertNotIn("transport_passengers", aux)
+
     def test_source_trace_offsets_onto_verified_normal_menu_route(self):
         plan = replay.validate_trace(sample_trace(), capacity=256)
         self.assertEqual(plan["entry"], "campaign-menu")
@@ -176,17 +259,38 @@ class T5ReplayValidationTests(unittest.TestCase):
             "control_tower_complete": 1,
             "transport_ship_slot": 12, "transport_ship_raw": 11,
             "transport_ship_alive": 1, "transport_ship_hp": 150,
-            "transport_ship_xy": [900, 880], "transport_cargo_space": 8,
+            "transport_ship_xy": [900, 880], "transport_cargo_space": 3,
             "transport_landing": [1200, 700], "transport_landed_count": 0,
             "transport_loaded": [{"slot": 20, "raw_type": 16},
                                  {"slot": 21, "raw_type": 19}],
+            "transport_passengers": [
+                {"slot": 20, "original_raw_type": 16, "alive": 1, "loaded": 1,
+                 "xy": [900, 880]},
+                {"slot": 21, "original_raw_type": 19, "alive": 1, "loaded": 1,
+                 "xy": [900, 880]},
+            ],
         })
         trace["events"].insert(-1, loaded)
         # The source transition trace remains valid and older fields continue
         # to be the only fields the replay debugger compares.
         plan = replay.validate_trace(trace, 256)
         self.assertEqual(plan["checkpoints"][-1]["kind"], "dropship-loaded")
-        replay.compare_observation(loaded, dict(loaded), "fixture")
+        actual = dict(loaded)
+        actual["replay_aux"] = {field: loaded[field] for field in replay.TECH_SNAPSHOT_FIELDS}
+        actual["replay_aux"].update({field: loaded[field] for field in replay.TRANSPORT_SNAPSHOT_FIELDS
+                                     if field in loaded})
+        actual["replay_aux"].update({
+            "_carrier_slot": 12,
+            "_building_rows": [
+                {"slot": 4, "owner": 0, "raw_type": 107, "under_construction": 0},
+                {"slot": 5, "owner": 0, "raw_type": 113, "under_construction": 0},
+            ],
+            "_unit_rows": [pool_unit(12, 11, hp=150, x=900, y=880,
+                                      order=9, tx=1200, ty=700),
+                           pool_unit(20, 16, x=900, y=880, order=8, target=12),
+                           pool_unit(21, 19, x=900, y=880, order=8, target=12)],
+        })
+        replay.compare_observation(loaded, actual, "fixture")
         self.assertTrue({"transport_loaded", "starport_complete"}.isdisjoint(
             replay.OBS_FIELDS))
 
@@ -202,6 +306,10 @@ class T5ReplayValidationTests(unittest.TestCase):
             "transport_ship_xy": [1000, 900], "transport_cargo_space": -1,
             "transport_landing": [1200, 700], "transport_landed_count": 0,
             "transport_loaded": [{"slot": 20, "raw_type": 16}],
+            "transport_passengers": [
+                {"slot": 20, "original_raw_type": 16, "alive": 1, "loaded": 1,
+                 "xy": [1000, 900]},
+            ],
         })
         trace["events"].insert(-1, destroyed)
         plan = replay.validate_trace(trace, 256)
@@ -222,12 +330,108 @@ class T5ReplayValidationTests(unittest.TestCase):
             (lambda row: row.update(transport_ship_xy=[1536, 0]), "map bounds"),
             (lambda row: row.update(transport_cargo_space=9), "capacity bounds"),
             (lambda row: row.update(starport_slot=64), "building bounds"),
+            (lambda row: row.update(transport_passengers=[{"slot": 0, "original_raw_type": 0,
+                                                           "alive": 1, "loaded": 0,
+                                                           "xy": [-1, -1]}]), "map bounds"),
         ):
             trace = sample_trace()
             row = add_aux_snapshot(trace["events"][0])
             mutate(row)
             with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
                 replay.validate_trace(trace, 256)
+
+    def test_compare_auxiliary_observations_checks_live_fields_and_frozen_passengers(self):
+        expected = add_aux_snapshot(observation("dropship-loaded", 500))
+        expected.update({
+            "transport_ship_slot": 8, "transport_ship_raw": 11,
+            "transport_ship_alive": 1, "transport_ship_hp": 150,
+            "transport_ship_xy": [512, 512], "transport_cargo_space": 1,
+            "transport_landing": [700, 800], "transport_landed_count": -1,
+            "transport_loaded": [{"slot": 9, "raw_type": 0}],
+            "transport_passenger_snapshot_tick": 500,
+            "transport_passengers": [
+                {"slot": 9, "original_raw_type": 0, "alive": 1, "loaded": 1,
+                 "xy": [512, 512]},
+            ],
+        })
+        actual = {"replay_aux": {field: expected[field] for field in replay.TECH_SNAPSHOT_FIELDS}}
+        actual["replay_aux"].update({field: expected[field] for field in replay.TRANSPORT_SNAPSHOT_FIELDS})
+        actual["replay_aux"].update({
+            "_carrier_slot": 8,
+            "_building_rows": [],
+            "_unit_rows": [pool_unit(8, 11, hp=150, order=9, tx=700, ty=800),
+                           pool_unit(9, 0, order=replay._ORDER_TRANSPORTED, target=8)],
+        })
+        replay.compare_aux_observation(expected, actual, "loaded")
+        actual["replay_aux"]["_unit_rows"][1]["order"] = 0
+        with self.assertRaisesRegex(RuntimeError, "transport_loaded mismatch"):
+            replay.compare_aux_observation(expected, actual, "loaded")
+
+        # The landing manifest is frozen at its stated source tick. It is not
+        # compared against later live state, which may legitimately change.
+        expected["kind"] = "periodic"
+        expected["host_tick"] = 700
+        expected["source_host_tick"] = 700
+        expected["transport_passenger_snapshot_tick"] = 500
+        actual["replay_aux"]["transport_loaded"] = expected["transport_loaded"]
+        actual["replay_aux"]["transport_passengers"] = []
+        actual["replay_aux"]["_unit_rows"] = [pool_unit(8, 11, hp=150, order=9,
+                                                               tx=700, ty=800),
+                                                pool_unit(9, 0, x=530, y=522,
+                                                          order=replay._ORDER_TRANSPORTED,
+                                                          target=8)]
+        replay.compare_aux_observation(expected, actual, "later")
+
+    def test_tracked_second_starport_and_carrier_use_exact_pool_slots(self):
+        expected = add_aux_snapshot(observation("dropship-landed", 500))
+        expected.update({
+            "starport_slot": 7, "starport_raw": 114, "starport_complete": 1,
+            "control_tower_slot": -1, "control_tower_raw": -1,
+            "transport_ship_slot": 13, "transport_ship_raw": 11,
+            "transport_ship_alive": 1, "transport_ship_hp": 120,
+            "transport_ship_xy": [650, 700], "transport_cargo_space": 1,
+            "transport_loaded": [{"slot": 21, "raw_type": 0}],
+            "transport_landing": [750, 800], "transport_landed_count": 0,
+            "transport_landed": [],
+        })
+        actual = {"replay_aux": {
+            # The public summaries deliberately describe the first matching
+            # actors; tracked identities must come from the decoded pools.
+            "starport_slot": 2, "starport_raw": 114, "starport_complete": 1,
+            "control_tower_slot": -1, "control_tower_raw": -1,
+            "transport_ship_slot": 4, "transport_ship_raw": 11,
+            "transport_ship_alive": 1, "transport_ship_hp": 150,
+            "transport_ship_xy": [400, 500], "transport_cargo_space": 0,
+            "transport_loaded": [],
+            "_building_rows": [
+                {"slot": 2, "owner": 0, "raw_type": 114, "under_construction": 0},
+                {"slot": 7, "owner": 0, "raw_type": 114, "under_construction": 0},
+            ],
+            "_unit_rows": [
+                pool_unit(4, 11, x=400, y=500, tx=1000, ty=1000),
+                pool_unit(13, 11, x=650, y=700, hp=120, tx=750, ty=800),
+                pool_unit(21, 0, x=650, y=700, order=replay._ORDER_TRANSPORTED,
+                          target=13),
+            ],
+        }}
+        replay.compare_aux_observation(expected, actual, "second-actors")
+
+        # Away from a landed checkpoint the host value is the originally
+        # planned point. The live carrier may later have a different target;
+        # exact live-position checks must not reinterpret that frozen value.
+        expected["kind"] = "periodic"
+        expected["host_tick"] = 600
+        expected["source_host_tick"] = 600
+        expected["transport_passenger_snapshot_tick"] = 500
+        actual["replay_aux"]["_unit_rows"][1]["tx"] = 1000
+        actual["replay_aux"]["_unit_rows"][1]["ty"] = 1000
+        replay.compare_aux_observation(expected, actual, "later-carrier-target")
+
+        # A slot that exists but has the wrong owner/type must not fall back to
+        # the first actor that happens to match the expected raw type.
+        actual["replay_aux"]["_unit_rows"][1]["owner"] = 1
+        with self.assertRaisesRegex(RuntimeError, "carrier identity mismatch"):
+            replay.compare_aux_observation(expected, actual, "wrong-carrier")
 
 
 if __name__ == "__main__":

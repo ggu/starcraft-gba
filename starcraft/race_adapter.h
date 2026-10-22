@@ -206,6 +206,7 @@ static int race_queue_unit(int owner, int producer, int type)
         b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type, r->producer) || b[producer].queue_count >= 5 ||
         !race_owner_has_prereq(owner, r->prereq)) return 0;
 #ifdef SC64_T5_RUNTIME
+    if (!race_t5_unit_product_available(owner, b[producer].raw_owner, type)) return 0;
     if (type == U_DROPSHIP && race_t5_active() &&
         !race_t5_starport_has_control_tower(producer)) return 0;
 #endif
@@ -240,6 +241,9 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
     int slot;
 #ifdef SC64_T5_RUNTIME
     if (type == B_CONTROL_TOWER) return 0; /* Starport-only add-on path. */
+    if (!race_t5_building_product_available(owner,
+            worker >= 0 && worker < MAX_UNITS ? u[worker].raw_owner : -1,
+            type)) return 0;
 #endif
     if (!r || r->race != race_owner_identity(owner) || worker < 0 || worker >= MAX_UNITS ||
         !u[worker].alive || u[worker].owner != owner || u[worker].type != r->worker ||

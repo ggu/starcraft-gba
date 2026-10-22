@@ -35,9 +35,11 @@ T4_RUNTIME_FLAGS := $(T4_SCENARIO_FLAGS) $(T4_OPTIMIZATION_FLAGS)
 T4_REPLAY_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T4_REPLAY_ENTRY
 T4_COMBINED_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T3_ENABLED -DSC64_T4_CAMPAIGN_ENTRY
 T5_PROBE_FLAGS := $(T4_COMBINED_FLAGS) -DSC64_T5_ENABLED -DSC64_T5_RUNTIME
+T5_CONTROLLER_REPLAY_FLAGS := $(T5_PROBE_FLAGS) -DSC64_T5_CAMPAIGN_ENTRY
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
 T4_SCENARIO_RECORDS := .local/sc64/races/generated/t4/records
 T5_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t5_scenario_generated.h
+T5_AVAILABILITY_HEADER := .local/sc64/races/generated/sc64_t5_availability_generated.h
 T5_SCENARIO_RECORDS := .local/sc64/races/generated/t5/records
 
 .PHONY: all clean test verify probe sc64 backwater skirmish campaign races unified \
@@ -376,6 +378,22 @@ build/test-sc64-transport-rules: tests/sc64_transport_rules.c starcraft/sc64_tra
 test-sc64-transport-rules: build/test-sc64-transport-rules
 	./build/test-sc64-transport-rules
 test-starcraft: test-sc64-transport-rules
+build/test-sc64-unit-availability: tests/sc64_unit_availability.c starcraft/sc64_unit_availability.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-unit-availability
+test-sc64-unit-availability: build/test-sc64-unit-availability
+	./build/test-sc64-unit-availability
+test-starcraft: test-sc64-unit-availability
+$(T5_AVAILABILITY_HEADER): tools/sc64_t5_availability.py .local/sc64/races/generated/t5/manifest.json .local/sc64/races/generated/t5/records/PUNI.bin
+	$(PYTHON) tools/sc64_t5_availability.py --out $@
+.PHONY: sc64-t5-availability
+sc64-t5-availability: $(T5_AVAILABILITY_HEADER)
+build/test-sc64-t5-availability-engine: tests/sc64_t5_availability_engine.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-t5-availability-engine
+test-sc64-t5-availability-engine: build/test-sc64-t5-availability-engine
+	./build/test-sc64-t5-availability-engine
+build/test-sc64-t5-world build/test-sc64-t5-engine build/sc64-t5-controller-probe build/test-sc64-t5-save build/test-sc64-t5-tech build/test-sc64-transport-engine build/test-sc64-transport-queries build/test-sc64-t5-combat build/starcraft-t5-engine-probe.elf build/starcraft-t5-controller-replay.elf: $(T5_AVAILABILITY_HEADER)
 build/test-sc64-t5-tech: tests/sc64_t5_tech.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-t5-tech
@@ -404,6 +422,22 @@ build/StarCraft-T5-Engine-Probe.gba: build/starcraft-t5-engine-probe.elf tools/f
 	$(PYTHON) tools/fix_rom.py $@ 'SC T5 PROBE' SCT5
 .PHONY: sc64-t5-engine-probe
 sc64-t5-engine-probe: build/StarCraft-T5-Engine-Probe.gba
+build/starcraft-t5-controller-replay.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(T5_CONTROLLER_REPLAY_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-t5-controller-replay.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-T5-Controller-Replay.gba: build/starcraft-t5-controller-replay.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC T5 MENU' SCT5
+.PHONY: sc64-t5-controller-replay
+sc64-t5-controller-replay: build/StarCraft-T5-Controller-Replay.gba
+build/starcraft-t5-profile.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(T5_CONTROLLER_REPLAY_FLAGS) -DSC64_DIAGNOSTIC_UPDATE $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-t5-profile.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-T5-Profile.gba: build/starcraft-t5-profile.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC T5 PROF' SCT5
+.PHONY: sc64-t5-profile
+sc64-t5-profile: build/StarCraft-T5-Profile.gba
 .PHONY: test-sc64-t5-actor-rules
 test-sc64-t5-actor-rules: build/test-sc64-t5-actor-rules
 	./build/test-sc64-t5-actor-rules

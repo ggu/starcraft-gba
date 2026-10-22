@@ -331,7 +331,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Standard builds enable two campaign missions per race. Experimental third-mission targets are described above; the other 21 missions still need scenario and gameplay implementation.
+- Standard builds enable two campaign missions per race. The experimental builds above make 10 missions playable across the three races; the other 20 still need scenario and gameplay implementation.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build these three profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

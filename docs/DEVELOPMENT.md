@@ -313,7 +313,15 @@ python3 tools/sc64_races_pack.py --rom /path/to/StarCraft64-USA.z64
 python3 tools/sc64_t4_scenario_pack.py --profile t5
 make test-sc64-t5-import test-sc64-t5-scenario \
   test-sc64-t5-actor-rules test-sc64-resource-actions
+make sc64-t5-availability test-sc64-unit-availability test-sc64-t5-availability-engine
 ```
+
+Current T5 preparation also retains the exact PUNI record and generates a
+342-byte availability bitmap in ignored storage. Re-run preparation after
+updating an older checkout whose T5 records lack `PUNI.bin`. The internal
+runtime uses this source table to reject disabled production before payment;
+existing placed units remain usable. It also checks queued products before
+accepting a saved T5 game.
 
 `make test-sc64-t5-actors test-sc64-t5-ai` also runs asset-free sanitizer
 checks for distinct Kerrigan, Raynor Vulture and Spider Mine actor rules,
@@ -356,7 +364,24 @@ the rescue/base sequence, paid production and an attempted Dropship assault.
 Its private checkpoints record loaded cargo and transport failures. Ending at its limit is an
 unfinished attempt, not a mission-completion test. The separate
 `SC64_T5_CAMPAIGN_ENTRY` menu flag is covered by asset-free frontend checks
-but is not enabled by any ROM target yet.
+and enabled only in the internal replay target:
+
+```sh
+make sc64-t5-controller-replay
+python3 tools/sc64_t5_controller_replay.py --trace /path/to/private-controller-trace.json
+```
+
+That diagnostic ROM starts at HOME and uses the ordinary campaign menus.
+The standard race and combined Terran builds keep T5 unavailable. The replay
+helper writes controller/scheduler inputs and reads mission state; its timing
+uses the GBA hardware clock. Private traces, reports and captures stay local.
+
+For a diagnostic update-stage breakdown, build `make sc64-t5-profile` and pass
+`--rom build/StarCraft-T5-Profile.gba --elf build/starcraft-t5-profile.elf`
+to the same replay helper. It adds update timing counters, including rescue
+contact, mines, and trigger/AI work. These counters add measurement overhead;
+use the ordinary replay ROM for final performance measurements. `--ticks`
+limits a run to a prefix, which does not establish a complete mission win.
 
 The internal T5 profile now supports paid Starport/Control Tower/Dropship
 production and eight-point cargo capacity. Select ground troops and press A

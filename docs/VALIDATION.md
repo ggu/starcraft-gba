@@ -1356,6 +1356,65 @@ uses the opening state; loaded cargo round trips are covered by the host
 engine fixture. No controller-only Revolution victory or physical GBA result
 is claimed. The mission remains gated and the playable total remains 10/30.
 
+## T5 source production restrictions and menu replay (2026-10-23)
+
+The internal Revolution runtime now uses the verified map's PUNI production
+availability. The importer retains the exact 5,708-byte framed record in
+ignored storage, validates its source and record hashes, and derives a
+342-byte effective bitmap. The native N64 handler and pinned OpenBW loader
+agree on the per-player/default-selection layout; see
+[References](REFERENCES.md#campaign-production-availability).
+
+Human production now rejects the source-disabled Ghost, Goliath, Tank,
+Battlecruiser, Science Facility and Armory. Factory selection cycles only to
+the allowed Vulture, and Starport selection offers Wraith and Dropship.
+Imported actors remain usable regardless of whether new production is
+allowed. Checks run before payment or queue mutation, use the current owner's
+source-player bank after rescue, and reject disabled queued products in a
+candidate T5 save before changing the live world. Save generation remains 14.
+This does not add missing unit abilities; in particular, Medic healing is
+still absent from the reduced engine.
+
+The asset-free decoder tests and optional real-engine sanitizer fixtures pass:
+
+```sh
+make test-sc64-unit-availability test-sc64-t5-availability-engine
+```
+
+The internal `sc64-t5-controller-replay` target now enables Revolution through
+the normal HOME/campaign/briefing sequence. Public race targets and the
+combined Terran T1–T4 target retain their existing mission gates. Its helper
+uses bounded controller/scheduler pages and reads the ARM world at source
+checkpoints, including paid tech, loaded passenger identities and landing
+survivors. It does not write scenario state. Hardware-cycle timing replaces
+wall-time throughput in the performance report.
+
+The first full 60,009-input-tick normal-menu ferry replay, before the PUNI
+restriction integration, matched the frozen 60,000-tick host trace. It boarded
+eight Marines and landed seven survivors with its Dropship alive, then
+continued in active play at frame 59,816 with 21 enemy buildings remaining and
+no trigger faults. It averaged 20.97 effective fps over counted live play;
+the worst counted observer interval was 15.54 fps. Its ROM SHA-256 was
+`eb58e51ddb58a9de5d84ce76b0b231a4d167e79585aa27a2c631a4ec9f7f66b3`.
+This extends the earlier host ferry proof to ARM. It does not establish a
+mission win or near-30-fps transport/battle performance.
+
+The production-restricted normal-menu ROM repeats the full ferry replay with
+all source checkpoints matching, the same final mission state, 20.97 mean fps
+and a 15.54-fps worst counted interval. Its SHA-256 is
+`27711523f53fa536137c1702cbe5d22d8428a73c07b0114b8706101b87dd5d7f`.
+Text/data/BSS are 2,240,520/388/243,216 bytes; IWRAM ends at `0x03004f78`
+and BSS at `0x0203b798`. Both existing reserve guards pass. Adding diagnostic
+rescue/mine/trigger timing counters leaves this ordinary ROM byte-identical.
+
+Default source-only build/tests (124 Python tests), unified checks, combined
+T3/T4 runtime/save/controller checks and all 18 skirmish launch combinations
+pass. The combined T1–T4 ROM retains SHA-256
+`d867886700a4c0a7351165f135ab720f37a6442327d529074775f4ac29d45077`.
+Revolution remains internal pending controller completion and further
+performance work. The playable total remains 10/30; physical GBA validation
+is still outstanding.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

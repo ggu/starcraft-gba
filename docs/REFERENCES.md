@@ -38,6 +38,22 @@ adapter; no OpenBW implementation is copied. Source unload time 15 becomes
 search, placeholder add-on art and Men-selector classification remain
 explicit approximations, as detailed in [Validation](VALIDATION.md).
 
+## Campaign production availability
+
+PUNI is a 5,700-byte CHK section: 12×228 per-player availability bytes,
+228 global defaults, then 12×228 default-selection bytes. A nonzero selector
+chooses the global byte; otherwise it chooses that player's byte. The pinned
+OpenBW loader at `bwgame.h:21522–21531` provides the same interpretation.
+
+In the verified USA N64 image, the PUNI dispatch entry at ROM offset `0x23D8`
+points to native handler `0x8002EC48`. It checks for `0x1644` bytes and computes
+the effective value for each player/type pair, writing to a 12×228 runtime
+table. The table's semantic name is inferred from the matching schema; no
+native implementation code is incorporated. The T5 importer retains the
+exact framed source record locally and derives a 342-byte effective bitmap
+for production checks. The generic decoder, generator and synthetic tests
+are source-only; scenario bytes and generated bitmaps remain private.
+
 ## Optional StarCraft 64 missions
 
 The optional unified profile reads map and graphics data from a user-supplied verified USA N64 ROM through `references/sc64-maps/extract_sc64_maps.py` at the pinned `sc64-maps` commit. The local adapter is `tools/sc64_import.py`; terrain, sprite, and race packing is implemented in `tools/sc64_assets.py`, `tools/sc64_sprites.py`, `tools/sc64_races_pack.py`, and `tools/sc64_race_sprites.py`. Imported outputs remain local. The result is an authored GBA engine and mission adaptation, not a port of the N64 engine. See [the unified guide](SC64-UNIFIED.md).

@@ -173,7 +173,8 @@ def nearest(color: int, palette: list[int], candidates: list[int]) -> int:
 
 def retain_source_records(chk: bytes, records_dir: Path, *, map_path: str,
                           rom_sha1: str = ROM_SHA1,
-                          extractor_commit: str = UPSTREAM_COMMIT) -> dict:
+                          extractor_commit: str = UPSTREAM_COMMIT,
+                          retain_puni: bool = False) -> dict:
     """Write exact framed campaign CHK records and return hash/size metadata.
 
     This intentionally stores only the bounded source records required for
@@ -181,7 +182,12 @@ def retain_source_records(chk: bytes, records_dir: Path, *, map_path: str,
     by the pinned BOLT extractor; no Blizzard records are added to tracked
     project files.
     """
-    found: dict[bytes, list[bytes]] = {tag: [] for tag in RETAINED_SOURCE_RECORDS}
+    retained_tags = dict(RETAINED_SOURCE_RECORDS)
+    # PUNI is retained only for T5; keep the existing T4 and earlier record
+    # sets and manifests byte-for-byte stable.
+    if retain_puni:
+        retained_tags[b'PUNI'] = 'PUNI.bin'
+    found: dict[bytes, list[bytes]] = {tag: [] for tag in retained_tags}
     offset = 0
     while offset < len(chk):
         if len(chk) - offset < 8:
@@ -200,10 +206,13 @@ def retain_source_records(chk: bytes, records_dir: Path, *, map_path: str,
 
     records_dir.mkdir(parents=True, exist_ok=True)
     metadata = {}
-    for tag, filename in RETAINED_SOURCE_RECORDS.items():
+    for tag, filename in retained_tags.items():
         record = found[tag][0]
         payload_size = struct.unpack_from('<I', record, 4)[0]
+        if tag == b'PUNI' and payload_size != 5700:
+            raise ValueError(f'T5 PUNI payload must be 5700 bytes; found {payload_size}')
         path = records_dir / filename
+        # Keep every retained record in its exact framed CHK representation.
         path.write_bytes(record)
         metadata[tag.decode('ascii').strip()] = {
             'file': filename,
@@ -553,7 +562,14 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                 reports[-1]['t5_import_only'] = True
                 reports[-1]['runtime_or_catalog_enabled'] = False
                 reports[-1]['source_record_retention'] = retain_source_records(
-                    chk, output.parent / 't5' / 'records', map_path=path)
+                    chk, output.parent / 't5' / 'records', map_path=path,
+                    retain_puni=True)
+                availability_packer = load(
+                    'sc64_t5_availability_source', ROOT / 'tools/sc64_t5_availability.py')
+                reports[-1]['availability_table'] = availability_packer.generate(
+                    output.parent / 't5' / 'records',
+                    output.parent / 't5' / 'manifest.json',
+                    output.parent / 'sc64_t5_availability_generated.h')
                 scenario_packer = load(
                     'sc64_t5_scenario_source', ROOT / 'tools/sc64_t4_scenario_pack.py')
                 scenario = scenario_packer.parse_source(

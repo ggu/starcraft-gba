@@ -559,9 +559,23 @@ race_campaign_tick(void)
     ++race_campaign.elapsed_frames;
 #ifdef SC64_T5_RUNTIME
     if (mission == SC64_T5_GLOBAL_ID) {
+#if defined(SC64_DIAGNOSTIC_UPDATE)
+        u32 t5_stage_start = gba_clock();
+#endif
         race_t5_world_tick();
+#if defined(SC64_DIAGNOSTIC_UPDATE)
+        sc64_t5_rescue_cycles = gba_clock() - t5_stage_start;
+        t5_stage_start = gba_clock();
+#endif
         race_t5_mines_tick();
+#if defined(SC64_DIAGNOSTIC_UPDATE)
+        sc64_t5_mine_cycles = gba_clock() - t5_stage_start;
+        t5_stage_start = gba_clock();
+#endif
         if (!race_t5_tick()) screen = SCREEN_PAUSE;
+#if defined(SC64_DIAGNOSTIC_UPDATE)
+        sc64_t5_trigger_ai_cycles = gba_clock() - t5_stage_start;
+#endif
         return;
     }
 #endif

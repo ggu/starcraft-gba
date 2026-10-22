@@ -50,6 +50,8 @@ static int race_t5_start_control_tower(int producer)
     if (!race_t5_active() || !rule || producer < 0 || producer >= MAX_BUILDINGS ||
         !b[producer].alive || b[producer].owner != SIDE ||
         b[producer].type != B_STARPORT || !building_complete(producer) ||
+        !race_t5_building_product_available(SIDE, b[producer].raw_owner,
+                                            B_CONTROL_TOWER) ||
         !race_owner_has_prereq(SIDE, SC_PR_FACTORY) ||
         race_t5_has_attached_control_tower(producer)) return 0;
     x = b[producer].x + SC64_T5_ADDON_X_OFFSET;

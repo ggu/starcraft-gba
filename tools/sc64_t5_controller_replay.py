@@ -32,8 +32,10 @@ ENTRY_TICKS = 9
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_RESULT = 0, 1, 3
 KEY_A, KEY_RIGHT = 1, 16
 CHECKPOINT_TICKS = 1000
-DEFAULT_TRACE = ROOT / ".local/sc64/t5/controller-production-final.json"
+DEFAULT_TRACE = ROOT / ".local/sc64/t5/controller-probe.json"
 DEFAULT_OUTPUT = ROOT / "build/emulator/sc64-t5-controller-replay"
+DEFAULT_ROM = ROOT / "build/StarCraft-T5-Controller-Replay.gba"
+DEFAULT_ELF = ROOT / "build/starcraft-t5-controller-replay.elf"
 TRACE_CHECKPOINTS = frozenset({
     "start", "opening", "rescue-attempt", "command-center-attempt",
     "command-center-approach-cleared", "kerrigan-center-correction",
@@ -73,6 +75,7 @@ TRANSPORT_SNAPSHOT_FIELDS = (
     "transport_ship_slot", "transport_ship_raw", "transport_ship_alive",
     "transport_ship_hp", "transport_ship_xy", "transport_cargo_space",
     "transport_landing", "transport_landed_count", "transport_loaded",
+    "transport_landed", "transport_passenger_snapshot_tick", "transport_passengers",
 )
 
 
@@ -87,12 +90,12 @@ def _bounded_pair(value: object, label: str, *, allow_sentinel: bool) -> None:
 
 
 def validate_aux_snapshot(row: dict, label: str) -> None:
-    """Validate optional tech/cargo evidence without treating it as replay oracle data.
+    """Validate optional tech/cargo evidence before consulting live debugger state.
 
     Older trace files omit these fields. New runner traces include both groups
     on every observation, using -1/empty sentinels before the corresponding
-    objects exist. Replay compares only OBS_FIELDS because these auxiliary
-    debugger summaries are not independently observed by the replay debugger.
+    objects exist. At checkpoints, the replay compares these summaries against
+    the decoded building and unit pools rather than trusting host-side values.
     """
     for group_name, fields in (("tech", TECH_SNAPSHOT_FIELDS),
                                ("transport", TRANSPORT_SNAPSHOT_FIELDS)):
@@ -151,9 +154,52 @@ def validate_aux_snapshot(row: dict, label: str) -> None:
             if actor_slot in seen_slots:
                 raise ValueError(f"{label} transport_loaded contains duplicate slots")
             seen_slots.add(actor_slot)
+        landed_manifest = row["transport_landed"]
+        if not isinstance(landed_manifest, list) or len(landed_manifest) > 8:
+            raise ValueError(f"{label} transport_landed must contain at most eight actors")
+        landed_slots = set()
+        for index, item in enumerate(landed_manifest):
+            if not isinstance(item, dict) or set(item) != {"slot", "raw_type"}:
+                raise ValueError(f"{label} transport_landed[{index}] has invalid shape")
+            actor_slot, actor_raw = item["slot"], item["raw_type"]
+            if type(actor_slot) is not int or not 0 <= actor_slot < 160:
+                raise ValueError(f"{label} transport_landed[{index}] slot is outside unit bounds")
+            if type(actor_raw) is not int or not 0 <= actor_raw <= 255:
+                raise ValueError(f"{label} transport_landed[{index}] raw type is invalid")
+            if actor_slot in landed_slots:
+                raise ValueError(f"{label} transport_landed contains duplicate slots")
+            landed_slots.add(actor_slot)
+        snapshot_tick = row["transport_passenger_snapshot_tick"]
+        if (type(snapshot_tick) is not int or snapshot_tick < 0 or
+                snapshot_tick > row.get("host_tick", -1)):
+            raise ValueError(f"{label} passenger snapshot tick is outside observation time")
+        passengers = row["transport_passengers"]
+        if not isinstance(passengers, list) or len(passengers) > 8:
+            raise ValueError(f"{label} transport_passengers must contain at most eight actors")
+        passenger_slots = set()
+        for index, item in enumerate(passengers):
+            if (not isinstance(item, dict) or
+                    set(item) != {"slot", "original_raw_type", "alive", "loaded", "xy"}):
+                raise ValueError(f"{label} transport_passengers[{index}] has invalid shape")
+            actor_slot, actor_raw = item["slot"], item["original_raw_type"]
+            if type(actor_slot) is not int or not 0 <= actor_slot < 160:
+                raise ValueError(f"{label} transport_passengers[{index}] slot is outside unit bounds")
+            if type(actor_raw) is not int or not 0 <= actor_raw <= 255:
+                raise ValueError(f"{label} transport_passengers[{index}] raw type is invalid")
+            if type(item["alive"]) is not int or item["alive"] not in (0, 1):
+                raise ValueError(f"{label} transport_passengers[{index}] alive must be boolean")
+            if type(item["loaded"]) is not int or item["loaded"] not in (0, 1):
+                raise ValueError(f"{label} transport_passengers[{index}] loaded must be boolean")
+            _bounded_pair(item["xy"], f"{label} transport_passengers[{index}].xy",
+                          allow_sentinel=not item["alive"])
+            if not item["alive"] and (item["loaded"] or item["xy"] != [-1, -1]):
+                raise ValueError(f"{label} dead passenger must use canonical state")
+            if actor_slot in passenger_slots:
+                raise ValueError(f"{label} transport_passengers contains duplicate slots")
+            passenger_slots.add(actor_slot)
         if slot == -1:
             if (raw != -1 or alive != 0 or hp != -1 or cargo != -1 or landed != -1 or
-                    row["transport_ship_xy"] != [-1, -1] or loaded):
+                    row["transport_ship_xy"] != [-1, -1] or loaded or landed_manifest or passengers):
                 raise ValueError(f"{label} absent transport must use canonical sentinels")
         elif raw < 0:
             raise ValueError(f"{label} present transport needs a raw type")
@@ -346,6 +392,113 @@ def make_pages(plan: dict, requested_ticks: int, capacity: int) -> list[dict]:
     return pages
 
 
+_TRANSPORT_SPACE = {
+    0: 1, 1: 1, 7: 1, 10: 1, 15: 1, 16: 1, 20: 1, 32: 1, 34: 1, 37: 1, 41: 1,
+    2: 2, 3: 2, 19: 2, 38: 2, 5: 4, 23: 4,
+}
+_ORDER_TRANSPORTED = 8
+_MAX_UNITS = 160
+_BUILDING_TYPES = {"starport": 114, "control_tower": 115}
+
+
+def _read_signed(row: bytes, offsets: dict[str, int], field: str) -> int:
+    if field not in offsets or offsets[field] + 4 > len(row):
+        raise RuntimeError(f"T5 replay ELF DWARF lacks unit/building field {field}")
+    return int.from_bytes(row[offsets[field]:offsets[field] + 4], "little", signed=True)
+
+
+def _row_alive(row: dict) -> bool:
+    """Profile entity lists contain live actors only; unit-pool rows carry alive explicitly."""
+    return bool(row.get("alive", True))
+
+
+def replay_aux_state(rsp, sym: dict[str, int], bank: dict, buildings: dict) -> dict:
+    """Read current tech, transport, and passenger state from the ARM world."""
+    building_rows = buildings["entities"]
+    result = {}
+    for prefix, raw_type in _BUILDING_TYPES.items():
+        matches = sorted((row for row in building_rows
+                          if row.get("owner") == 0 and row.get("raw_type") == raw_type),
+                         key=lambda row: row["slot"])
+        if matches:
+            row = matches[0]
+            result[f"{prefix}_slot"] = row["slot"]
+            result[f"{prefix}_raw"] = row["raw_type"]
+            result[f"{prefix}_complete"] = int(not row["under_construction"])
+        else:
+            result[f"{prefix}_slot"] = -1
+            result[f"{prefix}_raw"] = -1
+            result[f"{prefix}_complete"] = 0
+    # Keep the complete decoded building pool private to this observer so a
+    # host checkpoint can identify its tracked actor by exact slot. The public
+    # scalar summary above remains for report compatibility.
+    result["_building_rows"] = building_rows
+
+    unit_capacity = bank["unit_capacity"]
+    stride = bank["unit_stride_bytes"]
+    offsets = bank["unit_offsets"]
+    if "u" not in sym:
+        raise RuntimeError("T5 replay ELF has no unit bank symbol")
+    pool_size = unit_capacity * stride
+    if unit_capacity != _MAX_UNITS:
+        raise RuntimeError(f"T5 replay expects {_MAX_UNITS} unit slots, got {unit_capacity}")
+    pool = rsp.read(sym["u"], pool_size)
+    records = []
+    for slot in range(unit_capacity):
+        row = pool[slot * stride:(slot + 1) * stride]
+        records.append({
+            "slot": slot,
+            "x": _read_signed(row, offsets, "x"),
+            "y": _read_signed(row, offsets, "y"),
+            "hp": _read_signed(row, offsets, "hp"),
+            "owner": _read_signed(row, offsets, "owner"),
+            "type": _read_signed(row, offsets, "type"),
+            "alive": bool(_read_signed(row, offsets, "alive")),
+            "order": _read_signed(row, offsets, "order"),
+            "tx": _read_signed(row, offsets, "tx"),
+            "ty": _read_signed(row, offsets, "ty"),
+            "target": _read_signed(row, offsets, "target"),
+            "raw_type": _read_signed(row, offsets, "raw_type"),
+        })
+    carrier = next((row for row in records
+                    if row["owner"] == 0 and row["raw_type"] == 11), None)
+    result.update({
+        "transport_ship_slot": carrier["slot"] if carrier else -1,
+        "transport_ship_raw": carrier["raw_type"] if carrier else -1,
+        "transport_ship_alive": int(carrier["alive"]) if carrier else 0,
+        "transport_ship_hp": carrier["hp"] if carrier else -1,
+        "transport_ship_xy": [carrier["x"], carrier["y"]] if carrier else [-1, -1],
+        "transport_cargo_space": -1,
+        "transport_landing": [-1, -1],
+        "transport_landed_count": -1,
+        "transport_loaded": [],
+        "transport_landed": [],
+    })
+
+    if carrier and carrier["alive"]:
+        loaded = sorted((row for row in records if row["alive"] and
+                         row["order"] == _ORDER_TRANSPORTED and row["target"] == carrier["slot"]),
+                        key=lambda row: row["slot"])
+        result["transport_loaded"] = [
+            {"slot": row["slot"], "raw_type": row["raw_type"]} for row in loaded
+        ]
+        spaces = [_TRANSPORT_SPACE.get(row["raw_type"]) for row in loaded]
+        result["transport_cargo_space"] = (sum(spaces) if all(space is not None for space in spaces)
+                                            and sum(spaces) <= 8 else -1)
+        result["transport_landing"] = ([carrier["tx"], carrier["ty"]]
+                                        if carrier["tx"] >= 0 and carrier["ty"] >= 0 else [-1, -1])
+    else:
+        result["transport_landed_count"] = -1
+        result["transport_cargo_space"] = -1
+        result["transport_loaded"] = []
+    # Keep decoded pool rows internal to the observer. Host passenger manifests
+    # are used only as identities at their recorded snapshot tick, never as
+    # replay state or debugger inputs.
+    result["_unit_rows"] = records
+    result["_carrier_slot"] = carrier["slot"] if carrier else -1
+    return result
+
+
 def t5_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
                 campaign_layout: tuple[int, dict[str, int]],
                 t5_layout: tuple[int, dict[str, int]],
@@ -389,9 +542,9 @@ def t5_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
     state["enemy_units"] = units["by_owner"].get("1", 0)
     state["side_buildings"] = buildings["by_owner"].get("0", 0)
     state["enemy_buildings"] = buildings["by_owner"].get("1", 0)
-    state["kerrigan_alive"] = int(any(row["alive"] and row["raw_type"] == 16
+    state["kerrigan_alive"] = int(any(_row_alive(row) and row["raw_type"] == 16
                                      for row in state["units"]["entities"]))
-    state["raynor_alive"] = int(any(row["alive"] and row["raw_type"] == 19
+    state["raynor_alive"] = int(any(_row_alive(row) and row["raw_type"] == 19
                                     for row in state["units"]["entities"]))
     state["human_outcome"] = players[0]["outcome"]
     state["faults"] = sum(bool(p["fault"]) for p in players)
@@ -404,6 +557,7 @@ def t5_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
     state["elapsed"] = campaign.get("elapsed_frames", 0)
     state["enemy_minerals"] = state["race_minerals"][1]
     state["enemy_gas"] = state["race_gas"][1]
+    state["replay_aux"] = replay_aux_state(rsp, sym, bank, state["buildings"])
     return state
 
 
@@ -412,6 +566,126 @@ def compare_observation(expected: dict, actual: dict, label: str) -> None:
         if field in expected and expected[field] != actual.get(field):
             raise RuntimeError(f"{label} {field} mismatch: expected {expected[field]!r}, "
                                f"observed {actual.get(field)!r}")
+    compare_aux_observation(expected, actual, label)
+
+
+def compare_aux_observation(expected: dict, actual: dict, label: str) -> None:
+    if not any(field in expected for field in (*TECH_SNAPSHOT_FIELDS, *TRANSPORT_SNAPSHOT_FIELDS)):
+        return
+    observed = actual.get("replay_aux")
+    if not isinstance(observed, dict):
+        raise RuntimeError(f"{label} debugger observation has no replay auxiliary state")
+    # Harness slot -1 means its checkpoint code has not begun tracking that
+    # object yet; the object may already exist in the map. Once tracked, use
+    # the recorded slot as the stable identity rather than selecting the first
+    # matching actor from a pool that may contain several.
+    for prefix in ("starport", "control_tower"):
+        expected_slot = expected.get(f"{prefix}_slot", -1)
+        if expected_slot < 0:
+            continue
+        rows = observed.get("_building_rows")
+        if not isinstance(rows, list):
+            raise RuntimeError(f"{label} debugger observation has no decoded building pool")
+        row = next((item for item in rows if item.get("slot") == expected_slot), None)
+        raw_field = f"{prefix}_raw"
+        complete_field = f"{prefix}_complete"
+        expected_raw = expected.get(raw_field)
+        if (row is None or row.get("owner") != 0 or
+                row.get("raw_type") != expected_raw or
+                int(not row.get("under_construction")) != expected.get(complete_field)):
+            raise RuntimeError(f"{label} {prefix} identity/state mismatch at tracked slot "
+                               f"{expected_slot}: expected raw={expected_raw!r}, "
+                               f"complete={expected.get(complete_field)!r}")
+    expected_carrier = expected.get("transport_ship_slot", -1)
+    if expected_carrier < 0:
+        return
+    rows = observed.get("_unit_rows")
+    if not isinstance(rows, list):
+        raise RuntimeError(f"{label} debugger observation has no decoded unit pool")
+    units = {row.get("slot"): row for row in rows}
+    carrier = units.get(expected_carrier)
+    expected_raw = expected.get("transport_ship_raw")
+    if carrier is None or carrier.get("owner") != 0 or carrier.get("raw_type") != expected_raw:
+        raise RuntimeError(f"{label} transport carrier identity mismatch at tracked slot "
+                           f"{expected_carrier}: expected raw={expected_raw!r}")
+    actual_ship = {
+        "transport_ship_slot": expected_carrier,
+        "transport_ship_raw": carrier["raw_type"],
+        "transport_ship_alive": int(carrier["alive"]),
+        "transport_ship_hp": carrier["hp"],
+        "transport_ship_xy": [carrier["x"], carrier["y"]],
+        "transport_landing": ([carrier["tx"], carrier["ty"]]
+                              if carrier["alive"] and carrier["tx"] >= 0 and carrier["ty"] >= 0
+                              else [-1, -1]),
+    }
+    loaded_rows = sorted((row for row in rows if row["alive"] and
+                          row["order"] == _ORDER_TRANSPORTED and
+                          row["target"] == expected_carrier), key=lambda row: row["slot"])
+    actual_ship["transport_loaded"] = [
+        {"slot": row["slot"], "raw_type": row["raw_type"]} for row in loaded_rows
+    ]
+    spaces = [_TRANSPORT_SPACE.get(row["raw_type"]) for row in loaded_rows]
+    actual_ship["transport_cargo_space"] = (
+        sum(spaces) if carrier["alive"] and all(space is not None for space in spaces)
+        and sum(spaces) <= 8 else -1
+    )
+    for field, value in actual_ship.items():
+        # In the controller trace this field is a frozen planned landing
+        # coordinate, not a live destination at every later observation.
+        # It is compared against the exact carrier only on landed checkpoints.
+        if field == "transport_landing":
+            continue
+        if field in expected and expected[field] != value:
+            raise RuntimeError(f"{label} {field} mismatch: expected {expected[field]!r}, "
+                               f"observed {value!r}")
+    # The host trace freezes passenger status at landing. Compare that frozen
+    # manifest only at the exact source observation tick; later rows can show
+    # legitimate movement or deaths after the landing snapshot.
+    source_tick = expected.get("source_host_tick", expected.get("host_tick"))
+    if ("transport_passenger_snapshot_tick" in expected and
+            expected["transport_passenger_snapshot_tick"] == source_tick):
+        manifest = expected["transport_passengers"]
+        rows = units
+        carrier_slot = expected_carrier
+        actual_passengers = []
+        for item in manifest:
+            unit = rows.get(item["slot"])
+            alive = bool(unit and unit["alive"] and unit["raw_type"] == item["original_raw_type"])
+            loaded = bool(alive and unit["order"] == _ORDER_TRANSPORTED and
+                          unit["target"] == carrier_slot)
+            actual_passengers.append({
+                "slot": item["slot"], "original_raw_type": item["original_raw_type"],
+                "alive": int(alive), "loaded": int(loaded),
+                "xy": [unit["x"], unit["y"]] if alive else [-1, -1],
+            })
+        if manifest != actual_passengers:
+            raise RuntimeError(f"{label} transport passenger snapshot mismatch: "
+                               f"expected {manifest!r}, observed {actual_passengers!r}")
+    if (expected.get("kind") in ("dropship-landed", "dropship-unloaded") and
+            "transport_landed" in expected):
+        carrier_xy = actual_ship["transport_landing"]
+        if expected.get("transport_landing") != carrier_xy:
+            raise RuntimeError(f"{label} transport_landing mismatch: "
+                               f"expected {expected.get('transport_landing')!r}, observed {carrier_xy!r}")
+        manifest = expected.get("transport_passengers", [])
+        rows = units
+        landed = []
+        if carrier_xy != [-1, -1]:
+            for item in manifest:
+                unit = rows.get(item["slot"])
+                if (unit and unit["alive"] and unit["raw_type"] == item["original_raw_type"] and
+                        unit["owner"] == 0 and
+                        not (unit["order"] == _ORDER_TRANSPORTED and
+                             unit["target"] == expected_carrier) and
+                        (unit["x"] - carrier_xy[0]) ** 2 +
+                        (unit["y"] - carrier_xy[1]) ** 2 < 72 ** 2):
+                    landed.append({"slot": item["slot"], "raw_type": unit["raw_type"]})
+        if expected["transport_landed"] != landed:
+            raise RuntimeError(f"{label} transport_landed mismatch: "
+                               f"expected {expected['transport_landed']!r}, observed {landed!r}")
+        if expected["transport_landed_count"] != len(landed):
+            raise RuntimeError(f"{label} transport_landed_count mismatch: "
+                               f"expected {expected['transport_landed_count']}, observed {len(landed)}")
 
 
 def verify_final(expected: dict, state: dict) -> None:
@@ -453,8 +727,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         elf_path: Path | None = None, ticks: int | None = None) -> dict:
     trace_bytes = trace_path.read_bytes()
     plan = validate_trace(json.loads(trace_bytes), capacity=256)
-    rom = rom_path or ROOT / "build/StarCraft-T5-Campaign-GBA.gba"
-    elf = elf_path or ROOT / "build/starcraft-t5-campaign.elf"
+    rom = rom_path or DEFAULT_ROM
+    elf = elf_path or DEFAULT_ELF
     if not rom.is_file() or not elf.is_file():
         raise RuntimeError(f"T5 campaign-menu replay ROM/ELF missing ({rom}, {elf})")
     sym, sizes = symbols(elf), symbol_sizes(elf)
@@ -493,7 +767,12 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
     def record(checkpoint: dict) -> None:
         observations.append(checkpoint)
         with history_path.open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(checkpoint, separators=(",", ":")) + "\n")
+            public = dict(checkpoint)
+            aux = public.get("replay_aux")
+            if isinstance(aux, dict):
+                public["replay_aux"] = {key: value for key, value in aux.items()
+                                        if not key.startswith("_")}
+            stream.write(json.dumps(public, separators=(",", ":")) + "\n")
             stream.flush()
             os.fsync(stream.fileno())
 
@@ -507,7 +786,6 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         rsp.write(sym["demo_schedule_count"], struct.pack("<I", len(events)))
 
     replay_started = None
-    play_started = None
     try:
         proc, sock, rsp, log = split.start_emulator(run_dir.name, rom, run_dir, sym)
         initial = {"screen": profile.u32(rsp, sym["screen"]), "frame": profile.u32(rsp, sym["frame"]),
@@ -529,12 +807,32 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         state = t5_snapshot(rsp, sym, sizes, bank, campaign_layout, t5_layout, trigger_layout)
         if state.get("race_mode") != 0 or state.get("screen") != SCREEN_TITLE:
             raise RuntimeError("T5 normal-menu replay did not begin at campaign HOME")
-        record({"tick": 0, "host_tick": 0, "entry": "campaign-menu", **state})
+        previous_clock = profile.hardware_clock(rsp)
+        cycle_names = tuple(getattr(profile, "PROFILE_CYCLE_NAMES", ()))
+        cycle_values = {name: profile.u32(rsp, sym[name])
+                        for name in cycle_names if name in sym}
+        previous_buckets = (list(struct.unpack("<8I", rsp.read(sym["demo_tick_buckets"], 32)))
+                            if "demo_tick_buckets" in sym else None)
+        last_cycles = {name: profile.u32(rsp, sym[name])
+                       for name in ("demo_last_cycles", "demo_peak_cycles") if name in sym}
+        record({"tick": 0, "host_tick": 0, "entry": "campaign-menu",
+                "elapsed_hardware_cycles": 0, "frame_delta": 0,
+                "counted_live_play_interval": False, "effective_fps": None,
+                "profile_cycles_last_tick": cycle_values,
+                "profile_cycles_scope": "last-tick values; absent diagnostic symbols are unavailable",
+                "profile_cycles_missing": [name for name in cycle_names if name not in sym],
+                "diagnostic_cycle_symbols_available": any(name.startswith("sc64_update_") or name.startswith("sc64_order_")
+                                                           for name in cycle_values),
+                "demo_tick_buckets": previous_buckets,
+                "demo_last_cycles": last_cycles.get("demo_last_cycles"),
+                "demo_peak_cycles": last_cycles.get("demo_peak_cycles"),
+                **state})
         capture(rsp, run_dir / "home.png")
 
         previous_state = state
+        counted_frames = counted_cycles = 0
+        worst_live_interval = None
         boundaries = [page["end_tick"] for page in pages]
-        previous_tick = 0
         for page_index, expected_tick in enumerate(boundaries):
             rsp.tick()
             observed_tick = profile.u32(rsp, sym["demo_schedule_tick"])
@@ -545,11 +843,30 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
             if cursor != count or count != len(pages[page_index]["events"]):
                 raise RuntimeError(f"scheduler page incomplete at {expected_tick}: {cursor}/{count}")
             state = t5_snapshot(rsp, sym, sizes, bank, campaign_layout, t5_layout, trigger_layout)
+            now_clock = profile.hardware_clock(rsp)
+            elapsed_cycles = (now_clock - previous_clock) & scheduler.MAX_U32
+            frame_delta = (state["frame"] - previous_state["frame"]) & scheduler.MAX_U32
+            counted = (previous_state["screen"] == SCREEN_PLAY and
+                       state["screen"] == SCREEN_PLAY and frame_delta > 0)
+            fps = round(profile.CPU_HZ * frame_delta / max(1, elapsed_cycles), 2) if counted else None
+            if counted:
+                counted_frames += frame_delta
+                counted_cycles += elapsed_cycles
+                interval = {"tick": expected_tick, "frame_delta": frame_delta,
+                            "elapsed_hardware_cycles": elapsed_cycles,
+                            "effective_fps": fps}
+                if worst_live_interval is None or fps < worst_live_interval["effective_fps"]:
+                    worst_live_interval = interval
+            cycles = {name: profile.u32(rsp, sym[name])
+                      for name in cycle_names if name in sym}
+            buckets = (list(struct.unpack("<8I", rsp.read(sym["demo_tick_buckets"], 32)))
+                       if "demo_tick_buckets" in sym else None)
+            bucket_delta = ([(value - old) & scheduler.MAX_U32
+                             for value, old in zip(buckets, previous_buckets)]
+                            if buckets is not None and previous_buckets is not None else None)
             now = time.monotonic()
             if replay_started is None:
                 replay_started = now
-            if expected_tick == ENTRY_TICKS:
-                play_started = now
             if expected_tick >= ENTRY_TICKS and (state.get("race_mode") != 0 or
                                                   state.get("race_selected_mission") != MISSION_T5):
                 raise RuntimeError(f"normal HOME/menu controls failed to launch T5 by tick {expected_tick}")
@@ -568,16 +885,38 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                 next_page = pages[page_index + 1]
                 write_page(next_page)
                 rsp.write(sym["demo_schedule_length"], struct.pack("<I", next_page["end_tick"]))
-            frame_delta = (state["frame"] - previous_state.get("frame", 0)) & 0xFFFFFFFF
             checkpoint = {"tick": expected_tick, "host_tick": expected_tick,
-                          "frame_delta": frame_delta, **state}
+                          "elapsed_hardware_cycles": elapsed_cycles,
+                          "frame_delta": frame_delta,
+                          "counted_live_play_interval": counted,
+                          "effective_fps": fps,
+                          "profile_cycles_last_tick": cycles,
+                          "profile_cycles_scope": "last-tick values; absent diagnostic symbols are unavailable",
+                          "profile_cycles_missing": [name for name in cycle_names if name not in sym],
+                          "diagnostic_cycle_symbols_available": any(name.startswith("sc64_update_") or name.startswith("sc64_order_")
+                                                                     for name in cycles),
+                          "demo_tick_buckets": buckets,
+                          "demo_tick_bucket_interval": bucket_delta,
+                          "demo_last_cycles": (profile.u32(rsp, sym["demo_last_cycles"])
+                                                if "demo_last_cycles" in sym else None),
+                          "demo_peak_cycles": (profile.u32(rsp, sym["demo_peak_cycles"])
+                                                if "demo_peak_cycles" in sym else None),
+                          "worst_live_interval_so_far": worst_live_interval,
+                          **state}
             checkpoint["wall_seconds"] = round(now - replay_started, 6)
             record(checkpoint)
-            previous_state, previous_tick = state, expected_tick
+            previous_state = state
+            previous_clock, cycle_values, previous_buckets = now_clock, cycles, buckets
 
         final = observations[-1]
+        final_public = dict(final)
+        if isinstance(final_public.get("replay_aux"), dict):
+            final_public["replay_aux"] = {
+                key: value for key, value in final_public["replay_aux"].items()
+                if not key.startswith("_")
+            }
         status = "prefix" if prefix else plan["final"]["kind"]
-        play_wall = (time.monotonic() - play_started) if play_started is not None else 0.0
+        replay_wall = (time.monotonic() - replay_started) if replay_started is not None else 0.0
         play_frames = max(0, int(final.get("frame", 0)))
         report = {"profile": "terran-t5-campaign-menu", "entry": "campaign-menu",
                   "status": status, "mission": MISSION_T5, "rom": str(rom), "elf": str(elf),
@@ -591,12 +930,20 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                   "peak_page_transitions": max((len(p["events"]) for p in pages), default=0),
                   "trace_stop_tick": plan["stop_tick"], "requested_ticks": requested,
                   "observed_ticks": final["tick"], "prefix": prefix,
+                  "counted_live_play_frames": counted_frames,
+                  "counted_live_play_hardware_cycles": counted_cycles,
+                  "mean_live_play_effective_fps": round(profile.CPU_HZ * counted_frames /
+                                                         max(1, counted_cycles), 2),
+                  "worst_live_play_interval": worst_live_interval,
+                  "timer_method": "chained GBA timers sampled at each 1000-tick or trace observer boundary",
+                  "fps_exclusions": "Only positive frame deltas between PLAY observations count; HOME/menu intervals are excluded.",
                   "checkpoint_history": str(history_path), "captures": {"home": str(run_dir / "home.png")},
-                  "final": final, "play_frames": play_frames,
-                  "play_wall_seconds": round(play_wall, 3),
-                  "play_effective_fps": round(play_frames / play_wall, 3) if play_wall > 0 else 0.0,
+                  "final": final_public, "play_frames": play_frames,
+                  "replay_wall_seconds": round(replay_wall, 3),
+                  "last_tick_profile_counters": final.get("profile_cycles_last_tick", {}),
+                  "last_tick_demo_tick_buckets": final.get("demo_tick_buckets"),
                   "completed": False, "final_is_unfinished_limit": status == "limit",
-                  "final": final, "verified_win": False}
+                  "final": final_public, "verified_win": False}
         if not prefix:
             verify_final(plan["final"], final)
             report["verified_win"] = report["status"] == "won"

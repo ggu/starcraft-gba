@@ -22,7 +22,7 @@ Command Centers train SCVs. Barracks train Marines by default; select a Barracks
 
 This is an original-art RTS demake rather than a full StarCraft engine. It uses fixed-size unit/building pools, a compact map, simplified collision, direct routing across open ground, and BFS detours around blocked routes on a 16-pixel grid, with authored map balance. Combat uses the basic unit roles, hit points, armor, costs, supply, build times, and weapon values referenced below, scaled to the GBA's 30 updates per second. Resource trips preserve the eight-mineral harvest amount, with a shorter final trip for depleted patches. Gas uses a small worker pool and two fixed geysers.
 
-It omits campaign triggers, air units, large tech trees, unit abilities, damage-type/size modifiers, pathing influence from other mobile units, multiplayer, and original game art/audio. Firebat splash, Medic healing, upgrades, fog visibility, and Zerg wave behavior are compact approximations for a short handheld mission.
+It omits campaign triggers, air units, large tech trees, unit abilities, damage-type/size modifiers, pathing influence from other mobile units, multiplayer, and original game art/audio. Firebat splash, upgrades, fog visibility, and Zerg wave behavior are compact approximations for a short handheld mission. Medics do not have a healing order yet.
 
 The opening scenario averaged about 21.92 updates/second in a 240-tick mGBA ARM sample, with pathfinding hitches. Unit timers use a fixed step, so slowdown also slows in-game time. The renderer targets about 30 updates/second when update and drawing costs fit the frame budget. See the [validation record](../docs/VALIDATION.md); physical hardware performance has not been measured.
 

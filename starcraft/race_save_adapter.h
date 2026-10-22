@@ -264,6 +264,7 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #ifdef SC64_T5_RUNTIME
+    if (!race_t5_candidate_queues_available(&race_data)) return 0;
     if (race_t5_active()) {
         if (!race_t5_save_pack(&race_data.t5, &race_t5) ||
             !race_t5_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
@@ -401,6 +402,7 @@ static int race_load_game(void) {
 #undef RACE_U
 #undef RACE_B
 #ifdef SC64_T5_RUNTIME
+    if (!race_t5_candidate_queues_available(&race_data)) return 0;
     if (!race_transport_save_candidate_valid(&race_data, width, height)) return 0;
 #endif
     for(int i=0;i<MAX_MINERALS;i++)if(race_data.minerals_map[i].amount<0||

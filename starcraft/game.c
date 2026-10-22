@@ -479,6 +479,7 @@ static void race_t5_mines_tick(void);
 static int race_t5_start_control_tower(int producer);
 static void race_t5_tech_tick(void);
 static int sc64_race_t5_building_art_raw(int type);
+static int race_t5_unit_product_available(int owner, int raw_owner, int type);
 #endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 static Sc64T3State race_t3;
@@ -531,6 +532,9 @@ volatile u32 sc64_update_race_state_cycles, sc64_update_defenses_cycles;
 volatile u32 sc64_update_research_cycles, sc64_update_remainder_cycles;
 #ifdef SC64_T4_SCENARIO_RUNTIME
 volatile u32 sc64_t4_rescue_cycles, sc64_t4_script_cycles, sc64_t4_trap_cycles;
+#endif
+#ifdef SC64_T5_RUNTIME
+volatile u32 sc64_t5_rescue_cycles, sc64_t5_mine_cycles, sc64_t5_trigger_ai_cycles;
 #endif
 #endif
 #include "sc64_visibility.h"
@@ -3588,6 +3592,12 @@ select_next_train_type(void)
         for (int step = 1; step <= 5; ++step) {
             int type = advanced[(current + step) % 5];
             if (sc64_race_unit_rules[type].producer == b[selected_building].type) {
+#ifdef SC64_T5_RUNTIME
+                if (race_t5_active() &&
+                    !race_t5_unit_product_available(b[selected_building].owner,
+                                                    b[selected_building].raw_owner,
+                                                    type)) continue;
+#endif
                 train_type = type; return;
             }
         }
@@ -3858,6 +3868,11 @@ game_update(u16 held, u16 pressed)
     sc64_update_defenses_cycles = 0;
     sc64_update_research_cycles = 0;
     sc64_update_remainder_cycles = 0;
+#ifdef SC64_T5_RUNTIME
+    sc64_t5_rescue_cycles = 0;
+    sc64_t5_mine_cycles = 0;
+    sc64_t5_trigger_ai_cycles = 0;
+#endif
     sc64_update_stage_start = gba_clock();
 #endif
 #endif
@@ -5422,6 +5437,9 @@ game_self_test(void)
 
 #ifdef SC64_RACES
 #include "race_combat.h"
+#ifdef SC64_T5_RUNTIME
+#include "sc64_t5_availability_adapter.h"
+#endif
 #include "race_adapter.h"
 #ifdef SC64_T5_RUNTIME
 #include "sc64_t5_tech_adapter.h"
