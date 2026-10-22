@@ -1,6 +1,13 @@
 #ifndef SC64_VISIBILITY_H
 #define SC64_VISIBILITY_H
 
+#ifndef SC64_GRID_GET
+#define SC64_GRID_GET(grid, cell) ((grid)[(cell)] != 0)
+#define SC64_GRID_SET(grid, cell, value) ((grid)[(cell)] = (u8)((value) != 0))
+#define SC64_GRID_CLEAR(grid) memset((grid), 0, sizeof(grid))
+#define SC64_VISIBILITY_LOCAL_GRID_ACCESS
+#endif
+
 /* Exact incremental replacement for the SC64 update_exploration() scan.
  * Include after Unit/Building declarations and the globals u, b, visible,
  * explored, MAX_UNITS/MAX_BUILDINGS, SIDE, U_SCV, and B_COMMAND are defined.
@@ -26,23 +33,21 @@ static int GBA_HOT
 sc64_minimap_cell(int cell)
 {
 #ifdef SC64_RACES
-    int col=sc64_cell_col(cell),row=sc64_cell_row(cell);
+#ifdef SC64_LARGE_MAPS
+    return (int)sc64_map_tile_minimap_index((unsigned)sc64_cell_col(cell),
+        (unsigned)sc64_cell_row(cell), (unsigned)race_cols, (unsigned)race_rows);
+#else
+    int col=sc64_cell_col(cell), row=sc64_cell_row(cell);
+    int mx = MAP_COLS == 64 ? (col * 3) >> 3 : col >> 2;
+    int my = MAP_ROWS == 64 ? (row * 3) >> 3 : row >> 2;
+    return mx + my * 24;
+#endif
 #else
     int col=cell%MAP_COLS,row=cell/MAP_COLS;
-#endif
-    int mx =
-#ifdef SC64_RACES
-        MAP_COLS==64?(col*3)>>3:col>>2;
-#else
-        col*24/MAP_COLS;
-#endif
-    int my =
-#ifdef SC64_RACES
-        MAP_ROWS==64?(row*3)>>3:row>>2;
-#else
-        row*24/MAP_ROWS;
-#endif
+    int mx = col*24/MAP_COLS;
+    int my = row*24/MAP_ROWS;
     return mx + my * 24;
+#endif
 }
 
 static void
@@ -52,11 +57,11 @@ sc64_visibility_reset(void)
     memset(sc64_visible_sources, 0, sizeof(sc64_visible_sources));
     memset(sc64_minimap_visible, 0, sizeof(sc64_minimap_visible));
     memset(sc64_minimap_explored, 0, sizeof(sc64_minimap_explored));
-    memset(visible, 0, sizeof(visible));
+    SC64_GRID_CLEAR(visible);
     /* `explored` is save-persistent, so rebuild aggregate occupancy from the
        restored full-resolution grid before sources are re-added. */
     for (i = 0; i < MAP_COLS * MAP_ROWS; i++)
-        if (explored[i])
+        if (SC64_GRID_GET(explored, i))
             sc64_minimap_explored[sc64_minimap_cell(i)]++;
     for (i = 0; i < MAX_UNITS; i++)
         sc64_unit_visibility[i].active = 0;
@@ -88,8 +93,8 @@ sc64_explore_unit(int x, int y, int type)
             if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS &&
                 (col - c) * (col - c) + (row - r) * (row - r) <= radius * radius) {
                 int cell = col + row * MAP_COLS;
-                if (!explored[cell]) {
-                    explored[cell] = 1;
+                if (!SC64_GRID_GET(explored, cell)) {
+                    SC64_GRID_SET(explored, cell, 1);
                     sc64_minimap_explored[sc64_minimap_cell(cell)]++;
                 }
             }
@@ -105,8 +110,8 @@ sc64_explore_building(int x, int y, int type)
             if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS &&
                 (col - c) * (col - c) + (row - r) * (row - r) <= radius * radius) {
                 int cell = col + row * MAP_COLS;
-                if (!explored[cell]) {
-                    explored[cell] = 1;
+                if (!SC64_GRID_GET(explored, cell)) {
+                    SC64_GRID_SET(explored, cell, 1);
                     sc64_minimap_explored[sc64_minimap_cell(cell)]++;
                 }
             }
@@ -140,7 +145,7 @@ sc64_adjust_unit_visibility(int x, int y, int type, int delta)
                         if (sc64_visible_sources[cell] == 0)
                             sc64_minimap_visible[sc64_minimap_cell(cell)]--;
                     }
-                    visible[cell] = sc64_visible_sources[cell] != 0;
+                    SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
                 }
             }
 }
@@ -187,7 +192,7 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
                         if (sc64_visible_sources[cell] == 0)
                             sc64_minimap_visible[sc64_minimap_cell(cell)]--;
                     }
-                    visible[cell] = sc64_visible_sources[cell] != 0;
+                    SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
                 }
             }
 }
@@ -219,7 +224,7 @@ sc64_adjust_building_visibility(int x, int y, int type, int delta)
                         if (sc64_visible_sources[cell] == 0)
                             sc64_minimap_visible[sc64_minimap_cell(cell)]--;
                     }
-                    visible[cell] = sc64_visible_sources[cell] != 0;
+                    SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
                 }
             }
 }
@@ -282,4 +287,10 @@ sc64_update_exploration(void)
     }
 }
 
+#ifdef SC64_VISIBILITY_LOCAL_GRID_ACCESS
+#undef SC64_GRID_GET
+#undef SC64_GRID_SET
+#undef SC64_GRID_CLEAR
+#undef SC64_VISIBILITY_LOCAL_GRID_ACCESS
+#endif
 #endif /* SC64_VISIBILITY_H */

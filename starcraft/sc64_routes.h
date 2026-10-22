@@ -1,13 +1,24 @@
 #ifndef SC64_ROUTES_H
 #define SC64_ROUTES_H
 
+/* Standalone route fixtures still use byte grids; game.c supplies the packed
+ * accessor for SC64_LARGE_MAPS builds. */
+#ifndef SC64_GRID_GET
+#define SC64_GRID_GET(grid, cell) ((grid)[(cell)] != 0)
+#define SC64_ROUTES_LOCAL_GRID_GET
+#endif
+
 /* Shared shortest-path fields on the same four-neighbour collision grid.
  * A mineral, base or group destination costs one reverse flood, rather than
  * one flood per moving unit per tile. Dynamic actors still use local steering.
  * Derived caches are discarded after load and whenever a structure changes. */
 /* The race game needs fields for four economies and several armies. */
 #ifdef SC64_RACES
+#ifdef SC64_LARGE_MAPS
+#define SC64_ROUTE_SLOTS 14
+#else
 #define SC64_ROUTE_SLOTS 16
+#endif
 #define SC64_ROUTE_BYTES ((MAP_CELLS + 1) / 2)
 #elif defined(SC64_SKIRMISH)
 #define SC64_ROUTE_SLOTS 16
@@ -70,7 +81,7 @@ sc64_route_slot(int goal)
     field = sc64_route_field[slot];
     memset(field, 255, MAP_CELLS * sizeof(*field));
 #endif
-    if (path_walkable[goal]) {
+    if (SC64_GRID_GET(path_walkable, goal)) {
 #ifdef SC64_RACES
         sc64_route_put(slot, goal, 0);
 #else
@@ -87,7 +98,7 @@ sc64_route_slot(int goal)
             int col = x + dx, row = y + dy, cell;
             if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS) continue;
             cell = col + row * MAP_COLS;
-            if (path_walkable[cell]) {
+            if (SC64_GRID_GET(path_walkable, cell)) {
 #ifdef SC64_RACES
                 if (sc64_route_get(slot, cell) == 15) {
                     sc64_route_put(slot, cell, 0); bfs_queue[tail++] = (u16)cell;
@@ -109,12 +120,12 @@ sc64_route_slot(int goal)
 #ifdef SC64_RACES
 #define SC64_FLOOD(condition, neighbour, direction) \
         if (condition) { next = (neighbour); \
-            if (path_walkable[next] && sc64_route_get(slot, next) == 15) { \
+            if (SC64_GRID_GET(path_walkable, next) && sc64_route_get(slot, next) == 15) { \
                 sc64_route_put(slot, next, (direction)); bfs_queue[tail++] = (u16)next; } }
 #else
 #define SC64_FLOOD(condition, neighbour, direction) \
         if (condition) { next = (neighbour); \
-            if (path_walkable[next] && field[next] == 0xFFFF) { \
+            if (SC64_GRID_GET(path_walkable, next) && field[next] == 0xFFFF) { \
                 field[next] = (u16)(((field[cell] & ~7u) + 8u) | (direction)); \
                 bfs_queue[tail++] = (u16)next; } }
 #endif
@@ -149,7 +160,7 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
     field = sc64_route_field[slot];
     direction = field[cell] == 0xFFFF ? -1 : field[cell] & 7;
 #endif
-    if (direction < 0 && !path_walkable[cell]) {
+    if (direction < 0 && !SC64_GRID_GET(path_walkable, cell)) {
         static const s8 dx[4] = {1,-1,0,0}, dy[4] = {0,0,1,-1};
         int i, best = -1, cost = 0x7fffffff;
         /* Imported/produced units may start in an inflated building cell. */
@@ -189,4 +200,8 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
     *next_x = col * 16 + 8; *next_y = row * 16 + 8;
     return 1;
 }
+#ifdef SC64_ROUTES_LOCAL_GRID_GET
+#undef SC64_GRID_GET
+#undef SC64_ROUTES_LOCAL_GRID_GET
+#endif
 #endif

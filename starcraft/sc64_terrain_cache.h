@@ -1,6 +1,11 @@
 #ifndef SC64_TERRAIN_CACHE_INCLUDED
 #define SC64_TERRAIN_CACHE_INCLUDED
 
+#ifndef SC64_GRID_GET
+#define SC64_GRID_GET(grid, cell) ((grid)[(cell)] != 0)
+#define SC64_TERRAIN_LOCAL_GRID_GET
+#endif
+
 /* Cache only the static terrain and fog pixels. Dynamic objects are drawn
  * after this band is restored each frame. Keep the buffer word-aligned for
  * the Mode 4 DMA helpers. */
@@ -82,7 +87,8 @@ sc64_terrain_cached(int x, int y)
     for (row = row0; row < row1; row++)
         for (col = col0; col < col1; col++) {
             int cell = col + row * MAP_COLS;
-            u8 state = (visible[cell] ? 1 : 0) | (explored[cell] ? 2 : 0);
+            u8 state = (SC64_GRID_GET(visible, cell) ? 1 : 0) |
+                       (SC64_GRID_GET(explored, cell) ? 2 : 0);
             sc64_terrain_cache_dirty[i] = sc64_terrain_cache_mask[i] != state;
             if (sc64_terrain_cache_dirty[i]) unchanged = 0;
             i++;
@@ -120,7 +126,8 @@ sc64_terrain_store(int x, int y)
         for (col = col0; col < col1; col++) {
             int cell = col + row * MAP_COLS;
             sc64_terrain_cache_mask[i++] =
-                (visible[cell] ? 1 : 0) | (explored[cell] ? 2 : 0);
+                (SC64_GRID_GET(visible, cell) ? 1 : 0) |
+                (SC64_GRID_GET(explored, cell) ? 2 : 0);
         }
     sc64_terrain_cache_mask_count = i;
     sc64_terrain_cache_camx = x;
@@ -132,4 +139,8 @@ sc64_terrain_store(int x, int y)
     return 1;
 }
 
+#ifdef SC64_TERRAIN_LOCAL_GRID_GET
+#undef SC64_GRID_GET
+#undef SC64_TERRAIN_LOCAL_GRID_GET
+#endif
 #endif

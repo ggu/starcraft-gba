@@ -20,7 +20,7 @@ int main(void)
     assert(sc64_race_unit_armor(U_FENIX_DRAGOON) == 3);
     assert(sc64_race_unit_armor(U_GOLIATH) == 1);
     /* BWAPI Terran Vulture: 75/0, 80 HP, 2 supply, factory, 450 frames. */
-    assert(U_VULTURE < U_DROPSHIP && U_DROPSHIP == SC_RU_COUNT - 1);
+    assert(U_VULTURE < U_DROPSHIP && U_DROPSHIP == U_SCOURGE - 1);
     assert(sc64_race_unit_rule(U_VULTURE)->race == R_TER);
     assert(sc64_race_unit_rule(U_VULTURE)->producer == B_FACTORY);
     assert(sc64_race_unit_rule(U_VULTURE)->minerals == 75);
@@ -52,6 +52,17 @@ int main(void)
     assert(sc64_race_unit_range_vs(U_DROPSHIP, 0) == 0);
     assert(sc64_race_unit_range_vs(U_DROPSHIP, 1) == 0);
     assert(sc64_race_raw_unit(U_DROPSHIP) == 11);
+    assert(U_SCOURGE == SC_RU_COUNT - 1 && U_DROPSHIP == U_SCOURGE - 1);
+    assert(sc64_race_unit_from_raw(47) == U_SCOURGE);
+    assert(sc64_race_raw_unit(U_SCOURGE) == 47);
+    assert(sc64_race_unit_rule(U_SCOURGE)->race == R_ZERG);
+    assert(sc64_race_unit_rule(U_SCOURGE)->minerals == 25);
+    assert(sc64_race_unit_rule(U_SCOURGE)->gas == 75);
+    assert(sc64_race_unit_rule(U_SCOURGE)->build_frames == 450);
+    assert(sc64_race_unit_rule(U_SCOURGE)->hp == 25);
+    assert(sc64_race_unit_rule(U_SCOURGE)->supply == 1);
+    assert(sc64_race_unit_flying(U_SCOURGE));
+    assert(sc64_race_unit_damage_vs(U_SCOURGE, 1) == 0); /* Suicide attack not simulated. */
 #if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
     assert(sc64_race_unit_from_raw(11) == U_DROPSHIP);
 #else
@@ -69,6 +80,14 @@ int main(void)
     assert(sc64_race_building_armor(B_MATURE_CHRYSALIS) == 1);
     assert(sc64_race_unit_from_raw(216) == U_CHRYSALIS);
     assert(sc64_race_unit_rule(U_CHRYSALIS)->hp == 800);
+    assert(sc64_race_building_from_raw(133) == B_HIVE);
+    assert(sc64_race_raw_building(B_HIVE) == 133);
+    assert(sc64_race_building_rule(B_HIVE)->hp == 2500);
+    assert(sc64_race_building_armor(B_HIVE) == 1);
+    assert(sc64_race_building_from_raw(137) == B_GREATER_SPIRE);
+    assert(sc64_race_raw_building(B_GREATER_SPIRE) == 137);
+    assert(sc64_race_building_rule(B_GREATER_SPIRE)->hp == 1000);
+    assert(sc64_race_building_armor(B_GREATER_SPIRE) == 1);
     assert(sc64_race_building_armor(B_SUNKEN_COLONY) == 2);
     assert(sc64_race_building_armor(B_PYLON) == 0);
     assert(sc64_race_unit_from_raw(30) == U_SIEGE_TANK);

@@ -96,6 +96,22 @@ Imported skirmish data is fitted to the engine's bounded resource storage. The p
 
 ## Current limits
 
+Higher Ground (Protoss 3, global catalog ID 22) is in preparation. The private
+import preserves its 128×96 terrain, all 96 units, 42 buildings, 48 mineral
+fields and three geysers; three start markers are excluded from live entities.
+Both source computer-owner slots remain available for separate force handling.
+`make test-sc64-p3-import` validates these records without making the mission
+playable. Scourge has a distinct flying identity, but its suicide attack is
+not implemented.
+
+`make test-sc64-large-map sc64-large-probe` checks the opt-in
+`SC64_LARGE_MAPS` storage layout, including packed fog/path grids, larger
+target indexing and 48 mineral slots. The ARM probe links the existing Protoss
+missions with this layout; it does not enable Higher Ground. The synthetic
+save check covers the maximum fog buffer and high resource slots, not a
+128-column catalog mission's complete load/resume behavior. Standard build
+flags and save layouts remain unchanged.
+
 - Standard builds enable two campaign missions per race. Experimental Terran 3 is described above; the other later missions still need scenario and gameplay implementation.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build these three profiles until that preparation has been done.

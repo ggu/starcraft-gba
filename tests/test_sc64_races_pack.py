@@ -36,9 +36,15 @@ class RaceMapTableEmissionTests(unittest.TestCase):
             '    {14}, /* Z3: Zerg profile only, global ID 14 */\n'
             '#else\n    {0},\n#endif\n'
         )
+        p3_guard = campaign_guard_for_map(8)
+        rows.append(
+            f'#if defined(SC64_UNIFIED) && defined(SC64_P3_ENABLED) && ({p3_guard})\n'
+            '    {22}, /* P3: Protoss profile only, global ID 22 */\n'
+            '#else\n    {0},\n#endif\n'
+        )
         return rows
 
-    def compile_case(self, flags, expected_count, expected_t3, expected_z3):
+    def compile_case(self, flags, expected_count, expected_t3, expected_z3, expected_p3):
         source = (
             'typedef struct { int id; } Sc64RaceMap;\n'
             + emit_map_count()
@@ -48,11 +54,18 @@ class RaceMapTableEmissionTests(unittest.TestCase):
             + ' for (int i = 0; i < 6 && i < SC64_RACE_MAP_COUNT; ++i) '
               'if (sc64_race_maps[i].id != i) return 2;\n'
             + f' if (SC64_RACE_MAP_COUNT > 6 && sc64_race_maps[6].id != {expected_t3}) return 3;\n'
-            + ' if (SC64_RACE_MAP_COUNT == 15) {\n'
+            + ' if (SC64_RACE_MAP_COUNT >= 15) {\n'
             + '  for (int i = 7; i <= 13; ++i) if (sc64_race_maps[i].id != 0) return 4;\n'
             + f'  if (sc64_race_maps[14].id != {expected_z3}) return 5;\n'
             + ' }\n return 0;\n}\n'
         )
+        if expected_count == 23:
+            source = source.replace(
+                ' return 0;\n}\n',
+                ' if (SC64_RACE_MAP_COUNT == 23) {\n'
+                '  for (int i = 15; i <= 21; ++i) if (sc64_race_maps[i].id != 0) return 6;\n'
+                f'  if (sc64_race_maps[22].id != {expected_p3}) return 7;\n'
+                ' }\n return 0;\n}\n')
         with tempfile.TemporaryDirectory(prefix='sc64-map-table-') as directory:
             c_path = Path(directory) / 'fixture.c'
             exe_path = Path(directory) / 'fixture'
@@ -67,18 +80,26 @@ class RaceMapTableEmissionTests(unittest.TestCase):
                          '!defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE == 0')
         self.assertEqual(campaign_guard_for_map(7),
                          '!defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE == 1')
-        self.compile_case([], 4, 0, 0)
-        self.compile_case(['-DSC64_UNIFIED'], 6, 0, 0)
-        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T3_ENABLED'], 7, 6, 0)
-        self.compile_case(['-DSC64_UNIFIED', '-DSC64_Z3_ENABLED'], 15, 0, 14)
+        self.assertEqual(campaign_guard_for_map(8),
+                         '!defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE == 2')
+        self.compile_case([], 4, 0, 0, 0)
+        self.compile_case(['-DSC64_UNIFIED'], 6, 0, 0, 0)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T3_ENABLED'], 7, 6, 0, 0)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_Z3_ENABLED'], 15, 0, 14, 0)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_P3_ENABLED'], 23, 0, 0, 22)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_Z3_ENABLED',
-                           '-DSC64_CAMPAIGN_RACE=0'], 15, 0, 0)
+                           '-DSC64_CAMPAIGN_RACE=0'], 15, 0, 0, 0)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_T3_ENABLED',
                            '-DSC64_Z3_ENABLED', '-DSC64_CAMPAIGN_RACE=1'],
-                          15, 0, 14)
+                          15, 0, 14, 0)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_T3_ENABLED',
                            '-DSC64_Z3_ENABLED', '-DSC64_CAMPAIGN_RACE=0'],
-                          15, 6, 0)
+                          15, 6, 0, 0)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T3_ENABLED', '-DSC64_Z3_ENABLED',
+                           '-DSC64_P3_ENABLED', '-DSC64_CAMPAIGN_RACE=2'],
+                          23, 0, 0, 22)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_Z3_ENABLED', '-DSC64_P3_ENABLED',
+                           '-DSC64_CAMPAIGN_RACE=1'], 23, 0, 14, 0)
 
 
 if __name__ == '__main__':

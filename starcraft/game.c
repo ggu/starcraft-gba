@@ -1,4 +1,6 @@
 #include "../common/gba.h"
+#include "sc64_bitgrid.h"
+#include "sc64_map_math.h"
 void *memcpy(void *dst, const void *src, size_t n);
 void *memset(void *dst, int value, size_t n);
 
@@ -8,7 +10,9 @@ void *memset(void *dst, int value, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+#if defined(SC64_LARGE_MAPS)
+#define SC64_RACE_SAVE_GENERATION 6u
+#elif defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
 #define SC64_RACE_SAVE_GENERATION 5u
 #elif defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #define SC64_RACE_SAVE_GENERATION 3u
@@ -16,7 +20,11 @@ void *memset(void *dst, int value, size_t n);
 #define SC64_RACE_SAVE_GENERATION 2u
 #endif
 #define MAX_BUILDINGS 64
+#if defined(SC64_LARGE_MAPS)
+#define MAX_MINERALS 48
+#else
 #define MAX_MINERALS 32
+#endif
 #if defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 0
 #define SAVE_VERSION (0x53435430u + SC64_RACE_SAVE_GENERATION)
 #elif defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 1
@@ -24,7 +32,9 @@ void *memset(void *dst, int value, size_t n);
 #elif defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 2
 #define SAVE_VERSION (0x53435030u + SC64_RACE_SAVE_GENERATION)
 #elif defined(SC64_UNIFIED)
-#if defined(SC64_Z3_ENABLED)
+#if defined(SC64_LARGE_MAPS)
+#define SAVE_VERSION 0x53435535u
+#elif defined(SC64_Z3_ENABLED)
 #define SAVE_VERSION 0x53435534u
 #elif defined(SC64_T3_ENABLED)
 #define SAVE_VERSION 0x53435532u
@@ -97,9 +107,38 @@ static int race_cols=64,race_rows=64;
 #define MAP_ROWS 16
 #endif
 #ifdef SC64_RACES
+#ifdef SC64_LARGE_MAPS
+#define MAP_CELLS (128*96)
+#else
 #define MAP_CELLS (96*96)
+#endif
 #else
 #define MAP_CELLS (MAP_COLS * MAP_ROWS)
+#endif
+#if defined(SC64_LARGE_MAPS) && !defined(SC64_RACES)
+#error SC64_LARGE_MAPS requires SC64_RACES
+#endif
+#ifdef SC64_LARGE_MAPS
+#define SC64_GRID_STORAGE_BYTES ((MAP_CELLS + 7) / 8)
+/* Grid algorithms validate coordinates before indexing, as in the byte-grid
+ * profile. Keep their inner accesses small enough for the IWRAM code guard;
+ * the separately tested public bitgrid helpers also accept invalid indices. */
+static inline int sc64_grid_get(const u8 *grid, unsigned cell) {
+    return (grid[cell >> 3] >> (cell & 7u)) & 1u;
+}
+static inline void sc64_grid_set(u8 *grid, unsigned cell, int value) {
+    u8 mask = (u8)(1u << (cell & 7u));
+    if (value) grid[cell >> 3] |= mask;
+    else grid[cell >> 3] &= (u8)~mask;
+}
+#define SC64_GRID_GET(grid, cell) sc64_grid_get((grid), (unsigned)(cell))
+#define SC64_GRID_SET(grid, cell, value) sc64_grid_set((grid), (unsigned)(cell), (value))
+#define SC64_GRID_CLEAR(grid) memset((grid), 0, sizeof(grid))
+#else
+#define SC64_GRID_STORAGE_BYTES MAP_CELLS
+#define SC64_GRID_GET(grid, cell) ((grid)[(cell)] != 0)
+#define SC64_GRID_SET(grid, cell, value) ((grid)[(cell)] = (u8)((value) != 0))
+#define SC64_GRID_CLEAR(grid) memset((grid), 0, sizeof(grid))
 #endif
 #define WORLD_W (MAP_COLS * 16)
 #define WORLD_H (MAP_ROWS * 16)
@@ -109,16 +148,24 @@ static int race_cols=64,race_rows=64;
 #define IS_WORKER(t) ((t)==U_SCV)
 #endif
 #ifdef SC64_RACES
-/* Cell indices are bounded by 96*96. This exact reciprocal avoids software
-   integer division in the inner flood/visibility loops on ARM7TDMI. */
+/* Keep the production 64/96 arithmetic unchanged; the opt-in large profile
+ * adds the shift for 128-column maps. */
 static inline int sc64_cell_row(unsigned cell) {
-    return race_cols==64?(int)(cell>>6):(int)((cell*43691u)>>22);
+    if (race_cols == 64) return (int)(cell >> 6);
+#ifdef SC64_LARGE_MAPS
+    if (race_cols == 128) return (int)(cell >> 7);
+#endif
+    return (int)((cell * 43691u) >> 22);
 }
 static inline int sc64_cell_col(unsigned cell) {
     return (int)cell-sc64_cell_row(cell)*race_cols;
 }
 static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
-    return tiles==64?(int)((pixel*3u)>>7):(int)(pixel>>6);
+    if (tiles == 64) return (int)((pixel * 3u) >> 7);
+#ifdef SC64_LARGE_MAPS
+    if (tiles == 128) return (int)((pixel * 3u) >> 8);
+#endif
+    return (int)(pixel >> 6);
 }
 #else
 #define sc64_cell_row(cell) ((cell)/MAP_COLS)
@@ -258,9 +305,9 @@ static Geyser geysers[4] = {{
 }
 };
 static Tracer tracers[MAX_TRACERS];
-static u8 explored[MAP_CELLS];
-static u8 visible[MAP_CELLS];
-static u8 path_walkable[MAP_CELLS];
+static u8 explored[SC64_GRID_STORAGE_BYTES];
+static u8 visible[SC64_GRID_STORAGE_BYTES];
+static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 #ifdef SC64_IMPORTED_MISSION
 static u16 bfs_queue[MAP_CELLS];
 static void sc64_routes_reset(void);
@@ -718,7 +765,7 @@ build_path_grid(void)
     for (row = 0; row < MAP_ROWS; row++)
 	for (col = 0; col < MAP_COLS; col++) {
 	    int cell = col + row * MAP_COLS;
-	    path_walkable[cell] = !terrain_blocked(col, row);
+	    SC64_GRID_SET(path_walkable, cell, !terrain_blocked(col, row));
 	}
     for (i = 0; i < MAX_BUILDINGS; i++) if (b[i].alive) {
 #ifdef SC64_RACES
@@ -728,7 +775,7 @@ build_path_grid(void)
         for (row = limit(r - 2, 0, MAP_ROWS - 1); row <= limit(r + 2, 0, MAP_ROWS - 1); row++)
             for (col = limit(c - 2, 0, MAP_COLS - 1); col <= limit(c + 2, 0, MAP_COLS - 1); col++)
                 if (dist2(col * 16 + 8, row * 16 + 8, b[i].x, b[i].y) < 18 * 18)
-                    path_walkable[col + row * MAP_COLS] = 0;
+                    SC64_GRID_SET(path_walkable, col + row * MAP_COLS, 0);
     }
     path_grid_valid = 1;
 }
@@ -796,7 +843,7 @@ is_traversable(int col, int row, int from_cell)
     /* Original placements and production can begin inside an inflated
      * building tile. Let an actor leave that tile without allowing entry
      * into any other blocked tile. Route searches pass only their start. */
-    return path_walkable[cell] != 0 || cell == from_cell;
+    return SC64_GRID_GET(path_walkable, cell) || cell == from_cell;
 }
 
 #ifdef SC64_IMPORTED_MISSION
@@ -1074,7 +1121,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
         if (!owners_hostile(owner, p)) continue;
         for (row = row0; row <= row1; ++row)
             for (col = col0; col <= col1; ++col) {
-                int cell = col + row * SC64_TARGET_GRID_SIDE;
+                int cell = col + row * SC64_TARGET_GRID_COLS;
                 int entity;
                 for (entity = sc64_target_head[p][cell]; entity != 0xff;
                      entity = sc64_target_next[entity]) {
@@ -1634,7 +1681,7 @@ init_state(void)
     mission_objective_stage=mission_unsupported_count=0;
     train_type=race_mode?(race_human==R_TER?U_SCV:race_human==R_ZERG?U_DRONE:U_PROBE):
         (race_selected_mission<2?U_DRONE:U_PROBE);
-    memset(explored,0,sizeof(explored));memset(visible,0,sizeof(visible));
+    SC64_GRID_CLEAR(explored);SC64_GRID_CLEAR(visible);
     memset(tracers,0,sizeof(tracers));
     sc64_visibility_reset();
     race_campaign_init();
@@ -1647,8 +1694,8 @@ init_state(void)
     memset(b, 0, sizeof(b));
     invalidate_path_grid();
     memset(tracers, 0, sizeof(tracers));
-    memset(explored, 0, sizeof(explored));
-    memset(visible, 0, sizeof(visible));
+    SC64_GRID_CLEAR(explored);
+    SC64_GRID_CLEAR(visible);
 #ifdef SC64_IMPORTED_MISSION
     sc64_visibility_reset();
     geyser_count = 0;
@@ -1883,8 +1930,8 @@ game_init(void)
         screen = SCREEN_TITLE;
         memset(u, 0, sizeof(u));
         memset(b, 0, sizeof(b));
-        memset(explored, 0, sizeof(explored));
-        memset(visible, 0, sizeof(visible));
+        SC64_GRID_CLEAR(explored);
+        SC64_GRID_CLEAR(visible);
         selected_building = -1;
         frame = 0;
     }
@@ -2869,7 +2916,7 @@ update_exploration(void)
     sc64_update_exploration();
 #else
     int i, col, row;
-    memset(visible, 0, sizeof(visible));
+    SC64_GRID_CLEAR(visible);
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive && u[i].owner == SIDE) {
 	    int c = u[i].x / 16, r = u[i].y / 16, radius = IS_WORKER(u[i].type) ? 4 : 5;
@@ -2877,7 +2924,7 @@ update_exploration(void)
 		for (col = c - radius; col <= c + radius; col++)
 		    if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS &&
 			(col - c) * (col - c) + (row - r) * (row - r) <= radius * radius)
-			explored[col + row * MAP_COLS] = 1;
+			SC64_GRID_SET(explored, col + row * MAP_COLS, 1);
 	    radius = IS_WORKER(u[i].type) ? 56 : 72;
 	    for (row = r - 5; row <= r + 5; row++)
 		for (col = c - 5; col <= c + 5; col++)
@@ -2885,7 +2932,7 @@ update_exploration(void)
 			int dx = col * 16 + 8 - u[i].x;
 			int dy = row * 16 + 8 - u[i].y;
 			if (dx * dx + dy * dy <= radius * radius)
-			    visible[col + row * MAP_COLS] = 1;
+			    SC64_GRID_SET(visible, col + row * MAP_COLS, 1);
 		    }
 	}
     for (i = 0; i < MAX_BUILDINGS; i++)
@@ -2895,7 +2942,7 @@ update_exploration(void)
 		for (col = c - radius; col <= c + radius; col++)
 		    if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS &&
 			(col - c) * (col - c) + (row - r) * (row - r) <= radius * radius)
-			explored[col + row * MAP_COLS] = 1;
+			SC64_GRID_SET(explored, col + row * MAP_COLS, 1);
 	    if (b[i].type == B_COMMAND)
 		for (row = r - 8; row <= r + 8; row++)
 		    for (col = c - 8; col <= c + 8; col++)
@@ -2903,7 +2950,7 @@ update_exploration(void)
 			    int dx = col * 16 + 8 - b[i].x;
 			    int dy = row * 16 + 8 - b[i].y;
 			    if (dx * dx + dy * dy <= 112 * 112)
-				visible[col + row * MAP_COLS] = 1;
+				SC64_GRID_SET(visible, col + row * MAP_COLS, 1);
 			}
 	}
 #endif
@@ -3309,7 +3356,7 @@ currently_visible(int x, int y)
 	int col = x / 16, row = y / 16;
 	if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS)
 	    return 0;
-	return visible[col + row * MAP_COLS] != 0;
+	return SC64_GRID_GET(visible, col + row * MAP_COLS);
 }
 
 #ifndef SC64_IMPORTED_MISSION
@@ -3318,7 +3365,7 @@ cell_explored(int col, int row)
 {
     if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS)
 	return 0;
-    return explored[col + row * MAP_COLS] != 0;
+    return SC64_GRID_GET(explored, col + row * MAP_COLS);
 }
 #endif
 
@@ -3479,17 +3526,17 @@ draw_minimap(void)
 #ifdef SC64_IMPORTED_MISSION
 	    x = map_x + col * map_size / MAP_COLS;
 	    y = map_y + row * map_size / MAP_ROWS;
-	    gfx_pixel(x, y, visible[col + row * MAP_COLS] ? C_GRASS : C_FOG);
+	    gfx_pixel(x, y, SC64_GRID_GET(visible, col + row * MAP_COLS) ? C_GRASS : C_FOG);
 #else
 	    x = 185 + col * 2;
 	    y = 126 + row * 2;
-	    gfx_rect(x, y, 2, 2, visible[col + row * MAP_COLS] ? C_GRASS : C_FOG);
+	    gfx_rect(x, y, 2, 2, SC64_GRID_GET(visible, col + row * MAP_COLS) ? C_GRASS : C_FOG);
 #endif
 	}
 #endif
     for (i = 0; i < MAX_BUILDINGS; i++)
 	if (b[i].alive &&
-	    (b[i].owner == SIDE || visible[(b[i].x / 16) + (b[i].y / 16) * MAP_COLS])) {
+	    (b[i].owner == SIDE || SC64_GRID_GET(visible, (b[i].x / 16) + (b[i].y / 16) * MAP_COLS))) {
 #ifdef SC64_IMPORTED_MISSION
 	    x = map_x +
 #ifdef SC64_RACES
@@ -3519,7 +3566,7 @@ draw_minimap(void)
 	}
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive &&
-	    (u[i].owner == SIDE || visible[(u[i].x / 16) + (u[i].y / 16) * MAP_COLS])) {
+	    (u[i].owner == SIDE || SC64_GRID_GET(visible, (u[i].x / 16) + (u[i].y / 16) * MAP_COLS))) {
 #ifdef SC64_IMPORTED_MISSION
 	    x = map_x +
 #ifdef SC64_RACES
@@ -3732,19 +3779,19 @@ draw_map(void)
 	    int idx = col + row * MAP_COLS;
 #ifdef SC64_IMPORTED_MISSION
             if (sc64_terrain_tile_clean(col, row)) continue;
-            if (!visible[idx] && !explored[idx]) {
+            if (!SC64_GRID_GET(visible, idx) && !SC64_GRID_GET(explored, idx)) {
                 /* Restored pixels must disappear after load/restart removes fog. */
                 gfx_rect(col * 16 - camx, 12 + row * 16 - camy, 16, 16, C_BLACK);
                 continue;
             }
 #else
-	    if (!visible[idx] && !explored[idx]) continue;
+	    if (!SC64_GRID_GET(visible, idx) && !SC64_GRID_GET(explored, idx)) continue;
 #endif
 	    x = col * 16 - camx;
 	    y = 12 + row * 16 - camy;
 	    if (x >= 240 || x + 16 <= 0 || y >= 120 || y + 16 <= 12)
 		continue;
-	    if (!visible[idx]) {
+	    if (!SC64_GRID_GET(visible, idx)) {
 		gfx_rect(x, y, 16, 16, C_FOG);
 		continue;
 	    }
@@ -4569,14 +4616,14 @@ game_self_test(void)
     m[0].amount = 1234;
     cx = 245;
     cy = 191;
-    explored[MAP_CELLS - 1] = 1;
+    SC64_GRID_SET(explored, MAP_CELLS - 1, 1);
     if (!save_game())
         return 20;
     minerals = gas = m[0].amount = 0;
     cx = cy = 10;
-    explored[MAP_CELLS - 1] = 0;
+    SC64_GRID_SET(explored, MAP_CELLS - 1, 0);
     if (!load_game() || minerals != 321 || gas != 17 || m[0].amount != 1234 ||
-        cx != 245 || cy != 191 || !explored[MAP_CELLS - 1])
+        cx != 245 || cy != 191 || !SC64_GRID_GET(explored, MAP_CELLS - 1))
         return 21;
 
     /* Victory requires clearing the Zerg base; defeat follows CC destruction. */

@@ -2,11 +2,17 @@
 #define SC64_TARGETS_H
 
 /* Short-lived 64px spatial index for nearest-enemy queries in update_orders.
- * A fixed 24x24 grid covers the largest 96x96 SC64 map. Entries are compact
- * unified indices: units [0, MAX_UNITS), then buildings. */
+ * The default 24x24 grid covers 96x96; SC64_LARGE_MAPS uses 32x24 for
+ * 128x96. Entries are compact unified indices: units, then buildings. */
 #define SC64_TARGET_CELL_SIZE 64
-#define SC64_TARGET_GRID_SIDE 24
-#define SC64_TARGET_CELL_COUNT (SC64_TARGET_GRID_SIDE * SC64_TARGET_GRID_SIDE)
+#ifdef SC64_LARGE_MAPS
+#define SC64_TARGET_GRID_COLS 32
+#define SC64_TARGET_GRID_ROWS 24
+#else
+#define SC64_TARGET_GRID_COLS 24
+#define SC64_TARGET_GRID_ROWS 24
+#endif
+#define SC64_TARGET_CELL_COUNT (SC64_TARGET_GRID_COLS * SC64_TARGET_GRID_ROWS)
 #define SC64_TARGET_ENTITY_COUNT (MAX_UNITS + MAX_BUILDINGS)
 #define SC64_TARGET_DIRTY_CAPACITY (MAX_UNITS * 2 + MAX_BUILDINGS)
 
@@ -29,11 +35,11 @@ sc64_target_cell_for(int x, int y, int *cell)
     int col, row, cols = (WORLD_W + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
     int rows = (WORLD_H + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
     if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ||
-        cols > SC64_TARGET_GRID_SIDE || rows > SC64_TARGET_GRID_SIDE)
+        cols > SC64_TARGET_GRID_COLS || rows > SC64_TARGET_GRID_ROWS)
         return 0;
     col = x / SC64_TARGET_CELL_SIZE;
     row = y / SC64_TARGET_CELL_SIZE;
-    *cell = col + row * SC64_TARGET_GRID_SIDE;
+    *cell = col + row * SC64_TARGET_GRID_COLS;
     return 1;
 }
 

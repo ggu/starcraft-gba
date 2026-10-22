@@ -36,11 +36,13 @@ MISSIONS = [
     # Z3 has its fixed global catalog ID 14. Unified builds keep catalog
     # slots 7..13 explicitly unavailable rather than compacting this index.
     ('Z3', '008/016', 'The New Dominion'),
+    # P3 is a private import until large-map runtime support is ready (ID 22).
+    ('P3', '008/020', 'Higher Ground'),
 ]
 BUILDING_RAW_IDS = {
     106, 109, 110, 111, 112, 113, 114, 122, 124, 125, 130, 131, 132,
-    135, 139, 141, 142, 143, 144, 146, 149, 150, 151, 154, 155, 156, 157,
-    160, 162, 164, 166, 167,
+    133, 135, 137, 139, 141, 142, 143, 144, 146, 149, 150, 151, 154, 155,
+    156, 157, 160, 162, 164, 166, 167,
 }
 
 
@@ -64,7 +66,9 @@ def c_array(name: str, ctype: str, values, width: int = 24) -> str:
 def emit_map_count() -> str:
     """Emit compile-time map count for the stable direct-global-ID table."""
     return (
-        '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
+        '#if defined(SC64_UNIFIED) && defined(SC64_P3_ENABLED)\n'
+        '#define SC64_RACE_MAP_COUNT 23\n'
+        '#elif defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
         '#define SC64_RACE_MAP_COUNT 15\n'
         '#elif defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)\n'
         '#define SC64_RACE_MAP_COUNT 7\n'
@@ -78,7 +82,7 @@ def campaign_guard_for_map(map_index: int) -> str:
     """Return the profile guard used around one map's data and descriptor."""
     if map_index < 2 or map_index == 7:
         race = 1
-    elif map_index < 4:
+    elif map_index < 4 or map_index == 8:
         race = 2
     else:
         race = 0
@@ -88,20 +92,20 @@ def campaign_guard_for_map(map_index: int) -> str:
 def emit_descriptor_table(descriptors: list[str]) -> str:
     """Emit stable direct-ID descriptor slots, with disabled IDs zeroed.
 
-    ``descriptors`` uses packer order: four race missions, T1, T2, T3, Z3.
+    ``descriptors`` uses packer order: four race missions, T1, T2, T3, Z3, P3.
     The per-descriptor race guards are carried inside each supplied token.
     """
-    if len(descriptors) != 8:
-        raise ValueError('expected descriptors for map indices 0..7')
+    if len(descriptors) != 9:
+        raise ValueError('expected descriptors for map indices 0..8')
     return ''.join([
         'static const Sc64RaceMap sc64_race_maps[SC64_RACE_MAP_COUNT] = {\n',
         *descriptors[:4],
         '#ifdef SC64_UNIFIED\n', *descriptors[4:6], '#endif /* SC64_UNIFIED */\n',
         '#if defined(SC64_UNIFIED)\n',
         '#ifdef SC64_T3_ENABLED\n', descriptors[6],
-        '#elif defined(SC64_Z3_ENABLED)\n    {0}, /* global ID 6 is unavailable without T3 */\n',
+        '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED)\n    {0}, /* global ID 6 unavailable */\n',
         '#endif\n',
-        '#if defined(SC64_Z3_ENABLED)\n',
+        '#if defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED)\n',
         '    {0}, /* global ID 7 is unavailable */\n'
         '    {0}, /* global ID 8 is unavailable */\n'
         '    {0}, /* global ID 9 is unavailable */\n'
@@ -109,7 +113,19 @@ def emit_descriptor_table(descriptors: list[str]) -> str:
         '    {0}, /* global ID 11 is unavailable */\n'
         '    {0}, /* global ID 12 is unavailable */\n'
         '    {0}, /* global ID 13 is unavailable */\n',
-        descriptors[7], '#endif /* SC64_Z3_ENABLED */\n',
+        '#endif\n',
+        '#ifdef SC64_Z3_ENABLED\n', descriptors[7],
+        '#elif defined(SC64_P3_ENABLED)\n    {0}, /* global ID 14 unavailable */\n',
+        '#endif\n',
+        '#ifdef SC64_P3_ENABLED\n',
+        '    {0}, /* global ID 15 is unavailable */\n'
+        '    {0}, /* global ID 16 is unavailable */\n'
+        '    {0}, /* global ID 17 is unavailable */\n'
+        '    {0}, /* global ID 18 is unavailable */\n'
+        '    {0}, /* global ID 19 is unavailable */\n'
+        '    {0}, /* global ID 20 is unavailable */\n'
+        '    {0}, /* global ID 21 is unavailable */\n',
+        descriptors[8], '#endif /* SC64_P3_ENABLED */\n',
         '#endif /* SC64_UNIFIED */\n',
         '};\n',
     ])
@@ -226,6 +242,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             lines.append('#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)\n')
         elif map_index == 7:
             lines.append('#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n')
+        elif map_index == 8:
+            lines.append('#if defined(SC64_UNIFIED) && defined(SC64_P3_ENABLED)\n')
         campaign_guard = campaign_guard_for_map(map_index)
         lines.append(f'#if {campaign_guard}\n')
         unit_name = f'sc64_race_{name}_units'
@@ -249,6 +267,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             lines.append('#endif /* SC64_UNIFIED && SC64_T3_ENABLED */\n')
         elif map_index == 7:
             lines.append('#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n')
+        elif map_index == 8:
+            lines.append('#endif /* SC64_UNIFIED && SC64_P3_ENABLED */\n')
         descriptors.append(f'#if {campaign_guard}\n'
             f'    {{{info.width}u,{info.height}u,{tileset}u,{human_slot}u,sc64_race_{name}_owner_modes,sc64_race_{name}_owner_races,{unit_name},{len(units)}u,sc64_race_{name}_tiles,{len(tiles)}u,sc64_race_{name}_lookup,sc64_race_{name}_blocked,"{info.name}","{mission_id}"}},\n'
             '#else\n    {0}, /* campaign omitted from this cartridge */\n#endif\n')
@@ -320,6 +340,52 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                     'human_owner_slot_3': force_assignments[3],
                     'enemy_owner_slot_6': force_assignments[6],
                     'interpretation': 'Force 1 and Force 2 respectively; raw FORCE section bytes are preserved above',
+                }
+                reports[-1]['runtime_unit_rows_are_all_non_start_source_rows'] = True
+            if map_index == 8:
+                expected = {'unit_placements': 96, 'building_placements': 42,
+                            'mineral_fields': 48, 'geysers': 3}
+                category_keys = {
+                    'unit_placements': 'unit', 'building_placements': 'building',
+                    'mineral_fields': 'mineral', 'geysers': 'geyser',
+                }
+                actual = {key: source_categories[source_key]
+                          for key, source_key in category_keys.items()}
+                if actual != expected or source_categories['start_marker'] != 3:
+                    raise ValueError(f'P3 source UNIT roster changed: {actual}, '
+                                     f"start markers={source_categories['start_marker']}")
+                if len(units) != 189:
+                    raise ValueError('P3 importer skipped or duplicated non-start UNIT rows')
+                if len(force_assignments) < 8 or force_assignments[:8] != [1, 3, 3, 3, 3, 3, 2, 0]:
+                    raise ValueError('P3 source force assignments no longer match audited CHK')
+                raw_owners = Counter((u['source_type'], u['owner_raw']) for u in units)
+                if raw_owners[(47, 6)] != 8 or raw_owners[(133, 0)] != 1:
+                    raise ValueError('P3 Scourge/Hive source owner roster changed')
+                if raw_owners[(137, 0)] != 1 or raw_owners[(137, 6)] != 1:
+                    raise ValueError('P3 Greater Spire source owner roster changed')
+                reports[-1]['global_mission_id'] = 22
+                reports[-1]['raw_type_counts_by_owner_slot'] = {
+                    str(owner): {str(raw): count for (raw, slot), count in raw_owners.items()
+                                 if slot == owner}
+                    for owner in sorted({slot for _, slot in raw_owners})
+                }
+                reports[-1]['force_owner_policy'] = {
+                    'human_source_slot_7': 'SIDE (owner 0)',
+                    'force_2_source_slot_0': 'ENEMY (owner 1)',
+                    'force_3_source_slot_6': 'distinct hostile owner 4; RESCUABLE owner 3 remains reserved',
+                    'source_slot_and_force_assignment_are_preserved_in_source_unit_records': True,
+                    'runtime_note': 'descriptor owner_modes intentionally classifies both computer slots as enemies; P3 runtime must map by source owner slot and treat Force 2/3 as allied to each other and hostile to the human',
+                }
+                reports[-1]['trigger_source_facts'] = {
+                    'human_slot_7_start_resources': {'minerals': 300, 'gas': 100},
+                    'force_2_slot_0_start_resources': {'combined': 5000},
+                    'force_3_slot_6_start_resources': {'combined': 8000},
+                    'human_any_units_loss_condition': {'comparison': 'at_most', 'amount': 0, 'type': 'Any Unit'},
+                    'foes_buildings_at_most_zero_victory': {
+                        'wait_ms': 2000, 'transmissions': 2, 'post_transmission_wait_ms': 3000,
+                    },
+                    'raw_trigger_records_preserved_in_audit': True,
+                    'runtime_trigger_behavior_claimed': False,
                 }
                 reports[-1]['runtime_unit_rows_are_all_non_start_source_rows'] = True
     lines.extend([emit_descriptor_table(descriptors), '#endif\n'])

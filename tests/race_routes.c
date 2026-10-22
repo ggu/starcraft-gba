@@ -18,9 +18,27 @@ static int limit(int n, int lo, int hi) { return n < lo ? lo : (n > hi ? hi : n)
 static int sc64_cell_row(unsigned c) { return (int)c / MAP_COLS; }
 static int sc64_cell_col(unsigned c) { return (int)c % MAP_COLS; }
 static void build_path_grid(void) { path_grid_valid = 1; }
+#ifdef SC64_LARGE_MAPS
+#define GBA_HOST
+#include "starcraft/sc64_bitgrid.h"
+static u8 packed_walkable[(MAP_CELLS + 7) / 8];
+#define path_walkable packed_walkable
+#define SC64_GRID_GET(grid, cell) sc64_bitgrid_get((grid), MAP_CELLS, (cell))
+#endif
 #include "starcraft/sc64_routes.h"
+#ifdef SC64_LARGE_MAPS
+#undef path_walkable
+#undef SC64_GRID_GET
+#endif
 
-_Static_assert(sizeof(sc64_route_field) == (16*MAP_CELLS/2), "sixteen fields hold two cells per byte");
+_Static_assert(sizeof(sc64_route_field) == (SC64_ROUTE_SLOTS*MAP_CELLS/2), "route fields hold two cells per byte");
+static void reset_routes(void)
+{
+#ifdef SC64_LARGE_MAPS
+    sc64_bitgrid_pack(packed_walkable, path_walkable, MAP_CELLS);
+#endif
+    sc64_routes_reset();
+}
 static int distance[MAP_CELLS];
 static unsigned rng = 0x4398a12bu;
 static unsigned random32(void) { rng = rng*1664525u+1013904223u; return rng; }
@@ -43,7 +61,7 @@ static void verify_field(int goal)
 {
     int nx,ny;
     reference_bfs(goal);
-    sc64_routes_reset();
+    reset_routes();
     for(int c=0;c<MAP_CELLS;c++) if(path_walkable[c]) {
         int x=c%MAP_COLS,y=c/MAP_COLS,ok=sc64_route_next(x*16+8,y*16+8,
             (goal%MAP_COLS)*16+8,(goal/MAP_COLS)*16+8,&nx,&ny);
@@ -70,17 +88,17 @@ int main(void)
        it must exit toward a shortest reachable path without distance storage. */
     memset(path_walkable,1,sizeof(path_walkable));
     path_walkable[32+32*MAP_COLS]=0;
-    sc64_routes_reset();
+    reset_routes();
     int nx,ny;
     assert(sc64_route_next(32*16+8,32*16+8,40*16+8,40*16+8,&nx,&ny));
     int next=nx/16+(ny/16)*MAP_COLS;
     reference_bfs(40+40*MAP_COLS);
     assert(distance[next]==15); /* one step out plus 14 remaining */
-    /* Sixteen slots retain a mixed economy/army working set and count hits. */
-    sc64_routes_reset(); sc64_route_builds=0; sc64_route_hits=0;
-    for(int g=0;g<16;g++) assert(sc64_route_next(8*16+8,8*16+8,(g+16)*16+8,16*16+8,&nx,&ny));
-    for(int g=0;g<16;g++) assert(sc64_route_next(8*16+8,8*16+8,(g+16)*16+8,16*16+8,&nx,&ny));
-    assert(sc64_route_builds==16&&sc64_route_hits==16);
-    puts("packed race routes match BFS; blocked-start and 16-slot cache pass");
+    /* All slots retain a mixed economy/army working set and count hits. */
+    reset_routes(); sc64_route_builds=0; sc64_route_hits=0;
+    for(int g=0;g<SC64_ROUTE_SLOTS;g++) assert(sc64_route_next(8*16+8,8*16+8,(g+16)*16+8,16*16+8,&nx,&ny));
+    for(int g=0;g<SC64_ROUTE_SLOTS;g++) assert(sc64_route_next(8*16+8,8*16+8,(g+16)*16+8,16*16+8,&nx,&ny));
+    assert(sc64_route_builds==SC64_ROUTE_SLOTS&&sc64_route_hits==SC64_ROUTE_SLOTS);
+    printf("packed race routes match BFS; blocked-start and %d-slot cache pass\n", SC64_ROUTE_SLOTS);
     return 0;
 }

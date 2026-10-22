@@ -256,6 +256,38 @@ to 251,000–270,000 during ticks 51,000–53,000. Target-query cost grew much l
 This points to dense local movement as the next optimization target. These
 diagnostic counters add overhead and are not a final frame-rate measurement.
 
+## Higher Ground preparation (2026-10-22)
+
+Default build/tests, unified build/tests, all three race-profile suites and
+both experimental mission suites pass after the storage/import preparation.
+The asset-free suite includes 38 Python checks, the Higher Ground source-fact
+and trigger-model fixtures, and packed 128×96 route fields checked against an
+independent breadth-first search under ASan/UBSan.
+
+`make test-sc64-p3-import` confirms all 189 non-start source records: 96 units,
+42 buildings, 48 minerals and three geysers. It preserves source owner slots
+0 and 6 separately, direct global ID 22, and zeroed unavailable table slots.
+The model covers independent force grants, human AnyUnit defeat, ordered
+delayed victory, pause/copy continuity and invalid persisted states. It leaves
+timing conversion and same-frame trigger priority as explicit adapter policy.
+Neither the import flag nor these model checks make Higher Ground playable.
+
+`make test-sc64-large-map sc64-large-probe` passes with the existing Protoss
+catalog and opt-in storage. The ARM probe uses 364 bytes of data and 243,920
+bytes of BSS, an actual BSS increase of 3,696 bytes over the matching standard
+Protoss build. Its IWRAM ends at `0x03004fe8`, within the `0x03005000` guard.
+This narrow code margin remains a constraint on further hot-path additions.
+The synthetic fixture checks the final grid cell, minimap/target/path indexes,
+mineral slots 32–47 and full fog-buffer persistence. It does not validate
+loading a real 128-column mission's geometry or gameplay.
+
+A separate opt-in collision-candidate experiment is available with
+`SC64_COLLISION_CACHE_ENABLED`. `make test-sc64-race-collision` passes 959,570
+full-scan differential checks, including dense overflow fallback, same-cell
+movement invalidation, flight classes and dead neighbors. It adds about 272
+aligned bytes of runtime storage and remains disabled in standard builds
+pending ARM performance measurements.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

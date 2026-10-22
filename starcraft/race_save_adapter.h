@@ -28,6 +28,13 @@ typedef struct {
 } RaceSave;
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
 static RaceSave race_data;
+static int sc64_race_storage_geometry_valid(int width, int height) {
+#ifdef SC64_LARGE_MAPS
+    return width >= 1 && width <= 128 && height >= 1 && height <= 96;
+#else
+    return width >= 1 && width <= 96 && height >= 1 && height <= 96;
+#endif
+}
 static int race_save_game(void) {
     race_data.version=SAVE_VERSION;
     for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
@@ -37,7 +44,7 @@ static int race_save_game(void) {
         int n;memcpy(&n,(u8*)&b[i]+j*sizeof(int),sizeof(n));race_data.buildings[i][j]=(s16)n;
     }
     memset(race_data.fog,0,sizeof(race_data.fog));
-    for(int i=0;i<MAP_CELLS;i++)if(explored[i])race_data.fog[i>>3]|=1u<<(i&7);
+    for(int i=0;i<MAP_CELLS;i++)if(SC64_GRID_GET(explored,i))race_data.fog[i>>3]|=1u<<(i&7);
     memcpy(race_data.minerals_map,m,sizeof(m));
     int state[]={race_mode,race_human,race_selected_mission,race_completed,race_bots,minerals,gas,
         frame,cx,cy,train_type,weapons_level,armor_level,weapons_research,armor_research,
@@ -106,7 +113,7 @@ static int race_load_game(void) {
     for(int i=21;i<24;i++)if(v[i]<0||v[i]>2)return 0;
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
 #endif
-    if(width<1||height<1||width>96||height>96)return 0;
+    if(!sc64_race_storage_geometry_valid(width,height))return 0;
     if(v[8]<0||v[8]>=width*16||v[9]<0||v[9]>=height*16||v[11]<0||v[11]>2||
        v[12]<0||v[12]>2||v[18]<0||v[18]>1||v[19]<0||v[19]>1)return 0;
     for(int i=0;i<5;i++)if(race_data.players[i]<-1||race_data.players[i]>2||
@@ -216,7 +223,9 @@ static int race_load_game(void) {
         memcpy((u8*)&b[i]+j*sizeof(int),&n,sizeof(n));
     }
     memcpy(m,race_data.minerals_map,sizeof(m));
-    for(int i=0;i<MAP_CELLS;i++)explored[i]=(race_data.fog[i>>3]>>(i&7))&1;
+    SC64_GRID_CLEAR(explored);
+    for(int i=0;i<MAP_CELLS;i++)
+        if((race_data.fog[i>>3]>>(i&7))&1)SC64_GRID_SET(explored,i,1);
     memcpy(race_player,race_data.players,sizeof(race_player));
     memcpy(race_minerals,race_data.ore,sizeof(race_minerals));
     memcpy(race_gas,race_data.vespene,sizeof(race_gas));
