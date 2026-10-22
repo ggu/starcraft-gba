@@ -101,7 +101,8 @@ sc64_target_index_begin(void)
     sc64_target_dirty_count = 0;
     sc64_target_dirty_overflowed = 0;
     for (i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && !sc64_target_insert(i, u[i].owner, u[i].x, u[i].y)) return;
+        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
+            !sc64_target_insert(i, u[i].owner, u[i].x, u[i].y)) return;
     for (i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && !sc64_target_insert(MAX_UNITS + i, b[i].owner, b[i].x, b[i].y)) return;
     sc64_target_index_active = 1;

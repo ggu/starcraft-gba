@@ -1,6 +1,10 @@
 #ifndef SC64_VISIBILITY_H
 #define SC64_VISIBILITY_H
 
+#ifndef SC64_TRANSPORT_LOADED
+#define SC64_TRANSPORT_LOADED(q) 0
+#endif
+
 #ifndef SC64_GRID_GET
 #define SC64_GRID_GET(grid, cell) ((grid)[(cell)] != 0)
 #define SC64_GRID_SET(grid, cell, value) ((grid)[(cell)] = (u8)((value) != 0))
@@ -446,7 +450,8 @@ sc64_update_exploration(void)
     int i;
     for (i = 0; i < MAX_UNITS; i++) {
         Sc64VisibilitySnapshot *old = &sc64_unit_visibility[i];
-        int active = u[i].alive && u[i].owner == SIDE;
+        int active = u[i].alive && u[i].owner == SIDE &&
+                     !SC64_TRANSPORT_LOADED(&u[i]);
         int x = active ? u[i].x : 0;
         int y = active ? u[i].y : 0;
         int type = active ? u[i].type : 0;

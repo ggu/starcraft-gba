@@ -28,7 +28,7 @@ PORT = 2345
 SRAM_BASE = 0x0E000000
 SRAM_BYTES = 32768
 SLOT_BYTES = 16384
-SAVE_TAG = 0x53435430 + 13  # T5 is generation 13 in the combined campaign ROM.
+DEFAULT_GENERATION = 14  # Cargo orders share the existing payload with a new identity.
 KEY_B, KEY_L, KEY_START = 2, 512, 8
 SCREEN_PLAY, SCREEN_PAUSE = 1, 2
 
@@ -100,14 +100,14 @@ def persisted_rows(rsp, address: int, count: int, stride: int,
     return rows
 
 
-def save_record_info(raw_sram: bytes, expected_payload: int) -> list[dict]:
+def save_record_info(raw_sram: bytes, expected_payload: int, generation: int = DEFAULT_GENERATION) -> list[dict]:
     if len(raw_sram) != SRAM_BYTES:
         raise RuntimeError(f"expected {SRAM_BYTES}-byte SRAM, got {len(raw_sram)}")
     records = []
     for slot in range(2):
         offset = slot * SLOT_BYTES
         tag, size, checksum, sequence = struct.unpack_from("<4I", raw_sram, offset)
-        if tag != SAVE_TAG or size != expected_payload or sequence == 0:
+        if tag != 0x53435430 + generation or size != expected_payload or sequence == 0:
             continue
         payload = raw_sram[offset + 16:offset + 16 + size]
         fnv = 2166136261
@@ -117,7 +117,7 @@ def save_record_info(raw_sram: bytes, expected_payload: int) -> list[dict]:
             records.append({"slot": slot, "tag": hex(tag), "payload_bytes": size,
                             "sequence": sequence, "payload_sha256": hashlib.sha256(payload).hexdigest()})
     if not records:
-        raise RuntimeError("mGBA save file has no valid generation-13 T5 SRAM record")
+        raise RuntimeError(f"mGBA save file has no valid generation-{generation} T5 SRAM record")
     return records
 
 
@@ -188,9 +188,11 @@ def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int],
         "buildings": persisted_rows(rsp, sym["b"], 64, building_size, building_fields),
         "mineral_fields": minerals_state,
     }
-def run(rom: Path, elf: Path, out: Path, ticks: int) -> dict:
+def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_GENERATION) -> dict:
     if not rom.is_file() or not elf.is_file():
         raise RuntimeError(f"Build the T5 probe ROM/ELF first: {rom} and {elf}")
+    if generation not in (13, 14):
+        raise ValueError("supported T5 save generations are 13 and 14")
     if ticks < 1 or ticks > 10000:
         raise ValueError("--ticks must be between 1 and 10000")
     sym = symbols(elf)
@@ -213,7 +215,7 @@ def run(rom: Path, elf: Path, out: Path, ticks: int) -> dict:
         raise RuntimeError("T5 runtime or geyser layout differs from the validated save schema")
     save_size, _ = dwarf_struct(elf, "RaceSave")
     if save_size != 16328:
-        raise RuntimeError(f"expected 16328-byte generation-13 payload, got {save_size}")
+        raise RuntimeError(f"expected 16328-byte T5 payload, got {save_size}")
 
     out.mkdir(parents=True, exist_ok=True)
     out = out / f"run-{time.time_ns()}"
@@ -239,7 +241,7 @@ def run(rom: Path, elf: Path, out: Path, ticks: int) -> dict:
         if read_i32(rsp, sym["screen"]) != SCREEN_PAUSE:
             raise RuntimeError("B did not save from the T5 pause menu")
         sram = rsp.read(SRAM_BASE, SRAM_BYTES)
-        records = save_record_info(sram, save_size)
+        records = save_record_info(sram, save_size, generation)
         menu.capture(rsp, out / "t5-save-pause.png")
     finally:
         menu.stop_emulator(proc, sock, log)
@@ -303,6 +305,7 @@ def run(rom: Path, elf: Path, out: Path, ticks: int) -> dict:
             "elf_sha256": hashlib.sha256(elf.read_bytes()).hexdigest(),
             "save_file_sha256": hashlib.sha256(saved_sram).hexdigest(),
             "save_records": records,
+            "save_generation": generation,
             "saved_frame": paused["frame"],
             "loaded_frame": restored["frame"],
             "continued_frame": continued["frame"],
@@ -331,8 +334,10 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--ticks", type=int, default=120,
                         help="normal play ticks before pausing and saving (1..10000)")
+    parser.add_argument("--generation", type=int, choices=(13, 14), default=DEFAULT_GENERATION,
+                        help="SRAM generation; 13 checks the historical pre-cargo build")
     args = parser.parse_args()
-    print(json.dumps(run(args.rom, args.elf, args.output, args.ticks), indent=2))
+    print(json.dumps(run(args.rom, args.elf, args.output, args.ticks, args.generation), indent=2))
 
 
 if __name__ == "__main__":

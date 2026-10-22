@@ -181,6 +181,7 @@ sc64_t5_raw_extents(unsigned raw, int building,
         case 112: l=40;u=32;r=44;d=24;break;
         case 113: l=56;u=40;r=56;d=40;break;
         case 114: l=48;u=40;r=48;d=38;break;
+        case 115: l=47;u=24;r=28;d=22;break;
         case 124: l=16;u=32;r=16;d=16;break;
         case 125: l=32;u=24;r=32;d=16;break;
         case 195: l=48;u=32;r=47;d=31;break;
@@ -192,6 +193,7 @@ sc64_t5_raw_extents(unsigned raw, int building,
         case 2: case 3: case 19: l=16;u=16;r=15;d=15;break;
         case 7: l=11;u=11;r=11;d=11;break;
         case 8: l=19;u=15;r=18;d=14;break;
+        case 11: l=24;u=16;r=24;d=20;break;
         case 13: l=7;u=7;r=7;d=7;break;
         case 16: l=7;u=10;r=7;d=11;break;
         case 32: l=11;u=7;r=11;d=14;break;
@@ -228,15 +230,45 @@ sc64_t5_type_matches(unsigned wanted, int raw, int building)
     if (wanted == 231) return building;
     if (wanted == 230)
         return !building && (raw == 0 || raw == 2 || raw == 3 || raw == 7 ||
-               raw == 8 || raw == 13 || raw == 16 || raw == 19 || raw == 32);
+               raw == 8 || raw == 11 || raw == 13 || raw == 16 || raw == 19 ||
+               raw == 32);
     return raw == (int)wanted;
 }
 
 static int
 sc64_t5_source_is_flying(unsigned raw)
 {
-    /* The retained T5 airborne actor is the Terran Wraith (raw 8). */
-    return raw == 8;
+    /* BWAPI UnitType::isFlyer facts for the retained T5 actors. */
+    return raw == 8 || raw == 11;
+}
+
+static int
+sc64_t5_query_match(const Sc64T4Condition *condition, unsigned trigger_owner,
+                    unsigned live_owner, int raw_owner, unsigned raw_type,
+                    int building)
+{
+    int selected;
+    if (!condition) return -1;
+    selected = sc64_t5_selector_matches(condition->player, trigger_owner,
+                                        live_owner, raw_owner);
+    if (selected < 0) return -1;
+    return selected && sc64_t5_type_matches(condition->unit, (int)raw_type,
+                                             building);
+}
+
+/* Return -1 for an actor whose pinned bounds are unavailable, otherwise a
+ * boolean overlap. Cargo uses its carrier's position and elevation here. */
+static int
+sc64_t5_actor_overlaps(unsigned raw_type, int building, int ground_only,
+                       const Sc64T4QueryRect *area, int x, int y)
+{
+    Sc64T4QueryRect actor;
+    if (!area) return -1;
+    if (!building && ground_only && sc64_t5_source_is_flying(raw_type)) return 0;
+    if (area->left == 0 && area->top == 0 &&
+        area->right == 96 * 32 && area->bottom == 96 * 32) return 1;
+    if (!sc64_t5_actor_rect(raw_type, building, x, y, &actor)) return -1;
+    return sc64_t4_query_rect_overlap(area, &actor);
 }
 
 static int
@@ -246,23 +278,14 @@ sc64_t5_query_actor(const Sc64T4Condition *condition, unsigned trigger_owner,
                     const Sc64T4QueryRect *area, int x, int y,
                     u32 *count)
 {
-    Sc64T4QueryRect actor;
-    int selected;
-    if (!condition || !area || !count) return 0;
-    selected = sc64_t5_selector_matches(condition->player, trigger_owner,
-                                        live_owner, raw_owner);
-    if (selected < 0) return 0;
-    if (!selected || !sc64_t5_type_matches(condition->unit, (int)raw_type,
-                                           building)) return 1;
-    if (!building && ground_only && sc64_t5_source_is_flying(raw_type))
-        return 1;
-    if (area->left == 0 && area->top == 0 &&
-        area->right == 96 * 32 && area->bottom == 96 * 32) {
-        ++*count;
-        return 1;
-    }
-    if (!sc64_t5_actor_rect(raw_type, building, x, y, &actor)) return 0;
-    if (sc64_t4_query_rect_overlap(area, &actor)) ++*count;
+    int match = sc64_t5_query_match(condition, trigger_owner, live_owner,
+                                    raw_owner, raw_type, building);
+    if (match < 0 || !count) return 0;
+    if (!match) return 1;
+    int overlap = sc64_t5_actor_overlaps(raw_type, building, ground_only,
+                                         area, x, y);
+    if (overlap < 0) return 0;
+    if (overlap) ++*count;
     return 1;
 }
 
@@ -273,7 +296,6 @@ sc64_t5_world_count(void *context, const Sc64T4Condition *condition,
     Sc64T5RuntimeState *state = context;
     Sc64T4QueryRect area;
     u32 result = 0;
-    int map_command;
     int ground_only = 0;
     if (!state || !condition || !count || trigger_owner >= 8 ||
         (condition->opcode != 2 && condition->opcode != 3) ||
@@ -282,8 +304,7 @@ sc64_t5_world_count(void *context, const Sc64T4Condition *condition,
     unsigned selector = condition->player;
     if (!(selector <= 7 || selector == 12 || selector == 13 || selector == 17 ||
           (selector >= 18 && selector <= 21))) return 0;
-    map_command = condition->opcode == 2;
-    if (map_command) {
+    if (condition->opcode == 2) {
         area.left = 0; area.top = 0; area.right = 96 * 32; area.bottom = 96 * 32;
     } else {
         const Sc64T4Location *loc;
@@ -304,21 +325,59 @@ sc64_t5_world_count(void *context, const Sc64T4Condition *condition,
         condition->unit != 231 &&
         sc64_race_unit_from_raw(condition->unit) < 0 &&
         sc64_race_building_from_raw(condition->unit) < 0) return 0;
-    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive) {
-        int raw = u[i].raw_type >= 0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type);
-        if (!sc64_t5_query_actor(condition, trigger_owner, (unsigned)u[i].owner,
-                 u[i].raw_owner, (unsigned)raw, 0, ground_only,
-                 &area, u[i].x, u[i].y,
-                 &result)) return 0;
+    if (condition->opcode == 2) {
+        /* Command is a global count; loaded passengers remain live actors and
+         * are included by the original command-count path. */
+        int completed = condition->comparison != 1;
+        for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive) {
+            int raw = u[i].raw_type >= 0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type);
+            int match = sc64_t5_query_match(condition, trigger_owner,
+                    (unsigned)u[i].owner, u[i].raw_owner, (unsigned)raw, 0);
+            if (match < 0) return 0;
+            if (match) ++result;
+        }
+        for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
+            if (completed && b[i].under_construction) continue;
+            int raw = b[i].raw_type >= 0 ? b[i].raw_type : sc64_race_raw_building(b[i].type);
+            int match = sc64_t5_query_match(condition, trigger_owner,
+                    (unsigned)b[i].owner, b[i].raw_owner, (unsigned)raw, 1);
+            if (match < 0) return 0;
+            if (match) ++result;
+        }
+    } else {
+        int completed = condition->comparison != 1;
+        for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive) {
+            int raw = u[i].raw_type >= 0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type);
+            int match;
+            if (SC64_TRANSPORT_LOADED(&u[i])) {
+                int carrier = u[i].target, overlap;
+                if (!completed) continue;
+                if (carrier < 0 || carrier >= MAX_UNITS || carrier == i ||
+                    !u[carrier].alive || u[carrier].raw_type != 11 ||
+                    u[carrier].type != U_DROPSHIP ||
+                    u[carrier].owner != u[i].owner) return 0;
+                match = sc64_t5_query_match(condition, trigger_owner,
+                        (unsigned)u[i].owner, u[i].raw_owner, (unsigned)raw, 0);
+                if (match < 0) return 0;
+                if (!match) continue;
+                overlap = sc64_t5_actor_overlaps(11, 0, ground_only, &area,
+                                                  u[carrier].x, u[carrier].y);
+                if (overlap < 0) return 0;
+                if (overlap) ++result;
+                continue;
+            }
+            if (!sc64_t5_query_actor(condition, trigger_owner,
+                    (unsigned)u[i].owner, u[i].raw_owner, (unsigned)raw, 0,
+                    ground_only, &area, u[i].x, u[i].y, &result)) return 0;
+        }
+        for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
+            if (completed && b[i].under_construction) continue;
+            int raw = b[i].raw_type >= 0 ? b[i].raw_type : sc64_race_raw_building(b[i].type);
+            if (!sc64_t5_query_actor(condition, trigger_owner,
+                    (unsigned)b[i].owner, b[i].raw_owner, (unsigned)raw, 1,
+                    0, &area, b[i].x, b[i].y, &result)) return 0;
+        }
     }
-    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
-        int raw = b[i].raw_type >= 0 ? b[i].raw_type : sc64_race_raw_building(b[i].type);
-        if (!sc64_t5_query_actor(condition, trigger_owner, (unsigned)b[i].owner,
-                 b[i].raw_owner, (unsigned)raw, 1, 0,
-                 &area, b[i].x, b[i].y,
-                 &result)) return 0;
-    }
-    (void)map_command;
     *count = result;
     return 1;
 }
@@ -516,6 +575,8 @@ race_t5_remove_action(const Sc64T4Action *action, unsigned trigger_owner)
         exact_unit = 101;
     else if (action->opcode == 24 && action->unit == 195 && action->player == 0)
         exact_unit = 195;
+    else if (action->opcode == 24 && action->unit == 11 && action->player == 0)
+        exact_unit = 11;
     else return -1;
     u8 remove_units[MAX_UNITS], remove_buildings[MAX_BUILDINGS];
     memset(remove_units, 0, sizeof(remove_units));
@@ -536,6 +597,11 @@ race_t5_remove_action(const Sc64T4Action *action, unsigned trigger_owner)
     }
     int changed = 0;
     for (int i = 0; i < MAX_UNITS; ++i) if (remove_units[i]) {
+        /* Source RemoveUnit may delete a Dropship directly. Its passengers
+         * must be removed in this same action, before a later trigger query
+         * can observe cargo whose carrier no longer exists. */
+        if (u[i].raw_type == 11 && u[i].type == U_DROPSHIP)
+            race_transport_destroy_cargo(i);
         u[i].alive = 0; u[i].selected = 0; changed = 1;
         for (int j = 0; j < MAX_UNITS; ++j)
             if (u[j].alive && u[j].order == ORDER_ATTACK_TARGET && u[j].target == i) {

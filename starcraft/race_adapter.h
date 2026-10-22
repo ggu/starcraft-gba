@@ -3,6 +3,11 @@
 
 #include "race_skirmish.h"
 
+#ifdef SC64_T5_RUNTIME
+static int race_t5_active(void);
+static int race_t5_starport_has_control_tower(int producer);
+#endif
+
 /* Live owner-independent race adapter. Include from game.c after engine
  * helpers and before the frame/update hooks that call these functions. */
 static const int race_bot_owner_ids[3] = { ENEMY, RESCUABLE, 4 };
@@ -120,6 +125,10 @@ static int race_owner_has_prereq(int owner, unsigned short prereq)
         case B_FORGE: if (prereq & SC_PR_FORGE) prereq &= (unsigned short)~SC_PR_FORGE; break;
         case B_DEPOT: if (prereq & SC_PR_DEPOT) prereq &= (unsigned short)~SC_PR_DEPOT; break;
         case B_BARRACKS: if (prereq & SC_PR_BARRACKS) prereq &= (unsigned short)~SC_PR_BARRACKS; break;
+#ifdef SC64_T5_RUNTIME
+        case B_FACTORY: if (prereq & SC_PR_FACTORY) prereq &= (unsigned short)~SC_PR_FACTORY; break;
+        case B_CONTROL_TOWER: if (prereq & SC_PR_CONTROL_TOWER) prereq &= (unsigned short)~SC_PR_CONTROL_TOWER; break;
+#endif
         }
     }
     return prereq == 0;
@@ -196,6 +205,10 @@ static int race_queue_unit(int owner, int producer, int type)
     if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) || !building_complete(producer) ||
         b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type, r->producer) || b[producer].queue_count >= 5 ||
         !race_owner_has_prereq(owner, r->prereq)) return 0;
+#ifdef SC64_T5_RUNTIME
+    if (type == U_DROPSHIP && race_t5_active() &&
+        !race_t5_starport_has_control_tower(producer)) return 0;
+#endif
     {
         const Sc64RaceBuildingRule *br = sc64_race_building_rule(b[producer].type);
         if (br && (br->flags & SC_RACE_F_REQUIRES_POWER) &&
@@ -225,6 +238,9 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     Sc64RaceBank bank;
     int slot;
+#ifdef SC64_T5_RUNTIME
+    if (type == B_CONTROL_TOWER) return 0; /* Starport-only add-on path. */
+#endif
     if (!r || r->race != race_owner_identity(owner) || worker < 0 || worker >= MAX_UNITS ||
         !u[worker].alive || u[worker].owner != owner || u[worker].type != r->worker ||
         !race_can_site(owner, type, x, y) || !can_place(type, x, y)) return 0;

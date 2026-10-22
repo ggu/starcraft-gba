@@ -328,6 +328,8 @@ to the engine. With both T4 and T5 private scenario headers prepared, run:
 
 ```sh
 make test-sc64-t5-engine test-sc64-t5-world test-sc64-t5-combat test-sc64-t5-save
+make test-sc64-transport-rules test-sc64-t5-tech
+make test-sc64-transport-engine test-sc64-transport-queries
 make sc64-t5-engine-probe
 python3 tools/sc64_t5_engine_probe.py --ticks 3000
 python3 tools/sc64_t5_save_smoke.py
@@ -340,7 +342,7 @@ They do not demonstrate ordinary-controller completion.
 
 The probe ROM automatically enters global mission 8 for a bounded neutral-input
 ARM run. Its catalog entry stays unavailable pending controller completion.
-The probe uses save generation 13; the normal T1–T4 build keeps generation 11.
+The probe uses save generation 14; the normal T1–T4 build keeps generation 11.
 Use separate save files for these profiles. T5 shares the existing 16,328-byte
 SRAM payload with T4: four active trigger contexts are stored, and omitted
 contexts are checked against their initial state and reconstructed on load.
@@ -350,10 +352,23 @@ Reports and captures remain under ignored local output directories.
 
 `make sc64-t5-controller-probe` runs a bounded 60,000-tick host controller
 attempt and writes its private trace under `.local/sc64/t5/`. It exercises
-the rescue/base sequence and paid production. Ending at its limit is an
+the rescue/base sequence, paid production and an attempted Dropship assault.
+Its private checkpoints record loaded cargo and transport failures. Ending at its limit is an
 unfinished attempt, not a mission-completion test. The separate
 `SC64_T5_CAMPAIGN_ENTRY` menu flag is covered by asset-free frontend checks
 but is not enabled by any ROM target yet.
+
+The internal T5 profile now supports paid Starport/Control Tower/Dropship
+production and eight-point cargo capacity. Select ground troops and press A
+on a friendly Dropship to board. Select the ship, open B commands, choose
+UNLOAD CARGO and press A on the destination. Factory, Starport and Control
+Tower entries follow STOP / HOLD in the scrolling command list. Select a
+Factory or Starport and press R to cycle its production types, then A to queue.
+The Control Tower command requires a selected, completed Starport and builds
+its attached add-on automatically. Cargo stays in the existing actor/save
+records; one derived activity word avoids cargo scans when no transport
+orders are active. Generation 14 rejects generation-13 internal saves.
+These controls remain experimental and do not enable the mission catalog.
 
 Opaque AI scripts use explicit GBA policies: rescue conversion, passive guards,
 clear-combat orders, paid production and small periodic attack groups. Hero

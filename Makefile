@@ -370,6 +370,27 @@ build/test-sc64-t5-save: tests/sc64_t5_save.c $(STARCRAFT) $(wildcard starcraft/
 .PHONY: test-sc64-t5-save
 test-sc64-t5-save: build/test-sc64-t5-save
 	./build/test-sc64-t5-save
+build/test-sc64-transport-rules: tests/sc64_transport_rules.c starcraft/sc64_transport_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-transport-rules
+test-sc64-transport-rules: build/test-sc64-transport-rules
+	./build/test-sc64-transport-rules
+test-starcraft: test-sc64-transport-rules
+build/test-sc64-t5-tech: tests/sc64_t5_tech.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-t5-tech
+test-sc64-t5-tech: build/test-sc64-t5-tech
+	./build/test-sc64-t5-tech
+build/test-sc64-transport-engine: tests/sc64_transport_engine.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-transport-engine
+test-sc64-transport-engine: build/test-sc64-transport-engine
+	./build/test-sc64-transport-engine
+build/test-sc64-transport-queries: tests/sc64_transport_queries.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-transport-queries
+test-sc64-transport-queries: build/test-sc64-transport-queries
+	./build/test-sc64-transport-queries
 build/test-sc64-t5-combat: tests/sc64_t5_combat.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-t5-combat

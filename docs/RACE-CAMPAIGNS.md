@@ -213,8 +213,11 @@ combat. Sanitizer fixtures cover region-gated resource grants, the rebel-base
 sequence, and original victory/defeat predicates through direct world setup.
 These are engine checks, not ordinary-controller completion evidence.
 
-The public catalog still excludes T5. Its internal ARM probe automatically
-enters the mission and refuses T5 saves until persistence is implemented.
+The public catalog still excludes T5 pending a controller-completed mission.
+Its internal ARM probe automatically enters the mission and supports separate
+generation-14 saves, including trigger, mine, cargo and add-on validation.
+Host checks demonstrate paid Dropship transport and a landing; the ARM
+evidence covers the opening and a save/load across fresh emulator processes.
 See [the probe workflow](DEVELOPMENT.md#internal-t5-runtime-probe) for commands
 and remaining fidelity limits. Ten missions across the three race campaigns
 are currently playable; the other 20 remain unavailable.
@@ -306,9 +309,10 @@ supported roles, sight, bounded integer Ghost/concussive behavior, canonical
 Beacon save encoding, and the authored Rescue Passive contact/transfer policy.
 Rescue contact currently uses an inclusive 32-pixel square in GBA coordinates
 as a center-based approximation; it does not claim exact native query edges or
-ordering. The T4 catalog remains disabled and the scenario is not playable.
-Door and trap collision/state, teleports, trigger actions, objective behavior
-and completion still need implementation. No T4 frame-rate result is claimed.
+ordering. At that actor-only stage, the T4 catalog was disabled. Door and trap
+collision/state, teleports, triggers and completion were later integrated into
+the combined experimental build described above; the isolated actor fixture
+does not establish those behaviors or a frame-rate result.
 
 The next source-only foundation preserves all numeric trigger/location/THG2
 operands in private immutable C tables. `make test-sc64-t4-scenario` checks the

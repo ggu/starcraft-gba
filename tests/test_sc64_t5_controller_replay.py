@@ -47,6 +47,23 @@ def sample_trace() -> dict:
             "tick_limit": 1200, "events": events}
 
 
+def add_aux_snapshot(row: dict, *, transport: bool = True) -> dict:
+    row.update({
+        "starport_slot": -1, "starport_raw": -1, "starport_complete": 0,
+        "control_tower_slot": -1, "control_tower_raw": -1,
+        "control_tower_complete": 0,
+    })
+    if transport:
+        row.update({
+            "transport_ship_slot": -1, "transport_ship_raw": -1,
+            "transport_ship_alive": 0, "transport_ship_hp": -1,
+            "transport_ship_xy": [-1, -1], "transport_cargo_space": -1,
+            "transport_landing": [-1, -1], "transport_landed_count": -1,
+            "transport_loaded": [],
+        })
+    return row
+
+
 class T5ReplayValidationTests(unittest.TestCase):
     def test_source_trace_offsets_onto_verified_normal_menu_route(self):
         plan = replay.validate_trace(sample_trace(), capacity=256)
@@ -146,6 +163,71 @@ class T5ReplayValidationTests(unittest.TestCase):
         state["race_mode"] = 0
         state["race_selected_mission"] = 8
         replay.verify_final(plan["final"], state)
+
+    def test_accepts_optional_tech_and_transport_snapshots_without_comparing_them(self):
+        trace = sample_trace()
+        start = add_aux_snapshot(trace["events"][0])
+        start.update({"starport_slot": 4, "starport_raw": 107,
+                      "control_tower_slot": 5, "control_tower_raw": 113})
+        loaded = add_aux_snapshot(observation("dropship-loaded", 1100))
+        loaded.update({
+            "starport_slot": 4, "starport_raw": 107, "starport_complete": 1,
+            "control_tower_slot": 5, "control_tower_raw": 113,
+            "control_tower_complete": 1,
+            "transport_ship_slot": 12, "transport_ship_raw": 11,
+            "transport_ship_alive": 1, "transport_ship_hp": 150,
+            "transport_ship_xy": [900, 880], "transport_cargo_space": 8,
+            "transport_landing": [1200, 700], "transport_landed_count": 0,
+            "transport_loaded": [{"slot": 20, "raw_type": 16},
+                                 {"slot": 21, "raw_type": 19}],
+        })
+        trace["events"].insert(-1, loaded)
+        # The source transition trace remains valid and older fields continue
+        # to be the only fields the replay debugger compares.
+        plan = replay.validate_trace(trace, 256)
+        self.assertEqual(plan["checkpoints"][-1]["kind"], "dropship-loaded")
+        replay.compare_observation(loaded, dict(loaded), "fixture")
+        self.assertTrue({"transport_loaded", "starport_complete"}.isdisjoint(
+            replay.OBS_FIELDS))
+
+    def test_accepts_destroyed_carrier_snapshot_and_new_checkpoint_kinds(self):
+        trace = sample_trace()
+        destroyed = add_aux_snapshot(observation("dropship-destroyed-in-transit", 1100))
+        destroyed.update({
+            "starport_slot": 4, "starport_raw": 107, "starport_complete": 1,
+            "control_tower_slot": 5, "control_tower_raw": 113,
+            "control_tower_complete": 1,
+            "transport_ship_slot": 12, "transport_ship_raw": 11,
+            "transport_ship_alive": 0, "transport_ship_hp": 0,
+            "transport_ship_xy": [1000, 900], "transport_cargo_space": -1,
+            "transport_landing": [1200, 700], "transport_landed_count": 0,
+            "transport_loaded": [{"slot": 20, "raw_type": 16}],
+        })
+        trace["events"].insert(-1, destroyed)
+        plan = replay.validate_trace(trace, 256)
+        self.assertEqual(plan["checkpoints"][-1]["kind"],
+                         "dropship-destroyed-in-transit")
+        self.assertNotIn("dropship-destroyed-in-transit", replay.OBS_FIELDS)
+
+    def test_rejects_partial_or_malformed_auxiliary_snapshots(self):
+        trace = sample_trace()
+        trace["events"][0]["transport_ship_slot"] = -1
+        with self.assertRaisesRegex(ValueError, "snapshot is missing"):
+            replay.validate_trace(trace, 256)
+
+        for mutate, message in (
+            (lambda row: row.update(transport_loaded=[{"slot": 1}]), "invalid shape"),
+            (lambda row: row.update(transport_loaded=[{"slot": 1, "raw_type": 11},
+                                                       {"slot": 1, "raw_type": 12}]), "duplicate slots"),
+            (lambda row: row.update(transport_ship_xy=[1536, 0]), "map bounds"),
+            (lambda row: row.update(transport_cargo_space=9), "capacity bounds"),
+            (lambda row: row.update(starport_slot=64), "building bounds"),
+        ):
+            trace = sample_trace()
+            row = add_aux_snapshot(trace["events"][0])
+            mutate(row)
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                replay.validate_trace(trace, 256)
 
 
 if __name__ == "__main__":

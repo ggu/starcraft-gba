@@ -19,6 +19,25 @@ OpenBW's [`bwgame.h`](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a
 
 Build times and weapon cooldowns are simulation-frame counts. The default skirmish scales reference times to its 30-update target. The prototype uses simplified combat, collision, route finding, AI, and scenario balance; these references do not imply full original-game fidelity. Numeric facts and identifiers are documented for provenance and are not copied BWAPI implementation code.
 
+## Internal transport research
+
+At the pinned BWAPI revision, `UnitType.cpp` records raw-11 Dropship capacity
+and passenger space requirements in `unitSpaceRequired`/`unitSpaceProvided`,
+and the raw-115 Control Tower's HP, armor, costs, build time, dimensions and
+tile footprint. `UnitType.h` documents the 255 nontransportable-space sentinel.
+The authored `sc64_transport_rules.h` transcribes selected numeric facts;
+unknown passengers fail closed. Add-on placement uses the source (4,1)-tile
+top-left anchor and center conversion from a 4×3 Starport to a 2×2 Tower.
+
+The pinned OpenBW `bwgame.h` was inspected for load eligibility (around
+1781–1799), EnterTransport, unload intervals (3154–3174), carrier destruction
+(16113–16119), Command/Bring counting (18792–18890), and add-on construction
+(5177–5179). This research informs an independently authored bounded GBA
+adapter; no OpenBW implementation is copied. Source unload time 15 becomes
+19 GBA updates at 30 Hz. The runtime's constant flight speed, short landing
+search, placeholder add-on art and Men-selector classification remain
+explicit approximations, as detailed in [Validation](VALIDATION.md).
+
 ## Optional StarCraft 64 missions
 
 The optional unified profile reads map and graphics data from a user-supplied verified USA N64 ROM through `references/sc64-maps/extract_sc64_maps.py` at the pinned `sc64-maps` commit. The local adapter is `tools/sc64_import.py`; terrain, sprite, and race packing is implemented in `tools/sc64_assets.py`, `tools/sc64_sprites.py`, `tools/sc64_races_pack.py`, and `tools/sc64_race_sprites.py`. Imported outputs remain local. The result is an authored GBA engine and mission adaptation, not a port of the N64 engine. See [the unified guide](SC64-UNIFIED.md).

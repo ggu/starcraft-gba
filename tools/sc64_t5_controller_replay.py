@@ -39,6 +39,9 @@ TRACE_CHECKPOINTS = frozenset({
     "command-center-approach-cleared", "kerrigan-center-correction",
     "enemy-grant-attempt", "enemy-ai-started", "base-contact-attempt",
     "enemy-base-attack", "force2-area-attack", "paid-production-orders", "periodic",
+    "before-starport-tech", "starport-complete", "control-tower-complete",
+    "dropship-complete", "dropship-loaded", "dropship-landed", "dropship-unloaded",
+    "dropship-destroyed-in-transit", "dropship-landing-assault", "dropship-assault-result",
 })
 OBS_FIELDS = (
     "frame", "elapsed", "screen", "race_mode", "race_selected_mission",
@@ -60,6 +63,100 @@ def require_int_fields(row: dict, fields: tuple[str, ...], label: str) -> None:
             raise ValueError(f"{label} event is missing required field {field}")
         if type(row[field]) is not int:
             raise ValueError(f"{label} field {field} must be an integer")
+
+
+TECH_SNAPSHOT_FIELDS = (
+    "starport_slot", "starport_raw", "starport_complete",
+    "control_tower_slot", "control_tower_raw", "control_tower_complete",
+)
+TRANSPORT_SNAPSHOT_FIELDS = (
+    "transport_ship_slot", "transport_ship_raw", "transport_ship_alive",
+    "transport_ship_hp", "transport_ship_xy", "transport_cargo_space",
+    "transport_landing", "transport_landed_count", "transport_loaded",
+)
+
+
+def _bounded_pair(value: object, label: str, *, allow_sentinel: bool) -> None:
+    if (not isinstance(value, list) or len(value) != 2 or
+            any(type(part) is not int for part in value)):
+        raise ValueError(f"{label} must be a two-integer coordinate")
+    if allow_sentinel and value == [-1, -1]:
+        return
+    if any(part < 0 or part >= 96 * 16 for part in value):
+        raise ValueError(f"{label} is outside the T5 map bounds")
+
+
+def validate_aux_snapshot(row: dict, label: str) -> None:
+    """Validate optional tech/cargo evidence without treating it as replay oracle data.
+
+    Older trace files omit these fields. New runner traces include both groups
+    on every observation, using -1/empty sentinels before the corresponding
+    objects exist. Replay compares only OBS_FIELDS because these auxiliary
+    debugger summaries are not independently observed by the replay debugger.
+    """
+    for group_name, fields in (("tech", TECH_SNAPSHOT_FIELDS),
+                               ("transport", TRANSPORT_SNAPSHOT_FIELDS)):
+        present = [field in row for field in fields]
+        if any(present) and not all(present):
+            missing = fields[present.index(False)]
+            raise ValueError(f"{label} {group_name} snapshot is missing {missing}")
+
+    if all(field in row for field in TECH_SNAPSHOT_FIELDS):
+        for prefix in ("starport", "control_tower"):
+            slot, raw, complete = (row[f"{prefix}_slot"], row[f"{prefix}_raw"],
+                                   row[f"{prefix}_complete"])
+            if type(slot) is not int or not (-1 <= slot < 64):
+                raise ValueError(f"{label} {prefix}_slot is outside building bounds")
+            if type(raw) is not int or not (-1 <= raw <= 255):
+                raise ValueError(f"{label} {prefix}_raw is outside raw-type bounds")
+            if type(complete) is not int or complete not in (0, 1):
+                raise ValueError(f"{label} {prefix}_complete must be boolean")
+            if slot == -1 and (raw != -1 or complete != 0):
+                raise ValueError(f"{label} absent {prefix} must use canonical sentinels")
+            if slot >= 0 and raw < 0:
+                raise ValueError(f"{label} present {prefix} needs a raw type")
+
+    if all(field in row for field in TRANSPORT_SNAPSHOT_FIELDS):
+        slot, raw = row["transport_ship_slot"], row["transport_ship_raw"]
+        alive, hp = row["transport_ship_alive"], row["transport_ship_hp"]
+        cargo, landed = row["transport_cargo_space"], row["transport_landed_count"]
+        if type(slot) is not int or not (-1 <= slot < 160):
+            raise ValueError(f"{label} transport_ship_slot is outside unit bounds")
+        if type(raw) is not int or not (-1 <= raw <= 255):
+            raise ValueError(f"{label} transport_ship_raw is outside raw-type bounds")
+        if type(alive) is not int or alive not in (0, 1):
+            raise ValueError(f"{label} transport_ship_alive must be boolean")
+        if type(hp) is not int or not (-1 <= hp <= 100000):
+            raise ValueError(f"{label} transport_ship_hp is outside bounds")
+        if type(cargo) is not int or not (-1 <= cargo <= 8):
+            raise ValueError(f"{label} transport_cargo_space is outside capacity bounds")
+        if type(landed) is not int or not (-1 <= landed <= 160):
+            raise ValueError(f"{label} transport_landed_count is outside actor bounds")
+        _bounded_pair(row["transport_ship_xy"], f"{label} transport_ship_xy",
+                      allow_sentinel=True)
+        _bounded_pair(row["transport_landing"], f"{label} transport_landing",
+                      allow_sentinel=True)
+        loaded = row["transport_loaded"]
+        if not isinstance(loaded, list) or len(loaded) > 8:
+            raise ValueError(f"{label} transport_loaded must contain at most eight actors")
+        seen_slots = set()
+        for index, item in enumerate(loaded):
+            if not isinstance(item, dict) or set(item) != {"slot", "raw_type"}:
+                raise ValueError(f"{label} transport_loaded[{index}] has invalid shape")
+            actor_slot, actor_raw = item["slot"], item["raw_type"]
+            if type(actor_slot) is not int or not 0 <= actor_slot < 160:
+                raise ValueError(f"{label} transport_loaded[{index}] slot is outside unit bounds")
+            if type(actor_raw) is not int or not 0 <= actor_raw <= 255:
+                raise ValueError(f"{label} transport_loaded[{index}] raw type is invalid")
+            if actor_slot in seen_slots:
+                raise ValueError(f"{label} transport_loaded contains duplicate slots")
+            seen_slots.add(actor_slot)
+        if slot == -1:
+            if (raw != -1 or alive != 0 or hp != -1 or cargo != -1 or landed != -1 or
+                    row["transport_ship_xy"] != [-1, -1] or loaded):
+                raise ValueError(f"{label} absent transport must use canonical sentinels")
+        elif raw < 0:
+            raise ValueError(f"{label} present transport needs a raw type")
 
 
 def validate_trace(trace: object, capacity: int) -> dict:
@@ -121,11 +218,13 @@ def validate_trace(trace: object, capacity: int) -> dict:
             if source_inputs:
                 raise ValueError("T5 start observation must precede source controller inputs")
             require_int_fields(row, OBS_FIELDS, "start")
+            validate_aux_snapshot(row, "start")
             start = row
         elif kind in TRACE_CHECKPOINTS - {"start"}:
             if start is None or final is not None:
                 raise ValueError(f"{kind} checkpoint must follow start and precede final")
             require_int_fields(row, OBS_FIELDS, kind)
+            validate_aux_snapshot(row, kind)
             if checkpoints and tick < checkpoints[-1]["host_tick"]:
                 raise ValueError("T5 observation checkpoints must be ordered")
             checkpoints.append(row)
@@ -133,6 +232,7 @@ def validate_trace(trace: object, capacity: int) -> dict:
             if start is None or final is not None or i != len(rows) - 1:
                 raise ValueError("T5 trace must end with exactly one final outcome observation")
             require_int_fields(row, OBS_FIELDS, "final")
+            validate_aux_snapshot(row, "final")
             final = row
             final_source_tick = tick
         else:

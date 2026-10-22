@@ -179,6 +179,7 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
 #endif
 #ifdef SC64_T5_RUNTIME
 #include "sc64_t5_save_adapter.h"
+#include "sc64_transport_save_adapter.h"
 #endif
 static int sc64_race_storage_geometry_valid(int width, int height) {
 #ifdef SC64_T4_RUNTIME
@@ -279,6 +280,9 @@ static int race_save_game(void) {
     if (race_t4_active() &&
         !race_t4_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
+#ifdef SC64_T5_RUNTIME
+    if (!race_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
+#endif
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);toast(7);return 1;
 }
 static int race_load_game(void) {
@@ -351,7 +355,13 @@ static int race_load_game(void) {
         if(RACE_U(i,type)<0||RACE_U(i,type)>=SC_RU_COUNT||RACE_U(i,owner)<0||RACE_U(i,owner)>4||
             RACE_U(i,hp)<=0||RACE_U(i,maxhp)<=0||RACE_U(i,hp)>RACE_U(i,maxhp)||
             RACE_U(i,x)<0||RACE_U(i,x)>=width*16||RACE_U(i,y)<0||RACE_U(i,y)>=height*16||
-            RACE_U(i,order)<ORDER_IDLE||RACE_U(i,order)>ORDER_GAS||RACE_U(i,shield)<0||
+            RACE_U(i,order)<ORDER_IDLE||RACE_U(i,order)>
+#ifdef SC64_T5_RUNTIME
+            ORDER_UNLOAD||
+#else
+            ORDER_GAS||
+#endif
+            RACE_U(i,shield)<0||
             RACE_U(i,shield_remainder)<0||RACE_U(i,shield_remainder)>=1280)return 0;
         int target=RACE_U(i,target),order=RACE_U(i,order);
         if((order==ORDER_MINE&&(target<0||target>=MAX_MINERALS))||
@@ -390,6 +400,9 @@ static int race_load_game(void) {
     }
 #undef RACE_U
 #undef RACE_B
+#ifdef SC64_T5_RUNTIME
+    if (!race_transport_save_candidate_valid(&race_data, width, height)) return 0;
+#endif
     for(int i=0;i<MAX_MINERALS;i++)if(race_data.minerals_map[i].amount<0||
         race_data.minerals_map[i].amount>65535)return 0;
 #ifdef SC64_UNIFIED

@@ -21,7 +21,29 @@ static u32 host_ticks;
 static void checkpoint(const char *kind);
 static void tap(u16 key);
 static void move_cursor(int x, int y);
+static void wait_frames(int amount);
 static int dump_final;
+static int trace_ship_slot = -1;
+static int trace_starport_slot = -1;
+static int trace_tower_slot = -1;
+static int trace_landing_x = -1;
+static int trace_landing_y = -1;
+static int trace_landed_count = -1;
+static int trace_ship_hp = -1;
+static int trace_ship_x = -1;
+static int trace_ship_y = -1;
+static int trace_landed_manifest_count;
+static int trace_landed_slots[SC64_TRANSPORT_DROPSHIP_SPACE];
+static int trace_landed_raws[SC64_TRANSPORT_DROPSHIP_SPACE];
+static int trace_passenger_count;
+static int trace_passenger_slots[SC64_TRANSPORT_DROPSHIP_SPACE];
+static int trace_passenger_raws[SC64_TRANSPORT_DROPSHIP_SPACE];
+static int trace_passenger_snapshot_valid;
+static u32 trace_passenger_snapshot_tick;
+static int trace_passenger_alive[SC64_TRANSPORT_DROPSHIP_SPACE];
+static int trace_passenger_loaded[SC64_TRANSPORT_DROPSHIP_SPACE];
+static int trace_passenger_x[SC64_TRANSPORT_DROPSHIP_SPACE];
+static int trace_passenger_y[SC64_TRANSPORT_DROPSHIP_SPACE];
 static int reachable_location_distance(int sx, int sy, unsigned location,
                                        int *out_x, int *out_y)
 {
@@ -150,6 +172,46 @@ static int nearest_enemy_approach(int *out_x, int *out_y)
     return -1;
 }
 
+static int nearest_enemy_approach_from_mode(int sx, int sy, int *out_x, int *out_y,
+                                            int buildings_only)
+{
+    static u8 seen[MAP_CELLS];
+    static u16 queue[MAP_CELLS], distance[MAP_CELLS];
+    int start = sx / 16 + (sy / 16) * MAP_COLS, head = 0, tail = 0;
+    if (!out_x || !out_y || start < 0 || start >= MAP_CELLS) return -1;
+    build_path_grid(); memset(seen, 0, sizeof(seen));
+    memset(distance, 0, sizeof(distance)); seen[start] = 1; queue[tail++] = (u16)start;
+    while (head < tail) {
+        int cell = queue[head++], col = cell % MAP_COLS, row = cell / MAP_COLS;
+        int px = col * 16 + 8, py = row * 16 + 8;
+        for (int bi = 0; bi < MAX_BUILDINGS; ++bi) if (b[bi].alive && b[bi].owner == ENEMY) {
+            int d = dist2(px, py, b[bi].x, b[bi].y);
+            if (d >= 18 * 18 && d <= 40 * 40) {
+                *out_x = px; *out_y = py; return distance[cell];
+            }
+        }
+        for (int ui = 0; !buildings_only && ui < MAX_UNITS; ++ui)
+            if (u[ui].alive && u[ui].owner == ENEMY) {
+            int d = dist2(px, py, u[ui].x, u[ui].y);
+            if (d >= 12 * 12 && d <= 40 * 40) {
+                *out_x = px; *out_y = py; return distance[cell];
+            }
+        }
+#define T5_FROM_NEXT(n_) do { int z_=(n_); if (!seen[z_] && SC64_GRID_GET(path_walkable,z_)) { seen[z_]=1; distance[z_]=(u16)(distance[cell]+1); queue[tail++]=(u16)z_; } } while (0)
+        if (col > 0) T5_FROM_NEXT(cell - 1);
+        if (col + 1 < MAP_COLS) T5_FROM_NEXT(cell + 1);
+        if (row > 0) T5_FROM_NEXT(cell - MAP_COLS);
+        if (row + 1 < MAP_ROWS) T5_FROM_NEXT(cell + MAP_COLS);
+#undef T5_FROM_NEXT
+    }
+    return -1;
+}
+
+static int nearest_enemy_approach_from(int sx, int sy, int *out_x, int *out_y)
+{
+    return nearest_enemy_approach_from_mode(sx, sy, out_x, out_y, 0);
+}
+
 static int kerrigan_alive(void)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
@@ -276,7 +338,7 @@ static int command_group_to(int x, int y, int attack_move)
     return 1;
 }
 
-static int command_actor_to(int slot, int x, int y)
+static int controller_order_actor(int slot, int x, int y, int attack_move)
 {
     if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive || u[slot].owner != SIDE)
         return 0;
@@ -293,10 +355,460 @@ static int command_actor_to(int slot, int x, int y)
                 slot, u[slot].selected, selected_count(), selected_building);
         return 0;
     }
-    tap(KEY_B); tap(KEY_A);
+    tap(KEY_B);
+    if (attack_move) tap(KEY_DOWN);
+    tap(KEY_A);
     move_cursor(x, y);
     tap(KEY_A);
     return 1;
+}
+
+static int command_actor_to(int slot, int x, int y)
+{ return controller_order_actor(slot, x, y, 0); }
+
+static int command_actor_attack_to(int slot, int x, int y)
+{ return controller_order_actor(slot, x, y, 1); }
+
+static int controller_select_unit(int slot)
+{
+    if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive || u[slot].owner != SIDE)
+        return 0;
+    for (int retry = 0; retry <= MAX_UNITS && screen == SCREEN_PLAY &&
+         !won && !lost && host_ticks < (u32)run_limit; ++retry) {
+        if (u[slot].selected && selected_count() == 1 && selected_building < 0)
+            return 1;
+        tap(KEY_L);
+    }
+    return 0;
+}
+
+static int controller_select_building(int slot)
+{
+    if (slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive || b[slot].owner != SIDE)
+        return 0;
+    /* Field interaction treats A as producer-queue input while a building
+       remains selected, so clear that selection with the ordinary L cycle
+       before clicking the requested building. */
+    if (selected_building >= 0) tap(KEY_L);
+    move_cursor(b[slot].x, b[slot].y);
+    tap(KEY_A);
+    return selected_building == slot && selected_count() == 0;
+}
+
+static int controller_choose_menu_row(int row)
+{
+    if (row < 0 || row >= 14 || host_ticks >= (u32)run_limit) return 0;
+    tap(KEY_B);
+    for (int i = 0; i < row; ++i) tap(KEY_DOWN);
+    tap(KEY_A);
+    return screen == SCREEN_PLAY && !won && !lost;
+}
+
+static int find_side_building(int type, int completed_only)
+{
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == type &&
+            (!completed_only || building_complete(i))) return i;
+    return -1;
+}
+
+static int find_side_worker(void)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV &&
+            !SC64_TRANSPORT_LOADED(&u[i])) return i;
+    return -1;
+}
+
+static int controller_find_starport_site(int factory, int *out_x, int *out_y)
+{
+    int worker = find_side_worker(), best_distance = 0x7fffffff;
+    if (factory < 0 || worker < 0 || !out_x || !out_y) return 0;
+    for (int y = 16; y < WORLD_H - 48; y += 16)
+        for (int x = 32; x < WORLD_W - 64; x += 16) {
+            int tx = x + SC64_T5_ADDON_X_OFFSET;
+            int ty = y + SC64_T5_ADDON_Y_OFFSET;
+            int d = dist2(x, y, b[factory].x, b[factory].y) +
+                    dist2(x, y, u[worker].x, u[worker].y);
+            if (d > 2 * 288 * 288 || d >= best_distance ||
+                !race_can_site(SIDE, B_STARPORT, x, y) || !can_place(B_STARPORT, x, y) ||
+                !race_can_site(SIDE, B_CONTROL_TOWER, tx, ty) ||
+                !can_place(B_CONTROL_TOWER, tx, ty)) continue;
+            int clear = 1;
+            for (int bi = 0; bi < MAX_BUILDINGS; ++bi)
+                if (b[bi].alive && dist2(tx, ty, b[bi].x, b[bi].y) < 24 * 24) {
+                    clear = 0; break;
+                }
+            if (clear) { best_distance = d; *out_x = x; *out_y = y; }
+        }
+    return best_distance != 0x7fffffff;
+}
+
+static int controller_build_starport(int *out_slot)
+{
+    int factory = find_side_building(B_FACTORY, 1), worker = find_side_worker();
+    int x, y, before = owner_buildings(SIDE);
+    int existing = find_side_building(B_STARPORT, 0);
+    if (out_slot) *out_slot = existing;
+    if (existing >= 0) return 1;
+    if (factory < 0 || worker < 0 || minerals < 100 || gas < 100 ||
+        !controller_find_starport_site(factory, &x, &y)) return 0;
+    if (!controller_select_unit(worker) || !controller_choose_menu_row(11)) return 0;
+    move_cursor(x, y);
+    tap(KEY_A);
+    int slot = find_side_building(B_STARPORT, 0);
+    if (owner_buildings(SIDE) <= before || slot < 0 || b[slot].x != x || b[slot].y != y)
+        return 0;
+    fprintf(stderr, "T5 controller started paid Starport slot=%d site=%d,%d worker=%d wallet=%d/%d\n",
+            slot, x, y, worker, minerals, gas);
+    if (out_slot) *out_slot = slot;
+    return 1;
+}
+
+static int controller_wait_building(int slot, int ticks)
+{
+    if (slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive) return 0;
+    for (int i = 0; i < ticks && screen == SCREEN_PLAY && !won && !lost &&
+         host_ticks < (u32)run_limit && !building_complete(slot); ++i) step(0);
+    return b[slot].alive && building_complete(slot);
+}
+
+static int controller_build_control_tower(int starport)
+{
+    if (starport < 0 || starport >= MAX_BUILDINGS || !b[starport].alive ||
+        b[starport].owner != SIDE || b[starport].type != B_STARPORT) {
+        fprintf(stderr, "T5 tower route invalid Starport slot=%d\n", starport);
+        return 0;
+    }
+    if (race_t5_starport_has_control_tower(starport)) return 1;
+    if (!building_complete(starport) || minerals < 50 || gas < 50) {
+        fprintf(stderr, "T5 tower route prerequisites incomplete=%d wallet=%d/%d\n",
+                building_complete(starport), minerals, gas);
+        return 0;
+    }
+    if (!controller_select_building(starport)) {
+        fprintf(stderr, "T5 could not select Starport=%d selected_building=%d selected_units=%d cursor=%d,%d\n",
+                starport, selected_building, selected_count(), cx, cy);
+        return 0;
+    }
+    if (!controller_choose_menu_row(12)) {
+        fprintf(stderr, "T5 could not issue Control Tower menu command\n");
+        return 0;
+    }
+    fprintf(stderr, "T5 controller started paid attached Control Tower for Starport=%d wallet=%d/%d\n",
+            starport, minerals, gas);
+    for (int i = 0; i < 900 && screen == SCREEN_PLAY && !won && !lost &&
+         host_ticks < (u32)run_limit; ++i) {
+        step(0);
+        if (race_t5_starport_has_control_tower(starport)) return 1;
+    }
+    return race_t5_starport_has_control_tower(starport);
+}
+
+static int controller_build_dropship(int starport, int *out_slot)
+{
+    int ship = -1;
+    if (out_slot) *out_slot = -1;
+    if (starport < 0 || !race_t5_starport_has_control_tower(starport) ||
+        !controller_select_building(starport)) return 0;
+    for (int i = 0; i < 5 && train_type != U_DROPSHIP; ++i) tap(KEY_R);
+    if (train_type != U_DROPSHIP || minerals < 100 || gas < 100) return 0;
+    tap(KEY_A);
+    if (!b[starport].queue_count || b[starport].queue[b[starport].queue_head] != U_DROPSHIP)
+        return 0;
+    fprintf(stderr, "T5 controller queued paid Dropship at Starport=%d wallet=%d/%d\n",
+            starport, minerals, gas);
+    for (int tick = 0; tick < 5000 && screen == SCREEN_PLAY && !won && !lost &&
+         host_ticks < (u32)run_limit; ++tick) {
+        step(0);
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && u[i].type == U_DROPSHIP &&
+                !SC64_TRANSPORT_LOADED(&u[i])) { ship = i; break; }
+        if (ship >= 0) break;
+    }
+    if (out_slot) *out_slot = ship;
+    return ship >= 0;
+}
+
+static int controller_air_threat_radius(int attacker)
+{
+    int range = sc64_race_unit_range_vs(attacker, 1);
+    if (range <= 0 || sc64_race_unit_damage_vs(attacker, 1) <= 0) return 0;
+    return (range + 1) / 2 + 24; /* engine half-scale plus a conservative margin */
+}
+
+static int controller_air_cell_safe(int x, int y)
+{
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
+        owners_hostile(SIDE, u[i].owner)) {
+        int radius = controller_air_threat_radius(u[i].type);
+        if (radius > 0 && dist2(x, y, u[i].x, u[i].y) < radius * radius) return 0;
+    }
+    for (int i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) &&
+        owners_hostile(SIDE, b[i].owner)) {
+        /* These are the complete set of supported static air defenses in this
+           runtime. Their firing radii and damage are defined in race_combat.h. */
+        if (b[i].type == B_MISSILE_TURRET || b[i].type == B_SPORE_COLONY ||
+            b[i].type == B_PHOTON_CANNON) {
+            int radius = 112 + 24;
+            if (dist2(x, y, b[i].x, b[i].y) < radius * radius) return 0;
+        }
+    }
+    return 1;
+}
+
+typedef struct { u16 cell; u16 density; u32 enemy_distance; } T5LandingCandidate;
+enum { T5_LANDING_CANDIDATES = 24, T5_AIR_ROUTE_MAX_LEGS = 16 };
+
+static int controller_landing_point(int *out_x, int *out_y)
+{
+    T5LandingCandidate best[T5_LANDING_CANDIDATES];
+    int count = 0, terrain_candidates = 0, threat_safe = 0, ground_reachable = 0;
+    if (!out_x || !out_y) return 0;
+    build_path_grid();
+    for (int cell = 0; cell < MAP_CELLS; ++cell) {
+        if (!SC64_GRID_GET(path_walkable, cell)) continue;
+        ++terrain_candidates;
+        int x = (cell % MAP_COLS) * 16 + 8, y = (cell / MAP_COLS) * 16 + 8;
+        if (!controller_air_cell_safe(x, y)) continue;
+        ++threat_safe;
+        int enemy_d = 0x7fffffff, cluster = 0;
+        for (int bi = 0; bi < MAX_BUILDINGS; ++bi) if (b[bi].alive && b[bi].owner == ENEMY) {
+            int d = dist2(x, y, b[bi].x, b[bi].y);
+            if (d < enemy_d) enemy_d = d;
+            if (d <= 256 * 256) ++cluster;
+        }
+        if (enemy_d < 64 * 64 || enemy_d > 320 * 320) continue;
+        T5LandingCandidate item = {(u16)cell, (u16)cluster, (u32)enemy_d};
+        int at = 0;
+        while (at < count && (best[at].density > item.density ||
+               (best[at].density == item.density && best[at].enemy_distance <= item.enemy_distance))) ++at;
+        if (at >= T5_LANDING_CANDIDATES) continue;
+        if (count < T5_LANDING_CANDIDATES) ++count;
+        for (int j = count - 1; j > at; --j) best[j] = best[j - 1];
+        best[at] = item;
+    }
+    /* An airborne-safe cell is useful only if the existing ground path grid
+       can reach a real enemy approach cell from it. */
+    for (int i = 0; i < count; ++i) {
+        int x = (best[i].cell % MAP_COLS) * 16 + 8;
+        int y = (best[i].cell / MAP_COLS) * 16 + 8, ax, ay;
+        if (nearest_enemy_approach_from_mode(x, y, &ax, &ay, 1) < 0) continue;
+        ++ground_reachable;
+        *out_x = x; *out_y = y;
+        fprintf(stderr, "T5 safe landing candidate=%d,%d cluster=%u enemy-distance=%u ground-approach=%d,%d\n",
+                x, y, best[i].density, best[i].enemy_distance, ax, ay);
+        return 1;
+    }
+    fprintf(stderr, "T5 no connected AA-safe landing terrain=%d threat-safe=%d candidates=%d ground-reachable=%d\n",
+            terrain_candidates, threat_safe, count, ground_reachable);
+    return 0;
+}
+
+/* Air movement ignores terrain in move_toward, but still follows a straight
+   line between orders. This bounded BFS finds a safe next turning point on a
+   16-pixel lattice using the live hostile air-weapon envelopes. */
+static int controller_air_next_waypoint(int sx, int sy, int gx, int gy, int *wx, int *wy)
+{
+    static u8 seen[MAP_CELLS];
+    static u16 previous[MAP_CELLS], queue[MAP_CELLS], reverse[MAP_CELLS];
+    int start = sx / 16 + (sy / 16) * MAP_COLS;
+    int goal = gx / 16 + (gy / 16) * MAP_COLS;
+    int head = 0, tail = 0;
+    if (!wx || !wy || start < 0 || start >= MAP_CELLS || goal < 0 || goal >= MAP_CELLS)
+        return 0;
+    memset(seen, 0, sizeof(seen));
+    for (int i = 0; i < MAP_CELLS; ++i) previous[i] = 0xffffu;
+    seen[start] = 1; queue[tail++] = (u16)start;
+    while (head < tail && !seen[goal]) {
+        int cell = queue[head++], col = cell % MAP_COLS, row = cell / MAP_COLS;
+#define T5_AIR_NEXT(n_) do { int z_=(n_); if (!seen[z_]) { \
+    int zx_=(z_%MAP_COLS)*16+8, zy_=(z_/MAP_COLS)*16+8; \
+    if (z_ == start || controller_air_cell_safe(zx_,zy_)) { \
+        seen[z_]=1; previous[z_]=(u16)cell; queue[tail++]=(u16)z_; } } } while (0)
+        if (col > 0) T5_AIR_NEXT(cell - 1);
+        if (col + 1 < MAP_COLS) T5_AIR_NEXT(cell + 1);
+        if (row > 0) T5_AIR_NEXT(cell - MAP_COLS);
+        if (row + 1 < MAP_ROWS) T5_AIR_NEXT(cell + MAP_COLS);
+        if (col > 0 && row > 0) T5_AIR_NEXT(cell - MAP_COLS - 1);
+        if (col + 1 < MAP_COLS && row > 0) T5_AIR_NEXT(cell - MAP_COLS + 1);
+        if (col > 0 && row + 1 < MAP_ROWS) T5_AIR_NEXT(cell + MAP_COLS - 1);
+        if (col + 1 < MAP_COLS && row + 1 < MAP_ROWS) T5_AIR_NEXT(cell + MAP_COLS + 1);
+#undef T5_AIR_NEXT
+    }
+    if (!seen[goal]) return 0;
+    int len = 0, at = goal;
+    while (at != start && len < MAP_CELLS) {
+        reverse[len++] = (u16)at;
+        at = previous[at];
+        if (at >= MAP_CELLS) return 0;
+    }
+    if (len <= 0) { *wx = gx; *wy = gy; return 1; }
+    int prior = start, last_dx = 0, last_dy = 0;
+    for (int k = len - 1; k >= 0; --k) {
+        int next = reverse[k];
+        int dx = (next % MAP_COLS) - (prior % MAP_COLS);
+        int dy = (next / MAP_COLS) - (prior / MAP_COLS);
+        if (k != len - 1 && (dx != last_dx || dy != last_dy)) {
+            *wx = (prior % MAP_COLS) * 16 + 8;
+            *wy = (prior / MAP_COLS) * 16 + 8;
+            return 1;
+        }
+        last_dx = dx; last_dy = dy; prior = next;
+    }
+    *wx = gx; *wy = gy;
+    return 1;
+}
+
+static int controller_ferry_assault(int ship, int *out_landing_x, int *out_landing_y)
+{
+    int landing_x, landing_y, cargo = 0;
+    if (ship < 0 || ship >= MAX_UNITS || !race_transport_carrier_valid(ship)) {
+        fprintf(stderr, "T5 ferry has invalid Dropship slot=%d\n", ship);
+        return 0;
+    }
+    if (!controller_landing_point(&landing_x, &landing_y)) return 0;
+    /* Ferry armed support units individually and leave Kerrigan/Raynor on the
+       home side: the mission has explicit hero-survival loss conditions. */
+    for (int i = 0; i < MAX_UNITS && screen == SCREEN_PLAY && !won && !lost &&
+         host_ticks < (u32)run_limit; ++i) {
+        Unit *q = &u[i];
+        if (!q->alive || q->owner != SIDE || SC64_TRANSPORT_LOADED(q) ||
+            q->raw_type == 19 || q->raw_type == 20 ||
+            (q->type != U_MARINE && q->type != U_FIREBAT && q->type != U_VULTURE &&
+             q->type != U_GOLIATH && q->type != U_TANK)) continue;
+        cargo = race_transport_cargo_space(ship);
+        if (cargo < 0 || cargo >= SC64_TRANSPORT_DROPSHIP_SPACE) break;
+        unsigned space;
+        if (!sc64_transport_space_required_raw((unsigned)q->raw_type, &space) ||
+            space == SC64_TRANSPORT_SPACE_UNAVAILABLE ||
+            cargo + (int)space > SC64_TRANSPORT_DROPSHIP_SPACE) continue;
+        if (!controller_select_unit(i)) continue;
+        move_cursor(u[ship].x, u[ship].y);
+        tap(KEY_A); /* normal field interaction issues ORDER_BOARD */
+        for (int tick = 0; tick < 4000 && q->alive && q->order == ORDER_BOARD &&
+             screen == SCREEN_PLAY && !won && !lost && host_ticks < (u32)run_limit; ++tick)
+            step(0);
+        if (SC64_TRANSPORT_LOADED(q)) {
+            cargo = race_transport_cargo_space(ship);
+            fprintf(stderr, "T5 boarded assault actor slot=%d raw=%d cargo=%d/8\n",
+                    i, q->raw_type, cargo);
+        }
+    }
+    cargo = race_transport_cargo_space(ship);
+    if (cargo <= 0) return 0;
+    trace_passenger_count = 0;
+    for (int i = 0; i < MAX_UNITS && trace_passenger_count < SC64_TRANSPORT_DROPSHIP_SPACE; ++i)
+        if (u[i].alive && SC64_TRANSPORT_LOADED(&u[i]) && u[i].target == ship) {
+            int k = trace_passenger_count++;
+            trace_passenger_slots[k] = i;
+            trace_passenger_raws[k] = u[i].raw_type;
+        }
+    fprintf(stderr, "T5 controller loaded Dropship slot=%d cargo-space=%d landing=%d,%d\n",
+            ship, cargo, landing_x, landing_y);
+    trace_ship_slot = ship; trace_landing_x = landing_x; trace_landing_y = landing_y;
+    checkpoint("dropship-loaded");
+    for (int leg = 0; leg < T5_AIR_ROUTE_MAX_LEGS &&
+         dist2(u[ship].x, u[ship].y, landing_x, landing_y) > 10 * 10 &&
+         screen == SCREEN_PLAY && !won && !lost && host_ticks < (u32)run_limit; ++leg) {
+        int wx, wy;
+        if (!controller_air_next_waypoint(u[ship].x, u[ship].y,
+                                          landing_x, landing_y, &wx, &wy)) {
+            fprintf(stderr, "T5 no safe air route ship=%d at=%d,%d landing=%d,%d\n",
+                    ship, u[ship].x, u[ship].y, landing_x, landing_y);
+            return 0;
+        }
+        fprintf(stderr, "T5 Dropship safe waypoint leg=%d at=%d,%d target=%d,%d\n",
+                leg, u[ship].x, u[ship].y, wx, wy);
+        if (!command_actor_to(ship, wx, wy)) {
+            fprintf(stderr, "T5 Dropship move command failed selected=%u count=%d order=%u\n",
+                    u[ship].selected, selected_count(), u[ship].order);
+            return 0;
+        }
+        int arrived = 0;
+        for (int tick = 0; tick < 5000 && screen == SCREEN_PLAY && !won && !lost &&
+             host_ticks < (u32)run_limit; ++tick) {
+            step(0);
+            trace_ship_hp = u[ship].alive ? u[ship].hp : 0;
+            trace_ship_x = u[ship].x; trace_ship_y = u[ship].y;
+            if (!u[ship].alive) {
+                fprintf(stderr, "T5 Dropship destroyed in transit tick=%u last-pos=%d,%d\n",
+                        (unsigned)host_ticks, u[ship].x, u[ship].y);
+                checkpoint("dropship-destroyed-in-transit");
+                return 0;
+            }
+            if (dist2(u[ship].x, u[ship].y, wx, wy) <= 6 * 6) { arrived = 1; break; }
+        }
+        if (!arrived) {
+            fprintf(stderr, "T5 Dropship waypoint timeout tick=%u at=%d,%d target=%d,%d hp=%d\n",
+                    (unsigned)host_ticks, u[ship].x, u[ship].y, wx, wy, u[ship].hp);
+            return 0;
+        }
+    }
+    if (dist2(u[ship].x, u[ship].y, landing_x, landing_y) > 10 * 10) {
+        fprintf(stderr, "T5 Dropship travel incomplete tick=%u pos=%d,%d target=%d,%d order=%u\n",
+                (unsigned)host_ticks, u[ship].x, u[ship].y, landing_x, landing_y, u[ship].order);
+        return 0;
+    }
+    if (!controller_select_unit(ship) || !controller_choose_menu_row(13)) {
+        fprintf(stderr, "T5 Dropship unload command failed selected=%u count=%d\n",
+                u[ship].selected, selected_count());
+        return 0;
+    }
+    move_cursor(landing_x, landing_y);
+    tap(KEY_A);
+    for (int tick = 0; tick < 800 && screen == SCREEN_PLAY && !won && !lost &&
+         host_ticks < (u32)run_limit; ++tick) {
+        step(0);
+        if (race_transport_cargo_space(ship) == 0) break;
+    }
+    if (!race_transport_carrier_valid(ship) || race_transport_cargo_space(ship) != 0) {
+        fprintf(stderr, "T5 unload incomplete ship=%d alive=%d cargo=%d\n",
+                ship, u[ship].alive, race_transport_cargo_space(ship));
+        return 0;
+    }
+    int landed = 0;
+    for (int passenger = 0; passenger < trace_passenger_count; ++passenger) {
+        int i = trace_passenger_slots[passenger];
+        if (u[i].alive && u[i].owner == SIDE &&
+            u[i].raw_type == trace_passenger_raws[passenger] &&
+            !SC64_TRANSPORT_LOADED(&u[i]) &&
+            dist2(u[i].x, u[i].y, landing_x, landing_y) < 72 * 72) {
+            ++landed;
+            if (trace_landed_manifest_count < SC64_TRANSPORT_DROPSHIP_SPACE) {
+                int k = trace_landed_manifest_count++;
+                trace_landed_slots[k] = i; trace_landed_raws[k] = u[i].raw_type;
+            }
+        }
+    }
+    fprintf(stderr, "T5 controller unload result ship=%d cargo=%d landed-near=%d at %d,%d\n",
+            ship, race_transport_cargo_space(ship), landed, u[ship].x, u[ship].y);
+    trace_landed_count = landed;
+    checkpoint("dropship-landed");
+    if (out_landing_x) *out_landing_x = landing_x;
+    if (out_landing_y) *out_landing_y = landing_y;
+    return landed > 0;
+}
+
+static void controller_assault_from_landing(int ship, int landing_x, int landing_y)
+{
+    int issued = 0;
+    for (int i = 0; i < MAX_UNITS && host_ticks < (u32)run_limit &&
+         screen == SCREEN_PLAY && !won && !lost; ++i) {
+        int x, y;
+        if (i == ship || !u[i].alive || u[i].owner != SIDE ||
+            SC64_TRANSPORT_LOADED(&u[i]) ||
+            dist2(u[i].x, u[i].y, landing_x, landing_y) >= 96 * 96) continue;
+        int route = nearest_enemy_approach_from(u[i].x, u[i].y, &x, &y);
+        if (route < 0) continue;
+        fprintf(stderr, "T5 landing assault actor=%d raw=%d route=%d target=%d,%d\n",
+                i, u[i].raw_type, route, x, y);
+        if (command_actor_attack_to(i, x, y)) ++issued;
+    }
+    fprintf(stderr, "T5 landing assault issued=%d\n", issued);
+    checkpoint("dropship-landing-assault");
+    wait_frames(12000);
+    checkpoint("dropship-assault-result");
 }
 
 static int source_location_center(unsigned id, int *x, int *y)
@@ -322,6 +834,24 @@ static void wait_frames(int amount)
 static void checkpoint(const char *kind)
 {
     unsigned faults = 0;
+    if (!trace_passenger_snapshot_valid && !strcmp(kind, "dropship-landed")) {
+        for (int i = 0; i < trace_passenger_count; ++i) {
+            int slot = trace_passenger_slots[i];
+            int valid = slot >= 0 && slot < MAX_UNITS;
+            int alive = valid && u[slot].alive && u[slot].raw_type == trace_passenger_raws[i];
+            trace_passenger_alive[i] = alive;
+            trace_passenger_loaded[i] = alive && SC64_TRANSPORT_LOADED(&u[slot]) &&
+                                         u[slot].target == trace_ship_slot;
+            trace_passenger_x[i] = alive ? u[slot].x : -1;
+            trace_passenger_y[i] = alive ? u[slot].y : -1;
+        }
+        trace_passenger_snapshot_valid = 1;
+        trace_passenger_snapshot_tick = host_ticks;
+    }
+    if (trace_ship_slot >= 0 && trace_ship_slot < MAX_UNITS) {
+        trace_ship_hp = u[trace_ship_slot].alive ? u[trace_ship_slot].hp : 0;
+        trace_ship_x = u[trace_ship_slot].x; trace_ship_y = u[trace_ship_slot].y;
+    }
     for (unsigned p = 0; p < 8; ++p) faults += race_t5.player[p].fault != 0;
     if (trace_file) {
         trace_prefix();
@@ -331,14 +861,66 @@ static void checkpoint(const char *kind)
             "\"won\":%d,\"lost\":%d,\"faults\":%u,\"switch4\":%u,\"switch6\":%u,"
             "\"objective\":%u,\"side_units\":%d,\"enemy_units\":%d,"
             "\"side_buildings\":%d,\"enemy_buildings\":%d,\"kerrigan_alive\":%d,"
-            "\"minerals\":%d,\"gas\":%d,\"enemy_minerals\":%d,\"enemy_gas\":%d}",
+            "\"minerals\":%d,\"gas\":%d,\"enemy_minerals\":%d,\"enemy_gas\":%d,"
+            "\"starport_slot\":%d,\"starport_raw\":%d,\"starport_complete\":%d,"
+            "\"control_tower_slot\":%d,\"control_tower_raw\":%d,\"control_tower_complete\":%d,"
+            "\"transport_ship_slot\":%d,\"transport_ship_raw\":%d,"
+            "\"transport_cargo_space\":%d,\"transport_ship_alive\":%d,"
+            "\"transport_ship_hp\":%d,\"transport_ship_xy\":[%d,%d],"
+            "\"transport_landing\":[%d,%d],"
+            "\"transport_landed_count\":%d,\"transport_loaded\":[",
             kind, (unsigned)host_ticks, frame, (unsigned)race_campaign.elapsed_frames,
             screen, race_mode, race_selected_mission, won, lost, faults,
             !!(race_t5.switches.bits[0] & 0x10),
             !!(race_t5.switches.bits[0] & 0x40), race_campaign.objective_stage,
             owner_units(SIDE), owner_units(ENEMY), owner_buildings(SIDE),
             owner_buildings(ENEMY), kerrigan_alive(), minerals, gas,
-            race_minerals[ENEMY], race_gas[ENEMY]);
+            race_minerals[ENEMY], race_gas[ENEMY], trace_starport_slot,
+            trace_starport_slot >= 0 && trace_starport_slot < MAX_BUILDINGS ?
+                b[trace_starport_slot].raw_type : -1,
+            trace_starport_slot >= 0 && trace_starport_slot < MAX_BUILDINGS &&
+                b[trace_starport_slot].alive && !b[trace_starport_slot].under_construction,
+            trace_tower_slot,
+            trace_tower_slot >= 0 && trace_tower_slot < MAX_BUILDINGS ?
+                b[trace_tower_slot].raw_type : -1,
+            trace_tower_slot >= 0 && trace_tower_slot < MAX_BUILDINGS &&
+                b[trace_tower_slot].alive && !b[trace_tower_slot].under_construction,
+            trace_ship_slot,
+            trace_ship_slot >= 0 && trace_ship_slot < MAX_UNITS ? u[trace_ship_slot].raw_type : -1,
+            trace_ship_slot >= 0 && trace_ship_slot < MAX_UNITS && u[trace_ship_slot].alive ?
+                race_transport_cargo_space(trace_ship_slot) : -1,
+            trace_ship_slot >= 0 && trace_ship_slot < MAX_UNITS && u[trace_ship_slot].alive,
+            trace_ship_hp, trace_ship_x, trace_ship_y,
+            trace_landing_x, trace_landing_y, trace_landed_count);
+        int first_loaded = 1;
+        for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive &&
+                SC64_TRANSPORT_LOADED(&u[i]) && u[i].target == trace_ship_slot) {
+            fprintf(trace_file, "%s{\"slot\":%d,\"raw_type\":%d}",
+                    first_loaded ? "" : ",", i, u[i].raw_type);
+            first_loaded = 0;
+        }
+        fputs("],\"transport_landed\":[", trace_file);
+        for (int i = 0; i < trace_landed_manifest_count; ++i)
+            fprintf(trace_file, "%s{\"slot\":%d,\"raw_type\":%d}",
+                    i ? "," : "", trace_landed_slots[i], trace_landed_raws[i]);
+        fprintf(trace_file, "],\"transport_passenger_snapshot_tick\":%u,\"transport_passengers\":[",
+                (unsigned)(trace_passenger_snapshot_valid ? trace_passenger_snapshot_tick : host_ticks));
+        for (int i = 0; i < trace_passenger_count; ++i) {
+            int slot = trace_passenger_slots[i];
+            int valid = slot >= 0 && slot < MAX_UNITS;
+            int alive = trace_passenger_snapshot_valid ? trace_passenger_alive[i] :
+                valid && u[slot].alive && u[slot].raw_type == trace_passenger_raws[i];
+            int loaded = trace_passenger_snapshot_valid ? trace_passenger_loaded[i] :
+                alive && SC64_TRANSPORT_LOADED(&u[slot]) && u[slot].target == trace_ship_slot;
+            int x = trace_passenger_snapshot_valid ? trace_passenger_x[i] : alive ? u[slot].x : -1;
+            int y = trace_passenger_snapshot_valid ? trace_passenger_y[i] : alive ? u[slot].y : -1;
+            fprintf(trace_file,
+                    "%s{\"slot\":%d,\"original_raw_type\":%d,\"alive\":%d,"
+                    "\"loaded\":%d,\"xy\":[%d,%d]}",
+                    i ? "," : "", slot, trace_passenger_raws[i], alive, loaded,
+                    x, y);
+        }
+        fputs("]}", trace_file);
         fflush(trace_file);
     }
     fprintf(stderr,
@@ -415,7 +997,7 @@ int main(int argc, char **argv)
         if (!trace_file) return 2;
         fprintf(trace_file,
                 "{\"trace_schema\":1,\"entry\":\"t5-probe-entry\","
-                "\"policy\":\"bounded-normal-controller-quest-economy-ground-attack\","
+                "\"policy\":\"bounded-normal-controller-quest-economy-paid-dropship-transport-attempt\","
                 "\"mission\":8,\"tick_limit\":%d,\"events\":[\n",
                 run_limit);
     }
@@ -523,6 +1105,29 @@ int main(int argc, char **argv)
     if (race_t5.player[0].flags[10] & SC64_T4_TR_DONE) {
         controller_queue_paid_units();
         wait_frames(3600);
+        int starport = -1, ship = -1, landing_x = -1, landing_y = -1;
+        checkpoint("before-starport-tech");
+        if (controller_build_starport(&starport) &&
+            controller_wait_building(starport, 6000)) {
+            fprintf(stderr, "T5 controller completed Starport slot=%d at %d,%d\n",
+                    starport, b[starport].x, b[starport].y);
+            trace_starport_slot = starport;
+            checkpoint("starport-complete");
+            if (controller_build_control_tower(starport)) {
+                for (int i = 0; i < MAX_BUILDINGS; ++i)
+                    if (b[i].alive && b[i].raw_type == 115 && b[i].level == starport + 1) {
+                        trace_tower_slot = i; break;
+                    }
+                checkpoint("control-tower-complete");
+                if (controller_build_dropship(starport, &ship)) {
+                    checkpoint("dropship-complete");
+                    if (controller_ferry_assault(ship, &landing_x, &landing_y)) {
+                        checkpoint("dropship-unloaded");
+                        controller_assault_from_landing(ship, landing_x, landing_y);
+                    }
+                }
+            }
+        }
         for (unsigned retry = 0; retry < 12 && owner_buildings(ENEMY) &&
              screen == SCREEN_PLAY && !won && !lost && host_ticks < (u32)run_limit; ++retry) {
             int x = -1, y = -1;

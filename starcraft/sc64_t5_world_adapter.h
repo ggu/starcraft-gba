@@ -68,7 +68,7 @@ sc64_t5_transfer_rescue_actor(int unit_slot, int building_slot)
         Unit *q;
         if (unit_slot >= MAX_UNITS) return 0;
         q = &u[unit_slot];
-        if (!q->alive || q->owner != RESCUABLE ||
+        if (!q->alive || SC64_TRANSPORT_LOADED(q) || q->owner != RESCUABLE ||
             (q->raw_owner != 2 && q->raw_owner != 3)) return 0;
         raw_owner = q->raw_owner;
     } else {
@@ -125,7 +125,7 @@ static int
 sc64_t5_world_contact_candidate(int x, int y)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == SIDE &&
+        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE &&
             FAST_ABS(x - u[i].x) <= SC64_T5_AUTHORED_RESCUE_HALF_EXTENT &&
             FAST_ABS(y - u[i].y) <= SC64_T5_AUTHORED_RESCUE_HALF_EXTENT)
             return 1;
@@ -142,7 +142,7 @@ sc64_t5_rescue_contact_tick(void)
 {
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
-        if (!q->alive || q->owner != RESCUABLE ||
+        if (!q->alive || SC64_TRANSPORT_LOADED(q) || q->owner != RESCUABLE ||
             (q->raw_owner != 2 && q->raw_owner != 3)) continue;
         if (sc64_t5_world_contact_candidate(q->x, q->y))
             (void)sc64_t5_transfer_rescue_actor(i, -1);
@@ -201,7 +201,7 @@ race_t5_ai_script_callback(void *context, unsigned trigger_owner, u32 script_id,
         /* Authored passive guard: armed nonworkers already in the area hold
          * position and return fire through the normal combat system. */
         for (int i = 0; i < MAX_UNITS; ++i)
-            if (u[i].alive && u[i].owner == runtime_owner &&
+            if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == runtime_owner &&
                 !sc64_race_is_worker(u[i].type) &&
                 sc64_race_unit_damage(u[i].type) > 0 &&
                 sc64_t5_in_rect(u[i].x, u[i].y, area)) {

@@ -1228,7 +1228,7 @@ validation and near-30-fps full-campaign performance remain outstanding.
 
 ## T5 compact persistence (2026-10-23)
 
-The internal T5 profile uses save generation 13 and retains the combined
+The persistence-stage T5 profile used save generation 13 and retained the combined
 profile's 16,328-byte payload. T4 and T5 share the scenario region in SRAM.
 T5 stores its four executing source-player contexts in 764 bytes, including
 switches, resource-action snapshots, accepted AI requests and presentation
@@ -1273,10 +1273,88 @@ It ends in live play at frame 59,918 with Kerrigan alive and no trigger faults;
 A terrain audit of the verified `008/00E` map finds the remaining enemy base
 in a separate ground component using both the coarse GBA grid and the source
 VF4 minitile walk masks. Ground routing alone cannot complete this route.
-Air transport remains required work; the terrain has not been altered to
-bridge the islands. The five-mission menu has guarded asset-free tests,
+This finding motivated the internal transport stage below; the terrain has
+not been altered to bridge the islands. The five-mission menu has guarded asset-free tests,
 including its single-row third page, but the T5 entry flag stays off in ROM
 targets. The playable campaign total remains 10 of 30.
+
+## T5 internal Dropship transport (2026-10-23)
+
+The T5-only profile adds paid Dropship production through a completed
+Starport with its own completed Control Tower. The add-on costs 50/50, has
+500 HP and one armor, and takes 750 GBA updates (600 source simulation frames
+at the established 5:4 conversion). Its center offset is (48,8) GBA pixels,
+derived from the source tile footprints and add-on anchor. It uses existing
+Starport art as an explicit placeholder. New products receive canonical raw
+type/owner identities; imported placements retain their original identities.
+
+Cargo occupies the existing unit pool, retaining HP, owner and supply while
+hidden from rendering, selection, collision, targeting and independent sight.
+Capacity follows the pinned type-space values up to eight points. Boarding
+requires a living same-owner carrier and eligible unburrowed ground passenger.
+Carrier destruction kills its passengers synchronously, including invincible
+heroes, before scenario defeat queries. Unloading retries blocked landings,
+releases one passenger every 19 updates, and applies a 19-update weapon delay
+independent of actor-slot ordering. The 16-pixel boarding radius, constant
+2-pixel flight step, bounded 8/16-pixel landing search, collision footprints and
+30 Hz timing conversion are authored GBA approximations. Original transport
+acceleration, full order/AI behavior and animations remain incomplete.
+
+The Command/Bring adapter follows the inspected OpenBW count distinction:
+global Command includes cargo; completed Bring attributes passengers through
+the carrier's location/elevation, while AtMost's ordinary Bring path excludes
+them. Completed building counts exclude unfinished construction. Raw 11's
+membership in the Men selector is an authored classification; the pinned
+references do not supply that units.dat group bit.
+
+The following passes under ASan/UBSan and `-Werror`:
+
+```sh
+make test-sc64-transport-rules test-sc64-t5-tech test-sc64-transport-engine test-sc64-transport-queries test-sc64-t5-save
+```
+
+Fixtures cover mixed capacity, prerequisites and payment, attachment
+geometry and stale slot links, boarding, loaded-actor exclusions, blocked and
+successful unloads in both slot orders, hero cargo death, cargo save/load and
+atomic malformed-reference rejection. A forced combat fallback excludes cargo,
+and source carrier removal destroys passengers before the next Command query.
+These fixtures use direct world setup;
+they are not controller completion evidence.
+
+Save generation 14 validates cargo references, capacity, coordinates, order
+state and add-on links before mutation. It keeps the 16,328-byte SRAM payload
+and 764-byte compact T5 state; no per-actor fields are added. A derived activity
+flag uses four bytes. Normal T1–T4 builds retain generation 11. Internal
+generation-13 saves are incompatible with this profile.
+
+A bounded 60,000-tick host controller attempt uses only normal game inputs
+after internal auto-entry. It completes the rescue/base sequence, pays for
+the attached Tower and Dropship, boards eight raw-0 Marines, and uses
+anti-air-aware MOVE waypoints to reach a walkable enemy-island landing.
+The carrier is alive with zero cargo at the landing checkpoint; seven
+passengers survive nearby. The attempt ends in live play without a win or
+trigger faults. This establishes a host controller ferry, not a full mission
+win or an ARM transport replay. The earlier direct flight was destroyed by
+air defenses before landing; the controller planner changes its orders, not
+the game terrain, enemies or damage rules.
+
+The frozen 4 MiB internal auto-entry candidate has ROM SHA-256
+`84e0e9b803c3de5079c9c6db7c8be84adeb36840682a9b767e709480aff4fcd5`
+and ELF SHA-256
+`6e00c3860c6fadc88bea86621054f70f676973530d71f8bd291725264f0d8bda`.
+Text/data/BSS are 2,239,456/388/243,216 bytes; IWRAM ends at `0x03004f78`
+and BSS at `0x0203b798`. Both unchanged reserve guards pass. The once-per-frame
+T5 collision-bucket setup runs from ROM to preserve the IWRAM stack reserve.
+A 3,000-tick neutral-input ARM run averages 28.12 effective fps (intervals
+27.69, 28.27 and 28.41), with no trigger faults. This is opening-area evidence,
+not transport/battle or full-mission performance.
+
+The same generation-14 candidate passes normal START/B save and START/L load
+across fresh mGBA processes: frame 122 restores exactly and continues to frame
+182, with matching campaign/AI clocks and zero trigger faults. That ARM check
+uses the opening state; loaded cargo round trips are covered by the host
+engine fixture. No controller-only Revolution victory or physical GBA result
+is claimed. The mission remains gated and the playable total remains 10/30.
 
 ## Known limits
 

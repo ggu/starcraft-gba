@@ -4,6 +4,7 @@
    the reference's pixels. Scenario invincibility is CHK UNIT flag 0x10. */
 static int race_can_attack(int attacker,int target) {
     if(target<0||target>=MAX_UNITS+MAX_BUILDINGS)return 0;
+    if(target<MAX_UNITS&&SC64_TRANSPORT_LOADED(&u[target]))return 0;
 #ifdef SC64_T4_RUNTIME
     if(target<MAX_UNITS) {
         if((sc64_race_t4_actor_flags(u[target].type)&SC64_T4_ACTOR_HIDDEN)||

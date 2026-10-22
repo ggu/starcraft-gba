@@ -1,0 +1,195 @@
+#ifndef SC64_TRANSPORT_ADAPTER_H
+#define SC64_TRANSPORT_ADAPTER_H
+
+#ifdef SC64_T5_RUNTIME
+#include "sc64_transport_rules.h"
+
+/* Cargo lives in the existing unit pool: an embarked actor retains its type,
+ * HP, owner and supply, with ORDER_TRANSPORTED and target=carrier slot. No
+ * extra per-actor or SRAM fields are allocated; the derived activity flag
+ * below occupies one word. These are bounded GBA movement and placement
+ * policies, not a reproduction of the original order machine. */
+enum { SC64_TRANSPORT_BOARD_RADIUS = 16, SC64_TRANSPORT_UNLOAD_TICKS = 19 };
+/* Derived each order tick; no cargo bookkeeping is scanned in the ordinary
+ * no-transport opening/battle case. This flag is never save-persistent. */
+static int race_transport_activity;
+
+static int race_transport_carrier_valid(int slot)
+{
+    return slot >= 0 && slot < MAX_UNITS && u[slot].alive &&
+           u[slot].type == U_DROPSHIP && u[slot].raw_type == 11 &&
+           !SC64_TRANSPORT_LOADED(&u[slot]);
+}
+
+static int race_transport_passenger_space(const Unit *q)
+{
+    unsigned space;
+    int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+    if (!q->alive || (q->flags & 2) || sc64_race_unit_flying(q->type) ||
+        !sc64_transport_space_required_raw((unsigned)raw, &space) ||
+        space == SC64_TRANSPORT_SPACE_UNAVAILABLE) return -1;
+    return (int)space;
+}
+
+/* Return occupied space, or -1 for a malformed/unsupported carrier. */
+static int race_transport_cargo_space(int carrier)
+{
+    int total = 0;
+    if (!race_transport_carrier_valid(carrier)) return -1;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && SC64_TRANSPORT_LOADED(&u[i]) && u[i].target == carrier) {
+            int space = race_transport_passenger_space(&u[i]);
+            if (space < 0 || u[i].owner != u[carrier].owner) return -1;
+            total += space;
+            if (total > SC64_TRANSPORT_DROPSHIP_SPACE) return -1;
+        }
+    return total;
+}
+
+/* A transition invalidates the short-lived indexes: newly unloaded units
+ * must be targetable immediately, and newly loaded units must disappear.
+ * The existing exact scan fallbacks handle the remainder of this tick. */
+static void race_transport_changed(void)
+{
+    sc64_unit_bucket_active = 0;
+    sc64_target_index_active = 0;
+    target_lists_valid = 0;
+}
+
+static int race_transport_request_board(int passenger, int carrier)
+{
+    int used, space;
+    if (passenger < 0 || passenger >= MAX_UNITS || passenger == carrier ||
+        !race_transport_carrier_valid(carrier) ||
+        !u[passenger].alive || SC64_TRANSPORT_LOADED(&u[passenger]) ||
+        u[passenger].owner != u[carrier].owner) return 0;
+    used = race_transport_cargo_space(carrier);
+    space = race_transport_passenger_space(&u[passenger]);
+    if (used < 0 || space < 0 || used + space > SC64_TRANSPORT_DROPSHIP_SPACE)
+        return 0;
+    u[passenger].order = ORDER_BOARD;
+    u[passenger].target = carrier;
+    u[passenger].path_timer = u[passenger].path_retry = 0;
+    return 1;
+}
+
+static int race_transport_request_unload(int carrier, int x, int y)
+{
+    if (!race_transport_carrier_valid(carrier) ||
+        race_transport_cargo_space(carrier) <= 0 ||
+        x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) return 0;
+    u[carrier].order = ORDER_UNLOAD;
+    u[carrier].target = -1;
+    u[carrier].tx = x; u[carrier].ty = y;
+    u[carrier].work_timer = 0;
+    return 1;
+}
+
+static void race_transport_destroy_cargo(int carrier)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && SC64_TRANSPORT_LOADED(&u[i]) && u[i].target == carrier) {
+            if (u[i].owner == SIDE) supply_used -= unit_supply(u[i].type);
+            u[i].hp = 0; u[i].alive = u[i].selected = 0;
+            u[i].order = ORDER_IDLE; u[i].target = -1;
+        }
+    race_transport_changed();
+}
+
+static int race_transport_land_point(int passenger, int x, int y, int *px, int *py)
+{
+    /* Test the center, then nearby rings. Placement never turns blocked
+     * terrain into floor and never overlaps another ground actor/building. */
+    for (int radius = 0; radius <= 16; radius += 8)
+        for (int dy = -radius; dy <= radius; dy += 8)
+            for (int dx = -radius; dx <= radius; dx += 8) {
+                if (radius && FAST_ABS(dx) != radius && FAST_ABS(dy) != radius)
+                    continue;
+                int nx = x + dx, ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H ||
+                    !is_traversable(nx / 16, ny / 16, -1) ||
+                    !unit_step_clear(&u[passenger], nx, ny)) continue;
+                *px = nx; *py = ny; return 1;
+            }
+    return 0;
+}
+
+/* Handle only transport orders; return 1 when the ordinary order loop must
+ * leave this actor alone. Other units retain the existing engine behavior. */
+static int __attribute__((noinline)) race_transport_tick_unit(int slot)
+{
+    Unit *q = &u[slot];
+    if (SC64_TRANSPORT_LOADED(q)) return 1;
+    if (q->order == ORDER_BOARD) {
+        int carrier = q->target, space = race_transport_passenger_space(q);
+        int used = race_transport_cargo_space(carrier);
+        if (!race_transport_carrier_valid(carrier) || space < 0 || used < 0 ||
+            q->owner != u[carrier].owner ||
+            used + space > SC64_TRANSPORT_DROPSHIP_SPACE) {
+            q->order = ORDER_IDLE; q->target = -1; return 1;
+        }
+        if (dist2(q->x, q->y, u[carrier].x, u[carrier].y) >
+            SC64_TRANSPORT_BOARD_RADIUS * SC64_TRANSPORT_BOARD_RADIUS) {
+            move_toward(q, u[carrier].x, u[carrier].y);
+        } else {
+            q->order = ORDER_TRANSPORTED; q->selected = 0;
+            q->x = u[carrier].x; q->y = u[carrier].y;
+            q->path_timer = q->path_retry = 0;
+            race_transport_changed();
+        }
+        return 1;
+    }
+    if (q->order != ORDER_UNLOAD) return 0;
+    if (!race_transport_carrier_valid(slot) || race_transport_cargo_space(slot) <= 0) {
+        q->order = ORDER_IDLE; q->target = -1; return 1;
+    }
+    if (dist2(q->x, q->y, q->tx, q->ty) > 4 * 4) {
+        move_toward(q, q->tx, q->ty); return 1;
+    }
+    if (q->work_timer > 0) --q->work_timer;
+    return 1;
+}
+
+static void race_transport_try_unload(int slot)
+{
+    Unit *q = &u[slot];
+    if (!race_transport_carrier_valid(slot) || q->order != ORDER_UNLOAD ||
+        q->work_timer || dist2(q->x, q->y, q->tx, q->ty) > 4 * 4) return;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && SC64_TRANSPORT_LOADED(&u[i]) && u[i].target == slot) {
+            int x, y;
+            if (!race_transport_land_point(i, q->x, q->y, &x, &y)) return;
+            u[i].x = x; u[i].y = y;
+            u[i].order = ORDER_IDLE; u[i].target = -1;
+            u[i].path_timer = u[i].path_retry = 0;
+            if (u[i].cd < SC64_TRANSPORT_UNLOAD_TICKS)
+                u[i].cd = SC64_TRANSPORT_UNLOAD_TICKS;
+            q->work_timer = SC64_TRANSPORT_UNLOAD_TICKS;
+            race_transport_changed();
+            return;
+        }
+}
+
+static void race_transport_tick_after_orders(void)
+{
+    if (!race_transport_activity) return;
+    /* Disembark after every actor has ticked, making the passenger's weapon
+     * cooldown independent of whether its slot precedes the carrier's. */
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].order == ORDER_UNLOAD) race_transport_try_unload(i);
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && SC64_TRANSPORT_LOADED(&u[i])) {
+            int carrier = u[i].target;
+            if (!race_transport_carrier_valid(carrier) ||
+                u[i].owner != u[carrier].owner) {
+                /* Includes carriers removed by scenario effects or direct
+                 * damage, before the campaign's hero/outcome queries. */
+                race_transport_destroy_cargo(carrier);
+            } else {
+                u[i].x = u[carrier].x; u[i].y = u[carrier].y;
+            }
+        }
+}
+
+#endif
+#endif

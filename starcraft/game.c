@@ -45,7 +45,7 @@ int memcmp(const void *a, const void *b, size_t n);
 #define MAX_UNITS 128
 #endif
 #if defined(SC64_T5_RUNTIME)
-#define SC64_RACE_SAVE_GENERATION 13u
+#define SC64_RACE_SAVE_GENERATION 14u
 #elif defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 11u
 #elif defined(SC64_T4_SCENARIO_RUNTIME)
@@ -284,16 +284,31 @@ enum {
 enum {
     ORDER_IDLE, ORDER_MOVE, ORDER_ATTACK_MOVE, ORDER_ATTACK_TARGET,
     ORDER_MINE, ORDER_BUILD, ORDER_GAS
+#ifdef SC64_T5_RUNTIME
+    , ORDER_BOARD, ORDER_TRANSPORTED, ORDER_UNLOAD
+#endif
 };
+#ifdef SC64_T5_RUNTIME
+#define SC64_TRANSPORT_LOADED(q) ((q)->order == ORDER_TRANSPORTED)
+#else
+#define SC64_TRANSPORT_LOADED(q) 0
+#endif
 enum {
     SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSE, SCREEN_RESULT
 };
 enum {
     MENU_MOVE, MENU_ATTACK, MENU_BARRACKS, MENU_DEPOT, MENU_REFINERY,
-    MENU_ACADEMY, MENU_ENG_BAY, MENU_WEAPONS, MENU_ARMOR, MENU_STOP, MENU_COUNT
+    MENU_ACADEMY, MENU_ENG_BAY, MENU_WEAPONS, MENU_ARMOR, MENU_STOP,
+#ifdef SC64_T5_RUNTIME
+    MENU_FACTORY, MENU_STARPORT, MENU_CONTROL_TOWER, MENU_UNLOAD,
+#endif
+    MENU_COUNT
 };
 enum {
     MODE_NORMAL, MODE_MOVE, MODE_ATTACK, MODE_BUILD
+#ifdef SC64_T5_RUNTIME
+    , MODE_UNLOAD
+#endif
 };
 
 typedef struct {
@@ -461,6 +476,9 @@ static int race_t5_active(void)
 static int race_t5_init(void), race_t5_tick(void);
 static void race_t5_world_tick(void);
 static void race_t5_mines_tick(void);
+static int race_t5_start_control_tower(int producer);
+static void race_t5_tech_tick(void);
+static int sc64_race_t5_building_art_raw(int type);
 #endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 static Sc64T3State race_t3;
@@ -798,6 +816,13 @@ spawn_unit(int owner, int type, int x, int y)
     u[i].maxhp=sc64_race_unit_rules[type].hp;
     u[i].shield=sc64_race_unit_rules[type].shields;
     u[i].raw_type=u[i].raw_owner=-1;u[i].flags=u[i].shield_remainder=0;
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active()) {
+        u[i].raw_type = sc64_race_raw_unit(type);
+        u[i].raw_owner = owner == SIDE ? 0 : owner == ENEMY ? 6 :
+                         owner == RESCUABLE ? 3 : -1;
+    }
+#endif
 #endif
     u[i].hp = u[i].maxhp;
     u[i].alive = 1;
@@ -860,6 +885,13 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #endif
     b[i].shield=sc64_race_building_rules[type].race==R_PROTOSS?b[i].maxhp:0;
     b[i].raw_type=b[i].raw_owner=-1;b[i].flags=b[i].shield_remainder=0;
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active()) {
+        b[i].raw_type = sc64_race_raw_building(type);
+        b[i].raw_owner = owner == SIDE ? 0 : owner == ENEMY ? 6 :
+                         owner == RESCUABLE ? 3 : -1;
+    }
+#endif
     b[i].larva=3;b[i].larva_timer=0;
 #endif
     b[i].hp = constructing ? 1 : b[i].maxhp;
@@ -1049,7 +1081,7 @@ can_place(int type, int x, int y)
             && dist2(x, y, b[i].x, b[i].y) < (radius + 14) * (radius + 14))
 	    return 0;
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])
 #ifdef SC64_RACES
         && !sc64_race_unit_flying(u[i].type)
 #endif
@@ -1183,7 +1215,7 @@ static int __attribute__((noinline))
 unit_step_clear_race_fallback(const Unit *q, int nx, int ny)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (&u[i] != q && u[i].alive) {
+        if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
             if (u[i].type == U_CHRYSALIS ||
                 sc64_race_unit_flying(u[i].type) != sc64_race_unit_flying(q->type))
                 continue;
@@ -1251,6 +1283,9 @@ move_toward(Unit * q, int tx, int ty)
 #endif
 #ifdef SC64_RACES
     if(q->type==U_VULTURE)speed=2;
+#ifdef SC64_T5_RUNTIME
+    if(q->type==U_DROPSHIP)speed=2;
+#endif
 #ifdef SC64_T4_RUNTIME
     if (sc64_race_t4_actor_flags(q->type) &&
         !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_MOVABLE)) return;
@@ -1344,6 +1379,10 @@ move_toward(Unit * q, int tx, int ty)
     SC64_ORDER_DIAG_ACCUM(sc64_order_move_cycles, sc64_move_start);
 #endif
 }
+
+#ifdef SC64_T5_RUNTIME
+#include "sc64_transport_adapter.h"
+#endif
 
 #ifdef SC64_RACES
 static int race_can_attack(int attacker,int target);
@@ -1459,7 +1498,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
         return best;
     }
     for (i = 0; i < MAX_UNITS; i++) {
-	if (!u[i].alive
+	if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i])
 	    || FAST_ABS(x - u[i].x) >= max_distance ||
 	    FAST_ABS(y - u[i].y) >= max_distance || !owners_hostile(owner, u[i].owner)
                     || !SC64_CAN_ATTACK_FROM(attacker,i,owner)
@@ -1584,6 +1623,10 @@ target_y(int target)
 static int
 target_alive(int target)
 {
+#ifdef SC64_T5_RUNTIME
+    if (target >= 0 && target < MAX_UNITS && SC64_TRANSPORT_LOADED(&u[target]))
+        return 0;
+#endif
 #ifdef SC64_T4_RUNTIME
     if (target >= 0 && target < MAX_UNITS && u[target].alive &&
         (sc64_race_t4_actor_flags(u[target].type)&SC64_T4_ACTOR_HIDDEN)) return 0;
@@ -1611,6 +1654,10 @@ static void
 hit_target(int target, int damage, int source_type, int source_owner)
 {
     int i, tx, ty;
+#ifdef SC64_T5_RUNTIME
+    if (target >= 0 && target < MAX_UNITS && SC64_TRANSPORT_LOADED(&u[target]))
+        return;
+#endif
 #ifdef SC64_RACES
 #ifdef SC64_T4_RUNTIME
     if (target >= 0 && target < MAX_UNITS &&
@@ -1668,10 +1715,13 @@ hit_target(int target, int damage, int source_type, int source_owner)
 	    if (u[target].owner == SIDE)
 		supply_used -= unit_supply(u[target].type);
 	    u[target].alive = 0;
+#ifdef SC64_T5_RUNTIME
+            if (u[target].type == U_DROPSHIP) race_transport_destroy_cargo(target);
+#endif
 	}
 	if (source_type == U_FIREBAT) {
 	    for (i = 0; i < MAX_UNITS; i++)
-		if (u[i].alive && u[i].owner != source_owner && dist2(tx, ty, u[i].x, u[i].y) < 12 * 12) {
+		if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner != source_owner && dist2(tx, ty, u[i].x, u[i].y) < 12 * 12) {
 		    u[i].hp -= 3;
 		    if (u[i].hp <= 0) {
 			if (u[i].owner == SIDE)
@@ -2302,7 +2352,7 @@ selected_count(void)
 {
     int i, n = 0;
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && u[i].selected)
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].selected)
 	    n++;
     return n;
 }
@@ -2335,7 +2385,7 @@ selection_target(void)
     int i, best_unit = -1, best_building = -1;
     int unit_distance = 31 * 31, building_distance = 26 * 26, d;
     for (i = 0; i < MAX_UNITS; i++) {
-	if (!u[i].alive || u[i].owner != SIDE
+	if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || u[i].owner != SIDE
 #ifdef SC64_RACES
             ||u[i].type==U_CHRYSALIS
 #endif
@@ -2389,7 +2439,7 @@ select_visible_type(int type)
     int i, left = viewport_left(), top = viewport_top();
     clear_selection();
     for (i = 0; i < MAX_UNITS; i++)
-        if (u[i].alive && u[i].owner == SIDE && u[i].type == type &&
+        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE && u[i].type == type &&
 #ifdef SC64_T4_RUNTIME
             sc64_t4_unit_selectable(u[i].type) &&
 #endif
@@ -2412,7 +2462,7 @@ issue_order(int order, int tx, int ty)
     int i, n = 0;
     selected_building = -1;
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && u[i].owner == SIDE && u[i].selected) {
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE && u[i].selected) {
 #ifdef SC64_T4_RUNTIME
             if (sc64_race_t4_actor_flags(u[i].type) &&
                 !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_MOVABLE)) continue;
@@ -2441,7 +2491,7 @@ find_selected_worker(void)
 {
     int i;
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && u[i].owner == SIDE && u[i].selected && IS_WORKER(u[i].type))
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE && u[i].selected && IS_WORKER(u[i].type))
 	    return i;
     return -1;
 }
@@ -2554,6 +2604,22 @@ tick_research(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_T5_RUNTIME
+    if (choice >= MENU_FACTORY) {
+        menu_open = 0;
+        if (choice == MENU_UNLOAD) {
+            mode = MODE_UNLOAD; return;
+        }
+        if (race_human != R_TER) { toast(8); return; }
+        if (choice == MENU_CONTROL_TOWER) {
+            toast(race_t5_start_control_tower(selected_building) ? 3 : 8);
+            return;
+        }
+        mode = MODE_BUILD;
+        menu = choice == MENU_FACTORY ? B_FACTORY : B_STARPORT;
+        return;
+    }
+#endif
 #ifdef SC64_RACES
     static const int buildings[3][5]={
         {B_BARRACKS,B_DEPOT,B_REFINERY,B_ACADEMY,B_ENG_BAY},
@@ -2607,6 +2673,15 @@ choose_command(int choice)
 	break;
     }
 }
+
+/* Advanced Terran commands are available in the T5 development profile.
+ * Other factions retain their existing ten-row command list. */
+#ifdef SC64_T5_RUNTIME
+static int field_menu_count(void)
+{ return race_human == R_TER ? MENU_COUNT : MENU_STOP + 1; }
+#else
+#define field_menu_count() MENU_COUNT
+#endif
 
 static void
 queue_unit(int building, int type)
@@ -2680,6 +2755,26 @@ interact(void)
 	start_build(menu);
 	return;
     }
+#ifdef SC64_T5_RUNTIME
+    if (mode == MODE_UNLOAD) {
+        int issued = 0;
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && u[i].selected &&
+                race_transport_request_unload(i, cx, cy)) ++issued;
+        mode = MODE_NORMAL; toast(issued ? 0 : 8); return;
+    }
+    /* Select passengers, then press A on a friendly Dropship to board.
+     * Selecting an empty carrier without selected passengers still works. */
+    for (int carrier = 0; carrier < MAX_UNITS; ++carrier)
+        if (race_transport_carrier_valid(carrier) && u[carrier].owner == SIDE &&
+            dist2(cx, cy, u[carrier].x, u[carrier].y) < 18 * 18) {
+            int issued = 0;
+            for (int i = 0; i < MAX_UNITS; ++i)
+                if (u[i].alive && u[i].owner == SIDE && u[i].selected &&
+                    race_transport_request_board(i, carrier)) ++issued;
+            if (issued) { toast(0); return; }
+        }
+#endif
     if (double_unit >= 0) {
         /* A second tap on the SCV itself groups workers even beside a
          * Refinery. A tap on the Refinery still assigns gas normally. */
@@ -2704,6 +2799,13 @@ interact(void)
         if(b[selected_building].type==B_NEXUS)train_type=U_PROBE;
         if(b[selected_building].type==B_GATEWAY&&train_type!=U_ZEALOT&&train_type!=U_DRAGOON)train_type=U_ZEALOT;
         if(b[selected_building].type==B_BARRACKS&&train_type!=U_MARINE&&train_type!=U_FIREBAT&&train_type!=U_MEDIC)train_type=U_MARINE;
+#ifdef SC64_T5_RUNTIME
+        if (b[selected_building].type == B_FACTORY &&
+            train_type != U_VULTURE && train_type != U_GOLIATH && train_type != U_TANK)
+            train_type = U_VULTURE;
+        if (b[selected_building].type == B_STARPORT &&
+            train_type != U_WRAITH && train_type != U_DROPSHIP) train_type = U_WRAITH;
+#endif
         queue_unit(selected_building,train_type);return;
 #endif
 	if (b[selected_building].type == B_COMMAND)
@@ -2769,7 +2871,7 @@ nearest_friendly_unit(int x, int y, int max_distance)
 #endif
                 ) continue;
             for (i = target_unit_head[p]; i >= 0; i = target_unit_next[i]) {
-                if (!u[i].alive || FAST_ABS(x - u[i].x) >= max_distance ||
+                if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || FAST_ABS(x - u[i].x) >= max_distance ||
                     FAST_ABS(y - u[i].y) >= max_distance
 #ifdef SC64_IMPORTED_MISSION
                     || (p == NEUTRAL && u[i].type != U_RAYNOR)
@@ -2785,7 +2887,7 @@ nearest_friendly_unit(int x, int y, int max_distance)
         return best;
     }
     for (i = 0; i < MAX_UNITS; i++) {
-	if (!u[i].alive || FAST_ABS(x - u[i].x) >= max_distance ||
+	if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || FAST_ABS(x - u[i].x) >= max_distance ||
 	    FAST_ABS(y - u[i].y) >= max_distance || (u[i].owner != SIDE
 #ifdef SC64_IMPORTED_MISSION
 	    && !(u[i].owner == NEUTRAL && u[i].type == U_RAYNOR)
@@ -2954,6 +3056,9 @@ static void GBA_HOT
 update_orders(void)
 {
     int i, target;
+#ifdef SC64_T5_RUNTIME
+    race_transport_activity = 0;
+#endif
 #ifdef SC64_DIAGNOSTIC_ORDERS
     u32 sc64_setup_start = gba_clock();
     sc64_order_setup_cycles = 0;
@@ -2973,7 +3078,7 @@ update_orders(void)
     for (i = 0; i < 5; ++i) target_unit_head[i] = target_building_head[i] = -1;
     for (i = 0; i < MAX_UNITS; ++i) target_unit_next[i] = -1;
     for (i = 0; i < MAX_BUILDINGS; ++i) target_building_next[i] = -1;
-    for (i = MAX_UNITS - 1; i >= 0; --i) if (u[i].alive) {
+    for (i = MAX_UNITS - 1; i >= 0; --i) if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
         int owner = u[i].owner;
         if (owner < 0 || owner >= 5) goto target_lists_unavailable;
         target_unit_next[i] = target_unit_head[owner];
@@ -2998,6 +3103,10 @@ target_lists_unavailable:
 	if (!q->alive)
 	    continue;
 	#ifdef SC64_T5_RUNTIME
+        if (q->order >= ORDER_BOARD) {
+            race_transport_activity = 1;
+            if (race_transport_tick_unit(i)) continue;
+        }
         /* Preplaced mines own their arm/acquire/chase state. The ordinary
          * actor loop must not clear their target or consume their timer. */
         if (q->type == U_SPIDER_MINE) continue;
@@ -3397,7 +3506,7 @@ cycle_selection(void)
 	}
     clear_selection();
     for (i = selected + 1; i < MAX_UNITS; i++)
-	if (u[i].alive && u[i].owner == SIDE
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
@@ -3411,7 +3520,7 @@ cycle_selection(void)
 	    return;
 	}
     for (i = 0; i <= selected && i < MAX_UNITS; i++)
-	if (u[i].alive && u[i].owner == SIDE
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
@@ -3425,7 +3534,7 @@ cycle_selection(void)
 	    return;
 	}
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && u[i].owner == SIDE
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
@@ -3446,7 +3555,7 @@ select_combat_group(void)
     int i;
     clear_selection();
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && u[i].owner == SIDE &&
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE &&
 	    (u[i].type == U_MARINE || u[i].type == U_FIREBAT || u[i].type == U_MEDIC
 #ifdef SC64_RACES
              ||(!IS_WORKER(u[i].type)&&u[i].type!=U_OVERLORD&&u[i].type!=U_CHRYSALIS)
@@ -3470,6 +3579,20 @@ select_combat_group(void)
 static void
 select_next_train_type(void)
 {
+#ifdef SC64_T5_RUNTIME
+    if (selected_building >= 0 && b[selected_building].alive &&
+        (b[selected_building].type == B_FACTORY || b[selected_building].type == B_STARPORT)) {
+        static const int advanced[] = { U_VULTURE, U_GOLIATH, U_TANK, U_WRAITH, U_DROPSHIP };
+        int current = -1;
+        for (int i = 0; i < 5; ++i) if (advanced[i] == train_type) current = i;
+        for (int step = 1; step <= 5; ++step) {
+            int type = advanced[(current + step) % 5];
+            if (sc64_race_unit_rules[type].producer == b[selected_building].type) {
+                train_type = type; return;
+            }
+        }
+    }
+#endif
 #ifdef SC64_RACES
     static const int types[3][4]={{U_SCV,U_MARINE,U_FIREBAT,U_MEDIC},
         {U_DRONE,U_OVERLORD,U_ZERGLING,U_HYDRALISK},{U_PROBE,U_ZEALOT,U_DRAGOON,U_SCOUT}};
@@ -3499,7 +3622,7 @@ select_box_units(void)
     int bottom = box_anchor_y > box_end_y ? box_anchor_y : box_end_y;
     clear_selection();
     for (i = 0; i < MAX_UNITS; i++)
-        if (u[i].alive && u[i].owner == SIDE
+        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
@@ -3669,9 +3792,9 @@ game_update(u16 held, u16 pressed)
     if (menu_open) {
 	reset_selection_gestures();
 	if (pressed & KEY_UP)
-	    menu_cursor = (menu_cursor + MENU_COUNT - 1) % MENU_COUNT;
+	    menu_cursor = (menu_cursor + field_menu_count() - 1) % field_menu_count();
 	if (pressed & KEY_DOWN)
-	    menu_cursor = (menu_cursor + 1) % MENU_COUNT;
+	    menu_cursor = (menu_cursor + 1) % field_menu_count();
 	if (pressed & KEY_A)
 	    choose_command(menu_cursor);
 	return;
@@ -3722,6 +3845,9 @@ game_update(u16 held, u16 pressed)
     profile_start = gba_clock();
 #endif
     update_orders();
+#ifdef SC64_T5_RUNTIME
+    race_transport_tick_after_orders();
+#endif
 #ifdef SC64_IMPORTED_MISSION
     profile_orders_end = gba_clock();
     sc64_orders_cycles = profile_orders_end - profile_start;
@@ -3760,6 +3886,10 @@ game_update(u16 held, u16 pressed)
 #endif
 #endif
     tick_research();
+#ifdef SC64_T5_RUNTIME
+    race_t5_tech_tick();
+    race_transport_tick_after_orders();
+#endif
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
     sc64_update_research_cycles = gba_clock() - sc64_update_stage_start;
     sc64_update_remainder_start = gba_clock();
@@ -3899,6 +4029,7 @@ draw_mission_sprite(const Sc64SpriteFrame *s, int cx, int cy)
 static void
 draw_unit(Unit * q)
 {
+    if (SC64_TRANSPORT_LOADED(q)) return;
     int x = q->x - camx, y = q->y - camy + 12;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
 #ifdef SC64_T4_RUNTIME
@@ -4060,7 +4191,7 @@ draw_minimap(void)
                 );
 	}
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive &&
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
 #ifdef SC64_T4_RUNTIME
             !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_HIDDEN) &&
 #endif
@@ -4153,6 +4284,9 @@ draw_building_art(Building *q)
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
+#ifdef SC64_T5_RUNTIME
+        q->type == B_CONTROL_TOWER ? sc64_race_unit_sprite(sc64_race_t5_building_art_raw(q->type)) :
+#endif
         q->raw_type>=0?sc64_race_unit_sprite(q->raw_type):
 #endif
         mission_building_sprite(q->type);
@@ -4463,7 +4597,7 @@ draw_map(void)
     }
     if (menu_open) {
 	#ifdef SC64_RACES
-        static const char *race_labels[3][MENU_COUNT]={
+        static const char *race_labels[3][MENU_STOP + 1]={
             {"MOVE ORDER","ATTACK MOVE","BARRACKS","SUPPLY DEPOT","REFINERY","ACADEMY","ENGINEERING BAY","WEAPONS","ARMOR","STOP / HOLD"},
             {"MOVE ORDER","ATTACK MOVE","SPAWNING POOL","HATCHERY","EXTRACTOR","HYDRALISK DEN","EVOLUTION","WEAPONS","ARMOR","STOP / HOLD"},
             {"MOVE ORDER","ATTACK MOVE","GATEWAY","PYLON","ASSIMILATOR","CYBERNETICS","FORGE","WEAPONS","ARMOR","STOP / HOLD"}};
@@ -4477,10 +4611,24 @@ draw_map(void)
 #endif
 	gfx_rect(137, 14, 100, 96, C_PANEL);
 	gfx_frame(137, 14, 100, 96, C_EDGE);
+#ifdef SC64_T5_RUNTIME
+        int first = 0, count = field_menu_count();
+        static const char *const advanced_labels[] = {
+            "FACTORY", "STARPORT", "CONTROL TOWER", "UNLOAD CARGO"
+        };
+        if (menu_cursor >= 10) first = menu_cursor - 9;
+	for (i = first; i < count && i < first + 10; i++) {
+            const char *label = i >= MENU_FACTORY ?
+                advanced_labels[i - MENU_FACTORY] : labels[i];
+	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
+	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
+	}
+#else
 	for (i = 0; i < MENU_COUNT; i++) {
 	    gfx_text(142, 17 + i * 9, i == menu_cursor ? ">" : " ", C_GOLD);
 	    gfx_text(149, 17 + i * 9, labels[i], i == menu_cursor ? C_WHITE : C_DIM);
 	}
+#endif
     }
     if (mode == MODE_BUILD && box_state != 2) {
 	gfx_frame(x - 8, y - 6, 17, 13, (can_place(menu, cx, cy)
@@ -4682,6 +4830,13 @@ draw_hud_commands(void)
 		if (IS_WORKER(u[i].type))
 		    gfx_text(52, 137, "AUTO MINE / A GAS", C_GOLD);
 		else
+#ifdef SC64_T5_RUNTIME
+                if (u[i].type == U_DROPSHIP) {
+                    gfx_text(52, 137, "CARGO", C_GOLD);
+                    gfx_num(90, 137, race_transport_cargo_space(i), C_WHITE);
+                    gfx_text(104, 137, "/8  B UNLOAD", C_GOLD);
+                } else
+#endif
 		    gfx_text(52, 137, "A ORDER B COMMANDS", C_GOLD);
 		break;
 	    }
@@ -5268,6 +5423,9 @@ game_self_test(void)
 #ifdef SC64_RACES
 #include "race_combat.h"
 #include "race_adapter.h"
+#ifdef SC64_T5_RUNTIME
+#include "sc64_t5_tech_adapter.h"
+#endif
 #ifdef SC64_T4_RUNTIME
 #include "sc64_t4_actor_adapter.h"
 #ifdef SC64_T4_SCENARIO_RUNTIME

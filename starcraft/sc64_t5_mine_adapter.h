@@ -95,6 +95,9 @@ static int
 sc64_t5_mine_unit_targetable(const Unit *mine, const Unit *target)
 {
     int raw;
+#ifdef SC64_TRANSPORT_LOADED
+    if (target && SC64_TRANSPORT_LOADED(target)) return 0;
+#endif
     if (!mine || !target || !target->alive || target == mine ||
         !owners_hostile(mine->owner, target->owner) ||
         invincible_units[(int)(target - u)] || (target->flags & 16) ||

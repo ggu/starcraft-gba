@@ -43,6 +43,10 @@ enum {
     B_PIT_DOOR, B_RIGHT_PIT_DOOR, B_FLOOR_GUN_TRAP,
     B_WALL_FLAME_TRAP, B_RIGHT_WALL_MISSILE_TRAP,
 #endif
+#ifdef SC64_T5_RUNTIME
+    /* Raw 115: the attached Terran Control Tower add-on. */
+    B_CONTROL_TOWER,
+#endif
     SC_RB_COUNT
 };
 
@@ -62,6 +66,9 @@ enum {
     SC_PR_GATEWAY = 1u << 4, SC_PR_CYBERNETICS_CORE = 1u << 5,
     SC_PR_PYLON = 1u << 6, SC_PR_FORGE = 1u << 7,
     SC_PR_DEPOT = 1u << 8, SC_PR_BARRACKS = 1u << 9
+#ifdef SC64_T5_RUNTIME
+    , SC_PR_FACTORY = 1u << 10, SC_PR_CONTROL_TOWER = 1u << 11
+#endif
 };
 
 typedef struct {
@@ -108,8 +115,14 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
      * product; its source-type conversion therefore has no training cost. */
     [U_SIEGE_TANK] = { R_TER, 0, B_FACTORY, 4, 0, 0, 0, 150, 0, 0 },
     [U_VULTURE] = { R_TER, 0, B_FACTORY, 4, 75, 0, 450, 80, 0, 0 },
-    /* BWAPI raw 11 Dropship. Transport behavior is not implemented here. */
-    [U_DROPSHIP] = { R_TER, 0, B_STARPORT, 4, 100, 100, 750, 150, 0, 0 },
+    /* BWAPI raw 11 Dropship. Cargo behavior is opt-in with the T5 runtime. */
+    [U_DROPSHIP] = { R_TER, 0, B_STARPORT, 4, 100, 100, 750, 150, 0,
+#ifdef SC64_T5_RUNTIME
+        SC_PR_CONTROL_TOWER
+#else
+        0
+#endif
+    },
     /* BWAPI raw 47 Scourge: 25 HP, 25/75, 1 doubled supply. Its air-only
      * Suicide Scourge weapon is enabled only for the Higher Ground profile. */
     [U_SCOURGE] = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 1, 25, 75, 450, 25, 0, 0 }
@@ -160,7 +173,13 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     [B_CEREBRATE] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 0, 0, 0, 1500, 0 },
     [B_LAIR] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_PROVIDES_SUPPLY, U_DRONE, 2, 150, 100, 1500, 1800, SC_PR_SPAWNING_POOL },
     [B_STARGATE] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_REQUIRES_POWER, U_PROBE, 0, 150, 150, 1050, 600, SC_PR_CYBERNETICS_CORE | SC_PR_PYLON },
-    [B_STARPORT] = { R_TER, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER, U_SCV, 0, 150, 100, 1050, 1300, 0 },
+    [B_STARPORT] = { R_TER, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER, U_SCV, 0, 150, 100, 1050, 1300,
+#ifdef SC64_T5_RUNTIME
+        SC_PR_FACTORY
+#else
+        0
+#endif
+    },
     [B_MISSILE_TURRET] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 75, 0, 450, 200, 0 },
     [B_SPORE_COLONY] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 50, 0, 300, 400, SC_PR_HATCHERY },
     [B_ZERG_BEACON] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 250, 0, 0, 10000, 0 },
@@ -186,6 +205,11 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     , [B_FLOOR_GUN_TRAP] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 50, 0 }
     , [B_WALL_FLAME_TRAP] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 50, 0 }
     , [B_RIGHT_WALL_MISSILE_TRAP] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 50, 0 }
+#endif
+#ifdef SC64_T5_RUNTIME
+    /* BWAPI raw 115: 2x2 tiles, 500 HP, 1 armor, 50/50, 600 frames.
+       This is a Starport add-on, not an SCV-built structure. */
+    , [B_CONTROL_TOWER] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 500, 0 }
 #endif
 };
 
@@ -237,6 +261,9 @@ static inline const char *sc64_race_building_name(int type)
         ,"TERRAN BEACON","FLOOR MISSILE TRAP","UPPER DOOR",
         "RIGHT UPPER DOOR","PIT DOOR","RIGHT PIT DOOR",
         "FLOOR GUN TRAP","WALL FLAME TRAP","RIGHT WALL MISSILE TRAP"
+#endif
+#ifdef SC64_T5_RUNTIME
+        ,"CONTROL TOWER"
 #endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
@@ -666,6 +693,9 @@ static inline int sc64_race_building_armor(int type)
     case B_EXTRACTOR: case B_SPIRE: case B_CEREBRATE: case B_LAIR:
     case B_STARGATE: case B_STARPORT: case B_FACTORY:
     case B_ROBOTICS_FACILITY: case B_MATURE_CHRYSALIS: case B_HIVE: case B_GREATER_SPIRE: return 1;
+#ifdef SC64_T5_RUNTIME
+    case B_CONTROL_TOWER: return 1;
+#endif
     default: return 0;
     }
 }
@@ -719,6 +749,9 @@ static inline int sc64_race_raw_building(int type)
     case B_PHOTON_CANNON: return 162; case B_CYBERNETICS_CORE: return 164;
     case B_FORGE: return 166; case B_STARGATE: return 167; case B_FACTORY: return 113;
     case B_STARPORT: return 114; case B_MISSILE_TURRET: return 124; case B_ZERG_BEACON: return 194;
+#ifdef SC64_T5_RUNTIME
+    case B_CONTROL_TOWER: return 115;
+#endif
 #ifdef SC64_T4_RUNTIME
     case B_TERRAN_BEACON: return 195;
     case B_FLOOR_MISSILE_TRAP: return 203; case B_UPPER_DOOR: return 205;
@@ -758,7 +791,7 @@ static inline int sc64_race_unit_from_raw(int raw)
     case 78: return U_FENIX_DRAGOON; case 83: return U_REAVER;
     case 79: return U_TASSADAR;
     case 2: return U_VULTURE;
-#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
+#if defined(SC64_UNIFIED) && (defined(SC64_Z3_ENABLED) || defined(SC64_T5_RUNTIME))
     case 11: return U_DROPSHIP;
 #endif
     case 3: return U_GOLIATH; case 5: return U_TANK; case 30: return U_SIEGE_TANK;
@@ -807,6 +840,9 @@ static inline int sc64_race_building_from_raw(int raw)
     case 206: return B_RIGHT_UPPER_DOOR; case 207: return B_PIT_DOOR;
     case 208: return B_RIGHT_PIT_DOOR; case 209: return B_FLOOR_GUN_TRAP;
     case 211: return B_WALL_FLAME_TRAP; case 212: return B_RIGHT_WALL_MISSILE_TRAP;
+#endif
+#ifdef SC64_T5_RUNTIME
+    case 115: return B_CONTROL_TOWER;
 #endif
     default: return -1;
     }
