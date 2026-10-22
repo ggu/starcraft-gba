@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate private terrain and placement tables for the first Zerg/Protoss missions.
+"""Generate private terrain and placement tables for imported campaign maps.
 
 All extracted game data and generated headers stay under ignored .local/.
 The header is derived from a user-supplied verified StarCraft 64 USA ROM and
@@ -38,11 +38,19 @@ MISSIONS = [
     ('Z3', '008/016', 'The New Dominion'),
     # P3 is a private import until large-map runtime support is ready (ID 22).
     ('P3', '008/020', 'Higher Ground'),
+    # T4 is an import-only data stage until 128x128 runtime/trigger support
+    # lands. It occupies its stable campaign ID 7, ahead of the later Z3 IDs.
+    ('T4', '008/00D', 'The Jacobs Installation'),
 ]
 BUILDING_RAW_IDS = {
     106, 109, 110, 111, 112, 113, 114, 122, 124, 125, 130, 131, 132,
     133, 135, 137, 139, 141, 142, 143, 144, 146, 149, 150, 151, 154, 155,
     156, 157, 160, 162, 164, 166, 167,
+}
+T4_REQUIRED_SOURCE_RECORDS = {
+    b'UNIT': 'UNIT.bin', b'DIM ': 'DIM.bin', b'ERA ': 'ERA.bin',
+    b'MTXM': 'MTXM.bin', b'MRGN': 'MRGN.bin', b'DD2 ': 'DD2.bin',
+    b'THG2': 'THG2.bin', b'TRIG': 'TRIG.bin',
 }
 
 
@@ -70,6 +78,8 @@ def emit_map_count() -> str:
         '#define SC64_RACE_MAP_COUNT 23\n'
         '#elif defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
         '#define SC64_RACE_MAP_COUNT 15\n'
+        '#elif defined(SC64_UNIFIED) && defined(SC64_T4_ENABLED)\n'
+        '#define SC64_RACE_MAP_COUNT 8\n'
         '#elif defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)\n'
         '#define SC64_RACE_MAP_COUNT 7\n'
         '#elif defined(SC64_UNIFIED)\n'
@@ -80,6 +90,8 @@ def emit_map_count() -> str:
 
 def campaign_guard_for_map(map_index: int) -> str:
     """Return the profile guard used around one map's data and descriptor."""
+    if map_index == 9:
+        return 'defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 0'
     if map_index < 2 or map_index == 7:
         race = 1
     elif map_index < 4 or map_index == 8:
@@ -92,21 +104,24 @@ def campaign_guard_for_map(map_index: int) -> str:
 def emit_descriptor_table(descriptors: list[str]) -> str:
     """Emit stable direct-ID descriptor slots, with disabled IDs zeroed.
 
-    ``descriptors`` uses packer order: four race missions, T1, T2, T3, Z3, P3.
+    ``descriptors`` uses packer order: four race missions, T1, T2, T3, Z3, P3, T4.
     The per-descriptor race guards are carried inside each supplied token.
     """
-    if len(descriptors) != 9:
-        raise ValueError('expected descriptors for map indices 0..8')
+    if len(descriptors) != 10:
+        raise ValueError('expected descriptors for map indices 0..9')
     return ''.join([
         'static const Sc64RaceMap sc64_race_maps[SC64_RACE_MAP_COUNT] = {\n',
         *descriptors[:4],
         '#ifdef SC64_UNIFIED\n', *descriptors[4:6], '#endif /* SC64_UNIFIED */\n',
         '#if defined(SC64_UNIFIED)\n',
         '#ifdef SC64_T3_ENABLED\n', descriptors[6],
-        '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED)\n    {0}, /* global ID 6 unavailable */\n',
+        '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED) || defined(SC64_T4_ENABLED)\n'
+        '    {0}, /* global ID 6 unavailable */\n',
         '#endif\n',
+        '#ifdef SC64_T4_ENABLED\n', descriptors[9],
+        '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED)\n'
+        '    {0}, /* global ID 7 unavailable */\n#endif\n',
         '#if defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED)\n',
-        '    {0}, /* global ID 7 is unavailable */\n'
         '    {0}, /* global ID 8 is unavailable */\n'
         '    {0}, /* global ID 9 is unavailable */\n'
         '    {0}, /* global ID 10 is unavailable */\n'
@@ -136,6 +151,62 @@ def nearest(color: int, palette: list[int], candidates: list[int]) -> int:
         p = palette[i]
         return sum((((color >> s) & 31) - ((p >> s) & 31)) ** 2 for s in (0, 5, 10))
     return min(candidates, key=lambda i: (dist(i), i))
+
+
+def retain_t4_source_records(chk: bytes, records_dir: Path, *,
+                             rom_sha1: str = ROM_SHA1,
+                             extractor_commit: str = UPSTREAM_COMMIT) -> dict:
+    """Write exact framed T4 CHK records and return hash/size metadata.
+
+    This intentionally stores only the eight source records required for T4
+    data auditing. The input is a CHK byte string returned by the pinned BOLT
+    extractor; no Blizzard records are added to tracked project files.
+    """
+    found: dict[bytes, list[bytes]] = {tag: [] for tag in T4_REQUIRED_SOURCE_RECORDS}
+    offset = 0
+    while offset < len(chk):
+        if len(chk) - offset < 8:
+            raise ValueError('T4 CHK has a truncated section header')
+        tag = chk[offset:offset + 4]
+        size = struct.unpack_from('<I', chk, offset + 4)[0]
+        end = offset + 8 + size
+        if end > len(chk):
+            raise ValueError(f'T4 CHK section {tag!r} exceeds the CHK bounds')
+        if tag in found:
+            found[tag].append(chk[offset:end])
+        offset = end
+    for tag, records in found.items():
+        if len(records) != 1:
+            raise ValueError(f'T4 CHK requires exactly one {tag.decode("ascii")} section; found {len(records)}')
+
+    records_dir.mkdir(parents=True, exist_ok=True)
+    metadata = {}
+    for tag, filename in T4_REQUIRED_SOURCE_RECORDS.items():
+        record = found[tag][0]
+        payload_size = struct.unpack_from('<I', record, 4)[0]
+        path = records_dir / filename
+        path.write_bytes(record)
+        metadata[tag.decode('ascii').strip()] = {
+            'file': filename,
+            'record_bytes': len(record),
+            'payload_bytes': payload_size,
+            'record_sha256': hashlib.sha256(record).hexdigest(),
+            'payload_sha256': hashlib.sha256(record[8:]).hexdigest(),
+        }
+    chk_sha256 = hashlib.sha256(chk).hexdigest()
+    manifest = {
+        'schema': 1,
+        'source_map_path': '008/00D',
+        'source_rom_sha1': rom_sha1,
+        'source_chk_sha256': chk_sha256,
+        'extractor': 'references/sc64-maps/extract_sc64_maps.py',
+        'extractor_commit': extractor_commit,
+        'records': metadata,
+    }
+    manifest_path = records_dir.parent / 'manifest.json'
+    manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='ascii')
+    return {'manifest': str(manifest_path), 'source_chk_sha256': chk_sha256,
+            'records': metadata}
 
 
 def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict:
@@ -244,6 +315,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             lines.append('#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n')
         elif map_index == 8:
             lines.append('#if defined(SC64_UNIFIED) && defined(SC64_P3_ENABLED)\n')
+        elif map_index == 9:
+            lines.append('#if defined(SC64_UNIFIED) && defined(SC64_T4_ENABLED)\n')
         campaign_guard = campaign_guard_for_map(map_index)
         lines.append(f'#if {campaign_guard}\n')
         unit_name = f'sc64_race_{name}_units'
@@ -269,6 +342,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             lines.append('#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n')
         elif map_index == 8:
             lines.append('#endif /* SC64_UNIFIED && SC64_P3_ENABLED */\n')
+        elif map_index == 9:
+            lines.append('#endif /* SC64_UNIFIED && SC64_T4_ENABLED */\n')
         descriptors.append(f'#if {campaign_guard}\n'
             f'    {{{info.width}u,{info.height}u,{tileset}u,{human_slot}u,sc64_race_{name}_owner_modes,sc64_race_{name}_owner_races,{unit_name},{len(units)}u,sc64_race_{name}_tiles,{len(tiles)}u,sc64_race_{name}_lookup,sc64_race_{name}_blocked,"{info.name}","{mission_id}"}},\n'
             '#else\n    {0}, /* campaign omitted from this cartridge */\n#endif\n')
@@ -295,6 +370,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                 'mineral' if u['source_type'] in (176, 177, 178) else
                 'geyser' if u['source_type'] == 188 else
                 'building' if u['source_type'] in BUILDING_RAW_IDS else
+                'unclassified' if map_index == 9 and u['source_type'] == 195 else
                 'unit'
                 for u in source_units
             )
@@ -306,6 +382,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                 'building_placements': source_categories['building'],
                 'mineral_fields': source_categories['mineral'],
                 'geysers': source_categories['geyser'],
+                'unclassified_source_placements': source_categories['unclassified'],
             }
             reports[-1]['runtime_unit_locations'] = [
                 {'source_type': u['source_type'], 'owner_raw': u['owner_raw'],
@@ -387,6 +464,33 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                     'raw_trigger_records_preserved_in_audit': True,
                     'runtime_trigger_behavior_claimed': False,
                 }
+                reports[-1]['runtime_unit_rows_are_all_non_start_source_rows'] = True
+            if map_index == 9:
+                expected_raw_types = {0: 27, 1: 1, 2: 2, 3: 1, 7: 6, 15: 31,
+                                      20: 1, 32: 8, 37: 5, 89: 2, 95: 3, 195: 8}
+                source_types = Counter(u['source_type'] for u in units)
+                if (info.width, info.height, tileset, human_slot) != (128, 128, 2, 0):
+                    raise ValueError('T4 dimensions, Installation tileset, or human slot changed')
+                if len(source_units) != 102 or len(units) != 95 or source_categories['start_marker'] != 7:
+                    raise ValueError('T4 importer skipped or duplicated UNIT/start-marker rows')
+                if dict(source_types) != expected_raw_types:
+                    raise ValueError(f'T4 source UNIT type histogram changed: {dict(source_types)}')
+                if force_assignments[:8] != [0, 2, 2, 1, 3, 3, 3, 2]:
+                    raise ValueError('T4 source force assignments no longer match audited CHK')
+                if source_categories['unclassified'] != 8 or source_categories['building'] != 0:
+                    raise ValueError('T4 unknown raw195 rows must remain unclassified, not remapped')
+                reports[-1]['global_mission_id'] = 7
+                reports[-1]['raw_type_counts_by_owner_slot'] = {
+                    str(owner): {str(raw): count for (raw, slot), count in
+                                 Counter((u['source_type'], u['owner_raw'])
+                                         for u in units).items() if slot == owner}
+                    for owner in sorted({u['owner_raw'] for u in units})
+                }
+                reports[-1]['unclassified_source_types'] = {'195': 8}
+                reports[-1]['t4_import_only'] = True
+                reports[-1]['runtime_or_catalog_enabled'] = False
+                reports[-1]['source_record_retention'] = retain_t4_source_records(
+                    chk, output.parent / 't4' / 'records')
                 reports[-1]['runtime_unit_rows_are_all_non_start_source_rows'] = True
     lines.extend([emit_descriptor_table(descriptors), '#endif\n'])
     content = ''.join(lines)

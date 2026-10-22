@@ -1,0 +1,65 @@
+#ifndef SC64_STATIC_KEY_H
+#define SC64_STATIC_KEY_H
+
+/* Track only art that the static pass can draw into this viewport. Payload
+ * changes outside that set cannot affect the cached pixels; entering/leaving
+ * the set is itself a key change. Keep exact values rather than a hash. */
+static unsigned
+sc64_static_objects_key(void)
+{
+    enum { FIELDS = MAX_MINERALS * 4 + 4 * 3 + MAX_BUILDINGS * 6 };
+    static int previous[FIELDS];
+    static unsigned generation;
+    int n = 0, changed = 0;
+#define SC64_STATIC_FIELD(value) do { \
+    int next_value = (value); \
+    if (previous[n] != next_value) { \
+        previous[n] = next_value; changed = 1; \
+    } \
+    ++n; \
+} while (0)
+    for (int i = 0; i < MAX_MINERALS; ++i) {
+        int x = m[i].x - camx, y = m[i].y - camy + 12;
+        int drawn = m[i].amount > 0 && x > -6 && x < 245 &&
+                    y > 7 && y < 123 && currently_visible(m[i].x, m[i].y);
+        SC64_STATIC_FIELD(drawn);
+        if (drawn) {
+            SC64_STATIC_FIELD(m[i].x);
+            SC64_STATIC_FIELD(m[i].y);
+            SC64_STATIC_FIELD(m[i].style);
+        } else n += 3;
+    }
+    for (int i = 0; i < 4; ++i) {
+        int x = geysers[i].x - camx, y = geysers[i].y - camy + 12;
+        int drawn = i < geyser_count && x > 0 && x < 240 &&
+                    y > 12 && y < 120 && currently_visible(geysers[i].x, geysers[i].y);
+        SC64_STATIC_FIELD(drawn);
+        if (drawn) {
+            SC64_STATIC_FIELD(geysers[i].x);
+            SC64_STATIC_FIELD(geysers[i].y);
+        } else n += 2;
+    }
+    for (int i = 0; i < MAX_BUILDINGS; ++i) {
+        Building *q = &b[i];
+        int x = q->x - camx, y = q->y - camy + 12;
+        int drawn = q->alive && x >= -20 && x <= 260 && y >= 2 && y <= 130 &&
+                    (q->owner == SIDE || currently_visible(q->x, q->y));
+        SC64_STATIC_FIELD(drawn);
+        if (drawn) {
+            SC64_STATIC_FIELD(q->x);
+            SC64_STATIC_FIELD(q->y);
+            SC64_STATIC_FIELD(q->type);
+            SC64_STATIC_FIELD(q->owner);
+#ifdef SC64_RACES
+            SC64_STATIC_FIELD(q->raw_type);
+#else
+            SC64_STATIC_FIELD(0);
+#endif
+        } else n += 5;
+    }
+#undef SC64_STATIC_FIELD
+    if (changed) ++generation;
+    return generation;
+}
+
+#endif

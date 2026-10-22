@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import struct
@@ -153,11 +154,15 @@ def verify_final(trace_final: dict, state: dict) -> None:
     expected = {"screen": SCREEN_RESULT, "frame": trace_final["frame"], "won": 1, "lost": 0,
                 **{key: trace_final[key] for key in fields[4:]}}
     expected.update({"race_mode": 0, "race_selected_mission": MISSION_P3,
-                     "supply": trace_final["supply"], "supply_cap": trace_final["supply_cap"],
-                     "gateways": trace_final["gateways"]})
+                     "supply": trace_final["supply"], "supply_cap": trace_final["supply_cap"]})
     for key, value in expected.items():
         if state.get(key) != value:
             raise RuntimeError(f"final {key} mismatch: expected {value}, observed {state.get(key)}")
+    # The legacy controller trace stores gateway presence (side_building() >= 0),
+    # while p3_snapshot reports the full live gateway count for diagnostics.
+    if bool(state.get("gateways", 0)) != bool(trace_final["gateways"]):
+        raise RuntimeError("final gateways presence mismatch: "
+                           f"expected {bool(trace_final['gateways'])}, observed count {state.get('gateways')}")
     campaign = state.get("race_campaign", {})
     for key, value in (("mission", MISSION_P3), ("elapsed_frames", trace_final["frame"]), ("phase", 3)):
         if campaign.get(key) != value:
@@ -207,6 +212,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
     rom_hash = hashlib.sha256(rom.read_bytes()).hexdigest()
     elf_hash = hashlib.sha256(elf.read_bytes()).hexdigest()
     trace_hash = hashlib.sha256(trace_path.read_bytes()).hexdigest()
+    history_path = run_dir / "checkpoints.jsonl"
     split.FRONT_FIELDS = split.frontend_offsets(elf)
     scheduler.check_debugger_port_free()
     proc = sock = rsp = log = None
@@ -245,12 +251,22 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
             raise RuntimeError("scheduler failed to stop before first controller input")
 
         observations = []
+
+        def record_checkpoint(checkpoint: dict) -> None:
+            observations.append(checkpoint)
+            # Durable bounded history: at most one compact record per observer
+            # interval, plus tick zero. Keep it independently readable if final
+            # verification or report generation fails.
+            with history_path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(checkpoint, separators=(",", ":")) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
         previous_state = p3_snapshot(rsp, sym, sizes, bank, campaign_layout, p3_layout)
         previous_clock = profile.hardware_clock(rsp)
         previous_routes = {key: profile.u32(rsp, sym[key]) for key in
                            ("sc64_route_hits", "sc64_route_builds") if key in sym}
         counted_frames = counted_cycles = 0
-        observations.append({"tick": 0, "scheduler_tick": 0, "host_tick": 0,
+        record_checkpoint({"tick": 0, "scheduler_tick": 0, "host_tick": 0,
                              "elapsed_hardware_cycles": 0, "frame_delta": 0,
                              "counted_live_play_interval": False, "effective_fps": None,
                              "profile_cycles_last_tick": scheduler.profile_counters(rsp, sym)[0],
@@ -300,7 +316,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                           "route_interval": route_delta, **state}
             if completed in (1000, 10000, 30000, 50000, requested):
                 checkpoint["capture"] = capture(rsp, run_dir / f"checkpoint-{completed:06d}.png")
-            observations.append(checkpoint)
+            record_checkpoint(checkpoint)
             profile.write_progress(
                 run_dir / "progress.json", profile="protoss-p3", rom=rom, elf=elf,
                 rom_sha256=rom_hash, elf_sha256=elf_hash,
@@ -317,9 +333,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
             previous_state, previous_clock, previous_routes = state, now, route_values
             tick = completed
         final = observations[-1]
-        if not prefix:
-            verify_final(plan["final"], final)
-        report = {"status": "prefix" if prefix else "won", "mission": MISSION_P3,
+        report = {"profile": "protoss-p3", "status": "prefix" if prefix else "verification_pending", "mission": MISSION_P3,
                   "rom": str(rom), "elf": str(elf), "trace": str(trace_path),
                   "rom_sha256": rom_hash, "elf_sha256": elf_hash, "trace_sha256": trace_hash,
                   "input_transitions": plan["input_count"], "scheduler_mode": mode,
@@ -331,9 +345,44 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                   "timer_method": "GBA chained hardware timers at 1000-tick and exact-final observers",
                   "fps_exclusions": "Initial HOME and result intervals are excluded; only positive frame deltas between PLAY checkpoints count.",
                   "final": final, "checkpoints": observations,
+                  "checkpoint_history": str(history_path),
                   "captures": {"home": str(run_dir / "home.png"),
                                "final": str(run_dir / f"checkpoint-{requested:06d}.png")},
-                  "verified_win": not prefix}
+                  "verified_win": False}
+        path = run_dir / "profile.json"
+
+        def save_report() -> None:
+            temp_path = path.with_suffix(".json.tmp")
+            with temp_path.open("w", encoding="utf-8") as stream:
+                json.dump(report, stream, indent=2)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp_path, path)
+
+        # Persist the complete observations before any final contract checks.
+        save_report()
+        if not prefix:
+            try:
+                verify_final(plan["final"], final)
+            except Exception as exc:
+                report.update({"status": "verification_failed", "verification_failed": str(exc),
+                               "verified_win": False})
+                save_report()
+                profile.write_progress(
+                    run_dir / "progress.json", profile="protoss-p3", rom=rom, elf=elf,
+                    rom_sha256=rom_hash, elf_sha256=elf_hash,
+                    configuration={"mission": MISSION_P3, "trace": str(trace_path),
+                                   "trace_sha256": trace_hash, "input_transitions": plan["input_count"],
+                                   "scheduler_mode": mode, "scheduler_capacity": capacity,
+                                   "peak_page_transitions": plan["peak_page_transitions"],
+                                   "trace_stop_tick": plan["stop_tick"], "requested_ticks": requested,
+                                   "prefix": prefix},
+                    requested_ticks=requested, checkpoint_interval=scheduler.CHECKPOINT_TICKS,
+                    latest_checkpoint={"tick": final["tick"], **final},
+                    status="verification_failed", final_report=str(path))
+                raise
+            report.update({"status": "won", "verified_win": True})
         if save_at_end:
             if final["screen"] != SCREEN_PLAY:
                 raise RuntimeError("--save-at-end requires a prefix ending during live play")
@@ -350,8 +399,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
             saved.update({"path": str(saved_path),
                           "sha256": hashlib.sha256(saved_path.read_bytes()).hexdigest()})
             report["save"] = saved
-        path = run_dir / "profile.json"
-        path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        save_report()
         profile.write_progress(
             run_dir / "progress.json", profile="protoss-p3", rom=rom, elf=elf,
             rom_sha256=rom_hash, elf_sha256=elf_hash,

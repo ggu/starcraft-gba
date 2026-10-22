@@ -175,8 +175,12 @@ python3 tools/sc64_p3_controller_replay.py --trace .local/sc64/p3-controller-asa
 The helper supports frozen `--rom`/`--elf` paths, separate `--output` folders,
 and bounded `--ticks` prefixes with optional normal-control `--save-at-end`.
 It verifies the final quest model, completion bit, roster and global wallets.
-The complete ARM replay is still being validated. A fresh ARM process has
-already restored and continued a normal controller-created save. In that same
+The complete ARM input replay reached mission clear at the same frame and its
+retained final state passes the corrected quest, roster and wallet checks.
+The original report verifier confused Gateway presence with Gateway count;
+that reporting error left no complete checkpoint history or exact full-run
+frame-rate aggregate. Future runs retain each checkpoint before verification.
+A fresh ARM process has also restored and continued a normal controller-created save. In that same
 saved scene, filtering defense candidates raised effective performance from
 19.72 to 28.92 fps with identical reported gameplay state and captured pixels.
 That is a bounded scene comparison, not a full-mission frame-rate result.
@@ -186,6 +190,34 @@ P3 enables sorted defense candidate lists, a paged debugger input queue and
 clear-free live rendering after full-frame coverage checks. For an unoptimized
 comparison build, use `make -B protoss-p3 P3_OPTIMIZATION_FLAGS=`; retain ROM/ELF
 pairs separately, then restore the default with `make -B protoss-p3`.
+
+Optional rendering experiments reuse the cached terrain when the camera moves,
+track only drawable static objects and use packed visibility spans:
+
+```sh
+make -B protoss-p3 P3_EXTRA_FLAGS='-DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS'
+```
+
+A 10,000-tick
+controller prefix improved from 21.53 to 23.39 effective fps, matching all 11
+reported gameplay checkpoints and the three captured screens. The full
+completion replay for this candidate is still being validated; these flags
+are not yet the default.
+
+Jacobs Installation (Terran 4, global ID 7) has an import-only data stage.
+Regenerate the private race tables, then run its fixture:
+
+```sh
+python3 tools/sc64_races_pack.py --rom /path/to/StarCraft64-USA.z64
+make test-sc64-t4-import
+```
+
+The fixture checks all 95 non-start placements and the full 128×128 Installation
+terrain. Eight special Terran Beacons retain their raw type until runtime
+support exists. The importer retains the framed location, doodad, sprite and
+trigger records with hashes under ignored `.local/sc64/races/generated/t4/`.
+This stage does not expose the mission in the catalog: doors, teleports,
+rescue behavior and mission triggers still need implementation.
 
 `make test-sc64-large-map sc64-large-probe` checks the opt-in
 `SC64_LARGE_MAPS` storage layout, including packed fog/path grids, larger

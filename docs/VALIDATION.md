@@ -585,6 +585,82 @@ their initialization values for SIDE. The complete ARM controller replay is
 running separately. A host win and this bounded 28.92-fps scene do not certify
 the full ARM mission, its frame rate, or physical GBA performance.
 
+## Higher Ground ARM completion and durable replay evidence (2026-10-23)
+
+The frozen `9cc2691671d948fccac09ab9187055a50a0c5a539b130ab48bc33e3bbe2fefea`
+ROM completed the full 152,107-tick controller replay in mGBA at game frame
+151,088. The retained final observation has the P3 completion bit, won result,
+quest outcome 1 with no pending hold, 14 player units, 11 player buildings,
+seven Force 2 units and no hostile buildings. The global wallets are 44
+minerals and 1,048 gas, matching the host policy's final contract. The final
+capture displays mission clear and the game-saved message.
+
+The run's original final verifier treated the host trace's Gateway presence
+flag as an exact live count. Three surviving Gateways therefore caused a
+reporting exception after gameplay had won. The corrected presence check
+passes against the retained final observation, and a regression rejects zero
+Gateways. This proves the observed ARM completion, but the old runner retained
+only its latest checkpoint: complete checkpoint equality and an exact aggregate
+full-mission frame rate cannot be recovered from this run. They are not claimed.
+
+The runner now writes and flushes each checkpoint to a separate JSONL history,
+persists the full report before final validation, and retains failure details
+when validation raises. The comparison tool checks trace identity, matching
+checkpoint extents, typed actor summaries and all reported gameplay fields;
+timing/capture metadata is excluded. Prefix comparisons require an explicit
+flag and cannot claim a win. This is reported-state comparison, not full RAM
+equality. Eight replay-verifier and 11 comparator tests pass.
+
+## Higher Ground rendering experiments (2026-10-23)
+
+The opt-in `SC64_TERRAIN_SCROLL` path reuses the existing 240×108 cache across
+small camera moves, redrawing uncovered or changed-fog tiles. Stationary views
+retain the simple band-copy path. `SC64_STATIC_KEY_CULL` snapshots exact
+drawable-object fields and includes raw building art identity; offscreen
+payload changes do not invalidate the cache. No additional framebuffer is
+allocated. The actual imported renderer matches a fresh-render pixel oracle
+across 97 scene transitions, including camera edges, fog, ownership, depleted
+resources, overlapping static art and raw-art changes. Asset-free cache
+fixtures also cover both unchanged and scrolling paths under ASan/UBSan.
+
+`SC64_VISIBILITY_SPANS` is checked against the byte-grid reference on the full
+128×96 packed map, including edge, overlap, movement, death, ownership, reset
+and randomized cases. With spans enabled for P3, the fallback circle routine
+stays in ROM to preserve the unchanged IWRAM reserve. Other profiles retain
+their original placement.
+
+The frozen combined candidate has SHA-256
+`d5ebd9cc03705546d9f6fba301991110d1d02daa9f1e6b539047cdec84877f67`.
+IWRAM ends at `0x03004f88`, BSS at `0x020399e0`; BSS is 235,608 bytes and data
+388 bytes. Both unchanged linker guards pass. Against the frozen `9cc26916`
+baseline, the same 10,000-tick controller prefix improves from 21.53 to 23.39
+effective fps over the same 8,889 counted live frames. All 11 reported gameplay
+checkpoints match, as do RGB captures at HOME, tick 1,000 and tick 10,000. At
+the last checkpoint, visibility falls from 62,104 to 36,625 cycles and drawing
+from 248,385 to 216,755 cycles. This is an opening-prefix measurement, not a
+full-mission frame-rate result. The full candidate replay is being validated;
+the flags remain opt-in. Default build/tests (79 Python checks), unified
+build/tests and the full P3 suite with all three flags pass. The host policy
+still wins at frame 151,088. Default and unified ROM hashes are unchanged.
+
+## Jacobs Installation import stage (2026-10-23)
+
+The private race-map packer now imports T4 from the verified USA ROM using the
+unchanged pinned extractor. `make test-sc64-t4-import` checks all 95 non-start
+placements, their canonical row digest, all 16,384 terrain cells, the converted
+terrain digest and the source owner/type counts under ASan/UBSan. Eight raw
+type-195 special Terran Beacons remain unclassified rather than being silently
+mapped to an ordinary unit or building. Compiler-matrix tests keep global ID
+7 stable and restrict its data to the explicit Terran import profile.
+
+The packer retains exactly one each of UNIT, DIM, ERA, MTXM, MRGN, DD2, THG2
+and TRIG as original framed records under ignored local storage, with source
+ROM/extractor/CHK provenance and per-record hashes. Asset-free fixtures check
+the exact framed writes and rejection of a missing required record before any
+output directory is created. No extracted records or generated arrays are
+committed. The catalog and runtime do not enable T4. Door/trap collision,
+teleports, rescue behavior and mission scripting remain to be implemented.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

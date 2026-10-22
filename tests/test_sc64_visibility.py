@@ -14,7 +14,14 @@ C_SOURCE = r'''
 typedef uint8_t u8;
 typedef uint16_t u16;
 #define GBA_HOT
-enum { MAP_COLS=64, MAP_ROWS=64, MAP_CELLS=4096, MAX_UNITS=40,
+#ifdef SC64_LARGE_MAPS
+#define MAP_COLS 128
+#define MAP_ROWS 96
+#else
+#define MAP_COLS 64
+#define MAP_ROWS 64
+#endif
+enum { MAP_CELLS=MAP_COLS*MAP_ROWS, MAX_UNITS=40,
        MAX_BUILDINGS=16, SIDE=1, U_SCV=1, B_COMMAND=2
 #ifdef SC64_RACES
        , U_DRONE=3, B_HATCHERY=21, B_LAIR=22, B_HIVE=23, B_NEXUS=24
@@ -24,6 +31,7 @@ enum { MAP_COLS=64, MAP_ROWS=64, MAP_CELLS=4096, MAX_UNITS=40,
 #define IS_WORKER(type) ((type)==U_SCV || (type)==U_DRONE)
 #define sc64_cell_col(cell) ((cell)%MAP_COLS)
 #define sc64_cell_row(cell) ((cell)/MAP_COLS)
+static int race_cols=MAP_COLS, race_rows=MAP_ROWS;
 static int sc64_race_is_zerg_townhall(int type) {
  return type==B_HATCHERY || type==B_LAIR || type==B_HIVE;
 }
@@ -32,7 +40,30 @@ typedef struct { int alive, owner, x, y, type; } UnitFixture;
 typedef struct { int alive, owner, x, y, type; } BuildingFixture;
 static UnitFixture u[MAX_UNITS];
 static BuildingFixture b[MAX_BUILDINGS];
+#ifdef SC64_LARGE_MAPS
+#define SC64_GRID_STORAGE_BYTES ((MAP_CELLS+7)/8)
+static u8 visible[SC64_GRID_STORAGE_BYTES], explored[SC64_GRID_STORAGE_BYTES];
+static int test_grid_get(const u8 *grid,int cell) {
+ return (grid[(unsigned)cell>>3] >> ((unsigned)cell&7)) & 1;
+}
+static void test_grid_set(u8 *grid,int cell,int value) {
+ u8 mask=(u8)(1u<<((unsigned)cell&7));
+ if(value)grid[(unsigned)cell>>3]|=mask;
+ else grid[(unsigned)cell>>3]&=(u8)~mask;
+}
+#define SC64_GRID_GET(grid,cell) test_grid_get((grid),(cell))
+#define SC64_GRID_SET(grid,cell,value) test_grid_set((grid),(cell),(value))
+#define SC64_GRID_CLEAR(grid) memset((grid),0,sizeof(grid))
+#else
 static u8 visible[MAP_CELLS], explored[MAP_CELLS];
+#endif
+static int fixture_grid_get(const u8 *grid,int cell) {
+#ifdef SC64_LARGE_MAPS
+ return (grid[(unsigned)cell>>3] >> ((unsigned)cell&7)) & 1;
+#else
+ return grid[cell] != 0;
+#endif
+}
 #include "starcraft/sc64_visibility.h"
 
 static u8 ref_visible[MAP_CELLS], ref_explored[MAP_CELLS];
@@ -101,7 +132,8 @@ static void near_move_sweep(int type, int start_step){
 }
 static void edge_move_sweep(int start_step){
  static const int points[8][2]={{0,0},{15,0},{0,15},{15,15},
-   {1008,1008},{1023,1008},{1008,1023},{1023,1023}};
+   {(MAP_COLS-1)*16,(MAP_ROWS-1)*16},{MAP_COLS*16-1,(MAP_ROWS-1)*16},
+   {(MAP_COLS-1)*16,MAP_ROWS*16-1},{MAP_COLS*16-1,MAP_ROWS*16-1}};
  int i,step=start_step;
  memset(u,0,sizeof(u));memset(b,0,sizeof(b));
  memset(visible,0,sizeof(visible));memset(explored,0,sizeof(explored));
@@ -110,7 +142,8 @@ static void edge_move_sweep(int start_step){
  u[0].alive=u[1].alive=1;u[0].owner=u[1].owner=SIDE;
  u[0].type=U_SCV;u[1].type=0;
  for(i=0;i<8;i++){
-  int dx=points[i][0]<1010?15:-15,dy=points[i][1]<1010?15:-15;
+  int dx=points[i][0]<MAP_COLS*16-15?15:-15;
+  int dy=points[i][1]<MAP_ROWS*16-15?15:-15;
   u[0].x=points[i][0];u[0].y=points[i][1];
   u[1].x=points[i][0]+(dx>0?5:-5);u[1].y=points[i][1]+(dy>0?4:-4);
   compare(step++);
@@ -132,9 +165,12 @@ static void compare(int step){
   ref_minimap_visible[mini]+=ref_visible[i]!=0;
   ref_minimap_explored[mini]+=ref_explored[i]!=0;
  }
- if(memcmp(visible,ref_visible,sizeof(visible))||
-    memcmp(explored,ref_explored,sizeof(explored))||
-    memcmp(sc64_minimap_visible,ref_minimap_visible,sizeof(ref_minimap_visible))||
+ for(i=0;i<MAP_CELLS;i++)
+  if(fixture_grid_get(visible,i)!=(ref_visible[i]!=0)||
+     fixture_grid_get(explored,i)!=(ref_explored[i]!=0)){
+   fprintf(stderr,"grid mismatch at step %d cell %d\n",step,i);exit(1);
+  }
+ if(memcmp(sc64_minimap_visible,ref_minimap_visible,sizeof(ref_minimap_visible))||
     memcmp(sc64_minimap_explored,ref_minimap_explored,sizeof(ref_minimap_explored))){
   fprintf(stderr,"visibility mismatch at step %d\n",step);exit(1);
  }
@@ -148,7 +184,8 @@ int main(void){
  for(i=0;i<3;i++){
   int j;
   int halls[3]={B_HATCHERY,B_LAIR,B_HIVE};
-  int edge_x[4]={0,1023,0,1023},edge_y[4]={0,0,1023,1023};
+  int edge_x[4]={0,MAP_COLS*16-1,0,MAP_COLS*16-1};
+  int edge_y[4]={0,0,MAP_ROWS*16-1,MAP_ROWS*16-1};
   memset(u,0,sizeof(u));memset(b,0,sizeof(b));
   memset(visible,0,sizeof(visible));memset(explored,0,sizeof(explored));
   memset(ref_visible,0,sizeof(ref_visible));memset(ref_explored,0,sizeof(ref_explored));
@@ -180,7 +217,7 @@ int main(void){
   for(i=0;i<MAX_UNITS;i++)if((rnd()%5)==0){
    u[i].alive=(rnd()%4)!=0;u[i].owner=(int)(rnd()%3);
    u[i].type=(rnd()%2)?U_SCV:0;
-   u[i].x=(int)(rnd()%1024);u[i].y=(int)(rnd()%1024);
+   u[i].x=(int)(rnd()%(MAP_COLS*16));u[i].y=(int)(rnd()%(MAP_ROWS*16));
   }
   for(i=0;i<MAX_BUILDINGS;i++)if((rnd()%7)==0){
    b[i].alive=(rnd()%4)!=0;b[i].owner=(int)(rnd()%3);
@@ -195,7 +232,7 @@ int main(void){
 #else
    b[i].type=(rnd()%3)==0?B_COMMAND:0;
 #endif
-   b[i].x=(int)(rnd()%1024);b[i].y=(int)(rnd()%1024);
+   b[i].x=(int)(rnd()%(MAP_COLS*16));b[i].y=(int)(rnd()%(MAP_ROWS*16));
   }
   compare(step);
   if(step==499){
@@ -230,6 +267,16 @@ class VisibilityTests(unittest.TestCase):
                             result = subprocess.run([str(binary)], check=True, text=True,
                                                     capture_output=True)
                             self.assertIn("matches full recomputation", result.stdout)
+            with self.subTest(variant="large-packed-races-spans"):
+                binary = Path(temp) / "visibility-large-packed-spans"
+                subprocess.run([
+                    "clang", "-std=c11", "-O1", "-fsanitize=address,undefined",
+                    "-DSC64_RACES", "-DSC64_LARGE_MAPS", "-DSC64_VISIBILITY_SPANS",
+                    "-I", str(ROOT), str(source), "-o", str(binary),
+                ], check=True)
+                result = subprocess.run([str(binary)], check=True, text=True,
+                                        capture_output=True)
+                self.assertIn("matches full recomputation", result.stdout)
 
 
 if __name__ == "__main__":

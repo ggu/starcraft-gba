@@ -1,6 +1,9 @@
 """Asset-free tests for the generated race-map table's stable catalog IDs."""
 from pathlib import Path
+import hashlib
+import json
 import shutil
+import struct
 import subprocess
 import tempfile
 import unittest
@@ -9,7 +12,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 
 from sc64_races_pack import (campaign_guard_for_map, emit_descriptor_table,
-                             emit_map_count)
+                             emit_map_count, retain_t4_source_records)
 
 
 class RaceMapTableEmissionTests(unittest.TestCase):
@@ -42,9 +45,16 @@ class RaceMapTableEmissionTests(unittest.TestCase):
             '    {22}, /* P3: Protoss profile only, global ID 22 */\n'
             '#else\n    {0},\n#endif\n'
         )
+        t4_guard = campaign_guard_for_map(9)
+        rows.append(
+            f'#if defined(SC64_UNIFIED) && defined(SC64_T4_ENABLED) && ({t4_guard})\n'
+            '    {7}, /* T4: import-only, fixed global ID 7 */\n'
+            '#else\n    {0},\n#endif\n'
+        )
         return rows
 
-    def compile_case(self, flags, expected_count, expected_t3, expected_z3, expected_p3):
+    def compile_case(self, flags, expected_count, expected_t3, expected_z3, expected_p3,
+                     expected_t4=0):
         source = (
             'typedef struct { int id; } Sc64RaceMap;\n'
             + emit_map_count()
@@ -55,8 +65,11 @@ class RaceMapTableEmissionTests(unittest.TestCase):
               'if (sc64_race_maps[i].id != i) return 2;\n'
             + f' if (SC64_RACE_MAP_COUNT > 6 && sc64_race_maps[6].id != {expected_t3}) return 3;\n'
             + ' if (SC64_RACE_MAP_COUNT >= 15) {\n'
-            + '  for (int i = 7; i <= 13; ++i) if (sc64_race_maps[i].id != 0) return 4;\n'
+            + f'  if (sc64_race_maps[7].id != {expected_t4}) return 4;\n'
+            + '  for (int i = 8; i <= 13; ++i) if (sc64_race_maps[i].id != 0) return 5;\n'
             + f'  if (sc64_race_maps[14].id != {expected_z3}) return 5;\n'
+            + ' } else if (SC64_RACE_MAP_COUNT > 7) {\n'
+            + f'  if (sc64_race_maps[7].id != {expected_t4}) return 8;\n'
             + ' }\n return 0;\n}\n'
         )
         if expected_count == 23:
@@ -82,11 +95,30 @@ class RaceMapTableEmissionTests(unittest.TestCase):
                          '!defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE == 1')
         self.assertEqual(campaign_guard_for_map(8),
                          '!defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE == 2')
+        self.assertEqual(campaign_guard_for_map(9),
+                         'defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 0')
         self.compile_case([], 4, 0, 0, 0)
         self.compile_case(['-DSC64_UNIFIED'], 6, 0, 0, 0)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_T3_ENABLED'], 7, 6, 0, 0)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_Z3_ENABLED'], 15, 0, 14, 0)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_P3_ENABLED'], 23, 0, 0, 22)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T4_ENABLED'], 8, 0, 0, 0, 0)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T4_ENABLED',
+                           '-DSC64_CAMPAIGN_RACE=0'], 8, 0, 0, 0, 7)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T4_ENABLED',
+                           '-DSC64_CAMPAIGN_RACE=1'], 8, 0, 0, 0, 0)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T4_ENABLED',
+                           '-DSC64_Z3_ENABLED', '-DSC64_CAMPAIGN_RACE=0'],
+                          15, 0, 0, 0, 7)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T4_ENABLED',
+                           '-DSC64_Z3_ENABLED', '-DSC64_CAMPAIGN_RACE=1'],
+                          15, 0, 14, 0, 0)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T4_ENABLED',
+                           '-DSC64_P3_ENABLED', '-DSC64_CAMPAIGN_RACE=0'],
+                          23, 0, 0, 0, 7)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T4_ENABLED',
+                           '-DSC64_P3_ENABLED', '-DSC64_CAMPAIGN_RACE=2'],
+                          23, 0, 0, 22, 0)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_Z3_ENABLED',
                            '-DSC64_CAMPAIGN_RACE=0'], 15, 0, 0, 0)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_T3_ENABLED',
@@ -100,6 +132,59 @@ class RaceMapTableEmissionTests(unittest.TestCase):
                           23, 0, 0, 22)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_Z3_ENABLED', '-DSC64_P3_ENABLED',
                            '-DSC64_CAMPAIGN_RACE=1'], 23, 0, 14, 0)
+
+
+class T4SourceRecordRetentionTests(unittest.TestCase):
+    @staticmethod
+    def synthetic_chk(missing_tag=None):
+        records = []
+        payloads = {
+            b'UNIT': b'u1', b'DIM ': b'dims', b'ERA ': b'e', b'MTXM': b'tiles',
+            b'MRGN': b'locations', b'DD2 ': b'dd2', b'THG2': b'thg2', b'TRIG': b'trig',
+            b'OTHR': b'ignored',
+        }
+        for tag, payload in payloads.items():
+            if tag == missing_tag:
+                continue
+            records.append(tag + struct.pack('<I', len(payload)) + payload)
+        return b''.join(records), payloads
+
+    def test_writes_exact_framed_records_and_hash_manifest(self):
+        chk, payloads = self.synthetic_chk()
+        with tempfile.TemporaryDirectory(prefix='sc64-t4-records-') as td:
+            records_dir = Path(td) / 't4' / 'records'
+            result = retain_t4_source_records(
+                chk, records_dir, rom_sha1='synthetic-rom', extractor_commit='synthetic-pin')
+            manifest = json.loads(Path(result['manifest']).read_text())
+            self.assertEqual(manifest['source_map_path'], '008/00D')
+            self.assertEqual(manifest['source_rom_sha1'], 'synthetic-rom')
+            self.assertEqual(manifest['source_chk_sha256'], hashlib.sha256(chk).hexdigest())
+            self.assertEqual(manifest['extractor_commit'], 'synthetic-pin')
+            self.assertEqual(set(manifest['records']),
+                             {'UNIT', 'DIM', 'ERA', 'MTXM', 'MRGN', 'DD2', 'THG2', 'TRIG'})
+            for key, filename in {
+                'UNIT': 'UNIT.bin', 'DIM': 'DIM.bin', 'ERA': 'ERA.bin',
+                'MTXM': 'MTXM.bin', 'MRGN': 'MRGN.bin', 'DD2': 'DD2.bin',
+                'THG2': 'THG2.bin', 'TRIG': 'TRIG.bin',
+            }.items():
+                payload = payloads[(key + (' ' if key in ('DIM', 'ERA', 'DD2') else '')).encode()]
+                record = (key.encode() + (b' ' if key in ('DIM', 'ERA', 'DD2') else b'')
+                          + struct.pack('<I', len(payload)) + payload)
+                written = records_dir / filename
+                self.assertEqual(written.read_bytes(), record)
+                detail = manifest['records'][key]
+                self.assertEqual(detail['record_bytes'], len(record))
+                self.assertEqual(detail['payload_bytes'], len(payload))
+                self.assertEqual(detail['record_sha256'], hashlib.sha256(record).hexdigest())
+                self.assertEqual(detail['payload_sha256'], hashlib.sha256(payload).hexdigest())
+
+    def test_missing_required_section_is_rejected_before_writing(self):
+        chk, _ = self.synthetic_chk(b'TRIG')
+        with tempfile.TemporaryDirectory(prefix='sc64-t4-missing-') as td:
+            records_dir = Path(td) / 't4' / 'records'
+            with self.assertRaisesRegex(ValueError, 'requires exactly one TRIG'):
+                retain_t4_source_records(chk, records_dir)
+            self.assertFalse(records_dir.exists())
 
 
 if __name__ == '__main__':

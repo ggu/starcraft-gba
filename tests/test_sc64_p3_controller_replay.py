@@ -76,7 +76,7 @@ class P3ControllerReplayValidation(unittest.TestCase):
             "force3_units": 0, "force3_buildings": 0,
             "minerals": 44, "gas": 1048, "race_completed": 1 << 22,
             "race_mode": 0, "race_selected_mission": 22,
-            "supply": 54, "supply_cap": 98, "gateways": 1,
+            "supply": 54, "supply_cap": 98, "gateways": 3,
             # SIDE wallet arrays are stale mirrors; globals are authoritative.
             "race_minerals": [300, 0, 0, 0, 0], "race_gas": [100, 0, 0, 0, 0],
             "race_campaign": {"mission": 22, "elapsed_frames": 151088, "phase": 3,
@@ -85,12 +85,34 @@ class P3ControllerReplayValidation(unittest.TestCase):
                         "transmission": 0, "reserved": 0, "action_ticks": 0},
         }
         replay.verify_final(valid_trace()["events"][-1], state)
+        # Trace gateways is a historical presence flag; the observer keeps the
+        # actual live count, which can exceed one without invalidating the win.
+        state["gateways"] = 1
+        replay.verify_final(valid_trace()["events"][-1], state)
+        state["gateways"] = 3
         stale_wallet_arrays = dict(state)
         stale_wallet_arrays["race_minerals"] = [999, 0, 0, 0, 0]
         stale_wallet_arrays["race_gas"] = [888, 0, 0, 0, 0]
         replay.verify_final(valid_trace()["events"][-1], stale_wallet_arrays)
         state["race_completed"] = 0
         with self.assertRaisesRegex(RuntimeError, "completion bit"):
+            replay.verify_final(valid_trace()["events"][-1], state)
+
+    def test_final_verifier_rejects_missing_gateway(self):
+        state = {
+            "screen": 3, "frame": 151088, "won": 1, "lost": 0,
+            "side_units": 14, "side_buildings": 11,
+            "force2_units": 7, "force2_buildings": 0,
+            "force3_units": 0, "force3_buildings": 0,
+            "minerals": 44, "gas": 1048, "race_completed": 1 << 22,
+            "race_mode": 0, "race_selected_mission": 22,
+            "supply": 54, "supply_cap": 98, "gateways": 0,
+            "race_campaign": {"mission": 22, "elapsed_frames": 151088, "phase": 3,
+                              "objective_flags": 1},
+            "race_p3": {"outcome": 1, "sequence": 5, "fired": 31,
+                        "transmission": 0, "reserved": 0, "action_ticks": 0},
+        }
+        with self.assertRaisesRegex(RuntimeError, "gateways presence"):
             replay.verify_final(valid_trace()["events"][-1], state)
 
     def test_final_verifier_rejects_wrong_mode_mission_and_supply(self):

@@ -3816,6 +3816,9 @@ draw_building_overlay(Building *q)
 }
 
 #ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_STATIC_KEY_CULL
+#include "sc64_static_key.h"
+#else
 /* Resources have static art until their presence, placement or center-cell
  * visibility changes. Compare exact snapshots, then use a generation key. */
 static unsigned
@@ -3865,6 +3868,7 @@ sc64_static_objects_key(void)
     if (changed) generation++;
     return generation;
 }
+#endif
 #define SC64_TERRAIN_STATIC_KEY sc64_static_objects_key()
 #include "sc64_terrain_cache.h"
 #endif
