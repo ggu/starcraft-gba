@@ -4,6 +4,18 @@
 #include "gba.h"
 #include "campaign_catalog.h"
 
+#ifdef SC64_T4_REPLAY_ENTRY
+#if !defined(SC64_T4_SCENARIO_RUNTIME)
+#error "SC64_T4_REPLAY_ENTRY requires SC64_T4_SCENARIO_RUNTIME"
+#endif
+#if !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 0
+#error "SC64_T4_REPLAY_ENTRY requires the unified Terran campaign profile"
+#endif
+#ifndef SC64_T4_GLOBAL_ID7
+#define SC64_T4_GLOBAL_ID7 7
+#endif
+#endif
+
 #ifndef SC64_MAP_OUTPOST
 #define SC64_MAP_OUTPOST 0
 #endif
@@ -173,23 +185,39 @@ static inline void sc64_frontend_reset(Sc64Frontend *f, int mission,
     f->page = SC_FRONT_HOME;
     f->row = 0;
 #ifdef SC64_UNIFIED
+#ifdef SC64_T4_REPLAY_ENTRY
+    f->mission = mission == SC64_T4_GLOBAL_ID7 ? mission : sc64_front_clamp(mission, 0, 5);
+#else
 #if defined(SC64_T3_ENABLED) || defined(SC64_Z3_ENABLED) || \
     (defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED))
     f->mission = mission;
 #else
     f->mission = sc64_front_clamp(mission, 0, 5);
 #endif
+#endif
 #else
     f->mission = sc64_front_clamp(mission, 0, 3);
 #endif
 #ifdef SC64_CAMPAIGN_RACE
     f->faction = sc64_front_campaign_faction_at(0);
-    if (!sc64_catalog_mission_allowed(f->mission, sc64_front_catalog_faction(f->faction)))
+#ifdef SC64_T4_REPLAY_ENTRY
+    if (f->mission != SC64_T4_GLOBAL_ID7 &&
+        !sc64_catalog_mission_allowed(f->mission, sc64_front_catalog_faction(f->faction)))
         f->mission = sc64_catalog_playable_at(sc64_front_catalog_faction(f->faction), 0);
 #else
-    f->faction = sc64_frontend_mission_faction(f->mission);
     if (!sc64_catalog_mission_allowed(f->mission, sc64_front_catalog_faction(f->faction)))
         f->mission = sc64_catalog_playable_at(sc64_front_catalog_faction(f->faction), 0);
+#endif
+#else
+    f->faction = sc64_frontend_mission_faction(f->mission);
+#ifdef SC64_T4_REPLAY_ENTRY
+    if (f->mission != SC64_T4_GLOBAL_ID7 &&
+        !sc64_catalog_mission_allowed(f->mission, sc64_front_catalog_faction(f->faction)))
+        f->mission = sc64_catalog_playable_at(sc64_front_catalog_faction(f->faction), 0);
+#else
+    if (!sc64_catalog_mission_allowed(f->mission, sc64_front_catalog_faction(f->faction)))
+        f->mission = sc64_catalog_playable_at(sc64_front_catalog_faction(f->faction), 0);
+#endif
 #endif
     f->race = sc64_front_clamp(race, SC_FRONT_RACE_TERRAN,
                                SC_FRONT_RACE_PROTOSS);
@@ -234,6 +262,20 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
     edge = held & ~f->prev_buttons;
     f->prev_buttons = held;
 
+#ifdef SC64_T4_REPLAY_ENTRY
+    /* Internal scenario replay route: both controls must be held together.
+     * This bypasses the playable list without changing catalog metadata. */
+    if (f->page == SC_FRONT_HOME && (held & (KEY_START | KEY_SELECT)) ==
+        (KEY_START | KEY_SELECT) && (edge & (KEY_START | KEY_SELECT))) {
+        f->faction = SC_FRONT_TERRAN;
+        f->mission = SC64_T4_GLOBAL_ID7;
+        f->mission_page = 0;
+        f->row = 0;
+        f->page = SC_FRONT_BRIEFING;
+        return SC_FRONT_NONE;
+    }
+#endif
+
     if (edge & KEY_L) return SC_FRONT_LOAD;
 
     if (edge & KEY_B) {
@@ -249,6 +291,13 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
 #endif
             break;
         case SC_FRONT_BRIEFING:
+#ifdef SC64_T4_REPLAY_ENTRY
+            if (f->mission == SC64_T4_GLOBAL_ID7) {
+                f->page = SC_FRONT_HOME;
+                f->row = 0;
+                break;
+            }
+#endif
             f->page = SC_FRONT_MISSION;
             {
                 int ordinal = sc64_front_mission_ordinal(f);

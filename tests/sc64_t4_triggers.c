@@ -585,6 +585,96 @@ test_switch_bank_is_global_across_player_instances(void)
     assert(player0.elapsed_ticks == 1 && player3.elapsed_ticks == 1);
 }
 
+static void
+test_prevalidated_step_matches_checked_execution(void)
+{
+    Fixture checked, fast;
+    Sc64T4TriggerState checked_state, fast_state;
+    fixture_init(&checked, 2);
+    fixture_init(&fast, 2);
+    condition_switch(&checked.conditions[0][0], 3, 2);
+    condition_switch(&fast.conditions[0][0], 3, 2);
+    wait_ms(&checked.actions[0][0], 250);
+    wait_ms(&fast.actions[0][0], 250);
+    effect(&checked.actions[0][1], 11);
+    effect(&fast.actions[0][1], 11);
+    checked.actions[1][0].opcode = fast.actions[1][0].opcode = 13;
+    checked.actions[1][0].argument = fast.actions[1][0].argument = 3;
+    checked.actions[1][0].modifier = fast.actions[1][0].modifier = 4;
+    assert(sc64_t4_trigger_init(&checked_state, &checked.program, 0, 1));
+    assert(sc64_t4_trigger_init(&fast_state, &fast.program, 0, 1));
+    assert(sc64_t4_trigger_state_valid(&fast_state, &fast.program));
+
+    for (unsigned tick = 0; tick < 240; ++tick) {
+        int paused = tick >= 40 && tick < 47;
+        if (tick == 20 || tick == 110) {
+            checked.switches.bits[0] ^= 1u << 3;
+            fast.switches.bits[0] ^= 1u << 3;
+        }
+        assert(sc64_t4_trigger_step(&checked_state, &checked.program,
+                                    &checked.switches, &ops, &checked, paused));
+        assert(sc64_t4_trigger_step_prevalidated(&fast_state, &fast.program,
+                                                  &fast.switches, &ops, &fast,
+                                                  paused));
+        assert(memcmp(&checked_state, &fast_state, sizeof(checked_state)) == 0);
+        assert(memcmp(&checked.switches, &fast.switches,
+                      sizeof(checked.switches)) == 0);
+        assert(checked.count_calls == fast.count_calls);
+        assert(checked.action_calls == fast.action_calls);
+        assert(checked.log_count == fast.log_count);
+        assert(memcmp(checked.log, fast.log,
+                      checked.log_count * sizeof(checked.log[0])) == 0);
+    }
+    assert(sc64_t4_trigger_state_valid(&fast_state, &fast.program));
+}
+
+static void
+test_prevalidated_step_rejects_corrupt_scalars_and_indexes(void)
+{
+    Fixture f;
+    Sc64T4TriggerState state;
+    fixture_init(&f, 1);
+    effect(&f.actions[0][0], 1);
+    assert(sc64_t4_trigger_init(&state, &f.program, 0, 1));
+
+    state.owner = 8;
+    assert(!sc64_t4_trigger_step_prevalidated(&state, &f.program,
+                                               &f.switches, &ops, &f, 0));
+    state.owner = 0;
+
+    state.cooldown = SC64_T4_TRIGGER_PASS_TICKS;
+    assert(!sc64_t4_trigger_step_prevalidated(&state, &f.program,
+                                               &f.switches, &ops, &f, 0));
+    state.cooldown = 0;
+
+    state.wait_ticks = 1;
+    state.active_wait = 255;
+    assert(!sc64_t4_trigger_step_prevalidated(&state, &f.program,
+                                               &f.switches, &ops, &f, 0));
+    state.wait_ticks = 0;
+    state.active_wait = 255;
+
+    state.flags[0] = SC64_T4_TR_RUNNING;
+    state.cursor[0] = 64;
+    state.cooldown = 0;
+    assert(!sc64_t4_trigger_step_prevalidated(&state, &f.program,
+                                               &f.switches, &ops, &f, 0));
+    assert(!sc64_t4_trigger_step(&state, &f.program, &f.switches, &ops, &f, 0));
+
+    assert(sc64_t4_trigger_init(&state, &f.program, 0, 1));
+    state.wait_ticks = 1;
+    state.active_wait = 0;
+    state.flags[0] = SC64_T4_TR_RUNNING | SC64_T4_TR_WAIT;
+    state.cursor[0] = 64;
+    assert(!sc64_t4_trigger_step_prevalidated(&state, &f.program,
+                                               &f.switches, &ops, &f, 0));
+
+    assert(sc64_t4_trigger_init(&state, &f.program, 0, 1));
+    state.fault = SC64_T4_TR_BAD_ACTION;
+    assert(!sc64_t4_trigger_step_prevalidated(&state, &f.program,
+                                               &f.switches, &ops, &f, 0));
+}
+
 int
 main(void)
 {
@@ -603,6 +693,8 @@ main(void)
     test_source_cursor_and_trigger_limit_validation();
     test_copied_state_resume_replays_effects_once();
     test_switch_bank_is_global_across_player_instances();
+    test_prevalidated_step_matches_checked_execution();
+    test_prevalidated_step_rejects_corrupt_scalars_and_indexes();
     puts("sc64 T4 trigger runner tests passed");
     return 0;
 }

@@ -905,6 +905,51 @@ scenario ARM link contains 1,509,984 bytes of text, 364 bytes of data and
 The existing stack/reserve guards remain unchanged. These are link results,
 not measured gameplay timing. Default and unified ROM checksums are unchanged.
 
+## Internal T4 controller replay and validation cost (2026-10-23)
+
+A separate `sc64-t4-replay` target adds a HOME START+SELECT route to the T4
+briefing. This build-only entry leaves the ordinary catalog unchanged. Its
+on/off frontend fixtures are asset-free. A live minimap ping now consumes the
+saved coordinates/timer, with framebuffer checks for scaling, pulse, clipping,
+expiry and mode suppression.
+
+The controller attempt runner deploys through this entry and uses normal
+selection and attack/move controls. The ARM replay helper validates its private
+input trace, observes all eight trigger contexts and source actor identities
+through DWARF, and compares the recorded checkpoint fields. Twelve asset-free
+Python checks cover trace rejection, state decoding and result verification.
+The group attempts reach corridor doors and a teleport, but a normal-controller
+T4 win remains unproven. A recorded loss or unfinished attempt must retain that
+result in the report.
+
+The trigger runtime now uses a prevalidated step after full initialization or
+save/load validation. The immutable ROM program and persisted state retain
+their full validators; scalar/wait bounds are checked every tick, with
+cursor/flag checks before ready-pass accesses. The standalone checked entry
+point retains its validation behavior. Differential host execution and corrupt
+scalar/index fixtures pass under ASan/UBSan.
+
+On the same private 5,000-tick solo controller prefix (trace SHA-256
+`307c16e5df97ebfd8d6f3c193d87edea2c349c7c68d8dde34b3db19f38b86f91`),
+the internal ARM build improves from 13.35 to 17.19 effective fps over 3,997
+counted live frames. All six observations match the compared gameplay fields,
+including actor pools, campaign and complete T4 trigger/world state; all three
+PNG captures match exactly. Baseline ROM hash begins `d00ebdec6c5b`; candidate
+hash begins `f1c25b2b9043`. The measured prefix includes the controlled actor's
+death and idle frames, so it establishes neither full mission performance nor
+near-30-fps operation. Hardware timing remains unverified.
+
+A separate group-controller ARM replay matches its host checkpoints through
+the recorded Raynor loss at frame 10,156 (12 observations including boot and
+the final result). The report correctly records `lost`, human trigger outcome
+2, campaign phase 4, no trigger faults and `verified_win: false`.
+
+The default build/tests (101 Python checks), unified build/tests and focused
+T4 scenario checks pass. The internal replay ARM build uses 1,510,900 text
+bytes, 388 data bytes and 251,840 BSS bytes. Its IWRAM end is `0x03004ff8` and
+BSS end is `0x0203d948`; the existing reserve guards are unchanged. Standard
+default/unified ROM checksums remain unchanged.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

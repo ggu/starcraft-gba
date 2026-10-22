@@ -161,6 +161,35 @@ The link probe checks the complete opt-in engine profile. No claim is made for
 full native trigger eligibility, original animation behavior, full campaign
 playability, or near-30-fps operation.
 
+For controller/replay development, build the separate internal ROM:
+
+```sh
+make sc64-t4-replay test-sc64-t4-frontend-entry test-sc64-t4-ping \
+  build/test-sc64-t4-controller
+```
+
+`build/StarCraft-T4-Internal-GBA.gba` has an explicit
+`SC64_T4_REPLAY_ENTRY` flag. On HOME, press START+SELECT together to open the
+T4 briefing, then A to deploy. The ordinary catalog still lists two Terran
+missions. The on/off frontend fixtures exercise this distinction without
+private inputs. The ping fixture checks the live minimap marker, pulse,
+clipping and expiry. The controller runner records input attempts under ignored
+`.local/` storage and exits successfully only on a win; a limit/failed attempt
+is useful diagnostic evidence but does not establish completion.
+
+Replay a recorded attempt on ARM, or measure a bounded prefix:
+
+```sh
+python3 tools/sc64_t4_controller_replay.py --trace .local/sc64/t4-controller-attempt.json
+python3 tools/sc64_t4_controller_replay.py --trace .local/sc64/t4-controller-attempt.json --ticks 5000
+```
+
+The helper validates launch inputs and checkpoint fields before starting
+mGBA. It writes controller scheduler entries, observes gameplay through ELF
+symbols/DWARF, and saves private checkpoint/progress reports with ROM and trace
+hashes. A replay that reaches a recorded limit or loss verifies that attempt;
+only a matching source-trigger win can report `verified_win`.
+
 ## Troubleshooting
 
 - If `doctor` reports a missing required tool, install that tool and confirm its command is on `PATH`. ARM GCC also needs the matching `arm-none-eabi-objcopy` and `arm-none-eabi-size` commands. On a custom toolchain prefix, set `PREFIX` to the prefix used by all three commands.

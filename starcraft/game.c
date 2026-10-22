@@ -3993,6 +3993,27 @@ draw_minimap(void)
 #else
 	gfx_frame(185 + camx / 8, 126 + camy / 8, 30, 14, C_HIGHLIGHT);
 #endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (race_t4_active() && screen == SCREEN_PLAY && !won && !lost &&
+        race_t4.ping_ticks) {
+        int px = sc64_minimap_pixel(race_t4.ping_x, MAP_COLS);
+        int py = sc64_minimap_pixel(race_t4.ping_y, MAP_ROWS);
+        unsigned radius = (race_t4.ping_ticks & 8u) ? 1u : 2u;
+        if (px >= 0 && px < map_size && py >= 0 && py < map_size) {
+            /* The cross pulses between two radii. Clip to the 24x24 map, not
+             * merely the containing panel, so edge pings cannot paint its
+             * frame or neighboring HUD. */
+            for (int offset = -(int)radius; offset <= (int)radius; ++offset) {
+                int ax = px + offset, ay = py + offset;
+                if (ax >= 0 && ax < map_size)
+                    gfx_pixel(map_x + ax, map_y + py, C_GOLD);
+                if (ay >= 0 && ay < map_size)
+                    gfx_pixel(map_x + px, map_y + ay, C_GOLD);
+            }
+            gfx_pixel(map_x + px, map_y + py, C_WHITE);
+        }
+    }
+#endif
 }
 
 #if defined(SC64_T4_SCENARIO_RUNTIME) && defined(SC64_HAS_SPRITES)

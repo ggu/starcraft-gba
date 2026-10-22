@@ -105,10 +105,13 @@ race_t4_tick(void)
     if (race_t4.message_ticks && !--race_t4.message_ticks) race_t4.message = 0;
     if (race_t4.ping_ticks && !--race_t4.ping_ticks)
         race_t4.ping_x = race_t4.ping_y = 0;
+    /* Fresh init and SRAM load fully validate every context. The scenario is
+     * immutable ROM data; the runtime step preserves those state invariants. */
     for (unsigned player = 0; player < 8; ++player)
         if ((race_t4.active_mask & (1u << player)) &&
-            !sc64_t4_trigger_step(&race_t4.player[player], &sc64_t4_scenario,
-                                  &race_t4.switches, &ops, &race_t4, 0)) return 0;
+            !sc64_t4_trigger_step_prevalidated(&race_t4.player[player],
+                                  &sc64_t4_scenario, &race_t4.switches,
+                                  &ops, &race_t4, 0)) return 0;
     race_campaign.objective_stage = !!(race_t4.switches.bits[0] & 16);
     race_campaign.message = race_t4.message;
     race_campaign.message_ticks = race_t4.message_ticks;

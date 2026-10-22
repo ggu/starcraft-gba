@@ -137,6 +137,10 @@ static void front_briefing(void)
 #else
         4 ? lines[race_front.mission] : generic_lines;
 #endif
+#ifdef SC64_T4_REPLAY_ENTRY
+    static const char *t4_lines[5]={"FIND THE DATA DISKS","RAYNOR MUST SURVIVE","","",""};
+    if(race_front.mission==SC64_T4_GLOBAL_ID7)mission_lines=t4_lines;
+#endif
 #if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
     static const char *z3_lines[5]={"PROTECT THE CHRYSALIS","ELIMINATE TERRAN","PRESENCE","",""};
     if(race_front.mission==14)mission_lines=z3_lines;

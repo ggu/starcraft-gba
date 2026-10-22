@@ -133,6 +133,64 @@ sc64_t4_trigger_state_valid(const Sc64T4TriggerState *s,
     return 1;
 }
 
+/* Validate only the bounded scalar and wait references needed before the
+ * runtime fast path. The immutable program and all persisted cursors/flags
+ * must have passed the full validators at init/load. */
+static int
+sc64_t4_trigger_runtime_preflight(const Sc64T4TriggerState *s,
+                                  const Sc64T4Scenario *program)
+{
+    if (!s || !program || !program->triggers || !program->trigger_count ||
+        program->trigger_count > SC64_T4_TRIGGER_LIMIT ||
+        s->owner >= 8 || s->force < 1 || s->force > 4 ||
+        s->cooldown >= SC64_T4_TRIGGER_PASS_TICKS ||
+        s->outcome > SC64_T4_TR_LOST || s->fault || s->fault_trigger ||
+        s->fault_slot || s->reserved) return 0;
+    if (!s->wait_ticks) return s->active_wait == 255;
+    if (s->active_wait >= program->trigger_count) return 0;
+    const Sc64T4Trigger *tr = &program->triggers[s->active_wait];
+    unsigned flags = s->flags[s->active_wait];
+    unsigned cursor = s->cursor[s->active_wait];
+    if (!tr->actions || cursor >= 64 ||
+        (flags & ~(SC64_T4_TR_RUNNING | SC64_T4_TR_PRESERVE |
+                   SC64_T4_TR_DONE | SC64_T4_TR_WAIT)) ||
+        !(flags & SC64_T4_TR_RUNNING) || !(flags & SC64_T4_TR_WAIT) ||
+        (flags & SC64_T4_TR_DONE)) return 0;
+    const Sc64T4Action *a = &tr->actions[cursor];
+    u16 maximum;
+    return a->opcode == 4 && !(a->flags & 2) &&
+           sc64_t4_trigger_wait_duration(a->time, &maximum) &&
+           s->wait_ticks <= maximum;
+}
+
+/* Check a state slot immediately before the ready-pass code dereferences it.
+ * This is deliberately not a replacement for full persisted-state checking. */
+static int
+sc64_t4_trigger_runtime_slot_valid(const Sc64T4TriggerState *s,
+                                   const Sc64T4Scenario *program,
+                                   unsigned i)
+{
+    if (!s || !program || i >= program->trigger_count ||
+        i >= SC64_T4_TRIGGER_LIMIT) return 0;
+    const Sc64T4Trigger *tr = &program->triggers[i];
+    if (!tr->conditions || !tr->actions) return 0;
+    unsigned flags = s->flags[i];
+    unsigned cursor = s->cursor[i];
+    if (flags & ~(SC64_T4_TR_RUNNING | SC64_T4_TR_PRESERVE |
+                  SC64_T4_TR_DONE | SC64_T4_TR_WAIT)) return 0;
+    if (!sc64_t4_trigger_owner_enabled(tr, s->owner, s->force))
+        return flags == 0 && cursor == 0;
+    if (flags & SC64_T4_TR_DONE)
+        return flags == SC64_T4_TR_DONE && cursor == 0;
+    if (!(flags & SC64_T4_TR_RUNNING)) return flags == 0 && cursor == 0;
+    if (cursor >= 64) return 0;
+    if (flags & SC64_T4_TR_WAIT) {
+        const Sc64T4Action *a = &tr->actions[cursor];
+        if (a->opcode != 4 || (a->flags & 2)) return 0;
+    }
+    return 1;
+}
+
 static int
 sc64_t4_trigger_init(Sc64T4TriggerState *s, const Sc64T4Scenario *program,
                      unsigned owner, unsigned force)
@@ -222,11 +280,11 @@ sc64_t4_trigger_finish(Sc64T4TriggerState *s, unsigned i)
  * At most 64*64 actions and 64*16 conditions are visited in one pass.
  */
 static int
-sc64_t4_trigger_step(Sc64T4TriggerState *s, const Sc64T4Scenario *program,
-                     Sc64T4TriggerSwitches *switches,
-                     const Sc64T4TriggerOps *ops, void *context, int paused)
+sc64_t4_trigger_step_core(Sc64T4TriggerState *s, const Sc64T4Scenario *program,
+                          Sc64T4TriggerSwitches *switches,
+                          const Sc64T4TriggerOps *ops, void *context, int paused,
+                          int validate_slots)
 {
-    if (!switches || !sc64_t4_trigger_state_valid(s, program)) return 0;
     if (paused || s->outcome) return 1;
     if (s->elapsed_ticks != 0xffffffffu) ++s->elapsed_ticks;
     int ready = s->cooldown == 0;
@@ -238,6 +296,8 @@ sc64_t4_trigger_step(Sc64T4TriggerState *s, const Sc64T4Scenario *program,
     s->cooldown = SC64_T4_TRIGGER_PASS_TICKS - 1;
     for (unsigned i = 0; i < program->trigger_count; ++i) {
         const Sc64T4Trigger *tr = &program->triggers[i];
+        if (validate_slots && !sc64_t4_trigger_runtime_slot_valid(s, program, i))
+            return 0;
         if (!sc64_t4_trigger_owner_enabled(tr, s->owner, s->force) ||
             (s->flags[i] & SC64_T4_TR_DONE)) continue;
         if (!(s->flags[i] & SC64_T4_TR_RUNNING)) {
@@ -301,6 +361,33 @@ sc64_t4_trigger_step(Sc64T4TriggerState *s, const Sc64T4Scenario *program,
         }
     }
     return 1;
+}
+
+/* Checked entry point for fixtures and any untrusted program/state. */
+static int
+sc64_t4_trigger_step(Sc64T4TriggerState *s, const Sc64T4Scenario *program,
+                     Sc64T4TriggerSwitches *switches,
+                     const Sc64T4TriggerOps *ops, void *context, int paused)
+{
+    if (!switches || !sc64_t4_trigger_state_valid(s, program)) return 0;
+    return sc64_t4_trigger_step_core(s, program, switches, ops, context,
+                                     paused, 0);
+}
+
+/* Runtime entry for a program and state that passed full validation at
+ * mission initialization or save/load. Program immutability and the
+ * inductive state invariant are caller preconditions; scalar/wait checks run
+ * every tick, and cursor/flag checks run immediately before ready-pass use. */
+static int
+sc64_t4_trigger_step_prevalidated(Sc64T4TriggerState *s,
+                                  const Sc64T4Scenario *program,
+                                  Sc64T4TriggerSwitches *switches,
+                                  const Sc64T4TriggerOps *ops, void *context,
+                                  int paused)
+{
+    if (!switches || !sc64_t4_trigger_runtime_preflight(s, program)) return 0;
+    return sc64_t4_trigger_step_core(s, program, switches, ops, context,
+                                     paused, 1);
 }
 #endif /* SC64_T4_RUNTIME */
 #endif
