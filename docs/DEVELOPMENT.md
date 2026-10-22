@@ -330,6 +330,7 @@ to the engine. With both T4 and T5 private scenario headers prepared, run:
 make test-sc64-t5-engine test-sc64-t5-world test-sc64-t5-combat test-sc64-t5-save
 make sc64-t5-engine-probe
 python3 tools/sc64_t5_engine_probe.py --ticks 3000
+python3 tools/sc64_t5_save_smoke.py
 ```
 
 The first command runs sanitizer fixtures against the real engine. They use

@@ -1238,12 +1238,29 @@ generation 11 and its existing ROM hash.
 
 `make test-sc64-t5-save` runs against the real engine under ASan/UBSan and
 `-Werror`. It checks round trips, active trigger-Wait continuation, both
-active mine phases, pause-menu commands and other mission saves. Corrupted
-candidates are rejected before live world mutation. Validation ties the
+active mine phases, win/loss saves, pause-menu commands and other mission
+saves. Corrupted candidates are rejected before live world mutation. Validation ties the
 campaign and AI clocks to the saved frame and reconstructs accepted scripts,
 switches and exact resource grants from completed action prefixes. The tests
 use direct actor placement for some trigger states; they do not demonstrate
 controller completion.
+
+The persistence candidate is a 4 MiB internal auto-entry ROM with SHA-256
+`d922d1136b3239f1c9b1c5aa9127873598982e6ea4e357f926e3e0e6490812ba`
+and ELF SHA-256
+`8876f74a8c04f2b697cb1b65acebe19ac4611a55fe51ff97e8062ca8b463582c`.
+Its text/data/BSS sizes are 2,233,840/388/243,208 bytes; IWRAM and BSS ends
+remain `0x03004fe8` and `0x0203b790`. The unchanged reserve guards pass.
+`tools/sc64_t5_save_smoke.py` uses START/B to save at frame 122, closes mGBA,
+copies its flushed SRAM to a fresh process, and uses START/L to load. The
+persisted gameplay state matches at frame 122 and continues exactly 60 ticks
+to frame 182, with no trigger faults and matching campaign/AI clocks. Only
+controller-input injection is written through the debugger; scenario state
+inspection is read-only. Auto-entry is internal, so this does not establish
+normal-menu availability or a controller-completed mission.
+A separate 3,000-tick neutral-input ARM run averages 28.19 effective fps
+(intervals 27.72, 28.46 and 28.41) with no trigger faults. This measures the
+opening area, not a campaign completion or full battle.
 
 ## Known limits
 
