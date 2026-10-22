@@ -374,6 +374,27 @@ Default build/tests, unified build/tests, all three race-profile suites and
 the T3/Z3 runtime suites pass. The plain Z3 link ends IWRAM at `0x03004ea8`;
 the large-map probe ends at `0x03004f68`, within the unchanged stack guard.
 
+In a controlled late-Z3 comparison, both plain `b6d5b616` and HUD/bar
+`529e53e1` ROMs load the same controller-created SRAM at frame 58,708. Their
+observed campaign/Z3 state, entity records and resources match at every
+checkpoint. Both unattended runs lose at frame 67,997; this is a performance
+comparison, not another mission-completion proof. Over the same 9,000 live
+frames, the weighted rates are 18.66 and 18.94 fps respectively, a 1.50%
+increase. The ending result interval is excluded. Route counters match;
+the reports do not compare every byte of world RAM.
+
+The follow-up route cache holds 18 fields in standard race profiles, 17 in
+T3 and 15 in large-map builds. A capacity-plus-one fixture checks LRU touches,
+eviction/rebuilds, reset invalidation and exact BFS tie directions, including
+blocked starts and unreachable destinations. The complete Z3 host win trace
+remains byte-identical. The larger fields are derived state and are discarded
+on load; the SRAM layout is unchanged. BSS is 249,472 bytes in Z3, 251,272 in
+T3 and 250,072 in the large-map probe. IWRAM ends at `0x03004ec0`,
+`0x03004ec0` and `0x03004f80` respectively; neither linker guard was relaxed.
+Race building sight also recognizes a Hive as a town hall, with edge-clipped
+footprints checked against full recomputation. The legacy non-race visibility
+oracle remains enabled alongside the race fixture.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

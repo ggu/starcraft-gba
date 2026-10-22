@@ -205,7 +205,7 @@ sc64_adjust_building_visibility(int x, int y, int type, int delta)
 {
     int col, row, c = x / 16, r = y / 16;
 #ifdef SC64_RACES
-    int radius=(type==B_COMMAND||type==B_HATCHERY||type==B_LAIR||type==B_NEXUS)?112:64;
+    int radius=(type==B_COMMAND||sc64_race_is_zerg_townhall(type)||type==B_NEXUS)?112:64;
 #else
     if (type != B_COMMAND)return;
     int radius=112;

@@ -15,7 +15,19 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 #define GBA_HOT
 enum { MAP_COLS=64, MAP_ROWS=64, MAP_CELLS=4096, MAX_UNITS=40,
-       MAX_BUILDINGS=16, SIDE=1, U_SCV=1, B_COMMAND=2 };
+       MAX_BUILDINGS=16, SIDE=1, U_SCV=1, B_COMMAND=2
+#ifdef SC64_RACES
+       , U_DRONE=3, B_HATCHERY=21, B_LAIR=22, B_HIVE=23, B_NEXUS=24
+#endif
+       };
+#ifdef SC64_RACES
+#define IS_WORKER(type) ((type)==U_SCV || (type)==U_DRONE)
+#define sc64_cell_col(cell) ((cell)%MAP_COLS)
+#define sc64_cell_row(cell) ((cell)/MAP_COLS)
+static int sc64_race_is_zerg_townhall(int type) {
+ return type==B_HATCHERY || type==B_LAIR || type==B_HIVE;
+}
+#endif
 typedef struct { int alive, owner, x, y, type; } UnitFixture;
 typedef struct { int alive, owner, x, y, type; } BuildingFixture;
 static UnitFixture u[MAX_UNITS];
@@ -44,13 +56,23 @@ static void ref_update(void) {
  int i;
  memset(ref_visible,0,sizeof(ref_visible));
  for(i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE){
-  int r=u[i].type==U_SCV?4:5;
-  ref_explore(u[i].x,u[i].y,r);
-  ref_vision(u[i].x,u[i].y,u[i].type==U_SCV?56:72,5);
+#ifdef SC64_RACES
+  int worker=IS_WORKER(u[i].type);
+#else
+  int worker=u[i].type==U_SCV;
+#endif
+  ref_explore(u[i].x,u[i].y,worker?4:5);
+  ref_vision(u[i].x,u[i].y,worker?56:72,5);
  }
  for(i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE){
   ref_explore(b[i].x,b[i].y,b[i].type==B_COMMAND?7:3);
+#ifdef SC64_RACES
+  if(b[i].type==B_COMMAND || sc64_race_is_zerg_townhall(b[i].type) ||
+     b[i].type==B_NEXUS)ref_vision(b[i].x,b[i].y,112,8);
+  else ref_vision(b[i].x,b[i].y,64,8);
+#else
   if(b[i].type==B_COMMAND)ref_vision(b[i].x,b[i].y,112,8);
+#endif
  }
 }
 static unsigned rng=1234567;
@@ -77,6 +99,24 @@ static void compare(int step){
 int main(void){
  int i,step;
  sc64_visibility_reset();
+#ifdef SC64_RACES
+ /* Imported Zerg town halls share building sight exactly, including circles
+    clipped at all four map corners and edges. */
+ for(i=0;i<3;i++){
+  int j;
+  int halls[3]={B_HATCHERY,B_LAIR,B_HIVE};
+  int edge_x[4]={0,1023,0,1023},edge_y[4]={0,0,1023,1023};
+  memset(u,0,sizeof(u));memset(b,0,sizeof(b));
+  memset(visible,0,sizeof(visible));memset(explored,0,sizeof(explored));
+  memset(ref_visible,0,sizeof(ref_visible));memset(ref_explored,0,sizeof(ref_explored));
+  sc64_visibility_reset();
+  b[0].alive=1;b[0].owner=SIDE;b[0].type=halls[i];
+  for(j=0;j<4;j++){
+   b[0].x=edge_x[j];b[0].y=edge_y[j];
+   compare(-100-i*4-j);
+  }
+ }
+#endif
  /* Moving sources by one pixel changes their exact sight-circle boundary,
     while their exploration tile remains the same. Two nearby sources overlap
     so source-count transitions and minimap occupancy must remain exact. */
@@ -98,7 +138,17 @@ int main(void){
   }
   for(i=0;i<MAX_BUILDINGS;i++)if((rnd()%7)==0){
    b[i].alive=(rnd()%4)!=0;b[i].owner=(int)(rnd()%3);
+#ifdef SC64_RACES
+   switch(rnd()%5){
+    case 0:b[i].type=B_COMMAND;break;
+    case 1:b[i].type=B_HATCHERY;break;
+    case 2:b[i].type=B_LAIR;break;
+    case 3:b[i].type=B_HIVE;break;
+    default:b[i].type=0;break;
+   }
+#else
    b[i].type=(rnd()%3)==0?B_COMMAND:0;
+#endif
    b[i].x=(int)(rnd()%1024);b[i].y=(int)(rnd()%1024);
   }
   compare(step);
@@ -119,15 +169,17 @@ class VisibilityTests(unittest.TestCase):
     def test_incremental_cache_matches_reference(self):
         with tempfile.TemporaryDirectory() as temp:
             source = Path(temp) / "visibility.c"
-            binary = Path(temp) / "visibility-test"
             source.write_text(C_SOURCE)
-            subprocess.run([
-                "clang", "-std=c11", "-O1", "-fsanitize=address,undefined",
-                "-I", str(ROOT), str(source), "-o", str(binary),
-            ], check=True)
-            result = subprocess.run([str(binary)], check=True, text=True,
-                                    capture_output=True)
-        self.assertIn("matches full recomputation", result.stdout)
+            for variant, flags in (("legacy", []), ("races", ["-DSC64_RACES"])):
+                with self.subTest(variant=variant):
+                    binary = Path(temp) / f"visibility-{variant}"
+                    subprocess.run([
+                        "clang", "-std=c11", "-O1", "-fsanitize=address,undefined",
+                        *flags, "-I", str(ROOT), str(source), "-o", str(binary),
+                    ], check=True)
+                    result = subprocess.run([str(binary)], check=True, text=True,
+                                            capture_output=True)
+                    self.assertIn("matches full recomputation", result.stdout)
 
 
 if __name__ == "__main__":

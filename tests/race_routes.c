@@ -32,6 +32,19 @@ static u8 packed_walkable[(MAP_CELLS + 7) / 8];
 #endif
 
 _Static_assert(sizeof(sc64_route_field) == (SC64_ROUTE_SLOTS*MAP_CELLS/2), "route fields hold two cells per byte");
+#if defined(SC64_LARGE_MAPS)
+_Static_assert(SC64_ROUTE_SLOTS==15, "large race cache capacity");
+#elif defined(SC64_T3_ENABLED)
+_Static_assert(SC64_ROUTE_SLOTS==17, "T3 cache capacity");
+#else
+_Static_assert(SC64_ROUTE_SLOTS==18, "standard race cache capacity");
+#endif
+static int cached_goal(int goal)
+{
+    for(int i=0;i<SC64_ROUTE_SLOTS;i++)
+        if(sc64_route_valid[i]&&sc64_route_goal[i]==goal)return 1;
+    return 0;
+}
 static void reset_routes(void)
 {
 #ifdef SC64_LARGE_MAPS
@@ -40,21 +53,54 @@ static void reset_routes(void)
     sc64_routes_reset();
 }
 static int distance[MAP_CELLS];
+static u8 reference_direction[MAP_CELLS];
 static unsigned rng = 0x4398a12bu;
 static unsigned random32(void) { rng = rng*1664525u+1013904223u; return rng; }
 
 static void reference_bfs(int goal)
 {
     int head=0,tail=0;
-    for(int i=0;i<MAP_CELLS;i++) distance[i]=-1;
+    for(int i=0;i<MAP_CELLS;i++) { distance[i]=-1; reference_direction[i]=15; }
     if(path_walkable[goal]) { distance[goal]=0; bfs_queue[tail++]=(u16)goal; }
     while(head<tail) {
         int c=bfs_queue[head++], x=c%MAP_COLS, y=c/MAP_COLS;
+        /* Preserve the route flood's stable left/right/up/down tie order. */
         int n[4]={x?c-1:-1,x+1<MAP_COLS?c+1:-1,y?c-MAP_COLS:-1,y+1<MAP_ROWS?c+MAP_COLS:-1};
+        int toward[4]={1,2,3,4};
         for(int i=0;i<4;i++) if(n[i]>=0&&path_walkable[n[i]]&&distance[n[i]]<0) {
-            distance[n[i]]=distance[c]+1; bfs_queue[tail++]=(u16)n[i];
+            distance[n[i]]=distance[c]+1; reference_direction[n[i]]=(u8)toward[i];
+            bfs_queue[tail++]=(u16)n[i];
         }
     }
+}
+
+static int check_cached_route(int sx,int sy,int gx,int gy)
+{
+    int start=sx+sy*MAP_COLS,goal=gx+gy*MAP_COLS,nx,ny,expected=-1;
+    reference_bfs(goal);
+    if(path_walkable[start]) {
+        if(distance[start]>=0) expected=start==goal?start:
+            start+(reference_direction[start]==1?1:
+                   reference_direction[start]==2?-1:
+                   reference_direction[start]==3?MAP_COLS:
+                   reference_direction[start]==4?-MAP_COLS:0);
+    } else {
+        static const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
+        int best=0x7fffffff;
+        for(int i=0;i<4;i++) {
+            int x=sx+dx[i],y=sy+dy[i],cell,d;
+            if(x<0||y<0||x>=MAP_COLS||y>=MAP_ROWS)continue;
+            cell=x+y*MAP_COLS;
+            if(distance[cell]<0)continue;
+            d=distance[cell];
+            if(d<best){best=d;expected=cell;}
+        }
+    }
+    int ok=sc64_route_next(sx*16+8,sy*16+8,gx*16+8,gy*16+8,&nx,&ny);
+    if(expected<0)return !ok;
+    if(!ok)return 0;
+    if(expected==start)return nx==gx*16+8&&ny==gy*16+8;
+    return nx/16+(ny/16)*MAP_COLS==expected;
 }
 
 static void verify_field(int goal)
@@ -99,6 +145,53 @@ int main(void)
     for(int g=0;g<SC64_ROUTE_SLOTS;g++) assert(sc64_route_next(8*16+8,8*16+8,(g+16)*16+8,16*16+8,&nx,&ny));
     for(int g=0;g<SC64_ROUTE_SLOTS;g++) assert(sc64_route_next(8*16+8,8*16+8,(g+16)*16+8,16*16+8,&nx,&ny));
     assert(sc64_route_builds==SC64_ROUTE_SLOTS&&sc64_route_hits==SC64_ROUTE_SLOTS);
+
+    /* Capacity+1 independent destinations exercise the real LRU boundary.
+       The scalar BFS oracle checks exact tie direction, not merely distance. */
+    memset(path_walkable,1,sizeof(path_walkable));
+    reset_routes(); sc64_route_clock=0; sc64_route_builds=0; sc64_route_hits=0;
+    const int start_x=MAP_COLS/2,start_y=MAP_ROWS/2;
+    int goals[SC64_ROUTE_SLOTS+2];
+    for(int i=0;i<SC64_ROUTE_SLOTS+2;i++) {
+        int gx=10+i%10,gy=10+i/10;
+        goals[i]=gx+gy*MAP_COLS;
+    }
+    for(int i=0;i<SC64_ROUTE_SLOTS+1;i++)
+        assert(check_cached_route(start_x,start_y,goals[i]%MAP_COLS,goals[i]/MAP_COLS));
+    assert(sc64_route_builds==SC64_ROUTE_SLOTS+1&&sc64_route_hits==0);
+    for(int i=1;i<=SC64_ROUTE_SLOTS;i++)assert(cached_goal(goals[i]));
+    assert(!cached_goal(goals[0]));
+    /* Touch the oldest still-resident key, then force one miss. That key must
+       remain a hit; the next-oldest key must have been evicted and rebuild. */
+    assert(check_cached_route(start_x,start_y,goals[1]%MAP_COLS,goals[1]/MAP_COLS));
+    assert(sc64_route_hits==1);
+    assert(check_cached_route(start_x,start_y,goals[SC64_ROUTE_SLOTS+1]%MAP_COLS,
+                              goals[SC64_ROUTE_SLOTS+1]/MAP_COLS));
+    assert(sc64_route_builds==SC64_ROUTE_SLOTS+2);
+    assert(cached_goal(goals[1])&&!cached_goal(goals[2]));
+    assert(cached_goal(goals[SC64_ROUTE_SLOTS+1]));
+    assert(check_cached_route(start_x,start_y,goals[1]%MAP_COLS,goals[1]/MAP_COLS));
+    assert(sc64_route_hits==2);
+    assert(check_cached_route(start_x,start_y,goals[2]%MAP_COLS,goals[2]/MAP_COLS));
+    assert(sc64_route_builds==SC64_ROUTE_SLOTS+3);
+    assert(cached_goal(goals[2]));
+
+    /* A reset drops all derived keys (without changing route semantics); an
+       occupied-but-blocked start exits along the oracle's shortest gradient. */
+    sc64_routes_reset();
+    for(int i=0;i<SC64_ROUTE_SLOTS;i++)assert(sc64_route_valid[i]==0);
+    assert(check_cached_route(start_x,start_y,goals[2]%MAP_COLS,goals[2]/MAP_COLS));
+    assert(sc64_route_builds==SC64_ROUTE_SLOTS+4);
+    path_walkable[start_x+start_y*MAP_COLS]=0;
+    reset_routes();
+    assert(check_cached_route(start_x,start_y,goals[3]%MAP_COLS,goals[3]/MAP_COLS));
+    assert(sc64_route_builds==SC64_ROUTE_SLOTS+5);
+
+    /* A full-height wall makes the goal unreachable from the query side. */
+    memset(path_walkable,1,sizeof(path_walkable));
+    for(int row=0;row<MAP_ROWS;row++)path_walkable[MAP_COLS/2+row*MAP_COLS]=0;
+    reset_routes();
+    assert(check_cached_route(2,MAP_ROWS/2,MAP_COLS-3,MAP_ROWS/2));
     printf("packed race routes match BFS; blocked-start and %d-slot cache pass\n", SC64_ROUTE_SLOTS);
     return 0;
 }

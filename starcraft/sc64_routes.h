@@ -15,9 +15,11 @@
 /* The race game needs fields for four economies and several armies. */
 #ifdef SC64_RACES
 #ifdef SC64_LARGE_MAPS
-#define SC64_ROUTE_SLOTS 14
+#define SC64_ROUTE_SLOTS 15
+#elif defined(SC64_T3_ENABLED)
+#define SC64_ROUTE_SLOTS 17
 #else
-#define SC64_ROUTE_SLOTS 16
+#define SC64_ROUTE_SLOTS 18
 #endif
 #define SC64_ROUTE_BYTES ((MAP_CELLS + 1) / 2)
 #elif defined(SC64_SKIRMISH)
@@ -27,7 +29,8 @@
 #endif
 #ifdef SC64_RACES
 /* Two cells per byte: 0 is the goal, 1..4 point toward a shortest-path
- * neighbour, and 15 means unreachable. 16 × 96 × 96 cells = 72 KiB in the production profile. */
+ * neighbour, and 15 means unreachable. Slot counts remain per-profile bounded
+ * by EWRAM/link-guard budgets (18 standard, 17 T3, 15 large maps). */
 static u8 sc64_route_field[SC64_ROUTE_SLOTS][SC64_ROUTE_BYTES];
 #else
 /* Legacy fields retain distances for the original blocked-start behavior. */
