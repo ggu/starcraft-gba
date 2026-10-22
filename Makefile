@@ -61,6 +61,12 @@ build/test-skirmish-ai: tests/skirmish_ai.c starcraft/skirmish_ai.h | build
 build/test-sc64-frontend: tests/sc64_frontend.c starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon tests/sc64_frontend.c -o $@
 
+build/test-sc64-bitgrid: tests/sc64_bitgrid.c starcraft/sc64_bitgrid.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon tests/sc64_bitgrid.c -o $@
+
+build/test-sc64-map-math: tests/sc64_map_math.c starcraft/sc64_map_math.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined tests/sc64_map_math.c -o $@
+
 build/test-sc64-frontend-terran: RACE_FRONTEND_ID=0
 build/test-sc64-frontend-zerg: RACE_FRONTEND_ID=1
 build/test-sc64-frontend-protoss: RACE_FRONTEND_ID=2
@@ -83,12 +89,14 @@ build/test-terrain-cache: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cach
 build/test-collision: tests/sc64_collision.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -DSC64_SKIRMISH -Icommon tests/sc64_collision.c common/gba.c -o $@
 
-test-starcraft: build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-skirmish-ai build/test-sc64-frontend $(RACE_FRONTEND_TESTS) build/test-race-routes build/test-race-routes-96 build/test-race-routes-rect build/test-terrain-cache build/test-collision
+test-starcraft: build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-skirmish-ai build/test-sc64-frontend build/test-sc64-bitgrid build/test-sc64-map-math $(RACE_FRONTEND_TESTS) build/test-race-routes build/test-race-routes-96 build/test-race-routes-rect build/test-terrain-cache build/test-collision
 	./build/test-starcraft
 	./build/test-starcraft-selection
 	./build/test-race-rules
 	./build/test-skirmish-ai
 	./build/test-sc64-frontend
+	./build/test-sc64-bitgrid
+	./build/test-sc64-map-math
 	./build/test-sc64-frontend-terran
 	./build/test-sc64-frontend-zerg
 	./build/test-sc64-frontend-protoss
