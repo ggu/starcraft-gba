@@ -33,8 +33,9 @@ int main(void)
             assert(sc64_race_unit_from_raw(u->source_type) >= 0);
         }
     }
-    assert(units == 59 && buildings == 32 && minerals == 28 && geysers == 3);
-    assert(sc64_race_unit_from_raw(150) == U_CHRYSALIS);
+    assert(units == 58 && buildings == 33 && minerals == 28 && geysers == 3);
+    assert(sc64_race_unit_from_raw(150) == -1);
+    assert(sc64_race_building_from_raw(150) == B_MATURE_CHRYSALIS);
     assert(sc64_race_unit_from_raw(11) == U_DROPSHIP);
     for (i = 0; i < (unsigned int)m->width * m->height; ++i) {
         assert(m->tile_lookup[i] < m->tile_count);

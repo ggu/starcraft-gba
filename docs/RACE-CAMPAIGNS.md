@@ -59,7 +59,9 @@ make zerg-z3 test-sc64-z3-runtime
 campaign. Protect the Mature Chrysalis and eliminate the Terran presence.
 The source victory gates are at most six remaining enemy units/buildings
 combined, or no enemy buildings. Losing the Chrysalis starts defeat.
-All 59 units, 32 buildings, 28 mineral fields and three geysers are retained.
+All 58 units, 33 buildings, 28 mineral fields and three geysers are retained.
+The Mature Chrysalis is a stationary structure with 250 HP and one armor;
+the Young Chrysalis in the first two missions remains a separate powerup.
 The 128-unit engine reserves sixteen slots from enemy training for the player.
 
 Enemy pressure uses paid Marines every two minutes and small attacks from

@@ -18,38 +18,6 @@ static int race_can_attack(int attacker,int target) {
     } else if((b[target-MAX_UNITS].flags&16)||b[target-MAX_UNITS].type==B_ZERG_BEACON)return 0;
     return attacker<0||sc64_race_unit_damage(attacker)>0;
 }
-
-/* Query callers evaluate this profile once per attacker, then test many
-   candidate targets. Keep this equivalent to race_can_attack above. */
-static inline void race_attack_profile(int attacker, int *ground, int *air) {
-    *ground = attacker < 0 || sc64_race_unit_damage(attacker) > 0;
-    if (attacker < 0) { *air = 1; return; }
-    switch (attacker) {
-    case -1: case U_MARINE: case U_HYDRALISK: case U_HUNTER_KILLER:
-    case U_DRAGOON: case U_FENIX_DRAGOON: case U_GOLIATH:
-    case U_WRAITH: case U_MUTALISK: case U_SCOUT:
-        *air = 1;
-        break;
-    default:
-        *air = 0;
-        break;
-    }
-}
-
-static inline int race_can_attack_profiled(int target, int ground, int air) {
-    if (target < 0 || target >= MAX_UNITS + MAX_BUILDINGS) return 0;
-    if (target < MAX_UNITS) {
-        if (u[target].flags & 16) return 0;
-        if (!race_mode && race_selected_mission == 1 &&
-            u[target].type == U_CHRYSALIS &&
-            race_campaign.carrier_unit < MAX_UNITS) return 0;
-        if (sc64_race_unit_flying(u[target].type)) return air;
-    } else if ((b[target - MAX_UNITS].flags & 16) ||
-               b[target - MAX_UNITS].type == B_ZERG_BEACON) {
-        return 0;
-    }
-    return ground;
-}
 static void GBA_HOT race_tick_defenses(void) {
     for(int i=0;i<MAX_BUILDINGS;i++)if(building_complete(i)) {
         Building *q=&b[i];int ground=0,air=0,range=0,damage=0,cooldown=0;

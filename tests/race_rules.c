@@ -60,6 +60,15 @@ int main(void)
     assert(sc64_race_raw_building(B_ENG_BAY) == 122);
     assert(sc64_race_building_from_raw(122) == B_ENG_BAY);
     assert(sc64_race_building_from_raw(118) == -1);
+    /* Raw 150 is the Mature Chrysalis building; raw 216 remains the Young Chrysalis unit. */
+    assert(sc64_race_unit_from_raw(150) == -1);
+    assert(sc64_race_building_from_raw(150) == B_MATURE_CHRYSALIS);
+    assert(sc64_race_raw_building(B_MATURE_CHRYSALIS) == 150);
+    assert(sc64_race_building_rule(B_MATURE_CHRYSALIS)->flags & SC_RACE_F_BUILDING);
+    assert(sc64_race_building_rule(B_MATURE_CHRYSALIS)->hp == 250);
+    assert(sc64_race_building_armor(B_MATURE_CHRYSALIS) == 1);
+    assert(sc64_race_unit_from_raw(216) == U_CHRYSALIS);
+    assert(sc64_race_unit_rule(U_CHRYSALIS)->hp == 800);
     assert(sc64_race_building_armor(B_SUNKEN_COLONY) == 2);
     assert(sc64_race_building_armor(B_PYLON) == 0);
     assert(sc64_race_unit_from_raw(30) == U_SIEGE_TANK);

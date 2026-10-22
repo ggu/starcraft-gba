@@ -9,7 +9,7 @@ void *memset(void *dst, int value, size_t n);
 #define MAX_UNITS 128
 #endif
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
-#define SC64_RACE_SAVE_GENERATION 4u
+#define SC64_RACE_SAVE_GENERATION 5u
 #elif defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #define SC64_RACE_SAVE_GENERATION 3u
 #else
@@ -25,7 +25,7 @@ void *memset(void *dst, int value, size_t n);
 #define SAVE_VERSION (0x53435030u + SC64_RACE_SAVE_GENERATION)
 #elif defined(SC64_UNIFIED)
 #if defined(SC64_Z3_ENABLED)
-#define SAVE_VERSION 0x53435533u
+#define SAVE_VERSION 0x53435534u
 #elif defined(SC64_T3_ENABLED)
 #define SAVE_VERSION 0x53435532u
 #else
@@ -1055,13 +1055,10 @@ move_toward(Unit * q, int tx, int ty)
 
 #ifdef SC64_RACES
 static int race_can_attack(int attacker,int target);
-static inline void race_attack_profile(int attacker, int *ground, int *air);
-static inline int race_can_attack_profiled(int target, int ground, int air);
 static int GBA_HOT __attribute__((noinline))
 sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
 {
     int best = -1, best_distance = max_distance * max_distance, d;
-    int ground, air;
     int cols = (WORLD_W + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
     int rows = (WORLD_H + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
     int col0 = (x - max_distance) / SC64_TARGET_CELL_SIZE;
@@ -1069,7 +1066,6 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
     int col1 = (x + max_distance) / SC64_TARGET_CELL_SIZE;
     int row1 = (y + max_distance) / SC64_TARGET_CELL_SIZE;
     int p, col, row;
-    race_attack_profile(attacker, &ground, &air);
     if (col0 < 0) col0 = 0;
     if (row0 < 0) row0 = 0;
     if (col1 >= cols) col1 = cols - 1;
@@ -1093,7 +1089,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
                     }
                     if (FAST_ABS(x - candidate_x) >= max_distance ||
                         FAST_ABS(y - candidate_y) >= max_distance ||
-                        !race_can_attack_profiled(entity, ground, air)) continue;
+                        !race_can_attack(attacker, entity)) continue;
                     d = dist2(x, y, candidate_x, candidate_y);
                     if (d < best_distance ||
                         (best >= 0 && d == best_distance && entity < best)) {
@@ -1109,15 +1105,13 @@ static int __attribute__((noinline))
 nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
 {
     int i, best = -1, best_distance = max_distance * max_distance, d;
-    int ground, air;
-    race_attack_profile(attacker, &ground, &air);
     if (target_lists_valid) {
         int p;
         for (p = 0; p < 5; ++p) {
             if (!owners_hostile(owner, p)) continue;
             for (i = target_unit_head[p]; i >= 0; i = target_unit_next[i]) {
                 if (!u[i].alive || FAST_ABS(x-u[i].x)>=max_distance || FAST_ABS(y-u[i].y)>=max_distance)continue;
-                if(!race_can_attack_profiled(i, ground, air))continue;
+                if(!race_can_attack(attacker,i))continue;
                 d = dist2(x, y, u[i].x, u[i].y);
                 if (d < best_distance || (best >= 0 && d == best_distance && i < best)) {
                     best_distance = d;
@@ -1130,7 +1124,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
             for (i = target_building_head[p]; i >= 0; i = target_building_next[i]) {
                 int candidate = MAX_UNITS + i;
                 if (!b[i].alive || FAST_ABS(x-b[i].x)>=max_distance || FAST_ABS(y-b[i].y)>=max_distance)continue;
-                if(!race_can_attack_profiled(MAX_UNITS+i, ground, air))continue;
+                if(!race_can_attack(attacker,MAX_UNITS+i))continue;
                 d = dist2(x, y, b[i].x, b[i].y);
                 if (d < best_distance || (best >= 0 && d == best_distance && candidate < best)) {
                     best_distance = d;
@@ -1144,7 +1138,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
 	if (!u[i].alive
 	    || FAST_ABS(x - u[i].x) >= max_distance ||
 	    FAST_ABS(y - u[i].y) >= max_distance || !owners_hostile(owner, u[i].owner)
-                    || !race_can_attack_profiled(i, ground, air)
+                    || !race_can_attack(attacker,i)
                     )
 	    continue;
 	d = dist2(x, y, u[i].x, u[i].y);
@@ -1157,7 +1151,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
 	if (!b[i].alive
 	    || FAST_ABS(x - b[i].x) >= max_distance ||
 	    FAST_ABS(y - b[i].y) >= max_distance || !owners_hostile(owner, b[i].owner)
-                    || !race_can_attack_profiled(MAX_UNITS+i, ground, air)
+                    || !race_can_attack(attacker,MAX_UNITS+i)
                     )
 	    continue;
 	d = dist2(x, y, b[i].x, b[i].y);

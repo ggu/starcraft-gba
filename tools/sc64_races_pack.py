@@ -39,7 +39,7 @@ MISSIONS = [
 ]
 BUILDING_RAW_IDS = {
     106, 109, 110, 111, 112, 113, 114, 122, 124, 125, 130, 131, 132,
-    135, 139, 141, 142, 143, 144, 146, 149, 151, 154, 155, 156, 157,
+    135, 139, 141, 142, 143, 144, 146, 149, 150, 151, 154, 155, 156, 157,
     160, 162, 164, 166, 167,
 }
 
@@ -300,7 +300,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                 for u in units if u['owner_raw'] == 3
             ]
             if map_index == 7:
-                expected = {'unit_placements': 59, 'building_placements': 32,
+                expected = {'unit_placements': 58, 'building_placements': 33,
                             'mineral_fields': 28, 'geysers': 3}
                 category_keys = {
                     'unit_placements': 'unit', 'building_placements': 'building',

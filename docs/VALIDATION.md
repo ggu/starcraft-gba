@@ -171,7 +171,7 @@ and result-action order. Raw Wait and transmission fields remain explicit;
 the standalone model does not infer their duration in simulation ticks.
 
 `make test-sc64-z3-import` validates the locally generated 64-by-96 map:
-59 units, 32 buildings, 28 mineral fields and three geysers, with only two
+58 units, 33 buildings, 28 mineral fields and three geysers, with only two
 start markers excluded. Every retained placement has a supported runtime
 mapping; the two Dropships now have a distinct flying, unarmed unit identity.
 The fixture also checks coordinates, terrain indices and unavailable map
@@ -179,10 +179,13 @@ slots. Cargo behavior and the source enemy AI script remain unimplemented.
 
 The separate `make zerg-z3` build enables the mission at global ID 14, with
 an authored bounded enemy-pressure adapter and persisted result-action state.
-Its initial 5,000-tick ARM run (`b4427d56` ROM hash prefix) remained on the play
-screen and averaged 29.22 fps. It observed up to 60 live units, including one
+The corrected 5,000-tick ARM run (`cbb7e7b8` ROM hash prefix) remained on the play
+screen and averaged 29.22 fps. It observed up to 59 live units, including one
 paid Marine produced by the adapter. This is opening/performance evidence;
 it is not a controller-played mission completion or physical GBA measurement.
+The corrected version represents raw type 150 as a stationary 250-HP, one-armor
+structure; raw type 216 retains its Young Chrysalis identity. This changes
+the retained roster classification from 59 units/32 buildings to 58/33.
 
 `make test-sc64-z3-runtime` passes under ASan/UBSan. Its controller path
 checks the complete opening roster and source resource grants, 1,000 live
@@ -195,7 +198,7 @@ action timers, phases and objectives, unavailable map IDs, cross-profile
 completion bits and stale Z3 state on other missions.
 
 The Z3 link uses 388 bytes of data and 240,240 bytes of BSS. Its IWRAM ends at
-`0x03004f88`, below the stack-reserving `0x03005000` guard. Its 12,284-byte
+`0x03004e90`, below the stack-reserving `0x03005000` guard. Its 12,284-byte
 SRAM payload fits one bounded record. Eight asset-free frontend variants
 exercise Z3 with and without T3 across unified and fixed-race profiles.
 
@@ -208,16 +211,15 @@ Once a result sequence starts, this adapter serializes its actions and stops
 reevaluating victory/loss predicates. Concurrent source-trigger behavior is
 unresolved; this serialization is also an explicit adapter policy.
 
-## Query and three-AI regression (2026-10-22)
+## Eligibility-cache experiment (2026-10-22)
 
-Attacker ground/air eligibility is computed once per target query. Its
-candidate predicate is checked against the original attack predicate for
-every supported attacker and randomized mixed rosters, including scenario
-flags, the carried Chrysalis, Beacon exclusions, exact range bounds and ties.
-The complete host T3 survival trace remains byte-identical to the earlier
-target-index baseline.
+An experiment computed attacker ground/air eligibility once per target query.
+Its differential checks and complete host T3 trace passed. The full ARM run
+(`982062b4`) won but averaged 27.84 fps, with final-assault intervals around
+19.2 fps. The change was removed because it consumed 256 additional IWRAM
+bytes without improving frame rate. The existing spatial target index remains.
 
-Three 10,000-tick, three-opponent ARM runs after this change measured:
+Three 10,000-tick, three-opponent ARM runs of that experiment measured:
 
 | Profile | ROM hash prefix | Map | Human | Mean fps | Peak observed units |
 | --- | --- | --- | --- | ---: | ---: |
@@ -226,9 +228,10 @@ Three 10,000-tick, three-opponent ARM runs after this change measured:
 | Protoss | `3962579a` | Outpost | Protoss | 29.41 | 45 |
 
 All remained on the play screen. These bounded-population runs do not prove
-full-pool or physical GBA performance. The new T3 link (`982062b4`) passes
-the memory guards and ends IWRAM at `0x03004f80`; its full ARM survival timing
-run is still pending. The previously completed run remains identified above.
+full-pool or physical GBA performance. Its T3 link ended IWRAM at
+`0x03004f80`; removing the experiment recovers space for further profiling
+and later campaign work. These historical hashes identify the measured
+binaries separately from subsequent changes.
 
 ## Known limits
 

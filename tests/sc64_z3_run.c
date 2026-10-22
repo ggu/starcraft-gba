@@ -83,10 +83,10 @@ static void test_controller_opening_and_pause_save_resume(void)
 
     launch_z3_through_campaign_menu();
     assert(mission_unsupported_count == 0);
-    assert(owner_units(SIDE) == 14 && owner_units(ENEMY) == 45);
-    assert(live_units() == 59);
-    assert(owner_buildings(SIDE) == 6 && owner_buildings(ENEMY) == 26);
-    assert(live_buildings() == 32);
+    assert(owner_units(SIDE) == 13 && owner_units(ENEMY) == 45);
+    assert(live_units() == 58);
+    assert(owner_buildings(SIDE) == 7 && owner_buildings(ENEMY) == 26);
+    assert(live_buildings() == 33);
     assert(live_minerals() == 28 && geyser_count == 3);
     assert(minerals == SC64_Z3_MISSION_ORE && gas == SC64_Z3_MISSION_GAS);
     assert(sc64_z3_state_valid(&race_z3));
@@ -102,7 +102,7 @@ static void test_controller_opening_and_pause_save_resume(void)
     for (int i = 1; i < 1000; ++i) controller_frame(0);
     assert(race_campaign.elapsed_frames == 1000);
     assert(race_z3.outcome == SC64_Z3_RUNNING);
-    assert(live_units() == 59 && live_buildings() == 32);
+    assert(live_units() == 58 && live_buildings() == 33);
     /* The trigger is one-shot. Runtime training/income can alter the stock
      * after the initial 8000/8000 grant. */
     assert(race_z3.fired & SC64_Z3_F_FORCE2_START);
@@ -225,18 +225,29 @@ static void test_both_distinct_source_victory_predicates_and_sequence(void)
 
 static void test_only_raw150_chrysalis_starts_ordered_loss_sequence(void)
 {
-    int chrysalis[MAX_UNITS], n = 0;
-    for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == SIDE && u[i].raw_type == 150) {
+    int chrysalis[MAX_BUILDINGS], n = 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].raw_type == 150) {
             chrysalis[n++] = i;
         }
-    assert(n > 0 && u[chrysalis[0]].type == U_CHRYSALIS);
+    assert(n > 0 && b[chrysalis[0]].type == B_MATURE_CHRYSALIS);
+    assert(b[chrysalis[0]].hp == 250 && b[chrysalis[0]].maxhp == 250);
+    assert(sc64_race_building_armor(b[chrysalis[0]].type) == 1);
+    assert(sc64_race_building_rules[b[chrysalis[0]].type].flags & SC_RACE_F_BUILDING);
     reset_adapter_fixture();
+
+    /* Source Z3 has no raw-216 placement. Add this explicitly labeled fixture
+     * to prove the Young Chrysalis powerup is not the raw-150 objective. */
+    int young_powerup = spawn_unit(SIDE, U_CHRYSALIS, 760, 1320);
+    assert(young_powerup >= 0);
+    u[young_powerup].raw_type = 216;
     race_z3_campaign_tick();
     assert(race_z3.sequence == SC64_Z3_SEQ_NONE && race_z3.outcome == SC64_Z3_RUNNING);
     for (int i = 0; i < n; ++i)
-        u[chrysalis[i]].raw_type = 0; /* enum stays Chrysalis, CHK ID changes */
+        b[chrysalis[i]].raw_type = 0;
     race_z3_campaign_tick();
+    /* Keeping the raw-216 Young Chrysalis powerup alive does not satisfy the
+     * raw-150 Mature Chrysalis trigger once its building identity is gone. */
     assert(race_z3.sequence == SC64_Z3_SEQ_LOSS_WAIT_1000 && !lost);
     drive_action(30, SC64_Z3_SEQ_LOSS_WAV);
     drive_action(13, SC64_Z3_SEQ_LOSS_MESSAGE);
@@ -250,7 +261,7 @@ static void test_only_raw150_chrysalis_starts_ordered_loss_sequence(void)
 static void test_paid_enemy_reinforcement_respects_player_reserve(void)
 {
     int starting = live_units(), queued = 0;
-    assert(starting == 59);
+    assert(starting == 58);
     race_minerals[ENEMY] = 8000;
     race_gas[ENEMY] = 8000;
     race_z3_paid_reinforcement();

@@ -51,65 +51,6 @@ static void compare_query(int x, int y, int owner, int range, int attacker)
     assert(indexed == expected);
 }
 
-static unsigned random_state = 0x64c0ffeeu;
-static unsigned next_random(void)
-{
-    random_state = random_state * 1664525u + 1013904223u;
-    return random_state;
-}
-
-static void test_profiled_attack_queries(void)
-{
-    /* Populate mixed target classes at deterministic pseudo-random locations,
-       then compare every attacker rule against the original per-target scan. */
-    for (int i = 0; i < MAX_UNITS; ++i) {
-        u[i].alive = (next_random() & 3u) != 0;
-        u[i].owner = next_random() % 5u;
-        u[i].type = next_random() % SC_RU_COUNT;
-        u[i].flags = (next_random() & 7u) == 0 ? 16 : 0;
-        u[i].x = next_random() % WORLD_W;
-        u[i].y = next_random() % WORLD_H;
-    }
-    for (int i = 0; i < MAX_BUILDINGS; ++i) {
-        b[i].alive = (next_random() & 3u) != 0;
-        b[i].owner = next_random() % 5u;
-        b[i].type = next_random() % SC_RB_COUNT;
-        b[i].flags = (next_random() & 7u) == 0 ? 16 : 0;
-        b[i].x = next_random() % WORLD_W;
-        b[i].y = next_random() % WORLD_H;
-    }
-    build_owner_lists();
-    sc64_target_index_begin();
-    assert(sc64_target_index_active);
-    for (int attacker = -1; attacker < SC_RU_COUNT; ++attacker) {
-        int ground, air;
-        race_attack_profile(attacker, &ground, &air);
-        for (int target = 0; target < MAX_UNITS + MAX_BUILDINGS; ++target)
-            assert(race_can_attack_profiled(target, ground, air) ==
-                   race_can_attack(attacker, target));
-        for (int query = 0; query < 12; ++query) {
-            int x = next_random() % WORLD_W;
-            int y = next_random() % WORLD_H;
-            int owner = next_random() % 5u;
-            int range = 1 + next_random() % 300u;
-            compare_query(x, y, owner, range, attacker);
-        }
-    }
-    /* Mission 2's carried Chrysalis exception is independent of the cached
-       attacker profile and must continue to match the original predicate. */
-    u[0].alive = 1; u[0].owner = ENEMY; u[0].type = U_CHRYSALIS;
-    u[0].flags = 0; u[0].x = 384; u[0].y = 384;
-    sc64_target_index_begin();
-    assert(sc64_target_index_active);
-    race_mode = 0; race_selected_mission = 1;
-    race_campaign.carrier_unit = 1;
-    for (int attacker = -1; attacker < SC_RU_COUNT; ++attacker)
-        compare_query(384, 384, SIDE, 64, attacker);
-    race_mode = 1;
-    sc64_target_index_begin();
-    assert(sc64_target_index_active);
-}
-
 int main(void)
 {
     int moving;
@@ -167,8 +108,6 @@ int main(void)
     }
     assert(nearest_enemy_typed(800, 820, SIDE, 64, U_MARINE) == 72);
     assert(nearest_enemy_typed(1000, 900, SIDE, 112, U_MARINE) == -1);
-
-    test_profiled_attack_queries();
 
     /* The entity moves across bucket boundaries during the indexed pass; its
      * old cell must stop returning it and its new cell must return it. */

@@ -22,7 +22,8 @@ enum {
     B_NEXUS, B_GATEWAY, B_CYBERNETICS_CORE, B_FORGE, B_ASSIMILATOR,
     B_PYLON, B_PHOTON_CANNON, B_EXTRACTOR, B_SUNKEN_COLONY, B_SPIRE,
     B_CEREBRATE, B_LAIR, B_STARGATE, B_STARPORT, B_MISSILE_TURRET,
-    B_SPORE_COLONY, B_ZERG_BEACON, B_FACTORY, B_ROBOTICS_FACILITY, SC_RB_COUNT
+    B_SPORE_COLONY, B_ZERG_BEACON, B_FACTORY, B_ROBOTICS_FACILITY,
+    B_MATURE_CHRYSALIS, SC_RB_COUNT
 };
 
 enum {
@@ -123,7 +124,9 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     [B_SPORE_COLONY] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 50, 0, 300, 400, SC_PR_HATCHERY },
     [B_ZERG_BEACON] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 250, 0, 0, 10000, 0 },
     [B_FACTORY] = { R_TER, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER, U_SCV, 0, 200, 100, 1200, 1250, SC_PR_BARRACKS },
-    [B_ROBOTICS_FACILITY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_REQUIRES_POWER, U_PROBE, 0, 200, 200, 1200, 500, SC_PR_CYBERNETICS_CORE | SC_PR_PYLON }
+    [B_ROBOTICS_FACILITY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_REQUIRES_POWER, U_PROBE, 0, 200, 200, 1200, 500, SC_PR_CYBERNETICS_CORE | SC_PR_PYLON },
+    /* BWAPI raw 150 Mature Chrysalis: static mission building, not a unit. */
+    [B_MATURE_CHRYSALIS] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 0, 0, 0, 250, 0 }
 };
 
 static inline const Sc64RaceUnitRule *sc64_race_unit_rule(int type)
@@ -155,7 +158,7 @@ static inline const char *sc64_race_building_name(int type)
         "HYDRALISK DEN","EVOLUTION CHAMBER","NEXUS","GATEWAY","CYBERNETICS CORE","FORGE",
         "ASSIMILATOR","PYLON","PHOTON CANNON","EXTRACTOR","SUNKEN COLONY","SPIRE",
         "CEREBRATE","LAIR","STARGATE","STARPORT","MISSILE TURRET","SPORE COLONY",
-        "ZERG BEACON","FACTORY","ROBOTICS FACILITY"
+        "ZERG BEACON","FACTORY","ROBOTICS FACILITY","MATURE CHRYSALIS"
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
 }
@@ -282,7 +285,7 @@ static inline int sc64_race_building_armor(int type)
     case B_CYBERNETICS_CORE: case B_FORGE: case B_ASSIMILATOR:
     case B_EXTRACTOR: case B_SPIRE: case B_CEREBRATE: case B_LAIR:
     case B_STARGATE: case B_STARPORT: case B_FACTORY:
-    case B_ROBOTICS_FACILITY: return 1;
+    case B_ROBOTICS_FACILITY: case B_MATURE_CHRYSALIS: return 1;
     default: return 0;
     }
 }
@@ -315,6 +318,7 @@ static inline int sc64_race_raw_building(int type)
     case B_SPIRE: return 141; case B_SPAWNING_POOL: return 142; case B_CREEP_COLONY: return 143;
     case B_SPORE_COLONY: return 144; case B_SUNKEN_COLONY: return 146; case B_EXTRACTOR: return 149;
     case B_CEREBRATE: return 151; case B_NEXUS: return 154; case B_ROBOTICS_FACILITY: return 155;
+    case B_MATURE_CHRYSALIS: return 150;
     case B_PYLON: return 156; case B_ASSIMILATOR: return 157; case B_GATEWAY: return 160;
     case B_PHOTON_CANNON: return 162; case B_CYBERNETICS_CORE: return 164;
     case B_FORGE: return 166; case B_STARGATE: return 167; case B_FACTORY: return 113;
@@ -339,7 +343,7 @@ static inline int sc64_race_unit_from_raw(int raw)
     case 64: return U_PROBE; case 65: return U_ZEALOT; case 66: return U_DRAGOON;
     case 70: return U_SCOUT; case 77: return U_FENIX;
     case 78: return U_FENIX_DRAGOON; case 83: return U_REAVER;
-    case 79: return U_TASSADAR; case 150: return U_CHRYSALIS;
+    case 79: return U_TASSADAR;
     case 2: return U_VULTURE;
 #if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
     case 11: return U_DROPSHIP;
@@ -373,6 +377,7 @@ static inline int sc64_race_building_from_raw(int raw)
     case 155: return B_ROBOTICS_FACILITY;
     case 144: return B_SPORE_COLONY; case 194: return B_ZERG_BEACON;
     case 166: return B_FORGE; case 167: return B_STARGATE;
+    case 150: return B_MATURE_CHRYSALIS;
     default: return -1;
     }
 }

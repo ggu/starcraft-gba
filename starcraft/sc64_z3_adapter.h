@@ -78,18 +78,20 @@ race_z3_count_trigger_inputs(Sc64Z3Input *in)
     in->human_chrysalis = 0;
     /* Source Force2/Foes Any Unit selector 229 includes buildings. This map's
      * Force 2 is imported as ENEMY, opposed to human SIDE. */
-    for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == ENEMY) {
-        ++in->foes_any_units;
-        ++in->foes_buildings;
-        ++in->force2_any_units;
+    for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
+        if (b[i].owner == ENEMY) {
+            ++in->foes_any_units;
+            ++in->foes_buildings;
+            ++in->force2_any_units;
+        } else if (b[i].owner == SIDE &&
+                   b[i].raw_type == SC64_Z3_UNIT_MATURE_CHRYSALIS) {
+            ++in->human_chrysalis;
+        }
     }
     for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive) {
         if (u[i].owner == ENEMY) {
             ++in->foes_any_units;
             ++in->force2_any_units;
-        } else if (u[i].owner == SIDE &&
-                   u[i].raw_type == SC64_Z3_UNIT_MATURE_CHRYSALIS) {
-            ++in->human_chrysalis;
         }
     }
     in->paused = 0;
