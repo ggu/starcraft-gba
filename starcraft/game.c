@@ -216,6 +216,15 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 
 #ifdef SC64_RACES
 #include "race_rules.h"
+#ifdef SC64_T4_RUNTIME
+#include "sc64_t4_world.h"
+#ifndef SC64_T4_GLOBAL_ID7
+#define SC64_T4_GLOBAL_ID7 7
+#endif
+#ifndef SC64_T4_GLOBAL_ID
+#define SC64_T4_GLOBAL_ID SC64_T4_GLOBAL_ID7
+#endif
+#endif
 #include "race_missions.h"
 #ifdef SC64_P3_RUNTIME
 #include "sc64_p3_model.h"
@@ -459,6 +468,10 @@ static int GBA_HOT
 owners_hostile(int a, int other)
 {
 #ifdef SC64_RACES
+#ifdef SC64_T4_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID7)
+        return sc64_t4_owners_hostile(a, other);
+#endif
 #ifdef SC64_P3_RUNTIME
     if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID)
         return (a == SIDE && (other == ENEMY || other == 4)) ||
@@ -474,6 +487,36 @@ owners_hostile(int a, int other)
     return other == (a == SIDE ? ENEMY : SIDE);
 #endif
 }
+
+#ifdef SC64_T4_RUNTIME
+static int
+sc64_t4_unit_has(int type, unsigned flag)
+{
+    unsigned actor = sc64_race_t4_actor_flags(type);
+    return actor != 0 && (actor & flag) != 0;
+}
+
+static int
+sc64_t4_unit_selectable(int type)
+{
+    return !sc64_race_t4_actor_flags(type) ||
+        sc64_t4_unit_has(type, SC64_T4_ACTOR_SELECTABLE);
+}
+
+static int
+sc64_t4_unit_collidable(int type)
+{
+    return !sc64_race_t4_actor_flags(type) ||
+        sc64_t4_unit_has(type, SC64_T4_ACTOR_COLLIDABLE);
+}
+
+static int
+sc64_t4_building_collidable(int type)
+{
+    return !sc64_race_t4_building_flags(type) ||
+        (sc64_race_t4_building_flags(type) & SC64_T4_ACTOR_COLLIDABLE);
+}
+#endif
 static int
 owner_color(int owner)
 {
@@ -643,7 +686,11 @@ spawn_unit(int owner, int type, int x, int y)
     /* A newly produced unit can reuse a dead unit's array slot. */
     if (unit_tap == i) reset_unit_tap();
 #if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+#ifdef SC64_T4_RUNTIME
+    invincible_units[i] = (u8)sc64_race_t4_unit_intrinsically_invincible(type);
+#else
     invincible_units[i] = 0;
+#endif
 #endif
     u[i].x = x;
     u[i].y = y;
@@ -690,7 +737,11 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 	return -1;
     b[i].x = x;
 #if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+#ifdef SC64_T4_RUNTIME
+    invincible_buildings[i] = (u8)sc64_race_t4_building_intrinsically_invincible(type);
+#else
     invincible_buildings[i] = 0;
+#endif
 #endif
     b[i].y = y;
     b[i].owner = owner;
@@ -707,7 +758,11 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 	type == B_BARRACKS ? 1000 : type == B_ACADEMY ? 600 : type == B_ENG_BAY ? 850 :
 	type == B_REFINERY ? 750 : 500;
 #ifdef SC64_RACES
+#ifdef SC64_T4_RUNTIME
+    b[i].maxhp=sc64_race_building_max_hp(type);
+#else
     b[i].maxhp=sc64_race_building_rules[type].hp;
+#endif
     b[i].shield=sc64_race_building_rules[type].race==R_PROTOSS?b[i].maxhp:0;
     b[i].raw_type=b[i].raw_owner=-1;b[i].flags=b[i].shield_remainder=0;
     b[i].larva=3;b[i].larva_timer=0;
@@ -822,6 +877,9 @@ build_path_grid(void)
     for (i = 0; i < MAX_BUILDINGS; i++) if (b[i].alive) {
 #ifdef SC64_RACES
         if(b[i].type==B_ZERG_BEACON)continue;
+#ifdef SC64_T4_RUNTIME
+        if (!sc64_t4_building_collidable(b[i].type)) continue;
+#endif
 #endif
         int c = b[i].x / 16, r = b[i].y / 16;
         for (row = limit(r - 2, 0, MAP_ROWS - 1); row <= limit(r + 2, 0, MAP_ROWS - 1); row++)
@@ -849,7 +907,11 @@ can_place(int type, int x, int y)
 	if (geyser_at(x, y) < 0)
 	    return 0;
 	for (i = 0; i < MAX_BUILDINGS; i++)
-	    if (b[i].alive && dist2(x,y,b[i].x,b[i].y) <
+	    if (b[i].alive
+#ifdef SC64_T4_RUNTIME
+                && sc64_t4_building_collidable(b[i].type)
+#endif
+                && dist2(x,y,b[i].x,b[i].y) <
 #ifdef SC64_RACES
             36*36
 #else
@@ -871,12 +933,19 @@ can_place(int type, int x, int y)
     if (terrain_blocked(x / 16, y / 16))
 	return 0;
     for (i = 0; i < MAX_BUILDINGS; i++)
-	if (b[i].alive && dist2(x, y, b[i].x, b[i].y) < (radius + 14) * (radius + 14))
+	if (b[i].alive
+#ifdef SC64_T4_RUNTIME
+            && sc64_t4_building_collidable(b[i].type)
+#endif
+            && dist2(x, y, b[i].x, b[i].y) < (radius + 14) * (radius + 14))
 	    return 0;
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive
 #ifdef SC64_RACES
         && !sc64_race_unit_flying(u[i].type)
+#endif
+#ifdef SC64_T4_RUNTIME
+        && sc64_t4_unit_collidable(u[i].type)
 #endif
         && dist2(x, y, u[i].x, u[i].y) < (radius + 5) * (radius + 5))
 	    return 0;
@@ -1009,6 +1078,13 @@ unit_step_clear_race_fallback(const Unit *q, int nx, int ny)
             if (u[i].type == U_CHRYSALIS ||
                 sc64_race_unit_flying(u[i].type) != sc64_race_unit_flying(q->type))
                 continue;
+#ifdef SC64_T4_RUNTIME
+            if ((sc64_race_t4_actor_flags(u[i].type) &&
+                 !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_COLLIDABLE)) ||
+                (sc64_race_t4_actor_flags(q->type) &&
+                 !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_COLLIDABLE)))
+                continue;
+#endif
             /* Exact broad-phase reject avoids a distance calculation for
              * distant actors when the per-frame bucket index is unavailable. */
             if (u[i].x - nx >= 6 || nx - u[i].x >= 6 ||
@@ -1030,6 +1106,10 @@ unit_step_clear(const Unit *q, int nx, int ny)
     /* OpenBW bwgame.h unit_can_collide_with(): gathering workers pass
        through ordinary units; static terrain/building checks still apply. */
     if(IS_WORKER(q->type)&&(q->order==ORDER_MINE||q->order==ORDER_GAS))return 1;
+#ifdef SC64_T4_RUNTIME
+    if (sc64_race_t4_actor_flags(q->type) &&
+        !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_MOVABLE)) return 1;
+#endif
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
     if (sc64_unit_bucket_active) return sc64_unit_bucket_step_clear(q, nx, ny);
@@ -1062,6 +1142,10 @@ move_toward(Unit * q, int tx, int ty)
 #endif
 #ifdef SC64_RACES
     if(q->type==U_VULTURE)speed=2;
+#ifdef SC64_T4_RUNTIME
+    if (sc64_race_t4_actor_flags(q->type) &&
+        !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_MOVABLE)) return;
+#endif
     if(sc64_race_unit_flying(q->type)) {
         q->x=limit(q->x+(tx>q->x?speed:tx<q->x?-speed:0),0,WORLD_W-1);
         q->y=limit(q->y+(ty>q->y?speed:ty<q->y?-speed:0),0,WORLD_H-1);
@@ -1166,6 +1250,22 @@ static int sc64_p3_can_attack_from(int attacker, int target, int owner)
 }
 #define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
     sc64_p3_can_attack_from((attacker), (target), (owner))
+#elif defined(SC64_T4_RUNTIME)
+static int sc64_t4_can_attack_from(int attacker, int target, int owner)
+{
+    (void)owner;
+    if (target >= 0 && target < MAX_UNITS) {
+        int type = u[target].type;
+        if ((sc64_race_t4_actor_flags(type)&SC64_T4_ACTOR_HIDDEN) ||
+            sc64_race_t4_unit_intrinsically_invincible(type)) return 0;
+    } else if (target >= MAX_UNITS && target < MAX_UNITS + MAX_BUILDINGS &&
+               sc64_race_t4_building_intrinsically_invincible(b[target-MAX_UNITS].type)) {
+        return 0;
+    }
+    return race_can_attack(attacker, target);
+}
+#define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
+    sc64_t4_can_attack_from((attacker), (target), (owner))
 #else
 #define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
     race_can_attack((attacker), (target))
@@ -1357,6 +1457,10 @@ target_y(int target)
 static int
 target_alive(int target)
 {
+#ifdef SC64_T4_RUNTIME
+    if (target >= 0 && target < MAX_UNITS && u[target].alive &&
+        (sc64_race_t4_actor_flags(u[target].type)&SC64_T4_ACTOR_HIDDEN)) return 0;
+#endif
     return target >= 0 && (target < MAX_UNITS ? u[target].alive : b[target - MAX_UNITS].alive);
 }
 
@@ -1381,6 +1485,12 @@ hit_target(int target, int damage, int source_type, int source_owner)
 {
     int i, tx, ty;
 #ifdef SC64_RACES
+#ifdef SC64_T4_RUNTIME
+    if (target >= 0 && target < MAX_UNITS &&
+        sc64_race_t4_unit_intrinsically_invincible(u[target].type)) return;
+    if (target >= MAX_UNITS && target < MAX_UNITS + MAX_BUILDINGS &&
+        sc64_race_t4_building_intrinsically_invincible(b[target-MAX_UNITS].type)) return;
+#endif
     int flags=target<MAX_UNITS?u[target].flags:b[target-MAX_UNITS].flags;
     if(flags&16)return;
     int *shield=target<MAX_UNITS?&u[target].shield:&b[target-MAX_UNITS].shield;
@@ -1393,9 +1503,22 @@ hit_target(int target, int damage, int source_type, int source_owner)
     if (target < MAX_UNITS) {
 	tx = u[target].x;
 	ty = u[target].y;
+#ifdef SC64_T4_RUNTIME
+        if (source_type == U_GHOST) {
+            int armor = u[target].armor +
+                (u[target].owner == SIDE ? armor_level : 0);
+            int raw = u[target].raw_type >= 0 ? u[target].raw_type :
+                      sc64_race_raw_unit(u[target].type);
+            damage = sc64_race_t4_ghost_hp_damage(raw, damage, armor);
+        } else
+#endif
 	damage -= u[target].armor + (u[target].owner == SIDE ? armor_level : 0);
+#ifndef SC64_T4_RUNTIME
 	if (damage < 1)
 	    damage = 1;
+#else
+        if (source_type != U_GHOST && damage < 1) damage = 1;
+#endif
 	u[target].hp -= damage;
 	if (u[target].hp <= 0) {
 	    if (u[target].owner == SIDE)
@@ -1418,7 +1541,15 @@ hit_target(int target, int damage, int source_type, int source_owner)
 	tx = q->x;
 	ty = q->y;
 	#ifdef SC64_RACES
-    damage-=sc64_race_building_armor(q->type);q->hp-=damage>0?damage:1;
+#ifdef SC64_T4_RUNTIME
+    if (source_type == U_GHOST) {
+        int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_building(q->type);
+        damage = sc64_race_t4_ghost_hp_damage(raw, damage,
+            sc64_race_building_armor(q->type));
+    } else
+#endif
+    damage-=sc64_race_building_armor(q->type);
+    q->hp-=damage>0?damage:1;
 #else
     q->hp -= damage > 1 ? damage - 1 : 1;
 #endif
@@ -2051,6 +2182,9 @@ selection_target(void)
 #ifdef SC64_RACES
             ||u[i].type==U_CHRYSALIS
 #endif
+#ifdef SC64_T4_RUNTIME
+            ||!sc64_t4_unit_selectable(u[i].type)
+#endif
             )
 	    continue;
 	d = dist2(cx, cy, u[i].x, u[i].y);
@@ -2060,7 +2194,12 @@ selection_target(void)
 	}
     }
     for (i = 0; i < MAX_BUILDINGS; i++) {
-	if (!b[i].alive || b[i].owner != SIDE)
+	if (!b[i].alive || b[i].owner != SIDE
+#ifdef SC64_T4_RUNTIME
+            || (sc64_race_t4_building_flags(b[i].type) &&
+                !(sc64_race_t4_building_flags(b[i].type)&SC64_T4_ACTOR_SELECTABLE))
+#endif
+            )
 	    continue;
 	d = dist2(cx, cy, b[i].x, b[i].y);
 	if (d < building_distance) {
@@ -2094,6 +2233,9 @@ select_visible_type(int type)
     clear_selection();
     for (i = 0; i < MAX_UNITS; i++)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == type &&
+#ifdef SC64_T4_RUNTIME
+            sc64_t4_unit_selectable(u[i].type) &&
+#endif
             u[i].x >= left && u[i].x < left + 240 &&
             u[i].y >= top && u[i].y < top + 108) u[i].selected = 1;
 }
@@ -2114,6 +2256,10 @@ issue_order(int order, int tx, int ty)
     selected_building = -1;
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive && u[i].owner == SIDE && u[i].selected) {
+#ifdef SC64_T4_RUNTIME
+            if (sc64_race_t4_actor_flags(u[i].type) &&
+                !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_MOVABLE)) continue;
+#endif
 	    u[i].order = order;
 	    if (selected_count() > 1) {
 		u[i].tx = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
@@ -2689,6 +2835,14 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
+	#ifdef SC64_T4_RUNTIME
+        if (sc64_race_t4_actor_flags(q->type) &&
+            !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_MOVABLE)) {
+            q->order = ORDER_IDLE;
+            q->target = -1;
+            continue;
+        }
+	#endif
 	if (q->cd > 0)
 	    q->cd--;
 
@@ -3080,6 +3234,9 @@ cycle_selection(void)
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
+#ifdef SC64_T4_RUNTIME
+            &&sc64_t4_unit_selectable(u[i].type)
+#endif
             ) {
 	    u[i].selected = 1;
 	    cx = u[i].x;
@@ -3091,6 +3248,9 @@ cycle_selection(void)
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
+#ifdef SC64_T4_RUNTIME
+            &&sc64_t4_unit_selectable(u[i].type)
+#endif
             ) {
 	    u[i].selected = 1;
 	    cx = u[i].x;
@@ -3101,6 +3261,9 @@ cycle_selection(void)
 	if (u[i].alive && u[i].owner == SIDE
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
+#endif
+#ifdef SC64_T4_RUNTIME
+            &&sc64_t4_unit_selectable(u[i].type)
 #endif
             ) {
 	    u[i].selected = 1;
@@ -3124,7 +3287,16 @@ select_combat_group(void)
 #ifdef SC64_IMPORTED_MISSION
 	     || u[i].type == U_RAYNOR
 #endif
-	     ))
+#ifdef SC64_T4_RUNTIME
+             || sc64_t4_unit_has(u[i].type, SC64_T4_ACTOR_WEAPON)
+#endif
+	     )
+#ifdef SC64_T4_RUNTIME
+            && sc64_t4_unit_selectable(u[i].type)
+            && (!sc64_race_t4_actor_flags(u[i].type) ||
+                sc64_t4_unit_has(u[i].type, SC64_T4_ACTOR_WEAPON))
+#endif
+	    )
 	    u[i].selected = 1;
 }
 
@@ -3163,6 +3335,9 @@ select_box_units(void)
         if (u[i].alive && u[i].owner == SIDE
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
+#endif
+#ifdef SC64_T4_RUNTIME
+            &&sc64_t4_unit_selectable(u[i].type)
 #endif
             && u[i].x >= left && u[i].x <= right &&
             u[i].y >= top && u[i].y <= bottom) u[i].selected = 1;
@@ -3559,6 +3734,11 @@ draw_unit(Unit * q)
 {
     int x = q->x - camx, y = q->y - camy + 12;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
+#ifdef SC64_T4_RUNTIME
+    unsigned actor_flags = sc64_race_t4_actor_flags(q->type);
+    if (actor_flags & SC64_T4_ACTOR_HIDDEN) return;
+    if (actor_flags && !(actor_flags & SC64_T4_ACTOR_DRAWABLE)) return;
+#endif
     if (x < -8 || x > 247 || y < 10 || y > 125)
 	return;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
@@ -3612,7 +3792,10 @@ draw_unit(Unit * q)
 	gfx_pixel(x + 4, y - 3, C_PURPLE);
     }
     }
-    gfx_bar(x - 6, sprite_y - 4, 12, 2, q->hp, q->maxhp,
+#ifdef SC64_T4_RUNTIME
+    if (!(actor_flags & SC64_T4_ACTOR_INVINCIBLE))
+#endif
+	    gfx_bar(x - 6, sprite_y - 4, 12, 2, q->hp, q->maxhp,
 	    owner_color(q->owner), C_RED_DARK);
     if (q->selected)
 	gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
@@ -3666,6 +3849,10 @@ draw_minimap(void)
 #endif
     for (i = 0; i < MAX_BUILDINGS; i++)
 	if (b[i].alive &&
+#ifdef SC64_T4_RUNTIME
+            (!sc64_race_t4_building_flags(b[i].type) ||
+             (sc64_race_t4_building_flags(b[i].type)&SC64_T4_ACTOR_DRAWABLE)) &&
+#endif
 	    (b[i].owner == SIDE || SC64_GRID_GET(visible, (b[i].x / 16) + (b[i].y / 16) * MAP_COLS))) {
 #ifdef SC64_IMPORTED_MISSION
 	    x = map_x +
@@ -3696,6 +3883,9 @@ draw_minimap(void)
 	}
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive &&
+#ifdef SC64_T4_RUNTIME
+            !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_HIDDEN) &&
+#endif
 	    (u[i].owner == SIDE || SC64_GRID_GET(visible, (u[i].x / 16) + (u[i].y / 16) * MAP_COLS))) {
 #ifdef SC64_IMPORTED_MISSION
 	    x = map_x +
@@ -3752,6 +3942,10 @@ draw_minimap(void)
 static void
 draw_building_art(Building *q)
 {
+#ifdef SC64_T4_RUNTIME
+    if (sc64_race_t4_building_flags(q->type) &&
+        !(sc64_race_t4_building_flags(q->type)&SC64_T4_ACTOR_DRAWABLE)) return;
+#endif
     int x = q->x - camx, y = q->y - camy + 12;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
 #ifdef SC64_HAS_SPRITES
@@ -3802,6 +3996,9 @@ static void
 draw_building_overlay(Building *q)
 {
     int x = q->x - camx, y = q->y - camy + 12;
+#ifdef SC64_T4_RUNTIME
+    if (sc64_race_t4_building_flags(q->type)&SC64_T4_ACTOR_INVINCIBLE) return;
+#endif
     if (x < -20 || x > 260 || y < 2 || y > 130)
         return;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
@@ -4839,6 +5036,9 @@ game_self_test(void)
 #ifdef SC64_RACES
 #include "race_combat.h"
 #include "race_adapter.h"
+#ifdef SC64_T4_RUNTIME
+#include "sc64_t4_actor_adapter.h"
+#endif
 #include "race_campaign_adapter.h"
 #include "race_save_adapter.h"
 #endif

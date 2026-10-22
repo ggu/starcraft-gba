@@ -4,16 +4,17 @@
    the reference's pixels. Scenario invincibility is CHK UNIT flag 0x10. */
 static int race_can_attack(int attacker,int target) {
     if(target<0||target>=MAX_UNITS+MAX_BUILDINGS)return 0;
+#ifdef SC64_T4_RUNTIME
+    if(target<MAX_UNITS) {
+        if((sc64_race_t4_actor_flags(u[target].type)&SC64_T4_ACTOR_HIDDEN)||
+           sc64_race_t4_unit_intrinsically_invincible(u[target].type))return 0;
+    } else if(sc64_race_t4_building_intrinsically_invincible(b[target-MAX_UNITS].type))return 0;
+#endif
     if(target<MAX_UNITS) {
         if(u[target].flags&16)return 0;
         if(!race_mode&&race_selected_mission==1&&u[target].type==U_CHRYSALIS&&race_campaign.carrier_unit<MAX_UNITS)return 0;
         if(sc64_race_unit_flying(u[target].type)) {
-            switch(attacker) {
-            case -1: case U_MARINE: case U_HYDRALISK: case U_HUNTER_KILLER:
-            case U_DRAGOON: case U_FENIX_DRAGOON: case U_GOLIATH:
-            case U_WRAITH: case U_MUTALISK: case U_SCOUT: return 1;
-            default:return 0;
-            }
+            return sc64_race_unit_can_attack_air(attacker);
         }
     } else if((b[target-MAX_UNITS].flags&16)||b[target-MAX_UNITS].type==B_ZERG_BEACON)return 0;
     return attacker<0||sc64_race_unit_damage(attacker)>0;

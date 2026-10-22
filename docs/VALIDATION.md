@@ -685,8 +685,47 @@ and TRIG as original framed records under ignored local storage, with source
 ROM/extractor/CHK provenance and per-record hashes. Asset-free fixtures check
 the exact framed writes and rejection of a missing required record before any
 output directory is created. No extracted records or generated arrays are
-committed. The catalog and runtime do not enable T4. Door/trap collision,
-teleports, rescue behavior and mission scripting remain to be implemented.
+committed. The catalog does not enable T4; the runtime described below is an
+internal world probe only.
+
+## Jacobs Installation actor/world probe (2026-10-23)
+
+`make test-sc64-t4-actors` checks the hidden internal T4 load and actor/world
+rules under ASan/UBSan. The roster fixture loads all 95 non-start source
+actors (87 unit records and eight Beacon buildings), retains source ownership,
+and verifies the full 128×128 geometry. Actor fixtures cover selectability,
+movement/collision roles, hidden Map Revealer behavior, sight circles,
+Ghost weapon and bounded integer concussive damage. The concussive helper uses
+integer division with a minimum one HP; source fractional damage can differ by
+one HP. It does not model cloak, lockdown, or nuclear abilities.
+
+Rescue Passive ownership conversion is exercised through the real T4 adapter:
+individual contact uses an inclusive 32-pixel square in GBA coordinates,
+derived from the source hook's 64-pixel half-extent. This is an authored
+center-contact approximation to the opaque native bounds query, not a claim
+that its edge or enumeration behavior matches the original engine. Fixtures
+also check chain rescue, same-source-slot depot transfer, supply recount and
+stale allied attack-target cleanup. Rescue conversion does not advance shield
+or larva timers; the enclosing update advances them once. The private probe bypasses only the
+frontend availability check; it does not make T4 selectable or prove a
+controller-play win.
+
+Special Terran Beacons retain their canonical 100,000 HP in live state. Since
+the save record stores health words as signed 16-bit values, save writes zero
+for the Beacon's HP and max-HP fields only after validating its source type,
+invincibility and other canonical state. Load validates that encoding and
+restores both values to 100,000. Malformed live Beacon state is rejected rather
+than normalized during save.
+
+Door and trap collision/state, teleports, source trigger actions, objective
+logic and mission completion remain unavailable. The T4 probe makes no
+playability or frame-rate claim.
+
+The actor-stage ARM probe retains 249,304 BSS bytes and 364 data bytes, with
+IWRAM ending at `0x03004f78` and BSS at `0x0203cf48`. The unused fallback circle
+renderer stays in ROM for this profile; both unchanged stack/memory guards
+pass. The default build/tests (83 Python checks) and unified build/tests pass.
+The default, unified and P3 ROM hashes remain unchanged.
 
 ## Jacobs Installation storage integration (2026-10-23)
 
@@ -710,13 +749,13 @@ T4 now uses the supported paged scheduler with 256 entries; the unchanged
 2,048-entry queue would exceed the EWRAM guard. The actual-main fixture checks
 held keys, press edges, empty pages and legacy count-only use for T4 as well
 as Z3/P3. Wrong-profile and missing-prerequisite compiler probes reject invalid
-configurations. The integrated ARM probe uses 249,304 BSS bytes and 364 data
+configurations. The earlier storage-stage ARM probe used 249,304 BSS bytes and 364 data
 bytes, ends IWRAM at `0x03004e68` and BSS at `0x0203cf48`, and passes both
 unchanged linker assertions. This is an ARM link/storage result, not gameplay
-or frame-rate evidence. Unsupported actors and door/rescue/trigger behavior
-still prevent T4 playability.
+or frame-rate evidence. The subsequent actor stage above supplies actor and
+rescue handling; doors, traps, teleports and triggers still prevent T4 playability.
 
-Default build/tests (80 Python checks), unified build/tests and the existing
+At that storage stage, default build/tests (80 Python checks), unified build/tests and the existing
 128×96 storage fixture pass. Default and unified ROM hashes remain unchanged.
 
 ## Known limits

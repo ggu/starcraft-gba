@@ -35,6 +35,10 @@ enum {
 static int
 race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 {
+#ifdef SC64_T4_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID)
+        return sc64_t4_runtime_owner(raw_owner);
+#endif
     if (raw_owner == 11 || raw_owner >= 8) return NEUTRAL;
     if (raw_owner < 0) return NEUTRAL;
 #ifdef SC64_P3_RUNTIME
@@ -230,13 +234,19 @@ race_campaign_init(void)
     }
     race_selected_mission = limit(race_selected_mission, 0, SC64_RACE_MAP_COUNT - 1);
 #ifdef SC64_UNIFIED
-    if (!sc64_catalog_mission_allowed(race_selected_mission,
+    if ((!sc64_catalog_mission_allowed(race_selected_mission,
 #ifdef SC64_CAMPAIGN_RACE
                                      SC64_CAMPAIGN_RACE
 #else
                                      -1
 #endif
-                                     ) || !sc64_race_maps[race_selected_mission].width)
+                                     )
+#ifdef SC64_T4_RUNTIME
+         /* Internal world-loading probe. The frontend catalog remains gated
+          * until the scenario has a complete ordinary-controller proof. */
+         && race_selected_mission != SC64_T4_GLOBAL_ID
+#endif
+         ) || !sc64_race_maps[race_selected_mission].width)
         race_selected_mission = sc64_frontend_first_mission(
 #ifdef SC64_CAMPAIGN_RACE
             SC64_CAMPAIGN_RACE
@@ -290,6 +300,10 @@ race_campaign_init(void)
 
     for (i = 0; i < 8; ++i) {
         int owner = map->owner_modes[i];
+#ifdef SC64_T4_RUNTIME
+        if (race_selected_mission == SC64_T4_GLOBAL_ID)
+            owner = race_campaign_owner(map, i);
+#endif
 #ifdef SC64_P3_RUNTIME
         if (race_selected_mission == SC64_P3_GLOBAL_ID)
             owner = race_campaign_owner(map, i);
@@ -364,6 +378,9 @@ race_campaign_init(void)
     }
 
     switch (race_selected_mission) {
+#ifdef SC64_T4_RUNTIME
+    case SC64_T4_GLOBAL_ID: minerals = gas = 0; break;
+#endif
     case SC64_RACE_MISSION_Z1: minerals = 200; break;
     case SC64_RACE_MISSION_Z2: minerals = 300; break;
     case SC64_RACE_MISSION_P1: minerals = 400; gas = 100; break;
@@ -502,6 +519,14 @@ race_campaign_tick(void)
         race_campaign.phase == SC64_RACE_PHASE_FAILED) return;
     if (race_campaign.message_ticks) --race_campaign.message_ticks;
     ++race_campaign.elapsed_frames;
+#ifdef SC64_T4_RUNTIME
+    if (mission == SC64_T4_GLOBAL_ID) {
+        race_t4_world_tick();
+        /* Door/teleport/quest actions are not implemented by this roster
+         * stage. Do not run another mission's AI or infer a victory. */
+        return;
+    }
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
     if (mission == SC64_RACE_MISSION_T3) {
         race_t3_campaign_tick();

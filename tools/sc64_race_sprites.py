@@ -56,6 +56,32 @@ RACE_UNIT_IDS = {
     'geyser': 188, 'special_zerg_beacon': 194,
 }
 
+# Additional source-backed IDs needed by The Jacobs Installation (T4). Keep
+# this set out of the shared race sprite list so non-T4 profiles retain their
+# exact selected art and switch cases. Raw 101 is deliberately not an image:
+# it is a map-revealer actor and must remain invisible in the source behavior.
+T4_UNIT_IDS = {
+    'civilian': 15,
+    'raynor_raw20': 20,
+    'rhynadon': 89,
+    'ragnasaur': 95,
+    'terran_beacon': 195,
+    'data_disk': 218,
+}
+T4_INVISIBLE_RAW_TYPES = (101,)
+T4_EXPECTED_VISIBLE_RAW_TYPES = (0, 1, 2, 3, 7, 15, 20, 32, 37, 89, 95, 195, 218)
+
+
+def asset_manifest_sha256(assets: list[dict]) -> str:
+    """Hash stable source-asset identity fields without preview/path noise."""
+    canonical = [{key: asset[key] for key in
+                  ('name', 'unit_id', 'flingy_id', 'sprite_id', 'image_id',
+                   'grp_filename_index', 'bolt_path', 'sha1', 'canvas',
+                   'selected_frame', 'frame_rect', 'opaque_pixels')}
+                 for asset in assets]
+    payload = json.dumps(canonical, sort_keys=True, separators=(',', ':')).encode('ascii')
+    return hashlib.sha256(payload).hexdigest()
+
 # These types occur in the four authored campaign scenarios. Their game names
 # are scenario-specific or decorative; preserve actual indexed art for them
 # under an explicit source-id label rather than drawing a substitute.
@@ -69,7 +95,8 @@ for _raw in MISSION_RAW_TYPES:
         RACE_UNIT_IDS[f'raw_unit_{_raw}'] = _raw
 
 
-def write_header(path: Path, selected: list[dict], remap: bytes) -> None:
+def write_header(path: Path, selected: list[dict], remap: bytes,
+                 t4_selected: list[dict] | None = None) -> None:
     lines = [
         '/* Generated from the verified USA ROM; private local asset. */',
         '#ifndef SC64_RACE_SPRITES_GENERATED_H',
@@ -78,7 +105,7 @@ def write_header(path: Path, selected: list[dict], remap: bytes) -> None:
         'typedef struct { short offset_x, offset_y; unsigned short w, h, canvas_w, canvas_h; const unsigned char *pixels; } Sc64SpriteFrame;',
         '#endif',
     ]
-    for item in selected:
+    def append_asset(item: dict) -> None:
         name, frame = item['name'], item['frame']
         data = bytearray(base.crop_frame(frame))
         x, y, fw = frame['x'], frame['y'], frame['frame_width']
@@ -91,10 +118,17 @@ def write_header(path: Path, selected: list[dict], remap: bytes) -> None:
         lines.append(f'static const unsigned char {symbol}_pixels[{len(data)}] = {{')
         for i in range(0, len(data), 16):
             lines.append('    ' + ','.join(f'0x{v:02x}' for v in data[i:i + 16]) + ',')
-        lines += ['};',
-                  f'static const Sc64SpriteFrame {symbol} = '
-                  f'{{{frame["x"]},{frame["y"]},{fw},{frame["frame_height"]},'
-                  f'{frame["width"]},{frame["height"]},{symbol}_pixels}};']
+        lines.extend(['};',
+                      f'static const Sc64SpriteFrame {symbol} = '
+                      f'{{{frame["x"]},{frame["y"]},{fw},{frame["frame_height"]},'
+                      f'{frame["width"]},{frame["height"]},{symbol}_pixels}};'])
+    for item in selected:
+        append_asset(item)
+    if t4_selected:
+        lines.append('#ifdef SC64_T4_ENABLED')
+        for item in t4_selected:
+            append_asset(item)
+        lines.append('#endif /* SC64_T4_ENABLED */')
     lines += ['static inline const Sc64SpriteFrame *sc64_race_unit_sprite(unsigned short raw_type) {',
               '    switch (raw_type) {']
     seen = set()
@@ -103,13 +137,32 @@ def write_header(path: Path, selected: list[dict], remap: bytes) -> None:
             continue
         seen.add(raw_type)
         lines.append(f'    case {raw_type}: return &sc64_race_sprite_{name};')
+    if t4_selected:
+        lines.append('#ifdef SC64_T4_ENABLED')
+        for item in t4_selected:
+            lines.append(f'    case {T4_UNIT_IDS[item["name"]]}: return &sc64_race_sprite_{item["name"]};')
+        lines.append('#endif /* SC64_T4_ENABLED */')
     lines += ['    default: return (const Sc64SpriteFrame *)0;', '    }', '}', '#endif']
+    if t4_selected:
+        # A null sprite means "use the generic fallback" in game.c, so it
+        # cannot represent the source-invisible Map Revealer. Expose a distinct
+        # mode for the later renderer integration without inventing art.
+        lines[-1:-1] = [
+            '#ifdef SC64_T4_ENABLED',
+            'static inline unsigned char sc64_race_unit_sprite_mode(unsigned short raw_type) {',
+            '    switch (raw_type) {',
+            '    case 101: return 2; /* source-invisible map revealer */',
+            '    default: return sc64_race_unit_sprite(raw_type) ? 1 : 0; /* sprite / fallback */',
+            '    }',
+            '}',
+            '#endif /* SC64_T4_ENABLED */',
+        ]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text('\n'.join(lines) + '\n', encoding='ascii')
 
 
 def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
-             remap_path: Path = PALETTE_REMAP) -> dict:
+             remap_path: Path = PALETTE_REMAP, include_t4: bool = True) -> dict:
     raw = rom.read_bytes()
     extractor = base.load_extractor(base.UPSTREAM)
     normalized = extractor.load_rom(str(rom))
@@ -121,28 +174,49 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
         raise ValueError('Backwater sprite remap must have 256 entries')
     archive = extractor.BoltArchive(normalized)
     refs = base.resolve_grp_indices(archive, RACE_UNIT_IDS)
+    t4_refs = base.resolve_grp_indices(archive, T4_UNIT_IDS) if include_t4 else {}
     palette = base.decode_rgba5551_palette(base._entry_payload(archive, '00B/004'))
     entries = {entry.path: entry for entry in archive.entries()}
-    selected, manifest_assets = [], []
+    selected, t4_selected, manifest_assets = [], [], []
     out.mkdir(parents=True, exist_ok=True)
-    for name, ref in refs.items():
+    def load_asset(name, ref, target):
         grp_data = archive.read(entries[ref['bolt_path']])
         grp = base.parse_grp(grp_data)
         frame = grp['frames'][0]
         png = out / f'{name}.png'
         base.encode_png(png, grp['width'], grp['height'], base.render_frame(frame, palette))
-        selected.append({'name': name, 'frame': frame})
+        target.append({'name': name, 'frame': frame})
         manifest_assets.append({'name': name, **ref, 'sha1': hashlib.sha1(grp_data).hexdigest(),
                                 'frame_count': len(grp['frames']),
                                 'canvas': [grp['width'], grp['height']],
                                 'selected_frame': 0, 'frame_rect': [frame['x'], frame['y'],
                                 frame['frame_width'], frame['frame_height']],
                                 'opaque_pixels': sum(frame['alpha']), 'preview': png.name})
-    write_header(header, selected, remap)
+    for name, ref in refs.items():
+        load_asset(name, ref, selected)
+    for name, ref in t4_refs.items():
+        load_asset(name, ref, t4_selected)
+    write_header(header, selected, remap, t4_selected)
+    mapped_raw_types = set(RACE_UNIT_IDS.values()) | set(T4_UNIT_IDS.values())
+    actual_sprite_raw_types = ({int(ref['unit_id']) for ref in refs.values()} |
+                               {int(ref['unit_id']) for ref in t4_refs.values()})
+    expected_t4_visible = set(T4_EXPECTED_VISIBLE_RAW_TYPES) if include_t4 else set()
+    missing_t4_mapping = sorted(expected_t4_visible - mapped_raw_types)
+    missing_t4_sprite = sorted(expected_t4_visible - actual_sprite_raw_types)
+    missing_t4_visible = sorted(set(missing_t4_mapping) | set(missing_t4_sprite))
+    if missing_t4_visible:
+        raise ValueError(f'T4 visible raw types lack sprite mappings: {missing_t4_visible}')
     report = {'source': {'rom_sha1': sha1, 'rom_input_sha1': hashlib.sha1(raw).hexdigest(),
                          'upstream_commit': base.UPSTREAM_COMMIT},
               'palette': 'Shared Backwater GBA sprite palette; map terrain colors are quantized offline to avoid runtime sprite recoloring.',
-              'raw_unit_ids': RACE_UNIT_IDS, 'assets': manifest_assets,
+              'raw_unit_ids': RACE_UNIT_IDS,
+              't4_raw_unit_ids': T4_UNIT_IDS if include_t4 else {},
+              't4_invisible_raw_types': list(T4_INVISIBLE_RAW_TYPES) if include_t4 else [],
+              't4_expected_visible_raw_types': list(T4_EXPECTED_VISIBLE_RAW_TYPES) if include_t4 else [],
+              'resolved_t4_visible_raw_types': sorted(set(T4_EXPECTED_VISIBLE_RAW_TYPES) & actual_sprite_raw_types) if include_t4 else [],
+              'base_assets_manifest_sha256': asset_manifest_sha256(manifest_assets[:len(selected)]),
+              't4_assets_manifest_sha256': asset_manifest_sha256(manifest_assets[len(selected):]) if include_t4 else asset_manifest_sha256([]),
+              'assets': manifest_assets,
               'generated_header': str(header)}
     (out / 'manifest.json').write_text(json.dumps(report, indent=2) + '\n')
     return report
@@ -154,9 +228,12 @@ def main() -> int:
     parser.add_argument('--out', type=Path, default=OUT)
     parser.add_argument('--header', type=Path, default=HEADER)
     parser.add_argument('--remap', type=Path, default=PALETTE_REMAP)
+    parser.add_argument('--base-only', action='store_true',
+                        help='omit the SC64_T4_ENABLED-gated T4 sprite payloads')
     args = parser.parse_args()
     try:
-        report = generate(args.rom, args.out, args.header, args.remap)
+        report = generate(args.rom, args.out, args.header, args.remap,
+                          include_t4=not args.base_only)
     except (OSError, ValueError, RuntimeError, KeyError) as exc:
         print(f'sc64_race_sprites: {exc}', file=sys.stderr)
         return 1

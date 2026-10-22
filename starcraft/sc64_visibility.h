@@ -85,9 +85,69 @@ sc64_visibility_same(const Sc64VisibilitySnapshot *old, int active,
         (old->x == x && old->y == y && old->type == type));
 }
 
+#ifdef SC64_T4_RUNTIME
+static int __attribute__((noinline))
+sc64_t4_unit_sight_pixels(int type)
+{ return sc64_race_t4_sight_source_pixels(type); }
+
+static int __attribute__((noinline))
+sc64_t4_building_sight_pixels(int type)
+{ return sc64_race_t4_building_sight_source_pixels(type); }
+
+static void __attribute__((noinline))
+sc64_t4_explore_with_radius(int x, int y, int radius)
+{
+    int col,row,c=x/16,r=y/16;
+    for(row=r-radius;row<=r+radius;++row)
+        for(col=c-radius;col<=c+radius;++col)
+            if(col>=0&&row>=0&&col<MAP_COLS&&row<MAP_ROWS&&
+               (col-c)*(col-c)+(row-r)*(row-r)<=radius*radius) {
+                int cell=col+row*MAP_COLS;
+                if(!SC64_GRID_GET(explored,cell)) {
+                    SC64_GRID_SET(explored,cell,1);
+                    ++sc64_minimap_explored[sc64_minimap_cell(cell)];
+                }
+            }
+}
+
+/* Special T4 sources use exact BW source-radius circles. Keep this bounded
+ * but cold because the wider footprints change only when an actor changes. */
+static void __attribute__((noinline))
+sc64_t4_adjust_visibility_source(int x, int y, int radius, int delta)
+{
+    int col, row, c = x / 16, r = y / 16;
+    int extent = (radius + 23) / 16;
+    for (row = r - extent; row <= r + extent; ++row)
+        for (col = c - extent; col <= c + extent; ++col)
+            if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS) {
+                int dx = col * 16 + 8 - x, dy = row * 16 + 8 - y;
+                int cell = col + row * MAP_COLS;
+                if (dx*dx + dy*dy <= radius*radius) {
+                    if (delta > 0) {
+                        if (!sc64_visible_sources[cell])
+                            ++sc64_minimap_visible[sc64_minimap_cell(cell)];
+                        if (sc64_visible_sources[cell] != 0xff) ++sc64_visible_sources[cell];
+                    } else if (sc64_visible_sources[cell]) {
+                        --sc64_visible_sources[cell];
+                        if (!sc64_visible_sources[cell])
+                            --sc64_minimap_visible[sc64_minimap_cell(cell)];
+                    }
+                    SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
+                }
+            }
+}
+#endif
+
 static void GBA_HOT
 sc64_explore_unit(int x, int y, int type)
 {
+#ifdef SC64_T4_RUNTIME
+    int source_pixels=sc64_t4_unit_sight_pixels(type);
+    if(source_pixels>0) {
+        sc64_t4_explore_with_radius(x,y,source_pixels/32);
+        return;
+    }
+#endif
     int col, row, c = x / 16, r = y / 16;
     int radius =
 #ifdef SC64_RACES
@@ -111,6 +171,13 @@ sc64_explore_unit(int x, int y, int type)
 static void GBA_HOT
 sc64_explore_building(int x, int y, int type)
 {
+#ifdef SC64_T4_RUNTIME
+    int source_pixels=sc64_t4_building_sight_pixels(type);
+    if(source_pixels>0) {
+        sc64_t4_explore_with_radius(x,y,source_pixels/32);
+        return;
+    }
+#endif
     int col, row, c = x / 16, r = y / 16;
     int radius = type == B_COMMAND ? 7 : 3;
     for (row = r - radius; row <= r + radius; row++)
@@ -128,6 +195,13 @@ sc64_explore_building(int x, int y, int type)
 static void GBA_HOT
 sc64_adjust_unit_visibility(int x, int y, int type, int delta)
 {
+#ifdef SC64_T4_RUNTIME
+    int source_pixels=sc64_t4_unit_sight_pixels(type);
+    if (source_pixels>0) {
+        sc64_t4_adjust_visibility_source(x,y,source_pixels/2,delta);
+        return;
+    }
+#endif
     int col, row, c = x / 16, r = y / 16;
     int radius =
 #ifdef SC64_RACES
@@ -240,6 +314,16 @@ static void GBA_HOT
 sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
                                 int type)
 {
+#ifdef SC64_T4_RUNTIME
+    if (sc64_t4_unit_sight_pixels(type)>0) {
+        if (old_x != new_x || old_y != new_y) {
+            int radius=sc64_t4_unit_sight_pixels(type)/2;
+            sc64_t4_adjust_visibility_source(old_x,old_y,radius,-1);
+            sc64_t4_adjust_visibility_source(new_x,new_y,radius,1);
+        }
+        return;
+    }
+#endif
     int radius =
 #ifdef SC64_RACES
         IS_WORKER(type)
@@ -320,6 +404,13 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
 static void GBA_HOT
 sc64_adjust_building_visibility(int x, int y, int type, int delta)
 {
+#ifdef SC64_T4_RUNTIME
+    int source_pixels=sc64_t4_building_sight_pixels(type);
+    if(source_pixels>0) {
+        sc64_t4_adjust_visibility_source(x,y,source_pixels/2,delta);
+        return;
+    }
+#endif
     int col, row, c = x / 16, r = y / 16;
 #ifdef SC64_RACES
     int radius=(type==B_COMMAND||sc64_race_is_zerg_townhall(type)||type==B_NEXUS)?112:64;

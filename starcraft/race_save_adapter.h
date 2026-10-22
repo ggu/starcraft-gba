@@ -42,12 +42,28 @@ static int sc64_race_storage_geometry_valid(int width, int height) {
 #endif
 }
 static int race_save_game(void) {
+#ifdef SC64_T4_RUNTIME
+    /* The intrinsically invincible beacon has 100000 source HP. Its two
+     * health words use a canonical zero encoding instead of truncating to
+     * s16; malformed live props must never be saved as healthy beacons. */
+    for(int i=0;i<MAX_BUILDINGS;i++)
+        if(b[i].alive && b[i].type==B_TERRAN_BEACON &&
+           (b[i].hp!=100000 || b[i].maxhp!=100000 ||
+            b[i].raw_type!=195 || b[i].under_construction ||
+            b[i].queue_count || b[i].shield || !invincible_buildings[i]))return 0;
+#endif
     race_data.version=SAVE_VERSION;
     for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
         int n;memcpy(&n,(u8*)&u[i]+j*sizeof(int),sizeof(n));race_data.units[i][j]=(s16)n;
     }
     for(int i=0;i<MAX_BUILDINGS;i++)for(unsigned j=0;j<RACE_BUILD_WORDS;j++) {
-        int n;memcpy(&n,(u8*)&b[i]+j*sizeof(int),sizeof(n));race_data.buildings[i][j]=(s16)n;
+        int n;memcpy(&n,(u8*)&b[i]+j*sizeof(int),sizeof(n));
+#ifdef SC64_T4_RUNTIME
+        if(b[i].alive && b[i].type==B_TERRAN_BEACON &&
+           (j==offsetof(Building,hp)/sizeof(int) ||
+            j==offsetof(Building,maxhp)/sizeof(int)))n=0;
+#endif
+        race_data.buildings[i][j]=(s16)n;
     }
     memset(race_data.fog,0,sizeof(race_data.fog));
     for(int i=0;i<MAP_CELLS;i++)if(SC64_GRID_GET(explored,i))race_data.fog[i>>3]|=1u<<(i&7);
@@ -101,16 +117,24 @@ static int race_load_game(void) {
     if(v[0]<0||v[0]>1||v[1]<0||v[1]>2||v[2]<0||v[2]>=SC64_RACE_MAP_COUNT||v[4]<1||v[4]>3||
        v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||v[16]<0||v[16]>4)return 0;
 #ifdef SC64_CAMPAIGN_RACE
-    if(!v[0]&&!sc64_catalog_mission_allowed(v[2],SC64_CAMPAIGN_RACE))return 0;
+    if(!v[0]&&!sc64_catalog_mission_allowed(v[2],SC64_CAMPAIGN_RACE)
+#ifdef SC64_T4_RUNTIME
+       &&v[2]!=SC64_T4_GLOBAL_ID
+#endif
+       )return 0;
 #endif
 #ifdef SC64_UNIFIED
-    if(!sc64_catalog_mission_allowed(v[2],
+    if((!sc64_catalog_mission_allowed(v[2],
 #ifdef SC64_CAMPAIGN_RACE
                                    SC64_CAMPAIGN_RACE
 #else
                                    -1
 #endif
-                                   )||!sc64_race_maps[v[2]].width)return 0;
+                                   )
+#ifdef SC64_T4_RUNTIME
+        &&v[2]!=SC64_T4_GLOBAL_ID
+#endif
+        )||!sc64_race_maps[v[2]].width)return 0;
     if((unsigned)v[3]&~sc64_catalog_playable_mask(
 #ifdef SC64_CAMPAIGN_RACE
                                                SC64_CAMPAIGN_RACE
@@ -148,8 +172,19 @@ static int race_load_game(void) {
     for(int i=0;i<MAX_BUILDINGS;i++) {
         if(RACE_B(i,alive)<0||RACE_B(i,alive)>1)return 0;
         if(!RACE_B(i,alive))continue;
+#ifdef SC64_T4_RUNTIME
+        int health_ok=RACE_B(i,hp)>0&&RACE_B(i,maxhp)>0&&RACE_B(i,hp)<=RACE_B(i,maxhp);
+        if(RACE_B(i,type)==B_TERRAN_BEACON)
+            health_ok=RACE_B(i,hp)==0&&RACE_B(i,maxhp)==0&&RACE_B(i,raw_type)==195&&
+                RACE_B(i,under_construction)==0&&RACE_B(i,queue_count)==0&&
+                RACE_B(i,shield)==0&&race_data.invincible_buildings[i]==1;
+#endif
         if(RACE_B(i,type)<0||RACE_B(i,type)>=SC_RB_COUNT||RACE_B(i,owner)<0||RACE_B(i,owner)>4||
+#ifdef SC64_T4_RUNTIME
+            !health_ok||
+#else
             RACE_B(i,hp)<=0||RACE_B(i,maxhp)<=0||RACE_B(i,hp)>RACE_B(i,maxhp)||
+#endif
             RACE_B(i,x)<0||RACE_B(i,x)>=width*16||RACE_B(i,y)<0||RACE_B(i,y)>=height*16||
             RACE_B(i,queue_count)<0||RACE_B(i,queue_count)>5||RACE_B(i,queue_head)<0||RACE_B(i,queue_head)>4||
             RACE_B(i,queue_progress)<0||RACE_B(i,build_progress)<-1||RACE_B(i,shield)<0||
@@ -264,6 +299,10 @@ static int race_load_game(void) {
         int n=j==offsetof(Building,flags)/sizeof(int)?(u16)race_data.buildings[i][j]:race_data.buildings[i][j];
         memcpy((u8*)&b[i]+j*sizeof(int),&n,sizeof(n));
     }
+#ifdef SC64_T4_RUNTIME
+    for(int i=0;i<MAX_BUILDINGS;i++)
+        if(b[i].alive && b[i].type==B_TERRAN_BEACON)b[i].hp=b[i].maxhp=100000;
+#endif
     memcpy(m,race_data.minerals_map,sizeof(m));
     SC64_GRID_CLEAR(explored);
     for(int i=0;i<MAP_CELLS;i++)

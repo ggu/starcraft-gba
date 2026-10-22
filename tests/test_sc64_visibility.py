@@ -30,6 +30,10 @@ enum { MAP_CELLS=MAP_COLS*MAP_ROWS, MAX_UNITS=40,
 #ifdef SC64_RACES
        , U_DRONE=3, B_HATCHERY=21, B_LAIR=22, B_HIVE=23, B_NEXUS=24
 #endif
+#ifdef SC64_T4_RUNTIME
+       , U_MAP_REVEALER=5, U_GHOST=6, U_CIVILIAN=7, U_RHYNADON=8,
+       U_RAGNASAUR=9, U_DATA_DISK=10, B_TERRAN_BEACON=25
+#endif
        };
 #ifdef SC64_RACES
 #define IS_WORKER(type) ((type)==U_SCV || (type)==U_DRONE)
@@ -39,6 +43,20 @@ static int race_cols=MAP_COLS, race_rows=MAP_ROWS;
 static int sc64_race_is_zerg_townhall(int type) {
  return type==B_HATCHERY || type==B_LAIR || type==B_HIVE;
 }
+#ifdef SC64_T4_RUNTIME
+static int sc64_race_t4_sight_source_pixels(int type) {
+ switch(type) {
+ case U_GHOST:return 288;
+ case U_CIVILIAN:case U_RHYNADON:case U_RAGNASAUR:return 224;
+ case U_MAP_REVEALER:return 320;
+ case U_DATA_DISK:return 160;
+ default:return 0;
+ }
+}
+static int sc64_race_t4_building_sight_source_pixels(int type) {
+ return type==B_TERRAN_BEACON?256:0;
+}
+#endif
 #endif
 typedef struct { int alive, owner, x, y, type; } UnitFixture;
 typedef struct { int alive, owner, x, y, type; } BuildingFixture;
@@ -94,16 +112,28 @@ static void ref_update(void) {
  for(i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE){
 #ifdef SC64_RACES
   int worker=IS_WORKER(u[i].type);
+#ifdef SC64_T4_RUNTIME
+  int source=sc64_race_t4_sight_source_pixels(u[i].type);
+#else
+  int source=0;
+#endif
 #else
   int worker=u[i].type==U_SCV;
+  int source=0;
 #endif
-  ref_explore(u[i].x,u[i].y,worker?4:5);
-  ref_vision(u[i].x,u[i].y,worker?56:72,5);
+  ref_explore(u[i].x,u[i].y,source?source/32:worker?4:5);
+  ref_vision(u[i].x,u[i].y,source?source/2:worker?56:72,
+             source?(source/2+23)/16:5);
  }
  for(i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE){
-  ref_explore(b[i].x,b[i].y,b[i].type==B_COMMAND?7:3);
+  int building_source=0;
+#ifdef SC64_T4_RUNTIME
+  building_source=sc64_race_t4_building_sight_source_pixels(b[i].type);
+#endif
+  ref_explore(b[i].x,b[i].y,building_source?building_source/32:b[i].type==B_COMMAND?7:3);
 #ifdef SC64_RACES
-  if(b[i].type==B_COMMAND || sc64_race_is_zerg_townhall(b[i].type) ||
+  if(building_source)ref_vision(b[i].x,b[i].y,building_source/2,(building_source/2+23)/16);
+  else if(b[i].type==B_COMMAND || sc64_race_is_zerg_townhall(b[i].type) ||
      b[i].type==B_NEXUS)ref_vision(b[i].x,b[i].y,112,8);
   else ref_vision(b[i].x,b[i].y,64,8);
 #else
@@ -199,6 +229,41 @@ int main(void){
    b[0].x=edge_x[j];b[0].y=edge_y[j];
    compare(-100-i*4-j);
   }
+ }
+#endif
+#ifdef SC64_T4_RUNTIME
+ /* Every T4 special unit and the Beacon use their own source radius; exercise
+    incremental replacement, overlap counts and all clipped map edges. */
+ {
+  static const int types[]={U_GHOST,U_CIVILIAN,U_RHYNADON,U_RAGNASAUR,
+                            U_MAP_REVEALER,U_DATA_DISK};
+  static const int px[4]={640,0,MAP_COLS*16-1,0};
+  static const int py[4]={640,0,0,MAP_ROWS*16-1};
+  int j,k;
+  for(j=0;j<(int)(sizeof(types)/sizeof(types[0]));++j){
+   memset(u,0,sizeof(u));memset(b,0,sizeof(b));
+   memset(visible,0,sizeof(visible));memset(explored,0,sizeof(explored));
+   memset(ref_visible,0,sizeof(ref_visible));memset(ref_explored,0,sizeof(ref_explored));
+   sc64_visibility_reset();
+   u[0].alive=1;u[0].owner=SIDE;u[0].type=types[j];
+   for(k=0;k<4;k++){
+    u[0].x=px[k];u[0].y=py[k];compare(-300-j*8-k);
+    u[0].x+=u[0].x<MAP_COLS*16-15?15:-15;
+    u[0].y+=u[0].y<MAP_ROWS*16-15?15:-15;compare(-340-j*8-k);
+   }
+   u[0].alive=0;compare(-400-j);
+  }
+  memset(u,0,sizeof(u));memset(b,0,sizeof(b));
+  memset(visible,0,sizeof(visible));memset(explored,0,sizeof(explored));
+  memset(ref_visible,0,sizeof(ref_visible));memset(ref_explored,0,sizeof(ref_explored));
+  sc64_visibility_reset();
+  b[0].alive=1;b[0].owner=SIDE;b[0].type=B_TERRAN_BEACON;
+  for(k=0;k<4;k++){
+   b[0].x=px[k];b[0].y=py[k];compare(-500-k);
+   b[0].x+=b[0].x<MAP_COLS*16-15?15:-15;
+   b[0].y+=b[0].y<MAP_ROWS*16-15?15:-15;compare(-510-k);
+  }
+  b[0].alive=0;compare(-520);
  }
 #endif
  near_move_sweep(U_SCV,-2000);

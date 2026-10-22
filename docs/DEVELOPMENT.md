@@ -76,6 +76,26 @@ Preparation writes extracted and generated inputs under ignored `.local/`; ROM b
 
 See [SC64 unified](SC64-UNIFIED.md) for implemented missions and limitations, and [SC64 development notes](SC64.md) for import details.
 
+## T4 internal actor/world checks
+
+The Jacobs Installation data and actor rules have an internal, gated host-test
+path. This is not a playable campaign entry: the frontend catalog remains
+closed to T4, and no frame-rate result is claimed. After preparing the local
+unified inputs, run:
+
+```sh
+make test-sc64-t4-actors
+make test-sc64-t4-storage sc64-t4-storage-probe
+```
+
+The actor tests load the 95 source placements, check supported actor roles,
+sight, combat and bounded rescue behavior, and validate the special Beacon's
+save representation. Storage tests cover the T4-only 128×128 layout. Both
+targets use private generated inputs under ignored `.local/` storage. The
+scenario still lacks implemented doors, traps, teleports, trigger objectives
+and completion behavior. See [Validation](VALIDATION.md) for the exact test
+coverage and limits.
+
 ## Troubleshooting
 
 - If `doctor` reports a missing required tool, install that tool and confirm its command is on `PATH`. ARM GCC also needs the matching `arm-none-eabi-objcopy` and `arm-none-eabi-size` commands. On a custom toolchain prefix, set `PREFIX` to the prefix used by all three commands.

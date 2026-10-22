@@ -103,6 +103,12 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
                 if (&u[i] != q && u[i].alive) {
 #ifdef SC64_RACES
                     if(u[i].type==U_CHRYSALIS||sc64_race_unit_flying(u[i].type)!=sc64_race_unit_flying(q->type))continue;
+#ifdef SC64_T4_RUNTIME
+                    if ((sc64_race_t4_actor_flags(u[i].type) &&
+                         !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_COLLIDABLE)) ||
+                        (sc64_race_t4_actor_flags(q->type) &&
+                         !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_COLLIDABLE))) continue;
+#endif
 #endif
                     int dx = u[i].x - nx, dy = u[i].y - ny;
                     if (dx <= -6 || dx >= 6 || dy <= -6 || dy >= 6) continue;

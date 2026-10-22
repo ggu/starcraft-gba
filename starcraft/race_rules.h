@@ -13,7 +13,12 @@ enum {
     U_DRONE, U_OVERLORD, U_PROBE, U_ZEALOT, U_DRAGOON, U_SCOUT, U_TASSADAR,
     U_FENIX, U_CHRYSALIS, U_QUEEN, U_GOLIATH, U_TANK, U_WRAITH,
     U_MUTALISK, U_HUNTER_KILLER, U_REAVER, U_FENIX_DRAGOON, U_SIEGE_TANK,
-    U_VULTURE, U_DROPSHIP, U_SCOURGE, SC_RU_COUNT
+    U_VULTURE, U_DROPSHIP, U_SCOURGE,
+#ifdef SC64_T4_RUNTIME
+    /* T4-only actor IDs: props and neutral actors must not alias a combat unit. */
+    U_GHOST, U_CIVILIAN, U_RHYNADON, U_RAGNASAUR, U_MAP_REVEALER, U_DATA_DISK,
+#endif
+    SC_RU_COUNT
 };
 enum {
     B_COMMAND, B_BARRACKS, B_DEPOT, B_REFINERY, B_ACADEMY, B_ENG_BAY,
@@ -23,7 +28,11 @@ enum {
     B_PYLON, B_PHOTON_CANNON, B_EXTRACTOR, B_SUNKEN_COLONY, B_SPIRE,
     B_CEREBRATE, B_LAIR, B_STARGATE, B_STARPORT, B_MISSILE_TURRET,
     B_SPORE_COLONY, B_ZERG_BEACON, B_FACTORY, B_ROBOTICS_FACILITY,
-    B_MATURE_CHRYSALIS, B_HIVE, B_GREATER_SPIRE, SC_RB_COUNT
+    B_MATURE_CHRYSALIS, B_HIVE, B_GREATER_SPIRE,
+#ifdef SC64_T4_RUNTIME
+    B_TERRAN_BEACON,
+#endif
+    SC_RB_COUNT
 };
 
 enum {
@@ -93,6 +102,15 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     /* BWAPI raw 47 Scourge: 25 HP, 25/75, 1 doubled supply. Its air-only
      * Suicide Scourge weapon is enabled only for the Higher Ground profile. */
     [U_SCOURGE] = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 1, 25, 75, 450, 25, 0, 0 }
+#ifdef SC64_T4_RUNTIME
+    , [U_GHOST]        = { R_TER, 0, B_BARRACKS, 2, 25, 75, 750, 45, 0, 0 }
+    /* Scenario actors retain default HP but are not normal production units. */
+    , [U_CIVILIAN]     = { R_TER, 0, 0, 0, 0, 0, 0, 40, 0, 0 }
+    , [U_RHYNADON]     = { R_TER, 0, 0, 0, 0, 0, 0, 60, 0, 0 }
+    , [U_RAGNASAUR]    = { R_TER, 0, 0, 0, 0, 0, 0, 60, 0, 0 }
+    , [U_MAP_REVEALER] = { R_TER, 0, 0, 0, 0, 0, 0, 1, 0, 0 }
+    , [U_DATA_DISK]    = { R_TER, 0, 0, 0, 0, 0, 0, 800, 0, 0 }
+#endif
 };
 
 static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
@@ -132,6 +150,11 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     [B_MATURE_CHRYSALIS] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 0, 0, 0, 250, 0 },
     [B_HIVE] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_PROVIDES_SUPPLY, U_DRONE, 2, 200, 150, 1800, 2500, 0 },
     [B_GREATER_SPIRE] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 100, 150, 1800, 1000, 0 }
+#ifdef SC64_T4_RUNTIME
+    /* The source's 100000 HP cannot fit Sc64RaceBuildingRule.hp (u16).
+       Zero is a sentinel; T4 spawn hooks must use the int accessor below. */
+    , [B_TERRAN_BEACON] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 0, 0, 0, 0, 0 }
+#endif
 };
 
 static inline const Sc64RaceUnitRule *sc64_race_unit_rule(int type)
@@ -158,6 +181,9 @@ static inline const char *sc64_race_unit_name(int type)
         "FENIX","CHRYSALIS","QUEEN","GOLIATH","SIEGE TANK","WRAITH",
         "MUTALISK","HUNTER KILLER","REAVER","FENIX DRAGOON","SIEGE TANK",
         "VULTURE","DROPSHIP","SCOURGE"
+#ifdef SC64_T4_RUNTIME
+        ,"GHOST","CIVILIAN","RHYNADON","RAGNASAUR","MAP REVEALER","DATA DISK"
+#endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
 }
@@ -171,6 +197,9 @@ static inline const char *sc64_race_building_name(int type)
         "CEREBRATE","LAIR","STARGATE","STARPORT","MISSILE TURRET","SPORE COLONY",
         "ZERG BEACON","FACTORY","ROBOTICS FACILITY","MATURE CHRYSALIS",
         "HIVE","GREATER SPIRE"
+#ifdef SC64_T4_RUNTIME
+        ,"TERRAN BEACON"
+#endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
 }
@@ -186,12 +215,185 @@ static inline unsigned short sc64_race_building_shields(int type)
     }
 }
 
+#ifdef SC64_T4_RUNTIME
+/* T4-only actor policy bits. A zero result means use the pre-existing generic
+   behavior; these flags are explicit exceptions for imported special actors. */
+enum {
+    SC64_T4_ACTOR_SELECTABLE = 1,
+    SC64_T4_ACTOR_MOVABLE = 2,
+    SC64_T4_ACTOR_COLLIDABLE = 4,
+    SC64_T4_ACTOR_DRAWABLE = 8,
+    SC64_T4_ACTOR_MEN = 16,
+    SC64_T4_ACTOR_BUILDING = 32,
+    SC64_T4_ACTOR_INVINCIBLE = 64,
+    SC64_T4_ACTOR_HIDDEN = 128,
+    SC64_T4_ACTOR_WEAPON = 256
+};
+static inline unsigned sc64_race_t4_actor_flags(int type)
+{
+    switch (type) {
+    case U_GHOST:
+    case U_CIVILIAN:
+        return SC64_T4_ACTOR_SELECTABLE | SC64_T4_ACTOR_MOVABLE |
+               SC64_T4_ACTOR_COLLIDABLE | SC64_T4_ACTOR_DRAWABLE |
+               SC64_T4_ACTOR_MEN | (type == U_GHOST ? SC64_T4_ACTOR_WEAPON : 0);
+    case U_RHYNADON: case U_RAGNASAUR:
+        return SC64_T4_ACTOR_MOVABLE | SC64_T4_ACTOR_COLLIDABLE |
+               SC64_T4_ACTOR_DRAWABLE | SC64_T4_ACTOR_MEN;
+    case U_MAP_REVEALER:
+        return SC64_T4_ACTOR_HIDDEN;
+    case U_DATA_DISK:
+        return SC64_T4_ACTOR_DRAWABLE | SC64_T4_ACTOR_INVINCIBLE;
+    default:
+        return 0;
+    }
+}
+static inline unsigned sc64_race_t4_building_flags(int type)
+{
+    return type == B_TERRAN_BEACON ?
+        SC64_T4_ACTOR_DRAWABLE | SC64_T4_ACTOR_BUILDING |
+        SC64_T4_ACTOR_INVINCIBLE : 0;
+}
+/* BWAPI stores bounding offsets in source pixels; callers applying the GBA's
+   2:1 map scale should convert these raw offsets at their query boundary. */
+static inline int sc64_race_t4_bounds_source(int type, int *left, int *up,
+                                             int *right, int *down)
+{
+    int l, u, r, d;
+    switch (type) {
+    case U_GHOST: l=7; u=10; r=7; d=11; break;
+    case U_CIVILIAN: l=8; u=9; r=8; d=10; break;
+    case U_RHYNADON: case U_RAGNASAUR: l=16; u=16; r=15; d=15; break;
+    case U_MAP_REVEALER: l=13; u=13; r=13; d=17; break;
+    case U_DATA_DISK: l=16; u=16; r=15; d=15; break;
+    default: return 0;
+    }
+    if (left) *left=l;
+    if (up) *up=u;
+    if (right) *right=r;
+    if (down) *down=d;
+    return 1;
+}
+static inline int sc64_race_t4_building_bounds_source(int type, int *left,
+                                                      int *up, int *right,
+                                                      int *down)
+{
+    if (type != B_TERRAN_BEACON) return 0;
+    if (left) *left=48;
+    if (up) *up=32;
+    if (right) *right=47;
+    if (down) *down=31;
+    return 1;
+}
+static inline int sc64_race_t4_sight_source_pixels(int type)
+{
+    switch (type) {
+    case U_GHOST: return 9*32;
+    case U_CIVILIAN: case U_RHYNADON: case U_RAGNASAUR: return 7*32;
+    case U_MAP_REVEALER: return 10*32;
+    case U_DATA_DISK: return 5*32;
+    default: return 0;
+    }
+}
+static inline int sc64_race_t4_building_sight_source_pixels(int type)
+{
+    /* BWAPI UnitType::sightRange() is tile based; Special_Terran_Beacon
+       (raw 195) has sightRangeTiles[195] == 8. */
+    return type == B_TERRAN_BEACON ? 8 * 32 : 0;
+}
+static inline int sc64_race_t4_unit_intrinsically_invincible(int type)
+{ return type == U_DATA_DISK; }
+static inline int sc64_race_t4_building_intrinsically_invincible(int type)
+{ return type == B_TERRAN_BEACON; }
+static inline int sc64_race_building_max_hp(int type)
+{ const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
+  return type == B_TERRAN_BEACON ? 100000 : r ? r->hp : 0; }
+/* C-10 Canister Rifle is Concussive, and Terran Infantry Weapons add one
+   point per level. This model has no cloak/lockdown/nuke state. */
+enum { SC64_RACE_DAMAGE_NORMAL, SC64_RACE_DAMAGE_CONCUSSIVE };
+static inline int sc64_race_t4_weapon_damage_type(int type)
+{ return type == U_GHOST ? SC64_RACE_DAMAGE_CONCUSSIVE : SC64_RACE_DAMAGE_NORMAL; }
+static inline int sc64_race_t4_weapon_upgrade_bonus(int type)
+{ return type == U_GHOST ? 1 : 0; }
+
+/* BWAPI UnitSizeTypes: raw 0 Small, 1 Medium, 2 Large, 3 Independent.
+   Values verified in the pinned BWAPI UnitType.cpp unitSizes::unitSize table.
+   -1 means this helper has no source-size fact for that raw type. */
+enum {
+    SC64_T4_SIZE_UNKNOWN = -1,
+    SC64_T4_SIZE_INDEPENDENT = 0,
+    SC64_T4_SIZE_SMALL = 1,
+    SC64_T4_SIZE_MEDIUM = 2,
+    SC64_T4_SIZE_LARGE = 3
+};
+static inline int sc64_race_t4_source_size(int raw_type)
+{
+    switch (raw_type) {
+    case 0: case 1: case 7: case 15: case 20: case 32: case 34: case 37:
+    case 41: case 43: case 47: case 64: case 65: case 77: case 79:
+    case 89: case 95:
+        return SC64_T4_SIZE_SMALL;
+    case 2: case 19: case 38: case 45: case 53:
+        return SC64_T4_SIZE_MEDIUM;
+    /* All currently supported canonical building raws are Large except the
+       two special faction Beacons, whose BWAPI size is Independent. */
+    case 3: case 5: case 8: case 11: case 30: case 42: case 66: case 70:
+    case 78: case 83: case 106: case 109: case 110: case 111: case 112:
+    case 113: case 114: case 124: case 125: case 130: case 131: case 132:
+    case 133: case 135: case 137: case 139: case 141: case 142: case 143:
+    case 144: case 146: case 149: case 150: case 151: case 154: case 155:
+    case 156: case 157: case 160: case 162: case 164: case 166: case 167:
+        return SC64_T4_SIZE_LARGE;
+    case 101: case 194: case 195: case 216: case 218:
+        return SC64_T4_SIZE_INDEPENDENT;
+    default:
+        return SC64_T4_SIZE_UNKNOWN;
+    }
+}
+
+/* Apply armor and the Ghost's Concussive size factor to damage left after
+   shields. Weapon upgrades must be applied before shield absorption, as in
+   tick_combat; adding them here would count shield damage incorrectly.
+   Positive integer HP uses
+   floor division for Medium/Large and a minimum of 1; BW's fractional damage
+   can retain fractional HP, so this bounded integer policy may differ by 1 HP.
+   Damage and armor are bounded to keep this helper safe on target integer
+   widths. */
+static inline int sc64_race_t4_ghost_hp_damage(int raw_target, int raw_damage,
+                                              int armor)
+{
+    if (raw_damage < 0) raw_damage = 0;
+    if (raw_damage > 100000) raw_damage = 100000;
+    if (armor < 0) armor = 0;
+    if (armor > 100000) armor = 100000;
+    int post_armor = raw_damage - armor;
+    if (post_armor < 1) post_armor = 1;
+
+    switch (sc64_race_t4_source_size(raw_target)) {
+    case SC64_T4_SIZE_MEDIUM:
+        post_armor /= 2;
+        break;
+    case SC64_T4_SIZE_LARGE:
+        post_armor /= 4;
+        break;
+    default:
+        /* Small and Independent receive full Concussive damage. Unknown raw
+           types also use full damage until their source class is audited. */
+        break;
+    }
+    return post_armor > 0 ? post_armor : 1;
+}
+#endif
+
 /* Combat tuning uses BWAPI public default damage/range/cooldown facts and
  * retains pixel ranges and simulation-frame cooldowns. */
 static inline int sc64_race_unit_damage(int type)
 {
     switch (type) {
     case U_SCV: case U_DRONE: case U_PROBE: return 5;
+#ifdef SC64_T4_RUNTIME
+    case U_GHOST: return 10;
+#endif
     case U_MARINE: return 6; case U_FIREBAT: return 8;
     case U_ZERGLING: return 5; case U_HYDRALISK: return 10;
     case U_ZEALOT: return 8; case U_DRAGOON: return 20;
@@ -210,6 +412,9 @@ static inline int sc64_race_unit_range(int type)
 {
     switch (type) {
     case U_WRAITH: case U_VULTURE: return 160;
+#ifdef SC64_T4_RUNTIME
+    case U_GHOST: return 224;
+#endif
     case U_GOLIATH: return 192;
     case U_TANK: return 224;
     case U_MARINE: case U_HYDRALISK: case U_DRAGOON: case U_SCOUT:
@@ -227,6 +432,9 @@ static inline int sc64_race_unit_cooldown(int type)
 {
     switch (type) {
     case U_ZERGLING: return 8; case U_MARINE: return 15;
+#ifdef SC64_T4_RUNTIME
+    case U_GHOST: return 22;
+#endif
     case U_VULTURE: return 30;
     case U_HYDRALISK: return 15; case U_FIREBAT: return 22;
     case U_ZEALOT: return 22; case U_DRAGOON: return 30;
@@ -240,12 +448,39 @@ static inline int sc64_race_unit_cooldown(int type)
 }
 
 static inline int sc64_race_unit_flying(int type)
-{ return type == U_OVERLORD || type == U_WRAITH || type == U_MUTALISK || type == U_SCOUT || type == U_QUEEN || type == U_DROPSHIP || type == U_SCOURGE; }
+{ return type == U_OVERLORD || type == U_WRAITH || type == U_MUTALISK || type == U_SCOUT || type == U_QUEEN || type == U_DROPSHIP || type == U_SCOURGE
+#ifdef SC64_T4_RUNTIME
+    || type == U_MAP_REVEALER
+#endif
+    ; }
+
+/* Weapon eligibility against aircraft is intentionally separate from
+   damage: C-10 and several existing weapons have different air values. */
+static inline int sc64_race_unit_damage(int type);
+static inline int sc64_race_unit_can_attack_air(int type)
+{
+    switch (type) {
+    case -1: case U_MARINE: case U_HYDRALISK: case U_HUNTER_KILLER:
+    case U_DRAGOON: case U_FENIX_DRAGOON: case U_GOLIATH:
+    case U_WRAITH: case U_MUTALISK: case U_SCOUT:
+#ifdef SC64_T4_RUNTIME
+    case U_GHOST:
+#endif
+        return 1;
+    default: return 0;
+    }
+}
+static inline int sc64_race_unit_can_attack_target_class(int type, int flying)
+{ return type < 0 || (flying ? sc64_race_unit_can_attack_air(type) :
+                      sc64_race_unit_damage(type) > 0); }
 
 /* Ground and air weapons can differ on the same unit. Damage is per hit;
  * expose the number of simultaneous blade hits so armor is applied per hit. */
 static inline int sc64_race_unit_damage_vs(int type, int target_flying)
 {
+#ifdef SC64_T4_RUNTIME
+    if (type == U_GHOST) return 10;
+#endif
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     /* Pinned BWAPI Suicide_Scourge: 110 normal damage, cooldown 1, 3px
      * maximum range, air-only. game.c applies the engine's 2:1 scale. */
@@ -261,6 +496,9 @@ static inline int sc64_race_unit_damage_vs(int type, int target_flying)
 }
 static inline int sc64_race_unit_range_vs(int type, int target_flying)
 {
+#ifdef SC64_T4_RUNTIME
+    if (type == U_GHOST) return 224;
+#endif
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     if (type == U_SCOURGE) return target_flying ? 3 : 0;
 #endif
@@ -273,6 +511,9 @@ static inline int sc64_race_unit_range_vs(int type, int target_flying)
 }
 static inline int sc64_race_unit_cooldown_vs(int type, int target_flying)
 {
+#ifdef SC64_T4_RUNTIME
+    if (type == U_GHOST) return 22;
+#endif
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     if (type == U_SCOURGE) return target_flying ? 1 : 0;
 #endif
@@ -326,6 +567,11 @@ static inline int sc64_race_raw_unit(int type)
     case U_TANK: return 5; case U_SIEGE_TANK: return 30;
     case U_WRAITH: return 8; case U_CHRYSALIS: return 216;
     case U_VULTURE: return 2; case U_DROPSHIP: return 11; case U_SCOURGE: return 47;
+#ifdef SC64_T4_RUNTIME
+    case U_GHOST: return 1; case U_CIVILIAN: return 15;
+    case U_RHYNADON: return 89; case U_RAGNASAUR: return 95;
+    case U_MAP_REVEALER: return 101; case U_DATA_DISK: return 218;
+#endif
     default: return -1;
     }
 }
@@ -347,6 +593,9 @@ static inline int sc64_race_raw_building(int type)
     case B_PHOTON_CANNON: return 162; case B_CYBERNETICS_CORE: return 164;
     case B_FORGE: return 166; case B_STARGATE: return 167; case B_FACTORY: return 113;
     case B_STARPORT: return 114; case B_MISSILE_TURRET: return 124; case B_ZERG_BEACON: return 194;
+#ifdef SC64_T4_RUNTIME
+    case B_TERRAN_BEACON: return 195;
+#endif
     default: return -1;
     }
 }
@@ -376,6 +625,11 @@ static inline int sc64_race_unit_from_raw(int raw)
     case 8: return U_WRAITH; case 43: return U_MUTALISK;
     case 53: return U_HUNTER_KILLER; case 216: return U_CHRYSALIS;
     case 47: return U_SCOURGE;
+#ifdef SC64_T4_RUNTIME
+    case 1: return U_GHOST; case 15: return U_CIVILIAN;
+    case 89: return U_RHYNADON; case 95: return U_RAGNASAUR;
+    case 101: return U_MAP_REVEALER; case 218: return U_DATA_DISK;
+#endif
     default: return -1;
     }
 }
@@ -404,6 +658,9 @@ static inline int sc64_race_building_from_raw(int raw)
     case 166: return B_FORGE; case 167: return B_STARGATE;
     case 150: return B_MATURE_CHRYSALIS;
     case 133: return B_HIVE; case 137: return B_GREATER_SPIRE;
+#ifdef SC64_T4_RUNTIME
+    case 195: return B_TERRAN_BEACON;
+#endif
     default: return -1;
     }
 }

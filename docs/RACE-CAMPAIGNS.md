@@ -208,11 +208,10 @@ make test-sc64-t4-import
 ```
 
 The fixture checks all 95 non-start placements and the full 128×128 Installation
-terrain. Eight special Terran Beacons retain their raw type until runtime
-support exists. The importer retains the framed location, doodad, sprite and
+terrain. Eight special Terran Beacons retain their raw type and use dedicated
+internal actor and save handling. The importer retains the framed location, doodad, sprite and
 trigger records with hashes under ignored `.local/sc64/races/generated/t4/`.
-This stage does not expose the mission in the catalog: doors, teleports,
-rescue behavior and mission triggers still need implementation.
+This import stage does not expose the mission in the catalog.
 
 `make test-sc64-t4-storage sc64-t4-storage-probe` separately checks the T4-only
 128×128 storage profile and links `build/starcraft-t4-storage-probe.elf`.
@@ -221,6 +220,16 @@ and the shared 256-event debugger queue. It has a distinct save generation.
 The tests cover the bottom-right cell and max-size fog persistence using an
 existing available mission; they do not load or complete Jacobs Installation.
 This probe produces an ELF for memory validation, with no playable T4 ROM.
+
+The gated internal actor/world probe can be checked with
+`make test-sc64-t4-actors`. It loads the 95 source actors and tests their
+supported roles, sight, bounded integer Ghost/concussive behavior, canonical
+Beacon save encoding, and the authored Rescue Passive contact/transfer policy.
+Rescue contact currently uses an inclusive 32-pixel square in GBA coordinates
+as a center-based approximation; it does not claim exact native query edges or
+ordering. The T4 catalog remains disabled and the scenario is not playable.
+Door and trap collision/state, teleports, trigger actions, objective behavior
+and completion still need implementation. No T4 frame-rate result is claimed.
 
 `make test-sc64-large-map sc64-large-probe` checks the opt-in
 `SC64_LARGE_MAPS` storage layout, including packed fog/path grids, larger
