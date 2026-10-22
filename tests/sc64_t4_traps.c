@@ -167,12 +167,116 @@ test_target_order_range_and_eligibility(void)
     assert(u[far].hp == 100);
 
     reset_world();
+    put_trap(8, 0, B_WALL_FLAME_TRAP, 100, 100);
+    int edge = put_unit(SIDE, U_MARINE, 20, 132, 100);
+    u[edge].hp = 100;
+    race_t4_traps_tick();
+    assert(u[edge].hp == 92); /* Inclusive exact source-scaled range. */
+
+    reset_world();
+    put_trap(8, 0, B_FLOOR_GUN_TRAP, 100, 100);
+    int first_unit = put_unit(SIDE, U_MARINE, 20, 90, 100);
+    u[first_unit].hp = 100;
+    b[0].alive = 1; b[0].type = B_COMMAND; b[0].raw_type = 106;
+    b[0].raw_owner = 0; b[0].owner = SIDE; b[0].x = 110; b[0].y = 100;
+    b[0].hp = b[0].maxhp = 100;
+    race_t4_traps_tick();
+    assert(u[first_unit].hp == 90 && b[0].hp == 100);
+
+    reset_world();
     put_trap(8, 0, B_FLOOR_GUN_TRAP, 100, 100);
     b[8].raw_owner = 4;
     int mismapped = put_unit(SIDE, U_MARINE, 20, 100, 100);
     u[mismapped].hp = 100;
     race_t4_traps_tick();
     assert(u[mismapped].hp == 100 && b[8].queue_progress == 0);
+}
+
+static unsigned
+test_random_next(unsigned *state)
+{
+    *state = *state * 1664525u + 1013904223u;
+    return *state;
+}
+
+static void
+test_cached_candidates_match_bruteforce(void)
+{
+    static const int unit_types[] = {U_MARINE, U_WRAITH, U_GHOST, U_DRONE};
+    static const int unit_raws[] = {20, 8, 1, 41};
+    static const int building_types[] = {
+        B_COMMAND, B_HATCHERY, B_FLOOR_GUN_TRAP, B_TERRAN_BEACON
+    };
+    static const int building_raws[] = {106, 131, 209, 195};
+    static const int trap_types[] = {
+        B_FLOOR_MISSILE_TRAP, B_FLOOR_GUN_TRAP,
+        B_WALL_FLAME_TRAP, B_RIGHT_WALL_MISSILE_TRAP
+    };
+    unsigned random = 0x4a731b29u;
+    for (unsigned trial = 0; trial < 80; ++trial) {
+        u16 candidates[MAX_UNITS + MAX_BUILDINGS];
+        Building probes[4];
+        Sc64T4TrapRule rules[4];
+        unsigned count;
+        reset_world();
+        for (int i = 0; i < 96; ++i) {
+            unsigned r = test_random_next(&random);
+            int owner = (int)((r >> 24) % 5);
+            int type_index = (int)((r >> 16) % 4);
+            int x = (int)((r >> 8) % 321);
+            int y = (int)(r % 321);
+            int slot = put_unit(owner, unit_types[type_index],
+                                unit_raws[type_index], x, y);
+            if ((r & 0x40000000u) != 0) u[slot].flags |= 16;
+            if ((r & 0x20000000u) != 0) invincible_units[slot] = 1;
+        }
+        for (int i = 0; i < 32; ++i) {
+            unsigned r = test_random_next(&random);
+            int owner = (int)((r >> 24) % 5);
+            int type_index = (int)((r >> 16) % 4);
+            b[i].alive = (r & 0x80000000u) != 0;
+            b[i].owner = owner;
+            b[i].raw_owner = owner == SIDE ? 0 : 3;
+            b[i].type = building_types[type_index];
+            b[i].raw_type = building_raws[type_index];
+            b[i].x = (int)((r >> 8) % 321);
+            b[i].y = (int)(r % 321);
+            b[i].flags = (r & 0x40000000u) ? 16 : 0;
+            invincible_buildings[i] = (u8)((r & 0x20000000u) != 0);
+        }
+        count = race_t4_trap_build_candidates(candidates);
+        for (int i = 0; i < 4; ++i) {
+            unsigned r = test_random_next(&random);
+            memset(&probes[i], 0, sizeof(probes[i]));
+            probes[i].alive = 1;
+            probes[i].owner = 4;
+            probes[i].type = trap_types[i];
+            probes[i].x = (int)((r >> 8) % 321);
+            probes[i].y = (int)(r % 321);
+            assert(race_t4_trap_rule(trap_types[i], &rules[i]));
+            assert(race_t4_trap_find_target(&probes[i], &rules[i]) ==
+                   race_t4_trap_find_candidate_target(&probes[i], &rules[i],
+                                                      candidates, count));
+        }
+    }
+}
+
+static void
+test_cached_candidates_recheck_death_between_traps(void)
+{
+    int first, second;
+    reset_world();
+    put_trap(8, 0, B_FLOOR_GUN_TRAP, 100, 100);
+    put_trap(9, 1, B_FLOOR_GUN_TRAP, 100, 100);
+    first = put_unit(SIDE, U_MARINE, 20, 100, 100);
+    second = put_unit(SIDE, U_MARINE, 20, 101, 100);
+    u[first].hp = 10;
+    u[second].hp = 100;
+    race_t4_traps_tick();
+    assert(!u[first].alive);
+    assert(u[second].hp == 90);
+    assert(b[8].queue_progress == SC64_T4_TRAP_COOLDOWN);
+    assert(b[9].queue_progress == SC64_T4_TRAP_COOLDOWN);
 }
 
 static void
@@ -246,6 +350,8 @@ main(void)
     test_each_trap_fires_and_uses_factor();
     test_factor_hits_shields_and_armor_per_strike();
     test_target_order_range_and_eligibility();
+    test_cached_candidates_match_bruteforce();
+    test_cached_candidates_recheck_death_between_traps();
     test_disabled_intrinsic_and_cooldown();
     test_building_targets_and_side_supply_death();
     test_invalid_target_indices_are_ignored();

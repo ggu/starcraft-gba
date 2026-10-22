@@ -527,7 +527,13 @@ race_campaign_tick(void)
     ++race_campaign.elapsed_frames;
 #ifdef SC64_T4_RUNTIME
     if (mission == SC64_T4_GLOBAL_ID) {
+#if defined(SC64_DIAGNOSTIC_UPDATE) && defined(SC64_T4_SCENARIO_RUNTIME)
+        u32 t4_rescue_start = gba_clock();
+#endif
         race_t4_world_tick();
+#if defined(SC64_DIAGNOSTIC_UPDATE) && defined(SC64_T4_SCENARIO_RUNTIME)
+        sc64_t4_rescue_cycles = gba_clock() - t4_rescue_start;
+#endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
         if (!race_t4_tick()) screen = SCREEN_PAUSE;
 #else

@@ -29,7 +29,9 @@ LARGE_PROBE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_CAMPAIGN_RA
 P3_OPTIMIZATION_FLAGS ?= -DSC64_ROUTE_PACK3 -DSC64_P3_DEFENSE_TARGETS -DSC64_P3_WINDOWED_SCHEDULE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS
 P3_FLAGS := $(LARGE_PROBE_FLAGS) -DSC64_P3_ENABLED -DSC64_P3_RUNTIME $(P3_OPTIMIZATION_FLAGS) $(P3_EXTRA_FLAGS)
 T4_STORAGE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_T4_ENABLED -DSC64_T4_RUNTIME -DSC64_ROUTE_PACK3 -DSC64_T4_WINDOWED_SCHEDULE -DSC64_CAMPAIGN_RACE=0
-T4_RUNTIME_FLAGS := $(T4_STORAGE_FLAGS) -DSC64_T4_SCENARIO_RUNTIME
+T4_OPTIMIZATION_FLAGS ?=
+T4_SCENARIO_FLAGS := $(T4_STORAGE_FLAGS) -DSC64_T4_SCENARIO_RUNTIME
+T4_RUNTIME_FLAGS := $(T4_SCENARIO_FLAGS) $(T4_OPTIMIZATION_FLAGS)
 T4_REPLAY_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T4_REPLAY_ENTRY
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
 T4_SCENARIO_RECORDS := .local/sc64/races/generated/t4/records
@@ -239,6 +241,19 @@ test-sc64-t4-frontend-entry: build/test-sc64-t4-entry-on build/test-sc64-t4-entr
 	./build/test-sc64-t4-entry-on
 	./build/test-sc64-t4-entry-off
 test-starcraft: test-sc64-t4-frontend-entry
+T4_FRAME_TESTS := $(addprefix build/test-sc64-t4-frame-,base scroll noclear cull scroll-noclear scroll-cull noclear-cull all)
+build/test-sc64-t4-frame-scroll: T4_FRAME_FLAGS := -DSC64_TERRAIN_SCROLL
+build/test-sc64-t4-frame-noclear: T4_FRAME_FLAGS := -DSC64_NO_FRAME_CLEAR
+build/test-sc64-t4-frame-cull: T4_FRAME_FLAGS := -DSC64_STATIC_KEY_CULL
+build/test-sc64-t4-frame-scroll-noclear: T4_FRAME_FLAGS := -DSC64_TERRAIN_SCROLL -DSC64_NO_FRAME_CLEAR
+build/test-sc64-t4-frame-scroll-cull: T4_FRAME_FLAGS := -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL
+build/test-sc64-t4-frame-noclear-cull: T4_FRAME_FLAGS := -DSC64_NO_FRAME_CLEAR -DSC64_STATIC_KEY_CULL
+build/test-sc64-t4-frame-all: T4_FRAME_FLAGS := -DSC64_TERRAIN_SCROLL -DSC64_NO_FRAME_CLEAR -DSC64_STATIC_KEY_CULL
+$(T4_FRAME_TESTS): build/test-sc64-t4-frame-%: tests/sc64_t4_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T4_SCENARIO_FLAGS) $(T4_FRAME_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-t4-frame-coverage
+test-sc64-t4-frame-coverage: $(T4_FRAME_TESTS)
+	@for fixture in $^; do ./$$fixture || exit $$?; done
 build/test-sc64-t4-actor-rules: tests/sc64_t4_actor_rules.c starcraft/race_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_T4_RUNTIME -I. $< -o $@
 build/test-sc64-t4-world: tests/sc64_t4_world.c starcraft/sc64_t4_world.h Makefile | build

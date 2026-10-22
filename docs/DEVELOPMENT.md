@@ -190,6 +190,20 @@ symbols/DWARF, and saves private checkpoint/progress reports with ROM and trace
 hashes. A replay that reaches a recorded limit or loss verifies that attempt;
 only a matching source-trigger win can report `verified_win`.
 
+For changes to cached terrain or prop presentation, run all eight combinations
+of scrolling, clear suppression and static-key culling:
+
+```sh
+make test-sc64-t4-frame-coverage
+```
+
+The fixture compares both poisoned alternating framebuffers against an
+independently cleared, freshly rendered full frame. It covers door/trap state
+and binding changes, camera edges, fog, pause/results and restart/save/load.
+`T4_OPTIMIZATION_FLAGS` allows opt-in build comparisons; its default is empty.
+Diagnostic builds with `SC64_DIAGNOSTIC_UPDATE` expose separate rescue, trigger
+and trap cycle counters, which the controller replay report records when present.
+
 ## Troubleshooting
 
 - If `doctor` reports a missing required tool, install that tool and confirm its command is on `PATH`. ARM GCC also needs the matching `arm-none-eabi-objcopy` and `arm-none-eabi-size` commands. On a custom toolchain prefix, set `PREFIX` to the prefix used by all three commands.

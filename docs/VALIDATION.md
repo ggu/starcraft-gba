@@ -950,6 +950,36 @@ bytes, 388 data bytes and 251,840 BSS bytes. Its IWRAM end is `0x03004ff8` and
 BSS end is `0x0203d948`; the existing reserve guards are unchanged. Standard
 default/unified ROM checksums remain unchanged.
 
+## T4 trap candidates and cached prop rendering (2026-10-23)
+
+Trap targeting now builds one bounded, lazy stack-local list of eligible
+actors per trap update. Every trap still checks current target life, inclusive
+range and the original lowest-slot tie order. Differential fixtures compare
+the candidate path with the original full scan across 80 deterministic random
+worlds, edge/tie cases and a target killed between consecutive traps.
+
+The static terrain keys now include mutable T4 doodad state and bindings, plus
+raw building identity. This fixes stale door/trap art after a state change.
+Eight ASan/UBSan framebuffer variants cover all combinations of terrain
+scrolling, frame-clear suppression and static-key culling. Each compares
+poisoned alternating buffers with an independently cleared fresh-render oracle,
+including both toggle directions for all eight prop types and save/load.
+
+On the same 5,000-tick solo prefix recorded above, the corrected trap candidate
+build (`4850e084e6fd0c637d516cb4e6041a4f07ab2f76b87d006917dd8f6072aeefe9`)
+averages 23.38 effective fps over 3,997 counted live frames, compared with 17.19
+for the prevalidated build. All six compared gameplay observations and all
+three PNG captures match. This prefix does not establish full mission
+completion or near-30-fps operation; the prop fixtures separately exercise
+the corrected visual invalidation.
+
+Default build/tests (101 Python checks), unified build/tests and focused T4
+runtime, save, trap, prop and ping checks pass. The internal ARM build uses
+1,511,116 text bytes, 388 data bytes and 252,352 BSS bytes. IWRAM ends at
+`0x03004ff8`, BSS at `0x0203db48`; both unchanged reserve guards pass. Default
+and unified ROM hashes are unchanged. Diagnostic-only counters split rescue,
+trigger and trap work without adding counters to release builds.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

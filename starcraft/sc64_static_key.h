@@ -7,7 +7,11 @@
 static unsigned
 sc64_static_objects_key(void)
 {
-    enum { FIELDS = MAX_MINERALS * 4 + 4 * 3 + MAX_BUILDINGS * 6 };
+    enum { FIELDS = MAX_MINERALS * 4 + 4 * 3 + MAX_BUILDINGS * 6
+#ifdef SC64_T4_SCENARIO_RUNTIME
+                    + 32 * 2
+#endif
+    };
     static int previous[FIELDS];
     static unsigned generation;
     int n = 0, changed = 0;
@@ -57,6 +61,15 @@ sc64_static_objects_key(void)
 #endif
         } else n += 5;
     }
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    /* Prop state changes the endpoint/visibility drawn into this cache.
+     * Include the slot binding too, so restart/load cannot reuse art captured
+     * for a previous mapping. */
+    for (int i = 0; i < 32; ++i) {
+        SC64_STATIC_FIELD(race_t4.doodad_slot[i]);
+        SC64_STATIC_FIELD(race_t4.doodad_enabled[i]);
+    }
+#endif
 #undef SC64_STATIC_FIELD
     if (changed) ++generation;
     return generation;

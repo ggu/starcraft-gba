@@ -154,9 +154,59 @@ race_t4_trap_find_target(const Building *trap, const Sc64T4TrapRule *rule)
     return selected;
 }
 
+/* Build the source-slot-ordered candidate superset once for the trap pass.
+ * Trap resolution can kill actors, but does not change owner, type, flags,
+ * flight, or invincibility; the cached selector therefore rechecks alive on
+ * each query while reusing only those invariant filters. */
+static unsigned
+race_t4_trap_build_candidates(u16 *targets)
+{
+    unsigned count = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && owners_hostile(4, u[i].owner) &&
+            !invincible_units[i] && !(u[i].flags & 16) &&
+            !(sc64_race_t4_actor_flags(u[i].type) & SC64_T4_ACTOR_HIDDEN) &&
+            !sc64_race_t4_unit_intrinsically_invincible(u[i].type) &&
+            !sc64_race_unit_flying(u[i].type)) targets[count++] = (u16)i;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && owners_hostile(4, b[i].owner) &&
+            !invincible_buildings[i] && !(b[i].flags & 16) &&
+            !sc64_race_t4_building_intrinsically_invincible(b[i].type))
+            targets[count++] = (u16)(MAX_UNITS + i);
+    return count;
+}
+
+static int
+race_t4_trap_find_candidate_target(const Building *trap,
+                                   const Sc64T4TrapRule *rule,
+                                   const u16 *targets, unsigned count)
+{
+    int selected = -1;
+    int best = rule->range * rule->range;
+    for (unsigned n = 0; n < count; ++n) {
+        int target = targets[n];
+        int x, y, dx, dy, d;
+        if (!target_alive(target)) continue;
+        x = target_x(target); y = target_y(target);
+        dx = x - trap->x; dy = y - trap->y;
+        if (dx < 0) dx = -dx;
+        if (dy < 0) dy = -dy;
+        if (dx > rule->range || dy > rule->range) continue;
+        d = dist2(trap->x, trap->y, x, y);
+        if (d <= best && (selected < 0 || d < best)) {
+            selected = target;
+            best = d;
+        }
+    }
+    return selected;
+}
+
 static void
 race_t4_traps_tick(void)
 {
+    u16 candidates[MAX_UNITS + MAX_BUILDINGS];
+    unsigned candidate_count = 0;
+    int candidates_ready = 0;
     if (!race_t4_active()) return;
     for (unsigned row = 0; row < 32; ++row) {
         int slot = race_t4.doodad_slot[row];
@@ -173,7 +223,13 @@ race_t4_traps_tick(void)
             --trap->queue_progress;
             if (trap->queue_progress > 0) continue;
         }
-        target = race_t4_trap_find_target(trap, &rule);
+        if (!candidates_ready) {
+            candidate_count = race_t4_trap_build_candidates(candidates);
+            candidates_ready = 1;
+        }
+        target = race_t4_trap_find_candidate_target(trap, &rule,
+                                                    candidates,
+                                                    candidate_count);
         if (target < 0) continue;
         add_tracer(trap->x, trap->y, target_x(target), target_y(target), C_RED);
         for (int hit = 0; hit < rule.factor && target_alive(target); ++hit)

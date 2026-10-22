@@ -38,6 +38,13 @@ T4_STATE_BYTES = 1268
 T4_PLAYERS = 8
 T4_TRIGGER_LIMIT = 64
 CHECKPOINT_TICKS = scheduler.CHECKPOINT_TICKS
+T4_CYCLE_NAMES = ("sc64_t4_rescue_cycles", "sc64_t4_script_cycles", "sc64_t4_trap_cycles")
+
+
+def profile_counters(rsp, sym: dict[str, int]) -> tuple[dict, dict]:
+    cycles, routes = scheduler.profile_counters(rsp, sym)
+    cycles.update({name: profile.u32(rsp, sym[name]) for name in T4_CYCLE_NAMES if name in sym})
+    return cycles, routes
 
 
 def validate_trace(trace: object, capacity: int, *, windowed: bool = True) -> dict:
@@ -464,7 +471,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
 
         previous = t4_snapshot(rsp, sym, sizes, bank, campaign_layout, t4_layout, trigger_layout)
         previous_clock = profile.hardware_clock(rsp)
-        previous_cycles, previous_routes = scheduler.profile_counters(rsp, sym)
+        previous_cycles, previous_routes = profile_counters(rsp, sym)
         previous_buckets = list(struct.unpack("<8I", rsp.read(sym["demo_tick_buckets"], 32)))
         counted_frames = counted_cycles = 0
         record({"tick": 0, "host_tick": 0, "elapsed_hardware_cycles": 0, "frame_delta": 0,
@@ -505,7 +512,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
             if counted:
                 counted_frames += frame_delta
                 counted_cycles += elapsed
-            cycles, routes = scheduler.profile_counters(rsp, sym)
+            cycles, routes = profile_counters(rsp, sym)
             buckets = list(struct.unpack("<8I", rsp.read(sym["demo_tick_buckets"], 32)))
             bucket_delta = [(value - old) & 0xFFFFFFFF for value, old in zip(buckets, previous_buckets)]
             route_delta = scheduler.route_counter_deltas(routes, previous_routes)

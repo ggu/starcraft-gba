@@ -102,6 +102,10 @@ race_t4_tick(void)
         race_t4_trigger_count, race_t4_trigger_action
     };
     if (!race_t4_active()) return 1;
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    u32 t4_script_start = gba_clock();
+    sc64_t4_script_cycles = sc64_t4_trap_cycles = 0;
+#endif
     if (race_t4.message_ticks && !--race_t4.message_ticks) race_t4.message = 0;
     if (race_t4.ping_ticks && !--race_t4.ping_ticks)
         race_t4.ping_x = race_t4.ping_y = 0;
@@ -124,7 +128,14 @@ race_t4_tick(void)
         won = 1;
         /* The frontend/completion mask remain gated until controller proof. */
     }
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    sc64_t4_script_cycles = gba_clock() - t4_script_start;
+    u32 t4_trap_start = gba_clock();
+#endif
     if (!race_t4.player[0].outcome) race_t4_traps_tick();
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    sc64_t4_trap_cycles = gba_clock() - t4_trap_start;
+#endif
     return 1;
 }
 

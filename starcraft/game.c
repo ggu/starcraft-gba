@@ -467,6 +467,9 @@ volatile u32 sc64_background_cycles, sc64_building_cycles, sc64_unit_draw_cycles
 volatile u32 sc64_update_mission_cycles, sc64_update_production_cycles;
 volatile u32 sc64_update_race_state_cycles, sc64_update_defenses_cycles;
 volatile u32 sc64_update_research_cycles, sc64_update_remainder_cycles;
+#ifdef SC64_T4_SCENARIO_RUNTIME
+volatile u32 sc64_t4_rescue_cycles, sc64_t4_script_cycles, sc64_t4_trap_cycles;
+#endif
 #endif
 #include "sc64_visibility.h"
 #endif
@@ -4116,7 +4119,16 @@ draw_building_overlay(Building *q)
 static unsigned
 sc64_static_objects_key(void)
 {
-    enum { FIELDS = MAX_MINERALS * 5 + 4 * 3 + 1 + MAX_BUILDINGS * 6 };
+    enum { FIELDS = MAX_MINERALS * 5 + 4 * 3 + 1 + MAX_BUILDINGS *
+#ifdef SC64_T4_SCENARIO_RUNTIME
+                    7
+#else
+                    6
+#endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+                    + 32 * 2
+#endif
+    };
     static int previous[FIELDS];
     static unsigned generation;
     int values[FIELDS], n = 0, changed = 0, i;
@@ -4151,8 +4163,20 @@ sc64_static_objects_key(void)
         values[n++] = q->y;
         values[n++] = q->type;
         values[n++] = q->owner;
+#ifdef SC64_T4_SCENARIO_RUNTIME
+        values[n++] = q->raw_type;
+#endif
         values[n++] = in_bounds && (q->owner == SIDE || currently_visible(q->x, q->y));
     }
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    /* Prop art is static terrain too. Door endpoints and trap visibility
+     * depend on these mutable doodad bindings even when Building slots stay
+     * unchanged. Reading them here keeps restart/load invalidation immediate. */
+    for (i = 0; i < 32; i++) {
+        values[n++] = race_t4.doodad_slot[i];
+        values[n++] = race_t4.doodad_enabled[i];
+    }
+#endif
     for (i = 0; i < n; i++) {
         if (previous[i] != values[i]) changed = 1;
         previous[i] = values[i];
