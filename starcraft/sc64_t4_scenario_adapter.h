@@ -3,6 +3,10 @@
 
 #ifdef SC64_T4_SCENARIO_RUNTIME
 
+#ifdef SC64_T4_COUNT_CACHE
+#include "sc64_t4_count_cache.h"
+#endif
+
 /* T4's immutable numeric records stay in the private generated header.
  * This driver binds them to the bounded GBA pools. Immediate door state,
  * conservative tile collision and controller eligibility are authored GBA
@@ -101,6 +105,9 @@ race_t4_tick(void)
     static const Sc64T4TriggerOps ops = {
         race_t4_trigger_count, race_t4_trigger_action
     };
+#ifdef SC64_T4_COUNT_CACHE
+    Sc64T4CountCache count_cache;
+#endif
     if (!race_t4_active()) return 1;
 #ifdef SC64_DIAGNOSTIC_UPDATE
     u32 t4_script_start = gba_clock();
@@ -109,13 +116,24 @@ race_t4_tick(void)
     if (race_t4.message_ticks && !--race_t4.message_ticks) race_t4.message = 0;
     if (race_t4.ping_ticks && !--race_t4.ping_ticks)
         race_t4.ping_x = race_t4.ping_y = 0;
+#ifdef SC64_T4_COUNT_CACHE
+    /* All source-player contexts share counts for this simulation tick. A
+     * fresh stack object scopes memoized values to this point in the update. */
+    sc64_t4_count_cache_init(&count_cache, &ops, &race_t4);
+#endif
     /* Fresh init and SRAM load fully validate every context. The scenario is
      * immutable ROM data; the runtime step preserves those state invariants. */
     for (unsigned player = 0; player < 8; ++player)
         if ((race_t4.active_mask & (1u << player)) &&
+#ifdef SC64_T4_COUNT_CACHE
+            !sc64_t4_trigger_step_prevalidated(&race_t4.player[player],
+                                  &sc64_t4_scenario, &race_t4.switches,
+                                  &sc64_t4_count_cache_ops, &count_cache, 0)) return 0;
+#else
             !sc64_t4_trigger_step_prevalidated(&race_t4.player[player],
                                   &sc64_t4_scenario, &race_t4.switches,
                                   &ops, &race_t4, 0)) return 0;
+#endif
     race_campaign.objective_stage = !!(race_t4.switches.bits[0] & 16);
     race_campaign.message = race_t4.message;
     race_campaign.message_ticks = race_t4.message_ticks;

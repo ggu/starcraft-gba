@@ -200,7 +200,10 @@ make test-sc64-t4-frame-coverage
 The fixture compares both poisoned alternating framebuffers against an
 independently cleared, freshly rendered full frame. It covers door/trap state
 and binding changes, camera edges, fog, pause/results and restart/save/load.
-`T4_OPTIMIZATION_FLAGS` allows opt-in build comparisons; its default is empty.
+`T4_OPTIMIZATION_FLAGS` enables count memoization, scrolling, clear suppression
+and static-key culling for this internal profile. For a comparison build, use
+`make -B sc64-t4-replay T4_OPTIMIZATION_FLAGS=` and freeze its ROM/ELF pair
+before rebuilding the optimized default.
 Diagnostic builds with `SC64_DIAGNOSTIC_UPDATE` expose separate rescue, trigger
 and trap cycle counters, which the controller replay report records when present.
 

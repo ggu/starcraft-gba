@@ -980,6 +980,52 @@ runtime, save, trap, prop and ping checks pass. The internal ARM build uses
 and unified ROM hashes are unchanged. Diagnostic-only counters split rescue,
 trigger and trap work without adding counters to release builds.
 
+## T4 per-tick query cache and render options (2026-10-23)
+
+The internal T4 profile now enables a bounded stack-local count cache shared
+across its eight trigger contexts. It keys immutable condition records by
+pointer and, only for Current Player selectors, execution owner. Every
+delegated action invalidates it before invocation, including retry/failure;
+each tick starts fresh. Capacity-full queries fall back to the original count
+callback. The flag-off path remains available through
+`make -B sc64-t4-replay T4_OPTIMIZATION_FLAGS=`.
+
+The asset-free ASan/UBSan cache fixtures cover owner separation, tick reset,
+failure output, capacity fallback, invalid owners, corrupt bounds, source-order
+execution and action invalidation. They are included in `./dev test`.
+Cache-enabled full-runtime and save fixtures also pass. A GCC static stack
+audit reports a 1,264-byte `race_t4_tick` frame and an estimated deepest
+trigger-action path of about 2.6 KiB within the unchanged 11 KiB reserve. This
+is compiler frame accounting, not a runtime high-water measurement.
+
+The same 5,000-tick prefix yields these effective ARM frame rates over 3,997
+counted live frames:
+
+| Internal T4 build | Effective fps |
+| --- | ---: |
+| Trap candidates and corrected prop cache keys | 23.38 |
+| Plus scrolling, clear suppression and static-key culling | 23.71 |
+| Plus count cache only | 25.37 |
+| Plus count cache and all three render options | 25.75 |
+
+All six compared gameplay observations and three PNG captures match the
+corrected baseline in each comparison. The combined build is now the internal
+profile default, with ROM SHA-256
+`90ad795fe302267442488a7f0ca27f6374ea786226a8d3367e7c412e980def12`.
+The canonical rebuild is byte-identical to the measured candidate. It uses
+1,512,204 text bytes, 388 data bytes and 251,912 BSS bytes; IWRAM ends at
+`0x03004fc8` and BSS at `0x0203d990`. Both reserve guards remain unchanged.
+
+The longer frozen group trace also matches every shared gameplay field at
+all 12 observations, including complete trigger contexts and actor pools;
+all four PNG captures match. The optimized replay averages 21.11 fps over
+8,980 counted live frames, up from 15.04. It still reaches the recorded loss
+at frame 10,156, human outcome 2, phase 4 and no faults, with
+`verified_win: false`. Default build/tests (101 Python checks), unified
+build/tests and focused T4 runtime/save/trap/prop/ping checks pass. Default
+and unified hashes are unchanged. Full mission completion and near-30-fps
+operation remain unproven.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.
