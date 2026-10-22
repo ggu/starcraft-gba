@@ -4,13 +4,25 @@
 void *memcpy(void *dst, const void *src, size_t n);
 void *memset(void *dst, int value, size_t n);
 
+#ifdef SC64_P3_RUNTIME
+#if !defined(SC64_P3_ENABLED) || !defined(SC64_UNIFIED) || \
+    !defined(SC64_RACES) || !defined(SC64_LARGE_MAPS)
+#error "SC64_P3_RUNTIME requires P3 data, unified races and large-map storage"
+#endif
+#if defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE != 2
+#error "Higher Ground belongs to the Protoss campaign"
+#endif
+#endif
+
 #if defined(SC64_RACES)
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #define MAX_UNITS 160
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_LARGE_MAPS)
+#if defined(SC64_P3_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 7u
+#elif defined(SC64_LARGE_MAPS)
 #define SC64_RACE_SAVE_GENERATION 6u
 #elif defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
 #define SC64_RACE_SAVE_GENERATION 5u
@@ -32,7 +44,9 @@ void *memset(void *dst, int value, size_t n);
 #elif defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 2
 #define SAVE_VERSION (0x53435030u + SC64_RACE_SAVE_GENERATION)
 #elif defined(SC64_UNIFIED)
-#if defined(SC64_LARGE_MAPS)
+#if defined(SC64_P3_RUNTIME)
+#define SAVE_VERSION 0x53435536u
+#elif defined(SC64_LARGE_MAPS)
 #define SAVE_VERSION 0x53435535u
 #elif defined(SC64_Z3_ENABLED)
 #define SAVE_VERSION 0x53435534u
@@ -191,6 +205,13 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 #ifdef SC64_RACES
 #include "race_rules.h"
 #include "race_missions.h"
+#ifdef SC64_P3_RUNTIME
+#include "sc64_p3_model.h"
+_Static_assert(MAX_UNITS >= 96 && MAX_BUILDINGS >= 42 && MAX_MINERALS >= 48,
+               "Higher Ground must retain its complete starting roster");
+_Static_assert(MAX_UNITS + MAX_BUILDINGS <= 255,
+               "Visibility source counts require wider storage");
+#endif
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
 #include "sc64_z3.h"
 #endif
@@ -369,6 +390,11 @@ static Sc64Z3State race_z3;
 static u16 race_z3_action_ticks;
 static u16 race_z3_action_duration(const Sc64Z3State *s);
 #endif
+#ifdef SC64_P3_RUNTIME
+static Sc64P3State race_p3;
+static u16 race_p3_action_ticks;
+static u16 race_p3_action_duration(const Sc64P3State *s);
+#endif
 static int race_queue_unit(int owner,int building,int type);
 static int race_start_build(int owner,int worker,int type,int x,int y);
 static int race_can_site(int owner,int type,int x,int y);
@@ -408,10 +434,19 @@ static int nearest_refinery(int x, int y);
 static void update_exploration(void);
 static int owner_command_center(int owner);
 static void add_owner_resources(int owner, int ore, int vespene);
+#ifdef SC64_P3_RUNTIME
+static int GBA_HOT __attribute__((noinline))
+#else
 static int GBA_HOT
+#endif
 owners_hostile(int a, int other)
 {
 #ifdef SC64_RACES
+#ifdef SC64_P3_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID)
+        return (a == SIDE && (other == ENEMY || other == 4)) ||
+               (other == SIDE && (a == ENEMY || a == 4));
+#endif
     return a!=other && a!=NEUTRAL && other!=NEUTRAL &&
         (race_mode || a==ENEMY || other==ENEMY);
 #elif defined(SC64_SKIRMISH)
@@ -1909,6 +1944,9 @@ game_init(void)
 #ifdef SC64_RACES
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
     memset(&race_z3,0,sizeof(race_z3));race_z3_action_ticks=0;
+#endif
+#ifdef SC64_P3_RUNTIME
+    memset(&race_p3,0,sizeof(race_p3));race_p3_action_ticks=0;
 #endif
     race_mode=0;race_completed=0;race_bots=2;race_skirmish_map=0;
 #ifdef SC64_CAMPAIGN_RACE
@@ -4196,6 +4234,10 @@ draw_hud_commands(void)
         else if(race_selected_mission==14)
             gfx_text(5,149,race_z3.sequence?"CHRYSALIS / MISSION REPORT":"PROTECT CHRYSALIS / CLEAR TERRAN",C_GOLD);
 #endif
+#ifdef SC64_P3_RUNTIME
+        else if(race_selected_mission==SC64_P3_GLOBAL_ID)
+            gfx_text(5,149,race_p3.sequence?"HIGHER GROUND / MISSION REPORT":"DESTROY BOTH ZERG COLONIES",C_GOLD);
+#endif
 #endif
         if(race_selected_mission==3&&race_campaign.elapsed_frames<27000u) {
             gfx_text(170,126,"ETA",C_CYAN);
@@ -4262,6 +4304,10 @@ sc64_hud_changed(void)
     values[18] = box_state == 2;
 #ifdef SC64_RACES
     values[19]=race_campaign.phase;values[20]=race_campaign.message;
+#ifdef SC64_P3_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID)
+        values[20] |= (int)race_p3.sequence << 8;
+#endif
     /* race_tick_state has already counted live supply before rendering. */
     values[23]=supply_used+race_owner_queued_supply(SIDE);
     values[21]=race_selected_mission;values[22]=frame/30;

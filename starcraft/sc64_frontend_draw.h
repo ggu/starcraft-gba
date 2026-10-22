@@ -141,6 +141,10 @@ static void front_briefing(void)
     static const char *z3_lines[5]={"PROTECT THE CHRYSALIS","ELIMINATE TERRAN","PRESENCE","",""};
     if(race_front.mission==14)mission_lines=z3_lines;
 #endif
+#if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+    static const char *p3_lines[5]={"DESTROY BOTH ZERG","COLONIES","","",""};
+    if(race_front.mission==SC64_P3_GLOBAL_ID)mission_lines=p3_lines;
+#endif
     unsigned age=race_front.ticks-race_front_transition;
     front_header("MISSION BRIEFING",front_mission_title(race_front.mission));
     gfx_rect(108,45,126,68,C_PANEL);

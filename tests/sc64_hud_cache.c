@@ -17,7 +17,9 @@ fixture(void)
     memset(m, 0, sizeof(m));
     race_mode = 0;
     race_human = R_ZERG;
-#ifdef SC64_Z3_ENABLED
+#if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+    race_selected_mission = SC64_P3_GLOBAL_ID;
+#elif defined(SC64_Z3_ENABLED)
     race_selected_mission = 14;
 #elif defined(SC64_T3_ENABLED)
     race_selected_mission = 6;
@@ -193,6 +195,28 @@ test_mission_message_timer_and_minimap_stay_pixel_exact(void)
     assert_cached_matches_full();
 }
 
+#if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+/* Direct model-state render fixture: mission 22's sequence is part of the
+   bottom-band cache key because its pending transmission changes the footer. */
+static void
+test_p3_sequence_invalidates_bottom_and_matches_redraw(void)
+{
+    assert(race_campaign.mission == SC64_P3_GLOBAL_ID);
+    assert(race_p3.sequence == SC64_P3_SEQ_NONE);
+    assert_cached_matches_full();
+
+    race_p3.sequence = SC64_P3_SEQ_WIN_WAIT_2000;
+    race_campaign.objective_stage = race_p3.sequence;
+    expect_mask_and_match(HUD_BOTTOM);
+
+    race_p3.sequence = SC64_P3_SEQ_WIN_TX_1;
+    race_p3.transmission = 1;
+    race_campaign.objective_stage = race_p3.sequence;
+    race_campaign.message_ticks = 90;
+    expect_mask_and_match(HUD_BOTTOM);
+}
+#endif
+
 int
 main(void)
 {
@@ -201,5 +225,8 @@ main(void)
     test_wallet_and_queued_supply_invalidate_top_only();
     test_selection_building_box_and_modes_invalidate_bottom();
     test_mission_message_timer_and_minimap_stay_pixel_exact();
+#if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+    test_p3_sequence_invalidates_bottom_and_matches_redraw();
+#endif
     return 0;
 }

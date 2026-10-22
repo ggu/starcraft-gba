@@ -34,7 +34,7 @@ RACE_UNIT_IDS = {
     'interceptor': 73, 'reaver': 83, 'observer': 84,
     'zergling': 37, 'hydralisk': 38, 'ultralisk': 39, 'broodling': 40,
     'drone': 41, 'overlord': 42, 'mutalisk': 43, 'guardian': 44,
-    'queen': 45, 'scourge': 46, 'defiler': 47, 'larva': 35, 'egg': 36,
+    'queen': 45, 'defiler': 46, 'scourge': 47, 'larva': 35, 'egg': 36,
     'lurker': 103,
     'hatchery': 131, 'lair': 132, 'hive': 133, 'engineering_bay': 122,
     'hydralisk_den': 135,

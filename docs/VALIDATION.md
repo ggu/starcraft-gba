@@ -494,6 +494,47 @@ The P3 large-map ARM probe links with IWRAM ending at `0x03004f28` and BSS
 ending at `0x0203d248`, within the unchanged guards. This is a code/storage
 probe, not an ARM gameplay or Higher Ground completion proof.
 
+## Experimental Higher Ground runtime (2026-10-23)
+
+`make protoss-p3 test-sc64-p3` now builds a separately gated P3 runtime and
+checks its menu, full imported roster, diplomacy, result actions and SRAM.
+The real-controller smoke test launches mission 22 from campaign page two,
+checks all 96 units, 42 buildings, 48 mineral patches and three geysers against
+their retained source records, constructs a paid Pylon and queues a Probe.
+Both computer owners remain Zerg, allied with each other and hostile to the
+Protoss player. A separate diagnostic observed paid Zergling pairs from both
+forces' own wallets at the production cadence and mining orders for all eight
+starting enemy workers.
+
+Asset-free adapter tests cover the source AnyUnit defeat and Foes Buildings
+victory predicates, independent one-shot grants, bounded paid production and
+presentation holds. They intentionally arrange terminal populations to check
+the predicates; they do not prove a gameplay win. Save checks cover the 12,924
+byte record, pending action timers, results, owner races and wallets, earlier
+generation rejection and corruption rejection before world mutation. HUD
+fixtures compare immediate result-sequence changes with the uncached pixel
+oracle. Full controller completion is still pending.
+
+The final UI candidate has SHA-256
+`f3115b437f87e099b725a3d17899be3675e956b3fc6eb073f9c49ade78cb003a`.
+It uses 250,128 BSS bytes and 388 data bytes; IWRAM ends at `0x03004e80` and
+BSS ends at `0x0203d298`, within both unchanged memory guards. Its predecessor
+`077d359b` ran a 3,000-tick ARM opening at 19.86 effective fps, retaining both
+forces and reaching 100 live units after paid production. START/B saved frame
+3,004. A fresh emulator process running the final UI candidate restored that
+exact frame and the P3 model (`fired=7`, running, no pending action), then ran
+another 1,000 live ticks at 19.72 fps. No gameplay state was injected.
+
+Default build/tests (58 Python checks), unified build/tests and the full P3
+suite pass. The default and unified ROM hashes remain unchanged. The sprite
+importer's reversed Defiler/Scourge labels were corrected without changing any
+of the 88 distinct raw-ID pixel payloads or their geometry. This is a label
+correction, not a change to the imported artwork.
+
+Higher Ground remains experimental: the source AI interpreter, original
+transmission dialogue/audio, a full controller win, near-30-fps performance
+and physical GBA validation are not complete.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

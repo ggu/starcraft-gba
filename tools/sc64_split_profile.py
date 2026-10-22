@@ -110,6 +110,21 @@ def decode_z3_state(raw: bytes, offsets: dict[str, int], action_ticks: int) -> d
     return values
 
 
+def decode_p3_state(raw: bytes, offsets: dict[str, int], action_ticks: int) -> dict:
+    """Decode Higher Ground's persisted model using its actual DWARF layout."""
+    widths = {"fired": 2, "outcome": 1, "sequence": 1, "transmission": 1, "reserved": 1}
+    if widths.keys() - offsets.keys():
+        raise RuntimeError("P3 DWARF layout is incomplete")
+    values = {}
+    for field, width in widths.items():
+        offset = offsets[field]
+        if offset < 0 or offset + width > len(raw):
+            raise RuntimeError(f"P3 DWARF field {field} is outside its structure")
+        values[field] = int.from_bytes(raw[offset:offset + width], "little")
+    values["action_ticks"] = action_ticks
+    return values
+
+
 def write_progress(path: Path, *, profile: str, rom: Path, elf: Path,
                    rom_sha256: str, elf_sha256: str, configuration: dict,
                    requested_ticks: int, checkpoint_interval: int,
@@ -148,7 +163,8 @@ def write_progress(path: Path, *, profile: str, rom: Path, elf: Path,
 def observe(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
             campaign_layout: tuple[int, dict[str, int]] | None = None,
             t3_layout: tuple[int, dict[str, int]] | None = None,
-            z3_layout: tuple[int, dict[str, int]] | None = None) -> dict:
+            z3_layout: tuple[int, dict[str, int]] | None = None,
+            p3_layout: tuple[int, dict[str, int]] | None = None) -> dict:
     units = races.read_entities(rsp, sym["u"], bank["unit_capacity"],
                                 bank["unit_stride_bytes"], bank["unit_offsets"])
     buildings = races.read_entities(rsp, sym["b"], bank["building_capacity"],
@@ -198,6 +214,13 @@ def observe(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
         raw = rsp.read(sym["race_z3"], z3_size)
         action_ticks = int.from_bytes(rsp.read(sym["race_z3_action_ticks"], action_ticks_size), "little")
         state["race_z3"] = decode_z3_state(raw, z3_offsets, action_ticks)
+    if p3_layout:
+        size, offsets = p3_layout
+        if sizes.get("race_p3_action_ticks", 0) != 2:
+            raise RuntimeError("P3 action timer must be a 16-bit ELF symbol")
+        raw = rsp.read(sym["race_p3"], size)
+        action_ticks = int.from_bytes(rsp.read(sym["race_p3_action_ticks"], 2), "little")
+        state["race_p3"] = decode_p3_state(raw, offsets, action_ticks)
     return state
 
 
@@ -236,6 +259,7 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
     campaign_layout = None
     t3_layout = None
     z3_layout = None
+    p3_layout = None
     mission_ordinal = None
     if mission is not None:
         campaign = split.read_campaign_metadata(rom, elf, profile)
@@ -263,6 +287,14 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
                 raise RuntimeError(f"Z3 DWARF layout is incomplete: {z3_layout}")
             if sizes.get("race_z3_action_ticks", 0) != 2:
                 raise RuntimeError("Z3 action timer must be a 16-bit ELF symbol")
+        if mission == 22:
+            missing = {"race_p3", "race_p3_action_ticks"} - sym.keys()
+            if missing:
+                raise RuntimeError(f"P3 campaign ELF lacks model symbols: {sorted(missing)}")
+            p3_layout = races.dwarf_struct(elf, "Sc64P3State")
+            decode_p3_state(bytes(p3_layout[0]), p3_layout[1], 0)
+            if sizes.get("race_p3_action_ticks", 0) != 2:
+                raise RuntimeError("P3 action timer must be a 16-bit ELF symbol")
     required = (
         "game_update", "demo_inject_keys", "demo_schedule_events", "demo_schedule_count", "demo_schedule_length",
         "demo_schedule_tick", "demo_replay_checkpoint", "demo_tick_buckets", "demo_last_cycles",
@@ -296,7 +328,7 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
             rsp.write(sym["demo_inject_keys"], struct.pack("<H", split.KEY_L))
             rsp.tick(2)
             rsp.write(sym["demo_inject_keys"], b"\0\0")
-            loaded = observe(rsp, sym, sizes, bank, campaign_layout, t3_layout, z3_layout)
+            loaded = observe(rsp, sym, sizes, bank, campaign_layout, t3_layout, z3_layout, p3_layout)
             if (loaded["screen"], loaded["race_mode"], loaded["race_selected_mission"]) != (SCREEN_PLAY, 0, mission):
                 raise RuntimeError("HOME L did not load the requested campaign SRAM")
             loaded_frame = loaded["frame"]
@@ -323,6 +355,8 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
             configuration["loaded_frame"] = loaded_frame
             if "race_z3" in loaded:
                 configuration["loaded_race_z3"] = loaded["race_z3"]
+            if "race_p3" in loaded:
+                configuration["loaded_race_p3"] = loaded["race_p3"]
 
         # main.c has already sampled schedule_count==0 for the current
         # game_update iteration. It finishes normally, then sees this queue
@@ -353,7 +387,7 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
         def record_checkpoint(tick: int, interval_cycles: int,
                               before_buckets: tuple[int, ...], before_routes: dict[str, int]) -> dict:
             buckets = struct.unpack("<8I", rsp.read(sym["demo_tick_buckets"], 32))
-            state = observe(rsp, sym, sizes, bank, campaign_layout, t3_layout, z3_layout)
+            state = observe(rsp, sym, sizes, bank, campaign_layout, t3_layout, z3_layout, p3_layout)
             current_routes = {key: u32(rsp, sym[key]) for key in before_routes}
             cycles = ({key: u32(rsp, sym[key]) for key in PROFILE_CYCLE_NAMES if key in sym}
                       if state["screen"] == SCREEN_PLAY else None)
@@ -379,7 +413,7 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
 
         # Tick zero is a genuine PLAY snapshot and the baseline for all
         # interval counters; it is excluded from the measured intervals.
-        zero = observe(rsp, sym, sizes, bank, campaign_layout, t3_layout, z3_layout)
+        zero = observe(rsp, sym, sizes, bank, campaign_layout, t3_layout, z3_layout, p3_layout)
         if zero["screen"] != SCREEN_PLAY:
             raise RuntimeError(f"tick-zero observer is not on the live game screen: {zero['screen']}")
         zero_capture = capture(rsp, out / "tick-000000.png")

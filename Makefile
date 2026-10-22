@@ -26,6 +26,7 @@ T3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_T3_ENABLED -DSC64_CAMPAIGN_RACE=0 $(T3
 Z3_OPTIMIZATION_FLAGS ?= -DSC64_ROUTE_PACK3 -DSC64_VISIBILITY_SPANS -DSC64_Z3_WINDOWED_SCHEDULE
 Z3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_Z3_ENABLED -DSC64_CAMPAIGN_RACE=1 $(Z3_OPTIMIZATION_FLAGS) $(Z3_EXTRA_FLAGS)
 LARGE_PROBE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_CAMPAIGN_RACE=2
+P3_FLAGS := $(LARGE_PROBE_FLAGS) -DSC64_P3_ENABLED -DSC64_P3_RUNTIME -DSC64_ROUTE_PACK3 $(P3_EXTRA_FLAGS)
 
 .PHONY: all clean test verify probe sc64 backwater skirmish campaign races unified \
 	verify-sc64 verify-backwater verify-skirmish verify-campaign verify-races verify-unified \
@@ -92,6 +93,36 @@ build/test-sc64-p3-model: tests/sc64_p3_model.c starcraft/sc64_p3_model.h starcr
 
 # Import/storage probes do not expose Higher Ground in the playable catalog.
 .PHONY: test-sc64-p3-import test-sc64-p3-scourge test-sc64-large-map sc64-large-probe
+build/test-sc64-p3-runtime: tests/sc64_p3_runtime.c starcraft/sc64_p3_adapter.h starcraft/sc64_p3_model.h starcraft/sc64_p3.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $< -o $@
+build/test-sc64-p3-front: P3_FRONT_FLAGS=-DSC64_P3_RUNTIME -DSC64_P3_ENABLED
+build/test-sc64-p3-front-import: P3_FRONT_FLAGS=-DSC64_P3_ENABLED
+build/test-sc64-p3-front-incomplete: P3_FRONT_FLAGS=-DSC64_P3_RUNTIME
+P3_FRONT_TESTS := build/test-sc64-p3-front build/test-sc64-p3-front-import build/test-sc64-p3-front-incomplete
+$(P3_FRONT_TESTS): tests/sc64_p3_frontend.c starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon -DSC64_UNIFIED -DSC64_CAMPAIGN_RACE=2 $(P3_FRONT_FLAGS) $< -o $@
+
+.PHONY: protoss-p3 test-sc64-p3
+build/starcraft-protoss-p3.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P3_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p3.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P3-GBA.gba: build/starcraft-protoss-p3.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS3' SCP3
+protoss-p3: build/StarCraft-Protoss-P3-GBA.gba
+	$(PYTHON) tools/verify_roms.py --protoss-p3
+build/test-sc64-p3-run: tests/sc64_p3_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p3-save: tests/sc64_p3_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p3-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) $< common/gba.c -o $@
+test-sc64-p3: test-sc64-p3-import build/test-sc64-p3-runtime $(P3_FRONT_TESTS) build/test-sc64-p3-run build/test-sc64-p3-save build/test-sc64-p3-hud test-sc64-p3-scourge
+	./build/test-sc64-p3-runtime
+	@for test in $(P3_FRONT_TESTS); do ./$$test || exit $$?; done
+	./build/test-sc64-p3-run
+	./build/test-sc64-p3-save
+	./build/test-sc64-p3-hud
 build/test-sc64-p3-import: tests/sc64_p3_import.c starcraft/race_rules.h starcraft/sc64_types.h .local/sc64/races/generated/sc64_races_generated.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_P3_ENABLED -DSC64_CAMPAIGN_RACE=2 -Istarcraft -I.local/sc64/races/generated $< -o $@
 test-sc64-p3-import: build/test-sc64-p3-import
@@ -239,7 +270,9 @@ build/test-terrain-cache: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cach
 build/test-collision: tests/sc64_collision.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -DSC64_SKIRMISH -Icommon tests/sc64_collision.c common/gba.c -o $@
 
-test-starcraft: build/test-sc64-demo-schedule build/test-sc64-demo-schedule-runtime build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-race-rules-z3 build/test-skirmish-ai build/test-sc64-frontend build/test-sc64-bitgrid build/test-sc64-map-math build/test-sc64-t3-rules build/test-sc64-z3-rules build/test-sc64-p3-rules build/test-sc64-p3-model $(RACE_FRONTEND_TESTS) $(RACE_T3_FRONTEND_TESTS) $(RACE_Z3_FRONTEND_TESTS) $(RACE_Z3_UNIFIED_TESTS) build/test-sc64-frontend-t3-unified build/test-race-routes build/test-race-routes-96 build/test-race-routes-t3 build/test-race-routes-rect build/test-race-routes-large build/test-race-routes-pack3 build/test-race-routes-pack3-t3 build/test-race-routes-pack3-large build/test-terrain-cache build/test-collision
+test-starcraft: build/test-sc64-p3-runtime $(P3_FRONT_TESTS) build/test-sc64-demo-schedule build/test-sc64-demo-schedule-runtime build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-race-rules-z3 build/test-skirmish-ai build/test-sc64-frontend build/test-sc64-bitgrid build/test-sc64-map-math build/test-sc64-t3-rules build/test-sc64-z3-rules build/test-sc64-p3-rules build/test-sc64-p3-model $(RACE_FRONTEND_TESTS) $(RACE_T3_FRONTEND_TESTS) $(RACE_Z3_FRONTEND_TESTS) $(RACE_Z3_UNIFIED_TESTS) build/test-sc64-frontend-t3-unified build/test-race-routes build/test-race-routes-96 build/test-race-routes-t3 build/test-race-routes-rect build/test-race-routes-large build/test-race-routes-pack3 build/test-race-routes-pack3-t3 build/test-race-routes-pack3-large build/test-terrain-cache build/test-collision
+	./build/test-sc64-p3-runtime
+	@for test in $(P3_FRONT_TESTS); do ./$$test || exit $$?; done
 	./build/test-sc64-demo-schedule
 	./build/test-sc64-demo-schedule-runtime
 	./build/test-starcraft

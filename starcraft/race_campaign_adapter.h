@@ -26,6 +26,9 @@ enum {
 #ifdef SC64_Z3_ENABLED
     ,SC64_RACE_MISSION_Z3 = 14
 #endif
+#ifdef SC64_P3_RUNTIME
+    ,SC64_RACE_MISSION_P3 = 22
+#endif
 #endif
 };
 
@@ -34,6 +37,14 @@ race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 {
     if (raw_owner == 11 || raw_owner >= 8) return NEUTRAL;
     if (raw_owner < 0) return NEUTRAL;
+#ifdef SC64_P3_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID) {
+        if (raw_owner == SC64_P3_HUMAN_SLOT) return SIDE;
+        if (raw_owner == SC64_P3_FORCE2_SLOT) return ENEMY;
+        if (raw_owner == SC64_P3_FORCE3_SLOT) return 4;
+        return NEUTRAL;
+    }
+#endif
     return map->owner_modes[raw_owner];
 }
 
@@ -85,6 +96,9 @@ race_campaign_set_message(int id)
 #endif
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
 #include "sc64_z3_adapter.h"
+#endif
+#ifdef SC64_P3_RUNTIME
+#include "sc64_p3_adapter.h"
 #endif
 
 static void
@@ -207,6 +221,9 @@ race_campaign_init(void)
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
     memset(&race_z3,0,sizeof(race_z3));race_z3_action_ticks=0;
 #endif
+#ifdef SC64_P3_RUNTIME
+    memset(&race_p3,0,sizeof(race_p3));race_p3_action_ticks=0;
+#endif
     if (race_mode) {
         race_skirmish_init();
         return;
@@ -273,6 +290,10 @@ race_campaign_init(void)
 
     for (i = 0; i < 8; ++i) {
         int owner = map->owner_modes[i];
+#ifdef SC64_P3_RUNTIME
+        if (race_selected_mission == SC64_P3_GLOBAL_ID)
+            owner = race_campaign_owner(map, i);
+#endif
         if (owner >= 0 && owner < 5 && map->owner_races[i] < 3)
             race_player[owner] = map->owner_races[i];
     }
@@ -355,6 +376,9 @@ race_campaign_init(void)
 #ifdef SC64_Z3_ENABLED
     case SC64_RACE_MISSION_Z3: minerals=SC64_Z3_MISSION_ORE;gas=SC64_Z3_MISSION_GAS;break;
 #endif
+#ifdef SC64_P3_RUNTIME
+    case SC64_RACE_MISSION_P3: minerals=SC64_P3_HUMAN_MINERALS;gas=SC64_P3_HUMAN_GAS;break;
+#endif
 #endif
     default: minerals = 170; break;
     }
@@ -377,6 +401,9 @@ race_campaign_init(void)
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
     if (race_selected_mission == SC64_RACE_MISSION_Z3) race_z3_init();
 #endif
+#ifdef SC64_P3_RUNTIME
+    if (race_selected_mission == SC64_RACE_MISSION_P3) race_p3_init();
+#endif
     race_campaign_assign_mining();
     if (race_selected_mission == SC64_RACE_MISSION_Z1)
         race_campaign_set_message(1);
@@ -394,6 +421,9 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_Z3_ENABLED
     else if (race_selected_mission==SC64_RACE_MISSION_Z3) race_campaign_set_message(20);
+#endif
+#ifdef SC64_P3_RUNTIME
+    else if (race_selected_mission==SC64_RACE_MISSION_P3) race_campaign_set_message(0);
 #endif
 #endif
     update_exploration();
@@ -481,6 +511,9 @@ race_campaign_tick(void)
 #ifdef SC64_UNIFIED
 #ifdef SC64_Z3_ENABLED
     if(mission==SC64_RACE_MISSION_Z3){race_z3_campaign_tick();return;}
+#endif
+#ifdef SC64_P3_RUNTIME
+    if(mission==SC64_RACE_MISSION_P3){race_p3_campaign_tick();return;}
 #endif
     if(mission==SC64_RACE_MISSION_T1||mission==SC64_RACE_MISSION_T2){race_terran_tick();return;}
 #endif
@@ -647,6 +680,10 @@ static int race_campaign_lost(void)
 static const char *
 race_campaign_objective_text(void)
 {
+#ifdef SC64_P3_RUNTIME
+    if (race_campaign.mission == SC64_RACE_MISSION_P3)
+        return race_p3_objective_text();
+#endif
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
     if (race_campaign.mission == SC64_RACE_MISSION_Z3)
         return race_z3_objective_text();
@@ -675,6 +712,10 @@ race_campaign_objective_text(void)
 static const char *
 race_campaign_victory_text(void)
 {
+#ifdef SC64_P3_RUNTIME
+    if (race_campaign.mission == SC64_RACE_MISSION_P3)
+        return race_p3_victory_text();
+#endif
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
     if (race_campaign.mission == SC64_RACE_MISSION_Z3)
         return race_z3_victory_text();
@@ -699,6 +740,12 @@ race_campaign_victory_text(void)
 static const char *
 race_campaign_message_text(void)
 {
+#ifdef SC64_P3_RUNTIME
+    if (race_campaign.mission == SC64_RACE_MISSION_P3) {
+        if (race_p3.transmission) return "Zerg colonies cleared. Mission report pending.";
+        return race_p3_objective_text();
+    }
+#endif
     static const char *const messages[] = {
         "", "Protect the Chrysalis. Build a Spawning Pool and Hydralisk Den.",
         "The required Zerg structures are ready. Destroy the Terran encampment.",

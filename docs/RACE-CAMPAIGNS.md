@@ -1,6 +1,6 @@
 # Fixed-race campaign builds
 
-The Terran, Zerg, and Protoss profiles build three separate GBA ROMs from the same game engine. Each ROM offers one race's campaign and currently contains exactly its first two playable missions. The mission catalog records all 30 original campaign slots, but the remaining eight missions for each race are staged metadata only; they are not playable yet.
+The Terran, Zerg, and Protoss profiles build three separate GBA ROMs from the same game engine. Each standard ROM offers one race's first two playable missions. Separate experimental targets add the third mission of each race, as described below. The catalog records all 30 original campaign slots; the remaining 21 missions still need scenario and gameplay implementation.
 
 These are source-only profiles. The repository contains the engine, menu code, conversion tools, and authored Outpost map, but it does not contain a StarCraft 64 ROM or converted proprietary maps and graphics. To prepare a profile, supply a supported USA ROM that you are entitled to use:
 
@@ -145,15 +145,27 @@ Imported skirmish data is fitted to the engine's bounded resource storage. The p
 
 ## Current limits
 
-Higher Ground (Protoss 3, global catalog ID 22) is in preparation. The private
-import preserves its 128×96 terrain, all 96 units, 42 buildings, 48 mineral
-fields and three geysers; three start markers are excluded from live entities.
-Both source computer-owner slots remain available for separate force handling.
-`make test-sc64-p3-import` validates these records without making the mission
-playable. `make test-sc64-p3-scourge` checks Scourge's air-only suicide attack
-through the real combat and attack-move paths. That weapon is gated to the
-P3 profile; independent force AI, campaign integration and saveable result
-actions are still required before Higher Ground becomes playable.
+Higher Ground (Protoss 3, global catalog ID 22) now has an experimental runtime.
+After preparing a race profile, run `make protoss-p3 test-sc64-p3`. This creates
+`build/StarCraft-Protoss-P3-GBA.gba`, with Higher Ground on campaign page two.
+It retains the full 128×96 terrain, all 96 units, 42 buildings, 48 mineral
+fields and three geysers; source start markers do not become live entities.
+The two Zerg forces are allies with separate owners, wallets and production
+queues. The player starts with 300 minerals and 100 gas; source mission-start
+actions grant each Zerg force its own resources. Destroy both forces' buildings
+to start the persisted victory sequence. Losing every player unit and building
+causes defeat, including during that sequence.
+
+The original opaque AI scripts are replaced by bounded paid Zergling production,
+mining assignments and periodic small guard attacks. Original transmission
+dialogue/audio are absent; their holds use documented adapter timings. Scourge
+combat has an air-only suicide attack with fixed source-backed damage. This
+profile has a separate save generation, including quest actions and their
+remaining hold time. Its full-roster controller smoke test can build a paid
+Pylon and queue a Probe, and a fresh ARM emulator process has restored and
+continued a normal controller-created save. A full controller win remains
+unproven. The opening measured 19.86 fps and the reload tail 19.72 fps; the
+near-30-fps target and physical GBA validation remain unmet.
 
 `make test-sc64-large-map sc64-large-probe` checks the opt-in
 `SC64_LARGE_MAPS` storage layout, including packed fog/path grids, larger
@@ -163,7 +175,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Standard builds enable two campaign missions per race. Experimental Terran 3 is described above; the other later missions still need scenario and gameplay implementation.
+- Standard builds enable two campaign missions per race. Experimental third-mission targets are described above; the other 21 missions still need scenario and gameplay implementation.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build these three profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.
