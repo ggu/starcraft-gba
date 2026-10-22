@@ -49,6 +49,14 @@ performance and gameplay checks continue. The final assault still needs
 performance work; see the measured builds in [Validation](VALIDATION.md).
 The full 30-mission campaign remains in progress.
 
+Zerg 3, The New Dominion, has a map-import fixture and standalone trigger
+model. It is not enabled for play. After preparing the local data, run
+`make test-sc64-z3-import` to check its complete retained roster and terrain.
+The source-only suite checks the victory/loss predicates, action order and
+stable global mission ID 14. Runtime presentation, enemy behavior, save
+integration and gameplay validation are the next stage. Dropship type support
+does not yet include transport or cargo mechanics.
+
 After local preparation, `make test-sc64-t3-import` checks every retained T3
 record, its runtime type mapping, coordinate bounds and terrain indices. It
 does not launch the mission. The asset-free `./dev test` checks the standalone

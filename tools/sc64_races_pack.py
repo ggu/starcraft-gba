@@ -33,7 +33,15 @@ MISSIONS = [
     # T3 is emitted into the private header, but its data and map count are
     # compiled only by unified builds that explicitly enable stage 3.
     ('T3', '008/00C', 'Desperate Alliance'),
+    # Z3 has its fixed global catalog ID 14. Unified builds keep catalog
+    # slots 7..13 explicitly unavailable rather than compacting this index.
+    ('Z3', '008/016', 'The New Dominion'),
 ]
+BUILDING_RAW_IDS = {
+    106, 109, 110, 111, 112, 113, 114, 122, 124, 125, 130, 131, 132,
+    135, 139, 141, 142, 143, 144, 146, 149, 151, 154, 155, 156, 157,
+    160, 162, 164, 166, 167,
+}
 
 
 def load(name: str, path: Path):
@@ -51,6 +59,60 @@ def c_array(name: str, ctype: str, values, width: int = 24) -> str:
     rows = [','.join(str(v) for v in values[i:i + width])
             for i in range(0, len(values), width)]
     return f'static const {ctype} {name}[{len(values)}] = {{\n' + ',\n'.join(rows) + '\n};\n'
+
+
+def emit_map_count() -> str:
+    """Emit compile-time map count for the stable direct-global-ID table."""
+    return (
+        '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
+        '#define SC64_RACE_MAP_COUNT 15\n'
+        '#elif defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)\n'
+        '#define SC64_RACE_MAP_COUNT 7\n'
+        '#elif defined(SC64_UNIFIED)\n'
+        '#define SC64_RACE_MAP_COUNT 6\n'
+        '#else\n#define SC64_RACE_MAP_COUNT 4\n#endif\n'
+    )
+
+
+def campaign_guard_for_map(map_index: int) -> str:
+    """Return the profile guard used around one map's data and descriptor."""
+    if map_index < 2 or map_index == 7:
+        race = 1
+    elif map_index < 4:
+        race = 2
+    else:
+        race = 0
+    return f'!defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE == {race}'
+
+
+def emit_descriptor_table(descriptors: list[str]) -> str:
+    """Emit stable direct-ID descriptor slots, with disabled IDs zeroed.
+
+    ``descriptors`` uses packer order: four race missions, T1, T2, T3, Z3.
+    The per-descriptor race guards are carried inside each supplied token.
+    """
+    if len(descriptors) != 8:
+        raise ValueError('expected descriptors for map indices 0..7')
+    return ''.join([
+        'static const Sc64RaceMap sc64_race_maps[SC64_RACE_MAP_COUNT] = {\n',
+        *descriptors[:4],
+        '#ifdef SC64_UNIFIED\n', *descriptors[4:6], '#endif /* SC64_UNIFIED */\n',
+        '#if defined(SC64_UNIFIED)\n',
+        '#ifdef SC64_T3_ENABLED\n', descriptors[6],
+        '#elif defined(SC64_Z3_ENABLED)\n    {0}, /* global ID 6 is unavailable without T3 */\n',
+        '#endif\n',
+        '#if defined(SC64_Z3_ENABLED)\n',
+        '    {0}, /* global ID 7 is unavailable */\n'
+        '    {0}, /* global ID 8 is unavailable */\n'
+        '    {0}, /* global ID 9 is unavailable */\n'
+        '    {0}, /* global ID 10 is unavailable */\n'
+        '    {0}, /* global ID 11 is unavailable */\n'
+        '    {0}, /* global ID 12 is unavailable */\n'
+        '    {0}, /* global ID 13 is unavailable */\n',
+        descriptors[7], '#endif /* SC64_Z3_ENABLED */\n',
+        '#endif /* SC64_UNIFIED */\n',
+        '};\n',
+    ])
 
 
 def nearest(color: int, palette: list[int], candidates: list[int]) -> int:
@@ -89,10 +151,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
         '/* Source: references/sc64-maps/extract_sc64_maps.py @ ' + UPSTREAM_COMMIT + ' */\n',
         '#ifndef SC64_RACES_GENERATED_H\n#define SC64_RACES_GENERATED_H\n',
         '#include "sc64_types.h"\n',
-        '#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)\n'
-        '#define SC64_RACE_MAP_COUNT 7\n'
-        '#elif defined(SC64_UNIFIED)\n#define SC64_RACE_MAP_COUNT 6\n'
-        '#else\n#define SC64_RACE_MAP_COUNT 4\n#endif\n',
+        emit_map_count(),
         'typedef struct {\n'
         '    unsigned short width, height;\n'
         '    unsigned char tileset_id, human_slot;\n'
@@ -125,6 +184,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
         source_sides = list(sides[:8])
         owner_races = [0 if side == 1 else 1 if side == 0 else 2 if side == 2 else 3
                        for side in source_sides]
+        force_data = sections.get(b'FORC', b'')
+        force_assignments = list(force_data[:8]) if len(force_data) >= 8 else []
         raw = sections.get(b'MTXM', b'')
         if len(raw) != info.width * info.height * 2:
             raise ValueError(f'{path} MTXM dimensions do not match')
@@ -163,8 +224,9 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             lines.append('#ifdef SC64_UNIFIED\n')
         elif map_index == 6:
             lines.append('#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)\n')
-        campaign_race = 1 if map_index < 2 else 2 if map_index < 4 else 0
-        campaign_guard = f'!defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE == {campaign_race}'
+        elif map_index == 7:
+            lines.append('#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n')
+        campaign_guard = campaign_guard_for_map(map_index)
         lines.append(f'#if {campaign_guard}\n')
         unit_name = f'sc64_race_{name}_units'
         lines.append(f'static const Sc64ImportedUnit {unit_name}[{len(units)}] = {{\n')
@@ -185,6 +247,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             lines.append('#endif /* SC64_UNIFIED */\n')
         elif map_index == 6:
             lines.append('#endif /* SC64_UNIFIED && SC64_T3_ENABLED */\n')
+        elif map_index == 7:
+            lines.append('#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n')
         descriptors.append(f'#if {campaign_guard}\n'
             f'    {{{info.width}u,{info.height}u,{tileset}u,{human_slot}u,sc64_race_{name}_owner_modes,sc64_race_{name}_owner_races,{unit_name},{len(units)}u,sc64_race_{name}_tiles,{len(tiles)}u,sc64_race_{name}_lookup,sc64_race_{name}_blocked,"{info.name}","{mission_id}"}},\n'
             '#else\n    {0}, /* campaign omitted from this cartridge */\n#endif\n')
@@ -196,6 +260,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             'human_slot': human_slot, 'human_side': sides[human_slot],
             'owner_modes': owner_modes,
             'owner_races': owner_races,
+            'force_assignments_raw': force_assignments,
             'source_sides': source_sides,
             'chk_sha1': hashlib.sha1(chk).hexdigest(), 'unit_records': len(units),
             'trigger_records': len(triggers), 'objective_text': objectives,
@@ -209,7 +274,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                 'start_marker' if u['source_type'] == 214 else
                 'mineral' if u['source_type'] in (176, 177, 178) else
                 'geyser' if u['source_type'] == 188 else
-                'building' if 106 <= u['source_type'] < 176 else
+                'building' if u['source_type'] in BUILDING_RAW_IDS else
                 'unit'
                 for u in source_units
             )
@@ -234,14 +299,30 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                  'x': u['x_source_px'] // 2, 'y': u['y_source_px'] // 2}
                 for u in units if u['owner_raw'] == 3
             ]
-    lines.extend([
-        'static const Sc64RaceMap sc64_race_maps[SC64_RACE_MAP_COUNT] = {\n',
-        *descriptors[:4],
-        '#ifdef SC64_UNIFIED\n', *descriptors[4:6], '#endif /* SC64_UNIFIED */\n',
-        '#if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)\n',
-        *descriptors[6:], '#endif /* SC64_UNIFIED && SC64_T3_ENABLED */\n',
-        '};\n', '#endif\n',
-    ])
+            if map_index == 7:
+                expected = {'unit_placements': 59, 'building_placements': 32,
+                            'mineral_fields': 28, 'geysers': 3}
+                category_keys = {
+                    'unit_placements': 'unit', 'building_placements': 'building',
+                    'mineral_fields': 'mineral', 'geysers': 'geyser',
+                }
+                actual = {key: source_categories[source_key]
+                          for key, source_key in category_keys.items()}
+                if actual != expected or source_categories['start_marker'] != 2:
+                    raise ValueError(f'Z3 source UNIT roster changed: {actual}, '
+                                     f"start markers={source_categories['start_marker']}")
+                if len(units) != sum(expected.values()):
+                    raise ValueError('Z3 importer skipped or duplicated non-start UNIT rows')
+                if len(force_assignments) != 8 or force_assignments[3] != 0 or force_assignments[6] != 1:
+                    raise ValueError('Z3 human/enemy force assignment no longer matches audited CHK')
+                reports[-1]['global_mission_id'] = 14
+                reports[-1]['force_assignment_summary'] = {
+                    'human_owner_slot_3': force_assignments[3],
+                    'enemy_owner_slot_6': force_assignments[6],
+                    'interpretation': 'Force 1 and Force 2 respectively; raw FORCE section bytes are preserved above',
+                }
+                reports[-1]['runtime_unit_rows_are_all_non_start_source_rows'] = True
+    lines.extend([emit_descriptor_table(descriptors), '#endif\n'])
     content = ''.join(lines)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(content, encoding='ascii')

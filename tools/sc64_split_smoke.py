@@ -20,6 +20,7 @@ import time
 import sc64_menu_smoke as menu
 from emulator_smoke import ROOT
 from sc64_campaign_metadata import read_campaign_metadata
+from sc64_races_profile import dwarf_struct
 
 KEY_A, KEY_B, KEY_START, KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_L = 1, 2, 8, 32, 16, 64, 128, 512
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSE = 0, 1, 2
@@ -210,17 +211,128 @@ def campaign_launch(rsp, sym, profile: str, mission_id: int, ordinal: int,
     return got
 
 
+def t3_state_snapshot(rsp, sym: dict[str, int], t3_size: int,
+                      campaign_size: int, unit_layout: tuple[int, dict[str, int]],
+                      building_layout: tuple[int, dict[str, int]]) -> dict:
+    unit_size, unit_fields = unit_layout
+    building_size, building_fields = building_layout
+
+    def entities(base: int, capacity: int, size: int, fields: dict[str, int]) -> list[dict]:
+        result = []
+        raw = rsp.read(base, capacity * size)
+        for slot in range(capacity):
+            offset = slot * size
+            if struct.unpack_from("<i", raw, offset + fields["alive"])[0] == 0:
+                continue
+            result.append({"slot": slot, "state": raw[offset:offset + size]})
+        return result
+
+    snapshot = {
+        "screen": i32(rsp, sym["screen"]),
+        "frame": i32(rsp, sym["frame"]),
+        "mission": i32(rsp, sym["race_selected_mission"]),
+        "minerals": i32(rsp, sym["minerals"]),
+        "gas": i32(rsp, sym["gas"]),
+        "t3": rsp.read(sym["race_t3"], t3_size),
+        "campaign": rsp.read(sym["race_campaign"], campaign_size),
+        "kills": int.from_bytes(rsp.read(sym["race_t3_buildings_killed"], 2), "little"),
+        "units": entities(sym["u"], 160, unit_size, unit_fields),
+        "buildings": entities(sym["b"], 64, building_size, building_fields),
+    }
+    for name in ("race_minerals", "race_gas"):
+        if name in sym:
+            snapshot[name] = rsp.read(sym[name], 5 * 4)
+    return snapshot
+
+
+def t3_fresh_load_smoke(rom: pathlib.Path, elf: pathlib.Path, out: pathlib.Path,
+                        sym: dict[str, int], ordinal: int, mission_count: int) -> dict:
+    """Pause, save, reload in a fresh mGBA process, and resume T3 normally."""
+    needed = ("race_t3", "race_campaign", "race_t3_buildings_killed", "u", "b",
+              "screen", "frame", "race_selected_mission", "minerals", "gas")
+    missing = [name for name in needed if name not in sym]
+    if missing:
+        raise RuntimeError(f"T3 fresh-load smoke requires ELF symbols: {', '.join(missing)}")
+    t3_size, _ = dwarf_struct(elf, "Sc64T3State")
+    campaign_size, _ = dwarf_struct(elf, "Sc64RaceCampaignState")
+    unit_layout = dwarf_struct(elf, "Unit")
+    building_layout = dwarf_struct(elf, "Building")
+
+    name = "campaign-6-pause-save"
+    running = start_emulator(name, rom, out, sym)
+    proc, sock, rsp, log = running
+    source_dir = out / "saves" / name
+    try:
+        launched = campaign_launch(rsp, sym, "terran", 6, ordinal, mission_count)
+        rsp.tick(1000)
+        key(rsp, sym, KEY_START)
+        paused = t3_state_snapshot(rsp, sym, t3_size, campaign_size, unit_layout, building_layout)
+        if paused["screen"] != SCREEN_PAUSE:
+            raise RuntimeError(f"T3 did not pause: screen={paused['screen']}")
+        if paused["frame"] < 1000:
+            raise RuntimeError(f"T3 did not advance before pause: frame={paused['frame']}")
+        rsp.tick(120)
+        still_paused = t3_state_snapshot(rsp, sym, t3_size, campaign_size, unit_layout, building_layout)
+        if still_paused != paused:
+            raise RuntimeError("T3 timer, campaign model, resources, or roster advanced while paused")
+        key(rsp, sym, KEY_B)  # Pause menu B saves to the real mGBA SRAM backend.
+    finally:
+        menu.stop_emulator(proc, sock, log)
+
+    saves = list(source_dir.glob("*.sav"))
+    if len(saves) != 1 or saves[0].stat().st_size != 32768:
+        raise RuntimeError(f"T3 save did not flush one 32 KiB SRAM file: {saves}")
+    fresh_name = "campaign-6-fresh-load"
+    fresh_save_dir = out / "saves" / fresh_name
+    fresh_save_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(saves[0], fresh_save_dir / saves[0].name)
+    fresh = start_emulator(fresh_name, rom, out, sym)
+    proc, sock, rsp, log = fresh
+    try:
+        # Keys are sampled before the game_update breakpoint: two continues
+        # execute the sampled neutral call, then the L load. Observe before a
+        # third continue can run a live tick. Only controller input is written.
+        rsp.write(sym["demo_inject_keys"], struct.pack("<H", KEY_L))
+        rsp.tick(2)
+        rsp.write(sym["demo_inject_keys"], b"\0\0")
+        restored = t3_state_snapshot(rsp, sym, t3_size, campaign_size, unit_layout, building_layout)
+        if restored["screen"] != SCREEN_PLAY:
+            raise RuntimeError(f"T3 title-screen load did not resume live play: {restored['screen']}")
+        comparable = {key: value for key, value in paused.items() if key != "screen"}
+        loaded_comparable = {key: value for key, value in restored.items() if key != "screen"}
+        if loaded_comparable != comparable:
+            raise RuntimeError("fresh T3 SRAM load did not restore the paused campaign state")
+        before_tick = restored["frame"]
+        rsp.tick(10)
+        resumed = t3_state_snapshot(rsp, sym, t3_size, campaign_size, unit_layout, building_layout)
+        if resumed["screen"] != SCREEN_PLAY or resumed["frame"] <= before_tick:
+            raise RuntimeError("T3 did not resume simulation after the fresh SRAM load")
+        return {"paused_frame": paused["frame"], "loaded_frame": restored["frame"],
+                "resumed_frame": resumed["frame"], "kills": restored["kills"],
+                "launched": launched, "fresh_load_verified": True}
+    finally:
+        menu.stop_emulator(proc, sock, log)
+
+
 def run_one(profile: str, rom: pathlib.Path, elf: pathlib.Path,
             map_id: int | None, race: int | None, bots: int | None, ticks: int,
-            output: pathlib.Path) -> dict:
+            output: pathlib.Path, mission_id: int | None = None) -> dict:
     if not rom.is_file() or not elf.is_file():
         raise RuntimeError(f"{profile}: build both ROM and ELF first ({rom}, {elf})")
     global FRONT_FIELDS
     FRONT_FIELDS = frontend_offsets(elf)
     campaign = read_campaign_metadata(rom, elf, profile)
-    mission_ids = campaign["enabled_mission_ids"]
-    if not mission_ids:
+    enabled_mission_ids = campaign["enabled_mission_ids"]
+    selected_mission = mission_id
+    if not enabled_mission_ids:
         raise RuntimeError(f"{profile}: ELF catalog has no enabled campaign missions")
+    if selected_mission is not None:
+        if selected_mission not in enabled_mission_ids:
+            raise RuntimeError(f"{profile}: campaign mission {mission_id} is not enabled; "
+                               f"enabled missions are {enabled_mission_ids}")
+        missions_to_run = [selected_mission]
+    else:
+        missions_to_run = enabled_mission_ids
     sym = menu.symbols(elf)
     required = ("game_update", "race_front", "demo_inject_keys", "screen", "race_mode",
                 "race_human", "race_bots", "race_selected_mission", "race_skirmish_map",
@@ -230,21 +342,26 @@ def run_one(profile: str, rom: pathlib.Path, elf: pathlib.Path,
         raise RuntimeError(f"{profile}: ELF is missing symbols: {', '.join(missing)}")
     out = output / profile
     out.mkdir(parents=True, exist_ok=True)
-    selected_maps = [map_id] if map_id is not None else range(2)
+    selected_maps = [] if selected_mission is not None else ([map_id] if map_id is not None else range(2))
     selected_races = [race] if race is not None else range(3)
     selected_bots = [bots] if bots is not None else range(1, 4)
     records = []
-    for ordinal, mission_id in enumerate(mission_ids):
-        name = f"campaign-{mission_id}"
+    for current_mission in missions_to_run:
+        ordinal = enabled_mission_ids.index(current_mission)
+        name = f"campaign-{current_mission}"
         running = start_emulator(name, rom, out, sym)
         proc, sock, rsp, log = running
         try:
-            got = campaign_launch(rsp, sym, profile, mission_id, ordinal, len(mission_ids))
+            got = campaign_launch(rsp, sym, profile, current_mission, ordinal,
+                                  len(enabled_mission_ids))
             records.append({"kind": "campaign", "ordinal": ordinal,
-                            "mission_id": mission_id, **got})
-            print(f"{profile} campaign mission={mission_id} ordinal={ordinal}: ok", flush=True)
+                            "mission_id": current_mission, **got})
+            print(f"{profile} campaign mission={current_mission} ordinal={ordinal}: ok", flush=True)
         finally:
             menu.stop_emulator(proc, sock, log)
+        if current_mission == 6 and profile == "terran" and selected_mission == 6:
+            records[-1]["pause_save_fresh_load"] = t3_fresh_load_smoke(
+                rom, elf, out, sym, ordinal, len(enabled_mission_ids))
     for mid in selected_maps:
         for human in selected_races:
             for count in selected_bots:
@@ -309,6 +426,12 @@ def main() -> None:
     parser.add_argument("--map", type=int, choices=range(2))
     parser.add_argument("--race", type=int, choices=range(3))
     parser.add_argument("--bots", type=int, choices=range(1, 4))
+    parser.add_argument("--mission", type=int,
+                        help="launch only this enabled campaign mission global ID")
+    parser.add_argument("--rom", type=pathlib.Path,
+                        help="override ROM path (requires one explicit --profile)")
+    parser.add_argument("--elf", type=pathlib.Path,
+                        help="override matching ELF path (requires one explicit --profile)")
     parser.add_argument("--ticks", type=int, default=0,
                         help="neutral-input emulated game updates per selected skirmish (for example 10000)")
     parser.add_argument("--out", type=pathlib.Path, default=ROOT / "build/emulator/sc64-split")
@@ -316,15 +439,30 @@ def main() -> None:
     if args.ticks < 0:
         parser.error("--ticks cannot be negative")
     profiles = ("terran", "zerg", "protoss") if args.profile == "all" else (args.profile,)
+    if (args.rom or args.elf) and args.profile == "all":
+        parser.error("--rom and --elf overrides require one explicit --profile")
+    if args.mission is not None and args.profile == "all":
+        matching = []
+        for candidate in profiles:
+            candidate_rom = ROOT / "build" / f"StarCraft-{candidate.capitalize()}-GBA.gba"
+            candidate_elf = ROOT / "build" / f"starcraft-{candidate}.elf"
+            if not candidate_rom.is_file() or not candidate_elf.is_file():
+                continue
+            if args.mission in read_campaign_metadata(candidate_rom, candidate_elf,
+                                                       candidate)["enabled_mission_ids"]:
+                matching.append(candidate)
+        if not matching:
+            parser.error(f"campaign mission {args.mission} is not enabled in any built profile")
+        profiles = tuple(matching)
     args.out.mkdir(parents=True, exist_ok=True)
     run_out = args.out / f"run-{time.time_ns()}"
     run_out.mkdir(parents=False, exist_ok=False)
     results = []
     for profile in profiles:
-        rom = ROOT / "build" / f"StarCraft-{profile.capitalize()}-GBA.gba"
-        elf = ROOT / "build" / f"starcraft-{profile}.elf"
+        rom = args.rom or ROOT / "build" / f"StarCraft-{profile.capitalize()}-GBA.gba"
+        elf = args.elf or ROOT / "build" / f"starcraft-{profile}.elf"
         results.append(run_one(profile, rom, elf, args.map, args.race,
-                               args.bots, args.ticks, run_out))
+                               args.bots, args.ticks, run_out, args.mission))
     result = {"profiles": results}
     path = run_out / "sc64-split-smoke.json"
     path.write_text(json.dumps(result, indent=2) + "\n")

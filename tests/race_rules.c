@@ -20,7 +20,7 @@ int main(void)
     assert(sc64_race_unit_armor(U_FENIX_DRAGOON) == 3);
     assert(sc64_race_unit_armor(U_GOLIATH) == 1);
     /* BWAPI Terran Vulture: 75/0, 80 HP, 2 supply, factory, 450 frames. */
-    assert(U_VULTURE == SC_RU_COUNT - 1);
+    assert(U_VULTURE < U_DROPSHIP && U_DROPSHIP == SC_RU_COUNT - 1);
     assert(sc64_race_unit_rule(U_VULTURE)->race == R_TER);
     assert(sc64_race_unit_rule(U_VULTURE)->producer == B_FACTORY);
     assert(sc64_race_unit_rule(U_VULTURE)->minerals == 75);
@@ -36,6 +36,27 @@ int main(void)
     assert(sc64_race_unit_cooldown_vs(U_VULTURE, 0) == 30);
     assert(sc64_race_raw_unit(U_VULTURE) == 2);
     assert(sc64_race_unit_from_raw(2) == U_VULTURE);
+    /* Pinned BWAPI raw 11: Dropship is a distinct flying, unarmed unit.
+     * Transport/cargo behavior is deliberately outside this rules contract. */
+    assert(sc64_race_unit_rule(U_DROPSHIP)->race == R_TER);
+    assert(sc64_race_unit_rule(U_DROPSHIP)->producer == B_STARPORT);
+    assert(sc64_race_unit_rule(U_DROPSHIP)->minerals == 100);
+    assert(sc64_race_unit_rule(U_DROPSHIP)->gas == 100);
+    assert(sc64_race_unit_rule(U_DROPSHIP)->build_frames == 750);
+    assert(sc64_race_unit_rule(U_DROPSHIP)->hp == 150);
+    assert(sc64_race_unit_rule(U_DROPSHIP)->supply == 4);
+    assert(sc64_race_unit_armor(U_DROPSHIP) == 1);
+    assert(sc64_race_unit_flying(U_DROPSHIP));
+    assert(sc64_race_unit_damage_vs(U_DROPSHIP, 0) == 0);
+    assert(sc64_race_unit_damage_vs(U_DROPSHIP, 1) == 0);
+    assert(sc64_race_unit_range_vs(U_DROPSHIP, 0) == 0);
+    assert(sc64_race_unit_range_vs(U_DROPSHIP, 1) == 0);
+    assert(sc64_race_raw_unit(U_DROPSHIP) == 11);
+#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
+    assert(sc64_race_unit_from_raw(11) == U_DROPSHIP);
+#else
+    assert(sc64_race_unit_from_raw(11) == -1);
+#endif
     assert(sc64_race_raw_building(B_ENG_BAY) == 122);
     assert(sc64_race_building_from_raw(122) == B_ENG_BAY);
     assert(sc64_race_building_from_raw(118) == -1);

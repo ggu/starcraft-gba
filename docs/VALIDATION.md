@@ -128,14 +128,19 @@ Hardware-timer measurements distinguish these local ROMs:
 | --- | ---: | ---: | ---: | --- |
 | Initial runtime (`b208a7a7` ROM hash prefix) | 54,000 | 53,000 | 19.20 | Survival win |
 | Intermediate optimization (`c7487a79`) | 54,000 | 53,000 | 27.91 | Survival win |
-| Latest source (`69f7ea7e`) | 5,000 | 5,000 | 26.91 | Still playing |
+| Final optimized build (`69f7ea7e`) | 54,000 | 53,000 | 27.97 | Survival win |
 
-The latest build's six observed states match the intermediate winning run at
-the same ticks, including entities, resources, campaign state and countdown.
 The result-ending interval is excluded from full-run means because the exact
-finish point within that interval is unknown. The intermediate build's final
-assault still drops to about 19 fps. These measurements do not establish the
-latest build's full-mission or physical-hardware performance; T3 stays opt-in.
+finish point within that interval is unknown. The final build completes the
+full mission with the same observed campaign progression, but its final
+assault still drops to about 19 fps. T3 stays opt-in while that slowdown is
+addressed. These emulator measurements do not establish physical GBA performance.
+
+The controller-only host resume check advances T3 for 1,000 ticks, pauses it,
+proves that the countdown and roster remain frozen, saves through the pause
+menu, resets to HOME, loads with L, and verifies exact serialized state before
+resuming the simulation. It runs under ASan/UBSan as part of
+`make test-sc64-t3-runtime`.
 
 The latest ARM link uses 388 bytes of data and 246,656 bytes of BSS, leaving
 6,908 bytes below the EWRAM guard. Its IWRAM code ends at `0x03004e80`, below
@@ -149,6 +154,23 @@ separate setup, target queries and movement; they add measurement overhead.
 Rebuild with plain `make -B terran-t3` before measuring final frame rate.
 The profiler atomically publishes each observer snapshot in ignored
 `progress.json` and writes the complete `profile.json` at completion.
+
+## New Dominion preparation (2026-10-22)
+
+The asset-free suite includes the Z3 trigger model and a compiled matrix for
+the generated map table. The matrix checks stable mission IDs, profile guards
+and zeroed unavailable entries through global ID 14. The rules preserve the
+two switch-7 victory gates, Mature Chrysalis loss, one-shot resource grants
+and result-action order. Raw Wait and transmission fields remain explicit;
+the standalone model does not infer their duration in simulation ticks.
+
+`make test-sc64-z3-import` validates the locally generated 64-by-96 map:
+59 units, 32 buildings, 28 mineral fields and three geysers, with only two
+start markers excluded. Every retained placement has a supported runtime
+mapping; the two Dropships now have a distinct flying, unarmed unit identity.
+The fixture also checks coordinates, terrain indices and unavailable map
+slots. Cargo behavior and the source enemy AI script remain unimplemented.
+This preparation does not enable a playable Z3 mission.
 
 ## Known limits
 

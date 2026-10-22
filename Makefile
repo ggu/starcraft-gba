@@ -71,6 +71,18 @@ build/test-sc64-map-math: tests/sc64_map_math.c starcraft/sc64_map_math.h | buil
 build/test-sc64-t3-rules: tests/sc64_t3_rules.c starcraft/sc64_t3.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined tests/sc64_t3_rules.c -o $@
 
+build/test-sc64-z3-rules: tests/sc64_z3_rules.c starcraft/sc64_z3.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined tests/sc64_z3_rules.c -o $@
+
+build/test-race-rules-z3: tests/race_rules.c starcraft/race_rules.h starcraft/race_skirmish.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_Z3_ENABLED tests/race_rules.c -o $@
+
+.PHONY: test-sc64-z3-import
+build/test-sc64-z3-import: tests/sc64_z3_import.c starcraft/race_rules.h starcraft/sc64_types.h .local/sc64/races/generated/sc64_races_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_Z3_ENABLED -DSC64_CAMPAIGN_RACE=1 -Istarcraft -I.local/sc64/races/generated tests/sc64_z3_import.c -o $@
+test-sc64-z3-import: build/test-sc64-z3-import
+	./build/test-sc64-z3-import
+
 .PHONY: test-sc64-t3-import
 build/test-sc64-t3-import: tests/sc64_t3_import.c starcraft/race_rules.h starcraft/sc64_types.h .local/sc64/races/generated/sc64_races_generated.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_T3_ENABLED -DSC64_CAMPAIGN_RACE=0 -Istarcraft -I.local/sc64/races/generated tests/sc64_t3_import.c -o $@
@@ -93,9 +105,12 @@ build/test-sc64-t3-save: tests/sc64_t3_save.c $(STARCRAFT) $(wildcard starcraft/
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(T3_FLAGS) $< common/gba.c -o $@
 build/test-sc64-t3-targets: tests/sc64_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(T3_FLAGS) $< common/gba.c -o $@
-test-sc64-t3-runtime: test-sc64-t3-import build/test-sc64-t3-run build/test-sc64-t3-save build/test-sc64-t3-targets
+build/test-sc64-t3-resume: tests/sc64_t3_resume.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(T3_FLAGS) $< common/gba.c -o $@
+test-sc64-t3-runtime: test-sc64-t3-import build/test-sc64-t3-run build/test-sc64-t3-save build/test-sc64-t3-targets build/test-sc64-t3-resume
 	./build/test-sc64-t3-targets
 	./build/test-sc64-t3-save
+	./build/test-sc64-t3-resume
 	./build/test-sc64-t3-run
 
 build/test-sc64-frontend-terran: RACE_FRONTEND_ID=0
@@ -129,15 +144,17 @@ build/test-terrain-cache: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cach
 build/test-collision: tests/sc64_collision.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -DSC64_SKIRMISH -Icommon tests/sc64_collision.c common/gba.c -o $@
 
-test-starcraft: build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-skirmish-ai build/test-sc64-frontend build/test-sc64-bitgrid build/test-sc64-map-math build/test-sc64-t3-rules $(RACE_FRONTEND_TESTS) $(RACE_T3_FRONTEND_TESTS) build/test-sc64-frontend-t3-unified build/test-race-routes build/test-race-routes-96 build/test-race-routes-rect build/test-terrain-cache build/test-collision
+test-starcraft: build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-race-rules-z3 build/test-skirmish-ai build/test-sc64-frontend build/test-sc64-bitgrid build/test-sc64-map-math build/test-sc64-t3-rules build/test-sc64-z3-rules $(RACE_FRONTEND_TESTS) $(RACE_T3_FRONTEND_TESTS) build/test-sc64-frontend-t3-unified build/test-race-routes build/test-race-routes-96 build/test-race-routes-rect build/test-terrain-cache build/test-collision
 	./build/test-starcraft
 	./build/test-starcraft-selection
 	./build/test-race-rules
+	./build/test-race-rules-z3
 	./build/test-skirmish-ai
 	./build/test-sc64-frontend
 	./build/test-sc64-bitgrid
 	./build/test-sc64-map-math
 	./build/test-sc64-t3-rules
+	./build/test-sc64-z3-rules
 	./build/test-sc64-frontend-terran
 	./build/test-sc64-frontend-zerg
 	./build/test-sc64-frontend-protoss
