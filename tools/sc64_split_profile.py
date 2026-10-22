@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import socket
 import struct
 import subprocess
@@ -55,6 +56,38 @@ def check_debugger_port_free() -> None:
         raise RuntimeError("mGBA debugger port 2345 is already in use; leaving the existing emulator untouched") from exc
     finally:
         guard.close()
+
+
+def checked_sram(path: Path) -> Path:
+    """Only accept the cartridge SRAM size used by these profiles."""
+    path = path.resolve()
+    if not path.is_file() or path.stat().st_size != 32768:
+        raise ValueError(f"expected one 32 KiB SRAM file: {path}")
+    return path
+
+
+def save_live_checkpoint(rsp, sym: dict[str, int], *, tick: int) -> dict:
+    """Leave the observer scheduler, then pause/save using normal controls.
+
+    Called only at an observer checkpoint, after the measured interval ends.
+    No mission/entity/resource state is written through the debugger.
+    """
+    before_frame = u32(rsp, sym["frame"])
+    rsp.write(sym["demo_schedule_count"], struct.pack("<I", 0))
+    observer = sym["demo_replay_checkpoint"] & ~1
+    update = sym["game_update"] & ~1
+    if rsp.cmd(f"z1,{observer:x},2") != "OK" or rsp.cmd(f"Z1,{update:x},2") != "OK":
+        raise RuntimeError("failed to switch from observer to controller breakpoint")
+    rsp.tick()
+    split.key(rsp, sym, split.KEY_START)
+    if u32(rsp, sym["screen"]) != split.SCREEN_PAUSE:
+        raise RuntimeError("checkpoint controller did not pause live play")
+    paused_frame = u32(rsp, sym["frame"])
+    split.key(rsp, sym, split.KEY_B)
+    if u32(rsp, sym["screen"]) != split.SCREEN_PAUSE or u32(rsp, sym["frame"]) != paused_frame:
+        raise RuntimeError("checkpoint save advanced the paused simulation")
+    return {"observer_tick": tick, "observer_frame": before_frame,
+            "saved_frame": paused_frame, "input": "START pause, B save"}
 
 
 def u32(rsp, address: int) -> int:
@@ -146,7 +179,8 @@ def observe(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
 def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
         checkpoint: int, output: Path, mission: int | None = None,
         rom_path: Path | None = None, elf_path: Path | None = None,
-        require_win: bool = False) -> dict:
+        require_win: bool = False, load_save: Path | None = None,
+        save_at_end: bool = False) -> dict:
     if ticks < 1:
         raise ValueError("ticks must be positive")
     # The target's main loop checkpoints at every 1000 ticks and at the exact
@@ -155,6 +189,12 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
         raise ValueError("this ROM scheduler checkpoints at fixed 1000-tick intervals")
     if ticks > 0xFFFFFFFF:
         raise ValueError("ticks exceeds the 32-bit controller scheduler length")
+    if load_save is not None:
+        load_save = checked_sram(load_save)
+        if mission is None:
+            raise ValueError("--load-save requires --mission to verify the loaded campaign")
+    if save_at_end and require_win:
+        raise ValueError("--save-at-end requires live play, so cannot be combined with --require-win")
 
     rom = rom_path or ROOT / "build" / f"StarCraft-{profile.capitalize()}-GBA.gba"
     elf = elf_path or ROOT / "build" / f"starcraft-{profile}.elf"
@@ -188,7 +228,7 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
             if required_t3_fields - t3_layout[1].keys() or t3_layout[0] < 12:
                 raise RuntimeError(f"T3 DWARF layout is incomplete: {t3_layout}")
     required = (
-        "game_update", "demo_schedule_events", "demo_schedule_count", "demo_schedule_length",
+        "game_update", "demo_inject_keys", "demo_schedule_events", "demo_schedule_count", "demo_schedule_length",
         "demo_schedule_tick", "demo_replay_checkpoint", "demo_tick_buckets", "demo_last_cycles",
         "demo_peak_cycles", "u", "b", "screen", "frame", "won", "lost", "race_mode",
         "race_human", "race_bots", "race_skirmish_map", "race_cols", "race_rows",
@@ -205,11 +245,27 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
     out = output / f"{profile}-{scenario}-{time.time_ns()}"
     out.mkdir(parents=True, exist_ok=False)
     label = out.name
+    save_dir = out / "saves" / label
+    if load_save is not None:
+        save_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(load_save, save_dir / (rom.stem + ".sav"))
     check_debugger_port_free()
     proc = sock = rsp = log = None
     try:
         proc, sock, rsp, log = split.start_emulator(label, rom, out, sym)
-        if mission is None:
+        loaded_frame = None
+        if load_save is not None:
+            # Input was sampled before the breakpoint. Two continues execute
+            # the old neutral call and then HOME's L load, with no live tick.
+            rsp.write(sym["demo_inject_keys"], struct.pack("<H", split.KEY_L))
+            rsp.tick(2)
+            rsp.write(sym["demo_inject_keys"], b"\0\0")
+            loaded = observe(rsp, sym, sizes, bank, campaign_layout, t3_layout)
+            if (loaded["screen"], loaded["race_mode"], loaded["race_selected_mission"]) != (SCREEN_PLAY, 0, mission):
+                raise RuntimeError("HOME L did not load the requested campaign SRAM")
+            loaded_frame = loaded["frame"]
+            launch = {"width": loaded["race_cols"], "height": loaded["race_rows"]}
+        elif mission is None:
             launch = split.press_start(rsp, sym, map_id, race, bots)
         else:
             launch = split.campaign_launch(rsp, sym, profile, mission, mission_ordinal,
@@ -217,7 +273,7 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
         launch_state = split.state(rsp, sym)
         if launch_state["screen"] != SCREEN_PLAY:
             raise RuntimeError(f"scenario did not enter live play: {launch_state}")
-        if mission is not None and launch_state["mission"] != mission:
+        if mission is not None and load_save is None and launch_state["mission"] != mission:
             raise RuntimeError(f"campaign launch selected mission {launch_state['mission']} instead of {mission}")
         configuration = ({"mission": mission, "mission_ordinal": mission_ordinal,
                           "width": launch["width"], "height": launch["height"]}
@@ -225,6 +281,10 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
                          {"map": map_id, "human_race": race, "opponents": bots,
                           "bot_races": launch["bot_races"][:bots],
                           "width": launch["width"], "height": launch["height"]})
+        if load_save is not None:
+            configuration["loaded_sram"] = str(load_save)
+            configuration["loaded_sram_sha256"] = hashlib.sha256(load_save.read_bytes()).hexdigest()
+            configuration["loaded_frame"] = loaded_frame
 
         # main.c has already sampled schedule_count==0 for the current
         # game_update iteration. It finishes normally, then sees this queue
@@ -385,6 +445,22 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
                           "result": str(report)}, indent=2))
         if require_win and not final_won:
             raise RuntimeError(f"--require-win: final observed result did not win; report: {report}")
+        if save_at_end:
+            if observations[-1]["screen"] != SCREEN_PLAY:
+                raise RuntimeError("--save-at-end cannot save a completed campaign as live play")
+            saved = save_live_checkpoint(rsp, sym, tick=last_tick)
+            # mGBA flushes its backup file during graceful process shutdown.
+            menu.stop_emulator(proc, sock, log)
+            proc = sock = log = None
+            saves = list(save_dir.glob("*.sav"))
+            if len(saves) != 1:
+                raise RuntimeError(f"checkpoint did not flush exactly one SRAM file: {saves}")
+            saved_path = checked_sram(saves[0])
+            saved.update({"path": str(saved_path),
+                          "sha256": hashlib.sha256(saved_path.read_bytes()).hexdigest()})
+            result["checkpoint_save"] = saved
+            report.write_text(json.dumps(result, indent=2) + "\n")
+            print(json.dumps({"checkpoint_save": saved}), flush=True)
         return result
     finally:
         if proc is not None:
@@ -418,6 +494,10 @@ def main() -> None:
     parser.add_argument("--elf", type=Path, help="override the profile's default ELF")
     parser.add_argument("--require-win", action="store_true",
                         help="exit with failure unless the final observed screen is a won result")
+    parser.add_argument("--load-save", type=Path,
+                        help="load campaign SRAM through HOME L before measuring (requires --mission)")
+    parser.add_argument("--save-at-end", action="store_true",
+                        help="pause/save live play through normal controls after the measured interval")
     parser.add_argument("--ticks", type=int, default=10000)
     parser.add_argument("--checkpoint", type=int, default=1000)
     parser.add_argument("--out", type=Path, default=ROOT / "build/emulator/sc64-split-profile")
@@ -429,7 +509,8 @@ def main() -> None:
     try:
         run(args.profile, args.map, args.race, args.bots, args.ticks,
             args.checkpoint, args.out, mission=args.mission,
-            rom_path=args.rom, elf_path=args.elf, require_win=args.require_win)
+            rom_path=args.rom, elf_path=args.elf, require_win=args.require_win,
+            load_save=args.load_save, save_at_end=args.save_at_end)
     except (OSError, RuntimeError, ValueError, AssertionError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f"sc64_split_profile: {exc}\n")
 

@@ -233,6 +233,29 @@ full-pool or physical GBA performance. Its T3 link ended IWRAM at
 and later campaign work. These historical hashes identify the measured
 binaries separately from subsequent changes.
 
+## Campaign checkpoint profiling (2026-10-22)
+
+`tools/sc64_split_profile.py --mission 6 --save-at-end` can pause and save a
+live campaign after its measurement. `--load-save PATH --mission 6` copies
+that SRAM into a fresh emulator process and loads it through HOME L before
+profiling. Saves remain ignored local inputs. Use a compatible ROM/save
+generation; the game's loader rejects unavailable missions and stale layouts.
+The debugger schedules controller input and observes state; it does not write
+units, resources or mission timers to create a checkpoint.
+
+The frozen `a19385e` plain T3 build passed an ARM save/load smoke: measurement
+ended at frame 1003, the normal pause/save path recorded frame 1004, and a new
+process loaded exactly frame 1004 before continuing to frame 2005. The report
+records both observer and saved frames because switching breakpoints can
+advance one live tick before pause. Two asset-free checks reject missing or
+wrong-sized SRAM and incompatible profiler options before emulator launch.
+
+A separate instrumented full T3 run of that source completed all 54,000 ticks
+and won. Last-tick movement cost rose from about 7,300 cycles at tick 50,000
+to 251,000–270,000 during ticks 51,000–53,000. Target-query cost grew much less.
+This points to dense local movement as the next optimization target. These
+diagnostic counters add overhead and are not a final frame-rate measurement.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.
