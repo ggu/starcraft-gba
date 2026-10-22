@@ -395,6 +395,14 @@ Race building sight also recognizes a Hive as a town hall, with edge-clipped
 footprints checked against full recomputation. The legacy non-race visibility
 oracle remains enabled alongside the race fixture.
 
+The matching `d0972306` full ARM replay wins at frame 70,833 with the same
+final roster, resources and Chrysalis health as the host proof. All reported
+gameplay state matches the earlier `b6d5b616` run at all 73 checkpoints.
+Independent arithmetic over the same 69,659 live frames gives 17.21 fps
+versus 16.69 fps, a 3.12% increase. The worst complete observed interval is
+10.90 fps at scheduler tick 59,000, compared with the earlier 9.03 fps.
+The 30-fps target and physical hardware validation remain unmet.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.
