@@ -34,8 +34,11 @@ sc64_minimap_cell(int cell)
 {
 #ifdef SC64_RACES
 #ifdef SC64_LARGE_MAPS
-    return (int)sc64_map_tile_minimap_index((unsigned)sc64_cell_col(cell),
-        (unsigned)sc64_cell_row(cell), (unsigned)race_cols, (unsigned)race_rows);
+    int col = sc64_cell_col(cell), row = sc64_cell_row(cell);
+    int mx = race_cols == 64 ? (col * 3) >> 3 :
+             race_cols == 128 ? (col * 3) >> 4 : col >> 2;
+    int my = race_rows == 64 ? (row * 3) >> 3 : row >> 2;
+    return mx + my * 24;
 #else
     int col=sc64_cell_col(cell), row=sc64_cell_row(cell);
     int mx = MAP_COLS == 64 ? (col * 3) >> 3 : col >> 2;

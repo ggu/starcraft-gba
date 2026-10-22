@@ -6,6 +6,29 @@
 #include <string.h>
 #include "../starcraft/game.c"
 
+static void test_minimap_all_supported_geometries(void)
+{
+    static const int widths[] = {64, 96, 128};
+    static const int heights[] = {64, 96};
+    for (int wi = 0; wi < (int)(sizeof(widths) / sizeof(widths[0])); ++wi) {
+        for (int hi = 0; hi < (int)(sizeof(heights) / sizeof(heights[0])); ++hi) {
+            int width = widths[wi], height = heights[hi];
+            race_cols = width;
+            race_rows = height;
+            for (int row = 0; row < height; ++row) {
+                for (int col = 0; col < width; ++col) {
+                    int cell = col + row * width;
+                    int expected = (col * 24) / width +
+                                   ((row * 24) / height) * 24;
+                    int actual = sc64_minimap_cell(cell);
+                    assert(actual == expected);
+                    assert(actual >= 0 && actual < 24 * 24);
+                }
+            }
+        }
+    }
+}
+
 static void test_large_geometry_and_indexes(void)
 {
     int last = 128 * 96 - 1;
@@ -89,6 +112,7 @@ static void test_save_roundtrip_for_packed_grid_and_high_resources(void)
 
 int main(void)
 {
+    test_minimap_all_supported_geometries();
     test_large_geometry_and_indexes();
     test_save_roundtrip_for_packed_grid_and_high_resources();
     puts("large-map storage tests passed");

@@ -536,6 +536,15 @@ int main(int argc, char **argv)
         }
         step(0);
     }
+    if (won) {
+        int objective_check_x, objective_check_y;
+        assert(screen == SCREEN_RESULT && !lost);
+        assert(sc64_z3_state_valid(&race_z3) && race_z3.outcome == SC64_Z3_WON);
+        assert(race_campaign.phase == SC64_RACE_PHASE_COMPLETE);
+        assert(mature_chrysalis_position(&objective_check_x, &objective_check_y));
+        assert(owner_units(ENEMY) + owner_buildings(ENEMY) <= 6 ||
+               owner_buildings(ENEMY) == 0);
+    }
     checkpoint(won ? "won" : lost ? "lost" : "limit");
     fprintf(trace, "]}\n");
     fclose(trace);

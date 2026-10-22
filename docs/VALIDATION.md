@@ -294,6 +294,13 @@ The synthetic fixture checks the final grid cell, minimap/target/path indexes,
 mineral slots 32–47 and full fog-buffer persistence. It does not validate
 loading a real 128-column mission's geometry or gameplay.
 
+A follow-up keeps the large-profile minimap calculation in exact integer
+arithmetic after caller validation. Exhaustive tests check all 46,080 cells
+across the six supported width/height combinations against a division-based
+oracle. The updated probe ends IWRAM at `0x03004f48`, recovering 160 bytes of
+code space while leaving its BSS size unchanged. The production branch is
+unchanged.
+
 `make test-sc64-race-collision` checks the race collision buckets against a
 complete overlap scan over 959,577 candidates, including dense formations,
 same-cell movement, flight classes, edge coordinates and dead neighbors.
