@@ -153,6 +153,81 @@ sc64_adjust_unit_visibility(int x, int y, int type, int delta)
             }
 }
 
+#ifdef SC64_VISIBILITY_SPANS
+/* floor(sqrt(radius^2 - dy^2)), indexed by absolute pixel dy.  These are
+ * exact integer bounds for the two supported sight radii. */
+static const u8 sc64_visibility_halfwidth_56[57] = {
+    56,55,55,55,55,55,55,55,55,55,55,54,54,54,54,53,53,53,53,52,
+    52,51,51,51,50,50,49,49,48,47,47,46,45,45,44,43,42,42,41,40,
+    39,38,37,35,34,33,31,30,28,27,25,23,20,18,14,10,0
+};
+static const u8 sc64_visibility_halfwidth_72[73] = {
+    72,71,71,71,71,71,71,71,71,71,71,71,70,70,70,70,70,69,69,69,
+    69,68,68,68,67,67,67,66,66,65,65,64,64,63,63,62,62,61,61,60,
+    59,59,58,57,56,56,55,54,53,52,51,50,49,48,47,46,45,43,42,41,
+    39,38,36,34,32,30,28,26,23,20,16,11,0
+};
+
+static int
+sc64_visibility_floor_div16(int value)
+{
+    return value >= 0 ? value / 16 : -((-value + 15) / 16);
+}
+
+static int
+sc64_visibility_ceil_div16(int value)
+{
+    return value >= 0 ? (value + 15) / 16 : -((-value) / 16);
+}
+
+/* Derive exact row intervals in IWRAM without duplicating the helper body. */
+static void GBA_HOT __attribute__((noinline))
+sc64_visibility_row_span(int x, int y, int row, int radius, int extent,
+                         int *first, int *last)
+{
+    int c = x / 16, r = y / 16;
+    int col0, col1, dy, halfwidth;
+    *first = 1;
+    *last = 0;
+    if (row < r - extent || row > r + extent || row < 0 || row >= MAP_ROWS)
+        return;
+    dy = row * 16 + 8 - y;
+    if (dy < 0) dy = -dy;
+    if (dy > radius) return;
+    halfwidth = radius == 56 ? sc64_visibility_halfwidth_56[dy] :
+                               sc64_visibility_halfwidth_72[dy];
+    col0 = sc64_visibility_ceil_div16(x - halfwidth - 8);
+    col1 = sc64_visibility_floor_div16(x + halfwidth - 8);
+    if (col0 < c - extent) col0 = c - extent;
+    if (col1 > c + extent) col1 = c + extent;
+    if (col0 < 0) col0 = 0;
+    if (col1 >= MAP_COLS) col1 = MAP_COLS - 1;
+    if (col0 > col1) return;
+    *first = col0;
+    *last = col1;
+}
+
+static void GBA_HOT __attribute__((noinline))
+sc64_visibility_apply_span(int row, int first, int last, int add)
+{
+    int col;
+    for (col = first; col <= last; ++col) {
+        int cell = col + row * MAP_COLS;
+        if (add) {
+            if (sc64_visible_sources[cell] == 0)
+                sc64_minimap_visible[sc64_minimap_cell(cell)]++;
+            if (sc64_visible_sources[cell] != 0xFF)
+                sc64_visible_sources[cell]++;
+        } else if (sc64_visible_sources[cell] > 0) {
+            sc64_visible_sources[cell]--;
+            if (sc64_visible_sources[cell] == 0)
+                sc64_minimap_visible[sc64_minimap_cell(cell)]--;
+        }
+        SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
+    }
+}
+#endif
+
 /* Update a nearby unit's old and new footprints together. Pixels can move
  * within a tile every frame, but only the thin symmetric difference of the
  * two sight circles needs source-count work. */
@@ -167,6 +242,10 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
         type==U_SCV
 #endif
         ? 56 : 72;
+#ifdef SC64_VISIBILITY_SPANS
+    int old_row = old_y / 16, new_row = new_y / 16;
+    int row;
+#else
     int old_col = old_x / 16, old_row = old_y / 16;
     int new_col = new_x / 16, new_row = new_y / 16;
     int col0 = (old_col < new_col ? old_col : new_col) - 5;
@@ -174,6 +253,38 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
     int col1 = (old_col > new_col ? old_col : new_col) + 5;
     int row1 = (old_row > new_row ? old_row : new_row) + 5;
     int col, row;
+#endif
+#ifdef SC64_VISIBILITY_SPANS
+    int row0 = (old_row < new_row ? old_row : new_row) - 5;
+    int row1 = (old_row > new_row ? old_row : new_row) + 5;
+    for (row = row0; row <= row1; ++row) {
+        int old_first, old_last, new_first, new_last;
+        sc64_visibility_row_span(old_x, old_y, row, radius, 5,
+                                 &old_first, &old_last);
+        sc64_visibility_row_span(new_x, new_y, row, radius, 5,
+                                 &new_first, &new_last);
+        if (old_first > old_last) {
+            sc64_visibility_apply_span(row, new_first, new_last, 1);
+        } else if (new_first > new_last) {
+            sc64_visibility_apply_span(row, old_first, old_last, 0);
+        } else {
+            if (old_first < new_first)
+                sc64_visibility_apply_span(row, old_first,
+                    old_last < new_first - 1 ? old_last : new_first - 1, 0);
+            if (old_last > new_last)
+                sc64_visibility_apply_span(row,
+                    old_first > new_last + 1 ? old_first : new_last + 1,
+                    old_last, 0);
+            if (new_first < old_first)
+                sc64_visibility_apply_span(row, new_first,
+                    new_last < old_first - 1 ? new_last : old_first - 1, 1);
+            if (new_last > old_last)
+                sc64_visibility_apply_span(row,
+                    new_first > old_last + 1 ? new_first : old_last + 1,
+                    new_last, 1);
+        }
+    }
+#else
     for (row = row0; row <= row1; row++)
         for (col = col0; col <= col1; col++)
             if (col >= 0 && row >= 0 && col < MAP_COLS && row < MAP_ROWS) {
@@ -198,6 +309,7 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
                     SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
                 }
             }
+#endif
 }
 
 static void GBA_HOT

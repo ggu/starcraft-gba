@@ -13,24 +13,45 @@
  * one flood per moving unit per tile. Dynamic actors still use local steering.
  * Derived caches are discarded after load and whenever a structure changes. */
 /* The race game needs fields for four economies and several armies. */
+#if defined(SC64_ROUTE_PACK3) && !defined(SC64_RACES)
+#error "SC64_ROUTE_PACK3 is only supported by race route fields"
+#endif
 #ifdef SC64_RACES
 #ifdef SC64_LARGE_MAPS
+#ifdef SC64_ROUTE_PACK3
+#define SC64_ROUTE_SLOTS 20
+#else
 #define SC64_ROUTE_SLOTS 15
+#endif
 #elif defined(SC64_T3_ENABLED)
+#ifdef SC64_ROUTE_PACK3
+#define SC64_ROUTE_SLOTS 22
+#else
 #define SC64_ROUTE_SLOTS 17
+#endif
+#else
+#ifdef SC64_ROUTE_PACK3
+#define SC64_ROUTE_SLOTS 24
 #else
 #define SC64_ROUTE_SLOTS 18
 #endif
+#endif
+#ifdef SC64_ROUTE_PACK3
+#define SC64_ROUTE_BYTES ((MAP_CELLS * 3 + 7) / 8)
+#define SC64_ROUTE_UNREACHABLE 7
+#else
 #define SC64_ROUTE_BYTES ((MAP_CELLS + 1) / 2)
+#define SC64_ROUTE_UNREACHABLE 15
+#endif
 #elif defined(SC64_SKIRMISH)
 #define SC64_ROUTE_SLOTS 16
 #else
 #define SC64_ROUTE_SLOTS 8
 #endif
 #ifdef SC64_RACES
-/* Two cells per byte: 0 is the goal, 1..4 point toward a shortest-path
- * neighbour, and 15 means unreachable. Slot counts remain per-profile bounded
- * by EWRAM/link-guard budgets (18 standard, 17 T3, 15 large maps). */
+/* Default: two cells per byte. Optional PACK3: one 3-bit cell code. In either
+ * layout 0 is the goal, 1..4 point toward a shortest-path neighbour, and the
+ * all-ones code means unreachable. */
 static u8 sc64_route_field[SC64_ROUTE_SLOTS][SC64_ROUTE_BYTES];
 #else
 /* Legacy fields retain distances for the original blocked-start behavior. */
@@ -44,15 +65,34 @@ volatile u32 sc64_route_hits, sc64_route_builds;
 #ifdef SC64_RACES
 static int GBA_HOT sc64_route_get(int slot, int cell)
 {
+#ifdef SC64_ROUTE_PACK3
+    u32 bit = (u32)cell * 3u;
+    unsigned byte = bit >> 3, shift = bit & 7u;
+    u16 pair = sc64_route_field[slot][byte];
+    if (shift > 5u) pair |= (u16)sc64_route_field[slot][byte + 1] << 8;
+    return (pair >> shift) & 7u;
+#else
     u8 v = sc64_route_field[slot][cell >> 1];
     return (cell & 1) ? v >> 4 : v & 15;
+#endif
 }
 
 static void GBA_HOT sc64_route_put(int slot, int cell, int direction)
 {
+#ifdef SC64_ROUTE_PACK3
+    u32 bit = (u32)cell * 3u;
+    unsigned byte = bit >> 3, shift = bit & 7u;
+    u16 pair = sc64_route_field[slot][byte];
+    u16 mask = (u16)(7u << shift);
+    if (shift > 5u) pair |= (u16)sc64_route_field[slot][byte + 1] << 8;
+    pair = (u16)((pair & ~mask) | (((u16)direction & 7u) << shift));
+    sc64_route_field[slot][byte] = (u8)pair;
+    if (shift > 5u) sc64_route_field[slot][byte + 1] = (u8)(pair >> 8);
+#else
     u8 *p = &sc64_route_field[slot][cell >> 1];
     if (cell & 1) *p = (u8)((*p & 15) | (direction << 4));
     else *p = (u8)((*p & 240) | direction);
+#endif
 }
 #endif
 
@@ -103,7 +143,7 @@ sc64_route_slot(int goal)
             cell = col + row * MAP_COLS;
             if (SC64_GRID_GET(path_walkable, cell)) {
 #ifdef SC64_RACES
-                if (sc64_route_get(slot, cell) == 15) {
+                if (sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE) {
                     sc64_route_put(slot, cell, 0); bfs_queue[tail++] = (u16)cell;
                 }
 #else
@@ -123,7 +163,7 @@ sc64_route_slot(int goal)
 #ifdef SC64_RACES
 #define SC64_FLOOD(condition, neighbour, direction) \
         if (condition) { next = (neighbour); \
-            if (SC64_GRID_GET(path_walkable, next) && sc64_route_get(slot, next) == 15) { \
+            if (SC64_GRID_GET(path_walkable, next) && sc64_route_get(slot, next) == SC64_ROUTE_UNREACHABLE) { \
                 sc64_route_put(slot, next, (direction)); bfs_queue[tail++] = (u16)next; } }
 #else
 #define SC64_FLOOD(condition, neighbour, direction) \
@@ -145,6 +185,39 @@ sc64_route_slot(int goal)
     return slot;
 }
 
+#if defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
+/* Inflated structure cells are rare actor origins. Keep their gradient walk in
+ * ROM so the hot route query stays small; selection/ties remain identical. */
+static int __attribute__((noinline))
+sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out_row)
+{
+    static const s8 dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
+    int i,best=-1,cost=0x7fffffff;
+    for(i=0;i<4;i++) {
+        int cx=col+dx[i],cy=row+dy[i],distance,candidate;
+        if(cx<0||cy<0||cx>=MAP_COLS||cy>=MAP_ROWS)continue;
+        candidate=cx+cy*MAP_COLS;
+        if(sc64_route_get(slot,candidate)==SC64_ROUTE_UNREACHABLE)continue;
+        /* Follow each adjacent packed gradient to compare actual path lengths.
+         * Direction zero (including a blocked-goal seed) stops this walk. */
+        distance=0;
+        while(candidate!=goal&&distance<MAP_CELLS) {
+            int d=sc64_route_get(slot,candidate);
+            if(d<1||d>4)break;
+            if(d==1)candidate++;
+            else if(d==2)candidate--;
+            else if(d==3)candidate+=MAP_COLS;
+            else candidate-=MAP_COLS;
+            ++distance;
+        }
+        if(distance<cost){cost=distance;best=i;}
+    }
+    if(best<0)return 0;
+    *out_col=col+dx[best];*out_row=row+dy[best];
+    return 1;
+}
+#endif
+
 static int GBA_HOT
 sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
 {
@@ -158,11 +231,21 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
     slot = sc64_route_slot(goal);
 #ifdef SC64_RACES
     direction = sc64_route_get(slot, cell);
-    if (direction == 15) direction = -1;
+    if (direction == SC64_ROUTE_UNREACHABLE) direction = -1;
 #else
     field = sc64_route_field[slot];
     direction = field[cell] == 0xFFFF ? -1 : field[cell] & 7;
 #endif
+#if defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
+    if (direction < 0 && !SC64_GRID_GET(path_walkable, cell)) {
+        if(!sc64_route_blocked_start(slot,col,row,goal,&col,&row))return 0;
+    } else if(direction<0)return 0;
+    else if(direction==0){*next_x=tx;*next_y=ty;return 1;}
+    else if(direction==1)col++;
+    else if(direction==2)col--;
+    else if(direction==3)row++;
+    else row--;
+#else
     if (direction < 0 && !SC64_GRID_GET(path_walkable, cell)) {
         static const s8 dx[4] = {1,-1,0,0}, dy[4] = {0,0,1,-1};
         int i, best = -1, cost = 0x7fffffff;
@@ -173,7 +256,7 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
             if (cx < 0 || cy < 0 || cx >= MAP_COLS || cy >= MAP_ROWS) continue;
 #ifdef SC64_RACES
             candidate = cx + cy * MAP_COLS;
-            if (sc64_route_get(slot, candidate) == 15) continue;
+            if (sc64_route_get(slot, candidate) == SC64_ROUTE_UNREACHABLE) continue;
             /* Rare blocked starts have no distance nibble. Follow each
              * adjacent gradient to compare true path lengths. */
             distance = 0;
@@ -200,6 +283,7 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
     else if (direction == 2) col--;
     else if (direction == 3) row++;
     else row--;
+#endif
     *next_x = col * 16 + 8; *next_y = row * 16 + 8;
     return 1;
 }

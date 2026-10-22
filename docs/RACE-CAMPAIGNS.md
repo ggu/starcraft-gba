@@ -55,6 +55,14 @@ Zerg 3, The New Dominion, also has an experimental build:
 make zerg-z3 test-sc64-z3-runtime
 ```
 
+This target enables three-bit route fields and exact row-span sight updates.
+The extra route slots retain more destinations within the same field-memory
+budget. Sight updates preserve the existing circles and change only cells
+entering or leaving them. These optimizations are currently enabled for Z3.
+For a comparison build, use `make -B zerg-z3 Z3_OPTIMIZATION_FLAGS=`; rebuild
+with plain `make -B zerg-z3` to restore the optimized version. Retain each
+ROM/ELF pair separately before comparing runs.
+
 `build/StarCraft-Zerg-Z3-GBA.gba` adds New Dominion on page two of the Zerg
 campaign. Protect the Mature Chrysalis and eliminate the Terran presence.
 The source victory gates are at most six remaining enemy units/buildings
@@ -70,10 +78,11 @@ attacks on enemy structures. It wins with the Chrysalis intact. This is a
 host gameplay regression; ARM full-mission timing and physical GBA validation
 remain separate checks.
 
-The matching ARM replay also wins and matches the host's final state. It
-averages 16.69 fps during counted play, with much slower crowded intervals.
-The mission stays experimental while that performance gap is addressed;
-physical GBA testing remains pending.
+The optimized ARM replay also wins and matches the host's final state. It
+averages 19.19 fps during counted play, up from 16.69 fps before these changes.
+Its worst complete observed interval is 15.23 fps. Reported gameplay state
+matches the earlier run at all 73 checkpoints. The mission stays experimental
+while that performance gap is addressed; physical GBA testing remains pending.
 
 To replay that host test's complete input trace on the current experimental
 ARM build, run this after the build/test command above:
@@ -87,6 +96,11 @@ capacity from the ELF. It starts from a fresh HOME screen, schedules inputs
 and checks the final mission, roster, resources and objective state. Reports,
 saves and captures stay local in ignored output directories. Use `--rom`,
 `--elf`, `--trace` and `--out` to retain a frozen build and separate runs.
+
+For a bounded performance checkpoint, add `--ticks 59000 --save-at-end`.
+The helper stops that controller trace during play, pauses with START and
+saves with B. Its report records the observed and saved frames and SRAM hash.
+Prefixes are labeled explicitly and do not assert a complete mission win.
 
 Enemy pressure uses paid Marines every two minutes and small attacks from
 the imported guards every three minutes. This is an authored substitute for

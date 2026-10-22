@@ -403,6 +403,49 @@ versus 16.69 fps, a 3.12% increase. The worst complete observed interval is
 10.90 fps at scheduler tick 59,000, compared with the earlier 9.03 fps.
 The 30-fps target and physical hardware validation remain unmet.
 
+## Packed routes and sight intervals (2026-10-23)
+
+Experimental Z3 now enables three-bit route fields and exact row-span sight
+updates. Three-bit fields hold 24 destinations in the space previously used
+by 18 four-bit fields; directions, unreachable markers and BFS tie order
+remain unchanged. The rare blocked-start walk stays in ROM. Asset-free
+ASan/UBSan fixtures check all packing offsets, independent BFS directions,
+blocked seeds, capacity-plus-one LRU eviction and reset for standard, T3 and
+large-map field sizes. Other ROM targets retain their existing defaults.
+
+Sight updates use exact integer row intervals to visit cells entering or
+leaving the existing circles. Full-recomputation oracles check all fractional
+offsets, small moves in both directions, overlapping sources, clipped map
+edges and race town-hall sight. Both legacy and race visibility fixtures run
+with and without the optional span implementation.
+
+The optimized `ece77ae2` full ARM replay wins at frame 70,833 with the same
+1,388-input controller trace. Every reported gameplay field, including entity
+records, matches both earlier full runs at all 73 checkpoints. Independent
+timing arithmetic over the same 69,659 counted live frames gives:
+
+| Z3 build | ROM hash prefix | Weighted fps | Worst complete interval fps |
+| --- | --- | ---: | ---: |
+| Earlier plain build | `b6d5b616` | 16.69 | 9.03 |
+| HUD and expanded four-bit cache | `d0972306` | 17.21 | 10.90 |
+| Three-bit cache and sight intervals | `ece77ae2` | 19.19 | 15.23 |
+
+The latest run counts 60,887,297,856 timer cycles. In a separate same-save
+late-mission comparison over 9,000 live frames, the four-bit cache measured
+19.30 fps, the three-bit cache 19.78, and three-bit plus sight intervals 20.42.
+Those unattended tail runs all lose at frame 67,997 and have matching reported
+gameplay state; they are performance comparisons, not completion proofs.
+
+The latest Z3 ARM build uses 388 bytes of data and 249,512 bytes of BSS.
+IWRAM ends at `0x03004ff8`, within the unchanged `0x03005000` stack guard.
+The large-map probe with three-bit routes and baseline visibility also fits
+its guards; the combined optimization is currently enabled only for Z3.
+Default build/tests, unified build/tests and the Z3 runtime suite pass,
+including 51 Python checks and controller-only host completion under
+ASan/UBSan. Default and unified ROM hashes remain unchanged. A final source
+rebuild matches the measured Z3 ROM byte for byte. Near 30 fps and physical
+GBA validation remain unmet.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

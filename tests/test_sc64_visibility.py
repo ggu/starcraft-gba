@@ -37,6 +37,7 @@ static u8 visible[MAP_CELLS], explored[MAP_CELLS];
 
 static u8 ref_visible[MAP_CELLS], ref_explored[MAP_CELLS];
 static u8 ref_minimap_visible[24*24], ref_minimap_explored[24*24];
+static void compare(int step);
 static void ref_explore(int x,int y,int radius) {
  int c=x/16,r=y/16,col,row;
  for(row=r-radius;row<=r+radius;row++) for(col=c-radius;col<=c+radius;col++)
@@ -73,6 +74,48 @@ static void ref_update(void) {
 #else
   if(b[i].type==B_COMMAND)ref_vision(b[i].x,b[i].y,112,8);
 #endif
+ }
+}
+static void near_move_sweep(int type, int start_step){
+ static const int delta[10][2]={{1,0},{-1,0},{0,1},{0,-1},
+   {15,0},{-15,0},{0,15},{0,-15},{15,15},{-15,-15}};
+ int xoff,yoff,k,step=start_step;
+ memset(u,0,sizeof(u));memset(b,0,sizeof(b));
+ memset(visible,0,sizeof(visible));memset(explored,0,sizeof(explored));
+ memset(ref_visible,0,sizeof(ref_visible));memset(ref_explored,0,sizeof(ref_explored));
+ sc64_visibility_reset();
+ u[0].alive=u[1].alive=1;u[0].owner=u[1].owner=SIDE;
+ u[0].type=type;u[1].type=type==U_SCV?0:U_SCV;
+ for(xoff=0;xoff<16;xoff++)for(yoff=0;yoff<16;yoff++){
+  int x=400+xoff,y=400+yoff;
+  u[0].x=x;u[0].y=y;u[1].x=x+5;u[1].y=y+4;
+  compare(step++);
+  for(k=0;k<10;k++){
+   u[0].x=x+delta[k][0];u[0].y=y+delta[k][1];
+   u[1].x=x+5+delta[k][0];u[1].y=y+4+delta[k][1];
+   compare(step++);
+   u[0].x=x;u[0].y=y;u[1].x=x+5;u[1].y=y+4;
+   compare(step++);
+  }
+ }
+}
+static void edge_move_sweep(int start_step){
+ static const int points[8][2]={{0,0},{15,0},{0,15},{15,15},
+   {1008,1008},{1023,1008},{1008,1023},{1023,1023}};
+ int i,step=start_step;
+ memset(u,0,sizeof(u));memset(b,0,sizeof(b));
+ memset(visible,0,sizeof(visible));memset(explored,0,sizeof(explored));
+ memset(ref_visible,0,sizeof(ref_visible));memset(ref_explored,0,sizeof(ref_explored));
+ sc64_visibility_reset();
+ u[0].alive=u[1].alive=1;u[0].owner=u[1].owner=SIDE;
+ u[0].type=U_SCV;u[1].type=0;
+ for(i=0;i<8;i++){
+  int dx=points[i][0]<1010?15:-15,dy=points[i][1]<1010?15:-15;
+  u[0].x=points[i][0];u[0].y=points[i][1];
+  u[1].x=points[i][0]+(dx>0?5:-5);u[1].y=points[i][1]+(dy>0?4:-4);
+  compare(step++);
+  u[0].x+=dx;u[0].y+=dy;u[1].x+=dx;u[1].y+=dy;
+  compare(step++);
  }
 }
 static unsigned rng=1234567;
@@ -117,6 +160,9 @@ int main(void){
   }
  }
 #endif
+ near_move_sweep(U_SCV,-2000);
+ near_move_sweep(0,-12000);
+ edge_move_sweep(-22000);
  /* Moving sources by one pixel changes their exact sight-circle boundary,
     while their exploration tile remains the same. Two nearby sources overlap
     so source-count transitions and minimap occupancy must remain exact. */
@@ -172,14 +218,18 @@ class VisibilityTests(unittest.TestCase):
             source.write_text(C_SOURCE)
             for variant, flags in (("legacy", []), ("races", ["-DSC64_RACES"])):
                 with self.subTest(variant=variant):
-                    binary = Path(temp) / f"visibility-{variant}"
-                    subprocess.run([
-                        "clang", "-std=c11", "-O1", "-fsanitize=address,undefined",
-                        *flags, "-I", str(ROOT), str(source), "-o", str(binary),
-                    ], check=True)
-                    result = subprocess.run([str(binary)], check=True, text=True,
-                                            capture_output=True)
-                    self.assertIn("matches full recomputation", result.stdout)
+                    for spans, span_flags in (("baseline", []),
+                                              ("spans", ["-DSC64_VISIBILITY_SPANS"])):
+                        with self.subTest(path=spans):
+                            binary = Path(temp) / f"visibility-{variant}-{spans}"
+                            subprocess.run([
+                                "clang", "-std=c11", "-O1", "-fsanitize=address,undefined",
+                                *flags, *span_flags, "-I", str(ROOT), str(source),
+                                "-o", str(binary),
+                            ], check=True)
+                            result = subprocess.run([str(binary)], check=True, text=True,
+                                                    capture_output=True)
+                            self.assertIn("matches full recomputation", result.stdout)
 
 
 if __name__ == "__main__":

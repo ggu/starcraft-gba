@@ -31,13 +31,27 @@ static u8 packed_walkable[(MAP_CELLS + 7) / 8];
 #undef SC64_GRID_GET
 #endif
 
+#ifdef SC64_ROUTE_PACK3
+_Static_assert(sizeof(sc64_route_field) == (SC64_ROUTE_SLOTS*SC64_ROUTE_BYTES), "3-bit route fields fit packed byte storage");
+#else
 _Static_assert(sizeof(sc64_route_field) == (SC64_ROUTE_SLOTS*MAP_CELLS/2), "route fields hold two cells per byte");
+#endif
+#ifdef SC64_ROUTE_PACK3
+#if defined(SC64_LARGE_MAPS)
+_Static_assert(SC64_ROUTE_SLOTS==20, "large PACK3 race cache capacity");
+#elif defined(SC64_T3_ENABLED)
+_Static_assert(SC64_ROUTE_SLOTS==22, "T3 PACK3 cache capacity");
+#else
+_Static_assert(SC64_ROUTE_SLOTS==24, "standard PACK3 race cache capacity");
+#endif
+#else
 #if defined(SC64_LARGE_MAPS)
 _Static_assert(SC64_ROUTE_SLOTS==15, "large race cache capacity");
 #elif defined(SC64_T3_ENABLED)
 _Static_assert(SC64_ROUTE_SLOTS==17, "T3 cache capacity");
 #else
 _Static_assert(SC64_ROUTE_SLOTS==18, "standard race cache capacity");
+#endif
 #endif
 static int cached_goal(int goal)
 {
@@ -62,6 +76,19 @@ static void reference_bfs(int goal)
     int head=0,tail=0;
     for(int i=0;i<MAP_CELLS;i++) { distance[i]=-1; reference_direction[i]=15; }
     if(path_walkable[goal]) { distance[goal]=0; bfs_queue[tail++]=(u16)goal; }
+    else {
+        int gx=goal%MAP_COLS,gy=goal/MAP_COLS;
+        /* A blocked destination seeds its walkable eight-neighborhood with
+           direction zero; a query there returns the requested goal directly. */
+        for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++) {
+            int x=gx+dx,y=gy+dy,cell;
+            if((!dx&&!dy)||x<0||y<0||x>=MAP_COLS||y>=MAP_ROWS)continue;
+            cell=x+y*MAP_COLS;
+            if(path_walkable[cell]&&distance[cell]<0) {
+                distance[cell]=0;reference_direction[cell]=0;bfs_queue[tail++]=(u16)cell;
+            }
+        }
+    }
     while(head<tail) {
         int c=bfs_queue[head++], x=c%MAP_COLS, y=c/MAP_COLS;
         /* Preserve the route flood's stable left/right/up/down tie order. */
@@ -79,11 +106,13 @@ static int check_cached_route(int sx,int sy,int gx,int gy)
     int start=sx+sy*MAP_COLS,goal=gx+gy*MAP_COLS,nx,ny,expected=-1;
     reference_bfs(goal);
     if(path_walkable[start]) {
-        if(distance[start]>=0) expected=start==goal?start:
-            start+(reference_direction[start]==1?1:
-                   reference_direction[start]==2?-1:
-                   reference_direction[start]==3?MAP_COLS:
-                   reference_direction[start]==4?-MAP_COLS:0);
+        if(distance[start]>=0) {
+            if(start==goal||reference_direction[start]==0)expected=goal;
+            else expected=start+(reference_direction[start]==1?1:
+                                reference_direction[start]==2?-1:
+                                reference_direction[start]==3?MAP_COLS:
+                                reference_direction[start]==4?-MAP_COLS:0);
+        }
     } else {
         static const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
         int best=0x7fffffff;
@@ -99,7 +128,7 @@ static int check_cached_route(int sx,int sy,int gx,int gy)
     int ok=sc64_route_next(sx*16+8,sy*16+8,gx*16+8,gy*16+8,&nx,&ny);
     if(expected<0)return !ok;
     if(!ok)return 0;
-    if(expected==start)return nx==gx*16+8&&ny==gy*16+8;
+    if(expected==goal)return nx==gx*16+8&&ny==gy*16+8;
     return nx/16+(ny/16)*MAP_COLS==expected;
 }
 
@@ -124,6 +153,14 @@ static void verify_field(int goal)
 
 int main(void)
 {
+#ifdef SC64_ROUTE_PACK3
+    /* Exhaust every cell's bit offset, including cross-byte fields. */
+    memset(sc64_route_field[0],255,SC64_ROUTE_BYTES);
+    for(int cell=0;cell<MAP_CELLS;cell++)
+        sc64_route_put(0,cell,(cell*5+3)&7);
+    for(int cell=0;cell<MAP_CELLS;cell++)
+        assert(sc64_route_get(0,cell)==((cell*5+3)&7));
+#endif
     for(int map=0;map<4;map++) {
         for(int c=0;c<MAP_CELLS;c++) path_walkable[c]=(random32()%100)<72;
         int goal=(map*733+1777)%MAP_CELLS;
@@ -140,7 +177,40 @@ int main(void)
     int next=nx/16+(ny/16)*MAP_COLS;
     reference_bfs(40+40*MAP_COLS);
     assert(distance[next]==15); /* one step out plus 14 remaining */
+    assert(check_cached_route(32,32,40,40)); /* open-grid equal-path tie */
+
+    /* Sparse exits, corner bounds, blocked-goal zero seeds, and an isolated
+       blocked origin all exercise the out-of-line PACK3 recovery path. */
+    memset(path_walkable,1,sizeof(path_walkable));
+    int ox=MAP_COLS/2,oy=MAP_ROWS/2;
+    path_walkable[ox+oy*MAP_COLS]=0;
+    path_walkable[(ox+1)+oy*MAP_COLS]=0;
+    path_walkable[ox+(oy-1)*MAP_COLS]=0;
+    reset_routes();
+    assert(check_cached_route(ox,oy,ox-8,oy+8));
+    memset(path_walkable,1,sizeof(path_walkable));
+    path_walkable[0]=0;
+    reset_routes();
+    assert(check_cached_route(0,0,6,6));
+    memset(path_walkable,1,sizeof(path_walkable));
+    int blocked_goal_x=ox+6,blocked_goal_y=oy-4;
+    path_walkable[blocked_goal_x+blocked_goal_y*MAP_COLS]=0;
+    reset_routes();
+    assert(check_cached_route(blocked_goal_x-1,blocked_goal_y,
+                              blocked_goal_x,blocked_goal_y));
+    path_walkable[(blocked_goal_x-2)+blocked_goal_y*MAP_COLS]=0;
+    reset_routes();
+    assert(check_cached_route(blocked_goal_x-2,blocked_goal_y,
+                              blocked_goal_x,blocked_goal_y));
+    memset(path_walkable,0,sizeof(path_walkable));
+    int isolated_x=4,isolated_y=4;
+    path_walkable[isolated_x+1+isolated_y*MAP_COLS]=1;
+    path_walkable[12+12*MAP_COLS]=1;
+    reset_routes();
+    assert(check_cached_route(isolated_x,isolated_y,12,12));
+
     /* All slots retain a mixed economy/army working set and count hits. */
+    memset(path_walkable,1,sizeof(path_walkable));
     reset_routes(); sc64_route_builds=0; sc64_route_hits=0;
     for(int g=0;g<SC64_ROUTE_SLOTS;g++) assert(sc64_route_next(8*16+8,8*16+8,(g+16)*16+8,16*16+8,&nx,&ny));
     for(int g=0;g<SC64_ROUTE_SLOTS;g++) assert(sc64_route_next(8*16+8,8*16+8,(g+16)*16+8,16*16+8,&nx,&ny));
