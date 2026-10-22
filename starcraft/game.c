@@ -3,6 +3,7 @@
 #include "sc64_map_math.h"
 void *memcpy(void *dst, const void *src, size_t n);
 void *memset(void *dst, int value, size_t n);
+int memcmp(const void *a, const void *b, size_t n);
 
 #ifdef SC64_P3_RUNTIME
 #if !defined(SC64_P3_ENABLED) || !defined(SC64_UNIFIED) || \
@@ -21,6 +22,9 @@ void *memset(void *dst, int value, size_t n);
 #error "SC64_T4_RUNTIME requires the unified Terran 128x128 packed-map profile"
 #endif
 #endif
+#if defined(SC64_T4_SCENARIO_RUNTIME) && !defined(SC64_T4_RUNTIME)
+#error "SC64_T4_SCENARIO_RUNTIME requires the T4 actor/world profile"
+#endif
 
 #if defined(SC64_RACES)
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
@@ -28,7 +32,9 @@ void *memset(void *dst, int value, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_T4_RUNTIME)
+#if defined(SC64_T4_SCENARIO_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 9u
+#elif defined(SC64_T4_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 8u
 #elif defined(SC64_P3_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 7u
@@ -218,6 +224,10 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 #include "race_rules.h"
 #ifdef SC64_T4_RUNTIME
 #include "sc64_t4_world.h"
+#ifdef SC64_T4_SCENARIO_RUNTIME
+#include "sc64_t4_runtime.h"
+#include "sc64_t4_scenario_generated.h"
+#endif
 #ifndef SC64_T4_GLOBAL_ID7
 #define SC64_T4_GLOBAL_ID7 7
 #endif
@@ -402,6 +412,15 @@ static void race_frontend_reset(void)
 }
 static int race_player[5],race_minerals[5],race_gas[5];
 static Sc64RaceCampaignState race_campaign;
+#ifdef SC64_T4_SCENARIO_RUNTIME
+static Sc64T4RuntimeState race_t4;
+static int race_t4_active(void)
+{ return !race_mode && race_selected_mission == SC64_T4_GLOBAL_ID; }
+static int race_t4_init(void), race_t4_tick(void);
+static void race_t4_traps_tick(void);
+static int race_t4_create_action(const Sc64T4Action *action, unsigned owner);
+static int race_t4_doodad_action(const Sc64T4Action *action, unsigned owner);
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 static Sc64T3State race_t3;
 static u16 race_t3_buildings_killed;
@@ -511,11 +530,40 @@ sc64_t4_unit_collidable(int type)
 }
 
 static int
-sc64_t4_building_collidable(int type)
+sc64_t4_building_collidable(int slot)
 {
+    int type = b[slot].type;
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (race_t4_active() && sc64_race_t4_is_door(type)) {
+        for (unsigned row = 0; row < 32; ++row)
+            if (race_t4.doodad_slot[row] == slot)
+                return race_t4.doodad_enabled[row] != 0;
+        return 1; /* An unbound door never becomes passable silently. */
+    }
+#endif
     return !sc64_race_t4_building_flags(type) ||
         (sc64_race_t4_building_flags(type) & SC64_T4_ACTOR_COLLIDABLE);
 }
+#ifdef SC64_T4_SCENARIO_RUNTIME
+/* Door changes are infrequent. Keep this bounded grid rebuild in ROM rather
+ * than consuming IWRAM reserved for per-frame movement and the stack. */
+static int limit(int n, int lo, int hi);
+static __attribute__((noinline)) void
+race_t4_block_door_grid(int slot)
+{
+    int left, up, right, down;
+    const Building *door = &b[slot];
+    if (!sc64_race_t4_building_bounds_source(door->type, &left, &up, &right, &down))
+        return;
+    int min_col = limit((door->x * 2 - left) / 32, 0, MAP_COLS - 1);
+    int max_col = limit((door->x * 2 + right) / 32, 0, MAP_COLS - 1);
+    int min_row = limit((door->y * 2 - up) / 32, 0, MAP_ROWS - 1);
+    int max_row = limit((door->y * 2 + down) / 32, 0, MAP_ROWS - 1);
+    for (int row = min_row; row <= max_row; ++row)
+        for (int col = min_col; col <= max_col; ++col)
+            SC64_GRID_SET(path_walkable, col + row * MAP_COLS, 0);
+}
+#endif
 #endif
 static int
 owner_color(int owner)
@@ -878,7 +926,15 @@ build_path_grid(void)
 #ifdef SC64_RACES
         if(b[i].type==B_ZERG_BEACON)continue;
 #ifdef SC64_T4_RUNTIME
-        if (!sc64_t4_building_collidable(b[i].type)) continue;
+        if (!sc64_t4_building_collidable(i)) continue;
+#ifdef SC64_T4_SCENARIO_RUNTIME
+        if (race_t4_active() && sc64_race_t4_is_door(b[i].type)) {
+            /* Conservative tile overlap at the GBA's half scale. Opening
+             * restores the retained terrain, rather than carving new floor. */
+            race_t4_block_door_grid(i);
+            continue;
+        }
+#endif
 #endif
 #endif
         int c = b[i].x / 16, r = b[i].y / 16;
@@ -909,7 +965,7 @@ can_place(int type, int x, int y)
 	for (i = 0; i < MAX_BUILDINGS; i++)
 	    if (b[i].alive
 #ifdef SC64_T4_RUNTIME
-                && sc64_t4_building_collidable(b[i].type)
+                && sc64_t4_building_collidable(i)
 #endif
                 && dist2(x,y,b[i].x,b[i].y) <
 #ifdef SC64_RACES
@@ -935,7 +991,7 @@ can_place(int type, int x, int y)
     for (i = 0; i < MAX_BUILDINGS; i++)
 	if (b[i].alive
 #ifdef SC64_T4_RUNTIME
-            && sc64_t4_building_collidable(b[i].type)
+            && sc64_t4_building_collidable(i)
 #endif
             && dist2(x, y, b[i].x, b[i].y) < (radius + 14) * (radius + 14))
 	    return 0;
@@ -3939,6 +3995,9 @@ draw_minimap(void)
 #endif
 }
 
+#if defined(SC64_T4_SCENARIO_RUNTIME) && defined(SC64_HAS_SPRITES)
+#include "sc64_t4_prop_art.h"
+#endif
 static void
 draw_building_art(Building *q)
 {
@@ -3959,6 +4018,9 @@ draw_building_art(Building *q)
 	return;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
 	return;
+#if defined(SC64_T4_SCENARIO_RUNTIME) && defined(SC64_HAS_SPRITES)
+    if (race_t4_draw_prop(q, x, y)) return;
+#endif
 #ifdef SC64_HAS_SPRITES
     if (sprite) draw_mission_sprite(sprite, x, y);
     else
@@ -5038,6 +5100,12 @@ game_self_test(void)
 #include "race_adapter.h"
 #ifdef SC64_T4_RUNTIME
 #include "sc64_t4_actor_adapter.h"
+#ifdef SC64_T4_SCENARIO_RUNTIME
+#include "sc64_t4_effects_adapter.h"
+#include "sc64_t4_creation_adapter.h"
+#include "sc64_t4_scenario_adapter.h"
+#include "sc64_t4_trap_adapter.h"
+#endif
 #endif
 #include "race_campaign_adapter.h"
 #include "race_save_adapter.h"

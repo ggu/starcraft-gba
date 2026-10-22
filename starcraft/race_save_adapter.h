@@ -29,9 +29,106 @@ typedef struct {
     Sc64P3State p3;
     u16 p3_action_ticks;
 #endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    Sc64T4RuntimeState t4;
+#endif
 } RaceSave;
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
 static RaceSave race_data;
+#ifdef SC64_T4_SCENARIO_RUNTIME
+static int
+race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
+{
+    const Sc64T4RuntimeState *state;
+    unsigned next_building = 8;
+    if (!candidate) return 0;
+    state = &candidate->t4;
+    if (candidate->state[0] != 0 || candidate->state[2] != SC64_T4_GLOBAL_ID ||
+        candidate->state[7] < 0 ||
+        (u32)candidate->state[7] != candidate->campaign.elapsed_frames ||
+        candidate->campaign.mission != SC64_T4_GLOBAL_ID ||
+        state->active_mask != 0xdfu || state->location30_moved > 1 ||
+        state->message_ticks > 90 || state->ping_ticks > 90 ||
+        state->ping_x >= width * 16 || state->ping_y >= height * 16) return 0;
+    if (state->message != candidate->campaign.message ||
+        state->message_ticks != candidate->campaign.message_ticks ||
+        (state->ping_ticks == 0 && (state->ping_x || state->ping_y)) ||
+        candidate->campaign.objective_stage !=
+            ((state->switches.bits[0] & 0x10u) ? 1u : 0u)) return 0;
+    if (candidate->campaign.phase == SC64_RACE_PHASE_ACTIVE) {
+        if (candidate->state[18] || candidate->state[19] ||
+            (candidate->campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+    } else if (candidate->campaign.phase == SC64_RACE_PHASE_COMPLETE) {
+        if (!candidate->state[18] || candidate->state[19] ||
+            !(candidate->campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+    } else if (candidate->campaign.phase == SC64_RACE_PHASE_FAILED) {
+        if (candidate->state[18] || !candidate->state[19] ||
+            (candidate->campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+    } else return 0;
+    if (state->location30_moved) {
+        const Sc64T4Location *original = &sc64_t4_scenario.locations[29];
+        unsigned left = state->location30[0], top = state->location30[1];
+        unsigned right = state->location30[2], bottom = state->location30[3];
+        if (original->right <= original->left || original->bottom <= original->top ||
+            left >= right || top >= bottom || right > (unsigned)width * 32u ||
+            bottom > (unsigned)height * 32u ||
+            right - left != original->right - original->left ||
+            bottom - top != original->bottom - original->top) return 0;
+    } else if (state->location30[0] || state->location30[1] ||
+               state->location30[2] || state->location30[3]) return 0;
+    for (unsigned player = 0; player < 8; ++player) {
+        const Sc64T4TriggerState *p = &state->player[player];
+        unsigned force = sc64_t4_source_force((int)player);
+        if (!sc64_t4_trigger_state_valid(p, &sc64_t4_scenario) ||
+            p->owner != player || p->force != force) return 0;
+        if (player == 5) {
+            Sc64T4TriggerState initial;
+            if (!sc64_t4_trigger_init(&initial, &sc64_t4_scenario, player, force) ||
+                memcmp(p, &initial, sizeof(initial)) != 0) return 0;
+        } else if (p->elapsed_ticks != candidate->campaign.elapsed_frames) {
+            return 0;
+        }
+    }
+    for (unsigned d = 0; d < sc64_t4_scenario.doodad_count; ++d) {
+        const Sc64T4Doodad *row = &sc64_t4_scenario.doodads[d];
+        unsigned expected_slot = 255;
+        int type;
+        if (state->doodad_enabled[d] > 1) return 0;
+        if (!(row->flags & SC64_T4_THG2_SPRITE_FLAG)) expected_slot = next_building++;
+        if (state->doodad_slot[d] != expected_slot) return 0;
+        if (expected_slot == 255) {
+            if (state->doodad_enabled[d]) return 0;
+            continue;
+        }
+        if (expected_slot >= MAX_BUILDINGS) return 0;
+        type = sc64_race_building_from_raw(row->type);
+        if (type < 0 ||
+            candidate->buildings[expected_slot][offsetof(Building,type)/sizeof(int)] != type ||
+            candidate->buildings[expected_slot][offsetof(Building,raw_type)/sizeof(int)] != row->type ||
+            candidate->buildings[expected_slot][offsetof(Building,raw_owner)/sizeof(int)] != row->owner ||
+            candidate->buildings[expected_slot][offsetof(Building,x)/sizeof(int)] != row->x / 2 ||
+            candidate->buildings[expected_slot][offsetof(Building,y)/sizeof(int)] != row->y / 2 ||
+            candidate->invincible_buildings[expected_slot] !=
+                (unsigned char)sc64_race_t4_building_intrinsically_invincible(type)) return 0;
+        {
+            int owner = sc64_race_t4_is_door(type) ? SC64_T4_OWNER_NEUTRAL :
+                        sc64_t4_runtime_owner(row->owner);
+            if (owner < 0 || candidate->buildings[expected_slot]
+                    [offsetof(Building,owner)/sizeof(int)] != owner) return 0;
+        }
+        if (sc64_race_t4_is_door(type) &&
+            candidate->buildings[expected_slot]
+                [offsetof(Building,queue_progress)/sizeof(int)] != 0) return 0;
+        if (sc64_race_t4_is_trap(type) &&
+            (candidate->buildings[expected_slot]
+                [offsetof(Building,queue_progress)/sizeof(int)] < 0 ||
+             candidate->buildings[expected_slot]
+                [offsetof(Building,queue_progress)/sizeof(int)] > 28)) return 0;
+    }
+    if (next_building != 34) return 0;
+    return 1;
+}
+#endif
 static int sc64_race_storage_geometry_valid(int width, int height) {
 #ifdef SC64_T4_RUNTIME
     return width >= 1 && width <= 128 && height >= 1 && height <= 128;
@@ -43,13 +140,12 @@ static int sc64_race_storage_geometry_valid(int width, int height) {
 }
 static int race_save_game(void) {
 #ifdef SC64_T4_RUNTIME
-    /* The intrinsically invincible beacon has 100000 source HP. Its two
-     * health words use a canonical zero encoding instead of truncating to
-     * s16; malformed live props must never be saved as healthy beacons. */
+    /* T4 props with intrinsic invincibility have 100000 source HP. Their
+     * health words use canonical zero encoding instead of truncating to s16. */
     for(int i=0;i<MAX_BUILDINGS;i++)
-        if(b[i].alive && b[i].type==B_TERRAN_BEACON &&
+        if(sc64_race_t4_building_intrinsically_invincible(b[i].type) &&
            (b[i].hp!=100000 || b[i].maxhp!=100000 ||
-            b[i].raw_type!=195 || b[i].under_construction ||
+            b[i].raw_type!=sc64_race_raw_building(b[i].type) || b[i].under_construction ||
             b[i].queue_count || b[i].shield || !invincible_buildings[i]))return 0;
 #endif
     race_data.version=SAVE_VERSION;
@@ -59,7 +155,7 @@ static int race_save_game(void) {
     for(int i=0;i<MAX_BUILDINGS;i++)for(unsigned j=0;j<RACE_BUILD_WORDS;j++) {
         int n;memcpy(&n,(u8*)&b[i]+j*sizeof(int),sizeof(n));
 #ifdef SC64_T4_RUNTIME
-        if(b[i].alive && b[i].type==B_TERRAN_BEACON &&
+        if(sc64_race_t4_building_intrinsically_invincible(b[i].type) &&
            (j==offsetof(Building,hp)/sizeof(int) ||
             j==offsetof(Building,maxhp)/sizeof(int)))n=0;
 #endif
@@ -108,6 +204,12 @@ static int race_save_game(void) {
         race_data.p3=race_p3;
         race_data.p3_action_ticks=race_p3_action_ticks;
     }
+#endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (race_t4_active()) race_data.t4 = race_t4;
+    else memset(&race_data.t4, 0, sizeof(race_data.t4));
+    if (race_t4_active() &&
+        !race_t4_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);toast(7);return 1;
 }
@@ -171,13 +273,19 @@ static int race_load_game(void) {
     }
     for(int i=0;i<MAX_BUILDINGS;i++) {
         if(RACE_B(i,alive)<0||RACE_B(i,alive)>1)return 0;
+#ifdef SC64_T4_RUNTIME
+        if(RACE_B(i,type)>=0&&RACE_B(i,type)<SC_RB_COUNT&&
+           sc64_race_t4_building_intrinsically_invincible(RACE_B(i,type))&&
+           (RACE_B(i,hp)!=0||RACE_B(i,maxhp)!=0||
+            RACE_B(i,raw_type)!=sc64_race_raw_building(RACE_B(i,type))||
+            RACE_B(i,under_construction)!=0||RACE_B(i,queue_count)!=0||
+            RACE_B(i,shield)!=0||race_data.invincible_buildings[i]!=1))return 0;
+#endif
         if(!RACE_B(i,alive))continue;
 #ifdef SC64_T4_RUNTIME
         int health_ok=RACE_B(i,hp)>0&&RACE_B(i,maxhp)>0&&RACE_B(i,hp)<=RACE_B(i,maxhp);
-        if(RACE_B(i,type)==B_TERRAN_BEACON)
-            health_ok=RACE_B(i,hp)==0&&RACE_B(i,maxhp)==0&&RACE_B(i,raw_type)==195&&
-                RACE_B(i,under_construction)==0&&RACE_B(i,queue_count)==0&&
-                RACE_B(i,shield)==0&&race_data.invincible_buildings[i]==1;
+        if(sc64_race_t4_building_intrinsically_invincible(RACE_B(i,type)))
+            health_ok=1; /* Canonical zero was validated above. */
 #endif
         if(RACE_B(i,type)<0||RACE_B(i,type)>=SC_RB_COUNT||RACE_B(i,owner)<0||RACE_B(i,owner)>4||
 #ifdef SC64_T4_RUNTIME
@@ -281,6 +389,15 @@ static int race_load_game(void) {
         if(race_data.p3_action_ticks)return 0;
     }
 #endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (!v[0] && v[2] == SC64_T4_GLOBAL_ID) {
+        if (!race_t4_save_candidate_valid(&race_data, width, height)) return 0;
+    } else {
+        const u8 *t4 = (const u8 *)&race_data.t4;
+        for (unsigned i = 0; i < sizeof(race_data.t4); ++i)
+            if (t4[i]) return 0;
+    }
+#endif
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];
 #ifdef SC64_IMPORTED_SKIRMISH
     race_skirmish_map=v[20];for(int i=0;i<3;i++)race_bot_races[i]=v[21+i];
@@ -301,7 +418,8 @@ static int race_load_game(void) {
     }
 #ifdef SC64_T4_RUNTIME
     for(int i=0;i<MAX_BUILDINGS;i++)
-        if(b[i].alive && b[i].type==B_TERRAN_BEACON)b[i].hp=b[i].maxhp=100000;
+        if(sc64_race_t4_building_intrinsically_invincible(b[i].type))
+            b[i].hp=b[i].maxhp=100000;
 #endif
     memcpy(m,race_data.minerals_map,sizeof(m));
     SC64_GRID_CLEAR(explored);
@@ -339,6 +457,12 @@ static int race_load_game(void) {
     } else {
         memset(&race_p3,0,sizeof(race_p3));race_p3_action_ticks=0;
     }
+#endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID)
+        race_t4 = race_data.t4;
+    else
+        memset(&race_t4, 0, sizeof(race_t4));
 #endif
     memset(tracers,0,sizeof(tracers));mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
     invalidate_path_grid();sc64_visibility_reset();update_exploration();reset_selection_gestures();

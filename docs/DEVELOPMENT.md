@@ -92,9 +92,9 @@ The actor tests load the 95 source placements, check supported actor roles,
 sight, combat and bounded rescue behavior, and validate the special Beacon's
 save representation. Storage tests cover the T4-only 128×128 layout. Both
 targets use private generated inputs under ignored `.local/` storage. The
-scenario still lacks implemented doors, traps, teleports, trigger objectives
-and completion behavior. See [Validation](VALIDATION.md) for the exact test
-coverage and limits.
+initial actor/storage stage did not implement doors, traps, teleports, trigger
+objectives or completion behavior. Later gated runtime checks are described
+below. See [Validation](VALIDATION.md) for the exact test coverage and limits.
 
 The private numeric scenario import and the asset-free trigger/query core have
 separate checks:
@@ -109,11 +109,9 @@ Re-run preparation after updating an older checkout: T4 retention now includes
 FORC, OWNR, SIDE, UPRP and UPUS, in addition to the original eight sections.
 It reconstructs the full source sections from the generated C schema and
 checks their canonical digests. The second line needs no ROM or generated
-data and is included in `./dev test`. The runner is not connected to T4
-gameplay yet: world effects, SRAM integration, door/teleport behavior and a
-controller completion proof remain required. T4-only door/trap rules and a
-private source-frame accessor are available for that integration; neither
-door animation/collision nor trap firing is connected yet.
+data and is included in `./dev test`. These commands document the earlier
+numeric-import and callback-only stage; see the gated runtime status below for
+subsequent integration.
 
 World-effect callbacks have a separate internal fixture:
 
@@ -125,7 +123,43 @@ This requires the same private prepared inputs. It runs queries, removals,
 location movement and bounded group teleport effects against synthetic engine
 states, with creation and doodad calls stubbed at their callback boundaries.
 It does not start the T4 trigger scheduler, save that state or prove mission
-completion. The runtime still does not include these callbacks.
+completion. This callback-only fixture remains useful for the standalone
+effect API; the later runtime fixture also exercises those effects in context.
+
+## Gated T4 scenario runtime
+
+The internal Jacobs Installation runtime binds all 95 imported UNIT rows and
+26 unit-backed THG2 props into the fixed pools: 121 initial actors total
+(87 units and 34 buildings). It evaluates the 20 retained doodad-state
+actions, handles supported creation and map-revealer actions, updates door
+collision/path blocking, and runs the bounded trigger contexts. The frontend
+catalog still excludes T4, so this integration is not a new playable release.
+
+Door presentation uses an authored immediate-state policy: enabled/closed
+doors draw source frame 0, disabled/open doors draw frame 9; the paired right
+door types are mirrored. Traps draw static frame 0 when enabled and are hidden
+when disabled. Door animation timing and trap animation are not reproduced.
+These visual choices are bounded compatibility policies, not proof of native
+N64 IScript behavior. The runtime save generation is version 9 and persists
+the trigger and doodad state.
+
+After preparing the local T4 inputs, the focused host checks and ARM link probe
+are:
+
+```sh
+make sc64-t4-scenario \
+  test-sc64-t4-effects test-sc64-t4-creation test-sc64-t4-traps \
+  test-sc64-t4-prop-art test-sc64-t4-scenario-save test-sc64-t4-runtime \
+  sc64-t4-scenario-probe
+```
+
+The runtime test checks the full opening roster, 20 doodad toggles, door
+collision/path-grid changes, pause/save/load continuity, and trigger execution.
+Its win/loss fixtures directly place or remove scenario actors; they are
+synthetic rule-integration checks, not controller-played mission completion.
+The link probe checks the complete opt-in engine profile. No claim is made for
+full native trigger eligibility, original animation behavior, full campaign
+playability, or near-30-fps operation.
 
 ## Troubleshooting
 

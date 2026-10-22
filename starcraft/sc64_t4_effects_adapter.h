@@ -282,8 +282,8 @@ race_t4_effect_remove(const Sc64T4Action *action, unsigned owner,
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (selected_buildings[i]) {
         b[i].alive = 0; changed = 1;
         if (selected_building == i) selected_building = -1;
-        for (unsigned d = 0; d < 32; ++d)
-            if (state->doodad_slot[d] == i) state->doodad_slot[d] = 255;
+        /* THG2 bindings retain immutable provenance even after a trap dies.
+         * T4 creates only unit-pool actors after its initial world load. */
     }
     if (changed) {
         for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive) {

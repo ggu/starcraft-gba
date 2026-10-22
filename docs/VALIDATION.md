@@ -797,10 +797,10 @@ edge exclusion, current owner/force membership after rescue, inactive slots,
 and unsupported selectors. Integer overflow inputs and feature-off includes
 are checked. These are helper tests, not movement or mission-completion tests.
 
-The execution core is not wired into T4 gameplay or SRAM yet. Doors/traps,
-teleports, unit creation/properties, objective effects and controller
-completion remain required. No additional gameplay, ARM memory or frame-rate
-claim follows from these fixtures.
+At this execution-core checkpoint, the runner was not yet wired into T4
+gameplay or SRAM. The later gated runtime section records the subsequent
+integration. No gameplay, ARM memory or frame-rate claim follows from these
+earlier fixtures alone.
 
 Default build/tests (87 Python checks), unified build/tests and the existing
 T4 actor/storage checks pass. Default and unified ROM hashes remain unchanged.
@@ -860,11 +860,50 @@ that action numbers 1–64 map to UPRP slots 0–63; the source requests one
 property-backed creation among five total. Applying those property overrides
 is still required. An ARM compile-only check covers the callbacks and schema,
 with the same stub boundaries; it is not a full runtime link or memory result.
-The game does not call these callbacks or persist their state yet. Door/trap
-integration, scheduler/SRAM integration and a controller completion proof
-still gate T4, with no new gameplay or performance result claimed.
+At this callback-fixture checkpoint, the game did not call these callbacks or
+persist their state. The later runtime integration is documented below; this
+fixture itself remains callback evidence, not gameplay or performance proof.
 The default build/tests pass, including 89 Python checks; its ROM hash is
 unchanged. Unified build/tests also passed during this milestone.
+
+## Gated T4 scenario runtime (2026-10-23)
+
+The current opt-in scenario profile binds all 95 imported UNIT rows and 26
+unit-backed THG2 props into the fixed pools: 121 initial actors total (87
+units and 34 buildings). T4 remains excluded from the frontend catalog, so
+this is internal runtime evidence rather than a playable T4 release.
+
+With the locally prepared T4 inputs, run the scenario packer, host integration
+checks and ARM scenario link probe with:
+
+```sh
+make sc64-t4-scenario \
+  test-sc64-t4-effects test-sc64-t4-creation test-sc64-t4-traps \
+  test-sc64-t4-prop-art test-sc64-t4-scenario-save test-sc64-t4-runtime \
+  sc64-t4-scenario-probe
+```
+
+The runtime fixture checks source roster/slot bindings, all 20 retained
+doodad-state actions, door collision and path-grid changes, creation and map
+revealer handling, and pause/save/load continuity. Save generation 9 persists
+the trigger and doodad state. Its visual adapter applies explicit immediate
+state: enabled/closed doors draw source frame 0; disabled/open doors draw frame
+9; paired right-facing door types are mirrored. Enabled traps draw static
+frame 0, while disabled traps are hidden. This does not reproduce N64 IScript
+timing or trap animation.
+
+The win/loss fixtures directly place the human actor at the completion
+location or remove Raynor to test the integrated trigger results and save
+state. They are synthetic rule-integration checks, not controller-played
+mission completion. Full native trigger eligibility, physical GBA timing,
+catalog availability and near-30-fps performance are not claimed.
+
+The default build/tests (including 89 Python checks), unified build/tests,
+older T4 actor/storage fixtures and all focused scenario fixtures pass. The
+scenario ARM link contains 1,509,984 bytes of text, 364 bytes of data and
+251,840 bytes of BSS. IWRAM ends at `0x03004fc8`; BSS ends at `0x0203d930`.
+The existing stack/reserve guards remain unchanged. These are link results,
+not measured gameplay timing. Default and unified ROM checksums are unchanged.
 
 ## Known limits
 

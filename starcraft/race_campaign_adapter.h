@@ -228,6 +228,9 @@ race_campaign_init(void)
 #ifdef SC64_P3_RUNTIME
     memset(&race_p3,0,sizeof(race_p3));race_p3_action_ticks=0;
 #endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    memset(&race_t4, 0, sizeof(race_t4));
+#endif
     if (race_mode) {
         race_skirmish_init();
         return;
@@ -422,6 +425,9 @@ race_campaign_init(void)
     if (race_selected_mission == SC64_RACE_MISSION_P3) race_p3_init();
 #endif
     race_campaign_assign_mining();
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (race_t4_active() && !race_t4_init()) screen = SCREEN_PAUSE;
+#endif
     if (race_selected_mission == SC64_RACE_MISSION_Z1)
         race_campaign_set_message(1);
     else if (race_selected_mission == SC64_RACE_MISSION_Z2)
@@ -522,8 +528,12 @@ race_campaign_tick(void)
 #ifdef SC64_T4_RUNTIME
     if (mission == SC64_T4_GLOBAL_ID) {
         race_t4_world_tick();
+#ifdef SC64_T4_SCENARIO_RUNTIME
+        if (!race_t4_tick()) screen = SCREEN_PAUSE;
+#else
         /* Door/teleport/quest actions are not implemented by this roster
          * stage. Do not run another mission's AI or infer a victory. */
+#endif
         return;
     }
 #endif
@@ -705,6 +715,9 @@ static int race_campaign_lost(void)
 static const char *
 race_campaign_objective_text(void)
 {
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (race_t4_active()) return "Find the data disks. Raynor must survive.";
+#endif
 #ifdef SC64_P3_RUNTIME
     if (race_campaign.mission == SC64_RACE_MISSION_P3)
         return race_p3_objective_text();
@@ -737,6 +750,9 @@ race_campaign_objective_text(void)
 static const char *
 race_campaign_victory_text(void)
 {
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (race_t4_active()) return "JACOBS DATA RECOVERED";
+#endif
 #ifdef SC64_P3_RUNTIME
     if (race_campaign.mission == SC64_RACE_MISSION_P3)
         return race_p3_victory_text();
@@ -765,6 +781,11 @@ race_campaign_victory_text(void)
 static const char *
 race_campaign_message_text(void)
 {
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (race_t4_active()) return (race_t4.switches.bits[0] & 16) ?
+        "Data located. Keep Raynor alive until the mission report." :
+        "Explore the installation and find the data disks. Protect Raynor.";
+#endif
 #ifdef SC64_P3_RUNTIME
     if (race_campaign.mission == SC64_RACE_MISSION_P3) {
         if (race_p3.transmission) return "Zerg colonies cleared. Mission report pending.";

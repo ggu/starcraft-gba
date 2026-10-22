@@ -3,7 +3,10 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+/* Keep the callback fixture independent of the full scenario driver. */
+#undef SC64_T4_SCENARIO_RUNTIME
 #include "../starcraft/game.c"
+#define SC64_T4_SCENARIO_RUNTIME
 #include "../starcraft/sc64_t4_runtime.h"
 #include "sc64_t4_scenario_generated.h"
 static Sc64T4RuntimeState race_t4;
