@@ -11,8 +11,9 @@ import unittest
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 
-from sc64_races_pack import (campaign_guard_for_map, emit_descriptor_table,
-                             emit_map_count, retain_t4_source_records)
+from sc64_races_pack import (T4_REQUIRED_SOURCE_RECORDS, campaign_guard_for_map,
+                             emit_descriptor_table, emit_map_count,
+                             retain_t4_source_records)
 
 
 class RaceMapTableEmissionTests(unittest.TestCase):
@@ -141,6 +142,8 @@ class T4SourceRecordRetentionTests(unittest.TestCase):
         payloads = {
             b'UNIT': b'u1', b'DIM ': b'dims', b'ERA ': b'e', b'MTXM': b'tiles',
             b'MRGN': b'locations', b'DD2 ': b'dd2', b'THG2': b'thg2', b'TRIG': b'trig',
+            b'FORC': b'force', b'OWNR': b'owners', b'SIDE': b'sides',
+            b'UPRP': b'properties', b'UPUS': b'used properties',
             b'OTHR': b'ignored',
         }
         for tag, payload in payloads.items():
@@ -161,15 +164,12 @@ class T4SourceRecordRetentionTests(unittest.TestCase):
             self.assertEqual(manifest['source_chk_sha256'], hashlib.sha256(chk).hexdigest())
             self.assertEqual(manifest['extractor_commit'], 'synthetic-pin')
             self.assertEqual(set(manifest['records']),
-                             {'UNIT', 'DIM', 'ERA', 'MTXM', 'MRGN', 'DD2', 'THG2', 'TRIG'})
-            for key, filename in {
-                'UNIT': 'UNIT.bin', 'DIM': 'DIM.bin', 'ERA': 'ERA.bin',
-                'MTXM': 'MTXM.bin', 'MRGN': 'MRGN.bin', 'DD2': 'DD2.bin',
-                'THG2': 'THG2.bin', 'TRIG': 'TRIG.bin',
-            }.items():
+                             {'UNIT', 'DIM', 'ERA', 'MTXM', 'MRGN', 'DD2',
+                              'THG2', 'TRIG', 'FORC', 'OWNR', 'SIDE', 'UPRP', 'UPUS'})
+            for tag, filename in T4_REQUIRED_SOURCE_RECORDS.items():
+                key = tag.decode('ascii').strip()
                 payload = payloads[(key + (' ' if key in ('DIM', 'ERA', 'DD2') else '')).encode()]
-                record = (key.encode() + (b' ' if key in ('DIM', 'ERA', 'DD2') else b'')
-                          + struct.pack('<I', len(payload)) + payload)
+                record = tag + struct.pack('<I', len(payload)) + payload
                 written = records_dir / filename
                 self.assertEqual(written.read_bytes(), record)
                 detail = manifest['records'][key]

@@ -23,7 +23,12 @@ enum {
     SC64_T4_TR_LOST = 2,
     SC64_T4_TR_BAD_CONDITION = 1,
     SC64_T4_TR_BAD_ACTION = 2,
-    SC64_T4_TR_BAD_WAIT = 3
+    SC64_T4_TR_BAD_WAIT = 3,
+    /* Native CHK enabled-player switch: direct slots0..7, AllPlayers17,
+       then Force1..4 at18..21. */
+    SC64_T4_ENABLED_ALL_PLAYERS = 17,
+    SC64_T4_ENABLED_FORCE1 = 18,
+    SC64_T4_ENABLED_FORCE4 = 21
 };
 
 typedef struct {
@@ -58,8 +63,9 @@ sc64_t4_trigger_owner_enabled(const Sc64T4Trigger *tr, unsigned owner,
                               unsigned force)
 {
     if (!tr || owner >= 8 || force < 1 || force > 4) return 0;
-    return tr->enabled_players[owner] || tr->enabled_players[17] ||
-           tr->enabled_players[17 + force];
+    return tr->enabled_players[owner] ||
+           tr->enabled_players[SC64_T4_ENABLED_ALL_PLAYERS] ||
+           tr->enabled_players[SC64_T4_ENABLED_FORCE1 + force - 1];
 }
 
 static int
@@ -73,8 +79,13 @@ sc64_t4_trigger_program_valid(const Sc64T4Scenario *program)
          * Loading an already-running source program is not implemented. */
         if (!tr->conditions || !tr->actions || tr->execution_flags ||
             tr->initial_cursor) return 0;
-        for (unsigned p = 0; p < 27; ++p)
+        for (unsigned p = 0; p < 27; ++p) {
             if (tr->enabled_players[p] > 1) return 0;
+            if (tr->enabled_players[p] &&
+                !(p < 8 || p == SC64_T4_ENABLED_ALL_PLAYERS ||
+                  (p >= SC64_T4_ENABLED_FORCE1 &&
+                            p <= SC64_T4_ENABLED_FORCE4))) return 0;
+        }
     }
     return 1;
 }

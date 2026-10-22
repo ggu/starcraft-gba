@@ -40,7 +40,15 @@ def fixture_records(root):
 
     doodad = struct.pack('<HHHBBH', 0x1234, 0x2345, 0x3456,
                          0x67, 0x89, 0xABCD)
-    payloads = {'MRGN': loc, 'TRIG': bytes(trig), 'THG2': doodad}
+    property_row = struct.pack('<HHBBBBIHHI', 0x1122, 0x3344, 0x55, 0x66,
+                               0x77, 0x88, 0x99AABBCC, 0xDDEE, 0x1234,
+                               0x56789ABC)
+    properties = property_row + bytes(63 * 20)
+    forces = bytes([0, 1, 2, 3, 0, 1, 2, 3]) + bytes(range(12))
+    payloads = {'MRGN': loc, 'TRIG': bytes(trig), 'THG2': doodad,
+                'FORC': forces, 'OWNR': bytes(range(12)),
+                'SIDE': bytes(range(11, -1, -1)), 'UPRP': properties,
+                'UPUS': bytes([1] + [0] * 63)}
     files = {}
     manifest_records = {}
     for name, (filename, tag, _) in PACKER.REQUIRED.items():
@@ -76,7 +84,7 @@ class T4ScenarioPackTests(unittest.TestCase):
             self.assertEqual(struct.unpack_from('<I', raw_trigger, 2368)[0],
                              0xA1B2C3D4)
             self.assertEqual(raw_trigger[2372], 1)   # source player 0
-            self.assertEqual(raw_trigger[2389], 1)   # source all-players slot 17
+            self.assertEqual(raw_trigger[2389], 1)   # source AllPlayers owner byte
             self.assertEqual(raw_trigger[2399], 7)   # initial action cursor
             self.assertEqual(raw_trigger[2371], 0xA1)  # nonzero high flag byte
             decoded = PACKER.parse_source(
@@ -111,6 +119,20 @@ class T4ScenarioPackTests(unittest.TestCase):
                               doodad['owner'], doodad['unused'], doodad['flags']),
                              (0x1234, 0x2345, 0x3456, 0x67, 0x89, 0xABCD))
             self.assertEqual(doodad['raw'], framed_files['THG2'][8:])
+            props = decoded['properties']
+            self.assertEqual(len(props), 64)
+            self.assertEqual(props[0], {
+                'valid_special': 0x1122, 'valid_fields': 0x3344,
+                'owner': 0x55, 'hp_percent': 0x66, 'shield_percent': 0x77,
+                'energy_percent': 0x88, 'resources': 0x99AABBCC,
+                'hangar_count': 0xDDEE, 'special': 0x1234,
+                'unused': 0x56789ABC, 'raw': framed_files['UPRP'][8:28]})
+            self.assertEqual(decoded['setup']['force_by_slot'],
+                             bytes([0, 1, 2, 3, 0, 1, 2, 3]))
+            self.assertEqual(decoded['setup']['controllers'], bytes(range(12)))
+            self.assertEqual(decoded['setup']['races'], bytes(range(11, -1, -1)))
+            self.assertEqual(decoded['setup']['force_raw'], framed_files['FORC'][8:])
+            self.assertEqual(decoded['setup']['property_used'], framed_files['UPUS'][8:])
 
     def test_generated_header_compiles_with_fixed_layout(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -129,7 +151,9 @@ class T4ScenarioPackTests(unittest.TestCase):
                 '  return !(sizeof(Sc64T4Action) == 32 &&\n'
                 '    sc64_t4_triggers[0].actions[1].trailing[2] == \'z\' &&\n'
                 '    sc64_t4_doodads[0].flags == 0xabcd &&\n'
-                '    sc64_t4_triggers[0].execution_flags == 0xa1b2c3d4u);\n'
+                '    sc64_t4_triggers[0].execution_flags == 0xa1b2c3d4u &&\n'
+                '    sc64_t4_properties[0].resources == 0x99aabbccu &&\n'
+                '    sc64_t4_source_setup.force_by_slot[3] == 3);\n'
                 '}\n', encoding='ascii')
             result = subprocess.run(
                 ['cc', '-std=c11', '-Wall', '-Wextra', '-Werror',
@@ -161,6 +185,27 @@ class T4ScenarioPackTests(unittest.TestCase):
                                     expected_triggers=1, expected_doodads=1,
                                     expected_active_conditions=1,
                                     expected_active_actions=1)
+
+    def test_rejects_invalid_setup_even_with_matching_hashes(self):
+        for name, invalid, message in (
+            ('FORC', 4, 'invalid player force'),
+            ('UPUS', 2, 'invalid property-used'),
+        ):
+            with self.subTest(section=name), tempfile.TemporaryDirectory() as temporary:
+                records, manifest_path, _ = fixture_records(Path(temporary))
+                path = records / (name + '.bin')
+                data = bytearray(path.read_bytes())
+                data[8] = invalid
+                path.write_bytes(data)
+                manifest = json.loads(manifest_path.read_text())
+                manifest['records'][name]['record_sha256'] = hashlib.sha256(data).hexdigest()
+                manifest['records'][name]['payload_sha256'] = hashlib.sha256(data[8:]).hexdigest()
+                manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
+                with self.assertRaisesRegex(ValueError, message):
+                    PACKER.parse_source(records, manifest_path, expected_locations=1,
+                                        expected_triggers=1, expected_doodads=1,
+                                        expected_active_conditions=1,
+                                        expected_active_actions=1)
 
     def test_missing_record_and_bad_integrity_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

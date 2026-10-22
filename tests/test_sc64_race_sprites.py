@@ -5,6 +5,7 @@ from pathlib import Path
 from tools.sc64_race_sprites import (
     MISSION_RAW_TYPES, RACE_UNIT_IDS, T4_EXPECTED_VISIBLE_RAW_TYPES,
     T4_INVISIBLE_RAW_TYPES, T4_UNIT_IDS, asset_manifest_sha256, write_header,
+    T4_BUILDING_IDS,
 )
 
 
@@ -52,6 +53,31 @@ class RaceSpritePackTests(unittest.TestCase):
         self.assertEqual(T4_INVISIBLE_RAW_TYPES, (101,))
         resolved = set(RACE_UNIT_IDS.values()) | set(T4_UNIT_IDS.values())
         self.assertEqual(set(T4_EXPECTED_VISIBLE_RAW_TYPES) - resolved, set())
+
+    def test_t4_prop_grps_retain_all_source_frames_without_state_guessing(self):
+        def frame(pixel):
+            return {'pixels': bytes((pixel,)), 'alpha': bytes((1,)), 'width': 1,
+                    'height': 1, 'x': 0, 'y': 0, 'frame_width': 1,
+                    'frame_height': 1}
+        props = [{'name': name, 'frames': [frame(9), frame(10)]}
+                 for name in T4_BUILDING_IDS]
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'sprites.h'
+            write_header(path, [], bytes(range(256)),
+                         [{'name': 'civilian', 'frame': frame(8)}], props)
+            text = path.read_text()
+        self.assertIn('#ifdef SC64_T4_ENABLED', text)
+        self.assertIn('sc64_race_sprite_upper_door_frame_0_pixels[1]', text)
+        self.assertIn('sc64_race_sprite_upper_door_frame_1_pixels[1]', text)
+        self.assertIn('case 205:', text)
+        self.assertIn('case 0: return &sc64_race_sprite_upper_door_frame_0;', text)
+        self.assertIn('case 1: return &sc64_race_sprite_upper_door_frame_1;', text)
+        self.assertIn('static inline const Sc64SpriteFrame *sc64_race_building_sprite', text)
+        self.assertEqual(set(T4_BUILDING_IDS.values()), {203,205,206,207,208,209,211,212})
+        # The packer exposes indexed frames and does not equate an index to a
+        # semantic door state such as "closed" or "open".
+        self.assertNotIn('door_is_open', text)
+        self.assertNotIn('frame_index == 1 ? 1 : 0', text)
 
     def test_asset_manifest_hash_ignores_nonidentity_fields(self):
         asset = {'name': 'x', 'unit_id': 15, 'flingy_id': 1, 'sprite_id': 2,

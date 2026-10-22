@@ -25,6 +25,11 @@ REQUIRED = {
     'MRGN': ('MRGN.bin', b'MRGN', 20),
     'TRIG': ('TRIG.bin', b'TRIG', 2400),
     'THG2': ('THG2.bin', b'THG2', 10),
+    'FORC': ('FORC.bin', b'FORC', 20),
+    'OWNR': ('OWNR.bin', b'OWNR', 12),
+    'SIDE': ('SIDE.bin', b'SIDE', 12),
+    'UPRP': ('UPRP.bin', b'UPRP', 20),
+    'UPUS': ('UPUS.bin', b'UPUS', 64),
 }
 CONDITIONS_PER_TRIGGER = 16
 ACTIONS_PER_TRIGGER = 64
@@ -52,6 +57,7 @@ def parse_source(records_dir: Path = DEFAULT_RECORDS,
                  expected_locations: int = 255,
                  expected_triggers: int = 38,
                  expected_doodads: int = 32,
+                 expected_properties: int = 64,
                  expected_active_conditions: int | None = 48,
                  expected_active_actions: int | None = 141) -> dict:
     """Read, authenticate and decode exact private framed CHK records."""
@@ -106,6 +112,15 @@ def parse_source(records_dir: Path = DEFAULT_RECORDS,
         raise ValueError(f'TRIG has {trigger_count} triggers, expected {expected_triggers}')
     if doodad_count != expected_doodads:
         raise ValueError(f'THG2 has {doodad_count} doodads, expected {expected_doodads}')
+    for name, length in (('FORC', 20), ('OWNR', 12), ('SIDE', 12), ('UPUS', 64)):
+        if len(payloads[name]) != length:
+            raise ValueError(f'{name} must have exactly {length} source bytes')
+    if len(payloads['UPRP']) != expected_properties * 20:
+        raise ValueError(f'UPRP must have exactly {expected_properties} property records')
+    if any(force > 3 for force in payloads['FORC'][:8]):
+        raise ValueError('FORC has an invalid player force index')
+    if any(used > 1 for used in payloads['UPUS']):
+        raise ValueError('UPUS has an invalid property-used byte')
 
     locations = []
     for offset in range(0, len(location_payload), 20):
@@ -170,8 +185,21 @@ def parse_source(records_dir: Path = DEFAULT_RECORDS,
         doodads.append({'type': type_id, 'x': x, 'y': y, 'owner': owner,
                         'unused': unused, 'flags': flags, 'raw': raw})
 
+    properties = []
+    for offset in range(0, len(payloads['UPRP']), 20):
+        raw = payloads['UPRP'][offset:offset + 20]
+        values = struct.unpack('<HHBBBBIHHI', raw)
+        keys = ('valid_special', 'valid_fields', 'owner', 'hp_percent',
+                'shield_percent', 'energy_percent', 'resources',
+                'hangar_count', 'special', 'unused')
+        properties.append(dict(zip(keys, values), raw=raw))
+    setup = {'controllers': payloads['OWNR'], 'races': payloads['SIDE'],
+             'force_by_slot': payloads['FORC'][:8], 'force_raw': payloads['FORC'],
+             'property_used': payloads['UPUS']}
+
     return {'locations': locations, 'conditions': conditions, 'actions': actions,
             'triggers': triggers, 'doodads': doodads,
+            'properties': properties, 'setup': setup,
             'active_condition_count': active_conditions,
             'active_action_count': active_actions,
             'source_record_sha256': {name: _sha256(data) for name, data in framed.items()},
@@ -205,6 +233,18 @@ def emit_header(data: dict) -> str:
                            _u(item['elevation'], 4), _bytes(item['raw'])])
         out.append('    {' + values + '},\n')
     out.append('};\n')
+    out.append(f'static const Sc64T4UnitProperties sc64_t4_properties[{len(data["properties"])}] = {{\n')
+    for row in data['properties']:
+        values = [_u(row[key]) for key in (
+            'valid_special', 'valid_fields', 'owner', 'hp_percent',
+            'shield_percent', 'energy_percent', 'resources', 'hangar_count',
+            'special', 'unused')]
+        out.append('    {' + ','.join(values + [_bytes(row['raw'])]) + '},\n')
+    out.append('};\n')
+    out.append('static const Sc64T4SourceSetup sc64_t4_source_setup = {\n')
+    out.append(',\n'.join('    ' + _bytes(data['setup'][key]) for key in
+                         ('controllers', 'races', 'force_by_slot', 'force_raw', 'property_used')))
+    out.append('\n};\n')
     out.append(f'static const Sc64T4Condition sc64_t4_conditions[{len(conditions)}] = {{\n')
     for row in conditions:
         values = [_u(row[key]) for key in ('location', 'player', 'amount')]

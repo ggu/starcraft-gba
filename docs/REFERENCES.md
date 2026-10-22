@@ -39,3 +39,19 @@ behavioral facts transcribed into the authored helpers in
 `starcraft/sc64_t4_actions.h`; native instructions and generated C remain
 private. Exact actor selection, animation and collision transitions still
 need separate evidence and tests.
+
+The source setup importer also preserves FORC, OWNR, SIDE, UPRP and UPUS;
+these records distinguish original ownership, force membership, controllers
+and creation properties. Native trigger instantiation at `0x8008E094`
+normalizes the enabled selector by subtracting 13: switch case 4 (selector
+17) expands All Players, while cases 5–8 (selectors 18–21) filter Forces 1–4.
+Each matching source slot gets independent execution state. The operand
+namespace therefore agrees with the current Command/Bring helper for these
+selectors. Other enabled group selectors are rejected until implemented.
+
+Native Move Unit handler `0x8008498C` defaults count zero to a remaining-match
+limit of `0xF423F`; its callback decrements after matching. This establishes
+that zero processes all matching actors within the GBA's bounded pools.
+Destination placement and exact native candidate order remain separate work.
+The native action table's RAM address maps to ROM offset `0xC8164` in this
+image; entries 11 and 42 provide independent anchors for that mapping.

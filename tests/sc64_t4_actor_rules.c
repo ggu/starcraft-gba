@@ -10,6 +10,12 @@ static void check_bounds(int type, int l, int u, int r, int d)
     assert(sc64_race_t4_bounds_source(type, &got_l, &got_u, &got_r, &got_d));
     assert(got_l==l && got_u==u && got_r==r && got_d==d);
 }
+static void check_building_bounds(int type, int l, int u, int r, int d)
+{
+    int got_l=-1, got_u=-1, got_r=-1, got_d=-1;
+    assert(sc64_race_t4_building_bounds_source(type, &got_l, &got_u, &got_r, &got_d));
+    assert(got_l==l && got_u==u && got_r==r && got_d==d);
+}
 #endif
 
 int main(void)
@@ -25,7 +31,7 @@ int main(void)
     assert(!sc64_race_unit_can_attack_air(U_VULTURE));
 #else
     assert(SC_RU_COUNT == 34);
-    assert(SC_RB_COUNT == 36);
+    assert(SC_RB_COUNT == 44);
     assert(sc64_race_unit_from_raw(1) == U_GHOST);
     assert(sc64_race_unit_from_raw(15) == U_CIVILIAN);
     assert(sc64_race_unit_from_raw(89) == U_RHYNADON);
@@ -41,6 +47,43 @@ int main(void)
     assert(sc64_race_unit_from_raw(195) == -1);
     assert(sc64_race_building_from_raw(195) == B_TERRAN_BEACON);
     assert(sc64_race_raw_building(B_TERRAN_BEACON) == 195);
+    static const int props[][2] = {
+        {203,B_FLOOR_MISSILE_TRAP},{205,B_UPPER_DOOR},
+        {206,B_RIGHT_UPPER_DOOR},{207,B_PIT_DOOR},
+        {208,B_RIGHT_PIT_DOOR},{209,B_FLOOR_GUN_TRAP},
+        {211,B_WALL_FLAME_TRAP},{212,B_RIGHT_WALL_MISSILE_TRAP}
+    };
+    for (unsigned i=0;i<sizeof(props)/sizeof(props[0]);++i) {
+        assert(sc64_race_building_from_raw(props[i][0]) == props[i][1]);
+        assert(sc64_race_raw_building(props[i][1]) == props[i][0]);
+        assert(sc64_race_building_rule(props[i][1]) != 0);
+    }
+    assert(sc64_race_t4_is_trap(B_FLOOR_MISSILE_TRAP));
+    assert(sc64_race_t4_is_trap(B_FLOOR_GUN_TRAP));
+    assert(sc64_race_t4_is_trap(B_WALL_FLAME_TRAP));
+    assert(sc64_race_t4_is_trap(B_RIGHT_WALL_MISSILE_TRAP));
+    assert(sc64_race_t4_is_door(B_UPPER_DOOR));
+    assert(sc64_race_t4_is_door(B_RIGHT_UPPER_DOOR));
+    assert(sc64_race_t4_is_door(B_PIT_DOOR));
+    assert(sc64_race_t4_is_door(B_RIGHT_PIT_DOOR));
+    assert(!sc64_race_t4_is_door(B_TERRAN_BEACON));
+    assert(!sc64_race_t4_is_trap(B_TERRAN_BEACON));
+    assert(sc64_race_building_max_hp(B_FLOOR_MISSILE_TRAP)==50);
+    assert(sc64_race_building_max_hp(B_FLOOR_GUN_TRAP)==50);
+    assert(sc64_race_building_max_hp(B_WALL_FLAME_TRAP)==50);
+    assert(sc64_race_building_max_hp(B_RIGHT_WALL_MISSILE_TRAP)==50);
+    assert(sc64_race_building_max_hp(B_UPPER_DOOR)==100000);
+    assert(sc64_race_building_max_hp(B_RIGHT_UPPER_DOOR)==100000);
+    assert(sc64_race_building_max_hp(B_PIT_DOOR)==100000);
+    assert(sc64_race_building_max_hp(B_RIGHT_PIT_DOOR)==100000);
+    assert(sc64_race_t4_building_intrinsically_invincible(B_UPPER_DOOR));
+    assert(sc64_race_t4_building_intrinsically_invincible(B_RIGHT_UPPER_DOOR));
+    assert(sc64_race_t4_building_intrinsically_invincible(B_PIT_DOOR));
+    assert(sc64_race_t4_building_intrinsically_invincible(B_RIGHT_PIT_DOOR));
+    assert(!sc64_race_t4_building_intrinsically_invincible(B_FLOOR_MISSILE_TRAP));
+    assert(!sc64_race_t4_building_intrinsically_invincible(B_FLOOR_GUN_TRAP));
+    assert(!sc64_race_t4_building_intrinsically_invincible(B_WALL_FLAME_TRAP));
+    assert(!sc64_race_t4_building_intrinsically_invincible(B_RIGHT_WALL_MISSILE_TRAP));
     assert(strcmp(sc64_race_unit_name(U_GHOST), "GHOST") == 0);
     assert(strcmp(sc64_race_unit_name(U_DATA_DISK), "DATA DISK") == 0);
     assert(strcmp(sc64_race_building_name(B_TERRAN_BEACON), "TERRAN BEACON") == 0);
@@ -161,6 +204,18 @@ int main(void)
     assert(sc64_race_building_rule(B_TERRAN_BEACON)->hp == 0);
     assert(sc64_race_building_max_hp(B_TERRAN_BEACON) == 100000);
     assert(sc64_race_building_max_hp(-1) == 0);
+    static const int scenario_only_buildings[] = {
+        B_TERRAN_BEACON, B_FLOOR_MISSILE_TRAP, B_UPPER_DOOR,
+        B_RIGHT_UPPER_DOOR, B_PIT_DOOR, B_RIGHT_PIT_DOOR,
+        B_FLOOR_GUN_TRAP, B_WALL_FLAME_TRAP, B_RIGHT_WALL_MISSILE_TRAP
+    };
+    for (unsigned i=0;i<sizeof(scenario_only_buildings)/sizeof(scenario_only_buildings[0]);++i) {
+        const Sc64RaceBuildingRule *rule =
+            sc64_race_building_rule(scenario_only_buildings[i]);
+        assert(rule && rule->worker == 255);
+        for (int worker=0;worker<SC_RU_COUNT;++worker)
+            assert(rule->worker != worker);
+    }
 
     check_bounds(U_GHOST, 7, 10, 7, 11);
     check_bounds(U_CIVILIAN, 8, 9, 8, 10);
@@ -178,6 +233,22 @@ int main(void)
     assert(sc64_race_t4_sight_source_pixels(U_MAP_REVEALER) == 320);
     assert(sc64_race_t4_sight_source_pixels(U_DATA_DISK) == 160);
     assert(sc64_race_t4_building_sight_source_pixels(B_TERRAN_BEACON) == 256);
+    assert(sc64_race_t4_building_sight_source_pixels(B_UPPER_DOOR) == 32);
+    assert(sc64_race_t4_building_sight_source_pixels(B_RIGHT_UPPER_DOOR) == 32);
+    assert(sc64_race_t4_building_sight_source_pixels(B_PIT_DOOR) == 32);
+    assert(sc64_race_t4_building_sight_source_pixels(B_RIGHT_PIT_DOOR) == 32);
+    assert(sc64_race_t4_building_sight_source_pixels(B_FLOOR_MISSILE_TRAP) == 192);
+    assert(sc64_race_t4_building_sight_source_pixels(B_FLOOR_GUN_TRAP) == 192);
+    assert(sc64_race_t4_building_sight_source_pixels(B_WALL_FLAME_TRAP) == 96);
+    assert(sc64_race_t4_building_sight_source_pixels(B_RIGHT_WALL_MISSILE_TRAP) == 192);
+    check_building_bounds(B_UPPER_DOOR,25,17,44,20);
+    check_building_bounds(B_RIGHT_UPPER_DOOR,44,17,25,20);
+    check_building_bounds(B_PIT_DOOR,41,17,28,20);
+    check_building_bounds(B_RIGHT_PIT_DOOR,28,17,41,20);
+    check_building_bounds(B_FLOOR_MISSILE_TRAP,32,32,31,31);
+    check_building_bounds(B_FLOOR_GUN_TRAP,32,32,31,31);
+    check_building_bounds(B_WALL_FLAME_TRAP,16,16,15,15);
+    check_building_bounds(B_RIGHT_WALL_MISSILE_TRAP,16,16,15,15);
     assert(sc64_race_t4_building_sight_source_pixels(B_COMMAND) == 0);
 #endif
     return 0;

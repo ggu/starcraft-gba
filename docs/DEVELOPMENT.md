@@ -105,11 +105,15 @@ make test-sc64-t4-triggers test-sc64-t4-queries test-sc64-t4-actions
 ```
 
 The first line needs the retained records produced by local race preparation.
+Re-run preparation after updating an older checkout: T4 retention now includes
+FORC, OWNR, SIDE, UPRP and UPUS, in addition to the original eight sections.
 It reconstructs the full source sections from the generated C schema and
 checks their canonical digests. The second line needs no ROM or generated
 data and is included in `./dev test`. The runner is not connected to T4
 gameplay yet: world effects, SRAM integration, door/teleport behavior and a
-controller completion proof remain required.
+controller completion proof remain required. T4-only door/trap rules and a
+private source-frame accessor are available for that integration; neither
+door animation/collision nor trap firing is connected yet.
 
 ## Troubleshooting
 

@@ -248,6 +248,35 @@ static void test_ghost_upgrades_shields_and_hidden_target(void)
     assert(u[hidden].hp == 1 && u[ghost].cd == 0);
 }
 
+static void test_scenario_only_buildings_reject_scv_construction(void)
+{
+    static const int types[] = {
+        B_TERRAN_BEACON, B_FLOOR_MISSILE_TRAP, B_UPPER_DOOR,
+        B_RIGHT_UPPER_DOOR, B_PIT_DOOR, B_RIGHT_PIT_DOOR,
+        B_FLOOR_GUN_TRAP, B_WALL_FLAME_TRAP, B_RIGHT_WALL_MISSILE_TRAP
+    };
+    init_state();
+    assert(race_player[SIDE] == R_TER);
+    clear_actors();
+    minerals = 777;
+    gas = 333;
+    int worker = spawn_unit(SIDE, U_SCV, 80, 80);
+    assert(worker >= 0);
+    int buildings_before = 0;
+    for (int i=0;i<MAX_BUILDINGS;++i)
+        buildings_before += b[i].alive != 0;
+    for (unsigned j=0;j<sizeof(types)/sizeof(types[0]);++j) {
+        assert(sc64_race_building_rule(types[j])->worker == 255);
+        assert(!race_start_build(SIDE, worker, types[j], 200 + 32 * (int)j, 200));
+        int buildings_after = 0;
+        for (int i=0;i<MAX_BUILDINGS;++i)
+            buildings_after += b[i].alive != 0;
+        assert(buildings_after == buildings_before);
+        assert(minerals == 777 && gas == 333);
+        assert(u[worker].order == ORDER_IDLE && u[worker].target == -1);
+    }
+}
+
 int main(void)
 {
     test_select_and_orders();
@@ -256,6 +285,7 @@ int main(void)
     test_all_real_t4_sight_rules();
     test_ghost_and_intrinsic_immunity();
     test_ghost_upgrades_shields_and_hidden_target();
+    test_scenario_only_buildings_reject_scv_construction();
     puts("T4 actor engine policy tests passed");
     return 0;
 }

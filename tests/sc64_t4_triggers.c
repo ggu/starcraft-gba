@@ -405,14 +405,14 @@ test_enable_gates_terminal_precedence_and_state_resume(void)
     fixture_init(&f, 4);
     f.triggers[0].enabled_players[0] = 0;
     f.triggers[0].enabled_players[3] = 1;
-    f.triggers[1].enabled_players[17] = 1; /* All players. */
+    f.triggers[1].enabled_players[SC64_T4_ENABLED_ALL_PLAYERS] = 1;
     f.triggers[2].enabled_players[0] = 0;
-    f.triggers[2].enabled_players[21] = 1; /* Force 4. */
+    f.triggers[2].enabled_players[SC64_T4_ENABLED_FORCE4] = 1; /* Force 4. */
     f.triggers[3].enabled_players[0] = 0;
     f.triggers[3].enabled_players[2] = 1;
     for (unsigned i = 0; i < 4; ++i) f.actions[i][0].opcode = 1;
     assert(sc64_t4_trigger_init(&state, &f.program, 0, 4));
-    /* Trigger 0 is player 3 only, triggers 1/2 are eligible. */
+    /* Trigger 0 is player 3 only; triggers 1/2 apply to all and Force 4. */
     f.actions[1][0].opcode = 1;
     f.actions[2][0].opcode = 2;
     assert(sc64_t4_trigger_step(&state, &f.program, &f.switches, &ops, &f, 0));
@@ -431,7 +431,7 @@ test_enable_gates_terminal_precedence_and_state_resume(void)
     /* The force-4 bit alone gates this trigger: force 1 skips it. */
     fixture_init(&f, 1);
     f.triggers[0].enabled_players[0] = 0;
-    f.triggers[0].enabled_players[21] = 1;
+    f.triggers[0].enabled_players[SC64_T4_ENABLED_FORCE4] = 1;
     effect(&f.actions[0][0], 91);
     assert(sc64_t4_trigger_init(&state, &f.program, 0, 1));
     assert(sc64_t4_trigger_step(&state, &f.program, &f.switches, &ops, &f, 0));
@@ -439,6 +439,42 @@ test_enable_gates_terminal_precedence_and_state_resume(void)
     assert(sc64_t4_trigger_init(&state, &f.program, 0, 4));
     assert(sc64_t4_trigger_step(&state, &f.program, &f.switches, &ops, &f, 0));
     assert(f.action_calls == 1 && state.flags[0] == SC64_T4_TR_DONE);
+}
+
+static void
+test_enabled_owner_selector_namespace_exhaustively(void)
+{
+    Sc64T4Trigger tr;
+    Fixture f;
+    memset(&tr, 0, sizeof(tr));
+    for (unsigned selector = 0; selector < 27; ++selector) {
+        memset(tr.enabled_players, 0, sizeof(tr.enabled_players));
+        tr.enabled_players[selector] = 1;
+        for (unsigned owner = 0; owner < 8; ++owner) {
+            for (unsigned force = 1; force <= 4; ++force) {
+                int expected = selector == owner || selector == 17 ||
+                               selector == 17 + force;
+                /* Unsupported selectors remain fail-closed. */
+                assert(sc64_t4_trigger_owner_enabled(&tr, owner, force) == expected);
+            }
+        }
+    }
+    assert(!sc64_t4_trigger_owner_enabled(&tr, 8, 1));
+    assert(!sc64_t4_trigger_owner_enabled(&tr, 0, 0));
+    assert(!sc64_t4_trigger_owner_enabled(&tr, 0, 5));
+
+    /* Unsupported selector bytes must invalidate the source program instead
+       of being silently dropped by the runner. */
+    for (unsigned selector = 0; selector < 27; ++selector) {
+        fixture_init(&f, 1);
+        f.triggers[0].enabled_players[0] = 0;
+        f.triggers[0].enabled_players[selector] = 1;
+        int supported = selector < 8 ||
+                        selector == SC64_T4_ENABLED_ALL_PLAYERS ||
+                        (selector >= SC64_T4_ENABLED_FORCE1 &&
+                         selector <= SC64_T4_ENABLED_FORCE4);
+        assert(sc64_t4_trigger_program_valid(&f.program) == supported);
+    }
 }
 
 static void
@@ -563,6 +599,7 @@ main(void)
     test_disabled_final_slot_still_finishes_trigger();
     test_malformed_shared_wait_state_is_rejected();
     test_enable_gates_terminal_precedence_and_state_resume();
+    test_enabled_owner_selector_namespace_exhaustively();
     test_source_cursor_and_trigger_limit_validation();
     test_copied_state_resume_replays_effects_once();
     test_switch_bank_is_global_across_player_instances();

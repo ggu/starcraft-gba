@@ -68,6 +68,14 @@ T4_UNIT_IDS = {
     'terran_beacon': 195,
     'data_disk': 218,
 }
+# Source-backed map prop GRPs required by Jacobs Installation. Preserve every
+# indexed source frame; no frame number is interpreted as an open/closed state.
+T4_BUILDING_IDS = {
+    'floor_missile_trap': 203, 'upper_door': 205,
+    'right_upper_door': 206, 'pit_door': 207, 'right_pit_door': 208,
+    'floor_gun_trap': 209, 'wall_flame_trap': 211,
+    'right_wall_missile_trap': 212,
+}
 T4_INVISIBLE_RAW_TYPES = (101,)
 T4_EXPECTED_VISIBLE_RAW_TYPES = (0, 1, 2, 3, 7, 15, 20, 32, 37, 89, 95, 195, 218)
 
@@ -96,7 +104,8 @@ for _raw in MISSION_RAW_TYPES:
 
 
 def write_header(path: Path, selected: list[dict], remap: bytes,
-                 t4_selected: list[dict] | None = None) -> None:
+                 t4_selected: list[dict] | None = None,
+                 t4_building_selected: list[dict] | None = None) -> None:
     lines = [
         '/* Generated from the verified USA ROM; private local asset. */',
         '#ifndef SC64_RACE_SPRITES_GENERATED_H',
@@ -124,10 +133,13 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
                       f'{frame["width"]},{frame["height"]},{symbol}_pixels}};'])
     for item in selected:
         append_asset(item)
-    if t4_selected:
+    if t4_selected or t4_building_selected:
         lines.append('#ifdef SC64_T4_ENABLED')
-        for item in t4_selected:
+        for item in (t4_selected or []):
             append_asset(item)
+        for item in (t4_building_selected or []):
+            for frame_index, frame in enumerate(item['frames']):
+                append_asset({'name': f'{item["name"]}_frame_{frame_index}', 'frame': frame})
         lines.append('#endif /* SC64_T4_ENABLED */')
     lines += ['static inline const Sc64SpriteFrame *sc64_race_unit_sprite(unsigned short raw_type) {',
               '    switch (raw_type) {']
@@ -157,6 +169,21 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
             '}',
             '#endif /* SC64_T4_ENABLED */',
         ]
+    if t4_building_selected:
+        # Keep the frame index a raw source-GRP index. IScript-to-state
+        # selection is intentionally left to the runtime trigger adapter.
+        at = len(lines) - 1
+        helper = ['#ifdef SC64_T4_ENABLED',
+                  'static inline const Sc64SpriteFrame *sc64_race_building_sprite(unsigned short raw_type, unsigned short frame_index) {',
+                  '    switch (raw_type) {']
+        for item in t4_building_selected:
+            helper += [f'    case {T4_BUILDING_IDS[item["name"]]}:',
+                       '        switch (frame_index) {']
+            for frame_index in range(len(item['frames'])):
+                helper.append(f'        case {frame_index}: return &sc64_race_sprite_{item["name"]}_frame_{frame_index};')
+            helper += ['        default: return (const Sc64SpriteFrame *)0;', '        }']
+        helper += ['    default: return (const Sc64SpriteFrame *)0;', '    }', '}', '#endif /* SC64_T4_ENABLED */']
+        lines[at:at] = helper
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text('\n'.join(lines) + '\n', encoding='ascii')
 
@@ -175,9 +202,10 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
     archive = extractor.BoltArchive(normalized)
     refs = base.resolve_grp_indices(archive, RACE_UNIT_IDS)
     t4_refs = base.resolve_grp_indices(archive, T4_UNIT_IDS) if include_t4 else {}
+    t4_building_refs = base.resolve_grp_indices(archive, T4_BUILDING_IDS) if include_t4 else {}
     palette = base.decode_rgba5551_palette(base._entry_payload(archive, '00B/004'))
     entries = {entry.path: entry for entry in archive.entries()}
-    selected, t4_selected, manifest_assets = [], [], []
+    selected, t4_selected, t4_building_selected, manifest_assets = [], [], [], []
     out.mkdir(parents=True, exist_ok=True)
     def load_asset(name, ref, target):
         grp_data = archive.read(entries[ref['bolt_path']])
@@ -196,8 +224,24 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
         load_asset(name, ref, selected)
     for name, ref in t4_refs.items():
         load_asset(name, ref, t4_selected)
-    write_header(header, selected, remap, t4_selected)
-    mapped_raw_types = set(RACE_UNIT_IDS.values()) | set(T4_UNIT_IDS.values())
+    for name, ref in t4_building_refs.items():
+        grp_data = archive.read(entries[ref['bolt_path']])
+        grp = base.parse_grp(grp_data)
+        frame_list = grp['frames']
+        if not frame_list:
+            raise ValueError(f'T4 prop raw {ref["unit_id"]} has an empty GRP')
+        preview = out / f'{name}.png'
+        base.encode_png(preview, grp['width'], grp['height'], base.render_frame(frame_list[0], palette))
+        t4_building_selected.append({'name': name, 'frames': frame_list})
+        manifest_assets.append({'name': name, **ref, 'sha1': hashlib.sha1(grp_data).hexdigest(),
+                                'frame_count': len(frame_list), 'canvas': [grp['width'], grp['height']],
+                                'selected_frame': 'all-source-frames',
+                                'frame_rect': [frame_list[0]['x'], frame_list[0]['y'],
+                                               frame_list[0]['frame_width'], frame_list[0]['frame_height']],
+                                'opaque_pixels': sum(frame_list[0]['alpha']),
+                                'preview': preview.name})
+    write_header(header, selected, remap, t4_selected, t4_building_selected)
+    mapped_raw_types = set(RACE_UNIT_IDS.values()) | set(T4_UNIT_IDS.values()) | set(T4_BUILDING_IDS.values())
     actual_sprite_raw_types = ({int(ref['unit_id']) for ref in refs.values()} |
                                {int(ref['unit_id']) for ref in t4_refs.values()})
     expected_t4_visible = set(T4_EXPECTED_VISIBLE_RAW_TYPES) if include_t4 else set()
@@ -206,11 +250,16 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
     missing_t4_visible = sorted(set(missing_t4_mapping) | set(missing_t4_sprite))
     if missing_t4_visible:
         raise ValueError(f'T4 visible raw types lack sprite mappings: {missing_t4_visible}')
+    missing_t4_props = sorted(set(T4_BUILDING_IDS.values()) -
+                              {int(ref['unit_id']) for ref in t4_building_refs.values()}) if include_t4 else []
+    if missing_t4_props:
+        raise ValueError(f'T4 prop raw types lack source GRPs: {missing_t4_props}')
     report = {'source': {'rom_sha1': sha1, 'rom_input_sha1': hashlib.sha1(raw).hexdigest(),
                          'upstream_commit': base.UPSTREAM_COMMIT},
               'palette': 'Shared Backwater GBA sprite palette; map terrain colors are quantized offline to avoid runtime sprite recoloring.',
               'raw_unit_ids': RACE_UNIT_IDS,
               't4_raw_unit_ids': T4_UNIT_IDS if include_t4 else {},
+              't4_raw_building_ids': T4_BUILDING_IDS if include_t4 else {},
               't4_invisible_raw_types': list(T4_INVISIBLE_RAW_TYPES) if include_t4 else [],
               't4_expected_visible_raw_types': list(T4_EXPECTED_VISIBLE_RAW_TYPES) if include_t4 else [],
               'resolved_t4_visible_raw_types': sorted(set(T4_EXPECTED_VISIBLE_RAW_TYPES) & actual_sprite_raw_types) if include_t4 else [],

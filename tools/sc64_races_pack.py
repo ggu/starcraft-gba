@@ -50,7 +50,9 @@ BUILDING_RAW_IDS = {
 T4_REQUIRED_SOURCE_RECORDS = {
     b'UNIT': 'UNIT.bin', b'DIM ': 'DIM.bin', b'ERA ': 'ERA.bin',
     b'MTXM': 'MTXM.bin', b'MRGN': 'MRGN.bin', b'DD2 ': 'DD2.bin',
-    b'THG2': 'THG2.bin', b'TRIG': 'TRIG.bin',
+    b'THG2': 'THG2.bin', b'TRIG': 'TRIG.bin', b'FORC': 'FORC.bin',
+    b'OWNR': 'OWNR.bin', b'SIDE': 'SIDE.bin', b'UPRP': 'UPRP.bin',
+    b'UPUS': 'UPUS.bin',
 }
 
 
@@ -158,9 +160,10 @@ def retain_t4_source_records(chk: bytes, records_dir: Path, *,
                              extractor_commit: str = UPSTREAM_COMMIT) -> dict:
     """Write exact framed T4 CHK records and return hash/size metadata.
 
-    This intentionally stores only the eight source records required for T4
-    data auditing. The input is a CHK byte string returned by the pinned BOLT
-    extractor; no Blizzard records are added to tracked project files.
+    This intentionally stores only the bounded source records required for
+    T4 scenario and trigger auditing. The input is a CHK byte string returned
+    by the pinned BOLT extractor; no Blizzard records are added to tracked
+    project files.
     """
     found: dict[bytes, list[bytes]] = {tag: [] for tag in T4_REQUIRED_SOURCE_RECORDS}
     offset = 0

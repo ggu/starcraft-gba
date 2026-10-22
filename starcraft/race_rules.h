@@ -31,6 +31,11 @@ enum {
     B_MATURE_CHRYSALIS, B_HIVE, B_GREATER_SPIRE,
 #ifdef SC64_T4_RUNTIME
     B_TERRAN_BEACON,
+    /* Appended T4 special-unit rules. Doors and traps use the building pool
+       in this compact runtime while retaining their source raw identities. */
+    B_FLOOR_MISSILE_TRAP, B_UPPER_DOOR, B_RIGHT_UPPER_DOOR,
+    B_PIT_DOOR, B_RIGHT_PIT_DOOR, B_FLOOR_GUN_TRAP,
+    B_WALL_FLAME_TRAP, B_RIGHT_WALL_MISSILE_TRAP,
 #endif
     SC_RB_COUNT
 };
@@ -153,7 +158,19 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
 #ifdef SC64_T4_RUNTIME
     /* The source's 100000 HP cannot fit Sc64RaceBuildingRule.hp (u16).
        Zero is a sentinel; T4 spawn hooks must use the int accessor below. */
-    , [B_TERRAN_BEACON] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 0, 0, 0, 0, 0 }
+    /* Worker type 255 is an impossible unit ID and marks this as scenario-
+       only. Generic build APIs require an exact valid worker type match. */
+    , [B_TERRAN_BEACON] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 0, 0 }
+    /* BWAPI's door max HP is 100000 and does not fit the compact u16 rule.
+       sc64_race_building_max_hp() provides its exact int value. */
+    , [B_FLOOR_MISSILE_TRAP] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 50, 0 }
+    , [B_UPPER_DOOR] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 0, 0 }
+    , [B_RIGHT_UPPER_DOOR] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 0, 0 }
+    , [B_PIT_DOOR] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 0, 0 }
+    , [B_RIGHT_PIT_DOOR] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 0, 0 }
+    , [B_FLOOR_GUN_TRAP] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 50, 0 }
+    , [B_WALL_FLAME_TRAP] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 50, 0 }
+    , [B_RIGHT_WALL_MISSILE_TRAP] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 50, 0 }
 #endif
 };
 
@@ -198,7 +215,9 @@ static inline const char *sc64_race_building_name(int type)
         "ZERG BEACON","FACTORY","ROBOTICS FACILITY","MATURE CHRYSALIS",
         "HIVE","GREATER SPIRE"
 #ifdef SC64_T4_RUNTIME
-        ,"TERRAN BEACON"
+        ,"TERRAN BEACON","FLOOR MISSILE TRAP","UPPER DOOR",
+        "RIGHT UPPER DOOR","PIT DOOR","RIGHT PIT DOOR",
+        "FLOOR GUN TRAP","WALL FLAME TRAP","RIGHT WALL MISSILE TRAP"
 #endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
@@ -250,10 +269,29 @@ static inline unsigned sc64_race_t4_actor_flags(int type)
 }
 static inline unsigned sc64_race_t4_building_flags(int type)
 {
-    return type == B_TERRAN_BEACON ?
-        SC64_T4_ACTOR_DRAWABLE | SC64_T4_ACTOR_BUILDING |
-        SC64_T4_ACTOR_INVINCIBLE : 0;
+    switch (type) {
+    case B_TERRAN_BEACON:
+        return SC64_T4_ACTOR_DRAWABLE | SC64_T4_ACTOR_BUILDING |
+               SC64_T4_ACTOR_INVINCIBLE;
+    case B_UPPER_DOOR: case B_RIGHT_UPPER_DOOR:
+    case B_PIT_DOOR: case B_RIGHT_PIT_DOOR:
+        /* BWAPI's raw unit flags mark all four doors Invincible. */
+        return SC64_T4_ACTOR_DRAWABLE | SC64_T4_ACTOR_BUILDING |
+               SC64_T4_ACTOR_INVINCIBLE;
+    case B_FLOOR_MISSILE_TRAP: case B_FLOOR_GUN_TRAP:
+    case B_WALL_FLAME_TRAP: case B_RIGHT_WALL_MISSILE_TRAP:
+        /* All four raw types have a source groundWeapon entry. Selectability
+           and collision are handled by the scenario runtime. */
+        return SC64_T4_ACTOR_DRAWABLE | SC64_T4_ACTOR_BUILDING |
+               SC64_T4_ACTOR_WEAPON;
+    default: return 0;
+    }
 }
+static inline int sc64_race_t4_is_door(int type)
+{ return type >= B_UPPER_DOOR && type <= B_RIGHT_PIT_DOOR; }
+static inline int sc64_race_t4_is_trap(int type)
+{ return type == B_FLOOR_MISSILE_TRAP || type == B_FLOOR_GUN_TRAP ||
+         type == B_WALL_FLAME_TRAP || type == B_RIGHT_WALL_MISSILE_TRAP; }
 /* BWAPI stores bounding offsets in source pixels; callers applying the GBA's
    2:1 map scale should convert these raw offsets at their query boundary. */
 static inline int sc64_race_t4_bounds_source(int type, int *left, int *up,
@@ -278,6 +316,12 @@ static inline int sc64_race_t4_building_bounds_source(int type, int *left,
                                                       int *up, int *right,
                                                       int *down)
 {
+    if (type == B_UPPER_DOOR) { if(left)*left=25; if(up)*up=17; if(right)*right=44; if(down)*down=20; return 1; }
+    if (type == B_RIGHT_UPPER_DOOR) { if(left)*left=44; if(up)*up=17; if(right)*right=25; if(down)*down=20; return 1; }
+    if (type == B_PIT_DOOR) { if(left)*left=41; if(up)*up=17; if(right)*right=28; if(down)*down=20; return 1; }
+    if (type == B_RIGHT_PIT_DOOR) { if(left)*left=28; if(up)*up=17; if(right)*right=41; if(down)*down=20; return 1; }
+    if (type == B_FLOOR_MISSILE_TRAP || type == B_FLOOR_GUN_TRAP) { if(left)*left=32; if(up)*up=32; if(right)*right=31; if(down)*down=31; return 1; }
+    if (type == B_WALL_FLAME_TRAP || type == B_RIGHT_WALL_MISSILE_TRAP) { if(left)*left=16; if(up)*up=16; if(right)*right=15; if(down)*down=15; return 1; }
     if (type != B_TERRAN_BEACON) return 0;
     if (left) *left=48;
     if (up) *up=32;
@@ -299,15 +343,23 @@ static inline int sc64_race_t4_building_sight_source_pixels(int type)
 {
     /* BWAPI UnitType::sightRange() is tile based; Special_Terran_Beacon
        (raw 195) has sightRangeTiles[195] == 8. */
-    return type == B_TERRAN_BEACON ? 8 * 32 : 0;
+    switch (type) {
+    case B_TERRAN_BEACON: return 8 * 32;
+    case B_FLOOR_MISSILE_TRAP: case B_FLOOR_GUN_TRAP:
+    case B_RIGHT_WALL_MISSILE_TRAP: return 6 * 32;
+    case B_WALL_FLAME_TRAP: return 3 * 32;
+    case B_UPPER_DOOR: case B_RIGHT_UPPER_DOOR:
+    case B_PIT_DOOR: case B_RIGHT_PIT_DOOR: return 1 * 32;
+    default: return 0;
+    }
 }
 static inline int sc64_race_t4_unit_intrinsically_invincible(int type)
 { return type == U_DATA_DISK; }
 static inline int sc64_race_t4_building_intrinsically_invincible(int type)
-{ return type == B_TERRAN_BEACON; }
+{ return type == B_TERRAN_BEACON || sc64_race_t4_is_door(type); }
 static inline int sc64_race_building_max_hp(int type)
 { const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
-  return type == B_TERRAN_BEACON ? 100000 : r ? r->hp : 0; }
+  return type == B_TERRAN_BEACON || sc64_race_t4_is_door(type) ? 100000 : r ? r->hp : 0; }
 /* C-10 Canister Rifle is Concussive, and Terran Infantry Weapons add one
    point per level. This model has no cloak/lockdown/nuke state. */
 enum { SC64_RACE_DAMAGE_NORMAL, SC64_RACE_DAMAGE_CONCUSSIVE };
@@ -595,6 +647,10 @@ static inline int sc64_race_raw_building(int type)
     case B_STARPORT: return 114; case B_MISSILE_TURRET: return 124; case B_ZERG_BEACON: return 194;
 #ifdef SC64_T4_RUNTIME
     case B_TERRAN_BEACON: return 195;
+    case B_FLOOR_MISSILE_TRAP: return 203; case B_UPPER_DOOR: return 205;
+    case B_RIGHT_UPPER_DOOR: return 206; case B_PIT_DOOR: return 207;
+    case B_RIGHT_PIT_DOOR: return 208; case B_FLOOR_GUN_TRAP: return 209;
+    case B_WALL_FLAME_TRAP: return 211; case B_RIGHT_WALL_MISSILE_TRAP: return 212;
 #endif
     default: return -1;
     }
@@ -660,6 +716,10 @@ static inline int sc64_race_building_from_raw(int raw)
     case 133: return B_HIVE; case 137: return B_GREATER_SPIRE;
 #ifdef SC64_T4_RUNTIME
     case 195: return B_TERRAN_BEACON;
+    case 203: return B_FLOOR_MISSILE_TRAP; case 205: return B_UPPER_DOOR;
+    case 206: return B_RIGHT_UPPER_DOOR; case 207: return B_PIT_DOOR;
+    case 208: return B_RIGHT_PIT_DOOR; case 209: return B_FLOOR_GUN_TRAP;
+    case 211: return B_WALL_FLAME_TRAP; case 212: return B_RIGHT_WALL_MISSILE_TRAP;
 #endif
     default: return -1;
     }

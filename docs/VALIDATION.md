@@ -808,6 +808,35 @@ A separate ARM compilation checks the new core schemas and state-size
 assertions; the core still needs a full engine link and gameplay validation
 when it is connected to the mission.
 
+## T4 setup records and scenario props (2026-10-23)
+
+T4 source retention now covers 13 framed sections, adding FORC, OWNR, SIDE,
+UPRP and UPUS. The scenario importer validates their framing, sizes and
+manifest digests, retains all 64 property slots and checks force/used indices.
+Independent C reconstruction now checks all eight scenario/setup payloads,
+including unused property fields. Generated records and arrays stay private.
+The setup records corroborate the existing source-slot/force mapping.
+
+The trigger runner retains AllPlayers at selector 17 and Forces 1–4 at
+18–21. Exhaustive enabled-selector tests cover eight owners and four forces;
+programs with unsupported enabled selectors are rejected. T4's AllPlayers
+records require independent player contexts, rather than a single global
+cursor. A 1,268-byte prospective world-effect state holds eight contexts,
+shared switches and bounded mutable locations/doodad bindings; it is not
+allocated in the current game or persisted yet.
+
+T4-only rules now distinguish eight door/trap types with verified raw IDs,
+bounds, sight, armor and HP. Doors retain their intrinsic invincibility and
+100,000-HP sentinel. They use the compact building pool; this does not imply
+the original unit metadata classifies them as normal buildings. Scenario
+props cannot be constructed by a worker. Private sprite extraction retains
+every source frame for these eight types and exposes a checked frame accessor.
+No open/closed frame meaning, door collision or trap combat has been assigned.
+
+The actor/storage ARM probe still passes both unchanged memory guards. These
+checks remain import, rule and storage evidence, with no new T4 playability
+or frame-rate claim. The default and unified ROM hashes remain unchanged.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.
