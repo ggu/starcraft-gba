@@ -38,26 +38,6 @@ race_t3_victory_text(void)
 }
 
 static int
-race_t3_count_units(int owner, int type)
-{
-    int i, count = 0;
-    for (i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == owner && (type < 0 || u[i].type == type))
-            ++count;
-    return count;
-}
-
-static int
-race_t3_count_buildings(int owner, int type)
-{
-    int i, count = 0;
-    for (i = 0; i < MAX_BUILDINGS; ++i)
-        if (b[i].alive && b[i].owner == owner && (type < 0 || b[i].type == type))
-            ++count;
-    return count;
-}
-
-static int
 race_t3_total_units(void)
 {
     int i, count = 0;
@@ -123,11 +103,23 @@ race_t3_campaign_tick(void)
 {
     Sc64T3Input input;
     u16 events;
+    int i;
     input.force1_buildings_killed = race_t3_buildings_killed;
-    input.human_buildings = (u8)(race_t3_count_buildings(SIDE, -1) != 0);
-    input.force2_hatcheries = (u8)race_t3_count_buildings(ENEMY, B_HATCHERY);
-    input.force2_any_units = (u8)(race_t3_count_units(ENEMY, -1) +
-                                  race_t3_count_buildings(ENEMY, -1) != 0);
+    input.human_buildings = input.force2_hatcheries = input.force2_any_units = 0;
+    /* Derive all building predicates in one pass. Any Unit includes buildings,
+     * so the unit pass is only needed after the last enemy building is gone. */
+    for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
+        if (b[i].owner == SIDE) input.human_buildings = 1;
+        else if (b[i].owner == ENEMY) {
+            input.force2_any_units = 1;
+            if (b[i].type == B_HATCHERY) ++input.force2_hatcheries;
+        }
+    }
+    if (!input.force2_any_units)
+        for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == ENEMY) {
+            input.force2_any_units = 1;
+            break;
+        }
     input.paused = 0;
     events = sc64_t3_step(&race_t3, &input);
 
@@ -171,8 +163,7 @@ race_t3_campaign_tick(void)
         race_completed |= 1 << race_campaign.mission;
         won = 1;
     }
-    supply_used = race_owner_supply(SIDE);
-    supply_cap = race_owner_supply_cap(SIDE);
+    /* game_update recomputes supply in race_tick_state after production. */
 }
 
 #endif /* SC64_T3_ADAPTER_H */

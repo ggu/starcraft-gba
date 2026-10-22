@@ -18,7 +18,7 @@ static int race_can_attack(int attacker,int target) {
     } else if((b[target-MAX_UNITS].flags&16)||b[target-MAX_UNITS].type==B_ZERG_BEACON)return 0;
     return attacker<0||sc64_race_unit_damage(attacker)>0;
 }
-static void race_tick_defenses(void) {
+static void GBA_HOT race_tick_defenses(void) {
     for(int i=0;i<MAX_BUILDINGS;i++)if(building_complete(i)) {
         Building *q=&b[i];int ground=0,air=0,range=0,damage=0,cooldown=0;
         switch(q->type) {
@@ -32,7 +32,13 @@ static void race_tick_defenses(void) {
         }
         if(q->queue_progress>0){q->queue_progress--;continue;}
         int best=-1,bestd=range*range;
-        for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&owners_hostile(q->owner,u[j].owner)&&!(u[j].flags&16)) {
+        for(int j=0;j<MAX_UNITS;j++)if(u[j].alive) {
+            /* Reject candidates outside the circular weapon radius with the
+             * cheaper axis bounds before ownership, flags, and unit-class
+             * queries. Equality is out of range because the exact test below
+             * is strict (distance < range squared). */
+            if(FAST_ABS(q->x-u[j].x)>=range||FAST_ABS(q->y-u[j].y)>=range)continue;
+            if(!owners_hostile(q->owner,u[j].owner)||(u[j].flags&16))continue;
             int flying=sc64_race_unit_flying(u[j].type);
             if((flying&&!air)||(!flying&&!ground)||!race_can_attack(-1,j))continue;
             int d=dist2(q->x,q->y,u[j].x,u[j].y);

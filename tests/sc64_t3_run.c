@@ -76,6 +76,10 @@ static void checkpoint(void)
     T3Checkpoint *c;
     if (ticks % 1000u || checkpoint_count >=
         sizeof(checkpoints) / sizeof(checkpoints[0])) return;
+    /* Rendering reuses the common post-production supply totals. Check their
+     * consistency through production and the late loss of units/buildings. */
+    assert(supply_used == race_owner_supply(SIDE));
+    assert(supply_cap == race_owner_supply_cap(SIDE));
     c = &checkpoints[checkpoint_count++];
     c->tick = ticks;
     c->elapsed = race_t3.elapsed_ticks;

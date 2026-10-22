@@ -21,7 +21,11 @@ static void test_reset_and_home(void) {
 #endif
     assert(f.race == SC_FRONT_RACE_PROTOSS && f.bots == 1 &&
 #ifdef SC64_UNIFIED
+#ifdef SC64_T3_ENABLED
+           f.completed == 6);
+#else
            f.completed == 5);
+#endif
 #else
            f.completed == 3);
 #endif

@@ -10,11 +10,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import socket
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 
 TOOLS = Path(__file__).resolve().parent
@@ -31,6 +33,7 @@ SCREEN_PLAY = 1
 SCREEN_RESULT = 3
 PROFILE_CYCLE_NAMES = (
     "demo_update_cycles", "gfx_draw_cycles", "sc64_orders_cycles",
+    "sc64_order_setup_cycles", "sc64_order_query_cycles", "sc64_order_move_cycles",
     "sc64_sight_cycles", "sc64_other_cycles", "sc64_map_cycles",
     "sc64_hud_cycles", "sc64_background_cycles", "sc64_building_cycles",
     "sc64_unit_draw_cycles",
@@ -56,6 +59,41 @@ def check_debugger_port_free() -> None:
 
 def u32(rsp, address: int) -> int:
     return int.from_bytes(rsp.read(address, 4), "little")
+
+
+def write_progress(path: Path, *, profile: str, rom: Path, elf: Path,
+                   rom_sha256: str, elf_sha256: str, configuration: dict,
+                   requested_ticks: int, checkpoint_interval: int,
+                   latest_checkpoint: dict, status: str = "running",
+                   final_report: str | None = None) -> None:
+    """Atomically publish the latest complete observer snapshot."""
+    progress = {
+        "status": status, "profile": profile,
+        "rom": str(rom), "elf": str(elf),
+        "rom_sha256": rom_sha256, "elf_sha256": elf_sha256,
+        "configuration": configuration,
+        "requested_ticks": requested_ticks,
+        "checkpoint_interval": checkpoint_interval,
+        "observed_ticks": latest_checkpoint["tick"],
+        "latest_checkpoint": latest_checkpoint,
+    }
+    if final_report is not None:
+        progress["final_report"] = final_report
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_name = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=f".{path.name}.", suffix=".tmp",
+                                         delete=False) as stream:
+            temp_name = stream.name
+            json.dump(progress, stream, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_name, path)
+    finally:
+        if temp_name and os.path.exists(temp_name):
+            os.unlink(temp_name)
 
 
 def observe(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
@@ -122,6 +160,8 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
     elf = elf_path or ROOT / "build" / f"starcraft-{profile}.elf"
     if not rom.is_file() or not elf.is_file():
         raise RuntimeError(f"{profile}: build both ROM and ELF first ({rom}, {elf})")
+    rom_sha256 = hashlib.sha256(rom.read_bytes()).hexdigest()
+    elf_sha256 = hashlib.sha256(elf.read_bytes()).hexdigest()
     # The split UI helpers inspect the appended Sc64Frontend fields through
     # DWARF offsets. Populate their shared offset table before starting UI.
     split.FRONT_FIELDS = split.frontend_offsets(elf)
@@ -179,6 +219,12 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
             raise RuntimeError(f"scenario did not enter live play: {launch_state}")
         if mission is not None and launch_state["mission"] != mission:
             raise RuntimeError(f"campaign launch selected mission {launch_state['mission']} instead of {mission}")
+        configuration = ({"mission": mission, "mission_ordinal": mission_ordinal,
+                          "width": launch["width"], "height": launch["height"]}
+                         if mission is not None else
+                         {"map": map_id, "human_race": race, "opponents": bots,
+                          "bot_races": launch["bot_races"][:bots],
+                          "width": launch["width"], "height": launch["height"]})
 
         # main.c has already sampled schedule_count==0 for the current
         # game_update iteration. It finishes normally, then sees this queue
@@ -240,10 +286,22 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
             raise RuntimeError(f"tick-zero observer is not on the live game screen: {zero['screen']}")
         zero_capture = capture(rsp, out / "tick-000000.png")
         peak_at_tick_zero = u32(rsp, sym["demo_peak_cycles"])
-        observations.append({"tick": 0, "interval_ticks": 0, "interval_cycles": 0,
-                             "hardware_frames_per_tick_histogram": [0] * 8,
-                             "route_counters": prior_routes,
-                             "capture": zero_capture, **zero})
+        zero_cycles = {key: u32(rsp, sym[key]) for key in PROFILE_CYCLE_NAMES if key in sym}
+        zero_checkpoint = {"tick": 0, "interval_ticks": 0, "interval_cycles": 0,
+                           "interval_effective_fps": None,
+                           "hardware_frames_per_tick_histogram": [0] * 8,
+                           "demo_last_cycles": u32(rsp, sym["demo_last_cycles"]),
+                           "demo_peak_cycles_session": peak_at_tick_zero,
+                           "profile_cycles_last_tick": zero_cycles,
+                           "route_counters": prior_routes,
+                           "route_interval": {key: 0 for key in prior_routes},
+                           "counted_as_live_play": True,
+                           "capture": zero_capture, **zero}
+        observations.append(zero_checkpoint)
+        write_progress(out / "progress.json", profile=profile, rom=rom, elf=elf,
+                       rom_sha256=rom_sha256, elf_sha256=elf_sha256,
+                       configuration=configuration, requested_ticks=ticks,
+                       checkpoint_interval=checkpoint, latest_checkpoint=zero_checkpoint)
 
         ended_early = False
         while last_tick < ticks:
@@ -270,6 +328,10 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
                 record["game_ended_by_tick"] = completed
                 ended_early = completed < ticks
             observations.append(record)
+            write_progress(out / "progress.json", profile=profile, rom=rom, elf=elf,
+                           rom_sha256=rom_sha256, elf_sha256=elf_sha256,
+                           configuration=configuration, requested_ticks=ticks,
+                           checkpoint_interval=checkpoint, latest_checkpoint=record)
             print(f"{profile} {scenario} tick={completed}/{ticks} "
                   f"screen={record['screen']} frame={record.get('frame')} "
                   f"interval-fps={record['interval_effective_fps'] if record['interval_effective_fps'] is not None else 'n/a'}",
@@ -284,14 +346,9 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
         result = {
             "profile": profile,
             "rom": str(rom), "elf": str(elf),
-            "rom_sha256": hashlib.sha256(rom.read_bytes()).hexdigest(),
-            "elf_sha256": hashlib.sha256(elf.read_bytes()).hexdigest(),
-            "configuration": ({"mission": mission, "mission_ordinal": mission_ordinal,
-                               "width": launch["width"], "height": launch["height"]}
-                              if mission is not None else
-                              {"map": map_id, "human_race": race, "opponents": bots,
-                               "bot_races": launch["bot_races"][:bots],
-                               "width": launch["width"], "height": launch["height"]}),
+            "rom_sha256": rom_sha256,
+            "elf_sha256": elf_sha256,
+            "configuration": configuration,
             "campaign_catalog": campaign,
             "requested_ticks": ticks, "observed_ticks": last_tick,
             "counted_live_play_ticks": counted_play_ticks,
@@ -315,13 +372,18 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
         }
         report = out / "profile.json"
         report.write_text(json.dumps(result, indent=2) + "\n")
+        final_won = (observations[-1].get("screen") == SCREEN_RESULT and
+                     observations[-1].get("won") == 1 and observations[-1].get("lost") == 0)
+        write_progress(out / "progress.json", profile=profile, rom=rom, elf=elf,
+                       rom_sha256=rom_sha256, elf_sha256=elf_sha256,
+                       configuration=configuration, requested_ticks=ticks,
+                       checkpoint_interval=checkpoint, latest_checkpoint=observations[-1],
+                       status="finished", final_report=str(report))
         print(json.dumps({"profile": profile, "configuration": result["configuration"],
                           "observed_ticks": last_tick,
                           "mean_live_play_effective_fps": result["mean_live_play_effective_fps"],
                           "result": str(report)}, indent=2))
-        if require_win and not (observations[-1].get("screen") == SCREEN_RESULT and
-                                observations[-1].get("won") == 1 and
-                                observations[-1].get("lost") == 0):
+        if require_win and not final_won:
             raise RuntimeError(f"--require-win: final observed result did not win; report: {report}")
         return result
     finally:

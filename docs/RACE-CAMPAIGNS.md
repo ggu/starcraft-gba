@@ -45,8 +45,9 @@ rejects older saves; use a separate save file for the experimental ROM.
 
 A controller-only host run completes the full survival objective. The
 production Terran build still contains its first two missions while ARM
-performance and gameplay checks continue; the experimental runtime does not
-yet meet the near-30-fps target. The full 30-mission campaign remains in progress.
+performance and gameplay checks continue. The final assault still needs
+performance work; see the measured builds in [Validation](VALIDATION.md).
+The full 30-mission campaign remains in progress.
 
 After local preparation, `make test-sc64-t3-import` checks every retained T3
 record, its runtime type mapping, coordinate bounds and terrain indices. It
@@ -70,7 +71,7 @@ Imported skirmish data is fitted to the engine's bounded resource storage. The p
 
 ## Current limits
 
-- Only two campaign missions per race are playable; missions 3–10 for all races still need their maps, scenario rules, and gameplay implementation.
+- Standard builds enable two campaign missions per race. Experimental Terran 3 is described above; the other later missions still need scenario and gameplay implementation.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build these three profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

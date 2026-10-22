@@ -111,11 +111,44 @@ coverage; they have not yet been completed through live controller play.
 
 The save test fills all 160 unit slots, round-trips the 14,052-byte payload,
 rejects checksum-valid inconsistent mission/timer/result records before any
-live-state mutation, and rejects the prior save version. The experimental ARM
-link uses 388 bytes of data and 242,096 bytes of BSS, leaving 11,468 bytes below
-the EWRAM linker guard. Physical GBA testing remains pending. Initial full-roster
-ARM timing samples fall below the near-30-fps target, so production enablement
-and performance claims remain pending optimization and another measured run.
+live-state mutation, and rejects the prior save version. Physical GBA testing
+remains pending.
+
+The target broadphase uses bounded, owner-separated 64-pixel cells and tracks
+same-frame movement. Differential tests cover dense and sparse rosters, flight
+and scenario flags, strict range boundaries, lowest-index ties, highest entity
+slots, movement, death, invalid coordinates and dirty-list overflow/reset.
+The original scan remains the fallback. The complete controller trace is
+identical before and after the optimization. Tower targeting has a separate
+brute-force oracle; the full survival run also checks cached supply totals.
+
+Hardware-timer measurements distinguish these local ROMs:
+
+| Build | Observed ticks | Counted live ticks | Mean live fps | Outcome |
+| --- | ---: | ---: | ---: | --- |
+| Initial runtime (`b208a7a7` ROM hash prefix) | 54,000 | 53,000 | 19.20 | Survival win |
+| Intermediate optimization (`c7487a79`) | 54,000 | 53,000 | 27.91 | Survival win |
+| Latest source (`69f7ea7e`) | 5,000 | 5,000 | 26.91 | Still playing |
+
+The latest build's six observed states match the intermediate winning run at
+the same ticks, including entities, resources, campaign state and countdown.
+The result-ending interval is excluded from full-run means because the exact
+finish point within that interval is unknown. The intermediate build's final
+assault still drops to about 19 fps. These measurements do not establish the
+latest build's full-mission or physical-hardware performance; T3 stays opt-in.
+
+The latest ARM link uses 388 bytes of data and 246,656 bytes of BSS, leaving
+6,908 bytes below the EWRAM guard. Its IWRAM code ends at `0x03004e80`, below
+the `0x03005000` guard that reserves stack space. Default, unified, three
+race-profile and T3 host suites pass. Four T3-enabled frontend variants are
+also part of the asset-free suite, alongside 35 Python checks.
+
+For internal order profiling, build with
+`make -B terran-t3 T3_EXTRA_FLAGS=-DSC64_DIAGNOSTIC_ORDERS`. The optional counters
+separate setup, target queries and movement; they add measurement overhead.
+Rebuild with plain `make -B terran-t3` before measuring final frame rate.
+The profiler atomically publishes each observer snapshot in ignored
+`progress.json` and writes the complete `profile.json` at completion.
 
 ## Known limits
 

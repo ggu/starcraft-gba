@@ -19,6 +19,7 @@ TARGETS = {
     "--races": ("StarCraft64-Races-GBA", "starcraft64-races", "SCR3"),
     "--unified": ("StarCraft64-GBA", "starcraft64-unified", "SCU1"),
     "--terran": ("StarCraft-Terran-GBA", "starcraft-terran", "SCT2", "SC TERRAN"),
+    "--terran-t3": ("StarCraft-Terran-T3-GBA", "starcraft-terran-t3", "SCT3", "SC TERRAN T3"),
     "--zerg": ("StarCraft-Zerg-GBA", "starcraft-zerg", "SCZ2", "SC ZERG"),
     "--protoss": ("StarCraft-Protoss-GBA", "starcraft-protoss", "SCP2", "SC PROTOSS"),
 }

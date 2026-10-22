@@ -86,15 +86,20 @@ static int race_owner_supply_cap(int owner)
     return total;
 }
 
-static int race_owner_reserved_supply(int owner)
+static int race_owner_queued_supply(int owner)
 {
-    int i, j, total = race_owner_supply(owner);
+    int i, j, total = 0;
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == owner)
         for (j = 0; j < b[i].queue_count; ++j) {
             const Sc64RaceUnitRule *r = sc64_race_unit_rule(b[i].queue[(b[i].queue_head + j) % 5]);
             if (r) total += r->supply * (b[i].queue[(b[i].queue_head + j) % 5] == U_ZERGLING ? 2 : 1);
         }
     return total;
+}
+
+static int race_owner_reserved_supply(int owner)
+{
+    return race_owner_supply(owner) + race_owner_queued_supply(owner);
 }
 
 static int race_owner_has_prereq(int owner, unsigned short prereq)
