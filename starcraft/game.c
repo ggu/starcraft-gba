@@ -1102,6 +1102,22 @@ move_toward(Unit * q, int tx, int ty)
 
 #ifdef SC64_RACES
 static int race_can_attack(int attacker,int target);
+#if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+static int sc64_p3_can_attack_from(int attacker, int target, int owner)
+{
+    if (attacker == U_SCOURGE) {
+        return target >= 0 && target < MAX_UNITS && u[target].alive &&
+            sc64_race_unit_flying(u[target].type) && !(u[target].flags & 16) &&
+            !invincible_units[target] && owners_hostile(owner, u[target].owner);
+    }
+    return race_can_attack(attacker, target);
+}
+#define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
+    sc64_p3_can_attack_from((attacker), (target), (owner))
+#else
+#define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
+    race_can_attack((attacker), (target))
+#endif
 static int GBA_HOT __attribute__((noinline))
 sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
 {
@@ -1136,7 +1152,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
                     }
                     if (FAST_ABS(x - candidate_x) >= max_distance ||
                         FAST_ABS(y - candidate_y) >= max_distance ||
-                        !race_can_attack(attacker, entity)) continue;
+                        !SC64_CAN_ATTACK_FROM(attacker, entity, owner)) continue;
                     d = dist2(x, y, candidate_x, candidate_y);
                     if (d < best_distance ||
                         (best >= 0 && d == best_distance && entity < best)) {
@@ -1158,7 +1174,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
             if (!owners_hostile(owner, p)) continue;
             for (i = target_unit_head[p]; i >= 0; i = target_unit_next[i]) {
                 if (!u[i].alive || FAST_ABS(x-u[i].x)>=max_distance || FAST_ABS(y-u[i].y)>=max_distance)continue;
-                if(!race_can_attack(attacker,i))continue;
+                if(!SC64_CAN_ATTACK_FROM(attacker,i,owner))continue;
                 d = dist2(x, y, u[i].x, u[i].y);
                 if (d < best_distance || (best >= 0 && d == best_distance && i < best)) {
                     best_distance = d;
@@ -1171,7 +1187,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
             for (i = target_building_head[p]; i >= 0; i = target_building_next[i]) {
                 int candidate = MAX_UNITS + i;
                 if (!b[i].alive || FAST_ABS(x-b[i].x)>=max_distance || FAST_ABS(y-b[i].y)>=max_distance)continue;
-                if(!race_can_attack(attacker,MAX_UNITS+i))continue;
+                if(!SC64_CAN_ATTACK_FROM(attacker,MAX_UNITS+i,owner))continue;
                 d = dist2(x, y, b[i].x, b[i].y);
                 if (d < best_distance || (best >= 0 && d == best_distance && candidate < best)) {
                     best_distance = d;
@@ -1185,7 +1201,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
 	if (!u[i].alive
 	    || FAST_ABS(x - u[i].x) >= max_distance ||
 	    FAST_ABS(y - u[i].y) >= max_distance || !owners_hostile(owner, u[i].owner)
-                    || !race_can_attack(attacker,i)
+                    || !SC64_CAN_ATTACK_FROM(attacker,i,owner)
                     )
 	    continue;
 	d = dist2(x, y, u[i].x, u[i].y);
@@ -1198,7 +1214,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
 	if (!b[i].alive
 	    || FAST_ABS(x - b[i].x) >= max_distance ||
 	    FAST_ABS(y - b[i].y) >= max_distance || !owners_hostile(owner, b[i].owner)
-                    || !race_can_attack(attacker,MAX_UNITS+i)
+                    || !SC64_CAN_ATTACK_FROM(attacker,MAX_UNITS+i,owner)
                     )
 	    continue;
 	d = dist2(x, y, b[i].x, b[i].y);
@@ -2481,10 +2497,17 @@ static void
 tick_combat(Unit * q, int target)
 {
     int dx, dy, range, damage;
+#if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+    if (q->type == U_SCOURGE && !q->alive) return;
+    /* Scourge target validation must precede target_alive(), which indexes
+     * the unit or building arrays from this combined target namespace. */
+    if (q->type == U_SCOURGE &&
+        (target < 0 || target >= MAX_UNITS + MAX_BUILDINGS)) return;
+#endif
     if (target < 0 || !target_alive(target))
 	return;
 #ifdef SC64_RACES
-    if(!race_can_attack(q->type,target))return;
+    if(!SC64_CAN_ATTACK_FROM(q->type,target,q->owner))return;
 #endif
     dx = target_x(target) - q->x;
     dy = target_y(target) - q->y;
@@ -2496,7 +2519,14 @@ tick_combat(Unit * q, int target)
     /* Weapon reach is measured from a structure's footprint edge. The
        navigation grid keeps actors outside the same 18px collision radius. */
     if(target>=MAX_UNITS)range+=18;
-    damage=sc64_race_unit_damage_vs(q->type,flying)+(q->owner==SIDE?weapons_level:0);
+#if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+    /* BWAPI lists zero bonus damage for Suicide_Scourge. Keep its fixed
+     * 110 damage independent of the generic SIDE weapon upgrade. */
+    if (q->type == U_SCOURGE)
+        damage=sc64_race_unit_damage_vs(q->type,flying);
+    else
+#endif
+        damage=sc64_race_unit_damage_vs(q->type,flying)+(q->owner==SIDE?weapons_level:0);
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
     #ifndef SC64_RACES
@@ -2511,6 +2541,15 @@ tick_combat(Unit * q, int target)
 	#ifdef SC64_RACES
         int hits=sc64_race_unit_hits_vs(q->type,flying);
         for(int hit=0;hit<hits&&target_alive(target);hit++)hit_target(target,damage,q->type,q->owner);
+#if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+        /* Suicide Scourge damage is applied by hit_target first, preserving
+         * the regular shield/armor/death path, then the attacker is consumed. */
+        if (q->type == U_SCOURGE) {
+            if (q->owner == SIDE) supply_used -= unit_supply(q->type);
+            q->alive = 0;
+            q->selected = 0;
+        }
+#endif
 #else
         hit_target(target, damage, q->type, q->owner);
 #endif

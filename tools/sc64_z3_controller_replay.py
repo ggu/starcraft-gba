@@ -36,8 +36,10 @@ DEFAULT_TRACE = ROOT / ".local/sc64/z3-controller-asan-win.json"
 DEFAULT_OUTPUT = ROOT / ".local/sc64/z3-controller-replay"
 
 
-def validate_trace(trace: object, capacity: int) -> dict:
+def validate_trace(trace: object, capacity: int, *, windowed: bool = False) -> dict:
     """Validate a controller trace and return a scheduler-ready replay plan."""
+    if type(capacity) is not int or capacity < 1:
+        raise ValueError("controller queue capacity must be a positive integer")
     if not isinstance(trace, dict) or trace.get("schema") != 1:
         raise ValueError("trace schema must be an object with schema=1")
     if trace.get("mission") != MISSION_Z3:
@@ -83,7 +85,7 @@ def validate_trace(trace: object, capacity: int) -> dict:
 
     if not inputs or inputs[0][0] != 0:
         raise ValueError("first controller transition must be host_tick=1")
-    if len(inputs) > capacity:
+    if not windowed and len(inputs) > capacity:
         raise ValueError(f"controller queue exceeds ELF capacity ({len(inputs)}/{capacity})")
     if start is None:
         raise ValueError("trace must contain exactly one start event")
@@ -109,8 +111,20 @@ def validate_trace(trace: object, capacity: int) -> dict:
     for key in ("frame", "side_units", "side_buildings", "enemy_units", "enemy_buildings", "ore", "gas"):
         if type(final.get(key)) is not int:
             raise ValueError(f"final won event is missing integer field {key}")
+    if windowed:
+        last_page = (stop_tick - 1) // CHECKPOINT_TICKS
+        peak_page_transitions = max(
+            (sum(1 for tick, _ in inputs if tick // CHECKPOINT_TICKS == page)
+             for page in range(last_page + 1)), default=0)
+        if peak_page_transitions > capacity:
+            raise ValueError("controller event page exceeds ELF capacity "
+                             f"({peak_page_transitions}/{capacity} in a {CHECKPOINT_TICKS}-tick window)")
+    else:
+        peak_page_transitions = len(inputs)
     return {"inputs": inputs, "input_count": len(inputs), "stop_tick": stop_tick,
-            "start": start, "final": final}
+            "start": start, "final": final,
+            "scheduler_mode": "windowed" if windowed else "full",
+            "peak_page_transitions": peak_page_transitions}
 
 
 def schedule_capacity(sizes: dict[str, int]) -> int:
@@ -120,9 +134,63 @@ def schedule_capacity(sizes: dict[str, int]) -> int:
     return size // 8
 
 
+def schedule_mode(sym: dict[str, int], sizes: dict[str, int]) -> tuple[str, int]:
+    """Detect the opted-in page scheduler from its pair of ELF symbols."""
+    has_active = "demo_schedule_active" in sym
+    has_index = "demo_schedule_index" in sym
+    if has_active != has_index:
+        raise RuntimeError("ELF has an incomplete windowed scheduler symbol pair")
+    capacity = schedule_capacity(sizes)
+    if not has_active:
+        return "full", capacity
+    for name in ("demo_schedule_active", "demo_schedule_index"):
+        if sizes.get(name) != 4:
+            raise RuntimeError(f"windowed scheduler symbol {name} has unexpected size")
+    return "windowed", capacity
+
+
 def scheduler_events(plan: dict) -> list[tuple[int, int]]:
     """Map 1-based trace host ticks to main.c's zero-based scheduler ticks."""
     return list(plan["inputs"])
+
+
+def make_schedule_pages(plan: dict, requested_ticks: int, capacity: int,
+                        window_ticks: int = CHECKPOINT_TICKS) -> list[dict]:
+    """Prevalidate the bounded tick windows to be written before emulation."""
+    if type(requested_ticks) is not int or requested_ticks < 1 or requested_ticks > MAX_U32:
+        raise ValueError("requested schedule length must be a positive 32-bit integer")
+    if type(capacity) is not int or capacity < 1:
+        raise ValueError("scheduler capacity must be a positive integer")
+    if type(window_ticks) is not int or window_ticks < 1:
+        raise ValueError("scheduler window must be a positive integer")
+    inputs = plan.get("inputs")
+    if not isinstance(inputs, list):
+        raise ValueError("scheduler plan inputs must be a list")
+    previous = -1
+    for tick, held in inputs:
+        if type(tick) is not int or tick < 0 or tick <= previous or tick > MAX_U32:
+            raise ValueError("scheduler plan contains malformed or unordered input ticks")
+        if type(held) is not int or held < 0 or held & ~KEY_MASK:
+            raise ValueError("scheduler plan contains held bits outside 0x3ff")
+        previous = tick
+
+    pages = []
+    index = 0
+    for first in range(0, requested_ticks, window_ticks):
+        end = min(requested_ticks, first + window_ticks)
+        while index < len(inputs) and inputs[index][0] < first:
+            index += 1
+        page_events = []
+        cursor = index
+        while cursor < len(inputs) and inputs[cursor][0] < end:
+            page_events.append(inputs[cursor])
+            cursor += 1
+        if len(page_events) > capacity:
+            raise ValueError(f"controller event page exceeds ELF capacity "
+                             f"({len(page_events)}/{capacity} for ticks [{first},{end}))")
+        pages.append({"first": first, "end": end, "events": page_events})
+        index = cursor
+    return pages
 
 
 def run_length(plan: dict, ticks: int | None, save_at_end: bool = False) -> tuple[int, bool]:
@@ -241,9 +309,14 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
     if not rom.is_file() or not elf.is_file():
         raise RuntimeError(f"Zerg-Z3 ROM/ELF missing ({rom}, {elf})")
     sym, sizes = symbols(elf), symbol_sizes(elf)
-    capacity = schedule_capacity(sizes)
-    plan = validate_trace(trace, capacity)
+    scheduler_mode, capacity = schedule_mode(sym, sizes)
+    windowed = scheduler_mode == "windowed"
+    plan = validate_trace(trace, capacity, windowed=windowed)
     requested_ticks, is_prefix = run_length(plan, ticks, save_at_end)
+    pages = (make_schedule_pages(plan, requested_ticks, capacity)
+             if windowed else None)
+    peak_page_transitions = (max((len(page["events"]) for page in pages), default=0)
+                             if pages is not None else plan["input_count"])
     campaign_meta = split.read_campaign_metadata(rom, elf, "zerg")
     if MISSION_Z3 not in campaign_meta["enabled_mission_ids"]:
         raise RuntimeError("Zerg-Z3 ELF does not enable global mission 14")
@@ -255,6 +328,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                 "frame", "won", "lost", "race_mode", "race_selected_mission", "race_completed",
                 "race_campaign", "race_z3", "race_z3_action_ticks", "race_minerals", "race_gas",
                 "race_front", "u", "b")
+    if windowed:
+        required += ("demo_schedule_active", "demo_schedule_index")
     missing = [key for key in required if key not in sym]
     if missing:
         raise RuntimeError(f"Zerg-Z3 ELF is missing symbols: {', '.join(missing)}")
@@ -277,11 +352,28 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         if initial != {"screen": SCREEN_TITLE, "frame": 0, "page": split.FRONT_HOME}:
             raise RuntimeError(f"fresh boot advanced away from HOME before replay: {initial}")
 
-        queue = b"".join(struct.pack("<2I", tick, held) for tick, held in scheduler_events(plan))
-        for offset in range(0, len(queue), 256):
-            rsp.write(sym["demo_schedule_events"] + offset, queue[offset:offset + 256])
-        rsp.write(sym["demo_schedule_length"], struct.pack("<I", requested_ticks))
-        rsp.write(sym["demo_schedule_count"], struct.pack("<I", plan["input_count"]))
+        def write_page(events: list[tuple[int, int]]) -> None:
+            if len(events) > capacity:
+                raise RuntimeError(f"controller page exceeds ELF capacity ({len(events)}/{capacity})")
+            queue = b"".join(struct.pack("<2I", tick, held) for tick, held in events)
+            for offset in range(0, len(queue), 256):
+                rsp.write(sym["demo_schedule_events"] + offset, queue[offset:offset + 256])
+            rsp.write(sym["demo_schedule_count"], struct.pack("<I", len(events)))
+
+        if windowed:
+            assert pages is not None
+            write_page(pages[0]["events"])
+            rsp.write(sym["demo_schedule_index"], struct.pack("<I", 0))
+            rsp.write(sym["demo_schedule_length"], struct.pack("<I", requested_ticks))
+            # Enable only after page data and scheduler metadata are coherent.
+            rsp.write(sym["demo_schedule_active"], struct.pack("<I", 1))
+        else:
+            queue = b"".join(struct.pack("<2I", tick, held)
+                             for tick, held in scheduler_events(plan))
+            for offset in range(0, len(queue), 256):
+                rsp.write(sym["demo_schedule_events"] + offset, queue[offset:offset + 256])
+            rsp.write(sym["demo_schedule_length"], struct.pack("<I", requested_ticks))
+            rsp.write(sym["demo_schedule_count"], struct.pack("<I", plan["input_count"]))
         update = sym["game_update"] & ~1
         checkpoint_addr = sym["demo_replay_checkpoint"] & ~1
         if rsp.cmd(f"z1,{update:x},2") != "OK" or rsp.cmd(f"Z1,{checkpoint_addr:x},2") != "OK":
@@ -289,6 +381,13 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         rsp.tick()
         if profile.u32(rsp, sym["demo_schedule_tick"]) != 0:
             raise RuntimeError("scheduler did not stop before host_tick=1 at tick zero")
+        if windowed:
+            assert pages is not None
+            initial_page = pages[0]["events"]
+            if (profile.u32(rsp, sym["demo_schedule_active"]) != 1 or
+                    profile.u32(rsp, sym["demo_schedule_index"]) != 0 or
+                    profile.u32(rsp, sym["demo_schedule_count"]) != len(initial_page)):
+                raise RuntimeError("windowed scheduler did not stop at the initial page boundary")
         initial_after_neutral = {"screen": profile.u32(rsp, sym["screen"]),
                                  "frame": profile.u32(rsp, sym["frame"])}
         if initial_after_neutral != {"screen": SCREEN_TITLE, "frame": 0}:
@@ -334,6 +433,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                                               "trace_sha256": trace_hash,
                                               "input_transitions": plan["input_count"],
                                               "scheduler_capacity": capacity,
+                                              "scheduler_mode": scheduler_mode,
+                                              "peak_page_transitions": peak_page_transitions,
                                               "trace_stop_tick": plan["stop_tick"],
                                               "requested_ticks": requested_ticks,
                                               "prefix": is_prefix},
@@ -346,6 +447,17 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
             expected = min(requested_ticks, last_tick + CHECKPOINT_TICKS)
             if completed != expected:
                 raise RuntimeError(f"expected checkpoint tick {expected}, observed {completed}")
+            if windowed:
+                assert pages is not None
+                prior = pages[(completed - 1) // CHECKPOINT_TICKS]["events"]
+                cursor = profile.u32(rsp, sym["demo_schedule_index"])
+                count = profile.u32(rsp, sym["demo_schedule_count"])
+                if count != len(prior) or cursor != count:
+                    raise RuntimeError(f"windowed scheduler page was not fully consumed at tick {completed} "
+                                       f"(cursor={cursor}, count={count}, expected={len(prior)})")
+                if completed < requested_ticks:
+                    next_page = pages[completed // CHECKPOINT_TICKS]["events"]
+                    write_page(next_page)
             now = profile.hardware_clock(rsp)
             elapsed = (now - last_clock) & MAX_U32
             state = campaign_snapshot(rsp, sym, sizes, bank, campaign_layout, z3_layout)
@@ -360,6 +472,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                                                   "trace_sha256": trace_hash,
                                                   "input_transitions": plan["input_count"],
                                                   "scheduler_capacity": capacity,
+                                                  "scheduler_mode": scheduler_mode,
+                                                  "peak_page_transitions": peak_page_transitions,
                                                   "trace_stop_tick": plan["stop_tick"],
                                                   "requested_ticks": requested_ticks,
                                                   "prefix": is_prefix},
@@ -379,6 +493,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                   "rom": str(rom), "elf": str(elf), "trace": str(trace_path),
                   "rom_sha256": rom_hash, "elf_sha256": elf_hash, "trace_sha256": trace_hash,
                   "controller_input_count": plan["input_count"], "controller_capacity": capacity,
+                  "scheduler_mode": scheduler_mode,
+                  "peak_page_transitions": peak_page_transitions,
                   "trace_stop_tick": plan["stop_tick"], "requested_ticks": requested_ticks,
                   "observed_ticks": final["tick"], "prefix": is_prefix,
                   "final_host_tick": final["scheduler_tick"],
@@ -397,6 +513,10 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         if save_at_end:
             if final["screen"] != SCREEN_PLAY:
                 raise RuntimeError("--save-at-end requires the prefix to end during live PLAY")
+            if windowed:
+                # The ordinary pause/save UI runs outside the replay scheduler.
+                rsp.write(sym["demo_schedule_active"], struct.pack("<I", 0))
+                rsp.write(sym["demo_schedule_count"], struct.pack("<I", 0))
             saved = profile.save_live_checkpoint(rsp, sym, tick=final["tick"])
             menu.stop_emulator(proc, sock, log)
             proc = sock = log = None
@@ -416,6 +536,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                                               "trace_sha256": trace_hash,
                                               "input_transitions": plan["input_count"],
                                               "scheduler_capacity": capacity,
+                                              "scheduler_mode": scheduler_mode,
+                                              "peak_page_transitions": peak_page_transitions,
                                               "trace_stop_tick": plan["stop_tick"],
                                               "requested_ticks": requested_ticks,
                                               "prefix": is_prefix},
@@ -424,6 +546,10 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                                final_report=str(report_path))
         print(json.dumps({"status": report["status"], "observed_ticks": final["tick"],
                           "final_frame": final["frame"], "effective_fps": mean_fps,
+                          "scheduler_mode": scheduler_mode,
+                          "input_transitions": plan["input_count"],
+                          "scheduler_capacity": capacity,
+                          "peak_page_transitions": peak_page_transitions,
                           "checkpoint_save": report.get("checkpoint_save"),
                           "report": str(report_path)}, indent=2), flush=True)
         return report

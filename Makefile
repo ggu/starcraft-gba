@@ -8,6 +8,7 @@ PYTHON ?= python3
 CFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -O2 -g -std=c11 -ffreestanding -fno-builtin -fno-strict-aliasing -fno-common -ffunction-sections -fdata-sections -Wall -Wextra -Icommon
 LDFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -nostdlib -Tcommon/gba.ld -Wl,--gc-sections
 COMMON := common/start.s common/main.c common/gba.c common/memory.c
+COMMON_HEADERS := $(wildcard common/*.h)
 STARCRAFT := $(wildcard starcraft/*.c)
 
 SC64_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated
@@ -22,7 +23,7 @@ UNIFIED_FLAGS := $(RACES_FLAGS) -DSC64_UNIFIED
 RACE_CAMPAIGN_FLAGS := $(UNIFIED_FLAGS) -DSC64_IMPORTED_SKIRMISH -I.local/sc64/skirmish/generated
 RACE_CAMPAIGN_INPUTS := $(RACES_INPUTS) .local/sc64/skirmish/generated/sc64_skirmish_generated.h
 T3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_T3_ENABLED -DSC64_CAMPAIGN_RACE=0 $(T3_EXTRA_FLAGS)
-Z3_OPTIMIZATION_FLAGS ?= -DSC64_ROUTE_PACK3 -DSC64_VISIBILITY_SPANS
+Z3_OPTIMIZATION_FLAGS ?= -DSC64_ROUTE_PACK3 -DSC64_VISIBILITY_SPANS -DSC64_Z3_WINDOWED_SCHEDULE
 Z3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_Z3_ENABLED -DSC64_CAMPAIGN_RACE=1 $(Z3_OPTIMIZATION_FLAGS) $(Z3_EXTRA_FLAGS)
 LARGE_PROBE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_CAMPAIGN_RACE=2
 
@@ -42,7 +43,7 @@ verify: build/StarCraft-GBA.gba
 build:
 	mkdir -p build
 
-build/starcraft.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.ld Makefile | build
+build/starcraft.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft.map -lgcc -o $@
 	$(SIZE) $@
 
@@ -65,6 +66,12 @@ build/test-skirmish-ai: tests/skirmish_ai.c starcraft/skirmish_ai.h | build
 build/test-sc64-frontend: tests/sc64_frontend.c starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon tests/sc64_frontend.c -o $@
 
+build/test-sc64-demo-schedule: tests/sc64_demo_schedule.c common/demo_schedule.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I. -Icommon $< -o $@
+
+build/test-sc64-demo-schedule-runtime: tests/sc64_demo_schedule_runtime.c common/main.c common/demo_schedule.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+
 build/test-sc64-bitgrid: tests/sc64_bitgrid.c starcraft/sc64_bitgrid.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon tests/sc64_bitgrid.c -o $@
 
@@ -84,17 +91,21 @@ build/test-sc64-p3-model: tests/sc64_p3_model.c starcraft/sc64_p3_model.h starcr
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I. $< -o $@
 
 # Import/storage probes do not expose Higher Ground in the playable catalog.
-.PHONY: test-sc64-p3-import test-sc64-large-map sc64-large-probe
+.PHONY: test-sc64-p3-import test-sc64-p3-scourge test-sc64-large-map sc64-large-probe
 build/test-sc64-p3-import: tests/sc64_p3_import.c starcraft/race_rules.h starcraft/sc64_types.h .local/sc64/races/generated/sc64_races_generated.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_P3_ENABLED -DSC64_CAMPAIGN_RACE=2 -Istarcraft -I.local/sc64/races/generated $< -o $@
 test-sc64-p3-import: build/test-sc64-p3-import
 	./build/test-sc64-p3-import
+build/test-sc64-p3-scourge: tests/sc64_p3_scourge.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LARGE_PROBE_FLAGS) -DSC64_P3_ENABLED $< common/gba.c -o $@
+test-sc64-p3-scourge: build/test-sc64-p3-scourge
+	./build/test-sc64-p3-scourge
 build/test-sc64-large-map: tests/sc64_large_map.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(LARGE_PROBE_FLAGS) $< common/gba.c -o $@
 test-sc64-large-map: build/test-sc64-large-map build/test-race-routes-large
 	./build/test-sc64-large-map
 	./build/test-race-routes-large
-build/starcraft-large-probe.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
+build/starcraft-large-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(LARGE_PROBE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-large-probe.map -lgcc -o $@
 	$(SIZE) $@
 sc64-large-probe: build/starcraft-large-probe.elf
@@ -122,7 +133,7 @@ test-sc64-t3-import: build/test-sc64-t3-import
 
 # Staged T3 runtime remains opt-in until controller and timing checks pass.
 .PHONY: terran-t3 test-sc64-t3-runtime
-build/starcraft-terran-t3.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
+build/starcraft-terran-t3.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(T3_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran-t3.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Terran-T3-GBA.gba: build/starcraft-terran-t3.elf tools/fix_rom.py
@@ -149,7 +160,7 @@ test-sc64-t3-runtime: test-sc64-t3-import build/test-sc64-t3-run build/test-sc64
 
 # Staged New Dominion runtime has its own ROM and save identity.
 .PHONY: zerg-z3 test-sc64-z3-runtime
-build/starcraft-zerg-z3.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
+build/starcraft-zerg-z3.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(Z3_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z3.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z3-GBA.gba: build/starcraft-zerg-z3.elf tools/fix_rom.py
@@ -228,7 +239,9 @@ build/test-terrain-cache: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cach
 build/test-collision: tests/sc64_collision.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -DSC64_SKIRMISH -Icommon tests/sc64_collision.c common/gba.c -o $@
 
-test-starcraft: build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-race-rules-z3 build/test-skirmish-ai build/test-sc64-frontend build/test-sc64-bitgrid build/test-sc64-map-math build/test-sc64-t3-rules build/test-sc64-z3-rules build/test-sc64-p3-rules build/test-sc64-p3-model $(RACE_FRONTEND_TESTS) $(RACE_T3_FRONTEND_TESTS) $(RACE_Z3_FRONTEND_TESTS) $(RACE_Z3_UNIFIED_TESTS) build/test-sc64-frontend-t3-unified build/test-race-routes build/test-race-routes-96 build/test-race-routes-t3 build/test-race-routes-rect build/test-race-routes-large build/test-race-routes-pack3 build/test-race-routes-pack3-t3 build/test-race-routes-pack3-large build/test-terrain-cache build/test-collision
+test-starcraft: build/test-sc64-demo-schedule build/test-sc64-demo-schedule-runtime build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-race-rules-z3 build/test-skirmish-ai build/test-sc64-frontend build/test-sc64-bitgrid build/test-sc64-map-math build/test-sc64-t3-rules build/test-sc64-z3-rules build/test-sc64-p3-rules build/test-sc64-p3-model $(RACE_FRONTEND_TESTS) $(RACE_T3_FRONTEND_TESTS) $(RACE_Z3_FRONTEND_TESTS) $(RACE_Z3_UNIFIED_TESTS) build/test-sc64-frontend-t3-unified build/test-race-routes build/test-race-routes-96 build/test-race-routes-t3 build/test-race-routes-rect build/test-race-routes-large build/test-race-routes-pack3 build/test-race-routes-pack3-t3 build/test-race-routes-pack3-large build/test-terrain-cache build/test-collision
+	./build/test-sc64-demo-schedule
+	./build/test-sc64-demo-schedule-runtime
 	./build/test-starcraft
 	./build/test-starcraft-selection
 	./build/test-race-rules
@@ -264,7 +277,7 @@ test-starcraft: build/test-starcraft build/test-starcraft-selection build/test-r
 test: test-starcraft
 
 probe: build/probe.gba
-build/probe.elf: $(COMMON) tests/platform_probe.c common/gba.h common/gba.ld Makefile | build
+build/probe.elf: $(COMMON) $(COMMON_HEADERS) tests/platform_probe.c common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(COMMON) tests/platform_probe.c $(LDFLAGS) -Wl,-Map,build/probe.map -lgcc -o $@
 build/probe.gba: build/probe.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -277,7 +290,7 @@ sc64: verify-sc64
 	@echo 'Private mission data is missing. Run ./dev sc64 prepare --rom PATH --profile wasteland first.'
 	@false
 
-build/starcraft64.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(SC64_INPUTS) common/gba.h common/gba.ld Makefile | build
+build/starcraft64.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(SC64_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SC64_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft64.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft64-Wasteland-GBA.gba: build/starcraft64.elf tools/fix_rom.py
@@ -300,7 +313,7 @@ test-sc64: build/test-starcraft64 build/test-sc64-mission build/test-sc64-select
 
 .PHONY: test-backwater-mission test-backwater-render-cache
 backwater: verify-backwater
-build/starcraft64-backwater.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(BACKWATER_INPUTS) common/gba.h common/gba.ld Makefile | build
+build/starcraft64-backwater.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(BACKWATER_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(BACKWATER_FLAGS) -DSC64_BACKWATER $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft64-backwater.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft64-Backwater-GBA.gba: build/starcraft64-backwater.elf tools/fix_rom.py
@@ -323,7 +336,7 @@ test-backwater: build/test-backwater build/test-backwater-rules build/test-backw
 	./build/test-backwater-mission --trace build/backwater-completion-input.json
 
 skirmish: verify-skirmish
-build/starcraft64-skirmish.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(BACKWATER_INPUTS) common/gba.h common/gba.ld Makefile | build
+build/starcraft64-skirmish.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(BACKWATER_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(BACKWATER_FLAGS) -DSC64_SKIRMISH $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft64-skirmish.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft64-Skirmish-GBA.gba: build/starcraft64-skirmish.elf tools/fix_rom.py
@@ -342,7 +355,7 @@ test-skirmish: build/test-skirmish build/test-skirmish-ai
 	./build/test-skirmish-ai
 
 campaign: verify-campaign
-build/starcraft64-campaign.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
+build/starcraft64-campaign.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(CAMPAIGN_FLAGS) -DSC64_BACKWATER -DSC64_TERRAN_CAMPAIGN $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft64-campaign.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft64-Terran-Campaign-GBA.gba: build/starcraft64-campaign.elf tools/fix_rom.py
@@ -362,7 +375,7 @@ test-campaign: build/test-campaign build/test-campaign-backwater-mission build/t
 	./build/test-campaign-wasteland-mission --trace build/campaign-wasteland-completion-input.json
 
 races: verify-races
-build/starcraft64-races.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.ld Makefile | build
+build/starcraft64-races.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(RACES_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft64-races.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft64-Races-GBA.gba: build/starcraft64-races.elf tools/fix_rom.py
@@ -400,7 +413,7 @@ race-campaigns: verify-terran verify-zerg verify-protoss
 terran: verify-terran
 zerg: verify-zerg
 protoss: verify-protoss
-build/starcraft-terran.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
+build/starcraft-terran.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=0 $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Terran-GBA.gba: build/starcraft-terran.elf tools/fix_rom.py
@@ -413,7 +426,7 @@ build/test-terran: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h)
 test-terran: build/test-terran
 	./build/test-terran
 
-build/starcraft-zerg.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
+build/starcraft-zerg.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=1 $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-GBA.gba: build/starcraft-zerg.elf tools/fix_rom.py
@@ -426,7 +439,7 @@ build/test-zerg: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $
 test-zerg: build/test-zerg
 	./build/test-zerg
 
-build/starcraft-protoss.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
+build/starcraft-protoss.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=2 $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Protoss-GBA.gba: build/starcraft-protoss.elf tools/fix_rom.py
@@ -443,7 +456,7 @@ test-race-campaigns: test-terran test-zerg test-protoss
 verify-race-campaigns: verify-terran verify-zerg verify-protoss
 
 unified: verify-unified
-build/starcraft64-unified.elf: $(COMMON) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.ld Makefile | build
+build/starcraft64-unified.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(UNIFIED_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft64-unified.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft64-GBA.gba: build/starcraft64-unified.elf tools/fix_rom.py

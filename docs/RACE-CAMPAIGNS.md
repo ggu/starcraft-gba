@@ -102,6 +102,17 @@ The helper stops that controller trace during play, pauses with START and
 saves with B. Its report records the observed and saved frames and SRAM hash.
 Prefixes are labeled explicitly and do not assert a complete mission win.
 
+The experimental Z3 build uses `SC64_Z3_WINDOWED_SCHEDULE` to reduce its
+debugger input buffer from 2,048 to 256 entries. The helper detects this queue
+from ELF symbols and refills it at the existing
+1,000-tick observer stops. Events retain absolute ticks; held buttons and
+press edges carry across empty windows. It checks each page's capacity before
+launch and verifies consumption before refill. The complete proof trace has
+1,388 transitions and a peak of 49 per window. This option frees 14,328 bytes
+of BSS after bookkeeping, preserves legacy count-only scheduling for simple
+profilers, and has no input effect during ordinary play. Standard builds keep
+their existing queues. Use a current replay helper with a windowed ELF.
+
 Enemy pressure uses paid Marines every two minutes and small attacks from
 the imported guards every three minutes. This is an authored substitute for
 the source AI script. Result actions use explicit presentation timing policies:
@@ -139,8 +150,10 @@ import preserves its 128×96 terrain, all 96 units, 42 buildings, 48 mineral
 fields and three geysers; three start markers are excluded from live entities.
 Both source computer-owner slots remain available for separate force handling.
 `make test-sc64-p3-import` validates these records without making the mission
-playable. Scourge has a distinct flying identity, but its suicide attack is
-not implemented.
+playable. `make test-sc64-p3-scourge` checks Scourge's air-only suicide attack
+through the real combat and attack-move paths. That weapon is gated to the
+P3 profile; independent force AI, campaign integration and saveable result
+actions are still required before Higher Ground becomes playable.
 
 `make test-sc64-large-map sc64-large-probe` checks the opt-in
 `SC64_LARGE_MAPS` storage layout, including packed fog/path grids, larger

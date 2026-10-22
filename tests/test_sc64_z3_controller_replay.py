@@ -110,6 +110,68 @@ class TraceValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "symbol size"):
             replay.schedule_capacity({"demo_schedule_events": 17})
 
+    def test_scheduler_mode_requires_both_window_symbols(self):
+        self.assertEqual(replay.schedule_mode({}, {"demo_schedule_events": 2048 * 8}),
+                         ("full", 2048))
+        windowed_symbols = {"demo_schedule_active": 0x1000, "demo_schedule_index": 0x1004}
+        sizes = {"demo_schedule_events": 256 * 8,
+                 "demo_schedule_active": 4, "demo_schedule_index": 4}
+        self.assertEqual(replay.schedule_mode(windowed_symbols, sizes), ("windowed", 256))
+        with self.assertRaisesRegex(RuntimeError, "incomplete windowed"):
+            replay.schedule_mode({"demo_schedule_active": 0x1000}, sizes)
+        with self.assertRaisesRegex(RuntimeError, "unexpected size"):
+            replay.schedule_mode(windowed_symbols, {**sizes, "demo_schedule_index": 2})
+
+    def test_windowed_capacity_is_per_checkpoint_window_not_total_trace(self):
+        trace = valid_trace()
+        rows = trace["events"]
+        # Add 300 real held-state transitions distributed across two windows.
+        held = 0
+        added = []
+        for i in range(300):
+            next_held = 1 if held == 0 else 0
+            tick = 10 + i * 7
+            added.append({"kind": "input", "host_tick": tick, "held": next_held,
+                          "pressed": next_held & ~held})
+            held = next_held
+        rows[-1:-1] = added
+        with self.assertRaisesRegex(ValueError, "capacity"):
+            replay.validate_trace(trace, capacity=256)
+        plan = replay.validate_trace(trace, capacity=256, windowed=True)
+        self.assertEqual(plan["input_count"], 309)
+        self.assertLessEqual(plan["peak_page_transitions"], 256)
+        self.assertGreater(plan["peak_page_transitions"], 0)
+
+    def test_windowed_rejects_overcapacity_single_window(self):
+        trace = valid_trace()
+        rows = trace["events"]
+        held = 0
+        added = []
+        for i in range(260):
+            next_held = 1 if held == 0 else 0
+            tick = 10 + i
+            added.append({"kind": "input", "host_tick": tick, "held": next_held,
+                          "pressed": next_held & ~held})
+            held = next_held
+        rows[-1:-1] = added
+        with self.assertRaisesRegex(ValueError, "event page exceeds ELF capacity"):
+            replay.validate_trace(trace, capacity=256, windowed=True)
+
+    def test_window_pages_preserve_absolute_ticks_and_partial_final_window(self):
+        plan = {"inputs": [(0, 1), (999, 0), (1000, 1), (1499, 0), (1500, 1)]}
+        pages = replay.make_schedule_pages(plan, requested_ticks=1500, capacity=4)
+        self.assertEqual([(p["first"], p["end"]) for p in pages], [(0, 1000), (1000, 1500)])
+        self.assertEqual(pages[0]["events"], [(0, 1), (999, 0)])
+        self.assertEqual(pages[1]["events"], [(1000, 1), (1499, 0)])
+
+    def test_window_pages_reject_malformed_or_overcapacity_plan_before_run(self):
+        with self.assertRaisesRegex(ValueError, "unordered"):
+            replay.make_schedule_pages({"inputs": [(1, 1), (1, 0)]}, 10, 4)
+        with self.assertRaisesRegex(ValueError, "held bits"):
+            replay.make_schedule_pages({"inputs": [(0, 0x400)]}, 10, 4)
+        with self.assertRaisesRegex(ValueError, "event page exceeds"):
+            replay.make_schedule_pages({"inputs": [(0, 1), (1, 0), (2, 1)]}, 10, 2)
+
     def test_prefix_length_and_save_options_are_bounded(self):
         plan = replay.validate_trace(valid_trace(), 16)
         self.assertEqual(replay.run_length(plan, None), (71186, False))

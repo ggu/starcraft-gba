@@ -446,6 +446,54 @@ ASan/UBSan. Default and unified ROM hashes remain unchanged. A final source
 rebuild matches the measured Z3 ROM byte for byte. Near 30 fps and physical
 GBA validation remain unmet.
 
+## Bounded replay memory (2026-10-23)
+
+Experimental Z3 now enables `SC64_Z3_WINDOWED_SCHEDULE`. Its linked
+`ee035b5c` candidate reduces BSS from 249,512 to 235,184 bytes, a net saving of
+14,328 bytes. Its event array is 2,048 bytes; two four-byte control variables
+replace the 16,384-byte array. IWRAM still ends at `0x03004ff8`, and neither
+memory guard was relaxed. Ordinary profiles keep their previous scheduler.
+
+Asset-free tests compare held and pressed masks at every tick against the
+old preload loop across 40 randomized 50,000-tick streams with more than 256
+total events. Boundary, empty-window, capacity and malformed-row checks run
+under ASan/UBSan. A separate harness runs the actual `main` loop for paged
+and count-only schedules, including physical/injected input after deactivation.
+Sixteen Python replay checks cover validation, ELF detection and page slicing.
+
+An ARM prefix with the unchanged 1,388-input proof trace completes 2,500 ticks,
+including a partial last page. Its reported gameplay state matches the prior
+optimized ROM at shared ticks 0, 1,000 and 2,000. The normal START/B controls
+save at frame 2,478 after observer frame 2,477.
+
+The complete windowed ARM replay also wins at frame 70,833 after 71,186
+scheduler ticks. It consumes all 1,388 transitions in the unchanged proof
+trace, with a peak window occupancy of 49. All reported gameplay state matches
+the prior optimized build at all 73 checkpoints. Independent arithmetic gives
+19.19 fps over 69,659 live frames and 60,887,859,641 timer cycles; the worst
+complete interval remains 15.23 fps. The memory saving does not establish a
+frame-rate improvement. The final default Z3 rebuild matches this measured ROM.
+Default build/tests (56 Python checks), unified build/tests, the Z3 runtime
+suite and the P3 Scourge fixture pass. The complete host input trace remains
+byte-identical, and default/unified ROM hashes remain unchanged. Physical
+hardware checks and the near-30-fps target remain outstanding.
+
+## Higher Ground Scourge prerequisite (2026-10-23)
+
+The P3-gated Scourge weapon uses pinned BWAPI facts: 110 normal damage, no
+upgrade bonus, one-frame source cooldown and three-pixel source reach, scaled
+to two engine pixels. It targets hostile, vulnerable air units and consumes
+the attacker after a landed hit through the existing shield/armor/death path.
+Ground targets and structures remain invalid. Ordinary profiles keep the
+previous combat path; this does not enable mission 22.
+
+`make test-sc64-p3-scourge` runs ASan/UBSan checks for ground/building/friendly
+and invincible rejection, cooldown/range, shields/armor, fixed damage with
+weapon upgrades, attack-move approach, lethal hits and supply cleanup.
+The P3 large-map ARM probe links with IWRAM ending at `0x03004f28` and BSS
+ending at `0x0203d248`, within the unchanged guards. This is a code/storage
+probe, not an ARM gameplay or Higher Ground completion proof.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.
