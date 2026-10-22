@@ -163,12 +163,24 @@ continues to use its separate internal START+SELECT entry.
 The combined ROM uses save generation 11 and rejects saves from earlier
 generations, including generation 10 from the internal T4 target. Keep separate
 save files for these builds. Its controller-only host and ARM runs complete
-Jacobs Installation through the ordinary menu. The emulator replay averages
+Jacobs Installation through the ordinary menu. The earlier `181a5063` emulator replay averaged
 23.15 effective fps over 7,971 counted live frames, with a worst counted
 interval of 20.71 fps; this is below the 30-fps target and is not physical GBA
 timing. See [Validation](VALIDATION.md) for the ROM/ELF identities and other
 reproducible measurements. The combined build does not add the remaining 20
 missions.
+
+The current combined default enables `SC64_UNARMED_QUERY_SKIP`. Its frozen
+2 MiB ROM SHA-256 is
+`d867886700a4c0a7351165f135ab720f37a6442327d529074775f4ac29d45077`; its
+matching ELF SHA-256 is
+`3788c697cafe3f5693ee9b752013a6dee9cdc9a1c6673a90d838d920985d1202`. Its
+controller win, 11 gameplay checkpoints and three captures match the earlier
+combined build byte-for-byte for reported state and images. It averages
+23.53 effective fps across 7,971 counted frames, with a worst interval of
+21.17 fps. This is emulator performance below the 30-fps target, not physical
+GBA evidence. The earlier 29.48-fps skirmish measurement belongs to the
+`181a5063` ROM and is not a measurement of this current build.
 
 ## Custom skirmishes
 
@@ -182,13 +194,24 @@ map-select skirmish setup and the same two maps:
 
 The human player can choose Terran, Zerg, or Protoss independently of the campaign race used by that ROM. Choose one, two, or three computer opponents, then set each opponent's race independently. The engine and available gameplay mechanics remain shared among the profiles.
 
-On the combined Terran T4 ROM, a 10,000-tick neutral Blood Bath run with a
-Terran human and three independently selected Zerg, Protoss and Terran
-opponents averaged 29.48 effective fps in mGBA; observed intervals ranged
-from 28.58 to 29.86 fps. This bounded skirmish sample is not a full-battle
-worst-case or campaign-performance result.
+On the current frozen combined ROM `d8678867`, a 10,000-tick neutral Blood
+Bath run with a Terran human and three independently selected Zerg, Protoss
+and Terran opponents averaged 29.49 effective fps in mGBA; observed intervals
+ranged from 28.58 to 29.86 fps. Every observed checkpoint remained in play.
+This bounded sample does not establish full-battle or campaign performance.
 
 Imported skirmish data is fitted to the engine's bounded resource storage. The packer selects at most 32 distinct mineral patches, distributing the nearest available patches among the selected starts, with a target of up to eight per start. It validates map connectivity, source geyser placements, and resource-building footprints. The imported map keeps its source terrain and resource locations.
+
+## T5 source import only
+
+Antigan Revolt is reserved at Terran global mission ID 8. Its import path
+retains the full 96×96 Badlands terrain and 168 non-start UNIT rows: 79 units,
+48 buildings and 41 mineral fields. Four start markers are not emitted as live
+placements. The catalog and runtime do not enable this mission. The new actor
+rules and one-player SetResources arithmetic have asset-free regression tests;
+neither proves mission behavior. Cloak, mine arming and player-group selection
+are not implemented by those helpers. Ten missions across the three race
+campaigns are currently playable; the other 20 remain unavailable.
 
 ## Current limits
 

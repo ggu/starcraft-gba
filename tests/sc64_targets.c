@@ -3,12 +3,24 @@
 #include <assert.h>
 #include "../starcraft/game.c"
 
+static int reference_can_attack(int attacker, int target, int owner)
+{
+#if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+    /* The P3 Scourge override includes hostility/air-only constraints that
+     * race_can_attack alone does not model. */
+    return sc64_p3_can_attack_from(attacker, target, owner);
+#else
+    (void)owner;
+    return race_can_attack(attacker, target);
+#endif
+}
+
 static int reference_target(int x, int y, int owner, int range, int attacker)
 {
     int best = -1, bestd = range * range;
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive &&
         FAST_ABS(x - u[i].x) < range && FAST_ABS(y - u[i].y) < range &&
-        owners_hostile(owner, u[i].owner) && race_can_attack(attacker, i)) {
+        owners_hostile(owner, u[i].owner) && reference_can_attack(attacker, i, owner)) {
         int d = dist2(x, y, u[i].x, u[i].y);
         if (d < bestd || (best >= 0 && d == bestd && i < best)) {
             best = i; bestd = d;
@@ -17,7 +29,7 @@ static int reference_target(int x, int y, int owner, int range, int attacker)
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive &&
         FAST_ABS(x - b[i].x) < range && FAST_ABS(y - b[i].y) < range &&
         owners_hostile(owner, b[i].owner) &&
-        race_can_attack(attacker, MAX_UNITS + i)) {
+        reference_can_attack(attacker, MAX_UNITS + i, owner)) {
         int candidate = MAX_UNITS + i, d = dist2(x, y, b[i].x, b[i].y);
         if (d < bestd || (best >= 0 && d == bestd && candidate < best)) {
             best = candidate; bestd = d;
@@ -49,6 +61,22 @@ static void compare_query(int x, int y, int owner, int range, int attacker)
     int expected = reference_target(x, y, owner, range, attacker);
     int indexed = nearest_enemy_typed(x, y, owner, range, attacker);
     assert(indexed == expected);
+}
+
+static void compare_attacker_matrix(void)
+{
+    static const int queries[][4] = {
+        { 200, 160, SIDE, 128 },
+        { 780, 800, SIDE, 64 },
+        { 520, 520, ENEMY, 112 },
+        { 1000, 900, SIDE, 112 }
+    };
+    /* Include -1's wildcard contract and every compact unit ID, especially
+     * IDs with no ground/air weapon. */
+    for (int q = 0; q < (int)(sizeof(queries) / sizeof(queries[0])); ++q)
+        for (int attacker = -1; attacker < SC_RU_COUNT; ++attacker)
+            compare_query(queries[q][0], queries[q][1], queries[q][2],
+                          queries[q][3], attacker);
 }
 
 int main(void)
@@ -97,6 +125,7 @@ int main(void)
     build_owner_lists();
     sc64_target_index_begin();
     assert(sc64_target_index_active);
+    compare_attacker_matrix();
     for (int range_index = 0; range_index < 5; ++range_index) {
         int range = (int[]){ 1, 52, 64, 112, 128 }[range_index];
         for (int owner = SIDE; owner <= RESCUABLE; ++owner)
@@ -108,6 +137,24 @@ int main(void)
     }
     assert(nearest_enemy_typed(800, 820, SIDE, 64, U_MARINE) == 72);
     assert(nearest_enemy_typed(1000, 900, SIDE, 112, U_MARINE) == -1);
+
+    /* Exercise the same attacker matrix through the owner-list fallback and
+     * the original full-array scan, not just the indexed broadphase. */
+    sc64_target_index_end();
+    compare_attacker_matrix();
+    target_lists_valid = 0;
+    compare_attacker_matrix();
+    build_owner_lists();
+    sc64_target_index_begin();
+    assert(sc64_target_index_active);
+#if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+    /* The air-only Scourge must survive the no-weapon early-return check and
+     * find an enemy Mutalisk, while the wildcard remains unchanged. */
+    assert(sc64_race_unit_damage_vs(U_SCOURGE, 0) == 0);
+    assert(sc64_race_unit_damage_vs(U_SCOURGE, 1) > 0);
+    compare_query(820, 120, SIDE, 64, U_SCOURGE);
+    assert(nearest_enemy_typed(820, 120, SIDE, 64, U_SCOURGE) == 10);
+#endif
 
     /* The entity moves across bucket boundaries during the indexed pass; its
      * old cell must stop returning it and its new cell must return it. */

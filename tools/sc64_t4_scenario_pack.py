@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile private T4 location, trigger and THG2 records into immutable C data.
+"""Compile private T4/T5 location, trigger and THG2 records into immutable C data.
 
 Source CHK records and generated headers belong under ignored .local storage.
 This tool contains only schema and validation logic, never scenario operands or
@@ -20,6 +20,10 @@ DEFAULT_BASE = ROOT / '.local/sc64/races/generated/t4'
 DEFAULT_RECORDS = DEFAULT_BASE / 'records'
 DEFAULT_MANIFEST = DEFAULT_BASE / 'manifest.json'
 DEFAULT_OUTPUT = ROOT / '.local/sc64/races/generated/sc64_t4_scenario_generated.h'
+DEFAULT_T5_BASE = ROOT / '.local/sc64/races/generated/t5'
+DEFAULT_T5_RECORDS = DEFAULT_T5_BASE / 'records'
+DEFAULT_T5_MANIFEST = DEFAULT_T5_BASE / 'manifest.json'
+DEFAULT_T5_OUTPUT = ROOT / '.local/sc64/races/generated/sc64_t5_scenario_generated.h'
 VERIFIED_ROM_SHA1 = 'a36d91b5aac7bb95df0d7de5f9814f5270e25c2b'
 REQUIRED = {
     'MRGN': ('MRGN.bin', b'MRGN', 20),
@@ -34,6 +38,7 @@ REQUIRED = {
 CONDITIONS_PER_TRIGGER = 16
 ACTIONS_PER_TRIGGER = 64
 TRIGGER_ENABLED_BYTES = 27
+_USE_PROFILE_DEFAULT = object()
 
 
 def _sha256(data: bytes) -> str:
@@ -54,19 +59,36 @@ def _framed_record(data: bytes, expected_tag: bytes, label: str) -> bytes:
 
 def parse_source(records_dir: Path = DEFAULT_RECORDS,
                  manifest_path: Path = DEFAULT_MANIFEST, *,
-                 expected_locations: int = 255,
-                 expected_triggers: int = 38,
-                 expected_doodads: int = 32,
-                 expected_properties: int = 64,
-                 expected_active_conditions: int | None = 48,
-                 expected_active_actions: int | None = 141) -> dict:
+                 profile: str = 't4',
+                 expected_locations: int | None = None,
+                 expected_triggers: int | None = None,
+                 expected_doodads: int | None = None,
+                 expected_properties: int | None = None,
+                 expected_active_conditions: int | None | object = _USE_PROFILE_DEFAULT,
+                 expected_active_actions: int | None | object = _USE_PROFILE_DEFAULT) -> dict:
     """Read, authenticate and decode exact private framed CHK records."""
+    schemas = {
+        't4': ('008/00D', 255, 38, 32, 64, 48, 141),
+        't5': ('008/00E', 64, 16, 14, 64, 18, 68),
+    }
+    if profile not in schemas:
+        raise ValueError(f'unsupported private scenario profile: {profile}')
+    (map_path, loc_default, trig_default, doodad_default, prop_default,
+     cond_default, action_default) = schemas[profile]
+    expected_locations = loc_default if expected_locations is None else expected_locations
+    expected_triggers = trig_default if expected_triggers is None else expected_triggers
+    expected_doodads = doodad_default if expected_doodads is None else expected_doodads
+    expected_properties = prop_default if expected_properties is None else expected_properties
+    if expected_active_conditions is _USE_PROFILE_DEFAULT:
+        expected_active_conditions = cond_default
+    if expected_active_actions is _USE_PROFILE_DEFAULT:
+        expected_active_actions = action_default
     try:
         manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
     except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f'cannot read T4 source manifest: {exc}') from exc
-    if manifest.get('schema') != 1 or manifest.get('source_map_path') != '008/00D':
-        raise ValueError('manifest does not describe the expected T4 source map')
+        raise ValueError(f'cannot read {profile.upper()} source manifest: {exc}') from exc
+    if manifest.get('schema') != 1 or manifest.get('source_map_path') != map_path:
+        raise ValueError(f'manifest does not describe the expected {profile.upper()} source map')
     if manifest.get('source_rom_sha1') != VERIFIED_ROM_SHA1:
         raise ValueError('manifest ROM is not the verified StarCraft 64 USA image')
     for key in ('source_chk_sha256', 'extractor_commit'):
@@ -214,18 +236,24 @@ def _bytes(data: bytes) -> str:
     return '{' + ','.join(_u(value, 2) for value in data) + '}'
 
 
-def emit_header(data: dict) -> str:
+def emit_header(data: dict, *, profile: str = 't4') -> str:
     """Render the validated records as immutable, fixed-slot ROM arrays."""
+    if profile not in ('t4', 't5'):
+        raise ValueError(f'unsupported private scenario profile: {profile}')
+    prefix = f'sc64_{profile}'
+    guard = 'SC64_T4_SCENARIO_GENERATED_H' if profile == 't4' else 'SC64_T5_SCENARIO_GENERATED_H'
+    runtime_guard = 'SC64_T4_RUNTIME' if profile == 't4' else 'defined(SC64_T4_RUNTIME) && defined(SC64_T5_ENABLED)'
+    runtime_open = '#ifdef SC64_T4_RUNTIME\n' if profile == 't4' else f'#if {runtime_guard}\n'
     locations = data['locations']
     conditions = data['conditions']
     actions = data['actions']
     triggers = data['triggers']
     doodads = data['doodads']
     out = [
-        '/* Private generated T4 numeric scenario data. Do not commit or distribute. */\n',
-        '#ifndef SC64_T4_SCENARIO_GENERATED_H\n#define SC64_T4_SCENARIO_GENERATED_H\n',
-        '#ifdef SC64_T4_RUNTIME\n#include "sc64_trigger_types.h"\n',
-        f'static const Sc64T4Location sc64_t4_locations[{len(locations)}] = {{\n',
+        f'/* Private generated {profile.upper()} numeric scenario data. Do not commit or distribute. */\n',
+        f'#ifndef {guard}\n#define {guard}\n',
+        runtime_open, '#include "sc64_trigger_types.h"\n',
+        f'static const Sc64T4Location {prefix}_locations[{len(locations)}] = {{\n',
     ]
     for item in locations:
         values = ','.join([_u(item['left']), _u(item['top']), _u(item['right']),
@@ -233,7 +261,7 @@ def emit_header(data: dict) -> str:
                            _u(item['elevation'], 4), _bytes(item['raw'])])
         out.append('    {' + values + '},\n')
     out.append('};\n')
-    out.append(f'static const Sc64T4UnitProperties sc64_t4_properties[{len(data["properties"])}] = {{\n')
+    out.append(f'static const Sc64T4UnitProperties {prefix}_properties[{len(data["properties"])}] = {{\n')
     for row in data['properties']:
         values = [_u(row[key]) for key in (
             'valid_special', 'valid_fields', 'owner', 'hp_percent',
@@ -241,11 +269,11 @@ def emit_header(data: dict) -> str:
             'special', 'unused')]
         out.append('    {' + ','.join(values + [_bytes(row['raw'])]) + '},\n')
     out.append('};\n')
-    out.append('static const Sc64T4SourceSetup sc64_t4_source_setup = {\n')
+    out.append(f'static const Sc64T4SourceSetup {prefix}_source_setup = {{\n')
     out.append(',\n'.join('    ' + _bytes(data['setup'][key]) for key in
                          ('controllers', 'races', 'force_by_slot', 'force_raw', 'property_used')))
     out.append('\n};\n')
-    out.append(f'static const Sc64T4Condition sc64_t4_conditions[{len(conditions)}] = {{\n')
+    out.append(f'static const Sc64T4Condition {prefix}_conditions[{len(conditions)}] = {{\n')
     for row in conditions:
         values = [_u(row[key]) for key in ('location', 'player', 'amount')]
         values += [_u(row['unit'], 4)]
@@ -253,7 +281,7 @@ def emit_header(data: dict) -> str:
         values += [_u(row['mask'], 4)]
         out.append('    {' + ','.join(values) + '},\n')
     out.append('};\n')
-    out.append(f'static const Sc64T4Action sc64_t4_actions[{len(actions)}] = {{\n')
+    out.append(f'static const Sc64T4Action {prefix}_actions[{len(actions)}] = {{\n')
     for row in actions:
         values = [_u(row[key]) for key in ('location', 'string_id', 'wav_id', 'time',
                                             'player', 'argument')]
@@ -262,34 +290,42 @@ def emit_header(data: dict) -> str:
         values += [_bytes(row['trailing'])]
         out.append('    {' + ','.join(values) + '},\n')
     out.append('};\n')
-    out.append(f'static const Sc64T4Doodad sc64_t4_doodads[{len(doodads)}] = {{\n')
+    out.append(f'static const Sc64T4Doodad {prefix}_doodads[{len(doodads)}] = {{\n')
     for row in doodads:
         values = [_u(row[key], 4) for key in ('type', 'x', 'y')]
         values += [_u(row['owner'], 2), _u(row['unused'], 2), _u(row['flags'], 4)]
         values += [_bytes(row['raw'])]
         out.append('    {' + ','.join(values) + '},\n')
     out.append('};\n')
-    out.append(f'static const Sc64T4Trigger sc64_t4_triggers[{len(triggers)}] = {{\n')
+    out.append(f'static const Sc64T4Trigger {prefix}_triggers[{len(triggers)}] = {{\n')
     for index, trigger in enumerate(triggers):
         enabled = _bytes(trigger['enabled_players'])
-        cond_ptr = f'&sc64_t4_conditions[{index * CONDITIONS_PER_TRIGGER}]'
-        action_ptr = f'&sc64_t4_actions[{index * ACTIONS_PER_TRIGGER}]'
+        cond_ptr = f'&{prefix}_conditions[{index * CONDITIONS_PER_TRIGGER}]'
+        action_ptr = f'&{prefix}_actions[{index * ACTIONS_PER_TRIGGER}]'
         out.append(f'    {{{cond_ptr},{action_ptr},{enabled},'
                    f'{_u(trigger["initial_cursor"], 2)},'
                    f'{_u(trigger["execution_flags"])}}},\n')
     out.append('};\n')
-    out.append('static const Sc64T4Scenario sc64_t4_scenario = {\n'
-               '    sc64_t4_locations, (u16)(sizeof(sc64_t4_locations)/sizeof(sc64_t4_locations[0])),\n'
-               '    sc64_t4_triggers, (u16)(sizeof(sc64_t4_triggers)/sizeof(sc64_t4_triggers[0])),\n'
-               '    sc64_t4_doodads, (u16)(sizeof(sc64_t4_doodads)/sizeof(sc64_t4_doodads[0]))\n'
-               '};\n#endif /* SC64_T4_RUNTIME */\n#endif\n')
+    out.append(f'static const Sc64T4Scenario {prefix}_scenario = {{\n'
+               f'    {prefix}_locations, (u16)(sizeof({prefix}_locations)/sizeof({prefix}_locations[0])),\n'
+               f'    {prefix}_triggers, (u16)(sizeof({prefix}_triggers)/sizeof({prefix}_triggers[0])),\n'
+               f'    {prefix}_doodads, (u16)(sizeof({prefix}_doodads)/sizeof({prefix}_doodads[0]))\n'
+               f'}};\n#endif /* {runtime_guard} */\n#endif\n')
     return ''.join(out)
 
 
-def pack(records_dir: Path = DEFAULT_RECORDS, manifest: Path = DEFAULT_MANIFEST,
-         output: Path = DEFAULT_OUTPUT) -> dict:
-    data = parse_source(records_dir, manifest)
-    content = emit_header(data)
+def pack(records_dir: Path | None = None, manifest: Path | None = None,
+         output: Path | None = None, *, profile: str = 't4') -> dict:
+    if profile not in ('t4', 't5'):
+        raise ValueError(f'unsupported private scenario profile: {profile}')
+    if records_dir is None:
+        records_dir = DEFAULT_RECORDS if profile == 't4' else DEFAULT_T5_RECORDS
+    if manifest is None:
+        manifest = DEFAULT_MANIFEST if profile == 't4' else DEFAULT_T5_MANIFEST
+    if output is None:
+        output = DEFAULT_OUTPUT if profile == 't4' else DEFAULT_T5_OUTPUT
+    data = parse_source(records_dir, manifest, profile=profile)
+    content = emit_header(data, profile=profile)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile('w', encoding='ascii', dir=output.parent,
                                      prefix=output.name + '.', delete=False) as stream:
@@ -305,12 +341,14 @@ def pack(records_dir: Path = DEFAULT_RECORDS, manifest: Path = DEFAULT_MANIFEST,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--records-dir', type=Path, default=DEFAULT_RECORDS)
-    parser.add_argument('--manifest', type=Path, default=DEFAULT_MANIFEST)
-    parser.add_argument('--output', type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument('--profile', choices=('t4', 't5'), default='t4')
+    parser.add_argument('--records-dir', type=Path)
+    parser.add_argument('--manifest', type=Path)
+    parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     try:
-        report = pack(args.records_dir, args.manifest, args.output)
+        report = pack(args.records_dir, args.manifest, args.output,
+                      profile=args.profile)
     except (OSError, ValueError, struct.error) as exc:
         parser.error(str(exc))
     print(json.dumps(report, indent=2))

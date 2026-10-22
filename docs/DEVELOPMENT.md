@@ -245,8 +245,8 @@ identity.
 The combined ROM has save generation 11. It rejects saves from older
 generations, including generation 10 used by the standalone internal T4
 target, so use a separate save file. Its host and ARM controller runs both
-complete the mission through the normal campaign entry. On the recorded mGBA
-run, the win occurs at frame 9,331 (host tick 9,378); 160 input transitions
+complete the mission through the normal campaign entry. On the earlier
+`181a5063` mGBA run, the win occurs at frame 9,331 (host tick 9,378); 160 input transitions
 peak at 62 per scheduler page, and 11 observations match. The run averages
 23.15 effective fps over 7,971 counted live frames, with a worst observed
 interval of 20.71 fps. This remains below the 30-fps goal and is emulator
@@ -259,14 +259,31 @@ BSS; BSS ends at `0x0203b258` and IWRAM at `0x03004ec8`, within the existing
 guards.
 
 A separate 10,000-tick neutral skirmish run on Blood Bath with three opponents
-of independently selected Zerg, Protoss and Terran races averages 29.48 fps
-(observed intervals 28.58–29.86). This is bounded skirmish evidence, not a
+of independently selected Zerg, Protoss and Terran races on the earlier
+`181a5063` build averaged 29.48 fps (observed intervals 28.58–29.86). This is
+historical bounded-scenario evidence, not a measurement of the current ROM, a
 full-battle worst case or a campaign performance result. Across current
 experimental progression builds, Terran 1–4, Zerg 1–3 and Protoss 1–3 are
 playable; the remaining 20 catalogued missions are unavailable.
 `SC64_DIAGNOSTIC_UPDATE` exposes rescue, trigger and trap counters;
 `SC64_DIAGNOSTIC_TERRAIN` exposes terrain reuse/event and minimap counters.
 These are instrumentation, not separate performance results.
+
+The current combined default enables `SC64_UNARMED_QUERY_SKIP`. Its frozen
+2 MiB ROM SHA-256 is
+`d867886700a4c0a7351165f135ab720f37a6442327d529074775f4ac29d45077`; the
+matching ELF SHA-256 is
+`3788c697cafe3f5693ee9b752013a6dee9cdc9a1c6673a90d838d920985d1202`. The
+same controller win, 11 gameplay checkpoints and three captures match the
+earlier combined build byte-for-byte for reported state and images. This
+version averages 23.53 effective fps over 7,971 counted frames, with a worst
+interval of 21.17 fps. It remains below the 30-fps target. The experimental
+576-byte minimap-interior buffer was removed after an exact 5,000-tick
+comparison showed no measurable gain.
+A fresh 10,000-tick Blood Bath skirmish on this current ROM, with a Terran
+human and Zerg, Protoss and Terran AIs, averages 29.49 fps (intervals
+28.58–29.86). Every observed checkpoint remains in play; this is a bounded
+neutral-input scenario, not a full-battle performance guarantee.
 
 To replay the recorded normal-menu controller trace against the combined ROM,
 pass the matching ROM and ELF explicitly because the helper defaults to the
@@ -278,6 +295,31 @@ python3 tools/sc64_t4_controller_replay.py \
   --rom build/StarCraft-Terran-T4-GBA.gba \
   --elf build/starcraft-t4-combined.elf
 ```
+
+## T5 source import checks
+
+Antigan Revolt (Terran global mission ID 8) has an import-only data path. The
+private importer retains its 96×96 Badlands map and all 168 non-start UNIT
+rows: 79 units, 48 buildings and 41 mineral fields. Four start markers are
+excluded from the live placement rows. This does not add a mission to the
+catalog or make T5 loadable/playable. Across all three race campaigns, 10 of
+the 30 missions are playable and 20 still need implementation.
+
+After preparing the local ROM-derived input, regenerate the race tables, then
+the T5 scenario tables and run the focused source/import checks:
+
+```sh
+python3 tools/sc64_races_pack.py --rom /path/to/StarCraft64-USA.z64
+python3 tools/sc64_t4_scenario_pack.py --profile t5
+make test-sc64-t5-import test-sc64-t5-scenario \
+  test-sc64-t5-actor-rules test-sc64-resource-actions
+```
+
+The T5 checks cover retained rows, metadata and digests, bounded source actor
+rules, and isolated SetResources arithmetic. The actor facts do not establish
+cloak or mine-arming behavior, and the resource helper intentionally does not
+interpret player-group selection. These fixtures do not claim T5 runtime,
+mission completion, or playability.
 
 ## Troubleshooting
 

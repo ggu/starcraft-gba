@@ -1132,6 +1132,60 @@ release-candidate optimization comparison, not a diagnostic-counter run or a
 claim of near-30-fps operation. The candidate links with IWRAM ending at
 `0x03004ec0` and 251,912 bytes of BSS; both unchanged guards pass.
 
+## Combined Terran current default and T5 import-only stage (2026-10-23)
+
+The current combined Terran T1–T4 default enables `SC64_UNARMED_QUERY_SKIP`.
+Its 2 MiB ROM SHA-256 is
+`d867886700a4c0a7351165f135ab720f37a6442327d529074775f4ac29d45077`, and its
+ELF SHA-256 is
+`3788c697cafe3f5693ee9b752013a6dee9cdc9a1c6673a90d838d920985d1202`. It
+replays the same normal-menu win at frame 9,331, with no faults. All 11
+reported gameplay checkpoints and all three captures match the earlier
+combined build byte-for-byte. The current replay averages 23.53 effective fps
+over 7,971 counted frames, with a worst interval of 21.17 fps. This remains
+below the 30-fps target and is mGBA evidence only. The earlier exact
+`181a5063` build measured 23.15 fps for this campaign run; its separate
+29.48-fps Blood Bath sample is historical and is not a result for the current
+ROM. An exact 5,000-tick test of the 576-byte minimap-interior buffer found no
+measurable benefit, so that experiment was removed. The current ARM link uses
+1,857,244 text bytes, 388 data bytes and 241,872 BSS bytes; IWRAM ends at
+`0x03004f00` and BSS at `0x0203b258`. Both unchanged reserve guards pass.
+
+The same current ROM also completes a fresh 10,000-tick neutral-input Blood
+Bath skirmish with a Terran human and three independently selected Zerg,
+Protoss and Terran AIs. It averages 29.49 fps, with observed intervals of
+28.58–29.86; all checkpoints remain in play. This bounded scenario does not
+establish full-battle worst-case performance.
+
+Antigan Revolt (Terran global ID 8) has reached a source-import-only stage.
+The private race import retains the complete 96×96 Badlands terrain and 168
+non-start UNIT records: 79 units, 48 buildings and 41 mineral fields. Four
+start markers are excluded from live placements. This stage does not enable
+the T5 catalog entry or provide a playable runtime; the project still has 10
+playable missions and 20 unavailable missions.
+
+After preparing local ROM-derived inputs, regenerate the race tables and T5
+scenario data, then run the focused import and helper checks:
+
+```sh
+python3 tools/sc64_races_pack.py --rom /path/to/StarCraft64-USA.z64
+python3 tools/sc64_t4_scenario_pack.py --profile t5
+make test-sc64-t5-import test-sc64-t5-scenario \
+  test-sc64-t5-actor-rules test-sc64-resource-actions
+```
+
+The actor-rules fixture covers three source actor definitions. The
+resource-action fixture covers only native-backed per-player arithmetic; it
+does not implement player-group selection. Cloak and mine-arming behavior are
+not established by these checks. Neither fixture demonstrates T5 gameplay or
+completion. The import fixture checks every retained placement field and all
+9,216 converted terrain cells/pixels against recorded digests. The numeric
+fixture reconstructs all eight scenario/setup payloads and validates initial
+trigger contexts for all eight source slots. Default checks pass, including
+105 Python tests; unified and all three standard race build/test suites pass.
+Their ROM hashes are unchanged. Combined T3 survival, T4 completion,
+save/resume, targeting and all 18 skirmish launch combinations pass as well.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

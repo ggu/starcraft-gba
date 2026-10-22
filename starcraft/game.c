@@ -1472,6 +1472,21 @@ nearest_enemy_typed(int x, int y, int owner, int max_distance, int attacker)
 #ifdef SC64_DIAGNOSTIC_ORDERS
     u32 sc64_query_start = gba_clock();
 #endif
+#if defined(SC64_UNARMED_QUERY_SKIP) && !defined(SC64_RACES)
+#error "SC64_UNARMED_QUERY_SKIP requires SC64_RACES"
+#endif
+#ifdef SC64_UNARMED_QUERY_SKIP
+    /* Nothing in the ground or air weapon tables can damage a candidate.
+     * Keep attacker == -1 as the historical wildcard and leave invalid IDs
+     * to the ordinary checked query path. This deliberately uses damage_vs
+     * for both classes so the P3 air-only Scourge is not skipped. */
+    if (attacker >= 0 && attacker < SC_RU_COUNT &&
+        sc64_race_unit_damage_vs(attacker, 0) <= 0 &&
+        sc64_race_unit_damage_vs(attacker, 1) <= 0) {
+        result = -1;
+        goto sc64_query_done;
+    }
+#endif
 #ifdef SC64_RACES
     if (target_lists_valid && sc64_target_index_active && max_distance > 0 &&
         x >= 0 && y >= 0 && x < WORLD_W && y < WORLD_H)
@@ -1519,6 +1534,9 @@ nearest_enemy_typed(int x, int y, int owner, int max_distance, int attacker)
         }
     }
     result = best;
+#endif
+#ifdef SC64_UNARMED_QUERY_SKIP
+sc64_query_done:
 #endif
 #ifdef SC64_DIAGNOSTIC_ORDERS
     SC64_ORDER_DIAG_ACCUM(sc64_order_query_cycles, sc64_query_start);

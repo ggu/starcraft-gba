@@ -21,7 +21,7 @@ def framed(tag, payload):
 
 def fixture_records(root):
     records_dir = root / 'records'
-    records_dir.mkdir()
+    records_dir.mkdir(parents=True)
     loc = struct.pack('<IIIIHH', 0x10203040, 0x20304050, 0x30405060,
                       0x40506070, 0x1234, 0xABCD)
 
@@ -73,6 +73,33 @@ def fixture_records(root):
     manifest_path = root / 'manifest.json'
     manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
     return records_dir, manifest_path, files
+
+
+def fixture_t5_records(root):
+    """Synthetic T5-sized framed records with the pinned active-row counts."""
+    records_dir = root / 'records'
+    records_dir.mkdir(parents=True)
+    locations = struct.pack('<IIIIHH', 1, 2, 3, 4, 5, 6) * 64
+    triggers = bytearray(2400 * 16)
+    for index in range(18):
+        trigger, slot = divmod(index, 16)
+        triggers[trigger * 2400 + slot * 20 + 15] = 2
+    for index in range(68):
+        trigger, slot = divmod(index, 64)
+        triggers[trigger * 2400 + 320 + slot * 32 + 26] = 11
+    doodads = struct.pack('<HHHBBH', 1, 2, 3, 4, 5, 6) * 14
+    payloads = {
+        'MRGN': locations, 'TRIG': bytes(triggers), 'THG2': doodads,
+        'FORC': bytes([0, 3, 2, 2, 3, 3, 1, 3] + [0] * 12),
+        'OWNR': bytes([6, 0, 3, 7, 0, 0, 5, 0, 0, 0, 0, 0]),
+        'SIDE': bytes([1] * 8 + [7] * 4),
+        'UPRP': bytes(64 * 20), 'UPUS': bytes(64),
+    }
+    for name, (filename, tag, _) in PACKER.REQUIRED.items():
+        payload = payloads[name]
+        framed = tag + struct.pack('<I', len(payload)) + payload
+        (records_dir / filename).write_bytes(framed)
+    return records_dir
 
 
 class T4ScenarioPackTests(unittest.TestCase):
@@ -144,20 +171,45 @@ class T4ScenarioPackTests(unittest.TestCase):
                 expected_active_actions=1)
             generated = root / 'scenario.h'
             generated.write_text(PACKER.emit_header(data), encoding='ascii')
+            t5_records = fixture_t5_records(root / 't5')
+            retained_payloads = {
+                b'UNIT': b'unit rows', b'DIM ': b'dimensions', b'ERA ': b'era',
+                b'MTXM': b'terrain', b'DD2 ': b'dd2',
+            }
+            for filename, tag, _ in PACKER.REQUIRED.values():
+                framed = (t5_records / filename).read_bytes()
+                retained_payloads[tag] = framed[8:]
+            chk = b''.join(tag + struct.pack('<I', len(payload)) + payload
+                           for tag, payload in retained_payloads.items())
+            spec = importlib.util.spec_from_file_location(
+                'sc64_races_pack_for_header_fixture', ROOT / 'tools/sc64_races_pack.py')
+            race_packer = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(race_packer)
+            retained = race_packer.retain_source_records(
+                chk, t5_records, map_path='008/00E')
+            t5_data = PACKER.parse_source(t5_records, Path(retained['manifest']), profile='t5')
+            generated_t5 = root / 'scenario_t5.h'
+            generated_t5.write_text(PACKER.emit_header(t5_data, profile='t5'), encoding='ascii')
             source = root / 'check.c'
             source.write_text(
                 '#include "scenario.h"\n'
+                '#include "scenario_t5.h"\n'
                 'int main(void) {\n'
                 '  return !(sizeof(Sc64T4Action) == 32 &&\n'
                 '    sc64_t4_triggers[0].actions[1].trailing[2] == \'z\' &&\n'
                 '    sc64_t4_doodads[0].flags == 0xabcd &&\n'
                 '    sc64_t4_triggers[0].execution_flags == 0xa1b2c3d4u &&\n'
                 '    sc64_t4_properties[0].resources == 0x99aabbccu &&\n'
-                '    sc64_t4_source_setup.force_by_slot[3] == 3);\n'
+                '    sc64_t4_source_setup.force_by_slot[3] == 3 &&\n'
+                '    sizeof(sc64_t5_locations)/sizeof(sc64_t5_locations[0]) == 64 &&\n'
+                '    sizeof(sc64_t5_triggers)/sizeof(sc64_t5_triggers[0]) == 16 &&\n'
+                '    sizeof(sc64_t5_doodads)/sizeof(sc64_t5_doodads[0]) == 14 &&\n'
+                '    sc64_t5_locations[0].raw_record[19] == 0 &&\n'
+                '    sc64_t5_scenario.location_count == 64);\n'
                 '}\n', encoding='ascii')
             result = subprocess.run(
                 ['cc', '-std=c11', '-Wall', '-Wextra', '-Werror',
-                 '-DSC64_T4_RUNTIME', '-I', str(ROOT / 'starcraft'),
+                 '-DSC64_T4_RUNTIME', '-DSC64_T5_ENABLED', '-I', str(ROOT / 'starcraft'),
                  '-I', str(root), str(source), '-o', str(root / 'check')],
                 capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -217,6 +269,40 @@ class T4ScenarioPackTests(unittest.TestCase):
                                     expected_triggers=1, expected_doodads=1,
                                     expected_active_conditions=1,
                                     expected_active_actions=1)
+
+    def test_t5_schema_has_its_own_strict_source_counts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            records = fixture_t5_records(root)
+            retained_payloads = {
+                b'UNIT': b'unit rows', b'DIM ': b'dimensions', b'ERA ': b'era',
+                b'MTXM': b'terrain', b'DD2 ': b'dd2',
+            }
+            for filename, tag, _ in PACKER.REQUIRED.values():
+                data = (records / filename).read_bytes()
+                retained_payloads[tag] = data[8:]
+            chk = b''.join(tag + struct.pack('<I', len(payload)) + payload
+                           for tag, payload in retained_payloads.items())
+            spec = importlib.util.spec_from_file_location(
+                'sc64_races_pack_for_t5_fixture', ROOT / 'tools/sc64_races_pack.py')
+            race_packer = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(race_packer)
+            retained = race_packer.retain_source_records(
+                chk, records, map_path='008/00E')
+            manifest = Path(retained['manifest'])
+            parsed = PACKER.parse_source(records, manifest, profile='t5')
+            self.assertEqual((len(parsed['locations']), len(parsed['triggers']),
+                              len(parsed['doodads']), len(parsed['properties']),
+                              parsed['active_condition_count'], parsed['active_action_count']),
+                             (64, 16, 14, 64, 18, 68))
+            with self.assertRaisesRegex(ValueError, 'T4'):
+                PACKER.parse_source(records, manifest, profile='t4')
+            with self.assertRaisesRegex(ValueError, 'active actions'):
+                PACKER.parse_source(records, manifest, profile='t5',
+                                    expected_active_actions=67)
+            self.assertEqual(PACKER.parse_source(
+                records, manifest, profile='t5', expected_active_actions=None)
+                ['active_action_count'], 68)
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

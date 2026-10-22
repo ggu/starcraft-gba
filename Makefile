@@ -29,13 +29,15 @@ LARGE_PROBE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_CAMPAIGN_RA
 P3_OPTIMIZATION_FLAGS ?= -DSC64_ROUTE_PACK3 -DSC64_P3_DEFENSE_TARGETS -DSC64_P3_WINDOWED_SCHEDULE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS
 P3_FLAGS := $(LARGE_PROBE_FLAGS) -DSC64_P3_ENABLED -DSC64_P3_RUNTIME $(P3_OPTIMIZATION_FLAGS) $(P3_EXTRA_FLAGS)
 T4_STORAGE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_T4_ENABLED -DSC64_T4_RUNTIME -DSC64_ROUTE_PACK3 -DSC64_T4_WINDOWED_SCHEDULE -DSC64_CAMPAIGN_RACE=0
-T4_OPTIMIZATION_FLAGS ?= -DSC64_T4_COUNT_CACHE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS
+T4_OPTIMIZATION_FLAGS ?= -DSC64_T4_COUNT_CACHE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS -DSC64_UNARMED_QUERY_SKIP
 T4_SCENARIO_FLAGS := $(T4_STORAGE_FLAGS) -DSC64_T4_SCENARIO_RUNTIME
 T4_RUNTIME_FLAGS := $(T4_SCENARIO_FLAGS) $(T4_OPTIMIZATION_FLAGS)
 T4_REPLAY_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T4_REPLAY_ENTRY
 T4_COMBINED_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T3_ENABLED -DSC64_T4_CAMPAIGN_ENTRY
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
 T4_SCENARIO_RECORDS := .local/sc64/races/generated/t4/records
+T5_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t5_scenario_generated.h
+T5_SCENARIO_RECORDS := .local/sc64/races/generated/t5/records
 
 .PHONY: all clean test verify probe sc64 backwater skirmish campaign races unified \
 	verify-sc64 verify-backwater verify-skirmish verify-campaign verify-races verify-unified \
@@ -129,6 +131,11 @@ build/test-sc64-p3-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p3-controller: tests/sc64_p3_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p3-unarmed-targets: tests/sc64_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) -DSC64_UNARMED_QUERY_SKIP $< common/gba.c -o $@
+.PHONY: test-sc64-p3-unarmed-targets
+test-sc64-p3-unarmed-targets: build/test-sc64-p3-unarmed-targets
+	./build/test-sc64-p3-unarmed-targets
 build/test-sc64-p3-defenses: tests/sc64_p3_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p3-frame-coverage: tests/sc64_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
@@ -167,6 +174,21 @@ build/starcraft-t4-storage-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $
 	$(CC) $(CFLAGS) $(T4_STORAGE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-t4-storage-probe.map -lgcc -o $@
 	$(SIZE) $@
 sc64-t4-storage-probe: build/starcraft-t4-storage-probe.elf
+# T5 remains import-only: these fixtures do not enable a campaign entry.
+$(T5_SCENARIO_HEADER): tools/sc64_t4_scenario_pack.py starcraft/sc64_trigger_types.h .local/sc64/races/generated/t5/manifest.json $(wildcard $(T5_SCENARIO_RECORDS)/*.bin)
+	$(PYTHON) tools/sc64_t4_scenario_pack.py --profile t5
+build/test-sc64-t5-import: tests/sc64_t5_import.c starcraft/sc64_types.h .local/sc64/races/generated/sc64_races_generated.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_T5_ENABLED -DSC64_CAMPAIGN_RACE=0 -Istarcraft -I.local/sc64/races/generated $< -o $@
+build/test-sc64-t3t4t5-import: tests/sc64_t5_import.c starcraft/sc64_types.h .local/sc64/races/generated/sc64_races_generated.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_T3_ENABLED -DSC64_T4_ENABLED -DSC64_T5_ENABLED -DSC64_CAMPAIGN_RACE=0 -Istarcraft -I.local/sc64/races/generated $< -o $@
+build/test-sc64-t5-scenario: tests/sc64_t5_scenario.c starcraft/sc64_trigger_types.h starcraft/sc64_t4_triggers.h $(T5_SCENARIO_HEADER) Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DSC64_T4_RUNTIME -DSC64_T5_ENABLED -Istarcraft -I.local/sc64/races/generated $< -o $@
+.PHONY: test-sc64-t5-import test-sc64-t5-scenario
+test-sc64-t5-import: build/test-sc64-t5-import build/test-sc64-t3t4t5-import
+	./build/test-sc64-t5-import
+	./build/test-sc64-t3t4t5-import
+test-sc64-t5-scenario: build/test-sc64-t5-scenario
+	./build/test-sc64-t5-scenario
 $(T4_SCENARIO_HEADER): tools/sc64_t4_scenario_pack.py starcraft/sc64_trigger_types.h .local/sc64/races/generated/t4/manifest.json $(wildcard $(T4_SCENARIO_RECORDS)/*.bin)
 	$(PYTHON) tools/sc64_t4_scenario_pack.py
 .PHONY: sc64-t4-scenario test-sc64-t4-triggers test-sc64-t4-scenario test-sc64-t4-queries test-sc64-t4-actions test-sc64-t4-count-cache
@@ -289,6 +311,16 @@ $(T4_FRAME_TESTS): build/test-sc64-t4-frame-%: tests/sc64_t4_frame_coverage.c $(
 .PHONY: test-sc64-t4-frame-coverage
 test-sc64-t4-frame-coverage: $(T4_FRAME_TESTS)
 	@for fixture in $^; do ./$$fixture || exit $$?; done
+build/test-sc64-resource-actions: tests/sc64_resource_actions.c starcraft/sc64_resource_actions.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-resource-actions
+test-sc64-resource-actions: build/test-sc64-resource-actions
+	./build/test-sc64-resource-actions
+build/test-sc64-t5-actor-rules: tests/sc64_t5_actor_rules.c starcraft/sc64_t5_actor_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-t5-actor-rules
+test-sc64-t5-actor-rules: build/test-sc64-t5-actor-rules
+	./build/test-sc64-t5-actor-rules
 build/test-sc64-t4-actor-rules: tests/sc64_t4_actor_rules.c starcraft/race_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_T4_RUNTIME -I. $< -o $@
 build/test-sc64-t4-world: tests/sc64_t4_world.c starcraft/sc64_t4_world.h Makefile | build
@@ -478,7 +510,9 @@ build/test-terrain-scroll: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cac
 build/test-collision: tests/sc64_collision.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -DSC64_SKIRMISH -Icommon tests/sc64_collision.c common/gba.c -o $@
 
-test-starcraft: build/test-sc64-t4-actor-rules build/test-sc64-t4-world build/test-sc64-t4-schedule build/test-sc64-t4-count-cache build/test-sc64-p3-schedule build/test-sc64-p3-runtime $(P3_FRONT_TESTS) build/test-sc64-demo-schedule build/test-sc64-demo-schedule-runtime build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-race-rules-z3 build/test-skirmish-ai build/test-sc64-frontend build/test-sc64-bitgrid build/test-sc64-map-math build/test-sc64-t3-rules build/test-sc64-z3-rules build/test-sc64-p3-rules build/test-sc64-p3-model $(RACE_FRONTEND_TESTS) $(RACE_T3_FRONTEND_TESTS) $(RACE_Z3_FRONTEND_TESTS) $(RACE_Z3_UNIFIED_TESTS) build/test-sc64-frontend-t3-unified build/test-race-routes build/test-race-routes-96 build/test-race-routes-t3 build/test-race-routes-rect build/test-race-routes-large build/test-race-routes-pack3 build/test-race-routes-pack3-t3 build/test-race-routes-pack3-large build/test-terrain-cache build/test-terrain-scroll build/test-collision
+test-starcraft: build/test-sc64-resource-actions build/test-sc64-t5-actor-rules build/test-sc64-t4-actor-rules build/test-sc64-t4-world build/test-sc64-t4-schedule build/test-sc64-t4-count-cache build/test-sc64-p3-schedule build/test-sc64-p3-runtime $(P3_FRONT_TESTS) build/test-sc64-demo-schedule build/test-sc64-demo-schedule-runtime build/test-starcraft build/test-starcraft-selection build/test-race-rules build/test-race-rules-z3 build/test-skirmish-ai build/test-sc64-frontend build/test-sc64-bitgrid build/test-sc64-map-math build/test-sc64-t3-rules build/test-sc64-z3-rules build/test-sc64-p3-rules build/test-sc64-p3-model $(RACE_FRONTEND_TESTS) $(RACE_T3_FRONTEND_TESTS) $(RACE_Z3_FRONTEND_TESTS) $(RACE_Z3_UNIFIED_TESTS) build/test-sc64-frontend-t3-unified build/test-race-routes build/test-race-routes-96 build/test-race-routes-t3 build/test-race-routes-rect build/test-race-routes-large build/test-race-routes-pack3 build/test-race-routes-pack3-t3 build/test-race-routes-pack3-large build/test-terrain-cache build/test-terrain-scroll build/test-collision
+	./build/test-sc64-resource-actions
+	./build/test-sc64-t5-actor-rules
 	./build/test-sc64-t4-actor-rules
 	./build/test-sc64-t4-world
 	./build/test-sc64-t4-triggers
