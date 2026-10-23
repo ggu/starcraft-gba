@@ -45,7 +45,19 @@ MISSIONS = [
     ('T5', '008/00E', 'The Antigan Revolt'),
     # T6 is import-only at stable global ID 9 until runtime qualification.
     ('T6', '008/00F', 'The Norad II'),
+    # T7-T10 source maps are retained/imported only behind the late Terran
+    # data gate. They do not become campaign-playable through this table.
+    ('T7', '008/010', 'The Trump Card'),
+    ('T8', '008/011', 'The Big Push'),
+    ('T9', '008/012', 'New Gettysburg'),
+    ('T10', '008/013', 'The Hammer Falls'),
 ]
+TERRAN_LATE_CHK_SHA256 = {
+    '008/010': '0883a5241140199415650934bcb3c034b0944cb5be19c477a94a95aa70a2a1f7',
+    '008/011': '7c765fc6b8ccfd2ee63c321499dce934a25a81267aa6f8822149c0313facc3a2',
+    '008/012': 'afa086b680f37f1de4d467893351dc6bea5abb475121ff59da55c632de33f6f3',
+    '008/013': 'd1bcc9759b948e95ad565537ed3c29eb980cd325935aa25480dc0ad4a8298b6f',
+}
 BUILDING_RAW_IDS = {
     106, 109, 110, 111, 112, 113, 114, 122, 124, 125, 130, 131, 132,
     133, 135, 137, 139, 141, 142, 143, 144, 146, 149, 150, 151, 154, 155,
@@ -86,6 +98,8 @@ def emit_map_count() -> str:
         '#define SC64_RACE_MAP_COUNT 23\n'
         '#elif defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
         '#define SC64_RACE_MAP_COUNT 15\n'
+        '#elif defined(SC64_UNIFIED) && defined(SC64_TERRAN_LATE_ENABLED)\n'
+        '#define SC64_RACE_MAP_COUNT 14\n'
         '#elif defined(SC64_UNIFIED) && defined(SC64_T6_ENABLED)\n'
         '#define SC64_RACE_MAP_COUNT 10\n'
         '#elif defined(SC64_UNIFIED) && defined(SC64_T5_ENABLED)\n'
@@ -117,11 +131,11 @@ def emit_descriptor_table(descriptors: list[str]) -> str:
     """Emit stable direct-ID descriptor slots, with disabled IDs zeroed.
 
     ``descriptors`` uses packer order: four race missions, T1, T2, T3, Z3,
-    P3, T4, T5, T6.
+    P3, T4, T5, T6, then T7-T10 at global IDs 10..13.
     The per-descriptor race guards are carried inside each supplied token.
     """
-    if len(descriptors) != 12:
-        raise ValueError('expected descriptors for map indices 0..11')
+    if len(descriptors) != 16:
+        raise ValueError('expected descriptors for map indices 0..15')
     return ''.join([
         'static const Sc64RaceMap sc64_race_maps[SC64_RACE_MAP_COUNT] = {\n',
         *descriptors[:4],
@@ -135,12 +149,16 @@ def emit_descriptor_table(descriptors: list[str]) -> str:
         '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED) || defined(SC64_T5_ENABLED) || defined(SC64_T6_ENABLED)\n'
         '    {0}, /* global ID 7 unavailable */\n#endif\n',
         '#ifndef SC64_T5_ENABLED\n'
-        '#ifdef SC64_T6_ENABLED\n'
+        '#if defined(SC64_T6_ENABLED) || defined(SC64_TERRAN_LATE_ENABLED)\n'
         '    {0}, /* global ID 8 unavailable */\n'
         '#endif\n#endif\n',
         '#ifdef SC64_T5_ENABLED\n', descriptors[10], '#endif\n',
-        '#ifdef SC64_T6_ENABLED\n', descriptors[11], '#endif\n',
-        '#if defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED)\n',
+        '#ifdef SC64_T6_ENABLED\n', descriptors[11],
+        '#elif defined(SC64_TERRAN_LATE_ENABLED)\n    {0}, /* global ID 9 unavailable */\n',
+        '#endif\n',
+        '#if defined(SC64_UNIFIED) && defined(SC64_TERRAN_LATE_ENABLED)\n',
+        descriptors[12], descriptors[13], descriptors[14], descriptors[15],
+        '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED)\n',
         '#ifdef SC64_T6_ENABLED\n',
         '    {0}, /* global ID 10 is unavailable */\n'
         '    {0}, /* global ID 11 is unavailable */\n'
@@ -372,6 +390,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             lines.append('#if defined(SC64_UNIFIED) && defined(SC64_T5_ENABLED)\n')
         elif map_index == 11:
             lines.append('#if defined(SC64_UNIFIED) && defined(SC64_T6_ENABLED)\n')
+        elif map_index >= 12:
+            lines.append('#if defined(SC64_UNIFIED) && defined(SC64_TERRAN_LATE_ENABLED)\n')
         campaign_guard = campaign_guard_for_map(map_index)
         lines.append(f'#if {campaign_guard}\n')
         unit_name = f'sc64_race_{name}_units'
@@ -403,6 +423,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             lines.append('#endif /* SC64_UNIFIED && SC64_T5_ENABLED */\n')
         elif map_index == 11:
             lines.append('#endif /* SC64_UNIFIED && SC64_T6_ENABLED */\n')
+        elif map_index >= 12:
+            lines.append('#endif /* SC64_UNIFIED && SC64_TERRAN_LATE_ENABLED */\n')
         descriptors.append(f'#if {campaign_guard}\n'
             f'    {{{info.width}u,{info.height}u,{tileset}u,{human_slot}u,sc64_race_{name}_owner_modes,sc64_race_{name}_owner_races,{unit_name},{len(units)}u,sc64_race_{name}_tiles,{len(tiles)}u,sc64_race_{name}_lookup,sc64_race_{name}_blocked,"{info.name}","{mission_id}"}},\n'
             '#else\n    {0}, /* campaign omitted from this cartridge */\n#endif\n')
@@ -601,6 +623,43 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                     'properties': len(scenario['properties']),
                     'active_conditions': scenario['active_condition_count'],
                     'active_actions': scenario['active_action_count'],
+                }
+            if map_index >= 12:
+                profile = f't{map_index - 5}'
+                chk_hash = hashlib.sha256(chk).hexdigest()
+                if chk_hash != TERRAN_LATE_CHK_SHA256[path]:
+                    raise ValueError(f'{profile.upper()} CHK hash does not match the audited source')
+                reports[-1]['global_mission_id'] = map_index - 2
+                reports[-1]['source_chk_sha256'] = chk_hash
+                reports[-1]['late_terran_import_only'] = True
+                reports[-1]['runtime_or_catalog_enabled'] = False
+                reports[-1]['source_record_retention'] = retain_source_records(
+                    chk, output.parent / profile / 'records', map_path=path,
+                    retain_puni=True)
+                availability_packer = load(
+                    'sc64_late_availability_source', ROOT / 'tools/sc64_t5_availability.py')
+                reports[-1]['availability_table'] = availability_packer.generate(
+                    output.parent / profile / 'records',
+                    output.parent / profile / 'manifest.json',
+                    output.parent / f'sc64_{profile}_availability_generated.h',
+                    profile=profile)
+                scenario_packer = load(
+                    'sc64_late_scenario_source', ROOT / 'tools/sc64_t4_scenario_pack.py')
+                reports[-1]['scenario_table'] = scenario_packer.pack(
+                    output.parent / profile / 'records',
+                    output.parent / profile / 'manifest.json',
+                    output.parent / f'sc64_{profile}_scenario_generated.h',
+                    profile=profile)
+                late_scenario = scenario_packer.parse_source(
+                    output.parent / profile / 'records',
+                    output.parent / profile / 'manifest.json', profile=profile)
+                reports[-1]['scenario_source_counts'] = {
+                    'locations': len(late_scenario['locations']),
+                    'triggers': len(late_scenario['triggers']),
+                    'doodads': len(late_scenario['doodads']),
+                    'properties': len(late_scenario['properties']),
+                    'active_conditions': late_scenario['active_condition_count'],
+                    'active_actions': late_scenario['active_action_count'],
                 }
             if map_index == 11:
                 if hashlib.sha256(chk).hexdigest() != T6_CHK_SHA256:

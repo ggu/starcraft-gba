@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate retained T5/T6 PUNI bytes and emit private availability tables.
+"""Validate retained Terran PUNI bytes and emit private availability tables.
 
 The raw source record is private, ignored input under .local/sc64. Generated
 headers contain only effective availability bits and are likewise private.
@@ -34,6 +34,26 @@ PROFILES = {
         'chk_sha256': 'f07f21939bb8dbeeb6e3933fc632a04ff13bc1617ac5f8ae224c0ff978623f35',
         'puni_sha256': 'd73527196647e6cd42f169876015c8916226449935ee2b2899a0342829d48f1c',
     },
+    't7': {
+        'map': '008/010',
+        'chk_sha256': '0883a5241140199415650934bcb3c034b0944cb5be19c477a94a95aa70a2a1f7',
+        'puni_sha256': '26958787fee9adaae8f01a87bf09a954756fbaec6b2bffe9d47d5e3f20674ae7',
+    },
+    't8': {
+        'map': '008/011',
+        'chk_sha256': '7c765fc6b8ccfd2ee63c321499dce934a25a81267aa6f8822149c0313facc3a2',
+        'puni_sha256': '0993be10c473ff4f322d476b9089e7faa4abf4ace394d236678cc71d1f5e592e',
+    },
+    't9': {
+        'map': '008/012',
+        'chk_sha256': 'afa086b680f37f1de4d467893351dc6bea5abb475121ff59da55c632de33f6f3',
+        'puni_sha256': 'f0c884b11085608b9b0e0ca8aa1a701b518f45748b25557d89e1952b0ad41f4b',
+    },
+    't10': {
+        'map': '008/013',
+        'chk_sha256': 'd1bcc9759b948e95ad565537ed3c29eb980cd325935aa25480dc0ad4a8298b6f',
+        'puni_sha256': 'f0c884b11085608b9b0e0ca8aa1a701b518f45748b25557d89e1952b0ad41f4b',
+    },
 }
 PLAYERS = 12
 UNITS = 228
@@ -46,13 +66,19 @@ def read_puni(records_dir: Path = DEFAULT_RECORDS,
               expected_rom_sha1: str = EXPECTED_ROM_SHA1,
               expected_extractor: str = EXPECTED_EXTRACTOR,
               expected_extractor_commit: str = EXPECTED_EXTRACTOR_COMMIT,
-              expected_chk_sha256: str = EXPECTED_CHK_SHA256,
-              expected_puni_sha256: str = EXPECTED_PUNI_SHA256) -> tuple[bytes, dict]:
+              expected_chk_sha256: str | None = None,
+              expected_puni_sha256: str | None = None) -> tuple[bytes, dict]:
     """Load PUNI only when its map, pinned inputs and record hashes agree."""
     label = next((name.upper() for name, spec in PROFILES.items()
                   if spec['map'] == expected_map), None)
     if label is None:
         raise ValueError('unsupported availability source map')
+    profile = next(name for name, spec in PROFILES.items()
+                   if spec['map'] == expected_map)
+    if expected_chk_sha256 is None:
+        expected_chk_sha256 = PROFILES[profile]['chk_sha256']
+    if expected_puni_sha256 is None:
+        expected_puni_sha256 = PROFILES[profile]['puni_sha256']
     try:
         manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
     except (OSError, json.JSONDecodeError) as exc:

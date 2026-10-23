@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile private T4/T5/T6 location, trigger and THG2 records into immutable C data.
+"""Compile private campaign location, trigger and THG2 records into immutable C data.
 
 Source CHK records and generated headers belong under ignored .local storage.
 This tool contains only schema and validation logic, never scenario operands or
@@ -28,6 +28,18 @@ DEFAULT_T6_BASE = ROOT / '.local/sc64/races/generated/t6'
 DEFAULT_T6_RECORDS = DEFAULT_T6_BASE / 'records'
 DEFAULT_T6_MANIFEST = DEFAULT_T6_BASE / 'manifest.json'
 DEFAULT_T6_OUTPUT = ROOT / '.local/sc64/races/generated/sc64_t6_scenario_generated.h'
+LATE_PROFILES = {
+    't7': ('008/010', 255, 10, 15, 64, 13, 31),
+    't8': ('008/011', 64, 12, 6, 64, 13, 32),
+    't9': ('008/012', 64, 12, 32, 64, 13, 81),
+    't10': ('008/013', 64, 7, 54, 64, 7, 16),
+}
+LATE_CHK_SHA256 = {
+    't7': '0883a5241140199415650934bcb3c034b0944cb5be19c477a94a95aa70a2a1f7',
+    't8': '7c765fc6b8ccfd2ee63c321499dce934a25a81267aa6f8822149c0313facc3a2',
+    't9': 'afa086b680f37f1de4d467893351dc6bea5abb475121ff59da55c632de33f6f3',
+    't10': 'd1bcc9759b948e95ad565537ed3c29eb980cd325935aa25480dc0ad4a8298b6f',
+}
 VERIFIED_ROM_SHA1 = 'a36d91b5aac7bb95df0d7de5f9814f5270e25c2b'
 REQUIRED = {
     'MRGN': ('MRGN.bin', b'MRGN', 20),
@@ -78,6 +90,7 @@ def parse_source(records_dir: Path = DEFAULT_RECORDS,
         # private source record and is checked below rather than emitted.
         't6': ('008/00F', 64, 20, 54, 64, 31, 75),
     }
+    schemas.update(LATE_PROFILES)
     if profile not in schemas:
         raise ValueError(f'unsupported private scenario profile: {profile}')
     (map_path, loc_default, trig_default, doodad_default, prop_default,
@@ -98,6 +111,8 @@ def parse_source(records_dir: Path = DEFAULT_RECORDS,
         raise ValueError(f'manifest does not describe the expected {profile.upper()} source map')
     if manifest.get('source_rom_sha1') != VERIFIED_ROM_SHA1:
         raise ValueError('manifest ROM is not the verified StarCraft 64 USA image')
+    if profile in LATE_CHK_SHA256 and manifest.get('source_chk_sha256') != LATE_CHK_SHA256[profile]:
+        raise ValueError(f'manifest CHK hash does not match verified {profile.upper()} source')
     for key in ('source_chk_sha256', 'extractor_commit'):
         if not isinstance(manifest.get(key), str) or not manifest[key]:
             raise ValueError(f'manifest is missing {key}')
@@ -129,7 +144,7 @@ def parse_source(records_dir: Path = DEFAULT_RECORDS,
         payloads[name] = payload
         framed[name] = data
 
-    if profile == 't6':
+    if profile == 't6' or profile in LATE_PROFILES:
         metadata = records.get('PUNI')
         if not isinstance(metadata, dict) or metadata.get('file') != 'PUNI.bin':
             raise ValueError('T6 manifest has no valid PUNI record entry')
@@ -263,13 +278,14 @@ def _bytes(data: bytes) -> str:
 
 def emit_header(data: dict, *, profile: str = 't4') -> str:
     """Render the validated records as immutable, fixed-slot ROM arrays."""
-    if profile not in ('t4', 't5', 't6'):
+    if profile not in ('t4', 't5', 't6', *LATE_PROFILES):
         raise ValueError(f'unsupported private scenario profile: {profile}')
     prefix = f'sc64_{profile}'
     guard = f'SC64_{profile.upper()}_SCENARIO_GENERATED_H'
     runtime_guard = ('SC64_T4_RUNTIME' if profile == 't4' else
                      'defined(SC64_T4_RUNTIME) && defined(SC64_T5_ENABLED)' if profile == 't5' else
-                     'defined(SC64_T4_RUNTIME) && defined(SC64_T6_ENABLED)')
+                     'defined(SC64_T4_RUNTIME) && defined(SC64_T6_ENABLED)' if profile == 't6' else
+                     'defined(SC64_T4_RUNTIME) && defined(SC64_TERRAN_LATE_ENABLED)')
     runtime_open = ('#ifdef SC64_T4_RUNTIME\n' if profile == 't4' else
                     f'#if {runtime_guard}\n')
     locations = data['locations']
@@ -344,17 +360,20 @@ def emit_header(data: dict, *, profile: str = 't4') -> str:
 
 def pack(records_dir: Path | None = None, manifest: Path | None = None,
          output: Path | None = None, *, profile: str = 't4') -> dict:
-    if profile not in ('t4', 't5', 't6'):
+    if profile not in ('t4', 't5', 't6', *LATE_PROFILES):
         raise ValueError(f'unsupported private scenario profile: {profile}')
     if records_dir is None:
         records_dir = {'t4': DEFAULT_RECORDS, 't5': DEFAULT_T5_RECORDS,
-                       't6': DEFAULT_T6_RECORDS}[profile]
+                       't6': DEFAULT_T6_RECORDS}.get(
+                           profile, ROOT / f'.local/sc64/races/generated/{profile}/records')
     if manifest is None:
         manifest = {'t4': DEFAULT_MANIFEST, 't5': DEFAULT_T5_MANIFEST,
-                    't6': DEFAULT_T6_MANIFEST}[profile]
+                    't6': DEFAULT_T6_MANIFEST}.get(
+                        profile, ROOT / f'.local/sc64/races/generated/{profile}/manifest.json')
     if output is None:
         output = {'t4': DEFAULT_OUTPUT, 't5': DEFAULT_T5_OUTPUT,
-                  't6': DEFAULT_T6_OUTPUT}[profile]
+                  't6': DEFAULT_T6_OUTPUT}.get(
+                      profile, ROOT / f'.local/sc64/races/generated/sc64_{profile}_scenario_generated.h')
     data = parse_source(records_dir, manifest, profile=profile)
     content = emit_header(data, profile=profile)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -372,7 +391,7 @@ def pack(records_dir: Path | None = None, manifest: Path | None = None,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--profile', choices=('t4', 't5', 't6'), default='t4')
+    parser.add_argument('--profile', choices=('t4', 't5', 't6', *LATE_PROFILES), default='t4')
     parser.add_argument('--records-dir', type=Path)
     parser.add_argument('--manifest', type=Path)
     parser.add_argument('--output', type=Path)

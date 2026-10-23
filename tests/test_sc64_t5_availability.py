@@ -168,9 +168,9 @@ class T5AvailabilityTests(unittest.TestCase):
 
     def test_availability_profile_names_are_bounded(self):
         with self.assertRaisesRegex(ValueError, 'unsupported availability profile'):
-            AVAIL.generate(profile='t7')
+            AVAIL.generate(profile='t11')
         with self.assertRaisesRegex(ValueError, 'unsupported availability profile'):
-            AVAIL.render_header(bytes(AVAIL.PUNI_BYTES), profile='t7')
+            AVAIL.render_header(bytes(AVAIL.PUNI_BYTES), profile='t11')
 
     def test_packer_retains_puni_only_when_requested(self):
         records = dict(PACKER.RETAINED_SOURCE_RECORDS)

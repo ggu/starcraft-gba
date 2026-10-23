@@ -64,10 +64,18 @@ class RaceMapTableEmissionTests(unittest.TestCase):
             '    {9}, /* T6: import-only, fixed global ID 9 */\n'
             '#else\n    {0},\n#endif\n'
         )
+        for index, global_id in zip(range(12, 16), range(10, 14)):
+            guard = campaign_guard_for_map(index)
+            rows.append(
+                f'#if defined(SC64_UNIFIED) && defined(SC64_TERRAN_LATE_ENABLED) && ({guard})\n'
+                f'    {{{global_id}}}, /* late Terran import slot {global_id} */\n'
+                '#else\n    {0},\n#endif\n'
+            )
         return rows
 
     def compile_case(self, flags, expected_count, expected_t3, expected_z3, expected_p3,
-                     expected_t4=0, expected_t5=0, expected_t6=0):
+                     expected_t4=0, expected_t5=0, expected_t6=0,
+                     expected_late=False):
         source = (
             'typedef struct { int id; } Sc64RaceMap;\n'
             + emit_map_count()
@@ -83,6 +91,11 @@ class RaceMapTableEmissionTests(unittest.TestCase):
             + f'  if (sc64_race_maps[9].id != {expected_t6}) return 11;\n'
             + f'  for (int i = {10 if expected_t6 else 9 if expected_t5 else 8}; i <= 13; ++i) if (sc64_race_maps[i].id != 0) return 5;\n'
             + f'  if (sc64_race_maps[14].id != {expected_z3}) return 5;\n'
+            + ' } else if (SC64_RACE_MAP_COUNT == 14) {\n'
+            + f'  if (sc64_race_maps[10].id != {10 if expected_late else 0}) return 12;\n'
+            + f'  if (sc64_race_maps[11].id != {11 if expected_late else 0}) return 13;\n'
+            + f'  if (sc64_race_maps[12].id != {12 if expected_late else 0}) return 14;\n'
+            + f'  if (sc64_race_maps[13].id != {13 if expected_late else 0}) return 15;\n'
             + ' } else if (SC64_RACE_MAP_COUNT > 7) {\n'
             + f'  if (sc64_race_maps[7].id != {expected_t4}) return 8;\n'
             + ' }\n return 0;\n}\n'
@@ -185,6 +198,16 @@ class RaceMapTableEmissionTests(unittest.TestCase):
                           23, 0, 0, 22)
         self.compile_case(['-DSC64_UNIFIED', '-DSC64_Z3_ENABLED', '-DSC64_P3_ENABLED',
                            '-DSC64_CAMPAIGN_RACE=1'], 23, 0, 14, 0)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T3_ENABLED',
+                           '-DSC64_T4_ENABLED', '-DSC64_T5_ENABLED',
+                           '-DSC64_T6_ENABLED', '-DSC64_TERRAN_LATE_ENABLED',
+                           '-DSC64_CAMPAIGN_RACE=0'],
+                          14, 6, 0, 0, 7, 8, 9, True)
+        self.compile_case(['-DSC64_UNIFIED', '-DSC64_T3_ENABLED',
+                           '-DSC64_T4_ENABLED', '-DSC64_T5_ENABLED',
+                           '-DSC64_T6_ENABLED', '-DSC64_TERRAN_LATE_ENABLED',
+                           '-DSC64_CAMPAIGN_RACE=1'],
+                          14, 0, 0, 0, 0, 0, 0, False)
 
 
 class T4SourceRecordRetentionTests(unittest.TestCase):
