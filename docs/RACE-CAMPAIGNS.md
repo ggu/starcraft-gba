@@ -2,9 +2,9 @@
 
 The standard Terran, Zerg and Protoss targets remain separate ROMs. The
 integrated Terran runtime now has controller-driven host wins and recorded
-normal-menu ARM wins for all ten Terran missions across frozen builds. T7,
-T8 and T10 have full ARM wins on the canonical ROM; T9's full ARM win is on an
-earlier frozen ROM. The current
+normal-menu ARM wins for all ten Terran missions across frozen builds. The
+latest optimization build has full T7 and T10 ARM wins; T8 and T9 remain
+qualified on earlier frozen ROMs. The current
 full-profile ARM T10 result is below the 30-fps target, and no physical GBA
 result is claimed. The canonical `terran` profile includes all ten Terran
 missions. The standard Zerg and Protoss profiles include their first two
@@ -274,9 +274,9 @@ The late Terran runtime has host-controller wins for Terran missions 6–10;
 combined with missions 1–5, all ten missions have host completion runs and
 normal-menu ARM wins across the recorded frozen builds. T6's earlier
 generation-16 ARM run won at frame 21,046 and averaged 17.26 effective fps.
-The canonical ROM also has full T7, T8 and T10 ARM wins.
+The baseline canonical ROM also has full T7, T8 and T10 ARM wins.
 
-On the canonical ROM, T7 wins at frame 12,151 and averages 15.76 effective
+On that baseline ROM, T7 wins at frame 12,151 and averages 15.76 effective
 fps; T8 wins at frame 86,596 and averages 14.37 fps; T10 wins at frame
 38,491 and averages 11.78 fps. T10 ends with the Ion Cannon (source raw type
 127) destroyed, Raynor alive and zero trigger faults. T9's ARM win is from
@@ -286,6 +286,12 @@ finishes at frame 358,906 with all 43 Protoss Force2 buildings destroyed, all
 21 Zerg Force3 buildings intact, Kerrigan alive, all eight trigger clocks aligned and
 zero faults, averaging 16.94 fps. These emulator results are below the
 30-fps target; physical GBA testing has not been performed.
+
+The latest optimization build improves T7 to 25.00 effective fps and T10 to
+18.77 fps, with identical observed checkpoints and winning frames. All ten
+host controllers still win, and fresh-process T7/T10 saves pass. See the
+[optimization validation record](VALIDATION.md#terran-cpu-and-presentation-optimization-2026-10-23)
+for exact build hashes, comparison scope and remaining performance limits.
 
 Missions 7–10 use bounded authored AI behavior where the original AI script
 bodies are not implemented. This is documented adaptation behavior, not a

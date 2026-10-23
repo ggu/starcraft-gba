@@ -1040,6 +1040,8 @@ verify-terran: build/StarCraft-Terran-GBA.gba
 	$(PYTHON) tools/verify_roms.py --terran
 build/test-sc64-terran-late-count-cache: tests/sc64_terran_late_count_cache.c starcraft/sc64_terran_late_count_cache.h Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $< -o $@
+build/test-sc64-present: tests/sc64_present.c common/gba_present.h Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 build/test-sc64-terran-defense-targets: tests/sc64_terran_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $< common/gba.c -o $@
 build/test-sc64-terran-full-targets: tests/sc64_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
@@ -1053,7 +1055,9 @@ test-sc64-terran-late-count-cache: build/test-sc64-terran-late-count-cache
 	./$<
 test-sc64-terran-defense-targets: build/test-sc64-terran-defense-targets
 	./$<
-test-starcraft: test-sc64-terran-late-count-cache
+test-sc64-present: build/test-sc64-present
+	./$<
+test-starcraft: test-sc64-terran-late-count-cache test-sc64-present
 test-sc64-terran-full-targets: build/test-sc64-terran-full-targets
 	./build/test-sc64-terran-full-targets
 test-sc64-terran-full-spatial-hud: build/test-sc64-terran-full-collision build/test-sc64-terran-full-hud

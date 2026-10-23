@@ -1,4 +1,7 @@
 #include "gba.h"
+#ifdef SC64_LATE_TERRAN_STORAGE
+#include "gba_present.h"
+#endif
 #ifdef GBA_HOST
 #include <stdio.h>
 static u16 host_fb[2][19200];
@@ -224,16 +227,25 @@ HOT int gfx_blit_window_2x(int y,int height,const u8 *source,int stride,int rows
 void gfx_end(void) {
     gfx_draw_cycles=gba_clock()-draw_start;
 #ifndef GBA_HOST
+#ifdef SC64_LATE_TERRAN_STORAGE
+    while (!gba_present_ready(gba_clock()-previous_present,
+                              REG16(0x04000006))) {}
+#else
     /* Target 30 updates/s without adding a third video frame when drawing
        already consumed more than one 59.73 Hz hardware frame. */
     u32 elapsed=gba_clock()-previous_present;
     vblank();
 #endif
+#endif
     front^=1;
 #ifndef GBA_HOST
     REG16(0x04000000)=0x0404|(front?16:0);
+#ifdef SC64_LATE_TERRAN_STORAGE
+    previous_present=gba_clock();
+#else
     if(elapsed<280896u)vblank();
     previous_present=gba_clock();
+#endif
 #endif
 }
 HOT void gfx_pixel(int x,int y,u8 c){if((unsigned)x>=240||(unsigned)y>=160)return;volatile u16*p=pixels+y*120+(x>>1);u16 old=*p;*p=(x&1)?((old&255)|((u16)c<<8)):((old&0xff00)|c);}
