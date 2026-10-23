@@ -16,9 +16,26 @@ static int reference_target(const Building *q, int ground, int air, int range)
     return best;
 }
 
+static void build_target_lists(u8 head[5][2], u8 next[MAX_UNITS], u8 hostile[5])
+{
+    memset(head, 0xff, sizeof(u8) * 5 * 2);
+    for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
+        int owner = u[j].owner;
+        if (owner < 0 || owner >= 5) continue;
+        int flying = sc64_race_unit_flying(u[j].type);
+        next[j] = head[owner][flying];
+        head[owner][flying] = (u8)j;
+    }
+    for (int owner = 0; owner < 5; ++owner) {
+        hostile[owner] = 0;
+        for (int other = 0; other < 5; ++other)
+            if (owners_hostile(owner, other)) hostile[owner] |= (u8)(1u << other);
+    }
+}
+
 int main(void)
 {
-    u8 head[5], next[MAX_UNITS];
+    u8 head[5][2], next[MAX_UNITS], hostile[5];
     Building tower;
     gba_init(); game_init();
     race_mode = 1; race_human = R_TER; race_bots = 2;
@@ -40,11 +57,7 @@ int main(void)
     u[1].flags = u[2].flags = 0;
     u[MAX_UNITS - 1].x = 512; u[MAX_UNITS - 1].y = 400;
     u[MAX_UNITS - 1].flags = 0;
-    memset(head, 0xff, sizeof(head));
-    for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
-        int owner = u[j].owner;
-        next[j] = head[owner]; head[owner] = (u8)j;
-    }
+    build_target_lists(head, next, hostile);
 
     memset(&tower, 0, sizeof(tower));
     tower.owner = SIDE; tower.x = 400; tower.y = 400;
@@ -55,26 +68,48 @@ int main(void)
             for (int range = 1; range <= 128; range += 17) {
                 int expected = reference_target(&tower, ground, air, range);
                 int actual = race_defense_target_from_owner_lists(
-                    &tower, ground, air, range, head, next);
+                    &tower, ground, air, range, head, next, hostile[owner]);
                 assert(actual == expected);
             }
         }
     }
 
+    /* Class lists keep air-only and ground-only defenses exact while ties
+     * across classes still choose the lower global unit slot. */
+    memset(u, 0, sizeof(u));
+    u[0].alive = u[1].alive = 1;
+    u[0].owner = u[1].owner = ENEMY;
+    u[0].type = U_WRAITH; u[1].type = U_MARINE;
+    u[0].x = u[1].x = 400; u[0].y = u[1].y = 400;
+    build_target_lists(head, next, hostile);
+    assert(race_defense_target_from_owner_lists(&tower, 0, 1, 112, head, next,
+                                                hostile[SIDE]) == 0);
+    assert(race_defense_target_from_owner_lists(&tower, 1, 0, 112, head, next,
+                                                hostile[SIDE]) == 1);
+    assert(race_defense_target_from_owner_lists(&tower, 1, 1, 112, head, next,
+                                                hostile[SIDE]) == 0);
+    u[0].alive = 0;
+    assert(race_defense_target_from_owner_lists(&tower, 0, 1, 112, head, next,
+                                                hostile[SIDE]) == -1);
+
     /* A preceding defense can kill the indexed winner. The next lookup must
      * observe live state immediately and select the next target. */
     tower.owner = SIDE; tower.x = 400; tower.y = 400;
-    int first = race_defense_target_from_owner_lists(&tower, 1, 1, 112, head, next);
+    int first = race_defense_target_from_owner_lists(&tower, 1, 1, 112, head, next,
+                                                      hostile[SIDE]);
     assert(first >= 0);
     u[first].alive = 0;
-    assert(race_defense_target_from_owner_lists(&tower, 1, 1, 112, head, next) ==
+    assert(race_defense_target_from_owner_lists(&tower, 1, 1, 112, head, next,
+                                                hostile[SIDE]) ==
            reference_target(&tower, 1, 1, 112));
 
     /* Owner changes remain guarded by current ownership and hostility. */
-    int moved_owner = head[ENEMY];
+    int moved_owner = head[ENEMY][0];
+    if (moved_owner == 0xff) moved_owner = head[ENEMY][1];
     assert(moved_owner != 0xff);
     u[moved_owner].owner = SIDE;
-    assert(race_defense_target_from_owner_lists(&tower, 1, 1, 112, head, next) ==
+    assert(race_defense_target_from_owner_lists(&tower, 1, 1, 112, head, next,
+                                                hostile[SIDE]) ==
            reference_target(&tower, 1, 1, 112));
 
     /* Full-tick differential cases cover every late campaign mission and
@@ -139,9 +174,15 @@ int main(void)
             u[0].flags = u[1].flags = 0; invincible_units[0] = invincible_units[1] = 0;
             b[0].alive = b[1].alive = 1;
             b[0].owner = b[1].owner = SIDE;
-            b[0].type = b[1].type = B_MISSILE_TURRET;
+            b[0].type = b[1].type = B_SUNKEN_COLONY;
             b[0].x = b[1].x = 400; b[0].y = b[1].y = 400;
             b[0].queue_progress = b[1].queue_progress = 0;
+            if (test == 0) {
+                for (int j = 2; j < MAX_UNITS; ++j) u[j].alive = 0;
+                for (int i = 2; i < MAX_BUILDINGS; ++i) b[i].alive = 0;
+                b[0].type = b[1].type = B_SPORE_COLONY;
+                u[0].hp = u[1].hp = 90;
+            }
 
             memcpy(units_before, u, sizeof(units_before));
             memcpy(buildings_before, b, sizeof(buildings_before));
@@ -149,6 +190,7 @@ int main(void)
             late_before = race_late;
             int supply_before = supply_used;
             race_tick_defenses_fullscan();
+            if (test == 0) assert(b[0].queue_progress == 0 && b[1].queue_progress == 0);
             memcpy(units_after, u, sizeof(units_after));
             memcpy(buildings_after, b, sizeof(buildings_after));
             memcpy(tracers_after, tracers, sizeof(tracers_after));

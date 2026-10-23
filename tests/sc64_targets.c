@@ -135,12 +135,14 @@ int main(void)
     build_owner_lists();
     sc64_target_index_begin();
     assert(sc64_target_index_active);
+#ifdef SC64_LATE_TERRAN_STORAGE
     sc64_target_hostility_snapshot();
     assert(target_hostile_masks_valid);
     for (int owner = 0; owner < 5; ++owner)
         for (int other = 0; other < 5; ++other)
             assert(!!(target_hostile_mask[owner] & (1u << other)) ==
                    !!owners_hostile(owner, other));
+#endif
     compare_attacker_matrix();
     for (int range_index = 0; range_index < 5; ++range_index) {
         int range = (int[]){ 1, 52, 64, 112, 128 }[range_index];
@@ -172,6 +174,7 @@ int main(void)
     assert(nearest_enemy_typed(820, 120, SIDE, 64, U_SCOURGE) == 10);
 #endif
 
+#ifdef SC64_LATE_TERRAN_STORAGE
     /* The entity moves across bucket boundaries during the indexed pass; its
      * old cell must stop returning it and its new cell must return it. */
     moving = 0;
@@ -211,6 +214,7 @@ int main(void)
     assert(sc64_target_index_active);
     assert(sc64_target_owner_columns[ENEMY] == 0);
     assert(sc64_target_owner_rows[ENEMY] == 0);
+#endif
 
     /* Keep only the highest unit and building slots alive to cover the
      * uint8 sentinel edge and unified global-index ordering. */

@@ -138,23 +138,25 @@ static void race_tick_defenses(void) {
  * their byte representation remains valid while MAX_UNITS is 192. */
 static int GBA_HOT __attribute__((noinline))
 race_defense_target_from_owner_lists(const Building *q, int ground, int air,
-                                     int range, const u8 head[5],
-                                     const u8 next[MAX_UNITS])
+                                     int range, const u8 head[5][2],
+                                     const u8 next[MAX_UNITS], u8 hostile_mask)
 {
     int best = -1, bestd = range * range;
     for (int owner = 0; owner < 5; ++owner) {
-        if (!owners_hostile(q->owner, owner)) continue;
-        for (int j = head[owner]; j != 0xff; j = next[j]) {
-            if (!u[j].alive || u[j].owner != owner) continue;
-            if (FAST_ABS(q->x - u[j].x) >= range ||
-                FAST_ABS(q->y - u[j].y) >= range || (u[j].flags & 16)) continue;
-            int flying = sc64_race_unit_flying(u[j].type);
-            if ((flying && !air) || (!flying && !ground) || !race_can_attack(-1, j)) continue;
-            int d = dist2(q->x, q->y, u[j].x, u[j].y);
-            /* The original ascending full scan keeps the lowest slot on ties. */
-            if (d < bestd || (best >= 0 && d == bestd && j < best)) {
-                bestd = d;
-                best = j;
+        if (!(hostile_mask & (1u << owner))) continue;
+        for (int flying = 0; flying < 2; ++flying) {
+            if ((flying && !air) || (!flying && !ground)) continue;
+            for (int j = head[owner][flying]; j != 0xff; j = next[j]) {
+                if (!u[j].alive || u[j].owner != owner) continue;
+                if (FAST_ABS(q->x - u[j].x) >= range ||
+                    FAST_ABS(q->y - u[j].y) >= range || (u[j].flags & 16) ||
+                    !race_can_attack(-1, j)) continue;
+                int d = dist2(q->x, q->y, u[j].x, u[j].y);
+                /* The original ascending full scan keeps the lowest slot on ties. */
+                if (d < bestd || (best >= 0 && d == bestd && j < best)) {
+                    bestd = d;
+                    best = j;
+                }
             }
         }
     }
@@ -163,13 +165,20 @@ race_defense_target_from_owner_lists(const Building *q, int ground, int air,
 
 static __attribute__((noinline)) void race_tick_defenses_late_targets(void)
 {
-    u8 head[5], next[MAX_UNITS];
+    u8 head[5][2], next[MAX_UNITS], hostile_mask[5];
     memset(head, 0xff, sizeof(head));
     for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
         int owner = u[j].owner;
         if (owner < 0 || owner >= 5) continue;
-        next[j] = head[owner];
-        head[owner] = (u8)j;
+        int flying = sc64_race_unit_flying(u[j].type);
+        next[j] = head[owner][flying];
+        head[owner][flying] = (u8)j;
+    }
+    for (int owner = 0; owner < 5; ++owner) {
+        u8 mask = 0;
+        for (int other = 0; other < 5; ++other)
+            if (owners_hostile(owner, other)) mask |= (u8)(1u << other);
+        hostile_mask[owner] = mask;
     }
 
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i)) {
@@ -185,7 +194,9 @@ static __attribute__((noinline)) void race_tick_defenses_late_targets(void)
         default: continue;
         }
         if (q->queue_progress > 0) { q->queue_progress--; continue; }
-        int best = race_defense_target_from_owner_lists(q, ground, air, range, head, next);
+        int best = q->owner < 5 ?
+            race_defense_target_from_owner_lists(q, ground, air, range, head, next,
+                                                 hostile_mask[q->owner]) : -1;
         if (best >= 0) {
             hit_target(best, damage, U_MARINE, q->owner);
             add_tracer(q->x, q->y, u[best].x, u[best].y, owner_color(q->owner));

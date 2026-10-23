@@ -283,13 +283,16 @@ test_checked_and_prevalidated_paths_match(void)
     f.conditions[1][0].comparison = 2;
     f.conditions[1][0].resource = 127;
     f.actions[1][0].opcode = 26;
-    f.conditions[2][0].opcode = 22;
+    f.conditions[2][0].opcode = 2;
+    f.conditions[2][0].comparison = 0;
+    f.conditions[2][0].amount = 0;
     f.actions[2][0].opcode = 4;
     f.actions[2][0].time = 0;
     f.actions[2][1].opcode = 7;
     assert(sc64_terran_late_runtime_init(&checked, &f.program, &f.setup));
     fast = checked;
     for (unsigned tick = 0; tick < 70; ++tick) {
+        checked_world.count_value = fast_world.count_value = tick / 3;
         assert(sc64_terran_late_runtime_step(
             &checked, &f.program, &f.setup, &ops, &checked_world, 0));
         assert(sc64_terran_late_runtime_step_prevalidated(
@@ -305,6 +308,61 @@ test_checked_and_prevalidated_paths_match(void)
         &fast, &f.program, &f.setup, &ops, &fast_world, 0));
 }
 
+static void
+test_full_and_prevalidated_validation_boundaries(void)
+{
+    Fixture f;
+    Sc64TerranLateRuntimeState full, fast, before;
+    TestWorld full_world = {0}, fast_world = {0};
+    fixture_init(&f, 1);
+    f.conditions[0][0].opcode = 22;
+    f.actions[0][0].opcode = 1;
+    assert(sc64_terran_late_runtime_init(&full, &f.program, &f.setup));
+    fast = full;
+
+    /* The checked entry fully validates immutable program data every call. */
+    f.conditions[0][0].opcode = 250;
+    before = full;
+    assert(!sc64_terran_late_runtime_step(&full, &f.program, &f.setup,
+                                          &ops, &full_world, 0));
+    assert(memcmp(&full, &before, sizeof(full)) == 0);
+    f.conditions[0][0].opcode = 22;
+
+    /* Both entries retain per-frame scalar validation. */
+    full.player[0].cooldown = SC64_TERRAN_LATE_PASS_TICKS;
+    fast.player[0].cooldown = SC64_TERRAN_LATE_PASS_TICKS;
+    before = full;
+    assert(!sc64_terran_late_runtime_step(&full, &f.program, &f.setup,
+                                          &ops, &full_world, 0));
+    assert(memcmp(&full, &before, sizeof(full)) == 0);
+    assert(!sc64_terran_late_runtime_step_prevalidated(
+        &fast, &f.program, &f.setup, &ops, &fast_world, 0));
+
+    /* Prevalidated mode checks mutable slots before a ready pass uses them.
+     * A not-ready tick defers that slot check; the next ready tick rejects it
+     * before evaluating a condition or dispatching an action. */
+    assert(sc64_terran_late_runtime_init(&fast, &f.program, &f.setup));
+    fast.player[0].flags[0] = 0x80;
+    fast.player[0].cooldown = 1;
+    assert(sc64_terran_late_runtime_step_prevalidated(
+        &fast, &f.program, &f.setup, &ops, &fast_world, 0));
+    assert(fast.player[0].cooldown == 0);
+    unsigned count_calls = fast_world.count_calls;
+    unsigned action_calls = fast_world.action_calls;
+    assert(!sc64_terran_late_runtime_step_prevalidated(
+        &fast, &f.program, &f.setup, &ops, &fast_world, 0));
+    assert(fast_world.count_calls == count_calls &&
+           fast_world.action_calls == action_calls);
+
+    /* Full validation rejects the same bad slot before changing tick state. */
+    assert(sc64_terran_late_runtime_init(&full, &f.program, &f.setup));
+    full.player[0].flags[0] = 0x80;
+    before = full;
+    assert(!sc64_terran_late_runtime_step(&full, &f.program, &f.setup,
+                                          &ops, &full_world, 0));
+    assert(memcmp(&full, &before, sizeof(full)) == 0);
+}
+
 int
 main(void)
 {
@@ -315,5 +373,6 @@ main(void)
     test_disabled_entries_and_unsupported_faults();
     test_callback_retry_is_atomic_and_program_bound_is_audited();
     test_checked_and_prevalidated_paths_match();
+    test_full_and_prevalidated_validation_boundaries();
     return 0;
 }

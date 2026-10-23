@@ -458,7 +458,7 @@ static Building b[MAX_BUILDINGS];
 static int target_unit_head[5], target_building_head[5];
 static int target_unit_next[MAX_UNITS], target_building_next[MAX_BUILDINGS];
 static int target_lists_valid;
-#ifdef SC64_RACES
+#if defined(SC64_RACES) && defined(SC64_LATE_TERRAN_STORAGE)
 static u8 target_hostile_mask[5];
 static int target_hostile_masks_valid;
 #endif
@@ -1577,6 +1577,7 @@ static int sc64_t4_can_attack_from(int attacker, int target, int owner)
 #define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
     race_can_attack((attacker), (target))
 #endif
+#ifdef SC64_LATE_TERRAN_STORAGE
 static void
 sc64_target_hostility_snapshot(void)
 {
@@ -1591,12 +1592,14 @@ sc64_target_hostility_snapshot(void)
     }
     target_hostile_masks_valid = 1;
 }
+#endif
 static int GBA_HOT __attribute__((noinline))
 #if defined(SC64_T6_RUNTIME) && !defined(GBA_HOST)
 __attribute__((optimize("Os")))
 #endif
 sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
 {
+#ifdef SC64_LATE_TERRAN_STORAGE
     int best = -1, best_distance = max_distance * max_distance, d;
     int cols = (WORLD_W + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
     int rows = (WORLD_H + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
@@ -1651,6 +1654,49 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
             }
     }
     return best;
+#else
+    int best = -1, best_distance = max_distance * max_distance, d;
+    int cols = (WORLD_W + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
+    int rows = (WORLD_H + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
+    int col0 = (x - max_distance) / SC64_TARGET_CELL_SIZE;
+    int row0 = (y - max_distance) / SC64_TARGET_CELL_SIZE;
+    int col1 = (x + max_distance) / SC64_TARGET_CELL_SIZE;
+    int row1 = (y + max_distance) / SC64_TARGET_CELL_SIZE;
+    int p, col, row;
+    if (col0 < 0) col0 = 0;
+    if (row0 < 0) row0 = 0;
+    if (col1 >= cols) col1 = cols - 1;
+    if (row1 >= rows) row1 = rows - 1;
+    for (p = 0; p < 5; ++p) {
+        if (!owners_hostile(owner, p)) continue;
+        for (row = row0; row <= row1; ++row)
+            for (col = col0; col <= col1; ++col) {
+                int cell = col + row * SC64_TARGET_GRID_COLS, entity;
+                for (entity = sc64_target_head[p][cell]; entity != SC64_TARGET_NONE;
+                     entity = sc64_target_next[entity]) {
+                    int candidate_x, candidate_y;
+                    if (entity < MAX_UNITS) {
+                        if (!u[entity].alive) continue;
+                        candidate_x = u[entity].x; candidate_y = u[entity].y;
+                    } else {
+                        int bi = entity - MAX_UNITS;
+                        if (!b[bi].alive) continue;
+                        candidate_x = b[bi].x; candidate_y = b[bi].y;
+                    }
+                    if (FAST_ABS(x - candidate_x) >= max_distance ||
+                        FAST_ABS(y - candidate_y) >= max_distance ||
+                        !SC64_CAN_ATTACK_FROM(attacker, entity, owner)) continue;
+                    d = dist2(x, y, candidate_x, candidate_y);
+                    if (d < best_distance ||
+                        (best >= 0 && d == best_distance && entity < best)) {
+                        best_distance = d;
+                        best = entity;
+                    }
+                }
+            }
+    }
+    return best;
+#endif
 }
 static int __attribute__((noinline))
 nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
@@ -3414,7 +3460,9 @@ update_orders(void)
 target_lists_unavailable:
 #ifdef SC64_RACES
     if (target_lists_valid) sc64_target_index_begin();
+#ifdef SC64_LATE_TERRAN_STORAGE
     sc64_target_hostility_snapshot();
+#endif
 #endif
 #ifdef SC64_DIAGNOSTIC_ORDERS
     sc64_order_setup_cycles = gba_clock() - sc64_setup_start;
@@ -3643,7 +3691,9 @@ target_lists_unavailable:
     }
     target_lists_valid = 0;
 #ifdef SC64_RACES
+#ifdef SC64_LATE_TERRAN_STORAGE
     target_hostile_masks_valid = 0;
+#endif
     sc64_target_index_end();
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
@@ -4393,21 +4443,21 @@ draw_mission_sprite(const Sc64SpriteFrame *s, int cx, int cy)
 static void
 draw_unit(Unit * q)
 {
-#ifdef SC64_T6_RUNTIME
-    if (race_t6_active() && race_t6_unit_burrowed((int)(q - u))) return;
-#endif
     if (SC64_TRANSPORT_LOADED(q)) return;
     int x = q->x - camx, y = q->y - camy + 12;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
+    if (x < -8 || x > 247 || y < 10 || y > 125)
+	return;
+    if (q->owner != SIDE && !currently_visible(q->x, q->y))
+	return;
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active() && race_t6_unit_burrowed((int)(q - u))) return;
+#endif
 #ifdef SC64_T4_RUNTIME
     unsigned actor_flags = sc64_race_t4_actor_flags(q->type);
     if (actor_flags & SC64_T4_ACTOR_HIDDEN) return;
     if (actor_flags && !(actor_flags & SC64_T4_ACTOR_DRAWABLE)) return;
 #endif
-    if (x < -8 || x > 247 || y < 10 || y > 125)
-	return;
-    if (q->owner != SIDE && !currently_visible(q->x, q->y))
-	return;
 #ifdef SC64_HAS_SPRITES
 #ifdef SC64_T5_RUNTIME
     /* This probe reuses the verified Ghost/Vulture sprite frames for their
@@ -4530,13 +4580,15 @@ draw_minimap(void)
 #endif
 	}
 #endif
-    for (i = 0; i < MAX_BUILDINGS; i++)
-	if (b[i].alive &&
+    for (i = 0; i < MAX_BUILDINGS; i++) {
+	if (!b[i].alive) continue;
+	if (b[i].owner != SIDE &&
+	    (b[i].x < 0 || b[i].y < 0 || b[i].x >= WORLD_W || b[i].y >= WORLD_H ||
+	     !currently_visible(b[i].x, b[i].y))) continue;
 #ifdef SC64_T4_RUNTIME
-            (!sc64_race_t4_building_flags(b[i].type) ||
-             (sc64_race_t4_building_flags(b[i].type)&SC64_T4_ACTOR_DRAWABLE)) &&
+        if (sc64_race_t4_building_flags(b[i].type) &&
+            !(sc64_race_t4_building_flags(b[i].type) & SC64_T4_ACTOR_DRAWABLE)) continue;
 #endif
-	    (b[i].owner == SIDE || SC64_GRID_GET(visible, (b[i].x / 16) + (b[i].y / 16) * MAP_COLS))) {
 #ifdef SC64_IMPORTED_MISSION
 	    x = map_x +
 #ifdef SC64_RACES
@@ -4565,14 +4617,17 @@ draw_minimap(void)
                 );
 	}
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
+	{
+	if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i])) continue;
+	if (u[i].owner != SIDE &&
+	    (u[i].x < 0 || u[i].y < 0 || u[i].x >= WORLD_W || u[i].y >= WORLD_H ||
+	     !currently_visible(u[i].x, u[i].y))) continue;
 #ifdef SC64_T6_RUNTIME
-            !race_t6_unit_burrowed(i) &&
+        if (race_t6_unit_burrowed(i)) continue;
 #endif
 #ifdef SC64_T4_RUNTIME
-            !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_HIDDEN) &&
+        if (sc64_race_t4_actor_flags(u[i].type) & SC64_T4_ACTOR_HIDDEN) continue;
 #endif
-	    (u[i].owner == SIDE || SC64_GRID_GET(visible, (u[i].x / 16) + (u[i].y / 16) * MAP_COLS))) {
 #ifdef SC64_IMPORTED_MISSION
 	    x = map_x +
 #ifdef SC64_RACES

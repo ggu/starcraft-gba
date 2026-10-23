@@ -131,6 +131,7 @@ movement_invalidation(unsigned int *checks)
     check_candidate(q, 118, 100, checks);
 }
 
+#ifdef SC64_PERSISTENT_COLLISION
 static void
 persistent_reconciliation(unsigned int *checks)
 {
@@ -195,6 +196,7 @@ persistent_reconciliation(unsigned int *checks)
     check_candidate(&u[0], u[0].x + 1, u[0].y, checks);
     sc64_unit_buckets_end();
 }
+#endif
 
 static void
 edge_overflow_and_passthrough(unsigned int *checks)
@@ -247,7 +249,9 @@ main(void)
     unsigned int checks = 0;
     randomized_states(&checks);
     movement_invalidation(&checks);
+#ifdef SC64_PERSISTENT_COLLISION
     persistent_reconciliation(&checks);
+#endif
     edge_overflow_and_passthrough(&checks);
     printf("Race collision buckets match full scan (%u checks).\n", checks);
     return 0;

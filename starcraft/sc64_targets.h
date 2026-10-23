@@ -41,7 +41,9 @@ static u16 sc64_target_cell[SC64_TARGET_ENTITY_COUNT];
 static u16 sc64_target_dirty[SC64_TARGET_DIRTY_CAPACITY];
 static u16 sc64_target_dirty_count;
 /* Conservative per-owner axis occupancy. Bits are only cleared on begin. */
+#ifdef SC64_LATE_TERRAN_STORAGE
 static u32 sc64_target_owner_columns[5], sc64_target_owner_rows[5];
+#endif
 static int sc64_target_index_initialized;
 static int sc64_target_dirty_overflowed;
 static int sc64_target_index_active;
@@ -81,8 +83,10 @@ sc64_target_insert(int entity, int owner, int x, int y)
     if (old != SC64_TARGET_NONE) sc64_target_prev[old] = (Sc64TargetIndex)entity;
     sc64_target_head[owner][cell] = (Sc64TargetIndex)entity;
     sc64_target_cell[entity] = (u16)cell;
+#ifdef SC64_LATE_TERRAN_STORAGE
     sc64_target_owner_columns[owner] |= (u32)1u << (x >> 6);
     sc64_target_owner_rows[owner] |= (u32)1u << (y >> 6);
+#endif
     return 1;
 }
 
@@ -114,8 +118,10 @@ sc64_target_index_begin(void)
     }
     sc64_target_dirty_count = 0;
     sc64_target_dirty_overflowed = 0;
+#ifdef SC64_LATE_TERRAN_STORAGE
     memset(sc64_target_owner_columns, 0, sizeof(sc64_target_owner_columns));
     memset(sc64_target_owner_rows, 0, sizeof(sc64_target_owner_rows));
+#endif
     for (i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
             !sc64_target_insert(i, u[i].owner, u[i].x, u[i].y)) return;

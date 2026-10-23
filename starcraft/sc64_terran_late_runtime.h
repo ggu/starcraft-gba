@@ -356,9 +356,9 @@ sc64_terran_late_runtime_step_core(Sc64TerranLateRuntimeState *state,
                                    const Sc64T4SourceSetup *setup,
                                    const Sc64TerranLateRuntimeOps *ops,
                                    void *context, int paused,
-                                   int validate_slots)
+                                   int full_validation)
 {
-    if (validate_slots) {
+    if (full_validation) {
         if (!sc64_terran_late_runtime_state_valid(state, program, setup))
             return 0;
     } else if (!sc64_terran_late_runtime_preflight(state, program, setup))
@@ -377,7 +377,9 @@ sc64_terran_late_runtime_step_core(Sc64TerranLateRuntimeState *state,
         player->cooldown = SC64_TERRAN_LATE_PASS_TICKS - 1;
         for (unsigned ti = 0; ti < program->trigger_count; ++ti) {
             const Sc64T4Trigger *trigger = &program->triggers[ti];
-            if (validate_slots && !sc64_terran_late_slot_valid(
+            /* The prevalidated entry skips immutable program validation, but
+             * mutable trigger slots are checked before every ready-pass use. */
+            if (!sc64_terran_late_slot_valid(
                     player, trigger, ti, owner, player->force)) return 0;
             if (!sc64_terran_late_enabled(trigger, owner, player->force) ||
                 (player->flags[ti] & SC64_T4_TR_DONE)) continue;
@@ -467,7 +469,7 @@ sc64_terran_late_runtime_step(Sc64TerranLateRuntimeState *state,
                               void *context, int paused)
 {
     return sc64_terran_late_runtime_step_core(state, program, setup, ops,
-                                              context, paused, 0);
+                                              context, paused, 1);
 }
 
 /* Caller must preserve the full program/state validation invariant after
@@ -480,7 +482,7 @@ sc64_terran_late_runtime_step_prevalidated(
     void *context, int paused)
 {
     return sc64_terran_late_runtime_step_core(state, program, setup, ops,
-                                              context, paused, 1);
+                                              context, paused, 0);
 }
 #endif /* SC64_TERRAN_LATE_RUNTIME && SC64_T4_RUNTIME */
 #endif
