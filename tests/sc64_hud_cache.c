@@ -5,8 +5,8 @@
 #include "../starcraft/game.c"
 
 enum { HUD_TOP = 1, HUD_BOTTOM = 2, FB_PIXELS = 240 * 160 };
-static u8 cached_pixels[FB_PIXELS];
-static u8 full_pixels[FB_PIXELS];
+static _Alignas(4) u8 cached_pixels[FB_PIXELS];
+static _Alignas(4) u8 full_pixels[FB_PIXELS];
 #ifdef SC64_T5_RUNTIME
 static u8 cached_game_frame[FB_PIXELS];
 static u8 fresh_game_frame[FB_PIXELS];
@@ -200,6 +200,81 @@ test_mission_message_timer_and_minimap_stay_pixel_exact(void)
     assert_cached_matches_full();
 }
 
+#if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
+static void
+test_per_buffer_hud_reuse_across_changes_and_scenes(void)
+{
+    u8 buffer, paused_buffer, title_buffer, poisoned_buffer;
+    u32 generation;
+    fixture();
+    screen = SCREEN_PLAY;
+    sc64_hud_buffer_dirty[0] = sc64_hud_buffer_dirty[1] = 0;
+    sc64_hud_buffer_clear_generation[0] = sc64_hud_buffer_clear_generation[1] = 0;
+
+    /* Initial HUD draw dirties both copies; the next two frames consume each
+     * backbuffer's independent cached bands. */
+    game_render();
+    buffer = gfx_backbuffer_index();
+    assert(sc64_hud_buffer_dirty[buffer] == 0);
+    assert(sc64_hud_buffer_dirty[buffer ^ 1] == 3);
+    game_render();
+    assert(sc64_hud_buffer_dirty[gfx_backbuffer_index()] == 0);
+    game_render();
+    assert(sc64_hud_buffer_dirty[gfx_backbuffer_index()] == 0);
+
+    minerals += 31;
+    game_render();
+    buffer = gfx_backbuffer_index();
+    assert(sc64_hud_buffer_dirty[buffer] == 0);
+    assert(sc64_hud_buffer_dirty[buffer ^ 1] & HUD_TOP);
+    game_render();
+    assert(!(sc64_hud_buffer_dirty[gfx_backbuffer_index()] & HUD_TOP));
+    assert_cached_matches_full();
+
+    /* Pause draws over the bottom HUD strip. That framebuffer must repair the
+     * band when it returns to live play, even though the HUD key is unchanged. */
+    screen = SCREEN_PAUSE;
+    game_render();
+    paused_buffer = gfx_backbuffer_index();
+    assert(sc64_hud_buffer_dirty[paused_buffer] & HUD_BOTTOM);
+    screen = SCREEN_PLAY;
+    game_render();
+    game_render();
+    assert(!(sc64_hud_buffer_dirty[paused_buffer] & HUD_BOTTOM));
+    assert_cached_matches_full();
+
+    /* Result and title transitions also exercise preserved and cleared
+     * backbuffers; title's gfx_begin clear generation must force a HUD copy. */
+    screen = SCREEN_RESULT;
+    game_render();
+    screen = SCREEN_PLAY;
+    game_render();
+    game_render();
+    screen = SCREEN_TITLE;
+    game_render();
+    title_buffer = gfx_backbuffer_index();
+    generation = gfx_clear_generation(title_buffer);
+    assert(generation != sc64_hud_buffer_clear_generation[title_buffer]);
+    screen = SCREEN_PLAY;
+    game_render();
+    game_render();
+    assert(sc64_hud_buffer_clear_generation[title_buffer] == generation);
+    assert_cached_matches_full();
+
+    /* An external poison/clear is observable through the per-buffer
+     * generation even though game_render subsequently selects preserve mode. */
+    gfx_begin(0xe7);
+    poisoned_buffer = gfx_backbuffer_index();
+    generation = gfx_clear_generation(poisoned_buffer);
+    gfx_end();
+    assert(generation != sc64_hud_buffer_clear_generation[poisoned_buffer]);
+    game_render();
+    game_render();
+    assert(sc64_hud_buffer_clear_generation[poisoned_buffer] == generation);
+    assert_cached_matches_full();
+}
+#endif
+
 #ifdef SC64_T5_RUNTIME
 static void
 capture_game_frame(u8 *out)
@@ -347,6 +422,9 @@ main(void)
     test_wallet_and_queued_supply_invalidate_top_only();
     test_selection_building_box_and_modes_invalidate_bottom();
     test_mission_message_timer_and_minimap_stay_pixel_exact();
+#if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
+    test_per_buffer_hud_reuse_across_changes_and_scenes();
+#endif
 #ifdef SC64_T5_RUNTIME
     test_t5_static_cache_key_and_hud_timer_are_pixel_exact();
 #endif

@@ -19,6 +19,10 @@ void gba_init(void);
 u16 gba_keys(void);
 u32 gba_clock(void);
 void gfx_begin(u8 background);
+/* The buffer selected by the last begin call, and its explicit-clear count.
+ * Preserve-mode begin leaves that count unchanged for reusable pixel bands. */
+u8 gfx_backbuffer_index(void);
+u32 gfx_clear_generation(u8 buffer_index);
 #if defined(SC64_NO_FRAME_CLEAR) || defined(GBA_HOST)
 void gfx_begin_preserve(void);
 #endif

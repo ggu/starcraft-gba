@@ -43,6 +43,9 @@ PROFILE_CYCLE_NAMES = (
     "sc64_update_research_cycles", "sc64_update_remainder_cycles",
     "sc64_t5_rescue_cycles", "sc64_t5_mine_cycles",
     "sc64_t5_trigger_ai_cycles",
+    "sc64_late_flight_cycles", "sc64_late_world_cycles",
+    "sc64_late_emitter_cycles", "sc64_late_trigger_cycles",
+    "sc64_hud_minimap_cycles",
 )
 REFINERY_TYPES = {3: "terran_refinery", 17: "protoss_assimilator", 20: "zerg_extractor"}
 

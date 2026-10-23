@@ -22,9 +22,20 @@ reference_step_clear(const Unit *q, int nx, int ny)
     if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) return 0;
     if (IS_WORKER(q->type) && (q->order == ORDER_MINE || q->order == ORDER_GAS))
         return 1;
+#ifdef SC64_T4_RUNTIME
+    if (sc64_race_t4_actor_flags(q->type) &&
+        !(sc64_race_t4_actor_flags(q->type) & SC64_T4_ACTOR_MOVABLE)) return 1;
+#endif
     for (i = 0; i < MAX_UNITS; ++i)
-        if (&u[i] != q && u[i].alive && u[i].type != U_CHRYSALIS &&
+        if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
+            u[i].type != U_CHRYSALIS &&
             sc64_race_unit_flying(u[i].type) == sc64_race_unit_flying(q->type)) {
+#ifdef SC64_T4_RUNTIME
+            if ((sc64_race_t4_actor_flags(u[i].type) &&
+                 !(sc64_race_t4_actor_flags(u[i].type) & SC64_T4_ACTOR_COLLIDABLE)) ||
+                (sc64_race_t4_actor_flags(q->type) &&
+                 !(sc64_race_t4_actor_flags(q->type) & SC64_T4_ACTOR_COLLIDABLE))) continue;
+#endif
             int dx = u[i].x - nx, dy = u[i].y - ny;
             if (dx <= -6 || dx >= 6 || dy <= -6 || dy >= 6) continue;
             if (dx * dx + dy * dy < 36 &&
@@ -121,6 +132,71 @@ movement_invalidation(unsigned int *checks)
 }
 
 static void
+persistent_reconciliation(unsigned int *checks)
+{
+    memset(u, 0, sizeof(u));
+    u[0].alive = u[1].alive = 1;
+    u[0].type = u[1].type = U_MARINE;
+    u[0].x = 100; u[0].y = 100;
+    u[1].x = 104; u[1].y = 100;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    check_candidate(&u[0], 101, 100, checks);
+#ifdef SC64_T5_RUNTIME
+    /* A loaded live neighbor is omitted from the bucket when reconciled. */
+    u[1].order = ORDER_TRANSPORTED;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_cell[1] == 0xffffu);
+    check_candidate(&u[0], 101, 100, checks);
+    /* Unloading during an active update re-inserts it through the normal move
+     * hook, restoring the exact blocking result. */
+    u[1].order = ORDER_IDLE;
+    sc64_unit_bucket_move(&u[1]);
+    check_candidate(&u[0], 101, 100, checks);
+#endif
+    u[0].x = 117; sc64_unit_bucket_move(&u[0]);
+    check_candidate(&u[0], 118, 100, checks);
+    sc64_unit_buckets_end();
+
+    /* Death and transport remove memberships on the next reconciliation. */
+    u[1].alive = 0;
+#ifdef SC64_T5_RUNTIME
+    u[0].order = ORDER_TRANSPORTED;
+#endif
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    assert(sc64_unit_bucket_cell[1] == 0xffffu);
+#ifdef SC64_T5_RUNTIME
+    assert(sc64_unit_bucket_cell[0] == 0xffffu);
+    u[0].order = ORDER_IDLE;
+#endif
+    check_candidate(&u[0], u[0].x + 1, u[0].y, checks);
+
+    /* Reuse a dead slot at the same cell and at another cell. */
+    u[1].alive = 1; u[1].type = U_MARINE;
+    u[1].x = u[0].x; u[1].y = u[0].y;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    assert(sc64_unit_bucket_cell[1] == sc64_unit_bucket_cell_at(u[1].x, u[1].y));
+    check_candidate(&u[0], u[0].x + 1, u[0].y, checks);
+    u[1].x = 300; u[1].y = 300;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    check_candidate(&u[0], u[0].x + 1, u[0].y, checks);
+
+    /* An out-of-world member deactivates safely; the next valid tick repairs
+     * membership without retaining its old bucket link. */
+    u[1].x = -1;
+    sc64_unit_buckets_begin();
+    assert(!sc64_unit_bucket_active);
+    u[1].x = WORLD_W - 1;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    check_candidate(&u[0], u[0].x + 1, u[0].y, checks);
+    sc64_unit_buckets_end();
+}
+
+static void
 edge_overflow_and_passthrough(unsigned int *checks)
 {
     int i;
@@ -171,6 +247,7 @@ main(void)
     unsigned int checks = 0;
     randomized_states(&checks);
     movement_invalidation(&checks);
+    persistent_reconciliation(&checks);
     edge_overflow_and_passthrough(&checks);
     printf("Race collision buckets match full scan (%u checks).\n", checks);
     return 0;

@@ -5,6 +5,7 @@
     defined(SC64_TERRAN_LATE_ACTORS)
 
 #include "sc64_terran_late_mission_state.h"
+#include "sc64_terran_late_count_cache.h"
 #include "sc64_unit_availability.h"
 #include "sc64_t7_scenario_generated.h"
 #include "sc64_t8_scenario_generated.h"
@@ -16,6 +17,11 @@
 #include "sc64_t10_availability_generated.h"
 #include "sc64_t4_queries.h"
 #include "sc64_t4_actions.h"
+
+#ifdef SC64_DIAGNOSTIC_UPDATE
+volatile u32 sc64_late_flight_cycles, sc64_late_world_cycles;
+volatile u32 sc64_late_emitter_cycles, sc64_late_trigger_cycles;
+#endif
 
 enum {
     SC64_TERRAN_LATE_SOURCE_HUMAN_CONTROLLER = 6,
@@ -997,6 +1003,7 @@ race_late_building_product_available(int owner, int raw_owner, int type)
 static const Sc64TerranLateRuntimeOps race_late_runtime_ops = {
     race_late_trigger_count, race_late_trigger_action
 };
+static Sc64TerranLateCountCache race_late_count_cache;
 
 static int
 race_late_init(void)
@@ -1193,6 +1200,12 @@ race_late_tick(void)
 {
     const Sc64T4Scenario *scenario;
     const Sc64T4SourceSetup *setup;
+    int trigger_ok;
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    u32 late_stage_start;
+    sc64_late_flight_cycles = sc64_late_world_cycles = 0;
+    sc64_late_emitter_cycles = sc64_late_trigger_cycles = 0;
+#endif
     if (!race_late_active()) return 1;
     scenario = sc64_terran_late_scenario_for_mission(race_selected_mission);
     setup = sc64_terran_late_setup_for_mission(race_selected_mission);
@@ -1203,12 +1216,36 @@ race_late_tick(void)
         race_late.message = 0;
     if (race_late.ping_ticks && !--race_late.ping_ticks)
         race_late.ping_x = race_late.ping_y = 0;
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    late_stage_start = gba_clock();
+#endif
     race_late_flight_tick();
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    sc64_late_flight_cycles = gba_clock() - late_stage_start;
+    late_stage_start = gba_clock();
+#endif
     sc64_terran_late_world_tick();
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    sc64_late_world_cycles = gba_clock() - late_stage_start;
+    late_stage_start = gba_clock();
+#endif
     sc64_terran_late_emitter_tick();
-    if (!sc64_terran_late_runtime_step_prevalidated(
-            &race_late.triggers, scenario, setup, &race_late_runtime_ops,
-            &race_late, 0)) return 0;
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    sc64_late_emitter_cycles = gba_clock() - late_stage_start;
+    late_stage_start = gba_clock();
+#endif
+    /* Actor counts stay stable during condition evaluation. Delegated actions
+     * invalidate the memo before they can change units, buildings or regions. */
+    sc64_terran_late_count_cache_init(&race_late_count_cache,
+                                     &race_late_runtime_ops, &race_late);
+    trigger_ok = sc64_terran_late_runtime_step_prevalidated(
+            &race_late.triggers, scenario, setup,
+            &sc64_terran_late_count_cache_ops,
+            &race_late_count_cache, 0);
+#ifdef SC64_DIAGNOSTIC_UPDATE
+    sc64_late_trigger_cycles = gba_clock() - late_stage_start;
+#endif
+    if (!trigger_ok) return 0;
     race_campaign.message = race_late.message;
     race_campaign.message_ticks = race_late.message_ticks;
     race_campaign.objective_stage = race_late.emitter_carrier !=

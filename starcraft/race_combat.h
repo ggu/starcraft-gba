@@ -31,10 +31,14 @@ static int race_can_attack(int attacker,int target) {
 #error "SC64_P3_DEFENSE_TARGETS requires SC64_UNIFIED"
 #endif
 
-#ifdef SC64_P3_DEFENSE_TARGETS
+#if defined(SC64_P3_DEFENSE_TARGETS) || defined(SC64_TERRAN_LATE_RUNTIME)
 /* Keep the original full scan as both the fallback for every other mission
- * and a differential oracle for the P3-only candidate-list path. */
+ * and a differential oracle for candidate-list paths. */
+#ifdef SC64_TERRAN_LATE_RUNTIME
+static __attribute__((noinline)) void race_tick_defenses_fullscan(void) {
+#else
 static void GBA_HOT race_tick_defenses_fullscan(void) {
+#endif
 #else
 static void GBA_HOT race_tick_defenses(void) {
 #endif
@@ -127,6 +131,73 @@ static void race_tick_defenses(void) {
         race_tick_defenses_p3_targets();
     else
         race_tick_defenses_fullscan();
+}
+#elif defined(SC64_TERRAN_LATE_RUNTIME)
+/* Per-tick defense candidate lists reduce the 96-building x 192-unit scan to
+ * the owners each defense can actually attack. The links use unit slots, so
+ * their byte representation remains valid while MAX_UNITS is 192. */
+static int GBA_HOT __attribute__((noinline))
+race_defense_target_from_owner_lists(const Building *q, int ground, int air,
+                                     int range, const u8 head[5],
+                                     const u8 next[MAX_UNITS])
+{
+    int best = -1, bestd = range * range;
+    for (int owner = 0; owner < 5; ++owner) {
+        if (!owners_hostile(q->owner, owner)) continue;
+        for (int j = head[owner]; j != 0xff; j = next[j]) {
+            if (!u[j].alive || u[j].owner != owner) continue;
+            if (FAST_ABS(q->x - u[j].x) >= range ||
+                FAST_ABS(q->y - u[j].y) >= range || (u[j].flags & 16)) continue;
+            int flying = sc64_race_unit_flying(u[j].type);
+            if ((flying && !air) || (!flying && !ground) || !race_can_attack(-1, j)) continue;
+            int d = dist2(q->x, q->y, u[j].x, u[j].y);
+            /* The original ascending full scan keeps the lowest slot on ties. */
+            if (d < bestd || (best >= 0 && d == bestd && j < best)) {
+                bestd = d;
+                best = j;
+            }
+        }
+    }
+    return best;
+}
+
+static __attribute__((noinline)) void race_tick_defenses_late_targets(void)
+{
+    u8 head[5], next[MAX_UNITS];
+    memset(head, 0xff, sizeof(head));
+    for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
+        int owner = u[j].owner;
+        if (owner < 0 || owner >= 5) continue;
+        next[j] = head[owner];
+        head[owner] = (u8)j;
+    }
+
+    for (int i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i)) {
+        Building *q = &b[i];
+        int ground = 0, air = 0, range = 0, damage = 0, cooldown = 0;
+        switch (q->type) {
+        case B_PHOTON_CANNON:
+            if (!race_site_powered(q->owner, q->x, q->y)) continue;
+            ground = air = 1; range = 112; damage = 20; cooldown = 28; break;
+        case B_SUNKEN_COLONY: ground = 1; range = 112; damage = 40; cooldown = 40; break;
+        case B_SPORE_COLONY: air = 1; range = 112; damage = 15; cooldown = 19; break;
+        case B_MISSILE_TURRET: air = 1; range = 112; damage = 20; cooldown = 19; break;
+        default: continue;
+        }
+        if (q->queue_progress > 0) { q->queue_progress--; continue; }
+        int best = race_defense_target_from_owner_lists(q, ground, air, range, head, next);
+        if (best >= 0) {
+            hit_target(best, damage, U_MARINE, q->owner);
+            add_tracer(q->x, q->y, u[best].x, u[best].y, owner_color(q->owner));
+            q->queue_progress = cooldown;
+        }
+    }
+}
+
+static void race_tick_defenses(void)
+{
+    if (race_late_active()) race_tick_defenses_late_targets();
+    else race_tick_defenses_fullscan();
 }
 #endif
 #endif

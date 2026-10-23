@@ -9,8 +9,6 @@ static u8 sc64_unit_bucket_head[MAP_CELLS];
 static u8 sc64_unit_bucket_next[MAX_UNITS];
 static u8 sc64_unit_bucket_prev[MAX_UNITS];
 static u16 sc64_unit_bucket_cell[MAX_UNITS];
-static u16 sc64_unit_bucket_dirty[MAX_UNITS * 2];
-static u16 sc64_unit_bucket_dirty_count;
 static int sc64_unit_bucket_initialized;
 static int sc64_unit_bucket_active;
 
@@ -24,18 +22,32 @@ static void GBA_HOT
 sc64_unit_bucket_insert(int slot, int cell)
 {
     u8 head = sc64_unit_bucket_head[cell];
-    if (head == 0xff) {
-        if (sc64_unit_bucket_dirty_count >= MAX_UNITS * 2) {
-            sc64_unit_bucket_active = 0;
-            return;
-        }
-        sc64_unit_bucket_dirty[sc64_unit_bucket_dirty_count++] = (u16)cell;
-    }
     sc64_unit_bucket_prev[slot] = 0xff;
     sc64_unit_bucket_next[slot] = head;
     if (head != 0xff) sc64_unit_bucket_prev[head] = (u8)slot;
     sc64_unit_bucket_head[cell] = (u8)slot;
     sc64_unit_bucket_cell[slot] = (u16)cell;
+}
+
+#ifdef SC64_T5_RUNTIME
+/* Removal is needed on cell transitions and lifecycle changes, rather than
+ * every collision query. Keep it out of the late profile's fast-code budget. */
+static void __attribute__((noinline))
+#else
+static void GBA_HOT __attribute__((noinline))
+#endif
+sc64_unit_bucket_remove(int slot)
+{
+    u16 cell = sc64_unit_bucket_cell[slot];
+    u8 before, after;
+    if (cell == 0xffffu) return;
+    before = sc64_unit_bucket_prev[slot];
+    after = sc64_unit_bucket_next[slot];
+    if (before == 0xff) sc64_unit_bucket_head[cell] = after;
+    else sc64_unit_bucket_next[before] = after;
+    if (after != 0xff) sc64_unit_bucket_prev[after] = before;
+    sc64_unit_bucket_next[slot] = sc64_unit_bucket_prev[slot] = 0xff;
+    sc64_unit_bucket_cell[slot] = 0xffffu;
 }
 
 #ifdef SC64_T5_RUNTIME
@@ -50,41 +62,55 @@ sc64_unit_buckets_begin(void)
     int i;
     if (!sc64_unit_bucket_initialized) {
         memset(sc64_unit_bucket_head, 0xff, sizeof(sc64_unit_bucket_head));
+        for (i = 0; i < MAX_UNITS; ++i) {
+            sc64_unit_bucket_next[i] = 0xff;
+            sc64_unit_bucket_prev[i] = 0xff;
+            sc64_unit_bucket_cell[i] = 0xffffu;
+        }
         sc64_unit_bucket_initialized = 1;
-    } else {
-        for (i = 0; i < sc64_unit_bucket_dirty_count; ++i)
-            sc64_unit_bucket_head[sc64_unit_bucket_dirty[i]] = 0xff;
     }
-    sc64_unit_bucket_dirty_count = 0;
     sc64_unit_bucket_active = 0;
     for (i = 0; i < MAX_UNITS; ++i) {
-        sc64_unit_bucket_next[i] = 0xff;
-        sc64_unit_bucket_prev[i] = 0xff;
-    }
-    for (i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
-            int x = u[i].x, y = u[i].y;
-            if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) return;
-            sc64_unit_bucket_insert(i, sc64_unit_bucket_cell_at(x, y));
-            if (!sc64_unit_bucket_active && sc64_unit_bucket_dirty_count >= MAX_UNITS * 2) return;
+        int x = u[i].x, y = u[i].y;
+        u16 old_cell = sc64_unit_bucket_cell[i];
+        if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i])) {
+            sc64_unit_bucket_remove(i);
+            continue;
         }
+        if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) {
+            sc64_unit_bucket_remove(i);
+            return;
+        }
+        int new_cell = sc64_unit_bucket_cell_at(x, y);
+        if (old_cell != (u16)new_cell) {
+            sc64_unit_bucket_remove(i);
+            sc64_unit_bucket_insert(i, new_cell);
+        }
+    }
     sc64_unit_bucket_active = 1;
 }
 
 static void GBA_HOT
+#if defined(SC64_T5_RUNTIME) && !defined(GBA_HOST)
+__attribute__((optimize("Os")))
+#endif
 sc64_unit_bucket_move(Unit *q)
 {
     int slot = (int)(q - u), old_cell, new_cell;
-    u8 before, after;
     if (!sc64_unit_bucket_active || slot < 0 || slot >= MAX_UNITS) return;
+    if (!q->alive || SC64_TRANSPORT_LOADED(q)) {
+        sc64_unit_bucket_remove(slot);
+        return;
+    }
+    if (q->x < 0 || q->y < 0 || q->x >= WORLD_W || q->y >= WORLD_H) {
+        sc64_unit_bucket_remove(slot);
+        sc64_unit_bucket_active = 0;
+        return;
+    }
     old_cell = sc64_unit_bucket_cell[slot];
     new_cell = sc64_unit_bucket_cell_at(q->x, q->y);
     if (old_cell == new_cell) return;
-    before = sc64_unit_bucket_prev[slot];
-    after = sc64_unit_bucket_next[slot];
-    if (before == 0xff) sc64_unit_bucket_head[old_cell] = after;
-    else sc64_unit_bucket_next[before] = after;
-    if (after != 0xff) sc64_unit_bucket_prev[after] = before;
+    sc64_unit_bucket_remove(slot);
     sc64_unit_bucket_insert(slot, new_cell);
 }
 

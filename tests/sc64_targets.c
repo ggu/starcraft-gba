@@ -9,6 +9,16 @@ static int reference_can_attack(int attacker, int target, int owner)
     /* The P3 Scourge override includes hostility/air-only constraints that
      * race_can_attack alone does not model. */
     return sc64_p3_can_attack_from(attacker, target, owner);
+#elif defined(SC64_T4_RUNTIME)
+    int expected = race_can_attack(attacker, target);
+#ifdef SC64_T6_RUNTIME
+    if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target))
+        expected = 0;
+#endif
+    /* T4's wrapper must preserve race_can_attack eligibility exactly; T6's
+     * extra burrow rejection above is its only additional condition. */
+    assert(sc64_t4_can_attack_from(attacker, target, owner) == expected);
+    return expected;
 #else
     (void)owner;
     return race_can_attack(attacker, target);
@@ -125,6 +135,12 @@ int main(void)
     build_owner_lists();
     sc64_target_index_begin();
     assert(sc64_target_index_active);
+    sc64_target_hostility_snapshot();
+    assert(target_hostile_masks_valid);
+    for (int owner = 0; owner < 5; ++owner)
+        for (int other = 0; other < 5; ++other)
+            assert(!!(target_hostile_mask[owner] & (1u << other)) ==
+                   !!owners_hostile(owner, other));
     compare_attacker_matrix();
     for (int range_index = 0; range_index < 5; ++range_index) {
         int range = (int[]){ 1, 52, 64, 112, 128 }[range_index];
@@ -160,14 +176,41 @@ int main(void)
      * old cell must stop returning it and its new cell must return it. */
     moving = 0;
     u[moving].flags = 0;
-    u[moving].x = 900; u[moving].y = 900;
+    u[moving].x = WORLD_W - 16; u[moving].y = WORLD_H - 16;
     sc64_target_index_move(&u[moving]);
-    compare_query(900, 900, ENEMY, 10, U_MARINE);
+    assert(sc64_target_owner_columns[SIDE] & (1u << ((WORLD_W - 16) >> 6)));
+    assert(sc64_target_owner_rows[SIDE] & (1u << ((WORLD_H - 16) >> 6)));
+    compare_query(WORLD_W - 16, WORLD_H - 16, ENEMY, 10, U_MARINE);
     compare_query(180, 120, ENEMY, 10, U_MARINE);
 
     /* Death remains an immediate filter without rebuilding the index. */
     u[moving].alive = 0;
-    compare_query(900, 900, ENEMY, 10, U_MARINE);
+    compare_query(WORLD_W - 16, WORLD_H - 16, ENEMY, 10, U_MARINE);
+    assert(sc64_target_owner_columns[SIDE] & (1u << ((WORLD_W - 16) >> 6)));
+
+    /* Exercise masks at both bit endpoints. Moves add occupancy immediately;
+     * dead-entry bits remain conservative until the next begin reset. */
+    race_cols = race_rows = 128;
+    memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b));
+    u[0].alive = 1; u[0].owner = ENEMY; u[0].type = U_MARINE;
+    u[0].x = WORLD_W - 32; u[0].y = WORLD_H - 32;
+    build_owner_lists(); sc64_target_index_begin();
+    assert(sc64_target_index_active);
+    assert(sc64_target_owner_columns[ENEMY] == (1u << 31));
+    assert(sc64_target_owner_rows[ENEMY] == (1u << 31));
+    compare_query(u[0].x, u[0].y, SIDE, 1, U_MARINE);
+    u[0].x = u[0].y = 32;
+    sc64_target_index_move(&u[0]);
+    assert(sc64_target_owner_columns[ENEMY] == ((1u << 31) | 1u));
+    assert(sc64_target_owner_rows[ENEMY] == ((1u << 31) | 1u));
+    compare_query(32, 32, SIDE, 1, U_MARINE);
+    u[0].alive = 0;
+    compare_query(32, 32, SIDE, 1, U_MARINE);
+    assert(sc64_target_owner_columns[ENEMY] & 1u);
+    sc64_target_index_begin();
+    assert(sc64_target_index_active);
+    assert(sc64_target_owner_columns[ENEMY] == 0);
+    assert(sc64_target_owner_rows[ENEMY] == 0);
 
     /* Keep only the highest unit and building slots alive to cover the
      * uint8 sentinel edge and unified global-index ordering. */

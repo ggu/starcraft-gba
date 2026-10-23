@@ -44,6 +44,7 @@ LATE_TERRAN_RUNTIME_FLAGS := $(filter-out -I.local/sc64/races/generated,$(LATE_T
 LATE_TERRAN_HEADERS := $(LATE_TERRAN_STAGE)/sc64_races_generated.h $(LATE_TERRAN_STAGE)/sc64_race_sprites_generated.h $(foreach mission,7 8 9 10,$(LATE_TERRAN_STAGE)/sc64_t$(mission)_scenario_generated.h $(LATE_TERRAN_STAGE)/sc64_t$(mission)_availability_generated.h)
 TERRAN_FULL_FLAGS := $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_T6_CAMPAIGN_ENTRY -DSC64_TERRAN_FULL_CAMPAIGN_ENTRY
 TERRAN_FULL_INPUTS = $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER)
+
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
 T4_SCENARIO_RECORDS := .local/sc64/races/generated/t4/records
 T5_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t5_scenario_generated.h
@@ -1037,6 +1038,29 @@ build/StarCraft-Terran-GBA.gba: build/starcraft-terran.elf tools/fix_rom.py
 	$(PYTHON) tools/fix_rom.py $@ 'SC TERRAN 10' SCT8
 verify-terran: build/StarCraft-Terran-GBA.gba
 	$(PYTHON) tools/verify_roms.py --terran
+build/test-sc64-terran-late-count-cache: tests/sc64_terran_late_count_cache.c starcraft/sc64_terran_late_count_cache.h Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $< -o $@
+build/test-sc64-terran-defense-targets: tests/sc64_terran_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $< common/gba.c -o $@
+build/test-sc64-terran-full-targets: tests/sc64_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $< common/gba.c -o $@
+build/test-sc64-terran-full-collision: tests/sc64_race_collision.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $< common/gba.c -o $@
+build/test-sc64-terran-full-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-terran-late-count-cache test-sc64-terran-defense-targets test-sc64-terran-full-targets test-sc64-terran-full-spatial-hud
+test-sc64-terran-late-count-cache: build/test-sc64-terran-late-count-cache
+	./$<
+test-sc64-terran-defense-targets: build/test-sc64-terran-defense-targets
+	./$<
+test-starcraft: test-sc64-terran-late-count-cache
+test-sc64-terran-full-targets: build/test-sc64-terran-full-targets
+	./build/test-sc64-terran-full-targets
+test-sc64-terran-full-spatial-hud: build/test-sc64-terran-full-collision build/test-sc64-terran-full-hud
+	./build/test-sc64-terran-full-collision
+	./build/test-sc64-terran-full-hud
+test-sc64-terran-full-campaign: test-sc64-terran-defense-targets test-sc64-terran-full-targets test-sc64-terran-full-spatial-hud
+
 build/test-terran: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $< common/gba.c -o $@
 build/test-sc64-terran-full-profile: tests/sc64_terran_full_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build

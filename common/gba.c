@@ -20,6 +20,8 @@ static volatile u16 *pixels=host_fb[1];
 static volatile u16 *pixels=(volatile u16*)0x0600a000;
 #endif
 static u16 front;
+static u8 backbuffer_index;
+static u32 clear_generation[2];
 static int tone_frames;
 volatile u32 gfx_draw_cycles;
 static u32 draw_start;
@@ -36,7 +38,8 @@ static const u16 colors[32]={
 __attribute__((used)) const char gba_save_signature[]="SRAM_V113";
 void gba_init(void) {
 #ifdef GBA_HOST
- front=0; pixels=host_fb[1];
+ front=0; backbuffer_index=1; clear_generation[0]=clear_generation[1]=0;
+ pixels=host_fb[1];
  for(int i=0;i<32;i++)host_palette[i]=colors[i];
 #else
  REG16(0x04000208)=0;
@@ -49,7 +52,12 @@ void gba_init(void) {
  REG16(0x04000082)=0x0002;
  REG16(0x04000108)=0; REG16(0x0400010c)=0;
  REG16(0x0400010e)=0x0084; REG16(0x0400010a)=0x0080;
+ front=0; backbuffer_index=1; clear_generation[0]=clear_generation[1]=0;
 #endif
+}
+u8 gfx_backbuffer_index(void) { return backbuffer_index; }
+u32 gfx_clear_generation(u8 buffer_index) {
+ return buffer_index < 2 ? clear_generation[buffer_index] : 0;
 }
 void gfx_set_palette(int first,int count,const u16 *rgb555) {
  if(first<0||count<0||first+count>256||!rgb555)return;
@@ -79,8 +87,10 @@ static void vblank(void){while(REG16(0x04000006)>=160){}while(REG16(0x04000006)<
 #endif
 void gfx_begin(u8 color) {
  draw_start=gba_clock();
+ backbuffer_index=(u8)(front^1);
+ clear_generation[backbuffer_index]++;
 #ifdef GBA_HOST
- pixels=host_fb[front^1];
+ pixels=host_fb[backbuffer_index];
  for(int i=0;i<19200;i++)pixels[i]=color|((u16)color<<8);
 #else
  pixels=(volatile u16*)(front?0x06000000:0x0600a000);
@@ -97,8 +107,9 @@ void gfx_begin(u8 color) {
 #if defined(SC64_NO_FRAME_CLEAR) || defined(GBA_HOST)
 void gfx_begin_preserve(void) {
  draw_start=gba_clock();
+ backbuffer_index=(u8)(front^1);
 #ifdef GBA_HOST
- pixels=host_fb[front^1];
+ pixels=host_fb[backbuffer_index];
 #else
  pixels=(volatile u16*)(front?0x06000000:0x0600a000);
 #endif

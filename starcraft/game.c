@@ -459,6 +459,10 @@ static int target_unit_head[5], target_building_head[5];
 static int target_unit_next[MAX_UNITS], target_building_next[MAX_BUILDINGS];
 static int target_lists_valid;
 #ifdef SC64_RACES
+static u8 target_hostile_mask[5];
+static int target_hostile_masks_valid;
+#endif
+#ifdef SC64_RACES
 #include "sc64_targets.h"
 #endif
 static Mineral m[MAX_MINERALS];
@@ -1563,14 +1567,8 @@ static int sc64_t4_can_attack_from(int attacker, int target, int owner)
 #ifdef SC64_T6_RUNTIME
     if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target)) return 0;
 #endif
-    if (target >= 0 && target < MAX_UNITS) {
-        int type = u[target].type;
-        if ((sc64_race_t4_actor_flags(type)&SC64_T4_ACTOR_HIDDEN) ||
-            sc64_race_t4_unit_intrinsically_invincible(type)) return 0;
-    } else if (target >= MAX_UNITS && target < MAX_UNITS + MAX_BUILDINGS &&
-               sc64_race_t4_building_intrinsically_invincible(b[target-MAX_UNITS].type)) {
-        return 0;
-    }
+    /* race_can_attack already applies the T4 hidden and intrinsic-immunity
+     * rules, so keep only the T6-specific burrow rejection here. */
     return race_can_attack(attacker, target);
 }
 #define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
@@ -1579,6 +1577,20 @@ static int sc64_t4_can_attack_from(int attacker, int target, int owner)
 #define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
     race_can_attack((attacker), (target))
 #endif
+static void
+sc64_target_hostility_snapshot(void)
+{
+    int owner, other;
+    target_hostile_masks_valid = 0;
+    if (!target_lists_valid || !sc64_target_index_active) return;
+    for (owner = 0; owner < 5; ++owner) {
+        u8 mask = 0;
+        for (other = 0; other < 5; ++other)
+            if (owners_hostile(owner, other)) mask |= (u8)(1u << other);
+        target_hostile_mask[owner] = mask;
+    }
+    target_hostile_masks_valid = 1;
+}
 static int GBA_HOT __attribute__((noinline))
 #if defined(SC64_T6_RUNTIME) && !defined(GBA_HOST)
 __attribute__((optimize("Os")))
@@ -1592,13 +1604,26 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
     int row0 = (y - max_distance) / SC64_TARGET_CELL_SIZE;
     int col1 = (x + max_distance) / SC64_TARGET_CELL_SIZE;
     int row1 = (y + max_distance) / SC64_TARGET_CELL_SIZE;
+    u32 col_mask, row_mask;
     int p, col, row;
+    u8 hostile_mask;
     if (col0 < 0) col0 = 0;
     if (row0 < 0) row0 = 0;
     if (col1 >= cols) col1 = cols - 1;
     if (row1 >= rows) row1 = rows - 1;
-    for (p = 0; p < 5; ++p) {
-        if (!owners_hostile(owner, p)) continue;
+    col_mask = (0xffffffffu >> (31 - col1)) & (0xffffffffu << col0);
+    row_mask = (0xffffffffu >> (31 - row1)) & (0xffffffffu << row0);
+    if (target_hostile_masks_valid && owner >= 0 && owner < 5) {
+        hostile_mask = target_hostile_mask[owner];
+    } else {
+        hostile_mask = 0;
+        for (p = 0; p < 5; ++p)
+            if (owners_hostile(owner, p)) hostile_mask |= (u8)(1u << p);
+    }
+    for (p = 0; hostile_mask; ++p, hostile_mask >>= 1) {
+        if (!(hostile_mask & 1u)) continue;
+        if (!(sc64_target_owner_columns[p] & col_mask) ||
+            !(sc64_target_owner_rows[p] & row_mask)) continue;
         for (row = row0; row <= row1; ++row)
             for (col = col0; col <= col1; ++col) {
                 int cell = col + row * SC64_TARGET_GRID_COLS;
@@ -1615,14 +1640,13 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
                         candidate_x = b[bi].x; candidate_y = b[bi].y;
                     }
                     if (FAST_ABS(x - candidate_x) >= max_distance ||
-                        FAST_ABS(y - candidate_y) >= max_distance ||
-                        !SC64_CAN_ATTACK_FROM(attacker, entity, owner)) continue;
+                        FAST_ABS(y - candidate_y) >= max_distance) continue;
                     d = dist2(x, y, candidate_x, candidate_y);
-                    if (d < best_distance ||
-                        (best >= 0 && d == best_distance && entity < best)) {
-                        best_distance = d;
-                        best = entity;
-                    }
+                    if (d > best_distance ||
+                        (d == best_distance && (best < 0 || entity >= best)) ||
+                        !SC64_CAN_ATTACK_FROM(attacker, entity, owner)) continue;
+                    best_distance = d;
+                    best = entity;
                 }
             }
     }
@@ -3390,6 +3414,7 @@ update_orders(void)
 target_lists_unavailable:
 #ifdef SC64_RACES
     if (target_lists_valid) sc64_target_index_begin();
+    sc64_target_hostility_snapshot();
 #endif
 #ifdef SC64_DIAGNOSTIC_ORDERS
     sc64_order_setup_cycles = gba_clock() - sc64_setup_start;
@@ -3618,6 +3643,7 @@ target_lists_unavailable:
     }
     target_lists_valid = 0;
 #ifdef SC64_RACES
+    target_hostile_masks_valid = 0;
     sc64_target_index_end();
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
@@ -5296,6 +5322,10 @@ draw_hud_commands(void)
 #ifdef SC64_IMPORTED_MISSION
 static _Alignas(4) u8 sc64_hud_top[240 * 12], sc64_hud_bottom[240 * 40];
 static int sc64_hud_previous[24], sc64_hud_valid;
+#if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
+static u8 sc64_hud_buffer_dirty[2];
+static u32 sc64_hud_buffer_clear_generation[2];
+#endif
 
 #ifdef SC64_LATE_TERRAN_STORAGE
 /* Keep the expanded actor loop and target search in IWRAM. This once-per-
@@ -5365,6 +5395,35 @@ static void
 draw_hud(void)
 {
 #ifdef SC64_IMPORTED_MISSION
+#if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
+    int changed = sc64_hud_changed();
+    u8 buffer = gfx_backbuffer_index();
+    u8 dirty;
+    u32 generation = gfx_clear_generation(buffer);
+    if (changed) {
+        sc64_hud_buffer_dirty[0] |= (u8)changed;
+        sc64_hud_buffer_dirty[1] |= (u8)changed;
+    }
+    dirty = sc64_hud_buffer_dirty[buffer];
+    if (sc64_hud_buffer_clear_generation[buffer] != generation) dirty |= 3;
+    if (dirty & 1) {
+        if (changed & 1) {
+            draw_hud_resources();
+            gfx_read_band(0, 12, sc64_hud_top);
+        } else gfx_blit_band(0, 12, sc64_hud_top);
+        dirty &= (u8)~1;
+    }
+    if (dirty & 2) {
+        if (changed & 2) {
+            draw_hud_commands();
+            gfx_read_band(120, 40, sc64_hud_bottom);
+        } else gfx_blit_band(120, 40, sc64_hud_bottom);
+        dirty &= (u8)~2;
+    }
+    sc64_hud_buffer_dirty[buffer] = dirty;
+    sc64_hud_buffer_clear_generation[buffer] = generation;
+    sc64_hud_valid = 1;
+#else
     int changed = sc64_hud_changed();
     if (changed & 1) {
         draw_hud_resources();
@@ -5375,6 +5434,7 @@ draw_hud(void)
         gfx_read_band(120, 40, sc64_hud_bottom);
     } else gfx_blit_band(120, 40, sc64_hud_bottom);
     sc64_hud_valid = 1;
+#endif
 #else
     draw_hud_resources();
     draw_hud_commands();
@@ -5437,9 +5497,13 @@ game_render(void)
 #ifdef SC64_IMPORTED_MISSION
         sc64_hud_cycles = gba_clock() - profile_start;
 #endif
-	if (screen == SCREEN_PAUSE)
+	if (screen == SCREEN_PAUSE) {
 	    draw_pause();
-	else if (screen == SCREEN_RESULT)
+	#if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
+	    /* The pause panel crosses the bottom cached HUD band. */
+	    sc64_hud_buffer_dirty[gfx_backbuffer_index()] |= 2;
+	#endif
+	} else if (screen == SCREEN_RESULT)
 	    draw_result();
     }
     gfx_end();
