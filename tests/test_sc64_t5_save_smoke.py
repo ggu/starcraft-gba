@@ -51,6 +51,25 @@ class T5SaveSmokeMenuTests(unittest.TestCase):
         ])
         self.assertEqual(rsp.ticks, [2] * 12)
 
+    def test_late_terrans_use_correct_campaign_page_and_row(self):
+        expected = {
+            5: (1, 16, 16, 1, 1),
+            6: (1, 16, 16, 128, 1, 1),
+            7: (1, 16, 16, 16, 1, 1),
+            8: (1, 16, 16, 16, 128, 1, 1),
+            9: (1, 16, 16, 16, 16, 1, 1),
+            10: (1, 16, 16, 16, 16, 128, 1, 1),
+        }
+        for mission, buttons in expected.items():
+            with self.subTest(mission=mission):
+                self.assertEqual(smoke.campaign_menu_buttons(mission), buttons)
+                rsp = FakeRsp()
+                smoke.enter_t5_campaign_menu(rsp, 0x1234, mission)
+                self.assertEqual(len(rsp.ticks), 2 * len(buttons))
+                self.assertEqual(rsp.ticks, [2] * (2 * len(buttons)))
+        with self.assertRaises(ValueError):
+            smoke.campaign_menu_buttons(11)
+
     @staticmethod
     def pack_compact(values):
         row = bytearray(38)
@@ -90,6 +109,45 @@ class T5SaveSmokeMenuTests(unittest.TestCase):
             smoke.decode_compact_unit_row(row[:-1] + bytes([row[-1] | 0x80]))
         with self.assertRaises(ValueError):
             smoke.decode_compact_unit_rows(bytes(4) + row, 2)
+
+    def test_generation18_uses_dwarf_payload_and_late_runtime_capacity(self):
+        self.assertEqual(smoke.STORAGE_SCHEMAS[18], (96, None))
+        self.assertEqual(smoke.STORAGE_UNIT_COUNTS[18], 192)
+        self.assertEqual(smoke.STORAGE_MINERAL_COUNTS[18], 80)
+
+    def test_late_state_payload_extracts_exact_union_member(self):
+        payload = bytes(range(256)) * 8
+        fields = {"terran_late": 137}
+        self.assertEqual(smoke.late_save_state(payload, fields, 1892), payload[137:2029])
+        with self.assertRaises(ValueError):
+            smoke.late_save_state(payload[:1000], fields, 1892)
+
+    def test_late_state_summary_decodes_all_trigger_clocks_links_and_goals(self):
+        raw = bytearray(1892)
+        trigger_fields = {"player": 0}
+        player_fields = {"elapsed_ticks": 0, "fault": 139}
+        for owner in range(8):
+            base = owner * 144
+            raw[base:base + 4] = (200 + owner).to_bytes(4, "little")
+            raw[base + 139] = 0
+        fields = {"triggers": 0, "flight_goals": 1456,
+                  "emitter_unit": 1874, "emitter_carrier": 1876}
+        raw[1874:1876] = (191).to_bytes(2, "little")
+        raw[1876:1878] = (23).to_bytes(2, "little")
+        raw[1456:1460] = (1 << 22 | 17 | (19 << 11)).to_bytes(4, "little")
+        summary = smoke.late_state_summary(raw, fields, 1892,
+                                           trigger_fields, 1184,
+                                           player_fields, 144)
+        self.assertEqual(summary["trigger_clocks"], list(range(200, 208)))
+        self.assertEqual(summary["trigger_faults"], [0] * 8)
+        self.assertEqual(summary["emitter_unit"], 191)
+        self.assertEqual(summary["emitter_carrier"], 23)
+        self.assertEqual(summary["active_flight_goals"], 1)
+        self.assertEqual(summary["flight_goals"][0], 1 << 22 | 17 | (19 << 11))
+        with self.assertRaises(ValueError):
+            smoke.late_state_summary(raw[:-1], fields, 1892,
+                                     trigger_fields, 1184,
+                                     player_fields, 144)
 
     def test_compact_runtime_rows_preserve_every_named_field_including_dead(self):
         fields = {}

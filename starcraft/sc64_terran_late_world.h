@@ -353,6 +353,14 @@ sc64_terran_late_actor_rect(int raw_type, int building, int x, int y,
         out->right=x*2+right+1; out->bottom=y*2+d+1;
         return 1;
     }
+    /* Kerrigan and Raynor's hero Vulture use the earlier T5 actor facts;
+     * they must also support late source region/invincibility queries. */
+    if (!building && runtime_type >= 0 &&
+        sc64_t5_actor_bounds_source(runtime_type, &l, &u, &right, &d)) {
+        out->left=x*2-l; out->top=y*2-u;
+        out->right=x*2+right+1; out->bottom=y*2+d+1;
+        return 1;
+    }
     if (!building && sc64_t4_query_actor_rect((unsigned)raw_type, x*2, y*2, &r)) {
         out->left=r.left; out->top=r.top;
         out->right=r.right; out->bottom=r.bottom;
@@ -789,6 +797,34 @@ sc64_terran_late_center_location(const Sc64TerranLateMissionState *state,
     return 1;
 }
 
+/* MoveLocation accepts point-sized source/destination MRGNs. Keep ordinary
+ * query locations on the stricter rectangle accessor; this variant is used
+ * only by opcode 38 and still enforces map bounds/elevation validity. */
+static int
+sc64_terran_late_move_location_rect(const Sc64TerranLateMissionState *state,
+                                    unsigned id, Sc64TerranLateRect *out)
+{
+    const Sc64T4Scenario *scenario =
+        sc64_terran_late_scenario_for_mission(race_selected_mission);
+    u32 left, top, right, bottom;
+    if (sc64_terran_late_location_rect(state, id, out)) return 1;
+    if (!state || !out || !scenario || !id || id > scenario->location_count)
+        return 0;
+    if (id == state->mutable_location_id) {
+        left = state->mutable_location[0]; top = state->mutable_location[1];
+        right = state->mutable_location[2]; bottom = state->mutable_location[3];
+    } else {
+        const Sc64T4Location *loc = &scenario->locations[id - 1];
+        if (loc->elevation != 0 && loc->elevation != 0x38) return 0;
+        left = loc->left; top = loc->top; right = loc->right; bottom = loc->bottom;
+    }
+    if (left > right || top > bottom || right > (u32)race_cols * 32u ||
+        bottom > (u32)race_rows * 32u) return 0;
+    out->left = (s32)left; out->top = (s32)top;
+    out->right = (s32)right; out->bottom = (s32)bottom;
+    return 1;
+}
+
 /* Source MoveLocation chooses the first matching actor in its source area.
  * The source binary's linked-list ordering is not reproduced here; slot order
  * is the deterministic bounded policy used by this port. */
@@ -806,8 +842,9 @@ sc64_terran_late_move_location(Sc64TerranLateMissionState *state,
         action->modifier || action->flags || action->trailing[0] ||
         action->trailing[1] || action->trailing[2] ||
         action->unit >= SC64_PUNI_UNIT_COUNT ||
-        !sc64_terran_late_location_rect(state, action->location, &source) ||
-        !sc64_terran_late_location_rect(state, action->argument, &destination))
+        !sc64_terran_late_move_location_rect(state, action->location, &source) ||
+        !sc64_terran_late_move_location_rect(state, action->argument,
+                                              &destination))
         return -1;
     memset(&selector, 0, sizeof(selector));
     selector.player = action->player;
@@ -823,7 +860,13 @@ sc64_terran_late_move_location(Sc64TerranLateMissionState *state,
         if (count) { found_x = (u32)u[i].x * 2u;
                      found_y = (u32)u[i].y * 2u; found = 1; break; }
     }
-    if (!found) return 1;
+    /* Native MoveLocation falls back to the source location's center when
+     * its unit query finds no actor. The source helper computes the midpoint
+     * with signed integer division (truncating toward zero). */
+    if (!found) {
+        found_x = (u32)((source.left + source.right) / 2);
+        found_y = (u32)((source.top + source.bottom) / 2);
+    }
     u32 width = (u32)(destination.right - destination.left);
     u32 height = (u32)(destination.bottom - destination.top);
     u32 max_x = (u32)race_cols * 32u, max_y = (u32)race_rows * 32u;
@@ -832,8 +875,11 @@ sc64_terran_late_move_location(Sc64TerranLateMissionState *state,
     s32 top = (s32)found_y - (s32)(height / 2u);
     if (left < 0) left = 0;
     if (top < 0) top = 0;
-    if ((u32)left + width > max_x) left = (s32)(max_x - width);
-    if ((u32)top + height > max_y) top = (s32)(max_y - height);
+    /* Native map bounds are inclusive at the far edge: coordinates at or
+     * beyond tile_count*32 become bound-1, with the opposite edge shifted by
+     * the same overflow. Keep the normal interior translation unchanged. */
+    if ((u32)left + width >= max_x) left = (s32)(max_x - 1u - width);
+    if ((u32)top + height >= max_y) top = (s32)(max_y - 1u - height);
     state->mutable_location_id = (u16)action->argument;
     state->mutable_location[0] = (u32)left;
     state->mutable_location[1] = (u32)top;

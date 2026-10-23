@@ -5,6 +5,16 @@
 #include <string.h>
 #include "../starcraft/game.c"
 
+#ifdef SC64_TERRAN_LATE_RUNTIME
+#define SC64_TEST_OPTIONAL_SAVE_BYTES sizeof(race_data.terran_late)
+#elif defined(SC64_T6_RUNTIME)
+#define SC64_TEST_OPTIONAL_SAVE_BYTES sizeof(race_data.t6)
+#elif defined(SC64_T5_RUNTIME)
+#define SC64_TEST_OPTIONAL_SAVE_BYTES sizeof(race_data.t5)
+#else
+#define SC64_TEST_OPTIONAL_SAVE_BYTES sizeof(race_data.t4)
+#endif
+
 static Unit saved_units[MAX_UNITS];
 static Building saved_buildings[MAX_BUILDINGS];
 static Sc64T4RuntimeState saved_t4;
@@ -223,7 +233,7 @@ static void non_t4_saves_zero_the_optional_state(void)
     init_state(); /* A real skirmish launch initializes its own map/entities. */
     memset(&race_t4, 0xa5, sizeof(race_t4));
     assert(race_save_game());
-    for (unsigned i = 0; i < sizeof(race_data.t4); ++i)
+    for (unsigned i = 0; i < SC64_TEST_OPTIONAL_SAVE_BYTES; ++i)
         assert(((const u8 *)&race_data.t4)[i] == 0);
     assert(race_load_game());
     for (unsigned i = 0; i < sizeof(race_t4); ++i)
@@ -233,7 +243,10 @@ static void non_t4_saves_zero_the_optional_state(void)
 int main(void)
 {
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
-#ifdef SC64_T6_STORAGE
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    _Static_assert(SC64_RACE_SAVE_GENERATION == 18u,
+                   "full Terran saves require their own generation");
+#elif defined(SC64_T6_STORAGE)
     _Static_assert(SC64_RACE_SAVE_GENERATION == 15u,
                    "expanded combined storage requires a distinct generation");
 #elif defined(SC64_T5_RUNTIME)

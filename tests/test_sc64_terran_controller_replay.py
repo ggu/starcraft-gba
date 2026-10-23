@@ -38,6 +38,56 @@ def sample(mission=9, final="limit", stop=1200):
 
 
 class ReplayPlanTests(unittest.TestCase):
+    def test_new_late_mission_observations_are_strictly_compared(self):
+        fields = {"hostile_buildings": 9, "hero_alive": 1,
+                  "ion_cannon_alive": 0, "norad_flying_alive": 1,
+                  "emitter_at_goal": 1, "protoss_force2_buildings": 43,
+                  "zerg_force3_buildings": 21, "raw16_alive": 1, "zerg_units": 22}
+        replay._compare_trace_row({"host_tick": 77, **fields}, fields)
+        for key, wrong in (("hostile_buildings", 8), ("hero_alive", 0),
+                           ("ion_cannon_alive", 1), ("norad_flying_alive", 0),
+                           ("emitter_at_goal", 0), ("protoss_force2_buildings", 42),
+                           ("zerg_force3_buildings", 20), ("raw16_alive", 0),
+                           ("zerg_units", 21)):
+            actual = dict(fields, **{key: wrong})
+            with self.subTest(key=key), self.assertRaisesRegex(RuntimeError, key):
+                replay._compare_trace_row({"host_tick": 77, **fields}, actual)
+
+    def test_t7_source_location_test_matches_half_scale_half_open_rectangle(self):
+        bounds = (100, 200, 300, 400)  # synthetic source-space rectangle
+        self.assertTrue(replay._point_in_source_location(50, 100, bounds))
+        self.assertTrue(replay._point_in_source_location(149, 199, bounds))
+        self.assertFalse(replay._point_in_source_location(150, 100, bounds))
+        self.assertFalse(replay._point_in_source_location(50, 200, bounds))
+
+    def test_dense_controller_events_split_at_absolute_transition_ticks(self):
+        inputs = [(tick, tick & 1) for tick in range(1, 11)]
+        plan = {"launch_tick": 1, "inputs": inputs, "checkpoints": [],
+                "final": {"host_tick": 20}, "stop_tick": 20}
+        pages = replay.make_pages(plan, 20, 3)
+        self.assertEqual([event for page in pages for event in page["events"]], inputs)
+        self.assertTrue(all(len(page["events"]) <= 3 for page in pages))
+        self.assertTrue(all(page["end_tick"] - page["start_tick"] <= 1000 for page in pages))
+        for earlier, later in zip(pages, pages[1:]):
+            self.assertEqual(earlier["end_tick"], later["start_tick"])
+            if earlier["events"] and later["events"]:
+                self.assertLess(earlier["events"][-1][0], later["events"][0][0])
+
+    def test_source_actor_identity_handles_owner_changes(self):
+        actors = [{"raw_type": 29, "owner": 2}, {"raw_type": 127, "owner": 4}]
+        self.assertIsNotNone(replay._find_raw_actor(actors, 29))
+        self.assertIsNone(replay._find_raw_actor(actors, 29, 0))
+        self.assertEqual(replay._find_raw_actor(actors, 127)["owner"], 4)
+
+    def test_t9_force_building_counts_require_runtime_and_source_owner(self):
+        buildings = [
+            {"owner": 1, "raw_owner": 1}, {"owner": 1, "raw_owner": 1},
+            {"owner": 1, "raw_owner": 2}, {"owner": 4, "raw_owner": 3},
+            {"owner": 4, "raw_owner": 3}, {"owner": 4, "raw_owner": 4},
+        ]
+        self.assertEqual(replay._count_owner_raw_buildings(buildings, 1, 1), 2)
+        self.assertEqual(replay._count_owner_raw_buildings(buildings, 4, 3), 2)
+
     def test_t6_goal_counts_match_source_owner_region_and_transport_filter(self):
         units = [
             {"owner": 0, "raw_type": 19, "order": 0, "x": 10, "y": 10},
@@ -83,8 +133,11 @@ class ReplayPlanTests(unittest.TestCase):
         pages = replay.make_pages(plan, 1000, 256)
         self.assertEqual(pages[-1]["end_tick"], 1000)
         self.assertTrue(all(p["end_tick"] - p["start_tick"] <= 1000 for p in pages))
-        with self.assertRaisesRegex(ValueError, "capacity"):
-            replay.make_pages(plan, 1000, 2)
+        small_pages = replay.make_pages(plan, 1000, 2)
+        self.assertTrue(all(len(page["events"]) <= 2 for page in small_pages))
+        self.assertEqual([event for page in small_pages for event in page["events"]],
+                         [event for page in replay.make_pages(plan, 1000, 256)
+                          for event in page["events"]])
 
     def test_wrong_entry_mission_or_menu_prefix_rejected(self):
         for field, value in (("entry", "t6-probe-entry"), ("mission", 8)):
@@ -110,6 +163,33 @@ class ReplayPlanTests(unittest.TestCase):
         data["events"][-1]["lost"] = 1
         with self.assertRaises(ValueError):
             replay.validate_trace(data, 256)
+
+    def test_consistent_same_tick_observations_are_allowed(self):
+        data = sample(10, stop=1200)
+        observation = dict(data["events"][2])
+        observation["kind"] = "additional-observation"
+        data["events"].insert(3, observation)
+        plan = replay.validate_trace(data, 256)
+        self.assertEqual([c["source_host_tick"] for c in plan["checkpoints"][:2]], [500, 500])
+        self.assertEqual([c["host_tick"] for c in plan["checkpoints"][:2]], [511, 511])
+
+        data["events"][3]["frame"] = 2
+        with self.assertRaisesRegex(ValueError, "same-tick checkpoints disagree"):
+            replay.validate_trace(data, 256)
+
+    def test_late_human_outcome_slot_comes_from_source_setup(self):
+        self.assertEqual(replay._late_human_trigger_slot(10), 0)
+        self.assertEqual(replay._late_human_trigger_slot(11), 0)
+        self.assertEqual(replay._late_human_trigger_slot(12), 0)
+        self.assertEqual(replay._late_human_trigger_slot(13), 1)
+        with self.assertRaises(ValueError):
+            replay._late_human_trigger_slot(9)
+
+    def test_rescuable_hero_identity_is_not_owner_filtered(self):
+        rows = [{"raw_type": 16, "owner": 2, "slot": 7},
+                {"raw_type": 16, "owner": 0, "slot": 8}]
+        self.assertEqual(replay._find_raw_actor(rows, 16)["slot"], 7)
+        self.assertEqual(replay._find_raw_actor(rows, 16, 0)["slot"], 8)
 
     def test_cli_runs_replay_by_default_and_plan_only_is_explicit(self):
         with tempfile.TemporaryDirectory() as directory:

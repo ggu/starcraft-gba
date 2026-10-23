@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify T5 SRAM persistence through normal controller input on the ARM ROM.
+"""Verify Terran campaign SRAM persistence through normal controller input.
 
 The internal T5 probe auto-enters mission 8 for engine testing; --menu-entry
 launches the combined ROM through its ordinary campaign controls instead.
@@ -31,9 +31,9 @@ SRAM_BYTES = 32768
 SLOT_BYTES = 16384
 DEFAULT_GENERATION = 14  # Cargo orders share the existing payload with a new identity.
 STORAGE_SCHEMAS = {13: (64, 16328), 14: (64, 16328), 15: (80, 15384),
-                   16: (80, 15644), 17: (96, 15312)}
-STORAGE_UNIT_COUNTS = {13: 160, 14: 160, 15: 160, 16: 160, 17: 192}
-STORAGE_MINERAL_COUNTS = {13: 48, 14: 48, 15: 48, 16: 48, 17: 80}
+                   16: (80, 15644), 17: (96, 15312), 18: (96, None)}
+STORAGE_UNIT_COUNTS = {13: 160, 14: 160, 15: 160, 16: 160, 17: 192, 18: 192}
+STORAGE_MINERAL_COUNTS = {13: 48, 14: 48, 15: 48, 16: 48, 17: 80, 18: 80}
 STORAGE_T6_STATE_BYTES = {16: 1384, 17: 1388}
 KEY_B, KEY_L, KEY_START = 2, 512, 8
 SCREEN_PLAY, SCREEN_PAUSE = 1, 2
@@ -80,12 +80,68 @@ def press(rsp, inject: int, key: int, ticks: int = 2) -> None:
     rsp.tick(2)
 
 
+def campaign_menu_buttons(mission: int) -> tuple[int, ...]:
+    """Return HOME→campaign→mission→briefing→deploy keys for ordinal 5–10."""
+    if mission < 5 or mission > 10:
+        raise ValueError("Terran campaign menu supports mission ordinals 5 through 10")
+    chapter = mission
+    page = (chapter - 1) // 2
+    row = (chapter - 1) % 2
+    return (1, *(16 for _ in range(page)), *((128,) if row else ()), 1, 1)
+
+
 def enter_t5_campaign_menu(rsp, inject: int, mission: int = 5) -> None:
-    """Use ordinary HOME → Terran mission 5 → briefing → deploy controls."""
-    # T6 is the fourth Terran page row after T3/T4/T5: RIGHT twice, then DOWN.
-    buttons = MENU_ENTRY_BUTTONS if mission == 5 else (1, 16, 16, 128, 1, 1)
+    """Enter a Terran mission through the ordinary chapter/page menu."""
+    buttons = campaign_menu_buttons(mission)
     for key in buttons:
         press(rsp, inject, key)
+
+
+def late_save_state(payload: bytes, save_fields: dict[str, int], late_size: int) -> bytes:
+    """Extract the exact generation-18 late-mission union member from RaceSave."""
+    offset = save_fields.get("terran_late")
+    if offset is None or offset < 0 or late_size <= 0 or offset + late_size > len(payload):
+        raise ValueError("DWARF late Terran save member is outside RaceSave")
+    return payload[offset:offset + late_size]
+
+
+def late_state_summary(raw: bytes, late_fields: dict[str, int],
+                       runtime_size: int, trigger_fields: dict[str, int],
+                       trigger_size: int, player_fields: dict[str, int],
+                       player_size: int) -> dict:
+    """Decode named generation-18 clocks, links, and flight goals from DWARF."""
+    if len(raw) != runtime_size:
+        raise ValueError("late mission state size differs from its DWARF layout")
+    trigger_off = late_fields["triggers"]
+    if (player_size <= 0 or trigger_size <= 0 or trigger_off < 0 or
+            trigger_off + trigger_size > runtime_size or
+            trigger_fields["player"] + 8 * player_size > trigger_size or
+            player_fields["elapsed_ticks"] + 4 > player_size or
+            player_fields["fault"] + 1 > player_size or
+            late_fields["flight_goals"] + 96 * 4 > runtime_size or
+            late_fields["emitter_unit"] + 2 > runtime_size or
+            late_fields["emitter_carrier"] + 2 > runtime_size):
+        raise ValueError("late mission field offsets exceed their DWARF bounds")
+    player_off = trigger_fields["player"]
+    clocks, faults = [], []
+    for owner in range(8):
+        base = trigger_off + player_off + owner * player_size
+        clocks.append(int.from_bytes(raw[base + player_fields["elapsed_ticks"]:
+                                          base + player_fields["elapsed_ticks"] + 4], "little"))
+        faults.append(raw[base + player_fields["fault"]])
+    goals_off = late_fields["flight_goals"]
+    goals = [int.from_bytes(raw[goals_off + i * 4:goals_off + i * 4 + 4], "little")
+             for i in range(96)]
+    return {
+        "trigger_clocks": clocks,
+        "trigger_faults": faults,
+        "emitter_unit": int.from_bytes(raw[late_fields["emitter_unit"]:
+                                            late_fields["emitter_unit"] + 2], "little"),
+        "emitter_carrier": int.from_bytes(raw[late_fields["emitter_carrier"]:
+                                               late_fields["emitter_carrier"] + 2], "little"),
+        "flight_goals": goals,
+        "active_flight_goals": sum(bool(goal) for goal in goals),
+    }
 
 
 def field_int(raw: bytes, base: int, fields: dict[str, int], name: str,
@@ -210,7 +266,7 @@ def save_record_info(raw_sram: bytes, expected_payload: int, generation: int = D
             records.append({"slot": slot, "tag": hex(tag), "payload_bytes": size,
                             "sequence": sequence, "payload_sha256": hashlib.sha256(payload).hexdigest()})
     if not records:
-        raise RuntimeError(f"mGBA save file has no valid generation-{generation} T5 SRAM record")
+        raise RuntimeError(f"mGBA save file has no valid generation-{generation} Terran SRAM record")
     return records
 
 
@@ -282,7 +338,7 @@ def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int],
         "fog": rsp.read(sym["explored"], sizes["explored"]).hex(),
         "units": (compact_live_unit_rows(rsp, sym["u"], unit_fields,
                                          STORAGE_UNIT_COUNTS[generation], unit_size)
-                  if generation == 17 else
+                  if generation >= 17 else
                   persisted_rows(rsp, sym["u"], STORAGE_UNIT_COUNTS[generation],
                                  unit_size, unit_fields)),
         "buildings": persisted_rows(rsp, sym["b"], building_count, building_size, building_fields),
@@ -290,6 +346,15 @@ def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int],
     }
     if "Sc64T6MissionState" in layouts:
         result["t6_runtime"] = rsp.read(sym["race_t6"], layouts["Sc64T6MissionState"][0]).hex()
+    if generation >= 18:
+        late_size, late_fields = layouts["Sc64TerranLateMissionState"]
+        late_raw = rsp.read(sym["race_late"], late_size)
+        trigger_size, trigger_fields = layouts["Sc64TerranLateRuntimeState"]
+        player_size, player_fields = layouts["Sc64T4TriggerState"]
+        result["terran_late_runtime"] = late_raw.hex()
+        result["terran_late"] = late_state_summary(
+            late_raw, late_fields, late_size, trigger_fields, trigger_size,
+            player_fields, player_size)
     return result
 def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_GENERATION,
         menu_entry: bool = False, mission: int = 5) -> dict:
@@ -297,8 +362,14 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
         raise RuntimeError(f"Build the T5 probe ROM/ELF first: {rom} and {elf}")
     if generation not in STORAGE_SCHEMAS:
         raise ValueError("unsupported Terran save generation")
-    if mission not in (5, 6) or (mission == 6 and generation not in (16, 17)):
-        raise ValueError("T6 requires save generation 16 or the late Terran generation 17")
+    if mission < 5 or mission > 10:
+        raise ValueError("Terran mission ordinal must be between 5 and 10")
+    if mission == 6 and generation not in (16, 17, 18):
+        raise ValueError("T6 requires save generation 16 or newer")
+    if mission >= 7 and generation != 18:
+        raise ValueError("T7-T10 require late Terran save generation 18")
+    if generation == 18 and mission < 7:
+        raise ValueError("generation 18 is reserved for late Terran missions")
     mission_id = mission + 3
     building_count, expected_payload = STORAGE_SCHEMAS[generation]
     unit_count = STORAGE_UNIT_COUNTS[generation]
@@ -311,20 +382,22 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
                 "u", "b", "m", "explored", "geysers")
     if menu_entry:
         required += ("race_front",)
+    if mission == 6 or generation >= 17:
+        required += ("race_t6",)
+    if generation >= 18:
+        required += ("race_late",)
     missing = [name for name in required if name not in sym]
     if missing:
         raise RuntimeError(f"T5 probe ELF is missing symbols: {', '.join(missing)}")
-    expected_sizes = {"race_t5": 1340, "u": unit_count * (56 if generation == 17 else 108),
+    expected_sizes = {"race_t5": 1340, "u": unit_count * (56 if generation >= 17 else 108),
                       "b": building_count * 100, "m": mineral_count * 16,
                       "geysers": 4 * 8}
-    if generation == 17:
+    if generation >= 17:
         expected_sizes["race_t6"] = 1388
     bad_sizes = {name: (sizes.get(name), expected) for name, expected in expected_sizes.items()
                  if sizes.get(name) != expected}
     if bad_sizes:
         raise RuntimeError("T5 probe ELF has unexpected runtime/entity bank sizes")
-    if (mission == 6 or generation == 17) and "race_t6" not in required:
-        required += ("race_t6",)
     layouts = {name: dwarf_struct(elf, name) for name in
                ("Unit", "Building", "Mineral", "Sc64RaceCampaignState", "Sc64T5RuntimeState")}
     if mission == 6:
@@ -333,7 +406,7 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             raise RuntimeError("T6 mission state differs from its validated schema")
         layouts["Sc64T6MissionState"] = dwarf_struct(elf, "Sc64T6MissionState")
         layouts["Sc64T6RuntimeState"] = dwarf_struct(elf, "Sc64T6RuntimeState")
-    if generation == 17:
+    if generation >= 17:
         expected_fields = set(UNIT_RUNTIME_FIELDS)
         if (layouts["Unit"][0] != 56 or
                 not expected_fields.issubset(layouts["Unit"][1])):
@@ -343,9 +416,20 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
     runtime_size = layouts["Sc64T5RuntimeState"][0]
     if runtime_size != 1340:
         raise RuntimeError("T5 runtime or geyser layout differs from the validated save schema")
-    save_size, _ = dwarf_struct(elf, "RaceSave")
-    if save_size != expected_payload:
+    if generation >= 18:
+        layouts["Sc64TerranLateMissionState"] = dwarf_struct(elf, "Sc64TerranLateMissionState")
+        layouts["Sc64TerranLateRuntimeState"] = dwarf_struct(elf, "Sc64TerranLateRuntimeState")
+        layouts["Sc64T4TriggerState"] = dwarf_struct(elf, "Sc64T4TriggerState")
+        if sizes.get("race_late") != layouts["Sc64TerranLateMissionState"][0]:
+            raise RuntimeError("late Terran runtime symbol differs from its DWARF layout")
+    save_size, save_fields = dwarf_struct(elf, "RaceSave")
+    if expected_payload is not None and save_size != expected_payload:
         raise RuntimeError(f"expected {expected_payload}-byte generation-{generation} payload, got {save_size}")
+    if generation >= 18:
+        late_offset = save_fields.get("terran_late")
+        late_size = layouts["Sc64TerranLateMissionState"][0]
+        if late_offset is None or late_offset + late_size > save_size:
+            raise RuntimeError("generation-18 RaceSave DWARF misses its late state union member")
 
     out.mkdir(parents=True, exist_ok=True)
     out = out / f"run-{time.time_ns()}"
@@ -354,6 +438,7 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
     running = start(first_name, rom, out, sym)
     proc, sock, rsp, log = running
     source_saves = out / "saves" / first_name
+    late_payload_matches_runtime = None
     try:
         if menu_entry:
             front_page = read_i32(rsp, sym["race_front"] + layouts["Sc64Frontend"][1]["page"])
@@ -361,8 +446,12 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
                 raise RuntimeError("normal T5 save smoke did not start at HOME")
             enter_t5_campaign_menu(rsp, sym["demo_inject_keys"], mission)
         initial = snapshot(rsp, sym, sizes, layouts, generation)
-        if (initial["screen"], initial["mode"], initial["mission"], initial["geometry"]) != (
-                SCREEN_PLAY, 0, mission_id, [96, 96]):
+        valid_geometry = (initial["geometry"] == [96, 96] if mission <= 6 else
+                          len(initial["geometry"]) == 2 and
+                          0 < initial["geometry"][0] <= 128 and
+                          0 < initial["geometry"][1] <= 128)
+        if ((initial["screen"], initial["mode"], initial["mission"]) !=
+                (SCREEN_PLAY, 0, mission_id) or not valid_geometry):
             raise RuntimeError(f"entry did not launch mission {mission_id}: {initial}")
         rsp.tick(ticks)
         press(rsp, sym["demo_inject_keys"], KEY_START)
@@ -377,11 +466,18 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             raise RuntimeError("B did not save from the T5 pause menu")
         sram = rsp.read(SRAM_BASE, SRAM_BYTES)
         records = save_record_info(sram, save_size, generation)
-        if generation == 17:
+        if generation >= 17:
             saved_payload = newest_record_payload(sram, generation, save_size)
             compact_units = decode_compact_unit_rows(saved_payload, unit_count)
             if compact_units != paused["units"]:
-                raise RuntimeError("generation-17 compact Unit rows differ from every runtime slot")
+                raise RuntimeError(f"generation-{generation} compact Unit rows differ from every runtime slot")
+            if generation >= 18:
+                late_size = layouts["Sc64TerranLateMissionState"][0]
+                late_payload_matches_runtime = (
+                    late_save_state(saved_payload, save_fields, late_size).hex() ==
+                    paused["terran_late_runtime"])
+                if not late_payload_matches_runtime:
+                    raise RuntimeError("generation-18 saved late state differs from runtime bytes")
         menu.capture(rsp, out / "t5-save-pause.png")
     finally:
         menu.stop_emulator(proc, sock, log)
@@ -426,14 +522,22 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
         if continued["screen"] != SCREEN_PLAY or continued["frame"] != restored["frame"] + 60:
             raise RuntimeError("loaded T5 mission did not continue advancing")
         # Read trigger fault bytes from Sc64T5RuntimeState's nested player[8].
-        runtime_type = "Sc64T5RuntimeState" if mission == 5 else "Sc64T6RuntimeState"
+        runtime_type = ("Sc64T5RuntimeState" if mission == 5 else
+                        "Sc64T6RuntimeState" if mission == 6 else
+                        "Sc64TerranLateRuntimeState")
         _, runtime_fields = layouts[runtime_type]
-        player_size, player_fields = dwarf_struct(elf, "Sc64T4TriggerState")
+        if "Sc64T4TriggerState" in layouts:
+            player_size, player_fields = layouts["Sc64T4TriggerState"]
+        else:
+            player_size, player_fields = dwarf_struct(elf, "Sc64T4TriggerState")
         if mission == 5:
             runtime = rsp.read(sym["race_t5"], runtime_size)
-        else:
+        elif mission == 6:
             triggers_offset = layouts["Sc64T6MissionState"][1]["triggers"]
             runtime = rsp.read(sym["race_t6"] + triggers_offset, layouts[runtime_type][0])
+        else:
+            triggers_offset = layouts["Sc64TerranLateMissionState"][1]["triggers"]
+            runtime = rsp.read(sym["race_late"] + triggers_offset, layouts[runtime_type][0])
         players_offset = runtime_fields["player"]
         fault_offset = player_fields["fault"]
         fault_bytes = [runtime[players_offset + p * player_size + fault_offset]
@@ -447,18 +551,25 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
                                                  ai_offset + ai_fields["elapsed_ticks"] + 4], "little")
             if ai_size != 16:
                 raise RuntimeError("unexpected T5 AI state schema")
-        else:
+        elif mission == 6:
             ai_elapsed = None
             clocks = [int.from_bytes(runtime[players_offset + p * player_size + player_fields["elapsed_ticks"]:
                                                    players_offset + p * player_size + player_fields["elapsed_ticks"] + 4],
                                      "little") for p in range(8)]
             if clocks != [continued["frame"]] * 8:
                 raise RuntimeError(f"T6 trigger clocks diverged: {clocks}")
+        else:
+            ai_elapsed = None
+            clocks = [int.from_bytes(runtime[players_offset + p * player_size + player_fields["elapsed_ticks"]:
+                                                   players_offset + p * player_size + player_fields["elapsed_ticks"] + 4],
+                                     "little") for p in range(8)]
+            if clocks != [continued["frame"]] * 8:
+                raise RuntimeError(f"late Terran trigger clocks diverged: {clocks}")
         campaign_elapsed = int.from_bytes(rsp.read(sym["race_campaign"] +
                                                      dwarf_struct(elf, "Sc64RaceCampaignState")[1]["elapsed_frames"],
                                                      4), "little")
         if (ai_elapsed is not None and ai_elapsed != continued["frame"]) or campaign_elapsed != continued["frame"]:
-            raise RuntimeError("T5 campaign/AI clocks diverged during post-load continuation")
+            raise RuntimeError("campaign/AI clocks diverged during post-load continuation")
         menu.capture(rsp, out / "t5-loaded-play.png")
         result = {
             "rom_sha256": hashlib.sha256(rom.read_bytes()).hexdigest(),
@@ -469,7 +580,8 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             "building_capacity": building_count,
             "unit_capacity": unit_count,
             "mineral_capacity": mineral_count,
-            "unit_row_bytes": 38 if generation == 17 else None,
+            "unit_row_bytes": 38 if generation >= 17 else None,
+            "payload_bytes": save_size,
             "saved_frame": paused["frame"],
             "loaded_frame": restored["frame"],
             "continued_frame": continued["frame"],
@@ -477,14 +589,25 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             "faults_after_continue": fault_bytes,
             "mission": mission_id,
             "entry": "normal-campaign-menu" if menu_entry else "internal-probe-auto-entry",
-            "controller_inputs": (["HOME:A", "CAMPAIGN:RIGHT", "MISSION:RIGHT",
+            "controller_inputs": (["HOME:A", *["MISSION:RIGHT"] * ((mission - 1) // 2),
+                                   *(["MISSION:DOWN"] if mission % 2 == 0 else []),
                                    "BRIEFING:A", "DEPLOY:A", "START", "B", "START", "L"]
                                   if menu_entry else ["START", "B", "START", "L"]),
             "exact_load_state_match": True,
             "save_load_verified": True,
             "campaign_clock_matches_frame": campaign_elapsed == continued["frame"],
             "ai_clock_matches_frame": ai_elapsed == continued["frame"] if mission == 5 else None,
-            "trigger_clocks_match_frame": True if mission == 6 else None,
+            "trigger_clocks_match_frame": True if mission >= 6 else None,
+            "late_state_bytes": layouts["Sc64TerranLateMissionState"][0] if generation >= 18 else None,
+            "late_emitter_unit": paused["terran_late"]["emitter_unit"] if generation >= 18 else None,
+            "late_emitter_carrier": paused["terran_late"]["emitter_carrier"] if generation >= 18 else None,
+            "late_active_flight_goals": paused["terran_late"]["active_flight_goals"] if generation >= 18 else None,
+            "late_flight_goals": paused["terran_late"]["flight_goals"] if generation >= 18 else None,
+            "late_trigger_clocks": clocks if generation >= 18 else None,
+            "late_trigger_faults": fault_bytes if generation >= 18 else None,
+            "late_payload_matches_runtime_bytes": late_payload_matches_runtime,
+            "late_state_exact_load_match": (paused.get("terran_late_runtime") ==
+                                               restored.get("terran_late_runtime")) if generation >= 18 else None,
             "win_or_fps_claim": False,
         }
     finally:
@@ -504,9 +627,9 @@ def main() -> None:
     parser.add_argument("--generation", type=int, choices=tuple(STORAGE_SCHEMAS), default=DEFAULT_GENERATION,
                         help="SRAM generation; 13 is pre-cargo, 14 is T1-T5, 15 is the expanded storage probe")
     parser.add_argument("--menu-entry", action="store_true",
-                        help="launch T5 from HOME through ordinary campaign/mission/briefing controls")
-    parser.add_argument("--mission", type=int, choices=(5, 6), default=5,
-                        help="Terran mission ordinal; T6 remains an internal runtime probe")
+                        help="launch the selected Terran mission from HOME through ordinary controls")
+    parser.add_argument("--mission", type=int, choices=tuple(range(5, 11)), default=5,
+                        help="Terran mission ordinal 5 through 10 (late missions require generation 18)")
     args = parser.parse_args()
     print(json.dumps(run(args.rom, args.elf, args.output, args.ticks, args.generation,
                          args.menu_entry, args.mission), indent=2))

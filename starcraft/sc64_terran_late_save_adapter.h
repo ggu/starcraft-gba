@@ -144,6 +144,9 @@ race_terran_late_save_state_valid(const Sc64TerranLateMissionState *state,
     return 1;
 }
 
+static int race_terran_late_save_players_valid(
+    const RaceSave *candidate, int mission, const Sc64T4SourceSetup *setup);
+
 static int
 race_terran_late_save_campaign_valid(const RaceSave *candidate,
                                      const Sc64TerranLateMissionState *state,
@@ -156,7 +159,7 @@ race_terran_late_save_campaign_valid(const RaceSave *candidate,
         setup, SC64_TERRAN_LATE_SOURCE_HUMAN_CONTROLLER) : -1;
     if (!setup || human < 0 || human >= 8 ||
         candidate->state[0] != 0 || candidate->state[1] != R_TER ||
-        candidate->players[SIDE] != R_TER ||
+        !race_terran_late_save_players_valid(candidate, mission, setup) ||
         candidate->state[7] < 0 ||
         (u32)candidate->state[7] != candidate->campaign.elapsed_frames ||
         candidate->campaign.mission != mission ||
@@ -190,6 +193,32 @@ race_terran_late_save_campaign_valid(const RaceSave *candidate,
             (candidate->campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY))
             return 0;
     } else return 0;
+    return 1;
+}
+
+/* Reconstruct init_state's faction table from this candidate's mission.
+ * Late missions remap source controller/force slots, so owner_modes alone is
+ * not authoritative here. Keep validation candidate-local: never consult or
+ * temporarily mutate the currently loaded mission globals. Unassigned
+ * runtime owners retain game_init's canonical Terran value (zero). */
+static int
+race_terran_late_save_players_valid(const RaceSave *candidate, int mission,
+                                    const Sc64T4SourceSetup *setup)
+{
+    const Sc64RaceMap *map;
+    int expected[5] = { R_TER, R_TER, R_TER, R_TER, R_TER };
+    if (!candidate || !setup || mission < 0 ||
+        mission >= SC64_RACE_MAP_COUNT) return 0;
+    map = &sc64_race_maps[mission];
+    for (unsigned source = 0; source < 8; ++source) {
+        int owner = sc64_terran_late_runtime_owner_for_setup(setup, source);
+        if (owner >= 0 && owner < 5) {
+            if (map->owner_races[source] >= 3) return 0;
+            expected[owner] = map->owner_races[source];
+        }
+    }
+    for (unsigned owner = 0; owner < 5; ++owner)
+        if (candidate->players[owner] != expected[owner]) return 0;
     return 1;
 }
 

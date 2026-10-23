@@ -208,8 +208,99 @@ static void firebat_splash_respects_late_invincibility(void)
     assert(item->alive && item->hp == 250);
 }
 
+static void t7_goal_invincibility_uses_hero_bounds(void)
+{
+    game_init(); race_mode=0;
+    race_selected_mission=SC64_TERRAN_LATE_GLOBAL_T7; init_state();
+    int hero=-1;
+    for(int i=0;i<MAX_UNITS;++i)
+        if(u[i].alive&&u[i].raw_type==16){hero=i;break;}
+    assert(hero>=0);
+    /* Direct setup models its normal rescue before the goal trigger. */
+    u[hero].owner=SIDE;
+    const Sc64T4Action *action=&sc64_t7_scenario.triggers[2].actions[0];
+    assert(action->opcode==43 && action->unit==16 && action->modifier==4);
+    assert(race_late_trigger_action(&race_late,action,0)==1);
+    assert(invincible_units[hero]);
+}
+
+static void move_location_fallback_and_interior_translation(void)
+{
+    Sc64T4Action move = {0};
+    const Sc64T4Location *source, *small_dest, *wide_dest;
+    game_init();
+    race_mode = 0;
+    race_selected_mission = SC64_TERRAN_LATE_GLOBAL_T7;
+    init_state();
+    source = &sc64_t7_scenario.locations[0];
+    small_dest = &sc64_t7_scenario.locations[3];
+    wide_dest = &sc64_t7_scenario.locations[2];
+    memset(u, 0, sizeof(u));
+
+    /* No matching unit: native MoveLocation uses the source-area center.
+     * This high-edge case also checks the native inclusive bound-1 clamp. */
+    move.opcode = 38;
+    move.location = 1;
+    move.player = 7;
+    move.unit = 7;
+    move.argument = 3;
+    assert(race_late.mutable_location_id == SC64_TERRAN_LATE_NO_LOCATION);
+    assert(sc64_terran_late_move_location(&race_late, &move, 0) == 1);
+    u32 source_cx = (source->left + source->right) / 2u;
+    u32 source_cy = (source->top + source->bottom) / 2u;
+    u32 width = wide_dest->right - wide_dest->left;
+    u32 height = wide_dest->bottom - wide_dest->top;
+    assert(race_late.mutable_location_id == 3);
+    assert(race_late.mutable_location[0] == (u32)(race_cols * 32 - 1) - width);
+    assert(race_late.mutable_location[2] == (u32)(race_cols * 32 - 1));
+    assert(race_late.mutable_location[1] == source_cy - height / 2u);
+    assert(source_cx + width / 2u >= (u32)race_cols * 32u);
+
+    /* The source CHK has point-sized MRGN13. MoveLocation still accepts it;
+     * with no actor in that point it falls back to (0,0) and clamps the moved
+     * rectangle at the near map edges. */
+    memset(&move, 0, sizeof(move));
+    move.opcode = 38;
+    move.location = 13;
+    move.player = 7;
+    move.unit = 7;
+    move.argument = 4;
+    assert(sc64_terran_late_move_location(&race_late, &move, 0) == 1);
+    assert(race_late.mutable_location_id == 4);
+    assert(race_late.mutable_location[0] == 0 &&
+           race_late.mutable_location[1] == 0);
+    assert(race_late.mutable_location[2] ==
+           small_dest->right - small_dest->left);
+    assert(race_late.mutable_location[3] ==
+           small_dest->bottom - small_dest->top);
+
+    /* A matching actor on the source-area center preserves the ordinary
+     * in-bounds actor-center translation used by T7's trigger path. */
+    memset(&move, 0, sizeof(move));
+    move.opcode = 38;
+    move.location = 1;
+    move.player = 0;
+    move.unit = 7;
+    move.argument = 4;
+    u[0].alive = 1;
+    u[0].type = U_SCV;
+    u[0].raw_type = 7;
+    u[0].owner = SIDE;
+    u[0].raw_owner = 0;
+    u[0].x = (int)(source_cx / 2u);
+    u[0].y = (int)(source_cy / 2u);
+    assert(sc64_terran_late_move_location(&race_late, &move, 0) == 1);
+    assert(race_late.mutable_location_id == 4);
+    assert(race_late.mutable_location[0] == source_cx -
+           (small_dest->right - small_dest->left) / 2u);
+    assert(race_late.mutable_location[1] == source_cy -
+           (small_dest->bottom - small_dest->top) / 2u);
+}
+
 int main(void)
 {
+    t7_goal_invincibility_uses_hero_bounds();
+    move_location_fallback_and_interior_translation();
     mapping_and_diplomacy();
     mission_start_and_live_trigger_passes();
     death_ledgers_use_source_slots();

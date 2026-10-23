@@ -357,7 +357,7 @@ enum {
     MENU_FACTORY, MENU_STARPORT, MENU_CONTROL_TOWER, MENU_UNLOAD,
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
-    MENU_LIFT_LAND,
+    MENU_LIFT_LAND, MENU_COMMAND_CENTER,
 #endif
     MENU_COUNT
 };
@@ -561,6 +561,8 @@ static int race_late_airborne(int slot);
 static int race_late_lift(int slot);
 static int race_late_flight_order(int slot, int x, int y, int land);
 static void race_late_flight_tick(void);
+static int race_late_request_repair(void);
+static int race_late_repair_tick_unit(int slot);
 #endif
 static int race_t6_active(void)
 { return !race_mode && race_selected_mission == SC64_T6_GLOBAL_ID; }
@@ -2831,6 +2833,9 @@ choose_command(int choice)
     if (choice >= MENU_FACTORY) {
         menu_open = 0;
 #ifdef SC64_TERRAN_LATE_RUNTIME
+        if (choice == MENU_COMMAND_CENTER) {
+            mode = MODE_BUILD; menu = B_COMMAND; return;
+        }
         if (choice == MENU_LIFT_LAND) {
             if (race_late_airborne(selected_building)) mode = MODE_LAND;
             else toast(race_late_lift(selected_building) ? 0 : 8);
@@ -3030,6 +3035,9 @@ interact(void)
         remember_unit_tap(double_unit);
         return;
     }
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active() && race_late_request_repair()) { toast(0); return; }
+#endif
 #ifdef SC64_T6_RUNTIME
     if (race_t6_request_repair()) { toast(0); return; }
 #endif
@@ -3106,6 +3114,31 @@ owner_command_center(int owner)
         ) return i;
     return -1;
 }
+#ifdef SC64_TERRAN_LATE_RUNTIME
+/* The legacy model has one home depot. Late campaign expansion bases need
+ * the nearest landed depot; cache its slot in the otherwise unused worker
+ * build field for a resource trip, avoiding a full building scan each tick. */
+static int __attribute__((noinline)) race_late_worker_home(Unit *worker)
+{
+    int cached = worker->build;
+    if (cached >= 0 && cached < MAX_BUILDINGS && b[cached].alive &&
+        b[cached].owner == worker->owner && !b[cached].under_construction &&
+        !race_late_airborne(cached) && (b[cached].type == B_COMMAND ||
+        b[cached].type == B_NEXUS || sc64_race_is_zerg_townhall(b[cached].type)))
+        return cached;
+    int best = -1, distance = 0x7fffffff;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == worker->owner &&
+            !b[i].under_construction && !race_late_airborne(i) &&
+            (b[i].type == B_COMMAND || b[i].type == B_NEXUS ||
+             sc64_race_is_zerg_townhall(b[i].type))) {
+            int d = dist2(worker->x, worker->y, b[i].x, b[i].y);
+            if (d < distance) { distance = d; best = i; }
+        }
+    worker->build = best;
+    return best;
+}
+#endif
 #ifndef SC64_SKIRMISH
 static void
 add_owner_resources(int owner, int ore, int vespene)
@@ -3369,7 +3402,12 @@ target_lists_unavailable:
         /* Keep burrowed actors out of every ordinary movement/weapon path.
          * Transport boarding also rejects the corresponding source flag. */
         if (race_t6_unit_burrowed(i)) continue;
-        if (q->order == ORDER_REPAIR && race_t6_repair_tick_unit(i)) continue;
+        if (q->order == ORDER_REPAIR) {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+            if (race_late_active() && race_late_repair_tick_unit(i)) continue;
+#endif
+            if (race_t6_repair_tick_unit(i)) continue;
+        }
 #endif
 	#ifdef SC64_T5_RUNTIME
         if (q->order >= ORDER_BOARD) {
@@ -3453,7 +3491,11 @@ target_lists_unavailable:
 	}
 
 	if (q->order == ORDER_MINE || q->order == ORDER_GAS) {
-	    int home = owner_command_center(q->owner);
+            int home =
+#ifdef SC64_TERRAN_LATE_RUNTIME
+                race_late_active() ? race_late_worker_home(q) :
+#endif
+                owner_command_center(q->owner);
 	    if (q->order == ORDER_GAS && !building_complete(q->target)) {
 		q->order = ORDER_IDLE;
 		continue;
@@ -3477,6 +3519,9 @@ target_lists_unavailable:
                     add_owner_resources(q->owner, q->order == ORDER_MINE ? q->carry : 0,
                                         q->order == ORDER_GAS ? q->carry : 0);
 		    q->carry = 0;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+                    if (race_late_active()) q->build = -1;
+#endif
 		    q->work_timer = 20;
 		}
 	    } else if (dist2(q->x, q->y, tx, ty) >
@@ -3492,6 +3537,9 @@ target_lists_unavailable:
 	    } else if (q->order == ORDER_MINE) {
 		q->carry = m[q->target].amount < 8 ? m[q->target].amount : 8;
 		m[q->target].amount -= q->carry;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+                if (race_late_active()) q->build = -1;
+#endif
 		q->work_timer = 45;
 		if (q->carry <= 0)
 		    q->order = ORDER_IDLE;
@@ -3500,6 +3548,9 @@ target_lists_unavailable:
 		 * like minerals; depleted geysers (not yet modelled here) yield 2. */
 		#ifdef SC64_RACES
 		q->carry = 8;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+                if (race_late_active()) q->build = -1;
+#endif
 		#else
 		q->carry = 4;
 		#endif
@@ -4935,7 +4986,7 @@ draw_map(void)
         static const char *const advanced_labels[] = {
             "FACTORY", "STARPORT", "CONTROL TOWER", "UNLOAD CARGO"
 #ifdef SC64_TERRAN_LATE_RUNTIME
-            , "LIFT / LAND"
+            , "LIFT / LAND", "COMMAND CENTER"
 #endif
         };
         if (menu_cursor >= 10) first = menu_cursor - 9;
@@ -5795,6 +5846,9 @@ game_self_test(void)
 #ifdef SC64_T6_RUNTIME
 #include "sc64_t6_world_adapter.h"
 #include "sc64_t6_repair_world.h"
+#ifdef SC64_TERRAN_LATE_RUNTIME
+#include "sc64_terran_late_repair.h"
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
 #include "sc64_terran_late_world.h"
 #endif

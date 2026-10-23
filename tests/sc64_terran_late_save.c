@@ -85,6 +85,17 @@ static void test_all_map_geometries_roundtrip(void)
         assert(race_terran_late_save_candidate_valid(
             &valid_record, race_cols, race_rows));
 
+        /* Faction IDs are derived from this mission's source setup during
+         * init. A checksum-valid save with any corrupted runtime owner slot
+         * must be rejected before it can mutate the live mission. */
+        for (unsigned owner = 0; owner < 5; ++owner) {
+            RaceSave bad = valid_record;
+            bad.players[owner] = (bad.players[owner] + 1) % 3;
+            assert(!race_terran_late_save_candidate_valid(
+                &bad, race_cols, race_rows));
+            reject_atomically(&bad);
+        }
+
         /* Loading must restore the exact trigger clock and mission payload. */
         race_late.triggers.player[0].elapsed_ticks++;
         ++frame;

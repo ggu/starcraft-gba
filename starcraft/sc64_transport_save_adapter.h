@@ -15,6 +15,11 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
 #ifdef SC64_T6_RUNTIME
     if (candidate->state[0] == 0 &&
         candidate->state[2] == SC64_T6_GLOBAL_ID) max_order = ORDER_REPAIR;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (candidate->state[0] == 0 &&
+        candidate->state[2] >= SC64_TERRAN_LATE_GLOBAL_T7 &&
+        candidate->state[2] <= SC64_TERRAN_LATE_GLOBAL_T10) max_order = ORDER_REPAIR;
+#endif
 #endif
 #ifdef SC64_T6_STORAGE
 #define CARGO_B(i, field) saved_building.field

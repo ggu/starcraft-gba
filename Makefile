@@ -42,6 +42,8 @@ LATE_TERRAN_STORAGE_FLAGS := $(T6_RUNTIME_FLAGS) -DSC64_LATE_TERRAN_STORAGE -DSC
 LATE_TERRAN_STAGE := .local/sc64/terran-late/import-stage
 LATE_TERRAN_RUNTIME_FLAGS := $(filter-out -I.local/sc64/races/generated,$(LATE_TERRAN_STORAGE_FLAGS)) -I$(LATE_TERRAN_STAGE) -I.local/sc64/races/generated -DSC64_TERRAN_LATE_ENABLED -DSC64_TERRAN_LATE_RUNTIME
 LATE_TERRAN_HEADERS := $(LATE_TERRAN_STAGE)/sc64_races_generated.h $(LATE_TERRAN_STAGE)/sc64_race_sprites_generated.h $(foreach mission,7 8 9 10,$(LATE_TERRAN_STAGE)/sc64_t$(mission)_scenario_generated.h $(LATE_TERRAN_STAGE)/sc64_t$(mission)_availability_generated.h)
+TERRAN_FULL_FLAGS := $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_T6_CAMPAIGN_ENTRY -DSC64_TERRAN_FULL_CAMPAIGN_ENTRY
+TERRAN_FULL_INPUTS = $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER)
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
 T4_SCENARIO_RECORDS := .local/sc64/races/generated/t4/records
 T5_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t5_scenario_generated.h
@@ -1027,18 +1029,21 @@ race-campaigns: verify-terran verify-zerg verify-protoss
 terran: verify-terran
 zerg: verify-zerg
 protoss: verify-protoss
-build/starcraft-terran.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=0 $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran.map -lgcc -o $@
+build/starcraft-terran.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(TERRAN_FULL_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Terran-GBA.gba: build/starcraft-terran.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
-	$(PYTHON) tools/fix_rom.py $@ 'SC TERRAN' SCT2
+	$(PYTHON) tools/fix_rom.py $@ 'SC TERRAN 10' SCT8
 verify-terran: build/StarCraft-Terran-GBA.gba
 	$(PYTHON) tools/verify_roms.py --terran
-build/test-terran: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=0 tests/sc64_split_run.c common/gba.c -o $@
-test-terran: build/test-terran
+build/test-terran: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $< common/gba.c -o $@
+build/test-sc64-terran-full-profile: tests/sc64_terran_full_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $< common/gba.c -o $@
+test-terran: build/test-terran build/test-sc64-terran-full-profile
 	./build/test-terran
+	./build/test-sc64-terran-full-profile
 
 build/starcraft-zerg.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=1 $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg.map -lgcc -o $@
@@ -1115,7 +1120,7 @@ build/test-sc64-t6-campaign-run: tests/sc64_t6_campaign_run.c $(STARCRAFT) $(wil
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T6_RUNTIME_FLAGS) -DSC64_T6_PROBE_ENTRY $< common/gba.c -o $@
 build/test-sc64-t8-campaign-run: tests/sc64_terran_assault_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(LATE_TERRAN_HEADERS) $(RACE_CAMPAIGN_INPUTS) Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=11 $< common/gba.c -o $@
-build/test-sc64-t10-campaign-run: tests/sc64_terran_assault_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(LATE_TERRAN_HEADERS) $(RACE_CAMPAIGN_INPUTS) Makefile | build
+build/test-sc64-t10-campaign-run: tests/sc64_t10_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(LATE_TERRAN_HEADERS) $(RACE_CAMPAIGN_INPUTS) Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=13 $< common/gba.c -o $@
 
 # Explicit qualification builds expose the normal campaign menu, not probe entry.
@@ -1133,3 +1138,41 @@ build/StarCraft-Terran-Late-Controller.gba: build/starcraft-terran-late-controll
 	$(PYTHON) tools/fix_rom.py $@ 'SC TERRAN 10' SCT8
 .PHONY: sc64-terran-late-controller
 sc64-terran-late-controller: build/StarCraft-Terran-Late-Controller.gba
+
+build/test-sc64-terran-late-repair: tests/sc64_terran_late_repair.c $(STARCRAFT) $(wildcard starcraft/*.h) $(LATE_TERRAN_HEADERS) $(RACE_CAMPAIGN_INPUTS) Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-terran-late-repair
+test-sc64-terran-late-repair: build/test-sc64-terran-late-repair
+	./build/test-sc64-terran-late-repair
+
+build/test-sc64-t7-campaign-run: tests/sc64_t7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(LATE_TERRAN_HEADERS) $(RACE_CAMPAIGN_INPUTS) Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=10 $< common/gba.c -o $@
+
+build/test-sc64-t9-campaign-run: tests/sc64_t9_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=12 $< common/gba.c -o $@
+
+# Exercise the compact full-profile layout against the existing early mission
+# controllers and persistence tests, not only the late-mission fixtures.
+define TERRAN_FULL_TEST
+build/test-sc64-full-$(1): $(2) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $(3) $$< common/gba.c -o $$@
+endef
+$(eval $(call TERRAN_FULL_TEST,t3-run,tests/sc64_t3_run.c))
+$(eval $(call TERRAN_FULL_TEST,t3-save,tests/sc64_t3_save.c))
+$(eval $(call TERRAN_FULL_TEST,t3-resume,tests/sc64_t3_resume.c))
+$(eval $(call TERRAN_FULL_TEST,t4-run,tests/sc64_t4_campaign_run.c))
+$(eval $(call TERRAN_FULL_TEST,t4-save,tests/sc64_t4_scenario_save.c))
+$(eval $(call TERRAN_FULL_TEST,t5-save,tests/sc64_t5_save.c))
+$(eval $(call TERRAN_FULL_TEST,t5-run,tests/sc64_t5_campaign_run.c,-DSC64_T5_PROBE_ENTRY))
+$(eval $(call TERRAN_FULL_TEST,t6-run,tests/sc64_t6_campaign_run.c,-DSC64_T6_PROBE_ENTRY))
+.PHONY: test-sc64-terran-full-regression
+test-sc64-terran-full-regression: $(addprefix build/test-sc64-full-,t3-run t3-save t3-resume t4-run t4-save t5-save t5-run t6-run) test-terran
+	mkdir -p .local/sc64/terran-late
+	./build/test-sc64-full-t3-run
+	./build/test-sc64-full-t3-save
+	./build/test-sc64-full-t3-resume
+	./build/test-sc64-full-t4-run --limit 30000 --trace .local/sc64/terran-late/full-t4-controller.json
+	./build/test-sc64-full-t4-save
+	./build/test-sc64-full-t5-save
+	./build/test-sc64-full-t5-run --limit 200000 --trace .local/sc64/terran-late/full-t5-controller.json
+	./build/test-sc64-full-t6-run --limit 30000 --trace .local/sc64/terran-late/full-t6-controller.json

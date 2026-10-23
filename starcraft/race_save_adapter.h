@@ -30,6 +30,9 @@ race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *ou
     return sc64_building_save_decode(out, &candidate->buildings[slot]);
 }
 #endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+#include "sc64_terran_late_repair.h"
+#endif
 #ifdef SC64_T3_ENABLED
 #ifdef SC64_T4_SCENARIO_RUNTIME
 static int
@@ -508,6 +511,44 @@ static int race_load_game(void) {
            ((order==ORDER_GAS||order==ORDER_BUILD)&&(target<0||target>=MAX_BUILDINGS)))return 0;
 #ifdef SC64_T6_RUNTIME
         if (order == ORDER_REPAIR) {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+            if (race_data.state[0] == 0 &&
+                race_data.state[2] >= SC64_TERRAN_LATE_GLOBAL_T7 &&
+                race_data.state[2] <= SC64_TERRAN_LATE_GLOBAL_T10) {
+                if (RACE_U(i, owner) != SIDE || RACE_U(i, type) != U_SCV ||
+                    RACE_U(i, raw_type) != 7 || RACE_U(i, carry) < 0 ||
+                    RACE_U(i, carry) >= SC64_T6_REPAIR_FP_ONE ||
+                    RACE_U(i, work_timer) < 0 || RACE_U(i, work_timer) > 65535 ||
+                    target < 0 || target >= MAX_UNITS + MAX_BUILDINGS)
+                    return 0;
+                if (target < MAX_UNITS) {
+                    Unit repair_target;
+                    if (target == i ||
+                        !race_save_decode_unit(&race_data, (unsigned)target,
+                                               (unsigned)(width * 16),
+                                               (unsigned)(height * 16), &repair_target) ||
+                        !race_late_repair_unit_type_mechanical(repair_target.type) ||
+                        !race_late_repair_unit_fields_valid(repair_target.raw_type,
+                            repair_target.owner, repair_target.alive, repair_target.hp,
+                            repair_target.maxhp, SC64_TRANSPORT_LOADED(&repair_target)))
+                        return 0;
+                } else {
+                    unsigned building_slot = (unsigned)(target - MAX_UNITS);
+                    Building repair_target;
+                    const Sc64RaceBuildingRule *rule;
+                    if (!race_save_decode_building(&race_data, building_slot,
+                                                   &repair_target)) return 0;
+                    rule = sc64_race_building_rule(repair_target.type);
+                    if (!rule || rule->race != R_TER ||
+                        sc64_race_raw_building(repair_target.type) != repair_target.raw_type ||
+                        !race_late_repair_building_fields_valid(repair_target.raw_type,
+                            repair_target.owner, repair_target.alive,
+                            !repair_target.under_construction, (repair_target.flags & 4) != 0,
+                            repair_target.hp, repair_target.maxhp)) return 0;
+                }
+                continue;
+            }
+#endif
             Building target_building;
             const Sc64RaceBuildingRule *rule;
             int building_slot;

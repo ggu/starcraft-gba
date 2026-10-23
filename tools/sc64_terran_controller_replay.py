@@ -132,8 +132,17 @@ def validate_trace(trace: object, capacity: int) -> dict:
                 raise ValueError("checkpoints must follow start and precede final")
             if not isinstance(kind, str) or not kind or kind == "input":
                 raise ValueError(f"event {i} has unsupported kind")
-            if checkpoints and tick <= checkpoints[-1]["host_tick"]:
-                raise ValueError("checkpoint ticks must strictly increase")
+            if checkpoints and tick < checkpoints[-1]["host_tick"]:
+                raise ValueError("checkpoint ticks must not go backwards")
+            if checkpoints and tick == checkpoints[-1]["host_tick"]:
+                # Several source-side probes may label the same observation
+                # with separate event kinds. They are valid only when their
+                # overlapping state fields agree; do not force artificial
+                # one-tick gaps into a controller trace.
+                prior = checkpoints[-1]
+                shared = (set(prior) & set(row)) - {"kind"}
+                if any(prior[field] != row[field] for field in shared):
+                    raise ValueError("same-tick checkpoints disagree")
             checkpoints.append(row)
 
     if start is None or final is None:
@@ -196,6 +205,8 @@ def validate_trace(trace: object, capacity: int) -> dict:
 def make_pages(plan: dict, requested: int, capacity: int) -> list[dict]:
     if type(requested) is not int or requested < 1 or requested > scheduler.MAX_U32:
         raise ValueError("requested ticks must be positive 32-bit integer")
+    if type(capacity) is not int or capacity < 1:
+        raise ValueError("controller queue capacity must be positive")
     boundaries = {requested, plan["launch_tick"]}
     boundaries.update(range(CHECKPOINT_TICKS, requested, CHECKPOINT_TICKS))
     for row in [*plan["checkpoints"], plan["final"]]:
@@ -204,17 +215,30 @@ def make_pages(plan: dict, requested: int, capacity: int) -> list[dict]:
     ordered = sorted(boundaries)
     pages, cursor, start = [], 0, 0
     for end in ordered:
-        events = []
-        while cursor < len(plan["inputs"]) and plan["inputs"][cursor][0] < start:
-            raise ValueError("input transition omitted before observer")
-        while cursor < len(plan["inputs"]) and plan["inputs"][cursor][0] < end:
-            events.append(plan["inputs"][cursor]); cursor += 1
-        if len(events) > capacity:
-            raise ValueError("controller event page exceeds ELF capacity")
-        if end - start > CHECKPOINT_TICKS:
-            raise ValueError("observer page exceeds 1000 ticks")
-        pages.append({"start_tick": start, "end_tick": end, "events": events})
-        start = end
+        while start < end:
+            if cursor < len(plan["inputs"]) and plan["inputs"][cursor][0] < start:
+                raise ValueError("input transition omitted before observer")
+            end_cursor = cursor
+            while end_cursor < len(plan["inputs"]) and plan["inputs"][end_cursor][0] < end:
+                end_cursor += 1
+            if end_cursor - cursor <= capacity:
+                page_events = plan["inputs"][cursor:end_cursor]
+                pages.append({"start_tick": start, "end_tick": end, "events": page_events})
+                cursor = end_cursor
+                start = end
+                continue
+            # Split only between transitions. The transition at split_tick is
+            # the first event on the next page, preserving absolute ticks and
+            # held input state while respecting the ELF's actual queue size.
+            split_tick = plan["inputs"][cursor + capacity][0]
+            if split_tick <= start or split_tick >= end:
+                raise ValueError("cannot split overfull input page at a transition boundary")
+            pages.append({"start_tick": start, "end_tick": split_tick,
+                          "events": plan["inputs"][cursor:cursor + capacity]})
+            cursor += capacity
+            start = split_tick
+    if any(page["end_tick"] - page["start_tick"] > CHECKPOINT_TICKS for page in pages):
+        raise ValueError("observer page exceeds 1000 ticks")
     if requested >= plan["stop_tick"] and cursor != len(plan["inputs"]):
         raise ValueError("input transitions occur after exact stop")
     return pages
@@ -224,6 +248,10 @@ def _compare_trace_row(expected: dict, actual: dict) -> None:
     fields = ("frame", "screen", "mission", "won", "lost", "faults", "campaign_phase", "phase",
               "objective_stage", "objective_flags", "race_completed",
               "side_units", "enemy_units", "side_buildings", "enemy_buildings",
+              "hostile_buildings", "hero_alive", "ion_cannon_alive",
+              "norad_flying_alive", "emitter_at_goal",
+              "protoss_force2_buildings", "zerg_force3_buildings",
+              "raw16_alive", "zerg_units",
               "minerals", "gas", "raw19_alive", "raynor_alive", "raw126_alive",
               "raynors_at_goal", "dropships_at_goal",
               "norad_alive", "kerrigan_alive", "emitter_alive", "emitter_slot", "emitter_owner",
@@ -509,7 +537,8 @@ def _runtime_rows(rsp, sym: dict, sizes: dict, elf: Path) -> tuple[list[dict], l
             units.append({name: int.from_bytes(row[unit_fields[name]:unit_fields[name] + 4],
                                                "little", signed=True) for name in needed})
     raw_b = rsp.read(sym["b"], sizes["b"])
-    need_b = ("owner", "type", "alive", "raw_type", "under_construction", "x", "y")
+    need_b = ("owner", "type", "alive", "raw_type", "raw_owner",
+              "under_construction", "x", "y")
     if any(name not in building_fields for name in need_b):
         raise RuntimeError("Building DWARF lacks fields needed for actor verification")
     buildings = []
@@ -543,6 +572,10 @@ def _snapshot(rsp, sym: dict, sizes: dict, elf: Path, mission: int) -> dict:
     state.update({"mission": state.get("race_selected_mission", -1),
                   "side_units": by_owner.get(0, 0), "enemy_units": by_owner.get(1, 0),
                   "side_buildings": b_by_owner.get(0, 0), "enemy_buildings": b_by_owner.get(1, 0),
+                  "hostile_buildings": b_by_owner.get(1, 0) + b_by_owner.get(4, 0),
+                  "protoss_force2_buildings": _count_owner_raw_buildings(live_buildings, 1, 1),
+                  "zerg_force3_buildings": _count_owner_raw_buildings(live_buildings, 4, 3),
+                  "zerg_units": by_owner.get(4, 0),
                   "minerals": _read_i32(rsp, sym["minerals"]), "gas": _read_i32(rsp, sym["gas"]),
                   "faults": _read_i32(rsp, sym["mission_unsupported_count"]),
                   "elapsed": campaign.get("elapsed_frames", -1),
@@ -582,9 +615,9 @@ def _snapshot(rsp, sym: dict, sizes: dict, elf: Path, mission: int) -> dict:
             force_fields.append(_read_u32(rsp, po + trig_layout["elapsed_ticks"]))
             state["faults"] = max(state["faults"], int.from_bytes(rsp.read(po + trig_layout["fault"], 1), "little"))
         state["all_trigger_clocks"] = force_fields
-        state["human_outcome"] = max(int.from_bytes(
-            rsp.read(trig + owner * 144 + trig_layout["outcome"], 1), "little")
-            for owner in range(8))
+        human_slot = _late_human_trigger_slot(mission)
+        state["human_outcome"] = int.from_bytes(
+            rsp.read(trig + human_slot * 144 + trig_layout["outcome"], 1), "little")
         switches = trig + rt["switches"]
         state["switch2"] = (rsp.read(switches, 1)[0] >> 2) & 1
         state["objective_stage"] = _read_i32(rsp, sym.get("mission_objective_stage", 0))
@@ -598,21 +631,34 @@ def _snapshot(rsp, sym: dict, sizes: dict, elf: Path, mission: int) -> dict:
                 carrier["x"], carrier["y"], carrier["hp"])
         else:
             state["carrier_x"], state["carrier_y"], state["carrier_hp"] = -1, -1, -1
-    raw_unit = lambda raw, owner=-1: next((x for x in live_units
-        if x["raw_type"] == raw and (owner < 0 or x["owner"] == owner)), None)
-    raw_building = lambda raw, owner=-1: next((x for x in live_buildings
-        if x["raw_type"] == raw and (owner < 0 or x["owner"] == owner)), None)
+    raw_unit = lambda raw, owner=-1: _find_raw_actor(live_units, raw, owner)
+    raw_building = lambda raw, owner=-1: _find_raw_actor(live_buildings, raw, owner)
     state["raw19_alive"] = int(raw_unit(19) is not None)
+    state["raw16_alive"] = int(raw_unit(16) is not None)
     # The preplaced Raynor source actor is rescuable before the mission
     # converts it to SIDE ownership, so its trace identity is any-owner.
     raynor = raw_unit(19)
     state["raynor_alive"] = int(raynor is not None)
     norad = raw_building(126)
+    norad_flying = raw_unit(29)
+    state["norad_flying_alive"] = int(norad_flying is not None)
+    # The source T8 trace calls its surviving Norad II hero explicitly. Raw
+    # 29 is the flying Norad II unit; raw 126 is the distinct crashed building.
+    if mission == 11:
+        state["hero_alive"] = int(norad_flying is not None)
+    elif mission == 10:
+        state["hero_alive"] = int(raw_unit(16) is not None)
+    elif mission == 13:
+        state["hero_alive"] = int(raw_unit(19) is not None)
+    ion_cannon = raw_building(127)
+    state["ion_cannon_alive"] = int(ion_cannon is not None)
     state["raynor"] = raynor["slot"] if raynor else -1
     state["raw126_alive"] = int(norad is not None)
     state["norad_alive"] = state["raw126_alive"]
     state["norad"] = norad["slot"] if norad else -1
-    kerrigan, emitter = raw_unit(16, 0), raw_unit(217, 0)
+    # Like Raynor, preplaced Kerrigan can remain source-rescuable until the
+    # mission's capture path transfers her to the human player.
+    kerrigan, emitter = raw_unit(16), raw_unit(217, 0)
     state["kerrigan_alive"] = int(kerrigan is not None)
     state["kerrigan"] = kerrigan["slot"] if kerrigan else -1
     state["emitter_alive"] = int(emitter is not None)
@@ -626,6 +672,15 @@ def _snapshot(rsp, sym: dict, sizes: dict, elf: Path, mission: int) -> dict:
         else:
             state["emitter_owner"] = state["emitter_raw_owner"] = -1
             state["emitter_x"] = state["emitter_y"] = -1
+        if mission == 10:
+            bounds = _source_location_bounds(rsp, elf, sym, "sc64_t7_scenario", 1)
+            if state["emitter_slot"] >= 0:
+                goal_actor = units[state["emitter_slot"]]
+                state["emitter_at_goal"] = int(
+                    goal_actor["alive"] and goal_actor["raw_type"] == 217 and
+                    _point_in_source_location(goal_actor["x"], goal_actor["y"], bounds))
+            else:
+                state["emitter_at_goal"] = 0
     elif emitter:
         state["emitter_owner"] = emitter["owner"]
         state["emitter_raw_owner"] = emitter["raw_owner"]
@@ -671,6 +726,54 @@ def _snapshot(rsp, sym: dict, sizes: dict, elf: Path, mission: int) -> dict:
             state["screen"] == SCREEN_PLAY and any(value != state["elapsed"] for value in clocks)):
         raise RuntimeError("campaign/frame/source-player trigger clocks diverged")
     return state
+
+
+def _late_human_trigger_slot(mission: int) -> int:
+    """Source human controller slot for the retained late Terran setups.
+
+    T7-T9 assign controller 6 to source player 0; T10 assigns it to player 1.
+    This is read from the generated source setup tables rather than inferred
+    from the maximum outcome among all eight independently ticking players.
+    """
+    slots = {10: 0, 11: 0, 12: 0, 13: 1}
+    try:
+        return slots[mission]
+    except KeyError as exc:
+        raise ValueError(f"no late human trigger slot for mission {mission}") from exc
+
+
+def _find_raw_actor(rows: list[dict], raw_type: int, owner: int = -1):
+    return next((row for row in rows if row["raw_type"] == raw_type and
+                 (owner < 0 or row["owner"] == owner)), None)
+
+
+def _count_owner_raw_buildings(rows: list[dict], owner: int, raw_owner: int) -> int:
+    """Count live buildings only when both runtime and source owner match."""
+    return sum(1 for row in rows if row["owner"] == owner and row["raw_owner"] == raw_owner)
+
+
+def _source_location_bounds(rsp, elf: Path, sym: dict, scenario_symbol: str,
+                            location_id: int) -> tuple[int, int, int, int]:
+    """Read a one-based source MRGN rectangle from the linked scenario table."""
+    scenario_addr = sym.get(scenario_symbol)
+    if scenario_addr is None or type(location_id) is not int or location_id < 1:
+        raise RuntimeError("linked source scenario/location is unavailable")
+    _, scenario_fields = races.dwarf_struct(elf, "Sc64T4Scenario")
+    location_ptr = int.from_bytes(rsp.read(scenario_addr + scenario_fields["locations"], 4), "little")
+    location_count = int.from_bytes(rsp.read(scenario_addr + scenario_fields["location_count"], 2), "little")
+    location_size, location_fields = races.dwarf_struct(elf, "Sc64T4Location")
+    if location_id > location_count or location_ptr == 0:
+        raise RuntimeError(f"source scenario has no location {location_id}")
+    raw = rsp.read(location_ptr + (location_id - 1) * location_size, location_size)
+    return tuple(int.from_bytes(raw[location_fields[name]:location_fields[name] + 4], "little")
+                 for name in ("left", "top", "right", "bottom"))
+
+
+def _point_in_source_location(x: int, y: int,
+                              bounds: tuple[int, int, int, int]) -> bool:
+    """Use the T7 runner's half-scale, left/top-inclusive point test."""
+    left, top, right, bottom = bounds
+    return left <= x * 2 < right and top <= y * 2 < bottom
 
 
 if __name__ == "__main__":

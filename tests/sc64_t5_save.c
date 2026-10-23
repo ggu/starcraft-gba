@@ -15,6 +15,54 @@ static u8 saved_explored[(MAP_CELLS + 7) / 8];
 static int saved_frame, saved_cx, saved_cy, saved_minerals_count, saved_gas_count;
 static int saved_players[5], saved_ore[5], saved_vespene[5];
 
+#ifdef SC64_LATE_TERRAN_STORAGE
+static int saved_unit_field(const RaceSave *record, int slot, size_t offset)
+{
+    Unit decoded;
+    assert(sc64_unit_save_decode(&decoded, &record->units[slot],
+                                 (unsigned)(race_cols * 16),
+                                 (unsigned)(race_rows * 16)));
+    if (offset == offsetof(Unit, alive)) return decoded.alive;
+    if (offset == offsetof(Unit, type)) return decoded.type;
+    if (offset == offsetof(Unit, carry)) return decoded.carry;
+    assert(0 && "unsupported packed Unit field in save fixture");
+    return 0;
+}
+
+static void corrupt_saved_unit_field(RaceSave *record, int slot,
+                                     size_t offset, int value)
+{
+    Unit decoded;
+    assert(sc64_unit_save_decode(&decoded, &record->units[slot],
+                                 (unsigned)(race_cols * 16),
+                                 (unsigned)(race_rows * 16)));
+    if (offset == offsetof(Unit, carry)) decoded.carry = value;
+    else assert(0 && "unsupported packed Unit corruption field");
+    assert(sc64_unit_save_encode(&record->units[slot], &decoded,
+                                (unsigned)(race_cols * 16),
+                                (unsigned)(race_rows * 16)));
+}
+#else
+static int saved_unit_field(const RaceSave *record, int slot, size_t offset)
+{
+    return record->units[slot][offset / sizeof(int)];
+}
+
+static void corrupt_saved_unit_field(RaceSave *record, int slot,
+                                     size_t offset, int value)
+{
+    record->units[slot][offset / sizeof(int)] = (s16)value;
+}
+#endif
+
+#ifdef SC64_TERRAN_LATE_RUNTIME
+#define SC64_TEST_OPTIONAL_SAVE_BYTES sizeof(race_data.terran_late)
+#elif defined(SC64_T6_RUNTIME)
+#define SC64_TEST_OPTIONAL_SAVE_BYTES sizeof(race_data.t6)
+#else
+#define SC64_TEST_OPTIONAL_SAVE_BYTES sizeof(race_data.t4)
+#endif
+
 static void start_t5(void)
 {
     game_init();
@@ -92,7 +140,7 @@ static void active_runtime_roundtrip(void)
                sizeof(erased_grant.t5.resources[0]));
         reject_record_atomically(&erased_grant);
     }
-    for (unsigned i = sizeof(race_data.t5); i < sizeof(race_data.t4); ++i)
+    for (unsigned i = sizeof(race_data.t5); i < SC64_TEST_OPTIONAL_SAVE_BYTES; ++i)
         assert(((const u8 *)&race_data.t4)[i] == 0);
 
     remember_live();
@@ -135,12 +183,12 @@ static void malformed_records_are_atomic(void)
         case 11: {
             int mine = -1;
             for (int i = 0; i < MAX_UNITS; ++i)
-                if (bad.units[i][offsetof(Unit, alive)/sizeof(int)] &&
-                    bad.units[i][offsetof(Unit, type)/sizeof(int)] == U_SPIDER_MINE) {
+                if (saved_unit_field(&bad, i, offsetof(Unit, alive)) &&
+                    saved_unit_field(&bad, i, offsetof(Unit, type)) == U_SPIDER_MINE) {
                     mine = i; break;
                 }
             assert(mine >= 0);
-            bad.units[mine][offsetof(Unit, carry)/sizeof(int)] = 99;
+            corrupt_saved_unit_field(&bad, mine, offsetof(Unit, carry), 99);
             break;
         }
         }
@@ -359,7 +407,7 @@ static void other_modes_clear_union(void)
 {
     game_init(); race_mode = 0; race_selected_mission = 6; init_state(); /* T1 */
     assert(!race_t5_active() && race_save_game());
-    for (unsigned j = 0; j < sizeof(race_data.t4); ++j)
+    for (unsigned j = 0; j < SC64_TEST_OPTIONAL_SAVE_BYTES; ++j)
         assert(((const u8 *)&race_data.t4)[j] == 0);
 
     game_init(); race_mode = 0; race_selected_mission = 7; init_state(); /* T4 */
@@ -371,13 +419,16 @@ static void other_modes_clear_union(void)
     }
     game_init(); race_mode = 1; race_skirmish_map = 0; init_state();
     assert(!race_t5_active() && race_save_game());
-    for (unsigned j = 0; j < sizeof(race_data.t5); ++j)
+    for (unsigned j = 0; j < SC64_TEST_OPTIONAL_SAVE_BYTES; ++j)
         assert(((const u8 *)&race_data.t5)[j] == 0);
 }
 
 int main(void)
 {
-#ifdef SC64_T6_STORAGE
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    _Static_assert(SC64_RACE_SAVE_GENERATION == 18u,
+                   "full late Terran saves require generation 18");
+#elif defined(SC64_T6_STORAGE)
     _Static_assert(SC64_RACE_SAVE_GENERATION == 15u,
                    "expanded T5 storage uses its own save generation");
 #else
