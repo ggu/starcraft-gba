@@ -1180,3 +1180,10 @@ test-sc64-terran-full-regression: $(addprefix build/test-sc64-full-,t1-run t2-ru
 	./build/test-sc64-full-t5-save
 	./build/test-sc64-full-t5-run --limit 200000 --trace .local/sc64/terran-late/full-t5-controller.json
 	./build/test-sc64-full-t6-run --limit 30000 --trace .local/sc64/terran-late/full-t6-controller.json
+
+.PHONY: test-sc64-terran-full-campaign
+test-sc64-terran-full-campaign: test-sc64-terran-full-regression test-sc64-terran-late-world test-sc64-terran-late-save test-sc64-terran-late-repair $(addprefix build/test-sc64-t,7-campaign-run 8-campaign-run 9-campaign-run 10-campaign-run)
+	./build/test-sc64-t7-campaign-run --limit 20000 --trace .local/sc64/terran-late/full-t7-controller.json
+	./build/test-sc64-t8-campaign-run --limit 200000 --trace .local/sc64/terran-late/full-t8-controller.json
+	./build/test-sc64-t9-campaign-run --limit 500000 --trace .local/sc64/terran-late/full-t9-controller.json
+	./build/test-sc64-t10-campaign-run --limit 100000 --trace .local/sc64/terran-late/full-t10-controller.json

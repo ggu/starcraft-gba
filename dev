@@ -250,7 +250,7 @@ def main() -> int:
             target = {"unified": "test-unified", "races": "test-races",
                       "wasteland": "test-sc64", "backwater": "test-backwater",
                       "skirmish": "test-skirmish", "campaign": "test-campaign",
-                      "terran": "test-terran", "zerg": "test-zerg",
+                      "terran": "test-sc64-terran-full-campaign", "zerg": "test-zerg",
                       "protoss": "test-protoss"}[args.profile]
             run(["make", target])
         else:
