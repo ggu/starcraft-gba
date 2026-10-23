@@ -699,5 +699,5 @@ for each build. The replay's
 effective fps uses the emulated GBA hardware timer and completed simulation
 frames, not host wall time. Diagnostic counters describe only the final tick;
 collect them from a diagnostic build separately from the uninstrumented FPS
-comparison. `tools/sc64_p3_controller_compare.py` is Protoss-only and does not
+comparison. `tools/sc64_compare_campaign_replays.py` is Protoss-only and does not
 apply to Terran measurements.
