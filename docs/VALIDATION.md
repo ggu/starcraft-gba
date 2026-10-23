@@ -1686,3 +1686,51 @@ suite (158 Python tests), T6 world/tech/save fixtures, late-map world and save
 fixtures, compact storage and expanded target-index fixtures. Late source AI
 requests still use authored bounded behavior; native campaign AI scripts have
 not been recovered.
+
+## Canonical Terran T1–T10 profile (2026-10-23)
+
+The canonical `terran` preparation and build workflow now includes the full
+Terran campaign. The final frozen 8 MiB ROM is
+`build/StarCraft-Terran-GBA.gba`, SHA-256
+`00f0939878a51320b8fc252d69b2947ffc442e6d3cc39efa12d0d118511bf3ee`.
+Its generation-18 campaign save is 15,816 bytes, with 1,892 bytes of late
+mission state. The unchanged memory guards pass: IWRAM ends at `0x03004fb8`
+and BSS at `0x0203dc40`.
+
+Real `./dev sc64 prepare --rom PATH --profile terran`, the full Terran build/status flow,
+and the complete regression suite passed. The run covered 172 Python tests,
+the default and unified builds/tests, all ten Terran startup/save fixtures,
+and all 18 Outpost/Blood Bath combinations (three human races and one to
+three independently selected AI races). Host controller runs won all ten
+Terran missions. The full-profile controller milestones include T1 at frame 24,018, T2 at
+frame 34,513, T3 at frame 54,000, T4 at frame 9,331, T5 at frame 121,261,
+and T6 at frame 21,046. T1 and T2 also enter through the normal campaign menu.
+
+A separate fresh private output directory regenerated all race and sprite
+headers, T4–T10 scenarios and T5–T10 availability tables. Their hashes and all
+97 retained records match the canonical inputs; preparation does not depend
+on stale retained records from earlier development profiles.
+
+Repeated host winning traces for the late missions are deterministic:
+
+| Mission | Final frame | Winning trace SHA-256 |
+| --- | ---: | --- |
+| T7 | 12,151 | `46ea2855aac31b97194370130aa4c1a60aae01715a756b2a66bf7439e90faca4` |
+| T8 | 86,596 | `41c22e97d15d180b36453c679826e6cacb8c87372704226e0510e4f047ea3079` |
+| T9 | 358,906 | `d44ea1acd3e882d06fce333c47480fe6c7034033d9761b3b42a7b32a9538e552` |
+| T10 | 38,491 | `9a7d0aca12c46b5682247fa3d015076364cb60804a19559699c62ae9eb900514` |
+
+ARM evidence is narrower than host completion. The earlier generation-16 T6
+normal-menu replay won at frame 21,046 and averaged 17.26 effective fps. An
+earlier frozen generation-18 T10 ROM
+(`329793a4707e0d3c4b33ed169391b2b887374d5eb788943ceef8828604c7ce44`) won
+at frame 38,491 and averaged 11.78 effective fps. A full T9 replay on that
+older ROM is still in progress; its 140,000-tick checkpoint had zero trigger
+faults and all 21 Zerg buildings intact, so it is not a terminal result. The
+canonical-ROM ARM replays for T7, T8 and T10 and fresh generation-18 save checks for
+T5–T10 are queued, not yet qualified.
+
+Mission adapters use bounded authored AI behavior where original N64 AI
+scripts are unavailable; these results do not claim native AI execution.
+Measured emulator rates remain below the 30-fps target, and no physical GBA
+hardware result is claimed.

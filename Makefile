@@ -1157,6 +1157,8 @@ define TERRAN_FULL_TEST
 build/test-sc64-full-$(1): $(2) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $(3) $$< common/gba.c -o $$@
 endef
+$(eval $(call TERRAN_FULL_TEST,t1-run,tests/sc64_mission_run.c))
+$(eval $(call TERRAN_FULL_TEST,t2-run,tests/backwater_mission_run.c))
 $(eval $(call TERRAN_FULL_TEST,t3-run,tests/sc64_t3_run.c))
 $(eval $(call TERRAN_FULL_TEST,t3-save,tests/sc64_t3_save.c))
 $(eval $(call TERRAN_FULL_TEST,t3-resume,tests/sc64_t3_resume.c))
@@ -1166,8 +1168,10 @@ $(eval $(call TERRAN_FULL_TEST,t5-save,tests/sc64_t5_save.c))
 $(eval $(call TERRAN_FULL_TEST,t5-run,tests/sc64_t5_campaign_run.c,-DSC64_T5_PROBE_ENTRY))
 $(eval $(call TERRAN_FULL_TEST,t6-run,tests/sc64_t6_campaign_run.c,-DSC64_T6_PROBE_ENTRY))
 .PHONY: test-sc64-terran-full-regression
-test-sc64-terran-full-regression: $(addprefix build/test-sc64-full-,t3-run t3-save t3-resume t4-run t4-save t5-save t5-run t6-run) test-terran
+test-sc64-terran-full-regression: $(addprefix build/test-sc64-full-,t1-run t2-run t3-run t3-save t3-resume t4-run t4-save t5-save t5-run t6-run) test-terran
 	mkdir -p .local/sc64/terran-late
+	./build/test-sc64-full-t1-run --trace .local/sc64/terran-late/full-t1-controller.json
+	./build/test-sc64-full-t2-run --trace .local/sc64/terran-late/full-t2-controller.json
 	./build/test-sc64-full-t3-run
 	./build/test-sc64-full-t3-save
 	./build/test-sc64-full-t3-resume

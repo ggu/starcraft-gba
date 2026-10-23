@@ -246,11 +246,27 @@ int main(int argc,char **argv)
     int x,y,i,hero=-1,cc=-1;
     if(argc!=1 && !trace){fprintf(stderr,"usage: %s [--trace PATH]\n",argv[0]);return 64;}
     game_init();
+#ifdef SC64_UNIFIED
+    /* Enter T2 through the normal campaign and paged mission menus in the
+     * unified full-Terran profile. */
+    input_frame(KEY_A); input_frame(0);
+#ifndef SC64_CAMPAIGN_RACE
+    if (race_front.page != SC_FRONT_CAMPAIGN) return 66;
+    input_frame(KEY_A); input_frame(0); /* Terran campaign -> mission list. */
+#endif
+    if (race_front.page != SC_FRONT_MISSION) return 66;
+    input_frame(KEY_DOWN); input_frame(0); /* T2. */
+    input_frame(KEY_A); input_frame(0); /* Briefing. */
+    if (race_front.page != SC_FRONT_BRIEFING || race_front.mission != 5) return 66;
+    input_frame(KEY_A); input_frame(0); /* Deploy. */
+    if (screen != SCREEN_PLAY || race_selected_mission != 5) return 66;
+#else
 #ifdef SC64_TERRAN_CAMPAIGN
     /* Select T2 through the real title input path, then release before start. */
     input_frame(KEY_DOWN); input_frame(0);
 #endif
     input_frame(KEY_A); input_frame(0);
+#endif
     if(minerals!=200||gas!=200)return 1;
     for(i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].type==U_RAYNOR)hero=i;
     if(hero<0)return 2;

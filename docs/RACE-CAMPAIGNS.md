@@ -283,6 +283,44 @@ claim of original N64 AI execution. These missions are available through the
 canonical normal-menu `terran` profile and the `./dev sc64 ... --profile
 terran` workflow documented in [Development](DEVELOPMENT.md).
 
+## Terran campaign objectives and late controls
+
+The objective text below follows the campaign adapter's win/loss checks. Keep
+the named heroes and protected forces alive as well as completing the main
+goal.
+
+| Mission | Objective |
+| --- | --- |
+| T1 | Find Raynor, build a Barracks, and train ten Marines. |
+| T2 | Destroy the Infested Command Center; Raynor must survive. |
+| T3 | Survive the countdown, or unlock and complete the alternate Zerg Hatchery objective. |
+| T4 | Find the data disks; Raynor must survive. |
+| T5 | Reach the rebel base and destroy Confederate buildings; Kerrigan and Raynor must survive. |
+| T6 | Bring Raynor and two Dropships to Norad II; Raynor and Norad II must survive. |
+| T7 | Deliver the Psi Emitter; Kerrigan must survive. An SCV picks up the emitter when it gets within a short distance, then carries it as it moves. |
+| T8 | Clear the opposing bases and protect Norad II. |
+| T9 | Destroy the remaining hostile buildings while protecting Kerrigan and the Zerg buildings. |
+| T10 | Destroy the Ion Cannon; Raynor must survive. |
+
+For T7, use **Move** to take your forces past Zerg Spore Colonies before
+ordering attacks on the Protoss base. Attack Move may engage Zerg defenders
+along the route. Keep Kerrigan away from the fighting; use an SCV to collect
+and deliver the emitter.
+
+In T8, the Lift / Land command helps reposition eligible starting structures.
+Select a completed, player-owned Command Center, Barracks, Factory, Starport,
+Engineering Bay, or Science Facility with an empty production queue. Press B,
+scroll to **LIFT / LAND**, and press A to lift it. To move an airborne
+building, use B → **MOVE** → A and choose a destination. To land, use B →
+**LIFT / LAND** → A and click a valid clear site. The landing check rejects
+blocked terrain, occupied ground sites, map-edge sites and overlapping
+landing destinations. A completed building with a queued unit cannot lift.
+
+The separate **COMMAND CENTER** command in the same menu starts construction:
+select an SCV, press B, scroll to **COMMAND CENTER**, press A, choose a valid
+site, and press A again to place it. It does not select an existing Command
+Center; tap A on the existing structure to select it.
+
 ## Current limits
 
 Higher Ground (Protoss 3, global catalog ID 22) now has an experimental runtime.
