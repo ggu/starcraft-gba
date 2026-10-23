@@ -493,11 +493,16 @@ First prepare the usual local Terran inputs with `./dev sc64 prepare --rom
 make sc64-t6-prepare
 make sc64-t6-storage-probe
 make test-sc64-t6-import test-sc64-t6-scenario test-sc64-t6-actors
+make test-sc64-t6-availability
 make test-sc64-compact-building-save test-sc64-t6-storage test-sc64-t6-combined
 ```
 
-The dedicated preparation command retains the T6 records and adds its gated
-source sprites. Run it again after ordinary profile preparation, which omits
+The dedicated preparation command retains the T6 records, generates its
+source availability bitmap, and adds its gated source sprites. The optional
+availability check compares all 2,736 player/type values with the retained
+raw PUNI record. That source permits the human Dropship, Starport and Control
+Tower; this check does not exercise acquiring two Dropships in the game.
+Run preparation again after ordinary profile preparation, which omits
 T6 sprites. A storage build rejects incomplete T6 preparation.
 
 The import retains the 96×96 map and all 216 non-start UNIT placements,

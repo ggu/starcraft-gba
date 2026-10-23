@@ -43,6 +43,7 @@ T5_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t5_scenario_generated.h
 T5_AVAILABILITY_HEADER := .local/sc64/races/generated/sc64_t5_availability_generated.h
 T5_SCENARIO_RECORDS := .local/sc64/races/generated/t5/records
 T6_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t6_scenario_generated.h
+T6_AVAILABILITY_HEADER := .local/sc64/races/generated/sc64_t6_availability_generated.h
 T6_SCENARIO_RECORDS := .local/sc64/races/generated/t6/records
 
 .PHONY: all clean test verify probe sc64 backwater skirmish campaign races unified \
@@ -475,6 +476,7 @@ build/StarCraft-T6-Storage-Probe.gba: build/starcraft-t6-storage-probe.elf tools
 sc64-t6-prepare:
 	$(PYTHON) tools/sc64_races_pack.py
 	$(PYTHON) tools/sc64_t4_scenario_pack.py --profile t6
+	$(PYTHON) tools/sc64_t5_availability.py --profile t6
 	$(PYTHON) tools/sc64_race_sprites.py --include-t6
 sc64-t6-storage-probe: build/StarCraft-T6-Storage-Probe.gba
 build/test-sc64-t6-import: tests/sc64_t6_import.c $(RACES_INPUTS) $(wildcard starcraft/*.h) Makefile | build
@@ -488,6 +490,14 @@ test-sc64-t6-import: build/test-sc64-t6-import
 	./build/test-sc64-t6-import
 test-sc64-t6-scenario: build/test-sc64-t6-scenario
 	./build/test-sc64-t6-scenario
+$(T6_AVAILABILITY_HEADER): tools/sc64_t5_availability.py .local/sc64/races/generated/t6/manifest.json $(T6_SCENARIO_RECORDS)/PUNI.bin
+	$(PYTHON) tools/sc64_t5_availability.py --profile t6 --out $@
+build/test-sc64-t6-availability: tests/sc64_t6_availability.c starcraft/sc64_unit_availability.h $(T6_AVAILABILITY_HEADER) Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Istarcraft -I.local/sc64/races/generated $< -o $@
+.PHONY: sc64-t6-availability test-sc64-t6-availability
+sc64-t6-availability: $(T6_AVAILABILITY_HEADER)
+test-sc64-t6-availability: build/test-sc64-t6-availability
+	./build/test-sc64-t6-availability $(T6_SCENARIO_RECORDS)/PUNI.bin
 build/test-sc64-compact-building-save: tests/sc64_compact_building_save.c starcraft/sc64_compact_building_save.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-compact-building-save

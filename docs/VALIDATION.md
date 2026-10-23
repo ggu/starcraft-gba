@@ -1563,6 +1563,21 @@ only: T6 mission triggers, runtime, controller completion,
 and performance are not implemented or qualified. T6 remains unavailable and
 the current campaign count remains 11 of 30, with 19 missions unavailable.
 
+## T6 availability preparation (2026-10-23)
+
+`make sc64-t6-prepare` now emits a separate private T6 PUNI bitmap. Preparation
+checks the verified map, ROM, extractor, CHK and framed PUNI hashes before
+writing the output. `make test-sc64-t6-availability` independently compares
+all 2,736 generated player/type values with the retained raw record and
+confirms that the human Dropship/Starport/Control Tower route is permitted.
+This does not test construction or acquiring two Dropships in the mission.
+
+The asset-free Python tests cover profile isolation, wrong-map rejection,
+rehashed input tampering and preservation of an existing output after failure.
+All 138 Python tests, the default build/checks, and unified build/checks pass.
+Regenerating the default T5 availability header leaves it byte-identical.
+T6 remains unavailable; the playable count is still 11 of 30.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.

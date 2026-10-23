@@ -119,6 +119,59 @@ class T5AvailabilityTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'framed CHK record'):
                 self.read_fixture(records, manifest_path)
 
+    def test_t6_profile_uses_its_own_source_identity_and_symbols(self):
+        with tempfile.TemporaryDirectory(prefix='sc64-t6-puni-') as td:
+            records, manifest_path, payload = self.fixture(Path(td))
+            manifest = json.loads(manifest_path.read_text())
+            manifest['source_map_path'] = AVAIL.PROFILES['t6']['map']
+            manifest_path.write_text(json.dumps(manifest))
+            output = Path(td) / 't6.h'
+            result = AVAIL.generate(
+                records, manifest_path, output, profile='t6',
+                expected_rom_sha1='rom-pin', expected_extractor='extractor-pin',
+                expected_extractor_commit='commit-pin',
+                expected_chk_sha256='chk-pin',
+                expected_puni_sha256=hashlib.sha256(payload).hexdigest())
+            self.assertEqual(result['map'], '008/00F')
+            header = output.read_text()
+            self.assertIn('SC64_T6_AVAILABILITY_BIT_BYTES 342u', header)
+            self.assertIn('sc64_t6_availability_bits[', header)
+            self.assertNotIn('SC64_T5_', header)
+            with self.assertRaisesRegex(ValueError, 'T5'):
+                self.read_fixture(records, manifest_path)
+
+    def test_t6_rejects_rehashed_source_changes_without_replacing_output(self):
+        with tempfile.TemporaryDirectory(prefix='sc64-t6-puni-pin-') as td:
+            records, manifest_path, payload = self.fixture(Path(td))
+            manifest = json.loads(manifest_path.read_text())
+            manifest['source_map_path'] = AVAIL.PROFILES['t6']['map']
+            modified = bytes([payload[0] ^ 1]) + payload[1:]
+            framed = b'PUNI' + struct.pack('<I', len(modified)) + modified
+            (records / 'PUNI.bin').write_bytes(framed)
+            manifest['records']['PUNI']['payload_sha256'] = hashlib.sha256(modified).hexdigest()
+            manifest['records']['PUNI']['record_sha256'] = hashlib.sha256(framed).hexdigest()
+            manifest_path.write_text(json.dumps(manifest))
+            output = Path(td) / 't6.h'
+            output.write_text('existing header')
+            with self.assertRaisesRegex(ValueError, 'verified T6 source record'):
+                AVAIL.generate(
+                    records, manifest_path, output, profile='t6',
+                    expected_rom_sha1='rom-pin', expected_extractor='extractor-pin',
+                    expected_extractor_commit='commit-pin',
+                    expected_chk_sha256='chk-pin',
+                    expected_puni_sha256=hashlib.sha256(payload).hexdigest())
+            self.assertEqual(output.read_text(), 'existing header')
+            manifest['source_map_path'] = AVAIL.EXPECTED_MAP
+            manifest_path.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ValueError, 'T6'):
+                AVAIL.generate(records, manifest_path, output, profile='t6')
+
+    def test_availability_profile_names_are_bounded(self):
+        with self.assertRaisesRegex(ValueError, 'unsupported availability profile'):
+            AVAIL.generate(profile='t7')
+        with self.assertRaisesRegex(ValueError, 'unsupported availability profile'):
+            AVAIL.render_header(bytes(AVAIL.PUNI_BYTES), profile='t7')
+
     def test_packer_retains_puni_only_when_requested(self):
         records = dict(PACKER.RETAINED_SOURCE_RECORDS)
         with tempfile.TemporaryDirectory(prefix='sc64-puni-retain-') as td:
