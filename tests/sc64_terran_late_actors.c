@@ -87,7 +87,8 @@ int main(void)
         {108,B_NUCLEAR_SILO},{117,B_COVERT_OPS},{120,B_MACHINE_SHOP},
         {123,B_ARMORY},{136,B_DEFILER_MOUND},{140,B_ULTRALISK_CAVERN},
         {163,B_CITADEL_ADUN},{168,B_STASIS_CELL_PRISON},{169,B_FLEET_BEACON},
-        {171,B_ROBOTICS_SUPPORT_BAY},{172,B_SHIELD_BATTERY},{127,B_SPECIAL_ION_CANNON}
+        {171,B_ROBOTICS_SUPPORT_BAY},{172,B_SHIELD_BATTERY},{127,B_SPECIAL_ION_CANNON},
+        {116,B_SCIENCE_FACILITY},{118,B_PHYSICS_LAB}
     };
     static const int building_expect[][13] = {
         {600,0,1,100,100,1200,256,37,16,31,25,0,0},
@@ -101,10 +102,13 @@ int main(void)
         {500,500,1,300,200,900,320,40,32,47,24,0,0},
         {450,450,1,150,100,450,320,32,32,32,20,0,0},
         {200,200,1,100,0,450,320,32,16,32,16,0,0},
-        {2000,0,1,200,0,900,256,48,32,47,31,0,0}
+        {2000,0,1,200,0,900,256,48,32,47,31,0,0},
+        {850,0,1,100,150,900,320,48,38,48,38,0,0},
+        {600,0,1,50,50,600,256,47,24,28,22,0,0}
     };
     static const int building_footprints[][2] = {
-        {2,2},{2,2},{2,2},{3,2},{4,2},{3,2},{3,2},{4,3},{3,2},{3,2},{3,2},{3,2}
+        {2,2},{2,2},{2,2},{3,2},{4,2},{3,2},{3,2},{4,3},{3,2},{3,2},{3,2},{3,2},
+        {4,3},{2,2}
     };
     for (unsigned i=0; i<sizeof(buildings)/sizeof(buildings[0]); ++i) {
         const Sc64TerranLateActorFact *f = sc64_terran_late_building_fact(buildings[i].type);

@@ -35,6 +35,12 @@ enum {
 static int
 race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) return sc64_terran_late_runtime_owner((unsigned)raw_owner);
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active()) return sc64_t6_runtime_owner((unsigned)raw_owner);
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) {
         if (raw_owner == SC64_T5_SOURCE_HUMAN) return SIDE;
@@ -242,6 +248,12 @@ race_campaign_init(void)
 #ifdef SC64_T5_RUNTIME
     memset(&race_t5, 0, sizeof(race_t5));
 #endif
+#ifdef SC64_T6_RUNTIME
+    memset(&race_t6, 0, sizeof(race_t6));
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    memset(&race_late, 0, sizeof(race_late));
+#endif
     if (race_mode) {
         race_skirmish_init();
         return;
@@ -262,6 +274,12 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_T5_RUNTIME
          && race_selected_mission != SC64_T5_GLOBAL_ID
+#endif
+#ifdef SC64_T6_RUNTIME
+         && race_selected_mission != SC64_T6_GLOBAL_ID
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+         && !race_late_active()
 #endif
          ) || !sc64_race_maps[race_selected_mission].width)
         race_selected_mission = sc64_frontend_first_mission(
@@ -324,6 +342,12 @@ race_campaign_init(void)
 #ifdef SC64_T5_RUNTIME
         if (race_t5_active()) owner = race_campaign_owner(map, i);
 #endif
+#ifdef SC64_T6_RUNTIME
+        if (race_t6_active()) owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        if (race_late_active()) owner = race_campaign_owner(map, i);
+#endif
 #ifdef SC64_P3_RUNTIME
         if (race_selected_mission == SC64_P3_GLOBAL_ID)
             owner = race_campaign_owner(map, i);
@@ -363,13 +387,26 @@ race_campaign_init(void)
 #ifdef SC64_T5_RUNTIME
            && !race_t5_active()
 #endif
+#ifdef SC64_T6_RUNTIME
+           && !race_t6_active()
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+           && !race_late_active()
+#endif
            )owner=NEUTRAL;
 #endif
         type = sc64_race_unit_from_raw(raw);
 #ifdef SC64_T5_RUNTIME
         /* Earlier adapters use the established Raynor actor. Raw 19 gains
          * its distinct Vulture rules only in the T5 scenario. */
-        if (raw == 19 && !race_t5_active()) type = U_RAYNOR;
+        if (raw == 19 && !race_t5_active()
+#ifdef SC64_T6_RUNTIME
+            && !race_t6_active()
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+            && !race_late_active()
+#endif
+            ) type = U_RAYNOR;
 #endif
         if (type >= 0) {
             slot = spawn_unit(owner, type, x, y);
@@ -407,6 +444,12 @@ race_campaign_init(void)
     }
 
     switch (race_selected_mission) {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    case 10: case 11: case 12: case 13: minerals = gas = 0; break;
+#endif
+#ifdef SC64_T6_RUNTIME
+    case SC64_T6_GLOBAL_ID: minerals = gas = 0; break;
+#endif
 #ifdef SC64_T5_RUNTIME
     case SC64_T5_GLOBAL_ID: minerals = gas = 0; break;
 #endif
@@ -459,6 +502,12 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active() && !race_t5_init()) screen = SCREEN_PAUSE;
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active() && !race_t6_init()) screen = SCREEN_PAUSE;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active() && !race_late_init()) screen = SCREEN_PAUSE;
 #endif
     if (race_selected_mission == SC64_RACE_MISSION_Z1)
         race_campaign_set_message(1);
@@ -557,6 +606,18 @@ race_campaign_tick(void)
         race_campaign.phase == SC64_RACE_PHASE_FAILED) return;
     if (race_campaign.message_ticks) --race_campaign.message_ticks;
     ++race_campaign.elapsed_frames;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) {
+        if (!race_late_tick()) screen = SCREEN_PAUSE;
+        return;
+    }
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (mission == SC64_T6_GLOBAL_ID) {
+        if (!race_t6_tick()) screen = SCREEN_PAUSE;
+        return;
+    }
+#endif
 #ifdef SC64_T5_RUNTIME
     if (mission == SC64_T5_GLOBAL_ID) {
 #if defined(SC64_DIAGNOSTIC_UPDATE)
@@ -775,6 +836,21 @@ static int race_campaign_lost(void)
 static const char *
 race_campaign_objective_text(void)
 {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) {
+        switch (race_campaign.mission) {
+        case 10: return "Deliver the PSI Emitter. Kerrigan must survive.";
+        case 11: return "Clear the opposing bases. Protect Norad II.";
+        case 12: return "Destroy the remaining buildings.";
+        case 13: return "Destroy the Ion Cannon. Raynor must survive.";
+        default: break;
+        }
+    }
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active())
+        return "Bring Raynor and two Dropships to Norad II. Raynor and Norad II must survive.";
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active())
         return "Reach the rebel base and destroy Confederate buildings. Kerrigan and Raynor must survive.";
@@ -814,6 +890,20 @@ race_campaign_objective_text(void)
 static const char *
 race_campaign_victory_text(void)
 {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) {
+        switch (race_campaign.mission) {
+        case 10: return "PSI EMITTER DELIVERED";
+        case 11: return "THE BIG PUSH COMPLETE";
+        case 12: return "NEW GETTYSBURG CLEARED";
+        case 13: return "THE ION CANNON DESTROYED";
+        default: break;
+        }
+    }
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active()) return "NORAD II RESCUED";
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) return "ANTIGAN REVOLT COMPLETE";
 #endif
@@ -845,9 +935,37 @@ race_campaign_victory_text(void)
     return titles[limit(race_campaign.mission, 0, (int)(sizeof(titles)/sizeof(titles[0])) - 1)];
 }
 
+/* Used by the result screen when the late Terran profile is wired to its
+ * mission-specific defeat label. Keep the player-facing text independent of
+ * source dialogue and describe only each map's loss-critical actor/objective. */
+static const char *
+race_campaign_failure_text(void)
+{
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) {
+        switch (race_campaign.mission) {
+        case 10: return "KERRIGAN OR THE FORCE WAS LOST";
+        case 11: return "NORAD II OR THE FORCE WAS LOST";
+        case 12: return "THE ASSAULT FORCE WAS LOST";
+        case 13: return "RAYNOR OR THE ASSAULT FORCE WAS LOST";
+        default: break;
+        }
+    }
+#endif
+    return "MISSION FAILED";
+}
+
 static const char *
 race_campaign_message_text(void)
 {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active())
+        return race_campaign_lost() ? race_campaign_failure_text() :
+               race_campaign_objective_text();
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active()) return race_campaign_objective_text();
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) return race_campaign_objective_text();
 #endif

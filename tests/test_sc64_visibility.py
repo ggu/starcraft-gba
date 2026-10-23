@@ -13,6 +13,7 @@ C_SOURCE = r'''
 #include <string.h>
 typedef uint8_t u8;
 typedef uint16_t u16;
+typedef int16_t s16;
 #define GBA_HOT
 #ifdef SC64_LARGE_MAPS
 #define MAP_COLS 128
@@ -25,8 +26,13 @@ typedef uint16_t u16;
 #define MAP_COLS 64
 #define MAP_ROWS 64
 #endif
-enum { MAP_CELLS=MAP_COLS*MAP_ROWS, MAX_UNITS=40,
-       MAX_BUILDINGS=16, SIDE=1, U_SCV=1, B_COMMAND=2
+enum { MAP_CELLS=MAP_COLS*MAP_ROWS,
+#ifdef SC64_LATE_TERRAN_STORAGE
+       MAX_UNITS=192, MAX_BUILDINGS=96,
+#else
+       MAX_UNITS=40, MAX_BUILDINGS=16,
+#endif
+       SIDE=1, U_SCV=1, B_COMMAND=2
 #ifdef SC64_RACES
        , U_DRONE=3, B_HATCHERY=21, B_LAIR=22, B_HIVE=23, B_NEXUS=24
 #endif
@@ -212,6 +218,17 @@ static void compare(int step){
 int main(void){
  int i,step;
  sc64_visibility_reset();
+#ifdef SC64_LATE_TERRAN_STORAGE
+ /* All 288 live sources overlap, then disappear one at a time. In
+    particular removal must remain exact across the 256->255 transition. */
+ for(i=0;i<MAX_UNITS;i++)u[i]=(UnitFixture){1,SIDE,640,640,U_SCV};
+ for(i=0;i<MAX_BUILDINGS;i++)b[i]=(BuildingFixture){1,SIDE,640,640,B_COMMAND};
+ compare(-600);
+ if(sc64_visibility_source_count(40+40*MAP_COLS)!=288)abort();
+ for(i=0;i<MAX_UNITS;i++){u[i].alive=0;compare(-601-i);}
+ for(i=0;i<MAX_BUILDINGS;i++){b[i].alive=0;compare(-801-i);}
+ if(sc64_visibility_source_count(40+40*MAP_COLS)!=0)abort();
+#endif
 #ifdef SC64_RACES
  /* Imported Zerg town halls share building sight exactly, including circles
     clipped at all four map corners and edges. */
@@ -347,7 +364,9 @@ class VisibilityTests(unittest.TestCase):
                                         capture_output=True)
                 self.assertIn("matches full recomputation", result.stdout)
             for spans, span_flags in (("baseline", []),
-                                      ("spans", ["-DSC64_VISIBILITY_SPANS"])):
+                                      ("spans", ["-DSC64_VISIBILITY_SPANS"]),
+                                      ("late-baseline", ["-DSC64_LATE_TERRAN_STORAGE"]),
+                                      ("late-spans", ["-DSC64_LATE_TERRAN_STORAGE", "-DSC64_VISIBILITY_SPANS"])):
                 with self.subTest(variant=f"t4-128x128-packed-{spans}"):
                     binary = Path(temp) / f"visibility-t4-128x128-{spans}"
                     subprocess.run([

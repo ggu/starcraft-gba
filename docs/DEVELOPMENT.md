@@ -549,6 +549,43 @@ prevalidated entry avoids rescanning immutable tables each tick after
 init/load validation. The structural state validator is not a save execution
 provenance validator, and this stage does not change any ROM or SRAM format.
 
+## Internal Terran mission and capacity probes
+
+Norad II has a separate live-world probe, still unavailable in the normal
+campaign menu until a controller completion run is qualified:
+
+```sh
+make sc64-t6-prepare sc64-t6-engine-probe
+make test-sc64-t6-engine test-sc64-t6-world test-sc64-t6-save test-sc64-t6-tech
+make test-sc64-t6-repair
+```
+
+The probe imports the entire starting roster, executes the source trigger
+contexts, and supports paid Starport/Control Tower/Dropship construction.
+Select SCVs, then press A over a damaged friendly completed Terran structure
+to repair it. Repair spends resources and uses the reference construction HP
+rate at 24 source steps per 30 GBA ticks; mobile mechanical repair is pending.
+Original AI script bodies are still replaced by bounded authored behavior.
+
+The late-campaign storage probe tests a distinct generation-17 layout:
+
+```sh
+make sc64-terran-late-storage test-sc64-late-terran-storage
+make test-sc64-compact-unit-save test-sc64-terran-late-actors
+make test-sc64-terran-late-runtime
+python3 tools/sc64_t5_save_smoke.py --mission 6 --generation 17 \
+  --rom build/StarCraft-Terran-Late-Storage.gba \
+  --elf build/starcraft-terran-late-storage.elf \
+  --output .local/sc64/terran-late/arm-save --ticks 300
+```
+
+It holds 192 units, 96 buildings and 80 mineral fields. Its lossless 38-byte
+unit save rows and 56-byte runtime units preserve all named fields, including
+dead slots; the payload is 15,312 bytes. Combined target IDs use 16 bits and
+visibility has exact nine-bit overlap counts. Keep its SRAM separate from
+earlier profiles. These commands exercise storage and the internal Norad II
+probe; they do not qualify Terran missions 6–10 or establish performance.
+
 ## Troubleshooting
 
 - If `doctor` reports a missing required tool, install that tool and confirm its command is on `PATH`. ARM GCC also needs the matching `arm-none-eabi-objcopy` and `arm-none-eabi-size` commands. On a custom toolchain prefix, set `PREFIX` to the prefix used by all three commands.
@@ -560,3 +597,22 @@ provenance validator, and this stage does not change any ROM or SRAM format.
 ## References and scope
 
 Reference revisions, files consulted, and reduced-mechanics notes are in [REFERENCES.md](REFERENCES.md). License status and provenance are in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). Build and test coverage is summarized in [VALIDATION.md](VALIDATION.md). The engine uses bounded, fixed-size data for GBA memory. Campaign triggers, AI, unit systems, and presentation remain intentionally incomplete.
+
+### T6 ordinary-menu qualification build
+
+With the private T6 inputs prepared, `make sc64-terran-t6-controller` builds an
+explicit six-mission development cartridge. `make
+build/test-sc64-t6-campaign-run` builds its host controller runner. The ignored
+trace can be replayed with `tools/sc64_terran_controller_replay.py`, supplying
+that ROM and ELF through `--rom` and `--elf`; `--validate-only` checks the trace
+without starting mGBA. The ordinary T6 menu route is A, RIGHT, RIGHT, DOWN, A,
+A. The source-only repository deliberately excludes controller traces that
+encode private map data, generated headers, ROMs, and emulator output.
+
+The late Terran runtime adds LIFT / LAND to Terran field commands. Select a
+completed liftable building, choose LIFT / LAND to lift off, use MOVE ORDER to
+fly it, then choose LIFT / LAND and a clear destination to land. Airborne
+buildings cannot produce units or receive worker resource returns. Accepted
+landing goals are reserved against overlap and persist in generation-18
+saves. This support is required by The Big Push's imported airborne opening;
+it is still being exercised as part of the unqualified late campaign.

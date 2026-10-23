@@ -104,7 +104,11 @@ static void front_uplink(void)
 static void front_briefing(void)
 {
 #ifdef SC64_UNIFIED
-#if defined(SC64_T3_ENABLED)
+#if defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
+    static const char *lines[14][5]={
+#elif defined(SC64_T6_CAMPAIGN_ENTRY)
+    static const char *lines[10][5]={
+#elif defined(SC64_T3_ENABLED)
     static const char *lines[7][5]={
 #else
     static const char *lines[6][5]={
@@ -118,6 +122,17 @@ static void front_briefing(void)
 #if defined(SC64_T3_ENABLED)
         ,{"SURVIVE 30 MINUTES","PROTECT YOUR BASE","OPTIONAL OBJECTIVE","DESTROY ZERG HATCHERY",""}
 #endif
+#ifdef SC64_T6_CAMPAIGN_ENTRY
+        ,{"RECOVER DATA DISKS","KEEP RAYNOR ALIVE","","",""},
+        {"AID THE ANTIGAN REBELLION","DESTROY CONFEDERATE BASES","","",""},
+        {"FIND NORAD II","RESCUE RAYNOR","BRING TWO DROPSHIPS","KEEP BOTH ALIVE",""}
+#endif
+#ifdef SC64_TERRAN_FULL_CAMPAIGN_ENTRY
+        ,{"DELIVER THE PSI EMITTER","KEEP KERRIGAN ALIVE","","",""},
+        {"CLEAR OPPOSING BASES","PROTECT NORAD II","","",""},
+        {"CLEAR THE OPPOSING BASE","","","",""},
+        {"DESTROY THE ION CANNON","KEEP RAYNOR ALIVE","","",""}
+#endif
     };
 #else
     static const char *lines[4][5]={
@@ -129,7 +144,11 @@ static void front_briefing(void)
     static const char *generic_lines[5]={"COMPLETE THE MISSION","FOLLOW THE BRIEFING","","",""};
     const char *const *mission_lines = race_front.mission <
 #ifdef SC64_UNIFIED
-#if defined(SC64_T3_ENABLED)
+#if defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
+        14 ? lines[race_front.mission] : generic_lines;
+#elif defined(SC64_T6_CAMPAIGN_ENTRY)
+        10 ? lines[race_front.mission] : generic_lines;
+#elif defined(SC64_T3_ENABLED)
         7 ? lines[race_front.mission] : generic_lines;
 #else
         6 ? lines[race_front.mission] : generic_lines;

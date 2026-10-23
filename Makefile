@@ -37,6 +37,11 @@ T4_COMBINED_FLAGS := $(T4_RUNTIME_FLAGS) -DSC64_T3_ENABLED -DSC64_T4_CAMPAIGN_EN
 T5_PROBE_FLAGS := $(T4_COMBINED_FLAGS) -DSC64_T5_ENABLED -DSC64_T5_RUNTIME
 T5_CONTROLLER_REPLAY_FLAGS := $(T5_PROBE_FLAGS) -DSC64_T5_CAMPAIGN_ENTRY
 T6_STORAGE_FLAGS := $(T5_CONTROLLER_REPLAY_FLAGS) -DSC64_T6_ENABLED -DSC64_T6_STORAGE
+T6_RUNTIME_FLAGS := $(T6_STORAGE_FLAGS) -DSC64_T6_RUNTIME
+LATE_TERRAN_STORAGE_FLAGS := $(T6_RUNTIME_FLAGS) -DSC64_LATE_TERRAN_STORAGE -DSC64_TERRAN_LATE_ACTORS
+LATE_TERRAN_STAGE := .local/sc64/terran-late/import-stage
+LATE_TERRAN_RUNTIME_FLAGS := $(filter-out -I.local/sc64/races/generated,$(LATE_TERRAN_STORAGE_FLAGS)) -I$(LATE_TERRAN_STAGE) -I.local/sc64/races/generated -DSC64_TERRAN_LATE_ENABLED -DSC64_TERRAN_LATE_RUNTIME
+LATE_TERRAN_HEADERS := $(LATE_TERRAN_STAGE)/sc64_races_generated.h $(LATE_TERRAN_STAGE)/sc64_race_sprites_generated.h $(foreach mission,7 8 9 10,$(LATE_TERRAN_STAGE)/sc64_t$(mission)_scenario_generated.h $(LATE_TERRAN_STAGE)/sc64_t$(mission)_availability_generated.h)
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
 T4_SCENARIO_RECORDS := .local/sc64/races/generated/t4/records
 T5_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t5_scenario_generated.h
@@ -479,6 +484,90 @@ sc64-t6-prepare:
 	$(PYTHON) tools/sc64_t5_availability.py --profile t6
 	$(PYTHON) tools/sc64_race_sprites.py --include-t6
 sc64-t6-storage-probe: build/StarCraft-T6-Storage-Probe.gba
+build/starcraft-t6-engine-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(T6_RUNTIME_FLAGS) -DSC64_T6_PROBE_ENTRY $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-t6-engine-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-T6-Engine-Probe.gba: build/starcraft-t6-engine-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC T6 WORLD' SCT6
+.PHONY: sc64-t6-engine-probe
+sc64-t6-engine-probe: build/StarCraft-T6-Engine-Probe.gba
+build/starcraft-terran-late-storage.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(LATE_TERRAN_STORAGE_FLAGS) -DSC64_T6_PROBE_ENTRY $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran-late-storage.map -lgcc -o $@
+build/StarCraft-Terran-Late-Storage.gba: build/starcraft-terran-late-storage.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC T LATE' SCT7
+.PHONY: sc64-terran-late-storage
+sc64-terran-late-storage: build/StarCraft-Terran-Late-Storage.gba
+.PHONY: sc64-terran-late-prepare sc64-terran-late-engine
+sc64-terran-late-prepare:
+	$(PYTHON) tools/sc64_races_pack.py --out $(LATE_TERRAN_STAGE)/sc64_races_generated.h
+	$(PYTHON) tools/sc64_race_sprites.py --include-t6 --include-late-terran --out $(LATE_TERRAN_STAGE)/sprites --header $(LATE_TERRAN_STAGE)/sc64_race_sprites_generated.h
+build/starcraft-terran-late-engine.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=10 $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran-late-engine.map -lgcc -o $@
+build/StarCraft-Terran-Late-Engine.gba: build/starcraft-terran-late-engine.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC T LATE' SCT7
+sc64-terran-late-engine: build/StarCraft-Terran-Late-Engine.gba
+build/test-sc64-terran-late-world: tests/sc64_terran_late_world.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-terran-late-world
+test-sc64-terran-late-world: build/test-sc64-terran-late-world
+	./build/test-sc64-terran-late-world
+build/test-sc64-terran-late-save: tests/sc64_terran_late_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-terran-late-save
+test-sc64-terran-late-save: build/test-sc64-terran-late-save
+	./build/test-sc64-terran-late-save
+define T6_RUNTIME_TEST
+build/test-sc64-t6-$(1): tests/sc64_t6_$(1).c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T6_RUNTIME_FLAGS) $$< common/gba.c -o $$@
+.PHONY: test-sc64-t6-$(1)
+test-sc64-t6-$(1): build/test-sc64-t6-$(1)
+	./build/test-sc64-t6-$(1)
+endef
+$(eval $(call T6_RUNTIME_TEST,engine))
+$(eval $(call T6_RUNTIME_TEST,world))
+$(eval $(call T6_RUNTIME_TEST,save))
+$(eval $(call T6_RUNTIME_TEST,tech))
+build/test-sc64-compact-unit-save: tests/sc64_compact_unit_save.c starcraft/sc64_compact_unit_save.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-compact-unit-save
+test-sc64-compact-unit-save: build/test-sc64-compact-unit-save
+	./build/test-sc64-compact-unit-save
+test-starcraft: test-sc64-compact-unit-save
+build/test-sc64-terran-late-runtime: tests/sc64_terran_late_runtime.c starcraft/sc64_terran_late_runtime.h $(wildcard starcraft/sc64_t4_*.h) Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-terran-late-runtime test-sc64-terran-late-actors
+test-sc64-terran-late-runtime: build/test-sc64-terran-late-runtime
+	./build/test-sc64-terran-late-runtime
+build/test-sc64-terran-late-actors: tests/sc64_terran_late_actors.c starcraft/race_rules.h starcraft/sc64_terran_late_actor_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_T4_RUNTIME -DSC64_T5_RUNTIME -DSC64_T6_ENABLED -DSC64_TERRAN_LATE_ACTORS $< -o $@
+test-sc64-terran-late-actors: build/test-sc64-terran-late-actors
+	./build/test-sc64-terran-late-actors
+test-starcraft: test-sc64-terran-late-runtime test-sc64-terran-late-actors
+build/test-sc64-t6-repair: tests/sc64_t6_repair.c starcraft/sc64_t6_repair_adapter.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-t6-repair
+test-sc64-t6-repair: build/test-sc64-t6-repair
+	./build/test-sc64-t6-repair
+test-starcraft: test-sc64-t6-repair
+build/test-sc64-terran-late-state: tests/sc64_terran_late_mission_state.c starcraft/sc64_terran_late_mission_state.h starcraft/sc64_terran_late_runtime.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-terran-late-state
+test-sc64-terran-late-state: build/test-sc64-terran-late-state
+	./build/test-sc64-terran-late-state
+test-starcraft: test-sc64-terran-late-state
+build/test-sc64-late-terran-targets: tests/sc64_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_STORAGE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-late-terran-targets
+test-sc64-late-terran-targets: build/test-sc64-late-terran-targets
+	./build/test-sc64-late-terran-targets
+build/test-sc64-late-terran-storage: tests/sc64_late_terran_storage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_STORAGE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-late-terran-storage
+test-sc64-late-terran-storage: build/test-sc64-late-terran-storage
+	./build/test-sc64-late-terran-storage
 build/test-sc64-t6-import: tests/sc64_t6_import.c $(RACES_INPUTS) $(wildcard starcraft/*.h) Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $(T6_STORAGE_FLAGS) $< -o $@
 build/test-sc64-t6-scenario: tests/sc64_t6_scenario.c $(T6_SCENARIO_HEADER) $(wildcard starcraft/*.h) Makefile | build
@@ -1020,3 +1109,27 @@ test-unified: build/test-unified build/test-unified-frontend build/test-unified-
 
 clean:
 	rm -rf build
+
+# Ordinary-controller probes do not mark a catalog mission qualified.
+build/test-sc64-t6-campaign-run: tests/sc64_t6_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T6_RUNTIME_FLAGS) -DSC64_T6_PROBE_ENTRY $< common/gba.c -o $@
+build/test-sc64-t8-campaign-run: tests/sc64_terran_assault_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(LATE_TERRAN_HEADERS) $(RACE_CAMPAIGN_INPUTS) Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=11 $< common/gba.c -o $@
+build/test-sc64-t10-campaign-run: tests/sc64_terran_assault_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(LATE_TERRAN_HEADERS) $(RACE_CAMPAIGN_INPUTS) Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=13 $< common/gba.c -o $@
+
+# Explicit qualification builds expose the normal campaign menu, not probe entry.
+build/starcraft-terran-t6-controller.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(T6_RUNTIME_FLAGS) -DSC64_T6_CAMPAIGN_ENTRY $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran-t6-controller.map -lgcc -o $@
+build/StarCraft-Terran-T6-Controller.gba: build/starcraft-terran-t6-controller.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC TERRAN 6' SCT6
+.PHONY: sc64-terran-t6-controller
+sc64-terran-t6-controller: build/StarCraft-Terran-T6-Controller.gba
+build/starcraft-terran-late-controller.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_T6_CAMPAIGN_ENTRY -DSC64_TERRAN_FULL_CAMPAIGN_ENTRY $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-terran-late-controller.map -lgcc -o $@
+build/StarCraft-Terran-Late-Controller.gba: build/starcraft-terran-late-controller.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC TERRAN 10' SCT8
+.PHONY: sc64-terran-late-controller
+sc64-terran-late-controller: build/StarCraft-Terran-Late-Controller.gba

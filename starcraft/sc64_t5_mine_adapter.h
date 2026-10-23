@@ -190,11 +190,22 @@ sc64_t5_mine_step(Unit *mine, int tx, int ty)
     if (mine->path_timer <= 0) {
         if (direct_path_clear(mine->x, mine->y, tx, ty)) {
             mine->path_x = tx; mine->path_y = ty;
+#ifdef SC64_LATE_TERRAN_STORAGE
+        } else {
+            int nx, ny;
+            if (!path_next_tile(mine->x, mine->y, tx, ty, &nx, &ny)) {
+                mine->path_timer = 0;
+                mine->path_retry = 6;
+                return 0;
+            }
+            mine->path_x = (s16)nx; mine->path_y = (s16)ny;
+#else
         } else if (!path_next_tile(mine->x, mine->y, tx, ty,
                                    &mine->path_x, &mine->path_y)) {
             mine->path_timer = 0;
             mine->path_retry = 6;
             return 0;
+#endif
         }
         mine->path_timer = 16;
     }

@@ -1616,6 +1616,73 @@ This stage changes no ROM or SRAM format. T6 world/save integration, normal
 controller completion and performance qualification remain unfinished; the
 campaign stays at 11 playable missions out of 30.
 
+## Terran live-world and late-capacity foundation (2026-10-23)
+
+Norad II now initializes all 104 units, 74 buildings, 35 mineral fields and
+three geysers without unsupported rows. Focused ASan/UBSan checks cover world
+queries, source ownership, initial burrowing, resources, rescue, atomic spawn
+retry, 300 live ticks, add-on construction, production availability, and
+generation-16 persistence/provenance rejection. A separate repair arithmetic
+fixture exercises fixed-point HP accumulation, payments, completion and
+insufficient funds. This does not establish a campaign completion route.
+
+The generation-17 storage profile keeps 192 units, 96 buildings and 80 mineral
+fields. All entity slots round-trip in the host fixture; malformed compact
+rows and invalid pending repair orders reject before world mutation. Ten
+thousand deterministic randomized Unit codec round-trips, combined target
+IDs 254/255/287, and visibility removal across 288 overlapping sources have
+focused coverage. The 15,312-byte save uses 38-byte unit rows; the engine uses
+56-byte runtime units. Both existing RAM reserve guards pass: IWRAM ends at
+`0x03004e68`, BSS at `0x0203d440` for the tested storage build.
+
+That ARM ROM has SHA-256
+`502a97559d12f0809cc30eeb3360034210dc1d88333945df17ecc7e0d5daa664`.
+An internal-entry persistence check closes mGBA, loads the SRAM in a fresh
+process, restores frame 302 exactly and continues to frame 362. Every named
+unit field, including dead rows, matches both the live pre-save state and the
+decoded SRAM record; all eight trigger contexts remain fault-free and their
+clocks match the campaign/frame clock. No win or fps claim follows from this
+check. The earlier T4, T5 and generation-15 storage ROM hashes remain
+byte-identical to their recorded releases.
+
+The authenticated late-map audit and gated importer retain all four remaining
+Terran maps, their complete placements, trigger records, properties, source
+setup and availability tables. Asset-free synthetic late-trigger checks cover
+native comparison value 10, disabled actions, waits, preserve/retry, pause and
+checked/prevalidated parity. Runtime mission bindings and normal-controller
+completion remain required. No additional mission is marked playable; the
+qualified count remains Terran 5/10, Zerg 3/10 and Protoss 3/10.
+
 ## Known limits
 
 The engine is a reduced adaptation with a small authored default map, fixed-size entity pools, simplified combat/pathfinding and faction-specific approximations. See the [game guide](../starcraft/README.md) and [unified profile guide](SC64-UNIFIED.md) for feature limits. Physical GBA hardware testing is pending unless a dated result is added here.
+
+## Norad II controller qualification (2026-10-23)
+
+The internal generation-16 T6 runtime now has a complete ordinary-controller
+win. Two independent ASan/UBSan host runs produce identical input/observation
+traces (SHA-256 `94704db783fc05030df8f8b2084e6ff8057cebf8ce41d9b89662ec9632c84238`).
+The route rescues the base, pays for its economy and transport technology,
+produces two Dropships, boards Raynor, and unloads him in source location 2.
+It changes no world arrays after mission initialization.
+
+The same input trace passes through the normal campaign menu on the ARM ROM
+`7ff58f60e501442d8c57676492b82549d1ba15bf41e622f9e0ea42dd9cd4aad1`
+(ELF `0e3b5066d46c04e556c7ef2b041cf141e2410f76b08b9b7f76688551582e7832`).
+At simulation frame 21,046, the source human outcome is victory, the mission
+completion bit is set, Raynor and Norad are alive, one unloaded Raynor and two
+Dropships occupy the objective region, and all eight trigger clocks equal
+21,046 with zero faults. This establishes six completable Terran missions in
+explicit development profiles; it does not qualify missions 7–10.
+
+The full ARM replay averaged **17.26 effective fps** over sampled PLAY
+intervals, measured from emulated GBA hardware timer cycles. Its worst sampled
+interval was 4.54 fps over six advancing frames. These short intervals are
+reported for transparency, not as stable frame-rate percentiles. Near-30-fps
+performance and physical GBA SP verification remain outstanding.
+
+The current source checkpoint passes the asset-free default build and host
+suite (158 Python tests), T6 world/tech/save fixtures, late-map world and save
+fixtures, compact storage and expanded target-index fixtures. Late source AI
+requests still use authored bounded behavior; native campaign AI scripts have
+not been recovered.

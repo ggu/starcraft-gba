@@ -9,6 +9,16 @@
 #ifdef SC64_T6_STORAGE
 #include "sc64_compact_building_save.h"
 #endif
+#ifdef SC64_LATE_TERRAN_STORAGE
+#include "sc64_compact_unit_save.h"
+_Static_assert(SC_RU_COUNT <= 64, "late Terran unit codec uses six-bit types");
+#endif
+#ifdef SC64_T6_RUNTIME
+#include "sc64_t6_mission_state.h"
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+#include "sc64_terran_late_mission_state.h"
+#endif
 
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
 /* Source player 5 is inactive in the T4 scenario. The save validator requires
@@ -45,7 +55,11 @@ _Static_assert(sizeof(Sc64T5SaveState) == 764, "compact T5 save state budget");
 
 typedef struct {
     u32 version;
+#ifdef SC64_LATE_TERRAN_STORAGE
+    Sc64PackedUnitSave units[MAX_UNITS];
+#else
     s16 units[MAX_UNITS][RACE_UNIT_WORDS];
+#endif
 #ifdef SC64_T6_STORAGE
     Sc64PackedBuildingSave buildings[MAX_BUILDINGS];
 #else
@@ -75,10 +89,27 @@ typedef struct {
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #ifdef SC64_T5_RUNTIME
+#ifdef SC64_T6_RUNTIME
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    union {
+        Sc64T4SaveState t4;
+        Sc64T5SaveState t5;
+        Sc64T6MissionState t6;
+        Sc64TerranLateMissionState terran_late;
+    };
+#else
+    union {
+        Sc64T4SaveState t4;
+        Sc64T5SaveState t5;
+        Sc64T6MissionState t6;
+    };
+#endif
+#else
     union {
         Sc64T4SaveState t4;
         Sc64T5SaveState t5;
     };
+#endif
 #else
     Sc64T4SaveState t4;
 #endif
@@ -89,7 +120,17 @@ typedef struct {
 } RaceSave;
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
 #ifdef SC64_T6_STORAGE
+#ifdef SC64_LATE_TERRAN_STORAGE
+#ifdef SC64_TERRAN_LATE_RUNTIME
+_Static_assert(sizeof(RaceSave) <= 16368, "generation-18 late mission payload budget");
+#else
+_Static_assert(sizeof(RaceSave) == 15312, "generation-17 late Terran save payload");
+#endif
+#elif defined(SC64_T6_RUNTIME)
+_Static_assert(sizeof(RaceSave) == 15644, "generation-16 T6 save payload");
+#else
 _Static_assert(sizeof(RaceSave) == 15384, "generation-15 expanded storage payload");
+#endif
 #endif
 #if defined(SC64_T5_RUNTIME) && !defined(SC64_T6_STORAGE)
 _Static_assert(sizeof(RaceSave) == 16328, "T5 shares the existing SRAM payload");

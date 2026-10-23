@@ -9,6 +9,19 @@ static RaceSave race_data;
 #else
 static RaceSave race_data;
 #endif
+/* Decode a candidate unit without touching the live world. The compact
+ * late-Terran profile stores named fields; historical profiles retain their
+ * exact s16 word rows and conversion behavior. */
+#ifdef SC64_LATE_TERRAN_STORAGE
+static int
+race_save_decode_unit(const RaceSave *candidate, unsigned slot,
+                      unsigned world_width, unsigned world_height, Unit *out)
+{
+    if (!candidate || !out || slot >= MAX_UNITS) return 0;
+    return sc64_unit_save_decode(out, &candidate->units[slot],
+                                 world_width, world_height);
+}
+#endif
 #ifdef SC64_T6_STORAGE
 static int
 race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *out)
@@ -211,6 +224,12 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
 #include "sc64_t5_save_adapter.h"
 #include "sc64_transport_save_adapter.h"
 #endif
+#ifdef SC64_T6_RUNTIME
+#include "sc64_t6_save_adapter.h"
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+#include "sc64_terran_late_save_adapter.h"
+#endif
 static int sc64_race_storage_geometry_valid(int width, int height) {
 #ifdef SC64_T4_RUNTIME
     return width >= 1 && width <= 128 && height >= 1 && height <= 128;
@@ -236,9 +255,16 @@ static int race_save_game(void) {
     memset(&race_data, 0, sizeof(race_data));
 #endif
     race_data.version=SAVE_VERSION;
+#ifdef SC64_LATE_TERRAN_STORAGE
+    for(int i=0;i<MAX_UNITS;i++)
+        if(!sc64_unit_save_encode(&race_data.units[i], &u[i],
+                                  (unsigned)(race_cols * 16),
+                                  (unsigned)(race_rows * 16))) return 0;
+#else
     for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
         int n;memcpy(&n,(u8*)&u[i]+j*sizeof(int),sizeof(n));race_data.units[i][j]=(s16)n;
     }
+#endif
 #ifdef SC64_T6_STORAGE
     for(int i=0;i<MAX_BUILDINGS;i++)
         if(!sc64_building_save_encode(&race_data.buildings[i], &b[i],
@@ -300,9 +326,31 @@ static int race_save_game(void) {
     }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) {
+        if (!race_terran_late_save_pack(&race_data.terran_late, &race_late,
+                                        race_selected_mission,
+                                        race_cols, race_rows) ||
+            !race_terran_late_save_candidate_valid(&race_data,
+                                                    race_cols, race_rows))
+            return 0;
+    } else
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active()) {
+        if (!race_t6_save_pack(&race_data.t6, &race_t6) ||
+            !race_t6_save_candidate_valid(&race_data, race_cols, race_rows))
+            return 0;
+    } else
+#endif
 #ifdef SC64_T5_RUNTIME
+#ifndef SC64_T6_RUNTIME
     if (!race_t5_candidate_queues_available(&race_data)) return 0;
+#endif
     if (race_t5_active()) {
+#ifdef SC64_T6_RUNTIME
+        if (!race_t5_candidate_queues_available(&race_data)) return 0;
+#endif
         if (!race_t5_save_pack(&race_data.t5, &race_t5) ||
             !race_t5_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
     } else
@@ -314,7 +362,17 @@ static int race_save_game(void) {
         race_data.t4 = race_t4;
 #endif
     }
-    else memset(&race_data.t4, 0, sizeof(race_data.t4));
+    else {
+#ifdef SC64_T6_RUNTIME
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        memset(&race_data.t4, 0, sizeof(race_data.terran_late));
+#else
+        memset(&race_data.t4, 0, sizeof(race_data.t6));
+#endif
+#else
+        memset(&race_data.t4, 0, sizeof(race_data.t4));
+#endif
+    }
     if (race_t4_active() &&
         !race_t4_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
@@ -332,6 +390,14 @@ static int race_load_game(void) {
     Sc64T5RuntimeState expanded_t5;
     int expanded_t5_valid = 0;
 #endif
+#ifdef SC64_T6_RUNTIME
+    Sc64T6MissionState expanded_t6;
+    int expanded_t6_valid = 0;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    Sc64TerranLateMissionState expanded_terran_late;
+    int expanded_terran_late_valid = 0;
+#endif
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
     const int *v=race_data.state;
     if(v[0]<0||v[0]>1||v[1]<0||v[1]>2||v[2]<0||v[2]>=SC64_RACE_MAP_COUNT||v[4]<1||v[4]>3||
@@ -343,6 +409,13 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_T5_RUNTIME
        &&v[2]!=SC64_T5_GLOBAL_ID
+#endif
+#ifdef SC64_T6_RUNTIME
+       &&v[2]!=SC64_T6_GLOBAL_ID
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+       &&(v[2]<SC64_TERRAN_LATE_GLOBAL_T7||
+          v[2]>SC64_TERRAN_LATE_GLOBAL_T10)
 #endif
        )return 0;
 #endif
@@ -360,6 +433,13 @@ static int race_load_game(void) {
 #ifdef SC64_T5_RUNTIME
         &&v[2]!=SC64_T5_GLOBAL_ID
 #endif
+#ifdef SC64_T6_RUNTIME
+        &&v[2]!=SC64_T6_GLOBAL_ID
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        &&(v[2]<SC64_TERRAN_LATE_GLOBAL_T7||
+           v[2]>SC64_TERRAN_LATE_GLOBAL_T10)
+#endif
         )||!sc64_race_maps[v[2]].width)return 0;
     if((unsigned)v[3]&~sc64_catalog_playable_mask(
 #ifdef SC64_CAMPAIGN_RACE
@@ -370,6 +450,12 @@ static int race_load_game(void) {
                                                )
 #ifdef SC64_T5_RUNTIME
        & ~(1u << SC64_T5_GLOBAL_ID)
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+       & ~((1u << SC64_TERRAN_LATE_GLOBAL_T7) |
+           (1u << SC64_TERRAN_LATE_GLOBAL_T8) |
+           (1u << SC64_TERRAN_LATE_GLOBAL_T9) |
+           (1u << SC64_TERRAN_LATE_GLOBAL_T10))
 #endif
        )return 0;
 #endif
@@ -385,20 +471,32 @@ static int race_load_game(void) {
        v[12]<0||v[12]>2||v[18]<0||v[18]>1||v[19]<0||v[19]>1)return 0;
     for(int i=0;i<5;i++)if(race_data.players[i]<-1||race_data.players[i]>2||
         race_data.ore[i]<0||race_data.ore[i]>65535||race_data.vespene[i]<0||race_data.vespene[i]>65535)return 0;
+#ifdef SC64_LATE_TERRAN_STORAGE
+#define RACE_U(i,f) candidate_unit.f
+#else
 #define RACE_U(i,f) race_data.units[i][offsetof(Unit,f)/sizeof(int)]
+#endif
 #ifdef SC64_T6_STORAGE
 #define RACE_B(i,f) candidate_building.f
 #else
 #define RACE_B(i,f) race_data.buildings[i][offsetof(Building,f)/sizeof(int)]
 #endif
     for(int i=0;i<MAX_UNITS;i++) {
+#ifdef SC64_LATE_TERRAN_STORAGE
+        Unit candidate_unit;
+        if(!sc64_unit_save_decode(&candidate_unit, &race_data.units[i],
+                                  (unsigned)(width * 16),
+                                  (unsigned)(height * 16))) return 0;
+#endif
         if(RACE_U(i,alive)<0||RACE_U(i,alive)>1)return 0;
         if(!RACE_U(i,alive))continue;
         if(RACE_U(i,type)<0||RACE_U(i,type)>=SC_RU_COUNT||RACE_U(i,owner)<0||RACE_U(i,owner)>4||
             RACE_U(i,hp)<=0||RACE_U(i,maxhp)<=0||RACE_U(i,hp)>RACE_U(i,maxhp)||
             RACE_U(i,x)<0||RACE_U(i,x)>=width*16||RACE_U(i,y)<0||RACE_U(i,y)>=height*16||
             RACE_U(i,order)<ORDER_IDLE||RACE_U(i,order)>
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_T6_RUNTIME
+            ORDER_REPAIR||
+#elif defined(SC64_T5_RUNTIME)
             ORDER_UNLOAD||
 #else
             ORDER_GAS||
@@ -408,6 +506,28 @@ static int race_load_game(void) {
         int target=RACE_U(i,target),order=RACE_U(i,order);
         if((order==ORDER_MINE&&(target<0||target>=MAX_MINERALS))||
            ((order==ORDER_GAS||order==ORDER_BUILD)&&(target<0||target>=MAX_BUILDINGS)))return 0;
+#ifdef SC64_T6_RUNTIME
+        if (order == ORDER_REPAIR) {
+            Building target_building;
+            const Sc64RaceBuildingRule *rule;
+            int building_slot;
+            if (race_data.state[0] != 0 ||
+                race_data.state[2] != SC64_T6_GLOBAL_ID ||
+                RACE_U(i, owner) != SIDE || RACE_U(i, type) != U_SCV ||
+                RACE_U(i, carry) < 0 || RACE_U(i, carry) > 255 ||
+                target < MAX_UNITS || target >= MAX_UNITS + MAX_BUILDINGS)
+                return 0;
+            building_slot = target - MAX_UNITS;
+            if (!race_save_decode_building(&race_data, (unsigned)building_slot,
+                                           &target_building)) return 0;
+            rule = sc64_race_building_rule(target_building.type);
+            if (!target_building.alive || target_building.owner != SIDE ||
+                target_building.under_construction || target_building.hp < 0 ||
+                target_building.maxhp <= 0 || target_building.hp >= target_building.maxhp ||
+                !rule || rule->race != R_TER ||
+                (rule->worker == 255 && target_building.raw_type != 126)) return 0;
+        }
+#endif
     }
     for(int i=0;i<MAX_BUILDINGS;i++) {
 #ifdef SC64_T6_STORAGE
@@ -545,6 +665,23 @@ static int race_load_game(void) {
     }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (!v[0] && v[2] >= SC64_TERRAN_LATE_GLOBAL_T7 &&
+        v[2] <= SC64_TERRAN_LATE_GLOBAL_T10) {
+        if (!race_terran_late_save_candidate_valid(&race_data, width, height) ||
+            !race_terran_late_save_expand(&expanded_terran_late,
+                                          &race_data.terran_late,
+                                          v[2], width, height)) return 0;
+        expanded_terran_late_valid = 1;
+    } else
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (!v[0] && v[2] == SC64_T6_GLOBAL_ID) {
+        if (!race_t6_save_candidate_valid(&race_data, width, height) ||
+            !race_t6_save_expand(&expanded_t6, &race_data.t6)) return 0;
+        expanded_t6_valid = 1;
+    } else
+#endif
 #ifdef SC64_T5_RUNTIME
     if (!v[0] && v[2] == SC64_T5_GLOBAL_ID) {
         if (!race_t5_save_candidate_valid(&race_data, width, height) ||
@@ -560,8 +697,48 @@ static int race_load_game(void) {
 #endif
     } else {
         const u8 *t4 = (const u8 *)&race_data.t4;
+#ifdef SC64_T6_RUNTIME
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        for (unsigned i = 0; i < sizeof(race_data.terran_late); ++i)
+#else
+        for (unsigned i = 0; i < sizeof(race_data.t6); ++i)
+#endif
+            if (t4[i]) return 0;
+#else
         for (unsigned i = 0; i < sizeof(race_data.t4); ++i)
             if (t4[i]) return 0;
+#endif
+    }
+#endif
+#ifdef SC64_T6_RUNTIME
+    /* Mission states share one payload. Require all bytes beyond the selected
+     * schema to be zero, including T6 records under the larger generation-18
+     * union. */
+    {
+        unsigned used = 0;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        if (!v[0] && v[2] >= SC64_TERRAN_LATE_GLOBAL_T7 &&
+            v[2] <= SC64_TERRAN_LATE_GLOBAL_T10)
+            used = sizeof(Sc64TerranLateMissionState);
+#endif
+#ifdef SC64_T6_RUNTIME
+        if (!v[0] && v[2] == SC64_T6_GLOBAL_ID)
+            used = sizeof(Sc64T6MissionState);
+#endif
+#ifdef SC64_T5_RUNTIME
+        if (!v[0] && v[2] == SC64_T5_GLOBAL_ID) used = sizeof(Sc64T5SaveState);
+#endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+        if (!v[0] && v[2] == SC64_T4_GLOBAL_ID) used = sizeof(Sc64T4SaveState);
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        const u8 *payload = (const u8 *)&race_data.terran_late;
+        for (unsigned i = used; i < sizeof(race_data.terran_late); ++i)
+#else
+        const u8 *payload = (const u8 *)&race_data.t6;
+        for (unsigned i = used; i < sizeof(race_data.t6); ++i)
+#endif
+            if (payload[i]) return 0;
     }
 #endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
@@ -577,10 +754,20 @@ static int race_load_game(void) {
     race_cols=race_mode?64:sc64_race_maps[race_selected_mission].width;
     race_rows=race_mode?64:sc64_race_maps[race_selected_mission].height;
     if(race_mode)race_skirmish_geometry();
+#ifdef SC64_LATE_TERRAN_STORAGE
+    for(int i=0;i<MAX_UNITS;i++) {
+        Unit decoded;
+        if(!sc64_unit_save_decode(&decoded, &race_data.units[i],
+                                  (unsigned)(race_cols * 16),
+                                  (unsigned)(race_rows * 16))) return 0;
+        memcpy(&u[i], &decoded, sizeof(decoded));
+    }
+#else
     for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
         int n=j==offsetof(Unit,flags)/sizeof(int)?(u16)race_data.units[i][j]:race_data.units[i][j];
         memcpy((u8*)&u[i]+j*sizeof(int),&n,sizeof(n));
     }
+#endif
 #ifdef SC64_T6_STORAGE
     for(int i=0;i<MAX_BUILDINGS;i++) {
         if(!sc64_building_save_decode(&b[i], &race_data.buildings[i])) return 0;
@@ -646,6 +833,14 @@ static int race_load_game(void) {
 #ifdef SC64_T5_RUNTIME
     if (expanded_t5_valid) race_t5 = expanded_t5;
     else memset(&race_t5, 0, sizeof(race_t5));
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (expanded_t6_valid) race_t6 = expanded_t6;
+    else memset(&race_t6, 0, sizeof(race_t6));
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (expanded_terran_late_valid) race_late = expanded_terran_late;
+    else memset(&race_late, 0, sizeof(race_late));
 #endif
     memset(tracers,0,sizeof(tracers));mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
     invalidate_path_grid();sc64_visibility_reset();update_exploration();reset_selection_gestures();

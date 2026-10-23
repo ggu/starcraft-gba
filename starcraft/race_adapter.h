@@ -202,6 +202,9 @@ static int race_queue_unit(int owner, int producer, int type)
     int tail, count, reserved, cap;
     const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
     Sc64RaceBank bank;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_airborne(producer)) return 0;
+#endif
     if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) || !building_complete(producer) ||
         b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type, r->producer) || b[producer].queue_count >= 5 ||
         !race_owner_has_prereq(owner, r->prereq)) return 0;
@@ -209,6 +212,16 @@ static int race_queue_unit(int owner, int producer, int type)
     if (!race_t5_unit_product_available(owner, b[producer].raw_owner, type)) return 0;
     if (type == U_DROPSHIP && race_t5_active() &&
         !race_t5_starport_has_control_tower(producer)) return 0;
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (!race_t6_unit_product_available(owner, b[producer].raw_owner, type)) return 0;
+    if (type == U_DROPSHIP && race_t6_active() &&
+        !race_t6_can_train_dropship(producer)) return 0;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (!race_late_unit_product_available(owner, b[producer].raw_owner, type)) return 0;
+    if (type == U_DROPSHIP && race_late_active() &&
+        !race_t6_can_train_dropship(producer)) return 0;
 #endif
     {
         const Sc64RaceBuildingRule *br = sc64_race_building_rule(b[producer].type);
@@ -239,9 +252,19 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     Sc64RaceBank bank;
     int slot;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (!race_late_building_product_available(owner,
+            worker >= 0 && worker < MAX_UNITS ? u[worker].raw_owner : -1,
+            type)) return 0;
+#endif
 #ifdef SC64_T5_RUNTIME
     if (type == B_CONTROL_TOWER) return 0; /* Starport-only add-on path. */
     if (!race_t5_building_product_available(owner,
+            worker >= 0 && worker < MAX_UNITS ? u[worker].raw_owner : -1,
+            type)) return 0;
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (!race_t6_building_product_available(owner,
             worker >= 0 && worker < MAX_UNITS ? u[worker].raw_owner : -1,
             type)) return 0;
 #endif
@@ -259,6 +282,11 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
     if (slot < 0) return 0;
     /* Non-Terran construction starts only after the worker reaches the site. */
     if (race_owner_identity(owner) != R_TER) b[slot].build_progress = -1;
+#ifdef SC64_T6_RUNTIME
+    if (u[worker].order == ORDER_REPAIR) {
+        u[worker].carry = 0; u[worker].work_timer = 0;
+    }
+#endif
     u[worker].order = ORDER_BUILD;
     u[worker].target = slot;
     u[worker].tx = x;
@@ -343,6 +371,9 @@ static void race_tick_buildings(void)
 {
     int i;
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        if (race_late_airborne(i)) continue;
+#endif
         int type, frames, x, y, supply, owner;
         const Sc64RaceBuildingRule *br;
         if (b[i].under_construction) {

@@ -37,18 +37,39 @@ int memcmp(const void *a, const void *b, size_t n);
     (!defined(SC64_T6_ENABLED) || !defined(SC64_T5_RUNTIME))
 #error "T6 storage requires T6 data and the combined T1-T5 runtime"
 #endif
+#if defined(SC64_T6_RUNTIME) && !defined(SC64_T6_STORAGE)
+#error "T6 mission runtime requires the expanded T6 storage profile"
+#endif
+#if defined(SC64_T6_PROBE_ENTRY) && !defined(SC64_T6_RUNTIME)
+#error "T6 internal probe entry requires the T6 runtime"
+#endif
+#if defined(SC64_LATE_TERRAN_STORAGE) && !defined(SC64_T6_RUNTIME)
+#error "Late Terran storage extends the combined T1-T6 runtime"
+#endif
+#if defined(SC64_TERRAN_LATE_RUNTIME) && \
+    (!defined(SC64_LATE_TERRAN_STORAGE) || !defined(SC64_TERRAN_LATE_ENABLED))
+#error "Late Terran runtime requires the complete imported maps and storage"
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME) && \
     (!defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 0)
 #error "Combined T3/T4 runtime is an experimental unified Terran profile"
 #endif
 
 #if defined(SC64_RACES)
-#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+#if defined(SC64_LATE_TERRAN_STORAGE)
+#define MAX_UNITS 192
+#elif defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #define MAX_UNITS 160
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_T6_STORAGE)
+#if defined(SC64_TERRAN_LATE_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 18u
+#elif defined(SC64_LATE_TERRAN_STORAGE)
+#define SC64_RACE_SAVE_GENERATION 17u
+#elif defined(SC64_T6_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 16u
+#elif defined(SC64_T6_STORAGE)
 #define SC64_RACE_SAVE_GENERATION 15u
 #elif defined(SC64_T5_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 14u
@@ -69,12 +90,16 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define SC64_RACE_SAVE_GENERATION 2u
 #endif
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE)
+#define MAX_BUILDINGS 96
+#elif defined(SC64_T6_STORAGE)
 #define MAX_BUILDINGS 80
 #else
 #define MAX_BUILDINGS 64
 #endif
-#if defined(SC64_LARGE_MAPS)
+#if defined(SC64_LATE_TERRAN_STORAGE)
+#define MAX_MINERALS 80
+#elif defined(SC64_LARGE_MAPS)
 #define MAX_MINERALS 48
 #else
 #define MAX_MINERALS 32
@@ -262,6 +287,13 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 #include "sc64_t5_runtime.h"
 #include "sc64_t5_actor_adapter.h"
 #include "sc64_t5_scenario_generated.h"
+#ifdef SC64_T6_RUNTIME
+#include "sc64_t6_mission_state.h"
+#include "sc64_t6_scenario_adapter.h"
+#ifdef SC64_TERRAN_LATE_RUNTIME
+#include "sc64_terran_late_mission_state.h"
+#endif
+#endif
 #endif
 #endif
 #ifndef SC64_T4_GLOBAL_ID7
@@ -285,7 +317,11 @@ _Static_assert(MAX_UNITS + MAX_BUILDINGS <= 255,
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #include "sc64_t3.h"
 _Static_assert(MAX_UNITS >= 138, "T3 must retain its complete starting roster");
+#ifdef SC64_LATE_TERRAN_STORAGE
+_Static_assert(MAX_UNITS + MAX_BUILDINGS <= 511, "Nine-bit visibility source count bound");
+#else
 _Static_assert(MAX_UNITS + MAX_BUILDINGS <= 255, "Visibility source counts require wider storage");
+#endif
 #endif
 #else
 enum {
@@ -302,6 +338,9 @@ enum {
 #ifdef SC64_T5_RUNTIME
     , ORDER_BOARD, ORDER_TRANSPORTED, ORDER_UNLOAD
 #endif
+#ifdef SC64_T6_RUNTIME
+    , ORDER_REPAIR
+#endif
 };
 #ifdef SC64_T5_RUNTIME
 #define SC64_TRANSPORT_LOADED(q) ((q)->order == ORDER_TRANSPORTED)
@@ -317,6 +356,9 @@ enum {
 #ifdef SC64_T5_RUNTIME
     MENU_FACTORY, MENU_STARPORT, MENU_CONTROL_TOWER, MENU_UNLOAD,
 #endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    MENU_LIFT_LAND,
+#endif
     MENU_COUNT
 };
 enum {
@@ -324,15 +366,31 @@ enum {
 #ifdef SC64_T5_RUNTIME
     , MODE_UNLOAD
 #endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    , MODE_LAND
+#endif
 };
 
 typedef struct {
+#ifdef SC64_LATE_TERRAN_STORAGE
+    /* Named fields retain their engine meanings. The late campaign has a
+     * distinct save codec, so runtime records need no int-word ABI. HP and
+     * shields remain int because combat shares pointers with buildings. */
+    int hp, maxhp, carry, shield;
+    s16 x, y, tx, ty, build, target, path_x, path_y, raw_type, raw_owner;
+    u16 cd, work_timer, weapon, path_timer, path_retry, flags, shield_remainder;
+    u8 owner, type, alive, selected, order, armor;
+#else
     int x, y, hp, maxhp, owner, type, alive, selected, cd, order, tx, ty;
     int carry, build, work_timer, armor, weapon, target, path_timer, path_retry, path_x, path_y;
 #ifdef SC64_RACES
     int shield,raw_type,raw_owner,flags,shield_remainder;
 #endif
+#endif
 } Unit;
+#ifdef SC64_LATE_TERRAN_STORAGE
+_Static_assert(sizeof(Unit) == 56, "Late Terran runtime unit budget");
+#endif
 typedef struct {
     int x, y, hp, maxhp, owner, type, alive;
     int queue[5], queue_head, queue_count, queue_progress;
@@ -496,6 +554,46 @@ static void race_t5_tech_tick(void);
 static int sc64_race_t5_building_art_raw(int type);
 static int race_t5_unit_product_available(int owner, int raw_owner, int type);
 #endif
+#ifdef SC64_T6_RUNTIME
+static Sc64T6MissionState race_t6;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+static int race_late_airborne(int slot);
+static int race_late_lift(int slot);
+static int race_late_flight_order(int slot, int x, int y, int land);
+static void race_late_flight_tick(void);
+#endif
+static int race_t6_active(void)
+{ return !race_mode && race_selected_mission == SC64_T6_GLOBAL_ID; }
+static int race_t6_init(void), race_t6_tick(void);
+static int sc64_t6_runtime_owner(unsigned source);
+static int sc64_t6_owners_hostile(int owner, int other);
+static int race_t6_unit_burrowed(int slot);
+static void race_t6_unit_created(int slot);
+static void race_t6_building_died(int owner, int raw_owner);
+static int race_t6_unit_product_available(int owner, int raw_owner, int type);
+static int race_t6_start_control_tower(int producer);
+static int race_t6_can_train_dropship(int producer);
+static void race_t6_tech_tick(void);
+static inline int race_t6_tech_active(void);
+static int race_t6_request_repair(void);
+static int race_t6_repair_tick_unit(int slot);
+#ifdef SC64_TERRAN_LATE_RUNTIME
+static Sc64TerranLateMissionState race_late;
+static int race_late_active(void)
+{ return !race_mode && race_selected_mission >= 10 && race_selected_mission <= 13; }
+static int race_late_init(void), race_late_tick(void);
+static int sc64_terran_late_runtime_owner(unsigned source_slot);
+static int sc64_terran_late_runtime_race(unsigned source_slot);
+static int sc64_terran_late_current_source_owner(int live_owner, int raw_owner);
+static int sc64_terran_late_product_source_owner(int live_owner);
+static int race_late_unit_product_available(int owner, int raw_owner, int type);
+static int race_late_building_product_available(int owner, int raw_owner, int type);
+static int __attribute__((noinline)) sc64_terran_late_owners_hostile(int owner, int other);
+static void race_late_record_actor_death(int killer_owner, int killer_raw_owner,
+                                        int victim_owner, int victim_raw_owner,
+                                        int victim_raw_type, int is_building);
+#endif
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 static Sc64T3State race_t3;
 static u16 race_t3_buildings_killed;
@@ -571,6 +669,12 @@ static int GBA_HOT
 owners_hostile(int a, int other)
 {
 #ifdef SC64_RACES
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) return sc64_terran_late_owners_hostile(a, other);
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active()) return sc64_t6_owners_hostile(a, other);
+#endif
 #ifdef SC64_T4_RUNTIME
     if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID7)
         return sc64_t4_owners_hostile(a, other);
@@ -616,6 +720,9 @@ sc64_t4_unit_collidable(int type)
 static int
 sc64_t4_building_collidable(int slot)
 {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_airborne(slot)) return 0;
+#endif
     int type = b[slot].type;
 #ifdef SC64_T4_SCENARIO_RUNTIME
     if (race_t4_active() && sc64_race_t4_is_door(type)) {
@@ -842,6 +949,20 @@ spawn_unit(int owner, int type, int x, int y)
                          owner == RESCUABLE ? 3 : -1;
     }
 #endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active()) {
+        u[i].raw_type = sc64_race_raw_unit(type);
+        u[i].raw_owner = owner == SIDE ? 0 : owner == ENEMY ? 1 :
+                         owner == 4 ? 4 : -1;
+    }
+    race_t6_unit_created(i);
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) {
+        u[i].raw_type = sc64_race_raw_unit(type);
+        u[i].raw_owner = sc64_terran_late_product_source_owner(owner);
+    }
+#endif
 #endif
     u[i].hp = u[i].maxhp;
     u[i].alive = 1;
@@ -909,6 +1030,19 @@ spawn_build(int owner, int type, int x, int y, int constructing)
         b[i].raw_type = sc64_race_raw_building(type);
         b[i].raw_owner = owner == SIDE ? 0 : owner == ENEMY ? 6 :
                          owner == RESCUABLE ? 3 : -1;
+    }
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active()) {
+        b[i].raw_type = sc64_race_raw_building(type);
+        b[i].raw_owner = owner == SIDE ? 0 : owner == ENEMY ? 1 :
+                         owner == 4 ? 4 : -1;
+    }
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) {
+        b[i].raw_type = sc64_race_raw_building(type);
+        b[i].raw_owner = sc64_terran_late_product_source_owner(owner);
     }
 #endif
     b[i].larva=3;b[i].larva_timer=0;
@@ -1294,6 +1428,9 @@ unit_step_clear(const Unit *q, int nx, int ny)
 }
 
 static void GBA_HOT
+#if defined(SC64_T6_RUNTIME) && !defined(GBA_HOST)
+__attribute__((optimize("Os")))
+#endif
 move_toward(Unit * q, int tx, int ty)
 {
 	int nx, ny, speed = q->type == U_ZERGLING || q->type == U_FIREBAT || q->type == U_RAYNOR ? 2 : 1;
@@ -1421,6 +1558,9 @@ static int sc64_p3_can_attack_from(int attacker, int target, int owner)
 static int sc64_t4_can_attack_from(int attacker, int target, int owner)
 {
     (void)owner;
+#ifdef SC64_T6_RUNTIME
+    if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target)) return 0;
+#endif
     if (target >= 0 && target < MAX_UNITS) {
         int type = u[target].type;
         if ((sc64_race_t4_actor_flags(type)&SC64_T4_ACTOR_HIDDEN) ||
@@ -1438,6 +1578,9 @@ static int sc64_t4_can_attack_from(int attacker, int target, int owner)
     race_can_attack((attacker), (target))
 #endif
 static int GBA_HOT __attribute__((noinline))
+#if defined(SC64_T6_RUNTIME) && !defined(GBA_HOST)
+__attribute__((optimize("Os")))
+#endif
 sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
 {
     int best = -1, best_distance = max_distance * max_distance, d;
@@ -1458,7 +1601,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
             for (col = col0; col <= col1; ++col) {
                 int cell = col + row * SC64_TARGET_GRID_COLS;
                 int entity;
-                for (entity = sc64_target_head[p][cell]; entity != 0xff;
+                for (entity = sc64_target_head[p][cell]; entity != SC64_TARGET_NONE;
                      entity = sc64_target_next[entity]) {
                     int candidate_x, candidate_y;
                     if (entity < MAX_UNITS) {
@@ -1642,6 +1785,9 @@ target_y(int target)
 static int
 target_alive(int target)
 {
+#ifdef SC64_T6_RUNTIME
+    if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target)) return 0;
+#endif
 #ifdef SC64_T5_RUNTIME
     if (target >= 0 && target < MAX_UNITS && SC64_TRANSPORT_LOADED(&u[target]))
         return 0;
@@ -1673,6 +1819,9 @@ static void
 hit_target(int target, int damage, int source_type, int source_owner)
 {
     int i, tx, ty;
+#ifdef SC64_T6_RUNTIME
+    if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target)) return;
+#endif
 #ifdef SC64_T5_RUNTIME
     if (target >= 0 && target < MAX_UNITS && SC64_TRANSPORT_LOADED(&u[target]))
         return;
@@ -1731,6 +1880,19 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #endif
 	u[target].hp -= damage;
 	if (u[target].hp <= 0) {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+            if (u[target].alive && race_late_active()) {
+                race_late_record_actor_death(source_owner, -1, u[target].owner,
+                                             u[target].raw_owner, u[target].raw_type, 0);
+                if (u[target].type == U_DROPSHIP)
+                    for (int cargo = 0; cargo < MAX_UNITS; ++cargo)
+                        if (u[cargo].alive && u[cargo].order == ORDER_TRANSPORTED &&
+                            u[cargo].target == target)
+                            race_late_record_actor_death(source_owner, -1, u[cargo].owner,
+                                                         u[cargo].raw_owner,
+                                                         u[cargo].raw_type, 0);
+            }
+#endif
 	    if (u[target].owner == SIDE)
 		supply_used -= unit_supply(u[target].type);
 	    u[target].alive = 0;
@@ -1741,8 +1903,24 @@ hit_target(int target, int damage, int source_type, int source_owner)
 	if (source_type == U_FIREBAT) {
 	    for (i = 0; i < MAX_UNITS; i++)
 		if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner != source_owner && dist2(tx, ty, u[i].x, u[i].y) < 12 * 12) {
+#ifdef SC64_T6_RUNTIME
+                    if (race_t6_active() && (!owners_hostile(source_owner, u[i].owner) ||
+                        race_t6_unit_burrowed(i))) continue;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+                    if (race_late_active() &&
+                        (!owners_hostile(source_owner, u[i].owner) ||
+                         invincible_units[i] || (u[i].flags & 16) ||
+                         (sc64_terran_late_unit_actor_flags(u[i].type) &
+                          SC64_LATE_ACTOR_INVINCIBLE))) continue;
+#endif
 		    u[i].hp -= 3;
 		    if (u[i].hp <= 0) {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+                        if (race_late_active())
+                            race_late_record_actor_death(source_owner, -1, u[i].owner,
+                                                         u[i].raw_owner, u[i].raw_type, 0);
+#endif
 			if (u[i].owner == SIDE)
 			    supply_used -= unit_supply(u[i].type);
 			u[i].alive = 0;
@@ -1771,6 +1949,15 @@ hit_target(int target, int damage, int source_type, int source_owner)
     q->hp -= damage > 1 ? damage - 1 : 1;
 #endif
 	if (q->hp <= 0) {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+            if (q->alive && race_late_active())
+                race_late_record_actor_death(source_owner, -1, q->owner,
+                                             q->raw_owner, q->raw_type, 1);
+#endif
+#ifdef SC64_T6_RUNTIME
+            if (q->alive && race_t6_active())
+                race_t6_building_died(q->owner, q->raw_owner);
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
             if(q->alive && !race_mode && race_selected_mission==6 &&
                q->owner==ENEMY && source_owner==SIDE && race_t3_buildings_killed<65535u)
@@ -2364,6 +2551,14 @@ game_init(void)
     race_selected_mission = SC64_T5_GLOBAL_ID;
     init_state();
 #endif
+#ifdef SC64_T6_PROBE_ENTRY
+    race_selected_mission = SC64_T6_GLOBAL_ID;
+    init_state();
+#endif
+#ifdef SC64_TERRAN_LATE_PROBE_MISSION
+    race_selected_mission = SC64_TERRAN_LATE_PROBE_MISSION;
+    init_state();
+#endif
 }
 
 static int
@@ -2485,6 +2680,11 @@ issue_order(int order, int tx, int ty)
 #ifdef SC64_T4_RUNTIME
             if (sc64_race_t4_actor_flags(u[i].type) &&
                 !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_MOVABLE)) continue;
+#endif
+#ifdef SC64_T6_RUNTIME
+            if (u[i].order == ORDER_REPAIR) {
+                u[i].carry = 0; u[i].work_timer = 0;
+            }
 #endif
 	    u[i].order = order;
 	    if (selected_count() > 1) {
@@ -2620,17 +2820,34 @@ tick_research(void)
     }
 }
 
+#ifdef SC64_TERRAN_LATE_RUNTIME
+#include "sc64_terran_flight.h"
+#endif
+
 static void
 choose_command(int choice)
 {
 #ifdef SC64_T5_RUNTIME
     if (choice >= MENU_FACTORY) {
         menu_open = 0;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        if (choice == MENU_LIFT_LAND) {
+            if (race_late_airborne(selected_building)) mode = MODE_LAND;
+            else toast(race_late_lift(selected_building) ? 0 : 8);
+            return;
+        }
+#endif
         if (choice == MENU_UNLOAD) {
             mode = MODE_UNLOAD; return;
         }
         if (race_human != R_TER) { toast(8); return; }
         if (choice == MENU_CONTROL_TOWER) {
+#ifdef SC64_T6_RUNTIME
+            if (race_t6_tech_active()) {
+                toast(race_t6_start_control_tower(selected_building) ? 3 : 8);
+                return;
+            }
+#endif
             toast(race_t5_start_control_tower(selected_building) ? 3 : 8);
             return;
         }
@@ -2760,7 +2977,19 @@ interact(void)
 	choose_command(menu_cursor);
 	return;
     }
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (mode == MODE_LAND) {
+        toast(race_late_flight_order(selected_building, cx, cy, 1) ? 0 : 8);
+        mode = MODE_NORMAL; return;
+    }
+#endif
     if (mode == MODE_MOVE) {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        if (race_late_airborne(selected_building)) {
+            toast(race_late_flight_order(selected_building, cx, cy, 0) ? 0 : 8);
+            mode = MODE_NORMAL; return;
+        }
+#endif
 	issue_order(ORDER_MOVE, cx, cy);
 	mode = MODE_NORMAL;
 	return;
@@ -2801,6 +3030,9 @@ interact(void)
         remember_unit_tap(double_unit);
         return;
     }
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_request_repair()) { toast(0); return; }
+#endif
     {
 	int worker = find_selected_worker();
 	int refinery = nearest_refinery(cx, cy);
@@ -2812,7 +3044,12 @@ interact(void)
 	    return;
 	}
     }
-    if (selected_building >= 0) {
+    if (selected_building >= 0
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        && (!race_late_active() ||
+            dist2(cx, cy, b[selected_building].x, b[selected_building].y) < 26 * 26)
+#endif
+        ) {
 #ifdef SC64_RACES
         if(b[selected_building].type==B_COMMAND)train_type=U_SCV;
         if(b[selected_building].type==B_NEXUS)train_type=U_PROBE;
@@ -2862,7 +3099,11 @@ owner_command_center(int owner)
 #ifdef SC64_RACES
         ||sc64_race_is_zerg_townhall(b[i].type)||b[i].type==B_NEXUS
 #endif
-        ) && !b[i].under_construction) return i;
+        ) && !b[i].under_construction
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        && !race_late_airborne(i)
+#endif
+        ) return i;
     return -1;
 }
 #ifndef SC64_SKIRMISH
@@ -2994,6 +3235,9 @@ tick_combat(Unit * q, int target)
     damage = unit_damage(q->type);
 #ifdef SC64_RACES
     int flying=target<MAX_UNITS&&sc64_race_unit_flying(u[target].type);
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (target >= MAX_UNITS) flying = race_late_airborne(target - MAX_UNITS);
+#endif
     range=(sc64_race_unit_range_vs(q->type,flying)+1)/2;
     /* Weapon reach is measured from a structure's footprint edge. The
        navigation grid keeps actors outside the same 18px collision radius. */
@@ -3121,6 +3365,12 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
+#ifdef SC64_T6_RUNTIME
+        /* Keep burrowed actors out of every ordinary movement/weapon path.
+         * Transport boarding also rejects the corresponding source flag. */
+        if (race_t6_unit_burrowed(i)) continue;
+        if (q->order == ORDER_REPAIR && race_t6_repair_tick_unit(i)) continue;
+#endif
 	#ifdef SC64_T5_RUNTIME
         if (q->order >= ORDER_BOARD) {
             race_transport_activity = 1;
@@ -3613,6 +3863,10 @@ select_next_train_type(void)
                                                     b[selected_building].raw_owner,
                                                     type)) continue;
 #endif
+#ifdef SC64_T6_RUNTIME
+                if (!race_t6_unit_product_available(b[selected_building].owner,
+                        b[selected_building].raw_owner, type)) continue;
+#endif
                 train_type = type; return;
             }
         }
@@ -3920,6 +4174,9 @@ game_update(u16 held, u16 pressed)
     race_t5_tech_tick();
     race_transport_tick_after_orders();
 #endif
+#ifdef SC64_T6_RUNTIME
+    race_t6_tech_tick();
+#endif
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
     sc64_update_research_cycles = gba_clock() - sc64_update_stage_start;
     sc64_update_remainder_start = gba_clock();
@@ -4059,6 +4316,9 @@ draw_mission_sprite(const Sc64SpriteFrame *s, int cx, int cy)
 static void
 draw_unit(Unit * q)
 {
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active() && race_t6_unit_burrowed((int)(q - u))) return;
+#endif
     if (SC64_TRANSPORT_LOADED(q)) return;
     int x = q->x - camx, y = q->y - camy + 12;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
@@ -4077,7 +4337,14 @@ draw_unit(Unit * q)
      * hero variants; unique hero art is not present in the current bank. */
     int sprite_raw = q->raw_type;
     if (q->type == U_KERRIGAN) sprite_raw = 1;
-    if (q->type == U_RAYNOR_VULTURE) sprite_raw = 2;
+    if (q->type == U_RAYNOR_VULTURE
+#ifdef SC64_T6_RUNTIME
+        && !race_t6_active()
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        && !race_late_active()
+#endif
+        ) sprite_raw = 2;
 #endif
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
@@ -4222,6 +4489,9 @@ draw_minimap(void)
 	}
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
+#ifdef SC64_T6_RUNTIME
+            !race_t6_unit_burrowed(i) &&
+#endif
 #ifdef SC64_T4_RUNTIME
             !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_HIDDEN) &&
 #endif
@@ -4315,6 +4585,9 @@ draw_building_art(Building *q)
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
 #ifdef SC64_T5_RUNTIME
+#ifdef SC64_T6_RUNTIME
+        q->type == B_CONTROL_TOWER && race_t6_tech_active() ? sc64_race_unit_sprite(115) :
+#endif
         q->type == B_CONTROL_TOWER ? sc64_race_unit_sprite(sc64_race_t5_building_art_raw(q->type)) :
 #endif
         q->raw_type>=0?sc64_race_unit_sprite(q->raw_type):
@@ -4661,6 +4934,9 @@ draw_map(void)
         int first = 0, count = field_menu_count();
         static const char *const advanced_labels[] = {
             "FACTORY", "STARPORT", "CONTROL TOWER", "UNLOAD CARGO"
+#ifdef SC64_TERRAN_LATE_RUNTIME
+            , "LIFT / LAND"
+#endif
         };
         if (menu_cursor >= 10) first = menu_cursor - 9;
 	for (i = first; i < count && i < first + 10; i++) {
@@ -4888,6 +5164,9 @@ draw_hud_commands(void)
 	    }
     } else {
 	gfx_text(5, 126, mode == MODE_BUILD ? "BUILD PLACEMENT" :
+#ifdef SC64_TERRAN_LATE_RUNTIME
+                 mode == MODE_LAND ? "LANDING SITE" :
+#endif
 		 mode == MODE_ATTACK ? "ATTACK MOVE" : mode == MODE_MOVE ? "MOVE ORDER" : "FIELD COMMAND", C_WHITE);
 	gfx_text(5, 137, "B COMMANDS  A SELECT / PLACE", C_GOLD);
     }
@@ -4910,6 +5189,10 @@ draw_hud_commands(void)
             gfx_text(5,149,race_t3.objective?"HOLD / KILL HATCHERY":"HOLD BASE",C_GOLD);
             gfx_text(137,149,timer,C_WHITE);
         }
+#endif
+#ifdef SC64_T6_RUNTIME
+        else if(race_t6_active())
+            gfx_text(5,149,"RAYNOR + 2 DROPSHIPS / NORAD II",C_GOLD);
 #endif
 #ifdef SC64_Z3_ENABLED
         else if(race_selected_mission==14)
@@ -4963,7 +5246,14 @@ draw_hud_commands(void)
 static _Alignas(4) u8 sc64_hud_top[240 * 12], sc64_hud_bottom[240 * 40];
 static int sc64_hud_previous[24], sc64_hud_valid;
 
+#ifdef SC64_LATE_TERRAN_STORAGE
+/* Keep the expanded actor loop and target search in IWRAM. This once-per-
+ * render HUD invalidation pass can execute from ROM without using its stack
+ * reserve. Its timing impact is measured with the late-profile replay. */
+static int __attribute__((noinline))
+#else
 static int GBA_HOT __attribute__((noinline))
+#endif
 sc64_hud_changed(void)
 {
     int values[24] = {minerals, gas, supply_used, supply_cap, mode, selected_building,
@@ -5478,9 +5768,15 @@ game_self_test(void)
 #ifdef SC64_T5_RUNTIME
 #include "sc64_t5_availability_adapter.h"
 #endif
+#ifdef SC64_T6_RUNTIME
+#include "sc64_t6_availability_adapter.h"
+#endif
 #include "race_adapter.h"
 #ifdef SC64_T5_RUNTIME
 #include "sc64_t5_tech_adapter.h"
+#endif
+#ifdef SC64_T6_RUNTIME
+#include "sc64_t6_tech_adapter.h"
 #endif
 #ifdef SC64_T4_RUNTIME
 #include "sc64_t4_actor_adapter.h"
@@ -5495,6 +5791,13 @@ game_self_test(void)
 #include "sc64_t5_world_adapter.h"
 #include "sc64_t5_mine_adapter.h"
 #include "sc64_t5_scenario_adapter.h"
+#endif
+#ifdef SC64_T6_RUNTIME
+#include "sc64_t6_world_adapter.h"
+#include "sc64_t6_repair_world.h"
+#ifdef SC64_TERRAN_LATE_RUNTIME
+#include "sc64_terran_late_world.h"
+#endif
 #endif
 #include "race_campaign_adapter.h"
 #include "race_save_adapter.h"

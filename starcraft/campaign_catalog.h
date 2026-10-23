@@ -15,6 +15,21 @@
     !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 0
 #error "SC64_T5_CAMPAIGN_ENTRY requires the combined unified Terran T3/T4/T5 profile"
 #endif
+#ifdef SC64_T6_CAMPAIGN_ENTRY
+#if !defined(SC64_T3_ENABLED) || !defined(SC64_T4_CAMPAIGN_ENTRY) || \
+    !defined(SC64_T5_CAMPAIGN_ENTRY) || !defined(SC64_T6_RUNTIME) || \
+    !defined(SC64_T6_ENABLED) || !defined(SC64_UNIFIED) || \
+    !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 0
+#error "SC64_T6_CAMPAIGN_ENTRY requires the unified Terran T1-T6 runtime chain"
+#endif
+#endif
+#ifdef SC64_TERRAN_FULL_CAMPAIGN_ENTRY
+#if !defined(SC64_T6_CAMPAIGN_ENTRY) || !defined(SC64_TERRAN_LATE_RUNTIME) || \
+    !defined(SC64_TERRAN_LATE_ENABLED) || !defined(SC64_UNIFIED) || \
+    !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 0
+#error "SC64_TERRAN_FULL_CAMPAIGN_ENTRY requires unified Terran T1-T10 runtime"
+#endif
+#endif
 #endif
 
 /* Asset-free metadata for the ten original missions in each campaign.
@@ -63,11 +78,41 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
      0,
 #endif
      "REVOLUTION"},
-    {9, SC64_FACTION_TERRAN, 6, 0, "NORAD II"},
-    {10, SC64_FACTION_TERRAN, 7, 0, "THE TRUMP CARD"},
-    {11, SC64_FACTION_TERRAN, 8, 0, "THE BIG PUSH"},
-    {12, SC64_FACTION_TERRAN, 9, 0, "NEW GETTYSBURG"},
-    {13, SC64_FACTION_TERRAN, 10, 0, "THE HAMMER FALLS"},
+    {9, SC64_FACTION_TERRAN, 6,
+#ifdef SC64_T6_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "NORAD II"},
+    {10, SC64_FACTION_TERRAN, 7,
+#ifdef SC64_TERRAN_FULL_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "THE TRUMP CARD"},
+    {11, SC64_FACTION_TERRAN, 8,
+#ifdef SC64_TERRAN_FULL_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "THE BIG PUSH"},
+    {12, SC64_FACTION_TERRAN, 9,
+#ifdef SC64_TERRAN_FULL_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "NEW GETTYSBURG"},
+    {13, SC64_FACTION_TERRAN, 10,
+#ifdef SC64_TERRAN_FULL_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "THE HAMMER FALLS"},
     {14, SC64_FACTION_ZERG, 3,
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
      1,

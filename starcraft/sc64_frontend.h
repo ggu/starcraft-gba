@@ -189,6 +189,7 @@ static inline void sc64_frontend_reset(Sc64Frontend *f, int mission,
     f->mission = mission == SC64_T4_GLOBAL_ID7 ? mission : sc64_front_clamp(mission, 0, 5);
 #else
 #if defined(SC64_T3_ENABLED) || defined(SC64_Z3_ENABLED) || \
+    defined(SC64_T6_CAMPAIGN_ENTRY) || defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY) || \
     (defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED))
     f->mission = mission;
 #else
@@ -227,6 +228,10 @@ static inline void sc64_frontend_reset(Sc64Frontend *f, int mission,
     f->completed = sc64_front_clamp(completed, -1, 22);
 #elif defined(SC64_Z3_ENABLED)
     f->completed = sc64_front_clamp(completed, -1, 14);
+#elif defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
+    f->completed = sc64_front_clamp(completed, -1, 13);
+#elif defined(SC64_T6_CAMPAIGN_ENTRY)
+    f->completed = sc64_front_clamp(completed, -1, 9);
 #elif defined(SC64_T5_CAMPAIGN_ENTRY)
     f->completed = sc64_front_clamp(completed, -1, 8);
 #elif defined(SC64_T4_CAMPAIGN_ENTRY)

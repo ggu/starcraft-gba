@@ -64,6 +64,7 @@ enum {
     B_DEFILER_MOUND, B_ULTRALISK_CAVERN, B_CITADEL_ADUN,
     B_STASIS_CELL_PRISON, B_FLEET_BEACON, B_ROBOTICS_SUPPORT_BAY,
     B_SHIELD_BATTERY, B_SPECIAL_ION_CANNON,
+    B_SCIENCE_FACILITY, B_PHYSICS_LAB,
 #endif
     SC_RB_COUNT
 };
@@ -265,6 +266,8 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     , [B_ROBOTICS_SUPPORT_BAY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS, 255, 0, 150, 100, 450, 450, 0 }
     , [B_SHIELD_BATTERY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS, 255, 0, 100, 0, 450, 200, 0 }
     , [B_SPECIAL_ION_CANNON] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 200, 0, 900, 2000, 0 }
+    , [B_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
+    , [B_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
 #endif
 };
 
@@ -329,7 +332,8 @@ static inline const char *sc64_race_building_name(int type)
 #ifdef SC64_TERRAN_LATE_ACTORS
         ,"NUCLEAR SILO","COVERT OPS","MACHINE SHOP","ARMORY","DEFILER MOUND",
         "ULTRALISK CAVERN","CITADEL OF ADUN","STASIS CELL PRISON","FLEET BEACON",
-        "ROBOTICS SUPPORT BAY","SHIELD BATTERY","SPECIAL ION CANNON"
+        "ROBOTICS SUPPORT BAY","SHIELD BATTERY","SPECIAL ION CANNON",
+        "SCIENCE FACILITY","PHYSICS LAB"
 #endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
@@ -921,6 +925,7 @@ static inline int sc64_race_raw_building(int type)
     case B_CITADEL_ADUN: return 163; case B_STASIS_CELL_PRISON: return 168;
     case B_FLEET_BEACON: return 169; case B_ROBOTICS_SUPPORT_BAY: return 171;
     case B_SHIELD_BATTERY: return 172; case B_SPECIAL_ION_CANNON: return 127;
+    case B_SCIENCE_FACILITY: return 116; case B_PHYSICS_LAB: return 118;
 #endif
 #ifdef SC64_T4_RUNTIME
     case B_TERRAN_BEACON: return 195;
@@ -1030,6 +1035,7 @@ static inline int sc64_race_building_from_raw(int raw)
     case 163: return B_CITADEL_ADUN; case 168: return B_STASIS_CELL_PRISON;
     case 169: return B_FLEET_BEACON; case 171: return B_ROBOTICS_SUPPORT_BAY;
     case 172: return B_SHIELD_BATTERY; case 127: return B_SPECIAL_ION_CANNON;
+    case 116: return B_SCIENCE_FACILITY; case 118: return B_PHYSICS_LAB;
 #endif
     default: return -1;
     }

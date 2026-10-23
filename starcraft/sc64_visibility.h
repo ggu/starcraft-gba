@@ -23,11 +23,20 @@
  */
 
 typedef struct {
+#ifdef SC64_LATE_TERRAN_STORAGE
+    s16 x, y, type;
+#else
     int x, y, type;
+#endif
     u8 active;
 } Sc64VisibilitySnapshot;
 
 static u8 sc64_visible_sources[MAP_CELLS];
+#ifdef SC64_LATE_TERRAN_STORAGE
+/* Exact nine-bit counts avoid saturation when every actor shares one cell. */
+static u8 sc64_visible_sources_high[(MAP_CELLS + 7) / 8];
+_Static_assert(MAX_UNITS + MAX_BUILDINGS <= 511, "nine-bit source count bound");
+#endif
 static u8 sc64_minimap_visible[24 * 24];
 static u8 sc64_minimap_explored[24 * 24];
 static Sc64VisibilitySnapshot sc64_unit_visibility[MAX_UNITS];
@@ -62,11 +71,42 @@ sc64_minimap_cell(int cell)
 #endif
 }
 
+#ifdef SC64_LATE_TERRAN_STORAGE
+static unsigned
+sc64_visibility_source_count(int cell)
+{
+    return sc64_visible_sources[cell] |
+           ((unsigned)((sc64_visible_sources_high[(unsigned)cell >> 3] >>
+                        ((unsigned)cell & 7)) & 1) << 8);
+}
+
+static void
+sc64_visibility_source_change(int cell, int add)
+{
+    unsigned count = sc64_visibility_source_count(cell);
+    if (add) {
+        if (!count) ++sc64_minimap_visible[sc64_minimap_cell(cell)];
+        ++count; /* At most one source per bounded unit/building slot. */
+    } else if (count) {
+        --count;
+        if (!count) --sc64_minimap_visible[sc64_minimap_cell(cell)];
+    }
+    sc64_visible_sources[cell] = (u8)count;
+    u8 mask = (u8)(1u << ((unsigned)cell & 7));
+    if (count & 256u) sc64_visible_sources_high[(unsigned)cell >> 3] |= mask;
+    else sc64_visible_sources_high[(unsigned)cell >> 3] &= (u8)~mask;
+    SC64_GRID_SET(visible, cell, count != 0);
+}
+#endif
+
 static void
 sc64_visibility_reset(void)
 {
     int i;
     memset(sc64_visible_sources, 0, sizeof(sc64_visible_sources));
+#ifdef SC64_LATE_TERRAN_STORAGE
+    memset(sc64_visible_sources_high, 0, sizeof(sc64_visible_sources_high));
+#endif
     memset(sc64_minimap_visible, 0, sizeof(sc64_minimap_visible));
     memset(sc64_minimap_explored, 0, sizeof(sc64_minimap_explored));
     SC64_GRID_CLEAR(visible);
@@ -127,6 +167,9 @@ sc64_t4_adjust_visibility_source(int x, int y, int radius, int delta)
                 int dx = col * 16 + 8 - x, dy = row * 16 + 8 - y;
                 int cell = col + row * MAP_COLS;
                 if (dx*dx + dy*dy <= radius*radius) {
+#ifdef SC64_LATE_TERRAN_STORAGE
+                    sc64_visibility_source_change(cell, delta > 0);
+#else
                     if (delta > 0) {
                         if (!sc64_visible_sources[cell])
                             ++sc64_minimap_visible[sc64_minimap_cell(cell)];
@@ -137,6 +180,7 @@ sc64_t4_adjust_visibility_source(int x, int y, int radius, int delta)
                             --sc64_minimap_visible[sc64_minimap_cell(cell)];
                     }
                     SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
+#endif
                 }
             }
 }
@@ -221,6 +265,9 @@ sc64_adjust_unit_visibility(int x, int y, int type, int delta)
                 int dy = row * 16 + 8 - y;
                 int cell = col + row * MAP_COLS;
                 if (dx * dx + dy * dy <= radius * radius) {
+#ifdef SC64_LATE_TERRAN_STORAGE
+                    sc64_visibility_source_change(cell, delta > 0);
+#else
                     if (delta > 0) {
                         if (sc64_visible_sources[cell] == 0)
                             sc64_minimap_visible[sc64_minimap_cell(cell)]++;
@@ -232,6 +279,7 @@ sc64_adjust_unit_visibility(int x, int y, int type, int delta)
                             sc64_minimap_visible[sc64_minimap_cell(cell)]--;
                     }
                     SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
+#endif
                 }
             }
 }
@@ -296,6 +344,9 @@ sc64_visibility_apply_span(int row, int first, int last, int add)
     int col;
     for (col = first; col <= last; ++col) {
         int cell = col + row * MAP_COLS;
+#ifdef SC64_LATE_TERRAN_STORAGE
+        sc64_visibility_source_change(cell, add);
+#else
         if (add) {
             if (sc64_visible_sources[cell] == 0)
                 sc64_minimap_visible[sc64_minimap_cell(cell)]++;
@@ -307,6 +358,7 @@ sc64_visibility_apply_span(int row, int first, int last, int add)
                 sc64_minimap_visible[sc64_minimap_cell(cell)]--;
         }
         SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
+#endif
     }
 }
 #endif
@@ -389,6 +441,9 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
                 int new_in = new_dx * new_dx + new_dy * new_dy <= radius * radius;
                 if (old_in != new_in) {
                     int cell = col + row * MAP_COLS;
+#ifdef SC64_LATE_TERRAN_STORAGE
+                    sc64_visibility_source_change(cell, new_in);
+#else
                     if (new_in) {
                         if (sc64_visible_sources[cell] == 0)
                             sc64_minimap_visible[sc64_minimap_cell(cell)]++;
@@ -400,6 +455,7 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
                             sc64_minimap_visible[sc64_minimap_cell(cell)]--;
                     }
                     SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
+#endif
                 }
             }
 #endif
@@ -429,6 +485,9 @@ sc64_adjust_building_visibility(int x, int y, int type, int delta)
                 int dy = row * 16 + 8 - y;
                 int cell = col + row * MAP_COLS;
                 if (dx * dx + dy * dy <= radius * radius) {
+#ifdef SC64_LATE_TERRAN_STORAGE
+                    sc64_visibility_source_change(cell, delta > 0);
+#else
                     if (delta > 0) {
                         if (sc64_visible_sources[cell] == 0)
                             sc64_minimap_visible[sc64_minimap_cell(cell)]++;
@@ -440,6 +499,7 @@ sc64_adjust_building_visibility(int x, int y, int type, int delta)
                             sc64_minimap_visible[sc64_minimap_cell(cell)]--;
                     }
                     SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
+#endif
                 }
             }
 }

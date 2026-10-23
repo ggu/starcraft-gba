@@ -186,6 +186,39 @@ int main(void)
     assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) ==
            MAX_UNITS + MAX_BUILDINGS - 1);
 
+#ifdef SC64_LATE_TERRAN_STORAGE
+    /* Generation-17 expands the unified index past 255. Verify the exact
+     * transition values at 254/255 and the final target 287, including
+     * lowest-global-index ties through both the indexed and oracle paths. */
+    for (int i = 0; i < MAX_UNITS; ++i) u[i].alive = 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i) b[i].alive = 0;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        u[i].owner = ENEMY; u[i].type = U_MARINE;
+        u[i].x = 500; u[i].y = 500; u[i].flags = 0;
+    }
+    for (int i = 0; i < MAX_BUILDINGS; ++i) {
+        b[i].owner = ENEMY; b[i].type = B_HATCHERY;
+        b[i].x = 500; b[i].y = 500;
+    }
+    u[MAX_UNITS - 1].alive = 1;
+    b[62].alive = b[63].alive = b[MAX_BUILDINGS - 1].alive = 1;
+    build_owner_lists();
+    sc64_target_index_begin();
+    assert(sc64_target_index_active);
+    compare_query(500, 500, SIDE, 64, U_MARINE);
+    assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) == 191);
+    u[MAX_UNITS - 1].alive = 0;
+    compare_query(500, 500, SIDE, 64, U_MARINE);
+    assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) == 254);
+    b[62].alive = 0;
+    compare_query(500, 500, SIDE, 64, U_MARINE);
+    assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) == 255);
+    b[63].alive = 0;
+    compare_query(500, 500, SIDE, 64, U_MARINE);
+    assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) == 287);
+    sc64_target_index_end();
+#endif
+
     /* An out-of-bounds entity disables the broadphase and preserves the
      * original owner-list scan as a safe fallback. */
     u[MAX_UNITS - 1].alive = 1; u[MAX_UNITS - 1].x = -1;

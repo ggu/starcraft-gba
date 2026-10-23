@@ -116,12 +116,30 @@ static void test_campaign_catalog_contract(void) {
     assert(sc64_catalog_mission_allowed(6, SC64_FACTION_TERRAN));
     assert(sc64_catalog_get(6)->title[0] == 'D');
 #ifdef SC64_T4_CAMPAIGN_ENTRY
+#ifdef SC64_TERRAN_FULL_CAMPAIGN_ENTRY
+    assert(sc64_catalog_playable_count(SC64_FACTION_TERRAN) == 10);
+    for (int ordinal = 0; ordinal < 10; ++ordinal) {
+        assert(sc64_catalog_playable_at(SC64_FACTION_TERRAN, ordinal) == ordinal + 4);
+        assert(sc64_catalog_playable_ordinal(SC64_FACTION_TERRAN, ordinal + 4) == ordinal);
+    }
+    assert(sc64_catalog_available_next(SC64_FACTION_TERRAN, 12) == 13);
+    assert(sc64_catalog_available_next(SC64_FACTION_TERRAN, 13) == -1);
+#elif defined(SC64_T6_CAMPAIGN_ENTRY)
+    assert(sc64_catalog_playable_count(SC64_FACTION_TERRAN) == 6);
+    for (int ordinal = 0; ordinal < 6; ++ordinal) {
+        assert(sc64_catalog_playable_at(SC64_FACTION_TERRAN, ordinal) == ordinal + 4);
+        assert(sc64_catalog_playable_ordinal(SC64_FACTION_TERRAN, ordinal + 4) == ordinal);
+    }
+    assert(sc64_catalog_available_next(SC64_FACTION_TERRAN, 8) == 9);
+    assert(sc64_catalog_available_next(SC64_FACTION_TERRAN, 9) == -1);
+#else
     assert(sc64_catalog_playable_count(SC64_FACTION_TERRAN) == 4);
     assert(sc64_catalog_playable_at(SC64_FACTION_TERRAN, 3) == 7);
     assert(sc64_catalog_playable_ordinal(SC64_FACTION_TERRAN, 7) == 3);
     assert(sc64_catalog_available_next(SC64_FACTION_TERRAN, 6) == 7);
     assert(sc64_catalog_available_next(SC64_FACTION_TERRAN, 7) == -1);
     assert(sc64_catalog_mission_allowed(7, SC64_FACTION_TERRAN));
+#endif
 #else
     assert(sc64_catalog_playable_count(SC64_FACTION_TERRAN) == 3);
     assert(sc64_catalog_playable_at(SC64_FACTION_TERRAN, 2) == 6);
@@ -254,8 +272,32 @@ static void test_t3_paging_retention_and_reset(void) {
     assert(press(&f, KEY_A) == SC_FRONT_START_CAMPAIGN);
     assert(f.mission == 7);
 #endif
+#ifdef SC64_T6_CAMPAIGN_ENTRY
+    sc64_frontend_reset(&f, 9, SC_FRONT_RACE_TERRAN, 1, 9);
+    assert(f.faction == SC_FRONT_TERRAN && f.mission == 9 && f.mission_page == 2);
+    press(&f, KEY_A);
+    assert(f.page == SC_FRONT_MISSION && f.mission_page == 2 && f.row == 1);
+    press(&f, KEY_A);
+    assert(f.page == SC_FRONT_BRIEFING && f.mission == 9);
+    assert(press(&f, KEY_A) == SC_FRONT_START_CAMPAIGN && f.mission == 9);
+#endif
+#ifdef SC64_TERRAN_FULL_CAMPAIGN_ENTRY
+    sc64_frontend_reset(&f, 13, SC_FRONT_RACE_TERRAN, 1, 13);
+    assert(f.faction == SC_FRONT_TERRAN && f.mission == 13 && f.mission_page == 4);
+    press(&f, KEY_A);
+    assert(f.page == SC_FRONT_MISSION && f.mission_page == 4 && f.row == 1);
+    press(&f, KEY_UP);
+    assert(f.row == 0);
+    press(&f, KEY_A);
+    assert(f.page == SC_FRONT_BRIEFING && f.mission == 12);
+    assert(press(&f, KEY_A) == SC_FRONT_START_CAMPAIGN && f.mission == 12);
+#endif
     sc64_frontend_reset(&f, 30, SC_FRONT_RACE_TERRAN, 1, 99);
-#ifdef SC64_T4_CAMPAIGN_ENTRY
+#ifdef SC64_TERRAN_FULL_CAMPAIGN_ENTRY
+    assert(f.faction == SC_FRONT_TERRAN && f.mission == 4 && f.completed == 13);
+#elif defined(SC64_T6_CAMPAIGN_ENTRY)
+    assert(f.faction == SC_FRONT_TERRAN && f.mission == 4 && f.completed == 9);
+#elif defined(SC64_T4_CAMPAIGN_ENTRY)
     assert(f.faction == SC_FRONT_TERRAN && f.mission == 4 && f.completed == 7);
 #else
     assert(f.faction == SC_FRONT_TERRAN && f.mission == 4 && f.completed == 6);

@@ -30,7 +30,11 @@ SRAM_BASE = 0x0E000000
 SRAM_BYTES = 32768
 SLOT_BYTES = 16384
 DEFAULT_GENERATION = 14  # Cargo orders share the existing payload with a new identity.
-STORAGE_SCHEMAS = {13: (64, 16328), 14: (64, 16328), 15: (80, 15384)}
+STORAGE_SCHEMAS = {13: (64, 16328), 14: (64, 16328), 15: (80, 15384),
+                   16: (80, 15644), 17: (96, 15312)}
+STORAGE_UNIT_COUNTS = {13: 160, 14: 160, 15: 160, 16: 160, 17: 192}
+STORAGE_MINERAL_COUNTS = {13: 48, 14: 48, 15: 48, 16: 48, 17: 80}
+STORAGE_T6_STATE_BYTES = {16: 1384, 17: 1388}
 KEY_B, KEY_L, KEY_START = 2, 512, 8
 SCREEN_PLAY, SCREEN_PAUSE = 1, 2
 SCREEN_TITLE = 0
@@ -76,9 +80,11 @@ def press(rsp, inject: int, key: int, ticks: int = 2) -> None:
     rsp.tick(2)
 
 
-def enter_t5_campaign_menu(rsp, inject: int) -> None:
+def enter_t5_campaign_menu(rsp, inject: int, mission: int = 5) -> None:
     """Use ordinary HOME → Terran mission 5 → briefing → deploy controls."""
-    for key in MENU_ENTRY_BUTTONS:
+    # T6 is the fourth Terran page row after T3/T4/T5: RIGHT twice, then DOWN.
+    buttons = MENU_ENTRY_BUTTONS if mission == 5 else (1, 16, 16, 128, 1, 1)
+    for key in buttons:
         press(rsp, inject, key)
 
 
@@ -111,6 +117,82 @@ def persisted_rows(rsp, address: int, count: int, stride: int,
     return rows
 
 
+UNIT_COMPACT_FIELDS = (
+    ("x", 11, 0), ("y", 11, 0), ("hp", 18, 131072),
+    ("maxhp", 17, 0), ("owner", 3, 0), ("type", 6, 0),
+    ("alive", 1, 0), ("selected", 1, 0), ("cd", 16, 0),
+    ("order", 4, 0), ("tx", 11, 0), ("ty", 11, 0),
+    ("carry", 17, 65536), ("build", 10, 512), ("work_timer", 16, 0),
+    ("armor", 8, 0), ("weapon", 16, 0), ("target", 10, 512),
+    ("path_timer", 16, 0), ("path_retry", 16, 0),
+    ("path_x", 11, 0), ("path_y", 11, 0), ("shield", 17, 0),
+    ("raw_type", 9, 1), ("raw_owner", 9, 1), ("flags", 16, 0),
+    ("shield_remainder", 11, 0),
+)
+
+
+UNIT_RUNTIME_FIELDS = {
+    "x": (2, True), "y": (2, True), "hp": (4, True), "maxhp": (4, True),
+    "owner": (1, False), "type": (1, False), "alive": (1, False),
+    "selected": (1, False), "cd": (2, False), "order": (1, False),
+    "tx": (2, True), "ty": (2, True), "carry": (4, True), "build": (2, True),
+    "work_timer": (2, False), "armor": (1, False), "weapon": (2, False),
+    "target": (2, True), "path_timer": (2, False), "path_retry": (2, False),
+    "path_x": (2, True), "path_y": (2, True), "shield": (4, True),
+    "raw_type": (2, True), "raw_owner": (2, True), "flags": (2, False),
+    "shield_remainder": (2, False),
+}
+
+
+def decode_compact_unit_row(row: bytes) -> dict[str, int]:
+    """Decode one generation-17 Unit row, including values for dead slots."""
+    if len(row) != 38 or row[37] & 0x80:
+        raise ValueError("compact Unit row has invalid size or reserved bit")
+    if not any(row):
+        return {name: 0 for name, _, _ in UNIT_COMPACT_FIELDS}
+    bit = 0
+    decoded: dict[str, int] = {}
+    for name, width, bias in UNIT_COMPACT_FIELDS:
+        value = 0
+        for index in range(width):
+            value |= ((row[bit >> 3] >> (bit & 7)) & 1) << index
+            bit += 1
+        decoded[name] = value - bias
+    if bit != 303:
+        raise AssertionError("compact Unit field table must consume 303 bits")
+    return decoded
+
+
+def decode_compact_unit_rows(payload: bytes, unit_count: int) -> list[dict[str, int]]:
+    if unit_count < 1 or len(payload) < 4 + unit_count * 38:
+        raise ValueError("RaceSave payload is too short for compact Unit rows")
+    start = 4  # RaceSave.version precedes the Unit bank.
+    return [decode_compact_unit_row(payload[start + i * 38:start + (i + 1) * 38])
+            for i in range(unit_count)]
+
+
+def compact_live_unit_rows(rsp, address: int, fields: dict[str, int], count: int,
+                           stride: int) -> list[dict[str, int]]:
+    if stride != 56 or not set(UNIT_RUNTIME_FIELDS).issubset(fields):
+        raise RuntimeError("late-profile Unit DWARF layout is not the validated 56-byte schema")
+    raw = rsp.read(address, count * stride)
+    rows: list[dict[str, int]] = []
+    for slot in range(count):
+        base = slot * stride
+        rows.append({name: int.from_bytes(raw[base + fields[name]:
+                                               base + fields[name] + size],
+                                          "little", signed=signed)
+                     for name, (size, signed) in UNIT_RUNTIME_FIELDS.items()})
+    return rows
+
+
+def newest_record_payload(raw_sram: bytes, generation: int, payload_size: int) -> bytes:
+    records = save_record_info(raw_sram, payload_size, generation)
+    record = max(records, key=lambda item: item["sequence"])
+    slot = record["slot"]
+    return raw_sram[slot * SLOT_BYTES + 16:slot * SLOT_BYTES + 16 + payload_size]
+
+
 def save_record_info(raw_sram: bytes, expected_payload: int, generation: int = DEFAULT_GENERATION) -> list[dict]:
     if len(raw_sram) != SRAM_BYTES:
         raise RuntimeError(f"expected {SRAM_BYTES}-byte SRAM, got {len(raw_sram)}")
@@ -133,7 +215,7 @@ def save_record_info(raw_sram: bytes, expected_payload: int, generation: int = D
 
 
 def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int],
-             layouts: dict[str, tuple[int, dict[str, int]]]) -> dict:
+             layouts: dict[str, tuple[int, dict[str, int]]], generation: int) -> dict:
     unit_size, unit_fields = layouts["Unit"]
     building_size, building_fields = layouts["Building"]
     mineral_size, _ = layouts["Mineral"]
@@ -141,15 +223,17 @@ def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int],
     runtime_size, _ = layouts["Sc64T5RuntimeState"]
     # Compare the serialized entity banks word for word. State outside those
     # banks, such as renderer caches, is not part of the save payload.
-    invincible_units = rsp.read(sym["invincible_units"], 160)
+    unit_count = STORAGE_UNIT_COUNTS[generation]
+    invincible_units = rsp.read(sym["invincible_units"], unit_count)
     building_count = sizes["b"] // building_size
     invincible_buildings = rsp.read(sym["invincible_buildings"], building_count)
-    minerals_raw = rsp.read(sym["m"], 48 * mineral_size)
+    mineral_count = STORAGE_MINERAL_COUNTS[generation]
+    minerals_raw = rsp.read(sym["m"], mineral_count * mineral_size)
     mineral_words = mineral_size // 4
     minerals_state = [[int.from_bytes(minerals_raw[slot * mineral_size + i * 4:
                                                     slot * mineral_size + i * 4 + 4],
                                      "little", signed=True)
-                       for i in range(mineral_words)] for slot in range(48)]
+                       for i in range(mineral_words)] for slot in range(mineral_count)]
 
     required = ("screen", "frame", "race_mode", "race_human", "race_selected_mission",
                 "race_completed", "race_cols", "race_rows", "cx", "cy", "minerals", "gas",
@@ -162,7 +246,7 @@ def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int],
     missing = [name for name in required if name not in sym]
     if missing:
         raise RuntimeError(f"T5 save smoke ELF misses symbols: {', '.join(missing)}")
-    return {
+    result = {
         "screen": read_i32(rsp, sym["screen"]),
         "frame": read_i32(rsp, sym["frame"]),
         "mode": read_i32(rsp, sym["race_mode"]),
@@ -196,17 +280,29 @@ def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int],
         "geyser_count": read_i32(rsp, sym["geyser_count"]),
         "geysers": rsp.read(sym["geysers"], 4 * 8).hex(),
         "fog": rsp.read(sym["explored"], sizes["explored"]).hex(),
-        "units": persisted_rows(rsp, sym["u"], 160, unit_size, unit_fields),
+        "units": (compact_live_unit_rows(rsp, sym["u"], unit_fields,
+                                         STORAGE_UNIT_COUNTS[generation], unit_size)
+                  if generation == 17 else
+                  persisted_rows(rsp, sym["u"], STORAGE_UNIT_COUNTS[generation],
+                                 unit_size, unit_fields)),
         "buildings": persisted_rows(rsp, sym["b"], building_count, building_size, building_fields),
         "mineral_fields": minerals_state,
     }
+    if "Sc64T6MissionState" in layouts:
+        result["t6_runtime"] = rsp.read(sym["race_t6"], layouts["Sc64T6MissionState"][0]).hex()
+    return result
 def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_GENERATION,
-        menu_entry: bool = False) -> dict:
+        menu_entry: bool = False, mission: int = 5) -> dict:
     if not rom.is_file() or not elf.is_file():
         raise RuntimeError(f"Build the T5 probe ROM/ELF first: {rom} and {elf}")
     if generation not in STORAGE_SCHEMAS:
-        raise ValueError("supported T5 save generations are 13, 14 and 15")
+        raise ValueError("unsupported Terran save generation")
+    if mission not in (5, 6) or (mission == 6 and generation not in (16, 17)):
+        raise ValueError("T6 requires save generation 16 or the late Terran generation 17")
+    mission_id = mission + 3
     building_count, expected_payload = STORAGE_SCHEMAS[generation]
+    unit_count = STORAGE_UNIT_COUNTS[generation]
+    mineral_count = STORAGE_MINERAL_COUNTS[generation]
     if ticks < 1 or ticks > 10000:
         raise ValueError("--ticks must be between 1 and 10000")
     sym = symbols(elf)
@@ -218,14 +314,30 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
     missing = [name for name in required if name not in sym]
     if missing:
         raise RuntimeError(f"T5 probe ELF is missing symbols: {', '.join(missing)}")
-    expected_sizes = {"race_t5": 1340, "u": 160 * 108, "b": building_count * 100,
-                      "m": 48 * 16, "geysers": 4 * 8}
+    expected_sizes = {"race_t5": 1340, "u": unit_count * (56 if generation == 17 else 108),
+                      "b": building_count * 100, "m": mineral_count * 16,
+                      "geysers": 4 * 8}
+    if generation == 17:
+        expected_sizes["race_t6"] = 1388
     bad_sizes = {name: (sizes.get(name), expected) for name, expected in expected_sizes.items()
                  if sizes.get(name) != expected}
     if bad_sizes:
         raise RuntimeError("T5 probe ELF has unexpected runtime/entity bank sizes")
+    if (mission == 6 or generation == 17) and "race_t6" not in required:
+        required += ("race_t6",)
     layouts = {name: dwarf_struct(elf, name) for name in
                ("Unit", "Building", "Mineral", "Sc64RaceCampaignState", "Sc64T5RuntimeState")}
+    if mission == 6:
+        expected_t6_size = STORAGE_T6_STATE_BYTES[generation]
+        if sizes.get("race_t6") != expected_t6_size:
+            raise RuntimeError("T6 mission state differs from its validated schema")
+        layouts["Sc64T6MissionState"] = dwarf_struct(elf, "Sc64T6MissionState")
+        layouts["Sc64T6RuntimeState"] = dwarf_struct(elf, "Sc64T6RuntimeState")
+    if generation == 17:
+        expected_fields = set(UNIT_RUNTIME_FIELDS)
+        if (layouts["Unit"][0] != 56 or
+                not expected_fields.issubset(layouts["Unit"][1])):
+            raise RuntimeError("late-profile Unit DWARF fields differ from the named-field schema")
     if menu_entry:
         layouts["Sc64Frontend"] = dwarf_struct(elf, "Sc64Frontend")
     runtime_size = layouts["Sc64T5RuntimeState"][0]
@@ -238,7 +350,7 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
     out.mkdir(parents=True, exist_ok=True)
     out = out / f"run-{time.time_ns()}"
     out.mkdir()
-    first_name, second_name = "t5-save-source", "t5-save-fresh-load"
+    first_name, second_name = f"t{mission}-save-source", f"t{mission}-save-fresh-load"
     running = start(first_name, rom, out, sym)
     proc, sock, rsp, log = running
     source_saves = out / "saves" / first_name
@@ -247,24 +359,29 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             front_page = read_i32(rsp, sym["race_front"] + layouts["Sc64Frontend"][1]["page"])
             if read_i32(rsp, sym["screen"]) != SCREEN_TITLE or front_page != FRONT_HOME:
                 raise RuntimeError("normal T5 save smoke did not start at HOME")
-            enter_t5_campaign_menu(rsp, sym["demo_inject_keys"])
-        initial = snapshot(rsp, sym, sizes, layouts)
+            enter_t5_campaign_menu(rsp, sym["demo_inject_keys"], mission)
+        initial = snapshot(rsp, sym, sizes, layouts, generation)
         if (initial["screen"], initial["mode"], initial["mission"], initial["geometry"]) != (
-                SCREEN_PLAY, 0, 8, [96, 96]):
-            raise RuntimeError(f"internal T5 entry did not launch mission 8: {initial}")
+                SCREEN_PLAY, 0, mission_id, [96, 96]):
+            raise RuntimeError(f"entry did not launch mission {mission_id}: {initial}")
         rsp.tick(ticks)
         press(rsp, sym["demo_inject_keys"], KEY_START)
-        paused = snapshot(rsp, sym, sizes, layouts)
+        paused = snapshot(rsp, sym, sizes, layouts, generation)
         if paused["screen"] != SCREEN_PAUSE or paused["frame"] < ticks:
             raise RuntimeError(f"T5 did not reach a live pause after {ticks} ticks")
         rsp.tick(120)
-        if snapshot(rsp, sym, sizes, layouts) != paused:
+        if snapshot(rsp, sym, sizes, layouts, generation) != paused:
             raise RuntimeError("T5 state advanced while paused")
         press(rsp, sym["demo_inject_keys"], KEY_B)
         if read_i32(rsp, sym["screen"]) != SCREEN_PAUSE:
             raise RuntimeError("B did not save from the T5 pause menu")
         sram = rsp.read(SRAM_BASE, SRAM_BYTES)
         records = save_record_info(sram, save_size, generation)
+        if generation == 17:
+            saved_payload = newest_record_payload(sram, generation, save_size)
+            compact_units = decode_compact_unit_rows(saved_payload, unit_count)
+            if compact_units != paused["units"]:
+                raise RuntimeError("generation-17 compact Unit rows differ from every runtime slot")
         menu.capture(rsp, out / "t5-save-pause.png")
     finally:
         menu.stop_emulator(proc, sock, log)
@@ -286,9 +403,9 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             front_page = read_i32(rsp, sym["race_front"] + layouts["Sc64Frontend"][1]["page"])
             if read_i32(rsp, sym["screen"]) != SCREEN_TITLE or front_page != FRONT_HOME:
                 raise RuntimeError("fresh normal T5 save process did not start at HOME")
-            enter_t5_campaign_menu(rsp, sym["demo_inject_keys"])
-        fresh = snapshot(rsp, sym, sizes, layouts)
-        if (fresh["screen"], fresh["mode"], fresh["mission"]) != (SCREEN_PLAY, 0, 8):
+            enter_t5_campaign_menu(rsp, sym["demo_inject_keys"], mission)
+        fresh = snapshot(rsp, sym, sizes, layouts, generation)
+        if (fresh["screen"], fresh["mode"], fresh["mission"]) != (SCREEN_PLAY, 0, mission_id):
             raise RuntimeError("fresh T5 probe process did not enter the internal mission")
         press(rsp, sym["demo_inject_keys"], KEY_START)
         if read_i32(rsp, sym["screen"]) != SCREEN_PAUSE:
@@ -296,7 +413,7 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
         rsp.write(sym["demo_inject_keys"], struct.pack("<H", KEY_L))
         rsp.tick(2)  # Load, then stop at the next game_update entry before live simulation.
         rsp.write(sym["demo_inject_keys"], b"\0\0")  # Deliberately do not tick after release.
-        restored = snapshot(rsp, sym, sizes, layouts)
+        restored = snapshot(rsp, sym, sizes, layouts, generation)
         if restored["screen"] != SCREEN_PLAY:
             raise RuntimeError(f"L did not load T5 into play: screen={restored['screen']}")
         comparable_before = {k: v for k, v in paused.items() if k != "screen"}
@@ -305,27 +422,42 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             mismatches = [k for k in comparable_before if comparable_before[k] != comparable_loaded.get(k)]
             raise RuntimeError("fresh T5 SRAM load mismatch in: " + ", ".join(mismatches))
         rsp.tick(60)
-        continued = snapshot(rsp, sym, sizes, layouts)
+        continued = snapshot(rsp, sym, sizes, layouts, generation)
         if continued["screen"] != SCREEN_PLAY or continued["frame"] != restored["frame"] + 60:
             raise RuntimeError("loaded T5 mission did not continue advancing")
         # Read trigger fault bytes from Sc64T5RuntimeState's nested player[8].
-        _, runtime_fields = layouts["Sc64T5RuntimeState"]
+        runtime_type = "Sc64T5RuntimeState" if mission == 5 else "Sc64T6RuntimeState"
+        _, runtime_fields = layouts[runtime_type]
         player_size, player_fields = dwarf_struct(elf, "Sc64T4TriggerState")
-        runtime = rsp.read(sym["race_t5"], runtime_size)
+        if mission == 5:
+            runtime = rsp.read(sym["race_t5"], runtime_size)
+        else:
+            triggers_offset = layouts["Sc64T6MissionState"][1]["triggers"]
+            runtime = rsp.read(sym["race_t6"] + triggers_offset, layouts[runtime_type][0])
         players_offset = runtime_fields["player"]
         fault_offset = player_fields["fault"]
         fault_bytes = [runtime[players_offset + p * player_size + fault_offset]
                        for p in range(8)]
         if any(fault_bytes):
             raise RuntimeError(f"T5 trigger fault after fresh-load continuation: {fault_bytes}")
-        ai_size, ai_fields = dwarf_struct(elf, "Sc64T5AiState")
-        ai_offset = runtime_fields["ai"]
-        ai_elapsed = int.from_bytes(runtime[ai_offset + ai_fields["elapsed_ticks"]:
-                                             ai_offset + ai_fields["elapsed_ticks"] + 4], "little")
+        if mission == 5:
+            ai_size, ai_fields = dwarf_struct(elf, "Sc64T5AiState")
+            ai_offset = runtime_fields["ai"]
+            ai_elapsed = int.from_bytes(runtime[ai_offset + ai_fields["elapsed_ticks"]:
+                                                 ai_offset + ai_fields["elapsed_ticks"] + 4], "little")
+            if ai_size != 16:
+                raise RuntimeError("unexpected T5 AI state schema")
+        else:
+            ai_elapsed = None
+            clocks = [int.from_bytes(runtime[players_offset + p * player_size + player_fields["elapsed_ticks"]:
+                                                   players_offset + p * player_size + player_fields["elapsed_ticks"] + 4],
+                                     "little") for p in range(8)]
+            if clocks != [continued["frame"]] * 8:
+                raise RuntimeError(f"T6 trigger clocks diverged: {clocks}")
         campaign_elapsed = int.from_bytes(rsp.read(sym["race_campaign"] +
                                                      dwarf_struct(elf, "Sc64RaceCampaignState")[1]["elapsed_frames"],
                                                      4), "little")
-        if ai_size != 16 or ai_elapsed != continued["frame"] or campaign_elapsed != continued["frame"]:
+        if (ai_elapsed is not None and ai_elapsed != continued["frame"]) or campaign_elapsed != continued["frame"]:
             raise RuntimeError("T5 campaign/AI clocks diverged during post-load continuation")
         menu.capture(rsp, out / "t5-loaded-play.png")
         result = {
@@ -335,12 +467,15 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             "save_records": records,
             "save_generation": generation,
             "building_capacity": building_count,
+            "unit_capacity": unit_count,
+            "mineral_capacity": mineral_count,
+            "unit_row_bytes": 38 if generation == 17 else None,
             "saved_frame": paused["frame"],
             "loaded_frame": restored["frame"],
             "continued_frame": continued["frame"],
             "continuation_ticks": 60,
             "faults_after_continue": fault_bytes,
-            "mission": 8,
+            "mission": mission_id,
             "entry": "normal-campaign-menu" if menu_entry else "internal-probe-auto-entry",
             "controller_inputs": (["HOME:A", "CAMPAIGN:RIGHT", "MISSION:RIGHT",
                                    "BRIEFING:A", "DEPLOY:A", "START", "B", "START", "L"]
@@ -348,7 +483,8 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             "exact_load_state_match": True,
             "save_load_verified": True,
             "campaign_clock_matches_frame": campaign_elapsed == continued["frame"],
-            "ai_clock_matches_frame": ai_elapsed == continued["frame"],
+            "ai_clock_matches_frame": ai_elapsed == continued["frame"] if mission == 5 else None,
+            "trigger_clocks_match_frame": True if mission == 6 else None,
             "win_or_fps_claim": False,
         }
     finally:
@@ -369,9 +505,11 @@ def main() -> None:
                         help="SRAM generation; 13 is pre-cargo, 14 is T1-T5, 15 is the expanded storage probe")
     parser.add_argument("--menu-entry", action="store_true",
                         help="launch T5 from HOME through ordinary campaign/mission/briefing controls")
+    parser.add_argument("--mission", type=int, choices=(5, 6), default=5,
+                        help="Terran mission ordinal; T6 remains an internal runtime probe")
     args = parser.parse_args()
     print(json.dumps(run(args.rom, args.elf, args.output, args.ticks, args.generation,
-                         args.menu_entry), indent=2))
+                         args.menu_entry, args.mission), indent=2))
 
 
 if __name__ == "__main__":

@@ -8,17 +8,73 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
 {
     u8 used[MAX_UNITS] = { 0 };
     u8 attached[MAX_BUILDINGS] = { 0 };
+#ifdef SC64_T6_RUNTIME
+    int max_order = ORDER_UNLOAD;
+#endif
     if (!candidate || width < 1 || height < 1) return 0;
-#define CARGO_U(i, field) candidate->units[(i)][offsetof(Unit, field) / sizeof(int)]
+#ifdef SC64_T6_RUNTIME
+    if (candidate->state[0] == 0 &&
+        candidate->state[2] == SC64_T6_GLOBAL_ID) max_order = ORDER_REPAIR;
+#endif
 #ifdef SC64_T6_STORAGE
 #define CARGO_B(i, field) saved_building.field
 #else
 #define CARGO_B(i, field) candidate->buildings[(i)][offsetof(Building, field) / sizeof(int)]
 #endif
+#ifdef SC64_LATE_TERRAN_STORAGE
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        Unit actor;
+        if (!race_save_decode_unit(candidate, (unsigned)i,
+                                   (unsigned)width * 16u,
+                                   (unsigned)height * 16u, &actor)) return 0;
+        if (!actor.alive) continue;
+        int order = actor.order, carrier = actor.target;
+#ifdef SC64_T6_RUNTIME
+        if (order < ORDER_IDLE || order > max_order) return 0;
+#else
+        if (order < ORDER_IDLE || order > ORDER_UNLOAD) return 0;
+#endif
+        if (order == ORDER_UNLOAD) {
+            if (actor.type != U_DROPSHIP || actor.raw_type != 11 ||
+                carrier != -1 || actor.work_timer < 0 ||
+                actor.work_timer > SC64_TRANSPORT_UNLOAD_TICKS ||
+                actor.tx < 0 || actor.tx >= width * 16 ||
+                actor.ty < 0 || actor.ty >= height * 16) return 0;
+        }
+        if (order != ORDER_BOARD && order != ORDER_TRANSPORTED) continue;
+        unsigned space;
+        if (carrier < 0 || carrier >= MAX_UNITS || carrier == i) return 0;
+        Unit ship;
+        if (!race_save_decode_unit(candidate, (unsigned)carrier,
+                                   (unsigned)width * 16u,
+                                   (unsigned)height * 16u, &ship)) return 0;
+        int raw = actor.raw_type, type = actor.type;
+        if (!ship.alive || ship.type != U_DROPSHIP || ship.raw_type != 11 ||
+            ship.owner != actor.owner || ship.order == ORDER_BOARD ||
+            ship.order == ORDER_TRANSPORTED || (actor.flags & 2) ||
+            sc64_race_unit_flying(type) ||
+            (sc64_race_unit_from_raw(raw) != type &&
+             !(raw == 19 && type == U_RAYNOR)) ||
+            !sc64_transport_space_required_raw((unsigned)raw, &space) ||
+            space == SC64_TRANSPORT_SPACE_UNAVAILABLE) return 0;
+        if (order == ORDER_TRANSPORTED) {
+            if (actor.selected || actor.x != ship.x || actor.y != ship.y ||
+                actor.path_timer || actor.path_retry) return 0;
+            if ((unsigned)used[carrier] + space > SC64_TRANSPORT_DROPSHIP_SPACE)
+                return 0;
+            used[carrier] = (u8)(used[carrier] + space);
+        }
+    }
+#else
+#define CARGO_U(i, field) candidate->units[(i)][offsetof(Unit, field) / sizeof(int)]
     for (int i = 0; i < MAX_UNITS; ++i) {
         if (!CARGO_U(i, alive)) continue;
         int order = CARGO_U(i, order), carrier = CARGO_U(i, target);
+#ifdef SC64_T6_RUNTIME
+        if (order < ORDER_IDLE || order > max_order) return 0;
+#else
         if (order < ORDER_IDLE || order > ORDER_UNLOAD) return 0;
+#endif
         if (order == ORDER_UNLOAD) {
             if (CARGO_U(i, type) != U_DROPSHIP || CARGO_U(i, raw_type) != 11 ||
                 carrier != -1 || CARGO_U(i, work_timer) < 0 ||
@@ -49,6 +105,8 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
             used[carrier] = (u8)(used[carrier] + space);
         }
     }
+#undef CARGO_U
+#endif
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
 #ifdef SC64_T6_STORAGE
         Building saved_building;
@@ -66,16 +124,28 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
         /* An orphan stays a normal destructible building, but cannot grant
          * another Starport the attachment prerequisite. */
         if (parent < 0) continue;
+#ifdef SC64_T6_STORAGE
+        Building parent_building;
+        if (!sc64_building_save_decode(&parent_building,
+                                       &candidate->buildings[parent]) ||
+            !parent_building.alive || parent_building.type != B_STARPORT ||
+            parent_building.raw_type != 114 ||
+            parent_building.owner != saved_building.owner ||
+            saved_building.x != parent_building.x + SC64_T5_ADDON_X_OFFSET ||
+            saved_building.y != parent_building.y + SC64_T5_ADDON_Y_OFFSET ||
+            attached[parent]) return 0;
+#else
         if (!CARGO_B(parent, alive) || CARGO_B(parent, type) != B_STARPORT ||
             CARGO_B(parent, raw_type) != 114 ||
             CARGO_B(parent, owner) != CARGO_B(i, owner) ||
             CARGO_B(i, x) != CARGO_B(parent, x) + SC64_T5_ADDON_X_OFFSET ||
             CARGO_B(i, y) != CARGO_B(parent, y) + SC64_T5_ADDON_Y_OFFSET ||
             attached[parent]) return 0;
+#endif
         attached[parent] = 1;
     }
-#undef CARGO_U
 #undef CARGO_B
+#undef CARGO_U
     return 1;
 }
 #endif

@@ -170,23 +170,34 @@ race_t5_save_state_valid(const Sc64T5SaveState *state)
 }
 
 static int
-race_t5_save_mines_valid(const RaceSave *candidate)
+race_t5_save_mines_valid(const RaceSave *candidate, int width, int height)
 {
+#ifndef SC64_LATE_TERRAN_STORAGE
+    (void)width;
+    (void)height;
+#endif
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
+#ifdef SC64_LATE_TERRAN_STORAGE
+        Unit decoded;
+        if (!race_save_decode_unit(candidate, i, (unsigned)width * 16u,
+                                   (unsigned)height * 16u,
+                                   &decoded)) return 0;
+#define T5_MINE(field) decoded.field
+#else
         const s16 *row = candidate->units[i];
-        int alive = row[offsetof(Unit, alive) / sizeof(int)];
-        if (!alive || row[offsetof(Unit, type) / sizeof(int)] != U_SPIDER_MINE)
+#define T5_MINE(field) row[offsetof(Unit, field) / sizeof(int)]
+#endif
+        if (!T5_MINE(alive) || T5_MINE(type) != U_SPIDER_MINE)
             continue;
-        int carry = row[offsetof(Unit, carry) / sizeof(int)];
-        int timer = row[offsetof(Unit, work_timer) / sizeof(int)];
-        int target = row[offsetof(Unit, target) / sizeof(int)];
-        int raw = row[offsetof(Unit, raw_type) / sizeof(int)];
-        int raw_owner = row[offsetof(Unit, raw_owner) / sizeof(int)];
+        int carry = T5_MINE(carry);
+        int timer = T5_MINE(work_timer);
+        int target = T5_MINE(target);
+        int raw = T5_MINE(raw_type);
+        int raw_owner = T5_MINE(raw_owner);
         if (raw != 13 || raw_owner != SC64_T5_SOURCE_ENEMY ||
-            row[offsetof(Unit, owner) / sizeof(int)] != ENEMY ||
+            T5_MINE(owner) != ENEMY ||
             candidate->invincible_units[i] ||
-            row[offsetof(Unit, order) / sizeof(int)] != ORDER_IDLE ||
-            row[offsetof(Unit, cd) / sizeof(int)] != 0 ||
+            T5_MINE(order) != ORDER_IDLE || T5_MINE(cd) != 0 ||
             carry < 0 || carry > SC64_T5_MINE_CHASING ||
             timer < 0 || timer > SC64_T5_MINE_ARM_TICKS) return 0;
         if (carry == 0) {
@@ -197,6 +208,7 @@ race_t5_save_mines_valid(const RaceSave *candidate)
             if (timer || target != -1) return 0;
         } else if (timer || target < 0 || target >= MAX_UNITS) return 0;
     }
+#undef T5_MINE
     return 1;
 }
 
@@ -262,7 +274,7 @@ race_t5_save_candidate_valid(const RaceSave *candidate, int width, int height)
         candidate->campaign.phase > SC64_RACE_PHASE_FAILED) return 0;
     state = &candidate->t5;
     if (!race_t5_save_state_valid(state) ||
-        !race_t5_save_mines_valid(candidate) ||
+        !race_t5_save_mines_valid(candidate, width, height) ||
         state->message != candidate->campaign.message ||
         state->message_ticks != candidate->campaign.message_ticks ||
         candidate->campaign.objective_stage !=

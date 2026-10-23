@@ -91,6 +91,7 @@ LATE_BUILDING_IDS = {
     'nuclear_silo': 108, 'covert_ops': 117, 'machine_shop': 120,
     'armory_t8': 123, 'ion_cannon': 127,
     'robotics_support_bay': 171, 'shield_battery': 172,
+    'science_facility': 116, 'physics_lab': 118,
 }
 
 

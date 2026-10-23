@@ -36,10 +36,8 @@ static inline const Sc64TerranLateActorFact *sc64_terran_late_unit_fact(int type
         {69,  80,60, 1, 200,  0, 900,4,256, 20,16,19,15,1,  0,0,0,0,0,  0,0,0,0,0, 2,1 },
         {217,800, 0, 0,   1,  1,   1,0,160, 16,16,15,15,0,  0,0,0,0,0,  0,0,0,0,0, 1,1 }
     };
-    int raw = sc64_race_raw_unit(type);
-    for (unsigned i=0; i<sizeof(facts)/sizeof(facts[0]); ++i)
-        if (facts[i].raw == raw) return &facts[i];
-    return 0;
+    unsigned index = (unsigned)(type - U_SCIENCE_VESSEL);
+    return index < sizeof(facts)/sizeof(facts[0]) ? &facts[index] : 0;
 }
 
 static inline const Sc64TerranLateActorFact *sc64_terran_late_building_fact(int type)
@@ -56,12 +54,12 @@ static inline const Sc64TerranLateActorFact *sc64_terran_late_building_fact(int 
         {169,500,500,1,300,200,900,0,320,40,32,47,24,0,0,0,0,0,0,0,0,0,0,0,3,2},
         {171,450,450,1,150,100,450,0,320,32,32,32,20,0,0,0,0,0,0,0,0,0,0,0,3,2},
         {172,200,200,1,100,0,450,0,320,32,16,32,16,0,0,0,0,0,0,0,0,0,0,0,3,2},
-        {127,2000,0,1,200,0,900,0,256,48,32,47,31,0,0,0,0,0,0,0,0,0,0,0,3,2}
+        {127,2000,0,1,200,0,900,0,256,48,32,47,31,0,0,0,0,0,0,0,0,0,0,0,3,2},
+        {116,850,0,1,100,150,900,0,320,48,38,48,38,0,0,0,0,0,0,0,0,0,0,0,4,3},
+        {118,600,0,1,50,50,600,0,256,47,24,28,22,0,0,0,0,0,0,0,0,0,0,0,2,2}
     };
-    int raw = sc64_race_raw_building(type);
-    for (unsigned i=0; i<sizeof(facts)/sizeof(facts[0]); ++i)
-        if (facts[i].raw == raw) return &facts[i];
-    return 0;
+    unsigned index = (unsigned)(type - B_NUCLEAR_SILO);
+    return index < sizeof(facts)/sizeof(facts[0]) ? &facts[index] : 0;
 }
 
 static inline int sc64_terran_late_actor_bounds(int type, int building,

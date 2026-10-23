@@ -18,6 +18,10 @@ static int race_can_attack(int attacker,int target) {
             return sc64_race_unit_can_attack_air(attacker);
         }
     } else if((b[target-MAX_UNITS].flags&16)||b[target-MAX_UNITS].type==B_ZERG_BEACON)return 0;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if(target>=MAX_UNITS&&race_late_airborne(target-MAX_UNITS))
+        return attacker<0||sc64_race_unit_can_attack_air(attacker);
+#endif
     return attacker<0||sc64_race_unit_damage(attacker)>0;
 }
 #if defined(SC64_P3_DEFENSE_TARGETS) && !defined(SC64_P3_RUNTIME)
