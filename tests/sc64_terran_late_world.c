@@ -274,6 +274,24 @@ static void move_location_fallback_and_interior_translation(void)
     assert(race_late.mutable_location[3] ==
            small_dest->bottom - small_dest->top);
 
+    /* A destination spanning the entire map width has no representable
+     * inclusive placement. Reject without publishing a wrapped coordinate. */
+    {
+        Sc64TerranLateMissionState before = race_late;
+        int saved_cols = race_cols;
+        memset(&move, 0, sizeof(move));
+        move.opcode = 38;
+        move.location = 13;
+        move.player = 7;
+        move.unit = 7;
+        move.argument = 3;
+        race_cols = (int)((wide_dest->right - wide_dest->left) / 32u);
+        assert((u32)race_cols * 32u == wide_dest->right - wide_dest->left);
+        assert(sc64_terran_late_move_location(&race_late, &move, 0) == -1);
+        assert(!memcmp(&race_late, &before, sizeof(before)));
+        race_cols = saved_cols;
+    }
+
     /* A matching actor on the source-area center preserves the ordinary
      * in-bounds actor-center translation used by T7's trigger path. */
     memset(&move, 0, sizeof(move));

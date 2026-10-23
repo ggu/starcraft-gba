@@ -2,6 +2,12 @@
 
 The default StarCraft skirmish builds without ROMs, extracted assets, or external reference checkouts. The required tools are Git, GNU Make, `arm-none-eabi-gcc` with its `objcopy` and `size` tools, Clang, and Python 3.10 or newer. The project uses Python's standard library; no `pip install` step is needed. mGBA is only needed to play or run emulator workflows.
 
+The stage-by-stage campaign sections below preserve dated implementation
+history; older profile descriptions are snapshots of those stages.
+For the current combined Terran profile and qualification status, see
+[Combined Terran T1–T10 campaign](#combined-terran-t1t10-campaign) near the
+end of this guide.
+
 ## Install the tools
 
 ### macOS
@@ -296,15 +302,15 @@ python3 tools/sc64_t4_controller_replay.py \
   --elf build/starcraft-t4-combined.elf
 ```
 
-## T5 source import checks
+## T5 source import checks (historical stage)
 
 Antigan Revolt (Terran global mission ID 8) has an import-only data path. The
 private importer retains its 96×96 Badlands map and all 168 non-start UNIT
 rows: 79 units, 48 buildings and 41 mineral fields. Four start markers are
-excluded from the live placement rows. Import checks alone do not add a mission
-to the catalog or establish playability; the experimental combined T1–T5
-runtime candidate and its qualification are described below. Eleven of the
-30 missions are currently qualified as playable.
+excluded from the live placement rows. At this import-only stage, these checks
+did not add a mission to the catalog or establish playability; later combined
+campaign completion is recorded in the current summary at the end of this
+guide.
 
 After preparing the local ROM-derived input, regenerate the race tables, then
 the T5 scenario tables and run the focused source/import checks:
@@ -418,9 +424,9 @@ animation timing, THG2 sprite decorations, and original AI bytecode are still
 absent. The mine's
 source-based targeting and splash retain documented integer/timing/movement
 approximations; ordinary hero movement and sight still use the compact engine
-policies. T5 remains an experimental profile, but its normal-menu ARM win and
-fresh-process save check have passed. The qualified playable mission count is
-11 of 30.
+policies. At that stage, T5 was still an experimental profile; its normal-menu
+ARM win and fresh-process save check had passed. The campaign count then stood
+at 11 of 30.
 
 The import-only T5 checks cover retained rows, metadata and digests, bounded source actor
 rules, and isolated SetResources arithmetic. The actor facts do not establish
@@ -428,7 +434,7 @@ cloak or mine-arming behavior, and the resource helper intentionally does not
 interpret player-group selection. Those isolated fixtures do not claim T5 runtime,
 mission completion, or playability.
 
-### Combined Terran T1–T5 experimental candidate
+### Combined Terran T1–T5 experimental stage (historical)
 
 With the local Terran and T5 private inputs prepared, build the experimental
 combined profile and run its focused host checks:
@@ -478,9 +484,9 @@ SHA-256 for the frozen replay ELF is
 `1a9d2b9a6a8bebdd144502aa57c445f4a150202558a694db4a16b53143141f3a`.
 Rebuilding produces the same ROM; GCC's temporary object filename can change
 the ELF's nonloaded string table and hash without changing code or layouts.
-The build stays opt-in and does not change the standard race ROMs or combined
-T1–T4 target. Across current experimental builds, 11 of 30 missions are
-qualified as playable; 19 remain unavailable.
+At that historical stage, the build was opt-in and did not change the standard
+race ROMs or combined T1–T4 target. The experimental builds then had 11 of 30
+missions qualified as playable; 19 remained unavailable.
 
 ## T6 packed storage foundation (internal only)
 
@@ -527,9 +533,9 @@ are 2,474,724/388/245,632 bytes, IWRAM ends at `0x03004f90`, and BSS ends at
 `0x0203c108`. A fresh-process ordinary-menu T5 save test on that build saves at
 frame 123, reloads at frame 123, and continues to frame 183 with all eight
 source-player contexts fault-free and campaign/AI clocks aligned. This proves
-the new save layout on the existing T5 scenario only. T6 mission-world
-integration, controller completion, and performance qualification remain
-future work; the playable campaign count remains 11 of 30.
+the new save layout on the existing T5 scenario only. At that stage, T6
+mission-world integration, controller completion, and performance
+qualification remained future work; the campaign count was 11 of 30.
 
 The standalone T6 trigger adapter has separate host checks:
 
@@ -615,4 +621,47 @@ fly it, then choose LIFT / LAND and a clear destination to land. Airborne
 buildings cannot produce units or receive worker resource returns. Accepted
 landing goals are reserved against overlap and persist in generation-18
 saves. This support is required by The Big Push's imported airborne opening;
-it is still being exercised as part of the unqualified late campaign.
+that earlier stage note predates the completed host-controller runs recorded
+below.
+
+## Combined Terran T1–T10 campaign
+
+The canonical Terran profile integrates all ten campaign missions and the
+existing Outpost/Blood Bath skirmish setup in one ROM.
+Controller-driven host runs have completed all ten missions through the
+campaign runtime. Full normal-menu ARM replays are confirmed for T6 and T10;
+T7–T9 replays are pending. The T10 replay wins at frame 38,491 with Raynor
+alive, the Ion Cannon destroyed and zero trigger faults. It averaged 11.78
+effective fps, below the 30-fps target. Host completion alone is not
+physical-GBA qualification.
+
+Prepare the Terran inputs, then build, test and play the normal-menu ROM:
+
+```sh
+./dev sc64 prepare --rom "/path/to/your/StarCraft 64 ROM or ZIP" --profile terran
+./dev sc64 build --profile terran
+./dev sc64 test --profile terran
+./dev sc64 play --profile terran
+```
+
+This produces `build/StarCraft-Terran-GBA.gba`, an 8 MiB ROM. To build all
+three race campaigns, first prepare the shared inputs with the Terran profile,
+then run `make race-campaigns test-race-campaigns`. Preparing Zerg or Protoss
+alone is not sufficient for that aggregate target. The original 32 MiB N64
+image, imported content and generated headers remain under ignored local
+storage and must not be committed or distributed.
+
+The integrated profile uses 192 unit slots, 96 building slots and 80 mineral
+fields, with 128×128 terrain support for the largest retained maps. Its save
+generation is 18, so keep its SRAM separate from earlier campaign builds.
+The map-select skirmish still supports any human race and one to three
+opponents whose races are chosen independently. Current adaptations include
+bounded trigger execution, authored AI fallbacks and simplified presentation;
+they do not reproduce the original N64 engine or every original behavior.
+
+The frozen T10 ROM SHA-256 is
+`329793a4707e0d3c4b33ed169391b2b887374d5eb788943ceef8828604c7ce44`.
+The separately measured T6 ARM run averaged 17.26 effective fps and had a
+4.54-fps shortest sampled interval. The T6 and T10 measurements are from their
+respective frozen builds; the integrated T1–T10 campaign has no single
+full-campaign performance result yet. Physical GBA testing remains pending.

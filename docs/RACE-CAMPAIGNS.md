@@ -1,14 +1,17 @@
 # Fixed-race campaign builds
 
-The Terran, Zerg, and Protoss profiles build three separate GBA ROMs from the
-same game engine. Each standard ROM offers one race's first two playable
-missions. Separate experimental targets add the third mission for each race.
-The opt-in combined Terran T4 build adds Terran 4 through the normal campaign
-menu; the experimental combined T1–T5 candidate is documented below. Separate
-internal replay targets remain available for development.
-Across the current experimental campaign builds, Terran 1–5, Zerg 1–3 and
-Protoss 1–3 are playable. The catalog records all 30 original campaign slots;
-the remaining 19 missions still need scenario and gameplay implementation.
+The standard Terran, Zerg and Protoss targets remain separate ROMs. The
+integrated Terran runtime now has controller-driven host wins for
+all ten Terran missions. Full ARM replay evidence is available for Terran
+1–6 and 10; the full replays for Terran 7–9 are still pending. The current
+full-profile ARM T10 result is below the 30-fps target, and no physical GBA
+result is claimed. The canonical `terran` profile includes all ten Terran
+missions; Zerg and Protoss profiles each include their first three missions.
+The catalog records all 30 mission identifiers.
+
+The stage sections below preserve dated implementation history. The
+cumulative T1–T10 status and current limits near the end of this guide are the
+current summary.
 
 These are source-only profiles. The repository contains the engine, menu code, conversion tools, and authored Outpost map, but it does not contain a StarCraft 64 ROM or converted proprietary maps and graphics. To prepare a profile, supply a supported USA ROM that you are entitled to use:
 
@@ -19,18 +22,22 @@ These are source-only profiles. The repository contains the engine, menu code, c
 ./dev sc64 play --profile terran
 ```
 
+`make terran` builds the integrated campaign ROM; `make test-terran` runs its
+campaign startup/save checks and the Outpost/Blood Bath race-and-AI matrix.
+
 Use `zerg` or `protoss` in place of `terran` for the other builds. `prepare` accepts a `.z64`, `.v64`, or `.n64` image, or a ZIP containing exactly one supported image. It verifies the image and uses the pinned `sc64-maps` extractor; the first preparation requires Git and network access to fetch that tool. `status` checks preparation and build outputs. Build and test do not need an emulator; `play` requires mGBA. See [Development](DEVELOPMENT.md) for tool requirements and [SC64 development notes](SC64.md) for import details.
 
 The ROMs are `build/StarCraft-Terran-GBA.gba`, `build/StarCraft-Zerg-GBA.gba`, and `build/StarCraft-Protoss-GBA.gba`. Each profile has its own save identity, so its saves do not load as another race's campaign. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
 
-After preparing any one of these profiles, build and test all three with
-`make race-campaigns test-race-campaigns`. Their shared preparation generates
-all required local inputs. The asset-free `./dev test` also exercises all three
-frontend variants without requiring those inputs.
+To build and test all three race campaigns, first prepare the shared inputs
+with `./dev sc64 prepare --rom "/path/to/your/StarCraft 64 ROM or ZIP" --profile terran`, then run
+`make race-campaigns test-race-campaigns`. Preparing Zerg or Protoss alone
+does not generate the complete shared input set. The asset-free `./dev test`
+also exercises all three frontend variants without requiring those inputs.
 
 ## Campaign progress
 
-Each standard fixed-race campaign presents its two implemented missions and advances from the first to the second after a win. Experimental targets add missions without changing those standard builds. The catalog reserves identifiers for ten missions per race so later stages can add missions without renumbering the original six shared campaign entries. Across the experimental Terran, Zerg and Protoss builds, 11 of 30 missions are playable; the remaining 19 are not available in the menu. The full campaign remains unfinished.
+The Terran profile presents ten missions; Zerg and Protoss present their first three missions and advance after a win. Controller-driven host runs complete 16 of the 30 missions: Terran 1–10, Zerg 1–3 and Protoss 1–3. Terran 7–9 still need full ARM replay qualification, and the other 14 missions have no completed runtime.
 
 Terran 3, Desperate Alliance, has an experimental runtime behind
 `SC64_T3_ENABLED`. After preparing a race profile, build and check it with:
@@ -51,10 +58,10 @@ AI scripts; trigger-created extraction units are not implemented. Sixteen unit
 slots are reserved from enemy production for the player. The new save layout
 rejects older saves; use a separate save file for the experimental ROM.
 
-A controller-only host run completes the full survival objective. The standard
-`terran` build still contains only its first two missions. The combined T4
-experimental target described below includes this third mission and Jacobs
-Installation in the normal campaign flow. Performance remains below the
+A controller-only host run completes the full survival objective. At this
+earlier implementation stage, the `terran` build contained its first two
+missions. The combined T4 target described below added this third mission and
+Jacobs Installation to the normal campaign flow. Performance remains below the
 30-fps target; see the measured builds in [Validation](VALIDATION.md).
 
 Zerg 3, The New Dominion, also has an experimental build:
@@ -214,14 +221,12 @@ combat. Sanitizer fixtures cover region-gated resource grants, the rebel-base
 sequence, and original victory/defeat predicates through direct world setup.
 These are engine checks, not ordinary-controller completion evidence.
 
-The standard race profiles and combined T1–T4 ROM still exclude T5. The
-experimental combined T1–T5 build has a normal-menu entry and its controller
-win and fresh-process generation-14 save check pass. T5 is counted in the
-experimental campaign total, while the standard ROMs remain unchanged. See
-[the development workflow](DEVELOPMENT.md#combined-terran-t1t5-experimental-candidate)
-for the candidate build and evidence.
+At that stage, the standard profiles and combined T1–T4 ROM excluded T5. The
+combined T1–T5 build then added a normal-menu entry and passed its controller
+win and fresh-process generation-14 save check. The current integrated profile
+and qualification status are summarized below.
 
-## Combined Terran T1–T5 experimental candidate
+## Combined Terran T1–T5 experimental stage (historical)
 
 After preparing the local Terran inputs, build and run the focused host checks
 with:
@@ -242,7 +247,7 @@ The ARM run averages 20.85 effective fps, with an 11.95-fps worst counted
 observer interval, below the 30-fps target. This is emulator evidence, not
 physical-GBA performance validation.
 
-## T6 packed storage foundation (not playable)
+## T6 packed-storage milestone (historical)
 
 The internal T6 storage probe retains the Norad II map's 96×96 terrain and
 216 non-start UNIT placements, including 35 mineral fields and three geysers. The importer
@@ -253,13 +258,30 @@ minerals. Packed building rows use a 15,384-byte save record and generation
 15, distinct from T5 generation 14.
 See [the preparation and verification commands](DEVELOPMENT.md#t6-packed-storage-foundation-internal-only).
 
-Generation-15 persistence has passed a fresh-process T5 normal-menu save and
-resume check on the frozen storage-probe build. This does not exercise T6
-mission logic. A separate host-only trigger adapter now retains all eight
-source-slot contexts and delegates world effects through typed callbacks;
-its mission-world bindings, controller completion, and performance remain
-unfinished/unverified. T6 is not in the campaign menu. The campaign
-therefore remains at 11 playable missions out of 30, with 19 unavailable.
+This section records the earlier storage-only step. Later T6 world integration
+and controller-completion results supersede its statement that T6 is not in the
+campaign runtime.
+
+## Terran T6–T10 controller status
+
+The late Terran runtime has host-controller wins for Terran missions 6–10;
+combined with the previously completed missions 1–5, all ten Terran missions
+now have host completion runs. T6 also has a full normal-menu ARM win at
+frame 21,046, averaging 17.26 effective fps. T7, T8 and T9 full ARM replays
+remain pending.
+
+The frozen full ARM replay for T10 wins at frame 38,491: the Ion Cannon
+(source raw type 127) is destroyed, Raynor is alive and the trigger fault
+count is zero. The run averages 11.78 effective fps, below the 30-fps target.
+It uses frozen ROM SHA-256
+`329793a4707e0d3c4b33ed169391b2b887374d5eb788943ceef8828604c7ce44`.
+This is emulator evidence; physical GBA testing has not been performed.
+
+Missions 7–10 use bounded authored AI behavior where the original AI script
+bodies are not implemented. This is documented adaptation behavior, not a
+claim of original N64 AI execution. These missions are available through the
+canonical normal-menu `terran` profile and the `./dev sc64 ... --profile
+terran` workflow documented in [Development](DEVELOPMENT.md).
 
 ## Current limits
 
@@ -370,7 +392,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Standard builds enable two campaign missions per race. The experimental builds above make 11 missions playable across the three races; the other 19 still need scenario and gameplay implementation.
+- Host controller runs complete 16 missions: Terran 1–10, Zerg 1–3 and Protoss 1–3. Full ARM replay qualification for Terran 7–9 remains pending; 14 campaign missions have no completed runtime.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
-- Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build these three profiles until that preparation has been done.
+- Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

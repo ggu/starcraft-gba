@@ -55,7 +55,7 @@ static void fill_unused_unit_slots(void) {
                            24 + ((i - start) / 12) * 8);
         assert(n >= 0);
     }
-    assert(alive_units() == 160);
+    assert(alive_units() == MAX_UNITS);
     assert(alive_buildings() == 31);
 }
 
@@ -146,7 +146,7 @@ int main(void) {
     save_round_trip();
     corrupt_t3_payload_is_atomic();
     previous_stage_save_is_rejected();
-    printf("T3 save adapter: 160-unit pool, 31 buildings, source roster, corrupted payload atomicity and previous-stage version rejection pass (%zu bytes).\n",
-           sizeof(RaceSave));
+    printf("T3 save adapter: %d-unit pool, 31 buildings, source roster, corrupted payload atomicity and previous-stage version rejection pass (%zu bytes).\n",
+           MAX_UNITS, sizeof(RaceSave));
     return 0;
 }

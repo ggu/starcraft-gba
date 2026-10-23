@@ -870,7 +870,10 @@ sc64_terran_late_move_location(Sc64TerranLateMissionState *state,
     u32 width = (u32)(destination.right - destination.left);
     u32 height = (u32)(destination.bottom - destination.top);
     u32 max_x = (u32)race_cols * 32u, max_y = (u32)race_rows * 32u;
-    if (!width || !height || width > max_x || height > max_y) return -1;
+    /* A span equal to the full coordinate bound cannot fit inside inclusive
+     * [0,bound-1] coordinates without losing a cell; fail before any signed
+     * conversion or state write rather than underflowing the far-edge clamp. */
+    if (!width || !height || width >= max_x || height >= max_y) return -1;
     s32 left = (s32)found_x - (s32)(width / 2u);
     s32 top = (s32)found_y - (s32)(height / 2u);
     if (left < 0) left = 0;
