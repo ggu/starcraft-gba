@@ -628,12 +628,17 @@ below.
 
 The canonical Terran profile integrates all ten campaign missions and the
 existing Outpost/Blood Bath skirmish setup in one ROM.
-Controller-driven host runs have completed all ten missions through the
-campaign runtime. Full normal-menu ARM replays are confirmed for T6 and T10;
-T7–T9 replays are pending. The T10 replay wins at frame 38,491 with Raynor
-alive, the Ion Cannon destroyed and zero trigger faults. It averaged 11.78
-effective fps, below the 30-fps target. Host completion alone is not
-physical-GBA qualification.
+Controller-driven host runs and normal-menu ARM replays have completed all ten
+missions across the recorded frozen builds. T7, T8 and T10 have canonical-ROM
+ARM wins; T9's ARM win is on the earlier frozen ROM listed below. On the
+canonical ROM, T7 wins at frame 12,151 (15.76 effective fps), T8 at frame
+86,596 (14.37 fps), and T10 at frame 38,491 (11.78 fps). T10 ends with Raynor
+alive, the Ion Cannon destroyed and zero trigger faults. These emulator rates
+are below the 30-fps target; physical-GBA qualification is not claimed.
+All six fresh-process generation-18 saves for missions T5–T10 also pass on
+the canonical ROM: each loads exactly at frame 123, continues to frame 183
+with zero faults, and retains the mission-specific late state exactly for
+T7–T10.
 
 Prepare the Terran inputs, then build, test and play the normal-menu ROM:
 
@@ -659,9 +664,12 @@ opponents whose races are chosen independently. Current adaptations include
 bounded trigger execution, authored AI fallbacks and simplified presentation;
 they do not reproduce the original N64 engine or every original behavior.
 
-The frozen T10 ROM SHA-256 is
-`329793a4707e0d3c4b33ed169391b2b887374d5eb788943ceef8828604c7ce44`.
-The separately measured T6 ARM run averaged 17.26 effective fps and had a
-4.54-fps shortest sampled interval. The T6 and T10 measurements are from their
-respective frozen builds; the integrated T1–T10 campaign has no single
-full-campaign performance result yet. Physical GBA testing remains pending.
+The canonical ROM SHA-256 is
+`00f0939878a51320b8fc252d69b2947ffc442e6d3cc39efa12d0d118511bf3ee`.
+T9's ARM replay used earlier frozen ROM
+`329793a4707e0d3c4b33ed169391b2b887374d5eb788943ceef8828604c7ce44`; it
+wins at frame 358,906 with all 43 Protoss Force2 buildings destroyed, all 21
+Zerg Force3 buildings intact, Kerrigan alive, all eight trigger clocks at frame 358,906,
+zero faults, and 16.94 effective fps. T6's separately qualified ARM replay
+averaged 17.26 fps. All reported campaign rates are below target; physical
+GBA testing remains pending.

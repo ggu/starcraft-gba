@@ -34,7 +34,7 @@ STORAGE_SCHEMAS = {13: (64, 16328), 14: (64, 16328), 15: (80, 15384),
                    16: (80, 15644), 17: (96, 15312), 18: (96, None)}
 STORAGE_UNIT_COUNTS = {13: 160, 14: 160, 15: 160, 16: 160, 17: 192, 18: 192}
 STORAGE_MINERAL_COUNTS = {13: 48, 14: 48, 15: 48, 16: 48, 17: 80, 18: 80}
-STORAGE_T6_STATE_BYTES = {16: 1384, 17: 1388}
+STORAGE_T6_STATE_BYTES = {16: 1384, 17: 1388, 18: 1388}
 KEY_B, KEY_L, KEY_START = 2, 512, 8
 SCREEN_PLAY, SCREEN_PAUSE = 1, 2
 SCREEN_TITLE = 0
@@ -103,6 +103,44 @@ def late_save_state(payload: bytes, save_fields: dict[str, int], late_size: int)
     if offset is None or offset < 0 or late_size <= 0 or offset + late_size > len(payload):
         raise ValueError("DWARF late Terran save member is outside RaceSave")
     return payload[offset:offset + late_size]
+
+
+def active_save_member(mission: int) -> str:
+    """Return the RaceSave union member used by this campaign ordinal."""
+    if mission == 5:
+        return "t5"
+    if mission == 6:
+        return "t6"
+    if 7 <= mission <= 10:
+        return "terran_late"
+    raise ValueError("save smoke supports mission ordinals 5 through 10")
+
+
+def race_save_union_offset(save_fields: dict[str, int]) -> int:
+    """Locate the anonymous campaign-state union after the final named field."""
+    end = save_fields.get("t3_buildings_killed")
+    if end is None:
+        raise ValueError("RaceSave DWARF is missing the preceding T3 field")
+    # t3_buildings_killed is a u16; RaceSave aligns the following state union
+    # to four bytes. The exact offset is checked against payload bounds below.
+    return (end + 2 + 3) & ~3
+
+
+def save_union_member(payload: bytes, save_fields: dict[str, int],
+                      mission: int, member_sizes: dict[str, int]) -> tuple[bytes, bytes]:
+    """Return active bytes and padding; require the unused union tail to be zero."""
+    name = active_save_member(mission)
+    size = member_sizes.get(name, 0)
+    offset = race_save_union_offset(save_fields)
+    union_size = max(member_sizes.values(), default=0)
+    end = offset + union_size
+    if size <= 0 or size > union_size or end > len(payload):
+        raise ValueError("RaceSave union member is outside the serialized payload")
+    active = payload[offset:offset + size]
+    padding = payload[offset + size:end]
+    if any(padding):
+        raise ValueError(f"inactive RaceSave union tail for {name} is not canonical zero")
+    return active, padding
 
 
 def late_state_summary(raw: bytes, late_fields: dict[str, int],
@@ -272,6 +310,7 @@ def save_record_info(raw_sram: bytes, expected_payload: int, generation: int = D
 
 def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int],
              layouts: dict[str, tuple[int, dict[str, int]]], generation: int) -> dict:
+    mission = read_i32(rsp, sym["race_selected_mission"]) - 3
     unit_size, unit_fields = layouts["Unit"]
     building_size, building_fields = layouts["Building"]
     mineral_size, _ = layouts["Mineral"]
@@ -344,9 +383,9 @@ def snapshot(rsp, sym: dict[str, int], sizes: dict[str, int],
         "buildings": persisted_rows(rsp, sym["b"], building_count, building_size, building_fields),
         "mineral_fields": minerals_state,
     }
-    if "Sc64T6MissionState" in layouts:
+    if mission == 6 and "Sc64T6MissionState" in layouts:
         result["t6_runtime"] = rsp.read(sym["race_t6"], layouts["Sc64T6MissionState"][0]).hex()
-    if generation >= 18:
+    if generation >= 18 and mission >= 7:
         late_size, late_fields = layouts["Sc64TerranLateMissionState"]
         late_raw = rsp.read(sym["race_late"], late_size)
         trigger_size, trigger_fields = layouts["Sc64TerranLateRuntimeState"]
@@ -368,8 +407,6 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
         raise ValueError("T6 requires save generation 16 or newer")
     if mission >= 7 and generation != 18:
         raise ValueError("T7-T10 require late Terran save generation 18")
-    if generation == 18 and mission < 7:
-        raise ValueError("generation 18 is reserved for late Terran missions")
     mission_id = mission + 3
     building_count, expected_payload = STORAGE_SCHEMAS[generation]
     unit_count = STORAGE_UNIT_COUNTS[generation]
@@ -417,6 +454,8 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
     if runtime_size != 1340:
         raise RuntimeError("T5 runtime or geyser layout differs from the validated save schema")
     if generation >= 18:
+        layouts["Sc64T5SaveState"] = dwarf_struct(elf, "Sc64T5SaveState")
+        layouts["Sc64T6MissionState"] = dwarf_struct(elf, "Sc64T6MissionState")
         layouts["Sc64TerranLateMissionState"] = dwarf_struct(elf, "Sc64TerranLateMissionState")
         layouts["Sc64TerranLateRuntimeState"] = dwarf_struct(elf, "Sc64TerranLateRuntimeState")
         layouts["Sc64T4TriggerState"] = dwarf_struct(elf, "Sc64T4TriggerState")
@@ -426,9 +465,13 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
     if expected_payload is not None and save_size != expected_payload:
         raise RuntimeError(f"expected {expected_payload}-byte generation-{generation} payload, got {save_size}")
     if generation >= 18:
-        late_offset = save_fields.get("terran_late")
+        union_offset = race_save_union_offset(save_fields)
         late_size = layouts["Sc64TerranLateMissionState"][0]
-        if late_offset is None or late_offset + late_size > save_size:
+        member_sizes = {"t5": layouts["Sc64T5SaveState"][0],
+                        "t6": layouts["Sc64T6MissionState"][0],
+                        "terran_late": late_size}
+        union_size = max(member_sizes.values())
+        if union_offset + union_size != save_size:
             raise RuntimeError("generation-18 RaceSave DWARF misses its late state union member")
 
     out.mkdir(parents=True, exist_ok=True)
@@ -472,12 +515,22 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             if compact_units != paused["units"]:
                 raise RuntimeError(f"generation-{generation} compact Unit rows differ from every runtime slot")
             if generation >= 18:
-                late_size = layouts["Sc64TerranLateMissionState"][0]
-                late_payload_matches_runtime = (
-                    late_save_state(saved_payload, save_fields, late_size).hex() ==
-                    paused["terran_late_runtime"])
-                if not late_payload_matches_runtime:
-                    raise RuntimeError("generation-18 saved late state differs from runtime bytes")
+                member_sizes = {"t5": layouts["Sc64T5SaveState"][0],
+                                "t6": layouts["Sc64T6MissionState"][0],
+                                "terran_late": layouts["Sc64TerranLateMissionState"][0]}
+                active_payload, _ = save_union_member(saved_payload, save_fields,
+                                                       mission, member_sizes)
+                member = active_save_member(mission)
+                if member == "terran_late":
+                    late_payload_matches_runtime = (
+                        active_payload.hex() == paused["terran_late_runtime"])
+                    if not late_payload_matches_runtime:
+                        raise RuntimeError("generation-18 saved late state differs from runtime bytes")
+                elif member == "t6":
+                    if active_payload.hex() != paused["t6_runtime"]:
+                        raise RuntimeError("generation-18 saved T6 state differs from runtime bytes")
+                # T5 uses a compact union member, so its exact bytes are
+                # checked by decoding and comparing all runtime state fields.
         menu.capture(rsp, out / "t5-save-pause.png")
     finally:
         menu.stop_emulator(proc, sock, log)
@@ -598,16 +651,16 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             "campaign_clock_matches_frame": campaign_elapsed == continued["frame"],
             "ai_clock_matches_frame": ai_elapsed == continued["frame"] if mission == 5 else None,
             "trigger_clocks_match_frame": True if mission >= 6 else None,
-            "late_state_bytes": layouts["Sc64TerranLateMissionState"][0] if generation >= 18 else None,
-            "late_emitter_unit": paused["terran_late"]["emitter_unit"] if generation >= 18 else None,
-            "late_emitter_carrier": paused["terran_late"]["emitter_carrier"] if generation >= 18 else None,
-            "late_active_flight_goals": paused["terran_late"]["active_flight_goals"] if generation >= 18 else None,
-            "late_flight_goals": paused["terran_late"]["flight_goals"] if generation >= 18 else None,
-            "late_trigger_clocks": clocks if generation >= 18 else None,
-            "late_trigger_faults": fault_bytes if generation >= 18 else None,
+            "late_state_bytes": layouts["Sc64TerranLateMissionState"][0] if mission >= 7 else None,
+            "late_emitter_unit": paused["terran_late"]["emitter_unit"] if mission >= 7 else None,
+            "late_emitter_carrier": paused["terran_late"]["emitter_carrier"] if mission >= 7 else None,
+            "late_active_flight_goals": paused["terran_late"]["active_flight_goals"] if mission >= 7 else None,
+            "late_flight_goals": paused["terran_late"]["flight_goals"] if mission >= 7 else None,
+            "late_trigger_clocks": clocks if mission >= 7 else None,
+            "late_trigger_faults": fault_bytes if mission >= 7 else None,
             "late_payload_matches_runtime_bytes": late_payload_matches_runtime,
             "late_state_exact_load_match": (paused.get("terran_late_runtime") ==
-                                               restored.get("terran_late_runtime")) if generation >= 18 else None,
+                                               restored.get("terran_late_runtime")) if mission >= 7 else None,
             "win_or_fps_claim": False,
         }
     finally:

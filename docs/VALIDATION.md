@@ -1693,12 +1693,13 @@ The canonical `terran` preparation and build workflow now includes the full
 Terran campaign. The final frozen 8 MiB ROM is
 `build/StarCraft-Terran-GBA.gba`, SHA-256
 `00f0939878a51320b8fc252d69b2947ffc442e6d3cc39efa12d0d118511bf3ee`.
-Its generation-18 campaign save is 15,816 bytes, with 1,892 bytes of late
-mission state. The unchanged memory guards pass: IWRAM ends at `0x03004fb8`
+The recorded build uses ARM GCC 16.2.0 and GNU Binutils
+2.47.20260726. Its generation-18 campaign save is 15,816 bytes, with 1,892
+bytes of late mission state. The unchanged memory guards pass: IWRAM ends at `0x03004fb8`
 and BSS at `0x0203dc40`.
 
 Real `./dev sc64 prepare --rom PATH --profile terran`, the full Terran build/status flow,
-and the complete regression suite passed. The run covered 172 Python tests,
+and the complete regression suite passed. The run covered 175 Python tests,
 the default and unified builds/tests, all ten Terran startup/save fixtures,
 and all 18 Outpost/Blood Bath combinations (three human races and one to
 three independently selected AI races). Host controller runs won all ten
@@ -1720,17 +1721,30 @@ Repeated host winning traces for the late missions are deterministic:
 | T9 | 358,906 | `d44ea1acd3e882d06fce333c47480fe6c7034033d9761b3b42a7b32a9538e552` |
 | T10 | 38,491 | `9a7d0aca12c46b5682247fa3d015076364cb60804a19559699c62ae9eb900514` |
 
-ARM evidence is narrower than host completion. The earlier generation-16 T6
-normal-menu replay won at frame 21,046 and averaged 17.26 effective fps. An
-earlier frozen generation-18 T10 ROM
-(`329793a4707e0d3c4b33ed169391b2b887374d5eb788943ceef8828604c7ce44`) won
-at frame 38,491 and averaged 11.78 effective fps. A full T9 replay on that
-older ROM is still in progress; its 140,000-tick checkpoint had zero trigger
-faults and all 21 Zerg buildings intact, so it is not a terminal result. The
-canonical-ROM ARM replays for T7, T8 and T10 and fresh generation-18 save checks for
-T5–T10 are queued, not yet qualified.
+Full normal-menu ARM wins are now recorded for all ten Terran missions across
+the available frozen builds. The earlier generation-16 T6 replay won at frame
+21,046 and averaged 17.26 effective fps. The canonical ROM's T7, T8 and T10
+replays all won with zero trigger faults: T7 at frame 12,151 (15.76 effective
+fps), T8 at frame 86,596 (14.37 fps), and T10 at frame 38,491 (11.78 fps).
+T10 ends with Raynor alive and the Ion Cannon destroyed.
+
+T9's full normal-menu ARM win is on the earlier frozen generation-18 ROM
+`329793a4707e0d3c4b33ed169391b2b887374d5eb788943ceef8828604c7ce44`, not the
+canonical ROM. It completed at frame 358,906 with all 43 Protoss Force2
+buildings destroyed, all 21 Zerg Force3 buildings intact, Kerrigan alive, all eight
+trigger clocks aligned to frame 358,906 and zero faults; it averaged 16.94
+effective fps. Thus every Terran mission has a recorded ARM win, but T9 has
+not been replayed on the final canonical image.
+
+All six fresh-process generation-18 saves for T5–T10 passed on the canonical
+ROM. Each 15,816-byte save loaded at frame 123, continued to frame 183, matched
+the live state exactly and reported zero faults. Campaign clocks matched in
+all six; T6–T10 trigger clocks matched, and the saved 1,892-byte late mission
+payload matched runtime state exactly for T7–T10. T5–T10 saves used the
+canonical ROM SHA above and the matching ELF (SHA-256
+`5399b4318967a71814874c006d4cb2f2f7711e68be431ee0c6ef76446bd7b26d`).
 
 Mission adapters use bounded authored AI behavior where original N64 AI
 scripts are unavailable; these results do not claim native AI execution.
-Measured emulator rates remain below the 30-fps target, and no physical GBA
-hardware result is claimed.
+All measured campaign emulator rates remain below the 30-fps target, and no
+physical GBA hardware result is claimed.

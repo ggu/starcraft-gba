@@ -2,7 +2,7 @@
 
 StarCraft: GBA Outpost is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
 
-Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. Controller-driven host runs have completed all ten Terran missions. Full normal-menu ARM replays are confirmed for Terran 1–6 and 10; Terran 7–9 are still pending. The T10 replay averaged 11.78 effective fps, below the 30-fps target. This is a GBA adaptation built from a user-supplied, verified StarCraft 64 USA ROM. It does not execute or reproduce the original N64 engine. Imported maps and graphics stay local and are not part of the source release.
+Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. Controller-driven host runs and normal-menu ARM replays have now completed all ten Terran missions across the recorded frozen builds. T7, T8 and T10 have full ARM wins on the canonical Terran ROM; T9's ARM win is on an earlier frozen ROM. The measured late-mission rates remain below the 30-fps target. This is a GBA adaptation built from a user-supplied, verified StarCraft 64 USA ROM. It does not execute or reproduce the original N64 engine. Imported maps and graphics stay local and are not part of the source release.
 
 ## Get started
 
@@ -39,7 +39,7 @@ This profile requires a legally obtained StarCraft 64 USA ROM that you are entit
 ./dev sc64 play --profile terran
 ```
 
-The canonical Terran profile includes all ten Terran campaign missions. Preparing it also generates the shared inputs needed by `make race-campaigns`; preparing only Zerg or Protoss does not generate the complete shared input set. The integrated ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. Full ARM replay qualification is complete for Terran 1–6 and 10; Terran 7–9 remain pending, and no physical GBA result is claimed.
+The canonical Terran profile includes all ten Terran campaign missions. Preparing it also generates the shared inputs needed by `make race-campaigns`; preparing only Zerg or Protoss does not generate the complete shared input set. The integrated ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. Full normal-menu ARM wins are recorded for all ten Terran missions across frozen builds: T7, T8 and T10 on the canonical ROM, and T9 on an earlier ROM. No physical GBA result is claimed.
 
 The first preparation fetches the pinned `sc64-maps` extractor into ignored `references/`, so Git and network access are needed. ROMs, extracted data, generated headers, captures containing imported art, and saves stay in ignored local directories; do not commit or distribute them. Contributors can work on the default skirmish without this profile. See [the unified guide](docs/SC64-UNIFIED.md) and [development](docs/DEVELOPMENT.md) for details and troubleshooting.
 

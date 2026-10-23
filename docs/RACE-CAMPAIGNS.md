@@ -1,13 +1,15 @@
 # Fixed-race campaign builds
 
 The standard Terran, Zerg and Protoss targets remain separate ROMs. The
-integrated Terran runtime now has controller-driven host wins for
-all ten Terran missions. Full ARM replay evidence is available for Terran
-1–6 and 10; the full replays for Terran 7–9 are still pending. The current
+integrated Terran runtime now has controller-driven host wins and recorded
+normal-menu ARM wins for all ten Terran missions across frozen builds. T7,
+T8 and T10 have full ARM wins on the canonical ROM; T9's full ARM win is on an
+earlier frozen ROM. The current
 full-profile ARM T10 result is below the 30-fps target, and no physical GBA
 result is claimed. The canonical `terran` profile includes all ten Terran
-missions; Zerg and Protoss profiles each include their first three missions.
-The catalog records all 30 mission identifiers.
+missions. The standard Zerg and Protoss profiles include their first two
+missions; opt-in `zerg-z3` and `protoss-p3` builds add a third mission. The
+catalog records all 30 mission identifiers.
 
 The stage sections below preserve dated implementation history. The
 cumulative T1–T10 status and current limits near the end of this guide are the
@@ -37,7 +39,11 @@ also exercises all three frontend variants without requiring those inputs.
 
 ## Campaign progress
 
-The Terran profile presents ten missions; Zerg and Protoss present their first three missions and advance after a win. Controller-driven host runs complete 16 of the 30 missions: Terran 1–10, Zerg 1–3 and Protoss 1–3. Terran 7–9 still need full ARM replay qualification, and the other 14 missions have no completed runtime.
+The Terran profile presents ten missions. Standard Zerg and Protoss profiles
+present two each; their opt-in `zerg-z3` and `protoss-p3` builds present three
+each. Controller-driven host runs complete 16 of the 30 missions across these
+profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. The other 14 missions have
+no completed runtime.
 
 Terran 3, Desperate Alliance, has an experimental runtime behind
 `SC64_T3_ENABLED`. After preparing a race profile, build and check it with:
@@ -265,17 +271,21 @@ campaign runtime.
 ## Terran T6–T10 controller status
 
 The late Terran runtime has host-controller wins for Terran missions 6–10;
-combined with the previously completed missions 1–5, all ten Terran missions
-now have host completion runs. T6 also has a full normal-menu ARM win at
-frame 21,046, averaging 17.26 effective fps. T7, T8 and T9 full ARM replays
-remain pending.
+combined with missions 1–5, all ten missions have host completion runs and
+normal-menu ARM wins across the recorded frozen builds. T6's earlier
+generation-16 ARM run won at frame 21,046 and averaged 17.26 effective fps.
+The canonical ROM also has full T7, T8 and T10 ARM wins.
 
-The frozen full ARM replay for T10 wins at frame 38,491: the Ion Cannon
-(source raw type 127) is destroyed, Raynor is alive and the trigger fault
-count is zero. The run averages 11.78 effective fps, below the 30-fps target.
-It uses frozen ROM SHA-256
-`329793a4707e0d3c4b33ed169391b2b887374d5eb788943ceef8828604c7ce44`.
-This is emulator evidence; physical GBA testing has not been performed.
+On the canonical ROM, T7 wins at frame 12,151 and averages 15.76 effective
+fps; T8 wins at frame 86,596 and averages 14.37 fps; T10 wins at frame
+38,491 and averages 11.78 fps. T10 ends with the Ion Cannon (source raw type
+127) destroyed, Raynor alive and zero trigger faults. T9's ARM win is from
+the earlier frozen ROM SHA-256
+`329793a4707e0d3c4b33ed169391b2b887374d5eb788943ceef8828604c7ce44`: it
+finishes at frame 358,906 with all 43 Protoss Force2 buildings destroyed, all
+21 Zerg Force3 buildings intact, Kerrigan alive, all eight trigger clocks aligned and
+zero faults, averaging 16.94 fps. These emulator results are below the
+30-fps target; physical GBA testing has not been performed.
 
 Missions 7–10 use bounded authored AI behavior where the original AI script
 bodies are not implemented. This is documented adaptation behavior, not a
@@ -430,7 +440,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Host controller runs complete 16 missions: Terran 1–10, Zerg 1–3 and Protoss 1–3. Full ARM replay qualification for Terran 7–9 remains pending; 14 campaign missions have no completed runtime.
+- Host controller runs complete 16 missions: Terran 1–10, Zerg 1–3 and Protoss 1–3. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds; T9's win is on an earlier ROM. The other 14 campaign missions have no completed runtime.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

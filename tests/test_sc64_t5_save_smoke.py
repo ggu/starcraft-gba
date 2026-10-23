@@ -114,6 +114,48 @@ class T5SaveSmokeMenuTests(unittest.TestCase):
         self.assertEqual(smoke.STORAGE_SCHEMAS[18], (96, None))
         self.assertEqual(smoke.STORAGE_UNIT_COUNTS[18], 192)
         self.assertEqual(smoke.STORAGE_MINERAL_COUNTS[18], 80)
+        self.assertEqual(smoke.STORAGE_T6_STATE_BYTES[18], 1388)
+
+    def test_generation18_selects_the_active_mission_union_member(self):
+        self.assertEqual([smoke.active_save_member(mission) for mission in range(5, 11)],
+                         ["t5", "t6", "terran_late", "terran_late",
+                          "terran_late", "terran_late"])
+        with self.assertRaises(ValueError):
+            smoke.active_save_member(4)
+
+    def test_generation18_union_extraction_checks_padding_for_all_members(self):
+        fields = {"t3_buildings_killed": 8}
+        offset = smoke.race_save_union_offset(fields)
+        self.assertEqual(offset, 12)
+        sizes = {"t5": 4, "t6": 8, "terran_late": 12}
+        payload = bytearray(offset + 12)
+        payload[offset:offset + 4] = b"T5!!"
+        active, padding = smoke.save_union_member(bytes(payload), fields, 5, sizes)
+        self.assertEqual(active, b"T5!!")
+        self.assertEqual(padding, bytes(8))
+
+        payload[offset:offset + 8] = b"T6STATE!"
+        active, padding = smoke.save_union_member(bytes(payload), fields, 6, sizes)
+        self.assertEqual(active, b"T6STATE!")
+        self.assertEqual(padding, bytes(4))
+
+        payload[offset:offset + 12] = b"LATE-STATE!!"
+        active, padding = smoke.save_union_member(bytes(payload), fields, 7, sizes)
+        self.assertEqual(active, b"LATE-STATE!!")
+        self.assertEqual(padding, b"")
+
+        payload[offset + 5] = 1
+        with self.assertRaisesRegex(ValueError, "inactive RaceSave union tail"):
+            smoke.save_union_member(bytes(payload), fields, 5, sizes)
+
+    def test_generation18_union_extraction_rejects_short_or_missing_layout(self):
+        fields = {"t3_buildings_killed": 8}
+        with self.assertRaises(ValueError):
+            smoke.save_union_member(bytes(20), fields, 5,
+                                    {"t5": 4, "t6": 8, "terran_late": 12})
+        with self.assertRaises(ValueError):
+            smoke.save_union_member(bytes(24), fields, 5,
+                                    {"t5": 0, "t6": 8, "terran_late": 12})
 
     def test_late_state_payload_extracts_exact_union_member(self):
         payload = bytes(range(256)) * 8
