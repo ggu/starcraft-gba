@@ -227,6 +227,9 @@ sc64_t4_trigger_condition(const Sc64T4TriggerState *s,
     if (c->mask || (c->flags & ~0x12u)) return -1;
     switch (c->opcode) {
     case 2: case 3: /* Command / Bring: world/type/owner/elevation queries. */
+#ifdef SC64_T6_RUNTIME
+    case 15: /* T6 Deaths is count-backed; other missions retain T4 behavior. */
+#endif
         if (!ops || !ops->count || ops->count(context, c, s->owner, &count) != 1) return -1;
         return sc64_t4_trigger_compare(count, c->amount, c->comparison);
     case 11: { /* The raw switch index is zero based, in condition byte 16. */

@@ -1559,7 +1559,7 @@ combinations. The full T5 host controller run wins at frame 121,261 and its
 input trace is byte-identical to the generation-14 proof. Default checks
 (135 Python tests), unified checks, and the legacy combined T5 checks pass.
 The existing T4 and T5 ROM hashes remain unchanged. This is storage evidence
-only: T6 mission triggers, runtime, controller completion,
+only: T6 mission-world trigger bindings, controller completion,
 and performance are not implemented or qualified. T6 remains unavailable and
 the current campaign count remains 11 of 30, with 19 missions unavailable.
 
@@ -1577,6 +1577,44 @@ rehashed input tampering and preservation of an existing output after failure.
 All 138 Python tests, the default build/checks, and unified build/checks pass.
 Regenerating the default T5 availability header leaves it byte-identical.
 T6 remains unavailable; the playable count is still 11 of 30.
+
+## T6 standalone trigger adapter (2026-10-23)
+
+`make test-sc64-t6-runtime` passes under AddressSanitizer and
+UndefinedBehaviorSanitizer with the prepared private scenario. The adapter
+reuses the T4 runner with T6-gated Deaths query delegation, eight independent
+source-player contexts and one shared switch bank (1,184 bytes). It checks
+the source-supported condition/action shapes, setup and creation properties
+before execution. It delegates world queries and effects to typed callbacks;
+it does not implement the live mission world.
+
+The actual-source fixture checks all 24 enabled trigger/slot pairs, including
+execution of resource/AI callbacks for inactive Force4 controller slots. It
+checks victory with two Dropships and rejection with one, the Norad/Raynor
+loss branches and immediate loss with no human actors. A rules fixture makes
+all elapsed gates ready and verifies all 30 distinct creation-property
+references execute once across the six groups, without replay. This is not
+a controller or real-time campaign run.
+
+Pause freezes state. Copying an actually pending reinforcement Wait and its
+callback-visible fixture state produces identical remaining effects under
+checked and prevalidated execution, including an atomic creation retry. That
+is an in-memory continuation test, not SRAM serialization or execution
+provenance validation. World effects must honor the callback retry contract.
+The explicit GBA policy uses 30 elapsed ticks per second, ceiling conversion
+for millisecond waits, one-shot completion and same-pass defeat priority.
+Native scheduling, presentation duration and later AI unburrowing are not
+established by this evidence.
+
+`make test-sc64-t6-runtime-synthetic` is included in the asset-free default
+checks. It uses an invented small program to check typed Deaths forwarding,
+wait resumption, action retries, missing/unsupported callback faults and
+operand bounds. The default build/checks (138 Python tests), unified checks
+and focused T6 import/scenario/availability checks pass. Rebuilt T4, T5 and
+generation-15 storage ROMs remain byte-identical to the hashes recorded above.
+This stage changes no ROM or SRAM format. T6 world/save integration, normal
+controller completion and performance qualification remain unfinished; the
+campaign stays at 11 playable missions out of 30.
 
 ## Known limits
 

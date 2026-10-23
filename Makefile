@@ -498,6 +498,16 @@ build/test-sc64-t6-availability: tests/sc64_t6_availability.c starcraft/sc64_uni
 sc64-t6-availability: $(T6_AVAILABILITY_HEADER)
 test-sc64-t6-availability: build/test-sc64-t6-availability
 	./build/test-sc64-t6-availability $(T6_SCENARIO_RECORDS)/PUNI.bin
+build/test-sc64-t6-runtime-synthetic: tests/sc64_t6_runtime_synthetic.c starcraft/sc64_t6_runtime.h starcraft/sc64_t4_triggers.h starcraft/sc64_trigger_types.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DSC64_T4_RUNTIME -DSC64_T6_RUNTIME $< -o $@
+build/test-sc64-t6-runtime: tests/sc64_t6_runtime.c starcraft/sc64_t6_runtime.h starcraft/sc64_t6_scenario_adapter.h $(T6_SCENARIO_HEADER) starcraft/sc64_t4_triggers.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -Istarcraft -I.local/sc64/races/generated -DSC64_T4_RUNTIME -DSC64_T6_RUNTIME -DSC64_T6_ENABLED $< -o $@
+.PHONY: test-sc64-t6-runtime-synthetic test-sc64-t6-runtime
+test-sc64-t6-runtime-synthetic: build/test-sc64-t6-runtime-synthetic
+	./build/test-sc64-t6-runtime-synthetic
+test-sc64-t6-runtime: build/test-sc64-t6-runtime
+	./build/test-sc64-t6-runtime
+test-starcraft: test-sc64-t6-runtime-synthetic
 build/test-sc64-compact-building-save: tests/sc64_compact_building_save.c starcraft/sc64_compact_building_save.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-compact-building-save

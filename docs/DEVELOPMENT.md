@@ -527,9 +527,27 @@ are 2,474,724/388/245,632 bytes, IWRAM ends at `0x03004f90`, and BSS ends at
 `0x0203c108`. A fresh-process ordinary-menu T5 save test on that build saves at
 frame 123, reloads at frame 123, and continues to frame 183 with all eight
 source-player contexts fault-free and campaign/AI clocks aligned. This proves
-the new save layout on the existing T5 scenario only. T6 trigger execution,
-campaign runtime, controller completion, and performance qualification remain
+the new save layout on the existing T5 scenario only. T6 mission-world
+integration, controller completion, and performance qualification remain
 future work; the playable campaign count remains 11 of 30.
+
+The standalone T6 trigger adapter has separate host checks:
+
+```sh
+make test-sc64-t6-runtime-synthetic  # Asset-free typed callback/core checks
+make test-sc64-t6-runtime            # Requires the prepared private T6 records
+```
+
+It reuses the bounded T4 runner and retains all eight source-player contexts,
+including inactive controller slots enabled by source Force masks. Its 1,184
+bytes hold the contexts and shared switches. World queries, creation,
+resources, AI requests and presentation use typed callbacks; they are not yet
+bound to the playable GBA world. Waits use `ceil(milliseconds * 30 / 1000)`
+ticks and elapsed conditions use 30 ticks per second. These are GBA adapter
+policies. The checked entry validates the program and state; a separate
+prevalidated entry avoids rescanning immutable tables each tick after
+init/load validation. The structural state validator is not a save execution
+provenance validator, and this stage does not change any ROM or SRAM format.
 
 ## Troubleshooting
 

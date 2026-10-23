@@ -255,8 +255,10 @@ See [the preparation and verification commands](DEVELOPMENT.md#t6-packed-storage
 
 Generation-15 persistence has passed a fresh-process T5 normal-menu save and
 resume check on the frozen storage-probe build. This does not exercise T6
-mission logic: its trigger runtime, controller completion, and performance
-remain unimplemented/unverified. T6 is not in the campaign menu. The campaign
+mission logic. A separate host-only trigger adapter now retains all eight
+source-slot contexts and delegates world effects through typed callbacks;
+its mission-world bindings, controller completion, and performance remain
+unfinished/unverified. T6 is not in the campaign menu. The campaign
 therefore remains at 11 playable missions out of 30, with 19 unavailable.
 
 ## Current limits
