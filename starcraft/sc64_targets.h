@@ -18,6 +18,9 @@
 #define SC64_TARGET_GRID_ROWS 24
 #endif
 #define SC64_TARGET_CELL_COUNT (SC64_TARGET_GRID_COLS * SC64_TARGET_GRID_ROWS)
+#if SC64_TARGET_GRID_COLS > 32 || SC64_TARGET_GRID_ROWS > 32
+#error "SC64 target occupancy masks require at most 32 rows and columns"
+#endif
 #define SC64_TARGET_ENTITY_COUNT (MAX_UNITS + MAX_BUILDINGS)
 #define SC64_TARGET_DIRTY_CAPACITY (MAX_UNITS * 2 + MAX_BUILDINGS)
 
@@ -37,11 +40,15 @@ static Sc64TargetIndex sc64_target_prev[SC64_TARGET_ENTITY_COUNT];
 static u16 sc64_target_cell[SC64_TARGET_ENTITY_COUNT];
 static u16 sc64_target_dirty[SC64_TARGET_DIRTY_CAPACITY];
 static u16 sc64_target_dirty_count;
+/* Conservative per-owner axis occupancy. Bits are only cleared on begin. */
+#ifdef SC64_LATE_TERRAN_STORAGE
+static u32 sc64_target_owner_columns[5], sc64_target_owner_rows[5];
+#endif
 static int sc64_target_index_initialized;
 static int sc64_target_dirty_overflowed;
 static int sc64_target_index_active;
 
-static int GBA_HOT
+static int GBA_HOT __attribute__((noinline))
 sc64_target_cell_for(int x, int y, int *cell)
 {
     int col, row, cols = (WORLD_W + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
@@ -76,6 +83,10 @@ sc64_target_insert(int entity, int owner, int x, int y)
     if (old != SC64_TARGET_NONE) sc64_target_prev[old] = (Sc64TargetIndex)entity;
     sc64_target_head[owner][cell] = (Sc64TargetIndex)entity;
     sc64_target_cell[entity] = (u16)cell;
+#ifdef SC64_LATE_TERRAN_STORAGE
+    sc64_target_owner_columns[owner] |= (u32)1u << (x >> 6);
+    sc64_target_owner_rows[owner] |= (u32)1u << (y >> 6);
+#endif
     return 1;
 }
 
@@ -107,6 +118,10 @@ sc64_target_index_begin(void)
     }
     sc64_target_dirty_count = 0;
     sc64_target_dirty_overflowed = 0;
+#ifdef SC64_LATE_TERRAN_STORAGE
+    memset(sc64_target_owner_columns, 0, sizeof(sc64_target_owner_columns));
+    memset(sc64_target_owner_rows, 0, sizeof(sc64_target_owner_rows));
+#endif
     for (i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
             !sc64_target_insert(i, u[i].owner, u[i].x, u[i].y)) return;

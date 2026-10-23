@@ -1690,7 +1690,9 @@ not been recovered.
 ## Canonical Terran T1–T10 profile (2026-10-23)
 
 The canonical `terran` preparation and build workflow now includes the full
-Terran campaign. The final frozen 8 MiB ROM is
+Terran campaign. This section records the pre-optimization baseline; the
+performance pass below supersedes its current-build identity and rates. The
+baseline frozen 8 MiB ROM is
 `build/StarCraft-Terran-GBA.gba`, SHA-256
 `00f0939878a51320b8fc252d69b2947ffc442e6d3cc39efa12d0d118511bf3ee`.
 The recorded build uses ARM GCC 16.2.0 and GNU Binutils
@@ -1748,3 +1750,58 @@ Mission adapters use bounded authored AI behavior where original N64 AI
 scripts are unavailable; these results do not claim native AI execution.
 All measured campaign emulator rates remain below the 30-fps target, and no
 physical GBA hardware result is claimed.
+
+## Terran CPU and presentation optimization (2026-10-23)
+
+The optimized 8 MiB `build/StarCraft-Terran-GBA.gba` has SHA-256
+`8a9ddd41eab795dec08c1546e707aac04a093aa0a7e2ca147a59c1b351d57bb0`;
+its matching ELF has SHA-256
+`737dc9e388563d81680eff1adee8c06c76ea007988bf65f7372d36b3889024b5`.
+It uses ARM GCC 16.2.0 and GNU Binutils 2.47.20260726. The unchanged reserve
+guards pass with IWRAM ending at `0x03004fa0` and BSS at `0x0203d9ec`.
+The generation-18 save layout remains 15,816 bytes.
+
+This pass reduces repeated hostility and attack checks, retains collision
+memberships across ticks, narrows defense candidate searches, caches repeated
+late-trigger counts, and avoids redundant HUD band transfers. The late
+trigger runner now uses its prevalidated entry point as intended, while
+retaining mutable-slot validation before execution. The late profile can
+present during an already-open safe VBlank window after at least two video
+frame periods; it does not skip simulation or rendering ticks. Non-late
+profiles retain their previous collision and presentation paths.
+
+Full normal-menu ARM/mGBA input replays compare the baseline ROM above with
+this optimized ROM, using identical controller traces and the same emulator
+setup. These are mean effective rates over sampled advancing PLAY intervals,
+measured with the emulated GBA hardware timer; menus and result-boundary
+intervals are excluded.
+
+| Mission | Baseline fps | Optimized fps | Increase | Winning frame | Matching observed checkpoints |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| T7 | 15.76 | 25.00 | 58.6% | 12,151 | 45/45 |
+| T10 | 11.78 | 18.77 | 59.3% | 38,491 | 89/89 |
+
+T7 counts 12,148 PLAY frames over 8,153,259,467 timer cycles; T10 counts
+38,478 over 34,387,849,364 cycles. The trace hashes remain those in the
+baseline table. All exposed checkpoint state fields match the baseline after
+excluding timing and profiling counters. Both wins have zero trigger faults,
+all eight trigger clocks aligned, and the same objective results: T7 delivers
+the emitter with Kerrigan alive; T10 destroys the Ion Cannon with Raynor alive.
+This comparison does not establish equivalence of unobserved memory or pixels.
+
+The default build and host suite (175 Python tests), unified build/tests, and
+full Terran build/regressions pass. All ten host controllers still win; the
+T7–T10 winning trace hashes are unchanged. Focused ASan/UBSan checks include
+1,440,759 collision comparisons, target selection parity, full-tick defense
+parity, trigger checked/prevalidated parity, framebuffer HUD comparison, and
+presentation timing boundaries including timer wraparound.
+
+Fresh-process normal-menu ARM saves for T7 and T10 also pass on this ROM:
+both save and load frame 123 exactly, continue to frame 183, retain the exact
+late-state payload, align campaign/trigger clocks, and report zero faults.
+Other mission ARM wins and saves remain qualified on the earlier frozen
+builds described above, rather than being implied to have been rerun here.
+
+These improvements remain below the 30-fps target, particularly in T10's busy
+battles. No physical GBA or GBA SP result is claimed. The bounded authored AI
+and other adaptation limits remain unchanged.

@@ -673,3 +673,31 @@ Zerg Force3 buildings intact, Kerrigan alive, all eight trigger clocks at frame 
 zero faults, and 16.94 effective fps. T6's separately qualified ARM replay
 averaged 17.26 fps. All reported campaign rates are below target; physical
 GBA testing remains pending.
+
+### Repeatable Terran performance comparison
+
+For a repeatable T10 sample, prepare and build the Terran profile, then run
+`./dev sc64 test --profile terran`. This runs the private controller profile
+and writes its T10 trace to the ignored local path
+`.local/sc64/terran-late/full-t10-controller.json`. Replay that trace through
+the normal menu using a frozen ROM and its matching ELF for each build:
+
+```sh
+python3 tools/sc64_terran_controller_replay.py \
+  --trace .local/sc64/terran-late/full-t10-controller.json \
+  --rom /path/to/frozen-terran.gba --elf /path/to/matching-terran.elf \
+  --ticks 4000
+```
+
+This bounded prefix reports progress and performance without claiming a win.
+Omit `--ticks` to run the complete trace through the mission win. Keep
+immutable, matching ROM/ELF copies for the before and after builds, and record
+their SHA-256 hashes, compiler/toolchain versions, replay command, and observed
+mission state with each result. Compare runs only when they use the same trace,
+emulator setup, and observed state/frame range, with a matching ROM/ELF pair
+for each build. The replay's
+effective fps uses the emulated GBA hardware timer and completed simulation
+frames, not host wall time. Diagnostic counters describe only the final tick;
+collect them from a diagnostic build separately from the uninstrumented FPS
+comparison. `tools/sc64_compare_campaign_replays.py` is Protoss-only and does not
+apply to Terran measurements.

@@ -1,4 +1,7 @@
 #include "gba.h"
+#ifdef SC64_LATE_TERRAN_STORAGE
+#include "gba_present.h"
+#endif
 #ifdef GBA_HOST
 #include <stdio.h>
 static u16 host_fb[2][19200];
@@ -20,6 +23,8 @@ static volatile u16 *pixels=host_fb[1];
 static volatile u16 *pixels=(volatile u16*)0x0600a000;
 #endif
 static u16 front;
+static u8 backbuffer_index;
+static u32 clear_generation[2];
 static int tone_frames;
 volatile u32 gfx_draw_cycles;
 static u32 draw_start;
@@ -36,7 +41,8 @@ static const u16 colors[32]={
 __attribute__((used)) const char gba_save_signature[]="SRAM_V113";
 void gba_init(void) {
 #ifdef GBA_HOST
- front=0; pixels=host_fb[1];
+ front=0; backbuffer_index=1; clear_generation[0]=clear_generation[1]=0;
+ pixels=host_fb[1];
  for(int i=0;i<32;i++)host_palette[i]=colors[i];
 #else
  REG16(0x04000208)=0;
@@ -49,7 +55,12 @@ void gba_init(void) {
  REG16(0x04000082)=0x0002;
  REG16(0x04000108)=0; REG16(0x0400010c)=0;
  REG16(0x0400010e)=0x0084; REG16(0x0400010a)=0x0080;
+ front=0; backbuffer_index=1; clear_generation[0]=clear_generation[1]=0;
 #endif
+}
+u8 gfx_backbuffer_index(void) { return backbuffer_index; }
+u32 gfx_clear_generation(u8 buffer_index) {
+ return buffer_index < 2 ? clear_generation[buffer_index] : 0;
 }
 void gfx_set_palette(int first,int count,const u16 *rgb555) {
  if(first<0||count<0||first+count>256||!rgb555)return;
@@ -79,8 +90,10 @@ static void vblank(void){while(REG16(0x04000006)>=160){}while(REG16(0x04000006)<
 #endif
 void gfx_begin(u8 color) {
  draw_start=gba_clock();
+ backbuffer_index=(u8)(front^1);
+ clear_generation[backbuffer_index]++;
 #ifdef GBA_HOST
- pixels=host_fb[front^1];
+ pixels=host_fb[backbuffer_index];
  for(int i=0;i<19200;i++)pixels[i]=color|((u16)color<<8);
 #else
  pixels=(volatile u16*)(front?0x06000000:0x0600a000);
@@ -97,8 +110,9 @@ void gfx_begin(u8 color) {
 #if defined(SC64_NO_FRAME_CLEAR) || defined(GBA_HOST)
 void gfx_begin_preserve(void) {
  draw_start=gba_clock();
+ backbuffer_index=(u8)(front^1);
 #ifdef GBA_HOST
- pixels=host_fb[front^1];
+ pixels=host_fb[backbuffer_index];
 #else
  pixels=(volatile u16*)(front?0x06000000:0x0600a000);
 #endif
@@ -213,16 +227,25 @@ HOT int gfx_blit_window_2x(int y,int height,const u8 *source,int stride,int rows
 void gfx_end(void) {
     gfx_draw_cycles=gba_clock()-draw_start;
 #ifndef GBA_HOST
+#ifdef SC64_LATE_TERRAN_STORAGE
+    while (!gba_present_ready(gba_clock()-previous_present,
+                              REG16(0x04000006))) {}
+#else
     /* Target 30 updates/s without adding a third video frame when drawing
        already consumed more than one 59.73 Hz hardware frame. */
     u32 elapsed=gba_clock()-previous_present;
     vblank();
 #endif
+#endif
     front^=1;
 #ifndef GBA_HOST
     REG16(0x04000000)=0x0404|(front?16:0);
+#ifdef SC64_LATE_TERRAN_STORAGE
+    previous_present=gba_clock();
+#else
     if(elapsed<280896u)vblank();
     previous_present=gba_clock();
+#endif
 #endif
 }
 HOT void gfx_pixel(int x,int y,u8 c){if((unsigned)x>=240||(unsigned)y>=160)return;volatile u16*p=pixels+y*120+(x>>1);u16 old=*p;*p=(x&1)?((old&255)|((u16)c<<8)):((old&0xff00)|c);}
