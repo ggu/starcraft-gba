@@ -92,6 +92,18 @@ void gfx_begin(u8 color) {
  while(REG32(0x040000dc)&0x80000000){}
 #endif
 }
+/* Select the next backbuffer without clearing it. Only renderers proven to
+ * overwrite every pixel may use this; partial scenes need gfx_begin(). */
+#if defined(SC64_NO_FRAME_CLEAR) || defined(GBA_HOST)
+void gfx_begin_preserve(void) {
+ draw_start=gba_clock();
+#ifdef GBA_HOST
+ pixels=host_fb[front^1];
+#else
+ pixels=(volatile u16*)(front?0x06000000:0x0600a000);
+#endif
+}
+#endif
 /* Copy an exact full-width band between Mode 4 pixels and aligned linear
    indexed-pixel storage. The GBA DMA path uses whole 32-bit words only. */
 static int gfx_band_valid(int y,int height,const void *buffer) {
@@ -312,7 +324,13 @@ HOT void gfx_frame(int x,int y,int w,int h,u8 c){gfx_rect(x,y,w,1,c);gfx_rect(x,
 int absi(int x){return x<0?-x:x;}
 int clampi(int x,int lo,int hi){return x<lo?lo:(x>hi?hi:x);}
 HOT void gfx_line(int x0,int y0,int x1,int y1,u8 c){int dx=absi(x1-x0),sx=x0<x1?1:-1,dy=-absi(y1-y0),sy=y0<y1?1:-1,err=dx+dy;for(;;){gfx_pixel(x0,y0,c);if(x0==x1&&y0==y1)break;int e=2*err;if(e>=dy){err+=dy;x0+=sx;}if(e<=dx){err+=dx;y0+=sy;}}}
+#if (defined(SC64_P3_RUNTIME) && defined(SC64_VISIBILITY_SPANS)) || defined(SC64_T4_RUNTIME)
+/* These imported profiles render from source sprites and do not call this
+ * fallback. Keep it in ROM to reserve IWRAM for visibility updates. */
+void gfx_circle(int x,int y,int r,u8 c){if(r<0||r>240)return;for(int yy=-r;yy<=r;yy++)for(int xx=-r;xx<=r;xx++)if(xx*xx+yy*yy<=r*r)gfx_pixel(x+xx,y+yy,c);}
+#else
 HOT void gfx_circle(int x,int y,int r,u8 c){if(r<0||r>240)return;for(int yy=-r;yy<=r;yy++)for(int xx=-r;xx<=r;xx++)if(xx*xx+yy*yy<=r*r)gfx_pixel(x+xx,y+yy,c);}
+#endif
 HOT void gfx_diamond(int x,int y,int rx,int ry,u8 color) {
     if(rx<0||ry<0||rx>480||ry>320)return;
     if(!ry){gfx_rect(x-rx,y,rx*2+1,1,color);return;}
@@ -421,7 +439,14 @@ static HOT void glyph_row(int x,int y,u8 bits,u8 color) {
 }
 HOT void gfx_text(int x,int y,const char*t,u8 c){int origin=x;for(;*t;t++){u8 ch=(u8)*t;if(ch=='\n'){x=origin;y+=9;continue;}if(ch>='a'&&ch<='z')ch-=32;if(ch>=32&&ch<128&&x>-6&&x<240)for(int row=0;row<7;row++)glyph_row(x,y+row,font[ch-32][row],c);x+=6;}}
 HOT void gfx_num(int x,int y,int n,u8 c){char b[12];int i=0;u32 v;if(n<0){gfx_text(x,y,"-",c);x+=6;v=0u-(u32)n;}else v=(u32)n;do{b[i++]='0'+v%10;v/=10;}while(v&&i<11);for(int j=0;j<i;j++){char z[2]={b[i-j-1],0};gfx_text(x+j*6,y,z,c);}}
-HOT void gfx_bar(int x,int y,int w,int h,int v,int max,u8 c,u8 empty){gfx_rect(x,y,w,h,empty);if(max>0)gfx_rect(x,y,w*clampi(v,0,max)/max,h,c);}
+HOT void gfx_bar(int x,int y,int w,int h,int v,int max,u8 c,u8 empty){
+    if(max<=0||v<=0){gfx_rect(x,y,w,h,empty);return;}
+    /* A full bar is just the foreground rectangle; the empty fill is entirely
+       covered, so skip both the overdraw and the old width multiplication. */
+    if(v>=max){gfx_rect(x,y,w,h,c);return;}
+    gfx_rect(x,y,w,h,empty);
+    gfx_rect(x,y,w*clampi(v,0,max)/max,h,c);
+}
 u32 rng_next(u32*s){u32 x=*s;if(!x)x=0x6d2b79f5u;x^=x<<13;x^=x>>17;x^=x<<5;*s=x;return x;}
 static u32 hash_bytes(const u8*p,u32 n){u32 h=2166136261u;while(n--){h^=*p++;h*=16777619u;}return h;}
 #ifdef GBA_HOST

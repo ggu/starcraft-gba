@@ -2,7 +2,7 @@
 
 StarCraft: GBA Outpost is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
 
-The optional unified profile adds six reduced campaign missions—two each for Terran, Zerg, and Protoss—and three-faction custom games. It is a GBA adaptation built from a user-supplied, verified StarCraft 64 USA ROM. It does not execute or reproduce the original N64 engine. Imported maps and graphics stay local and are not part of the source release.
+Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. Controller-driven host runs and normal-menu ARM replays have now completed all ten Terran missions across the recorded frozen builds. T7, T8 and T10 have full ARM wins on the canonical Terran ROM; T9's ARM win is on an earlier frozen ROM. The measured late-mission rates remain below the 30-fps target. This is a GBA adaptation built from a user-supplied, verified StarCraft 64 USA ROM. It does not execute or reproduce the original N64 engine. Imported maps and graphics stay local and are not part of the source release.
 
 ## Get started
 
@@ -28,18 +28,26 @@ From the repository root, run:
 
 Playing is optional. Install mGBA using the instructions in [Development](docs/DEVELOPMENT.md), then run `./dev play starcraft`. The [StarCraft guide](starcraft/README.md) describes controls, gameplay, and current limits.
 
-## Optional unified missions
+## Optional StarCraft 64 profiles
 
 This profile requires a legally obtained StarCraft 64 USA ROM that you are entitled to use. The project does not provide the ROM, imported content, or converted assets. Preparation accepts a `.z64`, `.v64`, or `.n64` image, or a ZIP containing exactly one 32 MiB N64 image. It normalizes byte order and checks the resulting image against SHA-1 `a36d91b5aac7bb95df0d7de5f9814f5270e25c2b`.
 
 ```sh
-./dev sc64 prepare --rom "/path/to/your/StarCraft 64 ROM or ZIP" --profile unified
-make unified
-make test-unified
-./dev play unified
+./dev sc64 prepare --rom "/path/to/your/StarCraft 64 ROM or ZIP" --profile terran
+./dev sc64 build --profile terran
+./dev sc64 test --profile terran
+./dev sc64 play --profile terran
 ```
 
+The canonical Terran profile includes all ten Terran campaign missions. Preparing it also generates the shared inputs needed by `make race-campaigns`; preparing only Zerg or Protoss does not generate the complete shared input set. The integrated ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. Full normal-menu ARM wins are recorded for all ten Terran missions across frozen builds: T7, T8 and T10 on the canonical ROM, and T9 on an earlier ROM. No physical GBA result is claimed.
+
 The first preparation fetches the pinned `sc64-maps` extractor into ignored `references/`, so Git and network access are needed. ROMs, extracted data, generated headers, captures containing imported art, and saves stay in ignored local directories; do not commit or distribute them. Contributors can work on the default skirmish without this profile. See [the unified guide](docs/SC64-UNIFIED.md) and [development](docs/DEVELOPMENT.md) for details and troubleshooting.
+
+The [campaign guide](docs/RACE-CAMPAIGNS.md) records the staged profile
+history, current mission status, and shared skirmish setup. The combined
+Terran profile uses bounded pools of 192 units, 96 buildings, and 80 mineral
+fields; its generated GBA ROM is 8 MiB. The original 32 MiB N64 image and
+every converted map, sprite, and generated header remain private local inputs.
 
 ## Contributing and provenance
 

@@ -19,6 +19,9 @@ void gba_init(void);
 u16 gba_keys(void);
 u32 gba_clock(void);
 void gfx_begin(u8 background);
+#if defined(SC64_NO_FRAME_CLEAR) || defined(GBA_HOST)
+void gfx_begin_preserve(void);
+#endif
 void gfx_end(void);
 int gfx_read_band(int y,int height,u8 *aligned_pixels);
 int gfx_blit_band(int y,int height,const u8 *aligned_pixels);

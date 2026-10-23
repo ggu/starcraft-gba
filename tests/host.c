@@ -30,6 +30,21 @@ static int check_band(int y,int height) {
  }
  return 1;
 }
+static void scalar_rect(u8 *fb,int x,int y,int w,int h,u8 c) {
+ if(w<=0||h<=0)return;
+ for(int py=0;py<160;py++)for(int px=0;px<240;px++)
+  if(px>=x&&px<x+w&&py>=y&&py<y+h)fb[py*240+px]=c;
+}
+static int check_bar(int x,int y,int w,int h,int v,int max) {
+ u8 expected[240*160];
+ memset(expected,9,sizeof(expected));
+ scalar_rect(expected,x,y,w,h,4);
+ if(max>0)scalar_rect(expected,x,y,w*clampi(v,0,max)/max,h,11);
+ gfx_begin(9);gfx_bar(x,y,w,h,v,max,11,4);
+ for(int py=0;py<160;py++)for(int px=0;px<240;px++)
+  if(gfx_test_pixel(px,py)!=expected[py*240+px])return 0;
+ return 1;
+}
 int main(int argc,char**argv){
  gba_init();
  /* Imported terrain must retain pixel alignment and clip at every edge. */
@@ -51,6 +66,18 @@ int main(int argc,char**argv){
    }
    for(int i=0;i<256;i++)tile[i]=(u8)(32+i%224);
   }
+ }
+ /* Health bars must retain the old clipped-pixel result for empty, full,
+    overfull, intermediate, invalid-maximum and odd-edge rectangles. */
+ {
+  const int bars[][6]={{10,20,19,3,0,100},{10,20,19,3,-4,100},
+   {10,20,19,3,100,100},{10,20,19,3,140,100},{10,20,19,3,37,100},
+   {-5,0,13,4,5,10},{234,157,12,5,4,10},{1,1,15,2,5,0},
+   {1,1,15,2,5,-2},{30,30,0,3,5,10},{30,30,-4,3,5,10}};
+  for(unsigned i=0;i<sizeof(bars)/sizeof(bars[0]);i++)
+   if(!check_bar(bars[i][0],bars[i][1],bars[i][2],bars[i][3],bars[i][4],bars[i][5])){
+    fputs("Health bar fast-path parity failed\n",stderr);return 1;
+   }
  }
  /* Packed glyph writes must preserve the original 5x7 mask at each
     halfword/word alignment and clip identically at all screen edges. */

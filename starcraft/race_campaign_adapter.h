@@ -20,14 +20,49 @@ enum {
     SC64_RACE_MISSION_P2
 #ifdef SC64_UNIFIED
     ,SC64_RACE_MISSION_T1, SC64_RACE_MISSION_T2
+#ifdef SC64_T3_ENABLED
+    ,SC64_RACE_MISSION_T3
+#endif
+#ifdef SC64_Z3_ENABLED
+    ,SC64_RACE_MISSION_Z3 = 14
+#endif
+#ifdef SC64_P3_RUNTIME
+    ,SC64_RACE_MISSION_P3 = 22
+#endif
 #endif
 };
 
 static int
 race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) return sc64_terran_late_runtime_owner((unsigned)raw_owner);
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active()) return sc64_t6_runtime_owner((unsigned)raw_owner);
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active()) {
+        if (raw_owner == SC64_T5_SOURCE_HUMAN) return SIDE;
+        if (raw_owner == SC64_T5_SOURCE_ENEMY) return ENEMY;
+        if (raw_owner == SC64_T5_SOURCE_RESCUE) return RESCUABLE;
+        return NEUTRAL;
+    }
+#endif
+#ifdef SC64_T4_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID)
+        return sc64_t4_runtime_owner(raw_owner);
+#endif
     if (raw_owner == 11 || raw_owner >= 8) return NEUTRAL;
     if (raw_owner < 0) return NEUTRAL;
+#ifdef SC64_P3_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID) {
+        if (raw_owner == SC64_P3_HUMAN_SLOT) return SIDE;
+        if (raw_owner == SC64_P3_FORCE2_SLOT) return ENEMY;
+        if (raw_owner == SC64_P3_FORCE3_SLOT) return 4;
+        return NEUTRAL;
+    }
+#endif
     return map->owner_modes[raw_owner];
 }
 
@@ -73,6 +108,16 @@ race_campaign_set_message(int id)
     race_campaign.message_ticks = 180;
     toast(0);
 }
+
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+#include "sc64_t3_adapter.h"
+#endif
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+#include "sc64_z3_adapter.h"
+#endif
+#ifdef SC64_P3_RUNTIME
+#include "sc64_p3_adapter.h"
+#endif
 
 static void
 race_campaign_assign_mining(void)
@@ -126,7 +171,7 @@ race_campaign_ai_tick(void)
     }
     for (i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) && b[i].owner == ENEMY) {
         if (base_x < 0) { base_x = b[i].x; base_y = b[i].y; }
-        if (enemy_race == R_ZERG && b[i].type == B_HATCHERY) producer = i;
+        if (enemy_race == R_ZERG && sc64_race_is_zerg_townhall(b[i].type)) producer = i;
         else if (enemy_race == R_PROTOSS && b[i].type == B_NEXUS) producer = i;
         else if (enemy_race == R_TER && b[i].type == B_COMMAND) producer = i;
     }
@@ -191,11 +236,60 @@ race_campaign_init(void)
     memset(invincible_units,0,sizeof(invincible_units));memset(invincible_buildings,0,sizeof(invincible_buildings));
     backwater_message_trigger=backwater_message_action=backwater_message_ticks=0;
 #endif
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+    memset(&race_z3,0,sizeof(race_z3));race_z3_action_ticks=0;
+#endif
+#ifdef SC64_P3_RUNTIME
+    memset(&race_p3,0,sizeof(race_p3));race_p3_action_ticks=0;
+#endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    memset(&race_t4, 0, sizeof(race_t4));
+#endif
+#ifdef SC64_T5_RUNTIME
+    memset(&race_t5, 0, sizeof(race_t5));
+#endif
+#ifdef SC64_T6_RUNTIME
+    memset(&race_t6, 0, sizeof(race_t6));
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    memset(&race_late, 0, sizeof(race_late));
+#endif
     if (race_mode) {
         race_skirmish_init();
         return;
     }
     race_selected_mission = limit(race_selected_mission, 0, SC64_RACE_MAP_COUNT - 1);
+#ifdef SC64_UNIFIED
+    if ((!sc64_catalog_mission_allowed(race_selected_mission,
+#ifdef SC64_CAMPAIGN_RACE
+                                     SC64_CAMPAIGN_RACE
+#else
+                                     -1
+#endif
+                                     )
+#ifdef SC64_T4_RUNTIME
+         /* Internal world-loading probe. The frontend catalog remains gated
+          * until the scenario has a complete ordinary-controller proof. */
+         && race_selected_mission != SC64_T4_GLOBAL_ID
+#endif
+#ifdef SC64_T5_RUNTIME
+         && race_selected_mission != SC64_T5_GLOBAL_ID
+#endif
+#ifdef SC64_T6_RUNTIME
+         && race_selected_mission != SC64_T6_GLOBAL_ID
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+         && !race_late_active()
+#endif
+         ) || !sc64_race_maps[race_selected_mission].width)
+        race_selected_mission = sc64_frontend_first_mission(
+#ifdef SC64_CAMPAIGN_RACE
+            SC64_CAMPAIGN_RACE
+#else
+            SC_FRONT_TERRAN
+#endif
+        );
+#endif
     map = &sc64_race_maps[race_selected_mission];
     race_cols = map->width;
     race_rows = map->height;
@@ -241,6 +335,23 @@ race_campaign_init(void)
 
     for (i = 0; i < 8; ++i) {
         int owner = map->owner_modes[i];
+#ifdef SC64_T4_RUNTIME
+        if (race_selected_mission == SC64_T4_GLOBAL_ID)
+            owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_T5_RUNTIME
+        if (race_t5_active()) owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_T6_RUNTIME
+        if (race_t6_active()) owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        if (race_late_active()) owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_P3_RUNTIME
+        if (race_selected_mission == SC64_P3_GLOBAL_ID)
+            owner = race_campaign_owner(map, i);
+#endif
         if (owner >= 0 && owner < 5 && map->owner_races[i] < 3)
             race_player[owner] = map->owner_races[i];
     }
@@ -272,9 +383,31 @@ race_campaign_init(void)
         if (src->owner == human_owner) owner = SIDE;
 #ifdef SC64_UNIFIED
         /* Terran Raynor starts neutral and joins on contact, as in the existing adapter. */
-        if(race_selected_mission>=SC64_RACE_MISSION_T1&&raw==19)owner=NEUTRAL;
+        if(race_selected_mission>=SC64_RACE_MISSION_T1&&raw==19
+#ifdef SC64_T5_RUNTIME
+           && !race_t5_active()
+#endif
+#ifdef SC64_T6_RUNTIME
+           && !race_t6_active()
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+           && !race_late_active()
+#endif
+           )owner=NEUTRAL;
 #endif
         type = sc64_race_unit_from_raw(raw);
+#ifdef SC64_T5_RUNTIME
+        /* Earlier adapters use the established Raynor actor. Raw 19 gains
+         * its distinct Vulture rules only in the T5 scenario. */
+        if (raw == 19 && !race_t5_active()
+#ifdef SC64_T6_RUNTIME
+            && !race_t6_active()
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+            && !race_late_active()
+#endif
+            ) type = U_RAYNOR;
+#endif
         if (type >= 0) {
             slot = spawn_unit(owner, type, x, y);
             if (slot < 0) continue;
@@ -311,12 +444,33 @@ race_campaign_init(void)
     }
 
     switch (race_selected_mission) {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    case 10: case 11: case 12: case 13: minerals = gas = 0; break;
+#endif
+#ifdef SC64_T6_RUNTIME
+    case SC64_T6_GLOBAL_ID: minerals = gas = 0; break;
+#endif
+#ifdef SC64_T5_RUNTIME
+    case SC64_T5_GLOBAL_ID: minerals = gas = 0; break;
+#endif
+#ifdef SC64_T4_RUNTIME
+    case SC64_T4_GLOBAL_ID: minerals = gas = 0; break;
+#endif
     case SC64_RACE_MISSION_Z1: minerals = 200; break;
     case SC64_RACE_MISSION_Z2: minerals = 300; break;
     case SC64_RACE_MISSION_P1: minerals = 400; gas = 100; break;
 #ifdef SC64_UNIFIED
     case SC64_RACE_MISSION_T1: minerals=0;break;
     case SC64_RACE_MISSION_T2: backwater_init();break;
+#ifdef SC64_T3_ENABLED
+    case SC64_RACE_MISSION_T3: minerals=100;gas=0;break;
+#endif
+#ifdef SC64_Z3_ENABLED
+    case SC64_RACE_MISSION_Z3: minerals=SC64_Z3_MISSION_ORE;gas=SC64_Z3_MISSION_GAS;break;
+#endif
+#ifdef SC64_P3_RUNTIME
+    case SC64_RACE_MISSION_P3: minerals=SC64_P3_HUMAN_MINERALS;gas=SC64_P3_HUMAN_GAS;break;
+#endif
 #endif
     default: minerals = 170; break;
     }
@@ -327,7 +481,34 @@ race_campaign_init(void)
     cx = limit(cx, 120, map->width * 16 - 120);
     cy = limit(cy, 54, map->height * 16 - 54);
     camx = camy = 0;
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+    if (race_selected_mission == SC64_RACE_MISSION_T3) {
+        /* T3 TRIG 0 centers on MRGN 14 (the damaged Vulture area), at half
+         * the CHK pixel coordinates used by imported map records. */
+        cx = 544;
+        cy = 1384;
+        race_t3_init();
+    }
+#endif
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+    if (race_selected_mission == SC64_RACE_MISSION_Z3) race_z3_init();
+#endif
+#ifdef SC64_P3_RUNTIME
+    if (race_selected_mission == SC64_RACE_MISSION_P3) race_p3_init();
+#endif
     race_campaign_assign_mining();
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (race_t4_active() && !race_t4_init()) screen = SCREEN_PAUSE;
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active() && !race_t5_init()) screen = SCREEN_PAUSE;
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active() && !race_t6_init()) screen = SCREEN_PAUSE;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active() && !race_late_init()) screen = SCREEN_PAUSE;
+#endif
     if (race_selected_mission == SC64_RACE_MISSION_Z1)
         race_campaign_set_message(1);
     else if (race_selected_mission == SC64_RACE_MISSION_Z2)
@@ -337,7 +518,17 @@ race_campaign_init(void)
     else if(race_selected_mission==SC64_RACE_MISSION_P2)
         race_campaign_set_message(5);
 #ifdef SC64_UNIFIED
-    else race_campaign_set_message(race_selected_mission==SC64_RACE_MISSION_T1?10:11);
+    else if (race_selected_mission==SC64_RACE_MISSION_T1) race_campaign_set_message(10);
+    else if (race_selected_mission==SC64_RACE_MISSION_T2) race_campaign_set_message(11);
+#ifdef SC64_T3_ENABLED
+    else if (race_selected_mission==SC64_RACE_MISSION_T3) race_campaign_set_message(14);
+#endif
+#ifdef SC64_Z3_ENABLED
+    else if (race_selected_mission==SC64_RACE_MISSION_Z3) race_campaign_set_message(20);
+#endif
+#ifdef SC64_P3_RUNTIME
+    else if (race_selected_mission==SC64_RACE_MISSION_P3) race_campaign_set_message(0);
+#endif
 #endif
     update_exploration();
 }
@@ -415,8 +606,72 @@ race_campaign_tick(void)
         race_campaign.phase == SC64_RACE_PHASE_FAILED) return;
     if (race_campaign.message_ticks) --race_campaign.message_ticks;
     ++race_campaign.elapsed_frames;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) {
+        if (!race_late_tick()) screen = SCREEN_PAUSE;
+        return;
+    }
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (mission == SC64_T6_GLOBAL_ID) {
+        if (!race_t6_tick()) screen = SCREEN_PAUSE;
+        return;
+    }
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (mission == SC64_T5_GLOBAL_ID) {
+#if defined(SC64_DIAGNOSTIC_UPDATE)
+        u32 t5_stage_start = gba_clock();
+#endif
+        race_t5_world_tick();
+#if defined(SC64_DIAGNOSTIC_UPDATE)
+        sc64_t5_rescue_cycles = gba_clock() - t5_stage_start;
+        t5_stage_start = gba_clock();
+#endif
+        race_t5_mines_tick();
+#if defined(SC64_DIAGNOSTIC_UPDATE)
+        sc64_t5_mine_cycles = gba_clock() - t5_stage_start;
+        t5_stage_start = gba_clock();
+#endif
+        if (!race_t5_tick()) screen = SCREEN_PAUSE;
+#if defined(SC64_DIAGNOSTIC_UPDATE)
+        sc64_t5_trigger_ai_cycles = gba_clock() - t5_stage_start;
+#endif
+        return;
+    }
+#endif
+#ifdef SC64_T4_RUNTIME
+    if (mission == SC64_T4_GLOBAL_ID) {
+#if defined(SC64_DIAGNOSTIC_UPDATE) && defined(SC64_T4_SCENARIO_RUNTIME)
+        u32 t4_rescue_start = gba_clock();
+#endif
+        race_t4_world_tick();
+#if defined(SC64_DIAGNOSTIC_UPDATE) && defined(SC64_T4_SCENARIO_RUNTIME)
+        sc64_t4_rescue_cycles = gba_clock() - t4_rescue_start;
+#endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+        if (!race_t4_tick()) screen = SCREEN_PAUSE;
+#else
+        /* Door/teleport/quest actions are not implemented by this roster
+         * stage. Do not run another mission's AI or infer a victory. */
+#endif
+        return;
+    }
+#endif
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+    if (mission == SC64_RACE_MISSION_T3) {
+        race_t3_campaign_tick();
+        return;
+    }
+#endif
 #ifdef SC64_UNIFIED
-    if(mission>=SC64_RACE_MISSION_T1){race_terran_tick();return;}
+#ifdef SC64_Z3_ENABLED
+    if(mission==SC64_RACE_MISSION_Z3){race_z3_campaign_tick();return;}
+#endif
+#ifdef SC64_P3_RUNTIME
+    if(mission==SC64_RACE_MISSION_P3){race_p3_campaign_tick();return;}
+#endif
+    if(mission==SC64_RACE_MISSION_T1||mission==SC64_RACE_MISSION_T2){race_terran_tick();return;}
 #endif
     race_campaign_ai_tick();
 
@@ -581,6 +836,40 @@ static int race_campaign_lost(void)
 static const char *
 race_campaign_objective_text(void)
 {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) {
+        switch (race_campaign.mission) {
+        case 10: return "Deliver the PSI Emitter. Kerrigan must survive.";
+        case 11: return "Clear the opposing bases. Protect Norad II.";
+        case 12: return "Destroy the remaining buildings.";
+        case 13: return "Destroy the Ion Cannon. Raynor must survive.";
+        default: break;
+        }
+    }
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active())
+        return "Bring Raynor and two Dropships to Norad II. Raynor and Norad II must survive.";
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active())
+        return "Reach the rebel base and destroy Confederate buildings. Kerrigan and Raynor must survive.";
+#endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (race_t4_active()) return "Find the data disks. Raynor must survive.";
+#endif
+#ifdef SC64_P3_RUNTIME
+    if (race_campaign.mission == SC64_RACE_MISSION_P3)
+        return race_p3_objective_text();
+#endif
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+    if (race_campaign.mission == SC64_RACE_MISSION_Z3)
+        return race_z3_objective_text();
+#endif
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+    if (race_campaign.mission == SC64_RACE_MISSION_T3)
+        return race_t3_objective_text();
+#endif
     static const char *const objectives[] = {
         "Build a Spawning Pool and Hydralisk Den; protect the Chrysalis, then clear Terran buildings.",
         "Recover the Chrysalis and move it to the Warp Point.",
@@ -589,28 +878,108 @@ race_campaign_objective_text(void)
 #ifdef SC64_UNIFIED
         ,"Find Raynor; build a Barracks and train ten Marines.",
         "Destroy the Infested Command Center. Raynor must survive."
+#ifdef SC64_T3_ENABLED
+        ,"Survive the countdown, or unlock and complete the Zerg Hatchery objective."
+#endif
 #endif
     };
-    int mission = limit(race_campaign.mission, 0, SC64_RACE_MAP_COUNT - 1);
+    int mission = limit(race_campaign.mission, 0, (int)(sizeof(objectives)/sizeof(objectives[0])) - 1);
     return objectives[mission];
 }
 
 static const char *
 race_campaign_victory_text(void)
 {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) {
+        switch (race_campaign.mission) {
+        case 10: return "PSI EMITTER DELIVERED";
+        case 11: return "THE BIG PUSH COMPLETE";
+        case 12: return "NEW GETTYSBURG CLEARED";
+        case 13: return "THE ION CANNON DESTROYED";
+        default: break;
+        }
+    }
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active()) return "NORAD II RESCUED";
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active()) return "ANTIGAN REVOLT COMPLETE";
+#endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (race_t4_active()) return "JACOBS DATA RECOVERED";
+#endif
+#ifdef SC64_P3_RUNTIME
+    if (race_campaign.mission == SC64_RACE_MISSION_P3)
+        return race_p3_victory_text();
+#endif
+#if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
+    if (race_campaign.mission == SC64_RACE_MISSION_Z3)
+        return race_z3_victory_text();
+#endif
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+    if (race_campaign.mission == SC64_RACE_MISSION_T3)
+        return race_t3_victory_text();
+#endif
     static const char *const titles[] = {
         "AMONG THE RUINS CLEARED", "CHRYSALIS DELIVERED",
         "FIRST STRIKE COMPLETE", "CEREBRATE DESTROYED"
 #ifdef SC64_UNIFIED
         ,"WASTELAND SECURED", "BACKWATER SECURED"
+#ifdef SC64_T3_ENABLED
+        ,"THE DESPERATE ALLIANCE SURVIVED"
+#endif
 #endif
     };
-    return titles[limit(race_campaign.mission, 0, SC64_RACE_MAP_COUNT - 1)];
+    return titles[limit(race_campaign.mission, 0, (int)(sizeof(titles)/sizeof(titles[0])) - 1)];
+}
+
+/* Used by the result screen when the late Terran profile is wired to its
+ * mission-specific defeat label. Keep the player-facing text independent of
+ * source dialogue and describe only each map's loss-critical actor/objective. */
+static const char *
+race_campaign_failure_text(void)
+{
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active()) {
+        switch (race_campaign.mission) {
+        case 10: return "KERRIGAN OR THE FORCE WAS LOST";
+        case 11: return "NORAD II OR THE FORCE WAS LOST";
+        case 12: return "THE ASSAULT FORCE WAS LOST";
+        case 13: return "RAYNOR OR THE ASSAULT FORCE WAS LOST";
+        default: break;
+        }
+    }
+#endif
+    return "MISSION FAILED";
 }
 
 static const char *
 race_campaign_message_text(void)
 {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active())
+        return race_campaign_lost() ? race_campaign_failure_text() :
+               race_campaign_objective_text();
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (race_t6_active()) return race_campaign_objective_text();
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (race_t5_active()) return race_campaign_objective_text();
+#endif
+#ifdef SC64_T4_SCENARIO_RUNTIME
+    if (race_t4_active()) return (race_t4.switches.bits[0] & 16) ?
+        "Data located. Keep Raynor alive until the mission report." :
+        "Explore the installation and find the data disks. Protect Raynor.";
+#endif
+#ifdef SC64_P3_RUNTIME
+    if (race_campaign.mission == SC64_RACE_MISSION_P3) {
+        if (race_p3.transmission) return "Zerg colonies cleared. Mission report pending.";
+        return race_p3_objective_text();
+    }
+#endif
     static const char *const messages[] = {
         "", "Protect the Chrysalis. Build a Spawning Pool and Hydralisk Den.",
         "The required Zerg structures are ready. Destroy the Terran encampment.",
@@ -625,7 +994,14 @@ race_campaign_message_text(void)
         ,"Build your outpost and find Jim Raynor.",
         "Rescue the outpost and destroy the Infested Command Center.",
         "Opening supplies received. Find Jim Raynor.",
-        "Raynor has joined. Build a Barracks and train ten Marines."
+        "Raynor has joined. Build a Barracks and train ten Marines.",
+        "Hold the Terran base. Destroy a Zerg building before the final two minutes to reveal another objective.",
+        "The enemy has begun its assault. Hold your buildings until the countdown ends.",
+        "Ten minutes remain. Keep the Terran buildings alive.",
+        "Five minutes remain. Keep the Terran buildings alive.",
+        "One minute remains. Hold the line.",
+        "The Hatchery objective is open. Destroy the Zerg Hatchery or survive the countdown.",
+        "Protect the Chrysalis and eliminate the Terran presence."
 #endif
     };
     return race_campaign.message < sizeof(messages) / sizeof(messages[0]) ?

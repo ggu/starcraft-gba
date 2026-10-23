@@ -18,6 +18,14 @@ TARGETS = {
     "--campaign": ("StarCraft64-Terran-Campaign-GBA", "starcraft64-campaign", "SCT1"),
     "--races": ("StarCraft64-Races-GBA", "starcraft64-races", "SCR3"),
     "--unified": ("StarCraft64-GBA", "starcraft64-unified", "SCU1"),
+    "--terran": ("StarCraft-Terran-GBA", "starcraft-terran", "SCT8", "SC TERRAN 10"),
+    "--terran-t3": ("StarCraft-Terran-T3-GBA", "starcraft-terran-t3", "SCT3", "SC TERRAN T3"),
+    "--zerg": ("StarCraft-Zerg-GBA", "starcraft-zerg", "SCZ2", "SC ZERG"),
+    "--zerg-z3": ("StarCraft-Zerg-Z3-GBA", "starcraft-zerg-z3", "SCZ3", "SC ZERG Z3"),
+    "--protoss": ("StarCraft-Protoss-GBA", "starcraft-protoss", "SCP2", "SC PROTOSS"),
+    "--protoss-p3": ("StarCraft-Protoss-P3-GBA", "starcraft-protoss-p3", "SCP3", "SC PROTOSS3"),
+    "--t4-internal": ("StarCraft-T4-Internal-GBA", "starcraft-t4-replay", "SCT4", "SC64 T4 TEST"),
+    "--terran-t4": ("StarCraft-Terran-T4-GBA", "starcraft-t4-combined", "SCT5", "SC TERRAN T4"),
 }
 
 
@@ -29,7 +37,7 @@ def executable(name: str) -> str:
     return command
 
 
-def verify(name: str, elf_name: str, code: str) -> dict[str, object]:
+def verify(name: str, elf_name: str, code: str, title: str | None = None) -> dict[str, object]:
     rom = ROOT / "build" / f"{name}.gba"
     data = rom.read_bytes()
     if not 192 <= len(data) <= 32 * 1024 * 1024:
@@ -40,6 +48,8 @@ def verify(name: str, elf_name: str, code: str) -> dict[str, object]:
         raise ValueError(f"{rom.name}: invalid header checksum")
     if data[0xAC:0xB0].decode("ascii", errors="replace") != code:
         raise ValueError(f"{rom.name}: expected game code {code}")
+    if title is not None and data[0xA0:0xAC].decode("ascii", errors="replace").rstrip() != title:
+        raise ValueError(f"{rom.name}: expected title {title!r}")
     if b"SRAM_V113" not in data:
         raise ValueError(f"{rom.name}: missing SRAM detection signature")
     size_output = subprocess.check_output(
@@ -57,16 +67,18 @@ def main(argv: list[str]) -> int:
     if len(selected) > 1:
         raise SystemExit("Select only one optional ROM profile per verification run")
     if selected:
-        rom_name, elf_name, code = TARGETS[selected[0]]
-        targets = [(rom_name, elf_name, code)]
+        entry = TARGETS[selected[0]]
+        rom_name, elf_name, code = entry[:3]
+        title = entry[3] if len(entry) > 3 else None
+        targets = [(rom_name, elf_name, code, title)]
         output_name = selected[0][2:] + "-verification.json"
     else:
-        targets = [("StarCraft-GBA", "starcraft", "SCGD")]
+        targets = [("StarCraft-GBA", "starcraft", "SCGD", "SC GBA DEMO")]
         output_name = "verification.json"
 
     results = {}
-    for rom_name, elf_name, code in targets:
-        result = verify(rom_name, elf_name, code)
+    for rom_name, elf_name, code, title in targets:
+        result = verify(rom_name, elf_name, code, title)
         results[rom_name] = result
         print(f"{rom_name}: {result['bytes']} bytes, SHA-256 {result['sha256']}")
     (ROOT / "build" / output_name).write_text(json.dumps(results, indent=2) + "\n")

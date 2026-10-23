@@ -135,7 +135,7 @@ bw_spawn(void *context, int player, int type, int location, int amount)
         for (i = top / 16; i <= bottom / 16 && i < MAP_ROWS; i++) {
             int x;
             for (x = left / 16; x <= right / 16 && x < MAP_COLS; x++)
-                explored[x + i * MAP_COLS] = 1;
+                SC64_GRID_SET(explored, x + i * MAP_COLS, 1);
         }
         return amount;
     }

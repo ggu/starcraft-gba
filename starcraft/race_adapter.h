@@ -3,11 +3,34 @@
 
 #include "race_skirmish.h"
 
+#ifdef SC64_T5_RUNTIME
+static int race_t5_active(void);
+static int race_t5_starport_has_control_tower(int producer);
+#endif
+
 /* Live owner-independent race adapter. Include from game.c after engine
  * helpers and before the frame/update hooks that call these functions. */
 static const int race_bot_owner_ids[3] = { ENEMY, RESCUABLE, 4 };
-static const int race_base_x[4] = { 160, 864, 864, 160 };
-static const int race_base_y[4] = { 160, 864, 160, 864 };
+static int race_base_x[4] = { 160, 864, 864, 160 };
+static int race_base_y[4] = { 160, 864, 160, 864 };
+
+static void race_skirmish_geometry(void)
+{
+    static const int original_x[4]={160,864,864,160};
+    static const int original_y[4]={160,864,160,864};
+    race_cols=race_rows=64;
+    for(int i=0;i<4;i++){race_base_x[i]=original_x[i];race_base_y[i]=original_y[i];}
+#ifdef SC64_IMPORTED_SKIRMISH
+    race_skirmish_map=limit(race_skirmish_map,0,SC64_SKIRMISH_IMPORTED_COUNT);
+    if(race_skirmish_map>0){
+        const Sc64SkirmishMap *map=&sc64_skirmish_maps[race_skirmish_map-1];
+        race_cols=map->width;race_rows=map->height;
+        for(int i=0;i<4;i++){race_base_x[i]=map->start_x[i];race_base_y[i]=map->start_y[i];}
+    }
+#else
+    race_skirmish_map=0;
+#endif
+}
 
 static int race_bot_index(int owner)
 {
@@ -68,9 +91,9 @@ static int race_owner_supply_cap(int owner)
     return total;
 }
 
-static int race_owner_reserved_supply(int owner)
+static int race_owner_queued_supply(int owner)
 {
-    int i, j, total = race_owner_supply(owner);
+    int i, j, total = 0;
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == owner)
         for (j = 0; j < b[i].queue_count; ++j) {
             const Sc64RaceUnitRule *r = sc64_race_unit_rule(b[i].queue[(b[i].queue_head + j) % 5]);
@@ -79,13 +102,20 @@ static int race_owner_reserved_supply(int owner)
     return total;
 }
 
+static int race_owner_reserved_supply(int owner)
+{
+    return race_owner_supply(owner) + race_owner_queued_supply(owner);
+}
+
 static int race_owner_has_prereq(int owner, unsigned short prereq)
 {
     int i;
     if (!prereq) return 1;
     for (i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) && b[i].owner == owner) {
         switch (b[i].type) {
-        case B_HATCHERY: if (prereq & SC_PR_HATCHERY) prereq &= (unsigned short)~SC_PR_HATCHERY; break;
+        case B_HATCHERY: case B_LAIR: case B_HIVE:
+            if (prereq & SC_PR_HATCHERY) prereq &= (unsigned short)~SC_PR_HATCHERY;
+            break;
         case B_SPAWNING_POOL: if (prereq & SC_PR_SPAWNING_POOL) prereq &= (unsigned short)~SC_PR_SPAWNING_POOL; break;
         case B_HYDRALISK_DEN: if (prereq & SC_PR_HYDRALISK_DEN) prereq &= (unsigned short)~SC_PR_HYDRALISK_DEN; break;
         case B_NEXUS: if (prereq & SC_PR_NEXUS) prereq &= (unsigned short)~SC_PR_NEXUS; break;
@@ -95,6 +125,10 @@ static int race_owner_has_prereq(int owner, unsigned short prereq)
         case B_FORGE: if (prereq & SC_PR_FORGE) prereq &= (unsigned short)~SC_PR_FORGE; break;
         case B_DEPOT: if (prereq & SC_PR_DEPOT) prereq &= (unsigned short)~SC_PR_DEPOT; break;
         case B_BARRACKS: if (prereq & SC_PR_BARRACKS) prereq &= (unsigned short)~SC_PR_BARRACKS; break;
+#ifdef SC64_T5_RUNTIME
+        case B_FACTORY: if (prereq & SC_PR_FACTORY) prereq &= (unsigned short)~SC_PR_FACTORY; break;
+        case B_CONTROL_TOWER: if (prereq & SC_PR_CONTROL_TOWER) prereq &= (unsigned short)~SC_PR_CONTROL_TOWER; break;
+#endif
         }
     }
     return prereq == 0;
@@ -131,7 +165,7 @@ static int race_site_creep(int owner, int x, int y)
     int i;
     for (i = 0; i < MAX_BUILDINGS; ++i)
         if (building_complete(i) && b[i].owner == owner &&
-            (b[i].type == B_HATCHERY || b[i].type == B_LAIR) &&
+            sc64_race_is_zerg_townhall(b[i].type) &&
             dist2(x, y, b[i].x, b[i].y) <= 160 * 160) return 1;
     return 0;
 }
@@ -141,6 +175,9 @@ static int race_can_site(int owner, int type, int x, int y)
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     int race = race_owner_identity(owner);
     if (!r || r->race != race || !race_owner_has_prereq(owner, r->prereq)) return 0;
+    /* Imported Lairs/Hives and Greater Spires are recognized structures,
+       but this adapter does not implement their morph/build operations. */
+    if (type == B_LAIR || type == B_HIVE || type == B_GREATER_SPIRE) return 0;
     if ((r->flags & SC_RACE_F_REQUIRES_POWER) && !race_site_powered(owner, x, y)) return 0;
     if (race == R_ZERG && type != B_HATCHERY && type != B_EXTRACTOR && !race_site_creep(owner, x, y)) return 0;
     if (type == B_EXTRACTOR || type == B_ASSIMILATOR) {
@@ -165,9 +202,27 @@ static int race_queue_unit(int owner, int producer, int type)
     int tail, count, reserved, cap;
     const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
     Sc64RaceBank bank;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_airborne(producer)) return 0;
+#endif
     if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) || !building_complete(producer) ||
-        b[producer].owner != owner || b[producer].type != r->producer || b[producer].queue_count >= 5 ||
-        !race_owner_has_prereq(owner, r->prereq) || !race_owner_has_type(owner, r->producer)) return 0;
+        b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type, r->producer) || b[producer].queue_count >= 5 ||
+        !race_owner_has_prereq(owner, r->prereq)) return 0;
+#ifdef SC64_T5_RUNTIME
+    if (!race_t5_unit_product_available(owner, b[producer].raw_owner, type)) return 0;
+    if (type == U_DROPSHIP && race_t5_active() &&
+        !race_t5_starport_has_control_tower(producer)) return 0;
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (!race_t6_unit_product_available(owner, b[producer].raw_owner, type)) return 0;
+    if (type == U_DROPSHIP && race_t6_active() &&
+        !race_t6_can_train_dropship(producer)) return 0;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (!race_late_unit_product_available(owner, b[producer].raw_owner, type)) return 0;
+    if (type == U_DROPSHIP && race_late_active() &&
+        !race_t6_can_train_dropship(producer)) return 0;
+#endif
     {
         const Sc64RaceBuildingRule *br = sc64_race_building_rule(b[producer].type);
         if (br && (br->flags & SC_RACE_F_REQUIRES_POWER) &&
@@ -197,6 +252,22 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     Sc64RaceBank bank;
     int slot;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (!race_late_building_product_available(owner,
+            worker >= 0 && worker < MAX_UNITS ? u[worker].raw_owner : -1,
+            type)) return 0;
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (type == B_CONTROL_TOWER) return 0; /* Starport-only add-on path. */
+    if (!race_t5_building_product_available(owner,
+            worker >= 0 && worker < MAX_UNITS ? u[worker].raw_owner : -1,
+            type)) return 0;
+#endif
+#ifdef SC64_T6_RUNTIME
+    if (!race_t6_building_product_available(owner,
+            worker >= 0 && worker < MAX_UNITS ? u[worker].raw_owner : -1,
+            type)) return 0;
+#endif
     if (!r || r->race != race_owner_identity(owner) || worker < 0 || worker >= MAX_UNITS ||
         !u[worker].alive || u[worker].owner != owner || u[worker].type != r->worker ||
         !race_can_site(owner, type, x, y) || !can_place(type, x, y)) return 0;
@@ -211,6 +282,11 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
     if (slot < 0) return 0;
     /* Non-Terran construction starts only after the worker reaches the site. */
     if (race_owner_identity(owner) != R_TER) b[slot].build_progress = -1;
+#ifdef SC64_T6_RUNTIME
+    if (u[worker].order == ORDER_REPAIR) {
+        u[worker].carry = 0; u[worker].work_timer = 0;
+    }
+#endif
     u[worker].order = ORDER_BUILD;
     u[worker].target = slot;
     u[worker].tx = x;
@@ -247,7 +323,8 @@ static void race_tick_state(void)
 {
     int i,used=0,cap=0;
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && !b[i].under_construction &&
-        b[i].owner >= 0 && b[i].owner < 5 && race_owner_identity(b[i].owner) == R_ZERG && b[i].type == B_HATCHERY) {
+        b[i].owner >= 0 && b[i].owner < 5 && race_owner_identity(b[i].owner) == R_ZERG &&
+        sc64_race_is_zerg_townhall(b[i].type)) {
         if (b[i].larva < 3 && ++b[i].larva_timer >= 428) {
             b[i].larva_timer = 0;
             if (b[i].larva < 3) ++b[i].larva;
@@ -287,13 +364,16 @@ static void race_complete_building(int i)
     b[i].hp = b[i].maxhp;
     b[i].build_progress = 0;
     if (r && r->supply_provided && b[i].owner == SIDE) supply_cap += r->supply_provided;
-    if (b[i].type == B_HATCHERY) b[i].larva = 3;
+    if (sc64_race_is_zerg_townhall(b[i].type)) b[i].larva = 3;
 }
 
 static void race_tick_buildings(void)
 {
     int i;
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        if (race_late_airborne(i)) continue;
+#endif
         int type, frames, x, y, supply, owner;
         const Sc64RaceBuildingRule *br;
         if (b[i].under_construction) {
@@ -326,8 +406,11 @@ static void race_tick_buildings(void)
         } else {
             int spawned = spawn_unit(owner, type, x, y);
             if (spawned >= 0 && sc64_race_is_worker(type)) {
-                int base = owner == SIDE ? 0 : owner == ENEMY ? 1 : owner == RESCUABLE ? 2 : 3;
-                int patch = race_mode?base*4+((owner+frame/600)&3):nearest_mineral(x,y);
+                int patch = nearest_mineral(x,y);
+#ifndef SC64_IMPORTED_SKIRMISH
+                if(race_mode){int base=owner==SIDE?0:owner==ENEMY?1:owner==RESCUABLE?2:3;
+                    patch=base*4+((owner+frame/600)&3);}
+#endif
                 if (patch >= 0 && patch < MAX_MINERALS && m[patch].amount > 0) {
                     u[spawned].order = ORDER_MINE; u[spawned].target = patch; u[spawned].work_timer = 0;
                 }
@@ -353,7 +436,7 @@ static void race_skirmish_init(void)
     memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b)); memset(m, 0, sizeof(m));
     memset(race_player, 0xff, sizeof(race_player));
     memset(race_minerals, 0, sizeof(race_minerals)); memset(race_gas, 0, sizeof(race_gas));
-    race_cols = race_rows = 64;
+    race_skirmish_geometry();
     frame = 0; won = lost = 0; supply_used = 0; supply_cap = 0;
     minerals = 200; gas = 0; geyser_count = 4;
     for (i = 0; i < 4; ++i) {
@@ -368,8 +451,25 @@ static void race_skirmish_init(void)
         geysers[i].x = race_base_x[i] + (sx < 0 ? 64 : -64);
         geysers[i].y = race_base_y[i] + (sy < 0 ? 56 : -56);
     }
+#ifdef SC64_IMPORTED_SKIRMISH
+    if(race_skirmish_map>0){
+        const Sc64SkirmishMap *map=&sc64_skirmish_maps[race_skirmish_map-1];
+        memset(m,0,sizeof(m));
+        for(i=0;i<map->minerals_count&&i<MAX_MINERALS;i++){
+            m[i].x=map->minerals[i].x;m[i].y=map->minerals[i].y;
+            m[i].amount=map->minerals[i].amount;m[i].style=176;
+        }
+        geyser_count=map->geyser_count;
+        for(i=0;i<geyser_count;i++){geysers[i].x=map->geysers[i].x;geysers[i].y=map->geysers[i].y;}
+    }
+#endif
     for (i = 0; i < race_bots && i < 3; ++i)
-        race_player[race_bot_owner_ids[i]] = (race_human + i + 1) % 3;
+        race_player[race_bot_owner_ids[i]] =
+#ifdef SC64_IMPORTED_SKIRMISH
+            limit(race_bot_races[i],0,2);
+#else
+            (race_human + i + 1) % 3;
+#endif
     race_player[SIDE] = race_human;
     for (i = 0; i < 1 + race_bots && i < 4; ++i) {
         int base = i;
@@ -387,6 +487,21 @@ static void race_skirmish_init(void)
             spawn_unit(owner, U_OVERLORD, race_base_x[base] - 24, race_base_y[base] - 18);
         for (j = 0; j < 4; ++j) {
             int idx = base * 4 + j;
+#ifdef SC64_IMPORTED_SKIRMISH
+            if(race_skirmish_map>0){
+                int picked[4]={-1,-1,-1,-1};
+                for(int k=0;k<=j;k++){
+                    int best=0x7fffffff;idx=-1;
+                    for(int p=0;p<MAX_MINERALS;p++)if(m[p].amount>0){
+                        int used=0;for(int q=0;q<k;q++)if(picked[q]==p)used=1;
+                        int distance=dist2(m[p].x,m[p].y,race_base_x[base],race_base_y[base]);
+                        if(!used&&distance<best){best=distance;idx=p;}
+                    }
+                    picked[k]=idx;
+                }
+                if(idx<0)continue;
+            }
+#endif
             int wi = spawn_unit(owner, worker_type, m[idx].x + 4, m[idx].y + 4);
             if (wi >= 0) {
                 u[wi].order = ORDER_MINE;
@@ -408,9 +523,12 @@ static int race_skirmish_site_for(int owner, int type, int *x, int *y)
     static const int dy[8] = { 0,0,48,-48,48,48,-48,-48 };
     int i;
     if (base < 0) return 0;
-    for (i = 0; i < 8; ++i) {
-        int px = race_base_x[base] + dx[i], py = race_base_y[base] + dy[i];
-        if (race_can_site(owner, type, px, py) && can_place(type, px, py)) { *x = px; *y = py; return 1; }
+    for (int ring=0;ring<3;ring++) for (i = 0; i < 8; ++i) {
+        int px = race_base_x[base] + dx[i]*(48+ring*32)/48;
+        int py = race_base_y[base] + dy[i]*(48+ring*32)/48;
+        int reserved_gas=0;
+        for(int g=0;g<geyser_count;g++)if(dist2(px,py,geysers[g].x,geysers[g].y)<48*48)reserved_gas=1;
+        if(!reserved_gas&&race_can_site(owner, type, px, py) && can_place(type, px, py)) { *x = px; *y = py; return 1; }
     }
     return 0;
 }
@@ -427,7 +545,8 @@ static void race_tick_ai(void)
             else if (sc64_race_unit_damage(u[i].type) > 0) ++army;
         }
         for (i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) && b[i].owner == owner &&
-            b[i].type == (race == R_ZERG ? B_HATCHERY : race == R_PROTOSS ? B_NEXUS : B_COMMAND)) { producer = i; break; }
+            sc64_race_producer_compatible(b[i].type,
+                race == R_ZERG ? B_HATCHERY : race == R_PROTOSS ? B_NEXUS : B_COMMAND)) { producer = i; break; }
         /* Supply expansion is paid and finished before it raises the cap.
            Do not let worker queues permanently starve the Zerg combat army. */
         if(race_owner_supply_cap(owner)-race_owner_reserved_supply(owner)<=4) {
@@ -446,13 +565,11 @@ static void race_tick_ai(void)
                 }
             }
         }
-        /* Keep workers growing while real worker trips fund each order. */
-        if (producer >= 0 && workers < 8)
-            race_queue_unit(owner, producer, race == R_ZERG ? U_DRONE : race == R_PROTOSS ? U_PROBE : U_SCV);
         /* Put two actual workers on a completed gas structure, or build one
          * on the owner's geyser after the first combat structure is started. */
         {
             int ref = race_owner_refinery(owner), gx, gy, gi, gas_workers = 0;
+            int gas_type=race==R_ZERG?B_EXTRACTOR:race==R_PROTOSS?B_ASSIMILATOR:B_REFINERY;
             for (i = 0; i < MAX_UNITS; ++i)
                 if (u[i].alive && u[i].owner == owner && u[i].order == ORDER_GAS) ++gas_workers;
             if (ref >= 0 && gas_workers < 2) {
@@ -463,12 +580,17 @@ static void race_tick_ai(void)
                     if(d<best){best=d;w=j;}
                 }
                 if (w >= 0) { u[w].order = ORDER_GAS; u[w].target = ref; u[w].carry = 0; u[w].work_timer = 0; }
-            } else if (ref < 0 && (race_owner_has_type(owner, race == R_ZERG ? B_SPAWNING_POOL : race == R_PROTOSS ? B_GATEWAY : B_BARRACKS)) &&
+            } else if (ref < 0 && !race_owner_has_type(owner,gas_type) && (race_owner_has_type(owner, race == R_ZERG ? B_SPAWNING_POOL : race == R_PROTOSS ? B_GATEWAY : B_BARRACKS)) &&
                        owner != SIDE) {
-                gi = owner == ENEMY ? 1 : owner == RESCUABLE ? 2 : 3;
-                gx = geysers[gi].x; gy = geysers[gi].y;
-                build_type = race == R_ZERG ? B_EXTRACTOR : race == R_PROTOSS ? B_ASSIMILATOR : B_REFINERY;
-                if (race_can_site(owner, build_type, gx, gy) && can_place(build_type, gx, gy)) {
+                build_type = gas_type;
+                int base=owner==ENEMY?1:owner==RESCUABLE?2:3,best=0x7fffffff;
+                gi=-1;
+                for(int g=0;g<geyser_count;g++){
+                    int distance=dist2(geysers[g].x,geysers[g].y,race_base_x[base],race_base_y[base]);
+                    if(distance<best&&race_can_site(owner,build_type,geysers[g].x,geysers[g].y)&&can_place(build_type,geysers[g].x,geysers[g].y)){gi=g;best=distance;}
+                }
+                if(gi>=0){
+                    gx = geysers[gi].x; gy = geysers[gi].y;
                     int w = race_owner_worker(owner, race == R_ZERG ? U_DRONE : race == R_PROTOSS ? U_PROBE : U_SCV, gx, gy);
                     if (w >= 0) race_start_build(owner, w, build_type, gx, gy);
                 }
@@ -491,12 +613,23 @@ static void race_tick_ai(void)
             int worker = race_owner_worker(owner, U_PROBE, x, y);
             if (worker >= 0) { race_start_build(owner, worker, build_type, x, y); continue; }
         }
+        /* Reserve the first gas structure's price before queuing units.
+         * Marines and workers otherwise spend each mining trip before a
+         * refinery's full price can accumulate. Construction above spends
+         * this reserve normally; no resources are granted to the AI. */
+        int gas_type=race==R_ZERG?B_EXTRACTOR:race==R_PROTOSS?B_ASSIMILATOR:B_REFINERY;
+        int reserve=race_owner_has_type(owner,gas_type)?0:sc64_race_building_rule(gas_type)->minerals;
+        int worker_type=race==R_ZERG?U_DRONE:race==R_PROTOSS?U_PROBE:U_SCV;
+        if (producer >= 0 && workers < 8 &&
+            race_owner_minerals(owner)-reserve >= sc64_race_unit_rule(worker_type)->minerals)
+            race_queue_unit(owner, producer, worker_type);
         unit_type = race == R_ZERG ?
             (race_owner_has_type(owner, B_HYDRALISK_DEN) ? U_HYDRALISK : U_ZERGLING) :
             race == R_PROTOSS ? (race_owner_has_type(owner, B_CYBERNETICS_CORE) ? U_DRAGOON : U_ZEALOT) : U_MARINE;
         for (i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) && b[i].owner == owner &&
-            b[i].type == sc64_race_unit_rule(unit_type)->producer && b[i].queue_count < 2) {
-            race_queue_unit(owner, i, unit_type);
+            sc64_race_producer_compatible(b[i].type, sc64_race_unit_rule(unit_type)->producer) && b[i].queue_count < 2) {
+            if(race_owner_minerals(owner)-reserve >= sc64_race_unit_rule(unit_type)->minerals)
+                race_queue_unit(owner, i, unit_type);
             break;
         }
         if (army >= 4) {

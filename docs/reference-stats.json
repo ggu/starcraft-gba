@@ -118,6 +118,27 @@
       }
     },
     {
+      "name": "Zerg_Scourge",
+      "bwapi_enum_id": 47,
+      "hp": 25,
+      "armor": 0,
+      "minerals": 25,
+      "gas": 75,
+      "build_time_frames": 450,
+      "supply_required_internal_doubled": 1,
+      "supply_provided_internal_doubled": 0,
+      "weapon": {
+        "name": "Suicide_Scourge",
+        "bwapi_enum_id": 55,
+        "damage": 110,
+        "damage_bonus": 0,
+        "cooldown_frames": 1,
+        "max_range_pixels": 3,
+        "damage_type": "Normal",
+        "target_attributes": ["Air"]
+      }
+    },
+    {
       "name": "Terran_Command_Center",
       "bwapi_enum_id": 106,
       "hp": 1500,

@@ -38,7 +38,13 @@ sc64_unit_bucket_insert(int slot, int cell)
     sc64_unit_bucket_cell[slot] = (u16)cell;
 }
 
+#ifdef SC64_T5_RUNTIME
+/* Once-per-frame setup stays in ROM to preserve the unchanged IWRAM stack
+ * reserve as transport checks expand the hot actor loop. */
+static void __attribute__((noinline))
+#else
 static void GBA_HOT
+#endif
 sc64_unit_buckets_begin(void)
 {
     int i;
@@ -56,7 +62,7 @@ sc64_unit_buckets_begin(void)
         sc64_unit_bucket_prev[i] = 0xff;
     }
     for (i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive) {
+        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
             int x = u[i].x, y = u[i].y;
             if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) return;
             sc64_unit_bucket_insert(i, sc64_unit_bucket_cell_at(x, y));
@@ -100,9 +106,15 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
             int i;
             for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
                  i = sc64_unit_bucket_next[i])
-                if (&u[i] != q && u[i].alive) {
+                if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
 #ifdef SC64_RACES
                     if(u[i].type==U_CHRYSALIS||sc64_race_unit_flying(u[i].type)!=sc64_race_unit_flying(q->type))continue;
+#ifdef SC64_T4_RUNTIME
+                    if ((sc64_race_t4_actor_flags(u[i].type) &&
+                         !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_COLLIDABLE)) ||
+                        (sc64_race_t4_actor_flags(q->type) &&
+                         !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_COLLIDABLE))) continue;
+#endif
 #endif
                     int dx = u[i].x - nx, dy = u[i].y - ny;
                     if (dx <= -6 || dx >= 6 || dy <= -6 || dy >= 6) continue;

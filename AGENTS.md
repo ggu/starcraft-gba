@@ -31,4 +31,19 @@ make unified
 make test-unified
 ```
 
+For changes to the full Terran campaign, when its private inputs are prepared,
+also run:
+
+```sh
+./dev sc64 build --profile terran
+./dev sc64 test --profile terran
+```
+
+The build checks the ARM ROM and unchanged RAM reserve guards. The test command
+runs all ten mission controllers, startup and save checks, and the skirmish
+matrix under host sanitizers; it does not require an emulator. Normal-menu ARM
+replay and fresh-process SRAM qualification are separate checks described in
+`docs/VALIDATION.md`. See `docs/RACE-CAMPAIGNS.md` for campaign controls and
+profile limits.
+
 Do not fetch or generate private game inputs just to complete a default-profile task. If an optional check cannot run because its local inputs are absent, say so in the handoff and report the default checks completed.

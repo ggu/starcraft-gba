@@ -9,6 +9,7 @@ static int campaign_mission;
 #endif
 #else
 typedef uint8_t u8;
+typedef uint32_t u32;
 #endif
 enum { MAP_COLS = 64, MAP_ROWS = 64, MAP_CELLS = MAP_COLS * MAP_ROWS };
 #define WORLD_W (MAP_COLS * 16)
@@ -41,6 +42,24 @@ gfx_blit_band(int y, int height, const u8 *src)
     memcpy(pixels + y * 240, src, (size_t)height * 240);
     return 1;
 }
+
+#ifdef SC64_TERRAIN_SCROLL
+static int
+gfx_blit_window(int y, int height, const u8 *src, int stride, int rows,
+                int left, int top)
+{
+    for (int row = 0; row < height; ++row) {
+        int source_row = top + row;
+        if (source_row < 0 || source_row >= rows) continue;
+        for (int col = 0; col < 240; ++col) {
+            int source_col = left + col;
+            if (source_col >= 0 && source_col < stride)
+                pixels[(y + row) * 240 + col] = src[source_row * stride + source_col];
+        }
+    }
+    return 1;
+}
+#endif
 #endif
 
 #include "../starcraft/sc64_terrain_cache.h"
@@ -52,6 +71,81 @@ fill_band(u8 value)
     memset(pixels + SC64_TERRAIN_CACHE_Y * 240, value,
            SC64_TERRAIN_CACHE_HEIGHT * 240);
 }
+
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+static void
+test_diagnostic_counters(void)
+{
+    memset(visible, 0, sizeof(visible));
+    memset(explored, 0, sizeof(explored));
+    sc64_terrain_cache_valid = 0;
+    sc64_terrain_cache_reused_base = 0;
+    sc64_terrain_requests = sc64_terrain_hits = sc64_terrain_partial = 0;
+    sc64_terrain_diag_invalid_cache = 0;
+    sc64_terrain_diag_mission_change = 0;
+    sc64_terrain_diag_static_key_change = 0;
+    sc64_terrain_diag_camera_oversize = 0;
+    sc64_terrain_diag_camera_change = 0;
+    sc64_terrain_diag_invalid_view = 0;
+    sc64_terrain_diag_invalid_mask = 0;
+    sc64_terrain_diag_blit_failure = 0;
+    sc64_terrain_diag_capture_failure = 0;
+    sc64_terrain_diag_reused_pixels = 0;
+    sc64_terrain_diag_captured_pixels = 0;
+    sc64_terrain_diag_captured_tiles = 0;
+    sc64_terrain_diag_tiles_checked = 0;
+    sc64_terrain_diag_dirty_tiles = 0;
+    test_static_key = 3;
+#ifdef SC64_TERRAN_CAMPAIGN
+    campaign_mission = 0;
+#endif
+
+    assert(!sc64_terrain_cached(0, 0));
+    assert(sc64_terrain_diag_invalid_cache == 1);
+    fill_band(0x41);
+    assert(sc64_terrain_store(0, 0));
+    assert(sc64_terrain_diag_captured_pixels == 240u * SC64_TERRAIN_CACHE_HEIGHT);
+    assert(sc64_terrain_diag_captured_tiles == (u32)sc64_terrain_cache_mask_count);
+    assert(sc64_terrain_cached(0, 0));
+    assert(sc64_terrain_diag_reused_pixels == 240u * SC64_TERRAIN_CACHE_HEIGHT);
+    assert(sc64_terrain_diag_tiles_checked == (u32)sc64_terrain_cache_mask_count);
+    assert(sc64_terrain_diag_dirty_tiles == 0);
+
+    visible[0] = 1;
+    assert(!sc64_terrain_cached(0, 0));
+    assert(sc64_terrain_diag_dirty_tiles == 1);
+    assert(sc64_terrain_diag_tiles_checked == 2u * (u32)sc64_terrain_cache_mask_count);
+
+    test_static_key++;
+    assert(!sc64_terrain_cached(0, 0));
+    assert(sc64_terrain_diag_static_key_change == 1);
+    assert(sc64_terrain_store(0, 0));
+#ifdef SC64_TERRAIN_SCROLL
+    assert(!sc64_terrain_cached(240, 0));
+    assert(sc64_terrain_diag_camera_oversize == 1);
+    assert(sc64_terrain_store(0, 0));
+    sc64_terrain_cache_camx = -1;
+    assert(!sc64_terrain_cached(1, 0));
+    assert(sc64_terrain_diag_invalid_view == 1);
+#else
+    assert(!sc64_terrain_cached(1, 0));
+    assert(sc64_terrain_diag_camera_change == 1);
+#endif
+
+    assert(sc64_terrain_store(0, 0));
+    ++sc64_terrain_cache_mask_count;
+    assert(!sc64_terrain_cached(0, 0));
+    assert(sc64_terrain_diag_invalid_mask == 1);
+#ifdef SC64_TERRAN_CAMPAIGN
+    assert(sc64_terrain_store(0, 0));
+    campaign_mission++;
+    assert(!sc64_terrain_cached(0, 0));
+    assert(sc64_terrain_diag_mission_change == 1);
+    campaign_mission = 0;
+#endif
+    read_calls = blit_calls = 0;
+}
+#endif
 
 static void
 test_restore_preserves_surrounding_pixels(void)
@@ -144,6 +238,9 @@ test_static_object_key_invalidates_full_base(void)
 int
 main(void)
 {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+    test_diagnostic_counters();
+#endif
     test_restore_preserves_surrounding_pixels();
     test_camera_and_fog_invalidation();
     test_edge_viewport_and_campaign_mission_key();
@@ -168,7 +265,12 @@ static void
 render_fixture(int camx, int camy, int incremental)
 {
     gfx_begin(0);
-    if (incremental) (void)sc64_terrain_cached(camx, camy);
+    if (incremental) {
+        /* Prove the scroll path overwrites every destination pixel, including
+         * newly exposed strips and world-edge margins. */
+        gfx_rect(0, SC64_TERRAIN_CACHE_Y, 240, SC64_TERRAIN_CACHE_HEIGHT, 255);
+        (void)sc64_terrain_cached(camx, camy);
+    }
     for (int row = camy / 16; row <= (camy + SC64_TERRAIN_CACHE_HEIGHT) / 16; row++)
         for (int col = camx / 16; col <= (camx + 240) / 16; col++) {
             if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS) continue;
@@ -190,6 +292,57 @@ compare_incremental_with_fresh(int camx, int camy)
     assert(memcmp(incremental, fresh, sizeof(fresh)) == 0);
     render_fixture(camx, camy, 0);
     assert(sc64_terrain_store(camx, camy));
+}
+
+static void
+test_scroll_differential(void)
+{
+    static const int cameras[][2] = {
+        /* Consecutive 1/2/3-pixel shifts exercise byte alignment variants
+         * in gfx_blit_window. */
+        {0, 0}, {1, 1}, {3, 3}, {6, 6}, {2, 3}, {7, 8},
+        {15, 15}, {16, 16}, {17, 31}, {31, 17}, {63, 79}, {64, 80}, {80, 64},
+        {48, 48}, {239, 107}, {478, 213}, {238, 106},
+        {WORLD_W - 240, WORLD_H - SC64_TERRAIN_CACHE_HEIGHT},
+        {WORLD_W - 241, WORLD_H - SC64_TERRAIN_CACHE_HEIGHT - 1},
+        {WORLD_W - 480, WORLD_H - 216}, {0, 0},
+        {240, 108}, {480, 216}, {WORLD_W - 240, WORLD_H - 108}
+    };
+    memset(visible, 0, sizeof(visible));
+    memset(explored, 0, sizeof(explored));
+    for (int row = 0; row < MAP_ROWS; ++row)
+        for (int col = 0; col < MAP_COLS; ++col) {
+            int cell = col + row * MAP_COLS;
+            visible[cell] = ((col * 7 + row * 3) % 5) != 0;
+            explored[cell] = ((col + row) % 7) != 0;
+        }
+    test_static_key = 71;
+    for (unsigned i = 0; i < sizeof(cameras) / sizeof(cameras[0]); ++i) {
+        if (i == 7) {
+            int col = cameras[i][0] / 16 + 4;
+            int row = cameras[i][1] / 16 + 3;
+            int cell = col + row * MAP_COLS;
+            visible[cell] = !visible[cell];
+            explored[cell] = 1;
+        }
+        compare_incremental_with_fresh(cameras[i][0], cameras[i][1]);
+    }
+    /* These jumps have no overlap and must use a complete repaint. */
+    compare_incremental_with_fresh(100, 100);
+    compare_incremental_with_fresh(400, 400);
+    /* One-pixel overlap in both axes exercises clipped source edges at the
+     * largest reusable offsets in each direction under ASan. */
+    compare_incremental_with_fresh(100, 100);
+    compare_incremental_with_fresh(339, 207);
+    compare_incremental_with_fresh(100, 100);
+    test_static_key++;
+    compare_incremental_with_fresh(101, 101);
+    compare_incremental_with_fresh(100, 100);
+    ++sc64_terrain_cache_mask_count;
+    gfx_begin(0);
+    assert(!sc64_terrain_cached(101, 100));
+    assert(!sc64_terrain_cache_valid);
+    compare_incremental_with_fresh(101, 100);
 }
 
 int
@@ -241,6 +394,7 @@ main(void)
     assert(!sc64_terrain_cached(17, 11));
     render_fixture(17, 11, 1);
     compare_incremental_with_fresh(17, 11);
+    test_scroll_differential();
     return 0;
 }
 #endif

@@ -18,10 +18,92 @@ static int find_worker(int owner, int type)
     return -1;
 }
 
+/* Independent brute-force reference for the defense tower's strict weapon
+ * range, owner, scenario-flag, flight-class, and slot-order rules. */
+static int defense_reference_target(int building)
+{
+    Building *q = &b[building];
+    int ground = 0, air = 0, range = 0, best = -1, bestd;
+    switch (q->type) {
+    case B_SUNKEN_COLONY: ground = 1; range = 112; break;
+    case B_SPORE_COLONY: air = 1; range = 112; break;
+    default: assert(0); break;
+    }
+    bestd = range * range;
+    for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive &&
+        owners_hostile(q->owner, u[j].owner) && !(u[j].flags & 16)) {
+        int flying = sc64_race_unit_flying(u[j].type);
+        int dx = q->x - u[j].x, dy = q->y - u[j].y;
+        if ((flying && !air) || (!flying && !ground) || !race_can_attack(-1, j)) continue;
+        if (dx * dx + dy * dy < bestd) { bestd = dx * dx + dy * dy; best = j; }
+    }
+    return best;
+}
+
+static void check_defense_targeting(int tower_type, const int *types,
+                                    const int *xs, const int *ys,
+                                    const int *flags, int count)
+{
+    int tower, expected, hp[MAX_UNITS];
+    race_mode = 1; race_human = R_ZERG; race_bots = 1;
+    race_skirmish_init(); screen = SCREEN_PLAY;
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    tower = spawn_build(SIDE, tower_type, 200, 160, 0);
+    assert(tower >= 0);
+    for (int i = 0; i < count; ++i) {
+        int slot = spawn_unit(ENEMY, types[i], xs[i], ys[i]);
+        assert(slot == i);
+        u[slot].flags = (u8)flags[i];
+    }
+    expected = defense_reference_target(tower);
+    for (int i = 0; i < MAX_UNITS; ++i) hp[i] = u[i].hp;
+    race_tick_defenses();
+    for (int i = 0; i < count; ++i)
+        assert(u[i].hp == hp[i] - (i == expected ?
+            (tower_type == B_SUNKEN_COLONY ? 40 : 15) : 0));
+}
+
+static void test_defense_target_query(void)
+{
+    /* Sunken: nearest ground target wins; flagged and air targets are skipped.
+     * The nearer air target also checks that flight rejection stays intact. */
+    {
+        const int types[] = { U_ZERGLING, U_MARINE, U_MUTALISK, U_ZERGLING };
+        const int xs[] = { 240, 250, 201, 202 }, ys[] = { 160, 160, 160, 160 };
+        const int flags[] = { 0, 0, 0, 16 };
+        check_defense_targeting(B_SUNKEN_COLONY, types, xs, ys, flags, 4);
+    }
+    /* Spore: ground is ignored, exact range boundary is excluded, equal-range
+     * air targets resolve to the lowest unit slot. */
+    {
+        const int types[] = { U_ZERGLING, U_MUTALISK, U_WRAITH, U_MUTALISK };
+        const int xs[] = { 201, 312, 240, 240 }, ys[] = { 160, 160, 200, 120 };
+        const int flags[] = { 0, 0, 0, 0 };
+        check_defense_targeting(B_SPORE_COLONY, types, xs, ys, flags, 4);
+    }
+    /* Exact radius is not in range. */
+    {
+        const int types[] = { U_WRAITH };
+        const int xs[] = { 312 }, ys[] = { 160 };
+        const int flags[] = { 0 };
+        check_defense_targeting(B_SPORE_COLONY, types, xs, ys, flags, 1);
+    }
+    /* The closest airborne candidate is invulnerable; the next eligible air
+     * candidate must be selected instead. */
+    {
+        const int types[] = { U_MUTALISK, U_WRAITH, U_ZERGLING };
+        const int xs[] = { 204, 240, 205 }, ys[] = { 160, 160, 160 };
+        const int flags[] = { 16, 0, 0 };
+        check_defense_targeting(B_SPORE_COLONY, types, xs, ys, flags, 3);
+    }
+}
+
 int main(void)
 {
     gba_init();
     game_init();
+    test_defense_target_query();
 
     /* Mixed-race starts give each owner its actual worker, town hall, and
      * race-specific supply. The extra owners cycle through Z/T/P. */

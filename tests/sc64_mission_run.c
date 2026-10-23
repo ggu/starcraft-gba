@@ -426,8 +426,23 @@ main(int argc, char **argv)
         return 64;
     }
     game_init();
+#ifdef SC64_UNIFIED
+    /* In the full Terran profile, enter through the real campaign and mission
+     * menus rather than treating HOME confirmation as an immediate deploy. */
+    input_frame(KEY_A); input_frame(0);
+#ifndef SC64_CAMPAIGN_RACE
+    if (race_front.page != SC_FRONT_CAMPAIGN) return 66;
+    input_frame(KEY_A); input_frame(0); /* Terran campaign -> mission list. */
+#endif
+    if (race_front.page != SC_FRONT_MISSION) return 66;
+    input_frame(KEY_A); input_frame(0); /* T1 briefing. */
+    if (race_front.page != SC_FRONT_BRIEFING || race_front.mission != 4) return 66;
+    input_frame(KEY_A); input_frame(0); /* Deploy. */
+    if (screen != SCREEN_PLAY || race_selected_mission != 4) return 66;
+#else
     input_frame(KEY_A);
     input_frame(0);
+#endif
     initial_zerg = alive_count(ENEMY, U_ZERGLING);
     initial_scv = alive_count(SIDE, U_SCV);
     initial_marine = alive_count(SIDE, U_MARINE);

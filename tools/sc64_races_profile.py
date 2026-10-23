@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from emulator_smoke import ROOT, RSP, capture, require_mgba, symbol_sizes, symbols
 
 CPU_HZ = 16_777_216
-MAX_UNITS = 128
+UNIT_CAPACITIES = (128, 160)
 MAX_BUILDINGS = 64
 MAX_CONTROLLER_EVENTS = 2048
 KEY_A, KEY_B, KEY_SELECT, KEY_START, KEY_RIGHT, KEY_LEFT, KEY_UP, KEY_DOWN, KEY_L = 1, 2, 4, 8, 16, 32, 64, 128, 512
@@ -109,7 +109,7 @@ def race_bank_profile(elf: Path, sizes: dict[str, int]) -> dict:
     if unit_stride % 4 or building_stride % 4:
         raise RuntimeError('Unit and Building layouts must be 32-bit aligned')
     unit_capacity, building_capacity = unit_bytes // unit_stride, building_bytes // building_stride
-    if unit_capacity != MAX_UNITS or building_capacity != MAX_BUILDINGS:
+    if unit_capacity not in UNIT_CAPACITIES or building_capacity != MAX_BUILDINGS:
         raise RuntimeError(f'Unexpected Races bank capacity: {unit_capacity}/{building_capacity}')
     for field in ('owner', 'type', 'alive', 'x', 'y'):
         if field not in unit_offsets or field not in building_offsets:

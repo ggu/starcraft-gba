@@ -21,8 +21,12 @@ GAMES = {
     "backwater": ("backwater", "build/StarCraft64-Backwater-GBA.gba"),
     "skirmish": ("skirmish", "build/StarCraft64-Skirmish-GBA.gba"),
     "campaign": ("campaign", "build/StarCraft64-Terran-Campaign-GBA.gba"),
+    "terran": ("terran", "build/StarCraft-Terran-GBA.gba"),
+    "zerg": ("zerg", "build/StarCraft-Zerg-GBA.gba"),
+    "protoss": ("protoss", "build/StarCraft-Protoss-GBA.gba"),
 }
-SC64_PROFILES = ("wasteland", "backwater", "skirmish", "campaign", "races", "unified")
+SC64_PROFILES = ("wasteland", "backwater", "skirmish", "campaign", "races", "unified",
+                 "terran", "zerg", "protoss")
 
 
 def run(command: list[str], *, cwd: Path = ROOT) -> None:
@@ -140,10 +144,33 @@ def prepare(rom: Path, profile: str) -> None:
     private_rom = ROOT / ".local/sc64/rom/StarCraft64-USA.z64"
     if profile == "campaign":
         run([sys.executable, str(ROOT / "tools/sc64_campaign_pack.py"), "--rom", str(private_rom)])
-    elif profile in ("races", "unified"):
+    elif profile in ("races", "unified", "terran", "zerg", "protoss"):
         run([sys.executable, str(ROOT / "tools/sc64_races_pack.py")])
+        run([sys.executable, str(ROOT / "tools/sc64_t4_scenario_pack.py")])
         run([sys.executable, str(ROOT / "tools/sc64_race_sprites.py")])
         run([sys.executable, str(ROOT / "tools/sc64_menu_assets.py")])
+        if profile in ("terran", "zerg", "protoss"):
+            run([sys.executable, str(ROOT / "tools/sc64_skirmish_pack.py")])
+        if profile == "terran":
+            for mission in ("t5", "t6"):
+                run([sys.executable, str(ROOT / "tools/sc64_t4_scenario_pack.py"),
+                     "--profile", mission])
+                run([sys.executable, str(ROOT / "tools/sc64_t5_availability.py"),
+                     "--profile", mission])
+            # The full profile uses its own sprite set so the smaller race ROMs
+            # keep their existing generated inputs and memory limits.
+            race = ROOT / ".local/sc64/races/generated"
+            stage = ROOT / ".local/sc64/terran-late/import-stage"
+            stage.mkdir(parents=True, exist_ok=True)
+            names = ["sc64_races_generated.h"]
+            names.extend(f"sc64_t{mission}_{kind}_generated.h"
+                         for mission in range(7, 11)
+                         for kind in ("scenario", "availability"))
+            for name in names:
+                shutil.copy2(race / name, stage / name)
+            run([sys.executable, str(ROOT / "tools/sc64_race_sprites.py"),
+                 "--include-t6", "--include-late-terran", "--out", str(stage / "sprites"),
+                 "--header", str(stage / "sc64_race_sprites_generated.h")])
     print(f"Prepared local StarCraft 64 data for profile '{profile}'. Generated files stay under .local/.")
 
 
@@ -158,13 +185,27 @@ def status(profile: str) -> int:
     ]
     if profile == "campaign":
         paths.append(("Campaign data", ROOT / ".local/sc64/campaign/generated/sc64_campaign_generated.h"))
-    if profile in ("races", "unified"):
+    if profile in ("races", "unified", "terran", "zerg", "protoss"):
         race = ROOT / ".local/sc64/races/generated"
         paths.extend((label, race / name) for label, name in (
             ("Race maps", "sc64_races_generated.h"),
             ("Race sprites", "sc64_race_sprites_generated.h"),
             ("Menu artwork", "sc64_menu_generated.h"),
         ))
+    if profile in ("terran", "zerg", "protoss"):
+        paths.append(("Skirmish maps", ROOT / ".local/sc64/skirmish/generated/sc64_skirmish_generated.h"))
+    if profile == "terran":
+        race = ROOT / ".local/sc64/races/generated"
+        stage = ROOT / ".local/sc64/terran-late/import-stage"
+        paths.append(("Terran T4 triggers", race / "sc64_t4_scenario_generated.h"))
+        paths.extend((f"Terran T{mission} {kind}", race / f"sc64_t{mission}_{kind}_generated.h")
+                     for mission in (5, 6) for kind in ("scenario", "availability"))
+        paths.extend((label, stage / name) for label, name in (
+            ("Full Terran maps", "sc64_races_generated.h"),
+            ("Full Terran sprites", "sc64_race_sprites_generated.h"),
+        ))
+        paths.extend((f"Terran T{mission} {kind}", stage / f"sc64_t{mission}_{kind}_generated.h")
+                     for mission in range(7, 11) for kind in ("scenario", "availability"))
     _, rom_rel = GAMES[profile]
     paths.append(("Built ROM", ROOT / rom_rel))
     for label, path in paths:
@@ -208,7 +249,9 @@ def main() -> int:
         elif args.action == "test":
             target = {"unified": "test-unified", "races": "test-races",
                       "wasteland": "test-sc64", "backwater": "test-backwater",
-                      "skirmish": "test-skirmish", "campaign": "test-campaign"}[args.profile]
+                      "skirmish": "test-skirmish", "campaign": "test-campaign",
+                      "terran": "test-sc64-terran-full-campaign", "zerg": "test-zerg",
+                      "protoss": "test-protoss"}[args.profile]
             run(["make", target])
         else:
             return play(args.profile)
