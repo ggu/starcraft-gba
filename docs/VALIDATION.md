@@ -2021,3 +2021,38 @@ capture comparison found viewport-edge map graphics leaking into the HUD.
 A consecutive-frame host fixture reproduced that failure; poisoning both
 buffers before every comparison had previously hidden it by invalidating the
 cache each time. No HUD-band skip is enabled by these performance flags.
+
+### 2026-10-24 — race target occupancy optimization
+
+The existing late-Terran target-query implementation is now also gated by
+`SC64_TARGET_OCCUPANCY` for the race profiles. Conservative owner row/column
+masks skip empty areas; a per-update hostility snapshot avoids repeated
+alliance checks. Movement adds occupancy immediately, and stale bits remain
+conservative until the next rebuild. `SC64_UNARMED_QUERY_SKIP` skips searches
+for actors with neither weapon while preserving wildcard and air-only queries.
+The default and other flag-off profiles retain their previous implementation.
+
+Full Z4 ARM replay wins at frame 71777 with all 73 observed state checkpoints
+and five PNG captures equal to the baseline. Its live-play mean rises from
+15.12 to 16.61 fps. The candidate ROM SHA-256 is
+`a80939e948466450466682786ee2fe8aa000d9c3aa8cbcab5a7e2f6ffe1a8cf8`,
+with ELF `e1da9b0b7e7cfa5405094fe0041f5a893284fe0330534aae444558dea7c8ddf3`.
+The shared-source build produces that same ROM. Separate 30000-tick prefixes
+match all 31 states and four PNGs for Z4, Z3 and P3; measured means are
+18.48, 23.99 and 26.43 fps versus their original 16.52, 20.31 and 24.56.
+The Z3/P3 full candidate replays and optimized Z4 fresh-save checks are
+additional qualification work, not implied by those prefix comparisons.
+
+All four race target-query differential fixtures pass ASan/UBSan, covering
+five owners, every attacker type, strict range/tie rules, air-only targets,
+movement/deaths, index overflow/fallback and rescue hostility transitions.
+The existing unified and full-Terran target fixtures also compile and pass.
+All four ARM images satisfy the unchanged memory guards. A source-only copy
+of the staged performance changes passes `./dev build` and `./dev test`,
+including 248 Python tests with four optional private-data skips.
+
+To retain the IWRAM reserve with the larger query, the race HUD invalidation
+pass runs from ROM, as it already did in expanded profiles; expanded Z/P
+profiles also place `gfx_bar` in ROM. No HUD-band caching experiment is enabled.
+These are emulator results; physical GBA qualification and the 30-fps target
+remain outstanding.

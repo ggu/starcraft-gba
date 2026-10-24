@@ -566,7 +566,7 @@ static Building b[MAX_BUILDINGS];
 static int target_unit_head[5], target_building_head[5];
 static int target_unit_next[MAX_UNITS], target_building_next[MAX_BUILDINGS];
 static int target_lists_valid;
-#if defined(SC64_RACES) && defined(SC64_LATE_TERRAN_STORAGE)
+#if defined(SC64_RACES) && (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY))
 static u8 target_hostile_mask[5];
 static int target_hostile_masks_valid;
 #endif
@@ -1777,7 +1777,7 @@ static int sc64_t4_can_attack_from(int attacker, int target, int owner)
 #define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
     race_can_attack((attacker), (target))
 #endif
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
 static void
 sc64_target_hostility_snapshot(void)
 {
@@ -1799,7 +1799,7 @@ __attribute__((optimize("Os")))
 #endif
 sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
 {
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     int best = -1, best_distance = max_distance * max_distance, d;
     int cols = (WORLD_W + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
     int rows = (WORLD_H + SC64_TARGET_CELL_SIZE - 1) / SC64_TARGET_CELL_SIZE;
@@ -3681,7 +3681,7 @@ update_orders(void)
 target_lists_unavailable:
 #ifdef SC64_RACES
     if (target_lists_valid) sc64_target_index_begin();
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     sc64_target_hostility_snapshot();
 #endif
 #endif
@@ -3912,7 +3912,7 @@ target_lists_unavailable:
     }
     target_lists_valid = 0;
 #ifdef SC64_RACES
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     target_hostile_masks_valid = 0;
 #endif
     sc64_target_index_end();
@@ -5667,7 +5667,7 @@ static u8 sc64_hud_buffer_dirty[2];
 static u32 sc64_hud_buffer_clear_generation[2];
 #endif
 
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
 /* Keep the expanded actor loop and target search in IWRAM. This once-per-
  * render HUD invalidation pass can execute from ROM without using its stack
  * reserve. Its timing impact is measured with the late-profile replay. */
