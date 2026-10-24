@@ -1268,5 +1268,7 @@ int main(int argc,char **argv)
     fputs("]}\n",controller_trace);
     if(fclose(controller_trace)!=0) { perror("write Z6 controller trace"); return 2; }
     controller_trace=NULL;
-    return result;
+    /* Helpers historically returned zero for both early aborts and the
+     * completed route. Only an observed source victory may pass this target. */
+    return result == 0 && strcmp(terminal,"won") == 0 ? 0 : 1;
 }

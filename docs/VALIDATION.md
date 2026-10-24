@@ -3250,3 +3250,49 @@ The 534-file source-only export passes `./dev build` and `./dev test`,
 including 360 Python tests (six private-input checks skipped). The original-art
 ROM remains byte-identical (`4ad80ce0…f9aee`). Imported data and private replay
 artifacts remain outside the source index.
+
+### Opt-in nearest active resource depots
+
+`SC64_NEAREST_RESOURCE_DEPOT` replaces first-slot return-depot selection with
+the nearest same-owner, grounded, reachable active depot. It follows the
+pinned OpenBW active-depot/return-order rules (`bwgame.h:2191–2207` and
+`4452–4490`) using the current GBA navigation grid and approach radius;
+native path/footprint equivalence is not claimed. Lairs/Hives stay active
+during their in-place morph. New unfinished Hatcheries remain unavailable.
+
+The existing signed `Unit.build` field holds a per-trip depot slot or a
+no-home sentinel. Topology changes invalidate these caches; depot completion
+wakes no-home workers. Candidate distance/tie rejection precedes route
+searches. No new persistent storage or save-format fields are added. Workers
+keep their resource order and cargo when no depot can be reached; carrying
+gas can be delivered even after its former refinery disappears.
+
+Actual-engine ASan/UBSan fixtures pass in P5, Z6 and P6 builds. They cover
+nearby second-base mineral/gas delivery, no credit before arrival, all three
+worker types waiting without cargo loss, depot completion recovery, Lair
+morphing, incomplete/enemy/non-depot rejection, deterministic ties, destroyed
+refinery delivery, reused slots, disconnected/reconnected routes, packed
+cache round trips and SRAM reload invalidation/reselection. Airborne rejection
+is implemented in the late-Terran gate but is not exercised by this matrix.
+
+The initial ARM experiment exceeded the unchanged IWRAM guard when GCC left
+the enlarged order loop as a standalone hot function. Extracting only worker
+resource handling into a non-inlined ROM helper resolves it. The frozen
+candidate builds pass with these IWRAM/BSS ends: P5 plus production exits
+`0x03004328` / `0x0203d584`; P6 `0x03004608` / `0x0203d774`; Z6 plus count
+snapshot, collision hoisting and fact-range rejection `0x03004cd8` /
+`0x0203d980`. These build checks do not measure a gameplay speedup.
+
+The existing Z6 controller does not complete with the changed economy: its
+bounded attempt ends at frame 294038 with two Force2 units still present.
+During this check, the controller's old early-abort paths were found to
+return exit code zero. The entry point now requires an observed source win
+to pass. The reference route wins at frame 268694 with source fault zero;
+non-winning attempts must fail the target. This experiment remains off by
+default pending a winning route, ARM replay/save and performance qualification.
+
+The 535-file source-only snapshot passes `./dev build` and `./dev test`
+(360 Python tests, six private-input checks skipped), and current unified
+ARM/host checks pass. The original-art ROM remains byte-identical
+(`4ad80ce0…f9aee`). This does not advance the staged campaign count beyond
+T10/Z6/P6 or promote the canonical Zerg/Protoss profiles.

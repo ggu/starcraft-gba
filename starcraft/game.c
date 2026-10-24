@@ -1059,6 +1059,14 @@ volatile u32 sc64_order_setup_cycles, sc64_order_query_cycles, sc64_order_move_c
 static int nearest_refinery(int x, int y);
 static void update_exploration(void);
 static int owner_command_center(int owner);
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+#ifndef SC64_RACES
+#error "SC64_NEAREST_RESOURCE_DEPOT requires the race campaign runtime"
+#endif
+static int race_nearest_resource_depot(Unit *worker);
+static void race_depot_cache_invalidate_topology(void);
+static void race_depot_cache_clear_no_home(void);
+#endif
 static void add_owner_resources(int owner, int ore, int vespene);
 #ifdef SC64_P3_RUNTIME
 static int GBA_HOT __attribute__((noinline))
@@ -1626,6 +1634,9 @@ static void
 invalidate_path_grid(void)
 {
     path_grid_valid = 0;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+    race_depot_cache_invalidate_topology();
+#endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_routes_reset();
 #endif
@@ -3984,6 +3995,9 @@ interact(void)
 	    u[worker].order = ORDER_GAS;
 	    u[worker].target = refinery;
 	    u[worker].carry = 0;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+            u[worker].build = -1;
+#endif
 	    toast(0);
 	    return;
 	}
@@ -4022,6 +4036,9 @@ interact(void)
 	    if (worker >= 0) {
 		u[worker].order = ORDER_GAS;
 		u[worker].target = selected_building;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+                u[worker].build = -1;
+#endif
 		toast(0);
 	    } else
 		toast(5);
@@ -4050,6 +4067,87 @@ owner_command_center(int owner)
         ) return i;
     return -1;
 }
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+static int
+race_resource_depot_type(int type)
+{
+    return type == B_COMMAND || type == B_NEXUS || sc64_race_is_zerg_townhall(type);
+}
+
+static int
+race_resource_depot_valid_for(const Unit *worker, int slot)
+{
+    int morphing_zerg_depot;
+    if (!worker || slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive ||
+        b[slot].owner != worker->owner ||
+        !race_resource_depot_type(b[slot].type)) return 0;
+    morphing_zerg_depot = b[slot].under_construction &&
+        (b[slot].type == B_LAIR || b[slot].type == B_HIVE);
+    if (b[slot].under_construction && !morphing_zerg_depot) return 0;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_active() && race_late_airborne(slot)) return 0;
+#endif
+    return 1;
+}
+
+static int
+race_resource_depot_reachable(const Unit *worker, int slot)
+{
+    int next_x, next_y;
+    return path_next_tile(worker->x, worker->y, b[slot].x, b[slot].y,
+                          &next_x, &next_y);
+}
+
+static void
+race_depot_cache_invalidate_topology(void)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && IS_WORKER(u[i].type) &&
+            (u[i].build == -2 || u[i].order == ORDER_MINE ||
+             u[i].order == ORDER_GAS))
+            u[i].build = -1;
+}
+
+static void
+race_depot_cache_clear_no_home(void)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && IS_WORKER(u[i].type) && u[i].build == -2)
+            u[i].build = -1;
+}
+
+/* Cache one home depot for the current resource trip. The cache stores only
+ * a building slot in Unit.build (already serialized). Reachability is checked
+ * when selecting a home and cached routes are invalidated on topology changes;
+ * destination ownership/type/completion is checked whenever the slot is used. */
+/* Keep the bounded route-selection scan in ROM. Inlining it into the hot
+ * order loop consumes the reserved IWRAM stack space on campaign builds. */
+static int __attribute__((noinline))
+race_nearest_resource_depot(Unit *worker)
+{
+    int cached, best = -1, best_distance = 0x7fffffff;
+    if (!worker) return -1;
+    cached = worker->build;
+    if (cached == -2) return -1; /* No reachable depot until a new one appears. */
+    if (race_resource_depot_valid_for(worker, cached)) return cached;
+    worker->build = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i) {
+        int distance;
+        if (!race_resource_depot_valid_for(worker, i)) continue;
+        distance = dist2(worker->x, worker->y, b[i].x, b[i].y);
+        /* Slots are scanned in ascending order, so equal-distance candidates
+         * cannot win the existing tie. Avoid a route search for them too. */
+        if (distance >= best_distance ||
+            !race_resource_depot_reachable(worker, i)) continue;
+        if (distance < best_distance) {
+            best = i;
+            best_distance = distance;
+        }
+    }
+    worker->build = best >= 0 ? best : -2;
+    return best;
+}
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
 /* The legacy model has one home depot. Late campaign expansion bases need
  * the nearest landed depot; cache its slot in the otherwise unused worker
@@ -4084,6 +4182,64 @@ add_owner_resources(int owner, int ore, int vespene)
 #else
     if (owner == SIDE) { minerals += ore; gas += vespene; }
 #endif
+}
+#endif
+
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+/* Leave combat orders in fast RAM. Keeping the less frequent worker return
+ * state machine in ROM prevents GCC's inlining decision from placing the
+ * entire enlarged order loop in IWRAM and consuming the stack reserve. */
+static void __attribute__((noinline))
+race_update_resource_worker(Unit *q)
+{
+    int home, tx, ty;
+    if (!q->carry) {
+        if ((q->order == ORDER_GAS &&
+             (q->target < 0 || q->target >= MAX_BUILDINGS ||
+              !building_complete(q->target))) ||
+            (q->order == ORDER_MINE &&
+             (q->target < 0 || q->target >= MAX_MINERALS))) {
+            q->order = ORDER_IDLE;
+            q->build = -1;
+            return;
+        }
+    }
+    home = race_nearest_resource_depot(q);
+    /* Preserve the trip and its cargo while the no-home cache is asleep.
+     * A topology change or completed depot makes it eligible for selection. */
+    if (home < 0) return;
+    if (q->carry) {
+        if (dist2(q->x, q->y, b[home].x, b[home].y) > 32 * 32) {
+            move_toward(q, b[home].x, b[home].y);
+        } else {
+            add_owner_resources(q->owner, q->order == ORDER_MINE ? q->carry : 0,
+                                q->order == ORDER_GAS ? q->carry : 0);
+            q->carry = 0;
+            q->build = -1;
+            q->work_timer = 20;
+        }
+        return;
+    }
+    /* A loaded worker can return even if its former resource disappeared;
+     * only an empty worker needs to read the resource target coordinates. */
+    tx = q->order == ORDER_MINE ? m[q->target].x : b[q->target].x;
+    ty = q->order == ORDER_MINE ? m[q->target].y : b[q->target].y;
+    if (dist2(q->x, q->y, tx, ty) >
+        (q->order == ORDER_GAS ? 24 * 24 : 7 * 7)) {
+        move_toward(q, tx, ty);
+    } else if (q->work_timer > 0) {
+        --q->work_timer;
+    } else if (q->order == ORDER_MINE) {
+        q->carry = m[q->target].amount < 8 ? m[q->target].amount : 8;
+        m[q->target].amount -= q->carry;
+        if (q->carry > 0) q->build = -1;
+        q->work_timer = 45;
+        if (q->carry <= 0) q->order = ORDER_IDLE;
+    } else {
+        q->carry = 8;
+        q->build = -1;
+        q->work_timer = 60;
+    }
 }
 #endif
 
@@ -4446,6 +4602,10 @@ target_lists_unavailable:
 		b[q->target].under_construction = 0;
 		b[q->target].hp = b[q->target].maxhp;
 		b[q->target].build_progress = 0;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+                if (race_resource_depot_type(b[q->target].type))
+                    race_depot_cache_clear_no_home();
+#endif
 		if (b[q->target].type == B_DEPOT && q->owner == SIDE)
 		    supply_cap += 16;
 		q->order = ORDER_IDLE;
@@ -4454,6 +4614,12 @@ target_lists_unavailable:
 	    continue;
 	}
 
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+        if (q->order == ORDER_MINE || q->order == ORDER_GAS) {
+            race_update_resource_worker(q);
+            continue;
+        }
+#else
 	if (q->order == ORDER_MINE || q->order == ORDER_GAS) {
             int home =
 #ifdef SC64_TERRAN_LATE_RUNTIME
@@ -4522,6 +4688,8 @@ target_lists_unavailable:
 	    }
 	    continue;
 	}
+
+#endif
 
 	if (q->order == ORDER_MOVE) {
 	    if (dist2(q->x, q->y, q->tx, q->ty) <= 5 * 5)
@@ -4651,6 +4819,9 @@ economy(void)
 	    u[i].target = patch;
 	    u[i].work_timer = 0;
 	    u[i].carry = 0;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+            u[i].build = -1;
+#endif
 #ifndef SC64_SKIRMISH
 	    break;
 #endif

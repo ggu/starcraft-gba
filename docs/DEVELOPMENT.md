@@ -1429,6 +1429,27 @@ orders wait when no space is available. This is a bounded GBA placement model,
 with the limitations recorded in VALIDATION. Use a clean rebuild without the
 extra flag to return to the normal P5 build.
 
+Expansion resource returns have a separate opt-in experiment:
+
+```sh
+make test-sc64-nearest-resource-depot
+make -B protoss-p5-shuttle P3_EXTRA_FLAGS='-DSC64_P3_PRODUCTION_EXIT -DSC64_NEAREST_RESOURCE_DEPOT'
+```
+
+`SC64_NEAREST_RESOURCE_DEPOT` selects a same-owner, reachable active depot
+instead of the first base slot, and caches it for a resource trip. Morphing
+Lairs/Hives remain active depots; a new unfinished Hatchery does not. Missing
+depots preserve the worker's resource order and cargo until a topology or
+depot-completion event allows another selection. This needs the prepared
+P5/Z6/P6 private inputs for its actual-engine sanitizer matrix.
+
+The experiment remains disabled by default. Its focused behavior/save tests
+and ARM reserve checks pass, but the existing Z6 controller stalls with the
+changed economy and does not qualify a complete route. The Z6 controller
+target now exits nonzero for a loss or bounded attempt without a victory.
+Worker resource handling stays in ROM so compiler inlining cannot consume
+the IWRAM stack reserve; movement and combat retain their existing routines.
+
 After Z7 inputs are prepared, `make test-sc64-z7-gas-restore` checks destroyed
 source Extractors reopening their geyser locations and the corresponding
 transactional save validation. This does not establish a full Z7 win.

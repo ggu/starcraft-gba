@@ -456,6 +456,9 @@ static void race_complete_building(int i)
     b[i].under_construction = 0;
     b[i].hp = b[i].maxhp;
     b[i].build_progress = 0;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+    if (race_resource_depot_type(b[i].type)) race_depot_cache_clear_no_home();
+#endif
     if (r && r->supply_provided && b[i].owner == SIDE) supply_cap += r->supply_provided;
     if (sc64_race_is_zerg_townhall(b[i].type)) b[i].larva = 3;
 }
