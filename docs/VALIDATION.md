@@ -2040,8 +2040,24 @@ with ELF `e1da9b0b7e7cfa5405094fe0041f5a893284fe0330534aae444558dea7c8ddf3`.
 The shared-source build produces that same ROM. Separate 30000-tick prefixes
 match all 31 states and four PNGs for Z4, Z3 and P3; measured means are
 18.48, 23.99 and 26.43 fps versus their original 16.52, 20.31 and 24.56.
-The Z3/P3 full candidate replays and optimized Z4 fresh-save checks are
-additional qualification work, not implied by those prefix comparisons.
+The full Z3 and P3 candidate replays subsequently pass as well:
+
+| Full replay | Original mean | Optimized mean | Matching states | Identical PNGs |
+|---|---:|---:|---:|---:|
+| Z3 | 19.12 fps | 21.68 fps | 73 | 6 |
+| P3 | 22.83 fps | 25.08 fps | 154 | 6 |
+
+Both win at their original frames (70833 and 151088). Z3's ROM SHA-256 is
+`3cacc5db20f9576525dca643980c8f0aecdbb60f1047fae0117435a707ef0bda`,
+with ELF `28753e939c79a930427491418aca81a3c0437284ed17d68d7fe644e9f82f9805`.
+P3's ROM is `b590cd00e40606c4da31a8014ea6eecb0fae42abb065df22ebd119904f813c97`,
+with ELF `8a1c79d964f4302b63efcdf341f1724d4bc66dd73def2c56d2e78eb096037d78`.
+The shared builds are byte-identical to these frozen candidates.
+
+The optimized Z4 image additionally saves at frame 29852 and restores the
+observed state exactly in a fresh emulator process. Its input handoff plus
+60 neutral ticks ends at frame 29913. Fresh-save qualification of optimized
+canonical Z3/P3 is tracked separately from their full win comparisons.
 
 All four race target-query differential fixtures pass ASan/UBSan, covering
 five owners, every attacker type, strict range/tie rules, air-only targets,
