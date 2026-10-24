@@ -50,7 +50,7 @@ P6_PROBE_FLAGS := $(P6_QUERY_FLAGS) -I.local/sc64/p6/generated $(P5_SHUTTLE_FLAG
 P6_PROBE_INPUTS := $(P5_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_p6_abilities_generated.h .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p6/generated/sc64_p6_doodads_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h
 Z6_PROBE_FLAGS := $(Z6_QUERY_FLAGS) -I.local/sc64/z6/generated $(Z5_CONSUME_FLAGS) -DSC64_Z6_DATA_ENABLED -DSC64_Z6_RUNTIME -DSC64_Z6_ACTORS -DSC64_Z6_CAMPAIGN_ENTRY -DSC64_Z6_CLOAK_ENABLED -DSC64_Z6_STORM_ENABLED -DSC64_Z6_TRANSPORT_ENABLED
 Z6_PROBE_INPUTS := $(Z5_CLOAK_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_abilities_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h
-Z7_PROBE_FLAGS := $(Z6_PROBE_FLAGS) -DSC64_Z7_DATA_ENABLED -DSC64_Z7_RUNTIME -DSC64_Z7_CAMPAIGN_ENTRY
+Z7_PROBE_FLAGS := $(Z6_PROBE_FLAGS) -DSC64_Z7_DATA_ENABLED -DSC64_Z7_RUNTIME -DSC64_Z7_CAMPAIGN_ENTRY -DSC64_Z7_COLONY_DEFENSE_ENABLED
 Z7_PROBE_INPUTS := $(Z6_PROBE_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z7_scenario_generated.h
 T4_STORAGE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_T4_ENABLED -DSC64_T4_RUNTIME -DSC64_ROUTE_PACK3 -DSC64_T4_WINDOWED_SCHEDULE -DSC64_CAMPAIGN_RACE=0
 T4_OPTIMIZATION_FLAGS ?= -DSC64_T4_COUNT_CACHE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS -DSC64_UNARMED_QUERY_SKIP
@@ -1838,6 +1838,11 @@ test-sc64-z7-frame-coverage: build/test-sc64-z7-frame-coverage
 	./build/test-sc64-z7-frame-coverage
 test-sc64-z7-game-save: build/test-sc64-z7-game-save
 	./build/test-sc64-z7-game-save
+build/test-sc64-z7-colonies: tests/sc64_z7_colonies_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-colonies
+test-sc64-z7-colonies: build/test-sc64-z7-colonies
+	./build/test-sc64-z7-colonies
 
 build/test-sc64-z6-runtime: tests/sc64_z6_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@

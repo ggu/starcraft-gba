@@ -15,7 +15,11 @@
 #define PROFILE_FACTION SC64_FACTION_ZERG
 #define PROFILE_FRONT_FACTION SC_FRONT_ZERG
 #define PROFILE_RACE R_ZERG
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+#define PROFILE_SAVE_GENERATION 34u
+#else
 #define PROFILE_SAVE_GENERATION 33u
+#endif
 #define PROFILE_OLD_SAVE_TAG 0x53435a32u
 static const int profile_missions[] = {0, 1, 14, 15, 16, 17, 18};
 static const char *const profile_titles[] = {

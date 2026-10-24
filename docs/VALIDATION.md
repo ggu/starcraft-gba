@@ -2828,8 +2828,11 @@ The corrected ROM SHA-256 is
 A fresh emulator restores its 1,000-tick prefix snapshot exactly through HOME
 L at frame 967, takes one neutral handoff frame and then 60 measured live
 frames to frame 1028. That is an opening save check, not the late-mission
-qualification. The 150,000-tick save and new full replay remain running;
-staged qualification remains 20/30 until those checks complete.
+qualification. The 150,000-tick prefix now also passes exact fresh-process
+HOME restore at frame 148268, one neutral handoff frame and 60 measured live
+frames to frame 148329. Its resumed interval measures 17.15 effective fps;
+this is a 60-frame sample, not a full-mission rate. The corrected build's
+full replay remains running, so staged qualification remains 20/30.
 
 ### Default-off Z6 count-phase snapshot
 
@@ -2863,3 +2866,37 @@ This optimization preserves the current center-in-location predicate. The
 pinned reference instead uses actor-area intersection for Bring queries and
 supports elevation filtering; those boundary semantics remain a separate Z6
 fidelity gap and are not concealed by the count-cache equivalence checks.
+
+### Z7 colony defense commands and native morph HP
+
+The Z7 development profile enables `SC64_Z7_COLONY_DEFENSE_ENABLED` and uses
+save generation 34. A Drone-only selection adds CREEP COLONY after SPIRE;
+the ordinary placement path pays 75 minerals and consumes its Drone on
+arrival. A selected Creep Colony exposes SUNKEN in the contextual command
+row. Morph admission requires completion, source owner 3, a completed Pool
+and 50 minerals, and consumes no additional worker.
+
+The pinned OpenBW building-morph path retains Creep identity through the
+morph, then applies `current HP + target maximum HP - prior maximum HP`,
+with a floor of one, at completion. The gated adapter uses the existing
+375-tick construction clock, preserves Creep armor and zero shields while
+incomplete, and applies the 400-to-300 maximum-HP adjustment at completion.
+It uses a reserved marker and the otherwise-unused producer progress field
+of this non-producing building; no saved fields or actor arrays are added.
+Pre/post hooks return immediately outside Z7.
+
+The actual-engine ASan/UBSan fixture passes menu scrolling/dispatch,
+occupied-site and insufficient-funds rejection, exact payment and worker
+consumption, real damage before/during morph, completion armor/HP, full
+save/load and cold HOME restore. Malformed morph rows and a generation-33
+payload in a generation-34 record are rejected. A morph killed after the
+production phase remains dead through save/load, clears its marker on the
+next neutral frame and saves again. Mixed Drone/army selection hides the
+construction row.
+
+All seven campaign starts and 234 skirmish startup/save configurations pass,
+as do full-clear/reused-terrain rendering checks. The 4 MiB ARM build passes
+the fixed guards at IWRAM `0x03004eb8` / BSS `0x0203d9f0`. These checks do
+not establish a Z7 playthrough, a full skirmish win or hardware performance.
+Parallel native larva/egg production remains a separate fidelity gap: the
+current Hatchery processes paid orders serially, despite three stored larvae.

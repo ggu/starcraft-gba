@@ -1115,11 +1115,11 @@ make test-sc64-p7-model test-sc64-p7-adapter
 
 Z7's world/runtime fixture uses all 231 canonical rows and a bounded paid
 Zerg AI policy. Its opt-in shared-engine profile now includes a seventh menu
-entry, source objective outcomes and generation-33 saves:
+entry, source objective outcomes and generation-34 saves:
 
 ```sh
 make zerg-z7-probe
-make test-sc64-z7-profile test-sc64-z7-game-save test-sc64-z7-frame-coverage
+make test-sc64-z7-profile test-sc64-z7-game-save test-sc64-z7-frame-coverage test-sc64-z7-colonies
 ```
 
 This produces `build/StarCraft-Zerg-Z7-Probe-GBA.gba` (SCZF). It requires the
@@ -1128,7 +1128,14 @@ starting roster and resources; build a base and destroy the hostile source
 owner's buildings while preserving at least one human actor. Menu/startup,
 save rejection and render checks establish integration readiness, not a
 completed playthrough or full-mission performance result. Its save generation
-differs from the Z6 probe; older saves are rejected rather than converted.
+differs from the Z6 probe and earlier generation-33 Z7 probe; older saves are
+rejected rather than converted. With only Drones selected, scroll below SPIRE
+to CREEP COLONY and place a 75-mineral colony on creep. After it completes,
+select it and choose SUNKEN from the contextual row. A completed Spawning
+Pool and 50 minerals are required; this morph consumes no additional Drone.
+It preserves damage through the 375-tick morph and applies the reference's
+max-HP adjustment at completion. The explicit colony-defense gate is enabled
+only in the Z7 development profile.
 
 P7 has an isolated world foundation with separate source-Force wallets; its
 canonical roster fails closed on missing raw68/71/72 actor bindings. It still

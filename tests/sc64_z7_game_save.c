@@ -44,7 +44,13 @@ static void launch_z7_from_normal_menu(void)
     assert(race_selected_mission==SC64_Z7_GLOBAL_ID && race_z7_active());
     assert(race_campaign.mission==SC64_Z7_GLOBAL_ID);
     assert(sc64_z7_persistent_state_valid(&race_z7));
-    assert(SC64_RACE_SAVE_GENERATION==33u);
+    assert(SC64_RACE_SAVE_GENERATION==
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+           34u
+#else
+           33u
+#endif
+    );
 }
 
 static void reject_without_mutation(const RaceSave *bad)

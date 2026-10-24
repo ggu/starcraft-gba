@@ -136,7 +136,12 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_Z7_RUNTIME)
+#if defined(SC64_Z7_COLONY_DEFENSE_ENABLED) && !defined(SC64_Z7_RUNTIME)
+#error "Z7 colony defense requires the Z7 runtime"
+#endif
+#if defined(SC64_Z7_COLONY_DEFENSE_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 34u
+#elif defined(SC64_Z7_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 33u
 #elif defined(SC64_Z6_TRANSPORT_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 32u
@@ -599,6 +604,9 @@ enum {
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     MENU_ZP_LAIR, MENU_ZP_SPIRE,
 #endif
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+    MENU_Z7_CREEP,
+#endif
     MENU_COUNT
 };
 enum {
@@ -954,6 +962,11 @@ static Sc64Z7PersistentState race_z7;
 static int race_z7_active(void);
 static int race_z7_source_owner(unsigned source_slot);
 static int race_z7_product_source_owner(int owner);
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+static int race_z7_colony_start_sunken(int building);
+static int race_z7_colony_pre_building_tick(void);
+static int race_z7_colony_post_building_tick(void);
+#endif
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
 static int race_p6_combat_unit_burrowed(int slot);
@@ -3536,9 +3549,44 @@ static int race_selected_storm_hero(void)
 }
 #endif
 
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+static int race_z7_colony_command_available(void)
+{
+    if (!race_z7_active() || race_human!=R_ZERG || selected_building<0 ||
+        selected_building>=MAX_BUILDINGS) return 0;
+    for (unsigned i=0; i<MAX_UNITS; ++i)
+        if (u[i].alive && u[i].selected) return 0;
+    const Building *q=&b[selected_building];
+    return q->alive && q->owner==SIDE && q->type==B_CREEP_COLONY &&
+        q->raw_type==sc64_race_raw_building(B_CREEP_COLONY) && q->raw_owner==3;
+}
+
+static int race_z7_creep_command_available(void)
+{
+    int found=0;
+    if (!race_z7_active() || race_human!=R_ZERG || selected_building>=0) return 0;
+    for (unsigned i=0; i<MAX_UNITS; ++i) if (u[i].alive && u[i].selected) {
+        if (u[i].owner!=SIDE || u[i].type!=U_DRONE) return 0;
+        found=1;
+    }
+    return found;
+}
+#endif
+
 static void
 choose_command(int choice)
 {
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+    if (choice==MENU_STOP+1 && race_z7_colony_command_available()) {
+        menu_open=0; mode=MODE_NORMAL;
+        toast(race_z7_colony_start_sunken(selected_building)?3:8); return;
+    }
+    if (choice==MENU_Z7_CREEP) {
+        menu_open=0;
+        if (!race_z7_creep_command_available()) { mode=MODE_NORMAL; toast(8); return; }
+        mode=MODE_BUILD; menu=B_CREEP_COLONY; return;
+    }
+#endif
 #ifdef SC64_RACES
     /* Contextual eleventh row: spell and transport rows belong to their
        selected actors, while a selected Probe exposes base expansion. */
@@ -3704,6 +3752,9 @@ choose_command(int choice)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+    if (race_z7_colony_command_available()) return MENU_STOP+2;
+#endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
     if (race_z6_transport_research_selected() || race_z6_overlord_menu_available())
         return MENU_STOP + 2;
@@ -3728,7 +3779,14 @@ static int field_menu_count(void)
     if (race_p4_storm_menu_available()) return MENU_STOP + 2;
 #endif
     if (race_nexus_command_available()) return MENU_STOP + 2;
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+    if (race_human==R_ZERG) {
+        return race_z7_creep_command_available()?MENU_COUNT:MENU_Z7_CREEP;
+    }
+    return MENU_STOP+1;
+#else
     return race_human == R_ZERG ? MENU_COUNT : MENU_STOP + 1;
+#endif
 }
 #elif defined(SC64_T5_RUNTIME)
 static int field_menu_count(void)
@@ -3746,6 +3804,9 @@ static int field_menu_count(void)
 #ifdef SC64_RACES
 static const char *field_menu_base_label(int choice, const char *const *labels)
 {
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+    if (choice==MENU_STOP+1 && race_z7_colony_command_available()) return "SUNKEN";
+#endif
     return choice == MENU_STOP + 1 && race_nexus_command_available() ?
         "NEXUS" : labels[choice];
 }
@@ -4594,7 +4655,18 @@ static void
 update_production(void)
 {
 #ifdef SC64_RACES
-    race_tick_buildings();return;
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+    if (!race_z7_colony_pre_building_tick()) {
+        ++mission_unsupported_count; screen=SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+    race_tick_buildings();
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+    if (!race_z7_colony_post_building_tick()) {
+        ++mission_unsupported_count; screen=SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+    return;
 #endif
     int i, type, spawn_x, spawn_y, time;
     for (i = 0; i < MAX_BUILDINGS; i++) {
@@ -6063,6 +6135,9 @@ draw_map(void)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
              ,"UPGRADE TO LAIR","SPIRE"
 #endif
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+             ,"CREEP COLONY"
+#endif
             },
             {"MOVE ORDER","ATTACK MOVE","GATEWAY","PYLON","ASSIMILATOR","CYBERNETICS","FORGE","WEAPONS","ARMOR","STOP / HOLD"}};
         const char **labels=race_labels[race_human];
@@ -7071,6 +7146,9 @@ game_self_test(void)
 #include "sc64_t6_availability_adapter.h"
 #endif
 #include "race_adapter.h"
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+#include "sc64_z7_colony_adapter.h"
+#endif
 #ifdef SC64_T5_RUNTIME
 #include "sc64_t5_tech_adapter.h"
 #endif

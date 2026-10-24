@@ -308,6 +308,9 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
         if (!race_save_decode_building(candidate,i,&saved) ||
             RACE_SAVE_INV_B(candidate,i)>1u) return 0;
         if (!saved.alive) continue;
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+        if (!race_z7_colony_morph_state_valid(&saved)) return 0;
+#endif
         if (saved.owner==SIDE && saved.raw_owner==3)
             ++live_human_source_actors;
         if (saved.owner==ENEMY && saved.raw_owner==4)
