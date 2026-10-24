@@ -171,6 +171,9 @@ static unsigned race_z4_hud_seconds(void)
 #include "sc64_z5_runtime_adapter.h"
 #ifdef SC64_Z5_CLOAK_ENABLED
 #include "sc64_z5_cloak_adapter.h"
+#ifdef SC64_Z5_CONSUME_ENABLED
+#include "sc64_z5_consume_adapter.h"
+#endif
 #endif
 #endif
 #ifdef SC64_P3_RUNTIME

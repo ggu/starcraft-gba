@@ -960,3 +960,74 @@ KillUnitAtLocation and source properties. Its mutable location state still
 needs save integration. Source hallucination, energy and opaque AI actions
 require explicit integration callbacks and fail closed when absent; this
 fixture does not establish a playable Z6 mission.
+
+### Z5 Consume and remaining ability models
+
+The optional Z5 Consume profile shares Kerrigan's source-checked Q8 energy and
+cloak state. Prepare the existing Z5 inputs, regenerate the authenticated
+ability facts, then build and test:
+
+```sh
+python3 tools/sc64_z5_ability_pack.py
+make zerg-z5-consume test-sc64-z5-consume-runtime
+```
+
+Select Kerrigan, press **B**, choose **CONSUME** after the cloak command, then
+press **A** on a friendly Zergling. She approaches using ordinary movement and
+consumes it for 50 energy, capped at 250, with no energy cost. Hallucinated food
+is killed without giving energy. This adapter supports the authenticated Z5
+human target roster (source-owner-3 raw37 Zerglings); the standalone model
+records the broader native target filters without inventing an organic-only
+restriction. Native spell animation, projectile delay and inertia are not
+emulated. The range uses native collision-box geometry at the GBA's 2:1 scale
+with zero movement allowance.
+
+`build/StarCraft-Zerg-Z5-Consume-GBA.gba` has distinct identity SCZD and save
+generation 27, rejecting earlier generations. Pending Consume orders preserve
+validated caster/target identities through SRAM; invalid links reject before
+world mutation or SRAM replacement. The unused circle fallback is kept in ROM
+for this profile so the unchanged IWRAM stack reserve remains intact.
+
+The source audit also authenticates Ensnare permission. Its standalone model
+covers friendly-fire area filters, energy cost and the 75-status-decrement
+lifetime (600 native frames, nominally 750 GBA updates). Ensnare is **not yet
+integrated into the playable runtime**. Ability fixtures and startup/save
+coverage do not establish a complete Z5 controller win.
+
+### P6 numeric foundation
+
+P6 has isolated source-program and actor-fact checks:
+
+```sh
+make test-sc64-p6-model test-sc64-p6-actors
+python3 tools/sc64_zp_scenario_pack.py --mission P6
+make test-sc64-p6-adapter test-sc64-p6-world
+```
+
+The numeric adapter validates 26 one-shot records, 99 actions, 29 conditions,
+source selectors, waits, switches and the referenced UPRP identities. The isolated world adapter tests all source rows with synthetic callbacks. World
+operations still require live engine bindings and explicit capabilities; the opaque AI row fails closed
+without an authored policy. P6 is not yet a selectable playable mission. Its
+remaining runtime work includes property-driven enemy orders, permanent-cloak
+detection for Dark Templar/Zeratul, Infested Terran suicide damage, THG2 props,
+and full normal-input/ARM/save qualification. Source door types 205–208 are
+invincible non-buildings; placement in the GBA Building pool is a prop policy.
+
+
+The opt-in P6 sprite importer prepares the missing actor and wall-trap art
+without changing earlier sprite banks:
+
+```sh
+python3 tools/sc64_race_sprites.py --rom /path/to/StarCraft64-USA.z64 --include-p6-actors --include-z5-actors --include-z6-actors --out .local/sc64/p6/generated/sprites --header .local/sc64/p6/generated/sc64_race_sprites_generated.h
+python3 tools/sc64_p6_doodad_pack.py --verify-staged
+```
+
+Keep T4 imports enabled (omit `--base-only`) for the inherited props. The P6
+bundle reuses ZP beacons and Z5 indexed doors/traps and adds raw50/74/75 unit
+images plus all seven raw210 wall-missile-trap frames. This prepares art only;
+new raw actor behavior and the raw210 prop policy remain unimplemented. The
+THG2 audit preserves all 37 rows: 27 unit-backed props and ten sprite-only
+rows. The sprite-only type IDs are SpriteType IDs, not unit IDs. The two raw210
+unit-backed placements explicitly prevent runtime-ready prop generation until
+their mapping is implemented. `test-sc64-p6-actor-source` audits source UPRP
+values separately from the asset-free actor-fact checks.

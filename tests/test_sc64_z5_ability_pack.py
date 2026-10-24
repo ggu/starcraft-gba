@@ -46,8 +46,10 @@ def trap_payload(*, disable_203=3, disable_209=6):
     return b''.join(rows)
 
 
-def ptec_fixture(*, use_global=1, player_cloak=(1, 0), player_storm=(1, 0),
-                 global_cloak=(1, 0), global_storm=(0, 0)):
+def ptec_fixture(*, use_global=1, player_cloak=(1, 0), player_consume=(0, 0),
+                 player_ensnare=(0, 0), player_storm=(1, 0),
+                 global_cloak=(1, 0), global_consume=(1, 0),
+                 global_ensnare=(1, 0), global_storm=(0, 0)):
     data = bytearray(PACK.PTEC_BYTES)
     owner = PACK.HERO_SOURCE_OWNER
 
@@ -62,8 +64,12 @@ def ptec_fixture(*, use_global=1, player_cloak=(1, 0), player_storm=(1, 0),
         data[PACK.PTEC_GLOBAL_RESEARCHED + tech] = researched
 
     set_player(PACK.PTEC_CLOAK_ID, *player_cloak)
+    set_player(PACK.PTEC_CONSUME_ID, *player_consume)
+    set_player(PACK.PTEC_ENSNARE_ID, *player_ensnare)
     set_player(PACK.PTEC_STORM_ID, *player_storm)
     set_global(PACK.PTEC_CLOAK_ID, *global_cloak)
+    set_global(PACK.PTEC_CONSUME_ID, *global_consume)
+    set_global(PACK.PTEC_ENSNARE_ID, *global_ensnare)
     set_global(PACK.PTEC_STORM_ID, *global_storm)
     return bytes(data)
 
@@ -111,17 +117,27 @@ class Z5AbilityPackTests(unittest.TestCase):
     def test_ptec_global_default_and_explicit_player_override(self):
         payload = ptec_fixture()
         cloak = PACK.ptec_value(payload, 3, 10)
+        consume = PACK.ptec_value(payload, 3, 16)
+        ensnare = PACK.ptec_value(payload, 3, 17)
         storm = PACK.ptec_value(payload, 3, 19)
         self.assertEqual((cloak['available'], cloak['researched']), (1, 0))
+        self.assertEqual((consume['available'], consume['researched']), (1, 0))
+        self.assertEqual((ensnare['available'], ensnare['researched']), (1, 0))
         self.assertEqual((storm['available'], storm['researched']), (0, 0))
 
         override = ptec_fixture(use_global=0, player_cloak=(0, 1),
                                 global_cloak=(1, 0), player_storm=(1, 1),
-                                global_storm=(0, 0))
+                                global_storm=(0, 0), player_consume=(0, 1),
+                                player_ensnare=(0, 1), global_consume=(1, 0),
+                                global_ensnare=(1, 0))
         self.assertEqual(PACK.ptec_value(override, 3, 10)['available'], 0)
         self.assertEqual(PACK.ptec_value(override, 3, 10)['researched'], 1)
         self.assertEqual(PACK.ptec_value(override, 3, 19)['available'], 1)
         self.assertEqual(PACK.ptec_value(override, 3, 19)['researched'], 1)
+        self.assertEqual(PACK.ptec_value(override, 3, 16)['available'], 0)
+        self.assertEqual(PACK.ptec_value(override, 3, 16)['researched'], 1)
+        self.assertEqual(PACK.ptec_value(override, 3, 17)['available'], 0)
+        self.assertEqual(PACK.ptec_value(override, 3, 17)['researched'], 1)
 
     def test_ptec_bounds_length_and_target_booleans_are_strict(self):
         payload = ptec_fixture()
@@ -144,6 +160,23 @@ class Z5AbilityPackTests(unittest.TestCase):
                 bad[offset] = 2
                 with self.assertRaisesRegex(ValueError, 'boolean'):
                     PACK.ptec_value(bytes(bad), 3, 10)
+
+    def test_consume_and_ensnare_source_cells_are_strict_and_independent(self):
+        payload = ptec_fixture()
+        for tech in (PACK.PTEC_CONSUME_ID, PACK.PTEC_ENSNARE_ID):
+            with self.subTest(tech=tech):
+                offsets = (
+                    PACK.PTEC_PLAYER_AVAILABLE + 3 * 24 + tech,
+                    PACK.PTEC_PLAYER_RESEARCHED + 3 * 24 + tech,
+                    PACK.PTEC_PLAYER_USE_GLOBAL + 3 * 24 + tech,
+                    PACK.PTEC_GLOBAL_AVAILABLE + tech,
+                    PACK.PTEC_GLOBAL_RESEARCHED + tech,
+                )
+                for offset in offsets:
+                    bad = bytearray(payload)
+                    bad[offset] = 2
+                    with self.assertRaisesRegex(ValueError, 'boolean'):
+                        PACK.ptec_value(bytes(bad), 3, tech)
 
     def test_exact_hero_validity_energy_and_initial_cloak_fields(self):
         row = PACK.decode_hero(hero_row())
@@ -181,10 +214,18 @@ class Z5AbilityPackTests(unittest.TestCase):
         facts = PACK.derive_facts(sections_fixture(), scenario_fixture())
         self.assertEqual(facts['cloak_available'], 1)
         self.assertEqual(facts['cloak_researched'], 0)
+        self.assertEqual((facts['consume_available'], facts['consume_researched']), (1, 0))
+        self.assertEqual((facts['ensnare_available'], facts['ensnare_researched']), (1, 0))
+        self.assertEqual(facts['ensnare_nominal_native_frames'], 600)
+        self.assertEqual(facts['ensnare_project_gba_ticks_30hz'], 750)
+        self.assertEqual(facts['consume_range_source_pixels'], 16)
         self.assertEqual(facts['storm_available'], 0)
         self.assertEqual(facts['storm_researched'], 0)
         header = PACK.emit_header({'mission': 'Z5', **facts})
         self.assertIn('SC64_Z5_ABILITIES_PERSONNEL_CLOAK_AVAILABLE 1u', header)
+        self.assertIn('SC64_Z5_ABILITIES_CONSUME_AVAILABLE 1u', header)
+        self.assertIn('SC64_Z5_ABILITIES_ENSNARE_AVAILABLE 1u', header)
+        self.assertIn('SC64_Z5_ABILITIES_ENSNARE_NOMINAL_NATIVE_FRAMES 600u', header)
         self.assertIn('SC64_Z5_ABILITIES_PSIONIC_STORM_AVAILABLE 0u', header)
         self.assertIn('SC64_Z5_ABILITIES_DETECTOR_TRAP_COUNT 25u', header)
         self.assertIn('SC64_Z5_ABILITIES_DETECTOR_TRAP_INITIAL_ACTIVE_COUNT 16u', header)
@@ -199,6 +240,12 @@ class Z5AbilityPackTests(unittest.TestCase):
                               scenario_fixture())
         with self.assertRaisesRegex(ValueError, 'unexpectedly enables'):
             PACK.derive_facts(sections_fixture(ptec=ptec_fixture(global_storm=(1, 0))),
+                              scenario_fixture())
+        with self.assertRaisesRegex(ValueError, 'does not enable unresearched Consume'):
+            PACK.derive_facts(sections_fixture(ptec=ptec_fixture(global_consume=(0, 0))),
+                              scenario_fixture())
+        with self.assertRaisesRegex(ValueError, 'does not enable unresearched Ensnare'):
+            PACK.derive_facts(sections_fixture(ptec=ptec_fixture(global_ensnare=(0, 0))),
                               scenario_fixture())
         bad_scenario = scenario_fixture()
         bad_scenario['global_catalog_id'] = 17

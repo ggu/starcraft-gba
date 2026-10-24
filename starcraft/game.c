@@ -113,7 +113,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_P5_SHUTTLE_ENABLED)
+#if defined(SC64_Z5_CONSUME_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 27u
+#elif defined(SC64_P5_SHUTTLE_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 26u
 #elif defined(SC64_Z5_CLOAK_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 25u
@@ -514,6 +516,9 @@ enum {
 enum {
     ORDER_IDLE, ORDER_MOVE, ORDER_ATTACK_MOVE, ORDER_ATTACK_TARGET,
     ORDER_MINE, ORDER_BUILD, ORDER_GAS
+#ifdef SC64_Z5_CONSUME_ENABLED
+    , ORDER_Z5_CONSUME
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     , ORDER_BOARD, ORDER_TRANSPORTED, ORDER_UNLOAD
 #endif
@@ -545,6 +550,9 @@ enum {
 };
 enum {
     MODE_NORMAL, MODE_MOVE, MODE_ATTACK, MODE_BUILD
+#ifdef SC64_Z5_CONSUME_ENABLED
+    , MODE_Z5_CONSUME
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     , MODE_UNLOAD
 #endif
@@ -867,6 +875,10 @@ static int race_z5_cloak_toggle_selected(void);
 static int race_z5_cloak_tick(void);
 static int race_z5_cloak_world_state_valid(void);
 static int race_z5_cloaked_target_attackable(int target);
+#endif
+#ifdef SC64_Z5_CONSUME_ENABLED
+static int race_z5_consume_issue_selected(int x, int y);
+static int race_z5_consume_tick_unit(int slot);
 #endif
 static int race_start_build(int owner,int worker,int type,int x,int y);
 static int race_can_site(int owner,int type,int x,int y);
@@ -3278,6 +3290,11 @@ tick_research(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_Z5_CONSUME_ENABLED
+    if (choice == MENU_STOP + 2 && race_z5_cloak_menu_available()) {
+        menu_open = 0; mode = MODE_Z5_CONSUME; return;
+    }
+#endif
 #ifdef SC64_P5_SHUTTLE_ENABLED
     if (choice == MENU_STOP + 1 && race_p5_shuttle_menu_available()) {
         menu_open = 0;
@@ -3408,7 +3425,11 @@ static int field_menu_count(void)
     if (race_p5_shuttle_menu_available()) return MENU_STOP + 2;
 #endif
 #ifdef SC64_Z5_CLOAK_ENABLED
-    if (race_z5_cloak_menu_available()) return MENU_STOP + 2;
+    if (race_z5_cloak_menu_available()) return MENU_STOP + 2
+#ifdef SC64_Z5_CONSUME_ENABLED
+        + 1
+#endif
+        ;
 #endif
 #ifdef SC64_P4_STORM_ENABLED
     if (race_p4_storm_menu_available()) return MENU_STOP + 2;
@@ -3494,6 +3515,12 @@ interact(void)
         return;
     }
 #endif
+    #ifdef SC64_Z5_CONSUME_ENABLED
+    if (mode == MODE_Z5_CONSUME) {
+        toast(race_z5_consume_issue_selected(cx, cy) ? 0 : 8);
+        mode = MODE_NORMAL; return;
+    }
+    #endif
     if (mode == MODE_MOVE) {
 #ifdef SC64_TERRAN_LATE_RUNTIME
         if (race_late_airborne(selected_building)) {
@@ -3939,6 +3966,9 @@ target_lists_unavailable:
 	#endif
 	if (q->cd > 0)
 	    q->cd--;
+#ifdef SC64_Z5_CONSUME_ENABLED
+        if (q->order == ORDER_Z5_CONSUME && race_z5_consume_tick_unit(i)) continue;
+#endif
 
 	if (q->owner == ENEMY && q->order != ORDER_ATTACK_MOVE
 #if defined(SC64_SKIRMISH) || defined(SC64_RACES)
@@ -5630,7 +5660,11 @@ draw_map(void)
 	for (i = first; i < field_menu_count() && i < first + 10; ++i) {
 #ifdef SC64_Z5_CLOAK_ENABLED
             const char *label = i == MENU_STOP + 1 && race_z5_cloak_menu_available() ?
-                (race_z5.cloak.active ? "UNCLOAK" : "CLOAK") : labels[i];
+                (race_z5.cloak.active ? "UNCLOAK" : "CLOAK") :
+#ifdef SC64_Z5_CONSUME_ENABLED
+                i == MENU_STOP + 2 && race_z5_cloak_menu_available() ? "CONSUME" :
+#endif
+                labels[i];
 #endif
 	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
 #ifdef SC64_Z5_CLOAK_ENABLED
@@ -5875,6 +5909,9 @@ draw_hud_commands(void)
 #endif
 #ifdef SC64_P4_STORM_ENABLED
                  mode == MODE_P4_STORM ? "PSIONIC STORM TARGET" :
+#endif
+#ifdef SC64_Z5_CONSUME_ENABLED
+                 mode == MODE_Z5_CONSUME ? "CONSUME FRIENDLY ZERGLING" :
 #endif
 		 mode == MODE_ATTACK ? "ATTACK MOVE" : mode == MODE_MOVE ? "MOVE ORDER" : "FIELD COMMAND", C_WHITE);
 #ifdef SC64_P4_STORM_ENABLED

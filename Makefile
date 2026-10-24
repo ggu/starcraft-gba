@@ -37,6 +37,7 @@ ZP_FULL_STORAGE_FLAGS := $(P4_STORM_FLAGS) -DSC64_ZP_FULL_STORAGE
 Z5_FLAGS := $(filter-out -DSC64_ZP_DEFENSE_TARGETS -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated,$(Z4_FLAGS)) -I.local/sc64/z5/generated -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated -I.local/sc64/zp-stage/generated/scenarios -DSC64_ZP_FULL_STORAGE -DSC64_STATIC_KEY_CULL -DSC64_Z5_DATA_ENABLED -DSC64_Z5_ENABLED -DSC64_Z5_RUNTIME -DSC64_Z5_CAMPAIGN_ENTRY -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS
 Z5_INPUTS := $(Z4_INPUTS) .local/sc64/z5/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z5_scenario_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z5_doodads_generated.h
 Z5_CLOAK_FLAGS := $(Z5_FLAGS) -DSC64_Z5_CLOAK_ENABLED
+Z5_CONSUME_FLAGS := $(Z5_CLOAK_FLAGS) -DSC64_Z5_CONSUME_ENABLED
 Z5_CLOAK_INPUTS := $(Z5_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z5_abilities_generated.h
 P5_FLAGS := $(filter-out -DSC64_ZP_DEFENSE_TARGETS -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated,$(P4_STORM_FLAGS)) -I.local/sc64/p5/generated -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated -I.local/sc64/zp-stage/generated/scenarios -DSC64_ZP_FULL_STORAGE -DSC64_P5_DATA_ENABLED -DSC64_P5_ENABLED -DSC64_P5_RUNTIME -DSC64_P5_CAMPAIGN_ENTRY -DSC64_P5_ACTORS -DSC64_Z6_ACTORS
 P5_INPUTS := $(P4_INPUTS) .local/sc64/p5/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h
@@ -1205,6 +1206,28 @@ test-sc64-z5-cloak-runtime: test-sc64-z5-ability-models build/test-sc64-z5-cloak
 	./build/test-sc64-z5-cloak-profile
 	./build/test-sc64-z5-cloak-frame-coverage
 
+build/starcraft-zerg-z5-consume.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z5_CONSUME_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z5-consume.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z5-Consume-GBA.gba: build/starcraft-zerg-z5-consume.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z5 FEED' SCZD
+.PHONY: zerg-z5-consume
+zerg-z5-consume: build/StarCraft-Zerg-Z5-Consume-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z5-consume
+
+build/test-sc64-z5-consume-runtime: tests/sc64_z5_consume_runtime.c tests/sc64_z5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CONSUME_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z5-consume-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CONSUME_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z5-consume-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CONSUME_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z5-consume-runtime
+test-sc64-z5-consume-runtime: test-sc64-z5-ability-models build/test-sc64-z5-consume-runtime build/test-sc64-z5-consume-profile build/test-sc64-z5-consume-frame-coverage
+	./build/test-sc64-z5-consume-runtime
+	./build/test-sc64-z5-consume-profile
+	./build/test-sc64-z5-consume-frame-coverage
+
 build/test-sc64-z5-runtime: tests/sc64_z5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z5-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -1373,12 +1396,19 @@ test-starcraft: test-sc64-z5-hp-regen
 
 build/test-sc64-z5-cloak: tests/sc64_z5_cloak.c starcraft/sc64_z5_cloak.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_Z5_RUNTIME -DSC64_Z5_CLOAK_ENABLED $< -o $@
+build/test-sc64-z5-consume: tests/sc64_z5_consume.c starcraft/sc64_z5_consume.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-z5-ensnare: tests/sc64_z5_ensnare.c starcraft/sc64_z5_ensnare.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+
 build/test-sc64-z5-detection: tests/sc64_z5_detection.c starcraft/sc64_z5_detection.h starcraft/sc64_z5_actor_rules.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-z5-ability-models
-test-sc64-z5-ability-models: build/test-sc64-z5-cloak build/test-sc64-z5-detection
+test-sc64-z5-ability-models: build/test-sc64-z5-cloak build/test-sc64-z5-detection build/test-sc64-z5-consume build/test-sc64-z5-ensnare
 	./build/test-sc64-z5-cloak
 	./build/test-sc64-z5-detection
+	./build/test-sc64-z5-consume
+	./build/test-sc64-z5-ensnare
 test-starcraft: test-sc64-z5-ability-models
 
 build/test-sc64-z6-model: tests/sc64_z6.c starcraft/sc64_z6.h common/gba.h | build
@@ -1648,3 +1678,32 @@ test-sc64-terran-full-campaign: test-sc64-terran-full-regression test-sc64-terra
 	./build/test-sc64-t8-campaign-run --limit 200000 --trace .local/sc64/terran-late/full-t8-controller.json
 	./build/test-sc64-t9-campaign-run --limit 500000 --trace .local/sc64/terran-late/full-t9-controller.json
 	./build/test-sc64-t10-campaign-run --limit 100000 --trace .local/sc64/terran-late/full-t10-controller.json
+
+
+build/test-sc64-p6-model: tests/sc64_p6.c starcraft/sc64_p6.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-p6-actors: tests/sc64_p6_actor_rules.c starcraft/sc64_p6_actor_rules.h starcraft/sc64_z5_actor_rules.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-p6-adapter: tests/sc64_p6_adapter.c starcraft/sc64_p6.h starcraft/sc64_p6_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+.PHONY: test-sc64-p6-model test-sc64-p6-actors test-sc64-p6-adapter
+test-sc64-p6-model: build/test-sc64-p6-model
+	./build/test-sc64-p6-model
+test-sc64-p6-actors: build/test-sc64-p6-actors
+	./build/test-sc64-p6-actors
+test-sc64-p6-adapter: test-sc64-p6-model build/test-sc64-p6-adapter
+	./build/test-sc64-p6-adapter
+test-starcraft: test-sc64-p6-model test-sc64-p6-actors
+
+build/test-sc64-p6-actor-source: tests/sc64_p6_actor_rules.c starcraft/sc64_p6_actor_rules.h starcraft/sc64_z5_actor_rules.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_P6_SOURCE_AUDIT $< -o $@
+.PHONY: test-sc64-p6-actor-source
+test-sc64-p6-actor-source: build/test-sc64-p6-actor-source
+	./build/test-sc64-p6-actor-source
+test-sc64-p6-adapter: test-sc64-p6-actor-source
+
+build/test-sc64-p6-world: tests/sc64_p6_world.c starcraft/sc64_p6_world_adapter.h starcraft/sc64_p6_adapter.h starcraft/sc64_p6_actor_rules.h starcraft/sc64_p6.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+.PHONY: test-sc64-p6-world
+test-sc64-p6-world: test-sc64-p6-adapter build/test-sc64-p6-world
+	./build/test-sc64-p6-world

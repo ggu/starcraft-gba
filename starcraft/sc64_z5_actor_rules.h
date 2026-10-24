@@ -113,15 +113,16 @@ static inline const Sc64Z5BuildingFact *sc64_z5_building_fact(int raw)
          SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_INVINCIBLE|
          SC64_Z5_SOURCE_BEACON|SC64_Z5_REF_MOVE_INTERACTION|
          SC64_Z5_REF_HAS_SPRITE},
-        /* The four doors are large, invincible structures with 100000 HP. */
+        /* Native doors are invincible non-building types with 100000 HP.
+         * The GBA stores them in its Building pool as an explicit prop policy. */
         {205,100000,0,0,1,1,1,32, 3,2,25,17,44,20,3,
-         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
+         SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
         {206,100000,0,0,1,1,1,32, 3,2,44,17,25,20,3,
-         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
+         SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
         {207,100000,0,0,1,1,1,32, 3,2,41,17,28,20,3,
-         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
+         SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
         {208,100000,0,0,1,1,1,32, 3,2,28,17,41,20,3,
-         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
+         SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
         /* These unit-backed trap props live in the runtime building pool,
          * but their native UnitType flags do not include Building. They are
          * detectors; OpenBW therefore uses their nominal sight range. */

@@ -38,7 +38,7 @@ int main(void)
         assert(source->raw==raw);
         assert(source->flags&SC64_Z5_REF_HAS_SPRITE);
         if (raw==205 || raw==206 || raw==207 || raw==208) {
-            assert(source->flags&SC64_Z5_SOURCE_BUILDING);
+            assert(!(source->flags&SC64_Z5_SOURCE_BUILDING));
             assert(!(source->flags&SC64_Z5_SOURCE_DETECTOR));
             expected_policy |= SC64_ZP_ACTOR_INVINCIBLE;
             assert(source->hp==100000 && (source->flags&SC64_Z5_SOURCE_INVINCIBLE));

@@ -32,6 +32,8 @@ PTEC_GLOBAL_AVAILABLE = 24 * PTEC_TECH_COUNT
 PTEC_GLOBAL_RESEARCHED = PTEC_GLOBAL_AVAILABLE + PTEC_TECH_COUNT
 PTEC_PLAYER_USE_GLOBAL = PTEC_GLOBAL_RESEARCHED + PTEC_TECH_COUNT
 PTEC_CLOAK_ID = 10
+PTEC_CONSUME_ID = 16
+PTEC_ENSNARE_ID = 17
 PTEC_STORM_ID = 19
 HERO_RAW_TYPE = 51
 HERO_SOURCE_OWNER = 3
@@ -174,11 +176,17 @@ def derive_facts(sections: dict[bytes, bytes], scenario: dict) -> dict:
         raise ValueError(f'Z5 PTEC section has invalid size {len(ptec)}')
     hero = decode_hero(sections[b'UNIT'])
     cloak = ptec_value(ptec, HERO_SOURCE_OWNER, PTEC_CLOAK_ID)
+    consume = ptec_value(ptec, HERO_SOURCE_OWNER, PTEC_CONSUME_ID)
+    ensnare = ptec_value(ptec, HERO_SOURCE_OWNER, PTEC_ENSNARE_ID)
     storm = ptec_value(ptec, HERO_SOURCE_OWNER, PTEC_STORM_ID)
     if (cloak['available'], cloak['researched']) != (1, 0):
         raise ValueError('Z5 PTEC does not enable unresearched Personnel Cloaking for owner3')
     if storm['available'] != 0:
         raise ValueError('Z5 PTEC unexpectedly enables Psionic Storm for owner3')
+    if (consume['available'], consume['researched']) != (1, 0):
+        raise ValueError('Z5 PTEC does not enable unresearched Consume for owner3')
+    if (ensnare['available'], ensnare['researched']) != (1, 0):
+        raise ValueError('Z5 PTEC does not enable unresearched Ensnare for owner3')
     trap_facts = detector_census(sections[b'THG2'], MAP_WIDTH, MAP_HEIGHT)
     return {
         'source_chk_sha256': scenario['source_chk_sha256'],
@@ -187,6 +195,22 @@ def derive_facts(sections: dict[bytes, bytes], scenario: dict) -> dict:
         'cloak_available': cloak['available'],
         'cloak_researched': cloak['researched'],
         'cloak_hero_research_exemption_required': 1,
+        'consume_tech_id': PTEC_CONSUME_ID,
+        'consume_available': consume['available'],
+        'consume_researched': consume['researched'],
+        'consume_hero_research_exemption_required': 1,
+        'ensnare_tech_id': PTEC_ENSNARE_ID,
+        'ensnare_available': ensnare['available'],
+        'ensnare_researched': ensnare['researched'],
+        'ensnare_hero_research_exemption_required': 1,
+        'ensnare_status_decrements': 75,
+        'ensnare_native_frames_per_status_decrement': 8,
+        'ensnare_nominal_native_frames': 600,
+        'ensnare_project_gba_ticks_30hz': 750,
+        'consume_range_source_pixels': 16,
+        'consume_energy_cost': 0,
+        'consume_energy_gain': 50,
+        'consume_max_energy': 250,
         'storm_tech_id': PTEC_STORM_ID,
         'storm_available': storm['available'],
         'storm_researched': storm['researched'],
@@ -226,6 +250,22 @@ def emit_header(data: dict) -> str:
         ('PERSONNEL_CLOAK_AVAILABLE', 'cloak_available'),
         ('PERSONNEL_CLOAK_RESEARCHED', 'cloak_researched'),
         ('PERSONNEL_CLOAK_HERO_RESEARCH_EXEMPTION', 'cloak_hero_research_exemption_required'),
+        ('CONSUME_TECH_ID', 'consume_tech_id'),
+        ('CONSUME_AVAILABLE', 'consume_available'),
+        ('CONSUME_RESEARCHED', 'consume_researched'),
+        ('CONSUME_HERO_RESEARCH_EXEMPTION', 'consume_hero_research_exemption_required'),
+        ('CONSUME_RANGE_SOURCE_PIXELS', 'consume_range_source_pixels'),
+        ('CONSUME_ENERGY_COST', 'consume_energy_cost'),
+        ('CONSUME_ENERGY_GAIN', 'consume_energy_gain'),
+        ('CONSUME_MAX_ENERGY', 'consume_max_energy'),
+        ('ENSNARE_TECH_ID', 'ensnare_tech_id'),
+        ('ENSNARE_AVAILABLE', 'ensnare_available'),
+        ('ENSNARE_RESEARCHED', 'ensnare_researched'),
+        ('ENSNARE_HERO_RESEARCH_EXEMPTION', 'ensnare_hero_research_exemption_required'),
+        ('ENSNARE_STATUS_DECREMENTS', 'ensnare_status_decrements'),
+        ('ENSNARE_NATIVE_FRAMES_PER_STATUS_DECREMENT', 'ensnare_native_frames_per_status_decrement'),
+        ('ENSNARE_NOMINAL_NATIVE_FRAMES', 'ensnare_nominal_native_frames'),
+        ('ENSNARE_PROJECT_GBA_TICKS_30HZ', 'ensnare_project_gba_ticks_30hz'),
         ('PSIONIC_STORM_TECH_ID', 'storm_tech_id'),
         ('PSIONIC_STORM_AVAILABLE', 'storm_available'),
         ('PSIONIC_STORM_RESEARCHED', 'storm_researched'),
@@ -260,7 +300,11 @@ def verify_staged(source_root: Path) -> dict:
     data = parse_source(source_root)
     return {key: data[key] for key in (
         'mission', 'global_catalog_id', 'source_map_path', 'source_chk_sha256',
-        'cloak_available', 'cloak_researched', 'storm_available',
+        'cloak_available', 'cloak_researched', 'consume_available',
+        'consume_researched', 'ensnare_available', 'ensnare_researched',
+        'ensnare_nominal_native_frames', 'ensnare_project_gba_ticks_30hz',
+        'consume_range_source_pixels', 'consume_energy_cost',
+        'consume_energy_gain', 'consume_max_energy', 'storm_available',
         'hero_initial_energy_percent', 'hero_initial_cloaked',
         'detector_traps', 'detector_traps_initially_enabled',
         'non_detector_doors')}

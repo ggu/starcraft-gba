@@ -2283,3 +2283,21 @@ Candidate ROM SHA-256: `bfad3cdb598cb2bc7dfb0542ec39e1315c44f67a4513f23ceb1bb1c3
 Frozen ELF SHA-256: `6af9fc7e5bd2794196525558fd53b8a371a936d5843e727501438a1dc7b841ba`.
 The actual-engine differential defense fixture also compares P5 source-player
 death counters, ensuring earlier kills do not silently change later targeting.
+
+### Z5 optional Consume integration
+
+`zerg-z5-consume` adds a normal B-menu targeting mode and persisted approach
+order. Actual-engine sanitizer checks cover a real `game_update(KEY_A)` cast,
+source-box range 16 versus 18 source pixels (16 versus 17 GBA center offsets
+for these actors), zero-cost consumption, +50 energy/cap250, hallucinated food,
+wrong-source/foreign/invincible target rejection, pause, STOP and cancellation.
+A valid synthetic script snapshot isolates that one-frame input test; it is
+not a campaign playthrough. Active-order SRAM checks round-trip generation27
+and reject corrupted links/caster identity or generation25 without changing
+the live world or replacing the good SRAM.
+
+The separate ability packer authenticates Consume and Ensnare permissions from
+PTEC. Standalone Consume/Ensnare models pass sanitizer checks; Ensnare remains
+unwired in the game. The door source facts were corrected against the pinned
+UnitType flag expressions: raw205–208 are Invincible, not Building. Their GBA
+building-pool policy and collision geometry are unchanged.
