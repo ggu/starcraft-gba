@@ -4028,15 +4028,21 @@ public gate-off ARM ROM remains byte-identical to word-clear candidate
 `7ba4743d…fa9270`. The enabled public ROM is `ec5e6c58…a77264`, linking at
 IWRAM `0x030046e0` and unchanged BSS `0x0203d674` under the fixed reserves.
 
-An earlier private prototype (`25f28551…cc4165`, IWRAM `0x03004700`) has a
-separate 600-update late-P3 ARM pair against word clear. Loaded, tick-zero and
-final gameplay snapshots and three capture hashes match. It reduces route
-builds from 74 to 16 and measures 13.1525% fewer hardware cycles, or 16.6546
-to 19.1769 effective fps. This uses authenticated cross-build seeded SRAM;
-it is neither candidate-generated save qualification nor a full-mission
-performance measurement. The cleaned public helper has different ARM bytes,
-so prototype timing does not qualify the public ROM. Its own ARM timing,
-full replay, fresh-process SRAM and wider-profile promotion remain separate.
+The public ROM separately passes a 600-update late-P3 ARM pair against word
+clear. Loaded, tick-zero and final gameplay snapshots and three capture
+hashes match. Route builds fall from 74 to 16, and it measures 13.1523% fewer
+hardware cycles, or 16.6546 to 19.1768 effective fps. This uses authenticated
+cross-build seeded SRAM; it is neither candidate-generated save qualification
+nor a full-mission performance measurement.
+
+The earlier private prototype (`25f28551…cc4165`, IWRAM `0x03004700`) also
+finishes all 124,689 input ticks, wins at frame 123,916 and matches all 126
+reported gameplay checkpoints. Its full-mission mean is 14.08 effective fps
+versus word clear's 13.88 and the original baseline's 12.35. The smaller
+full-mission gain cannot be inferred from the short late interval. The
+cleaned public helper has different ARM bytes, so the prototype's full replay
+does not qualify the public ROM. Its own full replay, fresh-process SRAM and
+wider-profile promotion remain separate.
 
 The public source snapshot passes `./dev build`, `./dev test` (380 Python
 tests plus the default host fixtures, including all four new corridor cases),
@@ -4044,3 +4050,27 @@ tests plus the default host fixtures, including all four new corridor cases),
 ROMs remain `4ad80ce0…f9aee` and `6bab5be2…979f9`. An independent read-only
 review found no additional route correctness issue; this does not replace
 the remaining ARM, save and wider-profile checks.
+
+A further private packed-horizontal-span probe preserves the complete host
+trace and gameplay fingerprints, but its paired 600-update ARM interval has
+no meaningful elapsed-cycle gain: both builds report 19.1768 fps, differing
+by only 95 cycles over roughly 525 million. It remains private. Reduced
+host-side memory-read counts alone are not a performance qualification.
+
+### Z7 economy/controller follow-up
+
+The combined Z7 Egg/source-sight/Scourge/construction-HP/direct-attack build
+also links with the existing `SC64_NEAREST_RESOURCE_DEPOT` option: ROM
+`f0ee6313…6dd05a0`, IWRAM `0x03004a40`, BSS `0x0203d9f0`. A normal-input
+controller verifies mineral delivery continues during the paid Lair morph,
+using the existing morphing-depot rule. This is an ARM link and host witness,
+without a complete mission, fresh-process SRAM or FPS qualification.
+
+The controller initially sent only one visible Mutalisk to the source gas
+position. It then misclassified the valid direct-attack order on a revealed
+Extractor as a failed attack-move and repeatedly clicked it. Correcting that
+test-controller check and using ordinary cursor/double-tap input to select
+the nearby three-unit group clears the source Extractor and restores its
+geyser at frame 9,029. The controller buys its own Extractor at frame 10,915,
+but no gas-worker assignment succeeds before the economy and army are lost.
+The attempt loses at frame 16,085; no additional campaign mission is counted.
