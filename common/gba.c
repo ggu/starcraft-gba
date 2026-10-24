@@ -1,5 +1,5 @@
 #include "gba.h"
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
 #include "gba_present.h"
 #endif
 #ifdef GBA_HOST
@@ -85,7 +85,7 @@ return 0;
 return (~REG16(0x04000130))&1023;
 #endif
 }
-#ifndef GBA_HOST
+#if !defined(GBA_HOST) && !defined(SC64_LATE_TERRAN_STORAGE) && !defined(GBA_PRESENT_DEADLINE)
 static void vblank(void){while(REG16(0x04000006)>=160){}while(REG16(0x04000006)<160){}}
 #endif
 void gfx_begin(u8 color) {
@@ -227,7 +227,7 @@ HOT int gfx_blit_window_2x(int y,int height,const u8 *source,int stride,int rows
 void gfx_end(void) {
     gfx_draw_cycles=gba_clock()-draw_start;
 #ifndef GBA_HOST
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
     while (!gba_present_ready(gba_clock()-previous_present,
                               REG16(0x04000006))) {}
 #else
@@ -240,7 +240,7 @@ void gfx_end(void) {
     front^=1;
 #ifndef GBA_HOST
     REG16(0x04000000)=0x0404|(front?16:0);
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
     previous_present=gba_clock();
 #else
     if(elapsed<280896u)vblank();

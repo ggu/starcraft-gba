@@ -1952,3 +1952,42 @@ unified build/tests pass. Dedicated actor, storage and Z4 runtime checks
 pass under ASan/UBSan. The stage uses a separate generation-20 save layout,
 retaining the unchanged IWRAM and EWRAM reserve assertions. These results
 are development evidence; the canonical qualified count remains 16/30.
+
+### 2026-10-24 — race presentation performance comparison
+
+Two isolated full ARM/mGBA controller replays tested deadline-based VBlank
+presentation for both races and removal of the redundant framebuffer clear
+for Zerg. The presentation gate uses the existing two-hardware-frame minimum
+and flips only during safe VBlank scanlines. It avoids an extra wait when a
+busy frame has already crossed its presentation deadline. Game update rates,
+controller inputs and mission rules are unchanged.
+
+| Full campaign replay | Baseline mean | Candidate mean | Matching checkpoints | Identical PNG captures |
+|---|---:|---:|---:|---:|
+| Z3 | 19.12 fps | 20.88 fps | 73 | 6 |
+| P3 | 22.83 fps | 24.33 fps | 154 | 6 |
+
+Both candidates win at the same frames as their baselines (70833 and
+151088). Comparison excludes only timing/profiling fields and requires all
+other recorded game-state fields and captured pixels to match. FPS uses
+chained GBA hardware timers and positive live PLAY-to-PLAY frame intervals;
+startup and the final result interval are excluded. These are emulator
+measurements, not physical GBA results, and the 30-fps target remains unmet.
+
+The Z3 candidate ROM SHA-256 is
+`7878fc9914e06cbaa7d751a9d71e6df0e4d3220596c910f32bd79bfe8102b99b`,
+with ELF `0d478a3a09f9ba095acd1c6e852c76f04304018f130ce58993fda6edd3158b40`.
+The P3 candidate ROM SHA-256 is
+`6a1d23c4e50e131eb0b9e76b321b7941fd46e706e8b75640727831800519fff6`,
+with ELF `d04dcf9a328dd6ee2c66cc1ac7bf1d5f5de15fc2cb6f1460e2240dce2317ceac`.
+These frozen comparisons precede the shared fourth-chapter engine additions;
+newly linked images require their own ROM/ELF-bound qualification.
+
+The Zerg no-clear renderer also has a full-clear pixel oracle covering camera
+edges, fog, overlays, scene transitions, map-object mutations, save/load and
+restart. Both HUD bands continue to be restored every frame. An additional
+experiment that skipped unchanged HUD-band copies was rejected after its ARM
+capture comparison found viewport-edge map graphics leaking into the HUD.
+A consecutive-frame host fixture reproduced that failure; poisoning both
+buffers before every comparison had previously hidden it by invalidating the
+cache each time. No HUD-band skip is enabled by these performance flags.
