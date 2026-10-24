@@ -177,14 +177,58 @@ def generate(source_root: Path, output: Path) -> dict:
     return verify_staged(source_root)
 
 
+def emit_header(data: dict) -> str:
+    """Retain the authenticated numeric rows for a capability-checked runtime.
+
+    Emission does not assert that the game implements every row. In particular,
+    raw 210 still requires a dedicated trap handler; the runtime must verify
+    that capability before launching the map.
+    """
+    rows = data['doodads']
+    summary = _validate_p6_rows(rows)
+    lines = [
+        '#ifndef SC64_P6_DOODADS_GENERATED_H\n',
+        '#define SC64_P6_DOODADS_GENERATED_H\n',
+        f'#define SC64_P6_DOODAD_SOURCE_COUNT {summary["all_count"]}u\n',
+        f'#define SC64_P6_DOODAD_UNIT_PROP_COUNT {summary["unit_backed_count"]}u\n',
+        f'#define SC64_P6_DOODAD_SPRITE_COUNT {summary["sprite_count"]}u\n',
+        'typedef struct { unsigned short raw_type,x,y,flags; '
+        'unsigned char raw_owner,index,initial_enabled,sprite_only,source_unused; '
+        '} Sc64P6Doodad;\n',
+        f'static const Sc64P6Doodad sc64_p6_doodads[{len(rows)}] = {{\n',
+    ]
+    for row in rows:
+        lines.append('    {' + ','.join(str(v) for v in (
+            row['type'], row['x'], row['y'], row['flags'], row['owner'],
+            row['index'], row['initial_enabled'],
+            int(row['source_kind'] == 'sprite_only'), row['unused'])) + '},\n')
+    return ''.join(lines) + '};\n#endif\n'
+
+
+def generate_header(source_root: Path, output: Path) -> dict:
+    data = parse_source(source_root)
+    header = emit_header(data)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile('w', encoding='ascii', dir=output.parent,
+                                     prefix=output.name + '.', delete=False) as f:
+        temp = Path(f.name)
+        f.write(header)
+    temp.replace(output)
+    return {key: value for key, value in data.items() if key != 'doodads'}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-root', type=Path, default=DEFAULT_SOURCE_ROOT)
     parser.add_argument('--output', type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument('--header', type=Path,
+                        help='also write private numeric C rows; runtime capabilities remain required')
     parser.add_argument('--verify-staged', action='store_true')
     args = parser.parse_args()
     try:
         result = verify_staged(args.source_root) if args.verify_staged else generate(args.source_root, args.output)
+        if args.header:
+            generate_header(args.source_root, args.header)
     except (OSError, ValueError, RuntimeError) as exc:
         parser.error(str(exc))
     print(json.dumps(result, sort_keys=True))

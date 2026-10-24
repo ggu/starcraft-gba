@@ -6,6 +6,9 @@
 #include "sc64_p5_adapter.h"
 #include "sc64_p5_source_model.h"
 #include "sc64_resource_actions.h"
+#ifdef SC64_P5_COUNT_SNAPSHOT
+#include "sc64_p5_count_snapshot.h"
+#endif
 
 typedef struct {
     u8 source_current_player;
@@ -17,6 +20,9 @@ typedef struct {
     u8 presentation_opcode;
     u16 last_string_id, last_wav_id;
     u16 center_x, center_y;
+#ifdef SC64_P5_COUNT_SNAPSHOT
+    Sc64P5CountSnapshot count_snapshot;
+#endif
 } Sc64P5WorldContext;
 
 static int sc64_p5_world_location(unsigned id, int *left, int *top,
@@ -130,12 +136,127 @@ static int sc64_p5_world_type_match(unsigned wanted, unsigned raw, int building)
                       sc64_race_unit_from_raw((int)raw) >= 0;
 }
 
+#ifdef SC64_P5_COUNT_SNAPSHOT
+static int sc64_p5_count_snapshot_row(const Sc64P5SourceCondition *c,
+                                       unsigned *snapshot_index)
+{
+    static const u8 source_rows[6] = {0, 1, 4, 5, 7, 8};
+    static const u8 expected_players[6] = {13, 17, 13, 13, 13, 13};
+    static const u8 expected_units[6] = {229, 79, 79, 65, 229, 229};
+    static const u8 expected_locations[6] = {0, 0, 2, 2, 4, 5};
+    static const u8 expected_triggers[6] = {0, 1, 4, 4, 6, 7};
+    static const u8 expected_indices[6] = {0, 0, 0, 1, 0, 0};
+    if (!c || !snapshot_index) return 0;
+    for (unsigned i = 0; i < 6; ++i) {
+        const Sc64P5SourceCondition *row = &sc64_p5_source_conditions[source_rows[i]];
+        if (c != row) continue;
+        /* Authenticate all operands before allowing a cached answer. */
+        if (row->player != expected_players[i] || row->unit != expected_units[i] ||
+            row->location != expected_locations[i] ||
+            row->opcode != (i < 2 ? 2 : 3) ||
+            row->trigger != expected_triggers[i] ||
+            row->index != expected_indices[i] || row->flags != 0x10 ||
+            row->comparison != (i == 0 || i == 1 ? 1 : 0) ||
+            row->amount != (i == 0 || i == 1 ? 0 : i == 2 || i == 4 || i == 5 ? 1 : 2) ||
+            row->resource || row->mask) return 0;
+        *snapshot_index = i;
+        return 1;
+    }
+    return 0;
+}
+
+static int sc64_p5_count_snapshot_lookup(const Sc64P5WorldContext *ctx,
+                                          const Sc64P5SourceCondition *c,
+                                          u32 *count)
+{
+    unsigned index;
+    if (!ctx || !count || !ctx->count_snapshot.active ||
+        !sc64_p5_count_snapshot_row(c, &index)) return 0;
+    *count = ctx->count_snapshot.count[index];
+    return 1;
+}
+
+static int sc64_p5_count_snapshot_begin(Sc64P5WorldContext *ctx)
+{
+    int left[3], top[3], right[3], bottom[3];
+    u32 counts[6] = {0, 0, 0, 0, 0, 0};
+    if (!ctx) return 0;
+    ctx->count_snapshot.active = 0;
+    memset(ctx->count_snapshot.count, 0, sizeof(ctx->count_snapshot.count));
+    if (!sc64_p5_world_location(2, &left[0], &top[0], &right[0], &bottom[0]) ||
+        !sc64_p5_world_location(4, &left[1], &top[1], &right[1], &bottom[1]) ||
+        !sc64_p5_world_location(5, &left[2], &top[2], &right[2], &bottom[2]))
+        return 0;
+    for (unsigned category = 0; category < 2; ++category) {
+        const int building = (int)category;
+        const unsigned limit = building ? MAX_BUILDINGS : MAX_UNITS;
+        for (unsigned i = 0; i < limit; ++i) {
+            int alive, raw, raw_owner, live_owner, x, y, loaded = 0;
+            int current_player, all_players, hero_type = 0, zealot_type = 0;
+            if (building) {
+                alive = b[i].alive;
+                if (!alive) continue;
+                raw = b[i].raw_type >= 0 ? b[i].raw_type :
+                      sc64_race_raw_building(b[i].type);
+                raw_owner = b[i].raw_owner; live_owner = b[i].owner;
+                x = b[i].x; y = b[i].y;
+            } else {
+                alive = u[i].alive;
+                if (!alive) continue;
+                raw = u[i].raw_type >= 0 ? u[i].raw_type :
+                      sc64_race_raw_unit(u[i].type);
+                raw_owner = u[i].raw_owner; live_owner = u[i].owner;
+                x = u[i].x; y = u[i].y;
+#ifdef SC64_P5_SHUTTLE_ENABLED
+                loaded = SC64_TRANSPORT_LOADED(&u[i]);
+#endif
+            }
+            /* The six exact rows use only Current Player (13) and All Players
+             * (17). Share the common raw-slot/active check, then resolve each
+             * selector once instead of calling owner_matches six times. */
+            current_player = raw_owner >= 0 && raw_owner < 12 &&
+                ctx->source_slot_active[(unsigned)raw_owner] && live_owner == SIDE;
+            all_players = raw_owner >= 0 && raw_owner < 8 &&
+                ctx->source_slot_active[(unsigned)raw_owner];
+            if ((!current_player && !all_players) || raw < 0) continue;
+            if (current_player || all_players)
+                hero_type = sc64_p5_world_type_match(79, (unsigned)raw, building);
+            if (all_players && hero_type) ++counts[1];
+            if (!current_player) continue;
+            /* CHK Any Unit accepts every nonnegative raw type, including
+             * structures and identities without a public race mapping. */
+            ++counts[0];
+            zealot_type = sc64_p5_world_type_match(65, (unsigned)raw, building);
+            if (!loaded && (hero_type || zealot_type) &&
+                x >= left[0] && x < right[0] && y >= top[0] && y < bottom[0]) {
+                if (hero_type) ++counts[2];
+                if (zealot_type) ++counts[3];
+            }
+            if (!loaded && x >= left[1] && x < right[1] &&
+                y >= top[1] && y < bottom[1]) ++counts[4];
+            if (!loaded && x >= left[2] && x < right[2] &&
+                y >= top[2] && y < bottom[2]) ++counts[5];
+        }
+    }
+    memcpy(ctx->count_snapshot.count, counts, sizeof(counts));
+    ctx->count_snapshot.active = 1;
+    return 1;
+}
+
+static void sc64_p5_count_snapshot_end(Sc64P5WorldContext *ctx)
+{
+    if (!ctx) return;
+    ctx->count_snapshot.active = 0;
+    memset(ctx->count_snapshot.count, 0, sizeof(ctx->count_snapshot.count));
+}
+#endif
+
 static int sc64_p5_world_compare(unsigned comparison, u32 value, u32 amount)
 {
     switch (comparison) {
     case 0: return value >= amount;
     case 1: return value <= amount;
-    case 2: return value == amount;
+    case 10: return value == amount; /* CHK Exactly. */
     default: return -1;
     }
 }
@@ -148,8 +269,11 @@ static int sc64_p5_world_in_location(unsigned id, int x, int y)
            x >= left && x < right && y >= top && y < bottom;
 }
 
-static int sc64_p5_world_count(const Sc64P5WorldContext *ctx, unsigned selector,
-                                unsigned wanted, unsigned location, u32 *out)
+/* Keep this reference implementation as the exact semantic oracle for the
+ * opt-in type-first query path below. */
+static int sc64_p5_world_count_full(const Sc64P5WorldContext *ctx,
+                                    unsigned selector, unsigned wanted,
+                                    unsigned location, u32 *out)
 {
     u32 count = 0;
     if (!ctx || !out || wanted > 230 || selector > 21 ||
@@ -182,6 +306,62 @@ static int sc64_p5_world_count(const Sc64P5WorldContext *ctx, unsigned selector,
     return 1;
 }
 
+/* Count with cheap raw-type rejection before resolving source owner and map
+ * location. This is useful for P5's narrow raw-unit queries; all selectors,
+ * including Current Player rescue ownership, still use the same resolver. */
+#ifdef SC64_P5_TYPE_FIRST_COUNTS
+static int sc64_p5_world_count_type_first(const Sc64P5WorldContext *ctx,
+                                           unsigned selector, unsigned wanted,
+                                           unsigned location, u32 *out)
+{
+    u32 count = 0;
+    if (!ctx || !out || wanted > 230 || selector > 21 ||
+        (selector > 13 && selector < 17)) return 0;
+    if (location) {
+        int l, t, r, btm;
+        if (!sc64_p5_world_location(location, &l, &t, &r, &btm)) return 0;
+    }
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive) {
+#ifdef SC64_P5_SHUTTLE_ENABLED
+        /* Bring excludes cargo; global Command counts retain it. */
+        if (location && SC64_TRANSPORT_LOADED(&u[i])) continue;
+#endif
+        int raw = u[i].raw_type >= 0 ? u[i].raw_type :
+                  sc64_race_raw_unit(u[i].type);
+        if (raw < 0 || !sc64_p5_world_type_match(wanted, (unsigned)raw, 0))
+            continue;
+        int owner = sc64_p5_world_owner_matches(ctx, selector, u[i].raw_owner,
+                                                 u[i].owner);
+        if (owner < 0) return 0;
+        if (owner && sc64_p5_world_in_location(location, u[i].x, u[i].y))
+            ++count;
+    }
+    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
+        int raw = b[i].raw_type >= 0 ? b[i].raw_type :
+                  sc64_race_raw_building(b[i].type);
+        if (raw < 0 || !sc64_p5_world_type_match(wanted, (unsigned)raw, 1))
+            continue;
+        int owner = sc64_p5_world_owner_matches(ctx, selector, b[i].raw_owner,
+                                                 b[i].owner);
+        if (owner < 0) return 0;
+        if (owner && sc64_p5_world_in_location(location, b[i].x, b[i].y))
+            ++count;
+    }
+    *out = count;
+    return 1;
+}
+#endif
+
+static int sc64_p5_world_count(const Sc64P5WorldContext *ctx, unsigned selector,
+                                unsigned wanted, unsigned location, u32 *out)
+{
+#ifdef SC64_P5_TYPE_FIRST_COUNTS
+    return sc64_p5_world_count_type_first(ctx, selector, wanted, location, out);
+#else
+    return sc64_p5_world_count_full(ctx, selector, wanted, location, out);
+#endif
+}
+
 static int sc64_p5_world_condition(void *context, const Sc64P5RuntimeState *state,
                                     const Sc64P5SourceCondition *c)
 {
@@ -191,15 +371,25 @@ static int sc64_p5_world_condition(void *context, const Sc64P5RuntimeState *stat
         return -1;
     switch (c->opcode) {
     case 2: case 3: /* Command counts existing units; Bring also scopes a location. */
+#ifdef SC64_P5_COUNT_SNAPSHOT
+        if (!sc64_p5_count_snapshot_lookup(ctx, c, &count) &&
+            !sc64_p5_world_count(ctx, c->player, c->unit,
+                                 c->opcode == 3 ? c->location : 0, &count)) return -1;
+#else
         if (!sc64_p5_world_count(ctx, c->player, c->unit,
                                  c->opcode == 3 ? c->location : 0, &count)) return -1;
+#endif
         return sc64_p5_world_compare(c->comparison, count, c->amount);
     case 11: /* Switch, comparison 2=set and 3=cleared. */
         if (c->flags || c->resource > 255 || c->comparison < 2 || c->comparison > 3)
             return -1;
         count = sc64_p5_switch_is_set(state, c->resource) ? 1u : 0u;
         return c->comparison == 2 ? (int)count : !(int)count;
-    case 12: /* Always. */
+    case 12: /* Source Elapsed Time >= 0; validate the authenticated operands. */
+        if (c->location || c->player || c->amount || c->unit || c->resource ||
+            c->comparison != 0 || c->mask || c->flags) return -1;
+        /* Elapsed time is unsigned and nonnegative, so this source predicate
+         * is true at every representable frame. */
         return 1;
     case 15: /* Deaths is a separate source counter, not current occupancy. */
         if (!ctx->deaths_by_source || c->player >= 12 || c->unit != 229 ||

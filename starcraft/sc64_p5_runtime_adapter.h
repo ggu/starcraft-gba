@@ -522,6 +522,11 @@ static int race_p5_campaign_tick(void)
     /* Rescue is a source-world update and must precede Bring/Command
      * predicates for this scheduler tick. */
     race_p5_rescue_tick();
+#ifdef SC64_P5_COUNT_SNAPSHOT
+    /* Conditions are all sampled before any action dispatch. A failed snapshot
+     * leaves the exact existing full-scan callback active. */
+    (void)sc64_p5_count_snapshot_begin(&race_p5_world);
+#endif
     ops.context = &race_p5_world;
     ops.condition = sc64_p5_world_condition;
     ops.action = race_p5_world_action;
@@ -530,6 +535,9 @@ static int race_p5_campaign_tick(void)
     race_p5_world.defeat_requested = 0;
     result = sc64_p5_adapter_tick(&race_p5.runtime, &ops,
                                   screen != SCREEN_PLAY);
+#ifdef SC64_P5_COUNT_SNAPSHOT
+    sc64_p5_count_snapshot_end(&race_p5_world);
+#endif
     if (result < 0 || !race_p5_runtime_state_valid()) return 0;
     if (race_p5.runtime.model.outcome == SC64_P5_WON) {
         won = 1; lost = 0;

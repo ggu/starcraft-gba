@@ -44,9 +44,13 @@ typedef struct {
 #ifdef SC64_Z5_ACTORS
 #include "sc64_z5_actor_rules.h"
 #endif
+#ifdef SC64_P6_ACTORS
+#include "sc64_p6_actor_rules.h"
+#endif
 
-/* -1 is unknown size; other values match BWAPI's Small/Medium/Large/
- * Independent enumeration (0..3). Scenario actors have no training route. */
+/* Authored normalized size: -1 unknown, Small/Medium/Large/Independent
+ * encoded as 0/1/2/3. This differs from BWAPI native enum ordinals.
+ * Scenario actors have no training route. */
 static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
 {
 #ifdef SC64_Z6_ACTORS
@@ -79,6 +83,30 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
     };
     if (type == U_P5_SHUTTLE) return &shuttle;
     if (type == U_P5_BATTLECRUISER) return &battlecruiser;
+#endif
+#ifdef SC64_P6_ACTORS
+    static const Sc64ZpActorFact p6_facts[] = {
+        /* Source weapon values are retained for audit. WEAPON is deliberately
+           absent until the suicide/cloak mechanics have dedicated handlers. */
+        {50,60,0,0,100,50,600,160, 8,9,8,10,0,0,
+         500,0,1,3,1, 0,0,0,0,0,
+         SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
+         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN},
+        {74,40,80,0,150,150,750,224, 12,6,11,19,0,0,
+         45,1,30,15,1, 0,0,0,0,0,
+         SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
+         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN},
+        {75,60,400,0,100,300,1500,224, 12,6,11,19,0,0,
+         100,1,22,15,1, 0,0,0,0,0,
+         SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
+         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN}
+    };
+    switch (type) {
+    case U_P6_INFESTED_TERRAN: return &p6_facts[0];
+    case U_P6_HERO_DARK_TEMPLAR: return &p6_facts[1];
+    case U_P6_ZERATUL: return &p6_facts[2];
+    default: break;
+    }
 #endif
 #ifdef SC64_Z5_ACTORS
     static const Sc64ZpActorFact z5_facts[] = {
@@ -207,6 +235,14 @@ static inline const Sc64ZpBuildingFact *sc64_zp_building_fact(int type)
     case B_Z5_RIGHT_WALL_FLAME_TRAP: return &z5_doodads[7];
     default: break;
     }
+#endif
+#ifdef SC64_P6_ACTORS
+    static const Sc64ZpBuildingFact p6_wall_missile_trap = {
+        210,50,0,0,0,0,0,192,1,1,16,16,15,15,2,
+        SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|
+        SC64_ZP_ACTOR_COLLIDABLE
+    };
+    if (type == B_P6_WALL_MISSILE_TRAP) return &p6_wall_missile_trap;
 #endif
     static const Sc64ZpBuildingFact facts[] = {
         /* raw, hp, shields, armor, sight, width, height, size, flags */

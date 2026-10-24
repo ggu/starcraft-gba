@@ -44,10 +44,13 @@ The Terran profile presents ten missions. Standard Zerg and Protoss profiles
 present three each. Controller-driven host runs complete 16 of the 30 missions
 across these profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. Separate internal
 Z4 and P4 Storm builds additionally have normal-controller host and full ARM
-wins, bringing the staged total to 18 distinct missions. Their saves and ROM
-identities differ from the canonical outputs. Z5 cloak remains under controller qualification. P5 Shuttle has a complete
-normal-controller host and ARM win plus an exact fresh-process cargo save. The P5 island objective
-requires the optional Shuttle profile. The remaining chapters are incomplete.
+wins. P5 Shuttle also has a complete normal-controller host and ARM win plus
+an exact fresh-process cargo save, bringing the staged total to 19/30
+(Terran 10, Zerg 4, Protoss 5). These staged builds have separate save formats
+and ROM identities. The P5 island objective requires the optional Shuttle
+profile. Z5 Consume remains under controller qualification. P6 has source
+models, actor bindings and asset preparation; its live integration and later
+chapters remain incomplete.
 
 Zerg 3 **The New Dominion** and Protoss 3 **Higher Ground** are on the second
 campaign menu page. The canonical files remain `StarCraft-Zerg-GBA.gba` and

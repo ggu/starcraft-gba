@@ -172,9 +172,9 @@ static inline int sc64_p5_dispatch_action(Sc64P5RuntimeState *s,
 }
 
 /* Returns 1 when advanced, 0 for user pause/terminal, or a negative fault. */
-static inline int sc64_p5_adapter_tick(Sc64P5RuntimeState *s,
-                                       const Sc64P5WorldOps *ops,
-                                       int user_paused)
+static inline int sc64_p5_adapter_tick_policy(Sc64P5RuntimeState *s,
+                                              const Sc64P5WorldOps *ops,
+                                              int user_paused, int prune_started)
 {
     Sc64P5Input in = {{0}, 0, 0};
     Sc64P5Output out;
@@ -194,6 +194,12 @@ static inline int sc64_p5_adapter_tick(Sc64P5RuntimeState *s,
             s->fault = SC64_P5_FAULT_METADATA;
             return -SC64_P5_FAULT_METADATA;
         }
+        /* Source records are one-shot. Once latched, neither an active
+         * action program nor its completed state can use conditions again.
+         * Condition callbacks are read-only world queries; action dispatch,
+         * waits, source ordering and validation still run for every record. */
+        if (prune_started && sc64_p5_trigger_mask_test(s->model.started, (u8)t))
+            continue;
         for (unsigned c = 0; c < tr->condition_count; ++c) {
             const Sc64P5SourceCondition *row;
             int result;
@@ -237,6 +243,19 @@ static inline int sc64_p5_adapter_tick(Sc64P5RuntimeState *s,
         return -SC64_P5_FAULT_STATE;
     }
     return 1;
+}
+
+static inline int sc64_p5_adapter_tick(Sc64P5RuntimeState *s,
+                                       const Sc64P5WorldOps *ops,
+                                       int user_paused)
+{
+    return sc64_p5_adapter_tick_policy(s, ops, user_paused,
+#ifdef SC64_P5_PRUNE_STARTED
+                                       1
+#else
+                                       0
+#endif
+    );
 }
 
 #endif

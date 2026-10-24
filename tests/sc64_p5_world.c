@@ -9,10 +9,14 @@ enum { MAX_UNITS = 16, MAX_BUILDINGS = 8, SIDE = 0, ENEMY = 1,
 enum { ORDER_IDLE = 0 };
 typedef struct {
     int x, y, type, owner, raw_type, raw_owner, alive, selected, target, order;
+    int loaded;
 } Unit;
 typedef struct {
     int x, y, type, owner, raw_type, raw_owner, alive;
 } Building;
+#if defined(SC64_P5_SHUTTLE_ENABLED) && !defined(SC64_TRANSPORT_LOADED)
+#define SC64_TRANSPORT_LOADED(q) ((q)->loaded)
+#endif
 static Unit u[MAX_UNITS];
 static Building b[MAX_BUILDINGS];
 static u8 invincible_units[MAX_UNITS], invincible_buildings[MAX_BUILDINGS];
@@ -128,5 +132,27 @@ int main(void)
     assert(!u[4].alive);
     assert(deaths[7] == 1); /* Kill Unit increments Current Player deaths. */
     assert(!sc64_p5_world_action(&ctx, &sc64_p5_source_actions[34]));
+
+    /* P5 source trigger records 2, 9, and 10 carry ElapsedTime >= 0. */
+    {
+        const unsigned rows[] = { 2, 10, 11 };
+        for (unsigned i = 0; i < sizeof(rows) / sizeof(rows[0]); ++i) {
+            const Sc64P5SourceCondition *source =
+                &sc64_p5_source_conditions[rows[i]];
+            Sc64P5SourceCondition malformed;
+            assert(source->opcode == 12 && source->comparison == 0 &&
+                   source->amount == 0 && source->player == 0 &&
+                   source->unit == 0 && source->location == 0 &&
+                   source->resource == 0 && source->mask == 0 &&
+                   source->flags == 0);
+            assert(sc64_p5_world_condition(&ctx, &state, source) == 1);
+            malformed = *source;
+            malformed.comparison = 2; /* Exactly is CHK opcode 10. */
+            assert(sc64_p5_world_condition(&ctx, &state, &malformed) == -1);
+            malformed = *source;
+            malformed.amount = 1;
+            assert(sc64_p5_world_condition(&ctx, &state, &malformed) == -1);
+        }
+    }
     return 0;
 }

@@ -41,7 +41,8 @@ Z5_CONSUME_FLAGS := $(Z5_CLOAK_FLAGS) -DSC64_Z5_CONSUME_ENABLED
 Z5_CLOAK_INPUTS := $(Z5_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z5_abilities_generated.h
 P5_FLAGS := $(filter-out -DSC64_ZP_DEFENSE_TARGETS -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated,$(P4_STORM_FLAGS)) -I.local/sc64/p5/generated -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated -I.local/sc64/zp-stage/generated/scenarios -DSC64_ZP_FULL_STORAGE -DSC64_P5_DATA_ENABLED -DSC64_P5_ENABLED -DSC64_P5_RUNTIME -DSC64_P5_CAMPAIGN_ENTRY -DSC64_P5_ACTORS -DSC64_Z6_ACTORS
 P5_INPUTS := $(P4_INPUTS) .local/sc64/p5/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h
-P5_SHUTTLE_FLAGS := $(P5_FLAGS) -DSC64_P5_SHUTTLE_ENABLED -DSC64_ZP_DEFENSE_TARGETS
+P5_QUERY_FLAGS ?= -DSC64_P5_TYPE_FIRST_COUNTS -DSC64_P5_PRUNE_STARTED -DSC64_P5_COUNT_SNAPSHOT
+P5_SHUTTLE_FLAGS := $(P5_FLAGS) -DSC64_P5_SHUTTLE_ENABLED -DSC64_ZP_DEFENSE_TARGETS $(P5_QUERY_FLAGS)
 T4_STORAGE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_T4_ENABLED -DSC64_T4_RUNTIME -DSC64_ROUTE_PACK3 -DSC64_T4_WINDOWED_SCHEDULE -DSC64_CAMPAIGN_RACE=0
 T4_OPTIMIZATION_FLAGS ?= -DSC64_T4_COUNT_CACHE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS -DSC64_UNARMED_QUERY_SKIP
 T4_SCENARIO_FLAGS := $(T4_STORAGE_FLAGS) -DSC64_T4_SCENARIO_RUNTIME
@@ -1374,6 +1375,18 @@ test-sc64-p5-world: build/test-sc64-p5-source-model build/test-sc64-p5-world
 	./build/test-sc64-p5-source-model
 	./build/test-sc64-p5-world
 
+build/test-sc64-p5-count-queries: tests/sc64_p5_count_queries.c tests/sc64_p5_world.c starcraft/sc64_p5_world_adapter.h starcraft/sc64_p5_source_model.h starcraft/sc64_p5_adapter.h starcraft/sc64_p5.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+build/test-sc64-p5-count-snapshot: tests/sc64_p5_count_snapshot.c tests/sc64_p5_world.c starcraft/sc64_p5_count_snapshot.h starcraft/sc64_p5_world_adapter.h starcraft/sc64_p5_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+build/test-sc64-p5-trigger-prune: tests/sc64_p5_trigger_prune.c starcraft/sc64_p5_adapter.h starcraft/sc64_p5.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+.PHONY: test-sc64-p5-count-queries
+test-sc64-p5-count-queries: build/test-sc64-p5-count-queries build/test-sc64-p5-count-snapshot build/test-sc64-p5-trigger-prune
+	./build/test-sc64-p5-count-queries
+	./build/test-sc64-p5-count-snapshot
+	./build/test-sc64-p5-trigger-prune
+
 build/test-sc64-p5-actors-off: tests/sc64_p5_actor_rules.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 build/test-sc64-p5-actors-on: tests/sc64_p5_actor_rules.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h common/gba.h | build
@@ -1694,6 +1707,19 @@ test-sc64-p6-actors: build/test-sc64-p6-actors
 test-sc64-p6-adapter: test-sc64-p6-model build/test-sc64-p6-adapter
 	./build/test-sc64-p6-adapter
 test-starcraft: test-sc64-p6-model test-sc64-p6-actors
+
+build/test-sc64-p6-bindings-off: tests/sc64_p6_actor_bindings.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h starcraft/sc64_p6_actor_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-p6-bindings-on: tests/sc64_p6_actor_bindings.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h starcraft/sc64_p6_actor_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_P6_ACTORS $< -o $@
+build/test-sc64-p6-bindings-mixed: tests/sc64_p6_actor_bindings.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h starcraft/sc64_p6_actor_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_T4_RUNTIME -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS -DSC64_Z6_ACTORS -DSC64_P5_ACTORS -DSC64_P6_ACTORS $< -o $@
+.PHONY: test-sc64-p6-bindings
+test-sc64-p6-bindings: build/test-sc64-p6-bindings-off build/test-sc64-p6-bindings-on build/test-sc64-p6-bindings-mixed
+	./build/test-sc64-p6-bindings-off
+	./build/test-sc64-p6-bindings-on
+	./build/test-sc64-p6-bindings-mixed
+test-starcraft: test-sc64-p6-bindings
 
 build/test-sc64-p6-actor-source: tests/sc64_p6_actor_rules.c starcraft/sc64_p6_actor_rules.h starcraft/sc64_z5_actor_rules.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_P6_SOURCE_AUDIT $< -o $@

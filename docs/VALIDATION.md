@@ -2301,3 +2301,48 @@ PTEC. Standalone Consume/Ensnare models pass sanitizer checks; Ensnare remains
 unwired in the game. The door source facts were corrected against the pinned
 UnitType flag expressions: raw205–208 are Invincible, not Building. Their GBA
 building-pool policy and collision geometry are unchanged.
+
+
+### Protoss five shared source-condition queries
+
+The Shuttle profile now enables `SC64_P5_TYPE_FIRST_COUNTS`,
+`SC64_P5_PRUNE_STARTED`, and `SC64_P5_COUNT_SNAPSHOT`. Already-started
+one-shot records retain action/wait validation but stop querying unused
+conditions. Six authenticated Command/Bring rows share a transient actor
+snapshot built after rescue and discarded before action results are used.
+The cache is absent from SRAM. Copied or modified condition rows fall back
+to ordinary queries. Command includes cargo; Bring excludes it, and Current
+Player follows rescue ownership while source provenance remains intact.
+CHK Exactly uses comparison 10; opcode 12 is the authenticated Elapsed Time
+>= 0 predicate, with malformed operands rejected.
+
+Sanitizer checks compare 607,200 full/type-first count pairs, randomized
+snapshot worlds and 192,000 scheduler ticks with matching action streams.
+The combined full ARM win averages **18.28 effective fps**, versus 15.17 for
+pruning/type-first alone and 14.79 for defense lists alone (original 12.69).
+All ten observed checkpoints and three PNGs match the qualified win, including
+persisted mission state and whole actor-bank hashes. A fresh process restores
+the cargo save exactly and advances one handoff plus 60 live ticks. Normal
+Make output matches the qualified ROM hash. IWRAM ends at `0x03004310` and
+BSS at `0x0203d584`, inside unchanged reserve guards. This is below 30 fps.
+
+Private evidence: `.local/build/promotion/p5-snapshot-qualified/qualification.json`.
+ROM SHA-256: `d8906071993d2db4bc9ff8710314643d8d9103b844c2abc402d93336147de64f`.
+ELF SHA-256: `256a023e655b555aaf89bab5214fd626c5267c2e305880324f0120b62cb2f51f`.
+Trace SHA-256: `68bb8d49e8fd95b1ef0c3fb2f22ad1b866e9215e8c75a16377a90f68939d83c0`.
+
+### Protoss six gated actor bindings and numeric props
+
+`SC64_P6_ACTORS` appends distinct raw50/74/75 unit types and a raw210
+building-pool prop without changing earlier enum values when the gate is off.
+Source facts, mappings, bounds, supply and save-codec type capacity pass
+asset-free sanitizer checks with the gate off, on, and mixed with prior actor
+sets. The new units are untrainable scenario actors. Dedicated combat
+capabilities remain disabled pending live integration; numeric weapon facts
+alone do not enable ordinary attacks.
+
+The private doodad emitter retains all 37 authenticated THG2 records, including
+27 unit-backed props and ten SpriteType decorations. Three disabled raw205
+rows retain their initial state. Emission does not claim raw210 trap behavior
+is implemented, and runtime capability checks remain required. No P6 live
+mission completion is claimed by these foundations.

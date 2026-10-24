@@ -107,6 +107,8 @@ class P6DoodadPackTests(unittest.TestCase):
                 verified = PACK.verify_staged(source_root)
                 output = Path(tmp) / 'private' / 'doodads.json'
                 generated = PACK.generate(source_root, output)
+                header_path = Path(tmp) / 'private' / 'sc64_p6_doodads_generated.h'
+                PACK.generate_header(source_root, header_path)
             self.assertEqual(decoder.mission, 'P6')
             self.assertEqual(data['all_count'], 37)
             self.assertEqual(data['doodads'][0]['type'], 120)
@@ -116,6 +118,21 @@ class P6DoodadPackTests(unittest.TestCase):
             self.assertEqual(len(saved['doodads']), 37)
             self.assertNotIn('pixels', output.read_text().lower())
             self.assertNotIn('dialogue', output.read_text().lower())
+            header = header_path.read_text()
+            self.assertIn('#define SC64_P6_DOODAD_SOURCE_COUNT 37u', header)
+            self.assertIn('#define SC64_P6_DOODAD_UNIT_PROP_COUNT 27u', header)
+            self.assertIn('#define SC64_P6_DOODAD_SPRITE_COUNT 10u', header)
+            # Every source row survives, including raw 210 and sprite IDs that
+            # must never be interpreted as UnitType IDs.
+            emitted = [line.strip() for line in header.splitlines()
+                       if line.startswith('    {')]
+            self.assertEqual(len(emitted), 37)
+            for decoded, line in zip(data['doodads'], emitted):
+                values = [int(v) for v in line.strip('{},').split(',')]
+                self.assertEqual(values, [decoded['type'], decoded['x'], decoded['y'],
+                    decoded['flags'], decoded['owner'], decoded['index'],
+                    decoded['initial_enabled'], int(decoded['source_kind'] == 'sprite_only'),
+                    decoded['unused']])
 
     def test_authentication_and_source_inventory_fail_closed(self):
         payload = expected_payload()
