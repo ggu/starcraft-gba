@@ -2198,6 +2198,25 @@ test-sc64-construction-vfx: build/test-sc64-construction-vfx
 	./build/test-sc64-construction-vfx
 test-starcraft: test-sc64-construction-vfx
 
+build/test-sc64-construction-hp: tests/sc64_construction_hp.c starcraft/sc64_construction_hp.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-construction-hp-game: tests/sc64_construction_hp_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) -DSC64_CONSTRUCTION_HP $< common/gba.c -o $@
+build/test-sc64-construction-hp-z7: tests/sc64_construction_hp_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP $< common/gba.c -o $@
+build/test-sc64-construction-hp-colonies: tests/sc64_z7_colonies_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP $< common/gba.c -o $@
+.PHONY: test-sc64-construction-hp test-sc64-construction-hp-game test-sc64-construction-hp-z7
+test-sc64-construction-hp: build/test-sc64-construction-hp
+	./build/test-sc64-construction-hp
+test-sc64-construction-hp-game: build/test-sc64-construction-hp-game
+	./build/test-sc64-construction-hp-game
+test-sc64-construction-hp-z7: build/test-sc64-construction-hp-z7 build/test-sc64-construction-hp-colonies
+	./build/test-sc64-construction-hp-z7
+	./build/test-sc64-construction-hp-colonies
+test-starcraft: test-sc64-construction-hp
+test-unified: test-sc64-construction-hp-game
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build

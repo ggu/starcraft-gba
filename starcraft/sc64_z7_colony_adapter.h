@@ -33,8 +33,6 @@
 
 #if defined(SC64_Z7_RUNTIME) && defined(SC64_Z7_COLONY_DEFENSE_ENABLED)
 
-#define SC64_Z7_SUNKEN_MORPH_FLAG 0x8000u
-#define SC64_Z7_SPORE_MORPH_FLAG 0x4000u
 #define SC64_Z7_CREEP_RAW 143
 #define SC64_Z7_SUNKEN_RAW 146
 #define SC64_Z7_SPORE_RAW 144
@@ -84,7 +82,13 @@ static int race_z7_colony_morph_state_valid(const Building *q)
         (q->under_construction &&
          q->build_progress >= target_ticks) ||
         (!q->under_construction &&
-         (q->build_progress != 0 || q->hp != SC64_Z7_CREEP_HP)))
+         (q->build_progress != 0 ||
+#ifdef SC64_CONSTRUCTION_HP
+          q->hp != q->queue_progress
+#else
+          q->hp != SC64_Z7_CREEP_HP
+#endif
+          )))
         return 0;
     return 1;
 }

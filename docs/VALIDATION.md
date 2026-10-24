@@ -3640,3 +3640,46 @@ route-policy variants and pure Observer rules. Local unified build/host
 checks and the private-input P7 runtime, Observer and Archon fixtures pass.
 The original-art and unified ROM hashes remain `4ad80ce0…f9aee` and
 `6bab5be2…79f9` with these gates off.
+
+### Experimental construction hit-point progression
+
+The default-off `SC64_CONSTRUCTION_HP` gate requires race rules. Ordinary
+foundations start at one tenth of their maximum HP (at least one point),
+rather than staying at one HP until completion. Each construction update
+adds the difference between adjacent cumulative integer progress targets to
+the current HP. Damage therefore survives completion. Terran progress and
+growth require a working SCV; Zerg and Protoss growth wait for builder arrival.
+Protoss shields start at one tenth of their source maximum and receive
+construction gains alongside the existing passive shield recharge.
+
+This follows the pinned OpenBW construction lifecycle, with a documented
+integer adaptation: the source uses rounded 8.8 construction rates, while
+this path uses cumulative integer floors over the existing scaled 30 Hz
+duration. Lair, Hive and Greater Spire morphs skip ordinary growth and apply
+the absolute new-maximum minus old-maximum HP difference at completion.
+Z7's existing Creep-to-Sunken/Spore hooks retain their separate damage-preserving
+completion logic. Their transient completion validator accepts the saved
+pre-tick HP under this gate instead of requiring the old generic full heal.
+
+The existing pre-arrival Zerg/Protoss foundation remains a timing approximation:
+its progress is negative until arrival, so construction HP cannot grow, but
+the existing shield-recharge path can still run. Incomplete Zerg buildings
+receive no passive HP regeneration, consistent with the reference's
+completed-only HP regeneration check. No unit/building fields, save bytes or
+global storage are added. The gate remains off in standard profiles pending
+mission and fresh-process SRAM qualification.
+
+Asset-free ASan/UBSan tests cover integer boundaries, completion, damage,
+shield gains and morph clamps. Actual unified and Z7 fixtures cover SCV
+pause/resume, Drone consumption, delayed growth, Protoss HP/shield growth and
+Lair morph damage. The existing Z7 colony fixture also passes with the gate
+enabled, including damaged Sunken/Spore morphs and packed-save continuity.
+The gated Z7 ARM ROM (`4c97cd91…92596`) links with IWRAM end `0x03004f28`
+and unchanged BSS end `0x0203d9f0`, below the unchanged reserves. This is
+link and focused host evidence, without a qualified Z7 mission win.
+
+A 555-file source-only export passes the default build and complete host suite
+(380 Python tests, six private-input skips). Local unified build/host checks
+and both gate-on/off Z7 colony fixtures also pass. With the gate off,
+original-art and unified ROM bytes remain `4ad80ce0…f9aee` and
+`6bab5be2…79f9` respectively.

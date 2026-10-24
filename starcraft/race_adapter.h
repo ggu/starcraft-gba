@@ -448,13 +448,76 @@ static void race_tick_state(void)
     supply_used=used;supply_cap=cap;
 }
 
+#ifdef SC64_CONSTRUCTION_HP
+static int race_construction_growth_is_morph(const Building *building)
+{
+    if (building->type == B_LAIR || building->type == B_HIVE ||
+        building->type == B_GREATER_SPIRE) return 1;
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+    if (building->flags & (SC64_Z7_SUNKEN_MORPH_FLAG |
+                           SC64_Z7_SPORE_MORPH_FLAG)) return 1;
+#endif
+    return 0;
+}
+
+static int race_construction_morph_source_max(int type)
+{
+    int source = -1;
+    if (type == B_LAIR) source = B_HATCHERY;
+    else if (type == B_HIVE) source = B_LAIR;
+    else if (type == B_GREATER_SPIRE) source = B_SPIRE;
+    return source >= 0 ? sc64_race_building_rule(source)->hp : 0;
+}
+
+/* Keep optional integer construction math out of ARM hot-path inlining. */
+static void __attribute__((noinline))
+race_construction_hp_progress(int i, int progress, int total)
+{
+    Building *building;
+    int gain, shield_max;
+    if (i < 0 || i >= MAX_BUILDINGS || progress <= 0 || total <= 0) return;
+    building = &b[i];
+    if (!building->alive || !building->under_construction ||
+        building->hp <= 0 || race_construction_growth_is_morph(building)) return;
+    gain = sc64_construction_hp_gain(building->maxhp, progress, total);
+    if (gain > 0) {
+        building->hp += gain;
+        if (building->hp > building->maxhp) building->hp = building->maxhp;
+    }
+    shield_max = sc64_race_building_shields(building->type);
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    {
+        const Sc64ZpBuildingFact *fact = sc64_zp_building_fact(building->type);
+        if (fact) shield_max = fact->shields;
+    }
+#endif
+    if (shield_max > building->shield && shield_max > 0) {
+        gain = sc64_construction_shield_gain(shield_max, progress, total);
+        building->shield += gain;
+        if (building->shield > shield_max) building->shield = shield_max;
+    }
+}
+#endif
+
 static void race_complete_building(int i)
 {
     const Sc64RaceBuildingRule *r;
     if (i < 0 || i >= MAX_BUILDINGS || !b[i].alive || !b[i].under_construction) return;
     r = sc64_race_building_rule(b[i].type);
     b[i].under_construction = 0;
+#ifdef SC64_CONSTRUCTION_HP
+    {
+        int old_max = race_construction_morph_source_max(b[i].type);
+        if (old_max > 0) {
+            b[i].hp = sc64_construction_morph_hp(b[i].hp, old_max, b[i].maxhp);
+        }
+        else if (!race_construction_growth_is_morph(&b[i]) &&
+                 b[i].hp > b[i].maxhp)
+            b[i].hp = b[i].maxhp;
+    }
+#else
     b[i].hp = b[i].maxhp;
+#endif
     b[i].build_progress = 0;
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
     if (race_resource_depot_type(b[i].type)) race_depot_cache_clear_no_home();
@@ -571,8 +634,18 @@ static void race_tick_buildings(void)
         const Sc64RaceBuildingRule *br;
         if (b[i].under_construction) {
             br = sc64_race_building_rule(b[i].type);
+#ifdef SC64_CONSTRUCTION_HP
+            if (br && (br->race == R_ZERG || br->race == R_PROTOSS) &&
+                b[i].build_progress >= 0) {
+                int total = (br->build_frames * 5 + 3) / 4;
+                int progress = ++b[i].build_progress;
+                race_construction_hp_progress(i, progress, total);
+                if (progress >= total) race_complete_building(i);
+            }
+#else
             if (br && (br->race == R_ZERG || br->race == R_PROTOSS) && b[i].build_progress >= 0 && ++b[i].build_progress >= (br->build_frames * 5 + 3) / 4)
                 race_complete_building(i);
+#endif
             continue;
         }
         if (!b[i].queue_count) continue;

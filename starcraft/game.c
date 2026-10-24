@@ -1,6 +1,7 @@
 #include "../common/gba.h"
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
+#include "sc64_construction_hp.h"
 #ifdef SC64_RACES
 #include "sc64_weapon_vfx.h"
 #include "sc64_construction_vfx.h"
@@ -1025,6 +1026,10 @@ static int race_start_build(int owner,int worker,int type,int x,int y);
 static int race_can_site(int owner,int type,int x,int y);
 static int race_site_powered(int owner,int x,int y);
 static int race_builder_arrived(int worker);
+#ifdef SC64_CONSTRUCTION_HP
+static void race_construction_hp_progress(int building, int progress, int total);
+static void race_complete_building(int building);
+#endif
 static void race_tick_buildings(void),race_tick_state(void),race_tick_ai(void),race_tick_defenses(void);
 static void race_skirmish_init(void),race_skirmish_outcome(void);
 static void race_skirmish_geometry(void);
@@ -1523,6 +1528,10 @@ spawn_build(int owner, int type, int x, int y, int constructing)
       if (zp) { b[i].shield = zp->shields;
         b[i].raw_type = sc64_race_raw_building(type); } }
 #endif
+#ifdef SC64_CONSTRUCTION_HP
+    if (constructing)
+        b[i].shield = (unsigned short)sc64_construction_shield_start(b[i].shield);
+#endif
 #ifdef SC64_P5_SHUTTLE_ENABLED
     if (race_p5_active()) {
         b[i].raw_type = sc64_race_raw_building(type);
@@ -1569,7 +1578,11 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #endif
     b[i].larva=3;b[i].larva_timer=0;
 #endif
+#ifdef SC64_CONSTRUCTION_HP
+    b[i].hp = constructing ? sc64_construction_hp_start(b[i].maxhp) : b[i].maxhp;
+#else
     b[i].hp = constructing ? 1 : b[i].maxhp;
+#endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
     if (owner == SIDE && type == B_COMMAND && !constructing) supply_cap += 20;
 #endif
@@ -4673,7 +4686,20 @@ target_lists_unavailable:
 	     * building collision radius, so a 36px work radius avoids path wedges. */
 	    if (dist2(q->x, q->y, b[q->target].x, b[q->target].y) > 36 * 36) {
 		move_toward(q, b[q->target].x, b[q->target].y);
-	    } else if (++b[q->target].build_progress >= building_build_time(b[q->target].type)) {
+	    }
+#ifdef SC64_CONSTRUCTION_HP
+            else {
+                int total = building_build_time(b[q->target].type);
+                int progress = ++b[q->target].build_progress;
+                race_construction_hp_progress(q->target, progress, total);
+                if (progress >= total) {
+                    race_complete_building(q->target);
+                    q->order = ORDER_IDLE;
+                    q->target = -1;
+                }
+            }
+#else
+            else if (++b[q->target].build_progress >= building_build_time(b[q->target].type)) {
 		b[q->target].under_construction = 0;
 		b[q->target].hp = b[q->target].maxhp;
 		b[q->target].build_progress = 0;
@@ -4686,6 +4712,7 @@ target_lists_unavailable:
 		q->order = ORDER_IDLE;
 		q->target = -1;
 	    }
+#endif
 	    continue;
 	}
 

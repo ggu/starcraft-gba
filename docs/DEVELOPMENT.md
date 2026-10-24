@@ -1492,6 +1492,25 @@ After Z7 inputs are prepared, `make test-sc64-z7-gas-restore` checks destroyed
 source Extractors reopening their geyser locations and the corresponding
 transactional save validation. This does not establish a full Z7 win.
 
+Construction hit-point progression has a separate default-off
+`SC64_CONSTRUCTION_HP` gate requiring race rules. It starts ordinary buildings
+at one tenth HP, grows HP and Protoss shields with construction, and retains
+damage on completion. Zerg upgrades use their separate morph HP rules. The
+asset-free integer checks are included in `./dev test` and can run alone:
+
+```sh
+make test-sc64-construction-hp
+```
+
+With unified inputs available, `make test-sc64-construction-hp-game` runs
+actual worker/construction lifecycle fixtures. With the existing Z7 private
+inputs prepared, `make test-sc64-construction-hp-z7` also checks Lair and
+damaged Sunken/Spore morphs, including packed-save continuity. These test
+targets enable the gate explicitly; standard ROM flags leave it off pending
+complete mission and fresh-process SRAM qualification. See
+[Validation](VALIDATION.md#experimental-construction-hit-point-progression)
+for the integer-timing and pre-arrival-foundation limits.
+
 P7 has a gated source-fact foundation, independently testable without assets:
 
 ```sh
