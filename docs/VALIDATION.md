@@ -3803,8 +3803,11 @@ replacement policy while changing only all-unreachable field initialization.
 An explicitly aligned array and `may_alias` 32-bit stores avoid unaligned word
 access and strict-aliasing violations. Byte prefix/tail handling supports row
 sizes that are not multiples of four; no state, actor fields or save bytes are
-added. P3's 4,608-byte field needs 1,152 word stores instead of 4,608 byte
-stores; this operation count is not itself an FPS result.
+added. The P5 campaign bank used for the P3 measurement allocates each field
+for its 128×128 maximum, even while the active P3 map is 128×96. Each clear
+therefore needs 1,536 word stores instead of 6,144 byte stores. A standalone
+128×96 field uses 4,608 bytes; it is a separate fixture size. These operation
+counts are not themselves FPS results.
 
 ASan/UBSan fixtures compare every decoded field with an independent BFS across
 128×128, 128×96 and 10×10 grids. Canary checks exercise start offsets zero
