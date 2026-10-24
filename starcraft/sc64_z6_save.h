@@ -167,9 +167,10 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
     u8 seen_units[(MAX_UNITS + 7) / 8] = {0};
     u8 seen_buildings[(MAX_BUILDINGS + 7) / 8] = {0};
     u8 seen_minerals[(MAX_MINERALS + 7) / 8] = {0};
+    u8 seen_geysers[(MAX_RACE_GEYSERS + 7) / 8] = {0};
     unsigned unit_deaths[SC64_Z6_SOURCE_SLOT_COUNT] = {0};
     unsigned building_deaths[SC64_Z6_SOURCE_SLOT_COUNT] = {0};
-    unsigned live = 0, queued = 0, human_drone_missing = 0;
+    unsigned live = 0, queued = 0, human_drone_missing = 0, source_geysers = 0;
     unsigned ai_dispatched;
     if (!candidate || !state || width != SC64_Z6_MAP_COLS ||
         height != SC64_Z6_MAP_ROWS ||
@@ -313,16 +314,24 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
                 }
             }
             if (!found) return 0;
-        }
+        } else if (raw == 188u) ++source_geysers;
     }
-    if ((unsigned)candidate->state[16] != (unsigned)geyser_count) return 0;
-    for (int i = 0; i < geyser_count; ++i) {
+    /* A fresh HOME load has no live map yet. Authenticate this candidate
+       against the immutable map rather than the current world's count. */
+    if (source_geysers > MAX_RACE_GEYSERS ||
+        (unsigned)candidate->state[16] != source_geysers) return 0;
+    for (unsigned i = 0; i < source_geysers; ++i) {
         int found = 0;
+        unsigned ordinal = 0;
         for (unsigned row = 0; row < map->unit_count; ++row)
-            if (map->units[row].source_type == 188u &&
-                candidate->geysers[i].x == map->units[row].x_px &&
-                candidate->geysers[i].y == map->units[row].y_px) {
-                found = 1; break;
+            if (map->units[row].source_type == 188u) {
+                if (!(seen_geysers[ordinal >> 3] & (1u << (ordinal & 7u))) &&
+                    candidate->geysers[i].x == map->units[row].x_px &&
+                    candidate->geysers[i].y == map->units[row].y_px) {
+                    seen_geysers[ordinal >> 3] |= (u8)(1u << (ordinal & 7u));
+                    found = 1; break;
+                }
+                ++ordinal;
             }
         if (!found) return 0;
     }

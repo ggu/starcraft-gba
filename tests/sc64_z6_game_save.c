@@ -186,6 +186,15 @@ static void test_live_roundtrip_and_transactional_rejection(void)
     reject_without_mutation(&bad, SAVE_VERSION);
 
     bad = good;
+    ++bad.geysers[0].x;
+    reject_without_mutation(&bad, SAVE_VERSION);
+
+    assert(good.state[16] == 3);
+    bad = good;
+    bad.geysers[1] = bad.geysers[0];
+    reject_without_mutation(&bad, SAVE_VERSION);
+
+    bad = good;
     {
         int changed = 0;
         for (unsigned i = 0; i < MAX_UNITS; ++i) {
@@ -210,6 +219,25 @@ static void test_live_roundtrip_and_transactional_rejection(void)
     assert(sc64_z6_runtime_state_valid(&race_z6.runtime));
     assert(race_z6_world.source_slot_active[
         sc64_race_maps[SC64_Z6_GLOBAL_ID].human_slot]);
+
+    /* A cold HOME load must not require any previous live map. Reset the
+     * resource globals to their C-startup values: game_init itself does not
+     * import a map or reset a previous game's resource count. */
+    save_write(&good, sizeof(good), SAVE_VERSION);
+    game_init();
+    geyser_count = 0;
+    memset(geysers, 0, sizeof(geysers));
+    held_keys = 0;
+    assert(screen == SCREEN_TITLE && race_front.page == SC_FRONT_HOME);
+    assert(geyser_count == 0);
+    assert(race_z6_save_candidate_valid(&good, &good.z6,
+                                         SC64_Z6_MAP_COLS,
+                                         SC64_Z6_MAP_ROWS));
+    input(KEY_L);
+    assert(screen == SCREEN_PLAY && race_selected_mission == SC64_Z6_GLOBAL_ID);
+    assert(geyser_count == good.state[16] && frame == good.state[7]);
+    assert(!memcmp(geysers, good.geysers, sizeof(geysers)));
+    assert(!memcmp(&race_z6, &good.z6, sizeof(race_z6)));
     puts("Z6 normal-menu save/load and transactional rejection passed");
 }
 

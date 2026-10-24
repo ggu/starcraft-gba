@@ -2808,3 +2808,25 @@ checks and 326 Python tests with six private-data checks skipped. The default
 ROM remains 65,536 bytes with SHA-256 `4ad80ce0…f9aee` recorded above.
 Unified ARM and host regressions also pass. No game assets, generated private
 headers, ROMs, captures or experimental P6/Z7 controller traces are included.
+
+### Z6 cold HOME-load correction
+
+The failed fresh load above was traced to candidate validation using the live
+`geyser_count` before any map had been imported. The saved Z6 count is three;
+a fresh title process has zero. Validation now derives the expected count
+from immutable raw-188 map rows and matches each candidate geyser uniquely
+against those rows. It no longer depends on the active world's resource
+count. The generation-32 record layout and memory reserve guards are unchanged.
+
+The actual-engine ASan/UBSan fixture now loads through HOME L after clearing
+the resource globals to their C-startup values. It also rejects misplaced and
+duplicate geysers without changing live state. Transport, Z6 runtime/save,
+Z6 startup/skirmish matrix, Z7 save, default and unified checks pass.
+
+The corrected ROM SHA-256 is
+`bc24435f6e3bc47ce90512d1eb2ca814bc03168ce795b83bf5caa2a785a15e8c`.
+A fresh emulator restores its 1,000-tick prefix snapshot exactly through HOME
+L at frame 967, takes one neutral handoff frame and then 60 measured live
+frames to frame 1028. That is an opening save check, not the late-mission
+qualification. The 150,000-tick save and new full replay remain running;
+staged qualification remains 20/30 until those checks complete.
