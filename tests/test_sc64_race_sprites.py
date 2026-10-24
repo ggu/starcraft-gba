@@ -11,10 +11,108 @@ from tools.sc64_race_sprites import (
     T4_BUILDING_IDS, T6_UNIT_IDS, LATE_UNIT_IDS, LATE_BUILDING_IDS,
     ZP_UNIT_IDS, ZP_BUILDING_IDS, Z5_UNIT_IDS, Z5_BUILDING_IDS, Z6_UNIT_IDS,
     Z5_DOODAD_IDS, Z6_BUILDING_IDS,
+    P7_UNIT_IDS, P7_BUILDING_IDS, P7_SHARED_UNIT_IDS,
 )
 
 
 class RaceSpritePackTests(unittest.TestCase):
+    def test_p7_sprite_set_gates_arbiter_and_all_structure_frames(self):
+        def frame(pixel):
+            return {'pixels': bytes((pixel,)), 'alpha': bytes((1,)), 'width': 1,
+                    'height': 1, 'x': 0, 'y': 0, 'frame_width': 1,
+                    'frame_height': 1}
+        base_units = [{'name': name, 'frame': frame(9)} for name in RACE_UNIT_IDS]
+        p7_units = [{'name': name, 'frame': frame(20)} for name in P7_UNIT_IDS]
+        p7_buildings = [{'name': name, 'frames': [frame(21), frame(22)]}
+                        for name in P7_BUILDING_IDS]
+        late_buildings = [{'name': name, 'frames': [frame(31), frame(32)]}
+                          for name in LATE_BUILDING_IDS]
+        z6_buildings = [{'name': name, 'frames': [frame(41), frame(42)]}
+                        for name in Z6_BUILDING_IDS]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / 'p7.h'
+            write_header(path, base_units, bytes(range(256)),
+                         late_building_selected=late_buildings,
+                         z6_building_selected=z6_buildings,
+                         p7_selected=p7_units,
+                         p7_building_selected=p7_buildings)
+            text = path.read_text()
+            self.assertIn('#define SC64_P7_SPRITE_SET_COMPLETE 1', text)
+            self.assertIn('case 71: return &sc64_race_sprite_arbiter_p7;', text)
+            self.assertEqual(P7_BUILDING_IDS['robotics_support_bay_p7'], 171)
+            self.assertNotIn('robotics_facility_p7', P7_BUILDING_IDS)
+            for raw in (68, 71, 72, 84):
+                self.assertIn(f'case {raw}:', text)
+            for raw in P7_BUILDING_IDS.values():
+                self.assertIn(f'case {raw}:', text)
+            self.assertEqual(set(P7_SHARED_UNIT_IDS.values()), {68, 72, 84})
+            (root / 'check.c').write_text('''#include <assert.h>
+#include "p7.h"
+int main(void) {
+#ifdef SC64_P7_ACTORS
+#ifndef SC64_P7_SPRITE_SET_COMPLETE
+#error "complete P7 sprite set must advertise its own marker"
+#endif
+    assert(sc64_race_unit_sprite(68));
+    assert(sc64_race_unit_sprite(71));
+    assert(sc64_race_unit_sprite(72));
+    assert(sc64_race_unit_sprite(84));
+    assert(sc64_race_building_sprite(159, 1));
+    assert(sc64_race_building_sprite(163, 1));
+    assert(sc64_race_building_sprite(165, 1));
+    assert(sc64_race_building_sprite(169, 1));
+    assert(sc64_race_building_sprite(170, 1));
+    assert(sc64_race_building_sprite(171, 1));
+    assert(sc64_race_building_sprite(172, 1));
+    assert(sc64_race_unit_sprite(71)->pixels[0] == 20);
+    assert(sc64_race_building_sprite(171, 1)->pixels[0] == 22);
+    assert(sc64_race_building_sprite(172, 1)->pixels[0] == 22);
+    assert(!sc64_race_building_sprite(171, 2));
+#else
+    assert(!sc64_race_unit_sprite(71));
+#endif
+    return 0;
+}
+''')
+            for defines in ([], ['-DSC64_P7_ACTORS'],
+                            ['-DSC64_P7_ACTORS', '-DSC64_TERRAN_LATE_ENABLED',
+                             '-DSC64_Z6_RUNTIME']):
+                subprocess.run(['clang', '-std=c11', '-Werror', str(root / 'check.c'),
+                                '-o', str(root / 'check'), *defines],
+                               check=True, capture_output=True)
+                subprocess.run([str(root / 'check')], check=True, capture_output=True)
+            partial = root / 'partial.h'
+            write_header(partial, base_units, bytes(range(256)),
+                         p7_selected=p7_units,
+                         p7_building_selected=p7_buildings[:-1])
+            self.assertNotIn('SC64_P7_SPRITE_SET_COMPLETE', partial.read_text())
+            missing_shared = root / 'missing-shared.h'
+            no_shared_units = [item for item in base_units
+                               if item['name'] not in P7_SHARED_UNIT_IDS]
+            write_header(missing_shared, no_shared_units, bytes(range(256)),
+                         p7_selected=p7_units,
+                         p7_building_selected=p7_buildings)
+            self.assertNotIn('SC64_P7_SPRITE_SET_COMPLETE',
+                             missing_shared.read_text())
+            no_p7 = root / 'no-p7.h'
+            write_header(no_p7, base_units, bytes(range(256)),
+                         late_building_selected=late_buildings,
+                         z6_building_selected=z6_buildings)
+            no_p7_text = no_p7.read_text()
+            self.assertNotIn('!SC64_P7_ACTORS', no_p7_text)
+            self.assertNotIn('SC64_P7_ACTORS', no_p7_text)
+            legacy = root / 'legacy.h'
+            explicit_off = root / 'explicit-off.h'
+            write_header(legacy, base_units, bytes(range(256)))
+            write_header(explicit_off, base_units, bytes(range(256)),
+                         p7_selected=[], p7_building_selected=[])
+            self.assertEqual(legacy.read_bytes(), explicit_off.read_bytes())
+        help_result = subprocess.run(
+            [sys.executable, str(Path(__file__).parents[1] / 'tools/sc64_race_sprites.py'), '--help'],
+            check=True, capture_output=True, text=True)
+        self.assertIn('--include-p7-actors', help_result.stdout)
+
     def test_campaign_raw_types_have_real_asset_mappings(self):
         self.assertEqual(set(MISSION_RAW_TYPES) - set(RACE_UNIT_IDS.values()), set())
         self.assertEqual(RACE_UNIT_IDS['drone'], 41)

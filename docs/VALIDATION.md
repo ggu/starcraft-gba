@@ -3334,3 +3334,57 @@ The 538-file source-only export passes `./dev build` and `./dev test`,
 including 361 Python tests (six private-input checks skipped). The default
 original-art ROM remains byte-identical (`4ad80ce0…f9aee`). These checks do
 not add P7 to the qualified mission count.
+
+### Larger-bank P3 expansion controller
+
+The opt-in P5 Shuttle build with `SC64_P3_PRODUCTION_EXIT` and
+`SC64_NEAREST_RESOURCE_DEPOT` now has a reproducible ASan/UBSan controller
+win for Higher Ground. The public controller uses only normal button inputs
+to mutate gameplay, builds paid Nexus expansions with powered Cannon
+defenses, and orders the full army through both enemy bases. It does not
+replace the existing canonical P3 controller.
+
+The Make target completes 124,689 held-input ticks and wins at frame 123916.
+It verifies source sequence 5, fired mask 31, outcome WON, no action timer,
+primary objective/completion state, zero unsupported actors and no surviving
+enemy buildings. The final roster is 67 player units and 35 buildings,
+including 45 Probes and 11 Cannons. The trace SHA-256 is `321074f1…db01a`.
+A bounded non-winning attempt returns exit status one.
+
+The additive ARM replay route keeps the original garrison route as its
+default and pins the expansion launch/final witness independently. Its
+5,932 input transitions fit the larger build's 256-entry windowed scheduler
+with a peak of 121 transitions per 1,000-tick page. ABI fixtures cover signed
+selection/source-owner fields, transported units and both compact-byte and
+legacy-int queue rings. This is host/controller and observer validation;
+the larger-bank ARM win, save continuity and performance remain unqualified.
+The staged total remains T10/Z6/P6, and canonical profiles remain T10/Z3/P3.
+
+The frozen larger-bank candidate (ROM `d26ca305…f4d1`, ELF
+`9d80a53a…9e57`) also passes a 1,000-input-tick opening save and fresh HOME
+load. The recorded persisted observations match exactly, with the intentional
+building-selection reset reported separately: saved selection 5 becomes -1.
+This is not labelled an exact whole snapshot. The handoff takes one neutral
+live frame and then 60 scheduled live frames. The full ARM replay and late
+save are still running; the host win remains separate from that qualification.
+
+### Gated P7 sprite preparation
+
+The optional `--include-p7-actors` importer adds Arbiter raw 71 and all source
+frames for Protoss structures 159/163/165/169/170/171/172. Shared raw
+68/72/84 images are reused. The P7 completeness marker requires both the new
+payload and those shared images. P7 building lookups take precedence over
+overlapping late-Terran/Z6 aliases when the P7 payload is present; the
+existing generated output stays unchanged when P7 inclusion is off.
+
+Fourteen synthetic sprite-import tests pass, including compiled flag-off,
+P7-only and combined P7/late-Terran/Z6 headers, exact synthetic pixel mappings,
+indexed building frames, missing shared art and alias precedence. No game
+assets are part of these fixtures. This prepares source images; it does not
+establish P7 runtime binding, native animation selection or playable progress.
+
+The combined 541-file source-only snapshot passes `./dev build` and
+`./dev test` (379 Python tests, six private-input checks skipped). The
+original-art ROM remains byte-identical (`4ad80ce0…f9aee`), and the existing
+unified ARM build and host sanitizer checks pass. Imported assets and private
+qualification artifacts remain outside the source index.

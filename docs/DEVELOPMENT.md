@@ -1451,6 +1451,29 @@ target now exits nonzero for a loss or bounded attempt without a victory.
 Worker resource handling stays in ROM so compiler inlining cannot consume
 the IWRAM stack reserve; movement and combat retain their existing routines.
 
+The larger P5 bank has a separate P3 expansion controller using both options:
+
+```sh
+make test-sc64-p3-expansion-controller
+make -B protoss-p5-shuttle P3_EXTRA_FLAGS='-DSC64_P3_PRODUCTION_EXIT -DSC64_NEAREST_RESOURCE_DEPOT'
+python3 tools/sc64_p3_controller_replay.py --route expansion --trace build/p3-expansion-controller.json
+```
+
+The host target writes `build/p3-expansion-controller.json` and fails unless
+the source objective reaches a verified win. It uses paid expansions,
+production and normal controller commands; it preserves the canonical P3
+controller. The additive replay route validates the launch, final source
+state and windowed input capacity before starting mGBA. This larger-bank
+route has a host win at frame 123916. Its ARM replay and fresh-process saves
+are separate qualification checks; do not promote it from the host result.
+
+Adding `--ticks 1000 --save-at-end` to the replay command creates a bounded
+opening save. Run `python3 tools/sc64_p3_resume_smoke.py --report
+/path/to/prefix/profile.json` against the same ROM/ELF to load that SRAM from
+HOME in a fresh process. It compares the reported persisted state, explicitly
+reports the building-selection reset on load, and verifies one neutral
+handoff frame followed by 60 live frames. Unit selection remains checked.
+
 After Z7 inputs are prepared, `make test-sc64-z7-gas-restore` checks destroyed
 source Extractors reopening their geyser locations and the corresponding
 transactional save validation. This does not establish a full Z7 win.
@@ -1467,3 +1490,15 @@ this does not expose new training commands or a playable P7 campaign entry.
 The P7 header records missing splash, interceptor, cloak/detection, Arbiter
 field and Shield Battery mechanics. Enum capacity fits the current packed
 save fields, but P7 persistence and complete gameplay are not integrated yet.
+
+P7's sprite importer is also opt-in and writes to a separate private directory:
+
+```sh
+python3 tools/sc64_race_sprites.py --rom "/path/to/StarCraft 64.z64" --include-p6-actors --include-z5-actors --include-z6-actors --include-z6-buildings --include-p7-actors --out .local/sc64/p7/generated/sprites --header .local/sc64/p7/generated/sc64_race_sprites_generated.h
+```
+
+It adds Arbiter art and complete source frame banks for seven Protoss
+structures, reusing the shared Archon, Carrier and Observer images. The
+generated completeness marker requires that shared art as well. This prepares
+source images only; native animation selection and P7 renderer/profile
+integration remain unfinished. Generated art and previews stay local.

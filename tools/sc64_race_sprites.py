@@ -131,6 +131,17 @@ P6_UNIT_IDS = {
 }
 P6_DOODAD_IDS = {'wall_missile_trap_p6': 210}
 
+# The shared raw 68/72/84 unit art already comes from RACE_UNIT_IDS. P7 adds
+# Arbiter art plus complete frame banks for all seven Protoss structures.
+P7_UNIT_IDS = {'arbiter_p7': 71}
+P7_BUILDING_IDS = {
+    'observatory_p7': 159, 'citadel_of_adun_p7': 163,
+    'templar_archives_p7': 165, 'fleet_beacon_p7': 169,
+    'arbiter_tribunal_p7': 170, 'robotics_support_bay_p7': 171,
+    'shield_battery_p7': 172,
+}
+P7_SHARED_UNIT_IDS = {'archon': 68, 'carrier': 72, 'observer': 84}
+
 
 def asset_manifest_sha256(assets: list[dict]) -> str:
     """Hash stable source-asset identity fields without preview/path noise."""
@@ -175,7 +186,9 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
                  z5_doodad_selected: list[dict] | None = None,
                  p6_selected: list[dict] | None = None,
                  p6_doodad_selected: list[dict] | None = None,
-                 z6_building_selected: list[dict] | None = None) -> None:
+                 z6_building_selected: list[dict] | None = None,
+                 p7_selected: list[dict] | None = None,
+                 p7_building_selected: list[dict] | None = None) -> None:
     lines = [
         '/* Generated from the verified USA ROM; private local asset. */',
         '#ifndef SC64_RACE_SPRITES_GENERATED_H',
@@ -286,6 +299,18 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
             for frame_index, frame in enumerate(item['frames']):
                 append_asset({'name': f'{item["name"]}_frame_{frame_index}', 'frame': frame})
         lines.append('#endif /* SC64_P6_ACTORS */')
+    if p7_selected or p7_building_selected:
+        lines.append('#ifdef SC64_P7_ACTORS')
+        if (set(P7_SHARED_UNIT_IDS).issubset({item['name'] for item in selected}) and
+                {item['name'] for item in (p7_selected or [])} == set(P7_UNIT_IDS) and
+                {item['name'] for item in (p7_building_selected or [])} == set(P7_BUILDING_IDS)):
+            lines.append('#define SC64_P7_SPRITE_SET_COMPLETE 1')
+        for item in (p7_selected or []):
+            append_asset(item)
+        for item in (p7_building_selected or []):
+            for frame_index, frame in enumerate(item['frames']):
+                append_asset({'name': f'{item["name"]}_frame_{frame_index}', 'frame': frame})
+        lines.append('#endif /* SC64_P7_ACTORS */')
     lines += ['static inline const Sc64SpriteFrame *sc64_race_unit_sprite(unsigned short raw_type) {',
               '    switch (raw_type) {']
     seen = set()
@@ -322,6 +347,11 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
         for item in p6_selected:
             lines.append(f'    case {P6_UNIT_IDS[item["name"]]}: return &sc64_race_sprite_{item["name"]};')
         lines.append('#endif /* SC64_P6_ACTORS */')
+    if p7_selected:
+        lines.append('#ifdef SC64_P7_ACTORS')
+        for item in p7_selected:
+            lines.append(f'    case {P7_UNIT_IDS[item["name"]]}: return &sc64_race_sprite_{item["name"]};')
+        lines.append('#endif /* SC64_P7_ACTORS */')
     lines += ['    default: return (const Sc64SpriteFrame *)0;', '    }', '}', '#endif']
     if t4_selected:
         # A null sprite means "use the generic fallback" in game.c, so it
@@ -373,7 +403,7 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
         ]
     if (t4_building_selected or late_building_selected or zp_building_selected or
             z5_building_selected or z5_doodad_selected or p6_doodad_selected or
-            z6_building_selected):
+            z6_building_selected or p7_building_selected):
         # Keep the frame index a raw source-GRP index. IScript-to-state
         # selection is intentionally left to the runtime trigger adapter.
         at = len(lines) - 1
@@ -384,6 +414,8 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
             building_sprite_guard += ' || defined(SC64_P6_ACTORS)'
         if z6_building_selected:
             building_sprite_guard += ' || defined(SC64_Z6_RUNTIME)'
+        if p7_building_selected:
+            building_sprite_guard += ' || defined(SC64_P7_ACTORS)'
         helper = [building_sprite_guard,
                   'static inline const Sc64SpriteFrame *sc64_race_building_sprite(unsigned short raw_type, unsigned short frame_index) {',
                   '    switch (raw_type) {']
@@ -404,20 +436,28 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
         if late_building_selected:
             helper += ['#ifdef SC64_TERRAN_LATE_ENABLED']
             for item in late_building_selected:
+                if p7_building_selected and LATE_BUILDING_IDS[item['name']] in P7_BUILDING_IDS.values():
+                    helper.append('#ifndef SC64_P7_ACTORS')
                 helper += [f'    case {LATE_BUILDING_IDS[item["name"]]}:',
                            '        switch (frame_index) {']
                 for frame_index in range(len(item['frames'])):
                     helper.append(f'        case {frame_index}: return &sc64_race_sprite_{item["name"]}_frame_{frame_index};')
                 helper += ['        default: return (const Sc64SpriteFrame *)0;', '        }']
+                if p7_building_selected and LATE_BUILDING_IDS[item['name']] in P7_BUILDING_IDS.values():
+                    helper.append('#endif /* !SC64_P7_ACTORS */')
             helper += ['#endif /* SC64_TERRAN_LATE_ENABLED */']
         if z6_building_selected:
             helper += ['#if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ENABLED)']
             for item in z6_building_selected:
+                if p7_building_selected and Z6_BUILDING_IDS[item['name']] in P7_BUILDING_IDS.values():
+                    helper.append('#ifndef SC64_P7_ACTORS')
                 helper += [f'    case {Z6_BUILDING_IDS[item["name"]]}:',
                            '        switch (frame_index) {']
                 for frame_index in range(len(item['frames'])):
                     helper.append(f'        case {frame_index}: return &sc64_race_sprite_{item["name"]}_frame_{frame_index};')
                 helper += ['        default: return (const Sc64SpriteFrame *)0;', '        }']
+                if p7_building_selected and Z6_BUILDING_IDS[item['name']] in P7_BUILDING_IDS.values():
+                    helper.append('#endif /* !SC64_P7_ACTORS */')
             helper += ['#endif /* SC64_Z6_RUNTIME && !SC64_TERRAN_LATE_ENABLED */']
         if zp_building_selected:
             helper += ['#ifdef SC64_ZP_CAMPAIGN_ACTORS']
@@ -453,6 +493,15 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
                     helper.append(f'        case {frame_index}: return &sc64_race_sprite_{item["name"]}_frame_{frame_index};')
                 helper += ['        default: return (const Sc64SpriteFrame *)0;', '        }']
             helper += ['#endif /* SC64_P6_ACTORS */']
+        if p7_building_selected:
+            helper += ['#ifdef SC64_P7_ACTORS']
+            for item in p7_building_selected:
+                helper += [f'    case {P7_BUILDING_IDS[item["name"]]}:',
+                           '        switch (frame_index) {']
+                for frame_index in range(len(item['frames'])):
+                    helper.append(f'        case {frame_index}: return &sc64_race_sprite_{item["name"]}_frame_{frame_index};')
+                helper += ['        default: return (const Sc64SpriteFrame *)0;', '        }']
+            helper += ['#endif /* SC64_P7_ACTORS */']
         helper += ['    default: return (const Sc64SpriteFrame *)0;', '    }', '}', '#endif']
         lines[at:at] = helper
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -465,7 +514,8 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
              include_zp: bool = False, include_z5: bool = False,
              include_z6: bool = False, include_z5_doodads: bool = False,
              include_p6: bool = False,
-             include_z6_buildings: bool = False) -> dict:
+             include_z6_buildings: bool = False,
+             include_p7: bool = False) -> dict:
     raw = rom.read_bytes()
     extractor = base.load_extractor(base.UPSTREAM)
     normalized = extractor.load_rom(str(rom))
@@ -504,6 +554,8 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
                         if include_z6_buildings else {})
     p6_refs = base.resolve_grp_indices(archive, P6_UNIT_IDS) if include_p6 else {}
     p6_doodad_refs = base.resolve_grp_indices(archive, P6_DOODAD_IDS) if include_p6 else {}
+    p7_refs = base.resolve_grp_indices(archive, P7_UNIT_IDS) if include_p7 else {}
+    p7_building_refs = base.resolve_grp_indices(archive, P7_BUILDING_IDS) if include_p7 else {}
     palette = base.decode_rgba5551_palette(base._entry_payload(archive, '00B/004'))
     entries = {entry.path: entry for entry in archive.entries()}
     selected, t4_selected, t4_building_selected, t6_selected = [], [], [], []
@@ -514,6 +566,7 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
     z6_selected = []
     z6_building_selected = []
     p6_selected, p6_doodad_selected = [], []
+    p7_selected, p7_building_selected = [], []
     out.mkdir(parents=True, exist_ok=True)
     def load_asset(name, ref, target):
         grp_data = archive.read(entries[ref['bolt_path']])
@@ -670,11 +723,36 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
                                 'opaque_pixels': sum(frames[0]['alpha']), 'preview': preview.name})
     if include_p6 and set(p6_doodad_refs) != set(P6_DOODAD_IDS):
         raise ValueError('P6 source doodad GRPs did not resolve completely')
+    for name, ref in p7_refs.items():
+        load_asset(name, ref, p7_selected)
+    if include_p7 and set(p7_refs) != set(P7_UNIT_IDS):
+        raise ValueError('P7 actor source GRPs did not resolve completely')
+    if include_p7 and {int(ref['unit_id']) for ref in p7_refs.values()} != set(P7_UNIT_IDS.values()):
+        raise ValueError('P7 actor source GRPs resolved to unexpected raw ids')
+    for name, ref in p7_building_refs.items():
+        grp_data = archive.read(entries[ref['bolt_path']])
+        grp = base.parse_grp(grp_data)
+        if not grp['frames']:
+            raise ValueError(f'P7 source building raw {ref["unit_id"]} has an empty GRP')
+        frames = grp['frames']
+        preview = out / f'{name}.png'
+        base.encode_png(preview, grp['width'], grp['height'], base.render_frame(frames[0], palette))
+        p7_building_selected.append({'name': name, 'frames': frames})
+        manifest_assets.append({'name': name, **ref, 'sha1': hashlib.sha1(grp_data).hexdigest(),
+                                'frame_count': len(frames), 'canvas': [grp['width'], grp['height']],
+                                'selected_frame': 'all-source-frames',
+                                'frame_rect': [frames[0]['x'], frames[0]['y'],
+                                               frames[0]['frame_width'], frames[0]['frame_height']],
+                                'opaque_pixels': sum(frames[0]['alpha']), 'preview': preview.name})
+    if include_p7 and set(p7_building_refs) != set(P7_BUILDING_IDS):
+        raise ValueError('P7 source building GRPs did not resolve completely')
+    if include_p7 and {int(ref['unit_id']) for ref in p7_building_refs.values()} != set(P7_BUILDING_IDS.values()):
+        raise ValueError('P7 source building GRPs resolved to unexpected raw ids')
     write_header(header, selected, remap, t4_selected, t4_building_selected,
                  t6_selected, late_selected, late_building_selected,
                  zp_selected, zp_building_selected, z5_selected, z5_building_selected,
                  z6_selected, z5_doodad_selected, p6_selected, p6_doodad_selected,
-                 z6_building_selected)
+                 z6_building_selected, p7_selected, p7_building_selected)
     mapped_raw_types = set(RACE_UNIT_IDS.values()) | set(T4_UNIT_IDS.values()) | set(T4_BUILDING_IDS.values())
     actual_sprite_raw_types = ({int(ref['unit_id']) for ref in refs.values()} |
                                {int(ref['unit_id']) for ref in t4_refs.values()})
@@ -739,6 +817,12 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
         report['p6_raw_doodad_ids'] = P6_DOODAD_IDS
         report['p6_assets_manifest_sha256'] = named_asset_manifest_sha256(
             manifest_assets, set(P6_UNIT_IDS) | set(P6_DOODAD_IDS))
+    if include_p7:
+        report['p7_raw_unit_ids'] = {**P7_SHARED_UNIT_IDS, **P7_UNIT_IDS}
+        report['p7_raw_building_ids'] = P7_BUILDING_IDS
+        report['p7_assets_manifest_sha256'] = named_asset_manifest_sha256(
+            manifest_assets, set(P7_SHARED_UNIT_IDS) | set(P7_UNIT_IDS) |
+            set(P7_BUILDING_IDS))
     (out / 'manifest.json').write_text(json.dumps(report, indent=2) + '\n')
     return report
 
@@ -767,6 +851,8 @@ def main() -> int:
                         help='include SC64_Z6_RUNTIME-gated Robotics Support Bay and Shield Battery frame banks')
     parser.add_argument('--include-p6-actors', action='store_true',
                         help='include SC64_P6_ACTORS sprites and reuse the T4/ZP/Z5 actor and prop sets')
+    parser.add_argument('--include-p7-actors', action='store_true',
+                        help='include SC64_P7_ACTORS Arbiter and Protoss structure source sprites')
     args = parser.parse_args()
     try:
         report = generate(args.rom, args.out, args.header, args.remap,
@@ -777,7 +863,8 @@ def main() -> int:
                           include_z6=args.include_z6_actors,
                           include_z5_doodads=args.include_z5_doodads,
                           include_p6=args.include_p6_actors,
-                          include_z6_buildings=args.include_z6_buildings)
+                          include_z6_buildings=args.include_z6_buildings,
+                          include_p7=args.include_p7_actors)
     except (OSError, ValueError, RuntimeError, KeyError) as exc:
         print(f'sc64_race_sprites: {exc}', file=sys.stderr)
         return 1

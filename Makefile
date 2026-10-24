@@ -1959,6 +1959,12 @@ build/test-sc64-p3-production-exit: tests/sc64_p3_production_exit.c $(STARCRAFT)
 test-sc64-p3-production-exit: test-sc64-production-exit build/test-sc64-p3-production-exit
 	./build/test-sc64-p3-production-exit
 
+build/test-sc64-p3-expansion-controller: tests/sc64_p3_expansion_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) -DSC64_P3_PRODUCTION_EXIT -DSC64_NEAREST_RESOURCE_DEPOT $< common/gba.c -o $@
+.PHONY: test-sc64-p3-expansion-controller
+test-sc64-p3-expansion-controller: build/test-sc64-p3-expansion-controller
+	./build/test-sc64-p3-expansion-controller --trace build/p3-expansion-controller.json
+
 build/test-sc64-p7-model: tests/sc64_p7.c starcraft/sc64_p7.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 build/test-sc64-p7-adapter: tests/sc64_p7_adapter.c starcraft/sc64_p7_adapter.h starcraft/sc64_p7.h .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h common/gba.h | build
