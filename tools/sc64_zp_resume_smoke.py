@@ -200,8 +200,12 @@ def run(report_path: Path, rom_path: Path, elf_path: Path, output: Path,
             raise RuntimeError(f"fresh restore process did not start at HOME: {initial}")
         home_capture = capture(rsp, run_dir / "home.png")
 
-        # Use the real HOME L control; no SRAM or world data is written via GDB.
-        split.key(rsp, sym, split.KEY_L)
+        # Input was sampled before the update breakpoint: execute the pending
+        # neutral HOME call and then L's load. Observe before any live update;
+        # the generic key helper also releases for two ticks, advancing play.
+        rsp.write(sym["demo_inject_keys"], struct.pack("<H", split.KEY_L))
+        rsp.tick(2)
+        rsp.write(sym["demo_inject_keys"], b"\0\0")
         loaded = replay.mission_snapshot(rsp, sym, sizes, bank, campaign_layout,
                                          runtime_layout, model_layout, profile_name)
         if (loaded.get("screen"), loaded.get("race_mode"),
