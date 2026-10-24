@@ -1143,6 +1143,26 @@ test-sc64-zp-storage: build/test-sc64-zp-zerg-storage build/test-sc64-zp-protoss
 .PHONY: test-sc64-z4-campaign
 test-sc64-z4-campaign: test-sc64-z4-runtime build/test-sc64-z4-campaign-run
 	./build/test-sc64-z4-campaign-run --limit 150000 --trace .local/sc64/z4-controller-win-asan.json
+
+# Chapter-five models are asset-free; adapters additionally require the
+# authenticated numeric headers from sc64_zp_scenario_pack.py.
+build/test-sc64-z5-rules: tests/sc64_z5.c starcraft/sc64_z5.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-p5-rules: tests/sc64_p5.c starcraft/sc64_p5.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-zp-chapter-five-models test-sc64-z5-adapter test-sc64-p5-adapter
+test-sc64-zp-chapter-five-models: build/test-sc64-z5-rules build/test-sc64-p5-rules
+	./build/test-sc64-z5-rules
+	./build/test-sc64-p5-rules
+test-starcraft: test-sc64-zp-chapter-five-models
+build/test-sc64-z5-adapter: tests/sc64_z5_adapter.c starcraft/sc64_z5.h starcraft/sc64_z5_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_z5_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+build/test-sc64-p5-adapter: tests/sc64_p5_adapter.c starcraft/sc64_p5.h starcraft/sc64_p5_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+test-sc64-z5-adapter: build/test-sc64-z5-adapter
+	./build/test-sc64-z5-adapter
+test-sc64-p5-adapter: build/test-sc64-p5-adapter
+	./build/test-sc64-p5-adapter
 test-sc64-terran-full-targets: build/test-sc64-terran-full-targets
 	./build/test-sc64-terran-full-targets
 test-sc64-terran-full-spatial-hud: build/test-sc64-terran-full-collision build/test-sc64-terran-full-hud

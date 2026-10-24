@@ -829,3 +829,16 @@ location, player, property and availability records after authenticating the
 complete CHK and section hashes. Generation does not implement or enable a
 mission; actor support, runtime actions, save rules and controller
 qualification remain required.
+
+The isolated Z5/P5 schedulers have asset-free checks:
+
+```sh
+make test-sc64-zp-chapter-five-models
+```
+
+After generating both numeric headers, run their adapter checks with
+`make test-sc64-z5-adapter test-sc64-p5-adapter`. The adapters preserve source
+operands, sequence waits and switches, and reject failed world callbacks.
+They still require actual engine implementations of source conditions and
+effects; these fixtures do not establish playable fifth missions. Neither
+model or adapter enables a frontend entry.
