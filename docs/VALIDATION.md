@@ -3069,3 +3069,44 @@ The final 525-file source-only export passes `./dev build` and `./dev test`,
 including all default host checks and 349 Python tests (six private-input
 checks skipped). Re-running the public P6 Make target retains the exact full
 trace hash; an explicit 1,000-frame limit stops at frame 1000 as requested.
+
+### Default-off legacy collision fact hoist
+
+`SC64_COLLISION_FACT_HOIST` resolves the mover's radius, flight class and
+collision flags once per bucket query, and each candidate's flags once. It
+only changes the expanded Z/P legacy bucket path and adds no persistent
+state. `make test-sc64-z6-collision-facts` runs both builds against the
+pre-change bucket predicate and an independent full-pool scan: 1,500 seeded
+worlds, actor classes/zero facts, transported/dead actors and radius/cell
+boundaries pass under ASan/UBSan with identical result digest `2f4f1cc9`.
+
+A separate normal-input host replay covers every one of the 271,799 input
+ticks in the qualified Z6 route. Both builds also enable the previously
+checked count snapshot. Per-tick FNV-64 fingerprints cover the complete raw
+unit/building/mineral banks, Z5/Z6 persistent mission states, campaign state,
+economy arrays, random seed, result/frame and completion fields. The two
+2,174,392-byte fingerprint streams compare byte-for-byte (SHA-256
+`163cb1cd…20866`), ending at the same frame 268694 win with zero source faults.
+This checks those gameplay fields, not all RAM or ARM behavior.
+
+The ARM candidate passes the unchanged memory guards: IWRAM end
+`0x03004e70`, BSS end `0x0203d980`; its ROM hash is `910ecce5…54fd8`.
+A separate orders-diagnostic build also fits the guards and separates movement
+from target-query cycles. The 12,000-tick timing/state/capture comparison is
+queued behind P6; no ARM speedup or full-mission qualification is claimed yet.
+The optimization remains disabled by default.
+
+### Compact banks in the earlier-mission observer
+
+The shared race observer now resolves DWARF typedef chains and scalar widths
+instead of assuming every entity field is a signed 32-bit integer. It retains
+the legacy banks and accepts the known compact Z/P tuple: 240 Unit56 actors
+and 160 Building48 structures. Exact compact field widths and byte bounds are
+validated; malformed aliases, widths and short debugger reads are rejected.
+Ten asset-free tests pass, and the frozen Z6 ELF resolves the expected banks.
+This enables earlier-mission ARM checks under the larger staged builds; it
+does not itself promote the canonical campaign profiles.
+
+The final 527-file source-only export passes `./dev build` and `./dev test`,
+including 359 Python checks (six private-input checks skipped). No ROM,
+imported header, asset, capture or private replay is included in the index.

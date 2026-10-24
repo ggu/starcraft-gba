@@ -93,6 +93,15 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
 {
 #ifdef SC64_RACES
     if(IS_WORKER(q->type)&&(q->order==ORDER_MINE||q->order==ORDER_GAS))return 1;
+#if defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_ZP_CAMPAIGN_ACTORS)
+    /* These mover facts are immutable during this read-only collision query.
+     * Resolve them once instead of repeating ROM fact lookups per candidate. */
+    int mover_radius = sc64_game_unit_collision_radius(q->type);
+    int mover_flying = sc64_race_unit_flying(q->type);
+    unsigned mover_flags = sc64_game_unit_actor_flags(q->type);
+    int mover_collidable = !mover_flags ||
+        (mover_flags & SC64_GAME_ACTOR_COLLIDABLE);
+#endif
 #endif
     /* The audited Z/P roster has a maximum ten-pixel collision radius.
      * Search every cell that can contain a point strictly inside it. */
@@ -118,19 +127,35 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
                     if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
+#if defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_RACES)
+                    int candidate_radius = sc64_game_unit_collision_radius(u[i].type);
+                    int radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
+#else
                     int mover_radius = sc64_game_unit_collision_radius(q->type);
                     int candidate_radius = sc64_game_unit_collision_radius(u[i].type);
                     int radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
+#endif
 #else
                     int radius = 6;
 #endif
 #ifdef SC64_RACES
+#if defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_ZP_CAMPAIGN_ACTORS)
+                    if(u[i].type==U_CHRYSALIS||sc64_race_unit_flying(u[i].type)!=mover_flying)continue;
+#else
                     if(u[i].type==U_CHRYSALIS||sc64_race_unit_flying(u[i].type)!=sc64_race_unit_flying(q->type))continue;
+#endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+#if defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_ZP_CAMPAIGN_ACTORS)
+                    unsigned candidate_flags = sc64_game_unit_actor_flags(u[i].type);
+                    if ((candidate_flags &&
+                         !(candidate_flags & SC64_GAME_ACTOR_COLLIDABLE)) ||
+                        !mover_collidable) continue;
+#else
                     if ((sc64_game_unit_actor_flags(u[i].type) &&
                          !(sc64_game_unit_actor_flags(u[i].type)&SC64_GAME_ACTOR_COLLIDABLE)) ||
                         (sc64_game_unit_actor_flags(q->type) &&
                          !(sc64_game_unit_actor_flags(q->type)&SC64_GAME_ACTOR_COLLIDABLE))) continue;
+#endif
 #endif
 #endif
                     int dx = u[i].x - nx, dy = u[i].y - ny;

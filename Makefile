@@ -1907,6 +1907,15 @@ test-sc64-z6-count-queries: build/test-sc64-z6-count-snapshot build/test-sc64-z6
 	./build/test-sc64-z6-count-world
 	./build/test-sc64-z6-runtime-snapshot
 
+build/test-sc64-z6-collision-facts-baseline: tests/sc64_collision_fact_hoist.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z6-collision-facts-hoist: tests/sc64_collision_fact_hoist.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) -DSC64_COLLISION_FACT_HOIST $< common/gba.c -o $@
+.PHONY: test-sc64-z6-collision-facts
+test-sc64-z6-collision-facts: build/test-sc64-z6-collision-facts-baseline build/test-sc64-z6-collision-facts-hoist
+	./build/test-sc64-z6-collision-facts-baseline
+	./build/test-sc64-z6-collision-facts-hoist
+
 build/test-sc64-p7-model: tests/sc64_p7.c starcraft/sc64_p7.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 build/test-sc64-p7-adapter: tests/sc64_p7_adapter.c starcraft/sc64_p7_adapter.h starcraft/sc64_p7.h .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h common/gba.h | build

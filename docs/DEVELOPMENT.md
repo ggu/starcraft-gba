@@ -1376,3 +1376,14 @@ Full trace replay on ARM requires a dense probe build because some input
 windows exceed the standard queue's 1,000-tick capacity; see the dense replay
 section. This target is a deterministic regression route, with exact source
 hero/extraction/completion assertions at victory.
+
+The default-off expanded Z/P collision lookup experiment has a dedicated
+sanitizer differential target after Z6 inputs are prepared:
+
+```sh
+make test-sc64-z6-collision-facts
+```
+
+`SC64_COLLISION_FACT_HOIST` changes only repeated collision fact lookups;
+leave it disabled for normal builds until the recorded ARM comparison and
+qualification are complete.
