@@ -121,6 +121,19 @@ static int race_owner_reserved_supply(int owner)
 }
 
 #ifdef SC64_Z7_EGG_PRODUCTION
+/* Zerg production is attributed to the town hall in this adapter, while
+ * Brood War applies products to individual larvae. Larvae persist through a
+ * Lair/Hive morph; unfinished new Hatcheries still have no usable larvae. */
+static int race_z7_morphing_egg_hall(int owner, int producer)
+{
+    return race_z7_active() && owner >= 0 && owner < 5 &&
+           race_owner_identity(owner) == R_ZERG &&
+           producer >= 0 && producer < MAX_BUILDINGS &&
+           b[producer].alive && b[producer].owner == owner &&
+           b[producer].under_construction &&
+           (b[producer].type == B_LAIR || b[producer].type == B_HIVE);
+}
+
 /* Egg rows are independent timers. The product and remaining clock live in
  * fields already serialized for every Unit, so no producer link or extra
  * mission state is needed. Morphing keeps the Egg slot and its HP fraction. */
@@ -331,12 +344,13 @@ static int race_queue_unit(int owner, int producer, int type)
     if (race_late_airborne(producer)) return 0;
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
-    if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) || !building_complete(producer) ||
-        b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type, r->producer) ||
-        !race_owner_has_prereq(owner, r->prereq)) return 0;
     egg_job = race_z7_active() && owner >= 0 && owner < 5 &&
         race_owner_identity(owner) == R_ZERG && sc64_z7_egg_product_valid(type) &&
         (owner != ENEMY || type == U_ZERGLING);
+    if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) ||
+        (!building_complete(producer) && !(egg_job && race_z7_morphing_egg_hall(owner, producer))) ||
+        b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type, r->producer) ||
+        !race_owner_has_prereq(owner, r->prereq)) return 0;
     if (!egg_job && b[producer].queue_count >= 5) return 0;
 #else
     if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) || !building_complete(producer) ||
@@ -554,7 +568,12 @@ static void race_tick_state(void)
 #ifdef SC64_Z5_RUNTIME
     int z5_regeneration_active = race_z5_active();
 #endif
-    for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && !b[i].under_construction &&
+    for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive &&
+        (!b[i].under_construction ||
+#ifdef SC64_Z7_EGG_PRODUCTION
+         race_z7_morphing_egg_hall(b[i].owner, i) ||
+#endif
+         0) &&
         b[i].owner >= 0 && b[i].owner < 5 && race_owner_identity(b[i].owner) == R_ZERG &&
         sc64_race_is_zerg_townhall(b[i].type)) {
         if (b[i].larva < 3 && ++b[i].larva_timer >= 428) {

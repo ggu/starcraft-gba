@@ -112,6 +112,84 @@ static void test_more_than_three_live_eggs(void)
             assert(u[i].work_timer > 0 && u[i].target == U_QUEEN);
 }
 
+static void test_egg_jobs_and_larva_replenishment_during_morph(void)
+{
+    reset_world();
+    b[hatchery].larva = 1;
+    b[hatchery].larva_timer = 427;
+    int old_minerals = minerals, old_gas = gas;
+    assert(race_start_lair_morph(hatchery));
+    assert(b[hatchery].type == B_LAIR && b[hatchery].under_construction);
+    old_minerals = minerals; old_gas = gas;
+    assert(race_queue_unit(SIDE, hatchery, U_DRONE));
+    int egg = find_egg(U_DRONE);
+    assert(egg >= 0 && u[egg].target == U_DRONE &&
+           u[egg].work_timer == sc64_z7_egg_duration(U_DRONE));
+    assert(minerals == old_minerals - sc64_race_unit_rule(U_DRONE)->minerals);
+    assert(gas == old_gas - sc64_race_unit_rule(U_DRONE)->gas);
+    assert(b[hatchery].larva == 0 && b[hatchery].queue_count == 0);
+    assert(supply_used == sc64_z7_egg_reserved_supply(U_DRONE));
+
+    /* Preserve the documented adapter cadence: an existing morphing hall
+     * keeps replenishing larvae, and the paid Egg completes independently. */
+    race_tick_state();
+    assert(b[hatchery].larva == 1 && b[hatchery].larva_timer == 0);
+    for (int t = 0; t < sc64_z7_egg_duration(U_DRONE); ++t) step_world();
+    assert(count_type(U_DRONE) == 1 && count_type(U_Z7_EGG) == 0);
+    assert(b[hatchery].type == B_LAIR && b[hatchery].under_construction);
+
+    /* The live cap keeps the current timer paused while the morph continues. */
+    b[hatchery].larva = 3;
+    b[hatchery].larva_timer = 427;
+    race_tick_state();
+    assert(b[hatchery].larva == 3 && b[hatchery].larva_timer == 427);
+
+    /* An unfinished newly constructed Hatchery is not a morphing hall. */
+    reset_world();
+    b[hatchery].under_construction = 1;
+    b[hatchery].build_progress = 0;
+    b[hatchery].larva = 2;
+    b[hatchery].larva_timer = 97;
+    old_minerals = minerals; old_gas = gas;
+    assert(!race_queue_unit(SIDE, hatchery, U_DRONE));
+    assert(!race_queue_unit(SIDE, -1, U_DRONE));
+    assert(minerals == old_minerals && gas == old_gas &&
+           b[hatchery].larva == 2 && count_type(U_Z7_EGG) == 0);
+    race_tick_state();
+    assert(b[hatchery].larva == 2 && b[hatchery].larva_timer == 97);
+
+    /* The incomplete-hall exception is Z7 Egg-only and scenario-gated. */
+    reset_world();
+    b[hatchery].type = B_LAIR;
+    b[hatchery].raw_type = sc64_race_raw_building(B_LAIR);
+    b[hatchery].under_construction = 1;
+    b[hatchery].larva = 1;
+    b[hatchery].larva_timer = 81;
+    race_selected_mission = 0;
+    old_minerals = minerals; old_gas = gas;
+    assert(!race_queue_unit(SIDE, hatchery, U_DRONE));
+    race_tick_state();
+    assert(minerals == old_minerals && gas == old_gas &&
+           b[hatchery].larva == 1 && b[hatchery].larva_timer == 81);
+
+    /* The same scoped exception covers the other morph target, Hive. */
+    race_selected_mission = SC64_Z7_GLOBAL_ID;
+    b[hatchery].type = B_HIVE;
+    b[hatchery].raw_type = sc64_race_raw_building(B_HIVE);
+    b[hatchery].larva = 1;
+    assert(race_queue_unit(SIDE, hatchery, U_DRONE));
+    assert(b[hatchery].larva == 0 && find_egg(U_DRONE) >= 0);
+
+    /* Incomplete halls still cannot accept a non-Egg producer proxy. */
+    int enemy_hall = spawn_build(ENEMY, B_LAIR, 360, 160, 1);
+    assert(enemy_hall >= 0);
+    b[enemy_hall].larva = 1;
+    int enemy_ore = race_minerals[ENEMY], enemy_gas = race_gas[ENEMY];
+    assert(!race_queue_unit(ENEMY, enemy_hall, U_DRONE));
+    assert(race_minerals[ENEMY] == enemy_ore && race_gas[ENEMY] == enemy_gas &&
+           b[enemy_hall].larva == 1);
+}
+
 static void test_producer_loss_and_cancel_refund(void)
 {
     reset_world();
@@ -235,6 +313,7 @@ int main(void)
 {
     test_independent_jobs_and_hatch();
     test_more_than_three_live_eggs();
+    test_egg_jobs_and_larva_replenishment_during_morph();
     test_producer_loss_and_cancel_refund();
     test_ling_second_birth_failure_is_not_retried();
     test_scourge_pair_birth();

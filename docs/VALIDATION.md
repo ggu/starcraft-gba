@@ -4074,3 +4074,43 @@ the nearby three-unit group clears the source Extractor and restores its
 geyser at frame 9,029. The controller buys its own Extractor at frame 10,915,
 but no gas-worker assignment succeeds before the economy and army are lost.
 The attempt loses at frame 16,085; no additional campaign mission is counted.
+
+### Z7 Eggs during a Lair or Hive morph
+
+The pinned source keeps hatchery-class larva state and secondary-order
+updates during building morphs. Products are bought from the individual
+Larva, independently of whether its parent hall is complete. The GBA adapter
+instead attributes larva products to the hall; its unconditional completed-
+producer check and construction filter incorrectly blocked both purchases
+and larva replenishment during upgrades.
+
+With active Z7 and `SC64_Z7_EGG_PRODUCTION`, a live owned morphing Lair/Hive
+now permits the existing paid Egg path. Owner, product, tech prerequisites,
+larva availability, costs, supply and slot checks remain in that path.
+Its live-larva counter continues at the existing 428-update approximation
+and cap of three. Unfinished newly built Hatcheries, inactive profiles and
+ineligible non-Egg products retain their rejection behavior. No fields,
+arrays or save bytes are added, and internal save generation 36 is retained.
+
+The focused actual-engine production fixture verifies cost/larva/supply
+accounting, independent birth, morphing Hive, live cap/timer pause, unfinished
+Hatchery and inactive/invalid producer rejection. The save fixture uses the
+ordinary B/menu/A upgrade command and R/A paid Drone purchase in controlled
+Z7 setup, then verifies the exact morph progress, live larva count/timer and
+pending Egg product/timer through save/load. It advances the independent Egg
+update directly after load to isolate birth from campaign combat; this is
+not a full mission or fresh-process SRAM test. Both focused targets pass.
+
+The combined Egg/source-sight/Scourge/construction-HP/direct-attack/nearest-
+depot ARM ROM is `94eefe4d…66ba7f`, with unchanged IWRAM `0x03004a40` and
+BSS `0x0203d9f0` under the fixed reserves. Separate old/new adapter links
+with Eggs/Scourge disabled reproduce the same Z7 ROM `0ad661af…fc8637`.
+The P3 corridor build also remains byte-identical to `ec5e6c58…a77264`.
+Full Z7 playthrough, fresh-process SRAM and hardware performance qualification
+remain required before promotion.
+
+The final source passes both Egg fixtures, source sight with and without
+Eggs, Z7 and P3 Scourge regressions, the ZP air-tech fixture, `./dev build`,
+`./dev test` (380 Python tests plus default host fixtures), `make unified`
+and `make test-unified`. Original-art and unified ROMs remain byte-identical
+to `4ad80ce0…f9aee` and `6bab5be2…979f9` with the experimental gate off.

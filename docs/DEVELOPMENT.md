@@ -1674,6 +1674,13 @@ If no slot exists for the second unit at hatch, the first completes and the
 second is attempted only once, matching the pinned reference's allocation
 failure behavior.
 
+Existing larvae also remain usable while an owned Hatchery upgrades to Lair
+or Hive: the normal R/A production controls can start paid Eggs during the
+morph, and the existing 428-update larva counter continues toward its live
+cap of three. An unfinished newly built Hatchery remains unavailable. This
+models larvae through the town-hall proxy; native individual-larva movement
+and spawning timing remain separate limitations.
+
 This gate uses save generation 36; generation-35 internal Z7 records are
 rejected. Standard profiles keep the gate off. See
 [Validation](VALIDATION.md#experimental-independent-z7-egg-production) for

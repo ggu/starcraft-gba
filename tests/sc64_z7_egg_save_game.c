@@ -68,6 +68,14 @@ static void make_egg(int owner, int producer, int product)
     assert(u[slot].work_timer == sc64_z7_egg_duration(product));
 }
 
+static void press_command(int choice)
+{
+    press(KEY_B);
+    for (int step = 0; step < choice; ++step) press(KEY_DOWN);
+    assert(menu_open && menu_cursor == choice);
+    press(KEY_A);
+}
+
 static void encode_unit(RaceSave *save, unsigned slot, const Unit *q)
 {
     assert(sc64_zp_unit_save_encode(&save->units[slot], q,
@@ -276,6 +284,63 @@ static void test_human_egg_roundtrip_and_corruption(void)
                                          SC64_Z7_MAP_COLS, SC64_Z7_MAP_ROWS));
 }
 
+static void test_paid_egg_during_ui_lair_morph_roundtrip(void)
+{
+    launch_z7();
+    int producer = add_source_hatchery(SIDE, 3);
+    int pool = spawn_build(SIDE, B_SPAWNING_POOL, 470, 420, 0);
+    assert(pool >= 0);
+    b[pool].raw_owner = 3;
+    b[pool].raw_type = 142;
+    b[producer].larva = 2;
+    b[producer].larva_timer = 100;
+    race_minerals[SIDE] = minerals = 1000;
+    race_gas[SIDE] = gas = 1000;
+    selected_building = producer;
+    cx = b[producer].x;
+    cy = b[producer].y;
+
+    /* Use the visible command menu's A selection to begin the paid morph. */
+    press_command(MENU_ZP_LAIR);
+    assert(b[producer].type == B_LAIR && b[producer].under_construction);
+
+    /* R cycles the selected town hall's product; A pays for the Egg. */
+    train_type = U_MUTALISK;
+    press(KEY_R);
+    assert(train_type == U_DRONE);
+    int old_minerals = minerals, old_gas = gas;
+    press(KEY_A);
+    int egg = find_egg(SIDE, U_DRONE);
+    assert(egg >= 0 && u[egg].work_timer > 0);
+    assert(minerals == old_minerals - sc64_race_unit_rule(U_DRONE)->minerals);
+    assert(gas == old_gas - sc64_race_unit_rule(U_DRONE)->gas);
+    assert(b[producer].larva == 1 && b[producer].queue_count == 0);
+
+    for (int tick = 0; tick < 17; ++tick) game_update(0, 0);
+    int saved_egg_timer = u[egg].work_timer;
+    int saved_build_progress = b[producer].build_progress;
+    int saved_larva = b[producer].larva;
+    int saved_larva_timer = b[producer].larva_timer;
+    assert(saved_egg_timer > 0 && b[producer].under_construction);
+    assert(race_save_game());
+    assert(race_load_game());
+    assert(b[producer].type == B_LAIR && b[producer].under_construction &&
+           b[producer].build_progress == saved_build_progress &&
+           b[producer].larva == saved_larva &&
+           b[producer].larva_timer == saved_larva_timer);
+    assert(u[egg].alive && u[egg].type == U_Z7_EGG &&
+           u[egg].target == U_DRONE && u[egg].work_timer == saved_egg_timer);
+
+    /* Advance the engine's independent Egg clock without campaign combat;
+     * its paid birth happens while the saved morph remains in progress. */
+    for (int tick = 0; tick <= sc64_z7_egg_duration(U_DRONE) &&
+         u[egg].alive && u[egg].type == U_Z7_EGG; ++tick)
+        (void)race_z7_egg_tick_unit(egg);
+    assert(u[egg].alive && u[egg].type == U_DRONE &&
+           b[producer].type == B_LAIR && b[producer].under_construction);
+    assert(race_owner_supply(SIDE) == supply_used);
+}
+
 static void test_enemy_ling_egg_and_product_bound(void)
 {
     RaceSave good, bad, unchanged;
@@ -417,6 +482,7 @@ static void test_enemy_ling_egg_and_product_bound(void)
 int main(void)
 {
     test_human_egg_roundtrip_and_corruption();
+    test_paid_egg_during_ui_lair_morph_roundtrip();
     test_enemy_ling_egg_and_product_bound();
     puts("Z7 Egg save candidate, provenance, transactional load, and enemy Ling bounds passed");
     return 0;
