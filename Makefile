@@ -1943,6 +1943,24 @@ build/test-sc64-p6-burrow-cull-off: tests/sc64_p6_burrow_cull.c tests/sc64_p6_bu
 test-sc64-p6-burrow-cull: build/test-sc64-p6-burrow-cull-on build/test-sc64-p6-burrow-cull-off
 test-sc64-p6-query-experiments: test-sc64-p6-burrow-cull
 
+build/test-sc64-p6-storm-validation: tests/sc64_p6_storm_validation.c tests/sc64_p6_storm_validation_reference.c tests/sc64_p6_storm_validation_fixture.h starcraft/sc64_p6_storm_adapter.h starcraft/sc64_psionic_storm.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_abilities_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -I.local/sc64/zp-stage/generated/scenarios tests/sc64_p6_storm_validation.c tests/sc64_p6_storm_validation_reference.c common/gba.c -o $@
+build/test-sc64-p6-storm-game-local: tests/sc64_campaign_spell_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P6_STORM_POSTCHECK_LOCAL $< common/gba.c -o $@
+.PHONY: test-sc64-p6-storm-validation
+test-sc64-p6-storm-validation: build/test-sc64-p6-storm-validation build/test-sc64-p6-storm-game build/test-sc64-p6-storm-game-local
+	./build/test-sc64-p6-storm-validation
+	./build/test-sc64-p6-storm-game
+	./build/test-sc64-p6-storm-game-local
+test-sc64-p6-query-experiments: test-sc64-p6-storm-validation
+
+build/test-sc64-p6-rescue-grouped: tests/sc64_p6_rescue_grouped.c tests/sc64_p6_rescue_grouped_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P6_RESCUE_GROUPED tests/sc64_p6_rescue_grouped.c tests/sc64_p6_rescue_grouped_reference.c common/gba.c -o $@
+.PHONY: test-sc64-p6-rescue-grouped
+test-sc64-p6-rescue-grouped: build/test-sc64-p6-rescue-grouped
+	./build/test-sc64-p6-rescue-grouped
+test-sc64-p6-query-experiments: test-sc64-p6-rescue-grouped
+
 build/test-sc64-p6-burrow-grouped: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P6_BURROW_GROUPED tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
 build/test-sc64-p6-burrow-grouped-cull: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build

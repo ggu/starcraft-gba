@@ -2728,3 +2728,37 @@ Private artifacts are under `.local/build/promotion/z6-first-win-frozen/`.
 Full ARM win and fresh-process SRAM qualification remain pending, so this
 does not increase the staged completed total beyond 20/30 or establish a new
 full-mission FPS result.
+
+### Further default-off P6 scan experiments
+
+`SC64_P6_RESCUE_GROUPED` builds a frame-local list of live SIDE unit slots,
+appending each newly rescued unit at its original outer-loop position. This
+preserves forward rescue chains, the absence of backward revisits, and the
+subsequent building rescue pass. The independent nested-scan oracle matches
+whole production unit/building arrays and cache invalidation across 1200
+random worlds, enemy/neutral/provenance rows, exact radius boundaries,
+ascending/descending chains, full capacity and invalid-state/no-op gates.
+The candidate list uses 240 stack bytes with no persistent storage.
+
+`SC64_P6_STORM_POSTCHECK_LOCAL` retains full entry validation, Storm geometry,
+all-owner live raw-79 energy/remainder scans, cast checks and save/restore
+checks. It skips only repeated mission-model/death/doodad validation at the
+successful tick exit: the model and doodad fields are unchanged during that
+tick, and source-death updates saturate within their validated bound. This
+does not remove a unit-pool scan. Two separately compiled adapter paths match
+return values and state across 1320 seeded valid/invalid cases. The actual
+campaign entry/cast/pause/save fixture passes with the option off and on.
+
+Private ARM builds with the previous six query flags, seven including grouped
+rescue, and all eight including the local Storm post-check pass the unchanged
+reserve guards at IWRAM `0x030045d8` / BSS `0x0203d774`. The actual-game spell
+fixture also passes with all eight flags together. These remain unqualified
+performance experiments, disabled by default; no new FPS or campaign
+completion claim is made. Private builds and manifests are under
+`.local/build/promotion/p6-rescue-postcheck/`.
+
+The final 512-file source index passes a clean original-art build and the
+default host suite, including 324 Python tests with six private-data checks
+skipped. Its 65,536-byte ROM retains SHA-256 `4ad80ce0…f9aee` recorded above.
+The index audit contains no ROMs, imported/generated private payloads, build
+outputs or credential files. The active P6 controller experiment is excluded.

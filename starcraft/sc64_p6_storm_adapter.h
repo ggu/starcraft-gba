@@ -70,6 +70,29 @@ static int race_p6_storm_world_state_valid(void)
     return 1;
 }
 
+#ifdef SC64_P6_STORM_POSTCHECK_LOCAL
+/* The tick entry performs the full persistent-state/world preflight above.
+ * During a tick, the adapter mutates only the bounded Storm state, Tassadar's
+ * energy/remainder, actor HP/alive/selection and saturated source-death
+ * counters. The death hooks only update those bounded counters, so they
+ * never mutate the P6 runtime model. The model validator is
+ * therefore redundant at return; retain every Storm-local invariant that the
+ * public world validator checks, including live raw-79 energy rows of every
+ * owner (not only the SIDE caster). */
+static int race_p6_storm_post_state_valid(void)
+{
+    if (!sc64_psionic_storm_state_valid(&race_p6.storm)) return 0;
+    for (unsigned i = 0; i < SC64_STORM_MAX_ACTIVE; ++i) {
+        const Sc64PsionicStorm *effect = &race_p6.storm.storm[i];
+        if (effect->active && (effect->x >= WORLD_W || effect->y >= WORLD_H)) return 0;
+    }
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].raw_type == SC64_P6_STORM_RAW_TASSADAR &&
+            !race_p6_storm_energy_valid(&u[i])) return 0;
+    return 1;
+}
+#endif
+
 /* Call once after P6 source actors have been imported on a fresh mission.
  * Never call this during save restore: saved energy and remainder are state. */
 static void race_p6_storm_initialize_source_units(void)
@@ -201,7 +224,11 @@ static int race_p6_storm_tick(int user_paused)
             }
         }
     }
+#ifdef SC64_P6_STORM_POSTCHECK_LOCAL
+    return race_p6_storm_post_state_valid();
+#else
     return race_p6_storm_world_state_valid();
+#endif
 }
 
 static void race_p6_storm_draw(void)

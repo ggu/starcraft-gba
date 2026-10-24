@@ -1208,6 +1208,15 @@ full normal-input mainland-clearance and Ventral Sacs ferry playthrough under
 ASan/UBSan. It writes the private replay trace to `build/z6-controller.json`.
 The controller also accepts `--trace PATH` when invoked directly. A host win
 does not qualify the ARM replay, SRAM handoff or physical GBA performance.
+
+Two further P6 experiments remain default-off: `SC64_P6_RESCUE_GROUPED`
+groups live friendly rescue candidates while preserving in-frame rescue
+chains; `SC64_P6_STORM_POSTCHECK_LOCAL` skips the unchanged mission-model
+post-validation after a successful Storm tick. It retains full entry checks
+and the live raw-79 energy scan. Run their private-data host checks with
+`make test-sc64-p6-rescue-grouped test-sc64-p6-storm-validation`.
+Append either flag to an explicit `P6_QUERY_FLAGS` experiment and use `-B`
+when changing flags. Neither option has a qualified full-mission FPS result.
 Startup reports are explicitly separate from mission-win evidence.
 
 In the Z6 probe, **R** selects the combat group including Kerrigan. **B+R**

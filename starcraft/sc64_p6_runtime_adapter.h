@@ -622,6 +622,37 @@ static void race_p6_rescue_tick(void)
 {
     int changed = 0;
     if (!race_p6_active() || screen != SCREEN_PLAY || !race_p6_runtime_state_valid()) return;
+#ifdef SC64_P6_RESCUE_GROUPED
+    /* Rescue candidates are already partitioned by live owner in the unit
+     * array. A compact frame-local list avoids rescanning every slot for each
+     * candidate; appending at the exact outer-loop point preserves the
+     * baseline's one-way chaining semantics. */
+    _Static_assert(MAX_UNITS <= 256, "P6 rescue slots must fit in u8");
+    u8 side_slots[MAX_UNITS];
+    unsigned side_count = 0;
+    for (unsigned j = 0; j < MAX_UNITS; ++j)
+        if (u[j].alive && u[j].owner == SIDE) side_slots[side_count++] = (u8)j;
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == RESCUABLE) {
+        for (unsigned k = 0; k < side_count; ++k) {
+            int j = side_slots[k];
+            int dx = u[i].x-u[j].x, dy = u[i].y-u[j].y;
+            if (dx*dx+dy*dy <= 32*32) {
+                u[i].owner=SIDE; u[i].selected=0; u[i].target=-1;
+                u[i].order=ORDER_IDLE; u[i].tx=u[i].x; u[i].ty=u[i].y;
+                side_slots[side_count++] = (u8)i;
+                changed=1; break;
+            }
+        }
+    }
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == RESCUABLE) {
+            for (unsigned k = 0; k < side_count; ++k) {
+                int j = side_slots[k];
+                int dx=b[i].x-u[j].x, dy=b[i].y-u[j].y;
+                if (dx*dx+dy*dy <= 32*32) { b[i].owner=SIDE; changed=1; break; }
+            }
+        }
+#else
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == RESCUABLE) {
         for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE) {
             int dx = u[i].x-u[j].x, dy = u[i].y-u[j].y;
@@ -639,6 +670,7 @@ static void race_p6_rescue_tick(void)
                 if (dx*dx+dy*dy <= 32*32) { b[i].owner=SIDE; changed=1; break; }
             }
         }
+#endif
     if (changed) { target_lists_valid=0; sc64_unit_bucket_active=0; sc64_target_index_end(); }
 }
 
