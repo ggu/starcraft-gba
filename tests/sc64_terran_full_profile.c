@@ -102,24 +102,39 @@ static void test_all_ten_campaign_missions_start_and_roundtrip(void)
 }
 
 #ifdef SC64_IMPORTED_SKIRMISH
-static void skirmish_save_roundtrip(int map, int human, int bots)
+static void skirmish_save_roundtrip(int map, int human, int bots,
+                                    const int bot_races[3])
 {
     game_init();
     race_mode = 1;
     race_human = human;
     race_bots = bots;
     race_skirmish_map = map;
-    for (int i = 0; i < 3; ++i) race_bot_races[i] = (human + i + 1) % 3;
+    for (int i = 0; i < 3; ++i) race_bot_races[i] = bot_races[i];
     init_state();
     assert(screen == SCREEN_PLAY && race_mode && !won && !lost);
     assert(race_human == human && race_bots == bots && race_skirmish_map == map);
-    assert(race_cols == sc64_skirmish_maps[map - 1].width);
-    assert(race_rows == sc64_skirmish_maps[map - 1].height);
+    if (map == 0) {
+        /* Outpost uses race_skirmish_geometry()'s authored 64x64 field. */
+        assert(race_cols == 64 && race_rows == 64);
+    } else {
+        assert(race_cols == sc64_skirmish_maps[map - 1].width);
+        assert(race_rows == sc64_skirmish_maps[map - 1].height);
+    }
     assert(race_player[SIDE] == human);
     assert(race_player[ENEMY] == race_bot_races[0]);
     if (bots > 1) assert(race_player[RESCUABLE] == race_bot_races[1]);
     if (bots > 2) assert(race_player[4] == race_bot_races[2]);
     assert(live_units_for_owner(SIDE) > 0 && live_buildings_for_owner(SIDE) > 0);
+    const int owners[3] = { ENEMY, RESCUABLE, 4 };
+    for (int i = 0; i < bots; ++i) {
+        assert(live_units_for_owner(owners[i]) > 0);
+        assert(live_buildings_for_owner(owners[i]) > 0);
+    }
+    for (int i = bots; i < 3; ++i) {
+        assert(live_units_for_owner(owners[i]) == 0);
+        assert(live_buildings_for_owner(owners[i]) == 0);
+    }
 
     for (int tick = 0; tick < 60; ++tick) game_update(0, 0);
     assert(screen == SCREEN_PLAY && !won && !lost);
@@ -136,10 +151,27 @@ static void skirmish_save_roundtrip(int map, int human, int bots)
 static void test_imported_skirmish_matrix(void)
 {
     assert(SC64_SKIRMISH_IMPORTED_COUNT >= 1);
-    for (int map = 1; map <= SC64_SKIRMISH_IMPORTED_COUNT; ++map)
+    assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1);
+    assert(SC64_FRONT_MAP_COUNT == 2);
+    int cases = 0;
+    for (int map = 0; map < SC64_FRONT_MAP_COUNT; ++map)
         for (int human = R_TER; human <= R_PROTOSS; ++human)
-            for (int bots = 1; bots <= 3; ++bots)
-                skirmish_save_roundtrip(map, human, bots);
+            for (int bots = 1; bots <= 3; ++bots) {
+                int combinations = bots == 1 ? 3 : bots == 2 ? 9 : 27;
+                for (int config = 0; config < combinations; ++config) {
+                    int bot_races[3] = { R_TER, R_TER, R_TER };
+                    int remaining = config;
+                    for (int slot = 0; slot < bots; ++slot) {
+                        bot_races[slot] = remaining % 3;
+                        remaining /= 3;
+                    }
+                    skirmish_save_roundtrip(map, human, bots, bot_races);
+                    ++cases;
+                }
+            }
+    assert(cases == SC64_FRONT_MAP_COUNT * 3 * (3 + 9 + 27));
+    assert(cases == 234);
+    printf("Full Terran skirmish startup/save matrix: %d configurations passed\n", cases);
 }
 #endif
 

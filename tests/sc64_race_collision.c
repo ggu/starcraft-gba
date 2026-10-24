@@ -243,6 +243,39 @@ edge_overflow_and_passthrough(unsigned int *checks)
     sc64_unit_buckets_end();
 }
 
+#ifdef SC64_T4_RUNTIME
+static void
+t4_actor_collision_fallbacks(unsigned int *checks)
+{
+    Unit *q = &u[0], *other = &u[1];
+    memset(u, 0, sizeof(u));
+    q->alive = other->alive = 1;
+    q->type = other->type = U_MARINE; /* zero actor flags retain legacy collision */
+    q->x = 100; q->y = 100; other->x = 104; other->y = 100;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    check_candidate(q, 101, 100, checks);
+    assert(!unit_step_clear(q, 101, 100));
+
+    /* The hidden, non-collidable revealer is an aircraft in T4; its actor
+     * metadata must still suppress an otherwise overlapping flyer. */
+    q->type = U_WRAITH; other->type = U_MAP_REVEALER;
+    q->x = 100; q->y = 100; other->x = 104; other->y = 100;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    check_candidate(q, 101, 100, checks);
+    assert(unit_step_clear(q, 101, 100));
+
+    /* A hidden/non-movable mover keeps the outer fast-path behavior. */
+    q->type = U_MAP_REVEALER; other->type = U_WRAITH;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    check_candidate(q, 101, 100, checks);
+    assert(unit_step_clear(q, 101, 100));
+    sc64_unit_buckets_end();
+}
+#endif
+
 int
 main(void)
 {
@@ -253,6 +286,9 @@ main(void)
     persistent_reconciliation(&checks);
 #endif
     edge_overflow_and_passthrough(&checks);
+#ifdef SC64_T4_RUNTIME
+    t4_actor_collision_fallbacks(&checks);
+#endif
     printf("Race collision buckets match full scan (%u checks).\n", checks);
     return 0;
 }

@@ -701,3 +701,29 @@ frames, not host wall time. Diagnostic counters describe only the final tick;
 collect them from a diagnostic build separately from the uninstrumented FPS
 comparison. `tools/sc64_compare_campaign_replays.py` is Protoss-only and does not
 apply to Terran measurements.
+
+### Zerg 4 source staging
+
+The opt-in Z4 importer prepares the complete source for **Agent of the Swarm**
+without changing the canonical race pack or enabling a playable mission. Use
+the verified USA ROM and the existing pinned `references/sc64-maps` checkout:
+
+```sh
+python3 tools/sc64_z4_pack.py --rom /path/to/StarCraft64-USA.z64 \
+  --out .local/sc64/z4
+python3 tools/sc64_z4_pack.py --verify-staged --out .local/sc64/z4
+python3 tests/test_sc64_z4_import.py
+```
+
+Packing verifies the normalized ROM, extractor revision and exact extractor
+source bytes, and the authenticated Z4 CHK. The ignored output contains
+`source.chk`, 16 framed source records, `manifest.json`, and `source-audit.json`.
+Standalone verification checks retained files against the pinned CHK without
+requiring the original ROM or running the extractor. Keep all output private.
+
+The audit preserves all 184 placement rows, seven trigger records, source
+properties, ownership, locations and other CHK sections. It reports runtime
+mapping gaps and pool requirements rather than truncating source rows. Z4
+still needs gameplay mappings, larger building/mineral pools, its countdown
+and hatch sequence, victory/defeat behavior, persistence and controller/ARM
+qualification. Source staging alone does not establish a playable mission.
