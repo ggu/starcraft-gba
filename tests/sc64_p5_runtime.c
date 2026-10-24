@@ -96,6 +96,9 @@ static void check_source_census(void)
                &sc64_race_maps[SC64_P5_GLOBAL_ID]));
     assert(race_p5_runtime_state_valid());
     assert(race_p5_reserved_units() == SC64_P5_SOURCE_CREATE_COUNT);
+    assert(race_p5_remaining_creations(&race_p5) == SC64_P5_SOURCE_CREATE_COUNT);
+    assert(race_p5_saved_remaining_creations(&race_p5) ==
+           SC64_P5_SOURCE_CREATE_COUNT);
     /* Source OWNR/SIDE metadata stays authentic; live ownership gets distinct
      * force buckets for target queries and is checked against every map row. */
     assert(race_p5_live_owner_for_source(7) == SIDE);
@@ -241,6 +244,27 @@ static void check_source_create_program(void)
     assert(count_raw_unit(101, 7) == revealers_before + 1);
     /* Cursor is current action index + 1; creation indices 0..10 end at 11. */
     assert(race_p5.runtime.model.action_cursor[3] >= 11);
+    assert(race_p5_reserved_units() == 0);
+
+    /* A started trigger with cursor zero is complete, unlike the fresh
+     * unstarted state (11 reserved) and an in-flight cursor (10 remain after
+     * action 0 has already dispatched). Keep runtime and save validation in
+     * lockstep on that distinction. */
+    Sc64P5PersistentState progress = race_p5;
+    progress.runtime.model.action_cursor[3] = 1;
+    progress.runtime.action_ticks[3] = 1;
+    assert(sc64_p5_persistent_state_valid(&progress));
+    assert(race_p5_remaining_creations(&progress) == 10);
+    assert(race_p5_saved_remaining_creations(&progress) == 10);
+    progress.runtime.model.action_cursor[3] = 0;
+    progress.runtime.action_ticks[3] = 0;
+    assert(sc64_p5_persistent_state_valid(&progress));
+    assert(race_p5_remaining_creations(&progress) == 0);
+    assert(race_p5_saved_remaining_creations(&progress) == 0);
+    Sc64P5PersistentState original = race_p5;
+    race_p5 = progress;
+    assert(race_p5_reserved_units() == 0);
+    race_p5 = original;
     assert(race_p5_runtime_state_valid());
 }
 

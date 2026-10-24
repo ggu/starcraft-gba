@@ -87,6 +87,9 @@ static unsigned race_p5_remaining_creations(const Sc64P5PersistentState *state)
     if (!state) return SC64_P5_SOURCE_CREATE_COUNT;
     started = sc64_p5_trigger_mask_test(state->runtime.model.started,
                                         (u8)trigger);
+    /* started with cursor zero means every action in this one-shot program
+     * has completed; it is distinct from the unstarted zero-cursor state. */
+    if (started && !state->runtime.model.action_cursor[trigger]) return 0;
     for (unsigned i = 0; i < tr->action_count; ++i) {
         const Sc64P5SourceAction *a = &sc64_p5_source_actions[tr->first_action + i];
         if (a->opcode == 11 && (!started || i >= state->runtime.model.action_cursor[trigger]))

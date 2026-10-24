@@ -2229,3 +2229,40 @@ overcapacity and generation-24 rejection are checked before live mutation.
 The ARM build ends IWRAM at `0x03004100` and BSS at `0x0203d564`, inside the
 unchanged guards. No completed P5 controller or ARM playthrough is claimed
 by these lifecycle checks.
+
+
+### Protoss five Shuttle normal-controller qualification
+
+The optional `protoss-p5-shuttle` build now has two identical ordinary-input
+host wins and a matching complete ARM replay. The controller launches global
+mission 24 through HOME, rescues Tassadar, boards the real source Shuttle with
+Tassadar and two Zealots, flies around the source anti-air defenses, and unloads
+all three within source extraction rectangle `[1696,1680,1808,1776]`. Victory
+occurs at game frame 8106 / controller tick 8171, with zero runtime faults and
+Shuttle HP 19. No actor positions, health, resources, triggers, or result flags
+are injected by the replay; only the neutral input scheduler is written.
+The started-trigger mask is 2012 and all final action cursors/wait timers are
+zero. All 11 one-shot source creates have completed. Completed source programs
+now release their creation reservation, including the saved-state capacity check.
+
+Frozen private evidence is below `.local/build/promotion/p5-arm-qualified/`:
+
+- ROM SHA-256: `31fd14c41fad48dc89eefeb2efb3cd7e453585b07d842aabf271fba833b28959`.
+- ELF SHA-256: `91feeca6a4f574b998f2966bcdaa6549b7fb956c4d3aab6f04428153dfa6dd9e`.
+- Controller trace SHA-256: `68bb8d49e8fd95b1ef0c3fb2f22ad1b866e9215e8c75a16377a90f68939d83c0`.
+- Complete replay: `full-win/protoss-p5-1792819547611225000/profile.json`.
+- Cargo save at controller tick 6000: `cargo-save/protoss-p5-1792819623935158000/profile.json`.
+- Fresh-process resume: `cargo-resume/protoss-p5-resume-1792819678753722000/resume.json`.
+
+The fresh process loads the exact authenticated 32 KiB SRAM through HOME L,
+restores the observed live cargo links, source model, timers, death counters,
+all persisted bytes and complete actor-bank hashes exactly, then advances one
+neutral handoff frame and 60 live frames. Fifth-entry replay tooling reads the
+real 48-byte mixed-width Building representation and nested persistent mission
+state through DWARF; older fourth-entry observation schemas remain unchanged.
+
+This raises staged completed missions to 19/30 (Terran 10, Zerg 4, Protoss 5).
+Canonical distribution profiles remain Terran 10, Zerg 3, Protoss 3. P5's full
+ARM mean is **12.69 effective fps** across counted live-play intervals, excluding
+HOME/start and RESULT intervals. This is a playability qualification, not a
+30-fps result or physical GBA verification. Z5 and later missions remain unfinished.

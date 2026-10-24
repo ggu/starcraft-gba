@@ -945,7 +945,9 @@ a clear landing area. Passengers retain HP and supply while aboard and
 cannot be selected, attacked or counted in a Bring objective until unloaded.
 Cargo dies if the Shuttle is destroyed. These bounded GBA orders reuse
 existing unit/save fields; generation-24 saves are incompatible. Lifecycle
-checks do not establish a full P5 controller win.
+checks cover the transport lifecycle. A complete normal-controller P5 win, ARM replay,
+and fresh-process cargo save are now qualified (see `docs/VALIDATION.md`).
+Run `make test-sc64-p5-campaign-run` to repeat the host win with sanitizers.
 
 `make test-sc64-z5-ability-models test-sc64-z6-model` requires no imported data.
 After generating the Z6 numeric descriptor with the scenario packer,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Authenticate and resume a saved Z4/P4 campaign in a fresh mGBA process.
+"""Authenticate and resume a saved staged Zerg/Protoss campaign in a fresh mGBA process.
 
 The debugger writes only the neutral controller schedule. SRAM is copied into
 a new mGBA save directory, then loaded through the ordinary HOME L control.
@@ -54,7 +54,7 @@ def validate_source_report(report_path: Path, rom_path: Path, elf_path: Path,
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"cannot read source replay report: {exc}") from exc
     if not isinstance(report, dict) or report.get("profile") not in replay.MISSION_BY_PROFILE:
-        raise ValueError("source report profile must be zerg-z4 or protoss-p4")
+        raise ValueError("source report profile must name a supported staged Zerg/Protoss mission")
     profile_name = report["profile"]
     mission = replay.MISSION_BY_PROFILE[profile_name]
     if type(report.get("mission")) is not int or report["mission"] != mission:
@@ -159,7 +159,7 @@ def run(report_path: Path, rom_path: Path, elf_path: Path, output: Path,
                                "demo_replay_checkpoint", "screen", "frame", "won", "lost",
                                "race_mode", "race_human", "race_selected_mission", "race_completed",
                                "race_campaign", "race_minerals", "race_gas", "race_front", "u", "b",
-                               "race_z4" if profile_name == "zerg-z4" else "race_p4") if key not in sym]
+                               replay.RUNTIME_SYMBOLS[profile_name]) if key not in sym]
     if missing:
         raise RuntimeError("matching ELF lacks resume symbols: " + ", ".join(missing))
     mode, capacity = scheduler.schedule_mode(sym, sizes)
@@ -175,7 +175,7 @@ def run(report_path: Path, rom_path: Path, elf_path: Path, output: Path,
         raise RuntimeError(f"matching campaign catalog does not enable mission {mission}")
     bank = replay.compact_bank_profile(elf, sizes, profile_name)
     campaign_layout = races.dwarf_struct(elf, "Sc64RaceCampaignState")
-    runtime_layout = races.dwarf_struct(elf, replay.RUNTIME_TYPES[profile_name])
+    runtime_layout = replay.runtime_layout_for(elf, profile_name)
     model_layout = races.dwarf_struct(elf, replay.MODEL_TYPES[profile_name])
     split.FRONT_FIELDS = split.frontend_offsets(elf)
     run_dir = output / f"{profile_name}-resume-{time.time_ns()}"

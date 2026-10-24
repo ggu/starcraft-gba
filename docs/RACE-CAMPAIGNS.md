@@ -45,8 +45,8 @@ present three each. Controller-driven host runs complete 16 of the 30 missions
 across these profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. Separate internal
 Z4 and P4 Storm builds additionally have normal-controller host and full ARM
 wins, bringing the staged total to 18 distinct missions. Their saves and ROM
-identities differ from the canonical outputs. Z5 cloak and P5 Shuttle have
-internal runtimes under controller qualification. The P5 island objective
+identities differ from the canonical outputs. Z5 cloak remains under controller qualification. P5 Shuttle has a complete
+normal-controller host and ARM win plus an exact fresh-process cargo save. The P5 island objective
 requires the optional Shuttle profile. The remaining chapters are incomplete.
 
 Zerg 3 **The New Dominion** and Protoss 3 **Higher Ground** are on the second

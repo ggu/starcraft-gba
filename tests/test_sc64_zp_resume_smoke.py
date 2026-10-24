@@ -114,6 +114,67 @@ class ResumeAuthenticationTests(unittest.TestCase):
             resume.verify_handoff_and_resume(1000, 1001, 60, 59,
                                              {"frame": 1060, "screen": 1})
 
+    def test_authenticates_fifth_entry_z5_and_p5_pause_snapshots(self):
+        base = json.loads(self.report.read_text())
+        for profile_name, mission in (("zerg-z5", 16), ("protoss-p5", 24)):
+            with self.subTest(profile=profile_name):
+                payload = copy_report = json.loads(json.dumps(base))
+                payload["profile"] = profile_name
+                payload["mission"] = mission
+                saved = payload["save_checkpoint"]["state"]
+                saved["race_selected_mission"] = mission
+                saved["race_campaign"]["mission"] = mission
+                saved["race_runtime"] = {
+                    "model": {"outcome": 0,
+                              "action_cursor": list(range(40 if mission == 16 else 11)),
+                              "started_lo": 0x89ABCDEF, "started_hi": 0x01234567,
+                              "fired": 0x0123456789ABCDEF},
+                    "action_cursor": list(range(40 if mission == 16 else 11)),
+                    "action_ticks": list(range(40 if mission == 16 else 11)),
+                    "switch_bits": [0x11111111 * i for i in range(8)],
+                    "faults": 0, "persistent_bytes": list(range(181 if mission == 16 else 123)),
+                }
+                saved["buildings"]["entities"][0]["queue"] = [1, 7, 3, 9, 5]
+                self.report.write_text(json.dumps(payload))
+                auth = resume.validate_source_report(self.report, self.rom, self.elf)
+                self.assertEqual(auth["profile"], profile_name)
+                self.assertEqual(auth["mission"], mission)
+                self.assertEqual(auth["source_state"]["race_runtime"]["persistent_bytes"][-1],
+                                 (180 if mission == 16 else 122))
+                self.assertEqual(auth["source_state"]["buildings"]["entities"][0]["queue"],
+                                 [1, 7, 3, 9, 5])
+        self.report.write_text(json.dumps(base))
+
+    def test_restored_persistent_snapshot_compares_every_nested_byte(self):
+        saved = state(2)
+        saved["race_selected_mission"] = 24
+        saved["race_campaign"]["mission"] = 24
+        saved["race_runtime"] = {
+            "model": {"outcome": 0, "action_cursor": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+                      "started": 0x07F3, "fired": 0x07F3},
+            "action_cursor": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            "action_ticks": list(range(11)),
+            "switch_bits": [0xA0000000 + i for i in range(8)],
+            "deaths_by_source": list(range(12)),
+            "pressure_dispatched_mask": 5, "reserved": [0, 0, 0], "faults": 0,
+            "persistent_bytes": list(range(123)),
+        }
+        saved["buildings"]["entities"][0]["queue"] = [9, 8, 7, 6, 5]
+        restored = json.loads(json.dumps(saved)); restored["screen"] = 1
+        resume.compare_saved_state(saved, restored)
+        for path, mutate in (
+                ("race_runtime.model.action_cursor", lambda x: x.__setitem__(0, 0)),
+                ("race_runtime.switch_bits", lambda x: x.__setitem__(0, 0)),
+                ("race_runtime.persistent_bytes", lambda x: x.__setitem__(-1, 0)),
+                ("buildings.entities.0.queue", lambda x: x.__setitem__(-1, 0))):
+            changed = json.loads(json.dumps(restored))
+            value = changed
+            for key in path.split("."):
+                value = value[int(key)] if isinstance(value, list) else value[key]
+            mutate(value)
+            with self.subTest(path=path), self.assertRaisesRegex(RuntimeError, path.split(".")[0]):
+                resume.compare_saved_state(saved, changed)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay private Z4/P4 controller-win traces using only scheduled inputs.
+"""Replay private fourth/fifth Zerg/Protoss controller-win traces using only scheduled inputs.
 
 ROM/ELF catalog metadata and debugger symbols are checked before launch. The
 replay writes the controller queue and scheduler metadata; game/model state is
@@ -29,24 +29,35 @@ import sc64_z3_controller_replay as scheduler
 from emulator_smoke import ROOT, capture, symbol_sizes, symbols
 
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_RESULT = 0, 1, 3
-MISSION_BY_PROFILE = {"zerg-z4": 15, "protoss-p4": 23}
-FACTION_BY_PROFILE = {"zerg-z4": "zerg", "protoss-p4": "protoss"}
-MODEL_TYPES = {"zerg-z4": "Sc64Z4State", "protoss-p4": "Sc64P4State"}
-RUNTIME_TYPES = {"zerg-z4": "Sc64Z4RuntimeState", "protoss-p4": "Sc64P4RuntimeState"}
+MISSION_BY_PROFILE = {"zerg-z4": 15, "protoss-p4": 23, "zerg-z5": 16, "protoss-p5": 24}
+FACTION_BY_PROFILE = {name: ("zerg" if name.startswith("zerg") else "protoss")
+                      for name in MISSION_BY_PROFILE}
+MODEL_TYPES = {"zerg-z4": "Sc64Z4State", "protoss-p4": "Sc64P4State",
+               "zerg-z5": "Sc64Z5State", "protoss-p5": "Sc64P5State"}
+RUNTIME_TYPES = {"zerg-z4": "Sc64Z4RuntimeState", "protoss-p4": "Sc64P4RuntimeState",
+                 "zerg-z5": "Sc64Z5RuntimeState", "protoss-p5": "Sc64P5RuntimeState"}
+PERSISTENT_TYPES = {"zerg-z5": "Sc64Z5PersistentState", "protoss-p5": "Sc64P5PersistentState"}
+RUNTIME_SYMBOLS = {"zerg-z4": "race_z4", "protoss-p4": "race_p4",
+                   "zerg-z5": "race_z5", "protoss-p5": "race_p5"}
 DEFAULT_TRACE = ROOT / ".local/sc64/z4-controller-win.json"
 DEFAULT_TRACES = {"zerg-z4": DEFAULT_TRACE,
-                 "protoss-p4": ROOT / ".local/sc64/p4-controller-win.json"}
+                 "protoss-p4": ROOT / ".local/sc64/p4-controller-win.json",
+                 "zerg-z5": ROOT / ".local/sc64/z5-controller-win.json",
+                 "protoss-p5": ROOT / ".local/sc64/p5-controller-win.json"}
 DEFAULT_OUTPUT = ROOT / "build/emulator/zp-controller-replay"
 CHECKPOINT_TICKS = 1000
 MENU_PREFIX = ((1, 1), (2, 0), (3, 16), (4, 0), (5, 128),
                (6, 0), (7, 1), (8, 0), (9, 1))
 
+FIFTH_MENU_PREFIX = tuple((tick, 16 if tick == 5 else held)
+                          for tick, held in MENU_PREFIX)
+
 
 def validate_trace(trace: object, capacity: int, profile_name: str,
                    *, windowed: bool = True) -> dict:
-    """Strictly validate an authenticated Z4/P4 trace before emulator launch."""
+    """Strictly validate an authenticated staged campaign trace before emulator launch."""
     if profile_name not in MISSION_BY_PROFILE:
-        raise ValueError("profile must be zerg-z4 or protoss-p4")
+        raise ValueError("unknown staged Zerg/Protoss profile")
     if type(capacity) is not int or capacity < 1:
         raise ValueError("controller queue capacity must be positive")
     if not isinstance(trace, dict) or type(trace.get("schema")) is not int or trace["schema"] != 1:
@@ -96,6 +107,7 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
             start_input_tick = previous_tick
             start_transition_count = len(transitions)
         elif kind in ("periodic", "prehatch", "posthatch") or (
+                kind in ("rescued", "boarded", "unloaded") and profile_name == "protoss-p5") or (
                 kind == "both-rescued" and profile_name == "protoss-p4"):
             if start is None or final is not None:
                 raise ValueError(f"{kind} observation must follow start and precede final")
@@ -112,15 +124,17 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
 
     if not inputs or inputs[0][0] != 0:
         raise ValueError("first controller transition must be host_tick=1")
-    if (start_transition_count != len(MENU_PREFIX) or
-            transitions[:start_transition_count] != list(MENU_PREFIX)):
-        raise ValueError("normal HOME/menu inputs do not match the 4th-entry deployment route")
+    entry = 5 if profile_name in PERSISTENT_TYPES else 4
+    menu_prefix = FIFTH_MENU_PREFIX if entry == 5 else MENU_PREFIX
+    if (start_transition_count != len(menu_prefix) or
+            transitions[:start_transition_count] != list(menu_prefix)):
+        raise ValueError(f"normal HOME/menu inputs do not match the {entry}th-entry deployment route")
     if not windowed and len(inputs) > capacity:
         raise ValueError(f"controller queue exceeds ELF capacity ({len(inputs)}/{capacity})")
     if start is None or start.get("screen") != SCREEN_PLAY or start.get("frame") != 0:
         raise ValueError("trace start must be a live PLAY screen at frame zero")
     if start.get("host_tick") != 9 or start.get("host_tick") != start_input_tick:
-        raise ValueError("normal 4th-entry HOME/menu deployment must launch at host_tick=9")
+        raise ValueError(f"normal {entry}th-entry HOME/menu deployment must launch at host_tick=9")
     if start.get("won") != 0 or start.get("lost") != 0 or start.get("outcome") != 0:
         raise ValueError("trace start must be live and unfinished")
     if final is None or rows[-1] is not final or final.get("kind") != "won":
@@ -163,6 +177,8 @@ def decode_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
     if base < 0 or base + model_size > len(raw):
         raise ValueError("nested model lies outside runtime state")
     model_raw = raw[base:base + model_size]
+    if profile_name in PERSISTENT_TYPES:
+        return decode_fifth_runtime(raw, runtime_layout, model_layout, profile_name)
     model_widths = ({"fired": 2, "outcome": 1, "action_cursor": 7}
                     if profile_name == "zerg-z4" else
                     {"fired": 2, "outcome": 1, "sequence_trigger": 1,
@@ -220,6 +236,88 @@ def decode_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
     return result
 
 
+def runtime_layout_for(elf: Path, profile_name: str) -> tuple[int, dict[str, int]]:
+    """Flatten the persisted runtime using DWARF, retaining enclosing members."""
+    inner_size, inner = races.dwarf_struct(elf, RUNTIME_TYPES[profile_name])
+    if profile_name not in PERSISTENT_TYPES:
+        return inner_size, inner
+    size, outer = races.dwarf_struct(elf, PERSISTENT_TYPES[profile_name])
+    base = outer.get("runtime", -1)
+    if base < 0 or base + inner_size > size:
+        raise RuntimeError("persistent runtime lies outside DWARF structure")
+    fields = {name: offset for name, offset in outer.items() if name != "runtime"}
+    for name, offset in inner.items():
+        if offset < 0 or offset >= inner_size or name in fields:
+            raise RuntimeError("invalid or ambiguous nested runtime field")
+        fields[name] = base + offset
+    return size, fields
+
+
+def decode_fifth_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
+                         model_layout: tuple[int, dict[str, int]], profile_name: str) -> dict:
+    size, fields = runtime_layout
+    model_size, model_fields = model_layout
+    zerg = profile_name == "zerg-z5"
+    if profile_name not in PERSISTENT_TYPES or len(raw) != size:
+        raise ValueError("unknown fifth runtime or incorrect byte count")
+    base = fields["model"]
+    def scalar(name: str, width: int, *, model=False) -> int:
+        table, limit, data, start = (model_fields, model_size, raw, base) if model else (fields, size, raw, 0)
+        offset = table.get(name, -1)
+        if offset < 0 or offset + width > limit or start + offset + width > len(data):
+            raise ValueError(f"runtime field {name} exceeds or is absent from DWARF structure")
+        return int.from_bytes(data[start + offset:start + offset + width], "little")
+    def array(name: str, count: int, width: int, *, model=False) -> list[int]:
+        value = scalar(name, count * width, model=model)
+        mask = (1 << (width * 8)) - 1
+        return [(value >> (width * 8 * i)) & mask for i in range(count)]
+    model = {"outcome": scalar("outcome", 1, model=True),
+             "action_cursor": array("action_cursor", 40 if zerg else 11, 1, model=True)}
+    if zerg:
+        model["started_lo"] = scalar("started_lo", 4, model=True)
+        model["started_hi"] = scalar("started_hi", 4, model=True)
+        model["fired"] = model["started_lo"] | (model["started_hi"] << 32)
+    else:
+        model["started"] = scalar("started", 2, model=True)
+        model["fired"] = model["started"]
+    result = {"model": model, "action_ticks": array("action_ticks", 40 if zerg else 11, 2),
+              "switch_bits": array("switch_bits", 8, 4), "faults": scalar("fault", 1),
+              # Include the complete persisted representation, including optional
+              # ability state and reserved bytes, in fresh-process comparisons.
+              "persistent_bytes": list(raw)}
+    if zerg:
+        result.update({"source_paused": scalar("source_paused", 1),
+                       "doodad_enabled": array("doodad_enabled", 6, 1),
+                       "pause_acknowledged": scalar("pause_acknowledged", 1)})
+        if "cloak" in fields:
+            result["cloak"] = array("cloak", 2, 1)
+    else:
+        result.update({"deaths_by_source": array("deaths_by_source", 12, 4),
+                       "pressure_dispatched_mask": scalar("pressure_dispatched_mask", 1),
+                       "reserved": array("reserved", 3, 1)})
+    return result
+
+
+def verify_p5_extraction(trace_final: dict, state: dict) -> None:
+    bounds = trace_final.get("goal")
+    if bounds != [1696, 1680, 1808, 1776]:
+        raise RuntimeError("P5 trace lacks the authenticated source extraction bounds")
+    left, top, right, bottom = bounds
+    def inside(a):
+        return (a.get("owner") == 0 and a.get("order") != 8 and
+                left <= a.get("x", -1) < right and top <= a.get("y", -1) < bottom)
+    actors = state.get("units", {}).get("entities", [])
+    heroes = [a for a in actors if a.get("raw_type") == 79]
+    if len(heroes) != 1 or not inside(heroes[0]) or heroes[0].get("raw_owner") != 2:
+        raise RuntimeError("P5 requires the rescued, unloaded Tassadar inside extraction")
+    hero = heroes[0]
+    if trace_final.get("hero") != [1, hero["x"], hero["y"], 0]:
+        raise RuntimeError("P5 extracted hero differs from controller trace")
+    zealots = sum(inside(a) and a.get("raw_type") == 65 and a.get("raw_owner") == 7 for a in actors)
+    if zealots < 2 or zealots != trace_final.get("zealots_at_goal"):
+        raise RuntimeError("P5 requires two unloaded Zealots inside extraction")
+
+
 def verify_p4_hero_extraction(trace_final: dict, state: dict) -> None:
     """Cross-check recorded objective actors against the observed live bank."""
     if not any(f"{name}_alive" in trace_final for name in ("tassadar", "raynor")):
@@ -273,7 +371,7 @@ def verify_final(trace_final: dict, state: dict, profile_name: str) -> None:
         for key in ("chrysalis_alive", "kerrigan_alive", "force3_command_centers"):
             if key in trace_final and state.get(key) != trace_final[key]:
                 raise RuntimeError(f"final {key} differs from authenticated trace")
-    else:
+    elif profile_name == "protoss-p4":
         if runtime.get("faults") != 0:
             raise RuntimeError("P4 final state reports adapter faults")
         if "created" in trace_final and runtime.get("created_count") != trace_final["created"]:
@@ -287,14 +385,33 @@ def verify_final(trace_final: dict, state: dict, profile_name: str) -> None:
             if key in trace_final and state.get(key) != trace_final[key]:
                 raise RuntimeError(f"final {key} differs from authenticated trace")
 
+    else:
+        if runtime.get("faults") != 0:
+            raise RuntimeError("fifth mission final state reports adapter faults")
+        if runtime.get("action_ticks") != trace_final.get("action_ticks"):
+            raise RuntimeError("fifth mission source wait timers differ from trace")
+        if model.get("action_cursor") != trace_final.get("action_cursors"):
+            raise RuntimeError("fifth mission source action cursors differ from trace")
+        if profile_name == "protoss-p5":
+            if runtime.get("deaths_by_source") != trace_final.get("source_deaths"):
+                raise RuntimeError("P5 source-player death counters differ from trace")
+            if runtime.get("pressure_dispatched_mask") != trace_final.get("pressure_dispatched"):
+                raise RuntimeError("P5 authored pressure state differs from trace")
+            verify_p5_extraction(trace_final, state)
+        elif state.get("kerrigan_alive") != 1:
+            raise RuntimeError("Z5 final state requires its live source hero")
+
 
 def mission_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
                      campaign_layout: tuple[int, dict[str, int]],
                      runtime_layout: tuple[int, dict[str, int]],
                      model_layout: tuple[int, dict[str, int]], profile_name: str) -> dict:
     units = read_compact_units(rsp, sym["u"], bank["unit_capacity"],
-                               bank["unit_stride_bytes"], bank["unit_offsets"])
-    buildings = races.read_entities(rsp, sym["b"], bank["building_capacity"],
+                               bank["unit_stride_bytes"], bank["unit_offsets"],
+                               complete=profile_name in PERSISTENT_TYPES)
+    buildings = read_compact_buildings(rsp, sym["b"], bank["building_capacity"],
+                                       bank["building_stride_bytes"], bank["building_offsets"]) \
+        if profile_name in PERSISTENT_TYPES else races.read_entities(rsp, sym["b"], bank["building_capacity"],
                                     bank["building_stride_bytes"], bank["building_offsets"],
                                     building=True)
     building_offsets = bank["building_offsets"]
@@ -312,6 +429,11 @@ def mission_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict
               "race_completed", "race_skirmish_map", "race_selected_mission", "race_cols",
               "race_rows", "minerals", "gas") if name in sym}
     state["units"], state["buildings"] = units, buildings
+    if profile_name in PERSISTENT_TYPES:
+        # Retained dead actor provenance also participates in source bindings
+        # and saves. Hash the complete banks rather than observing live rows only.
+        state["unit_bank_sha256"] = hashlib.sha256(rsp.read(sym["u"], sizes["u"])).hexdigest()
+        state["building_bank_sha256"] = hashlib.sha256(rsp.read(sym["b"], sizes["b"])).hexdigest()
     if "race_player" in sym:
         size = sizes.get("race_player", 0)
         if size and size % 4 == 0:
@@ -337,7 +459,7 @@ def mission_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict
     for name in ("race_minerals", "race_gas"):
         if name in sym and sizes.get(name, 0) == 20:
             state[name] = list(struct.unpack("<5i", rsp.read(sym[name], 20)))
-    runtime_symbol = "race_z4" if profile_name == "zerg-z4" else "race_p4"
+    runtime_symbol = RUNTIME_SYMBOLS[profile_name]
     state["race_runtime"] = decode_runtime(
         rsp.read(sym[runtime_symbol], runtime_layout[0]), runtime_layout, model_layout, profile_name)
     owners = state["units"]["by_owner"]
@@ -359,7 +481,7 @@ def mission_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict
 
 
 def read_compact_units(rsp, address: int, capacity: int, stride: int,
-                       offsets: dict[str, int]) -> dict:
+                       offsets: dict[str, int], *, complete: bool = False) -> dict:
     """Read Unit banks with their real mixed-width DWARF field representation."""
     data = rsp.read(address, capacity * stride)
     widths = {"hp": (4, "i"), "maxhp": (4, "i"), "carry": (4, "i"),
@@ -398,12 +520,44 @@ def read_compact_units(rsp, address: int, capacity: int, stride: int,
         for optional in ("shield", "raw_type", "raw_owner", "tx", "ty", "build",
                          "target", "path_x", "path_y", "cd", "work_timer", "weapon",
                          "path_timer", "path_retry", "flags", "shield_remainder",
-                         "selected", "order", "armor"):
+                         "selected", "order", "armor") + (("carry", "maxhp") if complete else ()):
             if optional in offsets:
                 item[optional] = field(optional)
         entities.append(item)
     return {"alive": len(entities), "by_owner": by_owner,
             "by_owner_type": by_owner_type, "entities": entities}
+
+
+def read_compact_buildings(rsp, address: int, capacity: int, stride: int,
+                           offsets: dict[str, int]) -> dict:
+    """Decode the fifth-entry 48-byte Building layout without int-word reads."""
+    widths = {"hp": (4, "i"), "maxhp": (4, "i"), "shield": (4, "i"),
+              "build_progress": (4, "i"), "x": (2, "h"), "y": (2, "h"),
+              "raw_type": (2, "h"), "raw_owner": (2, "h"),
+              "queue_progress": (2, "H"), "flags": (2, "H"),
+              "larva_timer": (2, "H"), "shield_remainder": (2, "H"),
+              **{name: (1, "B") for name in ("owner", "type", "alive", "queue_head",
+                  "queue_count", "under_construction", "level", "larva")},
+              "queue": (5, "5B")}
+    for name, (width, _) in widths.items():
+        offset = offsets.get(name, -1)
+        if offset < 0 or offset + width > stride:
+            raise RuntimeError(f"compact Building DWARF field {name} exceeds or is absent from stride")
+    data = rsp.read(address, capacity * stride)
+    owners, types, entities = {}, {}, []
+    for slot in range(capacity):
+        row = data[slot * stride:(slot + 1) * stride]
+        item = {name: (list(struct.unpack_from("<" + fmt, row, offsets[name])) if name == "queue"
+                       else struct.unpack_from("<" + fmt, row, offsets[name])[0])
+                for name, (_, fmt) in widths.items()}
+        if not item["alive"]:
+            continue
+        owner, kind = str(item["owner"]), str(item["type"])
+        owners[owner] = owners.get(owner, 0) + 1
+        owner_types = types.setdefault(owner, {})
+        owner_types[kind] = owner_types.get(kind, 0) + 1
+        entities.append({"slot": slot, **item})
+    return {"alive": len(entities), "by_owner": owners, "by_owner_type": types, "entities": entities}
 
 
 def count_chrysalis(units: dict, buildings: dict) -> int:
@@ -420,21 +574,26 @@ def compact_bank_profile(elf: Path, sizes: dict[str, int], profile_name: str) ->
     if profile_name not in MISSION_BY_PROFILE:
         raise ValueError("unknown compact campaign profile")
     unit_stride, unit_offsets = races.dwarf_struct(elf, "Unit")
-    building_stride, building_offsets = races.dwarf_struct(elf, "Building")
+    building_stride, building_offsets = races.dwarf_struct(elf,
+        "Sc64ZpCompactBuilding" if profile_name in PERSISTENT_TYPES else "Building")
     capacity = 192 if profile_name == "zerg-z4" else 240
-    if (unit_stride != 56 or building_stride != 100 or
+    building_capacity = 160 if profile_name in PERSISTENT_TYPES else 96
+    expected_stride = 48 if profile_name in PERSISTENT_TYPES else 100
+    if (unit_stride != 56 or building_stride != expected_stride or
             sizes.get("u") != capacity * unit_stride or
-            sizes.get("b") != 96 * building_stride):
+            sizes.get("b") != building_capacity * building_stride):
         raise RuntimeError("staged compact entity banks differ from the bounded profile")
     for field in ("owner", "type", "alive", "x", "y", "hp", "raw_type"):
         if field not in unit_offsets:
             raise RuntimeError(f"compact Unit DWARF lacks {field}")
     for field in ("owner", "type", "alive", "x", "y", "hp", "raw_type", "under_construction"):
         offset = building_offsets.get(field)
-        if offset is None or offset % 4 or not 0 <= offset <= building_stride - 4:
+        width = (4 if field == "hp" else 2 if field in ("x", "y", "raw_type") else 1) \
+            if profile_name in PERSISTENT_TYPES else 4
+        if offset is None or (profile_name not in PERSISTENT_TYPES and offset % 4) or not 0 <= offset <= building_stride - width:
             raise RuntimeError(f"Building DWARF lacks a bounded int field {field}")
     return {"unit_bank_bytes": sizes["u"], "building_bank_bytes": sizes["b"],
-            "unit_capacity": capacity, "building_capacity": 96,
+            "unit_capacity": capacity, "building_capacity": building_capacity,
             "unit_stride_bytes": unit_stride, "building_stride_bytes": building_stride,
             "unit_offsets": unit_offsets, "building_offsets": building_offsets}
 
@@ -465,13 +624,13 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
         raise RuntimeError(f"matching ROM/ELF catalog does not enable global mission {mission}")
     bank = compact_bank_profile(elf_path, sizes, profile_name)
     campaign_layout = races.dwarf_struct(elf_path, "Sc64RaceCampaignState")
-    runtime_layout = races.dwarf_struct(elf_path, RUNTIME_TYPES[profile_name])
+    runtime_layout = runtime_layout_for(elf_path, profile_name)
     model_layout = races.dwarf_struct(elf_path, MODEL_TYPES[profile_name])
     required = ("game_update", "demo_schedule_events", "demo_schedule_count", "demo_schedule_length",
                 "demo_schedule_tick", "demo_replay_checkpoint", "screen", "frame", "won", "lost",
                 "race_mode", "race_selected_mission", "race_completed", "race_campaign",
                 "race_minerals", "race_gas", "race_front", "u", "b")
-    required += ("race_z4" if profile_name == "zerg-z4" else "race_p4",)
+    required += (RUNTIME_SYMBOLS[profile_name],)
     if mode == "windowed":
         required += ("demo_schedule_active", "demo_schedule_index")
     missing = [name for name in required if name not in sym]

@@ -340,6 +340,9 @@ static unsigned race_p5_saved_remaining_creations(const Sc64P5PersistentState *p
     const Sc64P5SourceTrigger *tr = &sc64_p5_source_triggers[trigger];
     unsigned remaining = 0;
     int started = sc64_p5_trigger_mask_test(p5->runtime.model.started, (u8)trigger);
+    /* The source record's started bit remains set after completion, while its
+     * cursor returns to zero. Do not reserve already-created actors then. */
+    if (started && !p5->runtime.model.action_cursor[trigger]) return 0;
     for (unsigned i = 0; i < tr->action_count; ++i) {
         const Sc64P5SourceAction *a = &sc64_p5_source_actions[tr->first_action + i];
         if (a->opcode == SC64_P5_ACTION_CREATE_UNIT &&
