@@ -2755,9 +2755,12 @@ campaign entry/cast/pause/save fixture passes with the option off and on.
 Private ARM builds with the previous six query flags, seven including grouped
 rescue, and all eight including the local Storm post-check pass the unchanged
 reserve guards at IWRAM `0x030045d8` / BSS `0x0203d774`. The actual-game spell
-fixture also passes with all eight flags together. These remain unqualified
-performance experiments, disabled by default; no new FPS or campaign
-completion claim is made. Private builds and manifests are under
+fixture also passes with all eight flags together. A new 1,000-live-frame
+startup comparison measures 8.37 effective fps with the previous six flags,
+9.50 with grouped rescue, and 9.51 with all eight. Both candidates match the
+handoff and all eleven observed states and captures exactly. This is startup
+evidence only; the options remain disabled by default with no full-mission
+performance or completion qualification. Private builds and manifests are under
 `.local/build/promotion/p6-rescue-postcheck/`.
 
 The final 512-file source index passes a clean original-art build and the
