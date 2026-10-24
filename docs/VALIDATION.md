@@ -3251,9 +3251,12 @@ completes all 271,799 held-input ticks and wins at frame 268694, with source
 fault zero and completion bit 17. The full route averages **19.01 effective
 fps** over live PLAY intervals. The opening prefix also restores exactly in
 a fresh HOME process and advances to frame 1028 after its neutral handoff and
-60 live updates. The late-save/fresh-process check is still running, so these
-options remain off by default. This does not qualify 30 fps or physical GBA
-performance, and is separate from the 10.97-fps opening measurement above.
+60 live updates. The late save also restores exactly in a fresh HOME process,
+then advances through one neutral handoff and 60 live updates to frame 148329.
+The three options now form the Z6 query defaults; Z7 inherits the same flags.
+Reference builds remain available through `Z6_QUERY_FLAGS=`. This does not
+qualify 30 fps or physical GBA performance, and is separate from the
+10.97-fps opening measurement above.
 
 The 534-file source-only export passes `./dev build` and `./dev test`,
 including 360 Python tests (six private-input checks skipped). The original-art
@@ -3388,3 +3391,33 @@ The combined 541-file source-only snapshot passes `./dev build` and
 original-art ROM remains byte-identical (`4ad80ce0…f9aee`), and the existing
 unified ARM build and host sanitizer checks pass. Imported assets and private
 qualification artifacts remain outside the source index.
+
+### Default-off collision-class cache
+
+`SC64_COLLISION_CLASS_CACHE` caches only immutable radius, flying and
+collidable facts in one transient byte per unit. Legacy bucket phases clear
+the cache; spawning invalidates a reused slot. Alive, loaded and burrowed
+state remain live checks. Invalid/unrepresentable packed values use the
+uncached resolver. The option rejects late-Terran persistent bucket storage
+and adds no save fields.
+
+ASan/UBSan full-scan oracle fixtures pass for the reference, hoisted,
+cache-only and combined variants, including 1,500 randomized worlds per
+variant, actor classes, invalid types, invalidation, slot reuse and encoding
+boundaries. The complete winning Z6 host route also preserves the recorded
+2,174,392-byte actor/mission fingerprint stream (`163cb1cd…20866`).
+
+With the three qualified query options enabled, the frozen cache candidate
+(ROM `f1bc31a2…bfade`, ELF `55e6399d…19a0b`) retains IWRAM end
+`0x03004fb8` and BSS end `0x0203da70`, within the unchanged reserves. Its
+12,000-input ARM opening improves from **10.97 to 11.29 fps (2.92%)**;
+all 13 reported states and four decoded captures match the no-cache build.
+This is prefix evidence, not a full ARM mission/save or hardware
+qualification. The cache remains disabled by default.
+
+The current default Z6 ARM ROM is byte-identical to the fully qualified
+`00019997…2e103` image. Runtime, save, startup/skirmish, framebuffer coverage,
+count-query and all four collision variants pass under host sanitizers.
+The 541-file source-only snapshot also passes `./dev build` and `./dev test`
+(379 Python tests, six private-input skips), retaining the original-art ROM
+hash `4ad80ce0…f9aee`.

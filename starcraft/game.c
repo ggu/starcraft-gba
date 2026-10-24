@@ -1370,6 +1370,9 @@ spawn_unit(int owner, int type, int x, int y)
     u[i].y = y;
     u[i].owner = owner;
     u[i].type = type;
+#ifdef SC64_COLLISION_CLASS_CACHE
+    sc64_unit_collision_class_invalidate(i);
+#endif
     u[i].maxhp = type == U_RAYNOR ? 200 : type == U_SCV ? 60 : type == U_MARINE ? 40 :
 	type == U_FIREBAT ? 50 : type == U_MEDIC ? 60 :
 	type == U_ZERGLING ? 35 : 80;

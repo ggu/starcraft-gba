@@ -1377,18 +1377,18 @@ windows exceed the standard queue's 1,000-tick capacity; see the dense replay
 section. This target is a deterministic regression route, with exact source
 hero/extraction/completion assertions at victory.
 
-The default-off expanded Z/P collision lookup experiment has a dedicated
+The expanded Z/P collision lookup has a dedicated
 sanitizer differential target after Z6 inputs are prepared:
 
 ```sh
 make test-sc64-z6-collision-facts
 ```
 
-`SC64_COLLISION_FACT_HOIST` changes only repeated collision fact lookups;
-leave it disabled for normal builds until the recorded ARM comparison and
-qualification are complete.
+`SC64_COLLISION_FACT_HOIST` changes only repeated collision fact lookups.
+The target explicitly builds its reference and hoisted variants independently
+of the profile's enabled query defaults.
 
-The separate `SC64_ZP_FACT_RANGE_CULL` experiment rejects ordinary roster
+`SC64_ZP_FACT_RANGE_CULL` rejects ordinary roster
 types before checking optional campaign actor facts. Its differential test
 needs no imported assets and compares complete resolver/wrapper answers
 across 16 actor-gate combinations, including P7 and the late Terran enum prefix:
@@ -1400,10 +1400,24 @@ make -B zerg-z6-probe Z6_QUERY_FLAGS='-DSC64_Z6_COUNT_SNAPSHOT -DSC64_COLLISION_
 
 The combined build reproduces the complete winning Z6 host route and the
 12,000-input-tick ARM prefix. The range cull improves that prefix from 10.47
-to 10.97 fps. The full ARM route now wins at 19.01 average effective fps;
-the opening save restores exactly in a fresh process. The options remain
-disabled by default while the late-save check runs.
-Rebuild without the extra flags to restore the normal Z6 output.
+to 10.97 fps. The full ARM route wins at 19.01 average effective fps, with
+both opening and late saves restoring exactly in fresh processes. The three
+options now form the Z6 defaults; the staged Z7 profile inherits them.
+`Z6_QUERY_FLAGS=` builds the reference path, and `Z6_EXTRA_FLAGS` appends
+diagnostic or experimental options without replacing those defaults.
+
+The separate collision-class cache remains disabled by default:
+
+```sh
+make test-sc64-z6-collision-classes
+make -B zerg-z6-probe Z6_EXTRA_FLAGS=-DSC64_COLLISION_CLASS_CACHE
+```
+
+It uses one transient byte per unit to retain type-derived collision facts
+within a bucket phase. Its 12,000-input opening improves from 10.97 to
+11.29 fps, with matching reported states and captures. A full ARM route and
+save qualification are still required for that candidate. It uses the legacy
+per-frame bucket lifecycle and rejects late-Terran persistent storage.
 
 P6's eight query options are enabled by default after the full ARM win and
 fresh-process save checks. `P6_QUERY_FLAGS=` explicitly builds the reference

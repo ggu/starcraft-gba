@@ -47,12 +47,16 @@ P5_SHUTTLE_FLAGS := $(P5_FLAGS) -DSC64_P5_SHUTTLE_ENABLED -DSC64_ZP_DEFENSE_TARG
 P6_VALIDATED_QUERY_FLAGS := -DSC64_P6_PRUNE_STARTED -DSC64_P6_PREVALIDATED_TICK -DSC64_P6_TRAP_CULL -DSC64_P6_COUNT_SNAPSHOT -DSC64_P6_BURROW_CULL -DSC64_P6_BURROW_GROUPED -DSC64_P6_RESCUE_GROUPED -DSC64_P6_STORM_POSTCHECK_LOCAL
 P6_QUERY_FLAGS ?= $(P6_VALIDATED_QUERY_FLAGS)
 P6_EXTRA_FLAGS ?=
-Z6_QUERY_FLAGS ?=
+Z6_VALIDATED_QUERY_FLAGS := -DSC64_Z6_COUNT_SNAPSHOT -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL
+Z6_QUERY_FLAGS ?= $(Z6_VALIDATED_QUERY_FLAGS)
+Z6_EXTRA_FLAGS ?=
 P6_PROBE_FLAGS := $(P6_QUERY_FLAGS) $(P6_EXTRA_FLAGS) -I.local/sc64/p6/generated $(P5_SHUTTLE_FLAGS) -DSC64_P6_DATA_ENABLED -DSC64_P6_RUNTIME -DSC64_P6_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS -DSC64_P6_COMBAT_ENABLED -DSC64_P6_CAMPAIGN_ENTRY -DSC64_P6_STORM_ENABLED
 # Differential fixtures select each query option explicitly, including off builds.
 P6_QUERY_TEST_BASE_FLAGS = $(filter-out $(P6_VALIDATED_QUERY_FLAGS),$(P6_PROBE_FLAGS))
 P6_PROBE_INPUTS := $(P5_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_p6_abilities_generated.h .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p6/generated/sc64_p6_doodads_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h
-Z6_PROBE_FLAGS := $(Z6_QUERY_FLAGS) -I.local/sc64/z6/generated $(Z5_CONSUME_FLAGS) -DSC64_Z6_DATA_ENABLED -DSC64_Z6_RUNTIME -DSC64_Z6_ACTORS -DSC64_Z6_CAMPAIGN_ENTRY -DSC64_Z6_CLOAK_ENABLED -DSC64_Z6_STORM_ENABLED -DSC64_Z6_TRANSPORT_ENABLED
+Z6_PROBE_FLAGS := $(Z6_QUERY_FLAGS) $(Z6_EXTRA_FLAGS) -I.local/sc64/z6/generated $(Z5_CONSUME_FLAGS) -DSC64_Z6_DATA_ENABLED -DSC64_Z6_RUNTIME -DSC64_Z6_ACTORS -DSC64_Z6_CAMPAIGN_ENTRY -DSC64_Z6_CLOAK_ENABLED -DSC64_Z6_STORM_ENABLED -DSC64_Z6_TRANSPORT_ENABLED
+# Keep explicit collision variants independent of enabled query defaults.
+Z6_QUERY_TEST_BASE_FLAGS = $(filter-out $(Z6_VALIDATED_QUERY_FLAGS) -DSC64_COLLISION_CLASS_CACHE,$(Z6_PROBE_FLAGS))
 Z6_PROBE_INPUTS := $(Z5_CLOAK_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_abilities_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h
 Z7_PROBE_FLAGS := $(Z6_PROBE_FLAGS) -DSC64_Z7_DATA_ENABLED -DSC64_Z7_RUNTIME -DSC64_Z7_CAMPAIGN_ENTRY -DSC64_Z7_COLONY_DEFENSE_ENABLED
 Z7_PROBE_INPUTS := $(Z6_PROBE_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z7_scenario_generated.h
@@ -1918,13 +1922,22 @@ test-sc64-z6-count-queries: build/test-sc64-z6-count-snapshot build/test-sc64-z6
 	./build/test-sc64-z6-runtime-snapshot
 
 build/test-sc64-z6-collision-facts-baseline: tests/sc64_collision_fact_hoist.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_QUERY_TEST_BASE_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z6-collision-facts-hoist: tests/sc64_collision_fact_hoist.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) -DSC64_COLLISION_FACT_HOIST $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_QUERY_TEST_BASE_FLAGS) -DSC64_COLLISION_FACT_HOIST $< common/gba.c -o $@
 .PHONY: test-sc64-z6-collision-facts
 test-sc64-z6-collision-facts: build/test-sc64-z6-collision-facts-baseline build/test-sc64-z6-collision-facts-hoist
 	./build/test-sc64-z6-collision-facts-baseline
 	./build/test-sc64-z6-collision-facts-hoist
+
+build/test-sc64-z6-collision-classes: tests/sc64_collision_fact_hoist.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_QUERY_TEST_BASE_FLAGS) -DSC64_COLLISION_CLASS_CACHE $< common/gba.c -o $@
+build/test-sc64-z6-collision-classes-hoist: tests/sc64_collision_fact_hoist.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_QUERY_TEST_BASE_FLAGS) -DSC64_COLLISION_FACT_HOIST -DSC64_COLLISION_CLASS_CACHE $< common/gba.c -o $@
+.PHONY: test-sc64-z6-collision-classes
+test-sc64-z6-collision-classes: test-sc64-z6-collision-facts build/test-sc64-z6-collision-classes build/test-sc64-z6-collision-classes-hoist
+	./build/test-sc64-z6-collision-classes
+	./build/test-sc64-z6-collision-classes-hoist
 
 .PHONY: test-sc64-zp-fact-range
 test-sc64-zp-fact-range:

@@ -102,6 +102,15 @@ static const int actor_types[] = {
     U_ZP_HIGH_TEMPLAR, U_ZP_ULTRALISK, U_Z5_GHOST, U_Z5_CIVILIAN,
     U_Z5_RHYNADON, U_Z5_BENGALAAS, U_Z5_RAGNASAUR, U_Z5_DATA_DISK,
     U_Z6_GUARDIAN, -1, SC_RU_COUNT, 255
+#ifdef SC64_P5_ACTORS
+    , U_P5_SHUTTLE, U_P5_BATTLECRUISER
+#endif
+#ifdef SC64_P6_ACTORS
+    , U_P6_INFESTED_TERRAN, U_P6_HERO_DARK_TEMPLAR, U_P6_ZERATUL
+#endif
+#ifdef SC64_P7_ACTORS
+    , U_P7_ARCHON, U_P7_ARBITER, U_P7_CARRIER, U_P7_OBSERVER
+#endif
 };
 
 static void compare_case(unsigned seed)
@@ -185,9 +194,67 @@ static void test_actor_filter_and_edges(void)
     sc64_unit_buckets_end();
 }
 
+#ifdef SC64_COLLISION_CLASS_CACHE
+static void test_collision_class_cache_and_invalidation(void)
+{
+    int r, f, c;
+    assert(sizeof(sc64_unit_collision_class_cache) == MAX_UNITS);
+
+    memset(u, 0, sizeof(u));
+    u[0].alive = 1; u[0].type = U_MARINE; u[0].x = 80; u[0].y = 80;
+    u[1].alive = 1; u[1].type = U_ZP_ULTRALISK; u[1].x = 96; u[1].y = 80;
+    sc64_unit_bucket_initialized = 0;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_step_clear(&u[0], 87, 80) ==
+           old_full_scan_clear(&u[0], 87, 80));
+    assert(sc64_unit_collision_class_cache[0] != 0);
+    assert(sc64_unit_collision_class_cache[1] != 0);
+
+    /* An in-phase type mutation must invalidate the slot before another
+     * collision query.  Radius/flying/collidable are all allowed to change. */
+    u[1].type = U_SCOUT;
+    sc64_unit_collision_class_invalidate(1);
+    assert(sc64_unit_collision_class_cache[1] == 0);
+    assert(sc64_unit_bucket_step_clear(&u[0], 87, 80) ==
+           old_full_scan_clear(&u[0], 87, 80));
+    assert(sc64_unit_collision_class_cache[1] != 0);
+
+    /* Reusing a dead slot between phases starts with a fresh class cache. */
+    sc64_unit_buckets_end();
+    u[1].alive = 0;
+    u[1].type = U_ZP_MAP_REVEALER;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_collision_class_cache[1] == 0);
+    u[1].alive = 1;
+    u[1].type = U_ZP_ULTRALISK;
+    sc64_unit_bucket_insert(1, sc64_unit_bucket_cell_at(u[1].x, u[1].y));
+    assert(sc64_unit_bucket_step_clear(&u[0], 87, 80) ==
+           old_full_scan_clear(&u[0], 87, 80));
+    sc64_unit_buckets_end();
+
+    /* Unknown and sentinel-like enum values keep the engine's fallback
+     * radius=6, ground, flags=0 (therefore collidable) behavior. */
+    assert(sc64_unit_collision_class_values(-1, &r, &f, &c));
+    assert(r == 6 && f == 0 && c == 1);
+    assert(sc64_unit_collision_class_values(SC_RU_COUNT, &r, &f, &c));
+    assert(r == 6 && f == 0 && c == 1);
+    assert(sc64_unit_collision_class_values(255, &r, &f, &c));
+    assert(r == 6 && f == 0 && c == 1);
+    assert(sc64_unit_collision_class_pack(63, 1, 1) == 255);
+    assert(sc64_unit_collision_class_pack(64, 1, 1) == 0);
+    assert(sc64_unit_collision_class_pack(-1, 1, 1) == 0);
+    assert(sc64_unit_collision_class_pack(0, 0, 0) == 0);
+    assert(sc64_unit_collision_class(-1, -1, &r, &f, &c) == 25);
+    assert(r == 6 && f == 0 && c == 1);
+}
+#endif
+
 int main(void)
 {
     test_actor_filter_and_edges();
+#ifdef SC64_COLLISION_CLASS_CACHE
+    test_collision_class_cache_and_invalidation();
+#endif
     for (unsigned i = 0; i < 1500; ++i) compare_case(i);
     printf("Z/P collision fact-hoist differential tests passed: %08x\n", result_hash);
     return 0;

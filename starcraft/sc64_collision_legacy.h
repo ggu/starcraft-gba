@@ -14,6 +14,63 @@ static u16 sc64_unit_bucket_dirty_count;
 static int sc64_unit_bucket_initialized;
 static int sc64_unit_bucket_active;
 
+#if defined(SC64_COLLISION_CLASS_CACHE)
+#if !defined(SC64_ZP_CAMPAIGN_ACTORS) || !defined(SC64_RACES)
+#error "SC64_COLLISION_CLASS_CACHE requires Z/P campaign actor facts"
+#endif
+/* Per bucket phase, cache only immutable type-derived collision facts.  The
+ * six radius bits and two flags occupy one byte; zero is the uncached
+ * sentinel (the only unrepresentable fact tuple is radius=0/flying=0/
+ * collidable=0, which is safely recomputed). */
+static u8 sc64_unit_collision_class_cache[MAX_UNITS];
+
+static void
+sc64_unit_collision_class_invalidate(int slot)
+{
+    if (slot >= 0 && slot < MAX_UNITS)
+        sc64_unit_collision_class_cache[slot] = 0;
+}
+
+static int GBA_HOT
+sc64_unit_collision_class_values(int type, int *radius, int *flying,
+                                 int *collidable)
+{
+    unsigned flags;
+    *radius = sc64_game_unit_collision_radius(type);
+    *flying = sc64_race_unit_flying(type);
+    flags = sc64_game_unit_actor_flags(type);
+    *collidable = !flags || (flags & SC64_GAME_ACTOR_COLLIDABLE);
+    return *radius >= 0 && *radius < 64;
+}
+
+static u8 GBA_HOT
+sc64_unit_collision_class_pack(int radius, int flying, int collidable)
+{
+    if (radius < 0 || radius >= 64) return 0;
+    return (u8)((radius << 2) | (!!flying << 1) | !!collidable);
+}
+
+static u8 GBA_HOT
+sc64_unit_collision_class(int slot, int type, int *radius, int *flying,
+                          int *collidable)
+{
+    u8 packed = slot >= 0 && slot < MAX_UNITS
+        ? sc64_unit_collision_class_cache[slot] : 0;
+    if (packed) {
+        *radius = packed >> 2;
+        *flying = (packed >> 1) & 1;
+        *collidable = packed & 1;
+        return packed;
+    }
+    if (!sc64_unit_collision_class_values(type, radius, flying, collidable))
+        return 0;
+    packed = sc64_unit_collision_class_pack(*radius, *flying, *collidable);
+    if (packed && slot >= 0 && slot < MAX_UNITS)
+        sc64_unit_collision_class_cache[slot] = packed;
+    return packed;
+}
+#endif
+
 static int GBA_HOT
 sc64_unit_bucket_cell_at(int x, int y)
 {
@@ -57,6 +114,10 @@ sc64_unit_buckets_begin(void)
     }
     sc64_unit_bucket_dirty_count = 0;
     sc64_unit_bucket_active = 0;
+#ifdef SC64_COLLISION_CLASS_CACHE
+    memset(sc64_unit_collision_class_cache, 0,
+           sizeof(sc64_unit_collision_class_cache));
+#endif
     for (i = 0; i < MAX_UNITS; ++i) {
         sc64_unit_bucket_next[i] = 0xff;
         sc64_unit_bucket_prev[i] = 0xff;
@@ -93,7 +154,11 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
 {
 #ifdef SC64_RACES
     if(IS_WORKER(q->type)&&(q->order==ORDER_MINE||q->order==ORDER_GAS))return 1;
-#if defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_ZP_CAMPAIGN_ACTORS)
+#if defined(SC64_COLLISION_CLASS_CACHE)
+    int mover_radius, mover_flying, mover_collidable;
+    (void)sc64_unit_collision_class((int)(q - u), q->type,
+        &mover_radius, &mover_flying, &mover_collidable);
+#elif defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_ZP_CAMPAIGN_ACTORS)
     /* These mover facts are immutable during this read-only collision query.
      * Resolve them once instead of repeating ROM fact lookups per candidate. */
     int mover_radius = sc64_game_unit_collision_radius(q->type);
@@ -127,7 +192,13 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
                     if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
-#if defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_RACES)
+#if defined(SC64_COLLISION_CLASS_CACHE)
+                    int candidate_radius, candidate_flying, candidate_collidable;
+                    (void)sc64_unit_collision_class(i, u[i].type,
+                        &candidate_radius, &candidate_flying,
+                        &candidate_collidable);
+                    int radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
+#elif defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_RACES)
                     int candidate_radius = sc64_game_unit_collision_radius(u[i].type);
                     int radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
 #else
@@ -139,13 +210,17 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
                     int radius = 6;
 #endif
 #ifdef SC64_RACES
-#if defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_ZP_CAMPAIGN_ACTORS)
+#if defined(SC64_COLLISION_CLASS_CACHE)
+                    if(u[i].type==U_CHRYSALIS||candidate_flying!=mover_flying)continue;
+#elif defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_ZP_CAMPAIGN_ACTORS)
                     if(u[i].type==U_CHRYSALIS||sc64_race_unit_flying(u[i].type)!=mover_flying)continue;
 #else
                     if(u[i].type==U_CHRYSALIS||sc64_race_unit_flying(u[i].type)!=sc64_race_unit_flying(q->type))continue;
 #endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
-#if defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_ZP_CAMPAIGN_ACTORS)
+#if defined(SC64_COLLISION_CLASS_CACHE)
+                    if (!candidate_collidable || !mover_collidable) continue;
+#elif defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_ZP_CAMPAIGN_ACTORS)
                     unsigned candidate_flags = sc64_game_unit_actor_flags(u[i].type);
                     if ((candidate_flags &&
                          !(candidate_flags & SC64_GAME_ACTOR_COLLIDABLE)) ||
