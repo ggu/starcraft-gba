@@ -70,6 +70,35 @@ static void test_enemy_splash_primary_ally_exception(void)
     assert(u[archon].hp==350);
 }
 
+static void test_enemy_splash_uses_source_owner_when_collapsed(void)
+{
+    clear_combat_fixture();
+    /* Source owners 0 and 4 are both represented by runtime ENEMY in this
+     * fixture. Enemy_Splash must exclude only same-source-owner collateral. */
+    int archon=add_raw_unit(ENEMY,68,100,100,350);
+    int primary=add_raw_unit(SIDE,64,130,100,100);
+    int same_source_owner=add_raw_unit(ENEMY,64,132,100,100);
+    int distinct_source_owner=add_raw_unit(ENEMY,64,134,100,100);
+    int building=spawn_build(ENEMY,B_NEXUS,136,100,0);
+    assert(building>=0);
+    u[archon].raw_owner=0;
+    u[primary].raw_owner=7;
+    u[same_source_owner].raw_owner=0;
+    u[distinct_source_owner].raw_owner=4;
+    b[building].raw_type=154;
+    b[building].raw_owner=4;
+    b[building].hp=b[building].maxhp=100;
+    b[building].shield=0;
+    race_mode=0;
+
+    assert(SC64_CAN_ATTACK_FROM(U_P7_ARCHON,primary,u[archon].owner));
+    tick_combat(&u[archon],primary);
+    assert(u[primary].hp==70); /* Base 30 damage; ENEMY has no SIDE upgrade. */
+    assert(u[same_source_owner].hp==100); /* Same source owner is excluded. */
+    assert(u[distinct_source_owner].hp==70); /* Distinct source owner is hit. */
+    assert(b[building].hp==71); /* Same-owner rule applies; Nexus armor is 1. */
+}
+
 static void test_fractional_shield_overflow_engine_quantization(void)
 {
     clear_combat_fixture();
@@ -159,6 +188,7 @@ int main(void)
 {
     test_actual_splash_targeting_and_damage();
     test_enemy_splash_primary_ally_exception();
+    test_enemy_splash_uses_source_owner_when_collapsed();
     test_fractional_shield_overflow_engine_quantization();
     test_diagonal_integer_distance_boundary();
     test_source_bounds_range_and_approach();

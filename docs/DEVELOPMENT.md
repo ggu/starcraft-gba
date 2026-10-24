@@ -1540,6 +1540,11 @@ adapted to the engine's integer HP/shields. Impact is immediate at the target
 center; projectile/windup and native burrow handling remain unfinished. This
 does not enable P7 in a campaign build or qualify its missing abilities.
 
+Splash compares known source-player identities even when two P7 source
+players share one runtime opponent slot. Actors with unknown source owners
+fall back to runtime ownership; future P7 production integration must assign
+that source provenance to newly created units and buildings.
+
 `SC64_ROUTE_VISIT_GRID` is an independent, default-off packed-route
 experiment. It requires `SC64_RACES` and `SC64_ROUTE_PACK3` and borrows the
 walkability grid to mark cells during a reverse flood. The existing BFS queue

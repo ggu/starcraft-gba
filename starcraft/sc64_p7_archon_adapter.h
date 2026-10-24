@@ -99,6 +99,19 @@ race_p7_archon_damage_one(int target,unsigned packet_q8,int source_owner)
     return 1;
 }
 
+/* P7 source players 0 and 4 can both map to one live ENEMY slot. Enemy_Splash
+ * owner exclusion is about source-player identity when provenance is known;
+ * for entities without source provenance, retain the runtime-owner fallback. */
+static int
+race_p7_archon_same_owner(int source_owner,int source_raw_owner,
+                           int target_owner,int target_raw_owner)
+{
+    if (source_raw_owner>=0 && source_raw_owner<8 &&
+        target_raw_owner>=0 && target_raw_owner<8)
+        return source_raw_owner==target_raw_owner;
+    return source_owner==target_owner;
+}
+
 static int
 race_p7_archon_splash_attack(Unit *attacker,int primary)
 {
@@ -136,7 +149,9 @@ race_p7_archon_splash_attack(Unit *attacker,int primary)
         if (raw<0 || !race_p7_archon_distance_to_actor(raw,candidate->x,
                     candidate->y,0,impact_x,impact_y,&distance) ||
             distance>SC64_P7_ARCHON_OUTER_SOURCE_PX) continue;
-        if (candidate->owner==attacker->owner && idx!=primary) continue;
+        if (idx!=primary && race_p7_archon_same_owner(attacker->owner,
+                attacker->raw_owner,candidate->owner,candidate->raw_owner))
+            continue;
         if (!SC64_CAN_ATTACK_FROM(-1,idx,attacker->owner)) continue;
         if (!sc64_p7_archon_packet((unsigned)upgrade,distance,&packet) ||
             !packet.tier) continue;
@@ -155,7 +170,9 @@ race_p7_archon_splash_attack(Unit *attacker,int primary)
         if (raw<0 || !race_p7_archon_distance_to_actor(raw,candidate->x,
                     candidate->y,1,impact_x,impact_y,&distance) ||
             distance>SC64_P7_ARCHON_OUTER_SOURCE_PX) continue;
-        if (candidate->owner==attacker->owner && idx!=primary) continue;
+        if (idx!=primary && race_p7_archon_same_owner(attacker->owner,
+                attacker->raw_owner,candidate->owner,candidate->raw_owner))
+            continue;
         if (!SC64_CAN_ATTACK_FROM(-1,idx,attacker->owner)) continue;
         if (!sc64_p7_archon_packet((unsigned)upgrade,distance,&packet) ||
             !packet.tier) continue;

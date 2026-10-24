@@ -3363,7 +3363,8 @@ legacy-int queue rings. This is host/controller and observer validation;
 the complete larger-bank ARM replay now wins at frame 123916, preserving
 the source objective/model witnesses with zero unsupported actors. Its
 124,689-input run averages **12.35 effective fps**, below the performance
-target. Late-save continuity and canonical promotion remain pending.
+target. Opening and late-save continuity pass as described below;
+canonical promotion remains pending.
 The staged total remains T10/Z6/P6, and canonical profiles remain T10/Z3/P3.
 
 The frozen larger-bank candidate (ROM `d26ca305…f4d1`, ELF
@@ -3371,8 +3372,13 @@ The frozen larger-bank candidate (ROM `d26ca305…f4d1`, ELF
 load. The recorded persisted observations match exactly, with the intentional
 building-selection reset reported separately: saved selection 5 becomes -1.
 This is not labelled an exact whole snapshot. The handoff takes one neutral
-live frame and then 60 scheduled live frames. The full ARM win is complete;
-the 90,000-input late save and fresh-process restore are still running.
+live frame and then 60 scheduled live frames. The 90,000-input late prefix
+also saves at frame 89287 and restores the reported persisted observations
+exactly through fresh HOME+L. Its selected building resets from 61 to -1;
+after one neutral handoff and 60 updates it reaches frame 89348. Both UI
+resets are explicit, without claiming whole-RAM equality or a full
+post-load mission completion. The full win, opening restore and late restore
+now pass for this frozen expansion build.
 
 ### Gated P7 sprite preparation
 
@@ -3484,6 +3490,14 @@ counter is 25 GBA updates. Enemy Splash excludes the attacker and same-owner
 neighbors, retaining the explicit primary exception and distinct-owner allied
 collateral.
 
+Known source-owner IDs distinguish P7's players 0 and 4 even though both
+map to the live opponent slot. A sanitizer regression routes an enemy
+Archon through `tick_combat`, preserving same-source exclusion while hitting
+distinct-source unit and building collateral. Its 30-damage base packet
+also verifies that an enemy Archon does not receive the player's upgrade.
+Unknown source provenance falls back to live ownership; P7 production
+still needs to populate source owners before this distinction is complete.
+
 Pure and actual-engine sanitizer fixtures cover axis and diagonal boundaries,
 approach behavior, ground/building hits, upgrade damage, Normal damage,
 shield overflow, loaded targets and invincibility flags/arrays. The latter
@@ -3501,6 +3515,10 @@ feature does not promote P7 or clear its complete-mechanics requirement.
 The 547-file source-only snapshot passes the default build and test suite
 (379 Python tests, six private-input skips). Its original-art ROM remains
 `4ad80ce0…f9aee`, and unified ARM/host checks pass with the gate off.
+
+The source-owner follow-up also passes its focused engine fixture and the
+380-test source-only suite (six private-input skips), retaining these ARM
+reserves and the original-art ROM hash.
 
 ### Packed route visited-grid experiment
 
