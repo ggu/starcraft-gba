@@ -1,6 +1,7 @@
 import copy
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
@@ -34,6 +35,27 @@ class TraceTests(unittest.TestCase):
     class Memory:
         def __init__(self, data): self.data = data
         def read(self, address, size): return self.data[address:address + size]
+
+    def test_compact_bank_profile_validates_layout_and_profile_bounds(self):
+        unit = {"hp": 0, "x": 16, "y": 18, "raw_type": 32,
+                "owner": 50, "type": 51, "alive": 52}
+        building = {"x": 0, "y": 4, "hp": 8, "owner": 16, "type": 20,
+                    "alive": 24, "under_construction": 64, "raw_type": 76}
+        def layout(_elf, name):
+            return (56, unit) if name == "Unit" else (100, building)
+        with mock.patch.object(replay.races, "dwarf_struct", side_effect=layout):
+            for name, capacity in (("zerg-z4", 192), ("protoss-p4", 240)):
+                bank = replay.compact_bank_profile(Path("fixture.elf"),
+                    {"u": capacity * 56, "b": 9600}, name)
+                self.assertEqual(bank["unit_capacity"], capacity)
+                self.assertEqual(bank["building_capacity"], 96)
+            with self.assertRaisesRegex(RuntimeError, "bounded profile"):
+                replay.compact_bank_profile(Path("fixture.elf"),
+                    {"u": 128 * 56, "b": 9600}, "zerg-z4")
+            building["alive"] = 99
+            with self.assertRaisesRegex(RuntimeError, "bounded int field alive"):
+                replay.compact_bank_profile(Path("fixture.elf"),
+                    {"u": 192 * 56, "b": 9600}, "zerg-z4")
 
     def test_accepts_z4_and_p4_campaign_metadata(self):
         self.assertEqual(replay.validate_trace(trace_for(), 16, "zerg-z4")["stop_tick"], 2000)

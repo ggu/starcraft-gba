@@ -813,3 +813,19 @@ accessible through ordinary controls. The Lair upgrade uses the existing
 construction policy: its larva timer pauses during the upgrade and completion
 fills its larva count to three. Native equivalence of that timing has not been
 established.
+
+For later-chapter implementation, authenticate and generate the retained
+numeric scenario metadata separately. For example:
+
+```sh
+python3 tools/sc64_zp_scenario_pack.py --mission Z5 --verify-staged
+python3 tools/sc64_zp_scenario_pack.py --mission Z5
+```
+
+The tool accepts Z5–Z10 and P5–P10 and reads the staged source-map directory
+created by `sc64_races_pack.py`. Its default output is an ignored header under
+`.local/sc64/zp-stage/generated/scenarios/`. It preserves numeric trigger,
+location, player, property and availability records after authenticating the
+complete CHK and section hashes. Generation does not implement or enable a
+mission; actor support, runtime actions, save rules and controller
+qualification remain required.

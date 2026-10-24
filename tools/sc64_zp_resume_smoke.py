@@ -173,7 +173,7 @@ def run(report_path: Path, rom_path: Path, elf_path: Path, output: Path,
     metadata = split.read_campaign_metadata(rom, elf, replay.FACTION_BY_PROFILE[profile_name])
     if mission not in metadata["enabled_mission_ids"]:
         raise RuntimeError(f"matching campaign catalog does not enable mission {mission}")
-    bank = races.race_bank_profile(elf, sizes)
+    bank = replay.compact_bank_profile(elf, sizes, profile_name)
     campaign_layout = races.dwarf_struct(elf, "Sc64RaceCampaignState")
     runtime_layout = races.dwarf_struct(elf, replay.RUNTIME_TYPES[profile_name])
     model_layout = races.dwarf_struct(elf, replay.MODEL_TYPES[profile_name])

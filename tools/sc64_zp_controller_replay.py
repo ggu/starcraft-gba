@@ -376,6 +376,30 @@ def count_chrysalis(units: dict, buildings: dict) -> int:
     return unit_count + building_count
 
 
+def compact_bank_profile(elf: Path, sizes: dict[str, int], profile_name: str) -> dict:
+    """Validate the staged compact banks without using legacy int-only readers."""
+    if profile_name not in MISSION_BY_PROFILE:
+        raise ValueError("unknown compact campaign profile")
+    unit_stride, unit_offsets = races.dwarf_struct(elf, "Unit")
+    building_stride, building_offsets = races.dwarf_struct(elf, "Building")
+    capacity = 192 if profile_name == "zerg-z4" else 240
+    if (unit_stride != 56 or building_stride != 100 or
+            sizes.get("u") != capacity * unit_stride or
+            sizes.get("b") != 96 * building_stride):
+        raise RuntimeError("staged compact entity banks differ from the bounded profile")
+    for field in ("owner", "type", "alive", "x", "y", "hp", "raw_type"):
+        if field not in unit_offsets:
+            raise RuntimeError(f"compact Unit DWARF lacks {field}")
+    for field in ("owner", "type", "alive", "x", "y", "hp", "raw_type", "under_construction"):
+        offset = building_offsets.get(field)
+        if offset is None or offset % 4 or not 0 <= offset <= building_stride - 4:
+            raise RuntimeError(f"Building DWARF lacks a bounded int field {field}")
+    return {"unit_bank_bytes": sizes["u"], "building_bank_bytes": sizes["b"],
+            "unit_capacity": capacity, "building_capacity": 96,
+            "unit_stride_bytes": unit_stride, "building_stride_bytes": building_stride,
+            "unit_offsets": unit_offsets, "building_offsets": building_offsets}
+
+
 def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
         profile_name: str, ticks: int | None = None, save_at_end: bool = False,
         expected_rom_sha256: str | None = None, expected_elf_sha256: str | None = None,
@@ -400,7 +424,7 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
     mission = MISSION_BY_PROFILE[profile_name]
     if mission not in metadata["enabled_mission_ids"]:
         raise RuntimeError(f"matching ROM/ELF catalog does not enable global mission {mission}")
-    bank = races.race_bank_profile(elf_path, sizes)
+    bank = compact_bank_profile(elf_path, sizes, profile_name)
     campaign_layout = races.dwarf_struct(elf_path, "Sc64RaceCampaignState")
     runtime_layout = races.dwarf_struct(elf_path, RUNTIME_TYPES[profile_name])
     model_layout = races.dwarf_struct(elf_path, MODEL_TYPES[profile_name])
