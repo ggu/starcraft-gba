@@ -23,6 +23,9 @@ CONFIGS = {
     "zp_p6": ("SC64_ZP_CAMPAIGN_ACTORS", "SC64_P6_ACTORS"),
     "zp_p6_combat": ("SC64_ZP_CAMPAIGN_ACTORS", "SC64_P6_ACTORS",
                      "SC64_P6_COMBAT_ENABLED"),
+    "zp_p7": ("SC64_ZP_CAMPAIGN_ACTORS", "SC64_P7_ACTORS"),
+    "zp_p7_p6_prefix": ("SC64_ZP_CAMPAIGN_ACTORS", "SC64_P6_ACTORS",
+                        "SC64_P7_ACTORS"),
     "zp_all_combat": ("SC64_ZP_CAMPAIGN_ACTORS", "SC64_Z5_ACTORS",
                       "SC64_Z5_DOODADS", "SC64_Z6_ACTORS", "SC64_P5_ACTORS",
                       "SC64_P6_ACTORS", "SC64_P6_COMBAT_ENABLED"),
@@ -39,6 +42,12 @@ CONFIGS = {
                                 "SC64_Z5_DOODADS", "SC64_Z6_ACTORS",
                                 "SC64_P5_ACTORS", "SC64_P6_ACTORS",
                                 "SC64_P6_COMBAT_ENABLED"),
+    "late_terran_p7_prefix": ("SC64_T4_RUNTIME", "SC64_T5_RUNTIME",
+                               "SC64_T6_ENABLED", "SC64_TERRAN_LATE_ACTORS",
+                               "SC64_ZP_CAMPAIGN_ACTORS", "SC64_Z5_ACTORS",
+                               "SC64_Z5_DOODADS", "SC64_Z6_ACTORS", "SC64_P5_ACTORS",
+                               "SC64_P6_ACTORS", "SC64_P6_COMBAT_ENABLED",
+                               "SC64_P7_ACTORS"),
 }
 
 

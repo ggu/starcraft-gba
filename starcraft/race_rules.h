@@ -16,6 +16,9 @@
 #if defined(SC64_P6_ACTORS) && !defined(SC64_ZP_CAMPAIGN_ACTORS)
 #error "SC64_P6_ACTORS requires SC64_ZP_CAMPAIGN_ACTORS"
 #endif
+#if defined(SC64_P7_ACTORS) && !defined(SC64_ZP_CAMPAIGN_ACTORS)
+#error "SC64_P7_ACTORS requires SC64_ZP_CAMPAIGN_ACTORS"
+#endif
 
 #ifdef SC64_T6_ENABLED
 #include "sc64_t6_actor_rules.h"
@@ -71,6 +74,10 @@ enum {
     /* P6 scenario identities are appended; special combat remains unsupported. */
     U_P6_INFESTED_TERRAN, U_P6_HERO_DARK_TEMPLAR, U_P6_ZERATUL,
 #endif
+#ifdef SC64_P7_ACTORS
+    /* P7-scoped Protoss identities stay separate from Terran-late aliases. */
+    U_P7_ARCHON, U_P7_ARBITER, U_P7_CARRIER, U_P7_OBSERVER,
+#endif
     SC_RU_COUNT
 };
 enum {
@@ -119,6 +126,12 @@ enum {
 #ifdef SC64_P6_ACTORS
     /* Raw 210 is native UnitType, but imported as a bounded GBA prop. */
     B_P6_WALL_MISSILE_TRAP,
+#endif
+#ifdef SC64_P7_ACTORS
+    /* P7 structures get separate identities from optional late-Terran rows. */
+    B_P7_OBSERVATORY, B_P7_CITADEL_ADUN, B_P7_TEMPLAR_ARCHIVES,
+    B_P7_FLEET_BEACON, B_P7_ARBITER_TRIBUNAL,
+    B_P7_ROBOTICS_SUPPORT_BAY, B_P7_SHIELD_BATTERY,
 #endif
 #if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
     /* Z6 starting structures; keep earlier actor/profile enum values intact. */
@@ -279,6 +292,14 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     , [U_P6_HERO_DARK_TEMPLAR] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 2, 150, 150, 750, 40, 80, 0 }
     , [U_P6_ZERATUL] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 0, 100, 300, 1500, 60, 400, 0 }
 #endif
+#ifdef SC64_P7_ACTORS
+    /* P7 raw actors are scenario rows, never ordinary products. Keep source
+       costs/vitals while the impossible producer sentinel blocks training. */
+    , [U_P7_ARCHON] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 8, 0, 0, 300, 10, 350, 0 }
+    , [U_P7_ARBITER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 8, 100, 350, 2400, 200, 150, 0 }
+    , [U_P7_CARRIER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 12, 350, 250, 2100, 300, 150, 0 }
+    , [U_P7_OBSERVER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 2, 25, 75, 600, 40, 20, 0 }
+#endif
 };
 
 static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
@@ -403,6 +424,16 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
 #ifdef SC64_P6_ACTORS
     , [B_P6_WALL_MISSILE_TRAP] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 50, 0 }
 #endif
+#ifdef SC64_P7_ACTORS
+    /* P7 structures remain imported scenario actors, not worker products. */
+    , [B_P7_OBSERVATORY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 50, 100, 450, 250, 0 }
+    , [B_P7_CITADEL_ADUN] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 150, 100, 900, 450, 0 }
+    , [B_P7_TEMPLAR_ARCHIVES] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 150, 200, 900, 500, 0 }
+    , [B_P7_FLEET_BEACON] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 300, 200, 900, 500, 0 }
+    , [B_P7_ARBITER_TRIBUNAL] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 200, 150, 900, 500, 0 }
+    , [B_P7_ROBOTICS_SUPPORT_BAY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 150, 100, 450, 450, 0 }
+    , [B_P7_SHIELD_BATTERY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 100, 0, 450, 200, 0 }
+#endif
 #if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
     , [B_Z6_ROBOTICS_SUPPORT_BAY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 150, 100, 450, 450, 0 }
     , [B_Z6_SHIELD_BATTERY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 100, 0, 450, 200, 0 }
@@ -458,6 +489,9 @@ static inline const char *sc64_race_unit_name(int type)
 #ifdef SC64_P6_ACTORS
         ,"INFESTED TERRAN","HERO DARK TEMPLAR","ZERATUL"
 #endif
+#ifdef SC64_P7_ACTORS
+        ,"ARCHON","ARBITER","CARRIER","OBSERVER"
+#endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
 }
@@ -500,6 +534,10 @@ static inline const char *sc64_race_building_name(int type)
 #endif
 #ifdef SC64_P6_ACTORS
         ,"WALL MISSILE TRAP"
+#endif
+#ifdef SC64_P7_ACTORS
+        ,"OBSERVATORY","CITADEL OF ADUN","TEMPLAR ARCHIVES","FLEET BEACON",
+        "ARBITER TRIBUNAL","ROBOTICS SUPPORT BAY","SHIELD BATTERY"
 #endif
 #if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
         ,"ROBOTICS SUPPORT BAY","SHIELD BATTERY"
@@ -1185,6 +1223,10 @@ static inline int sc64_race_raw_unit(int type)
     case U_P6_HERO_DARK_TEMPLAR: return SC64_P6_RAW_HERO_DARK_TEMPLAR;
     case U_P6_ZERATUL: return SC64_P6_RAW_ZERATUL;
 #endif
+#ifdef SC64_P7_ACTORS
+    case U_P7_ARCHON: return 68; case U_P7_ARBITER: return 71;
+    case U_P7_CARRIER: return 72; case U_P7_OBSERVER: return 84;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     case U_SCIENCE_VESSEL: return 9; case U_BATTLECRUISER: return 12;
     case U_NORAD_II: return 29;
@@ -1266,6 +1308,13 @@ static inline int sc64_race_raw_building(int type)
 #endif
 #ifdef SC64_P6_ACTORS
     case B_P6_WALL_MISSILE_TRAP: return SC64_P6_RAW_WALL_MISSILE_TRAP;
+#endif
+#ifdef SC64_P7_ACTORS
+    case B_P7_OBSERVATORY: return 159; case B_P7_CITADEL_ADUN: return 163;
+    case B_P7_TEMPLAR_ARCHIVES: return 165; case B_P7_FLEET_BEACON: return 169;
+    case B_P7_ARBITER_TRIBUNAL: return 170;
+    case B_P7_ROBOTICS_SUPPORT_BAY: return 171;
+    case B_P7_SHIELD_BATTERY: return 172;
 #endif
     default: return -1;
     }
@@ -1356,6 +1405,10 @@ static inline int sc64_race_unit_from_raw(int raw)
     case SC64_P6_RAW_HERO_DARK_TEMPLAR: return U_P6_HERO_DARK_TEMPLAR;
     case SC64_P6_RAW_ZERATUL: return U_P6_ZERATUL;
 #endif
+#ifdef SC64_P7_ACTORS
+    case 68: return U_P7_ARCHON; case 71: return U_P7_ARBITER;
+    case 72: return U_P7_CARRIER; case 84: return U_P7_OBSERVER;
+#endif
     default: return -1;
     }
 }
@@ -1428,14 +1481,24 @@ static inline int sc64_race_building_from_raw(int raw)
 #ifndef SC64_ZP_CAMPAIGN_ACTORS
     case 140: return B_ULTRALISK_CAVERN;
 #endif
-    case 163: return B_CITADEL_ADUN; case 168: return B_STASIS_CELL_PRISON;
-    case 169: return B_FLEET_BEACON; case 171: return B_ROBOTICS_SUPPORT_BAY;
-    case 172: return B_SHIELD_BATTERY; case 127: return B_SPECIAL_ION_CANNON;
+    case 168: return B_STASIS_CELL_PRISON;
+#ifndef SC64_P7_ACTORS
+    case 163: return B_CITADEL_ADUN; case 169: return B_FLEET_BEACON;
+    case 171: return B_ROBOTICS_SUPPORT_BAY; case 172: return B_SHIELD_BATTERY;
+#endif
+    case 127: return B_SPECIAL_ION_CANNON;
     case 116: return B_SCIENCE_FACILITY; case 118: return B_PHYSICS_LAB;
 #endif
-#if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
+#if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P7_ACTORS)
     case 171: return B_Z6_ROBOTICS_SUPPORT_BAY;
     case 172: return B_Z6_SHIELD_BATTERY;
+#endif
+#ifdef SC64_P7_ACTORS
+    case 159: return B_P7_OBSERVATORY; case 163: return B_P7_CITADEL_ADUN;
+    case 165: return B_P7_TEMPLAR_ARCHIVES; case 169: return B_P7_FLEET_BEACON;
+    case 170: return B_P7_ARBITER_TRIBUNAL;
+    case 171: return B_P7_ROBOTICS_SUPPORT_BAY;
+    case 172: return B_P7_SHIELD_BATTERY;
 #endif
 #ifdef SC64_P6_ACTORS
     case SC64_P6_RAW_WALL_MISSILE_TRAP: return B_P6_WALL_MISSILE_TRAP;

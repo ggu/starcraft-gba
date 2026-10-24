@@ -3246,6 +3246,15 @@ emulator prefix measurements; full ARM completion, fresh-process saves and
 physical-GBA performance are not established by this comparison. The option
 remains disabled by default pending the longer qualification run.
 
+The combined count-snapshot/collision-hoist/range-rejection ARM build now
+completes all 271,799 held-input ticks and wins at frame 268694, with source
+fault zero and completion bit 17. The full route averages **19.01 effective
+fps** over live PLAY intervals. The opening prefix also restores exactly in
+a fresh HOME process and advances to frame 1028 after its neutral handoff and
+60 live updates. The late-save/fresh-process check is still running, so these
+options remain off by default. This does not qualify 30 fps or physical GBA
+performance, and is separate from the 10.97-fps opening measurement above.
+
 The 534-file source-only export passes `./dev build` and `./dev test`,
 including 360 Python tests (six private-input checks skipped). The original-art
 ROM remains byte-identical (`4ad80ce0…f9aee`). Imported data and private replay
@@ -3296,3 +3305,32 @@ The 535-file source-only snapshot passes `./dev build` and `./dev test`
 ARM/host checks pass. The original-art ROM remains byte-identical
 (`4ad80ce0…f9aee`). This does not advance the staged campaign count beyond
 T10/Z6/P6 or promote the canonical Zerg/Protoss profiles.
+
+### P7 scoped actor foundation
+
+The default-off `SC64_P7_ACTORS` gate adds exact raw mappings and pinned
+BWAPI facts for Archon 68, Arbiter 71, Carrier 72 and Observer 84, plus seven
+Protoss structures (159/163/165/169/170/171/172). Its normalized rule rows
+retain source race, cost and vitals, shields/power flags and non-product
+sentinels; zero-initialized Terran products cannot leak into skirmish menus.
+P7-scoped mappings take precedence over overlapping optional structure
+aliases. Existing profiles keep their enum layout when the gate is off.
+
+Asset-free sanitizer checks exercise six gate combinations, raw round trips,
+normalized rules, source attributes and capability gaps. The actual staged
+Z/P prefix plus P7 has 49 unit and 60 building types, within both current
+six-bit packed enum fields. This verifies enum capacity only; it does not
+validate a P7 save payload. The fact-range differential matrix also passes
+with P7 and shifted prefixes (16 configurations).
+
+Source metadata retains Carrier's special native can-attack flag and absent
+weapon, while the GBA policy does not claim interceptor combat. Required,
+unimplemented capabilities explicitly include Archon radial splash,
+Carrier interceptors, Observer detection/permanent cloak, Arbiter fields and
+Shield Battery recharge. P7 map/sprite binding, campaign/save wiring, opaque
+AI behavior and a normal-input win remain required before promotion.
+
+The 538-file source-only export passes `./dev build` and `./dev test`,
+including 361 Python tests (six private-input checks skipped). The default
+original-art ROM remains byte-identical (`4ad80ce0…f9aee`). These checks do
+not add P7 to the qualified mission count.

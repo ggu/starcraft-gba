@@ -1930,6 +1930,10 @@ test-sc64-z6-collision-facts: build/test-sc64-z6-collision-facts-baseline build/
 test-sc64-zp-fact-range:
 	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_zp_fact_range.py'
 
+.PHONY: test-sc64-p7-actor-rules
+test-sc64-p7-actor-rules:
+	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_p7_actor_rules.py'
+
 build/test-sc64-nearest-resource-depot-p5: tests/sc64_nearest_resource_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT $< common/gba.c -o $@
 build/test-sc64-nearest-resource-depot-z6: tests/sc64_nearest_resource_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build

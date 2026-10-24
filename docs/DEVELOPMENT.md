@@ -1391,7 +1391,7 @@ qualification are complete.
 The separate `SC64_ZP_FACT_RANGE_CULL` experiment rejects ordinary roster
 types before checking optional campaign actor facts. Its differential test
 needs no imported assets and compares complete resolver/wrapper answers
-across 13 actor-gate combinations, including the late Terran enum prefix:
+across 16 actor-gate combinations, including P7 and the late Terran enum prefix:
 
 ```sh
 make test-sc64-zp-fact-range
@@ -1400,8 +1400,9 @@ make -B zerg-z6-probe Z6_QUERY_FLAGS='-DSC64_Z6_COUNT_SNAPSHOT -DSC64_COLLISION_
 
 The combined build reproduces the complete winning Z6 host route and the
 12,000-input-tick ARM prefix. The range cull improves that prefix from 10.47
-to 10.97 fps. It remains disabled by default while the full ARM route and
-fresh-process save checks run; this is not a full-mission performance claim.
+to 10.97 fps. The full ARM route now wins at 19.01 average effective fps;
+the opening save restores exactly in a fresh process. The options remain
+disabled by default while the late-save check runs.
 Rebuild without the extra flags to restore the normal Z6 output.
 
 P6's eight query options are enabled by default after the full ARM win and
@@ -1453,3 +1454,16 @@ the IWRAM stack reserve; movement and combat retain their existing routines.
 After Z7 inputs are prepared, `make test-sc64-z7-gas-restore` checks destroyed
 source Extractors reopening their geyser locations and the corresponding
 transactional save validation. This does not establish a full Z7 win.
+
+P7 has a gated source-fact foundation, independently testable without assets:
+
+```sh
+make test-sc64-p7-actor-rules test-sc64-zp-fact-range
+```
+
+`SC64_P7_ACTORS` supplies the missing Archon, Arbiter, Carrier and Observer
+identities plus seven Protoss structure types. They remain scenario-only;
+this does not expose new training commands or a playable P7 campaign entry.
+The P7 header records missing splash, interceptor, cloak/detection, Arbiter
+field and Shield Battery mechanics. Enum capacity fits the current packed
+save fields, but P7 persistence and complete gameplay are not integrated yet.
