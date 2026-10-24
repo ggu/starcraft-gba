@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 typedef uint8_t u8; typedef uint16_t u16; typedef uint32_t u32; typedef int8_t s8;
 #define GBA_HOT
@@ -29,11 +30,31 @@ static void build_path_grid(void) { path_grid_valid = 1; }
 static u8 packed_walkable[(MAP_CELLS + 7) / 8];
 #define path_walkable packed_walkable
 #define SC64_GRID_GET(grid, cell) sc64_bitgrid_get((grid), MAP_CELLS, (cell))
+#define SC64_GRID_SET(grid, cell, value) sc64_bitgrid_set((grid), MAP_CELLS, (cell), (value))
 #endif
 #include "starcraft/sc64_routes.h"
+#ifdef SC64_ROUTE_VISIT_GRID
+static int route_next_with_grid_snapshot(int x,int y,int tx,int ty,int *nx,int *ny)
+{
+#ifdef SC64_LARGE_MAPS
+    u8 before[sizeof(packed_walkable)];
+    memcpy(before,packed_walkable,sizeof(packed_walkable));
+    int result=sc64_route_next(x,y,tx,ty,nx,ny);
+    assert(memcmp(before,packed_walkable,sizeof(packed_walkable))==0);
+#else
+    u8 before[sizeof(path_walkable)];
+    memcpy(before,path_walkable,sizeof(path_walkable));
+    int result=sc64_route_next(x,y,tx,ty,nx,ny);
+    assert(memcmp(before,path_walkable,sizeof(path_walkable))==0);
+#endif
+    return result;
+}
+#define sc64_route_next route_next_with_grid_snapshot
+#endif
 #ifdef SC64_LARGE_MAPS
 #undef path_walkable
 #undef SC64_GRID_GET
+#undef SC64_GRID_SET
 #endif
 
 #ifdef SC64_ROUTE_PACK3
@@ -139,6 +160,19 @@ static int check_cached_route(int sx,int sy,int gx,int gy)
         }
     }
     int ok=sc64_route_next(sx*16+8,sy*16+8,gx*16+8,gy*16+8,&nx,&ny);
+#ifdef SC64_ROUTE_VISIT_GRID
+    {
+        int slot=-1;
+        for(int i=0;i<SC64_ROUTE_SLOTS;i++)
+            if(sc64_route_valid[i]&&sc64_route_goal[i]==goal)slot=i;
+        assert(slot>=0);
+        for(int cell=0;cell<MAP_CELLS;cell++) {
+            int expected_direction=distance[cell]<0 ? SC64_ROUTE_UNREACHABLE :
+                                   cell==goal ? 0 : reference_direction[cell];
+            assert(sc64_route_get(slot,cell)==expected_direction);
+        }
+    }
+#endif
     if(expected<0)return !ok;
     if(!ok)return 0;
     if(expected==goal)return nx==gx*16+8&&ny==gy*16+8;
@@ -162,6 +196,24 @@ static void verify_field(int goal)
             assert(distance[next]+1==distance[c]);
         }
     }
+#ifdef SC64_ROUTE_VISIT_GRID
+    {
+        int slot=-1;
+        for(int i=0;i<SC64_ROUTE_SLOTS;i++)
+            if(sc64_route_valid[i]&&sc64_route_goal[i]==goal)slot=i;
+        assert(slot>=0);
+        for(int cell=0;cell<MAP_CELLS;cell++) {
+            int expected=distance[cell]<0 ? SC64_ROUTE_UNREACHABLE :
+                         cell==goal ? 0 : reference_direction[cell];
+            int actual=sc64_route_get(slot,cell);
+            if(actual!=expected) {
+                fprintf(stderr,"route field mismatch goal=%d cell=%d dist=%d expected=%d actual=%d\\n",
+                        goal,cell,distance[cell],expected,actual);
+                abort();
+            }
+        }
+    }
+#endif
 }
 
 int main(void)
@@ -231,6 +283,8 @@ int main(void)
     assert(check_cached_route(blocked_goal_x-2,blocked_goal_y,
                               blocked_goal_x,blocked_goal_y));
     memset(path_walkable,0,sizeof(path_walkable));
+    reset_routes();
+    assert(check_cached_route(4,4,12,12)); /* empty flood restores no bits */
     int isolated_x=4,isolated_y=4;
     path_walkable[isolated_x+1+isolated_y*MAP_COLS]=1;
     path_walkable[12+12*MAP_COLS]=1;

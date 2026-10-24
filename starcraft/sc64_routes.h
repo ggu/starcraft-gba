@@ -8,6 +8,20 @@
 #define SC64_ROUTES_LOCAL_GRID_GET
 #endif
 
+#ifdef SC64_ROUTE_VISIT_GRID
+#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3)
+#error "SC64_ROUTE_VISIT_GRID requires SC64_RACES and SC64_ROUTE_PACK3"
+#endif
+#ifndef SC64_GRID_SET
+#ifdef SC64_ROUTES_LOCAL_GRID_GET
+#define SC64_GRID_SET(grid, cell, value) ((grid)[(cell)] = (u8)((value) != 0))
+#define SC64_ROUTES_LOCAL_GRID_SET
+#else
+#error "SC64_ROUTE_VISIT_GRID requires SC64_GRID_SET for a custom grid accessor"
+#endif
+#endif
+#endif
+
 /* Shared shortest-path fields on the same four-neighbour collision grid.
  * A mineral, base or group destination costs one reverse flood, rather than
  * one flood per moving unit per tile. Dynamic actors still use local steering.
@@ -137,6 +151,9 @@ sc64_route_slot(int goal)
         field[goal] = 0;
 #endif
         bfs_queue[tail++] = (u16)goal;
+#ifdef SC64_ROUTE_VISIT_GRID
+        SC64_GRID_SET(path_walkable, goal, 0);
+#endif
     } else {
 #ifdef SC64_RACES
         int x = sc64_cell_col(goal), y = sc64_cell_row(goal), dx, dy;
@@ -151,6 +168,9 @@ sc64_route_slot(int goal)
 #ifdef SC64_RACES
                 if (sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE) {
                     sc64_route_put(slot, cell, 0); bfs_queue[tail++] = (u16)cell;
+#ifdef SC64_ROUTE_VISIT_GRID
+                    SC64_GRID_SET(path_walkable, cell, 0);
+#endif
                 }
 #else
                 field[cell] = 0; bfs_queue[tail++] = (u16)cell;
@@ -167,10 +187,18 @@ sc64_route_slot(int goal)
         int next;
         /* The stored direction takes the neighbour back toward this cell. */
 #ifdef SC64_RACES
+#ifdef SC64_ROUTE_VISIT_GRID
+#define SC64_FLOOD(condition, neighbour, direction) \
+        if (condition) { next = (neighbour); \
+            if (SC64_GRID_GET(path_walkable, next)) { \
+                sc64_route_put(slot, next, (direction)); bfs_queue[tail++] = (u16)next; \
+                SC64_GRID_SET(path_walkable, next, 0); } }
+#else
 #define SC64_FLOOD(condition, neighbour, direction) \
         if (condition) { next = (neighbour); \
             if (SC64_GRID_GET(path_walkable, next) && sc64_route_get(slot, next) == SC64_ROUTE_UNREACHABLE) { \
                 sc64_route_put(slot, next, (direction)); bfs_queue[tail++] = (u16)next; } }
+#endif
 #else
 #define SC64_FLOOD(condition, neighbour, direction) \
         if (condition) { next = (neighbour); \
@@ -184,6 +212,11 @@ sc64_route_slot(int goal)
         SC64_FLOOD(row + 1 < MAP_ROWS, cell + MAP_COLS, 4);
 #undef SC64_FLOOD
     }
+#ifdef SC64_ROUTE_VISIT_GRID
+    /* Each enqueued cell was cleared exactly once, so bfs_queue is a compact
+     * restoration list for the temporarily borrowed walkability bits. */
+    for (i = 0; i < tail; ++i) SC64_GRID_SET(path_walkable, bfs_queue[i], 1);
+#endif
     sc64_route_goal[slot] = (u16)goal;
     sc64_route_age[slot] = ++sc64_route_clock;
     sc64_route_valid[slot] = 1;
@@ -296,5 +329,9 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
 #ifdef SC64_ROUTES_LOCAL_GRID_GET
 #undef SC64_GRID_GET
 #undef SC64_ROUTES_LOCAL_GRID_GET
+#endif
+#ifdef SC64_ROUTES_LOCAL_GRID_SET
+#undef SC64_GRID_SET
+#undef SC64_ROUTES_LOCAL_GRID_SET
 #endif
 #endif

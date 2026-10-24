@@ -1539,3 +1539,17 @@ It uses source collision rectangles for reach and radial damage, the source
 adapted to the engine's integer HP/shields. Impact is immediate at the target
 center; projectile/windup and native burrow handling remain unfinished. This
 does not enable P7 in a campaign build or qualify its missing abilities.
+
+`SC64_ROUTE_VISIT_GRID` is an independent, default-off packed-route
+experiment. It requires `SC64_RACES` and `SC64_ROUTE_PACK3` and borrows the
+walkability grid to mark cells during a reverse flood. The existing BFS queue
+restores those bits before returning, without extra persistent storage.
+Callers with a custom grid getter must also supply its matching setter.
+
+```sh
+python3 -m unittest discover -s tests -p 'test_sc64_routes.py'
+```
+
+The complete P3 host trace and state fingerprints match the reference with
+this gate enabled. ARM timing and full replay/save checks are still pending;
+it is not part of any qualified profile's defaults.

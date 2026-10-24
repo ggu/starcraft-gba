@@ -3360,7 +3360,10 @@ default and pins the expansion launch/final witness independently. Its
 with a peak of 121 transitions per 1,000-tick page. ABI fixtures cover signed
 selection/source-owner fields, transported units and both compact-byte and
 legacy-int queue rings. This is host/controller and observer validation;
-the larger-bank ARM win, save continuity and performance remain unqualified.
+the complete larger-bank ARM replay now wins at frame 123916, preserving
+the source objective/model witnesses with zero unsupported actors. Its
+124,689-input run averages **12.35 effective fps**, below the performance
+target. Late-save continuity and canonical promotion remain pending.
 The staged total remains T10/Z6/P6, and canonical profiles remain T10/Z3/P3.
 
 The frozen larger-bank candidate (ROM `d26ca305…f4d1`, ELF
@@ -3368,8 +3371,8 @@ The frozen larger-bank candidate (ROM `d26ca305…f4d1`, ELF
 load. The recorded persisted observations match exactly, with the intentional
 building-selection reset reported separately: saved selection 5 becomes -1.
 This is not labelled an exact whole snapshot. The handoff takes one neutral
-live frame and then 60 scheduled live frames. The full ARM replay and late
-save are still running; the host win remains separate from that qualification.
+live frame and then 60 scheduled live frames. The full ARM win is complete;
+the 90,000-input late save and fresh-process restore are still running.
 
 ### Gated P7 sprite preparation
 
@@ -3498,3 +3501,25 @@ feature does not promote P7 or clear its complete-mechanics requirement.
 The 547-file source-only snapshot passes the default build and test suite
 (379 Python tests, six private-input skips). Its original-art ROM remains
 `4ad80ce0…f9aee`, and unified ARM/host checks pass with the gate off.
+
+### Packed route visited-grid experiment
+
+The default-off `SC64_ROUTE_VISIT_GRID` gate borrows the packed walkability
+grid during a cache-miss reverse flood. Enqueuing a cell clears its bit;
+after the flood, the existing BFS queue restores every cleared bit before
+the function returns. This replaces packed route-code reads for visited
+checks without adding global storage or changing cache replacement.
+
+The asset-free sanitizer fixture compares every field code against an
+independent BFS and snapshots the complete packed walkability grid around
+each query. It covers randomized 128-by-128 maps, blocked starts/goals,
+empty/all-open floods, resets and eviction. The complete winning P3 host
+route preserves both the trace (`321074f1…db01a`) and explicit-field
+fingerprint stream (`3d766e63…51732`) exactly.
+
+The gated P3 ARM link has IWRAM end `0x030042f8` and unchanged BSS end
+`0x0203d584`. This establishes link/reserve checks only; GBA timing, full
+ARM replay and fresh-save qualification remain pending. No profile default
+enables the experiment. The 547-file source-only snapshot passes the default
+build and suite (380 Python tests, six private-input skips); original-art
+ROM bytes remain `4ad80ce0…f9aee`, and unified ARM/host checks pass.
