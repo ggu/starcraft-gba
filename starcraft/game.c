@@ -4984,6 +4984,21 @@ game_update(u16 held, u16 pressed)
         pressed &= (u16)~(KEY_A | KEY_B | KEY_R);
     }
 #endif
+#ifdef SC64_Z6_STORM_ENABLED
+    /* Authored GBA army shortcut for this escort mission. The sole selected
+     * Kerrigan spell hotkey above takes precedence; regular R includes her. */
+    if (race_z6_active() && (held & KEY_B) && (pressed & KEY_R) &&
+        !box_state && !(held & (KEY_LEFT|KEY_RIGHT|KEY_UP|KEY_DOWN))) {
+        reset_selection_gestures();
+        select_combat_group();
+        for (int i=0;i<MAX_UNITS;++i)
+            if (u[i].type==U_ZP_INFESTED_KERRIGAN)
+                u[i].selected=0;
+        mode=MODE_NORMAL;
+        menu_open=0;
+        pressed&=(u16)~(KEY_A|KEY_B|KEY_R);
+    }
+#endif
     if (menu_open) reset_selection_gestures();
     if ((pressed & KEY_B) && !box_state && !(pressed & KEY_L)) {
 	if (menu_open)

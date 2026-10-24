@@ -44,6 +44,19 @@ int main(void)
     assert(screen==SCREEN_PLAY && race_selected_mission==SPELL_MISSION);
     int hero=hero_slot(); assert(hero>=0);
     assert(u[hero].carry==250*256);
+#ifdef SC64_Z6_STORM_ENABLED
+    /* Ordinary R includes the escort hero. B+R on the army leaves her safe
+       while retaining every other combat selection and issuing no order. */
+    press(KEY_R);
+    assert(u[hero].selected && selected_count()>1);
+    unsigned army_count=(unsigned)selected_count();
+    input(KEY_B|KEY_R);
+    assert(!u[hero].selected && (unsigned)selected_count()==army_count-1u);
+    assert(mode==MODE_NORMAL && !menu_open);
+    input(0);
+    press(KEY_R);
+    assert(u[hero].selected && (unsigned)selected_count()==army_count);
+#endif
     for(int i=0;i<MAX_UNITS;++i) u[i].selected=0;
     selected_building=-1; u[hero].selected=1;
     cx=u[hero].x+80; cy=u[hero].y;

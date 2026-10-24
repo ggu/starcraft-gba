@@ -1190,3 +1190,22 @@ These flags remain off by default while full playthrough comparisons are in
 progress. The sixth missions remain internal probes until normal-input wins,
 fresh emulator replay, save continuity and performance are qualified. The
 completed staged campaign count remains Terran 10, Zerg 5 and Protoss 5.
+
+
+Both sixth probes now support the bounded startup observer. Z6 also has a
+full-bank replay observer, ready for a genuinely winning controller trace:
+
+```sh
+python3 tools/sc64_zp_start_profile.py --profile zerg-z6 --rom build/StarCraft-Zerg-Z6-Probe-GBA.gba --elf build/starcraft-zerg-z6-probe.elf --live-frames 1000 --checkpoint 100
+```
+
+The observer reads model, source deaths, mutable locations, ability/research
+state, Drone morph history and complete compact actor banks through the
+matching ELF's DWARF offsets. `--profile protoss-p6` remains the default.
+Startup reports are explicitly separate from mission-win evidence.
+
+In the Z6 probe, **R** selects the combat group including Kerrigan. **B+R**
+selects the army while leaving Kerrigan out, so group orders can keep the
+mission-critical hero safe. With only Kerrigan selected, **B+R** instead
+opens Storm targeting; an exhausted Kerrigan keeps her selection. This is
+an authored GBA control, not an original N64 binding.

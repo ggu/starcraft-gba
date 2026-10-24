@@ -30,24 +30,25 @@ from emulator_smoke import ROOT, capture, symbol_sizes, symbols
 
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_RESULT = 0, 1, 3
 MISSION_BY_PROFILE = {"zerg-z4": 15, "protoss-p4": 23, "zerg-z5": 16,
-                      "protoss-p5": 24, "protoss-p6": 25}
+                      "zerg-z6": 17, "protoss-p5": 24, "protoss-p6": 25}
 FACTION_BY_PROFILE = {name: ("zerg" if name.startswith("zerg") else "protoss")
                       for name in MISSION_BY_PROFILE}
 MODEL_TYPES = {"zerg-z4": "Sc64Z4State", "protoss-p4": "Sc64P4State",
                "zerg-z5": "Sc64Z5State", "protoss-p5": "Sc64P5State",
-               "protoss-p6": "Sc64P6State"}
+               "zerg-z6": "Sc64Z6State", "protoss-p6": "Sc64P6State"}
 RUNTIME_TYPES = {"zerg-z4": "Sc64Z4RuntimeState", "protoss-p4": "Sc64P4RuntimeState",
                  "zerg-z5": "Sc64Z5RuntimeState", "protoss-p5": "Sc64P5RuntimeState",
-                 "protoss-p6": "Sc64P6RuntimeState"}
-PERSISTENT_TYPES = {"zerg-z5": "Sc64Z5PersistentState", "protoss-p5": "Sc64P5PersistentState",
+                 "zerg-z6": "Sc64Z6RuntimeState", "protoss-p6": "Sc64P6RuntimeState"}
+PERSISTENT_TYPES = {"zerg-z5": "Sc64Z5PersistentState", "zerg-z6": "Sc64Z6PersistentState", "protoss-p5": "Sc64P5PersistentState",
                     "protoss-p6": "Sc64P6PersistentState"}
 RUNTIME_SYMBOLS = {"zerg-z4": "race_z4", "protoss-p4": "race_p4",
-                   "zerg-z5": "race_z5", "protoss-p5": "race_p5",
+                   "zerg-z5": "race_z5", "zerg-z6": "race_z6", "protoss-p5": "race_p5",
                    "protoss-p6": "race_p6"}
 DEFAULT_TRACE = ROOT / ".local/sc64/z4-controller-win.json"
 DEFAULT_TRACES = {"zerg-z4": DEFAULT_TRACE,
                  "protoss-p4": ROOT / ".local/sc64/p4-controller-win.json",
                  "zerg-z5": ROOT / ".local/sc64/z5-controller-win.json",
+                 "zerg-z6": ROOT / ".local/sc64/z6-controller-win.json",
                  "protoss-p5": ROOT / ".local/sc64/p5-controller-win.json",
                  "protoss-p6": ROOT / ".local/sc64/p6-controller-win.json"}
 DEFAULT_OUTPUT = ROOT / "build/emulator/zp-controller-replay"
@@ -61,6 +62,7 @@ SIXTH_MENU_PREFIX = ((1, 1), (2, 0), (3, 16), (4, 0), (5, 16), (6, 0),
                      (7, 128), (8, 0), (9, 1), (10, 0), (11, 1), (12, 0))
 P6_ACTION_COUNTS = (1, 1, 2, 2, 2, 2, 2, 2, 5, 2, 2, 8, 8,
                     1, 7, 12, 5, 2, 3, 3, 7, 12, 3, 1, 3, 1)
+Z6_ACTION_COUNTS = (1, 2, 1, 4, 2, 13, 5, 18, 2)
 P6_SWITCH_MASK = 0x3B
 P6_SPRITE_ONLY_DOODAD_MASK = (0x01, 0xF0, 0x9B, 0, 0)
 
@@ -154,7 +156,8 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
 
     if not inputs or inputs[0][0] != 0:
         raise ValueError("first controller transition must be host_tick=1")
-    entry = 6 if profile_name == "protoss-p6" else 5 if profile_name in PERSISTENT_TYPES else 4
+    entry = (6 if profile_name in ("protoss-p6", "zerg-z6") else
+             5 if profile_name in PERSISTENT_TYPES else 4)
     menu_prefix = (SIXTH_MENU_PREFIX if entry == 6 else
                    FIFTH_MENU_PREFIX if entry == 5 else MENU_PREFIX)
     if (start_transition_count != len(menu_prefix) or
@@ -162,7 +165,7 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
         raise ValueError(f"normal HOME/menu inputs do not match the {entry}th-entry deployment route")
     if not windowed and len(inputs) > capacity:
         raise ValueError(f"controller queue exceeds ELF capacity ({len(inputs)}/{capacity})")
-    expected_start_frame = 1 if profile_name == "protoss-p6" else 0
+    expected_start_frame = 1 if profile_name in ("protoss-p6", "zerg-z6") else 0
     if (start is None or start.get("screen") != SCREEN_PLAY or
             start.get("frame") != expected_start_frame):
         raise ValueError("trace start must match the profile's live PLAY handoff frame")
@@ -188,6 +191,22 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
                     (cursor and not (start["started"] & (1 << i))) or
                     ((cursor != 0) != (ticks != 0))):
                 raise ValueError("P6 start cursor/timer state violates source action bounds")
+    elif profile_name == "zerg-z6":
+        for name in ("action_cursors", "action_ticks"):
+            value = start.get(name)
+            if not isinstance(value, list) or len(value) != 9 or any(type(x) is not int or x < 0 for x in value):
+                raise ValueError(f"Z6 start observation requires 9 integer {name} values")
+        started = start.get("started")
+        if (type(started) is not int or not 0 <= started < (1 << 9) or
+                start.get("fired") != started or type(start.get("switch_bits")) is not list or
+                len(start["switch_bits"]) != 8 or
+                any(type(x) is not int or not 0 <= x <= 0xFFFFFFFF for x in start["switch_bits"]) or
+                start.get("fault") != 0):
+            raise ValueError("Z6 start observation has invalid model, switch, or fault state")
+        for i, (cursor, ticks) in enumerate(zip(start["action_cursors"], start["action_ticks"])):
+            if (cursor > Z6_ACTION_COUNTS[i] or (cursor and not (started & (1 << i))) or
+                    ((cursor != 0) != (ticks != 0))):
+                raise ValueError("Z6 start cursor/timer state violates source action bounds")
     if final is None or rows[-1] is not final or final.get("kind") != "won":
         raise ValueError("full controller trace must end in a won event")
     stop = final.get("host_tick")
@@ -227,6 +246,30 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
             raise ValueError("P6 final switch_bits exceed the authenticated switch set")
         if type(final.get("fault")) is not int or final["fault"] != 0:
             raise ValueError("P6 final observation must report zero adapter faults")
+    elif profile_name == "zerg-z6":
+        started = final.get("started")
+        if type(started) is not int or not 0 <= started < (1 << 9):
+            raise ValueError("Z6 final started mask must fit 9 source triggers")
+        if not (started & (1 << 5)) or started & ((1 << 0) | (1 << 6)):
+            raise ValueError("Z6 winning trace must include victory and exclude both defeat triggers")
+        if final["fired"] != started:
+            raise ValueError("Z6 final fired alias must match the started trigger mask")
+        for name, limit in (("action_cursors", 255), ("action_ticks", 65535)):
+            value = final.get(name)
+            if (not isinstance(value, list) or len(value) != 9 or
+                    any(type(x) is not int or not 0 <= x <= limit for x in value)):
+                raise ValueError(f"Z6 final observation requires 9 bounded {name} values")
+        for i, (cursor, ticks) in enumerate(zip(final["action_cursors"], final["action_ticks"])):
+            if (cursor > Z6_ACTION_COUNTS[i] or (cursor and not (started & (1 << i))) or
+                    ((cursor != 0) != (ticks != 0))):
+                raise ValueError("Z6 final cursor/timer state violates source action bounds")
+        switch = final.get("switch_bits")
+        if (not isinstance(switch, list) or len(switch) != 8 or
+                any(type(x) is not int or not 0 <= x <= 0xFFFFFFFF for x in switch) or
+                final.get("fault") != 0):
+            raise ValueError("Z6 final switch/fault state is malformed")
+        if final.get("kerrigan_alive") != 1:
+            raise ValueError("Z6 final observation requires the live source Kerrigan")
     if windowed:
         last_page = (stop - 1) // CHECKPOINT_TICKS
         peak = max((sum(1 for tick, _ in inputs if tick // CHECKPOINT_TICKS == page)
@@ -253,6 +296,8 @@ def decode_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
     model_raw = raw[base:base + model_size]
     if profile_name == "protoss-p6":
         return decode_p6_runtime(raw, runtime_layout, model_layout)
+    if profile_name == "zerg-z6":
+        return decode_z6_runtime(raw, runtime_layout, model_layout)
     if profile_name in PERSISTENT_TYPES:
         return decode_fifth_runtime(raw, runtime_layout, model_layout, profile_name)
     model_widths = ({"fired": 2, "outcome": 1, "action_cursor": 7}
@@ -326,7 +371,75 @@ def runtime_layout_for(elf: Path, profile_name: str) -> tuple[int, dict[str, int
         if offset < 0 or offset >= inner_size or name in fields:
             raise RuntimeError("invalid or ambiguous nested runtime field")
         fields[name] = base + offset
+    if profile_name == "zerg-z6":
+        # Flatten optional nested Z6 effects using their own ELF DWARF types;
+        # these offsets vary with enabled ability gates and are never guessed.
+        for member, type_name, prefix in (
+                ("cloak", "Sc64Z5CloakState", "cloak_"),
+                ("storm", "Sc64PsionicStormState", "storm_"),
+                ("transport", "Sc64Z6TransportTechState", "transport_")):
+            if member not in outer:
+                continue
+            nested_size, nested_fields = races.dwarf_struct(elf, type_name)
+            offset = outer[member]
+            if offset < 0 or offset + nested_size > size:
+                raise RuntimeError(f"Z6 {member} state lies outside persistent structure")
+            for nested_name, nested_offset in nested_fields.items():
+                key = prefix + nested_name
+                if key in fields or nested_offset < 0 or nested_offset >= nested_size:
+                    raise RuntimeError(f"invalid or duplicate Z6 {member} DWARF field")
+                fields[key] = offset + nested_offset
     return size, fields
+
+
+def decode_z6_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
+                      model_layout: tuple[int, dict[str, int]]) -> dict:
+    """Decode the complete Z6 payload (at most 180 bytes) using its DWARF layout."""
+    size, fields = runtime_layout
+    model_size, model_fields = model_layout
+    if len(raw) != size or "model" not in fields or size <= 0 or size > 180:
+        raise ValueError("Z6 persistent state bytes do not match bounded DWARF layout")
+    base = fields["model"]
+    if base < 0 or base + model_size > size:
+        raise ValueError("Z6 model lies outside persistent runtime structure")
+
+    def read(table: dict[str, int], limit: int, name: str, count: int, width: int,
+             *, start: int = 0) -> int | list[int]:
+        offset = table.get(name, -1)
+        total = count * width
+        if offset < 0 or offset + total > limit or start + offset + total > len(raw):
+            raise ValueError(f"Z6 runtime field {name} exceeds or is absent from DWARF structure")
+        data = raw[start + offset:start + offset + total]
+        if count == 1:
+            return int.from_bytes(data, "little")
+        return [int.from_bytes(data[i:i + width], "little")
+                for i in range(0, total, width)]
+
+    model = {"started": read(model_fields, model_size, "started", 1, 2, start=base),
+             "fired": read(model_fields, model_size, "started", 1, 2, start=base),
+             "outcome": read(model_fields, model_size, "outcome", 1, 1, start=base),
+             "action_cursor": read(model_fields, model_size, "action_cursor", 9, 1, start=base)}
+    result = {"model": model,
+              "action_ticks": read(fields, size, "action_ticks", 9, 2),
+              "switch_bits": read(fields, size, "switch_bits", 8, 4),
+              "fault": read(fields, size, "fault", 1, 1),
+              "deaths_by_source": read(fields, size, "deaths_by_source", 12, 4),
+              "moved_location": read(fields, size, "moved_location", 8, 2),
+              "moved_locations_mask": read(fields, size, "moved_locations_mask", 1, 1),
+              "ai_plan_ticks": read(fields, size, "ai_plan_ticks", 1, 1),
+              "ai_plan_phase": read(fields, size, "ai_plan_phase", 1, 1),
+              "human_drone_morphs": read(fields, size, "human_drone_morphs", 1, 1),
+              "persistent_size": size, "persistent_bytes": list(raw)}
+    if "cloak_active" in fields:
+        result["cloak"] = [read(fields, size, "cloak_active", 1, 1),
+                           read(fields, size, "cloak_regen_remainder", 1, 1)]
+    if "transport_ticks_remaining" in fields:
+        result["transport"] = [read(fields, size, "transport_ticks_remaining", 1, 2),
+                               read(fields, size, "transport_producer_slot_plus1", 1, 1),
+                               read(fields, size, "transport_researched", 1, 1)]
+    if "storm_storm" in fields:
+        result["storm"] = read(fields, size, "storm_storm", 32, 1)
+    return result
 
 
 def decode_fifth_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
@@ -570,6 +683,29 @@ def verify_final(trace_final: dict, state: dict, profile_name: str) -> None:
         if model.get("outcome") != 1 or model.get("fired") != trace_final.get("fired"):
             raise RuntimeError("P6 composite model differs from the winning controller trace")
         verify_p6_extraction(trace_final, state)
+    elif profile_name == "zerg-z6":
+        if runtime.get("fault") != 0:
+            raise RuntimeError("Z6 final state reports adapter faults")
+        if runtime.get("model", {}).get("started") != trace_final.get("started"):
+            raise RuntimeError("Z6 started trigger mask differs from controller trace")
+        if runtime.get("model", {}).get("action_cursor") != trace_final.get("action_cursors"):
+            raise RuntimeError("Z6 source action cursors differ from controller trace")
+        if runtime.get("action_ticks") != trace_final.get("action_ticks"):
+            raise RuntimeError("Z6 source action timers differ from controller trace")
+        if runtime.get("switch_bits") != trace_final.get("switch_bits"):
+            raise RuntimeError("Z6 switch state differs from controller trace")
+        if (runtime.get("model", {}).get("outcome") != 1 or
+                runtime.get("model", {}).get("fired") != trace_final.get("fired")):
+            raise RuntimeError("Z6 source model differs from the winning controller trace")
+        payload = runtime.get("persistent_bytes")
+        if (not isinstance(payload, list) or len(payload) != runtime.get("persistent_size") or
+                type(runtime.get("persistent_size")) is not int or
+                not 0 < runtime["persistent_size"] <= 180 or
+                any(type(v) is not int or not 0 <= v <= 255 for v in payload) or
+                runtime.get("human_drone_morphs", -1) not in range(5)):
+            raise RuntimeError("Z6 complete persistent payload or Drone morph count is malformed")
+        if state.get("kerrigan_alive") != 1:
+            raise RuntimeError("Z6 final state requires its live source hero")
     else:
         if runtime.get("faults") != 0:
             raise RuntimeError("fifth mission final state reports adapter faults")
@@ -656,7 +792,8 @@ def mission_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict
     state["force2_buildings"] = bowners.get("1", 0)
     state["force3_buildings"] = bowners.get("4", 0)
     state["kerrigan_alive"] = sum(1 for item in units["entities"]
-                                   if item["owner"] == 0 and item.get("raw_type") == 51)
+                                   if item["owner"] == 0 and item.get("raw_type") == 51 and
+                                   (profile_name != "zerg-z6" or item.get("raw_owner") == 3))
     state["force3_command_centers"] = sum(1 for item in buildings["entities"]
                                            if item["owner"] == 4 and item.get("raw_type") == 106)
     state["chrysalis_alive"] = count_chrysalis(units, buildings)
@@ -771,7 +908,7 @@ def compact_bank_profile(elf: Path, sizes: dict[str, int], profile_name: str) ->
     for field in ("owner", "type", "alive", "x", "y", "hp", "raw_type"):
         if field not in unit_offsets:
             raise RuntimeError(f"compact Unit DWARF lacks {field}")
-    if profile_name == "protoss-p6":
+    if profile_name in ("protoss-p6", "zerg-z6"):
         for field in ("raw_owner", "order"):
             if field not in unit_offsets:
                 raise RuntimeError(f"P6 compact Unit DWARF lacks {field}")

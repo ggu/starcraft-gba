@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Run a bounded, normal-input Protoss 6 startup performance diagnostic.
+"""Run a bounded, normal-input Zerg 6 or Protoss 6 startup diagnostic.
 
-This measures the first live P6 interval only. It is not a controller replay,
+This measures the first live mission interval only. It is not a controller replay,
 campaign completion, save-continuity, or mission-win qualification. The runner
 injects only the normal 12-input HOME/menu route, then leaves the game neutral.
 All campaign/world data is read through ELF symbols and DWARF.
@@ -33,22 +33,34 @@ from emulator_smoke import ROOT, capture, require_mgba, symbol_sizes, symbols
 P6_PROFILE = "protoss-p6"
 P6_FACTION = "protoss"
 P6_MISSION = 25
-SCREEN_TITLE, SCREEN_PLAY = 0, 1
+Z6_PROFILE = "zerg-z6"
+Z6_FACTION = "zerg"
+Z6_MISSION = 17
 DEFAULT_OUT = ROOT / ".local/build/promotion/p6-startup"
+PROFILE_INFO = {
+    P6_PROFILE: {"faction": P6_FACTION, "mission": P6_MISSION,
+                 "faction_id": 2, "runtime": "race_p6", "default_out": DEFAULT_OUT},
+    Z6_PROFILE: {"faction": Z6_FACTION, "mission": Z6_MISSION,
+                 "faction_id": 1, "runtime": "race_z6",
+                 "default_out": ROOT / ".local/build/promotion/z6-startup"},
+}
+SCREEN_TITLE, SCREEN_PLAY = 0, 1
 DEFAULT_LIVE_FRAMES = 1000
 DEFAULT_CHECKPOINT = 1000
 MAX_LIVE_FRAMES = 10000
 MAX_U32 = 0xFFFFFFFF
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
-P6_REQUIRED_SYMBOLS = (
+COMMON_REQUIRED_SYMBOLS = (
     "game_update", "demo_schedule_events", "demo_schedule_count",
     "demo_schedule_length", "demo_schedule_tick", "demo_replay_checkpoint",
     "screen", "frame", "won", "lost", "race_mode", "race_selected_mission",
     "race_completed", "race_campaign", "race_minerals", "race_gas", "race_front",
-    "u", "b", "race_p6", "demo_update_cycles", "gfx_draw_cycles",
+    "u", "b", "demo_update_cycles", "gfx_draw_cycles",
     "sc64_orders_cycles", "sc64_other_cycles",
 )
+P6_REQUIRED_SYMBOLS = COMMON_REQUIRED_SYMBOLS + ("race_p6",)
+Z6_REQUIRED_SYMBOLS = COMMON_REQUIRED_SYMBOLS + ("race_z6",)
 
 
 def validate_live_frames(value: int) -> int:
@@ -71,16 +83,22 @@ def validate_expected_hash(value: str | None, label: str) -> str | None:
     return value.lower()
 
 
-def startup_input_events(capacity: int) -> list[tuple[int, int]]:
+def _report_kind(profile_name: str) -> str:
+    return "p6-startup-diagnostic" if profile_name == P6_PROFILE else f"{profile_name}-startup-diagnostic"
+
+
+def startup_input_events(capacity: int, profile_name: str = P6_PROFILE) -> list[tuple[int, int]]:
     """Return exactly the authenticated sixth-entry input prefix (tick-zero based)."""
+    if profile_name not in PROFILE_INFO:
+        raise ValueError("startup profile must be protoss-p6 or zerg-z6")
     if type(capacity) is not int or capacity < len(replay.SIXTH_MENU_PREFIX):
-        raise ValueError("ELF scheduler capacity is too small for the 12-input P6 menu route")
+        raise ValueError("ELF scheduler capacity is too small for the 12-input sixth-entry menu route")
     expected = (
         (1, 1), (2, 0), (3, 16), (4, 0), (5, 16), (6, 0),
         (7, 128), (8, 0), (9, 1), (10, 0), (11, 1), (12, 0),
     )
     if tuple(replay.SIXTH_MENU_PREFIX) != expected:
-        raise RuntimeError("P6 menu route constant differs from the authenticated 12-input prefix")
+        raise RuntimeError(f"{profile_name} menu route constant differs from the authenticated 12-input prefix")
     return [(tick - 1, held) for tick, held in expected]
 
 
@@ -99,31 +117,47 @@ def startup_checkpoint_ticks(start_tick: int, live_frames: int,
     return sorted(checkpoints)
 
 
-def verify_profile_contract(metadata: dict, sym: dict[str, int], sizes: dict[str, int]) -> dict:
-    if not isinstance(metadata, dict) or metadata.get("profile") != P6_FACTION:
-        raise ValueError("ROM/ELF catalog metadata must identify the Protoss profile")
+def verify_profile_contract(metadata: dict, sym: dict[str, int], sizes: dict[str, int],
+                             profile_name: str = P6_PROFILE) -> dict:
+    if profile_name not in PROFILE_INFO:
+        raise ValueError("startup profile must be protoss-p6 or zerg-z6")
+    info = PROFILE_INFO[profile_name]
+    mission, faction, faction_id = info["mission"], info["faction"], info["faction_id"]
+    required_symbols = P6_REQUIRED_SYMBOLS if profile_name == P6_PROFILE else Z6_REQUIRED_SYMBOLS
+    if not isinstance(metadata, dict) or metadata.get("profile") != faction:
+        raise ValueError(f"ROM/ELF catalog metadata must identify the {faction} profile")
     records = metadata.get("records")
-    p6 = next((row for row in records if isinstance(row, dict) and row.get("id") == P6_MISSION), None) \
+    if not isinstance(records, list):
+        raise ValueError("ROM/ELF catalog metadata must include its records array")
+    target = next((row for row in records if isinstance(row, dict) and row.get("id") == mission), None) \
         if isinstance(records, list) else None
-    if not p6 or p6.get("faction") != 2 or p6.get("playable") != 1:
-        raise ValueError("matching catalog must enable playable Protoss P6 at global mission ID 25")
+    if not target or target.get("faction") != faction_id or target.get("playable") != 1:
+        raise ValueError(f"matching catalog must enable playable {profile_name} at global mission ID {mission}")
     enabled = metadata.get("enabled_mission_ids")
-    if not isinstance(enabled, list) or P6_MISSION not in enabled:
-        raise ValueError("Protoss P6 global mission ID 25 is not enabled in the ROM catalog")
-    missing = [name for name in P6_REQUIRED_SYMBOLS if name not in sym]
+    if not isinstance(enabled, list) or mission not in enabled:
+        raise ValueError(f"{profile_name} global mission ID {mission} is not enabled in the ROM catalog")
+    if profile_name == Z6_PROFILE:
+        zerg_ids = {row.get("id") for row in records
+                    if isinstance(row, dict) and row.get("faction") == faction_id}
+        staged_zerg_ids = {0, 1, 14, 15, 16, 17}
+        if not staged_zerg_ids.issubset(zerg_ids):
+            raise ValueError("Z6 catalog must retain all six staged Zerg chapter records")
+        if not staged_zerg_ids.issubset(set(enabled)):
+            raise ValueError("Z6 startup profile requires all six staged Zerg chapters enabled")
+    missing = [name for name in required_symbols if name not in sym]
     if missing:
-        raise RuntimeError("P6 ELF is missing required symbols: " + ", ".join(missing))
+        raise RuntimeError(f"{profile_name} ELF is missing required symbols: " + ", ".join(missing))
     if sizes.get("demo_schedule_events", 0) <= 0 or sizes["demo_schedule_events"] % 8:
-        raise RuntimeError("P6 ELF has an invalid controller event queue size")
+        raise RuntimeError(f"{profile_name} ELF has an invalid controller event queue size")
     mode, capacity = replay.scheduler.schedule_mode(sym, sizes)
     if mode == "windowed":
         for name in ("demo_schedule_active", "demo_schedule_index"):
             if name not in sym:
-                raise RuntimeError(f"windowed P6 ELF is missing scheduler symbol {name}")
-    return {"profile": P6_PROFILE, "mission": P6_MISSION,
+                raise RuntimeError(f"windowed {profile_name} ELF is missing scheduler symbol {name}")
+    return {"profile": profile_name, "mission": mission,
             "scheduler_mode": mode, "scheduler_capacity": capacity,
             "catalog_profile": metadata["profile"],
-            "catalog_mission": p6}
+            "catalog_mission": target}
 
 
 def validate_p6_live_state(state: dict, *, expected_screen: int = SCREEN_PLAY) -> None:
@@ -154,10 +188,72 @@ def validate_p6_live_state(state: dict, *, expected_screen: int = SCREEN_PLAY) -
             raise RuntimeError("P6 startup trigger cursor/timer exceeds source bounds")
 
 
+def validate_z6_live_state(state: dict, *, expected_screen: int = SCREEN_PLAY) -> None:
+    if not isinstance(state, dict) or state.get("screen") != expected_screen:
+        raise RuntimeError("Z6 startup left the expected screen")
+    if (state.get("race_mode") != 0 or state.get("race_selected_mission") != Z6_MISSION or
+            state.get("won") != 0 or state.get("lost") != 0):
+        raise RuntimeError("normal-input startup did not enter a live, unfinished Zerg Z6")
+    runtime = state.get("race_runtime")
+    if not isinstance(runtime, dict) or runtime.get("fault") != 0:
+        raise RuntimeError("Z6 runtime snapshot is missing or reports a fault")
+    model = runtime.get("model")
+    if not isinstance(model, dict) or model.get("outcome") != 0:
+        raise RuntimeError("Z6 startup model state is invalid or terminal")
+    started = model.get("started")
+    cursors, ticks = model.get("action_cursor"), runtime.get("action_ticks")
+    transport = runtime.get("transport")
+    payload = runtime.get("persistent_bytes")
+    state_size = runtime.get("persistent_size")
+    if (type(started) is not int or not 0 <= started < (1 << 9) or
+            model.get("fired") != started or
+            not isinstance(cursors, list) or len(cursors) != 9 or
+            not isinstance(ticks, list) or len(ticks) != 9 or
+            type(state_size) is not int or not 0 < state_size <= 180 or
+            not isinstance(payload, list) or len(payload) != state_size or
+            any(type(value) is not int or not 0 <= value <= 255 for value in payload) or
+            type(runtime.get("human_drone_morphs")) is not int or
+            not 0 <= runtime["human_drone_morphs"] <= 4 or
+            type(runtime.get("ai_plan_ticks")) is not int or
+            not 0 <= runtime["ai_plan_ticks"] <= 240 or
+            type(runtime.get("ai_plan_phase")) is not int or
+            not 0 <= runtime["ai_plan_phase"] <= 3 or
+            not isinstance(runtime.get("moved_location"), list) or
+            len(runtime["moved_location"]) != 8 or
+            not isinstance(transport, list) or len(transport) != 3 or
+            type(transport[0]) is not int or not 0 <= transport[0] <= 3000 or
+            type(transport[1]) is not int or not 0 <= transport[1] <= 240 or
+            type(transport[2]) is not int or transport[2] not in (0, 1)):
+        raise RuntimeError("Z6 startup trigger or persistent state has an invalid shape")
+    remaining, producer, researched = transport
+    if ((researched and (remaining or producer)) or
+            (not remaining and producer) or
+            (remaining and not 1 <= producer <= 160)):
+        raise RuntimeError("Z6 startup transport research has an invalid producer/timer relation")
+    for trigger, (cursor, timer) in enumerate(zip(cursors, ticks)):
+        if (type(cursor) is not int or type(timer) is not int or
+                not 0 <= cursor <= replay.Z6_ACTION_COUNTS[trigger] or
+                not 0 <= timer <= 65535 or
+                (cursor and not (started & (1 << trigger))) or
+                ((cursor != 0) != (timer != 0))):
+            raise RuntimeError("Z6 startup trigger cursor/timer exceeds source bounds")
+
+
+def _validate_live_state(profile_name: str, state: dict) -> None:
+    if profile_name == P6_PROFILE:
+        validate_p6_live_state(state)
+    elif profile_name == Z6_PROFILE:
+        validate_z6_live_state(state)
+    else:
+        raise ValueError("unsupported startup profile")
+
+
 def compare_startup_reports(baseline: dict, candidate: dict) -> dict:
     """Compare exact state and PNG digests at matching startup checkpoints."""
     for report in (baseline, candidate):
         _validate_report_header(report)
+    if baseline["profile"] != candidate["profile"]:
+        raise ValueError("startup reports use different profiles")
     if (baseline.get("live_frames") != candidate.get("live_frames") or
             baseline.get("checkpoint_interval") != candidate.get("checkpoint_interval")):
         raise ValueError("startup reports have different measurement windows")
@@ -191,11 +287,13 @@ def compare_startup_reports(baseline: dict, candidate: dict) -> dict:
 
 
 def _validate_report_header(report: object) -> dict:
-    if (not isinstance(report, dict) or report.get("schema") != 1 or
-            report.get("kind") != "p6-startup-diagnostic" or
-            report.get("profile") != P6_PROFILE or report.get("mission") != P6_MISSION or
+    if not isinstance(report, dict) or report.get("schema") != 1:
+        raise ValueError("comparison inputs must be schema-1 startup-only reports")
+    name = report.get("profile")
+    if name not in PROFILE_INFO or (report.get("kind") != _report_kind(name) or
+            report.get("mission") != PROFILE_INFO[name]["mission"] or
             report.get("qualification") != "startup-only"):
-        raise ValueError("comparison inputs must be schema-1 P6 startup-only reports")
+        raise ValueError("comparison inputs must be supported startup-only profile reports")
     for name in ("live_frames", "checkpoint_interval"):
         if type(report.get(name)) is not int:
             raise ValueError(f"startup report is missing integer {name}")
@@ -245,11 +343,18 @@ def _start_emulator(name: str, rom: Path, out: Path, sym: dict[str, int]):
         raise
 
 
-def run(rom_path: Path, elf_path: Path, out: Path = DEFAULT_OUT,
+def run(rom_path: Path, elf_path: Path, out: Path | None = None,
         live_frames: int = DEFAULT_LIVE_FRAMES, checkpoint: int = DEFAULT_CHECKPOINT,
         expected_rom_sha256: str | None = None,
         expected_elf_sha256: str | None = None,
-        compare_path: Path | None = None) -> dict:
+        compare_path: Path | None = None,
+        profile_name: str = P6_PROFILE) -> dict:
+    if profile_name not in PROFILE_INFO:
+        raise ValueError("startup profile must be protoss-p6 or zerg-z6")
+    info = PROFILE_INFO[profile_name]
+    mission = info["mission"]
+    if out is None:
+        out = info["default_out"]
     live_frames = validate_live_frames(live_frames)
     checkpoint = validate_checkpoint(checkpoint)
     expected_rom_sha256 = validate_expected_hash(expected_rom_sha256, "ROM")
@@ -264,6 +369,8 @@ def run(rom_path: Path, elf_path: Path, out: Path = DEFAULT_OUT,
         if (baseline_report["live_frames"] != live_frames or
                 baseline_report["checkpoint_interval"] != checkpoint):
             raise ValueError("startup comparison report has a different measurement window")
+        if baseline_report["profile"] != profile_name:
+            raise ValueError("startup comparison report uses a different profile")
         expected_ticks = startup_checkpoint_ticks(12, live_frames, checkpoint)
         baseline_rows = baseline_report["checkpoints"]
         if (len(baseline_rows) != len(expected_ticks) or
@@ -280,17 +387,17 @@ def run(rom_path: Path, elf_path: Path, out: Path = DEFAULT_OUT,
             raise RuntimeError(f"{label} SHA-256 mismatch: expected {expected}, observed {actual}")
 
     sym, sizes = symbols(elf_path), symbol_sizes(elf_path)
-    metadata = split.read_campaign_metadata(rom_path, elf_path, P6_FACTION)
-    contract = verify_profile_contract(metadata, sym, sizes)
-    bank = replay.compact_bank_profile(elf_path, sizes, P6_PROFILE)
+    metadata = split.read_campaign_metadata(rom_path, elf_path, info["faction"])
+    contract = verify_profile_contract(metadata, sym, sizes, profile_name)
+    bank = replay.compact_bank_profile(elf_path, sizes, profile_name)
     campaign_layout = races.dwarf_struct(elf_path, "Sc64RaceCampaignState")
-    runtime_layout = replay.runtime_layout_for(elf_path, P6_PROFILE)
-    model_layout = races.dwarf_struct(elf_path, replay.MODEL_TYPES[P6_PROFILE])
+    runtime_layout = replay.runtime_layout_for(elf_path, profile_name)
+    model_layout = races.dwarf_struct(elf_path, replay.MODEL_TYPES[profile_name])
     frontend = split.frontend_offsets(elf_path)
 
     scheduler_mode, capacity = contract["scheduler_mode"], contract["scheduler_capacity"]
-    events = startup_input_events(capacity)
-    run_dir = out / f"protoss-p6-startup-{time.time_ns()}"
+    events = startup_input_events(capacity, profile_name)
+    run_dir = out / f"{profile_name}-startup-{time.time_ns()}"
     run_dir.mkdir(parents=True, exist_ok=False)
     split.FRONT_FIELDS = frontend
     profile.check_debugger_port_free()
@@ -301,7 +408,7 @@ def run(rom_path: Path, elf_path: Path, out: Path = DEFAULT_OUT,
                    "frame": profile.u32(rsp, sym["frame"]),
                    "page": profile.u32(rsp, sym["race_front"] + frontend["page"])}
         if initial != {"screen": SCREEN_TITLE, "frame": 0, "page": split.FRONT_HOME}:
-            raise RuntimeError(f"fresh P6 boot did not remain on HOME: {initial}")
+            raise RuntimeError(f"fresh {profile_name} boot did not remain on HOME: {initial}")
         home_capture = capture(rsp, run_dir / "home.png")
 
         # The first scheduler observer runs before the first scheduled input.
@@ -320,19 +427,19 @@ def run(rom_path: Path, elf_path: Path, out: Path = DEFAULT_OUT,
                      "frame": profile.u32(rsp, sym["frame"]),
                      "page": profile.u32(rsp, sym["race_front"] + frontend["page"])}
         if pre_start != initial:
-            raise RuntimeError("P6 startup left HOME before processing the normal menu route")
+            raise RuntimeError(f"{profile_name} startup left HOME before processing the normal menu route")
 
         # Stop exactly at the real PLAY handoff after the 12 ordinary inputs.
         rsp.write(sym["demo_schedule_length"], struct.pack("<I", 12))
         rsp.tick()
         start_tick = profile.u32(rsp, sym["demo_schedule_tick"])
         if start_tick != 12:
-            raise RuntimeError(f"P6 menu route stopped at scheduler tick {start_tick}, expected 12")
+            raise RuntimeError(f"{profile_name} menu route stopped at scheduler tick {start_tick}, expected 12")
         start_state = replay.mission_snapshot(rsp, sym, sizes, bank, campaign_layout,
-                                              runtime_layout, model_layout, P6_PROFILE)
-        validate_p6_live_state(start_state)
+                                              runtime_layout, model_layout, profile_name)
+        _validate_live_state(profile_name, start_state)
         if start_state["frame"] != 1:
-            raise RuntimeError("P6 normal-input handoff frame differs from the expected first live frame")
+            raise RuntimeError(f"{profile_name} normal-input handoff frame differs from the expected first live frame")
         start_capture_path = run_dir / "live-start.png"
         start_capture = capture(rsp, start_capture_path)
         start_capture_hash = hashlib.sha256(start_capture_path.read_bytes()).hexdigest()
@@ -349,10 +456,10 @@ def run(rom_path: Path, elf_path: Path, out: Path = DEFAULT_OUT,
             if completed != target_tick:
                 raise RuntimeError(f"expected startup checkpoint {target_tick}, observed {completed}")
             state = replay.mission_snapshot(rsp, sym, sizes, bank, campaign_layout,
-                                            runtime_layout, model_layout, P6_PROFILE)
+                                            runtime_layout, model_layout, profile_name)
             if state["screen"] != SCREEN_PLAY:
-                raise RuntimeError(f"P6 left live PLAY during startup profiling at tick {completed}")
-            validate_p6_live_state(state)
+                raise RuntimeError(f"{profile_name} left live PLAY during startup profiling at tick {completed}")
+            _validate_live_state(profile_name, state)
             now = profile.hardware_clock(rsp)
             elapsed = (now - prior_clock) & MAX_U32
             frame_delta = (state["frame"] - prior_state["frame"]) & MAX_U32
@@ -369,7 +476,7 @@ def run(rom_path: Path, elf_path: Path, out: Path = DEFAULT_OUT,
                    "capture": str(image_path), "capture_sha256": image_hash,
                    "capture_info": image_info}
             checkpoints.append(row)
-            print(f"P6 startup live={live_frame}/{live_frames} tick={completed} "
+            print(f"{profile_name} startup live={live_frame}/{live_frames} tick={completed} "
                   f"fps={fps:.2f} update={stage_cycles.get('demo_update_cycles', 0)} "
                   f"draw={stage_cycles.get('gfx_draw_cycles', 0)}", flush=True)
             if state["won"] or state["lost"] or state["race_runtime"]["model"]["outcome"]:
@@ -380,10 +487,10 @@ def run(rom_path: Path, elf_path: Path, out: Path = DEFAULT_OUT,
         frames_counted = sum(row["frame_delta"] for row in checkpoints)
         report = {
             "schema": 1,
-            "kind": "p6-startup-diagnostic",
+            "kind": _report_kind(profile_name),
             "qualification": "startup-only",
-            "profile": P6_PROFILE,
-            "mission": P6_MISSION,
+            "profile": profile_name,
+            "mission": mission,
             "rom": str(rom_path.resolve()), "elf": str(elf_path.resolve()),
             "rom_sha256": rom_hash, "elf_sha256": elf_hash,
             "campaign_catalog": metadata, "profile_contract": contract,
@@ -433,9 +540,11 @@ def _write_events(rsp, sym: dict[str, int], events: list[tuple[int, int]]) -> No
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--rom", type=Path, required=True, help="P6 GBA ROM")
-    parser.add_argument("--elf", type=Path, required=True, help="matching P6 ELF with symbols and DWARF")
-    parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="diagnostic output root")
+    parser.add_argument("--profile", choices=tuple(PROFILE_INFO), default=P6_PROFILE,
+                        help="internal campaign profile (default: protoss-p6)")
+    parser.add_argument("--rom", type=Path, required=True, help="GBA ROM")
+    parser.add_argument("--elf", type=Path, required=True, help="matching ELF with symbols and DWARF")
+    parser.add_argument("--out", type=Path, default=None, help="diagnostic output root")
     parser.add_argument("--live-frames", type=int, default=DEFAULT_LIVE_FRAMES,
                         help=f"neutral live frames after menu launch (1..{MAX_LIVE_FRAMES})")
     parser.add_argument("--checkpoint", type=int, choices=(100, 1000), default=DEFAULT_CHECKPOINT,
@@ -452,7 +561,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         run(args.rom, args.elf, args.out, args.live_frames, args.checkpoint,
-            args.expect_rom_sha256, args.expect_elf_sha256, args.compare)
+            args.expect_rom_sha256, args.expect_elf_sha256, args.compare, args.profile)
     except (OSError, ValueError, RuntimeError, AssertionError,
             json.JSONDecodeError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f"sc64_zp_start_profile: {exc}\n")

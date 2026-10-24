@@ -71,6 +71,26 @@ def sixth_trace():
             "policy": "normal-input P6 fixture", "events": rows}
 
 
+def z6_trace():
+    rows = [{"kind": "input", "host_tick": tick, "held": held,
+             "pressed": held if held else 0}
+            for tick, held in replay.SIXTH_MENU_PREFIX]
+    rows.extend([
+        {"kind": "start", "host_tick": 12, "frame": 1, "screen": 1,
+         "won": 0, "lost": 0, "outcome": 0, "started": 1,
+         "fired": 1, "action_cursors": [1,0,0,0,0,0,0,0,0],
+         "action_ticks": [1,0,0,0,0,0,0,0,0], "switch_bits": [0] * 8, "fault": 0},
+        {"kind": "periodic", "host_tick": 1000},
+        {"kind": "won", "host_tick": 2000, "frame": 1990,
+         "screen": 3, "won": 1, "lost": 0, "outcome": 1,
+         "started": 1 << 5, "fired": 1 << 5,
+         "action_cursors": [0] * 9, "action_ticks": [0] * 9,
+         "switch_bits": [0] * 8, "fault": 0, "kerrigan_alive": 1},
+    ])
+    return {"schema": 1, "mission": 17, "profile": "zerg-z6",
+            "policy": "normal-input Z6 fixture", "events": rows}
+
+
 class TraceTests(unittest.TestCase):
     class Memory:
         def __init__(self, data): self.data = data
@@ -78,17 +98,25 @@ class TraceTests(unittest.TestCase):
 
     def test_compact_bank_profile_validates_layout_and_profile_bounds(self):
         unit = {"hp": 0, "x": 16, "y": 18, "raw_type": 32,
-                "owner": 50, "type": 51, "alive": 52}
+                "owner": 50, "type": 51, "alive": 52, "raw_owner": 34, "order": 36}
         building = {"x": 0, "y": 4, "hp": 8, "owner": 16, "type": 20,
                     "alive": 24, "under_construction": 64, "raw_type": 76}
         def layout(_elf, name):
-            return (56, unit) if name == "Unit" else (100, building)
+            if name == "Unit": return 56, unit
+            if name == "Sc64ZpCompactBuilding":
+                return 48, {"x": 0, "y": 2, "hp": 4, "owner": 8, "type": 9,
+                            "alive": 10, "under_construction": 11, "raw_type": 12}
+            return 100, building
         with mock.patch.object(replay.races, "dwarf_struct", side_effect=layout):
             for name, capacity in (("zerg-z4", 192), ("protoss-p4", 240)):
                 bank = replay.compact_bank_profile(Path("fixture.elf"),
                     {"u": capacity * 56, "b": 9600}, name)
                 self.assertEqual(bank["unit_capacity"], capacity)
                 self.assertEqual(bank["building_capacity"], 96)
+            bank = replay.compact_bank_profile(Path("fixture.elf"),
+                {"u": 240 * 56, "b": 160 * 48}, "zerg-z6")
+            self.assertEqual(bank["unit_capacity"], 240)
+            self.assertEqual(bank["building_capacity"], 160)
             with self.assertRaisesRegex(RuntimeError, "bounded profile"):
                 replay.compact_bank_profile(Path("fixture.elf"),
                     {"u": 128 * 56, "b": 9600}, "zerg-z4")
@@ -131,6 +159,74 @@ class TraceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "fired alias"):
             replay.validate_trace(bad, 16, "protoss-p6")
 
+    def test_sixth_entry_z6_route_and_win_require_actual_z6_source_contract(self):
+        trace = z6_trace()
+        plan = replay.validate_trace(trace, 16, "zerg-z6")
+        self.assertEqual(plan["input_count"], 12)
+        self.assertEqual(plan["start"]["host_tick"], 12)
+        self.assertEqual(plan["start"]["frame"], 1)
+        bad = copy.deepcopy(trace); bad["events"][12]["frame"] = 0
+        with self.assertRaisesRegex(ValueError, "live PLAY handoff frame"):
+            replay.validate_trace(bad, 16, "zerg-z6")
+        bad = copy.deepcopy(trace); bad["mission"] = 25
+        with self.assertRaises(ValueError): replay.validate_trace(bad, 16, "zerg-z6")
+        bad = copy.deepcopy(trace); bad["profile"] = "protoss-p6"
+        with self.assertRaises(ValueError): replay.validate_trace(bad, 16, "zerg-z6")
+        for mutate in (
+            lambda row: row.update(started=1 << 0, fired=1 << 0),
+            lambda row: row.update(kerrigan_alive=0),
+        ):
+            bad = copy.deepcopy(trace); mutate(bad["events"][-1])
+            with self.assertRaises(ValueError): replay.validate_trace(bad, 16, "zerg-z6")
+
+    def test_z6_nested_persistent_runtime_layout_and_full_payload_decode(self):
+        inner = (64, {"model": 0, "action_ticks": 12, "switch_bits": 30, "fault": 62})
+        outer = (180, {"runtime": 0, "deaths_by_source": 64,
+                       "moved_location": 112, "moved_locations_mask": 128,
+                       "ai_plan_ticks": 129, "ai_plan_phase": 130,
+                       "transport": 132, "human_drone_morphs": 136,
+                       "cloak": 137, "storm": 140})
+        nested = {
+            "Sc64Z6RuntimeState": inner,
+            "Sc64Z6PersistentState": outer,
+            "Sc64Z6TransportTechState": (4, {"ticks_remaining": 0,
+                "producer_slot_plus1": 2, "researched": 3}),
+            "Sc64Z5CloakState": (2, {"active": 0, "regen_remainder": 1}),
+            "Sc64PsionicStormState": (32, {"storm": 0}),
+        }
+        with mock.patch.object(replay.races, "dwarf_struct", side_effect=lambda _elf, name: nested[name]):
+            layout = replay.runtime_layout_for(Path("fixture.elf"), "zerg-z6")
+        self.assertEqual(layout[0], 180)
+        self.assertEqual(layout[1]["transport_ticks_remaining"], 132)
+        self.assertEqual(layout[1]["cloak_regen_remainder"], 138)
+        self.assertEqual(layout[1]["storm_storm"], 140)
+        model_layout = (12, {"started": 0, "outcome": 2, "action_cursor": 3})
+        raw = bytearray(180)
+        raw[0:2] = (0x101).to_bytes(2, "little")
+        raw[2] = 0
+        raw[3:12] = bytes(range(9))
+        for i in range(9): raw[12 + 2*i:14 + 2*i] = (20 + i).to_bytes(2, "little")
+        for i in range(8): raw[30 + i*4:34 + i*4] = (0x11110000 + i).to_bytes(4, "little")
+        raw[62] = 0
+        for i in range(12): raw[64 + i*4:68 + i*4] = (100 + i).to_bytes(4, "little")
+        for i in range(8): raw[112 + i*2:114 + i*2] = (200 + i).to_bytes(2, "little")
+        raw[128:131] = bytes([3, 240, 2])
+        raw[132:136] = bytes([0xB8, 0x0B, 2, 1])
+        raw[136] = 4
+        raw[137:139] = bytes([1, 2])
+        raw[140:172] = bytes(range(32))
+        decoded = replay.decode_runtime(bytes(raw), layout, model_layout, "zerg-z6")
+        self.assertEqual(decoded["model"], {"started": 0x101, "fired": 0x101,
+            "outcome": 0, "action_cursor": list(range(9))})
+        self.assertEqual(decoded["action_ticks"], list(range(20, 29)))
+        self.assertEqual(decoded["switch_bits"], [0x11110000 + i for i in range(8)])
+        self.assertEqual(decoded["deaths_by_source"], list(range(100, 112)))
+        self.assertEqual(decoded["moved_location"], list(range(200, 208)))
+        self.assertEqual(decoded["transport"], [3000, 2, 1])
+        self.assertEqual(decoded["human_drone_morphs"], 4)
+        self.assertEqual(decoded["cloak"], [1, 2])
+        self.assertEqual(decoded["storm"], list(range(32)))
+        self.assertEqual(decoded["persistent_bytes"], list(raw))
     def test_rejects_wrong_profile_mission_and_schema(self):
         p4_wrong = trace_for("protoss-p4", 15)
         with self.assertRaisesRegex(ValueError, "mission"):

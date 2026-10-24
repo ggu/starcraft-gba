@@ -48,9 +48,47 @@ def report(live=1000, interval=1000, *, state_value=None, capture_hash="a" * 64)
                              "state": state_value or state(), "capture_sha256": capture_hash}]}
 
 
+def z6_catalog():
+    missions = (0, 1, 14, 15, 16, 17)
+    return {"profile": "zerg", "enabled_mission_ids": list(missions),
+            "records": [{"id": mission, "faction": 1, "chapter": chapter,
+                         "playable": 1} for chapter, mission in enumerate(missions, 1)]}
+
+
+def z6_symbols():
+    names = startup.Z6_REQUIRED_SYMBOLS + ("demo_schedule_active", "demo_schedule_index")
+    return {name: i * 4 for i, name in enumerate(names, 1)}
+
+
+def z6_state():
+    return {"screen": 1, "race_mode": 0, "race_selected_mission": 17,
+            "won": 0, "lost": 0, "frame": 1,
+            "race_runtime": {"fault": 0, "persistent_size": 176, "persistent_bytes": [0] * 176,
+                "human_drone_morphs": 0, "ai_plan_ticks": 0, "ai_plan_phase": 0,
+                "moved_location": [0] * 8, "transport": [0, 0, 0],
+                "model": {"outcome": 0, "started": 1, "fired": 1,
+                          "action_cursor": [1,0,0,0,0,0,0,0,0]},
+                "action_ticks": [1,0,0,0,0,0,0,0,0]}}
+
+
+def z6_report(live=1000, interval=1000, *, state_value=None, capture_hash="a" * 64):
+    return {"schema": 1, "kind": "zerg-z6-startup-diagnostic", "qualification": "startup-only",
+            "profile": "zerg-z6", "mission": 17,
+            "live_frames": live, "checkpoint_interval": interval,
+            "rom_sha256": "1" * 64, "elf_sha256": "2" * 64,
+            "start_state": state_value or z6_state(),
+            "start_capture_sha256": capture_hash,
+            "checkpoints": [{"scheduler_tick": 1012, "live_frame": 1000,
+                             "state": state_value or z6_state(), "capture_sha256": capture_hash}]}
+
+
 class StartupProfileTests(unittest.TestCase):
     def test_default_scope_and_menu_prefix_are_exact(self):
         self.assertEqual(startup.DEFAULT_LIVE_FRAMES, 1000)
+        self.assertEqual(startup.build_parser().parse_args(["--rom", "r", "--elf", "e"]).profile,
+                         "protoss-p6")
+        self.assertEqual(startup.build_parser().parse_args(
+            ["--profile", "zerg-z6", "--rom", "r", "--elf", "e"]).profile, "zerg-z6")
         events = startup.startup_input_events(16)
         self.assertEqual(events, [(tick - 1, held)
                                   for tick, held in startup.replay.SIXTH_MENU_PREFIX])
@@ -129,6 +167,49 @@ class StartupProfileTests(unittest.TestCase):
         for value in ("x" * 64, "0" * 63, "0" * 65):
             with self.assertRaisesRegex(ValueError, "64 hexadecimal"):
                 startup.validate_expected_hash(value, "ELF")
+
+    def test_z6_profile_contract_requires_all_six_zerg_records_and_runtime_symbol(self):
+        contract = startup.verify_profile_contract(z6_catalog(), z6_symbols(), sizes(), "zerg-z6")
+        self.assertEqual(contract["mission"], 17)
+        self.assertEqual(contract["profile"], "zerg-z6")
+        self.assertEqual(contract["scheduler_mode"], "windowed")
+        for bad in (
+            {"profile": "protoss", "enabled_mission_ids": [17],
+             "records": z6_catalog()["records"]},
+            {"profile": "zerg", "enabled_mission_ids": [0, 1, 14, 15, 16, 17],
+             "records": z6_catalog()["records"][:-1]},
+            {"profile": "zerg", "enabled_mission_ids": [0, 1, 14, 15, 16],
+             "records": z6_catalog()["records"]},
+        ):
+            with self.assertRaises(ValueError):
+                startup.verify_profile_contract(bad, z6_symbols(), sizes(), "zerg-z6")
+        bad_symbols = z6_symbols(); del bad_symbols["race_z6"]
+        with self.assertRaisesRegex(RuntimeError, "race_z6"):
+            startup.verify_profile_contract(z6_catalog(), bad_symbols, sizes(), "zerg-z6")
+
+    def test_z6_startup_state_requires_live_unfinished_nine_trigger_snapshot(self):
+        startup.validate_z6_live_state(z6_state())
+        broken = copy.deepcopy(z6_state()); broken["race_selected_mission"] = 16
+        with self.assertRaises(RuntimeError): startup.validate_z6_live_state(broken)
+        broken = copy.deepcopy(z6_state()); broken["race_runtime"]["model"]["started"] = 1 << 9
+        with self.assertRaises(RuntimeError): startup.validate_z6_live_state(broken)
+        broken = copy.deepcopy(z6_state()); broken["race_runtime"]["action_ticks"][0] = 0
+        with self.assertRaises(RuntimeError): startup.validate_z6_live_state(broken)
+
+    def test_z6_research_timer_requires_candidate_producer_relation(self):
+        for transport in ([0, 0, 0], [3000, 1, 0], [1, 160, 0], [0, 0, 1]):
+            valid = z6_state(); valid["race_runtime"]["transport"] = transport
+            startup.validate_z6_live_state(valid)
+        for transport in ([3000, 0, 0], [3000, 161, 0], [0, 1, 0], [1, 1, 1]):
+            broken = z6_state(); broken["race_runtime"]["transport"] = transport
+            with self.assertRaisesRegex(RuntimeError, "producer/timer"):
+                startup.validate_z6_live_state(broken)
+
+    def test_z6_report_comparison_cannot_mix_profile_with_p6(self):
+        result = startup.compare_startup_reports(z6_report(), z6_report())
+        self.assertTrue(result["exact_state_match"])
+        with self.assertRaisesRegex(ValueError, "different profiles"):
+            startup.compare_startup_reports(report(), z6_report())
 
 
 if __name__ == "__main__":

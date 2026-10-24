@@ -2563,3 +2563,37 @@ configurations; Z6 frame coverage remains pixel-identical to full clears. The
 actual Z6 transport fixture passes paid timing, pause, capacity, unloading,
 Kerrigan cargo, Drone-morph save continuity, malformed save rejection and
 carrier/passenger death accounting under ASan/UBSan.
+
+
+### Z6 full-state startup observer
+
+The Z6 replay observer decodes the actual 176-byte persistent state from ELF
+DWARF, including nine action cursors/timers, eight switch words, source deaths,
+mutable locations, AI cadence, Cloak/Storm, transport research and Drone morphs.
+It hashes all 240 compact Unit rows and 160 compact Building rows, including
+retained dead provenance. A future full replay must require source victory
+trigger 5, neither defeat trigger 0/6, and a live human source-3 Kerrigan.
+Eleven startup-tool and 25 replay-tool asset-free tests pass; P6 defaults and
+report comparisons are retained.
+
+A normal-input 1,000-frame Z6 neutral opening runs at **15.24 effective fps**,
+with no runtime fault or terminal outcome. It reads all persistent fields and
+captures the handoff plus eleven later checkpoints. This is a startup baseline,
+not a full mission win or a 30-fps/hardware claim. The frozen engine commit is
+`b3bc50d`, with IWRAM `0x03004f00` and BSS `0x0203d980`. Private ROM/ELF copies
+and the hash manifest are under
+`.local/build/promotion/z6-transport-frozen/`; the report is under
+`.local/build/promotion/z6-transport-startup/`.
+
+The Z6 normal-menu controller and ARM startup observer both hand off at
+host tick 12, live frame 1. The trace validator requires that exact frame
+and rejects frame 0. Actual spell/control checks cover army B+R excluding
+Kerrigan, regular R including her, and sole-Kerrigan Storm precedence at
+both sufficient and insufficient energy.
+
+The observer/control checkpoint passes a fresh source-only build, all default
+host regressions and **320 Python tests (six private checks skipped)**. The
+source-only ROM remains 65,536 bytes with SHA-256
+`7c6b3068b747bd4b7375294bd0d63d5797665285f9bf622b226d6ffb2cf3de76`.
+The unified ARM build and sanitizer suite pass; the Z6 ARM build retains
+IWRAM `0x03004f00` and BSS `0x0203d980` with unchanged reserve guards.
