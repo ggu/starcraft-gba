@@ -53,6 +53,12 @@ typedef struct {
  * Scenario actors have no training route. */
 static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
 {
+#ifdef SC64_ZP_FACT_RANGE_CULL
+    /* Campaign actor facts occupy a contiguous enum suffix. Reject the
+       overwhelmingly common skirmish misses before the gate-specific facts
+       and switch below. Relational checks also handle INT_MIN/INT_MAX safely. */
+    if (type < U_ZP_INFESTED_KERRIGAN || type >= SC_RU_COUNT) return 0;
+#endif
 #ifdef SC64_Z6_ACTORS
     /* Guardian facts use the same pinned source values as the Z6 combat table;
        generic actor consumers now see its HP, sight, bounds, and policy too. */
@@ -202,6 +208,10 @@ static inline int sc64_zp_actor_default_shields(int type)
 
 static inline const Sc64ZpBuildingFact *sc64_zp_building_fact(int type)
 {
+#ifdef SC64_ZP_FACT_RANGE_CULL
+    /* Campaign building facts likewise occupy an enum suffix. */
+    if (type < B_ZP_CONTROL_TOWER || type >= SC_RB_COUNT) return 0;
+#endif
 #if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
     static const Sc64ZpBuildingFact z6_support_bay = {
         171,450,450,1,150,100,450,320,3,2,32,32,32,20,2,

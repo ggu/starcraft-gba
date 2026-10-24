@@ -3217,3 +3217,36 @@ completion bit 14 and zero action timer are verified. The run averages
 **15.50 effective fps**, so the larger profile still needs performance work.
 This closes the full earlier-mission ARM replay check; canonical promotion
 and cold-save continuity across the earlier chapters remain separate work.
+
+### Default-off campaign fact range rejection
+
+`SC64_ZP_FACT_RANGE_CULL` rejects types outside the campaign enum suffix
+before entering the gated actor/building fact lookup. Standard Zealot,
+Dragoon and Reaver queries were overwhelmingly misses in the measured Z6
+opening. The optimization adds no persistent storage or save fields.
+
+An asset-free ASan/UBSan differential suite compares every returned fact
+field and public wrapper output with the unchanged resolver, across 13
+actor-gate configurations. It includes independent P5/P6 gates, P6 combat,
+the late Terran enum prefix, every enum member, nearby invalid values and
+`INT_MIN`/`INT_MAX`. Complete serialized outputs match in each configuration.
+
+With count snapshots and collision fact hoisting enabled in both host
+comparisons, all 271,799 input ticks produce identical actor/mission-state
+fingerprints and win at frame 268694 with zero source fault. The fingerprint
+file is 2,174,392 bytes with SHA-256 `163cb1cd…20866`; this checks the recorded
+banks, resources, runtime and progression fields, not all RAM.
+
+The frozen ARM candidate is ROM `00019997…2e103` / ELF `db00e37a…25074`.
+It passes the unchanged guards with IWRAM end `0x03004f08` and BSS end
+`0x0203d980`. Against the previous collision-hoist candidate, the same
+12,000-input-tick opening improves from **10.47 to 10.97 fps (4.78%)**.
+All 13 reported states and four decoded captures match exactly. These are
+emulator prefix measurements; full ARM completion, fresh-process saves and
+physical-GBA performance are not established by this comparison. The option
+remains disabled by default pending the longer qualification run.
+
+The 534-file source-only export passes `./dev build` and `./dev test`,
+including 360 Python tests (six private-input checks skipped). The original-art
+ROM remains byte-identical (`4ad80ce0…f9aee`). Imported data and private replay
+artifacts remain outside the source index.

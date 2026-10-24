@@ -1388,6 +1388,22 @@ make test-sc64-z6-collision-facts
 leave it disabled for normal builds until the recorded ARM comparison and
 qualification are complete.
 
+The separate `SC64_ZP_FACT_RANGE_CULL` experiment rejects ordinary roster
+types before checking optional campaign actor facts. Its differential test
+needs no imported assets and compares complete resolver/wrapper answers
+across 13 actor-gate combinations, including the late Terran enum prefix:
+
+```sh
+make test-sc64-zp-fact-range
+make -B zerg-z6-probe Z6_QUERY_FLAGS='-DSC64_Z6_COUNT_SNAPSHOT -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL'
+```
+
+The combined build reproduces the complete winning Z6 host route and the
+12,000-input-tick ARM prefix. The range cull improves that prefix from 10.47
+to 10.97 fps. It remains disabled by default while the full ARM route and
+fresh-process save checks run; this is not a full-mission performance claim.
+Rebuild without the extra flags to restore the normal Z6 output.
+
 P6's eight query options are enabled by default after the full ARM win and
 fresh-process save checks. `P6_QUERY_FLAGS=` explicitly builds the reference
 path; assigning a subset replaces the defaults for a component comparison.

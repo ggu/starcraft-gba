@@ -1926,6 +1926,10 @@ test-sc64-z6-collision-facts: build/test-sc64-z6-collision-facts-baseline build/
 	./build/test-sc64-z6-collision-facts-baseline
 	./build/test-sc64-z6-collision-facts-hoist
 
+.PHONY: test-sc64-zp-fact-range
+test-sc64-zp-fact-range:
+	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_zp_fact_range.py'
+
 build/test-sc64-production-exit: tests/sc64_production_exit.c starcraft/sc64_production_exit.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-production-exit
