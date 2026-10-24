@@ -1,6 +1,10 @@
 #ifndef SC64_TERRAIN_CACHE_INCLUDED
 #define SC64_TERRAIN_CACHE_INCLUDED
 
+#if defined(SC64_RENDER_KEY_ONCE) && !defined(SC64_IMPORTED_MISSION)
+#error "SC64_RENDER_KEY_ONCE requires SC64_IMPORTED_MISSION"
+#endif
+
 #ifndef SC64_GRID_GET
 #define SC64_GRID_GET(grid, cell) ((grid)[(cell)] != 0)
 #define SC64_TERRAIN_LOCAL_GRID_GET
@@ -103,7 +107,7 @@ sc64_terrain_cache_view(int x, int y, int *col0, int *row0,
             (*col1 - *col0) * (*row1 - *row0) <= SC64_TERRAIN_CACHE_CELLS);
 }
 
-#ifdef SC64_T5_RUNTIME
+#if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
 #define SC64_TERRAIN_CACHE_KEY static_key
 static int
 sc64_terrain_cached_key(int x, int y, unsigned int static_key)
@@ -337,7 +341,7 @@ sc64_terrain_tile_clean(int col, int row)
     return !sc64_terrain_cache_dirty[i];
 }
 
-#ifdef SC64_T5_RUNTIME
+#if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
 #define SC64_TERRAIN_CACHE_KEY static_key
 static int
 sc64_terrain_store_key(int x, int y, unsigned int static_key)

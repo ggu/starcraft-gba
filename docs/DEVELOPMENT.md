@@ -1511,6 +1511,15 @@ complete mission and fresh-process SRAM qualification. See
 [Validation](VALIDATION.md#experimental-construction-hit-point-progression)
 for the integer-timing and pre-arrival-foundation limits.
 
+The default-off `SC64_RENDER_KEY_ONCE` option requires an imported profile.
+It computes the static terrain/object key once per draw and passes it through
+cache lookup and capture, extending the existing T5 keyed path. It adds no
+global storage or save fields. Asset-free cache checks are included in
+`./dev test` and can run with `make test-terrain-key-once`. With the existing
+P5 Shuttle, P6 and Z6 inputs prepared, `make test-sc64-render-key-once` compares
+the actual world renderer with full-clear output under all three profiles.
+Standard flags leave this experiment off pending ARM timing and replay checks.
+
 P7 has a gated source-fact foundation, independently testable without assets:
 
 ```sh

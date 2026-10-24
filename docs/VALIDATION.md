@@ -3715,3 +3715,27 @@ Rebuilding current public source with construction HP disabled produces the
 same combined ROM bytes. Profile defaults remain unchanged pending wider
 campaign and save qualification. This does not add another qualified mission
 or change the staged count of 22/30.
+
+### Experimental terrain-key reuse
+
+The default-off `SC64_RENDER_KEY_ONCE` gate requires an imported profile.
+It computes the exact static-art key once after camera placement, then passes
+it to terrain-cache lookup and capture. Rendering between those operations
+only reads the keyed world/visibility/prop inputs. T5 retains its existing
+keyed path; other profiles can select the same API without enabling T5
+gameplay. No global storage, cache fields or save bytes are added.
+
+Asset-free cache and real-framebuffer scroll fixtures pass under ASan/UBSan.
+P5 Shuttle, P6 and Z6 actual-scene pixel oracles also pass, including cold/warm
+cache, camera/fog changes, resource/building mutations, construction waiting,
+progress/completion/removal, restart and load transitions. Local default and
+unified build/host checks pass with the flag off. The combined P3 candidate
+links as ROM `2020678d…0bc81`, ELF `8cab7c0d…3f3d1`, with unchanged IWRAM end
+`0x03004598` and BSS end `0x0203d674`. Its gate-off rebuild reproduces the
+qualified six-gate ROM exactly. ARM timing and full replay remain pending;
+this is not evidence of a measured performance improvement yet.
+
+The 555-file source-only export passes the default build and 380 Python
+tests (six private-input skips). Original-art and unified ROM hashes remain
+`4ad80ce0…f9aee` and `6bab5be2…79f9` with the option off. An invalid
+non-imported game build is rejected at compile time.

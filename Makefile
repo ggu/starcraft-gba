@@ -880,6 +880,29 @@ build/test-terrain-cache: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cach
 build/test-terrain-scroll: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cache.h common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_TERRAIN_CACHE_REAL_GFX -DSC64_TERRAIN_SCROLL -Icommon $< common/gba.c -o $@
 
+build/test-terrain-key-once: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cache.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_IMPORTED_MISSION -DSC64_RENDER_KEY_ONCE $< -o $@
+build/test-terrain-key-once-scroll: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cache.h common/gba.h common/gba.c | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_TERRAIN_CACHE_REAL_GFX -DSC64_TERRAIN_SCROLL -DSC64_IMPORTED_MISSION -DSC64_RENDER_KEY_ONCE -Icommon $< common/gba.c -o $@
+.PHONY: test-terrain-key-once
+test-terrain-key-once: build/test-terrain-key-once build/test-terrain-key-once-scroll
+	./build/test-terrain-key-once
+	./build/test-terrain-key-once-scroll
+test-starcraft: test-terrain-key-once
+
+define RENDER_KEY_ONCE_PROFILE
+build/test-sc64-render-key-once-$(1): tests/sc64_z3_frame_coverage.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) -DSC64_RENDER_KEY_ONCE $$< common/gba.c -o $$@
+endef
+$(eval $(call RENDER_KEY_ONCE_PROFILE,p5,$(P5_SHUTTLE_FLAGS),$(P5_INPUTS)))
+$(eval $(call RENDER_KEY_ONCE_PROFILE,p6,$(P6_PROBE_FLAGS),$(P6_PROBE_INPUTS)))
+$(eval $(call RENDER_KEY_ONCE_PROFILE,z6,$(Z6_PROBE_FLAGS),$(Z6_PROBE_INPUTS)))
+.PHONY: test-sc64-render-key-once
+test-sc64-render-key-once: build/test-sc64-render-key-once-p5 build/test-sc64-render-key-once-p6 build/test-sc64-render-key-once-z6
+	./build/test-sc64-render-key-once-p5
+	./build/test-sc64-render-key-once-p6
+	./build/test-sc64-render-key-once-z6
+
 build/test-collision: tests/sc64_collision.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -DSC64_SKIRMISH -Icommon tests/sc64_collision.c common/gba.c -o $@
 

@@ -2,6 +2,9 @@
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
 #include "sc64_construction_hp.h"
+#if defined(SC64_RENDER_KEY_ONCE) && !defined(SC64_IMPORTED_MISSION)
+#error "SC64_RENDER_KEY_ONCE requires SC64_IMPORTED_MISSION"
+#endif
 #ifdef SC64_RACES
 #include "sc64_weapon_vfx.h"
 #include "sc64_construction_vfx.h"
@@ -6247,7 +6250,8 @@ draw_map(void)
 #ifdef SC64_IMPORTED_MISSION
     u32 profile_stage_start;
 #endif
-#if defined(SC64_T5_RUNTIME) && defined(SC64_IMPORTED_MISSION)
+#if (defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)) && \
+    defined(SC64_IMPORTED_MISSION)
     unsigned int terrain_static_key;
 #endif
     camx = viewport_left();
@@ -6255,9 +6259,10 @@ draw_map(void)
 #ifdef SC64_IMPORTED_MISSION
     profile_stage_start = gba_clock();
 #endif
-#if defined(SC64_T5_RUNTIME) && defined(SC64_IMPORTED_MISSION)
-    /* The key is unchanged between cache lookup and capture; compute the
-     * roster/visibility snapshot once and pass it through both operations. */
+#if (defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)) && \
+    defined(SC64_IMPORTED_MISSION)
+    /* Rendering below only reads world state and writes pixels. The exact
+     * roster/visibility key therefore remains valid through cache capture. */
     terrain_static_key = sc64_static_objects_key();
 #endif
 #ifdef SC64_IMPORTED_MISSION
@@ -6269,7 +6274,7 @@ draw_map(void)
     /* Each tile gets one terrain/fog pass. Unknown space stays black from
      * gfx_begin, so it needs no second opaque fill after sprites are drawn. */
 #ifdef SC64_IMPORTED_MISSION
-#ifdef SC64_T5_RUNTIME
+#if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
     if (!sc64_terrain_cached_key(camx, camy, terrain_static_key)) {
 #else
     if (!sc64_terrain_cached(camx, camy)) {
@@ -6369,7 +6374,7 @@ draw_map(void)
     for (i = 0; i < MAX_BUILDINGS; i++)
         if (b[i].alive)
             draw_building_art(&b[i]);
-#ifdef SC64_T5_RUNTIME
+#if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
     sc64_terrain_store_key(camx, camy, terrain_static_key);
 #else
     sc64_terrain_store(camx, camy);
