@@ -1496,6 +1496,7 @@ P7 has a gated source-fact foundation, independently testable without assets:
 
 ```sh
 make test-sc64-p7-actor-rules test-sc64-zp-fact-range
+make test-sc64-p7-geometry
 ```
 
 `SC64_P7_ACTORS` supplies the missing Archon, Arbiter, Carrier and Observer
@@ -1504,6 +1505,13 @@ this does not expose new training commands or a playable P7 campaign entry.
 The P7 header records missing splash, interceptor, cloak/detection, Arbiter
 field and Shield Battery mechanics. Enum capacity fits the current packed
 save fields, but P7 persistence and complete gameplay are not integrated yet.
+
+The asset-free geometry fixture checks source-pixel actor rectangles, including
+inclusive source extents and malformed coordinate rejection. Runtime centers
+are doubled before applying the source extents. With P7's private scenario
+prepared, `make test-sc64-p7-runtime` checks both actor-gate configurations;
+the enabled fixture checks the complete placement census and location edges.
+These are isolated integration checks, without a P7 playthrough qualification.
 
 P7's sprite importer is also opt-in and writes to a separate private directory:
 

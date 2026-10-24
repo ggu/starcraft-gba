@@ -3451,3 +3451,21 @@ ordinary `game_update(0,0)` calls through completion, preserving HP and the
 Drone count with no source fault. The final 541-file source-only snapshot
 passes `./dev build` and `./dev test` (379 Python tests, six private-input
 skips); unified ARM/host checks pass and original-art ROM bytes are unchanged.
+
+### P7 source-coordinate geometry
+
+The isolated P7 world now applies source collision extents after doubling the
+runtime center. The previous path halved the source extents a second time,
+which could miss location overlaps. A shared, asset-free helper returns
+half-open source rectangles and rejects unmapped types, missing output
+pointers, negative centers and coordinates that would overflow conversion.
+
+Sanitizer fixtures check exact source edges, the complete 180-unit and
+112-building placement census, unit/building location-boundary transitions,
+and source-owner preservation for the two scripted Carrier creations. Both
+actor-gate configurations pass. These checks do not establish a P7 campaign
+entry, complete abilities, save integration or a winning playthrough.
+
+The 543-file source-only snapshot passes `./dev build` and `./dev test`
+(379 Python tests, six private-input skips). The original-art ROM remains
+`4ad80ce0…f9aee`; unified ARM/host checks also pass.

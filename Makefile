@@ -1947,6 +1947,13 @@ test-sc64-zp-fact-range:
 test-sc64-p7-actor-rules:
 	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_p7_actor_rules.py'
 
+build/test-sc64-p7-geometry: tests/sc64_p7_geometry.c starcraft/sc64_p7_geometry.h starcraft/race_rules.h $(wildcard starcraft/*actor_rules.h) common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_P7_ACTORS $< -o $@
+.PHONY: test-sc64-p7-geometry
+test-sc64-p7-geometry: build/test-sc64-p7-geometry
+	./build/test-sc64-p7-geometry
+test-starcraft: test-sc64-p7-geometry
+
 build/test-sc64-nearest-resource-depot-p5: tests/sc64_nearest_resource_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT $< common/gba.c -o $@
 build/test-sc64-nearest-resource-depot-z6: tests/sc64_nearest_resource_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -2031,6 +2038,8 @@ test-sc64-campaign-spells: build/test-sc64-p6-storm-game build/test-sc64-z6-stor
 
 build/test-sc64-p7-runtime: tests/sc64_p7_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P7_DATA_ENABLED -DSC64_P7_RUNTIME $< common/gba.c -o $@
+build/test-sc64-p7-runtime-actors: tests/sc64_p7_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P7_DATA_ENABLED -DSC64_P7_RUNTIME -DSC64_P7_ACTORS $< common/gba.c -o $@
 build/test-sc64-p6-trigger-prune: tests/sc64_p6_trigger_prune.c tests/sc64_p6_trigger_prune_reference.c starcraft/sc64_p6_adapter.h starcraft/sc64_p6.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios tests/sc64_p6_trigger_prune.c tests/sc64_p6_trigger_prune_reference.c -o $@
 build/test-sc64-z6-trigger-prune: tests/sc64_z6_trigger_prune.c tests/sc64_z6_trigger_prune_reference.c starcraft/sc64_z6_adapter.h starcraft/sc64_z6.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h | build
@@ -2038,8 +2047,9 @@ build/test-sc64-z6-trigger-prune: tests/sc64_z6_trigger_prune.c tests/sc64_z6_tr
 build/test-sc64-p6-prevalidated: tests/sc64_p6_prevalidated.c tests/sc64_p6_prevalidated_reference.c starcraft/sc64_p6_adapter.h starcraft/sc64_p6.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios tests/sc64_p6_prevalidated.c tests/sc64_p6_prevalidated_reference.c -o $@
 .PHONY: test-sc64-p7-runtime test-sc64-six-query-options
-test-sc64-p7-runtime: build/test-sc64-p7-runtime
+test-sc64-p7-runtime: build/test-sc64-p7-runtime build/test-sc64-p7-runtime-actors
 	./build/test-sc64-p7-runtime
+	./build/test-sc64-p7-runtime-actors
 test-sc64-six-query-options: build/test-sc64-p6-trigger-prune build/test-sc64-z6-trigger-prune build/test-sc64-p6-prevalidated
 	./build/test-sc64-p6-trigger-prune
 	./build/test-sc64-z6-trigger-prune

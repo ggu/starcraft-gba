@@ -4,6 +4,7 @@
 /* Source-specific callbacks for P7. This intentionally implements only the
  * opcodes present in the authenticated P7 table; it is not a CHK executor. */
 #include "sc64_p7_state.h"
+#include "sc64_p7_geometry.h"
 #include "sc64_resource_actions.h"
 
 enum {
@@ -150,43 +151,13 @@ static int sc64_p7_world_actor_rect_source(unsigned raw,int x,int y,
                                             int building,int *left,int *top,
                                             int *right,int *bottom)
 {
-    int type,l,u,r,d;
-    if (!left || !top || !right || !bottom || raw > 227u || x < 0 || y < 0)
-        return 0;
-    type=building ? sc64_race_building_from_raw((int)raw) :
-                    sc64_race_unit_from_raw((int)raw);
-    if (type < 0) return 0;
-    if (building) {
-        if (!sc64_zp_building_bounds_source(type,&l,&u,&r,&d)) return 0;
-    } else if (!sc64_zp_actor_bounds_source(type,&l,&u,&r,&d)) {
-        /* Authored source dimensions for the ordinary units in Homeland's
-         * map. Values are BWAPI UnitType dimensions, kept in source pixels. */
-        switch (raw) {
-        case 0:l=7;u=10;r=7;d=11;break;   /* Marine, reused here rarely. */
-        case 64:l=8;u=8;r=8;d=8;break;
-        case 65:l=11;u=5;r=11;d=13;break;
-        case 66:l=15;u=15;r=16;d=16;break;
-        case 68:l=12;u=10;r=12;d=11;break;
-        case 69:l=20;u=16;r=19;d=15;break;
-        case 70:l=24;u=22;r=24;d=22;break;
-        case 71:l=24;u=24;r=23;d=23;break;
-        case 72:l=32;u=32;r=31;d=31;break;
-        case 74:l=12;u=6;r=11;d=19;break;
-        case 75:l=12;u=6;r=11;d=19;break;
-        case 77:l=12;u=12;r=11;d=12;break;
-        case 78:l=12;u=6;r=11;d=19;break;
-        case 79:l=12;u=10;r=11;d=13;break;
-        case 83:l=18;u=16;r=17;d=15;break;
-        case 84:l=10;u=10;r=10;d=12;break;
-        default:return 0;
-        }
-    }
-    /* Runtime centers are exactly half the source coordinate scale. Preserve
-     * odd source-pixel edges by doing overlap before any division. */
-    int cx=x*2,cy=y*2;
-    *left=cx-(l+1)/2; *top=cy-(u+1)/2;
-    *right=cx+(r+1)/2+1; *bottom=cy+(d+1)/2+1;
-    return 1;
+#ifdef SC64_P7_ACTORS
+    return sc64_p7_actor_rect_source(raw,x,y,building,left,top,right,bottom);
+#else
+    (void)raw; (void)x; (void)y; (void)building;
+    (void)left; (void)top; (void)right; (void)bottom;
+    return 0;
+#endif
 }
 
 static int sc64_p7_world_count(const Sc64P7WorldContext *ctx,unsigned selector,
