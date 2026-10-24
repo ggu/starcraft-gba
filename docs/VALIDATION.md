@@ -3592,6 +3592,12 @@ three decoded captures match. Hardware-cycle time falls 11.9938%, from
 benchmark, not candidate-generated late-save qualification. Full ARM mission
 and wider profile qualification remain required before enabling defaults.
 
+The full ARM attempt reached a logged checkpoint at 114,000 of 124,689
+inputs (live frame 113,232) before a checkpoint-history write failed with
+`ENOSPC`. The runner exited nonzero and closed mGBA. This partial attempt is
+not a qualified win; its log is retained separately for a retry with adequate
+disk headroom.
+
 ### Experimental P7 Observer cloak and detection
 
 `SC64_P7_OBSERVER_ENABLED` is default-off and requires the isolated P7 runtime
