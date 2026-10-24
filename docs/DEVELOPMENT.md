@@ -1524,3 +1524,18 @@ structures, reusing the shared Archon, Carrier and Observer images. The
 generated completeness marker requires that shared art as well. This prepares
 source images only; native animation selection and P7 renderer/profile
 integration remain unfinished. Generated art and previews stay local.
+
+The experimental `SC64_P7_ARCHON_SPLASH` combat path is separately gated and
+requires `SC64_P7_ACTORS`, `SC64_ZP_CAMPAIGN_ACTORS` and `SC64_RACES`:
+
+```sh
+make test-sc64-p7-archon-rules
+# Requires the existing private P6 inputs for the shared engine fixture:
+make test-sc64-p7-archon-splash
+```
+
+It uses source collision rectangles for reach and radial damage, the source
+30+3 weapon upgrade, and owner-based Enemy Splash exclusions. Q8 damage is
+adapted to the engine's integer HP/shields. Impact is immediate at the target
+center; projectile/windup and native burrow handling remain unfinished. This
+does not enable P7 in a campaign build or qualify its missing abilities.

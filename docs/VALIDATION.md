@@ -3469,3 +3469,32 @@ entry, complete abilities, save integration or a winning playthrough.
 The 543-file source-only snapshot passes `./dev build` and `./dev test`
 (379 Python tests, six private-input skips). The original-art ROM remains
 `4ad80ce0…f9aee`; unified ARM/host checks also pass.
+
+### Experimental P7 Archon splash
+
+The default-off `SC64_P7_ARCHON_SPLASH` path handles the complete Archon
+attack before generic center-distance combat. It measures the 64-source-pixel
+reach between collision rectangles and uses the source integer distance rule
+for inclusive 3/15/30-pixel splash rings. Its packet is 30 damage plus three
+per weapon upgrade, divided by one/two/four before HP armor. The cooldown
+counter is 25 GBA updates. Enemy Splash excludes the attacker and same-owner
+neighbors, retaining the explicit primary exception and distinct-owner allied
+collateral.
+
+Pure and actual-engine sanitizer fixtures cover axis and diagonal boundaries,
+approach behavior, ground/building hits, upgrade damage, Normal damage,
+shield overflow, loaded targets and invincibility flags/arrays. The latter
+must reject damage before touching shields. Fractional Q8 damage follows the
+existing integer HP/shield adaptation, with a nonzero fractional HP hit
+represented as one point. Shield armor remains zero in this compact model.
+
+The path adds no persistent fields. A private P6 engine build with both P7
+actor and splash gates links on ARM with IWRAM end `0x030047e0` and BSS end
+`0x0203d774`, below the unchanged reserves. This is a link check, without
+P7 gameplay or emulator qualification. Immediate target-center impact,
+projectile/windup timing and native burrow handling remain limitations; the
+feature does not promote P7 or clear its complete-mechanics requirement.
+
+The 547-file source-only snapshot passes the default build and test suite
+(379 Python tests, six private-input skips). Its original-art ROM remains
+`4ad80ce0…f9aee`, and unified ARM/host checks pass with the gate off.

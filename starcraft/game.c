@@ -979,6 +979,9 @@ static int race_p6_combat_infested_attack(Unit *q, int target);
 static int race_p6_combat_burrow_release_tick(void);
 static int race_p6_combat_tick_traps(void);
 #endif
+#ifdef SC64_P7_ARCHON_SPLASH
+static int race_p7_archon_splash_attack(Unit *q, int target);
+#endif
 #ifdef SC64_Z5_RUNTIME
 static int race_z5_active(void);
 static int race_z5_world_paused(void);
@@ -4381,6 +4384,14 @@ tick_combat(Unit * q, int target)
 #ifdef SC64_RACES
     if(!SC64_CAN_ATTACK_FROM(q->type,target,q->owner))return;
 #endif
+#ifdef SC64_P7_ARCHON_SPLASH
+    /* Archon weapon 70 measures reach between source collision rectangles,
+     * independently of the generic runtime-center approximation below. */
+    if (q->type==U_P7_ARCHON) {
+        (void)race_p7_archon_splash_attack(q,target);
+        return;
+    }
+#endif
     dx = target_x(target) - q->x;
     dy = target_y(target) - q->y;
     range = unit_range(q->type);
@@ -7356,6 +7367,9 @@ game_self_test(void)
 
 #ifdef SC64_RACES
 #include "race_combat.h"
+#ifdef SC64_P7_ARCHON_SPLASH
+#include "sc64_p7_archon_adapter.h"
+#endif
 #ifdef SC64_T5_RUNTIME
 #include "sc64_t5_availability_adapter.h"
 #endif
