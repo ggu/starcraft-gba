@@ -514,6 +514,9 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
                      "frame_delta": 0, "counted_live_play_interval": False,
                      "effective_fps": None, "capture": str(run_dir / "home.png"),
                      **prior_state}
+        cycles, routes = scheduler.profile_counters(rsp, sym)
+        tick_zero["profile_cycles_last_tick"] = cycles
+        tick_zero["route_counters"] = routes
         persist_checkpoint(tick_zero)
         last_tick = 0
         while last_tick < requested:
@@ -545,6 +548,9 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
                           "elapsed_hardware_cycles": elapsed, "frame_delta": frame_delta,
                           "counted_live_play_interval": counted, "effective_fps": interval_fps,
                           **state}
+            cycles, routes = scheduler.profile_counters(rsp, sym)
+            checkpoint["profile_cycles_last_tick"] = cycles
+            checkpoint["route_counters"] = routes
             if completed in (1000, 10000, 30000, requested):
                 checkpoint["capture"] = capture(rsp, run_dir / f"checkpoint-{completed:06d}.png")
             persist_checkpoint(checkpoint)
