@@ -27,10 +27,36 @@ GAMES = {
 }
 SC64_PROFILES = ("wasteland", "backwater", "skirmish", "campaign", "races", "unified",
                  "terran", "zerg", "protoss")
+SC64_TEST_TARGETS = {
+    "unified": "test-unified", "races": "test-races",
+    "wasteland": "test-sc64", "backwater": "test-backwater",
+    "skirmish": "test-skirmish", "campaign": "test-campaign",
+    "terran": "test-sc64-terran-full-campaign",
+    "zerg": "test-zerg", "protoss": "test-protoss",
+}
+RACE_CAMPAIGN_GATES = {
+    "zerg": ("SC64_Z3_ENABLED", "sc64_race_z3_units"),
+    "protoss": ("SC64_P3_ENABLED", "sc64_race_p3_units"),
+}
 
 
 def run(command: list[str], *, cwd: Path = ROOT) -> None:
     subprocess.run(command, cwd=cwd, check=True)
+
+
+def race_campaign_input_ready(profile: str, header: Path) -> bool:
+    """Check that generated source retains the opt-in map gate and payload."""
+    gate = RACE_CAMPAIGN_GATES.get(profile)
+    if gate is None or not header.is_file():
+        return False
+    text = header.read_text(encoding="utf-8")
+    opening = f"#if defined(SC64_UNIFIED) && defined({gate[0]})"
+    closing = f"#endif /* SC64_UNIFIED && {gate[0]} */"
+    start = text.find(opening)
+    if start < 0:
+        return False
+    end = text.find(closing, start + len(opening))
+    return end >= 0 and gate[1] in text[start:end]
 
 
 def locate_mgba() -> str | None:
@@ -146,6 +172,10 @@ def prepare(rom: Path, profile: str) -> None:
         run([sys.executable, str(ROOT / "tools/sc64_campaign_pack.py"), "--rom", str(private_rom)])
     elif profile in ("races", "unified", "terran", "zerg", "protoss"):
         run([sys.executable, str(ROOT / "tools/sc64_races_pack.py")])
+        if profile in RACE_CAMPAIGN_GATES:
+            header = ROOT / ".local/sc64/races/generated/sc64_races_generated.h"
+            if not race_campaign_input_ready(profile, header):
+                raise RuntimeError(f"generated race data is missing the {RACE_CAMPAIGN_GATES[profile][0]} map gate")
         run([sys.executable, str(ROOT / "tools/sc64_t4_scenario_pack.py")])
         run([sys.executable, str(ROOT / "tools/sc64_race_sprites.py")])
         run([sys.executable, str(ROOT / "tools/sc64_menu_assets.py")])
@@ -194,6 +224,9 @@ def status(profile: str) -> int:
         ))
     if profile in ("terran", "zerg", "protoss"):
         paths.append(("Skirmish maps", ROOT / ".local/sc64/skirmish/generated/sc64_skirmish_generated.h"))
+    if profile in RACE_CAMPAIGN_GATES:
+        paths.append((f"{profile.title()} chapter 3 gated map data",
+                      ROOT / ".local/sc64/races/generated/sc64_races_generated.h"))
     if profile == "terran":
         race = ROOT / ".local/sc64/races/generated"
         stage = ROOT / ".local/sc64/terran-late/import-stage"
@@ -209,8 +242,13 @@ def status(profile: str) -> int:
     _, rom_rel = GAMES[profile]
     paths.append(("Built ROM", ROOT / rom_rel))
     for label, path in paths:
-        print(f"{'READY  ' if path.is_file() else 'MISSING'} {label}: {path}")
-    return int(any(not path.is_file() for _, path in paths))
+        ready = path.is_file()
+        if label.endswith("gated map data"):
+            ready = race_campaign_input_ready(profile, path)
+        print(f"{'READY  ' if ready else 'MISSING'} {label}: {path}")
+    return int(any(not path.is_file() for _, path in paths) or
+               (profile in RACE_CAMPAIGN_GATES and not race_campaign_input_ready(
+                   profile, ROOT / ".local/sc64/races/generated/sc64_races_generated.h")))
 
 
 def main() -> int:
@@ -247,12 +285,7 @@ def main() -> int:
         elif args.action == "build":
             build(args.profile)
         elif args.action == "test":
-            target = {"unified": "test-unified", "races": "test-races",
-                      "wasteland": "test-sc64", "backwater": "test-backwater",
-                      "skirmish": "test-skirmish", "campaign": "test-campaign",
-                      "terran": "test-sc64-terran-full-campaign", "zerg": "test-zerg",
-                      "protoss": "test-protoss"}[args.profile]
-            run(["make", target])
+            run(["make", SC64_TEST_TARGETS[args.profile]])
         else:
             return play(args.profile)
         return 0

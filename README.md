@@ -39,7 +39,9 @@ This profile requires a legally obtained StarCraft 64 USA ROM that you are entit
 ./dev sc64 play --profile terran
 ```
 
-The canonical Terran profile includes all ten Terran campaign missions. Preparing it also generates the shared inputs needed by `make race-campaigns`; preparing only Zerg or Protoss does not generate the complete shared input set. The integrated ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. Full normal-menu ARM wins are recorded for all ten Terran missions across frozen builds, with T7 and T10 repeated on the latest optimization ROM. No physical GBA result is claimed.
+The canonical Terran profile includes all ten Terran campaign missions; Zerg and Protoss each include their first three. Use `--profile zerg` or `--profile protoss` with the same build/test/play commands. Each ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. The remaining 14 campaign missions are unfinished, and measured campaign rates remain below 30 fps. No physical GBA result is claimed.
+
+Preparing Terran also generates the shared inputs needed by `make race-campaigns`; preparing only Zerg or Protoss does not generate the complete Terran input set. The promoted Zerg and Protoss builds use their third-mission save formats and reject saves from the older two-mission builds. See [the campaign guide](docs/RACE-CAMPAIGNS.md) for mission and save-format details.
 
 The first preparation fetches the pinned `sc64-maps` extractor into ignored `references/`, so Git and network access are needed. ROMs, extracted data, generated headers, captures containing imported art, and saves stay in ignored local directories; do not commit or distribute them. Contributors can work on the default skirmish without this profile. See [the unified guide](docs/SC64-UNIFIED.md) and [development](docs/DEVELOPMENT.md) for details and troubleshooting.
 
