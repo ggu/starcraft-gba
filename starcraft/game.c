@@ -1,7 +1,7 @@
 #include "../common/gba.h"
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
-#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED)
+#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED)
 #define SC64_TRANSPORT_RUNTIME
 #endif
 #if defined(SC64_P5_SHUTTLE_ENABLED) && !defined(SC64_P5_RUNTIME)
@@ -126,7 +126,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_Z6_CLOAK_ENABLED)
+#if defined(SC64_Z6_TRANSPORT_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 32u
+#elif defined(SC64_Z6_CLOAK_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 31u
 #elif defined(SC64_Z6_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 29u
@@ -930,6 +932,10 @@ static void race_z6_note_building_death(const Building *q);
 static int race_z6_hallucination_incoming_damage(int target, int damage);
 static int race_z6_hallucination_can_deal_damage(int attacker);
 static int race_z6_hallucination_cleanup_dead(Unit *q);
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+static int race_z6_transport_research_selected(void);
+static int race_z6_transport_start_research_selected(void);
+#endif
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
 static int race_p6_combat_unit_burrowed(int slot);
@@ -1024,6 +1030,8 @@ static int owner_command_center(int owner);
 static void add_owner_resources(int owner, int ore, int vespene);
 #ifdef SC64_P3_RUNTIME
 static int GBA_HOT __attribute__((noinline))
+#elif defined(SC64_Z6_TRANSPORT_ENABLED) && !defined(GBA_HOST)
+static int GBA_HOT __attribute__((optimize("Os")))
 #else
 static int GBA_HOT
 #endif
@@ -2499,7 +2507,7 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #endif
 #ifdef SC64_T5_RUNTIME
             if (u[target].type == U_DROPSHIP) race_transport_destroy_cargo(target);
-#elif defined(SC64_P5_SHUTTLE_ENABLED)
+#elif defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED)
             if (race_transport_carrier_type(&u[target])) race_transport_destroy_cargo(target);
 #endif
 	}
@@ -3458,9 +3466,38 @@ tick_research(void)
 #include "sc64_terran_flight.h"
 #endif
 
+#if defined(SC64_P6_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
+static int race_selected_storm_hero(void)
+{
+    int found=0;
+    if (selected_building>=0) return 0;
+    for (int i=0; i<MAX_UNITS; ++i) if (u[i].alive && u[i].owner==SIDE && u[i].selected) {
+        int eligible=0;
+#ifdef SC64_P6_STORM_ENABLED
+        eligible |= race_p6_active() && u[i].raw_type==79 && u[i].raw_owner==2;
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+        eligible |= race_z6_active() && u[i].raw_type==51 && u[i].raw_owner==3;
+#endif
+        if (!eligible || ++found>1) return 0;
+    }
+    return found==1;
+}
+#endif
+
 static void
 choose_command(int choice)
 {
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (choice == MENU_STOP + 1 && race_z6_transport_research_selected()) {
+        int result = race_z6_transport_start_research_selected();
+        menu_open=0; mode=MODE_NORMAL;
+        toast(result == SC64_Z6_TRANSPORT_TECH_RESEARCHING ? 4 : 8); return;
+    }
+    if (choice == MENU_STOP + 1 && race_z6_overlord_menu_available()) {
+        menu_open=0; mode=MODE_UNLOAD; return;
+    }
+#endif
 #ifdef SC64_Z5_CONSUME_ENABLED
     if (choice == MENU_STOP + 2 && race_z5_cloak_menu_available()) {
         menu_open = 0; mode = MODE_Z5_CONSUME; return;
@@ -3609,6 +3646,10 @@ choose_command(int choice)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (race_z6_transport_research_selected() || race_z6_overlord_menu_available())
+        return MENU_STOP + 2;
+#endif
 #ifdef SC64_P5_SHUTTLE_ENABLED
     if (race_p5_shuttle_menu_available()) return MENU_STOP + 2;
 #endif
@@ -4909,6 +4950,24 @@ game_update(u16 held, u16 pressed)
         return;
     }
 #endif
+#if defined(SC64_P6_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
+    /* A spell hotkey keeps real-time targeting practical on the GBA pad. */
+    if ((held&KEY_B) && (pressed&KEY_R) && !box_state &&
+        !(held&(KEY_LEFT|KEY_RIGHT|KEY_UP|KEY_DOWN)) &&
+        race_selected_storm_hero()) {
+        int available=0;
+#ifdef SC64_P6_STORM_ENABLED
+        available |= race_p6_storm_menu_available();
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+        available |= race_z6_storm_menu_available();
+#endif
+        reset_selection_gestures(); menu_open=0;
+        mode=available ? MODE_P4_STORM : MODE_NORMAL;
+        if (!available) toast(8);
+        pressed&=(u16)~(KEY_A|KEY_B|KEY_R);
+    }
+#endif
     /* Menus own their inputs. Selection gestures start only in the field. */
 #ifdef SC64_P4_STORM_ENABLED
     /* B+R is an authored GBA escort-group shortcut. Keep the two objective
@@ -5915,6 +5974,10 @@ draw_map(void)
 #endif
                 labels[i];
 #endif
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+            if (i==MENU_STOP+1 && race_z6_transport_research_selected()) label="VENTRAL SACS";
+            if (i==MENU_STOP+1 && race_z6_overlord_menu_available()) label="UNLOAD CARGO";
+#endif
 #ifdef SC64_Z6_CLOAK_ENABLED
             if (race_z6_cloak_menu_available()) {
                 if (i==MENU_STOP+1) label=race_z6.cloak.active ? "UNCLOAK" : "CLOAK";
@@ -6110,6 +6173,14 @@ draw_hud_commands(void)
                  q->type == B_CREEP_COLONY ? "CREEP COLONY" : "ENGINEERING BAY", C_WHITE);
 #endif
 #ifdef SC64_RACES
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+        if (race_z6_active() && race_z6.transport.ticks_remaining &&
+            race_z6.transport.producer_slot_plus1==(unsigned)selected_building+1u) {
+            gfx_text(5,137,"VENTRAL SACS",C_CYAN);
+            gfx_num(95,137,(race_z6.transport.ticks_remaining+29u)/30u,C_WHITE);
+            gfx_text(119,137,"SECONDS",C_GOLD);
+        } else
+#endif
         if(!q->under_construction) {
             gfx_text(5,137,unit_name(train_type),C_WHITE);
             gfx_text(65,137,"A TRAIN R TYPE L CANCEL",C_GOLD);

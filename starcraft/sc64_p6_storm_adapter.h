@@ -109,9 +109,14 @@ static int race_p6_storm_cast_selected(int x, int y)
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].selected) { caster = i; break; }
     if (caster < 0) return 0;
-    return sc64_psionic_storm_cast(&race_p6.storm, (u16)x, (u16)y,
+    int cast=sc64_psionic_storm_cast(&race_p6.storm, (u16)x, (u16)y,
         (u16)u[caster].x, (u16)u[caster].y, &u[caster].carry,
         race_p6_storm_technology_researched());
+    if (cast) {
+        u[caster].order=ORDER_IDLE; u[caster].target=-1;
+        u[caster].tx=u[caster].x; u[caster].ty=u[caster].y;
+    }
+    return cast;
 }
 
 /* The caller invokes this only on simulation ticks, with user_paused reflecting
@@ -120,7 +125,7 @@ static int race_p6_storm_cast_selected(int x, int y)
 static int race_p6_storm_tick(int user_paused)
 {
     Sc64PsionicStormPulse pulses[SC64_STORM_MAX_ACTIVE];
-    u8 hit[MAX_UNITS];
+    u8 hit[MAX_UNITS], hit_props[MAX_BUILDINGS];
     u8 pulse_count;
     if (!race_p6_active()) return 1;
     if (!race_p6_storm_world_state_valid()) return 0;
@@ -135,6 +140,7 @@ static int race_p6_storm_tick(int user_paused)
     }
     pulse_count = sc64_psionic_storm_step(&race_p6.storm, pulses);
     memset(hit, 0, sizeof(hit));
+    memset(hit_props,0,sizeof(hit_props));
     for (unsigned p = 0; p < pulse_count; ++p) {
         for (int i = 0; i < MAX_UNITS; ++i) {
             unsigned actor_flags;
@@ -167,6 +173,31 @@ static int race_p6_storm_tick(int user_paused)
                 u[i].alive = 0;
                 u[i].selected = 0;
                 if (u[i].owner == SIDE) supply_used -= unit_supply(u[i].type);
+            }
+        }
+    }
+    /* Native traps are NonBuilding units even though this engine stores
+     * their stationary props in the Building pool. Storm can damage them. */
+    for (unsigned p=0; p<pulse_count; ++p) {
+        for (int i=0; i<MAX_BUILDINGS; ++i) {
+            Building *q=&b[i]; int raw=q->raw_type;
+            int hp_q8,shield_q8,dx,dy;
+            if (!q->alive || !(raw==203 || raw==209 || raw==210 || raw==211 || raw==213))
+                continue;
+            dx=(int)pulses[p].x-q->x; dy=(int)pulses[p].y-q->y;
+            if (dx < -SC64_STORM_RADIUS_GBA_PX || dx > SC64_STORM_RADIUS_GBA_PX ||
+                dy < -SC64_STORM_RADIUS_GBA_PX || dy > SC64_STORM_RADIUS_GBA_PX ||
+                dx*dx+dy*dy > SC64_STORM_RADIUS_GBA_PX*SC64_STORM_RADIUS_GBA_PX)
+                continue;
+            hp_q8=q->hp*SC64_STORM_ENERGY_ONE; shield_q8=q->shield*SC64_STORM_ENERGY_ONE;
+            if (!sc64_psionic_storm_apply_hit(
+                    SC64_STORM_TARGET_GROUND|SC64_STORM_TARGET_NONBUILDING,
+                    invincible_buildings[i] || (q->flags&16u), &hit_props[i],
+                    &hp_q8,&shield_q8)) continue;
+            q->hp=hp_q8/SC64_STORM_ENERGY_ONE; q->shield=shield_q8/SC64_STORM_ENERGY_ONE;
+            if (q->hp<=0) {
+                race_p6_note_building_death(q); q->hp=0; q->alive=0;
+                invalidate_path_grid();
             }
         }
     }

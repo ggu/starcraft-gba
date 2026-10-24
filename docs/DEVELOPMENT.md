@@ -1093,7 +1093,7 @@ make test-sc64-z6-world test-sc64-z6-runtime test-sc64-z6-save
 make test-sc64-z6-profile test-sc64-z6-frame-coverage
 ```
 
-This produces `build/StarCraft-Zerg-Z6-Probe-GBA.gba` (SCZE, generation 31).
+This produces `build/StarCraft-Zerg-Z6-Probe-GBA.gba` (SCZE, generation 32).
 It retains the complete 185-row source placement, adds distinct Robotics
 Support Bay and Shield Battery identities, and runs Z6's source trigger
 program. Hallucinated Tassadar actors have a bounded lifetime, cannot deal
@@ -1132,7 +1132,7 @@ P6's Tassadar has Storm at `B` → `STORM`; select him alone before casting.
 Z6's Kerrigan has `CLOAK`/`UNCLOAK` and `STORM` in the field menu. Stop retains
 spell energy. Active effects and energy survive SRAM restore; the new probes
 reject their older generation-28/29 saves. P6 uses generation 30 and Z6 uses
-31, while the separately qualified P5/Z5 outputs keep their existing formats.
+32, while the separately qualified P5/Z5 outputs keep their existing formats.
 
 Optional query experiments remain off by default. Compare a frozen baseline
 with `make -B protoss-p6-probe P6_QUERY_FLAGS='-DSC64_P6_PRUNE_STARTED -DSC64_P6_PREVALIDATED_TICK'`.
@@ -1141,3 +1141,52 @@ Restore a default build with `make -B protoss-p6-probe` or
 `make -B zerg-z6-probe`; Make does not track command-line flag changes.
 `tools/sc64_zp_start_profile.py --help` describes a bounded P6 startup
 comparison driven by ordinary menu inputs. It does not qualify mission wins.
+
+### Z6 transport integration and P6 query experiments
+
+The internal Z6 probe now requires authenticated Ventral Sacs facts:
+
+```sh
+python3 tools/sc64_z6_transport_pack.py
+make test-sc64-z6-transport test-sc64-z6-save test-sc64-campaign-spells
+make zerg-z6-probe
+```
+
+Z6's objective island is disconnected from the opening ground component in
+native tile walkability. Morph the starting Hatchery to a Lair, select the
+completed Lair, then use `B` → `VENTRAL SACS`. Research costs 200 minerals and
+200 gas and takes 3,000 active 30-Hz updates; pausing freezes it. It begins
+unresearched. Once complete, select ground passengers and press `A` on a
+friendly Overlord to board. Select the loaded Overlord and use `B` →
+`UNLOAD CARGO`, then `A` on traversable ground. Capacity is eight source space
+points, including one for Kerrigan and two for each Hydralisk. Research,
+embarked actors and source identities survive saves. Destroying the carrier
+kills its passengers and records their source deaths. Boarding and landing
+remain bounded GBA adaptations of the native order machine.
+
+The Z6 save format is generation 32. It also persists the bounded Drone-morph
+census used to distinguish construction from killed starting Drones, and
+accepts the imported Hatchery's in-place Lair morph. Older internal Z6 saves
+are intentionally rejected; the qualified standalone Z5 output is unchanged.
+
+P6 and Z6 heroes can enter Storm targeting with `B+R` when selected alone.
+Insufficient energy keeps that selection and reports failure. Successful casts
+stop the caster's previous movement order. P6 Storm also damages native
+NonBuilding traps held in the engine's Building pool.
+
+The optional P6 query experiments include conservative trap range rejection,
+one-shot trigger polling removal, preflight-backed immutable metadata checks,
+and a transient Command/Bring snapshot. The snapshot groups repeated source
+selectors and has room for every condition's query rectangle. It is built
+before predicates and discarded before any action or opaque AI callback;
+saves still use full candidate validation.
+
+```sh
+make test-sc64-p6-query-experiments
+make -B protoss-p6-probe P6_QUERY_FLAGS='-DSC64_P6_PRUNE_STARTED -DSC64_P6_PREVALIDATED_TICK -DSC64_P6_TRAP_CULL -DSC64_P6_COUNT_SNAPSHOT'
+```
+
+These flags remain off by default while full playthrough comparisons are in
+progress. The sixth missions remain internal probes until normal-input wins,
+fresh emulator replay, save continuity and performance are qualified. The
+completed staged campaign count remains Terran 10, Zerg 5 and Protoss 5.

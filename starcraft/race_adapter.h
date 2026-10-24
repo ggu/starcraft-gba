@@ -359,7 +359,11 @@ static int race_start_lair_morph(int building)
 
 /* Called by the worker's build-arrival branch. Protoss warp-in returns the
  * Probe immediately. Zerg construction consumes the Drone and its supply. */
+#ifdef SC64_Z6_RUNTIME
+static int __attribute__((noinline)) race_builder_arrived(int worker)
+#else
 static int race_builder_arrived(int worker)
+#endif
 {
     int building;
     if (worker < 0 || worker >= MAX_UNITS || !u[worker].alive || u[worker].order != ORDER_BUILD) return 0;
@@ -371,6 +375,11 @@ static int race_builder_arrived(int worker)
     if (race_owner_identity(u[worker].owner) == R_ZERG) {
         int supply = unit_supply(u[worker].type);
         u[worker].carry = 0;
+#ifdef SC64_Z6_RUNTIME
+        if (race_z6_active() && u[worker].owner==SIDE &&
+            u[worker].raw_type==41 && u[worker].raw_owner==3 &&
+            race_z6.human_drone_morphs<4u) ++race_z6.human_drone_morphs;
+#endif
         if (u[worker].owner == SIDE) supply_used -= supply;
         u[worker].alive = 0;
     } else {

@@ -59,6 +59,9 @@ static int race_z6_authored_ai_pulse(void);
 static int race_z6_source_owner(unsigned slot);
 static int race_z6_hallucination_mark_slot(unsigned slot);
 static int race_z6_hallucination_cleanup_dead(Unit *q);
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+static void race_z6_transport_note_building_death(int slot);
+#endif
 
 static int race_z6_product_source_owner(int owner)
 {
@@ -534,6 +537,12 @@ static void race_z6_note_building_death(const Building *q)
 {
     unsigned source;
     if (!race_z6_active() || !q) return;
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    for (int slot=0; slot<MAX_BUILDINGS; ++slot) if (q==&b[slot]) {
+        race_z6_transport_note_building_death(slot);
+        break;
+    }
+#endif
     source = q->owner == SIDE && race_z6_map ? race_z6_map->human_slot :
              q->raw_owner >= 0 ? (unsigned)q->raw_owner : SC64_Z6_SOURCE_SLOT_COUNT;
     if (source < SC64_Z6_SOURCE_SLOT_COUNT &&

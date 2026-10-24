@@ -169,7 +169,7 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
     u8 seen_minerals[(MAX_MINERALS + 7) / 8] = {0};
     unsigned unit_deaths[SC64_Z6_SOURCE_SLOT_COUNT] = {0};
     unsigned building_deaths[SC64_Z6_SOURCE_SLOT_COUNT] = {0};
-    unsigned live = 0, queued = 0;
+    unsigned live = 0, queued = 0, human_drone_missing = 0;
     unsigned ai_dispatched;
     if (!candidate || !state || width != SC64_Z6_MAP_COLS ||
         height != SC64_Z6_MAP_ROWS ||
@@ -186,6 +186,18 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
         candidate->players[ENEMY] != R_PROTOSS ||
         candidate->campaign.phase > SC64_RACE_PHASE_FAILED ||
         !race_save_invincible_padding_valid(candidate)) return 0;
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (state->transport.ticks_remaining) {
+        unsigned slot = (unsigned)state->transport.producer_slot_plus1 - 1u;
+        Building producer;
+        if (slot >= MAX_BUILDINGS ||
+            !race_save_decode_building(candidate, slot, &producer) ||
+            !producer.alive || producer.hp <= 0 || producer.under_construction ||
+            producer.owner != SIDE || producer.raw_owner != 3 ||
+            (producer.raw_type != 132 && producer.raw_type != 133) ||
+            producer.type != race_z6_save_building_type((unsigned)producer.raw_type)) return 0;
+    }
+#endif
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
         Unit decoded;
         if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u,
@@ -240,11 +252,17 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
                     saved.type == type && saved.owner == owner) {
                     seen_units[i >> 3] |= (u8)(1u << (i & 7u));
                     found = 1;
-                    if (!saved.alive) ++unit_deaths[src->owner];
+                    if (!saved.alive) {
+                        ++unit_deaths[src->owner];
+                        if (raw==41u && src->owner==3u) ++human_drone_missing;
+                    }
                     break;
                 }
             }
-            if (!found) ++unit_deaths[src->owner];
+            if (!found) {
+                ++unit_deaths[src->owner];
+                if (raw==41u && src->owner==3u) ++human_drone_missing;
+            }
             continue;
         }
         type = race_z6_save_building_type(raw);
@@ -255,8 +273,11 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
             Building saved;
             if (!race_save_decode_building(candidate, i, &saved)) return 0;
             if (!(seen_buildings[i >> 3] & (1u << (i & 7u))) &&
-                saved.raw_type == (int)raw && saved.raw_owner == src->owner &&
-                saved.type == type && saved.owner == owner &&
+                saved.raw_owner == src->owner && saved.owner == owner &&
+                ((saved.raw_type == (int)raw && saved.type == type) ||
+                 (raw == 131u && src->owner == 3u && owner == SIDE &&
+                  (saved.raw_type == 132 || saved.raw_type == 133) &&
+                  saved.type == race_z6_save_building_type((unsigned)saved.raw_type))) &&
                 saved.x == src->x_px && saved.y == src->y_px) {
                 seen_buildings[i >> 3] |= (u8)(1u << (i & 7u));
                 found = 1;
@@ -266,9 +287,12 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
         }
         if (!found) ++building_deaths[src->owner];
     }
-    for (unsigned source = 0; source < 8; ++source)
-        if (unit_deaths[source] + building_deaths[source] > state->deaths_by_source[source])
-            return 0;
+    for (unsigned source = 0; source < 8; ++source) {
+        unsigned morph_allowance = source==3u ? state->human_drone_morphs : 0u;
+        if (morph_allowance>human_drone_missing) morph_allowance=human_drone_missing;
+        if (unit_deaths[source] + building_deaths[source] >
+            state->deaths_by_source[source] + morph_allowance) return 0;
+    }
 
     /* Resource nodes retain their source position/style even after their
        amount reaches zero; geyser rows are immutable map identities. */
@@ -341,7 +365,12 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
                     race_z6_save_is_ai_product(raw) && ai_dispatched ?
                     1u + candidate->campaign.elapsed_frames /
                         (SC64_Z6_AI_INTERVAL_TICKS) : 0u;
-                if (saved_count > start_count + scripted + ai_limit) return 0;
+                /* Paid human products retain source slot 3. Heroes and
+                 * scripted actors still obey the exact source census. */
+                int human_product = source == 3u && saved.owner == SIDE &&
+                    (raw == 37 || raw == 38 || raw == 39 || raw == 41 || raw == 42 ||
+                     raw == 43 || raw == 44 || raw == 45 || raw == 46 || raw == 47);
+                if (!human_product && saved_count > start_count + scripted + ai_limit) return 0;
             }
         }
         ++live;
@@ -353,8 +382,9 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
         if (RACE_SAVE_INV_B(candidate, i) > 1) return 0;
         if (!(seen_buildings[i >> 3] & (1u << (i & 7u)))) {
             int raw = saved.raw_type;
-            if (saved.owner != SIDE || saved.raw_owner != -1 ||
-                (raw != -1 && (raw < 0 || race_z6_save_building_type((unsigned)raw) != saved.type)))
+            if (saved.owner != SIDE || (saved.raw_owner != -1 && saved.raw_owner != 3) ||
+                (raw != -1 && (raw < 0 || race_z6_save_building_type((unsigned)raw) != saved.type ||
+                 sc64_race_building_rule(saved.type)->race != R_ZERG)))
                 return 0;
         }
         for (int q = 0; q < saved.queue_count; ++q) {

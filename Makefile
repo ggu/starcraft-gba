@@ -48,8 +48,8 @@ P6_QUERY_FLAGS ?=
 Z6_QUERY_FLAGS ?=
 P6_PROBE_FLAGS := $(P6_QUERY_FLAGS) -I.local/sc64/p6/generated $(P5_SHUTTLE_FLAGS) -DSC64_P6_DATA_ENABLED -DSC64_P6_RUNTIME -DSC64_P6_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS -DSC64_P6_COMBAT_ENABLED -DSC64_P6_CAMPAIGN_ENTRY -DSC64_P6_STORM_ENABLED
 P6_PROBE_INPUTS := $(P5_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_p6_abilities_generated.h .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p6/generated/sc64_p6_doodads_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h
-Z6_PROBE_FLAGS := $(Z6_QUERY_FLAGS) -I.local/sc64/z6/generated $(Z5_CONSUME_FLAGS) -DSC64_Z6_DATA_ENABLED -DSC64_Z6_RUNTIME -DSC64_Z6_ACTORS -DSC64_Z6_CAMPAIGN_ENTRY -DSC64_Z6_CLOAK_ENABLED -DSC64_Z6_STORM_ENABLED
-Z6_PROBE_INPUTS := $(Z5_CLOAK_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z6_abilities_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h
+Z6_PROBE_FLAGS := $(Z6_QUERY_FLAGS) -I.local/sc64/z6/generated $(Z5_CONSUME_FLAGS) -DSC64_Z6_DATA_ENABLED -DSC64_Z6_RUNTIME -DSC64_Z6_ACTORS -DSC64_Z6_CAMPAIGN_ENTRY -DSC64_Z6_CLOAK_ENABLED -DSC64_Z6_STORM_ENABLED -DSC64_Z6_TRANSPORT_ENABLED
+Z6_PROBE_INPUTS := $(Z5_CLOAK_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_abilities_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h
 T4_STORAGE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_T4_ENABLED -DSC64_T4_RUNTIME -DSC64_ROUTE_PACK3 -DSC64_T4_WINDOWED_SCHEDULE -DSC64_CAMPAIGN_RACE=0
 T4_OPTIMIZATION_FLAGS ?= -DSC64_T4_COUNT_CACHE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS -DSC64_UNARMED_QUERY_SKIP
 T4_SCENARIO_FLAGS := $(T4_STORAGE_FLAGS) -DSC64_T4_SCENARIO_RUNTIME
@@ -1907,3 +1907,23 @@ test-sc64-six-query-options: build/test-sc64-p6-trigger-prune build/test-sc64-z6
 	./build/test-sc64-p6-trigger-prune
 	./build/test-sc64-z6-trigger-prune
 	./build/test-sc64-p6-prevalidated
+
+# Private sixth-mission integration and opt-in performance fixtures.
+build/test-sc64-z6-transport-tech: tests/sc64_z6_transport_tech.c starcraft/sc64_z6_transport_tech.h starcraft/sc64_z6_transport_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+build/test-sc64-z6-transport-save: tests/sc64_z6_transport_save.c starcraft/sc64_z6_transport_save.h starcraft/sc64_transport_rules.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+build/test-sc64-z6-transport-game: tests/sc64_z6_transport_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p6-count-snapshot: tests/sc64_p6_count_snapshot.c tests/sc64_p6_count_snapshot_reference.c starcraft/sc64_p6_count_snapshot.h starcraft/sc64_p6_world_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -Icommon -I.local/sc64/zp-stage/generated/scenarios -DSC64_P6_COUNT_SNAPSHOT tests/sc64_p6_count_snapshot.c tests/sc64_p6_count_snapshot_reference.c -o $@
+build/test-sc64-p6-trap-cull: tests/sc64_p6_trap_cull.c tests/sc64_p6_trap_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) tests/sc64_p6_trap_cull.c tests/sc64_p6_trap_cull_reference.c common/gba.c -o $@
+.PHONY: test-sc64-z6-transport test-sc64-p6-query-experiments
+test-sc64-z6-transport: build/test-sc64-z6-transport-tech build/test-sc64-z6-transport-save build/test-sc64-z6-transport-game
+	./build/test-sc64-z6-transport-tech
+	./build/test-sc64-z6-transport-save
+	./build/test-sc64-z6-transport-game
+test-sc64-p6-query-experiments: test-sc64-six-query-options build/test-sc64-p6-count-snapshot build/test-sc64-p6-trap-cull
+	./build/test-sc64-p6-count-snapshot
+	./build/test-sc64-p6-trap-cull

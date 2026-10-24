@@ -50,7 +50,8 @@ int main(void)
     press(KEY_B); assert(menu_open);
     for(int i=0;i<SPELL_MENU;++i) press(KEY_DOWN);
     press(KEY_A); assert(mode==MODE_P4_STORM && !menu_open);
-    press(KEY_A); assert(mode==MODE_NORMAL);
+    u[hero].order=ORDER_MOVE; u[hero].tx=u[hero].x+200; u[hero].ty=u[hero].y;
+    press(KEY_A); assert(mode==MODE_NORMAL && u[hero].order==ORDER_IDLE);
     assert(u[hero].carry>=175*256 && u[hero].carry<175*256+32);
     assert(sc64_psionic_storm_state_valid(&SPELL_STATE));
     unsigned active=0;
@@ -77,10 +78,35 @@ int main(void)
     assert(!race_load_game());
     assert(!memcmp(before,u,sizeof(u)) && !memcmp(&effect,&SPELL_STATE,sizeof(effect)));
 
+    input(KEY_B|KEY_R); assert(mode==MODE_P4_STORM && !menu_open);
+    input(0); press(KEY_B); press(KEY_B);
+    /* An exhausted caster keeps the same selection; B+R must not fall
+       through to ordinary R's bulk combat-group selection. */
+    u[hero].carry=0;
+    input(KEY_B|KEY_R);
+    assert(mode==MODE_NORMAL && !menu_open && selected_count()==1 && u[hero].selected);
+    input(0);
     input(KEY_START); assert(screen==SCREEN_PAUSE);
     effect=SPELL_STATE; energy=u[hero].carry;
     for(int i=0;i<20;++i) input(0);
     assert(!memcmp(&effect,&SPELL_STATE,sizeof(effect)) && u[hero].carry==energy);
+#ifdef SC64_P6_STORM_ENABLED
+    /* Native raw210 is a NonBuilding trap despite its GBA storage pool. */
+    game_init(); race_mode=0; race_selected_mission=SC64_P6_GLOBAL_ID; init_state();
+    game_update(0,0); hero=hero_slot(); assert(hero>=0);
+    int trap=-1;
+    for(int i=0;i<MAX_BUILDINGS;++i)
+        if(b[i].alive && b[i].raw_type==210) { trap=i; break; }
+    assert(trap>=0);
+    for(int i=0;i<MAX_UNITS;++i) u[i].selected=0;
+    u[hero].selected=1; selected_building=-1;
+    u[hero].x=b[trap].x-100; u[hero].y=b[trap].y;
+    assert(race_p6_storm_cast_selected(b[trap].x,b[trap].y));
+    u32 deaths=race_p6.deaths_by_source[b[trap].raw_owner];
+    for(int i=0;i<100;++i) assert(race_p6_storm_tick(0));
+    assert(!b[trap].alive && b[trap].hp==0);
+    assert(race_p6.deaths_by_source[b[trap].raw_owner]==deaths+1);
+#endif
     puts("Actual campaign spell controls/save/pause checks passed");
     return 0;
 }

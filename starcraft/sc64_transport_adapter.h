@@ -1,7 +1,7 @@
 #ifndef SC64_TRANSPORT_ADAPTER_H
 #define SC64_TRANSPORT_ADAPTER_H
 
-#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED)
+#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED)
 #include "sc64_transport_rules.h"
 
 #if defined(SC64_P5_SHUTTLE_ENABLED) && \
@@ -19,9 +19,22 @@ enum { SC64_TRANSPORT_BOARD_RADIUS = 16, SC64_TRANSPORT_UNLOAD_TICKS = 19 };
  * no-transport opening/battle case. This flag is never save-persistent. */
 static int race_transport_activity;
 
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+static int race_z6_transport_overlord_ready(void);
+#endif
+
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+static int __attribute__((noinline)) race_transport_carrier_type(const Unit *q)
+#else
 static int race_transport_carrier_type(const Unit *q)
+#endif
 {
     if (!q) return 0;
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (race_z6_active() && race_z6_transport_overlord_ready() &&
+        q->type==U_OVERLORD && q->raw_type==42 && q->raw_owner==3 && q->owner==SIDE)
+        return 1;
+#endif
 #ifdef SC64_T5_RUNTIME
     if (q->type == U_DROPSHIP && q->raw_type == SC64_TRANSPORT_DROPSHIP_RAW)
         return 1;
@@ -77,6 +90,17 @@ static int race_p5_shuttle_menu_available(void)
 }
 #endif
 
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+static int race_z6_overlord_menu_available(void)
+{
+    if (!race_z6_active() || selected_building >= 0) return 0;
+    for (int i=0; i<MAX_UNITS; ++i)
+        if (u[i].selected && race_transport_carrier_valid(i) &&
+            u[i].type==U_OVERLORD && race_transport_cargo_space(i)>0) return 1;
+    return 0;
+}
+#endif
+
 /* A transition invalidates the short-lived indexes: newly unloaded units
  * must be targetable immediately, and newly loaded units must disappear.
  * The existing exact scan fallbacks handle the remainder of this tick. */
@@ -124,6 +148,9 @@ static void race_transport_destroy_cargo(int carrier)
             /* Destroying a carrier kills its passengers in this authored
              * runtime. Count those deaths before clearing their source owner. */
             if (race_p5_active()) race_p5_note_unit_death(&u[i]);
+#endif
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+            if (race_z6_active()) race_z6_note_unit_death(&u[i]);
 #endif
             if (u[i].owner == SIDE) supply_used -= unit_supply(u[i].type);
             u[i].hp = 0; u[i].alive = u[i].selected = 0;

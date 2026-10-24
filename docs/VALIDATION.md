@@ -2501,3 +2501,65 @@ and fail-closed raw72 creates. The canonical roster still rejects missing
 raw68/71/72 bindings. Its opaque AI policy issues existing-unit orders only;
 full native AI, production and playable P7 integration remain unfinished.
 The staged completion total remains **20/30**.
+
+
+### Z6 transport/save integration and P6 opening optimization
+
+The Z6 probe adds paid Ventral Sacs research, shared Overlord boarding and
+unloading, and generation-32 transactional saves. The authenticated source
+starts with three Overlords, a Hatchery, and no transport upgrade. PUNI/UPGR/
+UPGS facts require a Lair/Hive and 200 minerals + 200 gas; 2,400 native frames
+become 3,000 active 30-Hz updates. Cancellation follows the pinned PC upgrade
+policy: 75% on destruction, full refund on ownership-loss cancellation.
+Native walkability places the objective island outside the opening ground
+component; no terrain cells are changed to manufacture a route.
+
+The save state also records up to four Drone morphs so construction does not
+look like unrecorded starting-unit deaths. The source Hatchery can retain its
+identity through an in-place Lair morph. Cargo validation uses candidate
+research, source owner/type identity and embarked capacity; pending boarding
+intents and the final empty unload tick retain the shared engine's behavior.
+
+P6 Storm now hits source NonBuilding traps stored in Building slots. The
+actual spell/control fixture checks their source-death accounting, successful
+casts stop previous movement, and the B+R shortcut preserves a single exhausted
+caster's selection rather than invoking bulk R selection.
+
+The P6 opening query experiment combines four default-off options:
+`SC64_P6_PRUNE_STARTED`, `SC64_P6_PREVALIDATED_TICK`,
+`SC64_P6_TRAP_CULL`, and `SC64_P6_COUNT_SNAPSHOT`. The conservative trap reject
+passes 100,000 randomized geometry proofs and 150 full-array target/damage
+comparisons. The transient snapshot covers every queried source rectangle,
+groups source-selector tests per actor, and is invalidated before action/AI
+callbacks. It passes 150 randomized count worlds and a 12,000-tick scheduler
+comparison against complete scans. Its bounded stack object stays below
+512 bytes and adds no SRAM or BSS fields.
+
+A frozen 1,000-frame normal-menu startup comparison improves from **3.54 to
+5.81 effective fps**. Handoff plus eleven later complete observations and
+twelve framebuffer captures match exactly. The candidate retains IWRAM
+`0x030045d8` and BSS `0x0203d774`, within the unchanged reserve limits. This
+is an opening-only improvement; full winning-route qualification and physical
+GBA measurements are still pending, and it remains far below 30 fps.
+
+Private reports:
+`.local/build/promotion/p6-query-traps-snapshot/{baseline,selectors}/startup/`.
+Baseline ROM SHA-256:
+`a635dba2b33962447af11236ba22adf16ad6d558e6a424f192512d9e855254d8`.
+Candidate ROM SHA-256:
+`147ad597f7984c332dd8e3df6da7c27ffbd73513957a8bcea9de5f3c8b24d5f2`.
+Candidate ELF SHA-256:
+`e4839c0844b1ba44d4178a53d80add6be950ce148414422c978896f7304f5b14`.
+The staged completed total is still **20/30 (T10/Z5/P5)**; sixth missions are
+internal probes until complete normal-input and emulator wins are verified.
+
+
+The transport/query source snapshot passes the original-art source-only build
+and all default host regressions plus **314 Python tests (six private-data
+checks skipped)** in a fresh index export with no staged game assets. The
+Git index audit reports 498 text source files and no game/build/credential
+payloads. Both sixth-profile normal-menu/save matrices retain all 234 skirmish
+configurations; Z6 frame coverage remains pixel-identical to full clears. The
+actual Z6 transport fixture passes paid timing, pause, capacity, unloading,
+Kerrigan cargo, Drone-morph save continuity, malformed save rejection and
+carrier/passenger death accounting under ASan/UBSan.

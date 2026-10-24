@@ -9,8 +9,10 @@
 enum {
     SC64_TRANSPORT_DROPSHIP_RAW = 11,
     SC64_TRANSPORT_SHUTTLE_RAW = 69,
+    SC64_TRANSPORT_OVERLORD_RAW = 42,
     SC64_TRANSPORT_DROPSHIP_SPACE = 8,
     SC64_TRANSPORT_SHUTTLE_SPACE = 8,
+    SC64_TRANSPORT_OVERLORD_SPACE = 8,
     SC64_TRANSPORT_SPACE_UNAVAILABLE = 255,
     SC64_TRANSPORT_MAX_PASSENGERS = 8
 };
@@ -23,6 +25,10 @@ static inline unsigned sc64_transport_space_provided_raw(unsigned raw_type)
 #ifdef SC64_P5_SHUTTLE_ENABLED
     if (raw_type == SC64_TRANSPORT_SHUTTLE_RAW)
         return SC64_TRANSPORT_SHUTTLE_SPACE;
+#endif
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (raw_type == SC64_TRANSPORT_OVERLORD_RAW)
+        return SC64_TRANSPORT_OVERLORD_SPACE;
 #endif
     return 0u;
 }
@@ -43,6 +49,11 @@ static inline int sc64_transport_space_required_raw(unsigned raw_type,
         value = 2; break;
     case 5: case 23:
         value = 4; break;
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    /* Authenticated Z6 ground cargo. raw51 is Kerrigan; raw39 is Ultralisk. */
+    case 39: value = 4; break;
+    case 51: value = 1; break;
+#endif
 #ifdef SC64_P5_SHUTTLE_ENABLED
     /* P5's authenticated Protoss escort passengers. Values are pinned
      * UnitType::unitSpaceRequired entries, not estimates from actor size. */

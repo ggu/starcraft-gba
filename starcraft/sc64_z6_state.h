@@ -12,6 +12,10 @@
 #include "sc64_psionic_storm.h"
 #endif
 
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+#include "sc64_z6_transport_tech.h"
+#endif
+
 enum { SC64_Z6_SOURCE_SLOT_COUNT = 12, SC64_Z6_MAX_SOURCE_DEATHS = 65535u };
 
 typedef struct {
@@ -29,15 +33,21 @@ typedef struct {
 #ifdef SC64_Z6_STORM_ENABLED
     Sc64PsionicStormState storm;
 #endif
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    Sc64Z6TransportTechState transport;
+#endif
+    /* Source Drones can morph into player structures without a unit death.
+       Saturate at the four starting Drones relevant to the source census. */
+    u8 human_drone_morphs;
 } Sc64Z6PersistentState;
 
-_Static_assert(sizeof(Sc64Z6PersistentState) <= 172,
+_Static_assert(sizeof(Sc64Z6PersistentState) <= 180,
                "Z6 persisted runtime must remain within mission budget");
 
 static inline int sc64_z6_persistent_state_valid(const Sc64Z6PersistentState *s)
 {
     if (!s || !sc64_z6_runtime_state_valid(&s->runtime) ||
-        s->ai_plan_ticks > 240u || s->ai_plan_phase > 3u ||
+        s->human_drone_morphs > 4u || s->ai_plan_ticks > 240u || s->ai_plan_phase > 3u ||
         (s->moved_locations_mask & (u8)~3u)) return 0;
 #ifdef SC64_Z6_CLOAK_ENABLED
     if (!sc64_z5_cloak_state_valid(&s->cloak)) return 0;
@@ -48,6 +58,9 @@ static inline int sc64_z6_persistent_state_valid(const Sc64Z6PersistentState *s)
         if (s->storm.storm[i].active &&
             (s->storm.storm[i].x >= SC64_Z6_MAP_COLS*16u ||
              s->storm.storm[i].y >= SC64_Z6_MAP_ROWS*16u)) return 0;
+#endif
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (!sc64_z6_transport_tech_state_valid(&s->transport)) return 0;
 #endif
     for (unsigned i = 0; i < SC64_Z6_SOURCE_SLOT_COUNT; ++i)
         if (s->deaths_by_source[i] > SC64_Z6_MAX_SOURCE_DEATHS) return 0;

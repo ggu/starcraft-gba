@@ -543,6 +543,32 @@ race_p6_combat_infested_attack(Unit *q, int target)
     return 1;
 }
 
+#if defined(SC64_P6_TRAP_CULL)
+/* Every target box accepted by race_p6_combat_box_for_target has source
+ * extents no larger than 128px (sc64_z5_detect_box_valid). The wall trap's
+ * largest half-extent is 16px and its inclusive box-distance range is 160px.
+ * Thus a center separation above 160+128+16+1 on either axis cannot reach
+ * the trap. Coordinates outside the bounded map domain deliberately fall
+ * through to the exact path. This is only a conservative rejection test;
+ * inclusive distance, target ordering, and every eligibility check remain
+ * on the original path.
+ */
+static int
+race_p6_combat_trap_center_may_reach(int trap_x, int trap_y,
+                                     int target_x, int target_y)
+{
+    unsigned dx, dy;
+    const unsigned max_center_gap =
+        SC64_P6_WALL_TRAP_RANGE_SOURCE_PX + 128u + 16u + 1u;
+    if (trap_x < 0 || trap_x >= 4096 || trap_y < 0 || trap_y >= 4096 ||
+        target_x < 0 || target_x >= 4096 || target_y < 0 || target_y >= 4096)
+        return 1;
+    dx=(unsigned)(trap_x > target_x ? trap_x-target_x : target_x-trap_x);
+    dy=(unsigned)(trap_y > target_y ? trap_y-target_y : target_y-trap_y);
+    return dx <= max_center_gap && dy <= max_center_gap;
+}
+#endif
+
 /* One bounded per-tick autonomous attack for each enabled raw210 prop. Trap
  * cooldown is persisted in the unused shield_remainder field (the trap has
  * no shields). */
@@ -573,10 +599,18 @@ race_p6_combat_tick_traps(void)
                     race_p6_combat_unit_burrowed(j)) continue;
                 owner=q->owner; raw=race_p6_combat_raw_unit(q);
                 flying=sc64_race_unit_flying(q->type);
+#if defined(SC64_P6_TRAP_CULL)
+                if (!race_p6_combat_trap_center_may_reach(
+                        trap_box.x,trap_box.y,q->x*2,q->y*2)) continue;
+#endif
             } else {
                 Building *q=&b[j-MAX_UNITS];
                 if (!q->alive) continue;
                 owner=q->owner; raw=race_p6_combat_raw_building(q);
+#if defined(SC64_P6_TRAP_CULL)
+                if (!race_p6_combat_trap_center_may_reach(
+                        trap_box.x,trap_box.y,q->x*2,q->y*2)) continue;
+#endif
             }
             if (race_p6_owners_hostile(trap->owner,owner)==0 || flying ||
                 race_p6_combat_target_is_invincible(j) ||

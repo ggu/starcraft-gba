@@ -159,7 +159,7 @@ static void save_roundtrip_and_candidate_rejection(void)
         assert(race_z6_cloak_tick(0));
     assert(race_save_game());
     RaceSave good=race_data;
-    assert(SC64_RACE_SAVE_GENERATION==31u);
+    assert(SC64_RACE_SAVE_GENERATION==32u);
     assert(race_z6_save_candidate_valid(&good,&good.z6,
                                        SC64_Z6_MAP_COLS,SC64_Z6_MAP_ROWS));
     assert(race_load_game());

@@ -16,6 +16,8 @@
 #define SC64_GAME_ACTOR_INVINCIBLE 64u
 #define SC64_TRANSPORT_LOADED(q) 0
 #define MAX_UNITS 4
+#define MAX_BUILDINGS 4
+#define ORDER_IDLE 0
 #define WORLD_W 1024
 #define WORLD_H 1024
 #define SIDE 0
@@ -27,9 +29,15 @@
 
 typedef struct {
     int alive, owner, raw_type, carry, work_timer, selected;
-    int hp, shield, flags, type, x, y;
+    int hp, shield, flags, type, x, y, order,target,tx,ty;
 } Unit;
 static Unit u[MAX_UNITS];
+typedef Unit Building;
+static Building b[MAX_BUILDINGS];
+static int invincible_buildings[MAX_BUILDINGS];
+static void invalidate_path_grid(void) { }
+static void race_p6_note_building_death(const Building *q) { assert(q && q->alive); }
+
 static int invincible_units[MAX_UNITS];
 static int race_human = R_PROTOSS, selected_building = -1;
 static int supply_used, camx, camy;

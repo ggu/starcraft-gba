@@ -5,6 +5,9 @@
 
 #include "sc64_p6_state.h"
 #include "sc64_p6_world_adapter.h"
+#ifdef SC64_P6_COUNT_SNAPSHOT
+#include "sc64_p6_count_snapshot.h"
+#endif
 
 /* Save-hook contract for the shared adapter:
  *   Sc64P6PersistentState race_p6;
@@ -643,6 +646,10 @@ static int race_p6_campaign_tick(void)
 {
     Sc64P6WorldOps ops;
     int result;
+#ifdef SC64_P6_COUNT_SNAPSHOT
+    Sc64P6CountSnapshot count_snapshot;
+    Sc64P6CountSnapshotOpsContext count_context;
+#endif
     if (!race_p6_active()) return 1;
     if (!sc64_p6_persistent_state_valid(&race_p6) ||
         !race_p6_doodad_bindings_still_valid()) return 0;
@@ -654,6 +661,21 @@ static int race_p6_campaign_tick(void)
     ops.condition = sc64_p6_world_condition;
     ops.action = sc64_p6_world_action;
     ops.opaque_ai = race_p6_source_ai;
+#ifdef SC64_P6_COUNT_SNAPSHOT
+    count_context.world = &race_p6_world;
+    count_context.snapshot = &count_snapshot;
+#ifdef SC64_P6_PRUNE_STARTED
+    (void)sc64_p6_count_snapshot_begin(&count_snapshot, &race_p6_world,
+                                      &race_p6.runtime.model, 1);
+#else
+    (void)sc64_p6_count_snapshot_begin(&count_snapshot, &race_p6_world,
+                                      &race_p6.runtime.model, 0);
+#endif
+    ops.context = &count_context;
+    ops.condition = sc64_p6_count_snapshot_condition;
+    ops.action = sc64_p6_count_snapshot_action;
+    ops.opaque_ai = sc64_p6_count_snapshot_opaque_ai;
+#endif
 #ifdef SC64_P6_PREVALIDATED_TICK
     /* init/rebind can set bindings_valid only after full immutable-program
        preflight and successful world binding. The still-valid check above is
@@ -662,6 +684,11 @@ static int race_p6_campaign_tick(void)
     result = sc64_p6_adapter_tick_prevalidated(&race_p6.runtime, &ops, 0);
 #else
     result = sc64_p6_adapter_tick(&race_p6.runtime, &ops, 0);
+#endif
+#ifdef SC64_P6_COUNT_SNAPSHOT
+    /* Also discard on paused/terminal/error returns; action callbacks already
+       invalidate before any world mutation within the tick. */
+    sc64_p6_count_snapshot_end(&count_snapshot);
 #endif
     if (result < 0 || !sc64_p6_persistent_state_valid(&race_p6)) return 0;
     for (unsigned i=0;i<SC64_P6_DOODAD_SOURCE_COUNT;++i) {

@@ -98,9 +98,14 @@ static int race_z6_storm_cast_selected(int x, int y)
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].selected) { caster = i; break; }
     if (caster < 0) return 0;
-    return sc64_psionic_storm_cast(&race_z6.storm, (u16)x, (u16)y,
+    int cast=sc64_psionic_storm_cast(&race_z6.storm, (u16)x, (u16)y,
         (u16)u[caster].x, (u16)u[caster].y, &u[caster].carry,
         race_z6_storm_technology_researched());
+    if (cast) {
+        u[caster].order=ORDER_IDLE; u[caster].target=-1;
+        u[caster].tx=u[caster].x; u[caster].ty=u[caster].y;
+    }
+    return cast;
 }
 
 /* Cloak owns Kerrigan's single energy clock. This advances only Storm effects

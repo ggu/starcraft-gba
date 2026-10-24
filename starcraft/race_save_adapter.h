@@ -85,6 +85,9 @@ race_save_invincible_padding_valid(const RaceSave *candidate)
 #endif
 #ifdef SC64_Z6_RUNTIME
 #include "sc64_z6_save.h"
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+#include "sc64_z6_transport_save.h"
+#endif
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
 #include "sc64_terran_late_repair.h"
@@ -567,6 +570,9 @@ static int race_save_game(void) {
 #ifdef SC64_Z6_CLOAK_ENABLED
             || !race_z6_cloak_world_state_valid()
 #endif
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+            || !race_z6_transport_state_valid()
+#endif
             ) return 0;
         race_data.z6 = race_z6;
 #ifdef SC64_Z5_RUNTIME
@@ -686,6 +692,9 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_P5_SHUTTLE_ENABLED
     if (!race_p5_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
+#endif
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (!race_z6_transport_save_candidate_valid(&race_data, &race_data.z6.transport, race_cols, race_rows)) return 0;
 #endif
 #ifdef SC64_Z5_CONSUME_ENABLED
     if (!race_z5_consume_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
@@ -951,6 +960,9 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_P5_SHUTTLE_ENABLED
     if (!race_p5_transport_save_candidate_valid(&race_data, width, height)) return 0;
+#endif
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (!race_z6_transport_save_candidate_valid(&race_data, &race_data.z6.transport, width, height)) return 0;
 #endif
 #ifdef SC64_Z5_CONSUME_ENABLED
     if (!race_z5_consume_save_candidate_valid(&race_data, width, height)) return 0;

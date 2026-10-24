@@ -250,6 +250,9 @@ static void race_p4_rescue_tick(void)
 #ifdef SC64_Z6_RUNTIME
 #include "sc64_z6_runtime_adapter.h"
 #include "sc64_z6_hallucination.h"
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+#include "sc64_z6_transport_adapter.h"
+#endif
 #ifdef SC64_Z6_CLOAK_ENABLED
 #include "sc64_z6_cloak_adapter.h"
 #endif
@@ -754,6 +757,11 @@ race_campaign_init(void)
     if (race_z6_active() && !race_z6_runtime_init(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (race_z6_active() && !race_z6_transport_initialize_source()) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
 #ifdef SC64_Z6_CLOAK_ENABLED
     if (race_z6_active() && !race_z6_cloak_initialize_source_units()) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
@@ -1057,6 +1065,9 @@ race_campaign_tick(void)
 #endif
 #ifdef SC64_Z6_RUNTIME
     if (mission == SC64_Z6_GLOBAL_ID) {
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+        if (!race_z6_transport_research_tick(0)) { screen=SCREEN_PAUSE; toast(14); return; }
+#endif
 #ifdef SC64_Z6_CLOAK_ENABLED
         if (!race_z6_cloak_tick(0)) { screen=SCREEN_PAUSE; toast(14); return; }
 #endif
