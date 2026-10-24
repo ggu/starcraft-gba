@@ -1,6 +1,12 @@
 #include "../common/gba.h"
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
+#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED)
+#define SC64_TRANSPORT_RUNTIME
+#endif
+#if defined(SC64_P5_SHUTTLE_ENABLED) && !defined(SC64_P5_RUNTIME)
+#error "P5 Shuttle transport requires the P5 runtime"
+#endif
 void *memcpy(void *dst, const void *src, size_t n);
 void *memset(void *dst, int value, size_t n);
 int memcmp(const void *a, const void *b, size_t n);
@@ -107,7 +113,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_Z5_CLOAK_ENABLED)
+#if defined(SC64_P5_SHUTTLE_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 26u
+#elif defined(SC64_Z5_CLOAK_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 25u
 #elif defined(SC64_P5_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 24u
@@ -506,14 +514,14 @@ enum {
 enum {
     ORDER_IDLE, ORDER_MOVE, ORDER_ATTACK_MOVE, ORDER_ATTACK_TARGET,
     ORDER_MINE, ORDER_BUILD, ORDER_GAS
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_TRANSPORT_RUNTIME
     , ORDER_BOARD, ORDER_TRANSPORTED, ORDER_UNLOAD
 #endif
 #ifdef SC64_T6_RUNTIME
     , ORDER_REPAIR
 #endif
 };
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_TRANSPORT_RUNTIME
 #define SC64_TRANSPORT_LOADED(q) ((q)->order == ORDER_TRANSPORTED)
 #else
 #define SC64_TRANSPORT_LOADED(q) 0
@@ -537,7 +545,7 @@ enum {
 };
 enum {
     MODE_NORMAL, MODE_MOVE, MODE_ATTACK, MODE_BUILD
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_TRANSPORT_RUNTIME
     , MODE_UNLOAD
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
@@ -835,6 +843,9 @@ static int race_p4_world_paused(void);
 #ifdef SC64_P5_RUNTIME
 static int race_p5_active(void);
 static int race_p5_source_owner(unsigned source_slot);
+#ifdef SC64_P5_SHUTTLE_ENABLED
+static int race_p5_product_source_owner(int owner);
+#endif
 static int race_p5_owners_hostile(int owner, int other);
 static unsigned race_p5_reserved_units(void);
 static void race_p5_note_unit_death(const Unit *q);
@@ -1216,6 +1227,12 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     if (sc64_zp_actor_fact(type)) u[i].raw_type = sc64_race_raw_unit(type);
 #endif
+#ifdef SC64_P5_SHUTTLE_ENABLED
+    if (race_p5_active()) {
+        u[i].raw_type = sc64_race_raw_unit(type);
+        u[i].raw_owner = race_p5_product_source_owner(owner);
+    }
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) {
         u[i].raw_type = sc64_race_raw_unit(type);
@@ -1315,6 +1332,12 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     { const Sc64ZpBuildingFact *zp = sc64_zp_building_fact(type);
       if (zp) { b[i].shield = zp->shields;
         b[i].raw_type = sc64_race_raw_building(type); } }
+#endif
+#ifdef SC64_P5_SHUTTLE_ENABLED
+    if (race_p5_active()) {
+        b[i].raw_type = sc64_race_raw_building(type);
+        b[i].raw_owner = race_p5_product_source_owner(owner);
+    }
 #endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) {
@@ -1876,7 +1899,7 @@ move_toward(Unit * q, int tx, int ty)
 #endif
 }
 
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_TRANSPORT_RUNTIME
 #include "sc64_transport_adapter.h"
 #endif
 
@@ -2316,6 +2339,8 @@ hit_target(int target, int damage, int source_type, int source_owner)
 	    u[target].alive = 0;
 #ifdef SC64_T5_RUNTIME
             if (u[target].type == U_DROPSHIP) race_transport_destroy_cargo(target);
+#elif defined(SC64_P5_SHUTTLE_ENABLED)
+            if (race_transport_carrier_type(&u[target])) race_transport_destroy_cargo(target);
 #endif
 	}
 	if (source_type == U_FIREBAT) {
@@ -3253,6 +3278,13 @@ tick_research(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_P5_SHUTTLE_ENABLED
+    if (choice == MENU_STOP + 1 && race_p5_shuttle_menu_available()) {
+        menu_open = 0;
+        mode = MODE_UNLOAD;
+        return;
+    }
+#endif
 #ifdef SC64_Z5_CLOAK_ENABLED
     if (choice == MENU_STOP + 1 && race_z5_cloak_menu_available()) {
         int result = race_z5_cloak_toggle_selected();
@@ -3372,6 +3404,9 @@ choose_command(int choice)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+#ifdef SC64_P5_SHUTTLE_ENABLED
+    if (race_p5_shuttle_menu_available()) return MENU_STOP + 2;
+#endif
 #ifdef SC64_Z5_CLOAK_ENABLED
     if (race_z5_cloak_menu_available()) return MENU_STOP + 2;
 #endif
@@ -3479,7 +3514,7 @@ interact(void)
 	start_build(menu);
 	return;
     }
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_TRANSPORT_RUNTIME
     if (mode == MODE_UNLOAD) {
         int issued = 0;
         for (int i = 0; i < MAX_UNITS; ++i)
@@ -3487,7 +3522,7 @@ interact(void)
                 race_transport_request_unload(i, cx, cy)) ++issued;
         mode = MODE_NORMAL; toast(issued ? 0 : 8); return;
     }
-    /* Select passengers, then press A on a friendly Dropship to board.
+    /* Select passengers, then press A on a friendly transport to board.
      * Selecting an empty carrier without selected passengers still works. */
     for (int carrier = 0; carrier < MAX_UNITS; ++carrier)
         if (race_transport_carrier_valid(carrier) && u[carrier].owner == SIDE &&
@@ -3823,7 +3858,7 @@ static void GBA_HOT
 update_orders(void)
 {
     int i, target;
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_TRANSPORT_RUNTIME
     race_transport_activity = 0;
 #endif
 #ifdef SC64_DIAGNOSTIC_ORDERS
@@ -3883,11 +3918,13 @@ target_lists_unavailable:
             if (race_t6_repair_tick_unit(i)) continue;
         }
 #endif
-	#ifdef SC64_T5_RUNTIME
+	#ifdef SC64_TRANSPORT_RUNTIME
         if (q->order >= ORDER_BOARD) {
             race_transport_activity = 1;
             if (race_transport_tick_unit(i)) continue;
         }
+	#endif
+	#ifdef SC64_T5_RUNTIME
         /* Preplaced mines own their arm/acquire/chase state. The ordinary
          * actor loop must not clear their target or consume their timer. */
         if (q->type == U_SPIDER_MINE) continue;
@@ -4710,7 +4747,7 @@ game_update(u16 held, u16 pressed)
     profile_start = gba_clock();
 #endif
     update_orders();
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_TRANSPORT_RUNTIME
     race_transport_tick_after_orders();
 #endif
 #ifdef SC64_IMPORTED_MISSION
@@ -4758,6 +4795,8 @@ game_update(u16 held, u16 pressed)
     tick_research();
 #ifdef SC64_T5_RUNTIME
     race_t5_tech_tick();
+#endif
+#ifdef SC64_TRANSPORT_RUNTIME
     race_transport_tick_after_orders();
 #endif
 #ifdef SC64_T6_RUNTIME
@@ -5581,6 +5620,9 @@ draw_map(void)
 	for (i = first; i < field_menu_count() && i < first + 10; ++i) {
 	    const char *label = i == MENU_STOP + 1 && race_p4_storm_menu_available() ?
                 "STORM" : labels[i];
+#ifdef SC64_P5_SHUTTLE_ENABLED
+            if (i == MENU_STOP + 1 && race_p5_shuttle_menu_available()) label = "UNLOAD CARGO";
+#endif
 	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
 	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
 	}
@@ -5812,8 +5854,12 @@ draw_hud_commands(void)
                     gfx_text(100, 137, race_z5.cloak.active ? "CLOAKED" : "B CLOAK", C_GOLD);
                 } else
 #endif
+#ifdef SC64_TRANSPORT_RUNTIME
 #ifdef SC64_T5_RUNTIME
                 if (u[i].type == U_DROPSHIP) {
+#else
+                if (race_transport_carrier_type(&u[i])) {
+#endif
                     gfx_text(52, 137, "CARGO", C_GOLD);
                     gfx_num(90, 137, race_transport_cargo_space(i), C_WHITE);
                     gfx_text(104, 137, "/8  B UNLOAD", C_GOLD);

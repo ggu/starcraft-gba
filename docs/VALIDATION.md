@@ -2211,3 +2211,21 @@ all five menu entries, skirmish setups and framebuffer coverage. Treating an
 enabled prop as an active detector is an authored policy. Source PTEC does
 not enable Psionic Storm. Z5 has no qualified controller win or frame-rate
 result from these checks.
+
+### 2026-10-24 — optional P5 Shuttle lifecycle
+
+P5's extraction island is disconnected from its starting ground force under
+the imported terrain; its source Shuttle is required. The separate
+generation-26 profile enables eight-space transport using pinned passenger
+capacities. The real-engine ASan/UBSan fixture boards through normal A input,
+fills capacity and rejects excess cargo, checks moving/idle-carrier cargo
+synchronization, and unloads through the normal B-menu command. Loaded units
+are excluded from targets, collision, vision and location-scoped Bring;
+Command still counts their presence. Carrier destruction kills cargo and
+records the corresponding source-player deaths.
+
+Active cargo and unloading save round trips, malformed links, foreign owner,
+overcapacity and generation-24 rejection are checked before live mutation.
+The ARM build ends IWRAM at `0x03004100` and BSS at `0x0203d564`, inside the
+unchanged guards. No completed P5 controller or ARM playthrough is claimed
+by these lifecycle checks.

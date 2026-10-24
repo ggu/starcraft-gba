@@ -40,6 +40,7 @@ Z5_CLOAK_FLAGS := $(Z5_FLAGS) -DSC64_Z5_CLOAK_ENABLED
 Z5_CLOAK_INPUTS := $(Z5_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z5_abilities_generated.h
 P5_FLAGS := $(filter-out -DSC64_ZP_DEFENSE_TARGETS -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated,$(P4_STORM_FLAGS)) -I.local/sc64/p5/generated -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated -I.local/sc64/zp-stage/generated/scenarios -DSC64_ZP_FULL_STORAGE -DSC64_P5_DATA_ENABLED -DSC64_P5_ENABLED -DSC64_P5_RUNTIME -DSC64_P5_CAMPAIGN_ENTRY -DSC64_P5_ACTORS -DSC64_Z6_ACTORS
 P5_INPUTS := $(P4_INPUTS) .local/sc64/p5/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h
+P5_SHUTTLE_FLAGS := $(P5_FLAGS) -DSC64_P5_SHUTTLE_ENABLED
 T4_STORAGE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_T4_ENABLED -DSC64_T4_RUNTIME -DSC64_ROUTE_PACK3 -DSC64_T4_WINDOWED_SCHEDULE -DSC64_CAMPAIGN_RACE=0
 T4_OPTIMIZATION_FLAGS ?= -DSC64_T4_COUNT_CACHE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS -DSC64_UNARMED_QUERY_SKIP
 T4_SCENARIO_FLAGS := $(T4_STORAGE_FLAGS) -DSC64_T4_SCENARIO_RUNTIME
@@ -1122,6 +1123,38 @@ build/StarCraft-Protoss-P5-GBA.gba: build/starcraft-protoss-p5.elf tools/fix_rom
 protoss-p5: build/StarCraft-Protoss-P5-GBA.gba
 	$(PYTHON) tools/verify_roms.py --protoss-p5
 
+build/starcraft-protoss-p5-shuttle.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P5_SHUTTLE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p5-shuttle.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P5-Shuttle-GBA.gba: build/starcraft-protoss-p5-shuttle.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P5 CARGO' SCPB
+.PHONY: protoss-p5-shuttle
+protoss-p5-shuttle: build/StarCraft-Protoss-P5-Shuttle-GBA.gba
+	$(PYTHON) tools/verify_roms.py --protoss-p5-shuttle
+
+build/test-sc64-p5-transport-on: tests/sc64_p5_transport.c starcraft/sc64_transport_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_P5_SHUTTLE_ENABLED $< -o $@
+build/test-sc64-p5-transport-off: tests/sc64_p5_transport.c starcraft/sc64_transport_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-p5-transport
+test-sc64-p5-transport: build/test-sc64-p5-transport-on build/test-sc64-p5-transport-off
+	./build/test-sc64-p5-transport-on
+	./build/test-sc64-p5-transport-off
+test-starcraft: test-sc64-p5-transport
+
+build/test-sc64-p5-shuttle-runtime: tests/sc64_p5_shuttle_runtime.c tests/sc64_p5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p5-shuttle-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p5-shuttle-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p5-shuttle-runtime
+test-sc64-p5-shuttle-runtime: test-sc64-p5-transport build/test-sc64-p5-shuttle-runtime build/test-sc64-p5-shuttle-profile build/test-sc64-p5-shuttle-frame-coverage
+	./build/test-sc64-p5-shuttle-runtime
+	./build/test-sc64-p5-shuttle-profile
+	./build/test-sc64-p5-shuttle-frame-coverage
+
 build/test-sc64-p5-runtime: tests/sc64_p5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p5-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -1421,6 +1454,13 @@ build/test-sc64-z5-world: tests/sc64_z5_world.c $(STARCRAFT) $(wildcard starcraf
 .PHONY: test-sc64-z5-world
 test-sc64-z5-world: build/test-sc64-z5-world
 	./build/test-sc64-z5-world
+
+Z6_WORLD_FLAGS := $(filter-out -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS,$(Z5_WORLD_FLAGS)) -DSC64_ZP_FULL_STORAGE -DSC64_Z6_ACTORS
+build/test-sc64-z6-world: tests/sc64_z6_world.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_WORLD_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z6-world
+test-sc64-z6-world: build/test-sc64-z6-world
+	./build/test-sc64-z6-world
 
 build/test-sc64-z4-defense-targets: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@

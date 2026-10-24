@@ -30,6 +30,7 @@ TARGETS = {
     "--protoss-p4": ("StarCraft-Protoss-P4-GBA", "starcraft-protoss-p4", "SCP4", "SC PROTOSS4"),
     "--protoss-p4-storm": ("StarCraft-Protoss-P4-Storm-GBA", "starcraft-protoss-p4-storm", "SCP5", "SC P4 STORM"),
     "--protoss-p5": ("StarCraft-Protoss-P5-GBA", "starcraft-protoss-p5", "SCPA", "SC PROTOSS5"),
+    "--protoss-p5-shuttle": ("StarCraft-Protoss-P5-Shuttle-GBA", "starcraft-protoss-p5-shuttle", "SCPB", "SC P5 CARGO"),
     "--t4-internal": ("StarCraft-T4-Internal-GBA", "starcraft-t4-replay", "SCT4", "SC64 T4 TEST"),
     "--terran-t4": ("StarCraft-Terran-T4-GBA", "starcraft-t4-combined", "SCT5", "SC TERRAN T4"),
 }

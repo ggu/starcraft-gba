@@ -66,6 +66,16 @@ static int race_p5_source_owner(unsigned slot)
     return race_p5_live_owner_for_source(slot);
 }
 
+#ifdef SC64_P5_SHUTTLE_ENABLED
+/* Produced actors need the same source provenance as their owning force.
+ * Imported and rescued actors retain the authenticated original raw_owner. */
+static int race_p5_product_source_owner(int owner)
+{
+    static const u8 source_for_owner[5] = {7, 3, 6, 2, 4};
+    return owner >= SIDE && owner <= 4 ? source_for_owner[owner] : -1;
+}
+#endif
+
 static int race_p5_runtime_state_valid(void);
 
 static unsigned race_p5_remaining_creations(const Sc64P5PersistentState *state)

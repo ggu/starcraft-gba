@@ -931,10 +931,30 @@ Bring Tassadar and two Zealots to the extraction point to satisfy the source
 victory predicates. The three opaque AI script actions use a bounded authored
 paid-pressure policy; native AI equivalence is unverified. Startup, source
 actions, saves and render checks do not establish a normal-controller win.
-The extraction terrain requires Shuttle transport, whose lifecycle is still
-pending in this generation-24 profile; it is not yet a completable release.
+The extraction terrain requires Shuttle transport, which this generation-24
+profile does not enable. To test the separate generation-26 cargo profile:
+
+```sh
+make protoss-p5-shuttle test-sc64-p5-shuttle-runtime
+```
+
+Select passengers and press **A** on the friendly Shuttle to board. It has
+eight space points: Probe 1, Zealot/High Templar/Tassadar 2, Dragoon 4. Select
+the loaded Shuttle, press **B**, choose **UNLOAD CARGO**, then press **A** on
+a clear landing area. Passengers retain HP and supply while aboard and
+cannot be selected, attacked or counted in a Bring objective until unloaded.
+Cargo dies if the Shuttle is destroyed. These bounded GBA orders reuse
+existing unit/save fields; generation-24 saves are incompatible. Lifecycle
+checks do not establish a full P5 controller win.
 
 `make test-sc64-z5-ability-models test-sc64-z6-model` requires no imported data.
 After generating the Z6 numeric descriptor with the scenario packer,
 `make test-sc64-z6-adapter` checks its isolated callback scheduler. Z6 is not
 an enabled runtime mission.
+
+`make test-sc64-z6-world` checks its engine-backed world callback foundation,
+including selectors, locations, resources, both MoveLocation targets,
+KillUnitAtLocation and source properties. Its mutable location state still
+needs save integration. Source hallucination, energy and opaque AI actions
+require explicit integration callbacks and fail closed when absent; this
+fixture does not establish a playable Z6 mission.

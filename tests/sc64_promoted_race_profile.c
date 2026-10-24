@@ -40,7 +40,11 @@ static const char *const profile_titles[] = {
 #define PROFILE_FACTION SC64_FACTION_PROTOSS
 #define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS
 #define PROFILE_RACE R_PROTOSS
+#ifdef SC64_P5_SHUTTLE_ENABLED
+#define PROFILE_SAVE_GENERATION 26u
+#else
 #define PROFILE_SAVE_GENERATION 24u
+#endif
 #define PROFILE_OLD_SAVE_TAG 0x53435032u
 static const int profile_missions[] = {2, 3, 22, 23, 24};
 static const char *const profile_titles[] = {

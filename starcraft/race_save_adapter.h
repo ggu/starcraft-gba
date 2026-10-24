@@ -277,6 +277,9 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
 #include "sc64_t5_save_adapter.h"
 #include "sc64_transport_save_adapter.h"
 #endif
+#ifdef SC64_P5_SHUTTLE_ENABLED
+#include "sc64_p5_transport_save.h"
+#endif
 #ifdef SC64_T6_RUNTIME
 #include "sc64_t6_save_adapter.h"
 #endif
@@ -591,6 +594,9 @@ static int race_save_game(void) {
 #ifdef SC64_T5_RUNTIME
     if (!race_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
+#ifdef SC64_P5_SHUTTLE_ENABLED
+    if (!race_p5_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
+#endif
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);toast(7);return 1;
 }
 static int race_load_game(void) {
@@ -709,7 +715,7 @@ static int race_load_game(void) {
             RACE_U(i,order)<ORDER_IDLE||RACE_U(i,order)>
 #ifdef SC64_T6_RUNTIME
             ORDER_REPAIR||
-#elif defined(SC64_T5_RUNTIME)
+#elif defined(SC64_TRANSPORT_RUNTIME)
             ORDER_UNLOAD||
 #else
             ORDER_GAS||
@@ -835,6 +841,9 @@ static int race_load_game(void) {
 #ifdef SC64_T5_RUNTIME
     if (!race_t5_candidate_queues_available(&race_data)) return 0;
     if (!race_transport_save_candidate_valid(&race_data, width, height)) return 0;
+#endif
+#ifdef SC64_P5_SHUTTLE_ENABLED
+    if (!race_p5_transport_save_candidate_valid(&race_data, width, height)) return 0;
 #endif
 #ifdef SC64_ZP_FULL_STORAGE
     for (int i = 0; i < MAX_MINERALS; ++i) {

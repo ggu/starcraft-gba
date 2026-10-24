@@ -62,8 +62,8 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
     if (type == U_Z6_GUARDIAN) return &guardian;
 #endif
 #ifdef SC64_P5_ACTORS
-    /* Shuttle source facts are numeric only. Cargo/transport behavior remains
-       unsupported by this actor policy and is not implied by the raw type. */
+    /* Shuttle source facts are shared; the optional P5 transport profile
+       supplies bounded cargo orders and saves. */
     static const Sc64ZpActorFact shuttle = {
         69,80,60,1,200,0,900,256, 20,16,19,15,1,2,
         0,0,0,0,0, 0,0,0,0,0,

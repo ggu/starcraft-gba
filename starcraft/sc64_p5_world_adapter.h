@@ -159,6 +159,10 @@ static int sc64_p5_world_count(const Sc64P5WorldContext *ctx, unsigned selector,
         if (!sc64_p5_world_location(location, &l, &t, &r, &btm)) return 0;
     }
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive) {
+#ifdef SC64_P5_SHUTTLE_ENABLED
+        /* Command retains cargo presence; Bring requires a world actor. */
+        if (location && SC64_TRANSPORT_LOADED(&u[i])) continue;
+#endif
         int raw = u[i].raw_type >= 0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type);
         int owner = sc64_p5_world_owner_matches(ctx, selector, u[i].raw_owner,
                                                  u[i].owner);
