@@ -23,6 +23,7 @@ TARGETS = {
     "--zerg": ("StarCraft-Zerg-GBA", "starcraft-zerg", "SCZ3", "SC ZERG Z3"),
     "--zerg-z3": ("StarCraft-Zerg-GBA", "starcraft-zerg", "SCZ3", "SC ZERG Z3"),
     "--zerg-z4": ("StarCraft-Zerg-Z4-GBA", "starcraft-zerg-z4", "SCZ4", "SC ZERG Z4"),
+    "--zerg-z5": ("StarCraft-Zerg-Z5-GBA", "starcraft-zerg-z5", "SCZ5", "SC ZERG Z5"),
     "--protoss": ("StarCraft-Protoss-GBA", "starcraft-protoss", "SCP3", "SC PROTOSS3"),
     "--protoss-p3": ("StarCraft-Protoss-GBA", "starcraft-protoss", "SCP3", "SC PROTOSS3"),
     "--protoss-p4": ("StarCraft-Protoss-P4-GBA", "starcraft-protoss-p4", "SCP4", "SC PROTOSS4"),

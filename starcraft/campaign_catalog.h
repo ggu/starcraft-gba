@@ -7,6 +7,16 @@
     SC64_CAMPAIGN_RACE != 0
 #error "SC64_T4_CAMPAIGN_ENTRY requires the combined unified Terran T3/T4 profile"
 #endif
+#ifdef SC64_Z5_CAMPAIGN_ENTRY
+#if !defined(SC64_Z4_CAMPAIGN_ENTRY) || !defined(SC64_Z4_RUNTIME) || \
+    !defined(SC64_Z5_RUNTIME) || !defined(SC64_Z5_ENABLED) || \
+    !defined(SC64_Z5_DATA_ENABLED) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_Z5_ACTORS) || !defined(SC64_Z5_DOODADS) || \
+    !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || \
+    SC64_CAMPAIGN_RACE != 1
+#error "SC64_Z5_CAMPAIGN_ENTRY requires the authenticated Z4/Z5 full-storage chain"
+#endif
+#endif
 #endif
 #ifdef SC64_T5_CAMPAIGN_ENTRY
 #if !defined(SC64_T3_ENABLED) || !defined(SC64_T4_CAMPAIGN_ENTRY) || \
@@ -127,7 +137,13 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
      0,
 #endif
      "AGENT OF THE SWARM"},
-    {16, SC64_FACTION_ZERG, 5, 0, "THE AMERIGO"},
+    {16, SC64_FACTION_ZERG, 5,
+#ifdef SC64_Z5_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "THE AMERIGO"},
     {17, SC64_FACTION_ZERG, 6, 0, "THE DARK TEMPLAR"},
     {18, SC64_FACTION_ZERG, 7, 0, "THE CULLING"},
     {19, SC64_FACTION_ZERG, 8, 0, "EYE FOR AN EYE"},

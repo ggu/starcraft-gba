@@ -34,7 +34,8 @@ enum {
     SC64_Z5_SOURCE_BEACON              = 1u << 12,
     SC64_Z5_REF_ATTACKABLE             = 1u << 13,
     SC64_Z5_REF_MOVE_INTERACTION       = 1u << 14,
-    SC64_Z5_REF_HAS_SPRITE             = 1u << 15
+    SC64_Z5_REF_HAS_SPRITE             = 1u << 15,
+    SC64_Z5_SOURCE_HAS_GROUND_WEAPON   = 1u << 16
 };
 
 typedef struct {
@@ -110,9 +111,34 @@ static inline const Sc64Z5BuildingFact *sc64_z5_building_fact(int raw)
         {195,100000,0,0,50,50,1,256, 3,2,48,32,47,31,3,
          SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_INVINCIBLE|
          SC64_Z5_SOURCE_BEACON|SC64_Z5_REF_MOVE_INTERACTION|
-         SC64_Z5_REF_HAS_SPRITE}
+         SC64_Z5_REF_HAS_SPRITE},
+        /* The four doors are large, invincible structures with 100000 HP. */
+        {205,100000,0,0,1,1,1,32, 3,2,25,17,44,20,3,
+         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
+        {206,100000,0,0,1,1,1,32, 3,2,44,17,25,20,3,
+         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
+        {207,100000,0,0,1,1,1,32, 3,2,41,17,28,20,3,
+         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
+        {208,100000,0,0,1,1,1,32, 3,2,28,17,41,20,3,
+         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
+        /* Four 50 HP weapon traps; per T4 policy they are drawable and
+         * represented in the building pool, but not selectable/collidable. */
+        {203,50,0,0,1,1,1,192, 2,2,32,32,31,31,3,
+         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_HAS_GROUND_WEAPON|SC64_Z5_REF_HAS_SPRITE},
+        {209,50,0,0,1,1,1,192, 2,2,32,32,31,31,3,
+         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_HAS_GROUND_WEAPON|SC64_Z5_REF_HAS_SPRITE},
+        {211,50,0,0,1,1,1,96, 1,1,16,16,15,15,3,
+         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_HAS_GROUND_WEAPON|SC64_Z5_REF_HAS_SPRITE},
+        {213,50,0,0,1,1,1,96, 1,1,16,16,15,15,3,
+         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_HAS_GROUND_WEAPON|SC64_Z5_REF_HAS_SPRITE}
     };
-    return raw == 195 ? &facts[0] : 0;
+    switch (raw) {
+    case 195: return &facts[0]; case 205: return &facts[1];
+    case 206: return &facts[2]; case 207: return &facts[3];
+    case 208: return &facts[4]; case 203: return &facts[5];
+    case 209: return &facts[6]; case 211: return &facts[7];
+    case 213: return &facts[8]; default: return 0;
+    }
 }
 
 /* Bounds dimensions are BWAPI source pixels. Keep the same conservative

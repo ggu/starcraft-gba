@@ -144,6 +144,39 @@ static inline const Sc64ZpBuildingFact *sc64_zp_building_fact(int type)
          SC64_ZP_ACTOR_INVINCIBLE|SC64_ZP_ACTOR_BEACON};
     if (type == B_Z5_TERRAN_BEACON) return &z5_beacon;
 #endif
+#ifdef SC64_Z5_DOODADS
+    static const Sc64ZpBuildingFact z5_doodads[] = {
+        /* These are authored GBA policies copied from the established T4
+         * prop adapter. Source invincibility/weapon facts are separate. */
+        {203,50,0,0,0,0,1,192,2,2,32,32,31,31,3,
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_WEAPON},
+        {205,100000,0,0,0,0,1,32,3,2,25,17,44,20,3,
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_INVINCIBLE},
+        {206,100000,0,0,0,0,1,32,3,2,44,17,25,20,3,
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_INVINCIBLE},
+        {207,100000,0,0,0,0,1,32,3,2,41,17,28,20,3,
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_INVINCIBLE},
+        {208,100000,0,0,0,0,1,32,3,2,28,17,41,20,3,
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_INVINCIBLE},
+        {209,50,0,0,0,0,1,192,2,2,32,32,31,31,3,
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_WEAPON},
+        {211,50,0,0,0,0,1,96,1,1,16,16,15,15,3,
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_WEAPON},
+        {213,50,0,0,0,0,1,96,1,1,16,16,15,15,3,
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_WEAPON}
+    };
+    switch (type) {
+    case B_Z5_FLOOR_MISSILE_TRAP: return &z5_doodads[0];
+    case B_Z5_UPPER_DOOR: return &z5_doodads[1];
+    case B_Z5_RIGHT_UPPER_DOOR: return &z5_doodads[2];
+    case B_Z5_PIT_DOOR: return &z5_doodads[3];
+    case B_Z5_RIGHT_PIT_DOOR: return &z5_doodads[4];
+    case B_Z5_FLOOR_GUN_TRAP: return &z5_doodads[5];
+    case B_Z5_WALL_FLAME_TRAP: return &z5_doodads[6];
+    case B_Z5_RIGHT_WALL_FLAME_TRAP: return &z5_doodads[7];
+    default: break;
+    }
+#endif
     static const Sc64ZpBuildingFact facts[] = {
         /* raw, hp, shields, armor, sight, width, height, size, flags */
         {115,500,0,1,50,50,600,256,2,2,47,24,28,22,2,SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_DRAWABLE},

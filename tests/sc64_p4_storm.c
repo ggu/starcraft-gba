@@ -42,6 +42,31 @@ static int source_unit(int raw)
     return -1;
 }
 
+static void test_escort_group_chord(void)
+{
+    launch_from_normal_menu();
+    int tassadar = source_unit(SC64_P4_RAW_TASSADAR);
+    int raynor = spawn_unit(SIDE, U_ZP_RAYNOR_VULTURE, 1640, 1900);
+    int escort = spawn_unit(SIDE, U_ZEALOT, 1630, 1900);
+    assert(tassadar >= 0 && raynor >= 0 && escort >= 0);
+    u[tassadar].owner = SIDE;
+    u[raynor].raw_type = SC64_P4_RAW_RAYNOR_VULTURE;
+    press(KEY_R);
+    assert(u[tassadar].selected && u[raynor].selected && u[escort].selected);
+    input(KEY_B);
+    assert(menu_open);
+    input(KEY_B | KEY_R);
+    assert(!menu_open && mode == MODE_NORMAL);
+    assert(!u[tassadar].selected && !u[raynor].selected && u[escort].selected);
+    input(0);
+    /* Both synthetic heroes becoming human-owned starts the real rescue
+     * presentation. Ordinary commands correctly wait for its source pause. */
+    for (int wait = 0; race_p4.source_paused && wait < 5000; ++wait) input(0);
+    assert(!race_p4.source_paused && screen == SCREEN_PLAY);
+    press(KEY_R);
+    assert(u[tassadar].selected && u[raynor].selected && u[escort].selected);
+}
+
 static int rescue_high_templar(void)
 {
     int caster = source_unit(SC64_P4_STORM_HIGH_TEMPLAR_RAW);
@@ -337,6 +362,7 @@ int main(void)
 {
     gba_init();
     test_inactive_runtime_and_save();
+    test_escort_group_chord();
     test_cast_range_pool_and_cancel();
     test_menu_cast_damage_and_friendly_fire();
     test_pause_and_save_validation();

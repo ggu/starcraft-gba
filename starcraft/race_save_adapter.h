@@ -20,8 +20,13 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
                       unsigned world_width, unsigned world_height, Unit *out)
 {
     if (!candidate || !out || slot >= MAX_UNITS) return 0;
+#ifdef SC64_ZP_FULL_STORAGE
+    return sc64_zp_unit_save_decode(out, &candidate->units[slot],
+                                    world_width, world_height);
+#else
     return sc64_unit_save_decode(out, &candidate->units[slot],
                                  world_width, world_height);
+#endif
 }
 #endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
@@ -29,8 +34,51 @@ static int
 race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *out)
 {
     if (!candidate || !out || slot >= MAX_BUILDINGS) return 0;
+#ifdef SC64_ZP_FULL_STORAGE
+    Building decoded;
+    if (!sc64_building_save_decode(&decoded, &candidate->buildings[slot])) return 0;
+    if (decoded.x < 0 || decoded.y < 0 || decoded.x >= 2048 || decoded.y >= 2048)
+        return 0;
+    *out = decoded;
+    return 1;
+#else
     return sc64_building_save_decode(out, &candidate->buildings[slot]);
+#endif
 }
+#endif
+#ifdef SC64_ZP_FULL_STORAGE
+static int
+race_save_decode_mineral(const RaceSave *candidate, unsigned slot,
+                         unsigned width, unsigned height, Mineral *out)
+{
+    return candidate && slot < MAX_MINERALS &&
+        sc64_mineral_save_decode(out, &candidate->minerals_map[slot], width, height);
+}
+static unsigned
+race_save_unit_invincible(const RaceSave *candidate, unsigned slot)
+{
+    return (candidate->invincible_bits[slot >> 3] >> (slot & 7u)) & 1u;
+}
+static unsigned
+race_save_building_invincible(const RaceSave *candidate, unsigned slot)
+{
+    unsigned bit = MAX_UNITS + slot;
+    return (candidate->invincible_bits[bit >> 3] >> (bit & 7u)) & 1u;
+}
+static int
+race_save_invincible_padding_valid(const RaceSave *candidate)
+{
+    unsigned bits = MAX_UNITS + MAX_BUILDINGS;
+    unsigned used = bits & 7u;
+    if (used && (candidate->invincible_bits[bits >> 3] & (u8)~((1u << used) - 1u)))
+        return 0;
+    return 1;
+}
+#define RACE_SAVE_INV_U(candidate, i) race_save_unit_invincible((candidate), (i))
+#define RACE_SAVE_INV_B(candidate, i) race_save_building_invincible((candidate), (i))
+#else
+#define RACE_SAVE_INV_U(candidate, i) ((candidate)->invincible_units[(i)])
+#define RACE_SAVE_INV_B(candidate, i) ((candidate)->invincible_buildings[(i)])
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
 #include "sc64_terran_late_repair.h"
@@ -183,7 +231,7 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
             saved.type != type || saved.raw_type != row->type ||
             saved.raw_owner != row->owner || saved.x != row->x / 2 ||
             saved.y != row->y / 2 ||
-            candidate->invincible_buildings[expected_slot] !=
+            RACE_SAVE_INV_B(candidate, expected_slot) !=
                 (unsigned char)sc64_race_t4_building_intrinsically_invincible(type)) return 0;
 #else
         if (type < 0 ||
@@ -192,7 +240,7 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
             candidate->buildings[expected_slot][offsetof(Building,raw_owner)/sizeof(int)] != row->owner ||
             candidate->buildings[expected_slot][offsetof(Building,x)/sizeof(int)] != row->x / 2 ||
             candidate->buildings[expected_slot][offsetof(Building,y)/sizeof(int)] != row->y / 2 ||
-            candidate->invincible_buildings[expected_slot] !=
+            RACE_SAVE_INV_B(candidate, expected_slot) !=
                 (unsigned char)sc64_race_t4_building_intrinsically_invincible(type)) return 0;
 #endif
         {
@@ -245,6 +293,18 @@ static int sc64_race_storage_geometry_valid(int width, int height) {
 #endif
 }
 static int race_save_game(void) {
+#ifdef SC64_ZP_FULL_STORAGE
+    if (geyser_count < 0 || geyser_count > MAX_RACE_GEYSERS ||
+        race_cols < 1 || race_cols > 128 || race_rows < 1 || race_rows > 128)
+        return 0;
+    for (unsigned i = 0; i < MAX_RACE_GEYSERS; ++i)
+        if (geysers[i].x < 0 || geysers[i].x >= race_cols * 16 ||
+            geysers[i].y < 0 || geysers[i].y >= race_rows * 16) return 0;
+    for (unsigned i = 0; i < MAX_UNITS; ++i)
+        if (invincible_units[i] > 1) return 0;
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i)
+        if (invincible_buildings[i] > 1) return 0;
+#endif
 #ifdef SC64_T4_RUNTIME
     /* T4 props with intrinsic invincibility have 100000 source HP. Legacy
      * s16 rows canonicalize that value; the T6 packed codec preserves it. */
@@ -263,10 +323,17 @@ static int race_save_game(void) {
 #endif
     race_data.version=SAVE_VERSION;
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_ZP_FULL_STORAGE
+    for(int i=0;i<MAX_UNITS;i++)
+        if(!sc64_zp_unit_save_encode(&race_data.units[i], &u[i],
+                                     (unsigned)(race_cols * 16),
+                                     (unsigned)(race_rows * 16))) return 0;
+#else
     for(int i=0;i<MAX_UNITS;i++)
         if(!sc64_unit_save_encode(&race_data.units[i], &u[i],
                                   (unsigned)(race_cols * 16),
                                   (unsigned)(race_rows * 16))) return 0;
+#endif
 #else
     for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
         int n;memcpy(&n,(u8*)&u[i]+j*sizeof(int),sizeof(n));race_data.units[i][j]=(s16)n;
@@ -290,7 +357,14 @@ static int race_save_game(void) {
 #endif
     memset(race_data.fog,0,sizeof(race_data.fog));
     for(int i=0;i<MAP_CELLS;i++)if(SC64_GRID_GET(explored,i))race_data.fog[i>>3]|=1u<<(i&7);
+#ifdef SC64_ZP_FULL_STORAGE
+    for (int i = 0; i < MAX_MINERALS; ++i)
+        if (!sc64_mineral_save_encode(&race_data.minerals_map[i], &m[i],
+                                      (unsigned)(race_cols * 16),
+                                      (unsigned)(race_rows * 16))) return 0;
+#else
     memcpy(race_data.minerals_map,m,sizeof(m));
+#endif
     int state[]={race_mode,race_human,race_selected_mission,race_completed,race_bots,minerals,gas,
         frame,cx,cy,train_type,weapons_level,armor_level,weapons_research,armor_research,
         (int)seed,geyser_count,mission_objective_stage,won,lost
@@ -306,8 +380,19 @@ static int race_save_game(void) {
     race_data.campaign=race_campaign;
 #ifdef SC64_UNIFIED
     race_data.backwater=backwater;
+#ifdef SC64_ZP_FULL_STORAGE
+    memset(race_data.invincible_bits, 0, sizeof(race_data.invincible_bits));
+    for (unsigned i = 0; i < MAX_UNITS; ++i)
+        if (invincible_units[i]) race_data.invincible_bits[i >> 3] |= (u8)(1u << (i & 7u));
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+        unsigned bit = MAX_UNITS + i;
+        if (invincible_buildings[i])
+            race_data.invincible_bits[bit >> 3] |= (u8)(1u << (bit & 7u));
+    }
+#else
     memcpy(race_data.invincible_units,invincible_units,sizeof(invincible_units));
     memcpy(race_data.invincible_buildings,invincible_buildings,sizeof(invincible_buildings));
+#endif
 #endif
 #if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)
     if(!race_mode&&race_selected_mission==6) {
@@ -344,6 +429,14 @@ static int race_save_game(void) {
     if (race_p4_active()) {
         if (!race_p4_runtime_state_valid(&race_p4)) return 0;
         race_data.p4 = race_p4;
+    }
+#endif
+#ifdef SC64_Z5_RUNTIME
+    memset(&race_data.z5, 0, sizeof(race_data.z5));
+    if (race_z5_active()) {
+        if (!sc64_z5_persistent_state_valid(&race_z5) ||
+            !race_z5_restore_doodads()) return 0;
+        race_data.z5 = race_z5;
     }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
@@ -422,7 +515,7 @@ static int race_load_game(void) {
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
     const int *v=race_data.state;
     if(v[0]<0||v[0]>1||v[1]<0||v[1]>2||v[2]<0||v[2]>=SC64_RACE_MAP_COUNT||v[4]<1||v[4]>3||
-       v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||v[16]<0||v[16]>4)return 0;
+       v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||v[16]<0||v[16]>MAX_RACE_GEYSERS)return 0;
 #ifdef SC64_CAMPAIGN_RACE
     if(!v[0]&&!sc64_catalog_mission_allowed(v[2],SC64_CAMPAIGN_RACE)
 #ifdef SC64_T4_RUNTIME
@@ -505,9 +598,10 @@ static int race_load_game(void) {
     for(int i=0;i<MAX_UNITS;i++) {
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
         Unit candidate_unit;
-        if(!sc64_unit_save_decode(&candidate_unit, &race_data.units[i],
+        if(!race_save_decode_unit(&race_data, (unsigned)i,
                                   (unsigned)(width * 16),
-                                  (unsigned)(height * 16))) return 0;
+                                  (unsigned)(height * 16),
+                                  &candidate_unit)) return 0;
 #endif
         if(RACE_U(i,alive)<0||RACE_U(i,alive)>1)return 0;
         if(!RACE_U(i,alive))continue;
@@ -589,7 +683,13 @@ static int race_load_game(void) {
 #endif
     }
     for(int i=0;i<MAX_BUILDINGS;i++) {
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_ZP_FULL_STORAGE)
+        Building candidate_building;
+        if (!race_save_decode_building(&race_data, (unsigned)i,
+                                       &candidate_building) ||
+            candidate_building.x >= width * 16 ||
+            candidate_building.y >= height * 16) return 0;
+#elif defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
         Building candidate_building;
         if(!sc64_building_save_decode(&candidate_building,
                                      &race_data.buildings[i])) return 0;
@@ -605,7 +705,7 @@ static int race_load_game(void) {
 #endif
             RACE_B(i,raw_type)!=sc64_race_raw_building(RACE_B(i,type))||
             RACE_B(i,under_construction)!=0||RACE_B(i,queue_count)!=0||
-            RACE_B(i,shield)!=0||race_data.invincible_buildings[i]!=1))return 0;
+            RACE_B(i,shield)!=0||RACE_SAVE_INV_B(&race_data, i)!=1))return 0;
 #endif
         if(!RACE_B(i,alive))continue;
 #ifdef SC64_T4_RUNTIME
@@ -638,14 +738,30 @@ static int race_load_game(void) {
     if (!race_t5_candidate_queues_available(&race_data)) return 0;
     if (!race_transport_save_candidate_valid(&race_data, width, height)) return 0;
 #endif
+#ifdef SC64_ZP_FULL_STORAGE
+    for (int i = 0; i < MAX_MINERALS; ++i) {
+        Mineral decoded;
+        if (!race_save_decode_mineral(&race_data, (unsigned)i,
+                                      (unsigned)(width * 16),
+                                      (unsigned)(height * 16), &decoded)) return 0;
+    }
+    for (int i = 0; i < MAX_RACE_GEYSERS; ++i)
+        if (race_data.geysers[i].x < 0 || race_data.geysers[i].x >= width * 16 ||
+            race_data.geysers[i].y < 0 || race_data.geysers[i].y >= height * 16) return 0;
+#else
     for(int i=0;i<MAX_MINERALS;i++)if(race_data.minerals_map[i].amount<0||
         race_data.minerals_map[i].amount>65535)return 0;
+#endif
 #ifdef SC64_UNIFIED
     if(race_data.backwater.outcome>SC64_BACKWATER_LOST||race_data.backwater.objective>1||
        race_data.backwater.spawn_remaining>5||race_data.campaign.phase>SC64_RACE_PHASE_FAILED||
        (!v[0]&&race_data.campaign.mission!=v[2]))return 0;
+#ifdef SC64_ZP_FULL_STORAGE
+    if (!race_save_invincible_padding_valid(&race_data)) return 0;
+#else
     for(int i=0;i<MAX_UNITS;i++)if(race_data.invincible_units[i]>1)return 0;
     for(int i=0;i<MAX_BUILDINGS;i++)if(race_data.invincible_buildings[i]>1)return 0;
+#endif
 #endif
 #if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)
     if(!v[0]&&v[2]==6) {
@@ -799,6 +915,83 @@ static int race_load_game(void) {
         for (unsigned i = 0; i < sizeof(race_data.p4); ++i) if (bytes[i]) return 0;
     }
 #endif
+#ifdef SC64_Z5_RUNTIME
+    if (!v[0] && v[2] == SC64_Z5_GLOBAL_ID) {
+        const Sc64Z5PersistentState *z5 = &race_data.z5;
+        const Sc64RaceMap *map = &sc64_race_maps[SC64_Z5_GLOBAL_ID];
+        unsigned live = 0, queued = 0, creates_remaining = 0;
+        unsigned outcome = z5->runtime.model.outcome;
+        unsigned phase = race_data.campaign.phase;
+        if (!sc64_z5_persistent_state_valid(z5) || map->width != SC64_Z5_MAP_COLS ||
+            map->height != SC64_Z5_MAP_ROWS || race_data.campaign.mission != SC64_Z5_GLOBAL_ID ||
+            race_data.campaign.elapsed_frames != (u32)v[7] || v[1] != R_ZERG ||
+            race_data.players[SIDE] != R_ZERG ||
+            race_data.campaign.objective_stage != 0) return 0;
+        for (unsigned i = 0; i < MAX_UNITS; ++i) {
+            Unit candidate;
+            if (!race_save_decode_unit(&race_data, i, width * 16u, height * 16u,
+                                       &candidate)) return 0;
+            live += candidate.alive != 0;
+        }
+        for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+            Building candidate;
+            if (!race_save_decode_building(&race_data, i, &candidate)) return 0;
+            if (candidate.alive) for (int q = 0; q < candidate.queue_count; ++q)
+                queued += candidate.queue[(candidate.queue_head + q) % 5] == U_ZERGLING ? 2u : 1u;
+        }
+        for (unsigned t = 0; t < SC64_Z5_TRIGGER_COUNT; ++t) {
+            const Sc64Z5SourceTrigger *trigger = &sc64_z5_source_triggers[t];
+            int started = sc64_z5_mask_test(z5->runtime.model.started_lo,
+                                             z5->runtime.model.started_hi, t);
+            unsigned cursor = z5->runtime.model.action_cursor[t];
+            if (trigger->first_action + trigger->action_count >
+                SC64_Z5_SOURCE_ACTION_COUNT) return 0;
+            for (unsigned a = 0; a < trigger->action_count; ++a) {
+                const Sc64Z5SourceAction *action =
+                    &sc64_z5_source_actions[trigger->first_action + a];
+                if (action->opcode == 11 &&
+                    (!started || (cursor && a >= cursor))) ++creates_remaining;
+            }
+        }
+        if (live + queued + creates_remaining > MAX_UNITS) return 0;
+        /* Every retained unit-backed THG2 row must still have exactly one
+         * immutable building-pool identity in the candidate save. */
+        for (unsigned row = 0; row < SC64_Z5_DOODAD_COUNT; ++row) {
+            const Sc64Z5SourceDoodad *src = &sc64_z5_source_doodads[row];
+            int expected_owner, type, matches = 0;
+            if (!src->unit_backed) continue;
+            if (src->owner >= 8 || src->type > 255) return 0;
+            type = sc64_race_building_from_raw(src->type);
+            if (type < 0) return 0;
+            expected_owner = src->owner == map->human_slot ? SIDE :
+                             map->owner_modes[src->owner];
+            for (unsigned slot = 0; slot < MAX_BUILDINGS; ++slot) {
+                Building candidate;
+                if (!race_save_decode_building(&race_data, slot, &candidate)) return 0;
+                if (candidate.alive && candidate.raw_type == src->type &&
+                    candidate.raw_owner == src->owner && candidate.type == type &&
+                    candidate.owner == expected_owner && candidate.x == src->x / 2 &&
+                    candidate.y == src->y / 2 && candidate.flags == src->flags)
+                    ++matches;
+            }
+            if (matches != 1) return 0;
+        }
+        if (outcome == SC64_Z5_RUNNING) {
+            if (v[18] || v[19] || phase != SC64_RACE_PHASE_ACTIVE ||
+                (race_data.campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+        } else if (outcome == SC64_Z5_WON) {
+            if (!v[18] || v[19] || phase != SC64_RACE_PHASE_COMPLETE ||
+                !(race_data.campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY) ||
+                !(v[3] & (1 << SC64_Z5_GLOBAL_ID))) return 0;
+        } else if (outcome == SC64_Z5_LOST) {
+            if (v[18] || !v[19] || phase != SC64_RACE_PHASE_FAILED ||
+                (race_data.campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+        } else return 0;
+    } else {
+        const u8 *bytes = (const u8 *)&race_data.z5;
+        for (unsigned i = 0; i < sizeof(race_data.z5); ++i) if (bytes[i]) return 0;
+    }
+#endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (!v[0] && v[2] >= SC64_TERRAN_LATE_GLOBAL_T7 &&
@@ -892,9 +1085,15 @@ static int race_load_game(void) {
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     for(int i=0;i<MAX_UNITS;i++) {
         Unit decoded;
+#ifdef SC64_ZP_FULL_STORAGE
+        if(!sc64_zp_unit_save_decode(&decoded, &race_data.units[i],
+                                     (unsigned)(race_cols * 16),
+                                     (unsigned)(race_rows * 16))) return 0;
+#else
         if(!sc64_unit_save_decode(&decoded, &race_data.units[i],
                                   (unsigned)(race_cols * 16),
                                   (unsigned)(race_rows * 16))) return 0;
+#endif
         memcpy(&u[i], &decoded, sizeof(decoded));
     }
 #else
@@ -918,7 +1117,14 @@ static int race_load_game(void) {
         if(sc64_race_t4_building_intrinsically_invincible(b[i].type))
             b[i].hp=b[i].maxhp=100000;
 #endif
+#ifdef SC64_ZP_FULL_STORAGE
+    for (int i = 0; i < MAX_MINERALS; ++i)
+        if (!race_save_decode_mineral(&race_data, (unsigned)i,
+                                      (unsigned)(race_cols * 16),
+                                      (unsigned)(race_rows * 16), &m[i])) return 0;
+#else
     memcpy(m,race_data.minerals_map,sizeof(m));
+#endif
     SC64_GRID_CLEAR(explored);
     for(int i=0;i<MAP_CELLS;i++)
         if((race_data.fog[i>>3]>>(i&7))&1)SC64_GRID_SET(explored,i,1);
@@ -928,8 +1134,15 @@ static int race_load_game(void) {
     memcpy(geysers,race_data.geysers,sizeof(race_data.geysers));race_campaign=race_data.campaign;
 #ifdef SC64_UNIFIED
     backwater=race_data.backwater;
+#ifdef SC64_ZP_FULL_STORAGE
+    for (unsigned i = 0; i < MAX_UNITS; ++i)
+        invincible_units[i] = (u8)race_save_unit_invincible(&race_data, i);
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i)
+        invincible_buildings[i] = (u8)race_save_building_invincible(&race_data, i);
+#else
     memcpy(invincible_units,race_data.invincible_units,sizeof(invincible_units));
     memcpy(invincible_buildings,race_data.invincible_buildings,sizeof(invincible_buildings));
+#endif
     backwater_message_ticks=0;
 #endif
 #if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)
@@ -962,6 +1175,17 @@ static int race_load_game(void) {
 #ifdef SC64_P4_RUNTIME
     if (race_p4_active()) race_p4 = race_data.p4;
     else memset(&race_p4, 0, sizeof(race_p4));
+#endif
+#ifdef SC64_Z5_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_Z5_GLOBAL_ID) {
+        race_z5 = race_data.z5;
+        if (!race_z5_rebind_loaded_world(&sc64_race_maps[SC64_Z5_GLOBAL_ID]))
+            return 0;
+    } else {
+        memset(&race_z5, 0, sizeof(race_z5));
+        memset(&race_z5_world, 0, sizeof(race_z5_world));
+        memset(race_z5_doodads, 0, sizeof(race_z5_doodads));
+    }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
     if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID) {

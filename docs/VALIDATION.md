@@ -2056,8 +2056,10 @@ The shared builds are byte-identical to these frozen candidates.
 
 The optimized Z4 image additionally saves at frame 29852 and restores the
 observed state exactly in a fresh emulator process. Its input handoff plus
-60 neutral ticks ends at frame 29913. Fresh-save qualification of optimized
-canonical Z3/P3 is tracked separately from their full win comparisons.
+60 neutral ticks ends at frame 29913. Optimized canonical Z3 and P3 also
+restore exact saved snapshots in fresh emulator processes. Their loaded
+frames 29858 and 29662 advance through one input-handoff frame and 60 neutral
+ticks to 29919 and 29723, respectively; both continuity invariants pass.
 
 All four race target-query differential fixtures pass ASan/UBSan, covering
 five owners, every attacker type, strict range/tie rules, air-only targets,
@@ -2103,3 +2105,38 @@ unchanged guards at IWRAM end `0x030040c0` and BSS end `0x0203d09c`.
 No completed P4 controller or ARM playthrough is claimed by this ability
 foundation. The ordinary P4 and canonical race builds leave the ability gate
 disabled and retain their frozen ROM bytes.
+
+### 2026-10-24 — P4 controller win and Z5 storage integration
+
+The separate P4 Storm profile has a repeatable normal-controller host win at
+frame 109776 (host tick 110452), fired mask `0x1ff8`, all 87 scripted creates,
+zero adapter faults, and both heroes inside the extraction rectangle.
+The controller rescues all four Probes, builds an army using normal input,
+uses Storm, and routes the escort separately with the authored B+R shortcut.
+Repeated ASan/UBSan runs produce the same complete trace (2185 transitions,
+peak 109 in one 1000-tick scheduler page). Trace SHA-256 is
+`b7d072d609ea9bd17c59024c81f6a27165b7b6ac3e8e0d0175b2227934111ef4`.
+ARM replay and fresh-process save qualification are in progress; this host
+result does not establish physical hardware performance.
+
+The opt-in Z5 runtime imports every retained starting actor and all 41
+unit-backed THG2 props. Source binding identity, enabled door/trap state,
+trigger progress and authored pause acknowledgment survive generation-23
+save/load; malformed padding is rejected before live-world mutation. A
+source-action door toggle changes both collision behavior and the exact
+static-art cache key. Focused real-engine host checks, all five normal-menu
+start/save cases, 234 skirmish setup/save combinations, and full-clear pixel
+coverage comparisons pass. No Z5 controller completion is claimed.
+
+Expanded storage holds 240 units, 160 buildings, 144 minerals and 12 geysers.
+Standalone codec tests, full P4 save round trips, final-row corruption,
+geyser bounds, invalid-live-save preservation and old/truncated-record
+rejection pass under sanitizers. The Z5 ARM build retains IWRAM end
+`0x03004f60` and BSS end `0x0203d7f0`, inside the unchanged reserve guards.
+Number formatting moves to ROM only for this expanded profile; glyph
+drawing remains in IWRAM. These pool and setup checks do not qualify all
+remaining missions.
+
+A private aligned-halfword sprite-read experiment matched 62 prefix state
+checkpoints and eight captures across P3/Z4, but improved their 30000-tick
+means only from 26.43 to 26.45 and 18.48 to 18.55 fps. It is not enabled.

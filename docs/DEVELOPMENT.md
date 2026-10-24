@@ -830,6 +830,12 @@ only when the selected caster has enough energy. Storm affects allied units
 too. Its pulse cadence and visual effect use documented authored policies;
 this experiment is not a completed P4 qualification.
 
+The P4 controller now has a repeatable host win. Run its full input-only
+playthrough with `make test-sc64-p4-campaign`; ARM replay and fresh-process
+save checks are separate. In this profile, **B+R** selects the combat escort
+without Tassadar and Raynor, so army orders can clear their route first.
+Ordinary **R** still selects the heroes with the army.
+
 For later-chapter implementation, authenticate and generate the retained
 numeric scenario metadata separately. For example:
 
@@ -858,3 +864,32 @@ operands, sequence waits and switches, and reject failed world callbacks.
 They still require actual engine implementations of source conditions and
 effects; these fixtures do not establish playable fifth missions. Neither
 model or adapter enables a frontend entry.
+
+### Staged Zerg chapter 5 and expanded storage
+
+After preparing the chapter-four inputs above, generate the additional Z5
+numeric records and isolated sprite bank:
+
+```sh
+python3 tools/sc64_zp_scenario_pack.py --mission Z5
+python3 tools/sc64_z5_doodad_pack.py
+python3 tools/sc64_race_sprites.py --rom /path/to/StarCraft64-USA.z64 --base-only --include-zp-campaign-actors --include-z5-actors --include-z5-doodads --out .local/sc64/z5/generated/sprites --header .local/sc64/z5/generated/sc64_race_sprites_generated.h
+make zerg-z5 test-sc64-z5-runtime test-sc64-z5-world
+```
+
+`build/StarCraft-Zerg-Z5-GBA.gba` and `build/starcraft-zerg-z5.elf` are an
+internal five-entry Zerg build. Its complete source placements include all
+41 unit-backed doors and traps; the other 30 THG2 rows are sprite-only
+decoration and have no world actor. The runtime tests cover import, trigger
+effects, door collision/cache changes, save/load and malformed-state
+rejection. They do not prove a controller win. The source PauseGame action
+requires an authored **A** acknowledgment; **B** saves while that pause is
+shown. Native speech, cinematic and AI-script behavior remain approximations.
+
+This profile uses generation 23 and an opt-in full-storage layout: 240 units,
+160 buildings, 144 mineral fields and 12 geysers. Compact 48-byte runtime
+buildings, 35-byte unit save rows and 5-byte mineral save rows keep the
+unchanged SRAM and RAM guards. Older save generations are incompatible.
+These are fixed pools, not a guarantee that unlimited repeated triggers or
+production in every later mission can fit. `make sc64-zp-full-storage-probe
+test-sc64-zp-full-storage` separately checks the storage layout with P4.

@@ -100,7 +100,7 @@ BUILDING_RAW_IDS = {
 # structures this runtime profile does not model. Raw 150 is
 # B_MATURE_CHRYSALIS; raw 216 is U_CHRYSALIS.
 SOURCE_BUILDING_RAW_IDS = set(range(106, 176))
-SOURCE_BUILDING_RAW_IDS.update({194, 195})
+SOURCE_BUILDING_RAW_IDS.update({194, 195, 196})
 SOURCE_UNIT_RAW_IDS = set(range(0, 106)) | {216, 218}
 RUNTIME_UNIT_RAW_IDS_ZERG = {
     0, 2, 3, 5, 7, 8, 11, 19, 30, 32, 34, 37, 38, 41, 42, 43, 45,

@@ -273,16 +273,16 @@ class FullCampaignSourceAuditTests(unittest.TestCase):
         rows = [{'source_type': raw} for raw in (150, 216, 214, 115, 69, 196)]
         z = source_actor_audit(rows, race=1)
         self.assertEqual(z['source_pool_demand'], {
-            'unit_slots': 2, 'unit_slots_upper_bound_including_unclassified': 3,
-            'building_slots': 2, 'building_slots_upper_bound_including_unclassified': 3,
+            'unit_slots': 2, 'unit_slots_upper_bound_including_unclassified': 2,
+            'building_slots': 3, 'building_slots_upper_bound_including_unclassified': 3,
             'mineral_fields': 0, 'geysers': 0,
             'start_markers_excluded_from_actor_pools': 1,
-            'unclassified_actor_slots': 1,
+            'unclassified_actor_slots': 0,
         })
         self.assertEqual(z['unsupported_or_unclassified_raw_types'], [
             {'raw_type': 69, 'count': 1, 'source_class': 'unit'},
             {'raw_type': 115, 'count': 1, 'source_class': 'building'},
-            {'raw_type': 196, 'count': 1, 'source_class': 'unclassified'},
+            {'raw_type': 196, 'count': 1, 'source_class': 'building'},
         ])
 
     def test_source_placement_categories_scope_raw_195_to_z5(self):

@@ -95,7 +95,8 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
             start = row
             start_input_tick = previous_tick
             start_transition_count = len(transitions)
-        elif kind in ("periodic", "prehatch", "posthatch"):
+        elif kind in ("periodic", "prehatch", "posthatch") or (
+                kind == "both-rescued" and profile_name == "protoss-p4"):
             if start is None or final is not None:
                 raise ValueError(f"{kind} observation must follow start and precede final")
             if kind == "periodic":
@@ -219,6 +220,34 @@ def decode_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
     return result
 
 
+def verify_p4_hero_extraction(trace_final: dict, state: dict) -> None:
+    """Cross-check recorded objective actors against the observed live bank."""
+    if not any(f"{name}_alive" in trace_final for name in ("tassadar", "raynor")):
+        return  # Earlier trace schemas record only the composite model.
+    bounds = trace_final.get("escape")
+    if (not isinstance(bounds, list) or len(bounds) != 4 or
+            any(type(value) is not int for value in bounds)):
+        raise RuntimeError("P4 extraction trace lacks integer rectangle bounds")
+    left, top, right, bottom = bounds
+    if not (0 <= left < right <= 2048 and 0 <= top < bottom <= 2048):
+        raise RuntimeError("P4 extraction rectangle is outside the world")
+    entities = state.get("units", {}).get("entities", [])
+    for name, raw in (("tassadar", 79), ("raynor", 19)):
+        fields = ("alive", "owner", "x", "y")
+        if any(type(trace_final.get(f"{name}_{field}")) is not int for field in fields):
+            raise RuntimeError(f"P4 trace lacks complete {name} observation")
+        actors = [actor for actor in entities if actor.get("raw_type") == raw]
+        if len(actors) != 1 or trace_final[f"{name}_alive"] != 1:
+            raise RuntimeError(f"P4 extraction must retain exactly one live {name}")
+        actor = actors[0]
+        for field in ("owner", "x", "y"):
+            if actor.get(field) != trace_final[f"{name}_{field}"]:
+                raise RuntimeError(f"P4 {name}.{field} differs from the controller trace")
+        if actor["owner"] != 0 or not (left <= actor["x"] < right and
+                                       top <= actor["y"] < bottom):
+            raise RuntimeError(f"P4 {name} is not player-owned inside extraction")
+
+
 def verify_final(trace_final: dict, state: dict, profile_name: str) -> None:
     mission = MISSION_BY_PROFILE[profile_name]
     campaign = state.get("race_campaign", {})
@@ -247,6 +276,9 @@ def verify_final(trace_final: dict, state: dict, profile_name: str) -> None:
     else:
         if runtime.get("faults") != 0:
             raise RuntimeError("P4 final state reports adapter faults")
+        if "created" in trace_final and runtime.get("created_count") != trace_final["created"]:
+            raise RuntimeError("P4 source-create total differs from controller trace")
+        verify_p4_hero_extraction(trace_final, state)
         if (model.get("sequence_active") != 0 or model.get("sequence_trigger") != 0 or
                 model.get("action_index") != 0 or model.get("reserved") != 0):
             raise RuntimeError("P4 final result sequence/cursor is not complete")

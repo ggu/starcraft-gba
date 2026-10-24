@@ -109,6 +109,16 @@ Z5_UNIT_IDS = {
     'bengalaas_z5': 90, 'ragnasaur_z5': 95, 'data_disk_z5': 218,
 }
 Z5_BUILDING_IDS = {'terran_beacon_z5': 195}
+Z5_DOODAD_IDS = {
+    'floor_missile_trap_z5': 203, 'upper_door_z5': 205,
+    'right_upper_door_z5': 206, 'pit_door_z5': 207,
+    'right_pit_door_z5': 208, 'floor_gun_trap_z5': 209,
+    'wall_flame_trap_z5': 211, 'right_wall_flame_trap_z5': 213,
+}
+
+# Guardian is listed in the ordinary sprite roster for compatibility, while
+# future Z6 adapters also require an independently complete/gated payload.
+Z6_UNIT_IDS = {'guardian_z6': 44}
 
 
 def asset_manifest_sha256(assets: list[dict]) -> str:
@@ -120,6 +130,12 @@ def asset_manifest_sha256(assets: list[dict]) -> str:
                  for asset in assets]
     payload = json.dumps(canonical, sort_keys=True, separators=(',', ':')).encode('ascii')
     return hashlib.sha256(payload).hexdigest()
+
+
+def named_asset_manifest_sha256(assets: list[dict], names: set[str]) -> str:
+    """Hash only the explicitly named asset group, preserving manifest order."""
+    selected = [asset for asset in assets if asset.get('name') in names]
+    return asset_manifest_sha256(selected)
 
 # These types occur in the four authored campaign scenarios. Their game names
 # are scenario-specific or decorative; preserve actual indexed art for them
@@ -143,7 +159,9 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
                  zp_selected: list[dict] | None = None,
                  zp_building_selected: list[dict] | None = None,
                  z5_selected: list[dict] | None = None,
-                 z5_building_selected: list[dict] | None = None) -> None:
+                 z5_building_selected: list[dict] | None = None,
+                 z6_selected: list[dict] | None = None,
+                 z5_doodad_selected: list[dict] | None = None) -> None:
     lines = [
         '/* Generated from the verified USA ROM; private local asset. */',
         '#ifndef SC64_RACE_SPRITES_GENERATED_H',
@@ -220,6 +238,21 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
             for frame_index, frame in enumerate(item['frames']):
                 append_asset({'name': f'{item["name"]}_frame_{frame_index}', 'frame': frame})
         lines.append('#endif /* SC64_Z5_ACTORS */')
+    if z6_selected:
+        lines.append('#ifdef SC64_Z6_ACTORS')
+        if {item['name'] for item in z6_selected} == set(Z6_UNIT_IDS):
+            lines.append('#define SC64_Z6_SPRITE_SET_COMPLETE 1')
+        for item in z6_selected:
+            append_asset(item)
+        lines.append('#endif /* SC64_Z6_ACTORS */')
+    if z5_doodad_selected:
+        lines.append('#ifdef SC64_Z5_DOODADS')
+        if {item['name'] for item in z5_doodad_selected} == set(Z5_DOODAD_IDS):
+            lines.append('#define SC64_Z5_DOODAD_SPRITE_SET_COMPLETE 1')
+        for item in z5_doodad_selected:
+            for frame_index, frame in enumerate(item['frames']):
+                append_asset({'name': f'{item["name"]}_frame_{frame_index}', 'frame': frame})
+        lines.append('#endif /* SC64_Z5_DOODADS */')
     lines += ['static inline const Sc64SpriteFrame *sc64_race_unit_sprite(unsigned short raw_type) {',
               '    switch (raw_type) {']
     seen = set()
@@ -278,6 +311,18 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
             '}',
             '#endif /* SC64_Z5_ACTORS */',
         ]
+    if z6_selected:
+        lines[-1:-1] = [
+            '#ifdef SC64_Z6_ACTORS',
+            'static inline const Sc64SpriteFrame *sc64_z6_actor_sprite(unsigned short raw_type) {',
+            '    switch (raw_type) {',
+        ] + [f'    case {Z6_UNIT_IDS[item["name"]]}: return &sc64_race_sprite_{item["name"]};'
+             for item in z6_selected] + [
+            '    default: return (const Sc64SpriteFrame *)0;',
+            '    }',
+            '}',
+            '#endif /* SC64_Z6_ACTORS */',
+        ]
     if zp_selected:
         lines[-1:-1] = [
             '#ifdef SC64_ZP_CAMPAIGN_ACTORS',
@@ -288,21 +333,28 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
             '    }', '}',
             '#endif /* SC64_ZP_CAMPAIGN_ACTORS */',
         ]
-    if t4_building_selected or late_building_selected or zp_building_selected or z5_building_selected:
+    if t4_building_selected or late_building_selected or zp_building_selected or z5_building_selected or z5_doodad_selected:
         # Keep the frame index a raw source-GRP index. IScript-to-state
         # selection is intentionally left to the runtime trigger adapter.
         at = len(lines) - 1
-        helper = ['#if defined(SC64_T4_ENABLED) || defined(SC64_TERRAN_LATE_ENABLED) || defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_Z5_ACTORS)',
+        building_sprite_guard = '#if defined(SC64_T4_ENABLED) || defined(SC64_TERRAN_LATE_ENABLED) || defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_Z5_ACTORS)'
+        if z5_doodad_selected:
+            building_sprite_guard += ' || defined(SC64_Z5_DOODADS)'
+        helper = [building_sprite_guard,
                   'static inline const Sc64SpriteFrame *sc64_race_building_sprite(unsigned short raw_type, unsigned short frame_index) {',
                   '    switch (raw_type) {']
         if t4_building_selected:
             helper.append('#ifdef SC64_T4_ENABLED')
         for item in (t4_building_selected or []):
+            if item['name'] in T4_BUILDING_IDS and T4_BUILDING_IDS[item['name']] in Z5_DOODAD_IDS.values():
+                helper.append('#ifndef SC64_Z5_DOODADS')
             helper += [f'    case {T4_BUILDING_IDS[item["name"]]}:',
                        '        switch (frame_index) {']
             for frame_index in range(len(item['frames'])):
                 helper.append(f'        case {frame_index}: return &sc64_race_sprite_{item["name"]}_frame_{frame_index};')
             helper += ['        default: return (const Sc64SpriteFrame *)0;', '        }']
+            if item['name'] in T4_BUILDING_IDS and T4_BUILDING_IDS[item['name']] in Z5_DOODAD_IDS.values():
+                helper.append('#endif /* !SC64_Z5_DOODADS */')
         if t4_building_selected:
             helper.append('#endif /* SC64_T4_ENABLED */')
         if late_building_selected:
@@ -330,6 +382,15 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
                     helper.append(f'        case {frame_index}: return &sc64_race_sprite_{item["name"]}_frame_{frame_index};')
                 helper += ['        default: return (const Sc64SpriteFrame *)0;', '        }']
             helper += ['#endif /* SC64_Z5_ACTORS */']
+        if z5_doodad_selected:
+            helper += ['#ifdef SC64_Z5_DOODADS']
+            for item in z5_doodad_selected:
+                helper += [f'    case {Z5_DOODAD_IDS[item["name"]]}:',
+                           '        switch (frame_index) {']
+                for frame_index in range(len(item['frames'])):
+                    helper.append(f'        case {frame_index}: return &sc64_race_sprite_{item["name"]}_frame_{frame_index};')
+                helper += ['        default: return (const Sc64SpriteFrame *)0;', '        }']
+            helper += ['#endif /* SC64_Z5_DOODADS */']
         helper += ['    default: return (const Sc64SpriteFrame *)0;', '    }', '}', '#endif']
         lines[at:at] = helper
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -339,7 +400,8 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
 def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
              remap_path: Path = PALETTE_REMAP, include_t4: bool = True,
              include_t6: bool = False, include_late: bool = False,
-             include_zp: bool = False, include_z5: bool = False) -> dict:
+             include_zp: bool = False, include_z5: bool = False,
+             include_z6: bool = False, include_z5_doodads: bool = False) -> dict:
     raw = rom.read_bytes()
     extractor = base.load_extractor(base.UPSTREAM)
     normalized = extractor.load_rom(str(rom))
@@ -362,12 +424,18 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
     zp_building_refs = base.resolve_grp_indices(archive, ZP_BUILDING_IDS) if include_zp else {}
     z5_refs = base.resolve_grp_indices(archive, Z5_UNIT_IDS) if include_z5 else {}
     z5_building_refs = base.resolve_grp_indices(archive, Z5_BUILDING_IDS) if include_z5 else {}
+    if include_z5_doodads and not include_z5:
+        raise ValueError('Z5 doodad sprites require the Z5 actor sprite set')
+    z5_doodad_refs = base.resolve_grp_indices(archive, Z5_DOODAD_IDS) if include_z5_doodads else {}
+    z6_refs = base.resolve_grp_indices(archive, Z6_UNIT_IDS) if include_z6 else {}
     palette = base.decode_rgba5551_palette(base._entry_payload(archive, '00B/004'))
     entries = {entry.path: entry for entry in archive.entries()}
     selected, t4_selected, t4_building_selected, t6_selected = [], [], [], []
     late_selected, late_building_selected, manifest_assets = [], [], []
     zp_selected, zp_building_selected = [], []
     z5_selected, z5_building_selected = [], []
+    z5_doodad_selected = []
+    z6_selected = []
     out.mkdir(parents=True, exist_ok=True)
     def load_asset(name, ref, target):
         grp_data = archive.read(entries[ref['bolt_path']])
@@ -466,9 +534,30 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
     if include_z5 and (set(z5_refs) != set(Z5_UNIT_IDS) or
                        set(z5_building_refs) != set(Z5_BUILDING_IDS)):
         raise ValueError('Z5 actor source GRPs did not resolve completely')
+    for name, ref in z5_doodad_refs.items():
+        grp_data = archive.read(entries[ref['bolt_path']])
+        grp = base.parse_grp(grp_data)
+        if not grp['frames']:
+            raise ValueError(f'Z5 source doodad raw {ref["unit_id"]} has an empty GRP')
+        frames = grp['frames']
+        preview = out / f'{name}.png'
+        base.encode_png(preview, grp['width'], grp['height'], base.render_frame(frames[0], palette))
+        z5_doodad_selected.append({'name': name, 'frames': frames})
+        manifest_assets.append({'name': name, **ref, 'sha1': hashlib.sha1(grp_data).hexdigest(),
+                                'frame_count': len(frames), 'canvas': [grp['width'], grp['height']],
+                                'selected_frame': 'all-source-frames',
+                                'frame_rect': [frames[0]['x'], frames[0]['y'], frames[0]['frame_width'], frames[0]['frame_height']],
+                                'opaque_pixels': sum(frames[0]['alpha']), 'preview': preview.name})
+    if include_z5_doodads and set(z5_doodad_refs) != set(Z5_DOODAD_IDS):
+        raise ValueError('Z5 source doodad GRPs did not resolve completely')
+    for name, ref in z6_refs.items():
+        load_asset(name, ref, z6_selected)
+    if include_z6 and set(z6_refs) != set(Z6_UNIT_IDS):
+        raise ValueError('Z6 actor source GRPs did not resolve completely')
     write_header(header, selected, remap, t4_selected, t4_building_selected,
                  t6_selected, late_selected, late_building_selected,
-                 zp_selected, zp_building_selected, z5_selected, z5_building_selected)
+                 zp_selected, zp_building_selected, z5_selected, z5_building_selected,
+                 z6_selected, z5_doodad_selected)
     mapped_raw_types = set(RACE_UNIT_IDS.values()) | set(T4_UNIT_IDS.values()) | set(T4_BUILDING_IDS.values())
     actual_sprite_raw_types = ({int(ref['unit_id']) for ref in refs.values()} |
                                {int(ref['unit_id']) for ref in t4_refs.values()})
@@ -503,19 +592,27 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
     if include_late:
         report['late_terran_raw_unit_ids'] = LATE_UNIT_IDS
         report['late_terran_raw_building_ids'] = LATE_BUILDING_IDS
-        report['late_terran_assets_manifest_sha256'] = asset_manifest_sha256(
-            manifest_assets[legacy_asset_count + len(t6_selected):])
+        report['late_terran_assets_manifest_sha256'] = named_asset_manifest_sha256(
+            manifest_assets, set(LATE_UNIT_IDS) | set(LATE_BUILDING_IDS))
     if include_zp:
         report['zp_campaign_raw_unit_ids'] = ZP_UNIT_IDS
         report['zp_campaign_raw_building_ids'] = ZP_BUILDING_IDS
         report['zp_campaign_invisible_raw_types'] = list(ZP_INVISIBLE_RAW_TYPES)
-        report['zp_campaign_assets_manifest_sha256'] = asset_manifest_sha256(
-            manifest_assets[legacy_asset_count + len(t6_selected) + len(late_selected) + len(late_building_selected):])
+        report['zp_campaign_assets_manifest_sha256'] = named_asset_manifest_sha256(
+            manifest_assets, set(ZP_UNIT_IDS) | set(ZP_BUILDING_IDS))
     if include_z5:
         report['z5_raw_unit_ids'] = Z5_UNIT_IDS
         report['z5_raw_building_ids'] = Z5_BUILDING_IDS
-        report['z5_assets_manifest_sha256'] = asset_manifest_sha256(
-            manifest_assets[-(len(z5_selected) + len(z5_building_selected)):])
+        report['z5_assets_manifest_sha256'] = named_asset_manifest_sha256(
+            manifest_assets, set(Z5_UNIT_IDS) | set(Z5_BUILDING_IDS))
+    if include_z5_doodads:
+        report['z5_doodad_raw_building_ids'] = Z5_DOODAD_IDS
+        report['z5_doodad_assets_manifest_sha256'] = named_asset_manifest_sha256(
+            manifest_assets, set(Z5_DOODAD_IDS))
+    if include_z6:
+        report['z6_raw_unit_ids'] = Z6_UNIT_IDS
+        report['z6_assets_manifest_sha256'] = named_asset_manifest_sha256(
+            manifest_assets, set(Z6_UNIT_IDS))
     (out / 'manifest.json').write_text(json.dumps(report, indent=2) + '\n')
     return report
 
@@ -536,13 +633,19 @@ def main() -> int:
                         help='include SC64_ZP_CAMPAIGN_ACTORS-gated Zerg/Protoss campaign actor sprites')
     parser.add_argument('--include-z5-actors', action='store_true',
                         help='include the separately gated SC64_Z5_ACTORS sprite set')
+    parser.add_argument('--include-z5-doodads', action='store_true',
+                        help='include all indexed prop GRPs behind SC64_Z5_DOODADS (requires --include-z5-actors)')
+    parser.add_argument('--include-z6-actors', action='store_true',
+                        help='include the separately gated SC64_Z6_ACTORS Guardian sprite set')
     args = parser.parse_args()
     try:
         report = generate(args.rom, args.out, args.header, args.remap,
                           include_t4=not args.base_only, include_t6=args.include_t6,
                           include_late=args.include_late_terran,
                           include_zp=args.include_zp_campaign_actors,
-                          include_z5=args.include_z5_actors)
+                          include_z5=args.include_z5_actors,
+                          include_z6=args.include_z6_actors,
+                          include_z5_doodads=args.include_z5_doodads)
     except (OSError, ValueError, RuntimeError, KeyError) as exc:
         print(f'sc64_race_sprites: {exc}', file=sys.stderr)
         return 1

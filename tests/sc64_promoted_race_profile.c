@@ -11,7 +11,18 @@
 #error "Compile with a promoted unified Zerg or Protoss profile"
 #endif
 
-#if SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z4_RUNTIME)
+#if SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z5_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_ZERG
+#define PROFILE_FRONT_FACTION SC_FRONT_ZERG
+#define PROFILE_RACE R_ZERG
+#define PROFILE_SAVE_GENERATION 23u
+#define PROFILE_OLD_SAVE_TAG 0x53435a32u
+static const int profile_missions[] = {0, 1, 14, 15, 16};
+static const char *const profile_titles[] = {
+    "AMONG THE RUINS", "EGRESSION", "THE NEW DOMINION", "AGENT OF THE SWARM",
+    "THE AMERIGO"
+};
+#elif SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z4_RUNTIME)
 #define PROFILE_FACTION SC64_FACTION_ZERG
 #define PROFILE_FRONT_FACTION SC_FRONT_ZERG
 #define PROFILE_RACE R_ZERG
@@ -25,7 +36,9 @@ static const char *const profile_titles[] = {
 #define PROFILE_FACTION SC64_FACTION_PROTOSS
 #define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS
 #define PROFILE_RACE R_PROTOSS
-#ifdef SC64_P4_STORM_ENABLED
+#ifdef SC64_ZP_FULL_STORAGE
+#define PROFILE_SAVE_GENERATION 22u
+#elif defined(SC64_P4_STORM_ENABLED)
 #define PROFILE_SAVE_GENERATION 21u
 #else
 #define PROFILE_SAVE_GENERATION 20u

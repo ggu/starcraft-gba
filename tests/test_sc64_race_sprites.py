@@ -6,9 +6,11 @@ import sys
 
 from tools.sc64_race_sprites import (
     MISSION_RAW_TYPES, RACE_UNIT_IDS, T4_EXPECTED_VISIBLE_RAW_TYPES,
-    T4_INVISIBLE_RAW_TYPES, T4_UNIT_IDS, asset_manifest_sha256, write_header,
+    T4_INVISIBLE_RAW_TYPES, T4_UNIT_IDS, asset_manifest_sha256,
+    named_asset_manifest_sha256, write_header,
     T4_BUILDING_IDS, T6_UNIT_IDS, LATE_UNIT_IDS, LATE_BUILDING_IDS,
-    Z5_UNIT_IDS, Z5_BUILDING_IDS,
+    ZP_UNIT_IDS, ZP_BUILDING_IDS, Z5_UNIT_IDS, Z5_BUILDING_IDS, Z6_UNIT_IDS,
+    Z5_DOODAD_IDS,
 )
 
 
@@ -82,6 +84,52 @@ class RaceSpritePackTests(unittest.TestCase):
         self.assertNotIn('door_is_open', text)
         self.assertNotIn('frame_index == 1 ? 1 : 0', text)
 
+    def test_z5_props_have_separate_complete_gate_and_keep_all_frames(self):
+        def frame(pixel):
+            return {'pixels': bytes((pixel,)), 'alpha': bytes((1,)), 'width': 1,
+                    'height': 1, 'x': 0, 'y': 0, 'frame_width': 1,
+                    'frame_height': 1}
+        props = [{'name': name, 'frames': [frame(9), frame(10)]}
+                 for name in Z5_DOODAD_IDS]
+        t4 = [{'name': name, 'frames': [frame(7)]} for name in T4_BUILDING_IDS]
+        base_units = [{'name': name, 'frame': frame(8)} for name in RACE_UNIT_IDS]
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'sprites.h'
+            write_header(path, base_units, bytes(range(256)), t4_building_selected=t4,
+                         z5_doodad_selected=props)
+            text = path.read_text()
+        self.assertIn('#ifdef SC64_Z5_DOODADS', text)
+        self.assertIn('#define SC64_Z5_DOODAD_SPRITE_SET_COMPLETE 1', text)
+        self.assertIn('case 213:', text)
+        self.assertIn('sc64_race_sprite_right_wall_flame_trap_z5_frame_1_pixels[1]', text)
+        self.assertIn('#ifndef SC64_Z5_DOODADS', text)
+        # In the combined T4/Z5 build, the Z5 raw mapping owns the duplicate
+        # prop type; the explicit guard prevents duplicate switch labels.
+        segment = text[text.index('sc64_race_building_sprite'):]
+        self.assertIn('case 203:', segment)
+        self.assertIn('case 212:', segment)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'sprites.h').write_text(text)
+            (root / 'fixture.c').write_text('''#include <assert.h>
+#include "sprites.h"
+#ifndef SC64_Z5_DOODAD_SPRITE_SET_COMPLETE
+#error "Z5 prop set must be explicitly complete"
+#endif
+int main(void) {
+    assert(sc64_race_building_sprite(203, 1));
+    assert(sc64_race_building_sprite(213, 1));
+    assert(sc64_race_building_sprite(212, 0));
+    assert(!sc64_race_building_sprite(203, 2));
+    return 0;
+}
+''')
+            subprocess.run(['clang', '-std=c11', '-Wall', '-Wextra', '-Werror',
+                            '-DSC64_T4_ENABLED', '-DSC64_Z5_DOODADS',
+                            str(root / 'fixture.c'), '-o', str(root / 'fixture')],
+                           check=True, capture_output=True)
+            subprocess.run([str(root / 'fixture')], check=True)
+
     def test_asset_manifest_hash_ignores_nonidentity_fields(self):
         asset = {'name': 'x', 'unit_id': 15, 'flingy_id': 1, 'sprite_id': 2,
                  'image_id': 3, 'grp_filename_index': 4, 'bolt_path': '00D/001',
@@ -91,6 +139,38 @@ class RaceSpritePackTests(unittest.TestCase):
         before = asset_manifest_sha256([asset])
         asset['preview'] = 'renamed.png'
         self.assertEqual(before, asset_manifest_sha256([asset]))
+
+    def test_named_group_hashes_ignore_later_groups_but_track_members(self):
+        def asset(name, digest):
+            return {'name': name, 'unit_id': len(name), 'flingy_id': 1,
+                    'sprite_id': 2, 'image_id': 3, 'grp_filename_index': 4,
+                    'bolt_path': f'00D/{len(name):03d}', 'sha1': digest * 40,
+                    'canvas': [8, 8], 'selected_frame': 0,
+                    'frame_rect': [0, 0, 8, 8], 'opaque_pixels': 32}
+
+        zp_names = set(ZP_UNIT_IDS) | set(ZP_BUILDING_IDS)
+        z5_names = set(Z5_UNIT_IDS) | set(Z5_BUILDING_IDS)
+        doodad_names = set(Z5_DOODAD_IDS)
+        z6_names = set(Z6_UNIT_IDS)
+        early = [asset(name, 'a') for name in sorted(zp_names)]
+        early += [asset(name, 'b') for name in sorted(z5_names)]
+        early_hash = named_asset_manifest_sha256(early, zp_names)
+        z5_hash = named_asset_manifest_sha256(early, z5_names)
+        doodad_hash = named_asset_manifest_sha256(early, doodad_names)
+        z6_hash = named_asset_manifest_sha256(early, z6_names)
+
+        later = early + [asset(name, 'c') for name in sorted(doodad_names | z6_names)]
+        self.assertEqual(early_hash, named_asset_manifest_sha256(later, zp_names))
+        self.assertEqual(z5_hash, named_asset_manifest_sha256(later, z5_names))
+        self.assertNotEqual(doodad_hash,
+                            named_asset_manifest_sha256(later, doodad_names))
+        self.assertNotEqual(z6_hash, named_asset_manifest_sha256(later, z6_names))
+
+        changed_zp = list(later)
+        first_zp_name = next(iter(zp_names))
+        changed_zp[0] = asset(first_zp_name, 'd')
+        self.assertNotEqual(early_hash,
+                            named_asset_manifest_sha256(changed_zp, zp_names))
 
     def test_base_header_has_no_t4_cases_or_visibility_api(self):
         frame = {'pixels': bytes((0,)), 'alpha': bytes((1,)), 'width': 1,
@@ -265,6 +345,45 @@ int main(void) {
             check=True, capture_output=True, text=True)
         self.assertIn('--include-z5-actors', help_result.stdout)
         self.assertIn('--include-zp-campaign-actors', help_result.stdout)
+
+    def test_z6_guardian_sprite_set_is_separately_complete_and_gated(self):
+        frame = {'pixels': bytes((11,)), 'alpha': bytes((1,)), 'width': 1,
+                 'height': 1, 'x': 0, 'y': 0, 'frame_width': 1,
+                 'frame_height': 1}
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / 'z6.h'
+            base_units = [{'name': name, 'frame': frame} for name in RACE_UNIT_IDS]
+            write_header(path, base_units, bytes(range(256)),
+                         z6_selected=[{'name': name, 'frame': frame}
+                                      for name in Z6_UNIT_IDS])
+            text = path.read_text()
+            (root / 'check.c').write_text('''#include <assert.h>
+#include "z6.h"
+int main(void) {
+#ifdef SC64_Z6_ACTORS
+#ifndef SC64_Z6_SPRITE_SET_COMPLETE
+#error "complete Guardian sprite set must carry its own marker"
+#endif
+    assert(sc64_z6_actor_sprite(44));
+    assert(!sc64_z6_actor_sprite(43));
+#endif
+    return 0;
+}
+''')
+            for enabled in (False, True):
+                command = ['clang', '-std=c11', '-Werror', str(root / 'check.c'),
+                           '-o', str(root / 'check')]
+                if enabled:
+                    command.append('-DSC64_Z6_ACTORS')
+                subprocess.run(command, check=True, capture_output=True)
+                subprocess.run([str(root / 'check')], check=True, capture_output=True)
+            self.assertIn('#ifdef SC64_Z6_ACTORS', text)
+            self.assertIn('#define SC64_Z6_SPRITE_SET_COMPLETE 1', text)
+            self.assertIn('case 44: return &sc64_race_sprite_guardian_z6;', text)
+            partial = root / 'partial.h'
+            write_header(partial, base_units, bytes(range(256)), z6_selected=[])
+            self.assertNotIn('SC64_Z6_SPRITE_SET_COMPLETE', partial.read_text())
 
 
 

@@ -64,13 +64,29 @@ int memcmp(const void *a, const void *b, size_t n);
 #if defined(SC64_ZP_CAMPAIGN_STORAGE) && !defined(SC64_ROUTE_PACK3)
 #error "Zerg/Protoss campaign storage requires packed route fields"
 #endif
+#if defined(SC64_ZP_FULL_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
+#error "Full Z/P storage requires the isolated campaign storage profile"
+#endif
+#ifdef SC64_Z5_RUNTIME
+#if !defined(SC64_Z4_RUNTIME) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_Z5_ENABLED) || !defined(SC64_Z5_DATA_ENABLED) || \
+    !defined(SC64_Z5_CAMPAIGN_ENTRY) || !defined(SC64_Z5_ACTORS) || \
+    !defined(SC64_Z5_DOODADS) || !defined(SC64_ZP_CAMPAIGN_ACTORS) || \
+    !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 1
+#error "Z5 runtime requires authenticated Z5 data, Z4 chain, and full Zerg storage"
+#endif
+#include "sc64_z5.h"
+#include "sc64_z5_state.h"
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME) && \
     (!defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 0)
 #error "Combined T3/T4 runtime is an experimental unified Terran profile"
 #endif
 
 #if defined(SC64_RACES)
-#if defined(SC64_ZP_CAMPAIGN_STORAGE) && SC64_CAMPAIGN_RACE == 2
+#if defined(SC64_ZP_FULL_STORAGE)
+#define MAX_UNITS 240
+#elif defined(SC64_ZP_CAMPAIGN_STORAGE) && SC64_CAMPAIGN_RACE == 2
 #define MAX_UNITS 240
 #elif defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define MAX_UNITS 192
@@ -79,7 +95,11 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_P4_STORM_ENABLED)
+#if defined(SC64_Z5_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 23u
+#elif defined(SC64_ZP_FULL_STORAGE)
+#define SC64_RACE_SAVE_GENERATION 22u
+#elif defined(SC64_P4_STORM_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 21u
 #elif defined(SC64_TERRAN_LATE_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 18u
@@ -113,7 +133,9 @@ int memcmp(const void *a, const void *b, size_t n);
 /* Opt-in Z/P pools are staged chapter bounds, not full-campaign maxima.
  * Protoss reserves headroom for 87 scripted creations; production must keep
  * those slots available until the corresponding events have executed. */
-#if defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_ZP_FULL_STORAGE)
+#define MAX_BUILDINGS 160
+#elif defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define MAX_BUILDINGS 96
 #elif defined(SC64_LATE_TERRAN_STORAGE)
 #define MAX_BUILDINGS 96
@@ -122,7 +144,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_BUILDINGS 64
 #endif
-#if defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_ZP_FULL_STORAGE)
+#define MAX_MINERALS 144
+#elif defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define MAX_MINERALS 48
 #elif defined(SC64_LATE_TERRAN_STORAGE)
 #define MAX_MINERALS 80
@@ -175,6 +199,11 @@ int memcmp(const void *a, const void *b, size_t n);
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
 #endif
+#ifdef SC64_ZP_FULL_STORAGE
+#define MAX_RACE_GEYSERS 12
+#else
+#define MAX_RACE_GEYSERS 4
+#endif
 #define MAX_TRACERS 12
 #ifdef SC64_IMPORTED_MISSION
 #include "sc64_mission_generated.h"
@@ -195,6 +224,12 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #include "sc64_sprites_generated.h"
 #ifdef SC64_RACES
 #include "sc64_race_sprites_generated.h"
+#endif
+#endif
+#if defined(SC64_Z5_RUNTIME) && defined(SC64_HAS_SPRITES)
+#if !defined(SC64_Z5_SPRITE_SET_COMPLETE) || \
+    !defined(SC64_Z5_DOODAD_SPRITE_SET_COMPLETE)
+#error "Z5 runtime requires the complete actor and unit-backed doodad sprite banks"
 #endif
 #endif
 #ifdef SC64_T6_STORAGE
@@ -430,6 +465,10 @@ _Static_assert(SC64_RACE_MAP_COUNT > 15,
 _Static_assert(SC64_RACE_MAP_COUNT > SC64_P4_GLOBAL_ID,
                "P4 runtime requires the staged P4 map descriptor");
 #endif
+#ifdef SC64_Z5_RUNTIME
+_Static_assert(SC64_RACE_MAP_COUNT > SC64_Z5_GLOBAL_ID,
+               "Z5 runtime requires the staged Z5 map descriptor");
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #include "sc64_t3.h"
 _Static_assert(MAX_UNITS >= 138, "T3 must retain its complete starting roster");
@@ -522,6 +561,10 @@ typedef struct {
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 _Static_assert(sizeof(Unit) == 56, "Late Terran runtime unit budget");
 #endif
+#ifdef SC64_ZP_FULL_STORAGE
+#include "sc64_zp_building_types.h"
+typedef Sc64ZpCompactBuilding Building;
+#else
 typedef struct {
     int x, y, hp, maxhp, owner, type, alive;
     int queue[5], queue_head, queue_count, queue_progress;
@@ -530,6 +573,7 @@ typedef struct {
     int shield,raw_type,raw_owner,flags,larva,larva_timer,shield_remainder;
 #endif
 } Building;
+#endif
 typedef struct {
     int x, y, amount;
 #ifdef SC64_IMPORTED_MISSION
@@ -568,7 +612,7 @@ typedef struct {
     u8 invincible_units[MAX_UNITS], invincible_buildings[MAX_BUILDINGS];
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
-    int geyser_x[4], geyser_y[4], geyser_count;
+    int geyser_x[MAX_RACE_GEYSERS], geyser_y[MAX_RACE_GEYSERS], geyser_count;
 #endif
 #ifdef SC64_SKIRMISH
     Sc64AiState bots[3];
@@ -597,7 +641,7 @@ static int target_hostile_masks_valid;
 #include "sc64_targets.h"
 #endif
 static Mineral m[MAX_MINERALS];
-static Geyser geysers[4] = {{
+static Geyser geysers[MAX_RACE_GEYSERS] = {{
 	224, 160
 }, {
     272, 192
@@ -681,6 +725,9 @@ static void race_frontend_reset(void)
 }
 static int race_player[5],race_minerals[5],race_gas[5];
 static Sc64RaceCampaignState race_campaign;
+#ifdef SC64_Z5_RUNTIME
+static Sc64Z5PersistentState race_z5;
+#endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 static Sc64T4RuntimeState race_t4;
 static int race_t4_active(void)
@@ -768,6 +815,14 @@ static unsigned race_z4_hud_seconds(void);
 #ifdef SC64_P4_RUNTIME
 static unsigned race_p4_reserved_units(void);
 static int race_p4_world_paused(void);
+#endif
+#ifdef SC64_Z5_RUNTIME
+static int race_z5_active(void);
+static int race_z5_world_paused(void);
+static int race_z5_is_door_type(int type);
+static int race_z5_building_collidable(int slot);
+static int race_z5_draw_prop(Building *q, int x, int y);
+static unsigned race_z5_prop_cache_field(unsigned row, int enabled);
 #endif
 static int race_start_build(int owner,int worker,int type,int x,int y);
 static int race_can_site(int owner,int type,int x,int y);
@@ -893,6 +948,10 @@ sc64_t4_building_collidable(int slot)
                 return race_t4.doodad_enabled[row] != 0;
         return 1; /* An unbound door never becomes passable silently. */
     }
+#endif
+#ifdef SC64_Z5_RUNTIME
+    if (race_z5_active() && race_z5_is_door_type(type))
+        return race_z5_building_collidable(slot);
 #endif
     unsigned flags = sc64_game_building_actor_flags(type);
     return !flags || (flags & SC64_GAME_ACTOR_COLLIDABLE);
@@ -1370,6 +1429,22 @@ build_path_grid(void)
             continue;
         }
 #endif
+#endif
+#ifdef SC64_Z5_RUNTIME
+        if (race_z5_active() && race_z5_is_door_type(b[i].type)) {
+            if (race_z5_building_collidable(i)) {
+                int left, up, right, down;
+                if (sc64_game_building_bounds_source(b[i].type, &left, &up, &right, &down)) {
+                    int c0=limit((b[i].x*2-left)/32,0,MAP_COLS-1);
+                    int c1=limit((b[i].x*2+right)/32,0,MAP_COLS-1);
+                    int r0=limit((b[i].y*2-up)/32,0,MAP_ROWS-1);
+                    int r1=limit((b[i].y*2+down)/32,0,MAP_ROWS-1);
+                    for(row=r0;row<=r1;row++) for(col=c0;col<=c1;col++)
+                        SC64_GRID_SET(path_walkable,col+row*MAP_COLS,0);
+                }
+            }
+            continue;
+        }
 #endif
 #endif
 #endif
@@ -2327,7 +2402,7 @@ save_game(void)
     memcpy(data.invincible_buildings, invincible_buildings, sizeof(invincible_buildings));
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
-    for (int i = 0; i < 4; i++) { data.geyser_x[i] = geysers[i].x; data.geyser_y[i] = geysers[i].y; }
+    for (int i = 0; i < MAX_RACE_GEYSERS; i++) { data.geyser_x[i] = geysers[i].x; data.geyser_y[i] = geysers[i].y; }
     data.geyser_count = geyser_count;
 #endif
 #ifdef SC64_SKIRMISH
@@ -2365,7 +2440,7 @@ load_game(void)
     if (data.minerals < 0 || data.minerals > 100000 || data.gas < 0 || data.gas > 100000 || data.supply_cap < 0 || data.supply_cap > 400 || data.frame < 0)
 	return 0;
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
-    if (data.geyser_count < 0 || data.geyser_count > 4) return 0;
+    if (data.geyser_count < 0 || data.geyser_count > MAX_RACE_GEYSERS) return 0;
 #endif
 #ifdef SC64_SKIRMISH
     if (data.bot_count < 1 || data.bot_count > 3) return 0;
@@ -2447,7 +2522,7 @@ load_game(void)
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
     geyser_count = data.geyser_count;
-    for (int k = 0; k < 4; k++) { geysers[k].x = data.geyser_x[k]; geysers[k].y = data.geyser_y[k]; }
+    for (int k = 0; k < MAX_RACE_GEYSERS; k++) { geysers[k].x = data.geyser_x[k]; geysers[k].y = data.geyser_y[k]; }
 #endif
 #ifdef SC64_SKIRMISH
     memcpy(skirmish_ai, data.bots, sizeof(skirmish_ai)); skirmish_bots = data.bot_count;
@@ -2514,7 +2589,7 @@ spawn_imported_mission(void)
         if (src->source_type == 214) continue;
 #ifdef SC64_BACKWATER
         if (src->source_type == 188) {
-            if (geyser_count < 4) { geysers[geyser_count].x = x; geysers[geyser_count++].y = y; }
+            if (geyser_count < MAX_RACE_GEYSERS) { geysers[geyser_count].x = x; geysers[geyser_count++].y = y; }
             else mission_unsupported_count++;
             continue;
         }
@@ -4452,6 +4527,17 @@ game_update(u16 held, u16 pressed)
 	}
 	return;
     }
+#ifdef SC64_Z5_RUNTIME
+    /* Z5's source program contains PauseGame without an UnpauseGame. A
+     * deliberate A press acknowledges that authored pause and resumes this
+     * adaptation; no timer, trigger, combat, or order advances while waiting. */
+    if (race_z5_world_paused()) {
+        if (pressed & KEY_A) race_z5.pause_acknowledged = 1;
+        else if (pressed & KEY_B) save_game();
+        else if (pressed & KEY_START) screen = SCREEN_PAUSE;
+        return;
+    }
+#endif
     if (pressed & KEY_START) {
 	reset_selection_gestures();
 	screen = SCREEN_PAUSE;
@@ -4480,6 +4566,21 @@ game_update(u16 held, u16 pressed)
     }
 #endif
     /* Menus own their inputs. Selection gestures start only in the field. */
+#ifdef SC64_P4_STORM_ENABLED
+    /* B+R is an authored GBA escort-group shortcut. Keep the two objective
+     * heroes separate from bulk route orders; regular R still selects them. */
+    if (race_p4_active() && (held & KEY_B) && (pressed & KEY_R) &&
+        !box_state && !(held & (KEY_LEFT|KEY_RIGHT|KEY_UP|KEY_DOWN))) {
+        reset_selection_gestures();
+        select_combat_group();
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].raw_type == SC64_P4_RAW_TASSADAR ||
+                u[i].raw_type == SC64_P4_RAW_RAYNOR_VULTURE) u[i].selected = 0;
+        mode = MODE_NORMAL;
+        menu_open = 0;
+        pressed &= (u16)~(KEY_A | KEY_B | KEY_R);
+    }
+#endif
     if (menu_open) reset_selection_gestures();
     if ((pressed & KEY_B) && !box_state && !(pressed & KEY_L)) {
 	if (menu_open)
@@ -5032,6 +5133,9 @@ draw_building_art(Building *q)
 #if defined(SC64_T4_SCENARIO_RUNTIME) && defined(SC64_HAS_SPRITES)
     if (race_t4_draw_prop(q, x, y)) return;
 #endif
+#if defined(SC64_Z5_RUNTIME) && defined(SC64_HAS_SPRITES)
+    if (race_z5_draw_prop(q, x, y)) return;
+#endif
 #ifdef SC64_HAS_SPRITES
     if (sprite) draw_mission_sprite(sprite, x, y);
     else
@@ -5106,7 +5210,7 @@ draw_building_overlay(Building *q)
 static unsigned
 sc64_static_objects_key(void)
 {
-    enum { FIELDS = MAX_MINERALS * 5 + 4 * 3 + 1 + MAX_BUILDINGS *
+    enum { FIELDS = MAX_MINERALS * 5 + MAX_RACE_GEYSERS * 3 + 1 + MAX_BUILDINGS *
 #ifdef SC64_T4_SCENARIO_RUNTIME
                     7
 #else
@@ -5114,6 +5218,9 @@ sc64_static_objects_key(void)
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
                     + 32 * 2
+#endif
+#ifdef SC64_Z5_RUNTIME
+                    + SC64_Z5_UNIT_BACKED_DOODADS * 2
 #endif
     };
     static int previous[FIELDS];
@@ -5130,7 +5237,7 @@ sc64_static_objects_key(void)
         values[n++] = in_bounds && currently_visible(m[i].x, m[i].y);
     }
     values[n++] = geyser_count;
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < MAX_RACE_GEYSERS; i++) {
         values[n++] = geysers[i].x;
         values[n++] = geysers[i].y;
         {
@@ -5162,6 +5269,12 @@ sc64_static_objects_key(void)
     for (i = 0; i < 32; i++) {
         values[n++] = race_t4.doodad_slot[i];
         values[n++] = race_t4.doodad_enabled[i];
+    }
+#endif
+#ifdef SC64_Z5_RUNTIME
+    for (i = 0; i < SC64_Z5_UNIT_BACKED_DOODADS; i++) {
+        values[n++] = (int)race_z5_prop_cache_field((unsigned)i, 0);
+        values[n++] = (int)race_z5_prop_cache_field((unsigned)i, 1);
     }
 #endif
     for (i = 0; i < n; i++) {
@@ -5647,7 +5760,11 @@ draw_hud_commands(void)
             gfx_text(5, 137, "A CAST  B CANCEL", C_GOLD);
         else
 #endif
-	gfx_text(5, 137, "B COMMANDS  A SELECT / PLACE", C_GOLD);
+	gfx_text(5, 137,
+#ifdef SC64_P4_STORM_ENABLED
+                 race_p4_active() ? "B COMMANDS  B+R ESCORTS" :
+#endif
+                 "B COMMANDS  A SELECT / PLACE", C_GOLD);
     }
 #ifdef SC64_RACES
     if(race_mode)gfx_text(5,149,"DESTROY ALL ENEMY BUILDINGS",C_GOLD);

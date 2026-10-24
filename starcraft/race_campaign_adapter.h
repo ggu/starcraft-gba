@@ -44,6 +44,9 @@ static int race_z4_source_owner(unsigned source_slot);
 #ifdef SC64_P4_RUNTIME
 static int race_p4_source_owner(unsigned source_slot);
 #endif
+#ifdef SC64_Z5_RUNTIME
+static int race_z5_source_owner(unsigned source_slot);
+#endif
 
 static int
 race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
@@ -80,6 +83,13 @@ race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 #endif
     if (raw_owner == 11 || raw_owner >= 8) return NEUTRAL;
     if (raw_owner < 0) return NEUTRAL;
+#ifdef SC64_Z5_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_Z5_GLOBAL_ID &&
+        raw_owner < 8) {
+        if (raw_owner == map->human_slot) return SIDE;
+        return map->owner_modes[raw_owner];
+    }
+#endif
 #ifdef SC64_P3_RUNTIME
     if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID) {
         if (raw_owner == SC64_P3_HUMAN_SLOT) return SIDE;
@@ -144,6 +154,9 @@ race_campaign_set_message(int id)
 #include "sc64_z4_adapter.h"
 static unsigned race_z4_hud_seconds(void)
 { return (race_z4.countdown_ticks + 29u) / 30u; }
+#endif
+#ifdef SC64_Z5_RUNTIME
+#include "sc64_z5_runtime_adapter.h"
 #endif
 #ifdef SC64_P3_RUNTIME
 #include "sc64_p3_adapter.h"
@@ -318,6 +331,11 @@ race_campaign_init(void)
 #ifdef SC64_TERRAN_LATE_RUNTIME
     memset(&race_late, 0, sizeof(race_late));
 #endif
+#ifdef SC64_Z5_RUNTIME
+    memset(&race_z5, 0, sizeof(race_z5));
+    memset(&race_z5_world, 0, sizeof(race_z5_world));
+    memset(race_z5_doodads, 0, sizeof(race_z5_doodads));
+#endif
     if (race_mode) {
         race_skirmish_init();
         return;
@@ -355,6 +373,11 @@ race_campaign_init(void)
         );
 #endif
     map = &sc64_race_maps[race_selected_mission];
+#ifdef SC64_Z5_RUNTIME
+    if (race_selected_mission == SC64_Z5_GLOBAL_ID && !race_z5_preflight(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     /* Validate every retained starting row before touching the live world.
      * These staged pools are deliberately smaller than later campaign maps. */
@@ -365,14 +388,21 @@ race_campaign_init(void)
             const Sc64ImportedUnit *src = &map->units[row];
             int raw = src->source_type;
             if (src->x_px >= map->width * 16 || src->y_px >= map->height * 16) invalid = 1;
+#ifdef SC64_Z5_RUNTIME
+            if (race_selected_mission == SC64_Z5_GLOBAL_ID && raw == 214) continue;
+#endif
             if (raw >= 176 && raw <= 178) ++minerals_count;
             else if (raw == 188) ++gas_count;
             else if (sc64_race_unit_from_raw(raw) >= 0) ++units;
             else if (sc64_race_building_from_raw(raw) >= 0) ++buildings;
             else invalid = 1;
         }
+#ifdef SC64_Z5_RUNTIME
+        if (race_selected_mission == SC64_Z5_GLOBAL_ID)
+            buildings += SC64_Z5_UNIT_BACKED_DOODADS;
+#endif
         if (invalid || units > MAX_UNITS || buildings > MAX_BUILDINGS ||
-            minerals_count > MAX_MINERALS || gas_count > 4) {
+            minerals_count > MAX_MINERALS || gas_count > MAX_RACE_GEYSERS) {
             ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
         }
     }
@@ -424,6 +454,10 @@ race_campaign_init(void)
 #ifdef SC64_Z4_RUNTIME
         if (race_selected_mission == SC64_RACE_MISSION_Z4) owner = race_campaign_owner(map, i);
 #endif
+#ifdef SC64_Z5_RUNTIME
+        if (race_selected_mission == SC64_Z5_GLOBAL_ID)
+            owner = race_campaign_owner(map, i);
+#endif
 #ifdef SC64_P4_RUNTIME
         if (race_selected_mission == SC64_RACE_MISSION_P4) owner = race_campaign_owner(map, i);
 #endif
@@ -447,6 +481,12 @@ race_campaign_init(void)
         if (owner >= 0 && owner < 5 && map->owner_races[i] < 3)
             race_player[owner] = map->owner_races[i];
     }
+#ifdef SC64_Z5_RUNTIME
+    /* Multiple source slots can map onto the live SIDE owner; make the
+     * authenticated human slot the final authority for the save identity. */
+    if (race_selected_mission == SC64_Z5_GLOBAL_ID)
+        race_player[SIDE] = race_human;
+#endif
     human_owner = map->human_slot;
 
     for (i = 0; i < map->unit_count; ++i) {
@@ -454,6 +494,9 @@ race_campaign_init(void)
         int raw = src->source_type, owner, type, slot;
         int x = src->x_px, y = src->y_px;
         if (x >= map->width * 16 || y >= map->height * 16) continue;
+#ifdef SC64_Z5_RUNTIME
+        if (race_selected_mission == SC64_Z5_GLOBAL_ID && raw == 214) continue;
+#endif
         if (raw == 176 || raw == 177 || raw == 178) {
             int j;
             for (j = 0; j < MAX_MINERALS; ++j) if (m[j].amount <= 0) break;
@@ -465,7 +508,7 @@ race_campaign_init(void)
             continue;
         }
         if (raw == 188) {
-            if (geyser_count < 4) {
+            if (geyser_count < MAX_RACE_GEYSERS) {
                 geysers[geyser_count].x = x;
                 geysers[geyser_count++].y = y;
             }
@@ -505,7 +548,14 @@ race_campaign_init(void)
 #endif
         if (type >= 0) {
             slot = spawn_unit(owner, type, x, y);
-            if (slot < 0) continue;
+            if (slot < 0) {
+#ifdef SC64_Z5_RUNTIME
+                if (race_selected_mission == SC64_Z5_GLOBAL_ID) {
+                    ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+                }
+#endif
+                continue;
+            }
             u[slot].raw_type = raw;
             u[slot].raw_owner = src->owner;
             u[slot].flags = src->flags;
@@ -524,7 +574,14 @@ race_campaign_init(void)
         type = sc64_race_building_from_raw(raw);
         if (type >= 0) {
             slot = spawn_build(owner, type, x, y, 0);
-            if (slot < 0) continue;
+            if (slot < 0) {
+#ifdef SC64_Z5_RUNTIME
+                if (race_selected_mission == SC64_Z5_GLOBAL_ID) {
+                    ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+                }
+#endif
+                continue;
+            }
             b[slot].raw_type = raw;
             b[slot].raw_owner = src->owner;
             b[slot].flags = src->flags;
@@ -537,6 +594,12 @@ race_campaign_init(void)
         else if(race_selected_mission>=SC64_RACE_MISSION_T1)++mission_unsupported_count;
 #endif
     }
+
+#ifdef SC64_Z5_RUNTIME
+    if (race_selected_mission == SC64_Z5_GLOBAL_ID && !race_z5_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
 
     switch (race_selected_mission) {
 #ifdef SC64_TERRAN_LATE_RUNTIME
@@ -786,6 +849,12 @@ race_campaign_tick(void)
 #ifdef SC64_Z4_RUNTIME
     if (mission == SC64_RACE_MISSION_Z4) {
         if (!race_z4_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
+        return;
+    }
+#endif
+#ifdef SC64_Z5_RUNTIME
+    if (mission == SC64_Z5_GLOBAL_ID) {
+        if (!race_z5_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
         return;
     }
 #endif

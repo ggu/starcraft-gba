@@ -73,6 +73,17 @@ class TraceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "schema"):
             replay.validate_trace(bad, 16, "zerg-z4")
 
+    def test_p4_rescue_observation_preserves_input_schedule(self):
+        trace = trace_for("protoss-p4", 23)
+        baseline = replay.validate_trace(trace, 16, "protoss-p4")
+        trace["events"].insert(-1, {"kind": "both-rescued", "host_tick": 1500})
+        plan = replay.validate_trace(trace, 16, "protoss-p4")
+        self.assertEqual(plan["inputs"], baseline["inputs"])
+        self.assertEqual(plan["checkpoints"][-1]["kind"], "both-rescued")
+        trace["profile"], trace["mission"] = "zerg-z4", 15
+        with self.assertRaisesRegex(ValueError, "unsupported kind"):
+            replay.validate_trace(trace, 16, "zerg-z4")
+
     def test_rejects_bad_input_edges_and_menu_deploy_order(self):
         bad = trace_for(); bad["events"][1]["host_tick"] = 1
         with self.assertRaisesRegex(ValueError, "strictly ordered"):
@@ -201,6 +212,31 @@ class TraceTests(unittest.TestCase):
                     "side_units": 4, "side_buildings": 2,
                     "force2_units": 0, "force3_units": 0}
         replay.verify_final(p4_final, p4_state, "protoss-p4")
+
+
+    def test_p4_extraction_checks_both_real_hero_positions(self):
+        final = {"escape": [100, 200, 160, 240]}
+        actors = []
+        for name, raw, x in (("tassadar", 79, 110), ("raynor", 19, 150)):
+            final.update({f"{name}_alive": 1, f"{name}_owner": 0,
+                          f"{name}_x": x, f"{name}_y": 220})
+            actors.append({"raw_type": raw, "owner": 0, "x": x, "y": 220})
+        state = {"units": {"entities": actors}}
+        replay.verify_p4_hero_extraction(final, state)
+        for raw in (19, 79):
+            broken = copy.deepcopy(state)
+            broken["units"]["entities"] = [a for a in actors if a["raw_type"] != raw]
+            with self.assertRaisesRegex(RuntimeError, "exactly one live"):
+                replay.verify_p4_hero_extraction(final, broken)
+        for field, value in (("owner", 1), ("x", 160), ("y", 240)):
+            wrong_final, wrong_state = copy.deepcopy(final), copy.deepcopy(state)
+            wrong_final[f"raynor_{field}"] = value
+            wrong_state["units"]["entities"][1][field] = value
+            with self.assertRaisesRegex(RuntimeError, "inside extraction"):
+                replay.verify_p4_hero_extraction(wrong_final, wrong_state)
+        incomplete = copy.deepcopy(final); del incomplete["tassadar_y"]
+        with self.assertRaisesRegex(RuntimeError, "complete tassadar"):
+            replay.verify_p4_hero_extraction(incomplete, state)
 
 
 if __name__ == "__main__":

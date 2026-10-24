@@ -26,14 +26,19 @@ is not a lifetime bound when a preserved trigger can fire again.
 | P10 | 128×128 | 120 | 67 | 142 | 12 | 4 | 28 / 28 | 0 | 5 / 3 | 1–28 |
 
 The largest starting pools in these chapters are Z9’s 150 buildings and P6’s
-200 units. The current staged ZP storage limits (Zerg 192 units; Protoss 240;
-96 buildings; 48 minerals; 4 geysers) therefore still fail later source maps:
+200 units. The chapter-four ZP storage limits (Zerg 192 units; Protoss 240;
+96 buildings; 48 minerals; 4 geysers) fail later source maps:
 Z9/Z10 exceed buildings, Z6/Z8/Z9/Z10 and P5/P7/P8/P9/P10 exceed minerals,
 and Z8/Z9 and P10 exceed geysers. P10 alone needs 142 mineral fields and 12
 geysers. These are source placements only; runtime-created actors need extra
 capacity. P9’s and Z8’s preserved creation triggers make that additional
 capacity potentially recurring, so a hard lifetime reserve needs a mission
 rule or an explicit bounded spawn policy.
+
+The opt-in Z5 full-storage profile now raises these pools to 240 units,
+160 buildings, 144 minerals and 12 geysers using compact runtime/save rows.
+It fits these starting-placement counts, but does not establish complete
+actor support, repeated-spawn safety or playability for the later maps.
 
 Raw 150 is the Mature Chrysalis building, while raw 216 is the Chrysalis unit.
 Raw 196 is a Protoss beacon building and is included in the building counts.
@@ -130,7 +135,8 @@ more map data:
   reserve capacity for authored creations. A full-campaign storage decision
   must cover the largest per-map demand plus the mission’s create behavior,
   including repeated preserved triggers. Current minerals/geysers/buildings
-  bounds are not sufficient for later chapters.
+  chapter-four bounds are not sufficient for later chapters; the new expanded
+  profile needs per-mission runtime qualification.
 - **Trigger semantics:** condition opcodes represented here need exact
   selector, unit-count and location semantics. Actions include creation with
   UPRP properties, waits/pause, owner-scoped resource and switch changes,

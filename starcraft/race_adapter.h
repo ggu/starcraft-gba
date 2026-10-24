@@ -488,6 +488,25 @@ static void race_skirmish_init(void)
     static const int mdx[4] = { 56, 42, 56, 42 };
     static const int mdy[4] = { 24, 40, 8, 20 };
     int i, j, owner, worker_type, townhall, supply_building;
+#ifdef SC64_ZP_FULL_STORAGE
+    if (race_skirmish_map > 0) {
+        const Sc64SkirmishMap *map;
+        race_skirmish_geometry();
+        map = &sc64_skirmish_maps[race_skirmish_map - 1];
+        if (map->geyser_count > MAX_RACE_GEYSERS) {
+            screen = SCREEN_PAUSE;
+            toast(14);
+            return;
+        }
+        for (unsigned g = 0; g < map->geyser_count; ++g)
+            if (map->geysers[g].x >= race_cols * 16 ||
+                map->geysers[g].y >= race_rows * 16) {
+                screen = SCREEN_PAUSE;
+                toast(14);
+                return;
+            }
+    }
+#endif
     memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b)); memset(m, 0, sizeof(m));
     memset(race_player, 0xff, sizeof(race_player));
     memset(race_minerals, 0, sizeof(race_minerals)); memset(race_gas, 0, sizeof(race_gas));
