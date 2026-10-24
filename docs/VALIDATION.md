@@ -2161,8 +2161,19 @@ power, cooldown and invalid-owner cases.
 
 Separate 30000-tick ARM prefixes match all 31 observed states and four captures
 for each mission. Z4 improves from 18.48 to 21.09 fps; P4 Storm improves from
-15.23 to 16.40 fps. Full wins and fresh-save qualification are running before
-enabling the flag in the staged builds.
+15.23 to 16.40 fps. Full wins also match: Z4 improves from 16.61 to 18.43 fps
+with 73 matching states and five captures; P4 Storm improves from 15.17 to
+16.51 fps with 112 states and five captures. Exact fresh-process restores
+plus one handoff and 60 neutral updates reach frames 29913 and 29964.
+The flag is enabled in the staged Z4/P4 profiles; fifth-mission profiles
+filter it out pending their own qualification and memory checks.
+
+The qualified Z4 ROM SHA-256 is
+`29a03a107ae702ac181967635003abfeb327e5a84d9f26fc2c698230d6c6c36b`,
+with ELF `b42e8791f717ef64738e4abda87be9ab9ac7da73cb235958a4d38f911dc87ba1`.
+P4 Storm ROM is `f9cfb3b9fe016db8e4247acfc855e32a950e52720545b76b13025ae4c7a83e2a`,
+with ELF `27efd0e9b2316becffde3cfc30746c86f195383ea69642e5fa7913f859646d7d`.
+These are emulator measurements; neither mission meets the 30-fps target.
 
 A separate private packed-minimap experiment passes its 1000-pattern host
 pixel oracle and both ARM state/capture comparisons, but changes the Z4/P3

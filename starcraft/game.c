@@ -5589,11 +5589,13 @@ draw_map(void)
 #ifdef SC64_Z5_CLOAK_ENABLED
             const char *label = i == MENU_STOP + 1 && race_z5_cloak_menu_available() ?
                 (race_z5.cloak.active ? "UNCLOAK" : "CLOAK") : labels[i];
-#else
-            const char *label = labels[i];
 #endif
 	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
+#ifdef SC64_Z5_CLOAK_ENABLED
 	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
+#else
+	    gfx_text(149, 17 + (i - first) * 9, labels[i], i == menu_cursor ? C_WHITE : C_DIM);
+#endif
 	}
 #endif
 #else
