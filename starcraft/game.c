@@ -2,6 +2,12 @@
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
 #include "sc64_construction_hp.h"
+#if defined(SC64_DIRECT_ATTACK) && !defined(SC64_RACES)
+#error "SC64_DIRECT_ATTACK requires SC64_RACES"
+#endif
+#ifdef SC64_DIRECT_ATTACK
+#include "sc64_direct_attack.h"
+#endif
 #if defined(SC64_RENDER_KEY_ONCE) && !defined(SC64_IMPORTED_MISSION)
 #error "SC64_RENDER_KEY_ONCE requires SC64_IMPORTED_MISSION"
 #endif
@@ -1080,6 +1086,16 @@ volatile u32 sc64_order_setup_cycles, sc64_order_query_cycles, sc64_order_move_c
 static int nearest_refinery(int x, int y);
 static void update_exploration(void);
 static int owner_command_center(int owner);
+#ifdef SC64_DIRECT_ATTACK
+static int currently_visible(int x, int y);
+static int target_alive(int target);
+static int target_x(int target), target_y(int target);
+static void sc64_direct_attack_clear_references(int entity);
+static int sc64_direct_attack_find_target(int x, int y);
+static int sc64_direct_attack_issue_target(int target);
+static void sc64_direct_attack_tick_unit(int slot);
+static void tick_combat(Unit *q, int target);
+#endif
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
 #ifndef SC64_RACES
 #error "SC64_NEAREST_RESOURCE_DEPOT requires the race campaign runtime"
@@ -1369,6 +1385,9 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_DIRECT_ATTACK
+    sc64_direct_attack_clear_references(i);
+#endif
     /* A newly produced unit can reuse a dead unit's array slot. */
     if (unit_tap == i) reset_unit_tap();
 #if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
@@ -1484,6 +1503,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     int i = find_build_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_DIRECT_ATTACK
+    sc64_direct_attack_clear_references(MAX_UNITS + i);
+#endif
     b[i].x = x;
 #if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
@@ -2503,6 +2525,182 @@ target_alive(int target)
 #endif
     return target >= 0 && (target < MAX_UNITS ? u[target].alive : b[target - MAX_UNITS].alive);
 }
+
+#ifdef SC64_DIRECT_ATTACK
+/* Direct orders use the packed order/target fields already present in each
+ * unit.  Slot reuse must invalidate references before the dead entity's
+ * coordinates/type/owner are overwritten. */
+static void __attribute__((noinline))
+sc64_direct_attack_clear_references(int entity)
+{
+    int i;
+    for (i = 0; i < MAX_UNITS; ++i) {
+        Unit *q = &u[i];
+        if (q->alive && q->order == ORDER_ATTACK_TARGET && q->target == entity) {
+            q->order = ORDER_IDLE;
+            q->target = -1;
+            q->tx = q->x;
+            q->ty = q->y;
+            q->path_timer = q->path_retry = 0;
+        }
+    }
+}
+
+static int __attribute__((noinline))
+sc64_direct_target_state(int entity, int source_live_owner,
+                         Sc64DirectTargetState *state)
+{
+    int owner, x, y, loaded = 0, immune;
+    if (!state || entity < 0 || entity >= MAX_UNITS + MAX_BUILDINGS ||
+        !target_alive(entity)) return 0;
+    if (entity < MAX_UNITS) {
+        owner = u[entity].owner;
+        x = u[entity].x; y = u[entity].y;
+        loaded = SC64_TRANSPORT_LOADED(&u[entity]);
+        immune = (u[entity].flags & 16) != 0;
+#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+        immune |= invincible_units[entity] != 0;
+#endif
+#ifdef SC64_T4_RUNTIME
+        immune |= sc64_race_t4_unit_intrinsically_invincible(u[entity].type);
+#endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        immune |= (sc64_game_unit_actor_flags(u[entity].type) &
+                   (SC64_GAME_ACTOR_HIDDEN | SC64_GAME_ACTOR_INVINCIBLE)) != 0;
+#endif
+    } else {
+        int bi = entity - MAX_UNITS;
+        owner = b[bi].owner;
+        x = b[bi].x; y = b[bi].y;
+        immune = (b[bi].flags & 16) != 0;
+#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+        immune |= invincible_buildings[bi] != 0;
+#endif
+#ifdef SC64_T4_RUNTIME
+        immune |= sc64_race_t4_building_intrinsically_invincible(b[bi].type);
+#endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        immune |= (sc64_game_building_actor_flags(b[bi].type) &
+                   SC64_GAME_ACTOR_INVINCIBLE) != 0;
+#endif
+#ifdef SC64_RACES
+        immune |= b[bi].type == B_ZERG_BEACON;
+#endif
+    }
+    state->alive = 1;
+    state->hostile = owners_hostile(source_live_owner, owner);
+    state->visible = source_live_owner != SIDE || currently_visible(x, y);
+    state->loaded = loaded;
+    state->invincible = immune;
+    /* Actual attack/detection eligibility is evaluated per selected shooter
+     * below; this field carries only generic target policy here. */
+    state->detectable = 1;
+    return sc64_direct_target_valid(*state);
+}
+
+static int __attribute__((noinline))
+sc64_direct_attack_find_target(int x, int y)
+{
+    int entity, best = -1, best_d = 0x7fffffff;
+    for (entity = 0; entity < MAX_UNITS + MAX_BUILDINGS; ++entity) {
+        int owner, tx, ty, radius, d;
+        Sc64DirectTargetState s;
+        if (entity < MAX_UNITS) {
+            if (!u[entity].alive || SC64_TRANSPORT_LOADED(&u[entity])) continue;
+            owner = u[entity].owner; tx = u[entity].x; ty = u[entity].y;
+            radius = 31;
+        } else {
+            int bi = entity - MAX_UNITS;
+            if (!b[bi].alive) continue;
+            owner = b[bi].owner; tx = b[bi].x; ty = b[bi].y;
+            radius = 26;
+        }
+        if (!owners_hostile(SIDE, owner) || !currently_visible(tx, ty) ||
+            !sc64_direct_target_state(entity, SIDE, &s)) continue;
+        d = dist2(x, y, tx, ty);
+        if (d < radius * radius && d < best_d) {
+            best = entity;
+            best_d = d;
+        }
+    }
+    return best;
+}
+
+static int __attribute__((noinline))
+sc64_direct_attack_issue_target(int target)
+{
+    int i, issued = 0;
+    Sc64DirectTargetState state;
+    if (!sc64_direct_target_state(target, SIDE, &state) ||
+        !sc64_direct_target_can_damage(state))
+        return 0;
+    selected_building = -1;
+    for (i = 0; i < MAX_UNITS; ++i) {
+        Unit *q = &u[i];
+        if (!q->alive || !q->selected || q->owner != SIDE ||
+            SC64_TRANSPORT_LOADED(q)) continue;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+        if (sc64_game_unit_actor_flags(q->type) &&
+            !(sc64_game_unit_actor_flags(q->type) & SC64_GAME_ACTOR_MOVABLE))
+            continue;
+#endif
+        if (!SC64_CAN_ATTACK_FROM_SOURCE(q->type, target, q->owner,
+                                         q->raw_owner)) continue;
+#ifdef SC64_T6_RUNTIME
+        if (q->order == ORDER_REPAIR) {
+            q->carry = 0;
+            q->work_timer = 0;
+        }
+#endif
+        q->order = ORDER_ATTACK_TARGET;
+        q->target = target;
+        q->tx = target_x(target);
+        q->ty = target_y(target);
+        q->path_timer = q->path_retry = 0;
+        ++issued;
+    }
+    toast(issued ? 0 : 5);
+    return issued;
+}
+
+static void __attribute__((noinline))
+sc64_direct_attack_tick_unit(int slot)
+{
+    Unit *q = &u[slot];
+    int target = q->target, tx, ty;
+    Sc64DirectTargetState state;
+    if (target < 0 || target >= MAX_UNITS + MAX_BUILDINGS ||
+        !sc64_direct_target_state(target, q->owner, &state)) {
+        q->order = ORDER_IDLE;
+        q->target = -1;
+        return;
+    }
+    if (state.visible) {
+        if (SC64_CAN_ATTACK_FROM_SOURCE(q->type, target, q->owner,
+                                        q->raw_owner)) {
+            q->tx = target_x(target);
+            q->ty = target_y(target);
+            tick_combat(q, target);
+        } else {
+            /* Optical visibility without weapon/detection eligibility is not
+             * a fogged last-known target. Drop it rather than chasing. */
+            q->order = ORDER_IDLE;
+            q->target = -1;
+        }
+        return;
+    }
+    /* A fogged or undetected target never contributes its current coordinates
+     * to movement or damage. The order approaches only its saved last-seen
+     * position and expires there; no native order queue/reacquisition exists. */
+    tx = q->tx; ty = q->ty;
+    if (!sc64_direct_order_keep_last_seen(0, dist2(q->x, q->y, tx, ty))) {
+        q->order = ORDER_IDLE;
+        q->target = -1;
+    } else {
+        move_toward(q, tx, ty);
+    }
+}
+#endif
 
 static void
 add_tracer(int x0, int y0, int x1, int y1, int color)
@@ -4030,6 +4228,14 @@ interact(void)
 	return;
     }
     if (mode == MODE_ATTACK) {
+#ifdef SC64_DIRECT_ATTACK
+        int direct_target = sc64_direct_attack_find_target(cx, cy);
+        if (direct_target >= 0) {
+            (void)sc64_direct_attack_issue_target(direct_target);
+            mode = MODE_NORMAL;
+            return;
+        }
+#endif
 	issue_order(ORDER_ATTACK_MOVE, cx, cy);
 	mode = MODE_NORMAL;
 	return;
@@ -4636,6 +4842,12 @@ target_lists_unavailable:
 	#endif
 	if (q->cd > 0)
 	    q->cd--;
+#ifdef SC64_DIRECT_ATTACK
+        if (q->order == ORDER_ATTACK_TARGET && q->owner == SIDE) {
+            sc64_direct_attack_tick_unit(i);
+            continue;
+        }
+#endif
 #ifdef SC64_Z5_CONSUME_ENABLED
         if (q->order == ORDER_Z5_CONSUME && race_z5_consume_tick_unit(i)) continue;
 #endif

@@ -3753,3 +3753,44 @@ The 555-file source-only export passes the default build and 380 Python
 tests (six private-input skips). Original-art and unified ROM hashes remain
 `4ad80ce0…f9aee` and `6bab5be2…79f9` with the option off. An invalid
 non-imported game build is rejected at compile time.
+
+
+### Experimental direct attack orders
+
+The default-off `SC64_DIRECT_ATTACK` path distinguishes an ATTACK click on a
+visible hostile actor from a ground Attack-Move. Capable selected human units
+retain the clicked combined unit/building target through approach and cooldown,
+and deal damage to that target even when another hostile is closer. The
+existing source-aware weapon/detection predicate still determines whether each
+shooter can attack. The cursor uses the existing coarse GBA selection radii
+(31 pixels for units, 26 for buildings), rather than native sprite hitboxes.
+
+While a target is fogged, the unit approaches only the last visible destination
+stored when it could see that target. It does not follow hidden current
+coordinates or damage the hidden actor. It drops the order within six pixels
+of that destination. A visible actor that becomes weapon/detection-ineligible,
+friendly, loaded, hidden or invulnerable is dropped; dead targets and references
+to reused actor slots are also cleared. This is a bounded direct-order policy:
+native order queues, target reacquisition and all native priority rules are not
+implemented here. Nonhuman order dispatch remains unchanged.
+
+The order uses the existing packed order/target fields without adding actor
+fields, global storage or save bytes. Actual-engine ASan/UBSan fixtures pass
+under plain race, unified and Z7-plus-construction-HP flags. They check direct
+farther-target damage with a nearer hostile untouched, cooldown and moving
+target identity, other hostile skirmish owners, weaponless actor rejection,
+fogged coordinate isolation, unit/building death and slot reuse, invulnerability,
+and supported hidden/transported actor guards. Last-seen arrival expiry,
+unit/building invincibility arrays and ground-only versus flying targets also
+pass. The Z7 compact unit row retains
+the direct order and combined target through encode/decode. These focused host
+checks do not qualify a full mission, physical GBA performance or a fresh-process
+save/load. The gate remains off in standard profiles.
+
+The gated Z7-plus-construction-HP ARM ROM (`bcecf4b5…28254`) links with
+IWRAM end `0x03004f58` and BSS end `0x0203d9f0`, below the unchanged
+reserves. The current controller can issue the direct order through the normal
+menu and click path, including a four-Mutalisk attack on a visible hostile
+Mutalisk. Its diagnostic Z7 run still loses at frame 18,612; this is evidence
+of UI/order integration, not a qualified mission win. P7 Observer cloak/detector
+integration is outside these fixture configurations and remains unqualified.

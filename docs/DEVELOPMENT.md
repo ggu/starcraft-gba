@@ -1586,3 +1586,25 @@ python3 -m unittest discover -s tests -p 'test_sc64_routes.py'
 The complete P3 host trace and state fingerprints match the reference with
 this gate enabled. ARM timing and full replay/save checks are still pending;
 it is not part of any qualified profile's defaults.
+
+
+### Experimental direct attack orders
+
+`SC64_DIRECT_ATTACK` is a default-off race-runtime gate. In the ordinary
+ATTACK command, clicking a visible hostile unit or building gives capable
+selected units a direct order against that actor. Clicking ground retains
+Attack-Move. The order keeps its target through cooldown and movement instead
+of choosing a nearer enemy on every update. It uses the existing packed order,
+target and last-visible destination fields; it adds no save fields or globals.
+
+With the local race and Z7 inputs already prepared, run:
+
+```sh
+make test-sc64-direct-attack
+```
+
+This runs actual-engine ASan/UBSan fixtures for the plain race, unified and
+Z7-plus-construction-HP configurations. The feature remains off in standard
+ROMs pending normal-controller mission and fresh-process SRAM qualification.
+See [Validation](VALIDATION.md#experimental-direct-attack-orders) for the
+bounded visibility and targeting policy.

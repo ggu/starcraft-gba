@@ -2240,6 +2240,19 @@ test-sc64-construction-hp-z7: build/test-sc64-construction-hp-z7 build/test-sc64
 test-starcraft: test-sc64-construction-hp
 test-unified: test-sc64-construction-hp-game
 
+define DIRECT_ATTACK_PROFILE
+build/test-sc64-direct-attack-$(1): tests/sc64_direct_attack_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) -DSC64_DIRECT_ATTACK $$< common/gba.c -o $$@
+endef
+$(eval $(call DIRECT_ATTACK_PROFILE,races,$(RACES_FLAGS),$(RACES_INPUTS)))
+$(eval $(call DIRECT_ATTACK_PROFILE,unified,$(UNIFIED_FLAGS),$(RACES_INPUTS)))
+$(eval $(call DIRECT_ATTACK_PROFILE,z7,$(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP,$(Z7_PROBE_INPUTS)))
+.PHONY: test-sc64-direct-attack
+test-sc64-direct-attack: build/test-sc64-direct-attack-races build/test-sc64-direct-attack-unified build/test-sc64-direct-attack-z7
+	./build/test-sc64-direct-attack-races
+	./build/test-sc64-direct-attack-unified
+	./build/test-sc64-direct-attack-z7
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
