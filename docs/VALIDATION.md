@@ -2999,3 +2999,13 @@ RESULT intervals. This verifies one complete one-AI sample, not all maps,
 races or opponent counts. Two-AI Zerg-build and three-AI Protoss-build samples
 remain queued/running. Frozen pairs and reports are under
 `.local/build/promotion/skirmish-dense-frozen/` and `skirmish-dense-qualified/`.
+
+The two remaining frozen skirmish samples also complete with exact terminal
+host witnesses. The Zerg ROM on the imported map, human Zerg against two AIs,
+reaches its loss at tick 24318/frame 18298 and averages **28.41 effective fps**.
+The Protoss ROM on the imported map, human Protoss against three AIs, reaches
+its win at tick 16338/frame 16300 and averages **26.10 effective fps**. All
+three samples preserve the configured human/bot races and owners, final
+frame/result and live actor counts. These cover one representative match per
+ROM and AI count, not all 54 host cases or physical GBA behavior. Summary:
+`.local/build/promotion/skirmish-dense-qualified/summary.json`.
