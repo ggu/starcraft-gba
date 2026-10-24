@@ -2,11 +2,21 @@
 #define SC64_RACE_COMBAT_H
 /* Original ground/air weapon eligibility; render coordinates are half of
    the reference's pixels. Scenario invincibility is CHK UNIT flag 0x10. */
-static int race_can_attack(int attacker,int target) {
+#ifdef SC64_Z6_RUNTIME
+/* One shared ROM eligibility routine avoids repeating the growing source
+ * actor/cloak policy in every hot query and preserves the IWRAM reserve. */
+static int __attribute__((noinline))
+#else
+static int
+#endif
+race_can_attack(int attacker,int target) {
     if(target<0||target>=MAX_UNITS+MAX_BUILDINGS)return 0;
     if(target<MAX_UNITS&&SC64_TRANSPORT_LOADED(&u[target]))return 0;
 #ifdef SC64_Z5_CLOAK_ENABLED
     if (!race_z5_cloaked_target_attackable(target)) return 0;
+#endif
+#ifdef SC64_Z6_CLOAK_ENABLED
+    if (!race_z6_cloaked_target_attackable(target)) return 0;
 #endif
 #ifdef SC64_T4_RUNTIME
     if(target<MAX_UNITS) {

@@ -382,6 +382,22 @@ static inline int sc64_p6_runtime_state_valid(const Sc64P6RuntimeState *s)
     return 1;
 }
 
+/* A started one-shot record never consults its predicates again. Preserve
+ * polling if source metadata marks repeat execution or contains PreserveTrigger. */
+static inline int sc64_p6_trigger_one_shot(unsigned trigger)
+{
+    const Sc64P6SourceTrigger *tr;
+    if (trigger >= SC64_P6_TRIGGER_COUNT) return 0;
+    tr = &sc64_p6_source_triggers[trigger];
+    if (tr->execution_flags) return 0;
+    for (unsigned i = 0; i < tr->action_count; ++i) {
+        const Sc64P6SourceAction *a;
+        if (!sc64_p6_source_action(trigger, i, &a) || a->opcode == 3u)
+            return 0;
+    }
+    return 1;
+}
+
 static inline void sc64_p6_runtime_init(Sc64P6RuntimeState *s)
 {
     if (!s) return;
@@ -424,9 +440,11 @@ static inline int sc64_p6_dispatch_action(Sc64P6RuntimeState *s,
     return SC64_P6_FAULT_NONE;
 }
 
-static inline int sc64_p6_adapter_tick(Sc64P6RuntimeState *s,
-                                        const Sc64P6WorldOps *ops,
-                                        int user_paused)
+static inline int sc64_p6_adapter_tick_policy(Sc64P6RuntimeState *s,
+                                               const Sc64P6WorldOps *ops,
+                                               int user_paused,
+                                               int prune_started,
+                                               int validate_immutable_metadata)
 {
     Sc64P6Input in={{0},0,0};
     Sc64P6Output out;
@@ -436,12 +454,15 @@ static inline int sc64_p6_adapter_tick(Sc64P6RuntimeState *s,
     }
     if (user_paused) return 0;
     if (s->model.outcome!=SC64_P6_RUNNING) return 0;
-    if (!ops || !ops->condition || !ops->action || !sc64_p6_runtime_metadata_valid()) {
+    if (!ops || !ops->condition || !ops->action ||
+        (validate_immutable_metadata && !sc64_p6_runtime_metadata_valid())) {
         s->fault=SC64_P6_FAULT_METADATA;
         return -SC64_P6_FAULT_METADATA;
     }
     for (unsigned t=0;t<SC64_P6_TRIGGER_COUNT;++t) {
         const Sc64P6SourceTrigger *tr=&sc64_p6_source_triggers[t];
+        if (prune_started && sc64_p6_trigger_started(&s->model,t) &&
+            sc64_p6_trigger_one_shot(t)) continue;
         for (unsigned i=0;i<tr->condition_count;++i) {
             const Sc64P6SourceCondition *row;
             int value;
@@ -474,5 +495,33 @@ static inline int sc64_p6_adapter_tick(Sc64P6RuntimeState *s,
     }
     return 1;
 }
+
+static inline int sc64_p6_adapter_tick(Sc64P6RuntimeState *s,
+                                       const Sc64P6WorldOps *ops,
+                                       int user_paused)
+{
+#ifdef SC64_P6_PRUNE_STARTED
+    return sc64_p6_adapter_tick_policy(s,ops,user_paused,1,1);
+#else
+    return sc64_p6_adapter_tick_policy(s,ops,user_paused,0,1);
+#endif
+}
+
+/* Campaign-only fast entry. The caller must have validated the immutable
+ * source tables during mission preflight/load before binding this runtime.
+ * All mutable runtime-state and callback checks remain in tick_policy. Keep
+ * the generic/public entry above fully validating on every call. */
+#ifdef SC64_P6_PREVALIDATED_TICK
+static inline int sc64_p6_adapter_tick_prevalidated(Sc64P6RuntimeState *s,
+                                                     const Sc64P6WorldOps *ops,
+                                                     int user_paused)
+{
+#ifdef SC64_P6_PRUNE_STARTED
+    return sc64_p6_adapter_tick_policy(s,ops,user_paused,1,0);
+#else
+    return sc64_p6_adapter_tick_policy(s,ops,user_paused,0,0);
+#endif
+}
+#endif
 
 #endif

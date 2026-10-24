@@ -2,9 +2,8 @@
 #define SC64_Z6_SAVE_H
 
 /* Candidate-only validation for the Z6 large-map payload. This header is
- * intentionally not wired into the shared save transaction yet: callers
- * pass the campaign state separately until the profile allocates its save
- * field. It never reads or changes the live Unit/Building arrays. */
+ * shared save transaction passes the decoded campaign state explicitly.
+ * Validation never changes the live Unit/Building arrays. */
 #if defined(SC64_Z6_RUNTIME)
 
 static int race_z6_save_building_type(unsigned raw)
@@ -193,6 +192,12 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
                                    &decoded) ||
             !race_z6_hallucination_unit_state_valid(&decoded,
                 race_z6_save_expected_owner(map, 2))) return 0;
+#ifdef SC64_Z6_CLOAK_ENABLED
+        if (decoded.raw_type==51 && decoded.raw_owner==3 &&
+            (decoded.carry<0 || decoded.carry>SC64_Z5_CLOAK_MAX_ENERGY_Q8 ||
+             (!decoded.alive && (state->cloak.active || state->cloak.regen_remainder))))
+            return 0;
+#endif
     }
     for (unsigned owner = 0; owner < 5; ++owner)
         if (candidate->ore[owner] < 0 || candidate->ore[owner] > 65535 ||

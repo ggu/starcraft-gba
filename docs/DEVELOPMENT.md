@@ -1058,7 +1058,7 @@ make test-sc64-p6-combat test-sc64-p6-profile test-sc64-p6-frame-coverage
 ```
 
 `build/StarCraft-Protoss-P6-Probe-GBA.gba` has an internal sixth menu entry and
-separate generation-28 identity SCPC. It imports 200 units, four beacons and
+separate generation-30 identity SCPC. It imports 200 units, four beacons and
 27 unit-backed THG2 props. The source 26-record program drives gates, creates
 and the Zeratul extraction objective. The bounded GBA actor policy includes
 permanent-cloak detection, property-driven burrow/release, Infested Terran
@@ -1093,14 +1093,16 @@ make test-sc64-z6-world test-sc64-z6-runtime test-sc64-z6-save
 make test-sc64-z6-profile test-sc64-z6-frame-coverage
 ```
 
-This produces `build/StarCraft-Zerg-Z6-Probe-GBA.gba` (SCZE, generation 29).
+This produces `build/StarCraft-Zerg-Z6-Probe-GBA.gba` (SCZE, generation 31).
 It retains the complete 185-row source placement, adds distinct Robotics
 Support Bay and Shield Battery identities, and runs Z6's source trigger
 program. Hallucinated Tassadar actors have a bounded lifetime, cannot deal
 damage, and take doubled damage before armor and shields. The Zer6 script
 uses an explicit paid-production/order policy rather than native AI bytecode.
-Shield Battery recharge and Kerrigan's Z6 spell controls remain incomplete.
-Do not count this as a completed sixth mission.
+Kerrigan now starts at the authored full energy and has Cloak and Storm in
+her field menu. Her source disables Consume. Ensnare and active Shield
+Battery recharge remain incomplete. Do not count this as a completed sixth
+mission.
 
 Z7 and P7 source schedulers can be checked independently:
 
@@ -1112,5 +1114,30 @@ make test-sc64-p7-model test-sc64-p7-adapter
 ```
 
 Z7's world/runtime fixture uses all 231 canonical rows and a bounded paid
-Zerg AI policy. P7 currently has a numeric scheduler foundation. Neither has
-shared menu/save integration or a completed controller playthrough.
+Zerg AI policy. P7 has an isolated world foundation with separate source-Force wallets; its
+canonical roster fails closed on missing raw68/71/72 actor bindings. Neither
+has shared menu/save integration or a completed controller playthrough.
+
+
+The sixth-mission probes require their authenticated spell metadata:
+
+```sh
+python3 tools/sc64_p6_ability_pack.py
+python3 tools/sc64_z6_ability_pack.py
+make test-sc64-campaign-spells test-sc64-p6-storm
+make test-sc64-six-query-options test-sc64-p7-runtime
+```
+
+P6's Tassadar has Storm at `B` → `STORM`; select him alone before casting.
+Z6's Kerrigan has `CLOAK`/`UNCLOAK` and `STORM` in the field menu. Stop retains
+spell energy. Active effects and energy survive SRAM restore; the new probes
+reject their older generation-28/29 saves. P6 uses generation 30 and Z6 uses
+31, while the separately qualified P5/Z5 outputs keep their existing formats.
+
+Optional query experiments remain off by default. Compare a frozen baseline
+with `make -B protoss-p6-probe P6_QUERY_FLAGS='-DSC64_P6_PRUNE_STARTED -DSC64_P6_PREVALIDATED_TICK'`.
+The analogous Z6 experiment uses `Z6_QUERY_FLAGS=-DSC64_Z6_PRUNE_STARTED`.
+Restore a default build with `make -B protoss-p6-probe` or
+`make -B zerg-z6-probe`; Make does not track command-line flag changes.
+`tools/sc64_zp_start_profile.py --help` describes a bounded P6 startup
+comparison driven by ordinary menu inputs. It does not qualify mission wins.

@@ -242,11 +242,20 @@ static void race_p4_rescue_tick(void)
 #endif
 #include "sc64_p6_runtime_adapter.h"
 #include "sc64_p6_render_adapter.h"
+#ifdef SC64_P6_STORM_ENABLED
+#include "sc64_p6_storm_adapter.h"
+#endif
 #endif
 
 #ifdef SC64_Z6_RUNTIME
 #include "sc64_z6_runtime_adapter.h"
 #include "sc64_z6_hallucination.h"
+#ifdef SC64_Z6_CLOAK_ENABLED
+#include "sc64_z6_cloak_adapter.h"
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+#include "sc64_z6_storm_adapter.h"
+#endif
 #endif
 
 static void
@@ -736,12 +745,20 @@ race_campaign_init(void)
     if (race_selected_mission == SC64_P6_GLOBAL_ID && !race_p6_runtime_init(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
+#ifdef SC64_P6_STORM_ENABLED
+    if (race_p6_active()) race_p6_storm_initialize_source_units();
+#endif
 #endif
 
 #ifdef SC64_Z6_RUNTIME
     if (race_z6_active() && !race_z6_runtime_init(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
+#ifdef SC64_Z6_CLOAK_ENABLED
+    if (race_z6_active() && !race_z6_cloak_initialize_source_units()) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
 #endif
     switch (race_selected_mission) {
 #ifdef SC64_Z6_RUNTIME
@@ -1031,12 +1048,21 @@ race_campaign_tick(void)
 #ifdef SC64_P6_RUNTIME
     if (mission == SC64_P6_GLOBAL_ID) {
         race_p6_rescue_tick();
+#ifdef SC64_P6_STORM_ENABLED
+        if (!race_p6_storm_tick(0)) { screen = SCREEN_PAUSE; toast(14); return; }
+#endif
         if (!race_p6_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
         return;
     }
 #endif
 #ifdef SC64_Z6_RUNTIME
     if (mission == SC64_Z6_GLOBAL_ID) {
+#ifdef SC64_Z6_CLOAK_ENABLED
+        if (!race_z6_cloak_tick(0)) { screen=SCREEN_PAUSE; toast(14); return; }
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+        if (!race_z6_storm_tick()) { screen=SCREEN_PAUSE; toast(14); return; }
+#endif
         if (!race_z6_hallucination_world_state_valid() ||
             !race_z6_hallucination_tick(0) ||
             !race_z6_runtime_tick(race_campaign.elapsed_frames, 0)) {

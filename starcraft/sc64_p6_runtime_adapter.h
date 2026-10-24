@@ -654,7 +654,15 @@ static int race_p6_campaign_tick(void)
     ops.condition = sc64_p6_world_condition;
     ops.action = sc64_p6_world_action;
     ops.opaque_ai = race_p6_source_ai;
+#ifdef SC64_P6_PREVALIDATED_TICK
+    /* init/rebind can set bindings_valid only after full immutable-program
+       preflight and successful world binding. The still-valid check above is
+       required on every frame before using this entry. */
+    if (!race_p6_doodad_bindings_valid) return 0;
+    result = sc64_p6_adapter_tick_prevalidated(&race_p6.runtime, &ops, 0);
+#else
     result = sc64_p6_adapter_tick(&race_p6.runtime, &ops, 0);
+#endif
     if (result < 0 || !sc64_p6_persistent_state_valid(&race_p6)) return 0;
     for (unsigned i=0;i<SC64_P6_DOODAD_SOURCE_COUNT;++i) {
         if (sc64_p6_doodads[i].sprite_only) continue;

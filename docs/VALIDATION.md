@@ -2460,3 +2460,44 @@ switch comparisons remain 2/3. Setup resources, terminal outcomes, timers,
 opaque-AI call mask and paid Zergling queues pass sanitizer checks. P7's
 asset-free model and authenticated numeric adapter also pass. These foundations
 are not additional completed missions. The staged total remains **20/30**.
+
+
+### Sixth-chapter ability integration and optional query experiments
+
+The generation-30 P6 probe adds authenticated full-energy Tassadar Storm;
+generation-31 Z6 adds full-energy Kerrigan Cloak and Storm with the source's
+hero research exemption. Consume remains disabled in Z6's PTEC. Ensnare and
+Shield Battery recharge are still missing. The actual-game spell fixture
+launches through the normal sixth-entry menu, casts through field controls,
+round-trips an active effect and exact energy, preserves energy on Stop,
+freezes effects/energy while paused, and rejects corrupt effect geometry
+before mutating the live world. The separate Z6 cloak fixture tests real
+Observer/Cannon geometry, ownership, liveness and completed-building detection,
+plus active-cloak save/load and malformed energy/state rejection. Photon
+Cannon's grounded detection range is seven tiles in the pinned PC policy,
+independent of its eleven-tile sight entry. No new full playthrough is claimed.
+
+These spell builds retain the SRAM/stack/RAM guards. The Z6 build uses a shared
+ROM attack-eligibility function to avoid copying expanded policy into hot
+loops; IWRAM ends at `0x03004f80`, BSS at `0x0203d978`. P6 ends at
+`0x030045d8` / `0x0203d774`. Both ROMs are 4 MiB.
+
+Optional P6/Z6 one-shot pruning passes two-translation-unit differential
+checks over 12000 ticks, with equal state and action streams, pause, terminal
+outcomes and invalid callbacks. The P6 prevalidated path skips only immutable
+ROM-table validation after successful initialization/load preflight. Its public
+adapter retains full validation. These options remain off by default.
+
+A 1000-frame normal-input P6 startup comparison measures **3.54 fps** baseline
+and **3.65 fps** with pruning plus prevalidation. The handoff and eleven later
+observations, with twelve PNGs, match exactly. This is a bounded opening-scene
+measurement, not full-mission performance or hardware verification. It remains
+far below 30 fps. Private reports are under
+`.local/build/promotion/p6-query-options/{baseline,prune-meta}/startup/`.
+
+P7's isolated world tests preserve the actual human 2500/2500 resource row,
+separate 10000/10000 Force wallets, exact source ownership for a raw69 creation,
+and fail-closed raw72 creates. The canonical roster still rejects missing
+raw68/71/72 bindings. Its opaque AI policy issues existing-unit orders only;
+full native AI, production and playable P7 integration remain unfinished.
+The staged completion total remains **20/30**.

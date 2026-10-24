@@ -126,8 +126,12 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_Z6_RUNTIME)
+#if defined(SC64_Z6_CLOAK_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 31u
+#elif defined(SC64_Z6_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 29u
+#elif defined(SC64_P6_STORM_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 30u
 #elif defined(SC64_P6_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 28u
 #elif defined(SC64_Z5_CONSUME_ENABLED)
@@ -594,7 +598,7 @@ enum {
 #ifdef SC64_TERRAN_LATE_RUNTIME
     , MODE_LAND
 #endif
-#ifdef SC64_P4_STORM_ENABLED
+#if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
     , MODE_P4_STORM
 #endif
 };
@@ -606,6 +610,12 @@ static int race_p4_storm_cast_selected(int x, int y);
 static void race_p4_storm_initialize_source_units(void);
 static void race_p4_storm_init_actor(int i);
 static void race_p4_storm_draw(void);
+#endif
+#ifdef SC64_P6_STORM_ENABLED
+static int race_p6_storm_menu_available(void);
+static int race_p6_storm_cast_selected(int x, int y);
+static void race_p6_storm_initialize_source_units(void);
+static void race_p6_storm_draw(void);
 #endif
 
 typedef struct {
@@ -911,6 +921,7 @@ static void race_p6_note_unit_death(const Unit *q);
 static void race_p6_note_building_death(const Building *q);
 #endif
 #ifdef SC64_Z6_RUNTIME
+static Sc64Z6PersistentState race_z6;
 static int race_z6_active(void);
 static int race_z6_source_owner(unsigned source_slot);
 static int race_z6_product_source_owner(int owner);
@@ -943,6 +954,17 @@ static int race_z5_cloak_toggle_selected(void);
 static int race_z5_cloak_tick(void);
 static int race_z5_cloak_world_state_valid(void);
 static int race_z5_cloaked_target_attackable(int target);
+#endif
+#ifdef SC64_Z6_CLOAK_ENABLED
+static int race_z6_cloak_actor(const Unit *q);
+static int race_z6_cloak_menu_available(void);
+static int race_z6_cloak_toggle_selected(void);
+static int race_z6_cloaked_target_attackable(int target);
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+static int race_z6_storm_menu_available(void);
+static int race_z6_storm_cast_selected(int x,int y);
+static void race_z6_storm_draw(void);
 #endif
 #ifdef SC64_Z5_CONSUME_ENABLED
 static int race_z5_consume_issue_selected(int x, int y);
@@ -3379,6 +3401,12 @@ stop_selected(void)
 #ifdef SC64_Z5_CLOAK_ENABLED
             if (!race_z5_cloak_actor(&u[i]))
 #endif
+#ifdef SC64_P6_STORM_ENABLED
+            if (!(race_p6_active() && u[i].raw_type == 79 && u[i].raw_owner == 2))
+#endif
+#ifdef SC64_Z6_CLOAK_ENABLED
+            if (!race_z6_cloak_actor(&u[i]))
+#endif
 	    u[i].carry = 0;
 	    u[i].target = -1;
 	}
@@ -3445,6 +3473,18 @@ choose_command(int choice)
         return;
     }
 #endif
+#ifdef SC64_Z6_CLOAK_ENABLED
+    if (choice == MENU_STOP + 1 && race_z6_cloak_menu_available()) {
+        int result=race_z6_cloak_toggle_selected();
+        menu_open=0; mode=MODE_NORMAL;
+        toast(result==SC64_Z5_CLOAK_ADVANCED ? 0 : 8); return;
+    }
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+    if (choice == MENU_STOP + 2 && race_z6_cloak_menu_available()) {
+        menu_open=0; mode=MODE_P4_STORM; toast(0); return;
+    }
+#endif
 #ifdef SC64_Z5_CLOAK_ENABLED
     if (choice == MENU_STOP + 1 && race_z5_cloak_menu_available()) {
         int result = race_z5_cloak_toggle_selected();
@@ -3452,6 +3492,11 @@ choose_command(int choice)
         mode = MODE_NORMAL;
         toast(result == SC64_Z5_CLOAK_ADVANCED ? 0 : 8);
         return;
+    }
+#endif
+#ifdef SC64_P6_STORM_ENABLED
+    if (choice == MENU_STOP + 1 && race_p6_storm_menu_available()) {
+        menu_open = 0; mode = MODE_P4_STORM; toast(0); return;
     }
 #endif
 #ifdef SC64_P4_STORM_ENABLED
@@ -3567,12 +3612,18 @@ static int field_menu_count(void)
 #ifdef SC64_P5_SHUTTLE_ENABLED
     if (race_p5_shuttle_menu_available()) return MENU_STOP + 2;
 #endif
+#ifdef SC64_Z6_CLOAK_ENABLED
+    if (race_z6_cloak_menu_available()) return MENU_STOP + 3;
+#endif
 #ifdef SC64_Z5_CLOAK_ENABLED
     if (race_z5_cloak_menu_available()) return MENU_STOP + 2
 #ifdef SC64_Z5_CONSUME_ENABLED
         + 1
 #endif
         ;
+#endif
+#ifdef SC64_P6_STORM_ENABLED
+    if (race_p6_storm_menu_available()) return MENU_STOP + 2;
 #endif
 #ifdef SC64_P4_STORM_ENABLED
     if (race_p4_storm_menu_available()) return MENU_STOP + 2;
@@ -3650,12 +3701,19 @@ interact(void)
         mode = MODE_NORMAL; return;
     }
 #endif
-#ifdef SC64_P4_STORM_ENABLED
+#if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
     if (mode == MODE_P4_STORM) {
-        int cast = race_p4_storm_cast_selected(cx, cy);
-        mode = MODE_NORMAL;
-        toast(cast ? 0 : 8);
-        return;
+        int cast=0;
+#ifdef SC64_P4_STORM_ENABLED
+        if (race_p4_active()) cast=race_p4_storm_cast_selected(cx,cy);
+#endif
+#ifdef SC64_P6_STORM_ENABLED
+        if (race_p6_active()) cast=race_p6_storm_cast_selected(cx,cy);
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+        if (race_z6_active()) cast=race_z6_storm_cast_selected(cx,cy);
+#endif
+        mode=MODE_NORMAL; toast(cast ? 0 : 8); return;
     }
 #endif
     #ifdef SC64_Z5_CONSUME_ENABLED
@@ -5758,17 +5816,23 @@ draw_map(void)
 #ifdef SC64_P4_STORM_ENABLED
     race_p4_storm_draw();
 #endif
+#ifdef SC64_P6_STORM_ENABLED
+    race_p6_storm_draw();
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+    race_z6_storm_draw();
+#endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_unit_draw_cycles = gba_clock() - profile_stage_start;
 #endif
     x = cx - camx;
     y = cy - camy + 12;
     gfx_frame(x - 4, y - 4, 9, 9, mode == MODE_BUILD ? C_GOLD :
-#ifdef SC64_P4_STORM_ENABLED
+#if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
               mode == MODE_P4_STORM ? C_CYAN :
 #endif
               C_WHITE);
-#ifdef SC64_P4_STORM_ENABLED
+#if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
     if (mode == MODE_P4_STORM) {
         gfx_line(x, y-24, x+24, y, C_CYAN);
         gfx_line(x+24, y, x, y+24, C_CYAN);
@@ -5832,6 +5896,9 @@ draw_map(void)
 	for (i = first; i < field_menu_count() && i < first + 10; ++i) {
 	    const char *label = i == MENU_STOP + 1 && race_p4_storm_menu_available() ?
                 "STORM" : labels[i];
+#ifdef SC64_P6_STORM_ENABLED
+            if (i == MENU_STOP + 1 && race_p6_storm_menu_available()) label = "STORM";
+#endif
 #ifdef SC64_P5_SHUTTLE_ENABLED
             if (i == MENU_STOP + 1 && race_p5_shuttle_menu_available()) label = "UNLOAD CARGO";
 #endif
@@ -5847,6 +5914,12 @@ draw_map(void)
                 i == MENU_STOP + 2 && race_z5_cloak_menu_available() ? "CONSUME" :
 #endif
                 labels[i];
+#endif
+#ifdef SC64_Z6_CLOAK_ENABLED
+            if (race_z6_cloak_menu_available()) {
+                if (i==MENU_STOP+1) label=race_z6.cloak.active ? "UNCLOAK" : "CLOAK";
+                if (i==MENU_STOP+2) label="STORM";
+            }
 #endif
 	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
 #ifdef SC64_Z5_CLOAK_ENABLED
@@ -6063,6 +6136,18 @@ draw_hud_commands(void)
 		if (IS_WORKER(u[i].type))
 		    gfx_text(52, 137, "AUTO MINE / A GAS", C_GOLD);
 		else
+#ifdef SC64_Z6_CLOAK_ENABLED
+                if (race_z6_cloak_actor(&u[i])) {
+                    gfx_text(52,137,"EN",C_CYAN); gfx_num(70,137,u[i].carry/256,C_WHITE);
+                    gfx_text(100,137,race_z6.cloak.active ? "CLOAKED" : "B SPELLS",C_GOLD);
+                } else
+#endif
+#ifdef SC64_P6_STORM_ENABLED
+                if (race_p6_active() && u[i].raw_type==79 && u[i].raw_owner==2) {
+                    gfx_text(52,137,"EN",C_CYAN); gfx_num(70,137,u[i].carry/256,C_WHITE);
+                    gfx_text(100,137,"B STORM",C_GOLD);
+                } else
+#endif
 #ifdef SC64_Z5_CLOAK_ENABLED
                 if (race_z5_cloak_actor(&u[i])) {
                     gfx_text(52, 137, "EN", C_CYAN);
@@ -6089,14 +6174,14 @@ draw_hud_commands(void)
 #ifdef SC64_TERRAN_LATE_RUNTIME
                  mode == MODE_LAND ? "LANDING SITE" :
 #endif
-#ifdef SC64_P4_STORM_ENABLED
+#if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
                  mode == MODE_P4_STORM ? "PSIONIC STORM TARGET" :
 #endif
 #ifdef SC64_Z5_CONSUME_ENABLED
                  mode == MODE_Z5_CONSUME ? "CONSUME FRIENDLY ZERGLING" :
 #endif
 		 mode == MODE_ATTACK ? "ATTACK MOVE" : mode == MODE_MOVE ? "MOVE ORDER" : "FIELD COMMAND", C_WHITE);
-#ifdef SC64_P4_STORM_ENABLED
+#if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
         if (mode == MODE_P4_STORM)
             gfx_text(5, 137, "A CAST  B CANCEL", C_GOLD);
         else

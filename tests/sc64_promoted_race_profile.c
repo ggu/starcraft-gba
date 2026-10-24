@@ -15,7 +15,7 @@
 #define PROFILE_FACTION SC64_FACTION_ZERG
 #define PROFILE_FRONT_FACTION SC_FRONT_ZERG
 #define PROFILE_RACE R_ZERG
-#define PROFILE_SAVE_GENERATION 29u
+#define PROFILE_SAVE_GENERATION 31u
 #define PROFILE_OLD_SAVE_TAG 0x53435a32u
 static const int profile_missions[] = {0, 1, 14, 15, 16, 17};
 static const char *const profile_titles[] = {
@@ -53,7 +53,7 @@ static const char *const profile_titles[] = {
 #define PROFILE_FACTION SC64_FACTION_PROTOSS
 #define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS
 #define PROFILE_RACE R_PROTOSS
-#define PROFILE_SAVE_GENERATION 28u
+#define PROFILE_SAVE_GENERATION 30u
 #define PROFILE_OLD_SAVE_TAG 0x53435032u
 static const int profile_missions[] = {2, 3, 22, 23, 24, 25};
 static const char *const profile_titles[] = {

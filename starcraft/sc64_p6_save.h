@@ -191,6 +191,10 @@ static int race_p6_save_candidate_valid(const RaceSave *candidate,
         Unit saved;
         if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u,
                                    &saved)) return 0;
+#ifdef SC64_P6_STORM_ENABLED
+        if (saved.raw_type == SC64_P6_STORM_RAW_TASSADAR &&
+            !race_p6_storm_energy_valid(&saved)) return 0;
+#endif
         if (saved.alive) {
             unsigned source;
             int raw = saved.raw_type;

@@ -142,9 +142,11 @@ def validate_source_report(report_path: Path, rom_path: Path, elf_path: Path,
                 runtime.get("reserved") != [0, 0]):
             raise ValueError("P6 save checkpoint has malformed pause or reserved bytes")
         payload = runtime.get("persistent_bytes")
-        if (not isinstance(payload, list) or len(payload) != 148 or
+        if (not isinstance(payload, list) or len(payload) != 180 or
                 any(type(v) is not int or not 0 <= v <= 255 for v in payload)):
-            raise ValueError("P6 save checkpoint must observe all 148 persistent bytes")
+            raise ValueError("P6 save checkpoint must observe all 180 persistent bytes")
+        if not replay.storm_bytes_valid(runtime.get("storm")):
+            raise ValueError("P6 save checkpoint has malformed Storm state")
     return {"report": report, "report_path": report_path,
             "report_sha256": hashlib.sha256(report_bytes).hexdigest(),
             "profile": profile_name, "mission": mission,

@@ -64,7 +64,7 @@ static void test_bind_owner_queries_and_events(void)
 {
     const Sc64RaceMap *map=init_map();
     assert(race_z6_runtime_init(map));
-    assert(sizeof(race_z6)<=136);
+    assert(sizeof(race_z6)<=172);
     assert(race_z6_source_owner(3)==SIDE && race_z6_source_owner(2)==ENEMY &&
            race_z6_source_owner(1)==ENEMY);
     assert(race_z6_world.source_force_for_slot[3]==0);

@@ -65,6 +65,24 @@ P6_SWITCH_MASK = 0x3B
 P6_SPRITE_ONLY_DOODAD_MASK = (0x01, 0xF0, 0x9B, 0, 0)
 
 
+def storm_bytes_valid(value: object) -> bool:
+    """Validate the bounded four-effect 30Hz policy's complete saved bytes."""
+    if (not isinstance(value, list) or len(value) != 32 or
+            any(type(x) is not int or not 0 <= x <= 255 for x in value)):
+        return False
+    for x, y, age, left, active in struct.iter_unpack("<HHHBB", bytes(value)):
+        if active == 0:
+            if x or y or age or left:
+                return False
+        elif active == 1:
+            done = 0 if age < 20 else 1 + (age - 20) // 10
+            if x >= 2048 or y >= 2048 or done >= 8 or left != 8 - done:
+                return False
+        else:
+            return False
+    return True
+
+
 def validate_trace(trace: object, capacity: int, profile_name: str,
                    *, windowed: bool = True) -> dict:
     """Strictly validate an authenticated staged campaign trace before emulator launch."""
@@ -395,6 +413,7 @@ def decode_p6_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
         "pause_acknowledged": read(fields, size, raw, "pause_acknowledged", 1, 1),
         "reserved": read(fields, size, raw, "reserved", 2, 1),
         "persistent_bytes": list(raw),
+        "storm": read(fields, size, raw, "storm", 32, 1),
     }
     return result
 
@@ -535,9 +554,11 @@ def verify_final(trace_final: dict, state: dict, profile_name: str) -> None:
             raise RuntimeError("P6 final doodad state has the wrong saved shape")
         if (type(runtime.get("pause_acknowledged")) is not int or
                 runtime.get("pause_acknowledged") not in (0, 1) or
-                reserved != [0, 0] or not isinstance(payload, list) or len(payload) != 148 or
+                reserved != [0, 0] or not isinstance(payload, list) or len(payload) != 180 or
                 any(type(v) is not int or not 0 <= v <= 255 for v in payload)):
             raise RuntimeError("P6 final persistent bytes or reserved state are malformed")
+        if not storm_bytes_valid(runtime.get("storm")):
+            raise RuntimeError("P6 final Storm state is malformed")
         if runtime.get("model", {}).get("started") != trace_final.get("started"):
             raise RuntimeError("P6 started trigger mask differs from controller trace")
         if runtime.get("model", {}).get("action_cursor") != trace_final.get("action_cursors"):

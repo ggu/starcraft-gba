@@ -52,7 +52,7 @@ static void launch_z6_from_normal_menu(void)
     assert(race_selected_mission == SC64_Z6_GLOBAL_ID && race_z6_active());
     assert(race_campaign.mission == SC64_Z6_GLOBAL_ID);
     assert(sc64_z6_persistent_state_valid(&race_z6));
-    assert(SC64_RACE_SAVE_GENERATION == 29u);
+    assert(SC64_RACE_SAVE_GENERATION == 31u);
 }
 
 static void issue_a_normal_group_move(void)

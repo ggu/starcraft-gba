@@ -541,8 +541,11 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_P6_RUNTIME
     if (race_p6_active()) {
-        if (!race_p6_runtime_state_valid() || !race_p6_doodad_bindings_still_valid())
-            return 0;
+        if (!race_p6_runtime_state_valid() || !race_p6_doodad_bindings_still_valid()
+#ifdef SC64_P6_STORM_ENABLED
+            || !race_p6_storm_world_state_valid()
+#endif
+            ) return 0;
         race_data.p6 = race_p6;
 #if defined(SC64_P5_RUNTIME)
     } else if (!race_p5_active()) {
@@ -560,7 +563,11 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_Z6_RUNTIME
     if (race_z6_active()) {
-        if (!sc64_z6_persistent_state_valid(&race_z6)) return 0;
+        if (!sc64_z6_persistent_state_valid(&race_z6)
+#ifdef SC64_Z6_CLOAK_ENABLED
+            || !race_z6_cloak_world_state_valid()
+#endif
+            ) return 0;
         race_data.z6 = race_z6;
 #ifdef SC64_Z5_RUNTIME
     } else if (!race_z5_active()) {

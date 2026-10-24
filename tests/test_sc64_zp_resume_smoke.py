@@ -143,7 +143,7 @@ class ResumeAuthenticationTests(unittest.TestCase):
                         "deaths_by_source": [0] * 12,
                         "doodad_enabled": [0, 1, 0, 0, 0x1F],
                         "pause_acknowledged": 1, "reserved": [0, 0],
-                        "persistent_bytes": [0] * 148,
+                        "storm": [0]*32, "persistent_bytes": [0] * 180,
                     }
                 saved["buildings"]["entities"][0]["queue"] = [1, 7, 3, 9, 5]
                 self.report.write_text(json.dumps(payload))
@@ -167,7 +167,7 @@ class ResumeAuthenticationTests(unittest.TestCase):
             "action_ticks": [0] * 26, "switch_bits": 0, "fault": 0,
             "deaths_by_source": [0] * 12, "doodad_enabled": [0] * 5,
             "pause_acknowledged": 0, "reserved": [0, 0],
-            "persistent_bytes": [0] * 148,
+            "storm": [0]*32, "persistent_bytes": [0] * 180,
         }
         self.report.write_text(json.dumps(payload))
         resume.validate_source_report(self.report, self.rom, self.elf)
@@ -178,7 +178,9 @@ class ResumeAuthenticationTests(unittest.TestCase):
                 ("doodad_enabled", [1, 0, 0, 0, 0], "doodad enabled"),
                 ("doodad_enabled", [0, 0xF0, 0, 0, 0], "doodad enabled"),
                 ("doodad_enabled", [0, 0, 0x9B, 0, 0], "doodad enabled"),
-                ("persistent_bytes", [0] * 147, "148 persistent bytes"),
+                ("persistent_bytes", [0] * 179, "180 persistent bytes"),
+                ("storm", [0] * 31, "Storm state"),
+                ("storm", [1]+[0]*31, "Storm state"),
                 ("reserved", [0, 0, 1], "reserved bytes")):
             broken = json.loads(json.dumps(payload))
             broken["save_checkpoint"]["state"]["race_runtime"][field] = changed

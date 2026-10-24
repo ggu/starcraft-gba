@@ -127,6 +127,22 @@ static inline int sc64_z6_runtime_state_valid(const Sc64Z6RuntimeState *s)
     return 1;
 }
 
+/* Started records stop polling conditions only when they are source one-shot
+ * rows. PreserveTrigger actions and any execution flags retain polling. */
+static inline int sc64_z6_trigger_one_shot(unsigned trigger)
+{
+    const Sc64Z6SourceTrigger *tr;
+    if (trigger >= SC64_Z6_TRIGGER_COUNT) return 0;
+    tr = &sc64_z6_source_triggers[trigger];
+    if (tr->execution_flags) return 0;
+    for (unsigned i = 0; i < tr->action_count; ++i) {
+        const Sc64Z6SourceAction *a;
+        if (!sc64_z6_source_action(trigger, i, &a) || a->opcode == 3u)
+            return 0;
+    }
+    return 1;
+}
+
 static inline u16 sc64_z6_runtime_init(Sc64Z6RuntimeState *s)
 {
     u8 *p;
@@ -186,9 +202,10 @@ static inline int sc64_z6_dispatch_action(Sc64Z6RuntimeState *s,
 /* One 30Hz mission tick. User pause freezes the scheduler; every source
  * condition/action is resolved through required callbacks and failures make
  * the state unsaveable. Return 1 updated, 0 paused/terminal, -fault on error. */
-static inline int sc64_z6_adapter_tick(Sc64Z6RuntimeState *s,
-                                        const Sc64Z6WorldOps *ops,
-                                        int user_paused)
+static inline int sc64_z6_adapter_tick_policy(Sc64Z6RuntimeState *s,
+                                               const Sc64Z6WorldOps *ops,
+                                               int user_paused,
+                                               int prune_started)
 {
     Sc64Z6Input in = {{0},0,0};
     Sc64Z6Output out;
@@ -205,6 +222,8 @@ static inline int sc64_z6_adapter_tick(Sc64Z6RuntimeState *s,
     }
     for (unsigned t = 0; t < SC64_Z6_TRIGGER_COUNT; ++t) {
         const Sc64Z6SourceTrigger *tr = &sc64_z6_source_triggers[t];
+        if (prune_started && (s->model.started & ((u16)1u << t)) &&
+            sc64_z6_trigger_one_shot(t)) continue;
         for (unsigned c = 0; c < tr->condition_count; ++c) {
             const Sc64Z6SourceCondition *row;
             int result;
@@ -248,6 +267,17 @@ static inline int sc64_z6_adapter_tick(Sc64Z6RuntimeState *s,
         return -SC64_Z6_FAULT_STATE;
     }
     return 1;
+}
+
+static inline int sc64_z6_adapter_tick(Sc64Z6RuntimeState *s,
+                                        const Sc64Z6WorldOps *ops,
+                                        int user_paused)
+{
+#ifdef SC64_Z6_PRUNE_STARTED
+    return sc64_z6_adapter_tick_policy(s,ops,user_paused,1);
+#else
+    return sc64_z6_adapter_tick_policy(s,ops,user_paused,0);
+#endif
 }
 
 #endif

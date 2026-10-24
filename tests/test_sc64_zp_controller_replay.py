@@ -409,26 +409,26 @@ class TraceTests(unittest.TestCase):
 
     def test_nested_p6_persistent_layout_flattens_both_union_payload_sections(self):
         inner = (92, {"model": 0, "action_ticks": 32, "switch_bits": 84, "fault": 88})
-        outer = (148, {"runtime": 0, "deaths_by_source": 92,
+        outer = (180, {"runtime": 0, "deaths_by_source": 92,
                        "doodad_enabled": 140, "pause_acknowledged": 145,
-                       "reserved": 146})
+                       "reserved": 146, "storm": 148})
         def dwarf(_elf, name):
             if name == "Sc64P6RuntimeState": return inner
             if name == "Sc64P6PersistentState": return outer
             raise AssertionError(name)
         with mock.patch.object(replay.races, "dwarf_struct", side_effect=dwarf):
             layout = replay.runtime_layout_for(Path("fixture.elf"), "protoss-p6")
-        self.assertEqual(layout, (148, {"deaths_by_source": 92, "doodad_enabled": 140,
-                                        "pause_acknowledged": 145, "reserved": 146,
+        self.assertEqual(layout, (180, {"deaths_by_source": 92, "doodad_enabled": 140,
+                                        "pause_acknowledged": 145, "reserved": 146, "storm": 148,
                                         "model": 0, "action_ticks": 32,
                                         "switch_bits": 84, "fault": 88}))
 
     def test_p6_persistent_decode_covers_full_save_shape(self):
         fields = {"model": 0, "action_ticks": 32, "switch_bits": 84,
                   "fault": 88, "deaths_by_source": 92, "doodad_enabled": 140,
-                  "pause_acknowledged": 145, "reserved": 146}
+                  "pause_acknowledged": 145, "reserved": 146, "storm": 148, "storm": 148}
         model = (32, {"started": 0, "outcome": 4, "action_cursor": 5})
-        raw = bytearray(148)
+        raw = bytearray(180)
         raw[0:4] = (0x0212345).to_bytes(4, "little")
         raw[4] = 0
         raw[5:31] = bytes(range(26))
@@ -439,7 +439,9 @@ class TraceTests(unittest.TestCase):
         raw[140:145] = bytes([1, 2, 4, 8, 0x1F])
         raw[145] = 1
         raw[146:148] = bytes([0, 0])
-        decoded = replay.decode_runtime(bytes(raw), (148, fields), model, "protoss-p6")
+        raw[148:180] = bytes(range(32))
+        decoded = replay.decode_runtime(bytes(raw), (180, fields), model, "protoss-p6")
+        self.assertEqual(decoded["storm"], list(range(32)))
         self.assertEqual(decoded["model"], {"started": 0x0212345, "fired": 0x0212345,
                                              "outcome": 0, "action_cursor": list(range(26))})
         self.assertEqual(decoded["action_ticks"], list(range(300, 326)))
@@ -528,7 +530,7 @@ class TraceTests(unittest.TestCase):
                    "action_ticks": ticks.copy(), "switch_bits": 1, "fault": 0,
                    "deaths_by_source": [0] * 12, "doodad_enabled": [0] * 5,
                    "pause_acknowledged": 0, "reserved": [0, 0],
-                   "persistent_bytes": [0] * 148}
+                   "storm": [0]*32, "persistent_bytes": [0] * 180}
         units = {"entities": [
             {"raw_type": 75, "raw_owner": 2, "owner": 0, "x": 1260, "y": 1700,
              "hp": 100, "order": 0},

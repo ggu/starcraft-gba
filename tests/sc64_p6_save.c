@@ -36,7 +36,13 @@ static RaceSave candidate_with_valid_p6_header(void)
 static void test_union_and_candidate_identity(void)
 {
     RaceSave s = candidate_with_valid_p6_header();
-    assert(sizeof(Sc64P6PersistentState) == 148);
+    assert(sizeof(Sc64P6PersistentState) ==
+#ifdef SC64_P6_STORM_ENABLED
+           180
+#else
+           148
+#endif
+           );
     assert(sizeof(RaceSave) <= 16368);
 #if defined(SC64_P5_RUNTIME) && defined(SC64_P6_RUNTIME)
     assert((void *)&s.p5 == (void *)&s.p6);

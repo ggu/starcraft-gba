@@ -50,7 +50,6 @@ _Static_assert(sizeof(Sc64Z6RuntimeBinding) <= 208,
 static int race_z6_active(void)
 { return !race_mode && race_selected_mission == SC64_Z6_GLOBAL_ID; }
 
-static Sc64Z6PersistentState race_z6;
 static Sc64Z6WorldContext race_z6_world;
 static Sc64Z6RuntimeHooks race_z6_hooks;
 static Sc64Z6WorldOps race_z6_ops;
