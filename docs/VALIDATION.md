@@ -3047,3 +3047,25 @@ It passes opening fresh-process SRAM restore; late-save and full ARM win
 qualification are running. This supersedes the slower candidate's incomplete
 late replay for qualification; its completed opening save evidence is retained.
 The options remain disabled by default until full qualification completes.
+
+### Public self-contained P6 normal-input regression
+
+`make test-sc64-p6-controller` now reproduces the full host win without an
+ignored opening file. Its authored fixture stores 6,418 held-mask/run-length
+pairs for the initial 102,005 input ticks. Independent expansion matches the
+original numeric input stream exactly (SHA-256 `fe242d01…aed79`), and every mask
+is within the ten controller bits. The fixture contains no actor/world rows,
+coordinates, sprites or ROM data. It is authored regression input data.
+
+The default sanitizer Make target wins at gameplay frame 172327 and input
+tick 174855, retaining living source Zeratul at extraction and living Tassadar,
+zero faults and the completion bit. Its complete trace is byte-identical to
+`e66d25a4…00421` above, including all 15,747 observations/input events. This
+supersedes the earlier missing-public-opening-generator limitation. The GBA
+runtime still uses the same ordinary controls; the fixture is host-test data.
+Full fast ARM/save qualification remains in progress and is not counted yet.
+
+The final 525-file source-only export passes `./dev build` and `./dev test`,
+including all default host checks and 349 Python tests (six private-input
+checks skipped). Re-running the public P6 Make target retains the exact full
+trace hash; an explicit 1,000-frame limit stops at frame 1000 as requested.

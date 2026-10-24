@@ -1353,3 +1353,26 @@ readiness with `./dev sc64 status --profile zerg-z6` or the corresponding
 Protoss profile. The output ROMs are `build/StarCraft-Zerg-Z6-Probe-GBA.gba`
 and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The ordinary `zerg` and
 `protoss` profile names still build their canonical three-mission versions.
+
+### Reproduce the P6 host win
+
+After preparing the P6 probe inputs described above, run:
+
+```sh
+make test-sc64-p6-controller
+```
+
+The host test replays an authored opening input fixture through the ordinary
+HOME/menu controls, then uses the adaptive Marine/hero escort policy. The
+fixture contains only held-key masks and run lengths; game assets still come
+from local preparation. No private opening input file is required. The default
+180,000-gameplay-frame limit covers the full win. To write a separate trace:
+
+```sh
+build/test-sc64-p6-controller --trace .local/sc64/p6-my-run.json
+```
+
+Full trace replay on ARM requires a dense probe build because some input
+windows exceed the standard queue's 1,000-tick capacity; see the dense replay
+section. This target is a deterministic regression route, with exact source
+hero/extraction/completion assertions at victory.

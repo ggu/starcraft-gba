@@ -50,8 +50,8 @@ win with an exact mid-mission save, with Z6 now also passing a full ARM win and 
 This brings the staged total to 21/30 (Terran 10, Zerg 6, Protoss 5). These staged builds have separate save formats
 and ROM identities. The P5 island objective requires the optional Shuttle
 profile. Z6 has normal-input host and full ARM wins plus exact cold-load continuity.
-P6 has a private normal-input host win; full ARM/save qualification and a
-publicly reproducible opening controller remain unfinished. Z7 has an internal seventh-entry ROM
+P6 has a reproducible normal-input host win; full ARM/save qualification
+remains unfinished. Z7 has an internal seventh-entry ROM
 with shared menu, source objectives and generation-34 saves; its host checks
 establish integration readiness, with no completed playthrough. P7 retains
 an isolated world foundation and numeric scheduler. The remaining staged
