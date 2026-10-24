@@ -3206,3 +3206,14 @@ pass the unchanged RAM reserve guards; the standard P5 output is restored.
 These source/build/fixture checks do not establish a full Z7 win or qualify
 P3 placement on ARM. The new P6 defaults reproduce the exact winning host
 trace `e66d25a4…00421`.
+
+### Earlier Z3 mission under the six-mission Zerg bank
+
+The compact-bank observer now completes the full Z3 controller replay on the
+frozen standard Z6 ROM `bc24435f…a15e8c`. All 71,186 input ticks match the host
+route, ending at frame 70833 with 79/8 human units/buildings and 3/1 enemy
+units/buildings. Source sequence 10/outcome WON, switch 7, objective flag,
+completion bit 14 and zero action timer are verified. The run averages
+**15.50 effective fps**, so the larger profile still needs performance work.
+This closes the full earlier-mission ARM replay check; canonical promotion
+and cold-save continuity across the earlier chapters remain separate work.
