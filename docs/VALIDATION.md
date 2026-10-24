@@ -1867,3 +1867,53 @@ pool sizes are unchanged.
 Minimap row-packing experiments measured no FPS improvement on the matched
 4,015-tick T10 prefix and were discarded. The shipped renderer is unchanged.
 Physical GBA testing remains pending.
+
+## Canonical Zerg and Protoss third missions (2026-10-24)
+
+The standard `zerg` and `protoss` targets now build their three-mission
+profiles. Legacy Z3/P3 ROM and ELF paths are compatibility symlinks to those
+canonical outputs. The prepared source gates are checked by `dev prepare`
+and `dev status`; both actual profile preparation commands pass.
+
+The frozen Zerg ROM SHA-256 is
+`616c45861d349d65f94e54d8872b35d67a3c611ea91362a9540cded433393e41`,
+with matching ELF SHA-256
+`ddce29f980413d6e03e1c9f26a420aa4332a2212a15bff3bb43f45ff3f1b10b2`.
+It is a 2 MiB `SCZ3` image, save generation 5. The unchanged linker guards
+pass at IWRAM `0x03004ff8` and BSS `0x02039848`.
+
+The frozen Protoss ROM SHA-256 is
+`8d0281c535e66cbf6cb61767912a5e0d364476ad31bb9cc79f49d55a7908f9a1`,
+with matching ELF SHA-256
+`ad72d0ac904744afef3e438b53d150485a5891370c532c463d0c0cfd8be03321`.
+It is a 2 MiB `SCP3` image, save generation 7. IWRAM ends at `0x03004f88`
+and BSS at `0x020399f0`, within the same guards. Rebuilt canonical ROMs match
+these frozen ROM hashes; replay uses the matching frozen ELF pairs.
+
+Full normal-menu ARM/mGBA controller replays win Z3 at frame 70,833 and P3
+at frame 151,088. Their counted live-play means are **19.12 fps** and
+**22.83 fps**, across 73 and 154 observed checkpoints respectively. These
+are measurements of the promoted images, not evidence of a new optimization
+gain. The 30-fps target remains unmet, and physical GBA testing is pending.
+
+Each replay also saves a separate 30,000-input-tick prefix through START/B.
+A fresh emulator process loads it through HOME/L and compares the observed
+actor snapshots, resources, race banks, campaign/model state and completion
+bits against the authenticated paused checkpoint. Z3 restores frame 29,858;
+P3 restores frame 29,662. The profiler then verifies its one neutral handoff
+frame plus 60 measured live ticks, ending at frames 29,919 and 29,723.
+The report is bound to both ROM/ELF hashes and the SRAM SHA-256. This checks
+the captured observations; host save tests independently check exact payload
+round trips.
+
+Default build/tests, 199 Python tests, unified build/tests, all race builds,
+the Z3/P3 runtime and controller suites, and all three startup/save matrices
+pass. The matrices cover 234 configurations per race ROM: two maps, three
+human races, and every independent assignment of one to three AI races.
+These 702 setups are not 702 completed matches. Zerg and Protoss also pass
+all three campaign menu launches and save round trips. Both reject an older
+generation-2 tagged save, and a current-tag container with an old payload
+version, without changing live state.
+
+No new campaign mission is enabled by this promotion: the completed count
+remains Terran 10, Zerg 3 and Protoss 3, or 16/30.
