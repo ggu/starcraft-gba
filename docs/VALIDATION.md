@@ -4150,3 +4150,61 @@ Original-art and unified ROM hashes remain `4ad80ce0…f9aee` and
 with IWRAM `0x03004a40` and BSS `0x0203d9f0` below the unchanged reserves.
 Separate old/new gate-off adapter links both reproduce `0ad661af…fc8637`;
 the P3 corridor ROM remains byte-identical to `ec5e6c58…a77264`.
+
+Further normal-input economy controllers clear the source Extractor at frame
+9,029, start the paid replacement at 9,462 and observe completion by 10,855.
+Individual worker selection preserves a safe gas return: the bank increases
+from 100 to 108, with the worker's cargo returning to zero. The two attempts
+still lose at frames 15,345 and 15,531; neither starts Spire or queues Scourge.
+This supplies a gas-delivery witness for the ordinary worker path, not a Z7
+mission qualification or additional completed campaign.
+
+### Experimental route fields sized to the active map
+
+`SC64_ROUTE_ACTIVE_STRIDE` retains the fixed 86,016-byte ZP PACK3 data bank
+and uses `ceil(3 * active_cells / 8)` bytes per cached field. Capacity is
+capped at 18: 64×64 and 128×96 maps use 18 fields, while 128×128 and 127×127
+use 14. Shape changes clear derived validity/age metadata and rebind field
+pointers; inactive pointers are null. Invalid dimensions are rejected before
+index arithmetic or grid reads. Standard profiles retain their old layout.
+
+Two standalone ASan/UBSan variants pass exact first-step comparisons against
+an independent tie-ordered BFS, complete stored-field comparisons, randomized
+routes and 64×64 → 128×96 → 128×128 → 127×127 → 64×64 changes. They exercise
+partial/L/word-clear and full-flood/byte-clear paths. Canaries cover packed
+last-cell writes, neighboring field starts, unaligned clears and unused pool
+tails. Zero, negative, oversized and extreme signed dimensions leave query
+outputs unchanged and cause no grid reads. Existing route fixtures are intact.
+
+The full P3 host trace and per-update gameplay fingerprints match the frozen
+baseline. The public enabled ARM ROM is `d1ac0694…a4e333`, byte-identical to
+the measured prototype despite a declaration-only cleanup for the fallback
+fixture. IWRAM ends at `0x030047f8`, BSS at `0x0203d6e4`; the extra metadata
+uses 112 BSS bytes and no new save fields. Gate-off P3 and combined Z7 ROMs
+remain `ec5e6c58…a77264` and `5d9c4edc…82cac0`.
+
+A paired 600-update late-P3 ARM interval matches loaded, initial and final
+gameplay observations and all three captures. Both configurations build 16
+fields; the candidate measures 19.1539 effective fps versus 19.1768, or
+0.1195% more cycles. This interval has no useful gain.
+
+The byte-identical ROM completes all 124,689 normal ARM input ticks and 5,932
+input transitions, wins at frame 123,916 and matches all 126 reported gameplay
+checkpoints. Its full-mission mean improves from the public clear-corridor
+ROM's 14.08 to 15.01 effective fps. The busy tick-73,000 → 74,000 interval
+builds 471 fields instead of 769 and measures 8.67 effective fps instead of
+7.01. These remain below the near-30-fps goal.
+
+The public build also completes a 12,000-input opening with 13 matching
+gameplay checkpoints and three matching captures. Its opening mean is 17.99
+effective fps versus 18.0133, consistent with the small lookup overhead in
+intervals without useful extra cache residency. A new emulator process loads
+the opening's own candidate-generated SRAM through HOME / load, with exact
+persisted observations and resume through frame 11,824. Its own late SRAM,
+full post-load win, wider profiles and hardware remain separate checks.
+
+The public source passes `./dev build`, `./dev test` (380 Python tests and
+the default host fixtures), `make unified` and `make test-unified`.
+Original-art and unified ROMs remain `4ad80ce0…f9aee` and
+`6bab5be2…979f9`. The feature remains off in standard profiles pending the
+remaining qualification.

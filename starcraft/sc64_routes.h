@@ -41,6 +41,12 @@
 #error "SC64_ROUTE_L_FAST_PATH requires SC64_RACES and SC64_ROUTE_PACK3"
 #endif
 #endif
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3) || \
+    !defined(SC64_ZP_CAMPAIGN_STORAGE) || !defined(SC64_LARGE_MAPS)
+#error "SC64_ROUTE_ACTIVE_STRIDE requires the packed ZP large-map race profile"
+#endif
+#endif
 
 /* Shared shortest-path fields on the same four-neighbour collision grid.
  * A mineral, base or group destination costs one reverse flood, rather than
@@ -56,7 +62,12 @@
 #endif
 #ifdef SC64_RACES
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+#define SC64_ROUTE_SLOTS 18
+#define SC64_ROUTE_ACTIVE_MAX_SLOTS 18
+#else
 #define SC64_ROUTE_SLOTS 14
+#endif
 #elif defined(SC64_LARGE_MAPS)
 #ifdef SC64_ROUTE_PACK3
 #define SC64_ROUTE_SLOTS 20
@@ -97,13 +108,25 @@
  * may_alias-qualified word type. Each row may start unaligned when the map's
  * packed byte count is not a multiple of four, so the helper handles a byte
  * prefix and tail around its aligned word stores. */
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+#define SC64_ROUTE_POOL_BYTES (14u * SC64_ROUTE_BYTES)
+static u8 sc64_route_pool[SC64_ROUTE_POOL_BYTES] __attribute__((aligned(4)));
+static u8 *sc64_route_field[SC64_ROUTE_SLOTS];
+static unsigned sc64_route_active_bytes, sc64_route_active_slots;
+static int sc64_route_config_cols = -1, sc64_route_config_rows = -1;
+#else
 static u8 sc64_route_field[SC64_ROUTE_SLOTS][SC64_ROUTE_BYTES]
     __attribute__((aligned(4)));
+#endif
 typedef u32 sc64_route_clear_word __attribute__((__may_alias__));
 static void sc64_route_field_clear(u8 *field)
 {
     unsigned prefix = (unsigned)(-(uintptr_t)field) & 3u;
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    unsigned remaining = sc64_route_active_bytes;
+#else
     unsigned remaining = SC64_ROUTE_BYTES;
+#endif
     unsigned words_count, i;
     while (prefix && remaining) {
         *field++ = 0xff;
@@ -127,7 +150,15 @@ static void sc64_route_field_clear(u8 *field)
     while (remaining--) *field++ = 0xff;
 }
 #else
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+#define SC64_ROUTE_POOL_BYTES (14u * SC64_ROUTE_BYTES)
+static u8 sc64_route_pool[SC64_ROUTE_POOL_BYTES];
+static u8 *sc64_route_field[SC64_ROUTE_SLOTS];
+static unsigned sc64_route_active_bytes, sc64_route_active_slots;
+static int sc64_route_config_cols = -1, sc64_route_config_rows = -1;
+#else
 static u8 sc64_route_field[SC64_ROUTE_SLOTS][SC64_ROUTE_BYTES];
+#endif
 #endif
 #else
 /* Legacy fields retain distances for the original blocked-start behavior. */
@@ -136,6 +167,52 @@ static u16 sc64_route_field[SC64_ROUTE_SLOTS][MAP_CELLS];
 static u8 sc64_route_valid[SC64_ROUTE_SLOTS];
 static u16 sc64_route_goal[SC64_ROUTE_SLOTS];
 static u32 sc64_route_age[SC64_ROUTE_SLOTS], sc64_route_clock;
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+/* Rebind field bases after map-shape changes. Return false for invalid or
+ * oversized geometry before any route-grid access can use these fields. */
+static int sc64_route_configure(void)
+{
+    int cols = MAP_COLS, rows = MAP_ROWS;
+    unsigned cells, bytes, slots, i;
+    if (cols <= 0 || rows <= 0 || cols > 128 || rows > 128 ||
+        (unsigned)cols > (unsigned)MAP_CELLS / (unsigned)rows) {
+        if (sc64_route_config_cols != cols || sc64_route_config_rows != rows ||
+            sc64_route_active_slots != 0) {
+            sc64_route_config_cols = cols;
+            sc64_route_config_rows = rows;
+            sc64_route_active_bytes = 0;
+            sc64_route_active_slots = 0;
+            for (i = 0; i < SC64_ROUTE_ACTIVE_MAX_SLOTS; ++i) sc64_route_field[i] = 0;
+            memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+            memset(sc64_route_age, 0, sizeof(sc64_route_age));
+            sc64_route_clock = 0;
+        }
+        return 0;
+    }
+    cells = (unsigned)cols * (unsigned)rows;
+    bytes = (cells * 3u + 7u) / 8u;
+    if (bytes == 0 || bytes > SC64_ROUTE_BYTES || bytes > SC64_ROUTE_POOL_BYTES)
+        return 0;
+    slots = SC64_ROUTE_POOL_BYTES / bytes;
+    if (slots > SC64_ROUTE_ACTIVE_MAX_SLOTS) slots = SC64_ROUTE_ACTIVE_MAX_SLOTS;
+    if (slots == 0) return 0;
+    if (sc64_route_config_cols == cols && sc64_route_config_rows == rows &&
+        sc64_route_active_bytes == bytes && sc64_route_active_slots == slots) return 1;
+    sc64_route_config_cols = cols;
+    sc64_route_config_rows = rows;
+    sc64_route_active_bytes = bytes;
+    sc64_route_active_slots = slots;
+    for (i = 0; i < slots; ++i) sc64_route_field[i] = sc64_route_pool + i * bytes;
+    for (; i < SC64_ROUTE_ACTIVE_MAX_SLOTS; ++i) sc64_route_field[i] = 0;
+    memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+    memset(sc64_route_age, 0, sizeof(sc64_route_age));
+    sc64_route_clock = 0;
+    return 1;
+}
+#define SC64_ROUTE_ACTIVE_SLOTS ((int)sc64_route_active_slots)
+#else
+#define SC64_ROUTE_ACTIVE_SLOTS SC64_ROUTE_SLOTS
+#endif
 volatile u32 sc64_route_hits, sc64_route_builds;
 
 #ifdef SC64_ROUTE_DECAY_FREQ
@@ -164,7 +241,7 @@ static void sc64_route_age_request(void)
     }
     ++sc64_route_clock;
     if ((sc64_route_clock & (SC64_ROUTE_DECAY_PERIOD - 1u)) != 0u) return;
-    for (i = 0; i < SC64_ROUTE_SLOTS; ++i) if (sc64_route_valid[i]) {
+    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i) if (sc64_route_valid[i]) {
         u32 packed = sc64_route_age[i];
         sc64_route_age[i] = sc64_route_age_pack(sc64_route_age_freq(packed) >> 1,
                                                 sc64_route_age_stamp(packed));
@@ -214,6 +291,9 @@ static void GBA_HOT sc64_route_put(int slot, int cell, int direction)
 static void
 sc64_routes_reset(void)
 {
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    (void)sc64_route_configure();
+#endif
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
 #ifdef SC64_ROUTE_DECAY_FREQ
     memset(sc64_route_age, 0, sizeof(sc64_route_age));
@@ -270,10 +350,13 @@ sc64_route_slot(int goal)
 #ifndef SC64_RACES
     u16 *field;
 #endif
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    if (!sc64_route_configure()) return -1;
+#endif
 #ifdef SC64_ROUTE_DECAY_FREQ
     sc64_route_age_request();
 #endif
-    for (i = 0; i < SC64_ROUTE_SLOTS; i++) {
+    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; i++) {
         if (sc64_route_valid[i] && sc64_route_goal[i] == goal) {
 #ifdef SC64_ROUTE_PARTIAL_FLOOD
             if (sc64_route_valid[i] == 1 ||
@@ -315,7 +398,13 @@ sc64_route_slot(int goal)
 #ifdef SC64_ROUTE_WORD_CLEAR
     sc64_route_field_clear(sc64_route_field[slot]);
 #else
-    memset(sc64_route_field[slot], 255, SC64_ROUTE_BYTES);
+    memset(sc64_route_field[slot], 255,
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+           sc64_route_active_bytes
+#else
+           SC64_ROUTE_BYTES
+#endif
+           );
 #endif
 #else
     field = sc64_route_field[slot];
@@ -489,6 +578,12 @@ sc64_route_preferred_l_clear(int start_col, int start_row,
 static int GBA_HOT
 sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
 {
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    int col, row, goal, cell, slot, direction;
+#ifdef SC64_ROUTE_L_FAST_PATH
+    int goal_col, goal_row;
+#endif
+#else
     int col = limit(x / 16, 0, MAP_COLS - 1), row = limit(y / 16, 0, MAP_ROWS - 1);
 #ifdef SC64_ROUTE_L_FAST_PATH
     int goal_col = limit(tx / 16, 0, MAP_COLS - 1);
@@ -498,8 +593,22 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
     int goal = limit(tx / 16, 0, MAP_COLS - 1) + limit(ty / 16, 0, MAP_ROWS - 1) * MAP_COLS;
 #endif
     int cell = col + row * MAP_COLS, slot, direction;
+#endif
 #ifndef SC64_RACES
     u16 *field;
+#endif
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    if (!sc64_route_configure()) return 0;
+    col = limit(x / 16, 0, MAP_COLS - 1);
+    row = limit(y / 16, 0, MAP_ROWS - 1);
+#ifdef SC64_ROUTE_L_FAST_PATH
+    goal_col = limit(tx / 16, 0, MAP_COLS - 1);
+    goal_row = limit(ty / 16, 0, MAP_ROWS - 1);
+    goal = goal_col + goal_row * MAP_COLS;
+#else
+    goal = limit(tx / 16, 0, MAP_COLS - 1) + limit(ty / 16, 0, MAP_ROWS - 1) * MAP_COLS;
+#endif
+    cell = col + row * MAP_COLS;
 #endif
     if (!path_grid_valid) build_path_grid();
 #ifdef SC64_ROUTE_L_FAST_PATH
@@ -522,6 +631,9 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
     slot = sc64_route_slot_for_origin(goal, cell, SC64_GRID_GET(path_walkable, cell));
 #else
     slot = sc64_route_slot(goal);
+#endif
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    if (slot < 0) return 0;
 #endif
 #ifdef SC64_RACES
     direction = sc64_route_get(slot, cell);

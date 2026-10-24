@@ -1652,6 +1652,28 @@ remains off in standard profiles pending broader qualification. See
 full host/ARM replay, timing and opening-save evidence and remaining limits.
 
 
+### Experimental route fields sized to the active map
+
+`SC64_ROUTE_ACTIVE_STRIDE` requires race rules, `SC64_ROUTE_PACK3`,
+`SC64_ZP_CAMPAIGN_STORAGE` and `SC64_LARGE_MAPS`. It partitions the existing
+86,016-byte route bank using the active map's packed field size. A 128×96
+map fits 18 fields instead of 14; a 128×128 map retains 14. Metadata and field
+pointers reset when map dimensions change. No field-data bank or save bytes
+are added; the pointer/configuration metadata uses 112 additional ARM BSS bytes.
+The flag remains off in standard profiles pending broader qualification.
+
+```sh
+make test-sc64-route-active-stride
+```
+
+The standalone asset-free sanitizer fixture checks exact BFS first steps and
+complete fallback fields, both word and byte initialization, runtime shape
+changes, field boundaries, unused pool bytes and invalid dimensions. Existing
+route fixtures remain unchanged. See
+[Validation](VALIDATION.md#experimental-route-fields-sized-to-the-active-map)
+for the measured intervals and qualification limits.
+
+
 ### Experimental independent Z7 Egg production
 
 `SC64_Z7_EGG_PRODUCTION` requires the race and Z7 runtimes and is active only

@@ -2283,6 +2283,17 @@ test-sc64-route-l-fast: build/test-sc64-route-l-fast-64x64 build/test-sc64-route
 	./build/test-sc64-route-l-fast-128x96-partial
 test-starcraft: test-sc64-route-l-fast
 
+ROUTE_ACTIVE_STRIDE_TEST_FLAGS := -DSC64_ROUTE_ACTIVE_STRIDE -DSC64_ROUTE_PACK3 -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_LARGE_MAPS -DSC64_ROUTE_VISIT_GRID
+build/test-sc64-route-active-stride: tests/sc64_route_active_stride.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $(ROUTE_ACTIVE_STRIDE_TEST_FLAGS) -DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_L_FAST_PATH -DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ $< -o $@
+build/test-sc64-route-active-stride-fallback: tests/sc64_route_active_stride.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $(ROUTE_ACTIVE_STRIDE_TEST_FLAGS) $< -o $@
+.PHONY: test-sc64-route-active-stride
+test-sc64-route-active-stride: build/test-sc64-route-active-stride build/test-sc64-route-active-stride-fallback
+	./build/test-sc64-route-active-stride
+	./build/test-sc64-route-active-stride-fallback
+test-starcraft: test-sc64-route-active-stride
+
 Z7_EGG_PROBE_FLAGS := $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_ATTACK -DSC64_Z7_EGG_PRODUCTION
 build/test-sc64-z7-egg-production: tests/sc64_z7_egg_production_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_EGG_PROBE_FLAGS) $< common/gba.c -o $@
