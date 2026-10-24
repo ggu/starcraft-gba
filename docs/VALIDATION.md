@@ -2597,3 +2597,42 @@ source-only ROM remains 65,536 bytes with SHA-256
 `7c6b3068b747bd4b7375294bd0d63d5797665285f9bf622b226d6ffb2cf3de76`.
 The unified ARM build and sanitizer suite pass; the Z6 ARM build retains
 IWRAM `0x03004f00` and BSS `0x0203d980` with unchanged reserve guards.
+
+### P6 burrow-release experiments
+
+Two additional default-off options avoid repeated work in the P6 ambush
+check. `SC64_P6_BURROW_CULL` rejects actors outside the exact 96-pixel circle's
+axis bounds before hostility checks. `SC64_P6_BURROW_GROUPED` builds a list
+of alive hostile actor slots once per burrower owner, using a bounded
+240-byte local array and no new BSS or SRAM. Changes to the burrow flag, order
+and target cannot change the target list's alive/owner/position predicate.
+Unsupported live owner values fall back to the original scan.
+
+All four option combinations pass ASan/UBSan comparisons against an independent
+full-scan translation unit across 150 randomized worlds. Focused cases cover
+96/97-pixel boundaries, every supported owner group and invalid-owner fallback;
+the axis reject also passes 100,000 conservative geometry checks.
+
+Combined with the four query flags above, the frozen 1,000-frame P6 opening
+improves from **3.54 to 8.37 effective fps** (the axis reject alone reached
+7.31). Handoff plus eleven later state observations and twelve framebuffer
+captures match the baseline exactly. IWRAM remains `0x030045d8` and BSS
+`0x0203d774`, with the original reserve guards. These are startup experiments;
+the flags remain disabled by default pending complete winning-route
+qualification, and neither 30 fps nor physical GBA performance is established.
+
+Private comparison report:
+`.local/build/promotion/p6-query-traps-snapshot/grouped/startup/protoss-p6-startup-1792834848572956000/profile.json`.
+Candidate ROM SHA-256:
+`cb8f7a1edf16fa18c0b0177c09a97f7ccb675b6d7467796634e84c98b5a3ddff`.
+Candidate ELF SHA-256:
+`be3a3a6ca4f654a8d27c3bb4c7803228cf64ebf925b9c4e1e20bc97f123e34cc`.
+The staged completed total remains **20/30 (T10/Z5/P5)**.
+
+The burrow/resume source snapshot passes the clean original-art build and all
+default host checks, including **324 Python tests (six private checks skipped)**.
+Z6 save-prefix authentication now checks all 176 persisted bytes and the source
+hero using the observer's live-only entity rows, plus trigger/timer, switch,
+MRGN, AI, Cloak/Storm and transport relations. Thirteen focused resume tests
+pass, and the real retained startup snapshot passes this runtime validator.
+This does not establish an actual fresh-process Z6 SRAM handoff yet.

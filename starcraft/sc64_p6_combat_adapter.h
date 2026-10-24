@@ -350,6 +350,70 @@ race_p6_combat_unit_burrowed(int slot)
            (u[slot].flags & 2u) != 0;
 }
 
+/* Center-distance broad phase for the 96-pixel scripted burrow-release
+ * radius. Unit coordinates are signed 16-bit compact positions, so widen
+ * before subtracting. This admits every possible exact-radius hit and is
+ * deliberately disabled unless the optional P6 optimization is selected. */
+static int
+race_p6_combat_burrow_center_may_reach(int qx, int qy, int tx, int ty)
+{
+#ifdef SC64_P6_BURROW_CULL
+    int dx=(int)(s16)qx-(int)(s16)tx;
+    int dy=(int)(s16)qy-(int)(s16)ty;
+    return (unsigned)(dx+96)<=192u && (unsigned)(dy+96)<=192u;
+#else
+    (void)qx;(void)qy;(void)tx;(void)ty;
+    return 1;
+#endif
+}
+
+#ifdef SC64_P6_BURROW_GROUPED
+_Static_assert(MAX_UNITS <= 256,
+               "P6 grouped burrow targets use byte-sized unit slots");
+static int
+race_p6_combat_burrow_release_one(int slot, const u8 *target_slots,
+                                  unsigned target_count)
+{
+    Unit *q = &u[slot];
+    for (unsigned n = 0; n < target_count; ++n) {
+        int j = target_slots[n];
+        if (j == slot) continue;
+        if (!race_p6_combat_burrow_center_may_reach(q->x, q->y,
+                                                     u[j].x, u[j].y))
+            continue;
+        if (dist2(q->x, q->y, u[j].x, u[j].y) <= 96 * 96) {
+            q->flags &= (u16)~2u;
+            q->order = ORDER_ATTACK_MOVE;
+            q->target = -1;
+            return 1;
+        }
+    }
+    return 0;
+}
+#endif
+
+#ifdef SC64_P6_BURROW_GROUPED
+static int
+race_p6_combat_burrow_release_one_fullscan(int slot)
+{
+    Unit *q = &u[slot];
+    for (int j = 0; j < MAX_UNITS; ++j) {
+        if (j == slot || !u[j].alive) continue;
+        if (!race_p6_combat_burrow_center_may_reach(q->x, q->y,
+                                                     u[j].x, u[j].y))
+            continue;
+        if (!race_p6_owners_hostile(q->owner, u[j].owner)) continue;
+        if (dist2(q->x, q->y, u[j].x, u[j].y) <= 96 * 96) {
+            q->flags &= (u16)~2u;
+            q->order = ORDER_ATTACK_MOVE;
+            q->target = -1;
+            return 1;
+        }
+    }
+    return 0;
+}
+#endif
+
 /* Bounded 30-Hz adaptation of the verified order-117 burrow request: scripted
  * Zerg actors begin concealed/idle, then clear the persisted bit and join the
  * ordinary local attack path when a hostile comes within 96 GBA pixels. Native
@@ -359,12 +423,52 @@ race_p6_combat_burrow_release_tick(void)
 {
     int released = 0;
     if (!race_p6_active()) return 0;
+#ifdef SC64_P6_BURROW_GROUPED
+    /* Group by the burrower's owner, building an ascending list of alive,
+       hostile targets once per owner. Releasing one actor changes only its
+       flags/order/target; target eligibility depends on immutable-for-this-
+       call alive/position/owner fields, and there are no callbacks here. */
+    u8 target_slots[MAX_UNITS];
+    for (int j = 0; j < MAX_UNITS; ++j) {
+        if (u[j].alive &&
+            (u[j].owner < SIDE || u[j].owner > 4)) {
+            for (int i = 0; i < MAX_UNITS; ++i) {
+                if (!race_p6_combat_unit_burrowed(i)) continue;
+                released += race_p6_combat_burrow_release_one_fullscan(i);
+            }
+            return released;
+        }
+    }
+    for (int owner = SIDE; owner <= 4; ++owner) {
+        unsigned target_count = 0;
+        int has_burrower = 0;
+        for (int i = 0; i < MAX_UNITS; ++i) {
+            if (u[i].owner == owner && race_p6_combat_unit_burrowed(i)) {
+                has_burrower = 1;
+                break;
+            }
+        }
+        if (!has_burrower) continue;
+        for (int j = 0; j < MAX_UNITS; ++j) {
+            if (u[j].alive && race_p6_owners_hostile(owner, u[j].owner))
+                target_slots[target_count++] = (u8)j;
+        }
+        for (int i = 0; i < MAX_UNITS; ++i) {
+            if (u[i].owner != owner || !race_p6_combat_unit_burrowed(i))
+                continue;
+            released += race_p6_combat_burrow_release_one(i, target_slots,
+                                                           target_count);
+        }
+    }
+#else
     for (int i=0;i<MAX_UNITS;++i) {
         Unit *q=&u[i];
         if (!race_p6_combat_unit_burrowed(i)) continue;
         for (int j=0;j<MAX_UNITS;++j) {
-            if (i==j || !u[j].alive ||
-                !race_p6_owners_hostile(q->owner,u[j].owner)) continue;
+            if (i==j || !u[j].alive) continue;
+            if (!race_p6_combat_burrow_center_may_reach(q->x,q->y,u[j].x,u[j].y))
+                continue;
+            if (!race_p6_owners_hostile(q->owner,u[j].owner)) continue;
             if (dist2(q->x,q->y,u[j].x,u[j].y) <= 96*96) {
                 q->flags &= (u16)~2u;
                 q->order = ORDER_ATTACK_MOVE;
@@ -374,6 +478,7 @@ race_p6_combat_burrow_release_tick(void)
             }
         }
     }
+#endif
     return released;
 }
 

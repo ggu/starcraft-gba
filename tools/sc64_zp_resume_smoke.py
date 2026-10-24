@@ -31,6 +31,111 @@ from emulator_smoke import ROOT, capture, symbol_sizes, symbols
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSE = 0, 1, 2
 RESUME_TICKS = 60
 SRAM_BYTES = 32 * 1024
+Z6_RUNTIME_SIZE = 176
+Z6_SWITCH_MASK = 0x3
+Z6_MAP_SOURCE_PX = 128 * 32
+Z6_AI_INTERVAL_TICKS = 240
+Z6_TRANSPORT_MAX_TICKS = 3000
+Z6_MAX_BUILDINGS = 160
+
+
+def validate_z6_prefix_state(expected_state: dict) -> None:
+    """Require the complete bounded Z6 runtime and a live unfinished source hero."""
+    runtime = expected_state.get("race_runtime")
+    if not isinstance(runtime, dict) or not isinstance(runtime.get("model"), dict):
+        raise ValueError("Z6 save checkpoint omits persistent model state")
+    model = runtime["model"]
+    started = model.get("started")
+    cursors = model.get("action_cursor")
+    ticks = runtime.get("action_ticks")
+    if (type(started) is not int or not 0 <= started < (1 << 9) or
+            type(model.get("fired")) is not int or model["fired"] != started or
+            type(model.get("outcome")) is not int or model["outcome"] != 0 or
+            not isinstance(cursors, list) or len(cursors) != 9 or
+            any(type(v) is not int or not 0 <= v <= 255 for v in cursors) or
+            not isinstance(ticks, list) or len(ticks) != 9 or
+            any(type(v) is not int or not 0 <= v <= 36000 for v in ticks)):
+        raise ValueError("Z6 save checkpoint has malformed model/cursor/timer state")
+    for i, (cursor, timer) in enumerate(zip(cursors, ticks)):
+        if (cursor > replay.Z6_ACTION_COUNTS[i] or
+                (cursor and not (started & (1 << i))) or
+                ((cursor != 0) != (timer != 0))):
+            raise ValueError("Z6 save checkpoint cursor/timer state violates source bounds")
+
+    switches = runtime.get("switch_bits")
+    if (not isinstance(switches, list) or len(switches) != 8 or
+            any(type(v) is not int or not 0 <= v <= 0xFFFFFFFF for v in switches) or
+            switches[0] & ~Z6_SWITCH_MASK or any(switches[1:]) or
+            type(runtime.get("fault")) is not int or runtime["fault"] != 0):
+        raise ValueError("Z6 save checkpoint has malformed switches or runtime fault")
+
+    deaths = runtime.get("deaths_by_source")
+    if (not isinstance(deaths, list) or len(deaths) != 12 or
+            any(type(v) is not int or not 0 <= v <= 65535 for v in deaths)):
+        raise ValueError("Z6 save checkpoint has malformed source death counters")
+
+    moved = runtime.get("moved_location")
+    moved_mask = runtime.get("moved_locations_mask")
+    if (not isinstance(moved, list) or len(moved) != 8 or
+            any(type(v) is not int or not 0 <= v <= Z6_MAP_SOURCE_PX for v in moved) or
+            type(moved_mask) is not int or moved_mask & ~3):
+        raise ValueError("Z6 save checkpoint has malformed moved MRGN locations")
+    for i in range(2):
+        left, top, right, bottom = moved[i * 4:i * 4 + 4]
+        if moved_mask & (1 << i):
+            if left >= right or top >= bottom:
+                raise ValueError("Z6 save checkpoint has invalid moved MRGN bounds")
+        elif left or top or right or bottom:
+            raise ValueError("Z6 save checkpoint has coordinates for an unmoved MRGN")
+
+    ai_ticks, ai_phase = runtime.get("ai_plan_ticks"), runtime.get("ai_plan_phase")
+    if (type(ai_ticks) is not int or not 0 <= ai_ticks <= Z6_AI_INTERVAL_TICKS or
+            type(ai_phase) is not int or not 0 <= ai_phase <= 3):
+        raise ValueError("Z6 save checkpoint has malformed AI cadence")
+    ai_dispatched = bool(started & (1 << 8)) and (cursors[8] == 0 or cursors[8] >= 2)
+    if not ai_dispatched and (ai_ticks or ai_phase):
+        raise ValueError("Z6 save checkpoint has AI cadence before its source action")
+
+    cloak = runtime.get("cloak")
+    if (not isinstance(cloak, list) or len(cloak) != 2 or
+            any(type(v) is not int for v in cloak) or
+            cloak[0] not in (0, 1) or not 0 <= cloak[1] < 5 or
+            (cloak[0] and cloak[1] != 0)):
+        raise ValueError("Z6 save checkpoint has malformed cloak state")
+    if not replay.storm_bytes_valid(runtime.get("storm")):
+        raise ValueError("Z6 save checkpoint has malformed Storm state")
+
+    transport = runtime.get("transport")
+    if (not isinstance(transport, list) or len(transport) != 3 or
+            any(type(v) is not int for v in transport)):
+        raise ValueError("Z6 save checkpoint has malformed transport research state")
+    remaining, producer_plus1, researched = transport
+    if (not 0 <= remaining <= Z6_TRANSPORT_MAX_TICKS or
+            not 0 <= producer_plus1 <= Z6_MAX_BUILDINGS or researched not in (0, 1) or
+            (researched and (remaining or producer_plus1)) or
+            (not remaining and producer_plus1) or
+            (remaining and not 1 <= producer_plus1 <= Z6_MAX_BUILDINGS)):
+        raise ValueError("Z6 save checkpoint has inconsistent transport research timer/producer")
+
+    morphs = runtime.get("human_drone_morphs")
+    persistent = runtime.get("persistent_bytes")
+    if (type(morphs) is not int or not 0 <= morphs <= 4 or
+            type(runtime.get("persistent_size")) is not int or
+            runtime["persistent_size"] != Z6_RUNTIME_SIZE or
+            not isinstance(persistent, list) or len(persistent) != Z6_RUNTIME_SIZE or
+            any(type(v) is not int or not 0 <= v <= 255 for v in persistent)):
+        raise ValueError("Z6 save checkpoint must observe all 176 persistent bytes and bounded morph count")
+
+    entities = expected_state.get("units", {}).get("entities")
+    if not isinstance(entities, list) or not any(
+            isinstance(actor, dict) and
+            all(type(actor.get(key)) is int for key in
+                ("owner", "raw_owner", "raw_type", "hp")) and
+            actor.get("alive", 1) == 1 and type(actor.get("alive", 1)) is int and
+            actor["owner"] == 0 and actor["raw_owner"] == 3 and
+            actor["raw_type"] == 51 and actor["hp"] > 0
+            for actor in entities):
+        raise ValueError("Z6 live prefix requires the source Kerrigan actor")
 
 
 def sha256_file(path: Path) -> str:
@@ -147,6 +252,8 @@ def validate_source_report(report_path: Path, rom_path: Path, elf_path: Path,
             raise ValueError("P6 save checkpoint must observe all 180 persistent bytes")
         if not replay.storm_bytes_valid(runtime.get("storm")):
             raise ValueError("P6 save checkpoint has malformed Storm state")
+    elif profile_name == "zerg-z6":
+        validate_z6_prefix_state(expected_state)
     return {"report": report, "report_path": report_path,
             "report_sha256": hashlib.sha256(report_bytes).hexdigest(),
             "profile": profile_name, "mission": mission,

@@ -30,6 +30,31 @@ def state(screen=2):
     }
 
 
+def z6_runtime():
+    return {
+        "model": {"started": 0, "fired": 0, "outcome": 0,
+                  "action_cursor": [0] * 9},
+        "action_ticks": [0] * 9, "switch_bits": [0] * 8, "fault": 0,
+        "deaths_by_source": [0] * 12, "moved_location": [0] * 8,
+        "moved_locations_mask": 0, "ai_plan_ticks": 0, "ai_plan_phase": 0,
+        "human_drone_morphs": 0, "cloak": [0, 0], "storm": [0] * 32,
+        "transport": [0, 0, 0], "persistent_size": 176,
+        "persistent_bytes": [0] * 176,
+    }
+
+
+def z6_state(screen=2):
+    result = state(screen)
+    result["race_selected_mission"] = 17
+    result["race_campaign"]["mission"] = 17
+    result["race_runtime"] = z6_runtime()
+    result["units"]["entities"][0].update({
+        "owner": 0, "raw_owner": 3, "raw_type": 51, "hp": 200,
+        "order": 0, "target": -1,
+    })
+    return result
+
+
 class ResumeAuthenticationTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -197,6 +222,101 @@ class ResumeAuthenticationTests(unittest.TestCase):
             self.report.write_text(json.dumps(broken))
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, error):
                 resume.validate_source_report(self.report, self.rom, self.elf)
+
+    def _write_z6_report(self, runtime=None, *, hero=True):
+        payload = json.loads(self.report.read_text())
+        saved = z6_state()
+        if runtime is not None:
+            saved["race_runtime"] = runtime
+        if not hero:
+            saved["units"]["entities"] = []
+        payload["profile"], payload["mission"] = "zerg-z6", 17
+        payload["save_checkpoint"]["state"] = saved
+        payload["save_checkpoint"]["saved_frame"] = saved["frame"]
+        self.report.write_text(json.dumps(payload))
+
+    def test_z6_resume_seed_authenticates_full_live_prefix(self):
+        self._write_z6_report()
+        auth = resume.validate_source_report(self.report, self.rom, self.elf)
+        self.assertEqual(auth["profile"], "zerg-z6")
+        self.assertEqual(auth["mission"], 17)
+        self.assertEqual(len(auth["source_state"]["race_runtime"]["persistent_bytes"]), 176)
+
+    def test_z6_live_entity_observer_shape_does_not_require_alive_field(self):
+        self._write_z6_report()
+        state_data = json.loads(self.report.read_text())["save_checkpoint"]["state"]
+        self.assertNotIn("alive", state_data["units"]["entities"][0])
+        resume.validate_z6_prefix_state(state_data)
+        state_data["units"]["entities"][0]["hp"] = 0
+        with self.assertRaisesRegex(ValueError, "source Kerrigan"):
+            resume.validate_z6_prefix_state(state_data)
+
+    def test_z6_resume_seed_rejects_malformed_persistent_relations(self):
+        cases = (
+            (lambda r: r["model"].update(started=1), "model/cursor/timer"),
+            (lambda r: r["model"]["action_cursor"].__setitem__(0, 2), "cursor/timer"),
+            (lambda r: r["action_ticks"].__setitem__(0, 1), "cursor/timer"),
+            (lambda r: r["switch_bits"].__setitem__(0, 4), "switches or runtime fault"),
+            (lambda r: r["switch_bits"].__setitem__(1, 1), "switches or runtime fault"),
+            (lambda r: r["deaths_by_source"].__setitem__(3, 65536), "death counters"),
+            (lambda r: r["moved_location"].__setitem__(2, 1), "unmoved MRGN"),
+            (lambda r: r.update(moved_locations_mask=4), "moved MRGN"),
+            (lambda r: r.update(ai_plan_ticks=1), "AI cadence before"),
+            (lambda r: r.update(ai_plan_phase=4), "AI cadence"),
+            (lambda r: r.update(cloak=[1, 1]), "cloak state"),
+            (lambda r: r.update(storm=[1] + [0] * 31), "Storm state"),
+            (lambda r: r.update(transport=[3001, 1, 0]), "transport research timer"),
+            (lambda r: r.update(transport=[1, 0, 0]), "transport research timer"),
+            (lambda r: r.update(transport=[1, 1, 1]), "transport research timer"),
+            (lambda r: r.update(transport=[1, 161, 0]), "transport research timer"),
+            (lambda r: r.update(human_drone_morphs=5), "176 persistent bytes"),
+            (lambda r: r.update(persistent_size=175), "176 persistent bytes"),
+            (lambda r: r.update(persistent_size=181), "176 persistent bytes"),
+            (lambda r: r.update(persistent_bytes=[0] * 175), "176 persistent bytes"),
+        )
+        for mutate, error in cases:
+            runtime = z6_runtime()
+            mutate(runtime)
+            self._write_z6_report(runtime)
+            with self.subTest(runtime=runtime), self.assertRaisesRegex(ValueError, error):
+                resume.validate_source_report(self.report, self.rom, self.elf)
+        self._write_z6_report(hero=False)
+        with self.assertRaisesRegex(ValueError, "source Kerrigan"):
+            resume.validate_source_report(self.report, self.rom, self.elf)
+        for field, value in (("alive", 0), ("raw_owner", 2), ("raw_type", 79)):
+            saved = z6_state()
+            saved["units"]["entities"][0][field] = value
+            self._write_z6_report(saved["race_runtime"])
+            payload = json.loads(self.report.read_text())
+            payload["save_checkpoint"]["state"]["units"] = saved["units"]
+            self.report.write_text(json.dumps(payload))
+            with self.subTest(hero_field=field), self.assertRaisesRegex(ValueError, "source Kerrigan"):
+                resume.validate_source_report(self.report, self.rom, self.elf)
+
+    def test_z6_save_resume_comparison_includes_transport_and_all_payload_bytes(self):
+        saved = z6_state()
+        saved["race_runtime"].update({
+            "model": {"started": 0x100, "fired": 0x100, "outcome": 0,
+                      "action_cursor": [0] * 8 + [1]},
+            "action_ticks": [0] * 8 + [90],
+            "ai_plan_ticks": 240, "ai_plan_phase": 2,
+            "moved_location": [1, 2, 3, 4, 0, 0, 0, 0],
+            "moved_locations_mask": 1, "transport": [2999, 160, 0],
+        })
+        restored = json.loads(json.dumps(saved))
+        restored["screen"] = 1
+        resume.compare_saved_state(saved, restored)
+        for key, mutate in (
+                ("transport", lambda v: v.__setitem__(0, 2998)),
+                ("persistent_bytes", lambda v: v.__setitem__(-1, 1))):
+            changed = json.loads(json.dumps(restored))
+            mutate(changed["race_runtime"][key])
+            with self.subTest(field=key), self.assertRaisesRegex(RuntimeError, "race_runtime"):
+                resume.compare_saved_state(saved, changed)
+        changed = json.loads(json.dumps(restored))
+        changed["units"]["entities"][0]["order"] = 7
+        with self.assertRaisesRegex(RuntimeError, "units.entities"):
+            resume.compare_saved_state(saved, changed)
 
     def test_restored_persistent_snapshot_compares_every_nested_byte(self):
         saved = state(2)

@@ -1927,3 +1927,21 @@ test-sc64-z6-transport: build/test-sc64-z6-transport-tech build/test-sc64-z6-tra
 test-sc64-p6-query-experiments: test-sc64-six-query-options build/test-sc64-p6-count-snapshot build/test-sc64-p6-trap-cull
 	./build/test-sc64-p6-count-snapshot
 	./build/test-sc64-p6-trap-cull
+
+build/test-sc64-p6-burrow-cull-on: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P6_BURROW_CULL tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
+build/test-sc64-p6-burrow-cull-off: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
+.PHONY: test-sc64-p6-burrow-cull
+test-sc64-p6-burrow-cull: build/test-sc64-p6-burrow-cull-on build/test-sc64-p6-burrow-cull-off
+test-sc64-p6-query-experiments: test-sc64-p6-burrow-cull
+
+build/test-sc64-p6-burrow-grouped: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P6_BURROW_GROUPED tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
+build/test-sc64-p6-burrow-grouped-cull: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P6_BURROW_GROUPED -DSC64_P6_BURROW_CULL tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
+test-sc64-p6-burrow-cull: build/test-sc64-p6-burrow-grouped build/test-sc64-p6-burrow-grouped-cull
+	./build/test-sc64-p6-burrow-cull-on
+	./build/test-sc64-p6-burrow-cull-off
+	./build/test-sc64-p6-burrow-grouped
+	./build/test-sc64-p6-burrow-grouped-cull

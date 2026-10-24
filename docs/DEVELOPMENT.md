@@ -1209,3 +1209,16 @@ selects the army while leaving Kerrigan out, so group orders can keep the
 mission-critical hero safe. With only Kerrigan selected, **B+R** instead
 opens Storm targeting; an exhausted Kerrigan keeps her selection. This is
 an authored GBA control, not an original N64 binding.
+
+P6 burrow-release options are also default-off experiments. To run their
+four-combination differential checks after preparing the private probe inputs:
+
+```sh
+make test-sc64-p6-burrow-cull
+```
+
+Add `-DSC64_P6_BURROW_CULL -DSC64_P6_BURROW_GROUPED` to the existing
+`P6_QUERY_FLAGS` experiment to compare the grouped candidate. Retain separate
+ROM/ELF pairs and use the startup profiler's `--compare` option. These flags
+are not enabled in a qualified full-mission build yet; current evidence and
+frozen hashes are in [Validation](VALIDATION.md#p6-burrow-release-experiments).
