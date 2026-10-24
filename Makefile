@@ -44,9 +44,13 @@ P5_FLAGS := $(filter-out -DSC64_ZP_DEFENSE_TARGETS -I.local/sc64/zp-stage/genera
 P5_INPUTS := $(P4_INPUTS) .local/sc64/p5/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h
 P5_QUERY_FLAGS ?= -DSC64_P5_TYPE_FIRST_COUNTS -DSC64_P5_PRUNE_STARTED -DSC64_P5_COUNT_SNAPSHOT
 P5_SHUTTLE_FLAGS := $(P5_FLAGS) -DSC64_P5_SHUTTLE_ENABLED -DSC64_ZP_DEFENSE_TARGETS $(P5_QUERY_FLAGS)
-P6_QUERY_FLAGS ?=
+P6_VALIDATED_QUERY_FLAGS := -DSC64_P6_PRUNE_STARTED -DSC64_P6_PREVALIDATED_TICK -DSC64_P6_TRAP_CULL -DSC64_P6_COUNT_SNAPSHOT -DSC64_P6_BURROW_CULL -DSC64_P6_BURROW_GROUPED -DSC64_P6_RESCUE_GROUPED -DSC64_P6_STORM_POSTCHECK_LOCAL
+P6_QUERY_FLAGS ?= $(P6_VALIDATED_QUERY_FLAGS)
+P6_EXTRA_FLAGS ?=
 Z6_QUERY_FLAGS ?=
-P6_PROBE_FLAGS := $(P6_QUERY_FLAGS) -I.local/sc64/p6/generated $(P5_SHUTTLE_FLAGS) -DSC64_P6_DATA_ENABLED -DSC64_P6_RUNTIME -DSC64_P6_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS -DSC64_P6_COMBAT_ENABLED -DSC64_P6_CAMPAIGN_ENTRY -DSC64_P6_STORM_ENABLED
+P6_PROBE_FLAGS := $(P6_QUERY_FLAGS) $(P6_EXTRA_FLAGS) -I.local/sc64/p6/generated $(P5_SHUTTLE_FLAGS) -DSC64_P6_DATA_ENABLED -DSC64_P6_RUNTIME -DSC64_P6_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS -DSC64_P6_COMBAT_ENABLED -DSC64_P6_CAMPAIGN_ENTRY -DSC64_P6_STORM_ENABLED
+# Differential fixtures select each query option explicitly, including off builds.
+P6_QUERY_TEST_BASE_FLAGS = $(filter-out $(P6_VALIDATED_QUERY_FLAGS),$(P6_PROBE_FLAGS))
 P6_PROBE_INPUTS := $(P5_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_p6_abilities_generated.h .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p6/generated/sc64_p6_doodads_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h
 Z6_PROBE_FLAGS := $(Z6_QUERY_FLAGS) -I.local/sc64/z6/generated $(Z5_CONSUME_FLAGS) -DSC64_Z6_DATA_ENABLED -DSC64_Z6_RUNTIME -DSC64_Z6_ACTORS -DSC64_Z6_CAMPAIGN_ENTRY -DSC64_Z6_CLOAK_ENABLED -DSC64_Z6_STORM_ENABLED -DSC64_Z6_TRANSPORT_ENABLED
 Z6_PROBE_INPUTS := $(Z5_CLOAK_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_abilities_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h
@@ -1853,6 +1857,12 @@ test-sc64-z7-frame-coverage: build/test-sc64-z7-frame-coverage
 	./build/test-sc64-z7-frame-coverage
 test-sc64-z7-game-save: build/test-sc64-z7-game-save
 	./build/test-sc64-z7-game-save
+
+build/test-sc64-z7-gas-restore: tests/sc64_z7_gas_restore.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-gas-restore
+test-sc64-z7-gas-restore: build/test-sc64-z7-gas-restore
+	./build/test-sc64-z7-gas-restore
 build/test-sc64-z7-colonies: tests/sc64_z7_colonies_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z7-colonies
@@ -1915,6 +1925,19 @@ build/test-sc64-z6-collision-facts-hoist: tests/sc64_collision_fact_hoist.c $(ST
 test-sc64-z6-collision-facts: build/test-sc64-z6-collision-facts-baseline build/test-sc64-z6-collision-facts-hoist
 	./build/test-sc64-z6-collision-facts-baseline
 	./build/test-sc64-z6-collision-facts-hoist
+
+build/test-sc64-production-exit: tests/sc64_production_exit.c starcraft/sc64_production_exit.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-production-exit
+test-sc64-production-exit: build/test-sc64-production-exit
+	./build/test-sc64-production-exit
+test-starcraft: test-sc64-production-exit
+
+build/test-sc64-p3-production-exit: tests/sc64_p3_production_exit.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p3-production-exit
+test-sc64-p3-production-exit: test-sc64-production-exit build/test-sc64-p3-production-exit
+	./build/test-sc64-p3-production-exit
 
 build/test-sc64-p7-model: tests/sc64_p7.c starcraft/sc64_p7.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
@@ -1993,7 +2016,7 @@ build/test-sc64-z6-transport-game: tests/sc64_z6_transport_game.c $(STARCRAFT) $
 build/test-sc64-p6-count-snapshot: tests/sc64_p6_count_snapshot.c tests/sc64_p6_count_snapshot_reference.c starcraft/sc64_p6_count_snapshot.h starcraft/sc64_p6_world_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -Icommon -I.local/sc64/zp-stage/generated/scenarios -DSC64_P6_COUNT_SNAPSHOT tests/sc64_p6_count_snapshot.c tests/sc64_p6_count_snapshot_reference.c -o $@
 build/test-sc64-p6-trap-cull: tests/sc64_p6_trap_cull.c tests/sc64_p6_trap_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) tests/sc64_p6_trap_cull.c tests/sc64_p6_trap_cull_reference.c common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) tests/sc64_p6_trap_cull.c tests/sc64_p6_trap_cull_reference.c common/gba.c -o $@
 .PHONY: test-sc64-z6-transport test-sc64-p6-query-experiments
 test-sc64-z6-transport: build/test-sc64-z6-transport-tech build/test-sc64-z6-transport-save build/test-sc64-z6-transport-game
 	./build/test-sc64-z6-transport-tech
@@ -2004,9 +2027,9 @@ test-sc64-p6-query-experiments: test-sc64-six-query-options build/test-sc64-p6-c
 	./build/test-sc64-p6-trap-cull
 
 build/test-sc64-p6-burrow-cull-on: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P6_BURROW_CULL tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) -DSC64_P6_BURROW_CULL tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
 build/test-sc64-p6-burrow-cull-off: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
 .PHONY: test-sc64-p6-burrow-cull
 test-sc64-p6-burrow-cull: build/test-sc64-p6-burrow-cull-on build/test-sc64-p6-burrow-cull-off
 test-sc64-p6-query-experiments: test-sc64-p6-burrow-cull
@@ -2014,7 +2037,7 @@ test-sc64-p6-query-experiments: test-sc64-p6-burrow-cull
 build/test-sc64-p6-storm-validation: tests/sc64_p6_storm_validation.c tests/sc64_p6_storm_validation_reference.c tests/sc64_p6_storm_validation_fixture.h starcraft/sc64_p6_storm_adapter.h starcraft/sc64_psionic_storm.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_abilities_generated.h common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -I.local/sc64/zp-stage/generated/scenarios tests/sc64_p6_storm_validation.c tests/sc64_p6_storm_validation_reference.c common/gba.c -o $@
 build/test-sc64-p6-storm-game-local: tests/sc64_campaign_spell_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P6_STORM_POSTCHECK_LOCAL $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) -DSC64_P6_STORM_POSTCHECK_LOCAL $< common/gba.c -o $@
 .PHONY: test-sc64-p6-storm-validation
 test-sc64-p6-storm-validation: build/test-sc64-p6-storm-validation build/test-sc64-p6-storm-game build/test-sc64-p6-storm-game-local
 	./build/test-sc64-p6-storm-validation
@@ -2023,16 +2046,16 @@ test-sc64-p6-storm-validation: build/test-sc64-p6-storm-validation build/test-sc
 test-sc64-p6-query-experiments: test-sc64-p6-storm-validation
 
 build/test-sc64-p6-rescue-grouped: tests/sc64_p6_rescue_grouped.c tests/sc64_p6_rescue_grouped_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P6_RESCUE_GROUPED tests/sc64_p6_rescue_grouped.c tests/sc64_p6_rescue_grouped_reference.c common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) -DSC64_P6_RESCUE_GROUPED tests/sc64_p6_rescue_grouped.c tests/sc64_p6_rescue_grouped_reference.c common/gba.c -o $@
 .PHONY: test-sc64-p6-rescue-grouped
 test-sc64-p6-rescue-grouped: build/test-sc64-p6-rescue-grouped
 	./build/test-sc64-p6-rescue-grouped
 test-sc64-p6-query-experiments: test-sc64-p6-rescue-grouped
 
 build/test-sc64-p6-burrow-grouped: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P6_BURROW_GROUPED tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) -DSC64_P6_BURROW_GROUPED tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
 build/test-sc64-p6-burrow-grouped-cull: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P6_BURROW_GROUPED -DSC64_P6_BURROW_CULL tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) -DSC64_P6_BURROW_GROUPED -DSC64_P6_BURROW_CULL tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
 test-sc64-p6-burrow-cull: build/test-sc64-p6-burrow-grouped build/test-sc64-p6-burrow-grouped-cull
 	./build/test-sc64-p6-burrow-cull-on
 	./build/test-sc64-p6-burrow-cull-off
@@ -2050,6 +2073,18 @@ test-sc64-probe-expansion: build/test-sc64-probe-expansion build/test-sc64-probe
 	./build/test-sc64-probe-expansion
 	./build/test-sc64-probe-expansion-p6
 	./build/test-sc64-probe-expansion-z6
+
+build/test-sc64-probe-cannon: tests/sc64_probe_cannon.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
+build/test-sc64-probe-cannon-p6: tests/sc64_probe_cannon.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-probe-cannon-z6: tests/sc64_probe_cannon.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-probe-cannon
+test-sc64-probe-cannon: build/test-sc64-probe-cannon build/test-sc64-probe-cannon-p6 build/test-sc64-probe-cannon-z6
+	./build/test-sc64-probe-cannon
+	./build/test-sc64-probe-cannon-p6
+	./build/test-sc64-probe-cannon-z6
 
 build/test-sc64-weapon-vfx: tests/sc64_weapon_vfx.c starcraft/sc64_weapon_vfx.h | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@

@@ -16,7 +16,8 @@ static int race_z7_save_source_owner(const Sc64RaceMap *map, unsigned slot)
 
 static int race_z7_save_map_valid(const Sc64RaceMap *map)
 {
-    unsigned units=0, buildings=0, minerals=0, geysers_count=0, markers=0;
+    unsigned units=0, buildings=0, minerals=0, geysers_count=0,
+             extractors=0, markers=0;
     if (!race_z7_map_shape_valid(map) || !race_z7_source_row_counts(map)) return 0;
     for (unsigned row=0; row<map->unit_count; ++row) {
         const Sc64ImportedUnit *src=&map->units[row];
@@ -32,13 +33,17 @@ static int race_z7_save_map_valid(const Sc64RaceMap *map)
             if (src->owner!=SC64_OWNER_NEUTRAL) return 0;
             ++geysers_count; continue;
         }
+        if (raw==149u) {
+            if (src->owner!=4u) return 0;
+            ++extractors;
+        }
         if (src->owner>=8u) return 0;
         if (sc64_race_unit_from_raw((int)raw)>=0) ++units;
         else if (sc64_race_building_from_raw((int)raw)>=0) ++buildings;
         else return 0;
     }
     return units==113u && buildings==57u && minerals==60u &&
-           geysers_count==1u && markers==0u &&
+           geysers_count==1u && extractors==5u && markers==0u &&
            units<=MAX_UNITS && buildings<=MAX_BUILDINGS &&
            minerals<=MAX_MINERALS && geysers_count<=MAX_RACE_GEYSERS;
 }
@@ -70,6 +75,43 @@ static int race_z7_save_source_building_match(const Sc64RaceMap *map,
     return src->owner==3u && raw==131u && owner==SIDE &&
         (saved->raw_type==132 || saved->raw_type==133) &&
         sc64_race_building_from_raw(saved->raw_type)==saved->type;
+}
+
+static int race_z7_save_gas_source_row(const Sc64RaceMap *map,int x,int y,
+                                       unsigned *row_out)
+{
+    for (unsigned row=0;row<map->unit_count;++row) {
+        const Sc64ImportedUnit *src=&map->units[row];
+        if ((src->source_type==188u && src->owner==SC64_OWNER_NEUTRAL) ||
+            (src->source_type==149u && src->owner==4u)) {
+            if (src->x_px==(unsigned)x && src->y_px==(unsigned)y) {
+                if (row_out) *row_out=row;
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static int race_z7_save_candidate_has_gas(const RaceSave *candidate,
+                                          int x,int y)
+{
+    unsigned count=(unsigned)candidate->state[16];
+    for (unsigned i=0;i<count;++i)
+        if (candidate->geysers[i].x==x && candidate->geysers[i].y==y) return 1;
+    return 0;
+}
+
+static int race_z7_save_candidate_has_live_extractor(const RaceSave *candidate,
+                                                      int x,int y)
+{
+    for (unsigned i=0;i<MAX_BUILDINGS;++i) {
+        Building saved;
+        if (!race_save_decode_building(candidate,i,&saved)) return 0;
+        if (saved.alive && saved.raw_type==149 && saved.raw_owner==4 &&
+            saved.type==B_EXTRACTOR && saved.x==x && saved.y==y) return 1;
+    }
+    return 0;
 }
 
 static int race_z7_save_human_unit_type(int type)
@@ -145,13 +187,15 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
     u8 seen_units[(MAX_UNITS+7u)/8u]={0};
     u8 seen_building_rows[32]={0};
     u8 seen_minerals[(MAX_MINERALS+7u)/8u]={0};
-    u8 seen_geysers[(MAX_RACE_GEYSERS+7u)/8u]={0};
-    unsigned live=0,queued=0,source_geysers=0;
+    unsigned live=0,queued=0,source_geysers=0,source_extractors=0;
     unsigned live_human_source_actors=0,live_enemy_source_buildings=0;
 
     map=&sc64_race_maps[SC64_Z7_GLOBAL_ID];
-    for (unsigned row=0;row<map->unit_count;++row)
+    for (unsigned row=0;row<map->unit_count;++row) {
         source_geysers+=map->units[row].source_type==188u;
+        source_extractors+=map->units[row].source_type==149u &&
+                           map->units[row].owner==4u;
+    }
 
     if (!candidate || !state || width!=SC64_Z7_MAP_COLS ||
         height!=SC64_Z7_MAP_ROWS || !race_z7_save_map_valid(
@@ -403,16 +447,36 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
             }
             if (!found) return 0;
         } else if (raw==188u) {
-            int found=0;
-            for (unsigned i=0;i<source_geysers && i<MAX_RACE_GEYSERS;++i)
-                if (!(seen_geysers[i>>3]&(1u<<(i&7u))) &&
-                    candidate->geysers[i].x==src->x_px && candidate->geysers[i].y==src->y_px) {
-                    seen_geysers[i>>3]|=(u8)(1u<<(i&7u)); found=1; break;
-                }
-            if (!found) return 0;
+            continue;
         }
     }
-    if (candidate->state[16]!=(int)source_geysers || source_geysers!=1u) return 0;
+    if (source_geysers!=1u || source_extractors!=5u ||
+        candidate->state[16]<(int)source_geysers ||
+        candidate->state[16]>(int)(source_geysers+source_extractors)) return 0;
+    /* The saved node list is exactly the immutable neutral starting geyser
+     * plus raw-149 source Extractor positions whose original building row is
+     * no longer alive.  This is independent of current runtime map binding,
+     * and rejects duplicate, invented, consumed-while-occupied, and stale
+     * off-map nodes before live state is mutated. */
+    for (unsigned i=0;i<(unsigned)candidate->state[16];++i) {
+        int x=candidate->geysers[i].x,y=candidate->geysers[i].y;
+        if (x<0 || y<0 || x>=(int)width*16 || y>=(int)height*16 ||
+            !race_z7_save_gas_source_row(map,x,y,0)) return 0;
+        for (unsigned j=0;j<i;++j)
+            if (candidate->geysers[j].x==x && candidate->geysers[j].y==y) return 0;
+    }
+    for (unsigned row=0;row<map->unit_count;++row) {
+        const Sc64ImportedUnit *src=&map->units[row];
+        unsigned raw=src->source_type;
+        int expected;
+        if (raw==188u && src->owner==SC64_OWNER_NEUTRAL) expected=1;
+        else if (raw==149u && src->owner==4u)
+            expected=!race_z7_save_candidate_has_live_extractor(
+                candidate,src->x_px,src->y_px);
+        else continue;
+        if (race_z7_save_candidate_has_gas(candidate,src->x_px,src->y_px)!=expected)
+            return 0;
+    }
     for (unsigned i=0;i<MAX_MINERALS;++i) if (!(seen_minerals[i>>3]&(1u<<(i&7u)))) {
         Mineral saved;
         if (!race_save_decode_mineral(candidate,i,width*16u,height*16u,&saved)) return 0;

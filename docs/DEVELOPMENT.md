@@ -1247,7 +1247,7 @@ ASan/UBSan. It writes the private replay trace to `build/z6-controller.json`.
 The controller also accepts `--trace PATH` when invoked directly. A host win
 does not qualify the ARM replay, SRAM handoff or physical GBA performance.
 
-Two further P6 experiments remain default-off: `SC64_P6_RESCUE_GROUPED`
+The qualified P6 defaults now include both: `SC64_P6_RESCUE_GROUPED`
 groups live friendly rescue candidates while preserving in-frame rescue
 chains; `SC64_P6_STORM_POSTCHECK_LOCAL` skips the unchanged mission-model
 post-validation after a successful Storm tick. It retains full entry checks
@@ -1263,7 +1263,7 @@ mission-critical hero safe. With only Kerrigan selected, **B+R** instead
 opens Storm targeting; an exhausted Kerrigan keeps her selection. This is
 an authored GBA control, not an original N64 binding.
 
-P6 burrow-release options are also default-off experiments. To run their
+P6 burrow-release options are included in the qualified defaults. To run their
 four-combination differential checks after preparing the private probe inputs:
 
 ```sh
@@ -1310,7 +1310,7 @@ existing 256-entry queue and RAM layout. It changes the debugger observation
 cadence; ordinary play continues to use the same game rules. For the P6 probe:
 
 ```sh
-make -B protoss-p6-probe P6_QUERY_FLAGS=-DSC64_DENSE_SCHEDULE
+make -B protoss-p6-probe P6_EXTRA_FLAGS=-DSC64_DENSE_SCHEDULE
 python3 tools/sc64_zp_controller_replay.py --help
 ```
 
@@ -1387,3 +1387,32 @@ make test-sc64-z6-collision-facts
 `SC64_COLLISION_FACT_HOIST` changes only repeated collision fact lookups;
 leave it disabled for normal builds until the recorded ARM comparison and
 qualification are complete.
+
+P6's eight query options are enabled by default after the full ARM win and
+fresh-process save checks. `P6_QUERY_FLAGS=` explicitly builds the reference
+path; assigning a subset replaces the defaults for a component comparison.
+`P6_EXTRA_FLAGS` appends replay/diagnostic options without replacing the query
+options. Differential Make fixtures explicitly select their on/off variants.
+The qualified dense P6 run averages 12.75 fps; 30 fps remains unfinished.
+
+The Probe-only command menu includes CANNON after NEXUS. The existing Forge,
+power, cost and placement rules apply; the new row provides access to them.
+`make test-sc64-probe-cannon test-sc64-probe-expansion` checks both commands
+in basic unified, Z6 and P6 builds.
+
+P3 has an optional bounded production-exit experiment:
+
+```sh
+make test-sc64-production-exit test-sc64-p3-production-exit
+make -B protoss-p5-shuttle P3_EXTRA_FLAGS=-DSC64_P3_PRODUCTION_EXIT
+```
+
+It is active only during P3 and remains disabled by default. Clear exits keep
+the existing location; blocked exits search for reachable space, and completed
+orders wait when no space is available. This is a bounded GBA placement model,
+with the limitations recorded in VALIDATION. Use a clean rebuild without the
+extra flag to return to the normal P5 build.
+
+After Z7 inputs are prepared, `make test-sc64-z7-gas-restore` checks destroyed
+source Extractors reopening their geyser locations and the corresponding
+transactional save validation. This does not establish a full Z7 win.

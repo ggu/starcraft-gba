@@ -3110,3 +3110,99 @@ does not itself promote the canonical campaign profiles.
 The final 527-file source-only export passes `./dev build` and `./dev test`,
 including 359 Python checks (six private-input checks skipped). No ROM,
 imported header, asset, capture or private replay is included in the index.
+
+### P6 full fast dense ARM qualification
+
+The eight P6 query options pass the complete normal-input ARM route on ROM
+`0e1f791e…da447` / ELF `3e201b40…96b0b`, with controller trace
+`e66d25a4…00421`. All 174,855 input ticks and 701 observer checkpoints complete
+at gameplay frame 172327. The live source Zeratul (raw 75, source owner 2,
+runtime owner 0) has 60 HP at (1267,1701), inside source extraction location
+15; Tassadar (raw 79, same owners) has 78 HP at (1523,1879). Source outcome is
+WON, fault/cursors/action clocks are zero and completion bit 25 is set.
+
+Opening and late saves also restore exactly in fresh HOME processes. The
+opening prefix is frame 976; its saved frame 977 resumes to 1038 after the
+neutral handoff and 60 live updates. The 150,000-input-tick late prefix is
+frame 147765; its saved frame 147766 resumes to 147827 by the same protocol.
+The complete run averages **12.75 effective fps**, measured from chained GBA
+hardware timers over positive PLAY-to-PLAY intervals (171,988 live frames).
+The late prefix averages 12.42 fps; these are emulator measurements.
+
+This qualifies staged P6 and brings the total to **22/30 (T10/Z6/P6)**.
+Canonical profiles remain T10/Z3/P3. The eight query options now form the P6
+build defaults; dense scheduling is a separate observer option. The earlier
+sections describe experiments before this qualification. No native-animation,
+full-campaign 30-fps or physical-GBA claim follows from this result.
+
+### Z6 collision timing and movement diagnosis
+
+The 12,000-input-tick ARM comparison completes with all 13 reported states
+and four decoded captures equal. With the count snapshot enabled in both
+builds, collision fact hoisting improves the prefix from **9.82 to 10.47 fps**
+(6.62%). This is a prefix measurement, not a complete mission or hardware gain;
+the option remains disabled by default pending full qualification.
+
+An instrumented reference build matches the same observations/captures. Its
+last observed update uses 1,305,973 cycles, including 846,492 in orders:
+70,972 setup, 36,426 target queries and 692,462 movement. Instrumented timing
+is for diagnosis and is not substituted for the uninstrumented comparison.
+
+### Cannon placement and optional P3 production exits
+
+Probe-only selection exposes CANNON immediately after the existing NEXUS row.
+The command uses the existing 150-mineral Photon Cannon rule, completed Forge,
+Pylon power and paid Probe warp-in path. Contextual spell/transport rows keep
+their selection context and the Nexus index is unchanged. Actual-engine
+sanitizer fixtures pass normal menu/scroll dispatch, mixed-selection rejection,
+missing Forge, unpowered-site and 149-mineral denial, payment at 150, Probe
+release, timed completion, and powered ground/air defense with no fire after
+power loss. Basic unified, Z6 and P6 command fixtures pass.
+
+The source-backed P3 production-exit experiment avoids placing a newly trained
+unit directly on an occupied exit. It preserves a clear preferred point, then
+checks bounded outward candidates against the current GBA terrain, building,
+unit and route predicates. A blocked order remains paid/queued and retries
+after eight ticks; Zergling pairs plan both positions before either spawns.
+Flying products ignore ground-building/terrain blockers and retain same-flight
+unit checks. No persistent storage or save layout changes. The feature is
+P3-only and default-off. Standalone and actual-game ASan/UBSan fixtures cover
+these transitions, including atomic failure and later unblocking.
+
+This is not native bounding-box placement equivalence: it uses the current GBA
+collision radii, a 60-pixel bounded search and at most 514 candidates. Worst-case
+placement cost and complete ARM playthrough remain unqualified. The old P3
+controller still limits under the larger P5-bank enemy capacity, so this patch
+does not close canonical Protoss promotion. Failed strategy/diagnostic drafts
+remain private; the tracked controller is the committed reproducible route.
+
+### Z7 source Extractors restore gas availability
+
+Pinned OpenBW's Extractor death path changes it into a neutral Vespene Geyser
+at the same position (`bwgame.h:16146–16158`). Z7's authenticated source map has
+one explicit raw-188 node and five enemy raw-149 Extractors. The GBA death hook
+now restores the latter locations when their original Extractor dies. Repeated
+notifications and rebuilt human Extractor deaths do not duplicate the node;
+there is no refund or resource grant. Starting source census remains unchanged.
+
+The packed SRAM layout and reserve guards are unchanged. Cold-HOME candidate
+validation requires exactly the neutral starting node plus source Extractor
+positions whose original building no longer lives. It rejects duplicate,
+off-source, missing and prematurely restored nodes before applying state. The
+focused actual-death/SRAM fixture and existing Z7 save fixture pass, including
+transactional rejection and capacity failure. A normal-input trial destroys the
+nearby source Extractor, observes the restored node, builds a paid Extractor and
+assigns gas workers; the trial still loses its army/economy. Full Z7 completion
+remains unfinished. Gas reservoir depletion is still not implemented.
+
+The final 532-file source-only snapshot passes `./dev build` and `./dev test`,
+including 359 Python tests (six private-input checks skipped). Current unified
+ARM/host checks and the canonical race build/test suite pass. The experimental
+P3 controller draft was preserved privately and the committed controller
+restored before the canonical checks. All 54 skirmish sanitizer matches finish
+again (six wins, 48 defeats); Z7 runtime/profile/frame/save/colony/gas checks
+pass. Current P6, P5 and Z7 ARM outputs and the opt-in P3-placement P5 build
+pass the unchanged RAM reserve guards; the standard P5 output is restored.
+These source/build/fixture checks do not establish a full Z7 win or qualify
+P3 placement on ARM. The new P6 defaults reproduce the exact winning host
+trace `e66d25a4…00421`.

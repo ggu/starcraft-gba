@@ -47,6 +47,48 @@ static int race_z7_product_source_owner(int owner)
     return owner==SIDE ? 3 : owner==ENEMY ? 4 : -1;
 }
 
+static int race_z7_map_shape_valid(const Sc64RaceMap *map);
+
+/* Native StarCraft turns a destroyed Extractor into a neutral Vespene
+ * Geyser at the same map coordinate.  Z7 keeps authenticated raw 149 rows as
+ * buildings until this hook runs; only those five immutable locations can
+ * become additional nodes.  This restores availability only: the shared
+ * engine's gas reservoir remains non-depleting, and no resource is refunded. */
+static int race_z7_source_gas_node(const Sc64RaceMap *map,int x,int y)
+{
+    if (!map || !race_z7_map_shape_valid(map)) return 0;
+    for (unsigned row=0;row<map->unit_count;++row) {
+        const Sc64ImportedUnit *src=&map->units[row];
+        if (src->source_type==149u && src->owner==4u &&
+            src->x_px==(unsigned)x && src->y_px==(unsigned)y) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void race_z7_note_building_death(const Building *q)
+{
+    const Sc64RaceMap *map=race_z7_map;
+    if (!race_z7_active() || !q || q->type!=B_EXTRACTOR) return;
+    if (!map && SC64_Z7_GLOBAL_ID<SC64_RACE_MAP_COUNT)
+        map=&sc64_race_maps[SC64_Z7_GLOBAL_ID];
+    if (!race_z7_source_gas_node(map,q->x,q->y)) return;
+    if (geyser_count<0 || geyser_count>MAX_RACE_GEYSERS) {
+        race_z7.runtime.fault=SC64_Z7_RUNTIME_FAULT_ACTOR;
+        return;
+    }
+    for (int i=0;i<geyser_count;++i)
+        if (geysers[i].x==q->x && geysers[i].y==q->y) return;
+    if (geyser_count>=MAX_RACE_GEYSERS) {
+        race_z7.runtime.fault=SC64_Z7_RUNTIME_FAULT_ACTOR;
+        return;
+    }
+    geysers[geyser_count].x=q->x;
+    geysers[geyser_count].y=q->y;
+    ++geyser_count;
+}
+
 static int race_z7_map_shape_valid(const Sc64RaceMap *map)
 {
     static const u8 modes[8]={2,2,2,0,1,2,2,2};
@@ -66,7 +108,8 @@ static int race_z7_map_shape_valid(const Sc64RaceMap *map)
 
 static int race_z7_source_row_counts(const Sc64RaceMap *map)
 {
-    unsigned units=0,buildings=0,minerals_count=0,geysers_count=0,markers=0;
+    unsigned units=0,buildings=0,minerals_count=0,geysers_count=0,
+             extractors=0,markers=0;
     if (!race_z7_map_shape_valid(map)) return 0;
     for (unsigned i=0;i<map->unit_count;++i) {
         const Sc64ImportedUnit *src=&map->units[i]; unsigned raw=src->source_type;
@@ -74,13 +117,17 @@ static int race_z7_source_row_counts(const Sc64RaceMap *map)
         if (raw==214u) { ++markers; continue; }
         if (raw>=176u && raw<=178u) { ++minerals_count; continue; }
         if (raw==188u) { ++geysers_count; continue; }
+        if (raw==149u) {
+            if (src->owner!=4u) return 0;
+            ++extractors;
+        }
         if (src->owner>=8u) return 0;
         if (sc64_race_unit_from_raw((int)raw)>=0) ++units;
         else if (sc64_race_building_from_raw((int)raw)>=0) ++buildings;
         else return 0;
     }
     return units==113u && buildings==57u && minerals_count==60u &&
-           geysers_count==1u && markers==0u && units<=MAX_UNITS &&
+           geysers_count==1u && extractors==5u && markers==0u && units<=MAX_UNITS &&
            buildings<=MAX_BUILDINGS && minerals_count<=MAX_MINERALS &&
            geysers_count<=MAX_RACE_GEYSERS && SC64_Z7_SOURCE_ACTION_COUNT==15u;
 }

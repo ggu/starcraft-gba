@@ -2,6 +2,12 @@
 #define SC64_RACE_ADAPTER_H
 
 #include "race_skirmish.h"
+#ifdef SC64_P3_PRODUCTION_EXIT
+#ifndef SC64_P3_RUNTIME
+#error "SC64_P3_PRODUCTION_EXIT requires the P3 campaign runtime"
+#endif
+#include "sc64_production_exit.h"
+#endif
 #ifdef SC64_Z5_RUNTIME
 #include "sc64_z5_hp_regen.h"
 #endif
@@ -454,6 +460,103 @@ static void race_complete_building(int i)
     if (sc64_race_is_zerg_townhall(b[i].type)) b[i].larva = 3;
 }
 
+#ifdef SC64_P3_PRODUCTION_EXIT
+typedef struct {
+    int producer_type;
+    int reserved;
+    int reserved_x, reserved_y, reserved_type;
+} Sc64P3ProductionExitContext;
+
+static int sc64_p3_exit_in_bounds(void *opaque, int x, int y)
+{
+    (void)opaque;
+    return x >= 0 && y >= 0 && x < WORLD_W && y < WORLD_H;
+}
+
+static int sc64_p3_exit_terrain_fits(void *opaque, int x, int y)
+{
+    (void)opaque;
+    return !terrain_blocked(x / 16, y / 16);
+}
+
+static int sc64_p3_exit_radius(int type)
+{
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    return sc64_game_unit_collision_radius(type);
+#else
+    (void)type;
+    return 6;
+#endif
+}
+
+static int sc64_p3_exit_building_blocked(void *opaque, int x, int y, int flying)
+{
+    int radius = sc64_p3_exit_radius(((Sc64P3ProductionExitContext *)opaque)->producer_type);
+    /* Ground structures block ground exits, but a flying producer can emerge
+     * over them. Unit collision remains flight-class-aware below. */
+    if (flying) return 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i) {
+        if (!b[i].alive) continue;
+        if (b[i].type == B_ZERG_BEACON) continue;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+        if (!sc64_t4_building_collidable(i)) continue;
+#endif
+        if (dist2(x, y, b[i].x, b[i].y) < (radius + 14) * (radius + 14)) return 1;
+    }
+    return 0;
+}
+
+static int sc64_p3_exit_unit_blocked(void *opaque, int x, int y, int flying)
+{
+    Sc64P3ProductionExitContext *ctx = (Sc64P3ProductionExitContext *)opaque;
+    int radius = sc64_p3_exit_radius(ctx->producer_type);
+    if (ctx->reserved &&
+        sc64_race_unit_flying(ctx->reserved_type) == flying &&
+        dist2(x, y, ctx->reserved_x, ctx->reserved_y) < radius * radius)
+        return 1;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i])) continue;
+        if (sc64_race_unit_flying(u[i].type) != flying) continue;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+        if (!sc64_game_unit_collidable(u[i].type)) continue;
+#endif
+        int other_radius = sc64_p3_exit_radius(u[i].type);
+        int required = other_radius > radius ? other_radius : radius;
+        if (dist2(x, y, u[i].x, u[i].y) < required * required) return 1;
+    }
+    return 0;
+}
+
+static int sc64_p3_exit_reachable(void *opaque, int from_x, int from_y, int x, int y)
+{
+    Sc64P3ProductionExitContext *ctx = (Sc64P3ProductionExitContext *)opaque;
+    int next_x, next_y;
+    if (sc64_race_unit_flying(ctx->producer_type)) return 1;
+    /* path_next_tile treats blocked goals as approach targets. A production
+     * point must be open itself, or it could teleport into a sealed tile. */
+    if (!is_traversable(x / 16, y / 16, -1)) return 0;
+    return path_next_tile(from_x, from_y, x, y, &next_x, &next_y);
+}
+
+static int sc64_p3_find_production_exit(int producer, int type,
+                                        int preferred_x, int preferred_y,
+                                        int *out_x, int *out_y,
+                                        Sc64P3ProductionExitContext *ctx)
+{
+    Sc64ProductionExitOps ops;
+    ctx->producer_type = type;
+    ops.context = ctx;
+    ops.in_bounds = sc64_p3_exit_in_bounds;
+    ops.terrain_fits = sc64_p3_exit_terrain_fits;
+    ops.building_blocked = sc64_p3_exit_building_blocked;
+    ops.unit_blocked = sc64_p3_exit_unit_blocked;
+    ops.reachable = sc64_p3_exit_reachable;
+    return sc64_production_exit_find(&ops, b[producer].x, b[producer].y,
+                                     preferred_x, preferred_y,
+                                     sc64_race_unit_flying(type), out_x, out_y);
+}
+#endif
+
 static void race_tick_buildings(void)
 {
     int i;
@@ -492,6 +595,61 @@ static void race_tick_buildings(void)
 #endif
         x = b[i].x + 20; y = b[i].y + 4;
         if (x >= WORLD_W - 8) x = b[i].x - 20;
+#ifdef SC64_P3_PRODUCTION_EXIT
+        if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID) {
+            Sc64P3ProductionExitContext ctx;
+            int first_x = x, first_y = y;
+            if (type == U_ZERGLING) {
+                int second_x, second_y, free_slots = 0;
+                ctx.reserved = 0;
+                for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+                if (free_slots < 2 ||
+                    !sc64_p3_find_production_exit(i, type, x, y, &first_x, &first_y, &ctx)) {
+                    b[i].queue_progress = frames > 8 ? frames - 8 : 0;
+                    continue;
+                }
+                ctx.reserved = 1;
+                ctx.reserved_x = first_x; ctx.reserved_y = first_y; ctx.reserved_type = type;
+                if (!sc64_p3_find_production_exit(i, type, first_x + 8, first_y,
+                                                  &second_x, &second_y, &ctx)) {
+                    b[i].queue_progress = frames > 8 ? frames - 8 : 0;
+                    continue;
+                }
+                int first_slot = spawn_unit(owner, U_ZERGLING, first_x, first_y);
+                if (first_slot < 0 || spawn_unit(owner, U_ZERGLING, second_x, second_y) < 0) {
+                    /* Capacity was checked before planning and no world state
+                     * changes between the paired spawns; this is defensive. */
+                    if (first_slot >= 0) u[first_slot].alive = 0;
+                    b[i].queue_progress = frames > 8 ? frames - 8 : 0;
+                    continue;
+                }
+            } else {
+                int spawned;
+                ctx.reserved = 0;
+                if (!sc64_p3_find_production_exit(i, type, x, y, &first_x, &first_y, &ctx)) {
+                    b[i].queue_progress = frames > 8 ? frames - 8 : 0;
+                    continue;
+                }
+                spawned = spawn_unit(owner, type, first_x, first_y);
+                if (spawned < 0) {
+                    b[i].queue_progress = frames > 8 ? frames - 8 : 0;
+                    continue;
+                }
+                if (sc64_race_is_worker(type)) {
+                    int patch = nearest_mineral(first_x, first_y);
+                    if (patch >= 0 && patch < MAX_MINERALS && m[patch].amount > 0) {
+                        u[spawned].order = ORDER_MINE; u[spawned].target = patch; u[spawned].work_timer = 0;
+                    }
+                }
+            }
+            supply = sc64_race_unit_supply_provided(type);
+            if (supply && owner == SIDE) supply_cap += supply;
+            b[i].queue_head = (b[i].queue_head + 1) % 5;
+            --b[i].queue_count;
+            b[i].queue_progress = 0;
+            continue;
+        }
+#endif
         if (type == U_ZERGLING) {
             int free_slots=0;
             for(int slot=0;slot<MAX_UNITS;slot++)if(!u[slot].alive)free_slots++;

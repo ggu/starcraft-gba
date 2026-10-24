@@ -962,6 +962,7 @@ static Sc64Z7PersistentState race_z7;
 static int race_z7_active(void);
 static int race_z7_source_owner(unsigned source_slot);
 static int race_z7_product_source_owner(int owner);
+static void race_z7_note_building_death(const Building *q);
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 static int race_z7_colony_start_sunken(int building);
 static int race_z7_colony_pre_building_tick(void);
@@ -2640,6 +2641,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #ifdef SC64_Z6_RUNTIME
             if (q->alive && race_z6_active()) race_z6_note_building_death(q);
 #endif
+#ifdef SC64_Z7_RUNTIME
+            if (q->alive && race_z7_active()) race_z7_note_building_death(q);
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
             if(q->alive && !race_mode && race_selected_mission==6 &&
                q->owner==ENEMY && source_owner==SIDE && race_t3_buildings_killed<65535u)
@@ -3410,6 +3414,22 @@ race_nexus_command_available(void)
         }
     return found;
 }
+
+/* Keep the extra defense command in the same Probe-only context as the
+ * Nexus action, and reject mixed selections even if another owner is
+ * selected through a debug or imported-control path. */
+static int
+race_probe_cannon_command_available(void)
+{
+    int found=0;
+    if (race_human != R_PROTOSS || selected_building >= 0) return 0;
+    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].selected) {
+        if (u[i].owner != SIDE || u[i].type != U_PROBE ||
+            SC64_TRANSPORT_LOADED(&u[i])) return 0;
+        found=1;
+    }
+    return found;
+}
 #endif
 
 static void
@@ -3592,6 +3612,9 @@ choose_command(int choice)
        selected actors, while a selected Probe exposes base expansion. */
     if (choice == MENU_STOP + 1 && race_nexus_command_available()) {
         menu_open = 0; mode = MODE_BUILD; menu = B_NEXUS; return;
+    }
+    if (choice == MENU_STOP + 2 && race_probe_cannon_command_available()) {
+        menu_open = 0; mode = MODE_BUILD; menu = B_PHOTON_CANNON; return;
     }
 #endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
@@ -3778,6 +3801,7 @@ static int field_menu_count(void)
 #ifdef SC64_P4_STORM_ENABLED
     if (race_p4_storm_menu_available()) return MENU_STOP + 2;
 #endif
+    if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     if (race_human==R_ZERG) {
@@ -3791,12 +3815,13 @@ static int field_menu_count(void)
 #elif defined(SC64_T5_RUNTIME)
 static int field_menu_count(void)
 {
+    if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
     return race_human == R_TER ? MENU_COUNT : MENU_STOP + 1;
 }
 #elif defined(SC64_RACES)
 static int field_menu_count(void)
-{ return MENU_STOP + 1 + race_nexus_command_available(); }
+{ return MENU_STOP + 1 + race_nexus_command_available() + race_probe_cannon_command_available(); }
 #else
 #define field_menu_count() MENU_COUNT
 #endif
@@ -3807,6 +3832,8 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     if (choice==MENU_STOP+1 && race_z7_colony_command_available()) return "SUNKEN";
 #endif
+    if (choice == MENU_STOP + 2 && race_probe_cannon_command_available())
+        return "CANNON";
     return choice == MENU_STOP + 1 && race_nexus_command_available() ?
         "NEXUS" : labels[choice];
 }
@@ -6161,7 +6188,8 @@ draw_map(void)
         if (menu_cursor >= 10) first = menu_cursor - 9;
 	for (i = first; i < count && i < first + 10; i++) {
             const char *label = race_nexus_command_available() && i == MENU_STOP + 1 ?
-                "NEXUS" : i >= MENU_FACTORY ?
+                "NEXUS" : race_probe_cannon_command_available() && i == MENU_STOP + 2 ?
+                "CANNON" : i >= MENU_FACTORY ?
                 advanced_labels[i - MENU_FACTORY] : labels[i];
 	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
 	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);

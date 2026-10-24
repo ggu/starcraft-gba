@@ -50,7 +50,7 @@ int main(void)
         if (u[i].alive && u[i].owner==SIDE && u[i].type==U_PROBE)
             u[i].selected=1;
     assert(race_nexus_command_available()); /* A group of only Probes also works. */
-    assert(field_menu_count()==MENU_STOP+2);
+    assert(field_menu_count()==MENU_STOP+3);
     press(KEY_B);
     for (int i=0;i<MENU_STOP+1;++i) press(KEY_DOWN);
     assert(menu_cursor==MENU_STOP+1);
