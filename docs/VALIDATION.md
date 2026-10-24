@@ -2830,3 +2830,36 @@ L at frame 967, takes one neutral handoff frame and then 60 measured live
 frames to frame 1028. That is an opening save check, not the late-mission
 qualification. The 150,000-tick save and new full replay remain running;
 staged qualification remains 20/30 until those checks complete.
+
+### Default-off Z6 count-phase snapshot
+
+`SC64_Z6_COUNT_SNAPSHOT` builds eight Command/Bring query counts with one scan
+of the live unit/building banks. Current Player is resolved separately for
+each source trigger, and positive unmapped raw IDs still count for AnyUnit as
+they do in the existing scan. The cache is local to the scheduler's condition
+phase and discarded before action dispatch, including failed dispatch;
+unsupported metadata, locations or source owners retain full-scan fallback.
+The snapshot occupies 30 stack bytes, with a builder bounded to 56 bytes and
+seven small location rectangles. No BSS or saved state is added.
+
+ASan/UBSan checks match 500 synthetic full-bank worlds and 100 randomized
+actual-engine worlds against the production full scan, including Current
+Player, raw-type fallback, unmapped IDs, buildings, moving rectangles,
+half-open boundary cases, invalid-owner failure and action invalidation.
+Runtime and cold-load/save checks pass with the option enabled. The complete
+normal-input host controller still wins and produces the identical trace
+SHA-256 `5199d432…ad894` recorded above.
+
+The ARM candidate passes unchanged reserves at IWRAM `0x03004eb8` / BSS
+`0x0203d980`, with ROM SHA-256
+`435f18383b287f2315d230e8c338a0fff7184655b35d238c3859d455720975e3`
+and ELF SHA-256
+`8865a640f1f19e5fc69cff5c6caa45309598e288b0d0d968976410ab0f562eeb`.
+Private frozen inputs are under `.local/build/promotion/z6-count-query-frozen/`.
+The option remains disabled by default pending the queued ARM comparison;
+no frame-rate gain or full ARM equivalence is claimed yet.
+
+This optimization preserves the current center-in-location predicate. The
+pinned reference instead uses actor-area intersection for Bring queries and
+supports elevation filtering; those boundary semantics remain a separate Z6
+fidelity gap and are not concealed by the count-cache equivalence checks.

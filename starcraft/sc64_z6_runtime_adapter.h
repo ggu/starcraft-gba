@@ -11,6 +11,9 @@
 
 #include "sc64_z6_state.h"
 #include "sc64_z6_world_adapter.h"
+#ifdef SC64_Z6_COUNT_SNAPSHOT
+#include "sc64_z6_count_snapshot.h"
+#endif
 
 enum {
     SC64_Z6_RUNTIME_FAULT_MAP = 0x40,
@@ -550,17 +553,96 @@ static void race_z6_note_building_death(const Building *q)
         ++race_z6.deaths_by_source[source];
 }
 
+#ifdef SC64_Z6_COUNT_SNAPSHOT
+typedef struct {
+    Sc64Z6WorldContext *world;
+    Sc64Z6CountSnapshot *snapshot;
+} Sc64Z6CachedOpsContext;
+
+static int race_z6_count_snapshot_build(Sc64Z6WorldContext *world,
+                                         Sc64Z6CountSnapshot *snapshot)
+{
+    Sc64Z6CountSnapshotBuilder builder;
+    Sc64Z6CountRect rects[7] = {{0}};
+    Sc64Z6CountActor actor;
+    if (!snapshot) return 0;
+    snapshot->active = 0;
+    if (!world) return 0;
+    for (unsigned qi=0; qi<SC64_Z6_COUNT_QUERY_COUNT; ++qi) {
+        unsigned id=sc64_z6_count_query_keys[qi].location;
+        Sc64Z6CountRect *r;
+        if (!id || rects[id].valid) continue;
+        r=&rects[id];
+        if (!sc64_z6_world_location(world,id,&r->left,&r->top,
+                                     &r->right,&r->bottom)) return 0;
+        r->valid=1;
+    }
+    if (!sc64_z6_count_snapshot_begin(snapshot,&builder,
+            world->source_slot_active,world->source_force_for_slot,rects,7)) return 0;
+    for (unsigned i=0; i<MAX_UNITS; ++i) if (u[i].alive) {
+        int raw=u[i].raw_type>=0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type);
+        actor=(Sc64Z6CountActor){u[i].x,u[i].y,(s16)raw,u[i].raw_owner,1,
+            (u8)((raw==51 || raw==79) && sc64_race_unit_from_raw(raw)>=0)};
+        if (!sc64_z6_count_snapshot_add_actor(&builder,&actor,0,rects)) return 0;
+    }
+    for (unsigned i=0; i<MAX_BUILDINGS; ++i) if (b[i].alive) {
+        int raw=b[i].raw_type>=0 ? b[i].raw_type : sc64_race_raw_building(b[i].type);
+        /* The exact-type rows name units; buildings only match AnyUnit. */
+        actor=(Sc64Z6CountActor){b[i].x,b[i].y,(s16)raw,b[i].raw_owner,1,0};
+        if (!sc64_z6_count_snapshot_add_actor(&builder,&actor,1,rects)) return 0;
+    }
+    return sc64_z6_count_snapshot_finish(&builder,snapshot);
+}
+
+static int race_z6_count_cached_condition(void *context,
+    const Sc64Z6RuntimeState *state,const Sc64Z6SourceCondition *condition)
+{
+    Sc64Z6CachedOpsContext *cached=(Sc64Z6CachedOpsContext *)context;
+    u32 count;
+    if (!cached || !cached->world || !state || !condition) return -1;
+    if (sc64_z6_count_snapshot_lookup(cached->snapshot,condition,&count))
+        return sc64_z6_world_compare(condition->comparison,count,condition->amount);
+    return race_z6_runtime_condition(cached->world,state,condition);
+}
+
+static int race_z6_count_cached_action(void *context,
+                                       const Sc64Z6SourceAction *action)
+{
+    Sc64Z6CachedOpsContext *cached=(Sc64Z6CachedOpsContext *)context;
+    if (!cached || !cached->world) return 0;
+    /* All conditions precede actions. Discard before any mutation as an
+       extra guard; a later query always falls back to the current world. */
+    if (cached->snapshot) cached->snapshot->active=0;
+    return race_z6_runtime_action(cached->world,action);
+}
+#endif
+
 static int race_z6_runtime_tick(u32 elapsed_frames, int user_paused)
 {
     int result;
     int ai_started_before;
+#ifdef SC64_Z6_COUNT_SNAPSHOT
+    Sc64Z6CountSnapshot snapshot={0};
+    Sc64Z6CachedOpsContext cached={&race_z6_world,&snapshot};
+    Sc64Z6WorldOps ops=race_z6_ops;
+#endif
     if (!race_z6_active()) return 1;
     if (!race_z6_map || !sc64_z6_persistent_state_valid(&race_z6)) return 0;
     race_z6_world.elapsed_frames = elapsed_frames;
     race_z6_world.victory_requested = race_z6_world.defeat_requested = 0;
     race_z6_world.objective_refresh_requested = 0;
     ai_started_before = (race_z6.runtime.model.started & (1u << 8)) != 0;
+#ifdef SC64_Z6_COUNT_SNAPSHOT
+    if (!user_paused && race_z6.runtime.model.outcome==SC64_Z6_RUNNING)
+        (void)race_z6_count_snapshot_build(&race_z6_world,&snapshot);
+    ops.context=&cached;
+    ops.condition=race_z6_count_cached_condition;
+    ops.action=race_z6_count_cached_action;
+    result=sc64_z6_adapter_tick(&race_z6.runtime,&ops,user_paused);
+    snapshot.active=0;
+#else
     result = sc64_z6_adapter_tick(&race_z6.runtime, &race_z6_ops, user_paused);
+#endif
     race_z6.moved_locations_mask = race_z6_world.moved_locations_mask;
     memcpy(race_z6.moved_location, race_z6_world.moved_location,
            sizeof(race_z6.moved_location));

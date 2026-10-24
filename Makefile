@@ -1874,6 +1874,19 @@ build/test-sc64-z6-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $
 test-sc64-z6-frame-coverage: build/test-sc64-z6-frame-coverage
 	./build/test-sc64-z6-frame-coverage
 
+# Private numeric source rows required; the optimization stays default-off.
+build/test-sc64-z6-count-snapshot: tests/sc64_z6_count_snapshot.c starcraft/sc64_z6_count_snapshot.h $(Z6_PROBE_INPUTS) Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< -o $@
+build/test-sc64-z6-count-world: tests/sc64_z6_count_world.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) -DSC64_Z6_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-z6-runtime-snapshot: tests/sc64_z6_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) -DSC64_Z6_COUNT_SNAPSHOT $< common/gba.c -o $@
+.PHONY: test-sc64-z6-count-queries
+test-sc64-z6-count-queries: build/test-sc64-z6-count-snapshot build/test-sc64-z6-count-world build/test-sc64-z6-runtime-snapshot
+	./build/test-sc64-z6-count-snapshot
+	./build/test-sc64-z6-count-world
+	./build/test-sc64-z6-runtime-snapshot
+
 build/test-sc64-p7-model: tests/sc64_p7.c starcraft/sc64_p7.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 build/test-sc64-p7-adapter: tests/sc64_p7_adapter.c starcraft/sc64_p7_adapter.h starcraft/sc64_p7.h .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h common/gba.h | build

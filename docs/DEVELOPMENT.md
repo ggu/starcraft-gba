@@ -1154,6 +1154,20 @@ reject their older generation-28/29 saves. P6 uses generation 30 and Z6 uses
 Optional query experiments remain off by default. Compare a frozen baseline
 with `make -B protoss-p6-probe P6_QUERY_FLAGS='-DSC64_P6_PRUNE_STARTED -DSC64_P6_PREVALIDATED_TICK'`.
 The analogous Z6 experiment uses `Z6_QUERY_FLAGS=-DSC64_Z6_PRUNE_STARTED`.
+An additional default-off Z6 count experiment is available after preparing
+the private numeric scenario inputs:
+
+```sh
+make test-sc64-z6-count-queries
+make -B zerg-z6-probe Z6_QUERY_FLAGS=-DSC64_Z6_COUNT_SNAPSHOT
+```
+
+It caches the eight authenticated Command/Bring counts for one condition
+phase, with full-scan fallback and invalidation before actions. It retains
+the current center-based location predicate; source bounding-box/elevation
+fidelity remains a separate correction. Host equivalence and a full host win
+are established; ARM timing and replay equivalence remain pending. Restore
+the standard build with `make -B zerg-z6-probe` after retaining any experiment.
 Restore a default build with `make -B protoss-p6-probe` or
 `make -B zerg-z6-probe`; Make does not track command-line flag changes.
 `tools/sc64_zp_start_profile.py --help` describes a bounded P6 startup
