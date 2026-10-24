@@ -3707,8 +3707,14 @@ restores that candidate's own opening SRAM with all reported persisted
 observations exact. Separately, the paired baseline-SRAM late-state benchmark
 improves 13.8936 to 15.9985 fps (13.1569% fewer hardware cycles), with the
 reported loaded/tick-zero/final states and three captures matching. The
-cross-build benchmark is not candidate-generated late-save qualification;
-that longer fresh-save check remains separate.
+cross-build benchmark alone is not candidate-generated late-save qualification.
+A subsequent 90,000-input run matches all 91 reported baseline snapshots and
+the three common captures, then creates its own SRAM. A fresh HOME+L process
+restores all reported persisted observations; the pause-screen and selected
+building resets are explicit. One neutral handoff plus 60 updates reaches
+frame 89,348 at 16.00 effective fps. Its SRAM bytes also match the frozen
+baseline's late save. This verifies late loading and continuation, without a
+complete post-load mission win.
 
 The combined link retains IWRAM end `0x03004598` and BSS end `0x0203d674`.
 Rebuilding current public source with construction HP disabled produces the
@@ -3732,8 +3738,16 @@ progress/completion/removal, restart and load transitions. Local default and
 unified build/host checks pass with the flag off. The combined P3 candidate
 links as ROM `2020678d…0bc81`, ELF `8cab7c0d…3f3d1`, with unchanged IWRAM end
 `0x03004598` and BSS end `0x0203d674`. Its gate-off rebuild reproduces the
-qualified six-gate ROM exactly. ARM timing and full replay remain pending;
-this is not evidence of a measured performance improvement yet.
+qualified six-gate ROM exactly.
+
+A paired ARM sample loads the same authenticated baseline SRAM into fresh
+processes, then runs one neutral handoff and 60 identical left-held updates.
+It verifies actual camera movement from x=1544 to x=1424, matching reported
+loaded/tick-zero/final states, cursor/camera values and all three captures.
+Both builds average 14.1089 effective fps: this sample shows no measurable
+speed improvement. The gate remains off; broader timing and full replay are
+unqualified. An earlier right-held sample also showed only 0.0108% fewer
+cycles and is retained separately, without using it as an improvement claim.
 
 The 555-file source-only export passes the default build and 380 Python
 tests (six private-input skips). Original-art and unified ROM hashes remain
