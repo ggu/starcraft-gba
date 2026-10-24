@@ -169,12 +169,41 @@ static int controller_mission(int mission)
     /* HOME → CAMPAIGN; choose the mission's faction, then mission and briefing. */
     controller_press(KEY_A);
 #ifdef SC64_UNIFIED
-    while(race_front.row!=sc64_front_campaign_row(sc64_frontend_mission_faction(mission)))controller_press(KEY_DOWN);
+    {
+        int faction = sc64_frontend_mission_faction(mission);
+        int campaign_row = sc64_front_campaign_row(faction);
+        int ordinal = sc64_catalog_playable_ordinal(sc64_front_catalog_faction(faction), mission);
+        int target_page, page_count, guard = 0;
+        if (ordinal < 0) return 0;
+        if (race_front.page == SC_FRONT_CAMPAIGN) {
+            while (race_front.row != campaign_row && guard++ < sc64_front_campaign_count())
+                controller_press(KEY_DOWN);
+            if (race_front.row != campaign_row) return 0;
+            controller_press(KEY_A);
+        } else if (race_front.page != SC_FRONT_MISSION ||
+                   sc64_front_catalog_faction(race_front.faction) !=
+                       sc64_front_catalog_faction(faction)) {
+            return 0;
+        }
+        if (race_front.page != SC_FRONT_MISSION) return 0;
+        target_page = ordinal / 2;
+        page_count = (sc64_catalog_playable_count(sc64_front_catalog_faction(faction)) + 1) / 2;
+        guard = 0;
+        while (race_front.mission_page != target_page && guard++ < page_count)
+            controller_press(KEY_RIGHT);
+        if (race_front.mission_page != target_page) return 0;
+        while (race_front.row != ordinal % 2 && guard++ < page_count + 2)
+            controller_press(KEY_DOWN);
+        if (race_front.row != ordinal % 2 ||
+            sc64_catalog_playable_at(sc64_front_catalog_faction(faction),
+                                     race_front.mission_page * 2 + race_front.row) != mission)
+            return 0;
+    }
 #else
     if (mission >= SC64_RACE_MISSION_P1) controller_press(KEY_RIGHT);
-#endif
     controller_press(KEY_A);
     if (mission & 1) controller_press(KEY_DOWN);
+#endif
     controller_press(KEY_A);
     controller_press(KEY_A);
     if (screen != SCREEN_PLAY || race_campaign.mission != mission) return 0;

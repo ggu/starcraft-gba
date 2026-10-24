@@ -43,65 +43,150 @@ def read_u32(rsp: RSP, address: int) -> int:
     return int.from_bytes(rsp.read(address, 4), 'little')
 
 
-def dwarf_struct(elf: Path, name: str) -> tuple[int, dict[str, int]]:
-    """Read a C struct's byte size/member offsets from the ELF DWARF info."""
-    tool = subprocess.run(['arm-none-eabi-readelf', '--debug-dump=info', str(elf)],
-                          check=True, text=True, capture_output=True).stdout
-    lines = tool.splitlines()
-    target_type = None
-    in_die = False
-    block = []
-    typedef_type = None
-    for line in lines:
-        if re.match(r'\s*<1><[0-9a-f]+>:', line):
-            if in_die:
-                die = '\n'.join(block)
-                name_line = next((item for item in block if 'DW_AT_name' in item), '')
-                if re.search(r'DW_AT_name\s*:.*?:\s*' + re.escape(name) + r'\s*$', name_line):
-                    m = re.search(r'DW_AT_type\s*:\s*<0x([0-9a-f]+)>', die)
-                    if m:
-                        typedef_type = int(m.group(1), 16)
-                        break
-                block = []
-            in_die = 'DW_TAG_typedef' in line
-            if in_die:
-                block = [line]
-        elif in_die:
-            block.append(line)
-    if typedef_type is None:
-        raise RuntimeError(f'{elf.name} has no DWARF typedef for {name}')
+class DwarfOffsets(dict[str, int]):
+    """Offset mapping that also carries compiler-derived field ABI metadata."""
 
-    target = f'{typedef_type:x}'
-    for i, line in enumerate(lines):
-        if re.match(r'\s*<1><' + target + r'>:', line) and 'DW_TAG_structure_type' in line:
-            block = [line]
-            for following in lines[i + 1:]:
-                if re.match(r'\s*<1><[0-9a-f]+>:', following):
-                    break
-                block.append(following)
-            joined = '\n'.join(block)
-            size_match = re.search(r'DW_AT_byte_size\s*:\s*(\d+)', joined)
-            if not size_match:
-                raise RuntimeError(f'Cannot read {name} DWARF structure size')
-            fields: dict[str, int] = {}
-            current_name = None
-            for member_line in block:
-                if 'DW_TAG_member' in member_line:
-                    current_name = None
-                match = re.search(r'DW_AT_name\s*:\s*(?:\(indirect string,[^)]*\):\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*$', member_line)
-                if match and current_name is None:
-                    current_name = match.group(1)
-                offset = re.search(r'DW_AT_data_member_location\s*:\s*(\d+)', member_line)
-                if offset and current_name:
-                    fields[current_name] = int(offset.group(1))
-                    current_name = None
-            return int(size_match.group(1)), fields
-    raise RuntimeError(f'{elf.name} has no complete DWARF structure for {name}')
+    def __init__(self, offsets: dict[str, int], widths: dict[str, int],
+                 signed: dict[str, bool]):
+        super().__init__(offsets)
+        self.widths = widths
+        self.signed = signed
+
+
+def _dwarf_dies(text: str) -> list[dict]:
+    header = re.compile(r'^\s*<(\d+)><([0-9a-f]+)>: Abbrev Number: \d+ \((DW_TAG_[^)]+)\)')
+    dies = []
+    current = None
+    for line in text.splitlines():
+        match = header.match(line)
+        if match:
+            if current is not None:
+                dies.append(current)
+            current = {'depth': int(match.group(1)), 'offset': int(match.group(2), 16),
+                       'tag': match.group(3), 'lines': [line]}
+        elif current is not None:
+            current['lines'].append(line)
+    if current is not None:
+        dies.append(current)
+    return dies
+
+
+def _dwarf_attr(die: dict, name: str) -> str | None:
+    for line in die['lines']:
+        match = re.search(re.escape(name) + r'\s*:\s*(.*)$', line)
+        if match:
+            value = match.group(1).strip()
+            # readelf prints indirect strings as "(indirect string, ...): value".
+            if value.startswith('(') and '): ' in value:
+                value = value.split('): ', 1)[1]
+            return value
+    return None
+
+
+def _dwarf_ref(die: dict, name: str = 'DW_AT_type') -> int | None:
+    value = _dwarf_attr(die, name)
+    match = re.search(r'<0x([0-9a-f]+)>', value or '')
+    return int(match.group(1), 16) if match else None
+
+
+def _dwarf_name(die: dict) -> str | None:
+    value = _dwarf_attr(die, 'DW_AT_name')
+    if value is None:
+        return None
+    match = re.match(r'([A-Za-z_][A-Za-z0-9_]*)\s*$', value)
+    return match.group(1) if match else value
+
+
+def parse_dwarf_struct(text: str, name: str, elf_label: str = 'ELF') -> tuple[int, DwarfOffsets]:
+    """Resolve a typedef chain and return member offsets plus compiler ABI widths."""
+    dies = _dwarf_dies(text)
+    by_offset = {die['offset']: die for die in dies}
+    typedef = next((die for die in dies if die['depth'] == 1 and
+                    die['tag'] == 'DW_TAG_typedef' and _dwarf_name(die) == name), None)
+    if typedef is None:
+        raise RuntimeError(f'{elf_label} has no DWARF typedef for {name}')
+
+    type_offset = _dwarf_ref(typedef)
+    struct_die = None
+    seen = set()
+    while type_offset is not None and type_offset not in seen:
+        seen.add(type_offset)
+        die = by_offset.get(type_offset)
+        if die is None:
+            break
+        if die['tag'] in ('DW_TAG_structure_type', 'DW_TAG_union_type'):
+            struct_die = die
+            break
+        type_offset = _dwarf_ref(die)
+    else:
+        struct_die = None
+    if type_offset is None or struct_die is None:
+        raise RuntimeError(f'{elf_label} has no complete DWARF structure for {name}')
+    size_text = _dwarf_attr(struct_die, 'DW_AT_byte_size')
+    if size_text is None or not size_text.isdigit():
+        raise RuntimeError(f'Cannot read {name} DWARF structure size')
+
+    def scalar_type(ref: int | None, trail: set[int] | None = None) -> tuple[int, bool] | None:
+        if ref is None:
+            return None
+        trail = set() if trail is None else trail
+        if ref in trail:
+            return None
+        trail.add(ref)
+        info = by_offset.get(ref)
+        if info is None:
+            return None
+        if info['tag'] == 'DW_TAG_base_type':
+            byte_text = _dwarf_attr(info, 'DW_AT_byte_size')
+            encoding_text = _dwarf_attr(info, 'DW_AT_encoding')
+            if byte_text and byte_text.isdigit():
+                encoding_match = re.match(r'(\d+)', encoding_text or '')
+                encoding = int(encoding_match.group(1)) if encoding_match else 0
+                return int(byte_text), encoding in (5, 6)
+            return None
+        if info['tag'] in ('DW_TAG_typedef', 'DW_TAG_const_type', 'DW_TAG_volatile_type',
+                           'DW_TAG_restrict_type', 'DW_TAG_atomic_type'):
+            return scalar_type(_dwarf_ref(info), trail)
+        return None
+
+    offsets: dict[str, int] = {}
+    widths: dict[str, int] = {}
+    signed: dict[str, bool] = {}
+    struct_index = dies.index(struct_die)
+    for member in dies[struct_index + 1:]:
+        if member['depth'] <= struct_die['depth']:
+            break
+        if member['depth'] != struct_die['depth'] + 1 or member['tag'] != 'DW_TAG_member':
+            continue
+        field_name = _dwarf_name(member)
+        offset_text = _dwarf_attr(member, 'DW_AT_data_member_location')
+        if field_name is None or offset_text is None:
+            continue
+        offset_match = re.match(r'(\d+)', offset_text)
+        if not offset_match:
+            continue
+        offsets[field_name] = int(offset_match.group(1))
+        layout = scalar_type(_dwarf_ref(member))
+        if layout is not None:
+            widths[field_name], signed[field_name] = layout
+    return int(size_text), DwarfOffsets(offsets, widths, signed)
+
+
+def dwarf_struct_layout(elf: Path, name: str) -> tuple[int, DwarfOffsets]:
+    """Read a C struct's DWARF size, field offsets, and scalar ABI widths."""
+    text = subprocess.run(['arm-none-eabi-readelf', '--debug-dump=info', str(elf)],
+                          check=True, text=True, capture_output=True).stdout
+    return parse_dwarf_struct(text, name, elf.name)
+
+
+def dwarf_struct(elf: Path, name: str) -> tuple[int, dict[str, int]]:
+    """Compatibility wrapper retaining the original (size, offsets) API."""
+    return dwarf_struct_layout(elf, name)
 
 
 def race_bank_profile(elf: Path, sizes: dict[str, int]) -> dict:
-    unit_stride, unit_offsets = dwarf_struct(elf, 'Unit')
-    building_stride, building_offsets = dwarf_struct(elf, 'Building')
+    unit_stride, unit_offsets = dwarf_struct_layout(elf, 'Unit')
+    building_stride, building_offsets = dwarf_struct_layout(elf, 'Building')
     unit_bytes, building_bytes = sizes.get('u', 0), sizes.get('b', 0)
     if not unit_bytes or not building_bytes or unit_bytes % unit_stride or building_bytes % building_stride:
         raise RuntimeError(f'Races ELF bank sizes do not match DWARF: {unit_bytes}/{building_bytes}, '
@@ -109,32 +194,62 @@ def race_bank_profile(elf: Path, sizes: dict[str, int]) -> dict:
     if unit_stride % 4 or building_stride % 4:
         raise RuntimeError('Unit and Building layouts must be 32-bit aligned')
     unit_capacity, building_capacity = unit_bytes // unit_stride, building_bytes // building_stride
-    if unit_capacity not in UNIT_CAPACITIES or building_capacity != MAX_BUILDINGS:
+    legacy_bank = unit_capacity in UNIT_CAPACITIES and building_capacity == MAX_BUILDINGS
+    compact_zp_bank = (unit_capacity == 240 and building_capacity == 160 and
+                       unit_stride == 56 and building_stride == 48)
+    if not legacy_bank and not compact_zp_bank:
         raise RuntimeError(f'Unexpected Races bank capacity: {unit_capacity}/{building_capacity}')
-    for field in ('owner', 'type', 'alive', 'x', 'y'):
-        if field not in unit_offsets or field not in building_offsets:
-            raise RuntimeError(f'DWARF layout is missing entity field {field}')
-    if 'under_construction' not in building_offsets:
-        raise RuntimeError('DWARF Building layout has no under_construction field')
+    def validate_fields(label: str, fields: DwarfOffsets, stride: int,
+                        required: dict[str, int], optional: dict[str, int]) -> None:
+        expected = {**required, **{key: val for key, val in optional.items() if key in fields}}
+        for field, legacy_width in expected.items():
+            if field not in fields:
+                raise RuntimeError(f'DWARF {label} layout is missing entity field {field}')
+            width = fields.widths.get(field)
+            offset = fields[field]
+            expected_width = (legacy_width if compact_zp_bank else 4)
+            if (width != expected_width or offset < 0 or offset + expected_width > stride):
+                raise RuntimeError(f'DWARF {label} field {field} has an unsupported or unbounded ABI width')
+
+    validate_fields('Unit', unit_offsets, unit_stride,
+                    {'owner': 1, 'type': 1, 'alive': 1,
+                     'x': 2, 'y': 2, 'hp': 4},
+                    {'raw_type': 2, 'shield': 4})
+    validate_fields('Building', building_offsets, building_stride,
+                    {'owner': 1, 'type': 1, 'alive': 1,
+                     'x': 2, 'y': 2, 'hp': 4, 'under_construction': 1},
+                    {'raw_type': 2, 'shield': 4})
     return {'unit_bank_bytes': unit_bytes, 'building_bank_bytes': building_bytes,
             'unit_capacity': unit_capacity, 'building_capacity': building_capacity,
             'unit_stride_bytes': unit_stride, 'building_stride_bytes': building_stride,
             'unit_words': unit_stride // 4, 'building_words': building_stride // 4,
-            'unit_offsets': unit_offsets, 'building_offsets': building_offsets}
+            'unit_offsets': unit_offsets, 'building_offsets': building_offsets,
+            'unit_field_widths': unit_offsets.widths,
+            'building_field_widths': building_offsets.widths}
 
 
 def read_entities(rsp: RSP, address: int, capacity: int, stride: int,
                   fields: dict[str, int], *, building: bool = False) -> dict:
     data = rsp.read(address, capacity * stride)
+    if len(data) != capacity * stride:
+        raise RuntimeError('Debugger returned a truncated entity bank')
     by_owner: dict[str, int] = {}
     by_owner_type: dict[str, dict[str, int]] = {}
     completed: dict[str, dict[str, int]] = {}
     alive_units = []
     alive_buildings = []
+    widths = getattr(fields, 'widths', {})
+    signed = getattr(fields, 'signed', {})
     for i in range(capacity):
         row = data[i * stride:(i + 1) * stride]
         def field(name: str) -> int:
-            return struct.unpack_from('<i', row, fields[name])[0]
+            if name not in fields:
+                raise RuntimeError(f'DWARF layout is missing entity field {name}')
+            offset = fields[name]
+            width = widths.get(name, 4)
+            if width not in (1, 2, 4) or offset < 0 or offset + width > stride:
+                raise RuntimeError(f'DWARF entity field {name} exceeds its bounded ABI width')
+            return int.from_bytes(row[offset:offset + width], 'little', signed=signed.get(name, True))
         if not field('alive'):
             continue
         owner, kind = field('owner'), field('type')

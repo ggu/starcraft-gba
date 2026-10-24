@@ -1,8 +1,13 @@
 #ifndef SC64_TRANSPORT_ADAPTER_H
 #define SC64_TRANSPORT_ADAPTER_H
 
-#ifdef SC64_T5_RUNTIME
+#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED)
 #include "sc64_transport_rules.h"
+
+#if defined(SC64_P5_SHUTTLE_ENABLED) && \
+    (!defined(SC64_P5_RUNTIME) || !defined(SC64_P5_ACTORS))
+#error "P5 Shuttle transport requires the P5 runtime and source actor mapping"
+#endif
 
 /* Cargo lives in the existing unit pool: an embarked actor retains its type,
  * HP, owner and supply, with ORDER_TRANSPORTED and target=carrier slot. No
@@ -14,10 +19,37 @@ enum { SC64_TRANSPORT_BOARD_RADIUS = 16, SC64_TRANSPORT_UNLOAD_TICKS = 19 };
  * no-transport opening/battle case. This flag is never save-persistent. */
 static int race_transport_activity;
 
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+static int race_z6_transport_overlord_ready(void);
+#endif
+
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+static int __attribute__((noinline)) race_transport_carrier_type(const Unit *q)
+#else
+static int race_transport_carrier_type(const Unit *q)
+#endif
+{
+    if (!q) return 0;
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (race_z6_active() && race_z6_transport_overlord_ready() &&
+        q->type==U_OVERLORD && q->raw_type==42 && q->raw_owner==3 && q->owner==SIDE)
+        return 1;
+#endif
+#ifdef SC64_T5_RUNTIME
+    if (q->type == U_DROPSHIP && q->raw_type == SC64_TRANSPORT_DROPSHIP_RAW)
+        return 1;
+#endif
+#ifdef SC64_P5_SHUTTLE_ENABLED
+    if (race_p5_active() && q->type == U_P5_SHUTTLE &&
+        q->raw_type == SC64_TRANSPORT_SHUTTLE_RAW) return 1;
+#endif
+    return 0;
+}
+
 static int race_transport_carrier_valid(int slot)
 {
     return slot >= 0 && slot < MAX_UNITS && u[slot].alive &&
-           u[slot].type == U_DROPSHIP && u[slot].raw_type == 11 &&
+           race_transport_carrier_type(&u[slot]) &&
            !SC64_TRANSPORT_LOADED(&u[slot]);
 }
 
@@ -45,6 +77,29 @@ static int race_transport_cargo_space(int carrier)
         }
     return total;
 }
+
+#ifdef SC64_P5_SHUTTLE_ENABLED
+static int race_p5_shuttle_menu_available(void)
+{
+    if (!race_p5_active() || selected_building >= 0) return 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].selected && race_transport_carrier_valid(i) &&
+            u[i].type == U_P5_SHUTTLE && race_transport_cargo_space(i) > 0)
+            return 1;
+    return 0;
+}
+#endif
+
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+static int race_z6_overlord_menu_available(void)
+{
+    if (!race_z6_active() || selected_building >= 0) return 0;
+    for (int i=0; i<MAX_UNITS; ++i)
+        if (u[i].selected && race_transport_carrier_valid(i) &&
+            u[i].type==U_OVERLORD && race_transport_cargo_space(i)>0) return 1;
+    return 0;
+}
+#endif
 
 /* A transition invalidates the short-lived indexes: newly unloaded units
  * must be targetable immediately, and newly loaded units must disappear.
@@ -89,6 +144,14 @@ static void race_transport_destroy_cargo(int carrier)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && SC64_TRANSPORT_LOADED(&u[i]) && u[i].target == carrier) {
+#ifdef SC64_P5_SHUTTLE_ENABLED
+            /* Destroying a carrier kills its passengers in this authored
+             * runtime. Count those deaths before clearing their source owner. */
+            if (race_p5_active()) race_p5_note_unit_death(&u[i]);
+#endif
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+            if (race_z6_active()) race_z6_note_unit_death(&u[i]);
+#endif
             if (u[i].owner == SIDE) supply_used -= unit_supply(u[i].type);
             u[i].hp = 0; u[i].alive = u[i].selected = 0;
             u[i].order = ORDER_IDLE; u[i].target = -1;

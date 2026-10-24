@@ -132,7 +132,7 @@ static int owner_units(int owner)
 static int first_side_unit(void)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == SIDE && sc64_t4_unit_selectable(u[i].type))
+        if (u[i].alive && u[i].owner == SIDE && sc64_game_unit_selectable(u[i].type))
             return i;
     return -1;
 }
@@ -342,7 +342,7 @@ static int select_human_group(void)
 {
     int left = WORLD_W, top = WORLD_H, right = -1, bottom = -1;
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
-        sc64_t4_unit_selectable(u[i].type)) {
+        sc64_game_unit_selectable(u[i].type)) {
         if (u[i].x < left) left = u[i].x;
         if (u[i].x > right) right = u[i].x;
         if (u[i].y < top) top = u[i].y;
@@ -367,7 +367,7 @@ static int select_human_group(void)
     int count = 0;
     if (selected_building >= 0) return 0;
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].selected) {
-        if (u[i].owner != SIDE || !sc64_t4_unit_selectable(u[i].type)) return 0;
+        if (u[i].owner != SIDE || !sc64_game_unit_selectable(u[i].type)) return 0;
         ++count;
     }
     return count > 0 && count == selected_count();
@@ -1401,7 +1401,7 @@ static int controller_select_type_box_group(int type, int *out_count)
     if (!controller_normalize_field()) return 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == type &&
-            !SC64_TRANSPORT_LOADED(&u[i]) && sc64_t4_unit_selectable(u[i].type)) {
+            !SC64_TRANSPORT_LOADED(&u[i]) && sc64_game_unit_selectable(u[i].type)) {
             if (u[i].x < left) left = u[i].x;
             if (u[i].x > right) right = u[i].x;
             if (u[i].y < top) top = u[i].y;
@@ -1414,7 +1414,7 @@ static int controller_select_type_box_group(int type, int *out_count)
     /* Do not let the diagnostic drag include heroes, workers, or the carrier. */
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && !SC64_TRANSPORT_LOADED(&u[i]) &&
-            sc64_t4_unit_selectable(u[i].type) && u[i].type != type &&
+            sc64_game_unit_selectable(u[i].type) && u[i].type != type &&
             u[i].x >= left && u[i].x <= right && u[i].y >= top && u[i].y <= bottom) {
             fprintf(stderr, "T5 type-box rejected mixed actor type=%d slot=%d at=%d,%d\n",
                     u[i].type, i, u[i].x, u[i].y);

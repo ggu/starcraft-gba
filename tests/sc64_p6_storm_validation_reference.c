@@ -1,0 +1,3 @@
+#define SC64_TEST_PREFIX sc64_p6_storm_reference
+#define SC64_P6_STORM_VALIDATION_REFERENCE 1
+#include "sc64_p6_storm_validation_fixture.h"

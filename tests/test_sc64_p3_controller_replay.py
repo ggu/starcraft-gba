@@ -7,7 +7,7 @@ from tools import sc64_z3_controller_replay as scheduler
 def valid_trace():
     final = dict(replay.EXPECTED_FINAL, elapsed=replay.EXPECTED_FINAL["frame"],
                  side_army=13, geyser_count=3)
-    return {"schema": 1, "mission": 22, "policy": "synthetic-controller-test", "events": [
+    return {"schema": 1, "mission": 22, "policy": replay.GARRISON_POLICY, "events": [
         {"kind": "input", "host_tick": 1, "held": 1, "pressed": 1},
         {"kind": "input", "host_tick": 2, "held": 0, "pressed": 0},
         {"kind": "input", "host_tick": 3, "held": 4, "pressed": 4},
@@ -19,7 +19,106 @@ def valid_trace():
     ]}
 
 
+def valid_expansion_trace():
+    final = dict(replay.EXPANSION_EXPECTED_FINAL, elapsed=replay.EXPANSION_EXPECTED_FINAL["frame"])
+    start = dict(replay.EXPANSION_EXPECTED_START, kind="start", host_tick=7, frame=0,
+                 screen=1, won=0, lost=0, p3_outcome=0)
+    inputs = []
+    previous = 0
+    for tick in range(1, 5933):
+        held = 1 if not previous else 0
+        inputs.append({"kind": "input", "host_tick": tick, "held": held,
+                       "pressed": held & ~previous})
+        previous = held
+    rows = inputs + [start]
+    observations = [{"kind": "periodic", "host_tick": n * 1000, "frame": n * 993}
+                    for n in range(1, 124)]
+    observations.extend({"kind": "progress", "host_tick": 500 + n * 10000,
+                         "frame": 400 + n * 990, "elapsed": 400 + n * 990,
+                         "screen": 1, "won": 0, "lost": 0, "p3_outcome": 0,
+                         "global_mission": 22, "selected_mission": 22, "race_mode": 0}
+                        for n in range(12))
+    rows.extend(sorted(observations, key=lambda row: row["host_tick"]))
+    rows.append({"kind": "won", **final})
+    return {"schema": 1, "mission": replay.MISSION_P3,
+            "policy": replay.EXPANSION_POLICY, "events": rows}
+
+
 class P3ControllerReplayValidation(unittest.TestCase):
+    class DebuggerBytes:
+        def __init__(self, data):
+            self.data = data
+
+        def read(self, address, size):
+            return self.data[address:address + size]
+
+    def test_signed_global_selection_value_is_decoded_as_minus_one(self):
+        rsp = self.DebuggerBytes(b"\xff\xff\xff\xff")
+        self.assertEqual(replay._debugger_scalar(rsp, 0, signed=True), -1)
+        self.assertEqual(replay._debugger_scalar(rsp, 0, signed=False), 0xFFFFFFFF)
+
+    def test_owner_and_selection_decoders_cover_legacy_and_compact_abis(self):
+        for stride, offsets, widths, signed in (
+                (108, {"alive": 0, "raw_owner": 4}, {"alive": 4, "raw_owner": 4},
+                 {"alive": True, "raw_owner": True}),
+                (48, {"alive": 34, "raw_owner": 22}, {"alive": 1, "raw_owner": 2},
+                 {"alive": False, "raw_owner": True})):
+            raw = bytearray(stride * 4)
+            for index, (alive, owner) in enumerate(((1, -1), (1, 7), (0, 6), (1, 6))):
+                base = index * stride
+                raw[base + offsets["alive"]:base + offsets["alive"] + widths["alive"]] = alive.to_bytes(
+                    widths["alive"], "little", signed=signed["alive"])
+                raw[base + offsets["raw_owner"]:base + offsets["raw_owner"] + widths["raw_owner"]] = owner.to_bytes(
+                    widths["raw_owner"], "little", signed=signed["raw_owner"])
+            self.assertEqual(sum(replay._record_scalar(raw, i, stride, offsets, widths, signed, "alive") and
+                                 replay._record_scalar(raw, i, stride, offsets, widths, signed, "raw_owner") == 7
+                                 for i in range(4)), 1)
+            self.assertEqual(sum(replay._record_scalar(raw, i, stride, offsets, widths, signed, "alive") and
+                                 replay._record_scalar(raw, i, stride, offsets, widths, signed, "raw_owner") == 6
+                                 for i in range(4)), 1)
+
+        for stride, offsets, widths, signed in (
+                (108, {"alive": 0, "selected": 4, "order": 8},
+                 {"alive": 4, "selected": 4, "order": 4},
+                 {"alive": True, "selected": True, "order": True}),
+                (56, {"alive": 52, "selected": 53, "order": 54},
+                 {"alive": 1, "selected": 1, "order": 1},
+                 {"alive": False, "selected": False, "order": False})):
+            raw = bytearray(stride * 4)
+            for index, (alive, selected, order) in enumerate(((1, 1, 0), (1, 1, 8), (0, 1, 0), (1, 0, 0))):
+                base = index * stride
+                for name, value in (("alive", alive), ("selected", selected), ("order", order)):
+                    width = widths[name]
+                    raw[base + offsets[name]:base + offsets[name] + width] = value.to_bytes(
+                        width, "little", signed=signed[name])
+            self.assertEqual(replay._selected_unit_count(raw, 4, stride, offsets, widths, signed), 1)
+
+    def test_queue_ring_decoder_handles_compact_and_legacy_widths(self):
+        for stride, offsets, widths, signed, item_width in (
+                (48, {"alive": 34, "owner": 32, "queue": 35, "queue_head": 40, "queue_count": 41},
+                 {"alive": 1, "owner": 1, "queue_head": 1, "queue_count": 1},
+                 {"alive": False, "owner": False, "queue_head": False, "queue_count": False}, 1),
+                (100, {"alive": 24, "owner": 16, "queue": 28, "queue_head": 48, "queue_count": 52},
+                 {"alive": 4, "owner": 4, "queue_head": 4, "queue_count": 4},
+                 {"alive": True, "owner": True, "queue_head": True, "queue_count": True}, 4)):
+            raw = bytearray(stride)
+            for name, value in (("alive", 1), ("owner", 0), ("queue_head", 4), ("queue_count", 3)):
+                width = widths[name]
+                raw[offsets[name]:offsets[name] + width] = value.to_bytes(
+                    width, "little", signed=signed[name])
+            # Ring order 4,0,1 contains two Zealots and one other unit.
+            for slot, value in enumerate((10, 4, 5, 0, 10)):
+                start = offsets["queue"] + slot * item_width
+                raw[start:start + item_width] = value.to_bytes(item_width, "little",
+                                                                signed=(item_width == 4))
+            self.assertEqual(replay._queued_type_count(
+                raw, 1, stride, offsets, widths, signed, owner=0, unit_type=10), 2)
+            raw[offsets["queue_head"]:offsets["queue_head"] + widths["queue_head"]] = (
+                5).to_bytes(widths["queue_head"], "little", signed=signed["queue_head"])
+            with self.assertRaisesRegex(RuntimeError, "queue count/head"):
+                replay._queued_type_count(raw, 1, stride, offsets, widths, signed,
+                                          owner=0, unit_type=10)
+
     def test_valid_trace_full_queue(self):
         plan = replay.validate_trace(valid_trace(), 4)
         self.assertEqual(plan["input_count"], 4)
@@ -34,6 +133,52 @@ class P3ControllerReplayValidation(unittest.TestCase):
         self.assertEqual([len(page["events"]) for page in pages[:2]], [3, 1])
         self.assertEqual(pages[0]["first"], 0)
         self.assertEqual(pages[1]["first"], 1000)
+
+    def test_dense_window_capacity_uses_selected_scheduler_period(self):
+        trace = valid_trace()
+        trace["events"][5]["host_tick"] = 251
+        plan = replay.validate_trace(trace, 3, windowed=True, window_ticks=250)
+        self.assertEqual(plan["peak_page_transitions"], 3)
+        with self.assertRaisesRegex(ValueError, "page exceeds"):
+            replay.validate_trace(trace, 3, windowed=True, window_ticks=1000)
+
+    def test_route_cli_is_additive_and_defaults_to_garrison(self):
+        self.assertEqual(replay.build_parser().parse_args([]).route, "garrison")
+        self.assertEqual(replay.build_parser().parse_args(["--route", "expansion"]).route, "expansion")
+
+    def test_expansion_route_is_additive_and_matches_its_own_witness(self):
+        trace = valid_expansion_trace()
+        plan = replay.validate_trace(trace, 6000, route="expansion")
+        self.assertEqual(plan["route"], "expansion")
+        self.assertEqual(plan["policy"], replay.EXPANSION_POLICY)
+        self.assertEqual(plan["input_count"], 5932)
+        self.assertEqual(plan["stop_tick"], 124689)
+        # The default remains the original strict garrison contract.
+        self.assertEqual(replay.validate_trace(valid_trace(), 4)["final"],
+                         valid_trace()["events"][-1])
+
+    def test_expansion_rejects_wrong_route_policy_final_and_mission(self):
+        trace = valid_expansion_trace()
+        with self.assertRaisesRegex(ValueError, "policy"):
+            replay.validate_trace(trace, 6000, route="garrison")
+        bad = valid_expansion_trace()
+        bad["events"][-1]["side_cannons"] += 1
+        with self.assertRaisesRegex(ValueError, "side_cannons"):
+            replay.validate_trace(bad, 6000, route="expansion")
+        bad = valid_expansion_trace()
+        bad["mission"] = 21
+        with self.assertRaisesRegex(ValueError, "mission"):
+            replay.validate_trace(bad, 6000, route="expansion")
+        bad = valid_expansion_trace()
+        bad["events"][-1]["global_mission"] = 21
+        with self.assertRaisesRegex(ValueError, "global_mission"):
+            replay.validate_trace(bad, 6000, route="expansion")
+
+    def test_expansion_trace_requires_exact_verified_start(self):
+        trace = valid_expansion_trace()
+        next(row for row in trace["events"] if row["kind"] == "start")["raw_owner0_units"] += 1
+        with self.assertRaisesRegex(ValueError, "raw_owner0_units"):
+            replay.validate_trace(trace, 6000, route="expansion")
 
     def test_rejects_legacy_queue_overflow_and_window_overflow(self):
         trace = valid_trace()
@@ -140,6 +285,36 @@ class P3ControllerReplayValidation(unittest.TestCase):
             changed[key] = value
             with self.subTest(key=key), self.assertRaisesRegex(RuntimeError, message):
                 replay.verify_final(final, changed)
+
+    def test_expansion_final_verifier_compares_witness_and_model(self):
+        final = valid_expansion_trace()["events"][-1]
+        state = {
+            "screen": 3, "frame": 123916, "won": 1, "lost": 0,
+            "side_units": 67, "side_buildings": 35,
+            "force2_units": 3, "force2_buildings": 0,
+            "force3_units": 1, "force3_buildings": 0,
+            "minerals": 14840, "gas": 21088, "race_completed": 1 << 22,
+            "race_mode": 0, "race_selected_mission": 22,
+            "supply": 178, "supply_cap": 230, "gateways": 1,
+            "mission_unsupported_count": 0,
+            "raw_owner7_units": 1, "raw_owner0_units": 3, "raw_owner6_units": 1,
+            "raw_owner7_buildings": 4, "raw_owner0_buildings": 0, "raw_owner6_buildings": 0,
+            "side_army": 22, "side_probes": 45, "side_cannons": 11,
+            "weapons_level": 2, "armor_level": 2, "weapons_research": 0,
+            "armor_research": 0, "zealots_queued": 2, "selected_units": 0,
+            "selected_building": 61, "geyser_count": 3,
+            "race_campaign": {"mission": 22, "elapsed_frames": 123916, "phase": 3,
+                              "objective_flags": 1},
+            "race_p3": {"outcome": 1, "sequence": 5, "fired": 31,
+                        "transmission": 0, "reserved": 0, "action_ticks": 0},
+        }
+        replay.verify_final(final, state, "expansion")
+        for key, value in (("side_probes", 44), ("raw_owner6_units", 2),
+                           ("selected_building", 62)):
+            bad = dict(state)
+            bad[key] = value
+            with self.subTest(key=key), self.assertRaisesRegex(RuntimeError, key):
+                replay.verify_final(final, bad, "expansion")
 
 
 if __name__ == "__main__":

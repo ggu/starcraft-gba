@@ -99,3 +99,14 @@ stride. The create-property path validates an action number in 1–64 and
 addresses `0x800C7640 + number*20`, so number 1 selects source UPRP entry 0.
 The authored index helper follows that mapping. Applying the individual
 property override fields to live actors remains unimplemented.
+
+
+P6's upper-level door props follow the pinned PC reference's dynamic actor
+collision exclusion: OpenBW `bwgame.h:9406–9415` explicitly returns false for
+all four door UnitTypes, and movement collision invokes that helper around
+`bwgame.h:11233`. This is a PC reference policy, not proof of native N64
+initial door state, elevation or tile mutation. The bounded GBA P6 adapter
+keeps separate authored state-dependent tile blockers for its source-scripted
+pit gates; its upper-level props retain source state/art without an added
+solid actor footprint. The pinned PC OpenDoor/CloseDoor update paths are
+unimplemented and cannot establish their native behavior.

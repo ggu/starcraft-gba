@@ -147,6 +147,22 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
         self.assertIn("14-slot cache pass", result.stdout)
 
+    def test_packed_visit_grid_matches_fields_and_restores_grid(self):
+        source = ROOT / "tests/race_routes.c"
+        with tempfile.TemporaryDirectory() as temp:
+            binary = Path(temp) / "routes-visit-grid-test"
+            subprocess.run([
+                "clang", "-std=c11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+                "-fsanitize=address,undefined", "-I", str(ROOT), "-I", str(ROOT / "common"),
+                "-DSC64_ROUTE_PACK3", "-DSC64_LARGE_MAPS", "-DSC64_T4_RUNTIME",
+                "-DSC64_ROUTE_VISIT_GRID", "-DRACE_TEST_COLS=128", "-DRACE_TEST_ROWS=128",
+                str(source), "-o", str(binary),
+            ], check=True)
+            result = subprocess.run([str(binary)], check=False, text=True,
+                                    capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+        self.assertIn("14-slot cache pass", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

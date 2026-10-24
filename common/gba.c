@@ -1,5 +1,5 @@
 #include "gba.h"
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
 #include "gba_present.h"
 #endif
 #ifdef GBA_HOST
@@ -85,7 +85,7 @@ return 0;
 return (~REG16(0x04000130))&1023;
 #endif
 }
-#ifndef GBA_HOST
+#if !defined(GBA_HOST) && !defined(SC64_LATE_TERRAN_STORAGE) && !defined(GBA_PRESENT_DEADLINE)
 static void vblank(void){while(REG16(0x04000006)>=160){}while(REG16(0x04000006)<160){}}
 #endif
 void gfx_begin(u8 color) {
@@ -227,7 +227,7 @@ HOT int gfx_blit_window_2x(int y,int height,const u8 *source,int stride,int rows
 void gfx_end(void) {
     gfx_draw_cycles=gba_clock()-draw_start;
 #ifndef GBA_HOST
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
     while (!gba_present_ready(gba_clock()-previous_present,
                               REG16(0x04000006))) {}
 #else
@@ -240,7 +240,7 @@ void gfx_end(void) {
     front^=1;
 #ifndef GBA_HOST
     REG16(0x04000000)=0x0404|(front?16:0);
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
     previous_present=gba_clock();
 #else
     if(elapsed<280896u)vblank();
@@ -347,7 +347,7 @@ HOT void gfx_frame(int x,int y,int w,int h,u8 c){gfx_rect(x,y,w,1,c);gfx_rect(x,
 int absi(int x){return x<0?-x:x;}
 int clampi(int x,int lo,int hi){return x<lo?lo:(x>hi?hi:x);}
 HOT void gfx_line(int x0,int y0,int x1,int y1,u8 c){int dx=absi(x1-x0),sx=x0<x1?1:-1,dy=-absi(y1-y0),sy=y0<y1?1:-1,err=dx+dy;for(;;){gfx_pixel(x0,y0,c);if(x0==x1&&y0==y1)break;int e=2*err;if(e>=dy){err+=dy;x0+=sx;}if(e<=dx){err+=dx;y0+=sy;}}}
-#if (defined(SC64_P3_RUNTIME) && defined(SC64_VISIBILITY_SPANS)) || defined(SC64_T4_RUNTIME)
+#if (defined(SC64_P3_RUNTIME) && defined(SC64_VISIBILITY_SPANS)) || defined(SC64_T4_RUNTIME) || defined(SC64_Z5_CONSUME_ENABLED)
 /* These imported profiles render from source sprites and do not call this
  * fallback. Keep it in ROM to reserve IWRAM for visibility updates. */
 void gfx_circle(int x,int y,int r,u8 c){if(r<0||r>240)return;for(int yy=-r;yy<=r;yy++)for(int xx=-r;xx<=r;xx++)if(xx*xx+yy*yy<=r*r)gfx_pixel(x+xx,y+yy,c);}
@@ -461,8 +461,21 @@ static HOT void glyph_row(int x,int y,u8 bits,u8 color) {
     }
 }
 HOT void gfx_text(int x,int y,const char*t,u8 c){int origin=x;for(;*t;t++){u8 ch=(u8)*t;if(ch=='\n'){x=origin;y+=9;continue;}if(ch>='a'&&ch<='z')ch-=32;if(ch>=32&&ch<128&&x>-6&&x<240)for(int row=0;row<7;row++)glyph_row(x,y+row,font[ch-32][row],c);x+=6;}}
-HOT void gfx_num(int x,int y,int n,u8 c){char b[12];int i=0;u32 v;if(n<0){gfx_text(x,y,"-",c);x+=6;v=0u-(u32)n;}else v=(u32)n;do{b[i++]='0'+v%10;v/=10;}while(v&&i<11);for(int j=0;j<i;j++){char z[2]={b[i-j-1],0};gfx_text(x+j*6,y,z,c);}}
-HOT void gfx_bar(int x,int y,int w,int h,int v,int max,u8 c,u8 empty){
+#ifdef SC64_ZP_FULL_STORAGE
+/* Later campaign actors need the hot-code reserve; number formatting can
+ * run from ROM while glyph drawing stays in IWRAM. */
+void gfx_num(
+#else
+HOT void gfx_num(
+#endif
+int x,int y,int n,u8 c){char b[12];int i=0;u32 v;if(n<0){gfx_text(x,y,"-",c);x+=6;v=0u-(u32)n;}else v=(u32)n;do{b[i++]='0'+v%10;v/=10;}while(v&&i<11);for(int j=0;j<i;j++){char z[2]={b[i-j-1],0};gfx_text(x+j*6,y,z,c);}}
+#if defined(SC64_ZP_CAMPAIGN_STORAGE) && defined(SC64_TARGET_OCCUPANCY)
+/* Reserve IWRAM for the expanded actor targeting loop in this profile. */
+void gfx_bar(
+#else
+HOT void gfx_bar(
+#endif
+int x,int y,int w,int h,int v,int max,u8 c,u8 empty){
     if(max<=0||v<=0){gfx_rect(x,y,w,h,empty);return;}
     /* A full bar is just the foreground rectangle; the empty fill is entirely
        covered, so skip both the overdraw and the old width multiplication. */

@@ -8,6 +8,9 @@
 #include "demo_schedule.h"
 #define SC64_WINDOWED_SCHEDULE 1
 #endif
+#if defined(SC64_DENSE_SCHEDULE) && !defined(SC64_WINDOWED_SCHEDULE)
+#error "SC64_DENSE_SCHEDULE requires a windowed controller scheduler"
+#endif
 #ifdef SC64_Z3_WINDOWED_SCHEDULE
 #if !defined(SC64_RACES) || !defined(SC64_UNIFIED) || \
     !defined(SC64_Z3_ENABLED) || !defined(SC64_CAMPAIGN_RACE) || \
@@ -60,6 +63,19 @@ __attribute__((noinline)) void demo_replay_checkpoint(void) {
 #endif
     __asm__ volatile ("" ::: "memory");
 }
+#ifdef SC64_DENSE_SCHEDULE
+/* At most one held-key transition occurs per tick, so a 250-tick page fits
+ * the existing 256-entry queue even during dense menu/selection input. The
+ * retained wrapper identifies this observer contract to debugger tools. */
+__attribute__((noinline)) void demo_replay_dense_checkpoint(void) {
+    demo_replay_checkpoint();
+}
+#define DEMO_WINDOW_TICKS 250u
+#define DEMO_WINDOW_CHECKPOINT demo_replay_dense_checkpoint
+#else
+#define DEMO_WINDOW_TICKS 1000u
+#define DEMO_WINDOW_CHECKPOINT demo_replay_checkpoint
+#endif
 int main(void) {
     gba_init();
     game_init();
@@ -114,8 +130,8 @@ int main(void) {
 #ifdef SC64_WINDOWED_SCHEDULE
         if(schedule_enabled) {
             demo_schedule_tick++;
-            if(demo_schedule_tick%1000u==0 || demo_schedule_tick==demo_schedule_length) {
-                demo_replay_checkpoint();
+            if(demo_schedule_tick%DEMO_WINDOW_TICKS==0 || demo_schedule_tick==demo_schedule_length) {
+                DEMO_WINDOW_CHECKPOINT();
                 /* The host checks the consumed cursor while stopped in the
                  * observer, then installs the next page before this reset. */
                 if(demo_schedule_active)

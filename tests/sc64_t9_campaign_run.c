@@ -174,7 +174,7 @@ static int group_selection(void)
     if (!normal_field()) return 0;
     int left = WORLD_W, top = WORLD_H, right = -1, bottom = -1;
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
-        sc64_t4_unit_selectable(u[i].type) && !SC64_TRANSPORT_LOADED(&u[i])) {
+        sc64_game_unit_selectable(u[i].type) && !SC64_TRANSPORT_LOADED(&u[i])) {
         if (u[i].x < left) left = u[i].x;
         if (u[i].x > right) right = u[i].x;
         if (u[i].y < top) top = u[i].y;

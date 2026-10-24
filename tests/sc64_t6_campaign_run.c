@@ -253,7 +253,7 @@ static int group_to(int x, int y, int attack_move)
 {
     if (!normal_field()) return 0;
     int l = WORLD_W, t = WORLD_H, r = -1, bot = -1;
-    for (int i=0;i<MAX_UNITS;i++) if (u[i].alive && u[i].owner==SIDE && sc64_t4_unit_selectable(u[i].type)) {
+    for (int i=0;i<MAX_UNITS;i++) if (u[i].alive && u[i].owner==SIDE && sc64_game_unit_selectable(u[i].type)) {
         if (u[i].x<l)l=u[i].x; if(u[i].x>r)r=u[i].x;
         if (u[i].y<t)t=u[i].y; if(u[i].y>bot)bot=u[i].y;
     }

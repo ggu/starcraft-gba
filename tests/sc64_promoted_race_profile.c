@@ -1,6 +1,6 @@
-/* Promoted Z3/P3 profile integration: normal-menu campaign starts, profile
- * save generations, and every supported skirmish startup/save combination.
- * These bounded setups are not mission-win evidence. */
+/* Promoted Z3/P3 and staged Z4/P4 profile integration: normal-menu campaign
+ * starts, profile save generations, and supported skirmish startup/save
+ * combinations. These bounded setups are not mission-win evidence. */
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -11,7 +11,106 @@
 #error "Compile with a promoted unified Zerg or Protoss profile"
 #endif
 
-#if SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z3_ENABLED)
+#if SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z7_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_ZERG
+#define PROFILE_FRONT_FACTION SC_FRONT_ZERG
+#define PROFILE_RACE R_ZERG
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+#define PROFILE_SAVE_GENERATION 35u
+#else
+#define PROFILE_SAVE_GENERATION 33u
+#endif
+#define PROFILE_OLD_SAVE_TAG 0x53435a32u
+static const int profile_missions[] = {0, 1, 14, 15, 16, 17, 18};
+static const char *const profile_titles[] = {
+    "AMONG THE RUINS", "EGRESSION", "THE NEW DOMINION", "AGENT OF THE SWARM",
+    "THE AMERIGO", "THE DARK TEMPLAR", "THE CULLING"
+};
+#elif SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z6_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_ZERG
+#define PROFILE_FRONT_FACTION SC_FRONT_ZERG
+#define PROFILE_RACE R_ZERG
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+#define PROFILE_SAVE_GENERATION 32u
+#else
+#define PROFILE_SAVE_GENERATION 31u
+#endif
+#define PROFILE_OLD_SAVE_TAG 0x53435a32u
+static const int profile_missions[] = {0, 1, 14, 15, 16, 17};
+static const char *const profile_titles[] = {
+    "AMONG THE RUINS", "EGRESSION", "THE NEW DOMINION", "AGENT OF THE SWARM",
+    "THE AMERIGO", "THE DARK TEMPLAR"
+};
+#elif SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z5_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_ZERG
+#define PROFILE_FRONT_FACTION SC_FRONT_ZERG
+#define PROFILE_RACE R_ZERG
+#if defined(SC64_Z5_CONSUME_ENABLED)
+#define PROFILE_SAVE_GENERATION 27u
+#elif defined(SC64_Z5_CLOAK_ENABLED)
+#define PROFILE_SAVE_GENERATION 25u
+#else
+#define PROFILE_SAVE_GENERATION 23u
+#endif
+#define PROFILE_OLD_SAVE_TAG 0x53435a32u
+static const int profile_missions[] = {0, 1, 14, 15, 16};
+static const char *const profile_titles[] = {
+    "AMONG THE RUINS", "EGRESSION", "THE NEW DOMINION", "AGENT OF THE SWARM",
+    "THE AMERIGO"
+};
+#elif SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z4_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_ZERG
+#define PROFILE_FRONT_FACTION SC_FRONT_ZERG
+#define PROFILE_RACE R_ZERG
+#define PROFILE_SAVE_GENERATION 20u
+#define PROFILE_OLD_SAVE_TAG 0x53435a32u
+static const int profile_missions[] = {0, 1, 14, 15};
+static const char *const profile_titles[] = {
+    "AMONG THE RUINS", "EGRESSION", "THE NEW DOMINION", "AGENT OF THE SWARM"
+};
+#elif SC64_CAMPAIGN_RACE == 2 && defined(SC64_P6_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_PROTOSS
+#define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS
+#define PROFILE_RACE R_PROTOSS
+#define PROFILE_SAVE_GENERATION 30u
+#define PROFILE_OLD_SAVE_TAG 0x53435032u
+static const int profile_missions[] = {2, 3, 22, 23, 24, 25};
+static const char *const profile_titles[] = {
+    "FIRST STRIKE", "INTO THE FLAMES", "HIGHER GROUND", "THE HUNT FOR TASSADAR",
+    "CHOOSING SIDES", "INTO THE DARKNESS"
+};
+#elif SC64_CAMPAIGN_RACE == 2 && defined(SC64_P5_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_PROTOSS
+#define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS
+#define PROFILE_RACE R_PROTOSS
+#ifdef SC64_P5_SHUTTLE_ENABLED
+#define PROFILE_SAVE_GENERATION 26u
+#else
+#define PROFILE_SAVE_GENERATION 24u
+#endif
+#define PROFILE_OLD_SAVE_TAG 0x53435032u
+static const int profile_missions[] = {2, 3, 22, 23, 24};
+static const char *const profile_titles[] = {
+    "FIRST STRIKE", "INTO THE FLAMES", "HIGHER GROUND", "THE HUNT FOR TASSADAR",
+    "CHOOSING SIDES"
+};
+#elif SC64_CAMPAIGN_RACE == 2 && defined(SC64_P4_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_PROTOSS
+#define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS
+#define PROFILE_RACE R_PROTOSS
+#ifdef SC64_ZP_FULL_STORAGE
+#define PROFILE_SAVE_GENERATION 22u
+#elif defined(SC64_P4_STORM_ENABLED)
+#define PROFILE_SAVE_GENERATION 21u
+#else
+#define PROFILE_SAVE_GENERATION 20u
+#endif
+#define PROFILE_OLD_SAVE_TAG 0x53435032u
+static const int profile_missions[] = {2, 3, 22, 23};
+static const char *const profile_titles[] = {
+    "FIRST STRIKE", "INTO THE FLAMES", "HIGHER GROUND", "THE HUNT FOR TASSADAR"
+};
+#elif SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z3_ENABLED)
 #define PROFILE_FACTION SC64_FACTION_ZERG
 #define PROFILE_FRONT_FACTION SC_FRONT_ZERG
 #define PROFILE_RACE R_ZERG
@@ -126,7 +225,13 @@ static void reject_generation2_save(int mission, int legacy_container)
     int old_map = race_skirmish_map;
     int old_bot_races[3];
     memcpy(old_bot_races, race_bot_races, sizeof(old_bot_races));
-#if SC64_CAMPAIGN_RACE == 1
+#if defined(SC64_Z7_RUNTIME)
+    Sc64Z7PersistentState old_profile_state = race_z7;
+#elif defined(SC64_Z4_RUNTIME)
+    Sc64Z4RuntimeState old_profile_state = race_z4;
+#elif defined(SC64_P4_RUNTIME)
+    Sc64P4RuntimeState old_profile_state = race_p4;
+#elif SC64_CAMPAIGN_RACE == 1
     Sc64Z3State old_profile_state = race_z3;
     u16 old_profile_ticks = race_z3_action_ticks;
 #else
@@ -149,7 +254,13 @@ static void reject_generation2_save(int mission, int legacy_container)
            race_human == old_human && race_bots == old_bots &&
            race_completed == old_completed && race_skirmish_map == old_map);
     assert(memcmp(old_bot_races, race_bot_races, sizeof(old_bot_races)) == 0);
-#if SC64_CAMPAIGN_RACE == 1
+#if defined(SC64_Z7_RUNTIME)
+    assert(memcmp(&old_profile_state, &race_z7, sizeof(old_profile_state)) == 0);
+#elif defined(SC64_Z4_RUNTIME)
+    assert(memcmp(&old_profile_state, &race_z4, sizeof(old_profile_state)) == 0);
+#elif defined(SC64_P4_RUNTIME)
+    assert(memcmp(&old_profile_state, &race_p4, sizeof(old_profile_state)) == 0);
+#elif SC64_CAMPAIGN_RACE == 1
     assert(memcmp(&old_profile_state, &race_z3, sizeof(old_profile_state)) == 0);
     assert(old_profile_ticks == race_z3_action_ticks);
 #else
@@ -250,10 +361,11 @@ int main(void)
 {
     gba_init();
     assert(SC64_RACE_SAVE_GENERATION == PROFILE_SAVE_GENERATION);
-    assert(sc64_catalog_playable_count(PROFILE_FACTION) == 3);
+    const unsigned mission_count = sizeof(profile_missions) / sizeof(profile_missions[0]);
+    assert(sc64_catalog_playable_count(PROFILE_FACTION) == mission_count);
     assert(SAVE_VERSION == PROFILE_OLD_SAVE_TAG +
            (PROFILE_SAVE_GENERATION - 2u));
-    for (unsigned i = 0; i < sizeof(profile_missions) / sizeof(profile_missions[0]); ++i) {
+    for (unsigned i = 0; i < mission_count; ++i) {
         assert(sc64_campaign_catalog[profile_missions[i]].id == profile_missions[i]);
         assert(sc64_campaign_catalog[profile_missions[i]].faction == PROFILE_FACTION);
         assert(sc64_campaign_catalog[profile_missions[i]].playable);

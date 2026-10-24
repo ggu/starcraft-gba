@@ -8,7 +8,11 @@
  * loading, unloading, and death behavior remain caller responsibilities. */
 enum {
     SC64_TRANSPORT_DROPSHIP_RAW = 11,
+    SC64_TRANSPORT_SHUTTLE_RAW = 69,
+    SC64_TRANSPORT_OVERLORD_RAW = 42,
     SC64_TRANSPORT_DROPSHIP_SPACE = 8,
+    SC64_TRANSPORT_SHUTTLE_SPACE = 8,
+    SC64_TRANSPORT_OVERLORD_SPACE = 8,
     SC64_TRANSPORT_SPACE_UNAVAILABLE = 255,
     SC64_TRANSPORT_MAX_PASSENGERS = 8
 };
@@ -16,7 +20,17 @@ enum {
 /* Number of passenger space points provided by a supported raw transport. */
 static inline unsigned sc64_transport_space_provided_raw(unsigned raw_type)
 {
-    return raw_type == SC64_TRANSPORT_DROPSHIP_RAW ? SC64_TRANSPORT_DROPSHIP_SPACE : 0u;
+    if (raw_type == SC64_TRANSPORT_DROPSHIP_RAW)
+        return SC64_TRANSPORT_DROPSHIP_SPACE;
+#ifdef SC64_P5_SHUTTLE_ENABLED
+    if (raw_type == SC64_TRANSPORT_SHUTTLE_RAW)
+        return SC64_TRANSPORT_SHUTTLE_SPACE;
+#endif
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (raw_type == SC64_TRANSPORT_OVERLORD_RAW)
+        return SC64_TRANSPORT_OVERLORD_SPACE;
+#endif
+    return 0u;
 }
 
 /* Return 1 for raw types with verified BWAPI spaceRequired data, including
@@ -35,11 +49,26 @@ static inline int sc64_transport_space_required_raw(unsigned raw_type,
         value = 2; break;
     case 5: case 23:
         value = 4; break;
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    /* Authenticated Z6 ground cargo. raw51 is Kerrigan; raw39 is Ultralisk. */
+    case 39: value = 4; break;
+    case 51: value = 1; break;
+#endif
+#ifdef SC64_P5_SHUTTLE_ENABLED
+    /* P5's authenticated Protoss escort passengers. Values are pinned
+     * UnitType::unitSpaceRequired entries, not estimates from actor size. */
+    case 64: value = 1; break; /* Probe */
+    case 65: case 67: case 79: value = 2; break; /* Zealot, Templar, Tassadar */
+    case 66: value = 4; break; /* Dragoon */
+#endif
     /* Verified non-transportable types from the same BWAPI table. */
     case 4: case 6: case 8: case 9: case 11: case 12: case 13: case 14:
     case 17: case 18: case 21: case 22: case 24: case 25: case 26:
     case 27: case 28: case 29: case 30: case 31:
     case 33: case 35: case 36: case 42: case 43: case 45: case 47:
+#ifdef SC64_P5_SHUTTLE_ENABLED
+    case 69:
+#endif
     /* Terran, Zerg, and Protoss building IDs used by the scenario adapters. */
     case 106: case 109: case 110: case 111: case 112: case 113: case 114:
     case 115:

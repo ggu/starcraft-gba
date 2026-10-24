@@ -7,6 +7,50 @@
     SC64_CAMPAIGN_RACE != 0
 #error "SC64_T4_CAMPAIGN_ENTRY requires the combined unified Terran T3/T4 profile"
 #endif
+#ifdef SC64_Z5_CAMPAIGN_ENTRY
+#if !defined(SC64_Z4_CAMPAIGN_ENTRY) || !defined(SC64_Z4_RUNTIME) || \
+    !defined(SC64_Z5_RUNTIME) || !defined(SC64_Z5_ENABLED) || \
+    !defined(SC64_Z5_DATA_ENABLED) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_Z5_ACTORS) || !defined(SC64_Z5_DOODADS) || \
+    !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || \
+    SC64_CAMPAIGN_RACE != 1
+#error "SC64_Z5_CAMPAIGN_ENTRY requires the authenticated Z4/Z5 full-storage chain"
+#endif
+#endif
+#endif
+#ifdef SC64_P5_CAMPAIGN_ENTRY
+#if !defined(SC64_P4_CAMPAIGN_ENTRY) || !defined(SC64_P4_STORM_ENABLED) || \
+    !defined(SC64_P5_RUNTIME) || !defined(SC64_P5_ENABLED) || \
+    !defined(SC64_P5_DATA_ENABLED) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_P5_ACTORS) || !defined(SC64_Z6_ACTORS) || \
+    !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || \
+    SC64_CAMPAIGN_RACE != 2
+#error "P5 campaign entry requires the authenticated P4/P5 Protoss runtime chain"
+#endif
+#endif
+#ifdef SC64_P6_CAMPAIGN_ENTRY
+#if !defined(SC64_P5_CAMPAIGN_ENTRY) || !defined(SC64_P6_RUNTIME) || \
+    !defined(SC64_P6_DATA_ENABLED) || !defined(SC64_P6_ACTORS) || \
+    !defined(SC64_P6_COMBAT_ENABLED) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 2
+#error "P6 entry requires the authenticated P1-P6 runtime, actors and combat profile"
+#endif
+#endif
+#ifdef SC64_Z6_CAMPAIGN_ENTRY
+#if !defined(SC64_Z5_CAMPAIGN_ENTRY) || !defined(SC64_Z6_RUNTIME) || \
+    !defined(SC64_Z6_DATA_ENABLED) || !defined(SC64_Z6_ACTORS) || \
+    !defined(SC64_ZP_FULL_STORAGE) || !defined(SC64_UNIFIED) || \
+    !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 1
+#error "Z6 entry requires its authenticated Z1-Z6 runtime and full storage"
+#endif
+#endif
+#ifdef SC64_Z7_CAMPAIGN_ENTRY
+#if !defined(SC64_Z6_CAMPAIGN_ENTRY) || !defined(SC64_Z7_RUNTIME) || \
+    !defined(SC64_Z7_DATA_ENABLED) || !defined(SC64_Z6_ACTORS) || \
+    !defined(SC64_ZP_FULL_STORAGE) || !defined(SC64_UNIFIED) || \
+    !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 1
+#error "Z7 entry requires its authenticated Z1-Z7 runtime and full storage"
+#endif
 #endif
 #ifdef SC64_T5_CAMPAIGN_ENTRY
 #if !defined(SC64_T3_ENABLED) || !defined(SC64_T4_CAMPAIGN_ENTRY) || \
@@ -120,10 +164,34 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
      0,
 #endif
      "THE NEW DOMINION"},
-    {15, SC64_FACTION_ZERG, 4, 0, "AGENT OF THE SWARM"},
-    {16, SC64_FACTION_ZERG, 5, 0, "THE AMERIGO"},
-    {17, SC64_FACTION_ZERG, 6, 0, "THE DARK TEMPLAR"},
-    {18, SC64_FACTION_ZERG, 7, 0, "THE CULLING"},
+    {15, SC64_FACTION_ZERG, 4,
+#if defined(SC64_Z4_CAMPAIGN_ENTRY) && defined(SC64_Z4_RUNTIME) && defined(SC64_Z4_ENABLED) && defined(SC64_UNIFIED)
+     1,
+#else
+     0,
+#endif
+     "AGENT OF THE SWARM"},
+    {16, SC64_FACTION_ZERG, 5,
+#ifdef SC64_Z5_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "THE AMERIGO"},
+    {17, SC64_FACTION_ZERG, 6,
+#ifdef SC64_Z6_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "THE DARK TEMPLAR"},
+    {18, SC64_FACTION_ZERG, 7,
+#ifdef SC64_Z7_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "THE CULLING"},
     {19, SC64_FACTION_ZERG, 8, 0, "EYE FOR AN EYE"},
     {20, SC64_FACTION_ZERG, 9, 0, "THE INVASION OF AIUR"},
     {21, SC64_FACTION_ZERG, 10, 0, "FULL CIRCLE"},
@@ -134,9 +202,27 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
      0,
 #endif
      "HIGHER GROUND"},
-    {23, SC64_FACTION_PROTOSS, 4, 0, "THE HUNT FOR TASSADAR"},
-    {24, SC64_FACTION_PROTOSS, 5, 0, "CHOOSING SIDES"},
-    {25, SC64_FACTION_PROTOSS, 6, 0, "INTO THE DARKNESS"},
+    {23, SC64_FACTION_PROTOSS, 4,
+#if defined(SC64_P4_CAMPAIGN_ENTRY) && defined(SC64_P4_RUNTIME) && defined(SC64_P4_ENABLED) && defined(SC64_UNIFIED)
+     1,
+#else
+     0,
+#endif
+     "THE HUNT FOR TASSADAR"},
+    {24, SC64_FACTION_PROTOSS, 5,
+#ifdef SC64_P5_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "CHOOSING SIDES"},
+    {25, SC64_FACTION_PROTOSS, 6,
+#ifdef SC64_P6_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "INTO THE DARKNESS"},
     {26, SC64_FACTION_PROTOSS, 7, 0, "HOMELAND"},
     {27, SC64_FACTION_PROTOSS, 8, 0, "THE TRIAL"},
     {28, SC64_FACTION_PROTOSS, 9, 0, "SHADOW HUNTERS"},

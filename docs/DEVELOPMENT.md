@@ -758,3 +758,822 @@ optimization flags. Protoss uses `SCP3`, generation 7, and the P3 large-map
 geometry and optimization flags. Older standard two-mission generation-2
 saves are incompatible and are rejected. The asset-free default build
 continues to require no imported inputs.
+
+### Staged Zerg and Protoss chapter 4
+
+`zerg-z4` and `protoss-p4` are internal fourth-chapter targets. The canonical
+race outputs above remain the separately qualified three-chapter builds.
+These targets load the complete starting rosters and numeric scenario
+metadata for Agent of the Swarm and The Hunt for Tassadar, using isolated
+private generated headers. Preparing later map data does not enable those
+later missions in the frontend.
+
+After the canonical profile preparation has supplied the common assets,
+prepare the additional ignored inputs from the same verified source ROM:
+
+```sh
+python3 tools/sc64_races_pack.py --rom /path/to/StarCraft64-USA.z64 --out .local/sc64/zp-stage/generated/sc64_races_generated.h
+python3 tools/sc64_race_sprites.py --rom /path/to/StarCraft64-USA.z64 --base-only --include-zp-campaign-actors --out .local/sc64/zp-stage/generated/sprites --header .local/sc64/zp-stage/generated/sc64_race_sprites_generated.h
+python3 tools/sc64_z4_pack.py --rom /path/to/StarCraft64-USA.z64
+python3 tools/sc64_z4_scenario_pack.py
+python3 tools/sc64_p4_pack.py --rom /path/to/StarCraft64-USA.z64
+python3 tools/sc64_p4_scenario_pack.py
+make zerg-z4 protoss-p4
+make test-sc64-z4-runtime test-sc64-p4-runtime test-sc64-zp-storage
+```
+
+Outputs are `build/StarCraft-Zerg-Z4-GBA.gba` and
+`build/StarCraft-Protoss-P4-GBA.gba`, with matching
+`build/starcraft-zerg-z4.elf` and `build/starcraft-protoss-p4.elf` files.
+Use the matching pairs for emulator qualification. All imported data, ROMs,
+saves and graphical captures must remain local and ignored.
+
+The staged layout uses 192 Zerg or 240 Protoss unit slots, 96 buildings,
+48 mineral fields, four geysers, compact save rows and 128×128 geometry.
+Its save generation is 20; older canonical saves are incompatible. Protoss
+production reserves the remaining 87 source-script creations, including
+queued products, instead of allowing those later actors to be dropped.
+These bounds still do not fit every later campaign map; see
+[the remaining-chapter audit](ZP-CAMPAIGN-IMPLEMENTATION.md).
+
+The runtime tests use real engine/menu/update/save paths under sanitizers.
+Their controlled actor deaths, position changes and protected worlds are
+synthetic predicate tests. They do not establish a normal controller win or
+hardware frame rate. The imported opaque AI routines use bounded authored
+pressure policies; text/audio actions use documented presentation holds.
+Original N64 AI, animation, abilities and trigger scheduling are not fully
+reproduced. Controller and ARM qualification remain separate requirements.
+
+The staged Zerg field menu adds **Upgrade to Lair** for a selected, idle
+Hatchery and **Spire** for a selected Drone. Select the completed Hatchery or
+Lair and press **R** to cycle to **Mutalisk**, then **A** to train. The Lair
+requires a Spawning Pool; the Spire requires a completed Lair; Mutalisks
+require a completed Spire. This makes the source-permitted air route
+accessible through ordinary controls. The Lair upgrade uses the existing
+construction policy: its larva timer pauses during the upgrade and completion
+fills its larva count to three. Native equivalence of that timing has not been
+established.
+
+An additional P4 ability experiment is isolated from the normal P4 build:
+
+```sh
+python3 tools/sc64_p4_scenario_pack.py
+make protoss-p4-storm test-sc64-p4-storm
+```
+
+This writes `build/StarCraft-Protoss-P4-Storm-GBA.gba` and its matching
+`build/starcraft-protoss-p4-storm.elf`. Its generation-21 save persists four
+bounded Psionic Storm effects and caster energy. In P4, select one High
+Templar or Tassadar, open **B** commands, choose **STORM**, place the cursor
+within cast range and press **A**; **B** cancels targeting. The row appears
+only when the selected caster has enough energy. Storm affects allied units
+too. Its pulse cadence and visual effect use documented authored policies;
+see the frozen development-image qualification in [Validation](VALIDATION.md).
+
+The P4 controller now has a repeatable host win. Run its full input-only
+playthrough with `make test-sc64-p4-campaign`; matching-image ARM replay and
+fresh-process save checks are separate. In this profile, **B+R** selects the combat escort
+without Tassadar and Raynor, so army orders can clear their route first.
+Ordinary **R** still selects the heroes with the army.
+
+For later-chapter implementation, authenticate and generate the retained
+numeric scenario metadata separately. For example:
+
+```sh
+python3 tools/sc64_zp_scenario_pack.py --mission Z5 --verify-staged
+python3 tools/sc64_zp_scenario_pack.py --mission Z5
+```
+
+The tool accepts Z5–Z10 and P5–P10 and reads the staged source-map directory
+created by `sc64_races_pack.py`. Its default output is an ignored header under
+`.local/sc64/zp-stage/generated/scenarios/`. It preserves numeric trigger,
+location, player, property and availability records after authenticating the
+complete CHK and section hashes. Generation does not implement or enable a
+mission; actor support, runtime actions, save rules and controller
+qualification remain required.
+
+The isolated Z5/P5 schedulers have asset-free checks:
+
+```sh
+make test-sc64-zp-chapter-five-models
+```
+
+After generating both numeric headers, run their adapter checks with
+`make test-sc64-z5-adapter test-sc64-p5-adapter`. The adapters preserve source
+operands, sequence waits and switches, and reject failed world callbacks.
+They still require actual engine implementations of source conditions and
+effects; these fixtures do not establish playable fifth missions. Neither
+model or adapter enables a frontend entry.
+
+### Staged Zerg chapter 5 and expanded storage
+
+After preparing the chapter-four inputs above, generate the additional Z5
+numeric records and isolated sprite bank:
+
+```sh
+python3 tools/sc64_zp_scenario_pack.py --mission Z5
+python3 tools/sc64_z5_doodad_pack.py
+python3 tools/sc64_race_sprites.py --rom /path/to/StarCraft64-USA.z64 --base-only --include-zp-campaign-actors --include-z5-actors --include-z5-doodads --out .local/sc64/z5/generated/sprites --header .local/sc64/z5/generated/sc64_race_sprites_generated.h
+make zerg-z5 test-sc64-z5-runtime test-sc64-z5-world
+```
+
+`build/StarCraft-Zerg-Z5-GBA.gba` and `build/starcraft-zerg-z5.elf` are an
+internal five-entry Zerg build. Its complete source placements include all
+41 unit-backed doors and traps; the other 30 THG2 rows are sprite-only
+decoration and have no world actor. The runtime tests cover import, trigger
+effects, door collision/cache changes, save/load and malformed-state
+rejection. They do not prove a controller win. The source PauseGame action
+requires an authored **A** acknowledgment; **B** saves while that pause is
+shown. Native speech, cinematic and AI-script behavior remain approximations.
+
+This profile uses generation 23 and an opt-in full-storage layout: 240 units,
+160 buildings, 144 mineral fields and 12 geysers. Compact 48-byte runtime
+buildings, 35-byte unit save rows and 5-byte mineral save rows keep the
+unchanged SRAM and RAM guards. Older save generations are incompatible.
+These are fixed pools, not a guarantee that unlimited repeated triggers or
+production in every later mission can fit. `make sc64-zp-full-storage-probe
+test-sc64-zp-full-storage` separately checks the storage layout with P4.
+
+### Optional Z5 cloak and staged Protoss chapter 5
+
+Z5's optional ability profile authenticates PTEC and the hero's UNIT energy
+before enabling Personnel Cloaking. With the Z5 inputs above prepared, run:
+
+```sh
+python3 tools/sc64_z5_ability_pack.py --verify-staged
+python3 tools/sc64_z5_ability_pack.py
+make zerg-z5-cloak test-sc64-z5-cloak-runtime
+```
+
+Select Kerrigan, press **B**, and choose **CLOAK** or **UNCLOAK** in the command
+list. Her HUD shows energy and cloak state. STOP preserves energy. Live,
+enabled hostile detector traps reveal her within their source bounding-box
+sight range; tying detector activity to the authored trap-enabled state is a
+GBA policy, not verified native doodad-order behavior. Source PTEC disables
+Psionic Storm here. This profile uses generation 25 and rejects older saves;
+it does not establish a completed Z5 playthrough.
+
+P5 has a separate five-entry Protoss build. After the chapter-four staging
+and P4 inputs are ready, prepare its numeric descriptor and sprite bank:
+
+```sh
+python3 tools/sc64_zp_scenario_pack.py --mission P5
+python3 tools/sc64_race_sprites.py --rom /path/to/StarCraft64-USA.z64 --base-only --include-zp-campaign-actors --include-z6-actors --out .local/sc64/p5/generated/sprites --header .local/sc64/p5/generated/sc64_race_sprites_generated.h
+make protoss-p5 test-sc64-p5-runtime test-sc64-p5-world
+```
+
+`build/StarCraft-Protoss-P5-GBA.gba` uses save generation 24. Choosing Sides
+retains every starting placement, separate hostile forces, source-player
+death counters, rescue, and all 11 source creates. Production reserves slots
+for unexecuted creates. The reinforcements wait for a source event: entering
+one of the choice regions or killing a source-player-6 actor sets switch 0.
+Bring Tassadar and two Zealots to the extraction point to satisfy the source
+victory predicates. The three opaque AI script actions use a bounded authored
+paid-pressure policy; native AI equivalence is unverified. Startup, source
+actions, saves and render checks do not establish a normal-controller win.
+The extraction terrain requires Shuttle transport, which this generation-24
+profile does not enable. To test the separate generation-26 cargo profile:
+
+```sh
+make protoss-p5-shuttle test-sc64-p5-shuttle-runtime
+```
+
+Select passengers and press **A** on the friendly Shuttle to board. It has
+eight space points: Probe 1, Zealot/High Templar/Tassadar 2, Dragoon 4. Select
+the loaded Shuttle, press **B**, choose **UNLOAD CARGO**, then press **A** on
+a clear landing area. Passengers retain HP and supply while aboard and
+cannot be selected, attacked or counted in a Bring objective until unloaded.
+Cargo dies if the Shuttle is destroyed. These bounded GBA orders reuse
+existing unit/save fields; generation-24 saves are incompatible. Lifecycle
+checks cover the transport lifecycle. A complete normal-controller P5 win, ARM replay,
+and fresh-process cargo save are now qualified (see `docs/VALIDATION.md`).
+Run `make test-sc64-p5-campaign-run` to repeat the host win with sanitizers.
+
+`make test-sc64-z5-ability-models test-sc64-z6-model` requires no imported data.
+After generating the Z6 numeric descriptor with the scenario packer,
+`make test-sc64-z6-adapter` checks its isolated callback scheduler. Z6 is not
+an enabled runtime mission.
+
+`make test-sc64-z6-world` checks its engine-backed world callback foundation,
+including selectors, locations, resources, both MoveLocation targets,
+KillUnitAtLocation and source properties. Its mutable location state still
+needs save integration. Source hallucination, energy and opaque AI actions
+require explicit integration callbacks and fail closed when absent; this
+fixture does not establish a playable Z6 mission.
+
+### Z5 Consume and remaining ability models
+
+The optional Z5 Consume profile shares Kerrigan's source-checked Q8 energy and
+cloak state. Prepare the existing Z5 inputs, regenerate the authenticated
+ability facts, then build and test:
+
+```sh
+python3 tools/sc64_z5_ability_pack.py
+make zerg-z5-consume test-sc64-z5-consume-runtime
+```
+
+Select Kerrigan, press **B**, choose **CONSUME** after the cloak command, then
+press **A** on a friendly Zergling. She approaches using ordinary movement and
+consumes it for 50 energy, capped at 250, with no energy cost. Hallucinated food
+is killed without giving energy. This adapter supports the authenticated Z5
+human target roster (source-owner-3 raw37 Zerglings); the standalone model
+records the broader native target filters without inventing an organic-only
+restriction. Native spell animation, projectile delay and inertia are not
+emulated. The range uses native collision-box geometry at the GBA's 2:1 scale
+with zero movement allowance.
+
+`build/StarCraft-Zerg-Z5-Consume-GBA.gba` has distinct identity SCZD and save
+generation 27, rejecting earlier generations. Pending Consume orders preserve
+validated caster/target identities through SRAM; invalid links reject before
+world mutation or SRAM replacement. The unused circle fallback is kept in ROM
+for this profile so the unchanged IWRAM stack reserve remains intact.
+
+The source audit also authenticates Ensnare permission. Its standalone model
+covers friendly-fire area filters, energy cost and the 75-status-decrement
+lifetime (600 native frames, nominally 750 GBA updates). Ensnare is **not yet
+integrated into the playable runtime**. Ability fixtures and startup/save
+coverage do not establish a complete Z5 controller win.
+
+### P6 numeric foundation
+
+P6 has isolated source-program and actor-fact checks:
+
+```sh
+make test-sc64-p6-model test-sc64-p6-actors
+python3 tools/sc64_zp_scenario_pack.py --mission P6
+make test-sc64-p6-adapter test-sc64-p6-world
+```
+
+The numeric adapter validates 26 one-shot records, 99 actions, 29 conditions,
+source selectors, waits, switches and the referenced UPRP identities. The isolated world adapter tests all source rows with synthetic callbacks. World
+operations still require live engine bindings and explicit capabilities; the opaque AI row fails closed
+without an authored policy. P6 is not yet a selectable playable mission. Its
+remaining runtime work includes property-driven enemy orders, permanent-cloak
+detection for Dark Templar/Zeratul, Infested Terran suicide damage, THG2 props,
+and full normal-input/ARM/save qualification. Source door types 205–208 are
+invincible non-buildings; placement in the GBA Building pool is a prop policy.
+
+
+The opt-in P6 sprite importer prepares the missing actor and wall-trap art
+without changing earlier sprite banks:
+
+```sh
+python3 tools/sc64_race_sprites.py --rom /path/to/StarCraft64-USA.z64 --include-p6-actors --include-z5-actors --include-z6-actors --out .local/sc64/p6/generated/sprites --header .local/sc64/p6/generated/sc64_race_sprites_generated.h
+python3 tools/sc64_p6_doodad_pack.py --verify-staged
+```
+
+Keep T4 imports enabled (omit `--base-only`) for the inherited props. The P6
+bundle reuses ZP beacons and Z5 indexed doors/traps and adds raw50/74/75 unit
+images plus all seven raw210 wall-missile-trap frames. This prepares art only;
+new raw actor behavior and the raw210 prop policy remain unimplemented. The
+THG2 audit preserves all 37 rows: 27 unit-backed props and ten sprite-only
+rows. The sprite-only type IDs are SpriteType IDs, not unit IDs. The two raw210
+unit-backed placements explicitly prevent runtime-ready prop generation until
+their mapping is implemented. `test-sc64-p6-actor-source` audits source UPRP
+values separately from the asset-free actor-fact checks.
+
+
+### Z5 complete controller and shared query checks
+
+The generation-27 Consume build now has a full ordinary-input host win, a
+complete ARM replay, and an exact fresh-process mid-mission save restore.
+Repeat the host run with `make test-sc64-z5-campaign-run`. It launches through
+HOME, retains Kerrigan and uses movement, cloak and Consume through the normal
+controls; victory follows the source gate and extraction program.
+
+`make test-sc64-z5-count-queries` checks the optional started-trigger pruning
+and phase-local Command/Bring snapshot against their full-query oracles. The
+three preserved source triggers continue to poll; copied or unsupported rows
+fall back to full queries. Neither optimization changes SRAM. See Validation
+for frozen replay comparisons and measured performance.
+
+### P6 internal live probe
+
+After preparing the P6 sprite and numeric THG2 inputs above, run:
+
+```sh
+make protoss-p6-probe
+make test-sc64-p6-game test-sc64-p6-runtime test-sc64-p6-save
+make test-sc64-p6-combat test-sc64-p6-profile test-sc64-p6-frame-coverage
+```
+
+`build/StarCraft-Protoss-P6-Probe-GBA.gba` has an internal sixth menu entry and
+separate generation-30 identity SCPC. It imports 200 units, four beacons and
+27 unit-backed THG2 props. The source 26-record program drives gates, creates
+and the Zeratul extraction objective. The bounded GBA actor policy includes
+permanent-cloak detection, property-driven burrow/release, Infested Terran
+suicide splash and raw210 trap attacks. Ten sprite-only decorations remain
+metadata rather than rendered actors. The opaque Suic script is an authored
+single AttackMove for source Force 2; native AI, animation timing and full
+combat equivalence are not claimed.
+
+The probe passes live startup, candidate-only save validation, combat and
+framebuffer checks, including source door changes. These checks do not yet
+establish a complete controller win, ARM mission replay or hardware viability.
+The standard Protoss output remains the separately qualified P1–P3 build.
+
+
+The Consume build enables the qualified Z5 query options by default. For a
+comparison build, use `make -B zerg-z5-consume Z5_QUERY_FLAGS=` and retain that
+ROM/ELF separately, then restore with `make -B zerg-z5-consume`. The complete
+optimized replay averages 17.73 effective fps versus 8.78 for the baseline,
+with matching observed state/captures and exact fresh-process save restore.
+
+
+### Z6 live probe and seventh-chapter foundations
+
+After the staged map and Z5 inputs are prepared, import Z6's complete optional
+actor/building bank and build the internal sixth-entry ROM:
+
+```sh
+python3 tools/sc64_race_sprites.py --rom "/path/to/StarCraft 64.z64" --base-only --include-zp-campaign-actors --include-z5-actors --include-z5-doodads --include-z6-actors --include-z6-buildings --out .local/sc64/z6/generated/sprites --header .local/sc64/z6/generated/sc64_race_sprites_generated.h
+python3 tools/sc64_zp_scenario_pack.py --mission Z6
+make zerg-z6-probe
+make test-sc64-z6-world test-sc64-z6-runtime test-sc64-z6-save
+make test-sc64-z6-profile test-sc64-z6-frame-coverage
+```
+
+This produces `build/StarCraft-Zerg-Z6-Probe-GBA.gba` (SCZE, generation 32).
+It retains the complete 185-row source placement, adds distinct Robotics
+Support Bay and Shield Battery identities, and runs Z6's source trigger
+program. Hallucinated Tassadar actors have a bounded lifetime, cannot deal
+damage, and take doubled damage before armor and shields. The Zer6 script
+uses an explicit paid-production/order policy rather than native AI bytecode.
+Kerrigan now starts at the authored full energy and has Cloak and Storm in
+her field menu. Her source disables Consume. Ensnare and active Shield
+Battery recharge remain incomplete. Do not count this as a completed sixth
+mission.
+
+Z7 and P7 source schedulers can be checked independently:
+
+```sh
+python3 tools/sc64_zp_scenario_pack.py --mission Z7
+python3 tools/sc64_zp_scenario_pack.py --mission P7
+make test-sc64-z7-model test-sc64-z7-adapter test-sc64-z7-runtime
+make test-sc64-p7-model test-sc64-p7-adapter
+```
+
+Z7's world/runtime fixture uses all 231 canonical rows and a bounded paid
+Zerg AI policy. Its opt-in shared-engine profile now includes a seventh menu
+entry, source objective outcomes and generation-35 saves:
+
+```sh
+make zerg-z7-probe
+make test-sc64-z7-profile test-sc64-z7-game-save test-sc64-z7-frame-coverage test-sc64-z7-colonies
+```
+
+This produces `build/StarCraft-Zerg-Z7-Probe-GBA.gba` (SCZF). It requires the
+complete Z6 inputs above and the Z7 scenario descriptor. It retains the source
+starting roster and resources; build a base and destroy the hostile source
+owner's buildings while preserving at least one human actor. Menu/startup,
+save rejection and render checks establish integration readiness, not a
+completed playthrough or full-mission performance result. Its save generation
+differs from the Z6 probe and earlier generation-33 Z7 probe; older saves are
+rejected rather than converted. With only Drones selected, scroll below SPIRE
+to CREEP COLONY and place a 75-mineral colony on creep. After it completes,
+select it and choose SUNKEN from the contextual row. A completed Spawning
+Pool and 50 minerals are required; this morph consumes no additional Drone.
+It preserves damage through the 375-tick morph and applies the reference's
+max-HP adjustment at completion. The explicit colony-defense gate is enabled
+only in the Z7 development profile.
+
+P7 has an isolated world foundation with separate source-Force wallets; its
+canonical roster fails closed on missing raw68/71/72 actor bindings. It still
+lacks shared menu/save integration. Neither seventh mission has a completed
+controller playthrough.
+
+
+The sixth-mission probes require their authenticated spell metadata:
+
+```sh
+python3 tools/sc64_p6_ability_pack.py
+python3 tools/sc64_z6_ability_pack.py
+make test-sc64-campaign-spells test-sc64-p6-storm
+make test-sc64-six-query-options test-sc64-p7-runtime
+```
+
+P6's Tassadar has Storm at `B` → `STORM`; select him alone before casting.
+Z6's Kerrigan has `CLOAK`/`UNCLOAK` and `STORM` in the field menu. Stop retains
+spell energy. Active effects and energy survive SRAM restore; the new probes
+reject their older generation-28/29 saves. P6 uses generation 30 and Z6 uses
+32, while the separately qualified P5/Z5 outputs keep their existing formats.
+
+Optional query experiments remain off by default. Compare a frozen baseline
+with `make -B protoss-p6-probe P6_QUERY_FLAGS='-DSC64_P6_PRUNE_STARTED -DSC64_P6_PREVALIDATED_TICK'`.
+The analogous Z6 experiment uses `Z6_QUERY_FLAGS=-DSC64_Z6_PRUNE_STARTED`.
+An additional default-off Z6 count experiment is available after preparing
+the private numeric scenario inputs:
+
+```sh
+make test-sc64-z6-count-queries
+make -B zerg-z6-probe Z6_QUERY_FLAGS=-DSC64_Z6_COUNT_SNAPSHOT
+```
+
+It caches the eight authenticated Command/Bring counts for one condition
+phase, with full-scan fallback and invalidation before actions. It retains
+the current center-based location predicate; source bounding-box/elevation
+fidelity remains a separate correction. Host equivalence and a full host win
+are established; ARM timing and replay equivalence remain pending. Restore
+the standard build with `make -B zerg-z6-probe` after retaining any experiment.
+Restore a default build with `make -B protoss-p6-probe` or
+`make -B zerg-z6-probe`; Make does not track command-line flag changes.
+`tools/sc64_zp_start_profile.py --help` describes a bounded P6 startup
+comparison driven by ordinary menu inputs. It does not qualify mission wins.
+
+### Z6 transport integration and P6 query experiments
+
+The internal Z6 probe now requires authenticated Ventral Sacs facts:
+
+```sh
+python3 tools/sc64_z6_transport_pack.py
+make test-sc64-z6-transport test-sc64-z6-save test-sc64-campaign-spells
+make zerg-z6-probe
+```
+
+Z6's objective island is disconnected from the opening ground component in
+native tile walkability. Morph the starting Hatchery to a Lair, select the
+completed Lair, then use `B` → `VENTRAL SACS`. Research costs 200 minerals and
+200 gas and takes 3,000 active 30-Hz updates; pausing freezes it. It begins
+unresearched. Once complete, select ground passengers and press `A` on a
+friendly Overlord to board. Select the loaded Overlord and use `B` →
+`UNLOAD CARGO`, then `A` on traversable ground. Capacity is eight source space
+points, including one for Kerrigan and two for each Hydralisk. Research,
+embarked actors and source identities survive saves. Destroying the carrier
+kills its passengers and records their source deaths. Boarding and landing
+remain bounded GBA adaptations of the native order machine.
+
+The Z6 save format is generation 32. It also persists the bounded Drone-morph
+census used to distinguish construction from killed starting Drones, and
+accepts the imported Hatchery's in-place Lair morph. Older internal Z6 saves
+are intentionally rejected; the qualified standalone Z5 output is unchanged.
+
+P6 and Z6 heroes can enter Storm targeting with `B+R` when selected alone.
+Insufficient energy keeps that selection and reports failure. Successful casts
+stop the caster's previous movement order. P6 Storm also damages native
+NonBuilding traps held in the engine's Building pool.
+
+The optional P6 query experiments include conservative trap range rejection,
+one-shot trigger polling removal, preflight-backed immutable metadata checks,
+and a transient Command/Bring snapshot. The snapshot groups repeated source
+selectors and has room for every condition's query rectangle. It is built
+before predicates and discarded before any action or opaque AI callback;
+saves still use full candidate validation.
+
+```sh
+make test-sc64-p6-query-experiments
+make -B protoss-p6-probe P6_QUERY_FLAGS='-DSC64_P6_PRUNE_STARTED -DSC64_P6_PREVALIDATED_TICK -DSC64_P6_TRAP_CULL -DSC64_P6_COUNT_SNAPSHOT'
+```
+
+These flags remain off by default while full playthrough comparisons are in
+progress. The sixth missions remain internal probes until normal-input wins,
+fresh emulator replay, save continuity and performance are qualified. The
+completed staged campaign count remains Terran 10, Zerg 5 and Protoss 5.
+
+
+Both sixth probes now support the bounded startup observer. Z6 also has a
+full-bank replay observer, ready for a genuinely winning controller trace:
+
+```sh
+python3 tools/sc64_zp_start_profile.py --profile zerg-z6 --rom build/StarCraft-Zerg-Z6-Probe-GBA.gba --elf build/starcraft-zerg-z6-probe.elf --live-frames 1000 --checkpoint 100
+```
+
+The observer reads model, source deaths, mutable locations, ability/research
+state, Drone morph history and complete compact actor banks through the
+matching ELF's DWARF offsets. `--profile protoss-p6` remains the default.
+
+With the Z6 private inputs prepared, `make test-sc64-z6-controller` runs the
+full normal-input mainland-clearance and Ventral Sacs ferry playthrough under
+ASan/UBSan. It writes the private replay trace to `build/z6-controller.json`.
+The controller also accepts `--trace PATH` when invoked directly. A host win
+does not qualify the ARM replay, SRAM handoff or physical GBA performance.
+
+The qualified P6 defaults now include both: `SC64_P6_RESCUE_GROUPED`
+groups live friendly rescue candidates while preserving in-frame rescue
+chains; `SC64_P6_STORM_POSTCHECK_LOCAL` skips the unchanged mission-model
+post-validation after a successful Storm tick. It retains full entry checks
+and the live raw-79 energy scan. Run their private-data host checks with
+`make test-sc64-p6-rescue-grouped test-sc64-p6-storm-validation`.
+Append either flag to an explicit `P6_QUERY_FLAGS` experiment and use `-B`
+when changing flags. Neither option has a qualified full-mission FPS result.
+Startup reports are explicitly separate from mission-win evidence.
+
+In the Z6 probe, **R** selects the combat group including Kerrigan. **B+R**
+selects the army while leaving Kerrigan out, so group orders can keep the
+mission-critical hero safe. With only Kerrigan selected, **B+R** instead
+opens Storm targeting; an exhausted Kerrigan keeps her selection. This is
+an authored GBA control, not an original N64 binding.
+
+P6 burrow-release options are included in the qualified defaults. To run their
+four-combination differential checks after preparing the private probe inputs:
+
+```sh
+make test-sc64-p6-burrow-cull
+```
+
+Add `-DSC64_P6_BURROW_CULL -DSC64_P6_BURROW_GROUPED` to the existing
+`P6_QUERY_FLAGS` experiment to compare the grouped candidate. Retain separate
+ROM/ELF pairs and use the startup profiler's `--compare` option. These flags
+are not enabled in a qualified full-mission build yet; current evidence and
+frozen hashes are in [Validation](VALIDATION.md#p6-burrow-release-experiments).
+
+### Complete skirmish controller matches
+
+After preparing the three canonical race profiles, run:
+
+```sh
+make test-sc64-skirmish-matches
+```
+
+This compiles an input-only controller against each canonical profile and runs
+both available maps, all three human races and one to three AI opponents.
+Opponent races rotate from the human race; this is 18 configurations per ROM,
+not every possible opponent-race permutation. The matrix allows 120,000 input
+ticks and fails on an unfinished match, launch failure or sanitizer error.
+Human defeats are valid completed matches. Private traces, logs and matrix
+reports are written under `.local/sc64/skirmish/{terran,zerg,protoss}-matches/`.
+To run one case directly:
+
+```sh
+build/test-sc64-skirmish-match-protoss 1 0 2 .local/sc64/skirmish/example.json 120000
+```
+
+The arguments are map (0 built-in arena, 1 imported), human race (0 Terran,
+1 Zerg, 2 Protoss), opponent count, output trace and optional input-tick cap.
+The controller uses ordinary HOME/menu navigation and `game_update` inputs;
+its world reads guide decisions without modifying resources, actors or AI.
+
+### Dense input replay without a larger queue
+
+Some full controller routes exceed 256 transitions in a 1,000-tick window.
+`SC64_DENSE_SCHEDULE` reduces replay pages to 250 ticks while retaining the
+existing 256-entry queue and RAM layout. It changes the debugger observation
+cadence; ordinary play continues to use the same game rules. For the P6 probe:
+
+```sh
+make -B protoss-p6-probe P6_EXTRA_FLAGS=-DSC64_DENSE_SCHEDULE
+python3 tools/sc64_zp_controller_replay.py --help
+```
+
+The Z3 and staged Zerg/Protoss replay tools discover the shorter period from
+the ELF. Other existing profilers still expect their documented 1,000-tick
+builds. Rebuild with the original flags before using those profilers.
+For a dense skirmish ROM/ELF, use the dedicated observer:
+
+```sh
+python3 tools/sc64_skirmish_controller_replay.py \
+  --trace .local/sc64/skirmish/example.json \
+  --rom /absolute/path/to/matching.gba \
+  --elf /absolute/path/to/matching.elf
+```
+
+Supply the matching build used to generate the trace; profile-specific actor
+capacities can change the outcome. The tool verifies a fresh HOME start,
+feeds only scheduler input fields, and checks the final configuration, frame,
+result and live actor counts. Its FPS mean uses GBA timer deltas between live
+PLAY checkpoints, excluding HOME/start and final RESULT intervals.
+
+### Prepare the qualified staged Zerg and Protoss builds
+
+The wrapper also supports the six-mission Zerg development profile and the
+five-mission Protoss Shuttle profile. From a fresh checkout, use your supported
+StarCraft 64 USA ROM:
+
+```sh
+./dev sc64 prepare --rom "/path/to/StarCraft64-USA.z64" --profile zerg-z6
+./dev sc64 build --profile zerg-z6
+./dev sc64 test --profile zerg-z6
+./dev sc64 prepare --rom "/path/to/StarCraft64-USA.z64" --profile protoss-p5-shuttle
+./dev sc64 build --profile protoss-p5-shuttle
+./dev sc64 test --profile protoss-p5-shuttle
+```
+
+These generate the required maps, art, scenario, ability and transport headers
+under `.local/`; Z6 also generates its inherited Z5 sprite bank. Inspect
+readiness with `./dev sc64 status --profile zerg-z6` or the corresponding
+Protoss profile. The output ROMs are `build/StarCraft-Zerg-Z6-Probe-GBA.gba`
+and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The ordinary `zerg` and
+`protoss` profile names still build their canonical three-mission versions.
+
+### Reproduce the P6 host win
+
+After preparing the P6 probe inputs described above, run:
+
+```sh
+make test-sc64-p6-controller
+```
+
+The host test replays an authored opening input fixture through the ordinary
+HOME/menu controls, then uses the adaptive Marine/hero escort policy. The
+fixture contains only held-key masks and run lengths; game assets still come
+from local preparation. No private opening input file is required. The default
+180,000-gameplay-frame limit covers the full win. To write a separate trace:
+
+```sh
+build/test-sc64-p6-controller --trace .local/sc64/p6-my-run.json
+```
+
+Full trace replay on ARM requires a dense probe build because some input
+windows exceed the standard queue's 1,000-tick capacity; see the dense replay
+section. This target is a deterministic regression route, with exact source
+hero/extraction/completion assertions at victory.
+
+The expanded Z/P collision lookup has a dedicated
+sanitizer differential target after Z6 inputs are prepared:
+
+```sh
+make test-sc64-z6-collision-facts
+```
+
+`SC64_COLLISION_FACT_HOIST` changes only repeated collision fact lookups.
+The target explicitly builds its reference and hoisted variants independently
+of the profile's enabled query defaults.
+
+`SC64_ZP_FACT_RANGE_CULL` rejects ordinary roster
+types before checking optional campaign actor facts. Its differential test
+needs no imported assets and compares complete resolver/wrapper answers
+across 16 actor-gate combinations, including P7 and the late Terran enum prefix:
+
+```sh
+make test-sc64-zp-fact-range
+make -B zerg-z6-probe Z6_QUERY_FLAGS='-DSC64_Z6_COUNT_SNAPSHOT -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL'
+```
+
+The combined build reproduces the complete winning Z6 host route and the
+12,000-input-tick ARM prefix. The range cull improves that prefix from 10.47
+to 10.97 fps. The full ARM route wins at 19.01 average effective fps, with
+both opening and late saves restoring exactly in fresh processes. The three
+options now form the Z6 defaults; the staged Z7 profile inherits them.
+`Z6_QUERY_FLAGS=` builds the reference path, and `Z6_EXTRA_FLAGS` appends
+diagnostic or experimental options without replacing those defaults.
+
+The separate collision-class cache remains disabled by default:
+
+```sh
+make test-sc64-z6-collision-classes
+make -B zerg-z6-probe Z6_EXTRA_FLAGS=-DSC64_COLLISION_CLASS_CACHE
+```
+
+It uses one transient byte per unit to retain type-derived collision facts
+within a bucket phase. Its 12,000-input opening improves from 10.97 to
+11.29 fps, with matching reported states and captures. A full ARM route and
+save qualification are still required for that candidate. It uses the legacy
+per-frame bucket lifecycle and rejects late-Terran persistent storage.
+
+P6's eight query options are enabled by default after the full ARM win and
+fresh-process save checks. `P6_QUERY_FLAGS=` explicitly builds the reference
+path; assigning a subset replaces the defaults for a component comparison.
+`P6_EXTRA_FLAGS` appends replay/diagnostic options without replacing the query
+options. Differential Make fixtures explicitly select their on/off variants.
+The qualified dense P6 run averages 12.75 fps; 30 fps remains unfinished.
+
+The Probe-only command menu includes CANNON after NEXUS. The existing Forge,
+power, cost and placement rules apply; the new row provides access to them.
+`make test-sc64-probe-cannon test-sc64-probe-expansion` checks both commands
+in basic unified, Z6 and P6 builds.
+
+P3 has an optional bounded production-exit experiment:
+
+```sh
+make test-sc64-production-exit test-sc64-p3-production-exit
+make -B protoss-p5-shuttle P3_EXTRA_FLAGS=-DSC64_P3_PRODUCTION_EXIT
+```
+
+It is active only during P3 and remains disabled by default. Clear exits keep
+the existing location; blocked exits search for reachable space, and completed
+orders wait when no space is available. This is a bounded GBA placement model,
+with the limitations recorded in VALIDATION. Use a clean rebuild without the
+extra flag to return to the normal P5 build.
+
+Expansion resource returns have a separate opt-in experiment:
+
+```sh
+make test-sc64-nearest-resource-depot
+make -B protoss-p5-shuttle P3_EXTRA_FLAGS='-DSC64_P3_PRODUCTION_EXIT -DSC64_NEAREST_RESOURCE_DEPOT'
+```
+
+`SC64_NEAREST_RESOURCE_DEPOT` selects a same-owner, reachable active depot
+instead of the first base slot, and caches it for a resource trip. Morphing
+Lairs/Hives remain active depots; a new unfinished Hatchery does not. Missing
+depots preserve the worker's resource order and cargo until a topology or
+depot-completion event allows another selection. This needs the prepared
+P5/Z6/P6 private inputs for its actual-engine sanitizer matrix.
+
+The experiment remains disabled by default. Its focused behavior/save tests
+and ARM reserve checks pass, but the existing Z6 controller stalls with the
+changed economy and does not qualify a complete route. The Z6 controller
+target now exits nonzero for a loss or bounded attempt without a victory.
+Worker resource handling stays in ROM so compiler inlining cannot consume
+the IWRAM stack reserve; movement and combat retain their existing routines.
+
+The larger P5 bank has a separate P3 expansion controller using both options:
+
+```sh
+make test-sc64-p3-expansion-controller
+make -B protoss-p5-shuttle P3_EXTRA_FLAGS='-DSC64_P3_PRODUCTION_EXIT -DSC64_NEAREST_RESOURCE_DEPOT'
+python3 tools/sc64_p3_controller_replay.py --route expansion --trace build/p3-expansion-controller.json
+```
+
+The host target writes `build/p3-expansion-controller.json` and fails unless
+the source objective reaches a verified win. It uses paid expansions,
+production and normal controller commands; it preserves the canonical P3
+controller. The additive replay route validates the launch, final source
+state and windowed input capacity before starting mGBA. This larger-bank
+route has a host win at frame 123916. Its ARM replay and fresh-process saves
+are separate qualification checks; do not promote it from the host result.
+
+Adding `--ticks 1000 --save-at-end` to the replay command creates a bounded
+opening save. Run `python3 tools/sc64_p3_resume_smoke.py --report
+/path/to/prefix/profile.json` against the same ROM/ELF to load that SRAM from
+HOME in a fresh process. It compares the reported persisted state, explicitly
+reports the building-selection reset on load, and verifies one neutral
+handoff frame followed by 60 live frames. Unit selection remains checked.
+
+After Z7 inputs are prepared, `make test-sc64-z7-gas-restore` checks destroyed
+source Extractors reopening their geyser locations and the corresponding
+transactional save validation. This does not establish a full Z7 win.
+
+Construction hit-point progression has a separate default-off
+`SC64_CONSTRUCTION_HP` gate requiring race rules. It starts ordinary buildings
+at one tenth HP, grows HP and Protoss shields with construction, and retains
+damage on completion. Zerg upgrades use their separate morph HP rules. The
+asset-free integer checks are included in `./dev test` and can run alone:
+
+```sh
+make test-sc64-construction-hp
+```
+
+With unified inputs available, `make test-sc64-construction-hp-game` runs
+actual worker/construction lifecycle fixtures. With the existing Z7 private
+inputs prepared, `make test-sc64-construction-hp-z7` also checks Lair and
+damaged Sunken/Spore morphs, including packed-save continuity. These test
+targets enable the gate explicitly; standard ROM flags leave it off pending
+complete mission and fresh-process SRAM qualification. See
+[Validation](VALIDATION.md#experimental-construction-hit-point-progression)
+for the integer-timing and pre-arrival-foundation limits.
+
+P7 has a gated source-fact foundation, independently testable without assets:
+
+```sh
+make test-sc64-p7-actor-rules test-sc64-zp-fact-range
+make test-sc64-p7-geometry
+```
+
+`SC64_P7_ACTORS` supplies the missing Archon, Arbiter, Carrier and Observer
+identities plus seven Protoss structure types. They remain scenario-only;
+this does not expose new training commands or a playable P7 campaign entry.
+The P7 header records missing splash, interceptor, cloak/detection, Arbiter
+field and Shield Battery mechanics. Enum capacity fits the current packed
+save fields, but P7 persistence and complete gameplay are not integrated yet.
+
+The asset-free geometry fixture checks source-pixel actor rectangles, including
+inclusive source extents and malformed coordinate rejection. Runtime centers
+are doubled before applying the source extents. With P7's private scenario
+prepared, `make test-sc64-p7-runtime` checks both actor-gate configurations;
+the enabled fixture checks the complete placement census and location edges.
+These are isolated integration checks, without a P7 playthrough qualification.
+
+P7's sprite importer is also opt-in and writes to a separate private directory:
+
+```sh
+python3 tools/sc64_race_sprites.py --rom "/path/to/StarCraft 64.z64" --include-p6-actors --include-z5-actors --include-z6-actors --include-z6-buildings --include-p7-actors --out .local/sc64/p7/generated/sprites --header .local/sc64/p7/generated/sc64_race_sprites_generated.h
+```
+
+It adds Arbiter art and complete source frame banks for seven Protoss
+structures, reusing the shared Archon, Carrier and Observer images. The
+generated completeness marker requires that shared art as well. This prepares
+source images only; native animation selection and P7 renderer/profile
+integration remain unfinished. Generated art and previews stay local.
+
+The experimental `SC64_P7_ARCHON_SPLASH` combat path is separately gated and
+requires `SC64_P7_ACTORS`, `SC64_ZP_CAMPAIGN_ACTORS` and `SC64_RACES`:
+
+```sh
+make test-sc64-p7-archon-rules
+# Requires the existing private P6 inputs for the shared engine fixture:
+make test-sc64-p7-archon-splash
+```
+
+It uses source collision rectangles for reach and radial damage, the source
+30+3 weapon upgrade, and owner-based Enemy Splash exclusions. Q8 damage is
+adapted to the engine's integer HP/shields. Impact is immediate at the target
+center; projectile/windup and native burrow handling remain unfinished. This
+does not enable P7 in a campaign build or qualify its missing abilities.
+
+Splash compares known source-player identities even when two P7 source
+players share one runtime opponent slot. Actors with unknown source owners
+fall back to runtime ownership; future P7 production integration must assign
+that source provenance to newly created units and buildings.
+
+`SC64_ROUTE_VISIT_GRID` is an independent, default-off packed-route
+experiment. It requires `SC64_RACES` and `SC64_ROUTE_PACK3` and borrows the
+walkability grid to mark cells during a reverse flood. The existing BFS queue
+restores those bits before returning, without extra persistent storage.
+Callers with a custom grid getter must also supply its matching setter.
+
+```sh
+python3 -m unittest discover -s tests -p 'test_sc64_routes.py'
+```
+
+The complete P3 host trace and state fingerprints match the reference with
+this gate enabled. ARM timing and full replay/save checks are still pending;
+it is not part of any qualified profile's defaults.
