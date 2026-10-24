@@ -31,6 +31,11 @@
 #endif
 #endif
 #endif
+#ifdef SC64_ROUTE_WORD_CLEAR
+#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3)
+#error "SC64_ROUTE_WORD_CLEAR requires SC64_RACES and SC64_ROUTE_PACK3"
+#endif
+#endif
 
 /* Shared shortest-path fields on the same four-neighbour collision grid.
  * A mineral, base or group destination costs one reverse flood, rather than
@@ -82,7 +87,43 @@
 /* Default: two cells per byte. Optional PACK3: one 3-bit cell code. In either
  * layout 0 is the goal, 1..4 point toward a shortest-path neighbour, and the
  * all-ones code means unreachable. */
+#ifdef SC64_ROUTE_WORD_CLEAR
+/* The optional word clear uses an explicitly aligned byte array and GCC's
+ * may_alias-qualified word type. Each row may start unaligned when the map's
+ * packed byte count is not a multiple of four, so the helper handles a byte
+ * prefix and tail around its aligned word stores. */
+static u8 sc64_route_field[SC64_ROUTE_SLOTS][SC64_ROUTE_BYTES]
+    __attribute__((aligned(4)));
+typedef u32 sc64_route_clear_word __attribute__((__may_alias__));
+static void sc64_route_field_clear(u8 *field)
+{
+    unsigned prefix = (unsigned)(-(uintptr_t)field) & 3u;
+    unsigned remaining = SC64_ROUTE_BYTES;
+    unsigned words_count, i;
+    while (prefix && remaining) {
+        *field++ = 0xff;
+        --prefix;
+        --remaining;
+    }
+    words_count = remaining / sizeof(sc64_route_clear_word);
+    {
+        sc64_route_clear_word *words =
+            (sc64_route_clear_word *)(void *)field;
+        for (i = 0; i + 4 <= words_count; i += 4) {
+            words[i] = 0xffffffffu;
+            words[i + 1] = 0xffffffffu;
+            words[i + 2] = 0xffffffffu;
+            words[i + 3] = 0xffffffffu;
+        }
+        for (; i < words_count; ++i) words[i] = 0xffffffffu;
+    }
+    field += words_count * sizeof(sc64_route_clear_word);
+    remaining -= words_count * sizeof(sc64_route_clear_word);
+    while (remaining--) *field++ = 0xff;
+}
+#else
 static u8 sc64_route_field[SC64_ROUTE_SLOTS][SC64_ROUTE_BYTES];
+#endif
 #else
 /* Legacy fields retain distances for the original blocked-start behavior. */
 static u16 sc64_route_field[SC64_ROUTE_SLOTS][MAP_CELLS];
@@ -266,7 +307,11 @@ sc64_route_slot(int goal)
     if (partial_slot >= 0) slot = partial_slot;
 #endif
 #ifdef SC64_RACES
+#ifdef SC64_ROUTE_WORD_CLEAR
+    sc64_route_field_clear(sc64_route_field[slot]);
+#else
     memset(sc64_route_field[slot], 255, SC64_ROUTE_BYTES);
+#endif
 #else
     field = sc64_route_field[slot];
     memset(field, 255, MAP_CELLS * sizeof(*field));

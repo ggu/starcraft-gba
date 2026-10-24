@@ -1608,3 +1608,21 @@ Z7-plus-construction-HP configurations. The feature remains off in standard
 ROMs pending normal-controller mission and fresh-process SRAM qualification.
 See [Validation](VALIDATION.md#experimental-direct-attack-orders) for the
 bounded visibility and targeting policy.
+
+
+### Experimental packed route-field initialization
+
+`SC64_ROUTE_WORD_CLEAR` requires race rules and `SC64_ROUTE_PACK3`. It replaces
+the byte-at-a-time all-unreachable field initialization with aligned,
+alias-qualified 32-bit writes. A byte prefix and tail handle arbitrary row
+sizes and unaligned later slots; the path adds no persistent or scratch state.
+It remains off in standard profiles.
+
+```sh
+make test-sc64-route-word-clear
+```
+
+The asset-free sanitizer fixture runs 128×128, 128×96 and 10×10 maps, including
+unaligned 38-byte rows, canaries and independent BFS field comparisons. It is
+part of the default test suite. [Validation](VALIDATION.md#experimental-packed-route-field-initialization)
+records the full host parity and limited ARM timing evidence.

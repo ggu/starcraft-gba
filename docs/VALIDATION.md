@@ -3794,3 +3794,35 @@ menu and click path, including a four-Mutalisk attack on a visible hostile
 Mutalisk. Its diagnostic Z7 run still loses at frame 18,612; this is evidence
 of UI/order integration, not a qualified mission win. P7 Observer cloak/detector
 integration is outside these fixture configurations and remains unqualified.
+
+
+### Experimental packed route-field initialization
+
+The default-off `SC64_ROUTE_WORD_CLEAR` gate retains PACK3 route contents and
+replacement policy while changing only all-unreachable field initialization.
+An explicitly aligned array and `may_alias` 32-bit stores avoid unaligned word
+access and strict-aliasing violations. Byte prefix/tail handling supports row
+sizes that are not multiples of four; no state, actor fields or save bytes are
+added. P3's 4,608-byte field needs 1,152 word stores instead of 4,608 byte
+stores; this operation count is not itself an FPS result.
+
+ASan/UBSan fixtures compare every decoded field with an independent BFS across
+128×128, 128×96 and 10×10 grids. Canary checks exercise start offsets zero
+through three, including an unaligned real slot in the 38-byte-row case.
+The complete P3 expansion controller also wins at frame 123,916 under host
+sanitizers. Its trace (`321074f1…db01a`) and explicit per-update gameplay
+fingerprints (`3d766e63…51732`) match the six-gate route/collision baseline.
+These fingerprints cover actor, order, economy and named campaign fields;
+they are not a whole-RAM comparison.
+
+The gated ARM ROM (`7ba4743d…fa9270`) links with IWRAM end `0x030045a8`
+and BSS end `0x0203d674`, below unchanged reserves. In a paired 600-update
+late-P3 benchmark, both builds load the same authenticated baseline SRAM,
+advance one handoff update and then 600 neutral updates to frame 89,888.
+Loaded, tick-zero and final gameplay snapshots, three screenshots and route
+counts match (74 builds and 2,159 hits). Effective FPS changes from 16.5374
+to 16.6546, or 0.7039% fewer hardware cycles. This is a modest result for that
+interval, not a full-mission average, physical GBA measurement or a candidate's
+own fresh-process save qualification. The gate remains off pending wider
+qualification. With the gate off, the six-gate ARM ROM is byte-identical to
+`bed9feb7…9bc2f`.

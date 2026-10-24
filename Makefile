@@ -2253,6 +2253,20 @@ test-sc64-direct-attack: build/test-sc64-direct-attack-races build/test-sc64-dir
 	./build/test-sc64-direct-attack-unified
 	./build/test-sc64-direct-attack-z7
 
+define ROUTE_WORD_CLEAR_FIXTURE
+build/test-sc64-route-word-clear-$(1): tests/sc64_route_word_clear.c starcraft/sc64_routes.h | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ROUTE_WORD_CLEAR -DROUTE_TEST_COLS=$(2) -DROUTE_TEST_ROWS=$(3) -I. $$< -o $$@
+endef
+$(eval $(call ROUTE_WORD_CLEAR_FIXTURE,128x128,128,128))
+$(eval $(call ROUTE_WORD_CLEAR_FIXTURE,128x96,128,96))
+$(eval $(call ROUTE_WORD_CLEAR_FIXTURE,10x10,10,10))
+.PHONY: test-sc64-route-word-clear
+test-sc64-route-word-clear: build/test-sc64-route-word-clear-128x128 build/test-sc64-route-word-clear-128x96 build/test-sc64-route-word-clear-10x10
+	./build/test-sc64-route-word-clear-128x128
+	./build/test-sc64-route-word-clear-128x96
+	./build/test-sc64-route-word-clear-10x10
+test-starcraft: test-sc64-route-word-clear
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
