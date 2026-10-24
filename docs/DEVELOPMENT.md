@@ -1202,6 +1202,12 @@ python3 tools/sc64_zp_start_profile.py --profile zerg-z6 --rom build/StarCraft-Z
 The observer reads model, source deaths, mutable locations, ability/research
 state, Drone morph history and complete compact actor banks through the
 matching ELF's DWARF offsets. `--profile protoss-p6` remains the default.
+
+With the Z6 private inputs prepared, `make test-sc64-z6-controller` runs the
+full normal-input mainland-clearance and Ventral Sacs ferry playthrough under
+ASan/UBSan. It writes the private replay trace to `build/z6-controller.json`.
+The controller also accepts `--trace PATH` when invoked directly. A host win
+does not qualify the ARM replay, SRAM handoff or physical GBA performance.
 Startup reports are explicitly separate from mission-win evidence.
 
 In the Z6 probe, **R** selects the combat group including Kerrigan. **B+R**

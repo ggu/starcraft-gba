@@ -2688,3 +2688,43 @@ P6 IWRAM `0x030045d8` / BSS `0x0203d774`; Z6 IWRAM `0x03004eb8` /
 BSS `0x0203d980`. Unified sanitizer regressions and the three Probe expansion
 profiles pass. The 506-file index audit contains no game/build/credential
 payloads. Full campaign replays and physical-hardware checks remain separate.
+
+### Visual build propagation and Z6 host playthrough
+
+After the construction/needle changes, `make race-campaigns
+protoss-p5-shuttle zerg-z5-consume` rebuilds and verifies all five outputs.
+The full `./dev sc64 test --profile terran` sanitizer suite passes, including
+all ten mission controllers. The existing reserve guards remain unchanged:
+
+| Output | IWRAM end | BSS end |
+| --- | --- | --- |
+| Terran | `0x03004e20` | `0x0203d9ec` |
+| Zerg | `0x03004ef8` | `0x02039878` |
+| Protoss | `0x03004e80` | `0x02039a20` |
+| P5 Shuttle | `0x03004310` | `0x0203d584` |
+| Z5 Consume | `0x03004cd0` | `0x0203d858` |
+
+`make test-sc64-z6-controller` now completes a normal-input host win: paid
+Lair/Extractor/gas economy, mainland Force2 clearance, Ventral Sacs research,
+Overlord boarding/flying/unloading and the source victory sequence. The final
+state is tick 271799 / gameplay frame 268694, outcome WON, started mask
+`0x1be`, no active action cursors and zero faults. Kerrigan is live raw51,
+source owner3/runtime owner0, idle and unloaded at `(950,1009)`; the source
+Force2 AnyUnit counts in locations 4 and 5 are both zero. Research is complete
+and the carrier has no cargo. The replay validator accepts all 9448 recorded
+held-state transitions. Sanitized controller cleanup and the Make profile
+preserve every input transition and terminal core field of the original win.
+
+The public-controller trace SHA-256 is
+`5199d4329a303f81b20e289351a0ea6987e33b64e3fb193cce640d48394ad894`.
+The first-win ARM qualification uses a frozen earlier trace with identical
+inputs, SHA-256
+`a5fde71c7b6b95f8e87b34edae404794826e3f5102a7a4c2b2c8523b4c0f2523`.
+Its frozen engine source commit is `62cc58f`, ROM SHA-256
+`8b9c54475c6b5cbe7f8d0871645e3d9e4c5c6cc4f498f80bdad471a38c0c0ffa`,
+ELF SHA-256
+`8ab1fe4d7994c2192cd62b4fb635f017d52c4cdc09ae44fbc0619c8bca0967f6`.
+Private artifacts are under `.local/build/promotion/z6-first-win-frozen/`.
+Full ARM win and fresh-process SRAM qualification remain pending, so this
+does not increase the staged completed total beyond 20/30 or establish a new
+full-mission FPS result.

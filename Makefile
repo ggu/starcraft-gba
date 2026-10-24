@@ -1829,6 +1829,13 @@ test-sc64-z6-save: build/test-sc64-z6-save build/test-sc64-z6-game-save
 	./build/test-sc64-z6-save
 	./build/test-sc64-z6-game-save
 
+# Full normal-input sixth-mission playthrough; imported private inputs required.
+build/test-sc64-z6-controller: tests/sc64_z6_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z6-controller
+test-sc64-z6-controller: build/test-sc64-z6-controller
+	./build/test-sc64-z6-controller --trace build/z6-controller.json
+
 build/test-sc64-z6-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z6-profile
