@@ -10,7 +10,6 @@
 #endif
 
 #include "sc64_p7_world_adapter.h"
-#include <string.h>
 
 static Sc64P7PersistentState race_p7;
 static Sc64P7WorldContext race_p7_world;
@@ -40,7 +39,8 @@ static int race_p7_map_shape_valid(const Sc64RaceMap *map)
         map->human_slot!=7u || map->unit_count!=357u ||
         !map->owner_modes || !map->owner_races || !map->units ||
         !map->blocked || !map->tile_lookup || !map->tile_pixels ||
-        !map->mission_id || strcmp(map->mission_id,"P7") ||
+        !map->mission_id || map->mission_id[0]!='P' ||
+        map->mission_id[1]!='7' || map->mission_id[2]!='\0' ||
         !sc64_p7_runtime_metadata_valid()) return 0;
     for (unsigned i=0;i<8;++i)
         if (map->owner_modes[i]!=sc64_p7_owner_modes_expected[i] ||

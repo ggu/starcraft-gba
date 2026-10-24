@@ -982,6 +982,13 @@ static int race_p6_combat_tick_traps(void);
 #ifdef SC64_P7_ARCHON_SPLASH
 static int race_p7_archon_splash_attack(Unit *q, int target);
 #endif
+#ifdef SC64_P7_OBSERVER_ENABLED
+static int race_p7_active(void);
+static int sc64_p7_observer_can_attack_from(int attacker, int target,
+                                            int live_owner, int source_owner);
+static int sc64_p7_observer_detector_sees(int target, int source_owner,
+                                          int live_owner);
+#endif
 #ifdef SC64_Z5_RUNTIME
 static int race_z5_active(void);
 static int race_z5_world_paused(void);
@@ -1410,6 +1417,12 @@ spawn_unit(int owner, int type, int x, int y)
         u[i].raw_owner = race_z7_product_source_owner(owner);
     }
 #endif
+#ifdef SC64_P7_OBSERVER_ENABLED
+    if (race_p7_active() && owner == SIDE) {
+        u[i].raw_type = sc64_race_raw_unit(type);
+        u[i].raw_owner = 7;
+    }
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) {
         u[i].raw_type = sc64_race_raw_unit(type);
@@ -1526,6 +1539,12 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     if (race_z7_active()) {
         b[i].raw_type = sc64_race_raw_building(type);
         b[i].raw_owner = race_z7_product_source_owner(owner);
+    }
+#endif
+#ifdef SC64_P7_OBSERVER_ENABLED
+    if (race_p7_active() && owner == SIDE) {
+        b[i].raw_type = sc64_race_raw_building(type);
+        b[i].raw_owner = 7;
     }
 #endif
 #ifdef SC64_T5_RUNTIME
@@ -2101,6 +2120,18 @@ move_toward(Unit * q, int tx, int ty)
 #include "sc64_transport_adapter.h"
 #endif
 
+/* These expand in query declarations/calls outside the race-specific block
+ * too, so keep the source-owner plumbing available in every profile. */
+#ifdef SC64_P7_OBSERVER_ENABLED
+#define SC64_P7_SOURCE_OWNER_PARAM , int source_owner
+#define SC64_P7_SOURCE_OWNER_ARG(owner) , (owner)
+#define SC64_P7_SOURCE_OWNER_VALUE source_owner
+#else
+#define SC64_P7_SOURCE_OWNER_PARAM
+#define SC64_P7_SOURCE_OWNER_ARG(owner)
+#define SC64_P7_SOURCE_OWNER_VALUE (-1)
+#endif
+
 #ifdef SC64_RACES
 static int race_can_attack(int attacker,int target);
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
@@ -2145,6 +2176,14 @@ static int sc64_p6_can_attack_from(int attacker, int target, int owner)
 #define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
     sc64_p6_can_attack_from((attacker), (target), (owner))
 #endif
+#ifdef SC64_P7_OBSERVER_ENABLED
+#define SC64_CAN_ATTACK_FROM_SOURCE(attacker, target, owner, source_owner) \
+    sc64_p7_observer_can_attack_from((attacker), (target), (owner), \
+                                     (source_owner))
+#else
+#define SC64_CAN_ATTACK_FROM_SOURCE(attacker, target, owner, source_owner) \
+    SC64_CAN_ATTACK_FROM((attacker), (target), (owner))
+#endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
 static void
 sc64_target_hostility_snapshot(void)
@@ -2165,7 +2204,8 @@ static int GBA_HOT __attribute__((noinline))
 #if defined(SC64_T6_RUNTIME) && !defined(GBA_HOST)
 __attribute__((optimize("Os")))
 #endif
-sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
+sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
+                    SC64_P7_SOURCE_OWNER_PARAM)
 {
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     int best = -1, best_distance = max_distance * max_distance, d;
@@ -2215,7 +2255,8 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
                     d = dist2(x, y, candidate_x, candidate_y);
                     if (d > best_distance ||
                         (d == best_distance && (best < 0 || entity >= best)) ||
-                        !SC64_CAN_ATTACK_FROM(attacker, entity, owner)) continue;
+                        !SC64_CAN_ATTACK_FROM_SOURCE(attacker, entity, owner,
+                                                     SC64_P7_SOURCE_OWNER_VALUE)) continue;
                     best_distance = d;
                     best = entity;
                 }
@@ -2253,7 +2294,8 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
                     }
                     if (FAST_ABS(x - candidate_x) >= max_distance ||
                         FAST_ABS(y - candidate_y) >= max_distance ||
-                        !SC64_CAN_ATTACK_FROM(attacker, entity, owner)) continue;
+                        !SC64_CAN_ATTACK_FROM_SOURCE(attacker, entity, owner,
+                                                     SC64_P7_SOURCE_OWNER_VALUE)) continue;
                     d = dist2(x, y, candidate_x, candidate_y);
                     if (d < best_distance ||
                         (best >= 0 && d == best_distance && entity < best)) {
@@ -2267,7 +2309,8 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker)
 #endif
 }
 static int __attribute__((noinline))
-nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
+nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
+                   SC64_P7_SOURCE_OWNER_PARAM)
 {
     int i, best = -1, best_distance = max_distance * max_distance, d;
     if (target_lists_valid) {
@@ -2276,7 +2319,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
             if (!owners_hostile(owner, p)) continue;
             for (i = target_unit_head[p]; i >= 0; i = target_unit_next[i]) {
                 if (!u[i].alive || FAST_ABS(x-u[i].x)>=max_distance || FAST_ABS(y-u[i].y)>=max_distance)continue;
-                if(!SC64_CAN_ATTACK_FROM(attacker,i,owner))continue;
+                if(!SC64_CAN_ATTACK_FROM_SOURCE(attacker,i,owner,SC64_P7_SOURCE_OWNER_VALUE))continue;
                 d = dist2(x, y, u[i].x, u[i].y);
                 if (d < best_distance || (best >= 0 && d == best_distance && i < best)) {
                     best_distance = d;
@@ -2289,7 +2332,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
             for (i = target_building_head[p]; i >= 0; i = target_building_next[i]) {
                 int candidate = MAX_UNITS + i;
                 if (!b[i].alive || FAST_ABS(x-b[i].x)>=max_distance || FAST_ABS(y-b[i].y)>=max_distance)continue;
-                if(!SC64_CAN_ATTACK_FROM(attacker,MAX_UNITS+i,owner))continue;
+                if(!SC64_CAN_ATTACK_FROM_SOURCE(attacker,MAX_UNITS+i,owner,SC64_P7_SOURCE_OWNER_VALUE))continue;
                 d = dist2(x, y, b[i].x, b[i].y);
                 if (d < best_distance || (best >= 0 && d == best_distance && candidate < best)) {
                     best_distance = d;
@@ -2303,7 +2346,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
 	if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i])
 	    || FAST_ABS(x - u[i].x) >= max_distance ||
 	    FAST_ABS(y - u[i].y) >= max_distance || !owners_hostile(owner, u[i].owner)
-                    || !SC64_CAN_ATTACK_FROM(attacker,i,owner)
+                    || !SC64_CAN_ATTACK_FROM_SOURCE(attacker,i,owner,SC64_P7_SOURCE_OWNER_VALUE)
                     )
 	    continue;
 	d = dist2(x, y, u[i].x, u[i].y);
@@ -2316,7 +2359,7 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
 	if (!b[i].alive
 	    || FAST_ABS(x - b[i].x) >= max_distance ||
 	    FAST_ABS(y - b[i].y) >= max_distance || !owners_hostile(owner, b[i].owner)
-                    || !SC64_CAN_ATTACK_FROM(attacker,MAX_UNITS+i,owner)
+                    || !SC64_CAN_ATTACK_FROM_SOURCE(attacker,MAX_UNITS+i,owner,SC64_P7_SOURCE_OWNER_VALUE)
                     )
 	    continue;
 	d = dist2(x, y, b[i].x, b[i].y);
@@ -2330,7 +2373,8 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker)
 #endif
 
 static int GBA_HOT
-nearest_enemy_typed(int x, int y, int owner, int max_distance, int attacker)
+nearest_enemy_typed(int x, int y, int owner, int max_distance, int attacker
+                    SC64_P7_SOURCE_OWNER_PARAM)
 {
     int result;
 #ifdef SC64_DIAGNOSTIC_ORDERS
@@ -2354,9 +2398,11 @@ nearest_enemy_typed(int x, int y, int owner, int max_distance, int attacker)
 #ifdef SC64_RACES
     if (target_lists_valid && sc64_target_index_active && max_distance > 0 &&
         x >= 0 && y >= 0 && x < WORLD_W && y < WORLD_H)
-        result = sc64_target_nearest(x, y, owner, max_distance, attacker);
+        result = sc64_target_nearest(x, y, owner, max_distance, attacker
+                                     SC64_P7_SOURCE_OWNER_ARG(SC64_P7_SOURCE_OWNER_VALUE));
     else
-        result = nearest_enemy_scan(x, y, owner, max_distance, attacker);
+        result = nearest_enemy_scan(x, y, owner, max_distance, attacker
+                                    SC64_P7_SOURCE_OWNER_ARG(SC64_P7_SOURCE_OWNER_VALUE));
 #else
     int i, best = -1, best_distance = max_distance * max_distance, d;
     (void)attacker;
@@ -2409,7 +2455,7 @@ sc64_query_done:
 }
 
 static int nearest_enemy(int x,int y,int owner,int distance) {
-    return nearest_enemy_typed(x,y,owner,distance,-1);
+    return nearest_enemy_typed(x,y,owner,distance,-1 SC64_P7_SOURCE_OWNER_ARG(-1));
 }
 
 static int
@@ -4382,7 +4428,7 @@ tick_combat(Unit * q, int target)
     if (race_p6_combat_infested_attack(q, target)) return;
 #endif
 #ifdef SC64_RACES
-    if(!SC64_CAN_ATTACK_FROM(q->type,target,q->owner))return;
+    if(!SC64_CAN_ATTACK_FROM_SOURCE(q->type,target,q->owner,q->raw_owner))return;
 #endif
 #ifdef SC64_P7_ARCHON_SPLASH
     /* Archon weapon 70 measures reach between source collision rectangles,
@@ -4608,7 +4654,7 @@ target_lists_unavailable:
 #ifdef SC64_RACES
                 +18
 #endif
-                ,q->type);
+                ,q->type SC64_P7_SOURCE_OWNER_ARG(q->raw_owner));
             if (target >= 0) tick_combat(q, target);
             continue;
         }
@@ -4734,7 +4780,7 @@ target_lists_unavailable:
 #ifdef SC64_RACES
                 unit_range(q->type)>64?unit_range(q->type)+18:
 #endif
-                64,q->type);
+                64,q->type SC64_P7_SOURCE_OWNER_ARG(q->raw_owner));
             if (target >= 0) tick_combat(q, target);
             else if (dist2(q->x, q->y, q->tx, q->ty) > 36) move_toward(q, q->tx, q->ty);
             else q->order = ORDER_IDLE;
@@ -4766,7 +4812,8 @@ target_lists_unavailable:
 		    q->order = ORDER_IDLE;
 		#endif
 	    } else {
-		target = nearest_enemy_typed(q->x, q->y, SIDE, 52,q->type);
+		target = nearest_enemy_typed(q->x, q->y, SIDE, 52,q->type
+                                             SC64_P7_SOURCE_OWNER_ARG(q->raw_owner));
 		if (target >= 0)
 		    tick_combat(q, target);
 		else if (dist2(q->x, q->y, q->tx, q->ty) > 6 * 6)
@@ -5654,6 +5701,10 @@ draw_unit(Unit * q)
 	return;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
 	return;
+#ifdef SC64_P7_OBSERVER_ENABLED
+    if (race_p7_active() && q->owner != SIDE && q->raw_type == 84 &&
+        !sc64_p7_observer_detector_sees((int)(q-u),7,SIDE)) return;
+#endif
 #ifdef SC64_T6_RUNTIME
     if (race_t6_active() && race_t6_unit_burrowed((int)(q - u))) return;
 #endif
@@ -5840,6 +5891,10 @@ draw_minimap(void)
 	if (u[i].owner != SIDE &&
 	    (u[i].x < 0 || u[i].y < 0 || u[i].x >= WORLD_W || u[i].y >= WORLD_H ||
 	     !currently_visible(u[i].x, u[i].y))) continue;
+#ifdef SC64_P7_OBSERVER_ENABLED
+        if (race_p7_active() && u[i].owner != SIDE && u[i].raw_type == 84 &&
+            !sc64_p7_observer_detector_sees(i,7,SIDE)) continue;
+#endif
 #ifdef SC64_T6_RUNTIME
         if (race_t6_unit_burrowed(i)) continue;
 #endif
@@ -7377,6 +7432,10 @@ game_self_test(void)
 #include "sc64_t6_availability_adapter.h"
 #endif
 #include "race_adapter.h"
+#ifdef SC64_P7_OBSERVER_ENABLED
+#include "sc64_p7_runtime_adapter.h"
+#include "sc64_p7_observer_adapter.h"
+#endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 #include "sc64_z7_colony_adapter.h"
 #endif

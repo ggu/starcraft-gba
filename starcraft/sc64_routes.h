@@ -8,6 +8,16 @@
 #define SC64_ROUTES_LOCAL_GRID_GET
 #endif
 
+#ifdef SC64_ROUTE_DECAY_FREQ
+#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3)
+#error "SC64_ROUTE_DECAY_FREQ requires SC64_RACES and SC64_ROUTE_PACK3"
+#endif
+#endif
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3)
+#error "SC64_ROUTE_PARTIAL_FLOOD requires SC64_RACES and SC64_ROUTE_PACK3"
+#endif
+#endif
 #ifdef SC64_ROUTE_VISIT_GRID
 #if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3)
 #error "SC64_ROUTE_VISIT_GRID requires SC64_RACES and SC64_ROUTE_PACK3"
@@ -82,6 +92,45 @@ static u16 sc64_route_goal[SC64_ROUTE_SLOTS];
 static u32 sc64_route_age[SC64_ROUTE_SLOTS], sc64_route_clock;
 volatile u32 sc64_route_hits, sc64_route_builds;
 
+#ifdef SC64_ROUTE_DECAY_FREQ
+#define SC64_ROUTE_FREQ_SHIFT 26u
+#define SC64_ROUTE_RECENCY_MASK 0x03FFFFFFu
+#define SC64_ROUTE_DECAY_PERIOD 128u
+static u32 sc64_route_age_freq(u32 packed) { return packed >> SC64_ROUTE_FREQ_SHIFT; }
+static u32 sc64_route_age_stamp(u32 packed) { return packed & SC64_ROUTE_RECENCY_MASK; }
+static u32 sc64_route_age_pack(u32 freq, u32 stamp)
+{
+    return ((freq > 63u ? 63u : freq) << SC64_ROUTE_FREQ_SHIFT) |
+           (stamp & SC64_ROUTE_RECENCY_MASK);
+}
+/* Clear the derived cache before recency wraps, keeping age ordering exact. */
+static int sc64_route_age_older(u32 a, u32 b)
+{
+    return sc64_route_age_stamp(a) < sc64_route_age_stamp(b);
+}
+static void sc64_route_age_request(void)
+{
+    int i;
+    if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK) {
+        memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+        memset(sc64_route_age, 0, sizeof(sc64_route_age));
+        sc64_route_clock = 0;
+    }
+    ++sc64_route_clock;
+    if ((sc64_route_clock & (SC64_ROUTE_DECAY_PERIOD - 1u)) != 0u) return;
+    for (i = 0; i < SC64_ROUTE_SLOTS; ++i) if (sc64_route_valid[i]) {
+        u32 packed = sc64_route_age[i];
+        sc64_route_age[i] = sc64_route_age_pack(sc64_route_age_freq(packed) >> 1,
+                                                sc64_route_age_stamp(packed));
+    }
+}
+static void sc64_route_age_touch(int slot, int increment)
+{
+    u32 freq = sc64_route_age_freq(sc64_route_age[slot]);
+    if (increment && freq < 63u) ++freq;
+    sc64_route_age[slot] = sc64_route_age_pack(freq, sc64_route_clock);
+}
+#endif
 #ifdef SC64_RACES
 static int GBA_HOT sc64_route_get(int slot, int cell)
 {
@@ -120,24 +169,102 @@ static void
 sc64_routes_reset(void)
 {
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+#ifdef SC64_ROUTE_DECAY_FREQ
+    memset(sc64_route_age, 0, sizeof(sc64_route_age));
+    sc64_route_clock = 0;
+#endif
 }
 
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+/* A partial field is usable only when it has discovered the query origin's
+ * exact gradient. A blocked origin waits for all walkable cardinal exits. */
+static int sc64_route_origin_ready(int slot, int origin, int origin_walkable)
+{
+    int col, row, cell;
+    if (origin < 0) return 0;
+    if (origin_walkable)
+        return sc64_route_get(slot, origin) != SC64_ROUTE_UNREACHABLE;
+    col = sc64_cell_col(origin);
+    row = sc64_cell_row(origin);
+    if (col > 0) {
+        cell = origin - 1;
+        if (sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE &&
+            SC64_GRID_GET(path_walkable, cell)) return 0;
+    }
+    if (col + 1 < MAP_COLS) {
+        cell = origin + 1;
+        if (sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE &&
+            SC64_GRID_GET(path_walkable, cell)) return 0;
+    }
+    if (row > 0) {
+        cell = origin - MAP_COLS;
+        if (sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE &&
+            SC64_GRID_GET(path_walkable, cell)) return 0;
+    }
+    if (row + 1 < MAP_ROWS) {
+        cell = origin + MAP_COLS;
+        if (sc64_route_get(slot, cell) == SC64_ROUTE_UNREACHABLE &&
+            SC64_GRID_GET(path_walkable, cell)) return 0;
+    }
+    return 1;
+}
+#endif
+
 static int GBA_HOT
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+sc64_route_slot_for_origin(int goal, int origin, int origin_walkable)
+#else
 sc64_route_slot(int goal)
+#endif
 {
     int i, slot = -1, head = 0, tail = 0;
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+    int partial_slot = -1, complete = 1;
+#endif
 #ifndef SC64_RACES
     u16 *field;
 #endif
+#ifdef SC64_ROUTE_DECAY_FREQ
+    sc64_route_age_request();
+#endif
     for (i = 0; i < SC64_ROUTE_SLOTS; i++) {
         if (sc64_route_valid[i] && sc64_route_goal[i] == goal) {
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+            if (sc64_route_valid[i] == 1 ||
+                sc64_route_origin_ready(i, origin, origin_walkable)) {
+#ifdef SC64_ROUTE_DECAY_FREQ
+                sc64_route_age_touch(i, 1);
+#else
+                sc64_route_age[i] = ++sc64_route_clock;
+#endif
+                sc64_route_hits++;
+                return i;
+            }
+            partial_slot = i;
+#else
+#ifdef SC64_ROUTE_DECAY_FREQ
+            sc64_route_age_touch(i, 1);
+#else
             sc64_route_age[i] = ++sc64_route_clock;
+#endif
             sc64_route_hits++;
             return i;
+#endif
         }
+#ifdef SC64_ROUTE_DECAY_FREQ
+        if (slot < 0 || !sc64_route_valid[i] ||
+            (sc64_route_valid[slot] &&
+             (sc64_route_age_freq(sc64_route_age[i]) < sc64_route_age_freq(sc64_route_age[slot]) ||
+              (sc64_route_age_freq(sc64_route_age[i]) == sc64_route_age_freq(sc64_route_age[slot]) &&
+               sc64_route_age_older(sc64_route_age[i], sc64_route_age[slot]))))) slot = i;
+#else
         if (slot < 0 || !sc64_route_valid[i] ||
             (sc64_route_valid[slot] && sc64_route_age[i] < sc64_route_age[slot])) slot = i;
+#endif
     }
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+    if (partial_slot >= 0) slot = partial_slot;
+#endif
 #ifdef SC64_RACES
     memset(sc64_route_field[slot], 255, SC64_ROUTE_BYTES);
 #else
@@ -178,6 +305,10 @@ sc64_route_slot(int goal)
             }
         }
     }
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+    if (sc64_route_origin_ready(slot, origin, origin_walkable)) complete = (tail == 0);
+    else
+#endif
     while (head < tail) {
 #ifdef SC64_RACES
         int cell = bfs_queue[head++], col = sc64_cell_col(cell), row = sc64_cell_row(cell);
@@ -211,6 +342,12 @@ sc64_route_slot(int goal)
         SC64_FLOOD(row > 0, cell - MAP_COLS, 3);
         SC64_FLOOD(row + 1 < MAP_ROWS, cell + MAP_COLS, 4);
 #undef SC64_FLOOD
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+        if (sc64_route_origin_ready(slot, origin, origin_walkable)) {
+            if (head < tail) complete = 0;
+            break;
+        }
+#endif
     }
 #ifdef SC64_ROUTE_VISIT_GRID
     /* Each enqueued cell was cleared exactly once, so bfs_queue is a compact
@@ -218,11 +355,32 @@ sc64_route_slot(int goal)
     for (i = 0; i < tail; ++i) SC64_GRID_SET(path_walkable, bfs_queue[i], 1);
 #endif
     sc64_route_goal[slot] = (u16)goal;
+#ifdef SC64_ROUTE_DECAY_FREQ
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+    if (partial_slot >= 0) sc64_route_age_touch(slot, 0);
+    else sc64_route_age[slot] = sc64_route_age_pack(1u, sc64_route_clock);
+#else
+    sc64_route_age[slot] = sc64_route_age_pack(1u, sc64_route_clock);
+#endif
+#else
     sc64_route_age[slot] = ++sc64_route_clock;
+#endif
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+    sc64_route_valid[slot] = complete ? 1 : 2;
+#else
     sc64_route_valid[slot] = 1;
+#endif
     sc64_route_builds++;
     return slot;
 }
+
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+/* Keep the legacy complete-field API for callers that do not have an origin. */
+static int GBA_HOT sc64_route_slot(int goal)
+{
+    return sc64_route_slot_for_origin(goal, -1, 0);
+}
+#endif
 
 #if defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
 /* Inflated structure cells are rare actor origins. Keep their gradient walk in
@@ -267,7 +425,11 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
     u16 *field;
 #endif
     if (!path_grid_valid) build_path_grid();
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+    slot = sc64_route_slot_for_origin(goal, cell, SC64_GRID_GET(path_walkable, cell));
+#else
     slot = sc64_route_slot(goal);
+#endif
 #ifdef SC64_RACES
     direction = sc64_route_get(slot, cell);
     if (direction == SC64_ROUTE_UNREACHABLE) direction = -1;

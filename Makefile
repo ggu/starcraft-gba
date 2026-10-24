@@ -1961,6 +1961,34 @@ test-sc64-p7-archon-rules: build/test-sc64-p7-archon-rules
 	./build/test-sc64-p7-archon-rules
 test-starcraft: test-sc64-p7-archon-rules
 
+build/test-sc64-p7-observer-rules: tests/sc64_p7_observer_rules.c starcraft/sc64_p7_observer_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-p7-observer-rules
+test-sc64-p7-observer-rules: build/test-sc64-p7-observer-rules
+	./build/test-sc64-p7-observer-rules
+test-starcraft: test-sc64-p7-observer-rules
+
+# Optional route policies stay off in ROM defaults. Exercise each independently
+# and together, with and without the borrowed visitation grid.
+ROUTE_POLICY_TEST_FLAGS = -Icommon -DGBA_HOST -DSC64_RACES -DSC64_LARGE_MAPS -DSC64_ROUTE_PACK3
+define route_policy_fixture
+build/test-sc64-route-policy-$(1): tests/race_routes_partial.c starcraft/sc64_routes.h starcraft/sc64_bitgrid.h common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -I. $$(ROUTE_POLICY_TEST_FLAGS) $(2) $$< -o $$@
+endef
+$(eval $(call route_policy_fixture,baseline,))
+$(eval $(call route_policy_fixture,visit,-DSC64_ROUTE_VISIT_GRID))
+$(eval $(call route_policy_fixture,partial,-DSC64_ROUTE_PARTIAL_FLOOD))
+$(eval $(call route_policy_fixture,frequency,-DSC64_ROUTE_DECAY_FREQ))
+$(eval $(call route_policy_fixture,partial-frequency,-DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ))
+$(eval $(call route_policy_fixture,partial-visit,-DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_VISIT_GRID))
+$(eval $(call route_policy_fixture,frequency-visit,-DSC64_ROUTE_DECAY_FREQ -DSC64_ROUTE_VISIT_GRID))
+$(eval $(call route_policy_fixture,partial-frequency-visit,-DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ -DSC64_ROUTE_VISIT_GRID))
+ROUTE_POLICY_VARIANTS = baseline visit partial frequency partial-frequency partial-visit frequency-visit partial-frequency-visit
+.PHONY: test-sc64-route-policies
+test-sc64-route-policies: $(addprefix build/test-sc64-route-policy-,$(ROUTE_POLICY_VARIANTS))
+	@$(foreach variant,$(ROUTE_POLICY_VARIANTS),./build/test-sc64-route-policy-$(variant) &&) true
+test-starcraft: test-sc64-route-policies
+
 build/test-sc64-nearest-resource-depot-p5: tests/sc64_nearest_resource_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT $< common/gba.c -o $@
 build/test-sc64-nearest-resource-depot-z6: tests/sc64_nearest_resource_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -2052,6 +2080,11 @@ build/test-sc64-p7-archon-splash: tests/sc64_p7_archon_splash.c $(STARCRAFT) $(w
 .PHONY: test-sc64-p7-archon-splash
 test-sc64-p7-archon-splash: test-sc64-p7-archon-rules build/test-sc64-p7-archon-splash
 	./build/test-sc64-p7-archon-splash
+build/test-sc64-p7-observer-game: tests/sc64_p7_observer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P7_DATA_ENABLED -DSC64_P7_RUNTIME -DSC64_P7_ACTORS -DSC64_P7_OBSERVER_ENABLED -DSC64_P7_ARCHON_SPLASH $< common/gba.c -o $@
+.PHONY: test-sc64-p7-observer
+test-sc64-p7-observer: test-sc64-p7-observer-rules build/test-sc64-p7-observer-game
+	./build/test-sc64-p7-observer-game
 build/test-sc64-p6-trigger-prune: tests/sc64_p6_trigger_prune.c tests/sc64_p6_trigger_prune_reference.c starcraft/sc64_p6_adapter.h starcraft/sc64_p6.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios tests/sc64_p6_trigger_prune.c tests/sc64_p6_trigger_prune_reference.c -o $@
 build/test-sc64-z6-trigger-prune: tests/sc64_z6_trigger_prune.c tests/sc64_z6_trigger_prune_reference.c starcraft/sc64_z6_adapter.h starcraft/sc64_z6.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h | build

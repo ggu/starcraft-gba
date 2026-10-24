@@ -3541,3 +3541,96 @@ ARM replay and fresh-save qualification remain pending. No profile default
 enables the experiment. The 547-file source-only snapshot passes the default
 build and suite (380 Python tests, six private-input skips); original-art
 ROM bytes remain `4ad80ce0…f9aee`, and unified ARM/host checks pass.
+
+### Experimental partial floods and frequency replacement
+
+Two additional default-off route gates require `SC64_RACES` and
+`SC64_ROUTE_PACK3`. `SC64_ROUTE_PARTIAL_FLOOD` stops a deterministic reverse
+flood once the queried origin has its exact gradient. A blocked origin waits
+for all walkable cardinal exits. Partial fields are extended by rebuilding
+the same BFS prefix; the one-argument full-field API still completes a field.
+The existing validity byte distinguishes partial and complete fields, so no
+global storage is added. Borrowed visitation bits are restored for all
+enqueued cells, including an early-stop frontier.
+
+`SC64_ROUTE_DECAY_FREQ` packs a six-bit access frequency and 26-bit recency
+stamp into each existing age word. It decays frequencies before every 128th
+request, saturates at 63, and selects invalid slots before the least-frequent,
+oldest entry. Extending a partial field preserves its frequency. Reset and
+timestamp rollover invalidate derived cache metadata before starting a new
+epoch. Both policies can be selected independently of the visitation gate;
+the standard ROM profiles leave them off.
+
+An asset-free sanitizer matrix exercises all eight combinations of the three
+route gates on a packed 128-by-128 grid. Returned steps and complete fields
+are compared with an independent BFS, including reachable blocked origins,
+disconnected exits and blocked goals. Every query and full-field wrapper
+checks packed-grid restoration. Focused replacement checks cover invalid
+entries, frequency/age ties, decay-before-hit, saturation, extension, reset
+and timestamp rollover.
+
+The private P3 host run with VISIT, PARTIAL and DECAY_FREQ preserves the entire
+winning input trace (`321074f1…db01a`) and per-update explicit-field fingerprint
+stream (`3d766e63…51732`). Across the same 123 periodic sampling windows,
+visited cells fall from 137,457,153 to 67,015,769 (51.2%). This run did not
+enable the separate collision hoist, fact-range or class-cache gates.
+
+Its ARM ROM is `9416f9cb…57bfc` and ELF `e9ad7a60…7bd95`, with IWRAM end
+`0x03004608` and unchanged BSS end `0x0203d584`. Rebuilding the current public
+source with the same compiler flags produces identical ROM bytes. A 12,000-input normal-menu
+opening matches all 13 reported baseline snapshots and the three common
+decoded captures. Its mean rises from 17.6234 to 17.83 effective updates per
+second. Fresh HOME+L loading of that candidate's own opening SRAM restores
+all reported persisted observations; one handoff plus 60 neutral updates
+reaches frame 11,824.
+
+A separate paired late-state benchmark loads the authenticated baseline's
+90,000-input SRAM into fresh processes for both ROMs. After one handoff and
+60 identical neutral updates, reported loaded/tick-zero/final states and all
+three decoded captures match. Hardware-cycle time falls 11.9938%, from
+13.8936 to 15.7870 effective updates per second. This cross-build seed is a
+benchmark, not candidate-generated late-save qualification. Full ARM mission
+and wider profile qualification remain required before enabling defaults.
+
+### Experimental P7 Observer cloak and detection
+
+`SC64_P7_OBSERVER_ENABLED` is default-off and requires the isolated P7 runtime
+and actor facts. It derives permanent cloak from Observer raw type 84,
+threads acting source-player identity through acquisition, direct combat and
+building defenses, and hides undetected enemy Observers in world/minimap
+rendering. Known source slots 0 and 4 retain separate optics and detector
+sets despite sharing the live opponent slot. Only an unknown querying source
+uses the existing live-owner fallback. New human products record source slot
+7; enemy producer provenance remains unfinished.
+
+Observers detect within their initial nine-tile sight; grounded Photon
+Cannons use seven tiles and require completion plus the runtime's same-owner
+Pylon power check. Source rectangle edges and the pinned integer distance
+metric determine range. Loaded Observers cannot detect. Non-human optical
+visibility is computed on demand using the current GBA cell-center circles;
+human source slot 7 reuses the existing visibility grid. No extra visibility
+grids or persistent save fields are added. Alive buildings provide optical
+sight during construction, matching that grid; an unfinished Cannon still
+cannot detect. Native construction-sight differences remain unmodeled.
+
+Pure policy and actual-engine sanitizer fixtures cover owner-specific target
+selection and damage, loaded detector exclusion, source identity, Cannon
+power ownership, axial/diagonal distance boundaries and primary rejection
+without detection. The combined Archon fixture confirms an undetected
+Observer can still take radial collateral from a visible primary target.
+Native terrain occlusion, all disabled/blinded/hallucination states, Sensor
+Array research, source power-mask geometry and complete P7 gameplay/save
+wiring remain outside this bounded implementation. This does not promote P7
+or change the qualified campaign count.
+
+The combined Observer/Archon ARM link retains IWRAM end `0x030047d8` and BSS
+end `0x0203d774`, within the unchanged reserves. The P7 runtime's map-ID check
+also no longer requires a hosted C string library. This is a link check,
+without P7 ARM gameplay qualification.
+
+The 552-file source-only snapshot passes `./dev build` and `./dev test`
+(380 Python tests, six private-input skips), including the eight asset-free
+route-policy variants and pure Observer rules. Local unified build/host
+checks and the private-input P7 runtime, Observer and Archon fixtures pass.
+The original-art and unified ROM hashes remain `4ad80ce0…f9aee` and
+`6bab5be2…79f9` with these gates off.
