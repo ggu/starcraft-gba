@@ -1673,3 +1673,24 @@ The fixture runs with and without independent Egg production. It compares
 incremental visibility with a fresh scan through movement, transport, removal,
 construction and real morph transitions. Standard profiles leave both gates
 off until mission and fresh-process SRAM qualification.
+
+### Experimental Z7 Scourge combat
+
+`SC64_Z7_SCOURGE_COMBAT` requires the Z7 runtime and independent Egg production.
+With the gate enabled, select a Hatchery or Lair and press R to cycle through
+the Zerg products, including **SCOURGE**. A completed Spire is required. A buys
+one Egg for 25 minerals and 75 gas; its normal timer produces two Scourge and
+reserves both outputs' supply. Each Scourge attacks hostile aircraft once for
+110 base damage, then is consumed. Weapon upgrades do not increase that damage.
+
+```sh
+make test-sc64-z7-scourge
+```
+
+The focused actual-engine fixture checks real R/A dispatch, paid production,
+mid-Egg save/load, both births and combat. Standard profiles leave this gate
+off pending mission, fresh-process SRAM and performance qualification.
+
+The Z7 trigger geometry also recognizes an ordinary Spire's source footprint.
+This correction applies independently of the Scourge gate: previously a Spire
+could make a Bring condition fault and pause the mission.

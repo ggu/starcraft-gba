@@ -118,7 +118,7 @@ static int sc64_z7_world_building_rect(unsigned raw,int x,int y,
         switch(raw) {
         case 131:case 132:case 133:l=49;t=32;r=49;b=32;break;
         case 135:l=40;t=32;r=40;b=24;break;
-        case 137:l=28;t=32;r=28;b=24;break;
+        case 137:case 141:l=28;t=32;r=28;b=24;break;
         case 138:l=38;t=28;r=32;b=28;break;
         case 139:l=44;t=32;r=32;b=20;break;
         case 140:l=40;t=32;r=32;b=31;break;

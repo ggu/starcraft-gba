@@ -153,6 +153,11 @@ int memcmp(const void *a, const void *b, size_t n);
     (!defined(SC64_RACES) || !defined(SC64_Z7_RUNTIME))
 #error "Z7 Egg production requires the race and Z7 runtimes"
 #endif
+#if defined(SC64_Z7_SCOURGE_COMBAT) && \
+    (!defined(SC64_RACES) || !defined(SC64_Z7_RUNTIME) || \
+     !defined(SC64_Z7_EGG_PRODUCTION))
+#error "Z7 Scourge combat requires the Z7 Egg production runtime"
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
 #define SC64_RACE_SAVE_GENERATION 36u
 #elif defined(SC64_Z7_COLONY_DEFENSE_ENABLED)
@@ -2212,6 +2217,22 @@ static int sc64_p3_can_attack_from(int attacker, int target, int owner)
 }
 #define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
     sc64_p3_can_attack_from((attacker), (target), (owner))
+#elif defined(SC64_Z7_SCOURGE_COMBAT)
+/* Share the extra Scourge guards from ROM; the Z7 hot-code reserve is full. */
+static int __attribute__((noinline))
+sc64_z7_can_attack_from(int attacker, int target, int owner)
+{
+    if (attacker == U_SCOURGE) {
+        if (target < 0 || target >= MAX_UNITS || !u[target].alive ||
+            !sc64_race_unit_flying(u[target].type) ||
+            (u[target].flags & 16) || invincible_units[target] ||
+            !owners_hostile(owner, u[target].owner)) return 0;
+    }
+    /* Keep common loaded, cloaked, hidden-actor, and scenario immunity checks. */
+    return race_can_attack(attacker, target);
+}
+#define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
+    sc64_z7_can_attack_from((attacker), (target), (owner))
 #elif defined(SC64_T4_RUNTIME)
 static int sc64_t4_can_attack_from(int attacker, int target, int owner)
 {
@@ -2492,6 +2513,16 @@ nearest_enemy_scan(int x, int y, int owner, int max_distance, int attacker
 }
 #endif
 
+#if defined(SC64_Z7_SCOURGE_COMBAT) && defined(SC64_UNARMED_QUERY_SKIP)
+/* Share the expanded ground/air lookup from ROM in the larger Z7 build. */
+static int __attribute__((noinline))
+sc64_z7_unit_has_weapon(int type)
+{
+    return sc64_race_unit_damage_vs(type, 0) > 0 ||
+           sc64_race_unit_damage_vs(type, 1) > 0;
+}
+#endif
+
 static int GBA_HOT
 nearest_enemy_typed(int x, int y, int owner, int max_distance, int attacker
                     SC64_P7_SOURCE_OWNER_PARAM)
@@ -2509,8 +2540,12 @@ nearest_enemy_typed(int x, int y, int owner, int max_distance, int attacker
      * to the ordinary checked query path. This deliberately uses damage_vs
      * for both classes so the P3 air-only Scourge is not skipped. */
     if (attacker >= 0 && attacker < SC_RU_COUNT &&
+#ifdef SC64_Z7_SCOURGE_COMBAT
+        !sc64_z7_unit_has_weapon(attacker)) {
+#else
         sc64_race_unit_damage_vs(attacker, 0) <= 0 &&
         sc64_race_unit_damage_vs(attacker, 1) <= 0) {
+#endif
         result = -1;
         goto sc64_query_done;
     }
@@ -4744,7 +4779,8 @@ static void
 tick_combat(Unit * q, int target)
 {
     int dx, dy, range, damage;
-#if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+#if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
+    defined(SC64_Z7_SCOURGE_COMBAT)
     if (q->type == U_SCOURGE && !q->alive) return;
     /* Scourge target validation must precede target_alive(), which indexes
      * the unit or building arrays from this combined target namespace. */
@@ -4780,7 +4816,8 @@ tick_combat(Unit * q, int target)
     /* Weapon reach is measured from a structure's footprint edge. The
        navigation grid keeps actors outside the same 18px collision radius. */
     if(target>=MAX_UNITS)range+=18;
-#if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+#if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
+    defined(SC64_Z7_SCOURGE_COMBAT)
     /* BWAPI lists zero bonus damage for Suicide_Scourge. Keep its fixed
      * 110 damage independent of the generic SIDE weapon upgrade. */
     if (q->type == U_SCOURGE)
@@ -4815,7 +4852,8 @@ tick_combat(Unit * q, int target)
         if (race_z6_hallucination_can_deal_damage((int)(q-u)))
 #endif
         for(int hit=0;hit<hits&&target_alive(target);hit++)hit_target(target,damage,q->type,q->owner);
-#if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+#if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
+    defined(SC64_Z7_SCOURGE_COMBAT)
         /* Suicide Scourge damage is applied by hit_target first, preserving
          * the regular shield/armor/death path, then the attacker is consumed. */
         if (q->type == U_SCOURGE) {
@@ -5506,11 +5544,25 @@ select_next_train_type(void)
 #ifdef SC64_RACES
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     if (race_human == R_ZERG) {
+#ifdef SC64_Z7_SCOURGE_COMBAT
+        static const int zerg_types[] = {U_DRONE, U_OVERLORD, U_ZERGLING, U_HYDRALISK, U_MUTALISK
+            , U_SCOURGE
+        };
+        const int zerg_count = (int)(sizeof(zerg_types) / sizeof(zerg_types[0]));
+        int n;
+        for (n = 0; n < zerg_count; ++n) if (zerg_types[n] == train_type) break;
+        for (int step = 1; step <= zerg_count; ++step) {
+            int type = zerg_types[(n + step) % zerg_count];
+#else
         static const int zerg_types[] = {U_DRONE, U_OVERLORD, U_ZERGLING, U_HYDRALISK, U_MUTALISK};
         int n;
         for (n = 0; n < 5; ++n) if (zerg_types[n] == train_type) break;
         for (int step = 1; step <= 5; ++step) {
             int type = zerg_types[(n + step) % 5];
+#endif
+#ifdef SC64_Z7_SCOURGE_COMBAT
+            if (type == U_SCOURGE && !race_z7_active()) continue;
+#endif
             if (selected_building < 0 || sc64_race_producer_compatible(
                     b[selected_building].type, sc64_race_unit_rules[type].producer)) {
                 train_type = type; return;

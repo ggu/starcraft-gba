@@ -238,9 +238,14 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
         0
 #endif
     },
-    /* BWAPI raw 47 Scourge: 25 HP, 25/75, 1 doubled supply. Its air-only
-     * Suicide Scourge weapon is enabled only for the Higher Ground profile. */
-    [U_SCOURGE] = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 1, 25, 75, 450, 25, 0, 0 }
+    /* BWAPI raw 47 Scourge: 25 HP, 25/75, 1 doubled supply. */
+    [U_SCOURGE] = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 1, 25, 75, 450, 25, 0,
+#ifdef SC64_Z7_SCOURGE_COMBAT
+        SC_PR_SPIRE
+#else
+        0
+#endif
+    }
 #ifdef SC64_T4_RUNTIME
     , [U_GHOST]        = { R_TER, 0, B_BARRACKS, 2, 25, 75, 750, 45, 0, 0 }
     /* Scenario actors retain default HP but are not normal production units. */
@@ -999,6 +1004,9 @@ static inline int sc64_race_unit_can_attack_air(int type)
     case -1: case U_MARINE: case U_HYDRALISK: case U_HUNTER_KILLER:
     case U_DRAGOON: case U_FENIX_DRAGOON: case U_GOLIATH:
     case U_WRAITH: case U_MUTALISK: case U_SCOUT:
+#ifdef SC64_Z7_SCOURGE_COMBAT
+    case U_SCOURGE:
+#endif
 #ifdef SC64_T4_RUNTIME
     case U_GHOST: case U_RAYNOR_MARINE:
 #endif
@@ -1040,6 +1048,9 @@ static inline int sc64_race_unit_damage_vs(int type, int target_flying)
     /* Pinned BWAPI Suicide_Scourge: 110 normal damage, cooldown 1, 3px
      * maximum range, air-only. game.c applies the engine's 2:1 scale. */
     if (type == U_SCOURGE) return target_flying ? 110 : 0;
+#elif defined(SC64_Z7_SCOURGE_COMBAT)
+    /* Fixed-damage Suicide Scourge; no generic weapon-level bonus. */
+    if (type == U_SCOURGE) return target_flying ? 110 : 0;
 #endif
     if (type == U_VULTURE && target_flying) return 0;
     if (target_flying) {
@@ -1072,6 +1083,8 @@ static inline int sc64_race_unit_range_vs(int type, int target_flying)
 #endif
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     if (type == U_SCOURGE) return target_flying ? 3 : 0;
+#elif defined(SC64_Z7_SCOURGE_COMBAT)
+    if (type == U_SCOURGE) return target_flying ? 3 : 0;
 #endif
     if (type == U_VULTURE && target_flying) return 0;
     if (type == U_GOLIATH) return target_flying ? 160 : 192;
@@ -1101,6 +1114,8 @@ static inline int sc64_race_unit_cooldown_vs(int type, int target_flying)
     if (type == U_KERRIGAN || type == U_RAYNOR_VULTURE) return 22;
 #endif
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+    if (type == U_SCOURGE) return target_flying ? 1 : 0;
+#elif defined(SC64_Z7_SCOURGE_COMBAT)
     if (type == U_SCOURGE) return target_flying ? 1 : 0;
 #endif
     if (type == U_WRAITH && target_flying) return 22;

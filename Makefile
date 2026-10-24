@@ -2288,6 +2288,13 @@ test-sc64-z7-source-sight: build/test-sc64-z7-source-sight build/test-sc64-z7-so
 	./build/test-sc64-z7-source-sight
 	./build/test-sc64-z7-source-sight-eggs
 
+Z7_SCOURGE_PROBE_FLAGS := $(Z7_EGG_PROBE_FLAGS) -DSC64_Z7_SOURCE_SIGHT -DSC64_Z7_SCOURGE_COMBAT
+build/test-sc64-z7-scourge: tests/sc64_z7_scourge_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SCOURGE_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-scourge
+test-sc64-z7-scourge: build/test-sc64-z7-scourge
+	./build/test-sc64-z7-scourge
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build

@@ -322,6 +322,11 @@ static int race_queue_unit(int owner, int producer, int type)
 #endif
     const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
     Sc64RaceBank bank;
+#ifdef SC64_Z7_SCOURGE_COMBAT
+    /* This staged producer uses Z7's paired Eggs. Other modes retain their
+       existing product list until independent production is qualified there. */
+    if (type == U_SCOURGE && !race_z7_active()) return 0;
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_airborne(producer)) return 0;
 #endif

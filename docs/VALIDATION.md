@@ -3947,4 +3947,55 @@ all 13 reported gameplay checkpoints and three captures matching the frozen
 baseline. Its measured opening mean is 18.01 effective fps versus 17.6234.
 It then resumes its own generated SRAM in a new emulator process through the
 ordinary HOME / load path, with exact persisted observations at frame 11,824.
-Late-campaign SRAM and wider-profile qualification remain separate.
+The 90,000-input late replay separately matches all 91 reported gameplay
+checkpoints and the same three captures. A new emulator process loads that
+candidate-generated SRAM through HOME / load with exact persisted observations
+and resumes through frame 89,348. Wider-profile qualification and a full
+post-load mission win remain separate.
+
+### Experimental Z7 Scourge combat and Spire geometry
+
+`SC64_Z7_SCOURGE_COMBAT` enables the existing Suicide Scourge combat path in the
+Z7 experimental build, requiring independent Egg production. The new Zerg
+production-cycle entry requires a completed Spire and buys a pair for the
+pinned 25 minerals / 75 gas and 450 source-frame build time (563 updates).
+The source weapon has 110 normal damage, zero upgrade bonus, air-only targets,
+three source-pixel reach and a one-frame cooldown. The current half-scale
+engine rounds reach to two world pixels and cooldown to two updates. A valid
+hit goes through the ordinary shield/armor/death path before consuming the
+attacker and releasing its supply. Common loaded, cloaked and hidden-actor
+guards remain in the target path.
+
+An actual-engine ASan/UBSan fixture launches Z7 through its normal menu, cycles
+the selected Hatchery with real press/release R inputs, buys the Egg with A,
+and saves/loads the pending product and selected training type. Isolated
+production advances the complete 563-update timer and verifies both births.
+Combat cases cover ground/allied/loaded/hidden/invincible and invalid targets,
+range and cooldown, fixed damage with weapon upgrades, shields/armor, attacker
+consumption, supply and prevention of repeat damage. The existing P3 Scourge
+fixture also passes. A separate inactive-mode check keeps Scourge out of the
+skirmish product cycle and rejects a serial single-unit purchase. These
+fixtures use controlled setup and are not full
+campaign controller wins or fresh-process SRAM tests.
+
+That real-menu fixture exposed a separate Z7 condition bug: the building
+rectangle fallback omitted ordinary Spire raw type 141. A Bring condition
+could therefore fail with condition fault 2 and pause as soon as a Spire was
+present. Raw 141 now uses its pinned left/up/right/down bounds 28/32/28/24,
+matching Greater Spire raw 137; the fixture verifies the exact half-open
+rectangle and that the live mission continues with the Spire. This correction
+is independent of the optional combat gate, so the Z7 gate-off ROM changes
+intentionally to `6f5822f8…3f1459`.
+
+The combined Egg/source-sight/Scourge ARM ROM (`5a183717…76dc60`) links at IWRAM
+`0x03004f78` and BSS `0x0203d9f0` under the unchanged reserves. Initial links
+exceeded the fast-code limit; shared target guards and the dual weapon lookup
+now stay in ROM. No actor fields, persistent arrays or save bytes are added;
+the gate retains internal save generation 36. Native projectile travel and
+IScript death timing, a complete Z7 win, cold SRAM and hardware performance
+remain unqualified. Mutalisk Glaive Wurm bounces are still unimplemented.
+
+The final source snapshot again passes `./dev build`, `./dev test` (380 Python
+tests plus the default host fixtures), `make unified` and `make test-unified`.
+The standard original-art/unified ROM hashes remain `4ad80ce0…f9aee` and
+`6bab5be2…979f9`; their profiles leave the experimental combat gate off.
