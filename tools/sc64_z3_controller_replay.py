@@ -36,10 +36,13 @@ DEFAULT_TRACE = ROOT / ".local/sc64/z3-controller-asan-win.json"
 DEFAULT_OUTPUT = ROOT / ".local/sc64/z3-controller-replay"
 
 
-def validate_trace(trace: object, capacity: int, *, windowed: bool = False) -> dict:
+def validate_trace(trace: object, capacity: int, *, windowed: bool = False,
+                   window_ticks: int = CHECKPOINT_TICKS) -> dict:
     """Validate a controller trace and return a scheduler-ready replay plan."""
     if type(capacity) is not int or capacity < 1:
         raise ValueError("controller queue capacity must be a positive integer")
+    if type(window_ticks) is not int or window_ticks not in (250, CHECKPOINT_TICKS):
+        raise ValueError("controller checkpoint period must be 250 or 1000 ticks")
     if not isinstance(trace, dict) or trace.get("schema") != 1:
         raise ValueError("trace schema must be an object with schema=1")
     if trace.get("mission") != MISSION_Z3:
@@ -112,13 +115,13 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False) -> d
         if type(final.get(key)) is not int:
             raise ValueError(f"final won event is missing integer field {key}")
     if windowed:
-        last_page = (stop_tick - 1) // CHECKPOINT_TICKS
+        last_page = (stop_tick - 1) // window_ticks
         peak_page_transitions = max(
-            (sum(1 for tick, _ in inputs if tick // CHECKPOINT_TICKS == page)
+            (sum(1 for tick, _ in inputs if tick // window_ticks == page)
              for page in range(last_page + 1)), default=0)
         if peak_page_transitions > capacity:
             raise ValueError("controller event page exceeds ELF capacity "
-                             f"({peak_page_transitions}/{capacity} in a {CHECKPOINT_TICKS}-tick window)")
+                             f"({peak_page_transitions}/{capacity} in a {window_ticks}-tick window)")
     else:
         peak_page_transitions = len(inputs)
     return {"inputs": inputs, "input_count": len(inputs), "stop_tick": stop_tick,
@@ -147,6 +150,11 @@ def schedule_mode(sym: dict[str, int], sizes: dict[str, int]) -> tuple[str, int]
         if sizes.get(name) != 4:
             raise RuntimeError(f"windowed scheduler symbol {name} has unexpected size")
     return "windowed", capacity
+
+
+def checkpoint_ticks(sym: dict[str, int]) -> int:
+    """Identify the compiled scheduler period; dense pages use the same queue."""
+    return 250 if "demo_replay_dense_checkpoint" in sym else CHECKPOINT_TICKS
 
 
 def scheduler_events(plan: dict) -> list[tuple[int, int]]:
@@ -312,9 +320,10 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
     sym, sizes = symbols(elf), symbol_sizes(elf)
     scheduler_mode, capacity = schedule_mode(sym, sizes)
     windowed = scheduler_mode == "windowed"
-    plan = validate_trace(trace, capacity, windowed=windowed)
+    period = checkpoint_ticks(sym)
+    plan = validate_trace(trace, capacity, windowed=windowed, window_ticks=period)
     requested_ticks, is_prefix = run_length(plan, ticks, save_at_end)
-    pages = (make_schedule_pages(plan, requested_ticks, capacity)
+    pages = (make_schedule_pages(plan, requested_ticks, capacity, period)
              if windowed else None)
     peak_page_transitions = (max((len(page["events"]) for page in pages), default=0)
                              if pages is not None else plan["input_count"])
@@ -439,25 +448,25 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                                               "trace_stop_tick": plan["stop_tick"],
                                               "requested_ticks": requested_ticks,
                                               "prefix": is_prefix},
-                               requested_ticks=requested_ticks, checkpoint_interval=CHECKPOINT_TICKS,
+                               requested_ticks=requested_ticks, checkpoint_interval=period,
                                latest_checkpoint=observations[-1])
 
         while last_tick < requested_ticks:
             rsp.tick()
             completed = profile.u32(rsp, sym["demo_schedule_tick"])
-            expected = min(requested_ticks, last_tick + CHECKPOINT_TICKS)
+            expected = min(requested_ticks, last_tick + period)
             if completed != expected:
                 raise RuntimeError(f"expected checkpoint tick {expected}, observed {completed}")
             if windowed:
                 assert pages is not None
-                prior = pages[(completed - 1) // CHECKPOINT_TICKS]["events"]
+                prior = pages[(completed - 1) // period]["events"]
                 cursor = profile.u32(rsp, sym["demo_schedule_index"])
                 count = profile.u32(rsp, sym["demo_schedule_count"])
                 if count != len(prior) or cursor != count:
                     raise RuntimeError(f"windowed scheduler page was not fully consumed at tick {completed} "
                                        f"(cursor={cursor}, count={count}, expected={len(prior)})")
                 if completed < requested_ticks:
-                    next_page = pages[completed // CHECKPOINT_TICKS]["events"]
+                    next_page = pages[completed // period]["events"]
                     write_page(next_page)
             now = profile.hardware_clock(rsp)
             elapsed = (now - last_clock) & MAX_U32
@@ -478,7 +487,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                                                   "trace_stop_tick": plan["stop_tick"],
                                                   "requested_ticks": requested_ticks,
                                                   "prefix": is_prefix},
-                                   requested_ticks=requested_ticks, checkpoint_interval=CHECKPOINT_TICKS,
+                                   requested_ticks=requested_ticks, checkpoint_interval=period,
                                    latest_checkpoint=checkpoint)
             print(f"zerg-z3 Z3 tick={completed}/{requested_ticks} screen={state['screen']} "
                   f"frame={state['frame']} fps={checkpoint['effective_fps'] if checkpoint['effective_fps'] is not None else 'n/a'}",
@@ -501,7 +510,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                   "final_host_tick": final["scheduler_tick"],
                   "final_frame": final["frame"], "counted_play_frames": counted_frames,
                   "mean_live_play_effective_fps": mean_fps,
-                  "timer_method": "GBA chained hardware timers at 1000-tick and exact-final observers",
+                  "timer_method": f"GBA chained hardware timers at {period}-tick and exact-final observers",
                   "fps_exclusions": "Initial HOME/start interval and final result interval are excluded;"
                                     " only positive frame deltas between PLAY checkpoints contribute.",
                   "capacity_source": "ELF symbol size demo_schedule_events / 8 bytes per event",
@@ -544,7 +553,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                                               "trace_stop_tick": plan["stop_tick"],
                                               "requested_ticks": requested_ticks,
                                               "prefix": is_prefix},
-                               requested_ticks=requested_ticks, checkpoint_interval=CHECKPOINT_TICKS,
+                               requested_ticks=requested_ticks, checkpoint_interval=period,
                                latest_checkpoint=final, status="prefix" if is_prefix else "finished",
                                final_report=str(report_path))
         print(json.dumps({"status": report["status"], "observed_ticks": final["tick"],

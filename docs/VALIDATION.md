@@ -2900,3 +2900,82 @@ the fixed guards at IWRAM `0x03004eb8` / BSS `0x0203d9f0`. These checks do
 not establish a Z7 playthrough, a full skirmish win or hardware performance.
 Parallel native larva/egg production remains a separate fidelity gap: the
 current Hatchery processes paid orders serially, despite three stored larvae.
+
+### Full skirmish matches across the three canonical builds
+
+The public `sc64_skirmish_campaign_run.c` controller now runs through normal
+HOME/custom-game menus and paid construction, production and combat inputs.
+The matrix checks two maps, three human races and one to three opponents,
+with rotated opponent races, against each of the three canonical source
+profiles. All **54** host sanitizer runs reach a terminal state within the
+120,000-input-tick bound: Terran build 1 win/17 losses, Zerg build 2 wins/16
+losses, Protoss build 3 wins/15 losses. These are engine match completions,
+not winning strategies for every configuration or all bot-race permutations.
+
+A Protoss-build match with human Terran against two AIs originally exceeded
+the 60,000-tick cap. It wins at tick 65,606/frame 65,541 under the larger cap;
+its entire input prefix through tick 60,000 is identical. No AI, economy or
+world-state changes were used to obtain that result. Private reports live at
+`.local/sc64/skirmish/{terran,zerg,protoss}-matches/matrix.json`.
+
+The new ARM observer validates input transitions, normal HOME entry, configured
+participants and terminal witnesses before launch, then reads the matching
+ELF's real mixed-width actor banks. It checks terminal frame, result, map,
+races, owners and each participant's live unit/building counts. Human wins
+require surviving human buildings and zero buildings for every participating
+bot; residual bot units are allowed by current skirmish victory rules. Its
+17 asset-free tests pass. Full skirmish ARM execution and hardware timing
+qualification remain pending.
+
+### Dense scheduler and P6 host completion evidence
+
+The P6 controller has a complete normal-input host win at frame **172327**
+(input tick 174855), with living rescued Zeratul inside source extraction
+location 15 and living Tassadar. Trigger state reports WON, zero fault and
+completed action cursors/timers; the mission completion bit is asserted.
+The private opening input prefix currently has no recovered public policy
+generator, so this is private replay evidence, not a reproducible public
+controller target. The experimental controller and trace remain untracked.
+
+The corrected trace records its actual start at tick 12/frame 1, following
+the normal sixth-entry menu route. It retains all 15,554 original input
+transitions and their SHA-256 `e33412dc161b332e8ca66c2a93e8d01fa9945f22ea09c7c224c0139e4fff1c09`.
+Its full trace SHA-256 is
+`e66d25a4df98f017efbefc679c30bbbba91e8566643a3d3db65fc7a319000421`.
+
+The opt-in dense scheduler observes every 250 ticks so those inputs fit the
+existing 256-entry queue (peak 199 in this P6 trace). The real main-loop
+sanitizer fixture also tests a transition every tick, empty windows, held keys
+and pressed edges through page boundaries. Default 1,000-tick scheduling
+remains unchanged. The dense P6 ARM build preserves IWRAM `0x030045d8` and
+BSS `0x0203d774`; its 4 MiB ROM SHA-256 is
+`b754e1f12cef830462110808834d56c04e20f8b7a5cfe4df85ad4ef9d51bdc81`.
+Frozen inputs are under `.local/build/promotion/p6-dense-winning-frozen/`.
+The full ARM replay and fresh-process SRAM checks are queued; this host win
+does not increase the qualified campaign total or establish a frame rate.
+
+### Z6 corrected-build full qualification
+
+The corrected-loader frozen build now completes the full normal-input ARM
+replay at tick 271799/frame 268694, with verified victory, living unloaded
+Kerrigan, source objective clearance and the mission completion bit. Its mean
+live-play rate is **17.83 effective fps**, below the near-30-fps target.
+Both the opening and 150,000-tick saves restore exactly in fresh HOME processes;
+the late save resumes from frame 148268 through one neutral handoff frame and
+60 measured live frames to 148329. This qualifies staged Z6 and raises the
+staged total to **21/30 (T10/Z6/P5)**. Canonical profiles remain T10/Z3/P3.
+
+The qualified ROM SHA-256 is
+`bc24435f6e3bc47ce90512d1eb2ca814bc03168ce795b83bf5caa2a785a15e8c`,
+ELF SHA-256 is
+`d48e8f637af53527a4b7318a24239fcdbbad683cc81a9a849c5ffa6fb04fcef1`,
+and the frozen input trace is `a5fde71c…f2523` recorded above. Reports are
+under `.local/build/promotion/z6-coldload-qualified/`. This supersedes the
+first-win build's failed cold-load result without concealing that earlier
+failure. The default-off count-snapshot performance comparison is separate.
+
+The 523-file source-only export passes the original-art build and default
+host regressions, including 344 Python tests with six private-input checks
+skipped. The source index audit contains no game/build/credential payloads.
+The local default/unified builds and host suites also pass. No physical GBA
+performance or complete Z7/P6 campaign qualification is claimed.

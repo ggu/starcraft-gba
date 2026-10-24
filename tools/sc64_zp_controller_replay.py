@@ -3,7 +3,7 @@
 
 ROM/ELF catalog metadata and debugger symbols are checked before launch. The
 replay writes the controller queue and scheduler metadata; game/model state is
-read through symbols and DWARF at 1000-tick checkpoints.
+read through symbols and DWARF at the compiled scheduler checkpoint period.
 """
 from __future__ import annotations
 
@@ -86,12 +86,14 @@ def storm_bytes_valid(value: object) -> bool:
 
 
 def validate_trace(trace: object, capacity: int, profile_name: str,
-                   *, windowed: bool = True) -> dict:
+                   *, windowed: bool = True, window_ticks: int = CHECKPOINT_TICKS) -> dict:
     """Strictly validate an authenticated staged campaign trace before emulator launch."""
     if profile_name not in MISSION_BY_PROFILE:
         raise ValueError("unknown staged Zerg/Protoss profile")
     if type(capacity) is not int or capacity < 1:
         raise ValueError("controller queue capacity must be positive")
+    if type(window_ticks) is not int or window_ticks not in (250, CHECKPOINT_TICKS):
+        raise ValueError("controller checkpoint period must be 250 or 1000 ticks")
     if not isinstance(trace, dict) or type(trace.get("schema")) is not int or trace["schema"] != 1:
         raise ValueError("trace schema must be an object with schema=1")
     mission = MISSION_BY_PROFILE[profile_name]
@@ -271,8 +273,8 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
         if final.get("kerrigan_alive") != 1:
             raise ValueError("Z6 final observation requires the live source Kerrigan")
     if windowed:
-        last_page = (stop - 1) // CHECKPOINT_TICKS
-        peak = max((sum(1 for tick, _ in inputs if tick // CHECKPOINT_TICKS == page)
+        last_page = (stop - 1) // window_ticks
+        peak = max((sum(1 for tick, _ in inputs if tick // window_ticks == page)
                     for page in range(last_page + 1)), default=0)
         if peak > capacity:
             raise ValueError(f"controller event page exceeds ELF capacity ({peak}/{capacity})")
@@ -940,7 +942,9 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
     trace = json.loads(trace_bytes)
     sym, sizes = symbols(elf_path), symbol_sizes(elf_path)
     mode, capacity = scheduler.schedule_mode(sym, sizes)
-    plan = validate_trace(trace, capacity, profile_name, windowed=mode == "windowed")
+    checkpoint_ticks = scheduler.checkpoint_ticks(sym)
+    plan = validate_trace(trace, capacity, profile_name, windowed=mode == "windowed",
+                          window_ticks=checkpoint_ticks)
     requested, prefix = scheduler.run_length(plan, ticks, save_at_end)
     if save_at_end and mode != "windowed":
         raise ValueError("--save-at-end requires a windowed scheduler")
@@ -977,7 +981,7 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
             raise RuntimeError(f"fresh boot did not remain on HOME: {initial}")
         home_capture = capture(rsp, run_dir / "home.png")
 
-        pages = scheduler.make_schedule_pages(plan, requested, capacity) if mode == "windowed" else None
+        pages = scheduler.make_schedule_pages(plan, requested, capacity, checkpoint_ticks) if mode == "windowed" else None
         def write_page(events: list[tuple[int, int]]) -> None:
             blob = b"".join(struct.pack("<2I", tick, held) for tick, held in events)
             for offset in range(0, len(blob), 256):
@@ -1024,7 +1028,7 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
                                "scheduler_mode": mode, "scheduler_capacity": capacity,
                                "trace_stop_tick": plan["stop_tick"], "requested_ticks": requested,
                                "prefix": prefix, "campaign_catalog": metadata},
-                requested_ticks=requested, checkpoint_interval=CHECKPOINT_TICKS,
+                requested_ticks=requested, checkpoint_interval=checkpoint_ticks,
                 latest_checkpoint=checkpoint, status=status)
 
         tick_zero = {"tick": 0, "host_tick": 0, "elapsed_hardware_cycles": 0,
@@ -1039,16 +1043,16 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
         while last_tick < requested:
             rsp.tick()
             completed = profile.u32(rsp, sym["demo_schedule_tick"])
-            expected = min(requested, last_tick + CHECKPOINT_TICKS)
+            expected = min(requested, last_tick + checkpoint_ticks)
             if completed != expected:
                 raise RuntimeError(f"expected checkpoint tick {expected}, observed {completed}")
             if mode == "windowed":
-                page = pages[(completed - 1) // CHECKPOINT_TICKS]
+                page = pages[(completed - 1) // checkpoint_ticks]
                 if (profile.u32(rsp, sym["demo_schedule_index"]) != len(page["events"]) or
                         profile.u32(rsp, sym["demo_schedule_count"]) != len(page["events"])):
                     raise RuntimeError(f"scheduler page incomplete at tick {completed}")
                 if completed < requested:
-                    write_page(pages[completed // CHECKPOINT_TICKS]["events"])
+                    write_page(pages[completed // checkpoint_ticks]["events"])
             now = profile.hardware_clock(rsp)
             elapsed = (now - prior_clock) & 0xFFFFFFFF
             state = mission_snapshot(rsp, sym, sizes, bank, campaign_layout,
@@ -1083,6 +1087,7 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
                   "trace": str(trace_path), "rom_sha256": rom_hash, "elf_sha256": elf_hash,
                   "trace_sha256": trace_hash, "input_transitions": plan["input_count"],
                   "scheduler_mode": mode, "scheduler_capacity": capacity,
+                  "checkpoint_interval": checkpoint_ticks,
                   "peak_page_transitions": plan["peak_page_transitions"],
                   "trace_stop_tick": plan["stop_tick"], "requested_ticks": requested,
                   "observed_ticks": final["tick"], "prefix": prefix,
@@ -1090,7 +1095,7 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
                   "counted_live_play_hardware_cycles": counted_cycles,
                   "mean_live_play_effective_fps": round(profile.CPU_HZ * counted_frames /
                                                           max(1, counted_cycles), 2),
-                  "timer_method": "GBA chained hardware timer deltas at 1000-tick checkpoints",
+                  "timer_method": f"GBA chained hardware timer deltas at {checkpoint_ticks}-tick checkpoints",
                   "fps_exclusions": "Initial HOME/start and final RESULT intervals are excluded; "
                                     "only positive frame deltas between PLAY checkpoints contribute.",
                   "initial_home": initial, "initial_home_capture": home_capture,
@@ -1129,7 +1134,7 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
                            "input_transitions": plan["input_count"], "scheduler_mode": mode,
                            "scheduler_capacity": capacity, "trace_stop_tick": plan["stop_tick"],
                            "requested_ticks": requested, "prefix": prefix},
-            requested_ticks=requested, checkpoint_interval=CHECKPOINT_TICKS,
+            requested_ticks=requested, checkpoint_interval=checkpoint_ticks,
             latest_checkpoint=final, status="prefix" if prefix else "finished",
             final_report=str(report_path))
         print(json.dumps({"status": report["status"], "ticks": requested,

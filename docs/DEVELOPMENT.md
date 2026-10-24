@@ -1275,3 +1275,59 @@ Add `-DSC64_P6_BURROW_CULL -DSC64_P6_BURROW_GROUPED` to the existing
 ROM/ELF pairs and use the startup profiler's `--compare` option. These flags
 are not enabled in a qualified full-mission build yet; current evidence and
 frozen hashes are in [Validation](VALIDATION.md#p6-burrow-release-experiments).
+
+### Complete skirmish controller matches
+
+After preparing the three canonical race profiles, run:
+
+```sh
+make test-sc64-skirmish-matches
+```
+
+This compiles an input-only controller against each canonical profile and runs
+both available maps, all three human races and one to three AI opponents.
+Opponent races rotate from the human race; this is 18 configurations per ROM,
+not every possible opponent-race permutation. The matrix allows 120,000 input
+ticks and fails on an unfinished match, launch failure or sanitizer error.
+Human defeats are valid completed matches. Private traces, logs and matrix
+reports are written under `.local/sc64/skirmish/{terran,zerg,protoss}-matches/`.
+To run one case directly:
+
+```sh
+build/test-sc64-skirmish-match-protoss 1 0 2 .local/sc64/skirmish/example.json 120000
+```
+
+The arguments are map (0 built-in arena, 1 imported), human race (0 Terran,
+1 Zerg, 2 Protoss), opponent count, output trace and optional input-tick cap.
+The controller uses ordinary HOME/menu navigation and `game_update` inputs;
+its world reads guide decisions without modifying resources, actors or AI.
+
+### Dense input replay without a larger queue
+
+Some full controller routes exceed 256 transitions in a 1,000-tick window.
+`SC64_DENSE_SCHEDULE` reduces replay pages to 250 ticks while retaining the
+existing 256-entry queue and RAM layout. It changes the debugger observation
+cadence; ordinary play continues to use the same game rules. For the P6 probe:
+
+```sh
+make -B protoss-p6-probe P6_QUERY_FLAGS=-DSC64_DENSE_SCHEDULE
+python3 tools/sc64_zp_controller_replay.py --help
+```
+
+The Z3 and staged Zerg/Protoss replay tools discover the shorter period from
+the ELF. Other existing profilers still expect their documented 1,000-tick
+builds. Rebuild with the original flags before using those profilers.
+For a dense skirmish ROM/ELF, use the dedicated observer:
+
+```sh
+python3 tools/sc64_skirmish_controller_replay.py \
+  --trace .local/sc64/skirmish/example.json \
+  --rom /absolute/path/to/matching.gba \
+  --elf /absolute/path/to/matching.elf
+```
+
+Supply the matching build used to generate the trace; profile-specific actor
+capacities can change the outcome. The tool verifies a fresh HOME start,
+feeds only scheduler input fields, and checks the final configuration, frame,
+result and live actor counts. Its FPS mean uses GBA timer deltas between live
+PLAY checkpoints, excluding HOME/start and final RESULT intervals.

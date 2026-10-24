@@ -46,12 +46,12 @@ across these profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. Separate int
 Z4 and P4 Storm builds additionally have normal-controller host and full ARM
 wins. P5 Shuttle also has a complete normal-controller host and ARM win plus
 an exact fresh-process cargo save. Z5 Consume also has a complete host and ARM
-win with an exact mid-mission save, bringing the staged total to 20/30
-(Terran 10, Zerg 5, Protoss 5). These staged builds have separate save formats
+win with an exact mid-mission save, with Z6 now also passing a full ARM win and exact fresh-process SRAM restore.
+This brings the staged total to 21/30 (Terran 10, Zerg 6, Protoss 5). These staged builds have separate save formats
 and ROM identities. The P5 island objective requires the optional Shuttle
-profile. Z6 now has normal-input host and full ARM wins; fresh-process SRAM
-qualification is still pending. P6 has a gated live runtime and startup/save
-checks, with no completed playthrough. Z7 has an internal seventh-entry ROM
+profile. Z6 has normal-input host and full ARM wins plus exact cold-load continuity.
+P6 has a private normal-input host win; full ARM/save qualification and a
+publicly reproducible opening controller remain unfinished. Z7 has an internal seventh-entry ROM
 with shared menu, source objectives and generation-34 saves; its host checks
 establish integration readiness, with no completed playthrough. P7 retains
 an isolated world foundation and numeric scheduler. The remaining staged
@@ -489,7 +489,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Host controller runs complete 16 missions: Terran 1–10, Zerg 1–3 and Protoss 1–3. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds; T9's win is on an earlier ROM. Separate staged profiles also complete Z4–Z5 and P4–P5, bringing the staged total to 20/30. Ten missions remain without a completed playthrough.
+- Host controller runs complete 16 missions: Terran 1–10, Zerg 1–3 and Protoss 1–3. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds; T9's win is on an earlier ROM. Separate staged profiles qualify Z4–Z6 and P4–P5, bringing the staged total to 21/30. Nine missions remain unqualified; P6 has host-only completion evidence.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

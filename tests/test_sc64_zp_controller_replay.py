@@ -286,6 +286,26 @@ class TraceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "event page exceeds"):
             replay.validate_trace(trace, 8, "zerg-z4")
 
+    def test_dense_pages_preserve_every_transition_without_growing_queue(self):
+        trace = sixth_trace()
+        dense = [{"kind": "input", "host_tick": tick,
+                  "held": 2 if tick % 2 else 0,
+                  "pressed": 2 if tick % 2 else 0}
+                 for tick in range(13, 913)]
+        trace["events"][13:13] = dense
+        with self.assertRaisesRegex(ValueError, "event page exceeds"):
+            replay.validate_trace(trace, 256, "protoss-p6")
+        plan = replay.validate_trace(trace, 256, "protoss-p6", window_ticks=250)
+        pages = replay.scheduler.make_schedule_pages(plan, 2000, 256, 250)
+        self.assertEqual(plan["peak_page_transitions"], 250)
+        self.assertEqual([event for page in pages for event in page["events"]],
+                         plan["inputs"])
+        self.assertEqual(replay.scheduler.checkpoint_ticks({}), 1000)
+        self.assertEqual(replay.scheduler.checkpoint_ticks(
+            {"demo_replay_dense_checkpoint": 0x08000100}), 250)
+        with self.assertRaisesRegex(ValueError, "period"):
+            replay.validate_trace(trace, 256, "protoss-p6", window_ticks=0)
+
     def test_runtime_model_decode_uses_compact_struct_field_widths(self):
         raw = bytearray(40)
         # Runtime.model starts at offset 2; Z4 model is 10 bytes: fired u16,
