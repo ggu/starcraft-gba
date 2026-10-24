@@ -115,7 +115,13 @@ static int race_owner_has_prereq(int owner, unsigned short prereq)
         switch (b[i].type) {
         case B_HATCHERY: case B_LAIR: case B_HIVE:
             if (prereq & SC_PR_HATCHERY) prereq &= (unsigned short)~SC_PR_HATCHERY;
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+            if (b[i].type != B_HATCHERY) prereq &= (unsigned short)~SC_PR_LAIR;
+#endif
             break;
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+        case B_SPIRE: case B_GREATER_SPIRE: prereq &= (unsigned short)~SC_PR_SPIRE; break;
+#endif
         case B_SPAWNING_POOL: if (prereq & SC_PR_SPAWNING_POOL) prereq &= (unsigned short)~SC_PR_SPAWNING_POOL; break;
         case B_HYDRALISK_DEN: if (prereq & SC_PR_HYDRALISK_DEN) prereq &= (unsigned short)~SC_PR_HYDRALISK_DEN; break;
         case B_NEXUS: if (prereq & SC_PR_NEXUS) prereq &= (unsigned short)~SC_PR_NEXUS; break;
@@ -230,6 +236,19 @@ static int race_queue_unit(int owner, int producer, int type)
     }
     if ((r->flags & SC_RACE_F_LARVA) && b[producer].larva < 1) return 0;
     count = type == U_ZERGLING ? 2 : 1;
+#ifdef SC64_P4_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
+        unsigned committed = race_p4_reserved_units();
+        unsigned free_slots = 0;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+        for (int slot = 0; slot < MAX_BUILDINGS; ++slot) if (b[slot].alive)
+            for (int q = 0; q < b[slot].queue_count; ++q) {
+                int queued = b[slot].queue[(b[slot].queue_head + q) % 5];
+                committed += queued == U_ZERGLING ? 2u : 1u;
+            }
+        if (committed + (unsigned)count > free_slots) return 0;
+    }
+#endif
     reserved = race_owner_reserved_supply(owner);
     cap = race_owner_supply_cap(owner);
     /* Zero-supply units (notably Overlords) must remain producible while
@@ -295,6 +314,32 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
     u[worker].path_retry = 0;
     return 1;
 }
+
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+/* In-place Lair upgrade: keep source provenance, position and larva slots.
+ * The existing bounded construction clock supplies the authored 30 Hz timing.
+ * An empty queue avoids silently discarding a paid larva product. */
+static int race_start_lair_morph(int building)
+{
+    const Sc64RaceBuildingRule *r = sc64_race_building_rule(B_LAIR);
+    Sc64RaceBank bank;
+    if (race_human != R_ZERG || building < 0 || building >= MAX_BUILDINGS ||
+        !building_complete(building) || b[building].owner != SIDE ||
+        b[building].type != B_HATCHERY || b[building].queue_count ||
+        !race_owner_has_prereq(SIDE, r->prereq)) return 0;
+    bank.minerals = (unsigned short)minerals;
+    bank.gas = (unsigned short)gas;
+    if (!sc64_race_pay_building(&bank, B_LAIR)) return 0;
+    minerals = bank.minerals; gas = bank.gas;
+    b[building].type = B_LAIR;
+    b[building].raw_type = sc64_race_raw_building(B_LAIR);
+    b[building].maxhp = r->hp;
+    b[building].under_construction = 1;
+    b[building].build_progress = 0;
+    invalidate_path_grid();
+    return 1;
+}
+#endif
 
 /* Called by the worker's build-arrival branch. Protoss warp-in returns the
  * Probe immediately. Zerg construction consumes the Drone and its supply. */
@@ -393,6 +438,16 @@ static void race_tick_buildings(void)
             if (pr && (pr->flags & SC_RACE_F_REQUIRES_POWER) && !race_site_powered(owner, b[i].x, b[i].y)) continue;
         }
         if (++b[i].queue_progress < frames) continue;
+#ifdef SC64_P4_RUNTIME
+        if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
+            unsigned free_slots = 0;
+            for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+            if (free_slots < race_p4_reserved_units() + (type == U_ZERGLING ? 2u : 1u)) {
+                b[i].queue_progress = frames - 1;
+                continue;
+            }
+        }
+#endif
         x = b[i].x + 20; y = b[i].y + 4;
         if (x >= WORLD_W - 8) x = b[i].x - 20;
         if (type == U_ZERGLING) {

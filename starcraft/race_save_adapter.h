@@ -1,6 +1,8 @@
 #ifndef SC64_RACE_SAVE_ADAPTER_H
 #define SC64_RACE_SAVE_ADAPTER_H
-#ifdef SC64_T3_ENABLED
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+#define race_data sc64_zp_route_save_scratch.save
+#elif defined(SC64_T3_ENABLED)
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #define race_data sc64_combined_route_save_scratch.save
 #else
@@ -12,7 +14,7 @@ static RaceSave race_data;
 /* Decode a candidate unit without touching the live world. The compact
  * late-Terran profile stores named fields; historical profiles retain their
  * exact s16 word rows and conversion behavior. */
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 static int
 race_save_decode_unit(const RaceSave *candidate, unsigned slot,
                       unsigned world_width, unsigned world_height, Unit *out)
@@ -22,7 +24,7 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
                                  world_width, world_height);
 }
 #endif
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 static int
 race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *out)
 {
@@ -234,7 +236,7 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
 #include "sc64_terran_late_save_adapter.h"
 #endif
 static int sc64_race_storage_geometry_valid(int width, int height) {
-#ifdef SC64_T4_RUNTIME
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     return width >= 1 && width <= 128 && height >= 1 && height <= 128;
 #elif defined(SC64_LARGE_MAPS)
     return width >= 1 && width <= 128 && height >= 1 && height <= 96;
@@ -252,13 +254,15 @@ static int race_save_game(void) {
             b[i].raw_type!=sc64_race_raw_building(b[i].type) || b[i].under_construction ||
             b[i].queue_count || b[i].shield || !invincible_buildings[i]))return 0;
 #endif
-#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    memset(&race_data, 0, sizeof(race_data));
+#elif defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
     /* The save shares storage with the transient route queue. Clear all
      * padding and optional fields before serializing this record. */
     memset(&race_data, 0, sizeof(race_data));
 #endif
     race_data.version=SAVE_VERSION;
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     for(int i=0;i<MAX_UNITS;i++)
         if(!sc64_unit_save_encode(&race_data.units[i], &u[i],
                                   (unsigned)(race_cols * 16),
@@ -268,7 +272,7 @@ static int race_save_game(void) {
         int n;memcpy(&n,(u8*)&u[i]+j*sizeof(int),sizeof(n));race_data.units[i][j]=(s16)n;
     }
 #endif
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     for(int i=0;i<MAX_BUILDINGS;i++)
         if(!sc64_building_save_encode(&race_data.buildings[i], &b[i],
                                      (unsigned)(race_cols * 16),
@@ -326,6 +330,20 @@ static int race_save_game(void) {
     if(!race_mode&&race_selected_mission==22) {
         race_data.p3=race_p3;
         race_data.p3_action_ticks=race_p3_action_ticks;
+    }
+#endif
+#ifdef SC64_Z4_RUNTIME
+    memset(&race_data.z4, 0, sizeof(race_data.z4));
+    if (race_z4_active()) {
+        if (!race_z4_runtime_state_valid(&race_z4)) return 0;
+        race_data.z4 = race_z4;
+    }
+#endif
+#ifdef SC64_P4_RUNTIME
+    memset(&race_data.p4, 0, sizeof(race_data.p4));
+    if (race_p4_active()) {
+        if (!race_p4_runtime_state_valid(&race_p4)) return 0;
+        race_data.p4 = race_p4;
     }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
@@ -474,18 +492,18 @@ static int race_load_game(void) {
        v[12]<0||v[12]>2||v[18]<0||v[18]>1||v[19]<0||v[19]>1)return 0;
     for(int i=0;i<5;i++)if(race_data.players[i]<-1||race_data.players[i]>2||
         race_data.ore[i]<0||race_data.ore[i]>65535||race_data.vespene[i]<0||race_data.vespene[i]>65535)return 0;
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define RACE_U(i,f) candidate_unit.f
 #else
 #define RACE_U(i,f) race_data.units[i][offsetof(Unit,f)/sizeof(int)]
 #endif
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define RACE_B(i,f) candidate_building.f
 #else
 #define RACE_B(i,f) race_data.buildings[i][offsetof(Building,f)/sizeof(int)]
 #endif
     for(int i=0;i<MAX_UNITS;i++) {
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
         Unit candidate_unit;
         if(!sc64_unit_save_decode(&candidate_unit, &race_data.units[i],
                                   (unsigned)(width * 16),
@@ -571,7 +589,7 @@ static int race_load_game(void) {
 #endif
     }
     for(int i=0;i<MAX_BUILDINGS;i++) {
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
         Building candidate_building;
         if(!sc64_building_save_decode(&candidate_building,
                                      &race_data.buildings[i])) return 0;
@@ -606,7 +624,7 @@ static int race_load_game(void) {
             RACE_B(i,queue_progress)<0||RACE_B(i,build_progress)<-1||RACE_B(i,shield)<0||
             RACE_B(i,larva)<0||RACE_B(i,larva)>3||RACE_B(i,shield_remainder)<0||RACE_B(i,shield_remainder)>=1280)return 0;
         for(int j=0;j<RACE_B(i,queue_count);j++) {
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
             int type=candidate_building.queue[(RACE_B(i,queue_head)+j)%5];
 #else
             int type=race_data.buildings[i][offsetof(Building,queue)/sizeof(int)+(RACE_B(i,queue_head)+j)%5];
@@ -705,6 +723,70 @@ static int race_load_game(void) {
         if(race_data.p3_action_ticks)return 0;
     }
 #endif
+#ifdef SC64_Z4_RUNTIME
+    if (!v[0] && v[2] == 15) {
+        const Sc64Z4RuntimeState *z4 = &race_data.z4;
+        unsigned outcome = z4->model.outcome;
+        unsigned phase = race_data.campaign.phase;
+        if (!race_z4_runtime_state_valid(z4) || v[1] != R_ZERG ||
+            race_data.players[SIDE] != R_ZERG || race_data.players[ENEMY] != R_TER ||
+            race_data.players[4] != R_TER || race_data.campaign.mission != 15 ||
+            race_data.campaign.elapsed_frames != (u32)v[7] ||
+            race_data.campaign.objective_stage !=
+                !!(z4->model.fired & SC64_Z4_EVENT_TRIGGER_HATCH)) return 0;
+        if (outcome == SC64_Z4_RUNNING) {
+            if (v[18] || v[19] || phase != SC64_RACE_PHASE_ACTIVE ||
+                (race_data.campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+        } else if (outcome == SC64_Z4_WON) {
+            if (!v[18] || v[19] || phase != SC64_RACE_PHASE_COMPLETE ||
+                !(race_data.campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY) ||
+                !(v[3] & (1 << 15))) return 0;
+        } else if (v[18] || !v[19] || phase != SC64_RACE_PHASE_FAILED ||
+                   (race_data.campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+    } else {
+        const u8 *bytes = (const u8 *)&race_data.z4;
+        for (unsigned i = 0; i < sizeof(race_data.z4); ++i) if (bytes[i]) return 0;
+    }
+#endif
+#ifdef SC64_P4_RUNTIME
+    if (!v[0] && v[2] == SC64_P4_GLOBAL_ID) {
+        const Sc64P4RuntimeState *p4 = &race_data.p4;
+        unsigned outcome = p4->model.outcome;
+        unsigned phase = race_data.campaign.phase;
+        unsigned live = 0, queued = 0;
+        for (unsigned i = 0; i < MAX_UNITS; ++i) {
+            Unit candidate;
+            if (!race_save_decode_unit(&race_data, i, (unsigned)(width * 16),
+                                       (unsigned)(height * 16), &candidate)) return 0;
+            live += candidate.alive != 0;
+        }
+        for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+            Building candidate;
+            if (!race_save_decode_building(&race_data, i, &candidate)) return 0;
+            if (candidate.alive) for (int q = 0; q < candidate.queue_count; ++q)
+                queued += candidate.queue[(candidate.queue_head + q) % 5] == U_ZERGLING ? 2u : 1u;
+        }
+        if (!race_p4_runtime_state_valid(p4) || v[1] != R_PROTOSS ||
+            race_data.players[SIDE] != R_PROTOSS || race_data.players[ENEMY] != R_ZERG ||
+            race_data.players[RESCUABLE] != R_PROTOSS || race_data.players[4] != R_ZERG ||
+            race_data.campaign.mission != SC64_P4_GLOBAL_ID ||
+            race_data.campaign.elapsed_frames != (u32)v[7] ||
+            live + queued + SC64_P4_SOURCE_CREATE_COUNT - p4->created_count > MAX_UNITS)
+            return 0;
+        if (outcome == SC64_P4_RUNNING) {
+            if (v[18] || v[19] || phase != SC64_RACE_PHASE_ACTIVE ||
+                (race_data.campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+        } else if (outcome == SC64_P4_WON) {
+            if (!v[18] || v[19] || phase != SC64_RACE_PHASE_COMPLETE ||
+                !(race_data.campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY) ||
+                !(v[3] & (1 << SC64_P4_GLOBAL_ID))) return 0;
+        } else if (v[18] || !v[19] || phase != SC64_RACE_PHASE_FAILED ||
+                   (race_data.campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+    } else {
+        const u8 *bytes = (const u8 *)&race_data.p4;
+        for (unsigned i = 0; i < sizeof(race_data.p4); ++i) if (bytes[i]) return 0;
+    }
+#endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (!v[0] && v[2] >= SC64_TERRAN_LATE_GLOBAL_T7 &&
@@ -795,7 +877,7 @@ static int race_load_game(void) {
     race_cols=race_mode?64:sc64_race_maps[race_selected_mission].width;
     race_rows=race_mode?64:sc64_race_maps[race_selected_mission].height;
     if(race_mode)race_skirmish_geometry();
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     for(int i=0;i<MAX_UNITS;i++) {
         Unit decoded;
         if(!sc64_unit_save_decode(&decoded, &race_data.units[i],
@@ -809,7 +891,7 @@ static int race_load_game(void) {
         memcpy((u8*)&u[i]+j*sizeof(int),&n,sizeof(n));
     }
 #endif
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     for(int i=0;i<MAX_BUILDINGS;i++) {
         if(!sc64_building_save_decode(&b[i], &race_data.buildings[i])) return 0;
     }
@@ -860,6 +942,14 @@ static int race_load_game(void) {
     } else {
         memset(&race_p3,0,sizeof(race_p3));race_p3_action_ticks=0;
     }
+#endif
+#ifdef SC64_Z4_RUNTIME
+    if (race_z4_active()) race_z4 = race_data.z4;
+    else memset(&race_z4, 0, sizeof(race_z4));
+#endif
+#ifdef SC64_P4_RUNTIME
+    if (race_p4_active()) race_p4 = race_data.p4;
+    else memset(&race_p4, 0, sizeof(race_p4));
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
     if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID) {

@@ -50,13 +50,25 @@ int memcmp(const void *a, const void *b, size_t n);
     (!defined(SC64_LATE_TERRAN_STORAGE) || !defined(SC64_TERRAN_LATE_ENABLED))
 #error "Late Terran runtime requires the complete imported maps and storage"
 #endif
+#if defined(SC64_ZP_CAMPAIGN_STORAGE) && \
+    (!defined(SC64_RACES) || !defined(SC64_UNIFIED) || \
+     !defined(SC64_CAMPAIGN_RACE) || \
+     (SC64_CAMPAIGN_RACE != 1 && SC64_CAMPAIGN_RACE != 2) || \
+     defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_T6_STORAGE))
+#error "Zerg/Protoss campaign storage requires a unified Zerg or Protoss race profile"
+#endif
+#if defined(SC64_ZP_CAMPAIGN_STORAGE) && !defined(SC64_ROUTE_PACK3)
+#error "Zerg/Protoss campaign storage requires packed route fields"
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME) && \
     (!defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 0)
 #error "Combined T3/T4 runtime is an experimental unified Terran profile"
 #endif
 
 #if defined(SC64_RACES)
-#if defined(SC64_LATE_TERRAN_STORAGE)
+#if defined(SC64_ZP_CAMPAIGN_STORAGE) && SC64_CAMPAIGN_RACE == 2
+#define MAX_UNITS 240
+#elif defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define MAX_UNITS 192
 #elif defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #define MAX_UNITS 160
@@ -73,6 +85,8 @@ int memcmp(const void *a, const void *b, size_t n);
 #define SC64_RACE_SAVE_GENERATION 15u
 #elif defined(SC64_T5_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 14u
+#elif defined(SC64_ZP_CAMPAIGN_STORAGE)
+#define SC64_RACE_SAVE_GENERATION 20u
 #elif defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 11u
 #elif defined(SC64_T4_SCENARIO_RUNTIME)
@@ -90,14 +104,21 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define SC64_RACE_SAVE_GENERATION 2u
 #endif
-#if defined(SC64_LATE_TERRAN_STORAGE)
+/* Opt-in Z/P pools are staged chapter bounds, not full-campaign maxima.
+ * Protoss reserves headroom for 87 scripted creations; production must keep
+ * those slots available until the corresponding events have executed. */
+#if defined(SC64_ZP_CAMPAIGN_STORAGE)
+#define MAX_BUILDINGS 96
+#elif defined(SC64_LATE_TERRAN_STORAGE)
 #define MAX_BUILDINGS 96
 #elif defined(SC64_T6_STORAGE)
 #define MAX_BUILDINGS 80
 #else
 #define MAX_BUILDINGS 64
 #endif
-#if defined(SC64_LATE_TERRAN_STORAGE)
+#if defined(SC64_ZP_CAMPAIGN_STORAGE)
+#define MAX_MINERALS 48
+#elif defined(SC64_LATE_TERRAN_STORAGE)
 #define MAX_MINERALS 80
 #elif defined(SC64_LARGE_MAPS)
 #define MAX_MINERALS 48
@@ -193,7 +214,7 @@ static int race_cols=64,race_rows=64;
 #define MAP_ROWS 16
 #endif
 #ifdef SC64_RACES
-#ifdef SC64_T4_RUNTIME
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define MAP_CELLS (128*128)
 #elif defined(SC64_LARGE_MAPS)
 #define MAP_CELLS (128*96)
@@ -206,7 +227,7 @@ static int race_cols=64,race_rows=64;
 #if defined(SC64_LARGE_MAPS) && !defined(SC64_RACES)
 #error SC64_LARGE_MAPS requires SC64_RACES
 #endif
-#ifdef SC64_LARGE_MAPS
+#if defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define SC64_GRID_STORAGE_BYTES ((MAP_CELLS + 7) / 8)
 /* Grid algorithms validate coordinates before indexing, as in the byte-grid
  * profile. Keep their inner accesses small enough for the IWRAM code guard;
@@ -240,7 +261,7 @@ static inline void sc64_grid_set(u8 *grid, unsigned cell, int value) {
  * adds the shift for 128-column maps. */
 static inline int sc64_cell_row(unsigned cell) {
     if (race_cols == 64) return (int)(cell >> 6);
-#ifdef SC64_LARGE_MAPS
+#if defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     if (race_cols == 128) return (int)(cell >> 7);
 #endif
     return (int)((cell * 43691u) >> 22);
@@ -250,7 +271,7 @@ static inline int sc64_cell_col(unsigned cell) {
 }
 static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
     if (tiles == 64) return (int)((pixel * 3u) >> 7);
-#ifdef SC64_LARGE_MAPS
+#if defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     if (tiles == 128) return (int)((pixel * 3u) >> 8);
 #endif
     return (int)(pixel >> 6);
@@ -278,6 +299,72 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 
 #ifdef SC64_RACES
 #include "race_rules.h"
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+/* Actor flag values deliberately share a stable bit layout across the T4
+ * scenario adapter and the dedicated Z/P source-fact provider. */
+enum {
+    SC64_GAME_ACTOR_SELECTABLE = 1u, SC64_GAME_ACTOR_MOVABLE = 2u,
+    SC64_GAME_ACTOR_COLLIDABLE = 4u, SC64_GAME_ACTOR_DRAWABLE = 8u,
+    SC64_GAME_ACTOR_MEN = 16u, SC64_GAME_ACTOR_BUILDING = 32u,
+    SC64_GAME_ACTOR_INVINCIBLE = 64u, SC64_GAME_ACTOR_HIDDEN = 128u,
+    SC64_GAME_ACTOR_WEAPON = 256u
+};
+static unsigned
+sc64_game_unit_actor_flags(int type)
+{
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    unsigned flags = sc64_zp_actor_flags(type);
+    if (flags) return flags;
+#endif
+#ifdef SC64_T4_RUNTIME
+    return sc64_race_t4_actor_flags(type);
+#else
+    return 0;
+#endif
+}
+static unsigned
+sc64_game_building_actor_flags(int type)
+{
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    unsigned flags = sc64_zp_building_flags(type);
+    if (flags) return flags;
+#endif
+#ifdef SC64_T4_RUNTIME
+    return sc64_race_t4_building_flags(type);
+#else
+    return 0;
+#endif
+}
+static int sc64_game_unit_has_flag(int type, unsigned flag)
+{ return (sc64_game_unit_actor_flags(type) & flag) != 0; }
+static int sc64_game_building_has_flag(int type, unsigned flag)
+{ return (sc64_game_building_actor_flags(type) & flag) != 0; }
+static int sc64_game_unit_selectable(int type)
+{ unsigned f=sc64_game_unit_actor_flags(type); return !f || (f & SC64_GAME_ACTOR_SELECTABLE); }
+static int sc64_game_building_selectable(int type)
+{ unsigned f=sc64_game_building_actor_flags(type); return !f || (f & SC64_GAME_ACTOR_SELECTABLE); }
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+/* Unit broad-phase overlap used by the simple mover is a radius in GBA
+ * pixels. The source box is in StarCraft pixels; half its widest axis gives
+ * the actor's half-extent at the renderer's 2:1 scale. Keep the historical
+ * six-pixel fallback for all actors without an audited source box. */
+static int
+sc64_game_unit_collision_radius(int type)
+{
+    int left, up, right, down;
+    if (!sc64_zp_actor_bounds_source(type, &left, &up, &right, &down)) return 6;
+    int width = left + right, height = up + down;
+    int source_extent = width > height ? width : height;
+    int gba_extent = (source_extent + 3) / 4;
+    return gba_extent > 6 ? gba_extent : 6;
+}
+static int
+sc64_game_building_bounds_source(int type, int *left, int *up, int *right, int *down)
+{
+    return sc64_zp_building_bounds_source(type, left, up, right, down);
+}
+#endif
+#endif
 #ifdef SC64_T4_RUNTIME
 #include "sc64_t4_world.h"
 #ifdef SC64_T4_SCENARIO_RUNTIME
@@ -308,16 +395,34 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 #include "sc64_p3_model.h"
 _Static_assert(MAX_UNITS >= 96 && MAX_BUILDINGS >= 42 && MAX_MINERALS >= 48,
                "Higher Ground must retain its complete starting roster");
+#ifndef SC64_ZP_CAMPAIGN_STORAGE
 _Static_assert(MAX_UNITS + MAX_BUILDINGS <= 255,
                "Visibility source counts require wider storage");
+#endif
 #endif
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
 #include "sc64_z3.h"
 #endif
+#ifdef SC64_Z4_RUNTIME
+#if !defined(SC64_Z4_ENABLED) || !defined(SC64_Z4_DATA_ENABLED) || !defined(SC64_ZP_CAMPAIGN_STORAGE) || !defined(SC64_ZP_CAMPAIGN_ACTORS)
+#error "Z4 runtime requires its complete source map, actor rules and expanded storage"
+#endif
+#include "sc64_z4.h"
+_Static_assert(SC64_RACE_MAP_COUNT > 15,
+               "Z4 runtime requires the staged Z4 map descriptor");
+#endif
+#ifdef SC64_P4_RUNTIME
+#if !defined(SC64_P4_ENABLED) || !defined(SC64_P4_DATA_ENABLED) || !defined(SC64_ZP_CAMPAIGN_STORAGE) || !defined(SC64_ZP_CAMPAIGN_ACTORS)
+#error "P4 runtime requires its complete source map, actor rules and expanded storage"
+#endif
+#include "sc64_p4.h"
+_Static_assert(SC64_RACE_MAP_COUNT > SC64_P4_GLOBAL_ID,
+               "P4 runtime requires the staged P4 map descriptor");
+#endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
 #include "sc64_t3.h"
 _Static_assert(MAX_UNITS >= 138, "T3 must retain its complete starting roster");
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 _Static_assert(MAX_UNITS + MAX_BUILDINGS <= 511, "Nine-bit visibility source count bound");
 #else
 _Static_assert(MAX_UNITS + MAX_BUILDINGS <= 255, "Visibility source counts require wider storage");
@@ -359,6 +464,9 @@ enum {
 #ifdef SC64_TERRAN_LATE_RUNTIME
     MENU_LIFT_LAND, MENU_COMMAND_CENTER,
 #endif
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    MENU_ZP_LAIR, MENU_ZP_SPIRE,
+#endif
     MENU_COUNT
 };
 enum {
@@ -372,7 +480,7 @@ enum {
 };
 
 typedef struct {
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     /* Named fields retain their engine meanings. The late campaign has a
      * distinct save codec, so runtime records need no int-word ABI. HP and
      * shields remain int because combat shares pointers with buildings. */
@@ -388,7 +496,7 @@ typedef struct {
 #endif
 #endif
 } Unit;
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 _Static_assert(sizeof(Unit) == 56, "Late Terran runtime unit budget");
 #endif
 typedef struct {
@@ -476,14 +584,27 @@ static Tracer tracers[MAX_TRACERS];
 static u8 explored[SC64_GRID_STORAGE_BYTES];
 static u8 visible[SC64_GRID_STORAGE_BYTES];
 static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+typedef union {
+    u16 bfs_queue[MAP_CELLS];
+    RaceSave save;
+} Sc64ZpRouteSaveScratch;
+static Sc64ZpRouteSaveScratch sc64_zp_route_save_scratch;
+#endif
 #ifdef SC64_IMPORTED_MISSION
-#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+#if defined(SC64_IMPORTED_MISSION) && defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
 typedef union {
     u16 bfs_queue[MAP_CELLS];
     RaceSave save;
 } Sc64CombinedRouteSaveScratch;
 static Sc64CombinedRouteSaveScratch sc64_combined_route_save_scratch;
 #define bfs_queue sc64_combined_route_save_scratch.bfs_queue
+#elif defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_IMPORTED_MISSION
+#define bfs_queue sc64_zp_route_save_scratch.bfs_queue
+#else
+static u16 bfs_queue[MAP_CELLS];
+#endif
 #else
 static u16 bfs_queue[MAP_CELLS];
 #endif
@@ -615,6 +736,16 @@ static u16 race_p3_action_ticks;
 static u16 race_p3_action_duration(const Sc64P3State *s);
 #endif
 static int race_queue_unit(int owner,int building,int type);
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+static int race_start_lair_morph(int building);
+#endif
+#ifdef SC64_Z4_RUNTIME
+static unsigned race_z4_hud_seconds(void);
+#endif
+#ifdef SC64_P4_RUNTIME
+static unsigned race_p4_reserved_units(void);
+static int race_p4_world_paused(void);
+#endif
 static int race_start_build(int owner,int worker,int type,int x,int y);
 static int race_can_site(int owner,int type,int x,int y);
 static int race_site_powered(int owner,int x,int y);
@@ -675,6 +806,16 @@ static int GBA_HOT
 owners_hostile(int a, int other)
 {
 #ifdef SC64_RACES
+#ifdef SC64_Z4_RUNTIME
+    if (!race_mode && race_selected_mission == 15)
+        return (a == SIDE && (other == ENEMY || other == 4)) ||
+               (other == SIDE && (a == ENEMY || a == 4));
+#endif
+#ifdef SC64_P4_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID)
+        return ((a == SIDE || a == RESCUABLE) && (other == ENEMY || other == 4)) ||
+               ((other == SIDE || other == RESCUABLE) && (a == ENEMY || a == 4));
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) return sc64_terran_late_owners_hostile(a, other);
 #endif
@@ -709,20 +850,12 @@ sc64_t4_unit_has(int type, unsigned flag)
     return actor != 0 && (actor & flag) != 0;
 }
 
-static int
-sc64_t4_unit_selectable(int type)
-{
-    return !sc64_race_t4_actor_flags(type) ||
-        sc64_t4_unit_has(type, SC64_T4_ACTOR_SELECTABLE);
-}
-
-static int
-sc64_t4_unit_collidable(int type)
-{
-    return !sc64_race_t4_actor_flags(type) ||
-        sc64_t4_unit_has(type, SC64_T4_ACTOR_COLLIDABLE);
-}
-
+#endif
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+static int sc64_game_unit_collidable(int type)
+{ unsigned flags=sc64_game_unit_actor_flags(type); return !flags || (flags & SC64_GAME_ACTOR_COLLIDABLE); }
+#endif
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
 static int
 sc64_t4_building_collidable(int slot)
 {
@@ -738,9 +871,11 @@ sc64_t4_building_collidable(int slot)
         return 1; /* An unbound door never becomes passable silently. */
     }
 #endif
-    return !sc64_race_t4_building_flags(type) ||
-        (sc64_race_t4_building_flags(type) & SC64_T4_ACTOR_COLLIDABLE);
+    unsigned flags = sc64_game_building_actor_flags(type);
+    return !flags || (flags & SC64_GAME_ACTOR_COLLIDABLE);
 }
+#endif
+#ifdef SC64_T4_RUNTIME
 #ifdef SC64_T4_SCENARIO_RUNTIME
 /* Door changes are infrequent. Keep this bounded grid rebuild in ROM rather
  * than consuming IWRAM reserved for per-frame movement and the stack. */
@@ -931,8 +1066,17 @@ spawn_unit(int owner, int type, int x, int y)
     /* A newly produced unit can reuse a dead unit's array slot. */
     if (unit_tap == i) reset_unit_tap();
 #if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    invincible_units[i] = (u8)(
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        (sc64_zp_actor_flags(type) & SC64_ZP_ACTOR_INVINCIBLE) != 0 ||
+#endif
 #ifdef SC64_T4_RUNTIME
-    invincible_units[i] = (u8)sc64_race_t4_unit_intrinsically_invincible(type);
+        sc64_race_t4_unit_intrinsically_invincible(type)
+#else
+        0
+#endif
+        );
 #else
     invincible_units[i] = 0;
 #endif
@@ -947,7 +1091,13 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_RACES
     u[i].maxhp=sc64_race_unit_rules[type].hp;
     u[i].shield=sc64_race_unit_rules[type].shields;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    { int hp = sc64_zp_actor_default_hp(type); if (hp) u[i].maxhp = hp; }
+#endif
     u[i].raw_type=u[i].raw_owner=-1;u[i].flags=u[i].shield_remainder=0;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    if (sc64_zp_actor_fact(type)) u[i].raw_type = sc64_race_raw_unit(type);
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) {
         u[i].raw_type = sc64_race_raw_unit(type);
@@ -1003,8 +1153,17 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 	return -1;
     b[i].x = x;
 #if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    invincible_buildings[i] = (u8)(
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        (sc64_zp_building_flags(type) & SC64_ZP_ACTOR_INVINCIBLE) != 0 ||
+#endif
 #ifdef SC64_T4_RUNTIME
-    invincible_buildings[i] = (u8)sc64_race_t4_building_intrinsically_invincible(type);
+        sc64_race_t4_building_intrinsically_invincible(type)
+#else
+        0
+#endif
+        );
 #else
     invincible_buildings[i] = 0;
 #endif
@@ -1029,8 +1188,16 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #else
     b[i].maxhp=sc64_race_building_rules[type].hp;
 #endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    { int hp = sc64_zp_building_default_hp(type); if (hp) b[i].maxhp = hp; }
+#endif
     b[i].shield=sc64_race_building_rules[type].race==R_PROTOSS?b[i].maxhp:0;
     b[i].raw_type=b[i].raw_owner=-1;b[i].flags=b[i].shield_remainder=0;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    { const Sc64ZpBuildingFact *zp = sc64_zp_building_fact(type);
+      if (zp) { b[i].shield = zp->shields;
+        b[i].raw_type = sc64_race_raw_building(type); } }
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) {
         b[i].raw_type = sc64_race_raw_building(type);
@@ -1151,7 +1318,7 @@ invalidate_path_grid(void)
 #endif
 }
 
-#if defined(SC64_T4_RUNTIME) && defined(SC64_VISIBILITY_SPANS)
+#if (defined(SC64_T4_RUNTIME) && defined(SC64_VISIBILITY_SPANS)) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 /* Rebuilds follow map/door changes. Keep the larger span visibility path in
  * IWRAM and this occasional full-grid rebuild in ROM within the same reserve. */
 static void
@@ -1169,8 +1336,9 @@ build_path_grid(void)
     for (i = 0; i < MAX_BUILDINGS; i++) if (b[i].alive) {
 #ifdef SC64_RACES
         if(b[i].type==B_ZERG_BEACON)continue;
-#ifdef SC64_T4_RUNTIME
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
         if (!sc64_t4_building_collidable(i)) continue;
+#ifdef SC64_T4_RUNTIME
 #ifdef SC64_T4_SCENARIO_RUNTIME
         if (race_t4_active() && sc64_race_t4_is_door(b[i].type)) {
             /* Conservative tile overlap at the GBA's half scale. Opening
@@ -1180,6 +1348,29 @@ build_path_grid(void)
         }
 #endif
 #endif
+#endif
+#endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        {
+            int left, up, right, down;
+            if (sc64_game_building_bounds_source(b[i].type, &left, &up, &right, &down)) {
+                int x0 = b[i].x * 2 - left, x1 = b[i].x * 2 + right;
+                int y0 = b[i].y * 2 - up, y1 = b[i].y * 2 + down;
+                int c0 = limit(x0 / 32, 0, MAP_COLS - 1);
+                int c1 = limit(x1 / 32, 0, MAP_COLS - 1);
+                int r0 = limit(y0 / 32, 0, MAP_ROWS - 1);
+                int r1 = limit(y1 / 32, 0, MAP_ROWS - 1);
+                for (row = r0; row <= r1; ++row)
+                    for (col = c0; col <= c1; ++col) {
+                        int cell_x0 = col * 32, cell_y0 = row * 32;
+                        int cell_x1 = cell_x0 + 32, cell_y1 = cell_y0 + 32;
+                        if (cell_x0 <= x1 && cell_x1 >= x0 &&
+                            cell_y0 <= y1 && cell_y1 >= y0)
+                            SC64_GRID_SET(path_walkable, col + row * MAP_COLS, 0);
+                    }
+                continue;
+            }
+        }
 #endif
         int c = b[i].x / 16, r = b[i].y / 16;
         for (row = limit(r - 2, 0, MAP_ROWS - 1); row <= limit(r + 2, 0, MAP_ROWS - 1); row++)
@@ -1208,7 +1399,7 @@ can_place(int type, int x, int y)
 	    return 0;
 	for (i = 0; i < MAX_BUILDINGS; i++)
 	    if (b[i].alive
-#ifdef SC64_T4_RUNTIME
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
                 && sc64_t4_building_collidable(i)
 #endif
                 && dist2(x,y,b[i].x,b[i].y) <
@@ -1234,7 +1425,7 @@ can_place(int type, int x, int y)
 	return 0;
     for (i = 0; i < MAX_BUILDINGS; i++)
 	if (b[i].alive
-#ifdef SC64_T4_RUNTIME
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
             && sc64_t4_building_collidable(i)
 #endif
             && dist2(x, y, b[i].x, b[i].y) < (radius + 14) * (radius + 14))
@@ -1244,8 +1435,8 @@ can_place(int type, int x, int y)
 #ifdef SC64_RACES
         && !sc64_race_unit_flying(u[i].type)
 #endif
-#ifdef SC64_T4_RUNTIME
-        && sc64_t4_unit_collidable(u[i].type)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+        && sc64_game_unit_collidable(u[i].type)
 #endif
         && dist2(x, y, u[i].x, u[i].y) < (radius + 5) * (radius + 5))
 	    return 0;
@@ -1375,22 +1566,28 @@ unit_step_clear_race_fallback(const Unit *q, int nx, int ny)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
         if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
+            int radius = 6;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+            int mover_radius = sc64_game_unit_collision_radius(q->type);
+            int candidate_radius = sc64_game_unit_collision_radius(u[i].type);
+            radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
+#endif
             if (u[i].type == U_CHRYSALIS ||
                 sc64_race_unit_flying(u[i].type) != sc64_race_unit_flying(q->type))
                 continue;
-#ifdef SC64_T4_RUNTIME
-            if ((sc64_race_t4_actor_flags(u[i].type) &&
-                 !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_COLLIDABLE)) ||
-                (sc64_race_t4_actor_flags(q->type) &&
-                 !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_COLLIDABLE)))
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+            if ((sc64_game_unit_actor_flags(u[i].type) &&
+                 !(sc64_game_unit_actor_flags(u[i].type)&SC64_GAME_ACTOR_COLLIDABLE)) ||
+                (sc64_game_unit_actor_flags(q->type) &&
+                 !(sc64_game_unit_actor_flags(q->type)&SC64_GAME_ACTOR_COLLIDABLE)))
                 continue;
 #endif
             /* Exact broad-phase reject avoids a distance calculation for
              * distant actors when the per-frame bucket index is unavailable. */
-            if (u[i].x - nx >= 6 || nx - u[i].x >= 6 ||
-                u[i].y - ny >= 6 || ny - u[i].y >= 6) continue;
+            if (u[i].x - nx >= radius || nx - u[i].x >= radius ||
+                u[i].y - ny >= radius || ny - u[i].y >= radius) continue;
             int next_distance = dist2(nx, ny, u[i].x, u[i].y);
-            if (next_distance < 36 &&
+            if (next_distance < radius * radius &&
                 next_distance <= dist2(q->x, q->y, u[i].x, u[i].y))
                 return 0;
         }
@@ -1406,9 +1603,9 @@ unit_step_clear(const Unit *q, int nx, int ny)
     /* OpenBW bwgame.h unit_can_collide_with(): gathering workers pass
        through ordinary units; static terrain/building checks still apply. */
     if(IS_WORKER(q->type)&&(q->order==ORDER_MINE||q->order==ORDER_GAS))return 1;
-#ifdef SC64_T4_RUNTIME
-    if (sc64_race_t4_actor_flags(q->type) &&
-        !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_MOVABLE)) return 1;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    if (sc64_game_unit_actor_flags(q->type) &&
+        !(sc64_game_unit_actor_flags(q->type)&SC64_GAME_ACTOR_MOVABLE)) return 1;
 #endif
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
@@ -1440,6 +1637,9 @@ __attribute__((optimize("Os")))
 move_toward(Unit * q, int tx, int ty)
 {
 	int nx, ny, speed = q->type == U_ZERGLING || q->type == U_FIREBAT || q->type == U_RAYNOR ? 2 : 1;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    if (q->type == U_ZP_RAYNOR_VULTURE) speed = 2;
+#endif
 #ifdef SC64_DIAGNOSTIC_ORDERS
     u32 sc64_move_start = gba_clock();
 #endif
@@ -1448,9 +1648,9 @@ move_toward(Unit * q, int tx, int ty)
 #ifdef SC64_T5_RUNTIME
     if(q->type==U_DROPSHIP)speed=2;
 #endif
-#ifdef SC64_T4_RUNTIME
-    if (sc64_race_t4_actor_flags(q->type) &&
-        !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_MOVABLE)) return;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    if (sc64_game_unit_actor_flags(q->type) &&
+        !(sc64_game_unit_actor_flags(q->type)&SC64_GAME_ACTOR_MOVABLE)) return;
 #endif
     if(sc64_race_unit_flying(q->type)) {
         q->x=limit(q->x+(tx>q->x?speed:tx<q->x?-speed:0),0,WORLD_W-1);
@@ -1864,9 +2064,9 @@ target_alive(int target)
     if (target >= 0 && target < MAX_UNITS && SC64_TRANSPORT_LOADED(&u[target]))
         return 0;
 #endif
-#ifdef SC64_T4_RUNTIME
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (target >= 0 && target < MAX_UNITS && u[target].alive &&
-        (sc64_race_t4_actor_flags(u[target].type)&SC64_T4_ACTOR_HIDDEN)) return 0;
+        sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_HIDDEN)) return 0;
 #endif
     return target >= 0 && (target < MAX_UNITS ? u[target].alive : b[target - MAX_UNITS].alive);
 }
@@ -1897,6 +2097,14 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #ifdef SC64_T5_RUNTIME
     if (target >= 0 && target < MAX_UNITS && SC64_TRANSPORT_LOADED(&u[target]))
         return;
+#endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    if (target >= 0 && target < MAX_UNITS &&
+        (sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_HIDDEN) ||
+         sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_INVINCIBLE))) return;
+    if (target >= MAX_UNITS && target < MAX_UNITS + MAX_BUILDINGS &&
+        sc64_game_building_has_flag(b[target-MAX_UNITS].type,
+                                    SC64_GAME_ACTOR_INVINCIBLE)) return;
 #endif
 #ifdef SC64_RACES
 #ifdef SC64_T4_RUNTIME
@@ -2675,8 +2883,8 @@ selection_target(void)
 #ifdef SC64_RACES
             ||u[i].type==U_CHRYSALIS
 #endif
-#ifdef SC64_T4_RUNTIME
-            ||!sc64_t4_unit_selectable(u[i].type)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+            ||!sc64_game_unit_selectable(u[i].type)
 #endif
             )
 	    continue;
@@ -2688,9 +2896,8 @@ selection_target(void)
     }
     for (i = 0; i < MAX_BUILDINGS; i++) {
 	if (!b[i].alive || b[i].owner != SIDE
-#ifdef SC64_T4_RUNTIME
-            || (sc64_race_t4_building_flags(b[i].type) &&
-                !(sc64_race_t4_building_flags(b[i].type)&SC64_T4_ACTOR_SELECTABLE))
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+            ||!sc64_game_building_selectable(b[i].type)
 #endif
             )
 	    continue;
@@ -2726,8 +2933,8 @@ select_visible_type(int type)
     clear_selection();
     for (i = 0; i < MAX_UNITS; i++)
         if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE && u[i].type == type &&
-#ifdef SC64_T4_RUNTIME
-            sc64_t4_unit_selectable(u[i].type) &&
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+            sc64_game_unit_selectable(u[i].type) &&
 #endif
             u[i].x >= left && u[i].x < left + 240 &&
             u[i].y >= top && u[i].y < top + 108) u[i].selected = 1;
@@ -2749,9 +2956,9 @@ issue_order(int order, int tx, int ty)
     selected_building = -1;
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE && u[i].selected) {
-#ifdef SC64_T4_RUNTIME
-            if (sc64_race_t4_actor_flags(u[i].type) &&
-                !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_MOVABLE)) continue;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+            if (sc64_game_unit_actor_flags(u[i].type) &&
+                !(sc64_game_unit_actor_flags(u[i].type)&SC64_GAME_ACTOR_MOVABLE)) continue;
 #endif
 #ifdef SC64_T6_RUNTIME
             if (u[i].order == ORDER_REPAIR) {
@@ -2932,6 +3139,17 @@ choose_command(int choice)
     }
 #endif
 #ifdef SC64_RACES
+    #ifdef SC64_ZP_CAMPAIGN_STORAGE
+    if (choice == MENU_ZP_LAIR || choice == MENU_ZP_SPIRE) {
+        menu_open = 0;
+        if (race_human != R_ZERG) { toast(8); return; }
+        if (choice == MENU_ZP_LAIR) {
+            toast(race_start_lair_morph(selected_building) ? 3 : 8);
+            return;
+        }
+        mode = MODE_BUILD; menu = B_SPIRE; return;
+    }
+    #endif
     static const int buildings[3][5]={
         {B_BARRACKS,B_DEPOT,B_REFINERY,B_ACADEMY,B_ENG_BAY},
         {B_SPAWNING_POOL,B_HATCHERY,B_EXTRACTOR,B_HYDRALISK_DEN,B_EVOLUTION_CHAMBER},
@@ -2987,7 +3205,10 @@ choose_command(int choice)
 
 /* Advanced Terran commands are available in the T5 development profile.
  * Other factions retain their existing ten-row command list. */
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+static int field_menu_count(void)
+{ return race_human == R_ZERG ? MENU_COUNT : MENU_STOP + 1; }
+#elif defined(SC64_T5_RUNTIME)
 static int field_menu_count(void)
 { return race_human == R_TER ? MENU_COUNT : MENU_STOP + 1; }
 #else
@@ -3491,9 +3712,9 @@ target_lists_unavailable:
          * actor loop must not clear their target or consume their timer. */
         if (q->type == U_SPIDER_MINE) continue;
 	#endif
-	#ifdef SC64_T4_RUNTIME
-        if (sc64_race_t4_actor_flags(q->type) &&
-            !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_MOVABLE)) {
+	#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+        if (sc64_game_unit_actor_flags(q->type) &&
+            !(sc64_game_unit_actor_flags(q->type)&SC64_GAME_ACTOR_MOVABLE)) {
             q->order = ORDER_IDLE;
             q->target = -1;
             continue;
@@ -3906,8 +4127,8 @@ cycle_selection(void)
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
-#ifdef SC64_T4_RUNTIME
-            &&sc64_t4_unit_selectable(u[i].type)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+            &&sc64_game_unit_selectable(u[i].type)
 #endif
             ) {
 	    u[i].selected = 1;
@@ -3920,8 +4141,8 @@ cycle_selection(void)
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
-#ifdef SC64_T4_RUNTIME
-            &&sc64_t4_unit_selectable(u[i].type)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+            &&sc64_game_unit_selectable(u[i].type)
 #endif
             ) {
 	    u[i].selected = 1;
@@ -3934,8 +4155,8 @@ cycle_selection(void)
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
-#ifdef SC64_T4_RUNTIME
-            &&sc64_t4_unit_selectable(u[i].type)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+            &&sc64_game_unit_selectable(u[i].type)
 #endif
             ) {
 	    u[i].selected = 1;
@@ -3959,14 +4180,14 @@ select_combat_group(void)
 #ifdef SC64_IMPORTED_MISSION
 	     || u[i].type == U_RAYNOR
 #endif
-#ifdef SC64_T4_RUNTIME
-             || sc64_t4_unit_has(u[i].type, SC64_T4_ACTOR_WEAPON)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+             || sc64_game_unit_has_flag(u[i].type, SC64_GAME_ACTOR_WEAPON)
 #endif
 	     )
-#ifdef SC64_T4_RUNTIME
-            && sc64_t4_unit_selectable(u[i].type)
-            && (!sc64_race_t4_actor_flags(u[i].type) ||
-                sc64_t4_unit_has(u[i].type, SC64_T4_ACTOR_WEAPON))
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+            && sc64_game_unit_selectable(u[i].type)
+            && (!sc64_game_unit_actor_flags(u[i].type) ||
+                sc64_game_unit_has_flag(u[i].type, SC64_GAME_ACTOR_WEAPON))
 #endif
 	    )
 	    u[i].selected = 1;
@@ -4000,6 +4221,21 @@ select_next_train_type(void)
     }
 #endif
 #ifdef SC64_RACES
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    if (race_human == R_ZERG) {
+        static const int zerg_types[] = {U_DRONE, U_OVERLORD, U_ZERGLING, U_HYDRALISK, U_MUTALISK};
+        int n;
+        for (n = 0; n < 5; ++n) if (zerg_types[n] == train_type) break;
+        for (int step = 1; step <= 5; ++step) {
+            int type = zerg_types[(n + step) % 5];
+            if (selected_building < 0 || sc64_race_producer_compatible(
+                    b[selected_building].type, sc64_race_unit_rules[type].producer)) {
+                train_type = type; return;
+            }
+        }
+        return;
+    }
+#endif
     static const int types[3][4]={{U_SCV,U_MARINE,U_FIREBAT,U_MEDIC},
         {U_DRONE,U_OVERLORD,U_ZERGLING,U_HYDRALISK},{U_PROBE,U_ZEALOT,U_DRAGOON,U_SCOUT}};
     int n;for(n=0;n<4;n++)if(types[race_human][n]==train_type)break;
@@ -4032,8 +4268,8 @@ select_box_units(void)
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
-#ifdef SC64_T4_RUNTIME
-            &&sc64_t4_unit_selectable(u[i].type)
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+            &&sc64_game_unit_selectable(u[i].type)
 #endif
             && u[i].x >= left && u[i].x <= right &&
             u[i].y >= top && u[i].y <= bottom) u[i].selected = 1;
@@ -4182,6 +4418,23 @@ game_update(u16 held, u16 pressed)
 	screen = SCREEN_PAUSE;
 	return;
     }
+#ifdef SC64_P4_RUNTIME
+    /* Advance the saved source action lists through PauseGame/UnpauseGame,
+     * while combat, production, orders and player commands remain frozen. */
+    if (race_p4_world_paused()) {
+        ++frame;
+        update_imported_mission();
+        update_exploration();
+        if (won || lost) {
+            if (won) race_completed |= 1 << race_selected_mission;
+            save_game();
+            reset_selection_gestures();
+            screen = SCREEN_RESULT;
+            result_timer = 0;
+        }
+        return;
+    }
+#endif
     /* Menus own their inputs. Selection gestures start only in the field. */
     if (menu_open) reset_selection_gestures();
     if ((pressed & KEY_B) && !box_state && !(pressed & KEY_L)) {
@@ -4453,10 +4706,10 @@ draw_unit(Unit * q)
 #ifdef SC64_T6_RUNTIME
     if (race_t6_active() && race_t6_unit_burrowed((int)(q - u))) return;
 #endif
-#ifdef SC64_T4_RUNTIME
-    unsigned actor_flags = sc64_race_t4_actor_flags(q->type);
-    if (actor_flags & SC64_T4_ACTOR_HIDDEN) return;
-    if (actor_flags && !(actor_flags & SC64_T4_ACTOR_DRAWABLE)) return;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    unsigned actor_flags = sc64_game_unit_actor_flags(q->type);
+    if (actor_flags & SC64_GAME_ACTOR_HIDDEN) return;
+    if (actor_flags && !(actor_flags & SC64_GAME_ACTOR_DRAWABLE)) return;
 #endif
 #ifdef SC64_HAS_SPRITES
 #ifdef SC64_T5_RUNTIME
@@ -4525,8 +4778,8 @@ draw_unit(Unit * q)
 	gfx_pixel(x + 4, y - 3, C_PURPLE);
     }
     }
-#ifdef SC64_T4_RUNTIME
-    if (!(actor_flags & SC64_T4_ACTOR_INVINCIBLE))
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    if (!(actor_flags & SC64_GAME_ACTOR_INVINCIBLE))
 #endif
 	    gfx_bar(x - 6, sprite_y - 4, 12, 2, q->hp, q->maxhp,
 	    owner_color(q->owner), C_RED_DARK);
@@ -4585,9 +4838,9 @@ draw_minimap(void)
 	if (b[i].owner != SIDE &&
 	    (b[i].x < 0 || b[i].y < 0 || b[i].x >= WORLD_W || b[i].y >= WORLD_H ||
 	     !currently_visible(b[i].x, b[i].y))) continue;
-#ifdef SC64_T4_RUNTIME
-        if (sc64_race_t4_building_flags(b[i].type) &&
-            !(sc64_race_t4_building_flags(b[i].type) & SC64_T4_ACTOR_DRAWABLE)) continue;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+        if (sc64_game_building_actor_flags(b[i].type) &&
+            !(sc64_game_building_actor_flags(b[i].type) & SC64_GAME_ACTOR_DRAWABLE)) continue;
 #endif
 #ifdef SC64_IMPORTED_MISSION
 	    x = map_x +
@@ -4625,8 +4878,10 @@ draw_minimap(void)
 #ifdef SC64_T6_RUNTIME
         if (race_t6_unit_burrowed(i)) continue;
 #endif
-#ifdef SC64_T4_RUNTIME
-        if (sc64_race_t4_actor_flags(u[i].type) & SC64_T4_ACTOR_HIDDEN) continue;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+        if (sc64_game_unit_has_flag(u[i].type, SC64_GAME_ACTOR_HIDDEN) ||
+            (sc64_game_unit_actor_flags(u[i].type) &&
+             !(sc64_game_unit_actor_flags(u[i].type) & SC64_GAME_ACTOR_DRAWABLE))) continue;
 #endif
 #ifdef SC64_IMPORTED_MISSION
 	    x = map_x +
@@ -4707,9 +4962,9 @@ draw_minimap(void)
 static void
 draw_building_art(Building *q)
 {
-#ifdef SC64_T4_RUNTIME
-    if (sc64_race_t4_building_flags(q->type) &&
-        !(sc64_race_t4_building_flags(q->type)&SC64_T4_ACTOR_DRAWABLE)) return;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    if (sc64_game_building_actor_flags(q->type) &&
+        !(sc64_game_building_actor_flags(q->type)&SC64_GAME_ACTOR_DRAWABLE)) return;
 #endif
     int x = q->x - camx, y = q->y - camy + 12;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
@@ -4770,8 +5025,8 @@ static void
 draw_building_overlay(Building *q)
 {
     int x = q->x - camx, y = q->y - camy + 12;
-#ifdef SC64_T4_RUNTIME
-    if (sc64_race_t4_building_flags(q->type)&SC64_T4_ACTOR_INVINCIBLE) return;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    if (sc64_game_building_has_flag(q->type, SC64_GAME_ACTOR_INVINCIBLE)) return;
 #endif
     if (x < -20 || x > 260 || y < 2 || y > 130)
         return;
@@ -5048,9 +5303,19 @@ draw_map(void)
     }
     if (menu_open) {
 	#ifdef SC64_RACES
-        static const char *race_labels[3][MENU_STOP + 1]={
+        static const char *race_labels[3][
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+            MENU_COUNT
+#else
+            MENU_STOP + 1
+#endif
+        ]={
             {"MOVE ORDER","ATTACK MOVE","BARRACKS","SUPPLY DEPOT","REFINERY","ACADEMY","ENGINEERING BAY","WEAPONS","ARMOR","STOP / HOLD"},
-            {"MOVE ORDER","ATTACK MOVE","SPAWNING POOL","HATCHERY","EXTRACTOR","HYDRALISK DEN","EVOLUTION","WEAPONS","ARMOR","STOP / HOLD"},
+            {"MOVE ORDER","ATTACK MOVE","SPAWNING POOL","HATCHERY","EXTRACTOR","HYDRALISK DEN","EVOLUTION","WEAPONS","ARMOR","STOP / HOLD"
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+             ,"UPGRADE TO LAIR","SPIRE"
+#endif
+            },
             {"MOVE ORDER","ATTACK MOVE","GATEWAY","PYLON","ASSIMILATOR","CYBERNETICS","FORGE","WEAPONS","ARMOR","STOP / HOLD"}};
         const char **labels=race_labels[race_human];
 #else
@@ -5076,6 +5341,12 @@ draw_map(void)
                 advanced_labels[i - MENU_FACTORY] : labels[i];
 	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
 	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
+	}
+#elif defined(SC64_ZP_CAMPAIGN_STORAGE)
+        int first = menu_cursor >= 10 ? menu_cursor - 9 : 0;
+	for (i = first; i < field_menu_count() && i < first + 10; ++i) {
+	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
+	    gfx_text(149, 17 + (i - first) * 9, labels[i], i == menu_cursor ? C_WHITE : C_DIM);
 	}
 #else
 	for (i = 0; i < MENU_COUNT; i++) {
@@ -5330,9 +5601,23 @@ draw_hud_commands(void)
         else if(race_selected_mission==14)
             gfx_text(5,149,race_z3.sequence?"CHRYSALIS / MISSION REPORT":"PROTECT CHRYSALIS / CLEAR TERRAN",C_GOLD);
 #endif
+#ifdef SC64_Z4_RUNTIME
+        else if (race_selected_mission == 15) {
+            unsigned seconds = race_z4_hud_seconds();
+            char timer[6] = {(char)('0' + seconds / 600u),
+                (char)('0' + seconds / 60u % 10u), ':',
+                (char)('0' + seconds / 10u % 6u), (char)('0' + seconds % 10u), 0};
+            gfx_text(5, 149, "PROTECT / CLEAR COMMAND CENTERS", C_GOLD);
+            gfx_text(194, 149, timer, C_WHITE);
+        }
+#endif
 #ifdef SC64_P3_RUNTIME
         else if(race_selected_mission==SC64_P3_GLOBAL_ID)
             gfx_text(5,149,race_p3.sequence?"HIGHER GROUND / MISSION REPORT":"DESTROY BOTH ZERG COLONIES",C_GOLD);
+#endif
+#ifdef SC64_P4_RUNTIME
+        else if (race_selected_mission == SC64_P4_GLOBAL_ID)
+            gfx_text(5, 149, "RESCUE HEROES / REACH EXTRACTION", C_GOLD);
 #endif
 #endif
         if(race_selected_mission==3&&race_campaign.elapsed_frames<27000u) {
@@ -5382,7 +5667,7 @@ static u8 sc64_hud_buffer_dirty[2];
 static u32 sc64_hud_buffer_clear_generation[2];
 #endif
 
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 /* Keep the expanded actor loop and target search in IWRAM. This once-per-
  * render HUD invalidation pass can execute from ROM without using its stack
  * reserve. Its timing impact is measured with the late-profile replay. */
@@ -5411,6 +5696,10 @@ sc64_hud_changed(void)
     values[18] = box_state == 2;
 #ifdef SC64_RACES
     values[19]=race_campaign.phase;values[20]=race_campaign.message;
+#ifdef SC64_Z4_RUNTIME
+    if (!race_mode && race_selected_mission == 15)
+        values[20] |= (int)race_z4_hud_seconds() << 8;
+#endif
 #ifdef SC64_P3_RUNTIME
     if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID)
         values[20] |= (int)race_p3.sequence << 8;

@@ -33,6 +33,11 @@ enum {
     U_SCIENCE_VESSEL, U_BATTLECRUISER, U_NORAD_II, U_ULTRALISK, U_SHUTTLE,
     U_PSI_EMITTER,
 #endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    /* Expanded Zerg/Protoss campaign identities; independent of Terran gates. */
+    U_ZP_INFESTED_KERRIGAN, U_ZP_MAP_REVEALER, U_ZP_RAYNOR_VULTURE,
+    U_ZP_HIGH_TEMPLAR, U_ZP_ULTRALISK,
+#endif
     SC_RU_COUNT
 };
 enum {
@@ -66,6 +71,10 @@ enum {
     B_SHIELD_BATTERY, B_SPECIAL_ION_CANNON,
     B_SCIENCE_FACILITY, B_PHYSICS_LAB,
 #endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    B_ZP_CONTROL_TOWER, B_ZP_MACHINE_SHOP, B_ZP_ARMORY,
+    B_ZP_QUEENS_NEST, B_ZP_ULTRALISK_CAVERN, B_ZP_PROTOSS_BEACON,
+#endif
     SC_RB_COUNT
 };
 
@@ -73,6 +82,9 @@ enum {
 static inline int sc64_race_raw_unit(int type);
 static inline int sc64_race_raw_building(int type);
 #include "sc64_terran_late_actor_rules.h"
+#endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+#include "sc64_zp_actor_rules.h"
 #endif
 
 enum {
@@ -91,6 +103,9 @@ enum {
     SC_PR_GATEWAY = 1u << 4, SC_PR_CYBERNETICS_CORE = 1u << 5,
     SC_PR_PYLON = 1u << 6, SC_PR_FORGE = 1u << 7,
     SC_PR_DEPOT = 1u << 8, SC_PR_BARRACKS = 1u << 9
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    , SC_PR_SPIRE = 1u << 12, SC_PR_LAIR = 1u << 13
+#endif
 #ifdef SC64_T5_RUNTIME
     , SC_PR_FACTORY = 1u << 10, SC_PR_CONTROL_TOWER = 1u << 11
 #endif
@@ -132,7 +147,13 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     [U_GOLIATH]   = { R_TER, 0, B_FACTORY, 4, 100, 50, 600, 125, 0, 0 },
     [U_TANK]      = { R_TER, 0, B_FACTORY, 4, 150, 100, 750, 150, 0, 0 },
     [U_WRAITH]    = { R_TER, 0, B_STARPORT, 4, 150, 100, 900, 120, 0, 0 },
-    [U_MUTALISK]  = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 4, 100, 100, 600, 120, 0, SC_PR_SPAWNING_POOL },
+    [U_MUTALISK]  = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 4, 100, 100, 600, 120, 0,
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+        SC_PR_SPIRE
+#else
+        SC_PR_SPAWNING_POOL
+#endif
+    },
     [U_HUNTER_KILLER] = { R_ZERG, 0, B_HATCHERY, 0, 150, 50, 780, 160, 0, SC_PR_HYDRALISK_DEN },
     [U_REAVER] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_ROBOTICS_FACILITY, 8, 200, 100, 1050, 100, 80, 0 },
     [U_FENIX_DRAGOON] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 0, 300, 100, 1500, 240, 240, 0 },
@@ -177,6 +198,13 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     , [U_SHUTTLE] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 4, 200, 0, 900, 80, 60, 0 }
     , [U_PSI_EMITTER] = { R_TER, 0, 255, 0, 1, 1, 1, 800, 0, 0 }
 #endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    , [U_ZP_INFESTED_KERRIGAN] = { R_ZERG, 0, 255, 0, 0, 0, 0, 400, 0, 0 }
+    , [U_ZP_MAP_REVEALER] = { R_TER, 0, 255, 0, 0, 0, 0, 1, 0, 0 }
+    , [U_ZP_RAYNOR_VULTURE] = { R_TER, 0, 255, 0, 0, 0, 0, 300, 0, 0 }
+    , [U_ZP_HIGH_TEMPLAR] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 0, 0, 0, 0, 40, 40, 0 }
+    , [U_ZP_ULTRALISK] = { R_ZERG, 0, 255, 0, 0, 0, 0, 400, 0, 0 }
+#endif
 };
 
 static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
@@ -202,7 +230,13 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     [B_PHOTON_CANNON] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_REQUIRES_POWER, U_PROBE, 0, 150, 0, 750, 100, SC_PR_FORGE | SC_PR_PYLON },
     [B_CREEP_COLONY] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_CONSUMES_WORKER, U_DRONE, 0, 75, 0, 300, 400, SC_PR_HATCHERY },
     [B_SUNKEN_COLONY] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 50, 0, 300, 300, SC_PR_SPAWNING_POOL },
-    [B_SPIRE] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_CONSUMES_WORKER, U_DRONE, 0, 200, 150, 1800, 600, SC_PR_SPAWNING_POOL },
+    [B_SPIRE] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_CONSUMES_WORKER, U_DRONE, 0, 200, 150, 1800, 600,
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+        SC_PR_LAIR
+#else
+        SC_PR_SPAWNING_POOL
+#endif
+    },
     [B_CEREBRATE] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 0, 0, 0, 1500, 0 },
     [B_LAIR] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_PROVIDES_SUPPLY, U_DRONE, 2, 150, 100, 1500, 1800, SC_PR_SPAWNING_POOL },
     [B_STARGATE] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_REQUIRES_POWER, U_PROBE, 0, 150, 150, 1050, 600, SC_PR_CYBERNETICS_CORE | SC_PR_PYLON },
@@ -269,6 +303,14 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     , [B_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
     , [B_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
 #endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    , [B_ZP_CONTROL_TOWER] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 500, 0 }
+    , [B_ZP_MACHINE_SHOP] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 750, 0 }
+    , [B_ZP_ARMORY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 50, 1200, 750, 0 }
+    , [B_ZP_QUEENS_NEST] = { R_ZERG, SC_RACE_F_BUILDING, 255, 0, 150, 100, 900, 850, 0 }
+    , [B_ZP_ULTRALISK_CAVERN] = { R_ZERG, SC_RACE_F_BUILDING, 255, 0, 150, 200, 1200, 600, 0 }
+    , [B_ZP_PROTOSS_BEACON] = { R_PROTOSS, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 0, 0 }
+#endif
 };
 
 static inline const Sc64RaceUnitRule *sc64_race_unit_rule(int type)
@@ -305,6 +347,9 @@ static inline const char *sc64_race_unit_name(int type)
 #ifdef SC64_TERRAN_LATE_ACTORS
         ,"SCIENCE VESSEL","BATTLECRUISER","NORAD II","ULTRALISK","SHUTTLE","PSI EMITTER"
 #endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        ,"INFESTED KERRIGAN","MAP REVEALER","RAYNOR VULTURE","HIGH TEMPLAR","ULTRALISK"
+#endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
 }
@@ -334,6 +379,9 @@ static inline const char *sc64_race_building_name(int type)
         "ULTRALISK CAVERN","CITADEL OF ADUN","STASIS CELL PRISON","FLEET BEACON",
         "ROBOTICS SUPPORT BAY","SHIELD BATTERY","SPECIAL ION CANNON",
         "SCIENCE FACILITY","PHYSICS LAB"
+#endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        ,"CONTROL TOWER","MACHINE SHOP","ARMORY","QUEEN'S NEST","ULTRALISK CAVERN","PROTOSS BEACON"
 #endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
@@ -518,7 +566,11 @@ static inline int sc64_race_building_max_hp(int type)
   const Sc64TerranLateActorFact *late = sc64_terran_late_building_fact(type);
   if (late) return late->hp;
 #endif
-  return type == B_TERRAN_BEACON || sc64_race_t4_is_door(type) ? 100000 : r ? r->hp : 0; }
+  return type == B_TERRAN_BEACON || sc64_race_t4_is_door(type)
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+      || type == B_ZP_PROTOSS_BEACON
+#endif
+      ? 100000 : r ? r->hp : 0; }
 /* C-10 Canister Rifle is Concussive, and Terran Infantry Weapons add one
    point per level. This model has no cloak/lockdown/nuke state. */
 enum { SC64_RACE_DAMAGE_NORMAL, SC64_RACE_DAMAGE_CONCUSSIVE };
@@ -607,6 +659,10 @@ static inline int sc64_race_t4_ghost_hp_damage(int raw_target, int raw_damage,
  * retains pixel ranges and simulation-frame cooldowns. */
 static inline int sc64_race_unit_damage(int type)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpActorFact *zp = sc64_zp_actor_fact(type);
+    if (zp) return zp->ground_damage;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_unit_fact(type);
     if (late) return late->ground_damage;
@@ -636,6 +692,10 @@ static inline int sc64_race_unit_damage(int type)
 
 static inline int sc64_race_unit_range(int type)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpActorFact *zp = sc64_zp_actor_fact(type);
+    if (zp) return zp->ground_range;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_unit_fact(type);
     if (late) return late->ground_range;
@@ -665,6 +725,10 @@ static inline int sc64_race_unit_range(int type)
 
 static inline int sc64_race_unit_cooldown(int type)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpActorFact *zp = sc64_zp_actor_fact(type);
+    if (zp) return zp->ground_cooldown;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_unit_fact(type);
     if (late) return late->ground_cooldown;
@@ -692,6 +756,10 @@ static inline int sc64_race_unit_cooldown(int type)
 
 static inline int sc64_race_unit_flying(int type)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpActorFact *zp = sc64_zp_actor_fact(type);
+    if (zp) return zp->flying;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_unit_fact(type);
     if (late) return late->flying;
@@ -708,6 +776,10 @@ static inline int sc64_race_unit_flying(int type)
 static inline int sc64_race_unit_damage(int type);
 static inline int sc64_race_unit_can_attack_air(int type)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpActorFact *zp = sc64_zp_actor_fact(type);
+    if (zp) return zp->air_damage > 0;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_unit_fact(type);
     if (late) return late->air_damage > 0;
@@ -734,6 +806,10 @@ static inline int sc64_race_unit_can_attack_target_class(int type, int flying)
  * expose the number of simultaneous blade hits so armor is applied per hit. */
 static inline int sc64_race_unit_damage_vs(int type, int target_flying)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpActorFact *zp = sc64_zp_actor_fact(type);
+    if (zp) return target_flying ? zp->air_damage : zp->ground_damage;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_unit_fact(type);
     if (late) return target_flying ? late->air_damage : late->ground_damage;
@@ -760,6 +836,10 @@ static inline int sc64_race_unit_damage_vs(int type, int target_flying)
 }
 static inline int sc64_race_unit_range_vs(int type, int target_flying)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpActorFact *zp = sc64_zp_actor_fact(type);
+    if (zp) return target_flying ? zp->air_range : zp->ground_range;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_unit_fact(type);
     if (late) return target_flying ? late->air_range : late->ground_range;
@@ -783,6 +863,10 @@ static inline int sc64_race_unit_range_vs(int type, int target_flying)
 }
 static inline int sc64_race_unit_cooldown_vs(int type, int target_flying)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpActorFact *zp = sc64_zp_actor_fact(type);
+    if (zp) return target_flying ? zp->air_cooldown : zp->ground_cooldown;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_unit_fact(type);
     if (late) return target_flying ? late->air_cooldown : late->ground_cooldown;
@@ -802,6 +886,10 @@ static inline int sc64_race_unit_cooldown_vs(int type, int target_flying)
 }
 static inline int sc64_race_unit_hits_vs(int type, int target_flying)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpActorFact *zp = sc64_zp_actor_fact(type);
+    if (zp) return target_flying ? zp->air_hits : zp->ground_hits;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_unit_fact(type);
     if (late) return target_flying ? late->air_hits : late->ground_hits;
@@ -810,6 +898,10 @@ static inline int sc64_race_unit_hits_vs(int type, int target_flying)
 }
 static inline int sc64_race_unit_armor(int type)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpActorFact *zp = sc64_zp_actor_fact(type);
+    if (zp) return zp->armor;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_unit_fact(type);
     if (late) return late->armor;
@@ -887,8 +979,16 @@ static inline int sc64_race_raw_unit(int type)
 #endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     case U_SCIENCE_VESSEL: return 9; case U_BATTLECRUISER: return 12;
-    case U_NORAD_II: return 29; case U_ULTRALISK: return 39;
+    case U_NORAD_II: return 29;
+#ifndef SC64_ZP_CAMPAIGN_ACTORS
+    case U_ULTRALISK: return 39;
+#endif
     case U_SHUTTLE: return 69; case U_PSI_EMITTER: return 217;
+#endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    case U_ZP_INFESTED_KERRIGAN: return 51; case U_ZP_MAP_REVEALER: return 101;
+    case U_ZP_RAYNOR_VULTURE: return 19; case U_ZP_HIGH_TEMPLAR: return 67;
+    case U_ZP_ULTRALISK: return 39;
 #endif
     default: return -1;
     }
@@ -911,7 +1011,7 @@ static inline int sc64_race_raw_building(int type)
     case B_PHOTON_CANNON: return 162; case B_CYBERNETICS_CORE: return 164;
     case B_FORGE: return 166; case B_STARGATE: return 167; case B_FACTORY: return 113;
     case B_STARPORT: return 114; case B_MISSILE_TURRET: return 124; case B_ZERG_BEACON: return 194;
-#ifdef SC64_T5_RUNTIME
+#if defined(SC64_T5_RUNTIME) && !defined(SC64_ZP_CAMPAIGN_ACTORS)
     case B_CONTROL_TOWER: return 115;
 #endif
 #ifdef SC64_T6_ENABLED
@@ -920,12 +1020,20 @@ static inline int sc64_race_raw_building(int type)
 #endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     case B_NUCLEAR_SILO: return 108; case B_COVERT_OPS: return 117;
+    case B_DEFILER_MOUND: return 136;
+#ifndef SC64_ZP_CAMPAIGN_ACTORS
     case B_MACHINE_SHOP: return 120; case B_ARMORY: return 123;
-    case B_DEFILER_MOUND: return 136; case B_ULTRALISK_CAVERN: return 140;
+    case B_ULTRALISK_CAVERN: return 140;
+#endif
     case B_CITADEL_ADUN: return 163; case B_STASIS_CELL_PRISON: return 168;
     case B_FLEET_BEACON: return 169; case B_ROBOTICS_SUPPORT_BAY: return 171;
     case B_SHIELD_BATTERY: return 172; case B_SPECIAL_ION_CANNON: return 127;
     case B_SCIENCE_FACILITY: return 116; case B_PHYSICS_LAB: return 118;
+#endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    case B_ZP_CONTROL_TOWER: return 115; case B_ZP_MACHINE_SHOP: return 120;
+    case B_ZP_ARMORY: return 123; case B_ZP_QUEENS_NEST: return 138;
+    case B_ZP_ULTRALISK_CAVERN: return 140; case B_ZP_PROTOSS_BEACON: return 196;
 #endif
 #ifdef SC64_T4_RUNTIME
     case B_TERRAN_BEACON: return 195;
@@ -951,7 +1059,9 @@ static inline int sc64_race_unit_from_raw(int raw)
 #else
     case 20: return U_RAYNOR;
 #endif
-#if defined(SC64_UNIFIED) || defined(SC64_T5_RUNTIME)
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    case 19: return U_ZP_RAYNOR_VULTURE;
+#elif defined(SC64_UNIFIED) || defined(SC64_T5_RUNTIME)
     case 19:
 #ifdef SC64_T5_RUNTIME
         return U_RAYNOR_VULTURE;
@@ -976,14 +1086,26 @@ static inline int sc64_race_unit_from_raw(int raw)
 #ifdef SC64_T4_RUNTIME
     case 1: return U_GHOST; case 15: return U_CIVILIAN;
     case 89: return U_RHYNADON; case 95: return U_RAGNASAUR;
-    case 101: return U_MAP_REVEALER; case 218: return U_DATA_DISK;
+#ifndef SC64_ZP_CAMPAIGN_ACTORS
+    case 101: return U_MAP_REVEALER;
+#endif
+    case 218: return U_DATA_DISK;
 #endif
 #ifdef SC64_T5_RUNTIME
     case 13: return U_SPIDER_MINE; case 16: return U_KERRIGAN;
 #endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    case 51: return U_ZP_INFESTED_KERRIGAN;
+    case 67: return U_ZP_HIGH_TEMPLAR;
+    case 101: return U_ZP_MAP_REVEALER;
+    case 39: return U_ZP_ULTRALISK;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     case 9: return U_SCIENCE_VESSEL; case 12: return U_BATTLECRUISER;
-    case 29: return U_NORAD_II; case 39: return U_ULTRALISK;
+    case 29: return U_NORAD_II;
+#ifndef SC64_ZP_CAMPAIGN_ACTORS
+    case 39: return U_ULTRALISK;
+#endif
     case 69: return U_SHUTTLE; case 217: return U_PSI_EMITTER;
 #endif
     default: return -1;
@@ -1021,17 +1143,30 @@ static inline int sc64_race_building_from_raw(int raw)
     case 208: return B_RIGHT_PIT_DOOR; case 209: return B_FLOOR_GUN_TRAP;
     case 211: return B_WALL_FLAME_TRAP; case 212: return B_RIGHT_WALL_MISSILE_TRAP;
 #endif
-#ifdef SC64_T5_RUNTIME
+#if defined(SC64_T5_RUNTIME) && !defined(SC64_ZP_CAMPAIGN_ACTORS)
     case 115: return B_CONTROL_TOWER;
 #endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    case 115: return B_ZP_CONTROL_TOWER;
+    case 120: return B_ZP_MACHINE_SHOP; case 123: return B_ZP_ARMORY;
+    case 138: return B_ZP_QUEENS_NEST; case 140: return B_ZP_ULTRALISK_CAVERN;
+    case 196: return B_ZP_PROTOSS_BEACON;
+#endif
 #ifdef SC64_T6_ENABLED
+#ifndef SC64_ZP_CAMPAIGN_ACTORS
     case SC64_T6_CRASHED_NORAD_RAW: return B_CRASHED_NORAD_II;
     case SC64_T6_QUEENS_NEST_RAW: return B_QUEENS_NEST;
 #endif
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     case 108: return B_NUCLEAR_SILO; case 117: return B_COVERT_OPS;
+#ifndef SC64_ZP_CAMPAIGN_ACTORS
     case 120: return B_MACHINE_SHOP; case 123: return B_ARMORY;
-    case 136: return B_DEFILER_MOUND; case 140: return B_ULTRALISK_CAVERN;
+#endif
+    case 136: return B_DEFILER_MOUND;
+#ifndef SC64_ZP_CAMPAIGN_ACTORS
+    case 140: return B_ULTRALISK_CAVERN;
+#endif
     case 163: return B_CITADEL_ADUN; case 168: return B_STASIS_CELL_PRISON;
     case 169: return B_FLEET_BEACON; case 171: return B_ROBOTICS_SUPPORT_BAY;
     case 172: return B_SHIELD_BATTERY; case 127: return B_SPECIAL_ION_CANNON;

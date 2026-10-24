@@ -6,10 +6,10 @@
 #define RACE_UNIT_WORDS (sizeof(Unit)/sizeof(int))
 #define RACE_BUILD_WORDS (sizeof(Building)/sizeof(int))
 
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #include "sc64_compact_building_save.h"
 #endif
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #include "sc64_compact_unit_save.h"
 _Static_assert(SC_RU_COUNT <= 64, "late Terran unit codec uses six-bit types");
 #endif
@@ -55,12 +55,12 @@ _Static_assert(sizeof(Sc64T5SaveState) == 764, "compact T5 save state budget");
 
 typedef struct {
     u32 version;
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     Sc64PackedUnitSave units[MAX_UNITS];
 #else
     s16 units[MAX_UNITS][RACE_UNIT_WORDS];
 #endif
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     Sc64PackedBuildingSave buildings[MAX_BUILDINGS];
 #else
     s16 buildings[MAX_BUILDINGS][RACE_BUILD_WORDS];
@@ -85,6 +85,12 @@ typedef struct {
 #if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     Sc64P3State p3;
     u16 p3_action_ticks;
+#endif
+#ifdef SC64_Z4_RUNTIME
+    Sc64Z4RuntimeState z4;
+#endif
+#ifdef SC64_P4_RUNTIME
+    Sc64P4RuntimeState p4;
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)

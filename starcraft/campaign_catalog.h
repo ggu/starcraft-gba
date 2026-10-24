@@ -120,7 +120,13 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
      0,
 #endif
      "THE NEW DOMINION"},
-    {15, SC64_FACTION_ZERG, 4, 0, "AGENT OF THE SWARM"},
+    {15, SC64_FACTION_ZERG, 4,
+#if defined(SC64_Z4_CAMPAIGN_ENTRY) && defined(SC64_Z4_RUNTIME) && defined(SC64_Z4_ENABLED) && defined(SC64_UNIFIED)
+     1,
+#else
+     0,
+#endif
+     "AGENT OF THE SWARM"},
     {16, SC64_FACTION_ZERG, 5, 0, "THE AMERIGO"},
     {17, SC64_FACTION_ZERG, 6, 0, "THE DARK TEMPLAR"},
     {18, SC64_FACTION_ZERG, 7, 0, "THE CULLING"},
@@ -134,7 +140,13 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
      0,
 #endif
      "HIGHER GROUND"},
-    {23, SC64_FACTION_PROTOSS, 4, 0, "THE HUNT FOR TASSADAR"},
+    {23, SC64_FACTION_PROTOSS, 4,
+#if defined(SC64_P4_CAMPAIGN_ENTRY) && defined(SC64_P4_RUNTIME) && defined(SC64_P4_ENABLED) && defined(SC64_UNIFIED)
+     1,
+#else
+     0,
+#endif
+     "THE HUNT FOR TASSADAR"},
     {24, SC64_FACTION_PROTOSS, 5, 0, "CHOOSING SIDES"},
     {25, SC64_FACTION_PROTOSS, 6, 0, "INTO THE DARKNESS"},
     {26, SC64_FACTION_PROTOSS, 7, 0, "HOMELAND"},

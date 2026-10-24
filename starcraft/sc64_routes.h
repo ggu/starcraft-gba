@@ -21,7 +21,7 @@
 #error "SC64_T4_RUNTIME requires large packed race routes"
 #endif
 #ifdef SC64_RACES
-#ifdef SC64_T4_RUNTIME
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define SC64_ROUTE_SLOTS 14
 #elif defined(SC64_LARGE_MAPS)
 #ifdef SC64_ROUTE_PACK3

@@ -93,6 +93,14 @@ LATE_BUILDING_IDS = {
     'robotics_support_bay': 171, 'shield_battery': 172,
     'science_facility': 116, 'physics_lab': 118,
 }
+# Authenticated scenario actors that are not part of the standard roster.
+# Raw 101 is intentionally represented as invisible mode, never extracted art.
+ZP_UNIT_IDS = {'infested_kerrigan': 51, 'raynor_vulture_zp': 19,
+               'tassadar_hero_zp': 79}
+ZP_BUILDING_IDS = {'control_tower_zp': 115, 'machine_shop_zp': 120,
+                   'armory_zp': 123, 'queens_nest_zp': 138,
+                   'ultralisk_cavern_zp': 140, 'protoss_beacon_zp': 196}
+ZP_INVISIBLE_RAW_TYPES = (101,)
 
 
 def asset_manifest_sha256(assets: list[dict]) -> str:
@@ -123,7 +131,9 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
                  t4_building_selected: list[dict] | None = None,
                  t6_selected: list[dict] | None = None,
                  late_selected: list[dict] | None = None,
-                 late_building_selected: list[dict] | None = None) -> None:
+                 late_building_selected: list[dict] | None = None,
+                 zp_selected: list[dict] | None = None,
+                 zp_building_selected: list[dict] | None = None) -> None:
     lines = [
         '/* Generated from the verified USA ROM; private local asset. */',
         '#ifndef SC64_RACE_SPRITES_GENERATED_H',
@@ -178,6 +188,17 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
             for frame_index, frame in enumerate(item['frames']):
                 append_asset({'name': f'{item["name"]}_frame_{frame_index}', 'frame': frame})
         lines.append('#endif /* SC64_TERRAN_LATE_ENABLED */')
+    if zp_selected or zp_building_selected:
+        lines.append('#ifdef SC64_ZP_CAMPAIGN_ACTORS')
+        if ({item['name'] for item in (zp_selected or [])} == set(ZP_UNIT_IDS) and
+                {item['name'] for item in (zp_building_selected or [])} == set(ZP_BUILDING_IDS)):
+            lines.append('#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1')
+        for item in (zp_selected or []):
+            append_asset(item)
+        for item in (zp_building_selected or []):
+            for frame_index, frame in enumerate(item['frames']):
+                append_asset({'name': f'{item["name"]}_frame_{frame_index}', 'frame': frame})
+        lines.append('#endif /* SC64_ZP_CAMPAIGN_ACTORS */')
     lines += ['static inline const Sc64SpriteFrame *sc64_race_unit_sprite(unsigned short raw_type) {',
               '    switch (raw_type) {']
     seen = set()
@@ -201,6 +222,14 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
         for item in late_selected:
             lines.append(f'    case {LATE_UNIT_IDS[item["name"]]}: return &sc64_race_sprite_{item["name"]};')
         lines.append('#endif /* SC64_TERRAN_LATE_ENABLED */')
+    if zp_selected:
+        lines.append('#ifdef SC64_ZP_CAMPAIGN_ACTORS')
+        for item in zp_selected:
+            raw_type = ZP_UNIT_IDS[item['name']]
+            if raw_type == 19 and t6_selected:
+                continue  # The T6 helper already emits raw 19 when both sets are compiled.
+            lines.append(f'    case {raw_type}: return &sc64_race_sprite_{item["name"]};')
+        lines.append('#endif /* SC64_ZP_CAMPAIGN_ACTORS */')
     lines += ['    default: return (const Sc64SpriteFrame *)0;', '    }', '}', '#endif']
     if t4_selected:
         # A null sprite means "use the generic fallback" in game.c, so it
@@ -216,19 +245,33 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
             '}',
             '#endif /* SC64_T4_ENABLED */',
         ]
-    if t4_building_selected or late_building_selected:
+    if zp_selected:
+        lines[-1:-1] = [
+            '#ifdef SC64_ZP_CAMPAIGN_ACTORS',
+            'static inline unsigned char sc64_zp_unit_sprite_mode(unsigned short raw_type) {',
+            '    switch (raw_type) {',
+            '    case 101: return 2; /* map revealer has no source-visible sprite */',
+            '    default: return sc64_race_unit_sprite(raw_type) ? 1 : 0;',
+            '    }', '}',
+            '#endif /* SC64_ZP_CAMPAIGN_ACTORS */',
+        ]
+    if t4_building_selected or late_building_selected or zp_building_selected:
         # Keep the frame index a raw source-GRP index. IScript-to-state
         # selection is intentionally left to the runtime trigger adapter.
         at = len(lines) - 1
-        helper = ['#ifdef SC64_T4_ENABLED',
+        helper = ['#if defined(SC64_T4_ENABLED) || defined(SC64_TERRAN_LATE_ENABLED) || defined(SC64_ZP_CAMPAIGN_ACTORS)',
                   'static inline const Sc64SpriteFrame *sc64_race_building_sprite(unsigned short raw_type, unsigned short frame_index) {',
                   '    switch (raw_type) {']
-        for item in t4_building_selected:
+        if t4_building_selected:
+            helper.append('#ifdef SC64_T4_ENABLED')
+        for item in (t4_building_selected or []):
             helper += [f'    case {T4_BUILDING_IDS[item["name"]]}:',
                        '        switch (frame_index) {']
             for frame_index in range(len(item['frames'])):
                 helper.append(f'        case {frame_index}: return &sc64_race_sprite_{item["name"]}_frame_{frame_index};')
             helper += ['        default: return (const Sc64SpriteFrame *)0;', '        }']
+        if t4_building_selected:
+            helper.append('#endif /* SC64_T4_ENABLED */')
         if late_building_selected:
             helper += ['#ifdef SC64_TERRAN_LATE_ENABLED']
             for item in late_building_selected:
@@ -238,7 +281,15 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
                     helper.append(f'        case {frame_index}: return &sc64_race_sprite_{item["name"]}_frame_{frame_index};')
                 helper += ['        default: return (const Sc64SpriteFrame *)0;', '        }']
             helper += ['#endif /* SC64_TERRAN_LATE_ENABLED */']
-        helper += ['    default: return (const Sc64SpriteFrame *)0;', '    }', '}', '#endif /* SC64_T4_ENABLED */']
+        if zp_building_selected:
+            helper += ['#ifdef SC64_ZP_CAMPAIGN_ACTORS']
+            for item in zp_building_selected:
+                helper += [f'    case {ZP_BUILDING_IDS[item["name"]]}:', '        switch (frame_index) {']
+                for frame_index in range(len(item['frames'])):
+                    helper.append(f'        case {frame_index}: return &sc64_race_sprite_{item["name"]}_frame_{frame_index};')
+                helper += ['        default: return (const Sc64SpriteFrame *)0;', '        }']
+            helper += ['#endif /* SC64_ZP_CAMPAIGN_ACTORS */']
+        helper += ['    default: return (const Sc64SpriteFrame *)0;', '    }', '}', '#endif']
         lines[at:at] = helper
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text('\n'.join(lines) + '\n', encoding='ascii')
@@ -246,7 +297,8 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
 
 def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
              remap_path: Path = PALETTE_REMAP, include_t4: bool = True,
-             include_t6: bool = False, include_late: bool = False) -> dict:
+             include_t6: bool = False, include_late: bool = False,
+             include_zp: bool = False) -> dict:
     raw = rom.read_bytes()
     extractor = base.load_extractor(base.UPSTREAM)
     normalized = extractor.load_rom(str(rom))
@@ -265,10 +317,13 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
         raise ValueError('late Terran sprites require the combined T4/T6 sprite sets')
     late_refs = base.resolve_grp_indices(archive, LATE_UNIT_IDS) if include_late else {}
     late_building_refs = base.resolve_grp_indices(archive, LATE_BUILDING_IDS) if include_late else {}
+    zp_refs = base.resolve_grp_indices(archive, ZP_UNIT_IDS) if include_zp else {}
+    zp_building_refs = base.resolve_grp_indices(archive, ZP_BUILDING_IDS) if include_zp else {}
     palette = base.decode_rgba5551_palette(base._entry_payload(archive, '00B/004'))
     entries = {entry.path: entry for entry in archive.entries()}
     selected, t4_selected, t4_building_selected, t6_selected = [], [], [], []
     late_selected, late_building_selected, manifest_assets = [], [], []
+    zp_selected, zp_building_selected = [], []
     out.mkdir(parents=True, exist_ok=True)
     def load_asset(name, ref, target):
         grp_data = archive.read(entries[ref['bolt_path']])
@@ -329,8 +384,27 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
     if include_late and (set(late_refs) != set(LATE_UNIT_IDS) or
                          set(late_building_refs) != set(LATE_BUILDING_IDS)):
         raise ValueError('late Terran source GRPs did not resolve completely')
+    for name, ref in zp_refs.items():
+        load_asset(name, ref, zp_selected)
+    for name, ref in zp_building_refs.items():
+        grp_data = archive.read(entries[ref['bolt_path']])
+        grp = base.parse_grp(grp_data)
+        if not grp['frames']:
+            raise ValueError(f'Z/P scenario building raw {ref["unit_id"]} has an empty GRP')
+        frames = grp['frames']
+        preview = out / f'{name}.png'
+        base.encode_png(preview, grp['width'], grp['height'], base.render_frame(frames[0], palette))
+        zp_building_selected.append({'name': name, 'frames': frames})
+        manifest_assets.append({'name': name, **ref, 'sha1': hashlib.sha1(grp_data).hexdigest(),
+                                'frame_count': len(frames), 'canvas': [grp['width'], grp['height']],
+                                'selected_frame': 'all-source-frames',
+                                'frame_rect': [frames[0]['x'], frames[0]['y'], frames[0]['frame_width'], frames[0]['frame_height']],
+                                'opaque_pixels': sum(frames[0]['alpha']), 'preview': preview.name})
+    if include_zp and (set(zp_refs) != set(ZP_UNIT_IDS) or set(zp_building_refs) != set(ZP_BUILDING_IDS)):
+        raise ValueError('Z/P campaign actor source GRPs did not resolve completely')
     write_header(header, selected, remap, t4_selected, t4_building_selected,
-                 t6_selected, late_selected, late_building_selected)
+                 t6_selected, late_selected, late_building_selected,
+                 zp_selected, zp_building_selected)
     mapped_raw_types = set(RACE_UNIT_IDS.values()) | set(T4_UNIT_IDS.values()) | set(T4_BUILDING_IDS.values())
     actual_sprite_raw_types = ({int(ref['unit_id']) for ref in refs.values()} |
                                {int(ref['unit_id']) for ref in t4_refs.values()})
@@ -367,6 +441,12 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
         report['late_terran_raw_building_ids'] = LATE_BUILDING_IDS
         report['late_terran_assets_manifest_sha256'] = asset_manifest_sha256(
             manifest_assets[legacy_asset_count + len(t6_selected):])
+    if include_zp:
+        report['zp_campaign_raw_unit_ids'] = ZP_UNIT_IDS
+        report['zp_campaign_raw_building_ids'] = ZP_BUILDING_IDS
+        report['zp_campaign_invisible_raw_types'] = list(ZP_INVISIBLE_RAW_TYPES)
+        report['zp_campaign_assets_manifest_sha256'] = asset_manifest_sha256(
+            manifest_assets[legacy_asset_count + len(t6_selected) + len(late_selected) + len(late_building_selected):])
     (out / 'manifest.json').write_text(json.dumps(report, indent=2) + '\n')
     return report
 
@@ -383,11 +463,14 @@ def main() -> int:
                         help='include SC64_T6_ENABLED-gated Norad, Raynor and Control Tower source sprites')
     parser.add_argument('--include-late-terran', action='store_true',
                         help='include SC64_TERRAN_LATE_ENABLED-gated late Terran campaign source sprites')
+    parser.add_argument('--include-zp-campaign-actors', action='store_true',
+                        help='include SC64_ZP_CAMPAIGN_ACTORS-gated Zerg/Protoss campaign actor sprites')
     args = parser.parse_args()
     try:
         report = generate(args.rom, args.out, args.header, args.remap,
                           include_t4=not args.base_only, include_t6=args.include_t6,
-                          include_late=args.include_late_terran)
+                          include_late=args.include_late_terran,
+                          include_zp=args.include_zp_campaign_actors)
     except (OSError, ValueError, RuntimeError, KeyError) as exc:
         print(f'sc64_race_sprites: {exc}', file=sys.stderr)
         return 1

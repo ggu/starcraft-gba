@@ -94,8 +94,15 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
 #ifdef SC64_RACES
     if(IS_WORKER(q->type)&&(q->order==ORDER_MINE||q->order==ORDER_GAS))return 1;
 #endif
-    int minx = (nx - 5) >> 4, maxx = (nx + 5) >> 4;
-    int miny = (ny - 5) >> 4, maxy = (ny + 5) >> 4;
+    /* The audited Z/P roster has a maximum ten-pixel collision radius.
+     * Search every cell that can contain a point strictly inside it. */
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const int reach = 9;
+#else
+    const int reach = 5;
+#endif
+    int minx = (nx - reach) >> 4, maxx = (nx + reach) >> 4;
+    int miny = (ny - reach) >> 4, maxy = (ny + reach) >> 4;
     int row, col;
     if (minx < 0) minx = 0;
     if (miny < 0) miny = 0;
@@ -107,20 +114,27 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
             for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
                  i = sc64_unit_bucket_next[i])
                 if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+                    int mover_radius = sc64_game_unit_collision_radius(q->type);
+                    int candidate_radius = sc64_game_unit_collision_radius(u[i].type);
+                    int radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
+#else
+                    int radius = 6;
+#endif
 #ifdef SC64_RACES
                     if(u[i].type==U_CHRYSALIS||sc64_race_unit_flying(u[i].type)!=sc64_race_unit_flying(q->type))continue;
-#ifdef SC64_T4_RUNTIME
-                    if ((sc64_race_t4_actor_flags(u[i].type) &&
-                         !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_COLLIDABLE)) ||
-                        (sc64_race_t4_actor_flags(q->type) &&
-                         !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_COLLIDABLE))) continue;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+                    if ((sc64_game_unit_actor_flags(u[i].type) &&
+                         !(sc64_game_unit_actor_flags(u[i].type)&SC64_GAME_ACTOR_COLLIDABLE)) ||
+                        (sc64_game_unit_actor_flags(q->type) &&
+                         !(sc64_game_unit_actor_flags(q->type)&SC64_GAME_ACTOR_COLLIDABLE))) continue;
 #endif
 #endif
                     int dx = u[i].x - nx, dy = u[i].y - ny;
-                    if (dx <= -6 || dx >= 6 || dy <= -6 || dy >= 6) continue;
+                    if (dx <= -radius || dx >= radius || dy <= -radius || dy >= radius) continue;
                     dx *= dx;
                     dy *= dy;
-                    if (dx + dy < 36) {
+                    if (dx + dy < radius * radius) {
                         int ox = u[i].x - q->x, oy = u[i].y - q->y;
                         if (dx + dy <= ox * ox + oy * oy) return 0;
                     }

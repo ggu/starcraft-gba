@@ -1917,3 +1917,38 @@ version, without changing live state.
 
 No new campaign mission is enabled by this promotion: the completed count
 remains Terran 10, Zerg 3 and Protoss 3, or 16/30.
+
+### 2026-10-24 — staged Z4/P4 engine foundations
+
+The next-stage source importer retains all remaining Zerg and Protoss CHKs
+and source records in ignored storage, with stable catalog IDs. Numeric
+scenario generators authenticate Z4's seven triggers/66 actions and P4's
+13 triggers/153 actions; they do not copy original dialogue or audio into
+tracked sources. Source retention does not make a mission playable.
+
+The staged Z4 source census is 73 units, 67 buildings, 39 mineral fields and
+two geysers. P4 has 137 units, 33 buildings and 26 mineral fields, with no
+geysers. The raw-196 beacon belongs in the building pool. Source raw-owner
+provenance is retained separately from runtime ownership during contact
+rescue. Hidden map revealers contribute sight while remaining unselectable,
+noncollidable, untargetable and undrawn; the Protoss beacon retains its exact
+100000 HP and intrinsic invincibility.
+
+Real-engine sanitizer fixtures cover the Z4 full 18000-tick countdown and
+hatch handoff, plus pre/mid/post-hatch save round trips and corrupt-state
+rejection. P4 checks its normal-menu launch, contact rescue, source pause,
+all 87 scripted creations, mid-creation saves, and production-slot reserves.
+Their forced victory/death setups are synthetic rule tests, not campaign
+completion. A normal-controller Z4 ground-only attempt reached the hatch
+with Kerrigan alive but could not reach the remaining Command Center;
+there is no win claim for that attempt. The subsequent air-tech controller
+built a Lair and Spire through the ordinary menu, produced Mutalisks, protected
+Kerrigan, and won at frame 71777 / host tick 71936. An independent ASan/UBSan
+run matched all 1217 trace events. ARM replay qualification is still pending;
+the Protoss controller attempt is also still in progress.
+
+The asset-free default build/tests pass, including 217 Python tests, and
+unified build/tests pass. Dedicated actor, storage and Z4 runtime checks
+pass under ASan/UBSan. The stage uses a separate generation-20 save layout,
+retaining the unchanged IWRAM and EWRAM reserve assertions. These results
+are development evidence; the canonical qualified count remains 16/30.

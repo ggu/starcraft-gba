@@ -26,15 +26,40 @@ enum {
 #ifdef SC64_Z3_ENABLED
     ,SC64_RACE_MISSION_Z3 = 14
 #endif
+#ifdef SC64_Z4_RUNTIME
+    ,SC64_RACE_MISSION_Z4 = 15
+#endif
 #ifdef SC64_P3_RUNTIME
     ,SC64_RACE_MISSION_P3 = 22
+#endif
+#ifdef SC64_P4_RUNTIME
+    ,SC64_RACE_MISSION_P4 = 23
 #endif
 #endif
 };
 
+#ifdef SC64_Z4_RUNTIME
+static int race_z4_source_owner(unsigned source_slot);
+#endif
+#ifdef SC64_P4_RUNTIME
+static int race_p4_source_owner(unsigned source_slot);
+#endif
+
 static int
 race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 {
+#ifdef SC64_P4_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_RACE_MISSION_P4) {
+        int owner = raw_owner < 0 ? -1 : race_p4_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
+#ifdef SC64_Z4_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_RACE_MISSION_Z4) {
+        int owner = raw_owner < 0 ? -1 : race_z4_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) return sc64_terran_late_runtime_owner((unsigned)raw_owner);
 #endif
@@ -115,8 +140,44 @@ race_campaign_set_message(int id)
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
 #include "sc64_z3_adapter.h"
 #endif
+#ifdef SC64_Z4_RUNTIME
+#include "sc64_z4_adapter.h"
+static unsigned race_z4_hud_seconds(void)
+{ return (race_z4.countdown_ticks + 29u) / 30u; }
+#endif
 #ifdef SC64_P3_RUNTIME
 #include "sc64_p3_adapter.h"
+#endif
+#ifdef SC64_P4_RUNTIME
+#include "sc64_p4_adapter.h"
+static int race_p4_world_paused(void)
+{ return race_p4_active() && race_p4.source_paused; }
+
+/* Bounded contact rescue keeps source-slot provenance while transferring
+ * control. The 32-pixel GBA radius is an authored compatibility policy. */
+static void race_p4_rescue_tick(void)
+{
+    if (race_p4.source_paused) return;
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == RESCUABLE) {
+        for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
+            u[j].raw_type != 101 && u[j].raw_type != 150) {
+            int dx = u[i].x - u[j].x, dy = u[i].y - u[j].y;
+            if (dx * dx + dy * dy <= 32 * 32) {
+                u[i].owner = SIDE; u[i].selected = 0;
+                u[i].order = ORDER_IDLE; u[i].target = -1;
+                u[i].tx = u[i].x; u[i].ty = u[i].y;
+                break;
+            }
+        }
+    }
+    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == RESCUABLE) {
+        for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
+            u[j].raw_type != 101 && u[j].raw_type != 150) {
+            int dx = b[i].x - u[j].x, dy = b[i].y - u[j].y;
+            if (dx * dx + dy * dy <= 32 * 32) { b[i].owner = SIDE; break; }
+        }
+    }
+}
 #endif
 
 static void
@@ -291,6 +352,28 @@ race_campaign_init(void)
         );
 #endif
     map = &sc64_race_maps[race_selected_mission];
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    /* Validate every retained starting row before touching the live world.
+     * These staged pools are deliberately smaller than later campaign maps. */
+    {
+        unsigned units = 0, buildings = 0, minerals_count = 0, gas_count = 0;
+        int invalid = map->width > 128 || map->height > 128;
+        for (unsigned row = 0; row < map->unit_count; ++row) {
+            const Sc64ImportedUnit *src = &map->units[row];
+            int raw = src->source_type;
+            if (src->x_px >= map->width * 16 || src->y_px >= map->height * 16) invalid = 1;
+            if (raw >= 176 && raw <= 178) ++minerals_count;
+            else if (raw == 188) ++gas_count;
+            else if (sc64_race_unit_from_raw(raw) >= 0) ++units;
+            else if (sc64_race_building_from_raw(raw) >= 0) ++buildings;
+            else invalid = 1;
+        }
+        if (invalid || units > MAX_UNITS || buildings > MAX_BUILDINGS ||
+            minerals_count > MAX_MINERALS || gas_count > 4) {
+            ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+        }
+    }
+#endif
     race_cols = map->width;
     race_rows = map->height;
     race_human = map->owner_races[map->human_slot];
@@ -335,6 +418,12 @@ race_campaign_init(void)
 
     for (i = 0; i < 8; ++i) {
         int owner = map->owner_modes[i];
+#ifdef SC64_Z4_RUNTIME
+        if (race_selected_mission == SC64_RACE_MISSION_Z4) owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_P4_RUNTIME
+        if (race_selected_mission == SC64_RACE_MISSION_P4) owner = race_campaign_owner(map, i);
+#endif
 #ifdef SC64_T4_RUNTIME
         if (race_selected_mission == SC64_T4_GLOBAL_ID)
             owner = race_campaign_owner(map, i);
@@ -384,6 +473,9 @@ race_campaign_init(void)
 #ifdef SC64_UNIFIED
         /* Terran Raynor starts neutral and joins on contact, as in the existing adapter. */
         if(race_selected_mission>=SC64_RACE_MISSION_T1&&raw==19
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+           && race_selected_mission<=13
+#endif
 #ifdef SC64_T5_RUNTIME
            && !race_t5_active()
 #endif
@@ -468,8 +560,14 @@ race_campaign_init(void)
 #ifdef SC64_Z3_ENABLED
     case SC64_RACE_MISSION_Z3: minerals=SC64_Z3_MISSION_ORE;gas=SC64_Z3_MISSION_GAS;break;
 #endif
+#ifdef SC64_Z4_RUNTIME
+    case SC64_RACE_MISSION_Z4: minerals=gas=0;break;
+#endif
 #ifdef SC64_P3_RUNTIME
     case SC64_RACE_MISSION_P3: minerals=SC64_P3_HUMAN_MINERALS;gas=SC64_P3_HUMAN_GAS;break;
+#endif
+#ifdef SC64_P4_RUNTIME
+    case SC64_RACE_MISSION_P4: minerals=gas=0;break;
 #endif
 #endif
     default: minerals = 170; break;
@@ -493,8 +591,18 @@ race_campaign_init(void)
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
     if (race_selected_mission == SC64_RACE_MISSION_Z3) race_z3_init();
 #endif
+#ifdef SC64_Z4_RUNTIME
+    if (race_selected_mission == SC64_RACE_MISSION_Z4 && !race_z4_init()) {
+        screen = SCREEN_PAUSE; toast(14);
+    }
+#endif
 #ifdef SC64_P3_RUNTIME
     if (race_selected_mission == SC64_RACE_MISSION_P3) race_p3_init();
+#endif
+#ifdef SC64_P4_RUNTIME
+    if (race_selected_mission == SC64_RACE_MISSION_P4 && !race_p4_init()) {
+        screen = SCREEN_PAUSE; toast(14);
+    }
 #endif
     race_campaign_assign_mining();
 #ifdef SC64_T4_SCENARIO_RUNTIME
@@ -668,8 +776,21 @@ race_campaign_tick(void)
 #ifdef SC64_Z3_ENABLED
     if(mission==SC64_RACE_MISSION_Z3){race_z3_campaign_tick();return;}
 #endif
+#ifdef SC64_Z4_RUNTIME
+    if (mission == SC64_RACE_MISSION_Z4) {
+        if (!race_z4_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
+        return;
+    }
+#endif
 #ifdef SC64_P3_RUNTIME
     if(mission==SC64_RACE_MISSION_P3){race_p3_campaign_tick();return;}
+#endif
+#ifdef SC64_P4_RUNTIME
+    if (mission == SC64_RACE_MISSION_P4) {
+        race_p4_rescue_tick();
+        if (!race_p4_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
+        return;
+    }
 #endif
     if(mission==SC64_RACE_MISSION_T1||mission==SC64_RACE_MISSION_T2){race_terran_tick();return;}
 #endif
@@ -836,6 +957,12 @@ static int race_campaign_lost(void)
 static const char *
 race_campaign_objective_text(void)
 {
+#ifdef SC64_P4_RUNTIME
+    if (race_p4_active()) return race_p4_objective_text();
+#endif
+#ifdef SC64_Z4_RUNTIME
+    if (race_z4_active()) return race_z4_objective_text();
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) {
         switch (race_campaign.mission) {
@@ -890,6 +1017,12 @@ race_campaign_objective_text(void)
 static const char *
 race_campaign_victory_text(void)
 {
+#ifdef SC64_P4_RUNTIME
+    if (race_p4_active()) return race_p4_victory_text();
+#endif
+#ifdef SC64_Z4_RUNTIME
+    if (race_z4_active()) return race_z4_victory_text();
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) {
         switch (race_campaign.mission) {
@@ -941,6 +1074,12 @@ race_campaign_victory_text(void)
 static const char *
 race_campaign_failure_text(void)
 {
+#ifdef SC64_P4_RUNTIME
+    if (race_p4_active()) return race_p4_failure_text();
+#endif
+#ifdef SC64_Z4_RUNTIME
+    if (race_z4_active()) return race_z4_failure_text();
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) {
         switch (race_campaign.mission) {

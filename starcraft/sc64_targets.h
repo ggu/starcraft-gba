@@ -3,12 +3,12 @@
 
 /* Short-lived 64px spatial index for nearest-enemy queries in update_orders.
  * The default 24x24 grid covers 96x96; SC64_LARGE_MAPS uses 32x24 for
- * 128x96; the T4 storage probe uses 32x32 for 128x128. Entries are compact
- * unified indices: units, then buildings. */
+ * 128x96; T4 and the staged Z/P storage use 32x32 for 128x128. Entries are
+ * compact unified indices: units, then buildings. */
 #define SC64_TARGET_CELL_SIZE 64
-#ifdef SC64_LARGE_MAPS
+#if defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define SC64_TARGET_GRID_COLS 32
-#ifdef SC64_T4_RUNTIME
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define SC64_TARGET_GRID_ROWS 32
 #else
 #define SC64_TARGET_GRID_ROWS 24
@@ -24,7 +24,7 @@
 #define SC64_TARGET_ENTITY_COUNT (MAX_UNITS + MAX_BUILDINGS)
 #define SC64_TARGET_DIRTY_CAPACITY (MAX_UNITS * 2 + MAX_BUILDINGS)
 
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 typedef u16 Sc64TargetIndex;
 #define SC64_TARGET_NONE 0xffffu
 #else

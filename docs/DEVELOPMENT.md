@@ -758,3 +758,58 @@ optimization flags. Protoss uses `SCP3`, generation 7, and the P3 large-map
 geometry and optimization flags. Older standard two-mission generation-2
 saves are incompatible and are rejected. The asset-free default build
 continues to require no imported inputs.
+
+### Staged Zerg and Protoss chapter 4
+
+`zerg-z4` and `protoss-p4` are internal fourth-chapter targets. The canonical
+race outputs above remain the separately qualified three-chapter builds.
+These targets load the complete starting rosters and numeric scenario
+metadata for Agent of the Swarm and The Hunt for Tassadar, using isolated
+private generated headers. Preparing later map data does not enable those
+later missions in the frontend.
+
+After the canonical profile preparation has supplied the common assets,
+prepare the additional ignored inputs from the same verified source ROM:
+
+```sh
+python3 tools/sc64_races_pack.py --rom /path/to/StarCraft64-USA.z64 --out .local/sc64/zp-stage/generated/sc64_races_generated.h
+python3 tools/sc64_race_sprites.py --rom /path/to/StarCraft64-USA.z64 --base-only --include-zp-campaign-actors --out .local/sc64/zp-stage/generated/sprites --header .local/sc64/zp-stage/generated/sc64_race_sprites_generated.h
+python3 tools/sc64_z4_pack.py --rom /path/to/StarCraft64-USA.z64
+python3 tools/sc64_z4_scenario_pack.py
+python3 tools/sc64_p4_pack.py --rom /path/to/StarCraft64-USA.z64
+python3 tools/sc64_p4_scenario_pack.py
+make zerg-z4 protoss-p4
+make test-sc64-z4-runtime test-sc64-p4-runtime test-sc64-zp-storage
+```
+
+Outputs are `build/StarCraft-Zerg-Z4-GBA.gba` and
+`build/StarCraft-Protoss-P4-GBA.gba`, with matching
+`build/starcraft-zerg-z4.elf` and `build/starcraft-protoss-p4.elf` files.
+Use the matching pairs for emulator qualification. All imported data, ROMs,
+saves and graphical captures must remain local and ignored.
+
+The staged layout uses 192 Zerg or 240 Protoss unit slots, 96 buildings,
+48 mineral fields, four geysers, compact save rows and 128×128 geometry.
+Its save generation is 20; older canonical saves are incompatible. Protoss
+production reserves the remaining 87 source-script creations, including
+queued products, instead of allowing those later actors to be dropped.
+These bounds still do not fit every later campaign map; see
+[the remaining-chapter audit](ZP-CAMPAIGN-IMPLEMENTATION.md).
+
+The runtime tests use real engine/menu/update/save paths under sanitizers.
+Their controlled actor deaths, position changes and protected worlds are
+synthetic predicate tests. They do not establish a normal controller win or
+hardware frame rate. The imported opaque AI routines use bounded authored
+pressure policies; text/audio actions use documented presentation holds.
+Original N64 AI, animation, abilities and trigger scheduling are not fully
+reproduced. Controller and ARM qualification remain separate requirements.
+
+The staged Zerg field menu adds **Upgrade to Lair** for a selected, idle
+Hatchery and **Spire** for a selected Drone. Select the completed Hatchery or
+Lair and press **R** to cycle to **Mutalisk**, then **A** to train. The Lair
+requires a Spawning Pool; the Spire requires a completed Lair; Mutalisks
+require a completed Spire. This makes the source-permitted air route
+accessible through ordinary controls. The Lair upgrade uses the existing
+construction policy: its larva timer pauses during the upgrade and completion
+fills its larva count to three. Native equivalence of that timing has not been
+established.

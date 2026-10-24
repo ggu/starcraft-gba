@@ -11,6 +11,15 @@ static int race_can_attack(int attacker,int target) {
            sc64_race_t4_unit_intrinsically_invincible(u[target].type))return 0;
     } else if(sc64_race_t4_building_intrinsically_invincible(b[target-MAX_UNITS].type))return 0;
 #endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    if(target<MAX_UNITS) {
+        unsigned actor = sc64_game_unit_actor_flags(u[target].type);
+        if(actor & SC64_GAME_ACTOR_HIDDEN) return 0;
+    } else {
+        unsigned actor = sc64_game_building_actor_flags(b[target-MAX_UNITS].type);
+        if(actor & SC64_GAME_ACTOR_INVINCIBLE) return 0;
+    }
+#endif
     if(target<MAX_UNITS) {
         if(u[target].flags&16)return 0;
         if(!race_mode&&race_selected_mission==1&&u[target].type==U_CHRYSALIS&&race_campaign.carrier_unit<MAX_UNITS)return 0;
