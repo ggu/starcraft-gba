@@ -3683,3 +3683,35 @@ A 555-file source-only export passes the default build and complete host suite
 and both gate-on/off Z7 colony fixtures also pass. With the gate off,
 original-art and unified ROM bytes remain `4ad80ce0…f9aee` and
 `6bab5be2…79f9` respectively.
+
+### Combined route and collision ARM qualification
+
+The three experimental route policies were also tested together with
+`SC64_COLLISION_FACT_HOIST`, `SC64_ZP_FACT_RANGE_CULL` and
+`SC64_COLLISION_CLASS_CACHE` in the P5 Shuttle bank's P3 expansion route.
+The complete sanitizer host run preserves the frozen winning input trace
+(`321074f1…db01a`) and per-update explicit-field fingerprints
+(`3d766e63…51732`). It is separate from the earlier route-only run.
+
+The combined ARM ROM (`bed9feb7…9bc2f`, ELF `86dd57c3…7340bf`) wins after
+all 124,689 controller inputs at live frame 123,916. All 126 reported
+checkpoints match the frozen baseline after excluding timing, route-cache
+counters and capture metadata. The final source outcome is victory, with
+no enemy buildings and no unsupported actors. Mean live-play performance
+rises from 12.35 to 13.81 effective updates per second, about 11.8% faster.
+This is progress toward the target, without reaching near 30 fps.
+
+Its 12,000-input opening also matches all 13 reported snapshots and the three
+common captures, improving 17.6234 to 17.99 fps. A fresh HOME+L process
+restores that candidate's own opening SRAM with all reported persisted
+observations exact. Separately, the paired baseline-SRAM late-state benchmark
+improves 13.8936 to 15.9985 fps (13.1569% fewer hardware cycles), with the
+reported loaded/tick-zero/final states and three captures matching. The
+cross-build benchmark is not candidate-generated late-save qualification;
+that longer fresh-save check remains separate.
+
+The combined link retains IWRAM end `0x03004598` and BSS end `0x0203d674`.
+Rebuilding current public source with construction HP disabled produces the
+same combined ROM bytes. Profile defaults remain unchanged pending wider
+campaign and save qualification. This does not add another qualified mission
+or change the staged count of 22/30.
