@@ -60,13 +60,15 @@ EXPECTED_RECORD_COUNTS = {
     b'UPUS': 64,
 }
 
-BUILDING_TYPES = set(range(106, 176)) - {150}  # Mature Chrysalis uses the unit pool.
+# This project's runtime type tables classify source type 150 as the mature
+# Chrysalis building; the separate source unit type 216 is U_CHRYSALIS.
+BUILDING_TYPES = set(range(106, 176))
 MINERAL_TYPES = {176, 177, 178}
 GEYSER_TYPES = {188}
 START_TYPE = 214
 UNMAPPED_RUNTIME_TYPES = {11: 3, 115: 3, 120: 2, 122: 1, 123: 1}
 CURRENT_POOL_CAPACITY = {'units': 128, 'buildings': 64, 'minerals': 32, 'geysers': 4}
-EXPECTED_POOL_DEMAND = {'units': 74, 'buildings': 66, 'minerals': 39, 'geysers': 2}
+EXPECTED_POOL_DEMAND = {'units': 73, 'buildings': 67, 'minerals': 39, 'geysers': 2}
 
 
 def _load_module(path: Path, name: str):

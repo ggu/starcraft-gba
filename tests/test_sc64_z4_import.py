@@ -82,7 +82,19 @@ class Z4SourceImportTests(unittest.TestCase):
         self.assertEqual(sum(z4.EXPECTED_SOURCE_TYPES.values()), 184)
         self.assertEqual(z4.EXPECTED_SOURCE_TYPES[214], 3)
         self.assertEqual(z4.source_pool_demand(z4.EXPECTED_SOURCE_TYPES),
-                         {'units': 74, 'buildings': 66, 'minerals': 39, 'geysers': 2})
+                         {'units': 73, 'buildings': 67, 'minerals': 39, 'geysers': 2})
+
+    def test_runtime_contract_classifies_chrysalis_source_types(self):
+        # race_rules.h / sc64_z3_adapter.h use raw 150 as B_MATURE_CHRYSALIS;
+        # U_CHRYSALIS is a distinct source unit type, raw 216.
+        with mock.patch.object(z4, 'EXPECTED_POOL_DEMAND',
+                               {'units': 0, 'buildings': 1, 'minerals': 0, 'geysers': 0}):
+            self.assertEqual(z4.source_pool_demand({150: 1}),
+                             {'units': 0, 'buildings': 1, 'minerals': 0, 'geysers': 0})
+        with mock.patch.object(z4, 'EXPECTED_POOL_DEMAND',
+                               {'units': 1, 'buildings': 0, 'minerals': 0, 'geysers': 0}):
+            self.assertEqual(z4.source_pool_demand({216: 1}),
+                             {'units': 1, 'buildings': 0, 'minerals': 0, 'geysers': 0})
 
     def test_complete_source_histogram_passes(self):
         rows = []

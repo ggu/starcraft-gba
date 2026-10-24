@@ -1805,3 +1805,29 @@ builds described above, rather than being implied to have been rerun here.
 These improvements remain below the 30-fps target, particularly in T10's busy
 battles. No physical GBA or GBA SP result is claimed. The bounded authored AI
 and other adaptation limits remain unchanged.
+
+## Zerg 4 source foundation (2026-10-24)
+
+The opt-in `tools/sc64_z4_pack.py` stages the complete **Agent of the Swarm**
+source at BOLT `008/017`, catalog ID 15, without modifying canonical race
+headers or enabling a playable mission. The actual private import and its
+standalone retained-record verification both pass. A second output directory
+independently passes the same checks. The authenticated CHK SHA-256 is
+`2cb8e516f07651801c1d6f519017d494af87c479a0ba8df9e33af34b14ec685a`.
+
+The tool verifies the normalized USA ROM, pinned extractor revision and
+extractor source bytes before execution. It preserves the full CHK, including
+all 184 placement rows and seven trigger records, plus 16 authenticated framed
+records. Thirteen asset-free tests cover malformed/truncated source, omitted or
+unexpected placements, wrong ROM/extractor identity, dirty extractor code,
+record/manifest tampering, standalone verification without a ROM, and the
+distinct runtime pools for Mature Chrysalis (raw 150) and Chrysalis (raw 216).
+
+The source audit identifies demand for 73 unit slots, 67 buildings, 39 mineral
+fields and two geysers. The current Zerg profile's 64-building and 32-mineral
+limits cannot retain the full scenario. Dropships, Control Towers, Machine
+Shops, Engineering Bay and Armory also need runtime mappings for this profile.
+The countdown, hatch sequence, Kerrigan/Chrysalis survival conditions,
+Command Center objective, authored AI and persistence remain unimplemented.
+There is no new controller win, ARM timing result or playable-mission claim;
+the completed campaign count remains 16/30 across development profiles.
