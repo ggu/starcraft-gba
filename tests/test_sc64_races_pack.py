@@ -7,13 +7,16 @@ import struct
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 
 from sc64_races_pack import (T4_REQUIRED_SOURCE_RECORDS, campaign_guard_for_map,
                              emit_descriptor_table, emit_map_count,
-                             retain_source_records, retain_t4_source_records)
+                             global_id_for_map, retain_complete_map_source,
+                             retain_source_records, retain_t4_source_records,
+                             source_actor_audit, verify_extractor_source)
 
 
 class RaceMapTableEmissionTests(unittest.TestCase):
@@ -69,6 +72,13 @@ class RaceMapTableEmissionTests(unittest.TestCase):
             rows.append(
                 f'#if defined(SC64_UNIFIED) && defined(SC64_TERRAN_LATE_ENABLED) && ({guard})\n'
                 f'    {{{global_id}}}, /* late Terran import slot {global_id} */\n'
+                '#else\n    {0},\n#endif\n'
+            )
+        for index in range(16, 30):
+            guard = campaign_guard_for_map(index)
+            global_id = global_id_for_map(index)
+            rows.append(
+                f'#if {guard}\n    {{{global_id}}}, /* staged chapter data */\n'
                 '#else\n    {0},\n#endif\n'
             )
         return rows
@@ -132,6 +142,10 @@ class RaceMapTableEmissionTests(unittest.TestCase):
                          'defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 0')
         self.assertEqual(campaign_guard_for_map(11),
                          'defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 0')
+        self.assertEqual(campaign_guard_for_map(16),
+                         '!defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE == 1')
+        self.assertEqual(campaign_guard_for_map(23),
+                         '!defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE == 2')
         self.compile_case([], 4, 0, 0, 0)
         self.compile_case(['-DSC64_T6_ENABLED'], 4, 0, 0, 0)
         self.compile_case(['-DSC64_UNIFIED'], 6, 0, 0, 0)
@@ -208,6 +222,99 @@ class RaceMapTableEmissionTests(unittest.TestCase):
                            '-DSC64_T6_ENABLED', '-DSC64_TERRAN_LATE_ENABLED',
                            '-DSC64_CAMPAIGN_RACE=1'],
                           14, 0, 0, 0, 0, 0, 0, False)
+
+    def test_explicit_data_gates_reserve_stable_high_water_ids_without_playability(self):
+        cases = [
+            (['-DSC64_UNIFIED', '-DSC64_Z4_DATA_ENABLED', '-DSC64_CAMPAIGN_RACE=1'], 16, 15, 1),
+            (['-DSC64_UNIFIED', '-DSC64_Z10_DATA_ENABLED', '-DSC64_CAMPAIGN_RACE=1'], 22, 21, 1),
+            (['-DSC64_UNIFIED', '-DSC64_P4_DATA_ENABLED', '-DSC64_CAMPAIGN_RACE=2'], 24, 23, 2),
+            (['-DSC64_UNIFIED', '-DSC64_P10_DATA_ENABLED', '-DSC64_CAMPAIGN_RACE=2'], 30, 29, 2),
+        ]
+        for flags, expected_count, expected_id, race in cases:
+            with self.subTest(flags=flags):
+                source = (
+                    'typedef struct { int id; } Sc64RaceMap;\n' + emit_map_count()
+                    + emit_descriptor_table(self.descriptors())
+                    + f'int main(void) {{ if (SC64_RACE_MAP_COUNT != {expected_count}) return 1; '
+                    + f'if (sc64_race_maps[{expected_id}].id != {expected_id}) return 2; '
+                    + 'return 0; }\n'
+                )
+                with tempfile.TemporaryDirectory(prefix='sc64-race-data-gate-') as td:
+                    c_path, exe = Path(td) / 'fixture.c', Path(td) / 'fixture'
+                    c_path.write_text(source)
+                    subprocess.run([self.cc, '-std=c11', '-Wall', '-Wextra', '-Werror',
+                                    *flags, str(c_path), '-o', str(exe)],
+                                   check=True, capture_output=True, text=True)
+                    subprocess.run([str(exe)], check=True, capture_output=True, text=True)
+                self.assertIn(f'-DSC64_CAMPAIGN_RACE={race}', flags)
+        # A mismatched profile reserves the direct ID but the race guard zeros it.
+        source = ('typedef struct { int id; } Sc64RaceMap;\n' + emit_map_count()
+                 + emit_descriptor_table(self.descriptors())
+                 + 'int main(void) { return SC64_RACE_MAP_COUNT != 16 || '
+                   'sc64_race_maps[15].id != 0; }\n')
+        with tempfile.TemporaryDirectory(prefix='sc64-race-wrong-gate-') as td:
+            c_path, exe = Path(td) / 'fixture.c', Path(td) / 'fixture'
+            c_path.write_text(source)
+            subprocess.run([self.cc, '-std=c11', '-Wall', '-Wextra', '-Werror',
+                            '-DSC64_UNIFIED', '-DSC64_Z4_DATA_ENABLED',
+                            '-DSC64_CAMPAIGN_RACE=2', str(c_path), '-o', str(exe)],
+                           check=True, capture_output=True, text=True)
+            subprocess.run([str(exe)], check=True, capture_output=True, text=True)
+
+
+class FullCampaignSourceAuditTests(unittest.TestCase):
+    def test_stable_catalog_id_ranges(self):
+        self.assertEqual([global_id_for_map(i) for i in range(16, 23)], list(range(15, 22)))
+        self.assertEqual([global_id_for_map(i) for i in range(23, 30)], list(range(23, 30)))
+
+    def test_source_pool_classification_keeps_raw_150_and_216_distinct(self):
+        rows = [{'source_type': raw} for raw in (150, 216, 214, 115, 69, 196)]
+        z = source_actor_audit(rows, race=1)
+        self.assertEqual(z['source_pool_demand'], {
+            'unit_slots': 2, 'unit_slots_upper_bound_including_unclassified': 3,
+            'building_slots': 2, 'building_slots_upper_bound_including_unclassified': 3,
+            'mineral_fields': 0, 'geysers': 0,
+            'start_markers_excluded_from_actor_pools': 1,
+            'unclassified_actor_slots': 1,
+        })
+        self.assertEqual(z['unsupported_or_unclassified_raw_types'], [
+            {'raw_type': 69, 'count': 1, 'source_class': 'unit'},
+            {'raw_type': 115, 'count': 1, 'source_class': 'building'},
+            {'raw_type': 196, 'count': 1, 'source_class': 'unclassified'},
+        ])
+
+    def test_complete_source_chk_is_exact_and_bounded(self):
+        chk = b'UNIT' + struct.pack('<I', 3) + b'abc' + b'TRIG' + struct.pack('<I', 0)
+        with tempfile.TemporaryDirectory(prefix='sc64-source-map-') as td:
+            result = retain_complete_map_source(chk, Path(td) / 'z4',
+                                                map_path='008/017', mission_id='Z4',
+                                                rom_sha1='fixture', extractor_commit='fixture-pin')
+            self.assertEqual(Path(result['source_chk_file']).read_bytes(), chk)
+            manifest = json.loads(Path(result['manifest']).read_text())
+            self.assertEqual(manifest['source_chk_sha256'], hashlib.sha256(chk).hexdigest())
+            self.assertEqual(manifest['source_map_path'], '008/017')
+            self.assertEqual(manifest['extractor_commit'], 'fixture-pin')
+            self.assertEqual([row['tag'] for row in manifest['sections']], ['UNIT', 'TRIG'])
+            with self.assertRaisesRegex(ValueError, 'exactly one UNIT'):
+                retain_complete_map_source(b'TRIG' + struct.pack('<I', 0),
+                                           Path(td) / 'bad', map_path='008/017', mission_id='Z4')
+            with self.assertRaisesRegex(ValueError, 'truncated'):
+                retain_complete_map_source(chk + b'bad', Path(td) / 'truncated',
+                                           map_path='008/017', mission_id='Z4')
+
+    def test_extractor_bytes_must_match_pinned_git_blob(self):
+        with tempfile.TemporaryDirectory(prefix='sc64-extractor-pin-') as td:
+            path = Path(td) / 'extract_sc64_maps.py'
+            path.write_bytes(b'clean pinned source')
+            completed = subprocess.CompletedProcess([], 0, stdout=b'clean pinned source')
+            with patch('sc64_races_pack.subprocess.run', return_value=completed) as run:
+                verify_extractor_source(path)
+                self.assertEqual(run.call_args.args[0][0:3],
+                                 ['git', '-C', td])
+            path.write_bytes(b'modified extractor at pinned HEAD')
+            with patch('sc64_races_pack.subprocess.run', return_value=completed):
+                with self.assertRaisesRegex(ValueError, 'differs from its committed bytes'):
+                    verify_extractor_source(path)
 
 
 class T4SourceRecordRetentionTests(unittest.TestCase):

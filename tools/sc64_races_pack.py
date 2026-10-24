@@ -13,6 +13,7 @@ import importlib.util
 import json
 from pathlib import Path
 import struct
+import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,7 +38,7 @@ MISSIONS = [
     # Z3 has its fixed global catalog ID 14. Unified builds keep catalog
     # slots 7..13 explicitly unavailable rather than compacting this index.
     ('Z3', '008/016', 'The New Dominion'),
-    # P3 is a private import until large-map runtime support is ready (ID 22).
+    # P3 has fixed global catalog ID 22 after the reserved Zerg chapter slots.
     ('P3', '008/020', 'Higher Ground'),
     # T4 occupies stable campaign ID 7, ahead of the later Z3 IDs.
     ('T4', '008/00D', 'The Jacobs Installation'),
@@ -51,6 +52,22 @@ MISSIONS = [
     ('T8', '008/011', 'The Big Push'),
     ('T9', '008/012', 'New Gettysburg'),
     ('T10', '008/013', 'The Hammer Falls'),
+    # Z4-Z10 and P4-P10 are explicit data imports. Their own *_DATA_ENABLED
+    # gates stage source-backed map data without enabling catalog/playable flags.
+    ('Z4', '008/017', 'Agent of the Swarm'),
+    ('Z5', '008/018', 'Assimilation'),
+    ('Z6', '008/019', 'The Dark Templar'),
+    ('Z7', '008/01A', 'The Culling'),
+    ('Z8', '008/01B', 'The Dark Templar'),
+    ('Z9', '008/01C', 'The Invasion of Aiur'),
+    ('Z10', '008/01D', 'Untitled Scenario'),
+    ('P4', '008/021', 'The Hunt for Tassadar'),
+    ('P5', '008/022', 'Choosing Sides'),
+    ('P6', '008/023', 'Protoss 06'),
+    ('P7', '008/024', 'Homeland'),
+    ('P8', '008/025', 'The Trial of Tassadar'),
+    ('P9', '008/026', 'Shadow Hunters'),
+    ('P10', '008/027', 'Untitled Scenario'),
 ]
 TERRAN_LATE_CHK_SHA256 = {
     '008/010': '0883a5241140199415650934bcb3c034b0944cb5be19c477a94a95aa70a2a1f7',
@@ -58,11 +75,40 @@ TERRAN_LATE_CHK_SHA256 = {
     '008/012': 'afa086b680f37f1de4d467893351dc6bea5abb475121ff59da55c632de33f6f3',
     '008/013': 'd1bcc9759b948e95ad565537ed3c29eb980cd325935aa25480dc0ad4a8298b6f',
 }
+RACE_EXTRA_CHK_SHA256 = {
+    '008/017': '2cb8e516f07651801c1d6f519017d494af87c479a0ba8df9e33af34b14ec685a',
+    '008/018': '070d8e0233f57ee478571cadbb77c25dc13f4c71ad2acabeecc4088adddd5466',
+    '008/019': 'cad7296dbb2c6f965510a80abfa028eca34b2be1f4657e774b536ec43edaa878',
+    '008/01A': '3e827076bee7558d743928e0f3e0fba534b86da0cafc0bb84a959debe4ad5b13',
+    '008/01B': 'ff6d0177a6a76fc68ef98f0962661857853ea11c50de9060b90ff934826cfd8e',
+    '008/01C': '0eff2a2e44c55c0f5de9aa0c9123121f16cb870e1d326ae3a0fb3dba6bd8e5f7',
+    '008/01D': '1a8f0e1de2ea9353e9561fb4b31da951852b32292f5963be416dc026c2862e17',
+    '008/021': '40f30ccedf87a3b9c88308dc3092611ceff10185ddaf32471104902042a93ecd',
+    '008/022': '5cb5bc0da8ba7b73515a53dd36150a0a2f32b4482faa6ca00898e652ce820d4c',
+    '008/023': 'd9bc1f180d945bc0d75e5eac561a91daf291821e97171d761de16d29f792cbec',
+    '008/024': '7c566d8b5e9d851be407dc1ac5438bebf32a8ff1d66a3d1b784cffd66f19e3a7',
+    '008/025': 'e2257c48a119bfde3da075e08628b312857e3aad9222c47678fc29d57c578cd9',
+    '008/026': 'eecccb0220c7456cacccf8b84f9bd82535f5cdce9192ba7d88986ea2867ba601',
+    '008/027': '59d0adcb12d7be73082a069d900acf119643cd3c0c754f6cfe80b2613a35a99f',
+}
 BUILDING_RAW_IDS = {
     106, 109, 110, 111, 112, 113, 114, 122, 124, 125, 130, 131, 132,
     133, 135, 137, 139, 141, 142, 143, 144, 146, 149, 150, 151, 154, 155,
     156, 157, 160, 162, 164, 166, 167,
 }
+# Source StarCraft UNIT building range used for campaign pool sizing, including
+# structures this runtime profile does not model. Raw 150 is
+# B_MATURE_CHRYSALIS; raw 216 is U_CHRYSALIS.
+SOURCE_BUILDING_RAW_IDS = set(range(106, 176))
+SOURCE_BUILDING_RAW_IDS.update({194, 195})
+SOURCE_UNIT_RAW_IDS = set(range(0, 106)) | {216, 218}
+RUNTIME_UNIT_RAW_IDS_ZERG = {
+    0, 2, 3, 5, 7, 8, 11, 19, 30, 32, 34, 37, 38, 41, 42, 43, 45,
+    47, 53, 64, 65, 66, 70, 77, 78, 79, 83, 216,
+}
+RUNTIME_UNIT_RAW_IDS_PROTOSS = RUNTIME_UNIT_RAW_IDS_ZERG - {11}
+RUNTIME_BUILDING_RAW_IDS = BUILDING_RAW_IDS | {194}
+RESOURCE_RAW_IDS = {176, 177, 178, 188}
 RETAINED_SOURCE_RECORDS = {
     b'UNIT': 'UNIT.bin', b'DIM ': 'DIM.bin', b'ERA ': 'ERA.bin',
     b'MTXM': 'MTXM.bin', b'MRGN': 'MRGN.bin', b'DD2 ': 'DD2.bin',
@@ -93,34 +139,37 @@ def c_array(name: str, ctype: str, values, width: int = 24) -> str:
 
 def emit_map_count() -> str:
     """Emit compile-time map count for the stable direct-global-ID table."""
-    return (
-        '#if defined(SC64_UNIFIED) && defined(SC64_P3_ENABLED)\n'
-        '#define SC64_RACE_MAP_COUNT 23\n'
-        '#elif defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
-        '#define SC64_RACE_MAP_COUNT 15\n'
-        '#elif defined(SC64_UNIFIED) && defined(SC64_TERRAN_LATE_ENABLED)\n'
-        '#define SC64_RACE_MAP_COUNT 14\n'
-        '#elif defined(SC64_UNIFIED) && defined(SC64_T6_ENABLED)\n'
-        '#define SC64_RACE_MAP_COUNT 10\n'
-        '#elif defined(SC64_UNIFIED) && defined(SC64_T5_ENABLED)\n'
-        '#define SC64_RACE_MAP_COUNT 9\n'
-        '#elif defined(SC64_UNIFIED) && defined(SC64_T4_ENABLED)\n'
-        '#define SC64_RACE_MAP_COUNT 8\n'
-        '#elif defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)\n'
-        '#define SC64_RACE_MAP_COUNT 7\n'
-        '#elif defined(SC64_UNIFIED)\n'
-        '#define SC64_RACE_MAP_COUNT 6\n'
-        '#else\n#define SC64_RACE_MAP_COUNT 4\n#endif\n'
-    )
+    lines = []
+    # Descending high-water checks preserve direct IDs and make a data flag
+    # reserve all intervening unavailable slots without changing playability.
+    gates = [('P', n, 23 + n - 4) for n in range(10, 3, -1)]
+    gates += [('Z', n, 15 + n - 4) for n in range(10, 3, -1)]
+    for i, (prefix, chapter, global_id) in enumerate(gates):
+        directive = '#if' if i == 0 else '#elif'
+        lines.append(
+            f'{directive} defined(SC64_UNIFIED) && defined(SC64_{prefix}{chapter}_DATA_ENABLED)\n'
+            f'#define SC64_RACE_MAP_COUNT {global_id + 1}\n')
+    lines.append('#elif defined(SC64_UNIFIED) && defined(SC64_P3_ENABLED)\n#define SC64_RACE_MAP_COUNT 23\n')
+    lines.extend([
+        '#elif defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n#define SC64_RACE_MAP_COUNT 15\n',
+        '#elif defined(SC64_UNIFIED) && defined(SC64_TERRAN_LATE_ENABLED)\n#define SC64_RACE_MAP_COUNT 14\n',
+        '#elif defined(SC64_UNIFIED) && defined(SC64_T6_ENABLED)\n#define SC64_RACE_MAP_COUNT 10\n',
+        '#elif defined(SC64_UNIFIED) && defined(SC64_T5_ENABLED)\n#define SC64_RACE_MAP_COUNT 9\n',
+        '#elif defined(SC64_UNIFIED) && defined(SC64_T4_ENABLED)\n#define SC64_RACE_MAP_COUNT 8\n',
+        '#elif defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)\n#define SC64_RACE_MAP_COUNT 7\n',
+        '#elif defined(SC64_UNIFIED)\n#define SC64_RACE_MAP_COUNT 6\n',
+        '#else\n#define SC64_RACE_MAP_COUNT 4\n#endif\n',
+    ])
+    return ''.join(lines)
 
 
 def campaign_guard_for_map(map_index: int) -> str:
     """Return the profile guard used around one map's data and descriptor."""
     if map_index in (9, 10, 11):
         return 'defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 0'
-    if map_index < 2 or map_index == 7:
+    if map_index < 2 or map_index == 7 or 16 <= map_index <= 22:
         race = 1
-    elif map_index < 4 or map_index == 8:
+    elif map_index < 4 or map_index == 8 or 23 <= map_index <= 29:
         race = 2
     else:
         race = 0
@@ -130,70 +179,89 @@ def campaign_guard_for_map(map_index: int) -> str:
 def emit_descriptor_table(descriptors: list[str]) -> str:
     """Emit stable direct-ID descriptor slots, with disabled IDs zeroed.
 
-    ``descriptors`` uses packer order: four race missions, T1, T2, T3, Z3,
-    P3, T4, T5, T6, then T7-T10 at global IDs 10..13.
-    The per-descriptor race guards are carried inside each supplied token.
+    ``descriptors`` uses packer order from ``MISSIONS``. Each source-order map
+    is placed into its stable direct global-ID slot; disabled intermediate IDs
+    become zero descriptors. Per-descriptor race guards stay inside each token.
     """
-    if len(descriptors) != 16:
-        raise ValueError('expected descriptors for map indices 0..15')
-    return ''.join([
-        'static const Sc64RaceMap sc64_race_maps[SC64_RACE_MAP_COUNT] = {\n',
-        *descriptors[:4],
-        '#ifdef SC64_UNIFIED\n', *descriptors[4:6], '#endif /* SC64_UNIFIED */\n',
-        '#if defined(SC64_UNIFIED)\n',
-        '#ifdef SC64_T3_ENABLED\n', descriptors[6],
-        '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED) || defined(SC64_T4_ENABLED) || defined(SC64_T5_ENABLED) || defined(SC64_T6_ENABLED)\n'
-        '    {0}, /* global ID 6 unavailable */\n',
-        '#endif\n',
-        '#ifdef SC64_T4_ENABLED\n', descriptors[9],
-        '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED) || defined(SC64_T5_ENABLED) || defined(SC64_T6_ENABLED)\n'
-        '    {0}, /* global ID 7 unavailable */\n#endif\n',
-        '#ifndef SC64_T5_ENABLED\n'
-        '#if defined(SC64_T6_ENABLED) || defined(SC64_TERRAN_LATE_ENABLED)\n'
-        '    {0}, /* global ID 8 unavailable */\n'
-        '#endif\n#endif\n',
-        '#ifdef SC64_T5_ENABLED\n', descriptors[10], '#endif\n',
-        '#ifdef SC64_T6_ENABLED\n', descriptors[11],
-        '#elif defined(SC64_TERRAN_LATE_ENABLED)\n    {0}, /* global ID 9 unavailable */\n',
-        '#endif\n',
-        '#if defined(SC64_UNIFIED) && defined(SC64_TERRAN_LATE_ENABLED)\n',
-        descriptors[12], descriptors[13], descriptors[14], descriptors[15],
-        '#elif defined(SC64_Z3_ENABLED) || defined(SC64_P3_ENABLED)\n',
-        '#ifdef SC64_T6_ENABLED\n',
-        '    {0}, /* global ID 10 is unavailable */\n'
-        '    {0}, /* global ID 11 is unavailable */\n'
-        '    {0}, /* global ID 12 is unavailable */\n'
-        '    {0}, /* global ID 13 is unavailable */\n'
-        '#elif defined(SC64_T5_ENABLED)\n',
-        '    {0}, /* global ID 9 is unavailable */\n'
-        '    {0}, /* global ID 10 is unavailable */\n'
-        '    {0}, /* global ID 11 is unavailable */\n'
-        '    {0}, /* global ID 12 is unavailable */\n'
-        '    {0}, /* global ID 13 is unavailable */\n'
-        '#else\n',
-        '    {0}, /* global ID 8 is unavailable */\n'
-        '    {0}, /* global ID 9 is unavailable */\n'
-        '    {0}, /* global ID 10 is unavailable */\n'
-        '    {0}, /* global ID 11 is unavailable */\n'
-        '    {0}, /* global ID 12 is unavailable */\n'
-        '    {0}, /* global ID 13 is unavailable */\n',
-        '#endif /* T5/T6 unavailable slots */\n',
-        '#endif\n',
-        '#ifdef SC64_Z3_ENABLED\n', descriptors[7],
-        '#elif defined(SC64_P3_ENABLED)\n    {0}, /* global ID 14 unavailable */\n',
-        '#endif\n',
-        '#ifdef SC64_P3_ENABLED\n',
-        '    {0}, /* global ID 15 is unavailable */\n'
-        '    {0}, /* global ID 16 is unavailable */\n'
-        '    {0}, /* global ID 17 is unavailable */\n'
-        '    {0}, /* global ID 18 is unavailable */\n'
-        '    {0}, /* global ID 19 is unavailable */\n'
-        '    {0}, /* global ID 20 is unavailable */\n'
-        '    {0}, /* global ID 21 is unavailable */\n',
-        descriptors[8], '#endif /* SC64_P3_ENABLED */\n',
-        '#endif /* SC64_UNIFIED */\n',
-        '};\n',
-    ])
+    if len(descriptors) not in (16, len(MISSIONS)):
+        raise ValueError(f'expected 16 legacy descriptors or {len(MISSIONS)} full-campaign descriptors')
+    if len(descriptors) == 16:
+        descriptors = descriptors + [f'    {{{global_id_for_map(i)}}}, /* staged */\n'
+                                      for i in range(16, len(MISSIONS))]
+
+    ids = [global_id_for_map(i) for i in range(len(MISSIONS))]
+    by_id = {global_id: index for index, global_id in enumerate(ids)}
+    output = ['static const Sc64RaceMap sc64_race_maps[SC64_RACE_MAP_COUNT] = {\n',
+              *descriptors[:4], '#ifdef SC64_UNIFIED\n', *descriptors[4:6],
+              '#endif /* SC64_UNIFIED */\n']
+    for global_id in range(6, 30):
+        higher = [feature_condition(index) for index, mapped_id in enumerate(ids)
+                  if mapped_id >= global_id and index >= 6]
+        if not higher:
+            continue
+        output.append(f'#if defined(SC64_UNIFIED) && ({" || ".join(higher)})\n')
+        index = by_id.get(global_id)
+        if index is None:
+            output.append(f'    {{0}}, /* global ID {global_id} unavailable */\n')
+        else:
+            output.append(f'#if {feature_condition(index)}\n')
+            output.append(descriptors[index])
+            output.append(f'#else\n    {{0}}, /* global ID {global_id} unavailable */\n#endif\n')
+        output.append('#endif\n')
+    output.extend(['};\n'])
+    return ''.join(output)
+
+
+def global_id_for_map(map_index: int) -> int:
+    """Map source-order index to its stable campaign catalog ID."""
+    if map_index < 6:
+        return map_index
+    if map_index == 6:
+        return 6
+    if map_index == 7:
+        return 14
+    if map_index == 8:
+        return 22
+    if map_index == 9:
+        return 7
+    if map_index == 10:
+        return 8
+    if map_index == 11:
+        return 9
+    if 12 <= map_index <= 15:
+        return map_index - 2
+    if 16 <= map_index <= 22:
+        return map_index - 1
+    if 23 <= map_index <= 29:
+        return map_index
+    raise ValueError(f'unknown race map index {map_index}')
+
+
+def feature_condition(map_index: int) -> str:
+    """Compile-time gate that controls whether this map contributes a slot."""
+    if map_index < 4:
+        return '1'
+    if map_index in (4, 5):
+        return 'defined(SC64_UNIFIED)'
+    if map_index == 6:
+        return 'defined(SC64_T3_ENABLED)'
+    if map_index == 7:
+        return 'defined(SC64_Z3_ENABLED)'
+    if map_index == 8:
+        return 'defined(SC64_P3_ENABLED)'
+    if map_index == 9:
+        return 'defined(SC64_T4_ENABLED)'
+    if map_index == 10:
+        return 'defined(SC64_T5_ENABLED)'
+    if map_index == 11:
+        return 'defined(SC64_T6_ENABLED)'
+    if 12 <= map_index <= 15:
+        return 'defined(SC64_TERRAN_LATE_ENABLED)'
+    if 16 <= map_index <= 22:
+        return f'defined(SC64_Z{map_index - 12}_DATA_ENABLED)'
+    if 23 <= map_index <= 29:
+        return f'defined(SC64_P{map_index - 19}_DATA_ENABLED)'
+    raise ValueError(f'unknown race map index {map_index}')
 
 
 def nearest(color: int, palette: list[int], candidates: list[int]) -> int:
@@ -278,7 +346,114 @@ def retain_t4_source_records(chk: bytes, records_dir: Path, *,
                                  extractor_commit=extractor_commit)
 
 
+def retain_complete_map_source(chk: bytes, source_dir: Path, *, map_path: str,
+                               mission_id: str,
+                               rom_sha1: str = ROM_SHA1,
+                               extractor_commit: str = UPSTREAM_COMMIT) -> dict:
+    """Retain the complete bounded CHK for source auditing, byte-for-byte."""
+    if not chk or len(chk) > 1024 * 1024:
+        raise ValueError(f'{mission_id} source CHK size is outside the 1 MiB bound')
+    sections = []
+    offset = 0
+    while offset < len(chk):
+        if len(chk) - offset < 8:
+            raise ValueError(f'{mission_id} CHK has a truncated section header')
+        tag = chk[offset:offset + 4]
+        size = struct.unpack_from('<I', chk, offset + 4)[0]
+        end = offset + 8 + size
+        if end > len(chk):
+            raise ValueError(f'{mission_id} CHK section {tag!r} exceeds the bounds')
+        sections.append({'tag': tag.decode('ascii', errors='replace'),
+                          'record_bytes': end - offset,
+                          'payload_bytes': size,
+                          'record_sha256': hashlib.sha256(chk[offset:end]).hexdigest()})
+        if len(sections) > 128:
+            raise ValueError(f'{mission_id} CHK exceeds 128 section records')
+        offset = end
+    unit_sections = [s for s in sections if s['tag'] == 'UNIT']
+    if len(unit_sections) != 1:
+        raise ValueError(f'{mission_id} source requires exactly one UNIT section')
+    source_dir.mkdir(parents=True, exist_ok=True)
+    chk_path = source_dir / 'source.chk'
+    chk_path.write_bytes(chk)
+    manifest = {
+        'schema': 1, 'mission_id': mission_id, 'source_map_path': map_path,
+        'source_rom_sha1': rom_sha1, 'source_chk_bytes': len(chk),
+        'source_chk_sha256': hashlib.sha256(chk).hexdigest(),
+        'source_chk_file': chk_path.name,
+        'extractor': 'references/sc64-maps/extract_sc64_maps.py',
+        'extractor_commit': extractor_commit, 'sections': sections,
+    }
+    manifest_path = source_dir / 'manifest.json'
+    manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='ascii')
+    return {'directory': str(source_dir), 'source_chk_file': str(chk_path),
+            'manifest': str(manifest_path),
+            'source_chk_sha256': manifest['source_chk_sha256'],
+            'source_chk_bytes': len(chk), 'section_count': len(sections)}
+
+
+def verify_extractor_source(path: Path | None = None) -> None:
+    """Refuse a dirty or substituted copy of the pinned extractor script."""
+    path = path or ROOT / 'references/sc64-maps/extract_sc64_maps.py'
+    try:
+        expected = subprocess.run(
+            ['git', '-C', str(path.parent), 'show',
+             f'{UPSTREAM_COMMIT}:{path.name}'], check=True, capture_output=True).stdout
+    except subprocess.CalledProcessError as exc:
+        raise ValueError('cannot verify pinned BOLT extractor source bytes') from exc
+    if path.read_bytes() != expected:
+        raise ValueError('pinned BOLT extractor source differs from its committed bytes')
+
+
+def source_actor_audit(rows: list[dict], race: int) -> dict:
+    """Classify source placements and report current profile mapping gaps."""
+    counts = Counter(row['source_type'] for row in rows)
+    categories = Counter()
+    unsupported = Counter()
+    units_supported = (RUNTIME_UNIT_RAW_IDS_ZERG if race == 1
+                       else RUNTIME_UNIT_RAW_IDS_PROTOSS)
+    for raw_type, count in counts.items():
+        if raw_type == 214:
+            categories['start_markers'] += count
+        elif raw_type in (176, 177, 178):
+            categories['mineral_fields'] += count
+        elif raw_type == 188:
+            categories['geysers'] += count
+        elif raw_type in SOURCE_BUILDING_RAW_IDS:
+            categories['building_slots'] += count
+            if raw_type not in RUNTIME_BUILDING_RAW_IDS:
+                unsupported[raw_type] += count
+        elif raw_type in SOURCE_UNIT_RAW_IDS:
+            categories['unit_slots'] += count
+            if raw_type not in units_supported:
+                unsupported[raw_type] += count
+        else:
+            categories['unclassified_actor_slots'] += count
+            unsupported[raw_type] += count
+    return {
+        'source_pool_demand': {
+            'unit_slots': categories['unit_slots'],
+            'unit_slots_upper_bound_including_unclassified': (
+                categories['unit_slots'] + categories['unclassified_actor_slots']),
+            'building_slots': categories['building_slots'],
+            'building_slots_upper_bound_including_unclassified': (
+                categories['building_slots'] + categories['unclassified_actor_slots']),
+            'mineral_fields': categories['mineral_fields'],
+            'geysers': categories['geysers'],
+            'start_markers_excluded_from_actor_pools': categories['start_markers'],
+            'unclassified_actor_slots': categories['unclassified_actor_slots'],
+        },
+        'source_raw_type_counts': {str(raw): count for raw, count in sorted(counts.items())},
+        'unsupported_or_unclassified_raw_types': [
+            {'raw_type': raw, 'count': count,
+             'source_class': ('building' if raw in SOURCE_BUILDING_RAW_IDS else
+                              'unit' if raw in SOURCE_UNIT_RAW_IDS else 'unclassified')}
+            for raw, count in sorted(unsupported.items())],
+    }
+
+
 def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict:
+    verify_extractor_source()
     importer = load('sc64_races_import', ROOT / 'tools/sc64_import.py')
     assets = load('sc64_races_assets', ROOT / 'tools/sc64_assets.py')
     x = importer.upstream_module(importer.UPSTREAM)
@@ -329,8 +504,13 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
         owners = sections.get(b'OWNR', b'')
         sides = sections.get(b'SIDE', b'')
         human_slots = [slot for slot, owner in enumerate(owners) if owner == 6]
-        if len(human_slots) != 1 or len(sides) < len(owners):
+        if not human_slots or len(sides) < len(owners):
+            raise ValueError(f'{path} has no human OWNR/SIDE slot')
+        if len(human_slots) != 1 and map_index < 16:
             raise ValueError(f'{path} has no unique human OWNR/SIDE slot')
+        # New map imports are data-only. When their original OWNR has several
+        # human slots, use the first only as a bounded descriptor placeholder;
+        # preserve and report the complete OWNR/SIDE source records separately.
         human_slot = human_slots[0]
         owner_modes = [2 if owner == 11 else 3 if owner == 3 else
                        0 if owner == 6 else 1 if owner in (1, 5, 7) else 2
@@ -390,7 +570,9 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             lines.append('#if defined(SC64_UNIFIED) && defined(SC64_T5_ENABLED)\n')
         elif map_index == 11:
             lines.append('#if defined(SC64_UNIFIED) && defined(SC64_T6_ENABLED)\n')
-        elif map_index >= 12:
+        elif map_index >= 16:
+            lines.append(f'#if defined(SC64_UNIFIED) && defined(SC64_{mission_id}_DATA_ENABLED)\n')
+        elif 12 <= map_index <= 15:
             lines.append('#if defined(SC64_UNIFIED) && defined(SC64_TERRAN_LATE_ENABLED)\n')
         campaign_guard = campaign_guard_for_map(map_index)
         lines.append(f'#if {campaign_guard}\n')
@@ -423,7 +605,9 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             lines.append('#endif /* SC64_UNIFIED && SC64_T5_ENABLED */\n')
         elif map_index == 11:
             lines.append('#endif /* SC64_UNIFIED && SC64_T6_ENABLED */\n')
-        elif map_index >= 12:
+        elif map_index >= 16:
+            lines.append(f'#endif /* SC64_UNIFIED && SC64_{mission_id}_DATA_ENABLED */\n')
+        elif 12 <= map_index <= 15:
             lines.append('#endif /* SC64_UNIFIED && SC64_TERRAN_LATE_ENABLED */\n')
         descriptors.append(f'#if {campaign_guard}\n'
             f'    {{{info.width}u,{info.height}u,{tileset}u,{human_slot}u,sc64_race_{name}_owner_modes,sc64_race_{name}_owner_races,{unit_name},{len(units)}u,sc64_race_{name}_tiles,{len(tiles)}u,sc64_race_{name}_lookup,sc64_race_{name}_blocked,"{info.name}","{mission_id}"}},\n'
@@ -434,6 +618,8 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             'mission_id': mission_id, 'path': path, 'title': info.name,
             'dimensions': [info.width, info.height], 'tileset_id': tileset,
             'human_slot': human_slot, 'human_side': sides[human_slot],
+            'human_slot_candidates': human_slots,
+            'human_slot_is_representative_only': len(human_slots) != 1,
             'owner_modes': owner_modes,
             'owner_races': owner_races,
             'force_assignments_raw': force_assignments,
@@ -444,16 +630,38 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             'cells': len(tile_ids), 'blocked_cells': sum(blocked),
             'terrain_assets_sha256': {k: hashlib.sha256(v).hexdigest() for k, v in sources.items()},
         })
+        if map_index in (0, 1, 2, 3, 7, 8) or map_index >= 16:
+            source_units = importer.unit_rows(sections.get(b'UNIT', b''))
+            source_starts = sum(u['source_type'] == 214 for u in source_units)
+            if len(units) != len(source_units) - source_starts:
+                raise ValueError(f'{mission_id} importer did not retain every non-start UNIT row')
+            race = 1 if mission_id.startswith('Z') else 2
+            reports[-1].update(source_actor_audit(source_units, race))
+            reports[-1]['source_unit_records'] = len(source_units)
+            reports[-1]['runtime_unit_records'] = len(units)
+            reports[-1]['runtime_unit_rows_are_all_non_start_source_rows'] = True
+            reports[-1]['global_mission_id'] = global_id_for_map(map_index)
+            if map_index >= 16:
+                chk_hash = hashlib.sha256(chk).hexdigest()
+                if chk_hash != RACE_EXTRA_CHK_SHA256[path]:
+                    raise ValueError(f'{mission_id} CHK hash does not match its audited source')
+                reports[-1]['global_mission_id'] = global_id_for_map(map_index)
+                reports[-1]['campaign_data_gate'] = f'SC64_{mission_id}_DATA_ENABLED'
+                reports[-1]['runtime_or_catalog_enabled'] = False
+                reports[-1]['source_chk_sha256'] = chk_hash
+                reports[-1]['source_record_retention'] = retain_complete_map_source(
+                    chk, output.parent / 'source_maps' / mission_id.lower(),
+                    map_path=path, mission_id=mission_id)
         if map_index >= 4:
             source_units = importer.unit_rows(sections.get(b'UNIT', b''))
             source_categories = Counter(
                 'start_marker' if u['source_type'] == 214 else
                 'mineral' if u['source_type'] in (176, 177, 178) else
                 'geyser' if u['source_type'] == 188 else
+                'unclassified' if map_index == 9 and u['source_type'] == 195 else
                 'building' if (u['source_type'] in BUILDING_RAW_IDS or
                                (map_index == 10 and u['source_type'] == 195)) else
                 'building' if map_index == 11 and u['source_type'] in (126, 138) else
-                'unclassified' if map_index == 9 and u['source_type'] == 195 else
                 'unit'
                 for u in source_units
             )
@@ -467,6 +675,16 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                 'geysers': source_categories['geyser'],
                 'unclassified_source_placements': source_categories['unclassified'],
             }
+            if map_index >= 16:
+                demand = reports[-1]['source_pool_demand']
+                reports[-1]['source_categories'] = {
+                    'unit_placements': demand['unit_slots'],
+                    'building_placements': demand['building_slots'],
+                    'mineral_fields': demand['mineral_fields'],
+                    'geysers': demand['geysers'],
+                    'start_markers': demand['start_markers_excluded_from_actor_pools'],
+                    'unclassified_source_placements': demand['unclassified_actor_slots'],
+                }
             reports[-1]['runtime_unit_locations'] = [
                 {'source_type': u['source_type'], 'owner_raw': u['owner_raw'],
                  'x': u['x_source_px'] // 2, 'y': u['y_source_px'] // 2,
@@ -624,7 +842,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                     'active_conditions': scenario['active_condition_count'],
                     'active_actions': scenario['active_action_count'],
                 }
-            if map_index >= 12:
+            if 12 <= map_index <= 15:
                 profile = f't{map_index - 5}'
                 chk_hash = hashlib.sha256(chk).hexdigest()
                 if chk_hash != TERRAN_LATE_CHK_SHA256[path]:
@@ -718,10 +936,44 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
     content = ''.join(lines)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(content, encoding='ascii')
+    race_campaigns = {}
+    for race_name, prefix in [('zerg', 'Z'), ('protoss', 'P')]:
+        race_maps = [row for row in reports
+                     if row['mission_id'].startswith(prefix) and 'source_pool_demand' in row]
+        demand_fields = ('unit_slots', 'unit_slots_upper_bound_including_unclassified',
+                         'building_slots', 'building_slots_upper_bound_including_unclassified',
+                         'mineral_fields', 'geysers',
+                         'start_markers_excluded_from_actor_pools', 'unclassified_actor_slots')
+        maximum = {}
+        for field in demand_fields:
+            peak = max((row['source_pool_demand'][field] for row in race_maps), default=0)
+            maximum[field] = {
+                'slots_or_records': peak,
+                'missions': [row['mission_id'] for row in race_maps
+                             if row['source_pool_demand'][field] == peak],
+            }
+        race_campaigns[race_name] = {
+            'source_map_count': len(race_maps),
+            'maximum_single_mission_pool_demand': maximum,
+            'aggregate_staged_records_across_maps': sum(row['source_unit_records']
+                                                         for row in race_maps),
+            'maximum_dimensions': {
+                'width': max((row['dimensions'][0] for row in race_maps), default=0),
+                'height': max((row['dimensions'][1] for row in race_maps), default=0),
+            },
+        }
     report = {
         'schema': 1,
         'source': {'rom_sha1': ROM_SHA1, 'extractor': 'references/sc64-maps/extract_sc64_maps.py', 'extractor_commit': UPSTREAM_COMMIT},
         'maps': [{'index': index, **row} for index, row in enumerate(reports)],
+        'race_campaign_source_pool_audit': race_campaigns,
+        'source_pool_classification': {
+            'buildings': 'source StarCraft structure IDs in SOURCE_BUILDING_RAW_IDS, including raw 150 B_MATURE_CHRYSALIS',
+            'units': 'non-resource/non-start source UNIT rows not classified as buildings',
+            'raw_216': 'unit U_CHRYSALIS, never a building',
+            'start_marker_raw_214': 'reported separately and excluded from unit/building pool demand',
+            'unclassified_actor_slots': 'source actor types with no recognized unit/building category; must be resolved before runtime use',
+        },
         'header': str(output), 'header_sha256': hashlib.sha256(content.encode('ascii')).hexdigest(),
         'palette_policy': 'all terrain colors are quantized offline to nearest used world color in the fixed Backwater palette; source indices remap directly to shared palette indices 32..255, preserving sprites without runtime recoloring',
         'collision_policy': 'VF4 walk bit 0; central four minitiles required walkable; this is a coarse 16px GBA pathfinding approximation',
