@@ -2979,3 +2979,23 @@ host regressions, including 344 Python tests with six private-input checks
 skipped. The source index audit contains no game/build/credential payloads.
 The local default/unified builds and host suites also pass. No physical GBA
 performance or complete Z7/P6 campaign qualification is claimed.
+
+### Z6 count-prefix comparison and first full skirmish ARM sample
+
+The default-off count snapshot improves the frozen 12,000-input-tick Z6
+opening from **9.52 to 9.82 effective fps** (3.15%). All 13 reported checkpoints
+match after excluding timing/capture metadata, and the four HOME/1k/10k/12k
+captures match as decoded pixels. The post-processing used bundled Python
+and Pillow after the first environment lacked Pillow; neither replay was
+restarted. This is prefix evidence, not a full-mission or physical-hardware
+speedup. The option remains disabled by default. The private comparison is
+`.local/build/promotion/z6-count-comparison/comparison.json`.
+
+The first complete skirmish ARM sample replays the canonical Terran build,
+built-in map, human Terran and one Zerg AI. It reaches the exact host loss at
+tick 11539/frame 11522, with matching configuration and participant counts.
+The live-interval mean is **29.72 effective fps**, excluding HOME/start and
+RESULT intervals. This verifies one complete one-AI sample, not all maps,
+races or opponent counts. Two-AI Zerg-build and three-AI Protoss-build samples
+remain queued/running. Frozen pairs and reports are under
+`.local/build/promotion/skirmish-dense-frozen/` and `skirmish-dense-qualified/`.
