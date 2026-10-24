@@ -1553,6 +1553,20 @@ generated completeness marker requires that shared art as well. This prepares
 source images only; native animation selection and P7 renderer/profile
 integration remain unfinished. Generated art and previews stay local.
 
+Shield Battery starting properties can be prepared separately from the same
+authenticated P7 source CHK:
+
+```sh
+python3 tools/sc64_p7_battery_pack.py
+```
+
+The packer uses the shared scenario authenticator, rereads and hashes the CHK,
+then derives the original Battery placements and HP/shield/energy percentages.
+It writes `sc64_p7_battery_properties_generated.h` under the ignored scenario
+directory. Use `--source-root` and `--output` for other local staging paths.
+The public source contains no copied map coordinates or generated properties.
+This preparation does not enable recharge or expose P7 in a campaign build.
+
 The experimental `SC64_P7_ARCHON_SPLASH` combat path is separately gated and
 requires `SC64_P7_ACTORS`, `SC64_ZP_CAMPAIGN_ACTORS` and `SC64_RACES`:
 

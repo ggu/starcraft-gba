@@ -4208,3 +4208,18 @@ the default host fixtures), `make unified` and `make test-unified`.
 Original-art and unified ROMs remain `4ad80ce0…f9aee` and
 `6bab5be2…979f9`. The feature remains off in standard profiles pending the
 remaining qualification.
+
+### P7 Shield Battery property preparation
+
+`tools/sc64_p7_battery_pack.py` authenticates the complete staged P7 CHK with
+the shared scenario packer, checks the bytes again before decoding UNIT, and
+derives Battery placements and starting HP/shield/energy properties into an
+ignored generated header. Public source and synthetic fixtures contain no
+copied source placements. Local generation is byte-identical to the private
+Battery prototype's input header (`de39e075…91527`).
+
+Seven asset-free Python checks cover record truncation, map-edge/owner bounds,
+property validity and authentication failures without writing an output.
+`./dev build` and `./dev test` pass (387 Python tests plus the default host
+fixtures). This qualifies the importer only; Battery gameplay, shared P5/P6
+save integration, ARM replay and complete P7 campaign qualification are separate.
