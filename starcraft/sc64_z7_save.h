@@ -148,6 +148,53 @@ static unsigned race_z7_save_enemy_ling_bound(
     return count;
 }
 
+#ifdef SC64_Z7_EGG_PRODUCTION
+static int race_z7_save_egg_valid(const Sc64RaceMap *map, const Unit *saved,
+                                   unsigned width, unsigned height)
+{
+    int source_owner, duration;
+    if (!map || !saved || saved->type != U_Z7_EGG || saved->raw_type != 36 ||
+        saved->raw_owner < 0 || saved->raw_owner >= 8 ||
+        (saved->raw_owner != 3 && saved->raw_owner != 4) ||
+        !sc64_z7_egg_product_valid(saved->target) ||
+        saved->order != ORDER_IDLE || saved->build != -1 ||
+        saved->maxhp != 200 || saved->hp > 200 ||
+        saved->armor != 10 || saved->shield != 0 ||
+        saved->shield_remainder != 0 || saved->carry != 0 || saved->cd != 0 ||
+        saved->path_timer != 0 || saved->path_retry != 0 ||
+        saved->tx != saved->x || saved->ty != saved->y ||
+        (saved->alive && saved->hp <= 0) || saved->flags != 0 ||
+        saved->x < 0 || saved->y < 0 ||
+        (unsigned)saved->x >= width * 16u ||
+        (unsigned)saved->y >= height * 16u) return 0;
+    source_owner = race_z7_save_source_owner(map, (unsigned)saved->raw_owner);
+    if (source_owner < 0 || source_owner != saved->owner ||
+        map->owner_races[saved->raw_owner] != R_ZERG) return 0;
+    /* The authored Z7 enemy production policy only queues Zerglings. Human
+     * players may use any product accepted by the ordinary larva rules. */
+    if (saved->raw_owner == 4 && saved->target != U_ZERGLING) return 0;
+    duration = sc64_z7_egg_duration(saved->target);
+    if (duration <= 0 || saved->work_timer > duration ||
+        (saved->alive && saved->work_timer == 0)) return 0;
+    return 1;
+}
+
+static unsigned race_z7_save_live_enemy_ling_eggs(const RaceSave *candidate,
+                                                    unsigned width,
+                                                    unsigned height)
+{
+    unsigned count = 0;
+    for (unsigned i = 0; i < MAX_UNITS; ++i) {
+        Unit saved;
+        if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u,
+                                   &saved)) return ~0u;
+        if (saved.alive && saved.type == U_Z7_EGG && saved.raw_owner == 4 &&
+            saved.target == U_ZERGLING) ++count;
+    }
+    return count;
+}
+#endif
+
 static int race_z7_save_human_building_type(int type)
 {
     const Sc64RaceBuildingRule *rule=sc64_race_building_rule(type);
@@ -249,6 +296,16 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
         Unit saved;
         if (!race_save_decode_unit(candidate,i,width*16u,height*16u,&saved) ||
             RACE_SAVE_INV_U(candidate,i)>1u) return 0;
+#ifdef SC64_Z7_EGG_PRODUCTION
+        if (saved.type == U_Z7_EGG || saved.raw_type == 36) {
+            if (!race_z7_save_egg_valid(map, &saved, width, height)) return 0;
+            if (!saved.alive) continue;
+            ++live;
+            if (saved.owner == SIDE && saved.raw_owner == 3)
+                ++live_human_source_actors;
+            continue;
+        }
+#endif
         if (!saved.alive) continue;
         ++live;
         if (saved.owner==SIDE && saved.raw_owner==3)
@@ -301,6 +358,11 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
                 /* The authored AI queues at most one paid egg per 240-tick
                  * pulse; each egg creates two Zerglings. */
                 unsigned bound=race_z7_save_enemy_ling_bound(candidate,state);
+#ifdef SC64_Z7_EGG_PRODUCTION
+                unsigned eggs=race_z7_save_live_enemy_ling_eggs(candidate,width,height);
+                if (eggs==~0u || eggs > (~0u-total)/2u) return 0;
+                total += eggs * 2u;
+#endif
                 if (total>bound) return 0;
             }
         }
@@ -313,6 +375,12 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
         Unit saved;
         if (!race_save_decode_unit(candidate,i,width*16u,height*16u,&saved)) return 0;
         if (race_z7_save_unused_unit(&saved)) continue;
+#ifdef SC64_Z7_EGG_PRODUCTION
+        if (saved.type == U_Z7_EGG || saved.raw_type == 36) {
+            if (!race_z7_save_egg_valid(map, &saved, width, height)) return 0;
+            continue;
+        }
+#endif
         if (saved.raw_owner>=0 || saved.raw_type>=0) {
             if (saved.raw_owner<0 || saved.raw_owner>=8 || saved.raw_type<0 ||
                 saved.raw_type>=228 ||
@@ -361,6 +429,27 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
         if (total>initial) return 0;
     }
 
+#ifdef SC64_Z7_EGG_PRODUCTION
+    /* Raw-36 Eggs are real retained unit slots, but are not source-map
+     * placements. Validate their provenance above and bound the enemy's
+     * unfinished Ling obligations against the same authored AI pulse budget. */
+    {
+        unsigned enemy_lings = 0;
+        unsigned enemy_eggs = race_z7_save_live_enemy_ling_eggs(
+            candidate, width, height);
+        if (enemy_eggs == ~0u) return 0;
+        for (unsigned i = 0; i < MAX_UNITS; ++i) {
+            Unit saved;
+            if (!race_save_decode_unit(candidate, i, width * 16u,
+                                       height * 16u, &saved)) return 0;
+            enemy_lings += saved.raw_owner == 4 && saved.raw_type == 37;
+        }
+        if (enemy_eggs > (~0u - enemy_lings) / 2u ||
+            enemy_lings + enemy_eggs * 2u >
+                race_z7_save_enemy_ling_bound(candidate, state)) return 0;
+    }
+#endif
+
     for (unsigned i=0;i<MAX_BUILDINGS;++i) {
         Building saved;
         if (!race_save_decode_building(candidate,i,&saved) ||
@@ -396,6 +485,9 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
             if (!ur || !br || ur->producer>=SC_RB_COUNT || !ur->build_frames ||
                 ur->race!=br->race ||
                 !sc64_race_producer_compatible(saved.type,ur->producer) ||
+#ifdef SC64_Z7_EGG_PRODUCTION
+                (ur->race==R_ZERG && (ur->flags&SC_RACE_F_LARVA)) ||
+#endif
                 (saved.owner==ENEMY && (saved.raw_owner!=4 || queued_type!=U_ZERGLING)) ||
                 (saved.owner!=SIDE && saved.owner!=ENEMY)) return 0;
             queued += queued_type==U_ZERGLING ? 2u : 1u;

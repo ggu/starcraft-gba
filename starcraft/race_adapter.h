@@ -83,7 +83,11 @@ static int race_owner_supply(int owner)
     for (i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == owner) {
             const Sc64RaceUnitRule *r = sc64_race_unit_rule(u[i].type);
+#ifdef SC64_Z7_EGG_PRODUCTION
+            if (r) total += unit_slot_supply(&u[i]);
+#else
             if (r) total += r->supply;
+#endif
         }
     return total;
 }
@@ -115,6 +119,104 @@ static int race_owner_reserved_supply(int owner)
 {
     return race_owner_supply(owner) + race_owner_queued_supply(owner);
 }
+
+#ifdef SC64_Z7_EGG_PRODUCTION
+/* Egg rows are independent timers. The product and remaining clock live in
+ * fields already serialized for every Unit, so no producer link or extra
+ * mission state is needed. Morphing keeps the Egg slot and its HP fraction. */
+static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
+{
+    Unit *q;
+    const Sc64RaceUnitRule *product;
+    int old_hp, new_hp, old_supply, owner, x, y, second;
+    if (slot < 0 || slot >= MAX_UNITS) return 1;
+    q = &u[slot];
+    if (!q->alive || q->type != U_Z7_EGG) return 1;
+    if (!race_z7_active() || !sc64_z7_egg_product_valid(q->target) ||
+        q->work_timer > sc64_z7_egg_duration(q->target)) {
+        /* Invalid transient data is never allowed to turn into a free unit. */
+        if (q->owner == SIDE) supply_used -= unit_slot_supply(q);
+        q->alive = 0;
+        q->selected = 0;
+        return 1;
+    }
+    if (q->work_timer > 0) --q->work_timer;
+    if (q->work_timer > 0) return 1;
+
+    product = sc64_race_unit_rule(q->target);
+    owner = q->owner;
+    x = q->x;
+    y = q->y;
+    old_hp = q->hp;
+    old_supply = unit_slot_supply(q);
+    new_hp = product->hp > 0 ? (old_hp * product->hp) / 200 : 1;
+    if (new_hp < 1) new_hp = 1;
+
+    q->type = q->target;
+#ifdef SC64_COLLISION_CLASS_CACHE
+    /* The cached class is keyed by unit slot, while this Egg keeps its slot
+     * and changes type at birth. */
+    sc64_unit_collision_class_invalidate(slot);
+#endif
+    q->maxhp = product->hp;
+    q->hp = new_hp > q->maxhp ? q->maxhp : new_hp;
+    q->shield = product->shields;
+    q->shield_remainder = 0;
+    q->armor = sc64_race_unit_armor(q->type);
+    q->weapon = owner == SIDE ? weapons_level : 0;
+    q->raw_type = sc64_race_raw_unit(q->type);
+    q->raw_owner = race_z7_product_source_owner(owner);
+    q->order = ORDER_IDLE;
+    q->target = -1;
+    q->tx = x;
+    q->ty = y;
+    q->carry = 0;
+    q->build = -1;
+    q->work_timer = 0;
+    q->path_timer = 0;
+    q->path_retry = 0;
+    q->path_x = x;
+    q->path_y = y;
+    q->flags = 0;
+    if (owner == SIDE) supply_used += unit_supply(q->type) - old_supply;
+
+    /* Brood War attempts the paired Ling as one birth event. If the unit pool
+     * is full, it still completes the first Ling and does not retry later. */
+    if (sc64_z7_egg_product_count(q->type) == 2) {
+        second = spawn_unit(owner, q->type, x + 8 < WORLD_W - 8 ? x + 8 : x - 8, y);
+        (void)second;
+    }
+    return 1;
+}
+
+static int race_z7_egg_cancel_available(void)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].selected && u[i].owner == SIDE &&
+            u[i].type == U_Z7_EGG && sc64_z7_egg_product_valid(u[i].target))
+            return 1;
+    return 0;
+}
+
+static int race_z7_egg_cancel_selected(void)
+{
+    int canceled = 0;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        Unit *q = &u[i];
+        const Sc64RaceUnitRule *product;
+        if (!q->alive || !q->selected || q->owner != SIDE ||
+            q->type != U_Z7_EGG || !sc64_z7_egg_product_valid(q->target))
+            continue;
+        product = sc64_race_unit_rule(q->target);
+        race_add_owner_resources(q->owner, product->minerals, product->gas);
+        supply_used -= unit_slot_supply(q);
+        q->alive = 0;
+        q->selected = 0;
+        ++canceled;
+    }
+    return canceled;
+}
+#endif
 
 static int race_owner_has_prereq(int owner, unsigned short prereq)
 {
@@ -215,14 +317,27 @@ static int race_owner_worker(int owner, int type, int x, int y)
 static int race_queue_unit(int owner, int producer, int type)
 {
     int tail, count, reserved, cap;
+#ifdef SC64_Z7_EGG_PRODUCTION
+    int egg_job = 0;
+#endif
     const Sc64RaceUnitRule *r = sc64_race_unit_rule(type);
     Sc64RaceBank bank;
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_airborne(producer)) return 0;
 #endif
+#ifdef SC64_Z7_EGG_PRODUCTION
     if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) || !building_complete(producer) ||
-        b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type, r->producer) || b[producer].queue_count >= 5 ||
+        b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type, r->producer) ||
         !race_owner_has_prereq(owner, r->prereq)) return 0;
+    egg_job = race_z7_active() && owner >= 0 && owner < 5 &&
+        race_owner_identity(owner) == R_ZERG && sc64_z7_egg_product_valid(type) &&
+        (owner != ENEMY || type == U_ZERGLING);
+    if (!egg_job && b[producer].queue_count >= 5) return 0;
+#else
+    if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) || !building_complete(producer) ||
+        b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type, r->producer) ||
+        b[producer].queue_count >= 5 || !race_owner_has_prereq(owner, r->prereq)) return 0;
+#endif
 #ifdef SC64_T5_RUNTIME
     if (!race_t5_unit_product_available(owner, b[producer].raw_owner, type)) return 0;
     if (type == U_DROPSHIP && race_t5_active() &&
@@ -275,13 +390,46 @@ static int race_queue_unit(int owner, int producer, int type)
     cap = race_owner_supply_cap(owner);
     /* Zero-supply units (notably Overlords) must remain producible while
        over the current cap so the player can restore supply. */
+#ifdef SC64_Z7_EGG_PRODUCTION
+    if (egg_job) count = sc64_z7_egg_product_count(type);
+#endif
     if (r->supply && reserved + r->supply * count > cap) return 0;
+#ifdef SC64_Z7_EGG_PRODUCTION
+    if (egg_job) {
+        int free_slots = 0;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+        if (!free_slots) return 0;
+    }
+#endif
     bank.minerals = (unsigned short)race_owner_minerals(owner);
     bank.gas = (unsigned short)race_owner_gas(owner);
     if (!sc64_race_pay_unit(&bank, type)) return 0;
     if (owner == SIDE) { minerals = bank.minerals; gas = bank.gas; }
     else { race_minerals[owner] = bank.minerals; race_gas[owner] = bank.gas; }
     if (r->flags & SC_RACE_F_LARVA) --b[producer].larva;
+#ifdef SC64_Z7_EGG_PRODUCTION
+    if (egg_job) {
+        int x = b[producer].x + 20, y = b[producer].y + 4;
+        int slot;
+        if (x >= WORLD_W - 8) x = b[producer].x - 20;
+        slot = spawn_unit(owner, U_Z7_EGG, x, y);
+        if (slot < 0) {
+            /* Admission checked for a slot before debiting the bank. This is
+             * defensive against a future synchronous spawn side effect. */
+            race_add_owner_resources(owner, r->minerals, r->gas);
+            ++b[producer].larva;
+            return 0;
+        }
+        u[slot].target = type;
+        u[slot].work_timer = (u16)sc64_z7_egg_duration(type);
+        u[slot].raw_type = 36;
+        u[slot].maxhp = 200;
+        u[slot].hp = 200;
+        u[slot].armor = 10;
+        if (owner == SIDE) supply_used += sc64_z7_egg_reserved_supply(type);
+        return 1;
+    }
+#endif
     tail = (b[producer].queue_head + b[producer].queue_count) % 5;
     b[producer].queue[tail] = type;
     ++b[producer].queue_count;
@@ -425,7 +573,7 @@ static void race_tick_state(void)
                                              &u[i].shield_remainder, 0);
         }
 #endif
-        if(u[i].owner==SIDE){used+=r->supply;cap+=sc64_race_unit_supply_provided(u[i].type);}
+        if(u[i].owner==SIDE){used+=unit_slot_supply(&u[i]);cap+=sc64_race_unit_supply_provided(u[i].type);}
         if (r->shields && u[i].shield < r->shields) {
             unsigned short value = (unsigned short)u[i].shield;
             unsigned short rem = (unsigned short)u[i].shield_remainder;

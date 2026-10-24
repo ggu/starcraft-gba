@@ -3829,3 +3829,122 @@ interval, not a full-mission average, physical GBA measurement or a candidate's
 own fresh-process save qualification. The gate remains off pending wider
 qualification. With the gate off, the six-gate ARM ROM is byte-identical to
 `bed9feb7…9bc2f`.
+
+
+### Experimental independent Z7 Egg production
+
+The default-off `SC64_Z7_EGG_PRODUCTION` path creates a real raw-36 Egg in an
+existing Unit slot for each paid larva product in Z7. Product identity and
+remaining time use the existing target/timer fields. The Egg is stationary,
+ground-targetable, has 200 HP, 10 armor, source collision bounds and four-tile
+sight, and cannot attack. The pinned BWAPI facts and OpenBW morph, cancellation
+and paired-birth lifecycle guide this path. Ordinary acquisition prefers an
+eligible non-Egg target before an Egg, with nearest-target selection within
+those categories; this is a bounded priority adaptation, not the full native
+priority scoring system.
+
+Jobs advance independently; three is the live-larva cap rather than an active
+Egg cap. Regeneration can therefore produce more than three concurrent Eggs
+from one Hatchery. Eggs do not depend on a producer link, so losing or reusing
+its building slot cannot cancel or transfer a job. At hatch, the same actor
+slot changes to the product and retains its integer HP fraction. Zergling and
+Scourge pairs attempt the second actor once; pool exhaustion completes only
+the first and releases the second output's reserved supply. Product costs,
+source durations and the existing 30-update conversion are preserved. No
+actor fields, persistent arrays or save bytes are added.
+
+The selected-unit CANCEL EGG command refunds the full product cost and removes
+the Egg; it does not turn it back into a Drone. STOP and ordinary movement
+commands cannot erase its product. Contextual supply accounts for both pending
+outputs through admission, hatch, cancellation, damage/death and save/load.
+The gate uses save generation 36 and rejects older serial-queue records.
+Candidate validation is read-only and checks Egg provenance, product, timer,
+canonical combat fields, outcome participation, and enemy Ling obligations
+against the unchanged authored AI pulse bound. Legitimate over-cap armies and
+a paired Egg with no extra free actor slot remain valid.
+
+Actual-engine ASan/UBSan fixtures cover three concurrent timers, five live Eggs
+following larva regeneration, producer death and slot reuse, damaged hatch HP,
+full-refund command dispatch, STOP preservation, both paired products and the
+one-output fallback, source traits and ordinary/manual targeting. The save
+fixture checks mid-Egg round trips, candidate byte immutability, valid over-cap
+and full-pool states, enemy provenance and paid-product bounds, and transactional
+rejection of forged products, timers, armor/shields and legacy larva queues.
+
+This remains a staged runtime adaptation. Larvae are still producer counters
+rather than wandering actors; Egg placement, hatch offsets and immediate timer
+completion do not reproduce native Larva motion or IScript birth timing.
+Existing product prerequisites and unsupported abilities retain their documented
+limits. The gate is off in standard profiles pending full Z7 mission and
+fresh-process SRAM qualification.
+
+
+The Egg ARM build (`c8c5945f…d27ab9`) links with IWRAM end `0x03004fe0`
+and BSS end `0x0203d9f0`. The hatch-processing body stays in ROM to preserve
+the unchanged fast-RAM/stack reserve. With the Egg gate off, the prior
+Z7 direct-attack-plus-construction-HP ROM is byte-identical to
+`bcecf4b5…28254`. These are focused host and ARM link checks; a complete Z7
+mission and a fresh-process mid-Egg SRAM continuation remain unqualified.
+
+### Experimental Z7 source sight
+
+The default-off `SC64_Z7_SOURCE_SIGHT` gate supplies pinned base sight ranges
+for supported Zerg types only during Z7. Mutalisks and Drones use seven source
+tiles, Hydralisks six, Overlords nine and Guardians eleven; each source tile
+is 32 pixels and the GBA world is half scale. All 36 raw-type table entries
+were independently compared with the pinned BWAPI sight-range table.
+
+An ordinary unfinished grounded building uses four source tiles. Lair, Hive
+and Greater Spire upgrades retain the predecessor's range until completion;
+colony morphs retain Creep Colony sight. A derived key in the existing building
+visibility snapshot makes completion/morph transitions at fixed coordinates
+remove the old footprint and add the new one. No snapshot fields, persistent
+arrays or save bytes are added.
+
+ASan/UBSan fixtures pass in both the ordinary Z7 and Egg-enabled configurations.
+They compare incremental source counts and fog bits against a fresh scan for
+movement, loading/unloading, removal, map-edge clipping, construction completion
+and a real Hatchery-to-Lair morph. Inactive profiles preserve their existing
+range policy. The combined Egg/source-sight ARM ROM (`f8abb6c8…3cdadf`) links
+at IWRAM `0x03004fe8` and unchanged BSS `0x0203d9f0` under the fixed reserves.
+
+This uses the existing circle/cell-center visibility rasterizer; it does not
+implement native terrain-height occlusion, blindness or sight upgrades.
+The pre-arrival foundation still follows the existing placement approximation.
+These tests do not qualify a full Z7 win, fresh-process SRAM or physical GBA
+performance, and standard profiles leave this gate off.
+
+The same normal-input Z7 controller was run with independent Eggs alone and
+with Eggs plus source sight, retaining identical costs, timers and tactics.
+Both lose: frame 15,988 (16,469 host updates) and frame 16,874 (17,406 host
+updates), respectively. The traces verify paid Egg admissions, but workers,
+army and the last Hatchery are lost before the objective is cleared. The
+controller's delayed interception of northern Guardians remains under study;
+the longer survival is not a mission qualification or performance measurement.
+
+The final Egg/source-sight source snapshot passes `./dev build`, `./dev test`
+(380 Python tests plus the default host fixtures), `make unified` and
+`make test-unified`. With the experimental gates off, original-art and unified
+ROMs remain byte-identical to `4ad80ce0…f9aee` and `6bab5be2…979f9`.
+The separate focused Egg core/save and source-sight sanitizer suites pass,
+including source sight with and without Egg production. A read-only source
+review found no additional lifecycle, supply, save or visibility defects;
+that review does not replace runtime campaign and SRAM qualification.
+
+
+### PACK3 word-clear full ARM follow-up
+
+The word-clear candidate also completes the full 124,689-tick P3 expansion
+replay, using 5,932 input transitions. It wins at frame 123,916 and matches all
+126 reported gameplay checkpoints against the frozen baseline. The mean over
+live-play intervals is 13.88 effective fps, compared with 13.81 for the previous
+six-gate candidate and 12.35 for the original baseline. This verifies a modest
+full-mission gain, without closing the near-30-fps goal. Candidate-generated
+SRAM and wider-profile qualification remain separate from this full win.
+
+The same word-clear ROM separately passes a 12,000-input opening replay with
+all 13 reported gameplay checkpoints and three captures matching the frozen
+baseline. Its measured opening mean is 18.01 effective fps versus 17.6234.
+It then resumes its own generated SRAM in a new emulator process through the
+ordinary HOME / load path, with exact persisted observations at frame 11,824.
+Late-campaign SRAM and wider-profile qualification remain separate.

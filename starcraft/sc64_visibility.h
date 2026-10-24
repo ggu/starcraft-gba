@@ -1,6 +1,10 @@
 #ifndef SC64_VISIBILITY_H
 #define SC64_VISIBILITY_H
 
+#ifdef SC64_Z7_SOURCE_SIGHT
+#include "sc64_z7_source_sight.h"
+#endif
+
 #ifndef SC64_TRANSPORT_LOADED
 #define SC64_TRANSPORT_LOADED(q) 0
 #endif
@@ -133,6 +137,10 @@ sc64_visibility_same(const Sc64VisibilitySnapshot *old, int active,
 static int __attribute__((noinline))
 sc64_actor_unit_sight_pixels(int type)
 {
+#ifdef SC64_Z7_SOURCE_SIGHT
+    int z7_pixels = sc64_z7_source_unit_sight_pixels(type);
+    if (z7_pixels) return z7_pixels;
+#endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     int pixels = sc64_zp_actor_sight_source_pixels(type);
     if (pixels) return pixels;
@@ -147,6 +155,10 @@ sc64_actor_unit_sight_pixels(int type)
 static int __attribute__((noinline))
 sc64_actor_building_sight_pixels(int type)
 {
+#ifdef SC64_Z7_SOURCE_SIGHT
+    int z7_pixels = sc64_z7_source_building_sight_pixels(type);
+    if (z7_pixels) return z7_pixels;
+#endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     int pixels = sc64_zp_building_sight_source_pixels(type);
     if (pixels) return pixels;
@@ -566,19 +578,33 @@ sc64_update_exploration(void)
         int x = active ? b[i].x : 0;
         int y = active ? b[i].y : 0;
         int type = active ? b[i].type : 0;
+#ifdef SC64_Z7_SOURCE_SIGHT
+        int sight_key = active ? sc64_z7_building_visibility_key(&b[i]) : 0;
+        if (sc64_visibility_same(old, active, x, y, sight_key))
+#else
         if (sc64_visibility_same(old, active, x, y, type))
+#endif
             continue;
         if (old->active)
             sc64_adjust_building_visibility(old->x, old->y, old->type, -1);
         if (active) {
+#ifdef SC64_Z7_SOURCE_SIGHT
+            sc64_explore_building(x, y, sight_key);
+            sc64_adjust_building_visibility(x, y, sight_key, 1);
+#else
             sc64_explore_building(x, y, type);
             sc64_adjust_building_visibility(x, y, type, 1);
+#endif
         }
         old->active = (u8)active;
         if (active) {
             old->x = x;
             old->y = y;
+#ifdef SC64_Z7_SOURCE_SIGHT
+            old->type = sight_key;
+#else
             old->type = type;
+#endif
         }
     }
 }

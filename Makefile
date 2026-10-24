@@ -2267,6 +2267,27 @@ test-sc64-route-word-clear: build/test-sc64-route-word-clear-128x128 build/test-
 	./build/test-sc64-route-word-clear-10x10
 test-starcraft: test-sc64-route-word-clear
 
+Z7_EGG_PROBE_FLAGS := $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_ATTACK -DSC64_Z7_EGG_PRODUCTION
+build/test-sc64-z7-egg-production: tests/sc64_z7_egg_production_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_EGG_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-egg-save: tests/sc64_z7_egg_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_EGG_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-egg-production test-sc64-z7-egg-save
+test-sc64-z7-egg-production: build/test-sc64-z7-egg-production
+	./build/test-sc64-z7-egg-production
+test-sc64-z7-egg-save: build/test-sc64-z7-egg-save
+	./build/test-sc64-z7-egg-save
+
+Z7_SOURCE_SIGHT_FLAGS := $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_ATTACK -DSC64_Z7_SOURCE_SIGHT
+build/test-sc64-z7-source-sight: tests/sc64_z7_source_sight_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SOURCE_SIGHT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-source-sight-eggs: tests/sc64_z7_source_sight_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SOURCE_SIGHT_FLAGS) -DSC64_Z7_EGG_PRODUCTION $< common/gba.c -o $@
+.PHONY: test-sc64-z7-source-sight
+test-sc64-z7-source-sight: build/test-sc64-z7-source-sight build/test-sc64-z7-source-sight-eggs
+	./build/test-sc64-z7-source-sight
+	./build/test-sc64-z7-source-sight-eggs
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build

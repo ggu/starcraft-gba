@@ -1626,3 +1626,50 @@ The asset-free sanitizer fixture runs 128×128, 128×96 and 10×10 maps, includi
 unaligned 38-byte rows, canaries and independent BFS field comparisons. It is
 part of the default test suite. [Validation](VALIDATION.md#experimental-packed-route-field-initialization)
 records the full host parity and limited ARM timing evidence.
+
+
+### Experimental independent Z7 Egg production
+
+`SC64_Z7_EGG_PRODUCTION` requires the race and Z7 runtimes and is active only
+in Z7. Ordinary larva products become independently ticking raw-36 Egg actors
+instead of serialized producer queue entries. The existing live-larva cap is
+three; it does not cap Eggs. Started Eggs survive Hatchery death and slot reuse.
+The authored enemy policy still buys Zerglings at its existing pulse cadence.
+
+With the private Z7 inputs already prepared:
+
+```sh
+make test-sc64-z7-egg-production
+make test-sc64-z7-egg-save
+```
+
+Select your Egg, open the command menu and choose **CANCEL EGG** to receive the
+full product mineral/gas refund. STOP and movement commands leave its paid
+product intact. Both Zergling and Scourge Eggs reserve supply for two outputs.
+If no slot exists for the second unit at hatch, the first completes and the
+second is attempted only once, matching the pinned reference's allocation
+failure behavior.
+
+This gate uses save generation 36; generation-35 internal Z7 records are
+rejected. Standard profiles keep the gate off. See
+[Validation](VALIDATION.md#experimental-independent-z7-egg-production) for
+runtime, save and fidelity limits.
+
+
+### Experimental Z7 source sight
+
+`SC64_Z7_SOURCE_SIGHT` uses the pinned base sight ranges for supported Zerg
+units and buildings only while Z7 is active. It replaces generic worker/army
+radii with the type's source range, while retaining the existing GBA rasterizer.
+Ordinary unfinished buildings use four source tiles; upgrades retain their
+predecessor sight until completion. The existing visibility snapshot encodes
+that derived state without adding storage or changing saves.
+
+```sh
+make test-sc64-z7-source-sight
+```
+
+The fixture runs with and without independent Egg production. It compares
+incremental visibility with a fresh scan through movement, transport, removal,
+construction and real morph transitions. Standard profiles leave both gates
+off until mission and fresh-process SRAM qualification.

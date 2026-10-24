@@ -78,6 +78,10 @@ enum {
     /* P7-scoped Protoss identities stay separate from Terran-late aliases. */
     U_P7_ARCHON, U_P7_ARBITER, U_P7_CARRIER, U_P7_OBSERVER,
 #endif
+#ifdef SC64_Z7_EGG_PRODUCTION
+    /* Raw 36 is a real, independently ticking Zerg Egg actor. */
+    U_Z7_EGG,
+#endif
     SC_RU_COUNT
 };
 enum {
@@ -300,6 +304,11 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     , [U_P7_CARRIER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 12, 350, 250, 2100, 300, 150, 0 }
     , [U_P7_OBSERVER] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 2, 25, 75, 600, 40, 20, 0 }
 #endif
+#ifdef SC64_Z7_EGG_PRODUCTION
+    /* Egg stats are raw36; product cost, supply and duration live on its
+       target actor while it is unfinished. */
+    , [U_Z7_EGG] = { R_ZERG, 0, 255, 0, 0, 0, 0, 200, 0, 0 }
+#endif
 };
 
 static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
@@ -491,6 +500,9 @@ static inline const char *sc64_race_unit_name(int type)
 #endif
 #ifdef SC64_P7_ACTORS
         ,"ARCHON","ARBITER","CARRIER","OBSERVER"
+#endif
+#ifdef SC64_Z7_EGG_PRODUCTION
+        ,"EGG"
 #endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
@@ -1113,6 +1125,9 @@ static inline int sc64_race_unit_hits_vs(int type, int target_flying)
 }
 static inline int sc64_race_unit_armor(int type)
 {
+#ifdef SC64_Z7_EGG_PRODUCTION
+    if (type == U_Z7_EGG) return 10;
+#endif
 #ifdef SC64_Z6_ACTORS
     if (type == U_Z6_GUARDIAN) return 2;
 #endif
@@ -1226,6 +1241,9 @@ static inline int sc64_race_raw_unit(int type)
 #ifdef SC64_P7_ACTORS
     case U_P7_ARCHON: return 68; case U_P7_ARBITER: return 71;
     case U_P7_CARRIER: return 72; case U_P7_OBSERVER: return 84;
+#endif
+#ifdef SC64_Z7_EGG_PRODUCTION
+    case U_Z7_EGG: return 36;
 #endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     case U_SCIENCE_VESSEL: return 9; case U_BATTLECRUISER: return 12;
@@ -1408,6 +1426,9 @@ static inline int sc64_race_unit_from_raw(int raw)
 #ifdef SC64_P7_ACTORS
     case 68: return U_P7_ARCHON; case 71: return U_P7_ARBITER;
     case 72: return U_P7_CARRIER; case 84: return U_P7_OBSERVER;
+#endif
+#ifdef SC64_Z7_EGG_PRODUCTION
+    case 36: return U_Z7_EGG;
 #endif
     default: return -1;
     }
