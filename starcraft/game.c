@@ -18,6 +18,12 @@ int memcmp(const void *a, const void *b, size_t n);
 #ifdef SC64_Z6_RUNTIME
 #include "sc64_z6_state.h"
 #endif
+#ifdef SC64_Z7_RUNTIME
+#if !defined(SC64_Z6_RUNTIME) || !defined(SC64_Z5_RUNTIME)
+#error "Z7 runtime extends the complete Zerg campaign storage chain"
+#endif
+#include "sc64_z7_state.h"
+#endif
 
 #if defined(SC64_P4_STORM_ENABLED) && !defined(SC64_P4_RUNTIME)
 #error "SC64_P4_STORM_ENABLED requires SC64_P4_RUNTIME"
@@ -130,7 +136,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_Z6_TRANSPORT_ENABLED)
+#if defined(SC64_Z7_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 33u
+#elif defined(SC64_Z6_TRANSPORT_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 32u
 #elif defined(SC64_Z6_CLOAK_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 31u
@@ -941,6 +949,12 @@ static int race_z6_transport_research_selected(void);
 static int race_z6_transport_start_research_selected(void);
 #endif
 #endif
+#ifdef SC64_Z7_RUNTIME
+static Sc64Z7PersistentState race_z7;
+static int race_z7_active(void);
+static int race_z7_source_owner(unsigned source_slot);
+static int race_z7_product_source_owner(int owner);
+#endif
 #ifdef SC64_P6_COMBAT_ENABLED
 static int race_p6_combat_unit_burrowed(int slot);
 static int race_p6_combat_target_detected(int target, int viewer_owner);
@@ -1359,6 +1373,12 @@ spawn_unit(int owner, int type, int x, int y)
         u[i].raw_owner = race_z6_product_source_owner(owner);
     }
 #endif
+#ifdef SC64_Z7_RUNTIME
+    if (race_z7_active()) {
+        u[i].raw_type = sc64_race_raw_unit(type);
+        u[i].raw_owner = race_z7_product_source_owner(owner);
+    }
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) {
         u[i].raw_type = sc64_race_raw_unit(type);
@@ -1469,6 +1489,12 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     if (race_z6_active()) {
         b[i].raw_type = sc64_race_raw_building(type);
         b[i].raw_owner = race_z6_product_source_owner(owner);
+    }
+#endif
+#ifdef SC64_Z7_RUNTIME
+    if (race_z7_active()) {
+        b[i].raw_type = sc64_race_raw_building(type);
+        b[i].raw_owner = race_z7_product_source_owner(owner);
     }
 #endif
 #ifdef SC64_T5_RUNTIME

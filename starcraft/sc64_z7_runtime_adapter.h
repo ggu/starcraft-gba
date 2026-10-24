@@ -20,7 +20,7 @@ enum {
     SC64_Z7_RUNTIME_FAULT_AI = 0x53
 };
 
-static Sc64Z7PersistentState race_z7;
+/* Persisted state is declared beside the engine's other mission states. */
 static Sc64Z7WorldContext race_z7_world;
 static Sc64Z7WorldOps race_z7_ops;
 static const Sc64RaceMap *race_z7_map;
@@ -38,6 +38,13 @@ static int race_z7_source_owner(unsigned slot)
         map=&sc64_race_maps[SC64_Z7_GLOBAL_ID];
     if (!map || slot>=8u || !map->owner_modes || map->human_slot>=8u) return -1;
     return slot==map->human_slot ? SIDE : map->owner_modes[slot];
+}
+
+static int race_z7_product_source_owner(int owner)
+{
+    /* Authenticated Z7 has exactly one live human and one hostile source
+       owner; the strict map-shape preflight enforces these bindings. */
+    return owner==SIDE ? 3 : owner==ENEMY ? 4 : -1;
 }
 
 static int race_z7_map_shape_valid(const Sc64RaceMap *map)

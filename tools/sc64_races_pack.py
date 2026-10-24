@@ -108,6 +108,11 @@ RUNTIME_UNIT_RAW_IDS_ZERG = {
 }
 RUNTIME_UNIT_RAW_IDS_PROTOSS = RUNTIME_UNIT_RAW_IDS_ZERG - {11}
 RUNTIME_BUILDING_RAW_IDS = BUILDING_RAW_IDS | {194}
+# Capabilities supplied by the opt-in Z7 profile's combined ZP and Z6 actor
+# gates. Keep these separate from the canonical baseline sets above: raw 39,
+# raw 44, and buildings 138/140 are not available in early race profiles.
+RUNTIME_UNIT_RAW_IDS_Z7 = RUNTIME_UNIT_RAW_IDS_ZERG | {39, 44}
+RUNTIME_BUILDING_RAW_IDS_Z7 = RUNTIME_BUILDING_RAW_IDS | {138, 140}
 RESOURCE_RAW_IDS = {176, 177, 178, 188}
 RETAINED_SOURCE_RECORDS = {
     b'UNIT': 'UNIT.bin', b'DIM ': 'DIM.bin', b'ERA ': 'ERA.bin',
@@ -405,13 +410,28 @@ def verify_extractor_source(path: Path | None = None) -> None:
         raise ValueError('pinned BOLT extractor source differs from its committed bytes')
 
 
-def source_actor_audit(rows: list[dict], race: int) -> dict:
-    """Classify source placements and report current profile mapping gaps."""
+def source_actor_audit(rows: list[dict], race: int,
+                       support_profile: str = 'legacy') -> dict:
+    """Classify source placements and report the selected profile's mapping gaps.
+
+    ``legacy`` preserves the original common-profile capability census.
+    ``z7`` adds only the actor/building bindings enabled by the Z7 profile's
+    ZP and Z6 gates; it does not imply those bindings exist in earlier ROMs.
+    """
+    if support_profile not in ('legacy', 'z7'):
+        raise ValueError(f'unknown runtime support profile: {support_profile}')
+    if support_profile == 'z7' and race != 1:
+        raise ValueError('the Z7 support profile is only valid for Zerg')
     counts = Counter(row['source_type'] for row in rows)
     categories = Counter()
     unsupported = Counter()
-    units_supported = (RUNTIME_UNIT_RAW_IDS_ZERG if race == 1
-                       else RUNTIME_UNIT_RAW_IDS_PROTOSS)
+    if support_profile == 'z7':
+        units_supported = RUNTIME_UNIT_RAW_IDS_Z7
+        buildings_supported = RUNTIME_BUILDING_RAW_IDS_Z7
+    else:
+        units_supported = (RUNTIME_UNIT_RAW_IDS_ZERG if race == 1
+                           else RUNTIME_UNIT_RAW_IDS_PROTOSS)
+        buildings_supported = RUNTIME_BUILDING_RAW_IDS
     for raw_type, count in counts.items():
         if raw_type == 214:
             categories['start_markers'] += count
@@ -421,7 +441,7 @@ def source_actor_audit(rows: list[dict], race: int) -> dict:
             categories['geysers'] += count
         elif raw_type in SOURCE_BUILDING_RAW_IDS:
             categories['building_slots'] += count
-            if raw_type not in RUNTIME_BUILDING_RAW_IDS:
+            if raw_type not in buildings_supported:
                 unsupported[raw_type] += count
         elif raw_type in SOURCE_UNIT_RAW_IDS:
             categories['unit_slots'] += count
@@ -661,7 +681,9 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             if len(units) != len(source_units) - source_starts:
                 raise ValueError(f'{mission_id} importer did not retain every non-start UNIT row')
             race = 1 if mission_id.startswith('Z') else 2
-            reports[-1].update(source_actor_audit(source_units, race))
+            reports[-1].update(source_actor_audit(
+                source_units, race,
+                support_profile='z7' if mission_id == 'Z7' else 'legacy'))
             reports[-1]['source_unit_records'] = len(source_units)
             reports[-1]['runtime_unit_records'] = len(units)
             reports[-1]['runtime_unit_rows_are_all_non_start_source_rows'] = True

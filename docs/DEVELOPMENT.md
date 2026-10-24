@@ -1114,9 +1114,26 @@ make test-sc64-p7-model test-sc64-p7-adapter
 ```
 
 Z7's world/runtime fixture uses all 231 canonical rows and a bounded paid
-Zerg AI policy. P7 has an isolated world foundation with separate source-Force wallets; its
-canonical roster fails closed on missing raw68/71/72 actor bindings. Neither
-has shared menu/save integration or a completed controller playthrough.
+Zerg AI policy. Its opt-in shared-engine profile now includes a seventh menu
+entry, source objective outcomes and generation-33 saves:
+
+```sh
+make zerg-z7-probe
+make test-sc64-z7-profile test-sc64-z7-game-save test-sc64-z7-frame-coverage
+```
+
+This produces `build/StarCraft-Zerg-Z7-Probe-GBA.gba` (SCZF). It requires the
+complete Z6 inputs above and the Z7 scenario descriptor. It retains the source
+starting roster and resources; build a base and destroy the hostile source
+owner's buildings while preserving at least one human actor. Menu/startup,
+save rejection and render checks establish integration readiness, not a
+completed playthrough or full-mission performance result. Its save generation
+differs from the Z6 probe; older saves are rejected rather than converted.
+
+P7 has an isolated world foundation with separate source-Force wallets; its
+canonical roster fails closed on missing raw68/71/72 actor bindings. It still
+lacks shared menu/save integration. Neither seventh mission has a completed
+controller playthrough.
 
 
 The sixth-mission probes require their authenticated spell metadata:

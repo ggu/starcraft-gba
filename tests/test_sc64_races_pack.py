@@ -285,6 +285,38 @@ class FullCampaignSourceAuditTests(unittest.TestCase):
             {'raw_type': 196, 'count': 1, 'source_class': 'building'},
         ])
 
+    def test_z7_gated_support_does_not_change_legacy_capability_report(self):
+        rows = ([{'source_type': 39} for _ in range(5)] +
+                [{'source_type': 44} for _ in range(5)] +
+                [{'source_type': 138}, {'source_type': 140},
+                 {'source_type': 52}, {'source_type': 136}])
+        legacy = source_actor_audit(rows, race=1)
+        self.assertEqual(legacy['source_pool_demand']['unit_slots'], 11)
+        self.assertEqual(legacy['source_pool_demand']['building_slots'], 3)
+        self.assertEqual(legacy['unsupported_or_unclassified_raw_types'], [
+            {'raw_type': 39, 'count': 5, 'source_class': 'unit'},
+            {'raw_type': 44, 'count': 5, 'source_class': 'unit'},
+            {'raw_type': 52, 'count': 1, 'source_class': 'unit'},
+            {'raw_type': 136, 'count': 1, 'source_class': 'building'},
+            {'raw_type': 138, 'count': 1, 'source_class': 'building'},
+            {'raw_type': 140, 'count': 1, 'source_class': 'building'},
+        ])
+
+        z7 = source_actor_audit(rows, race=1, support_profile='z7')
+        self.assertEqual(z7['source_pool_demand'], legacy['source_pool_demand'])
+        self.assertEqual(z7['unsupported_or_unclassified_raw_types'], [
+            {'raw_type': 52, 'count': 1, 'source_class': 'unit'},
+            {'raw_type': 136, 'count': 1, 'source_class': 'building'},
+        ])
+
+    def test_z7_support_profile_is_explicit_and_race_scoped(self):
+        with self.assertRaisesRegex(ValueError, 'unknown runtime support profile'):
+            source_actor_audit([{'source_type': 39}], race=1,
+                               support_profile='campaign')
+        with self.assertRaisesRegex(ValueError, 'only valid for Zerg'):
+            source_actor_audit([{'source_type': 39}], race=2,
+                               support_profile='z7')
+
     def test_source_placement_categories_scope_raw_195_to_z5(self):
         self.assertEqual(source_placement_category(195, 9, 'T4'), 'unclassified')
         self.assertEqual(source_placement_category(195, 10, 'T5'), 'building')

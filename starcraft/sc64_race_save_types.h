@@ -121,12 +121,13 @@ typedef struct {
     Sc64P4RuntimeState p4;
 #endif
 #if defined(SC64_Z5_RUNTIME) && defined(SC64_Z6_RUNTIME)
-    /* Z5 and Z6 are mutually exclusive campaign missions. Keep Z6 in the
-     * existing larger Z5 payload so adding the final Protoss stage does not
-     * grow the SRAM record. */
+    /* Mutually exclusive campaign missions share the larger Z5 payload. */
     union {
         Sc64Z5PersistentState z5;
         Sc64Z6PersistentState z6;
+#ifdef SC64_Z7_RUNTIME
+        Sc64Z7PersistentState z7;
+#endif
     };
 #elif defined(SC64_Z5_RUNTIME)
     Sc64Z5PersistentState z5;

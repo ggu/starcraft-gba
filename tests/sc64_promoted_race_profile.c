@@ -11,7 +11,18 @@
 #error "Compile with a promoted unified Zerg or Protoss profile"
 #endif
 
-#if SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z6_RUNTIME)
+#if SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z7_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_ZERG
+#define PROFILE_FRONT_FACTION SC_FRONT_ZERG
+#define PROFILE_RACE R_ZERG
+#define PROFILE_SAVE_GENERATION 33u
+#define PROFILE_OLD_SAVE_TAG 0x53435a32u
+static const int profile_missions[] = {0, 1, 14, 15, 16, 17, 18};
+static const char *const profile_titles[] = {
+    "AMONG THE RUINS", "EGRESSION", "THE NEW DOMINION", "AGENT OF THE SWARM",
+    "THE AMERIGO", "THE DARK TEMPLAR", "THE CULLING"
+};
+#elif SC64_CAMPAIGN_RACE == 1 && defined(SC64_Z6_RUNTIME)
 #define PROFILE_FACTION SC64_FACTION_ZERG
 #define PROFILE_FRONT_FACTION SC_FRONT_ZERG
 #define PROFILE_RACE R_ZERG
@@ -210,7 +221,9 @@ static void reject_generation2_save(int mission, int legacy_container)
     int old_map = race_skirmish_map;
     int old_bot_races[3];
     memcpy(old_bot_races, race_bot_races, sizeof(old_bot_races));
-#if defined(SC64_Z4_RUNTIME)
+#if defined(SC64_Z7_RUNTIME)
+    Sc64Z7PersistentState old_profile_state = race_z7;
+#elif defined(SC64_Z4_RUNTIME)
     Sc64Z4RuntimeState old_profile_state = race_z4;
 #elif defined(SC64_P4_RUNTIME)
     Sc64P4RuntimeState old_profile_state = race_p4;
@@ -237,7 +250,9 @@ static void reject_generation2_save(int mission, int legacy_container)
            race_human == old_human && race_bots == old_bots &&
            race_completed == old_completed && race_skirmish_map == old_map);
     assert(memcmp(old_bot_races, race_bot_races, sizeof(old_bot_races)) == 0);
-#if defined(SC64_Z4_RUNTIME)
+#if defined(SC64_Z7_RUNTIME)
+    assert(memcmp(&old_profile_state, &race_z7, sizeof(old_profile_state)) == 0);
+#elif defined(SC64_Z4_RUNTIME)
     assert(memcmp(&old_profile_state, &race_z4, sizeof(old_profile_state)) == 0);
 #elif defined(SC64_P4_RUNTIME)
     assert(memcmp(&old_profile_state, &race_p4, sizeof(old_profile_state)) == 0);

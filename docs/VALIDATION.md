@@ -2725,9 +2725,12 @@ Its frozen engine source commit is `62cc58f`, ROM SHA-256
 ELF SHA-256
 `8ab1fe4d7994c2192cd62b4fb635f017d52c4cdc09ae44fbc0619c8bca0967f6`.
 Private artifacts are under `.local/build/promotion/z6-first-win-frozen/`.
-Full ARM win and fresh-process SRAM qualification remain pending, so this
-does not increase the staged completed total beyond 20/30 or establish a new
-full-mission FPS result.
+The full ARM replay now wins at gameplay frame 268694, matching the host
+terminal state across 273 checkpoints. Its mean live-play effective rate is
+17.83 fps on the frozen emulator build. This falls short of the near-30-fps
+target and does not measure physical hardware. The 150,000-tick prefix saves
+at frame 148268, but its fresh-process HOME-load check fails. SRAM continuity
+is therefore not qualified, and the staged qualified total stays at 20/30.
 
 ### Further default-off P6 scan experiments
 
@@ -2762,3 +2765,43 @@ default host suite, including 324 Python tests with six private-data checks
 skipped. Its 65,536-byte ROM retains SHA-256 `4ad80ce0…f9aee` recorded above.
 The index audit contains no ROMs, imported/generated private payloads, build
 outputs or credential files. The active P6 controller experiment is excluded.
+
+### Z7 shared-engine integration readiness
+
+The internal `zerg-z7-probe` profile exposes The Culling as the seventh Zerg
+menu entry without changing canonical campaign profiles. It extends the Z6
+storage/actor gates, retains all 231 non-start source rows (113 units,
+57 buildings, 60 minerals and one geyser), and runs the source scheduler
+through the shared mission update. Source owner 3 maps to the human and owner
+4 to the hostile Zerg. The objective uses the hostile source building count;
+enemy units do not also have to be eliminated. The explicit paid-production
+AI policy remains an approximation of the opaque native scripts.
+
+ASan/UBSan checks pass for all seven menu starts and the 234 skirmish
+startup/save configurations. Full-clear rendering matches reused-terrain
+rendering, including cold/warm frames, construction, resource mutation,
+save/load and restart. These checks do not establish complete skirmish or
+campaign wins.
+
+Generation-33 saves reuse the existing larger Z5 union payload. Pure candidate
+validation checks source owners, actor/building identities, source positions,
+resource depletion, paid-production capacity and the two-unit Zergling egg
+yield before touching live state. The actual-engine fixture accepts human
+paid production and enemy paid egg queue/completion save round trips. It
+rejects fabricated heroes, mismatched building types, invalid provenance,
+resource overdraw and capacity overflow transactionally. Forged terminal
+outcomes are rejected against decoded world counts; genuine source-condition
+win/loss fixtures validate. Those synthetic terminal fixtures are not
+normal-input mission playthroughs.
+
+The ARM build passes unchanged reserve guards at IWRAM `0x03004eb8` and BSS
+`0x0203d9e8`, producing a 4 MiB ROM. No Z7 normal-input controller win, full
+ARM replay, fresh-process SRAM qualification or frame-rate result is claimed.
+The importer capability report adds raw 39/44 units and 138/140 buildings
+only for this opt-in profile; the legacy capability census remains unchanged.
+
+The 514-file source index passes a clean original-art build, default host
+checks and 326 Python tests with six private-data checks skipped. The default
+ROM remains 65,536 bytes with SHA-256 `4ad80ce0…f9aee` recorded above.
+Unified ARM and host regressions also pass. No game assets, generated private
+headers, ROMs, captures or experimental P6/Z7 controller traces are included.
