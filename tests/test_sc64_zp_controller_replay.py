@@ -149,6 +149,23 @@ class TraceTests(unittest.TestCase):
         self.assertEqual(snapshot["entities"][0]["x"], 0x1234)
         self.assertEqual(snapshot["entities"][0]["y"], -292)
 
+    def test_p4_optional_storm_observation_covers_all_effect_bytes(self):
+        fields = {"model": 0, "action_ticks": 8, "message_ticks": 34,
+                  "created_count": 36, "action_cursor": 38, "switch_bits": 51,
+                  "source_paused": 52, "speech_muted": 53, "ai_script_mask": 54,
+                  "switch13_set": 55, "faults": 56, "storm": 58}
+        model = (8, {"fired": 0, "outcome": 2, "sequence_trigger": 3,
+                     "action_index": 4, "sequence_active": 5, "reserved": 6})
+        raw = bytes(58) + bytes(range(32))
+        decoded = replay.decode_runtime(raw, (90, fields), model, "protoss-p4")
+        self.assertEqual(decoded["storm"], list(range(32)))
+        legacy = dict(fields); del legacy["storm"]
+        self.assertNotIn("storm", replay.decode_runtime(
+            raw[:58], (58, legacy), model, "protoss-p4"))
+        fields["storm"] = 59
+        with self.assertRaisesRegex(ValueError, "storm exceeds"):
+            replay.decode_runtime(raw, (90, fields), model, "protoss-p4")
+
     def test_chrysalis_identity_counts_unit_and_building_banks(self):
         units = {"entities": [{"owner": 0, "raw_type": 150},
                               {"owner": 4, "raw_type": 150}]}

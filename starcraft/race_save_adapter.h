@@ -759,6 +759,11 @@ static int race_load_game(void) {
             if (!race_save_decode_unit(&race_data, i, (unsigned)(width * 16),
                                        (unsigned)(height * 16), &candidate)) return 0;
             live += candidate.alive != 0;
+#ifdef SC64_P4_STORM_ENABLED
+            if ((candidate.raw_type == SC64_P4_STORM_HIGH_TEMPLAR_RAW ||
+                 candidate.raw_type == SC64_P4_RAW_TASSADAR) &&
+                !race_p4_storm_energy_valid(&candidate)) return 0;
+#endif
         }
         for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
             Building candidate;
@@ -773,6 +778,13 @@ static int race_load_game(void) {
             race_data.campaign.elapsed_frames != (u32)v[7] ||
             live + queued + SC64_P4_SOURCE_CREATE_COUNT - p4->created_count > MAX_UNITS)
             return 0;
+#ifdef SC64_P4_STORM_ENABLED
+        for (unsigned i = 0; i < SC64_STORM_MAX_ACTIVE; ++i) {
+            const Sc64PsionicStorm *effect = &p4->storm.storm[i];
+            if (effect->active && (effect->x >= width * 16 || effect->y >= height * 16))
+                return 0;
+        }
+#endif
         if (outcome == SC64_P4_RUNNING) {
             if (v[18] || v[19] || phase != SC64_RACE_PHASE_ACTIVE ||
                 (race_data.campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;

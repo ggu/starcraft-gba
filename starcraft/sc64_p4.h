@@ -2,6 +2,12 @@
 #define SC64_P4_H
 
 #include "../common/gba.h"
+#ifdef SC64_P4_STORM_ENABLED
+#ifndef SC64_P4_RUNTIME
+#error "P4 Storm requires the P4 runtime"
+#endif
+#include "sc64_psionic_storm.h"
+#endif
 
 /* Compact P4 rule model for authenticated BOLT 008/021. This is not a CHK
  * interpreter. Its input counts are already resolved by a future adapter
@@ -126,6 +132,9 @@ typedef struct {
     u8 ai_script_mask;    /* opaque source script seen; authored bounded policy */
     u8 switch13_set;      /* Raynor survival condition gate */
     u16 faults;
+#ifdef SC64_P4_STORM_ENABLED
+    Sc64PsionicStormState storm;
+#endif
 } Sc64P4RuntimeState;
 
 static inline u16 sc64_p4_init(Sc64P4State *s)

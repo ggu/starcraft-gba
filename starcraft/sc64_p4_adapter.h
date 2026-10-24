@@ -28,6 +28,9 @@ enum {
 static Sc64P4RuntimeState race_p4;
 
 static unsigned race_p4_ticks(u32 ms);
+#ifdef SC64_P4_STORM_ENABLED
+static void race_p4_storm_init_actor(int i);
+#endif
 
 static int race_p4_active(void)
 {
@@ -75,6 +78,9 @@ static int race_p4_runtime_state_valid(const Sc64P4RuntimeState *s)
         s->ai_script_mask & (u8)~1u ||
         s->created_count > SC64_P4_SOURCE_CREATE_COUNT ||
         s->message_ticks > SC64_P4_PRESENTATION_TICKS) return 0;
+#ifdef SC64_P4_STORM_ENABLED
+    if (!sc64_psionic_storm_state_valid(&s->storm)) return 0;
+#endif
     unsigned expected_creates = 0;
     for (unsigned t = 0; t < SC64_P4_TRIGGER_COUNT; ++t) {
         unsigned n = sc64_p4_source_triggers[t].action_count;
@@ -224,6 +230,9 @@ static int race_p4_create(const Sc64P4SourceAction *a)
          * The map has no property row requesting invincibility. */
         if (p[14] & 0x02u) u[n].flags |= 2;
     }
+#ifdef SC64_P4_STORM_ENABLED
+    race_p4_storm_init_actor(n);
+#endif
     ++race_p4.created_count;
     return 1;
 }

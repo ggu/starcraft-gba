@@ -40,7 +40,11 @@
 #error "Compile with the opt-in Zerg/Protoss storage gate"
 #endif
 
+#ifdef SC64_P4_STORM_ENABLED
+_Static_assert(SC64_RACE_SAVE_GENERATION == 21u, "distinct Storm storage generation");
+#else
 _Static_assert(SC64_RACE_SAVE_GENERATION == 20u, "distinct Z/P storage generation");
+#endif
 #if SC64_CAMPAIGN_RACE == 2
 _Static_assert(MAX_UNITS == 240, "first-stage Protoss unit bound");
 #else
@@ -245,7 +249,8 @@ static void test_save_union_and_generation(void)
     memset(&save, 0, sizeof(save));
     memset(&loaded, 0, sizeof(loaded));
     save.version = SAVE_VERSION;
-    assert(save.version == 0x53435a30u + 20u || save.version == 0x53435030u + 20u);
+    assert(save.version == 0x53435a30u + SC64_RACE_SAVE_GENERATION ||
+           save.version == 0x53435030u + SC64_RACE_SAVE_GENERATION);
     memset(&source, 0, sizeof(source));
     source.x = source.y = 2047;
     source.hp = 8; source.maxhp = 10; source.owner = 2; source.type = U_DRONE;

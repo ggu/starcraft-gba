@@ -25,6 +25,24 @@ CONDITIONS_PER_TRIGGER = 16
 ACTION_COUNTS = (1, 6, 6, 16, 8, 25, 9, 45, 6, 2, 21, 3, 5)
 CONDITION_COUNTS = (1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1)
 CHK_SHA256 = '40f30ccedf87a3b9c88308dc3092611ceff10185ddaf32471104902042a93ecd'
+PTEC_BYTES = 12 * 76
+UNIT_BYTES = 201 * 36
+P4_HUMAN_SLOT = 7
+PSIONIC_STORM_TECH_ID = 19
+PTEC_TECHS_PER_PLAYER = 24
+PTEC_PLAYER_TECH_BYTES = 12 * PTEC_TECHS_PER_PLAYER
+PTEC_GLOBAL_TECH_BYTES = 24
+PTEC_PLAYER_BYTES = PTEC_TECHS_PER_PLAYER
+PTEC_AVAILABLE_OFFSET = 0
+PTEC_RESEARCHED_OFFSET = PTEC_PLAYER_TECH_BYTES
+PTEC_GLOBAL_AVAILABLE_OFFSET = 2 * PTEC_PLAYER_TECH_BYTES
+PTEC_GLOBAL_RESEARCHED_OFFSET = PTEC_GLOBAL_AVAILABLE_OFFSET + PTEC_GLOBAL_TECH_BYTES
+PTEC_USE_DEFAULT_OFFSET = PTEC_GLOBAL_RESEARCHED_OFFSET + PTEC_GLOBAL_TECH_BYTES
+UNIT_ID_OFFSET = 8
+UNIT_STATE_FLAGS_OFFSET = 14
+UNIT_ENERGY_VALID = 0x0008
+UNIT_ENERGY_PERCENT_OFFSET = 19
+P4_CASTER_RAW_TYPES = (67, 79)
 
 
 def _load_pack():
@@ -83,7 +101,7 @@ def parse_source(source_dir: Path = DEFAULT_SOURCE) -> dict:
             raise ValueError('P4 scenario CHK hash differs from the pinned source')
         sections = _parse_sections(chk)
         required = (b'TRIG', b'MRGN', b'OWNR', b'SIDE', b'FORC',
-                    b'UPRP', b'UPUS')
+                    b'UPRP', b'UPUS', b'PTEC', b'UNIT')
         if any(tag not in sections for tag in required):
             raise ValueError('authenticated P4 CHK is missing a scenario metadata section')
         framed_records = {
@@ -220,6 +238,49 @@ def parse_source(source_dir: Path = DEFAULT_SOURCE) -> dict:
                                'instances_per_execution': count,
                                'group1': action['group1'], 'group2': action['group2'],
                                'flags': action['flags']})
+    ptec = sections[b'PTEC']
+    unit = sections[b'UNIT']
+    if len(ptec) != PTEC_BYTES or len(unit) != UNIT_BYTES:
+        raise ValueError('PTEC or UNIT source section has an unexpected size')
+    player_tech = P4_HUMAN_SLOT * PTEC_PLAYER_BYTES + PSIONIC_STORM_TECH_ID
+    global_tech = PSIONIC_STORM_TECH_ID
+    storm_available_value = ptec[PTEC_AVAILABLE_OFFSET + player_tech]
+    storm_researched_value = ptec[PTEC_RESEARCHED_OFFSET + player_tech]
+    storm_global_available_value = ptec[PTEC_GLOBAL_AVAILABLE_OFFSET + global_tech]
+    storm_global_researched_value = ptec[PTEC_GLOBAL_RESEARCHED_OFFSET + global_tech]
+    storm_use_default_value = ptec[PTEC_USE_DEFAULT_OFFSET + player_tech]
+    ptec_values = (storm_available_value, storm_researched_value,
+                   storm_global_available_value, storm_global_researched_value,
+                   storm_use_default_value)
+    if any(value not in (0, 1) for value in ptec_values):
+        raise ValueError('P4 slot 7 has invalid Psionic Storm PTEC boolean flags')
+    storm_effective_available = (storm_global_available_value if storm_use_default_value
+                                 else storm_available_value)
+    storm_effective_researched = (storm_global_researched_value if storm_use_default_value
+                                  else storm_researched_value)
+    caster_energy_percent: dict[str, int] = {}
+    for offset in range(0, len(unit), 36):
+        raw_type = struct.unpack_from('<H', unit, offset + UNIT_ID_OFFSET)[0]
+        if raw_type not in P4_CASTER_RAW_TYPES:
+            continue
+        state_flags = struct.unpack_from('<H', unit, offset + UNIT_STATE_FLAGS_OFFSET)[0]
+        if not state_flags & UNIT_ENERGY_VALID:
+            raise ValueError(f'P4 caster raw {raw_type} lacks the UNIT energy-valid flag')
+        percent = unit[offset + UNIT_ENERGY_PERCENT_OFFSET]
+        if percent > 100:
+            raise ValueError(f'P4 caster raw {raw_type} has invalid source energy percent')
+        key = str(raw_type)
+        if key in caster_energy_percent and caster_energy_percent[key] != percent:
+            raise ValueError(f'P4 caster raw {raw_type} has inconsistent source energy')
+        caster_energy_percent[key] = percent
+    if set(caster_energy_percent) != {str(raw) for raw in P4_CASTER_RAW_TYPES}:
+        raise ValueError('P4 UNIT source is missing a High Templar or Tassadar energy row')
+    if storm_effective_researched != 1:
+        raise ValueError('P4 slot 7 does not effectively mark Psionic Storm researched in PTEC')
+    if storm_effective_available != 1:
+        raise ValueError('P4 slot 7 does not effectively enable Psionic Storm in PTEC')
+    if any(value != 100 for value in caster_energy_percent.values()):
+        raise ValueError('P4 source caster energy is not the audited 100 percent')
     creation = {'actions': create_actions,
                 'instances_per_execution_by_trigger_and_raw_unit': by_trigger,
                 'instances_per_execution_by_raw_unit_and_trigger': by_type,
@@ -238,7 +299,17 @@ def parse_source(source_dir: Path = DEFAULT_SOURCE) -> dict:
                 for i in range(64)],
             'owners': list(records[b'OWNR']), 'sides': list(records[b'SIDE']),
             'forces': list(records[b'FORC']), 'properties': property_rows,
-            'property_used': list(records[b'UPUS']), 'actor_creation': creation}
+            'property_used': list(records[b'UPUS']), 'actor_creation': creation,
+            'psionic_storm': {'slot': P4_HUMAN_SLOT,
+                              'tech_id': PSIONIC_STORM_TECH_ID,
+                              'availability_ptec': storm_available_value,
+                              'researched_ptec': storm_researched_value,
+                              'global_availability_ptec': storm_global_available_value,
+                              'global_researched_ptec': storm_global_researched_value,
+                              'use_default_ptec': storm_use_default_value,
+                              'effective_available': storm_effective_available,
+                              'effective_researched': storm_effective_researched,
+                              'energy_percent_by_raw_type': caster_energy_percent}}
 
 
 def verify_staged(source_dir: Path = DEFAULT_SOURCE) -> dict:
@@ -274,6 +345,24 @@ def emit_header(data: dict) -> str:
         values += ['{' + ','.join(_u(value, 2) for value in row['trailing']) + '}']
         out.append('    {' + ','.join(values) + '},\n')
     out.append('};\n')
+    storm = data['psionic_storm']
+    out.append('static const unsigned char sc64_p4_source_storm_slot7_available_ptec = ' +
+               _u(storm['availability_ptec'], 2) + ';\n')
+    out.append('static const unsigned char sc64_p4_source_storm_slot7_researched_ptec = ' +
+               _u(storm['researched_ptec'], 2) + ';\n')
+    out.append('static const unsigned char sc64_p4_source_storm_global_default_available = ' +
+               _u(storm['global_availability_ptec'], 2) + ';\n')
+    out.append('static const unsigned char sc64_p4_source_storm_global_default_researched = ' +
+               _u(storm['global_researched_ptec'], 2) + ';\n')
+    out.append('static const unsigned char sc64_p4_source_storm_use_default = ' +
+               _u(storm['use_default_ptec'], 2) + ';\n')
+    out.append('static const unsigned char sc64_p4_source_storm_effective_available = ' +
+               _u(storm['effective_available'], 2) + ';\n')
+    out.append('static const unsigned char sc64_p4_source_storm_effective_researched = ' +
+               _u(storm['effective_researched'], 2) + ';\n')
+    for raw in P4_CASTER_RAW_TYPES:
+        out.append(f'static const unsigned char sc64_p4_source_energy_percent_{raw} = ' +
+                   _u(storm['energy_percent_by_raw_type'][str(raw)], 2) + ';\n')
     out.append(f'static const Sc64P4SourceCondition sc64_p4_source_conditions[{len(data["conditions"])}] = {{\n')
     for row in data['conditions']:
         values = [_u(row[key]) for key in ('location', 'player', 'amount')]

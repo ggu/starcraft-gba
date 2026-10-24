@@ -5,6 +5,10 @@ void *memcpy(void *dst, const void *src, size_t n);
 void *memset(void *dst, int value, size_t n);
 int memcmp(const void *a, const void *b, size_t n);
 
+#if defined(SC64_P4_STORM_ENABLED) && !defined(SC64_P4_RUNTIME)
+#error "SC64_P4_STORM_ENABLED requires SC64_P4_RUNTIME"
+#endif
+
 #ifdef SC64_P3_RUNTIME
 #if !defined(SC64_P3_ENABLED) || !defined(SC64_UNIFIED) || \
     !defined(SC64_RACES) || !defined(SC64_LARGE_MAPS)
@@ -75,7 +79,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_TERRAN_LATE_RUNTIME)
+#if defined(SC64_P4_STORM_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 21u
+#elif defined(SC64_TERRAN_LATE_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 18u
 #elif defined(SC64_LATE_TERRAN_STORAGE)
 #define SC64_RACE_SAVE_GENERATION 17u
@@ -415,6 +421,11 @@ _Static_assert(SC64_RACE_MAP_COUNT > 15,
 #if !defined(SC64_P4_ENABLED) || !defined(SC64_P4_DATA_ENABLED) || !defined(SC64_ZP_CAMPAIGN_STORAGE) || !defined(SC64_ZP_CAMPAIGN_ACTORS)
 #error "P4 runtime requires its complete source map, actor rules and expanded storage"
 #endif
+#ifdef SC64_P4_STORM_ENABLED
+#ifndef SC64_P4_RUNTIME
+#error "P4 Storm requires the P4 runtime"
+#endif
+#endif
 #include "sc64_p4.h"
 _Static_assert(SC64_RACE_MAP_COUNT > SC64_P4_GLOBAL_ID,
                "P4 runtime requires the staged P4 map descriptor");
@@ -477,7 +488,19 @@ enum {
 #ifdef SC64_TERRAN_LATE_RUNTIME
     , MODE_LAND
 #endif
+#ifdef SC64_P4_STORM_ENABLED
+    , MODE_P4_STORM
+#endif
 };
+
+#ifdef SC64_P4_STORM_ENABLED
+static int race_p4_active(void);
+static int race_p4_storm_menu_available(void);
+static int race_p4_storm_cast_selected(int x, int y);
+static void race_p4_storm_initialize_source_units(void);
+static void race_p4_storm_init_actor(int i);
+static void race_p4_storm_draw(void);
+#endif
 
 typedef struct {
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
@@ -3106,6 +3129,14 @@ tick_research(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_P4_STORM_ENABLED
+    if (choice == MENU_STOP + 1 && race_p4_storm_menu_available()) {
+        menu_open = 0;
+        mode = MODE_P4_STORM;
+        toast(0);
+        return;
+    }
+#endif
 #ifdef SC64_T5_RUNTIME
     if (choice >= MENU_FACTORY) {
         menu_open = 0;
@@ -3207,7 +3238,12 @@ choose_command(int choice)
  * Other factions retain their existing ten-row command list. */
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
-{ return race_human == R_ZERG ? MENU_COUNT : MENU_STOP + 1; }
+{
+#ifdef SC64_P4_STORM_ENABLED
+    if (race_p4_storm_menu_available()) return MENU_STOP + 2;
+#endif
+    return race_human == R_ZERG ? MENU_COUNT : MENU_STOP + 1;
+}
 #elif defined(SC64_T5_RUNTIME)
 static int field_menu_count(void)
 { return race_human == R_TER ? MENU_COUNT : MENU_STOP + 1; }
@@ -3277,6 +3313,14 @@ interact(void)
     if (mode == MODE_LAND) {
         toast(race_late_flight_order(selected_building, cx, cy, 1) ? 0 : 8);
         mode = MODE_NORMAL; return;
+    }
+#endif
+#ifdef SC64_P4_STORM_ENABLED
+    if (mode == MODE_P4_STORM) {
+        int cast = race_p4_storm_cast_selected(cx, cy);
+        mode = MODE_NORMAL;
+        toast(cast ? 0 : 8);
+        return;
     }
 #endif
     if (mode == MODE_MOVE) {
@@ -5286,12 +5330,27 @@ draw_map(void)
 	if (u[i].alive)
 	    draw_unit(&u[i]);
     draw_tracers();
+#ifdef SC64_P4_STORM_ENABLED
+    race_p4_storm_draw();
+#endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_unit_draw_cycles = gba_clock() - profile_stage_start;
 #endif
     x = cx - camx;
     y = cy - camy + 12;
-    gfx_frame(x - 4, y - 4, 9, 9, mode == MODE_BUILD ? C_GOLD : C_WHITE);
+    gfx_frame(x - 4, y - 4, 9, 9, mode == MODE_BUILD ? C_GOLD :
+#ifdef SC64_P4_STORM_ENABLED
+              mode == MODE_P4_STORM ? C_CYAN :
+#endif
+              C_WHITE);
+#ifdef SC64_P4_STORM_ENABLED
+    if (mode == MODE_P4_STORM) {
+        gfx_line(x, y-24, x+24, y, C_CYAN);
+        gfx_line(x+24, y, x, y+24, C_CYAN);
+        gfx_line(x, y+24, x-24, y, C_CYAN);
+        gfx_line(x-24, y, x, y-24, C_CYAN);
+    }
+#endif
     gfx_line(x - 7, y, x + 7, y, C_HIGHLIGHT);
     gfx_line(x, y - 7, x, y + 7, C_HIGHLIGHT);
     if (box_state == 2) {
@@ -5344,10 +5403,19 @@ draw_map(void)
 	}
 #elif defined(SC64_ZP_CAMPAIGN_STORAGE)
         int first = menu_cursor >= 10 ? menu_cursor - 9 : 0;
+#ifdef SC64_P4_STORM_ENABLED
+	for (i = first; i < field_menu_count() && i < first + 10; ++i) {
+	    const char *label = i == MENU_STOP + 1 && race_p4_storm_menu_available() ?
+                "STORM" : labels[i];
+	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
+	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
+	}
+#else
 	for (i = first; i < field_menu_count() && i < first + 10; ++i) {
 	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
 	    gfx_text(149, 17 + (i - first) * 9, labels[i], i == menu_cursor ? C_WHITE : C_DIM);
 	}
+#endif
 #else
 	for (i = 0; i < MENU_COUNT; i++) {
 	    gfx_text(142, 17 + i * 9, i == menu_cursor ? ">" : " ", C_GOLD);
@@ -5570,7 +5638,15 @@ draw_hud_commands(void)
 #ifdef SC64_TERRAN_LATE_RUNTIME
                  mode == MODE_LAND ? "LANDING SITE" :
 #endif
+#ifdef SC64_P4_STORM_ENABLED
+                 mode == MODE_P4_STORM ? "PSIONIC STORM TARGET" :
+#endif
 		 mode == MODE_ATTACK ? "ATTACK MOVE" : mode == MODE_MOVE ? "MOVE ORDER" : "FIELD COMMAND", C_WHITE);
+#ifdef SC64_P4_STORM_ENABLED
+        if (mode == MODE_P4_STORM)
+            gfx_text(5, 137, "A CAST  B CANCEL", C_GOLD);
+        else
+#endif
 	gfx_text(5, 137, "B COMMANDS  A SELECT / PLACE", C_GOLD);
     }
 #ifdef SC64_RACES

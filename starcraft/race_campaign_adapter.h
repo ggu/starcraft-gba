@@ -150,6 +150,9 @@ static unsigned race_z4_hud_seconds(void)
 #endif
 #ifdef SC64_P4_RUNTIME
 #include "sc64_p4_adapter.h"
+#ifdef SC64_P4_STORM_ENABLED
+#include "sc64_p4_storm_adapter.h"
+#endif
 static int race_p4_world_paused(void)
 { return race_p4_active() && race_p4.source_paused; }
 
@@ -603,6 +606,10 @@ race_campaign_init(void)
     if (race_selected_mission == SC64_RACE_MISSION_P4 && !race_p4_init()) {
         screen = SCREEN_PAUSE; toast(14);
     }
+#ifdef SC64_P4_STORM_ENABLED
+    else if (race_selected_mission == SC64_RACE_MISSION_P4)
+        race_p4_storm_initialize_source_units();
+#endif
 #endif
     race_campaign_assign_mining();
 #ifdef SC64_T4_SCENARIO_RUNTIME
@@ -788,6 +795,9 @@ race_campaign_tick(void)
 #ifdef SC64_P4_RUNTIME
     if (mission == SC64_RACE_MISSION_P4) {
         race_p4_rescue_tick();
+#ifdef SC64_P4_STORM_ENABLED
+        if (!race_p4_storm_tick()) { screen = SCREEN_PAUSE; toast(14); return; }
+#endif
         if (!race_p4_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
         return;
     }

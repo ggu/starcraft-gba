@@ -194,6 +194,13 @@ def decode_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
         wanted = ("action_ticks", "message_ticks", "created_count", "action_cursor",
                   "switch_bits", "source_paused", "speech_muted", "ai_script_mask",
                   "switch13_set", "faults")
+        # The optional P4 spell profile persists four eight-byte effects.
+        # Observe every byte so an in-flight save comparison cannot silently
+        # omit effect positions, ages or remaining pulses. Legacy P4 ELF
+        # layouts have no such member and retain their previous observation.
+        if "storm" in fields:
+            runtime_widths["storm"] = (32, "u8[]")
+            wanted += ("storm",)
     for name in wanted:
         if name not in fields or name not in runtime_widths:
             raise ValueError(f"runtime DWARF layout is missing {name}")

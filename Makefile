@@ -32,6 +32,7 @@ P3_OPTIMIZATION_FLAGS ?= -DSC64_ROUTE_PACK3 -DSC64_P3_DEFENSE_TARGETS -DSC64_P3_
 P3_FLAGS := $(LARGE_PROBE_FLAGS) -DSC64_P3_ENABLED -DSC64_P3_RUNTIME $(P3_OPTIMIZATION_FLAGS) $(P3_EXTRA_FLAGS)
 P4_FLAGS := $(filter-out -I.local/sc64/races/generated,$(P3_FLAGS)) -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated -I.local/sc64/p4/generated -DSC64_P4_DATA_ENABLED -DSC64_P4_ENABLED -DSC64_P4_RUNTIME -DSC64_P4_CAMPAIGN_ENTRY -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_ZP_CAMPAIGN_STORAGE
 P4_INPUTS := $(RACE_CAMPAIGN_INPUTS) .local/sc64/zp-stage/generated/sc64_races_generated.h .local/sc64/zp-stage/generated/sc64_race_sprites_generated.h .local/sc64/p4/generated/sc64_p4_scenario_generated.h
+P4_STORM_FLAGS := $(P4_FLAGS) -DSC64_P4_STORM_ENABLED
 T4_STORAGE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_T4_ENABLED -DSC64_T4_RUNTIME -DSC64_ROUTE_PACK3 -DSC64_T4_WINDOWED_SCHEDULE -DSC64_CAMPAIGN_RACE=0
 T4_OPTIMIZATION_FLAGS ?= -DSC64_T4_COUNT_CACHE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS -DSC64_UNARMED_QUERY_SKIP
 T4_SCENARIO_FLAGS := $(T4_STORAGE_FLAGS) -DSC64_T4_SCENARIO_RUNTIME
@@ -1094,6 +1095,16 @@ build/StarCraft-Protoss-P4-GBA.gba: build/starcraft-protoss-p4.elf tools/fix_rom
 protoss-p4: build/StarCraft-Protoss-P4-GBA.gba
 	$(PYTHON) tools/verify_roms.py --protoss-p4
 
+build/starcraft-protoss-p4-storm.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P4_STORM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p4-storm.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P4-Storm-GBA.gba: build/starcraft-protoss-p4-storm.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P4 STORM' SCP5
+.PHONY: protoss-p4-storm
+protoss-p4-storm: build/StarCraft-Protoss-P4-Storm-GBA.gba
+	$(PYTHON) tools/verify_roms.py --protoss-p4-storm
+
 build/test-sc64-zp-actors-on: tests/sc64_zp_actors.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS $< -o $@
 build/test-sc64-zp-actors-off: tests/sc64_zp_actors.c starcraft/race_rules.h Makefile | build
@@ -1162,6 +1173,27 @@ test-sc64-race-occupancy-targets: build/test-sc64-z3-occupancy-targets build/tes
 	./build/test-sc64-p3-occupancy-targets
 	./build/test-sc64-z4-occupancy-targets
 	./build/test-sc64-p4-occupancy-targets
+
+build/test-sc64-psionic-storm: tests/sc64_psionic_storm.c starcraft/sc64_psionic_storm.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-psionic-storm
+test-sc64-psionic-storm: build/test-sc64-psionic-storm
+	./build/test-sc64-psionic-storm
+test-starcraft: test-sc64-psionic-storm
+build/test-sc64-p4-storm: tests/sc64_p4_storm.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_STORM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-storm-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_STORM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-storm-storage: tests/sc64_zp_storage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_STORM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-storm-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_STORM_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p4-storm
+test-sc64-p4-storm: test-sc64-psionic-storm build/test-sc64-p4-storm build/test-sc64-p4-storm-profile build/test-sc64-p4-storm-storage build/test-sc64-p4-storm-frame-coverage
+	./build/test-sc64-p4-storm
+	./build/test-sc64-p4-storm-profile
+	./build/test-sc64-p4-storm-storage
+	./build/test-sc64-p4-storm-frame-coverage
 .PHONY: test-sc64-z4-campaign
 test-sc64-z4-campaign: test-sc64-z4-runtime build/test-sc64-z4-campaign-run
 	./build/test-sc64-z4-campaign-run --limit 150000 --trace .local/sc64/z4-controller-win-asan.json

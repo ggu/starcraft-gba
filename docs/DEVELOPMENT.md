@@ -814,6 +814,22 @@ construction policy: its larva timer pauses during the upgrade and completion
 fills its larva count to three. Native equivalence of that timing has not been
 established.
 
+An additional P4 ability experiment is isolated from the normal P4 build:
+
+```sh
+python3 tools/sc64_p4_scenario_pack.py
+make protoss-p4-storm test-sc64-p4-storm
+```
+
+This writes `build/StarCraft-Protoss-P4-Storm-GBA.gba` and its matching
+`build/starcraft-protoss-p4-storm.elf`. Its generation-21 save persists four
+bounded Psionic Storm effects and caster energy. In P4, select one High
+Templar or Tassadar, open **B** commands, choose **STORM**, place the cursor
+within cast range and press **A**; **B** cancels targeting. The row appears
+only when the selected caster has enough energy. Storm affects allied units
+too. Its pulse cadence and visual effect use documented authored policies;
+this experiment is not a completed P4 qualification.
+
 For later-chapter implementation, authenticate and generate the retained
 numeric scenario metadata separately. For example:
 

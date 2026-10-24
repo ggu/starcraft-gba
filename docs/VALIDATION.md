@@ -2056,3 +2056,34 @@ pass runs from ROM, as it already did in expanded profiles; expanded Z/P
 profiles also place `gfx_bar` in ROM. No HUD-band caching experiment is enabled.
 These are emulator results; physical GBA qualification and the 30-fps target
 remain outstanding.
+
+### 2026-10-24 — opt-in P4 Psionic Storm
+
+The separate `protoss-p4-storm` build adds a bounded four-effect Storm model
+and menu targeting for High Templar and Tassadar in P4. The authenticated
+PTEC decoder uses the five source tables at offsets 0/288/576/600/624 and
+resolves player-7 defaults to the global availability and research flags.
+UNIT energy comes from its energy-valid field and source percent byte.
+Both caster types start at the source's 100 percent energy.
+
+Pinned reference facts supply 75 energy cost, 14 damage per pulse, shield-first
+Ignore Armor damage, air/ground nonbuilding targeting and friendly fire. The
+GBA coordinate conversion gives a 24-pixel radius and 144-pixel cast range.
+The eight pulses at 20/10 GBA ticks are an authored cadence assumption, not
+verified native projectile timing; the VFX is also authored. Overlapping
+effects deal at most one pulse per target per update. Energy regeneration
+uses 32/5 Q8 per 30-Hz simulation tick; world and user pauses freeze it.
+
+Host ASan/UBSan checks pass for normal-menu casting/cancel, energy/range/pool
+denials, air and ground damage, shields, friendly fire, invincibility, all
+eight pulses, active-effect saves and transactional corrupt-state rejection.
+An inactive P4 payload is zeroed on save. The render check compares consecutive
+real preserve-mode frames with full-clear references at both viewport edges.
+The build also passes all four campaign startups, 234 skirmish setup/save
+combinations, storage checks and the general frame-coverage oracle.
+
+Its separate generation-21 save is 15364 bytes. The ARM build passes the
+unchanged guards at IWRAM end `0x030040c0` and BSS end `0x0203d09c`.
+No completed P4 controller or ARM playthrough is claimed by this ability
+foundation. The ordinary P4 and canonical race builds leave the ability gate
+disabled and retain their frozen ROM bytes.
