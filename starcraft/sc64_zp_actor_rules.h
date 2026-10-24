@@ -202,6 +202,20 @@ static inline int sc64_zp_actor_default_shields(int type)
 
 static inline const Sc64ZpBuildingFact *sc64_zp_building_fact(int type)
 {
+#if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
+    static const Sc64ZpBuildingFact z6_support_bay = {
+        171,450,450,1,150,100,450,320,3,2,32,32,32,20,2,
+        SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_COLLIDABLE|
+        SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_DRAWABLE
+    };
+    static const Sc64ZpBuildingFact z6_shield_battery = {
+        172,200,200,1,100,0,450,320,3,2,32,16,32,16,2,
+        SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_COLLIDABLE|
+        SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_DRAWABLE
+    };
+    if (type == B_Z6_ROBOTICS_SUPPORT_BAY) return &z6_support_bay;
+    if (type == B_Z6_SHIELD_BATTERY) return &z6_shield_battery;
+#endif
 #ifdef SC64_Z5_ACTORS
     static const Sc64ZpBuildingFact z5_beacon =
         {195,100000,0,0,50,50,1,256,3,2,48,32,47,31,3,

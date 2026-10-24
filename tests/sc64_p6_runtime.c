@@ -78,13 +78,13 @@ static void door_binding_and_objective(void)
                   "Rescue the heroes; bring Zeratul to the extraction point.") == 0);
     for (unsigned i = 0; i < SC64_P6_DOODAD_SOURCE_COUNT; ++i)
         if (!sc64_p6_doodads[i].sprite_only &&
-            sc64_p6_doodads[i].raw_type == SC64_P6_RAW_DOOR_FIRST) {
+            sc64_p6_doodads[i].raw_type == 207) {
             row = (int)i;
             break;
         }
     assert(row >= 0);
     b[3].alive = 1;
-    b[3].raw_type = SC64_P6_RAW_DOOR_FIRST;
+    b[3].raw_type = 207;
     /* Unknown/unrebound doors fail closed. A rebound source-enabled door is
      * collidable; clearing its state bit opens it. */
     assert(race_p6_building_collidable(3));
@@ -99,6 +99,13 @@ static void door_binding_and_objective(void)
     b[4].raw_type = 195;
     b[4].type = B_Z5_TERRAN_BEACON;
     assert(!race_p6_building_collidable(4));
+    b[5].alive = 1;
+    b[5].raw_type = 205;
+    b[5].type = sc64_race_building_from_raw(205);
+    assert(!race_p6_building_collidable(5));
+    b[5].raw_type = 206;
+    b[5].type = sc64_race_building_from_raw(206);
+    assert(!race_p6_building_collidable(5));
 }
 
 static void authored_ai_policy_has_real_effect(void)

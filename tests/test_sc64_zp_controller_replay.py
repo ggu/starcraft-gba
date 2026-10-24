@@ -39,6 +39,38 @@ def fifth_trace(profile="zerg-z5", mission=16):
     return trace
 
 
+def sixth_trace():
+    # P6 is the sixth Protoss entry: two page-rights, second-page down,
+    # confirm, then launch from briefing with the ordinary A input.
+    rows = [
+        {"kind": "input", "host_tick": tick, "held": held,
+         "pressed": held if held else 0}
+        for tick, held in replay.SIXTH_MENU_PREFIX
+    ]
+    cursors = [0] * 26
+    cursors[0] = cursors[23] = 1
+    ticks = [0] * 26
+    ticks[0] = ticks[23] = 1
+    rows.extend([
+        {"kind": "start", "host_tick": 12, "frame": 1, "screen": 1,
+         "won": 0, "lost": 0, "outcome": 0, "started": 0x800001,
+         "fired": 0x800001,
+         "action_cursors": cursors, "action_ticks": ticks,
+         "switch_bits": 0, "fault": 0},
+        {"kind": "periodic", "host_tick": 1000},
+        {"kind": "won", "host_tick": 2000, "frame": 1990,
+         "screen": 3, "won": 1, "lost": 0, "outcome": 1,
+         "started": 1 << 15, "fired": 1 << 15,
+         "action_cursors": [0] * 26, "action_ticks": [0] * 26,
+         "switch_bits": 1, "fault": 0,
+         "objective": [1216, 1664, 1312, 1728],
+         "zeratul": [1, 75, 2, 1260, 1700, 0, 100, 0],
+         "tassadar": [1, 79, 2, 1270, 1700, 0, 100, 0]},
+    ])
+    return {"schema": 1, "mission": 25, "profile": "protoss-p6",
+            "policy": "normal-input P6 fixture", "events": rows}
+
+
 class TraceTests(unittest.TestCase):
     class Memory:
         def __init__(self, data): self.data = data
@@ -80,6 +112,24 @@ class TraceTests(unittest.TestCase):
                     (5, 0), (6, 1), (7, 0), (8, 1)])
                 with self.assertRaisesRegex(ValueError, "5th-entry deployment route"):
                     replay.validate_trace(trace_for(name, mission), 16, name)
+
+    def test_sixth_entry_p6_route_and_source_win_observations_are_strict(self):
+        trace = sixth_trace()
+        plan = replay.validate_trace(trace, 16, "protoss-p6")
+        self.assertEqual(plan["start"]["host_tick"], 12)
+        self.assertEqual(plan["inputs"][:12], [
+            (0, 1), (1, 0), (2, 16), (3, 0), (4, 16), (5, 0),
+            (6, 128), (7, 0), (8, 1), (9, 0), (10, 1), (11, 0)])
+        with self.assertRaisesRegex(ValueError, "6th-entry deployment route"):
+            replay.validate_trace(fifth_trace("protoss-p6", 25), 16, "protoss-p6")
+        bad = copy.deepcopy(trace)
+        bad["events"][-1]["action_ticks"] = [0] * 25
+        with self.assertRaisesRegex(ValueError, "26 bounded action_ticks"):
+            replay.validate_trace(bad, 16, "protoss-p6")
+        bad = copy.deepcopy(trace)
+        bad["events"][-1]["fired"] = 1
+        with self.assertRaisesRegex(ValueError, "fired alias"):
+            replay.validate_trace(bad, 16, "protoss-p6")
 
     def test_rejects_wrong_profile_mission_and_schema(self):
         p4_wrong = trace_for("protoss-p4", 15)
@@ -357,6 +407,49 @@ class TraceTests(unittest.TestCase):
         self.assertEqual(decoded["reserved"], [0, 1, 2])
         self.assertEqual(decoded["persistent_bytes"], list(raw))
 
+    def test_nested_p6_persistent_layout_flattens_both_union_payload_sections(self):
+        inner = (92, {"model": 0, "action_ticks": 32, "switch_bits": 84, "fault": 88})
+        outer = (148, {"runtime": 0, "deaths_by_source": 92,
+                       "doodad_enabled": 140, "pause_acknowledged": 145,
+                       "reserved": 146})
+        def dwarf(_elf, name):
+            if name == "Sc64P6RuntimeState": return inner
+            if name == "Sc64P6PersistentState": return outer
+            raise AssertionError(name)
+        with mock.patch.object(replay.races, "dwarf_struct", side_effect=dwarf):
+            layout = replay.runtime_layout_for(Path("fixture.elf"), "protoss-p6")
+        self.assertEqual(layout, (148, {"deaths_by_source": 92, "doodad_enabled": 140,
+                                        "pause_acknowledged": 145, "reserved": 146,
+                                        "model": 0, "action_ticks": 32,
+                                        "switch_bits": 84, "fault": 88}))
+
+    def test_p6_persistent_decode_covers_full_save_shape(self):
+        fields = {"model": 0, "action_ticks": 32, "switch_bits": 84,
+                  "fault": 88, "deaths_by_source": 92, "doodad_enabled": 140,
+                  "pause_acknowledged": 145, "reserved": 146}
+        model = (32, {"started": 0, "outcome": 4, "action_cursor": 5})
+        raw = bytearray(148)
+        raw[0:4] = (0x0212345).to_bytes(4, "little")
+        raw[4] = 0
+        raw[5:31] = bytes(range(26))
+        for i in range(26): raw[32+2*i:34+2*i] = (300+i).to_bytes(2, "little")
+        raw[84:88] = (0xA51234).to_bytes(4, "little")
+        raw[88] = 0
+        for i in range(12): raw[92+4*i:96+4*i] = (100+i).to_bytes(4, "little")
+        raw[140:145] = bytes([1, 2, 4, 8, 0x1F])
+        raw[145] = 1
+        raw[146:148] = bytes([0, 0])
+        decoded = replay.decode_runtime(bytes(raw), (148, fields), model, "protoss-p6")
+        self.assertEqual(decoded["model"], {"started": 0x0212345, "fired": 0x0212345,
+                                             "outcome": 0, "action_cursor": list(range(26))})
+        self.assertEqual(decoded["action_ticks"], list(range(300, 326)))
+        self.assertEqual(decoded["switch_bits"], 0xA51234)
+        self.assertEqual(decoded["deaths_by_source"], list(range(100, 112)))
+        self.assertEqual(decoded["doodad_enabled"], [1, 2, 4, 8, 0x1F])
+        self.assertEqual(decoded["pause_acknowledged"], 1)
+        self.assertEqual(decoded["reserved"], [0, 0])
+        self.assertEqual(decoded["persistent_bytes"], list(raw))
+
     def test_fifth_final_verification_checks_p5_provenance_unloaded_state_and_faults(self):
         profiles = (("zerg-z5", 16, 40, 0x0123456789ABCDEF),
                     ("protoss-p5", 24, 11, 2012))
@@ -425,6 +518,50 @@ class TraceTests(unittest.TestCase):
                 bad_pressure["race_runtime"]["pressure_dispatched_mask"] = 1
                 with self.assertRaisesRegex(RuntimeError, "pressure state"):
                     replay.verify_final(final, bad_pressure, profile_name)
+
+    def test_p6_final_verification_requires_live_source_heroes_and_matching_runtime(self):
+        final = sixth_trace()["events"][-1]
+        cursors = [0] * 26
+        ticks = [0] * 26
+        runtime = {"model": {"outcome": 1, "started": 1 << 15, "fired": 1 << 15,
+                              "action_cursor": cursors.copy()},
+                   "action_ticks": ticks.copy(), "switch_bits": 1, "fault": 0,
+                   "deaths_by_source": [0] * 12, "doodad_enabled": [0] * 5,
+                   "pause_acknowledged": 0, "reserved": [0, 0],
+                   "persistent_bytes": [0] * 148}
+        units = {"entities": [
+            {"raw_type": 75, "raw_owner": 2, "owner": 0, "x": 1260, "y": 1700,
+             "hp": 100, "order": 0},
+            {"raw_type": 79, "raw_owner": 2, "owner": 0, "x": 1270, "y": 1700,
+             "hp": 100, "order": 0},
+        ]}
+        state = {"screen": 3, "frame": 1990, "won": 1, "lost": 0, "race_mode": 0,
+                 "race_selected_mission": 25, "race_completed": 1 << 25,
+                 "race_campaign": {"mission": 25, "elapsed_frames": 1990,
+                                   "phase": 3, "objective_flags": 1},
+                 "race_runtime": runtime, "units": units}
+        replay.verify_final(final, state, "protoss-p6")
+        bad = copy.deepcopy(state)
+        bad["units"]["entities"][0]["x"] = 1312
+        with self.assertRaisesRegex(RuntimeError, "Zeratul live bank"):
+            replay.verify_final(final, bad, "protoss-p6")
+        bad = copy.deepcopy(state)
+        bad["race_runtime"]["deaths_by_source"][2] = 65536
+        with self.assertRaisesRegex(RuntimeError, "death counters"):
+            replay.verify_final(final, bad, "protoss-p6")
+        bad = copy.deepcopy(state)
+        bad["race_runtime"]["doodad_enabled"][4] = 0x20
+        with self.assertRaisesRegex(RuntimeError, "doodad state"):
+            replay.verify_final(final, bad, "protoss-p6")
+        for row in (0, 12, 13, 14, 15, 16, 17, 19, 20, 23):
+            bad = copy.deepcopy(state)
+            bad["race_runtime"]["doodad_enabled"][row >> 3] = 1 << (row & 7)
+            with self.subTest(sprite_row=row), self.assertRaisesRegex(RuntimeError, "doodad state"):
+                replay.verify_final(final, bad, "protoss-p6")
+        bad_final = copy.deepcopy(final)
+        bad_final["zeratul"][2] = 7
+        with self.assertRaisesRegex(RuntimeError, "Zeratul source identity"):
+            replay.verify_final(bad_final, state, "protoss-p6")
 
     def test_chrysalis_identity_counts_unit_and_building_banks(self):
         units = {"entities": [{"owner": 0, "raw_type": 150},

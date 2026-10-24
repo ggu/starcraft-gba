@@ -2430,3 +2430,33 @@ Private evidence:
 ROM SHA-256: `9d21dcfd73022378ecba6fed2315d8b1b10a5b02076059ccbd1dc5b5704613bf`.
 ELF SHA-256: `de57d1e5d3b3f6336ca4c6ea04aa6e97794eab4b814a1be5c802b4bbd0632ddd`.
 The controller trace is the same `fcf5615f…00c5e1` qualified above.
+
+
+### Sixth-chapter live probes and seventh-chapter source foundations
+
+Z6's generation-29 internal probe passes normal sixth-entry menu startup,
+all six campaign start/save checks, the 234 skirmish race/map/AI configurations,
+actual-map runtime and hallucination tests, and candidate-only SRAM rejection
+without live mutation. A normally moved source actor survives save/load;
+invalid timers, provenance, geysers and older generations are rejected. Its
+actual-scene framebuffer checks match complete clears with cold/warm caches.
+The frozen readiness build ends IWRAM at `0x03004ff0` and BSS at `0x0203d950`.
+The fixed reserve limits remain unchanged. These are startup/readiness checks,
+not a full controller/ARM win or a 30-fps claim. Z6 hero spell controls and
+active Shield Battery recharge remain incomplete.
+
+For P6, upper-level raw205/206 door props now follow the pinned PC reference's
+dynamic noncollision policy. Authored raw207/208 pit-door gates retain their
+state-dependent blocking. This resolves a disconnected route to Zeratul in
+the GBA map; native N64 door/tile mutation is still unverified. Regression
+checks retain source state changes, empty selections, save validation and
+framebuffer parity. Full P6 playthrough qualification remains pending; its
+source-enabled Tassadar Storm control is a known missing mechanic.
+
+Z7's isolated scheduler/world fixture uses the actual 231 source rows without
+owner overrides: 113 units, 57 buildings, 60 mineral fields and one geyser.
+Queries use source-pixel actor bounds and numeric Exactly comparison 10;
+switch comparisons remain 2/3. Setup resources, terminal outcomes, timers,
+opaque-AI call mask and paid Zergling queues pass sanitizer checks. P7's
+asset-free model and authenticated numeric adapter also pass. These foundations
+are not additional completed missions. The staged total remains **20/30**.

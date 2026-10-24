@@ -155,6 +155,11 @@ static int race_p6_building_collidable(int slot)
     int raw;
     if (slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive) return 0;
     raw = b[slot].raw_type >= 0 ? b[slot].raw_type : sc64_race_raw_building(b[slot].type);
+    /* The pinned PC pathfinder excludes door actors from dynamic collision.
+     * P6's un-scripted upper-level door props follow that policy. Its six
+     * authored pit gates retain our explicit state-dependent tile blockers;
+     * exact native N64 tile/door-order behavior remains unverified. */
+    if (raw == 205 || raw == 206) return 0;
     if (raw >= SC64_P6_RAW_DOOR_FIRST && raw <= SC64_P6_RAW_DOOR_LAST)
         return race_p6_doodad_enabled_slot(slot);
     {

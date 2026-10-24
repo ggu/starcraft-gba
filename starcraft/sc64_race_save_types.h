@@ -120,8 +120,18 @@ typedef struct {
 #ifdef SC64_P4_RUNTIME
     Sc64P4RuntimeState p4;
 #endif
-#ifdef SC64_Z5_RUNTIME
+#if defined(SC64_Z5_RUNTIME) && defined(SC64_Z6_RUNTIME)
+    /* Z5 and Z6 are mutually exclusive campaign missions. Keep Z6 in the
+     * existing larger Z5 payload so adding the final Protoss stage does not
+     * grow the SRAM record. */
+    union {
+        Sc64Z5PersistentState z5;
+        Sc64Z6PersistentState z6;
+    };
+#elif defined(SC64_Z5_RUNTIME)
     Sc64Z5PersistentState z5;
+#elif defined(SC64_Z6_RUNTIME)
+    Sc64Z6PersistentState z6;
 #endif
 #if defined(SC64_P5_RUNTIME) && defined(SC64_P6_RUNTIME)
     union {
@@ -165,6 +175,10 @@ typedef struct {
 #endif
 #endif
 } RaceSave;
+#if defined(SC64_Z5_RUNTIME) && defined(SC64_Z6_RUNTIME)
+_Static_assert(sizeof(Sc64Z6PersistentState) <= sizeof(Sc64Z5PersistentState),
+               "Z6 must fit in the existing Z5 save payload");
+#endif
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
 #ifdef SC64_T6_STORAGE
 #ifdef SC64_LATE_TERRAN_STORAGE

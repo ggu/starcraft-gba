@@ -120,6 +120,10 @@ enum {
     /* Raw 210 is native UnitType, but imported as a bounded GBA prop. */
     B_P6_WALL_MISSILE_TRAP,
 #endif
+#if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
+    /* Z6 starting structures; keep earlier actor/profile enum values intact. */
+    B_Z6_ROBOTICS_SUPPORT_BAY, B_Z6_SHIELD_BATTERY,
+#endif
     SC_RB_COUNT
 };
 
@@ -399,6 +403,10 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
 #ifdef SC64_P6_ACTORS
     , [B_P6_WALL_MISSILE_TRAP] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 0, 0, 0, 50, 0 }
 #endif
+#if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
+    , [B_Z6_ROBOTICS_SUPPORT_BAY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 150, 100, 450, 450, 0 }
+    , [B_Z6_SHIELD_BATTERY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 100, 0, 450, 200, 0 }
+#endif
 };
 
 static inline const Sc64RaceUnitRule *sc64_race_unit_rule(int type)
@@ -493,6 +501,9 @@ static inline const char *sc64_race_building_name(int type)
 #ifdef SC64_P6_ACTORS
         ,"WALL MISSILE TRAP"
 #endif
+#if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
+        ,"ROBOTICS SUPPORT BAY","SHIELD BATTERY"
+#endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
 }
@@ -502,6 +513,10 @@ static inline unsigned short sc64_race_building_shields(int type)
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_building_fact(type);
     if (late) return (unsigned short)late->shields;
+#endif
+#if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
+    if (type == B_Z6_ROBOTICS_SUPPORT_BAY) return 450;
+    if (type == B_Z6_SHIELD_BATTERY) return 200;
 #endif
     switch (type) {
     case B_NEXUS: return 750; case B_GATEWAY: return 500;
@@ -1223,6 +1238,10 @@ static inline int sc64_race_raw_building(int type)
     case B_SHIELD_BATTERY: return 172; case B_SPECIAL_ION_CANNON: return 127;
     case B_SCIENCE_FACILITY: return 116; case B_PHYSICS_LAB: return 118;
 #endif
+#if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case B_Z6_ROBOTICS_SUPPORT_BAY: return 171;
+    case B_Z6_SHIELD_BATTERY: return 172;
+#endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     case B_ZP_CONTROL_TOWER: return 115; case B_ZP_MACHINE_SHOP: return 120;
     case B_ZP_ARMORY: return 123; case B_ZP_QUEENS_NEST: return 138;
@@ -1413,6 +1432,10 @@ static inline int sc64_race_building_from_raw(int raw)
     case 169: return B_FLEET_BEACON; case 171: return B_ROBOTICS_SUPPORT_BAY;
     case 172: return B_SHIELD_BATTERY; case 127: return B_SPECIAL_ION_CANNON;
     case 116: return B_SCIENCE_FACILITY; case 118: return B_PHYSICS_LAB;
+#endif
+#if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case 171: return B_Z6_ROBOTICS_SUPPORT_BAY;
+    case 172: return B_Z6_SHIELD_BATTERY;
 #endif
 #ifdef SC64_P6_ACTORS
     case SC64_P6_RAW_WALL_MISSILE_TRAP: return B_P6_WALL_MISSILE_TRAP;

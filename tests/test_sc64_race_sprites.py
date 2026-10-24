@@ -10,7 +10,7 @@ from tools.sc64_race_sprites import (
     named_asset_manifest_sha256, write_header,
     T4_BUILDING_IDS, T6_UNIT_IDS, LATE_UNIT_IDS, LATE_BUILDING_IDS,
     ZP_UNIT_IDS, ZP_BUILDING_IDS, Z5_UNIT_IDS, Z5_BUILDING_IDS, Z6_UNIT_IDS,
-    Z5_DOODAD_IDS,
+    Z5_DOODAD_IDS, Z6_BUILDING_IDS,
 )
 
 
@@ -345,6 +345,7 @@ int main(void) {
             check=True, capture_output=True, text=True)
         self.assertIn('--include-z5-actors', help_result.stdout)
         self.assertIn('--include-zp-campaign-actors', help_result.stdout)
+        self.assertIn('--include-z6-buildings', help_result.stdout)
 
     def test_z6_guardian_sprite_set_is_separately_complete_and_gated(self):
         frame = {'pixels': bytes((11,)), 'alpha': bytes((1,)), 'width': 1,
@@ -384,6 +385,61 @@ int main(void) {
             partial = root / 'partial.h'
             write_header(partial, base_units, bytes(range(256)), z6_selected=[])
             self.assertNotIn('SC64_Z6_SPRITE_SET_COMPLETE', partial.read_text())
+
+    def test_z6_building_framebanks_are_independently_complete_and_runtime_gated(self):
+        frames = [
+            {'pixels': bytes((11 + i,)), 'alpha': bytes((1,)), 'width': 1,
+             'height': 1, 'x': 0, 'y': 0, 'frame_width': 1,
+             'frame_height': 1}
+            for i in range(3)
+        ]
+        assets = [{'name': name, 'frames': frames} for name in Z6_BUILDING_IDS]
+        late_aliases = [{'name': name, 'frames': frames}
+                        for name in ('robotics_support_bay', 'shield_battery')]
+        base_units = [{'name': name, 'frame': frames[0]} for name in RACE_UNIT_IDS]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            full = root / 'z6_buildings.h'
+            write_header(full, base_units, bytes(range(256)),
+                         late_building_selected=late_aliases,
+                         z6_building_selected=assets)
+            text = full.read_text()
+            self.assertIn('#ifdef SC64_Z6_RUNTIME\n#define SC64_Z6_BUILDING_SPRITE_SET_COMPLETE 1', text)
+            self.assertIn('sc64_race_sprite_robotics_support_bay_z6_frame_2_pixels[1]', text)
+            self.assertIn('sc64_race_sprite_shield_battery_z6_frame_2_pixels[1]', text)
+            self.assertIn('case 171:', text)
+            self.assertIn('case 172:', text)
+            self.assertIn('case 2: return &sc64_race_sprite_robotics_support_bay_z6_frame_2;', text)
+            self.assertIn('case 2: return &sc64_race_sprite_shield_battery_z6_frame_2;', text)
+            (root / 'check.c').write_text('''#include <assert.h>
+#include "z6_buildings.h"
+int main(void) {
+#ifdef SC64_Z6_RUNTIME
+#ifndef SC64_Z6_BUILDING_SPRITE_SET_COMPLETE
+#error "complete Z6 building set must advertise its own marker"
+#endif
+    assert(sc64_race_building_sprite(171, 0));
+    assert(sc64_race_building_sprite(171, 2));
+    assert(!sc64_race_building_sprite(171, 3));
+    assert(sc64_race_building_sprite(172, 1));
+#else
+#ifdef SC64_Z6_BUILDING_SPRITE_SET_COMPLETE
+#error "Z6 building marker must stay behind the runtime gate"
+#endif
+#endif
+    return 0;
+}
+''')
+            for defines in ([], ['-DSC64_Z6_RUNTIME'],
+                            ['-DSC64_Z6_RUNTIME', '-DSC64_TERRAN_LATE_ENABLED']):
+                command = ['clang', '-std=c11', '-Werror', str(root / 'check.c'),
+                           '-o', str(root / 'check'), *defines]
+                subprocess.run(command, check=True, capture_output=True)
+                subprocess.run([str(root / 'check')], check=True, capture_output=True)
+            partial = root / 'partial.h'
+            write_header(partial, base_units, bytes(range(256)),
+                         z6_building_selected=assets[:1])
+            self.assertNotIn('SC64_Z6_BUILDING_SPRITE_SET_COMPLETE', partial.read_text())
 
 
 

@@ -206,6 +206,9 @@ static void test_real_source_rows_and_fail_closed(void)
 
 int main(void)
 {
+    assert(sc64_z6_world_compare(10, 4, 4)==1);
+    assert(sc64_z6_world_compare(10, 4, 5)==0);
+    assert(sc64_z6_world_compare(2, 4, 4)==-1);
     test_locations_owners_and_conditions();
     test_move_location_and_kill_unit_at_location();
     test_resource_switch_presentation_and_ai();

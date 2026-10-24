@@ -11,6 +11,10 @@ void *memcpy(void *dst, const void *src, size_t n);
 void *memset(void *dst, int value, size_t n);
 int memcmp(const void *a, const void *b, size_t n);
 
+#ifdef SC64_Z6_RUNTIME
+#include "sc64_z6_state.h"
+#endif
+
 #if defined(SC64_P4_STORM_ENABLED) && !defined(SC64_P4_RUNTIME)
 #error "SC64_P4_STORM_ENABLED requires SC64_P4_RUNTIME"
 #endif
@@ -122,7 +126,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_P6_RUNTIME)
+#if defined(SC64_Z6_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 29u
+#elif defined(SC64_P6_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 28u
 #elif defined(SC64_Z5_CONSUME_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 27u
@@ -275,6 +281,12 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #error "P6 runtime requires the complete actor and unit-backed doodad sprite banks"
 #endif
 #endif
+#if defined(SC64_Z6_RUNTIME) && defined(SC64_HAS_SPRITES)
+#if !defined(SC64_Z6_SPRITE_SET_COMPLETE) || \
+    !defined(SC64_Z6_BUILDING_SPRITE_SET_COMPLETE)
+#error "Z6 runtime requires its complete Guardian and source building sprite banks"
+#endif
+#endif
 #ifdef SC64_T6_STORAGE
 #if SC64_RACE_MAP_COUNT < 10 || !defined(SC64_T6_SPRITE_SET_COMPLETE)
 #error "Run make sc64-t6-prepare before building the T6 storage profile"
@@ -393,7 +405,13 @@ enum {
     SC64_GAME_ACTOR_INVINCIBLE = 64u, SC64_GAME_ACTOR_HIDDEN = 128u,
     SC64_GAME_ACTOR_WEAPON = 256u
 };
+#ifdef SC64_Z6_RUNTIME
+/* Share this expanded source-policy lookup in ROM instead of duplicating it
+ * across the hot movement/target loops and consuming their stack reserve. */
+static unsigned __attribute__((noinline))
+#else
 static unsigned
+#endif
 sc64_game_unit_actor_flags(int type)
 {
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
@@ -892,6 +910,16 @@ static int race_p6_draw_prop(Building *q, int x, int y);
 static void race_p6_note_unit_death(const Unit *q);
 static void race_p6_note_building_death(const Building *q);
 #endif
+#ifdef SC64_Z6_RUNTIME
+static int race_z6_active(void);
+static int race_z6_source_owner(unsigned source_slot);
+static int race_z6_product_source_owner(int owner);
+static void race_z6_note_unit_death(const Unit *q);
+static void race_z6_note_building_death(const Building *q);
+static int race_z6_hallucination_incoming_damage(int target, int damage);
+static int race_z6_hallucination_can_deal_damage(int attacker);
+static int race_z6_hallucination_cleanup_dead(Unit *q);
+#endif
 #ifdef SC64_P6_COMBAT_ENABLED
 static int race_p6_combat_unit_burrowed(int slot);
 static int race_p6_combat_target_detected(int target, int viewer_owner);
@@ -1291,6 +1319,12 @@ spawn_unit(int owner, int type, int x, int y)
         u[i].raw_owner = race_p5_product_source_owner(owner);
     }
 #endif
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active()) {
+        u[i].raw_type = sc64_race_raw_unit(type);
+        u[i].raw_owner = race_z6_product_source_owner(owner);
+    }
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) {
         u[i].raw_type = sc64_race_raw_unit(type);
@@ -1395,6 +1429,12 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     if (race_p5_active()) {
         b[i].raw_type = sc64_race_raw_building(type);
         b[i].raw_owner = race_p5_product_source_owner(owner);
+    }
+#endif
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active()) {
+        b[i].raw_type = sc64_race_raw_building(type);
+        b[i].raw_owner = race_z6_product_source_owner(owner);
     }
 #endif
 #ifdef SC64_T5_RUNTIME
@@ -2328,6 +2368,9 @@ static void
 hit_target(int target, int damage, int source_type, int source_owner)
 {
     int i, tx, ty;
+#ifdef SC64_Z6_RUNTIME
+    damage = race_z6_hallucination_incoming_damage(target, damage);
+#endif
 #ifdef SC64_P6_COMBAT_ENABLED
     if (target >= 0 && target < MAX_UNITS && race_p6_combat_unit_burrowed(target) &&
         source_type != U_P6_INFESTED_TERRAN) return;
@@ -2421,9 +2464,17 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #ifdef SC64_P6_RUNTIME
             if (u[target].alive && race_p6_active()) race_p6_note_unit_death(&u[target]);
 #endif
+#ifdef SC64_Z6_RUNTIME
+            if (u[target].alive && race_z6_active()) {
+                race_z6_note_unit_death(&u[target]);
+            }
+#endif
 	    if (u[target].owner == SIDE)
 		supply_used -= unit_supply(u[target].type);
 	    u[target].alive = 0;
+#ifdef SC64_Z6_RUNTIME
+            if (race_z6_active()) (void)race_z6_hallucination_cleanup_dead(&u[target]);
+#endif
 #ifdef SC64_T5_RUNTIME
             if (u[target].type == U_DROPSHIP) race_transport_destroy_cargo(target);
 #elif defined(SC64_P5_SHUTTLE_ENABLED)
@@ -2457,9 +2508,17 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #ifdef SC64_P6_RUNTIME
                         if (race_p6_active()) race_p6_note_unit_death(&u[i]);
 #endif
+#ifdef SC64_Z6_RUNTIME
+                        if (race_z6_active()) {
+                            race_z6_note_unit_death(&u[i]);
+                        }
+#endif
 			if (u[i].owner == SIDE)
 			    supply_used -= unit_supply(u[i].type);
 			u[i].alive = 0;
+#ifdef SC64_Z6_RUNTIME
+                        if (race_z6_active()) (void)race_z6_hallucination_cleanup_dead(&u[i]);
+#endif
 		    }
 		}
 	}
@@ -2499,6 +2558,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #endif
 #ifdef SC64_P6_RUNTIME
             if (q->alive && race_p6_active()) race_p6_note_building_death(q);
+#endif
+#ifdef SC64_Z6_RUNTIME
+            if (q->alive && race_z6_active()) race_z6_note_building_death(q);
 #endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
             if(q->alive && !race_mode && race_selected_mission==6 &&
@@ -3860,7 +3922,13 @@ unit_damage(int type)
     return 0;
 }
 
+#ifdef SC64_Z6_RUNTIME
+/* The large weapon body is already in ROM; keep its validation wrapper
+ * there as well rather than duplicating it in every ARM order branch. */
+static void __attribute__((noinline))
+#else
 static void
+#endif
 tick_combat(Unit * q, int target)
 {
     int dx, dy, range, damage;
@@ -3918,6 +3986,9 @@ tick_combat(Unit * q, int target)
 	    add_tracer(q->x, q->y, target_x(target), target_y(target), q->owner == SIDE ? C_GOLD : C_RED);
 	#ifdef SC64_RACES
         int hits=sc64_race_unit_hits_vs(q->type,flying);
+#ifdef SC64_Z6_RUNTIME
+        if (race_z6_hallucination_can_deal_damage((int)(q-u)))
+#endif
         for(int hit=0;hit<hits&&target_alive(target);hit++)hit_target(target,damage,q->type,q->owner);
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
         /* Suicide Scourge damage is applied by hit_target first, preserving

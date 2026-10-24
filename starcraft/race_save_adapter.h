@@ -83,6 +83,9 @@ race_save_invincible_padding_valid(const RaceSave *candidate)
 #ifdef SC64_P6_RUNTIME
 #include "sc64_p6_save.h"
 #endif
+#ifdef SC64_Z6_RUNTIME
+#include "sc64_z6_save.h"
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
 #include "sc64_terran_late_repair.h"
 #endif
@@ -555,6 +558,16 @@ static int race_save_game(void) {
         race_data.z5 = race_z5;
     }
 #endif
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active()) {
+        if (!sc64_z6_persistent_state_valid(&race_z6)) return 0;
+        race_data.z6 = race_z6;
+#ifdef SC64_Z5_RUNTIME
+    } else if (!race_z5_active()) {
+#endif
+        memset(&race_data.z6, 0, sizeof(race_data.z6));
+    }
+#endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) {
@@ -636,6 +649,31 @@ static int race_save_game(void) {
             if (bytes[i]) return 0;
     }
 #endif
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active()) {
+        if (!race_z6_save_candidate_valid(&race_data, &race_data.z6,
+                                          (unsigned)race_cols,
+                                          (unsigned)race_rows)) return 0;
+#ifdef SC64_Z5_RUNTIME
+        {
+            const u8 *payload = (const u8 *)&race_data.z6;
+            for (unsigned i = sizeof(race_data.z6); i < sizeof(race_data.z5); ++i)
+                if (payload[i]) return 0;
+        }
+#endif
+    } else {
+#ifdef SC64_Z5_RUNTIME
+        if (race_z5_active()) {
+            /* Z5 owns the larger shared payload. */
+        } else
+#endif
+        {
+            const u8 *bytes = (const u8 *)&race_data.z6;
+            for (unsigned i = 0; i < sizeof(race_data.z6); ++i)
+                if (bytes[i]) return 0;
+        }
+    }
+#endif
 #ifdef SC64_T5_RUNTIME
     if (!race_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
@@ -682,6 +720,9 @@ static int race_load_game(void) {
 #ifdef SC64_P6_RUNTIME
        &&v[2]!=SC64_P6_GLOBAL_ID
 #endif
+#ifdef SC64_Z6_RUNTIME
+       &&v[2]!=SC64_Z6_GLOBAL_ID
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
        &&(v[2]<SC64_TERRAN_LATE_GLOBAL_T7||
           v[2]>SC64_TERRAN_LATE_GLOBAL_T10)
@@ -707,6 +748,9 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_P6_RUNTIME
         &&v[2]!=SC64_P6_GLOBAL_ID
+#endif
+#ifdef SC64_Z6_RUNTIME
+        &&v[2]!=SC64_Z6_GLOBAL_ID
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
         &&(v[2]<SC64_TERRAN_LATE_GLOBAL_T7||
@@ -1214,8 +1258,42 @@ static int race_load_game(void) {
                 (race_data.campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
         } else return 0;
     } else {
+#ifdef SC64_Z6_RUNTIME
+        if (!v[0] && v[2] == SC64_Z6_GLOBAL_ID) {
+            /* Z5 and Z6 share this union; Z6 validation follows below. */
+        } else
+#endif
+        {
         const u8 *bytes = (const u8 *)&race_data.z5;
         for (unsigned i = 0; i < sizeof(race_data.z5); ++i) if (bytes[i]) return 0;
+        }
+    }
+#endif
+#ifdef SC64_Z6_RUNTIME
+    if (!v[0] && v[2] == SC64_Z6_GLOBAL_ID) {
+        if (!race_z6_save_candidate_valid(&race_data, &race_data.z6,
+                                           (unsigned)width,
+                                           (unsigned)height)) return 0;
+#ifdef SC64_Z5_RUNTIME
+        /* Z5 is the larger member; bytes outside the Z6 schema are canonical
+         * zero so old union contents cannot survive a mission change. */
+        {
+            const u8 *payload = (const u8 *)&race_data.z6;
+            for (unsigned i = sizeof(race_data.z6); i < sizeof(race_data.z5); ++i)
+                if (payload[i]) return 0;
+        }
+#endif
+    } else {
+#ifdef SC64_Z5_RUNTIME
+        if (!v[0] && v[2] == SC64_Z5_GLOBAL_ID) {
+            /* Z5 owns the full shared payload. */
+        } else
+#endif
+        {
+            const u8 *bytes = (const u8 *)&race_data.z6;
+            for (unsigned i = 0; i < sizeof(race_data.z6); ++i)
+                if (bytes[i]) return 0;
+        }
     }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
@@ -1433,6 +1511,16 @@ static int race_load_game(void) {
         memset(&race_z5, 0, sizeof(race_z5));
         memset(&race_z5_world, 0, sizeof(race_z5_world));
         memset(race_z5_doodads, 0, sizeof(race_z5_doodads));
+    }
+#endif
+#ifdef SC64_Z6_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_Z6_GLOBAL_ID) {
+        race_z6 = race_data.z6;
+        if (!race_z6_rebind_loaded_world(&sc64_race_maps[SC64_Z6_GLOBAL_ID]))
+            return 0;
+    } else {
+        memset(&race_z6, 0, sizeof(race_z6));
+        memset(&race_z6_world, 0, sizeof(race_z6_world));
     }
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME

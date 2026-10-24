@@ -114,9 +114,10 @@ class ResumeAuthenticationTests(unittest.TestCase):
             resume.verify_handoff_and_resume(1000, 1001, 60, 59,
                                              {"frame": 1060, "screen": 1})
 
-    def test_authenticates_fifth_entry_z5_and_p5_pause_snapshots(self):
+    def test_authenticates_fifth_and_sixth_entry_pause_snapshots(self):
         base = json.loads(self.report.read_text())
-        for profile_name, mission in (("zerg-z5", 16), ("protoss-p5", 24)):
+        for profile_name, mission in (("zerg-z5", 16), ("protoss-p5", 24),
+                                      ("protoss-p6", 25)):
             with self.subTest(profile=profile_name):
                 payload = copy_report = json.loads(json.dumps(base))
                 payload["profile"] = profile_name
@@ -134,16 +135,66 @@ class ResumeAuthenticationTests(unittest.TestCase):
                     "switch_bits": [0x11111111 * i for i in range(8)],
                     "faults": 0, "persistent_bytes": list(range(181 if mission == 16 else 123)),
                 }
+                if profile_name == "protoss-p6":
+                    saved["race_runtime"] = {
+                        "model": {"outcome": 0, "started": 0, "fired": 0,
+                                  "action_cursor": [0] * 26},
+                        "action_ticks": [0] * 26, "switch_bits": 0, "fault": 0,
+                        "deaths_by_source": [0] * 12,
+                        "doodad_enabled": [0, 1, 0, 0, 0x1F],
+                        "pause_acknowledged": 1, "reserved": [0, 0],
+                        "persistent_bytes": [0] * 148,
+                    }
                 saved["buildings"]["entities"][0]["queue"] = [1, 7, 3, 9, 5]
                 self.report.write_text(json.dumps(payload))
                 auth = resume.validate_source_report(self.report, self.rom, self.elf)
                 self.assertEqual(auth["profile"], profile_name)
                 self.assertEqual(auth["mission"], mission)
                 self.assertEqual(auth["source_state"]["race_runtime"]["persistent_bytes"][-1],
-                                 (180 if mission == 16 else 122))
+                                 (180 if mission == 16 else 0 if mission == 25 else 122))
                 self.assertEqual(auth["source_state"]["buildings"]["entities"][0]["queue"],
                                  [1, 7, 3, 9, 5])
         self.report.write_text(json.dumps(base))
+
+    def test_p6_resume_seed_rejects_incomplete_persistent_observations(self):
+        payload = json.loads(self.report.read_text())
+        payload["profile"], payload["mission"] = "protoss-p6", 25
+        saved = payload["save_checkpoint"]["state"]
+        saved["race_selected_mission"] = 25
+        saved["race_campaign"]["mission"] = 25
+        saved["race_runtime"] = {
+            "model": {"outcome": 0, "started": 0, "action_cursor": [0] * 26},
+            "action_ticks": [0] * 26, "switch_bits": 0, "fault": 0,
+            "deaths_by_source": [0] * 12, "doodad_enabled": [0] * 5,
+            "pause_acknowledged": 0, "reserved": [0, 0],
+            "persistent_bytes": [0] * 148,
+        }
+        self.report.write_text(json.dumps(payload))
+        resume.validate_source_report(self.report, self.rom, self.elf)
+        for field, changed, error in (
+                ("action_ticks", [0] * 25, "action timers"),
+                ("deaths_by_source", [0] * 11, "death counters"),
+                ("doodad_enabled", [0, 0, 0, 0, 0x20], "doodad enabled"),
+                ("doodad_enabled", [1, 0, 0, 0, 0], "doodad enabled"),
+                ("doodad_enabled", [0, 0xF0, 0, 0, 0], "doodad enabled"),
+                ("doodad_enabled", [0, 0, 0x9B, 0, 0], "doodad enabled"),
+                ("persistent_bytes", [0] * 147, "148 persistent bytes"),
+                ("reserved", [0, 0, 1], "reserved bytes")):
+            broken = json.loads(json.dumps(payload))
+            broken["save_checkpoint"]["state"]["race_runtime"][field] = changed
+            self.report.write_text(json.dumps(broken))
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, error):
+                resume.validate_source_report(self.report, self.rom, self.elf)
+        for name, mutate, error in (
+                ("cursor", lambda r: r["model"]["action_cursor"].__setitem__(4, 1),
+                 "cursor/timer state"),
+                ("switch", lambda r: r.__setitem__("switch_bits", 0x40),
+                 "switch bits")):
+            broken = json.loads(json.dumps(payload))
+            mutate(broken["save_checkpoint"]["state"]["race_runtime"])
+            self.report.write_text(json.dumps(broken))
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, error):
+                resume.validate_source_report(self.report, self.rom, self.elf)
 
     def test_restored_persistent_snapshot_compares_every_nested_byte(self):
         saved = state(2)

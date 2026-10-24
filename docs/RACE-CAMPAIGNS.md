@@ -49,8 +49,10 @@ an exact fresh-process cargo save. Z5 Consume also has a complete host and ARM
 win with an exact mid-mission save, bringing the staged total to 20/30
 (Terran 10, Zerg 5, Protoss 5). These staged builds have separate save formats
 and ROM identities. The P5 island objective requires the optional Shuttle
-profile. P6 has a gated live runtime, source doors/traps and save checks; its
-full mission playthrough and later chapters remain incomplete.
+profile. P6 and Z6 have gated live runtimes and startup/save checks; their
+full mission playthroughs remain incomplete. Z7 has an isolated world/runtime
+foundation and P7 a numeric scheduler. The remaining ten missions still need
+completed playthroughs and ARM qualification.
 
 Zerg 3 **The New Dominion** and Protoss 3 **Higher Ground** are on the second
 campaign menu page. The canonical files remain `StarCraft-Zerg-GBA.gba` and

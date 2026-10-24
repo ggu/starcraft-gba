@@ -100,6 +100,51 @@ def validate_source_report(report_path: Path, rom_path: Path, elf_path: Path,
     if not isinstance(expected_state.get("units"), dict) or not isinstance(
             expected_state.get("buildings"), dict):
         raise ValueError("save checkpoint omits entity-bank observations")
+    if profile_name == "protoss-p6":
+        runtime = expected_state.get("race_runtime")
+        if not isinstance(runtime, dict) or not isinstance(runtime.get("model"), dict):
+            raise ValueError("P6 save checkpoint omits persistent model state")
+        model = runtime["model"]
+        if (type(model.get("started")) is not int or
+                not 0 <= model["started"] < (1 << 26) or
+                type(model.get("outcome")) is not int or model["outcome"] != 0 or
+                not isinstance(model.get("action_cursor"), list) or
+                len(model["action_cursor"]) != 26 or
+                any(type(v) is not int or not 0 <= v <= 255 for v in model["action_cursor"])):
+            raise ValueError("P6 save checkpoint has malformed model mask/cursors")
+        if (not isinstance(runtime.get("action_ticks"), list) or
+                len(runtime["action_ticks"]) != 26 or
+                any(type(v) is not int or not 0 <= v <= 65535 for v in runtime["action_ticks"])):
+            raise ValueError("P6 save checkpoint has malformed action timers")
+        for i, (cursor, ticks) in enumerate(zip(model["action_cursor"], runtime["action_ticks"])):
+            if (cursor > replay.P6_ACTION_COUNTS[i] or
+                    (cursor and not (model["started"] & (1 << i))) or
+                    ((cursor != 0) != (ticks != 0))):
+                raise ValueError("P6 save checkpoint cursor/timer state violates source action bounds")
+        if (type(runtime.get("switch_bits")) is not int or
+                runtime["switch_bits"] & ~replay.P6_SWITCH_MASK):
+            raise ValueError("P6 save checkpoint has malformed switch bits")
+        if type(runtime.get("fault")) is not int or not 0 <= runtime["fault"] <= 255:
+            raise ValueError("P6 save checkpoint has malformed fault state")
+        deaths = runtime.get("deaths_by_source")
+        if (not isinstance(deaths, list) or len(deaths) != 12 or
+                any(type(v) is not int or not 0 <= v <= 65535 for v in deaths)):
+            raise ValueError("P6 save checkpoint has malformed source death counters")
+        doodads = runtime.get("doodad_enabled")
+        if (not isinstance(doodads, list) or len(doodads) != 5 or
+                any(type(v) is not int or not 0 <= v <= 255 for v in doodads) or
+                doodads[4] & 0xE0 or
+                any(value & forbidden for value, forbidden in
+                    zip(doodads, replay.P6_SPRITE_ONLY_DOODAD_MASK))):
+            raise ValueError("P6 save checkpoint has malformed doodad enabled bits")
+        if (type(runtime.get("pause_acknowledged")) is not int or
+                runtime["pause_acknowledged"] not in (0, 1) or
+                runtime.get("reserved") != [0, 0]):
+            raise ValueError("P6 save checkpoint has malformed pause or reserved bytes")
+        payload = runtime.get("persistent_bytes")
+        if (not isinstance(payload, list) or len(payload) != 148 or
+                any(type(v) is not int or not 0 <= v <= 255 for v in payload)):
+            raise ValueError("P6 save checkpoint must observe all 148 persistent bytes")
     return {"report": report, "report_path": report_path,
             "report_sha256": hashlib.sha256(report_bytes).hexdigest(),
             "profile": profile_name, "mission": mission,
@@ -347,7 +392,7 @@ def run(report_path: Path, rom_path: Path, elf_path: Path, output: Path,
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, required=True,
-                        help="Z4/P4 controller replay report containing save_checkpoint")
+                        help="staged Zerg/Protoss controller report containing save_checkpoint")
     parser.add_argument("--rom", type=Path, required=True)
     parser.add_argument("--elf", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=ROOT / "build/emulator/zp-resume-smoke")

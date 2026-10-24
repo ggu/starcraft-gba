@@ -36,6 +36,14 @@
 #error "P6 entry requires the authenticated P1-P6 runtime, actors and combat profile"
 #endif
 #endif
+#ifdef SC64_Z6_CAMPAIGN_ENTRY
+#if !defined(SC64_Z5_CAMPAIGN_ENTRY) || !defined(SC64_Z6_RUNTIME) || \
+    !defined(SC64_Z6_DATA_ENABLED) || !defined(SC64_Z6_ACTORS) || \
+    !defined(SC64_ZP_FULL_STORAGE) || !defined(SC64_UNIFIED) || \
+    !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 1
+#error "Z6 entry requires its authenticated Z1-Z6 runtime and full storage"
+#endif
+#endif
 #ifdef SC64_T5_CAMPAIGN_ENTRY
 #if !defined(SC64_T3_ENABLED) || !defined(SC64_T4_CAMPAIGN_ENTRY) || \
     !defined(SC64_T4_SCENARIO_RUNTIME) || !defined(SC64_T5_ENABLED) || \
@@ -162,7 +170,13 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
      0,
 #endif
      "THE AMERIGO"},
-    {17, SC64_FACTION_ZERG, 6, 0, "THE DARK TEMPLAR"},
+    {17, SC64_FACTION_ZERG, 6,
+#ifdef SC64_Z6_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "THE DARK TEMPLAR"},
     {18, SC64_FACTION_ZERG, 7, 0, "THE CULLING"},
     {19, SC64_FACTION_ZERG, 8, 0, "EYE FOR AN EYE"},
     {20, SC64_FACTION_ZERG, 9, 0, "THE INVASION OF AIUR"},

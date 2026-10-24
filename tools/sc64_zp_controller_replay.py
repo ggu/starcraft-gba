@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay private fourth/fifth Zerg/Protoss controller-win traces using only scheduled inputs.
+"""Replay private staged Zerg/Protoss controller-win traces using only scheduled inputs.
 
 ROM/ELF catalog metadata and debugger symbols are checked before launch. The
 replay writes the controller queue and scheduler metadata; game/model state is
@@ -29,21 +29,27 @@ import sc64_z3_controller_replay as scheduler
 from emulator_smoke import ROOT, capture, symbol_sizes, symbols
 
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_RESULT = 0, 1, 3
-MISSION_BY_PROFILE = {"zerg-z4": 15, "protoss-p4": 23, "zerg-z5": 16, "protoss-p5": 24}
+MISSION_BY_PROFILE = {"zerg-z4": 15, "protoss-p4": 23, "zerg-z5": 16,
+                      "protoss-p5": 24, "protoss-p6": 25}
 FACTION_BY_PROFILE = {name: ("zerg" if name.startswith("zerg") else "protoss")
                       for name in MISSION_BY_PROFILE}
 MODEL_TYPES = {"zerg-z4": "Sc64Z4State", "protoss-p4": "Sc64P4State",
-               "zerg-z5": "Sc64Z5State", "protoss-p5": "Sc64P5State"}
+               "zerg-z5": "Sc64Z5State", "protoss-p5": "Sc64P5State",
+               "protoss-p6": "Sc64P6State"}
 RUNTIME_TYPES = {"zerg-z4": "Sc64Z4RuntimeState", "protoss-p4": "Sc64P4RuntimeState",
-                 "zerg-z5": "Sc64Z5RuntimeState", "protoss-p5": "Sc64P5RuntimeState"}
-PERSISTENT_TYPES = {"zerg-z5": "Sc64Z5PersistentState", "protoss-p5": "Sc64P5PersistentState"}
+                 "zerg-z5": "Sc64Z5RuntimeState", "protoss-p5": "Sc64P5RuntimeState",
+                 "protoss-p6": "Sc64P6RuntimeState"}
+PERSISTENT_TYPES = {"zerg-z5": "Sc64Z5PersistentState", "protoss-p5": "Sc64P5PersistentState",
+                    "protoss-p6": "Sc64P6PersistentState"}
 RUNTIME_SYMBOLS = {"zerg-z4": "race_z4", "protoss-p4": "race_p4",
-                   "zerg-z5": "race_z5", "protoss-p5": "race_p5"}
+                   "zerg-z5": "race_z5", "protoss-p5": "race_p5",
+                   "protoss-p6": "race_p6"}
 DEFAULT_TRACE = ROOT / ".local/sc64/z4-controller-win.json"
 DEFAULT_TRACES = {"zerg-z4": DEFAULT_TRACE,
                  "protoss-p4": ROOT / ".local/sc64/p4-controller-win.json",
                  "zerg-z5": ROOT / ".local/sc64/z5-controller-win.json",
-                 "protoss-p5": ROOT / ".local/sc64/p5-controller-win.json"}
+                 "protoss-p5": ROOT / ".local/sc64/p5-controller-win.json",
+                 "protoss-p6": ROOT / ".local/sc64/p6-controller-win.json"}
 DEFAULT_OUTPUT = ROOT / "build/emulator/zp-controller-replay"
 CHECKPOINT_TICKS = 1000
 MENU_PREFIX = ((1, 1), (2, 0), (3, 16), (4, 0), (5, 128),
@@ -51,6 +57,12 @@ MENU_PREFIX = ((1, 1), (2, 0), (3, 16), (4, 0), (5, 128),
 
 FIFTH_MENU_PREFIX = tuple((tick, 16 if tick == 5 else held)
                           for tick, held in MENU_PREFIX)
+SIXTH_MENU_PREFIX = ((1, 1), (2, 0), (3, 16), (4, 0), (5, 16), (6, 0),
+                     (7, 128), (8, 0), (9, 1), (10, 0), (11, 1), (12, 0))
+P6_ACTION_COUNTS = (1, 1, 2, 2, 2, 2, 2, 2, 5, 2, 2, 8, 8,
+                    1, 7, 12, 5, 2, 3, 3, 7, 12, 3, 1, 3, 1)
+P6_SWITCH_MASK = 0x3B
+P6_SPRITE_ONLY_DOODAD_MASK = (0x01, 0xF0, 0x9B, 0, 0)
 
 
 def validate_trace(trace: object, capacity: int, profile_name: str,
@@ -124,19 +136,40 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
 
     if not inputs or inputs[0][0] != 0:
         raise ValueError("first controller transition must be host_tick=1")
-    entry = 5 if profile_name in PERSISTENT_TYPES else 4
-    menu_prefix = FIFTH_MENU_PREFIX if entry == 5 else MENU_PREFIX
+    entry = 6 if profile_name == "protoss-p6" else 5 if profile_name in PERSISTENT_TYPES else 4
+    menu_prefix = (SIXTH_MENU_PREFIX if entry == 6 else
+                   FIFTH_MENU_PREFIX if entry == 5 else MENU_PREFIX)
     if (start_transition_count != len(menu_prefix) or
             transitions[:start_transition_count] != list(menu_prefix)):
         raise ValueError(f"normal HOME/menu inputs do not match the {entry}th-entry deployment route")
     if not windowed and len(inputs) > capacity:
         raise ValueError(f"controller queue exceeds ELF capacity ({len(inputs)}/{capacity})")
-    if start is None or start.get("screen") != SCREEN_PLAY or start.get("frame") != 0:
-        raise ValueError("trace start must be a live PLAY screen at frame zero")
-    if start.get("host_tick") != 9 or start.get("host_tick") != start_input_tick:
-        raise ValueError(f"normal {entry}th-entry HOME/menu deployment must launch at host_tick=9")
+    expected_start_frame = 1 if profile_name == "protoss-p6" else 0
+    if (start is None or start.get("screen") != SCREEN_PLAY or
+            start.get("frame") != expected_start_frame):
+        raise ValueError("trace start must match the profile's live PLAY handoff frame")
+    launch_tick = 12 if entry == 6 else 9
+    if start.get("host_tick") != launch_tick or start.get("host_tick") != start_input_tick:
+        raise ValueError(f"normal {entry}th-entry HOME/menu deployment must launch at host_tick={launch_tick}")
     if start.get("won") != 0 or start.get("lost") != 0 or start.get("outcome") != 0:
         raise ValueError("trace start must be live and unfinished")
+    if profile_name == "protoss-p6":
+        for name, size in (("action_cursors", 26), ("action_ticks", 26)):
+            value = start.get(name)
+            if (not isinstance(value, list) or len(value) != size or
+                    any(type(x) is not int or x < 0 for x in value)):
+                raise ValueError(f"P6 start observation requires 26 integer {name} values")
+        if (type(start.get("started")) is not int or not 0 <= start["started"] < (1 << 26) or
+                type(start.get("fired")) is not int or start["fired"] != start["started"] or
+                type(start.get("switch_bits")) is not int or
+                start["switch_bits"] & ~P6_SWITCH_MASK or
+                type(start.get("fault")) is not int or start["fault"] != 0):
+            raise ValueError("P6 start observation has invalid model or switch state")
+        for i, (cursor, ticks) in enumerate(zip(start["action_cursors"], start["action_ticks"])):
+            if (cursor > P6_ACTION_COUNTS[i] or
+                    (cursor and not (start["started"] & (1 << i))) or
+                    ((cursor != 0) != (ticks != 0))):
+                raise ValueError("P6 start cursor/timer state violates source action bounds")
     if final is None or rows[-1] is not final or final.get("kind") != "won":
         raise ValueError("full controller trace must end in a won event")
     stop = final.get("host_tick")
@@ -153,6 +186,29 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
             raise ValueError(f"final event is missing integer field {field}")
     if final["frame"] <= start["frame"]:
         raise ValueError("final frame must follow mission start")
+    if profile_name == "protoss-p6":
+        started = final.get("started")
+        if type(started) is not int or not 0 <= started < (1 << 26):
+            raise ValueError("P6 final started mask must fit 26 source triggers")
+        if not (started & (1 << 15)) or started & ((1 << 1) | (1 << 8)):
+            raise ValueError("P6 winning trace must include victory and exclude defeat triggers")
+        if final["fired"] != started:
+            raise ValueError("P6 final fired alias must match the started trigger mask")
+        for name, limit in (("action_cursors", 255), ("action_ticks", 65535)):
+            value = final.get(name)
+            if (not isinstance(value, list) or len(value) != 26 or
+                    any(type(x) is not int or not 0 <= x <= limit for x in value)):
+                raise ValueError(f"P6 final observation requires 26 bounded {name} values")
+        for i, (cursor, ticks) in enumerate(zip(final["action_cursors"], final["action_ticks"])):
+            if (cursor > P6_ACTION_COUNTS[i] or
+                    (cursor and not (started & (1 << i))) or
+                    ((cursor != 0) != (ticks != 0))):
+                raise ValueError("P6 final cursor/timer state violates source action bounds")
+        if (type(final.get("switch_bits")) is not int or
+                final["switch_bits"] & ~P6_SWITCH_MASK):
+            raise ValueError("P6 final switch_bits exceed the authenticated switch set")
+        if type(final.get("fault")) is not int or final["fault"] != 0:
+            raise ValueError("P6 final observation must report zero adapter faults")
     if windowed:
         last_page = (stop - 1) // CHECKPOINT_TICKS
         peak = max((sum(1 for tick, _ in inputs if tick // CHECKPOINT_TICKS == page)
@@ -177,6 +233,8 @@ def decode_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
     if base < 0 or base + model_size > len(raw):
         raise ValueError("nested model lies outside runtime state")
     model_raw = raw[base:base + model_size]
+    if profile_name == "protoss-p6":
+        return decode_p6_runtime(raw, runtime_layout, model_layout)
     if profile_name in PERSISTENT_TYPES:
         return decode_fifth_runtime(raw, runtime_layout, model_layout, profile_name)
     model_widths = ({"fired": 2, "outcome": 1, "action_cursor": 7}
@@ -298,6 +356,49 @@ def decode_fifth_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
     return result
 
 
+def decode_p6_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
+                      model_layout: tuple[int, dict[str, int]]) -> dict:
+    """Decode the complete P6 persistent payload, including union member bytes."""
+    size, fields = runtime_layout
+    model_size, model_fields = model_layout
+    if len(raw) != size:
+        raise ValueError("P6 persistent state bytes do not match DWARF layout")
+    base = fields.get("model", -1)
+    if base < 0 or base + model_size > size:
+        raise ValueError("P6 model lies outside persistent runtime structure")
+
+    def read(table: dict[str, int], limit: int, source: bytes,
+             name: str, count: int, width: int, *, start: int = 0) -> list[int] | int:
+        offset = table.get(name, -1)
+        total = count * width
+        if offset < 0 or offset + total > limit or start + offset + total > len(source):
+            raise ValueError(f"P6 runtime field {name} exceeds or is absent from DWARF structure")
+        data = source[start + offset:start + offset + total]
+        if count == 1:
+            return int.from_bytes(data, "little")
+        return [int.from_bytes(data[i:i + width], "little")
+                for i in range(0, total, width)]
+
+    model = {
+        "started": read(model_fields, model_size, raw, "started", 1, 4, start=base),
+        "fired": read(model_fields, model_size, raw, "started", 1, 4, start=base),
+        "outcome": read(model_fields, model_size, raw, "outcome", 1, 1, start=base),
+        "action_cursor": read(model_fields, model_size, raw, "action_cursor", 26, 1, start=base),
+    }
+    result = {
+        "model": model,
+        "action_ticks": read(fields, size, raw, "action_ticks", 26, 2),
+        "switch_bits": read(fields, size, raw, "switch_bits", 1, 4),
+        "fault": read(fields, size, raw, "fault", 1, 1),
+        "deaths_by_source": read(fields, size, raw, "deaths_by_source", 12, 4),
+        "doodad_enabled": read(fields, size, raw, "doodad_enabled", 5, 1),
+        "pause_acknowledged": read(fields, size, raw, "pause_acknowledged", 1, 1),
+        "reserved": read(fields, size, raw, "reserved", 2, 1),
+        "persistent_bytes": list(raw),
+    }
+    return result
+
+
 def verify_p5_extraction(trace_final: dict, state: dict) -> None:
     bounds = trace_final.get("goal")
     if bounds != [1696, 1680, 1808, 1776]:
@@ -346,6 +447,39 @@ def verify_p4_hero_extraction(trace_final: dict, state: dict) -> None:
             raise RuntimeError(f"P4 {name} is not player-owned inside extraction")
 
 
+def verify_p6_extraction(trace_final: dict, state: dict) -> None:
+    """Verify source-proven Zeratul goal presence and live Tassadar from both snapshots."""
+    bounds = trace_final.get("objective")
+    if bounds != [1216, 1664, 1312, 1728]:
+        raise RuntimeError("P6 trace does not report authenticated source location 15 bounds")
+    z_trace, t_trace = trace_final.get("zeratul"), trace_final.get("tassadar")
+    if not isinstance(z_trace, list) or len(z_trace) != 8:
+        raise RuntimeError("P6 trace lacks complete Zeratul identity and position")
+    if not isinstance(t_trace, list) or len(t_trace) != 8:
+        raise RuntimeError("P6 trace lacks complete Tassadar identity and position")
+    left, top, right, bottom = bounds
+    for name, actor, raw, must_extract in (("Zeratul", z_trace, 75, True),
+                                            ("Tassadar", t_trace, 79, False)):
+        alive, raw_type, raw_owner, x, y, owner, hp, order = actor
+        if (alive != 1 or raw_type != raw or raw_owner != 2 or owner != 0 or
+                type(hp) is not int or hp <= 0 or type(order) is not int):
+            raise RuntimeError(f"P6 trace has invalid {name} source identity or live state")
+        if must_extract and not (left <= x < right and top <= y < bottom):
+            raise RuntimeError("P6 Zeratul is not inside source extraction location 15")
+    units = state.get("units", {}).get("entities", [])
+    for name, trace_actor, raw in (("Zeratul", z_trace, 75), ("Tassadar", t_trace, 79)):
+        matches = [a for a in units if a.get("raw_type") == raw and a.get("raw_owner") == 2]
+        if len(matches) != 1:
+            raise RuntimeError(f"P6 final bank must contain exactly one live source {name}")
+        a = matches[0]
+        live = [1, a.get("raw_type"), a.get("raw_owner"), a.get("x"), a.get("y"),
+                a.get("owner"), a.get("hp"), a.get("order")]
+        if live != trace_actor:
+            raise RuntimeError(f"P6 {name} live bank state differs from controller trace")
+        if name == "Zeratul" and not (left <= a["x"] < right and top <= a["y"] < bottom):
+            raise RuntimeError("P6 Zeratul is not inside source extraction location 15")
+
+
 def verify_final(trace_final: dict, state: dict, profile_name: str) -> None:
     mission = MISSION_BY_PROFILE[profile_name]
     campaign = state.get("race_campaign", {})
@@ -385,6 +519,36 @@ def verify_final(trace_final: dict, state: dict, profile_name: str) -> None:
             if key in trace_final and state.get(key) != trace_final[key]:
                 raise RuntimeError(f"final {key} differs from authenticated trace")
 
+    elif profile_name == "protoss-p6":
+        if runtime.get("fault") != 0:
+            raise RuntimeError("P6 final state reports adapter faults")
+        deaths, doodads = runtime.get("deaths_by_source"), runtime.get("doodad_enabled")
+        payload, reserved = runtime.get("persistent_bytes"), runtime.get("reserved")
+        if (not isinstance(deaths, list) or len(deaths) != 12 or
+                any(type(v) is not int or not 0 <= v <= 65535 for v in deaths)):
+            raise RuntimeError("P6 final source death counters have the wrong saved shape")
+        if (not isinstance(doodads, list) or len(doodads) != 5 or
+                any(type(v) is not int or not 0 <= v <= 255 for v in doodads) or
+                doodads[4] & 0xE0 or
+                any(value & forbidden for value, forbidden in
+                    zip(doodads, P6_SPRITE_ONLY_DOODAD_MASK))):
+            raise RuntimeError("P6 final doodad state has the wrong saved shape")
+        if (type(runtime.get("pause_acknowledged")) is not int or
+                runtime.get("pause_acknowledged") not in (0, 1) or
+                reserved != [0, 0] or not isinstance(payload, list) or len(payload) != 148 or
+                any(type(v) is not int or not 0 <= v <= 255 for v in payload)):
+            raise RuntimeError("P6 final persistent bytes or reserved state are malformed")
+        if runtime.get("model", {}).get("started") != trace_final.get("started"):
+            raise RuntimeError("P6 started trigger mask differs from controller trace")
+        if runtime.get("model", {}).get("action_cursor") != trace_final.get("action_cursors"):
+            raise RuntimeError("P6 source action cursors differ from controller trace")
+        if runtime.get("action_ticks") != trace_final.get("action_ticks"):
+            raise RuntimeError("P6 source action timers differ from controller trace")
+        if runtime.get("switch_bits") != trace_final.get("switch_bits"):
+            raise RuntimeError("P6 switch state differs from controller trace")
+        if model.get("outcome") != 1 or model.get("fired") != trace_final.get("fired"):
+            raise RuntimeError("P6 composite model differs from the winning controller trace")
+        verify_p6_extraction(trace_final, state)
     else:
         if runtime.get("faults") != 0:
             raise RuntimeError("fifth mission final state reports adapter faults")
@@ -586,6 +750,10 @@ def compact_bank_profile(elf: Path, sizes: dict[str, int], profile_name: str) ->
     for field in ("owner", "type", "alive", "x", "y", "hp", "raw_type"):
         if field not in unit_offsets:
             raise RuntimeError(f"compact Unit DWARF lacks {field}")
+    if profile_name == "protoss-p6":
+        for field in ("raw_owner", "order"):
+            if field not in unit_offsets:
+                raise RuntimeError(f"P6 compact Unit DWARF lacks {field}")
     for field in ("owner", "type", "alive", "x", "y", "hp", "raw_type", "under_construction"):
         offset = building_offsets.get(field)
         width = (4 if field == "hp" else 2 if field in ("x", "y", "raw_type") else 1) \

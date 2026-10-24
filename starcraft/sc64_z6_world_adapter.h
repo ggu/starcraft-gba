@@ -111,7 +111,7 @@ static int sc64_z6_world_compare(unsigned comparison, u32 value, u32 amount)
     switch (comparison) {
     case 0: return value >= amount;
     case 1: return value <= amount;
-    case 2: return value == amount;
+    case 10: return value == amount;
     default: return -1;
     }
 }
@@ -176,7 +176,7 @@ static int sc64_z6_world_condition(void *context,
     switch (c->opcode) {
     case 2: case 3:
         if (c->resource || (c->opcode==2 && c->location) ||
-            (c->comparison>2)) return -1;
+            (c->comparison!=0 && c->comparison!=1 && c->comparison!=10)) return -1;
         if (!sc64_z6_world_count(ctx,c->player,c->unit,
                                  c->opcode == 3 ? c->location : 0,&count)) return -1;
         return sc64_z6_world_compare(c->comparison,count,c->amount);
@@ -188,7 +188,7 @@ static int sc64_z6_world_condition(void *context,
         return c->comparison == 2 ? (int)count : !(int)count;
     case 12:
         if (c->location || c->player || c->unit || c->resource || c->flags ||
-            c->comparison>2) return -1;
+            (c->comparison!=0 && c->comparison!=1 && c->comparison!=10)) return -1;
         return sc64_z6_world_compare(c->comparison,ctx->elapsed_frames / 30u,c->amount);
     default: return -1;
     }

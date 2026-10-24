@@ -98,7 +98,10 @@ setup_profile(void)
 {
     game_init();
     race_mode = 0;
-#if defined(SC64_P6_RUNTIME)
+#if defined(SC64_Z6_RUNTIME)
+    race_human = R_ZERG;
+    race_selected_mission = SC64_Z6_GLOBAL_ID;
+#elif defined(SC64_P6_RUNTIME)
     race_human = R_PROTOSS;
     race_selected_mission = SC64_P6_GLOBAL_ID;
 #elif defined(SC64_P5_RUNTIME)

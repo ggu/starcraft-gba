@@ -29,6 +29,9 @@ enum {
 #ifdef SC64_Z4_RUNTIME
     ,SC64_RACE_MISSION_Z4 = 15
 #endif
+#ifdef SC64_Z6_RUNTIME
+    ,SC64_RACE_MISSION_Z6 = 17
+#endif
 #ifdef SC64_P3_RUNTIME
     ,SC64_RACE_MISSION_P3 = 22
 #endif
@@ -60,6 +63,12 @@ static int race_z5_source_owner(unsigned source_slot);
 static int
 race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 {
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active()) {
+        int owner = raw_owner < 0 ? -1 : race_z6_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
 #ifdef SC64_P6_RUNTIME
     if (!race_mode && race_selected_mission == SC64_P6_GLOBAL_ID) {
         int owner = raw_owner < 0 ? -1 : race_p6_source_owner((unsigned)raw_owner);
@@ -235,6 +244,11 @@ static void race_p4_rescue_tick(void)
 #include "sc64_p6_render_adapter.h"
 #endif
 
+#ifdef SC64_Z6_RUNTIME
+#include "sc64_z6_runtime_adapter.h"
+#include "sc64_z6_hallucination.h"
+#endif
+
 static void
 race_campaign_assign_mining(void)
 {
@@ -384,6 +398,11 @@ race_campaign_init(void)
     memset(&race_p6_world, 0, sizeof(race_p6_world));
     memset(race_p6_doodad_bindings, 0, sizeof(race_p6_doodad_bindings));
 #endif
+#ifdef SC64_Z6_RUNTIME
+    memset(&race_z6, 0, sizeof(race_z6));
+    memset(&race_z6_world, 0, sizeof(race_z6_world));
+    race_z6_map = 0;
+#endif
     if (race_mode) {
         race_skirmish_init();
         return;
@@ -424,6 +443,11 @@ race_campaign_init(void)
         );
 #endif
     map = &sc64_race_maps[race_selected_mission];
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active() && !race_z6_map_shape_valid(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
 #ifdef SC64_Z5_RUNTIME
     if (race_selected_mission == SC64_Z5_GLOBAL_ID && !race_z5_preflight(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
@@ -454,6 +478,9 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_P6_RUNTIME
             if (race_selected_mission == SC64_P6_GLOBAL_ID && raw == 214) continue;
+#endif
+#ifdef SC64_Z6_RUNTIME
+            if (race_selected_mission == SC64_Z6_GLOBAL_ID && raw == 214) continue;
 #endif
             if (raw >= 176 && raw <= 178) ++minerals_count;
             else if (raw == 188) ++gas_count;
@@ -537,6 +564,9 @@ race_campaign_init(void)
         if (race_selected_mission == SC64_P6_GLOBAL_ID)
             owner = race_campaign_owner(map, i);
 #endif
+#ifdef SC64_Z6_RUNTIME
+        if (race_z6_active()) owner = race_campaign_owner(map, i);
+#endif
 #ifdef SC64_T4_RUNTIME
         if (race_selected_mission == SC64_T4_GLOBAL_ID)
             owner = race_campaign_owner(map, i);
@@ -584,6 +614,9 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_P6_RUNTIME
         if (race_selected_mission == SC64_P6_GLOBAL_ID && raw == 214) continue;
+#endif
+#ifdef SC64_Z6_RUNTIME
+            if (race_selected_mission == SC64_Z6_GLOBAL_ID && raw == 214) continue;
 #endif
         if (raw == 176 || raw == 177 || raw == 178) {
             int j;
@@ -705,7 +738,15 @@ race_campaign_init(void)
     }
 #endif
 
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active() && !race_z6_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
     switch (race_selected_mission) {
+#ifdef SC64_Z6_RUNTIME
+    case SC64_Z6_GLOBAL_ID: minerals = gas = 0; break;
+#endif
 #ifdef SC64_P6_RUNTIME
     case SC64_P6_GLOBAL_ID: minerals = gas = 0; break;
 #endif
@@ -994,6 +1035,23 @@ race_campaign_tick(void)
         return;
     }
 #endif
+#ifdef SC64_Z6_RUNTIME
+    if (mission == SC64_Z6_GLOBAL_ID) {
+        if (!race_z6_hallucination_world_state_valid() ||
+            !race_z6_hallucination_tick(0) ||
+            !race_z6_runtime_tick(race_campaign.elapsed_frames, 0)) {
+            screen = SCREEN_PAUSE; toast(14); return;
+        }
+        if (race_z6.runtime.model.outcome == SC64_Z6_WON) {
+            won=1; lost=0; race_campaign.phase=SC64_RACE_PHASE_COMPLETE;
+            race_campaign.objective_flags|=SC64_RACE_OBJECTIVE_PRIMARY;
+            race_completed |= 1 << SC64_Z6_GLOBAL_ID;
+        } else if (race_z6.runtime.model.outcome == SC64_Z6_LOST) {
+            won=0; lost=1; race_campaign.phase=SC64_RACE_PHASE_FAILED;
+        }
+        return;
+    }
+#endif
     if(mission==SC64_RACE_MISSION_T1||mission==SC64_RACE_MISSION_T2){race_terran_tick();return;}
 #endif
     race_campaign_ai_tick();
@@ -1159,6 +1217,9 @@ static int race_campaign_lost(void)
 static const char *
 race_campaign_objective_text(void)
 {
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active()) return "Hunt Tassadar; keep Kerrigan alive.";
+#endif
 #ifdef SC64_P5_RUNTIME
     if (race_p5_active()) return race_p5_objective_text();
 #endif
@@ -1225,6 +1286,9 @@ race_campaign_objective_text(void)
 static const char *
 race_campaign_victory_text(void)
 {
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active()) return "THE HUNT IS OVER";
+#endif
 #ifdef SC64_P5_RUNTIME
     if (race_p5_active()) return race_p5_victory_text();
 #endif
@@ -1288,6 +1352,9 @@ race_campaign_victory_text(void)
 static const char *
 race_campaign_failure_text(void)
 {
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active()) return "KERRIGAN HAS FALLEN";
+#endif
 #ifdef SC64_P5_RUNTIME
     if (race_p5_active()) return race_p5_failure_text();
 #endif

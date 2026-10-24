@@ -1078,3 +1078,39 @@ comparison build, use `make -B zerg-z5-consume Z5_QUERY_FLAGS=` and retain that
 ROM/ELF separately, then restore with `make -B zerg-z5-consume`. The complete
 optimized replay averages 17.73 effective fps versus 8.78 for the baseline,
 with matching observed state/captures and exact fresh-process save restore.
+
+
+### Z6 live probe and seventh-chapter foundations
+
+After the staged map and Z5 inputs are prepared, import Z6's complete optional
+actor/building bank and build the internal sixth-entry ROM:
+
+```sh
+python3 tools/sc64_race_sprites.py --rom "/path/to/StarCraft 64.z64" --base-only --include-zp-campaign-actors --include-z5-actors --include-z5-doodads --include-z6-actors --include-z6-buildings --out .local/sc64/z6/generated/sprites --header .local/sc64/z6/generated/sc64_race_sprites_generated.h
+python3 tools/sc64_zp_scenario_pack.py --mission Z6
+make zerg-z6-probe
+make test-sc64-z6-world test-sc64-z6-runtime test-sc64-z6-save
+make test-sc64-z6-profile test-sc64-z6-frame-coverage
+```
+
+This produces `build/StarCraft-Zerg-Z6-Probe-GBA.gba` (SCZE, generation 29).
+It retains the complete 185-row source placement, adds distinct Robotics
+Support Bay and Shield Battery identities, and runs Z6's source trigger
+program. Hallucinated Tassadar actors have a bounded lifetime, cannot deal
+damage, and take doubled damage before armor and shields. The Zer6 script
+uses an explicit paid-production/order policy rather than native AI bytecode.
+Shield Battery recharge and Kerrigan's Z6 spell controls remain incomplete.
+Do not count this as a completed sixth mission.
+
+Z7 and P7 source schedulers can be checked independently:
+
+```sh
+python3 tools/sc64_zp_scenario_pack.py --mission Z7
+python3 tools/sc64_zp_scenario_pack.py --mission P7
+make test-sc64-z7-model test-sc64-z7-adapter test-sc64-z7-runtime
+make test-sc64-p7-model test-sc64-p7-adapter
+```
+
+Z7's world/runtime fixture uses all 231 canonical rows and a bounded paid
+Zerg AI policy. P7 currently has a numeric scheduler foundation. Neither has
+shared menu/save integration or a completed controller playthrough.
