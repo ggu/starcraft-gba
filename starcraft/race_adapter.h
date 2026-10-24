@@ -235,12 +235,26 @@ static int race_owner_has_prereq(int owner, unsigned short prereq)
 {
     int i;
     if (!prereq) return 1;
+#ifdef SC64_Z7_EGG_PRODUCTION
+    for (i = 0; i < MAX_BUILDINGS; ++i) if (
+        (building_complete(i) || race_z7_morphing_egg_hall(owner, i)) &&
+        b[i].owner == owner) {
+#else
     for (i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) && b[i].owner == owner) {
+#endif
         switch (b[i].type) {
         case B_HATCHERY: case B_LAIR: case B_HIVE:
             if (prereq & SC_PR_HATCHERY) prereq &= (unsigned short)~SC_PR_HATCHERY;
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
+            /* A morphing Lair still has the Hatchery source tier; a Hive
+             * morph still has the completed Lair source tier. */
+#ifdef SC64_Z7_EGG_PRODUCTION
+            if (b[i].type != B_HATCHERY &&
+                (!b[i].under_construction || b[i].type == B_HIVE))
+                prereq &= (unsigned short)~SC_PR_LAIR;
+#else
             if (b[i].type != B_HATCHERY) prereq &= (unsigned short)~SC_PR_LAIR;
+#endif
 #endif
             break;
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
@@ -294,7 +308,12 @@ static int race_site_creep(int owner, int x, int y)
 {
     int i;
     for (i = 0; i < MAX_BUILDINGS; ++i)
-        if (building_complete(i) && b[i].owner == owner &&
+#ifdef SC64_Z7_EGG_PRODUCTION
+        if ((building_complete(i) || race_z7_morphing_egg_hall(owner, i)) &&
+#else
+        if (building_complete(i) &&
+#endif
+            b[i].owner == owner &&
             sc64_race_is_zerg_townhall(b[i].type) &&
             dist2(x, y, b[i].x, b[i].y) <= 160 * 160) return 1;
     return 0;
@@ -304,7 +323,17 @@ static int race_can_site(int owner, int type, int x, int y)
 {
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     int race = race_owner_identity(owner);
-    if (!r || r->race != race || !race_owner_has_prereq(owner, r->prereq)) return 0;
+#ifdef SC64_Z7_EGG_PRODUCTION
+    unsigned short prereq = r ? r->prereq : 0;
+    if (race_z7_active() && race == R_ZERG && type == B_EXTRACTOR)
+        prereq &= (unsigned short)~SC_PR_HATCHERY;
+#endif
+    if (!r || r->race != race ||
+#ifdef SC64_Z7_EGG_PRODUCTION
+        !race_owner_has_prereq(owner, prereq)) return 0;
+#else
+        !race_owner_has_prereq(owner, r->prereq)) return 0;
+#endif
     /* Imported Lairs/Hives and Greater Spires are recognized structures,
        but this adapter does not implement their morph/build operations. */
     if (type == B_LAIR || type == B_HIVE || type == B_GREATER_SPIRE) return 0;

@@ -1649,7 +1649,7 @@ corridor, blocked endpoints and cache eviction/reset. This command is part of
 the default test suite. The gate adds no route, actor or save storage and
 remains off in standard profiles pending broader qualification. See
 [Validation](VALIDATION.md#experimental-clear-corridor-routing) for the
-distinction between the prototype ARM timing and public-source evidence.
+full host/ARM replay, timing and opening-save evidence and remaining limits.
 
 
 ### Experimental independent Z7 Egg production
@@ -1680,6 +1680,12 @@ morph, and the existing 428-update larva counter continues toward its live
 cap of three. An unfinished newly built Hatchery remains unavailable. This
 models larvae through the town-hall proxy; native individual-larva movement
 and spawning timing remain separate limitations.
+
+During those upgrades, the active Z7 build also retains the preceding hall's
+tech tier and the existing 160-pixel creep proxy. A Lair morph retains Hatchery
+requirements; a Hive morph retains Lair requirements. It grants the new tier
+only when complete. Extractors follow the source's Drone-and-geyser requirement
+while keeping normal placement checks and the 50-mineral cost.
 
 This gate uses save generation 36; generation-35 internal Z7 records are
 rejected. Standard profiles keep the gate off. See

@@ -4035,21 +4035,27 @@ hardware cycles, or 16.6546 to 19.1768 effective fps. This uses authenticated
 cross-build seeded SRAM; it is neither candidate-generated save qualification
 nor a full-mission performance measurement.
 
-The earlier private prototype (`25f28551…cc4165`, IWRAM `0x03004700`) also
-finishes all 124,689 input ticks, wins at frame 123,916 and matches all 126
-reported gameplay checkpoints. Its full-mission mean is 14.08 effective fps
-versus word clear's 13.88 and the original baseline's 12.35. The smaller
-full-mission gain cannot be inferred from the short late interval. The
-cleaned public helper has different ARM bytes, so the prototype's full replay
-does not qualify the public ROM. Its own full replay, fresh-process SRAM and
-wider-profile promotion remain separate.
+The exact public ROM completes all 124,689 input ticks and 5,932 input
+transitions, wins at frame 123,916 and matches all 126 reported gameplay
+checkpoints. Its full-mission mean is 14.08 effective fps versus word clear's
+13.88 and the original baseline's 12.35. The smaller full-mission gain cannot
+be inferred from the short late interval. The earlier private prototype
+(`25f28551…cc4165`) had the same rounded mean; the public result is measured
+separately against its own ROM and ELF.
+
+The public ROM also passes a 12,000-input opening replay with 13 matching
+gameplay checkpoints and three matching captures. Its opening mean is 18.01
+effective fps versus 17.6234. A new emulator process loads the opening's own
+candidate-generated SRAM through HOME / load, with exact persisted
+observations and resume through frame 11,824. Its own late SRAM, full
+post-load mission win, wider profiles and hardware remain separate checks.
 
 The public source snapshot passes `./dev build`, `./dev test` (380 Python
 tests plus the default host fixtures, including all four new corridor cases),
 `make unified` and `make test-unified`. Original-art and unified gate-off
 ROMs remain `4ad80ce0…f9aee` and `6bab5be2…979f9`. An independent read-only
 review found no additional route correctness issue; this does not replace
-the remaining ARM, save and wider-profile checks.
+the remaining save, wider-profile and hardware checks.
 
 A further private packed-horizontal-span probe preserves the complete host
 trace and gameplay fingerprints, but its paired 600-update ARM interval has
@@ -4114,3 +4120,33 @@ Eggs, Z7 and P3 Scourge regressions, the ZP air-tech fixture, `./dev build`,
 `./dev test` (380 Python tests plus default host fixtures), `make unified`
 and `make test-unified`. Original-art and unified ROMs remain byte-identical
 to `4ad80ce0…f9aee` and `6bab5be2…979f9` with the experimental gate off.
+
+### Z7 tech and Extractor placement during town-hall morphs
+
+The same active-Z7 Egg gate now retains a morphing hall's predecessor tech
+tier and its existing 160-pixel creep proxy. The pinned OpenBW prerequisites
+accept a Lair morph for Hatchery-tier structures, and a Hive morph for
+Lair-tier structures. An incomplete Lair does not unlock Spire; a newly built
+incomplete Hatchery supplies neither prerequisite tech nor this creep proxy.
+The proxy remains an authored approximation of native creep coverage.
+
+The source's Extractor requirement is a Drone and a valid geyser, without a
+Hatchery prerequisite. Active Z7 removes only that artificial table bit;
+the normal worker, owner, site occupancy, geyser and 50-mineral checks still
+apply. Other mission profiles retain their existing rules. No persistent
+fields, arrays or save bytes are added, and internal generation 36 is retained.
+
+The actual-engine production fixture passes predecessor-tier and creep
+checks, a paid Extractor order during Lair morph and a paid order without any
+town hall. Missing geysers, occupied sites, insufficient minerals, wrong
+owners/types and inactive-profile placement reject without changing resource
+banks or worker orders. This is focused rule coverage; it is not a Z7 mission
+win, gas-income witness or physical-hardware performance qualification.
+
+The extension passes the focused Egg/save/sight/Scourge and ZP air-tech
+fixtures, `./dev build`, `./dev test`, `make unified` and `make test-unified`.
+Original-art and unified ROM hashes remain `4ad80ce0…f9aee` and
+`6bab5be2…979f9`. The combined Z7 ARM candidate is `5d9c4edc…82cac0`,
+with IWRAM `0x03004a40` and BSS `0x0203d9f0` below the unchanged reserves.
+Separate old/new gate-off adapter links both reproduce `0ad661af…fc8637`;
+the P3 corridor ROM remains byte-identical to `ec5e6c58…a77264`.

@@ -190,6 +190,133 @@ static void test_egg_jobs_and_larva_replenishment_during_morph(void)
            b[enemy_hall].larva == 1);
 }
 
+static void test_zerg_build_prerequisites_and_extractor_during_morph(void)
+{
+    reset_world();
+    assert(race_owner_has_prereq(SIDE, SC_PR_HATCHERY));
+    assert(race_start_lair_morph(hatchery));
+    assert(b[hatchery].type == B_LAIR && b[hatchery].under_construction);
+
+    /* Native Pool/Evolution tier sees an existing Lair morph as its source
+     * Hatchery, while Spire's Lair tier is not complete yet. */
+    assert(race_owner_has_prereq(SIDE, SC_PR_HATCHERY));
+    assert(race_can_site(SIDE, B_SPAWNING_POOL, 300, 160));
+    assert(race_can_site(SIDE, B_EVOLUTION_CHAMBER, 300, 160));
+    assert(!race_owner_has_prereq(SIDE, SC_PR_LAIR));
+    assert(!race_can_site(SIDE, B_SPIRE, 300, 160));
+    assert(race_site_creep(SIDE, 300, 160)); /* 140px from morphing hall. */
+    assert(!race_site_creep(SIDE, 330, 160)); /* 170px exceeds the proxy. */
+
+    /* A Hive morph retains source Lair tech, and therefore may satisfy Spire. */
+    b[hatchery].type = B_HIVE;
+    b[hatchery].raw_type = sc64_race_raw_building(B_HIVE);
+    assert(race_owner_has_prereq(SIDE, SC_PR_HATCHERY));
+    assert(race_owner_has_prereq(SIDE, SC_PR_LAIR));
+
+    /* A newly built incomplete Hatchery is neither a tech prerequisite nor
+     * the adapter's completed-hall creep proxy. */
+    reset_world();
+    b[hatchery].under_construction = 1;
+    assert(!race_owner_has_prereq(SIDE, SC_PR_HATCHERY));
+    assert(!race_site_creep(SIDE, 300, 160));
+    assert(!race_can_site(SIDE, B_SPAWNING_POOL, 300, 160));
+
+    /* Extractor is Drone+geyser only in Brood War. It remains paid and
+     * keeps the actual geyser-placement / worker-order path during morph. */
+    reset_world();
+    assert(race_start_lair_morph(hatchery));
+    geysers[0] = (Geyser){ 400, 400 };
+    geyser_count = 1;
+    int drone = spawn_unit(SIDE, U_DRONE, 96, 96);
+    assert(drone >= 0);
+    int before_minerals = minerals, before_gas = gas;
+    assert(race_start_build(SIDE, drone, B_EXTRACTOR, 400, 400));
+    int extractor = u[drone].target;
+    assert(extractor >= 0 && b[extractor].type == B_EXTRACTOR &&
+           b[extractor].under_construction && b[extractor].build_progress == -1);
+    assert(u[drone].order == ORDER_BUILD && minerals == before_minerals - 50 &&
+           gas == before_gas);
+
+    /* No town hall is required for a valid Drone and geyser in active Z7. */
+    reset_world();
+    memset(b, 0, sizeof(b));
+    memset(u, 0, sizeof(u));
+    geysers[0] = (Geyser){ 400, 400 };
+    geyser_count = 1;
+    drone = spawn_unit(SIDE, U_DRONE, 96, 96);
+    assert(drone >= 0 && !race_owner_has_prereq(SIDE, SC_PR_HATCHERY));
+    before_minerals = minerals; before_gas = gas;
+    assert(race_start_build(SIDE, drone, B_EXTRACTOR, 400, 400));
+    assert(minerals == before_minerals - 50 && gas == before_gas);
+
+    /* Other missions keep the existing table prereq even with the same
+     * incomplete-morph and valid-site setup. */
+    reset_world();
+    assert(race_start_lair_morph(hatchery));
+    race_selected_mission = 0;
+    geysers[0] = (Geyser){ 400, 400 };
+    geyser_count = 1;
+    drone = spawn_unit(SIDE, U_DRONE, 96, 96);
+    assert(drone >= 0);
+    before_minerals = minerals; before_gas = gas;
+    assert(!race_start_build(SIDE, drone, B_EXTRACTOR, 400, 400));
+    assert(minerals == before_minerals && gas == before_gas &&
+           u[drone].order == ORDER_IDLE);
+
+    /* The Z7 exception removes only the artificial town-hall prerequisite;
+     * the actual build path still requires a real geyser, a free site,
+     * enough minerals, and this owner's Drone worker. */
+    reset_world();
+    drone = spawn_unit(SIDE, U_DRONE, 96, 96);
+    assert(drone >= 0);
+    before_minerals = minerals; before_gas = gas;
+    assert(!race_start_build(SIDE, drone, B_EXTRACTOR, 400, 400)); /* no geyser */
+    assert(minerals == before_minerals && gas == before_gas &&
+           u[drone].order == ORDER_IDLE && u[drone].target == -1);
+
+    reset_world();
+    geysers[0] = (Geyser){ 400, 400 };
+    geyser_count = 1;
+    assert(spawn_build(SIDE, B_SPAWNING_POOL, 400, 400, 0) >= 0);
+    drone = spawn_unit(SIDE, U_DRONE, 96, 96);
+    assert(drone >= 0);
+    before_minerals = minerals; before_gas = gas;
+    assert(!race_start_build(SIDE, drone, B_EXTRACTOR, 400, 400)); /* occupied */
+    assert(minerals == before_minerals && gas == before_gas &&
+           u[drone].order == ORDER_IDLE && u[drone].target == -1);
+
+    reset_world();
+    geysers[0] = (Geyser){ 400, 400 };
+    geyser_count = 1;
+    drone = spawn_unit(SIDE, U_DRONE, 96, 96);
+    assert(drone >= 0);
+    minerals = 49;
+    before_minerals = minerals; before_gas = gas;
+    assert(!race_start_build(SIDE, drone, B_EXTRACTOR, 400, 400)); /* costs 50 */
+    assert(minerals == before_minerals && gas == before_gas &&
+           u[drone].order == ORDER_IDLE && u[drone].target == -1);
+
+    reset_world();
+    geysers[0] = (Geyser){ 400, 400 };
+    geyser_count = 1;
+    drone = spawn_unit(ENEMY, U_DRONE, 96, 96);
+    assert(drone >= 0);
+    before_minerals = minerals; before_gas = gas;
+    assert(!race_start_build(SIDE, drone, B_EXTRACTOR, 400, 400)); /* wrong owner */
+    assert(minerals == before_minerals && gas == before_gas &&
+           u[drone].order == ORDER_IDLE && u[drone].target == -1);
+
+    reset_world();
+    geysers[0] = (Geyser){ 400, 400 };
+    geyser_count = 1;
+    drone = spawn_unit(SIDE, U_ZERGLING, 96, 96);
+    assert(drone >= 0);
+    before_minerals = minerals; before_gas = gas;
+    assert(!race_start_build(SIDE, drone, B_EXTRACTOR, 400, 400)); /* wrong type */
+    assert(minerals == before_minerals && gas == before_gas &&
+           u[drone].order == ORDER_IDLE && u[drone].target == -1);
+}
+
 static void test_producer_loss_and_cancel_refund(void)
 {
     reset_world();
@@ -314,6 +441,7 @@ int main(void)
     test_independent_jobs_and_hatch();
     test_more_than_three_live_eggs();
     test_egg_jobs_and_larva_replenishment_during_morph();
+    test_zerg_build_prerequisites_and_extractor_during_morph();
     test_producer_loss_and_cancel_refund();
     test_ling_second_birth_failure_is_not_retried();
     test_scourge_pair_birth();
