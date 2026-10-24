@@ -250,6 +250,7 @@ def campaign_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dic
     if action_ticks_size != 2:
         raise RuntimeError(f"race_z3_action_ticks has unexpected ELF size {action_ticks_size}")
     state["race_z3_action_ticks"] = int.from_bytes(rsp.read(sym["race_z3_action_ticks"], action_ticks_size), "little")
+    state["race_z3"]["action_ticks"] = state["race_z3_action_ticks"]
     # Building snapshots include raw type and coordinates; read the verified
     # HP field directly using DWARF rather than assuming a struct offset.
     hp_offset = bank["building_offsets"].get("hp")
@@ -518,6 +519,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                 rsp.write(sym["demo_schedule_active"], struct.pack("<I", 0))
                 rsp.write(sym["demo_schedule_count"], struct.pack("<I", 0))
             saved = profile.save_live_checkpoint(rsp, sym, tick=final["tick"])
+            saved["state"] = campaign_snapshot(rsp, sym, sizes, bank,
+                                                campaign_layout, z3_layout)
             menu.stop_emulator(proc, sock, log)
             proc = sock = log = None
             save_dir = run_dir / "saves" / run_dir.name

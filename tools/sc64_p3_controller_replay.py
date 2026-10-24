@@ -389,6 +389,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
             rsp.write(sym["demo_schedule_active"], struct.pack("<I", 0))
             rsp.write(sym["demo_schedule_count"], struct.pack("<I", 0))
             saved = profile.save_live_checkpoint(rsp, sym, tick=final["tick"])
+            saved["state"] = p3_snapshot(rsp, sym, sizes, bank,
+                                          campaign_layout, p3_layout)
             menu.stop_emulator(proc, sock, log)
             proc = sock = log = None
             save_dir = run_dir / "saves" / run_dir.name
