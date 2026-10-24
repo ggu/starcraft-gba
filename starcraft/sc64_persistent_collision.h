@@ -151,6 +151,9 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
             for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
                  i = sc64_unit_bucket_next[i])
                 if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
+#ifdef SC64_P6_COMBAT_ENABLED
+                    if (race_p6_combat_unit_burrowed(i)) continue;
+#endif
                     int radius = 6;
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
                     int candidate_radius = sc64_game_unit_collision_radius(u[i].type);

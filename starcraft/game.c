@@ -27,6 +27,15 @@ int memcmp(const void *a, const void *b, size_t n);
 #include "sc64_p5_state.h"
 #endif
 
+#ifdef SC64_P6_RUNTIME
+#if !defined(SC64_P5_SHUTTLE_ENABLED) || !defined(SC64_P6_DATA_ENABLED) || \
+    !defined(SC64_P6_ACTORS) || !defined(SC64_Z5_ACTORS) || !defined(SC64_Z5_DOODADS)
+#error "P6 runtime requires its complete source data, actors, props and P1-P5 chain"
+#endif
+#include "sc64_p6.h"
+#include "sc64_p6_state.h"
+#endif
+
 #ifdef SC64_P3_RUNTIME
 #if !defined(SC64_P3_ENABLED) || !defined(SC64_UNIFIED) || \
     !defined(SC64_RACES) || !defined(SC64_LARGE_MAPS)
@@ -113,7 +122,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_Z5_CONSUME_ENABLED)
+#if defined(SC64_P6_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 28u
+#elif defined(SC64_Z5_CONSUME_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 27u
 #elif defined(SC64_P5_SHUTTLE_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 26u
@@ -256,6 +267,12 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #if !defined(SC64_Z5_SPRITE_SET_COMPLETE) || \
     !defined(SC64_Z5_DOODAD_SPRITE_SET_COMPLETE)
 #error "Z5 runtime requires the complete actor and unit-backed doodad sprite banks"
+#endif
+#endif
+#if defined(SC64_P6_RUNTIME) && defined(SC64_HAS_SPRITES)
+#if !defined(SC64_P6_SPRITE_SET_COMPLETE) || \
+    !defined(SC64_Z5_DOODAD_SPRITE_SET_COMPLETE)
+#error "P6 runtime requires the complete actor and unit-backed doodad sprite banks"
 #endif
 #endif
 #ifdef SC64_T6_STORAGE
@@ -657,6 +674,10 @@ _Static_assert(sizeof(SaveData) <= 16368, "Save exceeds an alternating SRAM reco
 static SaveData data;
 #endif
 static Unit u[MAX_UNITS];
+#ifdef SC64_P6_COMBAT_ENABLED
+/* The collision headers below consult per-instance burrow state. */
+static int race_p6_combat_unit_burrowed(int slot);
+#endif
 static Building b[MAX_BUILDINGS];
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
 #include "sc64_collision.h"
@@ -859,6 +880,25 @@ static unsigned race_p5_reserved_units(void);
 static void race_p5_note_unit_death(const Unit *q);
 static void race_p5_note_building_death(const Building *q);
 #endif
+#ifdef SC64_P6_RUNTIME
+static int race_p6_active(void);
+static int race_p6_source_owner(unsigned source_slot);
+static int race_p6_owners_hostile(int owner, int other);
+static int race_p6_building_collidable(int slot);
+static unsigned race_p6_prop_cache_field(unsigned row, int enabled);
+#ifdef SC64_HAS_SPRITES
+static int race_p6_draw_prop(Building *q, int x, int y);
+#endif
+static void race_p6_note_unit_death(const Unit *q);
+static void race_p6_note_building_death(const Building *q);
+#endif
+#ifdef SC64_P6_COMBAT_ENABLED
+static int race_p6_combat_unit_burrowed(int slot);
+static int race_p6_combat_target_detected(int target, int viewer_owner);
+static int race_p6_combat_infested_attack(Unit *q, int target);
+static int race_p6_combat_burrow_release_tick(void);
+static int race_p6_combat_tick_traps(void);
+#endif
 #ifdef SC64_Z5_RUNTIME
 static int race_z5_active(void);
 static int race_z5_world_paused(void);
@@ -953,6 +993,9 @@ owners_hostile(int a, int other)
 #ifdef SC64_P5_RUNTIME
     if (race_p5_active()) return race_p5_owners_hostile(a, other);
 #endif
+#ifdef SC64_P6_RUNTIME
+    if (race_p6_active()) return race_p6_owners_hostile(a, other);
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) return sc64_terran_late_owners_hostile(a, other);
 #endif
@@ -1011,6 +1054,9 @@ sc64_t4_building_collidable(int slot)
 #ifdef SC64_Z5_RUNTIME
     if (race_z5_active() && race_z5_is_door_type(type))
         return race_z5_building_collidable(slot);
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (race_p6_active()) return race_p6_building_collidable(slot);
 #endif
     unsigned flags = sc64_game_building_actor_flags(type);
     return !flags || (flags & SC64_GAME_ACTOR_COLLIDABLE);
@@ -1607,6 +1653,9 @@ can_place(int type, int x, int y)
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
         && sc64_game_unit_collidable(u[i].type)
 #endif
+#ifdef SC64_P6_COMBAT_ENABLED
+        && !race_p6_combat_unit_burrowed(i)
+#endif
         && dist2(x, y, u[i].x, u[i].y) < (radius + 5) * (radius + 5))
 	    return 0;
     return x > 12 && y > 18 && x < WORLD_W - 12 && y < WORLD_H - 12;
@@ -1735,6 +1784,9 @@ unit_step_clear_race_fallback(const Unit *q, int nx, int ny)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
         if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
+#ifdef SC64_P6_COMBAT_ENABLED
+            if (race_p6_combat_unit_burrowed(i)) continue;
+#endif
             int radius = 6;
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
             int mover_radius = sc64_game_unit_collision_radius(q->type);
@@ -1945,6 +1997,19 @@ static int sc64_t4_can_attack_from(int attacker, int target, int owner)
 #else
 #define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
     race_can_attack((attacker), (target))
+#endif
+#ifdef SC64_P6_COMBAT_ENABLED
+static int sc64_p6_can_attack_from(int attacker, int target, int owner)
+{
+    if (race_p6_active() &&
+        (!race_p6_combat_target_detected(target, owner) ||
+         (target >= 0 && target < MAX_UNITS && race_p6_combat_unit_burrowed(target))))
+        return 0;
+    return sc64_p3_can_attack_from(attacker, target, owner);
+}
+#undef SC64_CAN_ATTACK_FROM
+#define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
+    sc64_p6_can_attack_from((attacker), (target), (owner))
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
 static void
@@ -2226,6 +2291,9 @@ target_y(int target)
 static int
 target_alive(int target)
 {
+#ifdef SC64_P6_COMBAT_ENABLED
+    if (target >= 0 && target < MAX_UNITS && race_p6_combat_unit_burrowed(target)) return 0;
+#endif
 #ifdef SC64_T6_RUNTIME
     if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target)) return 0;
 #endif
@@ -2260,6 +2328,10 @@ static void
 hit_target(int target, int damage, int source_type, int source_owner)
 {
     int i, tx, ty;
+#ifdef SC64_P6_COMBAT_ENABLED
+    if (target >= 0 && target < MAX_UNITS && race_p6_combat_unit_burrowed(target) &&
+        source_type != U_P6_INFESTED_TERRAN) return;
+#endif
 #ifdef SC64_T6_RUNTIME
     if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target)) return;
 #endif
@@ -2346,6 +2418,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
             if (u[target].alive && race_p5_active())
                 race_p5_note_unit_death(&u[target]);
 #endif
+#ifdef SC64_P6_RUNTIME
+            if (u[target].alive && race_p6_active()) race_p6_note_unit_death(&u[target]);
+#endif
 	    if (u[target].owner == SIDE)
 		supply_used -= unit_supply(u[target].type);
 	    u[target].alive = 0;
@@ -2378,6 +2453,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #endif
 #ifdef SC64_P5_RUNTIME
                         if (race_p5_active()) race_p5_note_unit_death(&u[i]);
+#endif
+#ifdef SC64_P6_RUNTIME
+                        if (race_p6_active()) race_p6_note_unit_death(&u[i]);
 #endif
 			if (u[i].owner == SIDE)
 			    supply_used -= unit_supply(u[i].type);
@@ -2418,6 +2496,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #endif
 #ifdef SC64_P5_RUNTIME
             if (q->alive && race_p5_active()) race_p5_note_building_death(q);
+#endif
+#ifdef SC64_P6_RUNTIME
+            if (q->alive && race_p6_active()) race_p6_note_building_death(q);
 #endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
             if(q->alive && !race_mode && race_selected_mission==6 &&
@@ -3792,6 +3873,9 @@ tick_combat(Unit * q, int target)
 #endif
     if (target < 0 || !target_alive(target))
 	return;
+#ifdef SC64_P6_COMBAT_ENABLED
+    if (race_p6_combat_infested_attack(q, target)) return;
+#endif
 #ifdef SC64_RACES
     if(!SC64_CAN_ATTACK_FROM(q->type,target,q->owner))return;
 #endif
@@ -3934,6 +4018,9 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
+#ifdef SC64_P6_COMBAT_ENABLED
+        if (race_p6_combat_unit_burrowed(i)) continue;
+#endif
 #ifdef SC64_T6_RUNTIME
         /* Keep burrowed actors out of every ordinary movement/weapon path.
          * Transport boarding also rejects the corresponding source flag. */
@@ -4773,6 +4860,9 @@ game_update(u16 held, u16 pressed)
 	interact();
 
     frame++;
+#ifdef SC64_P6_COMBAT_ENABLED
+    (void)race_p6_combat_burrow_release_tick();
+#endif
 #ifdef SC64_IMPORTED_MISSION
     profile_start = gba_clock();
 #endif
@@ -4812,6 +4902,9 @@ game_update(u16 held, u16 pressed)
 #endif
 #ifdef SC64_RACES
     race_tick_state();
+#ifdef SC64_P6_COMBAT_ENABLED
+    (void)race_p6_combat_tick_traps();
+#endif
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
     sc64_update_race_state_cycles = gba_clock() - sc64_update_stage_start;
     sc64_update_stage_start = gba_clock();
@@ -4972,6 +5065,9 @@ static void
 draw_unit(Unit * q)
 {
     if (SC64_TRANSPORT_LOADED(q)) return;
+#ifdef SC64_P6_COMBAT_ENABLED
+    if (race_p6_combat_unit_burrowed((int)(q - u))) return;
+#endif
     int x = q->x - camx, y = q->y - camy + 12;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
     if (x < -8 || x > 247 || y < 10 || y > 125)
@@ -5153,6 +5249,9 @@ draw_minimap(void)
 #ifdef SC64_T6_RUNTIME
         if (race_t6_unit_burrowed(i)) continue;
 #endif
+#ifdef SC64_P6_COMBAT_ENABLED
+        if (race_p6_combat_unit_burrowed(i)) continue;
+#endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
         if (sc64_game_unit_has_flag(u[i].type, SC64_GAME_ACTOR_HIDDEN) ||
             (sc64_game_unit_actor_flags(u[i].type) &&
@@ -5266,6 +5365,9 @@ draw_building_art(Building *q)
 #if defined(SC64_Z5_RUNTIME) && defined(SC64_HAS_SPRITES)
     if (race_z5_draw_prop(q, x, y)) return;
 #endif
+#if defined(SC64_P6_RUNTIME) && defined(SC64_HAS_SPRITES)
+    if (race_p6_draw_prop(q, x, y)) return;
+#endif
 #ifdef SC64_HAS_SPRITES
     if (sprite) draw_mission_sprite(sprite, x, y);
     else
@@ -5352,6 +5454,9 @@ sc64_static_objects_key(void)
 #ifdef SC64_Z5_RUNTIME
                     + SC64_Z5_UNIT_BACKED_DOODADS * 2
 #endif
+#ifdef SC64_P6_RUNTIME
+                    + SC64_P6_DOODAD_SOURCE_COUNT * 2
+#endif
     };
     static int previous[FIELDS];
     static unsigned generation;
@@ -5405,6 +5510,12 @@ sc64_static_objects_key(void)
     for (i = 0; i < SC64_Z5_UNIT_BACKED_DOODADS; i++) {
         values[n++] = (int)race_z5_prop_cache_field((unsigned)i, 0);
         values[n++] = (int)race_z5_prop_cache_field((unsigned)i, 1);
+    }
+#endif
+#ifdef SC64_P6_RUNTIME
+    for (i = 0; i < SC64_P6_DOODAD_SOURCE_COUNT; i++) {
+        values[n++] = (int)race_p6_prop_cache_field((unsigned)i, 0);
+        values[n++] = (int)race_p6_prop_cache_field((unsigned)i, 1);
     }
 #endif
     for (i = 0; i < n; i++) {

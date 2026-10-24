@@ -28,6 +28,14 @@
 #error "P5 campaign entry requires the authenticated P4/P5 Protoss runtime chain"
 #endif
 #endif
+#ifdef SC64_P6_CAMPAIGN_ENTRY
+#if !defined(SC64_P5_CAMPAIGN_ENTRY) || !defined(SC64_P6_RUNTIME) || \
+    !defined(SC64_P6_DATA_ENABLED) || !defined(SC64_P6_ACTORS) || \
+    !defined(SC64_P6_COMBAT_ENABLED) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 2
+#error "P6 entry requires the authenticated P1-P6 runtime, actors and combat profile"
+#endif
+#endif
 #ifdef SC64_T5_CAMPAIGN_ENTRY
 #if !defined(SC64_T3_ENABLED) || !defined(SC64_T4_CAMPAIGN_ENTRY) || \
     !defined(SC64_T4_SCENARIO_RUNTIME) || !defined(SC64_T5_ENABLED) || \
@@ -180,7 +188,13 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
      0,
 #endif
      "CHOOSING SIDES"},
-    {25, SC64_FACTION_PROTOSS, 6, 0, "INTO THE DARKNESS"},
+    {25, SC64_FACTION_PROTOSS, 6,
+#ifdef SC64_P6_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "INTO THE DARKNESS"},
     {26, SC64_FACTION_PROTOSS, 7, 0, "HOMELAND"},
     {27, SC64_FACTION_PROTOSS, 8, 0, "THE TRIAL"},
     {28, SC64_FACTION_PROTOSS, 9, 0, "SHADOW HUNTERS"},

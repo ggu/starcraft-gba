@@ -85,21 +85,26 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
     if (type == U_P5_BATTLECRUISER) return &battlecruiser;
 #endif
 #ifdef SC64_P6_ACTORS
+#ifdef SC64_P6_COMBAT_ENABLED
+#define SC64_P6_WEAPON_POLICY SC64_ZP_ACTOR_WEAPON
+#else
+#define SC64_P6_WEAPON_POLICY 0u
+#endif
     static const Sc64ZpActorFact p6_facts[] = {
         /* Source weapon values are retained for audit. WEAPON is deliberately
            absent until the suicide/cloak mechanics have dedicated handlers. */
         {50,60,0,0,100,50,600,160, 8,9,8,10,0,0,
          500,0,1,3,1, 0,0,0,0,0,
          SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
-         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN},
+         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN|SC64_P6_WEAPON_POLICY},
         {74,40,80,0,150,150,750,224, 12,6,11,19,0,0,
          45,1,30,15,1, 0,0,0,0,0,
          SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
-         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN},
+         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN|SC64_P6_WEAPON_POLICY},
         {75,60,400,0,100,300,1500,224, 12,6,11,19,0,0,
          100,1,22,15,1, 0,0,0,0,0,
          SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
-         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN}
+         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN|SC64_P6_WEAPON_POLICY}
     };
     switch (type) {
     case U_P6_INFESTED_TERRAN: return &p6_facts[0];
@@ -107,6 +112,7 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
     case U_P6_ZERATUL: return &p6_facts[2];
     default: break;
     }
+#undef SC64_P6_WEAPON_POLICY
 #endif
 #ifdef SC64_Z5_ACTORS
     static const Sc64ZpActorFact z5_facts[] = {
@@ -207,7 +213,7 @@ static inline const Sc64ZpBuildingFact *sc64_zp_building_fact(int type)
     static const Sc64ZpBuildingFact z5_doodads[] = {
         /* These are authored GBA policies copied from the established T4
          * prop adapter. Source invincibility/weapon facts are separate. */
-        {203,50,0,0,0,0,1,192,2,2,32,32,31,31,3,
+        {203,50,0,0,0,0,1,192,2,2,32,32,31,31,2,
          SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_WEAPON},
         {205,100000,0,0,0,0,1,32,3,2,25,17,44,20,3,
          SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_INVINCIBLE},
@@ -217,11 +223,11 @@ static inline const Sc64ZpBuildingFact *sc64_zp_building_fact(int type)
          SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_INVINCIBLE},
         {208,100000,0,0,0,0,1,32,3,2,28,17,41,20,3,
          SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_INVINCIBLE},
-        {209,50,0,0,0,0,1,192,2,2,32,32,31,31,3,
+        {209,50,0,0,0,0,1,192,2,2,32,32,31,31,2,
          SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_WEAPON},
-        {211,50,0,0,0,0,1,96,1,1,16,16,15,15,3,
+        {211,50,0,0,0,0,1,96,1,1,16,16,15,15,2,
          SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_WEAPON},
-        {213,50,0,0,0,0,1,96,1,1,16,16,15,15,3,
+        {213,50,0,0,0,0,1,96,1,1,16,16,15,15,2,
          SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_WEAPON}
     };
     switch (type) {

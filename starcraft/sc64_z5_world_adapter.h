@@ -6,6 +6,9 @@
  * separately authenticated map section, not part of the TRIG scenario table. */
 #include "sc64_z5_adapter.h"
 #include "sc64_z5_state.h"
+#ifdef SC64_Z5_COUNT_SNAPSHOT
+#include "sc64_z5_count_snapshot.h"
+#endif
 
 enum { SC64_Z5_DOODAD_CAPACITY = SC64_Z5_UNIT_BACKED_DOODADS };
 
@@ -35,6 +38,9 @@ typedef struct {
     u16 last_string_id, last_wav_id;
     u8 presentation_opcode;
     u8 fault;
+#ifdef SC64_Z5_COUNT_SNAPSHOT
+    Sc64Z5CountSnapshot count_snapshot;
+#endif
 } Sc64Z5WorldContext;
 
 static int sc64_z5_world_location(unsigned id, int *left, int *top,
@@ -192,7 +198,7 @@ static int sc64_z5_world_compare(unsigned comparison, unsigned value,
     switch (comparison) {
     case 0: return value >= amount; /* At least. */
     case 1: return value <= amount; /* At most. */
-    case 2: return value == amount;
+    case 10: return value == amount; /* CHK Exactly. */
     default: return -1;
     }
 }
@@ -237,6 +243,160 @@ static int sc64_z5_world_count_one(const Sc64Z5WorldContext *ctx,
     return 1;
 }
 
+#ifdef SC64_Z5_COUNT_SNAPSHOT
+typedef struct {
+    s16 left, top, right, bottom;
+    u8 row, query_flags; /* bit 0 Force1; bit 1 raw-51 rather than Any. */
+} Sc64Z5CountQuery;
+_Static_assert(sizeof(Sc64Z5CountQuery) == 10,
+               "Z5 count query scratch layout bound");
+
+/* Only table-owned numeric count rows using the selectors and actor kinds
+ * handled by this snapshot can hit the cache. Copies and other source rows
+ * always use the retained complete scan. */
+static int sc64_z5_count_query(unsigned row_index, Sc64Z5CountQuery *q)
+{
+    const Sc64Z5SourceCondition *c;
+    int left = 0, top = 0, right = 0, bottom = 0;
+    if (!q || row_index >= SC64_Z5_SOURCE_CONDITION_COUNT) return 0;
+    c = &sc64_z5_source_conditions[row_index];
+    if (c->index >= sc64_z5_condition_count(c->trigger) ||
+        &sc64_z5_source_conditions[row_index] != c ||
+        (c->opcode != 2 && c->opcode != 3) || c->flags != 0x10u ||
+        c->mask || (c->player != 13 && c->player != 18) ||
+        (c->unit != 229 && c->unit != 51) ||
+        (c->comparison != 0 && c->comparison != 1 && c->comparison != 10) ||
+        (c->opcode == 2 && c->location) ||
+        (c->opcode == 3 && !c->location)) return 0;
+    if (c->opcode == 3 && !sc64_z5_world_location(c->location,
+                                                  &left, &top, &right, &bottom))
+        return 0;
+    q->left = (s16)left; q->top = (s16)top;
+    q->right = (s16)right; q->bottom = (s16)bottom;
+    q->row = (u8)row_index;
+    q->query_flags = (u8)((c->player == 18 ? 1u : 0u) |
+                          (c->unit == 51 ? 2u : 0u));
+    return 1;
+}
+
+static int sc64_z5_count_snapshot_lookup(const Sc64Z5WorldContext *ctx,
+                                          const Sc64Z5SourceCondition *c,
+                                          u32 *count)
+{
+    unsigned row;
+    if (!ctx || !count || !ctx->count_snapshot.active || !c) return 0;
+    for (row = 0; row < SC64_Z5_SOURCE_CONDITION_COUNT; ++row) {
+        Sc64Z5CountQuery query;
+        if (c != &sc64_z5_source_conditions[row]) continue;
+        if (!sc64_z5_count_query(row, &query)) return 0;
+        if (!(ctx->count_snapshot.valid[row >> 3] &
+              (u8)(1u << (row & 7u)))) return 0;
+        *count = ctx->count_snapshot.count[row];
+        return 1;
+    }
+    return 0;
+}
+
+static int sc64_z5_count_snapshot_add_actor(
+    const Sc64Z5WorldContext *ctx, Sc64Z5CountSnapshot *snapshot,
+    const Sc64Z5CountQuery *queries, unsigned query_count, int building,
+    int raw, int raw_owner, int x, int y)
+{
+    int current, force1, any, type51, rect_ready = 0;
+    int al = 0, at = 0, ar = 0, ab = 0;
+    if (raw < 0 || raw_owner < 0 || raw_owner >= 12 ||
+        !ctx->source_slot_active[(unsigned)raw_owner]) return 1;
+    current = (unsigned)raw_owner == ctx->source_current_player;
+    force1 = raw_owner < 8 && sc64_z5_source_forces[(unsigned)raw_owner] == 0;
+    if (!current && !force1) return 1;
+    any = 1; /* CHK Any Unit includes structures and unmapped raw IDs. */
+    type51 = !building && raw == 51 && sc64_race_unit_from_raw(51) >= 0;
+    for (unsigned i = 0; i < query_count; ++i) {
+        const Sc64Z5CountQuery *q = &queries[i];
+        int owner_match = (q->query_flags & 1u) ? force1 : current;
+        if (!owner_match || ((q->query_flags & 2u) ? !type51 : !any)) continue;
+        if (q->right) {
+            if (!rect_ready) {
+                if (building) {
+                    int l, u, r, d;
+                    if (!sc64_z5_world_building_bounds((unsigned)raw,
+                                                        &l, &u, &r, &d)) return 0;
+                    al = x - (l + 1) / 2; at = y - (u + 1) / 2;
+                    ar = x + (r + 1) / 2 + 1; ab = y + (d + 1) / 2 + 1;
+                } else if (!sc64_z5_world_actor_rect((unsigned)raw, x, y,
+                                                     &al, &at, &ar, &ab)) return 0;
+                rect_ready = 1;
+            }
+            if (q->left >= ar || al >= q->right ||
+                q->top >= ab || at >= q->bottom) continue;
+        }
+        if (snapshot->count[q->row] == 0xffffu) return 0;
+        ++snapshot->count[q->row];
+    }
+    return 1;
+}
+
+/* Build after all pre-condition world changes and before scheduler actions.
+ * Any unsupported query geometry disables the snapshot; callers then retain
+ * the original full-scan error/success behavior. */
+static int sc64_z5_count_snapshot_begin(Sc64Z5WorldContext *ctx,
+                                         const Sc64Z5RuntimeState *runtime)
+{
+    Sc64Z5CountQuery queries[SC64_Z5_SOURCE_CONDITION_COUNT];
+    Sc64Z5CountSnapshot next;
+    unsigned query_count = 0;
+    if (!ctx) return 0;
+#ifdef SC64_Z5_PRUNE_STARTED
+    if (!runtime || !sc64_z5_runtime_state_valid(runtime)) return 0;
+#else
+    (void)runtime;
+#endif
+    ctx->count_snapshot.active = 0;
+    memset(ctx->count_snapshot.count, 0, sizeof(ctx->count_snapshot.count));
+    memset(&next, 0, sizeof(next));
+    for (unsigned row = 0; row < SC64_Z5_SOURCE_CONDITION_COUNT; ++row) {
+        Sc64Z5CountQuery query;
+        const Sc64Z5SourceCondition *c = &sc64_z5_source_conditions[row];
+        if (c->opcode != 2 && c->opcode != 3) continue;
+#ifdef SC64_Z5_PRUNE_STARTED
+        if (!sc64_z5_trigger_preserved(c->trigger) &&
+            sc64_z5_mask_test(runtime->model.started_lo,
+                              runtime->model.started_hi, c->trigger)) continue;
+#endif
+        if (sc64_z5_count_query(row, &query)) {
+            next.valid[row >> 3] |= (u8)(1u << (row & 7u));
+            queries[query_count++] = query;
+        }
+    }
+    if (!query_count) return 0;
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive) {
+        int raw = u[i].raw_type >= 0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type);
+        if (!sc64_z5_count_snapshot_add_actor(ctx, &next, queries, query_count,
+                                               0, raw, u[i].raw_owner,
+                                               u[i].x, u[i].y)) return 0;
+    }
+    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
+        int raw = b[i].raw_type >= 0 ? b[i].raw_type :
+                  sc64_race_raw_building(b[i].type);
+        if (!sc64_z5_count_snapshot_add_actor(ctx, &next, queries, query_count,
+                                               1, raw, b[i].raw_owner,
+                                               b[i].x, b[i].y)) return 0;
+    }
+    memcpy(ctx->count_snapshot.count, next.count, sizeof(next.count));
+    memcpy(ctx->count_snapshot.valid, next.valid, sizeof(next.valid));
+    ctx->count_snapshot.active = 1;
+    return 1;
+}
+
+static void sc64_z5_count_snapshot_end(Sc64Z5WorldContext *ctx)
+{
+    if (!ctx) return;
+    ctx->count_snapshot.active = 0;
+    memset(ctx->count_snapshot.count, 0, sizeof(ctx->count_snapshot.count));
+    memset(ctx->count_snapshot.valid, 0, sizeof(ctx->count_snapshot.valid));
+}
+#endif
+
 static int sc64_z5_world_condition(void *context,
                                     const Sc64Z5RuntimeState *state,
                                     const Sc64Z5SourceCondition *c)
@@ -247,6 +407,10 @@ static int sc64_z5_world_condition(void *context,
     if (!ctx || !state || !c || (c->flags != 0x10u && c->flags != 0) || c->mask) return -1;
     switch (c->opcode) {
     case 2: case 3: /* Command, Bring */
+#ifdef SC64_Z5_COUNT_SNAPSHOT
+        if (sc64_z5_count_snapshot_lookup(ctx, c, &count))
+            return sc64_z5_world_compare(c->comparison, count, c->amount);
+#endif
         if (!sc64_z5_world_count_one(ctx, c->player, c->unit,
                                      c->opcode == 3 ? c->location : 0, &count)) return -1;
         return sc64_z5_world_compare(c->comparison, count, c->amount);

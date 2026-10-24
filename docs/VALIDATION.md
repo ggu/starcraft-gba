@@ -2346,3 +2346,87 @@ The private doodad emitter retains all 37 authenticated THG2 records, including
 rows retain their initial state. Emission does not claim raw210 trap behavior
 is implemented, and runtime capability checks remain required. No P6 live
 mission completion is claimed by these foundations.
+
+
+### Zerg five complete normal-controller qualification
+
+The generation-27 Consume profile has a full normal-input sanitizer win and
+complete ARM replay. The controller launches through HOME and wins at game
+frame 47901 / controller tick 48345, following the source gate-25 and
+location-20 extraction sequence. Kerrigan survives with HP 185; two of the six
+starting Zerglings survive. Her final cloak state is active and Q8 energy is
+8637. The final source started mask is 198228763, with all action cursors and
+wait timers zero and runtime fault zero. Replay writes only held-input events,
+not actor positions, health, resources, source state or result flags.
+
+Frozen private baseline evidence is under
+`.local/build/promotion/z5-arm-qualified/qualification.json`:
+
+- ROM SHA-256: `160c03ed21adc2e254fc81d40246c8ec2361c1fdcbe0faf9b7b1517a82dfa788`.
+- ELF SHA-256: `1d29f0b5c2eb6d434f2696c79057de8ff223ca4bb3610e53872de9919c47fbe0`.
+- Trace SHA-256: `fcf5615fd186d1db6531fbf6364b6ec321e34f3e9aefa04e876f37dac600c5e1`.
+- Full replay: `full-win/zerg-z5-1792822969228526000/profile.json`.
+- Save at tick 30000: `mid-mission-save/zerg-z5-1792823703306320000/profile.json`.
+- Fresh resume: `mid-mission-resume/zerg-z5-resume-1792824117422200000/resume.json`.
+
+The fresh process restores the observed saved world and persistent source
+state exactly, then advances one handoff and 60 live frames to frame 29684.
+This raises the staged total to 20/30 (T10/Z5/P5); canonical profiles remain
+T10/Z3/P3. Baseline full-mission performance is **8.78 effective fps**.
+Performance qualification is separate from a source-model or host win, and
+physical GBA verification remains outstanding.
+
+### Protoss six live integration checks
+
+The internal generation-28 P6 probe launches the actual imported roster of
+200 units, four beacons and 27 unit-backed props, retaining all 37 THG2 rows
+in metadata. Sixty real game updates run without a source fault. The focused
+sanitizer checks cover native size factors, shield/HP damage order, source-box
+detection, property-driven burrow, suicide splash, trap cooldowns and death
+provenance. Candidate-only saves allow moved source actors, reject malformed
+identities before live mutation and round-trip a normally moved actor and a
+destroyed trap with negative HP. P5/P6 share a bounded mission-state union;
+P5-only builds retain their prior layout. Reserve guards are unchanged.
+
+The source door dispatcher now succeeds on an empty orientation selection,
+as required by trigger 2's raw208 location-1 action. Door/removal callbacks
+validate their own effects while the scheduler cursor/timer transaction is
+in flight; whole-runtime validation follows dispatch. The actual trigger-2
+regression checks the neutral-owned raw207 row and the empty raw208 action.
+The matching N64 handler routes raw modifier 0 and 6 to the same state-test
+and opposite-state command path; 4 and 5 take direct command paths. This
+establishes toggle semantics, not native visual/collision equivalence.
+
+Framebuffer comparisons use the actual P6 scene, support its zero-mineral
+roster, restore complete actor records before SRAM tests, and compare source
+door actions with cold and warm caches. P5 and Z5 also pass the corrected
+fixture on their actual fifth missions. The P6 ARM probe ends IWRAM at
+`0x030045d8` and BSS at `0x0203d754`, below the unchanged limits. Full P6
+controller/ARM wins and fresh-process save qualification remain incomplete;
+these checks do not add P6 to the completed mission count.
+
+
+### Z5 shared condition-query performance qualification
+
+The Consume target enables `SC64_Z5_PRUNE_STARTED` and
+`SC64_Z5_COUNT_SNAPSHOT` after the complete frozen comparison. Already-started
+one-shot records stop querying unused conditions; preserved triggers 7, 8 and
+34 continue to poll. The transient 96-byte snapshot batches 34 authenticated
+Command/Bring conditions and is discarded before action results are observed.
+Actor bounding-box overlap, source ownership and fallback errors remain the
+same as the complete scan. Numeric CHK Exactly is comparison 10; switch
+comparisons retain 2/3. Unsupported or copied query rows use full scans.
+
+Sanitizer differential checks cover 150 randomized real-array worlds and
+12000 scheduler ticks with equal persistent state and action streams. The
+full ARM win rises from **8.78 to 17.73 effective fps**. All 50 observed
+checkpoints and five PNGs match the baseline. The fresh mid-mission save
+restores exactly and advances one handoff plus 60 live frames. IWRAM ends at
+`0x03004fe0` and BSS at `0x0203d858`; both unchanged reserve guards pass.
+This remains below the 30-fps goal and is not physical GBA verification.
+
+Private evidence:
+`.local/build/promotion/z5-snapshot-final-qualified/qualification.json`.
+ROM SHA-256: `9d21dcfd73022378ecba6fed2315d8b1b10a5b02076059ccbd1dc5b5704613bf`.
+ELF SHA-256: `de57d1e5d3b3f6336ca4c6ea04aa6e97794eab4b814a1be5c802b4bbd0632ddd`.
+The controller trace is the same `fcf5615f…00c5e1` qualified above.

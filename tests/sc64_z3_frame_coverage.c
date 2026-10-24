@@ -98,12 +98,20 @@ setup_profile(void)
 {
     game_init();
     race_mode = 0;
-#if defined(SC64_P4_RUNTIME)
+#if defined(SC64_P6_RUNTIME)
+    race_human = R_PROTOSS;
+    race_selected_mission = SC64_P6_GLOBAL_ID;
+#elif defined(SC64_P5_RUNTIME)
+    race_human = R_PROTOSS;
+    race_selected_mission = SC64_P5_GLOBAL_ID;
+#elif defined(SC64_P4_RUNTIME)
     race_human = R_PROTOSS;
     race_selected_mission = SC64_P4_GLOBAL_ID;
 #else
     race_human = R_ZERG;
-#ifdef SC64_Z4_RUNTIME
+#ifdef SC64_Z5_RUNTIME
+    race_selected_mission = SC64_Z5_GLOBAL_ID;
+#elif defined(SC64_Z4_RUNTIME)
     race_selected_mission = 15;
 #else
     race_selected_mission = 14;
@@ -209,25 +217,33 @@ test_mutation_save_load_and_restart(void)
 {
     int mineral_slot = -1, building_slot = -1;
     int failures = 0;
+    Mineral saved_mineral;
+    Building saved_building;
+    int has_mineral;
     setup_profile();
     update_exploration();
     for (int i = 0; i < MAX_MINERALS; ++i)
         if (m[i].amount > 0) { mineral_slot = i; break; }
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive) { building_slot = i; break; }
-    assert(mineral_slot >= 0 && building_slot >= 0);
+    assert(building_slot >= 0);
+    has_mineral = mineral_slot >= 0;
+    saved_building = b[building_slot];
+    if (has_mineral) saved_mineral = m[mineral_slot];
 
     /* Mutate map actors after the initial frame/cache has been drawn. */
     game_render();
-    m[mineral_slot].amount = 0;
+    if (has_mineral) m[mineral_slot].amount = 0;
     b[building_slot].alive = 0;
-    failures += compare_game_render("resource/building mutation", 0);
+    failures += compare_game_render(has_mineral ? "resource/building mutation" :
+                                    "building mutation", 0);
 
-    /* Save a restored map, change it, then restore through the actual adapter. */
-    m[mineral_slot].amount = 1500;
-    b[building_slot].alive = 1;
+    /* Restore the complete source actor before saving. This matters for P6
+     * beacons and unit-backed THG2 props whose identities are immutable. */
+    b[building_slot] = saved_building;
+    if (has_mineral) m[mineral_slot] = saved_mineral;
     assert(race_save_game());
-    m[mineral_slot].amount = 0;
+    if (has_mineral) m[mineral_slot].amount = 0;
     b[building_slot].alive = 0;
     assert(race_load_game());
     failures += compare_game_render("save/load", 0);
@@ -236,6 +252,38 @@ test_mutation_save_load_and_restart(void)
     failures += compare_game_render("restart", 0);
     return failures;
 }
+
+#if defined(SC64_P6_RUNTIME)
+static int
+test_p6_doodad_action_cold_warm(void)
+{
+    u8 enabled[sizeof(race_p6.doodad_enabled)];
+    Sc64P6DoodadBinding saved_bindings[SC64_P6_DOODAD_SOURCE_COUNT];
+    int applied = 0, failures = 0;
+    setup_profile();
+    memcpy(enabled, race_p6.doodad_enabled, sizeof(enabled));
+    memcpy(saved_bindings, race_p6_doodad_bindings, sizeof(saved_bindings));
+    for (unsigned i = 0; i < SC64_P6_SOURCE_ACTION_COUNT; ++i) {
+        const Sc64P6SourceAction *action = &sc64_p6_source_actions[i];
+        if (action->opcode != SC64_P6_ACTION_SET_DOODAD) continue;
+        if (sc64_p6_world_action(&race_p6_world, action) == 1) {
+            applied = 1;
+            break;
+        }
+    }
+    assert(applied);
+    failures += compare_game_render("P6 source doodad action cold", 0);
+    failures += compare_game_render("P6 source doodad action warm", 1);
+    memcpy(race_p6.doodad_enabled, enabled, sizeof(enabled));
+    memcpy(race_p6_doodad_bindings, saved_bindings, sizeof(saved_bindings));
+    invalidate_path_grid();
+    target_lists_valid = 0;
+    sc64_unit_bucket_active = 0;
+    sc64_target_index_end();
+    reset_render_caches();
+    return failures;
+}
+#endif
 
 static int
 test_consecutive_viewport_edge_frames(void)
@@ -277,6 +325,9 @@ main(void)
     failures += test_scene_transitions();
     failures += test_mutation_save_load_and_restart();
     failures += test_consecutive_viewport_edge_frames();
+#if defined(SC64_P6_RUNTIME)
+    failures += test_p6_doodad_action_cold_warm();
+#endif
     if (failures) fprintf(stderr, "Race no-clear coverage failures: %d\n", failures);
     else puts("Race framebuffer coverage: all full-clear comparisons match");
     return failures != 0;

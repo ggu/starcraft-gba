@@ -260,7 +260,13 @@ static int race_z5_campaign_tick(void)
     race_z5_world.victory_requested = 0;
     race_z5_world.defeat_requested = 0;
     ops = sc64_z5_world_ops(&race_z5_world);
+#ifdef SC64_Z5_COUNT_SNAPSHOT
+    (void)sc64_z5_count_snapshot_begin(&race_z5_world, &race_z5.runtime);
+#endif
     result = sc64_z5_adapter_tick(&race_z5.runtime, &ops, 0);
+#ifdef SC64_Z5_COUNT_SNAPSHOT
+    sc64_z5_count_snapshot_end(&race_z5_world);
+#endif
     if (result < 0 || !sc64_z5_persistent_state_valid(&race_z5)) return 0;
     for (unsigned i = 0; i < SC64_Z5_DOODAD_CAPACITY; ++i) {
         if (race_z5_doodads[i].enabled)

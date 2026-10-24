@@ -1,7 +1,6 @@
 #ifndef SC64_P6_WORLD_ADAPTER_H
 #define SC64_P6_WORLD_ADAPTER_H
 
-#include <string.h>
 /* Bounded P6 source-world callbacks. This is intentionally mission-specific:
  * opaque AI, door state, and actor-specific properties require explicit
  * host policies instead of silently succeeding. */
@@ -201,8 +200,8 @@ static int sc64_p6_world_create(Sc64P6WorldContext *ctx,
 {
     unsigned owner_slot, property_index;
     int l,t,r,btm,live_owner;
-    Sc64P6WorldActorBinding binding;
-    Sc64P6WorldCreateRequest request;
+    Sc64P6WorldActorBinding binding = {0};
+    Sc64P6WorldCreateRequest request = {0};
     const Sc64P6ActorPolicyRequirement *requirement;
     if(!ctx||!a||a->opcode!=SC64_P6_ACTION_CREATE_UNIT||a->modifier||
        a->unit>=228u||a->flags!=(a->group2?0x18u:0x10u)||
@@ -211,12 +210,10 @@ static int sc64_p6_world_create(Sc64P6WorldContext *ctx,
        !sc64_p6_world_location(ctx,a->location,&l,&t,&r,&btm)||
        !ctx->resolve_actor||!ctx->create_actor)return 0;
     property_index=a->group2;
-    memset(&request,0,sizeof(request));
     if(property_index){
         if(!sc64_p6_world_properties(property_index,&request.properties))return 0;
         request.has_properties=1;
     }
-    memset(&binding,0,sizeof(binding));
     if(ctx->resolve_actor(ctx->callback_context,a->unit,&binding)!=1||
        binding.internal_type<0)return 0;
     requirement=sc64_p6_actor_policy_requirement(a->unit);

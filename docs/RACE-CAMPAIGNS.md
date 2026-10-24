@@ -45,12 +45,12 @@ present three each. Controller-driven host runs complete 16 of the 30 missions
 across these profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. Separate internal
 Z4 and P4 Storm builds additionally have normal-controller host and full ARM
 wins. P5 Shuttle also has a complete normal-controller host and ARM win plus
-an exact fresh-process cargo save, bringing the staged total to 19/30
-(Terran 10, Zerg 4, Protoss 5). These staged builds have separate save formats
+an exact fresh-process cargo save. Z5 Consume also has a complete host and ARM
+win with an exact mid-mission save, bringing the staged total to 20/30
+(Terran 10, Zerg 5, Protoss 5). These staged builds have separate save formats
 and ROM identities. The P5 island objective requires the optional Shuttle
-profile. Z5 Consume remains under controller qualification. P6 has source
-models, actor bindings and asset preparation; its live integration and later
-chapters remain incomplete.
+profile. P6 has a gated live runtime, source doors/traps and save checks; its
+full mission playthrough and later chapters remain incomplete.
 
 Zerg 3 **The New Dominion** and Protoss 3 **Higher Ground** are on the second
 campaign menu page. The canonical files remain `StarCraft-Zerg-GBA.gba` and
@@ -477,7 +477,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Host controller runs complete 16 missions: Terran 1–10, Zerg 1–3 and Protoss 1–3. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds; T9's win is on an earlier ROM. The other 14 campaign missions have no completed runtime.
+- Host controller runs complete 16 missions: Terran 1–10, Zerg 1–3 and Protoss 1–3. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds; T9's win is on an earlier ROM. Separate staged profiles also complete Z4–Z5 and P4–P5, bringing the staged total to 20/30. Ten missions remain without a completed playthrough.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

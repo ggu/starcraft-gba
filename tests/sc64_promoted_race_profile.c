@@ -38,6 +38,17 @@ static const int profile_missions[] = {0, 1, 14, 15};
 static const char *const profile_titles[] = {
     "AMONG THE RUINS", "EGRESSION", "THE NEW DOMINION", "AGENT OF THE SWARM"
 };
+#elif SC64_CAMPAIGN_RACE == 2 && defined(SC64_P6_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_PROTOSS
+#define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS
+#define PROFILE_RACE R_PROTOSS
+#define PROFILE_SAVE_GENERATION 28u
+#define PROFILE_OLD_SAVE_TAG 0x53435032u
+static const int profile_missions[] = {2, 3, 22, 23, 24, 25};
+static const char *const profile_titles[] = {
+    "FIRST STRIKE", "INTO THE FLAMES", "HIGHER GROUND", "THE HUNT FOR TASSADAR",
+    "CHOOSING SIDES", "INTO THE DARKNESS"
+};
 #elif SC64_CAMPAIGN_RACE == 2 && defined(SC64_P5_RUNTIME)
 #define PROFILE_FACTION SC64_FACTION_PROTOSS
 #define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS

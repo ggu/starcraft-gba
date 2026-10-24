@@ -218,6 +218,15 @@ static inline int sc64_z5_adapter_tick(Sc64Z5RuntimeState *s,
                 s->fault = SC64_Z5_FAULT_METADATA;
                 return -SC64_Z5_FAULT_METADATA;
             }
+#ifdef SC64_Z5_PRUNE_STARTED
+            /* Non-preserved Z5 records are one-shot. Once started, their
+             * predicate can no longer affect scheduling; still validate the
+             * complete trigger and condition metadata above on every tick. */
+            if (!sc64_z5_trigger_preserved((u8)t) &&
+                sc64_z5_mask_test(s->model.started_lo, s->model.started_hi,
+                                  (u8)t))
+                continue;
+#endif
             result = ops->condition(ops->context, s, row);
             if (result < 0 || result > 1) {
                 s->fault = SC64_Z5_FAULT_CONDITION;

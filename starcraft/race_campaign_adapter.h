@@ -38,6 +38,9 @@ enum {
 #ifdef SC64_P5_RUNTIME
     ,SC64_RACE_MISSION_P5 = 24
 #endif
+#ifdef SC64_P6_RUNTIME
+    ,SC64_RACE_MISSION_P6 = 25
+#endif
 #endif
 };
 
@@ -57,6 +60,12 @@ static int race_z5_source_owner(unsigned source_slot);
 static int
 race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 {
+#ifdef SC64_P6_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_P6_GLOBAL_ID) {
+        int owner = raw_owner < 0 ? -1 : race_p6_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
 #ifdef SC64_P5_RUNTIME
     if (!race_mode && race_selected_mission == SC64_RACE_MISSION_P5) {
         int owner = raw_owner < 0 ? -1 : race_p5_source_owner((unsigned)raw_owner);
@@ -217,6 +226,15 @@ static void race_p4_rescue_tick(void)
 }
 #endif
 
+#ifdef SC64_P6_RUNTIME
+#include "sc64_p6_doodads_generated.h"
+#ifdef SC64_P6_COMBAT_ENABLED
+#include "sc64_p6_combat_adapter.h"
+#endif
+#include "sc64_p6_runtime_adapter.h"
+#include "sc64_p6_render_adapter.h"
+#endif
+
 static void
 race_campaign_assign_mining(void)
 {
@@ -361,6 +379,11 @@ race_campaign_init(void)
     memset(&race_p5, 0, sizeof(race_p5));
     memset(&race_p5_world, 0, sizeof(race_p5_world));
 #endif
+#ifdef SC64_P6_RUNTIME
+    memset(&race_p6, 0, sizeof(race_p6));
+    memset(&race_p6_world, 0, sizeof(race_p6_world));
+    memset(race_p6_doodad_bindings, 0, sizeof(race_p6_doodad_bindings));
+#endif
     if (race_mode) {
         race_skirmish_init();
         return;
@@ -388,6 +411,9 @@ race_campaign_init(void)
 #ifdef SC64_TERRAN_LATE_RUNTIME
          && !race_late_active()
 #endif
+#ifdef SC64_P6_RUNTIME
+         && race_selected_mission != SC64_P6_GLOBAL_ID
+#endif
          ) || !sc64_race_maps[race_selected_mission].width)
         race_selected_mission = sc64_frontend_first_mission(
 #ifdef SC64_CAMPAIGN_RACE
@@ -408,6 +434,11 @@ race_campaign_init(void)
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
 #endif
+#ifdef SC64_P6_RUNTIME
+    if (race_selected_mission == SC64_P6_GLOBAL_ID && !race_p6_preflight(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     /* Validate every retained starting row before touching the live world.
      * These staged pools are deliberately smaller than later campaign maps. */
@@ -421,6 +452,9 @@ race_campaign_init(void)
 #ifdef SC64_Z5_RUNTIME
             if (race_selected_mission == SC64_Z5_GLOBAL_ID && raw == 214) continue;
 #endif
+#ifdef SC64_P6_RUNTIME
+            if (race_selected_mission == SC64_P6_GLOBAL_ID && raw == 214) continue;
+#endif
             if (raw >= 176 && raw <= 178) ++minerals_count;
             else if (raw == 188) ++gas_count;
             else if (sc64_race_unit_from_raw(raw) >= 0) ++units;
@@ -430,6 +464,10 @@ race_campaign_init(void)
 #ifdef SC64_Z5_RUNTIME
         if (race_selected_mission == SC64_Z5_GLOBAL_ID)
             buildings += SC64_Z5_UNIT_BACKED_DOODADS;
+#endif
+#ifdef SC64_P6_RUNTIME
+        if (race_selected_mission == SC64_P6_GLOBAL_ID)
+            buildings += SC64_P6_DOODAD_UNIT_PROP_COUNT;
 #endif
         if (invalid || units > MAX_UNITS || buildings > MAX_BUILDINGS ||
             minerals_count > MAX_MINERALS || gas_count > MAX_RACE_GEYSERS) {
@@ -495,6 +533,10 @@ race_campaign_init(void)
         if (race_selected_mission == SC64_P5_GLOBAL_ID)
             owner = race_campaign_owner(map, i);
 #endif
+#ifdef SC64_P6_RUNTIME
+        if (race_selected_mission == SC64_P6_GLOBAL_ID)
+            owner = race_campaign_owner(map, i);
+#endif
 #ifdef SC64_T4_RUNTIME
         if (race_selected_mission == SC64_T4_GLOBAL_ID)
             owner = race_campaign_owner(map, i);
@@ -527,6 +569,9 @@ race_campaign_init(void)
         race_player[NEUTRAL] = map->owner_races[6];
     }
 #endif
+#ifdef SC64_P6_RUNTIME
+    if (race_selected_mission == SC64_P6_GLOBAL_ID) race_player[SIDE] = race_human;
+#endif
     human_owner = map->human_slot;
 
     for (i = 0; i < map->unit_count; ++i) {
@@ -536,6 +581,9 @@ race_campaign_init(void)
         if (x >= map->width * 16 || y >= map->height * 16) continue;
 #ifdef SC64_Z5_RUNTIME
         if (race_selected_mission == SC64_Z5_GLOBAL_ID && raw == 214) continue;
+#endif
+#ifdef SC64_P6_RUNTIME
+        if (race_selected_mission == SC64_P6_GLOBAL_ID && raw == 214) continue;
 #endif
         if (raw == 176 || raw == 177 || raw == 178) {
             int j;
@@ -651,7 +699,16 @@ race_campaign_init(void)
     }
 #endif
 
+#ifdef SC64_P6_RUNTIME
+    if (race_selected_mission == SC64_P6_GLOBAL_ID && !race_p6_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+
     switch (race_selected_mission) {
+#ifdef SC64_P6_RUNTIME
+    case SC64_P6_GLOBAL_ID: minerals = gas = 0; break;
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     case 10: case 11: case 12: case 13: minerals = gas = 0; break;
 #endif
@@ -930,6 +987,13 @@ race_campaign_tick(void)
         return;
     }
 #endif
+#ifdef SC64_P6_RUNTIME
+    if (mission == SC64_P6_GLOBAL_ID) {
+        race_p6_rescue_tick();
+        if (!race_p6_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
+        return;
+    }
+#endif
     if(mission==SC64_RACE_MISSION_T1||mission==SC64_RACE_MISSION_T2){race_terran_tick();return;}
 #endif
     race_campaign_ai_tick();
@@ -1098,6 +1162,9 @@ race_campaign_objective_text(void)
 #ifdef SC64_P5_RUNTIME
     if (race_p5_active()) return race_p5_objective_text();
 #endif
+#ifdef SC64_P6_RUNTIME
+    if (race_p6_active()) return race_p6_objective_text();
+#endif
 #ifdef SC64_P4_RUNTIME
     if (race_p4_active()) return race_p4_objective_text();
 #endif
@@ -1161,6 +1228,9 @@ race_campaign_victory_text(void)
 #ifdef SC64_P5_RUNTIME
     if (race_p5_active()) return race_p5_victory_text();
 #endif
+#ifdef SC64_P6_RUNTIME
+    if (race_p6_active()) return race_p6_victory_text();
+#endif
 #ifdef SC64_P4_RUNTIME
     if (race_p4_active()) return race_p4_victory_text();
 #endif
@@ -1220,6 +1290,9 @@ race_campaign_failure_text(void)
 {
 #ifdef SC64_P5_RUNTIME
     if (race_p5_active()) return race_p5_failure_text();
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (race_p6_active()) return race_p6_failure_text();
 #endif
 #ifdef SC64_P4_RUNTIME
     if (race_p4_active()) return race_p4_failure_text();

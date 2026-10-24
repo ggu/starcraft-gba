@@ -14,6 +14,9 @@ sc64_static_objects_key(void)
 #ifdef SC64_Z5_RUNTIME
                     + SC64_Z5_UNIT_BACKED_DOODADS * 2
 #endif
+#ifdef SC64_P6_RUNTIME
+                    + SC64_P6_DOODAD_SOURCE_COUNT * 2
+#endif
     };
 #ifdef SC64_ZP_FULL_STORAGE
     /* Coordinates, raw IDs, owner/type and visibility fit signed 16 bits.
@@ -95,6 +98,12 @@ sc64_static_objects_key(void)
     for (int i = 0; i < SC64_Z5_UNIT_BACKED_DOODADS; ++i) {
         SC64_STATIC_FIELD(race_z5_prop_cache_field((unsigned)i, 0));
         SC64_STATIC_FIELD(race_z5_prop_cache_field((unsigned)i, 1));
+    }
+#endif
+#ifdef SC64_P6_RUNTIME
+    for (unsigned i = 0; i < SC64_P6_DOODAD_SOURCE_COUNT; ++i) {
+        SC64_STATIC_FIELD(race_p6_prop_cache_field((unsigned)i, 0));
+        SC64_STATIC_FIELD(race_p6_prop_cache_field((unsigned)i, 1));
     }
 #endif
 #undef SC64_STATIC_FIELD

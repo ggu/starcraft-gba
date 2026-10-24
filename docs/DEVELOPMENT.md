@@ -1031,3 +1031,50 @@ rows. The sprite-only type IDs are SpriteType IDs, not unit IDs. The two raw210
 unit-backed placements explicitly prevent runtime-ready prop generation until
 their mapping is implemented. `test-sc64-p6-actor-source` audits source UPRP
 values separately from the asset-free actor-fact checks.
+
+
+### Z5 complete controller and shared query checks
+
+The generation-27 Consume build now has a full ordinary-input host win, a
+complete ARM replay, and an exact fresh-process mid-mission save restore.
+Repeat the host run with `make test-sc64-z5-campaign-run`. It launches through
+HOME, retains Kerrigan and uses movement, cloak and Consume through the normal
+controls; victory follows the source gate and extraction program.
+
+`make test-sc64-z5-count-queries` checks the optional started-trigger pruning
+and phase-local Command/Bring snapshot against their full-query oracles. The
+three preserved source triggers continue to poll; copied or unsupported rows
+fall back to full queries. Neither optimization changes SRAM. See Validation
+for frozen replay comparisons and measured performance.
+
+### P6 internal live probe
+
+After preparing the P6 sprite and numeric THG2 inputs above, run:
+
+```sh
+make protoss-p6-probe
+make test-sc64-p6-game test-sc64-p6-runtime test-sc64-p6-save
+make test-sc64-p6-combat test-sc64-p6-profile test-sc64-p6-frame-coverage
+```
+
+`build/StarCraft-Protoss-P6-Probe-GBA.gba` has an internal sixth menu entry and
+separate generation-28 identity SCPC. It imports 200 units, four beacons and
+27 unit-backed THG2 props. The source 26-record program drives gates, creates
+and the Zeratul extraction objective. The bounded GBA actor policy includes
+permanent-cloak detection, property-driven burrow/release, Infested Terran
+suicide splash and raw210 trap attacks. Ten sprite-only decorations remain
+metadata rather than rendered actors. The opaque Suic script is an authored
+single AttackMove for source Force 2; native AI, animation timing and full
+combat equivalence are not claimed.
+
+The probe passes live startup, candidate-only save validation, combat and
+framebuffer checks, including source door changes. These checks do not yet
+establish a complete controller win, ARM mission replay or hardware viability.
+The standard Protoss output remains the separately qualified P1–P3 build.
+
+
+The Consume build enables the qualified Z5 query options by default. For a
+comparison build, use `make -B zerg-z5-consume Z5_QUERY_FLAGS=` and retain that
+ROM/ELF separately, then restore with `make -B zerg-z5-consume`. The complete
+optimized replay averages 17.73 effective fps versus 8.78 for the baseline,
+with matching observed state/captures and exact fresh-process save restore.

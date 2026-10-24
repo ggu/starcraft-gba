@@ -80,6 +80,9 @@ race_save_invincible_padding_valid(const RaceSave *candidate)
 #define RACE_SAVE_INV_U(candidate, i) ((candidate)->invincible_units[(i)])
 #define RACE_SAVE_INV_B(candidate, i) ((candidate)->invincible_buildings[(i)])
 #endif
+#ifdef SC64_P6_RUNTIME
+#include "sc64_p6_save.h"
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
 #include "sc64_terran_late_repair.h"
 #endif
@@ -524,10 +527,24 @@ static int race_save_game(void) {
     }
 #endif
 #ifdef SC64_P5_RUNTIME
-    memset(&race_data.p5, 0, sizeof(race_data.p5));
     if (race_p5_active()) {
         if (!race_p5_runtime_state_valid()) return 0;
         race_data.p5 = race_p5;
+#if defined(SC64_P6_RUNTIME)
+    } else if (!race_p6_active()) {
+#endif
+        memset(&race_data.p5, 0, sizeof(race_data.p5));
+    }
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (race_p6_active()) {
+        if (!race_p6_runtime_state_valid() || !race_p6_doodad_bindings_still_valid())
+            return 0;
+        race_data.p6 = race_p6;
+#if defined(SC64_P5_RUNTIME)
+    } else if (!race_p5_active()) {
+#endif
+        memset(&race_data.p6, 0, sizeof(race_data.p6));
     }
 #endif
 #ifdef SC64_Z5_RUNTIME
@@ -590,12 +607,34 @@ static int race_save_game(void) {
         !race_t4_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
 #ifdef SC64_P5_RUNTIME
-    if (!race_p5_active()) {
+    if (race_p5_active()) {
+        if (!race_p5_save_candidate_valid(&race_data, (unsigned)race_cols,
+                                          (unsigned)race_rows)) return 0;
+    }
+#if defined(SC64_P6_RUNTIME)
+    else if (!race_p6_active()) {
+#else
+    else {
+#endif
         const u8 *bytes = (const u8 *)&race_data.p5;
         for (unsigned i = 0; i < sizeof(race_data.p5); ++i)
             if (bytes[i]) return 0;
-    } else if (!race_p5_save_candidate_valid(&race_data, (unsigned)race_cols,
-                                             (unsigned)race_rows)) return 0;
+    }
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (race_p6_active()) {
+        if (!race_p6_save_candidate_valid(&race_data, (unsigned)race_cols,
+                                          (unsigned)race_rows)) return 0;
+    }
+#if defined(SC64_P5_RUNTIME)
+    else if (!race_p5_active()) {
+#else
+    else {
+#endif
+        const u8 *bytes = (const u8 *)&race_data.p6;
+        for (unsigned i = 0; i < sizeof(race_data.p6); ++i)
+            if (bytes[i]) return 0;
+    }
 #endif
 #ifdef SC64_T5_RUNTIME
     if (!race_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
@@ -640,6 +679,9 @@ static int race_load_game(void) {
 #ifdef SC64_T6_RUNTIME
        &&v[2]!=SC64_T6_GLOBAL_ID
 #endif
+#ifdef SC64_P6_RUNTIME
+       &&v[2]!=SC64_P6_GLOBAL_ID
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
        &&(v[2]<SC64_TERRAN_LATE_GLOBAL_T7||
           v[2]>SC64_TERRAN_LATE_GLOBAL_T10)
@@ -662,6 +704,9 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_T6_RUNTIME
         &&v[2]!=SC64_T6_GLOBAL_ID
+#endif
+#ifdef SC64_P6_RUNTIME
+        &&v[2]!=SC64_P6_GLOBAL_ID
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
         &&(v[2]<SC64_TERRAN_LATE_GLOBAL_T7||
@@ -1041,9 +1086,40 @@ static int race_load_game(void) {
         if (!race_p5_save_candidate_valid(&race_data, (unsigned)width,
                                           (unsigned)height)) return 0;
     } else {
+#if defined(SC64_P6_RUNTIME)
+        if (!v[0] && v[2] == SC64_P6_GLOBAL_ID) {
+            /* P5 and P6 share a union; P6 owns the payload in this case. */
+        } else
+#endif
+        {
         const u8 *bytes = (const u8 *)&race_data.p5;
         for (unsigned i = 0; i < sizeof(race_data.p5); ++i)
             if (bytes[i]) return 0;
+        }
+    }
+#if defined(SC64_P6_RUNTIME)
+    if (!v[0] && v[2] == SC64_P5_GLOBAL_ID) {
+        const u8 *payload = (const u8 *)&race_data.p5;
+        for (unsigned i = sizeof(race_data.p5); i < sizeof(race_data.p6); ++i)
+            if (payload[i]) return 0;
+    }
+#endif
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (!v[0] && v[2] == SC64_P6_GLOBAL_ID) {
+        if (!race_p6_save_candidate_valid(&race_data, (unsigned)width,
+                                           (unsigned)height)) return 0;
+    } else {
+#if defined(SC64_P5_RUNTIME)
+        if (!v[0] && v[2] == SC64_P5_GLOBAL_ID) {
+            /* P5 owns the payload in the shared union. */
+        } else
+#endif
+        {
+            const u8 *bytes = (const u8 *)&race_data.p6;
+            for (unsigned i = 0; i < sizeof(race_data.p6); ++i)
+                if (bytes[i]) return 0;
+        }
     }
 #endif
 #ifdef SC64_Z5_RUNTIME
@@ -1334,6 +1410,18 @@ static int race_load_game(void) {
     } else {
         memset(&race_p5, 0, sizeof(race_p5));
         memset(&race_p5_world, 0, sizeof(race_p5_world));
+    }
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (race_p6_active()) {
+        race_p6 = race_data.p6;
+        if (!race_p6_rebind_loaded_world(&sc64_race_maps[SC64_P6_GLOBAL_ID]))
+            return 0;
+    } else {
+        memset(&race_p6, 0, sizeof(race_p6));
+        memset(&race_p6_world, 0, sizeof(race_p6_world));
+        memset(race_p6_doodad_bindings, 0, sizeof(race_p6_doodad_bindings));
+        race_p6_doodad_bindings_valid = 0;
     }
 #endif
 #ifdef SC64_Z5_RUNTIME

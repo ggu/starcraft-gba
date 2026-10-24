@@ -40,12 +40,14 @@ int main(void)
         if (raw==205 || raw==206 || raw==207 || raw==208) {
             assert(!(source->flags&SC64_Z5_SOURCE_BUILDING));
             assert(!(source->flags&SC64_Z5_SOURCE_DETECTOR));
+            assert(source->size == 3 && policy->size == 3); /* Independent */
             expected_policy |= SC64_ZP_ACTOR_INVINCIBLE;
             assert(source->hp==100000 && (source->flags&SC64_Z5_SOURCE_INVINCIBLE));
             assert(!(source->flags&SC64_Z5_SOURCE_HAS_GROUND_WEAPON));
         } else {
             assert(!(source->flags&SC64_Z5_SOURCE_BUILDING));
             assert(source->flags&SC64_Z5_SOURCE_DETECTOR);
+            assert(source->size == 2 && policy->size == 2); /* Large */
             expected_policy |= SC64_ZP_ACTOR_WEAPON;
             assert(source->hp==50 && (source->flags&SC64_Z5_SOURCE_HAS_GROUND_WEAPON));
             assert(!(source->flags&SC64_Z5_SOURCE_INVINCIBLE));

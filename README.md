@@ -39,7 +39,7 @@ This profile requires a legally obtained StarCraft 64 USA ROM that you are entit
 ./dev sc64 play --profile terran
 ```
 
-The canonical Terran profile includes all ten Terran campaign missions; Zerg and Protoss each include their first three. Use `--profile zerg` or `--profile protoss` with the same build/test/play commands. Each ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. The remaining 14 campaign missions are unfinished, and measured campaign rates remain below 30 fps. No physical GBA result is claimed.
+The canonical Terran profile includes all ten Terran campaign missions; Zerg and Protoss each include their first three. Use `--profile zerg` or `--profile protoss` with the same build/test/play commands. Each ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. Separate staged Zerg and Protoss builds have completed their first five missions, for 20/30 staged missions overall; ten remain unfinished. Measured campaign rates remain below 30 fps. No physical GBA result is claimed.
 
 Preparing Terran also generates the shared inputs needed by `make race-campaigns`; preparing only Zerg or Protoss does not generate the complete Terran input set. The promoted Zerg and Protoss builds use their third-mission save formats and reject saves from the older two-mission builds. See [the campaign guide](docs/RACE-CAMPAIGNS.md) for mission and save-format details.
 
