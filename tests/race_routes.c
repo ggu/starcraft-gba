@@ -100,6 +100,35 @@ static void reset_routes(void)
 #endif
     sc64_routes_reset();
 }
+#ifdef SC64_ROUTE_L_FAST_PATH
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+static int request_route_cache(int goal, int origin)
+{
+    return sc64_route_slot_for_origin(goal, origin, path_walkable[origin] != 0) >= 0;
+}
+#else
+static int request_route_cache(int goal, int origin)
+{
+    (void)origin;
+    return sc64_route_slot(goal) >= 0;
+}
+#endif
+#if defined(SC64_ROUTE_VISIT_GRID) && !defined(SC64_ROUTE_PARTIAL_FLOOD)
+static int preferred_l_applicable(int sx, int sy, int gx, int gy)
+{
+    if (!path_walkable[sx + sy * MAP_COLS] || !path_walkable[gx + gy * MAP_COLS]) return 0;
+    while (gx != sx) {
+        gx += sx > gx ? 1 : -1;
+        if (!path_walkable[gx + gy * MAP_COLS]) return 0;
+    }
+    while (gy != sy) {
+        gy += sy > gy ? 1 : -1;
+        if (!path_walkable[gx + gy * MAP_COLS]) return 0;
+    }
+    return 1;
+}
+#endif
+#endif
 static int distance[MAP_CELLS];
 static u8 reference_direction[MAP_CELLS];
 static unsigned rng = 0x4398a12bu;
@@ -159,9 +188,18 @@ static int check_cached_route(int sx,int sy,int gx,int gy)
             if(d<best){best=d;expected=cell;}
         }
     }
+#if defined(SC64_ROUTE_L_FAST_PATH) && defined(SC64_ROUTE_VISIT_GRID) && !defined(SC64_ROUTE_PARTIAL_FLOOD)
+    int fast_path = preferred_l_applicable(sx, sy, gx, gy);
+#endif
     int ok=sc64_route_next(sx*16+8,sy*16+8,gx*16+8,gy*16+8,&nx,&ny);
-#ifdef SC64_ROUTE_VISIT_GRID
-    {
+#if defined(SC64_ROUTE_VISIT_GRID) && (!defined(SC64_ROUTE_PARTIAL_FLOOD) || !defined(SC64_ROUTE_L_FAST_PATH))
+    if (
+#ifdef SC64_ROUTE_L_FAST_PATH
+        !fast_path
+#else
+        1
+#endif
+       ) {
         int slot=-1;
         for(int i=0;i<SC64_ROUTE_SLOTS;i++)
             if(sc64_route_valid[i]&&sc64_route_goal[i]==goal)slot=i;
@@ -194,8 +232,17 @@ static void verify_field(int goal)
             int next=nx/16+(ny/16)*MAP_COLS;
             assert(next>=0&&next<MAP_CELLS&&path_walkable[next]);
             assert(distance[next]+1==distance[c]);
+#ifdef SC64_ROUTE_L_FAST_PATH
+            int direction=reference_direction[c];
+            int expected=c+(direction==1?1:direction==2?-1:
+                            direction==3?MAP_COLS:-MAP_COLS);
+            assert(next==expected);
+#endif
         }
     }
+#ifdef SC64_ROUTE_L_FAST_PATH
+    (void)sc64_route_slot(goal);
+#endif
 #ifdef SC64_ROUTE_VISIT_GRID
     {
         int slot=-1;
@@ -247,6 +294,27 @@ int main(void)
         path_walkable[goal]=1;
         verify_field(goal);
     }
+#ifdef SC64_ROUTE_L_FAST_PATH
+    /* Exercise the actual fast path against the stable BFS direction oracle on
+       open and obstructed maps, including endpoints near map boundaries. */
+    for(int map=0;map<4;map++) {
+        for(int c=0;c<MAP_CELLS;c++) path_walkable[c]=(random32()%100)<72;
+        reset_routes();
+        for(int query=0;query<96;query++) {
+            int start=random32()%MAP_CELLS,goal=random32()%MAP_CELLS;
+            path_walkable[start]=1;
+            path_walkable[goal]=1;
+            int sx=start%MAP_COLS,sy=start/MAP_COLS;
+            int gx=goal%MAP_COLS,gy=goal/MAP_COLS;
+            int col=gx,row=gy;
+            while(col!=sx) { col+=sx>col?1:-1; path_walkable[col+row*MAP_COLS]=1; }
+            while(row!=sy) { row+=sy>row?1:-1; path_walkable[col+row*MAP_COLS]=1; }
+            reset_routes();
+            assert(check_cached_route(start%MAP_COLS,start/MAP_COLS,
+                                      goal%MAP_COLS,goal/MAP_COLS));
+        }
+    }
+#endif
     /* A worker may be spawned inside the inflated footprint of a building;
        it must exit toward a shortest reachable path without distance storage. */
     memset(path_walkable,1,sizeof(path_walkable));
@@ -294,8 +362,19 @@ int main(void)
     /* All slots retain a mixed economy/army working set and count hits. */
     memset(path_walkable,1,sizeof(path_walkable));
     reset_routes(); sc64_route_builds=0; sc64_route_hits=0;
+#ifdef SC64_ROUTE_L_FAST_PATH
+    for(int g=0;g<SC64_ROUTE_SLOTS;g++) {
+        assert(check_cached_route(8,8,g+16,16));
+        assert(request_route_cache(g+16+16*MAP_COLS,8+8*MAP_COLS));
+    }
+    for(int g=0;g<SC64_ROUTE_SLOTS;g++) {
+        assert(check_cached_route(8,8,g+16,16));
+        assert(request_route_cache(g+16+16*MAP_COLS,8+8*MAP_COLS));
+    }
+#else
     for(int g=0;g<SC64_ROUTE_SLOTS;g++) assert(sc64_route_next(8*16+8,8*16+8,(g+16)*16+8,16*16+8,&nx,&ny));
     for(int g=0;g<SC64_ROUTE_SLOTS;g++) assert(sc64_route_next(8*16+8,8*16+8,(g+16)*16+8,16*16+8,&nx,&ny));
+#endif
     assert(sc64_route_builds==SC64_ROUTE_SLOTS&&sc64_route_hits==SC64_ROUTE_SLOTS);
 
     /* Capacity+1 independent destinations exercise the real LRU boundary.
@@ -308,23 +387,39 @@ int main(void)
         int gx=10+i%10,gy=10+i/10;
         goals[i]=gx+gy*MAP_COLS;
     }
-    for(int i=0;i<SC64_ROUTE_SLOTS+1;i++)
+    for(int i=0;i<SC64_ROUTE_SLOTS+1;i++) {
         assert(check_cached_route(start_x,start_y,goals[i]%MAP_COLS,goals[i]/MAP_COLS));
+#ifdef SC64_ROUTE_L_FAST_PATH
+        assert(request_route_cache(goals[i],start_x+start_y*MAP_COLS));
+#endif
+    }
     assert(sc64_route_builds==SC64_ROUTE_SLOTS+1&&sc64_route_hits==0);
     for(int i=1;i<=SC64_ROUTE_SLOTS;i++)assert(cached_goal(goals[i]));
     assert(!cached_goal(goals[0]));
     /* Touch the oldest still-resident key, then force one miss. That key must
        remain a hit; the next-oldest key must have been evicted and rebuild. */
     assert(check_cached_route(start_x,start_y,goals[1]%MAP_COLS,goals[1]/MAP_COLS));
+#ifdef SC64_ROUTE_L_FAST_PATH
+    assert(request_route_cache(goals[1],start_x+start_y*MAP_COLS));
+#endif
     assert(sc64_route_hits==1);
     assert(check_cached_route(start_x,start_y,goals[SC64_ROUTE_SLOTS+1]%MAP_COLS,
                               goals[SC64_ROUTE_SLOTS+1]/MAP_COLS));
+#ifdef SC64_ROUTE_L_FAST_PATH
+    assert(request_route_cache(goals[SC64_ROUTE_SLOTS+1],start_x+start_y*MAP_COLS));
+#endif
     assert(sc64_route_builds==SC64_ROUTE_SLOTS+2);
     assert(cached_goal(goals[1])&&!cached_goal(goals[2]));
     assert(cached_goal(goals[SC64_ROUTE_SLOTS+1]));
     assert(check_cached_route(start_x,start_y,goals[1]%MAP_COLS,goals[1]/MAP_COLS));
+#ifdef SC64_ROUTE_L_FAST_PATH
+    assert(request_route_cache(goals[1],start_x+start_y*MAP_COLS));
+#endif
     assert(sc64_route_hits==2);
     assert(check_cached_route(start_x,start_y,goals[2]%MAP_COLS,goals[2]/MAP_COLS));
+#ifdef SC64_ROUTE_L_FAST_PATH
+    assert(request_route_cache(goals[2],start_x+start_y*MAP_COLS));
+#endif
     assert(sc64_route_builds==SC64_ROUTE_SLOTS+3);
     assert(cached_goal(goals[2]));
 
@@ -333,6 +428,11 @@ int main(void)
     sc64_routes_reset();
     for(int i=0;i<SC64_ROUTE_SLOTS;i++)assert(sc64_route_valid[i]==0);
     assert(check_cached_route(start_x,start_y,goals[2]%MAP_COLS,goals[2]/MAP_COLS));
+#ifdef SC64_ROUTE_L_FAST_PATH
+    /* The route itself bypasses cache storage; explicitly request this key to
+       verify that reset removed it and the next cache request rebuilds it. */
+    assert(request_route_cache(goals[2],start_x+start_y*MAP_COLS));
+#endif
     assert(sc64_route_builds==SC64_ROUTE_SLOTS+4);
     path_walkable[start_x+start_y*MAP_COLS]=0;
     reset_routes();

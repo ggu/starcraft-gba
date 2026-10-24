@@ -3999,3 +3999,48 @@ The final source snapshot again passes `./dev build`, `./dev test` (380 Python
 tests plus the default host fixtures), `make unified` and `make test-unified`.
 The standard original-art/unified ROM hashes remain `4ad80ce0…f9aee` and
 `6bab5be2…979f9`; their profiles leave the experimental combat gate off.
+
+
+### Experimental clear-corridor routing
+
+The default-off `SC64_ROUTE_L_FAST_PATH` gate requires race rules and PACK3.
+The existing reverse BFS expands left, right, up, then down. Its preferred
+Manhattan-shortest path from the goal therefore completes horizontal moves
+before vertical moves. When that entire corridor and both endpoints are
+walkable, reversing the path returns the same first step even when obstacles
+exist elsewhere. A blocked corridor or endpoint falls through to the ordinary
+cache and blocked-endpoint rules. The shortcut changes derived cache traffic,
+not route tie order, and adds no persistent, scratch or save storage.
+
+`make test-sc64-route-l-fast` passes ASan/UBSan configurations for 64×64,
+128×96 and 128×128 maps, plus 128×96 with partial flooding and frequency
+decay. The independent reference BFS checks exact first steps, full fallback
+fields, blocked origins and goals, obstacles outside clear corridors and
+cache capacity/eviction/reset. Fast-path queries correctly avoid cache
+allocation; cache-accounting cases explicitly request a field as well. The
+existing default-off assertions remain intact. A separate private exhaustive
+3×3/random larger-grid oracle checks 184,483 applicable clear-corridor cases.
+
+The public-source sanitized P3 controller wins at frame 123,916 with its
+complete input trace and explicit per-update gameplay fingerprints exactly
+matching the frozen baseline (`321074f1…db01a` and `3d766e63…a51732`). The
+public gate-off ARM ROM remains byte-identical to word-clear candidate
+`7ba4743d…fa9270`. The enabled public ROM is `ec5e6c58…a77264`, linking at
+IWRAM `0x030046e0` and unchanged BSS `0x0203d674` under the fixed reserves.
+
+An earlier private prototype (`25f28551…cc4165`, IWRAM `0x03004700`) has a
+separate 600-update late-P3 ARM pair against word clear. Loaded, tick-zero and
+final gameplay snapshots and three capture hashes match. It reduces route
+builds from 74 to 16 and measures 13.1525% fewer hardware cycles, or 16.6546
+to 19.1769 effective fps. This uses authenticated cross-build seeded SRAM;
+it is neither candidate-generated save qualification nor a full-mission
+performance measurement. The cleaned public helper has different ARM bytes,
+so prototype timing does not qualify the public ROM. Its own ARM timing,
+full replay, fresh-process SRAM and wider-profile promotion remain separate.
+
+The public source snapshot passes `./dev build`, `./dev test` (380 Python
+tests plus the default host fixtures, including all four new corridor cases),
+`make unified` and `make test-unified`. Original-art and unified gate-off
+ROMs remain `4ad80ce0…f9aee` and `6bab5be2…979f9`. An independent read-only
+review found no additional route correctness issue; this does not replace
+the remaining ARM, save and wider-profile checks.

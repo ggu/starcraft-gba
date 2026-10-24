@@ -1628,6 +1628,30 @@ part of the default test suite. [Validation](VALIDATION.md#experimental-packed-r
 records the full host parity and limited ARM timing evidence.
 
 
+### Experimental clear-corridor routing
+
+`SC64_ROUTE_L_FAST_PATH` requires race rules and `SC64_ROUTE_PACK3`. Before
+requesting a cached route field, it checks the reverse search's preferred
+horizontal-then-vertical corridor from destination to origin. If the entire
+corridor and both endpoints are walkable, its first step is identical to the
+existing left/right/up/down BFS tie order. Otherwise the ordinary route cache
+handles the request. Blocked origins and destinations retain their existing
+fallback behavior.
+
+```sh
+make test-sc64-route-l-fast
+```
+
+The asset-free ASan/UBSan fixtures cover 64×64, 128×96 and 128×128 grids, plus
+128×96 with partial flooding. They compare exact first steps and complete
+fallback fields with an independent BFS, including obstacles outside a clear
+corridor, blocked endpoints and cache eviction/reset. This command is part of
+the default test suite. The gate adds no route, actor or save storage and
+remains off in standard profiles pending broader qualification. See
+[Validation](VALIDATION.md#experimental-clear-corridor-routing) for the
+distinction between the prototype ARM timing and public-source evidence.
+
+
 ### Experimental independent Z7 Egg production
 
 `SC64_Z7_EGG_PRODUCTION` requires the race and Z7 runtimes and is active only

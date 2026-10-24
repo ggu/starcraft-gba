@@ -2267,6 +2267,22 @@ test-sc64-route-word-clear: build/test-sc64-route-word-clear-128x128 build/test-
 	./build/test-sc64-route-word-clear-10x10
 test-starcraft: test-sc64-route-word-clear
 
+define ROUTE_L_FAST_FIXTURE
+build/test-sc64-route-l-fast-$(1): tests/race_routes.c starcraft/sc64_routes.h starcraft/sc64_bitgrid.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ROUTE_PACK3 -DSC64_LARGE_MAPS -DSC64_ROUTE_VISIT_GRID -DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_L_FAST_PATH -DRACE_TEST_COLS=$(2) -DRACE_TEST_ROWS=$(3) $(4) -I. -Icommon $$< -o $$@
+endef
+$(eval $(call ROUTE_L_FAST_FIXTURE,64x64,64,64))
+$(eval $(call ROUTE_L_FAST_FIXTURE,128x96,128,96))
+$(eval $(call ROUTE_L_FAST_FIXTURE,128x128,128,128))
+$(eval $(call ROUTE_L_FAST_FIXTURE,128x96-partial,128,96,-DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ))
+.PHONY: test-sc64-route-l-fast
+test-sc64-route-l-fast: build/test-sc64-route-l-fast-64x64 build/test-sc64-route-l-fast-128x96 build/test-sc64-route-l-fast-128x128 build/test-sc64-route-l-fast-128x96-partial
+	./build/test-sc64-route-l-fast-64x64
+	./build/test-sc64-route-l-fast-128x96
+	./build/test-sc64-route-l-fast-128x128
+	./build/test-sc64-route-l-fast-128x96-partial
+test-starcraft: test-sc64-route-l-fast
+
 Z7_EGG_PROBE_FLAGS := $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_ATTACK -DSC64_Z7_EGG_PRODUCTION
 build/test-sc64-z7-egg-production: tests/sc64_z7_egg_production_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_EGG_PROBE_FLAGS) $< common/gba.c -o $@

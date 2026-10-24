@@ -36,6 +36,11 @@
 #error "SC64_ROUTE_WORD_CLEAR requires SC64_RACES and SC64_ROUTE_PACK3"
 #endif
 #endif
+#ifdef SC64_ROUTE_L_FAST_PATH
+#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3)
+#error "SC64_ROUTE_L_FAST_PATH requires SC64_RACES and SC64_ROUTE_PACK3"
+#endif
+#endif
 
 /* Shared shortest-path fields on the same four-neighbour collision grid.
  * A mineral, base or group destination costs one reverse flood, rather than
@@ -460,16 +465,59 @@ sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out
 }
 #endif
 
+#ifdef SC64_ROUTE_L_FAST_PATH
+/* The reverse BFS expands left, right, up, then down. Its preferred shortest
+ * path runs from the goal horizontally, then vertically. If every cell on that
+ * L is walkable, no obstacle elsewhere can change the origin's first step. */
+static int GBA_HOT
+sc64_route_preferred_l_clear(int start_col, int start_row,
+                             int goal_col, int goal_row)
+{
+    int col = goal_col, row = goal_row;
+    while (col != start_col) {
+        col += start_col > col ? 1 : -1;
+        if (!SC64_GRID_GET(path_walkable, col + row * MAP_COLS)) return 0;
+    }
+    while (row != start_row) {
+        row += start_row > row ? 1 : -1;
+        if (!SC64_GRID_GET(path_walkable, col + row * MAP_COLS)) return 0;
+    }
+    return 1;
+}
+#endif
+
 static int GBA_HOT
 sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
 {
     int col = limit(x / 16, 0, MAP_COLS - 1), row = limit(y / 16, 0, MAP_ROWS - 1);
+#ifdef SC64_ROUTE_L_FAST_PATH
+    int goal_col = limit(tx / 16, 0, MAP_COLS - 1);
+    int goal_row = limit(ty / 16, 0, MAP_ROWS - 1);
+    int goal = goal_col + goal_row * MAP_COLS;
+#else
     int goal = limit(tx / 16, 0, MAP_COLS - 1) + limit(ty / 16, 0, MAP_ROWS - 1) * MAP_COLS;
+#endif
     int cell = col + row * MAP_COLS, slot, direction;
 #ifndef SC64_RACES
     u16 *field;
 #endif
     if (!path_grid_valid) build_path_grid();
+#ifdef SC64_ROUTE_L_FAST_PATH
+    if (SC64_GRID_GET(path_walkable, cell) && SC64_GRID_GET(path_walkable, goal) &&
+        sc64_route_preferred_l_clear(col, row, goal_col, goal_row)) {
+        if (cell == goal) {
+            *next_x = tx;
+            *next_y = ty;
+            return 1;
+        }
+        /* Reverse the goal-rooted horizontal-then-vertical route. */
+        if (row != goal_row) row += row < goal_row ? 1 : -1;
+        else col += col < goal_col ? 1 : -1;
+        *next_x = col * 16 + 8;
+        *next_y = row * 16 + 8;
+        return 1;
+    }
+#endif
 #ifdef SC64_ROUTE_PARTIAL_FLOOD
     slot = sc64_route_slot_for_origin(goal, cell, SC64_GRID_GET(path_walkable, cell));
 #else
