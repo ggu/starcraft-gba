@@ -29,6 +29,9 @@ _Static_assert(SC_RU_COUNT <= 64, "late Terran unit codec uses six-bit types");
 #ifdef SC64_Z5_RUNTIME
 #include "sc64_z5_state.h"
 #endif
+#ifdef SC64_P5_RUNTIME
+#include "sc64_p5_state.h"
+#endif
 
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
 /* Source player 5 is inactive in the T4 scenario. The save validator requires
@@ -116,6 +119,9 @@ typedef struct {
 #endif
 #ifdef SC64_Z5_RUNTIME
     Sc64Z5PersistentState z5;
+#endif
+#ifdef SC64_P5_RUNTIME
+    Sc64P5PersistentState p5;
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)

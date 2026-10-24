@@ -35,6 +35,22 @@ static int race_z5_is_door_type(int type)
            type == B_Z5_PIT_DOOR || type == B_Z5_RIGHT_PIT_DOOR;
 }
 
+static int race_z5_is_trap_type(int type)
+{
+    return type == B_Z5_FLOOR_MISSILE_TRAP || type == B_Z5_FLOOR_GUN_TRAP ||
+           type == B_Z5_WALL_FLAME_TRAP || type == B_Z5_RIGHT_WALL_FLAME_TRAP;
+}
+
+/* Killed traps retain their immutable source row in the building pool.
+ * Their destruction is normal combat, while invincible doors must survive. */
+static int race_z5_prop_state_valid(const Building *q, int type)
+{
+    const Sc64ZpBuildingFact *fact = sc64_zp_building_fact(type);
+    if (!q || !fact || q->type != type || q->maxhp != fact->hp ||
+        q->hp > q->maxhp) return 0;
+    return q->alive ? q->hp > 0 : race_z5_is_trap_type(type) && q->hp <= 0;
+}
+
 static int race_z5_building_collidable(int slot)
 {
     if (slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive) return 0;
@@ -176,13 +192,13 @@ static int race_z5_rebind_doodads(const Sc64RaceMap *map, int spawn)
         } else {
             slot = -1;
             for (int j = 0; j < MAX_BUILDINGS; ++j)
-                if (b[j].alive && b[j].raw_type == src->type &&
+                if (b[j].raw_type == src->type &&
                     b[j].raw_owner == src->owner && b[j].x == src->x / 2 &&
                     b[j].y == src->y / 2) {
                     if (slot >= 0) return 0;
                     slot = j;
                 }
-            if (slot < 0 || b[slot].type != type || b[slot].owner != owner ||
+            if (slot < 0 || !race_z5_prop_state_valid(&b[slot], type) || b[slot].owner != owner ||
                 b[slot].flags != src->flags) return 0;
         }
         dst = &race_z5_doodads[row];
@@ -223,7 +239,8 @@ static int race_z5_restore_doodads(void)
             dst->raw_flags != src->flags || dst->building_slot >= MAX_BUILDINGS)
             return 0;
         dst->enabled = (u8)((race_z5.doodad_enabled[row >> 3] >> (row & 7u)) & 1u);
-        if (!b[dst->building_slot].alive ||
+        if (!race_z5_prop_state_valid(&b[dst->building_slot],
+                                      sc64_race_building_from_raw(src->type)) ||
             b[dst->building_slot].raw_type != src->type ||
             b[dst->building_slot].raw_owner != src->owner ||
             b[dst->building_slot].x != src->x / 2 ||

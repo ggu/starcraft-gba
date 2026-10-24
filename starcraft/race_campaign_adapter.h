@@ -35,6 +35,9 @@ enum {
 #ifdef SC64_P4_RUNTIME
     ,SC64_RACE_MISSION_P4 = 23
 #endif
+#ifdef SC64_P5_RUNTIME
+    ,SC64_RACE_MISSION_P5 = 24
+#endif
 #endif
 };
 
@@ -44,6 +47,9 @@ static int race_z4_source_owner(unsigned source_slot);
 #ifdef SC64_P4_RUNTIME
 static int race_p4_source_owner(unsigned source_slot);
 #endif
+#ifdef SC64_P5_RUNTIME
+static int race_p5_source_owner(unsigned source_slot);
+#endif
 #ifdef SC64_Z5_RUNTIME
 static int race_z5_source_owner(unsigned source_slot);
 #endif
@@ -51,6 +57,12 @@ static int race_z5_source_owner(unsigned source_slot);
 static int
 race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 {
+#ifdef SC64_P5_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_RACE_MISSION_P5) {
+        int owner = raw_owner < 0 ? -1 : race_p5_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
 #ifdef SC64_P4_RUNTIME
     if (!race_mode && race_selected_mission == SC64_RACE_MISSION_P4) {
         int owner = raw_owner < 0 ? -1 : race_p4_source_owner((unsigned)raw_owner);
@@ -157,6 +169,9 @@ static unsigned race_z4_hud_seconds(void)
 #endif
 #ifdef SC64_Z5_RUNTIME
 #include "sc64_z5_runtime_adapter.h"
+#ifdef SC64_Z5_CLOAK_ENABLED
+#include "sc64_z5_cloak_adapter.h"
+#endif
 #endif
 #ifdef SC64_P3_RUNTIME
 #include "sc64_p3_adapter.h"
@@ -165,6 +180,9 @@ static unsigned race_z4_hud_seconds(void)
 #include "sc64_p4_adapter.h"
 #ifdef SC64_P4_STORM_ENABLED
 #include "sc64_p4_storm_adapter.h"
+#endif
+#ifdef SC64_P5_RUNTIME
+#include "sc64_p5_runtime_adapter.h"
 #endif
 static int race_p4_world_paused(void)
 { return race_p4_active() && race_p4.source_paused; }
@@ -336,6 +354,10 @@ race_campaign_init(void)
     memset(&race_z5_world, 0, sizeof(race_z5_world));
     memset(race_z5_doodads, 0, sizeof(race_z5_doodads));
 #endif
+#ifdef SC64_P5_RUNTIME
+    memset(&race_p5, 0, sizeof(race_p5));
+    memset(&race_p5_world, 0, sizeof(race_p5_world));
+#endif
     if (race_mode) {
         race_skirmish_init();
         return;
@@ -375,6 +397,11 @@ race_campaign_init(void)
     map = &sc64_race_maps[race_selected_mission];
 #ifdef SC64_Z5_RUNTIME
     if (race_selected_mission == SC64_Z5_GLOBAL_ID && !race_z5_preflight(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (race_selected_mission == SC64_P5_GLOBAL_ID && !race_p5_preflight(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
 #endif
@@ -461,6 +488,10 @@ race_campaign_init(void)
 #ifdef SC64_P4_RUNTIME
         if (race_selected_mission == SC64_RACE_MISSION_P4) owner = race_campaign_owner(map, i);
 #endif
+#ifdef SC64_P5_RUNTIME
+        if (race_selected_mission == SC64_P5_GLOBAL_ID)
+            owner = race_campaign_owner(map, i);
+#endif
 #ifdef SC64_T4_RUNTIME
         if (race_selected_mission == SC64_T4_GLOBAL_ID)
             owner = race_campaign_owner(map, i);
@@ -486,6 +517,12 @@ race_campaign_init(void)
      * authenticated human slot the final authority for the save identity. */
     if (race_selected_mission == SC64_Z5_GLOBAL_ID)
         race_player[SIDE] = race_human;
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (race_selected_mission == SC64_P5_GLOBAL_ID) {
+        race_player[SIDE] = race_human;
+        race_player[NEUTRAL] = map->owner_races[6];
+    }
 #endif
     human_owner = map->human_slot;
 
@@ -597,6 +634,16 @@ race_campaign_init(void)
 
 #ifdef SC64_Z5_RUNTIME
     if (race_selected_mission == SC64_Z5_GLOBAL_ID && !race_z5_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#ifdef SC64_Z5_CLOAK_ENABLED
+    if (race_z5_active() && !race_z5_cloak_initialize_source_units()) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (race_selected_mission == SC64_P5_GLOBAL_ID && !race_p5_runtime_init(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
     }
 #endif
@@ -854,6 +901,9 @@ race_campaign_tick(void)
 #endif
 #ifdef SC64_Z5_RUNTIME
     if (mission == SC64_Z5_GLOBAL_ID) {
+#ifdef SC64_Z5_CLOAK_ENABLED
+        if (!race_z5_cloak_tick()) { screen = SCREEN_PAUSE; toast(14); return; }
+#endif
         if (!race_z5_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
         return;
     }
@@ -868,6 +918,12 @@ race_campaign_tick(void)
         if (!race_p4_storm_tick()) { screen = SCREEN_PAUSE; toast(14); return; }
 #endif
         if (!race_p4_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
+        return;
+    }
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (mission == SC64_P5_GLOBAL_ID) {
+        if (!race_p5_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
         return;
     }
 #endif
@@ -1036,6 +1092,9 @@ static int race_campaign_lost(void)
 static const char *
 race_campaign_objective_text(void)
 {
+#ifdef SC64_P5_RUNTIME
+    if (race_p5_active()) return race_p5_objective_text();
+#endif
 #ifdef SC64_P4_RUNTIME
     if (race_p4_active()) return race_p4_objective_text();
 #endif
@@ -1096,6 +1155,9 @@ race_campaign_objective_text(void)
 static const char *
 race_campaign_victory_text(void)
 {
+#ifdef SC64_P5_RUNTIME
+    if (race_p5_active()) return race_p5_victory_text();
+#endif
 #ifdef SC64_P4_RUNTIME
     if (race_p4_active()) return race_p4_victory_text();
 #endif
@@ -1153,6 +1215,9 @@ race_campaign_victory_text(void)
 static const char *
 race_campaign_failure_text(void)
 {
+#ifdef SC64_P5_RUNTIME
+    if (race_p5_active()) return race_p5_failure_text();
+#endif
 #ifdef SC64_P4_RUNTIME
     if (race_p4_active()) return race_p4_failure_text();
 #endif

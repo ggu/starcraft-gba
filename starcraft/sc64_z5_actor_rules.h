@@ -35,7 +35,8 @@ enum {
     SC64_Z5_REF_ATTACKABLE             = 1u << 13,
     SC64_Z5_REF_MOVE_INTERACTION       = 1u << 14,
     SC64_Z5_REF_HAS_SPRITE             = 1u << 15,
-    SC64_Z5_SOURCE_HAS_GROUND_WEAPON   = 1u << 16
+    SC64_Z5_SOURCE_HAS_GROUND_WEAPON   = 1u << 16,
+    SC64_Z5_SOURCE_DETECTOR            = 1u << 17
 };
 
 typedef struct {
@@ -121,16 +122,17 @@ static inline const Sc64Z5BuildingFact *sc64_z5_building_fact(int raw)
          SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
         {208,100000,0,0,1,1,1,32, 3,2,28,17,41,20,3,
          SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_INVINCIBLE|SC64_Z5_REF_HAS_SPRITE},
-        /* Four 50 HP weapon traps; per T4 policy they are drawable and
-         * represented in the building pool, but not selectable/collidable. */
+        /* These unit-backed trap props live in the runtime building pool,
+         * but their native UnitType flags do not include Building. They are
+         * detectors; OpenBW therefore uses their nominal sight range. */
         {203,50,0,0,1,1,1,192, 2,2,32,32,31,31,3,
-         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_HAS_GROUND_WEAPON|SC64_Z5_REF_HAS_SPRITE},
+         SC64_Z5_SOURCE_DETECTOR|SC64_Z5_SOURCE_HAS_GROUND_WEAPON|SC64_Z5_REF_HAS_SPRITE},
         {209,50,0,0,1,1,1,192, 2,2,32,32,31,31,3,
-         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_HAS_GROUND_WEAPON|SC64_Z5_REF_HAS_SPRITE},
+         SC64_Z5_SOURCE_DETECTOR|SC64_Z5_SOURCE_HAS_GROUND_WEAPON|SC64_Z5_REF_HAS_SPRITE},
         {211,50,0,0,1,1,1,96, 1,1,16,16,15,15,3,
-         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_HAS_GROUND_WEAPON|SC64_Z5_REF_HAS_SPRITE},
+         SC64_Z5_SOURCE_DETECTOR|SC64_Z5_SOURCE_HAS_GROUND_WEAPON|SC64_Z5_REF_HAS_SPRITE},
         {213,50,0,0,1,1,1,96, 1,1,16,16,15,15,3,
-         SC64_Z5_SOURCE_BUILDING|SC64_Z5_SOURCE_HAS_GROUND_WEAPON|SC64_Z5_REF_HAS_SPRITE}
+         SC64_Z5_SOURCE_DETECTOR|SC64_Z5_SOURCE_HAS_GROUND_WEAPON|SC64_Z5_REF_HAS_SPRITE}
     };
     switch (raw) {
     case 195: return &facts[0]; case 205: return &facts[1];

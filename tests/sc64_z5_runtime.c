@@ -109,6 +109,94 @@ static void assert_save_load_rebind_and_reject_padding(void)
     assert(!memcmp(&expected_state, &race_z5, sizeof(race_z5)));
 }
 
+static void assert_regeneration_save_and_pause(void)
+{
+    int hero = -1;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].raw_type == 51) { hero = i; break; }
+    assert(hero >= 0);
+    u[hero].hp = 100; u[hero].shield_remainder = 31;
+    assert(race_save_game());
+    RaceSave retained = race_data;
+    race_tick_state();
+    assert(u[hero].hp == 100 && u[hero].shield_remainder == 32);
+    assert(race_load_game());
+    assert(u[hero].hp == 100 && u[hero].shield_remainder == 31);
+    for (int tick = 0; tick < 48; ++tick) race_tick_state();
+    assert(u[hero].hp == 100 && u[hero].shield_remainder == 79);
+    race_tick_state();
+    assert(u[hero].hp == 101 && u[hero].shield_remainder == 0);
+
+    input(KEY_START);
+    assert(screen == SCREEN_PAUSE);
+    for (int tick = 0; tick < 80; ++tick) input(0);
+    assert(u[hero].hp == 101 && u[hero].shield_remainder == 0);
+    input(KEY_A);
+    assert(screen == SCREEN_PLAY);
+    input(0);
+
+    u[hero].shield_remainder = 80;
+    assert(!race_save_game());
+    RaceSave untouched;
+    assert(save_read(&untouched, sizeof(untouched), SAVE_VERSION));
+    assert(!memcmp(&untouched, &retained, sizeof(retained)));
+    u[hero].shield_remainder = 0;
+    Unit bad = u[hero]; bad.shield_remainder = 80;
+    RaceSave corrupt = retained;
+    assert(sc64_zp_unit_save_encode(&corrupt.units[hero], &bad,
+                                    (unsigned)WORLD_W, (unsigned)WORLD_H));
+    save_write(&corrupt, sizeof(corrupt), SAVE_VERSION);
+    Unit units_before[MAX_UNITS]; Building buildings_before[MAX_BUILDINGS];
+    memcpy(units_before, u, sizeof(u)); memcpy(buildings_before, b, sizeof(b));
+    Sc64Z5PersistentState state_before = race_z5;
+    assert(!race_load_game());
+    assert(!memcmp(units_before, u, sizeof(u)));
+    assert(!memcmp(buildings_before, b, sizeof(b)));
+    assert(!memcmp(&state_before, &race_z5, sizeof(race_z5)));
+    u[hero].hp = u[hero].maxhp;
+}
+
+static void assert_destroyed_trap_continues_and_roundtrips(void)
+{
+    unsigned row, door = SC64_Z5_DOODAD_CAPACITY;
+    for (row = 0; row < SC64_Z5_DOODAD_CAPACITY; ++row)
+        if (race_z5_is_trap_type(b[race_z5_doodads[row].building_slot].type)) break;
+    assert(row < SC64_Z5_DOODAD_CAPACITY);
+    unsigned slot = race_z5_doodads[row].building_slot;
+    hit_target(MAX_UNITS + (int)slot, 500, U_MARINE, SIDE);
+    assert(!b[slot].alive && b[slot].hp <= 0);
+    unsigned old_frame = (unsigned)frame;
+    input(0);
+    assert(screen == SCREEN_PLAY && (unsigned)frame == old_frame + 1);
+    assert(race_z5_restore_doodads() && race_save_game());
+    Building expected = b[slot];
+    assert(race_load_game());
+    assert(!memcmp(&expected, &b[slot], sizeof(expected)));
+    assert(race_z5_doodads[row].building_slot == slot);
+    input(0);
+    assert(screen == SCREEN_PLAY);
+
+    for (row = 0; row < SC64_Z5_DOODAD_CAPACITY; ++row)
+        if (race_z5_is_door_type(b[race_z5_doodads[row].building_slot].type)) {
+            door = row; break;
+        }
+    assert(door < SC64_Z5_DOODAD_CAPACITY && race_save_game());
+    unsigned door_slot = race_z5_doodads[door].building_slot;
+    RaceSave corrupt = race_data;
+    Building dead_door = b[door_slot];
+    dead_door.alive = 0; dead_door.hp = 0;
+    assert(sc64_building_save_encode(&corrupt.buildings[door_slot], &dead_door,
+                                    (unsigned)WORLD_W, (unsigned)WORLD_H));
+    save_write(&corrupt, sizeof(corrupt), SAVE_VERSION);
+    Unit units_before[MAX_UNITS]; Building buildings_before[MAX_BUILDINGS];
+    memcpy(units_before, u, sizeof(u)); memcpy(buildings_before, b, sizeof(b));
+    Sc64Z5PersistentState state_before = race_z5;
+    assert(!race_load_game());
+    assert(!memcmp(units_before, u, sizeof(u)));
+    assert(!memcmp(buildings_before, b, sizeof(b)));
+    assert(!memcmp(&state_before, &race_z5, sizeof(race_z5)));
+}
+
 static void assert_pause_ack_and_world_action_path(void)
 {
     unsigned door = SC64_Z5_DOODAD_CAPACITY;
@@ -179,6 +267,8 @@ int main(void)
     assert(race_campaign.elapsed_frames == 1);
     assert(sc64_z5_runtime_state_valid(&race_z5.runtime));
     assert_save_load_rebind_and_reject_padding();
+    assert_regeneration_save_and_pause();
+    assert_destroyed_trap_continues_and_roundtrips();
     assert_pause_ack_and_world_action_path();
     puts("Z5 real-engine import/save/pause/action checks passed; no controller completion proof");
     return 0;

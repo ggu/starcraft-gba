@@ -2,6 +2,9 @@
 #define SC64_RACE_ADAPTER_H
 
 #include "race_skirmish.h"
+#ifdef SC64_Z5_RUNTIME
+#include "sc64_z5_hp_regen.h"
+#endif
 
 #ifdef SC64_T5_RUNTIME
 static int race_t5_active(void);
@@ -249,6 +252,19 @@ static int race_queue_unit(int owner, int producer, int type)
         if (committed + (unsigned)count > free_slots) return 0;
     }
 #endif
+#ifdef SC64_P5_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_P5_GLOBAL_ID) {
+        unsigned committed = race_p5_reserved_units();
+        unsigned free_slots = 0;
+        for (int slot = 0; slot < MAX_UNITS; ++slot) free_slots += !u[slot].alive;
+        for (int slot = 0; slot < MAX_BUILDINGS; ++slot) if (b[slot].alive)
+            for (int q = 0; q < b[slot].queue_count; ++q) {
+                int queued = b[slot].queue[(b[slot].queue_head + q) % 5];
+                committed += queued == U_ZERGLING ? 2u : 1u;
+            }
+        if (committed + (unsigned)count > free_slots) return 0;
+    }
+#endif
     reserved = race_owner_reserved_supply(owner);
     cap = race_owner_supply_cap(owner);
     /* Zero-supply units (notably Overlords) must remain producible while
@@ -367,6 +383,9 @@ static int race_builder_arrived(int worker)
 static void race_tick_state(void)
 {
     int i,used=0,cap=0;
+#ifdef SC64_Z5_RUNTIME
+    int z5_regeneration_active = race_z5_active();
+#endif
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && !b[i].under_construction &&
         b[i].owner >= 0 && b[i].owner < 5 && race_owner_identity(b[i].owner) == R_ZERG &&
         sc64_race_is_zerg_townhall(b[i].type)) {
@@ -377,6 +396,20 @@ static void race_tick_state(void)
     }
     for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].type >= 0 && u[i].type < SC_RU_COUNT) {
         const Sc64RaceUnitRule *r = sc64_race_unit_rule(u[i].type);
+#ifdef SC64_Z5_RUNTIME
+        if (z5_regeneration_active) {
+            int raw_type = -1;
+            if (u[i].type == U_ZERGLING)
+                raw_type = SC64_Z5_HP_REGEN_RAW_ZERGLING;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+            else if (u[i].type == U_ZP_INFESTED_KERRIGAN)
+                raw_type = SC64_Z5_HP_REGEN_RAW_INFESTED_KERRIGAN;
+#endif
+            if (raw_type >= 0)
+                (void)sc64_z5_hp_regen_tick(raw_type, &u[i].hp, u[i].maxhp,
+                                             &u[i].shield_remainder, 0);
+        }
+#endif
         if(u[i].owner==SIDE){used+=r->supply;cap+=sc64_race_unit_supply_provided(u[i].type);}
         if (r->shields && u[i].shield < r->shields) {
             unsigned short value = (unsigned short)u[i].shield;

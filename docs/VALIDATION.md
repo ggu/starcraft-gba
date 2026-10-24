@@ -2167,3 +2167,36 @@ enabling the flag in the staged builds.
 A separate private packed-minimap experiment passes its 1000-pattern host
 pixel oracle and both ARM state/capture comparisons, but changes the Z4/P3
 prefix means only from 18.48/26.43 to 18.65/26.49 fps. It remains disabled.
+
+### 2026-10-24 — P5 runtime and optional Z5 cloak
+
+The opt-in P5 build imports 110 units, 69 buildings, 57 minerals and three
+geysers, matching every retained source placement. Its actual-engine fixture
+checks distinct hostile force buckets, rescue, real combat death accounting,
+source-triggered reinforcement activation and all 11 creates. Source Kill
+Unit increments death counters; removal does not. Save/load and old or corrupt
+candidate rejection pass transactionally under ASan/UBSan. All five campaign
+entries, 234 skirmish setup/save combinations and the full-clear framebuffer
+oracle pass. The generation-24 ARM build ends IWRAM at `0x030040e0` and BSS
+at `0x0203d564`, inside the unchanged limits. No P5 controller win is claimed.
+
+Z5 now accepts destroyed trap props in source bindings and saves while still
+rejecting destroyed invincible doors. A regression reproduces a real trap
+kill and continues the normal runtime instead of pausing with a binding fault.
+Zergling/Kerrigan HP regeneration follows the authored 24-to-30-Hz conversion
+of pinned reference fractional regeneration (one HP per 80 live GBA updates),
+with its phase persisted and frozen by pause.
+
+The separate generation-25 Z5 cloak profile authenticates its PTEC and UNIT
+energy facts. Kerrigan starts uncloaked at 250 energy; activation costs 25,
+drain is 0.9375 energy/second and regeneration is 0.75/second at 30 updates/sec.
+The pinned reference's `_fp8` literals are raw Q8, including the per-update
+drain and regeneration; these values are not multiplied by 256 a second time.
+Geometry fixtures cover inclusive detector bbox ranges and one-pixel outside
+boundaries. Actual-engine tests pass for B-menu toggle, STOP preservation,
+pause, detection/target eligibility, exact active-cloak save round trips,
+invalid energy/state/old-generation rejection without live-world mutation,
+all five menu entries, skirmish setups and framebuffer coverage. Treating an
+enabled prop as an active detector is an authored policy. Source PTEC does
+not enable Psionic Storm. Z5 has no qualified controller win or frame-rate
+result from these checks.

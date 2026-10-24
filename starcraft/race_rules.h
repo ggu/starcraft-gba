@@ -10,6 +10,9 @@
 #if defined(SC64_Z6_ACTORS) && !defined(SC64_ZP_CAMPAIGN_ACTORS)
 #error "SC64_Z6_ACTORS requires SC64_ZP_CAMPAIGN_ACTORS"
 #endif
+#if defined(SC64_P5_ACTORS) && !defined(SC64_ZP_CAMPAIGN_ACTORS)
+#error "SC64_P5_ACTORS requires SC64_ZP_CAMPAIGN_ACTORS"
+#endif
 
 #ifdef SC64_T6_ENABLED
 #include "sc64_t6_actor_rules.h"
@@ -56,6 +59,10 @@ enum {
 #ifdef SC64_Z6_ACTORS
     /* Raw 44 Guardian is distinct from ordinary Mutalisk gameplay identity. */
     U_Z6_GUARDIAN,
+#endif
+#ifdef SC64_P5_ACTORS
+    /* P5-only battlecruiser and Shuttle preserve their own scenario identities. */
+    U_P5_SHUTTLE, U_P5_BATTLECRUISER,
 #endif
     SC_RU_COUNT
 };
@@ -244,7 +251,11 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     , [U_Z5_DATA_DISK] = { R_TER, 0, 255, 0, 0, 0, 0, 800, 0, 0 }
 #endif
 #ifdef SC64_Z6_ACTORS
-    , [U_Z6_GUARDIAN] = { R_ZERG, 0, 255, 0, 50, 100, 600, 150, 0, 0 }
+    , [U_Z6_GUARDIAN] = { R_ZERG, 0, 255, 4, 50, 100, 600, 150, 0, 0 }
+#endif
+#ifdef SC64_P5_ACTORS
+    , [U_P5_SHUTTLE] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 4, 200, 0, 900, 80, 60, 0 }
+    , [U_P5_BATTLECRUISER] = { R_TER, 0, 255, 12, 400, 300, 2000, 500, 0, 0 }
 #endif
 };
 
@@ -408,6 +419,12 @@ static inline const char *sc64_race_unit_name(int type)
 #endif
 #ifdef SC64_Z5_ACTORS
         ,"GHOST","CIVILIAN","RHYNADON","BENGALAAS","RAGNASAUR","DATA DISK"
+#endif
+#ifdef SC64_Z6_ACTORS
+        ,"GUARDIAN"
+#endif
+#ifdef SC64_P5_ACTORS
+        ,"SHUTTLE","BATTLECRUISER"
 #endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
@@ -1109,6 +1126,10 @@ static inline int sc64_race_raw_unit(int type)
 #ifdef SC64_Z6_ACTORS
     case U_Z6_GUARDIAN: return 44;
 #endif
+#ifdef SC64_P5_ACTORS
+    case U_P5_SHUTTLE: return 69;
+    case U_P5_BATTLECRUISER: return 12;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     case U_SCIENCE_VESSEL: return 9; case U_BATTLECRUISER: return 12;
     case U_NORAD_II: return 29;
@@ -1251,12 +1272,22 @@ static inline int sc64_race_unit_from_raw(int raw)
     case 39: return U_ZP_ULTRALISK;
 #endif
 #ifdef SC64_TERRAN_LATE_ACTORS
-    case 9: return U_SCIENCE_VESSEL; case 12: return U_BATTLECRUISER;
+    case 9: return U_SCIENCE_VESSEL;
+#ifndef SC64_P5_ACTORS
+    case 12: return U_BATTLECRUISER;
+#endif
     case 29: return U_NORAD_II;
 #ifndef SC64_ZP_CAMPAIGN_ACTORS
     case 39: return U_ULTRALISK;
 #endif
-    case 69: return U_SHUTTLE; case 217: return U_PSI_EMITTER;
+    case 217: return U_PSI_EMITTER;
+#ifndef SC64_P5_ACTORS
+    case 69: return U_SHUTTLE;
+#endif
+#endif
+#ifdef SC64_P5_ACTORS
+    case 69: return U_P5_SHUTTLE;
+    case 12: return U_P5_BATTLECRUISER;
 #endif
     default: return -1;
     }

@@ -35,18 +35,28 @@ int main(void)
         const Sc64ZpBuildingFact *policy=sc64_zp_building_fact(type);
         unsigned expected_policy = SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING;
         assert(source && policy);
-        assert(source->raw==raw && source->flags&SC64_Z5_SOURCE_BUILDING);
+        assert(source->raw==raw);
         assert(source->flags&SC64_Z5_REF_HAS_SPRITE);
         if (raw==205 || raw==206 || raw==207 || raw==208) {
+            assert(source->flags&SC64_Z5_SOURCE_BUILDING);
+            assert(!(source->flags&SC64_Z5_SOURCE_DETECTOR));
             expected_policy |= SC64_ZP_ACTOR_INVINCIBLE;
             assert(source->hp==100000 && (source->flags&SC64_Z5_SOURCE_INVINCIBLE));
             assert(!(source->flags&SC64_Z5_SOURCE_HAS_GROUND_WEAPON));
         } else {
+            assert(!(source->flags&SC64_Z5_SOURCE_BUILDING));
+            assert(source->flags&SC64_Z5_SOURCE_DETECTOR);
             expected_policy |= SC64_ZP_ACTOR_WEAPON;
             assert(source->hp==50 && (source->flags&SC64_Z5_SOURCE_HAS_GROUND_WEAPON));
             assert(!(source->flags&SC64_Z5_SOURCE_INVINCIBLE));
         }
         assert(policy->raw==raw && policy->hp==source->hp && policy->shields==0);
+        if (source->flags&SC64_Z5_SOURCE_DETECTOR) {
+            assert(raw==203 || raw==209 || raw==211 || raw==213);
+            assert(source->sight_px==(raw==203 || raw==209 ? 192 : 96));
+            /* Native traps are not buildings, so OpenBW does not apply its
+             * grounded-building fixed 7-tile detector range. */
+        }
         assert(policy->flags==expected_policy);
         assert(!(policy->flags&(SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_COLLIDABLE)));
         assert(sc64_race_building_from_raw(raw)==type);

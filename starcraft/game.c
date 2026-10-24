@@ -8,6 +8,18 @@ int memcmp(const void *a, const void *b, size_t n);
 #if defined(SC64_P4_STORM_ENABLED) && !defined(SC64_P4_RUNTIME)
 #error "SC64_P4_STORM_ENABLED requires SC64_P4_RUNTIME"
 #endif
+#ifdef SC64_P5_RUNTIME
+#if !defined(SC64_P5_ENABLED) || !defined(SC64_P5_DATA_ENABLED) || \
+    !defined(SC64_P5_CAMPAIGN_ENTRY) || !defined(SC64_P5_ACTORS) || \
+    !defined(SC64_Z6_ACTORS) || !defined(SC64_P4_STORM_ENABLED) || \
+    !defined(SC64_P4_RUNTIME) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_ZP_CAMPAIGN_STORAGE) || !defined(SC64_UNIFIED) || \
+    !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 2
+#error "P5 runtime requires P5 actors/data, P4 Storm, and full Protoss storage"
+#endif
+#include "sc64_p5.h"
+#include "sc64_p5_state.h"
+#endif
 
 #ifdef SC64_P3_RUNTIME
 #if !defined(SC64_P3_ENABLED) || !defined(SC64_UNIFIED) || \
@@ -95,7 +107,11 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_UNITS 128
 #endif
-#if defined(SC64_Z5_RUNTIME)
+#if defined(SC64_Z5_CLOAK_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 25u
+#elif defined(SC64_P5_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 24u
+#elif defined(SC64_Z5_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 23u
 #elif defined(SC64_ZP_FULL_STORAGE)
 #define SC64_RACE_SAVE_GENERATION 22u
@@ -816,6 +832,14 @@ static unsigned race_z4_hud_seconds(void);
 static unsigned race_p4_reserved_units(void);
 static int race_p4_world_paused(void);
 #endif
+#ifdef SC64_P5_RUNTIME
+static int race_p5_active(void);
+static int race_p5_source_owner(unsigned source_slot);
+static int race_p5_owners_hostile(int owner, int other);
+static unsigned race_p5_reserved_units(void);
+static void race_p5_note_unit_death(const Unit *q);
+static void race_p5_note_building_death(const Building *q);
+#endif
 #ifdef SC64_Z5_RUNTIME
 static int race_z5_active(void);
 static int race_z5_world_paused(void);
@@ -823,6 +847,15 @@ static int race_z5_is_door_type(int type);
 static int race_z5_building_collidable(int slot);
 static int race_z5_draw_prop(Building *q, int x, int y);
 static unsigned race_z5_prop_cache_field(unsigned row, int enabled);
+#endif
+#ifdef SC64_Z5_CLOAK_ENABLED
+static int race_z5_cloak_actor(const Unit *q);
+static int race_z5_cloak_initialize_source_units(void);
+static int race_z5_cloak_menu_available(void);
+static int race_z5_cloak_toggle_selected(void);
+static int race_z5_cloak_tick(void);
+static int race_z5_cloak_world_state_valid(void);
+static int race_z5_cloaked_target_attackable(int target);
 #endif
 static int race_start_build(int owner,int worker,int type,int x,int y);
 static int race_can_site(int owner,int type,int x,int y);
@@ -893,6 +926,9 @@ owners_hostile(int a, int other)
     if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID)
         return ((a == SIDE || a == RESCUABLE) && (other == ENEMY || other == 4)) ||
                ((other == SIDE || other == RESCUABLE) && (a == ENEMY || a == 4));
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (race_p5_active()) return race_p5_owners_hostile(a, other);
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) return sc64_terran_late_owners_hostile(a, other);
@@ -2271,6 +2307,10 @@ hit_target(int target, int damage, int source_type, int source_owner)
                                                          u[cargo].raw_type, 0);
             }
 #endif
+#ifdef SC64_P5_RUNTIME
+            if (u[target].alive && race_p5_active())
+                race_p5_note_unit_death(&u[target]);
+#endif
 	    if (u[target].owner == SIDE)
 		supply_used -= unit_supply(u[target].type);
 	    u[target].alive = 0;
@@ -2298,6 +2338,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
                         if (race_late_active())
                             race_late_record_actor_death(source_owner, -1, u[i].owner,
                                                          u[i].raw_owner, u[i].raw_type, 0);
+#endif
+#ifdef SC64_P5_RUNTIME
+                        if (race_p5_active()) race_p5_note_unit_death(&u[i]);
 #endif
 			if (u[i].owner == SIDE)
 			    supply_used -= unit_supply(u[i].type);
@@ -2335,6 +2378,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #ifdef SC64_T6_RUNTIME
             if (q->alive && race_t6_active())
                 race_t6_building_died(q->owner, q->raw_owner);
+#endif
+#ifdef SC64_P5_RUNTIME
+            if (q->alive && race_p5_active()) race_p5_note_building_death(q);
 #endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
             if(q->alive && !race_mode && race_selected_mission==6 &&
@@ -3150,6 +3196,9 @@ stop_selected(void)
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive && u[i].selected) {
 	    u[i].order = ORDER_IDLE;
+#ifdef SC64_Z5_CLOAK_ENABLED
+            if (!race_z5_cloak_actor(&u[i]))
+#endif
 	    u[i].carry = 0;
 	    u[i].target = -1;
 	}
@@ -3204,6 +3253,15 @@ tick_research(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_Z5_CLOAK_ENABLED
+    if (choice == MENU_STOP + 1 && race_z5_cloak_menu_available()) {
+        int result = race_z5_cloak_toggle_selected();
+        menu_open = 0;
+        mode = MODE_NORMAL;
+        toast(result == SC64_Z5_CLOAK_ADVANCED ? 0 : 8);
+        return;
+    }
+#endif
 #ifdef SC64_P4_STORM_ENABLED
     if (choice == MENU_STOP + 1 && race_p4_storm_menu_available()) {
         menu_open = 0;
@@ -3314,6 +3372,9 @@ choose_command(int choice)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+#ifdef SC64_Z5_CLOAK_ENABLED
+    if (race_z5_cloak_menu_available()) return MENU_STOP + 2;
+#endif
 #ifdef SC64_P4_STORM_ENABLED
     if (race_p4_storm_menu_available()) return MENU_STOP + 2;
 #endif
@@ -5525,8 +5586,14 @@ draw_map(void)
 	}
 #else
 	for (i = first; i < field_menu_count() && i < first + 10; ++i) {
+#ifdef SC64_Z5_CLOAK_ENABLED
+            const char *label = i == MENU_STOP + 1 && race_z5_cloak_menu_available() ?
+                (race_z5.cloak.active ? "UNCLOAK" : "CLOAK") : labels[i];
+#else
+            const char *label = labels[i];
+#endif
 	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
-	    gfx_text(149, 17 + (i - first) * 9, labels[i], i == menu_cursor ? C_WHITE : C_DIM);
+	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
 	}
 #endif
 #else
@@ -5736,6 +5803,13 @@ draw_hud_commands(void)
 		if (IS_WORKER(u[i].type))
 		    gfx_text(52, 137, "AUTO MINE / A GAS", C_GOLD);
 		else
+#ifdef SC64_Z5_CLOAK_ENABLED
+                if (race_z5_cloak_actor(&u[i])) {
+                    gfx_text(52, 137, "EN", C_CYAN);
+                    gfx_num(70, 137, u[i].carry / 256, C_WHITE);
+                    gfx_text(100, 137, race_z5.cloak.active ? "CLOAKED" : "B CLOAK", C_GOLD);
+                } else
+#endif
 #ifdef SC64_T5_RUNTIME
                 if (u[i].type == U_DROPSHIP) {
                     gfx_text(52, 137, "CARGO", C_GOLD);
@@ -5889,6 +5963,10 @@ sc64_hud_changed(void)
     values[18] = box_state == 2;
 #ifdef SC64_RACES
     values[19]=race_campaign.phase;values[20]=race_campaign.message;
+#ifdef SC64_Z5_CLOAK_ENABLED
+    if (first >= 0 && race_z5_cloak_actor(&u[first]))
+        values[20] |= (u[first].carry / 256 + ((int)race_z5.cloak.active << 9)) << 8;
+#endif
 #ifdef SC64_Z4_RUNTIME
     if (!race_mode && race_selected_mission == 15)
         values[20] |= (int)race_z4_hud_seconds() << 8;

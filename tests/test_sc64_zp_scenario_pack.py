@@ -31,8 +31,8 @@ def trigger_fixture() -> bytes:
     data = bytearray(2 * PACK.TRIGGER_BYTES)
     # One valid condition; the numeric row must survive exactly.
     struct.pack_into('<IIIHBBBBH', data, 0, 65, 13, 999, 37, 2, 13, 1, 3, 0x1234)
-    # PreserveTrigger and two repeated Create Unit with Properties rows.
-    for index, opcode in enumerate((3, 11, 11)):
+    # PreserveTrigger, CreateUnitwithProperties, SetInvincibility, and CreateUnit.
+    for index, opcode in enumerate((3, 11, 43, 44)):
         start = 320 + index * 32
         struct.pack_into('<IIIIIIHBBB3s', data, start,
                          65 if index else 0, 0x1100 + index, 0x2200 + index,
@@ -105,12 +105,14 @@ class ZpScenarioPackTests(unittest.TestCase):
             self.assertEqual((parsed['width'], parsed['height']), (128, 128))
             self.assertEqual(parsed['source_map_path'], '008/018')
             self.assertEqual(len(parsed['triggers']), 2)
-            self.assertEqual(len(parsed['actions']), 3)
-            self.assertEqual([row['opcode'] for row in parsed['actions']], [3, 11, 11])
+            self.assertEqual(len(parsed['actions']), 4)
+            self.assertEqual([row['opcode'] for row in parsed['actions']], [3, 11, 43, 44])
             self.assertEqual(parsed['actions'][1]['modifier'], 4)
             self.assertEqual(parsed['actions'][1]['group1'], 13)
             self.assertEqual(parsed['actions'][1]['group2'], 4)
             self.assertEqual(parsed['actions'][1]['trailing'], [1, 2, 3])
+            self.assertEqual(parsed['actions'][2]['opcode'], 43)  # SetInvincibility
+            self.assertEqual(parsed['actions'][3]['opcode'], 44)  # CreateUnit
             self.assertEqual(parsed['conditions'][0]['mask'], 0x1234)
             self.assertEqual(parsed['locations'][64]['index'], 65)
             self.assertEqual(len(parsed['properties']), 64)
@@ -118,7 +120,7 @@ class ZpScenarioPackTests(unittest.TestCase):
             self.assertEqual(len(parsed['puni']), 5700)
             self.assertEqual(verified['preserve_trigger_actions'], 1)
             self.assertEqual(verified['create_unit_actions'], 2)
-            self.assertIn('sc64_z5_source_actions[3]', header)
+            self.assertIn('sc64_z5_source_actions[4]', header)
             self.assertIn('sc64_z5_source_triggers[2]', header)
             self.assertIn('sc64_z5_source_locations[255]', header)
             self.assertIn('sc64_z5_source_puni[5700]', header)

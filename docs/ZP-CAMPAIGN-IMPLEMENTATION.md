@@ -26,7 +26,7 @@ is not a lifetime bound when a preserved trigger can fire again.
 | P10 | 128×128 | 120 | 67 | 142 | 12 | 4 | 28 / 28 | 0 | 5 / 3 | 1–28 |
 
 The largest starting pools in these chapters are Z9’s 150 buildings and P6’s
-200 units. The chapter-four ZP storage limits (Zerg 192 units; Protoss 240;
+200 units. The older chapter-four ZP storage limits (Zerg 192 units; Protoss 240;
 96 buildings; 48 minerals; 4 geysers) fail later source maps:
 Z9/Z10 exceed buildings, Z6/Z8/Z9/Z10 and P5/P7/P8/P9/P10 exceed minerals,
 and Z8/Z9 and P10 exceed geysers. P10 alone needs 142 mineral fields and 12
@@ -35,15 +35,23 @@ capacity. P9’s and Z8’s preserved creation triggers make that additional
 capacity potentially recurring, so a hard lifetime reserve needs a mission
 rule or an explicit bounded spawn policy.
 
-The opt-in Z5 full-storage profile now raises these pools to 240 units,
+The opt-in Z5 and P5 full-storage profiles now raise these pools to 240 units,
 160 buildings, 144 minerals and 12 geysers using compact runtime/save rows.
 It fits these starting-placement counts, but does not establish complete
 actor support, repeated-spawn safety or playability for the later maps.
 
+Current staged runtimes cover Z5's unusual actors, doors and traps and P5's
+complete actor census, including its Guardian, Shuttle and created
+Battlecruiser. Z5's optional source-permitted cloak has controls, energy,
+detector and save tests. P5 has source-world callbacks, rescue and persisted
+death counters. Neither fifth mission yet has a verified controller win.
+The actor-gap lists below retain the initial source audit; already resolved
+Z5/P5 entries are historical requirements, not current import failures.
+
 Raw 150 is the Mature Chrysalis building, while raw 216 is the Chrysalis unit.
 Raw 196 is a Protoss beacon building and is included in the building counts.
 Raw 214 start markers are not units. The source actor types not mapped by the
-current shared ZP actor/unit/building rules are listed by raw ID below; these
+initial shared ZP actor/unit/building rules are listed by raw ID below; these
 are source occurrences, not a claim that every row is mission-critical.
 
 ## Per-mission requirements
@@ -86,12 +94,11 @@ many AI actions (18 and 5 respectively) and broad Force selectors.
 | P9 | Command, Bring, Switch, ElapsedTime; `0,13,17,19,20,21` | CreateUnitwithProperties, MoveUnit, KillUnitAtLocation, PreserveTrigger, SetResources, SetSwitch, RunAIScriptAtLocation, Wait, Transmission, DisplayTextMessage, PlayWAV, objectives, Victory, Defeat; `0,5,6,7,18,19,20,21` | 3 / 3 IDs | `44×2, 46×2, 71×1, 75×1, 136×2` |
 | P10 | Command, Switch, ElapsedTime; `0,3,17` | CreateUnitwithProperties, MoveLocation, SetResources, SetSwitch, RunAIScriptAtLocation, CenterView, Wait, Transmission, DisplayTextMessage, PlayWAV, objectives, Victory, Defeat; `0,1,2,3,13,18` | 5 / 3 IDs | `44×4, 46×2, 74×4, 75×1, 82×1, 136×1, 147×1` |
 
-P5 has the smallest building/mineral footprint of the remaining Protoss maps,
-but its 14 raw-44 actors and three AI routines need explicit support or a
-documented replacement policy. P6 fits the current unit bound with no
+P5's 14 raw-44 actors now have explicit support; its three opaque AI routines
+have a documented bounded replacement policy. P6 fits the current unit bound with no
 buildings/resources, but has 20 Bring conditions, 18 doodad changes, 14
-property variants, and source actor types not yet mapped. P7/P8/P9 have
-starting buildings above the current 96-slot bound. P8 also creates 22 actors
+property variants, and source actor types not yet mapped. P7/P8/P9 exceed the
+older 96-building bound but fit the opt-in 160-building pool. P8 also creates 22 actors
 in one trigger and uses four UPRP variants. P9’s two preserved triggers each
 create raw-151 actors, so its two-create static count is not a lifetime cap.
 P10 has the largest resource demand and uses every property ID 1–28; its

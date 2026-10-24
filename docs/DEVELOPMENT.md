@@ -893,3 +893,48 @@ unchanged SRAM and RAM guards. Older save generations are incompatible.
 These are fixed pools, not a guarantee that unlimited repeated triggers or
 production in every later mission can fit. `make sc64-zp-full-storage-probe
 test-sc64-zp-full-storage` separately checks the storage layout with P4.
+
+### Optional Z5 cloak and staged Protoss chapter 5
+
+Z5's optional ability profile authenticates PTEC and the hero's UNIT energy
+before enabling Personnel Cloaking. With the Z5 inputs above prepared, run:
+
+```sh
+python3 tools/sc64_z5_ability_pack.py --verify-staged
+python3 tools/sc64_z5_ability_pack.py
+make zerg-z5-cloak test-sc64-z5-cloak-runtime
+```
+
+Select Kerrigan, press **B**, and choose **CLOAK** or **UNCLOAK** in the command
+list. Her HUD shows energy and cloak state. STOP preserves energy. Live,
+enabled hostile detector traps reveal her within their source bounding-box
+sight range; tying detector activity to the authored trap-enabled state is a
+GBA policy, not verified native doodad-order behavior. Source PTEC disables
+Psionic Storm here. This profile uses generation 25 and rejects older saves;
+it does not establish a completed Z5 playthrough.
+
+P5 has a separate five-entry Protoss build. After the chapter-four staging
+and P4 inputs are ready, prepare its numeric descriptor and sprite bank:
+
+```sh
+python3 tools/sc64_zp_scenario_pack.py --mission P5
+python3 tools/sc64_race_sprites.py --rom /path/to/StarCraft64-USA.z64 --base-only --include-zp-campaign-actors --include-z6-actors --out .local/sc64/p5/generated/sprites --header .local/sc64/p5/generated/sc64_race_sprites_generated.h
+make protoss-p5 test-sc64-p5-runtime test-sc64-p5-world
+```
+
+`build/StarCraft-Protoss-P5-GBA.gba` uses save generation 24. Choosing Sides
+retains every starting placement, separate hostile forces, source-player
+death counters, rescue, and all 11 source creates. Production reserves slots
+for unexecuted creates. The reinforcements wait for a source event: entering
+one of the choice regions or killing a source-player-6 actor sets switch 0.
+Bring Tassadar and two Zealots to the extraction point to satisfy the source
+victory predicates. The three opaque AI script actions use a bounded authored
+paid-pressure policy; native AI equivalence is unverified. Startup, source
+actions, saves and render checks do not establish a normal-controller win.
+The extraction terrain requires Shuttle transport, whose lifecycle is still
+pending in this generation-24 profile; it is not yet a completable release.
+
+`make test-sc64-z5-ability-models test-sc64-z6-model` requires no imported data.
+After generating the Z6 numeric descriptor with the scenario packer,
+`make test-sc64-z6-adapter` checks its isolated callback scheduler. Z6 is not
+an enabled runtime mission.

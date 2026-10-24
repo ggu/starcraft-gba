@@ -292,7 +292,90 @@ static int sc64_race_storage_geometry_valid(int width, int height) {
     return width >= 1 && width <= 96 && height >= 1 && height <= 96;
 #endif
 }
+#ifdef SC64_P5_RUNTIME
+static int race_p5_saved_phase_valid(const RaceSave *candidate)
+{
+    const Sc64P5PersistentState *p5;
+    unsigned outcome, phase;
+    int started, cursor;
+    if (!candidate) return 0;
+    p5 = &candidate->p5;
+    if (!sc64_p5_persistent_state_valid(p5)) return 0;
+    outcome = p5->runtime.model.outcome;
+    phase = candidate->campaign.phase;
+    started = sc64_p5_trigger_mask_test(p5->runtime.model.started, 2);
+    cursor = p5->runtime.model.action_cursor[2];
+    if (candidate->state[0] || candidate->state[2] != SC64_P5_GLOBAL_ID ||
+        candidate->state[1] != R_PROTOSS || candidate->players[SIDE] != R_PROTOSS ||
+        candidate->players[RESCUABLE] != R_PROTOSS ||
+        candidate->players[ENEMY] != R_ZERG || candidate->players[4] != R_ZERG ||
+        candidate->players[NEUTRAL] != R_TER ||
+        candidate->campaign.mission != SC64_P5_GLOBAL_ID ||
+        candidate->campaign.elapsed_frames != (u32)candidate->state[7] ||
+        candidate->campaign.objective_stage != (started ? 2u : 0u)) return 0;
+    if (outcome == SC64_P5_RUNNING) {
+        if (candidate->state[18] || candidate->state[19] ||
+            phase != SC64_RACE_PHASE_ACTIVE ||
+            (candidate->campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+    } else if (outcome == SC64_P5_WON) {
+        if (!candidate->state[18] || candidate->state[19] ||
+            phase != SC64_RACE_PHASE_COMPLETE ||
+            !(candidate->campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY) ||
+            !(candidate->state[3] & (1 << SC64_P5_GLOBAL_ID))) return 0;
+    } else if (outcome == SC64_P5_LOST) {
+        if (candidate->state[18] || !candidate->state[19] ||
+            phase != SC64_RACE_PHASE_FAILED ||
+            (candidate->campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY)) return 0;
+    } else return 0;
+    (void)cursor;
+    return 1;
+}
+
+static unsigned race_p5_saved_remaining_creations(const Sc64P5PersistentState *p5)
+{
+    const unsigned trigger = 3;
+    const Sc64P5SourceTrigger *tr = &sc64_p5_source_triggers[trigger];
+    unsigned remaining = 0;
+    int started = sc64_p5_trigger_mask_test(p5->runtime.model.started, (u8)trigger);
+    for (unsigned i = 0; i < tr->action_count; ++i) {
+        const Sc64P5SourceAction *a = &sc64_p5_source_actions[tr->first_action + i];
+        if (a->opcode == SC64_P5_ACTION_CREATE_UNIT &&
+            (!started || i >= p5->runtime.model.action_cursor[trigger]))
+            remaining += sc64_p5_source_create_count(a);
+    }
+    return remaining;
+}
+
+static int race_p5_save_candidate_valid(const RaceSave *candidate,
+                                        unsigned width, unsigned height)
+{
+    unsigned live = 0, queued = 0;
+    if (!candidate || width != SC64_P5_MAP_COLS || height != SC64_P5_MAP_ROWS ||
+        !race_p5_saved_phase_valid(candidate)) return 0;
+    for (unsigned i = 0; i < MAX_UNITS; ++i) {
+        Unit decoded;
+        if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u, &decoded))
+            return 0;
+        live += decoded.alive != 0;
+    }
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+        Building decoded;
+        if (!race_save_decode_building(candidate, i, &decoded)) return 0;
+        if (decoded.alive) for (int q = 0; q < decoded.queue_count; ++q)
+            queued += decoded.queue[(decoded.queue_head + q) % 5] == U_ZERGLING ? 2u : 1u;
+    }
+    return live + queued + race_p5_saved_remaining_creations(&candidate->p5) <= MAX_UNITS;
+}
+#endif
 static int race_save_game(void) {
+#ifdef SC64_Z5_CLOAK_ENABLED
+    if (race_z5_active() && !race_z5_cloak_world_state_valid()) return 0;
+#endif
+#ifdef SC64_Z5_RUNTIME
+    if (race_z5_active()) for (unsigned i = 0; i < MAX_UNITS; ++i)
+        if ((u[i].type == U_ZERGLING || u[i].type == U_ZP_INFESTED_KERRIGAN) &&
+            u[i].shield_remainder >= SC64_Z5_HP_REGEN_TICKS_PER_HP) return 0;
+#endif
 #ifdef SC64_ZP_FULL_STORAGE
     if (geyser_count < 0 || geyser_count > MAX_RACE_GEYSERS ||
         race_cols < 1 || race_cols > 128 || race_rows < 1 || race_rows > 128)
@@ -431,6 +514,13 @@ static int race_save_game(void) {
         race_data.p4 = race_p4;
     }
 #endif
+#ifdef SC64_P5_RUNTIME
+    memset(&race_data.p5, 0, sizeof(race_data.p5));
+    if (race_p5_active()) {
+        if (!race_p5_runtime_state_valid()) return 0;
+        race_data.p5 = race_p5;
+    }
+#endif
 #ifdef SC64_Z5_RUNTIME
     memset(&race_data.z5, 0, sizeof(race_data.z5));
     if (race_z5_active()) {
@@ -489,6 +579,14 @@ static int race_save_game(void) {
     }
     if (race_t4_active() &&
         !race_t4_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (!race_p5_active()) {
+        const u8 *bytes = (const u8 *)&race_data.p5;
+        for (unsigned i = 0; i < sizeof(race_data.p5); ++i)
+            if (bytes[i]) return 0;
+    } else if (!race_p5_save_candidate_valid(&race_data, (unsigned)race_cols,
+                                             (unsigned)race_rows)) return 0;
 #endif
 #ifdef SC64_T5_RUNTIME
     if (!race_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
@@ -915,11 +1013,24 @@ static int race_load_game(void) {
         for (unsigned i = 0; i < sizeof(race_data.p4); ++i) if (bytes[i]) return 0;
     }
 #endif
+#ifdef SC64_P5_RUNTIME
+    if (!v[0] && v[2] == SC64_P5_GLOBAL_ID) {
+        if (!race_p5_save_candidate_valid(&race_data, (unsigned)width,
+                                          (unsigned)height)) return 0;
+    } else {
+        const u8 *bytes = (const u8 *)&race_data.p5;
+        for (unsigned i = 0; i < sizeof(race_data.p5); ++i)
+            if (bytes[i]) return 0;
+    }
+#endif
 #ifdef SC64_Z5_RUNTIME
     if (!v[0] && v[2] == SC64_Z5_GLOBAL_ID) {
         const Sc64Z5PersistentState *z5 = &race_data.z5;
         const Sc64RaceMap *map = &sc64_race_maps[SC64_Z5_GLOBAL_ID];
         unsigned live = 0, queued = 0, creates_remaining = 0;
+#ifdef SC64_Z5_CLOAK_ENABLED
+        unsigned cloak_heroes = 0;
+#endif
         unsigned outcome = z5->runtime.model.outcome;
         unsigned phase = race_data.campaign.phase;
         if (!sc64_z5_persistent_state_valid(z5) || map->width != SC64_Z5_MAP_COLS ||
@@ -931,8 +1042,23 @@ static int race_load_game(void) {
             Unit candidate;
             if (!race_save_decode_unit(&race_data, i, width * 16u, height * 16u,
                                        &candidate)) return 0;
+            if ((candidate.type == U_ZERGLING || candidate.type == U_ZP_INFESTED_KERRIGAN) &&
+                candidate.shield_remainder >= SC64_Z5_HP_REGEN_TICKS_PER_HP) return 0;
+#ifdef SC64_Z5_CLOAK_ENABLED
+            if (candidate.raw_type == SC64_Z5_AUTH_KERRIGAN_RAW_TYPE &&
+                candidate.raw_owner == SC64_Z5_AUTH_KERRIGAN_SOURCE_OWNER &&
+                candidate.owner == SIDE) {
+                if (++cloak_heroes != 1 || candidate.type != U_ZP_INFESTED_KERRIGAN ||
+                    candidate.maxhp != sc64_zp_actor_default_hp(candidate.type) ||
+                    candidate.carry < 0 || candidate.carry > SC64_Z5_CLOAK_MAX_ENERGY_Q8 ||
+                    (!candidate.alive && (z5->cloak.active || z5->cloak.regen_remainder))) return 0;
+            }
+#endif
             live += candidate.alive != 0;
         }
+#ifdef SC64_Z5_CLOAK_ENABLED
+        if (cloak_heroes != 1) return 0;
+#endif
         for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
             Building candidate;
             if (!race_save_decode_building(&race_data, i, &candidate)) return 0;
@@ -968,7 +1094,8 @@ static int race_load_game(void) {
             for (unsigned slot = 0; slot < MAX_BUILDINGS; ++slot) {
                 Building candidate;
                 if (!race_save_decode_building(&race_data, slot, &candidate)) return 0;
-                if (candidate.alive && candidate.raw_type == src->type &&
+                if (race_z5_prop_state_valid(&candidate, type) &&
+                    candidate.raw_type == src->type &&
                     candidate.raw_owner == src->owner && candidate.type == type &&
                     candidate.owner == expected_owner && candidate.x == src->x / 2 &&
                     candidate.y == src->y / 2 && candidate.flags == src->flags)
@@ -1175,6 +1302,16 @@ static int race_load_game(void) {
 #ifdef SC64_P4_RUNTIME
     if (race_p4_active()) race_p4 = race_data.p4;
     else memset(&race_p4, 0, sizeof(race_p4));
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (race_p5_active()) {
+        race_p5 = race_data.p5;
+        if (!race_p5_rebind_loaded_world(&sc64_race_maps[SC64_P5_GLOBAL_ID]))
+            return 0;
+    } else {
+        memset(&race_p5, 0, sizeof(race_p5));
+        memset(&race_p5_world, 0, sizeof(race_p5_world));
+    }
 #endif
 #ifdef SC64_Z5_RUNTIME
     if (!race_mode && race_selected_mission == SC64_Z5_GLOBAL_ID) {

@@ -49,6 +49,37 @@ typedef struct {
  * Independent enumeration (0..3). Scenario actors have no training route. */
 static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
 {
+#ifdef SC64_Z6_ACTORS
+    /* Guardian facts use the same pinned source values as the Z6 combat table;
+       generic actor consumers now see its HP, sight, bounds, and policy too. */
+    static const Sc64ZpActorFact guardian = {
+        44,150,0,2,50,100,600,352, 22,22,21,21,1,2,
+        20,2,30,256,1, 0,0,0,0,0,
+        SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
+        SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|
+        SC64_ZP_ACTOR_MEN|SC64_ZP_ACTOR_WEAPON
+    };
+    if (type == U_Z6_GUARDIAN) return &guardian;
+#endif
+#ifdef SC64_P5_ACTORS
+    /* Shuttle source facts are numeric only. Cargo/transport behavior remains
+       unsupported by this actor policy and is not implied by the raw type. */
+    static const Sc64ZpActorFact shuttle = {
+        69,80,60,1,200,0,900,256, 20,16,19,15,1,2,
+        0,0,0,0,0, 0,0,0,0,0,
+        SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
+        SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN
+    };
+    static const Sc64ZpActorFact battlecruiser = {
+        12,500,0,3,400,300,2000,352, 37,29,37,29,1,2,
+        25,3,30,192,1, 25,3,30,192,1,
+        SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
+        SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|
+        SC64_ZP_ACTOR_MEN|SC64_ZP_ACTOR_WEAPON
+    };
+    if (type == U_P5_SHUTTLE) return &shuttle;
+    if (type == U_P5_BATTLECRUISER) return &battlecruiser;
+#endif
 #ifdef SC64_Z5_ACTORS
     static const Sc64ZpActorFact z5_facts[] = {
         /* raw, HP/shields/armor/cost/time/sight, bounds, flight/size,

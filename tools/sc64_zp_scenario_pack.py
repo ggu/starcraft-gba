@@ -347,6 +347,15 @@ def emit_header(data: dict) -> str:
     return ''.join(out)
 
 
+def count_create_unit_actions(actions: list[dict]) -> int:
+    """Count CHK CreateUnitwithProperties (11) and CreateUnit (44) rows.
+
+    Opcode 43 is SetInvincibility; treating it as a spawn inflates the source
+    census and can mislead actor coverage audits.
+    """
+    return sum(row['opcode'] in (11, 44) for row in actions)
+
+
 def verify_staged(source_root: Path, mission: str) -> dict:
     data = parse_source(source_root, mission)
     return {'mission': data['mission'], 'global_catalog_id': data['global_catalog_id'],
@@ -356,7 +365,7 @@ def verify_staged(source_root: Path, mission: str) -> dict:
             'trigger_records': data['trigger_count'], 'actions': len(data['actions']),
             'conditions': len(data['conditions']),
             'preserve_trigger_actions': sum(r['opcode'] == 3 for r in data['actions']),
-            'create_unit_actions': sum(r['opcode'] in (11, 43) for r in data['actions']),
+            'create_unit_actions': count_create_unit_actions(data['actions']),
             'locations': len(data['locations'])}
 
 

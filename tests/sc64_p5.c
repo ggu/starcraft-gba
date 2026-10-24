@@ -19,7 +19,7 @@ static void test_source_inventory_and_predicate_rows(void)
     assert(condition_total == SC64_P5_CONDITION_TOTAL);
     assert(SC64_P5_TRIGGER_VICTORY == 4);
     assert(SC64_P5_RAW_ANY_UNIT == 229 && SC64_P5_RAW_HERO == 79 &&
-           SC64_P5_RAW_CARRIER == 65);
+           SC64_P5_RAW_ZEALOT == 65);
     assert(SC64_P5_SELECTOR_CURRENT_PLAYER == 13 &&
            SC64_P5_SELECTOR_ALL_PLAYERS == 17);
 
