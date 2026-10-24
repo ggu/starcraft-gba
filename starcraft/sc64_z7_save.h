@@ -72,9 +72,18 @@ static int race_z7_save_source_building_match(const Sc64RaceMap *map,
     if (saved->raw_type==(int)raw && saved->type==type) return 1;
     /* A source Zerg Hatchery can morph in place while retaining its source
      * provenance and position.  No other building identity may change. */
-    return src->owner==3u && raw==131u && owner==SIDE &&
+    if (src->owner==3u && raw==131u && owner==SIDE &&
         (saved->raw_type==132 || saved->raw_type==133) &&
-        sc64_race_building_from_raw(saved->raw_type)==saved->type;
+        sc64_race_building_from_raw(saved->raw_type)==saved->type) return 1;
+    /* Z7 Creep Colony morphs retain source provenance and position while
+       changing the source building identity in place. */
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+    if (src->owner==3u && raw==SC64_Z7_CREEP_RAW && owner==SIDE &&
+        (saved->raw_type==SC64_Z7_SUNKEN_RAW ||
+         saved->raw_type==SC64_Z7_SPORE_RAW) &&
+        sc64_race_building_from_raw(saved->raw_type)==saved->type) return 1;
+#endif
+    return 0;
 }
 
 static int race_z7_save_gas_source_row(const Sc64RaceMap *map,int x,int y,
@@ -150,7 +159,12 @@ static int race_z7_save_building_type_matches_source(unsigned source,int raw,
 {
     return sc64_race_building_from_raw(raw)==type ||
         (source==3u && raw==131 && owner==SIDE &&
-         (type==B_LAIR || type==B_HIVE));
+         (type==B_LAIR || type==B_HIVE))
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+        || (source==3u && raw==SC64_Z7_CREEP_RAW && owner==SIDE &&
+            (type==B_SUNKEN_COLONY || type==B_SPORE_COLONY))
+#endif
+        ;
 }
 
 static int race_z7_save_unused_unit(const Unit *unit)

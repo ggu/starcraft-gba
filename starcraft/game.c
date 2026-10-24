@@ -140,7 +140,7 @@ int memcmp(const void *a, const void *b, size_t n);
 #error "Z7 colony defense requires the Z7 runtime"
 #endif
 #if defined(SC64_Z7_COLONY_DEFENSE_ENABLED)
-#define SC64_RACE_SAVE_GENERATION 34u
+#define SC64_RACE_SAVE_GENERATION 35u
 #elif defined(SC64_Z7_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 33u
 #elif defined(SC64_Z6_TRANSPORT_ENABLED)
@@ -965,6 +965,9 @@ static int race_z7_product_source_owner(int owner);
 static void race_z7_note_building_death(const Building *q);
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 static int race_z7_colony_start_sunken(int building);
+static int race_z7_colony_start_spore(int building);
+static int race_z7_colony_morph_available_for(int building,int target_type);
+static int race_z7_spore_morph_command_available(void);
 static int race_z7_colony_pre_building_tick(void);
 static int race_z7_colony_post_building_tick(void);
 #endif
@@ -3595,6 +3598,12 @@ static int race_z7_colony_command_available(void)
         q->raw_type==sc64_race_raw_building(B_CREEP_COLONY) && q->raw_owner==3;
 }
 
+static int race_z7_spore_morph_command_available(void)
+{
+    return race_z7_colony_command_available() &&
+        race_z7_colony_morph_available_for(selected_building,B_SPORE_COLONY);
+}
+
 static int race_z7_creep_command_available(void)
 {
     int found=0;
@@ -3614,6 +3623,10 @@ choose_command(int choice)
     if (choice==MENU_STOP+1 && race_z7_colony_command_available()) {
         menu_open=0; mode=MODE_NORMAL;
         toast(race_z7_colony_start_sunken(selected_building)?3:8); return;
+    }
+    if (choice==MENU_STOP+2 && race_z7_spore_morph_command_available()) {
+        menu_open=0; mode=MODE_NORMAL;
+        toast(race_z7_colony_start_spore(selected_building)?3:8); return;
     }
     if (choice==MENU_Z7_CREEP) {
         menu_open=0;
@@ -3790,7 +3803,8 @@ choose_command(int choice)
 static int field_menu_count(void)
 {
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-    if (race_z7_colony_command_available()) return MENU_STOP+2;
+    if (race_z7_colony_command_available())
+        return MENU_STOP+2+race_z7_spore_morph_command_available();
 #endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
     if (race_z6_transport_research_selected() || race_z6_overlord_menu_available())
@@ -3845,6 +3859,7 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 {
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     if (choice==MENU_STOP+1 && race_z7_colony_command_available()) return "SUNKEN";
+    if (choice==MENU_STOP+2 && race_z7_spore_morph_command_available()) return "SPORE";
 #endif
     if (choice == MENU_STOP + 2 && race_probe_cannon_command_available())
         return "CANNON";

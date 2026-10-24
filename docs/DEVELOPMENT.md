@@ -1115,7 +1115,7 @@ make test-sc64-p7-model test-sc64-p7-adapter
 
 Z7's world/runtime fixture uses all 231 canonical rows and a bounded paid
 Zerg AI policy. Its opt-in shared-engine profile now includes a seventh menu
-entry, source objective outcomes and generation-34 saves:
+entry, source objective outcomes and generation-35 saves:
 
 ```sh
 make zerg-z7-probe

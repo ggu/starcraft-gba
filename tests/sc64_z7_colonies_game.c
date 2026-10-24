@@ -279,6 +279,185 @@ static void test_prerequisite_and_identity_rejections(void)
     assert(!race_z7_colony_morph_available(colony));
 }
 
+static void test_paid_spore_morph_and_native_weapon_scope(void)
+{
+    int colony, chamber, site, ground, air, minerals_before;
+    reset_world();
+    colony=create_colony_through_normal_build();
+    assert(!race_z7_colony_morph_available_for(colony,B_SPORE_COLONY));
+    assert(!race_z7_colony_start_spore(colony)); /* no Evolution Chamber */
+    site=find_any_legal_site(B_EVOLUTION_CHAMBER,b[colony].x+96,b[colony].y);
+    assert(site>=0);
+    chamber=spawn_build(SIDE,B_EVOLUTION_CHAMBER,
+                        site%WORLD_W,site/WORLD_W,0);
+    assert(chamber>=0 && building_complete(chamber));
+    assert(race_z7_colony_morph_available_for(colony,B_SPORE_COLONY));
+
+    minerals=49;
+    assert(!race_z7_colony_start_spore(colony));
+    assert(b[colony].type==B_CREEP_COLONY && !b[colony].under_construction &&
+           minerals==49);
+    minerals=500;
+    minerals_before=minerals;
+    int drone=spawn_unit(SIDE,U_DRONE,b[colony].x+24,b[colony].y+24);
+    assert(drone>=0);
+    int drones_before=0;
+    for (int i=0;i<MAX_UNITS;++i)
+        drones_before+=u[i].alive && u[i].owner==SIDE && u[i].type==U_DRONE;
+    int x=b[colony].x,y=b[colony].y,raw_owner=b[colony].raw_owner;
+    b[colony].hp=280;
+    assert(race_z7_colony_start_spore(colony));
+    assert(minerals==minerals_before-50 && gas==0);
+    assert(b[colony].alive && b[colony].type==B_CREEP_COLONY &&
+           b[colony].raw_type==SC64_Z7_CREEP_RAW &&
+           b[colony].raw_owner==raw_owner && b[colony].x==x && b[colony].y==y &&
+           b[colony].hp==280 && b[colony].maxhp==SC64_Z7_CREEP_HP &&
+           b[colony].under_construction && b[colony].build_progress==0 &&
+           b[colony].queue_progress==280 &&
+           (b[colony].flags&SC64_Z7_SPORE_MORPH_FLAG));
+    int drones_after=0;
+    for (int i=0;i<MAX_UNITS;++i)
+        drones_after+=u[i].alive && u[i].owner==SIDE && u[i].type==U_DRONE;
+    assert(drones_before==drones_after); /* Morph never consumes a second Drone. */
+    assert(race_z7_colony_morph_state_valid(&b[colony]));
+
+    RaceSave checkpoint;
+    Building decoded;
+    memset(&checkpoint,0,sizeof(checkpoint));
+    for (int t=0;t<90;++t) {
+        assert(race_z7_colony_pre_building_tick());
+        race_tick_buildings();
+        assert(race_z7_colony_post_building_tick());
+    }
+    assert(sc64_building_save_encode(&checkpoint.buildings[colony],&b[colony],
+                                     SC64_Z7_MAP_COLS*16u,
+                                     SC64_Z7_MAP_ROWS*16u));
+    assert(race_save_decode_building(&checkpoint,(unsigned)colony,&decoded));
+    assert(race_z7_colony_morph_state_valid(&decoded) &&
+           (decoded.flags&SC64_Z7_SPORE_MORPH_FLAG) &&
+           decoded.build_progress==90 && decoded.queue_progress==280);
+    Building forged=decoded;
+    forged.flags|=SC64_Z7_SUNKEN_MORPH_FLAG;
+    assert(!race_z7_colony_morph_state_valid(&forged));
+    forged=decoded; forged.type=B_SPORE_COLONY; forged.raw_type=SC64_Z7_SPORE_RAW;
+    assert(!race_z7_colony_morph_state_valid(&forged));
+    for (int t=90;t<SC64_Z7_SPORE_MORPH_TICKS;++t) {
+        assert(race_z7_colony_pre_building_tick());
+        race_tick_buildings();
+        assert(race_z7_colony_post_building_tick());
+    }
+    assert(building_complete(colony) && b[colony].type==B_SPORE_COLONY &&
+           b[colony].raw_type==SC64_Z7_SPORE_RAW && b[colony].raw_owner==raw_owner &&
+           b[colony].maxhp==SC64_Z7_SPORE_HP && b[colony].hp==280 &&
+           !(b[colony].flags&SC64_Z7_SPORE_MORPH_FLAG));
+
+    /* The existing defense implementation must remain air-only. Cloak
+       detection is deliberately unsupported by the generic building path. */
+    b[colony].queue_progress=0;
+    ground=spawn_unit(ENEMY,U_ZERGLING,x+8,y+8);
+    air=spawn_unit(ENEMY,U_MUTALISK,x+12,y+12);
+    assert(ground>=0 && air>=0);
+    int ground_hp=u[ground].hp, air_hp=u[air].hp;
+    race_tick_defenses();
+    assert(u[ground].hp==ground_hp && u[air].hp==air_hp-15);
+    b[colony].queue_progress=0;
+    u[air].flags|=16; /* Cloaked actors remain undetected by this building path. */
+    air_hp=u[air].hp;
+    race_tick_defenses();
+    assert(u[air].hp==air_hp);
+}
+
+static void test_spore_morph_menu_dispatch(void)
+{
+    int colony, chamber, site;
+    reset_world();
+    screen=SCREEN_PLAY;
+    mode=MODE_NORMAL;
+    menu_open=0;
+    colony=create_colony_through_normal_build();
+    site=find_any_legal_site(B_EVOLUTION_CHAMBER,b[colony].x+96,b[colony].y);
+    assert(site>=0);
+    chamber=spawn_build(SIDE,B_EVOLUTION_CHAMBER,site%WORLD_W,site/WORLD_W,0);
+    assert(chamber>=0);
+    for (int i=0;i<MAX_UNITS;++i) u[i].selected=0;
+    selected_building=colony;
+    minerals=500;
+    assert(field_menu_count()==MENU_STOP+3);
+    const char *labels[MENU_COUNT]={0};
+    assert(!strcmp(field_menu_base_label(MENU_STOP+1,labels),"SUNKEN"));
+    assert(!strcmp(field_menu_base_label(MENU_STOP+2,labels),"SPORE"));
+    open_command_row(MENU_STOP+2);
+    press(KEY_A);
+    assert(!menu_open && mode==MODE_NORMAL && minerals==450 &&
+           b[colony].type==B_CREEP_COLONY &&
+           (b[colony].flags&SC64_Z7_SPORE_MORPH_FLAG));
+}
+
+static void test_spore_morph_death_clears_marker_before_slot_reuse(void)
+{
+    int colony, chamber, site;
+    reset_world();
+    colony=create_colony_through_normal_build();
+    site=find_any_legal_site(B_EVOLUTION_CHAMBER,b[colony].x+96,b[colony].y);
+    assert(site>=0);
+    chamber=spawn_build(SIDE,B_EVOLUTION_CHAMBER,site%WORLD_W,site/WORLD_W,0);
+    assert(chamber>=0 && building_complete(chamber));
+    assert(race_z7_colony_start_spore(colony));
+    b[colony].alive=0;
+    assert(race_z7_colony_pre_building_tick());
+    assert(!(b[colony].flags &
+             (SC64_Z7_SUNKEN_MORPH_FLAG|SC64_Z7_SPORE_MORPH_FLAG)) &&
+           b[colony].queue_progress==0);
+    assert(race_z7_colony_post_building_tick());
+    site=find_legal_site(B_CREEP_COLONY,b[chamber].x+96,b[chamber].y);
+    assert(site>=0);
+    int replacement=spawn_build(SIDE,B_CREEP_COLONY,
+                                 site%WORLD_W,site/WORLD_W,0);
+    assert(replacement==colony && b[replacement].alive &&
+           !(b[replacement].flags &
+             (SC64_Z7_SUNKEN_MORPH_FLAG|SC64_Z7_SPORE_MORPH_FLAG)));
+}
+
+static void test_spore_morph_uses_live_update_hooks(void)
+{
+    int chamber=-1, site, colony, drone, drone_count=0;
+    launch_z7_normally();
+    for (int i=0;i<MAX_BUILDINGS;++i)
+        if (b[i].alive && b[i].owner==SIDE &&
+            b[i].type==B_EVOLUTION_CHAMBER && building_complete(i)) {
+            chamber=i; break;
+        }
+    if (chamber<0) {
+        site=find_any_legal_site(B_EVOLUTION_CHAMBER,700,700);
+        assert(site>=0);
+        chamber=spawn_build(SIDE,B_EVOLUTION_CHAMBER,
+                            site%WORLD_W,site/WORLD_W,0);
+        assert(chamber>=0 && building_complete(chamber));
+    }
+    site=find_any_legal_site(B_CREEP_COLONY,b[chamber].x+96,b[chamber].y);
+    assert(site>=0);
+    colony=spawn_build(SIDE,B_CREEP_COLONY,site%WORLD_W,site/WORLD_W,0);
+    assert(colony>=0 && b[colony].raw_type==SC64_Z7_CREEP_RAW);
+    drone=spawn_unit(SIDE,U_DRONE,b[colony].x+24,b[colony].y+24);
+    assert(drone>=0);
+    for (int i=0;i<MAX_UNITS;++i)
+        drone_count+=u[i].alive && u[i].owner==SIDE && u[i].type==U_DRONE;
+    b[colony].hp=280;
+    assert(race_z7_colony_start_spore(colony));
+    invincible_buildings[colony]=1;
+    for (int tick=0;tick<SC64_Z7_SPORE_MORPH_TICKS;++tick) {
+        game_update(0,0);
+        assert(screen==SCREEN_PLAY && race_z7_active());
+    }
+    assert(building_complete(colony) && b[colony].type==B_SPORE_COLONY &&
+           b[colony].raw_type==SC64_Z7_SPORE_RAW && b[colony].hp==280 &&
+           !(b[colony].flags & SC64_Z7_SPORE_MORPH_FLAG));
+    int drones_after=0;
+    for (int i=0;i<MAX_UNITS;++i)
+        drones_after+=u[i].alive && u[i].owner==SIDE && u[i].type==U_DRONE;
+    assert(drones_after==drone_count);
+}
+
 static void test_real_campaign_sram_resume(void)
 {
     RaceSave saved, old_generation;
@@ -338,11 +517,11 @@ static void test_real_campaign_sram_resume(void)
                                         &old_generation.z7,
                                         SC64_Z7_MAP_COLS, SC64_Z7_MAP_ROWS));
     save_write(&saved, sizeof(saved), SAVE_VERSION);
-    /* Store a generation-33 payload under the current profile's tag so the
+    /* Store a generation-34 payload under the current profile's tag so the
        real load path must reject it rather than selecting the prior valid
        dual-slot record. */
     save_write(&old_generation, sizeof(old_generation), SAVE_VERSION);
-    assert(!race_load_game()); /* generation 33 is rejected by generation 34 */
+    assert(!race_load_game()); /* generation 34 is rejected by generation 35 */
     assert(race_z7_active() && b[colony].alive &&
            b[colony].type == B_CREEP_COLONY &&
            b[colony].build_progress == 90 &&
@@ -373,6 +552,50 @@ static void test_real_campaign_sram_resume(void)
     assert(building_complete(colony) && b[colony].type == B_SUNKEN_COLONY &&
            b[colony].raw_type == 146 && b[colony].raw_owner == 3 &&
            b[colony].hp == 300 && b[colony].shield == 0);
+
+    /* Spore source morphs preserve the same source row and use the packed
+       morph flag through a cold HOME restore. */
+    site=find_any_legal_site(B_EVOLUTION_CHAMBER,b[hatch].x+128,b[hatch].y);
+    assert(site>=0);
+    int evo=spawn_build(SIDE,B_EVOLUTION_CHAMBER,
+                        site%WORLD_W,site/WORLD_W,0);
+    assert(evo>=0 && building_complete(evo));
+    site=find_legal_site(B_CREEP_COLONY,b[hatch].x+144,b[hatch].y+64);
+    if(site<0) site=find_legal_site(B_CREEP_COLONY,b[hatch].x-144,b[hatch].y+64);
+    assert(site>=0);
+    colony=spawn_build(SIDE,B_CREEP_COLONY,site%WORLD_W,site/WORLD_W,0);
+    assert(colony>=0 && b[colony].raw_type==SC64_Z7_CREEP_RAW);
+    b[colony].hp=280;
+    assert(race_z7_colony_start_spore(colony));
+    assert(minerals>=0 && (b[colony].flags&SC64_Z7_SPORE_MORPH_FLAG));
+    for(int i=0;i<90;++i) {
+        assert(race_z7_colony_pre_building_tick());
+        race_tick_buildings();
+        assert(race_z7_colony_post_building_tick());
+    }
+    assert(race_save_game());
+    saved=race_data;
+    assert(race_z7_save_candidate_valid(&saved,&saved.z7,
+                                        SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+    assert(race_save_decode_building(&saved,(unsigned)colony,&loaded) &&
+           race_z7_colony_morph_state_valid(&loaded) &&
+           (loaded.flags&SC64_Z7_SPORE_MORPH_FLAG) &&
+           loaded.build_progress==90 && loaded.queue_progress==280);
+    save_write(&saved,sizeof(saved),SAVE_VERSION);
+    game_init(); held_keys=0;
+    assert(!race_z7_active() && screen==SCREEN_TITLE);
+    assert(race_load_game());
+    assert(race_z7_active() && race_z7_live_world_valid() &&
+           b[colony].type==B_CREEP_COLONY &&
+           (b[colony].flags&SC64_Z7_SPORE_MORPH_FLAG));
+    for(int i=90;i<SC64_Z7_SPORE_MORPH_TICKS;++i) {
+        assert(race_z7_colony_pre_building_tick());
+        race_tick_buildings();
+        assert(race_z7_colony_post_building_tick());
+    }
+    assert(building_complete(colony) && b[colony].type==B_SPORE_COLONY &&
+           b[colony].raw_type==SC64_Z7_SPORE_RAW && b[colony].hp==280);
+    assert(race_save_game());
 
     /* Death can occur after the normal pre/post production hooks. Use a
        second canonical-world colony, retain its morph marker through save and
@@ -488,6 +711,10 @@ int main(void)
     test_paid_in_place_morph_and_roundtrip(2);
     test_real_campaign_sram_resume();
     test_normal_menu_colony_build_and_sunken_dispatch();
-    puts("Z7 normal Creep Colony build and faithful Sunken morph passed");
+    test_paid_spore_morph_and_native_weapon_scope();
+    test_spore_morph_menu_dispatch();
+    test_spore_morph_death_clears_marker_before_slot_reuse();
+    test_spore_morph_uses_live_update_hooks();
+    puts("Z7 normal Creep Colony build and Sunken/Spore morph tests passed");
     return 0;
 }

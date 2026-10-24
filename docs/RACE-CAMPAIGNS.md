@@ -53,7 +53,7 @@ and ROM identities. The P5 island objective requires the optional Shuttle
 profile. Z6 has normal-input host and full ARM wins plus exact cold-load continuity.
 P6 has reproducible normal-input host and full ARM wins, with opening and late
 fresh-process SRAM continuity. Its qualified fast dense build averages 12.75 fps. Z7 has an internal seventh-entry ROM
-with shared menu, source objectives and generation-34 saves; its host checks
+with shared menu, source objectives and generation-35 saves; its host checks
 establish integration readiness, with no completed playthrough. P7 retains
 an isolated world foundation and numeric scheduler. The remaining staged
 missions still need completion and ARM qualification.
@@ -61,8 +61,11 @@ missions still need completion and ARM qualification.
 The internal Z7 profile also exposes the missing colony defense commands:
 Drone-only selection adds CREEP COLONY below SPIRE (75 minerals), and a
 selected completed Creep Colony offers SUNKEN with a completed Pool and
-50 minerals. The morph uses the same building and no additional Drone.
-This feature rejects earlier Z7 generation-33 saves; it is not yet enabled
+50 minerals. With a completed Evolution Chamber, the same Colony also offers
+SPORE for 50 minerals. Both morphs use the same building and no additional
+Drone. Spore attacks use the existing air-only defense policy; native detector
+behavior and full source sight are still missing.
+This feature rejects earlier Z7 generation-33/34 saves; it is not yet enabled
 in the canonical three-mission Zerg profile or skirmishes.
 
 Z7 also restores a neutral gas node when a source Extractor is destroyed.

@@ -46,7 +46,7 @@ static void launch_z7_from_normal_menu(void)
     assert(sc64_z7_persistent_state_valid(&race_z7));
     assert(SC64_RACE_SAVE_GENERATION==
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-           34u
+           35u
 #else
            33u
 #endif

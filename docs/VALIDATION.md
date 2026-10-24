@@ -3421,3 +3421,33 @@ count-query and all four collision variants pass under host sanitizers.
 The 541-file source-only snapshot also passes `./dev build` and `./dev test`
 (379 Python tests, six private-input skips), retaining the original-art ROM
 hash `4ad80ce0…f9aee`.
+
+### Z7 Spore morph command
+
+The internal Z7 colony menu now retains Sunken and adds Spore after a
+completed Evolution Chamber. A completed owned Creep Colony pays 50 minerals
+once, morphs in place for 375 GBA updates and consumes no additional Drone.
+It retains Creep identity and HP during the morph, then becomes source raw
+144 with 400 max HP. The existing air-only defense policy supplies its
+15-damage weapon; center-based targeting, projectile timing, detector
+behavior and the reduced building sight remain fidelity limits.
+
+Sanitizer fixtures cover payment denial at 49 minerals, completed tech,
+menu reachability/dispatch, retained source identity/position/HP, preserved
+Drone count, mid-morph save/load, air-only attacks, death cleanup and reused
+slots. Transactional source-save checks permit only the authenticated
+source-owned Creep-to-Sunken/Spore identities. Save generation 35 rejects
+generation 34 so its new reserved morph flag cannot be misinterpreted.
+
+The Z7 ARM build retains IWRAM end `0x03004f08` and BSS end `0x0203d9f0`;
+the fixed reserve guards are unchanged. Startup/skirmish, game-save,
+gas-restore and framebuffer checks pass. Private ordinary-input trials show
+the morph clock advancing under real gameplay; one Colony dies at progress
+321/375 under enemy fire. This is not a complete Z7 win, ARM replay/save
+qualification or campaign-count promotion.
+
+A separate fixture makes its test Colony invulnerable and advances 375
+ordinary `game_update(0,0)` calls through completion, preserving HP and the
+Drone count with no source fault. The final 541-file source-only snapshot
+passes `./dev build` and `./dev test` (379 Python tests, six private-input
+skips); unified ARM/host checks pass and original-art ROM bytes are unchanged.
