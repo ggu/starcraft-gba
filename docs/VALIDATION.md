@@ -1944,14 +1944,44 @@ with Kerrigan alive but could not reach the remaining Command Center;
 there is no win claim for that attempt. The subsequent air-tech controller
 built a Lair and Spire through the ordinary menu, produced Mutalisks, protected
 Kerrigan, and won at frame 71777 / host tick 71936. An independent ASan/UBSan
-run matched all 1217 trace events. ARM replay qualification is still pending;
-the Protoss controller attempt is also still in progress.
+run matched all 1217 trace events. The frozen Z4 ARM replay now also wins at
+frame 71777, with 73 checkpoints and a 15.12-fps mean over live PLAY intervals.
+A 30000-tick prefix saved at frame 29852; a fresh emulator process restored
+the observed state exactly, then completed the one-tick input handoff and 60
+neutral ticks at frame 29913. The source trace SHA-256 is
+`00ccdf89720a697e87084a7d99842b25ddebcc2f540926175ec865ce04d2ad6a`.
+The ROM SHA-256 is
+`4990ff713183d19e54078e2c171b829725ab49445debbe820605438f53a16d3c`,
+with ELF `77dd34fb7de332e29833843065d4abf1e2472041cd3a8c087532d910d5f0553c`.
+These results qualify that frozen development image; subsequent optimized
+images require their own comparisons. The Protoss controller is still in
+progress and has no completion claim.
 
 The asset-free default build/tests pass, including 217 Python tests, and
 unified build/tests pass. Dedicated actor, storage and Z4 runtime checks
 pass under ASan/UBSan. The stage uses a separate generation-20 save layout,
 retaining the unchanged IWRAM and EWRAM reserve assertions. These results
 are development evidence; the canonical qualified count remains 16/30.
+
+The staged four-entry profiles additionally pass every normal-menu mission
+launch, save round trip and 234 independent skirmish setups each under host
+ASan/UBSan. Those setup checks do not establish mission wins.
+
+### 2026-10-24 — fifth-chapter actor foundations
+
+An opt-in Z5 actor gate adds source facts and bounded GBA policies for Ghosts,
+Civilian, Rhynadon, Bengalaas, Ragnasaur, Data Disk and the Terran Beacon.
+The gate is disabled in all current ROM profiles. Existing enum identities
+and all four frozen Z3/P3/Z4/P4 ROM hashes remain unchanged with it disabled.
+Separate sprite completeness checks prevent partial Z5 imports from being
+treated as complete. The source-placement census counts Z5's seven raw-195
+beacons as buildings without changing other mission classifications.
+
+Actor tests cover the gate off, gate on and coexistence with the T4 actor set
+under ASan/UBSan; sprite generator and source-census tests use synthetic input.
+These foundations do not implement Z5's trigger effects, doodads or mission
+controller. UI/pathing policy for unusual actors is documented separately
+from source table facts; native equivalence is not implied.
 
 ### 2026-10-24 — race presentation performance comparison
 

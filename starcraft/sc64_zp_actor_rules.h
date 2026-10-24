@@ -15,6 +15,16 @@ enum {
     SC64_ZP_ACTOR_INVINCIBLE = 64u,
     SC64_ZP_ACTOR_HIDDEN = 128u,
     SC64_ZP_ACTOR_WEAPON = 256u
+#ifdef SC64_Z5_ACTORS
+    ,
+    /* GBA policy bits. For raw IDs that overlap existing T4 actors, the
+       authored policy reuses those project policies; source flags remain in
+       Sc64Z5ActorFact and do not imply these bits. Bengalaas intentionally
+       reuses the critter policy, with native UI/pathing equivalence unverified. */
+    SC64_ZP_ACTOR_POWERUP = 512u,
+    SC64_ZP_ACTOR_CRITTER = 1024u,
+    SC64_ZP_ACTOR_BEACON = 2048u
+#endif
 };
 
 typedef struct {
@@ -31,10 +41,56 @@ typedef struct {
     unsigned flags;
 } Sc64ZpBuildingFact;
 
+#ifdef SC64_Z5_ACTORS
+#include "sc64_z5_actor_rules.h"
+#endif
+
 /* -1 is unknown size; other values match BWAPI's Small/Medium/Large/
  * Independent enumeration (0..3). Scenario actors have no training route. */
 static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
 {
+#ifdef SC64_Z5_ACTORS
+    static const Sc64ZpActorFact z5_facts[] = {
+        /* raw, HP/shields/armor/cost/time/sight, bounds, flight/size,
+           ground damage/bonus/cooldown/range/hits, air weapon, policy tags */
+        {1,45,0,0,25,75,750,288, 7,10,7,11,0,0,
+         10,1,22,224,1, 10,1,22,224,1,
+         SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
+         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|
+         SC64_ZP_ACTOR_MEN|SC64_ZP_ACTOR_WEAPON},
+        {15,40,0,0,0,0,1,224, 8,9,8,10,0,0,
+         0,0,0,0,0, 0,0,0,0,0,
+         SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
+         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN},
+        {89,60,0,0,1,1,1,224, 16,16,15,15,0,0,
+         0,0,0,0,0, 0,0,0,0,0,
+         SC64_ZP_ACTOR_MOVABLE|SC64_ZP_ACTOR_COLLIDABLE|
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN|SC64_ZP_ACTOR_CRITTER},
+        {90,60,0,0,1,1,1,224, 16,16,15,15,0,0,
+         0,0,0,0,0, 0,0,0,0,0,
+         /* Reuses the critter GBA policy; native UI/pathing equivalence is
+            not established by BWAPI/OpenBW and remains unverified. */
+         SC64_ZP_ACTOR_MOVABLE|SC64_ZP_ACTOR_COLLIDABLE|
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN|SC64_ZP_ACTOR_CRITTER},
+        {95,60,0,0,1,1,1,224, 16,16,15,15,0,0,
+         0,0,0,0,0, 0,0,0,0,0,
+         SC64_ZP_ACTOR_MOVABLE|SC64_ZP_ACTOR_COLLIDABLE|
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN|SC64_ZP_ACTOR_CRITTER},
+        {218,800,0,0,1,1,1,160, 16,16,15,15,0,3,
+         0,0,0,0,0, 0,0,0,0,0,
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_INVINCIBLE|
+         SC64_ZP_ACTOR_POWERUP}
+    };
+    switch (type) {
+    case U_Z5_GHOST: return &z5_facts[0];
+    case U_Z5_CIVILIAN: return &z5_facts[1];
+    case U_Z5_RHYNADON: return &z5_facts[2];
+    case U_Z5_BENGALAAS: return &z5_facts[3];
+    case U_Z5_RAGNASAUR: return &z5_facts[4];
+    case U_Z5_DATA_DISK: return &z5_facts[5];
+    default: break;
+    }
+#endif
     static const Sc64ZpActorFact facts[] = {
         /* raw, default HP/shields/armor, default costs/time, sight,
            dimensions, flight, BWAPI size, ground/air weapon default facts */
@@ -81,6 +137,13 @@ static inline int sc64_zp_actor_default_shields(int type)
 
 static inline const Sc64ZpBuildingFact *sc64_zp_building_fact(int type)
 {
+#ifdef SC64_Z5_ACTORS
+    static const Sc64ZpBuildingFact z5_beacon =
+        {195,100000,0,0,50,50,1,256,3,2,48,32,47,31,3,
+         SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_BUILDING|
+         SC64_ZP_ACTOR_INVINCIBLE|SC64_ZP_ACTOR_BEACON};
+    if (type == B_Z5_TERRAN_BEACON) return &z5_beacon;
+#endif
     static const Sc64ZpBuildingFact facts[] = {
         /* raw, hp, shields, armor, sight, width, height, size, flags */
         {115,500,0,1,50,50,600,256,2,2,47,24,28,22,2,SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_BUILDING|SC64_ZP_ACTOR_DRAWABLE},

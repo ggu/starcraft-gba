@@ -1116,6 +1116,10 @@ build/test-sc64-z4-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p4-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z4-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_FLAGS) $< common/gba.c -o $@
 build/test-sc64-zp-actor-engine: tests/sc64_zp_actor_integration.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
 build/test-sc64-zp-zerg-storage: tests/sc64_zp_storage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -1127,16 +1131,18 @@ build/test-sc64-zp-air-tech: tests/sc64_zp_air_tech.c $(STARCRAFT) $(wildcard st
 build/test-sc64-z4-campaign-run: tests/sc64_z4_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z4-runtime test-sc64-p4-runtime test-sc64-zp-storage
-test-sc64-z4-runtime: build/test-sc64-z4-adapter build/test-sc64-z4-runtime build/test-sc64-zp-actor-engine build/test-sc64-zp-air-tech build/test-sc64-z4-frame-coverage
+test-sc64-z4-runtime: build/test-sc64-z4-adapter build/test-sc64-z4-runtime build/test-sc64-zp-actor-engine build/test-sc64-zp-air-tech build/test-sc64-z4-frame-coverage build/test-sc64-z4-profile
 	./build/test-sc64-z4-adapter
 	./build/test-sc64-zp-actor-engine
 	./build/test-sc64-zp-air-tech
 	./build/test-sc64-z4-runtime
 	./build/test-sc64-z4-frame-coverage
-test-sc64-p4-runtime: build/test-sc64-p4-adapter build/test-sc64-p4-runtime build/test-sc64-p4-frame-coverage
+	./build/test-sc64-z4-profile
+test-sc64-p4-runtime: build/test-sc64-p4-adapter build/test-sc64-p4-runtime build/test-sc64-p4-frame-coverage build/test-sc64-p4-profile
 	./build/test-sc64-p4-adapter
 	./build/test-sc64-p4-runtime
 	./build/test-sc64-p4-frame-coverage
+	./build/test-sc64-p4-profile
 test-sc64-zp-storage: build/test-sc64-zp-zerg-storage build/test-sc64-zp-protoss-storage
 	./build/test-sc64-zp-zerg-storage
 	./build/test-sc64-zp-protoss-storage
@@ -1163,6 +1169,19 @@ test-sc64-z5-adapter: build/test-sc64-z5-adapter
 	./build/test-sc64-z5-adapter
 test-sc64-p5-adapter: build/test-sc64-p5-adapter
 	./build/test-sc64-p5-adapter
+
+build/test-sc64-z5-actors-off: tests/sc64_z5_actor_rules.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h starcraft/sc64_z5_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS $< -o $@
+build/test-sc64-z5-actors-on: tests/sc64_z5_actor_rules.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h starcraft/sc64_z5_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS $< -o $@
+build/test-sc64-z5-actors-t4: tests/sc64_z5_actor_rules.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h starcraft/sc64_z5_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_T4_RUNTIME -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS $< -o $@
+.PHONY: test-sc64-z5-actors
+test-sc64-z5-actors: build/test-sc64-z5-actors-off build/test-sc64-z5-actors-on build/test-sc64-z5-actors-t4
+	./build/test-sc64-z5-actors-off
+	./build/test-sc64-z5-actors-on
+	./build/test-sc64-z5-actors-t4
+test-starcraft: test-sc64-z5-actors
 test-sc64-terran-full-targets: build/test-sc64-terran-full-targets
 	./build/test-sc64-terran-full-targets
 test-sc64-terran-full-spatial-hud: build/test-sc64-terran-full-collision build/test-sc64-terran-full-hud

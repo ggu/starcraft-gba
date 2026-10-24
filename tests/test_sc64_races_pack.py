@@ -1,4 +1,5 @@
 """Asset-free tests for the generated race-map table's stable catalog IDs."""
+from collections import Counter
 from pathlib import Path
 import hashlib
 import json
@@ -16,7 +17,8 @@ from sc64_races_pack import (T4_REQUIRED_SOURCE_RECORDS, campaign_guard_for_map,
                              emit_descriptor_table, emit_map_count,
                              global_id_for_map, retain_complete_map_source,
                              retain_source_records, retain_t4_source_records,
-                             source_actor_audit, verify_extractor_source)
+                             source_actor_audit, source_placement_category,
+                             verify_extractor_source)
 
 
 class RaceMapTableEmissionTests(unittest.TestCase):
@@ -282,6 +284,24 @@ class FullCampaignSourceAuditTests(unittest.TestCase):
             {'raw_type': 115, 'count': 1, 'source_class': 'building'},
             {'raw_type': 196, 'count': 1, 'source_class': 'unclassified'},
         ])
+
+    def test_source_placement_categories_scope_raw_195_to_z5(self):
+        self.assertEqual(source_placement_category(195, 9, 'T4'), 'unclassified')
+        self.assertEqual(source_placement_category(195, 10, 'T5'), 'building')
+        self.assertEqual(source_placement_category(195, 16, 'Z4'), 'unit')
+        self.assertEqual(source_placement_category(195, 17, 'Z5'), 'building')
+        self.assertEqual(source_placement_category(214, 17, 'Z5'), 'start_marker')
+        self.assertEqual(source_placement_category(150, 17, 'Z5'), 'building')
+
+    def test_z5_synthetic_source_census_counts_beacons_as_buildings(self):
+        rows = ([{'source_type': 0} for _ in range(135)] +
+                [{'source_type': 195} for _ in range(7)] +
+                [{'source_type': 214} for _ in range(7)])
+        categories = Counter(source_placement_category(
+            row['source_type'], 17, 'Z5') for row in rows)
+        self.assertEqual(categories, {
+            'unit': 135, 'building': 7, 'start_marker': 7,
+        })
 
     def test_complete_source_chk_is_exact_and_bounded(self):
         chk = b'UNIT' + struct.pack('<I', 3) + b'abc' + b'TRIG' + struct.pack('<I', 0)

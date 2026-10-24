@@ -452,6 +452,31 @@ def source_actor_audit(rows: list[dict], race: int) -> dict:
     }
 
 
+def source_placement_category(raw_type: int, map_index: int,
+                              mission_id: str | None = None) -> str:
+    """Classify a source UNIT row for its authored per-map census only.
+
+    Special raw-195 handling is intentionally map-scoped: T9 retains its
+    unclassified report, T10 retains its building report, and staged Z5's
+    seven Terran Beacons count as building placements. This does not alter
+    runtime mappings or pooled actor imports.
+    """
+    if raw_type == 214:
+        return 'start_marker'
+    if raw_type in (176, 177, 178):
+        return 'mineral'
+    if raw_type == 188:
+        return 'geyser'
+    if map_index == 9 and raw_type == 195:
+        return 'unclassified'
+    if (raw_type in BUILDING_RAW_IDS or
+            (raw_type == 195 and (map_index == 10 or mission_id == 'Z5'))):
+        return 'building'
+    if map_index == 11 and raw_type in (126, 138):
+        return 'building'
+    return 'unit'
+
+
 def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict:
     verify_extractor_source()
     importer = load('sc64_races_import', ROOT / 'tools/sc64_import.py')
@@ -655,14 +680,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
         if map_index >= 4:
             source_units = importer.unit_rows(sections.get(b'UNIT', b''))
             source_categories = Counter(
-                'start_marker' if u['source_type'] == 214 else
-                'mineral' if u['source_type'] in (176, 177, 178) else
-                'geyser' if u['source_type'] == 188 else
-                'unclassified' if map_index == 9 and u['source_type'] == 195 else
-                'building' if (u['source_type'] in BUILDING_RAW_IDS or
-                               (map_index == 10 and u['source_type'] == 195)) else
-                'building' if map_index == 11 and u['source_type'] in (126, 138) else
-                'unit'
+                source_placement_category(u['source_type'], map_index, mission_id)
                 for u in source_units
             )
             reports[-1]['source_unit_records'] = len(source_units)

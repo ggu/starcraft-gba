@@ -2,11 +2,13 @@ import tempfile
 import subprocess
 import unittest
 from pathlib import Path
+import sys
 
 from tools.sc64_race_sprites import (
     MISSION_RAW_TYPES, RACE_UNIT_IDS, T4_EXPECTED_VISIBLE_RAW_TYPES,
     T4_INVISIBLE_RAW_TYPES, T4_UNIT_IDS, asset_manifest_sha256, write_header,
     T4_BUILDING_IDS, T6_UNIT_IDS, LATE_UNIT_IDS, LATE_BUILDING_IDS,
+    Z5_UNIT_IDS, Z5_BUILDING_IDS,
 )
 
 
@@ -101,6 +103,7 @@ class RaceSpritePackTests(unittest.TestCase):
         self.assertNotIn('SC64_T4_ENABLED', text)
         self.assertNotIn('sc64_race_unit_sprite_mode', text)
         self.assertNotIn('case 218:', text)
+        self.assertNotIn('SC64_Z5_ACTORS', text)
 
     def test_crashed_norad_lookup_is_available_only_in_t6_profile(self):
         frame = {'pixels': bytes((9,)), 'alpha': bytes((1,)), 'width': 1,
@@ -184,12 +187,85 @@ int main(void) {
             self.assertIn('case 217: return &sc64_race_sprite_psi_emitter;', text)
             self.assertIn('case 127:', text)
             self.assertIn('case 172:', text)
-
             partial = root / 'partial.h'
             write_header(partial, base_units, bytes(range(256)), t4_units,
                          t4_buildings, t6_units, late_units[:1], late_buildings)
             self.assertNotIn('SC64_TERRAN_LATE_SPRITE_SET_COMPLETE',
                              partial.read_text())
+
+    def test_z5_sprite_set_has_independent_gate_and_complete_marker(self):
+        frame = {'pixels': bytes((9,)), 'alpha': bytes((1,)), 'width': 1,
+                 'height': 1, 'x': 0, 'y': 0, 'frame_width': 1,
+                 'frame_height': 1}
+        base_units = [{'name': name, 'frame': frame} for name in RACE_UNIT_IDS]
+        z5_units = [{'name': name, 'frame': frame} for name in Z5_UNIT_IDS]
+        z5_buildings = [{'name': name, 'frames': [frame, frame]}
+                        for name in Z5_BUILDING_IDS]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            full = root / 'z5.h'
+            write_header(full, base_units, bytes(range(256)),
+                         z5_selected=z5_units,
+                         z5_building_selected=z5_buildings)
+            text = full.read_text()
+            (root / 'check.c').write_text('''#include <assert.h>
+#include "z5.h"
+int main(void) {
+#ifdef SC64_Z5_ACTORS
+#ifndef SC64_Z5_SPRITE_SET_COMPLETE
+#error "complete Z5 set must advertise its own completion marker"
+#endif
+    assert(sc64_z5_actor_sprite(90));
+    assert(sc64_z5_actor_sprite(218));
+    assert(sc64_race_building_sprite(195, 1));
+    assert(!sc64_race_building_sprite(195, 2));
+#endif
+    return 0;
+}
+''')
+            for enabled in (False, True):
+                command = ['clang', '-std=c11', str(root / 'check.c'),
+                           '-o', str(root / 'check')]
+                if enabled:
+                    command.append('-DSC64_Z5_ACTORS')
+                subprocess.run(command, check=True, capture_output=True)
+                subprocess.run([str(root / 'check')], check=True, capture_output=True)
+            self.assertIn('#ifdef SC64_Z5_ACTORS', text)
+            self.assertIn('#define SC64_Z5_SPRITE_SET_COMPLETE 1', text)
+            self.assertIn('sc64_z5_actor_sprite(unsigned short raw_type)', text)
+            self.assertIn('case 90: return &sc64_race_sprite_bengalaas_z5;', text)
+            self.assertIn('case 195:', text)
+            partial = root / 'partial.h'
+            write_header(partial, base_units, bytes(range(256)),
+                         z5_selected=z5_units[:-1],
+                         z5_building_selected=z5_buildings)
+            self.assertNotIn('SC64_Z5_SPRITE_SET_COMPLETE', partial.read_text())
+            partial_building = root / 'partial-building.h'
+            write_header(partial_building, base_units, bytes(range(256)),
+                         z5_selected=z5_units,
+                         z5_building_selected=z5_buildings[:-1])
+            self.assertNotIn('SC64_Z5_SPRITE_SET_COMPLETE',
+                             partial_building.read_text())
+
+            zp_units = [{'name': name, 'frame': frame} for name in
+                        ('infested_kerrigan', 'raynor_vulture_zp', 'tassadar_hero_zp')]
+            zp_buildings = [{'name': name, 'frames': [frame]}
+                            for name in ('control_tower_zp', 'machine_shop_zp',
+                                         'armory_zp', 'queens_nest_zp',
+                                         'ultralisk_cavern_zp', 'protoss_beacon_zp')]
+            both = root / 'both.h'
+            write_header(both, base_units, bytes(range(256)),
+                         zp_selected=zp_units, zp_building_selected=zp_buildings,
+                         z5_selected=z5_units, z5_building_selected=z5_buildings)
+            both_text = both.read_text()
+            self.assertIn('SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE', both_text)
+            self.assertIn('SC64_Z5_SPRITE_SET_COMPLETE', both_text)
+        help_result = subprocess.run(
+            [sys.executable, str(Path(__file__).parents[1] / 'tools/sc64_race_sprites.py'), '--help'],
+            check=True, capture_output=True, text=True)
+        self.assertIn('--include-z5-actors', help_result.stdout)
+        self.assertIn('--include-zp-campaign-actors', help_result.stdout)
+
 
 
 if __name__ == '__main__':
