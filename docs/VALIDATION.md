@@ -2636,3 +2636,55 @@ hero using the observer's live-only entity rows, plus trigger/timer, switch,
 MRGN, AI, Cloak/Storm and transport relations. Thirteen focused resume tests
 pass, and the real retained startup snapshot passes this runtime validator.
 This does not establish an actual fresh-process Z6 SRAM handoff yet.
+
+### Probe expansion command
+
+The shared race menu now exposes NEXUS after STOP / HOLD when a Probe is
+selected. This uses the existing paid placement and construction path; a Nexus
+costs 400 minerals and does not require Pylon power. The extra row scrolls
+within the existing ten visible rows and leaves hero spell/transport menus in
+their existing selection contexts. No command indices or save fields change.
+
+Actual UI fixtures in basic unified, P6 and Z6 builds pass under ASan/UBSan:
+menu selection/rendering, denial at 399 minerals, successful expansion at
+400 minerals, Probe release, timed completion, added supply and Probe
+production at the second Nexus. Economy/arrival setup isolates this regression;
+these fixtures are not complete campaign wins.
+
+### Construction and Hydralisk visual pass
+
+Hydralisk/Hunter Killer shots now carry a transient needle style in the existing
+tracer color field. Four visible updates draw a moving segment capped at five
+pixels with a bright head, instead of a full red/gold beam. The firing update
+still applies damage immediately. Host tests cover geometry bounds, reversed
+and degenerate paths, both shooter owners, actual firing/aging/render order and
+unchanged tracer layout. No new save fields or runtime arrays are introduced.
+
+Construction uses existing progress and game-clock values for authored Terran
+scaffolding/sparks, Zerg morph pulses and Protoss warp pulses. The completed
+source sprite is revealed from the bottom as progress advances. Worker-en-route
+markers stay static. Incomplete art is kept out of the terrain cache; both
+static-key implementations pack the construction discriminator into an existing
+field so completion/removal invalidates cached art without adding RAM.
+
+Asset-free framebuffer tests cover distinct races, animation, waiting states,
+clamping and invalid input. P6 and Z6 actual-scene coverage compares repeated
+waiting/building/completion/removal transitions for all three races against
+full-clear rendering and passes. The extra Nexus command is restricted to
+Probe-only selections, keeping mixed transport/spell contexts unambiguous.
+
+This is a visual improvement, not native IScript reproduction. The local ROM
+contains construction and Needle Spines images, but their sequence mapping is
+not integrated. The native projectile timing/order and construction script
+signals remain fidelity gaps.
+
+The final UI/visual source snapshot passes a clean original-art build, all
+default host regressions and **324 Python tests (six private checks skipped)**,
+including the two new asset-free VFX suites. The source-only ROM is 65,536
+bytes with SHA-256
+`4ad80ce0319a9e9660a909c29414b7d8df86de036c6da459c0e158a0c50f9aee`.
+Basic unified and both sixth-probe ARM builds pass the unchanged reserve guards:
+P6 IWRAM `0x030045d8` / BSS `0x0203d774`; Z6 IWRAM `0x03004eb8` /
+BSS `0x0203d980`. Unified sanitizer regressions and the three Probe expansion
+profiles pass. The 506-file index audit contains no game/build/credential
+payloads. Full campaign replays and physical-hardware checks remain separate.

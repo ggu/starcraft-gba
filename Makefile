@@ -1945,3 +1945,33 @@ test-sc64-p6-burrow-cull: build/test-sc64-p6-burrow-grouped build/test-sc64-p6-b
 	./build/test-sc64-p6-burrow-cull-off
 	./build/test-sc64-p6-burrow-grouped
 	./build/test-sc64-p6-burrow-grouped-cull
+
+build/test-sc64-probe-expansion: tests/sc64_probe_expansion.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
+build/test-sc64-probe-expansion-p6: tests/sc64_probe_expansion.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-probe-expansion-z6: tests/sc64_probe_expansion.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-probe-expansion
+test-sc64-probe-expansion: build/test-sc64-probe-expansion build/test-sc64-probe-expansion-p6 build/test-sc64-probe-expansion-z6
+	./build/test-sc64-probe-expansion
+	./build/test-sc64-probe-expansion-p6
+	./build/test-sc64-probe-expansion-z6
+
+build/test-sc64-weapon-vfx: tests/sc64_weapon_vfx.c starcraft/sc64_weapon_vfx.h | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-weapon-vfx-game: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-weapon-vfx test-sc64-weapon-vfx-game
+test-sc64-weapon-vfx: build/test-sc64-weapon-vfx
+	./build/test-sc64-weapon-vfx
+test-sc64-weapon-vfx-game: build/test-sc64-weapon-vfx-game
+	./build/test-sc64-weapon-vfx-game
+test-starcraft: test-sc64-weapon-vfx
+
+build/test-sc64-construction-vfx: tests/sc64_construction_vfx.c starcraft/sc64_construction_vfx.h common/gba.c common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
+.PHONY: test-sc64-construction-vfx
+test-sc64-construction-vfx: build/test-sc64-construction-vfx
+	./build/test-sc64-construction-vfx
+test-starcraft: test-sc64-construction-vfx

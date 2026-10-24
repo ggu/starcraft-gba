@@ -1,6 +1,10 @@
 #include "../common/gba.h"
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
+#ifdef SC64_RACES
+#include "sc64_weapon_vfx.h"
+#include "sc64_construction_vfx.h"
+#endif
 #if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED)
 #define SC64_TRANSPORT_RUNTIME
 #endif
@@ -2389,6 +2393,11 @@ add_tracer(int x0, int y0, int x1, int y1, int color)
 	    tracers[i].x1 = x1;
 	    tracers[i].y1 = y1;
 	    tracers[i].life = 4;
+#ifdef SC64_RACES
+            /* The firing update ages effects before its first render. */
+            if (sc64_weapon_vfx_style(color)==SC64_WEAPON_VFX_STYLE_NEEDLE)
+                tracers[i].life=5;
+#endif
 	    tracers[i].color = color;
 	    return;
 	}
@@ -3348,6 +3357,22 @@ find_selected_worker(void)
     return -1;
 }
 
+#ifdef SC64_RACES
+static int
+race_nexus_command_available(void)
+{
+    int found=0;
+    if (race_human != R_PROTOSS || selected_building >= 0) return 0;
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && u[i].owner==SIDE && u[i].selected &&
+            !SC64_TRANSPORT_LOADED(&u[i])) {
+            if (u[i].type!=U_PROBE) return 0;
+            found=1;
+        }
+    return found;
+}
+#endif
+
 static void
 start_build(int type)
 {
@@ -3488,6 +3513,13 @@ static int race_selected_storm_hero(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_RACES
+    /* Contextual eleventh row: spell and transport rows belong to their
+       selected actors, while a selected Probe exposes base expansion. */
+    if (choice == MENU_STOP + 1 && race_nexus_command_available()) {
+        menu_open = 0; mode = MODE_BUILD; menu = B_NEXUS; return;
+    }
+#endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
     if (choice == MENU_STOP + 1 && race_z6_transport_research_selected()) {
         int result = race_z6_transport_start_research_selected();
@@ -3669,13 +3701,28 @@ static int field_menu_count(void)
 #ifdef SC64_P4_STORM_ENABLED
     if (race_p4_storm_menu_available()) return MENU_STOP + 2;
 #endif
+    if (race_nexus_command_available()) return MENU_STOP + 2;
     return race_human == R_ZERG ? MENU_COUNT : MENU_STOP + 1;
 }
 #elif defined(SC64_T5_RUNTIME)
 static int field_menu_count(void)
-{ return race_human == R_TER ? MENU_COUNT : MENU_STOP + 1; }
+{
+    if (race_nexus_command_available()) return MENU_STOP + 2;
+    return race_human == R_TER ? MENU_COUNT : MENU_STOP + 1;
+}
+#elif defined(SC64_RACES)
+static int field_menu_count(void)
+{ return MENU_STOP + 1 + race_nexus_command_available(); }
 #else
 #define field_menu_count() MENU_COUNT
+#endif
+
+#ifdef SC64_RACES
+static const char *field_menu_base_label(int choice, const char *const *labels)
+{
+    return choice == MENU_STOP + 1 && race_nexus_command_available() ?
+        "NEXUS" : labels[choice];
+}
 #endif
 
 static void
@@ -4082,7 +4129,12 @@ tick_combat(Unit * q, int target)
 	return;
     if (dx * dx + dy * dy <= range * range) {
 	if (!q->cd) {
-	    add_tracer(q->x, q->y, target_x(target), target_y(target), q->owner == SIDE ? C_GOLD : C_RED);
+            int shot_color=q->owner == SIDE ? C_GOLD : C_RED;
+#ifdef SC64_RACES
+            if (q->type==U_HYDRALISK || q->type==U_HUNTER_KILLER)
+                shot_color=sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_NEEDLE,C_GOLD);
+#endif
+	    add_tracer(q->x, q->y, target_x(target), target_y(target), shot_color);
 	#ifdef SC64_RACES
         int hits=sc64_race_unit_hits_vs(q->type,flying);
 #ifdef SC64_Z6_RUNTIME
@@ -5369,6 +5421,20 @@ draw_tracers(void)
 	if (tracers[i].life &&
 	    (currently_visible(tracers[i].x0, tracers[i].y0) ||
 	     currently_visible(tracers[i].x1, tracers[i].y1))) {
+#ifdef SC64_RACES
+            if (sc64_weapon_vfx_style(tracers[i].color)==SC64_WEAPON_VFX_STYLE_NEEDLE) {
+                Sc64WeaponVfxSegment needle;
+                if (sc64_weapon_vfx_segment(tracers[i].x0,tracers[i].y0,
+                        tracers[i].x1,tracers[i].y1,tracers[i].life,&needle)) {
+                    int hx=needle.head_x-camx,hy=needle.head_y-camy+12;
+                    gfx_line(needle.tail_x-camx,needle.tail_y-camy+12,
+                             hx,hy,sc64_weapon_vfx_color(tracers[i].color));
+                    gfx_pixel(hx,hy,C_WHITE);
+                    gfx_pixel(hx,hy-1,C_GOLD);
+                }
+                continue;
+            }
+#endif
 	    gfx_line(tracers[i].x0 - camx, tracers[i].y0 - camy + 12,
 		     tracers[i].x1 - camx, tracers[i].y1 - camy + 12, tracers[i].color);
 	}
@@ -5571,6 +5637,11 @@ draw_building_art(Building *q)
 #if defined(SC64_P6_RUNTIME) && defined(SC64_HAS_SPRITES)
     if (race_p6_draw_prop(q, x, y)) return;
 #endif
+#ifdef SC64_RACES
+    /* Unfinished structures are drawn dynamically below, so cached terrain
+       never freezes their construction effect or keeps their completed art. */
+    if (q->under_construction) return;
+#endif
 #ifdef SC64_HAS_SPRITES
     if (sprite) draw_mission_sprite(sprite, x, y);
     else
@@ -5628,12 +5699,37 @@ draw_building_overlay(Building *q)
 #else
     int sprite_x = x - 12, sprite_y = y - 12, sprite_w = 24, sprite_h = 24;
 #endif
+#ifdef SC64_RACES
+    if (q->under_construction) {
+        int duration=building_build_time(q->type);
+        int progress=q->build_progress;
+        int race=sc64_race_building_rules[q->type].race;
+#ifdef SC64_HAS_SPRITES
+        /* A bottom-up reveal uses the existing completed source art. The
+           scaffold/morph/warp motion is an authored visual approximation. */
+        if (sprite && duration>0 && progress>=0) {
+            int bounded=progress>duration?duration:progress;
+            int rows=(int)((u32)sprite->h*(unsigned)bounded/(unsigned)duration);
+            int skip=sprite->h-rows;
+            if (rows>0)
+                gfx_blit_sprite(sprite_x,sprite_y+skip,sprite->w,rows,
+                                sprite->pixels+skip*sprite->w);
+        }
+#endif
+        sc64_construction_vfx_draw(race+1,x,y,sprite_w,sprite_h,
+                                   progress,duration,(u32)frame);
+        if (duration>0 && progress>=0)
+            gfx_bar(x-12,sprite_y+sprite_h+3,24,2,progress,duration,C_CYAN,C_PANEL);
+    }
+#endif
     gfx_bar(x - 9, sprite_y - 4, 18, 2, q->hp, q->maxhp,
             owner_color(q->owner), C_RED_DARK);
+#ifndef SC64_RACES
     if (q->under_construction)
         gfx_text(x - 3, y, "C", C_GOLD);
     if (q->under_construction)
         gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_GOLD);
+#endif
 }
 
 #ifdef SC64_IMPORTED_MISSION
@@ -5690,7 +5786,11 @@ sc64_static_objects_key(void)
         int x = q->x - camx;
         int y = q->y - camy + 12;
         int in_bounds = q->alive && x >= -20 && x <= 260 && y >= 2 && y <= 130;
-        values[n++] = q->alive;
+        values[n++] = q->alive
+#ifdef SC64_RACES
+            | ((q->under_construction!=0)<<1)
+#endif
+            ;
         values[n++] = q->x;
         values[n++] = q->y;
         values[n++] = q->type;
@@ -5959,7 +6059,8 @@ draw_map(void)
         };
         if (menu_cursor >= 10) first = menu_cursor - 9;
 	for (i = first; i < count && i < first + 10; i++) {
-            const char *label = i >= MENU_FACTORY ?
+            const char *label = race_nexus_command_available() && i == MENU_STOP + 1 ?
+                "NEXUS" : i >= MENU_FACTORY ?
                 advanced_labels[i - MENU_FACTORY] : labels[i];
 	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
 	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
@@ -5969,7 +6070,7 @@ draw_map(void)
 #ifdef SC64_P4_STORM_ENABLED
 	for (i = first; i < field_menu_count() && i < first + 10; ++i) {
 	    const char *label = i == MENU_STOP + 1 && race_p4_storm_menu_available() ?
-                "STORM" : labels[i];
+                "STORM" : field_menu_base_label(i, labels);
 #ifdef SC64_P6_STORM_ENABLED
             if (i == MENU_STOP + 1 && race_p6_storm_menu_available()) label = "STORM";
 #endif
@@ -5981,13 +6082,14 @@ draw_map(void)
 	}
 #else
 	for (i = first; i < field_menu_count() && i < first + 10; ++i) {
+            const char *label = field_menu_base_label(i, labels);
 #ifdef SC64_Z5_CLOAK_ENABLED
-            const char *label = i == MENU_STOP + 1 && race_z5_cloak_menu_available() ?
+            label = i == MENU_STOP + 1 && race_z5_cloak_menu_available() ?
                 (race_z5.cloak.active ? "UNCLOAK" : "CLOAK") :
 #ifdef SC64_Z5_CONSUME_ENABLED
                 i == MENU_STOP + 2 && race_z5_cloak_menu_available() ? "CONSUME" :
 #endif
-                labels[i];
+                label;
 #endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
             if (i==MENU_STOP+1 && race_z6_transport_research_selected()) label="VENTRAL SACS";
@@ -6000,17 +6102,20 @@ draw_map(void)
             }
 #endif
 	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
-#ifdef SC64_Z5_CLOAK_ENABLED
 	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
-#else
-	    gfx_text(149, 17 + (i - first) * 9, labels[i], i == menu_cursor ? C_WHITE : C_DIM);
-#endif
 	}
 #endif
 #else
-	for (i = 0; i < MENU_COUNT; i++) {
-	    gfx_text(142, 17 + i * 9, i == menu_cursor ? ">" : " ", C_GOLD);
-	    gfx_text(149, 17 + i * 9, labels[i], i == menu_cursor ? C_WHITE : C_DIM);
+        int first = menu_cursor >= 10 ? menu_cursor - 9 : 0;
+	for (i = first; i < field_menu_count() && i < first + 10; i++) {
+            const char *label =
+#ifdef SC64_RACES
+                field_menu_base_label(i, labels);
+#else
+                labels[i];
+#endif
+	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
+	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
 	}
 #endif
     }

@@ -72,7 +72,9 @@ sc64_static_objects_key(void)
         int x = q->x - camx, y = q->y - camy + 12;
         int drawn = q->alive && x >= -20 && x <= 260 && y >= 2 && y <= 130 &&
                     (q->owner == SIDE || currently_visible(q->x, q->y));
-        SC64_STATIC_FIELD(drawn);
+        /* Construction is dynamic; completion must refresh the cached art.
+           Pack this discriminator into the existing drawn field, adding no RAM. */
+        SC64_STATIC_FIELD(drawn ? 1 + ((q->under_construction!=0)<<1) : 0);
         if (drawn) {
             SC64_STATIC_FIELD(q->x);
             SC64_STATIC_FIELD(q->y);

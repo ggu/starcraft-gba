@@ -135,6 +135,38 @@ setup_profile(void)
 }
 
 static int
+test_construction_cache_transitions(void)
+{
+    const int types[]={B_BARRACKS,B_HATCHERY,B_NEXUS};
+    int failures=0;
+    for (unsigned race=0;race<3;++race) {
+        setup_profile();
+        int slot=spawn_build(SIDE,types[race],512,512,1);
+        assert(slot>=0);
+        int duration=building_build_time(types[race]);
+        for (unsigned pass=0;pass<2;++pass) {
+            if (pass) { reset_render_caches(); poison_both_pages(); }
+            for (unsigned state=0;state<6;++state) {
+                Building *q=&b[slot];
+                q->alive=state!=5; q->under_construction=state<4;
+                q->build_progress=state==0?-1:(int)(state-1u)*duration/3;
+                frame=state*4u;
+                if (!pass) draw_full_clear_reference(transition_references[state]);
+                else {
+                    game_render(); capture(candidate_pixels);
+                    if (memcmp(transition_references[state],candidate_pixels,FB_SIZE)) {
+                        fprintf(stderr,"construction race%u state%u differs with reused terrain\n",
+                                race,state);
+                        ++failures;
+                    }
+                }
+            }
+        }
+    }
+    return failures;
+}
+
+static int
 test_camera_fog_and_overlays(void)
 {
     int failures = 0;
@@ -327,6 +359,7 @@ main(void)
     failures = test_camera_fog_and_overlays();
     failures += test_scene_transitions();
     failures += test_mutation_save_load_and_restart();
+    failures += test_construction_cache_transitions();
     failures += test_consecutive_viewport_edge_frames();
 #if defined(SC64_P6_RUNTIME)
     failures += test_p6_doodad_action_cold_warm();
