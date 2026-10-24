@@ -821,7 +821,7 @@ static int issue_group_order(int x, int y, int army_only, int attack_move)
 
 static void launch_from_normal_menu(void)
 {
-    assert(sc64_catalog_playable_count(SC64_FACTION_PROTOSS) == 4);
+    assert(sc64_catalog_is_playable(SC64_P4_GLOBAL_ID));
     assert(sc64_catalog_playable_ordinal(SC64_FACTION_PROTOSS, SC64_P4_GLOBAL_ID) == 3);
     game_init(); prior_keys = 0;
     assert(screen == SCREEN_TITLE && race_front.page == SC_FRONT_HOME);

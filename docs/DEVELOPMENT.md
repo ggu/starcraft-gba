@@ -1331,3 +1331,25 @@ capacities can change the outcome. The tool verifies a fresh HOME start,
 feeds only scheduler input fields, and checks the final configuration, frame,
 result and live actor counts. Its FPS mean uses GBA timer deltas between live
 PLAY checkpoints, excluding HOME/start and final RESULT intervals.
+
+### Prepare the qualified staged Zerg and Protoss builds
+
+The wrapper also supports the six-mission Zerg development profile and the
+five-mission Protoss Shuttle profile. From a fresh checkout, use your supported
+StarCraft 64 USA ROM:
+
+```sh
+./dev sc64 prepare --rom "/path/to/StarCraft64-USA.z64" --profile zerg-z6
+./dev sc64 build --profile zerg-z6
+./dev sc64 test --profile zerg-z6
+./dev sc64 prepare --rom "/path/to/StarCraft64-USA.z64" --profile protoss-p5-shuttle
+./dev sc64 build --profile protoss-p5-shuttle
+./dev sc64 test --profile protoss-p5-shuttle
+```
+
+These generate the required maps, art, scenario, ability and transport headers
+under `.local/`; Z6 also generates its inherited Z5 sprite bank. Inspect
+readiness with `./dev sc64 status --profile zerg-z6` or the corresponding
+Protoss profile. The output ROMs are `build/StarCraft-Zerg-Z6-Probe-GBA.gba`
+and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The ordinary `zerg` and
+`protoss` profile names still build their canonical three-mission versions.

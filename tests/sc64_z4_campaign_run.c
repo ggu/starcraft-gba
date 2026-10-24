@@ -282,7 +282,7 @@ static void issue_attack_move(int x, int y)
 
 static void launch_from_normal_menu(void)
 {
-    assert(sc64_catalog_playable_count(SC64_FACTION_ZERG) == 4);
+    assert(sc64_catalog_is_playable(15));
     assert(sc64_catalog_playable_ordinal(SC64_FACTION_ZERG, 15) == 3);
     game_init();
     prior_keys = 0;

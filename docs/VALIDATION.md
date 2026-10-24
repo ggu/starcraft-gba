@@ -3002,10 +3002,48 @@ remain queued/running. Frozen pairs and reports are under
 
 The two remaining frozen skirmish samples also complete with exact terminal
 host witnesses. The Zerg ROM on the imported map, human Zerg against two AIs,
-reaches its loss at tick 24318/frame 18298 and averages **28.41 effective fps**.
+reaches its loss at tick 24318/frame 18280 and averages **28.41 effective fps**.
 The Protoss ROM on the imported map, human Protoss against three AIs, reaches
 its win at tick 16338/frame 16300 and averages **26.10 effective fps**. All
 three samples preserve the configured human/bot races and owners, final
 frame/result and live actor counts. These cover one representative match per
 ROM and AI count, not all 54 host cases or physical GBA behavior. Summary:
 `.local/build/promotion/skirmish-dense-qualified/summary.json`.
+
+### Fresh staged preparation and promotion checks
+
+The `dev` wrapper now exposes `zerg-z6` and `protoss-p5-shuttle` preparation,
+build, test, status and play routes. Seventeen onboarding checks pass,
+including empty-directory packer-output coverage. An actual isolated source
+export, initially containing no generated private inputs, successfully prepares
+and builds both profiles from the existing authenticated user ROM. Both status
+commands report READY and both ARM builds pass the fixed memory guards.
+The fresh Z6 ROM is byte-identical to the qualified `bc24435f…15e8c` build.
+Fresh P5 Shuttle produces a 4 MiB ROM with SHA-256
+`6b51962db99d068cf31627493cb211e4199a1e27281f8c60bcb2d19e8fdbfe81`.
+Private commands/logs are under `.local/build/promotion/staged-prepare-fresh.json`.
+
+Profile-aware controller launchers now retain exact mission/ordinal checks
+without assuming that the catalog ends at chapter four. Under the larger Z6
+bank, genuine-input controllers win Z1–Z5; under P5 Shuttle they win P1/P2/P4
+and the P5 route. P3 remains a promotion gate: its starting roster/resources
+match the canonical build, but its paid AI uses the larger pool (240 rather
+than 128 units) and the old player policy does not complete at its full limit.
+No AI cap or victory condition was reduced to force a pass. Canonical profile
+promotion remains unfinished.
+
+The legacy non-unified four-mission controller check completes Z1/Z2/P1 but
+fails P2. Compiling the unmodified committed controller reproduces the identical
+P2 loss trace (SHA-256 `dce74d7c…e45f5`); this is a pre-existing route failure,
+not a changed non-unified launch sequence. The canonical expanded P2 route
+passes separately. This failure is not counted as a green regression.
+
+All eight default-off P6 query options now reproduce the entire frozen host
+winning trace byte for byte (`e66d25a4…00421` above), including every input and
+checkpoint. The fast dense ARM candidate retains the same memory ends and
+has ROM SHA-256
+`0e1f791e52773308b00925e88bfd949e4ff6d6be109a27e9d7552832457da447`.
+It passes opening fresh-process SRAM restore; late-save and full ARM win
+qualification are running. This supersedes the slower candidate's incomplete
+late replay for qualification; its completed opening save evidence is retained.
+The options remain disabled by default until full qualification completes.
