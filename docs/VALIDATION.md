@@ -2116,8 +2116,16 @@ uses Storm, and routes the escort separately with the authored B+R shortcut.
 Repeated ASan/UBSan runs produce the same complete trace (2185 transitions,
 peak 109 in one 1000-tick scheduler page). Trace SHA-256 is
 `b7d072d609ea9bd17c59024c81f6a27165b7b6ac3e8e0d0175b2227934111ef4`.
-ARM replay and fresh-process save qualification are in progress; this host
-result does not establish physical hardware performance.
+The frozen ARM image also completes that exact normal-input trace at frame
+109776, with the same heroes at Tassadar (1551,1984) and Raynor (1520,1992),
+all 87 creates and zero faults. Its full live-play mean is 15.17 fps. ROM
+SHA-256 is `381f0c4bb751ab2005502a3d8505aa8c7eaf8fa6f48213a8f313a7d5eda7fcf6`,
+with ELF `c5f785d26cc16ae5deb65d55007de50a413ab6c1e1c8718131a2dd83e74121ae`.
+A separate 30000-tick prefix saves at frame 29903; a fresh process restores
+the observed state exactly and advances one handoff frame plus 60 neutral
+ticks to frame 29964. This qualifies that frozen development image; later
+shared builds require their own matching-image checks. Physical hardware
+performance and the 30-fps target remain unqualified.
 
 The opt-in Z5 runtime imports every retained starting actor and all 41
 unit-backed THG2 props. Source binding identity, enabled door/trap state,
@@ -2140,3 +2148,22 @@ remaining missions.
 A private aligned-halfword sprite-read experiment matched 62 prefix state
 checkpoints and eight captures across P3/Z4, but improved their 30000-tick
 means only from 26.43 to 26.45 and 18.48 to 18.55 fps. It is not enabled.
+
+### 2026-10-24 — defense target-list candidate
+
+An opt-in `SC64_ZP_DEFENSE_TARGETS` path builds fresh owner/class lists after
+the mission tick, preserving lower-slot ties and rechecking targets killed by
+earlier defenses. Invalid ownership falls back before any combat mutation.
+The existing P3 path keeps its mission-specific dispatch. Three actual-engine
+ASan/UBSan fixtures compare complete defense ticks against the original scan,
+including 800 randomized worlds per profile, strict range, tie, early-death,
+power, cooldown and invalid-owner cases.
+
+Separate 30000-tick ARM prefixes match all 31 observed states and four captures
+for each mission. Z4 improves from 18.48 to 21.09 fps; P4 Storm improves from
+15.23 to 16.40 fps. Full wins and fresh-save qualification are running before
+enabling the flag in the staged builds.
+
+A separate private packed-minimap experiment passes its 1000-pattern host
+pixel oracle and both ARM state/capture comparisons, but changes the Z4/P3
+prefix means only from 18.48/26.43 to 18.65/26.49 fps. It remains disabled.

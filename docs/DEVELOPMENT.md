@@ -828,11 +828,11 @@ Templar or Tassadar, open **B** commands, choose **STORM**, place the cursor
 within cast range and press **A**; **B** cancels targeting. The row appears
 only when the selected caster has enough energy. Storm affects allied units
 too. Its pulse cadence and visual effect use documented authored policies;
-this experiment is not a completed P4 qualification.
+see the frozen development-image qualification in [Validation](VALIDATION.md).
 
 The P4 controller now has a repeatable host win. Run its full input-only
-playthrough with `make test-sc64-p4-campaign`; ARM replay and fresh-process
-save checks are separate. In this profile, **B+R** selects the combat escort
+playthrough with `make test-sc64-p4-campaign`; matching-image ARM replay and
+fresh-process save checks are separate. In this profile, **B+R** selects the combat escort
 without Tassadar and Raynor, so army orders can clear their route first.
 Ordinary **R** still selects the heroes with the army.
 

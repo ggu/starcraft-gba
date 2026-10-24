@@ -42,8 +42,11 @@ also exercises all three frontend variants without requiring those inputs.
 
 The Terran profile presents ten missions. Standard Zerg and Protoss profiles
 present three each. Controller-driven host runs complete 16 of the 30 missions
-across these profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. The other 14 missions have
-no completed runtime.
+across these profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. Separate internal
+Z4 and P4 Storm builds additionally have normal-controller host and full ARM
+wins, bringing the staged total to 18 distinct missions. Their saves and ROM
+identities differ from the canonical outputs. Z5 has an internal runtime under
+controller qualification; the remaining chapters are incomplete.
 
 Zerg 3 **The New Dominion** and Protoss 3 **Higher Ground** are on the second
 campaign menu page. The canonical files remain `StarCraft-Zerg-GBA.gba` and
@@ -52,11 +55,12 @@ generations 5 / 7. Their loaders reject saves from the older standard
 two-mission format (generation 2), without changing the live game state.
 Do not rename an older save and expect format conversion.
 
-An opt-in source staging tool now preserves and authenticates the complete
-Zerg 4 **Agent of the Swarm** scenario for the next implementation stage.
-It does not enable Z4 in a ROM or increase the 16/30 completed count. See
-[Z4 source staging](DEVELOPMENT.md#zerg-4-source-staging) for the command and
-remaining runtime work.
+The opt-in `zerg-z4` and `protoss-p4-storm` builds preserve the complete
+starting rosters for **Agent of the Swarm** and **The Hunt for Tassadar**.
+See [staged chapter setup](DEVELOPMENT.md#staged-zerg-and-protoss-chapter-4)
+and [Validation](VALIDATION.md) for their controls, frozen hashes and limits.
+These remain development targets while the canonical race outputs retain
+their separately qualified three-entry campaign menus.
 
 Terran 3, Desperate Alliance, has an experimental runtime behind
 `SC64_T3_ENABLED`. After preparing a race profile, build and check it with:
