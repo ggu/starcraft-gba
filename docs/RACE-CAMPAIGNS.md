@@ -7,8 +7,9 @@ latest optimization build has full T7 and T10 ARM wins; T8 and T9 remain
 qualified on earlier frozen ROMs. The current
 full-profile ARM T10 result is below the 30-fps target, and no physical GBA
 result is claimed. The canonical `terran` profile includes all ten Terran
-missions. The standard Zerg and Protoss profiles include their first two
-missions; opt-in `zerg-z3` and `protoss-p3` builds add a third mission. The
+missions. The standard Zerg and Protoss profiles include their first three
+missions. The older `zerg-z3` and `protoss-p3` target names now alias those
+canonical builds and their ROM/ELF files. The
 catalog records all 30 mission identifiers.
 
 The stage sections below preserve dated implementation history. The
@@ -40,10 +41,16 @@ also exercises all three frontend variants without requiring those inputs.
 ## Campaign progress
 
 The Terran profile presents ten missions. Standard Zerg and Protoss profiles
-present two each; their opt-in `zerg-z3` and `protoss-p3` builds present three
-each. Controller-driven host runs complete 16 of the 30 missions across these
-profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. The other 14 missions have
+present three each. Controller-driven host runs complete 16 of the 30 missions
+across these profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. The other 14 missions have
 no completed runtime.
+
+Zerg 3 **The New Dominion** and Protoss 3 **Higher Ground** are on the second
+campaign menu page. The canonical files remain `StarCraft-Zerg-GBA.gba` and
+`StarCraft-Protoss-GBA.gba`. They now use game codes `SCZ3` / `SCP3` and save
+generations 5 / 7. Their loaders reject saves from the older standard
+two-mission format (generation 2), without changing the live game state.
+Do not rename an older save and expect format conversion.
 
 An opt-in source staging tool now preserves and authenticates the complete
 Zerg 4 **Agent of the Swarm** scenario for the next implementation stage.
@@ -76,25 +83,34 @@ missions. The combined T4 target described below added this third mission and
 Jacobs Installation to the normal campaign flow. Performance remains below the
 30-fps target; see the measured builds in [Validation](VALIDATION.md).
 
-Zerg 3, The New Dominion, also has an experimental build:
+Historical Z3 implementation and performance evidence
+------------------------------------------------------
 
-```sh
-make zerg-z3 test-sc64-z3-runtime
-```
+The following commands and measurements document the earlier experimental
+build. Z3 is now part of the canonical three-mission Zerg profile; the legacy
+target name aliases that profile and no longer selects a separate build.
 
-This target enables three-bit route fields and exact row-span sight updates.
+The legacy `zerg-z3` target and `build/StarCraft-Zerg-Z3-GBA.gba` output
+name now resolve to the canonical Zerg profile. Use `make zerg test-zerg` for
+the current profile and runtime suite.
+
+The historical target enabled three-bit route fields and exact row-span sight
+updates.
 The extra route slots retain more destinations within the same field-memory
 budget. Sight updates preserve the existing circles and change only cells
-entering or leaving them. These optimizations are currently enabled for Z3.
-For a comparison build, use `make -B zerg-z3 Z3_OPTIMIZATION_FLAGS=`; rebuild
-with plain `make -B zerg-z3` to restore the optimized version. Retain each
+entering or leaving them. These optimizations are enabled in the current Z3
+profile. For a comparison build, use `make -B zerg Z3_OPTIMIZATION_FLAGS=`;
+rebuild with `make -B zerg` to restore the optimized version. Retain each
 ROM/ELF pair separately before comparing runs.
 
-`build/StarCraft-Zerg-Z3-GBA.gba` adds New Dominion on page two of the Zerg
-campaign. Protect the Mature Chrysalis and eliminate the Terran presence.
+New Dominion appears on page two of the Zerg campaign. The canonical ROM is
+`build/StarCraft-Zerg-GBA.gba`. Protect the Mature Chrysalis and eliminate
+the Terran presence.
 The source victory gates are at most six remaining enemy units/buildings
 combined, or no enemy buildings. Losing the Chrysalis starts defeat.
-All 58 units, 33 buildings, 28 mineral fields and three geysers are retained.
+All 58 runtime units, 33 runtime buildings, 28 mineral fields and three
+geysers are imported. This includes both Dropships; raw type 150, the Mature
+Chrysalis, is classified as a building by the runtime.
 The Mature Chrysalis is a stationary structure with 250 HP and one armor;
 the Young Chrysalis in the first two missions remains a separate powerup.
 The 128-unit engine reserves sixteen slots from enemy training for the player.
@@ -105,14 +121,15 @@ attacks on enemy structures. It wins with the Chrysalis intact. This is a
 host gameplay regression; ARM full-mission timing and physical GBA validation
 remain separate checks.
 
-The optimized ARM replay also wins and matches the host's final state. It
-averages 19.19 fps during counted play, up from 16.69 fps before these changes.
-Its worst complete observed interval is 15.23 fps. Reported gameplay state
-matches the earlier run at all 73 checkpoints. The mission stays experimental
-while that performance gap is addressed; physical GBA testing remains pending.
+The optimized ARM replay of that frozen experimental build also wins and
+matches the host's final state. It averaged 19.19 fps during counted play, up
+from 16.69 fps before those changes. Its worst complete observed interval was
+15.23 fps. Reported gameplay state matched the earlier run at all 73
+checkpoints. These are historical measurements, not measurements of the
+current canonical profile; physical GBA testing remains pending.
 
-To replay that host test's complete input trace on the current experimental
-ARM build, run this after the build/test command above:
+To replay that host test's complete input trace on a retained frozen
+experimental ARM build, run this after building that target:
 
 ```sh
 python3 tools/sc64_z3_controller_replay.py
@@ -129,26 +146,26 @@ The helper stops that controller trace during play, pauses with START and
 saves with B. Its report records the observed and saved frames and SRAM hash.
 Prefixes are labeled explicitly and do not assert a complete mission win.
 
-The experimental Z3 build uses `SC64_Z3_WINDOWED_SCHEDULE` to reduce its
+That experimental Z3 build used `SC64_Z3_WINDOWED_SCHEDULE` to reduce its
 debugger input buffer from 2,048 to 256 entries. The helper detects this queue
 from ELF symbols and refills it at the existing
 1,000-tick observer stops. Events retain absolute ticks; held buttons and
 press edges carry across empty windows. It checks each page's capacity before
-launch and verifies consumption before refill. The complete proof trace has
-1,388 transitions and a peak of 49 per window. This option frees 14,328 bytes
-of BSS after bookkeeping, preserves legacy count-only scheduling for simple
-profilers, and has no input effect during ordinary play. Standard builds keep
-their existing queues. Use a current replay helper with a windowed ELF.
+launch and verifies consumption before refill. The complete proof trace had
+1,388 transitions and a peak of 49 per window. This option freed 14,328 bytes
+of BSS after bookkeeping, preserved legacy count-only scheduling for simple
+profilers, and had no input effect during ordinary play. Use a replay helper
+that matches the retained windowed ELF.
 
 Enemy pressure uses paid Marines every two minutes and small attacks from
 the imported guards every three minutes. This is an authored substitute for
 the source AI script. Result actions use explicit presentation timing policies:
 30/15-tick waits, 90-tick transmission/text holds and a 13-tick loss-audio
 placeholder. Original dialogue/audio and Dropship transport are absent.
-The experimental save identity rejects older Zerg saves and retains the
-pending action cursor and timer. Standard Zerg builds still enable only
-their first two missions. See [Validation](VALIDATION.md) for what has been
-tested and what remains pending.
+The experimental save identity rejected older Zerg saves and retained the
+pending action cursor and timer. The current canonical Zerg profile uses the
+Z3 campaign identity and includes the first three missions. See
+[Validation](VALIDATION.md) for the current qualification status and limits.
 
 After local preparation, `make test-sc64-t3-import` checks every retained T3
 record, its runtime type mapping, coordinate bounds and terrain indices. It

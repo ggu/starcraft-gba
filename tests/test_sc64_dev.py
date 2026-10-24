@@ -16,9 +16,88 @@ loader = importlib.machinery.SourceFileLoader('starcraft_dev', str(ROOT / 'dev')
 spec = importlib.util.spec_from_loader(loader.name, loader)
 dev = importlib.util.module_from_spec(spec)
 loader.exec_module(dev)
+verify_loader = importlib.machinery.SourceFileLoader(
+    'starcraft_verify_roms', str(ROOT / 'tools/verify_roms.py'))
+verify_spec = importlib.util.spec_from_loader(verify_loader.name, verify_loader)
+verify_roms = importlib.util.module_from_spec(verify_spec)
+verify_loader.exec_module(verify_roms)
 
 
 class OnboardingTests(unittest.TestCase):
+    def test_z3_and_p3_profile_gates_are_required_and_distinct(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'sc64_races_generated.h'
+            header.write_text('#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
+                              'sc64_race_z3_units\n#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n',
+                              encoding='utf-8')
+            self.assertTrue(dev.race_campaign_input_ready('zerg', header))
+            self.assertFalse(dev.race_campaign_input_ready('protoss', header))
+            header.write_text('#if defined(SC64_UNIFIED) && defined(SC64_P3_ENABLED)\n'
+                              'sc64_race_p3_units\n#endif /* SC64_UNIFIED && SC64_P3_ENABLED */\n',
+                              encoding='utf-8')
+            self.assertTrue(dev.race_campaign_input_ready('protoss', header))
+            header.write_text('sc64_race_z3_units\n', encoding='utf-8')
+            self.assertFalse(dev.race_campaign_input_ready('zerg', header))
+
+    def test_canonical_race_verifiers_use_third_mission_identities(self):
+        self.assertEqual(verify_roms.TARGETS['--zerg'],
+                         ('StarCraft-Zerg-GBA', 'starcraft-zerg', 'SCZ3', 'SC ZERG Z3'))
+        self.assertEqual(verify_roms.TARGETS['--zerg-z3'], verify_roms.TARGETS['--zerg'])
+        self.assertEqual(verify_roms.TARGETS['--protoss'],
+                         ('StarCraft-Protoss-GBA', 'starcraft-protoss', 'SCP3', 'SC PROTOSS3'))
+        self.assertEqual(verify_roms.TARGETS['--protoss-p3'], verify_roms.TARGETS['--protoss'])
+
+    def test_dev_race_tests_include_full_campaign_targets(self):
+        self.assertEqual(dev.SC64_TEST_TARGETS['zerg'], 'test-zerg')
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
+
+    def test_race_profile_status_requires_its_compile_gated_map_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            race_header = root / '.local/sc64/races/generated/sc64_races_generated.h'
+            race_header.parent.mkdir(parents=True)
+            race_header.write_text('#if defined(SC64_UNIFIED) && defined(SC64_P3_ENABLED)\n'
+                                    'sc64_race_p3_units\n'
+                                    '#endif /* SC64_UNIFIED && SC64_P3_ENABLED */\n',
+                                   encoding='utf-8')
+            output = io.StringIO()
+            games = dict(dev.GAMES, zerg=('zerg', 'build/zerg.gba'))
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'GAMES', games), \
+                 contextlib.redirect_stdout(output):
+                status = dev.status('zerg')
+            self.assertEqual(status, 1)
+            self.assertIn('MISSING Zerg chapter 3 gated map data', output.getvalue())
+
+    def test_race_prepare_fails_if_generated_map_gate_is_wrong(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rom = root / 'user-rom.z64'
+            rom.write_bytes(b'user ROM fixture')
+
+            def fake_run(command, *, cwd=dev.ROOT):
+                script = Path(command[1]).name
+                local = root / '.local/sc64'
+                if script == 'sc64_workspace.py':
+                    (local / 'rom').mkdir(parents=True, exist_ok=True)
+                    (local / 'rom/StarCraft64-USA.z64').write_bytes(b'prepared ROM')
+                    base = local / 'backwater/generated'
+                    base.mkdir(parents=True, exist_ok=True)
+                    for name in ('sc64_mission_generated.h', 'sc64_assets_generated.h',
+                                 'sc64_sprites_generated.h'):
+                        (base / name).write_text('mock\n', encoding='utf-8')
+                elif script == 'sc64_races_pack.py':
+                    path = local / 'races/generated/sc64_races_generated.h'
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text('#if defined(SC64_UNIFIED) && defined(SC64_P3_ENABLED)\n'
+                                    'sc64_race_p3_units\n'
+                                    '#endif /* SC64_UNIFIED && SC64_P3_ENABLED */\n',
+                                    encoding='utf-8')
+
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
+                 patch.object(dev, 'run', side_effect=fake_run):
+                with self.assertRaisesRegex(RuntimeError, 'SC64_Z3_ENABLED map gate'):
+                    dev.prepare(rom, 'zerg')
+
     def check_doctor(self, *, require_emulator=False, emulator=None, missing=None):
         output = io.StringIO()
         def which(command):

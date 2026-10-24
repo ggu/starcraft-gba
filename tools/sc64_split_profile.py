@@ -74,6 +74,108 @@ def checked_sram(path: Path) -> Path:
     return path
 
 
+def saved_state_from_report(report_path: Path, save_path: Path, *, profile: str,
+                            mission: int, rom_sha256: str, elf_sha256: str) -> dict:
+    """Authenticate a replay save report and return its paused state snapshot."""
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"cannot read checkpoint report: {exc}") from exc
+    expected_profile = "zerg-z3" if profile == "zerg" else "protoss-p3" if profile == "protoss" else None
+    if expected_profile is None or report.get("profile") != expected_profile or report.get("mission") != mission:
+        raise ValueError("checkpoint report profile/mission does not match the requested fresh load")
+    if report.get("rom_sha256") != rom_sha256 or report.get("elf_sha256") != elf_sha256:
+        raise ValueError("checkpoint report ROM/ELF hashes do not match this fresh-load build")
+    checkpoint = report.get("checkpoint_save") or report.get("save")
+    if not isinstance(checkpoint, dict) or not isinstance(checkpoint.get("state"), dict):
+        raise ValueError("checkpoint report has no paused state snapshot")
+    save_path = checked_sram(save_path)
+    digest = hashlib.sha256(save_path.read_bytes()).hexdigest()
+    if checkpoint.get("sha256") != digest:
+        raise ValueError("checkpoint report does not authenticate the supplied SRAM file")
+    return checkpoint["state"]
+
+
+def verify_restored_checkpoint(expected: dict, observed: dict, *, mission: int) -> None:
+    """Compare persisted world and mission state after a fresh-process load."""
+    model_key = "race_z3" if mission == 14 else "race_p3" if mission == 22 else None
+    campaign_key = "campaign" if "campaign" in expected else "race_campaign"
+    if model_key is None or model_key not in expected or campaign_key not in expected:
+        raise RuntimeError("checkpoint report is missing the requested mission campaign/model state")
+    if not isinstance(expected[model_key], dict) or not isinstance(expected[campaign_key], dict):
+        raise RuntimeError("checkpoint report campaign/model state is malformed")
+    required = ("frame", "race_mode", "race_selected_mission", "race_human",
+                "won", "lost", "minerals", "gas", "units", "buildings")
+    for key in required:
+        if key not in expected or key not in observed:
+            raise RuntimeError(f"fresh SRAM restore is missing {key}")
+        if expected[key] != observed[key]:
+            raise RuntimeError(f"fresh SRAM restore {key} differs from saved checkpoint")
+    # Compare every persisted race-bank/model field present in the source
+    # snapshot, including fields added by later profile observers.
+    extra_keys = {key for key in expected if key.startswith("race_")}
+    extra_keys.update(("campaign", "supply", "supply_cap"))
+    for key in extra_keys:
+        if key not in expected:
+            continue
+        observed_key = key
+        if key == "campaign" and key not in observed and "race_campaign" in observed:
+            observed_key = "race_campaign"
+        if key == "race_campaign" and key not in observed and "campaign" in observed:
+            observed_key = "campaign"
+        if observed_key not in observed or expected[key] != observed[observed_key]:
+            raise RuntimeError(f"fresh SRAM restore {key} differs from saved checkpoint")
+    if observed.get("race_selected_mission") != mission or observed.get("screen") != SCREEN_PLAY:
+        raise RuntimeError("fresh SRAM load did not return to the requested live campaign")
+
+
+def validate_load_save_options(load_save: Path | None, load_save_report: Path | None,
+                               mission: int | None) -> None:
+    """Keep unverified legacy loads available; constrain report-backed checks."""
+    if load_save is None:
+        if load_save_report is not None:
+            raise ValueError("--load-save-report requires --load-save")
+        return
+    if mission is None:
+        raise ValueError("--load-save requires --mission to verify the loaded campaign")
+    if load_save_report is not None and mission not in (14, 22):
+        raise ValueError("--load-save-report continuity verification supports Z3 mission 14 and P3 mission 22")
+
+
+def resumed_frame_continuity(loaded_frame: int, tick_zero_frame: int,
+                             requested_ticks: int, completed_ticks: int,
+                             live_ticks: int, final_state: dict) -> dict:
+    """Verify the one handoff update and scheduler frame progression."""
+    handoff_ticks = (tick_zero_frame - loaded_frame) & 0xFFFFFFFF
+    if handoff_ticks != 1:
+        raise RuntimeError("fresh SRAM continuation did not perform exactly one neutral handoff frame")
+    observed_frame = final_state.get("frame")
+    playing = final_state.get("screen") == SCREEN_PLAY
+    expected_frame = (tick_zero_frame + completed_ticks) & 0xFFFFFFFF
+    observed_advance = ((observed_frame - loaded_frame) & 0xFFFFFFFF
+                        if observed_frame is not None else None)
+    observed_scheduler_advance = ((observed_frame - tick_zero_frame) & 0xFFFFFFFF
+                                  if observed_frame is not None else None)
+    verified = bool(playing and completed_ticks == requested_ticks and
+                    observed_frame == expected_frame)
+    if playing and observed_frame != expected_frame:
+        raise RuntimeError("fresh SRAM continuation frame does not match completed live ticks")
+    return {
+        "loaded_frame": loaded_frame,
+        "tick_zero_frame": tick_zero_frame,
+        "handoff_live_frames": handoff_ticks,
+        "requested_ticks": requested_ticks,
+        "completed_scheduler_ticks": completed_ticks,
+        "completed_scheduler_live_ticks": live_ticks,
+        "observed_frame": observed_frame,
+        "expected_frame": expected_frame,
+        "observed_simulation_frame_advance_since_load": observed_advance,
+        "observed_simulation_frame_advance_after_tick_zero": observed_scheduler_advance,
+        "frame_invariant_verified": verified,
+        "full_live_interval_not_verified": not verified,
+    }
+
+
 def save_live_checkpoint(rsp, sym: dict[str, int], *, tick: int) -> dict:
     """Leave the observer scheduler, then pause/save using normal controls.
 
@@ -178,12 +280,22 @@ def observe(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
     buildings = races.read_entities(rsp, sym["b"], bank["building_capacity"],
                                     bank["building_stride_bytes"], bank["building_offsets"],
                                     building=True)
+    buildings = add_building_hp(rsp, sym, bank, buildings)
     state = {name: u32(rsp, sym[name]) for name in
              ("screen", "frame", "won", "lost", "race_mode", "race_human", "race_bots",
+              "race_completed",
               "race_skirmish_map", "race_selected_mission", "race_cols", "race_rows",
               "minerals", "gas") if name in sym}
     state["units"] = units
     state["buildings"] = buildings
+    if "race_player" in sym:
+        size = sizes.get("race_player", 0)
+        if size and size % 4 == 0:
+            state["race_player"] = list(struct.unpack("<" + "i" * (size // 4),
+                                                       rsp.read(sym["race_player"], size)))
+    for symbol, field in (("supply_used", "supply"), ("supply_cap", "supply_cap")):
+        if symbol in sym:
+            state[field] = u32(rsp, sym[symbol])
     refinery_counts: dict[str, int] = {}
     for building in buildings["entities"]:
         refinery_name = REFINERY_TYPES.get(building["type"])
@@ -222,6 +334,7 @@ def observe(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
         raw = rsp.read(sym["race_z3"], z3_size)
         action_ticks = int.from_bytes(rsp.read(sym["race_z3_action_ticks"], action_ticks_size), "little")
         state["race_z3"] = decode_z3_state(raw, z3_offsets, action_ticks)
+        state["race_z3_action_ticks"] = action_ticks
     if p3_layout:
         size, offsets = p3_layout
         if sizes.get("race_p3_action_ticks", 0) != 2:
@@ -232,11 +345,26 @@ def observe(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
     return state
 
 
+def add_building_hp(rsp, sym: dict[str, int], bank: dict, buildings: dict) -> dict:
+    """Include the persisted building HP field used by replay snapshots."""
+    hp_offset = bank["building_offsets"].get("hp")
+    if hp_offset is None:
+        return buildings
+    stride = bank["building_stride_bytes"]
+    base = sym["b"]
+    buildings["entities"] = [
+        {**item, "hp": int.from_bytes(
+            rsp.read(base + item["slot"] * stride + hp_offset, 4), "little", signed=True)}
+        for item in buildings["entities"]
+    ]
+    return buildings
+
+
 def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
         checkpoint: int, output: Path, mission: int | None = None,
         rom_path: Path | None = None, elf_path: Path | None = None,
         require_win: bool = False, load_save: Path | None = None,
-        save_at_end: bool = False) -> dict:
+        save_at_end: bool = False, load_save_report: Path | None = None) -> dict:
     if ticks < 1:
         raise ValueError("ticks must be positive")
     # The target's main loop checkpoints at every 1000 ticks and at the exact
@@ -245,10 +373,9 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
         raise ValueError("this ROM scheduler checkpoints at fixed 1000-tick intervals")
     if ticks > 0xFFFFFFFF:
         raise ValueError("ticks exceeds the 32-bit controller scheduler length")
+    validate_load_save_options(load_save, load_save_report, mission)
     if load_save is not None:
         load_save = checked_sram(load_save)
-        if mission is None:
-            raise ValueError("--load-save requires --mission to verify the loaded campaign")
     if save_at_end and require_win:
         raise ValueError("--save-at-end requires live play, so cannot be combined with --require-win")
 
@@ -258,6 +385,10 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
         raise RuntimeError(f"{profile}: build both ROM and ELF first ({rom}, {elf})")
     rom_sha256 = hashlib.sha256(rom.read_bytes()).hexdigest()
     elf_sha256 = hashlib.sha256(elf.read_bytes()).hexdigest()
+    expected_saved_state = (saved_state_from_report(
+        load_save_report, load_save, profile=profile, mission=mission,
+        rom_sha256=rom_sha256, elf_sha256=elf_sha256)
+        if load_save_report is not None and load_save is not None and mission is not None else None)
     # The split UI helpers inspect the appended Sc64Frontend fields through
     # DWARF offsets. Populate their shared offset table before starting UI.
     split.FRONT_FIELDS = split.frontend_offsets(elf)
@@ -339,6 +470,8 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
             loaded = observe(rsp, sym, sizes, bank, campaign_layout, t3_layout, z3_layout, p3_layout)
             if (loaded["screen"], loaded["race_mode"], loaded["race_selected_mission"]) != (SCREEN_PLAY, 0, mission):
                 raise RuntimeError("HOME L did not load the requested campaign SRAM")
+            if expected_saved_state is not None:
+                verify_restored_checkpoint(expected_saved_state, loaded, mission=mission)
             loaded_frame = loaded["frame"]
             launch = {"width": loaded["race_cols"], "height": loaded["race_rows"]}
         elif mission is None:
@@ -361,6 +494,7 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
             configuration["loaded_sram"] = str(load_save)
             configuration["loaded_sram_sha256"] = hashlib.sha256(load_save.read_bytes()).hexdigest()
             configuration["loaded_frame"] = loaded_frame
+            configuration["saved_state_verified"] = expected_saved_state is not None
             if "race_z3" in loaded:
                 configuration["loaded_race_z3"] = loaded["race_z3"]
             if "race_p3" in loaded:
@@ -510,6 +644,11 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
                                "building_words", "building_offsets")},
             "checkpoints": observations,
         }
+        if expected_saved_state is not None and loaded_frame is not None:
+            tick_zero_frame = observations[0]["frame"]
+            result["resume_continuity"] = resumed_frame_continuity(
+                loaded_frame, tick_zero_frame, ticks, last_tick,
+                counted_play_ticks, observations[-1])
         report = out / "profile.json"
         report.write_text(json.dumps(result, indent=2) + "\n")
         final_won = (observations[-1].get("screen") == SCREEN_RESULT and
@@ -576,6 +715,8 @@ def main() -> None:
                         help="exit with failure unless the final observed screen is a won result")
     parser.add_argument("--load-save", type=Path,
                         help="load campaign SRAM through HOME L before measuring (requires --mission)")
+    parser.add_argument("--load-save-report", type=Path,
+                        help="matching Z3/P3 controller replay profile.json to verify the saved state and hashes")
     parser.add_argument("--save-at-end", action="store_true",
                         help="pause/save live play through normal controls after the measured interval")
     parser.add_argument("--ticks", type=int, default=10000)
@@ -590,7 +731,8 @@ def main() -> None:
         run(args.profile, args.map, args.race, args.bots, args.ticks,
             args.checkpoint, args.out, mission=args.mission,
             rom_path=args.rom, elf_path=args.elf, require_win=args.require_win,
-            load_save=args.load_save, save_at_end=args.save_at_end)
+            load_save=args.load_save, save_at_end=args.save_at_end,
+            load_save_report=args.load_save_report)
     except (OSError, RuntimeError, ValueError, AssertionError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f"sc64_split_profile: {exc}\n")
 
