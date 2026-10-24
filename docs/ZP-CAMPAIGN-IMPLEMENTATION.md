@@ -44,7 +44,8 @@ Current staged runtimes cover Z5's unusual actors, doors and traps and P5's
 complete actor census, including its Guardian, Shuttle and created
 Battlecruiser. Z5's optional source-permitted cloak has controls, energy,
 detector and save tests. P5 has source-world callbacks, rescue and persisted
-death counters. Neither fifth mission yet has a verified controller win.
+death counters. P5 Shuttle now has a complete ordinary-input host and ARM win
+and exact fresh-process cargo save. Z5 remains under controller qualification.
 The actor-gap lists below retain the initial source audit; already resolved
 Z5/P5 entries are historical requirements, not current import failures.
 

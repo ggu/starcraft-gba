@@ -2266,3 +2266,20 @@ Canonical distribution profiles remain Terran 10, Zerg 3, Protoss 3. P5's full
 ARM mean is **12.69 effective fps** across counted live-play intervals, excluding
 HOME/start and RESULT intervals. This is a playability qualification, not a
 30-fps result or physical GBA verification. Z5 and later missions remain unfinished.
+
+
+### Protoss five defense targeting optimization
+
+The source-preserving defense lists are enabled in `P5_SHUTTLE_FLAGS` after a
+complete ARM replay and cargo save qualification. The full win improves from
+12.69 to **14.79 effective fps** with all ten checkpoint observations and three
+PNG captures identical. This includes source action cursors, death counters,
+persisted mission bytes and whole actor-bank hashes. Fresh-process SRAM
+restoration is exact and continues through one handoff plus 60 live frames.
+The unchanged IWRAM/EWRAM reserve guards pass. This remains below 30 fps.
+
+Private evidence: `.local/build/promotion/p5-defense-qualified/qualification.json`.
+Candidate ROM SHA-256: `bfad3cdb598cb2bc7dfb0542ec39e1315c44f67a4513f23ceb1bb1c3157cc1e5`.
+Frozen ELF SHA-256: `6af9fc7e5bd2794196525558fd53b8a371a936d5843e727501438a1dc7b841ba`.
+The actual-engine differential defense fixture also compares P5 source-player
+death counters, ensuring earlier kills do not silently change later targeting.

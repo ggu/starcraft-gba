@@ -16,6 +16,9 @@ typedef struct {
     Tracer tracer_data[MAX_TRACERS];
     u8 invincible_units[MAX_UNITS], invincible_buildings[MAX_BUILDINGS];
     int supply_used, supply_cap, path_valid;
+#ifdef SC64_P5_RUNTIME
+    Sc64P5PersistentState p5;
+#endif
 } DefenseWorld;
 
 static DefenseWorld before, expected, actual;
@@ -39,6 +42,9 @@ static void world_save(DefenseWorld *s)
     s->supply_used = supply_used;
     s->supply_cap = supply_cap;
     s->path_valid = path_grid_valid;
+#ifdef SC64_P5_RUNTIME
+    s->p5 = race_p5;
+#endif
 }
 
 static void world_restore(const DefenseWorld *s)
@@ -51,6 +57,9 @@ static void world_restore(const DefenseWorld *s)
     supply_used = s->supply_used;
     supply_cap = s->supply_cap;
     path_grid_valid = s->path_valid;
+#ifdef SC64_P5_RUNTIME
+    race_p5 = s->p5;
+#endif
 }
 
 static void compare_paths(void)
@@ -77,7 +86,10 @@ static void clear_world(void)
     race_mode = 0;
     race_human = R_PROTOSS;
     race_bots = 0;
-#ifdef SC64_P4_RUNTIME
+#ifdef SC64_P5_RUNTIME
+    memset(&race_p5, 0, sizeof(race_p5));
+    race_selected_mission = SC64_P5_GLOBAL_ID;
+#elif defined(SC64_P4_RUNTIME)
     race_selected_mission = SC64_P4_GLOBAL_ID;
 #elif defined(SC64_Z5_RUNTIME)
     race_selected_mission = 16;
