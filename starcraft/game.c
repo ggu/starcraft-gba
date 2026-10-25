@@ -6632,12 +6632,14 @@ game_update(u16 held, u16 pressed)
 #endif
     if (frame % 30 == 0)
 	economy();
+#ifndef SC64_IMPORTED_MISSION
     if (frame % 90 == 0) {
 	int i;
 	for (i = 0; i < MAX_UNITS; i++)
 	    if (u[i].alive && u[i].owner == SIDE && IS_WORKER(u[i].type) && u[i].hp < u[i].maxhp)
 		u[i].hp++;
     }
+#endif
 #ifndef SC64_IMPORTED_MISSION
     enemy_wave();
 #endif
@@ -6735,11 +6737,30 @@ mission_unit_sprite(int type)
 #endif
 }
 
+#ifdef SC64_RACES
+static const Sc64SpriteFrame *
+sc64_race_building_art_sprite(int raw)
+{
+    const Sc64SpriteFrame *sprite =
+        raw >= 0 ? sc64_race_unit_sprite((unsigned short)raw) : 0;
+    if (sprite) return sprite;
+    switch (raw) {
+    /* These late Terran structures have dedicated source building frames,
+       rather than entries in the ordinary unit-sprite table. */
+    case 108: case 117: case 120: case 123: case 127:
+    case 116: case 118: case 171: case 172:
+        return sc64_race_building_sprite((unsigned short)raw, 0);
+    default:
+        return 0;
+    }
+}
+#endif
+
 static const Sc64SpriteFrame *
 mission_building_sprite(int type)
 {
 #ifdef SC64_RACES
-    return sc64_race_unit_sprite(sc64_race_raw_building(type));
+    return sc64_race_building_art_sprite(sc64_race_raw_building(type));
 #else
     if (type == B_COMMAND) return &sc64_sprite_command_center;
     if (type == B_BARRACKS) return &sc64_sprite_barracks;
@@ -7189,7 +7210,7 @@ draw_building_art(Building *q)
 #endif
         q->type == B_CONTROL_TOWER ? sc64_race_unit_sprite(sc64_race_t5_building_art_raw(q->type)) :
 #endif
-        q->raw_type>=0?sc64_race_unit_sprite(q->raw_type):
+        q->raw_type>=0?sc64_race_building_art_sprite(q->raw_type):
 #endif
         mission_building_sprite(q->type);
 #endif
@@ -7261,7 +7282,7 @@ draw_building_overlay(Building *q)
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
-        q->raw_type>=0?sc64_race_unit_sprite(q->raw_type):
+        q->raw_type>=0?sc64_race_building_art_sprite(q->raw_type):
 #endif
         mission_building_sprite(q->type);
     int sprite_x = sprite ? x - sprite->canvas_w / 2 + sprite->offset_x : x - 12;

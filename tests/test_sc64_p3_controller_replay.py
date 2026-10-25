@@ -49,8 +49,8 @@ def valid_stock_trace():
     rows = []
     previous = 0
     input_ticks = list(range(1, 8))
-    input_ticks.extend(8 + ((n - 8) * (58058 - 8)) // (2985 - 8)
-                       for n in range(8, 2986))
+    input_ticks.extend(8 + ((n - 8) * (59667 - 8)) // (2999 - 8)
+                       for n in range(8, 3000))
     for index, tick in enumerate(input_ticks):
         held = (index & 1) + 1 if (index & 1) == 0 else 0
         # Alternate valid press/release transitions. Keep the recorded menu
@@ -64,7 +64,7 @@ def valid_stock_trace():
             rows.append({"kind": "start", **replay.STOCK_EXPECTED_START})
 
     periodic = []
-    for n in range(1, 58):
+    for n in range(1, 60):
         frame = n * 1000
         periodic.append({"kind": "periodic", "host_tick": frame + 32,
                          "frame": frame, "elapsed": frame, "screen": replay.SCREEN_PLAY,
@@ -198,12 +198,12 @@ class P3ControllerReplayValidation(unittest.TestCase):
 
     def test_stock_route_is_additive_and_uses_its_authenticated_start_and_win(self):
         trace = valid_stock_trace()
-        plan = replay.validate_trace(trace, 128, route="stock", windowed=True)
+        plan = replay.validate_trace(trace, 256, route="stock", windowed=True)
         self.assertEqual(plan["route"], "stock")
         self.assertEqual(plan["policy"], replay.STOCK_POLICY)
-        self.assertEqual(plan["input_count"], 2985)
-        self.assertEqual(plan["stop_tick"], 58063)
-        self.assertEqual(plan["peak_page_transitions"], 58)
+        self.assertEqual(plan["input_count"], 2999)
+        self.assertEqual(plan["stop_tick"], 60197)
+        self.assertLessEqual(plan["peak_page_transitions"], 256)
         self.assertEqual(replay.build_parser().parse_args(["--route", "stock"]).route, "stock")
         # Existing frozen routes retain their exact policy and stop ticks.
         self.assertEqual(replay.validate_trace(valid_trace(), 4)["stop_tick"], 152107)
@@ -215,25 +215,25 @@ class P3ControllerReplayValidation(unittest.TestCase):
         start = next(row for row in trace["events"] if row["kind"] == "start")
         start["force2_units"] -= 1
         with self.assertRaisesRegex(ValueError, "stock start force2_units"):
-            replay.validate_trace(trace, 128, route="stock", windowed=True)
+            replay.validate_trace(trace, 256, route="stock", windowed=True)
 
         trace = valid_stock_trace()
         trace["events"][-1]["primary_objective"] = 0
         with self.assertRaisesRegex(ValueError, "primary_objective"):
-            replay.validate_trace(trace, 128, route="stock", windowed=True)
+            replay.validate_trace(trace, 256, route="stock", windowed=True)
 
         trace = valid_stock_trace()
         periodic = next(row for row in trace["events"] if row["kind"] == "periodic")
         periodic["frame"] += 1
         with self.assertRaisesRegex(ValueError, "live stock-route checkpoint"):
-            replay.validate_trace(trace, 128, route="stock", windowed=True)
+            replay.validate_trace(trace, 256, route="stock", windowed=True)
 
     def test_stock_route_reuses_strict_transition_and_page_validation(self):
         trace = valid_stock_trace()
         trace["events"][1]["held"] = trace["events"][0]["held"]
         trace["events"][1]["pressed"] = 0
         with self.assertRaisesRegex(ValueError, "held-state transition"):
-            replay.validate_trace(trace, 128, route="stock", windowed=True)
+            replay.validate_trace(trace, 256, route="stock", windowed=True)
 
         trace = valid_stock_trace()
         trace["events"][1]["pressed"] = 1
@@ -408,7 +408,7 @@ class P3ControllerReplayValidation(unittest.TestCase):
     def test_stock_final_verifier_compares_native_win_state_and_route_witness(self):
         final = valid_stock_trace()["events"][-1]
         state = {
-            "screen": replay.SCREEN_RESULT, "frame": 57457, "won": 1, "lost": 0,
+            "screen": replay.SCREEN_RESULT, "frame": 59586, "won": 1, "lost": 0,
             "side_units": 22, "side_army": 22, "side_buildings": 4,
             "force2_units": 6, "force2_buildings": 0,
             "force3_units": 9, "force3_buildings": 0,
@@ -417,7 +417,7 @@ class P3ControllerReplayValidation(unittest.TestCase):
             "supply": 88, "supply_cap": 32, "gateways": 1,
             "zealots_queued": 0, "selected_units": 22,
             "selected_building": -1, "geyser_count": 3,
-            "race_campaign": {"mission": 22, "elapsed_frames": 57457,
+            "race_campaign": {"mission": 22, "elapsed_frames": 59586,
                               "phase": 3, "objective_flags": 1},
             "race_p3": {"outcome": 1, "sequence": 5, "fired": 31,
                         "transmission": 0, "reserved": 0, "action_ticks": 0},

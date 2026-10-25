@@ -3267,3 +3267,25 @@ test-sc64-building-stock: build/test-sc64-building-stock-base build/test-sc64-bu
 	./build/test-sc64-building-stock-combined
 test: test-sc64-building-stock
 test-unified: test-sc64-building-stock
+
+# Exercise the worker-health branch through actual game_update() calls in both
+# imported stock profiles and the original-art runtime.
+build/test-sc64-worker-heal-imported: tests/sc64_worker_heal_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) $< common/gba.c -o $@
+build/test-sc64-worker-heal-legacy: tests/sc64_worker_heal_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
+.PHONY: test-sc64-worker-heal test-sc64-worker-heal-legacy test-sc64-worker-heal-imported
+test-sc64-worker-heal-legacy: build/test-sc64-worker-heal-legacy
+	./build/test-sc64-worker-heal-legacy
+test-sc64-worker-heal-imported: build/test-sc64-worker-heal-imported
+	./build/test-sc64-worker-heal-imported
+test-sc64-worker-heal: test-sc64-worker-heal-legacy test-sc64-worker-heal-imported
+test: test-sc64-worker-heal-legacy
+test-unified: test-sc64-worker-heal
+
+.PHONY: test-sc64-late-building-renderer
+build/test-sc64-late-building-renderer: tests/sc64_late_building_renderer.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $< common/gba.c -o $@
+test-sc64-late-building-renderer: build/test-sc64-late-building-renderer
+	./build/test-sc64-late-building-renderer
+test-terran: test-sc64-late-building-renderer

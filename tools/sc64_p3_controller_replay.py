@@ -60,7 +60,7 @@ STOCK_EXPECTED_START = {
     "geyser_count": 3,
 }
 STOCK_EXPECTED_FINAL = {
-    "host_tick": 58063, "frame": 57457, "elapsed": 57457,
+    "host_tick": 60197, "frame": 59586, "elapsed": 59586,
     "screen": SCREEN_RESULT, "won": 1, "lost": 0, "p3_outcome": 1,
     "p3_sequence": 5, "p3_fired": 31, "p3_model_valid": 1,
     "campaign_phase": 3, "objective_flags": 1, "primary_objective": 1,
@@ -229,8 +229,8 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False,
                                   sum(row.get("kind") == "periodic" for row in rows) != 123 or
                                   sum(row.get("kind") == "progress" for row in rows) != 12):
         raise ValueError("expansion trace input/checkpoint counts differ from the verified controller run")
-    if route == "stock" and (len(inputs) != 2985 or
-                              sum(row.get("kind") == "periodic" for row in rows) != 57):
+    if route == "stock" and (len(inputs) != 2999 or
+                              sum(row.get("kind") == "periodic" for row in rows) != 59):
         raise ValueError("stock trace input/checkpoint counts differ from the verified controller run")
     if windowed:
         last_page = (stop_tick - 1) // window_ticks
