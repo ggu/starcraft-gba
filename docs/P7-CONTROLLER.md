@@ -37,8 +37,8 @@ This produces `build/StarCraft-Protoss-P7-Campaign-Probe-GBA.gba`, title
 `SC P7 CAMP40`, code `SC7C`. Its host matrix wins P1–P7, tests typed saves
 across the catalog, and completes all eighteen full skirmish configurations.
 The ARM link passes unchanged reserves (IWRAM end `0x03004a30`, BSS end
-`0x0203dcd4`). The ARM completion and SRAM evidence below uses the original
-typed-move profile; the composition still needs its own ARM qualification.
+`0x0203dcd4`). The composition also passed its own instrumented P7 ARM
+completion and fresh-process SRAM continuation, as detailed below.
 
 ## Completion evidence on 2026-10-25
 
@@ -93,6 +93,17 @@ so this proves a playable saved-game continuation, not full ARM-state or
 uninterrupted-trajectory parity. The private ARM builds stayed within the
 unchanged guards (IWRAM end `0x03004a28`, BSS end `0x0203dce4`).
 
+The separate composition profile passed an independent instrumented ARM
+run at frame 39,370 with all 1,127 transitions, no scheduler/runtime fault,
+the expected hero ownership, and the source victory predicates. Its own
+32 KiB SRAM experiment saved at frame 29,862, loaded in a fresh process,
+and reached the same source win at frame 39,893 after the frozen suffix
+and 520 neutral updates. Checkpoint entity/economy/source telemetry matched;
+full ARM-state and uninterrupted-trajectory parity remain unproven. The
+instrumented composition stayed within the unchanged reserves (IWRAM end
+`0x03004a30`, BSS end `0x0203dce4`). Both private evidence manifests passed
+SHA-256 verification.
+
 Host controllers compiled with `P7_TYPED_MOVE_FLAGS` completed P1, P2, P4,
 P5 and P6. The same profile completed all eighteen skirmish configurations
 (two maps, three human races, one to three rotated AI races): three wins and
@@ -118,7 +129,8 @@ Its full host matrix also wins P1, P2 and P4–P7, passes actual-engine typed
 save/load fixtures, and completes all eighteen skirmish matches (three wins,
 fifteen losses). The P7 trace matches the original typed-move profile exactly;
 skirmish timing can change with nearest-depot routing. This establishes an
-existing working host composition for further ARM qualification.
+existing working host composition; its bounded P7 ARM checks above do not
+establish complete ARM qualification for all seven missions or skirmishes.
 
 This controller does not promote P7, change canonical menus, or
 establish native AI or Carrier combat equivalence. Physical GBA qualification
