@@ -2591,6 +2591,23 @@ build/test-sc64-z7-scourge: tests/sc64_z7_scourge_game.c $(STARCRAFT) $(wildcard
 test-sc64-z7-scourge: build/test-sc64-z7-scourge
 	./build/test-sc64-z7-scourge
 
+# Ordinary-input qualification candidate: the Egg, sight and Scourge rules
+# plus the existing nearest-depot worker policy; no campaign promotion.
+Z7_CONTROLLER_FLAGS := $(Z7_SCOURGE_PROBE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_DENSE_SCHEDULE
+build/test-sc64-z7-controller: tests/sc64_z7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_CONTROLLER_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-controller zerg-z7-controller-probe
+test-sc64-z7-controller: build/test-sc64-z7-controller
+	mkdir -p .local/build/z7-controller
+	./build/test-sc64-z7-controller --trace .local/build/z7-controller/controller-trace.json
+build/starcraft-zerg-z7-controller-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_CONTROLLER_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-controller-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Controller-Probe-GBA.gba: build/starcraft-zerg-z7-controller-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 RUN36' SCZQ
+zerg-z7-controller-probe: build/StarCraft-Zerg-Z7-Controller-Probe-GBA.gba
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
