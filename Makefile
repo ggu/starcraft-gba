@@ -2712,6 +2712,50 @@ build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba: build/starcraft-protoss-p7-
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 MOVE40' SC7M
 protoss-p7-typed-move-probe: build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba
 
+# Ordinary-input Homeland controller for the existing generation-40 probe.
+# This remains separate from canonical campaign promotion/ARM qualification.
+build/test-sc64-p7-controller: tests/sc64_p7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-controller
+test-sc64-p7-controller: build/test-sc64-p7-controller
+	mkdir -p .local/build/p7-controller
+	./build/test-sc64-p7-controller .local/build/p7-controller/controller-trace.jsonl
+
+# Separate seven-mission qualification profile. Existing probes keep their flags.
+P7_CAMPAIGN_COMPOSITION_FLAGS := $(P7_TYPED_MOVE_FLAGS) -DSC64_P3_PRODUCTION_EXIT -DSC64_NEAREST_RESOURCE_DEPOT
+define P7_CAMPAIGN_CONTROLLER
+build/test-sc64-p7-campaign-$(1): tests/$(2).c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $$(P7_CAMPAIGN_COMPOSITION_FLAGS) $$< common/gba.c -o $$@
+endef
+$(eval $(call P7_CAMPAIGN_CONTROLLER,early,race_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p3,sc64_p3_expansion_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p4,sc64_p4_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p5,sc64_p5_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p6,sc64_p6_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p7,sc64_p7_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,skirmish,sc64_skirmish_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,save,sc64_p7_typed_compact_game))
+.PHONY: test-sc64-p7-campaign-composition protoss-p7-campaign-probe
+test-sc64-p7-campaign-composition: $(addprefix build/test-sc64-p7-campaign-,early p3 p4 p5 p6 p7 skirmish save)
+	mkdir -p .local/build/p7-campaign
+	./build/test-sc64-p7-campaign-save
+	./build/test-sc64-p7-campaign-early --controller 2 --trace .local/build/p7-campaign/p1.json
+	./build/test-sc64-p7-campaign-early --controller 3 --trace .local/build/p7-campaign/p2.json
+	./build/test-sc64-p7-campaign-p3 --trace .local/build/p7-campaign/p3.json
+	./build/test-sc64-p7-campaign-p4 --attempt-tag p7-campaign
+	./build/test-sc64-p7-campaign-p5 --attempt-tag p7-campaign
+	./build/test-sc64-p7-campaign-p6 --trace .local/build/p7-campaign/p6.json
+	./build/test-sc64-p7-campaign-p7 .local/build/p7-campaign/p7.jsonl
+	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller build/test-sc64-p7-campaign-skirmish --output .local/build/p7-campaign/skirmish
+
+build/starcraft-protoss-p7-campaign-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_CAMPAIGN_COMPOSITION_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-campaign-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Campaign-Probe-GBA.gba: build/starcraft-protoss-p7-campaign-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 CAMP40' SC7C
+protoss-p7-campaign-probe: build/StarCraft-Protoss-P7-Campaign-Probe-GBA.gba
+
 # Opt-in exact source-rectangle reuse in P7 aura and detection.
 P7_TYPED_RECT_FLAGS := $(P7_TYPED_MOVE_FLAGS) -DSC64_P7_GEOMETRY_RECT_HOIST_ENABLED
 build/test-sc64-p7-rect-runtime: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
