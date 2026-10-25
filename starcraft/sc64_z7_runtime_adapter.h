@@ -218,6 +218,40 @@ static int race_z7_bind_world(const Sc64RaceMap *map)
 static int race_z7_action_callback(void *context,const Sc64Z7SourceAction *a)
 { return sc64_z7_world_action((Sc64Z7WorldContext *)context,&race_z7.runtime,a); }
 
+#if defined(SC64_Z7_PREVALIDATED_TICK)
+/* These callbacks are deliberately tied to the adapter's private context so
+ * serialized or caller-constructed contexts cannot assert the fast-path bit. */
+static int race_z7_prevalidated_condition_callback(void *context,
+                                                    const Sc64Z7RuntimeState *state,
+                                                    const Sc64Z7SourceCondition *c)
+{
+    if (context!=&race_z7_world || !race_z7_world.source_tables_prevalidated ||
+        state!=&race_z7.runtime) return -1;
+    return sc64_z7_world_condition_prevalidated(context,state,c);
+}
+
+static int race_z7_prevalidated_action_callback(void *context,
+                                                const Sc64Z7SourceAction *a)
+{
+    if (context!=&race_z7_world || !race_z7_world.source_tables_prevalidated) return 0;
+    return sc64_z7_world_action_prevalidated(&race_z7_world,&race_z7.runtime,a);
+}
+#endif
+
+#if defined(SC64_Z7_PREVALIDATED_TICK)
+static void race_z7_bind_ops_callbacks(void)
+{
+    race_z7_ops.context=&race_z7_world;
+    if (race_z7_world.source_tables_prevalidated) {
+        race_z7_ops.condition=race_z7_prevalidated_condition_callback;
+        race_z7_ops.action=race_z7_prevalidated_action_callback;
+        return;
+    }
+    race_z7_ops.condition=sc64_z7_world_condition;
+    race_z7_ops.action=race_z7_action_callback;
+}
+#endif
+
 static int race_z7_world_owner_slot(const Sc64Z7WorldContext *ctx,int owner,unsigned *slot)
 {
     unsigned found=12;
@@ -321,26 +355,54 @@ static int race_z7_live_world_valid(void)
 
 static int race_z7_runtime_init(const Sc64RaceMap *map)
 {
+#if defined(SC64_Z7_PREVALIDATED_TICK)
+    race_z7_world.source_tables_prevalidated=0;
+    memset(&race_z7_ops,0,sizeof(race_z7_ops));
+    race_z7_map=0;
+#endif
     if (!race_z7_active() || !race_z7_map_shape_valid(map) ||
         !race_z7_starting_world_matches(map) || !race_z7_bind_world(map)) return 0;
     memset(&race_z7,0,sizeof(race_z7));
     race_z7_map=map;
+#if defined(SC64_Z7_PREVALIDATED_TICK)
+    race_z7_world.source_tables_prevalidated=1;
+    race_z7_bind_ops_callbacks();
+#else
     race_z7_ops.context=&race_z7_world;
     race_z7_ops.condition=sc64_z7_world_condition;
     race_z7_ops.action=race_z7_action_callback;
+#endif
     return 1;
 }
 
 static int race_z7_rebind_loaded_world(const Sc64RaceMap *map)
 {
+#if defined(SC64_Z7_PREVALIDATED_TICK)
+    race_z7_world.source_tables_prevalidated=0;
+    memset(&race_z7_ops,0,sizeof(race_z7_ops));
+    race_z7_map=0;
+#endif
     if (!race_z7_active() || !sc64_z7_persistent_state_valid(&race_z7) ||
         !race_z7_map_shape_valid(map) || !race_z7_bind_world(map)) return 0;
     race_z7_map=map;
+#if defined(SC64_Z7_PREVALIDATED_TICK)
+    race_z7_world.source_tables_prevalidated=1;
+    race_z7_bind_ops_callbacks();
+    race_z7_reconcile_paid_products();
+    if (!race_z7_live_world_valid()) {
+        race_z7_world.source_tables_prevalidated=0;
+        memset(&race_z7_ops,0,sizeof(race_z7_ops));
+        race_z7_map=0;
+        return 0;
+    }
+    return 1;
+#else
     race_z7_ops.context=&race_z7_world;
     race_z7_ops.condition=sc64_z7_world_condition;
     race_z7_ops.action=race_z7_action_callback;
     race_z7_reconcile_paid_products();
     return race_z7_live_world_valid();
+#endif
 }
 
 static int race_z7_runtime_tick(int user_paused,u32 elapsed_frames)
@@ -356,7 +418,13 @@ static int race_z7_runtime_tick(int user_paused,u32 elapsed_frames)
     if (!race_z7_live_world_valid()) {
         race_z7.runtime.fault=SC64_Z7_RUNTIME_FAULT_ACTOR; return 0;
     }
+#if defined(SC64_Z7_PREVALIDATED_TICK)
+    if (race_z7_world.source_tables_prevalidated && race_z7_map==&sc64_race_maps[SC64_Z7_GLOBAL_ID])
+        result=sc64_z7_runtime_tick_prevalidated(&race_z7.runtime,&race_z7_ops,0);
+    else result=sc64_z7_runtime_tick(&race_z7.runtime,&race_z7_ops,0);
+#else
     result=sc64_z7_runtime_tick(&race_z7.runtime,&race_z7_ops,0);
+#endif
     if (result<0) return 0;
     /* A terminal action ends mission processing immediately. Other source
      * programs may have been active concurrently; discard their now-irrelevant
