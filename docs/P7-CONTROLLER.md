@@ -24,6 +24,22 @@ The matching ARM ROM is `build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba`,
 title `SC P7 MOVE40`, code `SC7M`.
 Canonical race profiles and their mission menus are unchanged.
 
+The separate seven-mission composition also enables the existing P3
+production-exit and nearest-resource-depot options. With the same private
+inputs, its host qualification target and ARM build target are:
+
+```sh
+make test-sc64-p7-campaign-composition
+make protoss-p7-campaign-probe
+```
+
+This produces `build/StarCraft-Protoss-P7-Campaign-Probe-GBA.gba`, title
+`SC P7 CAMP40`, code `SC7C`. Its host matrix wins P1–P7, tests typed saves
+across the catalog, and completes all eighteen full skirmish configurations.
+The ARM link passes unchanged reserves (IWRAM end `0x03004a30`, BSS end
+`0x0203dcd4`). The ARM completion and SRAM evidence below uses the original
+typed-move profile; the composition still needs its own ARM qualification.
+
 ## Completion evidence on 2026-10-25
 
 On staged base `fad7926`, an ordinary-input run reached RESULT at game frame
@@ -91,6 +107,18 @@ P3 remains an open qualification issue for this development profile. The
 P3 expansion and P5 controllers now pass source-owner arguments to optional
 P7 targeting diagnostics; P5 also accepts later catalog entries while still
 checking its exact mission ordinal and source deployment.
+
+A separate host composition adds the existing `SC64_P3_PRODUCTION_EXIT` and
+`SC64_NEAREST_RESOURCE_DEPOT` options to `P7_TYPED_MOVE_FLAGS`. The expansion
+controller wins P3 at frame 123,916 with zero hostile buildings. Its entire
+6,069-event trace is byte-identical to the established P5 expansion profile's
+trace (SHA-256 `321074f1b907846e996c23c5a07cb05687f24ed029b249ab13b25f21528db01a`).
+These options are enabled only by the separate composition target above.
+Its full host matrix also wins P1, P2 and P4–P7, passes actual-engine typed
+save/load fixtures, and completes all eighteen skirmish matches (three wins,
+fifteen losses). The P7 trace matches the original typed-move profile exactly;
+skirmish timing can change with nearest-depot routing. This establishes an
+existing working host composition for further ARM qualification.
 
 This controller does not promote P7, change canonical menus, or
 establish native AI or Carrier combat equivalence. Physical GBA qualification
