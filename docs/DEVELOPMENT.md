@@ -46,6 +46,132 @@ load resumes the same frame. Shadows, worker animation, finish signals and
 Protoss post-timer warp states remain unfinished. See
 [Validation](VALIDATION.md#source-construction-art-preview) for coverage.
 
+## Death animations
+
+Units and buildings no longer vanish when they die. Every build, including
+the asset-free original-art skirmish, plays a short death effect in the
+family StarCraft 64 uses for that actor:
+
+- Marines, Ghosts, Medics and critters collapse and leave remains.
+- Zerg ground units burst into gore and leave remains.
+- Zerg air units splash.
+- Vehicles, aircraft, SCVs and Firebats explode in orange, with a larger
+  blast for tanks, Science Vessels and Battlecruisers.
+- Protoss units release a blue energy burst. In the source, Zealots,
+  Dragoons and Templar collapse instead; the source-art preview below shows
+  that, while the authored fallback uses the burst for them too.
+- Buildings explode in their race's colors and leave rubble for 30 seconds.
+
+The families and their timings come from the source IScript Death
+animations: frames of three source updates, 7–14 frames per animation, and
+remnants that appear when the collapse ends, or under the explosion for
+buildings. Asset-free builds draw authored approximations with GBA
+primitives (`starcraft/sc64_death_vfx.h`, `sc64_death_vfx_render.h`).
+
+The effects are presentation only. At the start of every other update,
+and on the first result-screen update, `death_vfx_update()` looks for actor
+rows that changed from alive to dead with HP at or below zero. A death
+therefore appears one or two updates late, and the final deaths of a mission
+are always seen. It reads those rows and writes nothing back. The hook is a
+single bare call at the top of `game_update`: in some P7 probes, any larger
+addition to `game_update` changes GCC's inlining and overflows IWRAM.
+Scripted removals keep their HP, so they play no death. Units inside
+transports or Carrier hangars are not on the battlefield, so they play none
+either. New games and loads clear the pool and re-prime the alive shadow, so
+dead rows already in a loaded world never replay. The effects use no RNG,
+add no actor or save fields, and are clipped to visible battlefield cells
+above the cached lower HUD. The pool holds 16 effects in race profiles and
+12 in original-art builds (20 bytes each, in EWRAM). When it is full, a new
+death replaces the oldest rubble-only effect first. Build with
+`-DSC64_DEATH_VFX_DISABLED` to compile the feature out.
+
+```sh
+make test-sc64-death-vfx test-sc64-death-vfx-default
+```
+
+These asset-free checks run in `./dev test`. With the unified inputs
+prepared, `make test-sc64-death-vfx-unified` (part of `make test-unified`)
+runs the same game fixture on the race engine. With the full Terran, Z7 and
+P7 inputs prepared, `make test-sc64-death-vfx-profiles` also covers those
+actor sets. Each game fixture is built twice, once with the feature compiled
+out. Both builds run the same combat workload, rendering every frame, and
+must print the same field-wise state digest and the same SRAM digest after
+saving.
+
+### End-of-mission outro
+
+The simulation still stops on the update that decides victory or defeat.
+The result screen no longer replaces the battlefield at once. The final
+deaths keep animating over the frozen battlefield on a presentation clock,
+then the result panel grows open over 0.2 seconds, much as StarCraft 64
+shows its defeat or victory dialog after the last structures die. The outro
+lasts at least 0.8 seconds and ends when every collapse or explosion has
+finished, capped at 3.2 seconds. Destroying a final building takes about
+1.8 seconds.
+
+Input on the result screen is unchanged: A and B act on the first press,
+even during the outro, so controller replays and showcase restarts behave as
+before. The outro counter is not saved, and a world loaded on its result
+screen shows the panel immediately. `test-sc64-death-vfx-default` and
+`test-sc64-death-vfx-unified` check these result transitions:
+
+- the outcome arrives on the same update;
+- the final deaths are picked up on the first result-screen update;
+- the simulation stays frozen;
+- the panel is held back until the final explosions end;
+- the panel opens over 0.2 seconds;
+- input works during the outro;
+- a load shows the panel at once.
+
+The P3 frame-coverage oracle also renders a mid-outro result frame over
+poisoned buffers with `SC64_NO_FRAME_CLEAR`. Both frame-coverage oracles now
+render the result screen through the production `draw_result_screen()`.
+
+The feature-on/off workload digests include the outcome frame and 120
+frozen result updates.
+
+### Source death art preview
+
+After preparing the unified inputs, this separate preview draws the original
+StarCraft 64 death frames:
+
+```sh
+python3 tools/sc64_death_sprites.py
+make test-sc64-death-source death-visuals
+```
+
+The importer authenticates the same USA ROM and BOLT tables as the
+construction importer. For each source unit or building id, it follows
+`units.dat` → `flingy.dat` → `sprites.dat` → `images.dat` to the actor image.
+It then compiles that image's Death animation into at most eight independent
+layers:
+
+- collapse frames played on the actor's own GRP;
+- explosion overlays, plus any overlays they spawn (`imgol`/`imgul`);
+- remnant and rubble sprites (`lowsprul`).
+
+Each layer keeps its source frame order and waits. IScript `end` removes the
+layer, as in the source. Remnant streams are capped at 720 source updates
+(30 seconds). Only the frames that the animations reference are imported.
+
+The compiler is a whitelist. It ignores sounds, flip and direction
+instructions, and follows the grounded path of `liftoffcondjmp`. Anything
+else makes the actor keep the authored fallback. Remapped fire images
+(draw function 9: the orange Terran and blue Protoss explosions) store blend
+intensities rather than colors. GBA mode 4 cannot blend, so these map to
+fixed UI-palette ramps: the faintest band is dropped and the next is
+checkerboard-dithered. Generated art and its manifest stay under
+`.local/sc64/death/generated/`. Use `--rom`, `--palette-remap`, `--header`,
+`--out` and `--upstream` for other local paths.
+
+The importer currently compiles 167 actors from 61 image banks (about 770 KB
+of pixels). The preview ROM is `build/StarCraft-Death-Preview-GBA.gba`; its
+menus and missions match the unified profile. Canonical race ROMs keep the
+authored effects. To use the source art in another prepared race profile,
+compile with `SC64_DEATH_SOURCE_ART` and include the generated directory.
+See [Validation](VALIDATION.md#death-animations-2026-10-25) for coverage and
+memory figures.
+
 ## Install the tools
 
 ### macOS
@@ -121,6 +247,80 @@ Preparation writes extracted and generated inputs under ignored `.local/`; ROM b
 See [SC64 unified](SC64-UNIFIED.md) for implemented missions and limitations, and [SC64 development notes](SC64.md) for import details.
 
 The default `./dev test` includes the asset-free weapon-effect renderer check. After preparing the unified inputs, `make test-unified` also runs actual-attack visual checks and pixel/cache checks for Protoss shield bars; those checks keep damage application immediate and compare cached HUD output with a full redraw.
+
+## Optional StarCraft 64 sound effects and music
+
+`./dev sc64 prepare` also runs `tools/sc64_audio_pack.py`, which converts the
+ROM's sound effects and music into a private bank under ignored
+`.local/sc64/audio/generated/`: `sc64_audio_generated.bin` (signed 8-bit PCM),
+`sc64_audio_generated.h` (sample and per-unit index tables) and a manifest
+with counts and hashes. To refresh only the bank:
+
+```sh
+python3 tools/sc64_audio_pack.py
+python3 tools/sc64_audio_pack.py --music 0,4,5   # fewer music tracks, smaller ROM
+```
+
+Every imported (`SC64_*`) ARM profile links the bank automatically when the
+header exists. `make <target> SC64_AUDIO=0` builds the same profile silent, for
+example for performance baselines; `SC64_AUDIO=1` fails if the bank is absent.
+The default original-art ROM never uses it: it keeps short PSG placeholder
+tones for the same events. The bank is about 15.6 MB, so imported ROMs grow
+to the 32 MiB cartridge size. Like other imported data, the bank and any audio
+captured from it are game content: do not commit, attach or distribute them.
+
+What is imported:
+
+- StarCraft 64 keeps its sounds in the BOLT archive. `014/000` is a
+  1144-entry table indexed like PC `sfxdata` ids, pointing into an unlisted
+  5.6 MB blob at the end of the archive; `015/000`-`00F` are 16 music streams.
+  Both use mono IMA ADPCM (high nibble first) at 11025 Hz. The N64 mixes them
+  on the CPU to 11025 Hz stereo.
+- The converter decodes and linearly resamples them to 10512 Hz, the closest
+  GBA rate that consumes exactly 176 samples per video frame. Sounds are chosen
+  from the ROM's own `units.dat` (ready, selection and command responses, up
+  to four variants each) and IScript (`playsnd`, `playsndrand`,
+  `playsndbtwn`, `attackmelee` in attack and death animations, following
+  one level of spawned explosion sprites): 501 distinct clips. Annoyed
+  responses are not imported.
+- Music roles come from the resident N64 selector, which loads resource
+  `0x1500 + track`: 0 is the menu theme; Terran, Zerg and Protoss play
+  4/5, 8/9 and 12/13 in game, alternating as each ends; 2/3, 6/7 and 10/11 are
+  the mission-end stingers chosen by the result flag. Which stinger is victory
+  is inferred from that flag and has not been checked by ear. Tracks 1, 14 and
+  15 are not imported.
+
+Engine design (`common/audio_mixer.h`, `common/gba.c`):
+
+- Timer 0 runs at 10512 Hz and feeds both Direct Sound FIFOs. DMA1 plays a
+  352-byte double buffer of sound effects on channel A; DMA2 streams the
+  current music track on channel B (50% volume) straight from ROM, so music
+  costs no mixing. A 64-byte zero guard follows the double buffer: when the
+  interrupt is delayed (for example behind a long DMA3 blit) the FIFO reads a
+  few samples of silence instead of unrelated memory.
+- A VBlank interrupt drains an 8-entry request ring, assigns requests to four
+  fixed voices and mixes 176 samples with saturation. Voice 0 is reserved for
+  unit responses, which interrupt each other as in StarCraft; effects take a
+  free voice or steal a lower-priority, older one, and the same effect is not
+  retriggered within four frames. Samples are word-aligned, so the mixer
+  reads four samples per ROM word and adds them in two 16-bit lanes, clamping
+  only lanes that overflow. It runs as Thumb code from ROM: IWRAM has no room
+  for it.
+- The mix buffer and the event snapshot live in the unused VRAM gap between
+  the two mode-4 pages (`0x06009600`-`0x06009FFF`), so EWRAM grows only by the
+  mixer state.
+- `starcraft/game_audio.h` derives events at the start of each rendered frame
+  from read-only comparisons with the previous frame: a raised weapon
+  cooldown on a visible unit (a shot), alive 1->0 (a death), a new player unit
+  (ready), a cleared construction flag (completed building, which plays the
+  building's selection sound because StarCraft has none), and a new selection
+  or changed orders after input (selection and command responses). It never
+  writes simulation state or uses the game RNG, at most two effects start per
+  frame, and it ignores any tick discontinuity such as a load or restart.
+
+Check the engine with `make test-audio` (asset-free, part of `./dev test`) and
+`make test-game-audio-unified` (part of `make test-unified`). Measured costs
+and limits are in [Validation](VALIDATION.md#sampled-audio-2026-10-25).
 
 ## T4 internal actor/world checks
 
@@ -2105,6 +2305,8 @@ builds include them as well. The transient pool holds 32 effects in race
 profiles and retains 12 in the original-art save format. Overflow replaces
 the oldest cosmetic effect and never changes damage or RNG. Actor and save
 rows retain their existing layouts.
+Deaths use a separate transient pool; see
+[Death animations](#death-animations).
 
 For repeatable filming setups, `make showcase` builds the separate
 `StarCraft-Showcase-GBA.gba` with a hidden scene menu. On HOME hold R, add L,
