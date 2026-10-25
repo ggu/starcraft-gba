@@ -94,6 +94,20 @@ static int count_alive(void)
     return n;
 }
 
+/* Destroy every opposing building (and, in the original-art game, every
+ * enemy unit) so the next update reaches the victory outcome. */
+static void destroy_opposition(void)
+{
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        for (int guard = 0; b[i].alive && b[i].owner != SIDE && b[i].owner != NEUTRAL &&
+             guard < 10000; ++guard)
+            hit_target(MAX_UNITS + i, 400, ALLY_TYPE, SIDE);
+#ifndef SC64_RACES
+    for (int i = 0; i < MAX_UNITS; ++i)
+        while (u[i].alive && u[i].owner == ENEMY) hit_target(i, 500, ALLY_TYPE, SIDE);
+#endif
+}
+
 static int run_hash_workload(void)
 {
     int deaths = 0, peak = 0;
@@ -112,6 +126,16 @@ static int run_hash_workload(void)
         if (active > peak) peak = active;
 #endif
     }
+    /* End of mission: the outcome update and frozen result screen. */
+    int outcome_frame = -1;
+    if (screen == SCREEN_PLAY) {
+        destroy_opposition();
+        game_update(0, 0);
+        game_render();
+        outcome_frame = frame;
+    }
+    for (int step = 0; step < 120; ++step) { game_update(0, 0); game_render(); }
+    printf("OUTCOME screen %d won %d lost %d frame %d\n", screen, won, lost, outcome_frame);
     u32 state = state_hash();
     save_game();
     u32 save = fnv(2166136261u, host_save, sizeof(host_save));
@@ -126,14 +150,14 @@ static int run_hash_workload(void)
 #ifndef SC64_DEATH_VFX_DISABLED
 static int active_now(void)
 {
-    return sc64_death_vfx_active(death_vfx, SC64_DEATH_VFX_POOL, (u32)frame);
+    return sc64_death_vfx_active(death_vfx, SC64_DEATH_VFX_POOL, death_vfx_now());
 }
 
 static const Sc64DeathVfx *only_effect(void)
 {
     const Sc64DeathVfx *found = 0;
     for (int i = 0; i < SC64_DEATH_VFX_POOL; ++i)
-        if (!sc64_death_vfx_expired(&death_vfx[i], (u32)frame)) { assert(!found); found = &death_vfx[i]; }
+        if (!sc64_death_vfx_expired(&death_vfx[i], death_vfx_now())) { assert(!found); found = &death_vfx[i]; }
     assert(found);
     return found;
 }
@@ -268,6 +292,60 @@ static void test_pool_overflow(void)
     assert(active_now() == SC64_DEATH_VFX_POOL);
 }
 
+static int panel_pixels(void)
+{
+    int n = 0;
+    for (int y = 42; y < 104; ++y) for (int x = 30; x < 210; ++x) n += gfx_test_pixel(x, y) == C_PANEL;
+    return n;
+}
+
+static void test_result_outro(void)
+{
+    setup_world(); find_base();
+    for (int i = 0; i < 3; ++i) game_update(0, 0);
+    assert(screen == SCREEN_PLAY && !won && !lost);
+    destroy_opposition();
+    int before = frame;
+    game_update(0, 0);
+    assert(screen == SCREEN_RESULT && won && !lost);
+    int outcome = frame;
+    assert(outcome == before + 1);
+    u32 frozen = state_hash();
+    game_update(0, 0);   /* first result update: final deaths are scanned */
+    assert(death_vfx_bursting(death_vfx_now()));   /* final buildings exploding */
+    assert(!result_outro_end);
+    memset(visible, 0xff, sizeof(visible));
+    int full = 180 * 62;
+    game_render();
+    assert(panel_pixels() < full / 2);              /* battlefield, not the panel */
+    int ticks = 1;
+    while (!result_outro_end) { game_update(0, 0); ++ticks; assert(ticks <= (int)SC64_RESULT_OUTRO_MAX); }
+    assert(ticks >= (int)SC64_RESULT_OUTRO_MIN);
+    assert(ticks == (int)SC64_RESULT_OUTRO_MAX || !death_vfx_bursting(death_vfx_now()));
+    for (unsigned i = 0; i < SC64_RESULT_PANEL_OPEN; ++i) {
+        game_render();
+        int opening = panel_pixels();
+        assert(opening > 0 && opening < full);
+        game_update(0, 0);
+    }
+    game_render();
+    assert(panel_pixels() > full * 3 / 4);           /* full result panel */
+    assert(state_hash() == frozen && frame == outcome && screen == SCREEN_RESULT && won);
+    fprintf(stderr, "result outro: %d updates before the panel\n", ticks);
+    /* Input is unchanged: A during the outro acts at once. */
+    setup_world(); find_base();
+    game_update(0, 0); destroy_opposition(); game_update(0, 0);
+    assert(screen == SCREEN_RESULT && !result_outro_end);
+    game_update(KEY_A, KEY_A);
+    assert(screen == SCREEN_PLAY && !won);
+    /* A world loaded on its result screen shows the panel at once. */
+    death_vfx_reset();
+    assert(result_outro_end && result_outro >= result_outro_end + SC64_RESULT_PANEL_OPEN);
+    screen = SCREEN_RESULT; won = 1;
+    game_render();
+    assert(panel_pixels() > full * 3 / 4);
+}
+
 static void dump_gallery(void)
 {
     const char *out = getenv("SC64_DEATH_GALLERY");
@@ -307,8 +385,9 @@ int main(void)
     test_removal_and_buildings();
     test_loads_reprime();
     test_pool_overflow();
+    test_result_outro();
     dump_gallery();
-    puts("PASS observed unit/building deaths, expiry, fog, removals, load re-prime and pool overflow");
+    puts("PASS observed unit/building deaths, expiry, fog, removals, load re-prime, pool overflow and result outro");
     return 0;
 #endif
 }

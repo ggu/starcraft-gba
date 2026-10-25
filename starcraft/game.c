@@ -907,12 +907,22 @@ static Tracer tracers[MAX_TRACERS];
 static Sc64DeathVfx death_vfx[SC64_DEATH_VFX_POOL];
 static u8 death_vfx_seen[(MAX_UNITS + 7) / 8 + (MAX_BUILDINGS + 7) / 8];
 static u8 death_vfx_primed;
-/* New worlds and loads re-prime the shadow, so stale dead rows never play. */
+/* Result outro: the simulation stops on the outcome update, but final deaths
+ * keep animating on a presentation clock before the result panel appears.
+ * The counter is never read by the simulation, input handling or saves. */
+#define SC64_RESULT_OUTRO_MIN 24u  /* 0.8 s, even with nothing exploding */
+#define SC64_RESULT_OUTRO_MAX 96u  /* 3.2 s cap for long explosions */
+#define SC64_RESULT_PANEL_OPEN 6u  /* panel grows open over 0.2 s */
+static u16 result_outro, result_outro_end;
+/* New worlds and loads re-prime the shadow, so stale dead rows never play.
+ * A world loaded on its result screen shows the panel at once. */
 static void
 death_vfx_reset(void)
 {
     memset(death_vfx, 0, sizeof(death_vfx));
     death_vfx_primed = 0;
+    result_outro_end = SC64_RESULT_OUTRO_MAX;
+    result_outro = SC64_RESULT_OUTRO_MAX + SC64_RESULT_PANEL_OPEN;
 }
 #else
 #define death_vfx_reset() ((void)0)
@@ -5712,6 +5722,13 @@ update_tracers(void)
 }
 
 #ifndef SC64_DEATH_VFX_DISABLED
+/* Effect clock: game frames, plus outro ticks once the simulation stops. */
+static u32
+death_vfx_now(void)
+{
+    return (u32)frame + result_outro;
+}
+
 static int
 death_vfx_raw(int slot)
 {
@@ -5770,7 +5787,7 @@ death_vfx_spawn_slot(int slot, int x, int y, int owner)
         source = 1;
     }
 #endif
-    sc64_death_vfx_spawn(death_vfx, SC64_DEATH_VFX_POOL, (u32)frame, style, raw,
+    sc64_death_vfx_spawn(death_vfx, SC64_DEATH_VFX_POOL, death_vfx_now(), style, raw,
                          x, y, death_vfx_extent(slot, raw), &timing, source,
                          owner_color(owner));
 }
@@ -5783,6 +5800,7 @@ static void __attribute__((noinline))
 death_vfx_scan(void)
 {
     int primed = death_vfx_primed;
+    result_outro = result_outro_end = 0; /* playing: no outro offset */
     /* Build each 8-row alive mask in a register and compare it with the
      * shadow byte once: the common no-change path stays a short scan. */
     for (int base = 0; base < MAX_UNITS; base += 8) {
@@ -5817,13 +5835,45 @@ death_vfx_scan(void)
     death_vfx_primed = 1;
 }
 
-/* Called after the outcome check. Alternate updates halve the scan, so a
- * death appears at most one update late; the outcome update always scans so
- * the final deaths are recorded. */
-static void __attribute__((noinline))
-death_vfx_observe(void)
+/* An effect still in its collapse/explosion phase keeps the outro running. */
+static int
+death_vfx_bursting(u32 now)
 {
-    if (!(frame & 1) || won || lost) death_vfx_scan();
+    for (int i = 0; i < SC64_DEATH_VFX_POOL; ++i) {
+        const Sc64DeathVfx *e = &death_vfx[i];
+        if (!sc64_death_vfx_expired(e, now) &&
+            sc64_death_vfx_age_su(e->birth, now) < e->burst_su) return 1;
+    }
+    return 0;
+}
+
+/* Advance the presentation clock on result-screen updates. The outro ends at
+ * the cap, or after the minimum once every final burst has finished. */
+static void
+result_outro_tick(void)
+{
+    if (result_outro >= SC64_RESULT_OUTRO_MAX + SC64_RESULT_PANEL_OPEN) return;
+    ++result_outro;
+    if (result_outro_end) return;
+    if (result_outro >= SC64_RESULT_OUTRO_MAX ||
+        (result_outro >= SC64_RESULT_OUTRO_MIN && !death_vfx_bursting(death_vfx_now())))
+        result_outro_end = result_outro;
+}
+
+/* Runs at the top of every update, before input and simulation. During play
+ * it scans on alternate updates, so a death appears one or two updates late.
+ * The first result-screen update scans the outcome update's final deaths
+ * (the outro counter is still zero there), then the outro clock advances. */
+static void __attribute__((noinline))
+death_vfx_update(void)
+{
+    if (screen == SCREEN_PLAY) {
+        if (!(frame & 1)) death_vfx_scan();
+        return;
+    }
+    if (screen != SCREEN_RESULT) return;
+    if (!result_outro && !result_outro_end) death_vfx_scan();
+    result_outro_tick();
 }
 #endif
 
@@ -6134,6 +6184,9 @@ game_update(u16 held, u16 pressed)
 #endif
 #endif
     int speed = (held & KEY_R) ? 4 : 2;
+#ifndef SC64_DEATH_VFX_DISABLED
+    death_vfx_update(); /* bare call: game_update's size steers IWRAM inlining */
+#endif
 #ifdef SC64_SHOWCASE_ENABLED
     if (sc64_showcase_scene >= 0) {
         if (pressed & KEY_SELECT) { sc64_showcase_leave(held); return; }
@@ -6507,10 +6560,6 @@ game_update(u16 held, u16 pressed)
 	    won = 1;
 #endif
     }
-#ifndef SC64_DEATH_VFX_DISABLED
-    /* A bare call: game_update's size steers inlining of IWRAM helpers. */
-    death_vfx_observe();
-#endif
     if (won || lost) {
 #ifdef SC64_RACES
         if(won&&!race_mode)race_completed|=1<<race_selected_mission;
@@ -6826,7 +6875,7 @@ death_vfx_draw_source(const Sc64DeathVfx *e, int x, int y, u32 age, int under)
 static void __attribute__((noinline))
 draw_death_vfx(int under)
 {
-    u32 now = (u32)frame;
+    u32 now = death_vfx_now();
     for (int i = 0; i < SC64_DEATH_VFX_POOL; ++i) {
         const Sc64DeathVfx *e = &death_vfx[i];
         if (!e->style) continue;
@@ -7800,6 +7849,27 @@ draw_result(void)
 #endif
 }
 
+/* Result presentation: the final explosions play over the frozen
+ * battlefield, then the panel grows open, as StarCraft 64 shows its
+ * defeat/victory dialog after the last structures die. */
+static void
+draw_result_screen(void)
+{
+#ifndef SC64_DEATH_VFX_DISABLED
+    if (!result_outro_end) return;
+    unsigned open = result_outro >= result_outro_end ?
+                    (unsigned)(result_outro - result_outro_end) : 0u;
+    if (open < SC64_RESULT_PANEL_OPEN) {
+        int w = 16 + (int)(168u * (open + 1u) / (SC64_RESULT_PANEL_OPEN + 1u));
+        int h = 8 + (int)(58u * (open + 1u) / (SC64_RESULT_PANEL_OPEN + 1u));
+        gfx_rect(120 - w / 2, 73 - h / 2, w, h, C_PANEL);
+        gfx_frame(120 - w / 2, 73 - h / 2, w, h, won ? C_GOLD : C_RED);
+        return;
+    }
+#endif
+    draw_result();
+}
+
 static const char *
 unit_name(int type)
 {
@@ -8327,7 +8397,7 @@ game_render(void)
 	    sc64_hud_buffer_dirty[gfx_backbuffer_index()] |= 2;
 	#endif
 	} else if (screen == SCREEN_RESULT)
-	    draw_result();
+	    draw_result_screen();
     }
     gfx_end();
 }

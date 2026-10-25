@@ -68,11 +68,13 @@ remnants that appear when the collapse ends, or under the explosion for
 buildings. Asset-free builds draw authored approximations with GBA
 primitives (`starcraft/sc64_death_vfx.h`, `sc64_death_vfx_render.h`).
 
-The effects are presentation only. After every other simulation step, and
-always on the update that decides the mission, `death_vfx_observe()` looks
-for actor rows that changed from alive to dead with HP at or below zero, so
-a death appears at most one update late. It reads those rows and writes
-nothing back.
+The effects are presentation only. At the start of every other update,
+and on the first result-screen update, `death_vfx_update()` looks for actor
+rows that changed from alive to dead with HP at or below zero. A death
+therefore appears one or two updates late, and the final deaths of a mission
+are always seen. It reads those rows and writes nothing back. The hook is a
+single bare call at the top of `game_update`: in some P7 probes, any larger
+addition to `game_update` changes GCC's inlining and overflows IWRAM.
 Scripted removals keep their HP, so they play no death. Units inside
 transports or Carrier hangars are not on the battlefield, so they play none
 either. New games and loads clear the pool and re-prime the alive shadow, so
@@ -95,6 +97,38 @@ actor sets. Each game fixture is built twice, once with the feature compiled
 out. Both builds run the same combat workload, rendering every frame, and
 must print the same field-wise state digest and the same SRAM digest after
 saving.
+
+### End-of-mission outro
+
+The simulation still stops on the update that decides victory or defeat.
+The result screen no longer replaces the battlefield at once. The final
+deaths keep animating over the frozen battlefield on a presentation clock,
+then the result panel grows open over 0.2 seconds, much as StarCraft 64
+shows its defeat or victory dialog after the last structures die. The outro
+lasts at least 0.8 seconds and ends when every collapse or explosion has
+finished, capped at 3.2 seconds. Destroying a final building takes about
+1.8 seconds.
+
+Input on the result screen is unchanged: A and B act on the first press,
+even during the outro, so controller replays and showcase restarts behave as
+before. The outro counter is not saved, and a world loaded on its result
+screen shows the panel immediately. `test-sc64-death-vfx-default` and
+`test-sc64-death-vfx-unified` check these result transitions:
+
+- the outcome arrives on the same update;
+- the final deaths are picked up on the first result-screen update;
+- the simulation stays frozen;
+- the panel is held back until the final explosions end;
+- the panel opens over 0.2 seconds;
+- input works during the outro;
+- a load shows the panel at once.
+
+The P3 frame-coverage oracle also renders a mid-outro result frame over
+poisoned buffers with `SC64_NO_FRAME_CLEAR`. Both frame-coverage oracles now
+render the result screen through the production `draw_result_screen()`.
+
+The feature-on/off workload digests include the outcome frame and 120
+frozen result updates.
 
 ### Source death art preview
 
