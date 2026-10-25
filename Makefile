@@ -2771,7 +2771,9 @@ build/StarCraft-Zerg-Z7-Count-Snapshot-Probe-GBA.gba: build/starcraft-zerg-z7-co
 zerg-z7-count-snapshot-probe: build/StarCraft-Zerg-Z7-Count-Snapshot-Probe-GBA.gba
 # Ordinary-input qualification candidate: the Egg, sight and Scourge rules
 # plus the existing nearest-depot worker policy; no campaign promotion.
-Z7_CONTROLLER_FLAGS := $(Z7_SCOURGE_PROBE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_DENSE_SCHEDULE
+Z7_CONTROLLER_REFERENCE_FLAGS := $(Z7_SCOURGE_PROBE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_DENSE_SCHEDULE
+# Qualified only for this experimental probe; standard race flags stay separate.
+Z7_CONTROLLER_FLAGS := $(Z7_CONTROLLER_REFERENCE_FLAGS) -DSC64_Z7_PREVALIDATED_TICK -DSC64_Z7_COUNT_SNAPSHOT
 build/test-sc64-z7-controller: tests/sc64_z7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_CONTROLLER_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z7-controller zerg-z7-controller-probe
@@ -2792,8 +2794,8 @@ define Z7_TRACE_PARITY_BUILD
 build/test-sc64-z7-trace-$(1): tests/sc64_z7_trace_parity.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c -o $$@
 endef
-$(eval $(call Z7_TRACE_PARITY_BUILD,reference,$(Z7_CONTROLLER_FLAGS)))
-$(eval $(call Z7_TRACE_PARITY_BUILD,count-snapshot,$(Z7_CONTROLLER_FLAGS) -DSC64_Z7_PREVALIDATED_TICK -DSC64_Z7_COUNT_SNAPSHOT))
+$(eval $(call Z7_TRACE_PARITY_BUILD,reference,$(Z7_CONTROLLER_REFERENCE_FLAGS)))
+$(eval $(call Z7_TRACE_PARITY_BUILD,count-snapshot,$(Z7_CONTROLLER_FLAGS)))
 
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE

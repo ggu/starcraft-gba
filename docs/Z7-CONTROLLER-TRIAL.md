@@ -26,7 +26,9 @@ budget; an in-progress ordinary cursor/menu gesture can consume extra ticks.
 `make zerg-z7-controller-probe` builds the separate ARM probe
 `build/StarCraft-Zerg-Z7-Controller-Probe-GBA.gba`, title `SC Z7 RUN36`, code
 `SCZQ`. The host policy is not compiled into the ROM. Building the probe is
-not an ARM gameplay result.
+not an ARM gameplay result. The experimental host/probe flags now opt in to
+prevalidation and the condition-count snapshot; the reference remains
+available to the parity tool. Standard race ROM flags stay unchanged.
 
 ## Integrated observations, 2026-10-25
 
@@ -95,3 +97,38 @@ and `a635fcd145833601be5e7d7953ce30aec2071610d586074bc8506339ea603ab9`.
 Neither a successful mission route nor an ARM replay is implied by this host
 comparison. See [Z7-COUNT-SNAPSHOT.md](Z7-COUNT-SNAPSHOT.md) for the earlier
 bounded ARM optimization experiment and its limits.
+
+## Integrated ARM timing window
+
+A separate private pair built from the current source replays the first
+12,000 ordinary-input baseline host ticks in fresh mGBA processes. The
+observer retains `game_update`, `audio_update`, `game_render` and its display
+deadline. Reports and checkpoint hashing occur outside the timed interval;
+the debugger scheduler is replaced with a read-only input tape. This is an
+instrumented ARM experiment, not a standard-ROM or physical GBA measurement.
+Only prevalidation and the count snapshot differ between the pair.
+
+All 25 frame/common-state checkpoints match, including mission 18, bound
+callbacks/map, source AI activation and zero runtime faults. The 500-update
+window means are:
+
+| Measurement | Reference | Count snapshot | Reduction |
+| --- | ---: | ---: | ---: |
+| Update, audio and render cycles per update | 1,808,087 | 1,481,554 | 18.06% |
+| `game_update` cycles per update | 1,294,846 | 958,699 | 25.96% |
+
+Both builds exceed the 561,792-cycle two-VBlank 30 fps budget on 11,814 of
+12,000 updates. The maximum measured full updates are 17,134,620 and
+16,616,771 cycles. The experiment does not establish the cause of those
+outliers. These results justify the faster experimental probe, not a claim
+of 30 fps or a campaign promotion. A winning normal-input route, full ARM
+replay, fresh-process SRAM continuation and further performance work remain.
+
+The resulting non-observer controller probe is header/size/SRAM-signature
+verified at 32 MiB. IWRAM ends at `0x03004d38` and BSS at `0x0203de00`, below
+the unchanged `0x03005000` / `0x0203e000` reserves. The focused host save check
+reports a 16,296-byte payload below the 16,368-byte record limit. All seven
+count/prevalidation/runtime/save checks pass. Both optimized controller
+policies reproduce their original complete input/checkpoint/loss traces.
+The default original-art ROM remains byte-identical; all 447 asset-free
+Python checks and the default host fixtures pass.
