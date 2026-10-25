@@ -19,6 +19,10 @@ import sc64_zp_controller_replay as replay  # noqa: E402
 
 REFERENCE_TARGET = "build/test-sc64-z7-trace-reference"
 CANDIDATE_TARGET = "build/test-sc64-z7-trace-count-snapshot"
+VARIANTS = {
+    "count-snapshot": (REFERENCE_TARGET, CANDIDATE_TARGET),
+    "sight-spans": (CANDIDATE_TARGET, "build/test-sc64-z7-trace-sight-spans"),
+}
 MAX_TICKS = 1_000_000
 HASH_RE = re.compile(r"^[0-9a-f]{16}$")
 
@@ -62,12 +66,13 @@ def _safe_stem(path: Path) -> str:
     return stem or "trace"
 
 
-def _output_paths(output_dir: Path, index: int, trace_path: Path) -> tuple[Path, Path, Path, Path]:
-    prefix = f"{index:02d}-{_safe_stem(trace_path)}"
+def _output_paths(output_dir: Path, index: int, trace_path: Path,
+                  variant: str) -> tuple[Path, Path, Path, Path]:
+    prefix = f"{index:02d}-{_safe_stem(trace_path)}-{variant}"
     return (output_dir / f"{prefix}-reference.txt",
-            output_dir / f"{prefix}-count-snapshot.txt",
+            output_dir / f"{prefix}-candidate.txt",
             output_dir / f"{prefix}-reference.stderr",
-            output_dir / f"{prefix}-count-snapshot.stderr")
+            output_dir / f"{prefix}-candidate.stderr")
 
 
 def _run_binary(binary: Path, tape: bytes, stdout_path: Path, stderr_path: Path) -> None:
@@ -139,24 +144,27 @@ def _compare_streams(reference: Path, candidate: Path, expected_rows: int) -> No
         raise RuntimeError(f"expected {expected_rows} compared updates, observed {tick}")
 
 
-def run(traces: list[Path], output_dir: Path) -> int:
+def run(traces: list[Path], output_dir: Path, variant: str = "count-snapshot") -> int:
     """Validate traces, build both host drivers, and compare full output streams."""
     if not traces:
         raise ValueError("provide at least one authenticated host trace")
+    if variant not in VARIANTS:
+        raise ValueError(f"unknown optimization variant: {variant}")
+    reference_target, candidate_target = VARIANTS[variant]
     validated = [(path, *validate_trace_file(path)) for path in traces]
     output_dir.mkdir(parents=True, exist_ok=True)
-    build = subprocess.run(["make", REFERENCE_TARGET, CANDIDATE_TARGET], cwd=ROOT,
+    build = subprocess.run(["make", reference_target, candidate_target], cwd=ROOT,
                            check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                            text=True)
     if build.returncode:
         sys.stderr.write(build.stdout)
         sys.stderr.write(build.stderr)
         raise RuntimeError(f"host-driver build failed with status {build.returncode}")
-    reference_bin = ROOT / REFERENCE_TARGET
-    candidate_bin = ROOT / CANDIDATE_TARGET
+    reference_bin = ROOT / reference_target
+    candidate_bin = ROOT / candidate_target
     for index, (trace_path, plan, tape) in enumerate(validated, 1):
         reference, candidate, reference_err, candidate_err = _output_paths(
-            output_dir, index, trace_path)
+            output_dir, index, trace_path, variant)
         _run_binary(reference_bin, tape, reference, reference_err)
         _run_binary(candidate_bin, tape, candidate, candidate_err)
         reference_rows, reference_hash = _validate_rows(reference, plan)
@@ -180,12 +188,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("traces", nargs="+", type=Path,
                         help="authenticated Z7 host trace JSON file(s)")
+    parser.add_argument("--variant", choices=VARIANTS, default="count-snapshot",
+                        help="compare the count cache or source-radius sight spans")
     parser.add_argument("--output-dir", type=Path,
                         default=Path(".local/build/z7-trace-parity"),
                         help="directory for per-update comparison streams")
     args = parser.parse_args(argv)
     try:
-        return run(args.traces, args.output_dir)
+        return run(args.traces, args.output_dir, args.variant)
     except (OSError, json.JSONDecodeError, ValueError, RuntimeError) as exc:
         print(f"sc64_z7_trace_parity: {exc}", file=sys.stderr)
         return 2
