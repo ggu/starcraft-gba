@@ -1,30 +1,33 @@
 #!/usr/bin/env python3
-"""Compare public rule-helper probes with pinned BWAPI defaults, without assets.
+"""Compare current stock-profile helper probes with pinned BWAPI defaults.
 
-The comparison is a table audit, not a claim of native N64 or runtime equivalence.
-Runtime exceptions below are explicit findings from the dated source review;
-review them again when applying this helper to a newer engine revision.
+Table/helper equality is reported separately from full runtime behavior. This
+does not claim native N64 equivalence, collision/pathing fidelity, or complete
+special-weapon lifecycles.
 """
 from pathlib import Path
 import argparse
 import csv
+from datetime import date
 import hashlib
 import json
 
 
 NOTES = {
-    'U_RAYNOR': 'Legacy compatibility actor. Raw identity depends on profile; early campaign loaders can bypass canonical mapping. Non-T4 raw20 record has armor0 and no weapon; T4 raw19 record has HP200/armor0/no weapon versus stock Vulture300/3/30. Do not substitute for dedicated T5/ZP heroes.',
-    'U_FIREBAT': 'Special flame approximation: one primary8 plus authored3 HP radial splash when a unit-target primary hit reaches HP; splash can include surviving primary target and other-owner units. Source maxGroundHits3 is a maximum, not guaranteed three hits.',
+    'U_RAYNOR': 'Legacy objective identity is profile-dependent and may alias a different raw unit. Numeric facts are looked up by raw ID; do not infer them from this enum name.',
+    'U_FIREBAT': 'The runtime uses a special flame approximation rather than generic per-impact weapon resolution: one primary hit plus a fixed radial HP splash. Source maxGroundHits3 is not three guaranteed hits on one target; flame geometry remains incomplete.',
     'U_REAVER': 'Special Scarab lifecycle adaptation: direct100 damage/cooldown60; source Reaver has no direct weapon. Stock Scarab weapon carries100 base damage. No generic Scarab ammo/travel/splash parity established.',
     'U_SPIDER_MINE': 'Special autonomous T5 mine handler owns arm/acquire/chase/detonation. Generic weapon/motion fields are not its operating values; exclude from automatic generic verdicts.',
-    'U_MUTALISK': 'Primary base weapon matches; generic path does not implement stock bounce/glaive lifecycle.',
-    'U_SIEGE_TANK': 'Base50 versus stock70. Generic path does not enforce stock64-source-pixel minimum range or stock radial splash. Zero training cost/time is an in-place mode-switch policy.',
+    'U_MUTALISK': 'Base weapon fields are read from the stock table; generic attack resolution does not implement the full Glaive Wurm bounce lifecycle.',
+    'U_SIEGE_TANK': 'The stock Siege weapon helper supplies 70/150 base damage and a 64-source-pixel minimum range; the runtime tick fixture checks the half-scale dead zone. Siege splash and native mode/lifecycle behavior remain incomplete. Zero cost/time is an in-place mode-switch policy.',
     'U_SCOURGE': 'P3/P6/P7 inherit an explicit air-target bypass despite generic air helper false; Z7 enables a separate path. Other audited profiles leave it unarmed. Suicide lifecycle handled specially.',
     'U_P7_CARRIER': 'No direct stock weapon; matching zero generic damage does not establish interceptor lifecycle/combat support.',
     'U_P7_ARCHON': 'P7 profile enables a separate Archon splash adapter; generic weapon-table match alone does not qualify splash geometry or runtime parity.',
-    'U_DROPSHIP': 'Raw11 import mapping and transport support depend on profile; T5 shared movement step2, otherwise1.',
+    'U_DROPSHIP': 'Raw11 import mapping and transport support depend on profile. Nominal speed comes from the raw-ID stock table; transport and cargo lifecycle remain separate.',
     'U_Z7_EGG': 'Immobile production lifecycle actor; its timers do not use ordinary unit movement/combat.',
 }
+
+SPECIAL_ATTACKS = {'U_FIREBAT', 'U_REAVER', 'U_SPIDER_MINE', 'U_P7_CARRIER', 'U_P7_ARCHON'}
 
 
 def row_for(profile, engine, unit, reference, weapons):
@@ -33,18 +36,19 @@ def row_for(profile, engine, unit, reference, weapons):
     name = unit['name']
     identity = ('canonical' if unit['canonical_type'] == unit['enum_id'] else
                 'unmapped' if unit['canonical_type'] < 0 else 'noncanonical_alias')
-    # This is the reviewed shared move_toward path, not a new gameplay model.
-    step = 2 if name in {'U_ZERGLING', 'U_FIREBAT', 'U_RAYNOR',
-                         'U_ZP_RAYNOR_VULTURE', 'U_VULTURE'} else 1
-    if name == 'U_DROPSHIP' and '-DSC64_T5_RUNTIME' in flags:
-        step = 2
-    if unit['actor_flags'] and not unit['actor_flags'] & 2:
-        step = 0
     special_motion = name in {'U_SPIDER_MINE', 'U_Z7_EGG'}
+    motion = unit['motion']
+    source_rate_q10 = round(float(ref['top_speed']) * 1024)
+    expected_runtime_rate_q10 = (source_rate_q10 * 2 + 2) // 5
+    expected_diagonal_rate_q10 = (expected_runtime_rate_q10 * 724 + 512) >> 10
+    motion_matches = (motion['available'] and
+                      motion['runtime_speed_q10'] == expected_runtime_rate_q10 and
+                      motion['cardinal_steps_1024'] == expected_runtime_rate_q10 and
+                      motion['diagonal_steps_1024'] == expected_diagonal_rate_q10)
     motion_status = ('special_lifecycle' if special_motion else
-                     'source_immobile_order_gating_not_fully_audited' if not ref['top_speed'] else
-                     'nominal_axis_rate_match_only' if abs(step - ref['top_speed'] * .4) < 1e-8 else
-                     'nominal_axis_rate_difference')
+                     'stock_immobile' if not ref['top_speed'] and motion_matches else
+                     'fixedpoint_helper_matches_assumed_scale_and_clock' if motion_matches else
+                     'fixedpoint_helper_rate_difference')
     row = {'profile': profile, 'engine_commit': engine['engine_commit'],
            'enum': name, 'enum_id': unit['enum_id'], 'raw_id': unit['raw_id'],
            'reference_unit': ref['name'], 'identity': identity,
@@ -54,63 +58,96 @@ def row_for(profile, engine, unit, reference, weapons):
                     f'{field}_match': unit[field] == ref[field]})
     row.update({'engine_flying': unit['flying'],
                 'reference_top_speed_source_px_per_frame': ref['top_speed'],
-                'shared_motion_axis_step_px_per_update': step,
-                'expected_axis_step_if_source24_engine30_scale_half': round(ref['top_speed'] * .4, 6),
+                'reference_top_speed_q10': source_rate_q10,
+                'expected_scaled_runtime_rate_q10': expected_runtime_rate_q10,
+                'motion_helper_runtime_rate_q10': motion['runtime_speed_q10'],
+                'motion_helper_cardinal_steps_per_1024': motion['cardinal_steps_1024'],
+                'motion_helper_diagonal_steps_per_1024': motion['diagonal_steps_1024'],
+                'motion_assumes_half_spatial_scale_and_24_over_30_clock': True,
                 'movement_assessment': motion_status})
     notes = [NOTES[name]] if name in NOTES else []
     for target in ('ground', 'air'):
         w = weapons[ref[target + '_weapon']['id']]
-        e = unit[target]
+        e = unit[target + '_rule']
+        stock = unit[target + '_stock']
         eligible = bool(unit['air_eligible']) if target == 'air' else e['damage'] > 0
         if name == 'U_SCOURGE':
             special = ({'-DSC64_P3_ENABLED', '-DSC64_UNIFIED'} <= flags or
                        '-DSC64_Z7_SCOURGE_COMBAT' in flags)
             eligible = bool(special and target == 'air')
-        has_weapon = w['id'] < 130
-        difference = []
-        if has_weapon:
-            if not eligible:
-                difference.append('no_ordinary_eligible_weapon')
-            for ef, rf in [('damage', 'damage_amount'), ('cooldown', 'damage_cooldown'), ('range', 'max_range')]:
-                if e[ef] != w[rf]:
-                    difference.append(ef)
-            if e['hits'] != ref[target + '_weapon_hits'] * w['damage_factor']:
-                difference.append('attack_potential_multiplicity')
-            if w['min_range']:
-                difference.append('minimum_range_not_in_generic_path')
-        if name in {'U_REAVER', 'U_SPIDER_MINE', 'U_P7_CARRIER'}:
-            status = 'special_lifecycle_requires_runtime_review'
-        elif name == 'U_FIREBAT' and target == 'ground':
-            status = 'special_flame_model_difference'
+        has_weapon = w['id'] < 130 and w['damage_amount'] > 0
+        stock_available = bool(stock['available'])
+        if has_weapon and stock_available:
+            matches = (stock['weapon_id'] == w['id'] and
+                       stock['damage'] == w['damage_amount'] and
+                       stock['upgrade_bonus'] == w['damage_bonus'] and
+                       stock['damage_factor'] == w['damage_factor'] and
+                       stock['damage_class'] == w['damage_type']['id'] and
+                       stock['cooldown'] == w['damage_cooldown'] and
+                       stock['min_range'] == w['min_range'] and
+                       stock['max_range'] == w['max_range'] and
+                       stock['unit_hits'] == ref[target + '_weapon_hits'] and
+                       stock['impact_count'] == ref[target + '_weapon_hits'] * w['damage_factor'])
+            helper_status = 'stock_attack_helper_matches_reference' if matches else 'stock_attack_helper_mismatch'
+        elif not has_weapon and stock_available:
+            helper_status = 'unexpected_stock_attack_helper_available'
         elif not has_weapon:
-            status = 'no_reference_direct_weapon'
+            helper_status = 'no_reference_direct_weapon'
         else:
-            status = ';'.join(difference) if difference else 'base_table_match_only'
-        bonus = 1
-        if name == 'U_SCOURGE':
-            bonus = 0
-        if name == 'U_RAYNOR_VULTURE' and '-DSC64_T5_RUNTIME' in flags:
-            bonus = 2
+            helper_status = 'stock_attack_helper_unavailable'
+        if stock_available:
+            boundaries_passed = (stock['at_min_accepted'] and stock['at_max_accepted'] and
+                                 stock['above_max_rejected'] and
+                                 (not stock['min_range'] or stock['below_min_rejected']))
+            minrange_status = ('range_boundary_helper_passed' if boundaries_passed else
+                               'range_boundary_helper_failed')
+        else:
+            minrange_status = 'no_minimum_range'
+        if has_weapon and not eligible:
+            runtime_status = 'profile_eligibility_disables_stock_attack'
+        elif name in SPECIAL_ATTACKS:
+            runtime_status = 'special_lifecycle_or_damage_adapter'
+        elif name == 'U_SCOURGE':
+            runtime_status = 'special_suicide_lifecycle_with_profile_air_eligibility'
+        elif name == 'U_MUTALISK':
+            runtime_status = 'stock_primary_attack_fields; bounce_lifecycle_unmodeled'
+        elif name == 'U_SIEGE_TANK':
+            runtime_status = 'stock_attack_fields; splash_and_mode_lifecycle_unmodeled'
+        else:
+            runtime_status = 'generic_stock_attack_path_with_profile_exceptions'
         for key, value in {
             'reference_weapon': w['name'],
-            'engine_class_eligible': eligible,
-            'engine_damage_per_hit': e['damage'],
+            'race_rule_helper_class_eligible': eligible,
+            'race_rule_helper_damage': e['damage'],
+            'race_rule_helper_cooldown': e['cooldown'],
+            'race_rule_helper_max_range': e['range'],
+            'race_rule_helper_hits': e['hits'],
+            'stock_helper_available': stock_available,
+            'stock_helper_weapon_id': stock['weapon_id'],
+            'stock_helper_damage_per_impact': stock['damage'],
+            'stock_helper_upgrade_bonus': stock['upgrade_bonus'],
+            'stock_helper_damage_factor': stock['damage_factor'],
+            'stock_helper_damage_class_id': stock['damage_class'],
+            'stock_helper_unit_max_hits': stock['unit_hits'],
+            'stock_helper_impact_count': stock['impact_count'],
+            'stock_helper_cooldown_source_frames': stock['cooldown'],
+            'stock_helper_converted_cooldown_updates': (stock['cooldown'] * 5 + 3) // 4,
+            'stock_helper_min_range_source_pixels': stock['min_range'],
+            'stock_helper_half_scale_min_range': (stock['min_range'] + 1) // 2,
+            'stock_helper_max_range_source_pixels': stock['max_range'],
+            'stock_helper_half_scale_max_range': (stock['max_range'] + 1) // 2,
+            'stock_helper_attack_range_assessment': minrange_status,
+            'stock_helper_assessment': helper_status,
+            'runtime_behavior_assessment': runtime_status,
             'reference_damage_amount': w['damage_amount'],
-            'engine_hit_calls': e['hits'],
             'reference_unit_max_hits': ref[target + '_weapon_hits'],
             'reference_weapon_damage_factor': w['damage_factor'],
-            'engine_source_basis_cooldown': e['cooldown'],
             'reference_base_cooldown': w['damage_cooldown'],
-            'engine_converted_cooldown_updates': (e['cooldown'] * 5 + 3) // 4,
             'reference_converted_cooldown_updates': (w['damage_cooldown'] * 5 + 3) // 4,
-            'engine_source_basis_max_range': e['range'],
             'reference_max_range': w['max_range'],
-            'engine_half_scale_max_range': (e['range'] + 1) // 2,
             'reference_min_range': w['min_range'],
             'reference_damage_type': w['damage_type']['name'],
-            'generic_side_upgrade_increment': bonus if eligible else '',
             'reference_weapon_upgrade_bonus': w['damage_bonus'],
-            'assessment': status,
         }.items():
             row[target + '_' + key] = value
     # Costs/time/supply retained for review, not automatically called bugs:
@@ -134,9 +171,14 @@ def compare(reference_path, probes_dir, output, csv_output=None):
         if file.parent.name.startswith('optional-'):
             continue
         engine = json.loads(file.read_text())
+        if engine.get('schema') != 2 or not all(engine.get(key) for key in
+                ('stock_profiles_sha256', 'stock_combat_sha256', 'stock_motion_sha256')):
+            raise ValueError(f'{file} uses a stale probe schema; regenerate it with '
+                             'tools/sc64_unit_spec_engine.py before comparison')
         rows.extend(row_for(file.parent.name, engine, u, units, weapons) for u in engine['units'])
         profiles.append({key: engine[key] for key in
-                         ('engine_commit', 'profile_variable', 'defines', 'rules_sha256')} |
+                         ('engine_commit', 'profile_variable', 'defines', 'rules_sha256',
+                          'stock_profiles_sha256', 'stock_combat_sha256', 'stock_motion_sha256')} |
                         {'profile': file.parent.name, 'unit_rows': len(engine['units']),
                          'probe_json_sha256': hashlib.sha256(file.read_bytes()).hexdigest()})
     if not rows:
@@ -157,7 +199,7 @@ def compare(reference_path, probes_dir, output, csv_output=None):
             writer.writerows(rows)
     canonical = [r for r in rows if r['identity'] == 'canonical']
     manifest = {
-        'schema': 1, 'audit_date': '2026-10-25',
+        'schema': 2, 'audit_date': date.today().isoformat(),
         'classification': 'stock_PC_default_table_and_authored_runtime_review_not_N64_verification',
         'reference': {k: v for k, v in facts['provenance'].items() if k != 'repository'},
         'profiles': profiles,
@@ -168,11 +210,11 @@ def compare(reference_path, probes_dir, output, csv_output=None):
                               for field in ('hp', 'shields', 'armor')},
         'comparison_sha256': hashlib.sha256(dest.read_bytes()).hexdigest(),
         'limitations': [
-            'Rule helpers are compiled; full constructors and runtime behavior were source reviewed, not exhaustively executed.',
-            'Profile-specific Scourge eligibility is reviewed logic, not inferred from its generic helper.',
-            'Common movement axis rate assumes half spatial scale and source24/engine30 clock; not measured wall time.',
+            'Movement figures probe the fixed-point nominal-rate helper over its 1024-phase cycle; travel remains affected by pathing, collision, order gating and source-vs-runtime clock assumptions.',
+            'Stock attack helper values are compared separately from race-rule fallback helpers and special runtime adapters.',
+            'Minimum-range helper boundary checks are not a substitute for full target geometry; the current Siege minimum-range tick behavior also has an engine runtime fixture.',
             'No native N64 default-table/timing equivalence, every spell, or generic scenario override qualification.',
-            'Generic attack summaries do not replace special weapon/animation/lifecycle validation.',
+            'Generic attack summaries do not establish full projectile, splash, upgrade-family or special weapon/animation/lifecycle behavior.',
         ],
     }
     (output / 'unit-specs-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
