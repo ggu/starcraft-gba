@@ -2786,6 +2786,15 @@ build/StarCraft-Zerg-Z7-Controller-Probe-GBA.gba: build/starcraft-zerg-z7-contro
 	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 RUN36' SCZQ
 zerg-z7-controller-probe: build/StarCraft-Zerg-Z7-Controller-Probe-GBA.gba
 
+# Host-only, per-update replay comparison for the default-off Z7 count cache.
+# Private tapes are validated and streamed by tools/sc64_z7_trace_parity.py.
+define Z7_TRACE_PARITY_BUILD
+build/test-sc64-z7-trace-$(1): tests/sc64_z7_trace_parity.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c -o $$@
+endef
+$(eval $(call Z7_TRACE_PARITY_BUILD,reference,$(Z7_CONTROLLER_FLAGS)))
+$(eval $(call Z7_TRACE_PARITY_BUILD,count-snapshot,$(Z7_CONTROLLER_FLAGS) -DSC64_Z7_PREVALIDATED_TICK -DSC64_Z7_COUNT_SNAPSHOT))
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
