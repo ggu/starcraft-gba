@@ -83,6 +83,13 @@ static void test_authenticated_setup_and_switch(void)
            race_z7_world.last_string_id==12u);
     assert(race_z7.runtime.model.action_cursor[1]==0u);
     /* Only authored source elapsed/wait ticks advance. */
+#ifdef SC64_Z7_EGG_PRODUCTION
+    int larvae_before=0;
+    for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive && b[i].owner==ENEMY &&
+        b[i].raw_owner==4 && !b[i].under_construction &&
+        (b[i].type==B_HATCHERY || b[i].type==B_LAIR || b[i].type==B_HIVE))
+        larvae_before+=b[i].larva;
+#endif
     for(unsigned f=4;f<9400u;++f) {
         assert(race_z7_runtime_tick(0,f));
         if(initial_wait && f==299u) assert(!race_z7.runtime.switch10);
@@ -92,10 +99,32 @@ static void test_authenticated_setup_and_switch(void)
     assert(race_z7.runtime.model.action_cursor[3]==0u);
     assert(race_minerals[ENEMY]==7950 && race_gas[ENEMY]==8000 &&
            race_z7.runtime.ai_plan_phase==1u);
+#ifdef SC64_Z7_EGG_PRODUCTION
+    {
+        int larvae_after=0,egg=-1,egg_count=0,producer=-1;
+        for(int i=0;i<MAX_UNITS;++i) if(u[i].alive && u[i].owner==ENEMY &&
+            u[i].raw_owner==4 && u[i].type==U_Z7_EGG && u[i].raw_type==36 &&
+            u[i].target==U_ZERGLING &&
+            u[i].work_timer==sc64_z7_egg_duration(U_ZERGLING)) {
+            egg=i; ++egg_count;
+        }
+        for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive && b[i].owner==ENEMY &&
+            b[i].raw_owner==4 && !b[i].under_construction &&
+            (b[i].type==B_HATCHERY || b[i].type==B_LAIR || b[i].type==B_HIVE)) {
+            int ex=b[i].x+20;
+            if(ex>=WORLD_W-8) ex=b[i].x-20;
+            if(egg>=0 && u[egg].x==ex && u[egg].y==b[i].y+4) producer=i;
+            larvae_after+=b[i].larva;
+        }
+        assert(egg_count==1 && producer>=0);
+        assert(larvae_before>0 && larvae_after==larvae_before-1);
+    }
+#else
     int queued=0;
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive && b[i].owner==ENEMY &&
         b[i].raw_owner==4 && b[i].queue_count) queued=1;
     assert(queued); /* Authored replacement queues only through normal production. */
+#endif
     assert(sc64_z7_persistent_state_valid(&race_z7));
     u16 held=race_z7.runtime.ai_plan_ticks;
     assert(race_z7_runtime_tick(1,9400u));
@@ -166,6 +195,44 @@ static void test_terminal_queries_and_fail_closed_metadata(void)
     assert(!sc64_z7_world_action(&race_z7_world,&race_z7.runtime,&bad_action));
 }
 
+#ifdef SC64_Z7_PREVALIDATED_TICK
+static void test_prevalidation_capability_lifecycle(void)
+{
+    const Sc64RaceMap *map=load_canonical_z7();
+    assert(race_z7_runtime_init(map));
+    assert(race_z7_world.source_tables_prevalidated==1u);
+    assert(race_z7_ops.condition==race_z7_prevalidated_condition_callback);
+    assert(race_z7_ops.action==race_z7_prevalidated_action_callback);
+
+    Sc64RaceMap bad=*map;
+    bad.width=(u16)(map->width-1u);
+    assert(!race_z7_runtime_init(&bad));
+    assert(!race_z7_world.source_tables_prevalidated && !race_z7_map &&
+           !race_z7_ops.context && !race_z7_ops.condition && !race_z7_ops.action);
+
+    assert(race_z7_runtime_init(map));
+    assert(!race_z7_rebind_loaded_world(&bad));
+    assert(!race_z7_world.source_tables_prevalidated && !race_z7_map &&
+           !race_z7_ops.context && !race_z7_ops.condition && !race_z7_ops.action);
+
+    /* A fresh authenticated bind re-enables the capability; the checked
+       public condition API still rejects forged metadata in the gated build. */
+    assert(race_z7_runtime_init(map));
+    assert(race_z7_world.source_tables_prevalidated==1u);
+    Sc64Z7SourceCondition forged=sc64_z7_source_conditions[0];
+    forged.opcode=99u;
+    assert(sc64_z7_world_condition(&race_z7_world,&race_z7.runtime,&forged)<0);
+
+    int human=-1;
+    for(int i=0;i<MAX_UNITS;++i)
+        if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_owner==3) {human=i;break;}
+    assert(human>=0);
+    u[human].raw_owner=4;
+    assert(!race_z7_runtime_tick(0,1u));
+    assert(race_z7.runtime.fault==SC64_Z7_RUNTIME_FAULT_ACTOR);
+}
+#endif
+
 int main(void)
 {
     assert(sc64_z7_world_compare(10u,3u,3u)==1);
@@ -176,5 +243,8 @@ int main(void)
     test_bring_uses_source_bbox_edges();
     test_source_terminal_outcomes();
     test_terminal_queries_and_fail_closed_metadata();
+#ifdef SC64_Z7_PREVALIDATED_TICK
+    test_prevalidation_capability_lifecycle();
+#endif
     return 0;
 }

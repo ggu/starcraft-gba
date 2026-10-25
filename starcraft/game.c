@@ -8230,6 +8230,8 @@ draw_hud(void)
     }
 }
 
+#include "game_audio.h"
+
 void
 game_render(void)
 {
@@ -8245,6 +8247,7 @@ game_render(void)
 #else
     gfx_begin(C_BLACK);
 #endif
+    game_audio_observe();
     if (screen == SCREEN_TITLE)
 	draw_title();
     else {

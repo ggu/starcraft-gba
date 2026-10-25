@@ -248,6 +248,80 @@ See [SC64 unified](SC64-UNIFIED.md) for implemented missions and limitations, an
 
 The default `./dev test` includes the asset-free weapon-effect renderer check. After preparing the unified inputs, `make test-unified` also runs actual-attack visual checks and pixel/cache checks for Protoss shield bars; those checks keep damage application immediate and compare cached HUD output with a full redraw.
 
+## Optional StarCraft 64 sound effects and music
+
+`./dev sc64 prepare` also runs `tools/sc64_audio_pack.py`, which converts the
+ROM's sound effects and music into a private bank under ignored
+`.local/sc64/audio/generated/`: `sc64_audio_generated.bin` (signed 8-bit PCM),
+`sc64_audio_generated.h` (sample and per-unit index tables) and a manifest
+with counts and hashes. To refresh only the bank:
+
+```sh
+python3 tools/sc64_audio_pack.py
+python3 tools/sc64_audio_pack.py --music 0,4,5   # fewer music tracks, smaller ROM
+```
+
+Every imported (`SC64_*`) ARM profile links the bank automatically when the
+header exists. `make <target> SC64_AUDIO=0` builds the same profile silent, for
+example for performance baselines; `SC64_AUDIO=1` fails if the bank is absent.
+The default original-art ROM never uses it: it keeps short PSG placeholder
+tones for the same events. The bank is about 15.6 MB, so imported ROMs grow
+to the 32 MiB cartridge size. Like other imported data, the bank and any audio
+captured from it are game content: do not commit, attach or distribute them.
+
+What is imported:
+
+- StarCraft 64 keeps its sounds in the BOLT archive. `014/000` is a
+  1144-entry table indexed like PC `sfxdata` ids, pointing into an unlisted
+  5.6 MB blob at the end of the archive; `015/000`-`00F` are 16 music streams.
+  Both use mono IMA ADPCM (high nibble first) at 11025 Hz. The N64 mixes them
+  on the CPU to 11025 Hz stereo.
+- The converter decodes and linearly resamples them to 10512 Hz, the closest
+  GBA rate that consumes exactly 176 samples per video frame. Sounds are chosen
+  from the ROM's own `units.dat` (ready, selection and command responses, up
+  to four variants each) and IScript (`playsnd`, `playsndrand`,
+  `playsndbtwn`, `attackmelee` in attack and death animations, following
+  one level of spawned explosion sprites): 501 distinct clips. Annoyed
+  responses are not imported.
+- Music roles come from the resident N64 selector, which loads resource
+  `0x1500 + track`: 0 is the menu theme; Terran, Zerg and Protoss play
+  4/5, 8/9 and 12/13 in game, alternating as each ends; 2/3, 6/7 and 10/11 are
+  the mission-end stingers chosen by the result flag. Which stinger is victory
+  is inferred from that flag and has not been checked by ear. Tracks 1, 14 and
+  15 are not imported.
+
+Engine design (`common/audio_mixer.h`, `common/gba.c`):
+
+- Timer 0 runs at 10512 Hz and feeds both Direct Sound FIFOs. DMA1 plays a
+  352-byte double buffer of sound effects on channel A; DMA2 streams the
+  current music track on channel B (50% volume) straight from ROM, so music
+  costs no mixing. A 64-byte zero guard follows the double buffer: when the
+  interrupt is delayed (for example behind a long DMA3 blit) the FIFO reads a
+  few samples of silence instead of unrelated memory.
+- A VBlank interrupt drains an 8-entry request ring, assigns requests to four
+  fixed voices and mixes 176 samples with saturation. Voice 0 is reserved for
+  unit responses, which interrupt each other as in StarCraft; effects take a
+  free voice or steal a lower-priority, older one, and the same effect is not
+  retriggered within four frames. Samples are word-aligned, so the mixer
+  reads four samples per ROM word and adds them in two 16-bit lanes, clamping
+  only lanes that overflow. It runs as Thumb code from ROM: IWRAM has no room
+  for it.
+- The mix buffer and the event snapshot live in the unused VRAM gap between
+  the two mode-4 pages (`0x06009600`-`0x06009FFF`), so EWRAM grows only by the
+  mixer state.
+- `starcraft/game_audio.h` derives events at the start of each rendered frame
+  from read-only comparisons with the previous frame: a raised weapon
+  cooldown on a visible unit (a shot), alive 1->0 (a death), a new player unit
+  (ready), a cleared construction flag (completed building, which plays the
+  building's selection sound because StarCraft has none), and a new selection
+  or changed orders after input (selection and command responses). It never
+  writes simulation state or uses the game RNG, at most two effects start per
+  frame, and it ignores any tick discontinuity such as a load or restart.
+
+Check the engine with `make test-audio` (asset-free, part of `./dev test`) and
+`make test-game-audio-unified` (part of `make test-unified`). Measured costs
+and limits are in [Validation](VALIDATION.md#sampled-audio-2026-10-25).
+
 ## T4 internal actor/world checks
 
 The Jacobs Installation data and actor rules have an internal, gated host-test
