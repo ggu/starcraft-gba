@@ -407,11 +407,12 @@ dialogue/audio are absent; their holds use documented adapter timings. Scourge
 combat has an air-only suicide attack with fixed source-backed damage. This
 profile has a separate save generation, including quest actions and their
 remaining hold time. The current stock-stat controller completes the unchanged
-native mission at frame 57,457 after building a protected economy, Photon
-Cannons and a Gateway army, then destroying all 38 hostile buildings. A fresh
-input-only host replay and an ARM replay with the current production flags
-reach the same native result. The 2,985-transition trace fits the paged
-256-entry debugger queue, with at most 162 transitions per 1,000-tick page.
+native mission at frame 59,586 after building a protected economy, Photon
+Cannons and a Gateway army, then destroying all hostile buildings. Its trace
+records 2,999 input transitions and 59 live checkpoints. A fresh input-only
+host replay reaches the native result. The earlier ARM proof and performance
+measurement used commit `9a2e281`, before the imported-worker healing
+correction; an ARM replay of the current source has not yet been run.
 After the build/test command, replay it with:
 
 ```sh
@@ -423,10 +424,10 @@ and bounded `--ticks` prefixes with optional normal-control `--save-at-end`.
 It verifies the final quest model, completion bit, roster and global wallets.
 The stock route is the replay CLI default. Explicit `--route garrison` and
 `--route expansion` retain their historical contracts; their older wins do not
-qualify the current stock-stat engine. The current 58,063-update ARM replay
-verifies source launch and terminal quest state through a private input driver.
-Its whole-route mean is 839,963 CPU cycles per update/audio/render/present loop,
-about 20.0 fps equivalent. Opening skirmish samples near 29 fps do not establish
+qualify the current stock-stat engine. The previously measured 58,063-update
+ARM replay and 839,963-cycle whole-route mean (about 20.0 fps equivalent) apply
+to commit `9a2e281` before the worker-heal correction. Opening skirmish samples
+near 29 fps do not establish
 mission-wide performance. The near-30-fps mission target, current-stock
 fresh-process SRAM replay and physical GBA validation remain unmet. See the
 [current redraw and P3 audit](audits/2026-10-26-static-art-and-p3/README.md).
