@@ -25,6 +25,8 @@ aircraft explode, Protoss units burst in blue, and buildings explode and
 leave rubble for 30 seconds. These original-art effects follow the death
 families and timing of StarCraft 64. They are not its frames, and they do
 not affect combat or saves.
+When a mission ends, the last explosions finish before the result panel
+opens; buttons on the result screen still respond immediately.
 
 SCVs automatically gather mineral trips of up to eight minerals and return to the nearest Command Center. To build, select an SCV, open B, choose a structure, move to the site, and press A. Barracks require a completed Supply Depot; Academies require a completed Barracks. Refineries can only be placed on one of the two marked geysers. Select a worker and press A on a completed Refinery to assign gas harvesting, or select the Refinery and press A to assign an idle worker.
 
