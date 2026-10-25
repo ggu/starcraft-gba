@@ -29,7 +29,7 @@ showcase build has its own ROM game code (`SCSH`).
 | Protoss Last Stand | The final Nexus falls, with ordinary shield regeneration included. |
 | Protoss Crossfire | Zealots, Dragoons and Scouts clash with Hydralisks and Zerglings. |
 | Three Way Battle | Terran infantry, a Zerg swarm and a Protoss squad fight one another. |
-| Base Under Siege | Tanks and Marines attack a defended Zerg outpost. |
+| Base Under Siege | Marines advance on a defended Zerg outpost with Tanks holding position behind them. |
 
 These are staged starting positions running the current game simulation.
 Carrier Interceptor combat is unfinished: Carrier Approach is explicitly
