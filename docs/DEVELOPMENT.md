@@ -8,6 +8,34 @@ For the current combined Terran profile and qualification status, see
 [Combined Terran T1–T10 campaign](#combined-terran-t1t10-campaign) near the
 end of this guide.
 
+## Local-first verification
+
+Routine checks run on your development machine:
+
+```sh
+python3 tools/check_source_tree.py
+./dev doctor
+./dev build
+./dev test
+```
+
+The source-check workflow is disabled in repository settings and has only a
+`workflow_dispatch` trigger. Pushes, PRs and merges do not need an Actions run.
+Report the local commands/results and tested commit when reviewing a change.
+Prepared imported-profile and ARM qualifications remain separate local checks.
+
+For an explicitly requested Linux compatibility check, an administrator can
+enable `source.yml` and dispatch it manually, then disable it again. It uses
+the standard Ubuntu runner; public-repository standard runner usage is currently
+[free under GitHub's billing rules](https://docs.github.com/en/billing/concepts/product-billing/github-actions).
+Do not add paid/larger runners or automatic cloud fallback. Concurrency cancels
+superseded manual runs on the same branch.
+
+A self-hosted runner registered to another repository is not automatically
+available here. Use local checks on the current machine or a separately
+configured trusted machine; do not automatically execute public PR code on
+personal runners. Routine verification does not require a new runner service.
+
 ## Source construction art preview
 
 After preparing the optional unified inputs, this separate preview uses
