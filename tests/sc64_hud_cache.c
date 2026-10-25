@@ -90,7 +90,7 @@ assert_cached_matches_full(void)
 static int
 probe_change_mask(void)
 {
-    int previous[24];
+    int previous[SC64_HUD_KEY_COUNT];
     int valid = sc64_hud_valid;
     memcpy(previous, sc64_hud_previous, sizeof(previous));
     int changed = sc64_hud_changed();
@@ -171,6 +171,45 @@ test_selection_building_box_and_modes_invalidate_bottom(void)
     mode = MODE_BUILD;
     expect_mask_and_match(HUD_BOTTOM);
 }
+
+#ifdef SC64_RACES
+static void
+test_skirmish_shield_only_changes_invalidate_cached_bottom(void)
+{
+    game_init();
+    race_mode=1; race_human=R_PROTOSS; race_bots=1; race_skirmish_map=0;
+    race_skirmish_init();
+    screen=SCREEN_PLAY;
+    memset(u,0,sizeof(u));
+    memset(b,0,sizeof(b));
+    Unit *actor=&u[0];
+#ifdef SC64_P7_ACTORS
+    actor->type=U_P7_ARCHON;
+    actor->hp=actor->maxhp=10;
+#else
+    actor->type=U_DRAGOON;
+    actor->hp=actor->maxhp=sc64_race_unit_rules[U_DRAGOON].hp;
+#endif
+    actor->alive=1; actor->owner=SIDE; actor->raw_type=sc64_race_raw_unit(actor->type);
+    actor->raw_owner=7; actor->selected=1;
+    actor->shield=sc64_actor_max_shields(actor->type,0)/2;
+    sc64_hud_valid=0;
+    assert_cached_matches_full();
+    actor->shield++;
+    expect_mask_and_match(HUD_BOTTOM);
+
+    actor->selected=0;
+    selected_building=0;
+    Building *building=&b[0];
+    building->alive=1; building->owner=SIDE; building->type=B_PYLON;
+    building->raw_type=sc64_race_raw_building(B_PYLON); building->raw_owner=7;
+    building->hp=building->maxhp=300; building->shield=80;
+    sc64_hud_valid=0;
+    assert_cached_matches_full();
+    building->shield++;
+    expect_mask_and_match(HUD_BOTTOM);
+}
+#endif
 
 static void
 test_mission_message_timer_and_minimap_stay_pixel_exact(void)
@@ -430,6 +469,11 @@ main(void)
 #endif
 #if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     test_p3_sequence_invalidates_bottom_and_matches_redraw();
+#endif
+#ifdef SC64_RACES
+    /* Keep the skirmish fixture last so it cannot change the campaign state
+       expected by the older mission-message and mission-cache checks above. */
+    test_skirmish_shield_only_changes_invalidate_cached_bottom();
 #endif
     return 0;
 }

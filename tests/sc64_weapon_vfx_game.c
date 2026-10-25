@@ -52,7 +52,7 @@ static void test_actual_shot(int type,int owner,int air)
         unsigned changed=0;
         for(int y=0;y<160;++y) for(int x=0;x<240;++x) {
             int pixel=gfx_test_pixel(x,y);
-            if(y<12||y>127) assert(pixel==C_PANEL);
+            if(y<12||y>119) assert(pixel==C_PANEL);
             else changed+=pixel!=C_PANEL;
         }
         assert(changed>0);

@@ -5092,7 +5092,7 @@ bytes). Overflow deterministically replaces the oldest cosmetic effect. The
 original-art pool stays at 12, retaining its save layout; RaceSave and actor
 layouts are unchanged. All drawing clips before framebuffer writes and no
 long source-to-target line scans through offscreen space. Mapping and rendering
-remain in ROM. Current IWRAM/BSS ends are: Terran `0x03004e88/0x0203dbcc`,
+remain in ROM. At the weapon-family stage, IWRAM/BSS ends are: Terran `0x03004e88/0x0203dbcc`,
 Z3 `0x03004f88/0x02039a58`, P3 `0x03004f30/0x02039c00`, showcase
 `0x03004a28/0x0203dcd0`, Z7 derived `0x03004a40/0x0203dbd0` and P7 training
 `0x03004a30/0x0203dcd4`. The existing reserve guards pass.
@@ -5113,6 +5113,33 @@ and full Terran build/tests pass, including the ten controller missions,
 saves and skirmish matrix. This visual pass does not promote any new campaign
 mission or repeat full ARM campaign/save qualification; staged progress remains
 22/30. ROMs, captures and generated art remain local.
+
+### Separate shield and health display
+
+Protoss shields already absorb incoming damage before HP and regenerate/save
+separately. This presentation fix draws a cyan shield bar above the existing
+HP bar on shielded units and buildings. The blue empty track remains visible
+at zero shields, and the selected actor has a separate SH number. Capacities
+come from canonical actor facts with the existing rule-table fallback; Archon
+350-shield/10-HP and Carrier 150-shield/300-HP ratios are checked explicitly.
+Unshielded actors retain one health bar. Bars and weapon effects clip to the
+actual battlefield rows 12–119; the lower HUD begins at row 120.
+
+`make test-sc64-shield-bars` passes under ASan/UBSan in unified and P7 profiles,
+checking actual unit/building overlay pixels, full/partial/zero shields, HP
+independence, unshielded actors and viewport edges. The shared HUD fixture
+checks shield-only changes on a selected unit and Pylon, requiring bottom-band
+invalidation and exact equality with a forced redraw. The weapon-VFX game
+regression and host showcase checks also pass. A rendered selected-Dragoon
+fixture was visually inspected, including the adjacent minimap boundary.
+
+Two HUD cache keys add eight BSS bytes; actor/save rows and combat rules are
+unchanged. IWRAM ends remain unchanged in the rebuilt race/filming profiles.
+BSS ends are Terran `0x0203dbd4`, Z3 `0x02039a60`, P3 `0x02039c08` and
+showcase `0x0203dcd8`; all existing reserve guards pass. Default build/tests
+(414 Python checks plus host fixtures) and unified build/tests pass. Full Terran build/controller/save/skirmish
+checks also pass. This visual update does not qualify a new campaign mission, physical hardware,
+ARM SRAM continuation or a new performance result; staged progress stays 22/30.
 
 ### P7 mode-0 tile renderer
 
