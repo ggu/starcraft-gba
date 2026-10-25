@@ -126,7 +126,8 @@ static int heroes_alive(void)
     int count=0;
     for(unsigned h=0;h<sizeof(raw)/sizeof(raw[0]);h++)
         for(int i=0;i<MAX_UNITS;i++)
-            if(u[i].alive&&u[i].raw_type==raw[h]){++count;break;}
+            if(u[i].alive&&u[i].raw_type==raw[h]&&u[i].raw_owner==2&&
+               (u[i].owner==RESCUABLE||u[i].owner==SIDE)){++count;break;}
     return count;
 }
 
