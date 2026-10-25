@@ -5193,3 +5193,33 @@ gameplay frame 293497, with started mask `0x1be` and zero faults. Kerrigan is
 alive and unloaded at `(950,1009)`, research is complete and the Overlord has
 no cargo. The earlier route won at frame 268694. ARM replay, save continuity
 and performance were not re-measured for this route.
+
+### Sampled audio (2026-10-25)
+
+Imported profiles can play StarCraft 64 sound effects, unit responses and
+music from a private bank; the default ROM uses PSG placeholder tones for the
+same events. The design and import details are in
+[Development](DEVELOPMENT.md#optional-starcraft-64-sound-effects-and-music).
+Audio is presentation only: it reads simulation state at the start of each
+rendered frame, keeps its snapshot outside saves and the game RNG, and never
+writes game state.
+
+Host checks:
+
+- `make test-audio` (in `./dev test`): mixer silence, single-voice copy,
+  two/three-voice saturation, partial-frame retirement, exact multi-frame
+  length, speech interruption, effect allocation, duplicate suppression,
+  stealing and refusal, queue bounds and wrap, and the music start, loop,
+  one-shot, change, stop and absent-track paths. The hook fixtures cover a
+  real skirmish fight producing shot and death events, the cooldown shot
+  contract, off-screen silence, the two-effect frame cap, selection, command
+  response only on a new key press, new player units, completed buildings,
+  and no events after a tick discontinuity or pause.
+- The same 12,000-tick controller-driven run from the title screen gives the
+  same state hash with the observer compiled in and with `GAME_AUDIO_OFF`:
+  `4f8e47da` for the default profile (395 shot, 40 death, 95 selection and
+  three command events in the audible build).
+- `make test-game-audio-unified` (in `make test-unified`): the same hook
+  fixtures with the imported bank, checking that a selection plays one of the
+  unit's own response samples and that the race theme and menu theme are
+  requested; the unified run's state hash `602d8534` matches with audio off.

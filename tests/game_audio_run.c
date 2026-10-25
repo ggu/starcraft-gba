@@ -18,6 +18,7 @@ static int fail(const char *message)
 
 static void tick(u16 held)
 {
+    game_audio_host_held = held;
     game_update(held, held & (u16)~previous_held);
     previous_held = held;
     game_render();
@@ -170,9 +171,13 @@ static int hooks(void)
     observe_next();
     if (events(GAME_AUDIO_YES)) return fail("order change without input answered");
     u[0].tx = 95;
-    game_audio_pressed = KEY_A;
+    game_audio_host_held = KEY_A;
     observe_next();
     if (events(GAME_AUDIO_YES) != 1) return fail("command response");
+    u[0].tx = 100;
+    observe_next();
+    if (events(GAME_AUDIO_YES) != 1) return fail("held key is not a new command");
+    game_audio_host_held = 0;
     put_unit(5, SIDE, U_SCV, 300, 300);
     observe_next();
     if (events(GAME_AUDIO_READY) != 1) return fail("new unit ready response");

@@ -35,8 +35,7 @@ from typing import Iterable
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.sc64_construction_sprites import (  # noqa: E402
-    ANIMATIONS, animation_instructions, decode_instruction, image_animation_starts,
-    le_array, load_sprites, script_index,
+    animation_instructions, image_animation_starts, le_array, load_sprites, script_index,
 )
 
 UPSTREAM = ROOT / "references/sc64-maps/extract_sc64_maps.py"
@@ -44,7 +43,6 @@ ROM_DEFAULT = ROOT / ".local/sc64/rom/StarCraft64-USA.z64"
 OUT_DEFAULT = ROOT / ".local/sc64/audio/generated"
 EXPECTED_ROM_SHA1 = "a36d91b5aac7bb95df0d7de5f9814f5270e25c2b"
 SOUND_TABLE = "014/000"
-SOUND_TABLE_SHA256 = None  # checked structurally below; the ROM hash pins it
 SOUND_COUNT = 1144
 SOUND_BLOB_ROM_OFFSET = 0x1A516B0
 SOUND_BLOB_LENGTH = 0x5603C2

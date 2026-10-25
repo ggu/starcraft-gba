@@ -1234,8 +1234,6 @@ static int unit_tap = -1, unit_tap_x, unit_tap_y;
 static u32 unit_tap_frame;
 static int weapons_level, armor_level, selected_building;
 static int weapons_research, armor_research;
-/* Input latch for presentation-only audio responses; never saved. */
-static u16 game_audio_pressed;
 static u32 seed;
 #ifdef SC64_IMPORTED_MISSION
 volatile u32 sc64_orders_cycles, sc64_sight_cycles, sc64_other_cycles;
@@ -5984,7 +5982,6 @@ game_update(u16 held, u16 pressed)
 #endif
 #endif
     int speed = (held & KEY_R) ? 4 : 2;
-    game_audio_pressed |= pressed;
 #ifdef SC64_SHOWCASE_ENABLED
     if (sc64_showcase_scene >= 0) {
         if (pressed & KEY_SELECT) { sc64_showcase_leave(held); return; }

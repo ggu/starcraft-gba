@@ -41,6 +41,17 @@ _Static_assert(GBA_AUDIO_MIX_BYTES + (MAX_UNITS + MAX_BUILDINGS) * 2u <= GBA_AUD
 #define GAME_AUDIO_SNAPSHOT ((volatile u16 *)(GBA_AUDIO_ARENA + GBA_AUDIO_MIX_BYTES))
 #endif
 
+/* Input edges come from the main loop's record of this tick's held keys, so
+ * game_update() itself stays untouched (its inlining shapes IWRAM use). */
+#ifdef GBA_HOST
+u16 game_audio_host_held;  /* Host fixtures have no main loop. */
+#define GAME_AUDIO_HELD() game_audio_host_held
+#else
+extern volatile u16 demo_keys;
+#define GAME_AUDIO_HELD() demo_keys
+#endif
+static u16 game_audio_previous_held;
+
 static int game_audio_last_frame = -1, game_audio_last_screen = -1;
 static u32 game_audio_selection, game_audio_orders;
 static u8 game_audio_effects;
@@ -164,9 +175,12 @@ static void game_audio_observe(void)
     int fresh, i;
     u32 selection = 0, orders = 0;
     int first_selected = -1;
+    u16 held = GAME_AUDIO_HELD(), pressed = held & (u16)~game_audio_previous_held;
+    game_audio_previous_held = held;
 #ifdef GAME_AUDIO_OFF
     /* Differential test builds: the same simulation with no observer work. */
     (void)snap; (void)fresh; (void)i; (void)selection; (void)orders; (void)first_selected;
+    (void)pressed;
     return;
 #endif
 #ifdef SC64_AUDIO_IMPORTED
@@ -175,7 +189,7 @@ static void game_audio_observe(void)
     fresh = screen != SCREEN_PLAY || game_audio_last_screen != SCREEN_PLAY ||
             frame != game_audio_last_frame + 1;
     game_audio_last_screen = screen;
-    if (screen != SCREEN_PLAY) { game_audio_pressed = 0; return; }
+    if (screen != SCREEN_PLAY) return;
     if (frame == game_audio_last_frame) return;
     game_audio_last_frame = frame;
     game_audio_effects = 0;
@@ -226,12 +240,11 @@ static void game_audio_observe(void)
             game_audio_emit(GAME_AUDIO_WHAT, game_audio_unit_raw(&u[first_selected]));
         else
             game_audio_emit(GAME_AUDIO_WHAT, game_audio_building_raw(&b[selected_building]));
-    } else if (!fresh && selection && orders != game_audio_orders && game_audio_pressed &&
+    } else if (!fresh && selection && orders != game_audio_orders && pressed &&
                first_selected >= 0) {
         game_audio_emit(GAME_AUDIO_YES, game_audio_unit_raw(&u[first_selected]));
     }
     game_audio_selection = selection;
     game_audio_orders = orders;
-    game_audio_pressed = 0;
 }
 #endif
