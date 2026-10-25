@@ -969,6 +969,15 @@ test-sc64-no-depot-harvest-z7: build/test-sc64-no-depot-harvest-z7
 	./build/test-sc64-no-depot-harvest-z7
 test-starcraft: test-sc64-no-depot-harvest
 
+build/test-sc64-active-hall-depots-z6: tests/sc64_active_hall_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-active-hall-depots-z7: tests/sc64_active_hall_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SCOURGE_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-active-hall-depots
+test-sc64-active-hall-depots: build/test-sc64-active-hall-depots-z6 build/test-sc64-active-hall-depots-z7
+	./build/test-sc64-active-hall-depots-z6
+	./build/test-sc64-active-hall-depots-z7
+
 probe: build/probe.gba
 build/probe.elf: $(COMMON) $(COMMON_HEADERS) tests/platform_probe.c common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(COMMON) tests/platform_probe.c $(LDFLAGS) -Wl,-Map,build/probe.map -lgcc -o $@

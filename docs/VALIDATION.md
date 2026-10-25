@@ -4551,3 +4551,44 @@ defeat records after clearing process state; it also rejects an in-range
 completion bit belonging to another race without mutating live state. The
 late-Terran save fixture and the complete ten-mission Terran regression pass.
 No persistent layout, save generation or RAM reserve changes.
+
+### Active Lair and Hive resource depots
+
+The pinned reference's active-depot predicate accepts grounded Lairs and Hives
+even when incomplete (`bwgame.h:2191–2199`). It accepts Hatcheries when completed
+or morphing. The GBA upgrade already changes a Hatchery into a Lair immediately,
+but the standard first-depot lookup previously rejected every incomplete
+building. Returning workers therefore held their cargo through the Lair's
+entire construction clock.
+
+The existing lookup now accepts incomplete Lairs/Hives while retaining its
+ascending first-slot selection, same-owner/alive/type checks and late-Terran
+airborne rejection. This does not enable the separate nearest-depot experiment
+or introduce a marker, field, format generation or new persistent state.
+Fresh incomplete Hatcheries remain ineligible. Incomplete Lair/Hive acceptance
+also applies to imported placements, matching the explicit source predicate.
+The shared lookup also supplies skirmish AI base-presence and targeting helpers,
+so they continue to recognize the base during these upgrades.
+
+Actual-engine Z6 and full Z7 sanitizer fixtures exercise the paid Hatchery-to-Lair
+helper and mineral/gas deposits before completion. They also check first-slot
+selection, incomplete Hatchery and enemy/non-depot rejection, an unfinished
+Hive's mineral delivery, packed building roundtrip, death and slot reuse. The
+Hive state is direct fixture setup; no Lair-to-Hive command is established.
+
+A private ordinary-input Z7 comparison restores deposits during the upgrade:
+the same controller has 25/49 minerals at frames 7826/8126 instead of 1/1.
+Its bounded trial still has 52 enemy buildings remaining, with no qualified
+win. Another controller advances Extractor construction by about 2000 updates
+but loses at frame 16071. These results establish the resource-return bug and
+remaining tactical/economy work, not mission completion or an fps improvement.
+
+The integrated change passes `make test-sc64-active-hall-depots` under
+ASan/UBSan, `./dev build`, `./dev test` (404 Python tests plus host fixtures),
+`make unified test-unified`, and the full Terran build/test workflow, including
+all ten mission controllers and the 234-configuration skirmish startup/save
+matrix. The default ROM is byte-identical to the previous build. The updated
+unified and Terran links end IWRAM at `0x03004ee8` and `0x03004e88`, respectively;
+BSS remains `0x0203cfe8` and `0x0203d9ec`. These retain the existing RAM reserves.
+These are host regression and ARM link checks; no new ARM playthrough or
+hardware performance qualification is claimed.

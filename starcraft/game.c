@@ -4570,7 +4570,11 @@ owner_command_center(int owner)
 #ifdef SC64_RACES
         ||sc64_race_is_zerg_townhall(b[i].type)||b[i].type==B_NEXUS
 #endif
-        ) && !b[i].under_construction
+        ) && (!b[i].under_construction
+#ifdef SC64_RACES
+        || b[i].type == B_LAIR || b[i].type == B_HIVE
+#endif
+        )
 #ifdef SC64_TERRAN_LATE_RUNTIME
         && !race_late_airborne(i)
 #endif

@@ -1936,3 +1936,23 @@ The first check is included in `./dev test` and needs no game data. The second
 uses the prepared private Z7 Scourge profile and covers SCVs, Probes and Drones.
 See [Validation](VALIDATION.md#mineral-gathering-without-a-completed-base) for the
 native-reference limits and shared-profile regression results.
+
+## Active Zerg resource depots
+
+The standard first-depot worker path accepts Lairs and Hives while they are
+under construction, as the source rules do. The GBA Hatchery-to-Lair command
+retags the building immediately, so upgrading no longer suspends mineral or
+gas deliveries. Fresh unfinished Hatcheries remain inactive. Existing
+first-slot selection, owner checks and airborne rejection are preserved.
+
+With the private Z6/Z7 inputs prepared, run:
+
+```sh
+make test-sc64-active-hall-depots
+```
+
+This checks the actual Lair command, cargo delivery during its upgrade,
+unfinished Lair/Hive eligibility, fresh Hatchery rejection, slot reuse and
+packed building roundtrips. The Hive fixture supplies an unfinished Hive
+state; it does not establish a Lair-to-Hive command. See
+[Validation](VALIDATION.md#active-lair-and-hive-resource-depots) for scope.
