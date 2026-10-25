@@ -5957,6 +5957,9 @@ update_selection_box(u16 held, u16 pressed, int old_x, int old_y)
 #ifdef SC64_SHOWCASE_ENABLED
 #include "sc64_showcase_adapter.h"
 #endif
+#ifdef SC_COMMAND_RING
+#include "command_ring.h"
+#endif
 
 static void
 pause_action(u16 pressed)
@@ -6161,6 +6164,9 @@ game_update(u16 held, u16 pressed)
     }
 #endif
     if (menu_open) reset_selection_gestures();
+#ifdef SC_COMMAND_RING
+    if (command_ring_input(held, pressed)) return;
+#endif
     if ((pressed & KEY_B) && !box_state && !(pressed & KEY_L)) {
 	if (menu_open)
 	    menu_open = 0;
@@ -7259,6 +7265,9 @@ draw_map(void)
         int height = FAST_ABS(box_anchor_y - box_end_y) + 1;
         gfx_frame(left - camx, top - camy + 12, width, height, C_HIGHLIGHT);
     }
+#ifdef SC_COMMAND_RING
+    command_ring_draw(x, y);
+#endif
     if (menu_open) {
 	#ifdef SC64_RACES
         static const char *race_labels[3][
@@ -7551,6 +7560,9 @@ draw_hud_commands(void)
     int i, n = selected_count();
     gfx_rect(0, 121, 240, 39, C_PANEL);
     gfx_line(0, 120, 240, 120, C_EDGE);
+#ifdef SC_COMMAND_RING
+    if (command_ring_draw_hud()) return;
+#endif
     if (box_state == 2) {
         gfx_text(5, 126, "BOX SELECT", C_CYAN);
         gfx_text(5, 137, "RELEASE L SELECT B CANCEL", C_GOLD);
@@ -7641,7 +7653,11 @@ draw_hud_commands(void)
                     gfx_text(104, 137, "/8  B UNLOAD", C_GOLD);
                 } else
 #endif
+#ifdef SC_COMMAND_RING
+		    gfx_text(52, 137, "HOLD B ORDERS", C_GOLD);
+#else
 		    gfx_text(52, 137, "A ORDER B COMMANDS", C_GOLD);
+#endif
 		break;
 	    }
     } else {
@@ -7667,6 +7683,9 @@ draw_hud_commands(void)
 	gfx_text(5, 137,
 #ifdef SC64_P4_STORM_ENABLED
                  race_p4_active() ? "B COMMANDS  B+R ESCORTS" :
+#endif
+#ifdef SC_COMMAND_RING
+                 mode == MODE_NORMAL ? "HOLD B ORDERS  TAP B LIST" :
 #endif
                  "B COMMANDS  A SELECT / PLACE", C_GOLD);
     }
