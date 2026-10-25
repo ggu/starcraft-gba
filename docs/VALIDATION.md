@@ -4702,3 +4702,84 @@ Lossless subpixel motion, stable owner/target references, source-update phases,
 child-actor state and the native 100-bullet capacity remain required design
 constraints. No projectile pool, additional mission win, fps result or hardware
 qualification is claimed by the codec work.
+
+### P7 movement steering list
+
+The P7 count probe spends most of each update in `update_orders()`. A
+diagnostic build of the 600-update opening attributes about 0.85M of 1.16M
+order cycles per update to movement, and about 0.60M of that movement to
+blocked ground movers. When the next step is occupied, `move_toward()` tries
+eight one-pixel side steps. Each attempt rescans the collision buckets and
+repeats ROM unit-fact lookups for every nearby actor. Nearest-target queries
+take under 0.1M cycles. Moving `sc64_target_nearest` into ROM, as tried in an
+earlier private experiment, therefore addresses the smaller cost.
+
+The default-off movement probe enables two existing options:
+`SC64_ZP_FACT_RANGE_CULL` and `SC64_COLLISION_CLASS_CACHE`. It also adds
+`SC64_COLLISION_STEER_LIST`. After the first side-step test, the list keeps the
+nearby candidates that pass the unchanged alive, loaded, burrowed, Chrysalis,
+flying and collidable filters. Each candidate keeps its position, combined
+radius and bucket cell. Every side step then reapplies its own original cell
+window and strict distance tests. Because the result only asks whether any
+candidate blocks, visiting order cannot change it. Gathering workers, an
+inactive bucket index, maps wider than 256 cells and lists over 48 candidates
+use the original query. Terrain checks, steering order, cost ties, speed,
+retry timers and RNG use are unchanged. No save fields are added.
+
+`make test-sc64-p7-move` launches P7 through the menu in reference and
+candidate ASan/UBSan builds. It hashes Unit, Building, P7 runtime, frame and
+wallet state after every one of 1,200 neutral updates. It then issues one
+controller-only attack-move and hashes 1,500 more updates. Both builds print
+`e3584674` and `824e2f6d`. The candidate checks 619,216 side-step answers
+against `unit_step_clear()`, 335,229 of them blocked. They come from live
+states and 400 randomized dense crowds, including map edges and gathering
+workers. The candidate also reproduces the existing menu, trigger and
+pause/save/load fixture output byte for byte.
+
+ARM timing uses `tools/sc64_p7_move_workload.py`. The debugger writes only the
+controller field. Effective fps comes from emulated GBA timer cycles over
+complete in-play 100-update intervals. The attack-move workload runs the
+600-update opening, then R, B, DOWN and A. It moves the cursor with the D-pad to
+the enemy building nearest the selected army, then presses A. Both builds lose
+the mission at frame 2394. Builds were measured on base `ad0dde0`; both probes
+rebuild byte for byte on `0135d33`.
+
+```sh
+make protoss-p7-count-probe protoss-p7-move-probe
+python3 tools/sc64_p7_move_workload.py --elf build/starcraft-protoss-p7-move-probe.elf \
+    --rom build/StarCraft-Protoss-P7-Move-Probe-GBA.gba --out build/p7-move-attack \
+    --neutral-ticks 600 --attack-ticks 1500
+python3 tools/sc64_p7_move_workload.py --compare REFERENCE/result.json CANDIDATE/result.json
+```
+
+| Workload | Count probe | Existing options only | Movement probe |
+| --- | --- | --- | --- |
+| Opening, 600 updates | 10.512 | 12.335 | 12.694 |
+| Neutral, 2,400 updates | 7.876 | 10.235 | 11.188 |
+| Attack-move, 1,200 complete updates | 6.760 | 8.958 | 10.055 |
+
+Every checkpoint matches the count probe in all three builds. Each checkpoint
+compares SHA-256 hashes of the actor, map, campaign, P7 runtime, wallet, supply,
+upgrade and fog banks. It also compares decoded actors, per-owner HP and
+selection counts. Runtime faults and unsupported rows are zero. The same
+inputs and command phase are recorded. At update 2,400 of the neutral run,
+order cycles fall from 2.12M to 1.02M. Drawing and non-order updates are
+unchanged at about 0.63M cycles, so 30 fps is not reachable from movement work
+alone.
+
+The movement probe ROM is
+`04706eb5c18296e3e6fbf85d7a258dba38c9c5d0df4173300f6cc36537719c46`.
+IWRAM ends at `0x03004b98`, 960 bytes above the count probe, and BSS ends at
+`0x0203dae0`, 628 bytes higher. Both remain inside the unchanged guards.
+The `move_toward()` stack frame grows from 92 to 124 bytes. RaceSave remains 16,348 bytes, the P7 supplement 124 bytes, and Unit/Building
+56/48 bytes. With these flags off, preprocessed `game.c` is identical for the
+original-art, unified, full Terran, Z6 and P7 count-probe profiles; the count
+probe ROM is `ac2ca616…f51fd`.
+
+Rejected variants matched state but did not justify their cost. An 8-bit
+blocked-direction mask was slower. IWRAM list storage and a per-build burrow
+hoist each gained under 1.5 percent. An IWRAM target-index rebuild gained
+0.8 percent for 400 IWRAM bytes. Inlining the P6 burrow guard at every call
+site overflowed the IWRAM guard. These are emulator results only. They do not
+qualify a mission win, fresh-process SRAM, physical hardware or 30 fps. Staged
+campaign progress remains 22/30.

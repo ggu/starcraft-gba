@@ -1919,6 +1919,25 @@ unfinished structures and the Nexus-absence conditions. These synthetic
 condition stimuli do not qualify a mission win. See
 [Validation](VALIDATION.md#p7-count-snapshot-opening) for the opening measurement.
 
+A separate default-off movement probe adds the existing
+`SC64_ZP_FACT_RANGE_CULL` and `SC64_COLLISION_CLASS_CACHE` options and the new
+`SC64_COLLISION_STEER_LIST` to the count-snapshot flags:
+
+```sh
+make test-sc64-p7-move
+make protoss-p7-move-probe
+```
+
+It produces `build/StarCraft-Protoss-P7-Move-Probe-GBA.gba`. When a ground
+mover's next step is blocked, the steering list resolves nearby collision
+candidates once, then answers the eight one-step side checks from that short
+list. Each answer matches `unit_step_clear()`; workers that are gathering, an
+inactive bucket index or more than 48 candidates use the original query.
+`test-sc64-p7-move` compares reference and candidate traces over a neutral
+opening and a controller-only attack-move. It checks 619,216 list answers
+against the original query, then repeats the menu/save-load fixture. See
+[Validation](VALIDATION.md#p7-movement-steering-list) for ARM measurements.
+
 ## Mineral gathering before a base exists
 
 The shared first-depot worker path lets an empty mineral worker gather before

@@ -2248,12 +2248,26 @@ move_toward(Unit * q, int tx, int ty)
 	/* Local steering avoids repeatedly retrying the same occupied waypoint.
 	 * Static terrain still uses BFS; candidates may leave an occupied tile
 	 * but may never enter a different blocked cell. */
+#ifdef SC64_COLLISION_STEER_LIST
+	/* Build the neighbor list lazily, where the first query would run. */
+	int steer_list = -1;
+	for (i = 0; i < 8; i++) {
+	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
+	    int cost = dist2(sx, sy, q->path_x, q->path_y);
+	    if (cost >= best_cost || !is_traversable(sx / 16, sy / 16, from_cell))
+		continue;
+	    if (steer_list < 0) steer_list = sc64_steer_list_build(q, speed);
+	    if (steer_list ? sc64_steer_list_step_clear(q, sx, sy)
+	                   : unit_step_clear(q, sx, sy)) { best = i; best_cost = cost; }
+	}
+#else
 	for (i = 0; i < 8; i++) {
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
 	    int cost = dist2(sx, sy, q->path_x, q->path_y);
 	    if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell) &&
 		unit_step_clear(q, sx, sy)) { best = i; best_cost = cost; }
 	}
+#endif
 	if (best < 0) {
 	    q->path_timer = 0; q->path_retry = 6;
 #ifdef SC64_DIAGNOSTIC_ORDERS

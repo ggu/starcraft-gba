@@ -2261,6 +2261,33 @@ build/StarCraft-Protoss-P7-Count-Probe-GBA.gba: build/starcraft-protoss-p7-count
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
 protoss-p7-count-probe: build/StarCraft-Protoss-P7-Count-Probe-GBA.gba
+# Default-off P7 movement probe: the qualified Z6 collision-class cache and
+# fact-range rejection plus the exact blocked-mover steering list.
+P7_MOVE_BASE_FLAGS := $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT
+P7_MOVE_FLAGS := -DSC64_ZP_FACT_RANGE_CULL -DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST
+build/test-sc64-p7-move-reference: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-move-candidate: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $< common/gba.c -o $@
+# The menu, trigger and SRAM save/load fixture must also print the same trace.
+build/test-sc64-p7-move-runtime: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-move protoss-p7-move-probe
+test-sc64-p7-move: build/test-sc64-p7-move-reference build/test-sc64-p7-move-candidate build/test-sc64-p7-count-snapshot build/test-sc64-p7-move-runtime
+	./build/test-sc64-p7-move-reference > build/sc64-p7-move-reference.txt
+	./build/test-sc64-p7-move-candidate > build/sc64-p7-move-candidate.txt
+	cmp build/sc64-p7-move-reference.txt build/sc64-p7-move-candidate.txt
+	./build/test-sc64-p7-count-snapshot > build/sc64-p7-count-snapshot.txt
+	./build/test-sc64-p7-move-runtime > build/sc64-p7-move-runtime.txt
+	cmp build/sc64-p7-count-snapshot.txt build/sc64-p7-move-runtime.txt
+	cat build/sc64-p7-move-candidate.txt
+build/starcraft-protoss-p7-move-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-move-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Move-Probe-GBA.gba: build/starcraft-protoss-p7-move-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+protoss-p7-move-probe: build/StarCraft-Protoss-P7-Move-Probe-GBA.gba
 build/test-sc64-p7-battery-rules: tests/sc64_p7_battery_rules.c starcraft/sc64_p7_battery_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-p7-battery-rules
