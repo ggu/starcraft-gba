@@ -56,3 +56,25 @@ not establish that the game's current geometry, target acquisition, RNG stream
 or timer scheduler produces native-equivalent inputs. Actual aircraft movement,
 Carrier launch selection and cadence, weapon events, hangar integration and
 campaign playthrough qualification remain separate work.
+
+## Validation on 2026-10-25
+
+The isolated C suite passes with ASan/UBSan. It covers the launch/ascent/attack
+pass transitions, requested firing, Q8 retreat, reacquisition, leash, parent
+loss, reflection versus final bounds, return/relink requests and transactional
+rejection of invalid inputs. The standard `./dev test` also passes, including
+199 Python checks and the sanitized host suites. `./dev build` passes the
+unchanged ARM guards. The default ROM is byte-identical to the same-source
+baseline without this module (`0dc02375af72f873dd8179208278ed05e21676e2fac05bf02f5733d3fe2b34ef`).
+
+A private synthetic fixture directly calls the pinned OpenBW attack/return
+methods and compares them with this model in nine ASan-only cases: low
+shields, one Q8 unit below/exactly at/one Q8 unit above quarter shields,
+the parent leash, ascent wait expiry, and return movement at 61, 60 and 11
+source pixels. Those comparisons pass. The native 10-pixel hide/relink fixture
+could not complete because its synthetic world lacks the visibility and
+unit-finder registration required by `hide_unit`; the 10-pixel decision is
+covered only by the authored C suite. Native weapon execution, acquisition,
+random approach passes and actual hangar relinking are not qualified by these
+nine reference comparisons. The fixture, reference checkout and generated
+executables stay ignored locally.
