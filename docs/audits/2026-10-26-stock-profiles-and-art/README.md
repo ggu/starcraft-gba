@@ -50,6 +50,8 @@ flame hits is not applied as three guaranteed hits on one target. Its native
 flame geometry and damage distribution remain to be implemented. Save codecs
 retain their layouts while supporting exact 100000-HP Beacon values and old
 10000-HP records; derived codecs reconstruct unit HP from source identity.
+Legacy saves can retain their historical stored spawn capacities. Start a new
+mission to apply the revised spawn HP and armor defaults consistently.
 Ground contact reach has a six-runtime-pixel floor because the mover reserves
 that center separation; otherwise the stock SCV's ten-source-pixel range could
 never reach a unit. The stock range itself remains ten in the fact table.
@@ -139,3 +141,33 @@ The normal-input host runs complete all ten Terran missions. This is separate
 from normal-menu ARM replay, physical hardware, or mission-wide 30-fps proof.
 The individual source stock tables, available sprites and these controller
 routes do not establish complete native engine equivalence.
+
+## Final local verification
+
+The final runtime source is commit `ebdb058`; the follow-up render fixture
+keeps its mineral patch outside the restored Command Center underlay so the
+depletion assertion observes independent visible pixels. All checks passed:
+
+- `./dev build` and `./dev test`: 463 Python tests plus the asset-free host
+  fixtures, including the 12 building-capacity variants.
+- `make unified test-unified`: stock combat/contact/movement, renderer, cache,
+  shields, construction and save checks.
+- `./dev sc64 test --profile terran`: all ten actual-win mission controllers,
+  startup/save, skirmish, spatial and cache checks.
+- Independent stock facts and construction census: 228 raw IDs, 132 weapon
+  records and 50 constructible IDs, including morphs.
+- Extended P7 projectile, Carrier, Archon, Showcase and Battery fixtures.
+- Fresh ARM links and ROM verification for the unified and three race builds,
+  plus Showcase. Imported ROMs pad to 32 MiB; no reserve assertion was relaxed.
+
+| ROM | IWRAM end | BSS end |
+| --- | --- | --- |
+| Terran | `0x03004e08` | `0x0203ddd4` |
+| Zerg | `0x03004eb0` | `0x02039c50` |
+| Protoss | `0x03004eb8` | `0x02039df8` |
+| Showcase | `0x030049c0` | `0x0203dee8` |
+
+The unchanged guards require IWRAM below `0x03005000`, BSS below
+`0x0203e000`, and save payloads at most 16368 bytes. No new physical-GBA or
+mission-wide frame-rate result is claimed. Private evidence remains under
+`.local/build/stock-art/`; no Actions run was enabled or dispatched.

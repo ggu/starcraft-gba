@@ -367,7 +367,9 @@ test_t5_static_cache_key_and_hud_timer_are_pixel_exact(void)
 
     /* Place actual drawable static objects in the visible viewport. This is
        render-fixture state only; no gameplay or campaign proof is implied. */
-    m[0].amount = 50; m[0].x = 120; m[0].y = 64; m[0].style = 0;
+    /* Keep the test patch outside the Command Center's composed source
+     * body/underlay so depletion has independently visible pixels. */
+    m[0].amount = 50; m[0].x = 64; m[0].y = 64; m[0].style = 0;
     int mineral_cell = (m[0].x / 16) + (m[0].y / 16) * MAP_COLS;
     SC64_GRID_SET(visible, mineral_cell, 1);
     SC64_GRID_SET(explored, mineral_cell, 1);

@@ -45,6 +45,9 @@ prepare` generates the private header for race profiles; older prepared
 workspaces should regenerate it using the command below. `SC64_CONSTRUCTION_ART=0`
 selects the older authored fallback for diagnostic comparisons.
 
+When updating an existing prepared workspace, rerun `./dev sc64 prepare` with
+your ROM and profile to refresh its sprite banks as well as construction art.
+
 ```sh
 python3 tools/sc64_construction_sprites.py
 make test-sc64-construction-source construction-visuals
