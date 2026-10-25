@@ -948,10 +948,10 @@ static int race_load_game(void) {
        | (1u << SC64_P7_GLOBAL_ID)
 #endif
 #ifdef SC64_T5_RUNTIME
-       & ~(1u << SC64_T5_GLOBAL_ID)
+       | (1u << SC64_T5_GLOBAL_ID)
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
-       & ~((1u << SC64_TERRAN_LATE_GLOBAL_T7) |
+       | ((1u << SC64_TERRAN_LATE_GLOBAL_T7) |
            (1u << SC64_TERRAN_LATE_GLOBAL_T8) |
            (1u << SC64_TERRAN_LATE_GLOBAL_T9) |
            (1u << SC64_TERRAN_LATE_GLOBAL_T10))
