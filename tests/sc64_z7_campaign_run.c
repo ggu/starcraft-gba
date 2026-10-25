@@ -1212,6 +1212,7 @@ static int start_spore_colony(void)
 static int queue_hatchery_type(int type)
 {
     static unsigned last_queue_fail_frame;
+    static int next_producer_slot;
     /* Hold the full colony+Sunken cost while the second ordinary defense
        still needs a new Creep Colony. Once that Colony exists, preserve only
        the 50 minerals needed for its normal Sunken morph. Keep a worker queue
@@ -1238,10 +1239,15 @@ static int queue_hatchery_type(int type)
         }
     }
     int producer=-1;
-    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
-        sc64_race_is_zerg_townhall(b[i].type)&&
-        (building_complete(i)||race_z7_morphing_egg_hall(SIDE,i))&&
-        b[i].queue_count<5&&b[i].larva>0){producer=i;break;}
+    /* Round-robin visible townhalls so a completed expansion's larva can
+       contribute instead of always feeding the lowest building slot first. */
+    for(int n=0;n<MAX_BUILDINGS;n++) {
+        int i=(next_producer_slot+n)%MAX_BUILDINGS;
+        if(b[i].alive&&b[i].owner==SIDE&&
+           sc64_race_is_zerg_townhall(b[i].type)&&
+           (building_complete(i)||race_z7_morphing_egg_hall(SIDE,i))&&
+           b[i].queue_count<5&&b[i].larva>0) {producer=i;break;}
+    }
     if(producer<0||!select_building_slot(producer)) {
         if((type==U_DRONE||type==U_HYDRALISK)&&
            (last_queue_fail_frame==0||frame-last_queue_fail_frame>=600)) {
@@ -1272,6 +1278,16 @@ static int queue_hatchery_type(int type)
 #endif
        ){
         ++actions_taken;
+        if(owned_building_count(B_HATCHERY)>=2) {
+            fprintf(stderr,"Z7 multi-Hatch paid queue type%d producer%d larva-after%d hatches:",
+                type,producer,b[producer].larva);
+            for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
+                sc64_race_is_zerg_townhall(b[i].type))
+                fprintf(stderr," %d(type%d complete%d larva%d queue%d)",i,
+                    b[i].type,building_complete(i),b[i].larva,b[i].queue_count);
+            fputc('\n',stderr);
+        }
+        next_producer_slot=(producer+1)%MAX_BUILDINGS;
         fprintf(stderr,"Z7 admitted paid unit type%d producer%d frame%u queue%d->%d pending%d->%d larva%d->%d bank%d/%d->%d/%d\n",
             type,producer,(unsigned)frame,before,b[producer].queue_count,
             pending_before,queued_unit_count(type),larva_before,b[producer].larva,
@@ -2390,9 +2406,9 @@ static void macro_step(void)
     int hatch_egg_producer=home>=0&&
         (building_complete(home)||race_z7_morphing_egg_hall(SIDE,home));
     int worker_goal=hatch_egg_producer?6:3;
-    /* Raise the line only after both paid Sunken defenses complete, so the
-       expansion in mining capacity does not delay the protected opening. */
-    if(hatch_egg_producer&&completed_building_count(B_SUNKEN_COLONY)>=2)
+    /* Scale workers after either the second defense or a paid expansion. */
+    if(hatch_egg_producer&&(completed_building_count(B_SUNKEN_COLONY)>=2||
+       owned_building_count(B_HATCHERY)>=2))
         worker_goal=10;
     macro_worker_goal=worker_goal;
     /* Stabilize the ordinary-input opening before the legacy defensive macro
@@ -2420,6 +2436,47 @@ static void macro_step(void)
             return;
         }
         if(!building_complete(den))return;
+        /* Test one paid expansion after the first completed Sunken and a
+           usable eight-worker line. Keep this before miner reassignment and
+           second-Sunken retries, both of which can return from macro_step.
+           Combat and urgent evacuation already ran earlier this iteration. */
+        int expansion_hatches=owned_building_count(B_HATCHERY);
+        int expansion_sunkens=completed_building_count(B_SUNKEN_COLONY);
+        static unsigned last_expansion_diag;
+        if((unsigned)frame>=9000u&&(!last_expansion_diag||
+           (unsigned)frame-last_expansion_diag>=600u)) {
+            fprintf(stderr,"Z7 expansion gate frame%u home%d hatch%d sunken%d workers%d pending%d bank%d threat%d retreat%d\n",
+                (unsigned)frame,home,expansion_hatches,expansion_sunkens,
+                live_workers,pending_workers,minerals,enemy_at_minerals,
+                workers_retreating);
+            last_expansion_diag=(unsigned)frame;
+        }
+        if(expansion_hatches==1&&expansion_sunkens>=1&&live_workers>=8) {
+            if(minerals>=300) {
+                static unsigned last_expansion_attempt;
+                if(!last_expansion_attempt||
+                   (unsigned)frame-last_expansion_attempt>=600u) {
+                    unsigned begin=(unsigned)frame;
+                    last_expansion_attempt=begin;
+                    int accepted=start_building(B_HATCHERY,MENU_DEPOT);
+                    fprintf(stderr,"Z7 expansion Hatch input accepted%d frame%u->%u hatch%d->%d workers%d bank%d/%d threat%d retreat%d\n",
+                        accepted,begin,(unsigned)frame,expansion_hatches,
+                        owned_building_count(B_HATCHERY),live_workers,minerals,
+                        gas,enemy_at_minerals,workers_retreating);
+                    if(accepted)return;
+                }
+            } else {
+                static unsigned last_expansion_reserve;
+                if(!last_expansion_reserve||
+                   (unsigned)frame-last_expansion_reserve>=600u) {
+                    fprintf(stderr,"Z7 expansion reserve wait frame%u need300 bank%d workers%d threat%d retreat%d\n",
+                        (unsigned)frame,minerals,live_workers,
+                        enemy_at_minerals,workers_retreating);
+                    last_expansion_reserve=(unsigned)frame;
+                }
+                return;
+            }
+        }
         if(live_workers+pending_workers<6&&minerals>=50&&
            queue_hatchery_type(U_DRONE))return;
         /* Correct the source's position-relative autoassignment after the
