@@ -1918,6 +1918,40 @@ version, without changing live state.
 No new campaign mission is enabled by this promotion: the completed count
 remains Terran 10, Zerg 3 and Protoss 3, or 16/30.
 
+## Weapon-family effects and Protoss shield display (2026-10-25)
+
+Authored weapon-family effects now present the existing attack paths for the
+implemented actors and defenses, including T4 traps and T5 mines. They only
+change rendering: combat continues to apply damage on the existing attack
+tick. Effect pixels are clipped to the playfield rows 12–119 so they cannot
+overwrite the HUD. Protoss unit and building overlays draw shields separately
+from health using canonical shield capacity; the selection panel shows current
+shields for shielded selections. No campaign mission or combat/save rule was
+changed by this visual work.
+
+Focused host checks passed: `make test-sc64-weapon-vfx`,
+`make test-sc64-weapon-vfx-game`, `make test-sc64-shield-bars`,
+`make build/test-unified-hud && ./build/test-unified-hud`, and
+`make build/test-starcraft`. The renderer test exercises palette styles,
+extreme-coordinate clipping, visibility gating and the row-119 boundary. The
+attack fixture checks 30 armed unit/target-class profiles, ground and air
+attacks, effect lifetimes, camera/fog behavior, pool overflow and unchanged
+immediate-damage behavior. Shield checks compare unit/building bar pixels and
+verify shield-only HUD cache invalidation against a forced full redraw.
+
+All three canonical race ROMs build and pass the unchanged reserve guards.
+IWRAM/BSS ends are Terran `0x03004e58/0x0203dbd4`, Zerg
+`0x03004fb0/0x02039a30` and Protoss `0x03004f30/0x02039bd8`.
+Race HUD key construction runs in ROM so the new keys fit without reducing
+the existing fast-RAM stack reserve. The race effect pool uses 32 transient
+slots; original-art saves retain 12. Actor rows and save generations are
+unchanged. The canonical campaign count remains T10/Z3/P3 (16/30).
+
+Full regressions use `./dev build && ./dev test`, `make unified test-unified`,
+`make race-campaigns test-race-campaigns`, and
+`./dev sc64 test --profile terran`. These host/build checks do not establish
+ARM performance, physical GBA behavior or a new full campaign replay.
+
 ### 2026-10-24 — staged Z4/P4 engine foundations
 
 The next-stage source importer retains all remaining Zerg and Protoss CHKs

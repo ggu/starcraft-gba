@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_WEAPON_VFX_RENDER_H
 #define SC64_WEAPON_VFX_RENDER_H
 
