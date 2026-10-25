@@ -249,6 +249,8 @@ def prepare(rom: Path, profile: str) -> None:
     run([sys.executable, str(ROOT / "tools/sc64_workspace.py"), "prepare",
          "--rom", str(rom), "--profile", base_profile])
     private_rom = ROOT / ".local/sc64/rom/StarCraft64-USA.z64"
+    # Sound effects and music for every imported profile (optional at build time).
+    run([sys.executable, str(ROOT / "tools/sc64_audio_pack.py"), "--rom", str(private_rom)])
     if profile == "campaign":
         run([sys.executable, str(ROOT / "tools/sc64_campaign_pack.py"), "--rom", str(private_rom)])
     elif profile in ("races", "unified", "terran", "zerg", "protoss",
@@ -342,6 +344,8 @@ def status(profile: str) -> int:
                      for mission in range(7, 11) for kind in ("scenario", "availability"))
     _, rom_rel = GAMES[profile]
     paths.append(("Built ROM", ROOT / rom_rel))
+    audio = ROOT / ".local/sc64/audio/generated/sc64_audio_generated.h"
+    print(f"{'READY  ' if audio.is_file() else 'OPTIONAL'} Sound and music bank: {audio}")
     for label, path in paths:
         ready = path.is_file()
         if label.endswith("gated map data"):
