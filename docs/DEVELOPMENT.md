@@ -1016,34 +1016,37 @@ commands; no extra staged-profile selection is needed:
 ```
 
 Replace `zerg` with `protoss` for the Protoss campaign. The canonical output
-pairs are `build/StarCraft-Zerg-GBA.gba` / `build/starcraft-zerg.elf` and
-`build/StarCraft-Protoss-GBA.gba` / `build/starcraft-protoss.elf`. The existing
-`zerg-z3` and `protoss-p3` Make targets and ROM/ELF filenames are compatibility
-aliases to these outputs. Retain matching frozen ROM/ELF pairs for replay.
+pairs are `build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf`
+and `build/StarCraft-Protoss-GBA.gba` / `build/starcraft-protoss.elf`. The
+`zerg-z4` target also builds the canonical Zerg pair. Explicit `zerg-z3`
+preserves `build/StarCraft-Zerg-GBA.gba` / `build/starcraft-zerg.elf` and its
+save identity; versioned `-Z3` names are aliases. `protoss-p3` remains a compatibility alias. Retain matching
+frozen ROM/ELF pairs for replay.
 
-Both test targets run the profile's full third-mission runtime/controller
-suite, normal-menu campaign startup/save fixtures, and all 234 combinations
+The canonical Zerg test target runs the fourth-mission runtime and controller
+suite, normal-menu startup/save fixtures for all four campaign entries, and
+all 234 combinations
 of map, human race and independently selected AI races. The setup/save matrix
 does not prove a completed match for every combination. Build guards still
 enforce the same IWRAM and EWRAM reserves.
 
-The canonical Zerg build uses `SCZ3`, save generation 5, and the existing Z3
-optimization flags. Protoss uses `SCP3`, generation 7, and the P3 large-map
+Canonical Zerg uses `SCZ4`, save generation 20, the Z4 runtime and the same
+qualified canonical drawing flags. Its save directory is separate from the
+legacy Z3 profile. Protoss uses `SCP3`, generation 7, and the P3 large-map
 geometry and optimization flags. Older standard two-mission generation-2
 saves are incompatible and are rejected. The asset-free default build
 continues to require no imported inputs.
 
 ### Staged Zerg and Protoss chapter 4
 
-`zerg-z4` and `protoss-p4` are internal fourth-chapter targets. The canonical
-race outputs above remain the separately qualified three-chapter builds.
-These targets load the complete starting rosters and numeric scenario
-metadata for Agent of the Swarm and The Hunt for Tassadar, using isolated
-private generated headers. Preparing later map data does not enable those
-later missions in the frontend.
+Zerg 4 is enabled in the canonical profile. The `zerg-z4` spelling builds the
+same versioned ROM. `protoss-p4` remains an internal fourth-chapter target for
+**The Hunt for Tassadar**. Preparing later map data does not enable later
+missions in the frontend.
 
 After the canonical profile preparation has supplied the common assets,
-prepare the additional ignored inputs from the same verified source ROM:
+prepare the additional ignored Z4 and P4 inputs from the same verified source
+ROM (`./dev sc64 prepare --profile zerg` prepares Z4 automatically):
 
 ```sh
 python3 tools/sc64_races_pack.py --rom /path/to/StarCraft64-USA.z64 --out .local/sc64/zp-stage/generated/sc64_races_generated.h
@@ -1062,10 +1065,11 @@ Outputs are `build/StarCraft-Zerg-Z4-GBA.gba` and
 Use the matching pairs for emulator qualification. All imported data, ROMs,
 saves and graphical captures must remain local and ignored.
 
-The staged layout uses 192 Zerg or 240 Protoss unit slots, 96 buildings,
-48 mineral fields, four geysers, compact save rows and 128×128 geometry.
-Its save generation is 20; older canonical saves are incompatible. Protoss
-production reserves the remaining 87 source-script creations, including
+The Z4 layout uses 192 Zerg unit slots, 96 buildings, 48 mineral fields, four
+geysers, compact save rows and 128×128 geometry. Its generation-20 saves are
+incompatible with the legacy Z3 generation-5 saves. The P4 layout uses 240
+Protoss unit slots and its own generation-20 saves. Protoss production reserves
+the remaining 87 source-script creations, including
 queued products, instead of allowing those later actors to be dropped.
 These bounds still do not fit every later campaign map; see
 [the remaining-chapter audit](ZP-CAMPAIGN-IMPLEMENTATION.md).

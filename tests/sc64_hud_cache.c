@@ -26,6 +26,8 @@ fixture(void)
     race_human = R_ZERG;
 #if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     race_selected_mission = SC64_P3_GLOBAL_ID;
+#elif defined(SC64_Z4_RUNTIME)
+    race_selected_mission = 15;
 #elif defined(SC64_Z3_ENABLED)
     race_selected_mission = 14;
 #elif defined(SC64_T3_ENABLED)

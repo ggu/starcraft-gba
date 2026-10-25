@@ -120,6 +120,31 @@ static void controller_cursor(int x, int y)
     if (guard >= 3000) fprintf(stderr, "cursor guard target=%d,%d actual=%d,%d\n",x,y,cx,cy);
 }
 
+/* Follow a moving worker with ordinary cursor input, then verify the UI
+ * selected the requested live slot. A one-time cursor target can go stale
+ * while the worker walks its previous order. */
+static int controller_select_worker(int worker)
+{
+    int steps = 0;
+    if (worker < 0 || worker >= MAX_UNITS || !u[worker].alive ||
+        u[worker].owner != SIDE || !sc64_race_is_worker(u[worker].type)) return 0;
+    /* Click as close as the four-pixel cursor step allows so a nearby unit
+     * cannot consume A before the moving worker. */
+    while (u[worker].alive && dist2(cx, cy, u[worker].x, u[worker].y) > 2 * 2 + 2 * 2 &&
+           screen == SCREEN_PLAY && !won && !lost && steps++ < 120) {
+        u16 held = KEY_R;
+        if (cx < u[worker].x) held |= KEY_RIGHT;
+        if (cx > u[worker].x) held |= KEY_LEFT;
+        if (cy < u[worker].y) held |= KEY_DOWN;
+        if (cy > u[worker].y) held |= KEY_UP;
+        controller_frame(held);
+    }
+    if (!u[worker].alive || dist2(cx, cy, u[worker].x, u[worker].y) > 2 * 2 + 2 * 2)
+        return 0;
+    controller_press(KEY_A);
+    return selected_building < 0 && u[worker].selected && selected_count() == 1;
+}
+
 static int controller_attack(int x, int y, int max_ticks)
 {
     int guard = 0, i;
@@ -224,26 +249,23 @@ static int controller_mission(int mission)
         if (c >= MAX_UNITS || !u[c].alive || drone < 0) return 0;
         for (i = 0; i < MAX_UNITS; ++i)
             if (i != drone && u[i].alive && u[i].owner == SIDE && u[i].type == U_DRONE) { other_drone = i; break; }
-        /* Clear the source map's tightly packed combat group and second
-         * Drone from the primary carrier's path before starting the escort. */
+        /* Keep the opening combat group near the carrier so it can serve as
+         * an actual escort; moving it to the old staging waypoint left the
+         * Drone exposed on the long source route. */
         controller_press(KEY_R);
-        if (selected_count() && !controller_move_selected(600,500)) return 0;
         if (other_drone >= 0) {
-            for (guard = 0; guard < 12 && !u[other_drone].selected; ++guard) {
-                controller_cursor(u[other_drone].x, u[other_drone].y);
-                controller_press(KEY_A);
-            }
-            if (u[other_drone].selected) {
+            if (controller_select_worker(other_drone)) {
                 if (!controller_move_selected(440,360)) return 0;
                 for (i = 0; i < 2000 && screen == SCREEN_PLAY && !lost &&
                      dist2(u[other_drone].x,u[other_drone].y,440,360) > 20*20; ++i) controller_frame(0);
             }
         }
-        for (guard = 0; guard < 12 && !u[drone].selected; ++guard) {
-            controller_cursor(u[drone].x, u[drone].y);
-            controller_press(KEY_A);
+        if (!controller_select_worker(drone)) {
+            fprintf(stderr, "Z2 carrier selection failed: drone=%d alive=%d owner=%d pos=%d,%d cursor=%d,%d order=%d selected=%d building=%d\n",
+                    drone, u[drone].alive, u[drone].owner, u[drone].x, u[drone].y,
+                    cx, cy, u[drone].order, u[drone].selected, selected_building);
+            return 0;
         }
-        if (!u[drone].selected) return 0;
         for (guard = 0; guard < (int)(sizeof(pickup_route)/sizeof(pickup_route[0])) &&
              race_campaign.carrier_unit >= MAX_UNITS; ++guard) {
             if (!controller_move_selected(pickup_route[guard][0],pickup_route[guard][1])) return 0;
@@ -258,11 +280,12 @@ static int controller_mission(int mission)
             int carrier = race_campaign.carrier_unit;
             controller_press(KEY_R);
             if (!controller_attack_order(escort_route[guard][0],escort_route[guard][1])) return 0;
-            for (i = 0; i < 12 && !u[carrier].selected; ++i) {
-                controller_cursor(u[carrier].x,u[carrier].y);
-                controller_press(KEY_A);
+            if (!controller_select_worker(carrier)) {
+                fprintf(stderr, "Z2 carrier selection failed: drone=%d alive=%d owner=%d pos=%d,%d cursor=%d,%d order=%d selected=%d building=%d\n",
+                        carrier, u[carrier].alive, u[carrier].owner, u[carrier].x, u[carrier].y,
+                        cx, cy, u[carrier].order, u[carrier].selected, selected_building);
+                return 0;
             }
-            if (!u[carrier].alive || !u[carrier].selected) return 0;
             if (!controller_move_selected(escort_route[guard][2],escort_route[guard][3])) return 0;
             for (i = 0; i < 20000 && race_campaign.carrier_unit < MAX_UNITS &&
                  screen == SCREEN_PLAY && !won && !lost &&
@@ -275,6 +298,14 @@ static int controller_mission(int mission)
                         u[carrier].path_x, u[carrier].path_y, u[carrier].path_retry, u[carrier].path_timer,
                         u[c].x, u[c].y,
                         side_hunters_near(escort_route[guard][0],escort_route[guard][1],96));
+                for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == ENEMY &&
+                    dist2(u[j].x,u[j].y,u[c].x,u[c].y) < 180*180)
+                    fprintf(stderr, "  nearby enemy slot=%d type=%d at=%d,%d hp=%d\n",
+                            j,u[j].type,u[j].x,u[j].y,u[j].hp);
+                for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
+                    u[j].type == U_HUNTER_KILLER)
+                    fprintf(stderr, "  escort slot=%d at=%d,%d order=%d target=%d,%d hp=%d\n",
+                            j,u[j].x,u[j].y,u[j].order,u[j].tx,u[j].ty,u[j].hp);
                 break;
             }
         }

@@ -2,6 +2,29 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
+## Current campaign status (2026-10-26)
+
+Canonical campaign profiles currently expose Terran 1–10, Zerg 1–4, and
+Protoss 1–3. Zerg 4 is the promoted canonical Zerg entry and uses its own
+versioned ROM/save identity (`SCZ4`, `.local/play/zerg-z4`); the explicit
+`zerg-z3` target preserves the previous ROM and save identity
+(`SCZ3`, `.local/play/zerg`). No save conversion is provided. The legacy Z3
+entry-point and older validation sections below are historical snapshots and
+should not be read as the current default.
+
+Recorded campaign wins cover Terran 1–10 across frozen host/ARM builds.
+All four canonical Zerg chapters now have fresh host-controller wins; Z4 and
+P3 also have full current-flag ARM wins. Their full-run means are about 17.7
+and 20.5 fps equivalent, below target. P1/P2's generic controller routes lose
+on the current stock-stat engine, and P2 can run out of unit slots for Fenix's
+arrival. They still need current-source qualification. Historical staged
+coverage spans 22/30 across recorded builds. These are emulator/host results, not
+physical GBA qualification. Z4 save continuity is covered by its dedicated
+controller and fresh-process SRAM checks; the generic split-profile save
+report checker only covers earlier campaign model IDs and is not Z4 continuity
+evidence. The [current audit](audits/2026-10-26-z4-promotion-and-performance/README.md)
+records exact flags, parity checks, memory ends, and remaining work.
+
 ## Reproducible checks
 
 For the asset-free skirmish, run:
