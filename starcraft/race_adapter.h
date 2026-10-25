@@ -1036,6 +1036,7 @@ static void race_skirmish_init(void)
     memset(race_minerals, 0, sizeof(race_minerals)); memset(race_gas, 0, sizeof(race_gas));
     race_skirmish_geometry();
     frame = 0; won = lost = 0; supply_used = 0; supply_cap = 0;
+    death_vfx_reset();
     minerals = 200; gas = 0; geyser_count = 4;
     for (i = 0; i < 4; ++i) {
         int sx = (i == 0 || i == 3) ? -1 : 1;
