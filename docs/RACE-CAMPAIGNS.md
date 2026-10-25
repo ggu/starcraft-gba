@@ -45,15 +45,17 @@ Protoss presents three, exposing 17 of the 30 mission entries. All four Zerg
 chapters have fresh controller wins with the canonical pools and flags; Z4
 also has a full ARM win. Its measured full-run average is about 17.7 fps
 equivalent in mGBA, below the 30-fps target. P3 has a current full ARM win at
-about 20.5 fps equivalent. P1/P2's generic controller routes currently lose;
-P2 can also exhaust its unit pool before Fenix arrives. Those chapters still
-need current-source requalification. See the [current audit](audits/2026-10-26-z4-promotion-and-performance/README.md).
-P4 Storm
-also has normal-controller host and full ARM wins. P5 Shuttle has a complete
-normal-controller host and ARM win plus
-an exact fresh-process cargo save. Z5 Consume also has a complete host and ARM
-win with an exact mid-mission save, with Z6 now also passing a full ARM win and exact fresh-process SRAM restore.
-P6 now also has a full ARM win and opening/late fresh-process SRAM continuity.
+about 20.5 fps equivalent. P1 and P2 now have fresh canonical-flag host and
+full input-only ARM wins, with Fenix alive. P2's timed roster waits intact when unit slots are scarce.
+See the [Protoss requalification](audits/2026-10-26-protoss-requalification/README.md)
+and [performance audit](audits/2026-10-26-z4-promotion-and-performance/README.md).
+P4 Storm has recorded host/ARM wins on older frozen builds, but its fresh
+current-stock controller loses Tassadar and is not ready for promotion.
+Earlier frozen P5 Shuttle builds have a complete controller/ARM win and an
+exact fresh-process cargo save. Earlier frozen Z5 Consume builds have a
+controller/ARM win and exact mid-mission save; Z6 records a full ARM win and
+exact fresh-process SRAM restore. Earlier P6 builds record a full ARM win and
+opening/late fresh-process SRAM continuity.
 Historical canonical and staged playthrough coverage spans 22/30 across
 recorded builds (Terran 10, Zerg 6, Protoss 6); it is not fresh qualification
 of every chapter on the current source. The remaining staged chapter builds have separate save formats and ROM
@@ -507,7 +509,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Canonical profiles expose T1–T10, Z1–Z4 and P1–P3. Current Zerg controllers complete all four chapters and P3 has a current full ARM win. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds. Historical staged coverage spans 22/30, with eight chapters still lacking a staged playthrough; P1/P2 also need current-source requalification as described above.
+- Canonical profiles expose T1–T10, Z1–Z4 and P1–P3. Current Zerg controllers complete all four chapters and P3 has a current full ARM win. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds. Historical staged coverage spans 22/30, with eight chapters still lacking a staged playthrough; P1/P2 now have fresh host and input-only ARM wins. P4's current controller still needs a successful route that protects Tassadar.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

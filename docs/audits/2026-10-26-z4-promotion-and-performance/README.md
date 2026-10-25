@@ -1,5 +1,9 @@
 # Z4 promotion and full-mission performance
 
+The P1/P2 qualification gaps recorded below were subsequently addressed by the
+[early Protoss requalification](../2026-10-26-protoss-requalification/README.md).
+That follow-up retains the performance and full-campaign limits in this audit.
+
 The canonical outputs now expose T1–T10, Z1–Z4 and P1–P3. This is 17 mission
 entries, not a claim that all 30 missions or the 30-fps goal are complete.
 Staged Z5–Z6 and P4–P6 remain separate development profiles.
