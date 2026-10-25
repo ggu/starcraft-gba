@@ -8246,7 +8246,7 @@ sc64_hud_race_keys(int *values,int first)
 #endif
 }
 #endif
-#if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
+#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
 static u8 sc64_hud_buffer_dirty[2];
 static u32 sc64_hud_buffer_clear_generation[2];
 #endif
@@ -8306,7 +8306,7 @@ static void
 draw_hud(void)
 {
 #ifdef SC64_IMPORTED_MISSION
-#if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
+#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
     int changed = sc64_hud_changed();
     u8 buffer = gfx_backbuffer_index();
     u8 dirty;
@@ -8316,6 +8316,11 @@ draw_hud(void)
         sc64_hud_buffer_dirty[1] |= (u8)changed;
     }
     dirty = sc64_hud_buffer_dirty[buffer];
+#ifndef GBA_SCENE_CLIP
+    /* Unclipped map primitives can paint either HUD band. Restore both on
+     * each frame unless the scene clip guarantees those pixels stay intact. */
+    dirty |= 3;
+#endif
     if (sc64_hud_buffer_clear_generation[buffer] != generation) dirty |= 3;
     if (dirty & 1) {
         if (changed & 1) {
@@ -8402,7 +8407,13 @@ game_render(void)
 #ifdef SC64_IMPORTED_MISSION
         profile_start = gba_clock();
 #endif
+#ifdef GBA_SCENE_CLIP
+        gfx_set_clip_y(12,120);
+#endif
 	draw_map();
+#ifdef GBA_SCENE_CLIP
+        gfx_set_clip_y(0,160);
+#endif
 #ifdef SC64_IMPORTED_MISSION
         sc64_map_cycles = gba_clock() - profile_start;
         profile_start = gba_clock();
@@ -8416,7 +8427,7 @@ game_render(void)
 #endif
 	if (screen == SCREEN_PAUSE) {
 	    draw_pause();
-	#if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
+	#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
 	    /* The pause panel crosses the bottom cached HUD band. */
 	    sc64_hud_buffer_dirty[gfx_backbuffer_index()] |= 2;
 	#endif

@@ -7,6 +7,8 @@
 enum { HUD_TOP = 1, HUD_BOTTOM = 2, FB_PIXELS = 240 * 160 };
 static _Alignas(4) u8 cached_pixels[FB_PIXELS];
 static _Alignas(4) u8 full_pixels[FB_PIXELS];
+static _Alignas(4) u8 cached_frame_pixels[FB_PIXELS];
+static _Alignas(4) u8 forced_frame_pixels[FB_PIXELS];
 #ifdef SC64_T5_RUNTIME
 static u8 cached_game_frame[FB_PIXELS];
 static u8 fresh_game_frame[FB_PIXELS];
@@ -59,6 +61,29 @@ read_full(u8 *out)
     for (int y = 0; y < 160; ++y)
         for (int x = 0; x < 240; ++x)
             out[y * 240 + x] = gfx_test_pixel(x, y);
+}
+
+static void
+assert_game_frame_matches_forced_hud(void)
+{
+    game_render();
+    read_full(cached_frame_pixels);
+    /* Invalidate both HUD copies while preserving the same world and render
+     * state. The next game_render is the full-HUD pixel oracle. */
+    sc64_hud_valid = 0;
+    game_render();
+    read_full(forced_frame_pixels);
+    if (memcmp(cached_frame_pixels, forced_frame_pixels,
+               sizeof(cached_frame_pixels)) != 0) {
+        for (int i = 0; i < FB_PIXELS; ++i) {
+            if (cached_frame_pixels[i] != forced_frame_pixels[i]) {
+                fprintf(stderr, "full-frame HUD mismatch at (%d,%d): cached %u forced %u\n",
+                        i % 240, i / 240, cached_frame_pixels[i], forced_frame_pixels[i]);
+                break;
+            }
+        }
+        assert(0);
+    }
 }
 
 static void
@@ -239,7 +264,7 @@ test_mission_message_timer_and_minimap_stay_pixel_exact(void)
     assert_cached_matches_full();
 }
 
-#if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
+#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
 static void
 test_per_buffer_hud_reuse_across_changes_and_scenes(void)
 {
@@ -311,6 +336,41 @@ test_per_buffer_hud_reuse_across_changes_and_scenes(void)
     game_render();
     assert(sc64_hud_buffer_clear_generation[poisoned_buffer] == generation);
     assert_cached_matches_full();
+}
+
+static void
+test_full_frame_cache_does_not_retain_map_pixels_in_hud_bands(void)
+{
+    fixture();
+    screen = SCREEN_PLAY;
+    mode = MODE_NORMAL;
+    /* Anchor the view at the top edge and put the cursor, a tall hatchery,
+     * and a unit sprite there. Mirror large sprites at the lower edge, where
+     * their lower pixels can enter the cached command band. */
+    cx = 120; cy = 54;
+    u[0].alive = 1; u[0].owner = SIDE; u[0].type = U_DRONE;
+    u[0].raw_type = sc64_race_raw_unit(U_DRONE);
+    u[0].x = 120; u[0].y = 0;
+    u[1].alive = 1; u[1].owner = SIDE; u[1].type = U_DRONE;
+    u[1].raw_type = sc64_race_raw_unit(U_DRONE);
+    u[1].x = 180; u[1].y = 1023;
+    b[0].alive = 1; b[0].owner = SIDE; b[0].type = B_HATCHERY;
+    b[0].raw_type = sc64_race_raw_building(B_HATCHERY);
+    b[0].x = 48; b[0].y = 0;
+    b[1].alive = 1; b[1].owner = SIDE; b[1].type = B_HATCHERY;
+    b[1].raw_type = sc64_race_raw_building(B_HATCHERY);
+    b[1].x = 192; b[1].y = 1023;
+
+    /* Populate both backbuffers, then move the sprites without changing HUD
+     * keys. Compare the complete cached render against a forced band redraw. */
+    game_render(); game_render(); game_render();
+    for (int step = 0; step < 3; ++step) {
+        game_render(); game_render(); /* consume any oracle invalidation */
+        u[0].x += 1; u[1].x -= 1;
+        b[0].x += 1; b[1].x -= 1;
+        frame++;
+        assert_game_frame_matches_forced_hud();
+    }
 }
 #endif
 
@@ -463,8 +523,9 @@ main(void)
     test_wallet_and_queued_supply_invalidate_top_only();
     test_selection_building_box_and_modes_invalidate_bottom();
     test_mission_message_timer_and_minimap_stay_pixel_exact();
-#if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
+#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
     test_per_buffer_hud_reuse_across_changes_and_scenes();
+    test_full_frame_cache_does_not_retain_map_pixels_in_hud_bands();
 #endif
 #ifdef SC64_T5_RUNTIME
     test_t5_static_cache_key_and_hud_timer_are_pixel_exact();
