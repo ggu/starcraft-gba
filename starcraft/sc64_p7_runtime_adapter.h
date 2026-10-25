@@ -190,6 +190,9 @@ static int race_p7_rebind_loaded_world(const Sc64RaceMap *map)
 {
     if (!race_p7_active()) return 1;
     if (!race_p7_runtime_state_valid() || !race_p7_bind_world(map)) return 0;
+#ifdef SC64_P7_BATTERY_ENABLED
+    race_p7_map=map;
+#endif
     return 1;
 }
 

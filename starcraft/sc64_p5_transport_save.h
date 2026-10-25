@@ -19,6 +19,37 @@ static int race_p5_transport_passenger_provenance_valid(const Unit *q)
          q->raw_type == 67);
 }
 
+#ifdef SC64_P7_BATTERY_ENABLED
+/* The shared P5 cargo validator also runs for later P7 campaign saves. Accept
+ * P7's independent recharge order there only after validating its Battery
+ * target; retain the ordinary P5 cargo checks for every transport order. */
+static int race_p5_saved_p7_recharge_valid(const RaceSave *candidate,
+                                           const Unit *actor)
+{
+    Building battery;
+    const Sc64RaceUnitRule *rule;
+    int target;
+    if (!candidate || !actor || candidate->state[0] ||
+        candidate->state[2] != SC64_P7_GLOBAL_ID || actor->order != ORDER_P7_RECHARGE ||
+        actor->raw_type == 73 || actor->raw_type == 85 ||
+        actor->raw_owner < 0 || actor->raw_owner >= 8 || actor->work_timer != 0 ||
+        SC64_TRANSPORT_LOADED(actor)) return 0;
+    rule=sc64_race_unit_rule(actor->type);
+    if (!rule || rule->race != R_PROTOSS || !(rule->flags & SC_RACE_F_SHIELDS) ||
+        actor->shield >= rule->shields ||
+        (sc64_game_unit_actor_flags(actor->type) &&
+         !(sc64_game_unit_actor_flags(actor->type) & SC64_GAME_ACTOR_MOVABLE)))
+        return 0;
+    target=actor->target;
+    if (target<0 || target>=MAX_BUILDINGS ||
+        !race_save_decode_building(candidate,(unsigned)target,&battery)) return 0;
+    return battery.alive && battery.type==B_P7_SHIELD_BATTERY &&
+        battery.raw_type==172 && !battery.under_construction &&
+        battery.queue_progress>0 && battery.owner==actor->owner &&
+        battery.raw_owner==actor->raw_owner;
+}
+#endif
+
 /* Validate P5 cargo links from a decoded candidate without touching the live
  * world. The ordinary save validator checks every other actor/world field. */
 static int race_p5_transport_save_candidate_valid(const RaceSave *candidate,
@@ -32,7 +63,13 @@ static int race_p5_transport_save_candidate_valid(const RaceSave *candidate,
                                    (unsigned)width * 16u,
                                    (unsigned)height * 16u, &actor)) return 0;
         if (!actor.alive) continue;
-        if (actor.order < ORDER_IDLE || actor.order > ORDER_UNLOAD) return 0;
+        if (actor.order < ORDER_IDLE || actor.order > ORDER_UNLOAD) {
+#ifdef SC64_P7_BATTERY_ENABLED
+            if (actor.order==ORDER_P7_RECHARGE &&
+                race_p5_saved_p7_recharge_valid(candidate,&actor)) continue;
+#endif
+            return 0;
+        }
         if (actor.order >= ORDER_BOARD &&
             (candidate->state[0] || candidate->state[2] != SC64_P5_GLOBAL_ID ||
              actor.owner != SIDE)) return 0;

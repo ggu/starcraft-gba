@@ -4223,3 +4223,59 @@ property validity and authentication failures without writing an output.
 `./dev build` and `./dev test` pass (387 Python tests plus the default host
 fixtures). This qualifies the importer only; Battery gameplay, shared P5/P6
 save integration, ARM replay and complete P7 campaign qualification are separate.
+
+### Experimental P7 Shield Battery
+
+The default-off Battery gate adds paid Probe construction with Gateway and
+power requirements, source-property initialization, explicit unit/area
+recharge commands, bounded approach/transfer, energy regeneration and packed
+save binding. New Batteries start at 100 energy; the two authenticated map
+Batteries retain their original source owners and 100-percent initial energy.
+No human starting Battery is invented. Active P7 uses the existing shield
+fraction field at 1/1280-point precision, Q8 energy in the Battery queue-progress
+field and its existing level field for the regeneration phase. Internal save
+generation 37 distinguishes these meanings; no actor fields are added.
+
+The actual-engine sanitizer fixture loads the authenticated P7 map, selects a
+Probe through the contextual command, pays for construction and reaches the
+site. It saves at three updates of construction progress, clears transient P7
+bindings, loads and verifies their restoration, ticks the scheduler, then
+finishes the real construction timer. It renders the Probe and Battery menus,
+issues recharge, checks shield gain/energy cost and cooldown progression, and
+round-trips the live recharge order, target, energy and fractional shields.
+Candidate tests reject wrong mission/mode, dead/wrong-type/wrong-owner targets,
+invalid transport orders, full shields, missing energy and corrupt queue/phase
+fields. Reusing a dead Battery's building slot clears its old Recharge orders.
+Combat destruction clears those orders immediately, including before a save.
+Destroyed original map Batteries remain saveable.
+
+The same fixture runs with Battery alone and combined with Observer/Archon.
+Unchanged P5 runtime, P5 Shuttle and P6 save fixtures pass with Battery compiled
+and the complete private P7 sprite bank. The P5/P7 members are each 124 bytes;
+they fit the existing larger P6 payload in combined profiles. A candidate-only
+tail check rejects unused bytes without mistaking another mission's nonzero
+shared payload for corruption. No IWRAM, BSS or 16,368-byte save limit changes.
+ARM debug types confirm a 16,348-byte RaceSave, 56-byte Unit and 48-byte
+Building. The documented Make ARM target reproduces the measured ROM bytes.
+
+The combined ARM link uses ROM `6cf35113…f5b402` (4 MiB), IWRAM end
+`0x030047d8` and BSS end `0x0203d844`. The first inline service attempt exceeded
+the unchanged IWRAM guard; keeping the optional service in ROM fixes that.
+The Battery-off link reproduces the previous complete-P7-art Observer/Archon
+ROM `92ff35aa…175d5f` byte for byte, with BSS end `0x0203d774`.
+
+This is mechanical and save-fixture coverage plus an ARM link, not a complete
+P7 playthrough, fresh-process ARM SRAM proof or performance measurement.
+Carrier Interceptors, Arbiter abilities and broader P7 production/AI remain
+unfinished. Native animation/secondary orders, power-loss/disabled-state
+servicing, blinded state and source power geometry remain outside this bounded
+Battery implementation.
+The 24-to-30-Hz transfer scaling and final non-Q8 shield fraction are
+approximations. Qualified staged progress remains 22/30.
+
+The final C/header/Make inputs remain hash-stable throughout the focused
+Battery suite, documented ARM build, `./dev build`, `./dev test` (387 Python
+tests plus host fixtures), `make unified` and `make test-unified`; all pass.
+Original-art and unified ROMs remain `4ad80ce0…f9aee` and `6bab5be2…979f9`.
+The source-only index contains 572 text files; generated inputs and ROMs stay
+local.

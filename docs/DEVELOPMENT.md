@@ -1532,7 +1532,9 @@ identities plus seven Protoss structure types. They remain scenario-only;
 this does not expose new training commands or a playable P7 campaign entry.
 The P7 header records missing splash, interceptor, cloak/detection, Arbiter
 field and Shield Battery mechanics. Enum capacity fits the current packed
-save fields, but P7 persistence and complete gameplay are not integrated yet.
+save fields. Separate experimental gates now exercise Archon splash,
+Observer detection and Battery recharge; a complete P7 playthrough remains
+unqualified.
 
 The asset-free geometry fixture checks source-pixel actor rectangles, including
 inclusive source extents and malformed coordinate rejection. Runtime centers
@@ -1566,6 +1568,31 @@ It writes `sc64_p7_battery_properties_generated.h` under the ignored scenario
 directory. Use `--source-root` and `--output` for other local staging paths.
 The public source contains no copied map coordinates or generated properties.
 This preparation does not enable recharge or expose P7 in a campaign build.
+
+The default-off `SC64_P7_BATTERY_ENABLED` integration requires the P7 runtime,
+actor facts and full Protoss campaign storage. With the existing private P6
+inputs, the P7 scenario, properties and sprite bank prepared, run:
+
+```sh
+make test-sc64-p7-battery
+make protoss-p7-battery-probe
+```
+
+The internal ARM probe combines Battery, Observer and Archon gates. It retains
+the qualified campaign menu; it is not a completed P7 release. In a P7 test
+world, a selected Probe exposes SHIELD BATTERY after a completed Gateway;
+placement still requires power and pays 100 minerals. A selected completed
+Battery exposes RECHARGE: click a friendly unit or a point to order eligible
+units in the source-size square to approach it and recharge shields.
+
+The service uses existing fields for Q8 energy, regeneration phase and shield
+fractions. P7 state shares the existing Protoss save union; internal generation
+37 rejects older experimental formats. No actor fields or reserve increases
+are introduced. Only the fixed-point fixture joins the asset-free default
+suite; the full target also checks actual construction/recharge saves, source
+bindings, recycled targets, and existing P5/Shuttle/P6 save fixtures with the
+gate enabled. See [Validation](VALIDATION.md#experimental-p7-shield-battery)
+for limits and scoped ARM evidence.
 
 The experimental `SC64_P7_ARCHON_SPLASH` combat path is separately gated and
 requires `SC64_P7_ACTORS`, `SC64_ZP_CAMPAIGN_ACTORS` and `SC64_RACES`:

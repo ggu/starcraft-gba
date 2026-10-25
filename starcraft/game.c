@@ -153,12 +153,21 @@ int memcmp(const void *a, const void *b, size_t n);
     (!defined(SC64_RACES) || !defined(SC64_Z7_RUNTIME))
 #error "Z7 Egg production requires the race and Z7 runtimes"
 #endif
+#if defined(SC64_P7_BATTERY_ENABLED) && \
+    (!defined(SC64_RACES) || !defined(SC64_P7_RUNTIME) || \
+     !defined(SC64_P7_ACTORS) || !defined(SC64_ZP_FULL_STORAGE) || \
+     !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || \
+     SC64_CAMPAIGN_RACE != 2)
+#error "P7 Battery requires authenticated P7 data and full Protoss campaign storage"
+#endif
 #if defined(SC64_Z7_SCOURGE_COMBAT) && \
     (!defined(SC64_RACES) || !defined(SC64_Z7_RUNTIME) || \
      !defined(SC64_Z7_EGG_PRODUCTION))
 #error "Z7 Scourge combat requires the Z7 Egg production runtime"
 #endif
-#ifdef SC64_Z7_EGG_PRODUCTION
+#if defined(SC64_P7_BATTERY_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 37u
+#elif defined(SC64_Z7_EGG_PRODUCTION)
 #define SC64_RACE_SAVE_GENERATION 36u
 #elif defined(SC64_Z7_COLONY_DEFENSE_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 35u
@@ -609,6 +618,9 @@ enum {
 #ifdef SC64_T6_RUNTIME
     , ORDER_REPAIR
 #endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    , ORDER_P7_RECHARGE
+#endif
 };
 #ifdef SC64_TRANSPORT_RUNTIME
 #define SC64_TRANSPORT_LOADED(q) ((q)->order == ORDER_TRANSPORTED)
@@ -645,6 +657,9 @@ enum {
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     , MODE_LAND
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    , MODE_P7_RECHARGE
 #endif
 #if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
     , MODE_P4_STORM
@@ -1013,8 +1028,19 @@ static int race_p6_combat_tick_traps(void);
 #ifdef SC64_P7_ARCHON_SPLASH
 static int race_p7_archon_splash_attack(Unit *q, int target);
 #endif
-#ifdef SC64_P7_OBSERVER_ENABLED
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
 static int race_p7_active(void);
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+static int race_p7_battery_command_available(void);
+static int race_p7_battery_build_available(void);
+static int race_p7_battery_issue_command(int building, int x, int y);
+static int __attribute__((noinline)) race_p7_battery_tick_unit(int slot);
+static void race_p7_battery_clear_building_references(int slot);
+static int race_p7_battery_initialize_source(const Sc64RaceMap *map);
+static int race_p7_battery_live_world_valid(void);
+#endif
+#ifdef SC64_P7_OBSERVER_ENABLED
 static int sc64_p7_observer_can_attack_from(int attacker, int target,
                                             int live_owner, int source_owner);
 static int sc64_p7_observer_detector_sees(int target, int source_owner,
@@ -1477,7 +1503,7 @@ spawn_unit(int owner, int type, int x, int y)
         u[i].raw_owner = race_z7_product_source_owner(owner);
     }
 #endif
-#ifdef SC64_P7_OBSERVER_ENABLED
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
     if (race_p7_active() && owner == SIDE) {
         u[i].raw_type = sc64_race_raw_unit(type);
         u[i].raw_owner = 7;
@@ -1538,6 +1564,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 	return -1;
 #ifdef SC64_DIRECT_ATTACK
     sc64_direct_attack_clear_references(MAX_UNITS + i);
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    race_p7_battery_clear_building_references(i);
 #endif
     b[i].x = x;
 #if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
@@ -1608,10 +1637,16 @@ spawn_build(int owner, int type, int x, int y, int constructing)
         b[i].raw_owner = race_z7_product_source_owner(owner);
     }
 #endif
-#ifdef SC64_P7_OBSERVER_ENABLED
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
     if (race_p7_active() && owner == SIDE) {
         b[i].raw_type = sc64_race_raw_building(type);
         b[i].raw_owner = 7;
+    }
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    if (race_p7_active() && type == B_P7_SHIELD_BATTERY) {
+        b[i].queue_progress = 100 * 256;
+        b[i].level = 0;
     }
 #endif
 #ifdef SC64_T5_RUNTIME
@@ -3060,6 +3095,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
             if (q->type == B_COMMAND && q->owner == SIDE && !q->under_construction) supply_cap -= 20;
 #endif
 	    q->alive = 0;
+#ifdef SC64_P7_BATTERY_ENABLED
+            race_p7_battery_clear_building_references(target-MAX_UNITS);
+#endif
 	    invalidate_path_grid();
 	}
     }
@@ -4036,6 +4074,14 @@ choose_command(int choice)
 #ifdef SC64_RACES
     /* Contextual eleventh row: spell and transport rows belong to their
        selected actors, while a selected Probe exposes base expansion. */
+#ifdef SC64_P7_BATTERY_ENABLED
+    if (choice==MENU_STOP+1 && race_p7_battery_command_available()) {
+        menu_open=0; mode=MODE_P7_RECHARGE; return;
+    }
+    if (choice==MENU_STOP+3 && race_p7_battery_build_available()) {
+        menu_open=0; mode=MODE_BUILD; menu=B_P7_SHIELD_BATTERY; return;
+    }
+#endif
     if (choice == MENU_STOP + 1 && race_nexus_command_available()) {
         menu_open = 0; mode = MODE_BUILD; menu = B_NEXUS; return;
     }
@@ -4201,6 +4247,10 @@ choose_command(int choice)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+#ifdef SC64_P7_BATTERY_ENABLED
+    if (race_p7_battery_command_available()) return MENU_STOP+2;
+    if (race_p7_battery_build_available()) return MENU_STOP+4;
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (race_z7_egg_cancel_available()) return MENU_STOP + 2;
 #endif
@@ -4265,6 +4315,10 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     if (choice==MENU_STOP+1 && race_z7_colony_command_available()) return "SUNKEN";
     if (choice==MENU_STOP+2 && race_z7_spore_morph_command_available()) return "SPORE";
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    if (choice==MENU_STOP+1 && race_p7_battery_command_available()) return "RECHARGE";
+    if (choice==MENU_STOP+3 && race_p7_battery_build_available()) return "SHIELD BATTERY";
 #endif
     if (choice == MENU_STOP + 2 && race_probe_cannon_command_available())
         return "CANNON";
@@ -4358,6 +4412,12 @@ interact(void)
         mode = MODE_NORMAL; return;
     }
     #endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    if (mode==MODE_P7_RECHARGE) {
+        int issued=race_p7_battery_issue_command(selected_building,cx,cy);
+        mode=MODE_NORMAL; toast(issued ? 0 : 8); return;
+    }
+#endif
     if (mode == MODE_MOVE) {
 #ifdef SC64_TERRAN_LATE_RUNTIME
         if (race_late_airborne(selected_building)) {
@@ -4961,6 +5021,9 @@ target_lists_unavailable:
 #ifdef SC64_P6_COMBAT_ENABLED
         if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
+#ifdef SC64_P7_BATTERY_ENABLED
+        int p7_recharge_order=q->order==ORDER_P7_RECHARGE;
+#endif
 #ifdef SC64_T6_RUNTIME
         /* Keep burrowed actors out of every ordinary movement/weapon path.
          * Transport boarding also rejects the corresponding source flag. */
@@ -4973,7 +5036,11 @@ target_lists_unavailable:
         }
 #endif
 	#ifdef SC64_TRANSPORT_RUNTIME
-        if (q->order >= ORDER_BOARD) {
+        if (q->order >= ORDER_BOARD
+#ifdef SC64_P7_BATTERY_ENABLED
+            && q->order != ORDER_P7_RECHARGE
+#endif
+            ) {
             race_transport_activity = 1;
             if (race_transport_tick_unit(i)) continue;
         }
@@ -4993,6 +5060,9 @@ target_lists_unavailable:
 	#endif
 	if (q->cd > 0)
 	    q->cd--;
+#ifdef SC64_P7_BATTERY_ENABLED
+        if (p7_recharge_order && race_p7_battery_tick_unit(i)) continue;
+#endif
 #ifdef SC64_DIRECT_ATTACK
         if (q->order == ORDER_ATTACK_TARGET && q->owner == SIDE) {
             sc64_direct_attack_tick_unit(i);
@@ -6790,7 +6860,11 @@ draw_map(void)
 #endif
     x = cx - camx;
     y = cy - camy + 12;
-    gfx_frame(x - 4, y - 4, 9, 9, mode == MODE_BUILD ? C_GOLD :
+    gfx_frame(x - 4, y - 4, 9, 9, (mode == MODE_BUILD
+#ifdef SC64_P7_BATTERY_ENABLED
+              || mode == MODE_P7_RECHARGE
+#endif
+              ) ? C_GOLD :
 #if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
               mode == MODE_P4_STORM ? C_CYAN :
 #endif
@@ -7157,6 +7231,9 @@ draw_hud_commands(void)
 	gfx_text(5, 126, mode == MODE_BUILD ? "BUILD PLACEMENT" :
 #ifdef SC64_TERRAN_LATE_RUNTIME
                  mode == MODE_LAND ? "LANDING SITE" :
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+                 mode == MODE_P7_RECHARGE ? "RECHARGE SHIELDS" :
 #endif
 #if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
                  mode == MODE_P4_STORM ? "PSIONIC STORM TARGET" :
@@ -7844,6 +7921,10 @@ game_self_test(void)
 #ifdef SC64_P7_OBSERVER_ENABLED
 #include "sc64_p7_runtime_adapter.h"
 #include "sc64_p7_observer_adapter.h"
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+#include "sc64_p7_runtime_adapter.h"
+#include "sc64_p7_battery_adapter.h"
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 #include "sc64_z7_colony_adapter.h"

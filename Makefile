@@ -2108,6 +2108,49 @@ build/test-sc64-p7-observer-game: tests/sc64_p7_observer_game.c $(STARCRAFT) $(w
 .PHONY: test-sc64-p7-observer
 test-sc64-p7-observer: test-sc64-p7-observer-rules build/test-sc64-p7-observer-game
 	./build/test-sc64-p7-observer-game
+
+# Internal Battery integration checks. These do not expose a playable P7 entry.
+P7_BATTERY_DEFINES := -DSC64_P7_DATA_ENABLED -DSC64_P7_RUNTIME -DSC64_P7_ACTORS -DSC64_P7_BATTERY_ENABLED
+P7_BATTERY_FLAGS := -I.local/sc64/p7/generated $(P6_PROBE_FLAGS) $(P7_BATTERY_DEFINES)
+P7_BATTERY_P5_FLAGS := -I.local/sc64/p7/generated $(P5_SHUTTLE_FLAGS) $(P7_BATTERY_DEFINES)
+P7_BATTERY_INPUTS := $(P6_PROBE_INPUTS) .local/sc64/p7/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p7_battery_properties_generated.h
+.local/sc64/zp-stage/generated/scenarios/sc64_p7_battery_properties_generated.h: tools/sc64_p7_battery_pack.py tools/sc64_zp_scenario_pack.py tools/sc64_races_pack.py .local/sc64/zp-stage/generated/source_maps/p7/source.chk .local/sc64/zp-stage/generated/source_maps/p7/manifest.json
+	$(PYTHON) tools/sc64_p7_battery_pack.py
+build/starcraft-protoss-p7-battery-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_BATTERY_FLAGS) -DSC64_P7_OBSERVER_ENABLED -DSC64_P7_ARCHON_SPLASH $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-battery-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Battery-Probe-GBA.gba: build/starcraft-protoss-p7-battery-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+.PHONY: protoss-p7-battery-probe
+protoss-p7-battery-probe: build/StarCraft-Protoss-P7-Battery-Probe-GBA.gba
+build/test-sc64-p7-battery-rules: tests/sc64_p7_battery_rules.c starcraft/sc64_p7_battery_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-p7-battery-rules
+test-sc64-p7-battery-rules: build/test-sc64-p7-battery-rules
+	./build/test-sc64-p7-battery-rules
+test-starcraft: test-sc64-p7-battery-rules
+build/test-sc64-p7-battery-game: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-battery-combined: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_FLAGS) -DSC64_P7_OBSERVER_ENABLED -DSC64_P7_ARCHON_SPLASH $< common/gba.c -o $@
+build/test-sc64-p5-battery-save: tests/sc64_p5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_P5_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p5-battery-shuttle-save: tests/sc64_p5_shuttle_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_P5_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-battery-p5-union: tests/sc64_p7_union_tail_p5.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_P5_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p6-battery-save: tests/sc64_p6_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-battery
+test-sc64-p7-battery: test-sc64-p7-battery-rules build/test-sc64-p7-battery-game build/test-sc64-p7-battery-combined build/test-sc64-p5-battery-save build/test-sc64-p5-battery-shuttle-save build/test-sc64-p7-battery-p5-union build/test-sc64-p6-battery-save
+	./build/test-sc64-p7-battery-game
+	./build/test-sc64-p7-battery-combined
+	./build/test-sc64-p5-battery-save
+	./build/test-sc64-p5-battery-shuttle-save
+	./build/test-sc64-p7-battery-p5-union
+	./build/test-sc64-p6-battery-save
+
 build/test-sc64-p6-trigger-prune: tests/sc64_p6_trigger_prune.c tests/sc64_p6_trigger_prune_reference.c starcraft/sc64_p6_adapter.h starcraft/sc64_p6.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios tests/sc64_p6_trigger_prune.c tests/sc64_p6_trigger_prune_reference.c -o $@
 build/test-sc64-z6-trigger-prune: tests/sc64_z6_trigger_prune.c tests/sc64_z6_trigger_prune_reference.c starcraft/sc64_z6_adapter.h starcraft/sc64_z6.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h | build

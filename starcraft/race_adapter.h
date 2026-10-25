@@ -11,6 +11,9 @@
 #ifdef SC64_Z5_RUNTIME
 #include "sc64_z5_hp_regen.h"
 #endif
+#ifdef SC64_P7_BATTERY_ENABLED
+#include "sc64_p7_battery_rules.h"
+#endif
 
 #ifdef SC64_T5_RUNTIME
 static int race_t5_active(void);
@@ -630,7 +633,16 @@ static void race_tick_state(void)
         if (r->shields && u[i].shield < r->shields) {
             unsigned short value = (unsigned short)u[i].shield;
             unsigned short rem = (unsigned short)u[i].shield_remainder;
-            sc64_race_shield_tick_30fps(&value, r->shields, &rem);
+#ifdef SC64_P7_BATTERY_ENABLED
+            if (race_p7_active()) {
+                unsigned shield_value=value, shield_rem=rem;
+                sc64_p7_battery_passive_shield_tick(&shield_value,r->shields,
+                                                     &shield_rem);
+                value=(unsigned short)shield_value;
+                rem=(unsigned short)shield_rem;
+            } else
+#endif
+                sc64_race_shield_tick_30fps(&value, r->shields, &rem);
             u[i].shield = value;
             u[i].shield_remainder = rem;
         }
@@ -645,6 +657,16 @@ static void race_tick_state(void)
             b[i].shield = value;
             b[i].shield_remainder = rem;
         }
+#ifdef SC64_P7_BATTERY_ENABLED
+        if (race_p7_active() && b[i].type==B_P7_SHIELD_BATTERY &&
+            !b[i].under_construction && b[i].queue_count==0) {
+            unsigned energy=(unsigned)b[i].queue_progress;
+            unsigned phase=(unsigned)b[i].level;
+            sc64_p7_battery_regenerate(&energy,&phase);
+            b[i].queue_progress=(int)energy;
+            b[i].level=(int)phase;
+        }
+#endif
     }
     supply_used=used;supply_cap=cap;
 }
