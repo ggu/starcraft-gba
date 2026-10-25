@@ -20,6 +20,8 @@ static u16 prior_keys;
 static u32 host_ticks;
 static unsigned drone_deaths;
 static u32 run_limit=Z7_DEFAULT_LIMIT;
+/* Opt-in research policy; neither mode is a verified mission winner. */
+static int early_gas_policy;
 static int trace_first=1;
 static int next_macro_frame;
 static int next_attack_frame;
@@ -1399,7 +1401,7 @@ static int z7_assign_near_hatch_miners(int hatch,int live_workers)
         if(current_rank>=0||pending[i])continue;
         if(u[i].order!=ORDER_MINE||u[i].carry>0||attempts[i]>=2)continue;
         int target=-1,target_rank=-1;
-        for(int n=0;n<3;n++)if(assigned_count[n]<2) {
+        for(int n=0;n<3;n++)if(patches[n]>=0&&assigned_count[n]<2) {
             int nx=-1,ny=-1;
             if(!path_next_tile(u[i].x,u[i].y,m[patches[n]].x,m[patches[n]].y,&nx,&ny))continue;
             if(target<0||assigned_count[n]<assigned_count[target_rank]||
@@ -1884,7 +1886,7 @@ static int campaign_assault_retarget(void)
     /* Keep the local Extractor intact through the authored opening so the
        player can spend the finite starting gas on Hydralisks before sending
        Drones onto the contested geyser. */
-    if((unsigned)frame>=9000u)for(int i=0;i<MAX_BUILDINGS;i++)
+    if((unsigned)frame>=(early_gas_policy?2500u:9000u))for(int i=0;i<MAX_BUILDINGS;i++)
         if(b[i].alive&&b[i].owner==ENEMY&&b[i].raw_owner==4&&
            b[i].raw_type==149&&campaign_source_region4(b[i].x,b[i].y)&&
            currently_visible(b[i].x,b[i].y)&&z7_local_extractor_safe()) {
@@ -1957,7 +1959,7 @@ static int campaign_assault_retarget(void)
             for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==ENEMY&&
                 b[i].raw_owner==4&&currently_visible(b[i].x,b[i].y)&&
                 campaign_source_region4(b[i].x,b[i].y)&&
-                (b[i].raw_type==132||b[i].raw_type==142||
+                (early_gas_policy||b[i].raw_type==132||b[i].raw_type==142||
                  ((unsigned)frame>=9000u&&b[i].raw_type==149))) {
                 /* Keep the scripted placements first; then clear the observed
                    enemy Extractor only after the opening gas has funded the
@@ -2436,6 +2438,15 @@ static void macro_step(void)
             return;
         }
         if(!building_complete(den))return;
+        /* This opt-in trial recovers gas before reserving an expansion. A
+           nonzero starting balance is not evidence of renewable gas income. */
+        if(early_gas_policy&&gas<=150&&geyser_secured&&
+           !owned_building_count(B_EXTRACTOR)&&z7_local_extractor_safe()&&
+           live_workers>=6&&minerals>=50) {
+            if(start_building(B_EXTRACTOR,MENU_REFINERY))return;
+        }
+        if(early_gas_policy&&extractor>=0&&building_complete(extractor)&&
+           gas_worker_count()<2&&worker_count(ORDER_MINE)>=3&&assign_gas_worker())return;
         /* Test one paid expansion after the first completed Sunken and a
            usable eight-worker line. Keep this before miner reassignment and
            second-Sunken retries, both of which can return from macro_step.
@@ -2451,7 +2462,9 @@ static void macro_step(void)
                 workers_retreating);
             last_expansion_diag=(unsigned)frame;
         }
-        if(expansion_hatches==1&&expansion_sunkens>=1&&live_workers>=8) {
+        if(expansion_hatches==1&&expansion_sunkens>=1&&live_workers>=8&&
+           (!early_gas_policy||(expansion_sunkens>=2&&combat_count(SIDE)>=20&&
+                               !enemy_at_minerals&&!workers_retreating))) {
             if(minerals>=300) {
                 static unsigned last_expansion_attempt;
                 if(!last_expansion_attempt||
@@ -2504,14 +2517,14 @@ static void macro_step(void)
         /* After the first ground tank finishes, let the gas pay for a small
            Hydralisk reinforcement before reserving the second Sunken. */
         if(completed_building_count(B_SUNKEN_COLONY)>=1&&live_workers>=6&&
-           unit_type_count(U_HYDRALISK,SIDE)+queued_unit_count(U_HYDRALISK)<8&&
+           unit_type_count(U_HYDRALISK,SIDE)+queued_unit_count(U_HYDRALISK)<(early_gas_policy?12:8)&&
            minerals>=75&&gas>=25&&queue_hatchery_type(U_HYDRALISK))return;
-        if(gas==0&&geyser_secured&&z7_local_extractor_safe()&&!owned_building_count(B_EXTRACTOR)&&
+        if(!early_gas_policy&&gas==0&&geyser_secured&&z7_local_extractor_safe()&&!owned_building_count(B_EXTRACTOR)&&
            live_workers>=4&&minerals>=50) {
             (void)start_building(B_EXTRACTOR,MENU_REFINERY);
             return;
         }
-        if(gas==0&&extractor>=0&&building_complete(extractor)&&gas_worker_count()<2&&
+        if(!early_gas_policy&&gas==0&&extractor>=0&&building_complete(extractor)&&gas_worker_count()<2&&
            worker_count(ORDER_MINE)>=3) {
             if(assign_gas_worker())return;
         }
@@ -3066,6 +3079,17 @@ static void attack_step(void)
     int bx,by,slot;
     int hatch=z7_townhall(SIDE);
     int guard_x=1050,guard_y=1620;
+    /* Research policy: keep pursuing observed targets after the switch and
+       periodically reselect to admit paid reinforcements. This has not won. */
+    if(early_gas_policy&&campaign_assault_active) {
+        static unsigned next_assault_refresh;
+        if((unsigned)frame>=next_assault_refresh) {
+            campaign_assault_target=-1;campaign_assault_is_building=0;
+            campaign_assault_target_raw=0;
+            next_assault_refresh=(unsigned)frame+600u;
+        }
+        (void)campaign_assault_retarget();return;
+    }
     /* Clear the local approach before the native switch. Once the source wave
        starts, stop the assault and place the whole combat group at the north
        mineral boundary where it can meet Guardians before they reach workers. */
@@ -3608,7 +3632,7 @@ static void attack_step(void)
     if(hatch>=0&&combat_count(SIDE)>=6&&frame>=900&&frame>=defense_attack_frame) {
         int hostile=-1,nearest=0x7fffffff,threat_raw=0;
         /* Source raw43 is Mutalisk and attacks both air/ground; raw44 is
-           Guardian and attacks air only. Focus the former before the latter. */
+           Guardian and attacks ground only. Focus the former before the latter. */
         const int priority_raws[]={38,37};
         for(int p=0;p<2&&hostile<0;p++) {
             for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
@@ -3769,18 +3793,25 @@ static void log_status(void)
 int main(int argc,char **argv)
 {
     for(int i=1;i<argc;i++) {
-        if(!strcmp(argv[i],"--limit")&&i+1<argc)run_limit=(u32)strtoul(argv[++i],0,10);
+        if(!strcmp(argv[i],"--policy")&&i+1<argc) {
+            const char *name=argv[++i];
+            if(!strcmp(name,"baseline"))early_gas_policy=0;
+            else if(!strcmp(name,"early-gas"))early_gas_policy=1;
+            else {fprintf(stderr,"unknown policy: %s\n",name);return 2;}
+        }
+        else if(!strcmp(argv[i],"--limit")&&i+1<argc)run_limit=(u32)strtoul(argv[++i],0,10);
         else if(!strcmp(argv[i],"--trace")&&i+1<argc)trace_path=argv[++i];
         else if(!strcmp(argv[i],"--probe-hatch-site")&&i+2<argc) {
             hatch_probe_x=(int)strtol(argv[++i],0,10);hatch_probe_y=(int)strtol(argv[++i],0,10);
         }
-        else {fprintf(stderr,"usage: %s [--limit HOST_TICKS] [--trace PATH] [--probe-hatch-site X Y]\n",argv[0]);return 2;}
+        else {fprintf(stderr,"usage: %s [--policy baseline|early-gas] [--limit HOST_TICKS] [--trace PATH] [--probe-hatch-site X Y]\n",argv[0]);return 2;}
     }
     if(!run_limit||run_limit>1000000u)return 2;
     mkdir(".local",0777);mkdir(".local/sc64",0777);
     trace_file=fopen(trace_path,"w");if(!trace_file){perror("open Z7 controller trace");return 2;}
     fprintf(trace_file,"{\"schema\":1,\"profile\":\"zerg-z7\",\"mission\":18,"
-        "\"policy\":\"normal-input Z7 full-army assault with paid economy\",\"events\":[");
+        "\"policy\":\"%s\",\"events\":[",
+        early_gas_policy?"normal-input Z7 early-gas trial":"normal-input Z7 defensive baseline");
     launch_from_normal_menu();
     source_checkpoint("start");
     int last_checkpoint=frame;
