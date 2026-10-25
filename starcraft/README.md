@@ -14,6 +14,8 @@ A compact Terran-versus-Zerg RTS skirmish for the shared 240×160 mode-4 rendere
 
 Box selection requires a ROM rebuilt from the updated source; an older copied ROM does not include it.
 
+An optional build replaces menu scrolling with a hold-B command ring: aim, hold B, press a direction and release. See [`docs/COMMAND-RING.md`](../docs/COMMAND-RING.md).
+
 In the optional race ROMs, the light-blue bar above a Protoss unit or building
 shows shields; the lower bar shows HP. An empty blue track means shields are
 depleted. The selection panel displays shields as `SH` separately from `HP`.
