@@ -1,4 +1,5 @@
 #include "gba.h"
+#include "audio_mixer.h"
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
 #include "gba_present.h"
 #endif
@@ -25,10 +26,16 @@ static volatile u16 *pixels=(volatile u16*)0x0600a000;
 static u16 front;
 static u8 backbuffer_index;
 static u32 clear_generation[2];
-static int tone_frames;
+#ifdef GBA_SCENE_CLIP
+static u8 gfx_clip_top, gfx_clip_bottom;
+#endif
+static int tone_frames, noise_frames;
 volatile u32 gfx_draw_cycles;
 static u32 draw_start;
 static u32 previous_present;
+#ifdef SC64_UNIT_WORD_SPRITE_DIAGNOSTICS
+volatile u32 gfx_sprite_words_calls;
+#endif
 static const u16 colors[32]={
  RGB(1,1,2),RGB(30,30,28),RGB(13,15,17),RGB(3,5,8),RGB(8,12,15),
  RGB(30,5,5),RGB(12,2,3),RGB(7,28,12),RGB(2,10,5),RGB(6,14,30),RGB(2,5,15),
@@ -39,7 +46,13 @@ static const u16 colors[32]={
 };
 /* Cartridge backup signature used by emulator/flash-cart save-type detection. */
 __attribute__((used)) const char gba_save_signature[]="SRAM_V113";
+#if defined(SC64_AUDIO_IMPORTED) && !defined(GBA_HOST)
+static void audio_hw_init(void);
+#endif
 void gba_init(void) {
+#ifdef GBA_SCENE_CLIP
+ gfx_clip_top=0; gfx_clip_bottom=160;
+#endif
 #ifdef GBA_HOST
  front=0; backbuffer_index=1; clear_generation[0]=clear_generation[1]=0;
  pixels=host_fb[1];
@@ -51,13 +64,25 @@ void gba_init(void) {
  volatile u16 *pal=(volatile u16*)0x05000000;
  for(int i=0;i<32;i++)pal[i]=colors[i];
  REG16(0x04000084)=0x0080;
- REG16(0x04000080)=0x1177;
+ REG16(0x04000080)=0x9977;
  REG16(0x04000082)=0x0002;
  REG16(0x04000108)=0; REG16(0x0400010c)=0;
  REG16(0x0400010e)=0x0084; REG16(0x0400010a)=0x0080;
  front=0; backbuffer_index=1; clear_generation[0]=clear_generation[1]=0;
+#ifdef SC64_AUDIO_IMPORTED
+ audio_hw_init();
+#endif
 #endif
 }
+#ifdef GBA_SCENE_CLIP
+void gfx_set_clip_y(int top,int bottom) {
+ if(top<0||top>bottom||bottom>160)return;
+ gfx_clip_top=(u8)top; gfx_clip_bottom=(u8)bottom;
+}
+u16 gfx_get_clip_y(void) {
+ return (u16)(gfx_clip_top|((u16)gfx_clip_bottom<<8));
+}
+#endif
 u8 gfx_backbuffer_index(void) { return backbuffer_index; }
 u32 gfx_clear_generation(u8 buffer_index) {
  return buffer_index < 2 ? clear_generation[buffer_index] : 0;
@@ -89,6 +114,9 @@ return (~REG16(0x04000130))&1023;
 static void vblank(void){while(REG16(0x04000006)>=160){}while(REG16(0x04000006)<160){}}
 #endif
 void gfx_begin(u8 color) {
+#ifdef GBA_SCENE_CLIP
+ gfx_clip_top=0; gfx_clip_bottom=160;
+#endif
  draw_start=gba_clock();
  backbuffer_index=(u8)(front^1);
  clear_generation[backbuffer_index]++;
@@ -109,6 +137,9 @@ void gfx_begin(u8 color) {
  * overwrite every pixel may use this; partial scenes need gfx_begin(). */
 #if defined(SC64_NO_FRAME_CLEAR) || defined(GBA_HOST)
 void gfx_begin_preserve(void) {
+#ifdef GBA_SCENE_CLIP
+ gfx_clip_top=0; gfx_clip_bottom=160;
+#endif
  draw_start=gba_clock();
  backbuffer_index=(u8)(front^1);
 #ifdef GBA_HOST
@@ -163,6 +194,18 @@ HOT int gfx_blit_band(int y,int height,const u8 *src) {
 HOT int gfx_blit_window(int y,int height,const u8 *source,int stride,int rows,int left,int top) {
  if(!source||((uintptr_t)source&3)||stride<=0||(stride&3)||rows<=0||
     y<0||height<=0||height>160||y>160-height)return 0;
+#ifdef GBA_WINDOW_BANDS
+ /* A vertical scroll of a full-width cache is one contiguous transfer. Keep
+    out-of-source rows untouched, just as the generic per-row path does. */
+ if(stride==240 && left==0) {
+  if(top>=rows || top<=-height)return 1;
+  int first=top<0?-top:0,last=height;
+  if(top>rows-height)last=rows-top;
+  if(first<last)
+   return gfx_blit_band(y+first,last-first,source+(top+first)*240);
+  return 1;
+ }
+#endif
  for(int row=0;row<height;row++) {
   int sy=top+row;if(sy<0||sy>=rows)continue;
   int begin=left<0?-left:0,end=left+240>stride?stride-left:240;
@@ -248,10 +291,23 @@ void gfx_end(void) {
 #endif
 #endif
 }
-HOT void gfx_pixel(int x,int y,u8 c){if((unsigned)x>=240||(unsigned)y>=160)return;volatile u16*p=pixels+y*120+(x>>1);u16 old=*p;*p=(x&1)?((old&255)|((u16)c<<8)):((old&0xff00)|c);}
+HOT void gfx_pixel(int x,int y,u8 c){if((unsigned)x>=240)return;
+#ifdef GBA_SCENE_CLIP
+ if((unsigned)y-(unsigned)gfx_clip_top>=(unsigned)(gfx_clip_bottom-gfx_clip_top))return;
+#else
+ if((unsigned)y>=160)return;
+#endif
+ volatile u16*p=pixels+y*120+(x>>1);u16 old=*p;*p=(x&1)?((old&255)|((u16)c<<8)):((old&0xff00)|c);}
 HOT void gfx_blit16(int x,int y,const u8 *src) {
- if(!src||x>=240||y>=160||x<=-16||y<=-16)return;
+ if(!src||x>=240||x<=-16)return;
+#ifdef GBA_SCENE_CLIP
+ if(y>=gfx_clip_bottom||y+16<=gfx_clip_top)return;
+ int top=y<gfx_clip_top?gfx_clip_top-y:0;
+ int bottom=y+16>gfx_clip_bottom?gfx_clip_bottom-y:16;
+#else
+ if(y>=160||y<=-16)return;
  int top=y<0?-y:0,bottom=y+16>160?160-y:16;
+#endif
  if(x>=0&&x<=224&&!(x&3)&&!((uintptr_t)src&3)) {
   for(int row=top;row<bottom;row++) {
    const u32 *s=(const u32*)(src+row*16);
@@ -286,14 +342,35 @@ HOT void gfx_blit16(int x,int y,const u8 *src) {
  }
 }
 HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
- if(!src||width<=0||height<=0||width>256||height>256||x>=240||y>=160||x+width<=0||y+height<=0)return;
+ if(!src||width<=0||height<=0||width>256||height>256||x>=240||x+width<=0)return;
+#ifdef GBA_SCENE_CLIP
+ if(y>=gfx_clip_bottom||y+height<=gfx_clip_top)return;
+ int top=y<gfx_clip_top?gfx_clip_top-y:0;
+ int bottom=y+height>gfx_clip_bottom?gfx_clip_bottom-y:height;
+#else
+ if(y>=160||y+height<=0)return;
  int top=y<0?-y:0,bottom=y+height>160?160-y:height;
+#endif
  int left=x<0?-x:0,right=x+width>240?240-x:width;
  for(int row=top;row<bottom;row++) {
   int col=left;const u8*s=src+row*width;
   volatile u16*d=pixels+(y+row)*120+((x+col)>>1);
   if((x+col)&1){if(s[col])*d=(*d&255)|((u16)s[col]<<8);d++;col++;}
   for(;col+1<right;col+=2,d++){
+#ifdef GBA_SPRITE_WORDS
+   /* A quad is word-copied only when ROM and VRAM are both aligned. Mixed
+      quads fall through to the exact pair compositor; after one pair, both
+      alignments are off and that fallback remains in use until re-aligned. */
+   if(col+3<right && !((uintptr_t)d&3u) && !((uintptr_t)(s+col)&3u)) {
+    u32 pixels32=*(const u32 *)(const void *)(s+col);
+    if(!pixels32 || !(((pixels32-0x01010101u)&~pixels32&0x80808080u))) {
+     if(pixels32) *(volatile u32 *)(void *)d=pixels32;
+     col+=2;
+     ++d;
+     continue;
+    }
+   }
+#endif
    u8 a=s[col],b=s[col+1];
    if(a&&b)*d=a|((u16)b<<8);
    else if(a)*d=(*d&0xff00)|a;
@@ -302,6 +379,48 @@ HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
   if(col<right&&s[col])*d=(*d&0xff00)|s[col];
  }
 }
+#ifdef SC64_UNIT_WORD_SPRITES
+/* Phase-aligned four-pixel raster used only for generated unit frames.
+ * The sidecar's transparent lanes are already zero-padded at frame edges. */
+HOT void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame) {
+ if(!frame||!frame->width||!frame->height||frame->width>256||
+    frame->height>256||x>=240||x<=-(int)frame->width||
+    y>=160||y<=-(int)frame->height)return;
+ if(!frame->phase_words[0]||!frame->phase_words[1]||
+    !frame->phase_words[2]||!frame->phase_words[3])return;
+#ifdef SC64_UNIT_WORD_SPRITE_DIAGNOSTICS
+ ++gfx_sprite_words_calls;
+#endif
+ int width=frame->width,height=frame->height;
+#ifdef GBA_SCENE_CLIP
+ if(y>=gfx_clip_bottom||y<=gfx_clip_top-height)return;
+ int top=y<gfx_clip_top?gfx_clip_top-y:0;
+ int bottom=y+height>gfx_clip_bottom?gfx_clip_bottom-y:height;
+#else
+ int top=y<0?-y:0;
+ int bottom=y+height>160?160-y:height;
+#endif
+ int left=x<0?0:x,right=x+width>240?240:x+width;
+ if(left>=right||top>=bottom)return;
+ int phase=x%4;if(phase<0)phase+=4;
+ int origin=x-phase;
+ int first=left&~3,last=(right+3)&~3;
+ int groups=(phase+width+3)/4;
+ const u32 *row=frame->phase_words[phase]+top*groups*2+(first-origin)/4*2;
+ for(int dy=y+top;dy<y+bottom;dy++) {
+  volatile u32 *dst=(volatile u32 *)(void *)(pixels+dy*120+first/2);
+  const u32 *src=row;
+  for(int dx=first;dx<last;dx+=4,dst++,src+=2) {
+   u32 mask=src[1];
+   if(!mask)continue;
+   u32 color=src[0];
+   if(mask==0xffffffffu)*dst=color;
+   else *dst=(*dst&~mask)|color;
+  }
+  row+=groups*2;
+ }
+}
+#endif
 #if defined(D2_DEN_OF_EVIL) || defined(GBA_HOST)
 /* Transparent nearest-neighbour 2x sprite expansion for the Den scene. */
 HOT void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *src) {
@@ -314,7 +433,11 @@ HOT void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *src) {
   const u8 *s=src+row*width;
   for(int col=left;col<right;col++)if(s[col]) {
    u8 c=s[col];int dx=x+col*2,dy=y+row*2;
-   for(int yy=0;yy<2;yy++)if((unsigned)(dy+yy)<160) {
+   for(int yy=0;yy<2;yy++)if((unsigned)(dy+yy)<160
+#ifdef GBA_SCENE_CLIP
+                              &&dy+yy>=gfx_clip_top&&dy+yy<gfx_clip_bottom
+#endif
+                              ) {
     volatile u16 *d=pixels+(dy+yy)*120;
     if(dx>=0&&dx+1<240&&!(dx&1))d[dx>>1]=c|((u16)c<<8);
     else {if(dx>=0&&dx<240)gfx_pixel(dx,dy+yy,c);if(dx+1>=0&&dx+1<240)gfx_pixel(dx+1,dy+yy,c);}
@@ -345,10 +468,23 @@ void gfx_blit_sprite_hflip(int x,int y,int width,int height,const u8 *src) {
 }
 #endif
 HOT void gfx_rect(int x,int y,int w,int h,u8 color) {
-    if(w<=0||h<=0||x>=240||y>=160||x+w<=0||y+h<=0)return;
-    if(x<0){w+=x;x=0;}if(y<0){h+=y;y=0;}
+    if(w<=0||h<=0||x>=240||x+w<=0)return;
+#ifdef GBA_SCENE_CLIP
+    if(y>=gfx_clip_bottom||y+h<=gfx_clip_top)return;
+    if(y<gfx_clip_top){h-=gfx_clip_top-y;y=gfx_clip_top;}
+    if(y+h>gfx_clip_bottom)h=gfx_clip_bottom-y;
+    if(h<=0)return;
+#else
+    if(y>=160||y+h<=0)return;
+#endif
+    if(x<0){w+=x;x=0;}
+#ifndef GBA_SCENE_CLIP
+    if(y<0){h+=y;y=0;}
+#endif
     if(x+w>240)w=240-x;
+#ifndef GBA_SCENE_CLIP
     if(y+h>160)h=160-y;
+#endif
     const u16 pair=color|((u16)color<<8);
     const u32 quad=(u32)pair|((u32)pair<<16);
     for(int row=y;row<y+h;row++) {
@@ -383,7 +519,13 @@ HOT void gfx_diamond(int x,int y,int rx,int ry,u8 color) {
         int span=ry-(yy<0?-yy:yy);
         int half=rx==2*ry?span*2:(rx==ry?span:rx*span/ry);
         int left=x-half,right=x+half,sy=y+yy;
-        if((unsigned)sy>=160||right<0||left>=240)continue;
+        if(right<0||left>=240
+#ifdef GBA_SCENE_CLIP
+           ||(unsigned)sy-(unsigned)gfx_clip_top>=(unsigned)(gfx_clip_bottom-gfx_clip_top)
+#else
+           ||(unsigned)sy>=160
+#endif
+           )continue;
         if(left<0)left=0;
         if(right>239)right=239;
         volatile u16 *dst=pixels+sy*120+(left>>1);
@@ -451,7 +593,11 @@ static const u8 font[96][7]={
 };
 
 static HOT void glyph_row(int x,int y,u8 bits,u8 color) {
+#ifdef GBA_SCENE_CLIP
+    if ((unsigned)y-(unsigned)gfx_clip_top>=(unsigned)(gfx_clip_bottom-gfx_clip_top)) return;
+#else
     if ((unsigned)y>=160) return;
+#endif
     int col=0;
     /* Start on a halfword boundary, then update pairs with a single store. */
     if (x%2) {
@@ -482,9 +628,10 @@ static HOT void glyph_row(int x,int y,u8 bits,u8 color) {
     }
 }
 HOT void gfx_text(int x,int y,const char*t,u8 c){int origin=x;for(;*t;t++){u8 ch=(u8)*t;if(ch=='\n'){x=origin;y+=9;continue;}if(ch>='a'&&ch<='z')ch-=32;if(ch>=32&&ch<128&&x>-6&&x<240)for(int row=0;row<7;row++)glyph_row(x,y+row,font[ch-32][row],c);x+=6;}}
-#ifdef SC64_ZP_FULL_STORAGE
+#if defined(SC64_ZP_FULL_STORAGE) || defined(GBA_SCENE_CLIP)
 /* Later campaign actors need the hot-code reserve; number formatting can
- * run from ROM while glyph drawing stays in IWRAM. */
+ * run from ROM while glyph drawing stays in IWRAM. Scene clipping also uses
+ * this cold formatter placement to stay within the canonical IWRAM reserve. */
 void gfx_num(
 #else
 HOT void gfx_num(
@@ -561,18 +708,129 @@ void save_test_corrupt_latest(u32 len,u32 tag) {
     if(newest>=0)host_save[newest*SAVE_SLOT_SIZE+16]^=0x80;
 }
 #endif
+#ifdef GBA_HOST
+u32 audio_host_tones, audio_host_noises, audio_host_samples;
+int audio_host_last_sample=-1, audio_host_music=-1;
+#endif
 void audio_tone(int hz,int frames,int volume){
 #ifdef GBA_HOST
-(void)hz; (void)frames; (void)volume;
+(void)hz; (void)frames; (void)volume; ++audio_host_tones;
 #else
 hz=clampi(hz,64,2048);int f=2048-131072/hz;REG16(0x04000068)=((clampi(volume,0,15)<<12)|0x0080);REG16(0x0400006c)=0x8000|f;tone_frames=frames;
+#endif
+}
+/* PSG noise placeholder for builds without a sampled bank. */
+void audio_noise(int frames,int volume){
+#ifdef GBA_HOST
+(void)frames; (void)volume; ++audio_host_noises;
+#else
+REG16(0x04000078)=(u16)((clampi(volume,0,15)<<12)|0x0200);REG16(0x0400007c)=0x8000|0x0024;noise_frames=frames;
 #endif
 }
 void audio_update(void){
 #ifndef GBA_HOST
 if(tone_frames>0&&!--tone_frames)REG16(0x04000068)=0;
+if(noise_frames>0&&!--noise_frames)REG16(0x04000078)=0;
 #endif
 }
+#if defined(SC64_AUDIO_IMPORTED)
+#include "sc64_audio_generated.h"
+#ifdef GBA_HOST
+/* Host builds queue requests but never mix the bank. */
+static const s8 sc64_audio_blob[2];
+#else
+/* Linked from common/audio_bank.S; private data under .local/ only. */
+extern const s8 sc64_audio_blob[];
+#endif
+static const AudioBank audio_bank={
+ sc64_audio_blob,sc64_audio_sample_offset,sc64_audio_sample_length,SC64_AUDIO_SAMPLE_COUNT,
+ sc64_audio_music_offset,sc64_audio_music_frames,SC64_AUDIO_MUSIC_TRACKS
+};
+_Static_assert(SC64_AUDIO_SAMPLES_PER_FRAME==AUDIO_FRAME_SAMPLES,"bank and mixer frame sizes differ");
+_Static_assert(GBA_AUDIO_MIX_BYTES>=2*AUDIO_FRAME_SAMPLES+64,"mix buffer lacks its guard");
+static AudioMixer audio_mixer;
+int audio_sampled_available(void){return 1;}
+void audio_play_sample(u16 sample,u8 priority,u8 kind){
+#ifdef GBA_HOST
+ ++audio_host_samples; audio_host_last_sample=sample;
+#endif
+ audio_mixer_request(&audio_mixer,sample,priority,kind);
+}
+void audio_play_music(int track,int loop){
+#ifdef GBA_HOST
+ audio_host_music=track;
+#endif
+ audio_mixer_music(&audio_mixer,track<0?AUDIO_MUSIC_STOP:(u8)track,(u8)(loop!=0));
+}
+int audio_music_track(void){
+ u8 request=audio_mixer.music_request;
+ if(request!=AUDIO_MUSIC_NONE)return request==AUDIO_MUSIC_STOP?-1:request;
+ return audio_mixer.music_track==AUDIO_MUSIC_NONE?-1:audio_mixer.music_track;
+}
+#ifndef GBA_HOST
+#ifdef SC64_TILE_RENDERER
+#error "The audio buffers use the gap between the two mode-4 pages"
+#endif
+/* Two contiguous 176-sample halves between the mode-4 pages (VRAM
+ * 0x06009600-0x06009FFF is unused). DMA1 plays them back to back and is
+ * re-armed at the first half every second frame; each VBlank mixes the half
+ * that just finished. Both halves stay halfword-written; the zero guard after
+ * them is never written, so a delayed re-arm reads silence. */
+#define AUDIO_MIX_BUFFER ((volatile u16*)GBA_AUDIO_ARENA)
+volatile u32 audio_irq_cycles,audio_irq_peak,audio_irq_frames;
+static u8 audio_half;
+static void audio_music_dma(const s8 *data){
+ REG32(0x040000d0)=0;
+ if(!data){REG16(0x04000082)=(u16)((REG16(0x04000082)&~0x3000)|0x8000);return;}
+ REG32(0x040000c8)=(u32)data;REG32(0x040000cc)=0x040000a4;
+ REG32(0x040000d0)=0xb6400000u;
+ REG16(0x04000082)|=0x3000;
+}
+/* Thumb, from ROM: the IWRAM reserve is too small for the mixer. */
+static void __attribute__((noinline)) audio_vblank(void){
+ u32 start=gba_clock();
+ volatile u16 *mix;
+ if(audio_half){
+  REG32(0x040000c4)=0;REG32(0x040000bc)=(u32)AUDIO_MIX_BUFFER;REG32(0x040000c4)=0xb6400000u;
+  mix=AUDIO_MIX_BUFFER+AUDIO_FRAME_SAMPLES/2;
+ } else mix=AUDIO_MIX_BUFFER;
+ audio_half^=1;
+ int music=audio_mixer_frame(&audio_mixer,&audio_bank,mix);
+ if(music==AUDIO_MUSIC_RESTART)audio_music_dma(audio_mixer_music_data(&audio_mixer,&audio_bank));
+ else if(music==AUDIO_MUSIC_SILENCE)audio_music_dma(0);
+ u32 spent=gba_clock()-start;
+ audio_irq_cycles+=spent;++audio_irq_frames;
+ if(spent>audio_irq_peak)audio_irq_peak=spent;
+}
+/* The BIOS dispatcher enters this with an ARM-state load of 0x03007FFC. */
+__attribute__((target("arm"),noinline)) static void audio_irq(void){
+ u16 flags=REG16(0x04000202)&REG16(0x04000200);
+ if(flags&1)audio_vblank();
+ REG16(0x04000202)=flags;
+ *(volatile u16*)0x03007ff8|=flags;
+}
+static void audio_hw_init(void){
+ audio_mixer_reset(&audio_mixer);
+ for(u32 i=0;i<GBA_AUDIO_MIX_BYTES/2;i++)AUDIO_MIX_BUFFER[i]=0;
+ audio_half=0;
+ /* PSG 100%, Direct Sound A 100% and B 50%, both on timer 0, both FIFOs reset;
+  * music enables B's outputs when a track starts. */
+ REG16(0x04000082)=0x0002|0x0004|0x0300|0x0800|0x8000;
+ REG16(0x04000102)=0;REG16(0x04000100)=(u16)(65536u-280896u/AUDIO_FRAME_SAMPLES);REG16(0x04000102)=0x0080;
+ REG32(0x040000c4)=0;REG32(0x040000bc)=(u32)AUDIO_MIX_BUFFER;REG32(0x040000c0)=0x040000a0;
+ REG32(0x040000c4)=0xb6400000u;
+ *(volatile u32*)0x03007ffc=(u32)audio_irq;
+ REG16(0x04000004)|=0x0008;
+ REG16(0x04000200)=0x0001;
+ REG16(0x04000208)=1;
+}
+#endif
+#else
+int audio_sampled_available(void){return 0;}
+void audio_play_sample(u16 sample,u8 priority,u8 kind){(void)sample;(void)priority;(void)kind;}
+void audio_play_music(int track,int loop){(void)track;(void)loop;}
+int audio_music_track(void){return -1;}
+#endif
 
 #ifdef GBA_HOST
 u8 gfx_test_pixel(int x,int y){if((unsigned)x>=240||(unsigned)y>=160)return 0;u16 v=pixels[y*120+x/2];return (u8)(x&1?v>>8:v);}

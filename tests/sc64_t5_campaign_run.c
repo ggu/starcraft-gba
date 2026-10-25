@@ -26,6 +26,9 @@ static int controller_select_visible_type_group(int type, int after_slot,
                                                 int *out_count, int *out_seed);
 static int controller_marine_count(void);
 static int controller_wait_building(int slot, int ticks);
+static int controller_defend_command_center(void);
+static int controller_assign_idle_scvs_to_gas(int maximum);
+static int controller_assign_idle_scvs_to_minerals(int maximum);
 static void tap(u16 key);
 static int controller_normalize_field(void);
 static void move_cursor(int x, int y);
@@ -1251,7 +1254,8 @@ static int controller_queue_home_reinforcements(void)
 {
     int marines = controller_marine_count() + controller_count_queued_type(U_MARINE);
     const int marine_reserve_target = 24;
-    int scvs = 0, active_near_command = 0, command = find_side_building(B_COMMAND, 1);
+    int scvs = 0, queued_scvs = controller_count_queued_type(U_SCV);
+    int active_near_command = 0, command = find_side_building(B_COMMAND, 1);
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV &&
             !SC64_TRANSPORT_LOADED(&u[i])) ++scvs;
@@ -1275,7 +1279,8 @@ static int controller_queue_home_reinforcements(void)
             }
         }
     }
-    if (scvs < 8 && active_near_command > 0 && minerals >= unit_cost(U_SCV) &&
+    if (scvs + queued_scvs < 8 && active_near_command > 0 &&
+        minerals >= unit_cost(U_SCV) &&
         reserved_supply() + unit_supply(U_SCV) <= supply_cap) {
         if (command >= 0 && b[command].queue_count < 5 &&
             controller_select_building(command)) {
@@ -1284,11 +1289,22 @@ static int controller_queue_home_reinforcements(void)
             if (b[command].queue_count > before) {
                 ++queued;
                 fprintf(stderr, "T5 replenished paid SCV queue=%d workers=%d/8\n",
-                        controller_count_queued_type(U_SCV), scvs);
+                        controller_count_queued_type(U_SCV), scvs + queued_scvs);
             }
         }
     }
     return queued;
+}
+
+static void controller_service_home_base(void)
+{
+    if (find_side_building(B_COMMAND, 1) < 0) return;
+    (void)controller_queue_home_reinforcements();
+    (void)controller_defend_command_center();
+    if (host_ticks % 900 == 0) {
+        (void)controller_assign_idle_scvs_to_gas(3);
+        (void)controller_assign_idle_scvs_to_minerals(3);
+    }
 }
 
 static int controller_select_visible_type_group(int type, int after_slot,
@@ -1854,6 +1870,7 @@ static void wait_frames(int amount)
     for (int i = 0; i < amount && screen == SCREEN_PLAY && !won && !lost &&
          host_ticks < (u32)run_limit; ++i) {
         step(0);
+        if (host_ticks % 300 == 0) controller_service_home_base();
         if (trace_file && host_ticks && host_ticks % T5_CHECKPOINT_PERIOD == 0)
             checkpoint("periodic");
     }
@@ -2304,5 +2321,20 @@ int main(int argc, char **argv)
                         id, distance, rx, ry);
         }
     }
-    return 0;
+    int command_center = find_side_building(B_COMMAND, 1);
+    int qualified = won && !lost && mission_unsupported_count == 0 &&
+        race_campaign.phase == SC64_RACE_PHASE_COMPLETE &&
+        (race_campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY) &&
+        (race_completed & (1 << SC64_T5_GLOBAL_ID)) &&
+        kerrigan_alive() && raynor_alive() && command_center >= 0 &&
+        owner_buildings(ENEMY) == 0;
+    fprintf(stderr,
+        "T5 qualification won=%d lost=%d faults=%u phase=%u primary=%u completed=%u "
+        "Kerrigan=%d Raynor=%d command_center=%d enemy_buildings=%d result=%s\n",
+        won, lost, mission_unsupported_count, race_campaign.phase,
+        !!(race_campaign.objective_flags & SC64_RACE_OBJECTIVE_PRIMARY),
+        !!(race_completed & (1 << SC64_T5_GLOBAL_ID)), kerrigan_alive(),
+        raynor_alive(), command_center >= 0, owner_buildings(ENEMY),
+        qualified ? "PASS" : "FAIL");
+    return qualified ? 0 : 1;
 }

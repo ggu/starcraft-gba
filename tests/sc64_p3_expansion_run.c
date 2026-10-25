@@ -980,7 +980,8 @@ static void print_blocker(void)
                     route ? unit_step_clear(&u[i], next_x, next_y) : 0);
             if (u[i].type == U_ZEALOT || u[i].type == U_DRAGOON || u[i].type == U_SCOUT) {
                 int acquire = unit_range(u[i].type) > 64 ? unit_range(u[i].type) + 18 : 64;
-                int nearest = nearest_enemy_typed(u[i].x, u[i].y, SIDE, acquire, u[i].type);
+                int nearest = nearest_enemy_typed(u[i].x, u[i].y, SIDE, acquire, u[i].type
+                                                 SC64_P7_SOURCE_OWNER_ARG(u[i].raw_owner));
                 int closest_owner = -1, closest_type = -1, closest_d2 = 0x7fffffff;
                 for (int j = 0; j < MAX_UNITS; ++j)
                     if (u[j].alive && (u[j].owner == ENEMY || u[j].owner == 4)) {

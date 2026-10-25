@@ -19,6 +19,14 @@ void gba_init(void);
 u16 gba_keys(void);
 u32 gba_clock(void);
 void gfx_begin(u8 background);
+#ifdef GBA_SCENE_CLIP
+/* Restrict drawing primitives to [top,bottom). Invalid ranges are ignored.
+ * Explicit band/window copy helpers keep their validated spans and do
+ * not consult this scene clip. Every begin call restores the full screen. */
+void gfx_set_clip_y(int top,int bottom);
+/* Current valid range: top in the low byte, exclusive bottom in the high. */
+u16 gfx_get_clip_y(void);
+#endif
 /* The buffer selected by the last begin call, and its explicit-clear count.
  * Preserve-mode begin leaves that count unchanged for reusable pixel bands. */
 u8 gfx_backbuffer_index(void);
@@ -36,6 +44,16 @@ int gfx_blit_window_2x(int y,int height,const u8 *source,int stride,int rows,int
 void gfx_set_palette(int first,int count,const u16 *rgb555);
 void gfx_blit16(int x,int y,const u8 *indexed_pixels);
 void gfx_blit_sprite(int x,int y,int width,int height,const u8 *indexed_pixels);
+#ifdef SC64_UNIT_WORD_SPRITES
+/* Optional phase-aligned unit raster metadata. Each phase contains one
+ * {color, alpha-byte-mask} word per four destination pixels, row-major.
+ * Transparent lanes in each color word must be zero. */
+typedef struct {
+    u16 width, height;
+    const u32 *phase_words[4];
+} GbaSpriteWordFrame;
+void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame);
+#endif
 #if defined(D2_DEN_OF_EVIL) || defined(GBA_HOST)
 void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *indexed_pixels);
 #endif
@@ -57,7 +75,23 @@ int absi(int x);
 void save_write(const void *data,u32 length,u32 tag);
 int save_read(void *data,u32 length,u32 tag);
 void audio_tone(int frequency,int frames,int volume);
+void audio_noise(int frames,int volume);
 void audio_update(void);
+/* Optional sampled audio from a private imported bank (SC64_AUDIO_IMPORTED).
+ * Presentation only: these never read or write game state. Without a bank
+ * they do nothing and audio_sampled_available() returns 0. */
+int audio_sampled_available(void);
+void audio_play_sample(u16 sample,u8 priority,u8 kind);
+void audio_play_music(int track,int loop);
+/* Current or pending music track, or -1 when silent. */
+int audio_music_track(void);
+/* Unused VRAM between the two mode-4 pages: 0x06009600-0x06009FFF. The
+ * first 416 bytes hold the two 176-sample mix halves and a zero guard that a
+ * late VBlank interrupt lets DMA run into; the rest is free for
+ * halfword-sized presentation state. */
+#define GBA_AUDIO_ARENA 0x06009600u
+#define GBA_AUDIO_ARENA_BYTES 2560u
+#define GBA_AUDIO_MIX_BYTES 416u
 void game_init(void);
 void game_update(u16 held,u16 pressed);
 void game_render(void);

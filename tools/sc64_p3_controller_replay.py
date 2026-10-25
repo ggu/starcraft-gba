@@ -31,6 +31,7 @@ MISSION_P3 = 22
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_RESULT = 0, 1, 3
 DEFAULT_TRACE = ROOT / ".local/sc64/p3-controller-garrison.json"
 DEFAULT_EXPANSION_TRACE = ROOT / "build/p3-expansion-controller.json"
+DEFAULT_STOCK_TRACE = ROOT / ".local/sc64/p3-controller-stock-asan-win.json"
 DEFAULT_OUTPUT = ROOT / "build/emulator/sc64-p3-controller-replay"
 EXPECTED_FINAL = {
     "host_tick": 152107, "frame": 151088, "screen": SCREEN_RESULT,
@@ -42,6 +43,35 @@ EXPECTED_FINAL = {
 }
 EXPANSION_POLICY = "protoss-three-expansion-source-cleared"
 GARRISON_POLICY = "protoss-economy-tech-defense-assault"
+STOCK_POLICY = "protoss-stock-economy-cannons-assault"
+STOCK_OPENING_INPUTS = ((1, 1), (2, 0), (3, 16), (4, 0),
+                        (5, 1), (6, 0), (7, 1))
+STOCK_EXPECTED_START = {
+    "host_tick": 7, "frame": 0, "elapsed": 0, "screen": SCREEN_PLAY,
+    "won": 0, "lost": 0, "p3_outcome": 0, "p3_sequence": 0,
+    "p3_fired": 1, "p3_model_valid": 1, "campaign_phase": 1,
+    "objective_flags": 0, "primary_objective": 0, "action_ticks": 0,
+    "side_units": 14, "side_army": 10, "side_buildings": 4,
+    "force2_units": 43, "force2_buildings": 22,
+    "force3_units": 39, "force3_buildings": 16,
+    "minerals": 300, "gas": 100, "supply": 54, "supply_cap": 66,
+    "zealots_queued": 0, "gateways": 0, "cursor_x": 1616,
+    "cursor_y": 1322, "selected_units": 0, "selected_building": -1,
+    "geyser_count": 3,
+}
+STOCK_EXPECTED_FINAL = {
+    "host_tick": 60197, "frame": 59586, "elapsed": 59586,
+    "screen": SCREEN_RESULT, "won": 1, "lost": 0, "p3_outcome": 1,
+    "p3_sequence": 5, "p3_fired": 31, "p3_model_valid": 1,
+    "campaign_phase": 3, "objective_flags": 1, "primary_objective": 1,
+    "action_ticks": 0, "side_units": 22, "side_army": 22,
+    "side_buildings": 4, "force2_units": 6, "force2_buildings": 0,
+    "force3_units": 9, "force3_buildings": 0, "minerals": 491,
+    "gas": 1890, "supply": 88, "supply_cap": 32,
+    "zealots_queued": 0, "gateways": 1, "cursor_x": 1960,
+    "cursor_y": 256, "selected_units": 22, "selected_building": -1,
+    "geyser_count": 3,
+}
 EXPANSION_EXPECTED_START = {
     "global_mission": MISSION_P3, "selected_mission": MISSION_P3, "race_mode": 0,
     "campaign_phase": 1, "campaign_objectives": 0, "completed": 0,
@@ -80,10 +110,12 @@ EXPANSION_EXPECTED_FINAL = {
 def validate_trace(trace: object, capacity: int, *, windowed: bool = False,
                    route: str = "garrison", window_ticks: int = scheduler.CHECKPOINT_TICKS) -> dict:
     """Strictly validate the frozen P3 controller trace before any emulator work."""
-    if route not in ("garrison", "expansion"):
-        raise ValueError("route must be garrison or expansion")
-    expected_policy = GARRISON_POLICY if route == "garrison" else EXPANSION_POLICY
-    expected_final = EXPECTED_FINAL if route == "garrison" else EXPANSION_EXPECTED_FINAL
+    if route not in ("garrison", "expansion", "stock"):
+        raise ValueError("route must be garrison, expansion, or stock")
+    expected_policy = {"garrison": GARRISON_POLICY, "expansion": EXPANSION_POLICY,
+                       "stock": STOCK_POLICY}[route]
+    expected_final = {"garrison": EXPECTED_FINAL, "expansion": EXPANSION_EXPECTED_FINAL,
+                      "stock": STOCK_EXPECTED_FINAL}[route]
     if type(capacity) is not int or capacity < 1:
         raise ValueError("controller queue capacity must be a positive integer")
     if type(window_ticks) is not int or window_ticks < 1:
@@ -100,6 +132,7 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False,
     inputs: list[tuple[int, int]] = []
     previous_tick, previous_held = 0, 0
     start = final = None
+    start_index = None
     last_observation_tick = 0
     last_observation_kind = None
     for index, row in enumerate(rows):
@@ -122,9 +155,18 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False,
             if start is not None:
                 raise ValueError("trace must contain exactly one start event")
             start = row
+            start_index = index
         elif kind in ("periodic", "progress"):
             if kind == "progress" and route != "expansion":
                 raise ValueError("progress events are only valid in the expansion trace")
+            if kind == "periodic" and route == "stock":
+                expected_frame = (sum(row.get("kind") == "periodic" for row in rows[:index]) + 1) * 1000
+                if (row.get("frame") != expected_frame or row.get("elapsed") != expected_frame or
+                        row.get("screen") != SCREEN_PLAY or row.get("won") != 0 or
+                        row.get("lost") != 0 or row.get("p3_outcome") != 0 or
+                        row.get("p3_model_valid") != 1 or row.get("campaign_phase") != 1 or
+                        row.get("objective_flags") != 0):
+                    raise ValueError(f"periodic event {index} is not the expected live stock-route checkpoint")
             tick = row.get("host_tick")
             if type(tick) is not int or tick > 0xFFFFFFFF:
                 raise ValueError(f"{kind} event {index} has invalid host_tick")
@@ -154,6 +196,16 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False,
         raise ValueError("trace must record P3 launch at host_tick=7, frame=0, screen=PLAY")
     if start.get("p3_outcome") != 0 or start.get("won") != 0 or start.get("lost") != 0:
         raise ValueError("trace start must be a live, unfinished P3 mission")
+    if route == "stock":
+        if start_index != len(STOCK_OPENING_INPUTS):
+            raise ValueError("stock trace must record the complete HOME launch before its start event")
+        opening = [(row["host_tick"], row["held"]) for row in rows[:start_index]
+                   if isinstance(row, dict) and row.get("kind") == "input"]
+        if opening != list(STOCK_OPENING_INPUTS):
+            raise ValueError("stock trace opening inputs do not match the verified HOME-to-P3 launch")
+        for key, expected in STOCK_EXPECTED_START.items():
+            if type(start.get(key)) is not int or start[key] != expected:
+                raise ValueError(f"stock start {key} does not match the verified source launch")
     if route == "expansion":
         for key, expected in EXPANSION_EXPECTED_START.items():
             if type(start.get(key)) is not int or start[key] != expected:
@@ -177,6 +229,9 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False,
                                   sum(row.get("kind") == "periodic" for row in rows) != 123 or
                                   sum(row.get("kind") == "progress" for row in rows) != 12):
         raise ValueError("expansion trace input/checkpoint counts differ from the verified controller run")
+    if route == "stock" and (len(inputs) != 2999 or
+                              sum(row.get("kind") == "periodic" for row in rows) != 59):
+        raise ValueError("stock trace input/checkpoint counts differ from the verified controller run")
     if windowed:
         last_page = (stop_tick - 1) // window_ticks
         peak = max((sum(1 for tick, _ in inputs if tick // window_ticks == page)
@@ -341,9 +396,10 @@ def p3_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
 
 
 def verify_final(trace_final: dict, state: dict, route: str = "garrison") -> None:
-    if route not in ("garrison", "expansion"):
-        raise ValueError("route must be garrison or expansion")
-    expected_final = EXPECTED_FINAL if route == "garrison" else EXPANSION_EXPECTED_FINAL
+    if route not in ("garrison", "expansion", "stock"):
+        raise ValueError("route must be garrison, expansion, or stock")
+    expected_final = {"garrison": EXPECTED_FINAL, "expansion": EXPANSION_EXPECTED_FINAL,
+                      "stock": STOCK_EXPECTED_FINAL}[route]
     for key, value in expected_final.items():
         if type(trace_final.get(key)) is not int or trace_final[key] != value:
             raise RuntimeError(f"trace final {key} does not match the verified {route} route")
@@ -369,6 +425,13 @@ def verify_final(trace_final: dict, state: dict, route: str = "garrison") -> Non
                 raise RuntimeError(f"final {key} mismatch: expected {trace_final[key]}, observed {state.get(key)}")
         if state.get("race_selected_mission") != trace_final["selected_mission"]:
             raise RuntimeError("final selected_mission mismatch")
+    if route == "stock":
+        for key in ("side_army", "zealots_queued", "selected_units", "selected_building",
+                    "geyser_count"):
+            if key not in state:
+                raise RuntimeError(f"ARM observer cannot verify required stock-route field {key}")
+            if state.get(key) != trace_final[key]:
+                raise RuntimeError(f"final {key} mismatch: expected {trace_final[key]}, observed {state.get(key)}")
     # The legacy controller trace stores gateway presence (side_building() >= 0),
     # while p3_snapshot reports the full live gateway count for diagnostics.
     if bool(state.get("gateways", 0)) != bool(trace_final["gateways"]):
@@ -382,6 +445,8 @@ def verify_final(trace_final: dict, state: dict, route: str = "garrison") -> Non
         for key, value in (("objective_flags", 1),):
             if campaign.get(key) != value:
                 raise RuntimeError(f"final campaign.{key} mismatch: expected {value}, got {campaign.get(key)}")
+    if route == "stock" and campaign.get("objective_flags") != trace_final["objective_flags"]:
+        raise RuntimeError("final campaign objective flags mismatch")
     if not (campaign.get("objective_flags", 0) & 1):
         raise RuntimeError("final campaign primary objective flag is absent")
     model = state.get("race_p3", {})
@@ -414,6 +479,11 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
     if MISSION_P3 not in campaign_meta["enabled_mission_ids"]:
         raise RuntimeError("P3 ELF catalog does not enable Higher Ground global mission ID 22")
     bank = races.race_bank_profile(elf, sizes)
+    if route == "stock" and "selected" not in bank["unit_offsets"]:
+        raise RuntimeError("P3 stock replay requires a unit-bank selection field")
+    if route == "stock" and not all(name in bank["building_offsets"]
+                                     for name in ("queue_count", "queue_head", "queue", "alive", "owner")):
+        raise RuntimeError("P3 stock replay requires a bounded building production queue layout")
     campaign_layout = races.dwarf_struct(elf, "Sc64RaceCampaignState")
     p3_layout = races.dwarf_struct(elf, "Sc64P3State")
     required = ("game_update", "demo_schedule_events", "demo_schedule_count", "demo_schedule_length",
@@ -421,6 +491,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                 "race_mode", "race_selected_mission", "race_completed", "race_campaign", "race_p3",
                 "race_p3_action_ticks", "race_minerals", "race_gas", "supply_used", "supply_cap", "u", "b")
     required += ("race_front", "demo_inject_keys")
+    if route in ("expansion", "stock"):
+        required += ("selected_building", "geyser_count")
     if route == "expansion":
         required += ("weapons_level", "armor_level", "weapons_research", "armor_research",
                      "selected_building", "geyser_count", "mission_unsupported_count")
@@ -668,16 +740,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--elf", type=Path, help="P3 ELF override")
     parser.add_argument("--ticks", type=int, help="replay a positive trace prefix")
     parser.add_argument("--save-at-end", action="store_true", help="pause/save with normal controls at prefix end")
-    parser.add_argument("--route", choices=("garrison", "expansion"), default="garrison",
-                        help="select the frozen garrison or verified expansion controller trace")
+    parser.add_argument("--route", choices=("garrison", "expansion", "stock"), default="stock",
+                        help="select the frozen garrison, expansion, or stock-economy controller trace")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        trace_path = args.trace or (DEFAULT_EXPANSION_TRACE
-                                    if args.route == "expansion" else DEFAULT_TRACE)
+        trace_path = args.trace or ({"garrison": DEFAULT_TRACE,
+                                     "expansion": DEFAULT_EXPANSION_TRACE,
+                                     "stock": DEFAULT_STOCK_TRACE}[args.route])
         run(trace_path, args.output, args.rom, args.elf, args.ticks, args.save_at_end, args.route)
     except (OSError, ValueError, RuntimeError, KeyError, json.JSONDecodeError,
             subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:

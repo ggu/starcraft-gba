@@ -14,7 +14,7 @@ typedef struct { unsigned long tick; int screen, frame, won, lost, elapsed, flag
     int side_units, enemy_units, side_buildings, enemy_buildings; } RaceCheckpoint;
 static RaceInputEvent race_events[32768];
 static RaceCheckpoint race_checkpoints[128];
-static int race_event_count, race_checkpoint_count;
+static int race_event_count, race_checkpoint_count, race_event_overflow;
 static const char *race_trace_path;
 static int side_drone(void);
 static int side_hunters_near(int x, int y, int radius);
@@ -61,8 +61,9 @@ static void race_trace_save(void)
     FILE *f;
     int i;
     if (!race_trace_path || !(f = fopen(race_trace_path, "w"))) return;
-    fprintf(f, "{\"total_ticks\":%lu,\"target_race\":%d,\"mode\":%d,\"mission\":%d,\"race_human\":%d,\"race_mode\":%d,\"race_selected_mission\":%d,\"race_completed\":%d,\"events\":[",
-            controller_ticks, race_human, race_mode, race_campaign.mission,
+    fprintf(f, "{\"total_ticks\":%lu,\"event_overflow\":%d,\"target_race\":%d,\"mode\":%d,\"mission\":%d,\"race_human\":%d,\"race_mode\":%d,\"race_selected_mission\":%d,\"race_completed\":%d,\"events\":[",
+            controller_ticks, race_event_overflow,
+            race_human, race_mode, race_campaign.mission,
             race_human, race_mode, race_selected_mission, race_completed);
     for (i = 0; i < race_event_count; ++i)
         fprintf(f, "%s{\"tick\":%lu,\"held\":%u}", i ? "," : "", race_events[i].tick, race_events[i].held);
@@ -89,9 +90,13 @@ static void race_trace_save(void)
 
 static void controller_frame(u16 held)
 {
-    if (held != controller_previous && race_event_count < (int)(sizeof(race_events)/sizeof(race_events[0]))) {
-        race_events[race_event_count].tick = controller_ticks;
-        race_events[race_event_count++].held = held;
+    if (held != controller_previous) {
+        if (race_event_count < (int)(sizeof(race_events)/sizeof(race_events[0]))) {
+            race_events[race_event_count].tick = controller_ticks;
+            race_events[race_event_count++].held = held;
+        } else {
+            race_event_overflow = 1;
+        }
     }
     game_update(held, held & (u16)~controller_previous);
     controller_previous = held;
@@ -118,6 +123,171 @@ static void controller_cursor(int x, int y)
     }
     controller_frame(0);
     if (guard >= 3000) fprintf(stderr, "cursor guard target=%d,%d actual=%d,%d\n",x,y,cx,cy);
+}
+
+/* Follow a moving worker with ordinary cursor input, then verify the UI
+ * selected the requested live slot. A one-time cursor target can go stale
+ * while the worker walks its previous order. */
+static int controller_select_worker(int worker)
+{
+    int steps = 0;
+    if (worker < 0 || worker >= MAX_UNITS || !u[worker].alive ||
+        u[worker].owner != SIDE || !sc64_race_is_worker(u[worker].type)) return 0;
+    /* Click as close as the four-pixel cursor step allows so a nearby unit
+     * cannot consume A before the moving worker. */
+    while (u[worker].alive && dist2(cx, cy, u[worker].x, u[worker].y) > 2 * 2 + 2 * 2 &&
+           screen == SCREEN_PLAY && !won && !lost && steps++ < 120) {
+        u16 held = KEY_R;
+        if (cx < u[worker].x) held |= KEY_RIGHT;
+        if (cx > u[worker].x) held |= KEY_LEFT;
+        if (cy < u[worker].y) held |= KEY_DOWN;
+        if (cy > u[worker].y) held |= KEY_UP;
+        controller_frame(held);
+    }
+    if (!u[worker].alive || dist2(cx, cy, u[worker].x, u[worker].y) > 2 * 2 + 2 * 2)
+        return 0;
+    controller_press(KEY_A);
+    return selected_building < 0 && u[worker].selected && selected_count() == 1;
+}
+
+static int controller_select_actor(int actor)
+{
+    static const int offsets[][2] = {{0,0},{-8,0},{8,0},{0,-8},{0,8},
+                                    {-8,-8},{8,-8},{-8,8},{8,8}};
+    int i;
+    if (actor < 0 || actor >= MAX_UNITS || !u[actor].alive ||
+        u[actor].owner != SIDE) return 0;
+    for (i = 0; i < (int)(sizeof(offsets)/sizeof(offsets[0])); ++i) {
+        controller_cursor(u[actor].x + offsets[i][0], u[actor].y + offsets[i][1]);
+        controller_press(KEY_A);
+        if (selected_building < 0 && u[actor].selected && selected_count() == 1) return 1;
+    }
+    return 0;
+}
+
+static int controller_train_at_building(int building, int count)
+{
+    int attempt, n;
+    static const int offsets[][2] = {{0,0},{-16,0},{16,0},{0,-16},{0,16},
+                                    {-16,-16},{16,-16},{-16,16},{16,16}};
+    if (building < 0 || building >= MAX_BUILDINGS || !building_complete(building) ||
+        b[building].owner != SIDE || count < 1 || count > 5) return 0;
+    for (attempt = 0; attempt < (int)(sizeof(offsets)/sizeof(offsets[0])); ++attempt) {
+        controller_cursor(b[building].x + offsets[attempt][0],
+                          b[building].y + offsets[attempt][1]);
+        controller_press(KEY_A);
+        if (selected_building == building) break;
+    }
+    if (selected_building != building) return 0;
+    for (n = 0; n < count; ++n) controller_press(KEY_A);
+    return b[building].queue_count == count;
+}
+
+static int controller_build_pylon_near(int gateway)
+{
+    int probe = -1, i, slot;
+    static const int offsets[][2] = {{-96,0},{-64,-64},{-64,64},{0,96},
+                                    {0,-96},{96,0},{48,48},{-48,-48}};
+    if (gateway < 0 || gateway >= MAX_BUILDINGS || !b[gateway].alive || minerals < 100)
+        return -1;
+    for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
+        u[i].type == U_PROBE && u[i].order != ORDER_BUILD) { probe = i; break; }
+    if (probe < 0 || !controller_select_actor(probe)) return -1;
+    controller_press(KEY_B);
+    for (i = 0; i < MENU_COUNT && menu_cursor != MENU_DEPOT; ++i)
+        controller_press(KEY_DOWN);
+    if (!menu_open || menu_cursor != MENU_DEPOT) return -1;
+    controller_press(KEY_A);
+    if (mode != MODE_BUILD || menu != B_PYLON) return -1;
+    for (i = 0; i < (int)(sizeof(offsets)/sizeof(offsets[0])); ++i) {
+        int x = b[gateway].x + offsets[i][0], y = b[gateway].y + offsets[i][1];
+        controller_cursor(x, y);
+        controller_press(KEY_A);
+        if (mode == MODE_NORMAL) {
+            for (slot = 0; slot < MAX_BUILDINGS; ++slot) if (b[slot].alive &&
+                b[slot].owner == SIDE && b[slot].type == B_PYLON &&
+                dist2(b[slot].x, b[slot].y, x, y) < 32 * 32) return slot;
+            return -1;
+        }
+    }
+    return -1;
+}
+
+static int controller_p1_reinforce(void)
+{
+    int nexus = -1, gateway = -1, i, probe = -1, pylon;
+    if (race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE) < 2 || minerals < 50)
+        return 0;
+    for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == SIDE &&
+        building_complete(i)) {
+        if (b[i].type == B_NEXUS && nexus < 0) nexus = i;
+        if (b[i].type == B_GATEWAY && gateway < 0) gateway = i;
+    }
+    if (nexus < 0 || gateway < 0 || !controller_train_at_building(nexus, 1)) return 0;
+    for (i = 0; i < 700 && screen == SCREEN_PLAY && !won && !lost && b[nexus].queue_count;
+         ++i) controller_frame(0);
+    for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
+        u[i].type == U_PROBE && u[i].order != ORDER_BUILD) { probe = i; break; }
+    if (probe < 0) return 0;
+    pylon = controller_build_pylon_near(gateway);
+    if (pylon < 0) return 0;
+    for (i = 0; i < 1800 && screen == SCREEN_PLAY && !won && !lost &&
+         b[pylon].under_construction; ++i) controller_frame(0);
+    if (!building_complete(pylon) || !race_site_powered(SIDE, b[gateway].x, b[gateway].y) ||
+        race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE) < 4 || minerals < 100 ||
+        !controller_train_at_building(gateway, 1)) return 0;
+    for (i = 0; i < 900 && screen == SCREEN_PLAY && !won && !lost && b[gateway].queue_count;
+         ++i) controller_frame(0);
+    return b[gateway].queue_count == 0;
+}
+
+/* Use an ordinary L-button drag to select the combat force while excluding
+ * the protected objective actor. Geometry is read from live units solely to
+ * place the cursor; selection and orders still go through game_update(). */
+static int controller_select_combat_except(int excluded)
+{
+    int i, steps = 0, left = WORLD_W, top = WORLD_H, right = -1, bottom = -1;
+    int max_steps = WORLD_W + WORLD_H + 8;
+    for (i = 0; i < MAX_UNITS; ++i) if (i != excluded && u[i].alive &&
+        u[i].owner == SIDE && !sc64_race_is_worker(u[i].type)) {
+        if (u[i].x < left) left = u[i].x;
+        if (u[i].x > right) right = u[i].x;
+        if (u[i].y < top) top = u[i].y;
+        if (u[i].y > bottom) bottom = u[i].y;
+    }
+    if (right < left || bottom < top) return 0;
+    left = left > 8 ? left - 8 : 0;
+    top = top > 8 ? top - 8 : 0;
+    right = right + 8 < WORLD_W ? right + 8 : WORLD_W - 1;
+    bottom = bottom + 8 < WORLD_H ? bottom + 8 : WORLD_H - 1;
+    controller_cursor(left, top);
+    if (screen != SCREEN_PLAY || won || lost || abs(cx - left) > 3 || abs(cy - top) > 3)
+        return 0;
+    controller_frame(KEY_L);
+    while (cx < right || cy < bottom) {
+        u16 held = KEY_L;
+        int old_x = cx, old_y = cy;
+        if (screen != SCREEN_PLAY || won || lost || steps++ >= max_steps) {
+            controller_frame(0);
+            return 0;
+        }
+        if (cx < right) held |= KEY_RIGHT;
+        if (cy < bottom) held |= KEY_DOWN;
+        controller_frame(held);
+        if (cx == old_x && cy == old_y && (cx < right || cy < bottom)) {
+            controller_frame(0);
+            return 0;
+        }
+    }
+    controller_frame(0);
+    if (screen != SCREEN_PLAY || won || lost || abs(cx - right) > 3 || abs(cy - bottom) > 3)
+        return 0;
+    if (selected_count() <= 1 || (excluded >= 0 && excluded < MAX_UNITS && u[excluded].selected))
+        fprintf(stderr, "P1 box bounds=%d,%d..%d,%d anchor=%d,%d end=%d,%d state=%d cursor=%d,%d selected=%d excluded=%d\n",
+                left, top, right, bottom, box_anchor_x, box_anchor_y,
+                box_end_x, box_end_y, box_state, cx, cy, selected_count(), excluded);
+    return selected_count() > 0 &&
+           (excluded < 0 || excluded >= MAX_UNITS || !u[excluded].selected);
 }
 
 static int controller_attack(int x, int y, int max_ticks)
@@ -162,9 +332,9 @@ static int controller_move_selected(int x, int y)
 
 static int controller_mission(int mission)
 {
-    int i, target = -1;
+    int i, target = -1, p1_fenix_parked = 0, p1_reinforcement_attempted = 0;
     controller_previous = 0; controller_ticks = 0;
-    race_event_count = 0; race_checkpoint_count = 0;
+    race_event_count = 0; race_checkpoint_count = 0; race_event_overflow = 0;
     game_init();
     /* HOME → CAMPAIGN; choose the mission's faction, then mission and briefing. */
     controller_press(KEY_A);
@@ -224,26 +394,23 @@ static int controller_mission(int mission)
         if (c >= MAX_UNITS || !u[c].alive || drone < 0) return 0;
         for (i = 0; i < MAX_UNITS; ++i)
             if (i != drone && u[i].alive && u[i].owner == SIDE && u[i].type == U_DRONE) { other_drone = i; break; }
-        /* Clear the source map's tightly packed combat group and second
-         * Drone from the primary carrier's path before starting the escort. */
+        /* Keep the opening combat group near the carrier so it can serve as
+         * an actual escort; moving it to the old staging waypoint left the
+         * Drone exposed on the long source route. */
         controller_press(KEY_R);
-        if (selected_count() && !controller_move_selected(600,500)) return 0;
         if (other_drone >= 0) {
-            for (guard = 0; guard < 12 && !u[other_drone].selected; ++guard) {
-                controller_cursor(u[other_drone].x, u[other_drone].y);
-                controller_press(KEY_A);
-            }
-            if (u[other_drone].selected) {
+            if (controller_select_worker(other_drone)) {
                 if (!controller_move_selected(440,360)) return 0;
                 for (i = 0; i < 2000 && screen == SCREEN_PLAY && !lost &&
                      dist2(u[other_drone].x,u[other_drone].y,440,360) > 20*20; ++i) controller_frame(0);
             }
         }
-        for (guard = 0; guard < 12 && !u[drone].selected; ++guard) {
-            controller_cursor(u[drone].x, u[drone].y);
-            controller_press(KEY_A);
+        if (!controller_select_worker(drone)) {
+            fprintf(stderr, "Z2 carrier selection failed: drone=%d alive=%d owner=%d pos=%d,%d cursor=%d,%d order=%d selected=%d building=%d\n",
+                    drone, u[drone].alive, u[drone].owner, u[drone].x, u[drone].y,
+                    cx, cy, u[drone].order, u[drone].selected, selected_building);
+            return 0;
         }
-        if (!u[drone].selected) return 0;
         for (guard = 0; guard < (int)(sizeof(pickup_route)/sizeof(pickup_route[0])) &&
              race_campaign.carrier_unit >= MAX_UNITS; ++guard) {
             if (!controller_move_selected(pickup_route[guard][0],pickup_route[guard][1])) return 0;
@@ -258,11 +425,12 @@ static int controller_mission(int mission)
             int carrier = race_campaign.carrier_unit;
             controller_press(KEY_R);
             if (!controller_attack_order(escort_route[guard][0],escort_route[guard][1])) return 0;
-            for (i = 0; i < 12 && !u[carrier].selected; ++i) {
-                controller_cursor(u[carrier].x,u[carrier].y);
-                controller_press(KEY_A);
+            if (!controller_select_worker(carrier)) {
+                fprintf(stderr, "Z2 carrier selection failed: drone=%d alive=%d owner=%d pos=%d,%d cursor=%d,%d order=%d selected=%d building=%d\n",
+                        carrier, u[carrier].alive, u[carrier].owner, u[carrier].x, u[carrier].y,
+                        cx, cy, u[carrier].order, u[carrier].selected, selected_building);
+                return 0;
             }
-            if (!u[carrier].alive || !u[carrier].selected) return 0;
             if (!controller_move_selected(escort_route[guard][2],escort_route[guard][3])) return 0;
             for (i = 0; i < 20000 && race_campaign.carrier_unit < MAX_UNITS &&
                  screen == SCREEN_PLAY && !won && !lost &&
@@ -275,6 +443,14 @@ static int controller_mission(int mission)
                         u[carrier].path_x, u[carrier].path_y, u[carrier].path_retry, u[carrier].path_timer,
                         u[c].x, u[c].y,
                         side_hunters_near(escort_route[guard][0],escort_route[guard][1],96));
+                for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == ENEMY &&
+                    dist2(u[j].x,u[j].y,u[c].x,u[c].y) < 180*180)
+                    fprintf(stderr, "  nearby enemy slot=%d type=%d at=%d,%d hp=%d\n",
+                            j,u[j].type,u[j].x,u[j].y,u[j].hp);
+                for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
+                    u[j].type == U_HUNTER_KILLER)
+                    fprintf(stderr, "  escort slot=%d at=%d,%d order=%d target=%d,%d hp=%d\n",
+                            j,u[j].x,u[j].y,u[j].order,u[j].tx,u[j].ty,u[j].hp);
                 break;
             }
         }
@@ -290,8 +466,11 @@ static int controller_mission(int mission)
         return won && !lost;
     }
     if (mission == SC64_RACE_MISSION_P1) {
+        int fenix = race_campaign.rescue_unit;
         /* Original setup places the player force opposite Antioch. Route it
-         * into the marked Rescue Passive base before crossing toward Zerg. */
+         * into the marked Rescue Passive base before crossing toward Zerg.
+         * Park Fenix at the captured base before the assault to protect the
+         * source survival objective. */
         controller_press(KEY_R);
         if (!controller_move_selected(504, 1024)) return 0;
         for (i = 0; i < 30000 && screen == SCREEN_PLAY && !won && !lost; ++i) {
@@ -302,19 +481,38 @@ static int controller_mission(int mission)
                     b[k].y >= 848 && b[k].y <= 1200) ++remaining;
             if (remaining == 0 && u[race_campaign.rescue_unit].owner == SIDE) break;
         }
+        if (fenix >= MAX_UNITS || !u[fenix].alive || u[fenix].owner != SIDE ||
+            !controller_select_actor(fenix) || !controller_move_selected(780, 1180)) return 0;
+        for (i = 0; i < 3000 && screen == SCREEN_PLAY && !won && !lost &&
+             dist2(u[fenix].x, u[fenix].y, 780, 1180) > 24 * 24; ++i) controller_frame(0);
+        if (!u[fenix].alive || dist2(u[fenix].x, u[fenix].y, 780, 1180) > 24 * 24 ||
+            !controller_select_combat_except(fenix)) return 0;
+        p1_fenix_parked = 1;
     }
     /* For the destruction missions, choose the closest extant enemy
      * structure to the surviving force and reissue a controller attack order
      * while it remains. State reads only select a route goal. */
     for (i = 0; i < 100 && screen == SCREEN_PLAY && !won && !lost; ++i) {
         int j, k, closest = 0x7fffffff, alive_force = 0;
+        int protected_actor = mission == SC64_RACE_MISSION_P1 && p1_fenix_parked ?
+                              (int)race_campaign.rescue_unit : -1;
+        if (mission == SC64_RACE_MISSION_P1 && !p1_reinforcement_attempted &&
+            race_owner_supply_cap(SIDE) - race_owner_reserved_supply(SIDE) >= 2 && minerals >= 50) {
+            int reinforced;
+            p1_reinforcement_attempted = 1;
+            reinforced = controller_p1_reinforce();
+            if (reinforced) fprintf(stderr, "P1 ordinary Nexus/Probe/Pylon/Gateway reinforcement completed at tick %lu\n",
+                                    controller_ticks);
+            if (!controller_select_combat_except(protected_actor)) return 0;
+        }
         for (j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
-            !sc64_race_is_worker(u[j].type)) ++alive_force;
+            j != protected_actor && !sc64_race_is_worker(u[j].type)) ++alive_force;
         if (!alive_force) break;
         target = -1;
         for (j = 0; j < MAX_BUILDINGS; ++j) if (b[j].alive && b[j].owner == ENEMY) {
             int d = 0x7fffffff;
-            for (k = 0; k < MAX_UNITS; ++k) if (u[k].alive && u[k].owner == SIDE &&
+            for (k = 0; k < MAX_UNITS; ++k) if (k != protected_actor &&
+                u[k].alive && u[k].owner == SIDE &&
                 !sc64_race_is_worker(u[k].type)) {
                 int q = dist2(u[k].x,u[k].y,b[j].x,b[j].y);
                 if (q < d) d = q;
@@ -322,7 +520,19 @@ static int controller_mission(int mission)
             if (d < closest) { closest = d; target = j; }
         }
         if (target < 0) break;
-        if (!controller_attack(b[target].x, b[target].y, 6000)) return 0;
+        if (mission == SC64_RACE_MISSION_P1) {
+            int attacked = target, wait_ticks;
+            if (!controller_attack_order(b[attacked].x, b[attacked].y)) {
+                fprintf(stderr, "P1 attack order failed target=%d at=%d,%d mode=%d menu=%d cursor=%d,%d selected=%d ticks=%lu\n",
+                        attacked, b[attacked].x, b[attacked].y, mode,
+                        menu_open, cx, cy, selected_count(), controller_ticks);
+                return 0;
+            }
+            for (wait_ticks = 0; wait_ticks < 6000 && screen == SCREEN_PLAY && !won && !lost &&
+                 b[attacked].alive; ++wait_ticks) {
+                controller_frame(0);
+            }
+        } else if (!controller_attack(b[target].x, b[target].y, 6000)) return 0;
     }
     return won && !lost;
 }
@@ -390,11 +600,18 @@ main(int argc, char **argv)
 {
     int i, c, f, actor;
     if ((argc == 3 || argc == 5) && strcmp(argv[1], "--controller") == 0) {
-        int mission = atoi(argv[2]);
+        int mission = atoi(argv[2]), controller_result;
         if (mission < 0 || mission >= 4) return 64;
         if (argc == 5 && strcmp(argv[3], "--trace") != 0) return 64;
         race_trace_path = argc == 5 ? argv[4] : NULL;
-        if (!controller_mission(mission)) {
+        controller_result = controller_mission(mission);
+        if (race_event_overflow) {
+            race_trace_save();
+            fprintf(stderr, "Controller trace input event overflow for mission %d (capacity=%lu).\n",
+                    mission, (unsigned long)(sizeof(race_events)/sizeof(race_events[0])));
+            return 65;
+        }
+        if (!controller_result) {
             race_trace_save();
             int i, side_units = 0, enemy_buildings = 0;
             for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE) ++side_units;
@@ -421,6 +638,19 @@ main(int argc, char **argv)
                     fprintf(stderr," %d/t%d@%d,%d o%d",j,u[j].type,u[j].x,u[j].y,u[j].order);
                 fputc('\n',stderr);
             }
+            if (mission == SC64_RACE_MISSION_P1) {
+                for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == SIDE)
+                    fprintf(stderr, "P1 surviving side building slot=%d type=%d at=%d,%d complete=%d under=%d progress=%d queue=%d powered=%d\n",
+                            i,b[i].type,b[i].x,b[i].y,building_complete(i),b[i].under_construction,
+                            b[i].build_progress,b[i].queue_count,
+                            b[i].type == B_GATEWAY ? race_site_powered(SIDE,b[i].x,b[i].y) : 0);
+                for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == ENEMY)
+                    fprintf(stderr, "P1 remaining enemy building slot=%d type=%d raw=%d at=%d,%d hp=%d\n",
+                            i,b[i].type,b[i].raw_type,b[i].x,b[i].y,b[i].hp);
+                for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE)
+                    fprintf(stderr, "P1 surviving side unit slot=%d type=%d at=%d,%d hp=%d/%d order=%d target=%d,%d selected=%d\n",
+                            i,u[i].type,u[i].x,u[i].y,u[i].hp,u[i].maxhp,u[i].order,u[i].tx,u[i].ty,u[i].selected);
+            }
             return 20 + mission;
         }
         race_trace_save();
@@ -428,12 +658,19 @@ main(int argc, char **argv)
         return 0;
     }
     if (argc == 2 && strcmp(argv[1], "--controller-all") == 0) {
-        for (i = 0; i < 4; ++i)
-            if (!controller_mission(i)) {
+        for (i = 0; i < 4; ++i) {
+            int controller_result = controller_mission(i);
+            if (race_event_overflow) {
+                fprintf(stderr, "Controller input event overflow for mission %d (capacity=%lu).\n",
+                        i, (unsigned long)(sizeof(race_events)/sizeof(race_events[0])));
+                return 65;
+            }
+            if (!controller_result) {
                 fprintf(stderr, "Controller route did not complete mission %d (ticks=%lu, won=%d, lost=%d, phase=%d).\n",
                         i, controller_ticks, won, lost, race_campaign.phase);
                 return 20 + i;
             }
+        }
         puts("Controller completed all four race missions.");
         return 0;
     }

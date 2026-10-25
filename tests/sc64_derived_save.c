@@ -13,7 +13,8 @@ typedef struct { int hp; } Sc64SyntheticRule;
 static Sc64SyntheticRule sc64_race_unit_rules[SC_RU_COUNT];
 static Sc64SyntheticRule sc64_race_building_rules[SC_RB_COUNT];
 static int sc64_zp_actor_default_hp(int type) { (void)type; return 0; }
-static int sc64_zp_building_default_hp(int type) { (void)type; return 0; }
+static int sc64_race_building_max_hp(int type)
+{ return type == 63 ? 100000 : sc64_race_building_rules[type].hp; }
 static int sc64_race_unit_armor(int type) { return type % 11; }
 typedef struct {
   int x,y,hp,owner,type,alive,selected,cd,order,tx,ty,carry,build;

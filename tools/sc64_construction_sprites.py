@@ -16,7 +16,7 @@ from typing import Any, Callable, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from tools.sc64_construction_programs import compile_primary_frame_stream  # noqa: E402
+from tools.sc64_construction_programs import compile_source_layers  # noqa: E402
 
 UPSTREAM = ROOT / "references/sc64-maps/extract_sc64_maps.py"
 ROM_DEFAULT = ROOT / ".local/sc64/rom/StarCraft64-USA.z64"
@@ -38,10 +38,17 @@ IMAGE_COUNT = 999
 BUILDINGS = {
     "Command Center": ("terran", 106), "Supply Depot": ("terran", 109),
     "Refinery": ("terran", 110), "Barracks": ("terran", 111),
-    "Academy": ("terran", 112), "Starport": ("terran", 114),
+    "Academy": ("terran", 112), "Factory": ("terran", 113),
+    "Starport": ("terran", 114), "Engineering Bay": ("terran", 122),
+    "Comsat Station": ("terran", 107), "Nuclear Silo": ("terran", 108),
+    "Control Tower": ("terran", 115), "Science Facility": ("terran", 116),
+    "Covert Ops": ("terran", 117), "Physics Lab": ("terran", 118),
+    "Machine Shop": ("terran", 120), "Armory": ("terran", 123),
     "Missile Turret": ("terran", 124), "Bunker": ("terran", 125),
     "Hatchery": ("zerg", 131), "Lair": ("zerg", 132),
-    "Hive": ("zerg", 133), "Hydralisk Den": ("zerg", 135),
+    "Hive": ("zerg", 133), "Nydus Canal": ("zerg", 134),
+    "Defiler Mound": ("zerg", 136), "Queens Nest": ("zerg", 138),
+    "Ultralisk Cavern": ("zerg", 140), "Hydralisk Den": ("zerg", 135),
     "Evolution Chamber": ("zerg", 139), "Spire": ("zerg", 141),
     "Spawning Pool": ("zerg", 142), "Creep Colony": ("zerg", 143),
     "Spore Colony": ("zerg", 144), "Sunken Colony": ("zerg", 146),
@@ -82,6 +89,8 @@ OP_FORMATS = (
 )
 IMAGE_REFERENCE_OPS = {8, 9, 10, 11, 13, 14, 61}
 CONSTRUCTION_ANIMATION_IDS = (0, 13, 14, 15)
+GAS_OVERLAY_ACTIVE_BASE = 430
+GAS_OVERLAY_DEPLETED_BASE = 435
 
 def load_sprites(path: Path):
     spec = importlib.util.spec_from_file_location("sc64_sprites", path)
@@ -239,7 +248,7 @@ def select_images(
     def add(image_id: int, race: str, building: str, role: str) -> None:
         if not image_id:
             return
-        if image_id >= IMAGE_COUNT:
+        if image_id < 0 or image_id >= IMAGE_COUNT:
             raise ValueError(f"{building}: image id {image_id} out of range")
         grp_index = image_grp[image_id]
         if not grp_index:
@@ -263,6 +272,10 @@ def select_images(
             for opcode, args in animation_instructions(script_payload, starts[animation]):
                 if opcode == 61:  # imgulnextid: implicit image_id + 1; args are x/y
                     refs.append(image_id + 1)
+                elif opcode == 56:  # active/depleted variants selected by resource count
+                    selector = args[0] - 256 if args[0] > 127 else args[0]
+                    refs.extend((GAS_OVERLAY_ACTIVE_BASE + selector,
+                                 GAS_OVERLAY_DEPLETED_BASE + selector))
                 elif opcode in IMAGE_REFERENCE_OPS and args and isinstance(args[0], int):
                     refs.append(args[0])
         return refs
@@ -286,11 +299,27 @@ def select_images(
         if race == "protoss":
             for image_id in direct_refs(normal_image, {"WarpIn"}):
                 add(image_id, race, building, "warp_in_overlay")
+    # Imported image layers can themselves spawn Init overlays. Follow that
+    # bounded image graph so every referenced GRP can be rendered at runtime.
+    pending = list(selected)
+    visited: set[int] = set()
+    while pending:
+        image_id = pending.pop()
+        if image_id in visited:
+            continue
+        visited.add(image_id)
+        item = selected[image_id]
+        for ref in direct_refs(image_id, {"Init"}):
+            if ref not in selected:
+                add(ref, item["race"], item["buildings"][0], "nested_overlay")
+                pending.append(ref)
+        if len(selected) > 256:
+            raise ValueError("construction overlay image graph exceeds 256 images")
     return dict(sorted(selected.items()))
 
 
 def source_stage_inputs(tables: tuple[list[int], ...], payload: bytes) -> list[dict[str, Any]]:
-    """Return source-backed image/script starts for the supported T/Z stages."""
+    """Return source-backed T/Z construction and Protoss WarpIn starts."""
     unit_flingy, construction, flingy_sprite, sprite_image, _image_grp, image_iscript = tables
     scripts = script_index(payload)
     morph_targets = {132, 133, 137, 144, 146}
@@ -315,7 +344,26 @@ def source_stage_inputs(tables: tuple[list[int], ...], payload: bytes) -> list[d
     stage_inputs = []
     program_buildings = {**BUILDINGS, **MORPH_PROGRAMS}
     for building, (race, unit_id) in program_buildings.items():
-        if race == "protoss" or not construction[unit_id]:
+        if race == "protoss":
+            image_id = unit_image(unit_id)
+            start = animation_start(image_id, "WarpIn")
+            if start is not None:
+                stage_inputs.append({"raw_unit_id": unit_id, "building": building,
+                                     "race": race, "stage": 0,
+                                     "image_id": image_id, "animation": "WarpIn",
+                                     "start": start})
+            continue
+        if not construction[unit_id]:
+            if race != "terran":
+                continue
+            normal_image = unit_image(unit_id)
+            start = animation_start(normal_image, "AlmostBuilt")
+            if start is not None:
+                for stage in range(4):
+                    stage_inputs.append({"raw_unit_id": unit_id, "building": building,
+                                         "race": race, "stage": stage,
+                                         "image_id": normal_image, "animation": "AlmostBuilt",
+                                         "start": start})
             continue
         construction_image = construction[unit_id]
         normal_image = unit_image(unit_id) if race == "terran" else 0
@@ -337,6 +385,75 @@ def source_stage_inputs(tables: tuple[list[int], ...], payload: bytes) -> list[d
                                      "image_id": image_id, "animation": animation,
                                      "start": start})
     return stage_inputs
+
+
+def audit_construction_flipstate(payload: bytes,
+                                 stage_inputs: Sequence[dict[str, Any]],
+                                 animation_starts: dict[tuple[int, str], int],
+                                 sprite_image: Sequence[int]) -> dict[str, int]:
+    """Visit both fallthrough and branch paths, rejecting setflipstate.
+
+    followmaingraphic inherits its parent frame/flip in the runtime. This audit
+    proves that selected construction timelines do not also mutate the primary
+    flip state independently.
+    """
+    seen_animations: set[tuple[int, str, int]] = set()
+    instructions_seen = 0
+
+    def scan(image_id: int, animation: str, start: int, depth: int) -> None:
+        nonlocal instructions_seen
+        key = (image_id, animation, start)
+        if key in seen_animations:
+            return
+        if depth > 3:
+            raise ValueError("construction animation overlay depth exceeds audit limit")
+        seen_animations.add(key)
+        pending = [start]
+        visited: set[int] = set()
+        while pending:
+            pc = pending.pop()
+            for _ in range(512):
+                if pc in visited:
+                    break
+                visited.add(pc)
+                opcode, args, next_pc, jump = decode_instruction(payload, pc)
+                instructions_seen += 1
+                if instructions_seen > 65536:
+                    raise ValueError("construction script audit exceeds instruction bound")
+                if opcode == 23:
+                    raise ValueError(
+                        f"setflipstate (opcode 23) in construction image {image_id} "
+                        f"{animation} at {pc}")
+                child_ids: list[int] = []
+                if opcode in (8, 9, 10, 11, 13, 14):
+                    child_ids.append(args[0])
+                elif opcode == 61:
+                    child_ids.append(image_id + 1)
+                elif opcode == 56:
+                    selector = args[0] - 256 if args[0] > 127 else args[0]
+                    child_ids.extend((GAS_OVERLAY_ACTIVE_BASE + selector,
+                                      GAS_OVERLAY_DEPLETED_BASE + selector))
+                elif opcode in (15, 16, 17, 19, 20, 21):
+                    if not 0 <= args[0] < len(sprite_image):
+                        raise ValueError(f"construction animation sprite {args[0]} out of range")
+                    child_ids.append(sprite_image[args[0]])
+                for child in child_ids:
+                    child_start = animation_starts.get((child, "Init"))
+                    if child_start is not None:
+                        scan(child, "Init", child_start, depth + 1)
+                if opcode == 22:
+                    break
+                if opcode == 7:
+                    pc = jump
+                    continue
+                if jump is not None:
+                    pending.append(jump)
+                pc = next_pc
+
+    for source in stage_inputs:
+        scan(source["image_id"], source["animation"], source["start"], 0)
+    return {"reachable_animation_count": len(seen_animations),
+            "instruction_visits": instructions_seen, "setflipstate_count": 0}
 
 def write_header(path: Path, images: Sequence[dict[str, Any]], remap: bytes,
                  stage_programs: Sequence[dict[str, Any]] = ()) -> None:
@@ -376,14 +493,31 @@ def write_header(path: Path, images: Sequence[dict[str, Any]], remap: bytes,
     for program in stage_programs:
         raw, stage = program["raw_unit_id"], program["stage"]
         symbol = f"sc64_construction_raw_{raw}_stage_{stage}"
-        lines.append(f"static const SC64ConstructionAnimStep {symbol}_steps[] = {{")
-        for step in program["program"]["steps"]:
-            lines.append(f"    {{ {step['frame']}u, {step['duration_source_updates']}u }},")
-        desc = program["program"]
-        lines.extend(["};", f"static const SC64ConstructionAnimDesc {symbol}_animation = {{",
-                      f"    {symbol}_steps, {len(desc['steps'])}u, {desc['loop_start']}u, {desc['frame_count']}u",
-                      "};", f"static const SC64ConstructionSourceStage {symbol} = {{",
-                      f"    {program['image_id']}u, &{symbol}_animation", "};", ""])
+        for layer_index, layer in enumerate(program["program"]["layers"]):
+            layer_symbol = f"{symbol}_layer_{layer_index}"
+            desc = layer["program"]
+            lines.append(f"static const SC64ConstructionAnimStep {layer_symbol}_steps[] = {{")
+            for step in desc["steps"]:
+                lines.append(f"    {{ {step['frame']}u, {step['duration_source_updates']}u }},")
+            lines.extend(["};", f"static const SC64ConstructionAnimDesc {layer_symbol}_animation = {{",
+                          f"    {layer_symbol}_steps, {len(desc['steps'])}u, {desc['loop_start']}u, {desc['frame_count']}u", "};"])
+            if layer["gas_overlay_requests"]:
+                lines.append(f"static const SC64ConstructionGasOverlayRequest {layer_symbol}_gas_requests[] = {{")
+                lines.extend(f"    {{ {request['selector']}, {request['start_source_updates']}u }},"
+                             for request in layer["gas_overlay_requests"])
+                lines.append("};")
+        lines.append(f"static const SC64ConstructionSourceLayer {symbol}_layers[] = {{")
+        for layer_index, layer in enumerate(program["program"]["layers"]):
+            gas_ptr = (f"{symbol}_layer_{layer_index}_gas_requests"
+                       if layer["gas_overlay_requests"] else "(const SC64ConstructionGasOverlayRequest *)0")
+            lines.append(f"    {{ {layer['image_id']}u, {layer['x_offset']}, {layer['y_offset']}, "
+                         f"{layer['start_source_updates']}u, {int(layer['under'])}u, "
+                         f"{int(layer['follows_main_graphic'])}u, "
+                         f"{len(layer['gas_overlay_requests'])}u, {gas_ptr}, "
+                         f"&{symbol}_layer_{layer_index}_animation }},")
+        lines.extend(["};", f"static const SC64ConstructionSourceStage {symbol} = {{",
+                      f"    {program['image_id']}u, &{symbol}_layer_0_animation, "
+                      f"{symbol}_layers, {len(program['program']['layers'])}u", "};", ""])
     lines.extend(["static inline unsigned short sc64_construction_image_frame_count(unsigned short image_id) {", "    switch (image_id) {"])
     for image in images:
         iid = image["image_id"]
@@ -457,16 +591,26 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path,
         output.append({**item, "grp_sha1": hashlib.sha1(grp_data).hexdigest(),
                        "frame_count": len(grp["frames"]), "frames": grp["frames"]})
     frame_counts = {image["image_id"]: image["frame_count"] for image in output}
+    image_iscript = table_data[5]
+    script_offsets = script_index(script_data)
+    animation_starts: dict[tuple[int, str], int] = {}
+    for image_id, script_id in enumerate(image_iscript):
+        if script_id in script_offsets:
+            for name, start in image_animation_starts(script_data, script_offsets[script_id]).items():
+                animation_starts[(image_id, name)] = start
+    flip_audit = audit_construction_flipstate(
+        script_data, stage_inputs, animation_starts, table_data[3])
     stage_programs = []
-    rejected_stages = []
     for stage_input in stage_inputs:
         try:
-            compiled = compile_primary_frame_stream(
-                script_data, stage_input["start"], frame_counts[stage_input["image_id"]], 0)
+            compiled_layers = compile_source_layers(
+                script_data, {stage_input["image_id"]: stage_input["start"]},
+                stage_input["image_id"], decode_instruction, table_data[3],
+                animation_starts, frame_counts)
         except (ValueError, KeyError) as exc:
-            rejected_stages.append({**stage_input, "reason": str(exc)})
-            continue
-        stage_programs.append({**stage_input, "program": compiled})
+            raise ValueError(f"{stage_input['building']} {stage_input['animation']} "
+                             f"(image {stage_input['image_id']}): {exc}") from exc
+        stage_programs.append({**stage_input, "program": {"layers": compiled_layers}})
     write_header(header_path, output, remap, stage_programs)
     manifest = {
         "generator": {
@@ -489,10 +633,20 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path,
             "construction_images": "units.dat construction_animation column",
             "construction_animations": ["Init", "SpecialState1", "SpecialState2", "AlmostBuilt"],
             "protoss_warp_overlay_scan": "direct image references in completed structure WarpIn only",
-            "iscript_walk": "linear and unconditional goto; conditional branches and calls are not expanded",
-            "runtime_stage_races": ["terran", "zerg"],
+            "iscript_walk": "linear and unconditional goto; randwait uses midpoint; conditional branches and calls are not expanded",
+            "iscript_layer_walk": "bounded imgol/imgul and sprite overlay Init recursion; followmaingraphic is emitted as a parent frame/flip link; move is skipped for static images; creategasoverlays (opcode 56) stores timed selectors with active/depleted image variants",
+            "gas_overlay_requests": sum(len(layer["gas_overlay_requests"])
+                                         for stage in stage_programs
+                                         for layer in stage["program"]["layers"]),
+            "gas_overlay_image_bases": {
+                "resource_nonzero": GAS_OVERLAY_ACTIVE_BASE,
+                "resource_zero": GAS_OVERLAY_DEPLETED_BASE,
+            },
+            "construction_setflipstate_audit": flip_audit,
+            "runtime_stage_races": ["terran", "zerg", "protoss"],
             "zerg_initial_special_state1_raw_types": [132, 133, 137, 144, 146],
-            "protoss_runtime_stages": "not emitted; source banks retained for follow-up",
+            "protoss_runtime_stages": "normal structure WarpIn animation at stage 0, including spawned layers",
+            "terran_missing_construction_image": "normal AlmostBuilt animation used for all four progress slots",
         },
         "palette": {"bolt_path": "00B/004", "sha256": hashlib.sha256(palette).hexdigest(),
                     "remap_sha256": hashlib.sha256(remap).hexdigest()},
@@ -505,13 +659,13 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path,
         "stages": [{"raw_unit_id": stage["raw_unit_id"], "building": stage["building"],
                     "race": stage["race"], "stage": stage["stage"],
                     "animation": stage["animation"], "image_id": stage["image_id"],
-                    "frame_count": stage["program"]["frame_count"],
-                    "step_count": len(stage["program"]["steps"]),
-                    "loop_start": stage["program"]["loop_start"],
-                    "omitted_layers": stage["program"]["omitted_layers"],
-                    "signals": stage["program"]["signals"]} for stage in stage_programs],
-        "rejected_stages": [{key: value for key, value in item.items() if key != "start"}
-                            for item in rejected_stages],
+                    "frame_count": stage["program"]["layers"][0]["program"]["frame_count"],
+                    "step_count": len(stage["program"]["layers"][0]["program"]["steps"]),
+                    "loop_start": stage["program"]["layers"][0]["program"]["loop_start"],
+                    "layers": [{key: layer[key] for key in
+                                ("image_id", "x_offset", "y_offset", "start_source_updates", "under",
+                                 "follows_main_graphic", "gas_overlay_requests")}
+                               for layer in stage["program"]["layers"]]} for stage in stage_programs],
         "generated_header": str(header_path),
     }
     out_dir.mkdir(parents=True, exist_ok=True)

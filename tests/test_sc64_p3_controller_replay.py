@@ -44,6 +44,41 @@ def valid_expansion_trace():
             "policy": replay.EXPANSION_POLICY, "events": rows}
 
 
+def valid_stock_trace():
+    """Synthetic bounded fixture matching the authenticated stock route's facts."""
+    rows = []
+    previous = 0
+    input_ticks = list(range(1, 8))
+    input_ticks.extend(8 + ((n - 8) * (59667 - 8)) // (2999 - 8)
+                       for n in range(8, 3000))
+    for index, tick in enumerate(input_ticks):
+        held = (index & 1) + 1 if (index & 1) == 0 else 0
+        # Alternate valid press/release transitions. Keep the recorded menu
+        # prefix exactly equal to the authenticated stock trace.
+        if index < len(replay.STOCK_OPENING_INPUTS):
+            tick, held = replay.STOCK_OPENING_INPUTS[index]
+        pressed = held & ~previous
+        rows.append({"kind": "input", "host_tick": tick, "held": held, "pressed": pressed})
+        previous = held
+        if index == len(replay.STOCK_OPENING_INPUTS) - 1:
+            rows.append({"kind": "start", **replay.STOCK_EXPECTED_START})
+
+    periodic = []
+    for n in range(1, 60):
+        frame = n * 1000
+        periodic.append({"kind": "periodic", "host_tick": frame + 32,
+                         "frame": frame, "elapsed": frame, "screen": replay.SCREEN_PLAY,
+                         "won": 0, "lost": 0, "p3_outcome": 0,
+                         "p3_model_valid": 1, "campaign_phase": 1,
+                         "objective_flags": 0})
+    rows = rows[:len(replay.STOCK_OPENING_INPUTS) + 1] + sorted(
+        rows[len(replay.STOCK_OPENING_INPUTS) + 1:] + periodic,
+        key=lambda row: row["host_tick"])
+    rows.append({"kind": "won", **replay.STOCK_EXPECTED_FINAL})
+    return {"schema": 1, "mission": replay.MISSION_P3,
+            "policy": replay.STOCK_POLICY, "events": rows}
+
+
 class P3ControllerReplayValidation(unittest.TestCase):
     class DebuggerBytes:
         def __init__(self, data):
@@ -142,8 +177,12 @@ class P3ControllerReplayValidation(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "page exceeds"):
             replay.validate_trace(trace, 3, windowed=True, window_ticks=1000)
 
-    def test_route_cli_is_additive_and_defaults_to_garrison(self):
-        self.assertEqual(replay.build_parser().parse_args([]).route, "garrison")
+    def test_route_cli_defaults_to_stock_and_keeps_frozen_routes_explicit(self):
+        self.assertEqual(replay.build_parser().parse_args([]).route, "stock")
+        self.assertEqual(replay.DEFAULT_STOCK_TRACE,
+                         replay.ROOT / ".local/sc64/p3-controller-stock-asan-win.json")
+        self.assertEqual(replay.build_parser().parse_args(["--route", "garrison"]).route,
+                         "garrison")
         self.assertEqual(replay.build_parser().parse_args(["--route", "expansion"]).route, "expansion")
 
     def test_expansion_route_is_additive_and_matches_its_own_witness(self):
@@ -156,6 +195,56 @@ class P3ControllerReplayValidation(unittest.TestCase):
         # The default remains the original strict garrison contract.
         self.assertEqual(replay.validate_trace(valid_trace(), 4)["final"],
                          valid_trace()["events"][-1])
+
+    def test_stock_route_is_additive_and_uses_its_authenticated_start_and_win(self):
+        trace = valid_stock_trace()
+        plan = replay.validate_trace(trace, 256, route="stock", windowed=True)
+        self.assertEqual(plan["route"], "stock")
+        self.assertEqual(plan["policy"], replay.STOCK_POLICY)
+        self.assertEqual(plan["input_count"], 2999)
+        self.assertEqual(plan["stop_tick"], 60197)
+        self.assertLessEqual(plan["peak_page_transitions"], 256)
+        self.assertEqual(replay.build_parser().parse_args(["--route", "stock"]).route, "stock")
+        # Existing frozen routes retain their exact policy and stop ticks.
+        self.assertEqual(replay.validate_trace(valid_trace(), 4)["stop_tick"], 152107)
+        self.assertEqual(replay.validate_trace(valid_expansion_trace(), 6000,
+                                               route="expansion")["stop_tick"], 124689)
+
+    def test_stock_route_rejects_wrong_start_terminal_and_periodic_sequence(self):
+        trace = valid_stock_trace()
+        start = next(row for row in trace["events"] if row["kind"] == "start")
+        start["force2_units"] -= 1
+        with self.assertRaisesRegex(ValueError, "stock start force2_units"):
+            replay.validate_trace(trace, 256, route="stock", windowed=True)
+
+        trace = valid_stock_trace()
+        trace["events"][-1]["primary_objective"] = 0
+        with self.assertRaisesRegex(ValueError, "primary_objective"):
+            replay.validate_trace(trace, 256, route="stock", windowed=True)
+
+        trace = valid_stock_trace()
+        periodic = next(row for row in trace["events"] if row["kind"] == "periodic")
+        periodic["frame"] += 1
+        with self.assertRaisesRegex(ValueError, "live stock-route checkpoint"):
+            replay.validate_trace(trace, 256, route="stock", windowed=True)
+
+    def test_stock_route_reuses_strict_transition_and_page_validation(self):
+        trace = valid_stock_trace()
+        trace["events"][1]["held"] = trace["events"][0]["held"]
+        trace["events"][1]["pressed"] = 0
+        with self.assertRaisesRegex(ValueError, "held-state transition"):
+            replay.validate_trace(trace, 256, route="stock", windowed=True)
+
+        trace = valid_stock_trace()
+        trace["events"][1]["pressed"] = 1
+        with self.assertRaisesRegex(ValueError, "pressed does not match"):
+            replay.validate_trace(trace, 128, route="stock", windowed=True)
+
+        trace = valid_stock_trace()
+        with self.assertRaisesRegex(ValueError, "page exceeds"):
+            replay.validate_trace(trace, 32, route="stock", windowed=True)
+        with self.assertRaisesRegex(ValueError, "queue exceeds"):
+            replay.validate_trace(trace, 128, route="stock", windowed=False)
 
     def test_expansion_rejects_wrong_route_policy_final_and_mission(self):
         trace = valid_expansion_trace()
@@ -315,6 +404,31 @@ class P3ControllerReplayValidation(unittest.TestCase):
             bad[key] = value
             with self.subTest(key=key), self.assertRaisesRegex(RuntimeError, key):
                 replay.verify_final(final, bad, "expansion")
+
+    def test_stock_final_verifier_compares_native_win_state_and_route_witness(self):
+        final = valid_stock_trace()["events"][-1]
+        state = {
+            "screen": replay.SCREEN_RESULT, "frame": 59586, "won": 1, "lost": 0,
+            "side_units": 22, "side_army": 22, "side_buildings": 4,
+            "force2_units": 6, "force2_buildings": 0,
+            "force3_units": 9, "force3_buildings": 0,
+            "minerals": 491, "gas": 1890, "race_completed": 1 << 22,
+            "race_mode": 0, "race_selected_mission": 22,
+            "supply": 88, "supply_cap": 32, "gateways": 1,
+            "zealots_queued": 0, "selected_units": 22,
+            "selected_building": -1, "geyser_count": 3,
+            "race_campaign": {"mission": 22, "elapsed_frames": 59586,
+                              "phase": 3, "objective_flags": 1},
+            "race_p3": {"outcome": 1, "sequence": 5, "fired": 31,
+                        "transmission": 0, "reserved": 0, "action_ticks": 0},
+        }
+        replay.verify_final(final, state, "stock")
+        for key, value in (("side_army", 21), ("selected_units", 21),
+                           ("selected_building", 5), ("geyser_count", 2)):
+            bad = dict(state)
+            bad[key] = value
+            with self.subTest(key=key), self.assertRaisesRegex(RuntimeError, key):
+                replay.verify_final(final, bad, "stock")
 
 
 if __name__ == "__main__":

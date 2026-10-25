@@ -21,6 +21,14 @@ EXPECTED_OP_FORMATS = (
 )
 
 class ImportTests(unittest.TestCase):
+    def test_flip_audit_visits_conditional_branch_targets(self):
+        # op30 has a conditional jump to the setflipstate on the non-fallthrough
+        # path; construction code must not silently lose that visual state.
+        code = bytes((30, 0, 5, 0, 22, 23, 1, 22))
+        source = [{"image_id": 10, "animation": "Init", "start": 0}]
+        with self.assertRaisesRegex(ValueError, "setflipstate"):
+            mod.audit_construction_flipstate(code, source, {(10, "Init"): 0}, [0])
+
     def test_truncated_script_records_fail_closed(self):
         for payload, offset in ((b"SCPE", 0), (b"", 1), (b"SCPE"+bytes(4), -1)):
             with self.subTest(payload=payload, offset=offset), self.assertRaises(ValueError):
@@ -86,6 +94,33 @@ class ImportTests(unittest.TestCase):
         self.assertEqual(by_key[(137, 0)], "SpecialState1")
         self.assertEqual(by_key[(106, 3)], "AlmostBuilt")
 
+    def test_protoss_stage_uses_each_structure_warp_in_animation(self):
+        units = bytearray(228 * 14)
+        flingy = bytearray(209 * 2)
+        sprites = bytearray(517 * 2)
+        images = bytearray(999 * 38)
+        # Nexus and Pylon resolve through their own DAT image chain.
+        for raw, flingy_id, sprite_id, image_id in ((154, 1, 2, 301),
+                                                     (156, 3, 4, 302)):
+            units[raw] = flingy_id
+            struct.pack_into("<H", flingy, flingy_id * 2, sprite_id)
+            struct.pack_into("<H", sprites, sprite_id * 2, image_id)
+            struct.pack_into("<I", images, 999 * 10 + image_id * 4, 1)
+        tables = mod.table_images(bytes(units), bytes(flingy), bytes(sprites), bytes(images))
+
+        # Script id 1 has a WarpIn entry. It is resolved independently for
+        # each normal image, even when the IScript record is shared.
+        payload = bytearray(72)
+        struct.pack_into("<IhHhH", payload, 0, 4, 1, 16, -1, 0)
+        payload[16:20] = b"SCPE"
+        struct.pack_into("<I", payload, 20, 21)
+        struct.pack_into("<H", payload, 24 + 21 * 2, 64)
+        payload[64] = 22
+        stages = mod.source_stage_inputs(tables, bytes(payload))
+        got = {(item["raw_unit_id"], item["image_id"], item["animation"])
+               for item in stages}
+        self.assertEqual(got, {(154, 301, "WarpIn"), (156, 302, "WarpIn")})
+
     def test_header_preserves_frame_geometry_and_bounds_lookup(self):
         frame={"x":2,"y":3,"width":8,"height":9,"frame_width":2,"frame_height":2,
                "pixels":bytes([0]*72),"alpha":bytes([0]*72)}
@@ -94,8 +129,12 @@ class ImportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/"generated.h"
             program = {"raw_unit_id": 10, "stage": 2, "image_id": 44,
-                       "program": {"steps": [{"frame": 1, "duration_source_updates": 3}],
-                                   "loop_start": 0, "frame_count": 2}}
+                       "program": {"layers": [{"image_id": 44, "x_offset": 0,
+                                   "y_offset": 0, "start_source_updates": 0,
+                                   "under": False, "follows_main_graphic": False,
+                                   "gas_overlay_requests": [],
+                                   "program": {"steps": [{"frame": 1, "duration_source_updates": 3}],
+                                               "loop_start": 0, "frame_count": 2}}]}}
             mod.write_header(path,[{"image_id":44,"frames":[frame,frame]}],
                              bytes(range(256)),[program])
             self.assertNotIn('#define SC64_SPRITES_GENERATED_H', path.read_text())

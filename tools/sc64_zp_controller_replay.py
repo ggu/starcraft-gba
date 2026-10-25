@@ -30,27 +30,32 @@ from emulator_smoke import ROOT, capture, symbol_sizes, symbols
 
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_RESULT = 0, 1, 3
 MISSION_BY_PROFILE = {"zerg-z4": 15, "protoss-p4": 23, "zerg-z5": 16,
-                      "zerg-z6": 17, "protoss-p5": 24, "protoss-p6": 25}
+                      "zerg-z6": 17, "zerg-z7": 18,
+                      "protoss-p5": 24, "protoss-p6": 25}
 FACTION_BY_PROFILE = {name: ("zerg" if name.startswith("zerg") else "protoss")
                       for name in MISSION_BY_PROFILE}
 MODEL_TYPES = {"zerg-z4": "Sc64Z4State", "protoss-p4": "Sc64P4State",
                "zerg-z5": "Sc64Z5State", "protoss-p5": "Sc64P5State",
-               "zerg-z6": "Sc64Z6State", "protoss-p6": "Sc64P6State"}
+               "zerg-z6": "Sc64Z6State", "protoss-p6": "Sc64P6State",
+               "zerg-z7": "Sc64Z7State"}
 RUNTIME_TYPES = {"zerg-z4": "Sc64Z4RuntimeState", "protoss-p4": "Sc64P4RuntimeState",
                  "zerg-z5": "Sc64Z5RuntimeState", "protoss-p5": "Sc64P5RuntimeState",
-                 "zerg-z6": "Sc64Z6RuntimeState", "protoss-p6": "Sc64P6RuntimeState"}
+                 "zerg-z6": "Sc64Z6RuntimeState", "protoss-p6": "Sc64P6RuntimeState",
+                 "zerg-z7": "Sc64Z7RuntimeState"}
 PERSISTENT_TYPES = {"zerg-z5": "Sc64Z5PersistentState", "zerg-z6": "Sc64Z6PersistentState", "protoss-p5": "Sc64P5PersistentState",
-                    "protoss-p6": "Sc64P6PersistentState"}
+                    "protoss-p6": "Sc64P6PersistentState",
+                    "zerg-z7": "Sc64Z7PersistentState"}
 RUNTIME_SYMBOLS = {"zerg-z4": "race_z4", "protoss-p4": "race_p4",
                    "zerg-z5": "race_z5", "zerg-z6": "race_z6", "protoss-p5": "race_p5",
-                   "protoss-p6": "race_p6"}
+                   "protoss-p6": "race_p6", "zerg-z7": "race_z7"}
 DEFAULT_TRACE = ROOT / ".local/sc64/z4-controller-win.json"
 DEFAULT_TRACES = {"zerg-z4": DEFAULT_TRACE,
                  "protoss-p4": ROOT / ".local/sc64/p4-controller-win.json",
                  "zerg-z5": ROOT / ".local/sc64/z5-controller-win.json",
                  "zerg-z6": ROOT / ".local/sc64/z6-controller-win.json",
                  "protoss-p5": ROOT / ".local/sc64/p5-controller-win.json",
-                 "protoss-p6": ROOT / ".local/sc64/p6-controller-win.json"}
+                 "protoss-p6": ROOT / ".local/sc64/p6-controller-win.json",
+                 "zerg-z7": ROOT / ".local/build/z7-controller/controller-trace.json"}
 DEFAULT_OUTPUT = ROOT / "build/emulator/zp-controller-replay"
 CHECKPOINT_TICKS = 1000
 MENU_PREFIX = ((1, 1), (2, 0), (3, 16), (4, 0), (5, 128),
@@ -60,6 +65,9 @@ FIFTH_MENU_PREFIX = tuple((tick, 16 if tick == 5 else held)
                           for tick, held in MENU_PREFIX)
 SIXTH_MENU_PREFIX = ((1, 1), (2, 0), (3, 16), (4, 0), (5, 16), (6, 0),
                      (7, 128), (8, 0), (9, 1), (10, 0), (11, 1), (12, 0))
+SEVENTH_MENU_PREFIX = ((1, 1), (2, 0), (3, 16), (4, 0), (5, 16), (6, 0),
+                       (7, 16), (8, 0), (9, 1), (10, 0), (11, 1), (12, 0))
+Z7_ACTION_COUNTS = (1, 3, 1, 5, 2, 1, 1, 1)
 P6_ACTION_COUNTS = (1, 1, 2, 2, 2, 2, 2, 2, 5, 2, 2, 8, 8,
                     1, 7, 12, 5, 2, 3, 3, 7, 12, 3, 1, 3, 1)
 Z6_ACTION_COUNTS = (1, 2, 1, 4, 2, 13, 5, 18, 2)
@@ -86,10 +94,15 @@ def storm_bytes_valid(value: object) -> bool:
 
 
 def validate_trace(trace: object, capacity: int, profile_name: str,
-                   *, windowed: bool = True, window_ticks: int = CHECKPOINT_TICKS) -> dict:
+                   *, windowed: bool = True, window_ticks: int = CHECKPOINT_TICKS,
+                   attempt_prefix: bool = False, prefix_ticks: int | None = None) -> dict:
     """Strictly validate an authenticated staged campaign trace before emulator launch."""
     if profile_name not in MISSION_BY_PROFILE:
         raise ValueError("unknown staged Zerg/Protoss profile")
+    if attempt_prefix and profile_name != "zerg-z7":
+        raise ValueError("--attempt-prefix is supported only for zerg-z7")
+    if prefix_ticks is not None and (not attempt_prefix or type(prefix_ticks) is not int or prefix_ticks < 1):
+        raise ValueError("attempt prefix ticks must be a positive Z7 prefix length")
     if type(capacity) is not int or capacity < 1:
         raise ValueError("controller queue capacity must be positive")
     if type(window_ticks) is not int or window_ticks not in (250, CHECKPOINT_TICKS):
@@ -141,6 +154,7 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
             start_input_tick = previous_tick
             start_transition_count = len(transitions)
         elif kind in ("periodic", "prehatch", "posthatch") or (
+                kind == "checkpoint" and profile_name == "zerg-z7") or (
                 kind in ("rescued", "boarded", "unloaded") and profile_name == "protoss-p5") or (
                 kind == "both-rescued" and profile_name == "protoss-p4"):
             if start is None or final is not None:
@@ -158,20 +172,24 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
 
     if not inputs or inputs[0][0] != 0:
         raise ValueError("first controller transition must be host_tick=1")
-    entry = (6 if profile_name in ("protoss-p6", "zerg-z6") else
+    entry = (7 if profile_name == "zerg-z7" else
+             6 if profile_name in ("protoss-p6", "zerg-z6") else
              5 if profile_name in PERSISTENT_TYPES else 4)
-    menu_prefix = (SIXTH_MENU_PREFIX if entry == 6 else
+    menu_prefix = (SEVENTH_MENU_PREFIX if entry == 7 else
+                   SIXTH_MENU_PREFIX if entry == 6 else
                    FIFTH_MENU_PREFIX if entry == 5 else MENU_PREFIX)
     if (start_transition_count != len(menu_prefix) or
             transitions[:start_transition_count] != list(menu_prefix)):
         raise ValueError(f"normal HOME/menu inputs do not match the {entry}th-entry deployment route")
-    if not windowed and len(inputs) > capacity:
-        raise ValueError(f"controller queue exceeds ELF capacity ({len(inputs)}/{capacity})")
-    expected_start_frame = 1 if profile_name in ("protoss-p6", "zerg-z6") else 0
+    checked_inputs = ([event for event in inputs if event[0] < prefix_ticks]
+                      if attempt_prefix and prefix_ticks is not None else inputs)
+    if not windowed and len(checked_inputs) > capacity:
+        raise ValueError(f"controller queue exceeds ELF capacity ({len(checked_inputs)}/{capacity})")
+    expected_start_frame = 1 if profile_name in ("protoss-p6", "zerg-z6", "zerg-z7") else 0
     if (start is None or start.get("screen") != SCREEN_PLAY or
             start.get("frame") != expected_start_frame):
         raise ValueError("trace start must match the profile's live PLAY handoff frame")
-    launch_tick = 12 if entry == 6 else 9
+    launch_tick = 12 if entry in (6, 7) else 9
     if start.get("host_tick") != launch_tick or start.get("host_tick") != start_input_tick:
         raise ValueError(f"normal {entry}th-entry HOME/menu deployment must launch at host_tick={launch_tick}")
     if start.get("won") != 0 or start.get("lost") != 0 or start.get("outcome") != 0:
@@ -209,17 +227,38 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
             if (cursor > Z6_ACTION_COUNTS[i] or (cursor and not (started & (1 << i))) or
                     ((cursor != 0) != (ticks != 0))):
                 raise ValueError("Z6 start cursor/timer state violates source action bounds")
-    if final is None or rows[-1] is not final or final.get("kind") != "won":
+    elif profile_name == "zerg-z7":
+        _validate_z7_observation(start, "start", live=True)
+    if final is None or rows[-1] is not final:
+        raise ValueError("controller trace must end with exactly one terminal event")
+    if not attempt_prefix and final.get("kind") != "won":
         raise ValueError("full controller trace must end in a won event")
+    if attempt_prefix and final.get("kind") not in ("lost", "limit"):
+        raise ValueError("--attempt-prefix requires a failed or limited Z7 trace")
     stop = final.get("host_tick")
-    if type(stop) is not int or not 1 <= stop <= 0xFFFFFFFF or stop <= previous_tick:
-        raise ValueError("final won event must follow every controller transition")
+    # host_tick is one-based for inputs: the transition at tick N is applied
+    # by update N. A result observed after that update may share its timestamp.
+    if type(stop) is not int or not 1 <= stop <= 0xFFFFFFFF or stop < previous_tick:
+        raise ValueError("terminal update must include every controller transition")
+    if stop <= start["host_tick"]:
+        raise ValueError("terminal update must follow the live start observation")
+    if attempt_prefix and prefix_ticks is not None and prefix_ticks >= stop:
+        raise ValueError("--attempt-prefix ticks must end before the failed/limited terminal tick")
     if checkpoints and checkpoints[-1]["host_tick"] > stop:
         raise ValueError("checkpoint occurs after final result")
-    if final.get("screen") != SCREEN_RESULT or final.get("won") != 1 or final.get("lost") != 0:
-        raise ValueError("final event must record a won RESULT screen")
-    if final.get("outcome") != 1:
-        raise ValueError("final event must authenticate a completed campaign-model win")
+    if not attempt_prefix:
+        if final.get("screen") != SCREEN_RESULT or final.get("won") != 1 or final.get("lost") != 0:
+            raise ValueError("final event must record a won RESULT screen")
+        if final.get("outcome") != 1:
+            raise ValueError("final event must authenticate a completed campaign-model win")
+    elif final.get("kind") == "lost" and (
+            final.get("screen") != SCREEN_RESULT or final.get("won") != 0 or
+            final.get("lost") != 1 or final.get("outcome") != 2):
+        raise ValueError("failed Z7 attempt must record the authentic lost RESULT state")
+    elif final.get("kind") == "limit" and (
+            final.get("screen") != SCREEN_PLAY or final.get("won") != 0 or
+            final.get("lost") != 0 or final.get("outcome") != 0):
+        raise ValueError("limited Z7 attempt must remain live and unfinished")
     for field in ("frame", "fired"):
         if type(final.get(field)) is not int:
             raise ValueError(f"final event is missing integer field {field}")
@@ -272,17 +311,85 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
             raise ValueError("Z6 final switch/fault state is malformed")
         if final.get("kerrigan_alive") != 1:
             raise ValueError("Z6 final observation requires the live source Kerrigan")
+    elif profile_name == "zerg-z7":
+        _validate_z7_observation(final, "final", live=False)
+        if not attempt_prefix:
+            _validate_z7_trace_win(final)
     if windowed:
-        last_page = (stop - 1) // window_ticks
-        peak = max((sum(1 for tick, _ in inputs if tick // window_ticks == page)
+        check_stop = prefix_ticks if attempt_prefix and prefix_ticks is not None else stop
+        last_page = (check_stop - 1) // window_ticks
+        peak = max((sum(1 for tick, _ in checked_inputs if tick // window_ticks == page)
                     for page in range(last_page + 1)), default=0)
         if peak > capacity:
             raise ValueError(f"controller event page exceeds ELF capacity ({peak}/{capacity})")
     else:
-        peak = len(inputs)
+        peak = len(checked_inputs)
     return {"inputs": inputs, "input_count": len(inputs), "stop_tick": stop,
             "start": start, "final": final, "checkpoints": checkpoints,
             "peak_page_transitions": peak, "scheduler_mode": "windowed" if windowed else "full"}
+
+
+def _validate_z7_observation(row: dict, label: str, *, live: bool) -> None:
+    """Check the source-defined Z7 runtime observation shape and bounds."""
+    for name, maximum in (("started", 0xFF), ("fired", 0xFF), ("switch10", 1),
+                          ("ai_script_mask", 15), ("ai_plan_ticks", 240),
+                          ("ai_plan_phase", 3), ("fault", 255), ("outcome", 2)):
+        value = row.get(name)
+        if type(value) is not int or not 0 <= value <= maximum:
+            raise ValueError(f"Z7 {label} observation has invalid {name}")
+    if row["fired"] != row["started"]:
+        raise ValueError(f"Z7 {label} fired alias differs from started mask")
+    if row["ai_script_mask"] not in (0, 1, 3, 7, 15):
+        raise ValueError(f"Z7 {label} AI script mask is not a source-valid prefix")
+    if bool(row["ai_script_mask"]) != bool(row["ai_plan_ticks"]):
+        raise ValueError(f"Z7 {label} AI cadence disagrees with dispatched scripts")
+    if row["ai_script_mask"] == 0 and row["ai_plan_phase"] != 0:
+        raise ValueError(f"Z7 {label} idle AI state has a nonzero phase")
+    if live and (row["fault"] != 0 or row["outcome"] != 0):
+        raise ValueError(f"Z7 {label} observation must be running without adapter faults")
+    cursors, timers = row.get("action_cursors"), row.get("action_ticks")
+    if (not isinstance(cursors, list) or len(cursors) != 8 or
+            any(type(v) is not int for v in cursors)):
+        raise ValueError(f"Z7 {label} observation requires 8 source action cursors")
+    if (not isinstance(timers, list) or len(timers) != 8 or
+            any(type(v) is not int for v in timers)):
+        raise ValueError(f"Z7 {label} observation requires 8 source action timers")
+    # Only the initial switch's ten-second wait has a timer longer than one
+    # scheduler tick. The adapter caps all source waits at 36,000 ticks.
+    for i, (cursor, ticks, count) in enumerate(zip(cursors, timers, Z7_ACTION_COUNTS)):
+        max_ticks = 300 if i == 4 and cursor == 1 else 1
+        if (not 0 <= cursor <= count or not 0 <= ticks <= max_ticks or
+                bool(cursor) != bool(ticks) or (cursor and not row["started"] & (1 << i))):
+            raise ValueError(f"Z7 {label} action cursor/timer {i} violates source bounds")
+    loss_started, victory_started = bool(row["started"] & 1), bool(row["started"] & 4)
+    if ((row["outcome"] == 0 and
+         ((loss_started and cursors[0] == 0) or (victory_started and cursors[2] == 0))) or
+        (row["outcome"] == 1 and
+         (not victory_started or loss_started or cursors[2] != 0 or cursors[0] != 0)) or
+        (row["outcome"] == 2 and
+         (not loss_started or victory_started or cursors[0] != 0 or cursors[2] != 0))):
+        raise ValueError(f"Z7 {label} terminal cursors disagree with the source outcome")
+    ai_cursor = cursors[3]
+    expected_mask = (15 if not ai_cursor else
+                     ((1 << (ai_cursor - 1)) - 1 if ai_cursor >= 2 else 0)) \
+        if row["started"] & (1 << 3) else 0
+    if row["ai_script_mask"] != expected_mask:
+        raise ValueError(f"Z7 {label} AI mask disagrees with the source AI action cursor")
+
+
+def _validate_z7_trace_win(row: dict) -> None:
+    """Require complete source victory state and a surviving player actor."""
+    if (row.get("outcome") != 1 or not row["started"] & (1 << 2) or
+            row["started"] & 1 or any(row["action_cursors"]) or
+            any(row["action_ticks"]) or row["fault"] != 0):
+        raise ValueError("Z7 trace lacks a completed victory trigger, has defeat, or reports faults")
+    for key in ("side_units", "side_buildings", "enemy_units", "enemy_buildings", "workers"):
+        if type(row.get(key)) is not int or row[key] < 0:
+            raise ValueError(f"Z7 winning trace lacks a nonnegative {key} census")
+    if row["enemy_buildings"] != 0:
+        raise ValueError("Z7 win requires zero source enemy buildings")
+    if row["side_units"] + row["side_buildings"] < 1:
+        raise ValueError("Z7 win requires a surviving player actor")
 
 
 def decode_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
@@ -296,6 +403,8 @@ def decode_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
     if base < 0 or base + model_size > len(raw):
         raise ValueError("nested model lies outside runtime state")
     model_raw = raw[base:base + model_size]
+    if profile_name == "zerg-z7":
+        return decode_z7_runtime(raw, runtime_layout, model_layout)
     if profile_name == "protoss-p6":
         return decode_p6_runtime(raw, runtime_layout, model_layout)
     if profile_name == "zerg-z6":
@@ -365,6 +474,8 @@ def runtime_layout_for(elf: Path, profile_name: str) -> tuple[int, dict[str, int
     if profile_name not in PERSISTENT_TYPES:
         return inner_size, inner
     size, outer = races.dwarf_struct(elf, PERSISTENT_TYPES[profile_name])
+    if profile_name == "zerg-z7" and (size <= 0 or size > 36 or inner_size <= 0 or inner_size > 36):
+        raise RuntimeError("Z7 runtime or persistent state exceeds the 36-byte source budget")
     base = outer.get("runtime", -1)
     if base < 0 or base + inner_size > size:
         raise RuntimeError("persistent runtime lies outside DWARF structure")
@@ -392,6 +503,44 @@ def runtime_layout_for(elf: Path, profile_name: str) -> tuple[int, dict[str, int
                     raise RuntimeError(f"invalid or duplicate Z6 {member} DWARF field")
                 fields[key] = offset + nested_offset
     return size, fields
+
+
+def decode_z7_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
+                      model_layout: tuple[int, dict[str, int]]) -> dict:
+    """Decode the complete, bounded Z7 persistent state from its DWARF layout."""
+    size, fields = runtime_layout
+    model_size, model_fields = model_layout
+    if len(raw) != size or size <= 0 or size > 36:
+        raise ValueError("Z7 persistent state bytes do not match its 36-byte source bound")
+    base = fields.get("model", -1)
+    if base < 0 or model_size <= 0 or base + model_size > size or model_size > 12:
+        raise ValueError("Z7 source model lies outside its 12-byte source structure")
+
+    def read(table: dict[str, int], limit: int, name: str, count: int, width: int,
+             *, start: int = 0) -> int | list[int]:
+        offset = table.get(name, -1)
+        total = count * width
+        if offset < 0 or offset + total > limit or start + offset + total > len(raw):
+            raise ValueError(f"Z7 runtime field {name} exceeds or is absent from DWARF structure")
+        data = raw[start + offset:start + offset + total]
+        if count == 1:
+            return int.from_bytes(data, "little")
+        return [int.from_bytes(data[i:i + width], "little")
+                for i in range(0, total, width)]
+
+    model = {"started": read(model_fields, model_size, "started", 1, 2, start=base),
+             "fired": read(model_fields, model_size, "started", 1, 2, start=base),
+             "outcome": read(model_fields, model_size, "outcome", 1, 1, start=base),
+             "action_cursor": read(model_fields, model_size, "action_cursor", 8, 1, start=base)}
+    result = {"model": model,
+              "action_ticks": read(fields, size, "action_ticks", 8, 2),
+              "switch10": read(fields, size, "switch10", 1, 1),
+              "ai_script_mask": read(fields, size, "ai_script_mask", 1, 1),
+              "ai_plan_ticks": read(fields, size, "ai_plan_ticks", 1, 2),
+              "ai_plan_phase": read(fields, size, "ai_plan_phase", 1, 1),
+              "fault": read(fields, size, "fault", 1, 1),
+              "persistent_size": size, "persistent_bytes": list(raw)}
+    return result
 
 
 def decode_z6_runtime(raw: bytes, runtime_layout: tuple[int, dict[str, int]],
@@ -633,7 +782,48 @@ def verify_final(trace_final: dict, state: dict, profile_name: str) -> None:
     model = runtime.get("model", {})
     if model.get("outcome") != 1 or model.get("fired") != trace_final["fired"]:
         raise RuntimeError("final composite campaign model does not match trace outcome/fired state")
-    if profile_name == "zerg-z4":
+    if profile_name == "zerg-z7":
+        runtime = state.get("race_runtime", {})
+        model = runtime.get("model", {})
+        if runtime.get("fault") != 0:
+            raise RuntimeError("Z7 final state reports adapter faults")
+        if (model.get("outcome") != 1 or model.get("started") != trace_final.get("started") or
+                model.get("fired") != trace_final.get("fired")):
+            raise RuntimeError("Z7 source model does not match the completed victory trace")
+        if (model.get("action_cursor") != trace_final.get("action_cursors") or
+                runtime.get("action_ticks") != trace_final.get("action_ticks")):
+            raise RuntimeError("Z7 source action cursors or timers differ from the trace")
+        for name in ("switch10", "ai_script_mask", "ai_plan_ticks", "ai_plan_phase", "fault"):
+            if runtime.get(name) != trace_final.get(name):
+                raise RuntimeError(f"Z7 source runtime {name} differs from the trace")
+        payload, payload_size = runtime.get("persistent_bytes"), runtime.get("persistent_size")
+        if (type(payload_size) is not int or not 0 < payload_size <= 36 or
+                not isinstance(payload, list) or len(payload) != payload_size or
+                any(type(value) is not int or not 0 <= value <= 255 for value in payload)):
+            raise RuntimeError("Z7 complete persistent state bytes exceed their source bound")
+
+        units = state.get("units", {}).get("entities", [])
+        buildings = state.get("buildings", {}).get("entities", [])
+        human_units = [actor for actor in units if actor.get("raw_owner") == 3]
+        human_buildings = [actor for actor in buildings if actor.get("raw_owner") == 3]
+        enemy_units = [actor for actor in units if actor.get("raw_owner") == 4]
+        enemy_buildings = [actor for actor in buildings if actor.get("raw_owner") == 4]
+        if any(actor.get("owner") != 0 for actor in human_units + human_buildings):
+            raise RuntimeError("Z7 human source slot 3 is not bound to the live player")
+        if any(actor.get("owner") != 1 for actor in enemy_units + enemy_buildings):
+            raise RuntimeError("Z7 hostile source slot 4 is not bound to the live enemy")
+        workers = sum(actor.get("raw_type") == 41 for actor in human_units)
+        census = {"side_units": len(human_units), "side_buildings": len(human_buildings),
+                  "enemy_units": len(enemy_units), "enemy_buildings": len(enemy_buildings),
+                  "workers": workers}
+        for name, actual in census.items():
+            if trace_final.get(name) != actual:
+                raise RuntimeError(f"Z7 source-owner {name} census differs from the trace")
+        if census["enemy_buildings"] != 0:
+            raise RuntimeError("Z7 source victory requires zero hostile buildings")
+        if census["side_units"] + census["side_buildings"] == 0:
+            raise RuntimeError("Z7 source victory must retain at least one player actor")
+    elif profile_name == "zerg-z4":
         if runtime.get("faults") != 0 or runtime.get("hatch_effects") != 3:
             raise RuntimeError("Z4 final state has faults or incomplete hatch effects")
         for key in ("chrysalis_alive", "kerrigan_alive", "force3_command_centers"):
@@ -914,6 +1104,12 @@ def compact_bank_profile(elf: Path, sizes: dict[str, int], profile_name: str) ->
         for field in ("raw_owner", "order"):
             if field not in unit_offsets:
                 raise RuntimeError(f"P6 compact Unit DWARF lacks {field}")
+    elif profile_name == "zerg-z7":
+        for field in ("raw_owner", "order"):
+            if field not in unit_offsets:
+                raise RuntimeError(f"Z7 compact Unit DWARF lacks {field}")
+        if "raw_owner" not in building_offsets:
+            raise RuntimeError("Z7 compact Building DWARF lacks raw_owner")
     for field in ("owner", "type", "alive", "x", "y", "hp", "raw_type", "under_construction"):
         offset = building_offsets.get(field)
         width = (4 if field == "hp" else 2 if field in ("x", "y", "raw_type") else 1) \
@@ -929,7 +1125,9 @@ def compact_bank_profile(elf: Path, sizes: dict[str, int], profile_name: str) ->
 def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
         profile_name: str, ticks: int | None = None, save_at_end: bool = False,
         expected_rom_sha256: str | None = None, expected_elf_sha256: str | None = None,
-        expected_trace_sha256: str | None = None) -> dict:
+        expected_trace_sha256: str | None = None, attempt_prefix: bool = False) -> dict:
+    if attempt_prefix and (profile_name != "zerg-z7" or ticks is None or save_at_end):
+        raise ValueError("--attempt-prefix requires zerg-z7 with --ticks and forbids --save-at-end")
     trace_bytes = trace_path.read_bytes()
     trace_hash = hashlib.sha256(trace_bytes).hexdigest()
     rom_hash = hashlib.sha256(rom_path.read_bytes()).hexdigest()
@@ -944,8 +1142,15 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
     mode, capacity = scheduler.schedule_mode(sym, sizes)
     checkpoint_ticks = scheduler.checkpoint_ticks(sym)
     plan = validate_trace(trace, capacity, profile_name, windowed=mode == "windowed",
-                          window_ticks=checkpoint_ticks)
+                          window_ticks=checkpoint_ticks, attempt_prefix=attempt_prefix,
+                          prefix_ticks=ticks if attempt_prefix else None)
+    if attempt_prefix and (ticks is None or ticks >= plan["stop_tick"] or save_at_end):
+        raise ValueError("--attempt-prefix requires --ticks before the failed/limited terminal tick and forbids --save-at-end")
+    if profile_name == "zerg-z7" and not attempt_prefix and plan["final"].get("kind") != "won":
+        raise ValueError("full Z7 replay requires a winning controller trace; use --attempt-prefix for a failed/limited attempt")
     requested, prefix = scheduler.run_length(plan, ticks, save_at_end)
+    replay_plan = ({**plan, "inputs": [event for event in plan["inputs"] if event[0] < requested]}
+                   if attempt_prefix else plan)
     if save_at_end and mode != "windowed":
         raise ValueError("--save-at-end requires a windowed scheduler")
     metadata = split.read_campaign_metadata(rom_path, elf_path, FACTION_BY_PROFILE[profile_name])
@@ -981,7 +1186,7 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
             raise RuntimeError(f"fresh boot did not remain on HOME: {initial}")
         home_capture = capture(rsp, run_dir / "home.png")
 
-        pages = scheduler.make_schedule_pages(plan, requested, capacity, checkpoint_ticks) if mode == "windowed" else None
+        pages = scheduler.make_schedule_pages(replay_plan, requested, capacity, checkpoint_ticks) if mode == "windowed" else None
         def write_page(events: list[tuple[int, int]]) -> None:
             blob = b"".join(struct.pack("<2I", tick, held) for tick, held in events)
             for offset in range(0, len(blob), 256):
@@ -995,10 +1200,10 @@ def run(trace_path: Path, output: Path, rom_path: Path, elf_path: Path,
             rsp.write(sym["demo_schedule_length"], struct.pack("<I", requested))
             rsp.write(sym["demo_schedule_active"], struct.pack("<I", 1))
         else:
-            blob = b"".join(struct.pack("<2I", tick, held) for tick, held in plan["inputs"])
+            blob = b"".join(struct.pack("<2I", tick, held) for tick, held in replay_plan["inputs"])
             for offset in range(0, len(blob), 256):
                 rsp.write(sym["demo_schedule_events"] + offset, blob[offset:offset + 256])
-            rsp.write(sym["demo_schedule_count"], struct.pack("<I", len(plan["inputs"])))
+            rsp.write(sym["demo_schedule_count"], struct.pack("<I", len(replay_plan["inputs"])))
             rsp.write(sym["demo_schedule_length"], struct.pack("<I", requested))
         if rsp.cmd(f"z1,{sym['game_update'] & ~1:x},2") != "OK" or rsp.cmd(
                 f"Z1,{sym['demo_replay_checkpoint'] & ~1:x},2") != "OK":
@@ -1157,6 +1362,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--elf", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--ticks", type=int, help="replay a positive trace prefix")
+    parser.add_argument("--attempt-prefix", action="store_true",
+                        help="Z7 only: replay a failed/limited attempt prefix; never qualifies as a win")
     parser.add_argument("--save-at-end", action="store_true", help="pause/save at a live prefix endpoint")
     parser.add_argument("--expect-rom-sha256")
     parser.add_argument("--expect-elf-sha256")
@@ -1166,7 +1373,7 @@ def main(argv: list[str] | None = None) -> int:
         trace_path = args.trace or DEFAULT_TRACES[args.profile]
         run(trace_path, args.output, args.rom, args.elf, args.profile, args.ticks,
             args.save_at_end, args.expect_rom_sha256, args.expect_elf_sha256,
-            args.expect_trace_sha256)
+            args.expect_trace_sha256, args.attempt_prefix)
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
         print(f"Z/P controller replay failed: {exc}", file=sys.stderr)
         return 1

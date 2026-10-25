@@ -44,6 +44,8 @@ class SplitResumeQualificationTests(unittest.TestCase):
         self.report.write_text(json.dumps(payload), encoding="utf-8")
 
     def test_report_authenticates_matching_build_and_sram(self):
+        self.assertEqual(json.loads(self.report.read_text(encoding="utf-8"))["profile"],
+                         "zerg-z3")
         self.assertEqual(
             resume.saved_state_from_report(
                 self.report, self.save, profile="zerg", mission=14,

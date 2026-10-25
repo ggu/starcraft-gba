@@ -1,6 +1,11 @@
 #ifndef SC64_VISIBILITY_H
 #define SC64_VISIBILITY_H
 
+#if defined(SC64_Z7_SIGHT_SPANS) && \
+    (!defined(SC64_Z7_SOURCE_SIGHT) || !defined(SC64_VISIBILITY_SPANS))
+#error "SC64_Z7_SIGHT_SPANS requires SC64_Z7_SOURCE_SIGHT and SC64_VISIBILITY_SPANS"
+#endif
+
 #ifdef SC64_Z7_SOURCE_SIGHT
 #include "sc64_z7_source_sight.h"
 #endif
@@ -186,11 +191,22 @@ sc64_t4_explore_with_radius(int x, int y, int radius)
             }
 }
 
+#ifdef SC64_Z7_SIGHT_SPANS
+static int sc64_z7_visibility_radius_index(int radius);
+static void sc64_z7_adjust_visibility_source(int x, int y, int radius, int delta);
+#endif
+
 /* Special T4 sources use exact BW source-radius circles. Keep this bounded
  * but cold because the wider footprints change only when an actor changes. */
 static void __attribute__((noinline))
 sc64_t4_adjust_visibility_source(int x, int y, int radius, int delta)
 {
+#ifdef SC64_Z7_SIGHT_SPANS
+    if (race_z7_active() && sc64_z7_visibility_radius_index(radius) >= 0) {
+        sc64_z7_adjust_visibility_source(x, y, radius, delta);
+        return;
+    }
+#endif
     int col, row, c = x / 16, r = y / 16;
     int extent = (radius + 23) / 16;
     for (row = r - extent; row <= r + extent; ++row)
@@ -331,6 +347,10 @@ static const u8 sc64_visibility_halfwidth_72[73] = {
     39,38,36,34,32,30,28,26,23,20,16,11,0
 };
 
+#ifdef SC64_Z7_SIGHT_SPANS
+#include "sc64_z7_visibility_spans.h"
+#endif
+
 static int
 sc64_visibility_floor_div16(int value)
 {
@@ -393,6 +413,93 @@ sc64_visibility_apply_span(int row, int first, int last, int add)
 #endif
     }
 }
+#ifdef SC64_Z7_SIGHT_SPANS
+/* Exact source-radius row spans for authored Z7 unit/building sight radii.
+ * The LUTs contain floor(sqrt(radius^2-dy^2)); they stay in ROM. */
+static int
+sc64_z7_visibility_radius_index(int radius)
+{
+    switch (radius) {
+    case 64: return 0;
+    case 80: return 1;
+    case 96: return 2;
+    case 112: return 3;
+    case 128: return 4;
+    case 144: return 5;
+    case 160: return 6;
+    case 176: return 7;
+    default: return -1;
+    }
+}
+
+static void __attribute__((noinline))
+sc64_z7_visibility_row_span(int x, int y, int row, int radius, int extent,
+                            int *first, int *last)
+{
+    int c = x / 16, r = y / 16;
+    int col0, col1, dy, halfwidth, index;
+    *first = 1;
+    *last = 0;
+    if (row < r - extent || row > r + extent || row < 0 || row >= MAP_ROWS)
+        return;
+    dy = row * 16 + 8 - y;
+    if (dy < 0) dy = -dy;
+    index = sc64_z7_visibility_radius_index(radius);
+    if (index < 0 || dy > radius) return;
+    halfwidth = sc64_z7_visibility_halfwidth(index, dy);
+    col0 = sc64_visibility_ceil_div16(x - halfwidth - 8);
+    col1 = sc64_visibility_floor_div16(x + halfwidth - 8);
+    if (col0 < c - extent) col0 = c - extent;
+    if (col1 > c + extent) col1 = c + extent;
+    if (col0 < 0) col0 = 0;
+    if (col1 >= MAP_COLS) col1 = MAP_COLS - 1;
+    if (col0 > col1) return;
+    *first = col0;
+    *last = col1;
+}
+
+static void __attribute__((noinline))
+sc64_z7_adjust_visibility_source(int x, int y, int radius, int delta)
+{
+    int row, extent = (radius + 23) / 16;
+    for (row = y / 16 - extent; row <= y / 16 + extent; ++row) {
+        int first, last;
+        sc64_z7_visibility_row_span(x, y, row, radius, extent, &first, &last);
+        if (first <= last)
+            sc64_visibility_apply_span(row, first, last, delta > 0);
+    }
+}
+
+static void __attribute__((noinline))
+sc64_z7_transition_visibility(int old_x, int old_y, int new_x, int new_y,
+                              int radius)
+{
+    int extent = (radius + 23) / 16;
+    int old_row = old_y / 16, new_row = new_y / 16;
+    int row, row0 = (old_row < new_row ? old_row : new_row) - extent;
+    int row1 = (old_row > new_row ? old_row : new_row) + extent;
+    for (row = row0; row <= row1; ++row) {
+        int of, ol, nf, nl;
+        sc64_z7_visibility_row_span(old_x, old_y, row, radius, extent, &of, &ol);
+        sc64_z7_visibility_row_span(new_x, new_y, row, radius, extent, &nf, &nl);
+        if (of > ol) {
+            sc64_visibility_apply_span(row, nf, nl, 1);
+        } else if (nf > nl) {
+            sc64_visibility_apply_span(row, of, ol, 0);
+        } else {
+            if (of < nf)
+                sc64_visibility_apply_span(row, of, ol < nf - 1 ? ol : nf - 1, 0);
+            if (ol > nl)
+                sc64_visibility_apply_span(row, of > nl + 1 ? of : nl + 1, ol, 0);
+            if (nf < of)
+                sc64_visibility_apply_span(row, nf, nl < of - 1 ? nl : of - 1, 1);
+            if (nl > ol)
+                sc64_visibility_apply_span(row, nf > ol + 1 ? nf : ol + 1, nl, 1);
+        }
+    }
+}
+#endif
+
 #endif
 
 /* Update a nearby unit's old and new footprints together. Pixels can move
@@ -403,6 +510,21 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
                                 int type)
 {
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+#ifdef SC64_Z7_SIGHT_SPANS
+    int source_pixels = sc64_actor_unit_sight_pixels(type);
+    if (source_pixels>0) {
+        if (old_x != new_x || old_y != new_y) {
+            int radius=source_pixels/2;
+            if (race_z7_active() && sc64_z7_visibility_radius_index(radius) >= 0) {
+                sc64_z7_transition_visibility(old_x, old_y, new_x, new_y, radius);
+                return;
+            }
+            sc64_t4_adjust_visibility_source(old_x,old_y,radius,-1);
+            sc64_t4_adjust_visibility_source(new_x,new_y,radius,1);
+        }
+        return;
+    }
+#else
     if (sc64_actor_unit_sight_pixels(type)>0) {
         if (old_x != new_x || old_y != new_y) {
             int radius=sc64_actor_unit_sight_pixels(type)/2;
@@ -411,6 +533,7 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
         }
         return;
     }
+#endif
 #endif
     int radius =
 #ifdef SC64_RACES

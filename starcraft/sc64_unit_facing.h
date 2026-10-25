@@ -6,20 +6,19 @@
  *
  * StarCraft unit art stores 17 frames per pose, from north clockwise to
  * south; the other 15 of its 32 directions are mirrored. Units here used
- * frame 0 only, so everything faced north. This keeps a 32-direction facing
- * per actor slot: it follows the direction of travel, measured over at least
- * 8 pixels so the 8-way movement steps do not jitter, and turns toward the
- * target when the unit fires. Nothing here is read by the simulation or saved;
- * after a load, units face north until they move or fire. */
+ * frame 0 only, so everything faced north. This keeps one 32-direction facing
+ * byte per actor slot. A ground unit faces the path waypoint it is walking
+ * to and a flyer faces its move target, so the 8-way movement steps do not
+ * jitter. A unit turns toward its target when it fires and keeps that facing
+ * while its weapon cools down. Nothing here is read by the simulation or
+ * saved; after a load, units face north until they move or fire. */
 
 #include "sc64_unit_facing_generated.h"
 
-#define SC64_FACING_VALID 0x80u
-#define SC64_FACING_STEP 8
-#define SC64_FACING_RESET 64
+/* Ignore waypoints this close; the unit has arrived or is turning in place. */
+#define SC64_FACING_STEP 4
 
 static u8 sc64_facing[MAX_UNITS];
-static u8 sc64_facing_ax[MAX_UNITS], sc64_facing_ay[MAX_UNITS];
 
 /* Unit vectors for the 32 StarCraft directions, scaled by 256; y grows down. */
 static const s16 sc64_facing_vector[32][2] = {
@@ -46,39 +45,24 @@ sc64_facing_fire(const Unit *q, int tx, int ty)
 {
     int slot = (int)(q - u);
     if (slot < 0 || slot >= MAX_UNITS || (tx == q->x && ty == q->y)) return;
-    sc64_facing[slot] = (u8)((sc64_facing[slot] & SC64_FACING_VALID) |
-                             sc64_facing_direction(tx - q->x, ty - q->y));
+    sc64_facing[slot] = (u8)sc64_facing_direction(tx - q->x, ty - q->y);
 }
 
-/* Called before drawing a visible unit: follow its travel direction. */
+/* Called before drawing a visible unit: face where it is going. */
 static void
 sc64_facing_track(const Unit *q)
 {
-    int slot = (int)(q - u), dx, dy, ax, ay;
-    u8 f;
-    if (slot < 0 || slot >= MAX_UNITS) return;
-    f = sc64_facing[slot];
-    if (!(f & SC64_FACING_VALID)) {
-        sc64_facing_ax[slot] = (u8)q->x;
-        sc64_facing_ay[slot] = (u8)q->y;
-        sc64_facing[slot] = (u8)(f | SC64_FACING_VALID);
-        return;
+    int slot = (int)(q - u), dx, dy;
+    if (slot < 0 || slot >= MAX_UNITS || q->cd || q->order == ORDER_IDLE) return;
+    if (sc64_race_unit_flying(q->type)) {
+        dx = q->tx - q->x;
+        dy = q->ty - q->y;
+    } else {
+        dx = q->path_x - q->x;
+        dy = q->path_y - q->y;
     }
-    /* Anchors keep the low byte; small wrapped differences are exact. */
-    dx = (s8)(u8)(q->x - sc64_facing_ax[slot]);
-    dy = (s8)(u8)(q->y - sc64_facing_ay[slot]);
-    ax = dx < 0 ? -dx : dx;
-    ay = dy < 0 ? -dy : dy;
-    if (ax > SC64_FACING_RESET || ay > SC64_FACING_RESET) {
-        /* Teleport, unload, slot reuse or a long off-screen trip. */
-        sc64_facing_ax[slot] = (u8)q->x;
-        sc64_facing_ay[slot] = (u8)q->y;
-        return;
-    }
-    if (ax < SC64_FACING_STEP && ay < SC64_FACING_STEP) return;
-    sc64_facing[slot] = (u8)(SC64_FACING_VALID | sc64_facing_direction(dx, dy));
-    sc64_facing_ax[slot] = (u8)q->x;
-    sc64_facing_ay[slot] = (u8)q->y;
+    if (FAST_ABS(dx) < SC64_FACING_STEP && FAST_ABS(dy) < SC64_FACING_STEP) return;
+    sc64_facing[slot] = (u8)sc64_facing_direction(dx, dy);
 }
 
 static int

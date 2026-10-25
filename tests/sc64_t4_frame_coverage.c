@@ -190,6 +190,116 @@ test_camera_fog_and_scene_bands(void)
     assert_cached_equals_fresh();
 }
 
+#ifdef SC64_STATIC_DIRTY_ROWS
+static void
+test_static_dirty_row_partial_and_clip_contract(void)
+{
+    start_scene();
+    unsigned row = prop_row(205);
+    unsigned slot = race_t4.doodad_slot[row];
+    assert(slot < MAX_BUILDINGS && b[slot].alive);
+
+    /* Put a second static prop over the same source row, then warm the
+     * cache. Repainting any dirty band must replay the complete ordered
+     * static pass so transparent overlaps keep their painter order. */
+    unsigned other = prop_row(206);
+    unsigned other_slot = race_t4.doodad_slot[other];
+    assert(other_slot < MAX_BUILDINGS && b[other_slot].alive);
+    b[other_slot].x = b[slot].x + 8;
+    b[other_slot].y = b[slot].y;
+    focus_prop(row);
+    assert_cached_equals_fresh();
+
+    int center_cell = (b[slot].x / 16) + 1 + (b[slot].y / 16) * MAP_COLS;
+    int other_cell = center_cell + 3 * MAP_COLS;
+    assert(center_cell >= 0 && center_cell < MAP_CELLS);
+    assert(other_cell >= 0 && other_cell < MAP_CELLS);
+    SC64_GRID_SET(visible, center_cell, 0);
+    SC64_GRID_SET(explored, center_cell, 0);
+    SC64_GRID_SET(visible, other_cell, 0);
+    SC64_GRID_SET(explored, other_cell, 0);
+    unsigned partial_before = sc64_terrain_partial;
+    unsigned planned_before = sc64_static_dirty_rows_host_bands;
+    poison_both_backbuffers();
+    game_render();
+    capture_frame(cached_frame);
+    assert(sc64_terrain_partial > partial_before);
+    assert(sc64_static_dirty_rows_host_bands > planned_before);
+    sc64_terrain_cache_valid = 0;
+    sc64_hud_valid = 0;
+    poison_both_backbuffers();
+    gfx_begin(C_BLACK);
+    game_render();
+    capture_frame(fresh_frame);
+    assert(memcmp(cached_frame, fresh_frame, sizeof(cached_frame)) == 0);
+
+    /* The normal game path owns [12,120), while direct draw_map callers
+     * retain their full-screen clip and must take the conservative pass. */
+    SC64_GRID_SET(visible, center_cell, 1);
+    SC64_GRID_SET(explored, center_cell, 1);
+    gfx_begin(C_BLACK);
+    gfx_set_clip_y(0, 160);
+    partial_before = sc64_terrain_partial;
+    planned_before = sc64_static_dirty_rows_host_bands;
+    draw_map();
+    assert(sc64_terrain_partial > partial_before);
+    assert(sc64_static_dirty_rows_host_bands == planned_before);
+    assert(gfx_get_clip_y() == (u16)(0u | (160u << 8)));
+
+    /* A large camera jump misses reuse entirely and cannot claim a dirty-row
+     * span; it takes the existing full static pass. */
+    cx = 1900;
+    cy = 1950;
+    gfx_set_clip_y(12, 120);
+    planned_before = sc64_static_dirty_rows_host_bands;
+    draw_map();
+    assert(sc64_static_dirty_rows_host_bands == planned_before);
+}
+
+static void
+test_small_camera_scrolls_use_dirty_rows(void)
+{
+    static const int deltas[] = {1, 2, 3, 15, 16, 17};
+
+    for (unsigned step = 0; step < sizeof(deltas) / sizeof(deltas[0]); ++step) {
+        start_scene();
+        unsigned row = prop_row(205);
+        unsigned slot = race_t4.doodad_slot[row];
+        assert(slot < MAX_BUILDINGS && b[slot].alive);
+        for (int i = 0; i < MAX_BUILDINGS; ++i)
+            if ((unsigned)i != slot) b[i].alive = 0;
+        for (int i = 0; i < MAX_MINERALS; ++i) m[i].amount = 0;
+        geyser_count = 0;
+        b[slot].owner = SIDE;
+        memset(visible, 0xff, sizeof(visible));
+        memset(explored, 0xff, sizeof(explored));
+
+        focus_prop(row);
+        int base_cy = ((cy - 54) / 16) * 16 + 54;
+        if (cy < 54) base_cy = 54;
+        cy = base_cy;
+        sc64_terrain_cache_valid = 0;
+        sc64_hud_valid = 0;
+        gfx_begin(C_BLACK);
+        game_render();
+
+        cy = base_cy + deltas[step];
+        unsigned bands_before = sc64_static_dirty_rows_host_bands;
+        gfx_begin(C_BLACK);
+        game_render();
+        capture_frame(cached_frame);
+        assert(sc64_static_dirty_rows_host_bands > bands_before);
+
+        sc64_terrain_cache_valid = 0;
+        sc64_hud_valid = 0;
+        gfx_begin(C_BLACK);
+        game_render();
+        capture_frame(fresh_frame);
+        assert(memcmp(cached_frame, fresh_frame, sizeof(cached_frame)) == 0);
+    }
+}
+#endif
+
 static void
 test_restart_and_load_rebuild_prop_keys(void)
 {
@@ -226,6 +336,10 @@ main(void)
     test_prop_raw_identity_invalidates_key();
     test_binding_change_invalidates_art();
     test_camera_fog_and_scene_bands();
+#ifdef SC64_STATIC_DIRTY_ROWS
+    test_static_dirty_row_partial_and_clip_contract();
+    test_small_camera_scrolls_use_dirty_rows();
+#endif
     test_restart_and_load_rebuild_prop_keys();
     puts("T4 cached and fresh full-frame output matches");
     return 0;
