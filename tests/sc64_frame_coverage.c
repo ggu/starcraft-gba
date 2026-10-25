@@ -10,7 +10,7 @@ enum { FB_WIDTH = 240, FB_HEIGHT = 160, FB_SIZE = FB_WIDTH * FB_HEIGHT };
 static u8 reference_pixels[FB_SIZE];
 static u8 candidate_pixels[FB_SIZE];
 static void setup_campaign(int mission);
-static u8 transition_references[7][FB_SIZE];
+static u8 transition_references[8][FB_SIZE];
 
 static void
 capture(u8 *out)
@@ -45,7 +45,7 @@ draw_active_scene(void)
     draw_map();
     draw_hud();
     if (screen == SCREEN_PAUSE) draw_pause();
-    else if (screen == SCREEN_RESULT) draw_result();
+    else if (screen == SCREEN_RESULT) draw_result_screen(); /* production dispatch, including the outro */
 }
 
 static void
@@ -119,18 +119,27 @@ compare_game_render_after_poison(const char *name)
     return mismatches != 0;
 }
 
+static void
+set_result_outro(int playing)
+{
+    result_outro_end = playing ? 0 : SC64_RESULT_OUTRO_MAX;
+    result_outro = playing ? 10 : SC64_RESULT_OUTRO_MAX + SC64_RESULT_PANEL_OPEN;
+}
+
 static int
 run_game_render_transitions(void)
 {
     int failures = 0;
-    static const struct { int screen, won, lost; const char *name; } cases[] = {
-        {SCREEN_PLAY, 0, 0, "live"},
-        {SCREEN_PAUSE, 0, 0, "pause"},
-        {SCREEN_RESULT, 1, 0, "win result"},
-        {SCREEN_RESULT, 0, 1, "loss result"},
-        {SCREEN_TITLE, 0, 0, "title"},
-        {SCREEN_PLAY, 0, 0, "live again"},
-        {SCREEN_PAUSE, 0, 0, "pause again"}
+    /* outro=1 renders mid-outro: battlefield only, panel not yet open. */
+    static const struct { int screen, won, lost, outro; const char *name; } cases[] = {
+        {SCREEN_PLAY, 0, 0, 0, "live"},
+        {SCREEN_PAUSE, 0, 0, 0, "pause"},
+        {SCREEN_RESULT, 1, 0, 1, "win outro"},
+        {SCREEN_RESULT, 1, 0, 0, "win result"},
+        {SCREEN_RESULT, 0, 1, 0, "loss result"},
+        {SCREEN_TITLE, 0, 0, 0, "title"},
+        {SCREEN_PLAY, 0, 0, 0, "live again"},
+        {SCREEN_PAUSE, 0, 0, 0, "pause again"}
     };
     setup_campaign(SC64_P3_GLOBAL_ID);
     /* Store independently cleared references first, then run the real
@@ -138,6 +147,7 @@ run_game_render_transitions(void)
        buffers therefore contain stale output from preceding scenes. */
     for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         screen = cases[i].screen; won = cases[i].won; lost = cases[i].lost;
+        set_result_outro(cases[i].outro);
         render_clear_reference(transition_references[i]);
     }
     if (!poison_both_pages_and_check()) {
@@ -147,6 +157,7 @@ run_game_render_transitions(void)
     reset_render_caches();
     for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         screen = cases[i].screen; won = cases[i].won; lost = cases[i].lost;
+        set_result_outro(cases[i].outro);
         game_render();
         capture(candidate_pixels);
         int stale = memcmp(transition_references[i], candidate_pixels,

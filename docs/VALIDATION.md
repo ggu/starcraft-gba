@@ -5277,3 +5277,54 @@ each scene:
 The renderer was profiled and tightened to two fill calls per remnant and a
 table-driven ellipse. This is emulator timing, not physical-hardware
 qualification. ROMs, generated art and captures remain local.
+
+### End-of-mission outro (2026-10-25)
+
+The result screen now waits for the final deaths. The simulation still stops
+on the outcome update (`won`/`lost`, the screen change and saves are
+untouched). A presentation-only counter keeps death effects aging over the
+frozen battlefield; it is neither saved nor read by input handling. The
+result panel appears when every collapse or explosion has finished: at least
+24 updates (0.8 s), at most 96 (3.2 s), then a six-update panel opening.
+
+The default and unified game fixtures destroy the opposition and check:
+
+- the outcome arrives on the next update;
+- the final structures are exploding after the first result-screen update,
+  which scans the final deaths;
+- battlefield pixels, not the panel, are shown during the outro;
+- the state digest and frame stay frozen through the outro;
+- the panel opens after 45 updates (original art) and 53 updates (unified
+  Protoss buildings);
+- the full panel is drawn afterwards;
+- A during the outro restarts at once, as before;
+- a load shows the panel immediately.
+
+The P3 frame-coverage oracle renders a mid-outro frame over poisoned buffers
+with `SC64_NO_FRAME_CLEAR`, and it matches the clear reference. Both
+frame-coverage oracles now render the result screen through the production
+`draw_result_screen()` rather than calling `draw_result()` directly. The
+feature-off builds print the same outcome frame and the same state and
+SRAM digests after 120 frozen result updates. Host captures of a unified
+skirmish victory show the final Protoss structures bursting blue and leaving
+rubble, then the panel opening. The showcase controller replay still loses
+all three last stands at update 150 and restarts from the result screen
+with the same inputs.
+
+The outro adds no IWRAM in any of the 21 rebuilt ROMs and 4–8 BSS bytes over
+the death-animation branch. The largest BSS end is `0x0203de5c`, 420 bytes
+under the guard. Moving the death scan to the start of each update shifts
+which effects are on screen during the timing windows.
+
+Controller-only showcase replay effective fps against base `d085310`:
+
+| Scene | Base | With outro |
+| --- | --- | --- |
+| 0 | 12.800 | 12.665 |
+| 1 | 19.529 | 18.714 |
+| 5 | 17.965 | 17.526 |
+| 6 | 19.476 | 19.062 |
+| 7 | 23.270 | 21.785 |
+
+The last stands stay at 29.857 fps and still lose at update 150. This is
+emulator timing only.

@@ -37,7 +37,7 @@ draw_scene_contents(void)
     draw_map();
     draw_hud();
     if (screen == SCREEN_PAUSE) draw_pause();
-    else if (screen == SCREEN_RESULT) draw_result();
+    else if (screen == SCREEN_RESULT) draw_result_screen(); /* production dispatch, including the outro */
 }
 
 static void
