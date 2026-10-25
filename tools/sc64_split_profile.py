@@ -48,6 +48,11 @@ PROFILE_CYCLE_NAMES = (
     "sc64_hud_minimap_cycles",
 )
 REFINERY_TYPES = {3: "terran_refinery", 17: "protoss_assimilator", 20: "zerg_extractor"}
+PROFILE_BUILD_PATHS = {
+    "terran": ("StarCraft-Terran-GBA.gba", "starcraft-terran.elf"),
+    "zerg": ("StarCraft-Zerg-Z4-GBA.gba", "starcraft-zerg-z4.elf"),
+    "protoss": ("StarCraft-Protoss-GBA.gba", "starcraft-protoss.elf"),
+}
 
 
 def hardware_clock(rsp) -> int:
@@ -81,7 +86,14 @@ def saved_state_from_report(report_path: Path, save_path: Path, *, profile: str,
         report = json.loads(report_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"cannot read checkpoint report: {exc}") from exc
-    expected_profile = "zerg-z3" if profile == "zerg" else "protoss-p3" if profile == "protoss" else None
+    # The report label identifies the replay producer/model family, while the
+    # ROM and ELF hashes authenticate the requested canonical image. Mission
+    # 14 is still emitted by the legacy-named Z3 controller runner even when
+    # its explicit ROM/ELF arguments point at the canonical Z4 build.
+    expected_profile = {
+        "zerg": {14: "zerg-z3"},
+        "protoss": {22: "protoss-p3"},
+    }.get(profile, {}).get(mission)
     if expected_profile is None or report.get("profile") != expected_profile or report.get("mission") != mission:
         raise ValueError("checkpoint report profile/mission does not match the requested fresh load")
     if report.get("rom_sha256") != rom_sha256 or report.get("elf_sha256") != elf_sha256:
@@ -379,8 +391,9 @@ def run(profile: str, map_id: int, race: int, bots: int, ticks: int,
     if save_at_end and require_win:
         raise ValueError("--save-at-end requires live play, so cannot be combined with --require-win")
 
-    rom = rom_path or ROOT / "build" / f"StarCraft-{profile.capitalize()}-GBA.gba"
-    elf = elf_path or ROOT / "build" / f"starcraft-{profile}.elf"
+    rom_name, elf_name = PROFILE_BUILD_PATHS[profile]
+    rom = rom_path or ROOT / "build" / rom_name
+    elf = elf_path or ROOT / "build" / elf_name
     if not rom.is_file() or not elf.is_file():
         raise RuntimeError(f"{profile}: build both ROM and ELF first ({rom}, {elf})")
     rom_sha256 = hashlib.sha256(rom.read_bytes()).hexdigest()

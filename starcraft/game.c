@@ -6831,6 +6831,14 @@ sc64_draw_vital_bar(int left,int top,int width,int value,int maximum,
     if (top>=bottom || maximum<=0) return;
     if (value<0) value=0;
     if (value>maximum) value=maximum;
+#ifdef SC64_VITAL_BAR_FAST
+    /* Actor UI widths are 12/18 pixels and stock capacities fit the product.
+     * Full and empty bars need neither division nor an overwritten fill. */
+    if (!value || value==maximum) {
+        gfx_rect(left,top,width,bottom-top,(u8)(value ? color : empty));
+        return;
+    }
+#endif
     gfx_rect(left,top,width,bottom-top,(u8)empty);
     int fill=(int)((u32)value*(unsigned)width/(unsigned)maximum);
     if (fill) gfx_rect(left,top,fill,bottom-top,(u8)color);
