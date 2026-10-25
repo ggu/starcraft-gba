@@ -5174,3 +5174,22 @@ showcase `0x0203dcd8`; all existing reserve guards pass. Default build/tests
 (414 Python checks plus host fixtures) and unified build/tests pass. Full Terran build/controller/save/skirmish
 checks also pass. This visual update does not qualify a new campaign mission, physical hardware,
 ARM SRAM continuation or a new performance result; staged progress stays 22/30.
+
+### Z6 controller final-zone cleanup
+
+After the newer worker and depot economy changes, `make test-sc64-z6-controller`
+stalled in source location 5 with a mining Probe and a Pylon left. Kerrigan
+stood beside both targets, idle, while single Hydralisk reinforcements walked
+in from the main base and ran out the round budget. When at most two Force2
+actors remain and no escort is within 320 pixels, the controller now gives
+Kerrigan an ordinary attack-move. The final-building Hydra stepping is skipped
+on those rounds. When no target is found, the controller re-reads the source
+count before deciding the zone is unfinished; previously a stale count
+reported a Probe that had already died.
+
+Only controller strategy changed. Victory still requires the result screen,
+`won` and the source outcome WON. The host route now wins at host tick 297013,
+gameplay frame 293497, with started mask `0x1be` and zero faults. Kerrigan is
+alive and unloaded at `(950,1009)`, research is complete and the Overlord has
+no cargo. The earlier route won at frame 268694. ARM replay, save continuity
+and performance were not re-measured for this route.

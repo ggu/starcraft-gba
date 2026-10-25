@@ -611,6 +611,9 @@ static int clear_force2_locations(void)
         while(before&&rounds++<max_rounds&&screen==SCREEN_PLAY&&!won&&!lost) {
             int wx,wy;
             if(!nearest_force2_in_region(ll,tt,rr,bb,&wx,&wy)) {
+                /* The last target may have died since the count was read. */
+                (void)sc64_z6_world_count(&race_z6_world,19,229,loc,&before);
+                if(!before)break;
                 if(loc==5&&before<=1) {
                     fprintf(stderr,"  no nearest Force2 target despite before=%u bounds%d,%d-%d,%d\n",
                         before,ll,tt,rr,bb);
@@ -643,7 +646,18 @@ static int clear_force2_locations(void)
                         b[bi].raw_type,b[bi].x,b[bi].y,wx,wy);
                     break;
                 }
-            if(before<=1) {
+            /* With only the last Force2 actors left, reinforcements trickle in
+             * from the main base one at a time and can stall the round budget.
+             * If no escort is near the target, Kerrigan finishes it with an
+             * ordinary attack-move instead; victory conditions are unchanged. */
+            int escort_near=0;
+            for(int ei=0;ei<MAX_UNITS;ei++)
+                if(u[ei].alive&&u[ei].owner==SIDE&&u[ei].raw_type!=41&&u[ei].raw_type!=42&&
+                   u[ei].raw_type!=51&&dist2(u[ei].x,u[ei].y,wx,wy)<=320*320)escort_near=1;
+            int hero_finish=loc==5&&before<=2&&!escort_near&&kerrigan()>=0;
+            if(hero_finish)
+                fprintf(stderr,"  no escort within 320px of final Force2 actors; Kerrigan finishes\n");
+            if(before<=1&&!hero_finish) {
                 int in_range=0,stepped=0;
                 for(int ui=0;ui<MAX_UNITS;ui++)if(u[ui].alive&&u[ui].owner==SIDE&&u[ui].raw_type==38) {
                     if(dist2(u[ui].x,u[ui].y,wx,wy)<=64*64) { in_range++; continue; }
@@ -662,8 +676,8 @@ static int clear_force2_locations(void)
                 }
             }
             fprintf(stderr,"  focus Force2 target at%d,%d\n",wx,wy);
-            if(!order_fresh_combat_group(1,wx,wy)) {
-                if(loc==5&&before<=1&&kerrigan()>=0) {
+            if(hero_finish||!order_fresh_combat_group(1,wx,wy)) {
+                if(loc==5&&before<=2&&kerrigan()>=0) {
                     int hero=kerrigan();
                     int px=0,py=0;
                     if(dist2(u[hero].x,u[hero].y,wx,wy)>80*80&&
@@ -679,9 +693,15 @@ static int clear_force2_locations(void)
                     fprintf(stderr,"  no escort group remains; using Kerrigan's ordinary attack-move on final target\n");
                     if(hero_attack_move(wx,wy)) {
                         unsigned solo_start=host_ticks;
-                        while(host_ticks-solo_start<2400u&&screen==SCREEN_PLAY&&!won&&!lost&&
-                              final_building>=0&&final_building<MAX_BUILDINGS&&
-                              b[final_building].alive&&b[final_building].hp>0)input(0);
+                        /* Wait until a remaining Force2 actor dies (or the
+                         * final building, when only it remains). */
+                        while(host_ticks-solo_start<2400u&&screen==SCREEN_PLAY&&!won&&!lost) {
+                            u32 left=before;
+                            if(sc64_z6_world_count(&race_z6_world,19,229,loc,&left)&&left<before)break;
+                            if(final_building>=0&&final_building<MAX_BUILDINGS&&
+                               (!b[final_building].alive||b[final_building].hp<=0))break;
+                            input(0);
+                        }
                         (void)sc64_z6_world_count(&race_z6_world,19,229,loc,&after);
                         before=after;
                         if(!after)break;
