@@ -60,7 +60,38 @@ transition index double-counted the final page. Neither field establishes
 full-state hash or transition-count parity. The visible source verdict and
 ending census support the bounded ARM completion result above.
 
-Fresh-process SRAM continuation and physical GBA qualification remain
-separate work. This controller does not promote P7, change canonical menus,
-or establish native AI or Carrier combat equivalence; see
-[Validation](VALIDATION.md).
+## Save continuation and prior-mission checks
+
+A separate instrumented ARM experiment paused and saved through ordinary
+controls at frame 29,862, flushed a 32 KiB SRAM file, and loaded it with the
+normal HOME load input in a fresh mGBA process. Mission, hero provenance,
+entity census, economy and source bindings matched the observed checkpoint.
+The frozen input suffix plus 520 neutral updates reached a fault-free RESULT
+win at frame 39,893 with the expected Nexus predicates and all three source
+heroes alive. Split telemetry lines and corrected input-page accounting
+reported all 1,127 transitions without a scheduler fault.
+
+A separate-process host SRAM export/import check matched its canonical
+saved gameplay snapshot hash. The broader ARM hashes differed across load,
+so this proves a playable saved-game continuation, not full ARM-state or
+uninterrupted-trajectory parity. The private ARM builds stayed within the
+unchanged guards (IWRAM end `0x03004a28`, BSS end `0x0203dce4`).
+
+Host controllers compiled with `P7_TYPED_MOVE_FLAGS` completed P1, P2, P4,
+P5 and P6. The same profile completed all eighteen skirmish configurations
+(two maps, three human races, one to three rotated AI races): three wins and
+fifteen losses, with no incomplete matches. Actual-engine typed save/load
+fixtures passed across P1–P7 and all eighteen skirmish setups. These host
+checks do not establish physical SRAM behavior or 30-fps performance.
+
+The legacy P3 controller reached its 180,000-frame limit with 38 hostile
+buildings remaining. The expansion controller under the same P7 flags also
+reached the limit, with 34 hostile buildings remaining. Both are non-wins;
+P3 remains an open qualification issue for this development profile. The
+P3 expansion and P5 controllers now pass source-owner arguments to optional
+P7 targeting diagnostics; P5 also accepts later catalog entries while still
+checking its exact mission ordinal and source deployment.
+
+This controller does not promote P7, change canonical menus, or
+establish native AI or Carrier combat equivalence. Physical GBA qualification
+and mission-wide performance work remain; see [Validation](VALIDATION.md).
