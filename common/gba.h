@@ -54,7 +54,23 @@ int absi(int x);
 void save_write(const void *data,u32 length,u32 tag);
 int save_read(void *data,u32 length,u32 tag);
 void audio_tone(int frequency,int frames,int volume);
+void audio_noise(int frames,int volume);
 void audio_update(void);
+/* Optional sampled audio from a private imported bank (SC64_AUDIO_IMPORTED).
+ * Presentation only: these never read or write game state. Without a bank
+ * they do nothing and audio_sampled_available() returns 0. */
+int audio_sampled_available(void);
+void audio_play_sample(u16 sample,u8 priority,u8 kind);
+void audio_play_music(int track,int loop);
+/* Current or pending music track, or -1 when silent. */
+int audio_music_track(void);
+/* Unused VRAM between the two mode-4 pages: 0x06009600-0x06009FFF. The
+ * first 416 bytes hold the two 176-sample mix halves and a zero guard that a
+ * late VBlank interrupt lets DMA run into; the rest is free for
+ * halfword-sized presentation state. */
+#define GBA_AUDIO_ARENA 0x06009600u
+#define GBA_AUDIO_ARENA_BYTES 2560u
+#define GBA_AUDIO_MIX_BYTES 416u
 void game_init(void);
 void game_update(u16 held,u16 pressed);
 void game_render(void);
