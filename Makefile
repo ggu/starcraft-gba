@@ -7,14 +7,28 @@ CLANG ?= clang
 PYTHON ?= python3
 CFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -O2 -g -std=c11 -ffreestanding -fno-builtin -fno-strict-aliasing -fno-common -ffunction-sections -fdata-sections -Wall -Wextra -Icommon
 LDFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -nostdlib -Tcommon/gba.ld -Wl,--gc-sections
-COMMON := common/start.s common/main.c common/gba.c common/memory.c
+COMMON := common/start.s common/main.c common/gba.c common/memory.c common/audio_bank.S
 COMMON_HEADERS := $(wildcard common/*.h)
 STARCRAFT := $(wildcard starcraft/*.c)
 
-SC64_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated
-SC64_INPUTS := .local/sc64/generated/sc64_mission_generated.h .local/sc64/generated/sc64_assets_generated.h .local/sc64/generated/sc64_sprites_generated.h
-BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/backwater/generated
-BACKWATER_INPUTS := .local/sc64/backwater/generated/sc64_mission_generated.h .local/sc64/backwater/generated/sc64_assets_generated.h .local/sc64/backwater/generated/sc64_sprites_generated.h
+# Optional private StarCraft 64 audio bank from tools/sc64_audio_pack.py. Every
+# imported profile links it when present; SC64_AUDIO=0 builds them silent.
+SC64_AUDIO ?= auto
+SC64_AUDIO_DIR := .local/sc64/audio/generated
+SC64_AUDIO_FLAGS :=
+SC64_AUDIO_INPUTS :=
+ifneq ($(SC64_AUDIO),0)
+ifneq ($(wildcard $(SC64_AUDIO_DIR)/sc64_audio_generated.h),)
+SC64_AUDIO_FLAGS := -DSC64_AUDIO_IMPORTED -I$(SC64_AUDIO_DIR) '-DSC64_AUDIO_BLOB="$(SC64_AUDIO_DIR)/sc64_audio_generated.bin"'
+SC64_AUDIO_INPUTS := $(SC64_AUDIO_DIR)/sc64_audio_generated.h $(SC64_AUDIO_DIR)/sc64_audio_generated.bin
+else ifeq ($(SC64_AUDIO),1)
+$(error SC64_AUDIO=1 but $(SC64_AUDIO_DIR)/sc64_audio_generated.h is missing; run tools/sc64_audio_pack.py)
+endif
+endif
+SC64_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated $(SC64_AUDIO_FLAGS)
+SC64_INPUTS := .local/sc64/generated/sc64_mission_generated.h .local/sc64/generated/sc64_assets_generated.h .local/sc64/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
+BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/backwater/generated $(SC64_AUDIO_FLAGS)
+BACKWATER_INPUTS := .local/sc64/backwater/generated/sc64_mission_generated.h .local/sc64/backwater/generated/sc64_assets_generated.h .local/sc64/backwater/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
 CAMPAIGN_FLAGS := $(BACKWATER_FLAGS) -I.local/sc64/campaign/generated
 CAMPAIGN_INPUTS := $(BACKWATER_INPUTS) .local/sc64/campaign/generated/sc64_campaign_generated.h
 RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -I.local/sc64/races/generated
@@ -2890,3 +2904,33 @@ build/StarCraft-Protoss-P7-Typed-Probe-GBA.gba: build/starcraft-protoss-p7-typed
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 TYPED' SC7T
 .PHONY: protoss-p7-typed-probe
 protoss-p7-typed-probe: build/StarCraft-Protoss-P7-Typed-Probe-GBA.gba
+
+# Audio: mixer/sequencer checks, presentation hook fixtures, and a long
+# controller run whose state hash must not change when the audio observer is
+# compiled out (GAME_AUDIO_OFF).
+AUDIO_TEST_DEPS := common/gba.c common/gba.h common/audio_mixer.h $(STARCRAFT) $(wildcard starcraft/*.h) Makefile
+build/test-audio-mixer: tests/audio_mixer.c common/audio_mixer.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+
+define GAME_AUDIO_PROFILE
+build/test-game-audio-$(1)-on: tests/game_audio_run.c $$(AUDIO_TEST_DEPS) $(3) | build
+	$$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c -o $$@
+build/test-game-audio-$(1)-off: tests/game_audio_run.c $$(AUDIO_TEST_DEPS) $(3) | build
+	$$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) -DGAME_AUDIO_OFF $$< common/gba.c -o $$@
+.PHONY: test-game-audio-$(1)
+test-game-audio-$(1): build/test-game-audio-$(1)-on build/test-game-audio-$(1)-off
+	./build/test-game-audio-$(1)-on hooks
+	./build/test-game-audio-$(1)-on > build/test-game-audio-$(1)-on.txt
+	./build/test-game-audio-$(1)-off > build/test-game-audio-$(1)-off.txt
+	cat build/test-game-audio-$(1)-on.txt
+	test "$$$$(grep '^state' build/test-game-audio-$(1)-on.txt)" = "$$$$(grep '^state' build/test-game-audio-$(1)-off.txt)"
+	@echo "game audio $(1): audio-on and audio-off state hashes match"
+endef
+$(eval $(call GAME_AUDIO_PROFILE,default,,))
+$(eval $(call GAME_AUDIO_PROFILE,unified,$(UNIFIED_FLAGS),$(RACES_INPUTS)))
+
+.PHONY: test-audio
+test-audio: build/test-audio-mixer test-game-audio-default
+	./build/test-audio-mixer
+test-starcraft: test-audio
+test-unified: test-game-audio-unified
