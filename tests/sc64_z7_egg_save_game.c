@@ -4,6 +4,14 @@
 #include <string.h>
 #include "../starcraft/game.c"
 
+#ifdef SC64_Z7_DERIVED_SAVE
+#define TEST_UNIT_ENCODE sc64_derived_unit_encode
+#define TEST_BUILDING_ENCODE sc64_derived_building_encode
+#else
+#define TEST_UNIT_ENCODE sc64_zp_unit_save_encode
+#define TEST_BUILDING_ENCODE sc64_building_save_encode
+#endif
+
 #ifndef SC64_Z7_EGG_PRODUCTION
 #error "Compile this fixture with SC64_Z7_EGG_PRODUCTION"
 #endif
@@ -36,7 +44,13 @@ static void launch_z7(void)
     press(KEY_A);
     assert(screen == SCREEN_PLAY && race_z7_active() &&
            race_campaign.mission == SC64_Z7_GLOBAL_ID);
-    assert(SC64_RACE_SAVE_GENERATION == 36u);
+    assert(SC64_RACE_SAVE_GENERATION ==
+#ifdef SC64_Z7_DERIVED_SAVE
+           38u
+#else
+           36u
+#endif
+    );
 }
 
 static int add_source_hatchery(int owner, int raw_owner)
@@ -78,7 +92,7 @@ static void press_command(int choice)
 
 static void encode_unit(RaceSave *save, unsigned slot, const Unit *q)
 {
-    assert(sc64_zp_unit_save_encode(&save->units[slot], q,
+    assert(TEST_UNIT_ENCODE(&save->units[slot], q,
             SC64_Z7_MAP_COLS * 16u, SC64_Z7_MAP_ROWS * 16u));
 }
 
@@ -142,7 +156,7 @@ static void candidate_fill_human_lings(RaceSave *save, unsigned target)
             assert(race_save_decode_unit(save, i, SC64_Z7_MAP_COLS * 16u,
                                          SC64_Z7_MAP_ROWS * 16u, &old));
             if (old.alive) continue;
-            assert(sc64_zp_unit_save_encode(&save->units[i], &ling,
+            assert(TEST_UNIT_ENCODE(&save->units[i], &ling,
                     SC64_Z7_MAP_COLS * 16u, SC64_Z7_MAP_ROWS * 16u));
             ++live;
             placed = 1;
@@ -233,6 +247,17 @@ static void test_human_egg_roundtrip_and_corruption(void)
                 SC64_Z7_MAP_COLS * 16u, SC64_Z7_MAP_ROWS * 16u, &q));
         if (field == 0) ++q.armor;
         else q.shield = 1;
+#ifdef SC64_Z7_DERIVED_SAVE
+        if(field==0) {
+            Sc64DerivedUnitSave before=bad.units[egg];
+            assert(!TEST_UNIT_ENCODE(&bad.units[egg],&q,
+                    SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
+            assert(!memcmp(&before,&bad.units[egg],sizeof(before)));
+            assert(race_z7_save_candidate_valid(&bad,&bad.z7,
+                    SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+            continue;
+        }
+#endif
         encode_unit(&bad, (unsigned)egg, &q);
         assert(!race_z7_save_candidate_valid(&bad, &bad.z7,
                 SC64_Z7_MAP_COLS, SC64_Z7_MAP_ROWS));
@@ -273,7 +298,7 @@ static void test_human_egg_roundtrip_and_corruption(void)
                 (q.type != B_HATCHERY && q.type != B_LAIR && q.type != B_HIVE)) continue;
             q.queue_head = 0; q.queue_count = 1; q.queue_progress = 0;
             memset(q.queue, 0, sizeof(q.queue)); q.queue[0] = U_DRONE;
-            assert(sc64_building_save_encode(&bad.buildings[i], &q,
+            assert(TEST_BUILDING_ENCODE(&bad.buildings[i], &q,
                     SC64_Z7_MAP_COLS * 16u, SC64_Z7_MAP_ROWS * 16u));
             changed = 1;
             break;
@@ -307,6 +332,10 @@ static void test_paid_egg_during_ui_lair_morph_roundtrip(void)
     /* R cycles the selected town hall's product; A pays for the Egg. */
     train_type = U_MUTALISK;
     press(KEY_R);
+#ifdef SC64_Z7_SCOURGE_COMBAT
+    assert(train_type == U_SCOURGE);
+    press(KEY_R); /* The active-Z7 roster includes Scourge before Drone. */
+#endif
     assert(train_type == U_DRONE);
     int old_minerals = minerals, old_gas = gas;
     press(KEY_A);
@@ -388,7 +417,7 @@ static void test_enemy_ling_egg_and_product_bound(void)
         if (!q.alive || q.owner != SIDE || q.raw_owner != 3 ||
             q.type != U_OVERLORD) continue;
         q.alive = 0;
-        assert(sc64_zp_unit_save_encode(&bad.units[i], &q,
+        assert(TEST_UNIT_ENCODE(&bad.units[i], &q,
                 SC64_Z7_MAP_COLS * 16u, SC64_Z7_MAP_ROWS * 16u));
     }
     {
@@ -432,7 +461,7 @@ static void test_enemy_ling_egg_and_product_bound(void)
             if (!old.alive) { free_slot = i; break; }
         }
         assert(free_slot < MAX_UNITS);
-        assert(sc64_zp_unit_save_encode(&bad.units[free_slot], &q,
+        assert(TEST_UNIT_ENCODE(&bad.units[free_slot], &q,
                 SC64_Z7_MAP_COLS * 16u, SC64_Z7_MAP_ROWS * 16u));
     }
     assert(!race_z7_save_candidate_valid(&bad, &bad.z7,
@@ -447,7 +476,7 @@ static void test_enemy_ling_egg_and_product_bound(void)
                                      SC64_Z7_MAP_ROWS * 16u, &q));
         if (q.alive && q.owner == SIDE) {
             q.alive = 0;
-            assert(sc64_zp_unit_save_encode(&bad.units[i], &q,
+            assert(TEST_UNIT_ENCODE(&bad.units[i], &q,
                     SC64_Z7_MAP_COLS * 16u, SC64_Z7_MAP_ROWS * 16u));
         }
     }
@@ -456,7 +485,7 @@ static void test_enemy_ling_egg_and_product_bound(void)
         assert(race_save_decode_building(&bad, i, &q));
         if (q.alive && q.owner == SIDE) {
             q.alive = 0;
-            assert(sc64_building_save_encode(&bad.buildings[i], &q,
+            assert(TEST_BUILDING_ENCODE(&bad.buildings[i], &q,
                     SC64_Z7_MAP_COLS * 16u, SC64_Z7_MAP_ROWS * 16u));
         }
     }

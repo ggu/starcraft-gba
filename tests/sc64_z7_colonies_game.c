@@ -5,6 +5,12 @@
 #include "../starcraft/game.c"
 #include "../starcraft/sc64_z7_colony_adapter.h"
 
+#ifdef SC64_Z7_DERIVED_SAVE
+#define TEST_BUILDING_ENCODE sc64_derived_building_encode
+#else
+#define TEST_BUILDING_ENCODE sc64_building_save_encode
+#endif
+
 #ifndef SC64_Z7_RUNTIME
 #error "Compile with the authenticated Z7 runtime profile"
 #endif
@@ -198,7 +204,7 @@ static void test_paid_in_place_morph_and_roundtrip(int damage_mode)
         assert(race_z7_colony_post_building_tick());
     }
     assert(b[colony].under_construction && b[colony].build_progress == 75);
-    assert(sc64_building_save_encode(&checkpoint.buildings[colony], &b[colony],
+    assert(TEST_BUILDING_ENCODE(&checkpoint.buildings[colony], &b[colony],
                                      SC64_Z7_MAP_COLS * 16u,
                                      SC64_Z7_MAP_ROWS * 16u));
     assert(race_save_decode_building(&checkpoint, (unsigned)colony, &decoded));
@@ -329,7 +335,7 @@ static void test_paid_spore_morph_and_native_weapon_scope(void)
         race_tick_buildings();
         assert(race_z7_colony_post_building_tick());
     }
-    assert(sc64_building_save_encode(&checkpoint.buildings[colony],&b[colony],
+    assert(TEST_BUILDING_ENCODE(&checkpoint.buildings[colony],&b[colony],
                                      SC64_Z7_MAP_COLS*16u,
                                      SC64_Z7_MAP_ROWS*16u));
     assert(race_save_decode_building(&checkpoint,(unsigned)colony,&decoded));
@@ -517,11 +523,11 @@ static void test_real_campaign_sram_resume(void)
                                         &old_generation.z7,
                                         SC64_Z7_MAP_COLS, SC64_Z7_MAP_ROWS));
     save_write(&saved, sizeof(saved), SAVE_VERSION);
-    /* Store a generation-34 payload under the current profile's tag so the
+    /* Store a prior-generation payload under the current profile's tag so the
        real load path must reject it rather than selecting the prior valid
        dual-slot record. */
     save_write(&old_generation, sizeof(old_generation), SAVE_VERSION);
-    assert(!race_load_game()); /* generation 34 is rejected by generation 35 */
+    assert(!race_load_game()); /* the prior generation is rejected */
     assert(race_z7_active() && b[colony].alive &&
            b[colony].type == B_CREEP_COLONY &&
            b[colony].build_progress == 90 &&

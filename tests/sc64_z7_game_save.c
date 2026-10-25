@@ -6,6 +6,14 @@
 #include <string.h>
 #include "../starcraft/game.c"
 
+#ifdef SC64_Z7_DERIVED_SAVE
+#define TEST_UNIT_ENCODE sc64_derived_unit_encode
+#define TEST_BUILDING_ENCODE sc64_derived_building_encode
+#else
+#define TEST_UNIT_ENCODE sc64_zp_unit_save_encode
+#define TEST_BUILDING_ENCODE sc64_building_save_encode
+#endif
+
 #ifndef SC64_Z7_RUNTIME
 #error "Compile this fixture with the complete Z7 runtime profile flags"
 #endif
@@ -45,7 +53,11 @@ static void launch_z7_from_normal_menu(void)
     assert(race_campaign.mission==SC64_Z7_GLOBAL_ID);
     assert(sc64_z7_persistent_state_valid(&race_z7));
     assert(SC64_RACE_SAVE_GENERATION==
-#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+#ifdef SC64_Z7_DERIVED_SAVE
+           38u
+#elif defined(SC64_Z7_EGG_PRODUCTION)
+           36u
+#elif defined(SC64_Z7_COLONY_DEFENSE_ENABLED)
            35u
 #else
            33u
@@ -88,6 +100,64 @@ static void reject_without_mutation(const RaceSave *bad)
     assert(!memcmp(geysers_before,geysers,sizeof(geysers_before)));
     assert(frame==clock);
 }
+
+#ifdef SC64_Z7_DERIVED_SAVE
+static void launch_zerg_campaign_mission(int mission)
+{
+    int ordinal;
+    game_init(); held_keys=0;
+    ordinal=sc64_catalog_playable_ordinal(SC64_FACTION_ZERG,mission);
+    assert(ordinal>=0);
+    press(KEY_A);
+    assert(race_front.page==SC_FRONT_MISSION);
+    for(int page=0;page<ordinal/2;page++)press(KEY_RIGHT);
+    if(ordinal&1)press(KEY_DOWN);
+    press(KEY_A); assert(race_front.page==SC_FRONT_BRIEFING);
+    press(KEY_A); assert(screen==SCREEN_PLAY&&!race_mode);
+    assert(race_selected_mission==mission);
+}
+
+static void test_prefix_and_skirmish_save_layout(void)
+{
+    const int mission_ids[]={0,1,14,15,SC64_Z5_GLOBAL_ID,SC64_Z6_GLOBAL_ID,
+                             SC64_Z7_GLOBAL_ID};
+    for(unsigned n=0;n<sizeof(mission_ids)/sizeof(mission_ids[0]);n++) {
+        RaceSave snapshot;
+        launch_zerg_campaign_mission(mission_ids[n]);
+        for(int i=0;i<4;i++)game_update(0,0);
+        assert(race_save_game()); snapshot=race_data;
+        assert(sizeof(snapshot.units[0])==29&&sizeof(snapshot.buildings[0])==25);
+        assert(race_load_game()); game_update(0,0); assert(race_save_game());
+        assert(race_data.version==snapshot.version);
+        printf("derived rows survived campaign mission %d save/load/save\n",mission_ids[n]);
+    }
+    assert(SC64_FRONT_MAP_COUNT==2);
+    for(int race=R_TER;race<=R_PROTOSS;race++)
+      for(int bots=1;bots<=3;bots++)
+        for(int map=0;map<2;map++) {
+            RaceSave snapshot;
+            game_init(); held_keys=0;
+            press(KEY_DOWN); press(KEY_A);
+            assert(race_front.page==SC_FRONT_SKIRMISH);
+            if(map)press(KEY_RIGHT);
+            while(race_front.row<1)press(KEY_DOWN);
+            while(race_front.race!=race)press(KEY_RIGHT);
+            press(KEY_DOWN);
+            while(race_front.bots!=bots)
+                press(race_front.bots<bots?KEY_RIGHT:KEY_LEFT);
+            while(race_front.row<3+bots)press(KEY_DOWN);
+            press(KEY_A);
+            assert(screen==SCREEN_PLAY&&race_mode&&race_human==race&&
+                   race_bots==bots&&race_skirmish_map==map);
+            assert(race_save_game()); snapshot=race_data;
+            assert(race_load_game()); game_update(0,0); assert(race_save_game());
+            assert(race_data.version==snapshot.version);
+            assert(sizeof(snapshot.units[0])==29&&sizeof(snapshot.buildings[0])==25);
+            printf("derived rows survived skirmish race=%d bots=%d map=%d save/load/save\n",
+                   race,bots,map);
+        }
+}
+#endif
 
 static void test_terminal_source_witnesses(const RaceSave *checkpoint)
 {
@@ -201,14 +271,20 @@ static void candidate_fill_paid_units(RaceSave *candidate,unsigned target)
     template.type=U_ZERGLING;
     template.owner=SIDE;
     template.raw_type=template.raw_owner=-1;
-    template.hp=1; template.maxhp=1; template.alive=1; template.selected=0;
+#ifdef SC64_Z7_DERIVED_SAVE
+    template.maxhp=sc64_derived_unit_hp(template.type);
+    template.armor=sc64_race_unit_armor(template.type);
+#else
+    template.maxhp=1;
+#endif
+    template.hp=1; template.alive=1; template.selected=0;
     template.order=ORDER_IDLE; template.target=-1;
     for (unsigned i=0;i<MAX_UNITS && live<target;++i) {
         Unit old;
         assert(race_save_decode_unit(candidate,i,SC64_Z7_MAP_COLS*16u,
                                      SC64_Z7_MAP_ROWS*16u,&old));
         if (old.alive) continue;
-        assert(sc64_zp_unit_save_encode(&candidate->units[i],&template,
+        assert(TEST_UNIT_ENCODE(&candidate->units[i],&template,
                SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
         ++live;
     }
@@ -228,7 +304,7 @@ static void test_ling_egg_capacity(const RaceSave *checkpoint)
             producer=(int)i;
             q.queue_head=0; q.queue_count=1; q.queue_progress=0;
             memset(q.queue,0,sizeof(q.queue)); q.queue[0]=U_ZERGLING;
-            assert(sc64_building_save_encode(&candidate.buildings[i],&q,
+            assert(TEST_BUILDING_ENCODE(&candidate.buildings[i],&q,
                    SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
             break;
         }
@@ -280,7 +356,13 @@ static void test_paid_ai_egg_roundtrip(const RaceSave *checkpoint)
 
     /* A Zergling egg creates a pair. Run past its production time and save
      * the reconciled source-owner products as well as the queued-state case. */
-    for (unsigned i=0;i<540;++i) game_update(0,0);
+    for (unsigned i=0;i<
+#ifdef SC64_Z7_EGG_PRODUCTION
+         (unsigned)sc64_z7_egg_duration(U_ZERGLING)+20u
+#else
+         540u
+#endif
+         ;++i) game_update(0,0);
     assert(screen==SCREEN_PLAY && race_z7_active());
     if (count_enemy_lings()<before+2u)
         fprintf(stderr,"AI egg did not hatch: before=%u after=%u frame=%d producer=%u q=%d progress=%u mask=%u timer=%u minerals=%d outcome=%u\n",
@@ -305,7 +387,7 @@ static void test_paid_ai_egg_roundtrip(const RaceSave *checkpoint)
                 int mapped=sc64_race_building_from_raw(raw);
                 if (mapped>=0 && mapped!=q.type) {
                     q.raw_type=raw;
-                    assert(sc64_building_save_encode(&bad.buildings[i],&q,
+                    assert(TEST_BUILDING_ENCODE(&bad.buildings[i],&q,
                            SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
                     changed=1;
                     break;
@@ -327,7 +409,7 @@ static void test_paid_ai_egg_roundtrip(const RaceSave *checkpoint)
             if (!q.alive || q.owner!=SIDE || q.raw_owner<0 || q.queue_count) continue;
             q.queue_head=0; q.queue_count=1; q.queue_progress=0;
             memset(q.queue,0,sizeof(q.queue)); q.queue[0]=U_ZP_INFESTED_KERRIGAN;
-            assert(sc64_building_save_encode(&bad.buildings[i],&q,
+            assert(TEST_BUILDING_ENCODE(&bad.buildings[i],&q,
                    SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
             changed=1;
             break;
@@ -349,7 +431,7 @@ static void test_paid_ai_egg_roundtrip(const RaceSave *checkpoint)
             if (!q.alive || q.owner!=SIDE) continue;
             q.type=U_ZP_INFESTED_KERRIGAN;
             q.raw_type=q.raw_owner=-1;
-            assert(sc64_zp_unit_save_encode(&bad.units[i],&q,
+            assert(TEST_UNIT_ENCODE(&bad.units[i],&q,
                    SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
             changed=1;
             break;
@@ -359,12 +441,168 @@ static void test_paid_ai_egg_roundtrip(const RaceSave *checkpoint)
     assert(!race_z7_save_candidate_valid(&bad,&bad.z7,
                                          SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
 }
+#ifdef SC64_Z7_DERIVED_SAVE
+static void test_derived_rows(const RaceSave *saved)
+{
+    unsigned units=0,buildings=0;
+    {
+        Sc64DerivedUnitSave zero={{0}};
+        Unit output,before;
+        memset(&output,0xA5,sizeof(output)); before=output;
+        assert(!sc64_derived_unit_decode(&output,&zero,0,64));
+        assert(!memcmp(&output,&before,sizeof(output)));
+        assert(!sc64_derived_unit_decode(&output,&zero,64,2049));
+        assert(!memcmp(&output,&before,sizeof(output)));
+        assert(sc64_derived_unit_decode(&output,&zero,64,64));
+        { Unit expected={0}; assert(!memcmp(&output,&expected,sizeof(output))); }
+    }
+    for(unsigned i=0;i<MAX_UNITS;i++) {
+        Unit a,bad,b;
+        Sc64DerivedUnitSave row,keep;
+        assert(race_save_decode_unit(saved,i,SC64_Z7_MAP_COLS*16u,
+                                     SC64_Z7_MAP_ROWS*16u,&a));
+        if(sc64_derived_zero(saved->units[i].bytes,sizeof(saved->units[i].bytes)))
+            continue;
+        assert(sc64_derived_unit_encode(&row,&a,SC64_Z7_MAP_COLS*16u,
+                                        SC64_Z7_MAP_ROWS*16u));
+        assert(sc64_derived_unit_decode(&b,&row,SC64_Z7_MAP_COLS*16u,
+                                        SC64_Z7_MAP_ROWS*16u));
+        assert(memcmp(&a,&b,sizeof(a))==0);
+        /* weapon is intentionally omitted: a nonzero source field has no
+         * behavior reads, and decode returns the documented canonical zero. */
+        bad=a; bad.weapon=1;
+        assert(sc64_derived_unit_encode(&row,&bad,SC64_Z7_MAP_COLS*16u,
+                                        SC64_Z7_MAP_ROWS*16u));
+        assert(sc64_derived_unit_decode(&b,&row,SC64_Z7_MAP_COLS*16u,
+                                        SC64_Z7_MAP_ROWS*16u));
+        assert(b.weapon==0);
+        keep=row; bad=a; ++bad.maxhp;
+        assert(!sc64_derived_unit_encode(&row,&bad,SC64_Z7_MAP_COLS*16u,
+                                         SC64_Z7_MAP_ROWS*16u));
+        assert(memcmp(&row,&keep,sizeof(row))==0);
+        keep=row; bad=a; ++bad.armor;
+        assert(!sc64_derived_unit_encode(&row,&bad,SC64_Z7_MAP_COLS*16u,
+                                         SC64_Z7_MAP_ROWS*16u));
+        assert(memcmp(&row,&keep,sizeof(row))==0);
+        bad=a; bad.flags=256;
+        assert(!sc64_derived_unit_encode(&row,&bad,SC64_Z7_MAP_COLS*16u,
+                                         SC64_Z7_MAP_ROWS*16u));
+        bad=a; bad.raw_type=255;
+        assert(!sc64_derived_unit_encode(&row,&bad,SC64_Z7_MAP_COLS*16u,
+                                         SC64_Z7_MAP_ROWS*16u));
+        bad=a; bad.raw_owner=15;
+        assert(!sc64_derived_unit_encode(&row,&bad,SC64_Z7_MAP_COLS*16u,
+                                         SC64_Z7_MAP_ROWS*16u));
+        ++units;
+    }
+    for(unsigned i=0;i<MAX_BUILDINGS;i++) {
+        Building a,bad,b;
+        Sc64DerivedBuildingSave row,keep;
+        assert(race_save_decode_building(saved,i,&a));
+        if(sc64_derived_zero(saved->buildings[i].bytes,sizeof(saved->buildings[i].bytes)))
+            continue;
+        assert(sc64_derived_building_encode(&row,&a,SC64_Z7_MAP_COLS*16u,
+                                            SC64_Z7_MAP_ROWS*16u));
+        assert(sc64_derived_building_decode(&b,&row));
+        assert(memcmp(&a,&b,sizeof(a))==0);
+        keep=row; bad=a; ++bad.maxhp;
+        assert(!sc64_derived_building_encode(&row,&bad,SC64_Z7_MAP_COLS*16u,
+                                             SC64_Z7_MAP_ROWS*16u));
+        assert(memcmp(&row,&keep,sizeof(row))==0);
+        bad=a; bad.flags|=0x8000;
+        assert(sc64_derived_building_encode(&row,&bad,SC64_Z7_MAP_COLS*16u,
+                                            SC64_Z7_MAP_ROWS*16u));
+        assert(sc64_derived_building_decode(&b,&row));
+        assert(b.flags==bad.flags);
+        bad=a; bad.raw_type=255;
+        assert(!sc64_derived_building_encode(&row,&bad,SC64_Z7_MAP_COLS*16u,
+                                             SC64_Z7_MAP_ROWS*16u));
+        ++buildings;
+    }
+    assert(units>0&&buildings>0);
+    for(int type=0;type<SC_RU_COUNT;type++) {
+        int hp=sc64_derived_unit_hp(type);
+        Unit q,decoded;
+        Sc64DerivedUnitSave row;
+        if(hp<=0)continue;
+        memset(&q,0,sizeof(q));
+        q.x=q.y=q.tx=q.ty=q.path_x=q.path_y=1;
+        q.type=type; q.owner=SIDE; q.hp=q.maxhp=hp; q.alive=1;
+        q.armor=sc64_race_unit_armor(type); q.target=q.build=-1;
+        q.raw_type=q.raw_owner=-1;
+        assert(sc64_derived_unit_encode(&row,&q,SC64_Z7_MAP_COLS*16u,
+                                        SC64_Z7_MAP_ROWS*16u));
+        assert(sc64_derived_unit_decode(&decoded,&row,SC64_Z7_MAP_COLS*16u,
+                                        SC64_Z7_MAP_ROWS*16u));
+        assert(decoded.type==type&&decoded.maxhp==hp&&decoded.armor==q.armor);
+        q.alive=0; q.hp=0;
+        assert(sc64_derived_unit_encode(&row,&q,SC64_Z7_MAP_COLS*16u,
+                                        SC64_Z7_MAP_ROWS*16u));
+        assert(sc64_derived_unit_decode(&decoded,&row,SC64_Z7_MAP_COLS*16u,
+                                        SC64_Z7_MAP_ROWS*16u));
+        assert(!decoded.alive&&decoded.type==type&&decoded.maxhp==hp);
+    }
+    for(int type=0;type<SC_RB_COUNT;type++) {
+        int hp=sc64_derived_building_hp(type);
+        Building q,decoded;
+        Sc64DerivedBuildingSave row;
+        if(hp<=0)continue;
+        memset(&q,0,sizeof(q));
+        q.x=q.y=1; q.type=type; q.owner=SIDE; q.hp=q.maxhp=hp;
+        q.alive=1; q.build_progress=-1; q.raw_type=q.raw_owner=-1;
+        assert(sc64_derived_building_encode(&row,&q,SC64_Z7_MAP_COLS*16u,
+                                            SC64_Z7_MAP_ROWS*16u));
+        assert(sc64_derived_building_decode(&decoded,&row));
+        assert(decoded.type==type&&decoded.maxhp==hp);
+        q.alive=0; q.hp=0;
+        assert(sc64_derived_building_encode(&row,&q,SC64_Z7_MAP_COLS*16u,
+                                            SC64_Z7_MAP_ROWS*16u));
+        assert(sc64_derived_building_decode(&decoded,&row));
+        assert(!decoded.alive&&decoded.type==type&&decoded.maxhp==hp);
+    }
+    {
+        RaceSave malformed=*saved;
+        Unit output,before;
+        int slot=-1;
+        for(unsigned i=0;i<MAX_UNITS;i++)
+            if(!sc64_derived_zero(malformed.units[i].bytes,sizeof(malformed.units[i].bytes)))
+                {slot=(int)i;break;}
+        assert(slot>=0);
+        malformed.units[slot].bytes[SC64_DERIVED_UNIT_BYTES-1]|=0x80u;
+        memset(&output,0xa5,sizeof(output)); before=output;
+        assert(!sc64_derived_unit_decode(&output,&malformed.units[slot],
+                                         SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
+        assert(memcmp(&output,&before,sizeof(output))==0);
+        assert(!race_z7_save_candidate_valid(&malformed,&malformed.z7,
+                                             SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+        reject_without_mutation(&malformed);
+    }
+    {
+        RaceSave malformed=*saved;
+        Building output,before;
+        int slot=-1;
+        for(unsigned i=0;i<MAX_BUILDINGS;i++)
+            if(!sc64_derived_zero(malformed.buildings[i].bytes,sizeof(malformed.buildings[i].bytes)))
+                {slot=(int)i;break;}
+        assert(slot>=0);
+        malformed.buildings[slot].bytes[SC64_DERIVED_BUILDING_BYTES-1]|=0x80u;
+        memset(&output,0x5a,sizeof(output)); before=output;
+        assert(!sc64_derived_building_decode(&output,&malformed.buildings[slot]));
+        assert(memcmp(&output,&before,sizeof(output))==0);
+        assert(!race_z7_save_candidate_valid(&malformed,&malformed.z7,
+                                             SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+        reject_without_mutation(&malformed);
+    }
+}
+#endif
 
 static void test_z7_candidate_and_live_roundtrip(void)
 {
     RaceSave good,bad;
     int producer=-1;
+#ifndef SC64_Z7_EGG_PRODUCTION
     unsigned human_lings_before;
+#endif
 
     launch_z7_from_normal_menu();
     for (unsigned i=0;i<4;++i) game_update(0,0);
@@ -393,18 +631,26 @@ static void test_z7_candidate_and_live_roundtrip(void)
     }
     race_minerals[SIDE]=minerals=800;
     race_gas[SIDE]=gas=200;
+#ifndef SC64_Z7_EGG_PRODUCTION
     human_lings_before=count_lings_for_owner(SIDE,3u);
+#endif
     assert(race_queue_unit(SIDE,producer,U_ZERGLING));
+#ifdef SC64_Z7_EGG_PRODUCTION
+    { int egg=0; for(int i=0;i<MAX_UNITS;i++)
+        if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_Z7_EGG&&u[i].target==U_ZERGLING)egg=1;
+      assert(egg); }
+#else
     assert(b[producer].queue_count>0);
+#endif
+#ifdef SC64_Z7_EGG_PRODUCTION
+    for (unsigned i=0;i<4;++i) game_update(0,0);
+    assert(race_z7_live_world_valid());
+#else
     for (unsigned i=0;i<540;++i) game_update(0,0);
     assert(race_z7_live_world_valid());
     assert(b[producer].queue_count==0);
-    if (count_lings_for_owner(SIDE,3u)<human_lings_before+2u)
-        fprintf(stderr,"human egg did not hatch: before=%u after=%u producer=%d alive=%d raw=%d/%d q=%d progress=%d frame=%d\n",
-                human_lings_before,count_lings_for_owner(SIDE,3u),producer,
-                b[producer].alive,b[producer].raw_owner,b[producer].raw_type,
-                b[producer].queue_count,b[producer].queue_progress,frame);
     assert(count_lings_for_owner(SIDE,3u)>=human_lings_before+2u);
+#endif
 
     assert(race_campaign.elapsed_frames==(u32)frame);
     if (!race_save_game()) {
@@ -417,6 +663,9 @@ static void test_z7_candidate_and_live_roundtrip(void)
         assert(0);
     }
     good=race_data;
+#ifdef SC64_Z7_DERIVED_SAVE
+    test_derived_rows(&good);
+#endif
     assert(race_z7_save_candidate_valid(&good,&good.z7,
                                         SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
     assert(sizeof(RaceSave)<=16368u);
@@ -425,6 +674,8 @@ static void test_z7_candidate_and_live_roundtrip(void)
     save_write(&good,sizeof(good),SAVE_VERSION);
     assert(race_load_game());
     assert(sc64_z7_persistent_state_valid(&race_z7));
+    assert(race_z7_live_world_valid());
+    game_update(0,0);
     assert(race_z7_live_world_valid());
 
     bad=good; bad.z7.runtime.ai_plan_ticks=SC64_Z7_AI_PERIOD_TICKS+1u;
@@ -457,7 +708,7 @@ static void test_z7_candidate_and_live_roundtrip(void)
                                          SC64_Z7_MAP_ROWS*16u,&q));
             if (!q.alive || q.raw_owner<0) continue;
             q.raw_owner=q.raw_owner==3?4:3;
-            assert(sc64_zp_unit_save_encode(&bad.units[i],&q,
+            assert(TEST_UNIT_ENCODE(&bad.units[i],&q,
                    SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
             changed=1;
             break;
@@ -476,7 +727,7 @@ static void test_z7_candidate_and_live_roundtrip(void)
             assert(race_save_decode_building(&good,i,&q));
             if (!q.alive || q.raw_owner==3) continue;
             ++q.x;
-            assert(sc64_building_save_encode(&bad.buildings[i],&q,
+            assert(TEST_BUILDING_ENCODE(&bad.buildings[i],&q,
                    SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
             changed=1;
             break;
@@ -507,14 +758,20 @@ static void test_z7_candidate_and_live_roundtrip(void)
                                          SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
     reject_without_mutation(&bad);
 
+#ifndef SC64_Z7_EGG_PRODUCTION
     test_paid_ai_egg_roundtrip(&good);
+#endif
     test_terminal_source_witnesses(&good);
 
-    puts("Z7 normal-menu candidate save/load and transactional rejection passed");
+    printf("Z7 normal-menu candidate save/load and transactional rejection passed; RaceSave=%zu unitRow=%zu buildingRow=%zu\n",
+           sizeof(RaceSave),sizeof(race_data.units[0]),sizeof(race_data.buildings[0]));
 }
 
 int main(void)
 {
     test_z7_candidate_and_live_roundtrip();
+#ifdef SC64_Z7_DERIVED_SAVE
+    test_prefix_and_skirmish_save_layout();
+#endif
     return 0;
 }

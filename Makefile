@@ -59,6 +59,8 @@ Z6_PROBE_FLAGS := $(Z6_QUERY_FLAGS) $(Z6_EXTRA_FLAGS) -I.local/sc64/z6/generated
 Z6_QUERY_TEST_BASE_FLAGS = $(filter-out $(Z6_VALIDATED_QUERY_FLAGS) -DSC64_COLLISION_CLASS_CACHE,$(Z6_PROBE_FLAGS))
 Z6_PROBE_INPUTS := $(Z5_CLOAK_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_abilities_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h
 Z7_PROBE_FLAGS := $(Z6_PROBE_FLAGS) -DSC64_Z7_DATA_ENABLED -DSC64_Z7_RUNTIME -DSC64_Z7_CAMPAIGN_ENTRY -DSC64_Z7_COLONY_DEFENSE_ENABLED
+Z7_DERIVED_SAVE_EXTRA_FLAGS ?=
+Z7_DERIVED_SAVE_FLAGS = $(Z7_SCOURGE_PROBE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_Z7_DERIVED_SAVE $(Z7_DERIVED_SAVE_EXTRA_FLAGS)
 Z7_PROBE_INPUTS := $(Z6_PROBE_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z7_scenario_generated.h
 T4_STORAGE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_T4_ENABLED -DSC64_T4_RUNTIME -DSC64_ROUTE_PACK3 -DSC64_T4_WINDOWED_SCHEDULE -DSC64_CAMPAIGN_RACE=0
 T4_OPTIMIZATION_FLAGS ?= -DSC64_T4_COUNT_CACHE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS -DSC64_UNARMED_QUERY_SKIP
@@ -1877,6 +1879,33 @@ build/test-sc64-z7-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z7-game-save: tests/sc64_z7_game_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-derived-save: tests/sc64_z7_game_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_DERIVED_SAVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-derived-egg-save: tests/sc64_z7_egg_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_DERIVED_SAVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-derived-colonies: tests/sc64_z7_colonies_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_DERIVED_SAVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-egg-save-gateoff: tests/sc64_z7_game_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) -DSC64_Z7_EGG_PRODUCTION $< common/gba.c -o $@
+build/test-sc64-derived-save: tests/sc64_derived_save.c starcraft/sc64_derived_save.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-derived-save test-sc64-z7-derived-save zerg-z7-derived-save-probe
+test-sc64-derived-save: build/test-sc64-derived-save
+	./build/test-sc64-derived-save
+test-starcraft: test-sc64-derived-save
+test-sc64-z7-derived-save: test-sc64-derived-save build/test-sc64-z7-derived-save build/test-sc64-z7-derived-egg-save build/test-sc64-z7-derived-colonies build/test-sc64-z7-game-save build/test-sc64-z7-egg-save-gateoff
+	./build/test-sc64-z7-derived-save
+	./build/test-sc64-z7-derived-egg-save
+	./build/test-sc64-z7-derived-colonies
+	./build/test-sc64-z7-game-save
+	./build/test-sc64-z7-egg-save-gateoff
+build/starcraft-zerg-z7-derived-save-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_DERIVED_SAVE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-derived-save-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Derived-Save-Probe-GBA.gba: build/starcraft-zerg-z7-derived-save-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 SAVE' SCZ7
+zerg-z7-derived-save-probe: build/StarCraft-Zerg-Z7-Derived-Save-Probe-GBA.gba
 .PHONY: test-sc64-z7-profile test-sc64-z7-frame-coverage test-sc64-z7-game-save
 test-sc64-z7-profile: build/test-sc64-z7-profile
 	./build/test-sc64-z7-profile

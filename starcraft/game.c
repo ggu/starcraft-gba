@@ -165,7 +165,18 @@ int memcmp(const void *a, const void *b, size_t n);
      !defined(SC64_Z7_EGG_PRODUCTION))
 #error "Z7 Scourge combat requires the Z7 Egg production runtime"
 #endif
-#if defined(SC64_P7_BATTERY_ENABLED)
+#ifdef SC64_Z7_DERIVED_SAVE
+#if !defined(SC64_ZP_FULL_STORAGE) || !defined(SC64_ZP_CAMPAIGN_STORAGE) || \
+    !defined(SC64_ZP_CAMPAIGN_ACTORS) || !defined(SC64_Z7_RUNTIME) || \
+    !defined(SC64_Z7_EGG_PRODUCTION) || !defined(SC64_Z6_RUNTIME) || \
+    !defined(SC64_Z5_RUNTIME) || !defined(SC64_UNIFIED) || \
+    !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 1
+#error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
+#endif
+#endif
+#if defined(SC64_Z7_DERIVED_SAVE)
+#define SC64_RACE_SAVE_GENERATION 38u
+#elif defined(SC64_P7_BATTERY_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 37u
 #elif defined(SC64_Z7_EGG_PRODUCTION)
 #define SC64_RACE_SAVE_GENERATION 36u

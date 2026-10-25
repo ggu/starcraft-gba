@@ -7,11 +7,18 @@
 #define RACE_BUILD_WORDS (sizeof(Building)/sizeof(int))
 
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifndef SC64_Z7_DERIVED_SAVE
 #include "sc64_compact_building_save.h"
+#endif
+#endif
+#ifdef SC64_Z7_DERIVED_SAVE
+#include "sc64_derived_save.h"
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifdef SC64_ZP_FULL_STORAGE
+#ifndef SC64_Z7_DERIVED_SAVE
 #include "sc64_zp_unit_save.h"
+#endif
 #else
 #include "sc64_compact_unit_save.h"
 #endif
@@ -76,7 +83,11 @@ typedef struct {
     u32 version;
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_Z7_DERIVED_SAVE
+    Sc64DerivedUnitSave units[MAX_UNITS];
+#else
     Sc64ZpPackedUnitSave units[MAX_UNITS];
+#endif
 #else
     Sc64PackedUnitSave units[MAX_UNITS];
 #endif
@@ -84,7 +95,11 @@ typedef struct {
     s16 units[MAX_UNITS][RACE_UNIT_WORDS];
 #endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_Z7_DERIVED_SAVE
+    Sc64DerivedBuildingSave buildings[MAX_BUILDINGS];
+#else
     Sc64PackedBuildingSave buildings[MAX_BUILDINGS];
+#endif
 #else
     s16 buildings[MAX_BUILDINGS][RACE_BUILD_WORDS];
 #endif

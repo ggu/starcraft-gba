@@ -1805,3 +1805,33 @@ off pending mission, fresh-process SRAM and performance qualification.
 The Z7 trigger geometry also recognizes an ordinary Spire's source footprint.
 This correction applies independently of the Scourge gate: previously a Spire
 could make a Bring condition fault and pause the mission.
+
+### Experimental Z7 derived save rows
+
+`SC64_Z7_DERIVED_SAVE` is a default-off internal save-format experiment for the
+complete Zerg ZP/Z5/Z6/Z7 Egg profile. With its private inputs already prepared:
+
+```sh
+make test-sc64-derived-save
+make test-sc64-z7-derived-save
+make zerg-z7-derived-save-probe
+```
+
+The probe combines the current construction-HP, direct-attack, Egg, source-sight,
+Scourge and nearest-depot gates. It writes
+`build/StarCraft-Zerg-Z7-Derived-Save-Probe-GBA.gba`. Standard profiles retain
+their existing save format. The probe uses generation 38 and rejects older
+internal saves; it is not a qualified Z7 campaign release.
+
+Unit rows derive maximum HP and armor from the same profile facts used by
+constructors; Building rows derive maximum HP. The unused `Unit.weapon` field
+is restored as zero, so this is semantic preservation rather than a bitwise
+round trip of that field. Changing those facts or giving that field gameplay
+meaning requires a new generation or an explicit compatible migration.
+
+At 240 Unit and 160 Building slots, rows shrink from 35/28 to 29/25 bytes,
+reducing RaceSave from 16,296 to 14,376 bytes. This creates 1,920 bytes of save
+space without changing actor sizes or increasing RAM reserves. It does not
+allocate a projectile pool or establish any frame-rate improvement. See
+[Validation](VALIDATION.md#experimental-z7-derived-save-rows) for checks and
+remaining qualification work.

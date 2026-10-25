@@ -4304,3 +4304,52 @@ actor sizes or reserve guards change.
 Original-art and unified ROMs remain `4ad80ce0…f9aee` and `6bab5be2…979f9`.
 The source-only index contains 572 text files; generated inputs and ROMs stay
 local.
+
+### Experimental Z7 derived save rows
+
+The default-off `SC64_Z7_DERIVED_SAVE` profile uses internal save generation 38
+and requires the complete Zerg ZP/Z5/Z6/Z7 Egg runtime. Constructor-derived
+maximum HP and armor are omitted from Unit rows; maximum HP is omitted from
+Building rows. No gameplay path reads `Unit.weapon`, so it decodes to canonical
+zero instead of retaining a potentially stale constructor assignment. This
+exception is semantic preservation, not a bitwise claim. Future constructor
+fact changes or gameplay reads of that field require a format-generation
+change or an explicit compatible migration.
+
+The 29-byte Unit row contains 226 used bits, including an occupied-row marker;
+the 25-byte Building row contains 194 used bits including its marker. Each has
+six reserved zero bits. All-zero rows remain unused slots; the required marker
+prevents an occupied dead actor from colliding with that encoding. Decoders
+reject missing markers, nonzero padding, out-of-range fields and invalid type
+facts before committing output. Building flags retain their full 16 bits,
+including the Sunken/Spore morph discriminators. Unit flags are limited to the
+current Zerg profile's eight-bit envelope; this format does not support future
+Carrier child flags from the separate Protoss experiment.
+
+Actual ARM types show 240 Units at 56 bytes and 160 Buildings at 48 bytes.
+Reducing their saved rows from 35/28 to 29/25 bytes frees exactly 1,920 bytes:
+RaceSave falls from 16,296 to 14,376, within the unchanged 16,368-byte limit.
+No actor fields or runtime arrays are added. The documented full-feature probe
+links to a 4-MiB ROM `10ac2f87…bd71b1`, with IWRAM end `0x03004a40` and BSS end
+`0x0203d9f0`. Removing only the new gate reproduces the frozen full-feature Z7
+ROM `5d9c4edc…82cac0` byte for byte after applying the same cartridge header.
+
+The asset-free sanitizer fixture passes 100,000 randomized Unit/Building
+round trips, field and dimension boundaries, negative HP/carry, unused slots,
+the formerly all-zero occupied-building collision, marker/padding corruption,
+and unchanged output on rejected rows. The actual-engine suite passes normal
+menu save/load/next-tick/save for Z1 through Z7 and all 18 skirmish setup
+combinations, paid Egg and Lair morph saves, producer death/reuse/provenance,
+mid-Sunken/Spore morphs, and dead morph records. Legacy rows pass with the new
+gate off, both with and without Egg production. The combined Scourge profile
+also exercises its additional production-menu entry.
+
+These are codec, candidate-validation, host lifecycle and ARM-link checks.
+Fresh-process ARM SRAM qualification, a normal-input Z7 win and campaign
+performance remain outstanding. No projectile pool is allocated and no
+frame-rate gain is claimed. Qualified staged progress remains 22/30.
+
+The final C/header/Make inputs remain hash-stable through the focused suite,
+enabled/disabled ARM links, `./dev build`, `./dev test` (387 Python tests plus
+host fixtures), `make unified` and `make test-unified`; all pass. Original-art
+and unified ROMs retain `4ad80ce0…f9aee` and `6bab5be2…979f9` respectively.
