@@ -2153,6 +2153,33 @@ build/StarCraft-Protoss-P7-Battery-Probe-GBA.gba: build/starcraft-protoss-p7-bat
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
 .PHONY: protoss-p7-battery-probe
 protoss-p7-battery-probe: build/StarCraft-Protoss-P7-Battery-Probe-GBA.gba
+
+# Experimental Homeland menu/performance probes, not a qualified campaign win.
+P7_RUNTIME_FLAGS := $(P7_BATTERY_FLAGS) -DSC64_P7_OBSERVER_ENABLED -DSC64_P7_ARCHON_SPLASH -DSC64_P7_CAMPAIGN_ENTRY
+build/test-sc64-p7-runtime-reference: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_RUNTIME_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-runtime-prevalidated: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK $< common/gba.c -o $@
+.PHONY: test-sc64-p7-prevalidated
+test-sc64-p7-prevalidated: build/test-sc64-p7-runtime-reference build/test-sc64-p7-runtime-prevalidated
+	./build/test-sc64-p7-runtime-reference > build/sc64-p7-runtime-reference.txt
+	./build/test-sc64-p7-runtime-prevalidated > build/sc64-p7-runtime-prevalidated.txt
+	cmp build/sc64-p7-runtime-reference.txt build/sc64-p7-runtime-prevalidated.txt
+build/starcraft-protoss-p7-runtime-reference.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_RUNTIME_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-runtime-reference.map -lgcc -o $@
+	$(SIZE) $@
+build/starcraft-protoss-p7-runtime-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-runtime-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Runtime-Reference-GBA.gba: build/starcraft-protoss-p7-runtime-reference.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+build/StarCraft-Protoss-P7-Runtime-Probe-GBA.gba: build/starcraft-protoss-p7-runtime-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+.PHONY: protoss-p7-runtime-reference protoss-p7-runtime-probe
+protoss-p7-runtime-reference: build/StarCraft-Protoss-P7-Runtime-Reference-GBA.gba
+protoss-p7-runtime-probe: build/StarCraft-Protoss-P7-Runtime-Probe-GBA.gba
 build/test-sc64-p7-battery-rules: tests/sc64_p7_battery_rules.c starcraft/sc64_p7_battery_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-p7-battery-rules

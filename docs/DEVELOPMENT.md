@@ -1873,3 +1873,32 @@ space without changing actor sizes or increasing RAM reserves. It does not
 allocate a projectile pool or establish any frame-rate improvement. See
 [Validation](VALIDATION.md#experimental-z7-derived-save-rows) for checks and
 remaining qualification work.
+
+
+## Experimental P7 menu and prevalidated tick
+
+After preparing the current private P6/P7 inputs, build separate Homeland
+reference and optimized probes with:
+
+```sh
+make test-sc64-p7-prevalidated
+make protoss-p7-runtime-reference protoss-p7-runtime-probe
+```
+
+The ROMs are `build/StarCraft-Protoss-P7-Runtime-Reference-GBA.gba` and
+`build/StarCraft-Protoss-P7-Runtime-Probe-GBA.gba`. Both expose P7 through the
+normal single-race mission menu under `SC64_P7_CAMPAIGN_ENTRY`. This is an
+internal candidate entry: Carrier/Arbiter mechanics, production/AI fidelity,
+a full normal-input win and campaign performance remain unfinished. Canonical
+race ROMs do not enable this entry and qualified staged progress stays 22/30.
+
+The optimized probe additionally enables `SC64_P7_PREVALIDATED_TICK`. It
+validates immutable mission data at initialization and load, then checks
+mutable trigger, timer, wallet, location and binding state on each tick.
+Save candidates retain the full validators. It skips the repeated map census
+and immutable table scans without changing the persistent state format.
+The host fixture compares both profiles through menu launch, pause/save/load,
+hero-death conditions and a synthetic human-force defeat. The fast profile
+also checks full/fast validator agreement for 31,744 individual byte mutations.
+See [Validation](VALIDATION.md#p7-prevalidated-runtime-opening) for the scoped
+ARM measurement; neither probe is a near-30-fps campaign release.

@@ -42,6 +42,9 @@ typedef struct {
     u8 victory_requested, defeat_requested, objective_refresh_requested;
     u8 presentation_opcode;
     u16 last_string_id, last_wav_id, center_x, center_y;
+#ifdef SC64_P7_PREVALIDATED_TICK
+    u8 prevalidated_tick;
+#endif
 } Sc64P7WorldContext;
 
 static int sc64_p7_world_location_source(const Sc64P7WorldContext *ctx,
@@ -218,8 +221,13 @@ static int sc64_p7_world_condition(void *context,const Sc64P7RuntimeState *state
     const Sc64P7SourceCondition *source;
     u32 count=0;
     if (!ctx || !state || !c ||
-        !sc64_p7_condition_row(c->trigger,c->index,&source) || source!=c ||
-        !sc64_p7_runtime_metadata_valid()) return -1;
+        !sc64_p7_condition_row(c->trigger,c->index,&source) || source!=c
+#ifdef SC64_P7_PREVALIDATED_TICK
+        || (!ctx->prevalidated_tick && !sc64_p7_runtime_metadata_valid())
+#else
+        || !sc64_p7_runtime_metadata_valid()
+#endif
+        ) return -1;
     switch(c->opcode) {
     case SC64_P7_CONDITION_COMMAND:
         if (c->location || c->resource || c->mask || c->flags!=0x10u ||
@@ -386,7 +394,13 @@ static int sc64_p7_world_action(void *context,const Sc64P7SourceAction *a)
     Sc64P7WorldContext *ctx=(Sc64P7WorldContext *)context;
     const Sc64P7SourceAction *source;
     if (!ctx || !a || !sc64_p7_source_action(a->trigger,a->index,&source) ||
-        source!=a || !sc64_p7_runtime_metadata_valid()) return 0;
+        source!=a
+#ifdef SC64_P7_PREVALIDATED_TICK
+        || (!ctx->prevalidated_tick && !sc64_p7_runtime_metadata_valid())
+#else
+        || !sc64_p7_runtime_metadata_valid()
+#endif
+        ) return 0;
     switch (a->opcode) {
     case SC64_P7_ACTION_VICTORY:
         if (a->location || a->group1 || a->group2 || a->unit || a->time) return 0;

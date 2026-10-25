@@ -8,6 +8,12 @@
     SC64_CAMPAIGN_RACE != 2
 #error "P7 runtime requires authenticated P7 data and full Protoss campaign storage"
 #endif
+#ifdef SC64_P7_PREVALIDATED_TICK
+#if !defined(SC64_P7_ACTORS) || !defined(SC64_P7_BATTERY_ENABLED) || \
+    !defined(SC64_P7_OBSERVER_ENABLED) || !defined(SC64_P7_ARCHON_SPLASH)
+#error "P7 prevalidated tick requires the complete gated P7 runtime profile"
+#endif
+#endif
 
 #include "sc64_p7_world_adapter.h"
 
@@ -165,6 +171,25 @@ static int race_p7_bind_world(const Sc64RaceMap *map)
 static int race_p7_runtime_state_valid(void)
 { return sc64_p7_persistent_state_valid(&race_p7); }
 
+#ifdef SC64_P7_PREVALIDATED_TICK
+static int race_p7_world_prevalidated_bindings_valid(void)
+{
+    if (!race_p7_map || race_p7_map!=&sc64_race_maps[SC64_P7_GLOBAL_ID] ||
+        race_p7_world.map!=race_p7_map || race_p7_world.persistent!=&race_p7 ||
+        race_p7_world.source_current_player!=race_p7_map->human_slot ||
+        race_p7_world.prevalidated_tick) return 0;
+    for (unsigned slot=0;slot<8u;++slot)
+        if (race_p7_world.source_slot_active[slot]!=sc64_p7_active_slots[slot] ||
+            race_p7_world.live_owner_for_source[slot]!=race_p7_source_owner(slot) ||
+            race_p7_world.source_force_for_slot[slot]!=sc64_p7_force_for_slot[slot])
+            return 0;
+    for (unsigned slot=8;slot<12u;++slot)
+        if (race_p7_world.source_slot_active[slot] ||
+            race_p7_world.live_owner_for_source[slot]!=-1) return 0;
+    return 1;
+}
+#endif
+
 static int race_p7_world_ai_callback(void *context,
                                      const Sc64P7SourceAction *action)
 { return sc64_p7_world_run_ai((Sc64P7WorldContext *)context,action); }
@@ -198,9 +223,32 @@ static int race_p7_rebind_loaded_world(const Sc64RaceMap *map)
 
 /* The engine owns when this runs. The P7 model has exact one-shot trigger
  * timing; text/audio presentation assets remain a separate host concern. */
+#ifdef SC64_P7_PREVALIDATED_TICK
+static int __attribute__((noinline)) race_p7_runtime_tick(u32 elapsed_frames)
+#else
 static int race_p7_runtime_tick(u32 elapsed_frames)
+#endif
 {
     if (!race_p7_active()) return 1;
+#ifdef SC64_P7_PREVALIDATED_TICK
+    int result;
+    if (!sc64_p7_persistent_state_valid_prevalidated(&race_p7) ||
+        !race_p7_world_prevalidated_bindings_valid()) return 0;
+    race_p7_world.elapsed_frames=elapsed_frames;
+    race_p7_world.victory_requested=0;
+    race_p7_world.defeat_requested=0;
+    race_p7_world.objective_refresh_requested=0;
+    race_p7_world.presentation_opcode=0;
+    race_p7_world.last_string_id=0;
+    race_p7_world.last_wav_id=0;
+    race_p7_world.center_x=0;
+    race_p7_world.center_y=0;
+    race_p7_ops.elapsed_frames=elapsed_frames;
+    race_p7_world.prevalidated_tick=1;
+    result=sc64_p7_adapter_tick_prevalidated(&race_p7.runtime,&race_p7_ops,0);
+    race_p7_world.prevalidated_tick=0;
+    return result>=0 && sc64_p7_persistent_state_valid_prevalidated(&race_p7);
+#else
     if (!race_p7_runtime_state_valid() || !race_p7_map ||
         !race_p7_bind_world(race_p7_map)) return 0;
     race_p7_world.elapsed_frames=elapsed_frames;
@@ -210,6 +258,7 @@ static int race_p7_runtime_tick(u32 elapsed_frames)
     race_p7_ops.elapsed_frames=elapsed_frames;
     int result=sc64_p7_adapter_tick(&race_p7.runtime,&race_p7_ops,0);
     return result>=0 && race_p7_runtime_state_valid();
+#endif
 }
 
 #endif /* SC64_P7_RUNTIME */

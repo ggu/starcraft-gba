@@ -4416,3 +4416,50 @@ The final snapshot passes `./dev build`, `./dev test` (404 Python tests plus
 host fixtures), `make unified`, `make test-unified`, the focused source-art
 renderer/save checks and the source-only Git-index audit. Imported game art,
 the preview cartridge and visual captures remain private.
+
+
+### P7 prevalidated runtime opening
+
+The default-off `SC64_P7_PREVALIDATED_TICK` gate retains full immutable map,
+actor-census and trigger-table validation at initialization and loaded-world
+rebinding, while avoiding that repeated work on every active update. Mutable
+model flags, cursors, action timers, switch bits, created-actor mask, moved
+location, source wallets and transient binding identities remain checked.
+The scoped world-callback flag is reset after the adapter returns, including
+failure; callbacks outside that scope retain the checked path. Save and load
+candidates always use the full validators. The persistent supplement remains
+124 bytes, Unit/Building remain 56/48 bytes on ARM, and generation-37 RaceSave
+remains 16,348 bytes within the unchanged 16,368-byte limit.
+
+`SC64_P7_CAMPAIGN_ENTRY` separately exposes the seventh Protoss mission in
+these experimental profiles. The fixture navigates HOME → the final mission
+page → briefing → play, loads all 357 retained placement rows and checks the
+180-Unit/112-Building opening. Reference and fast sanitizer builds emit
+identical actor/runtime/wallet traces after 120 updates, normal pause/save/load,
+600 further updates, a synthetic removal of the human force and real hero
+deaths through combat hooks. Checksummed malformed saves reject without
+destroying the live state. The fast build compares full/fast persistent
+validator results for every byte offset and all 256 values (31,744 candidate
+mutations), and preserves the original state. These condition stimuli do not
+establish an ordinary-input mission win.
+
+Both public ARM probes launch through ordinary menu inputs and run 600 opening
+updates without tactical orders. Only the controller injection field is
+written by the debugger. Effective fps derives from emulated GBA timer deltas:
+reference **7.372 fps**, optimized **9.004 fps**, a 22.1-percent increase. All
+14 recorded actor, mission, resource, upgrade and fog banks match at each of
+seven checkpoints, with no runtime fault or unsupported source row. This
+opening result does not qualify later combat, full mission completion,
+fresh-process SRAM or physical hardware, and remains far below 30 fps.
+
+The reference 4-MiB ROM is
+`e75de54476958434e74f1b4fa6834aebe5735285eb8c027365686df66e11ec84`;
+the optimized 4-MiB ROM is
+`663d67fa38f85c9e84211a44c2ae70e72d53dbb6a8079ec84d442bababc63029`.
+Both link with IWRAM end `0x030047d8`; BSS ends are `0x0203d844` and
+`0x0203d84c` respectively. The unchanged internal Battery profile with the
+new gates off reproduces `b70bf313…e4a11` byte for byte. Original-art and
+canonical unified ROMs retain `4ad80ce0…f9aee` and `6bab5be2…979f9`.
+Default build/tests (404 Python tests plus host fixtures), unified build/tests,
+the focused differential fixture, ARM links and source-index audit pass.
+Qualified staged campaign progress remains 22/30; the PR remains draft.

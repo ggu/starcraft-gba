@@ -270,6 +270,25 @@ static inline int sc64_p7_runtime_state_valid(const Sc64P7RuntimeState *s)
     return 1;
 }
 
+/* Private campaign fast path: immutable source rows are authenticated by
+ * mission preflight/load. Keep every mutable cursor, timer and flag check. */
+#ifdef SC64_P7_PREVALIDATED_TICK
+static inline int sc64_p7_runtime_state_valid_prevalidated(
+    const Sc64P7RuntimeState *s)
+{
+    if (!s || !sc64_p7_state_valid(&s->model) || s->fault ||
+        (s->switch_bits & ~SC64_P7_SWITCH_MASK)) return 0;
+    for (unsigned i=0;i<SC64_P7_TRIGGER_COUNT;++i) {
+        u8 cursor=s->model.action_cursor[i];
+        u16 ticks=s->action_ticks[i];
+        if ((cursor!=0)!=(ticks!=0)) return 0;
+        if (ticks && (!cursor || ticks>sc64_p7_action_duration(i,cursor-1u)))
+            return 0;
+    }
+    return 1;
+}
+#endif
+
 static inline void sc64_p7_runtime_init(Sc64P7RuntimeState *s)
 {
     if (!s) return;
@@ -326,6 +345,38 @@ static inline int sc64_p7_dispatch_action(Sc64P7RuntimeState *s,
     s->action_ticks[event->trigger] = duration;
     return SC64_P7_FAULT_NONE;
 }
+
+#ifdef SC64_P7_PREVALIDATED_TICK
+static inline int sc64_p7_dispatch_action_prevalidated(
+    Sc64P7RuntimeState *s,const Sc64P7WorldOps *ops,
+    const Sc64P7ActionEvent *event)
+{
+    const Sc64P7SourceAction *a;
+    u16 duration;
+    int result;
+    if (!s || !ops || !event || !sc64_p7_source_action(event->trigger,
+                                                        event->action_index,&a))
+        return SC64_P7_FAULT_METADATA;
+    if (!sc64_p7_state_valid(&s->model) || s->fault ||
+        (s->switch_bits&~SC64_P7_SWITCH_MASK) ||
+        !sc64_p7_trigger_started(&s->model,event->trigger) ||
+        s->model.action_cursor[event->trigger] != (u8)(event->action_index+1u) ||
+        s->action_ticks[event->trigger]) return SC64_P7_FAULT_STATE;
+    duration=sc64_p7_action_duration(event->trigger,event->action_index);
+    if (!duration) return SC64_P7_FAULT_ACTION;
+    if (a->opcode==SC64_P7_ACTION_SET_SWITCH &&
+        (a->group2>=32u || a->modifier!=4)) return SC64_P7_FAULT_SWITCH;
+    if (a->opcode==SC64_P7_ACTION_RUN_AI_AT_LOCATION)
+        result=ops->opaque_ai ? ops->opaque_ai(ops->context,a) : 0;
+    else result=ops->action ? ops->action(ops->context,a) : 0;
+    if (result!=1) return a->opcode==SC64_P7_ACTION_RUN_AI_AT_LOCATION ?
+                             SC64_P7_FAULT_AI : SC64_P7_FAULT_ACTION;
+    if (a->opcode==SC64_P7_ACTION_SET_SWITCH)
+        s->switch_bits |= (u32)1u << a->group2;
+    s->action_ticks[event->trigger]=duration;
+    return SC64_P7_FAULT_NONE;
+}
+#endif
 
 /* Return 1 when an adapter tick ran, 0 when UI-paused or terminal, and a
  * negative fault code on invalid metadata, predicate, AI policy, or action. */
@@ -387,5 +438,52 @@ static inline int sc64_p7_adapter_tick(Sc64P7RuntimeState *s,
     }
     return 1;
 }
+
+#ifdef SC64_P7_PREVALIDATED_TICK
+/* Only skips repeated immutable table scans; all mutable runtime, trigger,
+ * callback result and action-state checks remain identical to the checked API. */
+static int __attribute__((noinline)) sc64_p7_adapter_tick_prevalidated(Sc64P7RuntimeState *s,
+    const Sc64P7WorldOps *ops,int user_paused)
+{
+    Sc64P7Input in={{0},0,0};
+    Sc64P7Output out;
+    if (!s || !sc64_p7_runtime_state_valid_prevalidated(s)) {
+        if (s) s->fault=SC64_P7_FAULT_STATE;
+        return -SC64_P7_FAULT_STATE;
+    }
+    if (user_paused || s->model.outcome!=SC64_P7_RUNNING) return 0;
+    if (!ops) { s->fault=SC64_P7_FAULT_METADATA; return -SC64_P7_FAULT_METADATA; }
+    for (unsigned t=0;t<SC64_P7_TRIGGER_COUNT;++t) {
+        const Sc64P7SourceCondition *c;
+        int result;
+        if (!sc64_p7_condition_row(t,0,&c)) {
+            s->fault=SC64_P7_FAULT_METADATA; return -SC64_P7_FAULT_METADATA;
+        }
+        result=sc64_p7_condition_eval(s,ops,c);
+        if (result<0 || result>1) {
+            s->fault=SC64_P7_FAULT_CONDITION; return -SC64_P7_FAULT_CONDITION;
+        }
+        in.condition_true[t]=(u8)result;
+    }
+    for (unsigned t=0;t<SC64_P7_TRIGGER_COUNT;++t) {
+        if (!s->model.action_cursor[t]) {
+            if (s->action_ticks[t]) { s->fault=SC64_P7_FAULT_STATE; return -s->fault; }
+            continue;
+        }
+        if (!s->action_ticks[t]) { s->fault=SC64_P7_FAULT_STATE; return -s->fault; }
+        --s->action_ticks[t];
+        if (!s->action_ticks[t]) in.action_complete|=sc64_p7_trigger_bit(t);
+    }
+    out=sc64_p7_step(&s->model,&in);
+    for (u8 i=0;i<out.action_count;++i) {
+        int fault=sc64_p7_dispatch_action_prevalidated(s,ops,&out.actions[i]);
+        if (fault) { s->fault=(u8)fault; return -fault; }
+    }
+    if (!sc64_p7_runtime_state_valid_prevalidated(s)) {
+        s->fault=SC64_P7_FAULT_STATE; return -s->fault;
+    }
+    return 1;
+}
+#endif
 
 #endif
