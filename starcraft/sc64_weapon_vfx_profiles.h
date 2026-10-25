@@ -49,25 +49,63 @@ sc64_weapon_vfx_unit_profile(int type, int target_air)
     case U_GHOST: case U_RAYNOR_MARINE:
         color=C_ORANGE; style=SC64_WEAPON_VFX_STYLE_MUZZLE; break;
 #endif
+#ifdef SC64_Z5_ACTORS
+    case U_Z5_GHOST:
+        color=C_ORANGE; style=SC64_WEAPON_VFX_STYLE_MUZZLE; break;
+#endif
 #ifdef SC64_T5_RUNTIME
     case U_KERRIGAN:
         color=C_ORANGE; style=SC64_WEAPON_VFX_STYLE_MUZZLE; break;
     case U_RAYNOR_VULTURE:
 #endif
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    case U_ZP_RAYNOR_VULTURE:
+#endif
+#if defined(SC64_T5_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
         color=C_ORANGE; style=target_air ? SC64_WEAPON_VFX_STYLE_NONE : SC64_WEAPON_VFX_STYLE_SHELL; break;
 #endif
-#if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
+#if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || defined(SC64_Z7_SCOURGE_COMBAT)
     case U_SCOURGE:
         color=C_GREEN; style=target_air ? SC64_WEAPON_VFX_STYLE_BURST : SC64_WEAPON_VFX_STYLE_NONE; break;
 #endif
+#ifdef SC64_Z6_ACTORS
+    case U_Z6_GUARDIAN:
+        color=C_GREEN; style=target_air ? SC64_WEAPON_VFX_STYLE_NONE : SC64_WEAPON_VFX_STYLE_ACID; break;
+#endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    case U_ZP_INFESTED_KERRIGAN:
+        color=C_GREEN; style=target_air ? SC64_WEAPON_VFX_STYLE_NONE : SC64_WEAPON_VFX_STYLE_SLASH; break;
+    case U_ZP_ULTRALISK:
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     case U_ULTRALISK:
+#endif
+#if defined(SC64_TERRAN_LATE_ACTORS) || defined(SC64_ZP_CAMPAIGN_ACTORS)
         color=C_GREEN; style=target_air ? SC64_WEAPON_VFX_STYLE_NONE : SC64_WEAPON_VFX_STYLE_SLASH; break;
+#endif
+#ifdef SC64_P6_ACTORS
+    case U_P6_INFESTED_TERRAN:
+        color=C_RED; style=target_air ? SC64_WEAPON_VFX_STYLE_NONE : SC64_WEAPON_VFX_STYLE_BURST; break;
+    case U_P6_HERO_DARK_TEMPLAR: case U_P6_ZERATUL:
+        color=C_CYAN; style=target_air ? SC64_WEAPON_VFX_STYLE_NONE : SC64_WEAPON_VFX_STYLE_SLASH; break;
 #endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     case U_BATTLECRUISER: case U_NORAD_II:
         color=C_ORANGE; style=SC64_WEAPON_VFX_STYLE_BEAM; break;
+#endif
+#ifdef SC64_P5_ACTORS
+    case U_P5_BATTLECRUISER:
+        color=C_ORANGE; style=SC64_WEAPON_VFX_STYLE_BEAM; break;
+#endif
+#ifdef SC64_P7_ACTORS
+    case U_P7_ARCHON:
+        color=C_CYAN; style=SC64_WEAPON_VFX_STYLE_ARC; break;
+    case U_P7_ARBITER:
+        color=C_CYAN; style=SC64_WEAPON_VFX_STYLE_PLASMA; break;
+#endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    case U_P7_INTERCEPTOR:
+        color=C_CYAN; style=SC64_WEAPON_VFX_STYLE_PLASMA; break;
 #endif
 #endif /* SC64_RACES */
     default: return 0;
@@ -94,6 +132,18 @@ sc64_weapon_vfx_building_profile(int type)
         color=C_ORANGE; style=SC64_WEAPON_VFX_STYLE_MUZZLE; break;
     case B_WALL_FLAME_TRAP:
         color=C_ORANGE; style=SC64_WEAPON_VFX_STYLE_FLAME; break;
+#endif
+#ifdef SC64_Z5_DOODADS
+    case B_Z5_FLOOR_MISSILE_TRAP:
+        color=C_RED; style=SC64_WEAPON_VFX_STYLE_MISSILE; break;
+    case B_Z5_FLOOR_GUN_TRAP:
+        color=C_ORANGE; style=SC64_WEAPON_VFX_STYLE_MUZZLE; break;
+    case B_Z5_WALL_FLAME_TRAP: case B_Z5_RIGHT_WALL_FLAME_TRAP:
+        color=C_ORANGE; style=SC64_WEAPON_VFX_STYLE_FLAME; break;
+#endif
+#ifdef SC64_P6_ACTORS
+    case B_P6_WALL_MISSILE_TRAP:
+        color=C_RED; style=SC64_WEAPON_VFX_STYLE_MISSILE; break;
 #endif
 #endif /* SC64_RACES */
     default: return 0;

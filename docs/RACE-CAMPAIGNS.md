@@ -42,8 +42,35 @@ also exercises all three frontend variants without requiring those inputs.
 
 The Terran profile presents ten missions. Standard Zerg and Protoss profiles
 present three each. Controller-driven host runs complete 16 of the 30 missions
-across these profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. The other 14 missions have
-no completed runtime.
+across these profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. Separate internal
+Z4 and P4 Storm builds additionally have normal-controller host and full ARM
+wins. P5 Shuttle also has a complete normal-controller host and ARM win plus
+an exact fresh-process cargo save. Z5 Consume also has a complete host and ARM
+win with an exact mid-mission save, with Z6 now also passing a full ARM win and exact fresh-process SRAM restore.
+P6 now also has a full ARM win and opening/late fresh-process SRAM continuity.
+This brings the staged total to 22/30 (Terran 10, Zerg 6, Protoss 6). These staged builds have separate save formats
+and ROM identities. The P5 island objective requires the optional Shuttle
+profile. Z6 has normal-input host and full ARM wins plus exact cold-load continuity.
+P6 has reproducible normal-input host and full ARM wins, with opening and late
+fresh-process SRAM continuity. Its qualified fast dense build averages 12.75 fps. Z7 has an internal seventh-entry ROM
+with shared menu, source objectives and generation-35 saves; its host checks
+establish integration readiness, with no completed playthrough. P7 retains
+an isolated world foundation and numeric scheduler. The remaining staged
+missions still need completion and ARM qualification.
+
+The internal Z7 profile also exposes the missing colony defense commands:
+Drone-only selection adds CREEP COLONY below SPIRE (75 minerals), and a
+selected completed Creep Colony offers SUNKEN with a completed Pool and
+50 minerals. With a completed Evolution Chamber, the same Colony also offers
+SPORE for 50 minerals. Both morphs use the same building and no additional
+Drone. Spore attacks use the existing air-only defense policy; native detector
+behavior and full source sight are still missing.
+This feature rejects earlier Z7 generation-33/34 saves; it is not yet enabled
+in the canonical three-mission Zerg profile or skirmishes.
+
+Z7 also restores a neutral gas node when a source Extractor is destroyed.
+The restored location persists through SRAM and can be rebuilt with a paid
+Extractor. Gas depletion is still outside the shared engine model.
 
 Zerg 3 **The New Dominion** and Protoss 3 **Higher Ground** are on the second
 campaign menu page. The canonical files remain `StarCraft-Zerg-GBA.gba` and
@@ -52,11 +79,12 @@ generations 5 / 7. Their loaders reject saves from the older standard
 two-mission format (generation 2), without changing the live game state.
 Do not rename an older save and expect format conversion.
 
-An opt-in source staging tool now preserves and authenticates the complete
-Zerg 4 **Agent of the Swarm** scenario for the next implementation stage.
-It does not enable Z4 in a ROM or increase the 16/30 completed count. See
-[Z4 source staging](DEVELOPMENT.md#zerg-4-source-staging) for the command and
-remaining runtime work.
+The opt-in `zerg-z4` and `protoss-p4-storm` builds preserve the complete
+starting rosters for **Agent of the Swarm** and **The Hunt for Tassadar**.
+See [staged chapter setup](DEVELOPMENT.md#staged-zerg-and-protoss-chapter-4)
+and [Validation](VALIDATION.md) for their controls, frozen hashes and limits.
+These remain development targets while the canonical race outputs retain
+their separately qualified three-entry campaign menus.
 
 Terran 3, Desperate Alliance, has an experimental runtime behind
 `SC64_T3_ENABLED`. After preparing a race profile, build and check it with:
@@ -469,7 +497,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Host controller runs complete 16 missions: Terran 1–10, Zerg 1–3 and Protoss 1–3. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds; T9's win is on an earlier ROM. The other 14 campaign missions have no completed runtime.
+- Host controller runs complete 16 missions: Terran 1–10, Zerg 1–3 and Protoss 1–3. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds; T9's win is on an earlier ROM. Separate staged profiles qualify Z4–Z6 and P4–P6, bringing the staged total to 22/30. Eight missions remain unqualified.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

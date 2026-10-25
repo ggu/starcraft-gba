@@ -59,7 +59,7 @@ static void test_raw_identity_and_rules(void)
     assert(sc64_race_unit_cooldown_vs(marine, 0) == 15);
     assert(sc64_race_unit_cooldown_vs(marine, 1) == 15);
     assert(sc64_race_unit_can_attack_air(marine));
-    assert(sc64_t4_unit_selectable(marine) && sc64_t4_unit_collidable(marine));
+    assert(sc64_game_unit_selectable(marine) && sc64_game_unit_collidable(marine));
     assert(sc64_race_unit_supply_provided(marine) == 0);
     assert(sc64_race_unit_name(marine) &&
            strcmp(sc64_race_unit_name(marine), "RAYNOR MARINE") == 0);

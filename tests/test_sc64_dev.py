@@ -51,6 +51,286 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(dev.SC64_TEST_TARGETS['zerg'], 'test-zerg')
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
 
+    def test_staged_z6_and_p5_profiles_have_explicit_build_and_test_routes(self):
+        self.assertEqual(dev.GAMES['zerg-z6'],
+                         ('zerg-z6-probe', 'build/StarCraft-Zerg-Z6-Probe-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p5-shuttle'],
+                         ('protoss-p5-shuttle', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
+        self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z6'], (
+            'test-sc64-z6-runtime', 'test-sc64-z6-save', 'test-sc64-z6-profile',
+            'test-sc64-z6-frame-coverage', 'test-sc64-z6-controller'))
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p5-shuttle'],
+                         ('test-sc64-p5-shuttle-runtime', 'test-sc64-p5-campaign-run'))
+
+    def test_staged_campaign_preparation_uses_existing_private_packers(self):
+        for profile, expected in (
+            ('zerg-z6', {
+                'sc64_z4_pack.py', 'sc64_z4_scenario_pack.py',
+                'sc64_zp_scenario_pack.py:Z5', 'sc64_zp_scenario_pack.py:Z6',
+                'sc64_z5_doodad_pack.py', 'sc64_z5_ability_pack.py',
+                'sc64_z6_transport_pack.py', 'sc64_z6_ability_pack.py',
+                'sc64_race_sprites.py:z5', 'sc64_race_sprites.py:z6',
+            }),
+            ('protoss-p5-shuttle', {
+                'sc64_p4_pack.py', 'sc64_p4_scenario_pack.py',
+                'sc64_zp_scenario_pack.py:P5', 'sc64_race_sprites.py:z6',
+            }),
+        ):
+            calls = []
+            private_rom = Path('/private/StarCraft64-USA.z64')
+            with self.subTest(profile=profile), patch.object(dev, 'run',
+                                                              side_effect=lambda cmd, **_kw: calls.append(cmd)):
+                dev.prepare_staged_campaign(profile, private_rom)
+            observed = set()
+            for command in calls:
+                name = Path(command[1]).name
+                mission = command[command.index('--mission') + 1] if '--mission' in command else None
+                if name == 'sc64_race_sprites.py':
+                    bank = 'z6' if '--include-z6-actors' in command else 'z5'
+                    observed.add(f'{name}:{bank}')
+                else:
+                    observed.add(f'{name}:{mission}' if mission else name)
+            self.assertEqual(observed, expected)
+            self.assertTrue(all('/private/StarCraft64-USA.z64' not in command
+                                for command in calls if Path(command[1]).name not in
+                                ('sc64_z4_pack.py', 'sc64_p4_pack.py', 'sc64_race_sprites.py')))
+
+    def test_staged_make_inputs_are_produced_from_empty_campaign_dirs(self):
+        expected = {
+            'zerg-z6': {
+                '.local/sc64/zp-stage/generated/sc64_races_generated.h',
+                '.local/sc64/zp-stage/generated/sc64_race_sprites_generated.h',
+                '.local/sc64/z4/generated/sc64_z4_scenario_generated.h',
+                '.local/sc64/z5/generated/sc64_race_sprites_generated.h',
+                '.local/sc64/zp-stage/generated/scenarios/sc64_z5_scenario_generated.h',
+                '.local/sc64/zp-stage/generated/scenarios/sc64_z5_doodads_generated.h',
+                '.local/sc64/zp-stage/generated/scenarios/sc64_z5_abilities_generated.h',
+                '.local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h',
+                '.local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h',
+                '.local/sc64/zp-stage/generated/scenarios/sc64_z6_abilities_generated.h',
+                '.local/sc64/z6/generated/sc64_race_sprites_generated.h',
+            },
+            'protoss-p5-shuttle': {
+                '.local/sc64/zp-stage/generated/sc64_races_generated.h',
+                '.local/sc64/zp-stage/generated/sc64_race_sprites_generated.h',
+                '.local/sc64/p4/generated/sc64_p4_scenario_generated.h',
+                '.local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h',
+                '.local/sc64/p5/generated/sc64_race_sprites_generated.h',
+            },
+        }
+        private_rom = Path('/private/StarCraft64-USA.z64')
+        for profile, required in expected.items():
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                # Inputs produced by the shared race import phase.
+                stage = root / '.local/sc64/zp-stage/generated'
+                stage.mkdir(parents=True)
+                gate, payload = dev.RACE_CAMPAIGN_GATES[profile]
+                (stage / 'sc64_races_generated.h').write_text(
+                    f'#if defined(SC64_UNIFIED) && defined({gate})\n{payload}\n'
+                    f'#endif /* SC64_UNIFIED && {gate} */\n', encoding='ascii')
+                (stage / 'sc64_race_sprites_generated.h').write_text(
+                    '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n', encoding='ascii')
+                markers_by_path = {}
+                for _, relative, marker in dev.STAGED_CAMPAIGN_INPUTS[profile]:
+                    if marker:
+                        markers_by_path.setdefault(relative, set()).add(marker)
+                calls = []
+
+                def fake_pack(command, **_kwargs):
+                    calls.append(command)
+                    script = Path(command[1]).name
+                    output = None
+                    mission = command[command.index('--mission') + 1] if '--mission' in command else None
+                    if '--header' in command:
+                        output = Path(command[command.index('--header') + 1])
+                    elif script == 'sc64_z4_scenario_pack.py':
+                        output = root / '.local/sc64/z4/generated/sc64_z4_scenario_generated.h'
+                    elif script == 'sc64_p4_scenario_pack.py':
+                        output = root / '.local/sc64/p4/generated/sc64_p4_scenario_generated.h'
+                    elif script == 'sc64_zp_scenario_pack.py':
+                        output = root / f'.local/sc64/zp-stage/generated/scenarios/sc64_{mission.lower()}_scenario_generated.h'
+                    elif script == 'sc64_z5_doodad_pack.py':
+                        output = root / '.local/sc64/zp-stage/generated/scenarios/sc64_z5_doodads_generated.h'
+                    elif script == 'sc64_z5_ability_pack.py':
+                        output = root / '.local/sc64/zp-stage/generated/scenarios/sc64_z5_abilities_generated.h'
+                    elif script == 'sc64_z6_transport_pack.py':
+                        output = root / '.local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h'
+                    elif script == 'sc64_z6_ability_pack.py':
+                        output = root / '.local/sc64/zp-stage/generated/scenarios/sc64_z6_abilities_generated.h'
+                    if output is not None:
+                        output.parent.mkdir(parents=True, exist_ok=True)
+                        marker_set = markers_by_path.get(str(output.relative_to(root)), set())
+                        output.write_text('\n'.join(f'#define {marker} 1' for marker in marker_set) + '\n',
+                                          encoding='ascii')
+
+                with patch.object(dev, 'ROOT', root), patch.object(dev, 'run', side_effect=fake_pack):
+                    dev.prepare_staged_campaign(profile, private_rom)
+
+                listed = {relative for _, relative, _ in dev.STAGED_CAMPAIGN_INPUTS[profile]}
+                self.assertEqual(listed, required)
+                for relative in required:
+                    path = root / relative
+                    self.assertTrue(path.is_file(), f'preparation omitted Make input {relative}')
+                    label = next(label for label, item, _ in dev.STAGED_CAMPAIGN_INPUTS[profile]
+                                 if item == relative)
+                    self.assertTrue(dev.staged_campaign_input_ready(profile, label, path), relative)
+
+    def test_full_staged_prepare_emits_all_base_and_chapter_make_inputs(self):
+        base_inputs = {
+            '.local/sc64/backwater/generated/sc64_mission_generated.h',
+            '.local/sc64/backwater/generated/sc64_assets_generated.h',
+            '.local/sc64/backwater/generated/sc64_sprites_generated.h',
+            '.local/sc64/races/generated/sc64_races_generated.h',
+            '.local/sc64/races/generated/sc64_race_sprites_generated.h',
+            '.local/sc64/races/generated/sc64_menu_generated.h',
+            '.local/sc64/skirmish/generated/sc64_skirmish_generated.h',
+        }
+        for profile in ('zerg-z6', 'protoss-p5-shuttle'):
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                rom = root / 'user-rom.z64'
+                rom.write_bytes(b'owned source fixture')
+
+                def fake_run(command, **_kwargs):
+                    script = Path(command[1]).name
+                    if script == 'sc64_workspace.py':
+                        for relative in (
+                            '.local/sc64/rom/StarCraft64-USA.z64',
+                            '.local/sc64/backwater/generated/sc64_mission_generated.h',
+                            '.local/sc64/backwater/generated/sc64_assets_generated.h',
+                            '.local/sc64/backwater/generated/sc64_sprites_generated.h',
+                        ):
+                            path = root / relative
+                            path.parent.mkdir(parents=True, exist_ok=True)
+                            path.write_text('prepared\n', encoding='ascii')
+                    elif script == 'sc64_races_pack.py':
+                        output = (Path(command[command.index('--out') + 1]) if '--out' in command
+                                  else root / '.local/sc64/races/generated/sc64_races_generated.h')
+                        output.parent.mkdir(parents=True, exist_ok=True)
+                        if output.parent == root / '.local/sc64/zp-stage/generated':
+                            gate, payload = dev.RACE_CAMPAIGN_GATES[profile]
+                            output.write_text(f'#if defined(SC64_UNIFIED) && defined({gate})\n'
+                                              f'{payload}\n#endif /* SC64_UNIFIED && {gate} */\n',
+                                              encoding='ascii')
+                        else:
+                            output.write_text('race map payload\n', encoding='ascii')
+                    elif script == 'sc64_race_sprites.py':
+                        if '--header' in command:
+                            output = Path(command[command.index('--header') + 1])
+                        else:
+                            output = root / '.local/sc64/races/generated/sc64_race_sprites_generated.h'
+                        output.parent.mkdir(parents=True, exist_ok=True)
+                        markers = set()
+                        if '--include-zp-campaign-actors' in command:
+                            markers.add('SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE')
+                        if '--include-z5-actors' in command:
+                            markers.add('SC64_Z5_SPRITE_SET_COMPLETE')
+                        if '--include-z5-doodads' in command:
+                            markers.add('SC64_Z5_DOODAD_SPRITE_SET_COMPLETE')
+                        if '--include-z6-actors' in command:
+                            markers.add('SC64_Z6_SPRITE_SET_COMPLETE')
+                        if '--include-z6-buildings' in command:
+                            markers.add('SC64_Z6_BUILDING_SPRITE_SET_COMPLETE')
+                        output.write_text('\n'.join(f'#define {marker} 1' for marker in markers) + '\n',
+                                          encoding='ascii')
+                    elif script == 'sc64_menu_assets.py':
+                        output = root / '.local/sc64/races/generated/sc64_menu_generated.h'
+                        output.parent.mkdir(parents=True, exist_ok=True)
+                        output.write_text('menu\n', encoding='ascii')
+                    elif script == 'sc64_skirmish_pack.py':
+                        output = root / '.local/sc64/skirmish/generated/sc64_skirmish_generated.h'
+                        output.parent.mkdir(parents=True, exist_ok=True)
+                        output.write_text('skirmish\n', encoding='ascii')
+                    elif script in ('sc64_z4_scenario_pack.py', 'sc64_p4_scenario_pack.py'):
+                        race = 'z4' if 'z4' in script else 'p4'
+                        path = root / f'.local/sc64/{race}/generated/sc64_{race}_scenario_generated.h'
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        guard = 'SC64_Z4_SCENARIO_GENERATED_H' if race == 'z4' else 'SC64_P4_SCENARIO_GENERATED_H'
+                        path.write_text(f'#define {guard} 1\n', encoding='ascii')
+                    else:
+                        mission = command[command.index('--mission') + 1] if '--mission' in command else None
+                        outputs = {
+                            'Z5': '.local/sc64/zp-stage/generated/scenarios/sc64_z5_scenario_generated.h',
+                            'Z6': '.local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h',
+                            'P5': '.local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h',
+                        }
+                        relative = outputs.get(mission)
+                        if script == 'sc64_z5_doodad_pack.py':
+                            relative = '.local/sc64/zp-stage/generated/scenarios/sc64_z5_doodads_generated.h'
+                        elif script == 'sc64_z5_ability_pack.py':
+                            relative = '.local/sc64/zp-stage/generated/scenarios/sc64_z5_abilities_generated.h'
+                        elif script == 'sc64_z6_transport_pack.py':
+                            relative = '.local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h'
+                        elif script == 'sc64_z6_ability_pack.py':
+                            relative = '.local/sc64/zp-stage/generated/scenarios/sc64_z6_abilities_generated.h'
+                        if relative:
+                            path = root / relative
+                            path.parent.mkdir(parents=True, exist_ok=True)
+                            marker = next((marker for _, item, marker in dev.STAGED_CAMPAIGN_INPUTS[profile]
+                                           if item == relative and marker), 'numeric payload')
+                            path.write_text(f'#define {marker} 1\n', encoding='ascii')
+
+                with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
+                        patch.object(dev, 'run', side_effect=fake_run):
+                    dev.prepare(rom, profile)
+
+                produced = set()
+                for _, relative, _ in dev.STAGED_CAMPAIGN_INPUTS[profile]:
+                    produced.add(relative)
+                produced |= base_inputs
+                if profile == 'zerg-z6':
+                    produced.add('.local/sc64/zp-stage/generated/scenarios/sc64_z5_doodads_generated.h')
+                for relative in produced:
+                    self.assertTrue((root / relative).is_file(),
+                                    f'{profile} fresh prepare omitted Make input {relative}')
+
+    def test_staged_profile_status_checks_gates_and_required_headers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for profile in ('zerg-z6', 'protoss-p5-shuttle'):
+                with self.subTest(profile=profile):
+                    for _, relative, marker in dev.STAGED_CAMPAIGN_INPUTS[profile]:
+                        path = root / relative
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_text((marker + '\n') if marker else 'base input\n',
+                                        encoding='ascii')
+                    for relative in (
+                        '.local/sc64/races/generated/sc64_races_generated.h',
+                        '.local/sc64/zp-stage/generated/sc64_races_generated.h',
+                    ):
+                        path = root / relative
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        gate, payload = dev.RACE_CAMPAIGN_GATES[profile]
+                        path.write_text(f'#if defined(SC64_UNIFIED) && defined({gate})\n'
+                                        f'{payload}\n#endif /* SC64_UNIFIED && {gate} */\n',
+                                        encoding='ascii')
+                    for relative in (
+                        '.local/sc64/rom/StarCraft64-USA.z64',
+                        '.local/sc64/backwater/generated/sc64_mission_generated.h',
+                        '.local/sc64/backwater/generated/sc64_assets_generated.h',
+                        '.local/sc64/backwater/generated/sc64_sprites_generated.h',
+                        '.local/sc64/skirmish/generated/sc64_skirmish_generated.h',
+                    ):
+                        path = root / relative
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_text('input\n', encoding='ascii')
+                    games = dict(dev.GAMES, **{profile: (profile, 'build/staged.gba')})
+                    output = io.StringIO()
+                    with patch.object(dev, 'ROOT', root), patch.object(dev, 'GAMES', games), \
+                            contextlib.redirect_stdout(output):
+                        self.assertEqual(dev.status(profile), 1)  # staged data is ready; ROM is not built
+                    self.assertNotIn('MISSING Zerg chapter 6 scenario', output.getvalue())
+                    self.assertNotIn('MISSING Protoss chapter 5 scenario', output.getvalue())
+                    self.assertIn('MISSING Built ROM', output.getvalue())
+
+                    # A malformed compile gate must make readiness fail even if the file exists.
+                    gate_path = root / '.local/sc64/zp-stage/generated/sc64_races_generated.h'
+                    gate_path.write_text('descriptor without data guard\n', encoding='ascii')
+                    with patch.object(dev, 'ROOT', root), patch.object(dev, 'GAMES', games), \
+                            contextlib.redirect_stdout(io.StringIO()):
+                        self.assertEqual(dev.status(profile), 1)
+
     def test_race_profile_status_requires_its_compile_gated_map_data(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

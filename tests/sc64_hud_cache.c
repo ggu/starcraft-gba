@@ -174,25 +174,32 @@ test_selection_building_box_and_modes_invalidate_bottom(void)
 
 #ifdef SC64_RACES
 static void
-test_selected_shield_only_changes_match_forced_redraw(void)
+test_skirmish_shield_only_changes_invalidate_cached_bottom(void)
 {
-    fixture();
+    game_init();
     race_mode=1; race_human=R_PROTOSS; race_bots=1; race_skirmish_map=0;
     race_skirmish_init();
     screen=SCREEN_PLAY;
-    memset(u,0,sizeof(u)); memset(b,0,sizeof(b));
-
+    memset(u,0,sizeof(u));
+    memset(b,0,sizeof(b));
     Unit *actor=&u[0];
-    actor->alive=1; actor->owner=SIDE; actor->type=U_DRAGOON;
-    actor->raw_type=sc64_race_raw_unit(U_DRAGOON); actor->raw_owner=7;
-    actor->selected=1; actor->hp=actor->maxhp=sc64_race_unit_rules[U_DRAGOON].hp;
-    actor->shield=40;
+#ifdef SC64_P7_ACTORS
+    actor->type=U_P7_ARCHON;
+    actor->hp=actor->maxhp=10;
+#else
+    actor->type=U_DRAGOON;
+    actor->hp=actor->maxhp=sc64_race_unit_rules[U_DRAGOON].hp;
+#endif
+    actor->alive=1; actor->owner=SIDE; actor->raw_type=sc64_race_raw_unit(actor->type);
+    actor->raw_owner=7; actor->selected=1;
+    actor->shield=sc64_actor_max_shields(actor->type,0)/2;
     sc64_hud_valid=0;
     assert_cached_matches_full();
     actor->shield++;
     expect_mask_and_match(HUD_BOTTOM);
 
-    actor->selected=0; selected_building=0;
+    actor->selected=0;
+    selected_building=0;
     Building *building=&b[0];
     building->alive=1; building->owner=SIDE; building->type=B_PYLON;
     building->raw_type=sc64_race_raw_building(B_PYLON); building->raw_owner=7;
@@ -464,9 +471,9 @@ main(void)
     test_p3_sequence_invalidates_bottom_and_matches_redraw();
 #endif
 #ifdef SC64_RACES
-    /* This fixture opens a skirmish; run it after campaign-specific checks
-     * so those still exercise their original campaign HUD context. */
-    test_selected_shield_only_changes_match_forced_redraw();
+    /* Keep the skirmish fixture last so it cannot change the campaign state
+       expected by the older mission-message and mission-cache checks above. */
+    test_skirmish_shield_only_changes_invalidate_cached_bottom();
 #endif
     return 0;
 }

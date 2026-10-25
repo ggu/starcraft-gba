@@ -100,7 +100,7 @@ int main(void)
     /* Crowd several neighboring cells with mixed owners and attack classes;
      * deterministic positions include strict range boundaries and ties. */
     for (int i = 0; i < 72; ++i) {
-        int owner = i % 3 == 0 ? SIDE : i % 3 == 1 ? ENEMY : RESCUABLE;
+        int owner = i % 5;
         int type = (i % 5 == 0) ? U_MUTALISK : (i % 2 ? U_ZERGLING : U_MARINE);
         int x = 180 + (i % 12) * 64, y = 120 + (i / 12) * 64;
         int slot = spawn_unit(owner, type, x, y);
@@ -123,7 +123,7 @@ int main(void)
     /* Fill the remaining unit and building slots densely in one 64px cell,
      * including T3's combined target index 223 (unit 159 / building 63). */
     for (int i = 75; i < MAX_UNITS; ++i) {
-        int owner = i % 3 == 0 ? SIDE : i % 3 == 1 ? ENEMY : RESCUABLE;
+        int owner = i % 5;
         int type = i % 2 ? U_ZERGLING : U_MARINE;
         assert(spawn_unit(owner, type, 500 + (i % 4), 500 + (i % 4)) == i);
     }
@@ -135,7 +135,7 @@ int main(void)
     build_owner_lists();
     sc64_target_index_begin();
     assert(sc64_target_index_active);
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     sc64_target_hostility_snapshot();
     assert(target_hostile_masks_valid);
     for (int owner = 0; owner < 5; ++owner)
@@ -144,9 +144,16 @@ int main(void)
                    !!owners_hostile(owner, other));
 #endif
     compare_attacker_matrix();
+#ifdef SC64_TARGET_OCCUPANCY
+    /* Cross every owner slot with every compact attacker, covering both air
+     * and ground weapon predicates through the indexed query and scan oracle. */
+    for (int owner = 0; owner < 5; ++owner)
+        for (int attacker = -1; attacker < SC_RU_COUNT; ++attacker)
+            compare_query(780, 800, owner, 128, attacker);
+#endif
     for (int range_index = 0; range_index < 5; ++range_index) {
         int range = (int[]){ 1, 52, 64, 112, 128 }[range_index];
-        for (int owner = SIDE; owner <= RESCUABLE; ++owner)
+        for (int owner = 0; owner < 5; ++owner)
             for (int attacker_index = 0; attacker_index < 3; ++attacker_index) {
                 int attacker = (int[]){ U_MARINE, U_ZERGLING, U_DRAGOON }[attacker_index];
                 compare_query(200 + range_index * 64, 160 + owner * 32,
@@ -165,16 +172,35 @@ int main(void)
     build_owner_lists();
     sc64_target_index_begin();
     assert(sc64_target_index_active);
+#ifdef SC64_UNARMED_QUERY_SKIP
+    {
+        int unarmed = -1;
+        for (int attacker = 0; attacker < SC_RU_COUNT; ++attacker)
+            if (sc64_race_unit_damage_vs(attacker, 0) <= 0 &&
+                sc64_race_unit_damage_vs(attacker, 1) <= 0) {
+                unarmed = attacker;
+                break;
+            }
+        assert(unarmed >= 0);
+        compare_query(780, 800, SIDE, 128, unarmed);
+        assert(nearest_enemy_typed(780, 800, SIDE, 128, unarmed) == -1);
+        compare_query(780, 800, SIDE, 128, -1);
+        assert(nearest_enemy_typed(780, 800, SIDE, 128, -1) == 72);
+    }
+#endif
 #if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     /* The air-only Scourge must survive the no-weapon early-return check and
      * find an enemy Mutalisk, while the wildcard remains unchanged. */
     assert(sc64_race_unit_damage_vs(U_SCOURGE, 0) == 0);
     assert(sc64_race_unit_damage_vs(U_SCOURGE, 1) > 0);
+    u[10].owner = ENEMY;
+    build_owner_lists();
+    sc64_target_index_begin();
     compare_query(820, 120, SIDE, 64, U_SCOURGE);
     assert(nearest_enemy_typed(820, 120, SIDE, 64, U_SCOURGE) == 10);
 #endif
 
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     /* The entity moves across bucket boundaries during the indexed pass; its
      * old cell must stop returning it and its new cell must return it. */
     moving = 0;
@@ -193,19 +219,20 @@ int main(void)
 
     /* Exercise masks at both bit endpoints. Moves add occupancy immediately;
      * dead-entry bits remain conservative until the next begin reset. */
-    race_cols = race_rows = 128;
+    race_cols = SC64_TARGET_GRID_COLS * 4;
+    race_rows = SC64_TARGET_GRID_ROWS * 4;
     memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b));
     u[0].alive = 1; u[0].owner = ENEMY; u[0].type = U_MARINE;
     u[0].x = WORLD_W - 32; u[0].y = WORLD_H - 32;
     build_owner_lists(); sc64_target_index_begin();
     assert(sc64_target_index_active);
-    assert(sc64_target_owner_columns[ENEMY] == (1u << 31));
-    assert(sc64_target_owner_rows[ENEMY] == (1u << 31));
+    assert(sc64_target_owner_columns[ENEMY] == (1u << (SC64_TARGET_GRID_COLS - 1)));
+    assert(sc64_target_owner_rows[ENEMY] == (1u << (SC64_TARGET_GRID_ROWS - 1)));
     compare_query(u[0].x, u[0].y, SIDE, 1, U_MARINE);
     u[0].x = u[0].y = 32;
     sc64_target_index_move(&u[0]);
-    assert(sc64_target_owner_columns[ENEMY] == ((1u << 31) | 1u));
-    assert(sc64_target_owner_rows[ENEMY] == ((1u << 31) | 1u));
+    assert(sc64_target_owner_columns[ENEMY] == ((1u << (SC64_TARGET_GRID_COLS - 1)) | 1u));
+    assert(sc64_target_owner_rows[ENEMY] == ((1u << (SC64_TARGET_GRID_ROWS - 1)) | 1u));
     compare_query(32, 32, SIDE, 1, U_MARINE);
     u[0].alive = 0;
     compare_query(32, 32, SIDE, 1, U_MARINE);
@@ -233,7 +260,7 @@ int main(void)
     assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) ==
            MAX_UNITS + MAX_BUILDINGS - 1);
 
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     /* Generation-17 expands the unified index past 255. Verify the exact
      * transition values at 254/255 and the final target 287, including
      * lowest-global-index ties through both the indexed and oracle paths. */
@@ -248,21 +275,22 @@ int main(void)
         b[i].x = 500; b[i].y = 500;
     }
     u[MAX_UNITS - 1].alive = 1;
-    b[62].alive = b[63].alive = b[MAX_BUILDINGS - 1].alive = 1;
+    b[0].alive = b[1].alive = b[MAX_BUILDINGS - 1].alive = 1;
     build_owner_lists();
     sc64_target_index_begin();
     assert(sc64_target_index_active);
     compare_query(500, 500, SIDE, 64, U_MARINE);
-    assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) == 191);
+    assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) == MAX_UNITS - 1);
     u[MAX_UNITS - 1].alive = 0;
     compare_query(500, 500, SIDE, 64, U_MARINE);
-    assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) == 254);
-    b[62].alive = 0;
+    assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) == MAX_UNITS);
+    b[0].alive = 0;
     compare_query(500, 500, SIDE, 64, U_MARINE);
-    assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) == 255);
-    b[63].alive = 0;
+    assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) == MAX_UNITS + 1);
+    b[1].alive = 0;
     compare_query(500, 500, SIDE, 64, U_MARINE);
-    assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) == 287);
+    assert(nearest_enemy_typed(500, 500, SIDE, 64, U_MARINE) ==
+           MAX_UNITS + MAX_BUILDINGS - 1);
     sc64_target_index_end();
 #endif
 
@@ -279,6 +307,8 @@ int main(void)
      * every head before rebuilding, rather than retaining stale links. */
     for (int i = 0; i < MAX_UNITS; ++i) u[i].alive = 0;
     for (int i = 0; i < MAX_BUILDINGS; ++i) b[i].alive = 0;
+    race_cols = SC64_TARGET_GRID_COLS * 4;
+    race_rows = SC64_TARGET_GRID_ROWS * 4;
     u[0].alive = 1; u[0].owner = SIDE; u[0].type = U_MARINE; u[0].flags = 0;
     u[1].alive = 1; u[1].owner = ENEMY; u[1].type = U_ZERGLING; u[1].flags = 0;
     u[0].x = 32; u[0].y = 32; u[1].x = 96; u[1].y = 32;
@@ -286,8 +316,8 @@ int main(void)
     sc64_target_index_begin();
     assert(sc64_target_index_active);
     for (int entity = 0; entity < 2 && sc64_target_index_active; ++entity)
-        for (int row = 0; row < 16 && sc64_target_index_active; ++row)
-            for (int col = 0; col < 16 && sc64_target_index_active; ++col) {
+        for (int row = 0; row < SC64_TARGET_GRID_ROWS && sc64_target_index_active; ++row)
+            for (int col = 0; col < SC64_TARGET_GRID_COLS && sc64_target_index_active; ++col) {
                 u[entity].x = col * 64 + 32;
                 u[entity].y = row * 64 + 32;
                 sc64_target_index_move(&u[entity]);
@@ -301,5 +331,34 @@ int main(void)
     assert(nearest_enemy_typed(32, 32, ENEMY, 64, U_MARINE) == 0);
     sc64_target_index_end();
     target_lists_valid = 0;
+#if defined(SC64_TARGET_OCCUPANCY) && \
+    (defined(SC64_Z4_RUNTIME) || defined(SC64_P4_RUNTIME))
+    /* Rebuild hostility masks after an alliance/rescue ownership transition.
+     * The Z/P mission treats the rescued owner as allied to SIDE; generic
+     * skirmish hostility treats distinct non-neutral owners as hostile. */
+    memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b));
+    race_mode = 0;
+#ifdef SC64_Z4_RUNTIME
+    race_selected_mission = SC64_Z4_GLOBAL_MISSION_ID;
+#else
+    race_selected_mission = SC64_P4_GLOBAL_ID;
+#endif
+    u[0].alive = u[1].alive = 1;
+    u[0].owner = SIDE; u[1].owner = RESCUABLE;
+    u[0].type = u[1].type = U_MARINE;
+    u[0].x = u[1].x = 512; u[0].y = u[1].y = 512;
+    build_owner_lists(); sc64_target_index_begin(); sc64_target_hostility_snapshot();
+    compare_query(512, 512, SIDE, 64, U_MARINE);
+    assert(nearest_enemy_typed(512, 512, SIDE, 64, U_MARINE) == -1);
+    u[1].owner = ENEMY; /* Simulate ownership changing at a source event. */
+    build_owner_lists(); sc64_target_index_begin(); sc64_target_hostility_snapshot();
+    compare_query(512, 512, SIDE, 64, U_MARINE);
+    assert(nearest_enemy_typed(512, 512, SIDE, 64, U_MARINE) == 1);
+    u[1].owner = RESCUABLE;
+    race_mode = 1;
+    build_owner_lists(); sc64_target_index_begin(); sc64_target_hostility_snapshot();
+    compare_query(512, 512, SIDE, 64, U_MARINE);
+    assert(nearest_enemy_typed(512, 512, SIDE, 64, U_MARINE) == 1);
+#endif
     return 0;
 }

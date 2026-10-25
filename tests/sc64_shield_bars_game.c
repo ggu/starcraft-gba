@@ -241,6 +241,6 @@ main(void)
     test_selected_hud_reads_live_shield_values();
 #endif
     test_vital_bar_viewport_clipping();
-    puts("PASS unit/building shield pixels, zero-shield baseline and selected HUD refresh");
+    puts("PASS P7 unit/building shield pixels, zero-shield baseline and selected HUD refresh");
     return 0;
 }

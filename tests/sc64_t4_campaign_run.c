@@ -114,7 +114,7 @@ static int select_human_group_except(int excluded_slot)
     int drag_steps = 0;
     for (int i = 0; i < MAX_UNITS; ++i) if (i != excluded_slot &&
         u[i].alive && u[i].owner == SIDE &&
-        sc64_t4_unit_selectable(u[i].type)) {
+        sc64_game_unit_selectable(u[i].type)) {
         if (u[i].x < left) left = u[i].x;
         if (u[i].x > right) right = u[i].x;
         if (u[i].y < top) top = u[i].y;
@@ -159,10 +159,10 @@ static int select_human_group_except(int excluded_slot)
     }
     int verified = 0;
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].selected) {
-        if (u[i].owner != SIDE || !sc64_t4_unit_selectable(u[i].type) ||
+        if (u[i].owner != SIDE || !sc64_game_unit_selectable(u[i].type) ||
             i == excluded_slot) {
             fprintf(stderr, "T4 controller box rejected slot=%d alive=%d owner=%u selectable=%d excluded=%d\n",
-                    i, u[i].alive, u[i].owner, sc64_t4_unit_selectable(u[i].type),
+                    i, u[i].alive, u[i].owner, sc64_game_unit_selectable(u[i].type),
                     i == excluded_slot);
             return 0;
         }
@@ -367,7 +367,7 @@ static int choose_human_actor(void)
         for (int i = 0; i < MAX_UNITS; ++i) {
             if (!u[i].alive || u[i].owner != SIDE ||
                 !race_t4_effect_men_raw(u[i].raw_type) ||
-                !sc64_t4_unit_selectable(u[i].type)) continue;
+                !sc64_game_unit_selectable(u[i].type)) continue;
             if ((pass == 0) != (u[i].raw_type == 20)) continue;
             int d = dist2(gx, gy, u[i].x, u[i].y);
             if (d < best_dist) { best = i; best_dist = d; }
@@ -384,7 +384,7 @@ static int choose_human_actor_in_location(int excluded_slot, unsigned location)
     for (int i = 0; i < MAX_UNITS; ++i) {
         if (i == excluded_slot || !u[i].alive || u[i].owner != SIDE ||
             !race_t4_effect_men_raw(u[i].raw_type) ||
-            !sc64_t4_unit_selectable(u[i].type) || !unit_in_location((unsigned)i, location)) continue;
+            !sc64_game_unit_selectable(u[i].type) || !unit_in_location((unsigned)i, location)) continue;
         int d = dist2(gx, gy, u[i].x, u[i].y);
         if (d < best_dist) { best = i; best_dist = d; }
     }

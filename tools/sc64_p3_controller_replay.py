@@ -30,6 +30,7 @@ from emulator_smoke import ROOT, capture, symbol_sizes, symbols
 MISSION_P3 = 22
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_RESULT = 0, 1, 3
 DEFAULT_TRACE = ROOT / ".local/sc64/p3-controller-garrison.json"
+DEFAULT_EXPANSION_TRACE = ROOT / "build/p3-expansion-controller.json"
 DEFAULT_OUTPUT = ROOT / "build/emulator/sc64-p3-controller-replay"
 EXPECTED_FINAL = {
     "host_tick": 152107, "frame": 151088, "screen": SCREEN_RESULT,
@@ -39,18 +40,60 @@ EXPECTED_FINAL = {
     "force3_units": 0, "force3_buildings": 0, "minerals": 44,
     "gas": 1048, "supply": 54, "supply_cap": 98, "gateways": 1,
 }
+EXPANSION_POLICY = "protoss-three-expansion-source-cleared"
+GARRISON_POLICY = "protoss-economy-tech-defense-assault"
+EXPANSION_EXPECTED_START = {
+    "global_mission": MISSION_P3, "selected_mission": MISSION_P3, "race_mode": 0,
+    "campaign_phase": 1, "campaign_objectives": 0, "completed": 0,
+    "mission_unsupported_count": 0, "model_valid": 1,
+    "raw_owner7_units": 14, "raw_owner0_units": 43, "raw_owner6_units": 39,
+    "raw_owner7_buildings": 4, "raw_owner0_buildings": 22, "raw_owner6_buildings": 16,
+    "p3_sequence": 0, "p3_fired": 1, "action_ticks": 0,
+    "side_units": 14, "side_army": 10, "side_buildings": 4,
+    "side_probes": 4, "side_cannons": 0, "force2_units": 43,
+    "force2_buildings": 22, "force3_units": 39, "force3_buildings": 16,
+    "minerals": 300, "gas": 100, "supply": 54, "supply_cap": 66,
+    "weapons_level": 0, "armor_level": 0, "weapons_research": 0,
+    "armor_research": 0, "zealots_queued": 0, "gateways": 0,
+    "selected_units": 0, "selected_building": -1, "geyser_count": 3,
+}
+EXPANSION_EXPECTED_FINAL = {
+    "host_tick": 124689, "frame": 123916, "screen": SCREEN_RESULT,
+    "won": 1, "lost": 0, "p3_outcome": 1, "global_mission": MISSION_P3,
+    "selected_mission": MISSION_P3, "race_mode": 0, "campaign_phase": 3,
+    "campaign_objectives": 1, "completed": 1, "mission_unsupported_count": 0,
+    "model_valid": 1, "raw_owner7_units": 1, "raw_owner0_units": 3,
+    "raw_owner6_units": 1, "raw_owner7_buildings": 4,
+    "raw_owner0_buildings": 0, "raw_owner6_buildings": 0,
+    "p3_sequence": 5, "p3_fired": 31, "action_ticks": 0,
+    "side_units": 67, "side_army": 22, "side_buildings": 35,
+    "side_probes": 45, "side_cannons": 11, "force2_units": 3,
+    "force2_buildings": 0, "force3_units": 1, "force3_buildings": 0,
+    "minerals": 14840, "gas": 21088, "supply": 178,
+    "supply_cap": 230, "weapons_level": 2, "armor_level": 2,
+    "weapons_research": 0, "armor_research": 0, "zealots_queued": 2,
+    "gateways": 1, "selected_units": 0, "selected_building": 61,
+    "geyser_count": 3,
+}
 
 
-def validate_trace(trace: object, capacity: int, *, windowed: bool = False) -> dict:
+def validate_trace(trace: object, capacity: int, *, windowed: bool = False,
+                   route: str = "garrison", window_ticks: int = scheduler.CHECKPOINT_TICKS) -> dict:
     """Strictly validate the frozen P3 controller trace before any emulator work."""
+    if route not in ("garrison", "expansion"):
+        raise ValueError("route must be garrison or expansion")
+    expected_policy = GARRISON_POLICY if route == "garrison" else EXPANSION_POLICY
+    expected_final = EXPECTED_FINAL if route == "garrison" else EXPANSION_EXPECTED_FINAL
     if type(capacity) is not int or capacity < 1:
         raise ValueError("controller queue capacity must be a positive integer")
+    if type(window_ticks) is not int or window_ticks < 1:
+        raise ValueError("scheduler checkpoint interval must be positive")
     if not isinstance(trace, dict) or type(trace.get("schema")) is not int or trace["schema"] != 1:
         raise ValueError("trace schema must be an object with schema=1")
     if type(trace.get("mission")) is not int or trace["mission"] != MISSION_P3:
         raise ValueError("trace mission must be P3 global ID 22")
-    if not isinstance(trace.get("policy"), str) or not trace["policy"]:
-        raise ValueError("trace policy must be a nonempty string")
+    if trace.get("policy") != expected_policy:
+        raise ValueError(f"trace policy does not match the selected {route} route")
     rows = trace.get("events")
     if not isinstance(rows, list) or not rows:
         raise ValueError("trace events must be a nonempty array")
@@ -58,6 +101,7 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False) -> d
     previous_tick, previous_held = 0, 0
     start = final = None
     last_observation_tick = 0
+    last_observation_kind = None
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             raise ValueError(f"trace event {index} must be an object")
@@ -78,11 +122,24 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False) -> d
             if start is not None:
                 raise ValueError("trace must contain exactly one start event")
             start = row
-        elif kind == "periodic":
+        elif kind in ("periodic", "progress"):
+            if kind == "progress" and route != "expansion":
+                raise ValueError("progress events are only valid in the expansion trace")
             tick = row.get("host_tick")
-            if type(tick) is not int or tick <= last_observation_tick or tick > 0xFFFFFFFF:
-                raise ValueError(f"periodic event {index} has invalid or unordered host_tick")
+            if type(tick) is not int or tick > 0xFFFFFFFF:
+                raise ValueError(f"{kind} event {index} has invalid host_tick")
+            same_tick_progress_pair = (kind == "progress" and last_observation_kind == "periodic" and
+                                       tick == last_observation_tick)
+            if tick < last_observation_tick or (tick == last_observation_tick and not same_tick_progress_pair):
+                raise ValueError(f"{kind} event {index} has invalid or unordered host_tick")
+            if kind == "progress" and (row.get("screen") != SCREEN_PLAY or row.get("won") != 0 or
+                                        row.get("lost") != 0 or row.get("p3_outcome") != 0 or
+                                        row.get("global_mission") != MISSION_P3 or
+                                        row.get("selected_mission") != MISSION_P3 or
+                                        row.get("race_mode") != 0 or row.get("elapsed") != row.get("frame")):
+                raise ValueError(f"progress event {index} is not a live P3 checkpoint")
             last_observation_tick = tick
+            last_observation_kind = kind
         elif kind == "won":
             if final is not None:
                 raise ValueError("trace must contain exactly one won event")
@@ -97,6 +154,10 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False) -> d
         raise ValueError("trace must record P3 launch at host_tick=7, frame=0, screen=PLAY")
     if start.get("p3_outcome") != 0 or start.get("won") != 0 or start.get("lost") != 0:
         raise ValueError("trace start must be a live, unfinished P3 mission")
+    if route == "expansion":
+        for key, expected in EXPANSION_EXPECTED_START.items():
+            if type(start.get(key)) is not int or start[key] != expected:
+                raise ValueError(f"expansion start {key} does not match the verified source launch")
     if final is None or rows[-1] is not final:
         raise ValueError("trace must end with its final won event")
     stop_tick = final.get("host_tick")
@@ -104,28 +165,112 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False) -> d
         raise ValueError("final won event has invalid host_tick or precedes controller input")
     if last_observation_tick > stop_tick:
         raise ValueError("periodic observation occurs after final result")
-    for key, expected in EXPECTED_FINAL.items():
+    for key, expected in expected_final.items():
         if type(final.get(key)) is not int or final[key] != expected:
             raise ValueError(f"final event {key} does not match the verified P3 win trace")
     if final.get("elapsed") != final["frame"]:
         raise ValueError("final P3 elapsed frame count does not match frame")
-    if final.get("side_army") != 13 or final.get("p3_fired") < 1:
+    expected_minimum_army = 13 if route == "garrison" else 22
+    if final.get("side_army") != expected_minimum_army or final.get("p3_fired") < 1:
         raise ValueError("final trace is missing expected player force or P3 trigger state")
+    if route == "expansion" and (len(inputs) != 5932 or
+                                  sum(row.get("kind") == "periodic" for row in rows) != 123 or
+                                  sum(row.get("kind") == "progress" for row in rows) != 12):
+        raise ValueError("expansion trace input/checkpoint counts differ from the verified controller run")
     if windowed:
-        last_page = (stop_tick - 1) // scheduler.CHECKPOINT_TICKS
-        peak = max((sum(1 for tick, _ in inputs if tick // scheduler.CHECKPOINT_TICKS == page)
+        last_page = (stop_tick - 1) // window_ticks
+        peak = max((sum(1 for tick, _ in inputs if tick // window_ticks == page)
                     for page in range(last_page + 1)), default=0)
         if peak > capacity:
             raise ValueError(f"controller event page exceeds ELF capacity ({peak}/{capacity})")
     else:
         peak = len(inputs)
-    return {"inputs": inputs, "input_count": len(inputs), "stop_tick": stop_tick,
+    return {"route": route, "policy": expected_policy,
+            "inputs": inputs, "input_count": len(inputs), "stop_tick": stop_tick,
             "start": start, "final": final, "scheduler_mode": "windowed" if windowed else "full",
             "peak_page_transitions": peak}
 
 
+def _record_scalar(raw: bytes, index: int, stride: int, offsets: dict[str, int],
+                   widths: dict[str, int], signed: dict[str, bool], name: str) -> int:
+    if name not in offsets:
+        raise RuntimeError(f"entity layout is missing {name}")
+    width, offset = widths.get(name, 4), offsets[name]
+    base = index * stride
+    if width not in (1, 2, 4) or offset < 0 or offset + width > stride or base + offset + width > len(raw):
+        raise RuntimeError(f"entity field {name} exceeds its bounded ABI width")
+    return int.from_bytes(raw[base + offset:base + offset + width], "little",
+                          signed=signed.get(name, False))
+
+
+def _debugger_scalar(rsp, address: int, *, width: int = 4, signed: bool = False) -> int:
+    if width not in (1, 2, 4):
+        raise RuntimeError("debugger scalar width is invalid")
+    data = rsp.read(address, width)
+    if len(data) != width:
+        raise RuntimeError("debugger returned a truncated scalar")
+    return int.from_bytes(data, "little", signed=signed)
+
+
+def _selected_unit_count(raw: bytes, capacity: int, stride: int, offsets: dict[str, int],
+                         widths: dict[str, int], signed: dict[str, bool]) -> int:
+    count = 0
+    for index in range(capacity):
+        if not _record_scalar(raw, index, stride, offsets, widths, signed, "alive"):
+            continue
+        if not _record_scalar(raw, index, stride, offsets, widths, signed, "selected"):
+            continue
+        # ORDER_TRANSPORTED units are live records, but selected_count() omits
+        # them while they are aboard a carrier.
+        if "order" in offsets and _record_scalar(raw, index, stride, offsets, widths,
+                                                  signed, "order") == 8:
+            continue
+        count += 1
+    return count
+
+
+def _queued_type_count(raw: bytes, capacity: int, stride: int, offsets: dict[str, int],
+                       widths: dict[str, int], signed: dict[str, bool], *,
+                       owner: int, unit_type: int) -> int:
+    required = ("alive", "owner", "queue_count", "queue_head", "queue")
+    if any(name not in offsets for name in required):
+        raise RuntimeError("building layout is missing queue fields")
+    if len(raw) != capacity * stride:
+        raise RuntimeError("building bank size does not match its bounded layout")
+    # Both supported ABIs are known from the ELF bank profile: the compact ZP
+    # record stores five u8 queue entries in a 48-byte stride; legacy records
+    # store five 32-bit ints in a 100-byte stride.
+    if stride == 48:
+        item_width = 1
+    elif stride == 100:
+        item_width = 4
+    else:
+        raise RuntimeError(f"unsupported building stride for queue decode: {stride}")
+    queue_offset = offsets["queue"]
+    if queue_offset < 0 or queue_offset + 5 * item_width > stride:
+        raise RuntimeError("building queue exceeds its bounded ABI width")
+    result = 0
+    for index in range(capacity):
+        if not _record_scalar(raw, index, stride, offsets, widths, signed, "alive") or \
+                _record_scalar(raw, index, stride, offsets, widths, signed, "owner") != owner:
+            continue
+        queued = _record_scalar(raw, index, stride, offsets, widths, signed, "queue_count")
+        head = _record_scalar(raw, index, stride, offsets, widths, signed, "queue_head")
+        if not 0 <= queued <= 5 or not 0 <= head < 5:
+            raise RuntimeError("building queue count/head is outside its bounded ring")
+        base = index * stride
+        for item in range(queued):
+            slot = (head + item) % 5
+            start = base + queue_offset + slot * item_width
+            if int.from_bytes(raw[start:start + item_width], "little",
+                              signed=(item_width == 4)) == unit_type:
+                result += 1
+    return result
+
+
 def p3_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
-                campaign_layout: tuple[int, dict[str, int]], p3_layout: tuple[int, dict[str, int]]) -> dict:
+                campaign_layout: tuple[int, dict[str, int]], p3_layout: tuple[int, dict[str, int]],
+                *, expansion_witness: bool = False) -> dict:
     state = profile.observe(rsp, sym, sizes, bank, campaign_layout=campaign_layout,
                             p3_layout=p3_layout)
     units = state["units"]["by_owner"]
@@ -143,12 +288,65 @@ def p3_snapshot(rsp, sym: dict[str, int], sizes: dict[str, int], bank: dict,
     state["race_completed"] = races.read_u32(rsp, sym["race_completed"])
     state["race_mode"] = races.read_u32(rsp, sym["race_mode"])
     state["race_selected_mission"] = races.read_u32(rsp, sym["race_selected_mission"])
+    if expansion_witness:
+        for side, symbol, capacity_key, stride_key, offsets_key, widths_key in (
+                ("units", "u", "unit_capacity", "unit_stride_bytes", "unit_offsets", "unit_field_widths"),
+                ("buildings", "b", "building_capacity", "building_stride_bytes", "building_offsets", "building_field_widths")):
+            offsets = bank[offsets_key]
+            if "raw_owner" not in offsets:
+                raise RuntimeError(f"P3 ELF {side} layout has no raw_owner field")
+            stride = bank[stride_key]
+            raw = rsp.read(sym[symbol], bank[capacity_key] * stride)
+            owner_offset = offsets["raw_owner"]
+            owner_width = bank[widths_key].get("raw_owner", 1)
+            if owner_width not in (1, 2, 4) or owner_offset + owner_width > stride:
+                raise RuntimeError(f"P3 ELF {side} raw_owner field exceeds its entity stride")
+            for source_owner in (0, 6, 7):
+                count = 0
+                for index in range(bank[capacity_key]):
+                    row = raw[index * stride:(index + 1) * stride]
+                    if _record_scalar(row, 0, stride, offsets, bank[widths_key], offsets.signed,
+                                      "alive") and \
+                            _record_scalar(row, 0, stride, offsets, bank[widths_key], offsets.signed,
+                                           "raw_owner") == source_owner:
+                        count += 1
+                state[f"raw_owner{source_owner}_{side}"] = count
     state["gateways"] = sum(1 for building in state["buildings"]["entities"]
                             if building["owner"] == 0 and building["type"] == 14)
+    state["side_probes"] = sum(1 for unit in state["units"]["entities"]
+                               if unit["owner"] == 0 and unit["type"] == 9)
+    state["side_army"] = state["side_units"] - state["side_probes"]
+    state["side_cannons"] = sum(1 for building in state["buildings"]["entities"]
+                                if building["owner"] == 0 and building["type"] == 19)
+    for key in ("weapons_level", "armor_level", "weapons_research", "armor_research",
+                "selected_building", "geyser_count", "mission_unsupported_count"):
+        if key in sym:
+            state[key] = _debugger_scalar(rsp, sym[key], signed=(key == "selected_building"))
+    if "selected" in bank["unit_offsets"]:
+        unit_raw = rsp.read(sym["u"], bank["unit_capacity"] * bank["unit_stride_bytes"])
+        offsets, widths = bank["unit_offsets"], bank["unit_field_widths"]
+        state["selected_units"] = _selected_unit_count(unit_raw, bank["unit_capacity"],
+                                                       bank["unit_stride_bytes"], offsets, widths,
+                                                       offsets.signed)
+    else:
+        state["selected_units"] = 0
+    if all(name in bank["building_offsets"] for name in ("queue_count", "queue_head", "queue", "alive", "owner")):
+        building_raw = rsp.read(sym["b"], bank["building_capacity"] * bank["building_stride_bytes"])
+        stride = bank["building_stride_bytes"]
+        state["zealots_queued"] = _queued_type_count(
+            building_raw, bank["building_capacity"], stride, bank["building_offsets"],
+            bank["building_field_widths"], bank["building_offsets"].signed,
+            owner=0, unit_type=10)
     return state
 
 
-def verify_final(trace_final: dict, state: dict) -> None:
+def verify_final(trace_final: dict, state: dict, route: str = "garrison") -> None:
+    if route not in ("garrison", "expansion"):
+        raise ValueError("route must be garrison or expansion")
+    expected_final = EXPECTED_FINAL if route == "garrison" else EXPANSION_EXPECTED_FINAL
+    for key, value in expected_final.items():
+        if type(trace_final.get(key)) is not int or trace_final[key] != value:
+            raise RuntimeError(f"trace final {key} does not match the verified {route} route")
     fields = ("screen", "frame", "won", "lost", "side_units", "side_buildings",
               "force2_units", "force2_buildings", "force3_units", "force3_buildings", "minerals", "gas")
     expected = {"screen": SCREEN_RESULT, "frame": trace_final["frame"], "won": 1, "lost": 0,
@@ -158,6 +356,19 @@ def verify_final(trace_final: dict, state: dict) -> None:
     for key, value in expected.items():
         if state.get(key) != value:
             raise RuntimeError(f"final {key} mismatch: expected {value}, observed {state.get(key)}")
+    if route == "expansion":
+        for key in ("race_mode", "mission_unsupported_count",
+                    "raw_owner7_units", "raw_owner0_units", "raw_owner6_units",
+                    "raw_owner7_buildings", "raw_owner0_buildings", "raw_owner6_buildings",
+                    "side_army", "side_probes", "side_cannons", "weapons_level", "armor_level",
+                    "weapons_research", "armor_research", "zealots_queued", "selected_units",
+                    "selected_building", "geyser_count"):
+            if key not in state:
+                raise RuntimeError(f"ARM observer cannot verify required expansion field {key}")
+            if state.get(key) != trace_final[key]:
+                raise RuntimeError(f"final {key} mismatch: expected {trace_final[key]}, observed {state.get(key)}")
+        if state.get("race_selected_mission") != trace_final["selected_mission"]:
+            raise RuntimeError("final selected_mission mismatch")
     # The legacy controller trace stores gateway presence (side_building() >= 0),
     # while p3_snapshot reports the full live gateway count for diagnostics.
     if bool(state.get("gateways", 0)) != bool(trace_final["gateways"]):
@@ -167,6 +378,10 @@ def verify_final(trace_final: dict, state: dict) -> None:
     for key, value in (("mission", MISSION_P3), ("elapsed_frames", trace_final["frame"]), ("phase", 3)):
         if campaign.get(key) != value:
             raise RuntimeError(f"final campaign.{key} mismatch: expected {value}, got {campaign.get(key)}")
+    if route == "expansion":
+        for key, value in (("objective_flags", 1),):
+            if campaign.get(key) != value:
+                raise RuntimeError(f"final campaign.{key} mismatch: expected {value}, got {campaign.get(key)}")
     if not (campaign.get("objective_flags", 0) & 1):
         raise RuntimeError("final campaign primary objective flag is absent")
     model = state.get("race_p3", {})
@@ -178,17 +393,21 @@ def verify_final(trace_final: dict, state: dict) -> None:
         raise RuntimeError("P3 completion bit is absent")
 def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         elf_path: Path | None = None, ticks: int | None = None,
-        save_at_end: bool = False) -> dict:
+        save_at_end: bool = False, route: str = "garrison") -> dict:
     trace = json.loads(trace_path.read_text(encoding="utf-8"))
-    rom = rom_path or ROOT / "build/StarCraft-Protoss-P3-GBA.gba"
-    elf = elf_path or ROOT / "build/starcraft-protoss-p3.elf"
+    rom = rom_path or ROOT / ("build/StarCraft-Protoss-P5-Shuttle-GBA.gba" if route == "expansion"
+                              else "build/StarCraft-Protoss-P3-GBA.gba")
+    elf = elf_path or ROOT / ("build/starcraft-protoss-p5-shuttle.elf" if route == "expansion"
+                              else "build/starcraft-protoss-p3.elf")
     if not rom.is_file() or not elf.is_file():
         raise RuntimeError(f"P3 ROM/ELF missing ({rom}, {elf})")
     sym, sizes = symbols(elf), symbol_sizes(elf)
     mode, capacity = scheduler.schedule_mode(sym, sizes)
-    plan = validate_trace(trace, capacity, windowed=mode == "windowed")
+    period = scheduler.checkpoint_ticks(sym)
+    plan = validate_trace(trace, capacity, windowed=mode == "windowed", route=route,
+                          window_ticks=period)
     requested, prefix = scheduler.run_length(plan, ticks, save_at_end)
-    pages = scheduler.make_schedule_pages(plan, requested, capacity) if mode == "windowed" else None
+    pages = scheduler.make_schedule_pages(plan, requested, capacity, period) if mode == "windowed" else None
     if save_at_end and not mode == "windowed":
         raise ValueError("--save-at-end requires a windowed controller scheduler")
     campaign_meta = split.read_campaign_metadata(rom, elf, "protoss")
@@ -202,6 +421,9 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                 "race_mode", "race_selected_mission", "race_completed", "race_campaign", "race_p3",
                 "race_p3_action_ticks", "race_minerals", "race_gas", "supply_used", "supply_cap", "u", "b")
     required += ("race_front", "demo_inject_keys")
+    if route == "expansion":
+        required += ("weapons_level", "armor_level", "weapons_research", "armor_research",
+                     "selected_building", "geyser_count", "mission_unsupported_count")
     if mode == "windowed":
         required += ("demo_schedule_active", "demo_schedule_index")
     missing = [name for name in required if name not in sym]
@@ -261,7 +483,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                 stream.write(json.dumps(checkpoint, separators=(",", ":")) + "\n")
                 stream.flush()
                 os.fsync(stream.fileno())
-        previous_state = p3_snapshot(rsp, sym, sizes, bank, campaign_layout, p3_layout)
+        previous_state = p3_snapshot(rsp, sym, sizes, bank, campaign_layout, p3_layout,
+                                     expansion_witness=route == "expansion")
         previous_clock = profile.hardware_clock(rsp)
         previous_routes = {key: profile.u32(rsp, sym[key]) for key in
                            ("sc64_route_hits", "sc64_route_builds") if key in sym}
@@ -277,30 +500,31 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         profile.write_progress(
             run_dir / "progress.json", profile="protoss-p3", rom=rom, elf=elf,
             rom_sha256=rom_hash, elf_sha256=elf_hash,
-            configuration={"mission": MISSION_P3, "trace": str(trace_path), "trace_sha256": trace_hash,
+            configuration={"mission": MISSION_P3, "route": route, "trace": str(trace_path), "trace_sha256": trace_hash,
                            "input_transitions": plan["input_count"], "scheduler_mode": mode,
                            "scheduler_capacity": capacity, "peak_page_transitions": plan["peak_page_transitions"],
                            "trace_stop_tick": plan["stop_tick"], "requested_ticks": requested,
                            "prefix": prefix}, requested_ticks=requested,
-            checkpoint_interval=scheduler.CHECKPOINT_TICKS, latest_checkpoint=observations[0])
+            checkpoint_interval=period, latest_checkpoint=observations[0])
         tick = 0
         while tick < requested:
             rsp.tick()
             completed = profile.u32(rsp, sym["demo_schedule_tick"])
-            expected = min(requested, tick + scheduler.CHECKPOINT_TICKS)
+            expected = min(requested, tick + period)
             if completed != expected:
                 raise RuntimeError(f"expected observer tick {expected}, got {completed}")
             if mode == "windowed":
                 assert pages is not None
-                page = pages[(completed - 1) // scheduler.CHECKPOINT_TICKS]
+                page = pages[(completed - 1) // period]
                 cursor, count = profile.u32(rsp, sym["demo_schedule_index"]), profile.u32(rsp, sym["demo_schedule_count"])
                 if cursor != count or count != len(page["events"]):
                     raise RuntimeError(f"scheduler page incomplete at {completed}: {cursor}/{count}")
                 if completed < requested:
-                    write_page(pages[completed // scheduler.CHECKPOINT_TICKS]["events"])
+                    write_page(pages[completed // period]["events"])
             now = profile.hardware_clock(rsp)
             elapsed = (now - previous_clock) & 0xFFFFFFFF
-            state = p3_snapshot(rsp, sym, sizes, bank, campaign_layout, p3_layout)
+            state = p3_snapshot(rsp, sym, sizes, bank, campaign_layout, p3_layout,
+                                 expansion_witness=route == "expansion")
             frame_delta = (state["frame"] - previous_state["frame"]) & 0xFFFFFFFF
             counted = previous_state["screen"] == SCREEN_PLAY and state["screen"] == SCREEN_PLAY and frame_delta > 0
             fps = round(profile.CPU_HZ * frame_delta / max(1, elapsed), 2) if counted else None
@@ -320,20 +544,21 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
             profile.write_progress(
                 run_dir / "progress.json", profile="protoss-p3", rom=rom, elf=elf,
                 rom_sha256=rom_hash, elf_sha256=elf_hash,
-                configuration={"mission": MISSION_P3, "trace": str(trace_path),
+                configuration={"mission": MISSION_P3, "route": route, "trace": str(trace_path),
                                "trace_sha256": trace_hash, "input_transitions": plan["input_count"],
                                "scheduler_mode": mode, "scheduler_capacity": capacity,
                                "peak_page_transitions": plan["peak_page_transitions"],
                                "trace_stop_tick": plan["stop_tick"], "requested_ticks": requested,
                                "prefix": prefix},
-                requested_ticks=requested, checkpoint_interval=scheduler.CHECKPOINT_TICKS,
+                requested_ticks=requested, checkpoint_interval=period,
                 latest_checkpoint=checkpoint)
             print(f"P3 tick={completed}/{requested} frame={state['frame']} screen={state['screen']} "
                   f"fps={fps if fps is not None else 'n/a'}", flush=True)
             previous_state, previous_clock, previous_routes = state, now, route_values
             tick = completed
         final = observations[-1]
-        report = {"profile": "protoss-p3", "status": "prefix" if prefix else "verification_pending", "mission": MISSION_P3,
+        report = {"profile": "protoss-p3", "route": route, "policy": plan["policy"],
+                  "status": "prefix" if prefix else "verification_pending", "mission": MISSION_P3,
                   "rom": str(rom), "elf": str(elf), "trace": str(trace_path),
                   "rom_sha256": rom_hash, "elf_sha256": elf_hash, "trace_sha256": trace_hash,
                   "input_transitions": plan["input_count"], "scheduler_mode": mode,
@@ -342,7 +567,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                   "observed_ticks": final["tick"], "prefix": prefix,
                   "counted_live_play_frames": counted_frames,
                   "mean_live_play_effective_fps": round(profile.CPU_HZ * counted_frames / max(1, counted_cycles), 2),
-                  "timer_method": "GBA chained hardware timers at 1000-tick and exact-final observers",
+                  "checkpoint_interval_ticks": period,
+                  "timer_method": "GBA chained hardware timers at observer checkpoints and exact-final observer",
                   "fps_exclusions": "Initial HOME and result intervals are excluded; only positive frame deltas between PLAY checkpoints count.",
                   "final": final, "checkpoints": observations,
                   "checkpoint_history": str(history_path),
@@ -364,7 +590,7 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         save_report()
         if not prefix:
             try:
-                verify_final(plan["final"], final)
+                verify_final(plan["final"], final, route)
             except Exception as exc:
                 report.update({"status": "verification_failed", "verification_failed": str(exc),
                                "verified_win": False})
@@ -372,13 +598,13 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
                 profile.write_progress(
                     run_dir / "progress.json", profile="protoss-p3", rom=rom, elf=elf,
                     rom_sha256=rom_hash, elf_sha256=elf_hash,
-                    configuration={"mission": MISSION_P3, "trace": str(trace_path),
+                    configuration={"mission": MISSION_P3, "route": route, "trace": str(trace_path),
                                    "trace_sha256": trace_hash, "input_transitions": plan["input_count"],
                                    "scheduler_mode": mode, "scheduler_capacity": capacity,
                                    "peak_page_transitions": plan["peak_page_transitions"],
                                    "trace_stop_tick": plan["stop_tick"], "requested_ticks": requested,
                                    "prefix": prefix},
-                    requested_ticks=requested, checkpoint_interval=scheduler.CHECKPOINT_TICKS,
+                    requested_ticks=requested, checkpoint_interval=period,
                     latest_checkpoint={"tick": final["tick"], **final},
                     status="verification_failed", final_report=str(path))
                 raise
@@ -390,7 +616,8 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
             rsp.write(sym["demo_schedule_count"], struct.pack("<I", 0))
             saved = profile.save_live_checkpoint(rsp, sym, tick=final["tick"])
             saved["state"] = p3_snapshot(rsp, sym, sizes, bank,
-                                          campaign_layout, p3_layout)
+                                          campaign_layout, p3_layout,
+                                          expansion_witness=route == "expansion")
             menu.stop_emulator(proc, sock, log)
             proc = sock = log = None
             save_dir = run_dir / "saves" / run_dir.name
@@ -405,13 +632,13 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
         profile.write_progress(
             run_dir / "progress.json", profile="protoss-p3", rom=rom, elf=elf,
             rom_sha256=rom_hash, elf_sha256=elf_hash,
-            configuration={"mission": MISSION_P3, "trace": str(trace_path),
+            configuration={"mission": MISSION_P3, "route": route, "trace": str(trace_path),
                            "trace_sha256": trace_hash, "input_transitions": plan["input_count"],
                            "scheduler_mode": mode, "scheduler_capacity": capacity,
                            "peak_page_transitions": plan["peak_page_transitions"],
                            "trace_stop_tick": plan["stop_tick"], "requested_ticks": requested,
                            "prefix": prefix},
-            requested_ticks=requested, checkpoint_interval=scheduler.CHECKPOINT_TICKS,
+            requested_ticks=requested, checkpoint_interval=period,
             latest_checkpoint={"tick": final["tick"], **final},
             status="prefix" if prefix else "finished", final_report=str(path))
         print(json.dumps({"status": report["status"], "observed_ticks": final["tick"],
@@ -435,19 +662,23 @@ def run(trace_path: Path, output: Path, rom_path: Path | None = None,
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--trace", type=Path, default=DEFAULT_TRACE)
+    parser.add_argument("--trace", type=Path)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--rom", type=Path, help="P3 ROM override")
     parser.add_argument("--elf", type=Path, help="P3 ELF override")
     parser.add_argument("--ticks", type=int, help="replay a positive trace prefix")
     parser.add_argument("--save-at-end", action="store_true", help="pause/save with normal controls at prefix end")
+    parser.add_argument("--route", choices=("garrison", "expansion"), default="garrison",
+                        help="select the frozen garrison or verified expansion controller trace")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        run(args.trace, args.output, args.rom, args.elf, args.ticks, args.save_at_end)
+        trace_path = args.trace or (DEFAULT_EXPANSION_TRACE
+                                    if args.route == "expansion" else DEFAULT_TRACE)
+        run(trace_path, args.output, args.rom, args.elf, args.ticks, args.save_at_end, args.route)
     except (OSError, ValueError, RuntimeError, KeyError, json.JSONDecodeError,
             subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
         print(f"sc64_p3_controller_replay: {exc}", file=sys.stderr)

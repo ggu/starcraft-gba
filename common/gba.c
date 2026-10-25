@@ -1,5 +1,6 @@
 #include "gba.h"
-#ifdef SC64_LATE_TERRAN_STORAGE
+#include "audio_mixer.h"
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
 #include "gba_present.h"
 #endif
 #ifdef GBA_HOST
@@ -25,7 +26,7 @@ static volatile u16 *pixels=(volatile u16*)0x0600a000;
 static u16 front;
 static u8 backbuffer_index;
 static u32 clear_generation[2];
-static int tone_frames;
+static int tone_frames, noise_frames;
 volatile u32 gfx_draw_cycles;
 static u32 draw_start;
 static u32 previous_present;
@@ -39,6 +40,9 @@ static const u16 colors[32]={
 };
 /* Cartridge backup signature used by emulator/flash-cart save-type detection. */
 __attribute__((used)) const char gba_save_signature[]="SRAM_V113";
+#if defined(SC64_AUDIO_IMPORTED) && !defined(GBA_HOST)
+static void audio_hw_init(void);
+#endif
 void gba_init(void) {
 #ifdef GBA_HOST
  front=0; backbuffer_index=1; clear_generation[0]=clear_generation[1]=0;
@@ -51,11 +55,14 @@ void gba_init(void) {
  volatile u16 *pal=(volatile u16*)0x05000000;
  for(int i=0;i<32;i++)pal[i]=colors[i];
  REG16(0x04000084)=0x0080;
- REG16(0x04000080)=0x1177;
+ REG16(0x04000080)=0x9977;
  REG16(0x04000082)=0x0002;
  REG16(0x04000108)=0; REG16(0x0400010c)=0;
  REG16(0x0400010e)=0x0084; REG16(0x0400010a)=0x0080;
  front=0; backbuffer_index=1; clear_generation[0]=clear_generation[1]=0;
+#ifdef SC64_AUDIO_IMPORTED
+ audio_hw_init();
+#endif
 #endif
 }
 u8 gfx_backbuffer_index(void) { return backbuffer_index; }
@@ -85,7 +92,7 @@ return 0;
 return (~REG16(0x04000130))&1023;
 #endif
 }
-#ifndef GBA_HOST
+#if !defined(GBA_HOST) && !defined(SC64_LATE_TERRAN_STORAGE) && !defined(GBA_PRESENT_DEADLINE)
 static void vblank(void){while(REG16(0x04000006)>=160){}while(REG16(0x04000006)<160){}}
 #endif
 void gfx_begin(u8 color) {
@@ -227,7 +234,7 @@ HOT int gfx_blit_window_2x(int y,int height,const u8 *source,int stride,int rows
 void gfx_end(void) {
     gfx_draw_cycles=gba_clock()-draw_start;
 #ifndef GBA_HOST
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
     while (!gba_present_ready(gba_clock()-previous_present,
                               REG16(0x04000006))) {}
 #else
@@ -240,7 +247,7 @@ void gfx_end(void) {
     front^=1;
 #ifndef GBA_HOST
     REG16(0x04000000)=0x0404|(front?16:0);
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
     previous_present=gba_clock();
 #else
     if(elapsed<280896u)vblank();
@@ -347,7 +354,7 @@ HOT void gfx_frame(int x,int y,int w,int h,u8 c){gfx_rect(x,y,w,1,c);gfx_rect(x,
 int absi(int x){return x<0?-x:x;}
 int clampi(int x,int lo,int hi){return x<lo?lo:(x>hi?hi:x);}
 HOT void gfx_line(int x0,int y0,int x1,int y1,u8 c){int dx=absi(x1-x0),sx=x0<x1?1:-1,dy=-absi(y1-y0),sy=y0<y1?1:-1,err=dx+dy;for(;;){gfx_pixel(x0,y0,c);if(x0==x1&&y0==y1)break;int e=2*err;if(e>=dy){err+=dy;x0+=sx;}if(e<=dx){err+=dx;y0+=sy;}}}
-#if (defined(SC64_P3_RUNTIME) && defined(SC64_VISIBILITY_SPANS)) || defined(SC64_T4_RUNTIME)
+#if (defined(SC64_P3_RUNTIME) && defined(SC64_VISIBILITY_SPANS)) || defined(SC64_T4_RUNTIME) || defined(SC64_Z5_CONSUME_ENABLED)
 /* These imported profiles render from source sprites and do not call this
  * fallback. Keep it in ROM to reserve IWRAM for visibility updates. */
 void gfx_circle(int x,int y,int r,u8 c){if(r<0||r>240)return;for(int yy=-r;yy<=r;yy++)for(int xx=-r;xx<=r;xx++)if(xx*xx+yy*yy<=r*r)gfx_pixel(x+xx,y+yy,c);}
@@ -461,8 +468,21 @@ static HOT void glyph_row(int x,int y,u8 bits,u8 color) {
     }
 }
 HOT void gfx_text(int x,int y,const char*t,u8 c){int origin=x;for(;*t;t++){u8 ch=(u8)*t;if(ch=='\n'){x=origin;y+=9;continue;}if(ch>='a'&&ch<='z')ch-=32;if(ch>=32&&ch<128&&x>-6&&x<240)for(int row=0;row<7;row++)glyph_row(x,y+row,font[ch-32][row],c);x+=6;}}
-HOT void gfx_num(int x,int y,int n,u8 c){char b[12];int i=0;u32 v;if(n<0){gfx_text(x,y,"-",c);x+=6;v=0u-(u32)n;}else v=(u32)n;do{b[i++]='0'+v%10;v/=10;}while(v&&i<11);for(int j=0;j<i;j++){char z[2]={b[i-j-1],0};gfx_text(x+j*6,y,z,c);}}
-HOT void gfx_bar(int x,int y,int w,int h,int v,int max,u8 c,u8 empty){
+#ifdef SC64_ZP_FULL_STORAGE
+/* Later campaign actors need the hot-code reserve; number formatting can
+ * run from ROM while glyph drawing stays in IWRAM. */
+void gfx_num(
+#else
+HOT void gfx_num(
+#endif
+int x,int y,int n,u8 c){char b[12];int i=0;u32 v;if(n<0){gfx_text(x,y,"-",c);x+=6;v=0u-(u32)n;}else v=(u32)n;do{b[i++]='0'+v%10;v/=10;}while(v&&i<11);for(int j=0;j<i;j++){char z[2]={b[i-j-1],0};gfx_text(x+j*6,y,z,c);}}
+#if defined(SC64_ZP_CAMPAIGN_STORAGE) && defined(SC64_TARGET_OCCUPANCY)
+/* Reserve IWRAM for the expanded actor targeting loop in this profile. */
+void gfx_bar(
+#else
+HOT void gfx_bar(
+#endif
+int x,int y,int w,int h,int v,int max,u8 c,u8 empty){
     if(max<=0||v<=0){gfx_rect(x,y,w,h,empty);return;}
     /* A full bar is just the foreground rectangle; the empty fill is entirely
        covered, so skip both the overdraw and the old width multiplication. */
@@ -527,18 +547,129 @@ void save_test_corrupt_latest(u32 len,u32 tag) {
     if(newest>=0)host_save[newest*SAVE_SLOT_SIZE+16]^=0x80;
 }
 #endif
+#ifdef GBA_HOST
+u32 audio_host_tones, audio_host_noises, audio_host_samples;
+int audio_host_last_sample=-1, audio_host_music=-1;
+#endif
 void audio_tone(int hz,int frames,int volume){
 #ifdef GBA_HOST
-(void)hz; (void)frames; (void)volume;
+(void)hz; (void)frames; (void)volume; ++audio_host_tones;
 #else
 hz=clampi(hz,64,2048);int f=2048-131072/hz;REG16(0x04000068)=((clampi(volume,0,15)<<12)|0x0080);REG16(0x0400006c)=0x8000|f;tone_frames=frames;
+#endif
+}
+/* PSG noise placeholder for builds without a sampled bank. */
+void audio_noise(int frames,int volume){
+#ifdef GBA_HOST
+(void)frames; (void)volume; ++audio_host_noises;
+#else
+REG16(0x04000078)=(u16)((clampi(volume,0,15)<<12)|0x0200);REG16(0x0400007c)=0x8000|0x0024;noise_frames=frames;
 #endif
 }
 void audio_update(void){
 #ifndef GBA_HOST
 if(tone_frames>0&&!--tone_frames)REG16(0x04000068)=0;
+if(noise_frames>0&&!--noise_frames)REG16(0x04000078)=0;
 #endif
 }
+#if defined(SC64_AUDIO_IMPORTED)
+#include "sc64_audio_generated.h"
+#ifdef GBA_HOST
+/* Host builds queue requests but never mix the bank. */
+static const s8 sc64_audio_blob[2];
+#else
+/* Linked from common/audio_bank.S; private data under .local/ only. */
+extern const s8 sc64_audio_blob[];
+#endif
+static const AudioBank audio_bank={
+ sc64_audio_blob,sc64_audio_sample_offset,sc64_audio_sample_length,SC64_AUDIO_SAMPLE_COUNT,
+ sc64_audio_music_offset,sc64_audio_music_frames,SC64_AUDIO_MUSIC_TRACKS
+};
+_Static_assert(SC64_AUDIO_SAMPLES_PER_FRAME==AUDIO_FRAME_SAMPLES,"bank and mixer frame sizes differ");
+_Static_assert(GBA_AUDIO_MIX_BYTES>=2*AUDIO_FRAME_SAMPLES+64,"mix buffer lacks its guard");
+static AudioMixer audio_mixer;
+int audio_sampled_available(void){return 1;}
+void audio_play_sample(u16 sample,u8 priority,u8 kind){
+#ifdef GBA_HOST
+ ++audio_host_samples; audio_host_last_sample=sample;
+#endif
+ audio_mixer_request(&audio_mixer,sample,priority,kind);
+}
+void audio_play_music(int track,int loop){
+#ifdef GBA_HOST
+ audio_host_music=track;
+#endif
+ audio_mixer_music(&audio_mixer,track<0?AUDIO_MUSIC_STOP:(u8)track,(u8)(loop!=0));
+}
+int audio_music_track(void){
+ u8 request=audio_mixer.music_request;
+ if(request!=AUDIO_MUSIC_NONE)return request==AUDIO_MUSIC_STOP?-1:request;
+ return audio_mixer.music_track==AUDIO_MUSIC_NONE?-1:audio_mixer.music_track;
+}
+#ifndef GBA_HOST
+#ifdef SC64_TILE_RENDERER
+#error "The audio buffers use the gap between the two mode-4 pages"
+#endif
+/* Two contiguous 176-sample halves between the mode-4 pages (VRAM
+ * 0x06009600-0x06009FFF is unused). DMA1 plays them back to back and is
+ * re-armed at the first half every second frame; each VBlank mixes the half
+ * that just finished. Both halves stay halfword-written; the zero guard after
+ * them is never written, so a delayed re-arm reads silence. */
+#define AUDIO_MIX_BUFFER ((volatile u16*)GBA_AUDIO_ARENA)
+volatile u32 audio_irq_cycles,audio_irq_peak,audio_irq_frames;
+static u8 audio_half;
+static void audio_music_dma(const s8 *data){
+ REG32(0x040000d0)=0;
+ if(!data){REG16(0x04000082)=(u16)((REG16(0x04000082)&~0x3000)|0x8000);return;}
+ REG32(0x040000c8)=(u32)data;REG32(0x040000cc)=0x040000a4;
+ REG32(0x040000d0)=0xb6400000u;
+ REG16(0x04000082)|=0x3000;
+}
+/* Thumb, from ROM: the IWRAM reserve is too small for the mixer. */
+static void __attribute__((noinline)) audio_vblank(void){
+ u32 start=gba_clock();
+ volatile u16 *mix;
+ if(audio_half){
+  REG32(0x040000c4)=0;REG32(0x040000bc)=(u32)AUDIO_MIX_BUFFER;REG32(0x040000c4)=0xb6400000u;
+  mix=AUDIO_MIX_BUFFER+AUDIO_FRAME_SAMPLES/2;
+ } else mix=AUDIO_MIX_BUFFER;
+ audio_half^=1;
+ int music=audio_mixer_frame(&audio_mixer,&audio_bank,mix);
+ if(music==AUDIO_MUSIC_RESTART)audio_music_dma(audio_mixer_music_data(&audio_mixer,&audio_bank));
+ else if(music==AUDIO_MUSIC_SILENCE)audio_music_dma(0);
+ u32 spent=gba_clock()-start;
+ audio_irq_cycles+=spent;++audio_irq_frames;
+ if(spent>audio_irq_peak)audio_irq_peak=spent;
+}
+/* The BIOS dispatcher enters this with an ARM-state load of 0x03007FFC. */
+__attribute__((target("arm"),noinline)) static void audio_irq(void){
+ u16 flags=REG16(0x04000202)&REG16(0x04000200);
+ if(flags&1)audio_vblank();
+ REG16(0x04000202)=flags;
+ *(volatile u16*)0x03007ff8|=flags;
+}
+static void audio_hw_init(void){
+ audio_mixer_reset(&audio_mixer);
+ for(u32 i=0;i<GBA_AUDIO_MIX_BYTES/2;i++)AUDIO_MIX_BUFFER[i]=0;
+ audio_half=0;
+ /* PSG 100%, Direct Sound A 100% and B 50%, both on timer 0, both FIFOs reset;
+  * music enables B's outputs when a track starts. */
+ REG16(0x04000082)=0x0002|0x0004|0x0300|0x0800|0x8000;
+ REG16(0x04000102)=0;REG16(0x04000100)=(u16)(65536u-280896u/AUDIO_FRAME_SAMPLES);REG16(0x04000102)=0x0080;
+ REG32(0x040000c4)=0;REG32(0x040000bc)=(u32)AUDIO_MIX_BUFFER;REG32(0x040000c0)=0x040000a0;
+ REG32(0x040000c4)=0xb6400000u;
+ *(volatile u32*)0x03007ffc=(u32)audio_irq;
+ REG16(0x04000004)|=0x0008;
+ REG16(0x04000200)=0x0001;
+ REG16(0x04000208)=1;
+}
+#endif
+#else
+int audio_sampled_available(void){return 0;}
+void audio_play_sample(u16 sample,u8 priority,u8 kind){(void)sample;(void)priority;(void)kind;}
+void audio_play_music(int track,int loop){(void)track;(void)loop;}
+int audio_music_track(void){return -1;}
+#endif
 
 #ifdef GBA_HOST
 u8 gfx_test_pixel(int x,int y){if((unsigned)x>=240||(unsigned)y>=160)return 0;u16 v=pixels[y*120+x/2];return (u8)(x&1?v>>8:v);}

@@ -33,21 +33,40 @@ static int windowed;
 
 static u16 reference_held(u32 tick)
 {
+#ifdef SC64_DENSE_SCHEDULE
+    /* Saturate four pages, hold through two empty pages, then repeat. */
+    if (tick < 1000u || (tick >= 1500u && tick < 2000u))
+        return tick & 1u ? KEY_A : KEY_B;
+    return KEY_RIGHT;
+#else
     u16 held = 0;
     for (unsigned i = 0; i < INPUT_COUNT; ++i)
         if (transitions[i][0] <= tick) held = (u16)transitions[i][1];
     return held;
+#endif
 }
 
 static void install_page(u32 start)
 {
-    u32 count = 0, end = start + 1000u;
+    u32 count = 0, end = start + DEMO_WINDOW_TICKS;
     if (end > STOP_TICK) end = STOP_TICK;
+#ifdef SC64_DENSE_SCHEDULE
+    for (u32 tick = start; tick < end; ++tick) {
+        u16 before = tick ? reference_held(tick - 1u) : 0;
+        u16 held = reference_held(tick);
+        if (held != before) {
+            assert(count < DEMO_SCHEDULE_WINDOW_CAPACITY);
+            demo_schedule_events[count][0] = tick;
+            demo_schedule_events[count++][1] = held;
+        }
+    }
+#else
     for (unsigned i = 0; i < INPUT_COUNT; ++i)
         if (transitions[i][0] >= start && transitions[i][0] < end) {
             demo_schedule_events[count][0] = transitions[i][0];
             demo_schedule_events[count++][1] = transitions[i][1];
         }
+#endif
     demo_schedule_count = count;
     ++page_count;
 }
@@ -88,7 +107,7 @@ void game_update(u16 held, u16 pressed)
 void game_render(void)
 {
     u32 next = iterations + 1u;
-    if (next < STOP_TICK && next % 1000u == 0 && windowed) {
+    if (next < STOP_TICK && next % DEMO_WINDOW_TICKS == 0 && windowed) {
         assert(demo_schedule_index == demo_schedule_count);
         install_page(next); /* Deliberately leave the old cursor unchanged. */
     }
@@ -111,20 +130,27 @@ static void run_case(int paged)
     memset((void *)demo_schedule_events, 0, sizeof(demo_schedule_events));
     if (setjmp(finished) == 0) (void)scheduled_main();
     assert(checks == STOP_TICK + 3u);
-    assert(page_count == (paged ? 8u : 0u));
+    assert(page_count == (paged ? (STOP_TICK + DEMO_WINDOW_TICKS - 1u) /
+                                  DEMO_WINDOW_TICKS : 0u));
 }
 
 int main(void)
 {
     assert(sizeof(demo_schedule_events) == 256u * 8u);
     run_case(1);
+#ifndef SC64_DENSE_SCHEDULE
     run_case(0);
+#endif
+#ifdef SC64_DENSE_SCHEDULE
+    puts("Dense actual main loop preserves per-tick held keys and edges across full/empty 250-tick pages.");
+#else
 #ifdef SC64_P3_WINDOWED_SCHEDULE
     puts("P3 actual main loop preserves paged/legacy held keys, edges and empty windows.");
 #elif defined(SC64_T4_WINDOWED_SCHEDULE)
     puts("T4 actual main loop preserves paged/legacy held keys, edges and empty windows.");
 #else
     puts("Z3 actual main loop preserves paged/legacy held keys, edges and empty windows.");
+#endif
 #endif
     return 0;
 }

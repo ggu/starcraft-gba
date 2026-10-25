@@ -26,15 +26,82 @@ enum {
 #ifdef SC64_Z3_ENABLED
     ,SC64_RACE_MISSION_Z3 = 14
 #endif
+#ifdef SC64_Z4_RUNTIME
+    ,SC64_RACE_MISSION_Z4 = 15
+#endif
+#ifdef SC64_Z6_RUNTIME
+    ,SC64_RACE_MISSION_Z6 = 17
+#endif
+#ifdef SC64_Z7_RUNTIME
+    ,SC64_RACE_MISSION_Z7 = 18
+#endif
 #ifdef SC64_P3_RUNTIME
     ,SC64_RACE_MISSION_P3 = 22
+#endif
+#ifdef SC64_P4_RUNTIME
+    ,SC64_RACE_MISSION_P4 = 23
+#endif
+#ifdef SC64_P5_RUNTIME
+    ,SC64_RACE_MISSION_P5 = 24
+#endif
+#ifdef SC64_P6_RUNTIME
+    ,SC64_RACE_MISSION_P6 = 25
 #endif
 #endif
 };
 
+#ifdef SC64_Z4_RUNTIME
+static int race_z4_source_owner(unsigned source_slot);
+#endif
+#ifdef SC64_P4_RUNTIME
+static int race_p4_source_owner(unsigned source_slot);
+#endif
+#ifdef SC64_P5_RUNTIME
+static int race_p5_source_owner(unsigned source_slot);
+#endif
+#ifdef SC64_Z5_RUNTIME
+static int race_z5_source_owner(unsigned source_slot);
+#endif
+
 static int
 race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 {
+#ifdef SC64_Z7_RUNTIME
+    if (race_z7_active()) {
+        int owner = raw_owner < 0 ? -1 : race_z7_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active()) {
+        int owner = raw_owner < 0 ? -1 : race_z6_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_P6_GLOBAL_ID) {
+        int owner = raw_owner < 0 ? -1 : race_p6_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_RACE_MISSION_P5) {
+        int owner = raw_owner < 0 ? -1 : race_p5_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
+#ifdef SC64_P4_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_RACE_MISSION_P4) {
+        int owner = raw_owner < 0 ? -1 : race_p4_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
+#ifdef SC64_Z4_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_RACE_MISSION_Z4) {
+        int owner = raw_owner < 0 ? -1 : race_z4_source_owner((unsigned)raw_owner);
+        return owner < 0 ? NEUTRAL : owner;
+    }
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) return sc64_terran_late_runtime_owner((unsigned)raw_owner);
 #endif
@@ -55,6 +122,13 @@ race_campaign_owner(const Sc64RaceMap *map, int raw_owner)
 #endif
     if (raw_owner == 11 || raw_owner >= 8) return NEUTRAL;
     if (raw_owner < 0) return NEUTRAL;
+#ifdef SC64_Z5_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_Z5_GLOBAL_ID &&
+        raw_owner < 8) {
+        if (raw_owner == map->human_slot) return SIDE;
+        return map->owner_modes[raw_owner];
+    }
+#endif
 #ifdef SC64_P3_RUNTIME
     if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID) {
         if (raw_owner == SC64_P3_HUMAN_SLOT) return SIDE;
@@ -115,8 +189,89 @@ race_campaign_set_message(int id)
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
 #include "sc64_z3_adapter.h"
 #endif
+#ifdef SC64_Z4_RUNTIME
+#include "sc64_z4_adapter.h"
+static unsigned race_z4_hud_seconds(void)
+{ return (race_z4.countdown_ticks + 29u) / 30u; }
+#endif
+#ifdef SC64_Z5_RUNTIME
+#include "sc64_z5_runtime_adapter.h"
+#ifdef SC64_Z5_CLOAK_ENABLED
+#include "sc64_z5_cloak_adapter.h"
+#ifdef SC64_Z5_CONSUME_ENABLED
+#include "sc64_z5_consume_adapter.h"
+#endif
+#endif
+#endif
 #ifdef SC64_P3_RUNTIME
 #include "sc64_p3_adapter.h"
+#endif
+#ifdef SC64_P4_RUNTIME
+#include "sc64_p4_adapter.h"
+#ifdef SC64_P4_STORM_ENABLED
+#include "sc64_p4_storm_adapter.h"
+#endif
+#ifdef SC64_P5_RUNTIME
+#include "sc64_p5_runtime_adapter.h"
+#endif
+static int race_p4_world_paused(void)
+{ return race_p4_active() && race_p4.source_paused; }
+
+/* Bounded contact rescue keeps source-slot provenance while transferring
+ * control. The 32-pixel GBA radius is an authored compatibility policy. */
+static void race_p4_rescue_tick(void)
+{
+    if (race_p4.source_paused) return;
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == RESCUABLE) {
+        for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
+            u[j].raw_type != 101 && u[j].raw_type != 150) {
+            int dx = u[i].x - u[j].x, dy = u[i].y - u[j].y;
+            if (dx * dx + dy * dy <= 32 * 32) {
+                u[i].owner = SIDE; u[i].selected = 0;
+                u[i].order = ORDER_IDLE; u[i].target = -1;
+                u[i].tx = u[i].x; u[i].ty = u[i].y;
+                break;
+            }
+        }
+    }
+    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == RESCUABLE) {
+        for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
+            u[j].raw_type != 101 && u[j].raw_type != 150) {
+            int dx = b[i].x - u[j].x, dy = b[i].y - u[j].y;
+            if (dx * dx + dy * dy <= 32 * 32) { b[i].owner = SIDE; break; }
+        }
+    }
+}
+#endif
+
+#ifdef SC64_P6_RUNTIME
+#include "sc64_p6_doodads_generated.h"
+#ifdef SC64_P6_COMBAT_ENABLED
+#include "sc64_p6_combat_adapter.h"
+#endif
+#include "sc64_p6_runtime_adapter.h"
+#include "sc64_p6_render_adapter.h"
+#ifdef SC64_P6_STORM_ENABLED
+#include "sc64_p6_storm_adapter.h"
+#endif
+#endif
+
+#ifdef SC64_Z6_RUNTIME
+#include "sc64_z6_runtime_adapter.h"
+#include "sc64_z6_hallucination.h"
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+#include "sc64_z6_transport_adapter.h"
+#endif
+#ifdef SC64_Z6_CLOAK_ENABLED
+#include "sc64_z6_cloak_adapter.h"
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+#include "sc64_z6_storm_adapter.h"
+#endif
+#endif
+
+#ifdef SC64_Z7_RUNTIME
+#include "sc64_z7_runtime_adapter.h"
 #endif
 
 static void
@@ -230,6 +385,9 @@ race_campaign_init(void)
     const Sc64RaceMap *map;
     int i, player_x = 0, player_y = 0, player_n = 0;
     int human_owner;
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    race_p7_projectile_reset();
+#endif
 
 #ifdef SC64_UNIFIED
     memset(&backwater,0,sizeof(backwater));
@@ -253,6 +411,37 @@ race_campaign_init(void)
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     memset(&race_late, 0, sizeof(race_late));
+#endif
+#ifdef SC64_Z5_RUNTIME
+    memset(&race_z5, 0, sizeof(race_z5));
+    memset(&race_z5_world, 0, sizeof(race_z5_world));
+    memset(race_z5_doodads, 0, sizeof(race_z5_doodads));
+#endif
+#ifdef SC64_P5_RUNTIME
+    memset(&race_p5, 0, sizeof(race_p5));
+    memset(&race_p5_world, 0, sizeof(race_p5_world));
+#endif
+#ifdef SC64_P6_RUNTIME
+    memset(&race_p6, 0, sizeof(race_p6));
+    memset(&race_p6_world, 0, sizeof(race_p6_world));
+    memset(race_p6_doodad_bindings, 0, sizeof(race_p6_doodad_bindings));
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    memset(&race_p7, 0, sizeof(race_p7));
+    memset(&race_p7_world, 0, sizeof(race_p7_world));
+    memset(&race_p7_ops, 0, sizeof(race_p7_ops));
+    race_p7_map = 0;
+#endif
+#ifdef SC64_Z6_RUNTIME
+    memset(&race_z6, 0, sizeof(race_z6));
+    memset(&race_z6_world, 0, sizeof(race_z6_world));
+    race_z6_map = 0;
+#endif
+#ifdef SC64_Z7_RUNTIME
+    memset(&race_z7, 0, sizeof(race_z7));
+    memset(&race_z7_world, 0, sizeof(race_z7_world));
+    memset(&race_z7_ops, 0, sizeof(race_z7_ops));
+    race_z7_map = 0;
 #endif
     if (race_mode) {
         race_skirmish_init();
@@ -281,6 +470,15 @@ race_campaign_init(void)
 #ifdef SC64_TERRAN_LATE_RUNTIME
          && !race_late_active()
 #endif
+#ifdef SC64_P6_RUNTIME
+         && race_selected_mission != SC64_P6_GLOBAL_ID
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+         && race_selected_mission != SC64_P7_GLOBAL_ID
+#endif
+#ifdef SC64_Z7_RUNTIME
+         && race_selected_mission != SC64_Z7_GLOBAL_ID
+#endif
          ) || !sc64_race_maps[race_selected_mission].width)
         race_selected_mission = sc64_frontend_first_mission(
 #ifdef SC64_CAMPAIGN_RACE
@@ -291,6 +489,78 @@ race_campaign_init(void)
         );
 #endif
     map = &sc64_race_maps[race_selected_mission];
+#ifdef SC64_Z7_RUNTIME
+    if (race_z7_active() && !race_z7_source_row_counts(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active() && !race_z6_map_shape_valid(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_Z5_RUNTIME
+    if (race_selected_mission == SC64_Z5_GLOBAL_ID && !race_z5_preflight(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (race_selected_mission == SC64_P5_GLOBAL_ID && !race_p5_preflight(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (race_selected_mission == SC64_P6_GLOBAL_ID && !race_p6_preflight(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    if (race_p7_active() && !race_p7_map_shape_valid(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+    /* Validate every retained starting row before touching the live world.
+     * These staged pools are deliberately smaller than later campaign maps. */
+    {
+        unsigned units = 0, buildings = 0, minerals_count = 0, gas_count = 0;
+        int invalid = map->width > 128 || map->height > 128;
+        for (unsigned row = 0; row < map->unit_count; ++row) {
+            const Sc64ImportedUnit *src = &map->units[row];
+            int raw = src->source_type;
+            if (src->x_px >= map->width * 16 || src->y_px >= map->height * 16) invalid = 1;
+#ifdef SC64_Z5_RUNTIME
+            if (race_selected_mission == SC64_Z5_GLOBAL_ID && raw == 214) continue;
+#endif
+#ifdef SC64_P6_RUNTIME
+            if (race_selected_mission == SC64_P6_GLOBAL_ID && raw == 214) continue;
+#endif
+#ifdef SC64_Z6_RUNTIME
+            if (race_selected_mission == SC64_Z6_GLOBAL_ID && raw == 214) continue;
+#endif
+#ifdef SC64_Z7_RUNTIME
+            if (race_selected_mission == SC64_Z7_GLOBAL_ID && raw == 214) continue;
+#endif
+            if (raw >= 176 && raw <= 178) ++minerals_count;
+            else if (raw == 188) ++gas_count;
+            else if (sc64_race_unit_from_raw(raw) >= 0) ++units;
+            else if (sc64_race_building_from_raw(raw) >= 0) ++buildings;
+            else invalid = 1;
+        }
+#ifdef SC64_Z5_RUNTIME
+        if (race_selected_mission == SC64_Z5_GLOBAL_ID)
+            buildings += SC64_Z5_UNIT_BACKED_DOODADS;
+#endif
+#ifdef SC64_P6_RUNTIME
+        if (race_selected_mission == SC64_P6_GLOBAL_ID)
+            buildings += SC64_P6_DOODAD_UNIT_PROP_COUNT;
+#endif
+        if (invalid || units > MAX_UNITS || buildings > MAX_BUILDINGS ||
+            minerals_count > MAX_MINERALS || gas_count > MAX_RACE_GEYSERS) {
+            ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+        }
+    }
+#endif
     race_cols = map->width;
     race_rows = map->height;
     race_human = map->owner_races[map->human_slot];
@@ -304,6 +574,7 @@ race_campaign_init(void)
     memset(explored, 0, sizeof(explored));
     memset(visible, 0, sizeof(visible));
     memset(tracers, 0, sizeof(tracers));
+    death_vfx_reset();
     reset_selection_gestures();
     geyser_count = 0;
     supply_used = 0;
@@ -335,6 +606,30 @@ race_campaign_init(void)
 
     for (i = 0; i < 8; ++i) {
         int owner = map->owner_modes[i];
+#ifdef SC64_Z7_RUNTIME
+        if (race_z7_active()) owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_Z4_RUNTIME
+        if (race_selected_mission == SC64_RACE_MISSION_Z4) owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_Z5_RUNTIME
+        if (race_selected_mission == SC64_Z5_GLOBAL_ID)
+            owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_P4_RUNTIME
+        if (race_selected_mission == SC64_RACE_MISSION_P4) owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_P5_RUNTIME
+        if (race_selected_mission == SC64_P5_GLOBAL_ID)
+            owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_P6_RUNTIME
+        if (race_selected_mission == SC64_P6_GLOBAL_ID)
+            owner = race_campaign_owner(map, i);
+#endif
+#ifdef SC64_Z6_RUNTIME
+        if (race_z6_active()) owner = race_campaign_owner(map, i);
+#endif
 #ifdef SC64_T4_RUNTIME
         if (race_selected_mission == SC64_T4_GLOBAL_ID)
             owner = race_campaign_owner(map, i);
@@ -355,6 +650,21 @@ race_campaign_init(void)
         if (owner >= 0 && owner < 5 && map->owner_races[i] < 3)
             race_player[owner] = map->owner_races[i];
     }
+#ifdef SC64_Z5_RUNTIME
+    /* Multiple source slots can map onto the live SIDE owner; make the
+     * authenticated human slot the final authority for the save identity. */
+    if (race_selected_mission == SC64_Z5_GLOBAL_ID)
+        race_player[SIDE] = race_human;
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (race_selected_mission == SC64_P5_GLOBAL_ID) {
+        race_player[SIDE] = race_human;
+        race_player[NEUTRAL] = map->owner_races[6];
+    }
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (race_selected_mission == SC64_P6_GLOBAL_ID) race_player[SIDE] = race_human;
+#endif
     human_owner = map->human_slot;
 
     for (i = 0; i < map->unit_count; ++i) {
@@ -362,6 +672,18 @@ race_campaign_init(void)
         int raw = src->source_type, owner, type, slot;
         int x = src->x_px, y = src->y_px;
         if (x >= map->width * 16 || y >= map->height * 16) continue;
+#ifdef SC64_Z5_RUNTIME
+        if (race_selected_mission == SC64_Z5_GLOBAL_ID && raw == 214) continue;
+#endif
+#ifdef SC64_P6_RUNTIME
+        if (race_selected_mission == SC64_P6_GLOBAL_ID && raw == 214) continue;
+#endif
+#ifdef SC64_Z6_RUNTIME
+            if (race_selected_mission == SC64_Z6_GLOBAL_ID && raw == 214) continue;
+#endif
+#ifdef SC64_Z7_RUNTIME
+            if (race_selected_mission == SC64_Z7_GLOBAL_ID && raw == 214) continue;
+#endif
         if (raw == 176 || raw == 177 || raw == 178) {
             int j;
             for (j = 0; j < MAX_MINERALS; ++j) if (m[j].amount <= 0) break;
@@ -373,7 +695,7 @@ race_campaign_init(void)
             continue;
         }
         if (raw == 188) {
-            if (geyser_count < 4) {
+            if (geyser_count < MAX_RACE_GEYSERS) {
                 geysers[geyser_count].x = x;
                 geysers[geyser_count++].y = y;
             }
@@ -384,6 +706,9 @@ race_campaign_init(void)
 #ifdef SC64_UNIFIED
         /* Terran Raynor starts neutral and joins on contact, as in the existing adapter. */
         if(race_selected_mission>=SC64_RACE_MISSION_T1&&raw==19
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+           && race_selected_mission<=13
+#endif
 #ifdef SC64_T5_RUNTIME
            && !race_t5_active()
 #endif
@@ -410,7 +735,14 @@ race_campaign_init(void)
 #endif
         if (type >= 0) {
             slot = spawn_unit(owner, type, x, y);
-            if (slot < 0) continue;
+            if (slot < 0) {
+#ifdef SC64_Z5_RUNTIME
+                if (race_selected_mission == SC64_Z5_GLOBAL_ID) {
+                    ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+                }
+#endif
+                continue;
+            }
             u[slot].raw_type = raw;
             u[slot].raw_owner = src->owner;
             u[slot].flags = src->flags;
@@ -429,7 +761,14 @@ race_campaign_init(void)
         type = sc64_race_building_from_raw(raw);
         if (type >= 0) {
             slot = spawn_build(owner, type, x, y, 0);
-            if (slot < 0) continue;
+            if (slot < 0) {
+#ifdef SC64_Z5_RUNTIME
+                if (race_selected_mission == SC64_Z5_GLOBAL_ID) {
+                    ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+                }
+#endif
+                continue;
+            }
             b[slot].raw_type = raw;
             b[slot].raw_owner = src->owner;
             b[slot].flags = src->flags;
@@ -443,7 +782,70 @@ race_campaign_init(void)
 #endif
     }
 
+#ifdef SC64_Z5_RUNTIME
+    if (race_selected_mission == SC64_Z5_GLOBAL_ID && !race_z5_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#ifdef SC64_Z5_CLOAK_ENABLED
+    if (race_z5_active() && !race_z5_cloak_initialize_source_units()) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (race_selected_mission == SC64_P5_GLOBAL_ID && !race_p5_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+
+#ifdef SC64_P6_RUNTIME
+    if (race_selected_mission == SC64_P6_GLOBAL_ID && !race_p6_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#ifdef SC64_P6_STORM_ENABLED
+    if (race_p6_active()) race_p6_storm_initialize_source_units();
+#endif
+#endif
+
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active() && !race_z6_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (race_z6_active() && !race_z6_transport_initialize_source()) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_Z6_CLOAK_ENABLED
+    if (race_z6_active() && !race_z6_cloak_initialize_source_units()) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#endif
+#ifdef SC64_Z7_RUNTIME
+    if (race_z7_active() && !race_z7_runtime_init(map)) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    if (race_p7_active() &&
+        (!race_p7_runtime_init(map) || !race_p7_battery_initialize_source(map))) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+#endif
     switch (race_selected_mission) {
+#ifdef SC64_Z7_RUNTIME
+    case SC64_Z7_GLOBAL_ID: minerals = gas = 0; break;
+#endif
+#ifdef SC64_Z6_RUNTIME
+    case SC64_Z6_GLOBAL_ID: minerals = gas = 0; break;
+#endif
+#ifdef SC64_P6_RUNTIME
+    case SC64_P6_GLOBAL_ID: minerals = gas = 0; break;
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    case SC64_P7_GLOBAL_ID: minerals = gas = 0; break;
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     case 10: case 11: case 12: case 13: minerals = gas = 0; break;
 #endif
@@ -468,8 +870,14 @@ race_campaign_init(void)
 #ifdef SC64_Z3_ENABLED
     case SC64_RACE_MISSION_Z3: minerals=SC64_Z3_MISSION_ORE;gas=SC64_Z3_MISSION_GAS;break;
 #endif
+#ifdef SC64_Z4_RUNTIME
+    case SC64_RACE_MISSION_Z4: minerals=gas=0;break;
+#endif
 #ifdef SC64_P3_RUNTIME
     case SC64_RACE_MISSION_P3: minerals=SC64_P3_HUMAN_MINERALS;gas=SC64_P3_HUMAN_GAS;break;
+#endif
+#ifdef SC64_P4_RUNTIME
+    case SC64_RACE_MISSION_P4: minerals=gas=0;break;
 #endif
 #endif
     default: minerals = 170; break;
@@ -493,8 +901,22 @@ race_campaign_init(void)
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
     if (race_selected_mission == SC64_RACE_MISSION_Z3) race_z3_init();
 #endif
+#ifdef SC64_Z4_RUNTIME
+    if (race_selected_mission == SC64_RACE_MISSION_Z4 && !race_z4_init()) {
+        screen = SCREEN_PAUSE; toast(14);
+    }
+#endif
 #ifdef SC64_P3_RUNTIME
     if (race_selected_mission == SC64_RACE_MISSION_P3) race_p3_init();
+#endif
+#ifdef SC64_P4_RUNTIME
+    if (race_selected_mission == SC64_RACE_MISSION_P4 && !race_p4_init()) {
+        screen = SCREEN_PAUSE; toast(14);
+    }
+#ifdef SC64_P4_STORM_ENABLED
+    else if (race_selected_mission == SC64_RACE_MISSION_P4)
+        race_p4_storm_initialize_source_units();
+#endif
 #endif
     race_campaign_assign_mining();
 #ifdef SC64_T4_SCENARIO_RUNTIME
@@ -668,8 +1090,106 @@ race_campaign_tick(void)
 #ifdef SC64_Z3_ENABLED
     if(mission==SC64_RACE_MISSION_Z3){race_z3_campaign_tick();return;}
 #endif
+#ifdef SC64_Z4_RUNTIME
+    if (mission == SC64_RACE_MISSION_Z4) {
+        if (!race_z4_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
+        return;
+    }
+#endif
+#ifdef SC64_Z5_RUNTIME
+    if (mission == SC64_Z5_GLOBAL_ID) {
+#ifdef SC64_Z5_CLOAK_ENABLED
+        if (!race_z5_cloak_tick()) { screen = SCREEN_PAUSE; toast(14); return; }
+#endif
+        if (!race_z5_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
+        return;
+    }
+#endif
 #ifdef SC64_P3_RUNTIME
     if(mission==SC64_RACE_MISSION_P3){race_p3_campaign_tick();return;}
+#endif
+#ifdef SC64_P4_RUNTIME
+    if (mission == SC64_RACE_MISSION_P4) {
+        race_p4_rescue_tick();
+#ifdef SC64_P4_STORM_ENABLED
+        if (!race_p4_storm_tick()) { screen = SCREEN_PAUSE; toast(14); return; }
+#endif
+        if (!race_p4_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
+        return;
+    }
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (mission == SC64_P5_GLOBAL_ID) {
+        if (!race_p5_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
+        return;
+    }
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (mission == SC64_P6_GLOBAL_ID) {
+        race_p6_rescue_tick();
+#ifdef SC64_P6_STORM_ENABLED
+        if (!race_p6_storm_tick(0)) { screen = SCREEN_PAUSE; toast(14); return; }
+#endif
+        if (!race_p6_campaign_tick()) { screen = SCREEN_PAUSE; toast(14); }
+        return;
+    }
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    if (mission == SC64_P7_GLOBAL_ID) {
+        if (!race_p7_battery_live_world_valid() ||
+            !race_p7_runtime_tick(race_campaign.elapsed_frames)) {
+            screen=SCREEN_PAUSE; toast(14); return;
+        }
+        if (race_p7.runtime.model.outcome==SC64_P7_WON) {
+            won=1; lost=0; race_campaign.phase=SC64_RACE_PHASE_COMPLETE;
+            race_campaign.objective_flags|=SC64_RACE_OBJECTIVE_PRIMARY;
+            race_completed |= 1 << SC64_P7_GLOBAL_ID;
+        } else if (race_p7.runtime.model.outcome==SC64_P7_LOST) {
+            won=0; lost=1; race_campaign.phase=SC64_RACE_PHASE_FAILED;
+        }
+        return;
+    }
+#endif
+#ifdef SC64_Z7_RUNTIME
+    if (mission == SC64_Z7_GLOBAL_ID) {
+        if (!race_z7_runtime_tick(0, race_campaign.elapsed_frames)) {
+            screen=SCREEN_PAUSE; toast(14); return;
+        }
+        if (race_z7.runtime.model.outcome==SC64_Z7_WON) {
+            won=1; lost=0; race_campaign.phase=SC64_RACE_PHASE_COMPLETE;
+            race_campaign.objective_flags|=SC64_RACE_OBJECTIVE_PRIMARY;
+            race_completed |= 1 << SC64_Z7_GLOBAL_ID;
+        } else if (race_z7.runtime.model.outcome==SC64_Z7_LOST) {
+            won=0; lost=1; race_campaign.phase=SC64_RACE_PHASE_FAILED;
+        }
+        return;
+    }
+#endif
+#ifdef SC64_Z6_RUNTIME
+    if (mission == SC64_Z6_GLOBAL_ID) {
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+        if (!race_z6_transport_research_tick(0)) { screen=SCREEN_PAUSE; toast(14); return; }
+#endif
+#ifdef SC64_Z6_CLOAK_ENABLED
+        if (!race_z6_cloak_tick(0)) { screen=SCREEN_PAUSE; toast(14); return; }
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+        if (!race_z6_storm_tick()) { screen=SCREEN_PAUSE; toast(14); return; }
+#endif
+        if (!race_z6_hallucination_world_state_valid() ||
+            !race_z6_hallucination_tick(0) ||
+            !race_z6_runtime_tick(race_campaign.elapsed_frames, 0)) {
+            screen = SCREEN_PAUSE; toast(14); return;
+        }
+        if (race_z6.runtime.model.outcome == SC64_Z6_WON) {
+            won=1; lost=0; race_campaign.phase=SC64_RACE_PHASE_COMPLETE;
+            race_campaign.objective_flags|=SC64_RACE_OBJECTIVE_PRIMARY;
+            race_completed |= 1 << SC64_Z6_GLOBAL_ID;
+        } else if (race_z6.runtime.model.outcome == SC64_Z6_LOST) {
+            won=0; lost=1; race_campaign.phase=SC64_RACE_PHASE_FAILED;
+        }
+        return;
+    }
 #endif
     if(mission==SC64_RACE_MISSION_T1||mission==SC64_RACE_MISSION_T2){race_terran_tick();return;}
 #endif
@@ -836,6 +1356,27 @@ static int race_campaign_lost(void)
 static const char *
 race_campaign_objective_text(void)
 {
+#ifdef SC64_P7_BATTERY_ENABLED
+    if (race_p7_active()) return "Destroy the Conclave heart. Keep Fenix, Zeratul, and Tassadar alive.";
+#endif
+#ifdef SC64_Z7_RUNTIME
+    if (race_z7_active()) return "Destroy all enemy buildings.";
+#endif
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active()) return "Hunt Tassadar; keep Kerrigan alive.";
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (race_p5_active()) return race_p5_objective_text();
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (race_p6_active()) return race_p6_objective_text();
+#endif
+#ifdef SC64_P4_RUNTIME
+    if (race_p4_active()) return race_p4_objective_text();
+#endif
+#ifdef SC64_Z4_RUNTIME
+    if (race_z4_active()) return race_z4_objective_text();
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) {
         switch (race_campaign.mission) {
@@ -890,6 +1431,24 @@ race_campaign_objective_text(void)
 static const char *
 race_campaign_victory_text(void)
 {
+#ifdef SC64_Z7_RUNTIME
+    if (race_z7_active()) return "THE CULLING IS COMPLETE";
+#endif
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active()) return "THE HUNT IS OVER";
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (race_p5_active()) return race_p5_victory_text();
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (race_p6_active()) return race_p6_victory_text();
+#endif
+#ifdef SC64_P4_RUNTIME
+    if (race_p4_active()) return race_p4_victory_text();
+#endif
+#ifdef SC64_Z4_RUNTIME
+    if (race_z4_active()) return race_z4_victory_text();
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) {
         switch (race_campaign.mission) {
@@ -941,6 +1500,24 @@ race_campaign_victory_text(void)
 static const char *
 race_campaign_failure_text(void)
 {
+#ifdef SC64_Z7_RUNTIME
+    if (race_z7_active()) return "THE BROOD HAS FALLEN";
+#endif
+#ifdef SC64_Z6_RUNTIME
+    if (race_z6_active()) return "KERRIGAN HAS FALLEN";
+#endif
+#ifdef SC64_P5_RUNTIME
+    if (race_p5_active()) return race_p5_failure_text();
+#endif
+#ifdef SC64_P6_RUNTIME
+    if (race_p6_active()) return race_p6_failure_text();
+#endif
+#ifdef SC64_P4_RUNTIME
+    if (race_p4_active()) return race_p4_failure_text();
+#endif
+#ifdef SC64_Z4_RUNTIME
+    if (race_z4_active()) return race_z4_failure_text();
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) {
         switch (race_campaign.mission) {

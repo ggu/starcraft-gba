@@ -6,18 +6,56 @@
 #define RACE_UNIT_WORDS (sizeof(Unit)/sizeof(int))
 #define RACE_BUILD_WORDS (sizeof(Building)/sizeof(int))
 
-#ifdef SC64_T6_STORAGE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+#if !defined(SC64_P7_BATTERY_ENABLED) || !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) || !defined(SC64_P7_RUNTIME) || !defined(SC64_UNIFIED) || !defined(SC64_ZP_FULL_STORAGE) || !defined(SC64_ZP_CAMPAIGN_STORAGE) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 2
+#error "P7 typed compact save requires unified P7 battery and Arbiter cache profile"
+#endif
+#endif
+
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifndef SC64_Z7_DERIVED_SAVE
 #include "sc64_compact_building_save.h"
 #endif
-#ifdef SC64_LATE_TERRAN_STORAGE
+#endif
+#ifdef SC64_Z7_DERIVED_SAVE
+#include "sc64_derived_save.h"
+#endif
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_ZP_FULL_STORAGE
+#ifndef SC64_Z7_DERIVED_SAVE
+#include "sc64_zp_unit_save.h"
+#endif
+#else
 #include "sc64_compact_unit_save.h"
+#endif
 _Static_assert(SC_RU_COUNT <= 64, "late Terran unit codec uses six-bit types");
+#endif
+#ifdef SC64_ZP_FULL_STORAGE
+#include "sc64_compact_mineral_save.h"
+#endif
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+_Static_assert(SC_RU_COUNT <= 64, "P7 typed unit type field uses six bits");
+_Static_assert(SC_RB_COUNT <= 64, "P7 typed building type field uses six bits");
+#include "sc64_p7_typed_unit_save.h"
+#include "sc64_p7_typed_building_save.h"
 #endif
 #ifdef SC64_T6_RUNTIME
 #include "sc64_t6_mission_state.h"
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
 #include "sc64_terran_late_mission_state.h"
+#endif
+#ifdef SC64_Z5_RUNTIME
+#include "sc64_z5_state.h"
+#endif
+#ifdef SC64_P5_RUNTIME
+#include "sc64_p5_state.h"
+#endif
+#ifdef SC64_P6_RUNTIME
+#include "sc64_p6_state.h"
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+#include "sc64_p7_state.h"
 #endif
 
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
@@ -55,24 +93,52 @@ _Static_assert(sizeof(Sc64T5SaveState) == 764, "compact T5 save state budget");
 
 typedef struct {
     u32 version;
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    Sc64P7TypedUnitSave units[MAX_UNITS];
+#else
+#ifdef SC64_Z7_DERIVED_SAVE
+    Sc64DerivedUnitSave units[MAX_UNITS];
+#else
+    Sc64ZpPackedUnitSave units[MAX_UNITS];
+#endif
+#endif
+#else
     Sc64PackedUnitSave units[MAX_UNITS];
+#endif
 #else
     s16 units[MAX_UNITS][RACE_UNIT_WORDS];
 #endif
-#ifdef SC64_T6_STORAGE
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    Sc64P7TypedBuildingSave buildings[MAX_BUILDINGS];
+#else
+#ifdef SC64_Z7_DERIVED_SAVE
+    Sc64DerivedBuildingSave buildings[MAX_BUILDINGS];
+#else
     Sc64PackedBuildingSave buildings[MAX_BUILDINGS];
+#endif
+#endif
 #else
     s16 buildings[MAX_BUILDINGS][RACE_BUILD_WORDS];
 #endif
+#ifdef SC64_ZP_FULL_STORAGE
+    Sc64PackedMineralSave minerals_map[MAX_MINERALS];
+#else
     Mineral minerals_map[MAX_MINERALS];
+#endif
     u8 fog[(MAP_CELLS+7)/8];
     int state[32],players[5],ore[5],vespene[5];
-    Geyser geysers[4];
+    Geyser geysers[MAX_RACE_GEYSERS];
     Sc64RaceCampaignState campaign;
 #ifdef SC64_UNIFIED
     Sc64BackwaterState backwater;
+#ifdef SC64_ZP_FULL_STORAGE
+    u8 invincible_bits[(MAX_UNITS + MAX_BUILDINGS + 7) / 8];
+#else
     u8 invincible_units[MAX_UNITS],invincible_buildings[MAX_BUILDINGS];
+#endif
 #endif
 #if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)
     Sc64T3State t3;
@@ -85,6 +151,54 @@ typedef struct {
 #if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     Sc64P3State p3;
     u16 p3_action_ticks;
+#endif
+#ifdef SC64_Z4_RUNTIME
+    Sc64Z4RuntimeState z4;
+#endif
+#ifdef SC64_P4_RUNTIME
+    Sc64P4RuntimeState p4;
+#endif
+#if defined(SC64_Z5_RUNTIME) && defined(SC64_Z6_RUNTIME)
+    /* Mutually exclusive campaign missions share the larger Z5 payload. */
+    union {
+        Sc64Z5PersistentState z5;
+        Sc64Z6PersistentState z6;
+#ifdef SC64_Z7_RUNTIME
+        Sc64Z7PersistentState z7;
+#endif
+    };
+#elif defined(SC64_Z5_RUNTIME)
+    Sc64Z5PersistentState z5;
+#elif defined(SC64_Z6_RUNTIME)
+    Sc64Z6PersistentState z6;
+#endif
+#if defined(SC64_P5_RUNTIME) && defined(SC64_P6_RUNTIME) && defined(SC64_P7_BATTERY_ENABLED)
+    union {
+        Sc64P5PersistentState p5;
+        Sc64P6PersistentState p6;
+        Sc64P7PersistentState p7;
+    };
+#elif defined(SC64_P5_RUNTIME) && defined(SC64_P6_RUNTIME)
+    union {
+        Sc64P5PersistentState p5;
+        Sc64P6PersistentState p6;
+    };
+#elif defined(SC64_P5_RUNTIME) && defined(SC64_P7_BATTERY_ENABLED)
+    union {
+        Sc64P5PersistentState p5;
+        Sc64P7PersistentState p7;
+    };
+#elif defined(SC64_P6_RUNTIME) && defined(SC64_P7_BATTERY_ENABLED)
+    union {
+        Sc64P6PersistentState p6;
+        Sc64P7PersistentState p7;
+    };
+#elif defined(SC64_P5_RUNTIME)
+    Sc64P5PersistentState p5;
+#elif defined(SC64_P6_RUNTIME)
+    Sc64P6PersistentState p6;
+#elif defined(SC64_P7_BATTERY_ENABLED)
+    Sc64P7PersistentState p7;
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
@@ -117,7 +231,15 @@ typedef struct {
     Sc64T4RuntimeState t4;
 #endif
 #endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    u8 interceptor_projectiles[SC64_CODEC_BYTES];
+    u8 interceptor_padding;
+#endif
 } RaceSave;
+#if defined(SC64_Z5_RUNTIME) && defined(SC64_Z6_RUNTIME)
+_Static_assert(sizeof(Sc64Z6PersistentState) <= sizeof(Sc64Z5PersistentState),
+               "Z6 must fit in the existing Z5 save payload");
+#endif
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
 #ifdef SC64_T6_STORAGE
 #ifdef SC64_LATE_TERRAN_STORAGE

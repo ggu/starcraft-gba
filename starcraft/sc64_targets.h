@@ -3,12 +3,12 @@
 
 /* Short-lived 64px spatial index for nearest-enemy queries in update_orders.
  * The default 24x24 grid covers 96x96; SC64_LARGE_MAPS uses 32x24 for
- * 128x96; the T4 storage probe uses 32x32 for 128x128. Entries are compact
- * unified indices: units, then buildings. */
+ * 128x96; T4 and the staged Z/P storage use 32x32 for 128x128. Entries are
+ * compact unified indices: units, then buildings. */
 #define SC64_TARGET_CELL_SIZE 64
-#ifdef SC64_LARGE_MAPS
+#if defined(SC64_LARGE_MAPS) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define SC64_TARGET_GRID_COLS 32
-#ifdef SC64_T4_RUNTIME
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #define SC64_TARGET_GRID_ROWS 32
 #else
 #define SC64_TARGET_GRID_ROWS 24
@@ -24,7 +24,7 @@
 #define SC64_TARGET_ENTITY_COUNT (MAX_UNITS + MAX_BUILDINGS)
 #define SC64_TARGET_DIRTY_CAPACITY (MAX_UNITS * 2 + MAX_BUILDINGS)
 
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 typedef u16 Sc64TargetIndex;
 #define SC64_TARGET_NONE 0xffffu
 #else
@@ -41,7 +41,7 @@ static u16 sc64_target_cell[SC64_TARGET_ENTITY_COUNT];
 static u16 sc64_target_dirty[SC64_TARGET_DIRTY_CAPACITY];
 static u16 sc64_target_dirty_count;
 /* Conservative per-owner axis occupancy. Bits are only cleared on begin. */
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
 static u32 sc64_target_owner_columns[5], sc64_target_owner_rows[5];
 #endif
 static int sc64_target_index_initialized;
@@ -83,7 +83,7 @@ sc64_target_insert(int entity, int owner, int x, int y)
     if (old != SC64_TARGET_NONE) sc64_target_prev[old] = (Sc64TargetIndex)entity;
     sc64_target_head[owner][cell] = (Sc64TargetIndex)entity;
     sc64_target_cell[entity] = (u16)cell;
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     sc64_target_owner_columns[owner] |= (u32)1u << (x >> 6);
     sc64_target_owner_rows[owner] |= (u32)1u << (y >> 6);
 #endif
@@ -118,7 +118,7 @@ sc64_target_index_begin(void)
     }
     sc64_target_dirty_count = 0;
     sc64_target_dirty_overflowed = 0;
-#ifdef SC64_LATE_TERRAN_STORAGE
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     memset(sc64_target_owner_columns, 0, sizeof(sc64_target_owner_columns));
     memset(sc64_target_owner_rows, 0, sizeof(sc64_target_owner_rows));
 #endif

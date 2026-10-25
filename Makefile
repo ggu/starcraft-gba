@@ -16,16 +16,30 @@ CLANG ?= clang
 PYTHON ?= python3
 CFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -O2 -g -std=c11 -ffreestanding -fno-builtin -fno-strict-aliasing -fno-common -ffunction-sections -fdata-sections -Wall -Wextra -Icommon
 LDFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -nostdlib -Tcommon/gba.ld -Wl,--gc-sections
-COMMON := common/start.s common/main.c common/gba.c common/memory.c
+COMMON := common/start.s common/main.c common/gba.c common/memory.c common/audio_bank.S
 COMMON_HEADERS := $(wildcard common/*.h)
 # The order-decision foundation is linked only by its isolated host check until
 # a gameplay adapter is implemented and qualified.
 STARCRAFT := $(filter-out starcraft/sc64_interceptor_orders.c,$(wildcard starcraft/*.c))
 
-SC64_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated
-SC64_INPUTS := .local/sc64/generated/sc64_mission_generated.h .local/sc64/generated/sc64_assets_generated.h .local/sc64/generated/sc64_sprites_generated.h
-BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/backwater/generated
-BACKWATER_INPUTS := .local/sc64/backwater/generated/sc64_mission_generated.h .local/sc64/backwater/generated/sc64_assets_generated.h .local/sc64/backwater/generated/sc64_sprites_generated.h
+# Optional private StarCraft 64 audio bank from tools/sc64_audio_pack.py. Every
+# imported profile links it when present; SC64_AUDIO=0 builds them silent.
+SC64_AUDIO ?= auto
+SC64_AUDIO_DIR := .local/sc64/audio/generated
+SC64_AUDIO_FLAGS :=
+SC64_AUDIO_INPUTS :=
+ifneq ($(SC64_AUDIO),0)
+ifneq ($(wildcard $(SC64_AUDIO_DIR)/sc64_audio_generated.h),)
+SC64_AUDIO_FLAGS := -DSC64_AUDIO_IMPORTED -I$(SC64_AUDIO_DIR) '-DSC64_AUDIO_BLOB="$(SC64_AUDIO_DIR)/sc64_audio_generated.bin"'
+SC64_AUDIO_INPUTS := $(SC64_AUDIO_DIR)/sc64_audio_generated.h $(SC64_AUDIO_DIR)/sc64_audio_generated.bin
+else ifeq ($(SC64_AUDIO),1)
+$(error SC64_AUDIO=1 but $(SC64_AUDIO_DIR)/sc64_audio_generated.h is missing; run tools/sc64_audio_pack.py)
+endif
+endif
+SC64_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated $(SC64_AUDIO_FLAGS)
+SC64_INPUTS := .local/sc64/generated/sc64_mission_generated.h .local/sc64/generated/sc64_assets_generated.h .local/sc64/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
+BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/backwater/generated $(SC64_AUDIO_FLAGS)
+BACKWATER_INPUTS := .local/sc64/backwater/generated/sc64_mission_generated.h .local/sc64/backwater/generated/sc64_assets_generated.h .local/sc64/backwater/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
 CAMPAIGN_FLAGS := $(BACKWATER_FLAGS) -I.local/sc64/campaign/generated
 CAMPAIGN_INPUTS := $(BACKWATER_INPUTS) .local/sc64/campaign/generated/sc64_campaign_generated.h
 RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -I.local/sc64/races/generated
@@ -34,11 +48,45 @@ UNIFIED_FLAGS := $(RACES_FLAGS) -DSC64_UNIFIED
 RACE_CAMPAIGN_FLAGS := $(UNIFIED_FLAGS) -DSC64_IMPORTED_SKIRMISH -I.local/sc64/skirmish/generated
 RACE_CAMPAIGN_INPUTS := $(RACES_INPUTS) .local/sc64/skirmish/generated/sc64_skirmish_generated.h
 T3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_T3_ENABLED -DSC64_CAMPAIGN_RACE=0 $(T3_EXTRA_FLAGS)
-Z3_OPTIMIZATION_FLAGS ?= -DSC64_ROUTE_PACK3 -DSC64_VISIBILITY_SPANS -DSC64_Z3_WINDOWED_SCHEDULE
+Z3_OPTIMIZATION_FLAGS ?= -DSC64_ROUTE_PACK3 -DSC64_VISIBILITY_SPANS -DSC64_Z3_WINDOWED_SCHEDULE -DSC64_NO_FRAME_CLEAR -DGBA_PRESENT_DEADLINE -DSC64_TARGET_OCCUPANCY -DSC64_UNARMED_QUERY_SKIP
 Z3_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_Z3_ENABLED -DSC64_CAMPAIGN_RACE=1 $(Z3_OPTIMIZATION_FLAGS) $(Z3_EXTRA_FLAGS)
+Z4_FLAGS := $(filter-out -I.local/sc64/races/generated,$(Z3_FLAGS)) -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated -I.local/sc64/z4/generated -DSC64_Z4_DATA_ENABLED -DSC64_Z4_ENABLED -DSC64_Z4_RUNTIME -DSC64_Z4_CAMPAIGN_ENTRY -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_ZP_DEFENSE_TARGETS
+Z4_INPUTS := $(RACE_CAMPAIGN_INPUTS) .local/sc64/zp-stage/generated/sc64_races_generated.h .local/sc64/zp-stage/generated/sc64_race_sprites_generated.h .local/sc64/z4/generated/sc64_z4_scenario_generated.h
 LARGE_PROBE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_CAMPAIGN_RACE=2
-P3_OPTIMIZATION_FLAGS ?= -DSC64_ROUTE_PACK3 -DSC64_P3_DEFENSE_TARGETS -DSC64_P3_WINDOWED_SCHEDULE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS
+P3_OPTIMIZATION_FLAGS ?= -DSC64_ROUTE_PACK3 -DSC64_P3_DEFENSE_TARGETS -DSC64_P3_WINDOWED_SCHEDULE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS -DGBA_PRESENT_DEADLINE -DSC64_TARGET_OCCUPANCY -DSC64_UNARMED_QUERY_SKIP
 P3_FLAGS := $(LARGE_PROBE_FLAGS) -DSC64_P3_ENABLED -DSC64_P3_RUNTIME $(P3_OPTIMIZATION_FLAGS) $(P3_EXTRA_FLAGS)
+P4_FLAGS := $(filter-out -I.local/sc64/races/generated,$(P3_FLAGS)) -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated -I.local/sc64/p4/generated -DSC64_P4_DATA_ENABLED -DSC64_P4_ENABLED -DSC64_P4_RUNTIME -DSC64_P4_CAMPAIGN_ENTRY -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_ZP_DEFENSE_TARGETS
+P4_INPUTS := $(RACE_CAMPAIGN_INPUTS) .local/sc64/zp-stage/generated/sc64_races_generated.h .local/sc64/zp-stage/generated/sc64_race_sprites_generated.h .local/sc64/p4/generated/sc64_p4_scenario_generated.h
+P4_STORM_FLAGS := $(P4_FLAGS) -DSC64_P4_STORM_ENABLED
+ZP_FULL_STORAGE_FLAGS := $(P4_STORM_FLAGS) -DSC64_ZP_FULL_STORAGE
+Z5_FLAGS := $(filter-out -DSC64_ZP_DEFENSE_TARGETS -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated,$(Z4_FLAGS)) -I.local/sc64/z5/generated -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated -I.local/sc64/zp-stage/generated/scenarios -DSC64_ZP_FULL_STORAGE -DSC64_STATIC_KEY_CULL -DSC64_Z5_DATA_ENABLED -DSC64_Z5_ENABLED -DSC64_Z5_RUNTIME -DSC64_Z5_CAMPAIGN_ENTRY -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS
+Z5_INPUTS := $(Z4_INPUTS) .local/sc64/z5/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z5_scenario_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z5_doodads_generated.h
+Z5_CLOAK_FLAGS := $(Z5_FLAGS) -DSC64_Z5_CLOAK_ENABLED
+Z5_QUERY_FLAGS ?= -DSC64_Z5_PRUNE_STARTED -DSC64_Z5_COUNT_SNAPSHOT
+Z5_CONSUME_FLAGS := $(Z5_CLOAK_FLAGS) -DSC64_Z5_CONSUME_ENABLED $(Z5_QUERY_FLAGS)
+Z5_CLOAK_INPUTS := $(Z5_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z5_abilities_generated.h
+P5_FLAGS := $(filter-out -DSC64_ZP_DEFENSE_TARGETS -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated,$(P4_STORM_FLAGS)) -I.local/sc64/p5/generated -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated -I.local/sc64/zp-stage/generated/scenarios -DSC64_ZP_FULL_STORAGE -DSC64_P5_DATA_ENABLED -DSC64_P5_ENABLED -DSC64_P5_RUNTIME -DSC64_P5_CAMPAIGN_ENTRY -DSC64_P5_ACTORS -DSC64_Z6_ACTORS
+P5_INPUTS := $(P4_INPUTS) .local/sc64/p5/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h
+P5_QUERY_FLAGS ?= -DSC64_P5_TYPE_FIRST_COUNTS -DSC64_P5_PRUNE_STARTED -DSC64_P5_COUNT_SNAPSHOT
+P5_SHUTTLE_FLAGS := $(P5_FLAGS) -DSC64_P5_SHUTTLE_ENABLED -DSC64_ZP_DEFENSE_TARGETS $(P5_QUERY_FLAGS)
+P6_VALIDATED_QUERY_FLAGS := -DSC64_P6_PRUNE_STARTED -DSC64_P6_PREVALIDATED_TICK -DSC64_P6_TRAP_CULL -DSC64_P6_COUNT_SNAPSHOT -DSC64_P6_BURROW_CULL -DSC64_P6_BURROW_GROUPED -DSC64_P6_RESCUE_GROUPED -DSC64_P6_STORM_POSTCHECK_LOCAL
+P6_QUERY_FLAGS ?= $(P6_VALIDATED_QUERY_FLAGS)
+P6_EXTRA_FLAGS ?=
+Z6_VALIDATED_QUERY_FLAGS := -DSC64_Z6_COUNT_SNAPSHOT -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL
+Z6_QUERY_FLAGS ?= $(Z6_VALIDATED_QUERY_FLAGS)
+Z6_EXTRA_FLAGS ?=
+P6_PROBE_FLAGS := $(P6_QUERY_FLAGS) $(P6_EXTRA_FLAGS) -I.local/sc64/p6/generated $(P5_SHUTTLE_FLAGS) -DSC64_P6_DATA_ENABLED -DSC64_P6_RUNTIME -DSC64_P6_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS -DSC64_P6_COMBAT_ENABLED -DSC64_P6_CAMPAIGN_ENTRY -DSC64_P6_STORM_ENABLED
+# Differential fixtures select each query option explicitly, including off builds.
+P6_QUERY_TEST_BASE_FLAGS = $(filter-out $(P6_VALIDATED_QUERY_FLAGS),$(P6_PROBE_FLAGS))
+P6_PROBE_INPUTS := $(P5_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_p6_abilities_generated.h .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p6/generated/sc64_p6_doodads_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h
+Z6_PROBE_FLAGS := $(Z6_QUERY_FLAGS) $(Z6_EXTRA_FLAGS) -I.local/sc64/z6/generated $(Z5_CONSUME_FLAGS) -DSC64_Z6_DATA_ENABLED -DSC64_Z6_RUNTIME -DSC64_Z6_ACTORS -DSC64_Z6_CAMPAIGN_ENTRY -DSC64_Z6_CLOAK_ENABLED -DSC64_Z6_STORM_ENABLED -DSC64_Z6_TRANSPORT_ENABLED
+# Keep explicit collision variants independent of enabled query defaults.
+Z6_QUERY_TEST_BASE_FLAGS = $(filter-out $(Z6_VALIDATED_QUERY_FLAGS) -DSC64_COLLISION_CLASS_CACHE,$(Z6_PROBE_FLAGS))
+Z6_PROBE_INPUTS := $(Z5_CLOAK_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_abilities_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h
+Z7_PROBE_FLAGS := $(Z6_PROBE_FLAGS) -DSC64_Z7_DATA_ENABLED -DSC64_Z7_RUNTIME -DSC64_Z7_CAMPAIGN_ENTRY -DSC64_Z7_COLONY_DEFENSE_ENABLED
+Z7_DERIVED_SAVE_EXTRA_FLAGS ?=
+Z7_DERIVED_SAVE_FLAGS = $(Z7_SCOURGE_PROBE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_Z7_DERIVED_SAVE $(Z7_DERIVED_SAVE_EXTRA_FLAGS)
+Z7_PROBE_INPUTS := $(Z6_PROBE_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z7_scenario_generated.h
 T4_STORAGE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_T4_ENABLED -DSC64_T4_RUNTIME -DSC64_ROUTE_PACK3 -DSC64_T4_WINDOWED_SCHEDULE -DSC64_CAMPAIGN_RACE=0
 T4_OPTIMIZATION_FLAGS ?= -DSC64_T4_COUNT_CACHE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS -DSC64_UNARMED_QUERY_SKIP
 T4_SCENARIO_FLAGS := $(T4_STORAGE_FLAGS) -DSC64_T4_SCENARIO_RUNTIME
@@ -128,6 +176,14 @@ build/test-sc64-demo-schedule: tests/sc64_demo_schedule.c common/demo_schedule.h
 
 build/test-sc64-demo-schedule-runtime: tests/sc64_demo_schedule_runtime.c common/main.c common/demo_schedule.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+
+build/test-sc64-dense-schedule: tests/sc64_demo_schedule_runtime.c common/main.c common/demo_schedule.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_DENSE_SCHEDULE -Icommon $< -o $@
+
+.PHONY: test-sc64-dense-schedule
+test-sc64-dense-schedule: build/test-sc64-dense-schedule
+	./build/test-sc64-dense-schedule
+test-starcraft: test-sc64-dense-schedule
 
 build/test-sc64-bitgrid: tests/sc64_bitgrid.c starcraft/sc64_bitgrid.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon tests/sc64_bitgrid.c -o $@
@@ -804,10 +860,13 @@ build/test-sc64-z3-controller: tests/sc64_z3_campaign_run.c $(STARCRAFT) $(wildc
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z3_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z3-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z3_FLAGS) $< common/gba.c -o $@
-test-sc64-z3-runtime: test-sc64-z3-import build/test-sc64-z3-run build/test-sc64-z3-save build/test-sc64-z3-controller build/test-sc64-z3-hud
+build/test-sc64-z3-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z3_FLAGS) $< common/gba.c -o $@
+test-sc64-z3-runtime: test-sc64-z3-import build/test-sc64-z3-run build/test-sc64-z3-save build/test-sc64-z3-controller build/test-sc64-z3-hud build/test-sc64-z3-frame-coverage
 	./build/test-sc64-z3-run
 	./build/test-sc64-z3-save
 	./build/test-sc64-z3-hud
+	./build/test-sc64-z3-frame-coverage
 	./build/test-sc64-z3-controller --policy hybrid --trace .local/sc64/z3-controller-asan-win.json
 
 build/test-sc64-frontend-terran: RACE_FRONTEND_ID=0
@@ -866,6 +925,29 @@ build/test-terrain-cache: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cach
 build/test-terrain-scroll: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cache.h common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_TERRAIN_CACHE_REAL_GFX -DSC64_TERRAIN_SCROLL -Icommon $< common/gba.c -o $@
 
+build/test-terrain-key-once: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cache.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_IMPORTED_MISSION -DSC64_RENDER_KEY_ONCE $< -o $@
+build/test-terrain-key-once-scroll: tests/sc64_terrain_cache.c starcraft/sc64_terrain_cache.h common/gba.h common/gba.c | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_TERRAIN_CACHE_REAL_GFX -DSC64_TERRAIN_SCROLL -DSC64_IMPORTED_MISSION -DSC64_RENDER_KEY_ONCE -Icommon $< common/gba.c -o $@
+.PHONY: test-terrain-key-once
+test-terrain-key-once: build/test-terrain-key-once build/test-terrain-key-once-scroll
+	./build/test-terrain-key-once
+	./build/test-terrain-key-once-scroll
+test-starcraft: test-terrain-key-once
+
+define RENDER_KEY_ONCE_PROFILE
+build/test-sc64-render-key-once-$(1): tests/sc64_z3_frame_coverage.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) -DSC64_RENDER_KEY_ONCE $$< common/gba.c -o $$@
+endef
+$(eval $(call RENDER_KEY_ONCE_PROFILE,p5,$(P5_SHUTTLE_FLAGS),$(P5_INPUTS)))
+$(eval $(call RENDER_KEY_ONCE_PROFILE,p6,$(P6_PROBE_FLAGS),$(P6_PROBE_INPUTS)))
+$(eval $(call RENDER_KEY_ONCE_PROFILE,z6,$(Z6_PROBE_FLAGS),$(Z6_PROBE_INPUTS)))
+.PHONY: test-sc64-render-key-once
+test-sc64-render-key-once: build/test-sc64-render-key-once-p5 build/test-sc64-render-key-once-p6 build/test-sc64-render-key-once-z6
+	./build/test-sc64-render-key-once-p5
+	./build/test-sc64-render-key-once-p6
+	./build/test-sc64-render-key-once-z6
+
 build/test-collision: tests/sc64_collision.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -DSC64_SKIRMISH -Icommon tests/sc64_collision.c common/gba.c -o $@
 
@@ -918,6 +1000,26 @@ test-starcraft: build/test-sc64-resource-actions build/test-sc64-t5-actor-rules 
 	$(PYTHON) -m unittest discover -s tests -p 'test_sc64*.py'
 
 test: test-starcraft
+
+build/test-sc64-no-depot-harvest: tests/sc64_no_depot_harvest.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
+build/test-sc64-no-depot-harvest-z7: tests/sc64_no_depot_harvest.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SCOURGE_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-no-depot-harvest test-sc64-no-depot-harvest-z7
+test-sc64-no-depot-harvest: build/test-sc64-no-depot-harvest
+	./build/test-sc64-no-depot-harvest
+test-sc64-no-depot-harvest-z7: build/test-sc64-no-depot-harvest-z7
+	./build/test-sc64-no-depot-harvest-z7
+test-starcraft: test-sc64-no-depot-harvest
+
+build/test-sc64-active-hall-depots-z6: tests/sc64_active_hall_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-active-hall-depots-z7: tests/sc64_active_hall_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SCOURGE_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-active-hall-depots
+test-sc64-active-hall-depots: build/test-sc64-active-hall-depots-z6 build/test-sc64-active-hall-depots-z7
+	./build/test-sc64-active-hall-depots-z6
+	./build/test-sc64-active-hall-depots-z7
 
 probe: build/probe.gba
 build/probe.elf: $(COMMON) $(COMMON_HEADERS) tests/platform_probe.c common/gba.h common/gba.ld Makefile | build
@@ -1084,6 +1186,461 @@ test-sc64-terran-defense-targets: build/test-sc64-terran-defense-targets
 test-sc64-present: build/test-sc64-present
 	./$<
 test-starcraft: test-sc64-terran-late-count-cache test-sc64-present
+
+build/test-sc64-z4-model: tests/sc64_z4_model.c starcraft/sc64_z4.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+build/test-sc64-p4-model: tests/sc64_p4_model.c starcraft/sc64_p4.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+.PHONY: test-sc64-zp-models
+test-sc64-zp-models: build/test-sc64-z4-model build/test-sc64-p4-model
+	./build/test-sc64-z4-model
+	./build/test-sc64-p4-model
+test-starcraft: test-sc64-zp-models
+
+# Staged fourth chapter; canonical Zerg stays on its qualified third chapter.
+build/starcraft-zerg-z4.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z4_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z4.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z4-GBA.gba: build/starcraft-zerg-z4.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z4' SCZ4
+.PHONY: zerg-z4
+zerg-z4: build/StarCraft-Zerg-Z4-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z4
+
+build/starcraft-protoss-p4.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P4_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p4.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P4-GBA.gba: build/starcraft-protoss-p4.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS4' SCP4
+.PHONY: protoss-p4
+protoss-p4: build/StarCraft-Protoss-P4-GBA.gba
+	$(PYTHON) tools/verify_roms.py --protoss-p4
+
+build/starcraft-protoss-p4-storm.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P4_STORM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p4-storm.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P4-Storm-GBA.gba: build/starcraft-protoss-p4-storm.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P4 STORM' SCP5
+.PHONY: protoss-p4-storm
+protoss-p4-storm: build/StarCraft-Protoss-P4-Storm-GBA.gba
+	$(PYTHON) tools/verify_roms.py --protoss-p4-storm
+
+build/starcraft-protoss-p5.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P5_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p5.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P5-GBA.gba: build/starcraft-protoss-p5.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS5' SCPA
+.PHONY: protoss-p5
+protoss-p5: build/StarCraft-Protoss-P5-GBA.gba
+	$(PYTHON) tools/verify_roms.py --protoss-p5
+
+build/starcraft-protoss-p5-shuttle.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P5_SHUTTLE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p5-shuttle.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P5-Shuttle-GBA.gba: build/starcraft-protoss-p5-shuttle.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P5 CARGO' SCPB
+.PHONY: protoss-p5-shuttle
+protoss-p5-shuttle: build/StarCraft-Protoss-P5-Shuttle-GBA.gba
+	$(PYTHON) tools/verify_roms.py --protoss-p5-shuttle
+
+build/test-sc64-p5-transport-on: tests/sc64_p5_transport.c starcraft/sc64_transport_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_P5_SHUTTLE_ENABLED $< -o $@
+build/test-sc64-p5-transport-off: tests/sc64_p5_transport.c starcraft/sc64_transport_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-p5-transport
+test-sc64-p5-transport: build/test-sc64-p5-transport-on build/test-sc64-p5-transport-off
+	./build/test-sc64-p5-transport-on
+	./build/test-sc64-p5-transport-off
+test-starcraft: test-sc64-p5-transport
+
+build/test-sc64-p5-shuttle-runtime: tests/sc64_p5_shuttle_runtime.c tests/sc64_p5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p5-shuttle-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p5-shuttle-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p5-shuttle-runtime
+test-sc64-p5-shuttle-runtime: test-sc64-p5-transport build/test-sc64-p5-shuttle-runtime build/test-sc64-p5-shuttle-profile build/test-sc64-p5-shuttle-frame-coverage
+	./build/test-sc64-p5-shuttle-runtime
+	./build/test-sc64-p5-shuttle-profile
+	./build/test-sc64-p5-shuttle-frame-coverage
+
+build/test-sc64-p5-campaign-run: tests/sc64_p5_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p5-campaign-run
+test-sc64-p5-campaign-run: build/test-sc64-p5-campaign-run
+	./build/test-sc64-p5-campaign-run
+
+build/test-sc64-p5-runtime: tests/sc64_p5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p5-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p5-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p5-runtime
+test-sc64-p5-runtime: build/test-sc64-p5-runtime build/test-sc64-p5-profile build/test-sc64-p5-frame-coverage
+	./build/test-sc64-p5-runtime
+	./build/test-sc64-p5-profile
+	./build/test-sc64-p5-frame-coverage
+
+build/starcraft-zerg-z5.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z5_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z5.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z5-GBA.gba: build/starcraft-zerg-z5.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z5' SCZ5
+.PHONY: zerg-z5
+zerg-z5: build/StarCraft-Zerg-Z5-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z5
+
+build/starcraft-zerg-z5-cloak.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z5_CLOAK_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z5-cloak.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z5-Cloak-GBA.gba: build/starcraft-zerg-z5-cloak.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z5 CLOAK' SCZC
+.PHONY: zerg-z5-cloak
+zerg-z5-cloak: build/StarCraft-Zerg-Z5-Cloak-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z5-cloak
+
+build/test-sc64-z5-cloak-runtime: tests/sc64_z5_cloak_runtime.c tests/sc64_z5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CLOAK_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z5-cloak-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CLOAK_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z5-cloak-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CLOAK_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z5-cloak-runtime
+test-sc64-z5-cloak-runtime: test-sc64-z5-ability-models build/test-sc64-z5-cloak-runtime build/test-sc64-z5-cloak-profile build/test-sc64-z5-cloak-frame-coverage
+	./build/test-sc64-z5-cloak-runtime
+	./build/test-sc64-z5-cloak-profile
+	./build/test-sc64-z5-cloak-frame-coverage
+
+build/starcraft-zerg-z5-consume.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z5_CONSUME_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z5-consume.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z5-Consume-GBA.gba: build/starcraft-zerg-z5-consume.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z5 FEED' SCZD
+.PHONY: zerg-z5-consume
+zerg-z5-consume: build/StarCraft-Zerg-Z5-Consume-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z5-consume
+
+build/test-sc64-z5-consume-runtime: tests/sc64_z5_consume_runtime.c tests/sc64_z5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CONSUME_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z5-consume-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CONSUME_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z5-consume-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CONSUME_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z5-consume-runtime
+test-sc64-z5-consume-runtime: test-sc64-z5-ability-models build/test-sc64-z5-consume-runtime build/test-sc64-z5-consume-profile build/test-sc64-z5-consume-frame-coverage
+	./build/test-sc64-z5-consume-runtime
+	./build/test-sc64-z5-consume-profile
+	./build/test-sc64-z5-consume-frame-coverage
+
+build/test-sc64-z5-runtime: tests/sc64_z5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z5-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z5-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z5-runtime
+test-sc64-z5-runtime: build/test-sc64-z5-runtime build/test-sc64-z5-profile build/test-sc64-z5-frame-coverage
+	./build/test-sc64-z5-runtime
+	./build/test-sc64-z5-profile
+	./build/test-sc64-z5-frame-coverage
+
+# Capacity/save-layout experiment; it does not enable later campaign entries.
+build/starcraft-zp-storage-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(ZP_FULL_STORAGE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zp-storage-probe.map -lgcc -o $@
+	$(SIZE) $@
+.PHONY: sc64-zp-full-storage-probe
+sc64-zp-full-storage-probe: build/starcraft-zp-storage-probe.elf
+
+build/test-sc64-zp-actors-on: tests/sc64_zp_actors.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS $< -o $@
+build/test-sc64-zp-actors-off: tests/sc64_zp_actors.c starcraft/race_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-zp-actors
+test-sc64-zp-actors: build/test-sc64-zp-actors-on build/test-sc64-zp-actors-off
+	./build/test-sc64-zp-actors-on
+	./build/test-sc64-zp-actors-off
+test-starcraft: test-sc64-zp-actors
+
+build/test-sc64-z4-adapter: tests/sc64_z4_adapter.c starcraft/sc64_z4.h starcraft/sc64_z4_adapter.h .local/sc64/z4/generated/sc64_z4_scenario_generated.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DGBA_HOST -DSC64_Z4_RUNTIME -Icommon -I.local/sc64/z4/generated $< -o $@
+build/test-sc64-p4-adapter: tests/sc64_p4_adapter.c starcraft/sc64_p4.h starcraft/sc64_p4_adapter.h .local/sc64/p4/generated/sc64_p4_scenario_generated.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -I.local/sc64/p4/generated $< -o $@
+build/test-sc64-z4-runtime: tests/sc64_z4_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-runtime: tests/sc64_p4_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z4-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z4-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-zp-actor-engine: tests/sc64_zp_actor_integration.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-zp-zerg-storage: tests/sc64_zp_storage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-zp-protoss-storage: tests/sc64_zp_storage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-zp-air-tech: tests/sc64_zp_air_tech.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z4-campaign-run: tests/sc64_z4_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z4-runtime test-sc64-p4-runtime test-sc64-zp-storage
+test-sc64-z4-runtime: build/test-sc64-z4-adapter build/test-sc64-z4-runtime build/test-sc64-zp-actor-engine build/test-sc64-zp-air-tech build/test-sc64-z4-frame-coverage build/test-sc64-z4-profile
+	./build/test-sc64-z4-adapter
+	./build/test-sc64-zp-actor-engine
+	./build/test-sc64-zp-air-tech
+	./build/test-sc64-z4-runtime
+	./build/test-sc64-z4-frame-coverage
+	./build/test-sc64-z4-profile
+test-sc64-p4-runtime: build/test-sc64-p4-adapter build/test-sc64-p4-runtime build/test-sc64-p4-frame-coverage build/test-sc64-p4-profile
+	./build/test-sc64-p4-adapter
+	./build/test-sc64-p4-runtime
+	./build/test-sc64-p4-frame-coverage
+	./build/test-sc64-p4-profile
+test-sc64-zp-storage: build/test-sc64-zp-zerg-storage build/test-sc64-zp-protoss-storage
+	./build/test-sc64-zp-zerg-storage
+	./build/test-sc64-zp-protoss-storage
+
+# Compare indexed target results with a full-array scan for every race build.
+build/test-sc64-z3-occupancy-targets: tests/sc64_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z3_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p3-occupancy-targets: tests/sc64_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z4-occupancy-targets: tests/sc64_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-occupancy-targets: tests/sc64_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-race-occupancy-targets
+test-sc64-race-occupancy-targets: build/test-sc64-z3-occupancy-targets build/test-sc64-p3-occupancy-targets build/test-sc64-z4-occupancy-targets build/test-sc64-p4-occupancy-targets
+	./build/test-sc64-z3-occupancy-targets
+	./build/test-sc64-p3-occupancy-targets
+	./build/test-sc64-z4-occupancy-targets
+	./build/test-sc64-p4-occupancy-targets
+
+build/test-sc64-psionic-storm: tests/sc64_psionic_storm.c starcraft/sc64_psionic_storm.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-psionic-storm
+test-sc64-psionic-storm: build/test-sc64-psionic-storm
+	./build/test-sc64-psionic-storm
+test-starcraft: test-sc64-psionic-storm
+build/test-sc64-p4-storm: tests/sc64_p4_storm.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_STORM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-storm-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_STORM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-storm-storage: tests/sc64_zp_storage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_STORM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-storm-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_STORM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-campaign-run: tests/sc64_p4_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_STORM_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p4-campaign
+test-sc64-p4-campaign: test-sc64-p4-storm build/test-sc64-p4-campaign-run
+	./build/test-sc64-p4-campaign-run --limit 180000 --attempt-tag make-qualified
+.PHONY: test-sc64-p4-storm
+test-sc64-p4-storm: test-sc64-psionic-storm build/test-sc64-p4-storm build/test-sc64-p4-storm-profile build/test-sc64-p4-storm-storage build/test-sc64-p4-storm-frame-coverage
+	./build/test-sc64-p4-storm
+	./build/test-sc64-p4-storm-profile
+	./build/test-sc64-p4-storm-storage
+	./build/test-sc64-p4-storm-frame-coverage
+.PHONY: test-sc64-z4-campaign
+test-sc64-z4-campaign: test-sc64-z4-runtime build/test-sc64-z4-campaign-run
+	./build/test-sc64-z4-campaign-run --limit 150000 --trace .local/sc64/z4-controller-win-asan.json
+
+# Chapter-five models are asset-free; adapters additionally require the
+# authenticated numeric headers from sc64_zp_scenario_pack.py.
+build/test-sc64-z5-rules: tests/sc64_z5.c starcraft/sc64_z5.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-p5-rules: tests/sc64_p5.c starcraft/sc64_p5.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-zp-chapter-five-models test-sc64-z5-adapter test-sc64-p5-adapter
+test-sc64-zp-chapter-five-models: build/test-sc64-z5-rules build/test-sc64-p5-rules
+	./build/test-sc64-z5-rules
+	./build/test-sc64-p5-rules
+test-starcraft: test-sc64-zp-chapter-five-models
+build/test-sc64-z5-adapter: tests/sc64_z5_adapter.c starcraft/sc64_z5.h starcraft/sc64_z5_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_z5_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+build/test-sc64-p5-adapter: tests/sc64_p5_adapter.c starcraft/sc64_p5.h starcraft/sc64_p5_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+test-sc64-z5-adapter: build/test-sc64-z5-adapter
+	./build/test-sc64-z5-adapter
+test-sc64-p5-adapter: build/test-sc64-p5-adapter
+	./build/test-sc64-p5-adapter
+
+build/test-sc64-p5-source-model: tests/sc64_p5_source_model.c starcraft/sc64_p5_source_model.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+build/test-sc64-p5-world: tests/sc64_p5_world.c starcraft/sc64_p5_world_adapter.h starcraft/sc64_p5_source_model.h starcraft/sc64_p5_adapter.h starcraft/sc64_p5.h starcraft/sc64_resource_actions.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+.PHONY: test-sc64-p5-world
+test-sc64-p5-world: build/test-sc64-p5-source-model build/test-sc64-p5-world
+	./build/test-sc64-p5-source-model
+	./build/test-sc64-p5-world
+
+build/test-sc64-p5-count-queries: tests/sc64_p5_count_queries.c tests/sc64_p5_world.c starcraft/sc64_p5_world_adapter.h starcraft/sc64_p5_source_model.h starcraft/sc64_p5_adapter.h starcraft/sc64_p5.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+build/test-sc64-p5-count-snapshot: tests/sc64_p5_count_snapshot.c tests/sc64_p5_world.c starcraft/sc64_p5_count_snapshot.h starcraft/sc64_p5_world_adapter.h starcraft/sc64_p5_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+build/test-sc64-p5-trigger-prune: tests/sc64_p5_trigger_prune.c starcraft/sc64_p5_adapter.h starcraft/sc64_p5.h .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+.PHONY: test-sc64-p5-count-queries
+test-sc64-p5-count-queries: build/test-sc64-p5-count-queries build/test-sc64-p5-count-snapshot build/test-sc64-p5-trigger-prune
+	./build/test-sc64-p5-count-queries
+	./build/test-sc64-p5-count-snapshot
+	./build/test-sc64-p5-trigger-prune
+
+build/test-sc64-p5-actors-off: tests/sc64_p5_actor_rules.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-p5-actors-on: tests/sc64_p5_actor_rules.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_P5_ACTORS -DSC64_Z6_ACTORS $< -o $@
+build/test-sc64-p5-actors-combined: tests/sc64_p5_actor_rules.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_P5_ACTORS -DSC64_Z6_ACTORS -DSC64_Z5_ACTORS -DSC64_T4_RUNTIME -DSC64_TERRAN_LATE_ACTORS $< -o $@
+.PHONY: test-sc64-p5-actors
+test-sc64-p5-actors: build/test-sc64-p5-actors-off build/test-sc64-p5-actors-on build/test-sc64-p5-actors-combined
+	./build/test-sc64-p5-actors-off
+	./build/test-sc64-p5-actors-on
+	./build/test-sc64-p5-actors-combined
+test-starcraft: test-sc64-p5-actors
+
+build/test-sc64-z5-hp-regen: tests/sc64_z5_hp_regen.c starcraft/sc64_z5_hp_regen.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_Z5_RUNTIME $< -o $@
+.PHONY: test-sc64-z5-hp-regen
+test-sc64-z5-hp-regen: build/test-sc64-z5-hp-regen
+	./build/test-sc64-z5-hp-regen
+test-starcraft: test-sc64-z5-hp-regen
+
+build/test-sc64-z5-cloak: tests/sc64_z5_cloak.c starcraft/sc64_z5_cloak.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_Z5_RUNTIME -DSC64_Z5_CLOAK_ENABLED $< -o $@
+build/test-sc64-z5-consume: tests/sc64_z5_consume.c starcraft/sc64_z5_consume.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-z5-ensnare: tests/sc64_z5_ensnare.c starcraft/sc64_z5_ensnare.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+
+build/test-sc64-z5-detection: tests/sc64_z5_detection.c starcraft/sc64_z5_detection.h starcraft/sc64_z5_actor_rules.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-z5-ability-models
+test-sc64-z5-ability-models: build/test-sc64-z5-cloak build/test-sc64-z5-detection build/test-sc64-z5-consume build/test-sc64-z5-ensnare
+	./build/test-sc64-z5-cloak
+	./build/test-sc64-z5-detection
+	./build/test-sc64-z5-consume
+	./build/test-sc64-z5-ensnare
+test-starcraft: test-sc64-z5-ability-models
+
+build/test-sc64-z6-model: tests/sc64_z6.c starcraft/sc64_z6.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-z6-adapter: tests/sc64_z6_adapter.c starcraft/sc64_z6.h starcraft/sc64_z6_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+.PHONY: test-sc64-z6-model test-sc64-z6-adapter
+test-sc64-z6-model: build/test-sc64-z6-model
+	./build/test-sc64-z6-model
+test-sc64-z6-adapter: test-sc64-z6-model build/test-sc64-z6-adapter
+	./build/test-sc64-z6-adapter
+test-starcraft: test-sc64-z6-model
+
+build/test-sc64-z5-actors-off: tests/sc64_z5_actor_rules.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h starcraft/sc64_z5_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS $< -o $@
+build/test-sc64-z5-actors-on: tests/sc64_z5_actor_rules.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h starcraft/sc64_z5_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS $< -o $@
+build/test-sc64-z5-actors-t4: tests/sc64_z5_actor_rules.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h starcraft/sc64_z5_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_T4_RUNTIME -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS $< -o $@
+.PHONY: test-sc64-z5-actors
+test-sc64-z5-actors: build/test-sc64-z5-actors-off build/test-sc64-z5-actors-on build/test-sc64-z5-actors-t4
+	./build/test-sc64-z5-actors-off
+	./build/test-sc64-z5-actors-on
+	./build/test-sc64-z5-actors-t4
+test-starcraft: test-sc64-z5-actors
+
+build/test-sc64-z6-actors-off: tests/sc64_z6_actor_rules.c starcraft/race_rules.h starcraft/sc64_z6_actor_rules.h starcraft/sc64_zp_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Istarcraft $< -o $@
+build/test-sc64-z6-actors-on: tests/sc64_z6_actor_rules.c starcraft/race_rules.h starcraft/sc64_z6_actor_rules.h starcraft/sc64_zp_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Istarcraft -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS -DSC64_Z6_ACTORS $< -o $@
+build/test-sc64-z6-actors-t4: tests/sc64_z6_actor_rules.c starcraft/race_rules.h starcraft/sc64_z6_actor_rules.h starcraft/sc64_zp_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Istarcraft -DSC64_T4_RUNTIME -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS -DSC64_Z6_ACTORS $< -o $@
+.PHONY: test-sc64-z6-actors
+test-sc64-z6-actors: build/test-sc64-z6-actors-off build/test-sc64-z6-actors-on build/test-sc64-z6-actors-t4
+	./build/test-sc64-z6-actors-off
+	./build/test-sc64-z6-actors-on
+	./build/test-sc64-z6-actors-t4
+
+build/test-sc64-compact-mineral-save: tests/sc64_compact_mineral_save.c starcraft/sc64_compact_mineral_save.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-zp-unit-save: tests/sc64_zp_unit_save.c starcraft/sc64_zp_unit_save.h starcraft/sc64_compact_unit_save.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-zp-building-types: tests/sc64_zp_building_types.c starcraft/sc64_zp_building_types.h starcraft/sc64_compact_building_save.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-zp-future-codecs
+test-sc64-zp-future-codecs: build/test-sc64-compact-mineral-save build/test-sc64-zp-unit-save build/test-sc64-zp-building-types
+	./build/test-sc64-compact-mineral-save
+	./build/test-sc64-zp-unit-save
+	./build/test-sc64-zp-building-types
+build/test-sc64-zp-full-storage: tests/sc64_zp_full_storage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZP_FULL_STORAGE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-zp-full-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZP_FULL_STORAGE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-zp-full-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZP_FULL_STORAGE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-zp-full-storage
+test-sc64-zp-full-storage: test-sc64-zp-future-codecs build/test-sc64-zp-full-storage build/test-sc64-zp-full-profile build/test-sc64-zp-full-frame-coverage
+	./build/test-sc64-zp-full-storage
+	./build/test-sc64-zp-full-profile
+	./build/test-sc64-zp-full-frame-coverage
+test-starcraft: test-sc64-z6-actors test-sc64-zp-future-codecs
+
+build/test-sc64-z5-props-off: tests/sc64_z5_prop_rules.c starcraft/race_rules.h starcraft/sc64_z5_actor_rules.h starcraft/sc64_zp_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS $< -o $@
+build/test-sc64-z5-props-on: tests/sc64_z5_prop_rules.c starcraft/race_rules.h starcraft/sc64_z5_actor_rules.h starcraft/sc64_zp_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS $< -o $@
+build/test-sc64-z5-props-t4: tests/sc64_z5_prop_rules.c starcraft/race_rules.h starcraft/sc64_z5_actor_rules.h starcraft/sc64_zp_actor_rules.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_T4_RUNTIME -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS $< -o $@
+.PHONY: test-sc64-z5-props
+test-sc64-z5-props: build/test-sc64-z5-props-off build/test-sc64-z5-props-on build/test-sc64-z5-props-t4
+	./build/test-sc64-z5-props-off
+	./build/test-sc64-z5-props-on
+	./build/test-sc64-z5-props-t4
+test-starcraft: test-sc64-z5-props
+
+Z5_WORLD_FLAGS := $(filter-out -I.local/sc64/races/generated,$(Z3_FLAGS)) -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated -I.local/sc64/zp-stage/generated/scenarios -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS
+build/test-sc64-z5-world: tests/sc64_z5_world.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z5_scenario_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_WORLD_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z5-world
+test-sc64-z5-world: build/test-sc64-z5-world
+	./build/test-sc64-z5-world
+
+Z6_WORLD_FLAGS := $(filter-out -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS,$(Z5_WORLD_FLAGS)) -DSC64_ZP_FULL_STORAGE -DSC64_Z6_ACTORS
+build/test-sc64-z6-world: tests/sc64_z6_world.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_WORLD_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z6-world
+test-sc64-z6-world: build/test-sc64-z6-world
+	./build/test-sc64-z6-world
+
+build/test-sc64-z4-defense-targets: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-defense-targets: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_STORM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z5-defense-targets: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p5-defense-targets: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p5-defense-targets
+test-sc64-p5-defense-targets: build/test-sc64-p5-defense-targets
+	./build/test-sc64-p5-defense-targets
+
+.PHONY: test-sc64-zp-defense-targets
+test-sc64-zp-defense-targets: build/test-sc64-z4-defense-targets build/test-sc64-p4-defense-targets build/test-sc64-z5-defense-targets
+	./build/test-sc64-z4-defense-targets
+	./build/test-sc64-p4-defense-targets
+	./build/test-sc64-z5-defense-targets
 test-sc64-terran-full-targets: build/test-sc64-terran-full-targets
 	./build/test-sc64-terran-full-targets
 test-sc64-terran-full-spatial-hud: build/test-sc64-terran-full-collision build/test-sc64-terran-full-hud
@@ -1249,3 +1806,1216 @@ test-sc64-terran-full-campaign: test-sc64-terran-full-regression test-sc64-terra
 	./build/test-sc64-t8-campaign-run --limit 200000 --trace .local/sc64/terran-late/full-t8-controller.json
 	./build/test-sc64-t9-campaign-run --limit 500000 --trace .local/sc64/terran-late/full-t9-controller.json
 	./build/test-sc64-t10-campaign-run --limit 100000 --trace .local/sc64/terran-late/full-t10-controller.json
+
+
+build/test-sc64-p6-model: tests/sc64_p6.c starcraft/sc64_p6.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-p6-actors: tests/sc64_p6_actor_rules.c starcraft/sc64_p6_actor_rules.h starcraft/sc64_z5_actor_rules.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-p6-adapter: tests/sc64_p6_adapter.c starcraft/sc64_p6.h starcraft/sc64_p6_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+.PHONY: test-sc64-p6-model test-sc64-p6-actors test-sc64-p6-adapter
+test-sc64-p6-model: build/test-sc64-p6-model
+	./build/test-sc64-p6-model
+test-sc64-p6-actors: build/test-sc64-p6-actors
+	./build/test-sc64-p6-actors
+test-sc64-p6-adapter: test-sc64-p6-model build/test-sc64-p6-adapter
+	./build/test-sc64-p6-adapter
+test-starcraft: test-sc64-p6-model test-sc64-p6-actors
+
+build/test-sc64-p6-bindings-off: tests/sc64_p6_actor_bindings.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h starcraft/sc64_p6_actor_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-p6-bindings-on: tests/sc64_p6_actor_bindings.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h starcraft/sc64_p6_actor_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_P6_ACTORS $< -o $@
+build/test-sc64-p6-bindings-mixed: tests/sc64_p6_actor_bindings.c starcraft/race_rules.h starcraft/sc64_zp_actor_rules.h starcraft/sc64_p6_actor_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_T4_RUNTIME -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS -DSC64_Z6_ACTORS -DSC64_P5_ACTORS -DSC64_P6_ACTORS $< -o $@
+.PHONY: test-sc64-p6-bindings
+test-sc64-p6-bindings: build/test-sc64-p6-bindings-off build/test-sc64-p6-bindings-on build/test-sc64-p6-bindings-mixed
+	./build/test-sc64-p6-bindings-off
+	./build/test-sc64-p6-bindings-on
+	./build/test-sc64-p6-bindings-mixed
+test-starcraft: test-sc64-p6-bindings
+
+build/test-sc64-p6-actor-source: tests/sc64_p6_actor_rules.c starcraft/sc64_p6_actor_rules.h starcraft/sc64_z5_actor_rules.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_P6_SOURCE_AUDIT $< -o $@
+.PHONY: test-sc64-p6-actor-source
+test-sc64-p6-actor-source: build/test-sc64-p6-actor-source
+	./build/test-sc64-p6-actor-source
+test-sc64-p6-adapter: test-sc64-p6-actor-source
+
+build/test-sc64-p6-world: tests/sc64_p6_world.c starcraft/sc64_p6_world_adapter.h starcraft/sc64_p6_adapter.h starcraft/sc64_p6_actor_rules.h starcraft/sc64_p6.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+.PHONY: test-sc64-p6-world
+test-sc64-p6-world: test-sc64-p6-adapter build/test-sc64-p6-world
+	./build/test-sc64-p6-world
+
+# Internal P6 integration candidate, with a separate ROM identity and save
+# generation. Canonical race outputs retain their qualified campaign menus.
+build/starcraft-protoss-p6-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P6_PROBE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p6-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P6-Probe-GBA.gba: build/starcraft-protoss-p6-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P6 PROBE' SCPC
+.PHONY: protoss-p6-probe
+protoss-p6-probe: build/StarCraft-Protoss-P6-Probe-GBA.gba
+
+build/test-sc64-p6-controller: tests/sc64_p6_campaign_run.c tests/sc64_p6_opening.h $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p6-controller
+test-sc64-p6-controller: build/test-sc64-p6-controller
+	mkdir -p .local/sc64
+	./build/test-sc64-p6-controller --trace .local/sc64/p6-controller-win.json
+
+build/test-sc64-z5-campaign-run: tests/sc64_z5_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CONSUME_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z5-campaign-run
+test-sc64-z5-campaign-run: build/test-sc64-z5-campaign-run
+	mkdir -p .local/sc64
+	./build/test-sc64-z5-campaign-run --limit 60000 --trace .local/sc64/z5-controller-diagnostics.json --attempt .local/sc64/z5-controller-attempt.json --verified .local/sc64/z5-controller-win.json
+
+build/test-sc64-p6-runtime: tests/sc64_p6_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p6-combat-runtime: tests/sc64_p6_combat_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p6-runtime
+test-sc64-p6-runtime: build/test-sc64-p6-runtime build/test-sc64-p6-combat-runtime
+	./build/test-sc64-p6-runtime
+	./build/test-sc64-p6-combat-runtime
+
+build/test-sc64-p6-game: tests/sc64_p6_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p6-game
+test-sc64-p6-game: build/test-sc64-p6-game
+	./build/test-sc64-p6-game
+
+build/test-sc64-p6-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p6-save: tests/sc64_p6_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p6-combat-sizes: tests/sc64_p6_combat_sizes.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p6-combat: tests/sc64_p6_combat.c starcraft/sc64_p6_combat.h starcraft/sc64_p6_actor_rules.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-p6-profile test-sc64-p6-save test-sc64-p6-combat
+test-sc64-p6-profile: build/test-sc64-p6-profile
+	./build/test-sc64-p6-profile
+test-sc64-p6-save: build/test-sc64-p6-save
+	./build/test-sc64-p6-save
+test-sc64-p6-combat: build/test-sc64-p6-combat build/test-sc64-p6-combat-sizes
+	./build/test-sc64-p6-combat
+	./build/test-sc64-p6-combat-sizes
+.PHONY: test-sc64-p6-combat-model
+test-sc64-p6-combat-model: build/test-sc64-p6-combat
+	./build/test-sc64-p6-combat
+test-starcraft: test-sc64-p6-combat-model
+
+build/test-sc64-z5-count-snapshot: tests/sc64_z5_count_snapshot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CONSUME_FLAGS) -DSC64_Z5_PRUNE_STARTED $< common/gba.c -o $@
+build/test-sc64-z5-trigger-prune: tests/sc64_z5_trigger_prune.c tests/sc64_z5_trigger_prune_reference.c starcraft/sc64_z5_adapter.h starcraft/sc64_z5.h .local/sc64/zp-stage/generated/scenarios/sc64_z5_scenario_generated.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_Z5_PRUNE_STARTED -I.local/sc64/zp-stage/generated/scenarios tests/sc64_z5_trigger_prune.c tests/sc64_z5_trigger_prune_reference.c -o $@
+.PHONY: test-sc64-z5-count-queries
+test-sc64-z5-count-queries: build/test-sc64-z5-count-snapshot build/test-sc64-z5-trigger-prune
+	./build/test-sc64-z5-count-snapshot
+	./build/test-sc64-z5-trigger-prune
+
+build/starcraft-zerg-z6-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z6_PROBE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z6-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z6-Probe-GBA.gba: build/starcraft-zerg-z6-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z6 PROBE' SCZE
+.PHONY: zerg-z6-probe
+zerg-z6-probe: build/StarCraft-Zerg-Z6-Probe-GBA.gba
+
+# Internal seventh mission: canonical profiles stay separately qualified.
+build/starcraft-zerg-z7-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_PROBE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Probe-GBA.gba: build/starcraft-zerg-z7-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 PROBE' SCZF
+.PHONY: zerg-z7-probe
+zerg-z7-probe: build/StarCraft-Zerg-Z7-Probe-GBA.gba
+
+build/test-sc64-z7-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-game-save: tests/sc64_z7_game_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-derived-save: tests/sc64_z7_game_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_DERIVED_SAVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-derived-egg-save: tests/sc64_z7_egg_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_DERIVED_SAVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-derived-colonies: tests/sc64_z7_colonies_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_DERIVED_SAVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-egg-save-gateoff: tests/sc64_z7_game_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) -DSC64_Z7_EGG_PRODUCTION $< common/gba.c -o $@
+build/test-sc64-derived-save: tests/sc64_derived_save.c starcraft/sc64_derived_save.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-derived-save test-sc64-z7-derived-save zerg-z7-derived-save-probe
+test-sc64-derived-save: build/test-sc64-derived-save
+	./build/test-sc64-derived-save
+test-starcraft: test-sc64-derived-save
+test-sc64-z7-derived-save: test-sc64-derived-save build/test-sc64-z7-derived-save build/test-sc64-z7-derived-egg-save build/test-sc64-z7-derived-colonies build/test-sc64-z7-game-save build/test-sc64-z7-egg-save-gateoff
+	./build/test-sc64-z7-derived-save
+	./build/test-sc64-z7-derived-egg-save
+	./build/test-sc64-z7-derived-colonies
+	./build/test-sc64-z7-game-save
+	./build/test-sc64-z7-egg-save-gateoff
+build/starcraft-zerg-z7-derived-save-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_DERIVED_SAVE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-derived-save-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Derived-Save-Probe-GBA.gba: build/starcraft-zerg-z7-derived-save-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 SAVE' SCZ7
+zerg-z7-derived-save-probe: build/StarCraft-Zerg-Z7-Derived-Save-Probe-GBA.gba
+.PHONY: test-sc64-z7-profile test-sc64-z7-frame-coverage test-sc64-z7-game-save
+test-sc64-z7-profile: build/test-sc64-z7-profile
+	./build/test-sc64-z7-profile
+test-sc64-z7-frame-coverage: build/test-sc64-z7-frame-coverage
+	./build/test-sc64-z7-frame-coverage
+test-sc64-z7-game-save: build/test-sc64-z7-game-save
+	./build/test-sc64-z7-game-save
+
+build/test-sc64-z7-gas-restore: tests/sc64_z7_gas_restore.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-gas-restore
+test-sc64-z7-gas-restore: build/test-sc64-z7-gas-restore
+	./build/test-sc64-z7-gas-restore
+build/test-sc64-z7-colonies: tests/sc64_z7_colonies_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-colonies
+test-sc64-z7-colonies: build/test-sc64-z7-colonies
+	./build/test-sc64-z7-colonies
+
+build/test-sc64-z6-runtime: tests/sc64_z6_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z6-save: tests/sc64_z6_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z6-hallucination: tests/sc64_z6_hallucination.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z6-game-save: tests/sc64_z6_game_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z6-runtime test-sc64-z6-save
+test-sc64-z6-runtime: build/test-sc64-z6-runtime build/test-sc64-z6-hallucination
+	./build/test-sc64-z6-runtime
+	./build/test-sc64-z6-hallucination
+test-sc64-z6-save: build/test-sc64-z6-save build/test-sc64-z6-game-save
+	./build/test-sc64-z6-save
+	./build/test-sc64-z6-game-save
+
+# Full normal-input sixth-mission playthrough; imported private inputs required.
+build/test-sc64-z6-controller: tests/sc64_z6_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z6-controller
+test-sc64-z6-controller: build/test-sc64-z6-controller
+	./build/test-sc64-z6-controller --trace build/z6-controller.json
+
+build/test-sc64-z6-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z6-profile
+test-sc64-z6-profile: build/test-sc64-z6-profile
+	./build/test-sc64-z6-profile
+
+build/test-sc64-z6-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z6-frame-coverage
+test-sc64-z6-frame-coverage: build/test-sc64-z6-frame-coverage
+	./build/test-sc64-z6-frame-coverage
+
+# Private numeric source rows required; the optimization stays default-off.
+build/test-sc64-z6-count-snapshot: tests/sc64_z6_count_snapshot.c starcraft/sc64_z6_count_snapshot.h $(Z6_PROBE_INPUTS) Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< -o $@
+build/test-sc64-z6-count-world: tests/sc64_z6_count_world.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) -DSC64_Z6_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-z6-runtime-snapshot: tests/sc64_z6_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) -DSC64_Z6_COUNT_SNAPSHOT $< common/gba.c -o $@
+.PHONY: test-sc64-z6-count-queries
+test-sc64-z6-count-queries: build/test-sc64-z6-count-snapshot build/test-sc64-z6-count-world build/test-sc64-z6-runtime-snapshot
+	./build/test-sc64-z6-count-snapshot
+	./build/test-sc64-z6-count-world
+	./build/test-sc64-z6-runtime-snapshot
+
+build/test-sc64-z6-collision-facts-baseline: tests/sc64_collision_fact_hoist.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_QUERY_TEST_BASE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z6-collision-facts-hoist: tests/sc64_collision_fact_hoist.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_QUERY_TEST_BASE_FLAGS) -DSC64_COLLISION_FACT_HOIST $< common/gba.c -o $@
+.PHONY: test-sc64-z6-collision-facts
+test-sc64-z6-collision-facts: build/test-sc64-z6-collision-facts-baseline build/test-sc64-z6-collision-facts-hoist
+	./build/test-sc64-z6-collision-facts-baseline
+	./build/test-sc64-z6-collision-facts-hoist
+
+build/test-sc64-z6-collision-classes: tests/sc64_collision_fact_hoist.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_QUERY_TEST_BASE_FLAGS) -DSC64_COLLISION_CLASS_CACHE $< common/gba.c -o $@
+build/test-sc64-z6-collision-classes-hoist: tests/sc64_collision_fact_hoist.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_QUERY_TEST_BASE_FLAGS) -DSC64_COLLISION_FACT_HOIST -DSC64_COLLISION_CLASS_CACHE $< common/gba.c -o $@
+.PHONY: test-sc64-z6-collision-classes
+test-sc64-z6-collision-classes: test-sc64-z6-collision-facts build/test-sc64-z6-collision-classes build/test-sc64-z6-collision-classes-hoist
+	./build/test-sc64-z6-collision-classes
+	./build/test-sc64-z6-collision-classes-hoist
+
+.PHONY: test-sc64-zp-fact-range
+test-sc64-zp-fact-range:
+	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_zp_fact_range.py'
+
+.PHONY: test-sc64-p7-actor-rules
+test-sc64-p7-actor-rules:
+	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_p7_actor_rules.py'
+
+build/test-sc64-p7-geometry: tests/sc64_p7_geometry.c starcraft/sc64_p7_geometry.h starcraft/race_rules.h $(wildcard starcraft/*actor_rules.h) common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_P7_ACTORS $< -o $@
+.PHONY: test-sc64-p7-geometry
+test-sc64-p7-geometry: build/test-sc64-p7-geometry
+	./build/test-sc64-p7-geometry
+test-starcraft: test-sc64-p7-geometry
+
+build/test-sc64-p7-archon-rules: tests/sc64_p7_archon_rules.c starcraft/sc64_p7_archon_rules.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_RACES -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_P7_ACTORS -DSC64_P7_ARCHON_SPLASH $< -o $@
+.PHONY: test-sc64-p7-archon-rules
+test-sc64-p7-archon-rules: build/test-sc64-p7-archon-rules
+	./build/test-sc64-p7-archon-rules
+test-starcraft: test-sc64-p7-archon-rules
+
+build/test-sc64-p7-observer-rules: tests/sc64_p7_observer_rules.c starcraft/sc64_p7_observer_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-p7-observer-rules
+test-sc64-p7-observer-rules: build/test-sc64-p7-observer-rules
+	./build/test-sc64-p7-observer-rules
+test-starcraft: test-sc64-p7-observer-rules
+
+# Optional route policies stay off in ROM defaults. Exercise each independently
+# and together, with and without the borrowed visitation grid.
+ROUTE_POLICY_TEST_FLAGS = -Icommon -DGBA_HOST -DSC64_RACES -DSC64_LARGE_MAPS -DSC64_ROUTE_PACK3
+define route_policy_fixture
+build/test-sc64-route-policy-$(1): tests/race_routes_partial.c starcraft/sc64_routes.h starcraft/sc64_bitgrid.h common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -I. $$(ROUTE_POLICY_TEST_FLAGS) $(2) $$< -o $$@
+endef
+$(eval $(call route_policy_fixture,baseline,))
+$(eval $(call route_policy_fixture,visit,-DSC64_ROUTE_VISIT_GRID))
+$(eval $(call route_policy_fixture,partial,-DSC64_ROUTE_PARTIAL_FLOOD))
+$(eval $(call route_policy_fixture,frequency,-DSC64_ROUTE_DECAY_FREQ))
+$(eval $(call route_policy_fixture,partial-frequency,-DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ))
+$(eval $(call route_policy_fixture,partial-visit,-DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_VISIT_GRID))
+$(eval $(call route_policy_fixture,frequency-visit,-DSC64_ROUTE_DECAY_FREQ -DSC64_ROUTE_VISIT_GRID))
+$(eval $(call route_policy_fixture,partial-frequency-visit,-DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ -DSC64_ROUTE_VISIT_GRID))
+ROUTE_POLICY_VARIANTS = baseline visit partial frequency partial-frequency partial-visit frequency-visit partial-frequency-visit
+.PHONY: test-sc64-route-policies
+test-sc64-route-policies: $(addprefix build/test-sc64-route-policy-,$(ROUTE_POLICY_VARIANTS))
+	@$(foreach variant,$(ROUTE_POLICY_VARIANTS),./build/test-sc64-route-policy-$(variant) &&) true
+test-starcraft: test-sc64-route-policies
+
+build/test-sc64-nearest-resource-depot-p5: tests/sc64_nearest_resource_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT $< common/gba.c -o $@
+build/test-sc64-nearest-resource-depot-z6: tests/sc64_nearest_resource_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT $< common/gba.c -o $@
+build/test-sc64-nearest-resource-depot-p6: tests/sc64_nearest_resource_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT $< common/gba.c -o $@
+.PHONY: test-sc64-nearest-resource-depot
+test-sc64-nearest-resource-depot: build/test-sc64-nearest-resource-depot-p5 build/test-sc64-nearest-resource-depot-z6 build/test-sc64-nearest-resource-depot-p6
+	./build/test-sc64-nearest-resource-depot-p5
+	./build/test-sc64-nearest-resource-depot-z6
+	./build/test-sc64-nearest-resource-depot-p6
+
+build/test-sc64-production-exit: tests/sc64_production_exit.c starcraft/sc64_production_exit.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-production-exit
+test-sc64-production-exit: build/test-sc64-production-exit
+	./build/test-sc64-production-exit
+test-starcraft: test-sc64-production-exit
+
+build/test-sc64-p3-production-exit: tests/sc64_p3_production_exit.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p3-production-exit
+test-sc64-p3-production-exit: test-sc64-production-exit build/test-sc64-p3-production-exit
+	./build/test-sc64-p3-production-exit
+
+build/test-sc64-p3-expansion-controller: tests/sc64_p3_expansion_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) -DSC64_P3_PRODUCTION_EXIT -DSC64_NEAREST_RESOURCE_DEPOT $< common/gba.c -o $@
+.PHONY: test-sc64-p3-expansion-controller
+test-sc64-p3-expansion-controller: build/test-sc64-p3-expansion-controller
+	./build/test-sc64-p3-expansion-controller --trace build/p3-expansion-controller.json
+
+build/test-sc64-p7-model: tests/sc64_p7.c starcraft/sc64_p7.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-p7-adapter: tests/sc64_p7_adapter.c starcraft/sc64_p7_adapter.h starcraft/sc64_p7.h .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+.PHONY: test-sc64-p7-model test-sc64-p7-adapter
+test-sc64-p7-model: build/test-sc64-p7-model
+	./build/test-sc64-p7-model
+test-sc64-p7-adapter: build/test-sc64-p7-adapter
+	./build/test-sc64-p7-adapter
+test-starcraft: test-sc64-p7-model
+
+build/test-sc64-p6-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p6-frame-coverage
+test-sc64-p6-frame-coverage: build/test-sc64-p6-frame-coverage
+	./build/test-sc64-p6-frame-coverage
+
+# Z7 isolated runtime foundation: no menu/profile promotion until playthrough qualification.
+build/test-sc64-z7-model: tests/sc64_z7.c starcraft/sc64_z7.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-z7-adapter: tests/sc64_z7_adapter.c starcraft/sc64_z7.h starcraft/sc64_z7_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_z7_scenario_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+build/test-sc64-z7-runtime: tests/sc64_z7_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_z7_scenario_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) -DSC64_Z7_DATA_ENABLED -DSC64_Z7_RUNTIME $< common/gba.c -o $@
+.PHONY: test-sc64-z7-model test-sc64-z7-adapter test-sc64-z7-runtime
+test-sc64-z7-model: build/test-sc64-z7-model
+	./build/test-sc64-z7-model
+test-sc64-z7-adapter: build/test-sc64-z7-adapter
+	./build/test-sc64-z7-adapter
+test-sc64-z7-runtime: build/test-sc64-z7-runtime
+	./build/test-sc64-z7-runtime
+test-starcraft: test-sc64-z7-model
+
+build/test-sc64-p6-storm: tests/sc64_p6_storm.c starcraft/sc64_p6_storm_adapter.h starcraft/sc64_psionic_storm.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_abilities_generated.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+.PHONY: test-sc64-p6-storm
+test-sc64-p6-storm: build/test-sc64-p6-storm
+	./build/test-sc64-p6-storm
+
+build/test-sc64-p6-storm-game: tests/sc64_campaign_spell_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z6-storm-game: tests/sc64_campaign_spell_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z6-cloak-game: tests/sc64_z6_cloak_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-campaign-spells
+test-sc64-campaign-spells: build/test-sc64-p6-storm-game build/test-sc64-z6-storm-game build/test-sc64-z6-cloak-game
+	./build/test-sc64-p6-storm-game
+	./build/test-sc64-z6-storm-game
+	./build/test-sc64-z6-cloak-game
+
+build/test-sc64-p7-runtime: tests/sc64_p7_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P7_DATA_ENABLED -DSC64_P7_RUNTIME $< common/gba.c -o $@
+build/test-sc64-p7-runtime-actors: tests/sc64_p7_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P7_DATA_ENABLED -DSC64_P7_RUNTIME -DSC64_P7_ACTORS $< common/gba.c -o $@
+build/test-sc64-p7-archon-splash: tests/sc64_p7_archon_splash.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P7_ACTORS -DSC64_P7_ARCHON_SPLASH $< common/gba.c -o $@
+.PHONY: test-sc64-p7-archon-splash
+test-sc64-p7-archon-splash: test-sc64-p7-archon-rules build/test-sc64-p7-archon-splash
+	./build/test-sc64-p7-archon-splash
+build/test-sc64-p7-observer-game: tests/sc64_p7_observer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) -DSC64_P7_DATA_ENABLED -DSC64_P7_RUNTIME -DSC64_P7_ACTORS -DSC64_P7_OBSERVER_ENABLED -DSC64_P7_ARCHON_SPLASH $< common/gba.c -o $@
+.PHONY: test-sc64-p7-observer
+test-sc64-p7-observer: test-sc64-p7-observer-rules build/test-sc64-p7-observer-game
+	./build/test-sc64-p7-observer-game
+
+# Internal Battery integration checks. These do not expose a playable P7 entry.
+P7_BATTERY_DEFINES := -DSC64_P7_DATA_ENABLED -DSC64_P7_RUNTIME -DSC64_P7_ACTORS -DSC64_P7_BATTERY_ENABLED
+P7_BATTERY_FLAGS := -I.local/sc64/p7/generated $(P6_PROBE_FLAGS) $(P7_BATTERY_DEFINES)
+P7_BATTERY_P5_FLAGS := -I.local/sc64/p7/generated $(P5_SHUTTLE_FLAGS) $(P7_BATTERY_DEFINES)
+P7_BATTERY_INPUTS := $(P6_PROBE_INPUTS) .local/sc64/p7/generated/sc64_race_sprites_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h .local/sc64/zp-stage/generated/scenarios/sc64_p7_battery_properties_generated.h
+.local/sc64/zp-stage/generated/scenarios/sc64_p7_battery_properties_generated.h: tools/sc64_p7_battery_pack.py tools/sc64_zp_scenario_pack.py tools/sc64_races_pack.py .local/sc64/zp-stage/generated/source_maps/p7/source.chk .local/sc64/zp-stage/generated/source_maps/p7/manifest.json
+	$(PYTHON) tools/sc64_p7_battery_pack.py
+build/starcraft-protoss-p7-battery-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_BATTERY_FLAGS) -DSC64_P7_OBSERVER_ENABLED -DSC64_P7_ARCHON_SPLASH $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-battery-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Battery-Probe-GBA.gba: build/starcraft-protoss-p7-battery-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+.PHONY: protoss-p7-battery-probe
+protoss-p7-battery-probe: build/StarCraft-Protoss-P7-Battery-Probe-GBA.gba
+
+# Experimental Homeland menu/performance probes, not a qualified campaign win.
+P7_RUNTIME_FLAGS := $(P7_BATTERY_FLAGS) -DSC64_P7_OBSERVER_ENABLED -DSC64_P7_ARCHON_SPLASH -DSC64_P7_CAMPAIGN_ENTRY
+# Optional Arbiter cloak/cache checks; this remains off in every default profile.
+P7_ARBITER_FLAGS := $(P7_RUNTIME_FLAGS) -DSC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+P7_ARBITER_PROBE_FLAGS := $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT
+build/test-sc64-p7-runtime-reference: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_RUNTIME_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-runtime-prevalidated: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK $< common/gba.c -o $@
+.PHONY: test-sc64-p7-prevalidated
+test-sc64-p7-prevalidated: build/test-sc64-p7-runtime-reference build/test-sc64-p7-runtime-prevalidated
+	./build/test-sc64-p7-runtime-reference > build/sc64-p7-runtime-reference.txt
+	./build/test-sc64-p7-runtime-prevalidated > build/sc64-p7-runtime-prevalidated.txt
+	cmp build/sc64-p7-runtime-reference.txt build/sc64-p7-runtime-prevalidated.txt
+
+# Explicit opt-in P7 Arbiter host matrix. Existing profiles remain cache-off.
+P7_ARBITER_INPUTS := $(P7_BATTERY_INPUTS)
+P7_ARBITER_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+build/test-sc64-p7-arbiter-reference: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-arbiter-prevalidated: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK $< common/gba.c -o $@
+build/test-sc64-p7-arbiter-count: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-arbiter-cache-policy: tests/sc64_p7_arbiter_cache_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-arbiter-battery: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-observer-no-cache: tests/sc64_p7_observer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-battery-no-cache: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-arbiter-initial-save: tests/sc64_p7_initial_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+.PHONY: test-sc64-p7-arbiter-host
+test-sc64-p7-arbiter-host: build/test-sc64-p7-arbiter-initial-save build/test-sc64-p7-arbiter-reference build/test-sc64-p7-arbiter-prevalidated build/test-sc64-p7-arbiter-count build/test-sc64-p7-arbiter-cache-policy build/test-sc64-p7-arbiter-battery build/test-sc64-p7-observer-no-cache build/test-sc64-p7-battery-no-cache
+	./build/test-sc64-p7-arbiter-reference > build/sc64-p7-arbiter-reference.txt
+	./build/test-sc64-p7-arbiter-prevalidated > build/sc64-p7-arbiter-prevalidated.txt
+	./build/test-sc64-p7-arbiter-count > build/sc64-p7-arbiter-count.txt
+	cmp build/sc64-p7-arbiter-reference.txt build/sc64-p7-arbiter-prevalidated.txt
+	cmp build/sc64-p7-arbiter-reference.txt build/sc64-p7-arbiter-count.txt
+	./build/test-sc64-p7-arbiter-cache-policy
+	./build/test-sc64-p7-arbiter-battery
+	./build/test-sc64-p7-observer-no-cache
+	./build/test-sc64-p7-battery-no-cache
+	./build/test-sc64-p7-arbiter-initial-save
+
+# Optional profile link only; no gameplay or timing qualification is implied.
+build/starcraft-protoss-p7-arbiter-cache-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_ARBITER_PROBE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-arbiter-cache-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Arbiter-Cache-Probe-GBA.gba: build/starcraft-protoss-p7-arbiter-cache-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 CLOAK' SC7A
+.PHONY: protoss-p7-arbiter-cache-probe
+protoss-p7-arbiter-cache-probe: build/StarCraft-Protoss-P7-Arbiter-Cache-Probe-GBA.gba
+build/starcraft-protoss-p7-runtime-reference.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_RUNTIME_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-runtime-reference.map -lgcc -o $@
+	$(SIZE) $@
+build/starcraft-protoss-p7-runtime-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-runtime-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Runtime-Reference-GBA.gba: build/starcraft-protoss-p7-runtime-reference.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+build/StarCraft-Protoss-P7-Runtime-Probe-GBA.gba: build/starcraft-protoss-p7-runtime-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+.PHONY: protoss-p7-runtime-reference protoss-p7-runtime-probe
+protoss-p7-runtime-reference: build/StarCraft-Protoss-P7-Runtime-Reference-GBA.gba
+protoss-p7-runtime-probe: build/StarCraft-Protoss-P7-Runtime-Probe-GBA.gba
+build/test-sc64-p7-count-snapshot: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+.PHONY: test-sc64-p7-count-snapshot protoss-p7-count-probe
+test-sc64-p7-count-snapshot: build/test-sc64-p7-runtime-reference build/test-sc64-p7-runtime-prevalidated build/test-sc64-p7-count-snapshot
+	./build/test-sc64-p7-runtime-reference > build/sc64-p7-runtime-reference.txt
+	./build/test-sc64-p7-runtime-prevalidated > build/sc64-p7-runtime-prevalidated.txt
+	./build/test-sc64-p7-count-snapshot > build/sc64-p7-count-snapshot.txt
+	cmp build/sc64-p7-runtime-reference.txt build/sc64-p7-runtime-prevalidated.txt
+	cmp build/sc64-p7-runtime-reference.txt build/sc64-p7-count-snapshot.txt
+build/starcraft-protoss-p7-count-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-count-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Count-Probe-GBA.gba: build/starcraft-protoss-p7-count-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+protoss-p7-count-probe: build/StarCraft-Protoss-P7-Count-Probe-GBA.gba
+# Default-off P7 movement probe: the qualified Z6 collision-class cache and
+# fact-range rejection plus the exact blocked-mover steering list.
+P7_MOVE_BASE_FLAGS := $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT
+P7_MOVE_FLAGS := -DSC64_ZP_FACT_RANGE_CULL -DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST
+build/test-sc64-p7-move-reference: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-move-candidate: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $< common/gba.c -o $@
+# The menu, trigger and SRAM save/load fixture must also print the same trace.
+build/test-sc64-p7-move-runtime: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-move protoss-p7-move-probe
+test-sc64-p7-move: build/test-sc64-p7-move-reference build/test-sc64-p7-move-candidate build/test-sc64-p7-count-snapshot build/test-sc64-p7-move-runtime
+	./build/test-sc64-p7-move-reference > build/sc64-p7-move-reference.txt
+	./build/test-sc64-p7-move-candidate > build/sc64-p7-move-candidate.txt
+	cmp build/sc64-p7-move-reference.txt build/sc64-p7-move-candidate.txt
+	./build/test-sc64-p7-count-snapshot > build/sc64-p7-count-snapshot.txt
+	./build/test-sc64-p7-move-runtime > build/sc64-p7-move-runtime.txt
+	cmp build/sc64-p7-count-snapshot.txt build/sc64-p7-move-runtime.txt
+	cat build/sc64-p7-move-candidate.txt
+build/starcraft-protoss-p7-move-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-move-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Move-Probe-GBA.gba: build/starcraft-protoss-p7-move-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+protoss-p7-move-probe: build/StarCraft-Protoss-P7-Move-Probe-GBA.gba
+build/test-sc64-p7-battery-rules: tests/sc64_p7_battery_rules.c starcraft/sc64_p7_battery_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-p7-battery-rules
+test-sc64-p7-battery-rules: build/test-sc64-p7-battery-rules
+	./build/test-sc64-p7-battery-rules
+test-starcraft: test-sc64-p7-battery-rules
+build/test-sc64-p7-power-geometry: tests/sc64_p7_power_geometry.c starcraft/sc64_p7_power_geometry.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-p7-power-geometry
+test-sc64-p7-power-geometry: build/test-sc64-p7-power-geometry
+	./build/test-sc64-p7-power-geometry
+test-starcraft: test-sc64-p7-power-geometry
+build/test-sc64-p7-battery-game: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-battery-combined: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_FLAGS) -DSC64_P7_OBSERVER_ENABLED -DSC64_P7_ARCHON_SPLASH $< common/gba.c -o $@
+build/test-sc64-p5-battery-save: tests/sc64_p5_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_P5_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p5-battery-shuttle-save: tests/sc64_p5_shuttle_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_P5_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-battery-p5-union: tests/sc64_p7_union_tail_p5.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_P5_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p6-battery-save: tests/sc64_p6_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-battery
+test-sc64-p7-battery: test-sc64-p7-battery-rules test-sc64-p7-power-geometry build/test-sc64-p7-battery-game build/test-sc64-p7-battery-combined build/test-sc64-p5-battery-save build/test-sc64-p5-battery-shuttle-save build/test-sc64-p7-battery-p5-union build/test-sc64-p6-battery-save
+	./build/test-sc64-p7-battery-game
+	./build/test-sc64-p7-battery-combined
+	./build/test-sc64-p5-battery-save
+	./build/test-sc64-p5-battery-shuttle-save
+	./build/test-sc64-p7-battery-p5-union
+	./build/test-sc64-p6-battery-save
+
+build/test-sc64-p6-trigger-prune: tests/sc64_p6_trigger_prune.c tests/sc64_p6_trigger_prune_reference.c starcraft/sc64_p6_adapter.h starcraft/sc64_p6.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios tests/sc64_p6_trigger_prune.c tests/sc64_p6_trigger_prune_reference.c -o $@
+build/test-sc64-z6-trigger-prune: tests/sc64_z6_trigger_prune.c tests/sc64_z6_trigger_prune_reference.c starcraft/sc64_z6_adapter.h starcraft/sc64_z6.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios tests/sc64_z6_trigger_prune.c tests/sc64_z6_trigger_prune_reference.c -o $@
+build/test-sc64-p6-prevalidated: tests/sc64_p6_prevalidated.c tests/sc64_p6_prevalidated_reference.c starcraft/sc64_p6_adapter.h starcraft/sc64_p6.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios tests/sc64_p6_prevalidated.c tests/sc64_p6_prevalidated_reference.c -o $@
+.PHONY: test-sc64-p7-runtime test-sc64-six-query-options
+test-sc64-p7-runtime: build/test-sc64-p7-runtime build/test-sc64-p7-runtime-actors
+	./build/test-sc64-p7-runtime
+	./build/test-sc64-p7-runtime-actors
+test-sc64-six-query-options: build/test-sc64-p6-trigger-prune build/test-sc64-z6-trigger-prune build/test-sc64-p6-prevalidated
+	./build/test-sc64-p6-trigger-prune
+	./build/test-sc64-z6-trigger-prune
+	./build/test-sc64-p6-prevalidated
+
+# Private sixth-mission integration and opt-in performance fixtures.
+build/test-sc64-z6-transport-tech: tests/sc64_z6_transport_tech.c starcraft/sc64_z6_transport_tech.h starcraft/sc64_z6_transport_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+build/test-sc64-z6-transport-save: tests/sc64_z6_transport_save.c starcraft/sc64_z6_transport_save.h starcraft/sc64_transport_rules.h .local/sc64/zp-stage/generated/scenarios/sc64_z6_transport_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -I.local/sc64/zp-stage/generated/scenarios $< -o $@
+build/test-sc64-z6-transport-game: tests/sc64_z6_transport_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p6-count-snapshot: tests/sc64_p6_count_snapshot.c tests/sc64_p6_count_snapshot_reference.c starcraft/sc64_p6_count_snapshot.h starcraft/sc64_p6_world_adapter.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -Icommon -I.local/sc64/zp-stage/generated/scenarios -DSC64_P6_COUNT_SNAPSHOT tests/sc64_p6_count_snapshot.c tests/sc64_p6_count_snapshot_reference.c -o $@
+build/test-sc64-p6-trap-cull: tests/sc64_p6_trap_cull.c tests/sc64_p6_trap_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) tests/sc64_p6_trap_cull.c tests/sc64_p6_trap_cull_reference.c common/gba.c -o $@
+.PHONY: test-sc64-z6-transport test-sc64-p6-query-experiments
+test-sc64-z6-transport: build/test-sc64-z6-transport-tech build/test-sc64-z6-transport-save build/test-sc64-z6-transport-game
+	./build/test-sc64-z6-transport-tech
+	./build/test-sc64-z6-transport-save
+	./build/test-sc64-z6-transport-game
+test-sc64-p6-query-experiments: test-sc64-six-query-options build/test-sc64-p6-count-snapshot build/test-sc64-p6-trap-cull
+	./build/test-sc64-p6-count-snapshot
+	./build/test-sc64-p6-trap-cull
+
+build/test-sc64-p6-burrow-cull-on: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) -DSC64_P6_BURROW_CULL tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
+build/test-sc64-p6-burrow-cull-off: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
+.PHONY: test-sc64-p6-burrow-cull
+test-sc64-p6-burrow-cull: build/test-sc64-p6-burrow-cull-on build/test-sc64-p6-burrow-cull-off
+test-sc64-p6-query-experiments: test-sc64-p6-burrow-cull
+
+build/test-sc64-p6-storm-validation: tests/sc64_p6_storm_validation.c tests/sc64_p6_storm_validation_reference.c tests/sc64_p6_storm_validation_fixture.h starcraft/sc64_p6_storm_adapter.h starcraft/sc64_psionic_storm.h .local/sc64/zp-stage/generated/scenarios/sc64_p6_abilities_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -I.local/sc64/zp-stage/generated/scenarios tests/sc64_p6_storm_validation.c tests/sc64_p6_storm_validation_reference.c common/gba.c -o $@
+build/test-sc64-p6-storm-game-local: tests/sc64_campaign_spell_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) -DSC64_P6_STORM_POSTCHECK_LOCAL $< common/gba.c -o $@
+.PHONY: test-sc64-p6-storm-validation
+test-sc64-p6-storm-validation: build/test-sc64-p6-storm-validation build/test-sc64-p6-storm-game build/test-sc64-p6-storm-game-local
+	./build/test-sc64-p6-storm-validation
+	./build/test-sc64-p6-storm-game
+	./build/test-sc64-p6-storm-game-local
+test-sc64-p6-query-experiments: test-sc64-p6-storm-validation
+
+build/test-sc64-p6-rescue-grouped: tests/sc64_p6_rescue_grouped.c tests/sc64_p6_rescue_grouped_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) -DSC64_P6_RESCUE_GROUPED tests/sc64_p6_rescue_grouped.c tests/sc64_p6_rescue_grouped_reference.c common/gba.c -o $@
+.PHONY: test-sc64-p6-rescue-grouped
+test-sc64-p6-rescue-grouped: build/test-sc64-p6-rescue-grouped
+	./build/test-sc64-p6-rescue-grouped
+test-sc64-p6-query-experiments: test-sc64-p6-rescue-grouped
+
+build/test-sc64-p6-burrow-grouped: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) -DSC64_P6_BURROW_GROUPED tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
+build/test-sc64-p6-burrow-grouped-cull: tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_QUERY_TEST_BASE_FLAGS) -DSC64_P6_BURROW_GROUPED -DSC64_P6_BURROW_CULL tests/sc64_p6_burrow_cull.c tests/sc64_p6_burrow_cull_reference.c common/gba.c -o $@
+test-sc64-p6-burrow-cull: build/test-sc64-p6-burrow-grouped build/test-sc64-p6-burrow-grouped-cull
+	./build/test-sc64-p6-burrow-cull-on
+	./build/test-sc64-p6-burrow-cull-off
+	./build/test-sc64-p6-burrow-grouped
+	./build/test-sc64-p6-burrow-grouped-cull
+
+build/test-sc64-probe-expansion: tests/sc64_probe_expansion.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
+build/test-sc64-probe-expansion-p6: tests/sc64_probe_expansion.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-probe-expansion-z6: tests/sc64_probe_expansion.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-probe-expansion
+test-sc64-probe-expansion: build/test-sc64-probe-expansion build/test-sc64-probe-expansion-p6 build/test-sc64-probe-expansion-z6
+	./build/test-sc64-probe-expansion
+	./build/test-sc64-probe-expansion-p6
+	./build/test-sc64-probe-expansion-z6
+
+build/test-sc64-probe-cannon: tests/sc64_probe_cannon.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
+build/test-sc64-probe-cannon-p6: tests/sc64_probe_cannon.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-probe-cannon-z6: tests/sc64_probe_cannon.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z6_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-probe-cannon
+test-sc64-probe-cannon: build/test-sc64-probe-cannon build/test-sc64-probe-cannon-p6 build/test-sc64-probe-cannon-z6
+	./build/test-sc64-probe-cannon
+	./build/test-sc64-probe-cannon-p6
+	./build/test-sc64-probe-cannon-z6
+
+build/test-sc64-weapon-vfx: tests/sc64_weapon_vfx.c starcraft/sc64_weapon_vfx.h starcraft/sc64_weapon_vfx_render.h common/gba.h | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-weapon-vfx-game: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-weapon-vfx test-sc64-weapon-vfx-game
+test-sc64-weapon-vfx: build/test-sc64-weapon-vfx
+	./build/test-sc64-weapon-vfx
+test-sc64-weapon-vfx-game: build/test-sc64-weapon-vfx-game
+	./build/test-sc64-weapon-vfx-game
+test-starcraft: test-sc64-weapon-vfx
+
+build/test-sc64-shield-bars: tests/sc64_shield_bars_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
+build/test-sc64-shield-bars-protoss: tests/sc64_shield_bars_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-shield-bars
+test-sc64-shield-bars: build/test-sc64-shield-bars build/test-sc64-shield-bars-protoss
+	./build/test-sc64-shield-bars
+	./build/test-sc64-shield-bars-protoss
+
+# The same actual-attack/renderer fixture checks optional actor identities.
+define WEAPON_VFX_PROFILE_FIXTURE
+build/test-sc64-weapon-vfx-$(1): tests/sc64_weapon_vfx_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c -o $$@
+endef
+$(eval $(call WEAPON_VFX_PROFILE_FIXTURE,terran,$(TERRAN_FULL_FLAGS),$(TERRAN_FULL_INPUTS)))
+build/test-sc64-weapon-vfx-zerg: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_DERIVED_SAVE_FLAGS) $< common/gba.c -o $@
+# P7 flags are declared below; keep them recursively expanded here.
+build/test-sc64-weapon-vfx-protoss: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-weapon-vfx-profiles
+test-sc64-weapon-vfx-profiles: test-sc64-weapon-vfx-game build/test-sc64-weapon-vfx-terran build/test-sc64-weapon-vfx-zerg build/test-sc64-weapon-vfx-protoss
+	./build/test-sc64-weapon-vfx-terran
+	./build/test-sc64-weapon-vfx-zerg
+	./build/test-sc64-weapon-vfx-protoss
+
+build/test-sc64-construction-vfx: tests/sc64_construction_vfx.c starcraft/sc64_construction_vfx.h common/gba.c common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
+.PHONY: test-sc64-construction-vfx
+test-sc64-construction-vfx: build/test-sc64-construction-vfx
+	./build/test-sc64-construction-vfx
+test-starcraft: test-sc64-construction-vfx
+
+build/test-sc64-construction-animation: tests/sc64_construction_animation.c starcraft/sc64_construction_animation.h starcraft/sc64_construction_source.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-construction-animation
+test-sc64-construction-animation: build/test-sc64-construction-animation
+	./build/test-sc64-construction-animation
+test-starcraft: test-sc64-construction-animation
+
+# Optional source-art preview. It reuses already-prepared private race inputs;
+# the default profile never extracts or links game art.
+CONSTRUCTION_ART_DIR := .local/sc64/construction/generated
+CONSTRUCTION_ART_HEADER := $(CONSTRUCTION_ART_DIR)/sc64_construction_sprites_generated.h
+CONSTRUCTION_ART_FLAGS := $(UNIFIED_FLAGS) -DSC64_CONSTRUCTION_SOURCE_ART -I$(CONSTRUCTION_ART_DIR)
+$(CONSTRUCTION_ART_HEADER): tools/sc64_construction_sprites.py tools/sc64_construction_programs.py tools/sc64_sprites.py
+	$(PYTHON) tools/sc64_construction_sprites.py
+build/test-sc64-construction-source: tests/sc64_construction_source_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(CONSTRUCTION_ART_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(CONSTRUCTION_ART_FLAGS) $< common/gba.c -o $@
+build/starcraft-construction.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(CONSTRUCTION_ART_HEADER) common/gba.h common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(CONSTRUCTION_ART_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-construction.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Construction-Preview-GBA.gba: build/starcraft-construction.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC BUILD ART' SCCA
+.PHONY: sc64-construction-art test-sc64-construction-source construction-visuals
+sc64-construction-art:
+	$(PYTHON) tools/sc64_construction_sprites.py
+test-sc64-construction-source: build/test-sc64-construction-source
+	./build/test-sc64-construction-source
+construction-visuals: build/StarCraft-Construction-Preview-GBA.gba
+	$(PYTHON) -c 'from tools.verify_roms import verify; print(verify("StarCraft-Construction-Preview-GBA", "starcraft-construction", "SCCA", "SC BUILD ART"))'
+
+# Transient death effects. The asset-free checks cover the authored renderer
+# and the original-art game; each game fixture is also built with the feature
+# compiled out and must print the same state/save digest over combat.
+DEATH_VFX_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+build/test-sc64-death-vfx: tests/sc64_death_vfx.c starcraft/sc64_death_vfx.h starcraft/sc64_death_vfx_render.h common/gba.c common/gba.h | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $< common/gba.c -o $@
+build/test-sc64-death-vfx-default: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $< -o $@
+build/test-sc64-death-vfx-default-off: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) -DSC64_DEATH_VFX_DISABLED $< -o $@
+# $(1)=name, $(2)=profile flags, $(3)=inputs
+define DEATH_VFX_GAME_FIXTURE
+build/test-sc64-death-vfx-$(1): tests/sc64_death_vfx_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(DEATH_VFX_TEST_FLAGS) $(2) $$< -o $$@
+build/test-sc64-death-vfx-$(1)-off: tests/sc64_death_vfx_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(DEATH_VFX_TEST_FLAGS) $(2) -DSC64_DEATH_VFX_DISABLED $$< -o $$@
+endef
+$(eval $(call DEATH_VFX_GAME_FIXTURE,unified,$(UNIFIED_FLAGS),$(RACES_INPUTS)))
+$(eval $(call DEATH_VFX_GAME_FIXTURE,terran,$(TERRAN_FULL_FLAGS),$(TERRAN_FULL_INPUTS)))
+$(eval $(call DEATH_VFX_GAME_FIXTURE,zerg,$$(Z7_DERIVED_SAVE_FLAGS),$$(Z7_PROBE_INPUTS)))
+$(eval $(call DEATH_VFX_GAME_FIXTURE,protoss,$$(P7_TYPED_RECT_FLAGS),$$(P7_ARBITER_INPUTS)))
+# Run the fixture, then compare feature-on/off digests over the workload.
+define DEATH_VFX_RUN
+	./build/test-sc64-death-vfx-$(1)
+	SC64_DEATH_VFX_HASH=1 ./build/test-sc64-death-vfx-$(1) > build/death-vfx-$(1).on
+	SC64_DEATH_VFX_HASH=1 ./build/test-sc64-death-vfx-$(1)-off > build/death-vfx-$(1).off
+	cmp build/death-vfx-$(1).on build/death-vfx-$(1).off
+	@echo "PASS death VFX $(1) state/save digest unchanged: $$(cat build/death-vfx-$(1).on)"
+endef
+.PHONY: test-sc64-death-vfx test-sc64-death-vfx-default test-sc64-death-vfx-unified test-sc64-death-vfx-profiles
+test-sc64-death-vfx: build/test-sc64-death-vfx
+	./build/test-sc64-death-vfx
+test-sc64-death-vfx-default: build/test-sc64-death-vfx-default build/test-sc64-death-vfx-default-off
+	$(call DEATH_VFX_RUN,default)
+test-sc64-death-vfx-unified: build/test-sc64-death-vfx-unified build/test-sc64-death-vfx-unified-off
+	$(call DEATH_VFX_RUN,unified)
+test-sc64-death-vfx-profiles: test-sc64-death-vfx-unified build/test-sc64-death-vfx-terran build/test-sc64-death-vfx-terran-off build/test-sc64-death-vfx-zerg build/test-sc64-death-vfx-zerg-off build/test-sc64-death-vfx-protoss build/test-sc64-death-vfx-protoss-off
+	$(call DEATH_VFX_RUN,terran)
+	$(call DEATH_VFX_RUN,zerg)
+	$(call DEATH_VFX_RUN,protoss)
+test-starcraft: test-sc64-death-vfx test-sc64-death-vfx-default
+test-unified: test-sc64-death-vfx-unified
+
+# Optional source death art preview, built like the construction preview.
+DEATH_ART_DIR := .local/sc64/death/generated
+DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
+DEATH_ART_FLAGS := $(UNIFIED_FLAGS) -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
+$(DEATH_ART_HEADER): tools/sc64_death_sprites.py tools/sc64_construction_sprites.py tools/sc64_sprites.py
+	$(PYTHON) tools/sc64_death_sprites.py
+build/test-sc64-death-source: tests/sc64_death_source_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(DEATH_ART_FLAGS) $< -o $@
+build/test-sc64-death-source-off: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(UNIFIED_FLAGS) -DSC64_DEATH_VFX_DISABLED $< -o $@
+build/test-sc64-death-source-on: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(DEATH_ART_FLAGS) $< -o $@
+build/starcraft-death.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(DEATH_ART_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-death.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Death-Preview-GBA.gba: build/starcraft-death.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC DEATH ART' SCDA
+.PHONY: sc64-death-art test-sc64-death-source death-visuals
+sc64-death-art:
+	$(PYTHON) tools/sc64_death_sprites.py
+test-sc64-death-source: build/test-sc64-death-source build/test-sc64-death-source-on build/test-sc64-death-source-off
+	./build/test-sc64-death-source
+	./build/test-sc64-death-source-on
+	SC64_DEATH_VFX_HASH=1 ./build/test-sc64-death-source-on > build/death-vfx-source.on
+	SC64_DEATH_VFX_HASH=1 ./build/test-sc64-death-source-off > build/death-vfx-source.off
+	cmp build/death-vfx-source.on build/death-vfx-source.off
+	@echo "PASS death VFX source-art state/save digest unchanged: $$(cat build/death-vfx-source.on)"
+death-visuals: build/StarCraft-Death-Preview-GBA.gba
+	$(PYTHON) -c 'from tools.verify_roms import verify; print(verify("StarCraft-Death-Preview-GBA", "starcraft-death", "SCDA", "SC DEATH ART"))'
+
+build/test-sc64-construction-hp: tests/sc64_construction_hp.c starcraft/sc64_construction_hp.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-construction-hp-game: tests/sc64_construction_hp_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) -DSC64_CONSTRUCTION_HP $< common/gba.c -o $@
+build/test-sc64-construction-hp-z7: tests/sc64_construction_hp_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP $< common/gba.c -o $@
+build/test-sc64-construction-hp-colonies: tests/sc64_z7_colonies_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP $< common/gba.c -o $@
+.PHONY: test-sc64-construction-hp test-sc64-construction-hp-game test-sc64-construction-hp-z7
+test-sc64-construction-hp: build/test-sc64-construction-hp
+	./build/test-sc64-construction-hp
+test-sc64-construction-hp-game: build/test-sc64-construction-hp-game
+	./build/test-sc64-construction-hp-game
+test-sc64-construction-hp-z7: build/test-sc64-construction-hp-z7 build/test-sc64-construction-hp-colonies
+	./build/test-sc64-construction-hp-z7
+	./build/test-sc64-construction-hp-colonies
+test-starcraft: test-sc64-construction-hp
+test-unified: test-sc64-construction-hp-game
+
+define DIRECT_ATTACK_PROFILE
+build/test-sc64-direct-attack-$(1): tests/sc64_direct_attack_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) -DSC64_DIRECT_ATTACK $$< common/gba.c -o $$@
+endef
+$(eval $(call DIRECT_ATTACK_PROFILE,races,$(RACES_FLAGS),$(RACES_INPUTS)))
+$(eval $(call DIRECT_ATTACK_PROFILE,unified,$(UNIFIED_FLAGS),$(RACES_INPUTS)))
+$(eval $(call DIRECT_ATTACK_PROFILE,z7,$(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP,$(Z7_PROBE_INPUTS)))
+.PHONY: test-sc64-direct-attack
+test-sc64-direct-attack: build/test-sc64-direct-attack-races build/test-sc64-direct-attack-unified build/test-sc64-direct-attack-z7
+	./build/test-sc64-direct-attack-races
+	./build/test-sc64-direct-attack-unified
+	./build/test-sc64-direct-attack-z7
+
+define ROUTE_WORD_CLEAR_FIXTURE
+build/test-sc64-route-word-clear-$(1): tests/sc64_route_word_clear.c starcraft/sc64_routes.h | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ROUTE_WORD_CLEAR -DROUTE_TEST_COLS=$(2) -DROUTE_TEST_ROWS=$(3) -I. $$< -o $$@
+endef
+$(eval $(call ROUTE_WORD_CLEAR_FIXTURE,128x128,128,128))
+$(eval $(call ROUTE_WORD_CLEAR_FIXTURE,128x96,128,96))
+$(eval $(call ROUTE_WORD_CLEAR_FIXTURE,10x10,10,10))
+.PHONY: test-sc64-route-word-clear
+test-sc64-route-word-clear: build/test-sc64-route-word-clear-128x128 build/test-sc64-route-word-clear-128x96 build/test-sc64-route-word-clear-10x10
+	./build/test-sc64-route-word-clear-128x128
+	./build/test-sc64-route-word-clear-128x96
+	./build/test-sc64-route-word-clear-10x10
+test-starcraft: test-sc64-route-word-clear
+
+define ROUTE_L_FAST_FIXTURE
+build/test-sc64-route-l-fast-$(1): tests/race_routes.c starcraft/sc64_routes.h starcraft/sc64_bitgrid.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_ROUTE_PACK3 -DSC64_LARGE_MAPS -DSC64_ROUTE_VISIT_GRID -DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_L_FAST_PATH -DRACE_TEST_COLS=$(2) -DRACE_TEST_ROWS=$(3) $(4) -I. -Icommon $$< -o $$@
+endef
+$(eval $(call ROUTE_L_FAST_FIXTURE,64x64,64,64))
+$(eval $(call ROUTE_L_FAST_FIXTURE,128x96,128,96))
+$(eval $(call ROUTE_L_FAST_FIXTURE,128x128,128,128))
+$(eval $(call ROUTE_L_FAST_FIXTURE,128x96-partial,128,96,-DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ))
+.PHONY: test-sc64-route-l-fast
+test-sc64-route-l-fast: build/test-sc64-route-l-fast-64x64 build/test-sc64-route-l-fast-128x96 build/test-sc64-route-l-fast-128x128 build/test-sc64-route-l-fast-128x96-partial
+	./build/test-sc64-route-l-fast-64x64
+	./build/test-sc64-route-l-fast-128x96
+	./build/test-sc64-route-l-fast-128x128
+	./build/test-sc64-route-l-fast-128x96-partial
+test-starcraft: test-sc64-route-l-fast
+
+ROUTE_ACTIVE_STRIDE_TEST_FLAGS := -DSC64_ROUTE_ACTIVE_STRIDE -DSC64_ROUTE_PACK3 -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_LARGE_MAPS -DSC64_ROUTE_VISIT_GRID
+build/test-sc64-route-active-stride: tests/sc64_route_active_stride.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $(ROUTE_ACTIVE_STRIDE_TEST_FLAGS) -DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_L_FAST_PATH -DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ $< -o $@
+build/test-sc64-route-active-stride-fallback: tests/sc64_route_active_stride.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $(ROUTE_ACTIVE_STRIDE_TEST_FLAGS) $< -o $@
+.PHONY: test-sc64-route-active-stride
+test-sc64-route-active-stride: build/test-sc64-route-active-stride build/test-sc64-route-active-stride-fallback
+	./build/test-sc64-route-active-stride
+	./build/test-sc64-route-active-stride-fallback
+test-starcraft: test-sc64-route-active-stride
+
+Z7_EGG_PROBE_FLAGS := $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_ATTACK -DSC64_Z7_EGG_PRODUCTION
+build/test-sc64-z7-egg-production: tests/sc64_z7_egg_production_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_EGG_PROBE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-egg-save: tests/sc64_z7_egg_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_EGG_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-egg-production test-sc64-z7-egg-save
+test-sc64-z7-egg-production: build/test-sc64-z7-egg-production
+	./build/test-sc64-z7-egg-production
+test-sc64-z7-egg-save: build/test-sc64-z7-egg-save
+	./build/test-sc64-z7-egg-save
+
+Z7_SOURCE_SIGHT_FLAGS := $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_ATTACK -DSC64_Z7_SOURCE_SIGHT
+build/test-sc64-z7-source-sight: tests/sc64_z7_source_sight_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SOURCE_SIGHT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-source-sight-eggs: tests/sc64_z7_source_sight_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SOURCE_SIGHT_FLAGS) -DSC64_Z7_EGG_PRODUCTION $< common/gba.c -o $@
+.PHONY: test-sc64-z7-source-sight
+test-sc64-z7-source-sight: build/test-sc64-z7-source-sight build/test-sc64-z7-source-sight-eggs
+	./build/test-sc64-z7-source-sight
+	./build/test-sc64-z7-source-sight-eggs
+
+Z7_SCOURGE_PROBE_FLAGS := $(Z7_EGG_PROBE_FLAGS) -DSC64_Z7_SOURCE_SIGHT -DSC64_Z7_SCOURGE_COMBAT
+build/test-sc64-z7-scourge: tests/sc64_z7_scourge_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SCOURGE_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-scourge
+test-sc64-z7-scourge: build/test-sc64-z7-scourge
+	./build/test-sc64-z7-scourge
+
+# Z7-only immutable-table prevalidation. Existing profiles leave this off.
+Z7_PREVALIDATED_BASE_FLAGS := $(Z7_SCOURGE_PROBE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT
+Z7_PREVALIDATED_FLAGS := $(Z7_PREVALIDATED_BASE_FLAGS) -DSC64_Z7_PREVALIDATED_TICK
+define Z7_PREVALIDATION_CHECK
+build/test-sc64-z7-prevalidated-$(1)-$(2): tests/$(3) $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(4) $$< common/gba.c -o $$@
+endef
+$(eval $(call Z7_PREVALIDATION_CHECK,reference,runtime,sc64_z7_runtime.c,$(Z7_PREVALIDATED_BASE_FLAGS)))
+$(eval $(call Z7_PREVALIDATION_CHECK,candidate,runtime,sc64_z7_runtime.c,$(Z7_PREVALIDATED_FLAGS)))
+$(eval $(call Z7_PREVALIDATION_CHECK,reference,save,sc64_z7_game_save.c,$(Z7_PREVALIDATED_BASE_FLAGS)))
+$(eval $(call Z7_PREVALIDATION_CHECK,candidate,save,sc64_z7_game_save.c,$(Z7_PREVALIDATED_FLAGS)))
+.PHONY: test-sc64-z7-prevalidated zerg-z7-prevalidated-probe
+test-sc64-z7-prevalidated: $(foreach mode,reference candidate,$(foreach check,runtime save,build/test-sc64-z7-prevalidated-$(mode)-$(check)))
+	./build/test-sc64-z7-prevalidated-reference-runtime
+	./build/test-sc64-z7-prevalidated-candidate-runtime
+	./build/test-sc64-z7-prevalidated-reference-save
+	./build/test-sc64-z7-prevalidated-candidate-save
+build/starcraft-zerg-z7-prevalidated-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_PREVALIDATED_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-prevalidated-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Prevalidated-Probe-GBA.gba: build/starcraft-zerg-z7-prevalidated-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 FAST36' SCZV
+zerg-z7-prevalidated-probe: build/StarCraft-Zerg-Z7-Prevalidated-Probe-GBA.gba
+
+# Z7 same-update condition-count experiment, layered on authenticated metadata.
+Z7_COUNT_SNAPSHOT_FLAGS := $(Z7_PREVALIDATED_FLAGS) -DSC64_Z7_COUNT_SNAPSHOT
+$(eval $(call Z7_PREVALIDATION_CHECK,snapshot,runtime,sc64_z7_runtime.c,$(Z7_COUNT_SNAPSHOT_FLAGS)))
+$(eval $(call Z7_PREVALIDATION_CHECK,snapshot,save,sc64_z7_game_save.c,$(Z7_COUNT_SNAPSHOT_FLAGS)))
+build/test-sc64-z7-count-snapshot: tests/sc64_z7_count_snapshot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_COUNT_SNAPSHOT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-count-snapshot zerg-z7-count-snapshot-probe
+test-sc64-z7-count-snapshot: test-sc64-z7-prevalidated build/test-sc64-z7-prevalidated-snapshot-runtime build/test-sc64-z7-prevalidated-snapshot-save build/test-sc64-z7-count-snapshot
+	./build/test-sc64-z7-prevalidated-snapshot-runtime
+	./build/test-sc64-z7-prevalidated-snapshot-save
+	./build/test-sc64-z7-count-snapshot
+build/starcraft-zerg-z7-count-snapshot-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_COUNT_SNAPSHOT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-count-snapshot-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Count-Snapshot-Probe-GBA.gba: build/starcraft-zerg-z7-count-snapshot-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 CNT36' SCZW
+zerg-z7-count-snapshot-probe: build/StarCraft-Zerg-Z7-Count-Snapshot-Probe-GBA.gba
+
+# Full normal-input skirmishes, distinct from startup/save configuration checks.
+define SKIRMISH_CONTROLLER_PROFILE
+build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c -o $$@
+endef
+$(eval $(call SKIRMISH_CONTROLLER_PROFILE,terran,$(TERRAN_FULL_FLAGS),$(TERRAN_FULL_INPUTS)))
+$(eval $(call SKIRMISH_CONTROLLER_PROFILE,zerg,$(Z3_FLAGS),$(RACE_CAMPAIGN_INPUTS)))
+$(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss,$(P3_FLAGS),$(RACE_CAMPAIGN_INPUTS)))
+
+.PHONY: test-sc64-skirmish-matches
+test-sc64-skirmish-matches: $(addprefix build/test-sc64-skirmish-match-,terran zerg protoss)
+	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller build/test-sc64-skirmish-match-terran --output .local/sc64/skirmish/terran-matches
+	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller build/test-sc64-skirmish-match-zerg --output .local/sc64/skirmish/zerg-matches
+	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller build/test-sc64-skirmish-match-protoss --output .local/sc64/skirmish/protoss-matches
+
+# Optional generation-40 P7 typed save codec fixture.
+P7_TYPED_COMPACT_FLAGS := $(P7_ARBITER_FLAGS) -DSC64_P7_TYPED_COMPACT_ENABLED
+build/test-sc64-p7-typed-compact: tests/sc64_p7_typed_compact_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_TYPED_COMPACT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-typed-compact
+test-sc64-p7-typed-compact: build/test-sc64-p7-typed-compact
+	./build/test-sc64-p7-typed-compact
+build/test-sc64-p7-typed-runtime-reference: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-typed-runtime-prevalidated: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK $< common/gba.c -o $@
+build/test-sc64-p7-typed-runtime-count: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-typed-battery: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-typed-cache-policy: tests/sc64_p7_arbiter_cache_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-typed-initial-save: tests/sc64_p7_initial_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+.PHONY: test-sc64-p7-typed-compact-matrix
+test-sc64-p7-typed-compact-matrix: build/test-sc64-p7-typed-runtime-reference build/test-sc64-p7-typed-runtime-prevalidated build/test-sc64-p7-typed-runtime-count build/test-sc64-p7-typed-battery build/test-sc64-p7-typed-cache-policy build/test-sc64-p7-typed-initial-save
+	./build/test-sc64-p7-typed-runtime-reference > build/sc64-p7-typed-reference.txt
+	./build/test-sc64-p7-typed-runtime-prevalidated > build/sc64-p7-typed-prevalidated.txt
+	./build/test-sc64-p7-typed-runtime-count > build/sc64-p7-typed-count.txt
+	cmp build/sc64-p7-typed-reference.txt build/sc64-p7-typed-prevalidated.txt
+	cmp build/sc64-p7-typed-reference.txt build/sc64-p7-typed-count.txt
+	./build/test-sc64-p7-typed-battery
+	./build/test-sc64-p7-typed-cache-policy
+	./build/test-sc64-p7-typed-initial-save
+
+# Opt-in composition of generation-40 typed rows with the P7 steering-list probe.
+# Existing profiles retain their save generations and feature flags.
+P7_TYPED_MOVE_FLAGS := $(P7_TYPED_COMPACT_FLAGS) $(P7_MOVE_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT
+build/test-sc64-p7-typed-move-runtime: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-typed-move-steer-reference: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-typed-move-steer: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-typed-move-battery: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-typed-move-initial-save: tests/sc64_p7_initial_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-typed-move protoss-p7-typed-move-probe
+test-sc64-p7-typed-move: build/test-sc64-p7-typed-runtime-count build/test-sc64-p7-typed-move-runtime build/test-sc64-p7-typed-move-steer-reference build/test-sc64-p7-typed-move-steer build/test-sc64-p7-typed-move-battery build/test-sc64-p7-typed-move-initial-save
+	./build/test-sc64-p7-typed-runtime-count > build/sc64-p7-typed-move-count.txt
+	./build/test-sc64-p7-typed-move-runtime > build/sc64-p7-typed-move-runtime.txt
+	cmp build/sc64-p7-typed-move-count.txt build/sc64-p7-typed-move-runtime.txt
+	./build/test-sc64-p7-typed-move-steer-reference > build/sc64-p7-typed-move-steer-reference.txt
+	./build/test-sc64-p7-typed-move-steer > build/sc64-p7-typed-move-steer.txt
+	cmp build/sc64-p7-typed-move-steer-reference.txt build/sc64-p7-typed-move-steer.txt
+	./build/test-sc64-p7-typed-move-battery
+	./build/test-sc64-p7-typed-move-initial-save
+build/starcraft-protoss-p7-typed-move-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_TYPED_MOVE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-typed-move-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba: build/starcraft-protoss-p7-typed-move-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 MOVE40' SC7M
+protoss-p7-typed-move-probe: build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba
+
+# Ordinary-input Homeland controller for the existing generation-40 probe.
+# This remains separate from canonical campaign promotion/ARM qualification.
+build/test-sc64-p7-controller: tests/sc64_p7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-controller
+test-sc64-p7-controller: build/test-sc64-p7-controller
+	mkdir -p .local/build/p7-controller
+	./build/test-sc64-p7-controller .local/build/p7-controller/controller-trace.jsonl
+
+# Separate seven-mission qualification profile. Existing probes keep their flags.
+P7_CAMPAIGN_COMPOSITION_FLAGS := $(P7_TYPED_MOVE_FLAGS) -DSC64_P3_PRODUCTION_EXIT -DSC64_NEAREST_RESOURCE_DEPOT
+define P7_CAMPAIGN_CONTROLLER
+build/test-sc64-p7-campaign-$(1): tests/$(2).c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $$(P7_CAMPAIGN_COMPOSITION_FLAGS) $$< common/gba.c -o $$@
+endef
+$(eval $(call P7_CAMPAIGN_CONTROLLER,early,race_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p3,sc64_p3_expansion_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p4,sc64_p4_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p5,sc64_p5_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p6,sc64_p6_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p7,sc64_p7_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,skirmish,sc64_skirmish_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,save,sc64_p7_typed_compact_game))
+.PHONY: test-sc64-p7-campaign-composition protoss-p7-campaign-probe
+test-sc64-p7-campaign-composition: $(addprefix build/test-sc64-p7-campaign-,early p3 p4 p5 p6 p7 skirmish save)
+	mkdir -p .local/build/p7-campaign
+	./build/test-sc64-p7-campaign-save
+	./build/test-sc64-p7-campaign-early --controller 2 --trace .local/build/p7-campaign/p1.json
+	./build/test-sc64-p7-campaign-early --controller 3 --trace .local/build/p7-campaign/p2.json
+	./build/test-sc64-p7-campaign-p3 --trace .local/build/p7-campaign/p3.json
+	./build/test-sc64-p7-campaign-p4 --attempt-tag p7-campaign
+	./build/test-sc64-p7-campaign-p5 --attempt-tag p7-campaign
+	./build/test-sc64-p7-campaign-p6 --trace .local/build/p7-campaign/p6.json
+	./build/test-sc64-p7-campaign-p7 .local/build/p7-campaign/p7.jsonl
+	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller build/test-sc64-p7-campaign-skirmish --output .local/build/p7-campaign/skirmish
+
+build/starcraft-protoss-p7-campaign-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_CAMPAIGN_COMPOSITION_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-campaign-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Campaign-Probe-GBA.gba: build/starcraft-protoss-p7-campaign-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 CAMP40' SC7C
+protoss-p7-campaign-probe: build/StarCraft-Protoss-P7-Campaign-Probe-GBA.gba
+
+# Opt-in exact source-rectangle reuse in P7 aura and detection.
+P7_TYPED_RECT_FLAGS := $(P7_TYPED_MOVE_FLAGS) -DSC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+build/test-sc64-p7-rect-runtime: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-rect-steer: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-rect-policy: tests/sc64_p7_arbiter_cache_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-rect-battery: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-rect-initial-save: tests/sc64_p7_initial_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-rect protoss-p7-rect-probe
+test-sc64-p7-rect: build/test-sc64-p7-typed-move-runtime build/test-sc64-p7-typed-move-steer build/test-sc64-p7-rect-runtime build/test-sc64-p7-rect-steer build/test-sc64-p7-rect-policy build/test-sc64-p7-rect-battery build/test-sc64-p7-rect-initial-save
+	./build/test-sc64-p7-typed-move-runtime > build/sc64-p7-rect-reference.txt
+	./build/test-sc64-p7-rect-runtime > build/sc64-p7-rect-runtime.txt
+	cmp build/sc64-p7-rect-reference.txt build/sc64-p7-rect-runtime.txt
+	./build/test-sc64-p7-typed-move-steer > build/sc64-p7-rect-steer-reference.txt
+	./build/test-sc64-p7-rect-steer > build/sc64-p7-rect-steer.txt
+	cmp build/sc64-p7-rect-steer-reference.txt build/sc64-p7-rect-steer.txt
+	./build/test-sc64-p7-rect-policy
+	./build/test-sc64-p7-rect-battery
+	./build/test-sc64-p7-rect-initial-save
+build/starcraft-protoss-p7-rect-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_TYPED_RECT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-rect-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Rect-Probe-GBA.gba: build/starcraft-protoss-p7-rect-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 RECT40' SC7R
+protoss-p7-rect-probe: build/StarCraft-Protoss-P7-Rect-Probe-GBA.gba
+
+# Asset-free packing coverage is part of the standard host suite.
+build/test-sc64-p7-typed-codec: tests/sc64_p7_typed_codec.c starcraft/sc64_p7_typed_unit_save.h starcraft/sc64_p7_typed_building_save.h starcraft/sc64_zp_unit_save.h starcraft/sc64_compact_building_save.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-p7-typed-codec
+test-sc64-p7-typed-codec: build/test-sc64-p7-typed-codec
+	./build/test-sc64-p7-typed-codec
+test-starcraft: test-sc64-p7-typed-codec
+
+# Asset-free Carrier storage and codec coverage.
+build/test-sc64-interceptor-pool-codec: tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c -o $@
+.PHONY: test-sc64-interceptor-pool-codec
+test-sc64-interceptor-pool-codec: build/test-sc64-interceptor-pool-codec
+	./build/test-sc64-interceptor-pool-codec
+test-starcraft: test-sc64-interceptor-pool-codec
+
+# Bounded source-coordinate projectile motion and serialization continuation.
+build/test-sc64-interceptor-motion: tests/sc64_interceptor_motion.c starcraft/sc64_interceptor_motion.c starcraft/sc64_interceptor_motion.h starcraft/sc64_interceptor_motion_kernel.h starcraft/sc64_interceptor_direction_tables.h starcraft/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Istarcraft $< starcraft/sc64_interceptor_motion.c starcraft/sc64_interceptor_pool_codec.c -o $@
+.PHONY: test-sc64-interceptor-motion
+test-sc64-interceptor-motion: build/test-sc64-interceptor-motion
+	./build/test-sc64-interceptor-motion
+test-starcraft: test-sc64-interceptor-motion
+
+# Generation 41 reserves the Mode 4 OBJ arena and saves all 100 projectile
+# slots. Child training/flight/weapon-event integration remains separate.
+P7_PROJECTILE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_P7_PROJECTILES_ENABLED
+P7_PROJECTILE_SOURCES := starcraft/sc64_interceptor_motion.c starcraft/sc64_interceptor_pool_codec.c
+build/test-sc64-p7-projectile: tests/sc64_p7_projectile_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_PROJECTILE_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) -o $@
+.PHONY: test-sc64-p7-projectile protoss-p7-projectile-probe
+test-sc64-p7-projectile: build/test-sc64-p7-projectile
+	./build/test-sc64-p7-projectile
+build/starcraft-protoss-p7-projectile-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_PROJECTILE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-projectile-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Projectile-Probe-GBA.gba: build/starcraft-protoss-p7-projectile-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 SHOT41' SC7J
+protoss-p7-projectile-probe: build/StarCraft-Protoss-P7-Projectile-Probe-GBA.gba
+
+P7_CARRIER_TRAINING_FLAGS := $(P7_PROJECTILE_FLAGS) -DSC64_P7_CARRIER_TRAINING_ENABLED
+build/test-sc64-p7-carrier-training: tests/sc64_p7_carrier_training_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_CARRIER_TRAINING_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) -o $@
+.PHONY: test-sc64-p7-carrier-training protoss-p7-carrier-training-probe
+test-sc64-p7-carrier-training: build/test-sc64-p7-carrier-training
+	./build/test-sc64-p7-carrier-training
+build/starcraft-protoss-p7-carrier-training-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_CARRIER_TRAINING_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-carrier-training-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Carrier-Training-Probe-GBA.gba: build/starcraft-protoss-p7-carrier-training-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 HANG42' SC7K
+protoss-p7-carrier-training-probe: build/StarCraft-Protoss-P7-Carrier-Training-Probe-GBA.gba
+
+# Dedicated filming build. Hidden menu and transient scenes stay off in all
+# canonical profiles; the P7 bundle supplies Carrier/Ultralisk render actors.
+SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED
+build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Showcase-GBA.gba: build/starcraft-showcase.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC SHOWCASE' SCSH
+.PHONY: showcase test-sc64-showcase test-sc64-showcase-front
+showcase: build/StarCraft-Showcase-GBA.gba
+build/test-sc64-showcase-front: tests/sc64_frontend.c starcraft/sc64_frontend.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_SHOWCASE_ENABLED -Icommon $< -o $@
+build/test-sc64-showcase-game: tests/sc64_showcase_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c -o $@
+test-sc64-showcase-front: build/test-sc64-showcase-front
+	./build/test-sc64-showcase-front
+test-starcraft: test-sc64-showcase-front
+test-sc64-showcase: test-sc64-showcase-front build/test-sc64-showcase-game
+	./build/test-sc64-showcase-game
+
+build/starcraft-protoss-p7-typed-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-typed-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Typed-Probe-GBA.gba: build/starcraft-protoss-p7-typed-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 TYPED' SC7T
+.PHONY: protoss-p7-typed-probe
+protoss-p7-typed-probe: build/StarCraft-Protoss-P7-Typed-Probe-GBA.gba
+
+# Audio: mixer/sequencer checks, presentation hook fixtures, and a long
+# controller run whose state hash must not change when the audio observer is
+# compiled out (GAME_AUDIO_OFF).
+AUDIO_TEST_DEPS := common/gba.c common/gba.h common/audio_mixer.h $(STARCRAFT) $(wildcard starcraft/*.h) Makefile
+build/test-audio-mixer: tests/audio_mixer.c common/audio_mixer.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+
+define GAME_AUDIO_PROFILE
+build/test-game-audio-$(1)-on: tests/game_audio_run.c $$(AUDIO_TEST_DEPS) $(3) | build
+	$$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c -o $$@
+build/test-game-audio-$(1)-off: tests/game_audio_run.c $$(AUDIO_TEST_DEPS) $(3) | build
+	$$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) -DGAME_AUDIO_OFF $$< common/gba.c -o $$@
+.PHONY: test-game-audio-$(1)
+test-game-audio-$(1): build/test-game-audio-$(1)-on build/test-game-audio-$(1)-off
+	./build/test-game-audio-$(1)-on hooks
+	./build/test-game-audio-$(1)-on > build/test-game-audio-$(1)-on.txt
+	./build/test-game-audio-$(1)-off > build/test-game-audio-$(1)-off.txt
+	cat build/test-game-audio-$(1)-on.txt
+	test "$$$$(grep '^state' build/test-game-audio-$(1)-on.txt)" = "$$$$(grep '^state' build/test-game-audio-$(1)-off.txt)"
+	@echo "game audio $(1): audio-on and audio-off state hashes match"
+endef
+$(eval $(call GAME_AUDIO_PROFILE,default,,))
+$(eval $(call GAME_AUDIO_PROFILE,unified,$(UNIFIED_FLAGS),$(RACES_INPUTS)))
+
+.PHONY: test-audio
+test-audio: build/test-audio-mixer test-game-audio-default
+	./build/test-audio-mixer
+test-starcraft: test-audio
+test-unified: test-game-audio-unified

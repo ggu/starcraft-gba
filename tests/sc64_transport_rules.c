@@ -27,6 +27,20 @@ static void test_capacity_and_required_space(void)
     assert(sc64_transport_space_required_raw(38, &space) && space == 2); /* Hydralisk */
     assert(sc64_transport_space_required_raw(41, &space) && space == 1); /* Drone */
     assert(!sc64_transport_space_required_raw(250, &space) && space == 1);
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    assert(sc64_transport_space_provided_raw(42) == 8);
+    assert(sc64_transport_space_required_raw(51, &space) && space == 1); /* Kerrigan */
+    assert(sc64_transport_space_required_raw(39, &space) && space == 4); /* Ultralisk */
+    assert(sc64_transport_space_required_raw(42, &space) &&
+           space == SC64_TRANSPORT_SPACE_UNAVAILABLE); /* carrier, not cargo */
+    assert(!sc64_transport_passenger_eligible_raw(42));
+    {
+        static const unsigned short zerg_capacity[] = { 39 };
+        static const unsigned short zerg_overflow[] = { 39, 39 };
+        assert(sc64_transport_load_fits_raw(42, zerg_capacity, 1, 51));
+        assert(!sc64_transport_load_fits_raw(42, zerg_overflow, 2, 51));
+    }
+#endif
 }
 
 static void test_nontransportable_types(void)

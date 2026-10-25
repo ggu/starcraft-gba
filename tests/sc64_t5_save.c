@@ -165,7 +165,7 @@ static void active_runtime_roundtrip(void)
 
 static void malformed_records_are_atomic(void)
 {
-    for (unsigned n = 0; n < 12; ++n) {
+    for (unsigned n = 0; n < 13; ++n) {
         RaceSave bad = valid_record;
         Sc64T4TriggerState *player = &bad.t5.player[0];
         switch (n) {
@@ -191,6 +191,8 @@ static void malformed_records_are_atomic(void)
             corrupt_saved_unit_field(&bad, mine, offsetof(Unit, carry), 99);
             break;
         }
+        /* An in-range mission bit from another race remains invalid. */
+        case 12: bad.state[3] |= 1u << 0; break;
         }
         reject_record_atomically(&bad);
     }

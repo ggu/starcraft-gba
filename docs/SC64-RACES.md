@@ -21,7 +21,7 @@ From the menu, Up/Down selects the faction, opponent count, or Launch row; Left/
 
 B opens commands. Select a worker before placing a structure. The five construction entries vary by faction: Terran Barracks/Depot/Refinery/Academy/Engineering Bay; Zerg Pool/Hatchery/Extractor/Den/Evolution Chamber; Protoss Gateway/Pylon/Assimilator/Core/Forge. Idle human workers seek minerals. Select a worker and use A near a completed gas structure to assign gas harvesting.
 
-Select a producer and press A to queue a unit; R cycles compatible types and L cancels the oldest order. Hatcheries offer Drone, Overlord, Zergling, and Hydralisk; one Zergling order produces two. Nexus produces Probes; Gateway offers Zealot and Dragoon. The basic construction menu does not expose every advanced scenario structure. Egression's Chrysalis can be picked up by a Drone and carried to the Warp Point; if its carrier dies, it drops for another Drone to collect. In First Strike, entering the source rescue region transfers the passive Protoss base. Start/Select pauses: A resumes, B saves, L loads, and R restarts.
+Select a producer and press A to queue a unit; R cycles compatible types and L cancels the oldest order. Hatcheries offer Drone, Overlord, Zergling, and Hydralisk; one Zergling order produces two. Nexus produces Probes; Gateway offers Zealot and Dragoon. With only Probes selected, the command list has an additional NEXUS entry after STOP / HOLD. Scroll down to it, choose a clear site, and spend 400 minerals; a Nexus does not need Pylon power. The Probe is released when warp-in starts. The next row, CANNON, places a Photon Cannon for 150 minerals after a Forge is complete; its site requires Pylon power. The basic construction menu does not expose every advanced scenario structure. Egression's Chrysalis can be picked up by a Drone and carried to the Warp Point; if its carrier dies, it drops for another Drone to collect. In First Strike, entering the source rescue region transfers the passive Protoss base. Start/Select pauses: A resumes, B saves, L loads, and R restarts.
 
 ## Missions
 
@@ -42,7 +42,7 @@ The Egression controller route takes the four-connected southern passage around 
 
 The engine implements race workers and resource trips, paid queues, doubled supply, larva limits and regeneration, Drone consumption, Probe return during warp-in, approximate creep/Pylon coverage, regenerating shields, ground/air weapon eligibility, per-hit Zealot/Fenix damage, and basic static defenses. Source weapon ranges are scaled to the half-size world; reference 24-frame timings are converted to the 30-update simulation. Normal gas trips carry eight; gas reservoirs do not yet deplete.
 
-Enemy strategy is authored and much smaller than the original campaign AI. Construction footprints, power/creep coverage, pathfinding, combat damage types, upgrades, and special abilities are incomplete approximations. Larva orders finish sequentially in a Hatchery queue rather than as independent eggs. There is no complete tech tree, transport system, spell roster, directional animation, original audio, or cinematic presentation. The shared limits are 128 units and 64 buildings across all owners. The build does not interpret arbitrary CHK triggers or execute original AI scripts.
+Enemy strategy is authored and much smaller than the original campaign AI. Construction footprints, power/creep coverage, pathfinding, combat damage types, upgrades, and special abilities are incomplete approximations. Larva orders finish sequentially in a Hatchery queue rather than as independent eggs. There is no complete tech tree, transport system, spell roster, directional animation, transmission dialogue, or cinematic presentation; imported sound effects, unit responses and music need the optional audio bank ([Development](DEVELOPMENT.md#optional-starcraft-64-sound-effects-and-music)). The shared limits are 128 units and 64 buildings across all owners. The build does not interpret arbitrary CHK triggers or execute original AI scripts.
 
 Original scenario geometry and objective rules can be preserved more closely than the complete engine behavior. An omitted feature remains unfinished work unless measured hardware evidence establishes a tradeoff.
 
@@ -53,3 +53,9 @@ The source ROM is checked against SHA-1 `a36d91b5aac7bb95df0d7de5f9814f5270e25c2
 `make test-races` checks economies, production, gas, shields and power, objective transitions, air collision/targeting, melee boundaries, save round trips on all four maps, and packed shortest paths under ASan/UBSan. Objective fixtures exercise state transitions; they are not controller completions. `make test-races-controller` runs controller drivers for all four campaign maps. `tools/sc64_races_profile.py --unified` replays the traces against the actual ARM ROM in mGBA and compares host checkpoints.
 
 The recorded campaign controller runs complete all four missions. Fast bounded cell arithmetic and sixteen packed reverse path fields addressed earlier 12–20 fps measurements on larger maps. Emulated timing is separate from hardware testing; see [VALIDATION.md](VALIDATION.md). Physical GBA SP/EverDrive validation is pending.
+
+Hydralisks and Hunter Killers draw a short moving needle effect. In-progress
+structures show Terran scaffolding/sparks, a Zerg morph pulse or a Protoss
+warp pulse, with the existing building art revealed as construction advances.
+These are authored visual approximations; the original IScript animation
+sequences and projectile travel/damage timing are not implemented yet.

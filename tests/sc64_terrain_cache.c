@@ -64,6 +64,14 @@ gfx_blit_window(int y, int height, const u8 *src, int stride, int rows,
 
 #include "../starcraft/sc64_terrain_cache.h"
 
+#ifdef SC64_RENDER_KEY_ONCE
+/* Exercise the same scenarios through the caller-supplied key API. */
+#define sc64_terrain_cached(x, y) \
+    sc64_terrain_cached_key((x), (y), test_static_key)
+#define sc64_terrain_store(x, y) \
+    sc64_terrain_store_key((x), (y), test_static_key)
+#endif
+
 #ifndef SC64_TERRAIN_CACHE_REAL_GFX
 static void
 fill_band(u8 value)
