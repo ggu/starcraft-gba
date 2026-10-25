@@ -54,7 +54,7 @@ guaranteed rate.
 | Base armor | 308/314 | Six repeated records are the same legacy Raynor Marine compatibility identity, with 0 instead of 3 armor |
 
 Five additional records have a noncanonical or disabled raw-ID round trip and
-are retained in the CSV rather than counted as canonical matches. Two are the
+are retained in the comparison rather than counted as canonical matches. Two are the
 legacy Terran `U_RAYNOR` alias; three are profile-disabled Dropship import
 mappings. A round trip alone is not proof of actual spawn identity: earlier
 campaign loaders can select the legacy Raynor alias directly.
@@ -169,13 +169,13 @@ render loop; failing the performance budget also slows real elapsed gameplay.
 
 ## Artifacts and reproduction
 
-- [Per-profile, per-unit comparison](unit-specs.csv): every probed actor,
+- [Per-profile, per-unit comparison](unit-specs.json): every probed actor,
   durability, raw identity, ground/air weapon values, hit counts, cooldowns,
   ranges, nominal movement and rule cost/time/supply values.
 - [Manifest](unit-specs-manifest.json): source commits, full profile define sets,
-  reference-table hashes, counts and CSV digest.
+  reference-table hashes, counts and comparison digest.
 
-CSV fields named `generic_*` or `shared_motion_*` describe that reviewed common
+Comparison fields named `generic_*` or `shared_motion_*` describe that reviewed common
 path. `engine_class_eligible` is weapon-class eligibility, including the reviewed
 Scourge exception; actual target eligibility also depends on life, ownership,
 loading, immunity, visibility and mission adapters. Special adapters and ineligible
@@ -184,6 +184,10 @@ automatically treating hero/mode-switch or Zerg paired-production policies as
 incorrect stock prices. Neither a `base_table_match_only` result nor a matching
 HP total qualifies all abilities, collision, target acquisition or mission AI.
 
+The JSON stores a `columns` array and a `rows` array in the same column order.
+CSV is an optional local export for spreadsheets; it is not added to the public
+source index.
+
 The public helpers need Python 3.9+, Make and Clang, with no game assets:
 
 ```sh
@@ -191,7 +195,7 @@ python3 tools/sc64_unit_spec_reference.py --reference /path/to/clean/pinned/bwap
 python3 tools/sc64_unit_spec_engine.py /path/to/engine TERRAN_FULL_FLAGS .local/unit-specs/probes/terran
 python3 tools/sc64_unit_spec_engine.py /path/to/engine Z3_FLAGS .local/unit-specs/probes/zerg
 python3 tools/sc64_unit_spec_engine.py /path/to/engine P3_FLAGS .local/unit-specs/probes/protoss
-python3 tools/sc64_unit_spec_compare.py --reference-json .local/unit-specs/reference.json --probes-dir .local/unit-specs/probes --output .local/unit-specs/report
+python3 tools/sc64_unit_spec_compare.py --reference-json .local/unit-specs/reference.json --probes-dir .local/unit-specs/probes --output .local/unit-specs/report --csv-output .local/unit-specs/unit-specs.csv
 ```
 
 For the exact dated matrix, use the manifest's engine commits and profile

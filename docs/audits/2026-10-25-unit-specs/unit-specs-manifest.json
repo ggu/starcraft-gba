@@ -470,7 +470,7 @@
     "shields": 314,
     "armor": 308
   },
-  "csv_sha256": "bf17fef044c306bd7693e66135ce869766a180047af0a488a6b13a562a62f6bd",
+  "comparison_sha256": "65a19dd937ebcc45e16883443de4adf3a231028b5b1afb4b28a75006e7a5c688",
   "limitations": [
     "Rule helpers are compiled; full constructors and runtime behavior were source reviewed, not exhaustively executed.",
     "Profile-specific Scourge eligibility is reviewed logic, not inferred from its generic helper.",

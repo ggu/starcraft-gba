@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare public rule-helper probes with pinned BWAPI defaults, without assets.
 
-The CSV is a table audit, not a claim of native N64 or runtime equivalence.
+The comparison is a table audit, not a claim of native N64 or runtime equivalence.
 Runtime exceptions below are explicit findings from the dated source review;
 review them again when applying this helper to a newer engine revision.
 """
@@ -124,7 +124,7 @@ def row_for(profile, engine, unit, reference, weapons):
     return row
 
 
-def compare(reference_path, probes_dir, output):
+def compare(reference_path, probes_dir, output, csv_output=None):
     facts = json.loads(reference_path.read_text())
     units = {u['id']: u for u in facts['units']}
     weapons = {w['id']: w for w in facts['weapons']}
@@ -141,11 +141,20 @@ def compare(reference_path, probes_dir, output):
                          'probe_json_sha256': hashlib.sha256(file.read_bytes()).hexdigest()})
     if not rows:
         raise ValueError('No profile probes found')
-    dest = output / 'unit-specs.csv'
-    with dest.open('w', newline='') as stream:
-        writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\n")
-        writer.writeheader()
-        writer.writerows(rows)
+    dest = output / 'unit-specs.json'
+    # Columnar JSON keeps the public numeric report compact and within the
+    # repository's source-text allowlist; CSV exports belong in ignored .local.
+    encoded_rows = ',\n'.join(
+        '    ' + json.dumps(list(row.values()), separators=(',', ':'))
+        for row in rows)
+    dest.write_text('{\n  "columns": ' + json.dumps(list(rows[0])) +
+                    ',\n  "rows": [\n' + encoded_rows + '\n  ]\n}\n')
+    if csv_output is not None:
+        csv_output.parent.mkdir(parents=True, exist_ok=True)
+        with csv_output.open('w', newline='') as stream:
+            writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
     canonical = [r for r in rows if r['identity'] == 'canonical']
     manifest = {
         'schema': 1, 'audit_date': '2026-10-25',
@@ -157,7 +166,7 @@ def compare(reference_path, probes_dir, output):
         'canonical_rows': len(canonical),
         'canonical_matches': {field: sum(r[field + '_match'] for r in canonical)
                               for field in ('hp', 'shields', 'armor')},
-        'csv_sha256': hashlib.sha256(dest.read_bytes()).hexdigest(),
+        'comparison_sha256': hashlib.sha256(dest.read_bytes()).hexdigest(),
         'limitations': [
             'Rule helpers are compiled; full constructors and runtime behavior were source reviewed, not exhaustively executed.',
             'Profile-specific Scourge eligibility is reviewed logic, not inferred from its generic helper.',
@@ -175,5 +184,6 @@ if __name__ == '__main__':
     parser.add_argument('--reference-json', type=Path, required=True)
     parser.add_argument('--probes-dir', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--csv-output', type=Path, help='Optional local spreadsheet export; use an ignored .local path')
     args = parser.parse_args()
-    compare(args.reference_json, args.probes_dir, args.output)
+    compare(args.reference_json, args.probes_dir, args.output, args.csv_output)
