@@ -13,6 +13,16 @@ from unittest.mock import patch
 from tools import sc64_split_profile, sc64_split_smoke
 
 ROOT = Path(__file__).resolve().parents[1]
+UNIT_WORD_SPRITE_HEADER = (
+    '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n'
+    '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 1\n'
+    'static const u32 sc64_race_unit_words_0_p0[1] = {0};\n'
+    'static const GbaSpriteWordFrame sc64_race_unit_words_0 = {1,1,{0,0,0,0}};\n'
+    'static inline const GbaSpriteWordFrame *sc64_race_unit_words_sprite(unsigned short raw_type, const Sc64SpriteFrame *frame) {\n'
+    '    switch (raw_type) { case 0: return &sc64_race_unit_words_0; }\n'
+    '    return (const GbaSpriteWordFrame *)0;\n'
+    '}\n'
+)
 loader = importlib.machinery.SourceFileLoader('starcraft_dev', str(ROOT / 'dev'))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 dev = importlib.util.module_from_spec(spec)
@@ -80,7 +90,7 @@ class OnboardingTests(unittest.TestCase):
                     '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\nsc64_race_z3_units\n#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n'
                     '#if defined(SC64_UNIFIED) && defined(SC64_Z4_DATA_ENABLED)\nsc64_race_z4_units\n#endif /* SC64_UNIFIED && SC64_Z4_DATA_ENABLED */',
                 '.local/sc64/zp-stage/generated/sc64_race_sprites_generated.h':
-                    '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1',
+                    UNIT_WORD_SPRITE_HEADER,
                 '.local/sc64/z4/generated/sc64_z4_scenario_generated.h':
                     '#define SC64_Z4_SCENARIO_GENERATED_H 1',
                 '.local/sc64/z4/manifest.json':
@@ -91,6 +101,15 @@ class OnboardingTests(unittest.TestCase):
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding='ascii')
+            sprite_header = root / '.local/sc64/zp-stage/generated/sc64_race_sprites_generated.h'
+            sprite_header.write_text('#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
+                                     encoding='ascii')
+            output = io.StringIO()
+            with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(output):
+                self.assertEqual(dev.status('zerg'), 1)
+            self.assertIn('MISSING Zerg chapter 4 sprites', output.getvalue())
+            self.assertIn('./dev sc64 prepare --rom PATH --profile zerg', output.getvalue())
+            sprite_header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
             output = io.StringIO()
             with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(output):
                 self.assertEqual(dev.status('zerg'), 0)
@@ -100,6 +119,18 @@ class OnboardingTests(unittest.TestCase):
                 encoding='ascii')
             with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(dev.status('zerg'), 1)
+
+    def test_canonical_zerg_build_rejects_stale_sprite_header_before_make(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            header = root / '.local/sc64/zp-stage/generated/sc64_race_sprites_generated.h'
+            header.parent.mkdir(parents=True)
+            header.write_text('#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
+                              encoding='ascii')
+            with patch.object(dev, 'ROOT', root), patch.object(
+                    dev, 'run', side_effect=AssertionError('make must not run')):
+                with self.assertRaisesRegex(RuntimeError, 'prepacked unit-word sprite metadata'):
+                    dev.build('zerg')
 
     def test_staged_z6_and_p5_profiles_have_explicit_build_and_test_routes(self):
         self.assertEqual(dev.GAMES['zerg-z6'],
@@ -426,6 +457,25 @@ class OnboardingTests(unittest.TestCase):
                 '#endif /* SC64_UNIFIED && SC64_Z4_DATA_ENABLED */\n', encoding='ascii')
             self.assertTrue(dev.canonical_zerg_input_ready(label, header))
 
+    def test_canonical_zerg_sprite_readiness_requires_word_metadata_and_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'sc64_race_sprites_generated.h'
+            label = 'Zerg chapter 4 sprites'
+            header.write_text(
+                '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n', encoding='ascii')
+            self.assertFalse(dev.canonical_zerg_input_ready(label, header))
+            header.write_text(
+                '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n'
+                'static inline const GbaSpriteWordFrame *sc64_race_unit_words_sprite(void) { }\n',
+                encoding='ascii')
+            self.assertFalse(dev.canonical_zerg_input_ready(label, header))
+            header.write_text(UNIT_WORD_SPRITE_HEADER.replace(
+                '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 1\n',
+                '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 0\n'), encoding='ascii')
+            self.assertFalse(dev.canonical_zerg_input_ready(label, header))
+            header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+            self.assertTrue(dev.canonical_zerg_input_ready(label, header))
+
     def test_canonical_zerg_status_rejects_stale_z3_only_stage_map(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -577,7 +627,8 @@ class OnboardingTests(unittest.TestCase):
                     else:
                         output = local / 'races/generated/sc64_race_sprites_generated.h'
                     output.parent.mkdir(parents=True, exist_ok=True)
-                    output.write_text('#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
+                    output.write_text(UNIT_WORD_SPRITE_HEADER if '--prepack-unit-words' in command
+                                      else '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
                                       encoding='ascii')
                 elif script == 'sc64_z4_pack.py':
                     output = local / 'z4/manifest.json'
@@ -600,6 +651,13 @@ class OnboardingTests(unittest.TestCase):
                 self.assertIn(required, scripts)
             self.assertTrue(all(dev.canonical_zerg_input_ready(label, root / relative)
                                 for label, relative, _ in dev.CANONICAL_ZERG_INPUTS))
+            canonical_sprite_calls = [call for call in calls
+                                      if Path(call[1]).name == 'sc64_race_sprites.py'
+                                      and '--header' in call
+                                      and str(root / '.local/sc64/zp-stage/generated/'
+                                              'sc64_race_sprites_generated.h') in call]
+            self.assertEqual(len(canonical_sprite_calls), 1)
+            self.assertIn('--prepack-unit-words', canonical_sprite_calls[0])
 
     def check_doctor(self, *, require_emulator=False, emulator=None, missing=None):
         output = io.StringIO()

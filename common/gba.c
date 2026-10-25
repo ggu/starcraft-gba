@@ -33,6 +33,9 @@ static int tone_frames, noise_frames;
 volatile u32 gfx_draw_cycles;
 static u32 draw_start;
 static u32 previous_present;
+#ifdef SC64_UNIT_WORD_SPRITE_DIAGNOSTICS
+volatile u32 gfx_sprite_words_calls;
+#endif
 static const u16 colors[32]={
  RGB(1,1,2),RGB(30,30,28),RGB(13,15,17),RGB(3,5,8),RGB(8,12,15),
  RGB(30,5,5),RGB(12,2,3),RGB(7,28,12),RGB(2,10,5),RGB(6,14,30),RGB(2,5,15),
@@ -376,6 +379,48 @@ HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
   if(col<right&&s[col])*d=(*d&0xff00)|s[col];
  }
 }
+#ifdef SC64_UNIT_WORD_SPRITES
+/* Phase-aligned four-pixel raster used only for generated unit frames.
+ * The sidecar's transparent lanes are already zero-padded at frame edges. */
+HOT void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame) {
+ if(!frame||!frame->width||!frame->height||frame->width>256||
+    frame->height>256||x>=240||x<=-(int)frame->width||
+    y>=160||y<=-(int)frame->height)return;
+ if(!frame->phase_words[0]||!frame->phase_words[1]||
+    !frame->phase_words[2]||!frame->phase_words[3])return;
+#ifdef SC64_UNIT_WORD_SPRITE_DIAGNOSTICS
+ ++gfx_sprite_words_calls;
+#endif
+ int width=frame->width,height=frame->height;
+#ifdef GBA_SCENE_CLIP
+ if(y>=gfx_clip_bottom||y<=gfx_clip_top-height)return;
+ int top=y<gfx_clip_top?gfx_clip_top-y:0;
+ int bottom=y+height>gfx_clip_bottom?gfx_clip_bottom-y:height;
+#else
+ int top=y<0?-y:0;
+ int bottom=y+height>160?160-y:height;
+#endif
+ int left=x<0?0:x,right=x+width>240?240:x+width;
+ if(left>=right||top>=bottom)return;
+ int phase=x%4;if(phase<0)phase+=4;
+ int origin=x-phase;
+ int first=left&~3,last=(right+3)&~3;
+ int groups=(phase+width+3)/4;
+ const u32 *row=frame->phase_words[phase]+top*groups*2+(first-origin)/4*2;
+ for(int dy=y+top;dy<y+bottom;dy++) {
+  volatile u32 *dst=(volatile u32 *)(void *)(pixels+dy*120+first/2);
+  const u32 *src=row;
+  for(int dx=first;dx<last;dx+=4,dst++,src+=2) {
+   u32 mask=src[1];
+   if(!mask)continue;
+   u32 color=src[0];
+   if(mask==0xffffffffu)*dst=color;
+   else *dst=(*dst&~mask)|color;
+  }
+  row+=groups*2;
+ }
+}
+#endif
 #if defined(D2_DEN_OF_EVIL) || defined(GBA_HOST)
 /* Transparent nearest-neighbour 2x sprite expansion for the Den scene. */
 HOT void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *src) {

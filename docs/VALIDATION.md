@@ -14,7 +14,7 @@ should not be read as the current default.
 
 Recorded campaign wins cover Terran 1–10 across frozen host/ARM builds.
 All four canonical Zerg chapters now have fresh host-controller wins; Z4 and
-P3 also have full current-flag ARM wins. Their full-run means are about 17.7
+P3 also have full current-flag ARM wins. Their full-run means are about 21.4
 and 20.5 fps equivalent, below target. P1 and P2 now have fresh current-flag
 host-controller and input-only ARM wins with Fenix alive; the P2 capacity/retry fix and exact
 checks are recorded in the [Protoss audit](audits/2026-10-26-protoss-requalification/README.md).
@@ -25,7 +25,7 @@ physical GBA qualification. Z4 save continuity is covered by its dedicated
 controller and fresh-process SRAM checks; the generic split-profile save
 report checker only covers earlier campaign model IDs and is not Z4 continuity
 evidence. The [current audit](audits/2026-10-26-z4-promotion-and-performance/README.md)
-records exact flags, parity checks, memory ends, and remaining work.
+records the promotion history. The [unit-rendering audit](audits/2026-10-26-unit-word-rendering/README.md) records the current Zerg tuning, parity checks and memory ends.
 
 ## Reproducible checks
 

@@ -43,12 +43,12 @@ also exercises all three frontend variants without requiring those inputs.
 The Terran profile presents ten missions. Canonical Zerg presents four and
 Protoss presents three, exposing 17 of the 30 mission entries. All four Zerg
 chapters have fresh controller wins with the canonical pools and flags; Z4
-also has a full ARM win. Its measured full-run average is about 17.7 fps
+also has a full ARM win. Its measured full-run average is about 21.4 fps
 equivalent in mGBA, below the 30-fps target. P3 has a current full ARM win at
 about 20.5 fps equivalent. P1 and P2 now have fresh canonical-flag host and
 full input-only ARM wins, with Fenix alive. P2's timed roster waits intact when unit slots are scarce.
 See the [Protoss requalification](audits/2026-10-26-protoss-requalification/README.md)
-and [performance audit](audits/2026-10-26-z4-promotion-and-performance/README.md).
+and [current rendering audit](audits/2026-10-26-unit-word-rendering/README.md).
 P4 Storm has recorded host/ARM wins on older frozen builds, but its fresh
 current-stock controller loses Tassadar and is not ready for promotion.
 Earlier frozen P5 Shuttle builds have a complete controller/ARM win and an

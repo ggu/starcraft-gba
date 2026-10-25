@@ -36,6 +36,26 @@ available here. Use local checks on the current machine or a separately
 configured trusted machine; do not automatically execute public PR code on
 personal runners. Routine verification does not require a new runner service.
 
+## Canonical Zerg unit rendering
+
+Canonical Zerg uses prealigned unit sprite words generated from the same indexed
+pixels. Refresh an older prepared workspace before building the new renderer:
+
+```sh
+./dev sc64 prepare --rom "/path/to/StarCraft 64 USA ROM" --profile zerg
+./dev sc64 build --profile zerg
+./dev sc64 test --profile zerg
+```
+
+Preparation requests `--prepack-unit-words` for the shared Zerg sprite bank.
+Status/build reject stale headers missing the metadata marker or payload.
+The extra data stays local; sprite/save layouts and the Z4 filename/identity
+are unchanged. Legacy Z3 and other race profiles retain their existing defaults.
+For a renderer comparison, `make zerg ZERG_UNIT_WORD_FLAGS=` disables the unit
+word path while retaining the other canonical tuning. See the
+[rendering audit](audits/2026-10-26-unit-word-rendering/README.md) for exact
+pixel/state checks, measurements and memory limits.
+
 ## Source construction art
 
 Prepared imported race builds now use the source construction art, including
