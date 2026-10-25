@@ -59,7 +59,47 @@ void game_init(void);
 void game_update(u16 held,u16 pressed);
 void game_render(void);
 int game_self_test(void);
+#ifdef SC64_TILE_RENDERER
+/* Experimental mode-0 presentation. Software primitives keep drawing into a
+ * persistent linear 240x160 buffer; changed 8x8 tiles are copied at VBlank to
+ * eight 64x64 sprites (rows 0-119) or a HUD background (rows 120-159).
+ * Terrain, fog and static art live on hardware backgrounds behind WIN0. */
+#define GFX_TILE_BLACK_INDEX 255 /* opaque copy of palette color 0 */
+#define GFX_TILE_FOG 1
+#define GFX_TILE_BLACK 2
+#define GFX_TILE_TERRAIN_FIRST 3
+#define GFX_TILE_TERRAIN_SLOTS 464
+#define GFX_TILE_ART_FIRST (GFX_TILE_TERRAIN_FIRST + GFX_TILE_TERRAIN_SLOTS)
+#define GFX_TILE_ART_SLOTS (GFX_TILE_HUD_FIRST - GFX_TILE_ART_FIRST)
+#define GFX_TILE_HUD_FIRST 650
+#define GFX_TILE_SBB_TERRAIN 25
+#define GFX_TILE_SBB_FOG 26
+#define GFX_TILE_SBB_ART 27 /* and 28 */
+#define GFX_TILE_SBB_HUD 29
+#define GFX_TILE_TABLES 0xF000u /* VRAM byte offset of renderer tables */
+#define GFX_TILE_WORLD_TOP 12
+#define GFX_TILE_WORLD_BOTTOM 120
 #ifdef GBA_HOST
+extern u16 gfx_host_vram[49152];
+extern u16 gfx_host_io[64];
+#define GFX_VRAM16 ((volatile u16 *)gfx_host_vram)
+#define GFX_IO16(offset) (gfx_host_io[(offset) >> 1])
+#else
+#define GFX_VRAM16 ((volatile u16 *)0x06000000)
+#define GFX_IO16(offset) (*(volatile u16 *)(0x04000000 + (offset)))
+#endif
+extern u32 gfx_tile_dirty[20], gfx_tile_drawn[20], gfx_tile_art_marks[20];
+extern u8 gfx_tile_band_top, gfx_tile_band_bottom;
+extern void (*gfx_tile_present_hook)(void);
+int gfx_tile_active(void);
+void gfx_tile_enter(void);
+void gfx_tile_leave(void);
+void gfx_tile_clear_world(void);
+void gfx_tile_art_capture(int enable);
+u8 *gfx_tile_buffer_pixels(void);
+#endif
+#ifdef GBA_HOST
+void gfx_host_frame_rgb(u16 *rgb38400);
 void gfx_dump_ppm(const char *path);
 void save_test_corrupt_latest(u32 length,u32 tag);
 u8 gfx_test_pixel(int x,int y);

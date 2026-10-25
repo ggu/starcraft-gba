@@ -10,6 +10,20 @@
 #define SC64_TERRAIN_LOCAL_GRID_GET
 #endif
 
+#ifdef SC64_TILE_RENDERER
+/* The tile renderer keeps terrain in hardware layers. Its mode-4 fallback
+ * (skirmish maps) redraws every frame, so no cache storage is reserved. */
+#ifndef SC64_TERRAIN_STATIC_KEY
+#define SC64_TERRAIN_STATIC_KEY 0u
+#endif
+static int sc64_terrain_cache_valid, sc64_terrain_cache_reused_base;
+static int sc64_terrain_cached(int x, int y) { (void)x; (void)y; return 0; }
+static int sc64_terrain_cached_key(int x, int y, unsigned int k) { (void)x; (void)y; (void)k; return 0; }
+static int sc64_terrain_tile_clean(int col, int row) { (void)col; (void)row; return 0; }
+static int sc64_terrain_store(int x, int y) { (void)x; (void)y; return 0; }
+static int sc64_terrain_store_key(int x, int y, unsigned int k) { (void)x; (void)y; (void)k; return 0; }
+#else
+
 /* Cache only the static terrain and fog pixels. Dynamic objects are drawn
  * after this band is restored each frame. Keep the buffer word-aligned for
  * the Mode 4 DMA helpers. */
@@ -387,6 +401,8 @@ sc64_terrain_store(int x, int y)
     return 1;
 }
 #undef SC64_TERRAIN_CACHE_KEY
+
+#endif /* SC64_TILE_RENDERER */
 
 #ifdef SC64_TERRAIN_LOCAL_GRID_GET
 #undef SC64_GRID_GET
