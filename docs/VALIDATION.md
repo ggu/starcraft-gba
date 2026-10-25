@@ -15,9 +15,11 @@ should not be read as the current default.
 Recorded campaign wins cover Terran 1–10 across frozen host/ARM builds.
 All four canonical Zerg chapters now have fresh host-controller wins; Z4 and
 P3 also have full current-flag ARM wins. Their full-run means are about 17.7
-and 20.5 fps equivalent, below target. P1/P2's generic controller routes lose
-on the current stock-stat engine, and P2 can run out of unit slots for Fenix's
-arrival. They still need current-source qualification. Historical staged
+and 20.5 fps equivalent, below target. P1 and P2 now have fresh current-flag
+host-controller and input-only ARM wins with Fenix alive; the P2 capacity/retry fix and exact
+checks are recorded in the [Protoss audit](audits/2026-10-26-protoss-requalification/README.md).
+P4 Storm's fresh current-stock route loses Tassadar, so its older recorded
+win does not qualify promotion of the current source. Historical staged
 coverage spans 22/30 across recorded builds. These are emulator/host results, not
 physical GBA qualification. Z4 save continuity is covered by its dedicated
 controller and fresh-process SRAM checks; the generic split-profile save
