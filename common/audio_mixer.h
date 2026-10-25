@@ -26,9 +26,9 @@
 enum { AUDIO_CLASS_EFFECT, AUDIO_CLASS_SPEECH };
 
 typedef struct {
-    const s8 *blob;            /* Even-aligned base of all PCM data. */
-    const u32 *sample_offset;  /* Byte offset of each sample; even. */
-    const u32 *sample_length;  /* Byte length of each sample; even. */
+    const s8 *blob;            /* Word-aligned base of all PCM data. */
+    const u32 *sample_offset;  /* Byte offset of each sample; multiple of 4. */
+    const u32 *sample_length;  /* Byte length of each sample; multiple of 4. */
     u32 sample_count;
     const u32 *music_offset;   /* Word-aligned track starts. */
     const u32 *music_frames;   /* Track length in AUDIO_FRAME_SAMPLES frames. */
@@ -37,7 +37,7 @@ typedef struct {
 
 typedef struct {
     const s8 *data;
-    u32 remaining;  /* Bytes still to play, always even; zero when idle. */
+    u32 remaining;  /* Bytes still to play, a multiple of four; zero when idle. */
     u16 sound;
     u8 priority;
     u8 age;         /* Frames since start, saturating. */
@@ -97,7 +97,7 @@ static inline void audio_mixer_start_voice(AudioVoice *v, const AudioBank *bank,
                                            const AudioRequest *r)
 {
     v->data = bank->blob + bank->sample_offset[r->sound];
-    v->remaining = bank->sample_length[r->sound] & ~1u;
+    v->remaining = bank->sample_length[r->sound] & ~3u;
     v->sound = r->sound;
     v->priority = r->priority;
     v->age = 0;
@@ -149,12 +149,31 @@ static inline s32 audio_clip8(s32 s)
     return s;
 }
 
-/* Mix one frame into out, written as halfwords (two samples each) so the
- * buffer may live in VRAM. Samples are read from ROM as halfwords: voice
- * positions and lengths are even by construction. */
+/* Sum n voices four samples at a time. Each source word is biased to
+ * unsigned bytes and split into two 16-bit lanes (bytes 0/2 and 1/3), so one
+ * ROM word read and four ALU operations add four samples; lanes cannot carry
+ * (4 * 255 < 65536). Saturation branches only when a lane clips. */
+static inline void audio_mixer_sum(volatile u32 *dst, const u32 *const *src, u32 n, u32 words)
+{
+    const u32 *a = src[0], *b = src[1], *c = n > 2 ? src[2] : 0, *d = n > 3 ? src[3] : 0;
+    const s32 bias = (s32)(128u * n);
+    for (u32 k = 0; k < words; ++k) {
+        u32 w = a[k] ^ 0x80808080u, even = w & 0x00ff00ffu, odd = (w >> 8) & 0x00ff00ffu;
+        w = b[k] ^ 0x80808080u; even += w & 0x00ff00ffu; odd += (w >> 8) & 0x00ff00ffu;
+        if (n > 2) { w = c[k] ^ 0x80808080u; even += w & 0x00ff00ffu; odd += (w >> 8) & 0x00ff00ffu; }
+        if (n > 3) { w = d[k] ^ 0x80808080u; even += w & 0x00ff00ffu; odd += (w >> 8) & 0x00ff00ffu; }
+        s32 s0 = audio_clip8((s32)(even & 0xffffu) - bias), s1 = audio_clip8((s32)(odd & 0xffffu) - bias);
+        s32 s2 = audio_clip8((s32)(even >> 16) - bias), s3 = audio_clip8((s32)(odd >> 16) - bias);
+        dst[k] = (u32)(u8)s0 | (u32)(u8)s1 << 8 | (u32)(u8)s2 << 16 | (u32)(u8)s3 << 24;
+    }
+}
+
+/* Mix one frame into out with word stores (VRAM accepts them). Voice
+ * positions and lengths are multiples of four by construction, so every
+ * span is too and ROM samples are read as aligned words. */
 static inline void audio_mixer_mix(AudioMixer *m, volatile u16 *out)
 {
-    const u16 *src[AUDIO_VOICES];
+    const u32 *src[AUDIO_VOICES];
     u32 count, pos = 0;
     for (u32 i = 0; i < AUDIO_VOICES; ++i)
         if (m->voice[i].age != 0xff) ++m->voice[i].age;
@@ -165,41 +184,23 @@ static inline void audio_mixer_mix(AudioMixer *m, volatile u16 *out)
         for (u32 i = 0; i < AUDIO_VOICES; ++i) {
             AudioVoice *v = &m->voice[i];
             if (!v->remaining) continue;
-            src[count++] = (const u16 *)(const void *)v->data;
+            src[count++] = (const u32 *)(const void *)v->data;
             if (v->remaining < span) span = v->remaining;
         }
-        volatile u16 *dst = out + pos / 2u;
-        u32 pairs = span / 2u;
+        volatile u32 *dst = (volatile u32 *)(volatile void *)(out + pos / 2u);
+        u32 words = span / 4u;
         switch (count) {
         case 0:
-            for (u32 k = 0; k < pairs; ++k) dst[k] = 0;
+            for (u32 k = 0; k < words; ++k) dst[k] = 0;
             break;
         case 1: {
-            const u16 *a = src[0];
-            for (u32 k = 0; k < pairs; ++k) dst[k] = a[k];
+            const u32 *a = src[0];
+            for (u32 k = 0; k < words; ++k) dst[k] = a[k];
             break;
         }
-        case 2: {
-            const u16 *a = src[0], *b = src[1];
-            for (u32 k = 0; k < pairs; ++k) {
-                u32 wa = a[k], wb = b[k];
-                s32 lo = (s8)(u8)wa + (s8)(u8)wb;
-                s32 hi = (s8)(u8)(wa >> 8) + (s8)(u8)(wb >> 8);
-                dst[k] = (u16)((u8)audio_clip8(lo) | ((u32)(u8)audio_clip8(hi) << 8));
-            }
-            break;
-        }
-        default:
-            for (u32 k = 0; k < pairs; ++k) {
-                s32 lo = 0, hi = 0;
-                for (u32 j = 0; j < count; ++j) {
-                    u32 w = src[j][k];
-                    lo += (s8)(u8)w;
-                    hi += (s8)(u8)(w >> 8);
-                }
-                dst[k] = (u16)((u8)audio_clip8(lo) | ((u32)(u8)audio_clip8(hi) << 8));
-            }
-            break;
+        case 2: audio_mixer_sum(dst, src, 2, words); break;
+        case 3: audio_mixer_sum(dst, src, 3, words); break;
+        default: audio_mixer_sum(dst, src, 4, words); break;
         }
         for (u32 i = 0; i < AUDIO_VOICES; ++i) {
             AudioVoice *v = &m->voice[i];

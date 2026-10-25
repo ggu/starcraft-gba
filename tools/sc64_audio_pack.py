@@ -288,8 +288,8 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
         key = (offsets[sound], lengths[sound])
         if key not in converted:
             pcm = resample_to_s8(ima_decode(blob[key[0] + 8:key[0] + key[1]]), SFX_GAIN)
-            # The mixer reads two samples per ROM halfword.
-            pcm += bytes(len(pcm) & 1)
+            # The mixer reads four samples per aligned ROM word.
+            pcm += bytes(-len(pcm) % 4)
             converted[key] = len(sample_offset)
             sample_offset.append(len(out))
             sample_length.append(len(pcm))

@@ -176,8 +176,10 @@ Engine design (`common/audio_mixer.h`, `common/gba.c`):
   fixed voices and mixes 176 samples with saturation. Voice 0 is reserved for
   unit responses, which interrupt each other as in StarCraft; effects take a
   free voice or steal a lower-priority, older one, and the same effect is not
-  retriggered within four frames. The mixer reads ROM samples as halfwords and
-  runs as Thumb code from ROM: IWRAM has no room for it.
+  retriggered within four frames. Samples are word-aligned, so the mixer
+  reads four samples per ROM word and adds them in two 16-bit lanes, clamping
+  only lanes that overflow. It runs as Thumb code from ROM: IWRAM has no room
+  for it.
 - The mix buffer and the event snapshot live in the unused VRAM gap between
   the two mode-4 pages (`0x06009600`-`0x06009FFF`), so EWRAM grows only by the
   mixer state.

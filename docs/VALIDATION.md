@@ -5223,3 +5223,19 @@ Host checks:
   fixtures with the imported bank, checking that a selection plays one of the
   unit's own response samples and that the race theme and menu theme are
   requested; the unified run's state hash `602d8534` matches with audio off.
+
+Memory, from a full rebuild of every ARM ELF target whose inputs are prepared
+(46 of the 55; the T6 storage family needs `make sc64-t6-prepare`, and
+`zerg-z5-cloak` already exceeds the IWRAM guard at base `d085310` with the
+same `__iwram_end = 0x03005040`):
+
+- `__iwram_end` is byte-identical to the base on every build: the mixer runs
+  as Thumb code from ROM and its small ARM interrupt entry is in ROM too.
+- BSS grows by 144 bytes with the bank (mixer state, counters and observer
+  state) and by 16-24 bytes without it. The tightest builds, the P7 Carrier
+  training, projectile and showcase ROMs, keep 660 bytes below the
+  `0x0203e000` guard. The mix buffers, a 64-byte zero guard and the
+  per-unit/per-building snapshot use the unused VRAM between the mode-4
+  pages (416 + 2 x (units + buildings) bytes, at most 1216 of 2560).
+- The default ROM stays 64 KiB. Imported ROMs gain the 15.6 MB bank and pad
+  to 32 MiB.

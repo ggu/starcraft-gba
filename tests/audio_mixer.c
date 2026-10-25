@@ -5,15 +5,15 @@
 
 #define CHECK(cond, msg) do { if (!(cond)) { fprintf(stderr, "FAIL audio mixer: %s (line %d)\n", msg, __LINE__); return 1; } } while (0)
 
-/* Samples: 0 = +10 x 400, 1 = +100 x 100, 2 = -100 x 100, 3 = ramp x 6,
- * 4 = +60 x 352. Music: track 0 two frames, track 1 three, track 2 absent. */
+/* Samples: 0 = +10 x 400, 1 = +100 x 100, 2 = -100 x 100, 3 = ramp x 8,
+ * 4 = +60 x 352 (ramp padded to a word). Music: track 0 two frames, track 1 three, track 2 absent. */
 static _Alignas(4) s8 blob[400 + 100 + 100 + 6 + 2 + 352 + 4 * 176];
 static const u32 offsets[5] = { 0, 400, 500, 600, 608 };
-static const u32 lengths[5] = { 400, 100, 100, 6, 352 };
+static const u32 lengths[5] = { 400, 100, 100, 8, 352 };
 static const u32 music_offset[3] = { 960, 960 + 2 * 176, 0 };
 static const u32 music_frames[3] = { 2, 3, 0 };
 static const AudioBank bank = { blob, offsets, lengths, 5, music_offset, music_frames, 3 };
-static u16 out[AUDIO_FRAME_SAMPLES / 2];
+static _Alignas(4) u16 out[AUDIO_FRAME_SAMPLES / 2];
 
 static int sample_at(u32 i)
 {
@@ -25,7 +25,7 @@ static void fill(void)
     memset(blob, 0, sizeof blob);
     for (int i = 0; i < 400; ++i) blob[i] = 10;
     for (int i = 0; i < 100; ++i) { blob[400 + i] = 100; blob[500 + i] = -100; }
-    for (int i = 0; i < 6; ++i) blob[600 + i] = (s8)(i + 1);
+    for (int i = 0; i < 8; ++i) blob[600 + i] = (s8)(i + 1);
     for (int i = 0; i < 352; ++i) blob[608 + i] = 60;
 }
 
@@ -50,8 +50,8 @@ int main(void)
     audio_mixer_reset(&m);
     CHECK(audio_mixer_request(&m, 3, 1, AUDIO_CLASS_EFFECT), "request accepted");
     mix(&m);
-    for (u32 i = 0; i < 6; ++i) CHECK(sample_at(i) == (int)i + 1, "single voice copied");
-    for (u32 i = 6; i < AUDIO_FRAME_SAMPLES; ++i) CHECK(sample_at(i) == 0, "voice tail silent");
+    for (u32 i = 0; i < 8; ++i) CHECK(sample_at(i) == (int)i + 1, "single voice copied");
+    for (u32 i = 8; i < AUDIO_FRAME_SAMPLES; ++i) CHECK(sample_at(i) == 0, "voice tail silent");
     CHECK(!m.voice[1].remaining, "short voice retired");
 
     /* Two and three voices sum with saturation; lengths advance exactly. */
@@ -75,6 +75,33 @@ int main(void)
     audio_mixer_request(&m, 0, 1, AUDIO_CLASS_EFFECT);
     mix(&m);
     CHECK(sample_at(0) == 10 && sample_at(99) == 10, "three opposite voices cancel");
+
+    /* Packed 2-4 voice sums match a scalar reference on random samples,
+     * including staggered ends inside a frame. */
+    {
+        static _Alignas(4) s8 rnd[4096];
+        static const u32 roff[4] = { 0, 1024, 2048, 3072 };
+        static const u32 rlen[4] = { 520, 176, 352, 1000 };
+        static const u32 none[1] = { 0 };
+        const AudioBank rbank = { rnd, roff, rlen, 4, none, none, 0 };
+        u32 lcg = 7;
+        for (u32 i = 0; i < sizeof rnd; ++i) { lcg = lcg * 1103515245u + 12345u; rnd[i] = (s8)(lcg >> 16); }
+        for (u32 voices = 2; voices <= 4; ++voices) {
+            audio_mixer_reset(&m);
+            audio_mixer_request(&m, 0, 1, AUDIO_CLASS_SPEECH);
+            for (u32 v = 1; v < voices; ++v) audio_mixer_request(&m, (u16)v, 1, AUDIO_CLASS_EFFECT);
+            audio_mixer_service(&m, &rbank);
+            for (u32 f = 0; f < 4; ++f) {
+                audio_mixer_mix(&m, (volatile u16 *)out);
+                for (u32 i = 0; i < AUDIO_FRAME_SAMPLES; ++i) {
+                    s32 ref = 0;
+                    u32 at = f * AUDIO_FRAME_SAMPLES + i;
+                    for (u32 v = 0; v < voices; ++v) if (at < rlen[v]) ref += rnd[roff[v] + at];
+                    CHECK(sample_at(i) == audio_clip8(ref), "packed sum matches reference");
+                }
+            }
+        }
+    }
 
     /* A voice spanning frames plays every byte exactly once. */
     audio_mixer_reset(&m);
