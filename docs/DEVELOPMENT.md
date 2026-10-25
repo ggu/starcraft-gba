@@ -2087,6 +2087,23 @@ weapon-event caller remain unfinished; neither enables Carrier combat.
 See [Carrier projectile development](CARRIER-PROJECTILES.md)
 for commands, memory ownership, reference evidence and promotion limits.
 
+Ordinary attacks use authored weapon-family effects: muzzle flashes, needles,
+missiles, plasma, flame, melee, acid, shells, psionic arcs, explosions, colony
+spines and laser pulses. Ground/air weapon variants have separate profiles;
+defenses and enabled traps use the same clipped, fog-aware renderer. These
+effects preserve the adaptation's existing instantaneous damage timing and
+are not imported native IScript animations. They do not enable weapons on
+actors whose combat is still unsupported.
+
+`make test-sc64-weapon-vfx` checks asset-free rendering geometry and clipping.
+With the existing private inputs, `make test-sc64-weapon-vfx-profiles` checks
+the unified, full Terran, Z7 and P7 actor sets and actual firing events.
+`make showcase` includes the effects in the filming ROM; the canonical race
+builds include them as well. The transient pool holds 32 effects in race
+profiles and retains 12 in the original-art save format. Overflow replaces
+the oldest cosmetic effect and never changes damage or RNG. Actor and save
+rows retain their existing layouts.
+
 For repeatable filming setups, `make showcase` builds the separate
 `StarCraft-Showcase-GBA.gba` with a hidden scene menu. On HOME hold R, add L,
 then tap Select. `make test-sc64-showcase` checks the menu, scene resets,

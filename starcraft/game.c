@@ -11,8 +11,8 @@
 #if defined(SC64_RENDER_KEY_ONCE) && !defined(SC64_IMPORTED_MISSION)
 #error "SC64_RENDER_KEY_ONCE requires SC64_IMPORTED_MISSION"
 #endif
-#ifdef SC64_RACES
 #include "sc64_weapon_vfx.h"
+#ifdef SC64_RACES
 #include "sc64_construction_vfx.h"
 #endif
 #if defined(SC64_CONSTRUCTION_SOURCE_ART) && \
@@ -376,7 +376,13 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #else
 #define MAX_RACE_GEYSERS 4
 #endif
+#ifdef SC64_RACES
+/* Transient visuals are absent from RaceSave. Keep dense volleys readable
+ * without growing actor/save rows; the ARM link still checks the RAM guard. */
+#define MAX_TRACERS 32
+#else
 #define MAX_TRACERS 12
+#endif
 #ifdef SC64_IMPORTED_MISSION
 #include "sc64_mission_generated.h"
 #include "sc64_assets_generated.h"
@@ -686,6 +692,7 @@ enum {
     B_BUNKER, B_INFESTED_COMMAND, B_CREEP_COLONY
 };
 #endif
+#include "sc64_weapon_vfx_profiles.h"
 enum {
     ORDER_IDLE, ORDER_MOVE, ORDER_ATTACK_MOVE, ORDER_ATTACK_TARGET,
     ORDER_MINE, ORDER_BUILD, ORDER_GAS
@@ -3020,25 +3027,26 @@ sc64_direct_attack_tick_unit(int slot)
 }
 #endif
 
-static void
+static void __attribute__((noinline))
 add_tracer(int x0, int y0, int x1, int y1, int color)
 {
-    int i;
-    for (i = 0; i < MAX_TRACERS; i++)
-	if (!tracers[i].life) {
-	    tracers[i].x0 = x0;
-	    tracers[i].y0 = y0;
-	    tracers[i].x1 = x1;
-	    tracers[i].y1 = y1;
-	    tracers[i].life = 4;
-#ifdef SC64_RACES
-            /* The firing update ages effects before its first render. */
-            if (sc64_weapon_vfx_style(color)==SC64_WEAPON_VFX_STYLE_NEEDLE)
-                tracers[i].life=5;
-#endif
-	    tracers[i].color = color;
-	    return;
-	}
+    int slot=0,oldest=-1;
+    if (!color) return; /* Non-combat actor: no invented weapon. */
+    if (!sc64_weapon_vfx_style(color))
+        color=sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_MUZZLE,color);
+    for (int i=0;i<MAX_TRACERS;++i) {
+        if (!tracers[i].life) { slot=i; break; }
+        int age=sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(tracers[i].color))+1-
+            tracers[i].life;
+        if (age>oldest) { oldest=age; slot=i; }
+    }
+    /* Cosmetic overflow replaces the oldest effect, never a damage event.
+     * Fresh shots cannot be starved indefinitely by an earlier volley. */
+    tracers[slot].x0=x0; tracers[slot].y0=y0;
+    tracers[slot].x1=x1; tracers[slot].y1=y1;
+    tracers[slot].color=color;
+    /* Combat emits before end-of-update aging, including the first draw. */
+    tracers[slot].life=sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(color))+1;
 }
 
 static void
@@ -5109,12 +5117,14 @@ tick_combat(Unit * q, int target)
 	return;
     if (dx * dx + dy * dy <= range * range) {
 	if (!q->cd) {
-            int shot_color=q->owner == SIDE ? C_GOLD : C_RED;
+	    add_tracer(q->x, q->y, target_x(target), target_y(target),
+                sc64_weapon_vfx_unit_profile(q->type,
 #ifdef SC64_RACES
-            if (q->type==U_HYDRALISK || q->type==U_HUNTER_KILLER)
-                shot_color=sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_NEEDLE,C_GOLD);
+                    flying
+#else
+                    0
 #endif
-	    add_tracer(q->x, q->y, target_x(target), target_y(target), shot_color);
+                ));
 	#ifdef SC64_RACES
         int hits=sc64_race_unit_hits_vs(q->type,flying);
 #ifdef SC64_Z6_RUNTIME
@@ -6542,31 +6552,21 @@ draw_unit(Unit * q)
 	gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
 }
 
+#define SC64_WEAPON_VFX_VISIBLE(x,y) currently_visible((x)+camx,(y)+camy-12)
+#include "sc64_weapon_vfx_render.h"
+#undef SC64_WEAPON_VFX_VISIBLE
+
 static void
 draw_tracers(void)
 {
-    int i;
-    for (i = 0; i < MAX_TRACERS; i++)
-	if (tracers[i].life &&
-	    (currently_visible(tracers[i].x0, tracers[i].y0) ||
-	     currently_visible(tracers[i].x1, tracers[i].y1))) {
-#ifdef SC64_RACES
-            if (sc64_weapon_vfx_style(tracers[i].color)==SC64_WEAPON_VFX_STYLE_NEEDLE) {
-                Sc64WeaponVfxSegment needle;
-                if (sc64_weapon_vfx_segment(tracers[i].x0,tracers[i].y0,
-                        tracers[i].x1,tracers[i].y1,tracers[i].life,&needle)) {
-                    int hx=needle.head_x-camx,hy=needle.head_y-camy+12;
-                    gfx_line(needle.tail_x-camx,needle.tail_y-camy+12,
-                             hx,hy,sc64_weapon_vfx_color(tracers[i].color));
-                    gfx_pixel(hx,hy,C_WHITE);
-                    gfx_pixel(hx,hy-1,C_GOLD);
-                }
-                continue;
-            }
-#endif
-	    gfx_line(tracers[i].x0 - camx, tracers[i].y0 - camy + 12,
-		     tracers[i].x1 - camx, tracers[i].y1 - camy + 12, tracers[i].color);
-	}
+    for (int i=0;i<MAX_TRACERS;++i) if (tracers[i].life) {
+        int style=sc64_weapon_vfx_style(tracers[i].color);
+        /* Legacy original-art saves may contain an untagged tracer color. */
+        if (!style) style=SC64_WEAPON_VFX_STYLE_MUZZLE;
+        sc64_weapon_vfx_draw(style,sc64_weapon_vfx_color(tracers[i].color),
+            tracers[i].x0-camx,tracers[i].y0-camy+12,
+            tracers[i].x1-camx,tracers[i].y1-camy+12,tracers[i].life);
+    }
 }
 
 static void

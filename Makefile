@@ -2416,7 +2416,7 @@ test-sc64-probe-cannon: build/test-sc64-probe-cannon build/test-sc64-probe-canno
 	./build/test-sc64-probe-cannon-p6
 	./build/test-sc64-probe-cannon-z6
 
-build/test-sc64-weapon-vfx: tests/sc64_weapon_vfx.c starcraft/sc64_weapon_vfx.h | build
+build/test-sc64-weapon-vfx: tests/sc64_weapon_vfx.c starcraft/sc64_weapon_vfx.h starcraft/sc64_weapon_vfx_render.h common/gba.h | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 build/test-sc64-weapon-vfx-game: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
@@ -2426,6 +2426,23 @@ test-sc64-weapon-vfx: build/test-sc64-weapon-vfx
 test-sc64-weapon-vfx-game: build/test-sc64-weapon-vfx-game
 	./build/test-sc64-weapon-vfx-game
 test-starcraft: test-sc64-weapon-vfx
+
+# The same actual-attack/renderer fixture checks optional actor identities.
+define WEAPON_VFX_PROFILE_FIXTURE
+build/test-sc64-weapon-vfx-$(1): tests/sc64_weapon_vfx_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c -o $$@
+endef
+$(eval $(call WEAPON_VFX_PROFILE_FIXTURE,terran,$(TERRAN_FULL_FLAGS),$(TERRAN_FULL_INPUTS)))
+build/test-sc64-weapon-vfx-zerg: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_DERIVED_SAVE_FLAGS) $< common/gba.c -o $@
+# P7 flags are declared below; keep them recursively expanded here.
+build/test-sc64-weapon-vfx-protoss: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-weapon-vfx-profiles
+test-sc64-weapon-vfx-profiles: test-sc64-weapon-vfx-game build/test-sc64-weapon-vfx-terran build/test-sc64-weapon-vfx-zerg build/test-sc64-weapon-vfx-protoss
+	./build/test-sc64-weapon-vfx-terran
+	./build/test-sc64-weapon-vfx-zerg
+	./build/test-sc64-weapon-vfx-protoss
 
 build/test-sc64-construction-vfx: tests/sc64_construction_vfx.c starcraft/sc64_construction_vfx.h common/gba.c common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@

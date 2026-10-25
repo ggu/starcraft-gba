@@ -180,7 +180,7 @@ race_p7_archon_splash_attack(Unit *attacker,int primary)
                                       attacker->owner)) ++slots;
     }
     if (slots) {
-        int color=attacker->owner==SIDE?C_GOLD:C_RED;
+        int color=sc64_weapon_vfx_unit_profile(attacker->type,0);
         add_tracer(attacker->x,attacker->y,target_x(primary),target_y(primary),color);
     }
     attacker->cd=SC64_P7_ARCHON_COOLDOWN_GBA_TICKS;

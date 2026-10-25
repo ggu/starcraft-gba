@@ -131,6 +131,7 @@ code; only the authored C and game host suites claim clean ASan/UBSan results.
 The generation-41 ARM projectile probe passes the unchanged link guards. This
 does not prove in-flight ARM SRAM continuation, stack high-water, physical
 hardware behavior, a P7 win or near-30-fps Carrier battles. Generation 42
-training links with IWRAM/BSS ends `0x03004a30` / `0x0203daf4`, within the
-unchanged guards. It has no production, native Carrier-combat, hardware, fps or
+training originally linked with IWRAM/BSS ends `0x03004a30` / `0x0203daf4`.
+The later shared weapon-effect pool expands BSS to `0x0203dcd4`, retaining
+the same IWRAM end and unchanged guards. It has no production, native Carrier-combat, hardware, fps or
 P7-win qualification claim. Those gates remain required before promotion.

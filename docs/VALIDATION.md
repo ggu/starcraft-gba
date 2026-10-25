@@ -2653,6 +2653,9 @@ these fixtures are not complete campaign wins.
 
 ### Construction and Hydralisk visual pass
 
+This is the historical Hydralisk-only pass. The later weapon-family pass
+described below replaces its renderer across implemented attack paths.
+
 Hydralisk/Hunter Killer shots now carry a transient needle style in the existing
 tracer color field. Four visible updates draw a moving segment capped at five
 pixels with a bright head, instead of a full red/gold beam. The firing update
@@ -5060,3 +5063,53 @@ hoist each gained under 1.5 percent. An IWRAM target-index rebuild gained
 site overflowed the IWRAM guard. These are emulator results only. They do not
 qualify a mission win, fresh-process SRAM, physical hardware or 30 fps. Staged
 campaign progress remains 22/30.
+
+### Weapon-family effects across implemented attacks
+
+The shared visual pass replaces ordinary straight-line tracers with authored
+weapon families. Unit profiles cover guns, needles, missiles, plasma, flames,
+melee, acid, shells, psionic arcs, contact explosions and laser pulses; Goliath,
+Wraith and Scout choose different ground/air effects. Static defenses use
+plasma, underground spines, spores and missiles. T4 traps, P6 wall missiles,
+P6 Infested Terran explosions, T5 mines and the specialized P7 Archon splash
+callback now emit corresponding effects. This does not implement unavailable
+weapons, Carrier flight, Mutalisk bounce damage or imported IScript sequences.
+Damage, target selection, cooldowns and RNG remain on their existing paths;
+travel and impacts are cosmetic rather than delayed damage events.
+
+`make test-sc64-weapon-vfx-profiles` passes under ASan/UBSan for unified (30),
+full Terran (42), Z7 (37) and P7 (45) armed unit/target-class profiles. It checks
+actual ground/air attack events, visible lifetimes, impact phases, clipping
+to the battlefield and current fog, camera translation, saturation replacement
+and the same-update damage contract. Pure renderer checks cover extreme
+coordinates, distinct orb/blob/shell silhouettes, vertical beam orientation
+and hidden pixels. T4 traps, P6 explosion/trap events, T5 mines and Archon's
+specialized attack have separate emission assertions in their existing tests.
+Host showcase checks retain all eight setups and update-150 last-stand defeats.
+
+The race-profile transient effect pool grows from 12 to 32 entries (+480 BSS
+bytes). Overflow deterministically replaces the oldest cosmetic effect. The
+original-art pool stays at 12, retaining its save layout; RaceSave and actor
+layouts are unchanged. All drawing clips before framebuffer writes and no
+long source-to-target line scans through offscreen space. Mapping and rendering
+remain in ROM. Current IWRAM/BSS ends are: Terran `0x03004e88/0x0203dbcc`,
+Z3 `0x03004f88/0x02039a58`, P3 `0x03004f30/0x02039c00`, showcase
+`0x03004a28/0x0203dcd0`, Z7 derived `0x03004a40/0x0203dbd0` and P7 training
+`0x03004a30/0x0203dcd4`. The existing reserve guards pass.
+
+A controller-only mGBA replay passes all eight filming scenes, including every
+last-stand defeat at update 150. A fresh `e72fe11` source build with the same
+current private inputs is the timing baseline. The five battle scenes measure
+13.031, 19.854, 18.911, 19.745 and 24.275 effective fps, versus baseline
+13.175, 19.965, 19.164, 20.020 and 24.961 (0.56–2.75% slower). All three
+last stands remain at 29.857 fps. These are short emulator samples, not physical
+hardware or a new 30-fps qualification. Captures were inspected alongside the
+asset-free per-family animation gallery.
+
+The current showcase ROM SHA-256 is
+`56cec04bba21be1566a4847d2649f3df45aa5292fce8582666b6a71001fa711a`.
+Default build/tests (414 Python checks plus host fixtures), unified build/tests
+and full Terran build/tests pass, including the ten controller missions,
+saves and skirmish matrix. This visual pass does not promote any new campaign
+mission or repeat full ARM campaign/save qualification; staged progress remains
+22/30. ROMs, captures and generated art remain local.
