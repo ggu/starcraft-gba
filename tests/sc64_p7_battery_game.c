@@ -208,6 +208,17 @@ static int source_actor(unsigned raw_owner, unsigned raw_type, int building)
     return -1;
 }
 
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+static void cache_frames(unsigned count)
+{
+    sc64_target_index_active=0;
+    while (count--) {
+        sc64_p7_arbiter_cache_frame_tick();
+        sc64_p7_arbiter_cache_process_due();
+    }
+}
+#endif
+
 static int legal_battery_site(int from_x,int from_y,int *out_x,int *out_y)
 {
     int best=0x7fffffff,found=0;
@@ -225,6 +236,9 @@ static int legal_battery_site(int from_x,int from_y,int *out_x,int *out_y)
 
 int main(void)
 {
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    assert(SC64_RACE_SAVE_GENERATION==39u);
+#endif
     static const char *menu_labels[MENU_COUNT]={0};
     test_p7_union_tail_guard();
     /* OpenBW square_at(...,128) is half-open. Actors touching either
@@ -246,10 +260,22 @@ int main(void)
     assert(!sc64_p7_in_psi_range(96,64)); /* false cell at mask row 4, col 6 */
 
     game_init();
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    assert(screen==SCREEN_TITLE);
+    /* P7 is still catalog-locked; seed the normal Briefing page with this
+       private fixture's authenticated mission and launch through KEY_A. */
+    sc64_frontend_reset(&race_front,SC64_P7_GLOBAL_ID,R_PROTOSS,1,-1);
+    race_front.page=SC_FRONT_BRIEFING;
+    race_front.mission=SC64_P7_GLOBAL_ID;
+    game_update(KEY_A,KEY_A); game_update(0,0);
+    assert(screen==SCREEN_PLAY && !mission_unsupported_count);
+    assert(sc64_p7_arbiter_cache_initialized);
+#else
     race_mode=0;
     race_selected_mission=SC64_P7_GLOBAL_ID;
     race_campaign_init();
     assert(screen==SCREEN_PLAY && !mission_unsupported_count);
+#endif
     assert(race_p7_active() && race_p7_runtime_state_valid());
     assert(race_p7_battery_live_world_valid());
 
@@ -594,6 +620,70 @@ int main(void)
     b[source0].alive=0;
     assert(race_p7_battery_live_world_valid());
     assert(race_save_game()); /* Destroying a source Battery remains saveable. */
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    /* Generation 39 stores bounded cache state in Unit.weapon and P7's
+       three reserved bytes. Native source updates occur 4/5 GBA frames. */
+    int arbiter=source_actor(0,71,0);
+    int target=source_actor(0,65,0);
+    int detector=source_actor(7,84,0);
+    assert(arbiter>=0 && target>=0 && detector>=0);
+    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].raw_owner==0 &&
+        u[i].raw_type==71) { u[i].x=u[target].x; u[i].y=u[target].y; }
+    int target_x=u[target].x, target_y=u[target].y;
+    u[detector].x=target_x; u[detector].y=target_y;
+    int cell=(target_x/16)+(target_y/16)*MAP_COLS;
+    SC64_GRID_SET(visible,cell,1);
+    assert(u[arbiter].owner==u[target].owner);
+    cache_frames(5); /* four source updates; newly cloaked target detects now */
+    assert(sc64_p7_observer_arbiter_aura_cloaks(target));
+    int aura_weapon=u[target].weapon;
+    assert(SC64_P7_ARBITER_CACHE_VALID(aura_weapon) &&
+           (aura_weapon&SC64_P7_ARBITER_AURA));
+    assert(race_save_game());
+    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].raw_owner==0 &&
+        u[i].raw_type==71) u[i].x+=500;
+    cache_frames(5);
+    assert(!sc64_p7_observer_arbiter_aura_cloaks(target));
+    assert(race_load_game());
+    assert(u[arbiter].x==target_x && u[arbiter].y==target_y &&
+           sc64_p7_observer_arbiter_aura_cloaks(target) &&
+           u[target].weapon==aura_weapon);
+
+    cache_frames(5);
+    assert(sc64_p7_observer_detector_sees(target,7,SIDE));
+    assert(sc64_p7_observer_can_attack_from(U_MARINE,target,SIDE,7));
+    assert(race_save_game());
+    u[detector].x=0; u[detector].y=0;
+    assert(sc64_p7_observer_detector_sees(target,7,SIDE));
+    /* The target's detected flag survives detector movement until its
+       native timer expires, provided current optical visibility remains. */
+    assert(sc64_p7_observer_can_attack_from(U_MARINE,target,SIDE,7));
+    SC64_GRID_SET(visible,cell,0);
+    assert(!sc64_p7_observer_detector_sees(target,7,SIDE));
+    assert(!sc64_p7_observer_can_attack_from(U_MARINE,target,SIDE,7));
+    SC64_GRID_SET(visible,cell,1);
+    assert(race_load_game());
+    assert(u[detector].x==target_x && u[detector].y==target_y &&
+           sc64_p7_observer_can_attack_from(U_MARINE,target,SIDE,7));
+    u[detector].x=0; u[detector].y=0;
+    unsigned left=SC64_P7_ARBITER_COUNTDOWN(u[target].weapon);
+    for(unsigned i=0;i<left;++i) {
+        sc64_p7_arbiter_cache_source_tick();
+        assert(sc64_p7_observer_can_attack_from(U_MARINE,target,SIDE,7));
+    }
+    assert(SC64_P7_ARBITER_COUNTDOWN(u[target].weapon)==0);
+    sc64_p7_arbiter_cache_source_tick();
+    assert(!sc64_p7_observer_can_attack_from(U_MARINE,target,SIDE,7));
+    assert(race_save_game());
+    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].raw_owner==0 &&
+        u[i].raw_type==71) u[i].alive=0;
+    cache_frames(5);
+    assert(!sc64_p7_observer_arbiter_aura_cloaks(target));
+    assert(race_save_game());
+    assert(race_load_game());
+    assert(!sc64_p7_observer_arbiter_aura_cloaks(target));
+#else
     puts("P7 Battery construction, recharge, reference lifetime and saves passed");
+#endif
     return 0;
 }

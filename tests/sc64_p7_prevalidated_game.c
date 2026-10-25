@@ -159,6 +159,14 @@ int main(void)
 #endif
         u[actor].raw_owner=old_owner;
     }
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    /* Normal menu launch occurs between ticks; first cache refresh happens
+       on the first ordinary play tick before that tick's unit orders. */
+    game_update(0,0);
+    assert(sc64_p7_arbiter_cache_initialized);
+    for (int i=0;i<MAX_UNITS;++i)
+        assert(sc64_p7_arbiter_cache_unit_valid(&u[i]));
+#endif
 
     for (int i=0;i<120;++i) {
         game_update(0,0);
@@ -183,6 +191,30 @@ int main(void)
         tap(KEY_B);
         assert(screen==SCREEN_PAUSE);
         assert(save_read(&race_data,sizeof(race_data),SAVE_VERSION));
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+        {
+            static RaceSave valid_candidate;
+            int slot=-1;
+            Unit decoded;
+            Sc64ZpPackedUnitSave malformed_row;
+            valid_candidate=race_data;
+            for(int i=0;i<MAX_UNITS;++i) if(u[i].alive) { slot=i; break; }
+            assert(slot>=0);
+            assert(sc64_zp_unit_save_decode(&decoded,&race_data.units[slot],
+                                             128u*16u,128u*16u));
+            decoded.weapon=(int)((unsigned)decoded.weapon&~(31u<<8))|(31u<<8);
+            assert(!sc64_p7_arbiter_cache_unit_valid(&decoded));
+            assert(sc64_zp_unit_save_encode(&malformed_row,&decoded,
+                                             128u*16u,128u*16u));
+            race_data.units[slot]=malformed_row;
+            save_write(&race_data,sizeof(race_data),SAVE_VERSION);
+            const unsigned before_bad_cache_load=trace_hash();
+            game_update(KEY_L,KEY_L);
+            assert(screen==SCREEN_PAUSE && trace_hash()==before_bad_cache_load);
+            race_data=valid_candidate;
+            save_write(&race_data,sizeof(race_data),SAVE_VERSION);
+        }
+#endif
         race_data.p7.reserved[0]=255;
         save_write(&race_data,sizeof(race_data),SAVE_VERSION);
         game_update(KEY_L,KEY_L); /* structurally corrupt but checksummed save */
@@ -200,6 +232,107 @@ int main(void)
         assert(race_p7_map==&sc64_race_maps[SC64_P7_GLOBAL_ID]);
         assert(live_units()==SC64_P7_MAP_UNITS);
         assert(live_buildings()==SC64_P7_MAP_BUILDINGS);
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+        {
+            static Sc64P7PersistentState saved_p7;
+            static Unit saved_units[MAX_UNITS];
+            static Building saved_buildings[MAX_BUILDINGS];
+            static int saved_players[5],saved_minerals[5],saved_gas[5];
+            static int saved_frame,saved_seed,saved_mineral_total,saved_gas_total;
+            static int saved_supply_used,saved_supply_cap;
+            static u16 saved_weapons[MAX_UNITS];
+            unsigned cached_detection_masks=0;
+            unsigned saved_clock;
+
+            saved_p7=race_p7;
+            memcpy(saved_units,u,sizeof(u));
+            memcpy(saved_buildings,b,sizeof(b));
+            memcpy(saved_players,race_player,sizeof(saved_players));
+            memcpy(saved_minerals,race_minerals,sizeof(saved_minerals));
+            memcpy(saved_gas,race_gas,sizeof(saved_gas));
+            saved_frame=frame; saved_seed=(int)seed;
+            saved_mineral_total=minerals; saved_gas_total=gas;
+            saved_supply_used=supply_used; saved_supply_cap=supply_cap;
+            for(int i=0;i<MAX_UNITS;++i) {
+                saved_weapons[i]=(u16)u[i].weapon;
+                if(u[i].alive && SC64_P7_ARBITER_CACHE_VALID(u[i].weapon) &&
+                   SC64_P7_ARBITER_DETECTED_MASK(u[i].weapon))
+                    ++cached_detection_masks;
+            }
+            saved_clock=(unsigned)race_p7.reserved[1] |
+                        ((unsigned)race_p7.reserved[2]<<8);
+            assert(sc64_p7_arbiter_cache_initialized);
+
+            /* Simulate a process restart while host SRAM remains intact. */
+            game_init();
+            memset(&race_p7,0,sizeof(race_p7));
+            memset(&race_p7_world,0,sizeof(race_p7_world));
+            memset(&race_p7_ops,0,sizeof(race_p7_ops));
+            race_p7_map=0;
+            sc64_p7_arbiter_cache_due=0;
+            sc64_p7_arbiter_cache_initialized=0;
+            memset(&race_data,0,sizeof(race_data));
+            target_lists_valid=0;
+            sc64_target_index_initialized=0;
+            sc64_target_index_active=0;
+            sc64_target_dirty_count=0;
+            sc64_target_dirty_overflowed=0;
+            memset(sc64_target_head,0xff,sizeof(sc64_target_head));
+            memset(sc64_target_next,0xff,sizeof(sc64_target_next));
+            memset(sc64_target_prev,0xff,sizeof(sc64_target_prev));
+            memset(sc64_target_cell,0xff,sizeof(sc64_target_cell));
+            memset(sc64_target_dirty,0,sizeof(sc64_target_dirty));
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
+            memset(sc64_target_owner_columns,0,sizeof(sc64_target_owner_columns));
+            memset(sc64_target_owner_rows,0,sizeof(sc64_target_owner_rows));
+#endif
+            assert(screen==SCREEN_TITLE && !race_p7_map &&
+                   !sc64_p7_arbiter_cache_initialized);
+            game_update(KEY_L,KEY_L); /* ordinary title-menu load path */
+            assert(screen==SCREEN_PLAY && race_p7_active() &&
+                   race_p7_runtime_state_valid());
+            assert(race_p7_map==&sc64_race_maps[SC64_P7_GLOBAL_ID]);
+            assert(sc64_p7_arbiter_cache_initialized &&
+                   !sc64_p7_arbiter_cache_due);
+            assert(!memcmp(&race_p7,&saved_p7,sizeof(race_p7)));
+            assert(saved_clock==((unsigned)race_p7.reserved[1] |
+                                 ((unsigned)race_p7.reserved[2]<<8)));
+            assert(!memcmp(u,saved_units,sizeof(u)));
+            assert(!memcmp(b,saved_buildings,sizeof(b)));
+            assert(!memcmp(race_player,saved_players,sizeof(saved_players)));
+            assert(!memcmp(race_minerals,saved_minerals,sizeof(saved_minerals)));
+            assert(!memcmp(race_gas,saved_gas,sizeof(saved_gas)));
+            for(int i=0;i<MAX_UNITS;++i)
+                assert((u16)u[i].weapon==saved_weapons[i]);
+            assert(frame==saved_frame && seed==(u32)saved_seed &&
+                   minerals==saved_mineral_total && gas==saved_gas_total &&
+                   supply_used==saved_supply_used && supply_cap==saved_supply_cap);
+            assert(cached_detection_masks>0);
+            printf("P7 cold SRAM reload clock=%u phase=%u target_masks=%u\n",
+                   saved_clock,(unsigned)saved_p7.reserved[0],cached_detection_masks);
+
+            /* One ordinary tick follows the saved phase, without a forced
+               launch refresh; if source cadence is due, it is a natural tick. */
+            unsigned old_phase=race_p7.reserved[0];
+            unsigned old_clock=(unsigned)race_p7.reserved[1] |
+                               ((unsigned)race_p7.reserved[2]<<8);
+            unsigned phase=old_phase+4u;
+            game_update(0,0);
+            assert(screen==SCREEN_PLAY && sc64_p7_arbiter_cache_initialized);
+            if(phase<5u) {
+                assert(race_p7.reserved[0]==phase);
+                assert(((unsigned)race_p7.reserved[1] |
+                        ((unsigned)race_p7.reserved[2]<<8))==old_clock);
+                for(int i=0;i<MAX_UNITS;++i)
+                    assert((u16)u[i].weapon==saved_weapons[i]);
+            } else {
+                unsigned expected=old_clock ? old_clock-1u : 300u;
+                assert(race_p7.reserved[0]==phase-5u);
+                assert(((unsigned)race_p7.reserved[1] |
+                        ((unsigned)race_p7.reserved[2]<<8))==expected);
+            }
+        }
+#endif
     }
     for (int i=0;i<600;++i) game_update(0,0);
     /* Exercise the authenticated switch-gated action row and its CreateUnit

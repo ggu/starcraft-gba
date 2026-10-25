@@ -224,6 +224,9 @@ static int race_p7_battery_initialize_source(const Sc64RaceMap *map)
 static int race_p7_battery_live_world_valid(void)
 {
     unsigned seen=0;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    if (!sc64_p7_arbiter_cache_world_valid()) return 0;
+#endif
     for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive &&
         b[i].type==B_P7_SHIELD_BATTERY) {
         if (b[i].raw_type!=172 || !sc64_p7_battery_fields_valid(i)) return 0;

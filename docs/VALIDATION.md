@@ -4592,3 +4592,69 @@ unified and Terran links end IWRAM at `0x03004ee8` and `0x03004e88`, respectivel
 BSS remains `0x0203cfe8` and `0x0203d9ec`. These retain the existing RAM reserves.
 These are host regression and ARM link checks; no new ARM playthrough or
 hardware performance qualification is claimed.
+
+
+### Experimental P7 Arbiter cloak and cached detection
+
+`SC64_P7_ARBITER_CLOAK_CACHE_ENABLED` is a single default-off profile gate. It
+requires the P7 Observer and Battery integrations, authenticated P7 data/runtime
+and actor facts, Protoss campaign actors, and race support. When enabled, save
+generation 39 assigns meaning to the previously reserved P7 phase/stagger bytes
+and to cache bits in the existing `Unit.weapon` word. It adds no Unit field or
+persistent supplement bytes; the generation change intentionally separates
+these cache-bearing saves from earlier experimental formats.
+
+The cache approximates the native source update schedule at four source
+updates per five GBA frames. It performs the first refresh on the first ordinary
+play tick after map setup. A unit newly entering the Arbiter aura or an intrinsic
+cloak is refreshed at the next source update. Detector checks use current
+optical visibility and authenticated source-owner identity; the cache retains
+per-target detection state until the source timer expires. This means cloak
+entry does not synchronously refresh every detector on that exact GBA frame.
+
+`make test-sc64-p7-arbiter-host` is the opt-in host matrix. It builds full,
+prevalidated and count-snapshot runtime variants, compares their traces, and
+includes standalone cache-policy, merged Battery/cache save-load, Observer
+without cache, and Battery without cache fixtures. The cache-off variants keep
+the prior Observer and Battery policies. The cold-SRAM block exercises
+`game_init()`, cleared host process state, and the ordinary title `KEY_L` path;
+it checks exact host-side restoration of P7 state, units and each `Unit.weapon`,
+buildings, player/resources, frame, seed and supply before the next tick. It is
+a host fixture and does not qualify physical SRAM or emulator behavior.
+
+The final optional count-snapshot/prevalidated Arbiter probe links at 4 MiB,
+with IWRAM ending at `0x030047d8` and BSS at `0x0203d878`. Its SHA-256 is
+`9679865837f763a1c7391b5129e1a567507ad30a60c9a1ff014086bdb1fca385`.
+ARM debug types confirm Unit 56, Building 48, RaceSave 16,348 and P7 supplement
+124 bytes. `update_orders` is placed in ROM only for this feature's ARM build.
+No FPS improvement or mission win is claimed; no Arbiter emulator or hardware
+gameplay qualification is included.
+
+The native global refresh iterates a combined visible-unit list. This model
+uses represented live, non-loaded actors in slot order, excluding map-revealer
+actors; buildings and unrepresented hidden/child states do not take stagger
+slots. It computes aura/detection before GBA order movement, while the native
+engine has additional movement and sprite phases. These are scheduling and
+representation approximations, not instruction-exact simulation. Native aura
+also excludes units with the WarpIn order; the current GBA actor model has no
+warp-in state and cannot express that exclusion. Arbiter Recall, Stasis,
+Carrier production/projectiles and a full P7 win remain separate work. Asset-free negative compile checks require the actual game translation
+unit to reject the bare, missing-dependency and old split feature gates.
+
+The cache clock is zero before the first source update. Saving immediately
+after launch preserves that pending update; loading this initial save follows
+the same first-tick path as resuming without a reload. A separate normal-menu
+fixture pauses and saves before any play tick, clears mission/cache process
+state, loads from the title, and compares the first-tick units, buildings,
+mission state, frame and RNG with the uninterrupted path. Running saves keep
+their existing detection state and phase until the saved clock advances.
+
+The final eight-fixture optional matrix passes under ASan/UBSan, including
+full/prevalidated/count output parity and the immediate launch-save case.
+The baseline fails the latter's exact Unit-array comparison; the corrected
+path matches units, buildings, mission state, frame and RNG at clock 149,
+phase 4 on the first tick. Default build/test (407 Python tests plus host
+fixtures), unified build/tests and full ten-mission Terran host regressions
+also pass. After the final P7-only launch-clock correction, rebuilt default,
+unified and Terran ARM ROMs remain byte-identical to published `0530cd0`.
+This establishes host behavior and ARM placement, not P7 completion or speed.

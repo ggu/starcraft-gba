@@ -202,6 +202,13 @@ static int race_p7_runtime_init(const Sc64RaceMap *map)
 {
     memset(&race_p7,0,sizeof(race_p7));
     sc64_p7_runtime_init(&race_p7.runtime);
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    sc64_p7_arbiter_cache_due=0;
+    sc64_p7_arbiter_cache_initialized=0;
+    race_p7.reserved[0]=0;
+    race_p7.reserved[1]=0; /* Pending first source update; persists across save/load. */
+    race_p7.reserved[2]=0;
+#endif
     race_p7_map=map;
     if (!race_p7_active()) return 1;
     if (!race_p7_bind_world(map)) {
@@ -217,6 +224,12 @@ static int race_p7_runtime_init(const Sc64RaceMap *map)
 
 static int race_p7_rebind_loaded_world(const Sc64RaceMap *map)
 {
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    sc64_p7_arbiter_cache_due=0;
+    /* Zero is the saved, not-yet-started clock. Running saves keep their
+       target-owned state until the saved source clock advances normally. */
+    sc64_p7_arbiter_cache_initialized=(race_p7.reserved[1] || race_p7.reserved[2]);
+#endif
     if (!race_p7_active()) return 1;
     if (!race_p7_runtime_state_valid() || !race_p7_bind_world(map)) return 0;
 #ifdef SC64_P7_BATTERY_ENABLED

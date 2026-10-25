@@ -1441,6 +1441,9 @@ static int race_load_game(void) {
             Unit candidate;
             if (!race_save_decode_unit(&race_data,i,(unsigned)(width*16),
                                        (unsigned)(height*16),&candidate)) return 0;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+            if (!sc64_p7_arbiter_cache_unit_valid(&candidate)) return 0;
+#endif
             live+=candidate.alive!=0;
         }
         for (unsigned i=0;i<MAX_BUILDINGS;++i) {

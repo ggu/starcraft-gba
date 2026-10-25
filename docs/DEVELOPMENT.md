@@ -1956,3 +1956,47 @@ unfinished Lair/Hive eligibility, fresh Hatchery rejection, slot reuse and
 packed building roundtrips. The Hive fixture supplies an unfinished Hive
 state; it does not establish a Lair-to-Hive command. See
 [Validation](VALIDATION.md#active-lair-and-hive-resource-depots) for scope.
+
+
+## Experimental P7 Arbiter cloak and cached detection
+
+The default-off `SC64_P7_ARBITER_CLOAK_CACHE_ENABLED` profile joins P7 Observer
+visibility, intrinsic cloak for Observers and the two authenticated Dark
+Templar identities, and same-source-owner Arbiter aura. Its host matrix is
+explicitly opt-in:
+
+```sh
+make test-sc64-p7-arbiter-host
+```
+
+The matrix builds full, prevalidated and count-snapshot versions of the existing
+runtime fixture, then compares their output. It also covers cache policy,
+Battery save/load with the cache enabled, and Observer/Battery compatibility
+with the cache gate disabled. The optional ARM link target is
+`make protoss-p7-arbiter-cache-probe`, which includes the prevalidated and
+count-snapshot runtime options.
+
+The cache follows the source's 24 Hz update cadence against the GBA's 30 Hz
+simulation: four source updates are spread over five GBA frames. The first
+refresh occurs on the first ordinary play tick after map setup. A target newly
+entering an Arbiter aura or intrinsic cloak is refreshed at the next source
+update; it does not force a detector refresh on the exact GBA frame the cloak
+begins. Aura and detection ownership use the authenticated source player
+identity, including raw owner, and current live-owner mapping. The cache stores
+its target mask, countdown, validity, aura and tracked bits in the existing
+`Unit.weapon` word. The source refresh stagger and phase occupy P7's existing
+reserved bytes. The feature selects save generation 39; the default profile
+remains cache-off.
+
+These checks cover engine integration and save behavior. They do not establish
+mission completion, frame rate, or physical hardware behavior. No added Unit
+field is introduced. The opt-in ARM build checks the existing memory limits;
+runtime timing still needs separate qualification.
+
+The cache clock is zero before the first source update. Saving immediately
+after launch preserves that pending update; loading this initial save follows
+the same first-tick path as resuming without a reload. A separate normal-menu
+fixture pauses and saves before any play tick, clears mission/cache process
+state, loads from the title, and compares the first-tick units, buildings,
+mission state, frame and RNG with the uninterrupted path. Running saves keep
+their existing detection state and phase until the saved clock advances.

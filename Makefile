@@ -2176,6 +2176,9 @@ protoss-p7-battery-probe: build/StarCraft-Protoss-P7-Battery-Probe-GBA.gba
 
 # Experimental Homeland menu/performance probes, not a qualified campaign win.
 P7_RUNTIME_FLAGS := $(P7_BATTERY_FLAGS) -DSC64_P7_OBSERVER_ENABLED -DSC64_P7_ARCHON_SPLASH -DSC64_P7_CAMPAIGN_ENTRY
+# Optional Arbiter cloak/cache checks; this remains off in every default profile.
+P7_ARBITER_FLAGS := $(P7_RUNTIME_FLAGS) -DSC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+P7_ARBITER_PROBE_FLAGS := $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT
 build/test-sc64-p7-runtime-reference: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_RUNTIME_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p7-runtime-prevalidated: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -2185,6 +2188,48 @@ test-sc64-p7-prevalidated: build/test-sc64-p7-runtime-reference build/test-sc64-
 	./build/test-sc64-p7-runtime-reference > build/sc64-p7-runtime-reference.txt
 	./build/test-sc64-p7-runtime-prevalidated > build/sc64-p7-runtime-prevalidated.txt
 	cmp build/sc64-p7-runtime-reference.txt build/sc64-p7-runtime-prevalidated.txt
+
+# Explicit opt-in P7 Arbiter host matrix. Existing profiles remain cache-off.
+P7_ARBITER_INPUTS := $(P7_BATTERY_INPUTS)
+P7_ARBITER_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+build/test-sc64-p7-arbiter-reference: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-arbiter-prevalidated: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK $< common/gba.c -o $@
+build/test-sc64-p7-arbiter-count: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-arbiter-cache-policy: tests/sc64_p7_arbiter_cache_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-arbiter-battery: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-observer-no-cache: tests/sc64_p7_observer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-battery-no-cache: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-arbiter-initial-save: tests/sc64_p7_initial_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+.PHONY: test-sc64-p7-arbiter-host
+test-sc64-p7-arbiter-host: build/test-sc64-p7-arbiter-initial-save build/test-sc64-p7-arbiter-reference build/test-sc64-p7-arbiter-prevalidated build/test-sc64-p7-arbiter-count build/test-sc64-p7-arbiter-cache-policy build/test-sc64-p7-arbiter-battery build/test-sc64-p7-observer-no-cache build/test-sc64-p7-battery-no-cache
+	./build/test-sc64-p7-arbiter-reference > build/sc64-p7-arbiter-reference.txt
+	./build/test-sc64-p7-arbiter-prevalidated > build/sc64-p7-arbiter-prevalidated.txt
+	./build/test-sc64-p7-arbiter-count > build/sc64-p7-arbiter-count.txt
+	cmp build/sc64-p7-arbiter-reference.txt build/sc64-p7-arbiter-prevalidated.txt
+	cmp build/sc64-p7-arbiter-reference.txt build/sc64-p7-arbiter-count.txt
+	./build/test-sc64-p7-arbiter-cache-policy
+	./build/test-sc64-p7-arbiter-battery
+	./build/test-sc64-p7-observer-no-cache
+	./build/test-sc64-p7-battery-no-cache
+	./build/test-sc64-p7-arbiter-initial-save
+
+# Optional profile link only; no gameplay or timing qualification is implied.
+build/starcraft-protoss-p7-arbiter-cache-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_ARBITER_PROBE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-arbiter-cache-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Arbiter-Cache-Probe-GBA.gba: build/starcraft-protoss-p7-arbiter-cache-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 CLOAK' SC7A
+.PHONY: protoss-p7-arbiter-cache-probe
+protoss-p7-arbiter-cache-probe: build/StarCraft-Protoss-P7-Arbiter-Cache-Probe-GBA.gba
 build/starcraft-protoss-p7-runtime-reference.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(P7_RUNTIME_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-runtime-reference.map -lgcc -o $@
 	$(SIZE) $@

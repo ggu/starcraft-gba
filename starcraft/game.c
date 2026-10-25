@@ -138,6 +138,18 @@ int memcmp(const void *a, const void *b, size_t n);
 #error "Combined T3/T4 runtime is an experimental unified Terran profile"
 #endif
 
+#if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && \
+    (!defined(SC64_P7_OBSERVER_ENABLED) || !defined(SC64_P7_BATTERY_ENABLED) || \
+     !defined(SC64_RACES) || !defined(SC64_P7_RUNTIME) || \
+     !defined(SC64_P7_ACTORS) || !defined(SC64_P7_DATA_ENABLED) || \
+     !defined(SC64_ZP_CAMPAIGN_ACTORS))
+#error "P7 Arbiter cloak requires Observer, Battery state, and authenticated P7 runtime"
+#endif
+#if defined(SC64_P7_ARBITER_CLOAK_ENABLED) && \
+    !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+#error "Use the unified P7 Arbiter cloak/cache feature gate"
+#endif
+
 #if defined(SC64_RACES)
 #if defined(SC64_ZP_FULL_STORAGE)
 #define MAX_UNITS 240
@@ -178,7 +190,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_Z7_DERIVED_SAVE)
+#if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 39u
+#elif defined(SC64_Z7_DERIVED_SAVE)
 #define SC64_RACE_SAVE_GENERATION 38u
 #elif defined(SC64_P7_BATTERY_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 37u
@@ -1064,6 +1078,15 @@ static int sc64_p7_observer_can_attack_from(int attacker, int target,
                                             int live_owner, int source_owner);
 static int sc64_p7_observer_detector_sees(int target, int source_owner,
                                           int live_owner);
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+static int sc64_p7_observer_target_revealed_to(int target,int source_owner,
+                                                int live_owner);
+static int sc64_p7_observer_target_is_cloaked(int target);
+static int sc64_p7_arbiter_cache_due;
+static int sc64_p7_arbiter_cache_initialized;
+static void sc64_p7_arbiter_cache_frame_tick(void);
+static void sc64_p7_arbiter_cache_process_due(void);
+#endif
 #endif
 #ifdef SC64_Z5_RUNTIME
 static int race_z5_active(void);
@@ -1567,6 +1590,9 @@ spawn_unit(int owner, int type, int x, int y)
     u[i].armor=sc64_race_unit_armor(type);
 #endif
     u[i].weapon = owner == SIDE ? weapons_level : 0;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    if (race_p7_active()) u[i].weapon = (u16)(1u << 13);
+#endif
     u[i].target = -1;
     u[i].path_timer = 0;
     u[i].path_retry = 0;u[i].path_x=x;u[i].path_y=y;
@@ -2788,6 +2814,19 @@ sc64_direct_attack_find_target(int x, int y)
         }
         if (!owners_hostile(SIDE, owner) || !currently_visible(tx, ty) ||
             !sc64_direct_target_state(entity, SIDE, &s)) continue;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+        if (race_p7_active() && sc64_p7_observer_target_is_cloaked(entity)) {
+            int eligible=0;
+            for (int a=0;a<MAX_UNITS;++a) if (u[a].alive && u[a].selected &&
+                u[a].owner==SIDE && !SC64_TRANSPORT_LOADED(&u[a]) &&
+                SC64_CAN_ATTACK_FROM_SOURCE(u[a].type,entity,u[a].owner,
+                                            u[a].raw_owner)) {
+                eligible=1;
+                break;
+            }
+            if (!eligible) continue;
+        }
+#endif
         d = dist2(x, y, tx, ty);
         if (d < radius * radius && d < best_d) {
             best = entity;
@@ -4982,7 +5021,11 @@ nearest_command_target(int x, int y)
     return best < 0 ? -1 : MAX_UNITS + best;
 }
 
+#if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && !defined(GBA_HOST)
+static void __attribute__((noinline,long_call))
+#else
 static void GBA_HOT
+#endif
 update_orders(void)
 {
     int i, target;
@@ -5024,6 +5067,9 @@ update_orders(void)
 target_lists_unavailable:
 #ifdef SC64_RACES
     if (target_lists_valid) sc64_target_index_begin();
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    if (race_p7_active()) sc64_p7_arbiter_cache_process_due();
+#endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     sc64_target_hostility_snapshot();
 #endif
@@ -5992,6 +6038,9 @@ game_update(u16 held, u16 pressed)
 	interact();
 
     frame++;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    if (race_p7_active()) sc64_p7_arbiter_cache_frame_tick();
+#endif
 #ifdef SC64_P6_COMBAT_ENABLED
     (void)race_p6_combat_burrow_release_tick();
 #endif
@@ -6207,8 +6256,13 @@ draw_unit(Unit * q)
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
 	return;
 #ifdef SC64_P7_OBSERVER_ENABLED
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    if (q->owner != SIDE &&
+        !sc64_p7_observer_target_revealed_to((int)(q-u),7,SIDE)) return;
+#else
     if (race_p7_active() && q->owner != SIDE && q->raw_type == 84 &&
         !sc64_p7_observer_detector_sees((int)(q-u),7,SIDE)) return;
+#endif
 #endif
 #ifdef SC64_T6_RUNTIME
     if (race_t6_active() && race_t6_unit_burrowed((int)(q - u))) return;
@@ -6397,8 +6451,13 @@ draw_minimap(void)
 	    (u[i].x < 0 || u[i].y < 0 || u[i].x >= WORLD_W || u[i].y >= WORLD_H ||
 	     !currently_visible(u[i].x, u[i].y))) continue;
 #ifdef SC64_P7_OBSERVER_ENABLED
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+        if (u[i].owner != SIDE &&
+            !sc64_p7_observer_target_revealed_to(i,7,SIDE)) continue;
+#else
         if (race_p7_active() && u[i].owner != SIDE && u[i].raw_type == 84 &&
             !sc64_p7_observer_detector_sees(i,7,SIDE)) continue;
+#endif
 #endif
 #ifdef SC64_T6_RUNTIME
         if (race_t6_unit_burrowed(i)) continue;

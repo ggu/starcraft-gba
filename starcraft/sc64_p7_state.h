@@ -15,8 +15,23 @@ typedef struct {
     u16 moved_location3[4]; /* Source-pixel bounds; set only by MoveLocation. */
     u8 moved_location3_valid;
     u8 created_mask;         /* Trigger 5 CreateUnit action indices 8..10. */
+    /* Generation 39: reserved[0] is phase 0..4; reserved[1..2] is a
+       little-endian detector refresh stagger bounded to 0..300. Zero marks
+       launch before the first source update, including after reloading. */
     u8 reserved[3];
 } Sc64P7PersistentState;
+
+static inline int sc64_p7_arbiter_reserved_valid(const Sc64P7PersistentState *s)
+{
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    unsigned stagger;
+    if (!s || s->reserved[0] > 4u) return 0;
+    stagger = (unsigned)s->reserved[1] | ((unsigned)s->reserved[2] << 8);
+    return stagger <= 300u;
+#else
+    return s && !s->reserved[0] && !s->reserved[1] && !s->reserved[2];
+#endif
+}
 
 _Static_assert(sizeof(Sc64P7PersistentState) <= 148,
                "P7 persistent runtime state bound");
@@ -25,7 +40,12 @@ static inline int sc64_p7_persistent_state_valid(const Sc64P7PersistentState *s)
 {
     if (!s || !sc64_p7_runtime_state_valid(&s->runtime) ||
         s->moved_location3_valid > 1 || (s->created_mask & 0xf8u) ||
-        s->reserved[0] || s->reserved[1] || s->reserved[2]) return 0;
+        #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+        !sc64_p7_arbiter_reserved_valid(s)
+#else
+        s->reserved[0] || s->reserved[1] || s->reserved[2]
+#endif
+        ) return 0;
     if (!s->moved_location3_valid &&
         (s->moved_location3[0] || s->moved_location3[1] ||
          s->moved_location3[2] || s->moved_location3[3])) return 0;
@@ -71,7 +91,12 @@ static inline int sc64_p7_persistent_state_valid_prevalidated(
 {
     if (!s || !sc64_p7_runtime_state_valid_prevalidated(&s->runtime) ||
         s->moved_location3_valid>1 || (s->created_mask&0xf8u) ||
-        s->reserved[0] || s->reserved[1] || s->reserved[2]) return 0;
+        #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+        !sc64_p7_arbiter_reserved_valid(s)
+#else
+        s->reserved[0] || s->reserved[1] || s->reserved[2]
+#endif
+        ) return 0;
     if (!s->moved_location3_valid &&
         (s->moved_location3[0] || s->moved_location3[1] ||
          s->moved_location3[2] || s->moved_location3[3])) return 0;

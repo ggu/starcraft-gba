@@ -21,6 +21,11 @@ int main(void)
     assert(sc64_p7_observer_xy_length(22,22)==29);
     assert(sc64_p7_observer_xy_length(100,25)==100);
     assert(sc64_p7_observer_xy_length(100,26)==102);
+#ifndef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    /* Observer-only generation retains the prior raw-74/75 policy. */
+    assert(!sc64_p7_observer_is_cloaked(74u));
+    assert(!sc64_p7_observer_is_cloaked(75u));
+#endif
     memset(u,0,sizeof(u));
     memset(b,0,sizeof(b));
     memset(visible,0,sizeof(visible));
