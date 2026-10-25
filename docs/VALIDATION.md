@@ -5239,3 +5239,44 @@ same `__iwram_end = 0x03005040`):
   pages (416 + 2 x (units + buildings) bytes, at most 1216 of 2560).
 - The default ROM stays 64 KiB. Imported ROMs gain the 15.6 MB bank and pad
   to 32 MiB.
+
+CPU, measured in mGBA from the emulated timer around the VBlank handler
+(`audio_irq_cycles`, `audio_irq_frames`, `audio_irq_peak`). The unified ROM
+sat on the title screen streaming the menu theme while a debugger forced 0-4
+voices onto long bank samples for 120 VBlanks each. Cycles per video frame
+(280,896 available):
+
+| Active voices | Average | Peak | Share of a frame |
+|---|---:|---:|---:|
+| 0 (music streaming only) | 1,115 | 1,136 | 0.40% |
+| 1 | 1,433 | 1,454 | 0.51% |
+| 2 | 6,193 | 7,843 | 2.2% |
+| 3 | 8,047 | 9,614 | 2.9% |
+| 4 | 9,100 | 11,326 | 3.2% |
+
+Music never costs mixing time because DMA streams it from ROM. At the
+experimental P7 mission's ~1.3M cycles per game tick (about 4.6 video
+frames), four busy voices cost about 42k cycles per tick. A first version
+that added samples one by one cost 18,510 cycles with four voices; reading
+four samples per word and repacking unclipped words halved that.
+
+ARM gameplay differential: `tools/sc64_p7_move_workload.py --neutral-ticks
+2400 --attack-ticks 1200` ran the experimental P7 move probe built with the
+bank and with `SC64_AUDIO=0`, launched through the normal menus, with 2,400
+neutral ticks and then a controller attack-move. `--compare` found every one
+of the 38 checkpoints identical (unit, building, resource, visibility and
+campaign state hashes), with the same 25 inputs and the same end at frame
+4105. Measured fps, silent then audible: neutral 10.935 and 10.892 (-0.4%),
+attack-move 9.054 and 8.957 (-1.1%). The runner now records the audio
+counters: the handler averaged 1,123 cycles per video frame in the neutral
+phase and 1,173 in the attack-move phase (0.40-0.42%), peaking at 6,415.
+
+Limits: these are emulator measurements, not physical-GBA results, and the
+audio itself was not checked by ear in this run. Direct Sound is 8-bit mono at
+10512 Hz, below StarCraft 64's 16-bit stereo 11025 Hz mix. There are four
+voices, with no distance attenuation or panning, and at most two new effects
+per frame. Annoyed responses, transmissions, advisor lines and briefing audio
+are not played. Building completion uses the building's selection sound.
+Shots are inferred from a raised cooldown, so a weapon sounds once per
+cooldown cycle. Victory and defeat stingers come from the N64 result flag and
+have not been confirmed by ear.
