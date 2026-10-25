@@ -2676,7 +2676,9 @@ Probe-only selections, keeping mixed transport/spell contexts unambiguous.
 This is a visual improvement, not native IScript reproduction. The local ROM
 contains construction and Needle Spines images, but their sequence mapping is
 not integrated. The native projectile timing/order and construction script
-signals remain fidelity gaps.
+signals remain fidelity gaps. The later opt-in
+[source construction art preview](#source-construction-art-preview) adds
+primary Terran/Zerg frame sequences; canonical builds retain this authored pass.
 
 The final UI/visual source snapshot passes a clean original-art build, all
 default host regressions and **324 Python tests (six private checks skipped)**,
@@ -4353,3 +4355,64 @@ The final C/header/Make inputs remain hash-stable through the focused suite,
 enabled/disabled ARM links, `./dev build`, `./dev test` (387 Python tests plus
 host fixtures), `make unified` and `make test-unified`; all pass. Original-art
 and unified ROMs retain `4ad80ce0…f9aee` and `6bab5be2…979f9` respectively.
+
+
+### Source construction art preview
+
+The default-off `SC64_CONSTRUCTION_SOURCE_ART` profile imports verified local
+ROM art and compiles a bounded primary-frame timeline for supported Terran and
+Zerg construction stages. The self-contained importer authenticates the ROM
+and five DAT/IScript tables, resolves unit → flingy → sprite → image → GRP,
+and writes only ignored private data. Its manifest records source, palette,
+generator and output hashes. The local import contains 64 image banks, 367
+frames and 64 stage programs (seven Terran/four stages each and twelve
+Zerg/three each); all selected programs compile without rejected stages.
+Protoss image banks are inventoried for future work, but no Protoss runtime
+stages are emitted.
+
+The original compiler accepts only `playfram`, `wait`, `goto`, `imgol`, `imgul`,
+`sigorder` and `end`. It records image layers/signals as metadata; the sampler
+renders only primary frames and never dispatches gameplay signals. Unsupported
+control flow, malformed streams, invalid frame IDs, instantaneous loops and
+work-limit overflows fail closed. Whitelisted frame waits retain their source
+N+1 update duration. Intro/loop selection scans at most 64 steps and uses
+integer arithmetic. Stage progress and a local 24/30 clock determine the frame;
+rendering has no side effects and adds no persistent state or save generation.
+An independent authored per-update interpreter matches all 64 generated
+programs across 2,048 updates each (131,072 primary-frame comparisons). This
+validates the compiler against the separate interpreter; it does not execute
+OpenBW or establish native rendering parity.
+
+Terran visual stage transitions approximate the native HP/order state using
+strict 20/40/60-percent progress thresholds. Zerg uses strict 25/50-percent
+progress thresholds and starts represented building morphs with SpecialState1.
+The engine still completes construction at its existing timer boundary. Native
+post-timer animation signals, shadows, SCV working animation, damage-dependent
+Terran stage history, independent animation during stalled construction and
+Protoss Warp Anchor/materialization phases remain outside this experiment.
+Unsupported structures, negative waiting progress and Protoss use the existing
+authored fallback. This is source art with adapted stage timing, not full
+IScript or native construction-order parity.
+
+The synthetic parser/importer tests cover schema alignment, frame geometry,
+private header lookup and program emission, malformed/truncated inputs, loops
+and stage selection. The sanitizer sampler fixture checks all progress values
+for durations 1–120 plus INT_MAX boundaries, frame/wait bounds, intro/loop
+wrapping and hold-last behavior. The actual-engine sanitizer fixture checks
+primary sprite pixels across seven Terran and ten Zerg building types, morph
+motion, frozen progress, worker waiting, completion, unsupported fallback and
+same-process SRAM save/load frame continuity. It uses synthetic construction
+states, not controller-built mission wins.
+
+`make construction-visuals` produces a verified 4-MiB preview ROM, SHA-256
+`ca7ad4743c6c9f95d80875c57f8308fb52b29a74db6b3656441a063d5ed2c5d0`.
+The ARM link passes the unchanged reserve assertions: IWRAM ends at
+`0x03004e88` (24 code bytes above canonical unified) and BSS remains
+`0x0203cfe8`. No frame-rate, fresh-process ARM SRAM or GBA hardware qualification
+is claimed. Canonical source-only/unified binaries retain hashes
+`4ad80ce0…f9aee` and `6bab5be2…979f9`; qualified campaign progress remains 22/30.
+
+The final snapshot passes `./dev build`, `./dev test` (404 Python tests plus
+host fixtures), `make unified`, `make test-unified`, the focused source-art
+renderer/save checks and the source-only Git-index audit. Imported game art,
+the preview cartridge and visual captures remain private.

@@ -2299,6 +2299,36 @@ test-sc64-construction-vfx: build/test-sc64-construction-vfx
 	./build/test-sc64-construction-vfx
 test-starcraft: test-sc64-construction-vfx
 
+build/test-sc64-construction-animation: tests/sc64_construction_animation.c starcraft/sc64_construction_animation.h starcraft/sc64_construction_source.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-construction-animation
+test-sc64-construction-animation: build/test-sc64-construction-animation
+	./build/test-sc64-construction-animation
+test-starcraft: test-sc64-construction-animation
+
+# Optional source-art preview. It reuses already-prepared private race inputs;
+# the default profile never extracts or links game art.
+CONSTRUCTION_ART_DIR := .local/sc64/construction/generated
+CONSTRUCTION_ART_HEADER := $(CONSTRUCTION_ART_DIR)/sc64_construction_sprites_generated.h
+CONSTRUCTION_ART_FLAGS := $(UNIFIED_FLAGS) -DSC64_CONSTRUCTION_SOURCE_ART -I$(CONSTRUCTION_ART_DIR)
+$(CONSTRUCTION_ART_HEADER): tools/sc64_construction_sprites.py tools/sc64_construction_programs.py tools/sc64_sprites.py
+	$(PYTHON) tools/sc64_construction_sprites.py
+build/test-sc64-construction-source: tests/sc64_construction_source_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(CONSTRUCTION_ART_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(CONSTRUCTION_ART_FLAGS) $< common/gba.c -o $@
+build/starcraft-construction.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(CONSTRUCTION_ART_HEADER) common/gba.h common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(CONSTRUCTION_ART_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-construction.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Construction-Preview-GBA.gba: build/starcraft-construction.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC BUILD ART' SCCA
+.PHONY: sc64-construction-art test-sc64-construction-source construction-visuals
+sc64-construction-art:
+	$(PYTHON) tools/sc64_construction_sprites.py
+test-sc64-construction-source: build/test-sc64-construction-source
+	./build/test-sc64-construction-source
+construction-visuals: build/StarCraft-Construction-Preview-GBA.gba
+	$(PYTHON) -c 'from tools.verify_roms import verify; print(verify("StarCraft-Construction-Preview-GBA", "starcraft-construction", "SCCA", "SC BUILD ART"))'
+
 build/test-sc64-construction-hp: tests/sc64_construction_hp.c starcraft/sc64_construction_hp.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 build/test-sc64-construction-hp-game: tests/sc64_construction_hp_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build

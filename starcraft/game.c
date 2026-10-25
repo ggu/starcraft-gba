@@ -15,6 +15,10 @@
 #include "sc64_weapon_vfx.h"
 #include "sc64_construction_vfx.h"
 #endif
+#if defined(SC64_CONSTRUCTION_SOURCE_ART) && \
+    (!defined(SC64_RACES) || !defined(SC64_HAS_SPRITES))
+#error "Source construction art requires the imported race sprite profile"
+#endif
 #if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED)
 #define SC64_TRANSPORT_RUNTIME
 #endif
@@ -331,6 +335,10 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #include "sc64_sprites_generated.h"
 #ifdef SC64_RACES
 #include "sc64_race_sprites_generated.h"
+#ifdef SC64_CONSTRUCTION_SOURCE_ART
+#include "sc64_construction_source.h"
+#include "sc64_construction_sprites_generated.h"
+#endif
 #endif
 #endif
 #if defined(SC64_Z5_RUNTIME) && defined(SC64_HAS_SPRITES)
@@ -6572,6 +6580,28 @@ draw_building_overlay(Building *q)
         int duration=building_build_time(q->type);
         int progress=q->build_progress;
         int race=sc64_race_building_rules[q->type].race;
+#ifdef SC64_CONSTRUCTION_SOURCE_ART
+        int source_drawn = 0;
+        unsigned source_stage, source_frame;
+        uint32_t source_elapsed;
+        if (sc64_construction_source_phase(race+1,progress,duration,
+                                           &source_stage,&source_elapsed)) {
+            int raw = q->raw_type >= 0 ? q->raw_type :
+                      sc64_race_raw_building(q->type);
+            const SC64ConstructionSourceStage *stage =
+                sc64_construction_stage(raw,source_stage);
+            if (stage && sc64_construction_animation_frame(stage->animation,
+                                        source_elapsed,&source_frame)) {
+                const Sc64SpriteFrame *construction =
+                    sc64_construction_image_frame(stage->image_id,source_frame);
+                if (construction) {
+                    draw_mission_sprite(construction,x,y);
+                    source_drawn = 1;
+                }
+            }
+        }
+        if (!source_drawn) {
+#endif
 #ifdef SC64_HAS_SPRITES
         /* A bottom-up reveal uses the existing completed source art. The
            scaffold/morph/warp motion is an authored visual approximation. */
@@ -6586,6 +6616,9 @@ draw_building_overlay(Building *q)
 #endif
         sc64_construction_vfx_draw(race+1,x,y,sprite_w,sprite_h,
                                    progress,duration,(u32)frame);
+#ifdef SC64_CONSTRUCTION_SOURCE_ART
+        }
+#endif
         if (duration>0 && progress>=0)
             gfx_bar(x-12,sprite_y+sprite_h+3,24,2,progress,duration,C_CYAN,C_PANEL);
     }
