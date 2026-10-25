@@ -21,9 +21,10 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
 {
     if (!candidate || !out || slot >= MAX_UNITS) return 0;
 #ifdef SC64_ZP_FULL_STORAGE
-#ifdef SC64_Z7_DERIVED_SAVE
-    return sc64_derived_unit_decode(out, &candidate->units[slot],
-                                    world_width, world_height);
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    return sc64_p7_typed_unit_decode(out, &candidate->units[slot], world_width, world_height);
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    return sc64_derived_unit_decode(out, &candidate->units[slot], world_width, world_height);
 #else
     return sc64_zp_unit_save_decode(out, &candidate->units[slot],
                                     world_width, world_height);
@@ -41,7 +42,9 @@ race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *ou
     if (!candidate || !out || slot >= MAX_BUILDINGS) return 0;
 #ifdef SC64_ZP_FULL_STORAGE
     Building decoded;
-#ifdef SC64_Z7_DERIVED_SAVE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    if (!sc64_p7_typed_building_decode(&decoded, &candidate->buildings[slot], 2048, 2048)) return 0;
+#elif defined(SC64_Z7_DERIVED_SAVE)
     if (!sc64_derived_building_decode(&decoded, &candidate->buildings[slot])) return 0;
 #else
     if (!sc64_building_save_decode(&decoded, &candidate->buildings[slot])) return 0;
@@ -471,7 +474,9 @@ static int race_save_game(void) {
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifdef SC64_ZP_FULL_STORAGE
     for(int i=0;i<MAX_UNITS;i++)
-#ifdef SC64_Z7_DERIVED_SAVE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+        if(!sc64_p7_typed_unit_encode(&race_data.units[i], &u[i], (unsigned)(race_cols * 16), (unsigned)(race_rows * 16))) return 0;
+#elif defined(SC64_Z7_DERIVED_SAVE)
         if(!sc64_derived_unit_encode(&race_data.units[i], &u[i],
                                      (unsigned)(race_cols * 16),
                                      (unsigned)(race_rows * 16))) return 0;
@@ -492,7 +497,10 @@ static int race_save_game(void) {
     }
 #endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
-#ifdef SC64_Z7_DERIVED_SAVE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    for(int i=0;i<MAX_BUILDINGS;i++)
+        if(!sc64_p7_typed_building_encode(&race_data.buildings[i], &b[i], (unsigned)(race_cols * 16), (unsigned)(race_rows * 16))) return 0;
+#elif defined(SC64_Z7_DERIVED_SAVE)
     for(int i=0;i<MAX_BUILDINGS;i++)
         if(!sc64_derived_building_encode(&race_data.buildings[i], &b[i],
                                         (unsigned)(race_cols * 16),
@@ -1740,7 +1748,9 @@ static int race_load_game(void) {
     for(int i=0;i<MAX_UNITS;i++) {
         Unit decoded;
 #ifdef SC64_ZP_FULL_STORAGE
-#ifdef SC64_Z7_DERIVED_SAVE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+        if(!race_save_decode_unit(&race_data, (unsigned)i, (unsigned)(race_cols * 16), (unsigned)(race_rows * 16), &decoded)) return 0;
+#elif defined(SC64_Z7_DERIVED_SAVE)
         if(!race_save_decode_unit(&race_data, (unsigned)i,
                                   (unsigned)(race_cols * 16),
                                   (unsigned)(race_rows * 16), &decoded)) return 0;
@@ -1764,7 +1774,9 @@ static int race_load_game(void) {
 #endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
     for(int i=0;i<MAX_BUILDINGS;i++) {
-#ifdef SC64_Z7_DERIVED_SAVE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+        if(!race_save_decode_building(&race_data, (unsigned)i, &b[i])) return 0;
+#elif defined(SC64_Z7_DERIVED_SAVE)
         if(!race_save_decode_building(&race_data, (unsigned)i, &b[i])) return 0;
 #else
         if(!sc64_building_save_decode(&b[i], &race_data.buildings[i])) return 0;

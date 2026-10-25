@@ -6,6 +6,12 @@
 #define RACE_UNIT_WORDS (sizeof(Unit)/sizeof(int))
 #define RACE_BUILD_WORDS (sizeof(Building)/sizeof(int))
 
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+#if !defined(SC64_P7_BATTERY_ENABLED) || !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) || !defined(SC64_P7_RUNTIME) || !defined(SC64_UNIFIED) || !defined(SC64_ZP_FULL_STORAGE) || !defined(SC64_ZP_CAMPAIGN_STORAGE) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 2
+#error "P7 typed compact save requires unified P7 battery and Arbiter cache profile"
+#endif
+#endif
+
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifndef SC64_Z7_DERIVED_SAVE
 #include "sc64_compact_building_save.h"
@@ -26,6 +32,12 @@ _Static_assert(SC_RU_COUNT <= 64, "late Terran unit codec uses six-bit types");
 #endif
 #ifdef SC64_ZP_FULL_STORAGE
 #include "sc64_compact_mineral_save.h"
+#endif
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+_Static_assert(SC_RU_COUNT <= 64, "P7 typed unit type field uses six bits");
+_Static_assert(SC_RB_COUNT <= 64, "P7 typed building type field uses six bits");
+#include "sc64_p7_typed_unit_save.h"
+#include "sc64_p7_typed_building_save.h"
 #endif
 #ifdef SC64_T6_RUNTIME
 #include "sc64_t6_mission_state.h"
@@ -83,10 +95,14 @@ typedef struct {
     u32 version;
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    Sc64P7TypedUnitSave units[MAX_UNITS];
+#else
 #ifdef SC64_Z7_DERIVED_SAVE
     Sc64DerivedUnitSave units[MAX_UNITS];
 #else
     Sc64ZpPackedUnitSave units[MAX_UNITS];
+#endif
 #endif
 #else
     Sc64PackedUnitSave units[MAX_UNITS];
@@ -95,10 +111,14 @@ typedef struct {
     s16 units[MAX_UNITS][RACE_UNIT_WORDS];
 #endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    Sc64P7TypedBuildingSave buildings[MAX_BUILDINGS];
+#else
 #ifdef SC64_Z7_DERIVED_SAVE
     Sc64DerivedBuildingSave buildings[MAX_BUILDINGS];
 #else
     Sc64PackedBuildingSave buildings[MAX_BUILDINGS];
+#endif
 #endif
 #else
     s16 buildings[MAX_BUILDINGS][RACE_BUILD_WORDS];

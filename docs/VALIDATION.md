@@ -4658,3 +4658,47 @@ fixtures), unified build/tests and full ten-mission Terran host regressions
 also pass. After the final P7-only launch-clock correction, rebuilt default,
 unified and Terran ARM ROMs remain byte-identical to published `0530cd0`.
 This establishes host behavior and ARM placement, not P7 completion or speed.
+
+### Experimental P7 typed save rows
+
+The default-off generation-40 typed codec stores Unit/Building rows in 28/25
+bytes and preserves the full Unit weapon/cache word and existing P7 supplement.
+Type-derived max HP and unit armor must match their constructors. Separate
+occupied markers distinguish zero slots from occupied dead actors. Load
+candidate validation decodes rows before mutating the live world. Invalid
+padding, out-of-domain fields and malformed cache state reject transactionally.
+
+The asset-free synthetic-fact fixture covers 12,000 randomized row pairs, all
+64 type codes, field boundaries, zero/dead rows, markers/padding, rejection
+atomicity and comparisons with established row codecs. These synthetic facts
+validate packing only. Actual constructor facts and P1–P7/18-skirmish save/load
+checks require the private-input engine fixture. Full/prevalidated/count cache
+fixtures, Battery recharge, cache policy and the immediate-launch save fixture
+also have typed variants. These establish represented engine/save behavior;
+they do not establish native gameplay parity or physical SRAM behavior.
+
+The optional ARM probe links at 4 MiB with IWRAM end `0x030047d8` and BSS end
+`0x0203d878`. Its SHA-256 is
+`3213c90da953b0a83742f79a1acba0709d3c99e3c13420e3704d62277061ad05`.
+ARM debug types confirm Unit 56, Building 48 and RaceSave 14,188 bytes. The
+payload is 2,160 bytes smaller than generation 39; runtime actor storage is
+unchanged. A same-source gate-off ARM build reproduces the published
+generation-39 Arbiter ROM byte for byte.
+
+The actual-engine fixture and six-variant typed matrix pass under ASan/UBSan,
+including full/prevalidated/count trace parity, active cached detection and
+recharge saves, and immediate-launch save continuation. Default build/tests
+(410 Python tests plus host fixtures), unified build/tests, and the full
+ten-mission Terran build/regression also pass. Default, unified and Terran
+ROMs remain byte-identical to published `ad0dde0`. After that complete run,
+the asset-free packing fixture was extended to compare every randomized pair
+with the legacy codecs and cover signed dead-HP boundaries; its dedicated
+sanitizer target passes again. No runtime source changed during validation.
+
+The payload bound preserves the existing two-slot journal: each 16 KiB slot
+reserves 16 bytes for its header in the 32 KiB save area. The 2,180-byte gap
+to that bound is not a proven projectile budget.
+Lossless subpixel motion, stable owner/target references, source-update phases,
+child-actor state and the native 100-bullet capacity remain required design
+constraints. No projectile pool, additional mission win, fps result or hardware
+qualification is claimed by the codec work.

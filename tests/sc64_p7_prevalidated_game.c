@@ -196,16 +196,26 @@ int main(void)
             static RaceSave valid_candidate;
             int slot=-1;
             Unit decoded;
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+            Sc64P7TypedUnitSave malformed_row;
+#else
             Sc64ZpPackedUnitSave malformed_row;
+#endif
             valid_candidate=race_data;
             for(int i=0;i<MAX_UNITS;++i) if(u[i].alive) { slot=i; break; }
             assert(slot>=0);
-            assert(sc64_zp_unit_save_decode(&decoded,&race_data.units[slot],
-                                             128u*16u,128u*16u));
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+            assert(sc64_p7_typed_unit_decode(&decoded,&race_data.units[slot], 128u*16u,128u*16u));
+#else
+            assert(sc64_zp_unit_save_decode(&decoded,&race_data.units[slot], 128u*16u,128u*16u));
+#endif
             decoded.weapon=(int)((unsigned)decoded.weapon&~(31u<<8))|(31u<<8);
             assert(!sc64_p7_arbiter_cache_unit_valid(&decoded));
-            assert(sc64_zp_unit_save_encode(&malformed_row,&decoded,
-                                             128u*16u,128u*16u));
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+            assert(sc64_p7_typed_unit_encode(&malformed_row,&decoded, 128u*16u,128u*16u));
+#else
+            assert(sc64_zp_unit_save_encode(&malformed_row,&decoded, 128u*16u,128u*16u));
+#endif
             race_data.units[slot]=malformed_row;
             save_write(&race_data,sizeof(race_data),SAVE_VERSION);
             const unsigned before_bad_cache_load=trace_hash();

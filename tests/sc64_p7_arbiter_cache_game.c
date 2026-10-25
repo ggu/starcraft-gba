@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Actual-engine fixture for generation-39 Arbiter cache behavior. */
+ * Actual-engine fixture for Arbiter cache behavior under generations 39/40. */
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -29,6 +29,11 @@ static int region_has_pixels(int x0,int y0,int x1,int y1)
 
 int main(void)
 {
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    assert(SC64_RACE_SAVE_GENERATION==40u);
+#else
+    assert(SC64_RACE_SAVE_GENERATION==39u);
+#endif
     memset(u,0,sizeof(u));
     memset(b,0,sizeof(b));
     memset(&race_p7,0,sizeof(race_p7));
@@ -213,6 +218,10 @@ int main(void)
     sc64_p7_arbiter_cache_source_tick();
     assert(!sc64_p7_observer_can_attack_from(U_MARINE,entry_target,SIDE,7));
 
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    puts("P7 generation-40 cache geometry/cadence/reuse checks passed");
+#else
     puts("P7 generation-39 cache geometry/cadence/reuse checks passed");
+#endif
     return 0;
 }

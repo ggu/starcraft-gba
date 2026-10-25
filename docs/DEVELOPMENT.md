@@ -2000,3 +2000,29 @@ fixture pauses and saves before any play tick, clears mission/cache process
 state, loads from the title, and compares the first-tick units, buildings,
 mission state, frame and RNG with the uninterrupted path. Running saves keep
 their existing detection state and phase until the saved clock advances.
+
+## Experimental P7 typed save rows
+
+`SC64_P7_TYPED_COMPACT_ENABLED` is an opt-in generation-40 codec for the
+complete P7 Arbiter/cache profile. It uses 28-byte Unit and 25-byte Building
+rows, reconstructing checked canonical max HP and unit armor from the current
+type catalog. It preserves every bit of the 16-bit Unit weapon/cache word,
+source identities, and the P7 clock/phase supplement. Invalid noncanonical
+fields reject instead of being truncated. Generation-39 saves are a separate
+format; no migration is provided by this experiment. Standard profiles keep
+their existing codecs and save generations.
+
+Asset-free packing and malformed-profile checks run in `./dev test`. With
+private P7 data prepared, use:
+
+```sh
+make test-sc64-p7-typed-compact test-sc64-p7-typed-compact-matrix
+make protoss-p7-typed-probe
+```
+
+The first target checks actual type facts and campaign/skirmish save roundtrips;
+the matrix checks full/prevalidated/count parity, active cache/recharge saves
+and initial-launch save timing. The ARM probe includes prevalidation and the
+count snapshot. Its format frees save space for future projectile state; it
+does not implement Carrier Interceptors or prove that a complete projectile
+and child-actor pool will fit. See [Validation](VALIDATION.md#experimental-p7-typed-save-rows).

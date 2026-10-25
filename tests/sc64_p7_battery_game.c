@@ -19,9 +19,35 @@ static Unit battery_candidate_unit(RaceSave *candidate,int slot)
 static void battery_candidate_store_unit(RaceSave *candidate,int slot,
                                          const Unit *actor)
 {
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    assert(sc64_p7_typed_unit_encode(&candidate->units[slot],actor,
+                                     race_cols*16,race_rows*16));
+#else
     assert(sc64_zp_unit_save_encode(&candidate->units[slot],actor,
                                     race_cols*16,race_rows*16));
+#endif
 }
+
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+static void battery_candidate_store_overmax_shield(RaceSave *candidate,int slot,
+                                                    const Unit *actor)
+{
+    Unit valid=*actor;
+    Sc64P7TypedUnitSave row;
+    int maxhp,armor,maxshield;
+    assert(sc64_p7_typed_unit_canonical(valid.type,&maxhp,&armor,&maxshield));
+    valid.maxhp=maxhp; valid.armor=(u8)armor; valid.shield=maxshield;
+    assert(sc64_p7_typed_unit_encode(&row,&valid,race_cols*16,race_rows*16));
+    /* Unit layout places the 9-bit shield field at bit 177. Craft an
+       over-maximum value that the ordinary encoder correctly refuses. */
+    const unsigned bit=177u;
+    unsigned byte=bit>>3,shift=bit&7u;
+    u16 word=(u16)row.bytes[byte] | ((u16)row.bytes[byte+1]<<8);
+    word=(u16)((word&~(0x1ffu<<shift))|((unsigned)(maxshield+1)<<shift));
+    row.bytes[byte]=(u8)word; row.bytes[byte+1]=(u8)(word>>8);
+    candidate->units[slot]=row;
+}
+#endif
 
 static Building battery_candidate_building(RaceSave *candidate,int slot)
 {
@@ -33,8 +59,11 @@ static Building battery_candidate_building(RaceSave *candidate,int slot)
 static void battery_candidate_store_building(RaceSave *candidate,int slot,
                                              const Building *building)
 {
-    assert(sc64_building_save_encode(&candidate->buildings[slot],building,
-                                     race_cols*16,race_rows*16));
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    assert(sc64_p7_typed_building_encode(&candidate->buildings[slot],building, race_cols*16,race_rows*16));
+#else
+    assert(sc64_building_save_encode(&candidate->buildings[slot],building, race_cols*16,race_rows*16));
+#endif
 }
 
 static void test_p7_union_tail_guard(void)
@@ -93,6 +122,9 @@ static void test_battery_candidate_guards(int unit_slot,int battery_slot)
 
     actor=battery_candidate_unit(&battery_candidate,unit_slot);
     actor.type=U_DRONE;
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    { int armor,maxshield; assert(sc64_p7_typed_unit_canonical(actor.type,&actor.maxhp,&armor,&maxshield)); actor.armor=(u8)armor; actor.shield=0; actor.shield_remainder=0; }
+#endif
     battery_candidate_store_unit(&battery_candidate,unit_slot,&actor);
     assert(!race_p5_transport_save_candidate_valid(&battery_candidate,
                                                     race_cols,race_rows));
@@ -100,13 +132,21 @@ static void test_battery_candidate_guards(int unit_slot,int battery_slot)
     actor=battery_candidate_unit(&battery_candidate,unit_slot);
     actor.shield=rule->shields;
     actor.shield_remainder=0;
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    { int maxhp,armor,maxshield; assert(sc64_p7_typed_unit_canonical(actor.type,&maxhp,&armor,&maxshield)); actor.shield=maxshield; }
+#endif
     battery_candidate_store_unit(&battery_candidate,unit_slot,&actor);
     /* Reaching full shields between the Recharge actor's service slot and a
        pause is a valid snapshot; its next order tick completes the order. */
     assert(race_p5_transport_save_candidate_valid(&battery_candidate,
                                                    race_cols,race_rows));
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    actor.shield=rule->shields+1;
+    battery_candidate_store_overmax_shield(&battery_candidate,unit_slot,&actor);
+#else
     actor.shield=rule->shields+1;
     battery_candidate_store_unit(&battery_candidate,unit_slot,&actor);
+#endif
     assert(!race_p5_transport_save_candidate_valid(&battery_candidate,
                                                     race_cols,race_rows));
     actor.shield=rule->shields;
@@ -142,6 +182,9 @@ static void test_battery_candidate_guards(int unit_slot,int battery_slot)
 
     Building target=battery_candidate_building(&battery_candidate,battery_slot);
     target.type=B_GATEWAY;
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    target.maxhp=sc64_p7_typed_building_maxhp(target.type);
+#endif
     battery_candidate_store_building(&battery_candidate,battery_slot,&target);
     assert(!race_p5_transport_save_candidate_valid(&battery_candidate,
                                                     race_cols,race_rows));
@@ -236,7 +279,9 @@ static int legal_battery_site(int from_x,int from_y,int *out_x,int *out_y)
 
 int main(void)
 {
-#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    assert(SC64_RACE_SAVE_GENERATION==40u);
+#elif defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
     assert(SC64_RACE_SAVE_GENERATION==39u);
 #endif
     static const char *menu_labels[MENU_COUNT]={0};
@@ -486,12 +531,22 @@ int main(void)
     u[zealot].order=ORDER_P7_RECHARGE; u[zealot].target=human_battery;
     u[zealot].work_timer=0;
     for (int i=0;i<MAX_UNITS;++i) {
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+        Sc64P7TypedUnitSave row;
+        assert(sc64_p7_typed_unit_encode(&row,&u[i],race_cols*16,race_rows*16));
+#else
         Sc64ZpPackedUnitSave row;
         assert(sc64_zp_unit_save_encode(&row,&u[i],race_cols*16,race_rows*16));
+#endif
     }
     for (int i=0;i<MAX_BUILDINGS;++i) {
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+        Sc64P7TypedBuildingSave row;
+        assert(sc64_p7_typed_building_encode(&row,&b[i],race_cols*16,race_rows*16));
+#else
         Sc64PackedBuildingSave row;
         assert(sc64_building_save_encode(&row,&b[i],race_cols*16,race_rows*16));
+#endif
     }
     int valid_battery_energy=b[human_battery].queue_progress;
     int valid_shield=u[zealot].shield;

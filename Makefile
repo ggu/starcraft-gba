@@ -2552,3 +2552,50 @@ test-sc64-skirmish-matches: $(addprefix build/test-sc64-skirmish-match-,terran z
 	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller build/test-sc64-skirmish-match-terran --output .local/sc64/skirmish/terran-matches
 	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller build/test-sc64-skirmish-match-zerg --output .local/sc64/skirmish/zerg-matches
 	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller build/test-sc64-skirmish-match-protoss --output .local/sc64/skirmish/protoss-matches
+
+# Optional generation-40 P7 typed save codec fixture.
+P7_TYPED_COMPACT_FLAGS := $(P7_ARBITER_FLAGS) -DSC64_P7_TYPED_COMPACT_ENABLED
+build/test-sc64-p7-typed-compact: tests/sc64_p7_typed_compact_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_TYPED_COMPACT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-typed-compact
+test-sc64-p7-typed-compact: build/test-sc64-p7-typed-compact
+	./build/test-sc64-p7-typed-compact
+build/test-sc64-p7-typed-runtime-reference: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-typed-runtime-prevalidated: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK $< common/gba.c -o $@
+build/test-sc64-p7-typed-runtime-count: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-typed-battery: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-typed-cache-policy: tests/sc64_p7_arbiter_cache_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-typed-initial-save: tests/sc64_p7_initial_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+.PHONY: test-sc64-p7-typed-compact-matrix
+test-sc64-p7-typed-compact-matrix: build/test-sc64-p7-typed-runtime-reference build/test-sc64-p7-typed-runtime-prevalidated build/test-sc64-p7-typed-runtime-count build/test-sc64-p7-typed-battery build/test-sc64-p7-typed-cache-policy build/test-sc64-p7-typed-initial-save
+	./build/test-sc64-p7-typed-runtime-reference > build/sc64-p7-typed-reference.txt
+	./build/test-sc64-p7-typed-runtime-prevalidated > build/sc64-p7-typed-prevalidated.txt
+	./build/test-sc64-p7-typed-runtime-count > build/sc64-p7-typed-count.txt
+	cmp build/sc64-p7-typed-reference.txt build/sc64-p7-typed-prevalidated.txt
+	cmp build/sc64-p7-typed-reference.txt build/sc64-p7-typed-count.txt
+	./build/test-sc64-p7-typed-battery
+	./build/test-sc64-p7-typed-cache-policy
+	./build/test-sc64-p7-typed-initial-save
+
+# Asset-free packing coverage is part of the standard host suite.
+build/test-sc64-p7-typed-codec: tests/sc64_p7_typed_codec.c starcraft/sc64_p7_typed_unit_save.h starcraft/sc64_p7_typed_building_save.h starcraft/sc64_zp_unit_save.h starcraft/sc64_compact_building_save.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-p7-typed-codec
+test-sc64-p7-typed-codec: build/test-sc64-p7-typed-codec
+	./build/test-sc64-p7-typed-codec
+test-starcraft: test-sc64-p7-typed-codec
+
+build/starcraft-protoss-p7-typed-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-typed-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Typed-Probe-GBA.gba: build/starcraft-protoss-p7-typed-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 TYPED' SC7T
+.PHONY: protoss-p7-typed-probe
+protoss-p7-typed-probe: build/StarCraft-Protoss-P7-Typed-Probe-GBA.gba

@@ -138,6 +138,15 @@ int memcmp(const void *a, const void *b, size_t n);
 #error "Combined T3/T4 runtime is an experimental unified Terran profile"
 #endif
 
+#if defined(SC64_P7_TYPED_COMPACT_ENABLED) && \
+    (!defined(SC64_P7_BATTERY_ENABLED) || \
+     !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) || \
+     !defined(SC64_P7_RUNTIME) || !defined(SC64_UNIFIED) || \
+     !defined(SC64_ZP_FULL_STORAGE) || !defined(SC64_ZP_CAMPAIGN_STORAGE) || \
+     !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 2)
+#error "P7 typed compact save requires unified P7 battery and Arbiter cache profile"
+#endif
+
 #if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && \
     (!defined(SC64_P7_OBSERVER_ENABLED) || !defined(SC64_P7_BATTERY_ENABLED) || \
      !defined(SC64_RACES) || !defined(SC64_P7_RUNTIME) || \
@@ -190,7 +199,9 @@ int memcmp(const void *a, const void *b, size_t n);
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+#if defined(SC64_P7_TYPED_COMPACT_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 40u
+#elif defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 39u
 #elif defined(SC64_Z7_DERIVED_SAVE)
 #define SC64_RACE_SAVE_GENERATION 38u
