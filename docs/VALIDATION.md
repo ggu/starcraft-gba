@@ -4396,6 +4396,13 @@ and unified ROMs retain `4ad80ce0…f9aee` and `6bab5be2…979f9` respectively.
 
 ### Source construction art preview
 
+Historical preview evidence follows. The subsequent
+[stock profile and art follow-up](audits/2026-10-26-stock-profiles-and-art/README.md)
+enables layered source construction art in canonical prepared race builds,
+adds Protoss WarpIn and expands coverage to all 50 constructible buildings,
+including the Greater Spire morph. The preview counts and ROM hashes below refer
+to the earlier implementation, not the current builds.
+
 The default-off `SC64_CONSTRUCTION_SOURCE_ART` profile imports verified local
 ROM art and compiles a bounded primary-frame timeline for supported Terran and
 Zerg construction stages. The self-contained importer authenticates the ROM

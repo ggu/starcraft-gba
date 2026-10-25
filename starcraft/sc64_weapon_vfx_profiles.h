@@ -18,7 +18,14 @@ sc64_weapon_vfx_unit_profile(int type, int target_air)
     case U_SCV: color=C_SILVER; style=target_air ? SC64_WEAPON_VFX_STYLE_NONE : SC64_WEAPON_VFX_STYLE_SLASH; break;
     case U_RAYNOR: color=C_ORANGE; style=SC64_WEAPON_VFX_STYLE_MUZZLE; break;
 #else
-    case U_RAYNOR: return 0;
+    case U_RAYNOR:
+        color=C_ORANGE;
+#ifdef SC64_T4_RUNTIME
+        style=target_air ? SC64_WEAPON_VFX_STYLE_NONE : SC64_WEAPON_VFX_STYLE_SHELL;
+#else
+        style=SC64_WEAPON_VFX_STYLE_MUZZLE;
+#endif
+        break;
     case U_SCV: case U_DRONE: case U_PROBE:
         color=C_SILVER; style=target_air ? SC64_WEAPON_VFX_STYLE_NONE : SC64_WEAPON_VFX_STYLE_SLASH; break;
 #endif

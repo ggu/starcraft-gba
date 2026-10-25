@@ -273,6 +273,8 @@ def prepare(rom: Path, profile: str) -> None:
                  "--header", str(stage / "sc64_race_sprites_generated.h")])
         run([sys.executable, str(ROOT / "tools/sc64_t4_scenario_pack.py")])
         run([sys.executable, str(ROOT / "tools/sc64_race_sprites.py")])
+        run([sys.executable, str(ROOT / "tools/sc64_construction_sprites.py"),
+             "--rom", str(private_rom)])
         run([sys.executable, str(ROOT / "tools/sc64_menu_assets.py")])
         if profile in ("terran", "zerg", "protoss", "zerg-z6", "protoss-p5-shuttle"):
             run([sys.executable, str(ROOT / "tools/sc64_skirmish_pack.py")])
@@ -320,6 +322,8 @@ def status(profile: str) -> int:
             ("Race sprites", "sc64_race_sprites_generated.h"),
             ("Menu artwork", "sc64_menu_generated.h"),
         ))
+        paths.append(("Source construction art",
+                      ROOT / ".local/sc64/construction/generated/sc64_construction_sprites_generated.h"))
     if profile in ("terran", "zerg", "protoss", "zerg-z6", "protoss-p5-shuttle"):
         paths.append(("Skirmish maps", ROOT / ".local/sc64/skirmish/generated/sc64_skirmish_generated.h"))
     if profile in ("zerg", "protoss"):

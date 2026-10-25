@@ -545,6 +545,8 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 
 #ifdef SC64_RACES
 #include "race_rules.h"
+#include "sc64_stock_motion.h"
+#include "sc64_stock_combat.h"
 #ifdef SC64_Z7_EGG_PRODUCTION
 #include "sc64_z7_egg_production.h"
 _Static_assert(SC_RU_COUNT <= 64,
@@ -1784,15 +1786,11 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 	type == B_BARRACKS ? 1000 : type == B_ACADEMY ? 600 : type == B_ENG_BAY ? 850 :
 	type == B_REFINERY ? 750 : 500;
 #ifdef SC64_RACES
-#ifdef SC64_T4_RUNTIME
     b[i].maxhp=sc64_race_building_max_hp(type);
-#else
-    b[i].maxhp=sc64_race_building_rules[type].hp;
-#endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     { int hp = sc64_zp_building_default_hp(type); if (hp) b[i].maxhp = hp; }
 #endif
-    b[i].shield=sc64_race_building_rules[type].race==R_PROTOSS?b[i].maxhp:0;
+    b[i].shield=sc64_race_building_shields(type);
     b[i].raw_type=b[i].raw_owner=-1;b[i].flags=b[i].shield_remainder=0;
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     { const Sc64ZpBuildingFact *zp = sc64_zp_building_fact(type);
@@ -2298,6 +2296,28 @@ unit_step_clear(const Unit *q, int nx, int ny)
 #endif
 }
 
+#ifdef SC64_RACES
+/* Keep fact lookup and endpoint arithmetic in ROM: large campaign profiles
+ * have very little spare IWRAM. The path/collision loops remain hot. */
+static unsigned __attribute__((noinline))
+sc64_unit_stock_step(const Unit *q,int tx,int ty)
+{
+    return sc64_stock_motion_step(q->raw_type>=0?q->raw_type:
+        sc64_race_raw_unit(q->type),(unsigned)frame,(unsigned)(q-u),
+        tx!=q->x && ty!=q->y);
+}
+
+static void __attribute__((noinline))
+sc64_stock_flying_move(Unit *q,int tx,int ty)
+{
+    unsigned step=sc64_unit_stock_step(q,tx,ty);
+    q->x=limit(sc64_stock_motion_axis(q->x,tx,step),0,WORLD_W-1);
+    q->y=limit(sc64_stock_motion_axis(q->y,ty,step),0,WORLD_H-1);
+    sc64_unit_bucket_move(q);
+    sc64_target_index_move(q);
+}
+#endif
+
 static void GBA_HOT
 #if defined(SC64_T6_RUNTIME) && !defined(GBA_HOST)
 __attribute__((optimize("Os")))
@@ -2321,10 +2341,7 @@ move_toward(Unit * q, int tx, int ty)
         !(sc64_game_unit_actor_flags(q->type)&SC64_GAME_ACTOR_MOVABLE)) return;
 #endif
     if(sc64_race_unit_flying(q->type)) {
-        q->x=limit(q->x+(tx>q->x?speed:tx<q->x?-speed:0),0,WORLD_W-1);
-        q->y=limit(q->y+(ty>q->y?speed:ty<q->y?-speed:0),0,WORLD_H-1);
-        sc64_unit_bucket_move(q);
-        sc64_target_index_move(q);
+        sc64_stock_flying_move(q,tx,ty);
 #ifdef SC64_DIAGNOSTIC_ORDERS
         SC64_ORDER_DIAG_ACCUM(sc64_order_move_cycles, sc64_move_start);
 #endif
@@ -2362,8 +2379,14 @@ move_toward(Unit * q, int tx, int ty)
 	q->path_timer = 24;
     }
     q->path_timer--;
+#ifdef SC64_RACES
+    speed=sc64_unit_stock_step(q,q->path_x,q->path_y);
+    nx=sc64_stock_motion_axis(q->x,q->path_x,(unsigned)speed);
+    ny=sc64_stock_motion_axis(q->y,q->path_y,(unsigned)speed);
+#else
     nx = q->x < q->path_x ? q->x + speed : q->x > q->path_x ? q->x - speed : q->x;
     ny = q->y < q->path_y ? q->y + speed : q->y > q->path_y ? q->y - speed : q->y;
+#endif
 	if (!is_traversable(nx / 16, ny / 16, (q->x / 16) + (q->y / 16) * MAP_COLS)) {
 	q->path_timer = 0;
 	q->path_retry = 3;
@@ -3092,9 +3115,13 @@ add_tracer(int x0, int y0, int x1, int y1, int color)
 }
 
 static void
-hit_target(int target, int damage, int source_type, int source_owner)
+hit_target_impl(int target, int damage, int source_type, int source_owner,
+                int stock_damage_class)
 {
     int i, tx, ty;
+#ifndef SC64_RACES
+    (void)stock_damage_class;
+#endif
 #ifdef SC64_TEST_HIT_OBSERVER
     SC64_TEST_HIT_OBSERVER(target, damage, source_type, source_owner);
 #endif
@@ -3139,6 +3166,17 @@ hit_target(int target, int damage, int source_type, int source_owner)
     if (target < MAX_UNITS) {
 	tx = u[target].x;
 	ty = u[target].y;
+#ifdef SC64_RACES
+        if (stock_damage_class>=0) {
+            int raw=u[target].raw_type>=0?u[target].raw_type:
+                    sc64_race_raw_unit(u[target].type);
+            const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
+            damage=sc64_stock_hp_damage_after_armor(damage,
+                u[target].armor+(u[target].owner==SIDE?armor_level:0),
+                stock_damage_class,stock?stock->size:SC64_STOCK_SIZE_LARGE);
+        } else
+#endif
+        {
 #ifdef SC64_T4_RUNTIME
         if (source_type == U_GHOST
 #ifdef SC64_T5_RUNTIME
@@ -3172,6 +3210,7 @@ hit_target(int target, int damage, int source_type, int source_owner)
         if (source_type != U_GHOST && damage < 1) damage = 1;
 #endif
 #endif
+	}
 	u[target].hp -= damage;
 	if (u[target].hp <= 0) {
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
@@ -3214,7 +3253,7 @@ hit_target(int target, int damage, int source_type, int source_owner)
             if (race_transport_carrier_type(&u[target])) race_transport_destroy_cargo(target);
 #endif
 	}
-	if (source_type == U_FIREBAT) {
+	if (source_type == U_FIREBAT && stock_damage_class<0) {
 	    for (i = 0; i < MAX_UNITS; i++)
 		if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner != source_owner && dist2(tx, ty, u[i].x, u[i].y) < 12 * 12) {
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
@@ -3266,6 +3305,13 @@ hit_target(int target, int damage, int source_type, int source_owner)
 	tx = q->x;
 	ty = q->y;
 	#ifdef SC64_RACES
+    if (stock_damage_class>=0) {
+        int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_building(q->type);
+        const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
+        damage=sc64_stock_hp_damage_after_armor(damage,
+            sc64_race_building_armor(q->type),stock_damage_class,
+            stock?stock->size:SC64_STOCK_SIZE_LARGE);
+    } else {
 #ifdef SC64_T4_RUNTIME
     if (source_type == U_GHOST
 #ifdef SC64_T5_RUNTIME
@@ -3278,6 +3324,7 @@ hit_target(int target, int damage, int source_type, int source_owner)
     } else
 #endif
     damage-=sc64_race_building_armor(q->type);
+    }
     q->hp-=damage>0?damage:1;
 #else
     q->hp -= damage > 1 ? damage - 1 : 1;
@@ -3331,6 +3378,25 @@ hit_target(int target, int damage, int source_type, int source_owner)
     (void)source_type;
     (void)source_owner;
 }
+
+/* Special adapters pass already-resolved packets through the legacy path;
+ * ordinary stock weapons supply an explicit damage class below. */
+static void hit_target(int target,int damage,int source_type,int source_owner)
+{ hit_target_impl(target,damage,source_type,source_owner,-1); }
+
+#ifdef SC64_RACES
+static void __attribute__((noinline))
+hit_stock_building_target(const Building *source,int target,int damage)
+{
+    Sc64StockAttack attack;
+    int raw=source->raw_type>=0?source->raw_type:
+            sc64_race_raw_building(source->type);
+    int flying=target<MAX_UNITS&&sc64_race_unit_flying(u[target].type);
+    if (sc64_stock_attack_select(raw,flying,&attack))
+        hit_target_impl(target,damage,U_MARINE,source->owner,attack.weapon->damage_class);
+    else hit_target(target,damage,U_MARINE,source->owner);
+}
+#endif
 
 static int
 save_game(void)
@@ -5153,6 +5219,37 @@ tick_combat(Unit * q, int target)
         damage = sc64_t5_actor_weapon_damage(q->type,
                      q->owner == SIDE ? weapons_level : 0, flying);
 #endif
+    Sc64StockAttack stock_attack;
+    int attack_raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
+    int stock_weapon=sc64_stock_attack_select(attack_raw,flying,&stock_attack);
+    if (!stock_weapon) {
+        const Sc64StockUnitProfile *identity=sc64_stock_unit_profile(attack_raw);
+        /* An alias may advertise another raw unit's weapon eligibility.
+         * A known source None weapon must not acquire that alias's attack.
+         * The existing Reaver adapter models ground Scarab ammunition. */
+        if (identity && (flying?identity->air_weapon:identity->ground_weapon)==130 &&
+            (flying || q->type!=U_REAVER)) return;
+    }
+    /* Firebat's three maximum hits describe spatial flame segments, not
+     * three guaranteed impacts on its selected target. Preserve the existing
+     * area adapter until native flame geometry/events are implemented. */
+    if (q->type==U_FIREBAT) stock_weapon=0;
+    int minimum_range=0;
+    if (stock_weapon) {
+        range=(stock_attack.weapon->max_range+1)/2;
+        minimum_range=(stock_attack.weapon->min_range+1)/2;
+        if (target>=MAX_UNITS) {
+            range+=18;
+            if (minimum_range) minimum_range+=18;
+        } else if (!flying && !sc64_race_unit_flying(q->type) && range<6) {
+            /* Native melee reach is measured from collision edges. Our
+             * center-based ground mover reserves six pixels of separation;
+             * a shorter center radius would make SCV contact impossible. */
+            range=6;
+        }
+        damage=sc64_stock_attack_damage_per_impact(&stock_attack,
+                     q->owner==SIDE?weapons_level:0);
+    }
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
     #ifndef SC64_RACES
@@ -5162,9 +5259,16 @@ tick_combat(Unit * q, int target)
     if (!damage)
 	return;
     if (dx * dx + dy * dy <= range * range) {
+#ifdef SC64_RACES
+        if (dx*dx+dy*dy<minimum_range*minimum_range) return;
+#endif
 	if (!q->cd) {
 	    add_tracer(q->x, q->y, target_x(target), target_y(target),
-                sc64_weapon_vfx_unit_profile(q->type,
+                sc64_weapon_vfx_unit_profile(
+#ifdef SC64_RACES
+                    q->type==U_RAYNOR && q->raw_type==19 ? U_VULTURE :
+#endif
+                    q->type,
 #ifdef SC64_RACES
                     flying
 #else
@@ -5172,11 +5276,16 @@ tick_combat(Unit * q, int target)
 #endif
                 ));
 	#ifdef SC64_RACES
-        int hits=sc64_race_unit_hits_vs(q->type,flying);
+        int hits=stock_weapon?(int)sc64_stock_attack_impact_count(&stock_attack):
+                              sc64_race_unit_hits_vs(q->type,flying);
 #ifdef SC64_Z6_RUNTIME
         if (race_z6_hallucination_can_deal_damage((int)(q-u)))
 #endif
-        for(int hit=0;hit<hits&&target_alive(target);hit++)hit_target(target,damage,q->type,q->owner);
+        for(int hit=0;hit<hits&&target_alive(target);hit++) {
+            if (stock_weapon) hit_target_impl(target,damage,q->type,q->owner,
+                                             stock_attack.weapon->damage_class);
+            else hit_target(target,damage,q->type,q->owner);
+        }
 #if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
     defined(SC64_Z7_SCOURGE_COMBAT)
         /* Suicide Scourge damage is applied by hit_target first, preserving
@@ -5191,7 +5300,8 @@ tick_combat(Unit * q, int target)
         hit_target(target, damage, q->type, q->owner);
 #endif
 	    #ifdef SC64_RACES
-        q->cd=(sc64_race_unit_cooldown_vs(q->type,flying)*5+3)/4;
+        q->cd=((stock_weapon?stock_attack.weapon->cooldown:
+                sc64_race_unit_cooldown_vs(q->type,flying))*5+3)/4;
 #else
         q->cd = q->type == U_ZERGLING ? 10 : q->type == U_FIREBAT ? 28 : q->type == U_RAYNOR ? 30 : 19;
 #endif
@@ -6742,27 +6852,9 @@ draw_unit(Unit * q)
     if (actor_flags && !(actor_flags & SC64_GAME_ACTOR_DRAWABLE)) return;
 #endif
 #ifdef SC64_HAS_SPRITES
-#ifdef SC64_T5_RUNTIME
-    /* This probe reuses the verified Ghost/Vulture sprite frames for their
-     * hero variants; unique hero art is not present in the current bank. */
-    int sprite_raw = q->raw_type;
-    if (q->type == U_KERRIGAN) sprite_raw = 1;
-    if (q->type == U_RAYNOR_VULTURE
-#ifdef SC64_T6_RUNTIME
-        && !race_t6_active()
-#endif
-#ifdef SC64_TERRAN_LATE_RUNTIME
-        && !race_late_active()
-#endif
-        ) sprite_raw = 2;
-#endif
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
-#ifdef SC64_T5_RUNTIME
-        sprite_raw>=0?sc64_race_unit_sprite(sprite_raw):
-#else
         q->raw_type>=0?sc64_race_unit_sprite(q->raw_type):
-#endif
 #endif
         mission_unit_sprite(q->type);
     int sprite_x = sprite ? x - sprite->canvas_w / 2 + sprite->offset_x : x - 4;
@@ -7112,6 +7204,11 @@ draw_building_art(Building *q)
     /* Unfinished structures are drawn dynamically below, so cached terrain
        never freezes their construction effect or keeps their completed art. */
     if (q->under_construction) return;
+#ifdef SC64_PHOTON_SOURCE_FRAMES
+    /* Photon attack frames belong to the dynamic pass, not the terrain
+     * cache. The cannon must also be drawn there while idle/unpowered. */
+    if (q->type==B_PHOTON_CANNON) return;
+#endif
 #endif
 #ifdef SC64_HAS_SPRITES
     if (sprite) draw_mission_sprite(sprite, x, y);
@@ -7171,6 +7268,16 @@ draw_building_overlay(Building *q)
     int sprite_x = x - 12, sprite_y = y - 12, sprite_w = 24, sprite_h = 24;
 #endif
 #ifdef SC64_RACES
+#if defined(SC64_PHOTON_SOURCE_FRAMES) && defined(SC64_HAS_SPRITES)
+    if (!q->under_construction && q->type==B_PHOTON_CANNON) {
+        unsigned elapsed=race_site_powered(q->owner,q->x,q->y) &&
+                         q->queue_progress>0 && q->queue_progress<=28 ?
+                         (unsigned)(28-q->queue_progress)*4u/5u : 24u;
+        const Sc64SpriteFrame *cannon=sc64_race_building_sprite(162,
+                                   sc64_photon_cannon_attack_frame(elapsed));
+        if (cannon) draw_mission_sprite(cannon,x,y);
+    }
+#endif
     if (q->under_construction) {
         int duration=building_build_time(q->type);
         int progress=q->build_progress;
@@ -7187,11 +7294,33 @@ draw_building_overlay(Building *q)
                 sc64_construction_stage(raw,source_stage);
             if (stage && sc64_construction_animation_frame(stage->animation,
                                         source_elapsed,&source_frame)) {
-                const Sc64SpriteFrame *construction =
-                    sc64_construction_image_frame(stage->image_id,source_frame);
-                if (construction) {
-                    draw_mission_sprite(construction,x,y);
-                    source_drawn = 1;
+                /* Source underlays must precede the main image. Each child
+                 * has its own spawn clock; follow-main layers use the root
+                 * frame instead. No extra saved actor state is required. */
+                for (int pass=0;pass<2;++pass) {
+                    if (pass) {
+                        const Sc64SpriteFrame *construction =
+                            sc64_construction_image_frame(stage->image_id,source_frame);
+                        if (construction) {
+                            draw_mission_sprite(construction,x,y);
+                            source_drawn=1;
+                        }
+                    }
+                    for (unsigned layer=1;layer<stage->layer_count;++layer) {
+                        const SC64ConstructionSourceLayer *child=&stage->layers[layer];
+                        unsigned child_frame=source_frame;
+                        if ((child->under!=0)!=(pass==0) ||
+                            source_elapsed<child->start_source_updates) continue;
+                        if (!child->follows_main_graphic &&
+                            !sc64_construction_animation_frame(child->animation,
+                                source_elapsed-child->start_source_updates,&child_frame)) continue;
+                        const Sc64SpriteFrame *art=
+                            sc64_construction_image_frame(child->image_id,child_frame);
+                        if (art) {
+                            draw_mission_sprite(art,x+child->x_offset,y+child->y_offset);
+                            source_drawn=1;
+                        }
+                    }
                 }
             }
         }

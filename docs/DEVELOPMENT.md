@@ -36,14 +36,17 @@ available here. Use local checks on the current machine or a separately
 configured trusted machine; do not automatically execute public PR code on
 personal runners. Routine verification does not require a new runner service.
 
-## Source construction art preview
+## Source construction art
 
-After preparing the optional unified inputs, this separate preview uses
-original primary construction frames for Terran and Zerg buildings. Its
-private data includes seven Terran and twelve Zerg structure types, with
-looping morph frames and source completed-building art for late Terran stages.
-Protoss retains the authored warp placeholder. Canonical race and unified
-builds keep their existing visuals.
+Prepared imported race builds now use the source construction art, including
+Protoss WarpIn and source image underlays/overlays. The importer covers all 50
+stock constructible building IDs, including the Greater Spire morph. `./dev sc64
+prepare` generates the private header for race profiles; older prepared
+workspaces should regenerate it using the command below. `SC64_CONSTRUCTION_ART=0`
+selects the older authored fallback for diagnostic comparisons.
+
+When updating an existing prepared workspace, rerun `./dev sc64 prepare` with
+your ROM and profile to refresh its sprite banks as well as construction art.
 
 ```sh
 python3 tools/sc64_construction_sprites.py
@@ -61,17 +64,20 @@ manifest stay under `.local/sc64/construction/generated/`.
 
 The ROM is `build/StarCraft-Construction-Preview-GBA.gba`; its menus and
 mission set match the canonical unified profile. It adds no campaign entries.
-To use the art in another prepared imported race profile, compile with
-`SC64_CONSTRUCTION_SOURCE_ART` and include the generated construction directory.
-Original-art builds do not use this flag.
+Canonical imported race profiles enable `SC64_CONSTRUCTION_SOURCE_ART` and
+depend on the generated construction header. Original-art builds do not use
+this flag or require the header.
 
 The bounded sampler uses existing saved build progress and adds no per-actor
 state or save-generation change. Stage timing is an adaptation: Terran uses
 progress thresholds instead of native HP/order states; Zerg uses progress
 quarters and halves. Animation waits use a local 24-Hz source clock derived
 from the 30-Hz simulation. Paused progress freezes the sampled visual, and a
-load resumes the same frame. Shadows, worker animation, finish signals and
-Protoss post-timer warp states remain unfinished. See
+load resumes the same frame. Child layers retain their source spawn clocks and
+follow-main frame links. This bounded visual sampler does not reproduce the
+complete native order/IScript machine: worker animation, finish signals,
+dynamic resource-gas overlays and Protoss post-timer warp states remain
+unfinished. See
 [Validation](VALIDATION.md#source-construction-art-preview) for coverage.
 
 ## Death animations
