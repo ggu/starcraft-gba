@@ -1,6 +1,7 @@
 #include "../common/gba.h"
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
+#include "sc64_weapon_vfx.h"
 void *memcpy(void *dst, const void *src, size_t n);
 void *memset(void *dst, int value, size_t n);
 int memcmp(const void *a, const void *b, size_t n);
@@ -148,7 +149,13 @@ int memcmp(const void *a, const void *b, size_t n);
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
 #endif
+#ifdef SC64_RACES
+/* Cosmetic effects are transient and excluded from RaceSave. Extra slots keep
+ * dense race volleys legible without changing actor or save records. */
+#define MAX_TRACERS 32
+#else
 #define MAX_TRACERS 12
+#endif
 #ifdef SC64_IMPORTED_MISSION
 #include "sc64_mission_generated.h"
 #include "sc64_assets_generated.h"
@@ -332,6 +339,7 @@ enum {
     B_BUNKER, B_INFESTED_COMMAND, B_CREEP_COLONY
 };
 #endif
+#include "sc64_weapon_vfx_profiles.h"
 enum {
     ORDER_IDLE, ORDER_MOVE, ORDER_ATTACK_MOVE, ORDER_ATTACK_TARGET,
     ORDER_MINE, ORDER_BUILD, ORDER_GAS
@@ -1871,20 +1879,22 @@ target_alive(int target)
     return target >= 0 && (target < MAX_UNITS ? u[target].alive : b[target - MAX_UNITS].alive);
 }
 
-static void
+static void __attribute__((noinline))
 add_tracer(int x0, int y0, int x1, int y1, int color)
 {
-    int i;
-    for (i = 0; i < MAX_TRACERS; i++)
-	if (!tracers[i].life) {
-	    tracers[i].x0 = x0;
-	    tracers[i].y0 = y0;
-	    tracers[i].x1 = x1;
-	    tracers[i].y1 = y1;
-	    tracers[i].life = 4;
-	    tracers[i].color = color;
-	    return;
-	}
+    int slot=0, oldest=-1;
+    if (!color) return;
+    if (!sc64_weapon_vfx_style(color))
+        color=sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_MUZZLE,color);
+    for (int i=0;i<MAX_TRACERS;++i) {
+        if (!tracers[i].life) { slot=i; break; }
+        int age=sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(tracers[i].color))+1-tracers[i].life;
+        if (age>oldest) { oldest=age; slot=i; }
+    }
+    tracers[slot].x0=x0; tracers[slot].y0=y0;
+    tracers[slot].x1=x1; tracers[slot].y1=y1;
+    tracers[slot].color=color;
+    tracers[slot].life=sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(color))+1;
 }
 
 static void
@@ -3368,7 +3378,14 @@ tick_combat(Unit * q, int target)
 	return;
     if (dx * dx + dy * dy <= range * range) {
 	if (!q->cd) {
-	    add_tracer(q->x, q->y, target_x(target), target_y(target), q->owner == SIDE ? C_GOLD : C_RED);
+	    add_tracer(q->x, q->y, target_x(target), target_y(target),
+                sc64_weapon_vfx_unit_profile(q->type,
+#ifdef SC64_RACES
+                    flying
+#else
+                    0
+#endif
+                ));
 	#ifdef SC64_RACES
         int hits=sc64_race_unit_hits_vs(q->type,flying);
         for(int hit=0;hit<hits&&target_alive(target);hit++)hit_target(target,damage,q->type,q->owner);
@@ -4440,6 +4457,47 @@ draw_mission_sprite(const Sc64SpriteFrame *s, int cx, int cy)
 }
 #endif
 
+/* Shield capacity comes from the canonical actor rules; it is kept
+ * separate from HP so units such as Archons retain their correct scale. */
+static int __attribute__((noinline))
+sc64_actor_max_shields(int type,int building)
+{
+#ifdef SC64_RACES
+    if (building) return type>=0&&type<SC_RB_COUNT?sc64_race_building_shields(type):0;
+#ifdef SC64_TERRAN_LATE_ACTORS
+    const Sc64TerranLateActorFact *late=sc64_terran_late_unit_fact(type);
+    if (late) return late->shields;
+#endif
+    return type>=0&&type<SC_RU_COUNT?sc64_race_unit_rules[type].shields:0;
+#else
+    (void)type; (void)building; return 0;
+#endif
+}
+
+static void
+sc64_draw_vital_bar(int left,int top,int width,int value,int maximum,int color,int empty)
+{
+    int bottom=top+2;
+    if (top<12) top=12;
+    if (bottom>120) bottom=120;
+    if (top>=bottom || maximum<=0) return;
+    if (value<0) value=0;
+    if (value>maximum) value=maximum;
+    gfx_rect(left,top,width,bottom-top,(u8)empty);
+    int fill=(int)((u32)value*(unsigned)width/(unsigned)maximum);
+    if (fill) gfx_rect(left,top,fill,bottom-top,(u8)color);
+}
+
+static void __attribute__((noinline))
+draw_actor_vitals(int x,int y,int width,int hp,int maxhp,int shield,
+                  int maxshield,int health_color)
+{
+    int left=x-width/2;
+    sc64_draw_vital_bar(left,y,width,hp,maxhp,health_color,C_RED_DARK);
+    if (maxshield>0)
+        sc64_draw_vital_bar(left,y-3,width,shield,maxshield,C_CYAN,C_BLUE_DARK);
+}
+
 static void
 draw_unit(Unit * q)
 {
@@ -4528,23 +4586,31 @@ draw_unit(Unit * q)
 #ifdef SC64_T4_RUNTIME
     if (!(actor_flags & SC64_T4_ACTOR_INVINCIBLE))
 #endif
-	    gfx_bar(x - 6, sprite_y - 4, 12, 2, q->hp, q->maxhp,
-	    owner_color(q->owner), C_RED_DARK);
+        draw_actor_vitals(x,sprite_y-4,12,q->hp,q->maxhp,
+#ifdef SC64_RACES
+            q->shield,sc64_actor_max_shields(q->type,0),
+#else
+            0,0,
+#endif
+            owner_color(q->owner));
     if (q->selected)
 	gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
 }
 
+#define SC64_WEAPON_VFX_VISIBLE(x,y) currently_visible((x)+camx,(y)+camy-12)
+#include "sc64_weapon_vfx_render.h"
+#undef SC64_WEAPON_VFX_VISIBLE
+
 static void
 draw_tracers(void)
 {
-    int i;
-    for (i = 0; i < MAX_TRACERS; i++)
-	if (tracers[i].life &&
-	    (currently_visible(tracers[i].x0, tracers[i].y0) ||
-	     currently_visible(tracers[i].x1, tracers[i].y1))) {
-	    gfx_line(tracers[i].x0 - camx, tracers[i].y0 - camy + 12,
-		     tracers[i].x1 - camx, tracers[i].y1 - camy + 12, tracers[i].color);
-	}
+    for (int i=0;i<MAX_TRACERS;++i) if (tracers[i].life) {
+        int style=sc64_weapon_vfx_style(tracers[i].color);
+        if (!style) style=SC64_WEAPON_VFX_STYLE_MUZZLE;
+        sc64_weapon_vfx_draw(style,sc64_weapon_vfx_color(tracers[i].color),
+            tracers[i].x0-camx,tracers[i].y0-camy+12,
+            tracers[i].x1-camx,tracers[i].y1-camy+12,tracers[i].life);
+    }
 }
 
 static void
@@ -4790,8 +4856,13 @@ draw_building_overlay(Building *q)
 #else
     int sprite_x = x - 12, sprite_y = y - 12, sprite_w = 24, sprite_h = 24;
 #endif
-    gfx_bar(x - 9, sprite_y - 4, 18, 2, q->hp, q->maxhp,
-            owner_color(q->owner), C_RED_DARK);
+    draw_actor_vitals(x,sprite_y-4,18,q->hp,q->maxhp,
+#ifdef SC64_RACES
+        q->shield,sc64_actor_max_shields(q->type,1),
+#else
+        0,0,
+#endif
+        owner_color(q->owner));
     if (q->under_construction)
         gfx_text(x - 3, y, "C", C_GOLD);
     if (q->under_construction)
@@ -5238,6 +5309,16 @@ draw_hud_resources(void)
 }
 
 static void
+draw_hud_shields(int shield,int maximum)
+{
+#ifdef SC64_RACES
+    if (maximum>0) { gfx_text(129,126,"SH",C_CYAN); gfx_num(147,126,shield,C_CYAN); }
+#else
+    (void)shield; (void)maximum;
+#endif
+}
+
+static void
 draw_hud_commands(void)
 {
     int i, n = selected_count();
@@ -5250,6 +5331,7 @@ draw_hud_commands(void)
 	Building *q = &b[selected_building];
 	#ifdef SC64_RACES
         gfx_text(5,126,sc64_race_building_name(q->type),C_WHITE);
+        draw_hud_shields(q->shield,sc64_actor_max_shields(q->type,1));
 #else
 	gfx_text(5, 126, q->type == B_COMMAND ? "COMMAND CENTER" :
 		 q->type == B_BARRACKS ? "BARRACKS" : q->type == B_DEPOT ? "SUPPLY DEPOT" :
@@ -5279,6 +5361,9 @@ draw_hud_commands(void)
 	for (i = 0; i < MAX_UNITS; i++)
 	    if (u[i].alive && u[i].selected) {
 		gfx_text(5, 126, n > 1 ? "COMBAT GROUP" : unit_name(u[i].type), C_WHITE);
+#ifdef SC64_RACES
+                draw_hud_shields(u[i].shield,sc64_actor_max_shields(u[i].type,0));
+#endif
 		gfx_text(5, 137, "HP", C_CYAN);
 		gfx_num(24, 137, u[i].hp, C_GREEN);
 		if (IS_WORKER(u[i].type))
@@ -5376,7 +5461,39 @@ draw_hud_commands(void)
 
 #ifdef SC64_IMPORTED_MISSION
 static _Alignas(4) u8 sc64_hud_top[240 * 12], sc64_hud_bottom[240 * 40];
-static int sc64_hud_previous[24], sc64_hud_valid;
+enum { SC64_HUD_KEY_COUNT=26 };
+static int sc64_hud_previous[SC64_HUD_KEY_COUNT], sc64_hud_valid;
+#ifdef SC64_RACES
+/* Keep race presentation key construction in ROM: canonical Z3 has very
+ * little fast-RAM code headroom. Key values and invalidation stay exact. */
+static void __attribute__((noinline))
+sc64_hud_race_keys(int *values,int first)
+{
+    if (first>=0) {
+        values[24]=u[first].shield;
+        values[25]=sc64_actor_max_shields(u[first].type,0);
+    }
+    if (selected_building>=0 && b[selected_building].alive) {
+        values[24]=b[selected_building].shield;
+        values[25]=sc64_actor_max_shields(b[selected_building].type,1);
+    }
+    values[19]=race_campaign.phase;values[20]=race_campaign.message;
+#ifdef SC64_P3_RUNTIME
+    if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID)
+        values[20] |= (int)race_p3.sequence << 8;
+#endif
+    /* race_tick_state has already counted live supply before rendering. */
+    values[23]=supply_used+race_owner_queued_supply(SIDE);
+    values[21]=race_selected_mission;
+#ifdef SC64_T5_RUNTIME
+    /* T5 has no HUD text driven by the elapsed frame counter. Keep the
+     * once-per-second invalidation for timed missions such as T1 and T3. */
+    values[22]=race_t5_active()?0:frame/30;
+#else
+    values[22]=frame/30;
+#endif
+}
+#endif
 #if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
 static u8 sc64_hud_buffer_dirty[2];
 static u32 sc64_hud_buffer_clear_generation[2];
@@ -5392,7 +5509,7 @@ static int GBA_HOT __attribute__((noinline))
 #endif
 sc64_hud_changed(void)
 {
-    int values[24] = {minerals, gas, supply_used, supply_cap, mode, selected_building,
+    int values[SC64_HUD_KEY_COUNT] = {minerals, gas, supply_used, supply_cap, mode, selected_building,
         train_type, mission_unsupported_count};
     int i, first = -1, changed = sc64_hud_valid ? 0 : 3;
     for (i = 0; i < MAX_UNITS; i++) if (u[i].alive && u[i].owner == SIDE) {
@@ -5410,21 +5527,8 @@ sc64_hud_changed(void)
     }
     values[18] = box_state == 2;
 #ifdef SC64_RACES
-    values[19]=race_campaign.phase;values[20]=race_campaign.message;
-#ifdef SC64_P3_RUNTIME
-    if (!race_mode && race_selected_mission == SC64_P3_GLOBAL_ID)
-        values[20] |= (int)race_p3.sequence << 8;
-#endif
-    /* race_tick_state has already counted live supply before rendering. */
-    values[23]=supply_used+race_owner_queued_supply(SIDE);
-    values[21]=race_selected_mission;
-#ifdef SC64_T5_RUNTIME
-    /* T5 has no HUD text driven by the elapsed frame counter. Keep the
-     * once-per-second invalidation for timed missions such as T1 and T3. */
-    values[22]=race_t5_active()?0:frame/30;
-#else
-    values[22]=frame/30;
-#endif
+    sc64_hud_race_keys(values,first);
+
 #endif
 #ifdef SC64_BACKWATER
 #ifdef SC64_TERRAN_CAMPAIGN
@@ -5436,7 +5540,7 @@ sc64_hud_changed(void)
 #elif defined(SC64_SKIRMISH)
     for (i = 0; i < skirmish_bots; i++) values[19] += skirmish_owner_alive(skirmish_owner_ids[i]);
 #endif
-    for (i = 0; i < 24; i++) {
+    for (i = 0; i < SC64_HUD_KEY_COUNT; i++) {
         /* Wallet and supply changes only affect the top band. Commands,
            selection and objectives can retain their independently cached art. */
         if (sc64_hud_previous[i] != values[i]) changed |= i < 4 || i == 23 ? 1 : 2;
