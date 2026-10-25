@@ -29,6 +29,9 @@ No ROM, scenario table, game art, save or capture is included in Git.
 
 ## Evidence on 2026-10-25
 
+The paired measurements below use the staged `fad7926` baseline. Later changes
+to the parent campaign branch need their own integrated performance check.
+
 Paired 1,500-update ARM neutral openings averaged 13.71 fps with the gate off
 and 14.93 fps with it on. This is about 8.9% higher effective fps and 8.2%
 fewer emulated hardware cycles for that interval. Normalized entity and
