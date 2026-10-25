@@ -76,6 +76,9 @@ void gfx_set_clip_y(int top,int bottom) {
  if(top<0||top>bottom||bottom>160)return;
  gfx_clip_top=(u8)top; gfx_clip_bottom=(u8)bottom;
 }
+u16 gfx_get_clip_y(void) {
+ return (u16)(gfx_clip_top|((u16)gfx_clip_bottom<<8));
+}
 #endif
 u8 gfx_backbuffer_index(void) { return backbuffer_index; }
 u32 gfx_clear_generation(u8 buffer_index) {

@@ -132,9 +132,10 @@ TERRAN_FULL_FLAGS := $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_T6_CAMPAIGN_ENTRY -DSC6
 # Keep qualified canonical draw options separate from experimental campaign
 # probes, which retain their own RAM and timing qualification.
 CANONICAL_DRAW_FLAGS ?= -DGBA_SPRITE_WORDS -DGBA_SCENE_CLIP -DSC64_HUD_BUFFER_REUSE
-TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS
+CANONICAL_STATIC_FLAGS ?= $(if $(filter -DGBA_SCENE_CLIP,$(CANONICAL_DRAW_FLAGS)),-DSC64_STATIC_DIRTY_ROWS)
+TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS)
 ZERG_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
-PROTOSS_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS
+PROTOSS_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS)
 TERRAN_FULL_INPUTS = $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER)
 
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
@@ -192,6 +193,24 @@ test-gfx-clip: build/test-gfx-clip build/test-gfx-clip-packed
 	./build/test-gfx-clip
 	./build/test-gfx-clip-packed
 test: test-gfx-clip
+
+.PHONY: test-sc64-static-dirty-rows
+build/test-sc64-static-dirty-rows: tests/sc64_static_dirty_rows.c starcraft/sc64_static_dirty_rows.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-sc64-static-dirty-rows: build/test-sc64-static-dirty-rows
+	./build/test-sc64-static-dirty-rows
+test: test-sc64-static-dirty-rows
+
+.PHONY: test-sc64-static-dirty-rows-game
+STATIC_DIRTY_ROWS_TEST_FLAGS := -DGBA_SCENE_CLIP -DSC64_STATIC_DIRTY_ROWS
+build/test-sc64-static-dirty-rows-t4: tests/sc64_t4_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fno-strict-aliasing -fsanitize=address,undefined -DGBA_HOST -Icommon $(T4_RUNTIME_FLAGS) $(STATIC_DIRTY_ROWS_TEST_FLAGS) $< common/gba.c -o $@
+build/test-sc64-static-dirty-rows-photon: tests/sc64_photon_cannon_renderer.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fno-strict-aliasing -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) $(STATIC_DIRTY_ROWS_TEST_FLAGS) $< common/gba.c -o $@
+test-sc64-static-dirty-rows-game: build/test-sc64-static-dirty-rows-t4 build/test-sc64-static-dirty-rows-photon
+	./build/test-sc64-static-dirty-rows-t4
+	./build/test-sc64-static-dirty-rows-photon
+test-canonical-render: test-sc64-static-dirty-rows-game
 
 build/starcraft.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft.map -lgcc -o $@
@@ -330,7 +349,7 @@ test-sc64-p3: test-sc64-p3-import build/test-sc64-p3-runtime $(P3_FRONT_TESTS) b
 	./build/test-sc64-p3-frame-coverage
 	./build/test-sc64-p3-static-key
 	./build/test-sc64-p3-schedule
-	./build/test-sc64-p3-controller --trace .local/sc64/p3-controller-asan-win.json
+	./build/test-sc64-p3-controller --trace .local/sc64/p3-controller-stock-asan-win.json
 build/test-sc64-p3-import: tests/sc64_p3_import.c starcraft/race_rules.h starcraft/sc64_types.h .local/sc64/races/generated/sc64_races_generated.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_P3_ENABLED -DSC64_CAMPAIGN_RACE=2 -Istarcraft -I.local/sc64/races/generated $< -o $@
 test-sc64-p3-import: build/test-sc64-p3-import

@@ -57,6 +57,39 @@ static unsigned source_pixel_count(const Sc64SpriteFrame *s)
     return count;
 }
 
+#ifdef SC64_STATIC_DIRTY_ROWS
+static void check_dirty_partial_with_dynamic_cannon(int under_construction)
+{
+    int slot = cannon(under_construction);
+    cx = 160;
+    cy = 160;
+    memset(explored, 0xff, sizeof(explored));
+    sc64_terrain_cache_valid = 0;
+    sc64_hud_valid = 0;
+    gfx_begin(C_BLACK);
+    game_render();
+
+    int cell = (b[slot].x / 16) + 1 + (b[slot].y / 16) * MAP_COLS;
+    assert(cell >= 0 && cell < MAP_CELLS);
+    SC64_GRID_SET(visible, cell, 0);
+    SC64_GRID_SET(explored, cell, 0);
+    unsigned before_partial = sc64_terrain_partial;
+    unsigned before_bands = sc64_static_dirty_rows_host_bands;
+    gfx_begin(C_BLACK);
+    game_render();
+    capture(before);
+    assert(sc64_terrain_partial > before_partial);
+    assert(sc64_static_dirty_rows_host_bands > before_bands);
+
+    sc64_terrain_cache_valid = 0;
+    sc64_hud_valid = 0;
+    gfx_begin(C_BLACK);
+    game_render();
+    capture(after);
+    assert(memcmp(before, after, sizeof(before)) == 0);
+}
+#endif
+
 int main(void)
 {
     int slot = cannon(0);
@@ -98,5 +131,9 @@ int main(void)
     unsigned matches = compare_source_frame(after, idle, b[slot].x - camx,
                                              b[slot].y - camy + 12);
     assert(matches * 4 >= source_pixel_count(idle));
+#ifdef SC64_STATIC_DIRTY_ROWS
+    check_dirty_partial_with_dynamic_cannon(0);
+    check_dirty_partial_with_dynamic_cannon(1);
+#endif
     return 0;
 }

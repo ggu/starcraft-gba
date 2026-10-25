@@ -390,7 +390,7 @@ Center; tap A on the existing structure to select it.
 
 ## Current limits
 
-Higher Ground (Protoss 3, global catalog ID 22) now has an experimental runtime.
+Higher Ground (Protoss 3, global catalog ID 22) is in the canonical Protoss ROM.
 After preparing a race profile, run `make protoss-p3 test-sc64-p3`. This creates
 `build/StarCraft-Protoss-P3-GBA.gba`, with Higher Ground on campaign page two.
 It retains the full 128×96 terrain, all 96 units, 42 buildings, 48 mineral
@@ -406,36 +406,36 @@ mining assignments and periodic small guard attacks. Original transmission
 dialogue/audio are absent; their holds use documented adapter timings. Scourge
 combat has an air-only suicide attack with fixed source-backed damage. This
 profile has a separate save generation, including quest actions and their
-remaining hold time. A controller-only ASan/UBSan host run now completes the
-mission at frame 151,088 after building a gas economy, Cybernetics Core and
-Gateway army, then destroying all 38 hostile buildings. It retains 14 units
-and 11 buildings. The frozen 5,809-transition input trace fits the paged
-256-entry debugger queue, with at most 90 transitions per 1,000-tick page.
+remaining hold time. The current stock-stat controller completes the unchanged
+native mission at frame 57,457 after building a protected economy, Photon
+Cannons and a Gateway army, then destroying all 38 hostile buildings. A fresh
+input-only host replay and an ARM replay with the current production flags
+reach the same native result. The 2,985-transition trace fits the paged
+256-entry debugger queue, with at most 162 transitions per 1,000-tick page.
 After the build/test command, replay it with:
 
 ```sh
-python3 tools/sc64_p3_controller_replay.py --trace .local/sc64/p3-controller-asan-win.json
+python3 tools/sc64_p3_controller_replay.py --route stock --trace .local/sc64/p3-controller-stock-asan-win.json
 ```
 
 The helper supports frozen `--rom`/`--elf` paths, separate `--output` folders,
 and bounded `--ticks` prefixes with optional normal-control `--save-at-end`.
 It verifies the final quest model, completion bit, roster and global wallets.
-The current default completes the full 152,107-tick ARM input replay at the
-same frame, with 154 retained observations and verified final quest, roster
-and wallet state. It averages 23.28 effective fps over 150,004 counted live
-frames; the worst observed interval is 17.72 fps. The final captured result
-matches the earlier baseline's RGB pixels. A fresh ARM process has also
-restored and continued a normal controller-created save. In that same
-saved scene, filtering defense candidates raised effective performance from
-19.72 to 28.92 fps with identical reported gameplay state and captured pixels.
-That is a bounded scene comparison, not a full-mission frame-rate result.
-The near-30-fps mission target and physical GBA validation remain unmet.
+The stock route is the replay CLI default. Explicit `--route garrison` and
+`--route expansion` retain their historical contracts; their older wins do not
+qualify the current stock-stat engine. The current 58,063-update ARM replay
+verifies source launch and terminal quest state through a private input driver.
+Its whole-route mean is 839,963 CPU cycles per update/audio/render/present loop,
+about 20.0 fps equivalent. Opening skirmish samples near 29 fps do not establish
+mission-wide performance. The near-30-fps mission target, current-stock
+fresh-process SRAM replay and physical GBA validation remain unmet. See the
+[current redraw and P3 audit](audits/2026-10-26-static-art-and-p3/README.md).
 
 P3 enables sorted defense candidate lists, a paged debugger input queue and
 clear-free live rendering after full-frame coverage checks, terrain reuse
 across small camera moves, exact drawable-object keys and visibility spans.
 For an unoptimized
-comparison build, use `make -B protoss-p3 P3_OPTIMIZATION_FLAGS=`; retain ROM/ELF
+comparison build, use `make -B protoss-p3 P3_OPTIMIZATION_FLAGS= CANONICAL_DRAW_FLAGS= CANONICAL_STATIC_FLAGS=`; retain ROM/ELF
 pairs separately, then restore the default with `make -B protoss-p3`.
 
 The same 10,000-tick controller prefix improves from 21.53 to 23.39 effective
