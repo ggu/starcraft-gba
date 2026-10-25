@@ -2088,3 +2088,11 @@ before arena mutation. The code is freestanding and uses the project's
 or reserves this arena. See
 [Validation](VALIDATION.md#carrier-pool-and-codec-foundation) for tests and
 the remaining combat, world-reference, frame-boundary and save integration.
+
+For repeatable filming setups, `make showcase` builds the separate
+`StarCraft-Showcase-GBA.gba` with a hidden scene menu. On HOME hold R, add L,
+then tap Select. `make test-sc64-showcase` checks the menu, scene resets,
+last-stand timing and save isolation with the existing private P7 inputs.
+The frontend input model also runs in the asset-free host suite. See
+[Showcase scenes](SHOWCASE.md) for all eight setups, recording controls,
+Carrier preview limits and the controller-only emulator replay.

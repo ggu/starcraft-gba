@@ -4859,6 +4859,51 @@ the complete-frame save boundary remain required. No Carrier combat, P7 win,
 whole-world continuation, fresh-process ARM SRAM or hardware result is
 claimed. Staged progress remains 22/30.
 
+### Hidden showcase menu and staged scenes
+
+The optional `SC64_SHOWCASE_ENABLED` build adds a hidden HOME chord and eight
+repeatable starting setups; see [Showcase scenes](SHOWCASE.md). It composes
+the typed/Arbiter/movement/rectangle profile to provide the required actors,
+but runs scenes as skirmishes, with campaign controllers and economy AI
+inactive. Normal movement, target selection, damage, shield regeneration and
+loss detection remain in use. The filming arena is flat and fully revealed.
+Scene state is transient, and both save/load entry points reject while a
+scene is active. The normal campaign and canonical build flags keep the
+feature disabled. The frontend structure and save format are unchanged.
+The disabled-feature ARM output matches a fresh `782539f` parent build made
+with the same current private inputs, byte for byte; preprocessed game tokens
+also match that parent.
+
+`make test-sc64-showcase` passes under ASan/UBSan: ordinary menu entry,
+all eight compositions, bounded simulation/rendering, pause/restart/exit,
+scene-row retention and an actual normal-skirmish save/load surrounding
+showcase play are checked. The three last stands lose at update 150 via
+ordinary Marine damage and skirmish defeat detection, including the Nexus's
+passive shield regeneration. No timed damage or forced outcome is injected.
+The input-model test also runs in the asset-free default host suite.
+
+The 4-MiB ARM showcase link retains Unit 56, Building 48, RaceSave 14,188 and
+frontend 56 bytes, with IWRAM/BSS ends `0x03004a28` / `0x0203daf0`, inside the
+unchanged reserve guards. The incomplete feature bundle is rejected at
+compile time. Carrier Approach is labeled a preview: the current Carrier
+actor has no Interceptor combat; its escorts engage normally. These are
+authored filming setups, not additional qualified campaign missions or
+native weapon/AI parity. Five seconds means 150 simulation updates at the
+nominal 30-update clock; physical duration depends on performance.
+
+A normal-menu, controller-only ARM replay exercises all eight scenes,
+paused launches, replay and scene-menu return. All three defeat variants
+remain alive at update 149 and lose at 150. Captures were visually checked
+for menu readability, Carrier formation, the tank rush and the result panel.
+The first 120 running updates measure effective fps from emulated GBA timer
+cycles: Carrier Approach 13.175; Siege Line 19.965; each Last Stand 29.857;
+Protoss Crossfire 19.164; Three Way Battle 20.020; Base Under Siege 24.961.
+These are bounded emulator samples, not physical GBA or whole-scene speed
+qualification. Default build/tests (414 Python tests plus host fixtures),
+unified build/tests, the full-bank scene-reset comparison and source audit
+pass. No additional campaign mission or near-30-fps battle qualification is
+claimed.
+
 ### Full-feature P7 cache timing and rejected cell memo
 
 A private diagnostic of the typed/Arbiter/movement profile separates the

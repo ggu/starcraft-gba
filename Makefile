@@ -2688,6 +2688,27 @@ test-sc64-interceptor-pool-codec: build/test-sc64-interceptor-pool-codec
 	./build/test-sc64-interceptor-pool-codec
 test-starcraft: test-sc64-interceptor-pool-codec
 
+# Dedicated filming build. Hidden menu and transient scenes stay off in all
+# canonical profiles; the P7 bundle supplies Carrier/Ultralisk render actors.
+SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED
+build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Showcase-GBA.gba: build/starcraft-showcase.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC SHOWCASE' SCSH
+.PHONY: showcase test-sc64-showcase test-sc64-showcase-front
+showcase: build/StarCraft-Showcase-GBA.gba
+build/test-sc64-showcase-front: tests/sc64_frontend.c starcraft/sc64_frontend.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_SHOWCASE_ENABLED -Icommon $< -o $@
+build/test-sc64-showcase-game: tests/sc64_showcase_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c -o $@
+test-sc64-showcase-front: build/test-sc64-showcase-front
+	./build/test-sc64-showcase-front
+test-starcraft: test-sc64-showcase-front
+test-sc64-showcase: test-sc64-showcase-front build/test-sc64-showcase-game
+	./build/test-sc64-showcase-game
+
 build/starcraft-protoss-p7-typed-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-typed-probe.map -lgcc -o $@
 	$(SIZE) $@

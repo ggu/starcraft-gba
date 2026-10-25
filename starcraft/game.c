@@ -29,6 +29,17 @@ void *memcpy(void *dst, const void *src, size_t n);
 void *memset(void *dst, int value, size_t n);
 int memcmp(const void *a, const void *b, size_t n);
 
+#if defined(SC64_SHOWCASE_ENABLED) && \
+    (!defined(SC64_RACES) || !defined(SC64_UNIFIED) || \
+     !defined(SC64_P7_ACTORS) || !defined(SC64_ZP_CAMPAIGN_ACTORS))
+#error "Showcase requires the unified P7/ZP actor profile"
+#endif
+#ifdef SC64_SHOWCASE_ENABLED
+/* Transient filming state: never serialized into ordinary saves. */
+static int sc64_showcase_scene = -1;
+static unsigned sc64_showcase_ticks;
+#endif
+
 #ifdef SC64_Z6_RUNTIME
 #include "sc64_z6_state.h"
 #endif
@@ -1790,6 +1801,10 @@ terrain_blocked(int col, int row)
 {
 #ifdef SC64_RACES
     if(col<0||row<0||col>=MAP_COLS||row>=MAP_ROWS)return 1;
+#ifdef SC64_SHOWCASE_ENABLED
+    /* The filming set is a flat arena; normal skirmish barriers stay intact. */
+    if(sc64_showcase_scene>=0)return 0;
+#endif
     if(!race_mode)return sc64_race_maps[race_selected_mission].blocked[col+row*MAP_COLS]!=0;
 #ifdef SC64_IMPORTED_SKIRMISH
     if(race_skirmish_map>0)return sc64_skirmish_maps[race_skirmish_map-1].blocked[col+row*MAP_COLS]!=0;
@@ -3198,6 +3213,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 static int
 save_game(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) return 0;
+#endif
 #ifdef SC64_RACES
     return race_save_game();
 #else
@@ -3252,6 +3270,9 @@ save_game(void)
 static int
 load_game(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) return 0;
+#endif
 #ifdef SC64_RACES
     return race_load_game();
 #else
@@ -3633,6 +3654,10 @@ init_state(void)
 static void
 update_imported_mission(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    /* Staged armies use regular orders/combat without AI rebuilding them. */
+    if (sc64_showcase_scene >= 0) return;
+#endif
 #ifdef SC64_RACES
     if(race_mode)race_tick_ai();else race_campaign_tick();return;
 #endif
@@ -3708,6 +3733,9 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    sc64_showcase_scene=-1;sc64_showcase_ticks=0;
+#endif
 #ifdef SC64_RACES
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
     memset(&race_z3,0,sizeof(race_z3));race_z3_action_ticks=0;
@@ -5824,6 +5852,10 @@ update_selection_box(u16 held, u16 pressed, int old_x, int old_y)
     return pressed & (u16)~consume;
 }
 
+#ifdef SC64_SHOWCASE_ENABLED
+#include "sc64_showcase_adapter.h"
+#endif
+
 static void
 pause_action(u16 pressed)
 {
@@ -5848,6 +5880,22 @@ game_update(u16 held, u16 pressed)
 #endif
 #endif
     int speed = (held & KEY_R) ? 4 : 2;
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) {
+        if (pressed & KEY_SELECT) { sc64_showcase_leave(held); return; }
+        if (screen == SCREEN_PAUSE) {
+            if (pressed & KEY_B) sc64_showcase_leave(held);
+            else if (pressed & KEY_R) sc64_showcase_start(sc64_showcase_scene);
+            else if (pressed & KEY_A) screen = SCREEN_PLAY;
+            return;
+        }
+        if (screen == SCREEN_RESULT) {
+            if (pressed & KEY_B) sc64_showcase_leave(held);
+            else if (pressed & KEY_A) sc64_showcase_start(sc64_showcase_scene);
+            return;
+        }
+    }
+#endif
     if (screen != SCREEN_PLAY) reset_selection_gestures();
     if (screen == SCREEN_TITLE) {
 #ifdef SC64_RACES
@@ -5857,6 +5905,12 @@ game_update(u16 held, u16 pressed)
         if(pressed){race_front_load_error=0;audio_tone((pressed&KEY_A)?660:440,2,2);}
         if(old_page!=race_front.page)race_front_transition=race_front.ticks;
         if(old_row!=race_front.row)audio_tone(440,2,2);
+#ifdef SC64_SHOWCASE_ENABLED
+        if (action == SC_FRONT_START_SHOWCASE) {
+            sc64_display_palette(sc64_palette+32);
+            sc64_showcase_start(race_front.row);
+        } else
+#endif
         if(action==SC_FRONT_START_CAMPAIGN||action==SC_FRONT_START_SKIRMISH) {
             race_mode=action==SC_FRONT_START_SKIRMISH;
             race_selected_mission=race_front.mission;
@@ -6068,6 +6122,9 @@ game_update(u16 held, u16 pressed)
 	interact();
 
     frame++;
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) ++sc64_showcase_ticks;
+#endif
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     if (race_p7_active()) sc64_p7_arbiter_cache_frame_tick();
 #endif
@@ -6162,6 +6219,9 @@ game_update(u16 held, u16 pressed)
     update_exploration();
 #ifdef SC64_IMPORTED_MISSION
     sc64_sight_cycles = gba_clock() - profile_sight_start;
+#endif
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) sc64_showcase_reveal();
 #endif
     if (toast_timer)
 	toast_timer--;
@@ -7201,6 +7261,19 @@ draw_title(void)
 static void
 draw_pause(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) {
+        gfx_rect(23,25,194,105,C_PANEL);
+        gfx_frame(23,25,194,105,C_CYAN);
+        gfx_text(35,35,"SHOWCASE / STAGED SETUP",C_GOLD);
+        gfx_text(35,49,"A ROLL / RESUME",C_WHITE);
+        gfx_text(35,61,"R RESTART SCENE",C_WHITE);
+        gfx_text(35,73,"B OR SELECT: SCENES",C_WHITE);
+        gfx_text(35,91,"START PAUSES THE ACTION",C_CYAN);
+        gfx_text(35,106,"REPLAYS DO NOT WRITE SAVES",C_DIM);
+        return;
+    }
+#endif
     gfx_rect(29, 18, 182, 124, C_PANEL);
     gfx_frame(29, 18, 182, 124, C_CYAN);
     gfx_text(47, 27, "FIELD COMMAND", C_GOLD);
@@ -7217,6 +7290,16 @@ draw_pause(void)
 static void
 draw_result(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) {
+        gfx_rect(26,39,188,67,C_PANEL);
+        gfx_frame(26,39,188,67,lost ? C_RED : C_GOLD);
+        gfx_text(49,49,lost ? "LAST OUTPOST LOST" : "SCENE COMPLETE",C_GOLD);
+        gfx_text(42,66,"STAGED GAMEPLAY SETUP",C_WHITE);
+        gfx_text(39,87,"A REPLAY  B/SEL SCENES",C_CYAN);
+        return;
+    }
+#endif
     gfx_rect(28, 40, 184, 66, C_PANEL);
     gfx_frame(28, 40, 184, 66, won ? C_GOLD : C_RED);
     gfx_text(won ? 81 : 79, 53, won ? "MISSION CLEAR" : "OUTPOST LOST", won ? C_GOLD : C_RED);
@@ -7664,6 +7747,9 @@ game_render(void)
         profile_start = gba_clock();
 #endif
 	draw_hud();
+#ifdef SC64_SHOWCASE_ENABLED
+        if (sc64_showcase_scene >= 0) sc64_showcase_draw_label();
+#endif
 #ifdef SC64_IMPORTED_MISSION
         sc64_hud_cycles = gba_clock() - profile_start;
 #endif

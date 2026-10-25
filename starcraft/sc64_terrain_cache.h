@@ -76,6 +76,9 @@ static int sc64_terrain_cache_view_camx, sc64_terrain_cache_view_camy;
 static int
 sc64_terrain_cache_mission_key(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    if(sc64_showcase_scene>=0)return 200+sc64_showcase_scene;
+#endif
 #ifdef SC64_RACES
     return race_mode?
 #ifdef SC64_IMPORTED_SKIRMISH

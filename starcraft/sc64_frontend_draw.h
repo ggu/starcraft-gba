@@ -65,6 +65,13 @@ static const char *front_map_title(int map)
     return names[map];
 }
 
+#ifdef SC64_SHOWCASE_ENABLED
+static const char *front_showcase_title(int scene)
+{
+    return sc64_front_showcase_name(scene);
+}
+#endif
+
 static const char *front_campaign_title(int faction)
 {
 #ifdef SC64_UNIFIED
@@ -263,6 +270,24 @@ static void sc64_frontend_draw(void)
         if((available+1)/2>1) gfx_text(199,121,"L/R PAGE",C_GOLD);
         front_uplink();front_footer("UP/DN MISSION  L/R PAGE  A BRIEFING  B BACK");
     } else if(page==SC_FRONT_BRIEFING)front_briefing();
+#ifdef SC64_SHOWCASE_ENABLED
+    else if(page==SC_FRONT_SHOWCASE) {
+        front_header("SHOWCASE SCENES","FILMING SETUPS");
+        gfx_rect(106,43,126,82,C_PANEL);
+        gfx_frame(106,43,126,82,C_EDGE);
+        for(int i=0;i<8;i++)
+            front_button(110,46+i*10,118,10,front_showcase_title(i),race_front.row==i);
+        gfx_text(12,58,"STAGED",C_GOLD);
+        gfx_text(12,70,"BATTLES",C_GOLD);
+        gfx_text(12,94,"QUICK",C_DIM);
+        gfx_text(12,104,"RESTART",C_DIM);
+        if(race_front.row==0) {
+            gfx_text(12,119,"CARRIER",C_SILVER);
+            gfx_text(12,129,"PREVIEW",C_SILVER);
+        }
+        front_footer("UP/DN SCENE   A START   B BACK");
+    }
+#endif
     else if(page==SC_FRONT_SKIRMISH) {
         front_header("CUSTOM GAME",0);
 #ifdef SC64_IMPORTED_SKIRMISH
