@@ -1680,10 +1680,11 @@ test-sc64-p5-defense-targets: build/test-sc64-p5-defense-targets
 	./build/test-sc64-p5-defense-targets
 
 .PHONY: test-sc64-zp-defense-targets
-test-sc64-zp-defense-targets: build/test-sc64-z4-defense-targets build/test-sc64-p4-defense-targets build/test-sc64-z5-defense-targets
+test-sc64-zp-defense-targets: build/test-sc64-z4-defense-targets build/test-sc64-p4-defense-targets build/test-sc64-z5-defense-targets build/test-sc64-p5-defense-targets
 	./build/test-sc64-z4-defense-targets
 	./build/test-sc64-p4-defense-targets
 	./build/test-sc64-z5-defense-targets
+	./build/test-sc64-p5-defense-targets
 test-sc64-terran-full-targets: build/test-sc64-terran-full-targets
 	./build/test-sc64-terran-full-targets
 test-sc64-terran-full-spatial-hud: build/test-sc64-terran-full-collision build/test-sc64-terran-full-hud
@@ -2841,6 +2842,27 @@ build/StarCraft-Zerg-Z7-Sight-Spans-Probe-GBA.gba: build/starcraft-zerg-z7-sight
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 VIS36' SCZX
 zerg-z7-sight-spans-probe: build/StarCraft-Zerg-Z7-Sight-Spans-Probe-GBA.gba
+
+# Z7-only qualification of fresh defense owner/flight lists. Keep the canonical
+# race flags unchanged; this probe has its own parity and timing qualification.
+Z7_DEFENSE_TARGET_FLAGS := $(Z7_SIGHT_SPAN_FLAGS) -DSC64_ZP_DEFENSE_TARGETS
+$(eval $(call Z7_TRACE_PARITY_BUILD,defense-targets,$(Z7_DEFENSE_TARGET_FLAGS)))
+build/test-sc64-z7-defense-targets: tests/sc64_zp_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_DEFENSE_TARGET_FLAGS) $< common/gba.c -o $@
+$(eval $(call Z7_PREVALIDATION_CHECK,defense-targets,runtime,sc64_z7_runtime.c,$(Z7_DEFENSE_TARGET_FLAGS)))
+$(eval $(call Z7_PREVALIDATION_CHECK,defense-targets,save,sc64_z7_game_save.c,$(Z7_DEFENSE_TARGET_FLAGS)))
+.PHONY: test-sc64-z7-defense-targets zerg-z7-defense-targets-probe
+test-sc64-z7-defense-targets: build/test-sc64-z7-defense-targets build/test-sc64-z7-prevalidated-defense-targets-runtime build/test-sc64-z7-prevalidated-defense-targets-save
+	./build/test-sc64-z7-defense-targets
+	./build/test-sc64-z7-prevalidated-defense-targets-runtime
+	./build/test-sc64-z7-prevalidated-defense-targets-save
+build/starcraft-zerg-z7-defense-targets-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_DEFENSE_TARGET_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-defense-targets-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Defense-Targets-Probe-GBA.gba: build/starcraft-zerg-z7-defense-targets-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 DEF36' SCZY
+zerg-z7-defense-targets-probe: build/StarCraft-Zerg-Z7-Defense-Targets-Probe-GBA.gba
 
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE

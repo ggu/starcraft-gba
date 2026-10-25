@@ -22,6 +22,8 @@ CANDIDATE_TARGET = "build/test-sc64-z7-trace-count-snapshot"
 VARIANTS = {
     "count-snapshot": (REFERENCE_TARGET, CANDIDATE_TARGET),
     "sight-spans": (CANDIDATE_TARGET, "build/test-sc64-z7-trace-sight-spans"),
+    "defense-targets": ("build/test-sc64-z7-trace-sight-spans",
+                        "build/test-sc64-z7-trace-defense-targets"),
 }
 MAX_TICKS = 1_000_000
 HASH_RE = re.compile(r"^[0-9a-f]{16}$")
@@ -189,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("traces", nargs="+", type=Path,
                         help="authenticated Z7 host trace JSON file(s)")
     parser.add_argument("--variant", choices=VARIANTS, default="count-snapshot",
-                        help="compare the count cache or source-radius sight spans")
+                        help="compare the count cache, sight spans or fresh defense lists")
     parser.add_argument("--output-dir", type=Path,
                         default=Path(".local/build/z7-trace-parity"),
                         help="directory for per-update comparison streams")
