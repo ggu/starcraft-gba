@@ -1,4 +1,13 @@
 .DEFAULT_GOAL := all
+
+# Asset-free Interceptor order decisions; no gameplay integration is enabled.
+.PHONY: test-sc64-interceptor-orders
+build/test-sc64-interceptor-orders: tests/sc64_interceptor_orders.c starcraft/sc64_interceptor_orders.c starcraft/sc64_interceptor_orders.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft $< starcraft/sc64_interceptor_orders.c -o $@
+test-sc64-interceptor-orders: build/test-sc64-interceptor-orders
+	./build/test-sc64-interceptor-orders
+test-starcraft: test-sc64-interceptor-orders
+
 PREFIX ?= arm-none-eabi-
 CC := $(PREFIX)gcc
 OBJCOPY := $(PREFIX)objcopy
@@ -9,7 +18,9 @@ CFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -O2 -g -std=c11 -ffreestandin
 LDFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -nostdlib -Tcommon/gba.ld -Wl,--gc-sections
 COMMON := common/start.s common/main.c common/gba.c common/memory.c common/audio_bank.S
 COMMON_HEADERS := $(wildcard common/*.h)
-STARCRAFT := $(wildcard starcraft/*.c)
+# The order-decision foundation is linked only by its isolated host check until
+# a gameplay adapter is implemented and qualified.
+STARCRAFT := $(filter-out starcraft/sc64_interceptor_orders.c,$(wildcard starcraft/*.c))
 
 # Optional private StarCraft 64 audio bank from tools/sc64_audio_pack.py. Every
 # imported profile links it when present; SC64_AUDIO=0 builds them silent.
