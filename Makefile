@@ -2180,6 +2180,22 @@ build/StarCraft-Protoss-P7-Runtime-Probe-GBA.gba: build/starcraft-protoss-p7-run
 .PHONY: protoss-p7-runtime-reference protoss-p7-runtime-probe
 protoss-p7-runtime-reference: build/StarCraft-Protoss-P7-Runtime-Reference-GBA.gba
 protoss-p7-runtime-probe: build/StarCraft-Protoss-P7-Runtime-Probe-GBA.gba
+build/test-sc64-p7-count-snapshot: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+.PHONY: test-sc64-p7-count-snapshot protoss-p7-count-probe
+test-sc64-p7-count-snapshot: build/test-sc64-p7-runtime-reference build/test-sc64-p7-runtime-prevalidated build/test-sc64-p7-count-snapshot
+	./build/test-sc64-p7-runtime-reference > build/sc64-p7-runtime-reference.txt
+	./build/test-sc64-p7-runtime-prevalidated > build/sc64-p7-runtime-prevalidated.txt
+	./build/test-sc64-p7-count-snapshot > build/sc64-p7-count-snapshot.txt
+	cmp build/sc64-p7-runtime-reference.txt build/sc64-p7-runtime-prevalidated.txt
+	cmp build/sc64-p7-runtime-reference.txt build/sc64-p7-count-snapshot.txt
+build/starcraft-protoss-p7-count-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_RUNTIME_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-count-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Count-Probe-GBA.gba: build/starcraft-protoss-p7-count-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+protoss-p7-count-probe: build/StarCraft-Protoss-P7-Count-Probe-GBA.gba
 build/test-sc64-p7-battery-rules: tests/sc64_p7_battery_rules.c starcraft/sc64_p7_battery_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-p7-battery-rules

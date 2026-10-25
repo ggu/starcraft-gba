@@ -1902,3 +1902,19 @@ hero-death conditions and a synthetic human-force defeat. The fast profile
 also checks full/fast validator agreement for 31,744 individual byte mutations.
 See [Validation](VALIDATION.md#p7-prevalidated-runtime-opening) for the scoped
 ARM measurement; neither probe is a near-30-fps campaign release.
+
+An additional default-off `SC64_P7_COUNT_SNAPSHOT` probe counts the eight
+authenticated ownership/type conditions in one actor census per runtime tick:
+
+```sh
+make test-sc64-p7-count-snapshot
+make protoss-p7-count-probe
+```
+
+It produces `build/StarCraft-Protoss-P7-Count-Probe-GBA.gba` and requires the
+prevalidated tick gate. The counts exist only during condition evaluation;
+invalid census data falls back to the checked callback. The differential
+fixture also exercises all three scripted actor creations, invalid ownership,
+unfinished structures and the Nexus-absence conditions. These synthetic
+condition stimuli do not qualify a mission win. See
+[Validation](VALIDATION.md#p7-count-snapshot-opening) for the opening measurement.

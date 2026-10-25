@@ -177,7 +177,11 @@ static int race_p7_world_prevalidated_bindings_valid(void)
     if (!race_p7_map || race_p7_map!=&sc64_race_maps[SC64_P7_GLOBAL_ID] ||
         race_p7_world.map!=race_p7_map || race_p7_world.persistent!=&race_p7 ||
         race_p7_world.source_current_player!=race_p7_map->human_slot ||
-        race_p7_world.prevalidated_tick) return 0;
+        race_p7_world.prevalidated_tick
+#ifdef SC64_P7_COUNT_SNAPSHOT
+        || race_p7_world.count_snapshot.active
+#endif
+        ) return 0;
     for (unsigned slot=0;slot<8u;++slot)
         if (race_p7_world.source_slot_active[slot]!=sc64_p7_active_slots[slot] ||
             race_p7_world.live_owner_for_source[slot]!=race_p7_source_owner(slot) ||
@@ -244,9 +248,15 @@ static int race_p7_runtime_tick(u32 elapsed_frames)
     race_p7_world.center_x=0;
     race_p7_world.center_y=0;
     race_p7_ops.elapsed_frames=elapsed_frames;
+#ifdef SC64_P7_COUNT_SNAPSHOT
+    (void)sc64_p7_count_snapshot_begin(&race_p7_world);
+#endif
     race_p7_world.prevalidated_tick=1;
     result=sc64_p7_adapter_tick_prevalidated(&race_p7.runtime,&race_p7_ops,0);
     race_p7_world.prevalidated_tick=0;
+#ifdef SC64_P7_COUNT_SNAPSHOT
+    sc64_p7_count_snapshot_end(&race_p7_world);
+#endif
     return result>=0 && sc64_p7_persistent_state_valid_prevalidated(&race_p7);
 #else
     if (!race_p7_runtime_state_valid() || !race_p7_map ||

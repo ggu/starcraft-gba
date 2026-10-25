@@ -112,6 +112,53 @@ int main(void)
     assert(sc64_race_maps[SC64_P7_GLOBAL_ID].unit_count==357);
     assert(live_units()==SC64_P7_MAP_UNITS);
     assert(live_buildings()==SC64_P7_MAP_BUILDINGS);
+#ifdef SC64_P7_COUNT_SNAPSHOT
+    {
+        int building=-1,was_constructing;
+        for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive) { building=i; break; }
+        assert(building>=0);
+        was_constructing=b[building].under_construction;
+        b[building].under_construction=1; /* Command includes unfinished buildings. */
+        assert(sc64_p7_count_snapshot_begin(&race_p7_world));
+        for (unsigned t=0;t<SC64_P7_TRIGGER_COUNT;++t) {
+            const Sc64P7SourceCondition *c;
+            u32 cached=0,checked=0;
+            assert(sc64_p7_condition_row(t,0,&c));
+            if (c->opcode!=SC64_P7_CONDITION_COMMAND) continue;
+            assert(!sc64_p7_count_snapshot_lookup(&race_p7_world,c,&cached));
+            race_p7_world.prevalidated_tick=1;
+            assert(sc64_p7_count_snapshot_lookup(&race_p7_world,c,&cached));
+            assert(sc64_p7_world_count(&race_p7_world,c->player,c->unit,0,&checked));
+            assert(cached==checked);
+            race_p7_world.prevalidated_tick=0;
+        }
+        sc64_p7_count_snapshot_end(&race_p7_world);
+        assert(!race_p7_world.count_snapshot.active);
+        b[building].under_construction=was_constructing;
+    }
+#endif
+    {
+        u32 ignored=0;
+        int actor=-1,old_owner;
+        assert(!sc64_p7_world_count(&race_p7_world,14,229,0,&ignored));
+        for (int i=0;i<MAX_UNITS;++i) if (u[i].alive) { actor=i; break; }
+        assert(actor>=0);
+        old_owner=u[actor].raw_owner;
+        u[actor].raw_owner=-1;
+        assert(!sc64_p7_world_count(&race_p7_world,13,229,0,&ignored));
+#ifdef SC64_P7_COUNT_SNAPSHOT
+        race_p7_world.prevalidated_tick=1;
+        assert(!sc64_p7_count_snapshot_begin(&race_p7_world));
+        {
+            const Sc64P7SourceCondition *c;
+            assert(sc64_p7_condition_row(0,0,&c));
+            assert(sc64_p7_world_condition(&race_p7_world,&race_p7.runtime,c)<0);
+        }
+        race_p7_world.prevalidated_tick=0;
+        assert(!race_p7_world.count_snapshot.active);
+#endif
+        u[actor].raw_owner=old_owner;
+    }
 
     for (int i=0;i<120;++i) {
         game_update(0,0);
@@ -155,6 +202,16 @@ int main(void)
         assert(live_buildings()==SC64_P7_MAP_BUILDINGS);
     }
     for (int i=0;i<600;++i) game_update(0,0);
+    /* Exercise the authenticated switch-gated action row and its CreateUnit
+       effects over real subsequent engine ticks. */
+    {
+        unsigned before=live_units();
+        race_p7.runtime.switch_bits|=SC64_P7_SWITCH_MASK;
+        for (int i=0;i<1200 && screen==SCREEN_PLAY && race_p7.created_mask!=7u;++i)
+            game_update(0,0);
+        assert(race_p7.created_mask==7u);
+        assert(live_units()>before);
+    }
     assert(screen==SCREEN_PLAY && race_p7_runtime_state_valid());
     unsigned conditions_before=live_condition_vector();
     assert(race_p7.runtime.model.started & (1u<<4));
@@ -184,6 +241,17 @@ int main(void)
     assert(screen==SCREEN_PLAY && race_p7_runtime_state_valid());
     for (unsigned t=1;t<=3;++t) {
         kill_source_condition(t);
+        for (int i=0;i<12;++i) game_update(0,0);
+        assert(race_p7.runtime.model.started & (1u<<t));
+    }
+    for (unsigned t=8;t<=9;++t) {
+        const Sc64P7SourceCondition *c;
+        assert(sc64_p7_condition_row(t,0,&c));
+        for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive &&
+            b[i].raw_type==(int)c->unit &&
+            sc64_p7_world_owner_matches(&race_p7_world,c->player,
+                                        b[i].raw_owner,b[i].owner)==1)
+            b[i].alive=0;
         for (int i=0;i<12;++i) game_update(0,0);
         assert(race_p7.runtime.model.started & (1u<<t));
     }

@@ -7,6 +7,13 @@
 #include "sc64_p7_geometry.h"
 #include "sc64_resource_actions.h"
 
+#ifdef SC64_P7_COUNT_SNAPSHOT
+#if !defined(SC64_P7_PREVALIDATED_TICK)
+#error "P7 count snapshot requires the prevalidated tick path"
+#endif
+typedef struct { u32 count[8]; u8 active; } Sc64P7CountSnapshot;
+#endif
+
 enum {
     SC64_P7_OWNER_SLOTS = 8,
     SC64_P7_MAP_UNITS = 180,
@@ -45,7 +52,93 @@ typedef struct {
 #ifdef SC64_P7_PREVALIDATED_TICK
     u8 prevalidated_tick;
 #endif
+#ifdef SC64_P7_COUNT_SNAPSHOT
+    Sc64P7CountSnapshot count_snapshot;
+#endif
 } Sc64P7WorldContext;
+
+#ifdef SC64_P7_COUNT_SNAPSHOT
+static int sc64_p7_world_owner_matches(const Sc64P7WorldContext *,unsigned,int,int);
+static int sc64_p7_world_type_match(unsigned,unsigned,int);
+/* The eight authenticated Command rows, indexed by trigger. Build counts in
+ * one Unit+Building census while preserving the reference callback's
+ * fail-closed owner and raw-type checks. */
+static int sc64_p7_count_snapshot_begin(Sc64P7WorldContext *ctx)
+{
+    Sc64P7CountSnapshot next = {{0},0};
+    static const u8 selector[8] = {13,17,17,17,19,18,18,19};
+    static const u8 wanted[8] = {229,78,79,75,229,229,154,154};
+    if (!ctx) return 0;
+    ctx->count_snapshot.active=0;
+    for (unsigned q=0;q<8;++q) {
+        unsigned trigger = q==0 ? 0 : q<=3 ? q : q+2;
+        const Sc64P7SourceCondition *c;
+        if (!sc64_p7_condition_row(trigger,0,&c) ||
+            c->opcode!=SC64_P7_CONDITION_COMMAND || c->player!=selector[q] ||
+            c->unit!=wanted[q] || c->location || c->resource || c->mask ||
+            c->flags!=0x10u) return 0;
+    }
+    for (int pass=0;pass<2;++pass) {
+        int limit=pass ? MAX_BUILDINGS : MAX_UNITS;
+        for (int i=0;i<limit;++i) {
+            int alive=pass ? b[i].alive : u[i].alive;
+            int raw_owner=pass ? b[i].raw_owner : u[i].raw_owner;
+            int live_owner=pass ? b[i].owner : u[i].owner;
+            if (!alive) continue;
+            int raw=pass ? (b[i].raw_type>=0 ? b[i].raw_type : sc64_race_raw_building(b[i].type)) :
+                           (u[i].raw_type>=0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type));
+            int owner13=sc64_p7_world_owner_matches(ctx,13,raw_owner,live_owner);
+            int owner17=sc64_p7_world_owner_matches(ctx,17,raw_owner,live_owner);
+            int owner19=sc64_p7_world_owner_matches(ctx,19,raw_owner,live_owner);
+            int owner18=sc64_p7_world_owner_matches(ctx,18,raw_owner,live_owner);
+            if (owner13<0 || owner17<0 || owner19<0 || owner18<0) return 0;
+            if (!(owner13 || owner17 || owner19 || owner18)) continue;
+            if (raw<0 || raw>227) return 0;
+            if (owner13) ++next.count[0];
+            if (owner17) {
+                for (unsigned q=1;q<=3;++q) {
+                    int match=sc64_p7_world_type_match(wanted[q],(unsigned)raw,pass);
+                    if (match<0) return 0;
+                    if (match) ++next.count[q];
+                }
+            }
+            if (owner19) ++next.count[4];
+            if (owner18) {
+                ++next.count[5];
+                int match=sc64_p7_world_type_match(154,(unsigned)raw,pass);
+                if (match<0) return 0;
+                if (match) ++next.count[6];
+            }
+            if (owner19) {
+                int match=sc64_p7_world_type_match(154,(unsigned)raw,pass);
+                if (match<0) return 0;
+                if (match) ++next.count[7];
+            }
+        }
+    }
+    next.active=1;
+    ctx->count_snapshot=next;
+    return 1;
+}
+
+static void sc64_p7_count_snapshot_end(Sc64P7WorldContext *ctx)
+{ if (ctx) ctx->count_snapshot.active=0; }
+
+static int sc64_p7_count_snapshot_lookup(const Sc64P7WorldContext *ctx,
+                                          const Sc64P7SourceCondition *c,
+                                          u32 *count)
+{
+    unsigned q;
+    if (!ctx || !count || ctx->prevalidated_tick!=1 ||
+        ctx->count_snapshot.active!=1 || !c || c->index ||
+        c->opcode!=SC64_P7_CONDITION_COMMAND) return 0;
+    q=c->trigger==0 ? 0 : c->trigger<=3 ? c->trigger : c->trigger==6 ? 4 :
+      c->trigger==7 ? 5 : c->trigger==8 ? 6 : c->trigger==9 ? 7 : 8;
+    if (q>=8) return 0;
+    *count=ctx->count_snapshot.count[q];
+    return 1;
+}
+#endif
 
 static int sc64_p7_world_location_source(const Sc64P7WorldContext *ctx,
                                           unsigned id, unsigned *left,
@@ -230,8 +323,14 @@ static int sc64_p7_world_condition(void *context,const Sc64P7RuntimeState *state
         ) return -1;
     switch(c->opcode) {
     case SC64_P7_CONDITION_COMMAND:
+#ifdef SC64_P7_COUNT_SNAPSHOT
+        if (c->location || c->resource || c->mask || c->flags!=0x10u) return -1;
+        if (!sc64_p7_count_snapshot_lookup(ctx,c,&count) &&
+            !sc64_p7_world_count(ctx,c->player,c->unit,0,&count)) return -1;
+#else
         if (c->location || c->resource || c->mask || c->flags!=0x10u ||
             !sc64_p7_world_count(ctx,c->player,c->unit,0,&count)) return -1;
+#endif
         return sc64_p7_world_compare(c->comparison,count,c->amount);
     case SC64_P7_CONDITION_SWITCH:
         if (c->location || c->player || c->amount || c->unit ||

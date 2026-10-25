@@ -4463,3 +4463,35 @@ canonical unified ROMs retain `4ad80ce0…f9aee` and `6bab5be2…979f9`.
 Default build/tests (404 Python tests plus host fixtures), unified build/tests,
 the focused differential fixture, ARM links and source-index audit pass.
 Qualified staged campaign progress remains 22/30; the PR remains draft.
+
+### P7 count snapshot opening
+
+The default-off `SC64_P7_COUNT_SNAPSHOT` gate combines the eight authenticated
+Command conditions into one Unit/Building census before condition evaluation.
+Actions execute after those conditions. The transient snapshot is available
+only inside the prevalidated tick scope, is cleared on return, and falls back
+to the checked callback if actor ownership or type data is invalid. Unfinished
+structures retain their reference counting behavior. Save data is unchanged.
+
+Reference, prevalidated and count-snapshot sanitizer fixtures produce identical
+traces through ordinary menu launch and pause/save/load, all three scripted
+CreateUnit effects, hero deaths, Nexus-absence conditions and synthetic force
+defeat. Invalid selectors/owners and out-of-scope cache access reject. The
+31,744 persistent-state mutation comparisons remain in the fixture. These
+stimuli test condition and action equivalence, not a normal-input mission win.
+
+The same 600-update, no-tactical-input ARM opening improves from **9.004 fps**
+to **10.512 fps** (16.7 percent). All 14 recorded banks match at seven
+checkpoints, with no runtime fault or unsupported row. Later combat, complete
+mission play, fresh-process SRAM and physical hardware remain unqualified;
+this is still far below 30 fps.
+
+The 4-MiB count probe hashes to
+`f51042ecd245fed4b5db09ea2057a5702394fe105a9a1e22a29e2b32f0767358`.
+IWRAM ends at `0x030047d8`; BSS ends at `0x0203d86c`, a 32-byte increase over
+the prevalidated probe. RaceSave remains 16,348 bytes, its supplement 124 bytes,
+and ARM Unit/Building sizes 56/48 bytes. Removing only this gate reproduces
+the prevalidated `663d67fa…63029` ROM byte for byte. Default build/tests
+(404 Python tests plus host fixtures), unified build/tests, focused sanitizer
+comparisons and ARM links pass with the unchanged RAM guards. Qualified staged
+campaign progress remains 22/30 and the PR stays draft.
