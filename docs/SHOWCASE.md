@@ -46,6 +46,27 @@ destruction or defeat. Wall-clock duration depends on actual frame rate.
 The map is a flat, fully revealed filming arena, with economy AI disabled so
 it does not rebuild or change the setup.
 
+## Unit facing
+
+The showcase build also turns on `SC64_UNIT_FACING`, which draws units in the
+32 StarCraft directions instead of only the north-facing frame. Before
+building, `tools/sc64_unit_facing.py` imports frames 0–16 of each unit's art
+into `.local/sc64/facing/generated/`; the other 15 directions are mirrored.
+Units face their direction of travel, measured over at least 8 pixels so the
+8-way movement steps do not jitter, and turn toward their target when they
+fire. Siege Tanks draw their hull and turret subunits (raw 5/6, or 30/31 when
+sieged), so Siege Line shows real tank art instead of placeholders.
+
+Facing is presentation-only. It is kept in 3 bytes per actor slot that the
+simulation never reads, and it is not saved: after a load, units face north
+until they move or fire. With per-update rendering, the host showcase
+simulation ends every scene with byte-identical unit and building state
+whether facing is on or off. The facing frames add about 416 KiB of ROM. The
+showcase ROM keeps the unchanged IWRAM end (0x03004a28) and ends BSS at
+0x0203dfa8, under the 0x0203e000 guard. Canonical ROMs leave the flag off.
+Every Siege Tank shares one turret direction with its hull, so a tank cannot
+yet aim its turret independently while driving.
+
 For a controller-only mGBA replay, captures and timings:
 
 ```sh
