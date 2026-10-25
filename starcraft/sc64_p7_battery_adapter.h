@@ -52,8 +52,23 @@ static int sc64_p7_battery_fields_valid(int battery)
                                      (unsigned)q->level);
 }
 
+static int sc64_p7_battery_powered_live(int battery)
+{
+    const Building *target;
+    if (battery<0 || battery>=MAX_BUILDINGS || !b[battery].alive) return 0;
+    target=&b[battery];
+    if (target->type!=B_P7_SHIELD_BATTERY || target->raw_type!=172 ||
+        target->raw_owner<0 || target->raw_owner>=8) return 0;
+    for (int i=0;i<MAX_BUILDINGS;++i) if (building_complete(i) &&
+        b[i].type==B_PYLON && b[i].raw_type==156 &&
+        b[i].owner==target->owner && b[i].raw_owner==target->raw_owner &&
+        sc64_p7_in_psi_range(target->x-b[i].x,target->y-b[i].y)) return 1;
+    return 0;
+}
+
 static int sc64_p7_battery_target_valid(int battery)
-{ return sc64_p7_battery_fields_valid(battery) && !b[battery].under_construction; }
+{ return sc64_p7_battery_fields_valid(battery) &&
+         !b[battery].under_construction && sc64_p7_battery_powered_live(battery); }
 
 static int sc64_p7_battery_distance_unit(int unit, int battery)
 {
@@ -130,9 +145,8 @@ static int race_p7_battery_command_available(void)
         selected_building>=MAX_BUILDINGS) return 0;
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].selected) return 0;
     const Building *q=&b[selected_building];
-    return q->alive && q->owner==SIDE && q->raw_owner==7 && q->raw_type==172 &&
-        q->type==B_P7_SHIELD_BATTERY && !q->under_construction &&
-        q->queue_progress>0;
+    return q->owner==SIDE && q->raw_owner==7 &&
+        sc64_p7_battery_target_valid(selected_building) && q->queue_progress>0;
 }
 
 static int race_p7_battery_build_available(void)

@@ -1581,15 +1581,26 @@ make protoss-p7-battery-probe
 The internal ARM probe combines Battery, Observer and Archon gates. It retains
 the qualified campaign menu; it is not a completed P7 release. In a P7 test
 world, a selected Probe exposes SHIELD BATTERY after a completed Gateway;
-placement still requires power and pays 100 minerals. A selected completed
+placement requires a completed same-source-owner Pylon's field and pays 100
+minerals. The Battery checks the pinned source psi mask at the represented
+half-resolution actor centers, including its asymmetric cell boundaries.
+A selected completed, powered
 Battery exposes RECHARGE: click a friendly unit or a point to order eligible
 units in the source-size square to approach it and recharge shields.
+
+Losing power cancels Recharge on the actor's next service update, before any
+transfer. Saving immediately after a supporting Pylon dies preserves the
+pending order; loading cancels it on its next update. Saving does not advance
+the simulation. Battery energy regeneration and construction progress continue
+without power, as in the pinned reference. Native disabled statuses that the
+adapter does not represent remain unsupported.
 
 The service uses existing fields for Q8 energy, regeneration phase and shield
 fractions. P7 state shares the existing Protoss save union; internal generation
 37 rejects older experimental formats. No actor fields or reserve increases
-are introduced. Only the fixed-point fixture joins the asset-free default
-suite; the full target also checks actual construction/recharge saves, source
+are introduced. The fixed-point and psi-mask geometry fixtures join the
+asset-free default suite; the full target also checks actual
+construction/recharge saves, immediate power-loss pause/save/load, source
 bindings, recycled targets, and existing P5/Shuttle/P6 save fixtures with the
 gate enabled. See [Validation](VALIDATION.md#experimental-p7-shield-battery)
 for limits and scoped ARM evidence.

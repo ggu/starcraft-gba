@@ -4244,8 +4244,10 @@ finishes the real construction timer. It renders the Probe and Battery menus,
 issues recharge, checks shield gain/energy cost and cooldown progression, and
 round-trips the live recharge order, target, energy and fractional shields.
 Candidate tests reject wrong mission/mode, dead/wrong-type/wrong-owner targets,
-invalid transport orders, full shields, missing energy and corrupt queue/phase
-fields. Reusing a dead Battery's building slot clears its old Recharge orders.
+invalid transport orders, above-maximum shields, full shields with a nonzero
+fraction and corrupt queue/phase fields. Exact full shields and empty energy
+can occur between service slots and remain valid pending orders until the next
+update. Reusing a dead Battery's building slot clears its old Recharge orders.
 Combat destruction clears those orders immediately, including before a save.
 Destroyed original map Batteries remain saveable.
 
@@ -4258,7 +4260,8 @@ shared payload for corruption. No IWRAM, BSS or 16,368-byte save limit changes.
 ARM debug types confirm a 16,348-byte RaceSave, 56-byte Unit and 48-byte
 Building. The documented Make ARM target reproduces the measured ROM bytes.
 
-The combined ARM link uses ROM `6cf35113…f5b402` (4 MiB), IWRAM end
+The combined ARM link with Battery power checks uses ROM
+`b70bf313…9e4a11` (4 MiB), IWRAM end
 `0x030047d8` and BSS end `0x0203d844`. The first inline service attempt exceeded
 the unchanged IWRAM guard; keeping the optional service in ROM fixes that.
 The Battery-off link reproduces the previous complete-P7-art Observer/Archon
@@ -4267,15 +4270,37 @@ ROM `92ff35aa…175d5f` byte for byte, with BSS end `0x0203d774`.
 This is mechanical and save-fixture coverage plus an ARM link, not a complete
 P7 playthrough, fresh-process ARM SRAM proof or performance measurement.
 Carrier Interceptors, Arbiter abilities and broader P7 production/AI remain
-unfinished. Native animation/secondary orders, power-loss/disabled-state
-servicing, blinded state and source power geometry remain outside this bounded
-Battery implementation.
+unfinished. Native animation/secondary orders, blinded state and disabled
+statuses other than represented Pylon power remain outside this bounded
+Battery implementation. Power for other P7 structures remains a separate
+integration task.
 The 24-to-30-Hz transfer scaling and final non-Q8 shield fraction are
 approximations. Qualified staged progress remains 22/30.
 
 The final C/header/Make inputs remain hash-stable throughout the focused
 Battery suite, documented ARM build, `./dev build`, `./dev test` (387 Python
 tests plus host fixtures), `make unified` and `make test-unified`; all pass.
+
+The Battery power follow-up uses the pinned OpenBW 5-by-8 psi mask and its
+outer-bound-before-negative-adjustment rule. Live placement and Recharge
+availability require a completed raw-156 Pylon with both runtime and source
+owner matching; source players 0 and 4 cannot share power just because the
+adapter groups them under one opponent owner. Coordinates use the source
+geometry at the represented half-resolution centers. Completed-Pylon activation
+is derived from the represented construction state; exact source order/list
+activation timing is not reproduced.
+
+The asset-free geometry fixture checks every integer point in a 301-by-201
+rectangle against independent horizontal-band bounds, signed interior/outer
+edges and extreme integer inputs. Actual-engine fixtures reject
+wrong-owner/incomplete/destroyed Pylon placement, cancel Recharge without
+transfer on power loss, and kill supporting Pylons through combat before an
+immediate pause-menu save/load. The loaded pending order cancels at its next
+service update. Candidate validation checks stable identity without consulting
+live power or changing the simulation. Unpowered energy regeneration and
+construction progress also pass. Existing full-shield/empty-energy transients
+remain saveable while forged shield bounds reject. No persistent fields,
+actor sizes or reserve guards change.
 Original-art and unified ROMs remain `4ad80ce0…f9aee` and `6bab5be2…979f9`.
 The source-only index contains 572 text files; generated inputs and ROMs stay
 local.

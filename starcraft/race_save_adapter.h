@@ -990,6 +990,10 @@ static int race_load_game(void) {
            ((order==ORDER_GAS||order==ORDER_BUILD)&&(target<0||target>=MAX_BUILDINGS)))return 0;
 #ifdef SC64_P7_BATTERY_ENABLED
         if (order==ORDER_P7_RECHARGE) {
+            /* Validate persistent identities, not temporary availability.
+             * Another actor may empty the Battery or kill its last Pylon
+             * after this actor's slot; passive regeneration can fill shields.
+             * A pause/save preserves that order until its next service tick. */
             Building target_battery;
             const Sc64RaceUnitRule *unit_rule=sc64_race_unit_rule(candidate_unit.type);
             if (race_data.state[0] != 0 ||
@@ -999,7 +1003,9 @@ static int race_load_game(void) {
                 candidate_unit.work_timer!=0 || !unit_rule ||
                 unit_rule->race!=R_PROTOSS ||
                 !(unit_rule->flags&SC_RACE_F_SHIELDS) ||
-                candidate_unit.shield>=unit_rule->shields ||
+                candidate_unit.shield>unit_rule->shields ||
+                (candidate_unit.shield==unit_rule->shields &&
+                 candidate_unit.shield_remainder!=0) ||
                 (sc64_game_unit_actor_flags(candidate_unit.type) &&
                  !(sc64_game_unit_actor_flags(candidate_unit.type)&SC64_GAME_ACTOR_MOVABLE)) ||
                 SC64_TRANSPORT_LOADED(&candidate_unit) || target<0 ||
@@ -1007,7 +1013,6 @@ static int race_load_game(void) {
                 !race_save_decode_building(&race_data,(unsigned)target,&target_battery) ||
                 !target_battery.alive || target_battery.type!=B_P7_SHIELD_BATTERY ||
                 target_battery.raw_type!=172 || target_battery.under_construction ||
-                target_battery.queue_progress<=0 ||
                 target_battery.owner!=candidate_unit.owner ||
                 target_battery.raw_owner!=candidate_unit.raw_owner) return 0;
         }

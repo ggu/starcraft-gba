@@ -2130,6 +2130,12 @@ build/test-sc64-p7-battery-rules: tests/sc64_p7_battery_rules.c starcraft/sc64_p
 test-sc64-p7-battery-rules: build/test-sc64-p7-battery-rules
 	./build/test-sc64-p7-battery-rules
 test-starcraft: test-sc64-p7-battery-rules
+build/test-sc64-p7-power-geometry: tests/sc64_p7_power_geometry.c starcraft/sc64_p7_power_geometry.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-p7-power-geometry
+test-sc64-p7-power-geometry: build/test-sc64-p7-power-geometry
+	./build/test-sc64-p7-power-geometry
+test-starcraft: test-sc64-p7-power-geometry
 build/test-sc64-p7-battery-game: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p7-battery-combined: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -2143,7 +2149,7 @@ build/test-sc64-p7-battery-p5-union: tests/sc64_p7_union_tail_p5.c $(STARCRAFT) 
 build/test-sc64-p6-battery-save: tests/sc64_p6_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_BATTERY_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-p7-battery
-test-sc64-p7-battery: test-sc64-p7-battery-rules build/test-sc64-p7-battery-game build/test-sc64-p7-battery-combined build/test-sc64-p5-battery-save build/test-sc64-p5-battery-shuttle-save build/test-sc64-p7-battery-p5-union build/test-sc64-p6-battery-save
+test-sc64-p7-battery: test-sc64-p7-battery-rules test-sc64-p7-power-geometry build/test-sc64-p7-battery-game build/test-sc64-p7-battery-combined build/test-sc64-p5-battery-save build/test-sc64-p5-battery-shuttle-save build/test-sc64-p7-battery-p5-union build/test-sc64-p6-battery-save
 	./build/test-sc64-p7-battery-game
 	./build/test-sc64-p7-battery-combined
 	./build/test-sc64-p5-battery-save

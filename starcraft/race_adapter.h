@@ -13,6 +13,7 @@
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_battery_rules.h"
+#include "sc64_p7_power_geometry.h"
 #endif
 
 #ifdef SC64_T5_RUNTIME
@@ -307,6 +308,18 @@ static int race_site_powered(int owner, int x, int y)
     return 0;
 }
 
+#ifdef SC64_P7_BATTERY_ENABLED
+static int race_p7_battery_site_powered(int owner,int x,int y)
+{
+    if (!race_p7_active() || owner!=SIDE) return 0;
+    for (int i=0;i<MAX_BUILDINGS;++i)
+        if (building_complete(i) && b[i].type==B_PYLON &&
+            b[i].raw_type==156 && b[i].owner==owner && b[i].raw_owner==7 &&
+            sc64_p7_in_psi_range(x-b[i].x,y-b[i].y)) return 1;
+    return 0;
+}
+#endif
+
 static int race_site_creep(int owner, int x, int y)
 {
     int i;
@@ -340,6 +353,12 @@ static int race_can_site(int owner, int type, int x, int y)
     /* Imported Lairs/Hives and Greater Spires are recognized structures,
        but this adapter does not implement their morph/build operations. */
     if (type == B_LAIR || type == B_HIVE || type == B_GREATER_SPIRE) return 0;
+#ifdef SC64_P7_BATTERY_ENABLED
+    if ((r->flags & SC_RACE_F_REQUIRES_POWER) && race_p7_active() &&
+        type==B_P7_SHIELD_BATTERY) {
+        if (!race_p7_battery_site_powered(owner,x,y)) return 0;
+    } else
+#endif
     if ((r->flags & SC_RACE_F_REQUIRES_POWER) && !race_site_powered(owner, x, y)) return 0;
     if (race == R_ZERG && type != B_HATCHERY && type != B_EXTRACTOR && !race_site_creep(owner, x, y)) return 0;
     if (type == B_EXTRACTOR || type == B_ASSIMILATOR) {

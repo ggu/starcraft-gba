@@ -99,6 +99,18 @@ static void test_battery_candidate_guards(int unit_slot,int battery_slot)
     memcpy(&battery_candidate,&race_data,sizeof(battery_candidate));
     actor=battery_candidate_unit(&battery_candidate,unit_slot);
     actor.shield=rule->shields;
+    actor.shield_remainder=0;
+    battery_candidate_store_unit(&battery_candidate,unit_slot,&actor);
+    /* Reaching full shields between the Recharge actor's service slot and a
+       pause is a valid snapshot; its next order tick completes the order. */
+    assert(race_p5_transport_save_candidate_valid(&battery_candidate,
+                                                   race_cols,race_rows));
+    actor.shield=rule->shields+1;
+    battery_candidate_store_unit(&battery_candidate,unit_slot,&actor);
+    assert(!race_p5_transport_save_candidate_valid(&battery_candidate,
+                                                    race_cols,race_rows));
+    actor.shield=rule->shields;
+    actor.shield_remainder=1;
     battery_candidate_store_unit(&battery_candidate,unit_slot,&actor);
     assert(!race_p5_transport_save_candidate_valid(&battery_candidate,
                                                     race_cols,race_rows));
@@ -161,8 +173,25 @@ static void test_battery_candidate_guards(int unit_slot,int battery_slot)
     target=battery_candidate_building(&battery_candidate,battery_slot);
     target.queue_progress=0;
     battery_candidate_store_building(&battery_candidate,battery_slot,&target);
-    assert(!race_p5_transport_save_candidate_valid(&battery_candidate,
-                                                    race_cols,race_rows));
+    /* Another Recharge actor can consume the last energy before this actor's
+       service slot; preserve that pending order for next-tick cancellation. */
+    assert(race_p5_transport_save_candidate_valid(&battery_candidate,
+                                                   race_cols,race_rows));
+    memcpy(&battery_candidate,&race_data,sizeof(battery_candidate));
+    target=battery_candidate_building(&battery_candidate,battery_slot);
+    int changed_pylon=0;
+    for (int i=0;i<MAX_BUILDINGS;++i) {
+        Building pylon=battery_candidate_building(&battery_candidate,i);
+        if (!pylon.alive || pylon.type!=B_PYLON || pylon.raw_type!=156 ||
+            pylon.owner!=target.owner || pylon.raw_owner!=target.raw_owner) continue;
+        pylon.raw_owner=(pylon.raw_owner+1)&7;
+        battery_candidate_store_building(&battery_candidate,i,&pylon);
+        ++changed_pylon;
+    }
+    assert(changed_pylon>0);
+    /* Power loss is transient runtime state, not malformed save identity. */
+    assert(race_p5_transport_save_candidate_valid(&battery_candidate,
+                                                   race_cols,race_rows));
 }
 
 static int source_actor(unsigned raw_owner, unsigned raw_type, int building)
@@ -206,6 +235,15 @@ int main(void)
     assert(sc64_p7_battery_click_overlap(0,127,10,140,0,0));
     assert(!sc64_p7_battery_click_overlap(-140,0,-128,10,0,0));
     assert(!sc64_p7_battery_click_overlap(0,-140,10,-128,0,0));
+    /* Pinned OpenBW psi-field edges/mask in source-pixel coordinates. */
+    assert(sc64_p7_in_psi_range(127,0));
+    assert(!sc64_p7_in_psi_range(128,0));
+    assert(sc64_p7_in_psi_range(-127,0));
+    assert(!sc64_p7_in_psi_range(-128,0));
+    assert(sc64_p7_in_psi_range(0,79));
+    assert(!sc64_p7_in_psi_range(0,80));
+    assert(sc64_p7_in_psi_range(0,-79));
+    assert(!sc64_p7_in_psi_range(96,64)); /* false cell at mask row 4, col 6 */
 
     game_init();
     race_mode=0;
@@ -222,6 +260,35 @@ int main(void)
     assert(b[source0].queue_progress==SC64_P7_BATTERY_MAX_ENERGY_Q8);
     assert(b[source4].queue_progress==SC64_P7_BATTERY_MAX_ENERGY_Q8);
     assert(source_actor(7,172,1)<0);
+    /* Source players 0 and 4 share a live opponent owner, but their Pylons
+       must not cross-power each other's Batteries. */
+    int test_pylon=spawn_build(b[source0].owner,B_PYLON,b[source0].x,
+                               b[source0].y,0);
+    assert(test_pylon>=0);
+    assert(b[source0].owner==b[source4].owner);
+    b[test_pylon].raw_type=156;
+    b[test_pylon].owner=b[source0].owner;
+    int other_pylons[MAX_BUILDINGS],other_raw_owner[MAX_BUILDINGS],other_count=0;
+    for (int i=0;i<MAX_BUILDINGS;++i) if (i!=test_pylon && b[i].alive &&
+        b[i].type==B_PYLON && b[i].raw_type==156) {
+        other_pylons[other_count]=i;
+        other_raw_owner[other_count++]=b[i].raw_owner;
+        b[i].raw_owner=6;
+    }
+    b[test_pylon].raw_owner=0;
+    assert(sc64_p7_battery_powered_live(source0));
+    assert(!sc64_p7_battery_powered_live(source4));
+    b[test_pylon].raw_owner=4;
+    b[test_pylon].x=b[source4].x; b[test_pylon].y=b[source4].y;
+    assert(sc64_p7_battery_powered_live(source4));
+    assert(!sc64_p7_battery_powered_live(source0));
+    b[test_pylon].under_construction=1;
+    assert(!sc64_p7_battery_powered_live(source4));
+    b[test_pylon].under_construction=0;
+    b[test_pylon].alive=0;
+    assert(!sc64_p7_battery_powered_live(source4));
+    for (int n=0;n<other_count;++n)
+        b[other_pylons[n]].raw_owner=other_raw_owner[n];
     b[source0].alive=0;
     assert(!race_p7_battery_initialize_source(&sc64_race_maps[SC64_P7_GLOBAL_ID]));
     b[source0].alive=1;
@@ -229,6 +296,32 @@ int main(void)
 
     int probe=source_actor(7,64,0), gateway=source_actor(7,160,1);
     assert(probe>=0 && gateway>=0 && !b[gateway].under_construction);
+    int pylon_slots[MAX_BUILDINGS],pylon_raw_owner[MAX_BUILDINGS];
+    int pylon_hp[MAX_BUILDINGS],pylon_shield[MAX_BUILDINGS],pylon_count=0;
+    for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive && b[i].type==B_PYLON &&
+        b[i].raw_type==156 && b[i].raw_owner==7) {
+        pylon_slots[pylon_count]=i;
+        pylon_raw_owner[pylon_count]=b[i].raw_owner;
+        pylon_hp[pylon_count]=b[i].hp;
+        pylon_shield[pylon_count]=b[i].shield;
+        ++pylon_count;
+    }
+    assert(pylon_count>0);
+    int pylon_x=b[pylon_slots[0]].x,pylon_y=b[pylon_slots[0]].y;
+    assert(race_p7_battery_site_powered(SIDE,pylon_x,pylon_y));
+    assert(race_can_site(SIDE,B_P7_SHIELD_BATTERY,pylon_x,pylon_y));
+    for (int n=0;n<pylon_count;++n) b[pylon_slots[n]].raw_owner=0;
+    assert(!race_p7_battery_site_powered(SIDE,pylon_x,pylon_y));
+    assert(!race_can_site(SIDE,B_P7_SHIELD_BATTERY,pylon_x,pylon_y));
+    for (int n=0;n<pylon_count;++n) b[pylon_slots[n]].raw_owner=pylon_raw_owner[n];
+    for (int n=0;n<pylon_count;++n) b[pylon_slots[n]].under_construction=1;
+    assert(!race_p7_battery_site_powered(SIDE,pylon_x,pylon_y));
+    assert(!race_can_site(SIDE,B_P7_SHIELD_BATTERY,pylon_x,pylon_y));
+    for (int n=0;n<pylon_count;++n) b[pylon_slots[n]].under_construction=0;
+    for (int n=0;n<pylon_count;++n) b[pylon_slots[n]].alive=0;
+    assert(!race_p7_battery_site_powered(SIDE,pylon_x,pylon_y));
+    assert(!race_can_site(SIDE,B_P7_SHIELD_BATTERY,pylon_x,pylon_y));
+    for (int n=0;n<pylon_count;++n) b[pylon_slots[n]].alive=1;
     int site_x=-1,site_y=-1;
     assert(legal_battery_site(u[probe].x,u[probe].y,&site_x,&site_y));
 
@@ -260,9 +353,14 @@ int main(void)
     assert(u[probe].order==ORDER_IDLE && u[probe].target==-1 &&
            b[human_battery].under_construction &&
            b[human_battery].build_progress==0);
+    /* Native construction does not pause after a placed building loses psi.
+       Exercise that distinction on the real paid Battery timer. */
+    for (int n=0;n<pylon_count;++n) b[pylon_slots[n]].raw_owner=6;
+    assert(!race_p7_battery_site_powered(SIDE,pylon_x,pylon_y));
     for (int tick=0;tick<3;++tick) race_tick_buildings();
     assert(b[human_battery].under_construction &&
            b[human_battery].build_progress==3);
+    for (int n=0;n<pylon_count;++n) b[pylon_slots[n]].raw_owner=pylon_raw_owner[n];
     int construction_progress=b[human_battery].build_progress;
     int construction_energy=b[human_battery].queue_progress;
     assert(race_save_game());
@@ -334,6 +432,33 @@ int main(void)
            u[zealot].target==human_battery);
     assert(race_p7_battery_live_world_valid());
     assert(race_p7_runtime_state_valid());
+
+    /* Losing the Battery's source-owner psi field disables it immediately:
+       Recharge cancels before any shield or energy transfer, and cancellation
+       remains saveable. Restoring power does not resurrect the old order. */
+    int power_energy=b[human_battery].queue_progress;
+    int power_shield=u[zealot].shield;
+    for (int n=0;n<pylon_count;++n) b[pylon_slots[n]].raw_owner=6;
+    assert(!sc64_p7_battery_target_valid(human_battery));
+    assert(!race_p7_battery_command_available());
+    /* Power is an instantaneous runtime eligibility check. A Pylon can be
+       lost after this actor's service slot; saving must preserve that real
+       transient order without changing it. */
+    assert(race_save_game());
+    assert(u[zealot].order==ORDER_P7_RECHARGE &&
+           u[zealot].target==human_battery &&
+           u[zealot].shield==power_shield &&
+           b[human_battery].queue_progress==power_energy);
+    assert(race_p7_battery_tick_unit(zealot));
+    assert(u[zealot].order==ORDER_IDLE && u[zealot].target==-1 &&
+           u[zealot].shield==power_shield &&
+           b[human_battery].queue_progress==power_energy);
+    assert(race_save_game());
+    for (int n=0;n<pylon_count;++n) b[pylon_slots[n]].raw_owner=pylon_raw_owner[n];
+
+    /* Return to a powered valid order for the candidate/save round trip. */
+    u[zealot].order=ORDER_P7_RECHARGE; u[zealot].target=human_battery;
+    u[zealot].work_timer=0;
     for (int i=0;i<MAX_UNITS;++i) {
         Sc64ZpPackedUnitSave row;
         assert(sc64_zp_unit_save_encode(&row,&u[i],race_cols*16,race_rows*16));
@@ -344,8 +469,9 @@ int main(void)
     }
     int valid_battery_energy=b[human_battery].queue_progress;
     int valid_shield=u[zealot].shield;
-    /* Candidate validation must reject both a corrupt Recharge reference and
-       a transport-only order on the P7 mission, without changing the world. */
+    int valid_remainder=u[zealot].shield_remainder;
+    /* Candidate validation rejects corrupt identity/order fields but accepts
+       legitimate end-of-slot states that the next Recharge tick cancels. */
     u[zealot].target=-1;
     assert(!race_save_game());
     u[zealot].target=human_battery;
@@ -355,13 +481,20 @@ int main(void)
     const Sc64RaceUnitRule *zealot_rule=sc64_race_unit_rule(u[zealot].type);
     assert(zealot_rule && zealot_rule->shields>0);
     u[zealot].shield=zealot_rule->shields;
+    u[zealot].shield_remainder=0;
+    assert(race_save_game());
+    u[zealot].shield=zealot_rule->shields+1;
     assert(!race_save_game());
+    u[zealot].shield=zealot_rule->shields;
+    u[zealot].shield_remainder=1;
+    assert(!race_save_game());
+    u[zealot].shield_remainder=valid_remainder;
     u[zealot].shield=valid_shield;
     u[zealot].order=ORDER_BOARD;
     assert(!race_save_game());
     u[zealot].order=ORDER_P7_RECHARGE;
     b[human_battery].queue_progress=0;
-    assert(!race_save_game());
+    assert(race_save_game());
     b[human_battery].queue_progress=valid_battery_energy;
     b[human_battery].queue_count=1;
     assert(!race_save_game());
@@ -386,6 +519,53 @@ int main(void)
            u[zealot].shield_remainder==saved_remainder &&
            u[zealot].order==ORDER_P7_RECHARGE &&
            u[zealot].target==human_battery);
+
+    /* Kill the last supporting Pylon through the real combat path, then
+       immediately pause and use the UI save/load commands before the next
+       gameplay update. The order is legitimate in that snapshot; after load,
+       its next service tick cancels without transferring shield or energy. */
+    assert(sc64_p7_battery_powered_live(human_battery));
+    for (int n=0;n<pylon_count;++n) if (b[pylon_slots[n]].alive)
+        hit_target(MAX_UNITS+pylon_slots[n],10000,U_HYDRALISK,ENEMY);
+    assert(!sc64_p7_battery_powered_live(human_battery));
+    assert(u[zealot].order==ORDER_P7_RECHARGE &&
+           u[zealot].target==human_battery);
+    int transient_energy=b[human_battery].queue_progress;
+    int transient_shield=u[zealot].shield;
+    assert(screen==SCREEN_PLAY);
+    game_update(KEY_START,KEY_START);
+    assert(screen==SCREEN_PAUSE);
+    game_update(KEY_B,KEY_B);
+    assert(screen==SCREEN_PAUSE && u[zealot].order==ORDER_P7_RECHARGE &&
+           u[zealot].target==human_battery &&
+           b[human_battery].queue_progress==transient_energy &&
+           u[zealot].shield==transient_shield);
+    u[zealot].order=ORDER_IDLE; u[zealot].target=-1;
+    game_update(KEY_L,KEY_L);
+    assert(screen==SCREEN_PLAY && u[zealot].order==ORDER_P7_RECHARGE &&
+           u[zealot].target==human_battery &&
+           b[human_battery].queue_progress==transient_energy &&
+           u[zealot].shield==transient_shield &&
+           !sc64_p7_battery_powered_live(human_battery));
+    assert(race_p7_battery_tick_unit(zealot));
+    assert(u[zealot].order==ORDER_IDLE && u[zealot].target==-1 &&
+           b[human_battery].queue_progress==transient_energy &&
+           u[zealot].shield==transient_shield);
+    /* Native update_unit_energy regenerates completed Battery energy without
+       consulting disabled/power state. The GBA 30 Hz adapter likewise keeps
+       its passive regeneration independent from Recharge availability. */
+    race_tick_state();
+    assert(b[human_battery].queue_progress>transient_energy &&
+           !sc64_p7_battery_powered_live(human_battery));
+    assert(race_save_game());
+    /* Restore the fixture's support structures after the boundary test so
+       later allocator-reuse coverage retains its original slot layout. */
+    for (int n=0;n<pylon_count;++n) {
+        b[pylon_slots[n]].alive=1;
+        b[pylon_slots[n]].raw_owner=pylon_raw_owner[n];
+        b[pylon_slots[n]].hp=pylon_hp[n];
+        b[pylon_slots[n]].shield=pylon_shield[n];
+    }
 
     /* Even an identical replacement must not inherit the dead instance's
        recharge orders. This allocator path also covers trigger removals. */
