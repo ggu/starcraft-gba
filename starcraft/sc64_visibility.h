@@ -543,6 +543,9 @@ sc64_update_exploration(void)
     for (i = 0; i < MAX_UNITS; i++) {
         Sc64VisibilitySnapshot *old = &sc64_unit_visibility[i];
         int active = u[i].alive && u[i].owner == SIDE &&
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+                     !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
+#endif
                      !SC64_TRANSPORT_LOADED(&u[i]);
         int x = active ? u[i].x : 0;
         int y = active ? u[i].y : 0;

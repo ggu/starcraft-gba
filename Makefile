@@ -2713,6 +2713,20 @@ build/StarCraft-Protoss-P7-Projectile-Probe-GBA.gba: build/starcraft-protoss-p7-
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 SHOT41' SC7J
 protoss-p7-projectile-probe: build/StarCraft-Protoss-P7-Projectile-Probe-GBA.gba
 
+P7_CARRIER_TRAINING_FLAGS := $(P7_PROJECTILE_FLAGS) -DSC64_P7_CARRIER_TRAINING_ENABLED
+build/test-sc64-p7-carrier-training: tests/sc64_p7_carrier_training_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_CARRIER_TRAINING_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) -o $@
+.PHONY: test-sc64-p7-carrier-training protoss-p7-carrier-training-probe
+test-sc64-p7-carrier-training: build/test-sc64-p7-carrier-training
+	./build/test-sc64-p7-carrier-training
+build/starcraft-protoss-p7-carrier-training-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_CARRIER_TRAINING_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-carrier-training-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Carrier-Training-Probe-GBA.gba: build/starcraft-protoss-p7-carrier-training-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 HANG42' SC7K
+protoss-p7-carrier-training-probe: build/StarCraft-Protoss-P7-Carrier-Training-Probe-GBA.gba
+
 # Dedicated filming build. Hidden menu and transient scenes stay off in all
 # canonical profiles; the P7 bundle supplies Carrier/Ultralisk render actors.
 SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED

@@ -170,6 +170,9 @@ static unsigned sc64_showcase_ticks;
 _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
                "Interceptor arena exceeds Mode 4 OBJ reserve");
 #endif
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#error "Carrier training requires P7 projectile storage and typed actor state"
+#endif
 
 #if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && \
     !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
@@ -228,7 +231,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_P7_PROJECTILES_ENABLED)
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 42u
+#elif defined(SC64_P7_PROJECTILES_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 41u
 #elif defined(SC64_P7_TYPED_COMPACT_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 40u
@@ -702,6 +707,12 @@ enum {
 #else
 #define SC64_TRANSPORT_LOADED(q) 0
 #endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+/* This stage has only training/inside children; all raw73 rows stay off-map. */
+#define SC64_CARRIER_HANGAR_HIDDEN(q) ((q)->type==U_P7_INTERCEPTOR)
+#else
+#define SC64_CARRIER_HANGAR_HIDDEN(q) 0
+#endif
 enum {
     SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSE, SCREEN_RESULT
 };
@@ -874,7 +885,14 @@ static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 typedef union {
     u16 bfs_queue[MAP_CELLS];
     RaceSave save;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    struct { RaceSave save; Unit units[MAX_UNITS]; } carrier_candidate;
+#endif
 } Sc64ZpRouteSaveScratch;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+_Static_assert(sizeof(RaceSave)+sizeof(Unit)*MAX_UNITS<=sizeof(u16)*MAP_CELLS,
+               "Carrier candidate decode must fit existing route scratch");
+#endif
 static Sc64ZpRouteSaveScratch sc64_zp_route_save_scratch;
 #endif
 #ifdef SC64_IMPORTED_MISSION
@@ -1125,6 +1143,16 @@ static void race_p7_projectile_tick_if_due(void);
 static void race_p7_projectile_draw(void);
 static int race_p7_projectile_encode(u8 *packet);
 static int race_p7_projectile_restore(const u8 *packet);
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+static int race_p7_carrier_training_menu_available(void);
+static int race_p7_carrier_training_queue_selected(void);
+static void race_p7_carrier_training_source_tick(void);
+static void race_p7_carrier_training_frame_tick(void);
+static void race_p7_carrier_training_clear_slot(int slot);
+static void race_p7_carrier_training_end_frame(void);
+static int race_p7_carrier_training_slots_available(unsigned wanted);
+static unsigned race_p7_carrier_training_child_count(int carrier);
 #endif
 #ifdef SC64_P7_OBSERVER_ENABLED
 static int sc64_p7_observer_can_attack_from(int attacker, int target,
@@ -1541,6 +1569,9 @@ spawn_unit(int owner, int type, int x, int y)
 	return -1;
 #ifdef SC64_P7_PROJECTILES_ENABLED
     race_p7_projectile_clear_references(i);
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    race_p7_carrier_training_clear_slot(i);
 #endif
 #ifdef SC64_DIRECT_ATTACK
     sc64_direct_attack_clear_references(i);
@@ -3093,6 +3124,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #endif
 	u[target].hp -= damage;
 	if (u[target].hp <= 0) {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+            race_p7_carrier_training_clear_slot(target);
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
             if (u[target].alive && race_late_active()) {
                 race_late_record_actor_death(source_owner, -1, u[target].owner,
@@ -3133,6 +3167,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 	if (source_type == U_FIREBAT) {
 	    for (i = 0; i < MAX_UNITS; i++)
 		if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner != source_owner && dist2(tx, ty, u[i].x, u[i].y) < 12 * 12) {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+                    if (SC64_CARRIER_HANGAR_HIDDEN(&u[i])) continue;
+#endif
 #ifdef SC64_T6_RUNTIME
                     if (race_t6_active() && (!owners_hostile(source_owner, u[i].owner) ||
                         race_t6_unit_burrowed(i))) continue;
@@ -3146,6 +3183,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #endif
 		    u[i].hp -= 3;
 		    if (u[i].hp <= 0) {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+                        race_p7_carrier_training_clear_slot(i);
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
                         if (race_late_active())
                             race_late_record_actor_death(source_owner, -1, u[i].owner,
@@ -4198,6 +4238,12 @@ static int race_z7_creep_command_available(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) {
+        menu_open=0; mode=MODE_NORMAL;
+        toast(race_p7_carrier_training_queue_selected()?4:8); return;
+    }
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (choice == MENU_STOP + 1 && race_z7_egg_cancel_available()) {
         menu_open = 0; mode = MODE_NORMAL;
@@ -4395,6 +4441,9 @@ choose_command(int choice)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (race_p7_carrier_training_menu_available()) return MENU_STOP+2;
+#endif
 #ifdef SC64_P7_BATTERY_ENABLED
     if (race_p7_battery_command_available()) return MENU_STOP+2;
     if (race_p7_battery_build_available()) return MENU_STOP+4;
@@ -4457,6 +4506,9 @@ static int field_menu_count(void)
 #ifdef SC64_RACES
 static const char *field_menu_base_label(int choice, const char *const *labels)
 {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) return "BUILD INTERCEPTOR";
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (choice == MENU_STOP + 1 && race_z7_egg_cancel_available()) return "CANCEL EGG";
 #endif
@@ -5176,6 +5228,9 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        if (SC64_CARRIER_HANGAR_HIDDEN(q)) continue;
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
         if (q->type == U_Z7_EGG) {
             (void)race_z7_egg_tick_unit(i);
@@ -6165,6 +6220,9 @@ game_update(u16 held, u16 pressed)
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     if (race_p7_active()) sc64_p7_arbiter_cache_frame_tick();
 #endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    race_p7_carrier_training_frame_tick();
+#endif
 #ifdef SC64_P6_COMBAT_ENABLED
     (void)race_p6_combat_burrow_release_tick();
 #endif
@@ -6258,6 +6316,9 @@ game_update(u16 held, u16 pressed)
 #endif
     update_exploration();
 #ifdef SC64_P7_PROJECTILES_ENABLED
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    race_p7_carrier_training_end_frame();
+#endif
     if (race_p7_active()) race_p7_projectile_clear_dead_references();
 #endif
 #ifdef SC64_IMPORTED_MISSION
@@ -7465,6 +7526,13 @@ draw_hud_commands(void)
 		if (IS_WORKER(u[i].type))
 		    gfx_text(52, 137, "AUTO MINE / A GAS", C_GOLD);
 		else
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+                if (race_p7_active() && u[i].type==U_P7_CARRIER) {
+                    gfx_text(52,137,"IC",C_CYAN);
+                    gfx_num(70,137,(int)race_p7_carrier_training_child_count(i),C_WHITE);
+                    gfx_text(84,137,"HANGAR / FLIGHT WIP",C_GOLD);
+                } else
+#endif
 #ifdef SC64_Z6_CLOAK_ENABLED
                 if (race_z6_cloak_actor(&u[i])) {
                     gfx_text(52,137,"EN",C_CYAN); gfx_num(70,137,u[i].carry/256,C_WHITE);
@@ -7647,6 +7715,10 @@ sc64_hud_changed(void)
     values[18] = box_state == 2;
 #ifdef SC64_RACES
     values[19]=race_campaign.phase;values[20]=race_campaign.message;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if(first>=0 && race_p7_active() && u[first].type==U_P7_CARRIER)
+        values[20]|=((int)race_p7_carrier_training_child_count(first)+(u[first].carry<<3))<<8;
+#endif
 #ifdef SC64_Z5_CLOAK_ENABLED
     if (first >= 0 && race_z5_cloak_actor(&u[first]))
         values[20] |= (u[first].carry / 256 + ((int)race_z5.cloak.active << 9)) << 8;
@@ -8200,6 +8272,7 @@ game_self_test(void)
 #include "sc64_p7_runtime_adapter.h"
 #include "sc64_p7_battery_adapter.h"
 #include "sc64_p7_projectile_adapter.h"
+#include "sc64_p7_carrier_training.h"
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 #include "sc64_z7_colony_adapter.h"

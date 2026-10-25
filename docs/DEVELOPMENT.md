@@ -2081,8 +2081,10 @@ or qualify P7 for campaign promotion.
 Carrier pool, codec and motion checks are asset-free and included in
 `./dev test`. The separate generation-41 P7 projectile probe reserves the
 Mode 4 arena and integrates game updates, damage consumption and saves.
-Child training/flight and the weapon-event caller remain unfinished; this
-does not enable Carrier combat. See [Carrier projectile development](CARRIER-PROJECTILES.md)
+The separate generation-42 training probe adds paid Interceptor queues and
+saved hidden hangar children. Carrier production, launch/flight and the
+weapon-event caller remain unfinished; neither enables Carrier combat.
+See [Carrier projectile development](CARRIER-PROJECTILES.md)
 for commands, memory ownership, reference evidence and promotion limits.
 
 For repeatable filming setups, `make showcase` builds the separate

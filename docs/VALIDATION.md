@@ -4858,6 +4858,41 @@ weapon-event caller remain unfinished. No Carrier combat, P7 win, full native
 world continuation, fresh-process ARM SRAM or hardware result is claimed.
 Staged progress remains 22/30.
 
+### P7 Carrier training and hidden hangar
+
+The separate default-off generation-42 training profile adds paid Interceptor
+queues and hidden training/inside Unit rows; see
+[Carrier projectile development](CARRIER-PROJECTILES.md) for commands and scope.
+It retains the 16,292-byte RaceSave, 56/48-byte actor rows and 240/160 actor
+caps. Candidate decoding uses the unused tail of the existing route-save
+scratch union, with a compile-time bound; BSS remains `0x0203daf4` and IWRAM
+ends at `0x03004a30`, below the unchanged guards. It cannot launch children
+and requires an empty projectile packet, so no generation-41 firing fixture
+is presented as generation-42 gameplay.
+
+`make test-sc64-p7-carrier-training` passes under ASan/UBSan. Checks cover
+player menu/price, four-child capacity, initial source-clock cadence, exact
+300-source-tick construction, save/load at construction and inside boundaries,
+15 malformed candidate rejections without live actor/building/pool/P7-runtime/
+wallet/frame/RNG mutation, child-rank compaction, scripted parent death,
+unit-slot reuse, competing producer/script reservations, hidden-unit damage
+and sight, pause, mission setup/save checks and 18 skirmish setups. Most
+construction ticks are isolated from campaign armies; these are component
+checks rather than a mission replay. Player tests supply a human-owned Carrier:
+the authenticated starting Carriers belong to enemy source owner 4. A separate
+case advances an explicitly supplied owner-4 paid queue; enemy autoqueueing is
+not implemented. Both owners' effective Carrier Capacity current/max levels
+are zero, so four slots match this mission's data.
+
+The ARM probe builds as `StarCraft-Protoss-P7-Carrier-Training-Probe-GBA.gba`,
+title `SC P7 HANG42`, code `SC7K`. Carrier production, launch orders, native
+flight/IScript events and actual Carrier combat are still pending. This stage
+does not qualify a P7 win, ARM SRAM continuation, whole-game stack high-water,
+physical hardware or near-30-fps combat. With projectile/training gates off,
+preprocessed P7 typed-rectangle game tokens match the `bfb4d45` baseline
+(5,945,648 tokens); no ROM byte-equality claim is made. Staged campaign progress
+remains 22/30.
+
 ### Hidden showcase menu and staged scenes
 
 The optional `SC64_SHOWCASE_ENABLED` build adds a hidden HOME chord and eight

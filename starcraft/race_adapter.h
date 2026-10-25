@@ -430,6 +430,9 @@ static int race_queue_unit(int owner, int producer, int type)
     }
     if ((r->flags & SC_RACE_F_LARVA) && b[producer].larva < 1) return 0;
     count = type == U_ZERGLING ? 2 : 1;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (race_p7_active() && !race_p7_carrier_training_slots_available((unsigned)count)) return 0;
+#endif
 #ifdef SC64_P4_RUNTIME
     if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
         unsigned committed = race_p4_reserved_units();

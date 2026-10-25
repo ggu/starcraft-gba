@@ -403,6 +403,23 @@ static int race_p5_save_candidate_valid(const RaceSave *candidate,
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_projectile_save_adapter.h"
 
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+static int race_p7_carrier_training_save_valid(const RaceSave *candidate,
+                                               unsigned ww,unsigned wh)
+{
+    /* The save occupies 16292 bytes; the candidate actor table fits in the
+     * unused tail of the existing 32768-byte route scratch union. */
+    Unit *actors=sc64_zp_route_save_scratch.carrier_candidate.units;
+    /* This generation cannot launch: reject impossible in-flight packets,
+     * including a packet that names a valid but docked child as its shooter. */
+    if (sc64_codec_allocated_count(candidate->interceptor_projectiles,
+                                  SC64_CODEC_BYTES)!=0) return 0;
+    for (unsigned i=0;i<MAX_UNITS;++i)
+        if (!race_save_decode_unit(candidate,i,ww,wh,&actors[i])) return 0;
+    return race_p7_carrier_training_candidate_valid(actors,MAX_UNITS);
+}
+#endif
+
 /* Shared Protoss mission payloads are zero-filled before serialization. Check
  * bytes not owned by the candidate schema to reject stale larger-profile data. */
 static int race_p7_union_tail_valid(const RaceSave *candidate)
@@ -861,6 +878,10 @@ static int race_save_game(void) {
 #ifdef SC64_P7_PROJECTILES_ENABLED
     if (!race_p7_projectile_encode(race_data.interceptor_projectiles) ||
         !race_p7_projectile_save_candidate_valid(&race_data,
+            (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (!race_p7_carrier_training_save_valid(&race_data,
             (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
 #endif
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);toast(7);return 1;
@@ -1460,6 +1481,10 @@ static int race_load_game(void) {
             if (!sc64_p7_arbiter_cache_unit_valid(&candidate)) return 0;
 #endif
             live+=candidate.alive!=0;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+            if (candidate.alive && candidate.type==U_P7_CARRIER && candidate.carry>0)
+                queued+=(unsigned)candidate.carry;
+#endif
         }
         for (unsigned i=0;i<MAX_BUILDINGS;++i) {
             Building candidate;
@@ -1743,6 +1768,10 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     if (!race_p7_projectile_save_candidate_valid(&race_data,
+            (unsigned)(width*16),(unsigned)(height*16))) return 0;
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (!race_p7_carrier_training_save_valid(&race_data,
             (unsigned)(width*16),(unsigned)(height*16))) return 0;
 #endif
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];

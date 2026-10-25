@@ -43,6 +43,9 @@ static int sc64_p7_observer_owner_sees_cell(int source_owner, int live_owner,
     if (source_owner == 7 || (source_owner < 0 && live_owner == SIDE))
         return SC64_GRID_GET(visible, cell);
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive &&
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
+#endif
         !SC64_TRANSPORT_LOADED(&u[i]) &&
         sc64_p7_observer_source_matches(u[i].raw_owner, u[i].owner,
                                         source_owner, live_owner)) {
@@ -283,6 +286,9 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
         if(SC64_GRID_GET(visible,cell)) visible_owners|=1u<<7;
     }
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive &&
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
+#endif
         !SC64_TRANSPORT_LOADED(&u[i])) {
         int source=u[i].raw_owner;
         int radius=sc64_p7_observer_sight_radius_runtime(u[i].type,0);
@@ -308,6 +314,9 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
                 visible_owners|=1u<<owner;
     }
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive &&
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
+#endif
         !SC64_TRANSPORT_LOADED(&u[i]) &&
         u[i].raw_type==SC64_P7_OBSERVER_RAW) {
         int source=u[i].raw_owner;
@@ -588,6 +597,9 @@ static int sc64_p7_observer_detector_sees(int target, int source_owner,
     int target_y = target < MAX_UNITS ? u[target].y : b[target-MAX_UNITS].y;
     int target_building = target >= MAX_UNITS;
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive &&
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
+#endif
         !SC64_TRANSPORT_LOADED(&u[i]) &&
         u[i].raw_type == SC64_P7_OBSERVER_RAW &&
         sc64_p7_observer_source_matches(u[i].raw_owner, u[i].owner,
