@@ -2058,3 +2058,22 @@ ARM memory checks and a matching 600-update emulator opening pass; measured
 effective fps is 7.880 for typed count and 9.045 for typed movement. See
 [Validation](VALIDATION.md#generation-40-movement-composition) for the exact
 comparison and limits. It is not part of the canonical or default build.
+
+The opt-in rectangle-reuse probe layers
+`SC64_P7_GEOMETRY_RECT_HOIST_ENABLED` on that typed/Arbiter/movement profile:
+
+```sh
+make test-sc64-p7-rect
+make protoss-p7-rect-probe
+```
+
+It validates an Arbiter's source rectangle once per source tick and reuses
+target rectangles for aura finder and distance checks and detector scans.
+Ownership, range thresholds, clipped finder edges and detection cadence are
+unchanged. The host target compares runtime/steering traces, checks geometry
+against the original helpers, and runs Battery and initial-save fixtures.
+The ARM output is `build/StarCraft-Protoss-P7-Rect-Probe-GBA.gba`, code `SC7R`,
+title `SC P7 RECT40`; save generation, actor sizes and RAM ends are unchanged.
+See [Validation](VALIDATION.md#p7-source-rectangle-reuse) for the measured
+opening/attack workload and its limits. This probe does not enable Carriers
+or qualify P7 for campaign promotion.

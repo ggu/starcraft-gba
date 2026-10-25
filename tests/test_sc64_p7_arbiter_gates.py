@@ -7,6 +7,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 GATE = "SC64_P7_ARBITER_CLOAK_CACHE_ENABLED"
+GEOMETRY_GATE = "SC64_P7_GEOMETRY_RECT_HOIST_ENABLED"
 DEPENDENCIES = (
     "SC64_P7_OBSERVER_ENABLED", "SC64_P7_BATTERY_ENABLED", "SC64_RACES",
     "SC64_P7_RUNTIME", "SC64_P7_ACTORS", "SC64_P7_DATA_ENABLED",
@@ -40,6 +41,10 @@ class ArbiterGateTests(unittest.TestCase):
     def test_legacy_split_gate(self):
         self.rejects(["SC64_P7_ARBITER_CLOAK_ENABLED"],
                      "Use the unified P7 Arbiter cloak/cache feature gate")
+
+    def test_geometry_hoist_requires_cache_gate(self):
+        self.rejects([GEOMETRY_GATE],
+                     "P7 geometry hoist requires the Arbiter cloak cache")
 
 
 if __name__ == "__main__":

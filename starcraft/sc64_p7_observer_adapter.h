@@ -138,6 +138,32 @@ static int sc64_p7_observer_rect_distance(unsigned raw_a, int x_a, int y_a,
     return (int)sc64_p7_observer_xy_length((unsigned)dx,(unsigned)dy);
 }
 
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+/* Exact continuation of rect_distance after both source rectangles have
+ * passed the same actor-rectangle validation as the legacy helper. */
+static int sc64_p7_observer_rect_distance_rects(int al,int at,int ar,int ab,
+                                                int bl,int bt,int br,int bb)
+{
+    int dx=al>=br ? al-(br-1) : bl>=ar ? bl-(ar-1) : 0;
+    int dy=at>=bb ? at-(bb-1) : bt>=ab ? bt-(ab-1) : 0;
+    return (int)sc64_p7_observer_xy_length((unsigned)dx,(unsigned)dy);
+}
+
+/* The caller validates the Arbiter rectangle once before reusing target
+ * rectangles here. The clipped finder-square policy is unchanged. */
+static int sc64_p7_arbiter_finder_square_rect(int arbiter,int tl,int tt,
+                                              int tr,int tb)
+{
+    int cx=u[arbiter].x*2,cy=u[arbiter].y*2;
+    int left=cx-160,top=cy-160,right=cx+160,bottom=cy+160;
+    if(left<0)left=0; if(top<0)top=0;
+    if(right>SC64_P7_MAP_COLS*32)right=SC64_P7_MAP_COLS*32;
+    if(bottom>SC64_P7_MAP_ROWS*32)bottom=SC64_P7_MAP_ROWS*32;
+    --tr; --tb;
+    return tl<right && tr>=left && tt<bottom && tb>=top;
+}
+#endif
+
 /* Generation-39 cache layout in the otherwise-unused Unit.weapon word:
  * bits 0..7 detected-and-optically-visible P7 owner mask;
  * bits 8..12 target's native secondary-order countdown (0..30);
@@ -244,6 +270,12 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
     x=u[target].x; y=u[target].y; col=x/16; row=y/16;
     if(col<0||row<0||col>=MAP_COLS||row>=MAP_ROWS) return 0;
     cx=col*16+8; cy=row*16+8;
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+    int target_l,target_t,target_r,target_b;
+    if(!sc64_p7_actor_rect_source((unsigned)u[target].raw_type,x,y,0,
+                                  &target_l,&target_t,&target_r,&target_b))
+        return 0;
+#endif
     /* Calculate all non-human source visibility in one actor/building pass;
        slot 7 uses the engine's authenticated SIDE visibility grid. */
     {
@@ -279,8 +311,17 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
         !SC64_TRANSPORT_LOADED(&u[i]) &&
         u[i].raw_type==SC64_P7_OBSERVER_RAW) {
         int source=u[i].raw_owner;
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+        int ol,ot,or_,ob;
+        int distance=-1;
+        if(sc64_p7_actor_rect_source(SC64_P7_OBSERVER_RAW,u[i].x,u[i].y,0,
+                                     &ol,&ot,&or_,&ob))
+            distance=sc64_p7_observer_rect_distance_rects(
+                ol,ot,or_,ob,target_l,target_t,target_r,target_b);
+#else
         int distance=sc64_p7_observer_rect_distance(SC64_P7_OBSERVER_RAW,
             u[i].x,u[i].y,0,(unsigned)u[target].raw_type,u[target].x,u[target].y,0);
+#endif
         if(distance<0||distance>SC64_P7_OBSERVER_BASE_SIGHT_SOURCE_PX) continue;
         if(source>=0&&source<8 && race_p7_source_owner((unsigned)source)==u[i].owner &&
            (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
@@ -292,8 +333,17 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
         b[i].raw_type==SC64_P7_CANNON_RAW && building_complete(i) &&
         powered_cannons[i]) {
         int source=b[i].raw_owner;
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+        int cl,ct,cr,cb;
+        int distance=-1;
+        if(sc64_p7_actor_rect_source(SC64_P7_CANNON_RAW,b[i].x,b[i].y,1,
+                                     &cl,&ct,&cr,&cb))
+            distance=sc64_p7_observer_rect_distance_rects(
+                cl,ct,cr,cb,target_l,target_t,target_r,target_b);
+#else
         int distance=sc64_p7_observer_rect_distance(SC64_P7_CANNON_RAW,
             b[i].x,b[i].y,1,(unsigned)u[target].raw_type,u[target].x,u[target].y,0);
+#endif
         if(distance<0||distance>SC64_P7_CANNON_DETECTION_SOURCE_PX) continue;
         if(source>=0&&source<8 && race_p7_source_owner((unsigned)source)==b[i].owner &&
            (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
@@ -345,6 +395,11 @@ static void sc64_p7_arbiter_cache_source_tick(void)
         u[i].raw_owner>=0 && u[i].raw_owner<8 && !(u[i].flags&8u) &&
         !SC64_TRANSPORT_LOADED(&u[i]) &&
         race_p7_source_owner((unsigned)u[i].raw_owner)==u[i].owner) {
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+        int al,at,ar,ab;
+        if(!sc64_p7_actor_rect_source(71u,u[i].x,u[i].y,0,
+                                      &al,&at,&ar,&ab)) continue;
+#endif
         if (sc64_target_index_active) {
             /* Target index cells are 64 GBA pixels. 160 source pixels is
              * 80 GBA pixels; 32 additional GBA pixels cover the maximum
@@ -363,11 +418,25 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                         if(slot<MAX_UNITS && slot!=(int)i &&
                            sc64_p7_observer_arbiter_aura_candidate(slot) &&
                            sc64_p7_arbiter_same_source((int)i,slot) &&
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+                           1) {
+                            int tl,tt,tr,tb;
+                            if(sc64_p7_actor_rect_source((unsigned)u[slot].raw_type,
+                                    u[slot].x,u[slot].y,0,&tl,&tt,&tr,&tb) &&
+                               sc64_p7_arbiter_finder_square_rect((int)i,
+                                    tl,tt,tr,tb)) {
+                                int d=sc64_p7_observer_rect_distance_rects(
+                                    al,at,ar,ab,tl,tt,tr,tb);
+                                if(d>=0&&d<=160)aura[slot]=1;
+                            }
+                        }
+#else
                            sc64_p7_arbiter_finder_square((int)i,slot)) {
                             int d=sc64_p7_observer_rect_distance(71u,u[i].x,u[i].y,0,
                                 (unsigned)u[slot].raw_type,u[slot].x,u[slot].y,0);
                             if(d>=0&&d<=160)aura[slot]=1;
                         }
+#endif
                         ent=sc64_target_next[slot];
                     }
                 }
@@ -375,11 +444,24 @@ static void sc64_p7_arbiter_cache_source_tick(void)
             for (j=0;j<MAX_UNITS;++j) if (j!=i &&
                 sc64_p7_observer_arbiter_aura_candidate((int)j) &&
                 sc64_p7_arbiter_same_source((int)i,(int)j) &&
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+                1) {
+                int tl,tt,tr,tb;
+                if(sc64_p7_actor_rect_source((unsigned)u[j].raw_type,
+                        u[j].x,u[j].y,0,&tl,&tt,&tr,&tb) &&
+                   sc64_p7_arbiter_finder_square_rect((int)i,tl,tt,tr,tb)) {
+                    int d=sc64_p7_observer_rect_distance_rects(
+                        al,at,ar,ab,tl,tt,tr,tb);
+                    if(d>=0&&d<=160)aura[j]=1;
+                }
+            }
+#else
                 sc64_p7_arbiter_finder_square((int)i,(int)j)) {
                 int d=sc64_p7_observer_rect_distance(71u,u[i].x,u[i].y,0,
                     (unsigned)u[j].raw_type,u[j].x,u[j].y,0);
                 if (d>=0 && d<=160) aura[j]=1;
             }
+#endif
         }
     }
     for (i=0;i<MAX_UNITS;++i) {

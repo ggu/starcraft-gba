@@ -4749,6 +4749,66 @@ win, fresh-process ARM SRAM, hardware qualification or near-30-fps result is
 claimed. Neither the default nor canonical build enables the composition;
 staged campaign progress remains 22/30.
 
+### P7 source-rectangle reuse
+
+`SC64_P7_GEOMETRY_RECT_HOIST_ENABLED` reuses validated rectangles within the
+full-feature typed/Arbiter/movement source tick. An Arbiter rectangle is
+validated once per emitter; an aura target rectangle is reused for the
+clipped finder and exact distance tests. Detection computes the target
+rectangle once, then validates each Observer/Cannon rectangle as before.
+The half-open rectangle conversion, inclusive 160-source-pixel threshold,
+owner checks, power checks and source timers are unchanged. The flag requires
+the complete Arbiter cache profile and remains disabled in default/canonical
+builds.
+
+`make test-sc64-p7-rect` passes under ASan/UBSan. Its fixture compares 28,710
+actor/building rectangle pairs and 2,475 finder cases with the original
+helpers, including unsupported rows and extreme coordinates. Existing live
+cache geometry/cadence/reuse checks pass. Full-runtime and steering traces
+match typed movement; the steering oracle covers 619,216 queries. Battery
+and immediate-save continuation pass, with clock 149, phase 4 and frame 1.
+The default ARM build, 414 Python tests plus asset-free host fixtures, and
+unified build/tests pass. Gate-off typed movement reproduces its published
+ROM hash byte for byte.
+
+`make protoss-p7-rect-probe` creates a 4-MiB ROM with SHA-256
+`a4efa9f3ea7c122714236b926b890d06eb704226c60284c03723a1d19d2772ab`.
+ARM DWARF reports Unit 56, Building 48, RaceSave 14,188 and P7 supplement 124
+bytes. IWRAM/BSS ends remain `0x03004a28` / `0x0203daec`, inside the unchanged
+RAM guards. Save generation 40 and the two-slot journal are unchanged.
+
+The normal-menu, controller-only runner selects the same 11 army units and
+issues an attack-move after a 600-update opening, then measures 1,500 attack
+updates. All 23 non-timing checkpoints, 25 input records, command details and
+ending frame 2,605 match typed movement. Emulated GBA timer cycles measure:
+
+| Full-feature workload | Typed movement | Rectangle reuse |
+| --- | --- | --- |
+| Opening, 600 updates | 9.045 | 9.205 |
+| Attack-move, 1,500 updates | 6.869 | 7.162 |
+
+This is 1.8 percent faster in the opening and 4.3 percent in attack. Reproduce
+the comparison with:
+
+```sh
+make protoss-p7-typed-move-probe protoss-p7-rect-probe
+python3 tools/sc64_p7_move_workload.py --elf build/starcraft-protoss-p7-typed-move-probe.elf \
+    --rom build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba --out build/p7-move-attack \
+    --neutral-ticks 600 --attack-ticks 1500
+python3 tools/sc64_p7_move_workload.py --elf build/starcraft-protoss-p7-rect-probe.elf \
+    --rom build/StarCraft-Protoss-P7-Rect-Probe-GBA.gba --out build/p7-rect-attack \
+    --neutral-ticks 600 --attack-ticks 1500
+python3 tools/sc64_p7_move_workload.py --compare build/p7-move-attack/result.json \
+    build/p7-rect-attack/result.json
+```
+
+A separate private source-owner-mask cache also matched all 23 checkpoints,
+but measured 9.031 / 6.913 fps. Its opening regresses and its attack gain is
+only 0.64 percent, so it is not promoted as a standalone runtime option.
+Neither experiment qualifies a mission win, fresh-process ARM SRAM,
+physical GBA performance or near-30-fps campaign play. Staged progress remains
+22/30; Carrier combat and a P7 win are still required.
+
 ### Full-feature P7 cache timing and rejected cell memo
 
 A private diagnostic of the typed/Arbiter/movement profile separates the

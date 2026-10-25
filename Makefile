@@ -2641,6 +2641,37 @@ build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba: build/starcraft-protoss-p7-
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 MOVE40' SC7M
 protoss-p7-typed-move-probe: build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba
 
+# Opt-in exact source-rectangle reuse in P7 aura and detection.
+P7_TYPED_RECT_FLAGS := $(P7_TYPED_MOVE_FLAGS) -DSC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+build/test-sc64-p7-rect-runtime: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-rect-steer: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-rect-policy: tests/sc64_p7_arbiter_cache_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-rect-battery: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-rect-initial-save: tests/sc64_p7_initial_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-rect protoss-p7-rect-probe
+test-sc64-p7-rect: build/test-sc64-p7-typed-move-runtime build/test-sc64-p7-typed-move-steer build/test-sc64-p7-rect-runtime build/test-sc64-p7-rect-steer build/test-sc64-p7-rect-policy build/test-sc64-p7-rect-battery build/test-sc64-p7-rect-initial-save
+	./build/test-sc64-p7-typed-move-runtime > build/sc64-p7-rect-reference.txt
+	./build/test-sc64-p7-rect-runtime > build/sc64-p7-rect-runtime.txt
+	cmp build/sc64-p7-rect-reference.txt build/sc64-p7-rect-runtime.txt
+	./build/test-sc64-p7-typed-move-steer > build/sc64-p7-rect-steer-reference.txt
+	./build/test-sc64-p7-rect-steer > build/sc64-p7-rect-steer.txt
+	cmp build/sc64-p7-rect-steer-reference.txt build/sc64-p7-rect-steer.txt
+	./build/test-sc64-p7-rect-policy
+	./build/test-sc64-p7-rect-battery
+	./build/test-sc64-p7-rect-initial-save
+build/starcraft-protoss-p7-rect-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_TYPED_RECT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-rect-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Rect-Probe-GBA.gba: build/starcraft-protoss-p7-rect-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 RECT40' SC7R
+protoss-p7-rect-probe: build/StarCraft-Protoss-P7-Rect-Probe-GBA.gba
+
 # Asset-free packing coverage is part of the standard host suite.
 build/test-sc64-p7-typed-codec: tests/sc64_p7_typed_codec.c starcraft/sc64_p7_typed_unit_save.h starcraft/sc64_p7_typed_building_save.h starcraft/sc64_zp_unit_save.h starcraft/sc64_compact_building_save.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@

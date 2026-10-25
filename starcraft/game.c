@@ -147,6 +147,11 @@ int memcmp(const void *a, const void *b, size_t n);
 #error "P7 typed compact save requires unified P7 battery and Arbiter cache profile"
 #endif
 
+#if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && \
+    !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+#error "P7 geometry hoist requires the Arbiter cloak cache"
+#endif
+
 #if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && \
     (!defined(SC64_P7_OBSERVER_ENABLED) || !defined(SC64_P7_BATTERY_ENABLED) || \
      !defined(SC64_RACES) || !defined(SC64_P7_RUNTIME) || \
