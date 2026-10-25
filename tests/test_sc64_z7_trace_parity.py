@@ -70,6 +70,14 @@ class Z7TraceParityTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "row-count mismatch at update 1"):
                 parity._compare_streams(left, right, 1)
 
+    def test_optimization_variants_preserve_separate_evidence_files(self):
+        root, trace = Path("private-output"), Path("same-trace.json")
+        count = parity._output_paths(root, 1, trace, "count-snapshot")
+        sight = parity._output_paths(root, 1, trace, "sight-spans")
+        self.assertTrue(set(count).isdisjoint(sight))
+        with self.assertRaisesRegex(ValueError, "unknown optimization"):
+            parity.run([trace], root, "unrecognized")
+
     def test_checks_every_row_and_reports_first_state_difference(self):
         plan = {"stop_tick": 400, "final": {"kind": "won", "frame": 389,
                 "screen": 3, "outcome": 1, "started": 6,

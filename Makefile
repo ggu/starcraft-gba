@@ -2797,6 +2797,26 @@ endef
 $(eval $(call Z7_TRACE_PARITY_BUILD,reference,$(Z7_CONTROLLER_REFERENCE_FLAGS)))
 $(eval $(call Z7_TRACE_PARITY_BUILD,count-snapshot,$(Z7_CONTROLLER_FLAGS)))
 
+# Default-off source-radius visibility experiment; independent of race ROMs.
+Z7_SIGHT_SPAN_FLAGS := $(Z7_CONTROLLER_FLAGS) -DSC64_Z7_SIGHT_SPANS
+$(eval $(call Z7_TRACE_PARITY_BUILD,sight-spans,$(Z7_SIGHT_SPAN_FLAGS)))
+build/test-sc64-z7-sight-spans: tests/sc64_z7_source_sight_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SIGHT_SPAN_FLAGS) $< common/gba.c -o $@
+$(eval $(call Z7_PREVALIDATION_CHECK,sight-spans,runtime,sc64_z7_runtime.c,$(Z7_SIGHT_SPAN_FLAGS)))
+$(eval $(call Z7_PREVALIDATION_CHECK,sight-spans,save,sc64_z7_game_save.c,$(Z7_SIGHT_SPAN_FLAGS)))
+.PHONY: test-sc64-z7-sight-spans zerg-z7-sight-spans-probe
+test-sc64-z7-sight-spans: build/test-sc64-z7-sight-spans build/test-sc64-z7-prevalidated-sight-spans-runtime build/test-sc64-z7-prevalidated-sight-spans-save
+	./build/test-sc64-z7-sight-spans
+	./build/test-sc64-z7-prevalidated-sight-spans-runtime
+	./build/test-sc64-z7-prevalidated-sight-spans-save
+build/starcraft-zerg-z7-sight-spans-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_SIGHT_SPAN_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-sight-spans-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Sight-Spans-Probe-GBA.gba: build/starcraft-zerg-z7-sight-spans-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 VIS36' SCZX
+zerg-z7-sight-spans-probe: build/StarCraft-Zerg-Z7-Sight-Spans-Probe-GBA.gba
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build

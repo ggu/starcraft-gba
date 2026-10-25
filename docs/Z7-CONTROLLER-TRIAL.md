@@ -132,3 +132,7 @@ count/prevalidation/runtime/save checks pass. Both optimized controller
 policies reproduce their original complete input/checkpoint/loss traces.
 The default original-art ROM remains byte-identical; all 447 asset-free
 Python checks and the default host fixtures pass.
+
+A separate [source-radius sight-span probe](Z7-SIGHT-SPANS.md) reduces visibility
+update work while retaining the count-only probe for comparison. Its tested
+state equivalence and bounded ARM timing are documented separately.
