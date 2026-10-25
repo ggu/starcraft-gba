@@ -246,6 +246,100 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
     return 1;
 }
 
+#ifdef SC64_COLLISION_STEER_LIST
+#if !defined(SC64_COLLISION_CLASS_CACHE) || !defined(SC64_ZP_CAMPAIGN_ACTORS)
+#error "SC64_COLLISION_STEER_LIST requires the Z/P collision-class cache"
+#endif
+/* A blocked mover tests up to eight one-step offsets around one position.
+ * Resolve the candidate filters of sc64_unit_bucket_step_clear() once, over
+ * the cells reachable from every offset, and keep each candidate's bucket
+ * cell so each offset still sees exactly its own cell window. The query is
+ * a pure any-blocker test, so candidate order cannot change its result. */
+#define SC64_STEER_LIST_CAPACITY 48
+typedef struct {
+    s16 x, y;
+    u8 radius, col, row, pad;
+} Sc64SteerCandidate;
+static Sc64SteerCandidate sc64_steer_list[SC64_STEER_LIST_CAPACITY];
+static int sc64_steer_list_count;
+
+/* Returns 0 when the caller must use unit_step_clear() unchanged. */
+static int GBA_HOT
+sc64_steer_list_build(const Unit *q, int speed)
+{
+    int mover_radius, mover_flying, mover_collidable;
+    const int reach = 9;
+    int minx, maxx, miny, maxy, row, col, count = 0;
+    if (!sc64_unit_bucket_active || speed < 0 || speed > 2 ||
+        MAP_COLS > 256 || MAP_ROWS > 256) return 0;
+    if (IS_WORKER(q->type) && (q->order == ORDER_MINE || q->order == ORDER_GAS))
+        return 0;
+    (void)sc64_unit_collision_class((int)(q - u), q->type,
+        &mover_radius, &mover_flying, &mover_collidable);
+    minx = (q->x - speed - reach) >> 4; maxx = (q->x + speed + reach) >> 4;
+    miny = (q->y - speed - reach) >> 4; maxy = (q->y + speed + reach) >> 4;
+    if (minx < 0) minx = 0;
+    if (miny < 0) miny = 0;
+    if (maxx >= MAP_COLS) maxx = MAP_COLS - 1;
+    if (maxy >= MAP_ROWS) maxy = MAP_ROWS - 1;
+    for (row = miny; row <= maxy; ++row)
+        for (col = minx; col <= maxx; ++col) {
+            int i;
+            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
+                 i = sc64_unit_bucket_next[i]) {
+                int candidate_radius, candidate_flying, candidate_collidable;
+                if (&u[i] == q || !u[i].alive || SC64_TRANSPORT_LOADED(&u[i]))
+                    continue;
+#ifdef SC64_P6_COMBAT_ENABLED
+                if (race_p6_combat_unit_burrowed(i)) continue;
+#endif
+                (void)sc64_unit_collision_class(i, u[i].type,
+                    &candidate_radius, &candidate_flying, &candidate_collidable);
+                if (u[i].type == U_CHRYSALIS || candidate_flying != mover_flying ||
+                    !candidate_collidable || !mover_collidable) continue;
+                int radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
+                if (count >= SC64_STEER_LIST_CAPACITY || radius < 0 || radius > 255)
+                    return 0;
+                sc64_steer_list[count].x = (s16)u[i].x;
+                sc64_steer_list[count].y = (s16)u[i].y;
+                sc64_steer_list[count].radius = (u8)radius;
+                sc64_steer_list[count].col = (u8)col;
+                sc64_steer_list[count].row = (u8)row;
+                ++count;
+            }
+        }
+    sc64_steer_list_count = count;
+    return 1;
+}
+
+/* Same result as unit_step_clear(q, nx, ny) for the movable mover after a
+ * successful build; move_toward() has already returned for immovable ones. */
+static int GBA_HOT
+sc64_steer_list_step_clear(const Unit *q, int nx, int ny)
+{
+    const int reach = 9;
+    int minx, maxx, miny, maxy, k;
+    if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) return 0;
+    minx = (nx - reach) >> 4; maxx = (nx + reach) >> 4;
+    miny = (ny - reach) >> 4; maxy = (ny + reach) >> 4;
+    for (k = 0; k < sc64_steer_list_count; ++k) {
+        const Sc64SteerCandidate *c = &sc64_steer_list[k];
+        int radius = c->radius, dx, dy;
+        if (c->col < minx || c->col > maxx || c->row < miny || c->row > maxy)
+            continue;
+        dx = c->x - nx; dy = c->y - ny;
+        if (dx <= -radius || dx >= radius || dy <= -radius || dy >= radius) continue;
+        dx *= dx;
+        dy *= dy;
+        if (dx + dy < radius * radius) {
+            int ox = c->x - q->x, oy = c->y - q->y;
+            if (dx + dy <= ox * ox + oy * oy) return 0;
+        }
+    }
+    return 1;
+}
+#endif
+
 static void
 sc64_unit_buckets_end(void)
 {
