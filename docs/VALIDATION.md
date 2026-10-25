@@ -1918,6 +1918,40 @@ version, without changing live state.
 No new campaign mission is enabled by this promotion: the completed count
 remains Terran 10, Zerg 3 and Protoss 3, or 16/30.
 
+## Weapon-family effects and Protoss shield display (2026-10-25)
+
+Authored weapon-family effects now present the existing attack paths for the
+implemented actors and defenses, including T4 traps and T5 mines. They only
+change rendering: combat continues to apply damage on the existing attack
+tick. Effect pixels are clipped to the playfield rows 12–119 so they cannot
+overwrite the HUD. Protoss unit and building overlays draw shields separately
+from health using canonical shield capacity; the selection panel shows current
+shields for shielded selections. No campaign mission or combat/save rule was
+changed by this visual work.
+
+Focused host checks passed: `make test-sc64-weapon-vfx`,
+`make test-sc64-weapon-vfx-game`, `make test-sc64-shield-bars`,
+`make build/test-unified-hud && ./build/test-unified-hud`, and
+`make build/test-starcraft`. The renderer test exercises palette styles,
+extreme-coordinate clipping, visibility gating and the row-119 boundary. The
+attack fixture checks 30 armed unit/target-class profiles, ground and air
+attacks, effect lifetimes, camera/fog behavior, pool overflow and unchanged
+immediate-damage behavior. Shield checks compare unit/building bar pixels and
+verify shield-only HUD cache invalidation against a forced full redraw.
+
+All three canonical race ROMs build and pass the unchanged reserve guards.
+IWRAM/BSS ends are Terran `0x03004e58/0x0203dbd4`, Zerg
+`0x03004fb0/0x02039a30` and Protoss `0x03004f30/0x02039bd8`.
+Race HUD key construction runs in ROM so the new keys fit without reducing
+the existing fast-RAM stack reserve. The race effect pool uses 32 transient
+slots; original-art saves retain 12. Actor rows and save generations are
+unchanged. The canonical campaign count remains T10/Z3/P3 (16/30).
+
+Full regressions use `./dev build && ./dev test`, `make unified test-unified`,
+`make race-campaigns test-race-campaigns`, and
+`./dev sc64 test --profile terran`. These host/build checks do not establish
+ARM performance, physical GBA behavior or a new full campaign replay.
+
 ### 2026-10-24 — staged Z4/P4 engine foundations
 
 The next-stage source importer retains all remaining Zerg and Protoss CHKs
@@ -5140,6 +5174,25 @@ showcase `0x0203dcd8`; all existing reserve guards pass. Default build/tests
 (414 Python checks plus host fixtures) and unified build/tests pass. Full Terran build/controller/save/skirmish
 checks also pass. This visual update does not qualify a new campaign mission, physical hardware,
 ARM SRAM continuation or a new performance result; staged progress stays 22/30.
+
+### Z6 controller final-zone cleanup
+
+After the newer worker and depot economy changes, `make test-sc64-z6-controller`
+stalled in source location 5 with a mining Probe and a Pylon left. Kerrigan
+stood beside both targets, idle, while single Hydralisk reinforcements walked
+in from the main base and ran out the round budget. When at most two Force2
+actors remain and no escort is within 320 pixels, the controller now gives
+Kerrigan an ordinary attack-move. The final-building Hydra stepping is skipped
+on those rounds. When no target is found, the controller re-reads the source
+count before deciding the zone is unfinished; previously a stale count
+reported a Probe that had already died.
+
+Only controller strategy changed. Victory still requires the result screen,
+`won` and the source outcome WON. The host route now wins at host tick 297013,
+gameplay frame 293497, with started mask `0x1be` and zero faults. Kerrigan is
+alive and unloaded at `(950,1009)`, research is complete and the Overlord has
+no cargo. The earlier route won at frame 268694. ARM replay, save continuity
+and performance were not re-measured for this route.
 
 ### P7 mode-0 tile renderer
 

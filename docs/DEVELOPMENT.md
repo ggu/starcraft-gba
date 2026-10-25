@@ -120,6 +120,8 @@ Preparation writes extracted and generated inputs under ignored `.local/`; ROM b
 
 See [SC64 unified](SC64-UNIFIED.md) for implemented missions and limitations, and [SC64 development notes](SC64.md) for import details.
 
+The default `./dev test` includes the asset-free weapon-effect renderer check. After preparing the unified inputs, `make test-unified` also runs actual-attack visual checks and pixel/cache checks for Protoss shield bars; those checks keep damage application immediate and compare cached HUD output with a full redraw.
+
 ## T4 internal actor/world checks
 
 The Jacobs Installation data and actor rules have an internal, gated host-test

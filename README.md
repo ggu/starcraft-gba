@@ -1,8 +1,16 @@
-# StarCraft: GBA Outpost
+# StarCraft GBA Demake Project
 
-StarCraft: GBA Outpost is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
+This project is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
 
 Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. Controller-driven host runs and normal-menu ARM replays have now completed all ten Terran missions across the recorded frozen builds. The latest optimization build has full T7 and T10 ARM wins at 25.00 and 18.77 effective fps; other ARM qualifications remain on earlier frozen builds. These rates remain below the 30-fps target. This is a GBA adaptation built from a user-supplied, verified StarCraft 64 USA ROM. It does not execute or reproduce the original N64 engine. Imported maps and graphics stay local and are not part of the source release.
+
+## Purpose and rights
+
+This independent research and hobby project explores real-time strategy engine design on the Game Boy Advance's resource-constrained hardware. It is not affiliated with, sponsored by, or endorsed by Blizzard Entertainment or Nintendo. References to their games, platforms, and trademarks identify the subject of the work or compatibility; they do not imply authorization.
+
+The default skirmish uses project-authored game art and requires no commercial game files. The optional StarCraft 64 importer requires user-supplied, lawfully obtained game data. The project does not distribute original StarCraft or StarCraft 64 ROMs or extracted game assets. Do not upload those materials or generated builds containing imported game assets to this repository, its issues, or its releases.
+
+Import tools grant no additional rights in game content. Importing, using, or sharing that content requires the necessary rights or applicable legal authorization; possession of a ROM alone does not establish those rights. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party material and licensing boundaries.
 
 ## Get started
 
@@ -66,7 +74,7 @@ Copyright (C) 2026 StarCraft GBA contributors.
 
 The project-authored files in this repository are free software: you may redistribute and modify them under the GNU General Public License, version 3 or, at your option, any later version (`GPL-3.0-or-later`). They are provided without warranty; see [LICENSE](LICENSE) for the full terms.
 
-Preserve existing file-level copyright and license notices. Third-party material and external dependencies retain their own terms, as described in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). This license grants no rights to StarCraft or StarCraft 64 ROMs, artwork, maps, sounds, or other game content.
+Preserve existing file-level copyright and license notices. Third-party material and external dependencies retain their own terms, as described in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). This license grants no rights to StarCraft or StarCraft 64 ROMs, artwork, maps, sounds, or other game content, or to Blizzard or Nintendo trademarks.
 
 ## Validation
 

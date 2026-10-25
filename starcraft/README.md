@@ -29,6 +29,8 @@ This is an original-art RTS demake rather than a full StarCraft engine. It uses 
 
 It omits campaign triggers, air units, large tech trees, unit abilities, damage-type/size modifiers, pathing influence from other mobile units, multiplayer, and original game art/audio. Firebat splash, upgrades, fog visibility, and Zerg wave behavior are compact approximations for a short handheld mission. Medics do not have a healing order yet.
 
+Combat effects use small authored weapon-family animations for the implemented attacks. They are presentation only: attacks still apply damage immediately, and the short effect timing does not reproduce the original game's projectile or IScript behavior. In Protoss profiles, unit and building overlays show shields in a separate blue bar above health, and the selection panel reports current shields for shielded actors.
+
 The opening scenario averaged about 21.92 updates/second in a 240-tick mGBA ARM sample, with pathfinding hitches. Unit timers use a fixed step, so slowdown also slows in-game time. The renderer targets about 30 updates/second when update and drawing costs fit the frame budget. See the [validation record](../docs/VALIDATION.md); physical hardware performance has not been measured.
 
 ## Rule references

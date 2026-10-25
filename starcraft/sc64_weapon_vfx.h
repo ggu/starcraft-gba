@@ -1,4 +1,5 @@
 #ifndef SC64_WEAPON_VFX_H
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 #define SC64_WEAPON_VFX_H
 
 #include <stdint.h>

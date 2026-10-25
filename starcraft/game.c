@@ -6602,11 +6602,11 @@ draw_unit(Unit * q)
 #endif
         draw_actor_vitals(x,sprite_y-4,12,q->hp,q->maxhp,
 #ifdef SC64_RACES
-            q->shield,
+            q->shield,sc64_actor_max_shields(q->type,0),
 #else
-            0,
+            0,0,
 #endif
-            sc64_actor_max_shields(q->type,0),owner_color(q->owner));
+            owner_color(q->owner));
     if (q->selected)
 	gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
 }
@@ -6959,11 +6959,11 @@ draw_building_overlay(Building *q)
 #endif
     draw_actor_vitals(x,sprite_y-4,18,q->hp,q->maxhp,
 #ifdef SC64_RACES
-        q->shield,
+        q->shield,sc64_actor_max_shields(q->type,1),
 #else
-        0,
+        0,0,
 #endif
-        sc64_actor_max_shields(q->type,1),owner_color(q->owner));
+        owner_color(q->owner));
 #ifndef SC64_RACES
     if (q->under_construction)
         gfx_text(x - 3, y, "C", C_GOLD);
@@ -7619,9 +7619,11 @@ draw_hud_resources(void)
 static void
 draw_hud_shields(int shield,int maximum)
 {
-    if (maximum<=0) return;
-    gfx_text(129,126,"SH",C_CYAN);
-    gfx_num(147,126,shield,C_CYAN);
+#ifdef SC64_RACES
+    if (maximum>0) { gfx_text(129,126,"SH",C_CYAN); gfx_num(147,126,shield,C_CYAN); }
+#else
+    (void)shield; (void)maximum;
+#endif
 }
 
 static void
@@ -7841,39 +7843,12 @@ static _Alignas(4) u8 sc64_hud_top[240 * 12], sc64_hud_bottom[240 * 40];
 #endif
 enum { SC64_HUD_KEY_COUNT=26 };
 static int sc64_hud_previous[SC64_HUD_KEY_COUNT], sc64_hud_valid;
-#if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
-static u8 sc64_hud_buffer_dirty[2];
-static u32 sc64_hud_buffer_clear_generation[2];
-#endif
-
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
-/* Keep the expanded actor loop and target search in IWRAM. This once-per-
- * render HUD invalidation pass can execute from ROM without using its stack
- * reserve. Its timing impact is measured with the late-profile replay. */
-static int __attribute__((noinline))
-#else
-static int GBA_HOT __attribute__((noinline))
-#endif
-sc64_hud_changed(void)
-{
-    int values[SC64_HUD_KEY_COUNT] = {minerals, gas, supply_used, supply_cap, mode, selected_building,
-        train_type, mission_unsupported_count};
-    int i, first = -1, changed = sc64_hud_valid ? 0 : 3;
-    for (i = 0; i < MAX_UNITS; i++) if (u[i].alive && u[i].owner == SIDE) {
-        if (u[i].selected) { values[8]++; if (first < 0) first = i; }
-        if (u[i].type == U_MARINE) values[9]++;
-        if (u[i].type == U_RAYNOR) values[10] = 1;
-    }
-    if (first >= 0) { values[11] = u[first].type; values[12] = u[first].hp; }
-    for (i = 0; i < MAX_BUILDINGS; i++)
-        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_BARRACKS) values[13] = 1;
-    if (selected_building >= 0 && b[selected_building].alive) {
-        Building *q = &b[selected_building];
-        values[14] = 1; values[15] = q->type; values[16] = q->under_construction;
-        values[17] = q->queue_count;
-    }
-    values[18] = box_state == 2;
 #ifdef SC64_RACES
+/* Keep race presentation key construction in ROM: canonical Z3 has very
+ * little fast-RAM code headroom. Key values and invalidation stay exact. */
+static void __attribute__((noinline))
+sc64_hud_race_keys(int *values,int first)
+{
     if (first>=0) {
         values[24]=u[first].shield;
         values[25]=sc64_actor_max_shields(u[first].type,0);
@@ -7909,6 +7884,43 @@ sc64_hud_changed(void)
 #else
     values[22]=frame/30;
 #endif
+}
+#endif
+#if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
+static u8 sc64_hud_buffer_dirty[2];
+static u32 sc64_hud_buffer_clear_generation[2];
+#endif
+
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
+/* Keep the expanded actor loop and target search in IWRAM. This once-per-
+ * render HUD invalidation pass can execute from ROM without using its stack
+ * reserve. Its timing impact is measured with the late-profile replay. */
+static int __attribute__((noinline))
+#else
+static int GBA_HOT __attribute__((noinline))
+#endif
+sc64_hud_changed(void)
+{
+    int values[SC64_HUD_KEY_COUNT] = {minerals, gas, supply_used, supply_cap, mode, selected_building,
+        train_type, mission_unsupported_count};
+    int i, first = -1, changed = sc64_hud_valid ? 0 : 3;
+    for (i = 0; i < MAX_UNITS; i++) if (u[i].alive && u[i].owner == SIDE) {
+        if (u[i].selected) { values[8]++; if (first < 0) first = i; }
+        if (u[i].type == U_MARINE) values[9]++;
+        if (u[i].type == U_RAYNOR) values[10] = 1;
+    }
+    if (first >= 0) { values[11] = u[first].type; values[12] = u[first].hp; }
+    for (i = 0; i < MAX_BUILDINGS; i++)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_BARRACKS) values[13] = 1;
+    if (selected_building >= 0 && b[selected_building].alive) {
+        Building *q = &b[selected_building];
+        values[14] = 1; values[15] = q->type; values[16] = q->under_construction;
+        values[17] = q->queue_count;
+    }
+    values[18] = box_state == 2;
+#ifdef SC64_RACES
+    sc64_hud_race_keys(values,first);
+
 #endif
 #ifdef SC64_BACKWATER
 #ifdef SC64_TERRAN_CAMPAIGN

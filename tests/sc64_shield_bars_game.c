@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Pixel checks for Protoss unit and building shield/health overlays. */
 #include <assert.h>
 #include <stdio.h>
