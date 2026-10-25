@@ -6446,6 +6446,60 @@ draw_mission_sprite(const Sc64SpriteFrame *s, int cx, int cy)
 }
 #endif
 
+/* Presentation queries the canonical shield capacity, independently of HP.
+ * In particular an Archon's tiny HP pool must not scale its large shields. */
+static int __attribute__((noinline))
+sc64_actor_max_shields(int type,int building)
+{
+#ifdef SC64_RACES
+    if (building) {
+        if (type<0 || type>=SC_RB_COUNT) return 0;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+        const Sc64ZpBuildingFact *fact=sc64_zp_building_fact(type);
+        if (fact) return fact->shields;
+#endif
+        return sc64_race_building_shields(type);
+    }
+    if (type<0 || type>=SC_RU_COUNT) return 0;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpActorFact *fact=sc64_zp_actor_fact(type);
+    if (fact) return fact->shields;
+#endif
+#ifdef SC64_TERRAN_LATE_ACTORS
+    const Sc64TerranLateActorFact *late=sc64_terran_late_unit_fact(type);
+    if (late) return late->shields;
+#endif
+    return sc64_race_unit_rules[type].shields;
+#else
+    (void)type; (void)building; return 0;
+#endif
+}
+
+static void
+sc64_draw_vital_bar(int left,int top,int width,int value,int maximum,
+                    int color,int empty)
+{
+    int bottom=top+2;
+    if (top<12) top=12;
+    if (bottom>120) bottom=120;
+    if (top>=bottom || maximum<=0) return;
+    if (value<0) value=0;
+    if (value>maximum) value=maximum;
+    gfx_rect(left,top,width,bottom-top,(u8)empty);
+    int fill=(int)((u32)value*(unsigned)width/(unsigned)maximum);
+    if (fill) gfx_rect(left,top,fill,bottom-top,(u8)color);
+}
+
+static void __attribute__((noinline))
+draw_actor_vitals(int x,int hp_y,int width,int hp,int maxhp,
+                   int shield,int maxshield,int health_color)
+{
+    int left=x-width/2;
+    sc64_draw_vital_bar(left,hp_y,width,hp,maxhp,health_color,C_RED_DARK);
+    if (maxshield>0)
+        sc64_draw_vital_bar(left,hp_y-3,width,shield,maxshield,C_CYAN,C_BLUE_DARK);
+}
+
 static void
 draw_unit(Unit * q)
 {
@@ -6546,8 +6600,13 @@ draw_unit(Unit * q)
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (!(actor_flags & SC64_GAME_ACTOR_INVINCIBLE))
 #endif
-	    gfx_bar(x - 6, sprite_y - 4, 12, 2, q->hp, q->maxhp,
-	    owner_color(q->owner), C_RED_DARK);
+        draw_actor_vitals(x,sprite_y-4,12,q->hp,q->maxhp,
+#ifdef SC64_RACES
+            q->shield,
+#else
+            0,
+#endif
+            sc64_actor_max_shields(q->type,0),owner_color(q->owner));
     if (q->selected)
 	gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
 }
@@ -6885,8 +6944,13 @@ draw_building_overlay(Building *q)
             gfx_bar(x-12,sprite_y+sprite_h+3,24,2,progress,duration,C_CYAN,C_PANEL);
     }
 #endif
-    gfx_bar(x - 9, sprite_y - 4, 18, 2, q->hp, q->maxhp,
-            owner_color(q->owner), C_RED_DARK);
+    draw_actor_vitals(x,sprite_y-4,18,q->hp,q->maxhp,
+#ifdef SC64_RACES
+        q->shield,
+#else
+        0,
+#endif
+        sc64_actor_max_shields(q->type,1),owner_color(q->owner));
 #ifndef SC64_RACES
     if (q->under_construction)
         gfx_text(x - 3, y, "C", C_GOLD);
@@ -7472,6 +7536,14 @@ draw_hud_resources(void)
 }
 
 static void
+draw_hud_shields(int shield,int maximum)
+{
+    if (maximum<=0) return;
+    gfx_text(129,126,"SH",C_CYAN);
+    gfx_num(147,126,shield,C_CYAN);
+}
+
+static void
 draw_hud_commands(void)
 {
     int i, n = selected_count();
@@ -7484,6 +7556,7 @@ draw_hud_commands(void)
 	Building *q = &b[selected_building];
 	#ifdef SC64_RACES
         gfx_text(5,126,sc64_race_building_name(q->type),C_WHITE);
+        draw_hud_shields(q->shield,sc64_actor_max_shields(q->type,1));
 #else
 	gfx_text(5, 126, q->type == B_COMMAND ? "COMMAND CENTER" :
 		 q->type == B_BARRACKS ? "BARRACKS" : q->type == B_DEPOT ? "SUPPLY DEPOT" :
@@ -7521,6 +7594,9 @@ draw_hud_commands(void)
 	for (i = 0; i < MAX_UNITS; i++)
 	    if (u[i].alive && u[i].selected) {
 		gfx_text(5, 126, n > 1 ? "COMBAT GROUP" : unit_name(u[i].type), C_WHITE);
+#ifdef SC64_RACES
+                draw_hud_shields(u[i].shield,sc64_actor_max_shields(u[i].type,0));
+#endif
 		gfx_text(5, 137, "HP", C_CYAN);
 		gfx_num(24, 137, u[i].hp, C_GREEN);
 		if (IS_WORKER(u[i].type))
@@ -7680,7 +7756,8 @@ draw_hud_commands(void)
 
 #ifdef SC64_IMPORTED_MISSION
 static _Alignas(4) u8 sc64_hud_top[240 * 12], sc64_hud_bottom[240 * 40];
-static int sc64_hud_previous[24], sc64_hud_valid;
+enum { SC64_HUD_KEY_COUNT=26 };
+static int sc64_hud_previous[SC64_HUD_KEY_COUNT], sc64_hud_valid;
 #if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
 static u8 sc64_hud_buffer_dirty[2];
 static u32 sc64_hud_buffer_clear_generation[2];
@@ -7696,7 +7773,7 @@ static int GBA_HOT __attribute__((noinline))
 #endif
 sc64_hud_changed(void)
 {
-    int values[24] = {minerals, gas, supply_used, supply_cap, mode, selected_building,
+    int values[SC64_HUD_KEY_COUNT] = {minerals, gas, supply_used, supply_cap, mode, selected_building,
         train_type, mission_unsupported_count};
     int i, first = -1, changed = sc64_hud_valid ? 0 : 3;
     for (i = 0; i < MAX_UNITS; i++) if (u[i].alive && u[i].owner == SIDE) {
@@ -7714,6 +7791,14 @@ sc64_hud_changed(void)
     }
     values[18] = box_state == 2;
 #ifdef SC64_RACES
+    if (first>=0) {
+        values[24]=u[first].shield;
+        values[25]=sc64_actor_max_shields(u[first].type,0);
+    }
+    if (selected_building>=0 && b[selected_building].alive) {
+        values[24]=b[selected_building].shield;
+        values[25]=sc64_actor_max_shields(b[selected_building].type,1);
+    }
     values[19]=race_campaign.phase;values[20]=race_campaign.message;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if(first>=0 && race_p7_active() && u[first].type==U_P7_CARRIER)
@@ -7752,7 +7837,7 @@ sc64_hud_changed(void)
 #elif defined(SC64_SKIRMISH)
     for (i = 0; i < skirmish_bots; i++) values[19] += skirmish_owner_alive(skirmish_owner_ids[i]);
 #endif
-    for (i = 0; i < 24; i++) {
+    for (i = 0; i < SC64_HUD_KEY_COUNT; i++) {
         /* Wallet and supply changes only affect the top band. Commands,
            selection and objectives can retain their independently cached art. */
         if (sc64_hud_previous[i] != values[i]) changed |= i < 4 || i == 23 ? 1 : 2;

@@ -14,6 +14,11 @@ A compact Terran-versus-Zerg RTS skirmish for the shared 240×160 mode-4 rendere
 
 Box selection requires a ROM rebuilt from the updated source; an older copied ROM does not include it.
 
+In the optional race ROMs, the light-blue bar above a Protoss unit or building
+shows shields; the lower bar shows HP. An empty blue track means shields are
+depleted. The selection panel displays shields as `SH` separately from `HP`.
+Shields absorb damage first and regenerate independently of health.
+
 SCVs automatically gather mineral trips of up to eight minerals and return to the nearest Command Center. To build, select an SCV, open B, choose a structure, move to the site, and press A. Barracks require a completed Supply Depot; Academies require a completed Barracks. Refineries can only be placed on one of the two marked geysers. Select a worker and press A on a completed Refinery to assign gas harvesting, or select the Refinery and press A to assign an idle worker.
 
 Command Centers train SCVs. Barracks train Marines by default; select a Barracks and press R to choose Firebat or Medic. Production queues hold five units and reserve supply while training. A completed Depot provides eight displayed supply. The Engineering Bay offers up to two weapon and armor upgrades.

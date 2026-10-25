@@ -2427,6 +2427,15 @@ test-sc64-weapon-vfx-game: build/test-sc64-weapon-vfx-game
 	./build/test-sc64-weapon-vfx-game
 test-starcraft: test-sc64-weapon-vfx
 
+build/test-sc64-shield-bars: tests/sc64_shield_bars_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
+build/test-sc64-shield-bars-protoss: tests/sc64_shield_bars_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-shield-bars
+test-sc64-shield-bars: build/test-sc64-shield-bars build/test-sc64-shield-bars-protoss
+	./build/test-sc64-shield-bars
+	./build/test-sc64-shield-bars-protoss
+
 # The same actual-attack/renderer fixture checks optional actor identities.
 define WEAPON_VFX_PROFILE_FIXTURE
 build/test-sc64-weapon-vfx-$(1): tests/sc64_weapon_vfx_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
