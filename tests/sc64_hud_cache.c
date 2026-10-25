@@ -453,9 +453,6 @@ main(void)
     fixture();
     test_wallet_and_queued_supply_invalidate_top_only();
     test_selection_building_box_and_modes_invalidate_bottom();
-#ifdef SC64_RACES
-    test_selected_shield_only_changes_match_forced_redraw();
-#endif
     test_mission_message_timer_and_minimap_stay_pixel_exact();
 #if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
     test_per_buffer_hud_reuse_across_changes_and_scenes();
@@ -465,6 +462,11 @@ main(void)
 #endif
 #if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
     test_p3_sequence_invalidates_bottom_and_matches_redraw();
+#endif
+#ifdef SC64_RACES
+    /* This fixture opens a skirmish; run it after campaign-specific checks
+     * so those still exercise their original campaign HUD context. */
+    test_selected_shield_only_changes_match_forced_redraw();
 #endif
     return 0;
 }
