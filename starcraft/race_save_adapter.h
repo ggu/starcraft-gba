@@ -401,6 +401,8 @@ static int race_p5_save_candidate_valid(const RaceSave *candidate,
 }
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
+#include "sc64_p7_projectile_save_adapter.h"
+
 /* Shared Protoss mission payloads are zero-filled before serialization. Check
  * bytes not owned by the candidate schema to reject stale larger-profile data. */
 static int race_p7_union_tail_valid(const RaceSave *candidate)
@@ -855,6 +857,11 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
     if (!race_p7_union_tail_valid(&race_data)) return 0;
+#endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    if (!race_p7_projectile_encode(race_data.interceptor_projectiles) ||
+        !race_p7_projectile_save_candidate_valid(&race_data,
+            (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
 #endif
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);toast(7);return 1;
 }
@@ -1734,6 +1741,10 @@ static int race_load_game(void) {
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
     if (!v[0] && v[2] == SC64_T4_GLOBAL_ID && !expanded_t4_valid) return 0;
 #endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    if (!race_p7_projectile_save_candidate_valid(&race_data,
+            (unsigned)(width*16),(unsigned)(height*16))) return 0;
+#endif
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];
 #ifdef SC64_IMPORTED_SKIRMISH
     race_skirmish_map=v[20];for(int i=0;i<3;i++)race_bot_races[i]=v[21+i];
@@ -1939,6 +1950,11 @@ static int race_load_game(void) {
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (expanded_terran_late_valid) race_late = expanded_terran_late;
     else memset(&race_late, 0, sizeof(race_late));
+#endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    /* Last commit step: later mission rebind failures must not clear the old
+     * projectile arena. The candidate packet already passed full preflight. */
+    if (!race_p7_projectile_restore(race_data.interceptor_projectiles)) return 0;
 #endif
     memset(tracers,0,sizeof(tracers));mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
     invalidate_path_grid();sc64_visibility_reset();update_exploration();reset_selection_gestures();

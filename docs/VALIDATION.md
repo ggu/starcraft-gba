@@ -4850,14 +4850,13 @@ frames are 408 bytes for decode, 192 for validation and 88 for the row parser;
 these are individual frames, not whole-game stack high-water. A separate
 non-inlined access audit emits `strh`/`ldrh` for arena access.
 
-This module is not linked into a game profile and reserves no runtime VRAM or
-SRAM. Its standalone arena fits within the proposed 16-KiB OBJ VRAM range,
-but allocation/rendering integration remains unproved. The packet has not
-been added to RaceSave. Child actors, motion, target/shooter invalidation,
-source-clock integration, same-update damage and exactly-once consumption at
-the complete-frame save boundary remain required. No Carrier combat, P7 win,
-whole-world continuation, fresh-process ARM SRAM or hardware result is
-claimed. Staged progress remains 22/30.
+The later optional generation-41 projectile profile now reserves the arena
+and adds the packet to RaceSave; see [Carrier projectile development](CARRIER-PROJECTILES.md).
+That profile adds C motion, source-clock updates, reference cleanup, damage
+consumption and host save continuation. Child flight/training and the gameplay
+weapon-event caller remain unfinished. No Carrier combat, P7 win, full native
+world continuation, fresh-process ARM SRAM or hardware result is claimed.
+Staged progress remains 22/30.
 
 ### Hidden showcase menu and staged scenes
 

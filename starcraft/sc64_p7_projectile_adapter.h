@@ -1,0 +1,168 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#ifndef SC64_P7_PROJECTILE_ADAPTER_H
+#define SC64_P7_PROJECTILE_ADAPTER_H
+#ifdef SC64_P7_PROJECTILES_ENABLED
+
+/* Mode 4 leaves the upper 16 KiB of OBJ VRAM unused. This pool owns its
+ * first 4816 bytes. All access goes through the halfword arena API; never
+ * memcpy/memset a byte buffer onto video memory. The experimental Mode 0
+ * renderer uses this region and is intentionally excluded by game.c. */
+#ifdef GBA_HOST
+static u16 race_p7_projectile_host_words[SC64_ARENA_WORDS];
+static Sc64Arena race_p7_projectiles={race_p7_projectile_host_words,SC64_ARENA_WORDS};
+#else
+static Sc64Arena race_p7_projectiles={(volatile u16 *)0x06014000,SC64_ARENA_WORDS};
+#endif
+static u8 race_p7_projectile_fault;
+
+static void race_p7_projectile_reset(void)
+{
+    race_p7_projectile_fault=(u8)!sc64_pool_init(&race_p7_projectiles);
+}
+
+static int race_p7_projectile_encode(u8 *packet)
+{
+    return !race_p7_projectile_fault &&
+        sc64_codec_encode(&race_p7_projectiles,packet,SC64_CODEC_BYTES);
+}
+
+static int race_p7_projectile_restore(const u8 *packet)
+{
+    if (!sc64_codec_decode(&race_p7_projectiles,packet,SC64_CODEC_BYTES)) return 0;
+    race_p7_projectile_fault=0;
+    return 1;
+}
+
+static int race_p7_projectile_target_alive(unsigned ref)
+{
+    return ref<MAX_UNITS+MAX_BUILDINGS && target_alive((int)ref);
+}
+
+/* Slot reuse must clear both namespaces before a new actor is installed.
+ * A shot keeps its source-owner identity even after its shooter disappears. */
+static void race_p7_projectile_clear_references(int ref)
+{
+    u8 id=sc64_pool_active_head(&race_p7_projectiles);
+    unsigned steps=0;
+    while (id!=SC64_END && steps++<SC64_POOL_CAPACITY) {
+        Sc64ProjectileRow row;
+        if (!sc64_pool_get_row(&race_p7_projectiles,id,&row)) break;
+        if (row.target_ref==ref) row.target_ref=511;
+        if (ref<MAX_UNITS && row.owner_ref==ref) row.owner_ref=255;
+        if (!sc64_pool_set_row(&race_p7_projectiles,id,&row)) break;
+        id=row.next_link;
+    }
+    if (id!=SC64_END) race_p7_projectile_fault=1;
+}
+
+/* Also cover source-script removals that do not pass through hit_target.
+ * Runs at the completed-update boundary, before pause/save may be accepted. */
+static void race_p7_projectile_clear_dead_references(void)
+{
+    u8 id=sc64_pool_active_head(&race_p7_projectiles);
+    unsigned steps=0;
+    while (id!=SC64_END && steps++<SC64_POOL_CAPACITY) {
+        Sc64ProjectileRow row;
+        if (!sc64_pool_get_row(&race_p7_projectiles,id,&row)) break;
+        if (!race_p7_projectile_target_alive(row.target_ref)) row.target_ref=511;
+        if (row.owner_ref>=MAX_UNITS || !u[row.owner_ref].alive) row.owner_ref=255;
+        if (!sc64_pool_set_row(&race_p7_projectiles,id,&row)) break;
+        id=row.next_link;
+    }
+    if (id!=SC64_END) race_p7_projectile_fault=1;
+}
+
+/* Entry point for the pending child weapon-event adapter, with native heading and source
+ * Q8 position. No damage is applied here. A full 100-shot pool rejects the
+ * new shot instead of recycling an in-flight projectile. */
+static int race_p7_projectile_fire(int shooter,int target,u8 heading,
+                                   s32 source_x_q8,s32 source_y_q8)
+{
+    Sc64ProjectileRow row;
+    u8 id,native_index;
+    if (!race_p7_active() || race_p7_projectile_fault || shooter<0 ||
+        shooter>=MAX_UNITS || !u[shooter].alive ||
+        u[shooter].type!=U_P7_INTERCEPTOR || u[shooter].raw_type!=73 ||
+        u[shooter].raw_owner<0 || u[shooter].raw_owner>=8 ||
+        race_p7_source_owner((unsigned)u[shooter].raw_owner)!=u[shooter].owner ||
+        source_x_q8<0 || source_y_q8<0 ||
+        source_x_q8>=race_cols*8192 || source_y_q8>=race_rows*8192 ||
+        source_x_q8/512!=u[shooter].x || source_y_q8/512!=u[shooter].y ||
+        target<0 || !race_p7_projectile_target_alive((unsigned)target) ||
+        !sc64_interceptor_projectile_launch(&row,source_x_q8,source_y_q8,
+            (s16)(target_x(target)*2),(s16)(target_y(target)*2),heading,
+            (u16)target,(u8)shooter,(u8)u[shooter].raw_owner)) return 0;
+    if (!sc64_pool_acquire(&race_p7_projectiles,&id,&native_index)) return 0;
+    (void)native_index;
+    if (!sc64_pool_set_row(&race_p7_projectiles,id,&row)) {
+        race_p7_projectile_fault=1; return 0;
+    }
+    return 1;
+}
+
+/* Unit orders run before this pass. The caller supplies the existing shared
+ * source-24 due event; a second accumulator would drift across save/load. */
+static void race_p7_projectile_source_tick(void)
+{
+    u8 id=sc64_pool_active_head(&race_p7_projectiles);
+    unsigned steps=0;
+    if (race_p7_projectile_fault) return;
+    while (id!=SC64_END && steps++<SC64_POOL_CAPACITY) {
+        Sc64ProjectileRow row;
+        Sc64InterceptorMotionContext context;
+        u8 next;
+        int impact;
+        if (!sc64_pool_get_row(&race_p7_projectiles,id,&row)) break;
+        next=row.next_link;
+        context.map_width_px=(u16)(race_cols*32);
+        context.map_height_px=(u16)(race_rows*32);
+        context.target_alive=(u8)race_p7_projectile_target_alive(row.target_ref);
+        context.owner_alive=(u8)(row.owner_ref<MAX_UNITS && u[row.owner_ref].alive);
+        if (!sc64_interceptor_motion_tick(&row,&context)) break;
+        impact=row.pending_damage_event;
+        /* The pulse is consumed inside this complete update. A saved DYING
+         * row must never reapply it after load. Commit before callbacks. */
+        row.pending_damage_event=0;
+        if (row.state==3 && !sc64_pool_retire(&race_p7_projectiles,id)) break;
+        if (!sc64_pool_set_row(&race_p7_projectiles,id,&row)) break;
+        if (impact && race_p7_projectile_target_alive(row.target_ref)) {
+            int owner=race_p7_source_owner(row.raw_source_owner);
+            int damage=6+(owner==SIDE?weapons_level:0);
+            if (owner>=0) hit_target(row.target_ref,damage,U_P7_INTERCEPTOR,owner);
+        }
+        id=next;
+    }
+    if (id!=SC64_END) race_p7_projectile_fault=1;
+}
+
+static void race_p7_projectile_tick_if_due(void)
+{
+    if (race_p7_active() && race_p7.reserved[0]!=4u)
+        race_p7_projectile_source_tick();
+}
+
+static void race_p7_projectile_draw(void)
+{
+    u8 id=sc64_pool_active_head(&race_p7_projectiles);
+    unsigned steps=0;
+    while (id!=SC64_END && steps++<SC64_POOL_CAPACITY) {
+        Sc64ProjectileRow row;
+        if (!sc64_pool_get_row(&race_p7_projectiles,id,&row)) return;
+        int x=row.x_q8_source>=0?row.x_q8_source/512:
+              -(int)((511u+(unsigned)(-row.x_q8_source))/512u);
+        int y=row.y_q8_source>=0?row.y_q8_source/512:
+              -(int)((511u+(unsigned)(-row.y_q8_source))/512u);
+        if (row.state<2 && x>=0 && y>=0 && x<WORLD_W && y<WORLD_H &&
+            currently_visible(x,y)) {
+            x-=camx; y=y-camy+12;
+            if (x>=1 && x<239 && y>=13 && y<119) {
+                /* Authored marker until the source projectile image bank is
+                 * imported. Its position comes from the actual moving row. */
+                gfx_rect(x-1,y,3,1,C_GOLD); gfx_pixel(x,y,C_WHITE);
+            }
+        }
+        id=row.next_link;
+    }
+}
+#endif
+#endif

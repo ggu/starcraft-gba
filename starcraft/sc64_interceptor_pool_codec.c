@@ -70,6 +70,15 @@ sethead(Sc64Arena * a, unsigned i, uint8_t v)
 {
     wr(a, i, v);
 }
+uint8_t
+sc64_pool_active_head(const Sc64Arena *a)
+{
+    if (!arena_ok(a) || rd(a,H_SIZE)>SC64_POOL_CAPACITY ||
+        rd(a,H_ACTIVE)>SC64_END ||
+        (rd(a,H_ACTIVE)!=SC64_END && rd(a,H_ACTIVE)>=rd(a,H_SIZE)))
+        return 255;
+    return head(a,H_ACTIVE);
+}
 static uint16_t rfield(const Sc64Arena * a, uint8_t id, unsigned f){
     return rd(a, at(id, f));
 }
@@ -438,11 +447,11 @@ sc64_codec_encode(const Sc64Arena * a, uint8_t * out, size_t n)
 	    return 0;
     } return 1;
 }
-int
-sc64_codec_decode(Sc64Arena * a, const uint8_t * in, size_t n)
+static int
+packet_preflight(const uint8_t *in, size_t n,
+                   uint8_t next_ids[SC64_POOL_CAPACITY], uint8_t heads[3])
 {
-    if (!arena_ok(a) || !in || n != SC64_CODEC_BYTES ||
-        packet_overlaps_arena(a, in, n))
+    if (!in || n != SC64_CODEC_BYTES)
         return 0;
 
     size_t	    pos = 0;
@@ -454,7 +463,6 @@ sc64_codec_decode(Sc64Arena * a, const uint8_t * in, size_t n)
 	return 0;
 
     /* Bounded preflight state: 100 next IDs, states and membership marks. */
-    uint8_t	    next_ids[SC64_POOL_CAPACITY];
     uint8_t	    states[SC64_POOL_CAPACITY];
     uint8_t	    membership[SC64_POOL_CAPACITY] = {0};
     for (uint8_t i = 0; i < SC64_POOL_CAPACITY; ++i) {
@@ -491,6 +499,49 @@ sc64_codec_decode(Sc64Arena * a, const uint8_t * in, size_t n)
 	if (!membership[i] || ((membership[i] == 2) != (states[i] == 3)))
 	    return 0;
     }
+    heads[0]=active_head; heads[1]=free_head; heads[2]=count;
+    return 1;
+}
+
+int
+sc64_codec_validate(const uint8_t *in, size_t n)
+{
+    uint8_t next_ids[SC64_POOL_CAPACITY], heads[3];
+    return packet_preflight(in,n,next_ids,heads);
+}
+
+int
+sc64_codec_allocated_count(const uint8_t *in, size_t n)
+{
+    if (!in || n!=SC64_CODEC_BYTES || (in[2]&0xe0u)) return -1;
+    unsigned count=((unsigned)in[1]>>6)|(((unsigned)in[2]&31u)<<2);
+    return count<=SC64_POOL_CAPACITY && count%SC64_POOL_GROWTH==0 ?
+        (int)count : -1;
+}
+
+int
+sc64_codec_get_row(const uint8_t *in, size_t n, uint8_t id,
+                    Sc64ProjectileRow *out)
+{
+    if (!in || !out || n!=SC64_CODEC_BYTES || id>=SC64_POOL_CAPACITY)
+        return 0;
+    size_t pos=(3u+(size_t)id*21u)*8u;
+    Sc64ProjectileRow row=getrow(in,&pos);
+    if ((in[3u+(size_t)id*21u+20u]&0xf0u) || !validrow(&row))
+        return 0;
+    *out=row;
+    return 1;
+}
+
+int
+sc64_codec_decode(Sc64Arena * a, const uint8_t * in, size_t n)
+{
+    uint8_t next_ids[SC64_POOL_CAPACITY], heads[3];
+    if (!arena_ok(a) || !in || n!=SC64_CODEC_BYTES ||
+        packet_overlaps_arena(a,in,n) ||
+        !packet_preflight(in,n,next_ids,heads)) return 0;
+    uint8_t active_head=heads[0], free_head=heads[1], count=heads[2];
+    size_t pos;
 
     /* Commit by decoding one local row at a time after complete preflight. */
     for (size_t i = 0; i < SC64_ARENA_WORDS; ++i)

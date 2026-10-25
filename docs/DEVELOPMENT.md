@@ -2078,16 +2078,12 @@ See [Validation](VALIDATION.md#p7-source-rectangle-reuse) for the measured
 opening/attack workload and its limits. This probe does not enable Carriers
 or qualify P7 for campaign promotion.
 
-The Carrier pool/codec foundation is asset-free and has no runtime feature
-gate yet. Run `make test-sc64-interceptor-pool-codec` or `./dev test` to check
-the authored fixed-pool and serialization code. It takes an aligned arena of
-2,408 halfwords (4,816 bytes) and uses a separate 2,103-byte save packet.
-Packets and arena storage must be disjoint; malformed packets are rejected
-before arena mutation. The code is freestanding and uses the project's
-`memset` implementation when linked on ARM. No game build currently links
-or reserves this arena. See
-[Validation](VALIDATION.md#carrier-pool-and-codec-foundation) for tests and
-the remaining combat, world-reference, frame-boundary and save integration.
+Carrier pool, codec and motion checks are asset-free and included in
+`./dev test`. The separate generation-41 P7 projectile probe reserves the
+Mode 4 arena and integrates game updates, damage consumption and saves.
+Child training/flight and the weapon-event caller remain unfinished; this
+does not enable Carrier combat. See [Carrier projectile development](CARRIER-PROJECTILES.md)
+for commands, memory ownership, reference evidence and promotion limits.
 
 For repeatable filming setups, `make showcase` builds the separate
 `StarCraft-Showcase-GBA.gba` with a hidden scene menu. On HOME hold R, add L,

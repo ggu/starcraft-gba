@@ -158,6 +158,19 @@ static unsigned sc64_showcase_ticks;
 #error "P7 typed compact save requires unified P7 battery and Arbiter cache profile"
 #endif
 
+#if defined(SC64_P7_PROJECTILES_ENABLED) && \
+    (!defined(SC64_P7_TYPED_COMPACT_ENABLED) || !defined(SC64_P7_ACTORS))
+#error "Interceptor projectiles require the P7 typed save and shared source clock"
+#endif
+#if defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_TILE_RENDERER)
+#error "Interceptor arena and experimental tile sprites overlap OBJ VRAM"
+#endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+#include "sc64_interceptor_motion.h"
+_Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
+               "Interceptor arena exceeds Mode 4 OBJ reserve");
+#endif
+
 #if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && \
     !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
 #error "P7 geometry hoist requires the Arbiter cloak cache"
@@ -215,7 +228,9 @@ static unsigned sc64_showcase_ticks;
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_P7_TYPED_COMPACT_ENABLED)
+#if defined(SC64_P7_PROJECTILES_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 41u
+#elif defined(SC64_P7_TYPED_COMPACT_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 40u
 #elif defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 39u
@@ -1100,6 +1115,17 @@ static void race_p7_battery_clear_building_references(int slot);
 static int race_p7_battery_initialize_source(const Sc64RaceMap *map);
 static int race_p7_battery_live_world_valid(void);
 #endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+static int race_p7_source_owner(unsigned source_slot);
+static void race_p7_projectile_reset(void);
+static void race_p7_projectile_clear_references(int ref);
+static void race_p7_projectile_clear_dead_references(void);
+static void race_p7_projectile_source_tick(void);
+static void race_p7_projectile_tick_if_due(void);
+static void race_p7_projectile_draw(void);
+static int race_p7_projectile_encode(u8 *packet);
+static int race_p7_projectile_restore(const u8 *packet);
+#endif
 #ifdef SC64_P7_OBSERVER_ENABLED
 static int sc64_p7_observer_can_attack_from(int attacker, int target,
                                             int live_owner, int source_owner);
@@ -1513,6 +1539,9 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    race_p7_projectile_clear_references(i);
+#endif
 #ifdef SC64_DIRECT_ATTACK
     sc64_direct_attack_clear_references(i);
 #endif
@@ -1634,6 +1663,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     int i = find_build_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    race_p7_projectile_clear_references(MAX_UNITS+i);
+#endif
 #ifdef SC64_DIRECT_ATTACK
     sc64_direct_attack_clear_references(MAX_UNITS + i);
 #endif
@@ -4959,6 +4991,11 @@ static void
 tick_combat(Unit * q, int target)
 {
     int dx, dy, range, damage;
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    /* Only the child weapon-event adapter may fire weapon 79. Until that
+     * lifecycle is connected, never fall back to instant generic damage. */
+    if (q->type==U_P7_INTERCEPTOR) return;
+#endif
 #if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
     defined(SC64_Z7_SCOURGE_COMBAT)
     if (q->type == U_SCOURGE && !q->alive) return;
@@ -6135,6 +6172,9 @@ game_update(u16 held, u16 pressed)
     profile_start = gba_clock();
 #endif
     update_orders();
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    race_p7_projectile_tick_if_due();
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     race_transport_tick_after_orders();
 #endif
@@ -6217,6 +6257,9 @@ game_update(u16 held, u16 pressed)
 #endif
 #endif
     update_exploration();
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    if (race_p7_active()) race_p7_projectile_clear_dead_references();
+#endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_sight_cycles = gba_clock() - profile_sight_start;
 #endif
@@ -7048,6 +7091,9 @@ draw_map(void)
 	if (u[i].alive)
 	    draw_unit(&u[i]);
     draw_tracers();
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    if (race_p7_active()) race_p7_projectile_draw();
+#endif
 #ifdef SC64_P4_STORM_ENABLED
     race_p4_storm_draw();
 #endif
@@ -8153,6 +8199,7 @@ game_self_test(void)
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_runtime_adapter.h"
 #include "sc64_p7_battery_adapter.h"
+#include "sc64_p7_projectile_adapter.h"
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 #include "sc64_z7_colony_adapter.h"

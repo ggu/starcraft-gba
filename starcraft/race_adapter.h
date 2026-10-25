@@ -1006,6 +1006,9 @@ static void race_skirmish_init(void)
     static const int mdx[4] = { 56, 42, 56, 42 };
     static const int mdy[4] = { 24, 40, 8, 20 };
     int i, j, owner, worker_type, townhall, supply_building;
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    race_p7_projectile_reset();
+#endif
 #ifdef SC64_ZP_FULL_STORAGE
     if (race_skirmish_map > 0) {
         const Sc64SkirmishMap *map;

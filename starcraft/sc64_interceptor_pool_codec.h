@@ -11,8 +11,7 @@ extern "C" {
 #define SC64_CODEC_BYTES 2103u
 #define SC64_ARENA_WORDS 2408u
 #define SC64_END 127u
-/* Storage foundation only: the game does not allocate this arena yet.
- * Runtime arena access is through volatile 16-bit words only. The caller
+/* Runtime arena access is through volatile 16-bit words only. The caller
  * supplies aligned storage and keeps packet buffers disjoint from it. */
 typedef struct { volatile uint16_t *words; size_t word_count; } Sc64Arena;
 /* Source-coordinate Q8 positions; lifecycle states 0=init, 1=moving,
@@ -32,7 +31,19 @@ int sc64_pool_init(Sc64Arena *a);
 int sc64_pool_acquire(Sc64Arena *a, uint8_t *ordinal, uint8_t *native_index);
 int sc64_pool_retire(Sc64Arena *a, uint8_t ordinal);
 int sc64_pool_validate(const Sc64Arena *a);
+/* Bounded list cursor for the exclusively owned runtime arena. Returns 255
+ * on malformed head metadata, SC64_END for an empty active list. */
+uint8_t sc64_pool_active_head(const Sc64Arena *a);
 int sc64_codec_encode(const Sc64Arena *a, uint8_t *out, size_t out_size);
+/* Full packet preflight without modifying an arena or a live game world. */
+int sc64_codec_validate(const uint8_t *in, size_t in_size);
+/* Header-only count, or -1 for malformed header/size. This is not a full
+ * preflight; callers accepting external packets must also validate them. */
+int sc64_codec_allocated_count(const uint8_t *in, size_t in_size);
+/* Read one bounded row. Full list membership must first be checked with
+ * sc64_codec_validate when consuming an untrusted save candidate. */
+int sc64_codec_get_row(const uint8_t *in, size_t in_size, uint8_t ordinal,
+                       Sc64ProjectileRow *out);
 int sc64_codec_decode(Sc64Arena *a, const uint8_t *in, size_t in_size);
 int sc64_pool_get_row(const Sc64Arena *a, uint8_t ordinal, Sc64ProjectileRow *out);
 /*

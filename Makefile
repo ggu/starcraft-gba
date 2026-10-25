@@ -2680,13 +2680,38 @@ test-sc64-p7-typed-codec: build/test-sc64-p7-typed-codec
 	./build/test-sc64-p7-typed-codec
 test-starcraft: test-sc64-p7-typed-codec
 
-# Asset-free Carrier storage foundation; no game runtime enables it yet.
+# Asset-free Carrier storage and codec coverage.
 build/test-sc64-interceptor-pool-codec: tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c -o $@
 .PHONY: test-sc64-interceptor-pool-codec
 test-sc64-interceptor-pool-codec: build/test-sc64-interceptor-pool-codec
 	./build/test-sc64-interceptor-pool-codec
 test-starcraft: test-sc64-interceptor-pool-codec
+
+# Bounded source-coordinate projectile motion and serialization continuation.
+build/test-sc64-interceptor-motion: tests/sc64_interceptor_motion.c starcraft/sc64_interceptor_motion.c starcraft/sc64_interceptor_motion.h starcraft/sc64_interceptor_motion_kernel.h starcraft/sc64_interceptor_direction_tables.h starcraft/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Istarcraft $< starcraft/sc64_interceptor_motion.c starcraft/sc64_interceptor_pool_codec.c -o $@
+.PHONY: test-sc64-interceptor-motion
+test-sc64-interceptor-motion: build/test-sc64-interceptor-motion
+	./build/test-sc64-interceptor-motion
+test-starcraft: test-sc64-interceptor-motion
+
+# Generation 41 reserves the Mode 4 OBJ arena and saves all 100 projectile
+# slots. Child training/flight/weapon-event integration remains separate.
+P7_PROJECTILE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_P7_PROJECTILES_ENABLED
+P7_PROJECTILE_SOURCES := starcraft/sc64_interceptor_motion.c starcraft/sc64_interceptor_pool_codec.c
+build/test-sc64-p7-projectile: tests/sc64_p7_projectile_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_PROJECTILE_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) -o $@
+.PHONY: test-sc64-p7-projectile protoss-p7-projectile-probe
+test-sc64-p7-projectile: build/test-sc64-p7-projectile
+	./build/test-sc64-p7-projectile
+build/starcraft-protoss-p7-projectile-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_PROJECTILE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-projectile-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Projectile-Probe-GBA.gba: build/starcraft-protoss-p7-projectile-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 SHOT41' SC7J
+protoss-p7-projectile-probe: build/StarCraft-Protoss-P7-Projectile-Probe-GBA.gba
 
 # Dedicated filming build. Hidden menu and transient scenes stay off in all
 # canonical profiles; the P7 bundle supplies Carrier/Ultralisk render actors.
