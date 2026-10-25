@@ -30,6 +30,35 @@ Production-capable ordinary units retain reference costs/time/supply. Mission
 actors, untrainable heroes, mode conversions and powerups keep their explicit
 nonproduction/UI policies; they are not purchasable stock units.
 
+The comparison probe was refreshed on 2026-10-26 to match the current helpers.
+It reads nominal movement rates and their 1024-phase cardinal/diagonal totals
+from `sc64_stock_motion_step`, and reports raw-ID stock attack helper fields
+separately from legacy race-rule fallbacks. It compares weapon ID, base damage,
+upgrade bonus, damage factor, damage class, unit hit count, per-impact count,
+cooldown and both range bounds. Its boundary checks reject below minimum and
+above maximum range. This corrected earlier report labels that treated Goliath
+and Scout's `1 hit × 2 weapon factor` as missing damage, represented motion by
+hardcoded one/two-pixel steps, and described Siege minimum range as absent.
+
+The probe now passes over 275 compiled unit/profile rows (55 distinct raw IDs
+across Terran Full, Z3, P3, P6, P7, Z6 and Z7 helper profiles): all 271
+canonical rows match source HP, shields and armor; all available stock attack
+helper rows match their pinned weapon records; and every mobile row's integrated
+nominal fixed-point rate matches the documented scaling assumption. Twenty-five
+source-immobile entries and two special lifecycle entries are classified
+separately. The 228-ID/132-weapon fact extraction checks the full public numeric
+table, including uncompiled IDs. These results qualify table/helper values, not
+all actor movement or the complete combat system.
+
+Movement uses the source top-speed number with the assumed half-size spatial
+scale and 24-source-frame/30-runtime-update conversion, then normalizes
+diagonal steps. The runtime still lacks native acceleration, turn rate, speed
+research and full movement IScript behavior; terrain, collisions and order
+gating also alter travel. The Siege helper reports 70 damage, +5 upgrade bonus,
+75-frame cooldown and 64/384 source-pixel bounds; its actual tick dead zone is
+covered by the engine combat fixture. The comparison is not a native N64
+equivalence test.
+
 Building capacities are also checked exhaustively across 12 compilation
 variants, including mapped scenario props that occupy Building slots. This
 caught the Robotics Facility's missing 500-shield capacity and extended
