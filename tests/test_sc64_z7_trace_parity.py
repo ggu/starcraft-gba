@@ -74,7 +74,13 @@ class Z7TraceParityTests(unittest.TestCase):
         root, trace = Path("private-output"), Path("same-trace.json")
         count = parity._output_paths(root, 1, trace, "count-snapshot")
         sight = parity._output_paths(root, 1, trace, "sight-spans")
+        defense = parity._output_paths(root, 1, trace, "defense-targets")
         self.assertTrue(set(count).isdisjoint(sight))
+        self.assertTrue(set(count).isdisjoint(defense))
+        self.assertTrue(set(sight).isdisjoint(defense))
+        self.assertEqual(parity.VARIANTS["defense-targets"],
+                         ("build/test-sc64-z7-trace-sight-spans",
+                          "build/test-sc64-z7-trace-defense-targets"))
         with self.assertRaisesRegex(ValueError, "unknown optimization"):
             parity.run([trace], root, "unrecognized")
 
