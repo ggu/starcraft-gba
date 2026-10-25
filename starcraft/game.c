@@ -11,6 +11,10 @@
 #if defined(SC64_RENDER_KEY_ONCE) && !defined(SC64_IMPORTED_MISSION)
 #error "SC64_RENDER_KEY_ONCE requires SC64_IMPORTED_MISSION"
 #endif
+#if defined(SC64_STATIC_DIRTY_ROWS) && \
+    (!defined(GBA_SCENE_CLIP) || !defined(SC64_IMPORTED_MISSION))
+#error "SC64_STATIC_DIRTY_ROWS requires GBA_SCENE_CLIP and SC64_IMPORTED_MISSION"
+#endif
 #include "sc64_weapon_vfx.h"
 #ifdef SC64_RACES
 #include "sc64_construction_vfx.h"
@@ -7168,11 +7172,13 @@ draw_minimap(void)
 static void
 draw_building_art(Building *q)
 {
+    int x = q->x - camx, y = q->y - camy + 12;
+    if (x < -20 || x > 260 || y < 2 || y > 130)
+        return;
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (sc64_game_building_actor_flags(q->type) &&
         !(sc64_game_building_actor_flags(q->type)&SC64_GAME_ACTOR_DRAWABLE)) return;
 #endif
-    int x = q->x - camx, y = q->y - camy + 12;
     int col = q->owner == SIDE ? C_TERRAN : C_ZERG;
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
@@ -7187,8 +7193,6 @@ draw_building_art(Building *q)
 #endif
         mission_building_sprite(q->type);
 #endif
-    if (x < -20 || x > 260 || y < 2 || y > 130)
-	return;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
 	return;
 #if defined(SC64_T4_SCENARIO_RUNTIME) && defined(SC64_HAS_SPRITES)
@@ -7247,11 +7251,11 @@ static void
 draw_building_overlay(Building *q)
 {
     int x = q->x - camx, y = q->y - camy + 12;
+    if (x < -20 || x > 260 || y < 2 || y > 130)
+        return;
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (sc64_game_building_has_flag(q->type, SC64_GAME_ACTOR_INVINCIBLE)) return;
 #endif
-    if (x < -20 || x > 260 || y < 2 || y > 130)
-        return;
     if (q->owner != SIDE && !currently_visible(q->x, q->y))
         return;
 #ifdef SC64_HAS_SPRITES
@@ -7463,6 +7467,51 @@ sc64_static_objects_key(void)
 #include "sc64_terrain_cache.h"
 #endif
 
+#if defined(SC64_STATIC_DIRTY_ROWS)
+#include "sc64_static_dirty_rows.h"
+#ifdef GBA_HOST
+static unsigned sc64_static_dirty_rows_host_bands;
+#endif
+#endif
+
+/* Static objects are part of the saved terrain band. Keep their painter
+ * order and existing visibility/viewport culls together for cache redraws. */
+static void
+draw_map_static_objects(void)
+{
+    int i, x, y;
+    for (i = 0; i < MAX_MINERALS; i++)
+	if (m[i].amount > 0) {
+	    x = m[i].x - camx;
+	    y = m[i].y - camy + 12;
+	    if (x > -6 && x < 245 && y > 7 && y < 123 &&
+	        currently_visible(m[i].x, m[i].y)) {
+#ifdef SC64_HAS_SPRITES
+		const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);
+		if (sprite) draw_mission_sprite(sprite, x, y);
+		else {
+#endif
+		gfx_diamond(x, y, 7, 4, C_CYAN);
+		gfx_pixel(x, y, C_WHITE);
+#ifdef SC64_HAS_SPRITES
+		}
+#endif
+	    }
+	}
+    for (i = 0; i < geyser_count; i++) {
+	x = geysers[i].x - camx;
+	y = geysers[i].y - camy + 12;
+	if (x > 0 && x < 240 && y > 12 && y < 120 &&
+	    currently_visible(geysers[i].x, geysers[i].y))
+	    gfx_diamond(x, y, 6, 4, C_GREEN);
+    }
+#ifdef SC64_IMPORTED_MISSION
+    for (i = 0; i < MAX_BUILDINGS; i++)
+        if (b[i].alive)
+            draw_building_art(&b[i]);
+#endif
+}
+
 static void
 draw_map(void)
 {
@@ -7565,35 +7614,50 @@ draw_map(void)
 	    } else
 		gfx_rect(x, y, 16, 16, C_GRASS);
 #endif
-	}
-    for (i = 0; i < MAX_MINERALS; i++)
-	if (m[i].amount > 0 && currently_visible(m[i].x, m[i].y)) {
-	    x = m[i].x - camx;
-	    y = m[i].y - camy + 12;
-	    if (x > -6 && x < 245 && y > 7 && y < 123) {
-#ifdef SC64_HAS_SPRITES
-		const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);
-		if (sprite) draw_mission_sprite(sprite, x, y);
-		else {
-#endif
-		gfx_diamond(x, y, 7, 4, C_CYAN);
-		gfx_pixel(x, y, C_WHITE);
-#ifdef SC64_HAS_SPRITES
-		}
-#endif
 	    }
-	}
-    for (i = 0; i < geyser_count; i++)
-	if (currently_visible(geysers[i].x, geysers[i].y)) {
-	    x = geysers[i].x - camx;
-	    y = geysers[i].y - camy + 12;
-	    if (x > 0 && x < 240 && y > 12 && y < 120)
-		gfx_diamond(x, y, 6, 4, C_GREEN);
-	}
+#ifdef SC64_STATIC_DIRTY_ROWS
+    {
+        u16 saved_clip = gfx_get_clip_y();
+        int view_col0, view_row0, view_col1, view_row1;
+        Sc64StaticDirtyRowsPlan plan;
+        int planned = 0;
+
+        /* Only partial cache reuse has a complete current-view dirty mask.
+         * The cache helper sets reused_base after a successful restore and
+         * fills every dirty cell before returning. */
+        if (saved_clip == (u16)(12u | (120u << 8)) &&
+            sc64_terrain_cache_valid && sc64_terrain_cache_reused_base &&
+            sc64_terrain_cache_view(camx, camy, &view_col0, &view_row0,
+                                    &view_col1, &view_row1) &&
+            view_col0 == col0 && view_row0 == row0 &&
+            view_col1 == col1 && view_row1 == row1 &&
+            view_col1 > view_col0 && view_row1 > view_row0 &&
+            (view_col1 - view_col0) * (view_row1 - view_row0) <=
+                SC64_TERRAIN_CACHE_CELLS)
+            planned = sc64_static_dirty_rows_plan(
+                sc64_terrain_cache_dirty,
+                (unsigned)(view_col1 - view_col0),
+                (unsigned)(view_row1 - view_row0), view_row0, camy,
+                (int)(saved_clip & 0xffu), (int)(saved_clip >> 8), &plan);
+
+        if (planned) {
+            for (unsigned band = 0; band < plan.count; ++band) {
+                gfx_set_clip_y(plan.bands[band].top, plan.bands[band].bottom);
+                draw_map_static_objects();
+#ifdef GBA_HOST
+                ++sc64_static_dirty_rows_host_bands;
+#endif
+            }
+            gfx_set_clip_y((int)(saved_clip & 0xffu), (int)(saved_clip >> 8));
+        } else {
+            /* Full misses and non-map caller clips retain the full pass. */
+            draw_map_static_objects();
+        }
+    }
+#else
+    draw_map_static_objects();
+#endif
 #ifdef SC64_IMPORTED_MISSION
-    for (i = 0; i < MAX_BUILDINGS; i++)
-        if (b[i].alive)
-            draw_building_art(&b[i]);
 #if defined(SC64_T5_RUNTIME) || defined(SC64_RENDER_KEY_ONCE)
     sc64_terrain_store_key(camx, camy, terrain_static_key);
 #else

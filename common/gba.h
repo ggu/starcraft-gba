@@ -24,6 +24,8 @@ void gfx_begin(u8 background);
  * Explicit band/window copy helpers keep their validated spans and do
  * not consult this scene clip. Every begin call restores the full screen. */
 void gfx_set_clip_y(int top,int bottom);
+/* Current valid range: top in the low byte, exclusive bottom in the high. */
+u16 gfx_get_clip_y(void);
 #endif
 /* The buffer selected by the last begin call, and its explicit-clear count.
  * Preserve-mode begin leaves that count unchanged for reusable pixel bands. */
