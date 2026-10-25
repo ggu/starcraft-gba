@@ -2667,6 +2667,15 @@ build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba: build/starcraft-protoss-p7-
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 MOVE40' SC7M
 protoss-p7-typed-move-probe: build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba
 
+# Ordinary-input Homeland controller for the existing generation-40 probe.
+# This remains separate from canonical campaign promotion/ARM qualification.
+build/test-sc64-p7-controller: tests/sc64_p7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-controller
+test-sc64-p7-controller: build/test-sc64-p7-controller
+	mkdir -p .local/build/p7-controller
+	./build/test-sc64-p7-controller .local/build/p7-controller/controller-trace.jsonl
+
 # Opt-in exact source-rectangle reuse in P7 aura and detection.
 P7_TYPED_RECT_FLAGS := $(P7_TYPED_MOVE_FLAGS) -DSC64_P7_GEOMETRY_RECT_HOIST_ENABLED
 build/test-sc64-p7-rect-runtime: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
