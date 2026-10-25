@@ -7,7 +7,9 @@ import unittest
 from tools.sc64_construction_programs import (
     HOLD_LAST,
     compile_primary_frame_stream,
+    compile_source_layers,
 )
+from tools.sc64_construction_sprites import decode_instruction
 
 
 def play(frame: int) -> bytes:
@@ -132,6 +134,43 @@ class CompilePrimaryFrameStreamTests(unittest.TestCase):
         code = bytes((36, 0)) * 257 + bytes((22,))
         with self.assertRaisesRegex(ValueError, "256 instructions"):
             self.compile(code)
+
+    def test_source_compiler_tracks_spawned_image_with_offsets_and_timing(self) -> None:
+        # Root waits one update, then places image 20 at (+1,-2), waits, ends.
+        # Child image's Init starts at byte 10 and draws frame 1 for two ticks.
+        code = bytes((5, 0, 8, 20, 0, 1, 254, 5, 0, 22,
+                      0, 1, 0, 5, 1, 7, 10, 0))
+        layers = compile_source_layers(
+            code, {10: 0}, 10, decode_instruction, [0],
+            {(20, "Init"): 10}, {10: 2, 20: 2})
+        self.assertEqual(len(layers), 2)
+        self.assertEqual(layers[0]["image_id"], 10)
+        self.assertEqual(layers[1]["image_id"], 20)
+        self.assertEqual((layers[1]["x_offset"], layers[1]["y_offset"]), (1, -2))
+        self.assertEqual(layers[1]["start_source_updates"], 1)
+        self.assertEqual(layers[1]["program"]["steps"], [
+            {"frame": 1, "duration_source_updates": 2}])
+
+    def test_follow_main_and_gas_overlays_are_explicit_layer_metadata(self) -> None:
+        # followmaingraphic (29), creategasoverlays (56) with signed selector,
+        # then end. Gas requests remain dynamic and are not folded into GRPs.
+        code = bytes((5, 0, 29, 5, 1, 56, 0xFE, 22))
+        layers = compile_source_layers(
+            code, {10: 0}, 10, decode_instruction, [0], {}, {10: 1})
+        self.assertTrue(layers[0]["follows_main_graphic"])
+        self.assertEqual(layers[0]["gas_overlay_requests"], [
+            {"selector": -2, "start_source_updates": 3}])
+        self.assertEqual(layers[0]["program"]["steps"], [
+            {"frame": 0, "duration_source_updates": 1},
+            {"frame": 0, "duration_source_updates": 2}])
+        # Opcode 41 is move speed and consumes one byte without changing the
+        # construction animation's visual clock.
+        moved = compile_source_layers(bytes((41, 99, 22)), {10: 0}, 10,
+                                     decode_instruction, [0], {}, {10: 1})
+        self.assertEqual(moved[0]["gas_overlay_requests"], [])
+        with self.assertRaisesRegex(ValueError, "setflipstate"):
+            compile_source_layers(bytes((23, 1, 22)), {10: 0}, 10,
+                                 decode_instruction, [0], {}, {10: 1})
 
 
 if __name__ == "__main__":

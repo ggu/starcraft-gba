@@ -38,7 +38,10 @@ static void test_actual_shot(int type,int owner,int air)
 {
     clear_world();
     int shooter=spawn_unit(owner,type,64,48);
-    int target=spawn_unit(owner==SIDE?ENEMY:SIDE,air?U_MUTALISK:U_ZEALOT,68,48);
+    /* Siege Mode cannot fire inside its stock minimum range. Keep every
+     * real shot fixture inside that weapon's valid range interval. */
+    int target=spawn_unit(owner==SIDE?ENEMY:SIDE,air?U_MUTALISK:U_ZEALOT,
+                         type==U_SIEGE_TANK?104:68,48);
     assert(shooter>=0 && target>=0);
     int health=u[target].hp+u[target].shield;
     tick_combat(&u[shooter],target);

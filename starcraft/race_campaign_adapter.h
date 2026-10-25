@@ -746,6 +746,15 @@ race_campaign_init(void)
             u[slot].raw_type = raw;
             u[slot].raw_owner = src->owner;
             u[slot].flags = src->flags;
+            /* Mission identity aliases (notably early Raynor) must retain
+             * their objective enum while using the actual source unit's
+             * stock capacities before applying scenario percentages. */
+            const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
+            if (stock) {
+                u[slot].hp=u[slot].maxhp=(int)stock->hp;
+                u[slot].shield=(int)stock->shields;
+                u[slot].armor=(u8)stock->armor;
+            }
             if (src->hp_percent && src->hp_percent <= 100)
                 u[slot].hp = u[slot].maxhp * src->hp_percent / 100;
             if (type == U_FENIX) race_campaign.rescue_unit = (unsigned short)slot;

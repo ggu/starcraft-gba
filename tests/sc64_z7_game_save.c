@@ -542,6 +542,29 @@ static void test_derived_rows(const RaceSave *saved)
                                         SC64_Z7_MAP_ROWS*16u));
         assert(!decoded.alive&&decoded.type==type&&decoded.maxhp==hp);
     }
+    {
+        int type=sc64_race_unit_from_raw(19);
+        if (type>=0) {
+            for (int raw=19;raw<=20;++raw) {
+                const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
+                Unit q,decoded;
+                Sc64DerivedUnitSave row;
+                assert(stock && stock->hp);
+                memset(&q,0,sizeof(q));
+                q.x=q.y=q.tx=q.ty=q.path_x=q.path_y=1;
+                q.type=type; q.owner=SIDE; q.hp=q.maxhp=(int)stock->hp;
+                q.alive=1; q.armor=sc64_race_unit_armor(type);
+                q.target=q.build=-1; q.raw_type=raw; q.raw_owner=0;
+                assert(sc64_derived_unit_encode(&row,&q,SC64_Z7_MAP_COLS*16u,
+                                                SC64_Z7_MAP_ROWS*16u));
+                assert(sc64_derived_unit_decode(&decoded,&row,
+                                                SC64_Z7_MAP_COLS*16u,
+                                                SC64_Z7_MAP_ROWS*16u));
+                assert(decoded.type==type && decoded.raw_type==raw &&
+                       decoded.maxhp==(int)stock->hp);
+            }
+        }
+    }
     for(int type=0;type<SC_RB_COUNT;type++) {
         int hp=sc64_derived_building_hp(type);
         Building q,decoded;

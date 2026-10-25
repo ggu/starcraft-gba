@@ -4,6 +4,9 @@
 #include "../starcraft/game.c"
 
 static u16 previous;
+static RaceSave beacon_valid_candidate;
+static RaceSave beacon_invalid_candidate;
+static RaceSave beacon_legacy_candidate;
 
 static void frame_input(u16 held)
 {
@@ -103,6 +106,7 @@ static int open_mission(int mission)
 static int roundtrip_mission(int mission)
 {
     int expected_race = mission >= 4 ? R_TER : mission >= 2 ? R_PROTOSS : R_ZERG;
+    int zerg_beacon = -1;
     if (!open_mission(mission)) {
         fprintf(stderr, "  menu launch: page=%d row=%d faction=%d selected=%d campaign=%d screen=%d\n",
                 race_front.page, race_front.row, race_front.faction,
@@ -110,10 +114,60 @@ static int roundtrip_mission(int mission)
         return 0;
     }
     if (race_human != expected_race) { fprintf(stderr, "  launch race=%d expected=%d\n", race_human, expected_race); return 0; }
+    if (mission == SC64_RACE_MISSION_Z1) {
+        for (int i = 0; i < MAX_BUILDINGS; ++i)
+            if (b[i].alive && b[i].raw_type == 194) { zerg_beacon = i; break; }
+        if (zerg_beacon < 0 || b[zerg_beacon].type != B_ZERG_BEACON ||
+            b[zerg_beacon].hp != 100000 || b[zerg_beacon].maxhp != 100000)
+            return 0;
+    }
     frame_input(KEY_START);
     frame_input(0);
     press(KEY_B); /* pause B writes the campaign save */
     if (screen != SCREEN_PAUSE) { fprintf(stderr, "  pause before save: screen=%d\n", screen); return 0; }
+    if (zerg_beacon >= 0 &&
+        (race_data.buildings[zerg_beacon][offsetof(Building,hp)/sizeof(int)] !=
+             SC64_LEGACY_BEACON_HP_SENTINEL ||
+         race_data.buildings[zerg_beacon][offsetof(Building,maxhp)/sizeof(int)] !=
+             SC64_LEGACY_BEACON_HP_SENTINEL)) return 0;
+    if (zerg_beacon >= 0) {
+        beacon_valid_candidate = race_data;
+        beacon_invalid_candidate = beacon_valid_candidate;
+        beacon_invalid_candidate.buildings[zerg_beacon]
+            [offsetof(Building,maxhp)/sizeof(int)] =
+                SC64_LEGACY_BEACON_HP_SENTINEL + 1;
+        save_write(&beacon_invalid_candidate,sizeof(beacon_invalid_candidate),
+                   SAVE_VERSION);
+        if (race_load_game() || b[zerg_beacon].hp != 100000 ||
+            b[zerg_beacon].maxhp != 100000) return 0;
+        beacon_legacy_candidate = beacon_valid_candidate;
+        beacon_legacy_candidate.buildings[zerg_beacon]
+            [offsetof(Building,hp)/sizeof(int)] = 10000;
+        beacon_legacy_candidate.buildings[zerg_beacon]
+            [offsetof(Building,maxhp)/sizeof(int)] = 10000;
+        save_write(&beacon_legacy_candidate,sizeof(beacon_legacy_candidate),
+                   SAVE_VERSION);
+        if (!race_load_game() || b[zerg_beacon].hp != 10000 ||
+            b[zerg_beacon].maxhp != 10000) return 0;
+        if (!race_save_game() ||
+            race_data.buildings[zerg_beacon]
+                [offsetof(Building,hp)/sizeof(int)] != 10000 ||
+            race_data.buildings[zerg_beacon]
+                [offsetof(Building,maxhp)/sizeof(int)] != 10000) return 0;
+        beacon_legacy_candidate.buildings[zerg_beacon]
+            [offsetof(Building,hp)/sizeof(int)] = 4321;
+        save_write(&beacon_legacy_candidate,sizeof(beacon_legacy_candidate),
+                   SAVE_VERSION);
+        if (!race_load_game() || b[zerg_beacon].hp != 4321 ||
+            b[zerg_beacon].maxhp != 10000 || !race_save_game() ||
+            race_data.buildings[zerg_beacon]
+                [offsetof(Building,hp)/sizeof(int)] != 4321 ||
+            race_data.buildings[zerg_beacon]
+                [offsetof(Building,maxhp)/sizeof(int)] != 10000) return 0;
+        save_write(&beacon_valid_candidate,sizeof(beacon_valid_candidate),
+                   SAVE_VERSION);
+        race_data = beacon_valid_candidate;
+    }
     game_init();
     previous = 0;
     press(KEY_B); /* HOME B restores the saved run */
@@ -124,6 +178,9 @@ static int roundtrip_mission(int mission)
                 screen, race_mode, race_selected_mission, race_campaign.mission, race_human);
         return 0;
     }
+    if (zerg_beacon >= 0 &&
+        (b[zerg_beacon].raw_type != 194 || b[zerg_beacon].type != B_ZERG_BEACON ||
+         b[zerg_beacon].hp != 100000 || b[zerg_beacon].maxhp != 100000)) return 0;
     return 1;
 }
 

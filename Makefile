@@ -1,5 +1,12 @@
 .DEFAULT_GOAL := all
 
+.PHONY: test-sc64-stock-motion test-sc64-stock-motion-runtime
+build/test-sc64-stock-motion: tests/sc64_stock_motion.c starcraft/sc64_stock_motion.h starcraft/sc64_stock_profiles.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-sc64-stock-motion: build/test-sc64-stock-motion
+	./build/test-sc64-stock-motion
+test: test-sc64-stock-motion
+
 # Asset-free Interceptor order decisions; no gameplay integration is enabled.
 .PHONY: test-sc64-interceptor-orders
 build/test-sc64-interceptor-orders: tests/sc64_interceptor_orders.c starcraft/sc64_interceptor_orders.c starcraft/sc64_interceptor_orders.h | build
@@ -42,8 +49,23 @@ BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPR
 BACKWATER_INPUTS := .local/sc64/backwater/generated/sc64_mission_generated.h .local/sc64/backwater/generated/sc64_assets_generated.h .local/sc64/backwater/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
 CAMPAIGN_FLAGS := $(BACKWATER_FLAGS) -I.local/sc64/campaign/generated
 CAMPAIGN_INPUTS := $(BACKWATER_INPUTS) .local/sc64/campaign/generated/sc64_campaign_generated.h
-RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -I.local/sc64/races/generated
-RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h
+# Prepared imported builds use source construction art by default. The
+# source-only original-art build remains independent of private inputs.
+SC64_CONSTRUCTION_ART ?= 1
+CONSTRUCTION_ART_DIR := .local/sc64/construction/generated
+CONSTRUCTION_ART_HEADER := $(CONSTRUCTION_ART_DIR)/sc64_construction_sprites_generated.h
+RACE_CONSTRUCTION_FLAGS :=
+RACE_CONSTRUCTION_INPUTS :=
+ifneq ($(SC64_CONSTRUCTION_ART),0)
+RACE_CONSTRUCTION_FLAGS := -DSC64_CONSTRUCTION_SOURCE_ART -I$(CONSTRUCTION_ART_DIR)
+RACE_CONSTRUCTION_INPUTS := $(CONSTRUCTION_ART_HEADER)
+endif
+RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -I.local/sc64/races/generated $(RACE_CONSTRUCTION_FLAGS)
+RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h $(RACE_CONSTRUCTION_INPUTS)
+build/test-sc64-stock-motion-runtime: tests/sc64_stock_motion_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) $< common/gba.c -o $@
+test-sc64-stock-motion-runtime: build/test-sc64-stock-motion-runtime
+	./build/test-sc64-stock-motion-runtime
 UNIFIED_FLAGS := $(RACES_FLAGS) -DSC64_UNIFIED
 RACE_CAMPAIGN_FLAGS := $(UNIFIED_FLAGS) -DSC64_IMPORTED_SKIRMISH -I.local/sc64/skirmish/generated
 RACE_CAMPAIGN_INPUTS := $(RACES_INPUTS) .local/sc64/skirmish/generated/sc64_skirmish_generated.h
@@ -2530,8 +2552,6 @@ test-starcraft: test-sc64-construction-animation
 
 # Optional source-art preview. It reuses already-prepared private race inputs;
 # the default profile never extracts or links game art.
-CONSTRUCTION_ART_DIR := .local/sc64/construction/generated
-CONSTRUCTION_ART_HEADER := $(CONSTRUCTION_ART_DIR)/sc64_construction_sprites_generated.h
 CONSTRUCTION_ART_FLAGS := $(UNIFIED_FLAGS) -DSC64_CONSTRUCTION_SOURCE_ART -I$(CONSTRUCTION_ART_DIR)
 $(CONSTRUCTION_ART_HEADER): tools/sc64_construction_sprites.py tools/sc64_construction_programs.py tools/sc64_sprites.py
 	$(PYTHON) tools/sc64_construction_sprites.py
@@ -3082,3 +3102,34 @@ test-audio: build/test-audio-mixer test-game-audio-default
 	./build/test-audio-mixer
 test-starcraft: test-audio
 test-unified: test-game-audio-unified
+
+# Stock profile facts are generated from the pinned public BWAPI default tables.
+# The normal local test stays asset-free; pass SC64_STOCK_FACTS to run the full
+# independent table-by-table comparison when the reference JSON is available.
+build/test-sc64-stock-profiles: tests/sc64_stock_profiles_dump.c starcraft/sc64_stock_profiles.h | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-stock-combat: tests/sc64_stock_combat.c starcraft/sc64_stock_combat.h starcraft/sc64_stock_profiles.h | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-raynor-stock20: tests/sc64_raynor_stock_fixture.c starcraft/race_rules.h starcraft/sc64_stock_profiles.h | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-raynor-stock19: tests/sc64_raynor_stock_fixture.c starcraft/race_rules.h starcraft/sc64_stock_profiles.h | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_T4_RUNTIME $< -o $@
+.PHONY: test-sc64-stock-profiles test-sc64-stock-profiles-facts
+test-sc64-stock-profiles: build/test-sc64-stock-profiles build/test-sc64-stock-combat build/test-sc64-raynor-stock20 build/test-sc64-raynor-stock19
+	./build/test-sc64-stock-profiles >/dev/null
+	./build/test-sc64-stock-combat
+	./build/test-sc64-raynor-stock20
+	./build/test-sc64-raynor-stock19
+SC64_STOCK_FACTS ?= .local/unit-specs/reference.json
+test-sc64-stock-profiles-facts:
+	@test -f "$(SC64_STOCK_FACTS)" || { echo "Set SC64_STOCK_FACTS to the extracted pinned BWAPI reference JSON"; exit 1; }
+	$(PYTHON) tools/test_sc64_stock_profiles.py --facts "$(SC64_STOCK_FACTS)"
+test: test-sc64-stock-profiles
+
+# Exercise stock weapon fields through the actual campaign tick_combat path.
+build/test-sc64-stock-combat-runtime: tests/sc64_stock_combat_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T4_STORAGE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-stock-combat-runtime
+test-sc64-stock-combat-runtime: build/test-sc64-stock-combat-runtime
+	./build/test-sc64-stock-combat-runtime
+test-unified: test-sc64-stock-motion-runtime test-sc64-stock-combat-runtime test-sc64-construction-source

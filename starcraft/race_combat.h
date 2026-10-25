@@ -101,7 +101,7 @@ static void GBA_HOT race_tick_defenses(void) {
             int d=dist2(q->x,q->y,u[j].x,u[j].y);
             if(d<bestd){bestd=d;best=j;}
         }
-        if(best>=0){hit_target(best,damage,U_MARINE,q->owner);
+        if(best>=0){hit_stock_building_target(q,best,damage);
             add_tracer(q->x,q->y,u[best].x,u[best].y,sc64_weapon_vfx_building_profile(q->type));
             q->queue_progress=cooldown;}
     }
@@ -190,7 +190,7 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         int best = race_defense_target_from_zp_lists(
             q, ground, air, range, head, next, hostile_mask[q->owner]);
         if (best >= 0) {
-            hit_target(best, damage, U_MARINE, q->owner);
+            hit_stock_building_target(q,best,damage);
             add_tracer(q->x, q->y, u[best].x, u[best].y, sc64_weapon_vfx_building_profile(q->type));
             q->queue_progress = cooldown;
         }
@@ -246,7 +246,7 @@ static __attribute__((noinline)) void race_tick_defenses_p3_targets(void) {
             if (d < bestd) { bestd = d; best = j; }
         }
         if (best >= 0) {
-            hit_target(best, damage, U_MARINE, q->owner);
+            hit_stock_building_target(q,best,damage);
             add_tracer(q->x, q->y, u[best].x, u[best].y, sc64_weapon_vfx_building_profile(q->type));
             q->queue_progress = cooldown;
         }
@@ -330,7 +330,7 @@ static __attribute__((noinline)) void race_tick_defenses_late_targets(void)
             race_defense_target_from_owner_lists(q, ground, air, range, head, next,
                                                  hostile_mask[q->owner]) : -1;
         if (best >= 0) {
-            hit_target(best, damage, U_MARINE, q->owner);
+            hit_stock_building_target(q,best,damage);
             add_tracer(q->x, q->y, u[best].x, u[best].y, sc64_weapon_vfx_building_profile(q->type));
             q->queue_progress = cooldown;
         }
