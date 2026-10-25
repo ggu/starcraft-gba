@@ -130,14 +130,12 @@ $(P3_FRONT_TESTS): tests/sc64_p3_frontend.c starcraft/sc64_frontend.h starcraft/
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon -DSC64_UNIFIED -DSC64_CAMPAIGN_RACE=2 $(P3_FRONT_FLAGS) $< -o $@
 
 .PHONY: protoss-p3 test-sc64-p3
-build/starcraft-protoss-p3.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(P3_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p3.map -lgcc -o $@
-	$(SIZE) $@
-build/StarCraft-Protoss-P3-GBA.gba: build/starcraft-protoss-p3.elf tools/fix_rom.py
-	$(OBJCOPY) -O binary $< $@
-	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS3' SCP3
-protoss-p3: build/StarCraft-Protoss-P3-GBA.gba
-	$(PYTHON) tools/verify_roms.py --protoss-p3
+# Compatibility filenames point at the canonical campaign ROM/ELF.
+build/starcraft-protoss-p3.elf: build/starcraft-protoss.elf | build
+	ln -sf starcraft-protoss.elf $@
+build/StarCraft-Protoss-P3-GBA.gba: build/StarCraft-Protoss-GBA.gba | build
+	ln -sf StarCraft-Protoss-GBA.gba $@
+protoss-p3: verify-protoss build/starcraft-protoss-p3.elf build/StarCraft-Protoss-P3-GBA.gba
 build/test-sc64-p3-run: tests/sc64_p3_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p3-save: tests/sc64_p3_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
@@ -760,16 +758,15 @@ test-sc64-t3t4-runtime: build/test-sc64-t3t4-targets build/test-sc64-t3t4-t3-sav
 	./build/test-sc64-t3t4-hud
 	./build/test-sc64-t3t4-run
 
-# Staged New Dominion runtime has its own ROM and save identity.
+# New Dominion is the canonical Zerg campaign ROM; legacy target paths alias it.
 .PHONY: zerg-z3 test-sc64-z3-runtime
-build/starcraft-zerg-z3.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(Z3_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z3.map -lgcc -o $@
-	$(SIZE) $@
-build/StarCraft-Zerg-Z3-GBA.gba: build/starcraft-zerg-z3.elf tools/fix_rom.py
-	$(OBJCOPY) -O binary $< $@
-	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z3' SCZ3
-zerg-z3: build/StarCraft-Zerg-Z3-GBA.gba
-	$(PYTHON) tools/verify_roms.py --zerg-z3
+# Compatibility filenames point at the canonical campaign ROM/ELF; keep the
+# replay tools working without compiling or storing a second Z3 profile.
+build/starcraft-zerg-z3.elf: build/starcraft-zerg.elf | build
+	ln -sf starcraft-zerg.elf $@
+build/StarCraft-Zerg-Z3-GBA.gba: build/StarCraft-Zerg-GBA.gba | build
+	ln -sf StarCraft-Zerg-GBA.gba $@
+zerg-z3: verify-zerg build/starcraft-zerg-z3.elf build/StarCraft-Zerg-Z3-GBA.gba
 build/test-sc64-z3-run: tests/sc64_z3_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z3_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z3-save: tests/sc64_z3_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
@@ -1074,30 +1071,36 @@ test-terran: build/test-terran build/test-sc64-terran-full-profile
 	./build/test-sc64-terran-full-profile
 
 build/starcraft-zerg.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=1 $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(Z3_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-GBA.gba: build/starcraft-zerg.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
-	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG' SCZ2
+	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z3' SCZ3
 verify-zerg: build/StarCraft-Zerg-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg
-build/test-zerg: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=1 tests/sc64_split_run.c common/gba.c -o $@
-test-zerg: build/test-zerg
+build/test-zerg: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z3_FLAGS) tests/sc64_split_run.c common/gba.c -o $@
+build/test-sc64-zerg-promoted-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z3_FLAGS) $< common/gba.c -o $@
+test-zerg: build/test-zerg build/test-sc64-zerg-promoted-profile test-sc64-z3-runtime
 	./build/test-zerg
+	./build/test-sc64-zerg-promoted-profile
 
 build/starcraft-protoss.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=2 $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(P3_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Protoss-GBA.gba: build/starcraft-protoss.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
-	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS' SCP2
+	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS3' SCP3
 verify-protoss: build/StarCraft-Protoss-GBA.gba
 	$(PYTHON) tools/verify_roms.py --protoss
-build/test-protoss: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACE_CAMPAIGN_FLAGS) -DSC64_CAMPAIGN_RACE=2 tests/sc64_split_run.c common/gba.c -o $@
-test-protoss: build/test-protoss
+build/test-protoss: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) tests/sc64_split_run.c common/gba.c -o $@
+build/test-sc64-protoss-promoted-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) $< common/gba.c -o $@
+test-protoss: build/test-protoss build/test-sc64-protoss-promoted-profile test-sc64-p3
 	./build/test-protoss
+	./build/test-sc64-protoss-promoted-profile
 
 test-race-campaigns: test-terran test-zerg test-protoss
 verify-race-campaigns: verify-terran verify-zerg verify-protoss

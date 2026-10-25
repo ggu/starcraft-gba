@@ -727,3 +727,34 @@ mapping gaps and pool requirements rather than truncating source rows. Z4
 still needs gameplay mappings, larger building/mineral pools, its countdown
 and hatch sequence, victory/defeat behavior, persistence and controller/ARM
 qualification. Source staging alone does not establish a playable mission.
+
+### Canonical Zerg and Protoss chapter 3 builds
+
+The standard Zerg and Protoss build targets include their first three
+missions. Prepare each profile from your verified ROM, then use the standard
+commands; no extra staged-profile selection is needed:
+
+```sh
+./dev sc64 prepare --rom /path/to/StarCraft64-USA.z64 --profile zerg
+./dev sc64 build --profile zerg
+./dev sc64 test --profile zerg
+./dev sc64 play --profile zerg
+```
+
+Replace `zerg` with `protoss` for the Protoss campaign. The canonical output
+pairs are `build/StarCraft-Zerg-GBA.gba` / `build/starcraft-zerg.elf` and
+`build/StarCraft-Protoss-GBA.gba` / `build/starcraft-protoss.elf`. The existing
+`zerg-z3` and `protoss-p3` Make targets and ROM/ELF filenames are compatibility
+aliases to these outputs. Retain matching frozen ROM/ELF pairs for replay.
+
+Both test targets run the profile's full third-mission runtime/controller
+suite, normal-menu campaign startup/save fixtures, and all 234 combinations
+of map, human race and independently selected AI races. The setup/save matrix
+does not prove a completed match for every combination. Build guards still
+enforce the same IWRAM and EWRAM reserves.
+
+The canonical Zerg build uses `SCZ3`, save generation 5, and the existing Z3
+optimization flags. Protoss uses `SCP3`, generation 7, and the P3 large-map
+geometry and optimization flags. Older standard two-mission generation-2
+saves are incompatible and are rejected. The asset-free default build
+continues to require no imported inputs.
