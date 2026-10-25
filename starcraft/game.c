@@ -50,6 +50,10 @@ int memcmp(const void *a, const void *b, size_t n);
 static int sc64_showcase_scene = -1;
 static unsigned sc64_showcase_ticks;
 #endif
+#ifdef SC64_UNIT_WORD_SPRITE_DIAGNOSTICS
+static u32 sc64_unit_words_derived_raw_calls;
+static u32 sc64_unit_words_explicit_raw_calls;
+#endif
 
 #ifdef SC64_Z6_RUNTIME
 #include "sc64_z6_state.h"
@@ -6898,7 +6902,27 @@ draw_unit(Unit * q)
     int sprite_x = x - 4, sprite_y = y - 4, sprite_w = 8, sprite_h = 8;
 #endif
 #ifdef SC64_HAS_SPRITES
-    if (sprite) draw_mission_sprite(sprite, x, y);
+    if (sprite) {
+#if defined(SC64_UNIT_WORD_SPRITES) && defined(SC64_RACE_UNIT_WORD_SPRITE_METADATA)
+        int sprite_raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
+        const GbaSpriteWordFrame *word_sprite = sprite_raw >= 0 ?
+            sc64_race_unit_words_sprite((unsigned short)sprite_raw,sprite) : 0;
+        if (word_sprite)
+#ifdef SC64_UNIT_WORD_SPRITE_DIAGNOSTICS
+        {
+            if(q->raw_type>=0)++sc64_unit_words_explicit_raw_calls;
+            else ++sc64_unit_words_derived_raw_calls;
+#endif
+            gfx_blit_sprite_words(sprite_x,sprite_y,word_sprite);
+#ifdef SC64_UNIT_WORD_SPRITE_DIAGNOSTICS
+        }
+#endif
+        else
+            draw_mission_sprite(sprite,x,y);
+#else
+        draw_mission_sprite(sprite,x,y);
+#endif
+    }
     else
 #endif
     {

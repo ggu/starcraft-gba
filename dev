@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -129,6 +130,18 @@ def canonical_zerg_input_ready(label: str, path: Path) -> bool:
         if expected_label == "Zerg chapter 4 maps":
             return (race_campaign_input_ready("zerg", path) and
                     race_campaign_input_ready("zerg-z4", path))
+        if expected_label == "Zerg chapter 4 sprites":
+            try:
+                text = path.read_text(encoding="ascii")
+            except (OSError, UnicodeError):
+                return False
+            return (marker in text and
+                    "#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 1" in text and
+                    "sc64_race_unit_words_sprite(" in text and
+                    re.search(r"static const GbaSpriteWordFrame sc64_race_unit_words_\d+ =",
+                              text) is not None and
+                    re.search(r"static const u32 sc64_race_unit_words_\d+_p[0-3]\[",
+                              text) is not None)
         if marker is None:
             return True
         try:
@@ -228,6 +241,12 @@ def doctor(require_emulator: bool = False) -> int:
 
 
 def build(game: str) -> None:
+    if game == "zerg" and not canonical_zerg_input_ready(
+            "Zerg chapter 4 sprites",
+            ROOT / ".local/sc64/zp-stage/generated/sc64_race_sprites_generated.h"):
+        raise RuntimeError(
+            "canonical Zerg requires prepacked unit-word sprite metadata; "
+            "regenerate it with ./dev sc64 prepare --rom PATH --profile zerg")
     make_target, _ = GAMES[game]
     run(["make", make_target])
 
@@ -325,6 +344,7 @@ def prepare(rom: Path, profile: str) -> None:
                 raise RuntimeError("generated staged race data is missing the SC64_Z3_ENABLED map gate")
             run([sys.executable, str(ROOT / "tools/sc64_race_sprites.py"),
                  "--rom", str(private_rom), "--base-only", "--include-zp-campaign-actors",
+                 "--prepack-unit-words",
                  "--out", str(stage / "sprites"),
                  "--header", str(stage / "sc64_race_sprites_generated.h")])
             run([sys.executable, str(ROOT / "tools/sc64_z4_pack.py"), "--rom", str(private_rom)])
@@ -333,6 +353,12 @@ def prepare(rom: Path, profile: str) -> None:
                     "Zerg chapter 4 maps", stage / "sc64_races_generated.h"):
                 raise RuntimeError(
                     "generated staged race data is missing the SC64_Z4_DATA_ENABLED map gate")
+            if not canonical_zerg_input_ready(
+                    "Zerg chapter 4 sprites",
+                    stage / "sc64_race_sprites_generated.h"):
+                raise RuntimeError(
+                    "generated canonical Zerg sprites are missing prepacked unit-word metadata; "
+                    "rerun ./dev sc64 prepare --rom PATH --profile zerg")
         if profile in ("terran", "zerg", "zerg-z3", "protoss", "zerg-z6", "protoss-p5-shuttle"):
             run([sys.executable, str(ROOT / "tools/sc64_skirmish_pack.py")])
         if profile in STAGED_CAMPAIGN_INPUTS:
@@ -417,7 +443,9 @@ def status(profile: str) -> int:
             ready = staged_campaign_input_ready(profile, label, path)
         elif profile == "zerg" and any(label == item[0] for item in CANONICAL_ZERG_INPUTS):
             ready = canonical_zerg_input_ready(label, path)
-        print(f"{'READY  ' if ready else 'MISSING'} {label}: {path}")
+        note = (" (run ./dev sc64 prepare --rom PATH --profile zerg to regenerate unit-word metadata)"
+                if profile == "zerg" and label == "Zerg chapter 4 sprites" and not ready else "")
+        print(f"{'READY  ' if ready else 'MISSING'} {label}: {path}{note}")
     return int(any(not path.is_file() for _, path in paths) or
                (profile in ("zerg", "zerg-z3", "protoss") and not race_campaign_input_ready(
                    "zerg" if profile == "zerg-z3" else profile,

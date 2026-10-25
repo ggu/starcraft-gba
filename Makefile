@@ -134,7 +134,8 @@ TERRAN_FULL_FLAGS := $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_T6_CAMPAIGN_ENTRY -DSC6
 CANONICAL_DRAW_FLAGS ?= -DGBA_SPRITE_WORDS -DGBA_SCENE_CLIP -DSC64_HUD_BUFFER_REUSE
 CANONICAL_STATIC_FLAGS ?= $(if $(filter -DGBA_SCENE_CLIP,$(CANONICAL_DRAW_FLAGS)),-DSC64_STATIC_DIRTY_ROWS)
 TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS)
-ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
+ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
+ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS)
 ZERG_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS)
 ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
 PROTOSS_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
@@ -3354,3 +3355,16 @@ test-sc64-protoss-carried-missions: build/test-sc64-protoss-carried-campaign
 	./build/test-sc64-protoss-carried-campaign --controller 2 --trace .local/sc64/p3-carried-p1-controller.json
 	./build/test-sc64-protoss-carried-campaign --controller 3 --trace .local/sc64/p3-carried-p2-controller.json
 test-protoss: test-sc64-protoss-carried-missions
+
+# The indexed and packed sprite paths must agree over the whole framebuffer,
+# including transparent lanes, alignment and both clipping configurations.
+SPRITE_WORD_TEST_FLAGS := -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_UNIT_WORD_SPRITES -Icommon
+build/test-gfx-sprite-packed: tests/gfx_sprite_words.c common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(SPRITE_WORD_TEST_FLAGS) -DGBA_SCENE_CLIP $< common/gba.c -o $@
+build/test-gfx-sprite-packed-no-clip: tests/gfx_sprite_words.c common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(SPRITE_WORD_TEST_FLAGS) $< common/gba.c -o $@
+.PHONY: test-gfx-sprite-packed
+test-gfx-sprite-packed: build/test-gfx-sprite-packed build/test-gfx-sprite-packed-no-clip
+	./build/test-gfx-sprite-packed
+	./build/test-gfx-sprite-packed-no-clip
+test-starcraft: test-gfx-sprite-packed
