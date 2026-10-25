@@ -56,18 +56,23 @@ static int sc64_derived_unit_hp(int type) {
 #endif
   return hp;
 }
+static int sc64_derived_unit_hp_for_raw(int type, int raw_type) {
+  int hp = sc64_derived_unit_hp(type);
+#ifdef SC64_RACES
+  /* Source identities may alias one gameplay enum (early Raynor is raw 19
+   * but keeps U_RAYNOR). The compact row already stores raw_type, so rebuild
+   * imported actors from that canonical source record when it has HP facts. */
+  const Sc64StockUnitProfile *stock = sc64_stock_unit_profile(raw_type);
+  if (stock && stock->hp) hp = (int)stock->hp;
+#else
+  (void)raw_type;
+#endif
+  return hp;
+}
 static int sc64_derived_building_hp(int type) {
   if (type < 0 || type >= SC_RB_COUNT)
     return 0;
-  int hp = sc64_race_building_rules[type].hp;
-  int z = sc64_zp_building_default_hp(type);
-  if (z)
-    hp = z;
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
-  if (type == B_ZP_PROTOSS_BEACON)
-    hp = 100000;
-#endif
-  return hp;
+  return sc64_race_building_max_hp(type);
 }
 static int sc64_derived_unit_encode(Sc64DerivedUnitSave *out, const Unit *q,
                                     unsigned ww, unsigned wh) {
@@ -83,7 +88,7 @@ static int sc64_derived_unit_encode(Sc64DerivedUnitSave *out, const Unit *q,
   }
   if (q->x < 0 || (unsigned)q->x >= ww || q->y < 0 || (unsigned)q->y >= wh ||
       q->hp < -131072 || q->hp >= 131072 || (q->alive && q->hp < 0) ||
-      q->maxhp != sc64_derived_unit_hp(q->type) || q->owner < 0 ||
+      q->maxhp != sc64_derived_unit_hp_for_raw(q->type,q->raw_type) || q->owner < 0 ||
       q->owner > 4 || q->type < 0 || q->type >= SC_RU_COUNT || q->alive > 1 ||
       q->selected > 1 || q->cd < 0 || q->cd > 65535 || q->order < 0 ||
       q->order > 15 || q->tx < 0 || q->tx > 2047 || q->ty < 0 || q->ty > 2047 ||
@@ -188,7 +193,7 @@ static int sc64_derived_unit_decode(Unit *out, const Sc64DerivedUnitSave *row,
 #undef G
   if (q.type < 0 || q.type >= SC_RU_COUNT)
     return 0;
-  q.maxhp = sc64_derived_unit_hp(q.type);
+  q.maxhp = sc64_derived_unit_hp_for_raw(q.type,q.raw_type);
   q.armor = sc64_race_unit_armor(q.type);
   q.weapon = 0;
   if (k != 226 || q.x < 0 ||

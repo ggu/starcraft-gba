@@ -13,7 +13,17 @@ int main(void)
     assert(sc64_race_unit_hits_vs(U_ZEALOT, 0) == 2);
     assert(sc64_race_unit_damage_vs(U_FENIX, 0) == 20);
     assert(sc64_race_unit_hits_vs(U_FENIX, 0) == 2);
+    assert(sc64_race_unit_cooldown_vs(U_FENIX, 0) == 22);
     assert(sc64_race_unit_damage_vs(U_FENIX_DRAGOON, 0) == 45);
+    assert(sc64_race_unit_damage(U_SIEGE_TANK) == 70);
+    assert(sc64_race_unit_range(U_HUNTER_KILLER) == 160);
+    assert(sc64_race_unit_range(U_SCV) == 10);
+    assert(sc64_race_unit_range(U_DRONE) == 32);
+    assert(sc64_race_unit_range(U_PROBE) == 32);
+    assert(sc64_race_unit_cooldown(U_DRONE) == 22);
+    assert(sc64_race_unit_cooldown(U_PROBE) == 22);
+    assert(sc64_race_unit_hits_vs(U_GOLIATH, 1) == 1);
+    assert(sc64_race_unit_hits_vs(U_SCOUT, 1) == 1);
     assert(sc64_race_unit_damage_vs(U_SCOUT, 1) == 14);
     assert(sc64_race_unit_range_vs(U_GOLIATH, 0) == 192);
     assert(sc64_race_unit_range_vs(U_GOLIATH, 1) == 160);

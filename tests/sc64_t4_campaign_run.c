@@ -46,14 +46,6 @@ static int enabled_doodads(void)
     return count;
 }
 
-static int doodad_enabled_for_building(unsigned slot)
-{
-    if (slot >= MAX_BUILDINGS) return -1;
-    for (unsigned row = 0; row < sc64_t4_scenario.doodad_count && row < 32u; ++row)
-        if (race_t4.doodad_slot[row] == slot) return race_t4.doodad_enabled[row] != 0;
-    return -1;
-}
-
 static void trace_prefix(void)
 {
     if (!trace_first) fputs(",\n", trace_file);
@@ -655,9 +647,6 @@ int main(int argc, char **argv)
                 if (!nearest_human_bring_point(u[group_lead].x, u[group_lead].y,
                                                visited_bring, 0, &bring_location,
                                                &route_x, &route_y)) break;
-                fprintf(stderr, "T4 post-teleport source Bring %d at %d,%d from actor %d@%d,%d\n",
-                        bring_location, route_x, route_y, group_lead,
-                        u[group_lead].x, u[group_lead].y);
                 if (!controller_move_unit_to(group_lead, route_x, route_y,
                                              u[group_lead].raw_type == 20)) break;
                 int deadline = frame + 2500;
@@ -669,50 +658,24 @@ int main(int argc, char **argv)
                 if (!unit_in_location((unsigned)group_lead, (unsigned)bring_location)) break;
                 courier = group_lead;
                 visited_bring[bring_location] = 1;
-                int settle_frames = bring_location == 26 ? 1 : 90;
-                for (int settle = 0; settle < settle_frames && frame < run_limit &&
-                     screen == SCREEN_PLAY && !won && !lost; ++settle) step(0);
-                fprintf(stderr, "T4 post-teleport entered source Bring %d; enabled doodads=%d\n",
-                        bring_location, enabled_doodads());
+                if (bring_location == 26) {
+                    int settle_deadline = frame + 1200;
+                    while (frame < settle_deadline && frame < run_limit &&
+                           screen == SCREEN_PLAY && !won && !lost &&
+                           dist2(u[group_lead].x, u[group_lead].y, route_x, route_y) > 4)
+                        step(0);
+                } else {
+                    for (int settle = 0; settle < 90 && frame < run_limit &&
+                         screen == SCREEN_PLAY && !won && !lost; ++settle) step(0);
+                }
                 group_lead = courier >= 0 && courier < MAX_UNITS && u[courier].alive ?
                              courier : choose_human_actor_in_location(actor_slot, 15);
                 if (group_lead < 0 || !nearest_reachable_location_point(
                         u[group_lead].x, u[group_lead].y, 20, &route_x, &route_y)) continue;
-                fprintf(stderr, "T4 post-gate route20 interior %d,%d\n", route_x, route_y);
                 if (!controller_move_unit_to(group_lead, route_x, route_y, 1)) break;
-                int last_goal_report = frame - 500;
                 while (frame < run_limit && screen == SCREEN_PLAY && !won && !lost &&
                        u[group_lead].alive &&
-                       !unit_in_location((unsigned)group_lead, 20)) {
-                    step(0);
-                    if (frame - last_goal_report >= 500) {
-                        int nearest_enemy = -1, enemy_dist = 0x7fffffff;
-                        int nearest_trap = -1, trap_dist = 0x7fffffff;
-                        for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive &&
-                            sc64_t4_owners_hostile(SIDE, u[i].owner)) {
-                            int d = dist2(u[group_lead].x, u[group_lead].y, u[i].x, u[i].y);
-                            if (d < enemy_dist) { enemy_dist = d; nearest_enemy = i; }
-                        }
-                        for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive &&
-                            (b[i].raw_type == 203 || b[i].raw_type == 209 ||
-                             b[i].raw_type == 211 || b[i].raw_type == 212)) {
-                            int d = dist2(u[group_lead].x, u[group_lead].y, b[i].x, b[i].y);
-                            if (d < trap_dist) { trap_dist = d; nearest_trap = i; }
-                        }
-                        fprintf(stderr, "T4 goal approach frame=%d courier=%d@%d,%d hp=%d order=%d path=%d,%d retry=%d enemy=%d owner=%d raw=%d d2=%d trap=%d raw=%d hp=%d enabled=%d d2=%d\n",
-                                frame, group_lead, u[group_lead].x, u[group_lead].y,
-                                u[group_lead].hp, u[group_lead].order, u[group_lead].path_x,
-                                u[group_lead].path_y, u[group_lead].path_retry, nearest_enemy,
-                                nearest_enemy >= 0 ? u[nearest_enemy].owner : -1,
-                                nearest_enemy >= 0 ? u[nearest_enemy].raw_type : -1,
-                                enemy_dist, nearest_trap,
-                                nearest_trap >= 0 ? b[nearest_trap].raw_type : -1,
-                                nearest_trap >= 0 ? b[nearest_trap].hp : -1,
-                                nearest_trap >= 0 ? doodad_enabled_for_building((unsigned)nearest_trap) : -1,
-                                trap_dist);
-                        last_goal_report = frame;
-                    }
-                }
+                       !unit_in_location((unsigned)group_lead, 20)) step(0);
                 break;
             }
         }

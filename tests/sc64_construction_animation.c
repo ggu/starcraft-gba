@@ -127,7 +127,10 @@ int main(void)
         assert(stage == 3 && elapsed < INT_MAX);
         assert(sc64_construction_source_phase(2,INT_MAX-1,INT_MAX,&stage,&elapsed));
         assert(stage == 2 && elapsed < INT_MAX);
-        assert(!sc64_construction_source_phase(3,1,100,&stage,&elapsed));
+        assert(sc64_construction_source_phase(3,1,100,&stage,&elapsed));
+        assert(stage==0 && elapsed==0);
+        assert(sc64_construction_source_phase(3,99,100,&stage,&elapsed));
+        assert(stage==0 && elapsed==79);
         assert(!sc64_construction_source_phase(1,-1,100,&stage,&elapsed));
         assert(!sc64_construction_source_phase(1,100,100,&stage,&elapsed));
         assert(!sc64_construction_source_phase(1,0,0,&stage,&elapsed));

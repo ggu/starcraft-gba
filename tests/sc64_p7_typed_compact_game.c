@@ -71,6 +71,14 @@ static void test_p7_typed_building_codec(void)
     assert(sc64_p7_typed_building_encode(&row,&q,2048,2048));
     assert(sc64_p7_typed_building_decode(&decoded,&row,2048,2048));
     assert(memcmp(&decoded,&q,sizeof(q))==0);
+    memset(&q,0,sizeof(q));
+    q.x=48; q.y=64; q.hp=q.maxhp=100000; q.owner=NEUTRAL;
+    q.type=B_ZERG_BEACON; q.alive=1; q.raw_type=194; q.raw_owner=0;
+    q.build_progress=-1;
+    assert(sc64_p7_typed_building_maxhp(B_ZERG_BEACON)==100000);
+    assert(sc64_p7_typed_building_encode(&row,&q,2048,2048));
+    assert(sc64_p7_typed_building_decode(&decoded,&row,2048,2048));
+    assert(memcmp(&decoded,&q,sizeof(q))==0);
     q.x=2047; q.y=2046; q.hp=1; q.owner=4; q.type=B_PYLON;
     q.alive=1; q.maxhp=sc64_p7_typed_building_maxhp(q.type);
     q.queue[0]=U_PROBE; q.queue[1]=U_ZERGLING;

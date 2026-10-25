@@ -346,6 +346,8 @@ select_nearest_worker(void)
         if (worker < 0)
             return 0;
         move_cursor_near(u[worker].x, u[worker].y);
+        if (!move_cursor_exact(u[worker].x, u[worker].y))
+            continue;
         press_key(KEY_A);
         for (i = 0; i < MAX_UNITS; i++)
             if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV && u[i].selected)
@@ -358,34 +360,48 @@ static int
 start_barracks(void)
 {
     int i, home = command_center_slot(), site_x, site_y, worker;
-    if (home < 0 || minerals < 150)
+    if (home < 0 || minerals < 150) {
+        fprintf(stderr, "Barracks precheck failed home=%d minerals=%d\n", home, minerals);
         return 0;
+    }
     /* Choose a clear authored placement north-west of the imported CC using
      * structure-relative offsets, not an extracted asset coordinate. */
     site_x = b[home].x - 48;
     site_y = b[home].y - 56;
-    if (!select_nearest_worker())
+    if (!select_nearest_worker()) {
+        fprintf(stderr, "Barracks worker selection failed at %d,%d\n", cx, cy);
         return 0;
+    }
     worker = -1;
     for (i = 0; i < MAX_UNITS; i++)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV && u[i].selected)
             worker = i;
-    if (worker < 0)
+    if (worker < 0) {
+        fprintf(stderr, "Barracks selected worker disappeared\n");
         return 0;
+    }
     press_key(KEY_B);
     while (menu_cursor != MENU_BARRACKS) {
         if (menu_cursor < MENU_BARRACKS) press_key(KEY_DOWN);
         else press_key(KEY_UP);
     }
     press_key(KEY_A);
-    if (mode != MODE_BUILD || !move_cursor_exact(site_x, site_y))
+    if (mode != MODE_BUILD || !move_cursor_exact(site_x, site_y)) {
+        fprintf(stderr, "Barracks placement mode/cursor failed mode=%d cursor=%d,%d target=%d,%d menu=%d\n",
+                mode,cx,cy,site_x,site_y,menu_open);
         return 0;
+    }
     press_key(KEY_A);
-    if (barracks_slot() < 0 || u[worker].order != ORDER_BUILD)
+    if (barracks_slot() < 0 || u[worker].order != ORDER_BUILD) {
+        fprintf(stderr, "Barracks issue failed slot=%d worker=%d order=%d target=%d,%d minerals=%d\n",
+                barracks_slot(),worker,u[worker].order,site_x,site_y,minerals);
         return 0;
+    }
     /* B exits build mode via its menu; a second B closes that menu. */
     press_key(KEY_B);
     press_key(KEY_B);
+    if (mode != MODE_NORMAL || menu_open)
+        fprintf(stderr, "Barracks menu close failed mode=%d menu=%d\n",mode,menu_open);
     return mode == MODE_NORMAL && !menu_open;
 }
 
@@ -478,8 +494,14 @@ main(int argc, char **argv)
         return 12;
 
     home = command_center_slot();
-    if (home < 0 || !start_barracks())
+    if (home < 0 || !start_barracks()) {
+        fprintf(stderr, "Wasteland Barracks command failed: home=%d frame=%d minerals=%d SCVs=%d Marines=%d Raynor=%d/%d mode=%d menu=%d selected=%d cursor=%d,%d\n",
+                home, frame, minerals, alive_count(SIDE,U_SCV),
+                alive_count(SIDE,U_MARINE), initial_raynor,
+                initial_raynor >= 0 ? u[initial_raynor].alive : 0,
+                mode, menu_open, selected_building, cx, cy);
         return 9;
+    }
     if (!queue_five_marines(5000))
         return 10;
     for (i = 0; i < 6000 && screen != SCREEN_RESULT; i++)

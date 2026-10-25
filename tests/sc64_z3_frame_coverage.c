@@ -113,6 +113,12 @@ setup_profile(void)
 #elif defined(SC64_P4_RUNTIME)
     race_human = R_PROTOSS;
     race_selected_mission = SC64_P4_GLOBAL_ID;
+#elif defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
+    race_human = R_TER;
+    race_selected_mission = 0;
+#elif defined(SC64_P3_RUNTIME)
+    race_human = R_PROTOSS;
+    race_selected_mission = SC64_P3_GLOBAL_ID;
 #else
     race_human = R_ZERG;
 #ifdef SC64_Z5_RUNTIME

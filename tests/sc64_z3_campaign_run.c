@@ -315,7 +315,7 @@ static int enemy_target_position(int *x, int *y)
         int d = dist2(objective_x, objective_y, b[i].x, b[i].y);
         if (d < best) { best = d; *x = b[i].x; *y = b[i].y; found = 1; }
     }
-    if (found) return 1; /* Focus enemy structures until the presence falls. */
+    if (found) return 1; /* Advance on structures when the objective is safe. */
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == ENEMY) {
         int d = dist2(objective_x, objective_y, u[i].x, u[i].y);
         if (d < best) { best = d; *x = u[i].x; *y = u[i].y; found = 1; }
@@ -323,10 +323,18 @@ static int enemy_target_position(int *x, int *y)
     return found;
 }
 
-static void issue_attack_order(void)
+static int nearest_enemy_unit_position(int x, int y, int *target_x, int *target_y)
 {
-    int x, y;
-    if (!enemy_target_position(&x, &y)) return;
+    int best = 0x7fffffff, found = 0;
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == ENEMY) {
+        int d = dist2(x, y, u[i].x, u[i].y);
+        if (d < best) { best = d; *target_x = u[i].x; *target_y = u[i].y; found = 1; }
+    }
+    return found ? best : -1;
+}
+
+static void issue_attack_order_at(int x, int y)
+{
     fprintf(stderr, "controller attack target=%d,%d from=%d,%d distance2=%d selected_building=%d\n",
             x, y, cx, cy, dist2(cx, cy, x, y), selected_building);
     if (selected_building >= 0) {
@@ -341,6 +349,12 @@ static void issue_attack_order(void)
     tap(KEY_A);             /* choose command */
     move_cursor(x, y);
     tap(KEY_A);             /* order selected units through normal input */
+}
+
+static void issue_attack_order(void)
+{
+    int x, y;
+    if (enemy_target_position(&x, &y)) issue_attack_order_at(x, y);
 }
 
 static void issue_order_at(int x, int y)
@@ -372,6 +386,15 @@ static int mature_chrysalis_position(int *x, int *y)
             *y = b[i].y;
             return 1;
         }
+    return 0;
+}
+
+static int mature_chrysalis_health(void)
+{
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE &&
+            b[i].raw_type == SC64_Z3_UNIT_MATURE_CHRYSALIS)
+            return b[i].hp;
     return 0;
 }
 
@@ -527,10 +550,18 @@ int main(int argc, char **argv)
             } else if (!strcmp(policy, "guard")) {
                 issue_order_at(guard_x, guard_y);
             } else {
-                int ex, ey;
+                int ex, ey, enemy_unit_distance;
                 int threat = nearest_enemy_from(chrysalis_x, chrysalis_y, &ex, &ey);
-                if (threat >= 0 && threat < 420 * 420) issue_attack_order();
-                else issue_order_at(guard_x, guard_y);
+                enemy_unit_distance = nearest_enemy_unit_position(chrysalis_x,
+                                                                   chrysalis_y,
+                                                                   &ex, &ey);
+                if (enemy_unit_distance >= 0 && enemy_unit_distance < 420 * 420)
+                    issue_attack_order_at(ex, ey);
+                else if (threat >= 0 && owner_units(SIDE) - side_worker_count() >= 40 &&
+                         mature_chrysalis_health() >= 150)
+                    issue_attack_order();
+                else
+                    issue_order_at(guard_x, guard_y);
             }
             next_action = frame + (!strcmp(policy, "guard") ? 900 : 1800);
         }

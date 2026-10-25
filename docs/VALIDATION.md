@@ -4396,6 +4396,13 @@ and unified ROMs retain `4ad80ce0…f9aee` and `6bab5be2…979f9` respectively.
 
 ### Source construction art preview
 
+Historical preview evidence follows. The subsequent
+[stock profile and art follow-up](audits/2026-10-26-stock-profiles-and-art/README.md)
+enables layered source construction art in canonical prepared race builds,
+adds Protoss WarpIn and expands coverage to all 50 constructible buildings,
+including the Greater Spire morph. The preview counts and ROM hashes below refer
+to the earlier implementation, not the current builds.
+
 The default-off `SC64_CONSTRUCTION_SOURCE_ART` profile imports verified local
 ROM art and compiles a bounded primary-frame timeline for supported Terran and
 Zerg construction stages. The self-contained importer authenticates the ROM
@@ -5450,8 +5457,11 @@ checked at build time against the cache. In this build, ROM text falls from
 2,967,864 to 2,305,248 bytes (22.3 percent). IWRAM ends at `0x03004ca8` and
 BSS at `0x0203dc58`, within the unchanged guards. The mode-4-only blitters
 move to ROM in this build only. RaceSave and the actor ABI are unchanged.
-After merging sampled audio, death animations and the mission outro, BSS
-ends at `0x0203dfdc` (IWRAM unchanged), 36 bytes inside the guard. Sampled audio keeps its mix
+After merging sampled audio, death animations, the mission outro and the
+canonical race-rendering update, IWRAM ends at `0x03004c60` and BSS at
+`0x0203dfdc`, 36 bytes inside the BSS guard. Scene clipping and full-width
+band blits from that update stay outside this probe; its builds do not
+define `GBA_SCENE_CLIP` or `GBA_WINDOW_BANDS`. Sampled audio keeps its mix
 buffers in the VRAM gap between the mode-4 pages, which mode 0 uses, so the
 tile probe builds without the imported audio bank and plays the PSG tones.
 

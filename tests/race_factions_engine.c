@@ -60,8 +60,11 @@ static void check_defense_targeting(int tower_type, const int *types,
     for (int i = 0; i < MAX_UNITS; ++i) hp[i] = u[i].hp;
     race_tick_defenses();
     for (int i = 0; i < count; ++i)
+        /* These Sunken fixtures select Small, zero-armor Zerglings: its
+         * stock 40 Explosive damage is halved against Small HP. Spore's
+         * 15 Normal damage is unscaled against these zero-armor flyers. */
         assert(u[i].hp == hp[i] - (i == expected ?
-            (tower_type == B_SUNKEN_COLONY ? 40 : 15) : 0));
+            (tower_type == B_SUNKEN_COLONY ? 20 : 15) : 0));
 }
 
 static void test_defense_target_query(void)

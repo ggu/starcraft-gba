@@ -31,6 +31,7 @@ static int gas_worker_slot = -1;
 static int home_miner_slot = -1;
 static int select_unit(int slot);
 static void move_cursor(int x, int y);
+static int move_cursor_exact(int x, int y);
 static int queue_scv(void);
 static int issue_wraith_group_order(int x, int y);
 
@@ -167,6 +168,18 @@ static void move_cursor(int x, int y)
         step(held);
     }
     step(0);
+}
+
+static int move_cursor_exact(int x,int y)
+{
+    for(int i=0;i<2000&&(cx!=x||cy!=y)&&host_tick<(u32)limit_ticks;i++){
+        u16 held=0;
+        if(cx<x)held|=KEY_RIGHT;if(cx>x)held|=KEY_LEFT;
+        if(cy<y)held|=KEY_DOWN;if(cy>y)held|=KEY_UP;
+        step(held);
+    }
+    step(0);
+    return cx==x&&cy==y;
 }
 
 static int group_selection(void)
@@ -382,7 +395,19 @@ static int send_wraith_wave_to(int target)
     fprintf(stderr,"T9 safe Wraith route count=%d wing=%d target=%d at=%d,%d\n",
             count,n,target,b[target].x,b[target].y);
     for(int k=0;k<count&&screen==SCREEN_PLAY&&!won&&!lost;++k) {
-        if(!issue_wraith_group_move(wx[k],wy[k]))return 0;
+        /* The route includes its start cell as a waypoint. If the group is
+         * already at that point, a normal Move command is rejected as a
+         * no-op and would prevent the later attack-move from being issued. */
+        int near=0;
+        for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].owner==SIDE&&
+            u[i].type==U_WRAITH&&!SC64_TRANSPORT_LOADED(&u[i])&&
+            dist2(u[i].x,u[i].y,wx[k],wy[k])<64*64)++near;
+        if(near>=n*2/3)continue;
+        if(!issue_wraith_group_move(wx[k],wy[k])) {
+            fprintf(stderr,"T9 Wraith waypoint failed k=%d/%d xy=%d,%d mode=%d menu=%d cursor=%d,%d selection=%d building=%d\n",
+                    k,count,wx[k],wy[k],mode,menu_open,cx,cy,selected_count(),selected_building);
+            break;
+        }
         for(int t=0;t<1800&&screen==SCREEN_PLAY&&!won&&!lost;++t) {
             int near=0;
             for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].owner==SIDE&&
@@ -515,10 +540,9 @@ static int assign_worker_to_mineral(int slot)
         u[slot].raw_type != 7 || !normal_field()) return 0;
     int cc = source_building(106, SIDE);
     int patch = -1, best = 0x7fffffff;
-    int bx = cc >= 0 ? b[cc].x : u[slot].x;
-    int by = cc >= 0 ? b[cc].y : u[slot].y;
-    for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0) {
-        int d = dist2(bx, by, m[i].x, m[i].y);
+    for (int i = 0; i < MAX_MINERALS; ++i) if (m[i].amount > 0 &&
+        ground_reachable(u[slot].x, u[slot].y, m[i].x, m[i].y)) {
+        int d = dist2(u[slot].x, u[slot].y, m[i].x, m[i].y);
         if (d < best) { best = d; patch = i; }
     }
     if (patch < 0 || patch >= MAX_MINERALS) { fprintf(stderr,"T9 worker %d no patch=%d\n",slot,patch); return 0; }
@@ -745,16 +769,25 @@ static int build_gas_outpost(void)
 
 static int assign_spare_worker_to_minerals(void)
 {
-    for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == SIDE && u[i].raw_type == 7 &&
-            i != home_miner_slot && i != gas_worker_slot &&
-            !SC64_TRANSPORT_LOADED(&u[i]) && u[i].order != ORDER_GAS &&
-            u[i].order != ORDER_BUILD)
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive || u[i].owner != SIDE || u[i].raw_type != 7 ||
+            i == gas_worker_slot ||
+            SC64_TRANSPORT_LOADED(&u[i]) || u[i].order == ORDER_GAS ||
+            u[i].order == ORDER_BUILD) continue;
+        /* A depleted patch does not make an ORDER_MINE worker productive in
+           this simulation. Reissue an ordinary mineral-line move/stop only
+           after its source target is gone; preserve active mining orders. */
+        if (u[i].order == ORDER_MINE) {
+            if (u[i].target < 0 || u[i].target >= MAX_MINERALS ||
+                m[u[i].target].amount > 0) continue;
+            /* A depleted patch is eligible for normal-control retargeting. */
+        }
             if (assign_worker_to_mineral(i)) {
                 fprintf(stderr,"T9 extra mineral worker assigned slot=%d tick=%u\n",
                         i,(unsigned)host_tick);
                 return 1;
             }
+    }
     return 0;
 }
 
@@ -808,6 +841,16 @@ static int queue_wraith(void)
             }
         }
     return 0;
+}
+
+static int queued_scv_count(void)
+{
+    int queued=0;
+    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
+       b[i].raw_type==106)
+        for(int q=0;q<b[i].queue_count&&q<5;q++)
+            if(b[i].queue[(b[i].queue_head+q)%5]==U_SCV)++queued;
+    return queued;
 }
 
 static int ferry_scv_to_gas_site(void)
@@ -1075,6 +1118,8 @@ static int run_policy(void)
     u32 next_order = host_tick + 15000;
     u32 next_wraith_attempt = host_tick + 700;
     u32 next_starport_attempt = host_tick + 900;
+    u32 next_worker_check = host_tick + 500;
+    u32 next_mineral_assignment = host_tick + 1500;
     int queued_total = 0, wave_sent = 0;
     while (host_tick < (u32)limit_ticks && screen == SCREEN_PLAY && !won && !lost) {
         int live_wraiths = side_wraith_count();
@@ -1087,13 +1132,27 @@ static int run_policy(void)
             if (build_starport()) checkpoint("additional-starport-order");
             next_starport_attempt = host_tick + 900;
         }
-        if (queued_total < 60 && live_wraiths + queued < 10 &&
+        if(host_tick>=next_worker_check){
+            next_worker_check=host_tick+500;
+            int live_scv=side_scv_count(),pending_scv=queued_scv_count();
+            if(live_scv+pending_scv<8&&minerals>=unit_cost(U_SCV)&&
+               supply_used+unit_supply(U_SCV)<=supply_cap&&queue_scv()){
+                fprintf(stderr,"T9 economy queued SCV live=%d pending=%d tick=%u wallet=%d/%d\n",
+                        live_scv,pending_scv,(unsigned)host_tick,minerals,gas);
+                checkpoint("economy-scv-queued");
+            }
+        }
+        if(host_tick>=next_mineral_assignment){
+            next_mineral_assignment=host_tick+1500;
+            (void)assign_spare_worker_to_minerals();
+        }
+        if (queued_total < 80 && live_wraiths + queued < 18 &&
             host_tick >= next_wraith_attempt) {
             if (reserved_supply() + 8 > supply_cap) (void)build_supply_depot();
             if (queue_wraith()) ++queued_total;
             next_wraith_attempt = host_tick + 700;
         }
-        if (!wave_sent && live_wraiths >= 6) {
+        if (!wave_sent && live_wraiths >= 18) {
             int target = nearest_force_building(1);
             if (target >= 0) {
                 int ok = send_wraith_wave_to(target);
@@ -1184,9 +1243,9 @@ int main(int argc, char **argv)
         fprintf(stderr,"T9 gas outpost=%d tick=%u wallet=%d/%d\n",
                 outpost,(unsigned)host_tick,minerals,gas);
         if (outpost) {
-            int extra_gas = add_gas_worker();
-            fprintf(stderr,"T9 additional paid gas worker=%d tick=%u wallet=%d/%d\n",
-                    extra_gas,(unsigned)host_tick,minerals,gas);
+            int extra_mineral = assign_spare_worker_to_minerals();
+            fprintf(stderr,"T9 additional paid mineral worker=%d tick=%u wallet=%d/%d\n",
+                    extra_mineral,(unsigned)host_tick,minerals,gas);
         }
     }
     fprintf(stderr,"T9 gas income checkpoint tick=%u wallet=%d/%d refinery=%d\n",
@@ -1216,6 +1275,13 @@ int main(int argc, char **argv)
     checkpoint("opening");
     int result = run_policy();
     checkpoint(won ? "won" : lost ? "lost" : "limit");
+    if(!result)fprintf(stderr,
+        "T9 controller failure checks won=%d lost=%d faults=%d phase=%u flags=%u completed=%u "
+        "protoss_buildings=%d zerg_buildings=%d raw16=%d wraiths=%d starports=%d minerals=%d gas=%d failed_action=%d\n",
+        won,lost,mission_unsupported_count,(unsigned)race_campaign.phase,
+        (unsigned)race_campaign.objective_flags,(unsigned)race_completed,
+        living_force_buildings(1),living_force_buildings(3),source_unit(16,-1),
+        side_wraith_count(),side_starport_count(),minerals,gas,failed_action);
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE && u[i].raw_type == 7)
         fprintf(stderr,"T9 ending SCV slot=%d xy=%d,%d hp=%d order=%d target=%d\n",
                 i,u[i].x,u[i].y,u[i].hp,u[i].order,u[i].target);

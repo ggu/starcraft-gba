@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Extract pinned BWAPI unit and weapon default-table facts to private JSON."""
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ COMMIT = 'd727fed68558c506163048ea889131d8cbb33915'
 UNIT_CPP = Path('bwapi/BWAPILIB/Source/UnitType.cpp')
 WEAPON_CPP = Path('bwapi/BWAPILIB/Source/WeaponType.cpp')
 UNIT_H = Path('bwapi/include/BWAPI/UnitType.h')
+UNIT_SIZE_H = Path('bwapi/include/BWAPI/UnitSizeType.h')
 WEAPON_H = Path('bwapi/include/BWAPI/WeaponType.h')
 DAMAGE_H = Path('bwapi/include/BWAPI/DamageType.h')
 
@@ -226,12 +228,14 @@ def main() -> None:
     unit_src, unit_hash = checked_source(UNIT_CPP)
     weapon_src, weapon_hash = checked_source(WEAPON_CPP)
     unit_h, unit_h_hash = checked_source(UNIT_H)
+    unit_size_h, unit_size_h_hash = checked_source(UNIT_SIZE_H)
     weapon_h, weapon_h_hash = checked_source(WEAPON_H)
     damage_h, damage_h_hash = checked_source(DAMAGE_H)
 
     unit_ids = enum_values(unit_h, 'Enum')
     weapon_ids = enum_values(weapon_h, 'Enum')
     damage_ids = enum_values(damage_h, 'Enum')
+    size_ids = enum_values(unit_size_h, 'Enum')
     unit_count = unit_ids['MAX']
     weapon_count = weapon_ids['MAX']
     unit_names = string_rows(unit_src, 'typeNames', unit_count)
@@ -260,6 +264,18 @@ def main() -> None:
     for key, array in (('ground_weapon', 'groundWeapon'), ('air_weapon', 'airWeapon')):
         for idx, value in enumerate(symbolic_rows(unit_src, array, unit_count, weapon_ids)):
             units_by_id[idx][key] = value
+    sizes = symbolic_rows(unit_src, 'unitSize', unit_count, size_ids)
+    for idx, value in enumerate(sizes):
+        units_by_id[idx]['size'] = value
+    building_flags = extract_initializer(unit_src, 'unitFlags')
+    if len(building_flags) != unit_count:
+        raise ValueError(f'unitFlags: expected {unit_count} rows, found {len(building_flags)}')
+    for idx, value in enumerate(building_flags):
+        units_by_id[idx]['is_building'] = any(part.strip() == 'Building'
+                                              for part in value.split('|'))
+    builders = symbolic_rows(unit_src, 'whatBuilds', unit_count, unit_ids)
+    for idx, value in enumerate(builders):
+        units_by_id[idx]['what_builds'] = value
 
     weapon_fields = {
         'damage_amount': 'defaultWpnDamageAmt',
@@ -283,7 +299,8 @@ def main() -> None:
     source_tables = {
         'UnitType.cpp': {
             name: initializer_line(unit_src, name)
-            for name in ('typeNames', *unit_fields.values(), 'groundWeapon', 'airWeapon')
+            for name in ('typeNames', *unit_fields.values(), 'groundWeapon', 'airWeapon',
+                         'unitSize', 'unitFlags', 'whatBuilds')
         },
         'WeaponType.cpp': {
             name: initializer_line(weapon_src, name)
@@ -300,7 +317,8 @@ def main() -> None:
             'source_files': {
                 str(path): {'sha256': digest}
                 for path, digest in ((UNIT_CPP, unit_hash), (WEAPON_CPP, weapon_hash),
-                                     (UNIT_H, unit_h_hash), (WEAPON_H, weapon_h_hash),
+                                     (UNIT_H, unit_h_hash), (UNIT_SIZE_H, unit_size_h_hash),
+                                     (WEAPON_H, weapon_h_hash),
                                      (DAMAGE_H, damage_h_hash))
             },
             'method': 'independent local parser of pinned BWAPI C++ initializer and enum declarations',
@@ -313,6 +331,7 @@ def main() -> None:
                 'top_speed': 'BWAPI default topSpeed values, pixels per frame; some are approximations',
                 'weapon_hits': 'BWAPI maximum hits per unit for ground/air weapons',
                 'cost_time_supply': 'BWAPI default unit tables, unchanged',
+                'what_builds': 'BWAPI default whatBuilds raw UnitType ID; used for source constructibility census',
             },
             'documentation_sources': {
                 'UnitType.h': 'topSpeed is approximate pixels per frame; maxGroundHits/maxAirHits are per-unit hit multiplicities',

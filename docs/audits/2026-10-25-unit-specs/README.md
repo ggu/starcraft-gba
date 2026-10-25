@@ -1,5 +1,9 @@
 # Unit specification audit — 25 October 2026
 
+Historical audit of the revisions listed below. See the subsequent
+[stock profile and sprite fixes](../2026-10-26-stock-profiles-and-art/README.md)
+for implemented corrections and remaining behavior limits.
+
 The engine does **not** yet match stock StarCraft unit behavior. Most default
 HP, shields, armor and primary weapon numbers match the public reference tables.
 There are definite numeric discrepancies and broader movement, damage and

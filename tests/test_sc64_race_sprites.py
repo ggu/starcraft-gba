@@ -1,5 +1,6 @@
 import tempfile
 import subprocess
+import re
 import unittest
 from pathlib import Path
 import sys
@@ -12,10 +13,125 @@ from tools.sc64_race_sprites import (
     ZP_UNIT_IDS, ZP_BUILDING_IDS, Z5_UNIT_IDS, Z5_BUILDING_IDS, Z6_UNIT_IDS,
     Z5_DOODAD_IDS, Z6_BUILDING_IDS,
     P7_UNIT_IDS, P7_BUILDING_IDS, P7_SHARED_UNIT_IDS,
+    P6_UNIT_IDS, P6_DOODAD_IDS,
+    image_init_frame,
+    compose_init_layers,
+    animation_frame_timeline,
 )
 
 
 class RaceSpritePackTests(unittest.TestCase):
+    def test_import_roster_covers_supported_modes_and_buildings(self):
+        self.assertTrue(
+            {13, 16, 30, 34}.issubset(set(RACE_UNIT_IDS.values())),
+            'Spider Mine, Kerrigan, Siege Mode, and Medic need source art')
+        self.assertTrue(
+            {110, 113}.issubset(set(RACE_UNIT_IDS.values())),
+            'Refinery and Factory need source art')
+
+    def test_unit_init_frame_comes_from_authored_iscript_playfram(self):
+        # SCPE record with Init at byte 16: playfram 2, then end.
+        payload = bytearray(32)
+        payload[16:20] = b'SCPE'
+        payload[20:24] = (0).to_bytes(4, 'little')
+        payload[24:26] = (28).to_bytes(2, 'little')
+        payload[26:28] = (0).to_bytes(2, 'little')
+        payload[28:32] = bytes((0, 2, 0, 22))
+        self.assertEqual(image_init_frame(3, (0, 0, 0, 42), bytes(payload), {42: 16}), 2)
+
+    def test_photon_attack_timeline_tracks_wait_plus_one_source_updates(self):
+        payload = bytearray(56)
+        payload[:33] = bytes((0,2,0, 5,2, 0,1,0, 5,2, 0,3,0, 5,2,
+                              5,1, 38, 42, 48, 0,1,0, 5,2, 0,2,0,
+                              5,2, 7,40,0))
+        payload[40:45] = bytes((0,0,0, 7,45))
+        payload[45] = 0  # The idle target is used only as a jump boundary.
+        payload[48:56] = bytes((5,1, 38,42,48, 0,1,0,))[:8]
+        payload[53:56] = bytes((5,2, 0,))
+        # Replace the compact repeat tail with explicit instructions and goto.
+        payload[48:59] = bytes((5,1, 38,42,48, 0,1,0, 5,2, 0))
+        payload[59:64] = bytes((2,0, 5,2, 7))
+        payload[64:66] = bytes((40,0))
+        self.assertEqual(animation_frame_timeline(bytes(payload), 0, 45), [
+            {'frame': 2, 'duration': 3}, {'frame': 1, 'duration': 3},
+            {'frame': 3, 'duration': 5}, {'frame': 1, 'duration': 3},
+            {'frame': 2, 'duration': 3}, {'frame': 0, 'duration': 0},
+        ])
+        self.assertEqual(animation_frame_timeline(bytes(payload), 48, 45), [
+            {'frame': 0, 'duration': 2}, {'frame': 1, 'duration': 3},
+            {'frame': 2, 'duration': 3}, {'frame': 0, 'duration': 0},
+        ])
+
+    def test_source_init_layers_compose_under_and_over_primary_pixels(self):
+        def frame(pixels, alpha, width=2, height=2):
+            return {'pixels': bytes(pixels), 'alpha': bytes(alpha),
+                    'width': width, 'height': height, 'x': 0, 'y': 0,
+                    'frame_width': width, 'frame_height': height}
+        main = frame((1, 0, 0, 0), (1, 0, 0, 0))
+        underlay = frame((2, 2, 2, 2), (1, 1, 1, 1))
+        overlay = frame((3, 0, 0, 0), (1, 0, 0, 0))
+        composed = compose_init_layers(main, [(underlay, 0, 0, True),
+                                                (overlay, 0, 0, False)])
+        self.assertEqual(composed['pixels'], bytes((3, 2, 2, 2)))
+        self.assertEqual(composed['alpha'], bytes((1, 1, 1, 1)))
+
+    def test_photon_cannon_frame_bank_is_available_to_race_renderer(self):
+        def frame(pixel):
+            return {'pixels': bytes((pixel,)), 'alpha': bytes((1,)), 'width': 1,
+                    'height': 1, 'x': 0, 'y': 0, 'frame_width': 1,
+                    'frame_height': 1}
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / 'sprites.h'
+            base_units = [{'name': name, 'frame': frame(20)} for name in RACE_UNIT_IDS]
+            write_header(path, base_units, bytes(range(256)),
+                         race_building_selected=[{'name': 'photon_cannon',
+                                                  'frames': [frame(21), frame(22)],
+                                                  'animations': {
+                                                      'gnd_attack_init': [
+                                                          {'frame': 2, 'duration': 3},
+                                                          {'frame': 1, 'duration': 3},
+                                                          {'frame': 3, 'duration': 5},
+                                                          {'frame': 1, 'duration': 3},
+                                                          {'frame': 2, 'duration': 3},
+                                                          {'frame': 0, 'duration': 0}],
+                                                      'gnd_attack_repeat': [
+                                                          {'frame': 0, 'duration': 2},
+                                                          {'frame': 1, 'duration': 3},
+                                                          {'frame': 2, 'duration': 3},
+                                                          {'frame': 0, 'duration': 0}]}}])
+            (root / 'check.c').write_text('''#include <assert.h>
+#include "sprites.h"
+int main(void) {
+    assert(sc64_race_building_sprite(162, 0));
+    assert(sc64_race_building_sprite(162, 1));
+    assert(!sc64_race_building_sprite(162, 2));
+    assert(sc64_race_building_sprite(162, 1)->pixels[0] == 22);
+    assert(sc64_race_photon_cannon_gnd_attack_init_frame(0) == 2);
+    assert(sc64_race_photon_cannon_gnd_attack_init_frame(2) == 2);
+    assert(sc64_race_photon_cannon_gnd_attack_init_frame(3) == 1);
+    assert(sc64_race_photon_cannon_gnd_attack_init_frame(5) == 1);
+    assert(sc64_race_photon_cannon_gnd_attack_init_frame(6) == 3);
+    assert(sc64_race_photon_cannon_gnd_attack_init_frame(10) == 3);
+    assert(sc64_race_photon_cannon_gnd_attack_init_frame(11) == 1);
+    assert(sc64_race_photon_cannon_gnd_attack_init_frame(14) == 2);
+    assert(sc64_race_photon_cannon_gnd_attack_init_frame(17) == 0);
+    assert(sc64_race_photon_cannon_gnd_attack_repeat_frame(0) == 0);
+    assert(sc64_race_photon_cannon_gnd_attack_repeat_frame(2) == 1);
+    assert(sc64_race_photon_cannon_gnd_attack_repeat_frame(5) == 2);
+    assert(sc64_race_photon_cannon_gnd_attack_repeat_frame(8) == 0);
+    assert(SC64_PHOTON_SOURCE_FRAMES == 18u);
+    assert(sc64_photon_cannon_attack_frame(16) == 2);
+    assert(sc64_photon_cannon_attack_frame(17) == 0);
+    assert(sc64_photon_cannon_attack_frame(400) == 0);
+    return 0;
+}
+''')
+            subprocess.run(['clang', '-std=c11', '-Wall', '-Wextra', '-Werror',
+                            '-DSC64_RACES', str(root / 'check.c'), '-o', str(root / 'check')],
+                           check=True, capture_output=True)
+            subprocess.run([str(root / 'check')], check=True, capture_output=True)
+
     def test_p7_sprite_set_gates_arbiter_and_all_structure_frames(self):
         def frame(pixel):
             return {'pixels': bytes((pixel,)), 'alpha': bytes((1,)), 'width': 1,
@@ -121,6 +237,34 @@ int main(void) {
         self.assertEqual(RACE_UNIT_IDS['hydralisk'], 38)
         self.assertEqual(RACE_UNIT_IDS['photon_cannon'], 162)
 
+    def test_all_runtime_raw_actor_and_building_ids_have_source_art(self):
+        rules = (Path(__file__).resolve().parents[1] / 'starcraft/race_rules.h').read_text()
+
+        def numeric_raw_ids(function_signature, next_signature):
+            start = rules.index(f'static inline int {function_signature}\n{{')
+            end = rules.index(f'static inline int {next_signature}\n{{', start)
+            body = rules[start:end]
+            return {int(value) for value in re.findall(r'return (\d+);', body)}
+
+        runtime_units = numeric_raw_ids('sc64_race_raw_unit(int type)',
+                                        'sc64_race_raw_building(int type)')
+        unit_assets = set(RACE_UNIT_IDS.values()) | set(T4_UNIT_IDS.values())
+        unit_assets |= set(T6_UNIT_IDS.values()) | set(LATE_UNIT_IDS.values())
+        unit_assets |= set(ZP_UNIT_IDS.values()) | set(Z5_UNIT_IDS.values())
+        unit_assets |= set(Z6_UNIT_IDS.values()) | set(P6_UNIT_IDS.values())
+        unit_assets |= set(P7_UNIT_IDS.values())
+        self.assertEqual(runtime_units - unit_assets, {101},
+                         'raw 101 is intentionally source-invisible')
+
+        runtime_buildings = numeric_raw_ids('sc64_race_raw_building(int type)',
+                                            'sc64_race_unit_from_raw(int raw)')
+        building_assets = set(RACE_UNIT_IDS.values()) | set(T4_BUILDING_IDS.values())
+        building_assets |= set(LATE_BUILDING_IDS.values()) | set(ZP_BUILDING_IDS.values())
+        building_assets |= set(Z5_BUILDING_IDS.values()) | set(Z5_DOODAD_IDS.values())
+        building_assets |= set(Z6_BUILDING_IDS.values()) | set(P6_DOODAD_IDS.values())
+        building_assets |= set(P7_BUILDING_IDS.values())
+        self.assertEqual(runtime_buildings - building_assets, set())
+
     def test_header_remaps_opaque_indices_and_keeps_transparency_zero(self):
         frame = {'pixels': bytes((0, 9, 0, 7)), 'alpha': bytes((0, 1, 0, 1)),
                  'width': 2, 'height': 2, 'x': 0, 'y': 0,
@@ -141,11 +285,13 @@ int main(void) {
         t4 = [{'name': name, 'frame': frame} for name in T4_UNIT_IDS]
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'sprites.h'
-            write_header(path, [], bytes(range(256)), t4)
+            base = [{'name': name, 'frame': frame} for name in RACE_UNIT_IDS]
+            write_header(path, base, bytes(range(256)), t4)
             text = path.read_text()
         self.assertIn('#ifdef SC64_T4_ENABLED', text)
         self.assertIn('case 15: return &sc64_race_sprite_civilian;', text)
         self.assertIn('case 20: return &sc64_race_sprite_raynor_raw20;', text)
+        self.assertIn('case 19: return &sc64_race_sprite_raynor_vulture_t6;', text)
         self.assertIn('case 89: return &sc64_race_sprite_rhynadon;', text)
         self.assertIn('case 95: return &sc64_race_sprite_ragnasaur;', text)
         self.assertIn('case 195: return &sc64_race_sprite_terran_beacon;', text)
@@ -302,11 +448,12 @@ int main(void) {
 #error "complete T6 preparation must advertise its sprite set"
 #endif
     assert(ship && ship->w == 1 && ship->pixels[0] == 9);
-    assert(sc64_race_unit_sprite(19));
     assert(sc64_race_unit_sprite(115));
 #else
     assert(!ship);
 #endif
+    assert(sc64_race_unit_sprite(19)); /* Raw-19 hero sprite is unconditional. */
+    assert(sc64_race_unit_sprite(20)); /* Base enum Raynor alias is unconditional. */
     assert(sc64_race_unit_sprite(138)); /* shared Queen's Nest art */
     assert(!sc64_race_unit_sprite(29)); /* flying Norad hero is distinct */
     return 0;
@@ -327,18 +474,19 @@ int main(void) {
         late_units = [{'name': name, 'frame': frame} for name in LATE_UNIT_IDS]
         late_buildings = [{'name': name, 'frames': [frame, frame]}
                           for name in LATE_BUILDING_IDS]
+        zp_buildings = [{'name': name, 'frames': [frame, frame]}
+                        for name in ZP_BUILDING_IDS]
         base_units = [{'name': name, 'frame': frame} for name in RACE_UNIT_IDS]
         t4_units = [{'name': name, 'frame': frame} for name in T4_UNIT_IDS]
         t4_buildings = [{'name': name, 'frames': [frame, frame]}
                          for name in T4_BUILDING_IDS]
-        t6_units = [{'name': name, 'frame': frame}
-                    for name in ('crashed_norad_ii', 'raynor_vulture_t6',
-                                 'control_tower_t6')]
+        t6_units = [{'name': name, 'frame': frame} for name in T6_UNIT_IDS]
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             full = root / 'late.h'
             write_header(full, base_units, bytes(range(256)), t4_units,
-                         t4_buildings, t6_units, late_units, late_buildings)
+                         t4_buildings, t6_units, late_units, late_buildings,
+                         zp_building_selected=zp_buildings)
             text = full.read_text()
             (root / 'check.c').write_text('''#include <assert.h>
 #include "late.h"
@@ -357,6 +505,7 @@ int main(void) {
 ''')
             subprocess.run(['clang', '-std=c11', '-DSC64_T4_ENABLED',
                             '-DSC64_T6_ENABLED', '-DSC64_TERRAN_LATE_ENABLED',
+                            '-DSC64_ZP_CAMPAIGN_ACTORS',
                             str(root / 'check.c'), '-o', str(root / 'check')],
                            check=True, capture_output=True)
             subprocess.run([str(root / 'check')], check=True, capture_output=True)
@@ -425,8 +574,7 @@ int main(void) {
             self.assertNotIn('SC64_Z5_SPRITE_SET_COMPLETE',
                              partial_building.read_text())
 
-            zp_units = [{'name': name, 'frame': frame} for name in
-                        ('infested_kerrigan', 'raynor_vulture_zp', 'tassadar_hero_zp')]
+            zp_units = [{'name': name, 'frame': frame} for name in ZP_UNIT_IDS]
             zp_buildings = [{'name': name, 'frames': [frame]}
                             for name in ('control_tower_zp', 'machine_shop_zp',
                                          'armory_zp', 'queens_nest_zp',

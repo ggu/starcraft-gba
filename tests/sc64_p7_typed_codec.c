@@ -21,6 +21,13 @@ static const Sc64RaceBuildingRule *sc64_race_building_rule(int type) { return ty
 static int sc64_zp_actor_default_hp(int type) { (void)type; return 0; }
 static int sc64_zp_actor_default_shields(int type) { (void)type; return 0; }
 static int sc64_zp_building_default_hp(int type) { (void)type; return 0; }
+/* Synthetic canonical-provider API; real stock capacities are checked by
+ * the imported game fixture, separately from these codec property cases. */
+static int sc64_race_building_max_hp(int type) {
+  const Sc64RaceBuildingRule *rule=sc64_race_building_rule(type);
+  int hp=sc64_zp_building_default_hp(type);
+  return hp?hp:rule?rule->hp:0;
+}
 static int sc64_race_unit_armor(int type) { return type % 11; }
 typedef struct {
   int hp, maxhp, carry, shield;
