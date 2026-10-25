@@ -22,6 +22,50 @@ FULL_PROFILE_HEADER = Path(os.environ.get(
 
 
 class PhotonCannonRendererTests(unittest.TestCase):
+    def test_base_race_enums_have_unconditional_opaque_sprites(self) -> None:
+        compiler = shutil.which("clang") or shutil.which("cc")
+        header = PRIVATE_HEADER / "sc64_race_sprites_generated.h"
+        if not compiler or not header.is_file():
+            self.skipTest("compiler and private base race sprite header are required")
+        with tempfile.TemporaryDirectory(prefix="sc64-base-roster-") as temp:
+            directory = Path(temp)
+            source = directory / "base-roster.c"
+            executable = directory / "base-roster"
+            source.write_text('''#include <assert.h>
+#include "sc64_race_sprites_generated.h"
+#include "race_rules.h"
+static void check(unsigned short raw) {
+    const Sc64SpriteFrame *s = sc64_race_unit_sprite(raw);
+    assert(s && s->pixels && s->w && s->h);
+    unsigned opaque = 0;
+    for (unsigned i = 0; i < (unsigned)s->w * s->h; ++i)
+        opaque += s->pixels[i] != 0;
+    assert(opaque);
+}
+int main(void) {
+    for (int type = 0; type < SC_RU_COUNT; ++type) {
+        int raw = sc64_race_raw_unit(type);
+        if (raw >= 0 && raw != 101) check((unsigned short)raw);
+    }
+    for (int type = 0; type < SC_RB_COUNT; ++type) {
+        int raw = sc64_race_raw_building(type);
+        if (raw >= 0) check((unsigned short)raw);
+    }
+    check(19); /* T6/T1 Raynor exists even in a base-only compile. */
+    check(20); /* The base U_RAYNOR enum resolves to raw 20. */
+    check(79); /* U_TASSADAR's source hero art is also part of the base set. */
+    return 0;
+}
+''')
+            subprocess.run(
+                [compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
+                 "-Wno-unused-function", "-DSC64_RACES",
+                 f"-I{ROOT / 'starcraft'}", f"-I{PRIVATE_HEADER}",
+                 str(source), "-o", str(executable)],
+                check=True, capture_output=True, text=True)
+            subprocess.run([str(executable)], check=True,
+                           capture_output=True, text=True)
+
     def test_native_cannon_pixels_reach_game_renderer(self) -> None:
         compiler = shutil.which("clang") or shutil.which("cc")
         if not compiler:

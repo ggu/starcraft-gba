@@ -285,11 +285,13 @@ int main(void) {
         t4 = [{'name': name, 'frame': frame} for name in T4_UNIT_IDS]
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'sprites.h'
-            write_header(path, [], bytes(range(256)), t4)
+            base = [{'name': name, 'frame': frame} for name in RACE_UNIT_IDS]
+            write_header(path, base, bytes(range(256)), t4)
             text = path.read_text()
         self.assertIn('#ifdef SC64_T4_ENABLED', text)
         self.assertIn('case 15: return &sc64_race_sprite_civilian;', text)
         self.assertIn('case 20: return &sc64_race_sprite_raynor_raw20;', text)
+        self.assertIn('case 19: return &sc64_race_sprite_raynor_vulture_t6;', text)
         self.assertIn('case 89: return &sc64_race_sprite_rhynadon;', text)
         self.assertIn('case 95: return &sc64_race_sprite_ragnasaur;', text)
         self.assertIn('case 195: return &sc64_race_sprite_terran_beacon;', text)
@@ -446,11 +448,12 @@ int main(void) {
 #error "complete T6 preparation must advertise its sprite set"
 #endif
     assert(ship && ship->w == 1 && ship->pixels[0] == 9);
-    assert(sc64_race_unit_sprite(19));
     assert(sc64_race_unit_sprite(115));
 #else
     assert(!ship);
 #endif
+    assert(sc64_race_unit_sprite(19)); /* Raw-19 hero sprite is unconditional. */
+    assert(sc64_race_unit_sprite(20)); /* Base enum Raynor alias is unconditional. */
     assert(sc64_race_unit_sprite(138)); /* shared Queen's Nest art */
     assert(!sc64_race_unit_sprite(29)); /* flying Norad hero is distinct */
     return 0;
@@ -477,9 +480,7 @@ int main(void) {
         t4_units = [{'name': name, 'frame': frame} for name in T4_UNIT_IDS]
         t4_buildings = [{'name': name, 'frames': [frame, frame]}
                          for name in T4_BUILDING_IDS]
-        t6_units = [{'name': name, 'frame': frame}
-                    for name in ('crashed_norad_ii', 'raynor_vulture_t6',
-                                 'control_tower_t6')]
+        t6_units = [{'name': name, 'frame': frame} for name in T6_UNIT_IDS]
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             full = root / 'late.h'
@@ -573,8 +574,7 @@ int main(void) {
             self.assertNotIn('SC64_Z5_SPRITE_SET_COMPLETE',
                              partial_building.read_text())
 
-            zp_units = [{'name': name, 'frame': frame} for name in
-                        ('infested_kerrigan', 'raynor_vulture_zp', 'tassadar_hero_zp')]
+            zp_units = [{'name': name, 'frame': frame} for name in ZP_UNIT_IDS]
             zp_buildings = [{'name': name, 'frames': [frame]}
                             for name in ('control_tower_zp', 'machine_shop_zp',
                                          'armory_zp', 'queens_nest_zp',

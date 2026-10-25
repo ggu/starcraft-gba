@@ -5220,8 +5220,16 @@ tick_combat(Unit * q, int target)
                      q->owner == SIDE ? weapons_level : 0, flying);
 #endif
     Sc64StockAttack stock_attack;
-    int stock_weapon=sc64_stock_attack_select(q->raw_type>=0?q->raw_type:
-                         sc64_race_raw_unit(q->type),flying,&stock_attack);
+    int attack_raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
+    int stock_weapon=sc64_stock_attack_select(attack_raw,flying,&stock_attack);
+    if (!stock_weapon) {
+        const Sc64StockUnitProfile *identity=sc64_stock_unit_profile(attack_raw);
+        /* An alias may advertise another raw unit's weapon eligibility.
+         * A known source None weapon must not acquire that alias's attack.
+         * The existing Reaver adapter models ground Scarab ammunition. */
+        if (identity && (flying?identity->air_weapon:identity->ground_weapon)==130 &&
+            (flying || q->type!=U_REAVER)) return;
+    }
     /* Firebat's three maximum hits describe spatial flame segments, not
      * three guaranteed impacts on its selected target. Preserve the existing
      * area adapter until native flame geometry/events are implemented. */

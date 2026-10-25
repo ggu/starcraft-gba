@@ -40,7 +40,7 @@ personal runners. Routine verification does not require a new runner service.
 
 Prepared imported race builds now use the source construction art, including
 Protoss WarpIn and source image underlays/overlays. The importer covers all 50
-stock constructible building IDs plus the Greater Spire morph. `./dev sc64
+stock constructible building IDs, including the Greater Spire morph. `./dev sc64
 prepare` generates the private header for race profiles; older prepared
 workspaces should regenerate it using the command below. `SC64_CONSTRUCTION_ART=0`
 selects the older authored fallback for diagnostic comparisons.

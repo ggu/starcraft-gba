@@ -56,6 +56,23 @@ static void test_goliath_and_scout_weapon_factors(void)
     assert(u[target].hp == initial - 24); /* 2x(14 - armor 2). */
 }
 
+static void test_source_alias_weapon_eligibility(void)
+{
+    reset_fixture();
+    int actor=spawn_unit(SIDE,U_RAYNOR,100,100);
+    int target=add_unit(ENEMY,8,120,100);
+    assert(actor>=0);
+    u[actor].raw_type=19; /* Vulture identity: no air weapon. */
+    int hp=u[target].hp;
+    tick_combat(&u[actor],target);
+    assert(u[target].hp==hp && !u[actor].cd);
+    u[actor].raw_type=20; /* Marine identity: armed against air. */
+#ifndef SC64_T4_RUNTIME
+    tick_combat(&u[actor],target);
+    assert(u[target].hp==hp-18 && u[actor].cd==19);
+#endif
+}
+
 static void test_zealot_two_blade_hits(void)
 {
     int attacker, target, initial;
@@ -117,6 +134,7 @@ static void test_early_raynor_mission_source_health(void)
 int main(void)
 {
     test_goliath_and_scout_weapon_factors();
+    test_source_alias_weapon_eligibility();
     test_zealot_two_blade_hits();
     test_hydralisk_shield_first_and_explosive_size();
     test_siege_minimum_range_and_cooldown();

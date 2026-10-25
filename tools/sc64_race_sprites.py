@@ -29,9 +29,12 @@ RACE_UNIT_IDS = {
     'marine': 0, 'ghost': 1, 'vulture': 2, 'goliath': 3, 'siege_tank': 5,
     'siege_tank_mode': 30, 'medic': 34, 'spider_mine': 13, 'kerrigan': 16,
     'scv': 7, 'wraith': 8, 'science_vessel': 9, 'dropship': 11,
+    # Canonical enum aliases can resolve to either raw hero identity even
+    # when the corresponding optional campaign adapter is disabled.
+    'raynor_vulture_t6': 19, 'raynor_raw20': 20,
     'firebat': 32,
     'battlecruiser': 12, 'hero_fenix': 77, 'fenix': 77,
-    'tassadar': 78,
+    'tassadar': 78, 'tassadar_hero_zp': 79,
     'probe': 64, 'zealot': 65, 'dragoon': 66, 'high_templar': 67,
     'archon': 68, 'shuttle': 69, 'scout': 70, 'carrier': 72,
     'interceptor': 73, 'reaver': 83, 'observer': 84,
@@ -61,12 +64,11 @@ RACE_UNIT_IDS = {
 }
 
 # Additional source-backed IDs needed by The Jacobs Installation (T4). Keep
-# this set out of the shared race sprite list so non-T4 profiles retain their
-# exact selected art and switch cases. Raw 101 is deliberately not an image:
+# T4-only scenario actors out of the shared race sprite list. Raw 101 is
+# deliberately not an image:
 # it is a map-revealer actor and must remain invisible in the source behavior.
 T4_UNIT_IDS = {
     'civilian': 15,
-    'raynor_raw20': 20,
     'rhynadon': 89,
     'ragnasaur': 95,
     'terran_beacon': 195,
@@ -82,11 +84,10 @@ T4_BUILDING_IDS = {
 }
 T4_INVISIBLE_RAW_TYPES = (101,)
 T4_EXPECTED_VISIBLE_RAW_TYPES = (0, 1, 2, 3, 7, 15, 20, 32, 37, 89, 95, 195, 218)
-# The crashed objective is not raw-29 Hero_Norad_II. Raw-19 Raynor and the
-# Control Tower also need their own art for T6's hero/transport route.
+# The crashed objective is not raw-29 Hero_Norad_II. Raw-19 Raynor now lives in
+# the unconditional bank because base race enum aliases can resolve to it.
 # Queen's Nest (138) already has a shared source sprite above.
-T6_UNIT_IDS = {'crashed_norad_ii': 126, 'raynor_vulture_t6': 19,
-               'control_tower_t6': 115}
+T6_UNIT_IDS = {'crashed_norad_ii': 126, 'control_tower_t6': 115}
 
 # Distinct late Terran campaign actors not already covered by the shared race,
 # T4, or T6 sets. These are private source GRPs behind the late-runtime flag.
@@ -99,8 +100,7 @@ LATE_BUILDING_IDS = {
 }
 # Authenticated scenario actors that are not part of the standard roster.
 # Raw 101 is intentionally represented as invisible mode, never extracted art.
-ZP_UNIT_IDS = {'infested_kerrigan': 51, 'raynor_vulture_zp': 19,
-               'tassadar_hero_zp': 79}
+ZP_UNIT_IDS = {'infested_kerrigan': 51, 'raynor_vulture_zp': 19}
 ZP_BUILDING_IDS = {'control_tower_zp': 115, 'machine_shop_zp': 120,
                    'armory_zp': 123, 'queens_nest_zp': 138,
                    'ultralisk_cavern_zp': 140, 'protoss_beacon_zp': 196}
@@ -474,12 +474,20 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
     if t4_selected:
         lines.append('#ifdef SC64_T4_ENABLED')
         for item in t4_selected:
-            lines.append(f'    case {T4_UNIT_IDS[item["name"]]}: return &sc64_race_sprite_{item["name"]};')
+            raw_type = T4_UNIT_IDS[item['name']]
+            if raw_type in seen:
+                continue
+            seen.add(raw_type)
+            lines.append(f'    case {raw_type}: return &sc64_race_sprite_{item["name"]};')
         lines.append('#endif /* SC64_T4_ENABLED */')
     if t6_selected:
         lines.append('#ifdef SC64_T6_ENABLED')
         for item in t6_selected:
-            lines.append(f'    case {T6_UNIT_IDS[item["name"]]}: return &sc64_race_sprite_{item["name"]};')
+            raw_type = T6_UNIT_IDS[item['name']]
+            if raw_type in seen:
+                continue
+            seen.add(raw_type)
+            lines.append(f'    case {raw_type}: return &sc64_race_sprite_{item["name"]};')
         lines.append('#endif /* SC64_T6_ENABLED */')
     if late_selected:
         lines.append('#ifdef SC64_TERRAN_LATE_ENABLED')
@@ -490,8 +498,9 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
         lines.append('#ifdef SC64_ZP_CAMPAIGN_ACTORS')
         for item in zp_selected:
             raw_type = ZP_UNIT_IDS[item['name']]
-            if raw_type == 19 and t6_selected:
-                continue  # The T6 helper already emits raw 19 when both sets are compiled.
+            if raw_type in seen:
+                continue  # Shared raw art wins across optional source-profile aliases.
+            seen.add(raw_type)
             lines.append(f'    case {raw_type}: return &sc64_race_sprite_{item["name"]};')
         lines.append('#endif /* SC64_ZP_CAMPAIGN_ACTORS */')
     if p6_selected:
@@ -1106,7 +1115,7 @@ def main() -> int:
     parser.add_argument('--base-only', action='store_true',
                         help='omit the SC64_T4_ENABLED-gated T4 sprite payloads')
     parser.add_argument('--include-t6', action='store_true',
-                        help='include SC64_T6_ENABLED-gated Norad, Raynor and Control Tower source sprites')
+                        help='include SC64_T6_ENABLED-gated crashed Norad and Control Tower source sprites')
     parser.add_argument('--include-late-terran', action='store_true',
                         help='include SC64_TERRAN_LATE_ENABLED-gated late Terran campaign source sprites')
     parser.add_argument('--include-zp-campaign-actors', action='store_true',

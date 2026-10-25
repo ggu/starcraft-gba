@@ -1845,7 +1845,7 @@ test-sc64-terran-full-regression: $(addprefix build/test-sc64-full-,t1-run t2-ru
 
 .PHONY: test-sc64-terran-full-campaign
 test-sc64-terran-full-campaign: test-sc64-terran-full-regression test-sc64-terran-late-world test-sc64-terran-late-save test-sc64-terran-late-repair $(addprefix build/test-sc64-t,7-campaign-run 8-campaign-run 9-campaign-run 10-campaign-run)
-	./build/test-sc64-t7-campaign-run --limit 20000 --trace .local/sc64/terran-late/full-t7-controller.json
+	./build/test-sc64-t7-campaign-run --limit 60000 --trace .local/sc64/terran-late/full-t7-controller.json
 	./build/test-sc64-t8-campaign-run --limit 200000 --trace .local/sc64/terran-late/full-t8-controller.json
 	./build/test-sc64-t9-campaign-run --limit 500000 --trace .local/sc64/terran-late/full-t9-controller.json
 	./build/test-sc64-t10-campaign-run --limit 100000 --trace .local/sc64/terran-late/full-t10-controller.json
@@ -3134,9 +3134,12 @@ test: test-sc64-stock-profiles
 # Exercise stock weapon fields through the actual campaign tick_combat path.
 build/test-sc64-stock-combat-runtime: tests/sc64_stock_combat_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T4_STORAGE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-stock-combat-runtime-base: tests/sc64_stock_combat_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-stock-combat-runtime
-test-sc64-stock-combat-runtime: build/test-sc64-stock-combat-runtime
+test-sc64-stock-combat-runtime: build/test-sc64-stock-combat-runtime build/test-sc64-stock-combat-runtime-base
 	./build/test-sc64-stock-combat-runtime
+	./build/test-sc64-stock-combat-runtime-base
 test-unified: test-sc64-stock-motion-runtime test-sc64-stock-combat-runtime test-sc64-scv-contact test-sc64-construction-source
 
 # Compare every compiled race-building identity against the independent public

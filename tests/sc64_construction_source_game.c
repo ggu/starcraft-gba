@@ -324,6 +324,20 @@ static void test_gas_overlay_source_requests(void)
 int main(void)
 {
     gba_init();
+    unsigned stages=0;
+    for (int raw=0;raw<228;++raw) for (unsigned phase=0;phase<4;++phase) {
+        const SC64ConstructionSourceStage *stage=sc64_construction_stage(raw,phase);
+        if (!stage) continue;
+        ++stages;
+        for (unsigned step=0;step<stage->animation->step_count;++step) {
+            unsigned index=stage->animation->steps[step].frame;
+            assert(sc64_construction_image_frame(stage->image_id,index));
+            for (unsigned i=1;i<stage->layer_count;++i)
+                if (stage->layers[i].follows_main_graphic)
+                    assert(sc64_construction_image_frame(stage->layers[i].image_id,index));
+        }
+    }
+    assert(stages==136); /* Full imported constructible/morph census. */
     test_stages_and_morph_loop();
     test_save_load_and_completion();
     test_waiting_and_unsupported_fallback();

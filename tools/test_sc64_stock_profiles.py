@@ -5,6 +5,7 @@ import argparse
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
 
@@ -57,8 +58,19 @@ def check(root: Path, facts_path: Path) -> None:
                                  f'{weapon_rows[weapon_id]} != {expected}')
     if building_count == 0:
         raise AssertionError('building flags were not extracted')
+    sys.path.insert(0,str(root))
+    from tools.sc64_construction_sprites import BUILDINGS, MORPH_PROGRAMS
+    expected_construction={u['id'] for u in units.values()
+                           if u['is_building'] and u['what_builds']['id']<228}
+    imported_construction={row[1] for row in
+                           (*BUILDINGS.values(),*MORPH_PROGRAMS.values())}
+    if expected_construction!=imported_construction:
+        raise AssertionError('construction census mismatch: missing %s, extra %s' %
+            (sorted(expected_construction-imported_construction),
+             sorted(imported_construction-expected_construction)))
     print(f'checked {len(unit_rows)} raw unit IDs ({building_count} buildings) '
           f'and {len(weapon_rows)} weapon rows')
+    print(f'checked {len(expected_construction)} constructible building IDs including morphs')
 
 
 if __name__ == '__main__':

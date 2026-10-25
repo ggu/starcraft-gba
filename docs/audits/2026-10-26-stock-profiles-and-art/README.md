@@ -81,6 +81,11 @@ cache cannot freeze its firing frames. The bounded attack sampler follows the
 source initial-volley frame/wait timeline and returns to idle. It does not
 retain the native repeated-attack IScript state machine.
 
+Both Raynor sprite variants (raw 19/20) and hero Tassadar (raw 79) now belong
+to the base race bank. Their enum identities exist outside the later campaign
+gates, so an all-gates atlas test alone could miss their absence in base builds.
+The compiled base-profile fixture now checks every unit and building enum too.
+
 Runtime/importer coverage checks include all 53 mapped actor raw IDs and 65
 building/prop IDs. Raw 101 is an intentionally invisible map revealer. The
 all-profile atlas fixture requires opaque pixels for every visible mapping;
@@ -88,7 +93,7 @@ the game renderer fixture also checks Photon Cannon idle, firing, return to
 idle and construction pixels through the production draw passes.
 
 Canonical prepared race builds now enable source construction art. The census
-covers all 50 stock constructible buildings plus the Greater Spire morph;
+covers all 50 stock constructible buildings, including the Greater Spire morph;
 the private pack contains 135 image banks, 685 frames and 136 stage descriptors.
 It draws underlays before the primary image and overlays afterward, retaining
 spawn times and follow-main frame links. The all-branch audit found no
@@ -117,3 +122,20 @@ python3 -m unittest tests.test_sc64_photon_cannon_renderer
 
 The source-only clone skips private pixel/atlas fixtures when inputs are absent.
 All verification runs locally; GitHub Actions remain disabled/manual-only.
+
+## Campaign regression qualification
+
+Controller timing and force composition were adjusted through normal input,
+without changing source mission outcomes or granting test-only resources or
+combat advantages. T5 now requires an actual win instead of returning success
+unconditionally. T6's strict two-Dropship check uses source actor-footprint
+overlap rather than centers. T7 uses source-space SCV/emitter bounds and source
+air-weapon reach; its bounded controller budget is 60000 ticks to allow escort
+preparation. T9 gathers a full Wraith force and keeps workers mining. The
+neutral skirmish economy fixture records production and gas milestones before
+later combat can wipe a player.
+
+The normal-input host runs complete all ten Terran missions. This is separate
+from normal-menu ARM replay, physical hardware, or mission-wide 30-fps proof.
+The individual source stock tables, available sprites and these controller
+routes do not establish complete native engine equivalence.
