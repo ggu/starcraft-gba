@@ -2636,6 +2636,25 @@ build/StarCraft-Zerg-Z7-Prevalidated-Probe-GBA.gba: build/starcraft-zerg-z7-prev
 	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 FAST36' SCZV
 zerg-z7-prevalidated-probe: build/StarCraft-Zerg-Z7-Prevalidated-Probe-GBA.gba
 
+# Z7 same-update condition-count experiment, layered on authenticated metadata.
+Z7_COUNT_SNAPSHOT_FLAGS := $(Z7_PREVALIDATED_FLAGS) -DSC64_Z7_COUNT_SNAPSHOT
+$(eval $(call Z7_PREVALIDATION_CHECK,snapshot,runtime,sc64_z7_runtime.c,$(Z7_COUNT_SNAPSHOT_FLAGS)))
+$(eval $(call Z7_PREVALIDATION_CHECK,snapshot,save,sc64_z7_game_save.c,$(Z7_COUNT_SNAPSHOT_FLAGS)))
+build/test-sc64-z7-count-snapshot: tests/sc64_z7_count_snapshot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_COUNT_SNAPSHOT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-count-snapshot zerg-z7-count-snapshot-probe
+test-sc64-z7-count-snapshot: test-sc64-z7-prevalidated build/test-sc64-z7-prevalidated-snapshot-runtime build/test-sc64-z7-prevalidated-snapshot-save build/test-sc64-z7-count-snapshot
+	./build/test-sc64-z7-prevalidated-snapshot-runtime
+	./build/test-sc64-z7-prevalidated-snapshot-save
+	./build/test-sc64-z7-count-snapshot
+build/starcraft-zerg-z7-count-snapshot-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_COUNT_SNAPSHOT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-count-snapshot-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Count-Snapshot-Probe-GBA.gba: build/starcraft-zerg-z7-count-snapshot-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 CNT36' SCZW
+zerg-z7-count-snapshot-probe: build/StarCraft-Zerg-Z7-Count-Snapshot-Probe-GBA.gba
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
