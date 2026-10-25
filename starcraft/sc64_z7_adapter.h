@@ -4,6 +4,9 @@
 #if defined(SC64_Z7_PREVALIDATED_TICK) && !defined(SC64_Z7_RUNTIME)
 #error "SC64_Z7_PREVALIDATED_TICK requires the authenticated Z7 runtime"
 #endif
+#if defined(SC64_Z7_COUNT_SNAPSHOT) && !defined(SC64_Z7_PREVALIDATED_TICK)
+#error "SC64_Z7_COUNT_SNAPSHOT requires SC64_Z7_PREVALIDATED_TICK"
+#endif
 
 #include "sc64_z7.h"
 #include "sc64_z7_scenario_generated.h"
@@ -216,6 +219,10 @@ typedef struct {
 #if defined(SC64_Z7_PREVALIDATED_TICK)
     /* Runtime-only capability; never serialized and set only after bind checks. */
     u8 source_tables_prevalidated;
+#endif
+#ifdef SC64_Z7_COUNT_SNAPSHOT
+    /* A single-tick live-world census; runtime-only and never serialized. */
+    struct { u32 count[5]; u8 active; } count_snapshot;
 #endif
     u32 elapsed_frames;
     u8 presentation_opcode;

@@ -9,6 +9,9 @@
     !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 1
 #error "Z7 runtime requires authenticated Z7 data and full Zerg campaign actor/storage gates"
 #endif
+#if defined(SC64_Z7_COUNT_SNAPSHOT) && !defined(SC64_Z7_PREVALIDATED_TICK)
+#error "Z7 count snapshot requires the authenticated prevalidated tick path"
+#endif
 
 #include "sc64_z7_state.h"
 #include "sc64_z7_world_adapter.h"
@@ -198,6 +201,9 @@ static int race_z7_starting_world_matches(const Sc64RaceMap *map)
 
 static int race_z7_bind_world(const Sc64RaceMap *map)
 {
+#ifdef SC64_Z7_COUNT_SNAPSHOT
+    sc64_z7_count_snapshot_invalidate(&race_z7_world);
+#endif
     if (!race_z7_source_row_counts(map)) return 0;
     memset(&race_z7_world,0,sizeof(race_z7_world));
     race_z7_world.source_current_player=map->human_slot;
@@ -356,6 +362,9 @@ static int race_z7_live_world_valid(void)
 static int race_z7_runtime_init(const Sc64RaceMap *map)
 {
 #if defined(SC64_Z7_PREVALIDATED_TICK)
+#ifdef SC64_Z7_COUNT_SNAPSHOT
+    sc64_z7_count_snapshot_invalidate(&race_z7_world);
+#endif
     race_z7_world.source_tables_prevalidated=0;
     memset(&race_z7_ops,0,sizeof(race_z7_ops));
     race_z7_map=0;
@@ -378,6 +387,9 @@ static int race_z7_runtime_init(const Sc64RaceMap *map)
 static int race_z7_rebind_loaded_world(const Sc64RaceMap *map)
 {
 #if defined(SC64_Z7_PREVALIDATED_TICK)
+#ifdef SC64_Z7_COUNT_SNAPSHOT
+    sc64_z7_count_snapshot_invalidate(&race_z7_world);
+#endif
     race_z7_world.source_tables_prevalidated=0;
     memset(&race_z7_ops,0,sizeof(race_z7_ops));
     race_z7_map=0;
@@ -420,7 +432,15 @@ static int race_z7_runtime_tick(int user_paused,u32 elapsed_frames)
     }
 #if defined(SC64_Z7_PREVALIDATED_TICK)
     if (race_z7_world.source_tables_prevalidated && race_z7_map==&sc64_race_maps[SC64_Z7_GLOBAL_ID])
+#if defined(SC64_Z7_COUNT_SNAPSHOT)
+    {
+        (void)sc64_z7_count_snapshot_begin(&race_z7_world);
         result=sc64_z7_runtime_tick_prevalidated(&race_z7.runtime,&race_z7_ops,0);
+        sc64_z7_count_snapshot_invalidate(&race_z7_world);
+    }
+#else
+        result=sc64_z7_runtime_tick_prevalidated(&race_z7.runtime,&race_z7_ops,0);
+#endif
     else result=sc64_z7_runtime_tick(&race_z7.runtime,&race_z7_ops,0);
 #else
     result=sc64_z7_runtime_tick(&race_z7.runtime,&race_z7_ops,0);

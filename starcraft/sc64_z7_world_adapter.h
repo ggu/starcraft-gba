@@ -188,6 +188,114 @@ static int sc64_z7_world_count(const Sc64Z7WorldContext *ctx,unsigned selector,
     *out=count; return 1;
 }
 
+#if defined(SC64_Z7_COUNT_SNAPSHOT)
+/* The five immutable source predicates that actually walk the actor census:
+ * loss-any-unit, hostile-force buildings, their named-region building probe,
+ * and the two human-force region probes. Keep this exact, source-row-bound,
+ * bounded cache private to prevalidated ticks. */
+static int sc64_z7_count_snapshot_begin(Sc64Z7WorldContext *ctx)
+{
+    static const u8 trigger[5]={0,2,4,6,7};
+    static const u8 opcode[5]={2,2,3,3,3};
+    static const u8 selector[5]={13,19,19,18,18};
+    static const u16 wanted[5]={229,231,231,229,229};
+    static const u8 location[5]={0,0,4,3,5};
+    static const u8 comparison[5]={1,1,1,0,0};
+    static const u32 amount[5]={0,0,0,1,1};
+    u32 counts[5]={0,0,0,0,0};
+    unsigned left[5]={0},top[5]={0},right[5]={0},bottom[5]={0};
+    if (!ctx) return 0;
+    ctx->count_snapshot.active=0;
+    for(unsigned q=0;q<5;++q) ctx->count_snapshot.count[q]=0;
+    if (!ctx->source_tables_prevalidated) return 0;
+    for (unsigned q=0;q<5;++q) {
+        const Sc64Z7SourceCondition *c;
+        if (!sc64_z7_condition_row(trigger[q],0,&c) ||
+            c->opcode!=opcode[q] || c->player!=selector[q] ||
+            c->unit!=wanted[q] || c->location!=location[q] ||
+            c->comparison!=comparison[q] || c->amount!=amount[q] ||
+            c->resource || c->flags!=16u || c->mask ||
+            (location[q] && !sc64_z7_world_location_source(ctx,location[q],
+                &left[q],&top[q],&right[q],&bottom[q]))) return 0;
+    }
+    for (int pass=0;pass<2;++pass) {
+        int limit=pass?MAX_BUILDINGS:MAX_UNITS;
+        for (int i=0;i<limit;++i) {
+            int alive=pass?b[i].alive:u[i].alive;
+            int raw_owner=pass?b[i].raw_owner:u[i].raw_owner;
+            int x=pass?b[i].x:u[i].x, y=pass?b[i].y:u[i].y;
+            int raw,owner13,owner19,owner18,actor_left=0,actor_top=0;
+            int actor_right=0,actor_bottom=0,have_rect=0;
+            if (!alive) continue;
+            raw=pass?(b[i].raw_type>=0?b[i].raw_type:
+                      sc64_race_raw_building(b[i].type)):
+                     (u[i].raw_type>=0?u[i].raw_type:
+                      sc64_race_raw_unit(u[i].type));
+            owner13=sc64_z7_world_owner_matches(ctx,13u,raw_owner);
+            owner19=sc64_z7_world_owner_matches(ctx,19u,raw_owner);
+            owner18=sc64_z7_world_owner_matches(ctx,18u,raw_owner);
+            if (owner13<0 || owner19<0 || owner18<0) return 0;
+            if (!(owner13 || owner19 || owner18)) continue;
+            if (raw<0 || raw>227 || (pass?
+                sc64_race_building_from_raw(raw)<0:
+                sc64_race_unit_from_raw(raw)<0)) return 0;
+            if (owner13) ++counts[0];
+            if (pass && owner19) ++counts[1];
+            if (pass && owner19) {
+                if (!sc64_z7_world_building_rect((unsigned)raw,x,y,&actor_left,
+                    &actor_top,&actor_right,&actor_bottom)) return 0;
+                have_rect=1;
+                if ((int)left[2]<actor_right && actor_left<(int)right[2] &&
+                    (int)top[2]<actor_bottom && actor_top<(int)bottom[2])
+                    ++counts[2];
+            }
+            if (owner18) {
+                if (!have_rect) {
+                    if (pass) {
+                        if (!sc64_z7_world_building_rect((unsigned)raw,x,y,
+                            &actor_left,&actor_top,&actor_right,&actor_bottom)) return 0;
+                    } else if (!sc64_z7_world_actor_rect((unsigned)raw,x,y,
+                        &actor_left,&actor_top,&actor_right,&actor_bottom)) return 0;
+                    have_rect=1;
+                }
+                if (owner18 && (int)left[3]<actor_right && actor_left<(int)right[3] &&
+                    (int)top[3]<actor_bottom && actor_top<(int)bottom[3])
+                    ++counts[3];
+                if (owner18 && (int)left[4]<actor_right && actor_left<(int)right[4] &&
+                    (int)top[4]<actor_bottom && actor_top<(int)bottom[4])
+                    ++counts[4];
+            }
+        }
+    }
+    for (unsigned q=0;q<5;++q) ctx->count_snapshot.count[q]=counts[q];
+    ctx->count_snapshot.active=1;
+    return 1;
+}
+
+static int sc64_z7_count_snapshot_lookup(const Sc64Z7WorldContext *ctx,
+    const Sc64Z7SourceCondition *c,u32 *count)
+{
+    static const u8 trigger[5]={0,2,4,6,7};
+    if (!ctx || !count || !c || !ctx->source_tables_prevalidated ||
+        !ctx->count_snapshot.active) return 0;
+    for (unsigned q=0;q<5;++q) if (c->trigger==trigger[q]) {
+        const Sc64Z7SourceCondition *canonical;
+        if (c->index || !sc64_z7_condition_row(trigger[q],0,&canonical) ||
+            canonical!=c) return 0;
+        *count=ctx->count_snapshot.count[q];
+        return 1;
+    }
+    return 0;
+}
+
+static void sc64_z7_count_snapshot_invalidate(Sc64Z7WorldContext *ctx)
+{
+    if (!ctx) return;
+    ctx->count_snapshot.active=0;
+    for(unsigned q=0;q<5;++q) ctx->count_snapshot.count[q]=0;
+}
+#endif
+
 #if defined(SC64_Z7_PREVALIDATED_TICK)
 static int sc64_z7_world_condition_impl(void *context,const Sc64Z7RuntimeState *state,
                                         const Sc64Z7SourceCondition *c,
@@ -206,7 +314,12 @@ static int sc64_z7_world_condition_impl(void *context,const Sc64Z7RuntimeState *
             (c->resource || c->flags!=16u || c->mask ||
              (c->comparison!=0u && c->comparison!=1u && c->comparison!=10u) ||
              (c->opcode==2 && c->location))) return -1;
+#if defined(SC64_Z7_COUNT_SNAPSHOT)
+        if (!(source_metadata_checked && sc64_z7_count_snapshot_lookup(ctx,c,&count)) &&
+            !sc64_z7_world_count(ctx,c->player,c->unit,c->opcode==3?c->location:0,&count)) return -1;
+#else
         if (!sc64_z7_world_count(ctx,c->player,c->unit,c->opcode==3?c->location:0,&count)) return -1;
+#endif
         return sc64_z7_world_compare(c->comparison,count,c->amount);
     case 11:
         if (!source_metadata_checked &&
