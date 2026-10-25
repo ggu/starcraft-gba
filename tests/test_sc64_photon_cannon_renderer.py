@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Private-input pixel fixture for completed, firing and constructing cannons."""
 from __future__ import annotations
 

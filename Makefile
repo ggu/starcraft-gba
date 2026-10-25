@@ -66,6 +66,11 @@ build/test-sc64-stock-motion-runtime: tests/sc64_stock_motion_runtime.c $(STARCR
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) $< common/gba.c -o $@
 test-sc64-stock-motion-runtime: build/test-sc64-stock-motion-runtime
 	./build/test-sc64-stock-motion-runtime
+build/test-sc64-scv-contact: tests/sc64_scv_contact_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) -DSC64_DIRECT_ATTACK $< common/gba.c -o $@
+.PHONY: test-sc64-scv-contact
+test-sc64-scv-contact: build/test-sc64-scv-contact
+	./build/test-sc64-scv-contact
 UNIFIED_FLAGS := $(RACES_FLAGS) -DSC64_UNIFIED
 RACE_CAMPAIGN_FLAGS := $(UNIFIED_FLAGS) -DSC64_IMPORTED_SKIRMISH -I.local/sc64/skirmish/generated
 RACE_CAMPAIGN_INPUTS := $(RACES_INPUTS) .local/sc64/skirmish/generated/sc64_skirmish_generated.h
@@ -3132,4 +3137,41 @@ build/test-sc64-stock-combat-runtime: tests/sc64_stock_combat_runtime.c $(STARCR
 .PHONY: test-sc64-stock-combat-runtime
 test-sc64-stock-combat-runtime: build/test-sc64-stock-combat-runtime
 	./build/test-sc64-stock-combat-runtime
-test-unified: test-sc64-stock-motion-runtime test-sc64-stock-combat-runtime test-sc64-construction-source
+test-unified: test-sc64-stock-motion-runtime test-sc64-stock-combat-runtime test-sc64-scv-contact test-sc64-construction-source
+
+# Compare every compiled race-building identity against the independent public
+# BWAPI numeric profile rows. Build the same fixture under each profile gate so
+# optional campaign suffixes and their max-HP/shield/armor helpers stay covered.
+SC64_BUILDING_STOCK_TEST_FLAGS := -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -Icommon
+define BUILD_SC64_BUILDING_STOCK_PROFILE
+build/test-sc64-building-stock-$(1): tests/sc64_building_stock_fixture.c $(wildcard starcraft/*.h) Makefile | build
+	$$(CLANG) $$(SC64_BUILDING_STOCK_TEST_FLAGS) $(2) $$< -o $$@
+endef
+$(eval $(call BUILD_SC64_BUILDING_STOCK_PROFILE,base,))
+$(eval $(call BUILD_SC64_BUILDING_STOCK_PROFILE,z3,-DSC64_Z3_ENABLED -DSC64_CAMPAIGN_RACE=1))
+$(eval $(call BUILD_SC64_BUILDING_STOCK_PROFILE,p3,-DSC64_P3_ENABLED -DSC64_P3_RUNTIME -DSC64_CAMPAIGN_RACE=2))
+$(eval $(call BUILD_SC64_BUILDING_STOCK_PROFILE,t4,-DSC64_T4_RUNTIME))
+$(eval $(call BUILD_SC64_BUILDING_STOCK_PROFILE,t5,-DSC64_T5_RUNTIME))
+$(eval $(call BUILD_SC64_BUILDING_STOCK_PROFILE,late,-DSC64_TERRAN_LATE_ACTORS))
+$(eval $(call BUILD_SC64_BUILDING_STOCK_PROFILE,terran-full,-DSC64_TERRAN_LATE_ACTORS -DSC64_T4_RUNTIME -DSC64_T5_RUNTIME -DSC64_T6_ENABLED))
+$(eval $(call BUILD_SC64_BUILDING_STOCK_PROFILE,zp-p7,-DSC64_ZP_CAMPAIGN_ACTORS -DSC64_P7_ACTORS))
+$(eval $(call BUILD_SC64_BUILDING_STOCK_PROFILE,z5-p6,-DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS -DSC64_P6_ACTORS))
+$(eval $(call BUILD_SC64_BUILDING_STOCK_PROFILE,z6,-DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z6_RUNTIME -DSC64_Z6_ACTORS))
+$(eval $(call BUILD_SC64_BUILDING_STOCK_PROFILE,z7,-DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS -DSC64_P6_ACTORS -DSC64_Z6_RUNTIME -DSC64_Z6_ACTORS -DSC64_Z7_RUNTIME -DSC64_Z7_ENABLED -DSC64_Z7_CAMPAIGN_ENTRY))
+$(eval $(call BUILD_SC64_BUILDING_STOCK_PROFILE,combined,-DSC64_TERRAN_LATE_ACTORS -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_P7_ACTORS -DSC64_P6_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS -DSC64_T4_RUNTIME -DSC64_Z6_RUNTIME -DSC64_T6_ENABLED))
+.PHONY: test-sc64-building-stock
+test-sc64-building-stock: build/test-sc64-building-stock-base build/test-sc64-building-stock-z3 build/test-sc64-building-stock-p3 build/test-sc64-building-stock-t4 build/test-sc64-building-stock-t5 build/test-sc64-building-stock-late build/test-sc64-building-stock-terran-full build/test-sc64-building-stock-zp-p7 build/test-sc64-building-stock-z5-p6 build/test-sc64-building-stock-z6 build/test-sc64-building-stock-z7 build/test-sc64-building-stock-combined
+	./build/test-sc64-building-stock-base
+	./build/test-sc64-building-stock-z3
+	./build/test-sc64-building-stock-p3
+	./build/test-sc64-building-stock-t4
+	./build/test-sc64-building-stock-t5
+	./build/test-sc64-building-stock-late
+	./build/test-sc64-building-stock-terran-full
+	./build/test-sc64-building-stock-zp-p7
+	./build/test-sc64-building-stock-z5-p6
+	./build/test-sc64-building-stock-z6
+	./build/test-sc64-building-stock-z7
+	./build/test-sc64-building-stock-combined
+test: test-sc64-building-stock
+test-unified: test-sc64-building-stock

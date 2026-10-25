@@ -591,6 +591,10 @@ static inline const char *sc64_race_building_name(int type)
 
 static inline unsigned short sc64_race_building_shields(int type)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpBuildingFact *zp = sc64_zp_building_fact(type);
+    if (zp) return (unsigned short)zp->shields;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_building_fact(type);
     if (late) return (unsigned short)late->shields;
@@ -604,6 +608,7 @@ static inline unsigned short sc64_race_building_shields(int type)
     case B_CYBERNETICS_CORE: return 500; case B_FORGE: return 550;
     case B_ASSIMILATOR: return 450; case B_PYLON: return 300;
     case B_PHOTON_CANNON: return 100; case B_STARGATE: return 600;
+    case B_ROBOTICS_FACILITY: return 500;
     default: return 0;
     }
 }
@@ -870,7 +875,7 @@ static inline int sc64_race_t4_ghost_hp_damage(int raw_target, int raw_damage,
 static inline int sc64_race_building_max_hp(int type)
 {
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
-#if defined(SC64_Z5_DOODADS) || defined(SC64_P6_ACTORS)
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
     const Sc64ZpBuildingFact *zp = sc64_zp_building_fact(type);
     if (zp) return zp->hp;
 #endif
@@ -1227,6 +1232,10 @@ static inline int sc64_race_unit_armor(int type)
 }
 static inline int sc64_race_building_armor(int type)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpBuildingFact *zp = sc64_zp_building_fact(type);
+    if (zp) return zp->armor;
+#endif
 #ifdef SC64_P6_ACTORS
     if (type == B_P6_WALL_MISSILE_TRAP)
         return sc64_zp_building_fact(type)->armor;

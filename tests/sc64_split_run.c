@@ -173,7 +173,7 @@ int main(void) {
     int before_min = 0, before_units[4];
     for (int i = 0; i < MAX_MINERALS; ++i) before_min += m[i].amount;
     for (int p = 0; p < 4; ++p) before_units[p] = count_units(owner_at(p));
-    int peak_workers[4] = {0}, peak_units[4] = {0}, peak_buildings[4] = {0};
+    int peak_workers[4] = {0}, peak_buildings[4] = {0};
     int saw_production[4] = {0}, saw_gas[4] = {0}, saw_refinery[4] = {0};
     for (int tick = 0; tick < 10000; ++tick) {
         frame_input(0);
@@ -188,7 +188,6 @@ int main(void) {
             int refinery = race_player[owner] == R_ZERG ? B_EXTRACTOR :
                            race_player[owner] == R_PROTOSS ? B_ASSIMILATOR : B_REFINERY;
             if (workers > peak_workers[p]) peak_workers[p] = workers;
-            if (units > peak_units[p]) peak_units[p] = units;
             if (buildings > peak_buildings[p]) peak_buildings[p] = buildings;
             if (units > before_units[p]) saw_production[p] = 1;
             if (race_owner_gas(owner) > 0) saw_gas[p] = 1;
@@ -205,8 +204,6 @@ int main(void) {
                stays neutral; bots demonstrate production/build progression. */
             assert(race_owner_minerals(owner) > 200);
         } else {
-            int refinery = race_player[owner] == R_ZERG ? B_EXTRACTOR :
-                           race_player[owner] == R_PROTOSS ? B_ASSIMILATOR : B_REFINERY;
             assert(peak_workers[p] >= 5);
             assert(saw_production[p]);
             assert(peak_buildings[p] > (race_player[owner] == R_ZERG ? 1 : 2));
@@ -215,10 +212,13 @@ int main(void) {
     }
     printf("split profile=%d: launches=18; maps=2; human_races=3; ai_counts=1..3; "
            "economy_ticks=10000; neutral_minerals=%d->%d; human_bank=%d; "
-           "bot_banks=(%d,%d,%d); bot_gas=(%d,%d,%d); buildings=(%d,%d,%d,%d)\n",
+           "bot_banks=(%d,%d,%d); bot_gas=(%d,%d,%d); peak_workers=(%d,%d,%d); "
+           "progress=(%d,%d,%d); buildings=(%d,%d,%d,%d)\n",
            SC64_CAMPAIGN_RACE, before_min, after_min, race_owner_minerals(SIDE),
            race_owner_minerals(ENEMY), race_owner_minerals(RESCUABLE), race_owner_minerals(4),
            race_owner_gas(ENEMY), race_owner_gas(RESCUABLE), race_owner_gas(4),
+           peak_workers[1], peak_workers[2], peak_workers[3],
+           saw_production[1], saw_production[2], saw_production[3],
            count_buildings(SIDE), count_buildings(ENEMY), count_buildings(RESCUABLE), count_buildings(4));
     check_invalid_save_rejection();
     puts("split race skirmish controller/profile: ok");

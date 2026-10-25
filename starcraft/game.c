@@ -5233,6 +5233,11 @@ tick_combat(Unit * q, int target)
         if (target>=MAX_UNITS) {
             range+=18;
             if (minimum_range) minimum_range+=18;
+        } else if (!flying && !sc64_race_unit_flying(q->type) && range<6) {
+            /* Native melee reach is measured from collision edges. Our
+             * center-based ground mover reserves six pixels of separation;
+             * a shorter center radius would make SCV contact impossible. */
+            range=6;
         }
         damage=sc64_stock_attack_damage_per_impact(&stock_attack,
                      q->owner==SIDE?weapons_level:0);

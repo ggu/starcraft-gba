@@ -30,6 +30,12 @@ Production-capable ordinary units retain reference costs/time/supply. Mission
 actors, untrainable heroes, mode conversions and powerups keep their explicit
 nonproduction/UI policies; they are not purchasable stock units.
 
+Building capacities are also checked exhaustively across 12 compilation
+variants, including mapped scenario props that occupy Building slots. This
+caught the Robotics Facility's missing 500-shield capacity and extended
+Protoss buildings bypassing the generic shield/armor helpers; regeneration,
+construction and save validation now receive their source capacities too.
+
 Important remaining behavior limits: navigation is still an eight-direction
 GBA adaptation without native acceleration/turning or movement upgrades;
 generic range uses centers/approximated building edges; HP remains integer
@@ -44,6 +50,9 @@ flame hits is not applied as three guaranteed hits on one target. Its native
 flame geometry and damage distribution remain to be implemented. Save codecs
 retain their layouts while supporting exact 100000-HP Beacon values and old
 10000-HP records; derived codecs reconstruct unit HP from source identity.
+Ground contact reach has a six-runtime-pixel floor because the mover reserves
+that center separation; otherwise the stock SCV's ten-source-pixel range could
+never reach a unit. The stock range itself remains ten in the fact table.
 
 Reproduce the independent fact comparison using a clean local reference:
 
@@ -51,6 +60,7 @@ Reproduce the independent fact comparison using a clean local reference:
 python3 tools/sc64_unit_spec_reference.py --reference /path/to/bwapi --output .local/unit-specs/reference.json
 make test-sc64-stock-profiles-facts SC64_STOCK_FACTS=.local/unit-specs/reference.json
 make test-sc64-stock-motion test-sc64-stock-motion-runtime test-sc64-stock-combat-runtime
+make test-sc64-building-stock test-sc64-scv-contact
 ```
 
 The extractor checks the pinned reference and hashes its inputs; nothing is
