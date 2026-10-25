@@ -4749,6 +4749,48 @@ win, fresh-process ARM SRAM, hardware qualification or near-30-fps result is
 claimed. Neither the default nor canonical build enables the composition;
 staged campaign progress remains 22/30.
 
+### Full-feature P7 cache timing and rejected cell memo
+
+A private diagnostic of the typed/Arbiter/movement profile separates the
+source cache call from order setup. At the 600-update checkpoint it takes
+about 420,000 cycles, versus 380,000 for movement and 322,000 for mission
+processing. A second diagnostic splits that cache work into power checks,
+aura/stagger work and detection refresh. At updates 100/200/300/400/500/600,
+power is 44,474 cycles each; aura is
+84,852/99,552/118,564/115,255/141,938/162,581; refresh is
+132,737/209,386/132,335/444,120/210,038/210,945. These are sampled last-tick
+counters, not whole-run average costs. Instrumented runs match all seven
+non-timing opening checkpoints; their roughly 8.85 fps includes diagnostic
+overhead and is not a production speed result.
+
+The first candidate memoized only the optical source-owner mask for repeated
+16-pixel target cells within one source-cache invocation. Its 32-entry,
+96-byte stack table retained full cell keys, used exact scans on collisions,
+and expired before unit orders could move actors. Exact detector rectangles,
+ownership checks and timers remained per target. The host checks covered
+source-0/4 separation, nonzero Observer detection, hit/miss/eviction and reset
+after a sight source changed, runtime/steering parity, Battery and immediate
+save continuation. The ARM link retained the existing actor/save sizes and
+RAM ends; gate-off typed-movement output was byte-identical.
+
+A normal-menu controller-only comparison ran the 600-update opening, selected
+11 army units and issued the same attack-move, then ran 1,500 attack updates.
+All 23 non-timing checkpoints, 25 recorded inputs, command details and the
+ending frame 2,605 match. Neither run wins or loses within this workload.
+Effective fps from emulated GBA timer cycles is:
+
+| Full-feature workload | Typed movement | Private cell memo |
+| --- | --- | --- |
+| Opening, 600 updates | 9.045 | 9.068 |
+| Attack-move, 1,500 updates | 6.869 | 6.911 |
+
+The gains are only 0.25 and 0.61 percent, so the memo is rejected for runtime
+promotion. No cell-memo flag or build target is added to the public project.
+The measurements instead direct further work toward repeated rectangle/fact
+calculations inside aura and detection, and mission processing. They do not
+qualify a mission, fresh-process ARM SRAM, hardware or near-30-fps result;
+staged campaign progress remains 22/30.
+
 ### P7 movement steering list
 
 The P7 count probe spends most of each update in `update_orders()`. A
