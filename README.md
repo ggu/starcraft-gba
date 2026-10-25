@@ -1,6 +1,6 @@
-# StarCraft Demake Project
+# StarCraft GBA Demake Project
 
-StarCraft: GBA Outpost is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
+This project is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
 
 Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. Controller-driven host runs and normal-menu ARM replays have now completed all ten Terran missions across the recorded frozen builds. The latest optimization build has full T7 and T10 ARM wins at 25.00 and 18.77 effective fps; other ARM qualifications remain on earlier frozen builds. These rates remain below the 30-fps target. This is a GBA adaptation built from a user-supplied, verified StarCraft 64 USA ROM. It does not execute or reproduce the original N64 engine. Imported maps and graphics stay local and are not part of the source release.
 
