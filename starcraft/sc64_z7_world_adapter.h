@@ -188,6 +188,112 @@ static int sc64_z7_world_count(const Sc64Z7WorldContext *ctx,unsigned selector,
     *out=count; return 1;
 }
 
+#if defined(SC64_Z7_PREVALIDATED_TICK)
+static int sc64_z7_world_condition_impl(void *context,const Sc64Z7RuntimeState *state,
+                                        const Sc64Z7SourceCondition *c,
+                                        int source_metadata_checked)
+{
+    Sc64Z7WorldContext *ctx=(Sc64Z7WorldContext *)context;
+    const Sc64Z7SourceCondition *source;
+    u32 count=0;
+    if (!ctx || !state || !c) return -1;
+    if (!source_metadata_checked &&
+        (!sc64_z7_condition_row(c->trigger,c->index,&source) || source!=c ||
+         !sc64_z7_runtime_metadata_valid())) return -1;
+    switch (c->opcode) {
+    case 2: case 3:
+        if (!source_metadata_checked &&
+            (c->resource || c->flags!=16u || c->mask ||
+             (c->comparison!=0u && c->comparison!=1u && c->comparison!=10u) ||
+             (c->opcode==2 && c->location))) return -1;
+        if (!sc64_z7_world_count(ctx,c->player,c->unit,c->opcode==3?c->location:0,&count)) return -1;
+        return sc64_z7_world_compare(c->comparison,count,c->amount);
+    case 11:
+        if (!source_metadata_checked &&
+            (c->location || c->player || c->amount || c->unit || c->comparison<2u ||
+             c->comparison>3u || c->resource!=10u || c->flags || c->mask)) return -1;
+        return c->comparison==2u ? state->switch10 : !state->switch10;
+    case 12:
+        if (!source_metadata_checked &&
+            (c->location || c->player || c->unit || c->resource || c->flags || c->mask ||
+             (c->comparison!=0u && c->comparison!=1u && c->comparison!=10u))) return -1;
+        return sc64_z7_world_compare(c->comparison,ctx->elapsed_frames/30u,c->amount);
+    default: return -1;
+    }
+}
+
+static int sc64_z7_world_condition(void *context,const Sc64Z7RuntimeState *state,
+                                    const Sc64Z7SourceCondition *c)
+{ return sc64_z7_world_condition_impl(context,state,c,0); }
+
+/* Only the private authenticated adapter may call this after constructor or
+ * rebind has validated the complete immutable scenario table. */
+static int sc64_z7_world_condition_prevalidated(void *context,
+                                                const Sc64Z7RuntimeState *state,
+                                                const Sc64Z7SourceCondition *c)
+{ return sc64_z7_world_condition_impl(context,state,c,1); }
+
+static int sc64_z7_world_action_impl(Sc64Z7WorldContext *ctx,Sc64Z7RuntimeState *state,
+                                      const Sc64Z7SourceAction *a,
+                                      int source_metadata_checked)
+{
+    const Sc64Z7SourceAction *source;
+    if (!ctx || !state || !a) return 0;
+    if (!source_metadata_checked &&
+        (!sc64_z7_source_action(a->trigger,a->index,&source) || source!=a ||
+         !sc64_z7_runtime_metadata_valid())) return 0;
+    switch (a->opcode) {
+    case 1: ctx->victory_requested=1; return 1;
+    case 2: ctx->defeat_requested=1; return 1;
+    case 4: return 1; /* Scheduler owns the exact source wait. */
+    case 12:
+        ctx->objective_refresh_requested=1;
+        ctx->last_string_id=(u16)a->string_id;
+        return 1;
+    case 13:
+        if (!source_metadata_checked &&
+            (a->group1 || a->group2!=10u || a->modifier!=4u || a->flags)) return 0;
+        state->switch10=1; return 1;
+    case 16: {
+        unsigned bit;
+        if (!source_metadata_checked &&
+            (a->trigger!=SC64_Z7_TRIGGER_AI || a->index<1u || a->index>4u ||
+             a->unit || a->group1 || a->modifier || a->flags)) return 0;
+        if (a->index<1u || a->index>4u) return 0;
+        bit=1u<<(a->index-1u);
+        state->ai_script_mask|=(u8)bit;
+        if (!state->ai_plan_ticks) state->ai_plan_ticks=SC64_Z7_AI_PERIOD_TICKS;
+        return 1; /* The opaque source script is replaced by runtime policy. */
+    }
+    case 26: {
+        unsigned slot; int owner; Sc64ResourceActionState values;
+        if ((!source_metadata_checked &&
+             (a->modifier!=7u || a->unit>2u || a->group2>65535u)) ||
+            !sc64_z7_world_owner_resolve(ctx,a->group1,&slot)) return 0;
+        owner=ctx->live_owner_for_source[slot];
+        if (owner<SIDE || owner>4 || (a->group1==19u && (slot!=4u || owner!=ENEMY))) return 0;
+        values.current_minerals=(u32)race_minerals[owner];
+        values.current_gas=(u32)race_gas[owner];
+        values.total_minerals_gathered=values.total_gas_gathered=0;
+        if (!sc64_resource_action_apply_one_player(&values,(u16)a->unit,a->modifier,a->group2)) return 0;
+        race_minerals[owner]=(int)values.current_minerals;
+        race_gas[owner]=(int)values.current_gas;
+        if (owner==SIDE) { minerals=race_minerals[owner]; gas=race_gas[owner]; }
+        return 1;
+    }
+    default: return 0;
+    }
+}
+
+static int sc64_z7_world_action(Sc64Z7WorldContext *ctx,Sc64Z7RuntimeState *state,
+                                 const Sc64Z7SourceAction *a)
+{ return sc64_z7_world_action_impl(ctx,state,a,0); }
+
+static int sc64_z7_world_action_prevalidated(Sc64Z7WorldContext *ctx,
+                                              Sc64Z7RuntimeState *state,
+                                              const Sc64Z7SourceAction *a)
+{ return sc64_z7_world_action_impl(ctx,state,a,1); }
+#else
 static int sc64_z7_world_condition(void *context,const Sc64Z7RuntimeState *state,
                                     const Sc64Z7SourceCondition *c)
 {
@@ -258,5 +364,6 @@ static int sc64_z7_world_action(Sc64Z7WorldContext *ctx,Sc64Z7RuntimeState *stat
     default: return 0;
     }
 }
+#endif
 
 #endif
