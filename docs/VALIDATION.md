@@ -5194,6 +5194,176 @@ alive and unloaded at `(950,1009)`, research is complete and the Overlord has
 no cargo. The earlier route won at frame 268694. ARM replay, save continuity
 and performance were not re-measured for this route.
 
+### Sampled audio (2026-10-25)
+
+Imported profiles can play StarCraft 64 sound effects, unit responses and
+music from a private bank; the default ROM uses PSG placeholder tones for the
+same events. The design and import details are in
+[Development](DEVELOPMENT.md#optional-starcraft-64-sound-effects-and-music).
+Audio is presentation only: it reads simulation state at the start of each
+rendered frame, keeps its snapshot outside saves and the game RNG, and never
+writes game state.
+
+Host checks:
+
+- `make test-audio` (in `./dev test`): mixer silence, single-voice copy,
+  two/three-voice saturation, partial-frame retirement, exact multi-frame
+  length, speech interruption, effect allocation, duplicate suppression,
+  stealing and refusal, queue bounds and wrap, and the music start, loop,
+  one-shot, change, stop and absent-track paths. The hook fixtures cover a
+  real skirmish fight producing shot and death events, the cooldown shot
+  contract, off-screen silence, the two-effect frame cap, selection, command
+  response only on a new key press, new player units, completed buildings,
+  and no events after a tick discontinuity or pause.
+- The same 12,000-tick controller-driven run from the title screen gives the
+  same state hash with the observer compiled in and with `GAME_AUDIO_OFF`:
+  `4f8e47da` for the default profile (395 shot, 40 death, 95 selection and
+  three command events in the audible build).
+- `make test-game-audio-unified` (in `make test-unified`): the same hook
+  fixtures with the imported bank, checking that a selection plays one of the
+  unit's own response samples and that the race theme and menu theme are
+  requested; the unified run's state hash `602d8534` matches with audio off.
+
+Memory, from a full rebuild of every ARM ELF target whose inputs are prepared
+(46 of the 55; the T6 storage family needs `make sc64-t6-prepare`, and
+`zerg-z5-cloak` already exceeds the IWRAM guard at base `d085310` with the
+same `__iwram_end = 0x03005040`):
+
+- `__iwram_end` is byte-identical to the base on every build: the mixer runs
+  as Thumb code from ROM and its small ARM interrupt entry is in ROM too.
+- BSS grows by 144 bytes with the bank (mixer state, counters and observer
+  state) and by 16-24 bytes without it. The tightest builds, the P7 Carrier
+  training, projectile and showcase ROMs, keep 660 bytes below the
+  `0x0203e000` guard. The mix buffers, a 64-byte zero guard and the
+  per-unit/per-building snapshot use the unused VRAM between the mode-4
+  pages (416 + 2 x (units + buildings) bytes, at most 1216 of 2560).
+- The default ROM stays 64 KiB. Imported ROMs gain the 15.6 MB bank and pad
+  to 32 MiB.
+
+CPU, measured in mGBA from the emulated timer around the VBlank handler
+(`audio_irq_cycles`, `audio_irq_frames`, `audio_irq_peak`). The unified ROM
+sat on the title screen streaming the menu theme while a debugger forced 0-4
+voices onto long bank samples for 120 VBlanks each. Cycles per video frame
+(280,896 available):
+
+| Active voices | Average | Peak | Share of a frame |
+|---|---:|---:|---:|
+| 0 (music streaming only) | 1,115 | 1,136 | 0.40% |
+| 1 | 1,433 | 1,454 | 0.51% |
+| 2 | 6,193 | 7,843 | 2.2% |
+| 3 | 8,047 | 9,614 | 2.9% |
+| 4 | 9,100 | 11,326 | 3.2% |
+
+Music never costs mixing time because DMA streams it from ROM. At the
+experimental P7 mission's ~1.3M cycles per game tick (about 4.6 video
+frames), four busy voices cost about 42k cycles per tick. A first version
+that added samples one by one cost 18,510 cycles with four voices; reading
+four samples per word and repacking unclipped words halved that.
+
+ARM gameplay differential: `tools/sc64_p7_move_workload.py --neutral-ticks
+2400 --attack-ticks 1200` ran the experimental P7 move probe built with the
+bank and with `SC64_AUDIO=0`, launched through the normal menus, with 2,400
+neutral ticks and then a controller attack-move. `--compare` found every one
+of the 38 checkpoints identical (unit, building, resource, visibility and
+campaign state hashes), with the same 25 inputs and the same end at frame
+4105. Measured fps, silent then audible: neutral 10.935 and 10.892 (-0.4%),
+attack-move 9.054 and 8.957 (-1.1%). The runner now records the audio
+counters: the handler averaged 1,123 cycles per video frame in the neutral
+phase and 1,173 in the attack-move phase (0.40-0.42%), peaking at 6,415.
+
+Limits: these are emulator measurements, not physical-GBA results, and the
+audio itself was not checked by ear in this run. Direct Sound is 8-bit mono at
+10512 Hz, below StarCraft 64's 16-bit stereo 11025 Hz mix. There are four
+voices, with no distance attenuation or panning, and at most two new effects
+per frame. Annoyed responses, transmissions, advisor lines and briefing audio
+are not played. Building completion uses the building's selection sound.
+Shots are inferred from a raised cooldown, so a weapon sounds once per
+cooldown cycle. Victory and defeat stingers come from the N64 result flag and
+have not been confirmed by ear.
+### Death animations (2026-10-25)
+
+Units and buildings now play death effects instead of disappearing. Deaths
+are observed from actor rows that change from alive to dead with HP at or
+below zero; the simulation never reads the pool or the alive shadow. The
+authored, asset-free renderer follows the StarCraft 64 Death families:
+
+- infantry, Zerg ground units and critters collapse and leave remains;
+- vehicles and aircraft explode, with a large blast for heavy units;
+- Zerg air units splash;
+- Protoss units burst in blue;
+- buildings explode and leave rubble.
+
+Timelines use the source frame lengths. Remains last 153 source updates;
+rubble is capped at 30 seconds.
+
+The optional source preview compiles 167 actors from the authenticated ROM
+(61 image banks, 770,522 pixel bytes). Nine actors keep the authored
+fallback because their Death animation draws no frames. The fixture checks
+every compiled layer frame. It also confirms that the drawn pixels equal the
+clipped imported frames for:
+
+- Marine, Zergling and Dragoon: collapse and remains;
+- Vulture and Probe: orange and blue explosion overlays.
+
+Approximations:
+
+- The faintest remap blend band is dropped and the next is dithered,
+  because GBA mode 4 cannot blend.
+- Remnants are capped at 30 seconds.
+- Hallucination puffs, Scourge suicides and spider-mine detonations play no
+  death, because those removals keep positive HP.
+- A death reaches the pool at most one update late.
+- A death and a new unit in the same slot within one scan window would hide
+  that death.
+
+Asset-free checks run in `./dev test`: 420 Python checks and the default
+fixtures. They cover timing, families, eviction, clipping at every viewport
+edge, and real unit and building kills. They also cover expiry, fog,
+scripted removals, load re-priming and pool overflow. The same game fixture
+passes in the unified, full Terran, Z7 and P7 profiles. Each profile is also
+built with `SC64_DEATH_VFX_DISABLED` and runs a combat workload that renders
+every frame. Both builds print the same field-wise state digest and the same
+SRAM digest after saving. The same holds for the source-art build.
+
+The following pass:
+
+- default build and tests;
+- unified build and tests;
+- full Terran, Zerg and Protoss profile builds and tests;
+- `test-sc64-death-vfx-profiles`;
+- `test-sc64-death-source` and `death-visuals`.
+
+Memory: IWRAM ends are unchanged in all 21 rebuilt race, probe and showcase
+ROMs. The race pool holds 16 rows of 20 bytes, plus a 50-byte alive shadow.
+Race-profile BSS grows by 0x158–0x178 bytes:
+
+| Profile | BSS end |
+| --- | --- |
+| Terran | `0x0203dd3c` |
+| Zerg | `0x02039bc0` |
+| Protoss | `0x02039d68` |
+| Unified | `0x0203d328` |
+| Showcase | `0x0203de50` |
+| P7 Carrier training and projectile probes (largest) | `0x0203de54` |
+
+The largest leaves 428 bytes under the reserve guard. The original-art ROM
+ends BSS at `0x020043ec` with a 12-row pool. The new code is about 5 KB of
+ROM per profile and adds no IWRAM.
+
+Emulator timing comes from controller-only showcase replays. Cycle counters
+compare this build with the base `d085310` over the first 60 updates of
+each scene:
+
+- The scan adds 6.4k cycles per update, about 1.5% of a dense battle update.
+- Drawing adds 1k–19k cycles per frame.
+- Effective fps falls 1.3–2.7% in four battle scenes and 5.2% in Base Under
+  Siege (22.05 versus 23.27).
+- The three last stands stay at 29.857 fps and still end at update 150.
+
+The renderer was profiled and tightened to two fill calls per remnant and a
+table-driven ellipse. This is emulator timing, not physical-hardware
+qualification. ROMs, generated art and captures remain local.
+
 ### P7 mode-0 tile renderer
 
 `SC64_TILE_RENDERER` is a default-off render probe over the movement probe.
@@ -5229,6 +5399,10 @@ checked at build time against the cache. In this build, ROM text falls from
 2,967,864 to 2,305,248 bytes (22.3 percent). IWRAM ends at `0x03004ca8` and
 BSS at `0x0203dc58`, within the unchanged guards. The mode-4-only blitters
 move to ROM in this build only. RaceSave and the actor ABI are unchanged.
+After merging sampled audio and death animations, BSS ends at `0x0203dfd8`
+(IWRAM unchanged), 40 bytes inside the guard. Sampled audio keeps its mix
+buffers in the VRAM gap between the mode-4 pages, which mode 0 uses, so the
+tile probe builds without the imported audio bank and plays the PSG tones.
 
 `make test-sc64-p7-tile` renders 2,095 frames in reference and candidate
 ASan/UBSan builds. The session covers menu launch, still play, four 160-update

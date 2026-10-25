@@ -19,6 +19,13 @@
     (!defined(SC64_RACES) || !defined(SC64_HAS_SPRITES))
 #error "Source construction art requires the imported race sprite profile"
 #endif
+#if defined(SC64_DEATH_SOURCE_ART) && \
+    (!defined(SC64_RACES) || !defined(SC64_HAS_SPRITES) || defined(SC64_DEATH_VFX_DISABLED))
+#error "Source death art requires the imported race sprite profile and death effects"
+#endif
+#ifndef SC64_DEATH_VFX_DISABLED
+#include "sc64_death_vfx.h"
+#endif
 #if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED)
 #define SC64_TRANSPORT_RUNTIME
 #endif
@@ -405,6 +412,10 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #ifdef SC64_CONSTRUCTION_SOURCE_ART
 #include "sc64_construction_source.h"
 #include "sc64_construction_sprites_generated.h"
+#endif
+#ifdef SC64_DEATH_SOURCE_ART
+#include "sc64_death_source.h"
+#include "sc64_death_sprites_generated.h"
 #endif
 #endif
 #endif
@@ -885,6 +896,27 @@ static Geyser geysers[MAX_RACE_GEYSERS] = {{
 }
 };
 static Tracer tracers[MAX_TRACERS];
+#ifndef SC64_DEATH_VFX_DISABLED
+/* Presentation-only death effects. The pool and the alive shadow are never
+ * read by the simulation and are absent from every save format. */
+#ifdef SC64_RACES
+#define SC64_DEATH_VFX_POOL 16
+#else
+#define SC64_DEATH_VFX_POOL 12
+#endif
+static Sc64DeathVfx death_vfx[SC64_DEATH_VFX_POOL];
+static u8 death_vfx_seen[(MAX_UNITS + 7) / 8 + (MAX_BUILDINGS + 7) / 8];
+static u8 death_vfx_primed;
+/* New worlds and loads re-prime the shadow, so stale dead rows never play. */
+static void
+death_vfx_reset(void)
+{
+    memset(death_vfx, 0, sizeof(death_vfx));
+    death_vfx_primed = 0;
+}
+#else
+#define death_vfx_reset() ((void)0)
+#endif
 static u8 explored[SC64_GRID_STORAGE_BYTES];
 static u8 visible[SC64_GRID_STORAGE_BYTES];
 static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
@@ -3422,6 +3454,7 @@ load_game(void)
     invalidate_path_grid();
     memcpy(m, data.minerals_map, sizeof(m));
     memcpy(tracers, data.tracer_data, sizeof(tracers));
+    death_vfx_reset();
     memcpy(explored, data.explored_map, sizeof(explored));
 #ifdef SC64_TERRAN_CAMPAIGN
     campaign_mission = data.campaign_mission;
@@ -3602,6 +3635,7 @@ init_state(void)
         (race_selected_mission<2?U_DRONE:U_PROBE);
     SC64_GRID_CLEAR(explored);SC64_GRID_CLEAR(visible);
     memset(tracers,0,sizeof(tracers));
+    death_vfx_reset();
     sc64_visibility_reset();
     race_campaign_init();
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
@@ -3613,6 +3647,7 @@ init_state(void)
     memset(b, 0, sizeof(b));
     invalidate_path_grid();
     memset(tracers, 0, sizeof(tracers));
+    death_vfx_reset();
     SC64_GRID_CLEAR(explored);
     SC64_GRID_CLEAR(visible);
 #ifdef SC64_IMPORTED_MISSION
@@ -3841,6 +3876,7 @@ game_init(void)
 #endif
     memset(u, 0, sizeof(u));
     memset(b, 0, sizeof(b));
+    death_vfx_reset();
     invalidate_path_grid();
     screen = SCREEN_TITLE;
     help = 0;
@@ -5675,6 +5711,122 @@ update_tracers(void)
 	    tracers[i].life--;
 }
 
+#ifndef SC64_DEATH_VFX_DISABLED
+static int
+death_vfx_raw(int slot)
+{
+#ifdef SC64_RACES
+    if (slot < MAX_UNITS)
+        return u[slot].raw_type >= 0 ? u[slot].raw_type : sc64_race_raw_unit(u[slot].type);
+    const Building *q = &b[slot - MAX_UNITS];
+    return q->raw_type >= 0 ? q->raw_type : sc64_race_raw_building(q->type);
+#else
+    /* Original-art types use the matching StarCraft unit ids. */
+    static const unsigned char units[] = { 7, 0, 32, 34, 37, 38, 19 };
+    static const unsigned char buildings[] = { 106, 111, 109, 110, 112, 122, 131,
+                                               125, 130, 143 };
+    int type = slot < MAX_UNITS ? u[slot].type : b[slot - MAX_UNITS].type;
+    if (slot < MAX_UNITS)
+        return type >= 0 && type < (int)sizeof(units) ? units[type] : -1;
+    return type >= 0 && type < (int)sizeof(buildings) ? buildings[type] : -1;
+#endif
+}
+
+#if defined(SC64_HAS_SPRITES) && !defined(SC64_RACES)
+static const Sc64SpriteFrame *mission_unit_sprite(int type);
+static const Sc64SpriteFrame *mission_building_sprite(int type);
+#endif
+static int
+death_vfx_extent(int slot, int raw)
+{
+#ifdef SC64_HAS_SPRITES
+    const Sc64SpriteFrame *sprite =
+#ifdef SC64_RACES
+        raw >= 0 ? sc64_race_unit_sprite((unsigned short)raw) : 0;
+#else
+        slot < MAX_UNITS ? mission_unit_sprite(u[slot].type) :
+                           mission_building_sprite(b[slot - MAX_UNITS].type);
+#endif
+    (void)raw;
+    if (sprite) return (sprite->w > sprite->h ? sprite->w : sprite->h) / 2;
+#else
+    (void)raw;
+#endif
+    return slot < MAX_UNITS ? 5 : 14;
+}
+
+static void
+death_vfx_spawn_slot(int slot, int x, int y, int owner)
+{
+    int raw = death_vfx_raw(slot), building = slot >= MAX_UNITS;
+    int style = sc64_death_vfx_style_for_raw(raw, building), source = 0;
+    Sc64DeathVfxTiming timing = sc64_death_vfx_timing(style);
+#ifdef SC64_DEATH_SOURCE_ART
+    const Sc64DeathSource *art = raw >= 0 ? sc64_death_source(raw) : 0;
+    if (sc64_death_source_valid(art)) {
+        timing.burst_su = art->burst_su;
+        timing.remnant_start = art->remnant_start;
+        timing.total_su = art->total_su;
+        source = 1;
+    }
+#endif
+    sc64_death_vfx_spawn(death_vfx, SC64_DEATH_VFX_POOL, (u32)frame, style, raw,
+                         x, y, death_vfx_extent(slot, raw), &timing, source,
+                         owner_color(owner));
+}
+
+/* Observe alive-to-dead transitions with non-positive HP after a simulation
+ * step. This reads actor rows only; scripted removals keep their HP, and
+ * units that die loaded in a transport or hidden in a hangar were not on the
+ * battlefield, so none of them plays a death. */
+static void __attribute__((noinline))
+death_vfx_scan(void)
+{
+    int primed = death_vfx_primed;
+    /* Build each 8-row alive mask in a register and compare it with the
+     * shadow byte once: the common no-change path stays a short scan. */
+    for (int base = 0; base < MAX_UNITS; base += 8) {
+        unsigned now = 0, gone;
+        int end = base + 8 < MAX_UNITS ? base + 8 : MAX_UNITS;
+        for (int i = base; i < end; ++i)
+            if (u[i].alive) now |= 1u << (i - base);
+        gone = death_vfx_seen[base >> 3] & ~now;
+        death_vfx_seen[base >> 3] = (u8)now;
+        if (!gone || !primed) continue;
+        /* Cargo destroyed with its transport and hangar-hidden children
+         * still carry those orders/types: they were off the battlefield. */
+        for (int i = base; i < end; ++i)
+            if ((gone >> (i - base)) & 1u && u[i].hp <= 0 &&
+                !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_CARRIER_HANGAR_HIDDEN(&u[i]))
+                death_vfx_spawn_slot(i, u[i].x, u[i].y, u[i].owner);
+    }
+    /* Building shadow bits follow the unit bits (byte aligned). */
+    for (int base = 0; base < MAX_BUILDINGS; base += 8) {
+        unsigned now = 0, gone;
+        int end = base + 8 < MAX_BUILDINGS ? base + 8 : MAX_BUILDINGS;
+        u8 *seen = &death_vfx_seen[(MAX_UNITS + 7) / 8 + (base >> 3)];
+        for (int i = base; i < end; ++i)
+            if (b[i].alive) now |= 1u << (i - base);
+        gone = *seen & ~now;
+        *seen = (u8)now;
+        if (!gone || !primed) continue;
+        for (int i = base; i < end; ++i)
+            if ((gone >> (i - base)) & 1u && b[i].hp <= 0)
+                death_vfx_spawn_slot(MAX_UNITS + i, b[i].x, b[i].y, b[i].owner);
+    }
+    death_vfx_primed = 1;
+}
+
+/* Called after the outcome check. Alternate updates halve the scan, so a
+ * death appears at most one update late; the outcome update always scans so
+ * the final deaths are recorded. */
+static void __attribute__((noinline))
+death_vfx_observe(void)
+{
+    if (!(frame & 1) || won || lost) death_vfx_scan();
+}
+#endif
+
 static void GBA_HOT
 update_exploration(void)
 {
@@ -6355,6 +6507,10 @@ game_update(u16 held, u16 pressed)
 	    won = 1;
 #endif
     }
+#ifndef SC64_DEATH_VFX_DISABLED
+    /* A bare call: game_update's size steers inlining of IWRAM helpers. */
+    death_vfx_observe();
+#endif
     if (won || lost) {
 #ifdef SC64_RACES
         if(won&&!race_mode)race_completed|=1<<race_selected_mission;
@@ -6627,6 +6783,69 @@ draw_tracers(void)
             tracers[i].x1-camx,tracers[i].y1-camy+12,tracers[i].life);
     }
 }
+
+#ifndef SC64_DEATH_VFX_DISABLED
+#include "sc64_death_vfx_render.h"
+#ifdef SC64_DEATH_SOURCE_ART
+/* Clip source frames to the battlefield rows above the cached lower HUD. */
+static void
+death_vfx_blit(const Sc64SpriteFrame *s, int cx, int cy)
+{
+    int x = cx - s->canvas_w / 2 + s->offset_x;
+    int y = cy - s->canvas_h / 2 + s->offset_y, h = s->h;
+    const u8 *pixels = s->pixels;
+    if (y < 12) {
+        int skip = 12 - y;
+        if (skip >= h) return;
+        pixels += skip * s->w; h -= skip; y = 12;
+    }
+    if (y + h > 120) h = 120 - y;
+    if (h > 0) gfx_blit_sprite(x, y, s->w, h, pixels);
+}
+
+static int
+death_vfx_draw_source(const Sc64DeathVfx *e, int x, int y, u32 age, int under)
+{
+    const Sc64DeathSource *art = sc64_death_source(e->raw);
+    if (!sc64_death_source_valid(art)) return 0;
+    for (unsigned i = 0; i < art->layer_count; ++i) {
+        const Sc64DeathSourceLayer *layer = &art->layers[i];
+        unsigned frame_index;
+        if (layer->under != under ||
+            !sc64_death_source_layer_frame(layer, age, &frame_index)) continue;
+        const Sc64SpriteFrame *sprite =
+            sc64_death_image_frame(layer->image_id, (unsigned short)frame_index);
+        if (sprite) death_vfx_blit(sprite, x + layer->x, y + layer->y);
+    }
+    return 1;
+}
+#endif
+
+/* under=1 draws remnants and collapse frames beneath units; under=0 draws
+ * explosions above them. Effects in unseen cells stay hidden, as units do. */
+static void __attribute__((noinline))
+draw_death_vfx(int under)
+{
+    u32 now = (u32)frame;
+    for (int i = 0; i < SC64_DEATH_VFX_POOL; ++i) {
+        const Sc64DeathVfx *e = &death_vfx[i];
+        if (!e->style) continue;
+        u32 age = sc64_death_vfx_age_su(e->birth, now);
+        if (age >= e->total_su) continue;
+        /* Skip a pass this effect has nothing for before the fog lookup:
+         * authored remnants start late, and bursts end early. Source
+         * collapse frames draw beneath units from the start. */
+        if (under ? !e->source && age < e->remnant_start : age >= e->burst_su) continue;
+        int x = e->x - camx, y = e->y - camy + 12;
+        if (x < -64 || x > 304 || y < -52 || y > 172 || !currently_visible(e->x, e->y)) continue;
+#ifdef SC64_DEATH_SOURCE_ART
+        if (e->source && death_vfx_draw_source(e, x, y, age, under)) continue;
+#endif
+        if (under) sc64_death_vfx_draw_remnant(e, x, y, age);
+        else sc64_death_vfx_draw_burst(e, x, y, age);
+    }
+}
+#endif
 
 static void
 draw_minimap(void)
@@ -7293,9 +7512,15 @@ sc64_tile_background_done:
             draw_building_overlay(&b[i]);
         }
 #endif
+#ifndef SC64_DEATH_VFX_DISABLED
+    draw_death_vfx(1);
+#endif
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive)
 	    draw_unit(&u[i]);
+#ifndef SC64_DEATH_VFX_DISABLED
+    draw_death_vfx(0);
+#endif
     draw_tracers();
 #ifdef SC64_P7_PROJECTILES_ENABLED
     if (race_p7_active()) race_p7_projectile_draw();
@@ -8048,6 +8273,8 @@ draw_hud(void)
 #endif
 }
 
+#include "game_audio.h"
+
 void
 game_render(void)
 {
@@ -8074,6 +8301,7 @@ game_render(void)
 #else
     gfx_begin(C_BLACK);
 #endif
+    game_audio_observe();
     if (screen == SCREEN_TITLE)
 	draw_title();
     else {

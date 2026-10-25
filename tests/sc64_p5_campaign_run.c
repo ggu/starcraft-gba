@@ -557,7 +557,8 @@ static int issue_actor_move(int slot, int x, int y)
 
 static void launch_from_menu(void)
 {
-    assert(sc64_catalog_playable_count(SC64_FACTION_PROTOSS) == 5);
+    /* Later staged profiles retain P5 at ordinal four while adding entries. */
+    assert(sc64_catalog_playable_count(SC64_FACTION_PROTOSS) >= 5);
     assert(sc64_catalog_playable_ordinal(SC64_FACTION_PROTOSS,
                                          SC64_P5_GLOBAL_ID) == 4);
     game_init(); prior_keys = 0;
@@ -748,7 +749,8 @@ int main(int argc, char **argv)
                         u[i].path_y, u[i].path_retry);
         for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE && u[i].raw_type == 66) {
             int r = unit_range(u[i].type) > 64 ? unit_range(u[i].type) + 18 : 64;
-            int target = nearest_enemy_typed(u[i].x,u[i].y,u[i].owner,r,u[i].type);
+            int target = nearest_enemy_typed(u[i].x,u[i].y,u[i].owner,r,u[i].type
+                                            SC64_P7_SOURCE_OWNER_ARG(u[i].raw_owner));
             fprintf(stderr,"P5 Dragoon target-query slot=%d xy=%d,%d radius=%d target=%d",
                     i,u[i].x,u[i].y,r,target);
             if (target >= 0) fprintf(stderr," raw=%d xy=%d,%d",target<MAX_UNITS?u[target].raw_type:b[target-MAX_UNITS].raw_type,

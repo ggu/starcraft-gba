@@ -1,6 +1,13 @@
 #ifndef SC64_Z7_ADAPTER_H
 #define SC64_Z7_ADAPTER_H
 
+#if defined(SC64_Z7_PREVALIDATED_TICK) && !defined(SC64_Z7_RUNTIME)
+#error "SC64_Z7_PREVALIDATED_TICK requires the authenticated Z7 runtime"
+#endif
+#if defined(SC64_Z7_COUNT_SNAPSHOT) && !defined(SC64_Z7_PREVALIDATED_TICK)
+#error "SC64_Z7_COUNT_SNAPSHOT requires SC64_Z7_PREVALIDATED_TICK"
+#endif
+
 #include "sc64_z7.h"
 #include "sc64_z7_scenario_generated.h"
 
@@ -209,6 +216,14 @@ typedef struct {
     u8 source_slot_active[12];
     s8 live_owner_for_source[12];
     u8 source_force_for_slot[8];
+#if defined(SC64_Z7_PREVALIDATED_TICK)
+    /* Runtime-only capability; never serialized and set only after bind checks. */
+    u8 source_tables_prevalidated;
+#endif
+#ifdef SC64_Z7_COUNT_SNAPSHOT
+    /* A single-tick live-world census; runtime-only and never serialized. */
+    struct { u32 count[5]; u8 active; } count_snapshot;
+#endif
     u32 elapsed_frames;
     u8 presentation_opcode;
     u16 last_string_id;
@@ -233,6 +248,76 @@ static inline int sc64_z7_dispatch_action(Sc64Z7RuntimeState *s,
 
 /* One campaign scheduler tick. All source rows are resolved every tick;
  * user pause freezes both timers and action cursors. */
+#if defined(SC64_Z7_PREVALIDATED_TICK)
+static inline int sc64_z7_runtime_tick_internal(Sc64Z7RuntimeState *s,
+                                                const Sc64Z7WorldOps *ops,
+                                                int user_paused,
+                                                int metadata_prevalidated)
+{
+    Sc64Z7Input input={{0},0,0};
+    Sc64Z7Output out;
+    if (!s || !sc64_z7_runtime_state_valid(s)) {
+        if (s) s->fault=SC64_Z7_FAULT_STATE;
+        return -SC64_Z7_FAULT_STATE;
+    }
+    if (user_paused || s->model.outcome!=SC64_Z7_RUNNING) return 0;
+    if (!ops || !ops->condition || !ops->action ||
+        (!metadata_prevalidated && !sc64_z7_runtime_metadata_valid())) {
+        s->fault=SC64_Z7_FAULT_METADATA; return -SC64_Z7_FAULT_METADATA;
+    }
+    for (u8 t=0;t<SC64_Z7_TRIGGER_COUNT;++t) {
+        const Sc64Z7SourceCondition *c;
+        int result;
+        if (metadata_prevalidated) {
+            c=&sc64_z7_source_conditions[sc64_z7_source_triggers[t].first_condition];
+        } else if (!sc64_z7_condition_row(t,0,&c)) {
+            s->fault=SC64_Z7_FAULT_METADATA; return -SC64_Z7_FAULT_METADATA;
+        }
+        result=ops->condition(ops->context,s,c);
+        if (result<0 || result>1) {
+            s->fault=SC64_Z7_FAULT_CONDITION; return -SC64_Z7_FAULT_CONDITION;
+        }
+        if (result) input.condition_true[t]=1;
+    }
+    for (u8 t=0;t<SC64_Z7_TRIGGER_COUNT;++t) {
+        if (!s->model.action_cursor[t]) {
+            if (s->action_ticks[t]) { s->fault=SC64_Z7_FAULT_STATE; return -SC64_Z7_FAULT_STATE; }
+            continue;
+        }
+        if (!s->action_ticks[t]) { s->fault=SC64_Z7_FAULT_STATE; return -SC64_Z7_FAULT_STATE; }
+        if (!--s->action_ticks[t]) input.action_complete|=(u16)(1u<<t);
+    }
+    out=sc64_z7_step(&s->model,&input);
+    for (u8 i=0;i<out.action_count;++i) {
+        int fault=sc64_z7_dispatch_action(s,ops,&out.actions[i]);
+        if (fault) { s->fault=(u8)fault; return -fault; }
+    }
+    if (s->model.outcome!=SC64_Z7_RUNNING) {
+        for (unsigned i=0;i<SC64_Z7_TRIGGER_COUNT;++i) {
+            s->model.action_cursor[i]=0;
+            s->action_ticks[i]=0;
+        }
+    }
+    if (!sc64_z7_runtime_state_valid(s)) {
+        s->fault=SC64_Z7_FAULT_STATE; return -SC64_Z7_FAULT_STATE;
+    }
+    return 1;
+}
+
+/* Public checked entrypoint for standalone clients and fixtures. */
+static inline int sc64_z7_runtime_tick(Sc64Z7RuntimeState *s,
+                                        const Sc64Z7WorldOps *ops,
+                                        int user_paused)
+{ return sc64_z7_runtime_tick_internal(s,ops,user_paused,0); }
+
+/* Private to the authenticated game adapter after its immutable table checks. */
+static inline int sc64_z7_runtime_tick_prevalidated(Sc64Z7RuntimeState *s,
+                                                     const Sc64Z7WorldOps *ops,
+                                                     int user_paused)
+{ return sc64_z7_runtime_tick_internal(s,ops,user_paused,1); }
+#else
+/* Keep the default build's public checked path exactly as before the optional
+ * campaign-only fast entry was introduced. */
 static inline int sc64_z7_runtime_tick(Sc64Z7RuntimeState *s,
                                         const Sc64Z7WorldOps *ops,
                                         int user_paused)
@@ -283,5 +368,6 @@ static inline int sc64_z7_runtime_tick(Sc64Z7RuntimeState *s,
     }
     return 1;
 }
+#endif
 
 #endif

@@ -1,4 +1,13 @@
 .DEFAULT_GOAL := all
+
+# Asset-free Interceptor order decisions; no gameplay integration is enabled.
+.PHONY: test-sc64-interceptor-orders
+build/test-sc64-interceptor-orders: tests/sc64_interceptor_orders.c starcraft/sc64_interceptor_orders.c starcraft/sc64_interceptor_orders.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft $< starcraft/sc64_interceptor_orders.c -o $@
+test-sc64-interceptor-orders: build/test-sc64-interceptor-orders
+	./build/test-sc64-interceptor-orders
+test-starcraft: test-sc64-interceptor-orders
+
 PREFIX ?= arm-none-eabi-
 CC := $(PREFIX)gcc
 OBJCOPY := $(PREFIX)objcopy
@@ -7,14 +16,30 @@ CLANG ?= clang
 PYTHON ?= python3
 CFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -O2 -g -std=c11 -ffreestanding -fno-builtin -fno-strict-aliasing -fno-common -ffunction-sections -fdata-sections -Wall -Wextra -Icommon
 LDFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -nostdlib -Tcommon/gba.ld -Wl,--gc-sections
-COMMON := common/start.s common/main.c common/gba.c common/memory.c
+COMMON := common/start.s common/main.c common/gba.c common/memory.c common/audio_bank.S
 COMMON_HEADERS := $(wildcard common/*.h)
-STARCRAFT := $(wildcard starcraft/*.c)
+# The order-decision foundation is linked only by its isolated host check until
+# a gameplay adapter is implemented and qualified.
+STARCRAFT := $(filter-out starcraft/sc64_interceptor_orders.c,$(wildcard starcraft/*.c))
 
-SC64_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated
-SC64_INPUTS := .local/sc64/generated/sc64_mission_generated.h .local/sc64/generated/sc64_assets_generated.h .local/sc64/generated/sc64_sprites_generated.h
-BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/backwater/generated
-BACKWATER_INPUTS := .local/sc64/backwater/generated/sc64_mission_generated.h .local/sc64/backwater/generated/sc64_assets_generated.h .local/sc64/backwater/generated/sc64_sprites_generated.h
+# Optional private StarCraft 64 audio bank from tools/sc64_audio_pack.py. Every
+# imported profile links it when present; SC64_AUDIO=0 builds them silent.
+SC64_AUDIO ?= auto
+SC64_AUDIO_DIR := .local/sc64/audio/generated
+SC64_AUDIO_FLAGS :=
+SC64_AUDIO_INPUTS :=
+ifneq ($(SC64_AUDIO),0)
+ifneq ($(wildcard $(SC64_AUDIO_DIR)/sc64_audio_generated.h),)
+SC64_AUDIO_FLAGS := -DSC64_AUDIO_IMPORTED -I$(SC64_AUDIO_DIR) '-DSC64_AUDIO_BLOB="$(SC64_AUDIO_DIR)/sc64_audio_generated.bin"'
+SC64_AUDIO_INPUTS := $(SC64_AUDIO_DIR)/sc64_audio_generated.h $(SC64_AUDIO_DIR)/sc64_audio_generated.bin
+else ifeq ($(SC64_AUDIO),1)
+$(error SC64_AUDIO=1 but $(SC64_AUDIO_DIR)/sc64_audio_generated.h is missing; run tools/sc64_audio_pack.py)
+endif
+endif
+SC64_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated $(SC64_AUDIO_FLAGS)
+SC64_INPUTS := .local/sc64/generated/sc64_mission_generated.h .local/sc64/generated/sc64_assets_generated.h .local/sc64/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
+BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/backwater/generated $(SC64_AUDIO_FLAGS)
+BACKWATER_INPUTS := .local/sc64/backwater/generated/sc64_mission_generated.h .local/sc64/backwater/generated/sc64_assets_generated.h .local/sc64/backwater/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
 CAMPAIGN_FLAGS := $(BACKWATER_FLAGS) -I.local/sc64/campaign/generated
 CAMPAIGN_INPUTS := $(BACKWATER_INPUTS) .local/sc64/campaign/generated/sc64_campaign_generated.h
 RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -I.local/sc64/races/generated
@@ -2314,7 +2339,9 @@ TILE8_SOURCE := .local/sc64/zp-stage/generated/sc64_races_generated.h
 TILE8_HEADER := .local/sc64/tile8/generated/sc64_races_generated.h
 $(TILE8_HEADER): tools/sc64_tile8_pack.py $(TILE8_SOURCE)
 	$(PYTHON) tools/sc64_tile8_pack.py --input $(TILE8_SOURCE) --output $@
-P7_TILE_FLAGS := -I.local/sc64/tile8/generated $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) -DSC64_TILE_RENDERER
+# Mode 0 needs the VRAM gap the sampled-audio buffers use between the mode-4
+# pages (see common/gba.c), so the tile probe builds silent, as SC64_AUDIO=0.
+P7_TILE_FLAGS := -I.local/sc64/tile8/generated $(filter-out $(SC64_AUDIO_FLAGS),$(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS)) -DSC64_TILE_RENDERER
 build/test-sc64-p7-tile-reference: tests/sc64_p7_tile_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p7-tile-candidate: tests/sc64_p7_tile_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) $(TILE8_HEADER) common/gba.c common/gba.h Makefile | build
@@ -2535,6 +2562,80 @@ test-sc64-construction-source: build/test-sc64-construction-source
 construction-visuals: build/StarCraft-Construction-Preview-GBA.gba
 	$(PYTHON) -c 'from tools.verify_roms import verify; print(verify("StarCraft-Construction-Preview-GBA", "starcraft-construction", "SCCA", "SC BUILD ART"))'
 
+# Transient death effects. The asset-free checks cover the authored renderer
+# and the original-art game; each game fixture is also built with the feature
+# compiled out and must print the same state/save digest over combat.
+DEATH_VFX_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+build/test-sc64-death-vfx: tests/sc64_death_vfx.c starcraft/sc64_death_vfx.h starcraft/sc64_death_vfx_render.h common/gba.c common/gba.h | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $< common/gba.c -o $@
+build/test-sc64-death-vfx-default: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $< -o $@
+build/test-sc64-death-vfx-default-off: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) -DSC64_DEATH_VFX_DISABLED $< -o $@
+# $(1)=name, $(2)=profile flags, $(3)=inputs
+define DEATH_VFX_GAME_FIXTURE
+build/test-sc64-death-vfx-$(1): tests/sc64_death_vfx_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(DEATH_VFX_TEST_FLAGS) $(2) $$< -o $$@
+build/test-sc64-death-vfx-$(1)-off: tests/sc64_death_vfx_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(DEATH_VFX_TEST_FLAGS) $(2) -DSC64_DEATH_VFX_DISABLED $$< -o $$@
+endef
+$(eval $(call DEATH_VFX_GAME_FIXTURE,unified,$(UNIFIED_FLAGS),$(RACES_INPUTS)))
+$(eval $(call DEATH_VFX_GAME_FIXTURE,terran,$(TERRAN_FULL_FLAGS),$(TERRAN_FULL_INPUTS)))
+$(eval $(call DEATH_VFX_GAME_FIXTURE,zerg,$$(Z7_DERIVED_SAVE_FLAGS),$$(Z7_PROBE_INPUTS)))
+$(eval $(call DEATH_VFX_GAME_FIXTURE,protoss,$$(P7_TYPED_RECT_FLAGS),$$(P7_ARBITER_INPUTS)))
+# Run the fixture, then compare feature-on/off digests over the workload.
+define DEATH_VFX_RUN
+	./build/test-sc64-death-vfx-$(1)
+	SC64_DEATH_VFX_HASH=1 ./build/test-sc64-death-vfx-$(1) > build/death-vfx-$(1).on
+	SC64_DEATH_VFX_HASH=1 ./build/test-sc64-death-vfx-$(1)-off > build/death-vfx-$(1).off
+	cmp build/death-vfx-$(1).on build/death-vfx-$(1).off
+	@echo "PASS death VFX $(1) state/save digest unchanged: $$(cat build/death-vfx-$(1).on)"
+endef
+.PHONY: test-sc64-death-vfx test-sc64-death-vfx-default test-sc64-death-vfx-unified test-sc64-death-vfx-profiles
+test-sc64-death-vfx: build/test-sc64-death-vfx
+	./build/test-sc64-death-vfx
+test-sc64-death-vfx-default: build/test-sc64-death-vfx-default build/test-sc64-death-vfx-default-off
+	$(call DEATH_VFX_RUN,default)
+test-sc64-death-vfx-unified: build/test-sc64-death-vfx-unified build/test-sc64-death-vfx-unified-off
+	$(call DEATH_VFX_RUN,unified)
+test-sc64-death-vfx-profiles: test-sc64-death-vfx-unified build/test-sc64-death-vfx-terran build/test-sc64-death-vfx-terran-off build/test-sc64-death-vfx-zerg build/test-sc64-death-vfx-zerg-off build/test-sc64-death-vfx-protoss build/test-sc64-death-vfx-protoss-off
+	$(call DEATH_VFX_RUN,terran)
+	$(call DEATH_VFX_RUN,zerg)
+	$(call DEATH_VFX_RUN,protoss)
+test-starcraft: test-sc64-death-vfx test-sc64-death-vfx-default
+test-unified: test-sc64-death-vfx-unified
+
+# Optional source death art preview, built like the construction preview.
+DEATH_ART_DIR := .local/sc64/death/generated
+DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
+DEATH_ART_FLAGS := $(UNIFIED_FLAGS) -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
+$(DEATH_ART_HEADER): tools/sc64_death_sprites.py tools/sc64_construction_sprites.py tools/sc64_sprites.py
+	$(PYTHON) tools/sc64_death_sprites.py
+build/test-sc64-death-source: tests/sc64_death_source_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(DEATH_ART_FLAGS) $< -o $@
+build/test-sc64-death-source-off: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(UNIFIED_FLAGS) -DSC64_DEATH_VFX_DISABLED $< -o $@
+build/test-sc64-death-source-on: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(DEATH_ART_FLAGS) $< -o $@
+build/starcraft-death.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(DEATH_ART_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-death.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Death-Preview-GBA.gba: build/starcraft-death.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC DEATH ART' SCDA
+.PHONY: sc64-death-art test-sc64-death-source death-visuals
+sc64-death-art:
+	$(PYTHON) tools/sc64_death_sprites.py
+test-sc64-death-source: build/test-sc64-death-source build/test-sc64-death-source-on build/test-sc64-death-source-off
+	./build/test-sc64-death-source
+	./build/test-sc64-death-source-on
+	SC64_DEATH_VFX_HASH=1 ./build/test-sc64-death-source-on > build/death-vfx-source.on
+	SC64_DEATH_VFX_HASH=1 ./build/test-sc64-death-source-off > build/death-vfx-source.off
+	cmp build/death-vfx-source.on build/death-vfx-source.off
+	@echo "PASS death VFX source-art state/save digest unchanged: $$(cat build/death-vfx-source.on)"
+death-visuals: build/StarCraft-Death-Preview-GBA.gba
+	$(PYTHON) -c 'from tools.verify_roms import verify; print(verify("StarCraft-Death-Preview-GBA", "starcraft-death", "SCDA", "SC DEATH ART"))'
+
 build/test-sc64-construction-hp: tests/sc64_construction_hp.c starcraft/sc64_construction_hp.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 build/test-sc64-construction-hp-game: tests/sc64_construction_hp_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -2636,6 +2737,50 @@ build/test-sc64-z7-scourge: tests/sc64_z7_scourge_game.c $(STARCRAFT) $(wildcard
 test-sc64-z7-scourge: build/test-sc64-z7-scourge
 	./build/test-sc64-z7-scourge
 
+# Z7-only immutable-table prevalidation. Existing profiles leave this off.
+Z7_PREVALIDATED_BASE_FLAGS := $(Z7_SCOURGE_PROBE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT
+Z7_PREVALIDATED_FLAGS := $(Z7_PREVALIDATED_BASE_FLAGS) -DSC64_Z7_PREVALIDATED_TICK
+define Z7_PREVALIDATION_CHECK
+build/test-sc64-z7-prevalidated-$(1)-$(2): tests/$(3) $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(4) $$< common/gba.c -o $$@
+endef
+$(eval $(call Z7_PREVALIDATION_CHECK,reference,runtime,sc64_z7_runtime.c,$(Z7_PREVALIDATED_BASE_FLAGS)))
+$(eval $(call Z7_PREVALIDATION_CHECK,candidate,runtime,sc64_z7_runtime.c,$(Z7_PREVALIDATED_FLAGS)))
+$(eval $(call Z7_PREVALIDATION_CHECK,reference,save,sc64_z7_game_save.c,$(Z7_PREVALIDATED_BASE_FLAGS)))
+$(eval $(call Z7_PREVALIDATION_CHECK,candidate,save,sc64_z7_game_save.c,$(Z7_PREVALIDATED_FLAGS)))
+.PHONY: test-sc64-z7-prevalidated zerg-z7-prevalidated-probe
+test-sc64-z7-prevalidated: $(foreach mode,reference candidate,$(foreach check,runtime save,build/test-sc64-z7-prevalidated-$(mode)-$(check)))
+	./build/test-sc64-z7-prevalidated-reference-runtime
+	./build/test-sc64-z7-prevalidated-candidate-runtime
+	./build/test-sc64-z7-prevalidated-reference-save
+	./build/test-sc64-z7-prevalidated-candidate-save
+build/starcraft-zerg-z7-prevalidated-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_PREVALIDATED_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-prevalidated-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Prevalidated-Probe-GBA.gba: build/starcraft-zerg-z7-prevalidated-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 FAST36' SCZV
+zerg-z7-prevalidated-probe: build/StarCraft-Zerg-Z7-Prevalidated-Probe-GBA.gba
+
+# Z7 same-update condition-count experiment, layered on authenticated metadata.
+Z7_COUNT_SNAPSHOT_FLAGS := $(Z7_PREVALIDATED_FLAGS) -DSC64_Z7_COUNT_SNAPSHOT
+$(eval $(call Z7_PREVALIDATION_CHECK,snapshot,runtime,sc64_z7_runtime.c,$(Z7_COUNT_SNAPSHOT_FLAGS)))
+$(eval $(call Z7_PREVALIDATION_CHECK,snapshot,save,sc64_z7_game_save.c,$(Z7_COUNT_SNAPSHOT_FLAGS)))
+build/test-sc64-z7-count-snapshot: tests/sc64_z7_count_snapshot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_COUNT_SNAPSHOT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-count-snapshot zerg-z7-count-snapshot-probe
+test-sc64-z7-count-snapshot: test-sc64-z7-prevalidated build/test-sc64-z7-prevalidated-snapshot-runtime build/test-sc64-z7-prevalidated-snapshot-save build/test-sc64-z7-count-snapshot
+	./build/test-sc64-z7-prevalidated-snapshot-runtime
+	./build/test-sc64-z7-prevalidated-snapshot-save
+	./build/test-sc64-z7-count-snapshot
+build/starcraft-zerg-z7-count-snapshot-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_COUNT_SNAPSHOT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-count-snapshot-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Count-Snapshot-Probe-GBA.gba: build/starcraft-zerg-z7-count-snapshot-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 CNT36' SCZW
+zerg-z7-count-snapshot-probe: build/StarCraft-Zerg-Z7-Count-Snapshot-Probe-GBA.gba
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
@@ -2711,6 +2856,50 @@ build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba: build/starcraft-protoss-p7-
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 MOVE40' SC7M
 protoss-p7-typed-move-probe: build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba
+
+# Ordinary-input Homeland controller for the existing generation-40 probe.
+# This remains separate from canonical campaign promotion/ARM qualification.
+build/test-sc64-p7-controller: tests/sc64_p7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-controller
+test-sc64-p7-controller: build/test-sc64-p7-controller
+	mkdir -p .local/build/p7-controller
+	./build/test-sc64-p7-controller .local/build/p7-controller/controller-trace.jsonl
+
+# Separate seven-mission qualification profile. Existing probes keep their flags.
+P7_CAMPAIGN_COMPOSITION_FLAGS := $(P7_TYPED_MOVE_FLAGS) -DSC64_P3_PRODUCTION_EXIT -DSC64_NEAREST_RESOURCE_DEPOT
+define P7_CAMPAIGN_CONTROLLER
+build/test-sc64-p7-campaign-$(1): tests/$(2).c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $$(P7_CAMPAIGN_COMPOSITION_FLAGS) $$< common/gba.c -o $$@
+endef
+$(eval $(call P7_CAMPAIGN_CONTROLLER,early,race_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p3,sc64_p3_expansion_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p4,sc64_p4_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p5,sc64_p5_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p6,sc64_p6_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,p7,sc64_p7_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,skirmish,sc64_skirmish_campaign_run))
+$(eval $(call P7_CAMPAIGN_CONTROLLER,save,sc64_p7_typed_compact_game))
+.PHONY: test-sc64-p7-campaign-composition protoss-p7-campaign-probe
+test-sc64-p7-campaign-composition: $(addprefix build/test-sc64-p7-campaign-,early p3 p4 p5 p6 p7 skirmish save)
+	mkdir -p .local/build/p7-campaign
+	./build/test-sc64-p7-campaign-save
+	./build/test-sc64-p7-campaign-early --controller 2 --trace .local/build/p7-campaign/p1.json
+	./build/test-sc64-p7-campaign-early --controller 3 --trace .local/build/p7-campaign/p2.json
+	./build/test-sc64-p7-campaign-p3 --trace .local/build/p7-campaign/p3.json
+	./build/test-sc64-p7-campaign-p4 --attempt-tag p7-campaign
+	./build/test-sc64-p7-campaign-p5 --attempt-tag p7-campaign
+	./build/test-sc64-p7-campaign-p6 --trace .local/build/p7-campaign/p6.json
+	./build/test-sc64-p7-campaign-p7 .local/build/p7-campaign/p7.jsonl
+	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller build/test-sc64-p7-campaign-skirmish --output .local/build/p7-campaign/skirmish
+
+build/starcraft-protoss-p7-campaign-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_CAMPAIGN_COMPOSITION_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-campaign-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Campaign-Probe-GBA.gba: build/starcraft-protoss-p7-campaign-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 CAMP40' SC7C
+protoss-p7-campaign-probe: build/StarCraft-Protoss-P7-Campaign-Probe-GBA.gba
 
 # Opt-in exact source-rectangle reuse in P7 aura and detection.
 P7_TYPED_RECT_FLAGS := $(P7_TYPED_MOVE_FLAGS) -DSC64_P7_GEOMETRY_RECT_HOIST_ENABLED
@@ -2827,3 +3016,33 @@ build/StarCraft-Protoss-P7-Typed-Probe-GBA.gba: build/starcraft-protoss-p7-typed
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 TYPED' SC7T
 .PHONY: protoss-p7-typed-probe
 protoss-p7-typed-probe: build/StarCraft-Protoss-P7-Typed-Probe-GBA.gba
+
+# Audio: mixer/sequencer checks, presentation hook fixtures, and a long
+# controller run whose state hash must not change when the audio observer is
+# compiled out (GAME_AUDIO_OFF).
+AUDIO_TEST_DEPS := common/gba.c common/gba.h common/audio_mixer.h $(STARCRAFT) $(wildcard starcraft/*.h) Makefile
+build/test-audio-mixer: tests/audio_mixer.c common/audio_mixer.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+
+define GAME_AUDIO_PROFILE
+build/test-game-audio-$(1)-on: tests/game_audio_run.c $$(AUDIO_TEST_DEPS) $(3) | build
+	$$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c -o $$@
+build/test-game-audio-$(1)-off: tests/game_audio_run.c $$(AUDIO_TEST_DEPS) $(3) | build
+	$$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) -DGAME_AUDIO_OFF $$< common/gba.c -o $$@
+.PHONY: test-game-audio-$(1)
+test-game-audio-$(1): build/test-game-audio-$(1)-on build/test-game-audio-$(1)-off
+	./build/test-game-audio-$(1)-on hooks
+	./build/test-game-audio-$(1)-on > build/test-game-audio-$(1)-on.txt
+	./build/test-game-audio-$(1)-off > build/test-game-audio-$(1)-off.txt
+	cat build/test-game-audio-$(1)-on.txt
+	test "$$$$(grep '^state' build/test-game-audio-$(1)-on.txt)" = "$$$$(grep '^state' build/test-game-audio-$(1)-off.txt)"
+	@echo "game audio $(1): audio-on and audio-off state hashes match"
+endef
+$(eval $(call GAME_AUDIO_PROFILE,default,,))
+$(eval $(call GAME_AUDIO_PROFILE,unified,$(UNIFIED_FLAGS),$(RACES_INPUTS)))
+
+.PHONY: test-audio
+test-audio: build/test-audio-mixer test-game-audio-default
+	./build/test-audio-mixer
+test-starcraft: test-audio
+test-unified: test-game-audio-unified

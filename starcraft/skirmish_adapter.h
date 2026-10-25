@@ -432,6 +432,7 @@ skirmish_init(void)
         skirmish_ai[i].attack_threshold = 8;
     }
     frame = 0;
+    death_vfx_reset();
     enemy_timer = 0;
     wave = 0;
     invalidate_path_grid();

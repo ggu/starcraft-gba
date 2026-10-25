@@ -35,7 +35,8 @@ P7_MISSION, P7_ORDINAL, PROTOSS_MISSIONS = 26, 6, 7
 STATE_BANKS = ("u", "b", "m", "geysers", "geyser_count", "race_campaign", "race_p7",
                "race_minerals", "race_gas", "race_supply_used", "race_supply_cap",
                "race_player", "weapons_level", "armor_level", "visible", "explored")
-TIMING_FIELDS = {"elapsed_hardware_cycles", "effective_fps", "profile_cycles_last_tick", "routes"}
+TIMING_FIELDS = {"elapsed_hardware_cycles", "effective_fps", "profile_cycles_last_tick", "routes",
+                 "audio"}
 MAX_TICKS = 12000
 
 
@@ -123,6 +124,10 @@ def run(args: argparse.Namespace) -> int:
             s["unit_hp_by_owner"] = hp
             s["selected"] = len(selected_slots())
             s["profile_cycles_last_tick"], s["routes"] = replay.profile_counters(rsp, sym)
+            if "audio_irq_frames" in sym:
+                # Cumulative VBlank mixer cycles, frames and peak (sampled audio builds).
+                s["audio"] = {name: menu.u32(rsp, sym[name]) for name in
+                              ("audio_irq_cycles", "audio_irq_frames", "audio_irq_peak")}
             return s
 
         def interval(label: str, previous: dict, clock: int, total: list[int]):
@@ -199,6 +204,7 @@ def run(args: argparse.Namespace) -> int:
             "launch": launch, "command": command,
             "neutral_fps": fps(neutral), "attack_fps": fps(attack),
             "neutral_cycles_frames": neutral, "attack_cycles_frames": attack,
+            "audio": previous.get("audio"),
             "ended": {k: previous[k] for k in ("screen", "frame", "won", "lost")},
             "rom_sha256": hashlib.sha256(args.rom.read_bytes()).hexdigest(),
             "elf_sha256": hashlib.sha256(args.elf.read_bytes()).hexdigest(),
