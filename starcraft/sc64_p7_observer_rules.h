@@ -28,6 +28,13 @@
 #error "Use the unified P7 Arbiter cloak/cache feature gate"
 #endif
 
+/* Geometry hoisting changes only how the cache reuses validated source
+ * rectangles. Keep it behind the complete cache profile. */
+#if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && \
+    !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+#error "P7 geometry hoist requires the Arbiter cloak cache"
+#endif
+
 enum {
     SC64_P7_OBSERVER_RAW = 84,
     SC64_P7_HERO_DARK_TEMPLAR_RAW = 74,

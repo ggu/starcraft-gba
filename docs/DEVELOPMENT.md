@@ -2071,3 +2071,69 @@ and initial-launch save timing. The ARM probe includes prevalidation and the
 count snapshot. Its format frees save space for future projectile state; it
 does not implement Carrier Interceptors or prove that a complete projectile
 and child-actor pool will fit. See [Validation](VALIDATION.md#experimental-p7-typed-save-rows).
+
+The composed generation-40 movement probe is also opt-in:
+`make test-sc64-p7-typed-move` compares typed count-snapshot and combined
+runtime traces, compares the steering-list fixture against the typed count
+baseline while checking each list answer against `unit_step_clear()`, and runs
+typed Battery and initial-save fixtures. `make protoss-p7-typed-move-probe`
+links the combined typed/Arbiter/movement profile as code `SC7M` (title
+`SC P7 MOVE40`). It keeps generation 40, the 56-byte Unit, 48-byte Building,
+14,188-byte RaceSave and the existing source clock. The combined host matrix,
+ARM memory checks and a matching 600-update emulator opening pass; measured
+effective fps is 7.880 for typed count and 9.045 for typed movement. See
+[Validation](VALIDATION.md#generation-40-movement-composition) for the exact
+comparison and limits. It is not part of the canonical or default build.
+
+The opt-in rectangle-reuse probe layers
+`SC64_P7_GEOMETRY_RECT_HOIST_ENABLED` on that typed/Arbiter/movement profile:
+
+```sh
+make test-sc64-p7-rect
+make protoss-p7-rect-probe
+```
+
+It validates an Arbiter's source rectangle once per source tick and reuses
+target rectangles for aura finder and distance checks and detector scans.
+Ownership, range thresholds, clipped finder edges and detection cadence are
+unchanged. The host target compares runtime/steering traces, checks geometry
+against the original helpers, and runs Battery and initial-save fixtures.
+The ARM output is `build/StarCraft-Protoss-P7-Rect-Probe-GBA.gba`, code `SC7R`,
+title `SC P7 RECT40`; save generation, actor sizes and RAM ends are unchanged.
+See [Validation](VALIDATION.md#p7-source-rectangle-reuse) for the measured
+opening/attack workload and its limits. This probe does not enable Carriers
+or qualify P7 for campaign promotion.
+
+Carrier pool, codec and motion checks are asset-free and included in
+`./dev test`. The separate generation-41 P7 projectile probe reserves the
+Mode 4 arena and integrates game updates, damage consumption and saves.
+The separate generation-42 training probe adds paid Interceptor queues and
+saved hidden hangar children. Carrier production, launch/flight and the
+weapon-event caller remain unfinished; neither enables Carrier combat.
+See [Carrier projectile development](CARRIER-PROJECTILES.md)
+for commands, memory ownership, reference evidence and promotion limits.
+
+Ordinary attacks use authored weapon-family effects: muzzle flashes, needles,
+missiles, plasma, flame, melee, acid, shells, psionic arcs, explosions, colony
+spines and laser pulses. Ground/air weapon variants have separate profiles;
+defenses and enabled traps use the same clipped, fog-aware renderer. These
+effects preserve the adaptation's existing instantaneous damage timing and
+are not imported native IScript animations. They do not enable weapons on
+actors whose combat is still unsupported.
+
+`make test-sc64-weapon-vfx` checks asset-free rendering geometry and clipping.
+With the existing private inputs, `make test-sc64-weapon-vfx-profiles` checks
+the unified, full Terran, Z7 and P7 actor sets and actual firing events.
+`make showcase` includes the effects in the filming ROM; the canonical race
+builds include them as well. The transient pool holds 32 effects in race
+profiles and retains 12 in the original-art save format. Overflow replaces
+the oldest cosmetic effect and never changes damage or RNG. Actor and save
+rows retain their existing layouts.
+
+For repeatable filming setups, `make showcase` builds the separate
+`StarCraft-Showcase-GBA.gba` with a hidden scene menu. On HOME hold R, add L,
+then tap Select. `make test-sc64-showcase` checks the menu, scene resets,
+last-stand timing and save isolation with the existing private P7 inputs.
+The frontend input model also runs in the asset-free host suite. See
+[Showcase scenes](SHOWCASE.md) for all eight setups, recording controls,
+Carrier preview limits and the controller-only emulator replay.

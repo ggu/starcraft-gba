@@ -11,8 +11,8 @@
 #if defined(SC64_RENDER_KEY_ONCE) && !defined(SC64_IMPORTED_MISSION)
 #error "SC64_RENDER_KEY_ONCE requires SC64_IMPORTED_MISSION"
 #endif
-#ifdef SC64_RACES
 #include "sc64_weapon_vfx.h"
+#ifdef SC64_RACES
 #include "sc64_construction_vfx.h"
 #endif
 #if defined(SC64_CONSTRUCTION_SOURCE_ART) && \
@@ -28,6 +28,17 @@
 void *memcpy(void *dst, const void *src, size_t n);
 void *memset(void *dst, int value, size_t n);
 int memcmp(const void *a, const void *b, size_t n);
+
+#if defined(SC64_SHOWCASE_ENABLED) && \
+    (!defined(SC64_RACES) || !defined(SC64_UNIFIED) || \
+     !defined(SC64_P7_ACTORS) || !defined(SC64_ZP_CAMPAIGN_ACTORS))
+#error "Showcase requires the unified P7/ZP actor profile"
+#endif
+#ifdef SC64_SHOWCASE_ENABLED
+/* Transient filming state: never serialized into ordinary saves. */
+static int sc64_showcase_scene = -1;
+static unsigned sc64_showcase_ticks;
+#endif
 
 #ifdef SC64_Z6_RUNTIME
 #include "sc64_z6_state.h"
@@ -147,6 +158,27 @@ int memcmp(const void *a, const void *b, size_t n);
 #error "P7 typed compact save requires unified P7 battery and Arbiter cache profile"
 #endif
 
+#if defined(SC64_P7_PROJECTILES_ENABLED) && \
+    (!defined(SC64_P7_TYPED_COMPACT_ENABLED) || !defined(SC64_P7_ACTORS))
+#error "Interceptor projectiles require the P7 typed save and shared source clock"
+#endif
+#if defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_TILE_RENDERER)
+#error "Interceptor arena and experimental tile sprites overlap OBJ VRAM"
+#endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+#include "sc64_interceptor_motion.h"
+_Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
+               "Interceptor arena exceeds Mode 4 OBJ reserve");
+#endif
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#error "Carrier training requires P7 projectile storage and typed actor state"
+#endif
+
+#if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && \
+    !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+#error "P7 geometry hoist requires the Arbiter cloak cache"
+#endif
+
 #if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && \
     (!defined(SC64_P7_OBSERVER_ENABLED) || !defined(SC64_P7_BATTERY_ENABLED) || \
      !defined(SC64_RACES) || !defined(SC64_P7_RUNTIME) || \
@@ -199,7 +231,11 @@ int memcmp(const void *a, const void *b, size_t n);
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_P7_TYPED_COMPACT_ENABLED)
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 42u
+#elif defined(SC64_P7_PROJECTILES_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 41u
+#elif defined(SC64_P7_TYPED_COMPACT_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 40u
 #elif defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 39u
@@ -340,7 +376,13 @@ int memcmp(const void *a, const void *b, size_t n);
 #else
 #define MAX_RACE_GEYSERS 4
 #endif
+#ifdef SC64_RACES
+/* Transient visuals are absent from RaceSave. Keep dense volleys readable
+ * without growing actor/save rows; the ARM link still checks the RAM guard. */
+#define MAX_TRACERS 32
+#else
 #define MAX_TRACERS 12
+#endif
 #ifdef SC64_IMPORTED_MISSION
 #include "sc64_mission_generated.h"
 #include "sc64_assets_generated.h"
@@ -650,6 +692,7 @@ enum {
     B_BUNKER, B_INFESTED_COMMAND, B_CREEP_COLONY
 };
 #endif
+#include "sc64_weapon_vfx_profiles.h"
 enum {
     ORDER_IDLE, ORDER_MOVE, ORDER_ATTACK_MOVE, ORDER_ATTACK_TARGET,
     ORDER_MINE, ORDER_BUILD, ORDER_GAS
@@ -670,6 +713,12 @@ enum {
 #define SC64_TRANSPORT_LOADED(q) ((q)->order == ORDER_TRANSPORTED)
 #else
 #define SC64_TRANSPORT_LOADED(q) 0
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+/* This stage has only training/inside children; all raw73 rows stay off-map. */
+#define SC64_CARRIER_HANGAR_HIDDEN(q) ((q)->type==U_P7_INTERCEPTOR)
+#else
+#define SC64_CARRIER_HANGAR_HIDDEN(q) 0
 #endif
 enum {
     SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSE, SCREEN_RESULT
@@ -843,7 +892,14 @@ static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 typedef union {
     u16 bfs_queue[MAP_CELLS];
     RaceSave save;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    struct { RaceSave save; Unit units[MAX_UNITS]; } carrier_candidate;
+#endif
 } Sc64ZpRouteSaveScratch;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+_Static_assert(sizeof(RaceSave)+sizeof(Unit)*MAX_UNITS<=sizeof(u16)*MAP_CELLS,
+               "Carrier candidate decode must fit existing route scratch");
+#endif
 static Sc64ZpRouteSaveScratch sc64_zp_route_save_scratch;
 #endif
 #ifdef SC64_IMPORTED_MISSION
@@ -1083,6 +1139,27 @@ static int __attribute__((noinline)) race_p7_battery_tick_unit(int slot);
 static void race_p7_battery_clear_building_references(int slot);
 static int race_p7_battery_initialize_source(const Sc64RaceMap *map);
 static int race_p7_battery_live_world_valid(void);
+#endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+static int race_p7_source_owner(unsigned source_slot);
+static void race_p7_projectile_reset(void);
+static void race_p7_projectile_clear_references(int ref);
+static void race_p7_projectile_clear_dead_references(void);
+static void race_p7_projectile_source_tick(void);
+static void race_p7_projectile_tick_if_due(void);
+static void race_p7_projectile_draw(void);
+static int race_p7_projectile_encode(u8 *packet);
+static int race_p7_projectile_restore(const u8 *packet);
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+static int race_p7_carrier_training_menu_available(void);
+static int race_p7_carrier_training_queue_selected(void);
+static void race_p7_carrier_training_source_tick(void);
+static void race_p7_carrier_training_frame_tick(void);
+static void race_p7_carrier_training_clear_slot(int slot);
+static void race_p7_carrier_training_end_frame(void);
+static int race_p7_carrier_training_slots_available(unsigned wanted);
+static unsigned race_p7_carrier_training_child_count(int carrier);
 #endif
 #ifdef SC64_P7_OBSERVER_ENABLED
 static int sc64_p7_observer_can_attack_from(int attacker, int target,
@@ -1497,6 +1574,12 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    race_p7_projectile_clear_references(i);
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    race_p7_carrier_training_clear_slot(i);
+#endif
 #ifdef SC64_DIRECT_ATTACK
     sc64_direct_attack_clear_references(i);
 #endif
@@ -1618,6 +1701,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     int i = find_build_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    race_p7_projectile_clear_references(MAX_UNITS+i);
+#endif
 #ifdef SC64_DIRECT_ATTACK
     sc64_direct_attack_clear_references(MAX_UNITS + i);
 #endif
@@ -1785,6 +1871,10 @@ terrain_blocked(int col, int row)
 {
 #ifdef SC64_RACES
     if(col<0||row<0||col>=MAP_COLS||row>=MAP_ROWS)return 1;
+#ifdef SC64_SHOWCASE_ENABLED
+    /* The filming set is a flat arena; normal skirmish barriers stay intact. */
+    if(sc64_showcase_scene>=0)return 0;
+#endif
     if(!race_mode)return sc64_race_maps[race_selected_mission].blocked[col+row*MAP_COLS]!=0;
 #ifdef SC64_IMPORTED_SKIRMISH
     if(race_skirmish_map>0)return sc64_skirmish_maps[race_skirmish_map-1].blocked[col+row*MAP_COLS]!=0;
@@ -2937,25 +3027,26 @@ sc64_direct_attack_tick_unit(int slot)
 }
 #endif
 
-static void
+static void __attribute__((noinline))
 add_tracer(int x0, int y0, int x1, int y1, int color)
 {
-    int i;
-    for (i = 0; i < MAX_TRACERS; i++)
-	if (!tracers[i].life) {
-	    tracers[i].x0 = x0;
-	    tracers[i].y0 = y0;
-	    tracers[i].x1 = x1;
-	    tracers[i].y1 = y1;
-	    tracers[i].life = 4;
-#ifdef SC64_RACES
-            /* The firing update ages effects before its first render. */
-            if (sc64_weapon_vfx_style(color)==SC64_WEAPON_VFX_STYLE_NEEDLE)
-                tracers[i].life=5;
-#endif
-	    tracers[i].color = color;
-	    return;
-	}
+    int slot=0,oldest=-1;
+    if (!color) return; /* Non-combat actor: no invented weapon. */
+    if (!sc64_weapon_vfx_style(color))
+        color=sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_MUZZLE,color);
+    for (int i=0;i<MAX_TRACERS;++i) {
+        if (!tracers[i].life) { slot=i; break; }
+        int age=sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(tracers[i].color))+1-
+            tracers[i].life;
+        if (age>oldest) { oldest=age; slot=i; }
+    }
+    /* Cosmetic overflow replaces the oldest effect, never a damage event.
+     * Fresh shots cannot be starved indefinitely by an earlier volley. */
+    tracers[slot].x0=x0; tracers[slot].y0=y0;
+    tracers[slot].x1=x1; tracers[slot].y1=y1;
+    tracers[slot].color=color;
+    /* Combat emits before end-of-update aging, including the first draw. */
+    tracers[slot].life=sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(color))+1;
 }
 
 static void
@@ -3041,6 +3132,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #endif
 	u[target].hp -= damage;
 	if (u[target].hp <= 0) {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+            race_p7_carrier_training_clear_slot(target);
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
             if (u[target].alive && race_late_active()) {
                 race_late_record_actor_death(source_owner, -1, u[target].owner,
@@ -3081,6 +3175,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 	if (source_type == U_FIREBAT) {
 	    for (i = 0; i < MAX_UNITS; i++)
 		if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner != source_owner && dist2(tx, ty, u[i].x, u[i].y) < 12 * 12) {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+                    if (SC64_CARRIER_HANGAR_HIDDEN(&u[i])) continue;
+#endif
 #ifdef SC64_T6_RUNTIME
                     if (race_t6_active() && (!owners_hostile(source_owner, u[i].owner) ||
                         race_t6_unit_burrowed(i))) continue;
@@ -3094,6 +3191,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 #endif
 		    u[i].hp -= 3;
 		    if (u[i].hp <= 0) {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+                        race_p7_carrier_training_clear_slot(i);
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
                         if (race_late_active())
                             race_late_record_actor_death(source_owner, -1, u[i].owner,
@@ -3193,6 +3293,9 @@ hit_target(int target, int damage, int source_type, int source_owner)
 static int
 save_game(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) return 0;
+#endif
 #ifdef SC64_RACES
     return race_save_game();
 #else
@@ -3247,6 +3350,9 @@ save_game(void)
 static int
 load_game(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) return 0;
+#endif
 #ifdef SC64_RACES
     return race_load_game();
 #else
@@ -3628,6 +3734,10 @@ init_state(void)
 static void
 update_imported_mission(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    /* Staged armies use regular orders/combat without AI rebuilding them. */
+    if (sc64_showcase_scene >= 0) return;
+#endif
 #ifdef SC64_RACES
     if(race_mode)race_tick_ai();else race_campaign_tick();return;
 #endif
@@ -3703,6 +3813,9 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    sc64_showcase_scene=-1;sc64_showcase_ticks=0;
+#endif
 #ifdef SC64_RACES
 #if defined(SC64_Z3_ENABLED) && defined(SC64_UNIFIED)
     memset(&race_z3,0,sizeof(race_z3));race_z3_action_ticks=0;
@@ -4133,6 +4246,12 @@ static int race_z7_creep_command_available(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) {
+        menu_open=0; mode=MODE_NORMAL;
+        toast(race_p7_carrier_training_queue_selected()?4:8); return;
+    }
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (choice == MENU_STOP + 1 && race_z7_egg_cancel_available()) {
         menu_open = 0; mode = MODE_NORMAL;
@@ -4330,6 +4449,9 @@ choose_command(int choice)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (race_p7_carrier_training_menu_available()) return MENU_STOP+2;
+#endif
 #ifdef SC64_P7_BATTERY_ENABLED
     if (race_p7_battery_command_available()) return MENU_STOP+2;
     if (race_p7_battery_build_available()) return MENU_STOP+4;
@@ -4392,6 +4514,9 @@ static int field_menu_count(void)
 #ifdef SC64_RACES
 static const char *field_menu_base_label(int choice, const char *const *labels)
 {
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) return "BUILD INTERCEPTOR";
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (choice == MENU_STOP + 1 && race_z7_egg_cancel_available()) return "CANCEL EGG";
 #endif
@@ -4926,6 +5051,11 @@ static void
 tick_combat(Unit * q, int target)
 {
     int dx, dy, range, damage;
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    /* Only the child weapon-event adapter may fire weapon 79. Until that
+     * lifecycle is connected, never fall back to instant generic damage. */
+    if (q->type==U_P7_INTERCEPTOR) return;
+#endif
 #if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
     defined(SC64_Z7_SCOURGE_COMBAT)
     if (q->type == U_SCOURGE && !q->alive) return;
@@ -4987,12 +5117,14 @@ tick_combat(Unit * q, int target)
 	return;
     if (dx * dx + dy * dy <= range * range) {
 	if (!q->cd) {
-            int shot_color=q->owner == SIDE ? C_GOLD : C_RED;
+	    add_tracer(q->x, q->y, target_x(target), target_y(target),
+                sc64_weapon_vfx_unit_profile(q->type,
 #ifdef SC64_RACES
-            if (q->type==U_HYDRALISK || q->type==U_HUNTER_KILLER)
-                shot_color=sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_NEEDLE,C_GOLD);
+                    flying
+#else
+                    0
 #endif
-	    add_tracer(q->x, q->y, target_x(target), target_y(target), shot_color);
+                ));
 	#ifdef SC64_RACES
         int hits=sc64_race_unit_hits_vs(q->type,flying);
 #ifdef SC64_Z6_RUNTIME
@@ -5106,6 +5238,9 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+        if (SC64_CARRIER_HANGAR_HIDDEN(q)) continue;
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
         if (q->type == U_Z7_EGG) {
             (void)race_z7_egg_tick_unit(i);
@@ -5819,6 +5954,10 @@ update_selection_box(u16 held, u16 pressed, int old_x, int old_y)
     return pressed & (u16)~consume;
 }
 
+#ifdef SC64_SHOWCASE_ENABLED
+#include "sc64_showcase_adapter.h"
+#endif
+
 static void
 pause_action(u16 pressed)
 {
@@ -5843,6 +5982,22 @@ game_update(u16 held, u16 pressed)
 #endif
 #endif
     int speed = (held & KEY_R) ? 4 : 2;
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) {
+        if (pressed & KEY_SELECT) { sc64_showcase_leave(held); return; }
+        if (screen == SCREEN_PAUSE) {
+            if (pressed & KEY_B) sc64_showcase_leave(held);
+            else if (pressed & KEY_R) sc64_showcase_start(sc64_showcase_scene);
+            else if (pressed & KEY_A) screen = SCREEN_PLAY;
+            return;
+        }
+        if (screen == SCREEN_RESULT) {
+            if (pressed & KEY_B) sc64_showcase_leave(held);
+            else if (pressed & KEY_A) sc64_showcase_start(sc64_showcase_scene);
+            return;
+        }
+    }
+#endif
     if (screen != SCREEN_PLAY) reset_selection_gestures();
     if (screen == SCREEN_TITLE) {
 #ifdef SC64_RACES
@@ -5852,6 +6007,12 @@ game_update(u16 held, u16 pressed)
         if(pressed){race_front_load_error=0;audio_tone((pressed&KEY_A)?660:440,2,2);}
         if(old_page!=race_front.page)race_front_transition=race_front.ticks;
         if(old_row!=race_front.row)audio_tone(440,2,2);
+#ifdef SC64_SHOWCASE_ENABLED
+        if (action == SC_FRONT_START_SHOWCASE) {
+            sc64_display_palette(sc64_palette+32);
+            sc64_showcase_start(race_front.row);
+        } else
+#endif
         if(action==SC_FRONT_START_CAMPAIGN||action==SC_FRONT_START_SKIRMISH) {
             race_mode=action==SC_FRONT_START_SKIRMISH;
             race_selected_mission=race_front.mission;
@@ -6063,8 +6224,14 @@ game_update(u16 held, u16 pressed)
 	interact();
 
     frame++;
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) ++sc64_showcase_ticks;
+#endif
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     if (race_p7_active()) sc64_p7_arbiter_cache_frame_tick();
+#endif
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    race_p7_carrier_training_frame_tick();
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
     (void)race_p6_combat_burrow_release_tick();
@@ -6073,6 +6240,9 @@ game_update(u16 held, u16 pressed)
     profile_start = gba_clock();
 #endif
     update_orders();
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    race_p7_projectile_tick_if_due();
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     race_transport_tick_after_orders();
 #endif
@@ -6155,8 +6325,17 @@ game_update(u16 held, u16 pressed)
 #endif
 #endif
     update_exploration();
+#ifdef SC64_P7_PROJECTILES_ENABLED
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    race_p7_carrier_training_end_frame();
+#endif
+    if (race_p7_active()) race_p7_projectile_clear_dead_references();
+#endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_sight_cycles = gba_clock() - profile_sight_start;
+#endif
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) sc64_showcase_reveal();
 #endif
     if (toast_timer)
 	toast_timer--;
@@ -6373,31 +6552,21 @@ draw_unit(Unit * q)
 	gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
 }
 
+#define SC64_WEAPON_VFX_VISIBLE(x,y) currently_visible((x)+camx,(y)+camy-12)
+#include "sc64_weapon_vfx_render.h"
+#undef SC64_WEAPON_VFX_VISIBLE
+
 static void
 draw_tracers(void)
 {
-    int i;
-    for (i = 0; i < MAX_TRACERS; i++)
-	if (tracers[i].life &&
-	    (currently_visible(tracers[i].x0, tracers[i].y0) ||
-	     currently_visible(tracers[i].x1, tracers[i].y1))) {
-#ifdef SC64_RACES
-            if (sc64_weapon_vfx_style(tracers[i].color)==SC64_WEAPON_VFX_STYLE_NEEDLE) {
-                Sc64WeaponVfxSegment needle;
-                if (sc64_weapon_vfx_segment(tracers[i].x0,tracers[i].y0,
-                        tracers[i].x1,tracers[i].y1,tracers[i].life,&needle)) {
-                    int hx=needle.head_x-camx,hy=needle.head_y-camy+12;
-                    gfx_line(needle.tail_x-camx,needle.tail_y-camy+12,
-                             hx,hy,sc64_weapon_vfx_color(tracers[i].color));
-                    gfx_pixel(hx,hy,C_WHITE);
-                    gfx_pixel(hx,hy-1,C_GOLD);
-                }
-                continue;
-            }
-#endif
-	    gfx_line(tracers[i].x0 - camx, tracers[i].y0 - camy + 12,
-		     tracers[i].x1 - camx, tracers[i].y1 - camy + 12, tracers[i].color);
-	}
+    for (int i=0;i<MAX_TRACERS;++i) if (tracers[i].life) {
+        int style=sc64_weapon_vfx_style(tracers[i].color);
+        /* Legacy original-art saves may contain an untagged tracer color. */
+        if (!style) style=SC64_WEAPON_VFX_STYLE_MUZZLE;
+        sc64_weapon_vfx_draw(style,sc64_weapon_vfx_color(tracers[i].color),
+            tracers[i].x0-camx,tracers[i].y0-camy+12,
+            tracers[i].x1-camx,tracers[i].y1-camy+12,tracers[i].life);
+    }
 }
 
 static void
@@ -7064,6 +7233,9 @@ sc64_tile_background_done:
 	if (u[i].alive)
 	    draw_unit(&u[i]);
     draw_tracers();
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    if (race_p7_active()) race_p7_projectile_draw();
+#endif
 #ifdef SC64_P4_STORM_ENABLED
     race_p4_storm_draw();
 #endif
@@ -7277,6 +7449,19 @@ draw_title(void)
 static void
 draw_pause(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) {
+        gfx_rect(23,25,194,105,C_PANEL);
+        gfx_frame(23,25,194,105,C_CYAN);
+        gfx_text(35,35,"SHOWCASE / STAGED SETUP",C_GOLD);
+        gfx_text(35,49,"A ROLL / RESUME",C_WHITE);
+        gfx_text(35,61,"R RESTART SCENE",C_WHITE);
+        gfx_text(35,73,"B OR SELECT: SCENES",C_WHITE);
+        gfx_text(35,91,"START PAUSES THE ACTION",C_CYAN);
+        gfx_text(35,106,"REPLAYS DO NOT WRITE SAVES",C_DIM);
+        return;
+    }
+#endif
     gfx_rect(29, 18, 182, 124, C_PANEL);
     gfx_frame(29, 18, 182, 124, C_CYAN);
     gfx_text(47, 27, "FIELD COMMAND", C_GOLD);
@@ -7293,6 +7478,16 @@ draw_pause(void)
 static void
 draw_result(void)
 {
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) {
+        gfx_rect(26,39,188,67,C_PANEL);
+        gfx_frame(26,39,188,67,lost ? C_RED : C_GOLD);
+        gfx_text(49,49,lost ? "LAST OUTPOST LOST" : "SCENE COMPLETE",C_GOLD);
+        gfx_text(42,66,"STAGED GAMEPLAY SETUP",C_WHITE);
+        gfx_text(39,87,"A REPLAY  B/SEL SCENES",C_CYAN);
+        return;
+    }
+#endif
     gfx_rect(28, 40, 184, 66, C_PANEL);
     gfx_frame(28, 40, 184, 66, won ? C_GOLD : C_RED);
     gfx_text(won ? 81 : 79, 53, won ? "MISSION CLEAR" : "OUTPOST LOST", won ? C_GOLD : C_RED);
@@ -7412,6 +7607,13 @@ draw_hud_commands(void)
 		if (IS_WORKER(u[i].type))
 		    gfx_text(52, 137, "AUTO MINE / A GAS", C_GOLD);
 		else
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+                if (race_p7_active() && u[i].type==U_P7_CARRIER) {
+                    gfx_text(52,137,"IC",C_CYAN);
+                    gfx_num(70,137,(int)race_p7_carrier_training_child_count(i),C_WHITE);
+                    gfx_text(84,137,"HANGAR / FLIGHT WIP",C_GOLD);
+                } else
+#endif
 #ifdef SC64_Z6_CLOAK_ENABLED
                 if (race_z6_cloak_actor(&u[i])) {
                     gfx_text(52,137,"EN",C_CYAN); gfx_num(70,137,u[i].carry/256,C_WHITE);
@@ -7596,6 +7798,10 @@ sc64_hud_changed(void)
     values[18] = box_state == 2;
 #ifdef SC64_RACES
     values[19]=race_campaign.phase;values[20]=race_campaign.message;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+    if(first>=0 && race_p7_active() && u[first].type==U_P7_CARRIER)
+        values[20]|=((int)race_p7_carrier_training_child_count(first)+(u[first].carry<<3))<<8;
+#endif
 #ifdef SC64_Z5_CLOAK_ENABLED
     if (first >= 0 && race_z5_cloak_actor(&u[first]))
         values[20] |= (u[first].carry / 256 + ((int)race_z5.cloak.active << 9)) << 8;
@@ -7783,6 +7989,9 @@ game_render(void)
         profile_start = gba_clock();
 #endif
 	draw_hud();
+#ifdef SC64_SHOWCASE_ENABLED
+        if (sc64_showcase_scene >= 0) sc64_showcase_draw_label();
+#endif
 #ifdef SC64_IMPORTED_MISSION
         sc64_hud_cycles = gba_clock() - profile_start;
 #endif
@@ -8186,6 +8395,8 @@ game_self_test(void)
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_runtime_adapter.h"
 #include "sc64_p7_battery_adapter.h"
+#include "sc64_p7_projectile_adapter.h"
+#include "sc64_p7_carrier_training.h"
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 #include "sc64_z7_colony_adapter.h"

@@ -2441,7 +2441,7 @@ test-sc64-probe-cannon: build/test-sc64-probe-cannon build/test-sc64-probe-canno
 	./build/test-sc64-probe-cannon-p6
 	./build/test-sc64-probe-cannon-z6
 
-build/test-sc64-weapon-vfx: tests/sc64_weapon_vfx.c starcraft/sc64_weapon_vfx.h | build
+build/test-sc64-weapon-vfx: tests/sc64_weapon_vfx.c starcraft/sc64_weapon_vfx.h starcraft/sc64_weapon_vfx_render.h common/gba.h | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 build/test-sc64-weapon-vfx-game: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
@@ -2451,6 +2451,23 @@ test-sc64-weapon-vfx: build/test-sc64-weapon-vfx
 test-sc64-weapon-vfx-game: build/test-sc64-weapon-vfx-game
 	./build/test-sc64-weapon-vfx-game
 test-starcraft: test-sc64-weapon-vfx
+
+# The same actual-attack/renderer fixture checks optional actor identities.
+define WEAPON_VFX_PROFILE_FIXTURE
+build/test-sc64-weapon-vfx-$(1): tests/sc64_weapon_vfx_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c -o $$@
+endef
+$(eval $(call WEAPON_VFX_PROFILE_FIXTURE,terran,$(TERRAN_FULL_FLAGS),$(TERRAN_FULL_INPUTS)))
+build/test-sc64-weapon-vfx-zerg: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_DERIVED_SAVE_FLAGS) $< common/gba.c -o $@
+# P7 flags are declared below; keep them recursively expanded here.
+build/test-sc64-weapon-vfx-protoss: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-weapon-vfx-profiles
+test-sc64-weapon-vfx-profiles: test-sc64-weapon-vfx-game build/test-sc64-weapon-vfx-terran build/test-sc64-weapon-vfx-zerg build/test-sc64-weapon-vfx-protoss
+	./build/test-sc64-weapon-vfx-terran
+	./build/test-sc64-weapon-vfx-zerg
+	./build/test-sc64-weapon-vfx-protoss
 
 build/test-sc64-construction-vfx: tests/sc64_construction_vfx.c starcraft/sc64_construction_vfx.h common/gba.c common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
@@ -2635,6 +2652,68 @@ test-sc64-p7-typed-compact-matrix: build/test-sc64-p7-typed-runtime-reference bu
 	./build/test-sc64-p7-typed-cache-policy
 	./build/test-sc64-p7-typed-initial-save
 
+# Opt-in composition of generation-40 typed rows with the P7 steering-list probe.
+# Existing profiles retain their save generations and feature flags.
+P7_TYPED_MOVE_FLAGS := $(P7_TYPED_COMPACT_FLAGS) $(P7_MOVE_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT
+build/test-sc64-p7-typed-move-runtime: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-typed-move-steer-reference: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-typed-move-steer: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-typed-move-battery: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-typed-move-initial-save: tests/sc64_p7_initial_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-typed-move protoss-p7-typed-move-probe
+test-sc64-p7-typed-move: build/test-sc64-p7-typed-runtime-count build/test-sc64-p7-typed-move-runtime build/test-sc64-p7-typed-move-steer-reference build/test-sc64-p7-typed-move-steer build/test-sc64-p7-typed-move-battery build/test-sc64-p7-typed-move-initial-save
+	./build/test-sc64-p7-typed-runtime-count > build/sc64-p7-typed-move-count.txt
+	./build/test-sc64-p7-typed-move-runtime > build/sc64-p7-typed-move-runtime.txt
+	cmp build/sc64-p7-typed-move-count.txt build/sc64-p7-typed-move-runtime.txt
+	./build/test-sc64-p7-typed-move-steer-reference > build/sc64-p7-typed-move-steer-reference.txt
+	./build/test-sc64-p7-typed-move-steer > build/sc64-p7-typed-move-steer.txt
+	cmp build/sc64-p7-typed-move-steer-reference.txt build/sc64-p7-typed-move-steer.txt
+	./build/test-sc64-p7-typed-move-battery
+	./build/test-sc64-p7-typed-move-initial-save
+build/starcraft-protoss-p7-typed-move-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_TYPED_MOVE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-typed-move-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba: build/starcraft-protoss-p7-typed-move-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 MOVE40' SC7M
+protoss-p7-typed-move-probe: build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba
+
+# Opt-in exact source-rectangle reuse in P7 aura and detection.
+P7_TYPED_RECT_FLAGS := $(P7_TYPED_MOVE_FLAGS) -DSC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+build/test-sc64-p7-rect-runtime: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-rect-steer: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-rect-policy: tests/sc64_p7_arbiter_cache_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-rect-battery: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-rect-initial-save: tests/sc64_p7_initial_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_RECT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-rect protoss-p7-rect-probe
+test-sc64-p7-rect: build/test-sc64-p7-typed-move-runtime build/test-sc64-p7-typed-move-steer build/test-sc64-p7-rect-runtime build/test-sc64-p7-rect-steer build/test-sc64-p7-rect-policy build/test-sc64-p7-rect-battery build/test-sc64-p7-rect-initial-save
+	./build/test-sc64-p7-typed-move-runtime > build/sc64-p7-rect-reference.txt
+	./build/test-sc64-p7-rect-runtime > build/sc64-p7-rect-runtime.txt
+	cmp build/sc64-p7-rect-reference.txt build/sc64-p7-rect-runtime.txt
+	./build/test-sc64-p7-typed-move-steer > build/sc64-p7-rect-steer-reference.txt
+	./build/test-sc64-p7-rect-steer > build/sc64-p7-rect-steer.txt
+	cmp build/sc64-p7-rect-steer-reference.txt build/sc64-p7-rect-steer.txt
+	./build/test-sc64-p7-rect-policy
+	./build/test-sc64-p7-rect-battery
+	./build/test-sc64-p7-rect-initial-save
+build/starcraft-protoss-p7-rect-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_TYPED_RECT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-rect-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Rect-Probe-GBA.gba: build/starcraft-protoss-p7-rect-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 RECT40' SC7R
+protoss-p7-rect-probe: build/StarCraft-Protoss-P7-Rect-Probe-GBA.gba
+
 # Asset-free packing coverage is part of the standard host suite.
 build/test-sc64-p7-typed-codec: tests/sc64_p7_typed_codec.c starcraft/sc64_p7_typed_unit_save.h starcraft/sc64_p7_typed_building_save.h starcraft/sc64_zp_unit_save.h starcraft/sc64_compact_building_save.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
@@ -2642,6 +2721,74 @@ build/test-sc64-p7-typed-codec: tests/sc64_p7_typed_codec.c starcraft/sc64_p7_ty
 test-sc64-p7-typed-codec: build/test-sc64-p7-typed-codec
 	./build/test-sc64-p7-typed-codec
 test-starcraft: test-sc64-p7-typed-codec
+
+# Asset-free Carrier storage and codec coverage.
+build/test-sc64-interceptor-pool-codec: tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c -o $@
+.PHONY: test-sc64-interceptor-pool-codec
+test-sc64-interceptor-pool-codec: build/test-sc64-interceptor-pool-codec
+	./build/test-sc64-interceptor-pool-codec
+test-starcraft: test-sc64-interceptor-pool-codec
+
+# Bounded source-coordinate projectile motion and serialization continuation.
+build/test-sc64-interceptor-motion: tests/sc64_interceptor_motion.c starcraft/sc64_interceptor_motion.c starcraft/sc64_interceptor_motion.h starcraft/sc64_interceptor_motion_kernel.h starcraft/sc64_interceptor_direction_tables.h starcraft/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Istarcraft $< starcraft/sc64_interceptor_motion.c starcraft/sc64_interceptor_pool_codec.c -o $@
+.PHONY: test-sc64-interceptor-motion
+test-sc64-interceptor-motion: build/test-sc64-interceptor-motion
+	./build/test-sc64-interceptor-motion
+test-starcraft: test-sc64-interceptor-motion
+
+# Generation 41 reserves the Mode 4 OBJ arena and saves all 100 projectile
+# slots. Child training/flight/weapon-event integration remains separate.
+P7_PROJECTILE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_P7_PROJECTILES_ENABLED
+P7_PROJECTILE_SOURCES := starcraft/sc64_interceptor_motion.c starcraft/sc64_interceptor_pool_codec.c
+build/test-sc64-p7-projectile: tests/sc64_p7_projectile_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_PROJECTILE_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) -o $@
+.PHONY: test-sc64-p7-projectile protoss-p7-projectile-probe
+test-sc64-p7-projectile: build/test-sc64-p7-projectile
+	./build/test-sc64-p7-projectile
+build/starcraft-protoss-p7-projectile-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_PROJECTILE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-projectile-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Projectile-Probe-GBA.gba: build/starcraft-protoss-p7-projectile-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 SHOT41' SC7J
+protoss-p7-projectile-probe: build/StarCraft-Protoss-P7-Projectile-Probe-GBA.gba
+
+P7_CARRIER_TRAINING_FLAGS := $(P7_PROJECTILE_FLAGS) -DSC64_P7_CARRIER_TRAINING_ENABLED
+build/test-sc64-p7-carrier-training: tests/sc64_p7_carrier_training_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_CARRIER_TRAINING_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) -o $@
+.PHONY: test-sc64-p7-carrier-training protoss-p7-carrier-training-probe
+test-sc64-p7-carrier-training: build/test-sc64-p7-carrier-training
+	./build/test-sc64-p7-carrier-training
+build/starcraft-protoss-p7-carrier-training-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_CARRIER_TRAINING_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-carrier-training-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Carrier-Training-Probe-GBA.gba: build/starcraft-protoss-p7-carrier-training-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 HANG42' SC7K
+protoss-p7-carrier-training-probe: build/StarCraft-Protoss-P7-Carrier-Training-Probe-GBA.gba
+
+# Dedicated filming build. Hidden menu and transient scenes stay off in all
+# canonical profiles; the P7 bundle supplies Carrier/Ultralisk render actors.
+SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED
+build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Showcase-GBA.gba: build/starcraft-showcase.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC SHOWCASE' SCSH
+.PHONY: showcase test-sc64-showcase test-sc64-showcase-front
+showcase: build/StarCraft-Showcase-GBA.gba
+build/test-sc64-showcase-front: tests/sc64_frontend.c starcraft/sc64_frontend.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_SHOWCASE_ENABLED -Icommon $< -o $@
+build/test-sc64-showcase-game: tests/sc64_showcase_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c -o $@
+test-sc64-showcase-front: build/test-sc64-showcase-front
+	./build/test-sc64-showcase-front
+test-starcraft: test-sc64-showcase-front
+test-sc64-showcase: test-sc64-showcase-front build/test-sc64-showcase-game
+	./build/test-sc64-showcase-game
 
 build/starcraft-protoss-p7-typed-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-typed-probe.map -lgcc -o $@

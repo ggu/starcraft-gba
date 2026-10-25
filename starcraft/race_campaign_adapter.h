@@ -385,6 +385,9 @@ race_campaign_init(void)
     const Sc64RaceMap *map;
     int i, player_x = 0, player_y = 0, player_n = 0;
     int human_owner;
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    race_p7_projectile_reset();
+#endif
 
 #ifdef SC64_UNIFIED
     memset(&backwater,0,sizeof(backwater));

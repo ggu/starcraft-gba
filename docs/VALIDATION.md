@@ -2653,6 +2653,9 @@ these fixtures are not complete campaign wins.
 
 ### Construction and Hydralisk visual pass
 
+This is the historical Hydralisk-only pass. The later weapon-family pass
+described below replaces its renderer across implemented attack paths.
+
 Hydralisk/Hunter Killer shots now carry a transient needle style in the existing
 tracer color field. Four visible updates draw a moving segment capped at five
 pixels with a bright head, instead of a full red/gold beam. The firing update
@@ -4703,6 +4706,283 @@ child-actor state and the native 100-bullet capacity remain required design
 constraints. No projectile pool, additional mission win, fps result or hardware
 qualification is claimed by the codec work.
 
+#### Generation-40 movement composition
+
+PR6's movement optimization also passes with the typed generation-40 P7
+save rows and Arbiter cloak/cache enabled. Build it with
+`make protoss-p7-typed-move-probe`; the opt-in flags compose
+`P7_TYPED_COMPACT_FLAGS`, `P7_MOVE_FLAGS`, prevalidation and the count snapshot.
+`make test-sc64-p7-typed-move` passes under ASan/UBSan: the combined runtime
+trace matches typed count, the steering fixture matches that baseline while
+checking 619,216 queries against `unit_step_clear()` (335,229 blocked,
+77,402 list builds, 36,304 fallbacks), and Battery and initial-save fixtures
+pass. Immediate-save continuation has clock 149, phase 4 and frame 1.
+
+Both ARM probes are 4 MiB. DWARF reports Unit 56, Building 48, RaceSave 14,188
+and P7 supplement 124 bytes in each. The typed count baseline reproduces ROM
+`3213c90da953b0a83742f79a1acba0709d3c99e3c13420e3704d62277061ad05`,
+with IWRAM/BSS ends `0x030047d8` / `0x0203d878`. The composition is
+`654be346fc4f39e059fda3c2fd0c9099f8dc70da5bf0a708bbcb85bb000c7a73`,
+with ends `0x03004a28` / `0x0203daec`. Both remain inside the unchanged RAM
+reserve and two-slot SRAM journal guards. Generation 40 and the existing
+source clock remain unchanged.
+
+The same normal-menu, controller-only 600-update P7 opening measures
+**7.880 -> 9.045 effective fps** (14.8 percent faster) using emulated GBA
+hardware timer cycles. All seven checkpoints match in every recorded
+non-timing field, including bank hashes, decoded actors, per-owner HP,
+selection counts, input schedule and ending frame 602. Runtime faults and
+unsupported counts remain zero. Reproduce both runs with:
+
+```sh
+make protoss-p7-typed-probe protoss-p7-typed-move-probe
+python3 tools/sc64_p7_move_workload.py --elf build/starcraft-protoss-p7-typed-probe.elf \
+    --rom build/StarCraft-Protoss-P7-Typed-Probe-GBA.gba --out build/p7-typed-opening \
+    --neutral-ticks 600
+python3 tools/sc64_p7_move_workload.py --elf build/starcraft-protoss-p7-typed-move-probe.elf \
+    --rom build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba --out build/p7-typed-move-opening \
+    --neutral-ticks 600
+python3 tools/sc64_p7_move_workload.py --compare build/p7-typed-opening/result.json \
+    build/p7-typed-move-opening/result.json
+```
+
+This comparison includes cloak/cache, unlike the earlier cache-off movement
+probe below. It covers the opening only: no combined attack workload, mission
+win, fresh-process ARM SRAM, hardware qualification or near-30-fps result is
+claimed. Neither the default nor canonical build enables the composition;
+staged campaign progress remains 22/30.
+
+### P7 source-rectangle reuse
+
+`SC64_P7_GEOMETRY_RECT_HOIST_ENABLED` reuses validated rectangles within the
+full-feature typed/Arbiter/movement source tick. An Arbiter rectangle is
+validated once per emitter; an aura target rectangle is reused for the
+clipped finder and exact distance tests. Detection computes the target
+rectangle once, then validates each Observer/Cannon rectangle as before.
+The half-open rectangle conversion, inclusive 160-source-pixel threshold,
+owner checks, power checks and source timers are unchanged. The flag requires
+the complete Arbiter cache profile and remains disabled in default/canonical
+builds.
+
+`make test-sc64-p7-rect` passes under ASan/UBSan. Its fixture compares 28,710
+actor/building rectangle pairs and 2,475 finder cases with the original
+helpers, including unsupported rows and extreme coordinates. Existing live
+cache geometry/cadence/reuse checks pass. Full-runtime and steering traces
+match typed movement; the steering oracle covers 619,216 queries. Battery
+and immediate-save continuation pass, with clock 149, phase 4 and frame 1.
+The default ARM build, 414 Python tests plus asset-free host fixtures, and
+unified build/tests pass. Gate-off typed movement reproduces its published
+ROM hash byte for byte.
+
+`make protoss-p7-rect-probe` creates a 4-MiB ROM with SHA-256
+`a4efa9f3ea7c122714236b926b890d06eb704226c60284c03723a1d19d2772ab`.
+ARM DWARF reports Unit 56, Building 48, RaceSave 14,188 and P7 supplement 124
+bytes. IWRAM/BSS ends remain `0x03004a28` / `0x0203daec`, inside the unchanged
+RAM guards. Save generation 40 and the two-slot journal are unchanged.
+
+The normal-menu, controller-only runner selects the same 11 army units and
+issues an attack-move after a 600-update opening, then measures 1,500 attack
+updates. All 23 non-timing checkpoints, 25 input records, command details and
+ending frame 2,605 match typed movement. Emulated GBA timer cycles measure:
+
+| Full-feature workload | Typed movement | Rectangle reuse |
+| --- | --- | --- |
+| Opening, 600 updates | 9.045 | 9.205 |
+| Attack-move, 1,500 updates | 6.869 | 7.162 |
+
+This is 1.8 percent faster in the opening and 4.3 percent in attack. Reproduce
+the comparison with:
+
+```sh
+make protoss-p7-typed-move-probe protoss-p7-rect-probe
+python3 tools/sc64_p7_move_workload.py --elf build/starcraft-protoss-p7-typed-move-probe.elf \
+    --rom build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba --out build/p7-move-attack \
+    --neutral-ticks 600 --attack-ticks 1500
+python3 tools/sc64_p7_move_workload.py --elf build/starcraft-protoss-p7-rect-probe.elf \
+    --rom build/StarCraft-Protoss-P7-Rect-Probe-GBA.gba --out build/p7-rect-attack \
+    --neutral-ticks 600 --attack-ticks 1500
+python3 tools/sc64_p7_move_workload.py --compare build/p7-move-attack/result.json \
+    build/p7-rect-attack/result.json
+```
+
+A separate private source-owner-mask cache also matched all 23 checkpoints,
+but measured 9.031 / 6.913 fps. Its opening regresses and its attack gain is
+only 0.64 percent, so it is not promoted as a standalone runtime option.
+Neither experiment qualifies a mission win, fresh-process ARM SRAM,
+physical GBA performance or near-30-fps campaign play. Staged progress remains
+22/30; Carrier combat and a P7 win are still required.
+
+The following private variant combined rectangle reuse with per-source owner
+masks and lazily cached sight radii. Its 1,202-byte ARM context expires each
+source tick; the compiler reports a 2,488-byte source-tick frame. Host checks
+prove nonzero cache hits/misses, sentinel handling, per-query equivalence to
+the original visibility scan, runtime/steering parity, Battery and initial
+save continuation. All 23 ARM checkpoints match rectangle reuse, but fps is
+9.128 / 7.147 versus 9.205 / 7.162. It consumes more stack and is slower in
+both measured workloads, so the owner/radius variant is not promoted.
+
+### Carrier pool and codec foundation
+
+`starcraft/sc64_interceptor_pool_codec.[ch]` provides authored, asset-free
+storage for a future 100-slot Interceptor projectile pool. It preserves the
+reviewed ten-slot growth, last-free growth, physical-ordinal/native-index
+mapping and active/free insertion order. The arena uses exactly 2,408
+volatile halfwords (4,816 bytes), with explicit halfword reads/writes. The
+2,103-byte packet has a three-byte header and 100 fixed 21-byte rows; row
+padding, reserved fields, signed-coordinate limits, references, timers and
+complete list partitions are validated. Decode preflights all rows/lists
+before committing and reconstructs previous links and counts. Unallocated
+rows and storage links must be canonical. Packet/arena aliases are rejected
+before mutation.
+
+`make test-sc64-interceptor-pool-codec`, also in `./dev test`, passes under
+ASan/UBSan. It checks a deterministic 100-acquire/100-retire sequence and
+20,000 successful randomized transitions (10,049 acquisitions, 9,951
+retirements), comparing both full list orders after each transition. It also
+checks 250 snapshots of 40 allocated rows: 10,000 randomized field rows,
+including active/free rows, signed endpoints, sentinel/max references,
+speed/timer limits and reused slots. Re-encoded packets match byte for byte
+and decoded fields match their inputs. Canary, malformed-field, reserved
+metadata, unused-link, alias and rejection-atomicity checks pass.
+
+Private checks compare empty and size-20/13-active C packets byte for byte
+with the previously reviewed C++ codec-v3 model. The earlier native pool-order
+oracle checks the allocator model separately; this C test needs no upstream
+headers or game data. ARM7TDMI Thumb `-O2` compilation passes. Static compiler
+frames are 408 bytes for decode, 192 for validation and 88 for the row parser;
+these are individual frames, not whole-game stack high-water. A separate
+non-inlined access audit emits `strh`/`ldrh` for arena access.
+
+The later optional generation-41 projectile profile now reserves the arena
+and adds the packet to RaceSave; see [Carrier projectile development](CARRIER-PROJECTILES.md).
+That profile adds C motion, source-clock updates, reference cleanup, damage
+consumption and host save continuation. Child flight/training and the gameplay
+weapon-event caller remain unfinished. No Carrier combat, P7 win, full native
+world continuation, fresh-process ARM SRAM or hardware result is claimed.
+Staged progress remains 22/30.
+
+### P7 Carrier training and hidden hangar
+
+The separate default-off generation-42 training profile adds paid Interceptor
+queues and hidden training/inside Unit rows; see
+[Carrier projectile development](CARRIER-PROJECTILES.md) for commands and scope.
+It retains the 16,292-byte RaceSave, 56/48-byte actor rows and 240/160 actor
+caps. Candidate decoding uses the unused tail of the existing route-save
+scratch union, with a compile-time bound; BSS remains `0x0203daf4` and IWRAM
+ends at `0x03004a30`, below the unchanged guards. It cannot launch children
+and requires an empty projectile packet, so no generation-41 firing fixture
+is presented as generation-42 gameplay.
+
+`make test-sc64-p7-carrier-training` passes under ASan/UBSan. Checks cover
+player menu/price, four-child capacity, initial source-clock cadence, exact
+300-source-tick construction, save/load at construction and inside boundaries,
+15 malformed candidate rejections without live actor/building/pool/P7-runtime/
+wallet/frame/RNG mutation, child-rank compaction, scripted parent death,
+unit-slot reuse, competing producer/script reservations, hidden-unit damage
+and sight, pause, mission setup/save checks and 18 skirmish setups. Most
+construction ticks are isolated from campaign armies; these are component
+checks rather than a mission replay. Player tests supply a human-owned Carrier:
+the authenticated starting Carriers belong to enemy source owner 4. A separate
+case advances an explicitly supplied owner-4 paid queue; enemy autoqueueing is
+not implemented. Both owners' effective Carrier Capacity current/max levels
+are zero, so four slots match this mission's data.
+
+The ARM probe builds as `StarCraft-Protoss-P7-Carrier-Training-Probe-GBA.gba`,
+title `SC P7 HANG42`, code `SC7K`. Carrier production, launch orders, native
+flight/IScript events and actual Carrier combat are still pending. This stage
+does not qualify a P7 win, ARM SRAM continuation, whole-game stack high-water,
+physical hardware or near-30-fps combat. With projectile/training gates off,
+preprocessed P7 typed-rectangle game tokens match the `bfb4d45` baseline
+(5,945,648 tokens); no ROM byte-equality claim is made. Staged campaign progress
+remains 22/30.
+
+### Hidden showcase menu and staged scenes
+
+The optional `SC64_SHOWCASE_ENABLED` build adds a hidden HOME chord and eight
+repeatable starting setups; see [Showcase scenes](SHOWCASE.md). It composes
+the typed/Arbiter/movement/rectangle profile to provide the required actors,
+but runs scenes as skirmishes, with campaign controllers and economy AI
+inactive. Normal movement, target selection, damage, shield regeneration and
+loss detection remain in use. The filming arena is flat and fully revealed.
+Scene state is transient, and both save/load entry points reject while a
+scene is active. The normal campaign and canonical build flags keep the
+feature disabled. The frontend structure and save format are unchanged.
+The disabled-feature ARM output matches a fresh `782539f` parent build made
+with the same current private inputs, byte for byte; preprocessed game tokens
+also match that parent.
+
+`make test-sc64-showcase` passes under ASan/UBSan: ordinary menu entry,
+all eight compositions, bounded simulation/rendering, pause/restart/exit,
+scene-row retention and an actual normal-skirmish save/load surrounding
+showcase play are checked. The three last stands lose at update 150 via
+ordinary Marine damage and skirmish defeat detection, including the Nexus's
+passive shield regeneration. No timed damage or forced outcome is injected.
+The input-model test also runs in the asset-free default host suite.
+
+The 4-MiB ARM showcase link retains Unit 56, Building 48, RaceSave 14,188 and
+frontend 56 bytes, with IWRAM/BSS ends `0x03004a28` / `0x0203daf0`, inside the
+unchanged reserve guards. The incomplete feature bundle is rejected at
+compile time. Carrier Approach is labeled a preview: the current Carrier
+actor has no Interceptor combat; its escorts engage normally. These are
+authored filming setups, not additional qualified campaign missions or
+native weapon/AI parity. Five seconds means 150 simulation updates at the
+nominal 30-update clock; physical duration depends on performance.
+
+A normal-menu, controller-only ARM replay exercises all eight scenes,
+paused launches, replay and scene-menu return. All three defeat variants
+remain alive at update 149 and lose at 150. Captures were visually checked
+for menu readability, Carrier formation, the tank rush and the result panel.
+The first 120 running updates measure effective fps from emulated GBA timer
+cycles: Carrier Approach 13.175; Siege Line 19.965; each Last Stand 29.857;
+Protoss Crossfire 19.164; Three Way Battle 20.020; Base Under Siege 24.961.
+These are bounded emulator samples, not physical GBA or whole-scene speed
+qualification. Default build/tests (414 Python tests plus host fixtures),
+unified build/tests, the full-bank scene-reset comparison and source audit
+pass. No additional campaign mission or near-30-fps battle qualification is
+claimed.
+
+### Full-feature P7 cache timing and rejected cell memo
+
+A private diagnostic of the typed/Arbiter/movement profile separates the
+source cache call from order setup. At the 600-update checkpoint it takes
+about 420,000 cycles, versus 380,000 for movement and 322,000 for mission
+processing. A second diagnostic splits that cache work into power checks,
+aura/stagger work and detection refresh. At updates 100/200/300/400/500/600,
+power is 44,474 cycles each; aura is
+84,852/99,552/118,564/115,255/141,938/162,581; refresh is
+132,737/209,386/132,335/444,120/210,038/210,945. These are sampled last-tick
+counters, not whole-run average costs. Instrumented runs match all seven
+non-timing opening checkpoints; their roughly 8.85 fps includes diagnostic
+overhead and is not a production speed result.
+
+The first candidate memoized only the optical source-owner mask for repeated
+16-pixel target cells within one source-cache invocation. Its 32-entry,
+96-byte stack table retained full cell keys, used exact scans on collisions,
+and expired before unit orders could move actors. Exact detector rectangles,
+ownership checks and timers remained per target. The host checks covered
+source-0/4 separation, nonzero Observer detection, hit/miss/eviction and reset
+after a sight source changed, runtime/steering parity, Battery and immediate
+save continuation. The ARM link retained the existing actor/save sizes and
+RAM ends; gate-off typed-movement output was byte-identical.
+
+A normal-menu controller-only comparison ran the 600-update opening, selected
+11 army units and issued the same attack-move, then ran 1,500 attack updates.
+All 23 non-timing checkpoints, 25 recorded inputs, command details and the
+ending frame 2,605 match. Neither run wins or loses within this workload.
+Effective fps from emulated GBA timer cycles is:
+
+| Full-feature workload | Typed movement | Private cell memo |
+| --- | --- | --- |
+| Opening, 600 updates | 9.045 | 9.068 |
+| Attack-move, 1,500 updates | 6.869 | 6.911 |
+
+The gains are only 0.25 and 0.61 percent, so the memo is rejected for runtime
+promotion. No cell-memo flag or build target is added to the public project.
+The measurements instead direct further work toward repeated rectangle/fact
+calculations inside aura and detection, and mission processing. They do not
+qualify a mission, fresh-process ARM SRAM, hardware or near-30-fps result;
+staged campaign progress remains 22/30.
+
 ### P7 movement steering list
 
 The P7 count probe spends most of each update in `update_orders()`. A
@@ -4783,6 +5063,56 @@ hoist each gained under 1.5 percent. An IWRAM target-index rebuild gained
 site overflowed the IWRAM guard. These are emulator results only. They do not
 qualify a mission win, fresh-process SRAM, physical hardware or 30 fps. Staged
 campaign progress remains 22/30.
+
+### Weapon-family effects across implemented attacks
+
+The shared visual pass replaces ordinary straight-line tracers with authored
+weapon families. Unit profiles cover guns, needles, missiles, plasma, flames,
+melee, acid, shells, psionic arcs, contact explosions and laser pulses; Goliath,
+Wraith and Scout choose different ground/air effects. Static defenses use
+plasma, underground spines, spores and missiles. T4 traps, P6 wall missiles,
+P6 Infested Terran explosions, T5 mines and the specialized P7 Archon splash
+callback now emit corresponding effects. This does not implement unavailable
+weapons, Carrier flight, Mutalisk bounce damage or imported IScript sequences.
+Damage, target selection, cooldowns and RNG remain on their existing paths;
+travel and impacts are cosmetic rather than delayed damage events.
+
+`make test-sc64-weapon-vfx-profiles` passes under ASan/UBSan for unified (30),
+full Terran (42), Z7 (37) and P7 (45) armed unit/target-class profiles. It checks
+actual ground/air attack events, visible lifetimes, impact phases, clipping
+to the battlefield and current fog, camera translation, saturation replacement
+and the same-update damage contract. Pure renderer checks cover extreme
+coordinates, distinct orb/blob/shell silhouettes, vertical beam orientation
+and hidden pixels. T4 traps, P6 explosion/trap events, T5 mines and Archon's
+specialized attack have separate emission assertions in their existing tests.
+Host showcase checks retain all eight setups and update-150 last-stand defeats.
+
+The race-profile transient effect pool grows from 12 to 32 entries (+480 BSS
+bytes). Overflow deterministically replaces the oldest cosmetic effect. The
+original-art pool stays at 12, retaining its save layout; RaceSave and actor
+layouts are unchanged. All drawing clips before framebuffer writes and no
+long source-to-target line scans through offscreen space. Mapping and rendering
+remain in ROM. Current IWRAM/BSS ends are: Terran `0x03004e88/0x0203dbcc`,
+Z3 `0x03004f88/0x02039a58`, P3 `0x03004f30/0x02039c00`, showcase
+`0x03004a28/0x0203dcd0`, Z7 derived `0x03004a40/0x0203dbd0` and P7 training
+`0x03004a30/0x0203dcd4`. The existing reserve guards pass.
+
+A controller-only mGBA replay passes all eight filming scenes, including every
+last-stand defeat at update 150. A fresh `e72fe11` source build with the same
+current private inputs is the timing baseline. The five battle scenes measure
+13.031, 19.854, 18.911, 19.745 and 24.275 effective fps, versus baseline
+13.175, 19.965, 19.164, 20.020 and 24.961 (0.56–2.75% slower). All three
+last stands remain at 29.857 fps. These are short emulator samples, not physical
+hardware or a new 30-fps qualification. Captures were inspected alongside the
+asset-free per-family animation gallery.
+
+The current showcase ROM SHA-256 is
+`56cec04bba21be1566a4847d2649f3df45aa5292fce8582666b6a71001fa711a`.
+Default build/tests (414 Python checks plus host fixtures), unified build/tests
+and full Terran build/tests pass, including the ten controller missions,
+saves and skirmish matrix. This visual pass does not promote any new campaign
+mission or repeat full ARM campaign/save qualification; staged progress remains
+22/30. ROMs, captures and generated art remain local.
 
 ### P7 mode-0 tile renderer
 

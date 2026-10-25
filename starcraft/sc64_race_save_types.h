@@ -231,6 +231,10 @@ typedef struct {
     Sc64T4RuntimeState t4;
 #endif
 #endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    u8 interceptor_projectiles[SC64_CODEC_BYTES];
+    u8 interceptor_padding;
+#endif
 } RaceSave;
 #if defined(SC64_Z5_RUNTIME) && defined(SC64_Z6_RUNTIME)
 _Static_assert(sizeof(Sc64Z6PersistentState) <= sizeof(Sc64Z5PersistentState),

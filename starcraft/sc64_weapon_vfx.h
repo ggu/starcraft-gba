@@ -13,8 +13,42 @@
 
 enum {
     SC64_WEAPON_VFX_STYLE_NONE = 0,
-    SC64_WEAPON_VFX_STYLE_NEEDLE = 1
+    SC64_WEAPON_VFX_STYLE_NEEDLE = 1,
+    SC64_WEAPON_VFX_STYLE_MUZZLE,
+    SC64_WEAPON_VFX_STYLE_MISSILE,
+    SC64_WEAPON_VFX_STYLE_PLASMA,
+    SC64_WEAPON_VFX_STYLE_FLAME,
+    SC64_WEAPON_VFX_STYLE_SLASH,
+    SC64_WEAPON_VFX_STYLE_ACID,
+    SC64_WEAPON_VFX_STYLE_SHELL,
+    SC64_WEAPON_VFX_STYLE_ARC,
+    SC64_WEAPON_VFX_STYLE_BURST,
+    SC64_WEAPON_VFX_STYLE_SPINES,
+    SC64_WEAPON_VFX_STYLE_BEAM
 };
+
+/* Number of visible renderer calls for an authored style. Callers seed a
+ * transient tracer with lifetime+1 and age it before drawing, so the first
+ * visible call sees exactly this value. NONE and unknown styles draw zero. */
+static inline int
+sc64_weapon_vfx_lifetime(int style)
+{
+    switch (style) {
+    case SC64_WEAPON_VFX_STYLE_NEEDLE: return 4;
+    case SC64_WEAPON_VFX_STYLE_MUZZLE: return 3;
+    case SC64_WEAPON_VFX_STYLE_MISSILE: return 8;
+    case SC64_WEAPON_VFX_STYLE_PLASMA: return 7;
+    case SC64_WEAPON_VFX_STYLE_FLAME: return 6;
+    case SC64_WEAPON_VFX_STYLE_SLASH: return 5;
+    case SC64_WEAPON_VFX_STYLE_ACID: return 8;
+    case SC64_WEAPON_VFX_STYLE_SHELL: return 7;
+    case SC64_WEAPON_VFX_STYLE_ARC: return 8;
+    case SC64_WEAPON_VFX_STYLE_BURST: return 6;
+    case SC64_WEAPON_VFX_STYLE_SPINES: return 5;
+    case SC64_WEAPON_VFX_STYLE_BEAM: return 8;
+    default: return 0;
+    }
+}
 
 typedef struct {
     int tail_x, tail_y;

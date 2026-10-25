@@ -10,6 +10,7 @@
 static void reset_combat(void)
 {
     memset(u,0,sizeof(u)); memset(b,0,sizeof(b));
+    memset(tracers,0,sizeof(tracers));
     memset(invincible_units,0,sizeof(invincible_units));
     memset(invincible_buildings,0,sizeof(invincible_buildings));
     memset(&race_p6,0,sizeof(race_p6));
@@ -124,6 +125,8 @@ static void explosion_uses_nearest_bbox_octagonal_distance_and_deaths(void)
     u[1].type=U_MARINE;u[1].raw_type=0;u[1].x=110;u[1].y=100;
     u[1].hp=100;u[1].maxhp=100;u[1].armor=0;
     assert(race_p6_combat_infested_explode(0)==2);
+    assert(tracers[0].life>0 &&
+        sc64_weapon_vfx_style(tracers[0].color)==SC64_WEAPON_VFX_STYLE_BURST);
     assert(!u[0].alive && !u[1].alive);
     assert(race_p6.deaths_by_source[7]==1);
     assert(sc64_p6_infested_splash_tier(20)==SC64_P6_SPLASH_INNER);
@@ -158,6 +161,8 @@ static void normal_attack_entry_and_trap_cooldown(void)
     u[0].type=U_MARINE;u[0].raw_type=0;u[0].x=110;u[0].y=100;
     u[0].hp=100;u[0].maxhp=100;
     assert(race_p6_combat_tick_traps()==1);
+    assert(tracers[0].life>0 &&
+        sc64_weapon_vfx_style(tracers[0].color)==SC64_WEAPON_VFX_STYLE_MISSILE);
     int after_first=u[0].hp;
     assert(after_first<100 && b[0].shield_remainder==28);
     for(int i=0;i<27;++i) assert(race_p6_combat_tick_traps()==0);

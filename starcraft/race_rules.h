@@ -82,6 +82,10 @@ enum {
     /* Raw 36 is a real, independently ticking Zerg Egg actor. */
     U_Z7_EGG,
 #endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    /* Independent raw73 identity; child lifecycle is a separate feature. */
+    U_P7_INTERCEPTOR,
+#endif
     SC_RU_COUNT
 };
 enum {
@@ -314,6 +318,9 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
        target actor while it is unfinished. */
     , [U_Z7_EGG] = { R_ZERG, 0, 255, 0, 0, 0, 0, 200, 0, 0 }
 #endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    , [U_P7_INTERCEPTOR] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 0, 25, 0, 300, 40, 40, 0 }
+#endif
 };
 
 static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
@@ -512,6 +519,9 @@ static inline const char *sc64_race_unit_name(int type)
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
         ,"EGG"
+#endif
+#ifdef SC64_P7_PROJECTILES_ENABLED
+        ,"INTERCEPTOR"
 #endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
@@ -1260,6 +1270,9 @@ static inline int sc64_race_raw_unit(int type)
 #ifdef SC64_P7_ACTORS
     case U_P7_ARCHON: return 68; case U_P7_ARBITER: return 71;
     case U_P7_CARRIER: return 72; case U_P7_OBSERVER: return 84;
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    case U_P7_INTERCEPTOR: return 73;
+#endif
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     case U_Z7_EGG: return 36;
@@ -1445,6 +1458,9 @@ static inline int sc64_race_unit_from_raw(int raw)
 #ifdef SC64_P7_ACTORS
     case 68: return U_P7_ARCHON; case 71: return U_P7_ARBITER;
     case 72: return U_P7_CARRIER; case 84: return U_P7_OBSERVER;
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    case 73: return U_P7_INTERCEPTOR;
+#endif
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     case 36: return U_Z7_EGG;

@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include "../common/gba.h"
+#include "../starcraft/sc64_weapon_vfx.h"
 
 #define SC64_T5_RUNTIME 1
 #define MAX_UNITS 8
@@ -30,6 +32,13 @@ static Unit u[MAX_UNITS];
 static int invincible_units[MAX_UNITS];
 static int target_lists_valid = 1, target_end_count, bucket_end_count;
 static int hit_count, hit_target_log[16], hit_damage_log[16];
+static unsigned explosion_visuals;
+static void add_tracer(int x0,int y0,int x1,int y1,int profile)
+{
+    assert(x0==x1 && y0==y1);
+    assert(sc64_weapon_vfx_style(profile)==SC64_WEAPON_VFX_STYLE_BURST);
+    ++explosion_visuals;
+}
 
 static int owners_hostile(int a, int b) { return a != b; }
 static int sc64_race_unit_flying(int type) { return type == U_WRAITH; }
@@ -89,6 +98,7 @@ static void reset_fixture(void)
     memset(hit_target_log, 0xff, sizeof(hit_target_log));
     memset(hit_damage_log, 0, sizeof(hit_damage_log));
     hit_count = target_end_count = bucket_end_count = 0;
+    explosion_visuals=0;
     target_lists_valid = 1;
 }
 
@@ -186,6 +196,7 @@ static void test_contact_splash_and_friendly_fire(void)
     assert(sc64_t5_mine_splash_divisor_sq(101*101)==0);
     race_t5_mines_tick();
     assert(!mine->alive && hit_count == 2);
+    assert(explosion_visuals==1);
     assert(hit_target_log[0] == 1 && hit_damage_log[0] == 125);
     assert(hit_target_log[1] == 2 && hit_damage_log[1] == 62);
     assert(target_end_count == 1 && bucket_end_count == 1 && !target_lists_valid);

@@ -94,12 +94,31 @@ static inline const Sc64P7ActorFact *sc64_p7_actor_fact(int type)
          SC64_P7_SRC_PERMA_CLOAK|SC64_P7_SRC_AUTO_ATTACK|
          SC64_P7_SRC_ATTACK|SC64_P7_SRC_MECHANICAL,
          SC64_P7_NEEDS_OBSERVER_DETECTION_AND_CLOAK,0}
+#ifdef SC64_P7_PROJECTILES_ENABLED
+        /* raw73 numeric facts from pinned BWAPI UnitType/WeaponType tables.
+         * Pulse Cannon table cooldown 1 is not its IScript firing cadence.
+         * No generic WEAPON/SELECTABLE policy: the pending child adapter owns
+         * those orders, and must call the real moving projectile launcher. */
+        ,{{73,40,40,0,25,0,300,192,8,8,7,7,1,0,
+           6,1,1,128,1,6,1,1,128,1,
+           SC64_ZP_ACTOR_MOVABLE|SC64_ZP_ACTOR_DRAWABLE
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+           |SC64_ZP_ACTOR_HIDDEN
+#endif
+           },
+          79,79,0,0,0,0,0,0,0,1,1,
+          SC64_P7_SRC_FLYER|SC64_P7_SRC_AUTO_ATTACK|SC64_P7_SRC_ATTACK|
+          SC64_P7_SRC_MECHANICAL,SC64_P7_NEEDS_CARRIER_INTERCEPTORS,0}
+#endif
     };
     switch (type) {
     case U_P7_ARCHON: return &facts[0];
     case U_P7_ARBITER: return &facts[1];
     case U_P7_CARRIER: return &facts[2];
     case U_P7_OBSERVER: return &facts[3];
+#ifdef SC64_P7_PROJECTILES_ENABLED
+    case U_P7_INTERCEPTOR: return &facts[4];
+#endif
     default: return 0;
     }
 }

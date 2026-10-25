@@ -27,6 +27,71 @@ static int region_has_pixels(int x0,int y0,int x1,int y1)
     return 0;
 }
 
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+/* Differential oracle: the public wrappers below are the unhoisted HEAD
+ * policy, while the candidate reuses already validated rectangles. */
+static void geometry_hoist_differential(void)
+{
+    static const unsigned actors[]={0,64,65,66,70,71,77,78,79,83,84};
+    static const unsigned buildings[]={154,155,156,157,160,162,164,166,167};
+    static const int coords[]={-1,0,1,7,79,80,159,160,255,2047,2048,4095,
+                               (INT_MAX-256)/2,(INT_MAX-256)/2+1,INT_MAX};
+    for(unsigned ai=0;ai<sizeof(actors)/sizeof(actors[0]);++ai)
+        for(unsigned bi=0;bi<sizeof(actors)/sizeof(actors[0]);++bi)
+            for(unsigned xi=0;xi<sizeof(coords)/sizeof(coords[0]);++xi)
+                for(unsigned yi=0;yi<sizeof(coords)/sizeof(coords[0]);++yi) {
+                    int al,at,ar,ab,bl,bt,br,bb;
+                    int old=sc64_p7_observer_rect_distance(actors[ai],
+                        coords[xi],coords[yi],0,actors[bi],coords[yi],
+                        coords[xi],0);
+                    int valid=sc64_p7_actor_rect_source(actors[ai],
+                        coords[xi],coords[yi],0,&al,&at,&ar,&ab) &&
+                        sc64_p7_actor_rect_source(actors[bi],coords[yi],
+                        coords[xi],0,&bl,&bt,&br,&bb);
+                    int candidate=valid ?
+                        sc64_p7_observer_rect_distance_rects(al,at,ar,ab,
+                                                             bl,bt,br,bb) : -1;
+                    assert(old==candidate);
+                }
+    for(unsigned ai=0;ai<sizeof(buildings)/sizeof(buildings[0]);++ai)
+        for(unsigned bi=0;bi<sizeof(actors)/sizeof(actors[0]);++bi)
+            for(unsigned xi=0;xi<sizeof(coords)/sizeof(coords[0]);++xi) {
+                int al,at,ar,ab,bl,bt,br,bb;
+                int old=sc64_p7_observer_rect_distance(buildings[ai],
+                    coords[xi],coords[0],1,actors[bi],coords[0],coords[xi],0);
+                int valid=sc64_p7_actor_rect_source(buildings[ai],coords[xi],
+                    coords[0],1,&al,&at,&ar,&ab) &&
+                    sc64_p7_actor_rect_source(actors[bi],coords[0],
+                    coords[xi],0,&bl,&bt,&br,&bb);
+                int candidate=valid ?
+                    sc64_p7_observer_rect_distance_rects(al,at,ar,ab,
+                                                         bl,bt,br,bb) : -1;
+                assert(old==candidate);
+            }
+    /* Exercise finder edges with the live Arbiter center, including map
+       clipping, target-inner-edge conversion, and unsupported target rows. */
+    Unit saved0=u[0],saved1=u[1];
+    memset(&u[0],0,sizeof(u[0])); memset(&u[1],0,sizeof(u[1]));
+    u[0].raw_type=71;
+    for(unsigned ai=0;ai<sizeof(coords)/sizeof(coords[0]);++ai)
+        for(unsigned ti=0;ti<sizeof(actors)/sizeof(actors[0]);++ti)
+            for(unsigned t=0;t<sizeof(coords)/sizeof(coords[0]);++t) {
+                int tl,tt,tr,tb;
+                u[0].x=coords[ai]; u[0].y=coords[sizeof(coords)/sizeof(coords[0])-1-ai];
+                u[1].raw_type=(int)actors[ti];
+                u[1].x=coords[t]; u[1].y=coords[sizeof(coords)/sizeof(coords[0])-1-t];
+                int old=sc64_p7_arbiter_finder_square(0,1);
+                int candidate=sc64_p7_actor_rect_source(71,u[0].x,u[0].y,0,
+                        &tl,&tt,&tr,&tb) &&
+                    sc64_p7_actor_rect_source(actors[ti],u[1].x,u[1].y,0,
+                        &tl,&tt,&tr,&tb) &&
+                    sc64_p7_arbiter_finder_square_rect(0,tl,tt,tr,tb);
+                assert(old==candidate);
+            }
+    u[0]=saved0; u[1]=saved1;
+}
+#endif
+
 int main(void)
 {
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
@@ -37,6 +102,9 @@ int main(void)
     memset(u,0,sizeof(u));
     memset(b,0,sizeof(b));
     memset(&race_p7,0,sizeof(race_p7));
+#ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
+    geometry_hoist_differential();
+#endif
     race_mode=0;
     race_selected_mission=SC64_P7_GLOBAL_ID;
     race_p7.reserved[1]=150;

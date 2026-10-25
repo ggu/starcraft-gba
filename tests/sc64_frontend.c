@@ -1,5 +1,8 @@
 #include <assert.h>
 #include <stdio.h>
+#ifdef SC64_SHOWCASE_ENABLED
+#include <string.h>
+#endif
 #include "../starcraft/sc64_frontend.h"
 
 static int press(Sc64Frontend *f, unsigned key) {
@@ -7,6 +10,40 @@ static int press(Sc64Frontend *f, unsigned key) {
     (void)sc64_frontend_update(f, 0);
     return action;
 }
+
+#ifdef SC64_SHOWCASE_ENABLED
+static void test_hidden_showcase(void) {
+    Sc64Frontend f;
+    sc64_frontend_reset(&f, 0, SC_FRONT_RACE_TERRAN, 1, -1);
+
+    /* Hold R, add L, then tap SELECT. The staged chord takes precedence over
+       L quick-load on HOME. */
+    assert(sc64_frontend_update(&f, KEY_R) == SC_FRONT_NONE);
+    (void)sc64_frontend_update(&f, 0);
+    assert(sc64_frontend_update(&f, KEY_R | KEY_L) == SC_FRONT_NONE);
+    (void)sc64_frontend_update(&f, 0);
+    assert(sc64_frontend_update(&f, KEY_L | KEY_R | KEY_SELECT) == SC_FRONT_NONE);
+    assert(f.page == SC_FRONT_SHOWCASE && f.row == 0);
+    (void)sc64_frontend_update(&f, 0);
+    assert(press(&f, KEY_L) == SC_FRONT_NONE);
+    assert(f.page == SC_FRONT_SHOWCASE);
+    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 1);
+    assert(press(&f, KEY_UP) == SC_FRONT_NONE && f.row == 0);
+    assert(press(&f, KEY_B) == SC_FRONT_NONE && f.page == SC_FRONT_HOME);
+
+    /* The chord is HOME-only, and all eight scene indices wrap cleanly. */
+    f.page = SC_FRONT_SHOWCASE;
+    f.row = 7;
+    assert(press(&f, KEY_DOWN) == SC_FRONT_NONE && f.row == 0);
+    assert(press(&f, KEY_UP) == SC_FRONT_NONE && f.row == 7);
+    assert(press(&f, KEY_A) == SC_FRONT_START_SHOWCASE && f.row == 7);
+    assert(strcmp(sc64_front_showcase_name(0), "CARRIER APPROACH") == 0);
+
+    sc64_frontend_reset(&f, 0, SC_FRONT_RACE_TERRAN, 1, -1);
+    assert(press(&f, KEY_L | KEY_SELECT) == SC_FRONT_LOAD);
+    assert(f.page == SC_FRONT_HOME);
+}
+#endif
 
 #ifndef SC64_CAMPAIGN_RACE
 static void test_reset_and_home(void) {
@@ -318,6 +355,9 @@ static void test_t3_paging_retention_and_reset(void) {
 #endif
 
 int main(void) {
+#ifdef SC64_SHOWCASE_ENABLED
+    test_hidden_showcase();
+#endif
 #ifdef SC64_CAMPAIGN_RACE
     Sc64Frontend f;
     const int profile_faction = SC64_CAMPAIGN_RACE == 0 ? SC_FRONT_TERRAN :

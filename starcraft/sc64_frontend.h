@@ -31,6 +31,10 @@
 #define SC64_MAP_COUNT SC64_FRONT_MAP_COUNT
 #endif
 
+#ifdef SC64_SHOWCASE_ENABLED
+#define SC64_FRONT_SHOWCASE_COUNT 8
+#endif
+
 /* Small, deterministic input model for the optional StarCraft 64 frontend.
  * Rendering is deliberately left to the caller. `held` is the current
  * held-key mask (using KEY_* from common/gba.h); actions fire on key edges.
@@ -41,6 +45,9 @@ enum {
     SC_FRONT_MISSION,
     SC_FRONT_BRIEFING,
     SC_FRONT_SKIRMISH
+#ifdef SC64_SHOWCASE_ENABLED
+    , SC_FRONT_SHOWCASE
+#endif
 };
 
 enum {
@@ -48,6 +55,9 @@ enum {
     SC_FRONT_START_CAMPAIGN,
     SC_FRONT_START_SKIRMISH,
     SC_FRONT_LOAD
+#ifdef SC64_SHOWCASE_ENABLED
+    , SC_FRONT_START_SHOWCASE
+#endif
 };
 
 enum {
@@ -154,6 +164,17 @@ static inline int sc64_front_campaign_faction_at(int row) {
 static inline int sc64_front_clamp(int v, int lo, int hi) {
     return v < lo ? lo : (v > hi ? hi : v);
 }
+
+#ifdef SC64_SHOWCASE_ENABLED
+static inline const char *sc64_front_showcase_name(int scene) {
+    static const char *const names[SC64_FRONT_SHOWCASE_COUNT] = {
+        "CARRIER APPROACH", "SIEGE LINE", "TERRAN LAST STAND",
+        "ZERG LAST STAND", "PROTOSS LAST STAND", "PROTOSS CROSS FIRE",
+        "THREE WAY BATTLE", "BASE UNDER SIEGE"
+    };
+    return names[sc64_front_clamp(scene, 0, SC64_FRONT_SHOWCASE_COUNT - 1)];
+}
+#endif
 
 static inline int sc64_front_catalog_faction(int faction) {
 #ifdef SC64_UNIFIED
@@ -285,7 +306,26 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
     }
 #endif
 
+#ifdef SC64_SHOWCASE_ENABLED
+    /* Hidden filming menu. Requiring the shoulder buttons to remain held
+     * while SELECT is newly pressed keeps ordinary HOME controls untouched. */
+    if (f->page == SC_FRONT_HOME &&
+        (held & (KEY_L | KEY_R)) == (KEY_L | KEY_R) && (edge & KEY_SELECT)) {
+        f->page = SC_FRONT_SHOWCASE;
+        f->row = 0;
+        return SC_FRONT_NONE;
+    }
+#endif
+
+#ifdef SC64_SHOWCASE_ENABLED
+    if (edge & KEY_L) {
+        if (!(f->page == SC_FRONT_SHOWCASE ||
+              (f->page == SC_FRONT_HOME && (held & KEY_R))))
+            return SC_FRONT_LOAD;
+    }
+#else
     if (edge & KEY_L) return SC_FRONT_LOAD;
+#endif
 
     if (edge & KEY_B) {
         switch (f->page) {
@@ -315,6 +355,9 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
             }
             break;
         case SC_FRONT_SKIRMISH: f->page = SC_FRONT_HOME; f->row = 1; break;
+#ifdef SC64_SHOWCASE_ENABLED
+        case SC_FRONT_SHOWCASE: f->page = SC_FRONT_HOME; f->row = 0; break;
+#endif
         default: f->page = SC_FRONT_HOME; f->row = 0; break;
         }
         return SC_FRONT_NONE;
@@ -336,6 +379,9 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
             count = 3;
 #endif
             break;
+#ifdef SC64_SHOWCASE_ENABLED
+        case SC_FRONT_SHOWCASE: count = SC64_FRONT_SHOWCASE_COUNT; break;
+#endif
         default: count = 1; break;
         }
         f->row = sc64_front_wrap(f->row + delta, count);
@@ -424,6 +470,10 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
         f->row = 2;
 #endif
         break;
+#ifdef SC64_SHOWCASE_ENABLED
+    case SC_FRONT_SHOWCASE:
+        return SC_FRONT_START_SHOWCASE;
+#endif
     default:
         f->page = SC_FRONT_HOME;
         f->row = 0;

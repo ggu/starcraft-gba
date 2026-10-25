@@ -46,6 +46,8 @@ static void test_actual_splash_targeting_and_damage(void)
     race_mode=0;
     assert(!owners_hostile(SIDE,RESCUABLE));
     tick_combat(&u[archon],primary);
+    assert(tracers[0].life>0 &&
+        sc64_weapon_vfx_style(tracers[0].color)==SC64_WEAPON_VFX_STYLE_ARC);
     assert(u[primary].hp==69 && u[primary].shield==0); /* 33, Normal */
     assert(u[middle].hp==84); /* 16.5 Q8 packet -> integer GBA HP */
     assert(u[outer].hp==92);  /* 8.25 Q8 packet -> integer GBA HP */
