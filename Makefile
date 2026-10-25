@@ -2015,6 +2015,10 @@ test-sc64-z6-collision-classes: test-sc64-z6-collision-facts build/test-sc64-z6-
 test-sc64-zp-fact-range:
 	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_zp_fact_range.py'
 
+.PHONY: test-sc64-fact-tables
+test-sc64-fact-tables:
+	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_fact_tables.py'
+
 .PHONY: test-sc64-p7-actor-rules
 test-sc64-p7-actor-rules:
 	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_p7_actor_rules.py'
@@ -2288,6 +2292,40 @@ build/StarCraft-Protoss-P7-Move-Probe-GBA.gba: build/starcraft-protoss-p7-move-p
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
 protoss-p7-move-probe: build/StarCraft-Protoss-P7-Move-Probe-GBA.gba
+# Default-off P7 fact-table probe: the movement probe plus SC64_FACT_TABLES.
+# A host generator evaluates the unchanged fact functions under the probe's
+# exact flags and writes packed per-type ROM tables to an ignored build path.
+P7_FACT_TABLE_DIR := build/generated/p7-fact-tables
+P7_FACT_TABLE_HEADER := $(P7_FACT_TABLE_DIR)/sc64_fact_tables_generated.h
+P7_FACT_FLAGS := -DSC64_FACT_TABLES -I$(P7_FACT_TABLE_DIR)
+$(P7_FACT_TABLE_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) Makefile | build
+	mkdir -p $(P7_FACT_TABLE_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -DGBA_HOST -Icommon -Istarcraft $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $< -o build/sc64-p7-fact-tables-gen
+	./build/sc64-p7-fact-tables-gen > $@.tmp
+	mv $@.tmp $@
+build/test-sc64-p7-fact-check: tests/sc64_fact_tables_check.c $(P7_FACT_TABLE_HEADER) $(wildcard starcraft/*.h) Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $(P7_FACT_FLAGS) $< -o $@
+build/test-sc64-p7-fact-candidate: tests/sc64_p7_steer_game.c $(P7_FACT_TABLE_HEADER) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $(P7_FACT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-fact-runtime: tests/sc64_p7_prevalidated_game.c $(P7_FACT_TABLE_HEADER) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $(P7_FACT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-fact-tables protoss-p7-fact-probe
+test-sc64-p7-fact-tables: build/test-sc64-p7-fact-check build/test-sc64-p7-move-reference build/test-sc64-p7-fact-candidate build/test-sc64-p7-count-snapshot build/test-sc64-p7-fact-runtime
+	./build/test-sc64-p7-fact-check
+	./build/test-sc64-p7-move-reference > build/sc64-p7-move-reference.txt
+	./build/test-sc64-p7-fact-candidate > build/sc64-p7-fact-candidate.txt
+	cmp build/sc64-p7-move-reference.txt build/sc64-p7-fact-candidate.txt
+	./build/test-sc64-p7-count-snapshot > build/sc64-p7-count-snapshot.txt
+	./build/test-sc64-p7-fact-runtime > build/sc64-p7-fact-runtime.txt
+	cmp build/sc64-p7-count-snapshot.txt build/sc64-p7-fact-runtime.txt
+	cat build/sc64-p7-fact-candidate.txt
+build/starcraft-protoss-p7-fact-probe.elf: $(P7_FACT_TABLE_HEADER) $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $(P7_FACT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-fact-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Fact-Probe-GBA.gba: build/starcraft-protoss-p7-fact-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+protoss-p7-fact-probe: build/StarCraft-Protoss-P7-Fact-Probe-GBA.gba
 build/test-sc64-p7-battery-rules: tests/sc64_p7_battery_rules.c starcraft/sc64_p7_battery_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-p7-battery-rules

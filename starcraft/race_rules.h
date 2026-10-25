@@ -978,6 +978,10 @@ static inline int sc64_race_unit_cooldown(int type)
     }
 }
 
+#ifdef SC64_FACT_TABLES
+/* Reference oracle; sc64_fact_tables.h defines the table-backed lookup. */
+#define sc64_race_unit_flying sc64_race_unit_flying_reference
+#endif
 static inline int sc64_race_unit_flying(int type)
 {
 #ifdef SC64_Z6_ACTORS
