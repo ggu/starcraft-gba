@@ -2610,6 +2610,37 @@ test-sc64-p7-typed-compact-matrix: build/test-sc64-p7-typed-runtime-reference bu
 	./build/test-sc64-p7-typed-cache-policy
 	./build/test-sc64-p7-typed-initial-save
 
+# Opt-in composition of generation-40 typed rows with the P7 steering-list probe.
+# Existing profiles retain their save generations and feature flags.
+P7_TYPED_MOVE_FLAGS := $(P7_TYPED_COMPACT_FLAGS) $(P7_MOVE_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT
+build/test-sc64-p7-typed-move-runtime: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-typed-move-steer-reference: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $< common/gba.c -o $@
+build/test-sc64-p7-typed-move-steer: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-typed-move-battery: tests/sc64_p7_battery_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-typed-move-initial-save: tests/sc64_p7_initial_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_TYPED_MOVE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-typed-move protoss-p7-typed-move-probe
+test-sc64-p7-typed-move: build/test-sc64-p7-typed-runtime-count build/test-sc64-p7-typed-move-runtime build/test-sc64-p7-typed-move-steer-reference build/test-sc64-p7-typed-move-steer build/test-sc64-p7-typed-move-battery build/test-sc64-p7-typed-move-initial-save
+	./build/test-sc64-p7-typed-runtime-count > build/sc64-p7-typed-move-count.txt
+	./build/test-sc64-p7-typed-move-runtime > build/sc64-p7-typed-move-runtime.txt
+	cmp build/sc64-p7-typed-move-count.txt build/sc64-p7-typed-move-runtime.txt
+	./build/test-sc64-p7-typed-move-steer-reference > build/sc64-p7-typed-move-steer-reference.txt
+	./build/test-sc64-p7-typed-move-steer > build/sc64-p7-typed-move-steer.txt
+	cmp build/sc64-p7-typed-move-steer-reference.txt build/sc64-p7-typed-move-steer.txt
+	./build/test-sc64-p7-typed-move-battery
+	./build/test-sc64-p7-typed-move-initial-save
+build/starcraft-protoss-p7-typed-move-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_TYPED_MOVE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-typed-move-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba: build/starcraft-protoss-p7-typed-move-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 MOVE40' SC7M
+protoss-p7-typed-move-probe: build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba
+
 # Asset-free packing coverage is part of the standard host suite.
 build/test-sc64-p7-typed-codec: tests/sc64_p7_typed_codec.c starcraft/sc64_p7_typed_unit_save.h starcraft/sc64_p7_typed_building_save.h starcraft/sc64_zp_unit_save.h starcraft/sc64_compact_building_save.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@

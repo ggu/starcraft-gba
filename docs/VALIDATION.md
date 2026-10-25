@@ -4703,6 +4703,52 @@ child-actor state and the native 100-bullet capacity remain required design
 constraints. No projectile pool, additional mission win, fps result or hardware
 qualification is claimed by the codec work.
 
+#### Generation-40 movement composition
+
+PR6's movement optimization also passes with the typed generation-40 P7
+save rows and Arbiter cloak/cache enabled. Build it with
+`make protoss-p7-typed-move-probe`; the opt-in flags compose
+`P7_TYPED_COMPACT_FLAGS`, `P7_MOVE_FLAGS`, prevalidation and the count snapshot.
+`make test-sc64-p7-typed-move` passes under ASan/UBSan: the combined runtime
+trace matches typed count, the steering fixture matches that baseline while
+checking 619,216 queries against `unit_step_clear()` (335,229 blocked,
+77,402 list builds, 36,304 fallbacks), and Battery and initial-save fixtures
+pass. Immediate-save continuation has clock 149, phase 4 and frame 1.
+
+Both ARM probes are 4 MiB. DWARF reports Unit 56, Building 48, RaceSave 14,188
+and P7 supplement 124 bytes in each. The typed count baseline reproduces ROM
+`3213c90da953b0a83742f79a1acba0709d3c99e3c13420e3704d62277061ad05`,
+with IWRAM/BSS ends `0x030047d8` / `0x0203d878`. The composition is
+`654be346fc4f39e059fda3c2fd0c9099f8dc70da5bf0a708bbcb85bb000c7a73`,
+with ends `0x03004a28` / `0x0203daec`. Both remain inside the unchanged RAM
+reserve and two-slot SRAM journal guards. Generation 40 and the existing
+source clock remain unchanged.
+
+The same normal-menu, controller-only 600-update P7 opening measures
+**7.880 -> 9.045 effective fps** (14.8 percent faster) using emulated GBA
+hardware timer cycles. All seven checkpoints match in every recorded
+non-timing field, including bank hashes, decoded actors, per-owner HP,
+selection counts, input schedule and ending frame 602. Runtime faults and
+unsupported counts remain zero. Reproduce both runs with:
+
+```sh
+make protoss-p7-typed-probe protoss-p7-typed-move-probe
+python3 tools/sc64_p7_move_workload.py --elf build/starcraft-protoss-p7-typed-probe.elf \
+    --rom build/StarCraft-Protoss-P7-Typed-Probe-GBA.gba --out build/p7-typed-opening \
+    --neutral-ticks 600
+python3 tools/sc64_p7_move_workload.py --elf build/starcraft-protoss-p7-typed-move-probe.elf \
+    --rom build/StarCraft-Protoss-P7-Typed-Move-Probe-GBA.gba --out build/p7-typed-move-opening \
+    --neutral-ticks 600
+python3 tools/sc64_p7_move_workload.py --compare build/p7-typed-opening/result.json \
+    build/p7-typed-move-opening/result.json
+```
+
+This comparison includes cloak/cache, unlike the earlier cache-off movement
+probe below. It covers the opening only: no combined attack workload, mission
+win, fresh-process ARM SRAM, hardware qualification or near-30-fps result is
+claimed. Neither the default nor canonical build enables the composition;
+staged campaign progress remains 22/30.
+
 ### P7 movement steering list
 
 The P7 count probe spends most of each update in `update_orders()`. A

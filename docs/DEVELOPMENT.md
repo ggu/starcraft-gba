@@ -2045,3 +2045,16 @@ and initial-launch save timing. The ARM probe includes prevalidation and the
 count snapshot. Its format frees save space for future projectile state; it
 does not implement Carrier Interceptors or prove that a complete projectile
 and child-actor pool will fit. See [Validation](VALIDATION.md#experimental-p7-typed-save-rows).
+
+The composed generation-40 movement probe is also opt-in:
+`make test-sc64-p7-typed-move` compares typed count-snapshot and combined
+runtime traces, compares the steering-list fixture against the typed count
+baseline while checking each list answer against `unit_step_clear()`, and runs
+typed Battery and initial-save fixtures. `make protoss-p7-typed-move-probe`
+links the combined typed/Arbiter/movement profile as code `SC7M` (title
+`SC P7 MOVE40`). It keeps generation 40, the 56-byte Unit, 48-byte Building,
+14,188-byte RaceSave and the existing source clock. The combined host matrix,
+ARM memory checks and a matching 600-update emulator opening pass; measured
+effective fps is 7.880 for typed count and 9.045 for typed movement. See
+[Validation](VALIDATION.md#generation-40-movement-composition) for the exact
+comparison and limits. It is not part of the canonical or default build.
