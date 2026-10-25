@@ -329,10 +329,12 @@ def prepare(rom: Path, profile: str) -> None:
                 raise RuntimeError(f"generated staged race data is missing the {RACE_CAMPAIGN_GATES[profile][0]} map gate")
             run([sys.executable, str(ROOT / "tools/sc64_race_sprites.py"),
                  "--rom", str(private_rom), "--base-only", "--include-zp-campaign-actors",
+                 "--prepack-unit-words",
                  "--out", str(stage / "sprites"),
                  "--header", str(stage / "sc64_race_sprites_generated.h")])
         run([sys.executable, str(ROOT / "tools/sc64_t4_scenario_pack.py")])
-        run([sys.executable, str(ROOT / "tools/sc64_race_sprites.py")])
+        run([sys.executable, str(ROOT / "tools/sc64_race_sprites.py"),
+             "--prepack-unit-words"])
         run([sys.executable, str(ROOT / "tools/sc64_construction_sprites.py"),
              "--rom", str(private_rom)])
         run([sys.executable, str(ROOT / "tools/sc64_menu_assets.py")])
@@ -381,7 +383,8 @@ def prepare(rom: Path, profile: str) -> None:
             for name in names:
                 shutil.copy2(race / name, stage / name)
             run([sys.executable, str(ROOT / "tools/sc64_race_sprites.py"),
-                 "--include-t6", "--include-late-terran", "--out", str(stage / "sprites"),
+                 "--include-t6", "--include-late-terran", "--prepack-unit-words",
+                 "--out", str(stage / "sprites"),
                  "--header", str(stage / "sc64_race_sprites_generated.h")])
     print(f"Prepared local StarCraft 64 data for profile '{profile}'. Generated files stay under .local/.")
 
