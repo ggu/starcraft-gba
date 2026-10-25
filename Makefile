@@ -2524,6 +2524,80 @@ test-sc64-construction-source: build/test-sc64-construction-source
 construction-visuals: build/StarCraft-Construction-Preview-GBA.gba
 	$(PYTHON) -c 'from tools.verify_roms import verify; print(verify("StarCraft-Construction-Preview-GBA", "starcraft-construction", "SCCA", "SC BUILD ART"))'
 
+# Transient death effects. The asset-free checks cover the authored renderer
+# and the original-art game; each game fixture is also built with the feature
+# compiled out and must print the same state/save digest over combat.
+DEATH_VFX_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+build/test-sc64-death-vfx: tests/sc64_death_vfx.c starcraft/sc64_death_vfx.h starcraft/sc64_death_vfx_render.h common/gba.c common/gba.h | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $< common/gba.c -o $@
+build/test-sc64-death-vfx-default: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $< -o $@
+build/test-sc64-death-vfx-default-off: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) -DSC64_DEATH_VFX_DISABLED $< -o $@
+# $(1)=name, $(2)=profile flags, $(3)=inputs
+define DEATH_VFX_GAME_FIXTURE
+build/test-sc64-death-vfx-$(1): tests/sc64_death_vfx_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(DEATH_VFX_TEST_FLAGS) $(2) $$< -o $$@
+build/test-sc64-death-vfx-$(1)-off: tests/sc64_death_vfx_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(DEATH_VFX_TEST_FLAGS) $(2) -DSC64_DEATH_VFX_DISABLED $$< -o $$@
+endef
+$(eval $(call DEATH_VFX_GAME_FIXTURE,unified,$(UNIFIED_FLAGS),$(RACES_INPUTS)))
+$(eval $(call DEATH_VFX_GAME_FIXTURE,terran,$(TERRAN_FULL_FLAGS),$(TERRAN_FULL_INPUTS)))
+$(eval $(call DEATH_VFX_GAME_FIXTURE,zerg,$$(Z7_DERIVED_SAVE_FLAGS),$$(Z7_PROBE_INPUTS)))
+$(eval $(call DEATH_VFX_GAME_FIXTURE,protoss,$$(P7_TYPED_RECT_FLAGS),$$(P7_ARBITER_INPUTS)))
+# Run the fixture, then compare feature-on/off digests over the workload.
+define DEATH_VFX_RUN
+	./build/test-sc64-death-vfx-$(1)
+	SC64_DEATH_VFX_HASH=1 ./build/test-sc64-death-vfx-$(1) > build/death-vfx-$(1).on
+	SC64_DEATH_VFX_HASH=1 ./build/test-sc64-death-vfx-$(1)-off > build/death-vfx-$(1).off
+	cmp build/death-vfx-$(1).on build/death-vfx-$(1).off
+	@echo "PASS death VFX $(1) state/save digest unchanged: $$(cat build/death-vfx-$(1).on)"
+endef
+.PHONY: test-sc64-death-vfx test-sc64-death-vfx-default test-sc64-death-vfx-unified test-sc64-death-vfx-profiles
+test-sc64-death-vfx: build/test-sc64-death-vfx
+	./build/test-sc64-death-vfx
+test-sc64-death-vfx-default: build/test-sc64-death-vfx-default build/test-sc64-death-vfx-default-off
+	$(call DEATH_VFX_RUN,default)
+test-sc64-death-vfx-unified: build/test-sc64-death-vfx-unified build/test-sc64-death-vfx-unified-off
+	$(call DEATH_VFX_RUN,unified)
+test-sc64-death-vfx-profiles: test-sc64-death-vfx-unified build/test-sc64-death-vfx-terran build/test-sc64-death-vfx-terran-off build/test-sc64-death-vfx-zerg build/test-sc64-death-vfx-zerg-off build/test-sc64-death-vfx-protoss build/test-sc64-death-vfx-protoss-off
+	$(call DEATH_VFX_RUN,terran)
+	$(call DEATH_VFX_RUN,zerg)
+	$(call DEATH_VFX_RUN,protoss)
+test-starcraft: test-sc64-death-vfx test-sc64-death-vfx-default
+test-unified: test-sc64-death-vfx-unified
+
+# Optional source death art preview, built like the construction preview.
+DEATH_ART_DIR := .local/sc64/death/generated
+DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
+DEATH_ART_FLAGS := $(UNIFIED_FLAGS) -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
+$(DEATH_ART_HEADER): tools/sc64_death_sprites.py tools/sc64_construction_sprites.py tools/sc64_sprites.py
+	$(PYTHON) tools/sc64_death_sprites.py
+build/test-sc64-death-source: tests/sc64_death_source_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(DEATH_ART_FLAGS) $< -o $@
+build/test-sc64-death-source-off: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(UNIFIED_FLAGS) -DSC64_DEATH_VFX_DISABLED $< -o $@
+build/test-sc64-death-source-on: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(DEATH_ART_FLAGS) $< -o $@
+build/starcraft-death.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(DEATH_ART_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-death.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Death-Preview-GBA.gba: build/starcraft-death.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC DEATH ART' SCDA
+.PHONY: sc64-death-art test-sc64-death-source death-visuals
+sc64-death-art:
+	$(PYTHON) tools/sc64_death_sprites.py
+test-sc64-death-source: build/test-sc64-death-source build/test-sc64-death-source-on build/test-sc64-death-source-off
+	./build/test-sc64-death-source
+	./build/test-sc64-death-source-on
+	SC64_DEATH_VFX_HASH=1 ./build/test-sc64-death-source-on > build/death-vfx-source.on
+	SC64_DEATH_VFX_HASH=1 ./build/test-sc64-death-source-off > build/death-vfx-source.off
+	cmp build/death-vfx-source.on build/death-vfx-source.off
+	@echo "PASS death VFX source-art state/save digest unchanged: $$(cat build/death-vfx-source.on)"
+death-visuals: build/StarCraft-Death-Preview-GBA.gba
+	$(PYTHON) -c 'from tools.verify_roms import verify; print(verify("StarCraft-Death-Preview-GBA", "starcraft-death", "SCDA", "SC DEATH ART"))'
+
 build/test-sc64-construction-hp: tests/sc64_construction_hp.c starcraft/sc64_construction_hp.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 build/test-sc64-construction-hp-game: tests/sc64_construction_hp_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build

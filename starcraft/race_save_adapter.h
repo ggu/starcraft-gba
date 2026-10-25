@@ -1985,7 +1985,7 @@ static int race_load_game(void) {
      * projectile arena. The candidate packet already passed full preflight. */
     if (!race_p7_projectile_restore(race_data.interceptor_projectiles)) return 0;
 #endif
-    memset(tracers,0,sizeof(tracers));mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
+    memset(tracers,0,sizeof(tracers));death_vfx_reset();mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
     invalidate_path_grid();sc64_visibility_reset();update_exploration();reset_selection_gestures();
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;

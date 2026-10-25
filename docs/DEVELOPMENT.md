@@ -46,6 +46,98 @@ load resumes the same frame. Shadows, worker animation, finish signals and
 Protoss post-timer warp states remain unfinished. See
 [Validation](VALIDATION.md#source-construction-art-preview) for coverage.
 
+## Death animations
+
+Units and buildings no longer vanish when they die. Every build, including
+the asset-free original-art skirmish, plays a short death effect in the
+family StarCraft 64 uses for that actor:
+
+- Marines, Ghosts, Medics and critters collapse and leave remains.
+- Zerg ground units burst into gore and leave remains.
+- Zerg air units splash.
+- Vehicles, aircraft, SCVs and Firebats explode in orange, with a larger
+  blast for tanks, Science Vessels and Battlecruisers.
+- Protoss units release a blue energy burst. In the source, Zealots,
+  Dragoons and Templar collapse instead; the source-art preview below shows
+  that, while the authored fallback uses the burst for them too.
+- Buildings explode in their race's colors and leave rubble for 30 seconds.
+
+The families and their timings come from the source IScript Death
+animations: frames of three source updates, 7–14 frames per animation, and
+remnants that appear when the collapse ends, or under the explosion for
+buildings. Asset-free builds draw authored approximations with GBA
+primitives (`starcraft/sc64_death_vfx.h`, `sc64_death_vfx_render.h`).
+
+The effects are presentation only. After every other simulation step, and
+always on the update that decides the mission, `death_vfx_observe()` looks
+for actor rows that changed from alive to dead with HP at or below zero, so
+a death appears at most one update late. It reads those rows and writes
+nothing back.
+Scripted removals keep their HP, so they play no death. Units inside
+transports or Carrier hangars are not on the battlefield, so they play none
+either. New games and loads clear the pool and re-prime the alive shadow, so
+dead rows already in a loaded world never replay. The effects use no RNG,
+add no actor or save fields, and are clipped to visible battlefield cells
+above the cached lower HUD. The pool holds 16 effects in race profiles and
+12 in original-art builds (20 bytes each, in EWRAM). When it is full, a new
+death replaces the oldest rubble-only effect first. Build with
+`-DSC64_DEATH_VFX_DISABLED` to compile the feature out.
+
+```sh
+make test-sc64-death-vfx test-sc64-death-vfx-default
+```
+
+These asset-free checks run in `./dev test`. With the unified inputs
+prepared, `make test-sc64-death-vfx-unified` (part of `make test-unified`)
+runs the same game fixture on the race engine. With the full Terran, Z7 and
+P7 inputs prepared, `make test-sc64-death-vfx-profiles` also covers those
+actor sets. Each game fixture is built twice, once with the feature compiled
+out. Both builds run the same combat workload, rendering every frame, and
+must print the same field-wise state digest and the same SRAM digest after
+saving.
+
+### Source death art preview
+
+After preparing the unified inputs, this separate preview draws the original
+StarCraft 64 death frames:
+
+```sh
+python3 tools/sc64_death_sprites.py
+make test-sc64-death-source death-visuals
+```
+
+The importer authenticates the same USA ROM and BOLT tables as the
+construction importer. For each source unit or building id, it follows
+`units.dat` → `flingy.dat` → `sprites.dat` → `images.dat` to the actor image.
+It then compiles that image's Death animation into at most eight independent
+layers:
+
+- collapse frames played on the actor's own GRP;
+- explosion overlays, plus any overlays they spawn (`imgol`/`imgul`);
+- remnant and rubble sprites (`lowsprul`).
+
+Each layer keeps its source frame order and waits. IScript `end` removes the
+layer, as in the source. Remnant streams are capped at 720 source updates
+(30 seconds). Only the frames that the animations reference are imported.
+
+The compiler is a whitelist. It ignores sounds, flip and direction
+instructions, and follows the grounded path of `liftoffcondjmp`. Anything
+else makes the actor keep the authored fallback. Remapped fire images
+(draw function 9: the orange Terran and blue Protoss explosions) store blend
+intensities rather than colors. GBA mode 4 cannot blend, so these map to
+fixed UI-palette ramps: the faintest band is dropped and the next is
+checkerboard-dithered. Generated art and its manifest stay under
+`.local/sc64/death/generated/`. Use `--rom`, `--palette-remap`, `--header`,
+`--out` and `--upstream` for other local paths.
+
+The importer currently compiles 167 actors from 61 image banks (about 770 KB
+of pixels). The preview ROM is `build/StarCraft-Death-Preview-GBA.gba`; its
+menus and missions match the unified profile. Canonical race ROMs keep the
+authored effects. To use the source art in another prepared race profile,
+compile with `SC64_DEATH_SOURCE_ART` and include the generated directory.
+See [Validation](VALIDATION.md#death-animations-2026-10-25) for coverage and
+memory figures.
+
 ## Install the tools
 
 ### macOS
@@ -2179,6 +2271,8 @@ builds include them as well. The transient pool holds 32 effects in race
 profiles and retains 12 in the original-art save format. Overflow replaces
 the oldest cosmetic effect and never changes damage or RNG. Actor and save
 rows retain their existing layouts.
+Deaths use a separate transient pool; see
+[Death animations](#death-animations).
 
 For repeatable filming setups, `make showcase` builds the separate
 `StarCraft-Showcase-GBA.gba` with a hidden scene menu. On HOME hold R, add L,

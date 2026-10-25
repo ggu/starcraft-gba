@@ -5280,3 +5280,86 @@ are not played. Building completion uses the building's selection sound.
 Shots are inferred from a raised cooldown, so a weapon sounds once per
 cooldown cycle. Victory and defeat stingers come from the N64 result flag and
 have not been confirmed by ear.
+### Death animations (2026-10-25)
+
+Units and buildings now play death effects instead of disappearing. Deaths
+are observed from actor rows that change from alive to dead with HP at or
+below zero; the simulation never reads the pool or the alive shadow. The
+authored, asset-free renderer follows the StarCraft 64 Death families:
+
+- infantry, Zerg ground units and critters collapse and leave remains;
+- vehicles and aircraft explode, with a large blast for heavy units;
+- Zerg air units splash;
+- Protoss units burst in blue;
+- buildings explode and leave rubble.
+
+Timelines use the source frame lengths. Remains last 153 source updates;
+rubble is capped at 30 seconds.
+
+The optional source preview compiles 167 actors from the authenticated ROM
+(61 image banks, 770,522 pixel bytes). Nine actors keep the authored
+fallback because their Death animation draws no frames. The fixture checks
+every compiled layer frame. It also confirms that the drawn pixels equal the
+clipped imported frames for:
+
+- Marine, Zergling and Dragoon: collapse and remains;
+- Vulture and Probe: orange and blue explosion overlays.
+
+Approximations:
+
+- The faintest remap blend band is dropped and the next is dithered,
+  because GBA mode 4 cannot blend.
+- Remnants are capped at 30 seconds.
+- Hallucination puffs, Scourge suicides and spider-mine detonations play no
+  death, because those removals keep positive HP.
+- A death reaches the pool at most one update late.
+- A death and a new unit in the same slot within one scan window would hide
+  that death.
+
+Asset-free checks run in `./dev test`: 420 Python checks and the default
+fixtures. They cover timing, families, eviction, clipping at every viewport
+edge, and real unit and building kills. They also cover expiry, fog,
+scripted removals, load re-priming and pool overflow. The same game fixture
+passes in the unified, full Terran, Z7 and P7 profiles. Each profile is also
+built with `SC64_DEATH_VFX_DISABLED` and runs a combat workload that renders
+every frame. Both builds print the same field-wise state digest and the same
+SRAM digest after saving. The same holds for the source-art build.
+
+The following pass:
+
+- default build and tests;
+- unified build and tests;
+- full Terran, Zerg and Protoss profile builds and tests;
+- `test-sc64-death-vfx-profiles`;
+- `test-sc64-death-source` and `death-visuals`.
+
+Memory: IWRAM ends are unchanged in all 21 rebuilt race, probe and showcase
+ROMs. The race pool holds 16 rows of 20 bytes, plus a 50-byte alive shadow.
+Race-profile BSS grows by 0x158–0x178 bytes:
+
+| Profile | BSS end |
+| --- | --- |
+| Terran | `0x0203dd3c` |
+| Zerg | `0x02039bc0` |
+| Protoss | `0x02039d68` |
+| Unified | `0x0203d328` |
+| Showcase | `0x0203de50` |
+| P7 Carrier training and projectile probes (largest) | `0x0203de54` |
+
+The largest leaves 428 bytes under the reserve guard. The original-art ROM
+ends BSS at `0x020043ec` with a 12-row pool. The new code is about 5 KB of
+ROM per profile and adds no IWRAM.
+
+Emulator timing comes from controller-only showcase replays. Cycle counters
+compare this build with the base `d085310` over the first 60 updates of
+each scene:
+
+- The scan adds 6.4k cycles per update, about 1.5% of a dense battle update.
+- Drawing adds 1k–19k cycles per frame.
+- Effective fps falls 1.3–2.7% in four battle scenes and 5.2% in Base Under
+  Siege (22.05 versus 23.27).
+- The three last stands stay at 29.857 fps and still end at update 150.
+
+The renderer was profiled and tightened to two fill calls per remnant and a
+table-driven ellipse. This is emulator timing, not physical-hardware
+qualification. ROMs, generated art and captures remain local.
