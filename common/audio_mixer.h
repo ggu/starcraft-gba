@@ -152,16 +152,26 @@ static inline s32 audio_clip8(s32 s)
 /* Sum n voices four samples at a time. Each source word is biased to
  * unsigned bytes and split into two 16-bit lanes (bytes 0/2 and 1/3), so one
  * ROM word read and four ALU operations add four samples; lanes cannot carry
- * (4 * 255 < 65536). Saturation branches only when a lane clips. */
+ * (4 * 255 < 65536). Unclipped words repack in a few operations; only a
+ * word with a clipping lane is clamped lane by lane. */
 static inline void audio_mixer_sum(volatile u32 *dst, const u32 *const *src, u32 n, u32 words)
 {
     const u32 *a = src[0], *b = src[1], *c = n > 2 ? src[2] : 0, *d = n > 3 ? src[3] : 0;
     const s32 bias = (s32)(128u * n);
+    const u32 rebias = 128u * (n - 1u) * 0x00010001u;
     for (u32 k = 0; k < words; ++k) {
         u32 w = a[k] ^ 0x80808080u, even = w & 0x00ff00ffu, odd = (w >> 8) & 0x00ff00ffu;
         w = b[k] ^ 0x80808080u; even += w & 0x00ff00ffu; odd += (w >> 8) & 0x00ff00ffu;
         if (n > 2) { w = c[k] ^ 0x80808080u; even += w & 0x00ff00ffu; odd += (w >> 8) & 0x00ff00ffu; }
         if (n > 3) { w = d[k] ^ 0x80808080u; even += w & 0x00ff00ffu; odd += (w >> 8) & 0x00ff00ffu; }
+        /* Rebias every lane to one unsigned byte at once. A lane outside
+         * 0..255 sets bits 8-15 or 24-31 (an underflowing low lane does so
+         * too, before its borrow reaches the high lane). */
+        u32 e = even - rebias, o = odd - rebias;
+        if (!((e | o) & 0xff00ff00u)) {
+            dst[k] = (e | o << 8) ^ 0x80808080u;
+            continue;
+        }
         s32 s0 = audio_clip8((s32)(even & 0xffffu) - bias), s1 = audio_clip8((s32)(odd & 0xffffu) - bias);
         s32 s2 = audio_clip8((s32)(even >> 16) - bias), s3 = audio_clip8((s32)(odd >> 16) - bias);
         dst[k] = (u32)(u8)s0 | (u32)(u8)s1 << 8 | (u32)(u8)s2 << 16 | (u32)(u8)s3 << 24;
