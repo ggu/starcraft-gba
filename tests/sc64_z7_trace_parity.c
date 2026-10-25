@@ -37,6 +37,13 @@ static uint64_t common_state_hash(void)
     HASH(target_hostile_mask); HASH(target_hostile_masks_valid);
 #endif
     HASH(visible); HASH(explored);
+    HASH(sc64_visible_sources);
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+    HASH(sc64_visible_sources_high);
+#endif
+    HASH(sc64_minimap_visible); HASH(sc64_minimap_explored);
+    HASH(sc64_unit_visibility); HASH(sc64_building_visibility);
+    HASH(race_cols); HASH(race_rows);
     HASH(race_campaign); HASH(race_z7); HASH(race_player);
     HASH(race_minerals); HASH(race_gas);
     HASH(race_z7_world.source_current_player);

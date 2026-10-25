@@ -73,8 +73,8 @@ only `SC64_Z7_PREVALIDATED_TICK` and `SC64_Z7_COUNT_SNAPSHOT` added. It validate
 the normal menu route and recorded terminal state, streams the same sparse
 held/pressed inputs to two fresh ASan/UBSan processes, checks zero adapter
 faults, and compares common-state hashes after every update. Coverage includes
-actors, building queues, resources, fog, source runtime/AI, target-list caches,
-invincibility and the selected UI fields listed in the C driver. Candidate-only
+actors, building queues, resources, fog grids and incremental visibility/
+minimap snapshots, source runtime/AI, target-list caches, invincibility and the selected UI fields listed in the C driver. Candidate-only
 validation/count context fields are excluded. This is a deterministic state
 comparison, not a timing measurement or a proof over every possible input.
 
@@ -90,8 +90,8 @@ Private output streams stay under `.local/build/z7-trace-parity/` by default.
 The integrated baseline and early-gas traces match at all 23,295 and 15,587
 updates respectively (38,882 total), including their authentic loss states.
 Their identical output stream SHA-256 values are
-`949a209e55e78cf3f9bcd23a4972880c7b3541878e2467208a009f027007af0e`
-and `3d202c237616ea25fa03963f1160ce1506c5ebf4c142f094ed622d95af6888a7`.
+`32ee290ba591e9e54183dadaac1d50df356fa8e8defb3b3ed1f498588b41bb16`
+and `a635fcd145833601be5e7d7953ce30aec2071610d586074bc8506339ea603ab9`.
 Neither a successful mission route nor an ARM replay is implied by this host
 comparison. See [Z7-COUNT-SNAPSHOT.md](Z7-COUNT-SNAPSHOT.md) for the earlier
 bounded ARM optimization experiment and its limits.
