@@ -2077,3 +2077,14 @@ title `SC P7 RECT40`; save generation, actor sizes and RAM ends are unchanged.
 See [Validation](VALIDATION.md#p7-source-rectangle-reuse) for the measured
 opening/attack workload and its limits. This probe does not enable Carriers
 or qualify P7 for campaign promotion.
+
+The Carrier pool/codec foundation is asset-free and has no runtime feature
+gate yet. Run `make test-sc64-interceptor-pool-codec` or `./dev test` to check
+the authored fixed-pool and serialization code. It takes an aligned arena of
+2,408 halfwords (4,816 bytes) and uses a separate 2,103-byte save packet.
+Packets and arena storage must be disjoint; malformed packets are rejected
+before arena mutation. The code is freestanding and uses the project's
+`memset` implementation when linked on ARM. No game build currently links
+or reserves this arena. See
+[Validation](VALIDATION.md#carrier-pool-and-codec-foundation) for tests and
+the remaining combat, world-reference, frame-boundary and save integration.

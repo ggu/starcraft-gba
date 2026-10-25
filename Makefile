@@ -2680,6 +2680,14 @@ test-sc64-p7-typed-codec: build/test-sc64-p7-typed-codec
 	./build/test-sc64-p7-typed-codec
 test-starcraft: test-sc64-p7-typed-codec
 
+# Asset-free Carrier storage foundation; no game runtime enables it yet.
+build/test-sc64-interceptor-pool-codec: tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft tests/sc64_interceptor_pool_codec.c starcraft/sc64_interceptor_pool_codec.c -o $@
+.PHONY: test-sc64-interceptor-pool-codec
+test-sc64-interceptor-pool-codec: build/test-sc64-interceptor-pool-codec
+	./build/test-sc64-interceptor-pool-codec
+test-starcraft: test-sc64-interceptor-pool-codec
+
 build/starcraft-protoss-p7-typed-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(P7_TYPED_COMPACT_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-typed-probe.map -lgcc -o $@
 	$(SIZE) $@

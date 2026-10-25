@@ -4809,6 +4809,56 @@ Neither experiment qualifies a mission win, fresh-process ARM SRAM,
 physical GBA performance or near-30-fps campaign play. Staged progress remains
 22/30; Carrier combat and a P7 win are still required.
 
+The following private variant combined rectangle reuse with per-source owner
+masks and lazily cached sight radii. Its 1,202-byte ARM context expires each
+source tick; the compiler reports a 2,488-byte source-tick frame. Host checks
+prove nonzero cache hits/misses, sentinel handling, per-query equivalence to
+the original visibility scan, runtime/steering parity, Battery and initial
+save continuation. All 23 ARM checkpoints match rectangle reuse, but fps is
+9.128 / 7.147 versus 9.205 / 7.162. It consumes more stack and is slower in
+both measured workloads, so the owner/radius variant is not promoted.
+
+### Carrier pool and codec foundation
+
+`starcraft/sc64_interceptor_pool_codec.[ch]` provides authored, asset-free
+storage for a future 100-slot Interceptor projectile pool. It preserves the
+reviewed ten-slot growth, last-free growth, physical-ordinal/native-index
+mapping and active/free insertion order. The arena uses exactly 2,408
+volatile halfwords (4,816 bytes), with explicit halfword reads/writes. The
+2,103-byte packet has a three-byte header and 100 fixed 21-byte rows; row
+padding, reserved fields, signed-coordinate limits, references, timers and
+complete list partitions are validated. Decode preflights all rows/lists
+before committing and reconstructs previous links and counts. Unallocated
+rows and storage links must be canonical. Packet/arena aliases are rejected
+before mutation.
+
+`make test-sc64-interceptor-pool-codec`, also in `./dev test`, passes under
+ASan/UBSan. It checks a deterministic 100-acquire/100-retire sequence and
+20,000 successful randomized transitions (10,049 acquisitions, 9,951
+retirements), comparing both full list orders after each transition. It also
+checks 250 snapshots of 40 allocated rows: 10,000 randomized field rows,
+including active/free rows, signed endpoints, sentinel/max references,
+speed/timer limits and reused slots. Re-encoded packets match byte for byte
+and decoded fields match their inputs. Canary, malformed-field, reserved
+metadata, unused-link, alias and rejection-atomicity checks pass.
+
+Private checks compare empty and size-20/13-active C packets byte for byte
+with the previously reviewed C++ codec-v3 model. The earlier native pool-order
+oracle checks the allocator model separately; this C test needs no upstream
+headers or game data. ARM7TDMI Thumb `-O2` compilation passes. Static compiler
+frames are 408 bytes for decode, 192 for validation and 88 for the row parser;
+these are individual frames, not whole-game stack high-water. A separate
+non-inlined access audit emits `strh`/`ldrh` for arena access.
+
+This module is not linked into a game profile and reserves no runtime VRAM or
+SRAM. Its standalone arena fits within the proposed 16-KiB OBJ VRAM range,
+but allocation/rendering integration remains unproved. The packet has not
+been added to RaceSave. Child actors, motion, target/shooter invalidation,
+source-clock integration, same-update damage and exactly-once consumption at
+the complete-frame save boundary remain required. No Carrier combat, P7 win,
+whole-world continuation, fresh-process ARM SRAM or hardware result is
+claimed. Staged progress remains 22/30.
+
 ### Full-feature P7 cache timing and rejected cell memo
 
 A private diagnostic of the typed/Arbiter/movement profile separates the
