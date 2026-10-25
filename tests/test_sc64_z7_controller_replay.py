@@ -31,7 +31,7 @@ def z7_trace(final_kind="won"):
                   "action_ticks": [0] * 8, "switch10": 0, "ai_script_mask": 0,
                   "ai_plan_ticks": 0, "ai_plan_phase": 0, "fault": 0}
     events.append(checkpoint)
-    started = 2 | (1 << 2) if final_kind == "won" else 2 | 1
+    started = 2 | (1 << 2) if final_kind == "won" else 2 | 1 if final_kind == "lost" else 2
     final = {"kind": final_kind, "host_tick": 400, "frame": 389,
              "screen": 3 if final_kind in ("won", "lost") else 1,
              "won": int(final_kind == "won"), "lost": int(final_kind == "lost"),
@@ -82,6 +82,32 @@ class Z7TraceTests(unittest.TestCase):
             replay.validate_trace(failed, 240, "zerg-z6", attempt_prefix=True)
         with self.assertRaisesRegex(ValueError, "failed or limited"):
             replay.validate_trace(z7_trace(), 240, "zerg-z7", attempt_prefix=True)
+
+    def test_terminal_update_can_apply_the_last_input_transition(self):
+        for kind in ("won", "lost", "limit"):
+            with self.subTest(kind=kind):
+                trace = z7_trace(kind)
+                stop = trace["events"][-1]["host_tick"]
+                trace["events"].insert(-1, {"kind": "input", "host_tick": stop,
+                                           "held": 1, "pressed": 1})
+                plan = replay.validate_trace(trace, 240, "zerg-z7",
+                                             attempt_prefix=kind != "won")
+                self.assertEqual(plan["inputs"][-1], (stop - 1, 1))
+                self.assertEqual(plan["stop_tick"], stop)
+                # A transition from a later update still cannot precede the
+                # terminal observation, even with otherwise valid state fields.
+                trace["events"][-2]["host_tick"] = stop + 1
+                with self.assertRaisesRegex(ValueError, "unordered host_tick"):
+                    replay.validate_trace(trace, 240, "zerg-z7",
+                                          attempt_prefix=kind != "won")
+
+    def test_terminal_must_follow_the_live_z7_start(self):
+        trace = z7_trace("lost")
+        trace["events"] = [row for row in trace["events"]
+                           if row["kind"] != "checkpoint"]
+        trace["events"][-1]["host_tick"] = 12
+        with self.assertRaisesRegex(ValueError, "must follow the live start"):
+            replay.validate_trace(trace, 240, "zerg-z7", attempt_prefix=True)
 
     def test_attempt_prefix_checks_only_replayed_queue_pages(self):
         failed = z7_trace("lost")

@@ -2769,6 +2769,33 @@ build/StarCraft-Zerg-Z7-Count-Snapshot-Probe-GBA.gba: build/starcraft-zerg-z7-co
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 CNT36' SCZW
 zerg-z7-count-snapshot-probe: build/StarCraft-Zerg-Z7-Count-Snapshot-Probe-GBA.gba
+# Ordinary-input qualification candidate: the Egg, sight and Scourge rules
+# plus the existing nearest-depot worker policy; no campaign promotion.
+Z7_CONTROLLER_REFERENCE_FLAGS := $(Z7_SCOURGE_PROBE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT -DSC64_DENSE_SCHEDULE
+# Qualified only for this experimental probe; standard race flags stay separate.
+Z7_CONTROLLER_FLAGS := $(Z7_CONTROLLER_REFERENCE_FLAGS) -DSC64_Z7_PREVALIDATED_TICK -DSC64_Z7_COUNT_SNAPSHOT
+build/test-sc64-z7-controller: tests/sc64_z7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_CONTROLLER_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-controller zerg-z7-controller-probe
+test-sc64-z7-controller: build/test-sc64-z7-controller
+	mkdir -p .local/build/z7-controller
+	./build/test-sc64-z7-controller --trace .local/build/z7-controller/controller-trace.json
+build/starcraft-zerg-z7-controller-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_CONTROLLER_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-controller-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Controller-Probe-GBA.gba: build/starcraft-zerg-z7-controller-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 RUN36' SCZQ
+zerg-z7-controller-probe: build/StarCraft-Zerg-Z7-Controller-Probe-GBA.gba
+
+# Host-only, per-update replay comparison for the default-off Z7 count cache.
+# Private tapes are validated and streamed by tools/sc64_z7_trace_parity.py.
+define Z7_TRACE_PARITY_BUILD
+build/test-sc64-z7-trace-$(1): tests/sc64_z7_trace_parity.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c -o $$@
+endef
+$(eval $(call Z7_TRACE_PARITY_BUILD,reference,$(Z7_CONTROLLER_REFERENCE_FLAGS)))
+$(eval $(call Z7_TRACE_PARITY_BUILD,count-snapshot,$(Z7_CONTROLLER_FLAGS)))
 
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE

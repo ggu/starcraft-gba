@@ -236,8 +236,12 @@ def validate_trace(trace: object, capacity: int, profile_name: str,
     if attempt_prefix and final.get("kind") not in ("lost", "limit"):
         raise ValueError("--attempt-prefix requires a failed or limited Z7 trace")
     stop = final.get("host_tick")
-    if type(stop) is not int or not 1 <= stop <= 0xFFFFFFFF or stop <= previous_tick:
-        raise ValueError("final won event must follow every controller transition")
+    # host_tick is one-based for inputs: the transition at tick N is applied
+    # by update N. A result observed after that update may share its timestamp.
+    if type(stop) is not int or not 1 <= stop <= 0xFFFFFFFF or stop < previous_tick:
+        raise ValueError("terminal update must include every controller transition")
+    if stop <= start["host_tick"]:
+        raise ValueError("terminal update must follow the live start observation")
     if attempt_prefix and prefix_ticks is not None and prefix_ticks >= stop:
         raise ValueError("--attempt-prefix ticks must end before the failed/limited terminal tick")
     if checkpoints and checkpoints[-1]["host_tick"] > stop:
