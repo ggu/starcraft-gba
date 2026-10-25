@@ -90,7 +90,7 @@ assert_cached_matches_full(void)
 static int
 probe_change_mask(void)
 {
-    int previous[24];
+    int previous[SC64_HUD_KEY_COUNT];
     int valid = sc64_hud_valid;
     memcpy(previous, sc64_hud_previous, sizeof(previous));
     int changed = sc64_hud_changed();
@@ -171,6 +171,38 @@ test_selection_building_box_and_modes_invalidate_bottom(void)
     mode = MODE_BUILD;
     expect_mask_and_match(HUD_BOTTOM);
 }
+
+#ifdef SC64_RACES
+static void
+test_selected_shield_only_changes_match_forced_redraw(void)
+{
+    fixture();
+    race_mode=1; race_human=R_PROTOSS; race_bots=1; race_skirmish_map=0;
+    race_skirmish_init();
+    screen=SCREEN_PLAY;
+    memset(u,0,sizeof(u)); memset(b,0,sizeof(b));
+
+    Unit *actor=&u[0];
+    actor->alive=1; actor->owner=SIDE; actor->type=U_DRAGOON;
+    actor->raw_type=sc64_race_raw_unit(U_DRAGOON); actor->raw_owner=7;
+    actor->selected=1; actor->hp=actor->maxhp=sc64_race_unit_rules[U_DRAGOON].hp;
+    actor->shield=40;
+    sc64_hud_valid=0;
+    assert_cached_matches_full();
+    actor->shield++;
+    expect_mask_and_match(HUD_BOTTOM);
+
+    actor->selected=0; selected_building=0;
+    Building *building=&b[0];
+    building->alive=1; building->owner=SIDE; building->type=B_PYLON;
+    building->raw_type=sc64_race_raw_building(B_PYLON); building->raw_owner=7;
+    building->hp=building->maxhp=300; building->shield=80;
+    sc64_hud_valid=0;
+    assert_cached_matches_full();
+    building->shield++;
+    expect_mask_and_match(HUD_BOTTOM);
+}
+#endif
 
 static void
 test_mission_message_timer_and_minimap_stay_pixel_exact(void)
@@ -421,6 +453,9 @@ main(void)
     fixture();
     test_wallet_and_queued_supply_invalidate_top_only();
     test_selection_building_box_and_modes_invalidate_bottom();
+#ifdef SC64_RACES
+    test_selected_shield_only_changes_match_forced_redraw();
+#endif
     test_mission_message_timer_and_minimap_stay_pixel_exact();
 #if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_NO_FRAME_CLEAR)
     test_per_buffer_hud_reuse_across_changes_and_scenes();

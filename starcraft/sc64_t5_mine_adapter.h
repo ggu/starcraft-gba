@@ -162,6 +162,8 @@ sc64_t5_mine_explode(Unit *mine)
     int center_x, center_y;
     if (!mine) return;
     center_x = mine->x * 2; center_y = mine->y * 2;
+    add_tracer(mine->x,mine->y,mine->x,mine->y,
+        sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_BURST,C_ORANGE));
     /* Radial splash is allowed to hit allied ground units too. The native
        weapon is Ground + NoBuild; buildings and flyers are not candidates. */
     for (int i = 0; i < MAX_UNITS; ++i) {

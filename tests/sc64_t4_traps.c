@@ -104,7 +104,9 @@ test_each_trap_fires_and_uses_factor(void)
         race_t4_traps_tick();
         assert(u[target].hp == cases[c].expected);
         assert(b[trap].queue_progress == SC64_T4_TRAP_COOLDOWN);
-        assert(tracers[0].life == 4);
+        assert(sc64_weapon_vfx_style(tracers[0].color)==
+            sc64_weapon_vfx_style(sc64_weapon_vfx_building_profile(cases[c].type)));
+        assert(tracers[0].life>1);
     }
 }
 
