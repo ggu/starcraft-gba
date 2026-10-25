@@ -1050,7 +1050,7 @@ build/test-sc64-terran-full-collision: tests/sc64_race_collision.c $(STARCRAFT) 
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $< common/gba.c -o $@
 build/test-sc64-terran-full-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $< common/gba.c -o $@
-.PHONY: test-sc64-terran-late-count-cache test-sc64-terran-defense-targets test-sc64-terran-full-targets test-sc64-terran-full-spatial-hud
+.PHONY: test-sc64-terran-late-count-cache test-sc64-present test-sc64-terran-defense-targets test-sc64-terran-full-targets test-sc64-terran-full-spatial-hud
 test-sc64-terran-late-count-cache: build/test-sc64-terran-late-count-cache
 	./$<
 test-sc64-terran-defense-targets: build/test-sc64-terran-defense-targets

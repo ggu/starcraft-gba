@@ -119,6 +119,14 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
 {
 #ifdef SC64_RACES
     if(IS_WORKER(q->type)&&(q->order==ORDER_MINE||q->order==ORDER_GAS))return 1;
+    /* These facts depend only on the mover, so resolve them once rather than
+     * repeating the same table lookups for every nearby bucket candidate. */
+    int mover_flying = sc64_race_unit_flying(q->type);
+#ifdef SC64_T4_RUNTIME
+    unsigned mover_flags = sc64_race_t4_actor_flags(q->type);
+    int mover_collidable = !mover_flags ||
+        (mover_flags & SC64_T4_ACTOR_COLLIDABLE);
+#endif
 #endif
     int minx = (nx - 5) >> 4, maxx = (nx + 5) >> 4;
     int miny = (ny - 5) >> 4, maxy = (ny + 5) >> 4;
@@ -133,23 +141,22 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
             for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
                  i = sc64_unit_bucket_next[i])
                 if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
-#ifdef SC64_RACES
-                    if(u[i].type==U_CHRYSALIS||sc64_race_unit_flying(u[i].type)!=sc64_race_unit_flying(q->type))continue;
-#ifdef SC64_T4_RUNTIME
-                    if ((sc64_race_t4_actor_flags(u[i].type) &&
-                         !(sc64_race_t4_actor_flags(u[i].type)&SC64_T4_ACTOR_COLLIDABLE)) ||
-                        (sc64_race_t4_actor_flags(q->type) &&
-                         !(sc64_race_t4_actor_flags(q->type)&SC64_T4_ACTOR_COLLIDABLE))) continue;
-#endif
-#endif
                     int dx = u[i].x - nx, dy = u[i].y - ny;
                     if (dx <= -6 || dx >= 6 || dy <= -6 || dy >= 6) continue;
                     dx *= dx;
                     dy *= dy;
-                    if (dx + dy < 36) {
-                        int ox = u[i].x - q->x, oy = u[i].y - q->y;
-                        if (dx + dy <= ox * ox + oy * oy) return 0;
-                    }
+                    if (dx + dy >= 36) continue;
+#ifdef SC64_RACES
+                    if(u[i].type==U_CHRYSALIS||sc64_race_unit_flying(u[i].type)!=mover_flying)continue;
+#ifdef SC64_T4_RUNTIME
+                    unsigned candidate_flags = sc64_race_t4_actor_flags(u[i].type);
+                    if ((candidate_flags &&
+                         !(candidate_flags & SC64_T4_ACTOR_COLLIDABLE)) ||
+                        !mover_collidable) continue;
+#endif
+#endif
+                    int ox = u[i].x - q->x, oy = u[i].y - q->y;
+                    if (dx + dy <= ox * ox + oy * oy) return 0;
                 }
         }
     return 1;

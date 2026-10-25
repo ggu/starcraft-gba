@@ -1805,3 +1805,65 @@ builds described above, rather than being implied to have been rerun here.
 These improvements remain below the 30-fps target, particularly in T10's busy
 battles. No physical GBA or GBA SP result is claimed. The bounded authored AI
 and other adaptation limits remain unchanged.
+
+## Zerg 4 source foundation (2026-10-24)
+
+The opt-in `tools/sc64_z4_pack.py` stages the complete **Agent of the Swarm**
+source at BOLT `008/017`, catalog ID 15, without modifying canonical race
+headers or enabling a playable mission. The actual private import and its
+standalone retained-record verification both pass. A second output directory
+independently passes the same checks. The authenticated CHK SHA-256 is
+`2cb8e516f07651801c1d6f519017d494af87c479a0ba8df9e33af34b14ec685a`.
+
+The tool verifies the normalized USA ROM, pinned extractor revision and
+extractor source bytes before execution. It preserves the full CHK, including
+all 184 placement rows and seven trigger records, plus 16 authenticated framed
+records. Thirteen asset-free tests cover malformed/truncated source, omitted or
+unexpected placements, wrong ROM/extractor identity, dirty extractor code,
+record/manifest tampering, standalone verification without a ROM, and the
+distinct runtime pools for Mature Chrysalis (raw 150) and Chrysalis (raw 216).
+
+The source audit identifies demand for 73 unit slots, 67 buildings, 39 mineral
+fields and two geysers. The current Zerg profile's 64-building and 32-mineral
+limits cannot retain the full scenario. Dropships, Control Towers, Machine
+Shops, Engineering Bay and Armory also need runtime mappings for this profile.
+The countdown, hatch sequence, Kerrigan/Chrysalis survival conditions,
+Command Center objective, authored AI and persistence remain unimplemented.
+There is no new controller win, ARM timing result or playable-mission claim;
+the completed campaign count remains 16/30 across development profiles.
+
+## Collision and complete skirmish lineup checks (2026-10-24)
+
+The Terran collision broad phase now resolves the mover's flight and collision
+classification once per query and rejects geometrically irrelevant candidates
+before reading their actor metadata. The legacy zero-flags fallback and
+overlap-separation rules are preserved. Focused ASan/UBSan comparison with the
+full scan passes 1,440,762 cases, including hidden actors, loaded units, slot
+reuse and the zero-flags case. The late build frees 328 bytes of IWRAM code;
+the unchanged guards pass at IWRAM `0x03004e58` and BSS `0x0203d9ec`.
+
+The frozen Terran ROM SHA-256 is
+`55df7258ec66a55566434af6ef3cb2dcac08d09c8792066cde7c29c38fe0082f`,
+with matching ELF SHA-256
+`fecdec39c3c61c280b6f53c6deec4539c070c58145e6a97e8f3f4335d5e65468`.
+Full normal-menu ARM/mGBA T7 and T10 wins retain the previous measured rates
+to two decimal places: **25.00 fps** and **18.77 fps**. All 45 T7 and 89 T10
+observed checkpoint states match the preceding `8a9ddd...` build, excluding
+timing/profiling counters. Winning frames and zero-fault trigger results are
+unchanged. Both generation-18 fresh-process saves restore frame 123 exactly
+and continue to frame 183 with the same late-state payload and zero faults.
+No meaningful FPS increase is established by this change; 30 fps remains unmet.
+
+The full Terran startup/save fixture now tests every map, human race and
+independent AI-race assignment: Outpost and Blood Bath, three human races, and
+3/9/27 assignments for one/two/three AI opponents. All **234 configurations**
+pass startup, active/inactive owner roster checks, 60 play ticks and exact
+save/load round trips. These are setup/persistence checks, not 234 complete
+skirmish victories. All ten Terran host controllers still win, with unchanged
+T7–T10 trace hashes. Default build/host checks, the final 188 Python tests,
+unified build/tests and all three race builds/tests pass. Save layouts and
+pool sizes are unchanged.
+
+Minimap row-packing experiments measured no FPS improvement on the matched
+4,015-tick T10 prefix and were discarded. The shipped renderer is unchanged.
+Physical GBA testing remains pending.

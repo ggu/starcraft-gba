@@ -45,6 +45,12 @@ each. Controller-driven host runs complete 16 of the 30 missions across these
 profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. The other 14 missions have
 no completed runtime.
 
+An opt-in source staging tool now preserves and authenticates the complete
+Zerg 4 **Agent of the Swarm** scenario for the next implementation stage.
+It does not enable Z4 in a ROM or increase the 16/30 completed count. See
+[Z4 source staging](DEVELOPMENT.md#zerg-4-source-staging) for the command and
+remaining runtime work.
+
 Terran 3, Desperate Alliance, has an experimental runtime behind
 `SC64_T3_ENABLED`. After preparing a race profile, build and check it with:
 
