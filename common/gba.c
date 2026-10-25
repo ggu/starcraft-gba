@@ -26,6 +26,9 @@ static volatile u16 *pixels=(volatile u16*)0x0600a000;
 static u16 front;
 static u8 backbuffer_index;
 static u32 clear_generation[2];
+#ifdef GBA_SCENE_CLIP
+static u8 gfx_clip_top, gfx_clip_bottom;
+#endif
 static int tone_frames, noise_frames;
 volatile u32 gfx_draw_cycles;
 static u32 draw_start;
@@ -44,6 +47,9 @@ __attribute__((used)) const char gba_save_signature[]="SRAM_V113";
 static void audio_hw_init(void);
 #endif
 void gba_init(void) {
+#ifdef GBA_SCENE_CLIP
+ gfx_clip_top=0; gfx_clip_bottom=160;
+#endif
 #ifdef GBA_HOST
  front=0; backbuffer_index=1; clear_generation[0]=clear_generation[1]=0;
  pixels=host_fb[1];
@@ -65,6 +71,12 @@ void gba_init(void) {
 #endif
 #endif
 }
+#ifdef GBA_SCENE_CLIP
+void gfx_set_clip_y(int top,int bottom) {
+ if(top<0||top>bottom||bottom>160)return;
+ gfx_clip_top=(u8)top; gfx_clip_bottom=(u8)bottom;
+}
+#endif
 u8 gfx_backbuffer_index(void) { return backbuffer_index; }
 u32 gfx_clear_generation(u8 buffer_index) {
  return buffer_index < 2 ? clear_generation[buffer_index] : 0;
@@ -96,6 +108,9 @@ return (~REG16(0x04000130))&1023;
 static void vblank(void){while(REG16(0x04000006)>=160){}while(REG16(0x04000006)<160){}}
 #endif
 void gfx_begin(u8 color) {
+#ifdef GBA_SCENE_CLIP
+ gfx_clip_top=0; gfx_clip_bottom=160;
+#endif
  draw_start=gba_clock();
  backbuffer_index=(u8)(front^1);
  clear_generation[backbuffer_index]++;
@@ -116,6 +131,9 @@ void gfx_begin(u8 color) {
  * overwrite every pixel may use this; partial scenes need gfx_begin(). */
 #if defined(SC64_NO_FRAME_CLEAR) || defined(GBA_HOST)
 void gfx_begin_preserve(void) {
+#ifdef GBA_SCENE_CLIP
+ gfx_clip_top=0; gfx_clip_bottom=160;
+#endif
  draw_start=gba_clock();
  backbuffer_index=(u8)(front^1);
 #ifdef GBA_HOST
@@ -170,6 +188,18 @@ HOT int gfx_blit_band(int y,int height,const u8 *src) {
 HOT int gfx_blit_window(int y,int height,const u8 *source,int stride,int rows,int left,int top) {
  if(!source||((uintptr_t)source&3)||stride<=0||(stride&3)||rows<=0||
     y<0||height<=0||height>160||y>160-height)return 0;
+#ifdef GBA_WINDOW_BANDS
+ /* A vertical scroll of a full-width cache is one contiguous transfer. Keep
+    out-of-source rows untouched, just as the generic per-row path does. */
+ if(stride==240 && left==0) {
+  if(top>=rows || top<=-height)return 1;
+  int first=top<0?-top:0,last=height;
+  if(top>rows-height)last=rows-top;
+  if(first<last)
+   return gfx_blit_band(y+first,last-first,source+(top+first)*240);
+  return 1;
+ }
+#endif
  for(int row=0;row<height;row++) {
   int sy=top+row;if(sy<0||sy>=rows)continue;
   int begin=left<0?-left:0,end=left+240>stride?stride-left:240;
@@ -255,10 +285,23 @@ void gfx_end(void) {
 #endif
 #endif
 }
-HOT void gfx_pixel(int x,int y,u8 c){if((unsigned)x>=240||(unsigned)y>=160)return;volatile u16*p=pixels+y*120+(x>>1);u16 old=*p;*p=(x&1)?((old&255)|((u16)c<<8)):((old&0xff00)|c);}
+HOT void gfx_pixel(int x,int y,u8 c){if((unsigned)x>=240)return;
+#ifdef GBA_SCENE_CLIP
+ if((unsigned)y-(unsigned)gfx_clip_top>=(unsigned)(gfx_clip_bottom-gfx_clip_top))return;
+#else
+ if((unsigned)y>=160)return;
+#endif
+ volatile u16*p=pixels+y*120+(x>>1);u16 old=*p;*p=(x&1)?((old&255)|((u16)c<<8)):((old&0xff00)|c);}
 HOT void gfx_blit16(int x,int y,const u8 *src) {
- if(!src||x>=240||y>=160||x<=-16||y<=-16)return;
+ if(!src||x>=240||x<=-16)return;
+#ifdef GBA_SCENE_CLIP
+ if(y>=gfx_clip_bottom||y+16<=gfx_clip_top)return;
+ int top=y<gfx_clip_top?gfx_clip_top-y:0;
+ int bottom=y+16>gfx_clip_bottom?gfx_clip_bottom-y:16;
+#else
+ if(y>=160||y<=-16)return;
  int top=y<0?-y:0,bottom=y+16>160?160-y:16;
+#endif
  if(x>=0&&x<=224&&!(x&3)&&!((uintptr_t)src&3)) {
   for(int row=top;row<bottom;row++) {
    const u32 *s=(const u32*)(src+row*16);
@@ -293,14 +336,35 @@ HOT void gfx_blit16(int x,int y,const u8 *src) {
  }
 }
 HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
- if(!src||width<=0||height<=0||width>256||height>256||x>=240||y>=160||x+width<=0||y+height<=0)return;
+ if(!src||width<=0||height<=0||width>256||height>256||x>=240||x+width<=0)return;
+#ifdef GBA_SCENE_CLIP
+ if(y>=gfx_clip_bottom||y+height<=gfx_clip_top)return;
+ int top=y<gfx_clip_top?gfx_clip_top-y:0;
+ int bottom=y+height>gfx_clip_bottom?gfx_clip_bottom-y:height;
+#else
+ if(y>=160||y+height<=0)return;
  int top=y<0?-y:0,bottom=y+height>160?160-y:height;
+#endif
  int left=x<0?-x:0,right=x+width>240?240-x:width;
  for(int row=top;row<bottom;row++) {
   int col=left;const u8*s=src+row*width;
   volatile u16*d=pixels+(y+row)*120+((x+col)>>1);
   if((x+col)&1){if(s[col])*d=(*d&255)|((u16)s[col]<<8);d++;col++;}
   for(;col+1<right;col+=2,d++){
+#ifdef GBA_SPRITE_WORDS
+   /* A quad is word-copied only when ROM and VRAM are both aligned. Mixed
+      quads fall through to the exact pair compositor; after one pair, both
+      alignments are off and that fallback remains in use until re-aligned. */
+   if(col+3<right && !((uintptr_t)d&3u) && !((uintptr_t)(s+col)&3u)) {
+    u32 pixels32=*(const u32 *)(const void *)(s+col);
+    if(!pixels32 || !(((pixels32-0x01010101u)&~pixels32&0x80808080u))) {
+     if(pixels32) *(volatile u32 *)(void *)d=pixels32;
+     col+=2;
+     ++d;
+     continue;
+    }
+   }
+#endif
    u8 a=s[col],b=s[col+1];
    if(a&&b)*d=a|((u16)b<<8);
    else if(a)*d=(*d&0xff00)|a;
@@ -321,7 +385,11 @@ HOT void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *src) {
   const u8 *s=src+row*width;
   for(int col=left;col<right;col++)if(s[col]) {
    u8 c=s[col];int dx=x+col*2,dy=y+row*2;
-   for(int yy=0;yy<2;yy++)if((unsigned)(dy+yy)<160) {
+   for(int yy=0;yy<2;yy++)if((unsigned)(dy+yy)<160
+#ifdef GBA_SCENE_CLIP
+                              &&dy+yy>=gfx_clip_top&&dy+yy<gfx_clip_bottom
+#endif
+                              ) {
     volatile u16 *d=pixels+(dy+yy)*120;
     if(dx>=0&&dx+1<240&&!(dx&1))d[dx>>1]=c|((u16)c<<8);
     else {if(dx>=0&&dx<240)gfx_pixel(dx,dy+yy,c);if(dx+1>=0&&dx+1<240)gfx_pixel(dx+1,dy+yy,c);}
@@ -331,10 +399,23 @@ HOT void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *src) {
 }
 #endif
 HOT void gfx_rect(int x,int y,int w,int h,u8 color) {
-    if(w<=0||h<=0||x>=240||y>=160||x+w<=0||y+h<=0)return;
-    if(x<0){w+=x;x=0;}if(y<0){h+=y;y=0;}
+    if(w<=0||h<=0||x>=240||x+w<=0)return;
+#ifdef GBA_SCENE_CLIP
+    if(y>=gfx_clip_bottom||y+h<=gfx_clip_top)return;
+    if(y<gfx_clip_top){h-=gfx_clip_top-y;y=gfx_clip_top;}
+    if(y+h>gfx_clip_bottom)h=gfx_clip_bottom-y;
+    if(h<=0)return;
+#else
+    if(y>=160||y+h<=0)return;
+#endif
+    if(x<0){w+=x;x=0;}
+#ifndef GBA_SCENE_CLIP
+    if(y<0){h+=y;y=0;}
+#endif
     if(x+w>240)w=240-x;
+#ifndef GBA_SCENE_CLIP
     if(y+h>160)h=160-y;
+#endif
     const u16 pair=color|((u16)color<<8);
     const u32 quad=(u32)pair|((u32)pair<<16);
     for(int row=y;row<y+h;row++) {
@@ -369,7 +450,13 @@ HOT void gfx_diamond(int x,int y,int rx,int ry,u8 color) {
         int span=ry-(yy<0?-yy:yy);
         int half=rx==2*ry?span*2:(rx==ry?span:rx*span/ry);
         int left=x-half,right=x+half,sy=y+yy;
-        if((unsigned)sy>=160||right<0||left>=240)continue;
+        if(right<0||left>=240
+#ifdef GBA_SCENE_CLIP
+           ||(unsigned)sy-(unsigned)gfx_clip_top>=(unsigned)(gfx_clip_bottom-gfx_clip_top)
+#else
+           ||(unsigned)sy>=160
+#endif
+           )continue;
         if(left<0)left=0;
         if(right>239)right=239;
         volatile u16 *dst=pixels+sy*120+(left>>1);
@@ -437,7 +524,11 @@ static const u8 font[96][7]={
 };
 
 static HOT void glyph_row(int x,int y,u8 bits,u8 color) {
+#ifdef GBA_SCENE_CLIP
+    if ((unsigned)y-(unsigned)gfx_clip_top>=(unsigned)(gfx_clip_bottom-gfx_clip_top)) return;
+#else
     if ((unsigned)y>=160) return;
+#endif
     int col=0;
     /* Start on a halfword boundary, then update pairs with a single store. */
     if (x%2) {
@@ -468,9 +559,10 @@ static HOT void glyph_row(int x,int y,u8 bits,u8 color) {
     }
 }
 HOT void gfx_text(int x,int y,const char*t,u8 c){int origin=x;for(;*t;t++){u8 ch=(u8)*t;if(ch=='\n'){x=origin;y+=9;continue;}if(ch>='a'&&ch<='z')ch-=32;if(ch>=32&&ch<128&&x>-6&&x<240)for(int row=0;row<7;row++)glyph_row(x,y+row,font[ch-32][row],c);x+=6;}}
-#ifdef SC64_ZP_FULL_STORAGE
+#if defined(SC64_ZP_FULL_STORAGE) || defined(GBA_SCENE_CLIP)
 /* Later campaign actors need the hot-code reserve; number formatting can
- * run from ROM while glyph drawing stays in IWRAM. */
+ * run from ROM while glyph drawing stays in IWRAM. Scene clipping also uses
+ * this cold formatter placement to stay within the canonical IWRAM reserve. */
 void gfx_num(
 #else
 HOT void gfx_num(
