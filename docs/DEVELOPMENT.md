@@ -1918,3 +1918,21 @@ fixture also exercises all three scripted actor creations, invalid ownership,
 unfinished structures and the Nexus-absence conditions. These synthetic
 condition stimuli do not qualify a mission win. See
 [Validation](VALIDATION.md#p7-count-snapshot-opening) for the opening measurement.
+
+## Mineral gathering before a base exists
+
+The shared first-depot worker path lets an empty mineral worker gather before
+a friendly completed base exists. A loaded worker keeps its cargo and mineral
+order, then uses the existing return/delivery path when a base becomes ready.
+This fixes Z7's base-less opening without changing gas orders, depot selection
+or the save format. The separate nearest-depot experiment remains opt-in.
+
+```sh
+make test-sc64-no-depot-harvest
+make test-sc64-no-depot-harvest-z7
+```
+
+The first check is included in `./dev test` and needs no game data. The second
+uses the prepared private Z7 Scourge profile and covers SCVs, Probes and Drones.
+See [Validation](VALIDATION.md#mineral-gathering-without-a-completed-base) for the
+native-reference limits and shared-profile regression results.

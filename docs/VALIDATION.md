@@ -4495,3 +4495,59 @@ the prevalidated `663d67fa…63029` ROM byte for byte. Default build/tests
 (404 Python tests plus host fixtures), unified build/tests, focused sanitizer
 comparisons and ARM links pass with the unchanged RAM guards. Qualified staged
 campaign progress remains 22/30 and the PR stays draft.
+
+### Mineral gathering without a completed base
+
+The shared first-depot order loop no longer cancels a mineral trip merely
+because no completed friendly townhall exists. Empty workers can approach and
+gather; loaded workers hold their cargo without crediting resources or mining
+again. Once a completed friendly depot exists, the unchanged return path
+delivers the cargo. Gas orders and the separate opt-in nearest-depot path are
+unchanged. No persistent field or save generation changes.
+
+This follows the pinned reference's gather-then-ReturnMinerals behavior and
+its preservation of cargo when a depot cannot be found. The GBA engine has
+no separate ReturnMinerals state: it retries on ordinary order updates rather
+than the native 75-update retry timer. Z7's authenticated opening has four
+human Drones and no friendly townhall, making this a real mission blocker.
+
+Actual-engine ASan/UBSan fixtures cover the asset-free SCV and the full Z7
+profile's SCV, Probe and Drone. They verify no resource credit before delivery,
+held cargo after patch depletion, no extra mining, rejection of enemy and
+unfinished friendly depots, and delivery after a friendly depot completes.
+The gas no-depot behavior retains its existing idle result. The focused
+fixture uses nearby actors to isolate the order transition; separate private
+Z7 controller attempts exercise movement and still do not qualify a win.
+
+The default, unified and full Terran ARM builds pass the unchanged reserve
+guards. Their IWRAM/BSS ends are respectively `0x03002ec0`/`0x020042ec`,
+`0x03004ed8`/`0x0203cfe8` and `0x03004e68`/`0x0203d9ec`. This shared behavior
+change intentionally changes their ROM identities: the 64-KiB default is
+`2e387c7aab91324eca5e8eca0748f0c5d601fd2861acda1e9e77b85a34d78c04`,
+the 4-MiB unified ROM is
+`e12289dc36779173f25f5d43597e6c2c5bdd1d300ba6f5faaaa9efbb952c9a77`,
+and the 8-MiB Terran ROM is
+`737e97ae1d9712c4e94860a541736af06b7f27e3ecd2208e9343efbfd5c53d82`.
+This does not establish new ARM playthrough, SRAM or performance qualification.
+
+Default build/tests (404 Python tests plus host fixtures), unified build/tests,
+both focused worker profiles and the full Terran build/regression pass with
+the save-mask correction below. The ten Terran controllers observe source
+wins; startup/skirmish, packed saves, repair and target fixtures also pass.
+The tested source hashes remain unchanged throughout these checks.
+
+### Terran completed-mission save mask
+
+The campaign loader mistakenly removed T5 and T7–T10 completion bits from its
+allowed mask before taking the complement. A valid completed T5 save with
+progress `0x100` therefore failed even though the full Terran catalog permits
+`0x3ff0`. The same failure reproduces on committed `4600901` and with the
+mineral-order fix, establishing that it predates that worker change.
+
+The runtime-specific mission bits are now ORed into the allowed set. The
+existing schema, mission binding, checksums and transactional candidate
+validators remain intact. The T5 sanitizer fixture reloads both victory and
+defeat records after clearing process state; it also rejects an in-range
+completion bit belonging to another race without mutating live state. The
+late-Terran save fixture and the complete ten-mission Terran regression pass.
+No persistent layout, save generation or RAM reserve changes.

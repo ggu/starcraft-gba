@@ -958,6 +958,17 @@ test-starcraft: build/test-sc64-resource-actions build/test-sc64-t5-actor-rules 
 
 test: test-starcraft
 
+build/test-sc64-no-depot-harvest: tests/sc64_no_depot_harvest.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
+build/test-sc64-no-depot-harvest-z7: tests/sc64_no_depot_harvest.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SCOURGE_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-no-depot-harvest test-sc64-no-depot-harvest-z7
+test-sc64-no-depot-harvest: build/test-sc64-no-depot-harvest
+	./build/test-sc64-no-depot-harvest
+test-sc64-no-depot-harvest-z7: build/test-sc64-no-depot-harvest-z7
+	./build/test-sc64-no-depot-harvest-z7
+test-starcraft: test-sc64-no-depot-harvest
+
 probe: build/probe.gba
 build/probe.elf: $(COMMON) $(COMMON_HEADERS) tests/platform_probe.c common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(COMMON) tests/platform_probe.c $(LDFLAGS) -Wl,-Map,build/probe.map -lgcc -o $@

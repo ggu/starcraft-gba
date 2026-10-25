@@ -5193,8 +5193,13 @@ target_lists_unavailable:
 	    }
 	    int tx, ty;
 	    if (home < 0) {
-		q->order = ORDER_IDLE;
-		continue;
+		/* Mineral trips can collect before a base exists. Hold loaded cargo
+		 * until a completed friendly depot can receive it. */
+		if (q->order != ORDER_MINE) {
+		    q->order = ORDER_IDLE;
+		    continue;
+		}
+		if (q->carry) continue;
 	    }
 	    tx = q->order == ORDER_MINE ? m[q->target].x : b[q->target].x;
 	    ty = q->order == ORDER_MINE ? m[q->target].y : b[q->target].y;
