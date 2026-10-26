@@ -37,9 +37,9 @@ Both runs win at input tick 59260 / game frame 59101, with no source faults,
 unsupported operations or input errors. Independent ARM input replays reach
 the same terminal fields.
 
-Private counters prove the optimized path runs: 793507 packed draws, including
-629411 derived-raw draws from ordinarily spawned units and 164124 explicit-raw
-draws. The initial prototype only accelerated explicit imports; it was corrected
+Private counters prove the optimized path runs: 793507 compositor calls pass
+its initial bounds checks. The caller records 629411 derived-raw and 164124
+explicit-raw path attempts; 28 are rejected by those early compositor guards. The initial prototype only accelerated explicit imports; it was corrected
 and requalified before promotion. A kernel-only 95-frame microbenchmark is
 separate evidence and must not be reported as the campaign speedup.
 

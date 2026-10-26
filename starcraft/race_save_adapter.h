@@ -653,8 +653,9 @@ static int race_save_game(void) {
     if (race_p5_active()) {
         if (!race_p5_runtime_state_valid()) return 0;
         race_data.p5 = race_p5;
+    }
 #if defined(SC64_P6_RUNTIME) || defined(SC64_P7_BATTERY_ENABLED)
-    } else if (
+    else if (
 #ifdef SC64_P6_RUNTIME
                !race_p6_active() &&
 #endif
@@ -662,9 +663,9 @@ static int race_save_game(void) {
                !race_p7_active() &&
 #endif
                1) {
-#endif
         memset(&race_data.p5, 0, sizeof(race_data.p5));
     }
+#endif
 #endif
 #ifdef SC64_P6_RUNTIME
     if (race_p6_active()) {

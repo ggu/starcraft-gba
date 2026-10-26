@@ -287,6 +287,20 @@ def parse_source(source_dir: Path = DEFAULT_SOURCE) -> dict:
                 'total_instances_per_execution': sum(
                     item['instances_per_execution'] for item in create_actions),
                 'quantity_rule': 'opcode 11 modifier zero normalizes to one, per audited native helper'}
+    # The runtime validator counts dispatched opcode-11 action rows, once each;
+    # it does not count the action's quantity modifier. Emit that exact prefix
+    # so the runtime can replace repeated immutable-row recounts with two
+    # bounded table reads.
+    create_action_prefix = [0]
+    for action in actions:
+        create_action_prefix.append(
+            create_action_prefix[-1] + (1 if action['opcode'] == 11 else 0))
+    if len(create_action_prefix) != len(actions) + 1:
+        raise ValueError('P4 create-action prefix has an invalid endpoint count')
+    if create_action_prefix[-1] != len(create_actions):
+        raise ValueError('P4 create-action prefix differs from authenticated action rows')
+    creation['create_action_prefix'] = create_action_prefix
+    creation['create_action_row_count'] = create_action_prefix[-1]
     return {'source_chk_sha256': hashlib.sha256(chk).hexdigest(),
             'triggers': triggers, 'actions': actions, 'conditions': conditions,
             'locations': [
@@ -329,9 +343,19 @@ def _u(value: int, width: int = 8) -> str:
 
 def emit_header(data: dict) -> str:
     """Emit numeric P4 source fields only; never copy STR text or WAV bytes."""
+    actions = data['actions']
+    prefix = data['actor_creation']['create_action_prefix']
+    if len(prefix) != len(actions) + 1 or prefix[0] != 0:
+        raise ValueError('P4 create-action prefix does not cover all action endpoints')
+    expected = 0
+    for index, action in enumerate(actions):
+        expected += 1 if action['opcode'] == 11 else 0
+        if prefix[index + 1] != expected:
+            raise ValueError('P4 create-action prefix differs from authenticated actions')
     out = ['/* Private generated P4 numeric trigger dispatch metadata. */\n',
            '#ifndef SC64_P4_SCENARIO_GENERATED_H\n#define SC64_P4_SCENARIO_GENERATED_H\n',
            f'#define SC64_P4_SOURCE_CHK_SHA256_HEX "{data["source_chk_sha256"]}"\n',
+           '#define SC64_P4_CREATE_PREFIX_VERSION 1\n',
            'typedef struct { unsigned int location,string_id,wav_id,time,group1,group2; unsigned short unit; unsigned char trigger,index,opcode,modifier,flags,trailing[3]; } Sc64P4SourceAction;\n',
            'typedef struct { unsigned int location,player,amount; unsigned short unit,mask; unsigned char trigger,index,comparison,opcode,resource,flags; } Sc64P4SourceCondition;\n',
            'typedef struct { unsigned short first_action,action_count,first_condition,condition_count; unsigned int execution_flags; unsigned char initial_cursor,enabled_players[27]; } Sc64P4SourceTrigger;\n',
@@ -344,6 +368,10 @@ def emit_header(data: dict) -> str:
                    ('trigger', 'index', 'opcode', 'modifier', 'flags')]
         values += ['{' + ','.join(_u(value, 2) for value in row['trailing']) + '}']
         out.append('    {' + ','.join(values) + '},\n')
+    out.append('};\n')
+    out.append(f'static const unsigned char sc64_p4_source_create_prefix[{len(prefix)}] = {{\n')
+    for start in range(0, len(prefix), 16):
+        out.append('    ' + ','.join(_u(value, 2) for value in prefix[start:start + 16]) + ',\n')
     out.append('};\n')
     storm = data['psionic_storm']
     out.append('static const unsigned char sc64_p4_source_storm_slot7_available_ptec = ' +

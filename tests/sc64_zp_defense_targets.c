@@ -335,6 +335,58 @@ static void dispatcher_preserves_p3_and_skirmish_paths(void)
     assert(!memcmp(&expected, &actual, sizeof(expected)));
 }
 
+static void assert_stock_defense_interval(int defense_type, int defense_raw,
+                                          int cooldown, int target_type,
+                                          int target_raw, int powered,
+                                          int skirmish)
+{
+    clear_world();
+    race_mode = skirmish;
+    b[0] = (Building){ .x=240, .y=240, .hp=500, .maxhp=500,
+        .owner=SIDE, .type=(u8)defense_type, .raw_type=defense_raw,
+        .alive=1 };
+    if (powered) {
+        b[1] = (Building){ .x=240, .y=240, .hp=500, .maxhp=500,
+            .owner=SIDE, .type=B_PYLON, .raw_type=156, .alive=1 };
+    }
+    u[0] = (Unit){ .x=256, .y=240, .hp=1000, .maxhp=1000,
+        .owner=ENEMY, .type=(u8)target_type, .raw_type=target_raw,
+        .alive=1 };
+
+    race_tick_defenses();
+    int first_hp = u[0].hp;
+    assert(first_hp < 1000);
+    assert(b[0].queue_progress == cooldown);
+    /* Both campaign target lists and skirmish fullscan dispatch through
+     * this fixture's caller-selected mode. Expiry must attack on tick N. */
+    for (int tick = 1; tick < cooldown; ++tick) {
+        race_tick_defenses();
+        assert(u[0].hp == first_hp);
+    }
+    race_tick_defenses();
+    assert(u[0].hp < first_hp);
+    assert(b[0].queue_progress == cooldown);
+}
+
+static void stock_defense_attack_intervals(void)
+{
+    static const struct {
+        int building, raw, cooldown, target, target_raw, powered;
+    } defenses[] = {
+        { B_PHOTON_CANNON, 162, 28, U_MARINE, 0, 1 },
+        { B_MISSILE_TURRET, 124, 19, U_MUTALISK, 43, 0 },
+        { B_SPORE_COLONY, 144, 19, U_MUTALISK, 43, 0 },
+        { B_SUNKEN_COLONY, 146, 40, U_ZERGLING, 37, 0 },
+    };
+    for (int skirmish = 0; skirmish <= 1; ++skirmish) {
+        for (unsigned i = 0; i < sizeof(defenses) / sizeof(defenses[0]); ++i) {
+            assert_stock_defense_interval(defenses[i].building, defenses[i].raw,
+                defenses[i].cooldown, defenses[i].target, defenses[i].target_raw,
+                defenses[i].powered, skirmish);
+        }
+    }
+}
+
 int main(void)
 {
     gba_init();
@@ -346,6 +398,7 @@ int main(void)
     same_update_mutations_precede_defense_query();
     invalid_owner_falls_back_before_mutation();
     dispatcher_preserves_p3_and_skirmish_paths();
+    stock_defense_attack_intervals();
     puts("Z/P defense target differential tests passed");
     return 0;
 }

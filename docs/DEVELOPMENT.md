@@ -50,16 +50,35 @@ pixels. Refresh an older prepared workspace before building the new renderer:
 Preparation requests `--prepack-unit-words` for the shared Zerg sprite bank.
 Status/build reject stale headers missing the metadata marker or payload.
 The extra data stays local; sprite/save layouts and the Z4 filename/identity
-are unchanged. Legacy Z3 and other race profiles retain their existing defaults.
-For a renderer comparison, `make zerg ZERG_UNIT_WORD_FLAGS=` disables the unit
-word path while retaining the other canonical tuning. See the
+are unchanged. Explicit legacy Z3/P3 retain their earlier defaults.
+For a renderer comparison, `make -B zerg ZERG_UNIT_WORD_FLAGS=` disables the unit
+word path while retaining the other canonical tuning. Canonical Terran also
+uses packed unit words; prepare its own bank with `--profile terran`. Its
+comparison override is `make -B terran TERRAN_UNIT_WORD_FLAGS=`; force the
+rebuild because Make does not track changed command-line flags. The
+[Terran audit](audits/2026-10-26-terran-word-promotion/README.md) records the
+current stock-combat replay evidence and memory limits. See the
 [rendering audit](audits/2026-10-26-unit-word-rendering/README.md) for exact
 pixel/state checks, measurements and memory limits.
+
+## Canonical minimap rendering
+
+Canonical Terran, Zerg and Protoss builds and Showcase batch the same 24-by-24
+visibility raster through the existing sprite compositor. No new private inputs
+are needed. `make test-sc64-minimap-terrain` checks both scalar and batched
+paths without a source ROM. To compare a prepared profile with scalar drawing,
+use `make -B protoss CANONICAL_MINIMAP_FLAGS=` (replace `protoss` with another
+canonical target as needed); force rebuilding when changing flags.
+
+The [minimap audit](audits/2026-10-26-minimap-terrain/README.md) records the
+pixel oracle, byte-identical public replay and scoped ARM timing. P3/Z3 legacy
+and staged profiles retain their existing flag selections.
 
 ## Source construction art
 
 Prepared imported race builds now use the source construction art, including
-Protoss WarpIn and source image underlays/overlays. The importer covers all 50
+the animated Protoss Warp Anchor during the build timer and source image
+underlays/overlays. The importer covers all 50
 stock constructible building IDs, including the Greater Spire morph. `./dev sc64
 prepare` generates the private header for race profiles; older prepared
 workspaces should regenerate it using the command below. `SC64_CONSTRUCTION_ART=0`
@@ -1024,7 +1043,7 @@ qualification. Source staging alone does not establish a playable mission.
 
 ### Canonical Zerg and Protoss chapter 3 builds
 
-The standard Zerg and Protoss build targets include their first three
+The standard Zerg and Protoss build targets include their first four
 missions. Prepare each profile from your verified ROM, then use the standard
 commands; no extra staged-profile selection is needed:
 
@@ -1037,10 +1056,11 @@ commands; no extra staged-profile selection is needed:
 
 Replace `zerg` with `protoss` for the Protoss campaign. The canonical output
 pairs are `build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf`
-and `build/StarCraft-Protoss-GBA.gba` / `build/starcraft-protoss.elf`. The
+and `build/StarCraft-Protoss-P4-Storm-GBA.gba` / `build/starcraft-protoss-p4-storm.elf`. The
 `zerg-z4` target also builds the canonical Zerg pair. Explicit `zerg-z3`
 preserves `build/StarCraft-Zerg-GBA.gba` / `build/starcraft-zerg.elf` and its
-save identity; versioned `-Z3` names are aliases. `protoss-p3` remains a compatibility alias. Retain matching
+save identity; versioned `-Z3` names are aliases. `protoss-p3` preserves the
+legacy P3 real files, code and save path. Retain matching
 frozen ROM/ELF pairs for replay.
 
 The canonical Zerg test target runs the fourth-mission runtime and controller
@@ -1052,17 +1072,53 @@ enforce the same IWRAM and EWRAM reserves.
 
 Canonical Zerg uses `SCZ4`, save generation 20, the Z4 runtime and the same
 qualified canonical drawing flags. Its save directory is separate from the
-legacy Z3 profile. Protoss uses `SCP3`, generation 7, and the P3 large-map
-geometry and optimization flags. Older standard two-mission generation-2
+legacy Z3 profile. Canonical Protoss uses `SCP5`, generation 21, and the P4
+Storm runtime; explicit `protoss-p3` retains `SCP3`, generation 7. Older standard two-mission generation-2
 saves are incompatible and are rejected. The asset-free default build
 continues to require no imported inputs.
 
 ### Staged Zerg and Protoss chapter 4
 
 Zerg 4 is enabled in the canonical profile. The `zerg-z4` spelling builds the
-same versioned ROM. `protoss-p4` remains an internal fourth-chapter target for
-**The Hunt for Tassadar**. Preparing later map data does not enable later
-missions in the frontend.
+same versioned ROM. Canonical Protoss now includes **The Hunt for Tassadar**
+through the Storm-enabled fourth-chapter profile. The plain `protoss-p4`
+build remains a separate internal experiment. Preparing later map data does
+not enable unqualified later missions in the frontend.
+
+The wrapper can prepare, build, test and launch the Storm-enabled P4 profile
+without running the individual packers manually:
+
+```sh
+./dev sc64 prepare --rom "/path/to/StarCraft 64 USA ROM" --profile protoss-p4-storm
+./dev sc64 build --profile protoss-p4-storm
+./dev sc64 test --profile protoss-p4-storm
+./dev sc64 play --profile protoss-p4-storm
+```
+
+This route checks both P3/P4 map gates, source mission identity and packed
+sprite metadata. It uses `.local/play/protoss-p4-storm` for emulator saves.
+The explicit `protoss-p3` wrapper retains the older P3 ROM and
+`.local/play/protoss` saves. Their generations and game codes are distinct;
+the wrapper does not convert saves between them. See the
+[P4 audit](audits/2026-10-26-p4-promotion/README.md) for current-source ARM
+mission and live-save qualification, separate from preparation.
+
+Canonical P4 also enables the generated create-action prefix and hot validator.
+An older prepared workspace must regenerate its numeric scenario header before
+building:
+
+```sh
+python3 tools/sc64_p4_scenario_pack.py
+make protoss test-protoss
+```
+
+The generator uses the already authenticated local P4 source; it does not fetch
+assets. Full `./dev sc64 prepare --profile protoss` also prepares this version.
+For an explicit comparison build, `make -B protoss P4_CREATE_PREFIX_FLAGS=`
+retains the old action-row recount. Force rebuilding is necessary when changing
+flags. These flags do not change save generation, actor limits or the legacy P3
+build. See the [prefix audit](audits/2026-10-26-p4-create-prefix/README.md) for
+the measured scope and unchanged worst-frame limitation.
 
 After the canonical profile preparation has supplied the common assets,
 prepare the additional ignored Z4 and P4 inputs from the same verified source
@@ -1070,7 +1126,7 @@ ROM (`./dev sc64 prepare --profile zerg` prepares Z4 automatically):
 
 ```sh
 python3 tools/sc64_races_pack.py --rom /path/to/StarCraft64-USA.z64 --out .local/sc64/zp-stage/generated/sc64_races_generated.h
-python3 tools/sc64_race_sprites.py --rom /path/to/StarCraft64-USA.z64 --base-only --include-zp-campaign-actors --out .local/sc64/zp-stage/generated/sprites --header .local/sc64/zp-stage/generated/sc64_race_sprites_generated.h
+python3 tools/sc64_race_sprites.py --rom /path/to/StarCraft64-USA.z64 --base-only --include-zp-campaign-actors --prepack-unit-words --out .local/sc64/zp-stage/generated/sprites --header .local/sc64/zp-stage/generated/sc64_race_sprites_generated.h
 python3 tools/sc64_z4_pack.py --rom /path/to/StarCraft64-USA.z64
 python3 tools/sc64_z4_scenario_pack.py
 python3 tools/sc64_p4_pack.py --rom /path/to/StarCraft64-USA.z64
