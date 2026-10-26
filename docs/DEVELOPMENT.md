@@ -1059,8 +1059,8 @@ enforce the same IWRAM and EWRAM reserves.
 
 Canonical Zerg uses `SCZ4`, save generation 20, the Z4 runtime and the same
 qualified canonical drawing flags. Its save directory is separate from the
-legacy Z3 profile. Protoss uses `SCP3`, generation 7, and the P3 large-map
-geometry and optimization flags. Older standard two-mission generation-2
+legacy Z3 profile. Canonical Protoss uses `SCP5`, generation 21, and the P4
+Storm runtime; explicit `protoss-p3` retains `SCP3`, generation 7. Older standard two-mission generation-2
 saves are incompatible and are rejected. The asset-free default build
 continues to require no imported inputs.
 
@@ -1089,6 +1089,23 @@ The explicit `protoss-p3` wrapper retains the older P3 ROM and
 the wrapper does not convert saves between them. See the
 [P4 audit](audits/2026-10-26-p4-promotion/README.md) for current-source ARM
 mission and live-save qualification, separate from preparation.
+
+Canonical P4 also enables the generated create-action prefix and hot validator.
+An older prepared workspace must regenerate its numeric scenario header before
+building:
+
+```sh
+python3 tools/sc64_p4_scenario_pack.py
+make protoss test-protoss
+```
+
+The generator uses the already authenticated local P4 source; it does not fetch
+assets. Full `./dev sc64 prepare --profile protoss` also prepares this version.
+For an explicit comparison build, `make -B protoss P4_CREATE_PREFIX_FLAGS=`
+retains the old action-row recount. Force rebuilding is necessary when changing
+flags. These flags do not change save generation, actor limits or the legacy P3
+build. See the [prefix audit](audits/2026-10-26-p4-create-prefix/README.md) for
+the measured scope and unchanged worst-frame limitation.
 
 After the canonical profile preparation has supplied the common assets,
 prepare the additional ignored Z4 and P4 inputs from the same verified source

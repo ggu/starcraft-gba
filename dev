@@ -196,7 +196,13 @@ def protoss_p4_input_ready(label: str, path: Path) -> bool:
                 return (manifest.get("schema") == 1 and manifest.get("mission") == {
                     "id": "P4", "global_catalog_index": 23,
                     "source_map_path": "008/021"})
-            return marker in path.read_text(encoding="ascii")
+            text = path.read_text(encoding="ascii")
+            if expected_label.endswith("scenario"):
+                return (marker in text and
+                        re.search(r"^#define\s+SC64_P4_CREATE_PREFIX_VERSION\s+1\s*$",
+                                  text, re.MULTILINE) is not None and
+                        re.search(r"\bsc64_p4_source_create_prefix\s*\[", text) is not None)
+            return marker in text
         except (OSError, UnicodeError, json.JSONDecodeError):
             return False
     return path.is_file()

@@ -88,7 +88,8 @@ LARGE_PROBE_FLAGS := $(RACE_CAMPAIGN_FLAGS) -DSC64_LARGE_MAPS -DSC64_CAMPAIGN_RA
 P3_OPTIMIZATION_FLAGS ?= -DSC64_ROUTE_PACK3 -DSC64_P3_DEFENSE_TARGETS -DSC64_P3_WINDOWED_SCHEDULE -DSC64_NO_FRAME_CLEAR -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DSC64_VISIBILITY_SPANS -DGBA_PRESENT_DEADLINE -DSC64_TARGET_OCCUPANCY -DSC64_UNARMED_QUERY_SKIP
 P3_FLAGS := $(LARGE_PROBE_FLAGS) -DSC64_P3_ENABLED -DSC64_P3_RUNTIME $(P3_OPTIMIZATION_FLAGS) $(P3_EXTRA_FLAGS)
 P4_FLAGS := $(filter-out -I.local/sc64/races/generated,$(P3_FLAGS)) -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated -I.local/sc64/p4/generated -DSC64_P4_DATA_ENABLED -DSC64_P4_ENABLED -DSC64_P4_RUNTIME -DSC64_P4_CAMPAIGN_ENTRY -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_ZP_DEFENSE_TARGETS
-P4_INPUTS := $(RACE_CAMPAIGN_INPUTS) .local/sc64/zp-stage/generated/sc64_races_generated.h .local/sc64/zp-stage/generated/sc64_race_sprites_generated.h .local/sc64/p4/generated/sc64_p4_scenario_generated.h
+P4_SCENARIO_HEADER := .local/sc64/p4/generated/sc64_p4_scenario_generated.h
+P4_INPUTS := $(RACE_CAMPAIGN_INPUTS) .local/sc64/zp-stage/generated/sc64_races_generated.h .local/sc64/zp-stage/generated/sc64_race_sprites_generated.h $(P4_SCENARIO_HEADER)
 P4_STORM_FLAGS := $(P4_FLAGS) -DSC64_P4_STORM_ENABLED
 ZP_FULL_STORAGE_FLAGS := $(P4_STORM_FLAGS) -DSC64_ZP_FULL_STORAGE
 Z5_FLAGS := $(filter-out -DSC64_ZP_DEFENSE_TARGETS -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated,$(Z4_FLAGS)) -I.local/sc64/z5/generated -I.local/sc64/zp-stage/generated -I.local/sc64/races/generated -I.local/sc64/zp-stage/generated/scenarios -DSC64_ZP_FULL_STORAGE -DSC64_STATIC_KEY_CULL -DSC64_Z5_DATA_ENABLED -DSC64_Z5_ENABLED -DSC64_Z5_RUNTIME -DSC64_Z5_CAMPAIGN_ENTRY -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS
@@ -149,7 +150,8 @@ PROTOSS_P3_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_P
 PROTOSS_P3_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_P3_CANONICAL_FLAGS)
 PROTOSS_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 PROTOSS_CANONICAL_FLAGS ?= $(PROTOSS_P3_CANONICAL_FLAGS) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL -DSC64_P4_COUNT_CENSUS_ENABLED $(PROTOSS_UNIT_WORD_FLAGS)
-PROTOSS_ROM_FLAGS = $(P4_STORM_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS)
+P4_CREATE_PREFIX_FLAGS ?= -DSC64_P4_CREATE_PREFIX -DSC64_P4_VALIDATOR_HOT
+PROTOSS_ROM_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P4_STORM_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS)
 TERRAN_FULL_INPUTS = $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER)
 
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
@@ -1528,7 +1530,32 @@ build/test-sc64-zp-air-tech: tests/sc64_zp_air_tech.c $(STARCRAFT) $(wildcard st
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z4-campaign-run: tests/sc64_z4_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
-.PHONY: test-sc64-z4-runtime test-sc64-p4-runtime test-sc64-zp-storage
+.PHONY: test-sc64-z4-runtime test-sc64-p4-runtime test-sc64-p4-create-prefix test-sc64-zp-storage
+
+
+$(P4_SCENARIO_HEADER): tools/sc64_p4_scenario_pack.py tools/sc64_p4_pack.py \
+		.local/sc64/p4/source.chk .local/sc64/p4/manifest.json \
+		$(wildcard .local/sc64/p4/records/*.bin) | build
+	$(PYTHON) tools/sc64_p4_scenario_pack.py --output $@ \
+		--report .local/sc64/p4/generated/scenario-audit.json
+
+build/test-sc64-p4-create-prefix: tests/sc64_p4_create_prefix.c $(STARCRAFT) \
+		$(wildcard starcraft/*.h) $(P4_INPUTS) \
+		common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror \
+		-Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined \
+		-DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+
+build/test-sc64-p4-runtime-fast: tests/sc64_p4_runtime.c $(STARCRAFT) \
+		$(wildcard starcraft/*.h) $(P4_INPUTS) \
+		common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST \
+		-Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+
+test-sc64-p4-create-prefix: build/test-sc64-p4-create-prefix build/test-sc64-p4-runtime-fast
+	./build/test-sc64-p4-create-prefix
+	./build/test-sc64-p4-runtime-fast
+
 test-sc64-z4-runtime: build/test-sc64-z4-adapter build/test-sc64-z4-runtime build/test-sc64-zp-actor-engine build/test-sc64-zp-air-tech build/test-sc64-z4-frame-coverage build/test-sc64-z4-profile
 	./build/test-sc64-z4-adapter
 	./build/test-sc64-zp-actor-engine
@@ -1536,7 +1563,7 @@ test-sc64-z4-runtime: build/test-sc64-z4-adapter build/test-sc64-z4-runtime buil
 	./build/test-sc64-z4-runtime
 	./build/test-sc64-z4-frame-coverage
 	./build/test-sc64-z4-profile
-test-sc64-p4-runtime: build/test-sc64-p4-adapter build/test-sc64-p4-runtime build/test-sc64-p4-frame-coverage build/test-sc64-p4-profile
+test-sc64-p4-runtime: build/test-sc64-p4-adapter build/test-sc64-p4-runtime build/test-sc64-p4-frame-coverage build/test-sc64-p4-profile test-sc64-p4-create-prefix
 	./build/test-sc64-p4-adapter
 	./build/test-sc64-p4-runtime
 	./build/test-sc64-p4-frame-coverage
@@ -1830,7 +1857,7 @@ build/test-sc64-p4-census: tests/sc64_p4_census.c $(STARCRAFT) $(wildcard starcr
 .PHONY: test-sc64-p4-census
 test-sc64-p4-census: build/test-sc64-p4-census
 	./build/test-sc64-p4-census
-test-protoss: build/test-protoss build/test-sc64-protoss-promoted-profile build/test-sc64-protoss-canonical-storm build/test-sc64-protoss-canonical-storage build/test-sc64-protoss-canonical-controller test-sc64-p4-census
+test-protoss: build/test-protoss build/test-sc64-protoss-promoted-profile build/test-sc64-protoss-canonical-storm build/test-sc64-protoss-canonical-storage build/test-sc64-protoss-canonical-controller test-sc64-p4-census test-sc64-p4-create-prefix
 	./build/test-protoss
 	./build/test-sc64-protoss-promoted-profile
 	./build/test-sc64-protoss-canonical-storm
