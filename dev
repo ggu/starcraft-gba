@@ -118,6 +118,9 @@ STAGED_CAMPAIGN_INPUTS = {
 FACING_PROFILES = ("terran", "zerg", "zerg-z4", "protoss", "protoss-p5-shuttle")
 FACING_HEADER = ".local/sc64/facing/generated/sc64_unit_facing_generated.h"
 TANK_VFX_HEADER = ".local/sc64/tank-vfx/generated/sc64_tank_source_vfx_generated.h"
+CONSTRUCTION_HEADER = ".local/sc64/construction/generated/sc64_construction_sprites_generated.h"
+CONSTRUCTION_PROFILES = ("races", "unified", "terran", "zerg", "zerg-z4", "zerg-z3", "protoss",
+                         "protoss-p3", "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle")
 
 
 def run(command: list[str], *, cwd: Path = ROOT) -> None:
@@ -194,6 +197,22 @@ def facing_sprite_input_ready(path: Path) -> bool:
             re.search(r"static const Sc64SpriteFrame sc64_unit_facing_\d+\[17\]",
                       text) is not None and
             re.search(r"static const unsigned char sc64_unit_facing_\d+_0_pixels\[[1-9]\d*\]",
+                      text) is not None)
+
+
+def construction_color_input_ready(path: Path) -> bool:
+    """Reject old opaque Warp Anchor banks before invoking the compiler."""
+    try:
+        text = path.read_text(encoding="ascii")
+    except (OSError, UnicodeError):
+        return False
+    return (re.search(r"^#define\s+SC64_CONSTRUCTION_COLOR_MODIFIERS_VERSION\s+1u?\s*$",
+                      text, re.MULTILINE) is not None and
+            "sc64_construction_modifier_frame(" in text and
+            "sc64_construction_modifier_lookup(" in text and
+            re.search(r"static const unsigned char \w*211_strengths_\d+\[[1-9]\d*\]",
+                      text) is not None and
+            re.search(r"static const unsigned char \w*(?:lookup|lut)\w*\[(?:10240|40\s*\*\s*256)\]",
                       text) is not None)
 
 
@@ -421,6 +440,10 @@ def build(game: str) -> None:
         raise RuntimeError(
             "canonical race builds require source Tank effects; "
             "regenerate with ./dev sc64 prepare --rom PATH --profile " + game)
+    if game in CONSTRUCTION_PROFILES and not construction_color_input_ready(ROOT / CONSTRUCTION_HEADER):
+        raise RuntimeError(
+            "source construction art requires the blue-glow modifier bank; "
+            "regenerate with ./dev sc64 prepare --rom PATH --profile " + game)
     make_target, _ = GAMES[game]
     run(["make", make_target])
 
@@ -511,6 +534,8 @@ def prepare(rom: Path, profile: str) -> None:
              "--prepack-unit-words"])
         run([sys.executable, str(ROOT / "tools/sc64_construction_sprites.py"),
              "--rom", str(private_rom)])
+        if not construction_color_input_ready(ROOT / CONSTRUCTION_HEADER):
+            raise RuntimeError("construction preparation produced a stale blue-glow bank")
         run([sys.executable, str(ROOT / "tools/sc64_menu_assets.py")])
         if profile in ("zerg", "zerg-z4", "protoss", "protoss-p4-storm"):
             zerg = profile in ("zerg", "zerg-z4")
@@ -615,16 +640,14 @@ def status(profile: str) -> int:
     ]
     if profile == "campaign":
         paths.append(("Campaign data", ROOT / ".local/sc64/campaign/generated/sc64_campaign_generated.h"))
-    if profile in ("races", "unified", "terran", "zerg", "zerg-z4", "zerg-z3", "protoss",
-                   "protoss-p3", "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle"):
+    if profile in CONSTRUCTION_PROFILES:
         race = ROOT / ".local/sc64/races/generated"
         paths.extend((label, race / name) for label, name in (
             ("Race maps", "sc64_races_generated.h"),
             ("Race sprites", "sc64_race_sprites_generated.h"),
             ("Menu artwork", "sc64_menu_generated.h"),
         ))
-        paths.append(("Source construction art",
-                      ROOT / ".local/sc64/construction/generated/sc64_construction_sprites_generated.h"))
+        paths.append(("Source construction art", ROOT / CONSTRUCTION_HEADER))
     if profile in ("terran", "zerg", "zerg-z4", "zerg-z3", "protoss", "protoss-p3",
                    "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle"):
         paths.append(("Skirmish maps", ROOT / ".local/sc64/skirmish/generated/sc64_skirmish_generated.h"))
@@ -673,6 +696,8 @@ def status(profile: str) -> int:
             ready = facing_sprite_input_ready(path)
         elif label == "Tank firing effects":
             ready = tank_vfx_input_ready(path)
+        elif label == "Source construction art":
+            ready = construction_color_input_ready(path)
         elif label.endswith("gated map data"):
             map_profile = ("protoss-p5-shuttle" if label == "Protoss chapter 5 gated map data"
                            else "zerg-z6" if label == "Zerg chapter 6 gated map data"
@@ -699,6 +724,7 @@ def status(profile: str) -> int:
     return int(any(not path.is_file() for _, path in paths) or
                (profile in FACING_PROFILES and not facing_sprite_input_ready(ROOT / FACING_HEADER)) or
                (profile in FACING_PROFILES and not tank_vfx_input_ready(ROOT / TANK_VFX_HEADER)) or
+               (profile in CONSTRUCTION_PROFILES and not construction_color_input_ready(ROOT / CONSTRUCTION_HEADER)) or
                (profile in ("zerg", "zerg-z4", "zerg-z3", "protoss", "protoss-p3") and not race_campaign_input_ready(
                    "zerg" if profile in ("zerg-z3", "zerg-z4") else profile,
                    ROOT / ".local/sc64/races/generated/sc64_races_generated.h")) or

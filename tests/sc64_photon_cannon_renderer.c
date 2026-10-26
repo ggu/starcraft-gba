@@ -58,25 +58,31 @@ static unsigned source_pixel_count(const Sc64SpriteFrame *s)
 }
 
 #ifdef SC64_CONSTRUCTION_SOURCE_ART
-static unsigned compare_construction_source_frame(const u8 *pixels,
-                                                  const Sc64SpriteFrame *s,
-                                                  int cx, int cy,
-                                                  int ui_top, int ui_height,
-                                                  unsigned *expected_pixels)
+static unsigned compare_warp_anchor_frame(const u8 *pixels,
+                                          const u8 *destinations,
+                                          const SC64ConstructionModifierFrame *frame,
+                                          const u8 *lookup, unsigned rows,
+                                          int cx, int cy,
+                                          int ui_top, int ui_height,
+                                          unsigned *expected_pixels)
 {
-    int left = cx - s->canvas_w / 2 + s->offset_x;
-    int top = cy - s->canvas_h / 2 + s->offset_y;
+    assert(frame && frame->strengths && lookup && rows == 40);
+    int left = cx - frame->canvas_w / 2 + frame->x;
+    int top = cy - frame->canvas_h / 2 + frame->y;
     unsigned expected = 0, matches = 0;
-    for (int y = 0; y < s->h; ++y)
-        for (int x = 0; x < s->w; ++x) {
-            u8 pixel = s->pixels[y * s->w + x];
+    for (int y = 0; y < frame->h; ++y)
+        for (int x = 0; x < frame->w; ++x) {
+            u8 strength = frame->strengths[y * frame->w + x];
             int sx = left + x, sy = top + y;
-            if (!pixel || sx < 0 || sx >= 240 || sy < 0 || sy >= 160 ||
+            if (!strength || strength > rows || sx < 0 || sx >= 240 ||
+                sy < 12 || sy >= 120 ||
                 (sy >= ui_top - 8 && sy < ui_top + 2) ||
                 (sy >= ui_top + ui_height + 3 &&
                  sy < ui_top + ui_height + 5)) continue;
             ++expected;
-            if (pixels[sy * 240 + sx] == pixel) ++matches;
+            u8 wanted = lookup[(strength - 1u) * 256u +
+                               destinations[sy * 240 + sx]];
+            if (pixels[sy * 240 + sx] == wanted) ++matches;
         }
     if (expected_pixels) *expected_pixels = expected;
     return matches;
@@ -150,6 +156,7 @@ int main(void)
     b[slot].build_progress = building_build_time(B_PHOTON_CANNON) / 2;
     gfx_begin(C_BLACK);
     draw_building_art(&b[slot]);
+    capture(before);
     draw_building_overlay(&b[slot]);
     capture(after);
 #ifdef SC64_CONSTRUCTION_SOURCE_ART
@@ -165,17 +172,21 @@ int main(void)
     assert(stage && stage->image_id==211 && stage->layer_count==1);
     assert(sc64_construction_animation_frame(stage->animation,
                                               source_elapsed,&source_frame));
-    const Sc64SpriteFrame *warp_anchor=
-        sc64_construction_image_frame(stage->image_id,(unsigned short)source_frame);
-    assert(warp_anchor && source_pixel_count(warp_anchor)>0);
+    const SC64ConstructionModifierFrame *warp_anchor=
+        sc64_construction_modifier_frame(stage->image_id,
+                                         (unsigned short)source_frame);
+    unsigned lut_rows=0;
+    const u8 *warp_lut=sc64_construction_modifier_lookup(stage->image_id,
+                                                          &lut_rows);
+    assert(warp_anchor && warp_anchor->strengths && warp_lut && lut_rows==40);
     const Sc64SpriteFrame *completed=mission_building_sprite(b[slot].type);
     assert(completed);
     int cx=b[slot].x-camx, cy=b[slot].y-camy+12;
     int ui_top=cy-completed->canvas_h/2+completed->offset_y;
     unsigned expected=0;
-    unsigned matches=compare_construction_source_frame(after,warp_anchor,cx,cy,
-        ui_top,completed->h,&expected);
-    assert(expected>8 && matches*5>=expected*4);
+    unsigned matches=compare_warp_anchor_frame(after,before,warp_anchor,
+        warp_lut,lut_rows,cx,cy,ui_top,completed->h,&expected);
+    assert(expected>8 && matches==expected);
 #else
     /* Diagnostic builds without source construction art retain the authored
        fallback expectation for the unfinished Cannon. */

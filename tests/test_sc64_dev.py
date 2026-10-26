@@ -40,9 +40,23 @@ TANK_VFX_HEADER = (
     'static const uint8_t sc64_tank_source_pixels[1] = {1};\n'
     'static const uint8_t sc64_tank_projected_lut[63*256] = {0};\n'
 )
+CONSTRUCTION_COLOR_HEADER = (
+    '#define SC64_CONSTRUCTION_COLOR_MODIFIERS_VERSION 1\n'
+    'static const unsigned char sc64_warp_211_strengths_0[1] = {32};\n'
+    'static const unsigned char sc64_construction_blue_lookup[40*256] = {0};\n'
+    'sc64_construction_modifier_frame(int image_id, int frame);\n'
+    'sc64_construction_modifier_lookup(int image_id, int *rows);\n'
+)
+
+
+def emit_construction_header(root):
+    path = root / dev.CONSTRUCTION_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(CONSTRUCTION_COLOR_HEADER, encoding='ascii')
 
 
 def emit_facing_header(root):
+    emit_construction_header(root)
     path = root / dev.FACING_HEADER
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(FACING_SPRITE_HEADER, encoding='ascii')
@@ -68,6 +82,22 @@ verify_loader.exec_module(verify_roms)
 
 
 class OnboardingTests(unittest.TestCase):
+    def test_construction_readiness_requires_glow_version_and_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'construction.h'
+            self.assertFalse(dev.construction_color_input_ready(header))
+            for text in (
+                '#define SC64_CONSTRUCTION_SPRITES_GENERATED_H\n',
+                CONSTRUCTION_COLOR_HEADER.replace('MODIFIERS_VERSION 1', 'MODIFIERS_VERSION 10'),
+                CONSTRUCTION_COLOR_HEADER.replace('sc64_construction_modifier_frame(', 'old_frame('),
+                CONSTRUCTION_COLOR_HEADER.replace('211_strengths_0[1]', '211_strengths_0[0]'),
+                CONSTRUCTION_COLOR_HEADER.replace('blue_lookup[40*256]', 'blue_lookup[0]'),
+            ):
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.construction_color_input_ready(header))
+            header.write_text(CONSTRUCTION_COLOR_HEADER, encoding='ascii')
+            self.assertTrue(dev.construction_color_input_ready(header))
+
     def test_tank_effect_readiness_rejects_empty_or_stale_payload(self):
         with tempfile.TemporaryDirectory() as directory:
             header = Path(directory) / 'tank.h'
@@ -120,6 +150,11 @@ class OnboardingTests(unittest.TestCase):
                 run.reset_mock()
                 (root / dev.TANK_VFX_HEADER).unlink()
                 with self.assertRaisesRegex(RuntimeError, 'source Tank effects'):
+                    dev.build('terran')
+                run.assert_not_called()
+                emit_facing_header(root)
+                (root / dev.CONSTRUCTION_HEADER).unlink()
+                with self.assertRaisesRegex(RuntimeError, 'blue-glow modifier bank'):
                     dev.build('terran')
                 run.assert_not_called()
 
@@ -228,6 +263,8 @@ class OnboardingTests(unittest.TestCase):
                               else local / 'races/generated/sc64_race_sprites_generated.h')
                     self.assertIn('--prepack-unit-words', command)
                     emit(output, UNIT_WORD_SPRITE_HEADER)
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
                 elif script == 'sc64_p4_pack.py':
                     emit(local / 'p4/manifest.json',
                          '{"schema":1,"mission":{"id":"P4","global_catalog_index":23,'
@@ -291,7 +328,7 @@ class OnboardingTests(unittest.TestCase):
                     '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\nsc64_race_z3_units\n#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */',
                 '.local/sc64/races/generated/sc64_race_sprites_generated.h': 'input',
                 '.local/sc64/races/generated/sc64_menu_generated.h': 'input',
-                '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': 'input',
+                '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': CONSTRUCTION_COLOR_HEADER,
                 '.local/sc64/skirmish/generated/sc64_skirmish_generated.h': 'input',
                 '.local/sc64/zp-stage/generated/sc64_races_generated.h':
                     '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\nsc64_race_z3_units\n#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n'
@@ -613,6 +650,8 @@ class OnboardingTests(unittest.TestCase):
                         if '--prepack-unit-words' in command:
                             content += UNIT_WORD_SPRITE_HEADER
                         output.write_text(content, encoding='ascii')
+                    elif script == 'sc64_construction_sprites.py':
+                        emit_construction_header(root)
                     elif script == 'sc64_unit_facing.py':
                         emit_facing_header(root)
                     elif script == 'sc64_menu_assets.py':
@@ -797,7 +836,7 @@ class OnboardingTests(unittest.TestCase):
                     '#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n',
                 '.local/sc64/races/generated/sc64_race_sprites_generated.h': 'sprites',
                 '.local/sc64/races/generated/sc64_menu_generated.h': 'menu',
-                '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': 'art',
+                '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': CONSTRUCTION_COLOR_HEADER,
                 '.local/sc64/skirmish/generated/sc64_skirmish_generated.h': 'skirmish',
                 '.local/sc64/zp-stage/generated/sc64_races_generated.h':
                     '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
@@ -855,6 +894,8 @@ class OnboardingTests(unittest.TestCase):
                     output.parent.mkdir(parents=True, exist_ok=True)
                     output.write_text('#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
                                       encoding='ascii')
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
                 elif script == 'sc64_z4_pack.py':
@@ -939,6 +980,8 @@ class OnboardingTests(unittest.TestCase):
                     output.write_text(UNIT_WORD_SPRITE_HEADER if '--prepack-unit-words' in command
                                       else '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
                                       encoding='ascii')
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
                 elif script == 'sc64_z4_pack.py':
@@ -1005,6 +1048,8 @@ class OnboardingTests(unittest.TestCase):
                     output.write_text(UNIT_WORD_SPRITE_HEADER if '--prepack-unit-words' in command
                                       else '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
                                       encoding='ascii')
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
                 elif script == 'sc64_z4_pack.py':
@@ -1185,6 +1230,8 @@ class OnboardingTests(unittest.TestCase):
                     touch(header)
                     if '--prepack-unit-words' in command:
                         header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
                 elif script == 'sc64_menu_assets.py':

@@ -4447,6 +4447,27 @@ and unified ROMs retain `4ad80ce0…f9aee` and `6bab5be2…979f9` respectively.
 
 ### Source construction art preview
 
+The later blue-glow correction preserves image 211's raw 1..40 strengths and
+composites them through a destination-dependent 40x256 table. Ordinary palette
+remapping had treated those strengths as color indices, producing an opaque,
+washed-out orb. The new projection uses the displayed GBA palette, including
+UI overrides, rather than only the source-remap preimages. The N64 table role
+is structurally inferred and the RGB555 projection is approximate; this does
+not establish pixel parity or finish the native post-timer materialization.
+
+Local validation for this correction includes an asset-free compiled C palette
+oracle (256 colors), a synthetic 10,240-cell lookup oracle, preparation guards,
+and sanitizer fixtures for three source animation phases. The production
+overlay fixture compares every visible effect pixel against its original
+framebuffer destination, checks blue-dominant pixels, distinct frame hashes,
+unchanged building state, and 371 above-map pixels with and without scene clip.
+The construction lifecycle/save fixture covers all three races; the Cannon
+fixture now checks exact modifier output while retaining its completed sprite,
+firing, and power-loss assertions. All four production ARM builds retain their
+existing IWRAM/BSS ends and save layout. These are local checks, not a new
+physical GBA frame-rate measurement.
+
+
 Historical preview evidence follows. The subsequent
 [stock profile and art follow-up](audits/2026-10-26-stock-profiles-and-art/README.md)
 enables layered source construction art in canonical prepared race builds,
