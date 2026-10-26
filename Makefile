@@ -138,13 +138,18 @@ TERRAN_FULL_FLAGS := $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_T6_CAMPAIGN_ENTRY -DSC6
 # probes, which retain their own RAM and timing qualification.
 CANONICAL_DRAW_FLAGS ?= -DGBA_SPRITE_WORDS -DGBA_SCENE_CLIP -DSC64_HUD_BUFFER_REUSE
 CANONICAL_STATIC_FLAGS ?= $(if $(filter -DGBA_SCENE_CLIP,$(CANONICAL_DRAW_FLAGS)),-DSC64_STATIC_DIRTY_ROWS)
-TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS)
+TERRAN_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
+TERRAN_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(TERRAN_FULL_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) $(TERRAN_UNIT_WORD_FLAGS)
+TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS)
 ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS)
 ZERG_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS)
 ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
-PROTOSS_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
-PROTOSS_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS)
+PROTOSS_P3_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
+PROTOSS_P3_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_P3_CANONICAL_FLAGS)
+PROTOSS_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
+PROTOSS_CANONICAL_FLAGS ?= $(PROTOSS_P3_CANONICAL_FLAGS) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL -DSC64_P4_COUNT_CENSUS_ENABLED $(PROTOSS_UNIT_WORD_FLAGS)
+PROTOSS_ROM_FLAGS = $(P4_STORM_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS)
 TERRAN_FULL_INPUTS = $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER)
 
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
@@ -321,20 +326,22 @@ $(P3_FRONT_TESTS): tests/sc64_p3_frontend.c starcraft/sc64_frontend.h starcraft/
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon -DSC64_UNIFIED -DSC64_CAMPAIGN_RACE=2 $(P3_FRONT_FLAGS) $< -o $@
 
 .PHONY: protoss-p3 test-sc64-p3
-# Compatibility filenames point at the canonical campaign ROM/ELF.
+# Legacy P3 keeps its original real files and save identity. Canonical P4
+# uses the distinct Storm filenames below; never point these aliases back
+# through the canonical target and create a symlink cycle.
 build/starcraft-protoss-p3.elf: build/starcraft-protoss.elf | build
 	ln -sf starcraft-protoss.elf $@
 build/StarCraft-Protoss-P3-GBA.gba: build/StarCraft-Protoss-GBA.gba | build
 	ln -sf StarCraft-Protoss-GBA.gba $@
-protoss-p3: verify-protoss build/starcraft-protoss-p3.elf build/StarCraft-Protoss-P3-GBA.gba
+protoss-p3: verify-protoss-p3 build/starcraft-protoss-p3.elf build/StarCraft-Protoss-P3-GBA.gba
 build/test-sc64-p3-run: tests/sc64_p3_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p3-save: tests/sc64_p3_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p3-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_P3_ROM_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p3-controller: tests/sc64_p3_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_P3_ROM_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p3-unarmed-targets: tests/sc64_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) -DSC64_UNARMED_QUERY_SKIP $< common/gba.c -o $@
 .PHONY: test-sc64-p3-unarmed-targets
@@ -343,7 +350,7 @@ test-sc64-p3-unarmed-targets: build/test-sc64-p3-unarmed-targets
 build/test-sc64-p3-defenses: tests/sc64_p3_defense_targets.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P3_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p3-frame-coverage: tests/sc64_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_P3_ROM_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p3-static-key: tests/sc64_static_key.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_TERRAIN_SCROLL -Icommon $(P3_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p3-schedule: tests/sc64_demo_schedule_runtime.c common/main.c common/demo_schedule.h common/gba.h Makefile | build
@@ -1288,18 +1295,20 @@ build/test-sc64-terran-full-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard 
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) $< common/gba.c -o $@
 build/test-sc64-terran-full-frame: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) $< common/gba.c -o $@
-build/test-sc64-protoss-canonical-frame: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+build/test-sc64-protoss-canonical-frame: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-protoss-canonical-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
 build/test-sc64-zerg-canonical-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
 .PHONY: test-canonical-render
-test-canonical-render: build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-z4-frame-coverage build/test-sc64-zerg-canonical-hud build/test-sc64-protoss-canonical-frame build/test-sc64-p3-hud
+test-canonical-render: build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-z4-frame-coverage build/test-sc64-zerg-canonical-hud build/test-sc64-protoss-canonical-frame build/test-sc64-protoss-canonical-hud
 	./build/test-sc64-terran-full-frame
 	./build/test-sc64-terran-full-hud
 	./build/test-sc64-z4-frame-coverage
 	./build/test-sc64-zerg-canonical-hud
 	./build/test-sc64-protoss-canonical-frame
-	./build/test-sc64-p3-hud
+	./build/test-sc64-protoss-canonical-hud
 .PHONY: test-sc64-terran-late-count-cache test-sc64-present test-sc64-terran-defense-targets test-sc64-terran-full-targets test-sc64-terran-full-spatial-hud
 test-sc64-terran-late-count-cache: build/test-sc64-terran-late-count-cache
 	./$<
@@ -1341,7 +1350,7 @@ protoss-p4: build/StarCraft-Protoss-P4-GBA.gba
 	$(PYTHON) tools/verify_roms.py --protoss-p4
 
 build/starcraft-protoss-p4-storm.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(P4_STORM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p4-storm.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(PROTOSS_ROM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p4-storm.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Protoss-P4-Storm-GBA.gba: build/starcraft-protoss-p4-storm.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
@@ -1797,20 +1806,36 @@ test-zerg: build/test-zerg build/test-sc64-zerg-promoted-profile test-sc64-z4-ca
 test-zerg-z3: test-sc64-z3-runtime
 
 build/starcraft-protoss.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(PROTOSS_ROM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(PROTOSS_P3_ROM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Protoss-GBA.gba: build/starcraft-protoss.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS3' SCP3
-verify-protoss: build/StarCraft-Protoss-GBA.gba
+verify-protoss: build/StarCraft-Protoss-P4-Storm-GBA.gba
 	$(PYTHON) tools/verify_roms.py --protoss
-build/test-protoss: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+verify-protoss-p3: build/StarCraft-Protoss-GBA.gba
+	$(PYTHON) tools/verify_roms.py --protoss-p3
+build/test-protoss: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) tests/sc64_split_run.c common/gba.c -o $@
-build/test-sc64-protoss-promoted-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.c Makefile | build
+build/test-sc64-protoss-promoted-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
-test-protoss: build/test-protoss build/test-sc64-protoss-promoted-profile test-sc64-p3
+build/test-sc64-protoss-canonical-storm: tests/sc64_p4_storm.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-protoss-canonical-storage: tests/sc64_zp_storage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-protoss-canonical-controller: tests/sc64_p4_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p4-census: tests/sc64_p4_census.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(filter-out -DSC64_P4_COUNT_CENSUS_ENABLED,$(PROTOSS_ROM_FLAGS)) -DSC64_P4_COUNT_CENSUS_ENABLED $< common/gba.c -o $@
+.PHONY: test-sc64-p4-census
+test-sc64-p4-census: build/test-sc64-p4-census
+	./build/test-sc64-p4-census
+test-protoss: build/test-protoss build/test-sc64-protoss-promoted-profile build/test-sc64-protoss-canonical-storm build/test-sc64-protoss-canonical-storage build/test-sc64-protoss-canonical-controller test-sc64-p4-census
 	./build/test-protoss
 	./build/test-sc64-protoss-promoted-profile
+	./build/test-sc64-protoss-canonical-storm
+	./build/test-sc64-protoss-canonical-storage
+	./build/test-sc64-protoss-canonical-controller --limit 180000 --attempt-tag canonical-qualified
 
 test-race-campaigns: test-terran test-zerg test-protoss
 verify-race-campaigns: verify-terran verify-zerg verify-protoss
@@ -1861,10 +1886,10 @@ clean:
 # Ordinary-controller probes do not mark a catalog mission qualified.
 build/test-sc64-t6-campaign-run: tests/sc64_t6_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T6_RUNTIME_FLAGS) -DSC64_T6_PROBE_ENTRY $< common/gba.c -o $@
-build/test-sc64-t8-campaign-run: tests/sc64_terran_assault_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(LATE_TERRAN_HEADERS) $(RACE_CAMPAIGN_INPUTS) Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=11 $< common/gba.c -o $@
-build/test-sc64-t10-campaign-run: tests/sc64_t10_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(LATE_TERRAN_HEADERS) $(RACE_CAMPAIGN_INPUTS) Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=13 $< common/gba.c -o $@
+build/test-sc64-t8-campaign-run: tests/sc64_terran_assault_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=11 $< common/gba.c -o $@
+build/test-sc64-t10-campaign-run: tests/sc64_t10_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=13 $< common/gba.c -o $@
 
 # Explicit qualification builds expose the normal campaign menu, not probe entry.
 build/starcraft-terran-t6-controller.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) common/gba.ld Makefile | build
@@ -1888,17 +1913,17 @@ build/test-sc64-terran-late-repair: tests/sc64_terran_late_repair.c $(STARCRAFT)
 test-sc64-terran-late-repair: build/test-sc64-terran-late-repair
 	./build/test-sc64-terran-late-repair
 
-build/test-sc64-t7-campaign-run: tests/sc64_t7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(LATE_TERRAN_HEADERS) $(RACE_CAMPAIGN_INPUTS) Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=10 $< common/gba.c -o $@
+build/test-sc64-t7-campaign-run: tests/sc64_t7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=10 $< common/gba.c -o $@
 
 build/test-sc64-t9-campaign-run: tests/sc64_t9_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=12 $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) -DSC64_TERRAN_LATE_PROBE_MISSION=12 $< common/gba.c -o $@
 
 # Exercise the compact full-profile layout against the existing early mission
 # controllers and persistence tests, not only the late-mission fixtures.
 define TERRAN_FULL_TEST
 build/test-sc64-full-$(1): $(2) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_FULL_FLAGS) $(3) $$< common/gba.c -o $$@
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) $(3) $$< common/gba.c -o $$@
 endef
 $(eval $(call TERRAN_FULL_TEST,t1-run,tests/sc64_mission_run.c))
 $(eval $(call TERRAN_FULL_TEST,t2-run,tests/backwater_mission_run.c))
@@ -3353,12 +3378,15 @@ test-sc64-p2-reinforcements: build/test-sc64-p2-reinforcements build/test-sc64-p
 	./build/test-sc64-p2-reinforcements-canonical
 test-unified test-protoss: test-sc64-p2-reinforcements
 
-build/test-sc64-protoss-carried-campaign: tests/race_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+build/test-sc64-protoss-carried-campaign: tests/race_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-protoss-carried-p3: tests/sc64_p3_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-protoss-carried-missions
-test-sc64-protoss-carried-missions: build/test-sc64-protoss-carried-campaign
+test-sc64-protoss-carried-missions: build/test-sc64-protoss-carried-campaign build/test-sc64-protoss-carried-p3
 	./build/test-sc64-protoss-carried-campaign --controller 2 --trace .local/sc64/p3-carried-p1-controller.json
 	./build/test-sc64-protoss-carried-campaign --controller 3 --trace .local/sc64/p3-carried-p2-controller.json
+	./build/test-sc64-protoss-carried-p3 --trace .local/sc64/p4-carried-p3-controller.json
 test-protoss: test-sc64-protoss-carried-missions
 
 # The indexed and packed sprite paths must agree over the whole framebuffer,

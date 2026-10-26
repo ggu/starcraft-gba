@@ -33,7 +33,7 @@ MAP_DIMS = ((64, 64), (64, 64))
 PROFILE_BUILD_PATHS = {
     "terran": ("StarCraft-Terran-GBA.gba", "starcraft-terran.elf"),
     "zerg": ("StarCraft-Zerg-Z4-GBA.gba", "starcraft-zerg-z4.elf"),
-    "protoss": ("StarCraft-Protoss-GBA.gba", "starcraft-protoss.elf"),
+    "protoss": ("StarCraft-Protoss-P4-Storm-GBA.gba", "starcraft-protoss-p4-storm.elf"),
 }
 
 
