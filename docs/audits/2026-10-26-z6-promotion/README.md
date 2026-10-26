@@ -25,7 +25,8 @@ The canonical flag vector is the Z6 storage/runtime/query vector
 (`Z6_PROBE_FLAGS`) with three changes. A word-packed copy of the six-chapter
 sprite bank (`.local/sc64/zerg-z6/generated`) takes the probe bank's place.
 The canonical drawing, Zerg tuning, minimap, directional-sprite and
-source weapon-effect flags are added, matching the Z4 product on base.
+source weapon-effect and death-art flags are added, matching the Z4 product on
+base.
 Like P5 Shuttle and Z7, it also restores the defense-target lists
 (`-DSC64_ZP_DEFENSE_TARGETS`) that Z4 already uses. With the source weapon
 effects inlined, the full-scan defense fallback would otherwise sit in IWRAM
@@ -187,16 +188,16 @@ same tapes, built from the same checkout. Z5 and Z6 have no Z4 baseline.
 
 | Mission | Product | Mean update | Mean draw | Mean full | Worst window | Worst in-mission update | Victory update | Updates over 561,792 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Z1 | Z4 baseline | 217,741 | 357,802 | 664,782 | 1,047,405 | 9,548,271 | 7,533,607 | 41.4% |
-| Z1 | Z6 | 254,826 | 394,314 | 724,830 | 1,128,917 | 9,674,843 | 12,522,226 | 58.1% |
-| Z2 | Z4 baseline | 260,863 | 381,678 | 736,194 | 942,623 | 6,974,836 | 5,628,700 | 56.8% |
-| Z2 | Z6 | 290,810 | 422,512 | 785,209 | 1,011,233 | 7,034,545 | 10,373,367 | 65.3% |
-| Z3 | Z4 baseline | 337,491 | 348,408 | 765,086 | 1,175,001 | 16,143,134 | 5,938,364 | 67.9% |
-| Z3 | Z6 | 384,451 | 386,847 | 854,133 | 1,254,212 | 16,336,802 | 11,093,753 | 86.7% |
-| Z4 | Z4 baseline | 295,922 | 387,322 | 770,949 | 1,717,697 | 4,564,305 | 5,999,572 | 88.5% |
-| Z4 | Z6 | 330,168 | 427,473 | 857,580 | 1,784,550 | 4,626,193 | 11,300,870 | 98.9% |
-| Z5 | Z6 | 556,130 | 304,798 | 949,783 | 1,237,638 | 5,231,261 | 12,559,824 | 99.0% |
-| Z6 | Z6 | 457,034 | 361,401 | 884,412 | 1,803,891 | 12,147,491 | 17,149,603 | 94.7% |
+| Z1 | Z4 baseline | 217,743 | 359,208 | 666,047 | 1,054,145 | 9,548,251 | 7,533,437 | 41.4% |
+| Z1 | Z6 | 254,826 | 395,721 | 726,142 | 1,138,187 | 9,674,859 | 12,517,159 | 58.1% |
+| Z2 | Z4 baseline | 260,868 | 382,323 | 736,448 | 940,725 | 6,974,867 | 5,628,863 | 56.8% |
+| Z2 | Z6 | 290,811 | 423,171 | 785,899 | 1,011,795 | 7,034,587 | 10,373,352 | 65.3% |
+| Z3 | Z4 baseline | 337,491 | 348,563 | 765,251 | 1,175,282 | 16,143,086 | 5,938,223 | 67.9% |
+| Z3 | Z6 | 384,453 | 387,001 | 854,303 | 1,254,212 | 16,336,841 | 11,093,943 | 86.7% |
+| Z4 | Z4 baseline | 295,923 | 387,336 | 770,930 | 1,717,416 | 4,564,323 | 5,999,586 | 88.5% |
+| Z4 | Z6 | 330,169 | 427,488 | 857,622 | 1,786,797 | 4,626,139 | 11,300,860 | 98.9% |
+| Z5 | Z6 | 556,130 | 304,857 | 949,917 | 1,237,638 | 5,231,261 | 12,559,784 | 99.0% |
+| Z6 | Z6 | 457,034 | 361,331 | 884,310 | 1,803,891 | 12,147,479 | 17,149,387 | 94.6% |
 
 On the same tapes, the six-chapter product costs 9.0%, 6.7%, 11.6% and 11.2%
 more mean full-frame cycles than the Z4 product for Z1–Z4. It also roughly
@@ -222,20 +223,21 @@ None of these numbers is a hardware measurement or a frame-rate claim.
 | IWRAM end | `0x03004e00` | `< 0x03005000` |
 | BSS end | `0x0203de78` | `< 0x0203e000` |
 | Save payload | 16,296 bytes (`sizeof(RaceSave)`) | `<= 16,368`, static assert |
-| ROM | 33,554,432 bytes, SHA-256 `f8d25fad…71ce616` | `<= 32 MiB` |
+| ROM | 33,554,432 bytes, SHA-256 `ffbde38e…5308e87f` | `<= 32 MiB` |
 
 The legacy Z4 ROM rebuilt at the tested commit is 33,554,432 bytes, SHA-256
-`4b6adc9bd5855427052da99091a5aa7c922b974c9ad6aab76c51d90ee66e0f74`. That is
+`fd9f06a2b8b597535f9b883ce61c057fba5c66563973924c54a8876680543d0f`. That is
 byte-identical to the canonical Z4 build from `codex/source-release` at
-`aa64d05`, which includes directional sprites, source weapon effects,
-attack poses, geyser hit testing and the Protoss warp-in glow. The
+`95b6151`, which includes directional sprites, source weapon effects,
+attack poses, source death art, geyser hit testing and the Protoss warp-in
+glow. The
 explicit Z3 ROM is identical to base as well
 (`da51cac4d80a6c31d1c8a7de9fc46b28273f758f96a0fb14964f4fbca9dfce29`).
 
 ## Commands run at the tested commit
 
-All of the following ran at `75ab58a3d35512ab55804ef82f2089a19fc74d13`, after
-merging `codex/source-release` at `aa64d05`. Every
+All of the following ran at `53ff953a741cd446f6e151f44426b6788cfb2fbf`, the
+merge of `codex/source-release` at `95b6151`. Every
 command exited 0.
 
 ```sh
