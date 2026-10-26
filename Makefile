@@ -3238,7 +3238,7 @@ zerg-z7-full-render-probe: build/StarCraft-Zerg-Z7-Full-Render-Probe-GBA.gba
 
 define Z7_FULL_RENDER_FIXTURE
 build/test-sc64-z7-full-render-$(1): tests/$(2) $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(Z7_FULL_RENDER_INPUTS) common/gba.c common/gba.h Makefile | build
-	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(Z7_FULL_RENDER_FLAGS) $$< common/gba.c -o $$@
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(Z7_FULL_RENDER_FLAGS) $(3) $$< common/gba.c -o $$@
 endef
 $(eval $(call Z7_FULL_RENDER_FIXTURE,profile,sc64_promoted_race_profile.c))
 $(eval $(call Z7_FULL_RENDER_FIXTURE,save,sc64_z7_game_save.c))
@@ -3249,6 +3249,13 @@ test-sc64-z7-full-render: $(addprefix build/test-sc64-z7-full-render-,profile sa
 	./build/test-sc64-z7-full-render-save
 	./build/test-sc64-z7-full-render-frame
 	./build/test-sc64-z7-full-render-scourge
+
+$(eval $(call Z7_FULL_RENDER_FIXTURE,formation-reference,sc64_reachable_formation.c))
+$(eval $(call Z7_FULL_RENDER_FIXTURE,formation,sc64_reachable_formation.c,-DSC64_REACHABLE_FORMATION))
+.PHONY: test-sc64-z7-reachable-formation
+test-sc64-z7-reachable-formation: build/test-sc64-z7-full-render-formation-reference build/test-sc64-z7-full-render-formation
+	./build/test-sc64-z7-full-render-formation-reference
+	./build/test-sc64-z7-full-render-formation
 
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE

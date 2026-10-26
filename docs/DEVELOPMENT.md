@@ -1652,6 +1652,12 @@ are emulator measurements, not hardware or 30-fps qualifications. The Z6
 canonical profile remains unchanged, and staged campaign qualification stays
 at 22/30.
 
+`make test-sc64-z7-reachable-formation` checks the default-off
+`SC64_REACHABLE_FORMATION` group-order fallback against the original slot
+policy. Canonical flags leave it disabled. See the
+[formation audit](audits/2026-10-27-reachable-formation/README.md) for the
+synthetic input fixture, ARM link evidence and remaining qualification gates.
+
 P7 has an isolated world foundation with separate source-Force wallets; its
 canonical roster fails closed on missing raw68/71/72 actor bindings. It still
 lacks shared menu/save integration. Neither seventh mission has a completed
