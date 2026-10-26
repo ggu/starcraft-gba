@@ -512,7 +512,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Canonical profiles expose T1–T10, Z1–Z4 and P1–P3. Current Zerg controllers complete all four chapters and P3 has a current full ARM win. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds. Historical staged coverage spans 22/30, with eight chapters still lacking a staged playthrough; P1/P2 now have fresh host and input-only ARM wins. P4's current controller still needs a successful route that protects Tassadar.
+- Canonical profiles expose T1–T10, Z1–Z4 and P1–P4 (18/30). Current Zerg controllers complete all four chapters; P1–P4 have host and input-only ARM wins in the canonical P4 pools. P4's route protects and extracts Tassadar and Raynor, with a live SRAM cold-load and continued-win proof. These ARM proofs precede the later construction-art correction. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds. Historical staged coverage spans 22/30, with eight chapters still lacking a staged playthrough.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

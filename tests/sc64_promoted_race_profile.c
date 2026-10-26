@@ -181,6 +181,17 @@ static void test_campaign_mission_roundtrip(int mission)
     assert(race_campaign.elapsed_frames == (u32)frame);
     assert(race_save_game());
     RaceSave expected = race_data;
+#ifdef SC64_P5_RUNTIME
+    if (mission == SC64_P5_GLOBAL_ID) {
+        assert(expected.p5.runtime.model.started != 0);
+        assert(expected.campaign.objective_stage != 0);
+        assert(memcmp(expected.p5.runtime.model.action_cursor,
+                      race_p5.runtime.model.action_cursor,
+                      sizeof(expected.p5.runtime.model.action_cursor)) == 0);
+        assert(expected.p5.runtime.model.started == race_p5.runtime.model.started);
+        assert(expected.campaign.objective_stage == race_campaign.objective_stage);
+    }
+#endif
     assert(expected.version == SAVE_VERSION);
     assert(SC64_RACE_SAVE_GENERATION == PROFILE_SAVE_GENERATION);
     assert(race_load_game());
@@ -189,6 +200,37 @@ static void test_campaign_mission_roundtrip(int mission)
     assert(race_save_game());
     assert(memcmp(&expected, &race_data, sizeof(expected)) == 0);
 }
+
+#ifdef SC64_P5_RUNTIME
+static void test_p5_inflight_save_payload(void)
+{
+    campaign_start_from_menu(SC64_P5_GLOBAL_ID);
+    game_update(0, 0);
+    assert(screen == SCREEN_PLAY && race_p5_active());
+
+    u8 any_cursor = 0;
+    for (unsigned i = 0; i < SC64_P5_TRIGGER_COUNT; ++i)
+        any_cursor |= race_p5.runtime.model.action_cursor[i];
+    assert(race_p5.runtime.model.started != 0);
+    assert(any_cursor != 0);
+    assert(race_campaign.objective_stage != 0);
+
+    assert(race_save_game());
+    RaceSave expected = race_data;
+    assert(expected.p5.runtime.model.started == race_p5.runtime.model.started);
+    assert(memcmp(expected.p5.runtime.model.action_cursor,
+                  race_p5.runtime.model.action_cursor,
+                  sizeof(expected.p5.runtime.model.action_cursor)) == 0);
+    assert(expected.campaign.objective_stage == race_campaign.objective_stage);
+
+    assert(race_load_game());
+    assert(race_p5.runtime.model.started == expected.p5.runtime.model.started);
+    assert(memcmp(race_p5.runtime.model.action_cursor,
+                  expected.p5.runtime.model.action_cursor,
+                  sizeof(expected.p5.runtime.model.action_cursor)) == 0);
+    assert(race_campaign.objective_stage == expected.campaign.objective_stage);
+}
+#endif
 
 static void reject_generation2_save(int mission, int legacy_container)
 {
@@ -373,6 +415,9 @@ int main(void)
                       profile_titles[i]) == 0);
         test_campaign_mission_roundtrip(profile_missions[i]);
     }
+#ifdef SC64_P5_RUNTIME
+    test_p5_inflight_save_payload();
+#endif
     test_older_generation_rejection(profile_missions[0]);
     test_all_skirmish_lineups();
     puts("Promoted race profile startup/save qualification passed");
