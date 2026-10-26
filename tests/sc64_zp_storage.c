@@ -39,7 +39,9 @@
 #error "Compile with the opt-in Zerg/Protoss storage gate"
 #endif
 
-#ifdef SC64_P5_SHUTTLE_ENABLED
+#ifdef SC64_P6_STORM_ENABLED
+_Static_assert(SC64_RACE_SAVE_GENERATION == 30u, "distinct P6 Storm storage generation");
+#elif defined(SC64_P5_SHUTTLE_ENABLED)
 _Static_assert(SC64_RACE_SAVE_GENERATION == 26u, "distinct P5 Shuttle storage generation");
 #elif defined(SC64_P4_STORM_ENABLED)
 _Static_assert(SC64_RACE_SAVE_GENERATION == 21u, "distinct Storm storage generation");

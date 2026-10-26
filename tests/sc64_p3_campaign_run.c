@@ -175,10 +175,12 @@ static int queued_type(int type)
 static int closest_foe_building(int x, int y)
 {
     int best = -1, best_d = 0x7fffffff;
-    /* Clear the nearer west force before committing to the eastern base. */
-    int owner = owner_buildings(ENEMY) > 0 ? ENEMY : 4;
+    /* Both enemy forces share the mission. Prefer the nearest base reachable
+       from the current army instead of committing every pass to one owner. */
     for (int i = 0; i < MAX_BUILDINGS; ++i)
-        if (b[i].alive && b[i].owner == owner) {
+        if (b[i].alive && (b[i].owner == ENEMY || b[i].owner == 4)) {
+            int nx, ny;
+            if (!path_next_tile(x, y, b[i].x, b[i].y, &nx, &ny)) continue;
             int d = dist2(x, y, b[i].x, b[i].y);
             if (d < best_d) { best = i; best_d = d; }
         }
@@ -623,7 +625,25 @@ static void assign_gas_probe(void)
     for (int j = 0; j < MAX_UNITS; ++j)
         if (u[j].alive && u[j].owner == SIDE && u[j].type == U_PROBE &&
             u[j].order == ORDER_GAS) ++gas_workers;
-    if (gas_workers >= 4) return;
+    /* Keep mining income available for reinforcements. When the mineral bank
+       is low, move every gas worker back to a mineral patch using normal input. */
+    int keep_gas = minerals < 200 ? 0 : 2;
+    if (gas_workers > keep_gas) {
+        int kept = 0;
+        for (int j = 0; j < MAX_UNITS; ++j)
+            if (u[j].alive && u[j].owner == SIDE && u[j].type == U_PROBE &&
+                u[j].order == ORDER_GAS) {
+                if (kept++ < keep_gas) continue;
+                int patch = nearest_mineral(u[j].x, u[j].y);
+                if (patch < 0) return;
+                select_box(u[j].x, u[j].y, 8);
+                tap(KEY_B); tap(KEY_A); /* choose ordinary MOVE */
+                move_cursor(m[patch].x, m[patch].y);
+                tap(KEY_A);
+                return;
+            }
+    }
+    if (gas_workers >= keep_gas) return;
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner == SIDE && b[i].type == B_ASSIMILATOR &&
             !b[i].under_construction) {
@@ -647,6 +667,30 @@ static void assign_gas_probe(void)
                 tap(KEY_A);
             }
         }
+}
+
+static int recover_stalled_builder(void)
+{
+    ensure_normal_ui();
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
+            u[i].order == ORDER_BUILD && u[i].target >= 0 && u[i].target < MAX_BUILDINGS &&
+            b[u[i].target].alive && b[u[i].target].under_construction &&
+            dist2(u[i].x, u[i].y, b[u[i].target].x, b[u[i].target].y) > 36 * 36) {
+            int nx, ny;
+            int path = path_next_tile(u[i].x, u[i].y, b[u[i].target].x, b[u[i].target].y, &nx, &ny);
+            if (path && u[i].path_retry < 8) continue;
+            int wx = u[i].x, wy = u[i].y;
+            select_box(wx, wy, 8);
+            if (selected_count() != 1 || selected_building >= 0) return 0;
+            tap(KEY_B);
+            for (int row = 0; row < MENU_COUNT && menu_open && menu_cursor != MENU_STOP; ++row)
+                tap(KEY_DOWN);
+            if (!menu_open || menu_cursor != MENU_STOP) return 0;
+            tap(KEY_A); /* ordinary STOP releases the unreachable builder */
+            return 1;
+        }
+    return 0;
 }
 
 static void build_pylons_and_gateways(void)
@@ -683,7 +727,7 @@ static void build_pylons_and_gateways(void)
         build_photon_cannon_near_nexus();
         if (side_construction_count() > before) return;
     }
-    if (free_supply <= 18 && minerals >= 100 && side_building_count(B_PYLON) < 10) {
+    if (free_supply <= 18 && minerals >= 100 && side_building_count(B_PYLON) < 20) {
         build_pylon_near_nexus();
         if (side_construction_count() > before) return;
     }
@@ -823,6 +867,7 @@ int main(int argc, char **argv)
            input before deciding the next action. */
         if (menu_open || mode != MODE_NORMAL) ensure_normal_ui();
         if (frame >= next_build) {
+            (void)recover_stalled_builder();
             build_pylons_and_gateways();
             next_build = frame + 500;
         }
@@ -846,7 +891,9 @@ int main(int argc, char **argv)
 #endif
         }
         if (frame >= next_order) {
-            if (!assault_started && frame >= 10000 && owner_army(SIDE) >= 14)
+            if (owner_buildings(4) == 0 && owner_buildings(ENEMY) > 0)
+                assault_started = owner_army(SIDE) >= 28;
+            else if (!assault_started && frame >= 10000 && owner_army(SIDE) >= 10)
                 assault_started = 1;
             if (assault_started) {
                 issue_sweep_order();

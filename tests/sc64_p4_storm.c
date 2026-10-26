@@ -32,7 +32,10 @@ static void launch_from_normal_menu(void)
     press(KEY_A);
     input(KEY_A);
     assert(screen == SCREEN_PLAY && race_p4_active());
-#ifdef SC64_P5_SHUTTLE_ENABLED
+#ifdef SC64_P6_STORM_ENABLED
+    /* Carried P4 uses the enclosing P6 product's save schema. */
+    assert(SAVE_VERSION == 0x53435030u + 30u);
+#elif defined(SC64_P5_SHUTTLE_ENABLED)
     /* P4 remains the selected mission, but the combined P5 ROM owns the
      * shared save identity and generation. */
     assert(SAVE_VERSION == 0x53435030u + 26u);

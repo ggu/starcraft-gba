@@ -313,6 +313,9 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(verify_roms.TARGETS['--zerg-z3'],
                          ('StarCraft-Zerg-GBA', 'starcraft-zerg', 'SCZ3', 'SC ZERG Z3'))
         self.assertEqual(verify_roms.TARGETS['--protoss'],
+                         ('StarCraft-Protoss-P6-GBA', 'starcraft-protoss-p6',
+                          'SCP6', 'SC PROTOSS6'))
+        self.assertEqual(verify_roms.TARGETS['--protoss-p5-shuttle'],
                          ('StarCraft-Protoss-P5-Shuttle-GBA', 'starcraft-protoss-p5-shuttle',
                           'SCPB', 'SC P5 CARGO'))
         self.assertEqual(verify_roms.TARGETS['--protoss-p4-storm'],
@@ -326,12 +329,17 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z4'], 'test-zerg-z4')
         self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z3'], 'test-zerg-z3')
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p6'], 'test-protoss')
+        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P6-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p6'], ('protoss', 'build/StarCraft-Protoss-P6-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p5-shuttle'],
+                         ('protoss-p5-shuttle', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg'], ('zerg', 'build/StarCraft-Zerg-Z6-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg-z4'], ('zerg-z4', 'build/StarCraft-Zerg-Z4-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg-z3'], ('zerg-z3', 'build/StarCraft-Zerg-GBA.gba'))
         self.assertEqual(dev.PLAY_SAVE_PROFILES,
                          {'zerg': 'zerg-z6', 'zerg-z4': 'zerg-z4', 'zerg-z3': 'zerg',
-                          'protoss': 'protoss-p5-shuttle', 'protoss-p3': 'protoss',
+                          'protoss': 'protoss-p6', 'protoss-p6': 'protoss-p6', 'protoss-p3': 'protoss',
                           'protoss-p4-storm': 'protoss-p4-storm',
                           'protoss-p5-shuttle': 'protoss-p5-shuttle'})
         self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['zerg'],
@@ -340,7 +348,7 @@ class OnboardingTests(unittest.TestCase):
                          ('StarCraft-Zerg-Z6-GBA.gba', 'starcraft-zerg-z6.elf'))
         for routes in (sc64_split_profile.PROFILE_BUILD_PATHS, sc64_split_smoke.PROFILE_BUILD_PATHS):
             self.assertEqual(routes['protoss'],
-                             ('StarCraft-Protoss-P5-Shuttle-GBA.gba', 'starcraft-protoss-p5-shuttle.elf'))
+                             ('StarCraft-Protoss-P6-GBA.gba', 'starcraft-protoss-p6.elf'))
 
     def test_p4_storm_and_legacy_p3_have_explicit_build_and_save_routes(self):
         self.assertEqual(dev.GAMES['protoss-p3'],
@@ -354,12 +362,19 @@ class OnboardingTests(unittest.TestCase):
         self.assertIn('test-sc64-p4-runtime', p4_test)
         self.assertIn('test-sc64-p4-campaign', p4_test)
         self.assertIn('test-sc64-p4-occupancy-targets', p4_test)
+        carried_rule = next(line for line in makefile.splitlines()
+                            if line.startswith('build/test-sc64-protoss-carried-campaign:'))
+        self.assertIn('$(PROTOSS_CANONICAL_INPUTS)', carried_rule)
         p5_rule = next(line for line in makefile.splitlines()
-                       if line.startswith('build/test-sc64-protoss-carried-campaign:'))
+                       if line.startswith('build/starcraft-protoss-p5-shuttle.elf:'))
         self.assertIn('$(P5_INPUTS)', p5_rule)
+        p5_recipe = makefile.splitlines()[makefile.splitlines().index(p5_rule) + 1]
+        self.assertIn('$(PROTOSS_P5_CANONICAL_FLAGS)', p5_recipe)
         self.assertNotEqual(dev.GAMES['protoss'][1], dev.GAMES['protoss-p4-storm'][1])
-        self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss'], 'protoss-p5-shuttle')
-        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss'], 'protoss-p6')
+        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P6-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p5-shuttle'],
+                         ('protoss-p5-shuttle', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
         self.assertEqual(dev.GAMES['protoss-p4-storm'], ('protoss-p4-storm', 'build/StarCraft-Protoss-P4-Storm-GBA.gba'))
         self.assertEqual(dev.PLAY_SAVE_PROFILES.get('protoss-p4-storm', 'protoss-p4-storm'),
                          'protoss-p4-storm')
@@ -592,6 +607,96 @@ class OnboardingTests(unittest.TestCase):
             header.write_text('#define SC64_Z6_SPRITE_SET_COMPLETE 1\n' + UNIT_WORD_SPRITE_HEADER,
                               encoding='ascii')
             self.assertTrue(dev.staged_campaign_input_ready('protoss-p5-shuttle', label, header))
+
+    def test_canonical_p6_requires_complete_source_and_word_sprite_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for label, relative, marker in dev.STAGED_CAMPAIGN_INPUTS['protoss-p6']:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if label == 'Protoss chapter 5 sprites':
+                    contents = '#define SC64_Z6_SPRITE_SET_COMPLETE 1\n' + UNIT_WORD_SPRITE_HEADER
+                elif label == 'Protoss chapter 6 scenario':
+                    contents = ('#define SC64_P6_SOURCE_GLOBAL_ID 25u\n'
+                                'static const Sc64P6SourceAction sc64_p6_source_actions[1];\n')
+                elif label == 'Protoss chapter 6 abilities':
+                    contents = ('#define SC64_P6_ABILITIES_COMPLETE 1u\n'
+                                '#define SC64_P6_ABILITIES_SOURCE_GLOBAL_ID 25u\n')
+                elif label == 'Protoss chapter 6 doodads':
+                    contents = ('#define SC64_P6_DOODAD_SOURCE_COUNT 27u\n'
+                                'static const Sc64P6Doodad sc64_p6_doodads[27];\n')
+                elif label == 'Protoss chapter 6 sprites':
+                    contents = '#define SC64_P6_SPRITE_SET_COMPLETE 1\n' + UNIT_WORD_SPRITE_HEADER
+                else:
+                    contents = f'#define {marker} 1\n' if marker else 'maps\n'
+                path.write_text(contents, encoding='ascii')
+                self.assertTrue(dev.staged_campaign_input_ready('protoss-p6', label, path), label)
+
+            p6_sprite = root / dev.STAGED_CAMPAIGN_INPUTS['protoss-p6'][-1][1]
+            p6_sprite.write_text('#define SC64_P6_SPRITE_SET_COMPLETE 1\n', encoding='ascii')
+            self.assertFalse(dev.staged_campaign_input_ready(
+                'protoss-p6', 'Protoss chapter 6 sprites', p6_sprite))
+            p6_sprite.write_text('#define SC64_P6_SPRITE_SET_COMPLETE 1\n' +
+                                 UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+            self.assertTrue(dev.staged_campaign_input_ready(
+                'protoss-p6', 'Protoss chapter 6 sprites', p6_sprite))
+
+            scenario = root / dev.STAGED_CAMPAIGN_INPUTS['protoss-p6'][5][1]
+            scenario.write_text('#define SC64_P6_SOURCE_GLOBAL_ID 24u\n'
+                                'static const Sc64P6SourceAction sc64_p6_source_actions[1];\n',
+                                encoding='ascii')
+            self.assertFalse(dev.staged_campaign_input_ready(
+                'protoss-p6', 'Protoss chapter 6 scenario', scenario))
+
+    def test_staged_p6_preparation_uses_existing_private_packers_and_actor_bank(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rom = root / 'prepared-usa.z64'
+            rom.write_bytes(b'fixture')
+            calls = []
+            with patch.object(dev, 'ROOT', root), patch.object(
+                    dev, 'run', side_effect=lambda command, **_: calls.append(command)):
+                dev.prepare_staged_campaign('protoss-p6', rom)
+            scripts = [Path(command[1]).name for command in calls]
+            self.assertEqual(scripts, [
+                'sc64_zp_scenario_pack.py', 'sc64_p6_ability_pack.py',
+                'sc64_p6_doodad_pack.py', 'sc64_race_sprites.py'])
+            self.assertIn('--mission', calls[0])
+            self.assertIn('P6', calls[0])
+            self.assertIn('--header', calls[2])
+            self.assertIn('--include-p6-actors', calls[3])
+            self.assertIn('--prepack-unit-words', calls[3])
+            self.assertEqual(calls[3][calls[3].index('--header') + 1],
+                             str(root / '.local/sc64/protoss-p6/generated/sc64_race_sprites_generated.h'))
+
+    def test_canonical_p6_make_flags_pin_validated_queries_against_probe_overrides(self):
+        make_snippet = ('.PHONY: print-p6-flags\n'
+                        'print-p6-flags:\n'
+                        "\t@printf '%s\\n' '$(PROTOSS_P6_CANONICAL_FLAGS)'\n")
+        overrides = {
+            'P5_QUERY_FLAGS': '-DP5_QUERY_OVERRIDE_SENTINEL',
+            'P6_QUERY_FLAGS': '-DP6_QUERY_OVERRIDE_SENTINEL',
+            'P6_EXTRA_FLAGS': '-DP6_EXTRA_OVERRIDE_SENTINEL',
+        }
+        command = ['make', '-s', '-f', 'Makefile', '-f', '-', 'print-p6-flags']
+        command.extend(f'{name}={value}' for name, value in overrides.items())
+        result = subprocess.run(command, cwd=ROOT, input=make_snippet, text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        evaluated_flags = result.stdout.strip().split()
+        evaluated = set(evaluated_flags)
+        for flag in (
+                '-DSC64_P5_TYPE_FIRST_COUNTS', '-DSC64_P5_PRUNE_STARTED',
+                '-DSC64_P5_COUNT_SNAPSHOT', '-DSC64_P6_PRUNE_STARTED',
+                '-DSC64_P6_PREVALIDATED_TICK', '-DSC64_P6_TRAP_CULL',
+                '-DSC64_P6_COUNT_SNAPSHOT', '-DSC64_P6_BURROW_CULL',
+                '-DSC64_P6_BURROW_GROUPED', '-DSC64_P6_RESCUE_GROUPED',
+                '-DSC64_P6_STORM_POSTCHECK_LOCAL',
+        ):
+            with self.subTest(required_flag=flag):
+                self.assertIn(flag, evaluated)
+        for flag in overrides.values():
+            with self.subTest(probe_override=flag):
+                self.assertNotIn(flag, evaluated)
 
     def test_staged_z6_and_p5_profiles_have_explicit_build_and_test_routes(self):
         self.assertEqual(dev.GAMES['zerg-z6'],

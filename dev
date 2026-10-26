@@ -27,19 +27,21 @@ GAMES = {
     "zerg": ("zerg", "build/StarCraft-Zerg-Z6-GBA.gba"),
     "zerg-z4": ("zerg-z4", "build/StarCraft-Zerg-Z4-GBA.gba"),
     "zerg-z3": ("zerg-z3", "build/StarCraft-Zerg-GBA.gba"),
-    "protoss": ("protoss", "build/StarCraft-Protoss-P5-Shuttle-GBA.gba"),
+    "protoss": ("protoss", "build/StarCraft-Protoss-P6-GBA.gba"),
+    "protoss-p6": ("protoss", "build/StarCraft-Protoss-P6-GBA.gba"),
     "protoss-p3": ("protoss-p3", "build/StarCraft-Protoss-GBA.gba"),
     "protoss-p4-storm": ("protoss-p4-storm", "build/StarCraft-Protoss-P4-Storm-GBA.gba"),
     "zerg-z6": ("zerg-z6-probe", "build/StarCraft-Zerg-Z6-Probe-GBA.gba"),
     "protoss-p5-shuttle": ("protoss-p5-shuttle", "build/StarCraft-Protoss-P5-Shuttle-GBA.gba"),
 }
 PLAY_SAVE_PROFILES = {"zerg": "zerg-z6", "zerg-z4": "zerg-z4", "zerg-z3": "zerg",
-                      "protoss": "protoss-p5-shuttle", "protoss-p3": "protoss",
+                      "protoss": "protoss-p6", "protoss-p6": "protoss-p6",
+                      "protoss-p3": "protoss",
                       "protoss-p4-storm": "protoss-p4-storm",
                       "protoss-p5-shuttle": "protoss-p5-shuttle"}
 SC64_PROFILES = ("wasteland", "backwater", "skirmish", "campaign", "races", "unified",
                  "terran", "zerg", "zerg-z4", "zerg-z3", "protoss", "protoss-p3",
-                 "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle")
+                 "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle", "protoss-p6")
 SC64_TEST_TARGETS = {
     "unified": "test-unified", "races": "test-races",
     "wasteland": "test-sc64", "backwater": "test-backwater",
@@ -52,6 +54,7 @@ SC64_TEST_TARGETS = {
     "zerg-z6": ("test-sc64-z6-runtime", "test-sc64-z6-save", "test-sc64-z6-profile",
                 "test-sc64-z6-frame-coverage", "test-sc64-z6-controller"),
     "protoss-p5-shuttle": ("test-sc64-p5-shuttle-runtime", "test-sc64-p5-campaign-run"),
+    "protoss-p6": "test-protoss",
 }
 RACE_CAMPAIGN_GATES = {
     "zerg": ("SC64_Z3_ENABLED", "sc64_race_z3_units"),
@@ -62,6 +65,7 @@ RACE_CAMPAIGN_GATES = {
     "protoss-p4-storm": ("SC64_P4_DATA_ENABLED", "sc64_race_p4_units"),
     "zerg-z6": ("SC64_Z6_DATA_ENABLED", "sc64_race_z6_units"),
     "protoss-p5-shuttle": ("SC64_P5_DATA_ENABLED", "sc64_race_p5_units"),
+    "protoss-p6": ("SC64_P6_DATA_ENABLED", "sc64_race_p6_units"),
 }
 
 CANONICAL_ZERG_INPUTS = (
@@ -113,9 +117,20 @@ STAGED_CAMPAIGN_INPUTS = {
         ("Protoss chapter 5 scenario", ".local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h", "SC64_P5_SOURCE_GLOBAL_ID"),
         ("Protoss chapter 5 sprites", ".local/sc64/p5/generated/sc64_race_sprites_generated.h", "SC64_Z6_SPRITE_SET_COMPLETE"),
     ),
+    "protoss-p6": (
+        ("Protoss maps", ".local/sc64/zp-stage/generated/sc64_races_generated.h", None),
+        ("Protoss shared sprites", ".local/sc64/zp-stage/generated/sc64_race_sprites_generated.h", "SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE"),
+        ("Protoss chapter 4 scenario", ".local/sc64/p4/generated/sc64_p4_scenario_generated.h", "SC64_P4_SCENARIO_GENERATED_H"),
+        ("Protoss chapter 5 scenario", ".local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h", "SC64_P5_SOURCE_GLOBAL_ID"),
+        ("Protoss chapter 5 sprites", ".local/sc64/p5/generated/sc64_race_sprites_generated.h", "SC64_Z6_SPRITE_SET_COMPLETE"),
+        ("Protoss chapter 6 scenario", ".local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h", "SC64_P6_SOURCE_GLOBAL_ID"),
+        ("Protoss chapter 6 abilities", ".local/sc64/zp-stage/generated/scenarios/sc64_p6_abilities_generated.h", "SC64_P6_ABILITIES_COMPLETE"),
+        ("Protoss chapter 6 doodads", ".local/sc64/p6/generated/sc64_p6_doodads_generated.h", "SC64_P6_DOODAD_SOURCE_COUNT"),
+        ("Protoss chapter 6 sprites", ".local/sc64/protoss-p6/generated/sc64_race_sprites_generated.h", "SC64_P6_SPRITE_SET_COMPLETE"),
+    ),
 }
 
-FACING_PROFILES = ("terran", "zerg", "zerg-z4", "protoss", "protoss-p5-shuttle")
+FACING_PROFILES = ("terran", "zerg", "zerg-z4", "protoss", "protoss-p5-shuttle", "protoss-p6")
 FACING_HEADER = ".local/sc64/facing/generated/sc64_unit_facing_generated.h"
 TANK_VFX_HEADER = ".local/sc64/tank-vfx/generated/sc64_tank_source_vfx_generated.h"
 WEAPON_SOURCE_HEADER = ".local/sc64/weapon-vfx/generated/sc64_weapon_source_generated.h"
@@ -123,7 +138,7 @@ ATTACK_POSE_HEADER = ".local/sc64/attack-poses/generated/sc64_unit_attack_source
 DEATH_SOURCE_HEADER = ".local/sc64/death/generated/sc64_death_sprites_generated.h"
 CONSTRUCTION_HEADER = ".local/sc64/construction/generated/sc64_construction_sprites_generated.h"
 CONSTRUCTION_PROFILES = ("races", "unified", "terran", "zerg", "zerg-z4", "zerg-z3", "protoss",
-                         "protoss-p3", "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle")
+                         "protoss-p3", "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle", "protoss-p6")
 
 
 def run(command: list[str], *, cwd: Path = ROOT) -> None:
@@ -155,7 +170,25 @@ def staged_campaign_input_ready(profile: str, label: str, path: Path) -> bool:
         if marker is None:
             return True
         try:
-            if profile == "protoss-p5-shuttle" and label == "Protoss chapter 5 sprites":
+            if profile == "protoss-p6" and label == "Protoss chapter 6 scenario":
+                text = path.read_text(encoding="ascii")
+                return (re.search(r"^#define\s+SC64_P6_SOURCE_GLOBAL_ID\s+25u\s*$",
+                                  text, re.MULTILINE) is not None and
+                        re.search(r"static const Sc64P6SourceAction sc64_p6_source_actions\[[1-9][0-9]*\]",
+                                  text) is not None)
+            if profile == "protoss-p6" and label == "Protoss chapter 6 abilities":
+                text = path.read_text(encoding="ascii")
+                return ("#define SC64_P6_ABILITIES_COMPLETE 1u" in text and
+                        "#define SC64_P6_ABILITIES_SOURCE_GLOBAL_ID 25u" in text)
+            if profile == "protoss-p6" and label == "Protoss chapter 6 doodads":
+                text = path.read_text(encoding="ascii")
+                return (re.search(r"^#define\s+SC64_P6_DOODAD_SOURCE_COUNT\s+[1-9][0-9]*u\s*$",
+                                  text, re.MULTILINE) is not None and
+                        re.search(r"static const Sc64P6Doodad sc64_p6_doodads\[",
+                                  text) is not None)
+            if profile in ("protoss-p5-shuttle", "protoss-p6") and label == "Protoss chapter 5 sprites":
+                return unit_word_sprite_input_ready(path, marker)
+            if profile == "protoss-p6" and label == "Protoss chapter 6 sprites":
                 return unit_word_sprite_input_ready(path, marker)
             return marker in path.read_text(encoding="ascii")
         except (OSError, UnicodeError):
@@ -434,6 +467,16 @@ def prepare_staged_campaign(profile: str, private_rom: Path) -> None:
              "--prepack-unit-words",
              "--out", str(ROOT / ".local/sc64/p5/generated/sprites"),
              "--header", str(ROOT / ".local/sc64/p5/generated/sc64_race_sprites_generated.h")])
+    elif profile == "protoss-p6":
+        run([py, str(ROOT / "tools/sc64_zp_scenario_pack.py"), "--mission", "P6"])
+        run([py, str(ROOT / "tools/sc64_p6_ability_pack.py")])
+        run([py, str(ROOT / "tools/sc64_p6_doodad_pack.py"), "--header",
+             str(ROOT / ".local/sc64/p6/generated/sc64_p6_doodads_generated.h")])
+        run([py, str(ROOT / "tools/sc64_race_sprites.py"), "--rom", str(private_rom),
+             "--include-zp-campaign-actors", "--include-z5-actors", "--include-p6-actors",
+             "--prepack-unit-words",
+             "--out", str(ROOT / ".local/sc64/protoss-p6/generated/sprites"),
+             "--header", str(ROOT / ".local/sc64/protoss-p6/generated/sc64_race_sprites_generated.h")])
     else:
         raise ValueError(f"unsupported staged campaign profile: {profile}")
 
@@ -509,15 +552,15 @@ def build(game: str) -> None:
                 "canonical Zerg Z1-Z6 requires authenticated chapter 5/6 inputs: " +
                 ", ".join(missing or ["the SC64_Z6_DATA_ENABLED map gate"]) +
                 "; regenerate with ./dev sc64 prepare --rom PATH --profile zerg")
-    if game in ("protoss", "protoss-p4-storm"):
+    if game in ("protoss", "protoss-p6", "protoss-p4-storm"):
         missing = [label for label, relative, _ in PROTOSS_P4_INPUTS
                    if not protoss_p4_input_ready(label, ROOT / relative)]
         if missing:
             raise RuntimeError(
                 "Protoss P4 requires authenticated chapter inputs: " + ", ".join(missing) +
                 "; prepare them with ./dev sc64 prepare --rom PATH --profile " +
-                ("protoss" if game == "protoss" else "protoss-p4-storm"))
-    if game == "protoss":
+                ("protoss" if game in ("protoss", "protoss-p6") else "protoss-p4-storm"))
+    if game in ("protoss", "protoss-p6"):
         p5_maps = ROOT / ".local/sc64/zp-stage/generated/sc64_races_generated.h"
         if not race_campaign_input_ready("protoss-p5-shuttle", p5_maps):
             raise RuntimeError("canonical Protoss requires the P5 map gate; regenerate with ./dev sc64 prepare --rom PATH --profile protoss")
@@ -529,6 +572,14 @@ def build(game: str) -> None:
             detail = ", ".join(p5_missing or ["Protoss chapter 5 prepacked unit-word sprites"])
             raise RuntimeError(
                 "canonical Protoss P5 requires authenticated chapter inputs: " + detail +
+                "; regenerate with ./dev sc64 prepare --rom PATH --profile protoss")
+        p6_missing = [label for label, relative, _ in STAGED_CAMPAIGN_INPUTS["protoss-p6"]
+                      if not staged_campaign_input_ready("protoss-p6", label, ROOT / relative)]
+        if (p6_missing or
+                not race_campaign_input_ready("protoss-p6", p5_maps)):
+            raise RuntimeError(
+                "canonical Protoss P6 requires authenticated chapter inputs: " +
+                ", ".join(p6_missing or ["the SC64_P6_DATA_ENABLED map gate"]) +
                 "; regenerate with ./dev sc64 prepare --rom PATH --profile protoss")
     if game in FACING_PROFILES and not facing_sprite_input_ready(ROOT / FACING_HEADER):
         raise RuntimeError(
@@ -620,11 +671,12 @@ def prepare(rom: Path, profile: str) -> None:
     if profile == "campaign":
         run([sys.executable, str(ROOT / "tools/sc64_campaign_pack.py"), "--rom", str(private_rom)])
     elif profile in ("races", "unified", "terran", "zerg", "zerg-z4", "zerg-z3", "protoss",
-                     "protoss-p3", "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle"):
+                     "protoss-p3", "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle", "protoss-p6"):
         run([sys.executable, str(ROOT / "tools/sc64_races_pack.py")])
-        if profile in ("zerg", "zerg-z4", "zerg-z3", "protoss", "protoss-p3"):
+        if profile in ("zerg", "zerg-z4", "zerg-z3", "protoss", "protoss-p6", "protoss-p3"):
             header = ROOT / ".local/sc64/races/generated/sc64_races_generated.h"
-            gate_profile = "zerg" if profile in ("zerg-z3", "zerg-z4") else profile
+            gate_profile = ("zerg" if profile in ("zerg-z3", "zerg-z4") else
+                            "protoss" if profile == "protoss-p6" else profile)
             if not race_campaign_input_ready(gate_profile, header):
                 raise RuntimeError(f"generated race data is missing the {RACE_CAMPAIGN_GATES[gate_profile][0]} map gate")
         if profile in STAGED_CAMPAIGN_INPUTS:
@@ -647,7 +699,7 @@ def prepare(rom: Path, profile: str) -> None:
         if not construction_color_input_ready(ROOT / CONSTRUCTION_HEADER):
             raise RuntimeError("construction preparation produced a stale blue-glow bank")
         run([sys.executable, str(ROOT / "tools/sc64_menu_assets.py")])
-        if profile in ("zerg", "zerg-z4", "protoss", "protoss-p4-storm"):
+        if profile in ("zerg", "zerg-z4", "protoss", "protoss-p6", "protoss-p4-storm"):
             zerg = profile in ("zerg", "zerg-z4")
             faction = "Zerg" if zerg else "Protoss"
             chapter = "z4" if zerg else "p4"
@@ -676,9 +728,9 @@ def prepare(rom: Path, profile: str) -> None:
                     f"generated {faction} sprites are missing prepacked unit-word metadata; "
                     f"rerun ./dev sc64 prepare --rom PATH --profile {profile}")
         if profile in ("terran", "zerg", "zerg-z4", "zerg-z3", "protoss", "protoss-p3",
-                       "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle"):
+                       "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle", "protoss-p6"):
             run([sys.executable, str(ROOT / "tools/sc64_skirmish_pack.py")])
-        if profile == "protoss":
+        if profile in ("protoss", "protoss-p6"):
             prepare_staged_campaign("protoss-p5-shuttle", private_rom)
             p5_maps = ROOT / ".local/sc64/zp-stage/generated/sc64_races_generated.h"
             if not race_campaign_input_ready("protoss-p5-shuttle", p5_maps):
@@ -686,6 +738,13 @@ def prepare(rom: Path, profile: str) -> None:
             p5_sprite = ROOT / ".local/sc64/p5/generated/sc64_race_sprites_generated.h"
             if not unit_word_sprite_input_ready(p5_sprite, "SC64_Z6_SPRITE_SET_COMPLETE"):
                 raise RuntimeError("generated P5 sprites lack prepacked word metadata; regenerate with ./dev sc64 prepare --rom PATH --profile protoss")
+            prepare_staged_campaign("protoss-p6", private_rom)
+            if not race_campaign_input_ready("protoss-p6", p5_maps):
+                raise RuntimeError("generated staged race data is missing the SC64_P6_DATA_ENABLED map gate")
+            p6_missing = [label for label, relative, _ in STAGED_CAMPAIGN_INPUTS["protoss-p6"]
+                          if not staged_campaign_input_ready("protoss-p6", label, ROOT / relative)]
+            if p6_missing:
+                raise RuntimeError("generated P6 inputs are incomplete: " + ", ".join(p6_missing))
         elif profile == "zerg":
             # Chapter 5/6 programs and banks as staged, then one word-packed
             # bank holding every actor of the six canonical chapters.
@@ -704,7 +763,7 @@ def prepare(rom: Path, profile: str) -> None:
             if missing:
                 raise RuntimeError("canonical Zerg Z1-Z6 inputs are incomplete: " + ", ".join(missing) +
                                    "; regenerate with ./dev sc64 prepare --rom PATH --profile zerg")
-        elif profile in STAGED_CAMPAIGN_INPUTS:
+        elif profile in STAGED_CAMPAIGN_INPUTS and profile != "protoss-p6":
             prepare_staged_campaign(profile, private_rom)
         if profile == "terran":
             for mission in ("t5", "t6"):
@@ -778,9 +837,9 @@ def status(profile: str) -> int:
         ))
         paths.append(("Source construction art", ROOT / CONSTRUCTION_HEADER))
     if profile in ("terran", "zerg", "zerg-z4", "zerg-z3", "protoss", "protoss-p3",
-                   "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle"):
+                   "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle", "protoss-p6"):
         paths.append(("Skirmish maps", ROOT / ".local/sc64/skirmish/generated/sc64_skirmish_generated.h"))
-    if profile in ("zerg", "zerg-z4", "zerg-z3", "protoss", "protoss-p3"):
+    if profile in ("zerg", "zerg-z4", "zerg-z3", "protoss", "protoss-p6", "protoss-p3"):
         paths.append((f"{profile.title()} chapter 3 gated map data",
                       ROOT / ".local/sc64/races/generated/sc64_races_generated.h"))
     if profile in ("zerg", "zerg-z4"):
@@ -789,11 +848,11 @@ def status(profile: str) -> int:
         paths.extend((label, ROOT / relative) for label, relative, _ in CANONICAL_ZERG_Z6_INPUTS)
         paths.append(("Zerg chapter 6 gated map data",
                       ROOT / ".local/sc64/zp-stage/generated/sc64_races_generated.h"))
-    if profile in ("protoss", "protoss-p4-storm"):
+    if profile in ("protoss", "protoss-p6", "protoss-p4-storm"):
         paths.extend((label, ROOT / relative) for label, relative, _ in PROTOSS_P4_INPUTS)
     if profile == "protoss":
-        paths.extend((label, ROOT / relative) for label, relative, _ in STAGED_CAMPAIGN_INPUTS["protoss-p5-shuttle"])
-        paths.append(("Protoss chapter 5 gated map data",
+        paths.extend((label, ROOT / relative) for label, relative, _ in STAGED_CAMPAIGN_INPUTS["protoss-p6"])
+        paths.append(("Protoss chapter 6 gated map data",
                       ROOT / ".local/sc64/zp-stage/generated/sc64_races_generated.h"))
     for label, relative, _ in STAGED_CAMPAIGN_INPUTS.get(profile, ()):
         paths.append((label, ROOT / relative))
@@ -837,9 +896,10 @@ def status(profile: str) -> int:
         elif label == "Source construction art":
             ready = construction_color_input_ready(path)
         elif label.endswith("gated map data"):
-            map_profile = ("protoss-p5-shuttle" if label == "Protoss chapter 5 gated map data"
+            map_profile = ("protoss-p6" if label == "Protoss chapter 6 gated map data"
                            else "zerg-z6" if label == "Zerg chapter 6 gated map data"
-                           else "zerg" if profile in ("zerg-z3", "zerg-z4") else profile)
+                           else "zerg" if profile in ("zerg-z3", "zerg-z4") else
+                           "protoss" if profile == "protoss-p6" else profile)
             ready = race_campaign_input_ready(map_profile, path)
         elif any(label == item[0] for item in STAGED_CAMPAIGN_INPUTS.get(profile, ())):
             ready = staged_campaign_input_ready(profile, label, path)
@@ -847,12 +907,10 @@ def status(profile: str) -> int:
             ready = canonical_zerg_input_ready(label, path)
         elif profile == "zerg" and any(label == item[0] for item in CANONICAL_ZERG_Z6_INPUTS):
             ready = canonical_zerg_z6_input_ready(label, path)
-        elif profile in ("protoss", "protoss-p4-storm") and any(label == item[0] for item in PROTOSS_P4_INPUTS):
+        elif profile in ("protoss", "protoss-p6", "protoss-p4-storm") and any(label == item[0] for item in PROTOSS_P4_INPUTS):
             ready = protoss_p4_input_ready(label, path)
-        elif profile == "protoss" and any(label == item[0] for item in STAGED_CAMPAIGN_INPUTS["protoss-p5-shuttle"]):
-            ready = staged_campaign_input_ready("protoss-p5-shuttle", label, path)
-            if label == "Protoss chapter 5 sprites":
-                ready = unit_word_sprite_input_ready(path, "SC64_Z6_SPRITE_SET_COMPLETE")
+        elif profile in ("protoss", "protoss-p6") and any(label == item[0] for item in STAGED_CAMPAIGN_INPUTS["protoss-p6"]):
+            ready = staged_campaign_input_ready("protoss-p6", label, path)
         elif profile == "terran" and label == "Full Terran sprites":
             ready = unit_word_sprite_input_ready(path)
         note = (f" (run ./dev sc64 prepare --rom PATH --profile {profile} to regenerate unit-word metadata)"
@@ -870,8 +928,9 @@ def status(profile: str) -> int:
                (profile in FACING_PROFILES and not weapon_source_input_ready(ROOT / WEAPON_SOURCE_HEADER)) or
                (profile in FACING_PROFILES and not death_source_input_ready(ROOT / DEATH_SOURCE_HEADER)) or
                (profile in CONSTRUCTION_PROFILES and not construction_color_input_ready(ROOT / CONSTRUCTION_HEADER)) or
-               (profile in ("zerg", "zerg-z4", "zerg-z3", "protoss", "protoss-p3") and not race_campaign_input_ready(
-                   "zerg" if profile in ("zerg-z3", "zerg-z4") else profile,
+               (profile in ("zerg", "zerg-z4", "zerg-z3", "protoss", "protoss-p6", "protoss-p3") and not race_campaign_input_ready(
+                   "zerg" if profile in ("zerg-z3", "zerg-z4") else
+                   "protoss" if profile == "protoss-p6" else profile,
                    ROOT / ".local/sc64/races/generated/sc64_races_generated.h")) or
                (profile in ("zerg", "zerg-z4") and any(not canonical_zerg_input_ready(
                    label, ROOT / relative) for label, relative, _ in CANONICAL_ZERG_INPUTS)) or
@@ -879,13 +938,13 @@ def status(profile: str) -> int:
                    not race_campaign_input_ready("zerg-z6", ROOT / ".local/sc64/zp-stage/generated/sc64_races_generated.h") or
                    any(not canonical_zerg_z6_input_ready(label, ROOT / relative)
                        for label, relative, _ in CANONICAL_ZERG_Z6_INPUTS))) or
-               (profile in ("protoss", "protoss-p4-storm") and any(not protoss_p4_input_ready(
+               (profile in ("protoss", "protoss-p6", "protoss-p4-storm") and any(not protoss_p4_input_ready(
                    label, ROOT / relative) for label, relative, _ in PROTOSS_P4_INPUTS)) or
-               (profile == "protoss" and (
+               (profile in ("protoss", "protoss-p6") and (
                    not race_campaign_input_ready("protoss-p5-shuttle", ROOT / ".local/sc64/zp-stage/generated/sc64_races_generated.h") or
-                   any(not staged_campaign_input_ready("protoss-p5-shuttle", label, ROOT / relative)
-                       for label, relative, _ in STAGED_CAMPAIGN_INPUTS["protoss-p5-shuttle"]) or
-                   not unit_word_sprite_input_ready(ROOT / ".local/sc64/p5/generated/sc64_race_sprites_generated.h", "SC64_Z6_SPRITE_SET_COMPLETE"))) or
+                   not race_campaign_input_ready("protoss-p6", ROOT / ".local/sc64/zp-stage/generated/sc64_races_generated.h") or
+                   any(not staged_campaign_input_ready("protoss-p6", label, ROOT / relative)
+                       for label, relative, _ in STAGED_CAMPAIGN_INPUTS["protoss-p6"]))) or
                (profile == "terran" and not unit_word_sprite_input_ready(
                    ROOT / ".local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h")) or
                (profile in STAGED_CAMPAIGN_INPUTS and not race_campaign_input_ready(

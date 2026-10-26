@@ -6913,7 +6913,18 @@ static const Sc64SpriteFrame *
 mission_unit_sprite(int type)
 {
 #ifdef SC64_RACES
+#ifdef SC64_Z5_ACTORS
+    int raw = sc64_race_raw_unit(type);
+    /* Z5 actor enums share raw identities with T4 actors, but retain their
+     * own selected source art. Keep the raw T4 enums on the generic path. */
+    if (type >= U_Z5_GHOST && type <= U_Z5_DATA_DISK && raw >= 0) {
+        const Sc64SpriteFrame *z5 = sc64_z5_actor_sprite((unsigned short)raw);
+        if (z5) return z5;
+    }
+    return raw >= 0 ? sc64_race_unit_sprite((unsigned short)raw) : 0;
+#else
     return sc64_race_unit_sprite(sc64_race_raw_unit(type));
+#endif
 #else
     if (type == U_SCV) return &sc64_sprite_scv;
     if (type == U_MARINE) return &sc64_sprite_marine;

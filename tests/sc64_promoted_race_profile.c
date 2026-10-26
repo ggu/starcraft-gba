@@ -1,6 +1,6 @@
-/* Promoted Z3/P3 and staged Z4/P4 profile integration: normal-menu campaign
- * starts, profile save generations, and supported skirmish startup/save
- * combinations. These bounded setups are not mission-win evidence. */
+/* Promoted race-profile integration: normal-menu campaign starts, profile
+ * save generations, and supported skirmish startup/save combinations. These
+ * bounded setups are not mission-win evidence. */
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -74,6 +74,15 @@ static const char *const profile_titles[] = {
 #define PROFILE_RACE R_PROTOSS
 #define PROFILE_SAVE_GENERATION 30u
 #define PROFILE_OLD_SAVE_TAG 0x53435032u
+#if !defined(SC64_P6_STORM_ENABLED) || !defined(SC64_P6_CAMPAIGN_ENTRY)
+#error "Canonical Protoss P6 requires its qualified Storm and campaign-entry features"
+#endif
+_Static_assert(SC64_RACE_SAVE_GENERATION == 30u,
+               "canonical P6 retains its qualified generation-30 save schema");
+_Static_assert(SAVE_VERSION == 0x5343504eu,
+               "canonical P6 keeps its generation-30 Protoss save identity");
+_Static_assert(SC64_P6_GLOBAL_ID == 25,
+               "canonical Protoss P6 uses its stable global catalog identity");
 static const int profile_missions[] = {2, 3, 22, 23, 24, 25};
 static const char *const profile_titles[] = {
     "FIRST STRIKE", "INTO THE FLAMES", "HIGHER GROUND", "THE HUNT FOR TASSADAR",
