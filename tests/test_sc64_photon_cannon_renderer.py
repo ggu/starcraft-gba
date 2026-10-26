@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -150,6 +151,144 @@ int main(void) {
                 capture_output=True, text=True)
             self.assertEqual(compiled.returncode, 0, compiled.stderr)
             subprocess.run([str(executable)], check=True, capture_output=True, text=True)
+
+    def test_canonical_profiles_resolve_their_runtime_sprite_rosters(self) -> None:
+        """Check each shipped profile's actual enum-to-draw resolver.
+
+        The all-profile atlas above deliberately enables every group, which can
+        hide missing conditional cases in a canonical ROM's selected groups.
+        Reuse each canonical renderer test's exact Make flags and include order.
+        """
+        compiler = shutil.which("clang") or shutil.which("cc")
+        if not compiler:
+            self.skipTest("clang or cc is required for the canonical sprite fixture")
+
+        from tools.sc64_race_sprites import (
+            LATE_BUILDING_IDS, LATE_UNIT_IDS, RACE_UNIT_IDS,
+            T4_BUILDING_IDS, T4_UNIT_IDS, T6_UNIT_IDS,
+            ZP_BUILDING_IDS, ZP_UNIT_IDS,
+        )
+
+        profiles = (
+            ("terran", "build/test-sc64-terran-full-frame",
+             Path(".local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h"),
+             set(T4_UNIT_IDS.values()) | set(T6_UNIT_IDS.values()) |
+             set(LATE_UNIT_IDS.values()),
+             set(T4_BUILDING_IDS.values()) | set(LATE_BUILDING_IDS.values()), set()),
+            ("zerg", "build/test-sc64-z4-frame-coverage",
+             Path(".local/sc64/zp-stage/generated/sc64_race_sprites_generated.h"),
+             set(ZP_UNIT_IDS.values()), set(), set(ZP_BUILDING_IDS.values())),
+            ("protoss", "build/test-sc64-protoss-canonical-frame",
+             Path(".local/sc64/races/generated/sc64_race_sprites_generated.h"),
+             set(), set(), set()),
+        )
+
+        def opaque_check(call: str, label: str) -> str:
+            return (f'check_sprite({call}, "{label}");\n')
+
+        for profile, target, header, extra_units, extra_buildings, zp_buildings in profiles:
+            with self.subTest(profile=profile):
+                if not (ROOT / header).is_file():
+                    self.skipTest(f"prepared {profile} sprite header is unavailable: {header}")
+
+                explicit_units = sorted(set(RACE_UNIT_IDS.values()) | extra_units)
+                explicit_buildings = sorted(extra_buildings | zp_buildings)
+                source_lines = [
+                    '#include <assert.h>\n#include <stdio.h>\n#include <string.h>\n',
+                    f'#include "{ROOT / "starcraft/game.c"}"\n',
+                    'static unsigned char actual[240 * 160];\n',
+                    'static unsigned char expected_pixels[240 * 160];\n',
+                    'static void check_sprite(const Sc64SpriteFrame *s, const char *id) {\n',
+                    '  if(!s||!s->pixels||!s->w||!s->h) fprintf(stderr,"missing sprite: %s\\n",id); '
+                    'assert(s && s->pixels && s->w && s->h); unsigned n=0;\n',
+                    '  for (unsigned i=0;i<(unsigned)s->w*s->h;++i) n += s->pixels[i] != 0;\n',
+                    '  if (!n) fprintf(stderr,"empty sprite: %s\\n",id); assert(n);\n',
+                    '}\n',
+                    'static void capture(unsigned char *p) { for(int y=0;y<160;++y) '
+                    'for(int x=0;x<240;++x) p[y*240+x]=gfx_test_pixel(x,y); }\n',
+                    'static void compose(unsigned char *p,const Sc64SpriteFrame *s,int cx,int cy) {\n',
+                    '  int l=cx-s->canvas_w/2+s->offset_x, t=cy-s->canvas_h/2+s->offset_y;\n',
+                    '  for(int y=0;y<s->h;++y) for(int x=0;x<s->w;++x) { unsigned char c=s->pixels[y*s->w+x]; '
+                    'int dx=l+x,dy=t+y; if(c&&dx>=0&&dx<240&&dy>=0&&dy<160) p[dy*240+dx]=c; }\n',
+                    '}\n',
+                    'static void check_building_pixels(int type,int raw,const Sc64SpriteFrame *s) {\n',
+                    '  Building q; memset(&q,0,sizeof(q)); q.x=120; q.y=72; q.owner=SIDE; '
+                    'q.type=type; q.raw_type=(short)raw; q.alive=1; q.hp=q.maxhp=1000;\n',
+                    '  camx=camy=0; gfx_begin(C_BLACK); draw_building_art(&q); capture(actual);\n',
+                    '  memset(expected_pixels,C_BLACK,sizeof(expected_pixels)); compose(expected_pixels,s,q.x,q.y+12);\n',
+                    '  if(memcmp(actual,expected_pixels,sizeof(actual))) fprintf(stderr,"building pixels differ type=%d raw=%d\\n",type,raw); '
+                    'assert(memcmp(actual,expected_pixels,sizeof(actual))==0);\n',
+                    '  gfx_begin(C_BLACK); draw_building_overlay(&q); capture(actual);\n',
+                    '  int sy=q.y+12-s->canvas_h/2+s->offset_y;\n',
+                    '  gfx_begin(C_BLACK);\n',
+                    '#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)\n',
+                    '  if(!sc64_game_building_has_flag(q.type,SC64_GAME_ACTOR_INVINCIBLE)) {\n',
+                    '#else\n',
+                    '  {\n',
+                    '#endif\n',
+                    '  draw_actor_vitals(q.x,sy-4,18,q.hp,q.maxhp,q.shield, '
+                    'sc64_actor_max_shields(q.type,1),owner_color(q.owner)); } capture(expected_pixels);\n',
+                    '  if(memcmp(actual,expected_pixels,sizeof(actual))) fprintf(stderr,"building vitals differ type=%d raw=%d\\n",type,raw); '
+                    'assert(memcmp(actual,expected_pixels,sizeof(actual))==0);\n',
+                    '}\n',
+                    'int main(void) { unsigned invisible=0;\n',
+                    '  for(int t=0;t<SC_RU_COUNT;++t) { int raw=sc64_race_raw_unit(t); if(raw<0) continue; '
+                    'if(raw==101) { assert(mission_unit_sprite(t)==0); ++invisible; continue; } '
+                    'check_sprite(mission_unit_sprite(t),sc64_race_unit_name(t)); }\n',
+                    '  for(int t=0;t<SC_RB_COUNT;++t) { int raw=sc64_race_raw_building(t); if(raw<0) continue; '
+                    f'if({"||".join(f"raw=={raw}" for raw in sorted(T4_BUILDING_IDS.values())) or "0"}) '
+                    'check_sprite(sc64_race_building_sprite((unsigned short)raw,0),sc64_race_building_name(t)); '
+                    'else check_sprite(mission_building_sprite(t),sc64_race_building_name(t)); }\n',
+                    '  assert(invisible <= 2);\n',
+                ]
+                for raw in explicit_units:
+                    source_lines.append(opaque_check(f"sc64_race_unit_sprite({raw})",
+                                                     f"unit raw {raw}"))
+                for raw in explicit_buildings:
+                    source_lines.append(opaque_check(f"sc64_race_building_sprite({raw},0)",
+                                                     f"building raw {raw}"))
+                if zp_buildings:
+                    for name, raw in sorted(ZP_BUILDING_IDS.items(), key=lambda pair: pair[1]):
+                        enum = {
+                            115: "B_ZP_CONTROL_TOWER", 120: "B_ZP_MACHINE_SHOP",
+                            123: "B_ZP_ARMORY", 138: "B_ZP_QUEENS_NEST",
+                            140: "B_ZP_ULTRALISK_CAVERN", 196: "B_ZP_PROTOSS_BEACON",
+                        }[raw]
+                        source_lines.append(
+                            f'  check_building_pixels({enum},{raw},sc64_race_building_sprite({raw},0));\n'
+                            f'  assert(mission_building_sprite({enum}) == sc64_race_building_sprite({raw},0));\n')
+                source_lines.append('  return 0; }\n')
+
+                with tempfile.TemporaryDirectory(prefix=f"sc64-{profile}-sprite-roster-") as temp:
+                    directory = Path(temp)
+                    source = directory / "canonical-roster.c"
+                    executable = directory / "canonical-roster"
+                    source.write_text("".join(source_lines), encoding="ascii")
+                    dry_run = subprocess.run(
+                        ["make", "-Bn", "--no-print-directory", target],
+                        cwd=ROOT, capture_output=True, text=True)
+                    self.assertEqual(dry_run.returncode, 0, dry_run.stderr)
+                    compile_commands = [shlex.split(line)
+                                        for line in dry_run.stdout.splitlines()]
+                    compile_commands = [argv for argv in compile_commands
+                                        if "common/gba.c" in argv and "-o" in argv and
+                                        any(item.endswith(".c") and
+                                            ("frame_coverage.c" in item)
+                                            for item in argv)]
+                    self.assertTrue(compile_commands, dry_run.stdout)
+                    command = compile_commands[-1]
+                    command[0] = compiler
+                    command = [str(source) if item.startswith("tests/") and item.endswith(".c")
+                               else item for item in command]
+                    out = command.index("-o")
+                    command[out + 1] = str(executable)
+                    compiled = subprocess.run(command, cwd=ROOT,
+                                              capture_output=True, text=True)
+                    self.assertEqual(compiled.returncode, 0, compiled.stderr)
+                    executed = subprocess.run([str(executable)], cwd=ROOT,
+                                              capture_output=True, text=True)
+                    self.assertEqual(executed.returncode, 0,
+                                     executed.stderr or executed.stdout)
 
 
 if __name__ == "__main__":

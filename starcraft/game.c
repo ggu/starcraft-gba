@@ -5249,11 +5249,23 @@ tick_combat(Unit * q, int target)
         if (target>=MAX_UNITS) {
             range+=18;
             if (minimum_range) minimum_range+=18;
-        } else if (!flying && !sc64_race_unit_flying(q->type) && range<6) {
-            /* Native melee reach is measured from collision edges. Our
-             * center-based ground mover reserves six pixels of separation;
-             * a shorter center radius would make SCV contact impossible. */
-            range=6;
+        } else if (!flying && !sc64_race_unit_flying(q->type) &&
+                   stock_attack.weapon->min_range==0 &&
+                   stock_attack.weapon->max_range<=32) {
+            /* Ground melee needs to reach the center spacing reserved by
+             * unit_step_clear(). Campaign actors can reserve up to ten
+             * pixels from source bounds; retain the six-pixel fallback in
+             * the standard roster and do not widen ranged/min-range weapons. */
+            int contact_range=6;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+            if (target<MAX_UNITS) {
+                int mover_radius=sc64_game_unit_collision_radius(q->type);
+                int target_radius=sc64_game_unit_collision_radius(u[target].type);
+                if (mover_radius>contact_range) contact_range=mover_radius;
+                if (target_radius>contact_range) contact_range=target_radius;
+            }
+#endif
+            if (range<contact_range) range=contact_range;
         }
         damage=sc64_stock_attack_damage_per_impact(&stock_attack,
                      q->owner==SIDE?weapons_level:0);
@@ -6745,6 +6757,14 @@ mission_unit_sprite(int type)
 static const Sc64SpriteFrame *
 sc64_race_building_art_sprite(int raw)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    /* ZP reuses several stock raw identities for buildings with distinct
+       campaign art (including Queen's Nest and Ultralisk Cavern). Prefer the
+       profile's selected building frame bank before the generic unit atlas. */
+    const Sc64SpriteFrame *zp_sprite =
+        raw >= 0 ? sc64_race_building_sprite((unsigned short)raw, 0) : 0;
+    if (zp_sprite) return zp_sprite;
+#endif
     const Sc64SpriteFrame *sprite =
         raw >= 0 ? sc64_race_unit_sprite((unsigned short)raw) : 0;
     if (sprite) return sprite;
