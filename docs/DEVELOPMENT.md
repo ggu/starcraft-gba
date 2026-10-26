@@ -1671,6 +1671,16 @@ fixtures. See the [started-trigger pruning audit](audits/2026-10-27-z7-started-p
 for the opening and real-save ARM digest comparisons and measured limits.
 It does not promote Z7 or enable the option in canonical build flags.
 
+`make zerg-z7-steering-probe` builds a separate full-render generation-36
+`SCZS` development ROM with the collision-class cache and bounded local
+steering list enabled. `make test-sc64-z7-steering` checks list answers against
+the original step-clear query, capacity/worker fallback, slot reuse and SRAM
+cache rebuilding under ASan/UBSan. The Z7 list uses a 388-byte caller-owned
+stack context and a ROM builder to fit the unchanged product guards. See the
+[Z7 steering audit](audits/2026-10-27-z7-steering-list/README.md) for the actual
+standalone link, paired ARM digests, stack canary and cycle measurements.
+Canonical race flags and the earlier full-render probe stay unchanged.
+
 P7 has an isolated world foundation with separate source-Force wallets; its
 canonical roster fails closed on missing raw68/71/72 actor bindings. It still
 lacks shared menu/save integration. Neither seventh mission has a completed
