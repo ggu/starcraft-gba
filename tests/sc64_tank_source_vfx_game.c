@@ -139,6 +139,58 @@ static void generic_weapon_still_renders(void)
     assert(changed>0);
 }
 
+/* Fog gates source frames per 16x16 cell, whether the renderer takes the
+ * whole-frame fast path (every covered cell visible) or the per-cell path.
+ * Expected pixels apply the source LUT only where the world cell is visible,
+ * using the renderer's documented rule (x in the map, currently_visible). */
+static int assert_fogged_frame(int image,unsigned frame_index,int cx,int cy,int direction)
+{
+    const Sc64TankSourceFrame *f=sc64_private_tank_frame(image,frame_index);
+    assert(f);
+    int flipped=direction>16;
+    int frame_x=flipped?f->flip_x:f->x;
+    const u8 *src=sc64_tank_source_pixels+(flipped?f->flip_offset:f->offset);
+    int left=cx-camx-(int)f->cw/2+frame_x, top=cy-camy+12-(int)f->ch/2+f->y;
+    int changed=0;
+    for(int y=0;y<160;y++) for(int x=0;x<240;x++) {
+        unsigned expected=before_pixels[y*240+x];
+        int xx=x-left, yy=y-top, wx=x+camx, wy=y+camy-12;
+        if(xx>=0 && xx<f->w && yy>=0 && yy<f->h && y>=12 && y<120 &&
+           wx>=0 && wx<MAP_COLS*16 && currently_visible(wx,wy)) {
+            unsigned strength=src[(yy+f->y)*f->cw+frame_x+xx];
+            if(strength) expected=sc64_tank_palette_remap[
+                sc64_tank_raw_lut[(strength-1)*256+sc64_tank_reverse_palette[expected]]];
+        }
+        assert(gfx_test_pixel(x,y)==expected);
+        changed+=expected!=before_pixels[y*240+x];
+    }
+    return changed;
+}
+
+static void fog_paths_match_the_oracle(void)
+{
+    static const struct { int image; unsigned frame; int cx, cy, direction; } cases[] = {
+        { 533, 6, 120, 70, 0 }, { 533, 13, 40, 50, 0 }, { 537, 93, 100, 80, 20 },
+        { 531, 4, 8, 20, 0 },   /* crosses the map's left edge */
+        { 533, 3, 60, 4, 0 },   /* rows above world row 0 */
+    };
+    int partial=0, whole=0;
+    for(unsigned i=0;i<sizeof(cases)/sizeof(cases[0]);++i)
+        for(int pattern=0;pattern<4;++pattern) {
+            reset_world();
+            for(int r=0;r<MAP_ROWS;++r) for(int c=0;c<MAP_COLS;++c) {
+                int v=pattern==0 ? 1 : pattern==1 ? ((r+c)&1) :
+                      pattern==2 ? !(c==cases[i].cx/16 && r==cases[i].cy/16) : c>cases[i].cx/16;
+                SC64_GRID_SET(visible,c+r*MAP_COLS,v);
+            }
+            patterned_backdrop();
+            sc64_private_tank_blit(cases[i].image,cases[i].frame,cases[i].cx,cases[i].cy,cases[i].direction);
+            int changed=assert_fogged_frame(cases[i].image,cases[i].frame,cases[i].cx,cases[i].cy,cases[i].direction);
+            if(pattern) partial+=changed>0; else whole+=changed>0;
+        }
+    assert(whole==5 && partial>=10);
+}
+
 static void test_clock(void)
 {
     assert((2*4)/5==1 && (3*4)/5==2 && (4*4)/5==3);
@@ -159,6 +211,7 @@ int main(void)
     fire_and_check(30,4,537,93,533,1,12,80); /* mirrored direction */
     fire_and_check(30,10,0,0,533,6,212,118);
     generic_weapon_still_renders();
-    puts("Tank source VFX engine path and raw-LUT oracle passed");
+    fog_paths_match_the_oracle();
+    puts("Tank source VFX engine path, fog paths and raw-LUT oracle passed");
     return 0;
 }

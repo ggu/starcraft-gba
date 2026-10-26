@@ -128,6 +128,42 @@ class PixelTests(unittest.TestCase):
         self.assertEqual(list(plain["pixels"]), [2, 11, 11, 48])
 
 
+class SpanTests(unittest.TestCase):
+    @staticmethod
+    def paint(spans, parity, w, h):
+        """Decode one parity stream onto zeroed halfwords, as gfx_blit_spans does."""
+        i = 1 + (spans[0] if parity else 0)
+        rows = [[0] * ((w + 2) // 2) for _ in range(h)]
+        for r in range(h):
+            while spans[i] != mod.SPAN_ROW_END:
+                column, n = spans[i] >> 8, spans[i] & 255
+                i += 1
+                if not n:
+                    rows[r][column] |= spans[i]
+                    i += 1
+                for k in range(n):
+                    rows[r][column + k] = spans[i]
+                    i += 1
+            i += 1
+        if parity:
+            assert i == len(spans)
+        return [b"".join(v.to_bytes(2, "little") for v in row)[parity:parity + w] for row in rows]
+
+    def test_both_parities_reproduce_the_frame(self):
+        import random
+        rng = random.Random(7)
+        for density in (0.0, 0.3, 0.5, 0.9, 1.0):
+            for w, h in ((1, 1), (2, 3), (7, 5), (16, 4), (33, 9), (256, 2)):
+                pixels = bytes(rng.randrange(1, 256) if rng.random() < density else 0
+                               for _ in range(w * h))
+                spans = mod.span_stream(pixels, w, h)
+                for parity in (0, 1):
+                    rows = self.paint(spans, parity, w, h)
+                    self.assertEqual(b"".join(rows), pixels, (density, w, h, parity))
+        # Empty pixels cost nothing: a blank frame is just row terminators.
+        self.assertEqual(mod.span_stream(bytes(6), 3, 2), [2] + [mod.SPAN_ROW_END] * 4)
+
+
 class HeaderTests(unittest.TestCase):
     def test_header_compiles_and_dedupes_programs(self):
         layer = {"image_id": 7, "x": 0, "y": -1, "start": 0, "end": 6, "under": False,
@@ -152,7 +188,8 @@ class HeaderTests(unittest.TestCase):
                     "canvas_h; const unsigned char *pixels; } Sc64SpriteFrame;\n"
                     '#include "sc64_death_sprites_generated.h"\n'
                     "int main(void) { return !sc64_death_source_valid(sc64_death_source(3)) || "
-                    "!sc64_death_image_frame(7, 1) || sc64_death_image_frame(7, 2) != 0; }\n")
+                    "!sc64_death_image_frame(7, 1) || sc64_death_image_frame(7, 2) != 0 || "
+                    "!sc64_death_image_spans(7, 1) || sc64_death_image_spans(7, 2) != 0; }\n")
                 exe = Path(tmp) / "probe"
                 subprocess.run([clang, "-std=c11", "-Wall", "-Wextra", "-Werror",
                                 "-Wno-unused-function", "-DSC64_DEATH_SOURCE_ART",

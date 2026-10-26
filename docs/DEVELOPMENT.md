@@ -100,6 +100,12 @@ generated graphics, lookup tables and manifests stay ignored under `.local/`.
 `make -B showcase CANONICAL_WEAPON_FLAGS= SHOWCASE_SIEGE_FLAGS=` selects the earlier weapon behavior
 for comparison. The same override applies to the three canonical race targets.
 
+The frames blend into the destination through a lookup table and are hidden
+per 16-by-16 fog cell. When every cell under a clipped frame is visible, as
+in the fully revealed showcase arenas, each row is drawn in one call;
+otherwise the renderer splits rows at cell boundaries and skips hidden cells.
+Both paths produce the same pixels.
+
 Showcase enables the `SC64_SIEGE_SPLASH` prototype. Campaign builds retain
 their earlier primary-target damage rule: the stock splash change causes the
 Z3 normal-controller completion regression to reach its 180000-update limit,
@@ -327,9 +333,19 @@ checkerboard-dithered. Generated art and its manifest stay under
 
 The importer currently compiles 167 actors from 61 image banks (about 770 KB
 of pixels). The preview ROM is `build/StarCraft-Death-Preview-GBA.gba`; its
-menus and missions match the unified profile. Canonical race ROMs keep the
-authored effects. To use the source art in another prepared race profile,
-compile with `SC64_DEATH_SOURCE_ART` and include the generated directory.
+menus and missions match the unified profile. Showcase also uses the source
+deaths; `make -B showcase SHOWCASE_DEATH_FLAGS=` restores the authored
+effects. Canonical race ROMs keep the authored effects. To use the source art
+in another prepared race profile, compile with `SC64_DEATH_SOURCE_ART` and
+include the generated directory.
+
+The importer also emits each frame as a span stream for even and odd screen
+x: runs of opaque framebuffer halfwords, plus single half-transparent
+halfwords. With `SC64_SPAN_BLIT`, frames that fit the screen width draw from
+these streams in IWRAM, so transparent pixels cost nothing and opaque pairs
+need no read-modify-write. Frames crossing a side edge, and builds without the
+flag, use the frame pixels. Showcase enables it; the death preview ROM has no
+IWRAM to spare and keeps the pixel path.
 See [Validation](VALIDATION.md#death-animations-2026-10-25) for coverage and
 memory figures.
 

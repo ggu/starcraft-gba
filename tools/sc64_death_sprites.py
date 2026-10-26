@@ -209,6 +209,52 @@ def timing(layers: Sequence[dict[str, Any]]) -> dict[str, int]:
             "total_su": total}
 
 
+SPAN_ROW_END = 0xFFFF
+
+
+def span_stream(pixels: bytes, w: int, h: int) -> list[int]:
+    """Encode a frame as mode-4 halfword spans for even and odd screen x.
+
+    The stream is [len(even), even..., odd...]. Each row holds ops ending in
+    SPAN_ROW_END: (column << 8) | n followed by n opaque halfwords, or n = 0
+    followed by one halfword whose zero byte is transparent. Columns count
+    halfwords from x >> 1, so empty pixels cost nothing at runtime."""
+    streams = []
+    for parity in (0, 1):
+        out: list[int] = []
+        for r in range(h):
+            row = bytes(parity) + pixels[r * w:(r + 1) * w]
+            row += bytes(len(row) & 1)
+            run: list[int] = []
+            start = 0
+            for j in range(len(row) // 2):
+                a, b = row[2 * j], row[2 * j + 1]
+                if a and b:
+                    if not run:
+                        start = j
+                    run.append(a | b << 8)
+                    continue
+                if run:
+                    out += [start << 8 | len(run), *run]
+                    run = []
+                if a or b:
+                    out += [j << 8, a | b << 8]
+            if run:
+                out += [start << 8 | len(run), *run]
+            out.append(SPAN_ROW_END)
+        streams.append(out)
+    return [len(streams[0]), *streams[0], *streams[1]]
+
+
+def span_lines(symbol: str, f: dict[str, Any]) -> list[str]:
+    spans = span_stream(f["pixels"], f["w"], f["h"])
+    lines = [f"static const unsigned short {symbol}_spans[{len(spans)}] = {{"]
+    for offset in range(0, len(spans), 12):
+        lines.append("    " + ", ".join(f"0x{v:04x}" for v in spans[offset:offset + 12]) + ",")
+    lines.append("};")
+    return lines
+
+
 def write_header(path: Path, sources: dict[int, dict[str, Any]],
                  images: dict[int, dict[str, Any]]) -> None:
     lines = [
@@ -227,8 +273,11 @@ def write_header(path: Path, sources: dict[int, dict[str, Any]],
                 lines.append("    " + ", ".join(f"0x{v:02x}" for v in f["pixels"][offset:offset + 16]) + ",")
             lines.extend(["};", f"static const Sc64SpriteFrame {symbol} = {{ {f['x']}, {f['y']}, "
                           f"{f['w']}, {f['h']}, {f['canvas_w']}, {f['canvas_h']}, {symbol}_pixels }};"])
+            lines.extend(span_lines(symbol, f))
         lines.append(f"static const Sc64SpriteFrame *const sc64_death_image_{iid}_frames[] = {{")
         lines.extend(f"    &sc64_death_image_{iid}_frame_{i}," for i in range(len(image["frames"])))
+        lines.extend(["};", f"static const unsigned short *const sc64_death_image_{iid}_spans[] = {{"])
+        lines.extend(f"    sc64_death_image_{iid}_frame_{i}_spans," for i in range(len(image["frames"])))
         lines.extend(["};", ""])
     programs: dict[tuple, str] = {}
     layer_sets: dict[tuple, str] = {}
@@ -265,6 +314,14 @@ def write_header(path: Path, sources: dict[int, dict[str, Any]],
         lines.append(f"    case {iid}: return frame_index < {count}u ? "
                      f"sc64_death_image_{iid}_frames[frame_index] : (const Sc64SpriteFrame *)0;")
     lines.extend(["    default: return (const Sc64SpriteFrame *)0;", "    }", "}",
+                  "static inline const unsigned short *",
+                  "sc64_death_image_spans(unsigned short image_id, unsigned short frame_index)",
+                  "{", "    switch (image_id) {"])
+    for iid, image in images.items():
+        count = len(image["frames"])
+        lines.append(f"    case {iid}: return frame_index < {count}u ? "
+                     f"sc64_death_image_{iid}_spans[frame_index] : (const unsigned short *)0;")
+    lines.extend(["    default: return (const unsigned short *)0;", "    }", "}",
                   "static inline const Sc64DeathSource *", "sc64_death_source(int raw_unit_id)",
                   "{", "    switch (raw_unit_id) {"])
     lines.extend(f"    case {raw}: return &sc64_death_raw_{raw};" for raw in sources)

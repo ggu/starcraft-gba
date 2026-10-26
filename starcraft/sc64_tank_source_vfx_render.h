@@ -22,6 +22,22 @@ static void sc64_private_tank_blit(int image,unsigned frame_index,int world_x,in
     int left=world_x-camx-(int)f->cw/2;
     int top=world_y-camy+12-(int)f->ch/2+f->y;
     int first=flip?f->flip_x:f->x, last=first+f->w;
+    /* Fast path: when every fog cell under the clipped frame is visible, the
+       per-cell loop below would draw each row whole, so draw it in one call.
+       Rows use the same truncating world-row division as currently_visible. */
+    int sy0=top<12?12:top, sy1=top+f->h>120?120:top+f->h;
+    if(sy0>=sy1) return;
+    int wx0=left+first+camx, wx1=left+last-1+camx;
+    int whole=wx0>=0 && wx1<MAP_COLS*16;
+    for(int r=(sy0+camy-12)/16; whole && r<=(sy1-1+camy-12)/16; ++r)
+        for(int c=wx0>>4; whole && c<=wx1>>4; ++c)
+            whole=currently_visible(c*16,r*16);
+    if(whole) {
+        for(int sy=sy0;sy<sy1;++sy)
+            gfx_blit_sprite_mapped(left+first,sy,last-first,1,
+                src+(sy-top+f->y)*f->cw+first,sc64_tank_projected_lut,63);
+        return;
+    }
     for(int row=0;row<f->h;++row) {
         int sy=top+row, col=0;
         if(sy<12 || sy>=120) continue;
