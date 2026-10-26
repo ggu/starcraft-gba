@@ -45,6 +45,31 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
     if (left >= 240 || left + r->width <= 0 || top >= 120 ||
         top + r->height <= 12) return;
 
+    /* Fast path: when every map tile under the clipped raster is visible, the
+     * tile loop below would draw each row whole, so draw it in one call. The
+     * per-pixel reversed branch (no mirror pixels) keeps the tile loop. */
+    if (!(hflip && !use_mirror_pixels)) {
+        int sy0 = top < 12 ? 12 : top;
+        int sy1 = top + (int)r->height > 120 ? 120 : top + (int)r->height;
+        int wx0 = left + camx, wx1 = left + (int)r->width - 1 + camx;
+        int wy0 = sy0 + camy - 12, wy1 = sy1 - 1 + camy - 12;
+        int whole = wx0 >= 0 && wx1 < MAP_COLS * 16 && wy0 >= 0 && wy1 < MAP_ROWS * 16;
+        for (int ty = wy0 >> 4; whole && ty <= wy1 >> 4; ++ty)
+            for (int tx = wx0 >> 4; whole && tx <= wx1 >> 4; ++tx)
+                whole = currently_visible(tx * 16, ty * 16);
+        if (whole) {
+            for (int sy = sy0; sy < sy1; ++sy) {
+                const uint8_t *src = frame_pixels + (sy - top) * r->width;
+                if (r->modifier == 9 || r->modifier == 10)
+                    gfx_blit_sprite_mapped(left, sy, r->width, 1, src,
+                                           r->lookup, r->lookup_rows);
+                else
+                    gfx_blit_sprite(left, sy, r->width, 1, src);
+            }
+            return;
+        }
+    }
+
     for (int row = 0; row < r->height; ++row) {
         int sy = top + row;
         if (sy < 12 || sy >= 120) continue;

@@ -89,6 +89,12 @@ PATH --profile terran` (or `zerg` / `protoss`) before building. See
 [Native weapon effects](native-weapon-effects.md) for coverage, local checks
 and the remaining differences from the source engine.
 
+Weapon frames, from this bank and from the Tank effect bank below, are hidden
+per 16-by-16 map tile. When every tile under a clipped frame is visible, as in
+the fully revealed showcase arenas, each row is drawn in one call; otherwise
+the renderers split rows at tile boundaries and skip hidden tiles. Both paths
+produce the same pixels.
+
 ## Tank firing effects and siege splash
 
 Canonical race builds and Showcase use source Tank muzzle and target-impact
@@ -99,12 +105,6 @@ It verifies the USA ROM, weapon/image chains and supported script sequences;
 generated graphics, lookup tables and manifests stay ignored under `.local/`.
 `make -B showcase CANONICAL_WEAPON_FLAGS= SHOWCASE_SIEGE_FLAGS=` selects the earlier weapon behavior
 for comparison. The same override applies to the three canonical race targets.
-
-The frames blend into the destination through a lookup table and are hidden
-per 16-by-16 fog cell. When every cell under a clipped frame is visible, as
-in the fully revealed showcase arenas, each row is drawn in one call;
-otherwise the renderer splits rows at cell boundaries and skips hidden cells.
-Both paths produce the same pixels.
 
 Showcase enables the `SC64_SIEGE_SPLASH` prototype. Campaign builds retain
 their earlier primary-target damage rule: the stock splash change causes the
