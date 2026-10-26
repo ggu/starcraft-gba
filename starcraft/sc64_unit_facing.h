@@ -9,16 +9,34 @@
  * frame 0 only, so everything faced north. This keeps one 32-direction facing
  * byte per actor slot. A ground unit faces the path waypoint it is walking
  * to and a flyer faces its move target, so the 8-way movement steps do not
- * jitter. A unit turns toward its target when it fires and keeps that facing
- * while its weapon cools down. Nothing here is read by the simulation or
- * saved; after a load, units face north until they move or fire. */
+ * jitter. A unit turns toward its target when it fires. Movement orders keep
+ * updating facing during cooldown; stationary firing units keep their aim.
+ * Nothing here is read by the simulation or saved; after a load, units face
+ * north until they move or fire. */
 
 #include "sc64_unit_facing_generated.h"
+
+#if defined(SC64_UNIT_WORD_SPRITES) && !defined(SC64_UNIT_FACING_WORD_METADATA)
+#error "SC64_UNIT_WORD_SPRITES requires generated unit-facing word sidecars"
+#endif
 
 /* Ignore waypoints this close; the unit has arrived or is turning in place. */
 #define SC64_FACING_STEP 4
 
 static u8 sc64_facing[MAX_UNITS];
+
+/* Presentation-only direction is not part of Unit or any save row. */
+static void
+sc64_facing_reset_all(void)
+{
+    memset(sc64_facing, 0, sizeof(sc64_facing));
+}
+
+static void
+sc64_facing_reset_slot(int slot)
+{
+    if ((unsigned)slot < MAX_UNITS) sc64_facing[slot] = 0;
+}
 
 /* Unit vectors for the 32 StarCraft directions, scaled by 256; y grows down. */
 static const s16 sc64_facing_vector[32][2] = {
@@ -53,7 +71,8 @@ static void
 sc64_facing_track(const Unit *q)
 {
     int slot = (int)(q - u), dx, dy;
-    if (slot < 0 || slot >= MAX_UNITS || q->cd || q->order == ORDER_IDLE) return;
+    if (slot < 0 || slot >= MAX_UNITS || q->order == ORDER_IDLE) return;
+    if (q->cd && q->order != ORDER_MOVE && q->order != ORDER_ATTACK_MOVE) return;
     if (sc64_race_unit_flying(q->type)) {
         dx = q->tx - q->x;
         dy = q->ty - q->y;
@@ -65,26 +84,43 @@ sc64_facing_track(const Unit *q)
     sc64_facing[slot] = (u8)sc64_facing_direction(dx, dy);
 }
 
+static void
+sc64_facing_blit_frame(const Sc64SpriteFrame *s, int dir, int x, int y)
+{
+    if (dir <= 16) {
+        gfx_blit_sprite(x - s->canvas_w / 2 + s->offset_x,
+                        y - s->canvas_h / 2 + s->offset_y,
+                        s->w, s->h, s->pixels);
+    } else {
+        gfx_blit_sprite_hflip(x + s->canvas_w / 2 - s->offset_x - s->w,
+                              y - s->canvas_h / 2 + s->offset_y,
+                              s->w, s->h, s->pixels);
+    }
+}
+
 static int
 sc64_facing_blit(unsigned raw, int dir, int x, int y)
 {
-    const Sc64SpriteFrame *frames = sc64_unit_facing_frames((unsigned short)raw), *s;
-    if (!frames) return 0;
-    if (dir <= 16) {
-        s = &frames[dir];
-        gfx_blit_sprite(x - s->canvas_w / 2 + s->offset_x, y - s->canvas_h / 2 + s->offset_y,
-                        s->w, s->h, s->pixels);
-    } else {
-        s = &frames[32 - dir];
-        gfx_blit_sprite_hflip(x + s->canvas_w / 2 - s->offset_x - s->w,
-                              y - s->canvas_h / 2 + s->offset_y, s->w, s->h, s->pixels);
+#if defined(SC64_UNIT_WORD_SPRITES) && defined(SC64_UNIT_FACING_WORD_METADATA)
+    const Sc64UnitFacingWordFrame *word =
+        sc64_unit_facing_word_frame((unsigned short)raw, (unsigned char)dir);
+    if (word) {
+        gfx_blit_sprite_words(x - word->canvas_w / 2 + word->offset_x,
+                              y - word->canvas_h / 2 + word->offset_y,
+                              word->sprite);
+        return 1;
     }
+#endif
+    const Sc64SpriteFrame *frames = sc64_unit_facing_frames((unsigned short)raw);
+    if (!frames) return 0;
+    sc64_facing_blit_frame(&frames[dir <= 16 ? dir : 32 - dir], dir, x, y);
     return 1;
 }
 
 /* Draw a unit with its facing frame. Siege Tanks draw their hull and turret
  * subunits (raw 5/6 in tank mode, 30/31 when sieged); the sieged hull has a
- * single frame. Returns 0 when no facing art exists for this unit. */
+ * single frame. Muzzle/impact effects remain with the stock VFX renderer.
+ * Returns 0 when no facing art exists for this unit. */
 static int
 sc64_facing_draw(const Unit *q, int raw, int x, int y)
 {
@@ -95,7 +131,7 @@ sc64_facing_draw(const Unit *q, int raw, int x, int y)
     if (q->type == U_SIEGE_TANK || q->type == U_TANK) {
         int sieged = q->type == U_SIEGE_TANK;
         if (!sc64_facing_blit(sieged ? 30u : 5u, dir, x, y)) return 0;
-        (void)sc64_facing_blit(sieged ? 31u : 6u, dir, x, y);
+        if (!sc64_facing_blit(sieged ? 31u : 6u, dir, x, y)) return 0;
         return 1;
     }
 #endif

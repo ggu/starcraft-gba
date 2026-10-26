@@ -61,6 +61,26 @@ current stock-combat replay evidence and memory limits. See the
 [rendering audit](audits/2026-10-26-unit-word-rendering/README.md) for exact
 pixel/state checks, measurements and memory limits.
 
+## Directional unit sprites
+
+Canonical Terran, Zerg, Protoss and Showcase builds select directional frames
+from the source unit images instead of always drawing frame zero. Refresh an
+older workspace with `./dev sc64 prepare --rom PATH --profile terran` (or
+`zerg` / `protoss`). Preparation writes the private bank under
+`.local/sc64/facing/generated/`; status/build reject older banks without the
+directional metadata and packed-frame payload. The source image's directional
+flag determines whether its frames represent headings; frame count alone does
+not qualify an image.
+
+Ground units face their movement waypoint, flyers face their destination, and
+units aim toward their target when firing. Facing is presentation state: a new
+game, scene restart, accepted load or reused actor slot starts at north until
+the unit moves or fires. It does not change the save format or combat rules.
+This adds directional idle poses, including Tank hull/turret layers; it does
+not implement the original walking cycles, turn rates or independent turret
+tracking. Canonical campaigns use packed directional frames; Showcase uses
+the indexed compositor within its existing memory limits.
+
 ## Canonical minimap rendering
 
 Canonical Terran, Zerg and Protoss builds and Showcase batch the same 24-by-24

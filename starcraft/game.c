@@ -882,6 +882,10 @@ _Static_assert(sizeof(SaveData) <= 16368, "Save exceeds an alternating SRAM reco
 static SaveData data;
 #endif
 static Unit u[MAX_UNITS];
+#ifdef SC64_UNIT_FACING
+static void sc64_facing_reset_all(void);
+static void sc64_facing_reset_slot(int slot);
+#endif
 #ifdef SC64_P6_COMBAT_ENABLED
 /* The collision headers below consult per-instance burrow state. */
 static int race_p6_combat_unit_burrowed(int slot);
@@ -1629,6 +1633,9 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_UNIT_FACING
+    sc64_facing_reset_slot(i);
+#endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     race_p7_projectile_clear_references(i);
 #endif
@@ -3473,7 +3480,11 @@ load_game(void)
     if (sc64_showcase_scene >= 0) return 0;
 #endif
 #ifdef SC64_RACES
-    return race_load_game();
+    int loaded = race_load_game();
+#ifdef SC64_UNIT_FACING
+    if (loaded) sc64_facing_reset_all();
+#endif
+    return loaded;
 #else
     int i, j, computed_supply = 0, computed_cap =
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
@@ -3712,6 +3723,9 @@ static void
 init_state(void)
 {
 #ifdef SC64_RACES
+#ifdef SC64_UNIT_FACING
+    sc64_facing_reset_all();
+#endif
     reset_selection_gestures();
     mode=MODE_NORMAL;menu=menu_open=menu_cursor=help=0;
     screen=SCREEN_PLAY;selected_building=-1;result_timer=0;
@@ -3935,6 +3949,9 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+#ifdef SC64_UNIT_FACING
+    sc64_facing_reset_all();
+#endif
 #ifdef SC64_SHOWCASE_ENABLED
     sc64_showcase_scene=-1;sc64_showcase_ticks=0;
 #endif
@@ -6927,11 +6944,8 @@ draw_unit(Unit * q)
 #endif
         mission_unit_sprite(q->type);
 #ifdef SC64_UNIT_FACING
-#ifdef SC64_T5_RUNTIME
-    int facing_raw = sprite_raw;
-#else
-    int facing_raw = q->raw_type;
-#endif
+    int facing_raw = q->raw_type >= 0 ? q->raw_type :
+        sc64_race_raw_unit(q->type);
     /* Units missing from the race bank (e.g. the sieged Siege Tank) can still
      * have per-direction art; its north frame also sizes the selection box. */
     if (!sprite && facing_raw >= 0)

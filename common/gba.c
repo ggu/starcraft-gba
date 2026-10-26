@@ -489,8 +489,15 @@ HOT void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *src) {
 #ifdef SC64_UNIT_FACING
 /* gfx_blit_sprite with each source row mirrored horizontally. */
 void gfx_blit_sprite_hflip(int x,int y,int width,int height,const u8 *src) {
- if(!src||width<=0||height<=0||width>256||height>256||x>=240||y>=160||x+width<=0||y+height<=0)return;
+ if(!src||width<=0||height<=0||width>256||height>256||x>=240||x+width<=0)return;
+#ifdef GBA_SCENE_CLIP
+ if(y>=gfx_clip_bottom||y+height<=gfx_clip_top)return;
+ int top=y<gfx_clip_top?gfx_clip_top-y:0;
+ int bottom=y+height>gfx_clip_bottom?gfx_clip_bottom-y:height;
+#else
+ if(y>=160||y+height<=0)return;
  int top=y<0?-y:0,bottom=y+height>160?160-y:height;
+#endif
  int left=x<0?-x:0,right=x+width>240?240-x:width;
  for(int row=top;row<bottom;row++) {
   const u8*s=src+row*width+width-1;
