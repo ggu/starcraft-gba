@@ -53,3 +53,10 @@ Routing adds up to two static-route queries per selected ground actor on a
 command. Command latency and worst-case cost still need measurement before
 promotion; no near-30-fps claim is made. Staged campaign qualification stays
 22/30. Generated inputs, ROMs, traces and saves remain private.
+
+## Subsequent command-cost work
+
+The [group command cost audit](../2026-10-27-group-command-cost/README.md)
+records the later selection-count hoist and complete-field component queries.
+Measurements above describe the original prototype; the new audit records
+the later implementation and its separate validation limits.

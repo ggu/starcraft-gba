@@ -1657,6 +1657,11 @@ at 22/30.
 policy. Canonical flags leave it disabled. See the
 [formation audit](audits/2026-10-27-reachable-formation/README.md) for the
 synthetic input fixture, ARM link evidence and remaining qualification gates.
+The newer [group command cost audit](audits/2026-10-27-group-command-cost/README.md)
+records the unconditional selection-count hoist and the component-based
+reachability implementation. The optional target also checks retained route
+hints against an independent graph oracle. The formation feature remains off
+in canonical builds; the selection-count hoist applies to all builds.
 
 P7 has an isolated world foundation with separate source-Force wallets; its
 canonical roster fails closed on missing raw68/71/72 actor bindings. It still
