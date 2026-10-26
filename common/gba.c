@@ -486,6 +486,27 @@ HOT void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *src) {
  }
 }
 #endif
+#ifdef SC64_UNIT_FACING
+/* gfx_blit_sprite with each source row mirrored horizontally. */
+void gfx_blit_sprite_hflip(int x,int y,int width,int height,const u8 *src) {
+ if(!src||width<=0||height<=0||width>256||height>256||x>=240||y>=160||x+width<=0||y+height<=0)return;
+ int top=y<0?-y:0,bottom=y+height>160?160-y:height;
+ int left=x<0?-x:0,right=x+width>240?240-x:width;
+ for(int row=top;row<bottom;row++) {
+  const u8*s=src+row*width+width-1;
+  int col=left;
+  volatile u16*d=pixels+(y+row)*120+((x+col)>>1);
+  if((x+col)&1){u8 a=s[-col];if(a)*d=(*d&255)|((u16)a<<8);d++;col++;}
+  for(;col+1<right;col+=2,d++){
+   u8 a=s[-col],b=s[-(col+1)];
+   if(a&&b)*d=a|((u16)b<<8);
+   else if(a)*d=(*d&0xff00)|a;
+   else if(b)*d=(*d&255)|((u16)b<<8);
+  }
+  if(col<right){u8 a=s[-col];if(a)*d=(*d&0xff00)|a;}
+ }
+}
+#endif
 HOT void gfx_rect(int x,int y,int w,int h,u8 color) {
     if(w<=0||h<=0||x>=240||x+w<=0)return;
 #ifdef GBA_SCENE_CLIP

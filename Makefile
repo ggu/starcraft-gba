@@ -3268,8 +3268,14 @@ protoss-p7-carrier-training-probe: build/StarCraft-Protoss-P7-Carrier-Training-P
 
 # Dedicated filming build. Hidden menu and transient scenes stay off in all
 # canonical profiles; the P7 bundle supplies Carrier/Ultralisk render actors.
-SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED $(CANONICAL_MINIMAP_FLAGS)
-build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+# Presentation-only 32-direction unit facing (including Siege Tank turrets),
+# from per-direction frames imported into a separate private header.
+UNIT_FACING_HEADER := .local/sc64/facing/generated/sc64_unit_facing_generated.h
+$(UNIT_FACING_HEADER): tools/sc64_unit_facing.py tools/sc64_race_sprites.py tools/sc64_sprites.py
+	$(PYTHON) tools/sc64_unit_facing.py
+UNIT_FACING_FLAGS := -I.local/sc64/facing/generated -DSC64_UNIT_FACING
+SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS)
+build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Showcase-GBA.gba: build/starcraft-showcase.elf tools/fix_rom.py
@@ -3279,7 +3285,7 @@ build/StarCraft-Showcase-GBA.gba: build/starcraft-showcase.elf tools/fix_rom.py
 showcase: build/StarCraft-Showcase-GBA.gba
 build/test-sc64-showcase-front: tests/sc64_frontend.c starcraft/sc64_frontend.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_SHOWCASE_ENABLED -Icommon $< -o $@
-build/test-sc64-showcase-game: tests/sc64_showcase_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c Makefile | build
+build/test-sc64-showcase-game: tests/sc64_showcase_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) common/gba.c Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c -o $@
 test-sc64-showcase-front: build/test-sc64-showcase-front
 	./build/test-sc64-showcase-front

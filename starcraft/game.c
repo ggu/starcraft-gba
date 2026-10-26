@@ -5163,6 +5163,12 @@ unit_damage(int type)
 #endif
     return 0;
 }
+#ifdef SC64_UNIT_FACING
+#if !defined(SC64_HAS_SPRITES) || !defined(SC64_RACES)
+#error "SC64_UNIT_FACING requires imported race sprites"
+#endif
+#include "sc64_unit_facing.h"
+#endif
 
 #ifdef SC64_Z6_RUNTIME
 /* The large weapon body is already in ROM; keep its validation wrapper
@@ -5286,6 +5292,9 @@ tick_combat(Unit * q, int target)
         if (dx*dx+dy*dy<minimum_range*minimum_range) return;
 #endif
 	if (!q->cd) {
+#ifdef SC64_UNIT_FACING
+	    SC64_FACING_FIRE(q, target);
+#endif
 	    add_tracer(q->x, q->y, target_x(target), target_y(target),
                 sc64_weapon_vfx_unit_profile(
 #ifdef SC64_RACES
@@ -6917,6 +6926,17 @@ draw_unit(Unit * q)
         q->raw_type>=0?sc64_race_unit_sprite(q->raw_type):
 #endif
         mission_unit_sprite(q->type);
+#ifdef SC64_UNIT_FACING
+#ifdef SC64_T5_RUNTIME
+    int facing_raw = sprite_raw;
+#else
+    int facing_raw = q->raw_type;
+#endif
+    /* Units missing from the race bank (e.g. the sieged Siege Tank) can still
+     * have per-direction art; its north frame also sizes the selection box. */
+    if (!sprite && facing_raw >= 0)
+        sprite = sc64_unit_facing_frames((unsigned short)facing_raw);
+#endif
     int sprite_x = sprite ? x - sprite->canvas_w / 2 + sprite->offset_x : x - 4;
     int sprite_y = sprite ? y - sprite->canvas_h / 2 + sprite->offset_y : y - 4;
     int sprite_w = sprite ? sprite->w : 8;
@@ -6925,6 +6945,11 @@ draw_unit(Unit * q)
     int sprite_x = x - 4, sprite_y = y - 4, sprite_w = 8, sprite_h = 8;
 #endif
 #ifdef SC64_HAS_SPRITES
+#ifdef SC64_UNIT_FACING
+    sc64_facing_track(q);
+    if (sprite && sc64_facing_draw(q, facing_raw, x, y)) {}
+    else
+#endif
     if (sprite) {
 #if defined(SC64_UNIT_WORD_SPRITES) && defined(SC64_RACE_UNIT_WORD_SPRITE_METADATA)
         int sprite_raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
