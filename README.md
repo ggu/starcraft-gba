@@ -2,7 +2,9 @@
 
 This project is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
 
-Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. Controller-driven host runs and normal-menu ARM replays have now completed all ten Terran missions across the recorded frozen builds. The latest optimization build has full T7 and T10 ARM wins at 25.00 and 18.77 effective fps; other ARM qualifications remain on earlier frozen builds. These rates remain below the 30-fps target. This is a GBA adaptation built from a user-supplied, verified StarCraft 64 USA ROM. It does not execute or reproduce the original N64 engine. Imported maps and graphics stay local and are not part of the source release.
+Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. The canonical profiles expose Terran 1–10, Zerg 1–4, and Protoss 1–4: 18 of 30 campaign entries. P4 now has a current-source normal-input host/ARM win and a live SRAM cold-load/continued-win proof; P1–P3 were requalified in its larger pools. See the [P4 promotion audit](docs/audits/2026-10-26-p4-promotion/README.md).
+
+Performance remains below the 30-fps goal. P4's current optimized full ARM replay averages 16.3 fps equivalent. The current Terran renderer improves full means by 2.9% on T7 and 0.5% on T10 (about 22.4 and 18.8 fps equivalent on those probe-entry traces). The [Terran audit](docs/audits/2026-10-26-terran-word-promotion/README.md) records the scope; older Z4/P3 measurements apply to their frozen builds. No physical GBA result is claimed. This adaptation uses a user-supplied, verified StarCraft 64 USA ROM and does not reproduce the N64 engine. Imported maps and graphics stay local.
 
 ## Purpose and rights
 
@@ -47,9 +49,9 @@ This profile requires a legally obtained StarCraft 64 USA ROM that you are entit
 ./dev sc64 play --profile terran
 ```
 
-The canonical Terran profile includes all ten Terran campaign missions; Zerg and Protoss each include their first three. Use `--profile zerg` or `--profile protoss` with the same build/test/play commands. Each ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. Separate staged builds qualify the first six missions of both Zerg and Protoss, for 22/30 staged missions overall; eight remain unqualified. Measured campaign rates remain below 30 fps. No physical GBA result is claimed.
+The canonical Terran profile includes all ten Terran campaign missions; canonical Zerg and Protoss include their first four. Use `--profile zerg` or `--profile protoss` with the same build/test/play commands. Each ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. Separate staged builds record wins through the first six missions of both Zerg and Protoss, for historical combined coverage of 22/30 missions; eight remain unqualified.
 
-Preparing Terran also generates the shared inputs needed by `make race-campaigns`; preparing only Zerg or Protoss does not generate the complete Terran input set. The promoted Zerg and Protoss builds use their third-mission save formats and reject saves from the older two-mission builds. See [the campaign guide](docs/RACE-CAMPAIGNS.md) for mission and save-format details.
+Preparing Terran generates its complete ten-mission input set; preparing only Zerg or Protoss does not. Prepare each canonical race before `make race-campaigns`. Canonical Zerg uses the Z4 identity and `.local/play/zerg-z4`; canonical Protoss uses P4 Storm and `.local/play/protoss-p4-storm`. Explicit `zerg-z3` and `protoss-p3` retain their old ROMs and save paths. No save conversion is performed. See [the campaign guide](docs/RACE-CAMPAIGNS.md) for mission and save-format details.
 
 The first preparation fetches the pinned `sc64-maps` extractor into ignored `references/`, so Git and network access are needed. ROMs, extracted data, generated headers, captures containing imported art, and saves stay in ignored local directories; do not commit or distribute them. Contributors can work on the default skirmish without this profile. See [the unified guide](docs/SC64-UNIFIED.md) and [development](docs/DEVELOPMENT.md) for details and troubleshooting.
 

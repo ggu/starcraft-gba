@@ -104,6 +104,11 @@ class P4ScenarioPackTests(unittest.TestCase):
                                                             for i in range(1260, 1280)))
             self.assertEqual(data['property_used'], [i % 2 for i in range(64)])
             self.assertEqual(data['actor_creation']['total_instances_per_execution'], 1)
+            self.assertEqual(data['actor_creation']['create_action_row_count'], 1)
+            self.assertEqual(len(data['actor_creation']['create_action_prefix']), 154)
+            self.assertEqual(data['actor_creation']['create_action_prefix'][0], 0)
+            self.assertEqual(data['actor_creation']['create_action_prefix'][1:3], [0, 1])
+            self.assertEqual(data['actor_creation']['create_action_prefix'][-1], 1)
             self.assertEqual(data['psionic_storm'], {
                 'slot': 7, 'tech_id': 19, 'availability_ptec': 0,
                 'researched_ptec': 0, 'global_availability_ptec': 1,
@@ -113,6 +118,41 @@ class P4ScenarioPackTests(unittest.TestCase):
             self.assertEqual(data['actor_creation']['instances_per_execution_by_trigger_and_raw_unit'],
                              {'1': {'37': 1}})
             self.assertEqual(verified['created_instances_per_execution'], 1)
+
+    def test_create_prefix_counts_rows_in_source_order_not_quantity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)
+            chk = staged_fixture(source)
+            verifier = types.SimpleNamespace(verify_staged=lambda _path: {})
+            with mock.patch.object(PACK, '_load_pack', return_value=verifier):
+                trig = bytearray(_unframe_record(source / 'records/TRIG.bin', b'TRIG'))
+                # Keep the original trigger-1 create, then add creates in three
+                # different triggers. Quantity modifiers vary deliberately:
+                # the validator counts each action row once, not its quantity.
+                for trigger, index, quantity in ((0, 0, 5), (3, 2, 0), (12, 4, 2)):
+                    action = trigger * 2400 + 320 + index * 32
+                    trig[action + 26] = 11
+                    trig[action + 27] = quantity
+                replace_trigger(source, chk, bytes(trig))
+                changed_chk = (source / 'source.chk').read_bytes()
+                with mock.patch.object(PACK, 'CHK_SHA256', hashlib.sha256(changed_chk).hexdigest()):
+                    data = PACK.parse_source(source)
+
+            actions = data['actions']
+            expected = [0]
+            for row in actions:
+                expected.append(expected[-1] + (row['opcode'] == 11))
+            prefix = data['actor_creation']['create_action_prefix']
+            self.assertEqual(prefix, expected)
+            self.assertEqual(prefix[-1], 4)
+            self.assertEqual(data['actor_creation']['total_instances_per_execution'], 9)
+            header = PACK.emit_header(data)
+            self.assertIn('#define SC64_P4_CREATE_PREFIX_VERSION 1', header)
+            self.assertIn('sc64_p4_source_create_prefix[154]', header)
+            prefix_body = header.split(
+                'sc64_p4_source_create_prefix[154] = {', 1)[1]
+            self.assertTrue(prefix_body.startswith(
+                '\n    0x00u,0x01u,0x02u,0x02u'))
 
     def test_opcode_11_quantity_helper_uses_known_zero_default(self):
         self.assertEqual(PACK.create_instance_count({'opcode': 11, 'modifier': 0}), 1)

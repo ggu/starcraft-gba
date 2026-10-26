@@ -164,6 +164,34 @@ def named_asset_manifest_sha256(assets: list[dict], names: set[str]) -> str:
     return asset_manifest_sha256(selected)
 
 
+def prepack_unit_sprite_words(width: int, height: int,
+                              pixels: bytes) -> tuple[tuple[int, ...], ...]:
+    """Pack indexed unit pixels into four x-alignment phases.
+
+    Each phase is row-major pairs of u32 color and alpha-byte mask words.
+    Color bytes in transparent lanes are zero, matching the indexed-pixel
+    transparency rule and allowing a mask-free merge.
+    """
+    if not 1 <= width <= 256 or not 1 <= height <= 256 or len(pixels) != width * height:
+        raise ValueError('unit sprite dimensions/pixels are outside the packed format bounds')
+    phases = []
+    for phase in range(4):
+        groups = (phase + width + 3) // 4
+        words = []
+        for y in range(height):
+            for group in range(groups):
+                color = mask = 0
+                for lane in range(4):
+                    sx = group * 4 + lane - phase
+                    pixel = pixels[y * width + sx] if 0 <= sx < width else 0
+                    color |= pixel << (lane * 8)
+                    if pixel:
+                        mask |= 0xff << (lane * 8)
+                words.extend((color, mask))
+        phases.append(tuple(words))
+    return tuple(phases)
+
+
 def image_init_frame(image_id: int, image_iscript: tuple[int, ...],
                      iscript_payload: bytes, scripts: dict[int, int]) -> int:
     """Return the first primary GRP frame authored by an image's Init path."""
@@ -321,7 +349,8 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
                  z6_building_selected: list[dict] | None = None,
                  p7_selected: list[dict] | None = None,
                  p7_building_selected: list[dict] | None = None,
-                 race_building_selected: list[dict] | None = None) -> None:
+                 race_building_selected: list[dict] | None = None,
+                 prepack_unit_words: bool = False) -> None:
     lines = [
         '/* Generated from the verified USA ROM; private local asset. */',
         '#ifndef SC64_RACE_SPRITES_GENERATED_H',
@@ -675,6 +704,75 @@ def write_header(path: Path, selected: list[dict], remap: bytes,
             helper += ['#endif /* SC64_P7_ACTORS */']
         helper += ['    default: return (const Sc64SpriteFrame *)0;', '    }', '}', '#endif']
         lines[at:at] = helper
+    if prepack_unit_words:
+        selected_groups = [
+            (None, RACE_UNIT_IDS, selected),
+            ('SC64_T4_ENABLED', T4_UNIT_IDS, t4_selected or []),
+            ('SC64_T6_ENABLED', T6_UNIT_IDS, t6_selected or []),
+            ('SC64_TERRAN_LATE_ENABLED', LATE_UNIT_IDS, late_selected or []),
+            ('SC64_ZP_CAMPAIGN_ACTORS', ZP_UNIT_IDS, zp_selected or []),
+            ('SC64_P6_ACTORS', P6_UNIT_IDS, p6_selected or []),
+            ('SC64_P7_ACTORS', P7_UNIT_IDS, p7_selected or []),
+        ]
+        emitted_raws = set()
+        packed_groups = []
+        metadata = ['#ifdef SC64_UNIT_WORD_SPRITES']
+        for guard, raw_names, group in selected_groups:
+            group_start = len(metadata)
+            by_name = {item['name']: item for item in group}
+            packed_frames = []
+            for name, raw_type in raw_names.items():
+                if raw_type >= 106 or raw_type in emitted_raws or name not in by_name:
+                    continue
+                emitted_raws.add(raw_type)
+                frame = by_name[name]['frame']
+                width, height = frame['frame_width'], frame['frame_height']
+                source = bytearray(base.crop_frame(frame))
+                for row in range(height):
+                    for col in range(width):
+                        si = (frame['y'] + row) * frame['width'] + frame['x'] + col
+                        di = row * width + col
+                        source[di] = remap[source[di]] if frame['alpha'][si] else 0
+                phases = prepack_unit_sprite_words(width, height, bytes(source))
+                phase_symbols = []
+                for phase, words in enumerate(phases):
+                    symbol = f'sc64_race_unit_words_{raw_type}_p{phase}'
+                    phase_symbols.append(symbol)
+                    metadata.append(f'static const u32 {symbol}[{len(words)}] = {{')
+                    for i in range(0, len(words), 8):
+                        metadata.append('    ' + ','.join(f'0x{word:08x}u' for word in words[i:i + 8]) + ',')
+                    metadata.append('};')
+                packed_frames.append((raw_type, width, height, phase_symbols))
+            if packed_frames:
+                if guard:
+                    metadata.insert(group_start, f'#ifdef {guard}')
+                for raw_type, width, height, phase_symbols in packed_frames:
+                    metadata.append(
+                        f'static const GbaSpriteWordFrame sc64_race_unit_words_{raw_type} = '
+                        f'{{{width},{height},{{{",".join(phase_symbols)}}}}};')
+                if guard:
+                    metadata.append(f'#endif /* {guard} */')
+                packed_groups.append((guard, packed_frames))
+        metadata.append('#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 1')
+        metadata += [
+            'static inline const GbaSpriteWordFrame *sc64_race_unit_words_sprite(unsigned short raw_type, const Sc64SpriteFrame *frame) {',
+            '    if (raw_type >= 106 || !frame || sc64_race_unit_sprite(raw_type) != frame) return (const GbaSpriteWordFrame *)0;',
+            '    switch (raw_type) {',
+        ]
+        for guard, packed_frames in packed_groups:
+            if guard:
+                metadata.append(f'#ifdef {guard}')
+            for raw_type, _width, _height, _phase_symbols in packed_frames:
+                metadata.append(f'    case {raw_type}: return &sc64_race_unit_words_{raw_type};')
+            if guard:
+                metadata.append(f'#endif /* {guard} */')
+        metadata += [
+            '    default: return (const GbaSpriteWordFrame *)0;',
+            '    }',
+            '}',
+            '#endif /* SC64_UNIT_WORD_SPRITES */',
+        ]
+        lines[-1:-1] = metadata
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text('\n'.join(lines) + '\n', encoding='ascii')
 
@@ -686,7 +784,8 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
              include_z6: bool = False, include_z5_doodads: bool = False,
              include_p6: bool = False,
              include_z6_buildings: bool = False,
-             include_p7: bool = False) -> dict:
+             include_p7: bool = False,
+             prepack_unit_words: bool = False) -> dict:
     raw = rom.read_bytes()
     extractor = base.load_extractor(base.UPSTREAM)
     normalized = extractor.load_rom(str(rom))
@@ -1016,7 +1115,7 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
                  zp_selected, zp_building_selected, z5_selected, z5_building_selected,
                  z6_selected, z5_doodad_selected, p6_selected, p6_doodad_selected,
                  z6_building_selected, p7_selected, p7_building_selected,
-                 race_building_selected)
+                 race_building_selected, prepack_unit_words)
     mapped_raw_types = set(RACE_UNIT_IDS.values()) | set(T4_UNIT_IDS.values()) | set(T4_BUILDING_IDS.values())
     actual_sprite_raw_types = ({int(ref['unit_id']) for ref in refs.values()} |
                                {int(ref['unit_id']) for ref in t4_refs.values()})
@@ -1132,6 +1231,8 @@ def main() -> int:
                         help='include SC64_P6_ACTORS sprites and reuse the T4/ZP/Z5 actor and prop sets')
     parser.add_argument('--include-p7-actors', action='store_true',
                         help='include SC64_P7_ACTORS Arbiter and Protoss structure source sprites')
+    parser.add_argument('--prepack-unit-words', action='store_true',
+                        help='emit optional four-phase color/mask words for mapped raw unit IDs below 106')
     args = parser.parse_args()
     try:
         report = generate(args.rom, args.out, args.header, args.remap,
@@ -1143,7 +1244,8 @@ def main() -> int:
                           include_z5_doodads=args.include_z5_doodads,
                           include_p6=args.include_p6_actors,
                           include_z6_buildings=args.include_z6_buildings,
-                          include_p7=args.include_p7_actors)
+                          include_p7=args.include_p7_actors,
+                          prepack_unit_words=args.prepack_unit_words)
     except (OSError, ValueError, RuntimeError, KeyError) as exc:
         print(f'sc64_race_sprites: {exc}', file=sys.stderr)
         return 1

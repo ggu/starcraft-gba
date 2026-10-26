@@ -2,6 +2,50 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
+## Current campaign status (2026-10-26)
+
+The [stock roster follow-up](audits/2026-10-26-roster-contact-and-art/README.md)
+corrects melee contact, defense cooldown expiry and selected building art.
+The newer [P4 promotion](audits/2026-10-26-p4-promotion/README.md) and
+[Terran renderer](audits/2026-10-26-terran-word-promotion/README.md) audits
+requalify their stated ARM traces after those combat corrections. Older
+measurement sections below remain records of their frozen images.
+
+The [construction lifecycle recheck](audits/2026-10-26-construction-lifecycle/README.md)
+corrects the Protoss pre-completion visual to the source Warp Anchor's `Init`
+animation. It keeps the existing build timer and save layout. The older
+campaign ARM timings below precede that artwork correction. The
+[P4 prefix follow-up](audits/2026-10-26-p4-create-prefix/README.md) records a
+current-art paired full-mission ARM replay, a 2.16% full-cost reduction and
+fresh-process SRAM continued win. It does not establish physical-GBA performance.
+The [minimap follow-up](audits/2026-10-26-minimap-terrain/README.md) reduces
+P4's measured full cost by another 1.60%, to about 17.0 fps equivalent, with
+pixel-identical terrain drawing and unchanged worst-frame stalls.
+
+Canonical profiles expose Terran 1–10, Zerg 1–4 and Protoss 1–4: 18/30
+entries. Canonical Zerg uses `SCZ4` and `.local/play/zerg-z4`; canonical
+Protoss uses the P4 Storm files, `SCP5`, generation 21 and
+`.local/play/protoss-p4-storm`. Explicit `zerg-z3` and `protoss-p3` preserve
+their earlier real files, identities and save paths. No save conversion is
+provided. The old P3 compatibility filenames still point to the P3 real
+files, never to the new P4 ROM.
+
+All ten Terran missions pass the actual canonical-flag host controller
+target. T7/T10 have current paired ARM wins from explicit mission probe entry;
+other Terran ARM wins remain evidence for their earlier frozen builds. All
+four Zerg chapters have current host wins; the older Z4 ARM timing applies
+to its frozen build. P1–P4 have fresh host and input-only ARM wins in the
+canonical P4 pools, retaining Fenix in P1/P2 and both heroes in P4. P4 also
+has a live mid-mission SRAM cold-load/continued-win proof.
+
+The 30-fps goal remains unfinished. PR 35's full-replay averages are about
+22.4/18.8 fps equivalent for Terran T7/T10 and 16.3 for P4. These are scoped
+emulator cycle measurements, not physical-GBA guarantees. Historical staged
+coverage spans 22/30 across recorded builds, not fresh qualification of all
+chapters on current source. The generic split-profile report checker only
+covers earlier mission models; dedicated Z4/P4 codec/input checks establish
+their stated save continuity.
+
 ## Reproducible checks
 
 For the asset-free skirmish, run:
@@ -4399,9 +4443,12 @@ and unified ROMs retain `4ad80ce0…f9aee` and `6bab5be2…979f9` respectively.
 Historical preview evidence follows. The subsequent
 [stock profile and art follow-up](audits/2026-10-26-stock-profiles-and-art/README.md)
 enables layered source construction art in canonical prepared race builds,
-adds Protoss WarpIn and expands coverage to all 50 constructible buildings,
+adds Protoss source art and expands coverage to all 50 constructible buildings,
 including the Greater Spire morph. The preview counts and ROM hashes below refer
-to the earlier implementation, not the current builds.
+to the earlier implementation, not the current builds. The newer
+[lifecycle recheck](audits/2026-10-26-construction-lifecycle/README.md) selects
+the source Warp Anchor during Protoss build progress; later materialization
+states remain incomplete.
 
 The default-off `SC64_CONSTRUCTION_SOURCE_ART` profile imports verified local
 ROM art and compiles a bounded primary-frame timeline for supported Terran and

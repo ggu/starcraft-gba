@@ -37,7 +37,7 @@ typedef struct {
 /* This visual-only adaptation has no persistent order/IScript state. Terran
  * stages follow progress at 20/40/60 percent instead of the native HP/order
  * transitions. Zerg follows the 25/50 percent morph thresholds. Protoss runs
- * the source WarpIn script from its first unfinished tick through completion. */
+ * OpenBW's WarpAnchor Init image program while its source build timer remains. */
 static inline int
 sc64_construction_source_phase(int race, int progress, int duration,
                                unsigned *stage, uint32_t *elapsed)

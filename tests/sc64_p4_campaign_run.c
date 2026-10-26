@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -16,15 +17,12 @@ static u32 host_ticks;
 static int last_logged_keys = -1;
 static int trace_first = 1;
 static int run_limit = RUN_LIMIT_DEFAULT;
-static int path_diagnostics;
 static int deployed;
 static int last_order_frame = -1;
 static int rescued_logged;
 static int escape_group_ordered;
 static int escape_cursor_ready;
 static int heroes_released;
-static int next_hero_follow;
-static int raynor_follow_start;
 static const int P4_PARK_X = 520, P4_PARK_Y = 240;
 static int controller_buildup_started;
 static int controller_buildup_done;
@@ -41,6 +39,7 @@ static void move_cursor(int x, int y);
 static int alive_units(void);
 static int escort_combat_count(void);
 static int cycle_select_actor(int slot);
+static int source_pool_slack(void);
 static int safe_escape_waypoint(int start_x, int start_y, int goal_x, int goal_y,
                                 int *out_x, int *out_y);
 
@@ -64,37 +63,31 @@ static int source_building(int raw, int owner)
     return -1;
 }
 
-static int queue_zealot_at_gateway(void)
+static int side_building_type(int type, int complete_only)
 {
-    int gateway = source_building(160, SIDE);
-    if (gateway < 0 || b[gateway].queue_count >= 5 || minerals < 100) return 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == type &&
+            (!complete_only || building_complete(i))) return i;
+    return -1;
+}
+
+static int queue_zealot_at_gateway(int gateway)
+{
+    int core = side_building_type(B_CYBERNETICS_CORE, 1);
+    int wanted = core >= 0 && building_complete(core) && gas >= 50 ? U_DRAGOON : U_ZEALOT;
+    int mineral_cost = wanted == U_DRAGOON ? 125 : 100;
+    int gas_cost = wanted == U_DRAGOON ? 50 : 0;
+    if (gateway < 0 || !b[gateway].alive || b[gateway].owner != SIDE ||
+        b[gateway].queue_count >= 5 || minerals < mineral_cost || gas < gas_cost) return 0;
     int old_count = b[gateway].queue_count;
     int old_minerals = minerals;
     move_cursor(b[gateway].x, b[gateway].y);
     tap(KEY_A);
     if (selected_building != gateway) return 0;
+    for (int i = 0; i < 4 && train_type != wanted; ++i) tap(KEY_R);
+    if (train_type != wanted) return 0;
     tap(KEY_A);
     int queued = b[gateway].queue_count > old_count || minerals < old_minerals;
-    fprintf(stderr, "P4 training attempt frame=%u queue=%d->%d minerals=%d->%d result=%d supply=%d/%d\n",
-            (unsigned)frame, old_count, b[gateway].queue_count,
-            old_minerals, minerals, queued, supply_used, supply_cap);
-    return queued;
-}
-
-static int queue_probe_at_nexus(void)
-{
-    int nexus = source_building(154, SIDE);
-    if (nexus < 0 || b[nexus].queue_count >= 5 || minerals < 50) return 0;
-    int old_count = b[nexus].queue_count;
-    int old_minerals = minerals;
-    move_cursor(b[nexus].x, b[nexus].y);
-    tap(KEY_A);
-    if (selected_building != nexus) return 0;
-    tap(KEY_A);
-    int queued = b[nexus].queue_count > old_count || minerals < old_minerals;
-    fprintf(stderr, "P4 Probe training frame=%u queue=%d->%d minerals=%d->%d result=%d\n",
-            (unsigned)frame, old_count, b[nexus].queue_count,
-            old_minerals, minerals, queued);
     return queued;
 }
 
@@ -106,12 +99,196 @@ static int side_probe_count(void)
     return count;
 }
 
+static int queue_probe_at_nexus(void)
+{
+    int nexus = side_building_type(B_NEXUS, 1);
+    if (nexus < 0 || b[nexus].queue_count >= 5 || minerals < 50 ||
+        source_pool_slack() <= 0 ||
+        race_owner_reserved_supply(SIDE) + 2 > race_owner_supply_cap(SIDE)) return 0;
+    int before = b[nexus].queue_count;
+    move_cursor(b[nexus].x, b[nexus].y);
+    tap(KEY_A);
+    if (selected_building != nexus) return 0;
+    tap(KEY_A);
+    int queued = b[nexus].queue_count > before &&
+                 b[nexus].queue[(b[nexus].queue_head + b[nexus].queue_count - 1) % 5] == U_PROBE;
+    return queued;
+}
+
+static int side_gas_worker_count(void)
+{
+    int count = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        count += u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
+                 u[i].order == ORDER_GAS;
+    return count;
+}
+
 static int side_queued_units(void)
 {
     int count = 0;
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner == SIDE) count += b[i].queue_count;
     return count;
+}
+
+static int side_gateway_count(void)
+{
+    int count = 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        count += b[i].alive && b[i].owner == SIDE && b[i].type == B_GATEWAY;
+    return count;
+}
+
+static int side_incomplete_pylon_count(void)
+{
+    int count = 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        count += b[i].alive && b[i].owner == SIDE && b[i].type == B_PYLON &&
+                 b[i].under_construction;
+    return count;
+}
+
+static int build_gateway_from_probe(int gateway_index)
+{
+    int worker = -1;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
+            u[i].order != ORDER_BUILD && u[i].order != ORDER_GAS) { worker = i; break; }
+    if (worker < 0 || minerals < 150 || gateway_index >= 2) return 0;
+    int x = -1, y = -1;
+    static const int spot[][2] = {
+        {672,320}, {720,320}, {672,384}, {720,384},
+        {640,384}, {768,320}, {768,384}, {640,320},
+        {672,256}, {720,256}, {640,432}, {768,432}
+    };
+    for (unsigned i = 0; i < sizeof(spot) / sizeof(spot[0]); ++i)
+        if (race_can_site(SIDE, B_GATEWAY, spot[i][0], spot[i][1]) &&
+            can_place(B_GATEWAY, spot[i][0], spot[i][1])) {
+            x = spot[i][0]; y = spot[i][1]; break;
+        }
+    if (x < 0) return 0;
+    if (!cycle_select_actor(worker)) return 0;
+    tap(KEY_B);
+    for (int i = 0; i < 2; ++i) tap(KEY_DOWN); /* Gateway is menu item two. */
+    tap(KEY_A);
+    if (mode != MODE_BUILD) return 0;
+    move_cursor(x, y);
+    tap(KEY_A);
+    int target = u[worker].target;
+    int gateway = target >= 0 && target < MAX_BUILDINGS && b[target].alive &&
+                  b[target].owner == SIDE && b[target].type == B_GATEWAY &&
+                  dist2(b[target].x, b[target].y, x, y) <= 8 * 8 ? target : -1;
+    if (gateway >= 0 && u[worker].order == ORDER_BUILD) return 1;
+    if (mode == MODE_BUILD) tap(KEY_B);
+    if (menu_open) tap(KEY_B);
+    return 0;
+}
+
+static int build_cybernetics_core_from_probe(void)
+{
+    int worker = -1;
+    if (side_building_type(B_CYBERNETICS_CORE, 0) >= 0 || minerals < 200) return 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
+            u[i].order != ORDER_BUILD && u[i].order != ORDER_GAS) { worker = i; break; }
+    if (worker < 0) return 0;
+    int nexus = source_building(154, SIDE);
+    int x = -1, y = -1, best = 0x7fffffff;
+    if (nexus >= 0) for (int yy = b[nexus].y - 160; yy <= b[nexus].y + 160; yy += 32)
+        for (int xx = b[nexus].x - 192; xx <= b[nexus].x + 192; xx += 32) {
+            if (xx < 32 || yy < 32 || xx >= WORLD_W - 32 || yy >= WORLD_H - 32 ||
+                !race_can_site(SIDE, B_CYBERNETICS_CORE, xx, yy) ||
+                !can_place(B_CYBERNETICS_CORE, xx, yy)) continue;
+            int d = dist2(xx, yy, b[nexus].x, b[nexus].y);
+            if (d < best) { x = xx; y = yy; best = d; }
+        }
+    if (worker < 0) return 0;
+    if (x < 0 || !cycle_select_actor(worker)) {
+        return 0;
+    }
+    tap(KEY_B);
+    for (int i = 0; i < 5; ++i) tap(KEY_DOWN); /* Cybernetics Core is field-menu row five. */
+    tap(KEY_A);
+    if (mode != MODE_BUILD) return 0;
+    move_cursor(x, y);
+    tap(KEY_A);
+    int target = u[worker].target;
+    int core = target >= 0 && target < MAX_BUILDINGS && b[target].alive &&
+               b[target].owner == SIDE && b[target].type == B_CYBERNETICS_CORE &&
+               dist2(b[target].x, b[target].y, x, y) <= 8 * 8 ? target : -1;
+    if (core >= 0 && u[worker].order == ORDER_BUILD) return 1;
+    if (mode == MODE_BUILD) tap(KEY_B);
+    if (menu_open) tap(KEY_B);
+    return 0;
+}
+
+static int assign_probe_to_gas(void)
+{
+    int gas_workers = 0, assimilator = -1, worker = -1, best = 0x7fffffff;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_ASSIMILATOR &&
+            building_complete(i)) { assimilator = i; break; }
+    if (assimilator < 0) return 0;
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_PROBE) continue;
+        if (u[i].order == ORDER_GAS) { ++gas_workers; continue; }
+        if (u[i].order == ORDER_BUILD) continue;
+        int d = dist2(u[i].x, u[i].y, b[assimilator].x, b[assimilator].y);
+        if (d < best) { best = d; worker = i; }
+    }
+    if (gas_workers >= 2 || worker < 0 || !cycle_select_actor(worker)) return 0;
+    if (best <= 24 * 24) {
+        move_cursor(b[assimilator].x, b[assimilator].y);
+        tap(KEY_A);
+        int assigned = u[worker].alive && u[worker].order == ORDER_GAS &&
+                       u[worker].target == assimilator;
+        return assigned;
+    }
+    if (u[worker].order == ORDER_MOVE &&
+        dist2(u[worker].tx, u[worker].ty, b[assimilator].x, b[assimilator].y) < 24 * 24)
+        return 0;
+    tap(KEY_B);
+    tap(KEY_A); /* normal Move order */
+    if (mode != MODE_MOVE) { if (menu_open) tap(KEY_B); return 0; }
+    move_cursor(b[assimilator].x, b[assimilator].y);
+    tap(KEY_A);
+    int moving = u[worker].alive && u[worker].order == ORDER_MOVE;
+    return moving;
+}
+
+static int build_cannon_from_probe(int cannon_index)
+{
+    static const int spot[][2] = {
+        {480,368}, {448,416}, {512,416}, {576,416}, {448,352}
+    };
+    int worker = -1;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
+            u[i].order != ORDER_BUILD && u[i].order != ORDER_GAS) { worker = i; break; }
+    if (worker < 0 || minerals < 150 || cannon_index >= 3 ||
+        source_building(166, SIDE) < 0) return 0;
+    int x = -1, y = -1;
+    for (unsigned i = 0; i < sizeof(spot) / sizeof(spot[0]); ++i)
+        if (race_can_site(SIDE, B_PHOTON_CANNON, spot[i][0], spot[i][1]) &&
+            can_place(B_PHOTON_CANNON, spot[i][0], spot[i][1])) {
+            x = spot[i][0]; y = spot[i][1]; break;
+        }
+    if (x < 0 || !cycle_select_actor(worker)) return 0;
+    tap(KEY_B);
+    for (int i = 0; i < MENU_STOP + 2; ++i) tap(KEY_DOWN);
+    tap(KEY_A);
+    if (mode != MODE_BUILD) return 0;
+    move_cursor(x, y);
+    tap(KEY_A);
+    int target = u[worker].target;
+    int cannon = target >= 0 && target < MAX_BUILDINGS && b[target].alive &&
+                 b[target].owner == SIDE && b[target].type == B_PHOTON_CANNON &&
+                 dist2(b[target].x, b[target].y, x, y) <= 8 * 8 ? target : -1;
+    if (cannon >= 0 && u[worker].order == ORDER_BUILD) return 1;
+    if (mode == MODE_BUILD) tap(KEY_B);
+    if (menu_open) tap(KEY_B);
+    return 0;
 }
 
 static int source_pool_slack(void)
@@ -122,83 +299,50 @@ static int source_pool_slack(void)
            side_queued_units();
 }
 
-static int build_pylon_from_probe(int build_index)
+static int build_pylon_from_probe(void)
 {
     static const int spot[][2] = {
-        {544,368}, {608,368}, {672,368}, {544,432}, {736,368}
+        {544,368}, {608,368}, {672,368}, {544,432}, {736,368},
+        {608,432}, {736,432}, {544,496}, {672,432}, {800,368},
+        {800,432}, {608,496}, {736,496}, {800,496}, {480,432},
+        {480,496}, {864,368}, {864,432}, {864,496}
     };
     int worker = -1;
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE) {
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
+            u[i].order != ORDER_BUILD && u[i].order != ORDER_GAS) {
             worker = i; break;
         }
-    if (worker < 0 || minerals < 100 || build_index >= 5) return 0;
-    int old_buildings = 0;
-    for (int i = 0; i < MAX_BUILDINGS; ++i) old_buildings += b[i].alive;
+    if (worker < 0 || minerals < 100) return 0;
+    int x = -1, y = -1;
+    int best = 0x7fffffff;
+    for (unsigned i = 0; i < sizeof(spot) / sizeof(spot[0]); ++i)
+        if (race_can_site(SIDE, B_PYLON, spot[i][0], spot[i][1]) &&
+            can_place(B_PYLON, spot[i][0], spot[i][1])) {
+            int next_x, next_y;
+            if (!sc64_route_next(u[worker].x, u[worker].y, spot[i][0], spot[i][1],
+                                 &next_x, &next_y)) continue;
+            int d = dist2(u[worker].x, u[worker].y, spot[i][0], spot[i][1]);
+            if (d < best) { x = spot[i][0]; y = spot[i][1]; best = d; }
+        }
+    if (x < 0) return 0;
     if (!cycle_select_actor(worker)) return 0;
     tap(KEY_B);
     for (int i = 0; i < 3; ++i) tap(KEY_DOWN); /* Protoss Depot slot is Pylon. */
     tap(KEY_A);
     if (mode != MODE_BUILD) return 0;
-    move_cursor(spot[build_index][0], spot[build_index][1]);
+    move_cursor(x, y);
     tap(KEY_A);
-    int new_buildings = 0;
-    for (int i = 0; i < MAX_BUILDINGS; ++i) new_buildings += b[i].alive;
-    fprintf(stderr, "P4 pylon build frame=%u slot=%d mode=%d buildings=%d->%d minerals=%d supply=%d/%d\n",
-            (unsigned)frame, worker, mode, old_buildings, new_buildings,
-            minerals, supply_used, supply_cap);
-    if (new_buildings > old_buildings && u[worker].order == ORDER_BUILD) return 1;
+    int target = u[worker].target;
+    if (u[worker].order == ORDER_BUILD &&
+        target >= 0 && target < MAX_BUILDINGS && b[target].alive &&
+        b[target].owner == SIDE && b[target].type == B_PYLON &&
+        dist2(b[target].x, b[target].y, x, y) <= 8 * 8) return 1;
     /* A rejected placement leaves the build cursor armed. Cancel through the
      * ordinary field menu so the next placement attempt starts cleanly. */
     if (mode == MODE_BUILD) tap(KEY_B);
     if (menu_open) tap(KEY_B);
     return 0;
-}
-
-static void dump_army_paths(void)
-{
-    int l = 0, t = 0, r = 0, b0 = 0;
-    int goal_x = 0, goal_y = 0;
-    if (race_p4_location(SC64_P4_LOCATION_ESCAPE, &l, &t, &r, &b0)) {
-        goal_x = (l + r) / 2; goal_y = (t + b0) / 2;
-    }
-    int count = 0, sx = 0, sy = 0, front = -1, front_d = 0x7fffffff;
-    for (int i = 0; i < MAX_UNITS; ++i) {
-        if (!u[i].alive || u[i].owner != SIDE || u[i].type == U_TASSADAR ||
-            u[i].type == U_ZP_RAYNOR_VULTURE || sc64_race_is_worker(u[i].type)) continue;
-        ++count; sx += u[i].x; sy += u[i].y;
-        int d = dist2(u[i].x, u[i].y, goal_x, goal_y);
-        if (d < front_d) { front = i; front_d = d; }
-    }
-    fprintf(stderr, "P4 path dump frame=%u goal=%d,%d count=%d center=%d,%d front=%d\n",
-            (unsigned)frame, goal_x, goal_y, count, count ? sx / count : -1,
-            count ? sy / count : -1, front);
-    for (int i = 0; i < MAX_UNITS; ++i) {
-        if (!u[i].alive || u[i].owner != SIDE || u[i].type == U_TASSADAR ||
-            u[i].type == U_ZP_RAYNOR_VULTURE || sc64_race_is_worker(u[i].type)) continue;
-        int nx = -1, ny = -1;
-        int can = path_next_tile(u[i].x, u[i].y, u[i].tx, u[i].ty, &nx, &ny);
-        int c = (u[i].x / 16) + (u[i].y / 16) * MAP_COLS;
-        int nc = can ? nx / 16 + (ny / 16) * MAP_COLS : -1;
-        fprintf(stderr, " P4 unit slot=%d raw=%d type=%d xy=%d,%d ord=%d targ=%d,%d path=%d,%d timer=%d retry=%d next=%d,%d ok=%d terrain=%d/%d walk=%d/%d\n",
-                i, u[i].raw_type, u[i].type, u[i].x, u[i].y, u[i].order,
-                u[i].tx, u[i].ty, u[i].path_x, u[i].path_y,
-                u[i].path_timer, u[i].path_retry, nx, ny, can,
-                terrain_blocked(u[i].x / 16, u[i].y / 16),
-                can ? terrain_blocked(nx / 16, ny / 16) : -1,
-                c >= 0 && c < MAP_CELLS ? SC64_GRID_GET(path_walkable, c) : -1,
-                nc >= 0 && nc < MAP_CELLS ? SC64_GRID_GET(path_walkable, nc) : -1);
-        for (int j = 0; j < MAX_UNITS; ++j)
-            if (u[j].alive && owners_hostile(SIDE, u[j].owner) &&
-                dist2(u[i].x, u[i].y, u[j].x, u[j].y) <= 64 * 64)
-                fprintf(stderr, "  hostile slot=%d raw=%d type=%d xy=%d,%d d2=%d\n",
-                        j, u[j].raw_type, u[j].type, u[j].x, u[j].y,
-                        dist2(u[i].x, u[i].y, u[j].x, u[j].y));
-        for (int j = 0; j < MAX_BUILDINGS; ++j)
-            if (b[j].alive && dist2(u[i].x, u[i].y, b[j].x, b[j].y) <= 48 * 48)
-                fprintf(stderr, "  building slot=%d raw=%d type=%d owner=%d xy=%d,%d\n",
-                        j, b[j].raw_type, b[j].type, b[j].owner, b[j].x, b[j].y);
-    }
 }
 
 static int owner_units(int owner)
@@ -218,9 +362,6 @@ static int alive_units(void)
 
 static void checkpoint(const char *kind)
 {
-    if (path_diagnostics && !strcmp(kind, "periodic") &&
-        frame >= 18000 && frame <= 21000)
-        dump_army_paths();
     int raw1_side = 0, raw1_rescuable = 0, raw1_buildings_side = 0,
         raw1_buildings_rescuable = 0;
     int probes = side_probe_count();
@@ -241,13 +382,6 @@ static void checkpoint(const char *kind)
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].raw_owner == 1) {
         raw1_buildings_side += b[i].owner == SIDE;
         raw1_buildings_rescuable += b[i].owner == RESCUABLE;
-    }
-    if (!strcmp(kind, "start")) {
-        for (int i = 0; i < MAX_UNITS; ++i)
-            if (u[i].alive && owners_hostile(SIDE, u[i].owner))
-                fprintf(stderr, "P4 startup hostile slot=%d raw=%d type=%d owner=%d xy=%d,%d d2=%d\n",
-                        i, u[i].raw_type, u[i].type, u[i].owner, u[i].x, u[i].y,
-                        dist2(1600, 1920, u[i].x, u[i].y));
     }
     int first_side = -1;
     for (int i = 0; i < MAX_UNITS; ++i)
@@ -396,7 +530,6 @@ static int select_actor(int slot)
  * because Storm also damages allied units. */
 static int try_cast_storm(void)
 {
-    static unsigned storm_diagnostics;
     int caster = -1, target_x = -1, target_y = -1, best_score = 0;
     if (!deployed || race_p4.source_paused || screen != SCREEN_PLAY || won || lost ||
         mode != MODE_NORMAL || menu_open) return 0;
@@ -451,40 +584,10 @@ static int try_cast_storm(void)
             best_score = candidate_score;
         }
     }
-    if (caster < 0) {
-        int any_caster = -1;
-        for (int i = 0; i < MAX_UNITS; ++i)
-            if (u[i].alive && u[i].owner == SIDE &&
-                (u[i].raw_type == SC64_P4_STORM_HIGH_TEMPLAR_RAW ||
-                 u[i].raw_type == SC64_P4_RAW_TASSADAR) &&
-                u[i].carry >= SC64_STORM_ENERGY_COST * SC64_STORM_ENERGY_ONE) {
-                any_caster = i; break;
-            }
-        if (any_caster < 0) {
-            if (storm_diagnostics++ < 12)
-                fprintf(stderr, "P4 Storm unavailable: no owned caster frame=%u\n",
-                        (unsigned)frame);
-            return 0;
-        }
-        for (int i = 0; i < SC64_STORM_MAX_ACTIVE; ++i)
-            if (!race_p4.storm.storm[i].active) break;
-            else if (i + 1 == SC64_STORM_MAX_ACTIVE) return 0;
-        int nearest = 0x7fffffff, nearest_x = -1, nearest_y = -1;
-        for (int e = 0; e < MAX_UNITS; ++e)
-            if (u[e].alive && owners_hostile(SIDE, u[e].owner)) {
-                int d = dist2(u[e].x, u[e].y, u[any_caster].x, u[any_caster].y);
-                if (d < nearest) { nearest = d; nearest_x = u[e].x; nearest_y = u[e].y; }
-            }
-        if (storm_diagnostics++ < 24 || frame % 3000u < 90u)
-            fprintf(stderr, "P4 Storm no target frame=%u caster=%d xy=%d,%d energy=%d nearest=%d,%d d2=%d\n",
-                    (unsigned)frame, any_caster, u[any_caster].x,
-                    u[any_caster].y, u[any_caster].carry, nearest_x, nearest_y, nearest);
-        return 0;
-    }
+    if (caster < 0) return 0;
     wait_for_controller();
     if (!select_actor(caster) || selected_count() != 1 ||
         !race_p4_storm_menu_available()) return 0;
-    int energy_before = u[caster].carry;
     int effects_before = 0;
     for (int i = 0; i < SC64_STORM_MAX_ACTIVE; ++i)
         effects_before += race_p4.storm.storm[i].active != 0;
@@ -497,12 +600,7 @@ static int try_cast_storm(void)
     int effects_after = 0;
     for (int i = 0; i < SC64_STORM_MAX_ACTIVE; ++i)
         effects_after += race_p4.storm.storm[i].active != 0;
-    if (effects_after > effects_before) {
-        fprintf(stderr, "P4 controller Storm frame=%u caster=%d target=%d,%d score=%d energy=%d\n",
-                (unsigned)frame, caster, target_x, target_y, best_score,
-                u[caster].carry);
-        return 1;
-    }
+    if (effects_after > effects_before) return 1;
     return 0;
 }
 
@@ -620,7 +718,10 @@ static int escort_combat_count(void)
     int count = 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type != U_TASSADAR &&
-            u[i].type != U_ZP_RAYNOR_VULTURE && !sc64_race_is_worker(u[i].type))
+            u[i].type != U_ZP_RAYNOR_VULTURE &&
+            u[i].raw_type != SC64_P4_RAW_TASSADAR &&
+            u[i].raw_type != SC64_P4_STORM_HIGH_TEMPLAR_RAW &&
+            !sc64_race_is_worker(u[i].type))
             ++count;
     return count;
 }
@@ -632,6 +733,25 @@ static int actor_in_escape_region(int slot)
         race_p4_location(SC64_P4_LOCATION_ESCAPE, &left, &top, &right, &bottom) &&
         u[slot].x >= left && u[slot].x <= right &&
         u[slot].y >= top && u[slot].y <= bottom;
+}
+
+static int issue_hero_escape_segment(int slot, int force)
+{
+    if (slot < 0 || !u[slot].alive || u[slot].owner != SIDE ||
+        actor_in_escape_region(slot)) return 0;
+    if (!force && u[slot].order == ORDER_MOVE &&
+        dist2(u[slot].x, u[slot].y, u[slot].tx, u[slot].ty) > 96 * 96)
+        return 0;
+    int left, top, right, bottom, tx, ty;
+    if (!race_p4_location(SC64_P4_LOCATION_ESCAPE, &left, &top, &right, &bottom))
+        return 0;
+    tx = (left + right) / 2;
+    ty = (top + bottom) / 2;
+    if (!safe_escape_waypoint(u[slot].x, u[slot].y, tx, ty, &tx, &ty))
+        return 0;
+    if (tx == u[slot].x && ty == u[slot].y) { tx = (left + right) / 2; ty = (top + bottom) / 2; }
+    if (!issue_hero_move(slot, tx, ty)) return 0;
+    return 1;
 }
 
 /* Plan a conservative route segment for the rescue party. The mission's
@@ -710,7 +830,7 @@ static int safe_escape_waypoint(int start_x, int start_y, int goal_x, int goal_y
     if (!n) { *out_x = goal_x; *out_y = goal_y; return 1; }
     /* Advance about 320 px at a time so movement uses short, threat-aware
      * segments instead of the engine's shorter but guard-exposed direct route. */
-    unsigned pick = n > 8u ? n - 8u : 0u;
+    unsigned pick = n > 20u ? n - 20u : 0u;
     int cell = reverse_path[pick];
     *out_x = (cell % MAP_COLS) * 16 + 8;
     *out_y = (cell / MAP_COLS) * 16 + 8;
@@ -746,9 +866,6 @@ static int issue_group_order(int x, int y, int army_only, int attack_move)
      * have been moved clear, select the escorts with an ordinary drag box so
      * later orders do not pull them back into the battle. */
     wait_for_controller();
-    fprintf(stderr, "P4 group-order begin frame=%u target=%d,%d selected=%d pause=%u cursor=%u xy=%d,%d\n",
-            (unsigned)frame, x, y, selected_count(), race_p4.source_paused,
-            race_p4.action_cursor[3], cx, cy);
     if (army_only) {
         /* P4's authored B+R chord selects the combat group without the two
          * objective heroes, even when they are standing among the escorts. */
@@ -761,25 +878,13 @@ static int issue_group_order(int x, int y, int army_only, int attack_move)
         step(KEY_R);
         step(0);
     }
-    if (frame > 4900) for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].selected)
-            fprintf(stderr, "P4 selected slot=%d raw=%d type=%d owner=%d pos=%d,%d\n",
-                    i, u[i].raw_type, u[i].type, u[i].owner, u[i].x, u[i].y);
-    if (!selected_count()) {
-        fprintf(stderr, "P4 controller group-order no selection frame=%u\\n", (unsigned)frame);
-        return 0;
-    }
+    if (!selected_count()) return 0;
     wait_for_controller();
     tap(KEY_B);
     wait_for_controller();
     if (attack_move) { tap(KEY_DOWN); wait_for_controller(); }
     tap(KEY_A); /* Move is first; Attack Move is the second field choice. */
-    if (mode != (attack_move ? MODE_ATTACK : MODE_MOVE) || menu_open) {
-        fprintf(stderr, "P4 command menu failed frame=%u pause=%u cursor=%u mode=%d menu=%d selection=%d\n",
-                (unsigned)frame, race_p4.source_paused, race_p4.action_cursor[3],
-                mode, menu_open, selected_count());
-        return 0;
-    }
+    if (mode != (attack_move ? MODE_ATTACK : MODE_MOVE) || menu_open) return 0;
     move_cursor(x, y);
     wait_for_controller();
     u8 commanded[MAX_UNITS];
@@ -796,9 +901,6 @@ static int issue_group_order(int x, int y, int army_only, int attack_move)
             commanded[i] = 1;
             ++ncommanded;
         }
-    fprintf(stderr, "P4 group-order A frame=%u pause=%u cursor=%u mode=%d menu=%d selection=%d xy=%d,%d\n",
-            (unsigned)frame, race_p4.source_paused, race_p4.action_cursor[3],
-            mode, menu_open, ncommanded, cx, cy);
     tap(KEY_A);
     int applied = ncommanded > 0;
     for (int i = 0; i < MAX_UNITS; ++i) {
@@ -813,9 +915,6 @@ static int issue_group_order(int x, int y, int army_only, int attack_move)
             applied = 0;
         }
     }
-    fprintf(stderr, "P4 group-order result frame=%u applied=%d pause=%u cursor=%u mode=%d menu=%d\n",
-            (unsigned)frame, applied, race_p4.source_paused, race_p4.action_cursor[3],
-            mode, menu_open);
     return applied;
 }
 
@@ -840,20 +939,23 @@ static void launch_from_normal_menu(void)
     assert(race_campaign.mission == SC64_P4_GLOBAL_ID);
     assert(alive_units() == 137 && source_unit(SC64_P4_RAW_TASSADAR) >= 0);
     assert(source_unit(SC64_P4_RAW_RAYNOR_VULTURE) < 0);
-    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].raw_owner == 1)
-        fprintf(stderr, "P4 raw1 unit slot=%d raw=%d type=%d owner=%d xy=%d,%d\n",
-                i, u[i].raw_type, u[i].type, u[i].owner, u[i].x, u[i].y);
-    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].raw_owner == 1)
-        fprintf(stderr, "P4 raw1 building slot=%d raw=%d type=%d owner=%d xy=%d,%d\n",
-                i, b[i].raw_type, b[i].type, b[i].owner, b[i].x, b[i].y);
+}
+
+static int trace_path_exists(const char *path)
+{
+    FILE *existing = fopen(path, "rb");
+    if (!existing) return 0;
+    fclose(existing);
+    return 1;
 }
 
 static void write_trace_header(void)
 {
-    trace = fopen(attempt_path, "w");
+    trace = fopen(attempt_path, "wx");
     assert(trace);
     fprintf(trace, "{\"schema\":1,\"mission\":23,\"profile\":\"protoss-p4\","
-                   "\"policy\":\"normal-controller-rescue-buildup-and-extract\",\"events\":[\n");
+                   "\"policy\":\"protoss-stock-gas-cannons-dragoon-escort-extract\","
+                   "\"path_diagnostics\":false,\"events\":[\n");
 }
 
 static void promote_verified_trace(void)
@@ -861,8 +963,12 @@ static void promote_verified_trace(void)
     assert(screen == SCREEN_RESULT && won && !lost && race_selected_mission == 23 &&
            race_p4.model.outcome == SC64_P4_WON &&
            (race_completed & (1 << 23)) != 0);
+    if (trace_path_exists(verified_path)) {
+        fprintf(stderr, "refusing to overwrite existing P4 proof %s\n", verified_path);
+        assert(0);
+    }
     if (rename(attempt_path, verified_path) != 0) {
-        FILE *src = fopen(attempt_path, "rb"), *dst = fopen(verified_path, "wb");
+        FILE *src = fopen(attempt_path, "rb"), *dst = fopen(verified_path, "wbx");
         assert(src && dst);
         char buffer[4096];
         size_t n;
@@ -880,47 +986,55 @@ int main(int argc, char **argv)
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--limit") && i + 1 < argc) run_limit = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--attempt-tag") && i + 1 < argc) attempt_tag = argv[++i];
-        else if (!strcmp(argv[i], "--path-diagnostics")) path_diagnostics = 1;
         else if (!strcmp(argv[i], "--help")) {
-            puts("usage: sc64_p4_campaign_run [--limit TICKS] [--attempt-tag TAG] [--path-diagnostics]");
+            puts("usage: sc64_p4_campaign_run [--limit TICKS] [--attempt-tag TAG] ");
             return 0;
         } else return 2;
     }
     if (run_limit < 1 || run_limit > 1000000) return 2;
+    char unique_tag[112];
     if (attempt_tag) {
         for (const char *p = attempt_tag; *p; ++p)
             if (!( (*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
                    (*p >= '0' && *p <= '9') || *p == '-' || *p == '_' )) return 2;
-        if (snprintf(attempt_path, sizeof(attempt_path),
-                     ".local/sc64/p4-controller-%s-running.json", attempt_tag) >=
+    } else attempt_tag = "p4-auto";
+    int tag_len = snprintf(unique_tag, sizeof(unique_tag), "%s-%ld",
+                           attempt_tag, (long)getpid());
+    if (tag_len < 0 || (size_t)tag_len >= sizeof(unique_tag) ||
+        snprintf(attempt_path, sizeof(attempt_path),
+                 ".local/sc64/p4-controller-%s-running.json", unique_tag) >=
             (int)sizeof(attempt_path) ||
-            snprintf(final_attempt_path, sizeof(final_attempt_path),
-                     ".local/sc64/p4-controller-%s.json", attempt_tag) >=
-            (int)sizeof(final_attempt_path)) return 2;
-    }
+        snprintf(final_attempt_path, sizeof(final_attempt_path),
+                 ".local/sc64/p4-controller-%s.json", unique_tag) >=
+            (int)sizeof(final_attempt_path) ||
+        snprintf(verified_path, sizeof(verified_path),
+                 ".local/sc64/p4-controller-%s-win.json", unique_tag) >=
+            (int)sizeof(verified_path)) return 2;
+    if (trace_path_exists(attempt_path) || trace_path_exists(final_attempt_path) ||
+        trace_path_exists(verified_path)) return 2;
     mkdir(".local", 0777); mkdir(".local/sc64", 0777);
     write_trace_header();
     gba_init();
     launch_from_normal_menu();
     checkpoint("start");
-    for (int raw = 19; raw <= 79; raw += 60) {
-        int slot = source_unit(raw);
-        if (slot >= 0) fprintf(stderr,
-            "P4 startup actor raw=%d slot=%d owner=%d xy=%d,%d order=%d\n",
-            raw, slot, u[slot].owner, u[slot].x, u[slot].y, u[slot].order);
-    }
-
     int l, t, r, bottom;
     assert(race_p4_location(SC64_P4_LOCATION_ESCAPE, &l, &t, &r, &bottom));
     int escape_x = (l + r) / 2, escape_y = (t + bottom) / 2;
     int scheduled_order = -1;
-    int base_stage_orders = 0;
     int pylon_builds_started = 0;
     int pylon_build_attempts = 0;
     int pylon_next_build_frame = 0;
+    int gateway_builds_started = 0;
+    int gateway_next_build_frame = 0;
+    int core_build_attempts = 0;
+    int core_next_build_frame = 0;
+    int cannon_builds_started = 0;
+    int cannon_next_build_frame = 0;
     int next_storm_attempt = 0;
     int next_templar_follow = 0;
     int next_solo_hero_order = 0;
+    int next_probe_queue_frame = 0;
+    int heroes_final_advance = 0;
     while (frame < run_limit && screen == SCREEN_PLAY && !won && !lost) {
         int tassadar = source_unit(SC64_P4_RAW_TASSADAR);
         int raynor = source_unit(SC64_P4_RAW_RAYNOR_VULTURE);
@@ -982,17 +1096,11 @@ int main(int argc, char **argv)
                        u[high_templar].owner == RESCUABLE) {
                 /* Rescue the source-owned High Templar so the ordinary menu
                  * can provide researched Storm against the scripted waves. */
-                fprintf(stderr, "P4 rescuing High Templar order frame=%u target=%d,%d\n",
-                        (unsigned)frame, u[high_templar].x, u[high_templar].y);
                 issued = issue_group_order(u[high_templar].x, u[high_templar].y, 0, 1);
             } else if (nexus < 0 || gateway < 0) {
                 int target = nexus < 0 ? source_building(154, 3) :
                                          source_building(160, 3);
                 if (target >= 0) {
-                    ++base_stage_orders;
-                    fprintf(stderr, "P4 rescuing base order=%d frame=%u raw=%d target=%d,%d\n",
-                            base_stage_orders, (unsigned)frame, b[target].raw_type,
-                            b[target].x, b[target].y);
                     int army_x, army_y, tx = b[target].x,
                         ty = b[target].y;
                     /* Approach the Nexus from its north edge, inside the
@@ -1004,9 +1112,6 @@ int main(int argc, char **argv)
                     issued = issue_group_order(tx, ty, 0, 1);
                 }
             } else if (rescued_probes < 4 && rescuable_probe >= 0) {
-                fprintf(stderr, "P4 rescuing Probe frame=%u slot=%d pos=%d,%d count=%d\n",
-                        (unsigned)frame, rescuable_probe, u[rescuable_probe].x,
-                        u[rescuable_probe].y, rescued_probes);
                 int army_x, army_y, tx = u[rescuable_probe].x,
                     ty = u[rescuable_probe].y;
                 escort_army_center(tx, ty, &army_x, &army_y);
@@ -1018,9 +1123,6 @@ int main(int argc, char **argv)
                 if (!controller_buildup_started) {
                     controller_buildup_started = 1;
                     controller_buildup_start_frame = frame;
-                    fprintf(stderr, "P4 base buildup begins frame=%u units=%d combat=%d probes=%d minerals=%d pool_slack=%d\n",
-                            (unsigned)frame, alive_units(), escort_combat_count(),
-                            side_probe_count(), minerals, source_pool_slack());
                 }
                 int heroes[3] = {tassadar, raynor, high_templar};
                 for (int h = 0; h < 3; ++h) {
@@ -1030,64 +1132,81 @@ int main(int argc, char **argv)
                         (u[slot].order != ORDER_MOVE ||
                          dist2(u[slot].tx, u[slot].ty, P4_PARK_X, P4_PARK_Y) > 24 * 24)) {
                         if (issue_hero_move(slot, P4_PARK_X, P4_PARK_Y)) {
-                            fprintf(stderr, "P4 park source hero raw=%d frame=%u at=%d,%d\n",
-                                    u[slot].raw_type, (unsigned)frame, P4_PARK_X, P4_PARK_Y);
-                            issued = 1;
+                                    issued = 1;
                             break; /* one menu command per controller interval */
                         }
                     }
                 }
                 if (nexus < 0 || gateway < 0) {
                     controller_buildup_done = 1;
-                    fprintf(stderr, "P4 base buildup ends frame=%u reason=production-base-lost nexus=%d gateway=%d\n",
-                            (unsigned)frame, nexus, gateway);
                 }
                 int combat = escort_combat_count();
                 int slack = source_pool_slack();
                 int elapsed = frame - controller_buildup_start_frame;
                 if (side_probe_count() == 0) {
                     controller_buildup_done = 1;
-                    fprintf(stderr, "P4 base buildup ends frame=%u reason=workers-lost combat=%d minerals=%d\n",
-                            (unsigned)frame, combat, minerals);
                 }
                 if (slack <= 0 && side_queued_units() == 0) {
                     if (controller_buildup_pool_blocked_since < 0)
                         controller_buildup_pool_blocked_since = frame;
                 } else controller_buildup_pool_blocked_since = -1;
-                if (!controller_buildup_done && (combat >= 30 || elapsed >= 45000 ||
+                if (!controller_buildup_done && (combat >= 44 || elapsed >= 60000 ||
                     (controller_buildup_pool_blocked_since >= 0 &&
                      frame - controller_buildup_pool_blocked_since >= 2700))) {
                     controller_buildup_done = 1;
-                    fprintf(stderr, "P4 base buildup ends frame=%u elapsed=%d combat=%d probes=%d minerals=%d queued=%d pool_slack=%d reason=%s\n",
-                            (unsigned)frame, elapsed, combat, side_probe_count(),
-                            minerals, side_queued_units(), slack,
-                            combat >= 30 ? "combat-target" : elapsed >= 45000 ?
-                            "bounded-timeout" : "source-pool");
+                } else if (!controller_buildup_done && side_gas_worker_count() < 2 &&
+                           source_building(157, SIDE) >= 0) {
+                    issued = assign_probe_to_gas();
+                } else if (!controller_buildup_done && side_probe_count() < 8 &&
+                           frame >= next_probe_queue_frame && minerals >= 50 &&
+                           source_pool_slack() > 0 &&
+                           race_owner_reserved_supply(SIDE) + 2 <=
+                               race_owner_supply_cap(SIDE)) {
+                    issued = queue_probe_at_nexus();
+                    next_probe_queue_frame = frame + (issued ? 1800 : 600);
                 } else if (!controller_buildup_done && minerals >= 100 && supply_cap < supply_used + 4 &&
-                           pylon_builds_started < 5 && pylon_build_attempts < 5 &&
+                    pylon_builds_started < 12 && pylon_build_attempts < 24 &&
+                           side_incomplete_pylon_count() == 0 &&
                            frame >= pylon_next_build_frame) {
-                    int built = build_pylon_from_probe(pylon_build_attempts++);
+                    ++pylon_build_attempts;
+                    int built = build_pylon_from_probe();
                     if (built) {
                         ++pylon_builds_started;
                         pylon_next_build_frame = frame + 700;
                         issued = 1;
                     } else pylon_next_build_frame = frame + 300;
-                } else if (!controller_buildup_done && side_probe_count() < 8 && minerals >= 50 && slack > 0 &&
-                           nexus >= 0 && b[nexus].queue_count < 5) {
-                    issued = queue_probe_at_nexus();
-                    if (!issued) fprintf(stderr, "P4 Probe queue unavailable frame=%u minerals=%d queue=%d slack=%d\n",
-                                         (unsigned)frame, minerals, b[nexus].queue_count, slack);
-                } else if (!controller_buildup_done && combat < 30 && minerals >= 100 && slack > 0 &&
-                           supply_used + 4 <= supply_cap && gateway >= 0 &&
-                           b[gateway].queue_count < 5) {
-                    issued = queue_zealot_at_gateway();
-                    if (!issued) fprintf(stderr, "P4 Zealot queue unavailable frame=%u combat=%d minerals=%d supply=%d/%d slack=%d\n",
-                                         (unsigned)frame, combat, minerals,
-                                         supply_used, supply_cap, slack);
-                } else if (!issued) {
-                    fprintf(stderr, "P4 buildup wait frame=%u elapsed=%d combat=%d probes=%d minerals=%d supply=%d/%d queued=%d slack=%d\n",
-                            (unsigned)frame, elapsed, combat, side_probe_count(),
-                            minerals, supply_used, supply_cap, side_queued_units(), slack);
+                } else if (!controller_buildup_done && cannon_builds_started < 3 &&
+                           minerals >= 150 && frame >= cannon_next_build_frame &&
+                           source_building(166, SIDE) >= 0) {
+                    if (build_cannon_from_probe(cannon_builds_started)) {
+                        ++cannon_builds_started;
+                        cannon_next_build_frame = frame + 600;
+                        issued = 1;
+                    } else cannon_next_build_frame = frame + 1200;
+                } else if (!controller_buildup_done && side_gateway_count() >= 2 &&
+                           side_building_type(B_CYBERNETICS_CORE, 0) < 0 && core_build_attempts < 8 &&
+                           minerals >= 200 && frame >= core_next_build_frame) {
+                    ++core_build_attempts;
+                    if (build_cybernetics_core_from_probe()) issued = 1;
+                    core_next_build_frame = frame + (issued ? 600 : 1200);
+                } else if (!controller_buildup_done && gateway_builds_started < 2 &&
+                           minerals >= 150 && frame >= gateway_next_build_frame) {
+                    int built = build_gateway_from_probe(gateway_builds_started);
+                    if (built) {
+                        ++gateway_builds_started;
+                        gateway_next_build_frame = frame + 600;
+                        issued = 1;
+                    } else gateway_next_build_frame = frame + 2400;
+                } else if (!controller_buildup_done && combat < 44 && minerals >= 100 && slack > 0 &&
+                           supply_used + 4 <= supply_cap && gateway >= 0) {
+                    for (int i = 0; i < MAX_BUILDINGS; ++i)
+                        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_GATEWAY &&
+                            b[i].queue_count < 5 && building_complete(i) &&
+                            race_site_powered(SIDE, b[i].x, b[i].y)) {
+                            gateway = i;
+                            break;
+                        }
+                    issued = queue_zealot_at_gateway(gateway);
                 }
             } else if (!tassadar_rescued && tassadar >= 0) {
                 issued = issue_group_order(u[tassadar].x, u[tassadar].y, 0, 1);
@@ -1114,9 +1233,6 @@ int main(int argc, char **argv)
                         issue_hero_move(raynor, tx, ty);
                     issued = moved_t || moved_r;
                     if (issued) heroes_released = 1;
-                    if (issued) fprintf(stderr,
-                        "P4 solo-hero move frame=%u target=%d,%d t=%d r=%d\n",
-                        (unsigned)frame, tx, ty, moved_t, moved_r);
                 } else {
                 /* Refresh the escort's formation/order periodically so units
                  * that split during the scripted pause regroup on the route. */
@@ -1127,14 +1243,30 @@ int main(int argc, char **argv)
                 int tx = escape_x, ty = escape_y;
                 (void)safe_escape_waypoint(army_x, army_y, escape_x, escape_y,
                                            &tx, &ty);
-                fprintf(stderr, "P4 escort destination frame=%u from=%d,%d to=%d,%d\n",
-                        (unsigned)frame, army_x, army_y, tx, ty);
                 /* Reuse the ordinary combat-group shortcut for every bulk
                  * waypoint. A drag box can include a hero stacked beside a
                  * rescued escort and was being rejected as an unsafe group. */
                 int army_only = 1;
                 issued = issue_group_order(tx, ty, army_only, 0);
                 if (issued) escape_group_ordered = 1;
+                }
+            } else if (rescued && heroes_released && escort_combat_count() >= 2) {
+                int army_x, army_y;
+                escort_army_center(escape_x, escape_y, &army_x, &army_y);
+                if (dist2(army_x, army_y, escape_x, escape_y) <= 360 * 360 &&
+                    frame >= next_solo_hero_order) {
+                    int force = !heroes_final_advance;
+                    heroes_final_advance = 1;
+                    int moved_t = issue_hero_escape_segment(tassadar, force);
+                    raynor = source_unit(SC64_P4_RAW_RAYNOR_VULTURE);
+                    int moved_r = issue_hero_escape_segment(raynor, force);
+                    issued = moved_t || moved_r;
+                    next_solo_hero_order = frame + 1200;
+                } else if (dist2(army_x, army_y, escape_x, escape_y) > 200 * 200) {
+                    int tx = escape_x, ty = escape_y;
+                    (void)safe_escape_waypoint(army_x, army_y, escape_x, escape_y,
+                                               &tx, &ty);
+                    issued = issue_group_order(tx, ty, 1, 0);
                 }
             } else if (rescued && heroes_released && escort_combat_count() <= 1) {
                 /* If the escort is gone, preserve the source objective with
@@ -1157,29 +1289,12 @@ int main(int argc, char **argv)
                     }
                     next_solo_hero_order = frame + 1200;
                 }
-            } else if (rescued && heroes_released) {
-                int army_x, army_y;
-                escort_army_center(escape_x, escape_y, &army_x, &army_y);
-                if (dist2(army_x, army_y, escape_x, escape_y) > 200 * 200) {
-                    int tx = escape_x, ty = escape_y;
-                    (void)safe_escape_waypoint(army_x, army_y, escape_x, escape_y,
-                                               &tx, &ty);
-                    fprintf(stderr,
-                        "P4 escort continuation frame=%u from=%d,%d to=%d,%d\n",
-                        (unsigned)frame, army_x, army_y, tx, ty);
-                    issued = issue_group_order(tx, ty, 1, 0);
-                }
             }
             if (rescued && !heroes_released && controller_buildup_done) {
                 int army_x, army_y;
                 escort_army_center(escape_x, escape_y, &army_x, &army_y);
                 if (dist2(army_x, army_y, P4_PARK_X, P4_PARK_Y) > 256 * 256) {
                     heroes_released = 1;
-                    raynor_follow_start = frame + 6000;
-                    next_hero_follow = frame;
-                    fprintf(stderr, "P4 objective heroes assigned to cleared-route follow frame=%u center=%d,%d combat=%d; Raynor starts at %d\n",
-                            (unsigned)frame, army_x, army_y, escort_combat_count(),
-                            raynor_follow_start);
                 }
             }
             high_templar = source_unit(SC64_P4_STORM_HIGH_TEMPLAR_RAW);
@@ -1189,31 +1304,9 @@ int main(int argc, char **argv)
                 int army_x, army_y;
                 escort_army_center(escape_x, escape_y, &army_x, &army_y);
                 if (dist2(u[high_templar].x, u[high_templar].y,
-                          army_x, army_y) > 128 * 128 &&
-                    move_rescue_hero_to_safety(high_templar, army_x, army_y))
-                    fprintf(stderr, "P4 High Templar follow frame=%u to=%d,%d\n",
-                            (unsigned)frame, army_x, army_y);
+                          army_x, army_y) > 128 * 128)
+                    (void)move_rescue_hero_to_safety(high_templar, army_x, army_y);
                 next_templar_follow = frame + 1800;
-            }
-            if (rescued && heroes_released && escort_combat_count() > 1 &&
-                frame >= next_hero_follow) {
-                int army_x, army_y;
-                escort_army_center(escape_x, escape_y, &army_x, &army_y);
-                int hero_slots[2] = {tassadar, raynor};
-                for (int h = 0; h < 2; ++h) {
-                    int slot = hero_slots[h];
-                    if (slot < 0 || !u[slot].alive || u[slot].owner != SIDE ||
-                        (h == 1 && frame < raynor_follow_start)) continue;
-                    if (dist2(u[slot].x, u[slot].y, army_x, army_y) <= 192 * 192)
-                        continue;
-                    int tx = army_x, ty = army_y;
-                    if (!safe_escape_waypoint(u[slot].x, u[slot].y,
-                                              army_x, army_y, &tx, &ty)) continue;
-                    if (issue_hero_move(slot, tx, ty))
-                        fprintf(stderr, "P4 objective hero follow raw=%d frame=%u target=%d,%d army=%d,%d\n",
-                                u[slot].raw_type, (unsigned)frame, tx, ty, army_x, army_y);
-                }
-                next_hero_follow = frame + 1800;
             }
             scheduled_order = frame + (rescued ?
                 (escort_combat_count() ? 1200 : 300) : 2400);
@@ -1229,43 +1322,6 @@ int main(int argc, char **argv)
         promote_verified_trace();
     else
         assert(rename(attempt_path, final_attempt_path) == 0);
-    if (!won) for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == SIDE)
-            fprintf(stderr, "P4 path actor raw=%d type=%d at=%d,%d order=%d target=%d,%d path=%d,%d timer=%d retry=%d\n",
-                    u[i].raw_type,u[i].type,u[i].x,u[i].y,u[i].order,
-                    u[i].tx,u[i].ty,u[i].path_x,u[i].path_y,u[i].path_timer,u[i].path_retry);
-    if (!won) {
-        int actor = first_side_combat_unit();
-        if (actor >= 0) {
-            int col = u[actor].x / 16, row = u[actor].y / 16;
-            int hero = source_unit(SC64_P4_RAW_TASSADAR), nx = -1, ny = -1;
-            int reachable = hero >= 0 && sc64_route_next(u[actor].x, u[actor].y,
-                u[hero].x, u[hero].y, &nx, &ny);
-            fprintf(stderr, "P4 route diagnostic actor=%d,%d hero=%d,%d route=%d next=%d,%d walkable=%d/%d\n",
-                    u[actor].x, u[actor].y, hero >= 0 ? u[hero].x : -1,
-                    hero >= 0 ? u[hero].y : -1, reachable, nx, ny,
-                    SC64_GRID_GET(path_walkable, col + row * MAP_COLS),
-                    hero >= 0 ? SC64_GRID_GET(path_walkable,
-                        (u[hero].x / 16) + (u[hero].y / 16) * MAP_COLS) : 0);
-            for (int j = 0; j < MAX_UNITS; ++j)
-                if (j != actor && u[j].alive &&
-                    dist2(u[actor].x,u[actor].y,u[j].x,u[j].y) < 80*80)
-                    fprintf(stderr, "P4 nearby unit slot=%d owner=%d raw=%d type=%d at=%d,%d d2=%d\n",
-                            j,u[j].owner,u[j].raw_type,u[j].type,u[j].x,u[j].y,
-                            dist2(u[actor].x,u[actor].y,u[j].x,u[j].y));
-            for (int j = 0; j < MAX_BUILDINGS; ++j)
-                if (b[j].alive && dist2(u[actor].x,u[actor].y,b[j].x,b[j].y) < 96*96)
-                    fprintf(stderr, "P4 nearby building slot=%d owner=%d raw=%d type=%d at=%d,%d d2=%d\n",
-                            j,b[j].owner,b[j].raw_type,b[j].type,b[j].x,b[j].y,
-                            dist2(u[actor].x,u[actor].y,b[j].x,b[j].y));
-            fprintf(stderr, "P4 local raw terrain around first combat actor cell %d,%d (T/t = blocked/open)\n", col, row);
-            for (int dy = -8; dy <= 8; ++dy) {
-                for (int dx = -12; dx <= 12; ++dx)
-                    fputc(terrain_blocked(col + dx, row + dy) ? '#' : '.', stderr);
-                fputc('\n', stderr);
-            }
-        }
-    }
     printf("P4 controller attempt result=%s frame=%u fired=0x%x created=%u outcome=%u side=%d trace=%s\n",
            won ? "WON" : lost ? "LOST" : "LIMIT", (unsigned)frame,
            race_p4.model.fired, race_p4.created_count, race_p4.model.outcome,

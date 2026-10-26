@@ -24,6 +24,8 @@ void gfx_begin(u8 background);
  * Explicit band/window copy helpers keep their validated spans and do
  * not consult this scene clip. Every begin call restores the full screen. */
 void gfx_set_clip_y(int top,int bottom);
+/* Current valid range: top in the low byte, exclusive bottom in the high. */
+u16 gfx_get_clip_y(void);
 #endif
 /* The buffer selected by the last begin call, and its explicit-clear count.
  * Preserve-mode begin leaves that count unchanged for reusable pixel bands. */
@@ -42,6 +44,16 @@ int gfx_blit_window_2x(int y,int height,const u8 *source,int stride,int rows,int
 void gfx_set_palette(int first,int count,const u16 *rgb555);
 void gfx_blit16(int x,int y,const u8 *indexed_pixels);
 void gfx_blit_sprite(int x,int y,int width,int height,const u8 *indexed_pixels);
+#ifdef SC64_UNIT_WORD_SPRITES
+/* Optional phase-aligned unit raster metadata. Each phase contains one
+ * {color, alpha-byte-mask} word per four destination pixels, row-major.
+ * Transparent lanes in each color word must be zero. */
+typedef struct {
+    u16 width, height;
+    const u32 *phase_words[4];
+} GbaSpriteWordFrame;
+void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame);
+#endif
 #if defined(D2_DEN_OF_EVIL) || defined(GBA_HOST)
 void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *indexed_pixels);
 #endif

@@ -107,6 +107,7 @@ check_clip_range(int top, int bottom)
     gfx_begin(0);
     draw_pattern();
     gfx_set_clip_y(top, bottom);
+    assert(gfx_get_clip_y() == (u16)(top | (bottom << 8)));
     draw_operations();
     capture(clipped);
 
@@ -134,6 +135,7 @@ test_invalid_ranges_are_ignored(void)
     gfx_set_clip_y(-1, 40);
     gfx_set_clip_y(41, 40);
     gfx_set_clip_y(0, 161);
+    assert(gfx_get_clip_y() == (u16)(20 | (40 << 8)));
     gfx_pixel(1, 19, 31);
     gfx_pixel(1, 20, 30);
     gfx_pixel(1, 39, 29);
@@ -154,10 +156,12 @@ test_begin_resets_clip(void)
 
     /* Both begin variants establish a new scene with the full-screen clip. */
     gfx_begin(0);
+    assert(gfx_get_clip_y() == (u16)(160 << 8));
     gfx_pixel(4, 4, 31);
     assert(gfx_test_pixel(4, 4) == 31);
     gfx_set_clip_y(12, 120);
     gfx_begin_preserve();
+    assert(gfx_get_clip_y() == (u16)(160 << 8));
     gfx_pixel(4, 4, 30);
     assert(gfx_test_pixel(4, 4) == 30);
 }

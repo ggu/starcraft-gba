@@ -35,6 +35,11 @@ UNIT_COUNT = 228
 FLINGY_COUNT = 209
 SPRITE_COUNT = 517
 IMAGE_COUNT = 999
+# Pinned OpenBW bwenums.h at 4b046d5f65302b10cb0a745f0fecd37ec85b20a8:
+# ImageTypes::IMAGEID_Warp_Anchor. units.dat has no construction image for
+# Protoss, but order_ProtossBuild installs this shared image before
+# IncompleteWarping begins.
+PROTOSS_WARP_ANCHOR_IMAGE = 211
 BUILDINGS = {
     "Command Center": ("terran", 106), "Supply Depot": ("terran", 109),
     "Refinery": ("terran", 110), "Barracks": ("terran", 111),
@@ -297,8 +302,7 @@ def select_images(
             for image_id in direct_refs(construction[unit_id], {"Init", "SpecialState1", "SpecialState2", "AlmostBuilt"}):
                 add(image_id, race, building, "construction_overlay")
         if race == "protoss":
-            for image_id in direct_refs(normal_image, {"WarpIn"}):
-                add(image_id, race, building, "warp_in_overlay")
+            add(PROTOSS_WARP_ANCHOR_IMAGE, race, building, "warp_anchor")
     # Imported image layers can themselves spawn Init overlays. Follow that
     # bounded image graph so every referenced GRP can be rendered at runtime.
     pending = list(selected)
@@ -319,7 +323,7 @@ def select_images(
 
 
 def source_stage_inputs(tables: tuple[list[int], ...], payload: bytes) -> list[dict[str, Any]]:
-    """Return source-backed T/Z construction and Protoss WarpIn starts."""
+    """Return source-backed T/Z construction and Protoss WarpAnchor starts."""
     unit_flingy, construction, flingy_sprite, sprite_image, _image_grp, image_iscript = tables
     scripts = script_index(payload)
     morph_targets = {132, 133, 137, 144, 146}
@@ -345,12 +349,12 @@ def source_stage_inputs(tables: tuple[list[int], ...], payload: bytes) -> list[d
     program_buildings = {**BUILDINGS, **MORPH_PROGRAMS}
     for building, (race, unit_id) in program_buildings.items():
         if race == "protoss":
-            image_id = unit_image(unit_id)
-            start = animation_start(image_id, "WarpIn")
+            image_id = PROTOSS_WARP_ANCHOR_IMAGE
+            start = animation_start(image_id, "Init")
             if start is not None:
                 stage_inputs.append({"raw_unit_id": unit_id, "building": building,
                                      "race": race, "stage": 0,
-                                     "image_id": image_id, "animation": "WarpIn",
+                                     "image_id": image_id, "animation": "Init",
                                      "start": start})
             continue
         if not construction[unit_id]:
@@ -632,7 +636,7 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path,
             "unit_lookup": "units.dat->flingy.dat->sprites.dat->images.dat",
             "construction_images": "units.dat construction_animation column",
             "construction_animations": ["Init", "SpecialState1", "SpecialState2", "AlmostBuilt"],
-            "protoss_warp_overlay_scan": "direct image references in completed structure WarpIn only",
+            "protoss_warp_overlay_scan": "pinned WarpAnchor image 211 Init and its nested overlays",
             "iscript_walk": "linear and unconditional goto; randwait uses midpoint; conditional branches and calls are not expanded",
             "iscript_layer_walk": "bounded imgol/imgul and sprite overlay Init recursion; followmaingraphic is emitted as a parent frame/flip link; move is skipped for static images; creategasoverlays (opcode 56) stores timed selectors with active/depleted image variants",
             "gas_overlay_requests": sum(len(layer["gas_overlay_requests"])
@@ -645,7 +649,7 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path,
             "construction_setflipstate_audit": flip_audit,
             "runtime_stage_races": ["terran", "zerg", "protoss"],
             "zerg_initial_special_state1_raw_types": [132, 133, 137, 144, 146],
-            "protoss_runtime_stages": "normal structure WarpIn animation at stage 0, including spawned layers",
+            "protoss_runtime_stages": "shared WarpAnchor Init animation at stage 0 until build timer ends",
             "terran_missing_construction_image": "normal AlmostBuilt animation used for all four progress slots",
         },
         "palette": {"bolt_path": "00B/004", "sha256": hashlib.sha256(palette).hexdigest(),
