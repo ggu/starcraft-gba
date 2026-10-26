@@ -312,6 +312,36 @@ static int defend_hatch_with_army(int x,int y)
     press(KEY_A);
     return cursor_near(x,y)&&(press(KEY_A),1);
 }
+static void refresh_local_defense(void);
+/* After a costly engagement, fall back to the north-front rally and rebuild
+   from banked resources so the next target meets one full group instead of
+   a dwindling stream. Every action is a selection, train or attack input. */
+static void regroup_hydras(int below,int target)
+{
+    int h=-1;
+    if(count_units(SIDE,U_HYDRALISK)>=below)return;
+    for(int j=0;j<MAX_BUILDINGS;j++)if(b[j].alive&&b[j].owner==SIDE&&b[j].type==B_HATCHERY)h=j;
+    if(h<0||!race_owner_has_type(SIDE,B_HYDRALISK_DEN))return;
+    if(count_units(SIDE,U_HYDRALISK)+count_units(SIDE,U_ZERGLING)>0)defend_hatch_with_army(200,790);
+    for(int t=0;t<9000&&screen==SCREEN_PLAY&&!won&&!lost;t++) {
+        int live=count_units(SIDE,U_HYDRALISK)+queued_units(h,U_HYDRALISK);
+        if(live>=target||(gas<25&&!queued_units(h,U_HYDRALISK)))break;
+        if(selected_building!=h)click(b[h].x,b[h].y);
+        if(selected_building==h&&b[h].larva>0&&b[h].queue_count<5) {
+            int type=race_owner_reserved_supply(SIDE)+2>race_owner_supply_cap(SIDE)?U_OVERLORD:U_HYDRALISK;
+            select_train_type(type);
+            const Sc64RaceUnitRule *rule=sc64_race_unit_rule(train_type);
+            if(rule&&minerals>=rule->minerals&&gas>=rule->gas&&
+               (type==U_HYDRALISK||!queued_unit(h,type)))press(KEY_A);
+        }
+        controller_frame(0);
+        if(t%300==0)refresh_local_defense();
+        if(t%600==0)assign_gas();
+        if(!b[h].alive)break;
+    }
+    for(int t=0;t<900&&screen==SCREEN_PLAY&&!won&&!lost&&b[h].queue_count;t++)controller_frame(0);
+    select_hatchery();
+}
 static int order_local_defense(void)
 {
     int threat=-1,td=200*200;
@@ -503,6 +533,7 @@ int main(int argc,char **argv)
             }
             continue;
         }
+        regroup_hydras(20,26);
         if(nearest_enemy_building(&x,&y)<0)break;
         int result=attack_nearest(x,y,900);
         if(!result)return fail("issue attack-move command");

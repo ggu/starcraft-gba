@@ -99,6 +99,10 @@ sc64_unit_bucket_insert(int slot, int cell)
 /* Once-per-frame setup stays in ROM to preserve the unchanged IWRAM stack
  * reserve as transport checks expand the hot actor loop. */
 static void __attribute__((noinline))
+#elif defined(SC64_FACT_TABLES)
+/* The smaller table-backed update_orders() would otherwise absorb this
+ * once-per-frame IWRAM setup into its ROM Thumb body. */
+static void GBA_HOT __attribute__((noinline))
 #else
 static void GBA_HOT
 #endif

@@ -22,8 +22,10 @@ The [minimap follow-up](audits/2026-10-26-minimap-terrain/README.md) reduces
 P4's measured full cost by another 1.60%, to about 17.0 fps equivalent, with
 pixel-identical terrain drawing and unchanged worst-frame stalls.
 
-Canonical profiles expose Terran 1–10, Zerg 1–4 and Protoss 1–5: 19/30
-entries. Canonical Zerg uses `SCZ4` and `.local/play/zerg-z4`; canonical
+Canonical profiles expose Terran 1–10, Zerg 1–6 and Protoss 1–5: 21/30
+entries (see the [Z6 promotion audit](audits/2026-10-26-z6-promotion/README.md)).
+Canonical Zerg uses `SCZ6`, generation 32 and `.local/play/zerg-z6`; explicit
+`zerg-z4` keeps `SCZ4`, generation 20 and `.local/play/zerg-z4`; canonical
 Protoss uses the P5 Shuttle files, `SCPB`, generation 26 and
 `.local/play/protoss-p5-shuttle`. Explicit `protoss-p4-storm` retains the real
 P4 files, `SCP5`, generation 21 and its own save path. Explicit `zerg-z3` and
@@ -34,8 +36,8 @@ files, never to the newer canonical ROM.
 All ten Terran missions pass the actual canonical-flag host controller
 target. T7/T10 have current paired ARM wins from explicit mission probe entry;
 other Terran ARM wins remain evidence for their earlier frozen builds. All
-four Zerg chapters have current host wins; the older Z4 ARM timing applies
-to its frozen build. P1–P5 have fresh host and input-only ARM wins in the
+six Zerg chapters have current host and input-only ARM wins in the canonical
+Z6 build, with Z5/Z6 fresh-process SRAM continuity. P1–P5 have fresh host and input-only ARM wins in the
 canonical P5 pools, retaining Fenix in P1/P2 and both heroes in P4. P5 has an
 exact fresh-process cargo SRAM restore and continued win. Earlier P4 save
 qualification remains scoped to its preserved P4 build. See the
@@ -5177,6 +5179,75 @@ hoist each gained under 1.5 percent. An IWRAM target-index rebuild gained
 site overflowed the IWRAM guard. These are emulator results only. They do not
 qualify a mission win, fresh-process SRAM, physical hardware or 30 fps. Staged
 campaign progress remains 22/30.
+
+### P7 build-time fact tables
+
+The movement probe still derives per-type facts at run time on several hot
+paths. Each unit's `move_toward()` checks movability and flight. Collision
+radius, flight and collidability are resolved on every class-cache miss.
+Targeting checks flight and hidden policy, and `draw_minimap()` checks
+drawability. Each lookup walks the gate-specific fact switches (P7, Z6, P5,
+P6, Z5 and Z/P), then the skirmish flight list, often from ROM Thumb code.
+`SC64_FACT_TABLES` is default-off. With it, a host generator evaluates the
+unchanged functions under the probe's exact flags for all 49 unit and 58
+building types. It emits packed ROM tables: a 32-bit word per unit (actor
+flags, radius, flight) and a 16-bit word per building. The tables take 196 and
+116 bytes. The hot paths read these tables; the original functions remain as
+`*_reference`, and out-of-range types still use them. The generated header
+lists the 23 actor gates it was built with. A build with different gates fails
+with `#error`, and a static assertion checks the roster sizes. The per-slot
+collision-class cache and steering list are unchanged.
+
+`make test-sc64-fact-tables` compares every table entry with the reference
+functions in 21 host gate configurations, each built with and without
+`SC64_ZP_FACT_RANGE_CULL`. They are the 16 fact-range gate sets, four P7, Z6
+and Z7 variants, and the P7 movement profile's gates. It checks 64 types past each end of both rosters,
+and the integer extremes except in late-Terran builds. The late-Terran
+reference lookup overflows on `INT_MIN`, so those builds skip the extremes. It
+also checks the derived collidable, movable, drawable, hidden and selectable
+policies, and that every fact-selecting macro in the fact headers is recorded.
+Tables built for `zp_p7` are rejected by `zp_p7_projectiles`, `zp_p6` and `zp`
+builds. `make test-sc64-p7-fact-tables` makes the same check under the P7 flags
+(1,996 checks). The ASan/UBSan fact build also prints the movement trace hashes
+`e3584674` and `824e2f6d` after 619,216 steering-list oracle checks. It
+reproduces the count-snapshot menu, trigger and pause/save/load fixture byte
+for byte.
+
+ARM timing uses the steering-list workloads on base `fad7926`. The movement
+probe was rebuilt on the same base:
+
+```sh
+make protoss-p7-move-probe protoss-p7-fact-probe
+python3 tools/sc64_p7_move_workload.py --elf build/starcraft-protoss-p7-fact-probe.elf \
+    --rom build/StarCraft-Protoss-P7-Fact-Probe-GBA.gba --out build/p7-fact-attack \
+    --neutral-ticks 600 --attack-ticks 1500
+python3 tools/sc64_p7_move_workload.py --compare REFERENCE/result.json CANDIDATE/result.json
+```
+
+| Workload | Movement probe | Fact tables, setup inlined | Fact-table probe |
+| --- | --- | --- | --- |
+| Opening, 600 updates | 12.579 | 12.610 | 12.677 |
+| Neutral, 2,400 updates | 11.140 | 11.170 | 11.215 |
+| Attack-move, 1,200 complete updates | 10.044 | 10.072 | 10.098 |
+
+The gain is small, 0.5 to 0.8 percent. The existing range cull already
+rejects the common skirmish-roster types early, and the class cache already
+resolves collision facts once per slot each frame. Every checkpoint, input and
+ending matches the movement probe in all three workloads. Both builds lose at
+frame 2394 in the attack-move run. In the "setup inlined" build, the smaller
+table-backed code let GCC inline the once-per-frame IWRAM bucket setup into
+the ROM Thumb `update_orders()`. The submitted probe keeps that setup out of
+line in IWRAM, but only when `SC64_FACT_TABLES` is defined.
+
+The fact-table probe ROM is
+`1f929e98f809483bad02449ed202813d9a03005cdbbaa9d2c4493459bb504ebd`.
+IWRAM ends at `0x03004900`, 664 bytes below the movement probe's `0x03004b98`.
+The IWRAM bodies of `move_toward()`, `unit_step_clear()` and the class lookup
+shrink by 276, 132 and 236 bytes. BSS is unchanged at `0x0203dcc8`, and ROM text
+is 4,248 bytes smaller. With the flag off, the original-art, unified and P7
+movement-probe ROMs are byte-identical to `fad7926`. Saves and save layouts are
+unchanged. These are emulator results only. They do not qualify a mission win,
+fresh-process SRAM, physical hardware or 30 fps.
 
 ### Weapon-family effects across implemented attacks
 

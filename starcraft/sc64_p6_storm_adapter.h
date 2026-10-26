@@ -171,7 +171,7 @@ static int race_p6_storm_tick(int user_paused)
             u8 target_class;
             if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i])) continue;
             actor_flags = sc64_game_unit_actor_flags(u[i].type);
-            if (actor_flags & SC64_GAME_ACTOR_HIDDEN) continue;
+            if ((actor_flags & SC64_GAME_ACTOR_HIDDEN) || SC64_CARRIER_STATE_HIDDEN(&u[i])) continue;
             dx = (int)pulses[p].x - u[i].x;
             dy = (int)pulses[p].y - u[i].y;
             if (dx < -SC64_STORM_RADIUS_GBA_PX || dx > SC64_STORM_RADIUS_GBA_PX ||

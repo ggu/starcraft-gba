@@ -488,6 +488,7 @@ race_p6_combat_target_is_invincible(int target)
     if (target < MAX_UNITS) {
         return (u[target].flags & 16) || invincible_units[target] ||
             sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_HIDDEN) ||
+            SC64_CARRIER_STATE_HIDDEN(&u[target]) ||
             sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_INVINCIBLE);
     }
     target -= MAX_UNITS;

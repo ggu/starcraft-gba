@@ -102,7 +102,8 @@ static inline const Sc64P7ActorFact *sc64_p7_actor_fact(int type)
         ,{{73,40,40,0,25,0,300,192,8,8,7,7,1,0,
            6,1,1,128,1,6,1,1,128,1,
            SC64_ZP_ACTOR_MOVABLE|SC64_ZP_ACTOR_DRAWABLE
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && \
+    !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
            |SC64_ZP_ACTOR_HIDDEN
 #endif
            },
