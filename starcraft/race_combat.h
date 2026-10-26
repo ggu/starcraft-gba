@@ -60,6 +60,18 @@ _Static_assert(MAX_UNITS < 255,
                "Z/P defense lists reserve 0xff as the end marker");
 #endif
 
+/* Unit cooldowns are decremented before their next attack check. Defense
+ * queue_progress must likewise allow the defense to fire on the update the
+ * converted source cooldown expires, rather than one update afterward. */
+static int race_defense_cooldown_ready(Building *q)
+{
+    if (q->queue_progress > 0) {
+        --q->queue_progress;
+        if (q->queue_progress > 0) return 0;
+    }
+    return 1;
+}
+
 #if defined(SC64_P3_DEFENSE_TARGETS) || defined(SC64_TERRAN_LATE_RUNTIME) || \
     defined(SC64_ZP_DEFENSE_TARGETS)
 /* Keep the original full scan as both the fallback for every other mission
@@ -86,7 +98,7 @@ static void GBA_HOT race_tick_defenses(void) {
         case B_MISSILE_TURRET:air=1;range=112;damage=20;cooldown=19;break;
         default:continue;
         }
-        if(q->queue_progress>0){q->queue_progress--;continue;}
+        if(!race_defense_cooldown_ready(q))continue;
         int best=-1,bestd=range*range;
         for(int j=0;j<MAX_UNITS;j++)if(u[j].alive) {
             /* Reject candidates outside the circular weapon radius with the
@@ -186,7 +198,7 @@ static __attribute__((noinline)) void race_tick_defenses_zp_targets(void)
         case B_MISSILE_TURRET: air = 1; range = 112; damage = 20; cooldown = 19; break;
         default: continue;
         }
-        if (q->queue_progress > 0) { q->queue_progress--; continue; }
+        if (!race_defense_cooldown_ready(q)) continue;
         int best = race_defense_target_from_zp_lists(
             q, ground, air, range, head, next, hostile_mask[q->owner]);
         if (best >= 0) {
@@ -224,7 +236,7 @@ static __attribute__((noinline)) void race_tick_defenses_p3_targets(void) {
         case B_MISSILE_TURRET: air = 1; range = 112; damage = 20; cooldown = 19; break;
         default: continue;
         }
-        if (q->queue_progress > 0) { q->queue_progress--; continue; }
+        if (!race_defense_cooldown_ready(q)) continue;
 
         const u8 *targets = 0;
         int target_count = 0;
@@ -325,7 +337,7 @@ static __attribute__((noinline)) void race_tick_defenses_late_targets(void)
         case B_MISSILE_TURRET: air = 1; range = 112; damage = 20; cooldown = 19; break;
         default: continue;
         }
-        if (q->queue_progress > 0) { q->queue_progress--; continue; }
+        if (!race_defense_cooldown_ready(q)) continue;
         int best = q->owner < 5 ?
             race_defense_target_from_owner_lists(q, ground, air, range, head, next,
                                                  hostile_mask[q->owner]) : -1;

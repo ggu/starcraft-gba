@@ -313,8 +313,10 @@ class OnboardingTests(unittest.TestCase):
                             markers.add('SC64_Z6_SPRITE_SET_COMPLETE')
                         if '--include-z6-buildings' in command:
                             markers.add('SC64_Z6_BUILDING_SPRITE_SET_COMPLETE')
-                        output.write_text('\n'.join(f'#define {marker} 1' for marker in markers) + '\n',
-                                          encoding='ascii')
+                        content = '\n'.join(f'#define {marker} 1' for marker in markers) + '\n'
+                        if '--prepack-unit-words' in command:
+                            content += UNIT_WORD_SPRITE_HEADER
+                        output.write_text(content, encoding='ascii')
                     elif script == 'sc64_menu_assets.py':
                         output = root / '.local/sc64/races/generated/sc64_menu_generated.h'
                         output.parent.mkdir(parents=True, exist_ok=True)
@@ -355,6 +357,13 @@ class OnboardingTests(unittest.TestCase):
                 with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
                         patch.object(dev, 'run', side_effect=fake_run):
                     dev.prepare(rom, profile)
+
+                # Preparing a later staged profile rewrites the same shared
+                # bank as canonical Zerg; it must not erase the packed data.
+                shared = root / '.local/sc64/zp-stage/generated/sc64_race_sprites_generated.h'
+                self.assertTrue(dev.canonical_zerg_input_ready('Zerg chapter 4 sprites', shared))
+                base = root / '.local/sc64/races/generated/sc64_race_sprites_generated.h'
+                self.assertIn('SC64_RACE_UNIT_WORD_SPRITE_METADATA 1', base.read_text())
 
                 produced = set()
                 for _, relative, _ in dev.STAGED_CAMPAIGN_INPUTS[profile]:

@@ -71,6 +71,11 @@ build/test-sc64-scv-contact: tests/sc64_scv_contact_game.c $(STARCRAFT) $(wildca
 .PHONY: test-sc64-scv-contact
 test-sc64-scv-contact: build/test-sc64-scv-contact
 	./build/test-sc64-scv-contact
+build/test-sc64-scv-contact-zp: tests/sc64_scv_contact_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_DIRECT_ATTACK $< common/gba.c -o $@
+.PHONY: test-sc64-scv-contact-zp
+test-sc64-scv-contact-zp: build/test-sc64-scv-contact-zp
+	./build/test-sc64-scv-contact-zp
 UNIFIED_FLAGS := $(RACES_FLAGS) -DSC64_UNIFIED
 RACE_CAMPAIGN_FLAGS := $(UNIFIED_FLAGS) -DSC64_IMPORTED_SKIRMISH -I.local/sc64/skirmish/generated
 RACE_CAMPAIGN_INPUTS := $(RACES_INPUTS) .local/sc64/skirmish/generated/sc64_skirmish_generated.h
@@ -3249,7 +3254,7 @@ build/test-sc64-stock-combat-runtime-base: tests/sc64_stock_combat_runtime.c $(S
 test-sc64-stock-combat-runtime: build/test-sc64-stock-combat-runtime build/test-sc64-stock-combat-runtime-base
 	./build/test-sc64-stock-combat-runtime
 	./build/test-sc64-stock-combat-runtime-base
-test-unified: test-sc64-stock-motion-runtime test-sc64-stock-combat-runtime test-sc64-scv-contact test-sc64-construction-source
+test-unified: test-sc64-stock-motion-runtime test-sc64-stock-combat-runtime test-sc64-scv-contact test-sc64-scv-contact-zp test-sc64-construction-source
 
 # Compare every compiled race-building identity against the independent public
 # BWAPI numeric profile rows. Build the same fixture under each profile gate so
