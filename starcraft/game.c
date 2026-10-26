@@ -8,6 +8,9 @@
 #if defined(SC64_DIRECT_ATTACK) && !defined(SC64_RACES)
 #error "SC64_DIRECT_ATTACK requires SC64_RACES"
 #endif
+#if defined(SC64_REACHABLE_FORMATION) && !defined(SC64_RACES)
+#error "SC64_REACHABLE_FORMATION requires SC64_RACES"
+#endif
 #ifdef SC64_DIRECT_ATTACK
 #include "sc64_direct_attack.h"
 #endif
@@ -4250,6 +4253,9 @@ static void
 issue_order(int order, int tx, int ty)
 {
     int i, n = 0;
+#ifdef SC64_REACHABLE_FORMATION
+    int group_order = selected_count() > 1;
+#endif
     selected_building = -1;
     for (i = 0; i < MAX_UNITS; i++)
 	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE && u[i].selected) {
@@ -4268,6 +4274,24 @@ issue_order(int order, int tx, int ty)
             }
 #endif
 	    u[i].order = order;
+	#ifdef SC64_REACHABLE_FORMATION
+	    if (group_order) {
+	        int slot_x = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
+	        int slot_y = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);
+	        int next_x, next_y;
+	        if (!sc64_race_unit_flying(u[i].type) &&
+	            !path_next_tile(u[i].x, u[i].y, slot_x, slot_y, &next_x, &next_y) &&
+	            path_next_tile(u[i].x, u[i].y, tx, ty, &next_x, &next_y)) {
+	            slot_x = tx;
+	            slot_y = ty;
+	        }
+	        u[i].tx = slot_x;
+	        u[i].ty = slot_y;
+	    } else {
+	        u[i].tx = tx;
+	        u[i].ty = ty;
+	    }
+	#else
 	    if (selected_count() > 1) {
 		u[i].tx = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
 		u[i].ty = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);
@@ -4275,6 +4299,7 @@ issue_order(int order, int tx, int ty)
 		u[i].tx = tx;
 		u[i].ty = ty;
 	    }
+	#endif
 	    u[i].path_timer = 0;
 	    u[i].path_retry = 0;
 	    u[i].target = -1;
