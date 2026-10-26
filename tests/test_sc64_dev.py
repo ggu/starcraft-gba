@@ -66,11 +66,84 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
         self.assertEqual(dev.GAMES['zerg'], ('zerg', 'build/StarCraft-Zerg-Z4-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg-z3'], ('zerg-z3', 'build/StarCraft-Zerg-GBA.gba'))
-        self.assertEqual(dev.PLAY_SAVE_PROFILES, {'zerg': 'zerg-z4', 'zerg-z3': 'zerg'})
+        self.assertEqual(dev.PLAY_SAVE_PROFILES,
+                         {'zerg': 'zerg-z4', 'zerg-z3': 'zerg', 'protoss-p3': 'protoss'})
         self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['zerg'],
                          ('StarCraft-Zerg-Z4-GBA.gba', 'starcraft-zerg-z4.elf'))
         self.assertEqual(sc64_split_profile.PROFILE_BUILD_PATHS['zerg'],
                          ('StarCraft-Zerg-Z4-GBA.gba', 'starcraft-zerg-z4.elf'))
+
+    def test_p4_storm_and_legacy_p3_have_explicit_build_and_save_routes(self):
+        self.assertEqual(dev.GAMES['protoss-p3'],
+                         ('protoss-p3', 'build/StarCraft-Protoss-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p4-storm'],
+                         ('protoss-p4-storm', 'build/StarCraft-Protoss-P4-Storm-GBA.gba'))
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p4-storm'], 'test-sc64-p4-campaign')
+        self.assertEqual(dev.PLAY_SAVE_PROFILES.get('protoss-p4-storm', 'protoss-p4-storm'),
+                         'protoss-p4-storm')
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss-p3'], 'protoss')
+
+    def test_p4_prepare_authenticates_fresh_chapter_inputs_before_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rom = root / 'owned-rom.z64'
+            rom.write_bytes(b'user supplied fixture')
+            calls = []
+
+            def emit(path, text):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text, encoding='ascii')
+
+            def fake_run(command, **_kwargs):
+                calls.append(command)
+                script = Path(command[1]).name
+                local = root / '.local/sc64'
+                if script == 'sc64_workspace.py':
+                    emit(local / 'rom/StarCraft64-USA.z64', 'prepared source fixture')
+                elif script == 'sc64_races_pack.py':
+                    output = (Path(command[command.index('--out') + 1]) if '--out' in command
+                              else local / 'races/generated/sc64_races_generated.h')
+                    emit(output, ''.join(
+                        f'#if defined(SC64_UNIFIED) && defined({gate})\n{payload}\n'
+                        f'#endif /* SC64_UNIFIED && {gate} */\n'
+                        for gate, payload in (dev.RACE_CAMPAIGN_GATES['protoss-p3'],
+                                              dev.RACE_CAMPAIGN_GATES['protoss-p4-storm'])))
+                elif script == 'sc64_race_sprites.py':
+                    output = (Path(command[command.index('--header') + 1]) if '--header' in command
+                              else local / 'races/generated/sc64_race_sprites_generated.h')
+                    self.assertIn('--prepack-unit-words', command)
+                    emit(output, UNIT_WORD_SPRITE_HEADER)
+                elif script == 'sc64_p4_pack.py':
+                    emit(local / 'p4/manifest.json',
+                         '{"schema":1,"mission":{"id":"P4","global_catalog_index":23,'
+                         '"source_map_path":"008/021"}}')
+                elif script == 'sc64_p4_scenario_pack.py':
+                    emit(local / 'p4/generated/sc64_p4_scenario_generated.h',
+                         '#define SC64_P4_SCENARIO_GENERATED_H 1\n')
+
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
+                    patch.object(dev, 'run', side_effect=fake_run):
+                dev.prepare(rom, 'protoss-p4-storm')
+            self.assertTrue(all(dev.protoss_p4_input_ready(label, root / relative)
+                                for label, relative, _ in dev.PROTOSS_P4_INPUTS))
+            self.assertIn('sc64_skirmish_pack.py', [Path(call[1]).name for call in calls])
+            # Existence is insufficient: stale maps, art, scenarios and source
+            # identities must all be rejected before invoking Make.
+            for label, relative, _ in dev.PROTOSS_P4_INPUTS:
+                path = root / relative
+                original = path.read_text()
+                path.write_text('stale fixture\n', encoding='ascii')
+                with self.subTest(label=label), patch.object(dev, 'ROOT', root), \
+                        patch.object(dev, 'run', side_effect=AssertionError('Make must not run')):
+                    with self.assertRaisesRegex(RuntimeError, 'authenticated chapter inputs'):
+                        dev.build('protoss-p4-storm')
+                path.write_text(original, encoding='ascii')
+            manifest = root / '.local/sc64/p4/manifest.json'
+            manifest.write_text(
+                '{"schema":1,"mission":{"id":"P4","global_catalog_index":22,'
+                '"source_map_path":"008/021"}}', encoding='ascii')
+            self.assertFalse(dev.protoss_p4_input_ready(
+                'Protoss chapter 4 authenticated source', manifest))
 
     def test_canonical_zerg_readiness_requires_z4_stage_inputs(self):
         with tempfile.TemporaryDirectory() as directory:

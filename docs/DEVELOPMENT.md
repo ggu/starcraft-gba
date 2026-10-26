@@ -1064,13 +1064,30 @@ same versioned ROM. `protoss-p4` remains an internal fourth-chapter target for
 **The Hunt for Tassadar**. Preparing later map data does not enable later
 missions in the frontend.
 
+The wrapper can prepare, build, test and launch the Storm-enabled P4 profile
+without running the individual packers manually:
+
+```sh
+./dev sc64 prepare --rom "/path/to/StarCraft 64 USA ROM" --profile protoss-p4-storm
+./dev sc64 build --profile protoss-p4-storm
+./dev sc64 test --profile protoss-p4-storm
+./dev sc64 play --profile protoss-p4-storm
+```
+
+This route checks both P3/P4 map gates, source mission identity and packed
+sprite metadata. It uses `.local/play/protoss-p4-storm` for emulator saves.
+The explicit `protoss-p3` wrapper retains the older P3 ROM and
+`.local/play/protoss` saves. Their generations and game codes are distinct;
+the wrapper does not convert saves between them. Canonical promotion and
+current-source ARM mission qualification are separate from preparation.
+
 After the canonical profile preparation has supplied the common assets,
 prepare the additional ignored Z4 and P4 inputs from the same verified source
 ROM (`./dev sc64 prepare --profile zerg` prepares Z4 automatically):
 
 ```sh
 python3 tools/sc64_races_pack.py --rom /path/to/StarCraft64-USA.z64 --out .local/sc64/zp-stage/generated/sc64_races_generated.h
-python3 tools/sc64_race_sprites.py --rom /path/to/StarCraft64-USA.z64 --base-only --include-zp-campaign-actors --out .local/sc64/zp-stage/generated/sprites --header .local/sc64/zp-stage/generated/sc64_race_sprites_generated.h
+python3 tools/sc64_race_sprites.py --rom /path/to/StarCraft64-USA.z64 --base-only --include-zp-campaign-actors --prepack-unit-words --out .local/sc64/zp-stage/generated/sprites --header .local/sc64/zp-stage/generated/sc64_race_sprites_generated.h
 python3 tools/sc64_z4_pack.py --rom /path/to/StarCraft64-USA.z64
 python3 tools/sc64_z4_scenario_pack.py
 python3 tools/sc64_p4_pack.py --rom /path/to/StarCraft64-USA.z64
