@@ -612,7 +612,14 @@ static void move_cursor(int x, int y)
 {
     x = snap4(cx, x, WORLD_W);
     y = snap4(cy, y, WORLD_H);
-    while ((cx != x || cy != y) && screen == SCREEN_PLAY && !won && !lost) {
+    u32 cursor_start = host_ticks;
+    while ((cx != x || cy != y) && screen == SCREEN_PLAY && !won && !lost &&
+           host_ticks - cursor_start < 600u) {
+        /* The source PauseGame freezes the field until A acknowledges it. */
+        if (race_z5_world_paused() && !race_z5.pause_acknowledged) {
+            tap(KEY_A);
+            continue;
+        }
         u16 held = KEY_R;
         if (cx < x) held |= KEY_RIGHT;
         if (cx > x) held |= KEY_LEFT;
@@ -1283,7 +1290,24 @@ int main(int argc, char **argv)
     reset_target_progress();
     observed_started_lo = race_z5.runtime.model.started_lo;
     observed_started_hi = race_z5.runtime.model.started_hi;
+    u32 extraction_tick = 0;
     while ((int)frame < run_limit && screen == SCREEN_PLAY && !won && !lost) {
+        /* Gate 0 is the extraction: once it starts, the source victory
+         * sequence runs on its own. Acknowledge its PauseGame and wait
+         * instead of chasing optional gates. Frames stop while paused, so
+         * bound the wait in host ticks. */
+        if (sc64_z5_mask_test(race_z5.runtime.model.started_lo,
+                              race_z5.runtime.model.started_hi, 0)) {
+            if (!extraction_tick) {
+                extraction_tick = host_ticks;
+                fprintf(stderr, "Z5 extraction gate started frame=%u; awaiting source victory\n",
+                        (unsigned)frame);
+            }
+            if (host_ticks - extraction_tick > 20000u) break;
+            if (race_z5_world_paused() && !race_z5.pause_acknowledged) tap(KEY_A);
+            else step(0);
+            continue;
+        }
         int k = kerrigan_slot();
         if (k < 0) {
             /* Allow the ordinary defeat/result transition to settle after
@@ -1671,7 +1695,9 @@ int main(int argc, char **argv)
                         (unsigned)frame);
                 terminal_trap_slot=-1;
                 terminal_trap_raw=0;
-                if (same_trap && u[k].order==ORDER_ATTACK_MOVE &&
+                /* Resume whether the detector stopped detecting or was
+                 * destroyed; a destroyed target leaves Kerrigan idle at it. */
+                if ((u[k].order==ORDER_ATTACK_MOVE || u[k].order==ORDER_IDLE) &&
                     dist2(u[k].tx,u[k].ty,source_goal_x,source_goal_y)>32*32) {
                     if (order_kerrigan_attack_move_to(source_goal_x,source_goal_y))
                         target_changed=0;

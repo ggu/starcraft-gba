@@ -22,6 +22,12 @@
 #error "SC64_TANK_SOURCE_VFX requires imported race sprites"
 #endif
 #include "sc64_weapon_vfx.h"
+#ifdef SC64_WEAPON_SOURCE_VFX
+#if !defined(SC64_RACES) || !defined(SC64_HAS_SPRITES)
+#error "Source weapon effects require imported race sprites"
+#endif
+#include "sc64_weapon_source_runtime.h"
+#endif
 #ifdef SC64_TANK_SOURCE_VFX
 #include "sc64_tank_source_vfx.h"
 #endif
@@ -197,6 +203,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_P7_PROJECTILES_ENABLED)
 #error "Carrier training requires P7 projectile storage and typed actor state"
 #endif
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && !defined(SC64_P7_CARRIER_TRAINING_ENABLED)
+#error "Interceptor flight requires the P7 Carrier training stage"
+#endif
 
 #if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && \
     !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
@@ -255,7 +264,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_P7_CARRIER_TRAINING_ENABLED)
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 43u
+#elif defined(SC64_P7_CARRIER_TRAINING_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 42u
 #elif defined(SC64_P7_PROJECTILES_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 41u
@@ -436,8 +447,22 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #ifdef SC64_DEATH_SOURCE_ART
 #include "sc64_death_source.h"
 #include "sc64_death_sprites_generated.h"
+#if !defined(SC64_DEATH_SOURCE_BANK_VERSION) || SC64_DEATH_SOURCE_BANK_VERSION != 2 || \
+    !defined(SC64_DEATH_SOURCE_METADATA_VERSION) || SC64_DEATH_SOURCE_METADATA_VERSION != 1 || \
+    !defined(SC64_DEATH_SOURCE_PIXEL_BYTES) || SC64_DEATH_SOURCE_PIXEL_BYTES == 0
+#error "Regenerate source death art with tools/sc64_death_sprites.py (bank v2)"
+#endif
+#ifdef SC64_UNIT_WORD_SPRITES
+#if !defined(SC64_DEATH_SOURCE_WORD_METADATA) || SC64_DEATH_SOURCE_WORD_METADATA != 1 || \
+    !defined(SC64_DEATH_SOURCE_WORD_BYTES) || SC64_DEATH_SOURCE_WORD_BYTES == 0
+#error "Regenerate source death art with packed remnant frames"
 #endif
 #endif
+#endif
+#endif
+#endif
+#ifdef SC64_UNIT_ATTACK_POSES_ENABLED
+#include "sc64_unit_attack_source.h"
 #endif
 #if defined(SC64_Z5_RUNTIME) && defined(SC64_HAS_SPRITES)
 #if !defined(SC64_Z5_SPRITE_SET_COMPLETE) || \
@@ -572,78 +597,7 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 _Static_assert(SC_RU_COUNT <= 64,
                "Packed ZP actor type needs a six-bit enum");
 #endif
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
-/* Actor flag values deliberately share a stable bit layout across the T4
- * scenario adapter and the dedicated Z/P source-fact provider. */
-enum {
-    SC64_GAME_ACTOR_SELECTABLE = 1u, SC64_GAME_ACTOR_MOVABLE = 2u,
-    SC64_GAME_ACTOR_COLLIDABLE = 4u, SC64_GAME_ACTOR_DRAWABLE = 8u,
-    SC64_GAME_ACTOR_MEN = 16u, SC64_GAME_ACTOR_BUILDING = 32u,
-    SC64_GAME_ACTOR_INVINCIBLE = 64u, SC64_GAME_ACTOR_HIDDEN = 128u,
-    SC64_GAME_ACTOR_WEAPON = 256u
-};
-#ifdef SC64_Z6_RUNTIME
-/* Share this expanded source-policy lookup in ROM instead of duplicating it
- * across the hot movement/target loops and consuming their stack reserve. */
-static unsigned __attribute__((noinline))
-#else
-static unsigned
-#endif
-sc64_game_unit_actor_flags(int type)
-{
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
-    unsigned flags = sc64_zp_actor_flags(type);
-    if (flags) return flags;
-#endif
-#ifdef SC64_T4_RUNTIME
-    return sc64_race_t4_actor_flags(type);
-#else
-    return 0;
-#endif
-}
-static unsigned
-sc64_game_building_actor_flags(int type)
-{
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
-    unsigned flags = sc64_zp_building_flags(type);
-    if (flags) return flags;
-#endif
-#ifdef SC64_T4_RUNTIME
-    return sc64_race_t4_building_flags(type);
-#else
-    return 0;
-#endif
-}
-static int sc64_game_unit_has_flag(int type, unsigned flag)
-{ return (sc64_game_unit_actor_flags(type) & flag) != 0; }
-static int sc64_game_building_has_flag(int type, unsigned flag)
-{ return (sc64_game_building_actor_flags(type) & flag) != 0; }
-static int sc64_game_unit_selectable(int type)
-{ unsigned f=sc64_game_unit_actor_flags(type); return !f || (f & SC64_GAME_ACTOR_SELECTABLE); }
-static int sc64_game_building_selectable(int type)
-{ unsigned f=sc64_game_building_actor_flags(type); return !f || (f & SC64_GAME_ACTOR_SELECTABLE); }
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
-/* Unit broad-phase overlap used by the simple mover is a radius in GBA
- * pixels. The source box is in StarCraft pixels; half its widest axis gives
- * the actor's half-extent at the renderer's 2:1 scale. Keep the historical
- * six-pixel fallback for all actors without an audited source box. */
-static int
-sc64_game_unit_collision_radius(int type)
-{
-    int left, up, right, down;
-    if (!sc64_zp_actor_bounds_source(type, &left, &up, &right, &down)) return 6;
-    int width = left + right, height = up + down;
-    int source_extent = width > height ? width : height;
-    int gba_extent = (source_extent + 3) / 4;
-    return gba_extent > 6 ? gba_extent : 6;
-}
-static int
-sc64_game_building_bounds_source(int type, int *left, int *up, int *right, int *down)
-{
-    return sc64_zp_building_bounds_source(type, left, up, right, down);
-}
-#endif
-#endif
+#include "sc64_game_actor_facts.h"
 #ifdef SC64_T4_RUNTIME
 #include "sc64_t4_world.h"
 #ifdef SC64_T4_SCENARIO_RUNTIME
@@ -747,11 +701,23 @@ enum {
 #else
 #define SC64_TRANSPORT_LOADED(q) 0
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+/* Training (state 1) and inside (state 2) children stay off-map; launched
+ * and detached Interceptors fly, but the flight adapter owns their orders. */
+#define SC64_CARRIER_HANGAR_HIDDEN(q) ((q)->type==U_P7_INTERCEPTOR && \
+    ((((unsigned)(q)->flags >> 8) & 7u) - 1u) < 2u)
+#define SC64_CARRIER_CHILD_SCRIPTED(q) ((q)->type==U_P7_INTERCEPTOR)
+/* Raw73 keeps no type-level hidden flag here, so per-row checks replace it. */
+#define SC64_CARRIER_STATE_HIDDEN(q) SC64_CARRIER_HANGAR_HIDDEN(q)
+#elif defined(SC64_P7_CARRIER_TRAINING_ENABLED)
 /* This stage has only training/inside children; all raw73 rows stay off-map. */
 #define SC64_CARRIER_HANGAR_HIDDEN(q) ((q)->type==U_P7_INTERCEPTOR)
+#define SC64_CARRIER_CHILD_SCRIPTED(q) ((q)->type==U_P7_INTERCEPTOR)
+#define SC64_CARRIER_STATE_HIDDEN(q) 0 /* the raw73 type flag hides them */
 #else
 #define SC64_CARRIER_HANGAR_HIDDEN(q) 0
+#define SC64_CARRIER_CHILD_SCRIPTED(q) 0
+#define SC64_CARRIER_STATE_HIDDEN(q) 0
 #endif
 enum {
     SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSE, SCREEN_RESULT
@@ -1234,6 +1200,10 @@ static void race_p7_carrier_training_clear_slot(int slot);
 static void race_p7_carrier_training_end_frame(void);
 static int race_p7_carrier_training_slots_available(unsigned wanted);
 static unsigned race_p7_carrier_training_child_count(int carrier);
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+static int race_p7_interceptor_flight_carrier_holds(int carrier);
+static int race_p7_interceptor_flight_carrier_order(int carrier);
+#endif
 #endif
 #ifdef SC64_P7_OBSERVER_ENABLED
 static int sc64_p7_observer_can_attack_from(int attacker, int target,
@@ -2957,7 +2927,8 @@ target_alive(int target)
 #endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (target >= 0 && target < MAX_UNITS && u[target].alive &&
-        sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_HIDDEN)) return 0;
+        (sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_HIDDEN) ||
+         SC64_CARRIER_STATE_HIDDEN(&u[target]))) return 0;
 #endif
     return target >= 0 && (target < MAX_UNITS ? u[target].alive : b[target - MAX_UNITS].alive);
 }
@@ -3002,7 +2973,8 @@ sc64_direct_target_state(int entity, int source_live_owner,
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
         immune |= (sc64_game_unit_actor_flags(u[entity].type) &
-                   (SC64_GAME_ACTOR_HIDDEN | SC64_GAME_ACTOR_INVINCIBLE)) != 0;
+                   (SC64_GAME_ACTOR_HIDDEN | SC64_GAME_ACTOR_INVINCIBLE)) != 0 ||
+                   SC64_CARRIER_STATE_HIDDEN(&u[entity]);
 #endif
     } else {
         int bi = entity - MAX_UNITS;
@@ -3151,6 +3123,32 @@ sc64_direct_attack_tick_unit(int slot)
 }
 #endif
 
+/* Reconstruct presentation age from existing endpoints; no new saved state. */
+static int __attribute__((noinline))
+sc64_trace_duration(int packed, int x0, int y0, int x1, int y1)
+{
+#ifdef SC64_WEAPON_SOURCE_VFX
+    if (sc64_weapon_source_vfx_is_tagged((uint32_t)packed)) {
+        Sc64WeaponSourceVfxKey key;
+        const Sc64WeaponSourceAttackProfile *profile =
+            sc64_weapon_source_trace_profile((uint32_t)packed);
+        if (!profile || !sc64_weapon_source_vfx_unpack((uint32_t)packed, &key)) return 0;
+        unsigned duration = sc64_weapon_source_trace_duration_heading(profile,key.direction,x0,y0,x1,y1);
+#ifdef SC64_UNIT_ATTACK_POSES_ENABLED
+        if (key.actor_slot_plus1) {
+            unsigned pose = sc64_weapon_source_vfx_gba_duration(
+                sc64_unit_attack_source_full_duration(key.actor_raw,key.target_air));
+            if (pose > duration) duration = pose;
+        }
+#endif
+        return (int)duration;
+    }
+#else
+    (void)x0; (void)y0; (void)x1; (void)y1;
+#endif
+    return sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(packed));
+}
+
 static void __attribute__((noinline))
 add_tracer(int x0, int y0, int x1, int y1, int color)
 {
@@ -3158,10 +3156,12 @@ add_tracer(int x0, int y0, int x1, int y1, int color)
     if (!color) return; /* Non-combat actor: no invented weapon. */
     if (!sc64_weapon_vfx_style(color))
         color=sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_MUZZLE,color);
+    int duration=sc64_trace_duration(color,x0,y0,x1,y1);
+    if (duration<=0) return;
     for (int i=0;i<MAX_TRACERS;++i) {
         if (!tracers[i].life) { slot=i; break; }
-        int age=sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(tracers[i].color))+1-
-            tracers[i].life;
+        int age=sc64_trace_duration(tracers[i].color,tracers[i].x0,tracers[i].y0,
+                    tracers[i].x1,tracers[i].y1)+1-tracers[i].life;
         if (age>oldest) { oldest=age; slot=i; }
     }
     /* Cosmetic overflow replaces the oldest effect, never a damage event.
@@ -3170,8 +3170,72 @@ add_tracer(int x0, int y0, int x1, int y1, int color)
     tracers[slot].x1=x1; tracers[slot].y1=y1;
     tracers[slot].color=color;
     /* Combat emits before end-of-update aging, including the first draw. */
-    tracers[slot].life=sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(color))+1;
+    tracers[slot].life=duration+1;
 }
+
+#ifdef SC64_WEAPON_SOURCE_VFX
+static int
+sc64_source_effect_direction(int dx,int dy)
+{
+    static const short vector[32][2] = {
+        {0,-256},{50,-251},{98,-237},{142,-213},{181,-181},{213,-142},{237,-98},{251,-50},
+        {256,0},{251,50},{237,98},{213,142},{181,181},{142,213},{98,237},{50,251},
+        {0,256},{-50,251},{-98,237},{-142,213},{-181,181},{-213,142},{-237,98},{-251,50},
+        {-256,0},{-251,-50},{-237,-98},{-213,-142},{-181,-181},{-142,-213},{-98,-237},{-50,-251}
+    };
+    int best=0; long score=-0x7fffffffL;
+    for(int i=0;i<32;++i) {
+        long dot=(long)dx*vector[i][0]+(long)dy*vector[i][1];
+        if(dot>score) {score=dot;best=i;}
+    }
+    return best;
+}
+
+static int __attribute__((noinline))
+sc64_source_emit(int raw,int slot_plus1,int weapon,int air,
+                 int x0,int y0,int x1,int y1)
+{
+    if(raw<0 || raw>=228 || weapon<0 || weapon>=130) return 0;
+    unsigned variant=raw>=106 ? 2u : (raw==83 && weapon==82) ? 1u : 0u;
+    const Sc64WeaponSourceAttackProfile *profile =
+        sc64_weapon_source_profile_lookup((uint8_t)raw,(uint8_t)weapon,(uint8_t)air,(uint8_t)variant);
+    if(!profile) return 0;
+    unsigned count=profile->weapon_count==2 ? 2u : 1u;
+    for(unsigned shot=0;shot<count;++shot) {
+        Sc64WeaponSourceVfxKey key = {
+            .actor_raw=(uint8_t)raw,.actor_slot_plus1=(uint8_t)slot_plus1,
+            .weapon_id=(uint8_t)weapon,
+            .direction=(uint8_t)sc64_source_effect_direction(x1-x0,y1-y0),
+            .target_air=(uint8_t)!!air,.variant=(uint8_t)(variant?variant:shot)
+        };
+        uint32_t packed;
+        if(sc64_weapon_source_vfx_pack(key,&packed))
+            add_tracer(x0,y0,x1,y1,(int)packed);
+    }
+    return 1;
+}
+
+static int
+sc64_source_unit_vfx(Unit *q,int x1,int y1,int air)
+{
+    int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
+    Sc64StockAttack attack;
+    int weapon;
+    if(sc64_stock_attack_select(raw,air,&attack)) weapon=attack.weapon_id;
+    else if(raw==83 && !air) weapon=82; /* Existing Reaver/Scarab adapter. */
+    else return 0;
+    return sc64_source_emit(raw,(int)(q-u)+1,weapon,air,q->x,q->y,x1,y1);
+}
+
+static int
+sc64_source_building_vfx(const Building *q,int x1,int y1,int air)
+{
+    int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_building(q->type);
+    Sc64StockAttack attack;
+    return sc64_stock_attack_select(raw,air,&attack) &&
+        sc64_source_emit(raw,0,attack.weapon_id,air,q->x,q->y,x1,y1);
+}
+#endif
 
 static void
 hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
@@ -3205,6 +3269,7 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     if (target >= 0 && target < MAX_UNITS &&
         (sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_HIDDEN) ||
+         SC64_CARRIER_STATE_HIDDEN(&u[target]) ||
          sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_INVINCIBLE))) return;
     if (target >= MAX_UNITS && target < MAX_UNITS + MAX_BUILDINGS &&
         sc64_game_building_has_flag(b[target-MAX_UNITS].type,
@@ -5389,6 +5454,9 @@ tick_combat(Unit * q, int target)
             }
 #endif
 #endif
+#ifdef SC64_WEAPON_SOURCE_VFX
+            if (!sc64_source_unit_vfx(q,target_x(target),target_y(target),flying))
+#endif
             add_tracer(q->x,q->y,target_x(target),target_y(target),visual_color);
 	#ifdef SC64_RACES
 #ifdef SC64_SIEGE_SPLASH
@@ -5516,7 +5584,12 @@ target_lists_unavailable:
 	if (!q->alive)
 	    continue;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-        if (SC64_CARRIER_HANGAR_HIDDEN(q)) continue;
+        if (SC64_CARRIER_CHILD_SCRIPTED(q)) continue;
+#endif
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+        /* An engaged Carrier stops and launches instead of closing in. */
+        if (q->type == U_P7_CARRIER && race_p7_interceptor_flight_carrier_order(i))
+            continue;
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
         if (q->type == U_Z7_EGG) {
@@ -7076,6 +7149,31 @@ draw_worker_cargo_badge(int x, int y, int gas)
     }
 }
 
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+static const Sc64SpriteFrame *
+sc64_source_unit_attack_pose(const Unit *q)
+{
+    int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
+    int slot=(int)(q-u)+1, newest=0x7fffffff;
+    const Sc64SpriteFrame *pose=0;
+    if(!q->cd) return 0;
+    for(int i=0;i<MAX_TRACERS;++i) {
+        const Tracer *t=&tracers[i]; Sc64WeaponSourceVfxKey key;
+        if(t->life<=0 || !sc64_weapon_source_vfx_unpack((uint32_t)t->color,&key) ||
+           key.actor_slot_plus1!=slot || key.actor_raw!=raw ||
+           q->x!=t->x0 || q->y!=t->y0) continue;
+        int age=sc64_trace_duration(t->color,t->x0,t->y0,t->x1,t->y1)-t->life;
+        if(age<0) age=0;
+        if(age>=newest) continue;
+        const Sc64SpriteFrame *candidate=sc64_unit_attack_source_full_frame(
+            (unsigned short)raw,key.target_air,key.direction,
+            sc64_weapon_source_vfx_source_tick((unsigned)age));
+        if(candidate) {pose=candidate;newest=age;}
+    }
+    return pose;
+}
+#endif
+
 static void
 draw_unit(Unit * q)
 {
@@ -7103,7 +7201,7 @@ draw_unit(Unit * q)
 #endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     unsigned actor_flags = sc64_game_unit_actor_flags(q->type);
-    if (actor_flags & SC64_GAME_ACTOR_HIDDEN) return;
+    if ((actor_flags & SC64_GAME_ACTOR_HIDDEN) || SC64_CARRIER_STATE_HIDDEN(q)) return;
     if (actor_flags && !(actor_flags & SC64_GAME_ACTOR_DRAWABLE)) return;
 #endif
 #ifdef SC64_HAS_SPRITES
@@ -7120,6 +7218,10 @@ draw_unit(Unit * q)
     if (!sprite && facing_raw >= 0)
         sprite = sc64_unit_facing_frames((unsigned short)facing_raw);
 #endif
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+    const Sc64SpriteFrame *attack_pose=sc64_source_unit_attack_pose(q);
+    if(attack_pose) sprite=attack_pose;
+#endif
     int sprite_x = sprite ? x - sprite->canvas_w / 2 + sprite->offset_x : x - 4;
     int sprite_y = sprite ? y - sprite->canvas_h / 2 + sprite->offset_y : y - 4;
     int sprite_w = sprite ? sprite->w : 8;
@@ -7130,6 +7232,10 @@ draw_unit(Unit * q)
 #ifdef SC64_HAS_SPRITES
 #ifdef SC64_UNIT_FACING
     sc64_facing_track(q);
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+    if(attack_pose) draw_mission_sprite(attack_pose,x,y);
+    else
+#endif
     if (sprite && sc64_facing_draw(q, facing_raw, x, y)) {}
     else
 #endif
@@ -7213,10 +7319,24 @@ draw_unit(Unit * q)
 #include "sc64_tank_source_vfx_render.h"
 #endif
 
+#ifdef SC64_WEAPON_SOURCE_VFX
+#include "sc64_weapon_source_vfx_render.h"
+#endif
+
 static void
 draw_tracers(void)
 {
     for (int i=0;i<MAX_TRACERS;++i) if (tracers[i].life) {
+#ifdef SC64_WEAPON_SOURCE_VFX
+        if(sc64_weapon_source_vfx_is_tagged((uint32_t)tracers[i].color)) {
+            int age=sc64_trace_duration(tracers[i].color,tracers[i].x0,tracers[i].y0,
+                    tracers[i].x1,tracers[i].y1)-tracers[i].life;
+            sc64_weapon_source_vfx_draw_trace((uint32_t)tracers[i].color,
+                tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,
+                tracers[i].life,(unsigned)(age<0?0:age));
+            continue;
+        }
+#endif
         int style=sc64_weapon_vfx_style(tracers[i].color);
         /* Legacy original-art saves may contain an untagged tracer color. */
         if (!style) style=SC64_WEAPON_VFX_STYLE_MUZZLE;
@@ -7264,7 +7384,21 @@ death_vfx_draw_source(const Sc64DeathVfx *e, int x, int y, u32 age, int under)
             !sc64_death_source_layer_frame(layer, age, &frame_index)) continue;
         const Sc64SpriteFrame *sprite =
             sc64_death_image_frame(layer->image_id, (unsigned short)frame_index);
-        if (sprite) death_vfx_blit(sprite, x + layer->x, y + layer->y);
+        if (sprite) {
+#if defined(SC64_UNIT_WORD_SPRITES) && !defined(SC64_DEATH_INDEXED_REMNANTS)
+            const GbaSpriteWordFrame *words =
+                sc64_death_image_word_frame(layer->image_id,(unsigned short)frame_index);
+            int left=x+layer->x-sprite->canvas_w/2+sprite->offset_x;
+            int top=y+layer->y-sprite->canvas_h/2+sprite->offset_y;
+            /* Packed collapse/remnant frames use the word compositor and no extra
+             * RAM. The indexed fallback explicitly clips partial HUD-edge
+             * frames even in builds without the scene-clip API. */
+            if (words && top>=12 && top+(int)sprite->h<=120)
+                gfx_blit_sprite_words(left,top,words);
+            else
+#endif
+                death_vfx_blit(sprite, x + layer->x, y + layer->y);
+        }
     }
     return 1;
 }
@@ -7398,6 +7532,7 @@ draw_minimap(void)
 #endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
         if (sc64_game_unit_has_flag(u[i].type, SC64_GAME_ACTOR_HIDDEN) ||
+            SC64_CARRIER_STATE_HIDDEN(&u[i]) ||
             (sc64_game_unit_actor_flags(u[i].type) &&
              !(sc64_game_unit_actor_flags(u[i].type) & SC64_GAME_ACTOR_DRAWABLE))) continue;
 #endif
@@ -9331,6 +9466,7 @@ game_self_test(void)
 #include "sc64_p7_battery_adapter.h"
 #include "sc64_p7_projectile_adapter.h"
 #include "sc64_p7_carrier_training.h"
+#include "sc64_p7_interceptor_flight.h"
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 #include "sc64_z7_colony_adapter.h"

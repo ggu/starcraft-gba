@@ -5,7 +5,7 @@ authored weapon-79 projectile model to P7's game update, ordinary damage
 handler and save/load validation. That projectile-only profile does **not**
 enable Carrier combat: it has no child training, launch orders, native
 Interceptor flight or IScript attack events, and no gameplay caller of the
-firing entry point. Generic Interceptor instant damage is explicitly disabled.
+firing entry point. Generation 43 (below) adds those. Generic Interceptor instant damage is explicitly disabled.
 
 The separate generation-42 `SC64_P7_CARRIER_TRAINING_ENABLED` profile adds
 player-commanded Carrier hangar training and persistent hidden child rows. It
@@ -48,6 +48,93 @@ validator requires an empty projectile pool. The current test fixture creates
 a human-owned Carrier because the authenticated mission's starting Carriers
 belong to enemy raw owner 4; it does not demonstrate player control of those
 starting enemy Carriers.
+
+## Generation 43: Interceptor flight
+
+The `SC64_P7_INTERCEPTOR_FLIGHT_ENABLED` profile builds on generation 42 and
+makes Carriers fight:
+
+- **Launch.** A Carrier with an attack target, or an attack-move or idle
+  Carrier with an enemy within its 8-tile acquisition range, stops. It then
+  releases its healthiest completed inside child (at least half HP) every
+  7 source ticks (native `order_Carrier`/`release_fighter`). Out of range,
+  an attack-ordered Carrier flies toward its target.
+- **Attack passes.** Each launched child runs the authored order model in
+  `sc64_interceptor_orders.c`: the launch offset, a 15-tick climb, then
+  attack, strafe and return-strafe passes.
+- **Firing.** A fire request starts the decoded attack script: the weapon
+  event runs one source tick later and the lock clears one tick after that.
+  The cooldown is 1 + (rand & 3) − 1. The event launches a moving weapon-79
+  projectile through the existing pool; damage arrives on impact.
+- **Return.** A child returns when its shields fall below a quarter, when it
+  has no target it can reacquire, or when the target leaves the Carrier's
+  leash. It docks within 10 source pixels and is repaired at once.
+- **Carrier death.** Hangar children die with the Carrier. Launched children
+  detach and are removed after 15–45 source ticks.
+
+Run the host fixture and build the probe with:
+
+```sh
+make test-sc64-p7-interceptor-flight
+make protoss-p7-interceptor-flight-probe
+```
+
+The probe is `build/StarCraft-Protoss-P7-Interceptor-Flight-Probe-GBA.gba`,
+title `SC P7 FLY43`, code `SC7L`. It is a development profile; canonical and
+filming ROMs leave it off. With the flag off, the generation 41/42 probes and
+the canonical ROMs are byte-identical to the base revision.
+
+Save format: RaceSave stays 16,292 bytes. Launched-child state uses actor
+fields the typed codec already stores:
+
+| State | Field |
+| --- | --- |
+| attack or return order | `order` |
+| order state | `path_retry` |
+| order timer | `work_timer` |
+| waypoint, in runtime pixels | `tx`/`ty` |
+| attack-animation phase | `path_timer` |
+| weapon cooldown | `cd` |
+| detach countdown | `carry` |
+
+The Carrier's release timer uses its `work_timer`. Generation 43 accepts
+in-flight projectiles and launched or detached children. Its validator bounds
+each of these fields, and it rejects any generation-42 save.
+
+Approximations (deterministic and save-stable):
+
+- Random pass offsets, cooldown jitter and the detach timer hash the saved
+  frame counter and slot instead of using the native RNG stream.
+- Range checks use centre distances, not unit-box distances.
+- Waypoints keep half the source precision.
+- The muzzle heading is the current flight direction rather than a turned
+  flingy heading.
+- Flight uses the stock flyer step without acceleration or turning.
+- A docked child is repaired at once instead of gradually.
+- Carrier Stop does not recall children explicitly; they come back through
+  the leash or when no target remains.
+- Interceptors attack through the shared sight, detection and invincibility
+  rules, so Arbiter-cloaked units need detection, as in the source.
+
+`make test-sc64-p7-interceptor-flight` passes under ASan/UBSan. It covers:
+
+- out-of-range hold-off and 7-tick release cadence;
+- flight within the leash, and damage only through projectiles;
+- a mid-flight save/load that restores every flight field and the
+  projectile pool;
+- return and docking;
+- shield retreat;
+- hangar rows that cannot be targeted or fire;
+- Carrier death detaching children, with removal inside the 15–45 tick
+  window;
+- 11 malformed-save rejections without live mutation;
+- full `game_update` combat, periodic save/load and pause;
+- every mission and the 18 skirmish setups.
+
+These are host scenarios, not campaign or ARM playthrough results.
+Generation 43 has no fps, hardware or P7-win qualification. Enemy Carriers
+still have no AI training, so in the authenticated mission only player
+Carriers launch.
 
 ## Runtime and save contract
 

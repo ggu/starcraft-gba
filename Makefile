@@ -167,11 +167,30 @@ CANONICAL_MINIMAP_FLAGS ?= -DSC64_MINIMAP_BLIT
 CANONICAL_STATIC_FLAGS ?= $(if $(filter -DGBA_SCENE_CLIP,$(CANONICAL_DRAW_FLAGS)),-DSC64_STATIC_DIRTY_ROWS)
 TERRAN_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 TERRAN_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(TERRAN_FULL_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) $(TERRAN_UNIT_WORD_FLAGS)
-CANONICAL_WEAPON_FLAGS ?= -DSC64_TANK_SOURCE_VFX -I.local/sc64/tank-vfx/generated
-TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS)
+WEAPON_SOURCE_DIR := .local/sc64/weapon-vfx/generated
+WEAPON_SOURCE_HEADER := $(WEAPON_SOURCE_DIR)/sc64_weapon_source_generated.h
+ATTACK_POSE_DIR := .local/sc64/attack-poses/generated
+ATTACK_POSE_HEADER := $(ATTACK_POSE_DIR)/sc64_unit_attack_source_generated.h
+SOURCE_WEAPON_INPUTS := $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER)
+SOURCE_WEAPON_FLAGS := -DSC64_WEAPON_SOURCE_VFX -I$(WEAPON_SOURCE_DIR) -DSC64_UNIT_ATTACK_POSES_ENABLED -I$(ATTACK_POSE_DIR)
+CANONICAL_WEAPON_FLAGS ?= -DSC64_TANK_SOURCE_VFX -I.local/sc64/tank-vfx/generated $(SOURCE_WEAPON_FLAGS)
+DEATH_ART_DIR := .local/sc64/death/generated
+DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
+CANONICAL_DEATH_FLAGS ?= -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
+CANONICAL_DEATH_INPUTS = $(if $(filter -DSC64_DEATH_SOURCE_ART,$(CANONICAL_DEATH_FLAGS)),$(DEATH_ART_HEADER))
+TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
 ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS)
-ZERG_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS)
+# Explicit legacy Z1-Z4 product: SCZ4, save generation 20, unchanged flags.
+ZERG_Z4_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
+# Canonical Z1-Z6: the Z6 storage/runtime/query vector, with a word-packed
+# copy of its sprite bank in place of the probe bank, and canonical drawing.
+# Like P5 Shuttle and Z7, it restores the defense-target lists, which keep
+# the full-scan defense fallback out of IWRAM in the larger storage profiles.
+ZERG_Z6_BANK := .local/sc64/zerg-z6/generated
+ZERG_Z6_FLAGS = $(patsubst -I.local/sc64/z6/generated,-I$(ZERG_Z6_BANK),$(Z6_PROBE_FLAGS)) -DSC64_ZP_DEFENSE_TARGETS
+ZERG_Z6_INPUTS = $(filter-out .local/sc64/z5/generated/sc64_race_sprites_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h,$(Z6_PROBE_INPUTS)) $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h
+ZERG_ROM_FLAGS = $(ZERG_Z6_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
 ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
 PROTOSS_P3_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
 PROTOSS_P3_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_P3_CANONICAL_FLAGS)
@@ -179,7 +198,7 @@ PROTOSS_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 PROTOSS_CANONICAL_FLAGS ?= $(PROTOSS_P3_CANONICAL_FLAGS) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL -DSC64_P4_COUNT_CENSUS_ENABLED $(PROTOSS_UNIT_WORD_FLAGS)
 P4_CREATE_PREFIX_FLAGS ?= -DSC64_P4_CREATE_PREFIX -DSC64_P4_VALIDATOR_HOT
 PROTOSS_P4_STORM_ROM_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P4_STORM_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS)
-PROTOSS_P5_CANONICAL_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P5_SHUTTLE_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS)
+PROTOSS_P5_CANONICAL_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P5_SHUTTLE_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
 PROTOSS_ROM_FLAGS = $(PROTOSS_P5_CANONICAL_FLAGS)
 TERRAN_FULL_INPUTS = $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) $(UNIT_FACING_HEADER)
 
@@ -1330,7 +1349,7 @@ build/test-sc64-protoss-canonical-frame: tests/sc64_z3_frame_coverage.c $(STARCR
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
 build/test-sc64-protoss-canonical-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
-build/test-sc64-zerg-canonical-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
+build/test-sc64-zerg-canonical-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
 .PHONY: test-canonical-render
 test-canonical-render: build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-z4-frame-coverage build/test-sc64-zerg-canonical-hud build/test-sc64-protoss-canonical-frame build/test-sc64-protoss-canonical-hud
@@ -1365,16 +1384,25 @@ test-sc64-zp-models: build/test-sc64-z4-model build/test-sc64-p4-model
 	./build/test-sc64-p4-model
 test-starcraft: test-sc64-zp-models
 
-# Canonical four-entry Zerg ROM. The paired Z3 target above remains available.
+# Explicit legacy four-entry Zerg ROM; the paired Z3 target above also remains.
 build/starcraft-zerg-z4.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(ZERG_ROM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z4.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(ZERG_Z4_ROM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z4.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z4-GBA.gba: build/starcraft-zerg-z4.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z4' SCZ4
-.PHONY: zerg-z4
-zerg-z4: verify-zerg
+.PHONY: zerg-z4 verify-zerg-z4
+verify-zerg-z4: build/StarCraft-Zerg-Z4-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z4
+zerg-z4: verify-zerg-z4
+
+# Canonical six-entry Zerg ROM: SCZ6, save generation 32.
+build/starcraft-zerg-z6.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) $(TANK_SOURCE_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(ZERG_ROM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z6.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z6-GBA.gba: build/starcraft-zerg-z6.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z6' SCZ6
 
 build/starcraft-protoss-p4.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(P4_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p4.map -lgcc -o $@
@@ -1569,7 +1597,7 @@ build/test-sc64-z4-runtime: tests/sc64_z4_runtime.c $(STARCRAFT) $(wildcard star
 build/test-sc64-p4-runtime: tests/sc64_p4_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z4-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z4_ROM_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p4-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z4-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -1585,7 +1613,7 @@ build/test-sc64-zp-protoss-storage: tests/sc64_zp_storage.c $(STARCRAFT) $(wildc
 build/test-sc64-zp-air-tech: tests/sc64_zp_air_tech.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z4-campaign-run: tests/sc64_z4_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z4_ROM_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z4-runtime test-sc64-p4-runtime test-sc64-p4-create-prefix test-sc64-zp-storage
 
 
@@ -1880,16 +1908,25 @@ build/starcraft-zerg.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard st
 build/StarCraft-Zerg-GBA.gba: build/starcraft-zerg.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z3' SCZ3
-verify-zerg: build/StarCraft-Zerg-Z4-GBA.gba
+verify-zerg: build/StarCraft-Zerg-Z6-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg
-build/test-zerg: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
+build/test-zerg: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) tests/sc64_split_run.c common/gba.c -o $@
-build/test-sc64-zerg-promoted-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
+build/test-sc64-zerg-promoted-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
-test-zerg: build/test-zerg build/test-sc64-zerg-promoted-profile test-sc64-z4-campaign
+test-zerg: build/test-zerg build/test-sc64-zerg-promoted-profile
 	./build/test-zerg
 	./build/test-sc64-zerg-promoted-profile
 test-zerg-z3: test-sc64-z3-runtime
+# Explicit legacy four-entry Zerg product.
+build/test-zerg-z4: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z4_ROM_FLAGS) tests/sc64_split_run.c common/gba.c -o $@
+build/test-sc64-zerg-z4-promoted-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z4_ROM_FLAGS) $< common/gba.c -o $@
+.PHONY: test-zerg-z4
+test-zerg-z4: build/test-zerg-z4 build/test-sc64-zerg-z4-promoted-profile test-sc64-z4-campaign
+	./build/test-zerg-z4
+	./build/test-sc64-zerg-z4-promoted-profile
 
 build/starcraft-protoss.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(PROTOSS_P3_ROM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss.map -lgcc -o $@
@@ -2297,6 +2334,10 @@ test-sc64-z6-collision-classes: test-sc64-z6-collision-facts build/test-sc64-z6-
 test-sc64-zp-fact-range:
 	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_zp_fact_range.py'
 
+.PHONY: test-sc64-fact-tables
+test-sc64-fact-tables:
+	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_fact_tables.py'
+
 .PHONY: test-sc64-p7-actor-rules
 test-sc64-p7-actor-rules:
 	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_p7_actor_rules.py'
@@ -2614,6 +2655,40 @@ build/StarCraft-Protoss-P7-Tile-Probe-GBA.gba: build/starcraft-protoss-p7-tile-p
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
 protoss-p7-tile-probe: build/StarCraft-Protoss-P7-Tile-Probe-GBA.gba
+# Default-off P7 fact-table probe: the movement probe plus SC64_FACT_TABLES.
+# A host generator evaluates the unchanged fact functions under the probe's
+# exact flags and writes packed per-type ROM tables to an ignored build path.
+P7_FACT_TABLE_DIR := build/generated/p7-fact-tables
+P7_FACT_TABLE_HEADER := $(P7_FACT_TABLE_DIR)/sc64_fact_tables_generated.h
+P7_FACT_FLAGS := -DSC64_FACT_TABLES -I$(P7_FACT_TABLE_DIR)
+$(P7_FACT_TABLE_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) Makefile | build
+	mkdir -p $(P7_FACT_TABLE_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -DGBA_HOST -Icommon -Istarcraft $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $< -o build/sc64-p7-fact-tables-gen
+	./build/sc64-p7-fact-tables-gen > $@.tmp
+	mv $@.tmp $@
+build/test-sc64-p7-fact-check: tests/sc64_fact_tables_check.c $(P7_FACT_TABLE_HEADER) $(wildcard starcraft/*.h) Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $(P7_FACT_FLAGS) $< -o $@
+build/test-sc64-p7-fact-candidate: tests/sc64_p7_steer_game.c $(P7_FACT_TABLE_HEADER) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $(P7_FACT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-fact-runtime: tests/sc64_p7_prevalidated_game.c $(P7_FACT_TABLE_HEADER) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $(P7_FACT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-fact-tables protoss-p7-fact-probe
+test-sc64-p7-fact-tables: build/test-sc64-p7-fact-check build/test-sc64-p7-move-reference build/test-sc64-p7-fact-candidate build/test-sc64-p7-count-snapshot build/test-sc64-p7-fact-runtime
+	./build/test-sc64-p7-fact-check
+	./build/test-sc64-p7-move-reference > build/sc64-p7-move-reference.txt
+	./build/test-sc64-p7-fact-candidate > build/sc64-p7-fact-candidate.txt
+	cmp build/sc64-p7-move-reference.txt build/sc64-p7-fact-candidate.txt
+	./build/test-sc64-p7-count-snapshot > build/sc64-p7-count-snapshot.txt
+	./build/test-sc64-p7-fact-runtime > build/sc64-p7-fact-runtime.txt
+	cmp build/sc64-p7-count-snapshot.txt build/sc64-p7-fact-runtime.txt
+	cat build/sc64-p7-fact-candidate.txt
+build/starcraft-protoss-p7-fact-probe.elf: $(P7_FACT_TABLE_HEADER) $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $(P7_FACT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-fact-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Fact-Probe-GBA.gba: build/starcraft-protoss-p7-fact-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+protoss-p7-fact-probe: build/StarCraft-Protoss-P7-Fact-Probe-GBA.gba
 build/test-sc64-p7-battery-rules: tests/sc64_p7_battery_rules.c starcraft/sc64_p7_battery_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-p7-battery-rules
@@ -2869,10 +2944,8 @@ test-starcraft: test-sc64-death-vfx test-sc64-death-vfx-default
 test-unified: test-sc64-death-vfx-unified
 
 # Optional source death art preview, built like the construction preview.
-DEATH_ART_DIR := .local/sc64/death/generated
-DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
 DEATH_ART_FLAGS := $(UNIFIED_FLAGS) -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
-$(DEATH_ART_HEADER): tools/sc64_death_sprites.py tools/sc64_construction_sprites.py tools/sc64_sprites.py
+$(DEATH_ART_HEADER): tools/sc64_death_sprites.py tools/sc64_construction_sprites.py tools/sc64_sprites.py tools/sc64_unit_facing.py
 	$(PYTHON) tools/sc64_death_sprites.py
 build/test-sc64-death-source: tests/sc64_death_source_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(DEATH_ART_FLAGS) $< -o $@
@@ -3345,6 +3418,23 @@ build/StarCraft-Protoss-P7-Carrier-Training-Probe-GBA.gba: build/starcraft-proto
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 HANG42' SC7K
 protoss-p7-carrier-training-probe: build/StarCraft-Protoss-P7-Carrier-Training-Probe-GBA.gba
 
+# Generation 43: launched Interceptor flight, attack passes and return.
+# The order model is outside $(STARCRAFT) until this profile links it.
+P7_INTERCEPTOR_FLIGHT_FLAGS := $(P7_CARRIER_TRAINING_FLAGS) -DSC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+P7_INTERCEPTOR_FLIGHT_SOURCES := starcraft/sc64_interceptor_orders.c
+build/test-sc64-p7-interceptor-flight: tests/sc64_p7_interceptor_flight_game.c $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_INTERCEPTOR_FLIGHT_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+.PHONY: test-sc64-p7-interceptor-flight protoss-p7-interceptor-flight-probe
+test-sc64-p7-interceptor-flight: build/test-sc64-p7-interceptor-flight
+	./build/test-sc64-p7-interceptor-flight
+build/starcraft-protoss-p7-interceptor-flight-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_INTERCEPTOR_FLIGHT_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-interceptor-flight-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Interceptor-Flight-Probe-GBA.gba: build/starcraft-protoss-p7-interceptor-flight-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 FLY43' SC7L
+protoss-p7-interceptor-flight-probe: build/StarCraft-Protoss-P7-Interceptor-Flight-Probe-GBA.gba
+
 # Dedicated filming build. Hidden menu and transient scenes stay off in all
 # canonical profiles; the P7 bundle supplies Carrier/Ultralisk render actors.
 # Presentation-only 32-direction unit facing (including Siege Tank turrets),
@@ -3354,11 +3444,12 @@ $(UNIT_FACING_HEADER): tools/sc64_unit_facing.py tools/sc64_race_sprites.py tool
 $(TANK_SOURCE_HEADER): tools/sc64_tank_source_vfx.py tools/sc64_construction_sprites.py tools/sc64_sprites.py .local/sc64/backwater/generated/palette-remap.bin .local/sc64/backwater/generated/palette.json
 	$(PYTHON) tools/sc64_tank_source_vfx.py --out $(dir $@)
 
-# Exercise the production tank tracer path and source-LUT oracle with/without
-# the scene clip API; the source renderer must still protect the HUD itself.
-TANK_SOURCE_TEST_NOCLIP_FLAGS = $(filter-out -DGBA_SCENE_CLIP -DSC64_STATIC_DIRTY_ROWS,$(TERRAN_ROM_FLAGS))
+# Retain the earlier Tank-only renderer and source-LUT oracle with/without
+# scene clipping. The new canonical pipeline has separate source-bank fixtures.
+TANK_SOURCE_LEGACY_TEST_FLAGS = $(filter-out -DSC64_WEAPON_SOURCE_VFX -DSC64_UNIT_ATTACK_POSES_ENABLED,$(TERRAN_ROM_FLAGS))
+TANK_SOURCE_TEST_NOCLIP_FLAGS = $(filter-out -DGBA_SCENE_CLIP -DSC64_STATIC_DIRTY_ROWS,$(TANK_SOURCE_LEGACY_TEST_FLAGS))
 build/test-sc64-tank-source-vfx-game: tests/sc64_tank_source_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TANK_SOURCE_LEGACY_TEST_FLAGS) $< common/gba.c -o $@
 build/test-sc64-tank-source-vfx-game-no-clip: tests/sc64_tank_source_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TANK_SOURCE_TEST_NOCLIP_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-tank-source-vfx-game
@@ -3370,7 +3461,7 @@ build/test-terran build/test-sc64-terran-full-profile build/test-zerg build/test
 UNIT_FACING_FLAGS := -I.local/sc64/facing/generated -DSC64_UNIT_FACING
 SHOWCASE_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 SHOWCASE_SIEGE_FLAGS ?= -DSC64_SIEGE_SPLASH
-SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS)
+SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS) $(CANONICAL_DEATH_FLAGS)
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
 	$(SIZE) $@
@@ -3544,19 +3635,30 @@ test-sc64-vital-bars: build/test-sc64-vital-bars-reference build/test-sc64-vital
 	./build/test-sc64-vital-bars-fast
 test: test-sc64-vital-bars
 
-# Requalify carried chapters with the canonical four-entry Zerg pools and
-# flags, rather than relying on a win from the smaller legacy Z3 profile.
-build/test-sc64-zerg-carried-z1: tests/race_z1_controls.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+# Requalify every carried chapter with the canonical six-entry Zerg pools and
+# flags, rather than relying on wins from smaller or staged profiles.
+ZERG_CARRIED_DEPS = $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile
+build/test-sc64-zerg-carried-z1: tests/race_z1_controls.c $(ZERG_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
-build/test-sc64-zerg-carried-z2: tests/race_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+build/test-sc64-zerg-carried-z2: tests/race_campaign_run.c $(ZERG_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
-build/test-sc64-zerg-carried-z3: tests/sc64_z3_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+build/test-sc64-zerg-carried-z3: tests/sc64_z3_campaign_run.c $(ZERG_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-zerg-carried-z4: tests/sc64_z4_campaign_run.c $(ZERG_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-zerg-carried-z5: tests/sc64_z5_campaign_run.c $(ZERG_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-zerg-carried-z6: tests/sc64_z6_campaign_run.c $(ZERG_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-zerg-carried-missions
-test-sc64-zerg-carried-missions: build/test-sc64-zerg-carried-z1 build/test-sc64-zerg-carried-z2 build/test-sc64-zerg-carried-z3
-	./build/test-sc64-zerg-carried-z1 --trace .local/sc64/z4-carried-z1-controller.json
-	./build/test-sc64-zerg-carried-z2 --controller 1 --trace .local/sc64/z4-carried-z2-controller.json
-	./build/test-sc64-zerg-carried-z3 --trace .local/sc64/z4-carried-z3-controller.json
+test-sc64-zerg-carried-missions: build/test-sc64-zerg-carried-z1 build/test-sc64-zerg-carried-z2 build/test-sc64-zerg-carried-z3 build/test-sc64-zerg-carried-z4 build/test-sc64-zerg-carried-z5 build/test-sc64-zerg-carried-z6
+	mkdir -p .local/sc64
+	./build/test-sc64-zerg-carried-z1 --trace .local/sc64/z6-carried-z1-controller.json
+	./build/test-sc64-zerg-carried-z2 --controller 1 --trace .local/sc64/z6-carried-z2-controller.json
+	./build/test-sc64-zerg-carried-z3 --trace .local/sc64/z6-carried-z3-controller.json
+	./build/test-sc64-zerg-carried-z4 --limit 150000 --trace .local/sc64/z6-carried-z4-controller.json
+	./build/test-sc64-zerg-carried-z5 --limit 60000 --trace .local/sc64/z6-carried-z5-diagnostics.json --attempt .local/sc64/z6-carried-z5-attempt.json --verified .local/sc64/z6-carried-z5-controller.json
+	./build/test-sc64-zerg-carried-z6 --trace .local/sc64/z6-carried-z6-controller.json
 test-zerg: test-sc64-zerg-carried-missions
 
 # P2's timed source roster must not become a false Fenix death when the
@@ -3604,3 +3706,65 @@ test-gfx-unit-facing-clip: build/test-gfx-unit-facing-clip
 .PHONY: test-sc64-unit-facing-importer
 test-sc64-unit-facing-importer:
 	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_unit_facing.py'
+
+
+# Optional native weapon-art banks. Nothing in the asset-free default target
+# prepares private data; canonical imported ROMs require both versioned banks.
+$(WEAPON_SOURCE_HEADER): tools/sc64_weapon_source_sprites.py tools/sc64_weapon_source_audit.py tools/sc64_effect_palette.py tools/sc64_construction_sprites.py tools/sc64_sprites.py common/gba.c common/gba.h starcraft/sc64_display.h .local/sc64/backwater/generated/palette-remap.bin .local/sc64/backwater/generated/palette.json
+	$(PYTHON) tools/sc64_weapon_source_sprites.py --out $(WEAPON_SOURCE_DIR)
+$(ATTACK_POSE_HEADER): tools/sc64_unit_attack_sprites.py tools/sc64_construction_sprites.py tools/sc64_sprites.py .local/sc64/backwater/generated/palette-remap.bin
+	$(PYTHON) tools/sc64_unit_attack_sprites.py --out $(ATTACK_POSE_DIR) --header $(ATTACK_POSE_HEADER)
+build/starcraft-terran.elf build/starcraft-zerg-z4.elf build/starcraft-zerg-z6.elf build/starcraft-protoss-p5-shuttle.elf build/starcraft-showcase.elf: $(SOURCE_WEAPON_INPUTS)
+build/test-terran build/test-zerg build/test-zerg-z4 build/test-sc64-zerg-z4-promoted-profile build/test-protoss build/test-sc64-terran-full-profile build/test-sc64-zerg-promoted-profile build/test-sc64-protoss-promoted-profile build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-protoss-skirmish-pylons build/test-sc64-protoss-gas-placement build/test-sc64-worker-cargo-packed build/test-sc64-protoss-warp-color build/test-sc64-protoss-warp-color-no-clip build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-z4-frame-coverage build/test-sc64-zerg-canonical-hud build/test-sc64-protoss-canonical-frame build/test-sc64-protoss-canonical-hud: $(SOURCE_WEAPON_INPUTS)
+
+SOURCE_SAMPLER_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined
+build/test-sc64-weapon-source-sampling: tests/sc64_weapon_source_vfx_sampling.c starcraft/sc64_weapon_source_vfx.h | build
+	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) $< -o $@
+build/test-sc64-weapon-source-raster: tests/sc64_weapon_source_vfx_render.c starcraft/sc64_weapon_source_vfx_render.h common/gba.h | build
+	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) $< -o $@
+build/test-sc64-weapon-source-runtime: tests/sc64_weapon_source_runtime.c starcraft/sc64_weapon_source_runtime.h starcraft/sc64_weapon_source_vfx.h tests/fixtures/weapon_source_mock.h | build
+	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) -Itests/fixtures $< -o $@
+.PHONY: test-sc64-weapon-source-sampling
+test-sc64-weapon-source-sampling: build/test-sc64-weapon-source-sampling build/test-sc64-weapon-source-raster build/test-sc64-weapon-source-runtime
+	./build/test-sc64-weapon-source-sampling
+	./build/test-sc64-weapon-source-raster
+	./build/test-sc64-weapon-source-runtime
+test: test-sc64-weapon-source-sampling
+
+# The actual engine emitter/renderer, using only already prepared private art.
+build/test-sc64-native-weapon-game: tests/sc64_native_weapon_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(SOURCE_WEAPON_INPUTS) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-native-weapon-game
+test-sc64-native-weapon-game: build/test-sc64-native-weapon-game
+	./build/test-sc64-native-weapon-game
+
+# Source event/LO/trail timing against the already prepared private bank.
+build/test-sc64-weapon-source-generated: tests/sc64_weapon_source_generated_compile.c starcraft/sc64_weapon_source_runtime.h starcraft/sc64_weapon_source_vfx.h starcraft/sc64_weapon_source_vfx_render.h $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER) common/gba.h Makefile | build
+	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) -I$(WEAPON_SOURCE_DIR) -I$(ATTACK_POSE_DIR) -DSC64_UNIT_ATTACK_POSES_ENABLED $< -o $@
+.PHONY: test-sc64-weapon-source-generated
+test-sc64-weapon-source-generated: build/test-sc64-weapon-source-generated
+	./build/test-sc64-weapon-source-generated
+
+# Canonical source death/corpse art; default original-art/unified remains asset-free.
+build/starcraft-terran.elf build/starcraft-zerg-z4.elf build/starcraft-zerg-z6.elf build/starcraft-protoss-p5-shuttle.elf build/starcraft-showcase.elf: $(CANONICAL_DEATH_INPUTS)
+build/test-terran build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-z4-frame-coverage build/test-sc64-zerg-canonical-hud build/test-sc64-protoss-canonical-frame build/test-sc64-protoss-canonical-hud build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-native-weapon-game build/test-sc64-protoss-skirmish-pylons build/test-sc64-protoss-gas-placement build/test-sc64-worker-cargo-packed build/test-sc64-protoss-warp-color build/test-sc64-protoss-warp-color-no-clip: $(CANONICAL_DEATH_INPUTS)
+
+build/test-sc64-showcase-death-source: tests/sc64_showcase_death_source.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(SOURCE_WEAPON_INPUTS) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(DEATH_ART_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-showcase-death-source
+test-sc64-showcase-death-source: build/test-sc64-showcase-death-source
+	./build/test-sc64-showcase-death-source
+
+# Packed source remains must match indexed pixels, including HUD-edge fallback.
+build/test-sc64-death-source-packed: tests/sc64_death_source_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(DEATH_ART_FLAGS) -DSC64_UNIT_WORD_SPRITES -DGBA_SPRITE_WORDS -DGBA_SCENE_CLIP $< -o $@
+build/test-sc64-death-source-packed-no-clip: tests/sc64_death_source_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(DEATH_ART_FLAGS) -DSC64_UNIT_WORD_SPRITES -DGBA_SPRITE_WORDS $< -o $@
+.PHONY: test-sc64-death-source-packed
+test-sc64-death-source-packed: build/test-sc64-death-source-packed build/test-sc64-death-source-packed-no-clip
+	./build/test-sc64-death-source-packed
+	./build/test-sc64-death-source-packed-no-clip
+
+# Full-campaign controller binaries compile the canonical presentation flags.
+# Refresh them when their generated art changes as well as when code changes.
+$(addprefix build/test-sc64-full-,t1-run t2-run t3-run t3-save t3-resume t4-run t4-save t5-save t5-run t6-run) $(addprefix build/test-sc64-t,7-campaign-run 8-campaign-run 9-campaign-run 10-campaign-run): $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS)

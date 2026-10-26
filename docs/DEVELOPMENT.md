@@ -81,6 +81,14 @@ not implement the original walking cycles, turn rates or independent turret
 tracking. Canonical campaigns and Showcase use packed directional frames.
 `make -B showcase SHOWCASE_UNIT_WORD_FLAGS=` selects the indexed comparison path.
 
+## Source weapon and attack animations
+
+Canonical race ROMs and Showcase now require both the source weapon bank and
+full attack-pose bank. Refresh existing inputs with `./dev sc64 prepare --rom
+PATH --profile terran` (or `zerg` / `protoss`) before building. See
+[Native weapon effects](native-weapon-effects.md) for coverage, local checks
+and the remaining differences from the source engine.
+
 ## Tank firing effects and siege splash
 
 Canonical race builds and Showcase use source Tank muzzle and target-impact
@@ -110,8 +118,8 @@ light lookup projected into the GBA palette. The N64 light-table binding is
 inferred, and palette reduction changes colors; this is not a pixel-identical
 N64 rendering claim. Source waits are converted from 24 to 30 simulation
 updates per second. The engine still applies damage immediately when firing;
-native attack windup, independently moving turrets and a complete projectile
-state machine remain unfinished. The visual pool is cosmetic and carries no
+source visual attack windup now plays, while gameplay windup, independently
+moving turrets and a complete projectile state machine remain unfinished. The visual pool is cosmetic and carries no
 pending damage or new save fields.
 
 ## Canonical minimap rendering
@@ -211,7 +219,7 @@ family StarCraft 64 uses for that actor:
 - Vehicles, aircraft, SCVs and Firebats explode in orange, with a larger
   blast for tanks, Science Vessels and Battlecruisers.
 - Protoss units release a blue energy burst. In the source, Zealots,
-  Dragoons and Templar collapse instead; the source-art preview below shows
+  Dragoons and Templar collapse instead; canonical source-art builds show
   that, while the authored fallback uses the burst for them too.
 - Buildings explode in their race's colors and leave rubble for 30 seconds.
 
@@ -283,10 +291,18 @@ render the result screen through the production `draw_result_screen()`.
 The feature-on/off workload digests include the outcome frame and 120
 frozen result updates.
 
-### Source death art preview
+### Source death and corpse art
 
-After preparing the unified inputs, this separate preview draws the original
-StarCraft 64 death frames:
+Canonical Terran, Zerg, Protoss and Showcase ROMs use the extracted death and
+corpse frames. This replaces the authored purple Zerg puddles that formed
+segmented health-bar-like rows in Siege Line. Refresh older prepared inputs
+with `./dev sc64 prepare --rom PATH --profile terran` (or `zerg` / `protoss`)
+before building. The source bank must have version 2 timing metadata and a
+nonempty pixel payload; setup/build reject stale banks. Keep generated banks local to
+each checkout when branches use different formats; parallel preparation in
+another worktree must not overwrite this checkout's generated header.
+
+The same art is available in the separate unified preview:
 
 ```sh
 python3 tools/sc64_death_sprites.py
@@ -303,7 +319,8 @@ layers:
 - explosion overlays, plus any overlays they spawn (`imgol`/`imgul`);
 - remnant and rubble sprites (`lowsprul`).
 
-Each layer keeps its source frame order and waits. IScript `end` removes the
+Each layer keeps its source frame order; a fixed `wait N` spans N source
+updates. Random waits use a deterministic midpoint, without an extra update. IScript `end` removes the
 layer, as in the source. Remnant streams are capped at 720 source updates
 (30 seconds). Only the frames that the animations reference are imported.
 
@@ -318,12 +335,21 @@ checkerboard-dithered. Generated art and its manifest stay under
 `--out` and `--upstream` for other local paths.
 
 The importer currently compiles 167 actors from 61 image banks (about 770 KB
-of pixels). The preview ROM is `build/StarCraft-Death-Preview-GBA.gba`; its
-menus and missions match the unified profile. Canonical race ROMs keep the
-authored effects. To use the source art in another prepared race profile,
-compile with `SC64_DEATH_SOURCE_ART` and include the generated directory.
-See [Validation](VALIDATION.md#death-animations-2026-10-25) for coverage and
-memory figures.
+of pixels). Canonical builds also prepack combat-unit collapse and remnant frames
+for the existing word compositor (about 891 KB of ROM data, no new RAM).
+Neutral actors and buildings use the same source pixels through indexed drawing
+to fit the complete Terran ROM. The indexed fallback handles HUD-edge clipping. Adding
+`-DSC64_DEATH_INDEXED_REMNANTS` to the source death flags selects identical
+indexed pixels for a performance comparison. The preview ROM is `build/StarCraft-Death-Preview-GBA.gba`; its
+menus and missions match the unified profile. Canonical race builds and
+Showcase select this bank by default. `CANONICAL_DEATH_FLAGS=` selects the
+authored comparison path when forcing a rebuild; it leaves gameplay unchanged.
+The original-art build and explicit older profiles retain authored effects.
+Unsupported source actors also keep their bounded authored fallback.
+`make test-sc64-showcase-death-source` exercises actual Siege Line deaths
+and compares rendered layers to source-frame composites. See
+[Validation](VALIDATION.md#canonical-source-death-art-2026-10-26) for current
+coverage and limits; older preview measurements remain historical.
 
 ## Install the tools
 
@@ -1123,7 +1149,7 @@ qualification. Source staging alone does not establish a playable mission.
 
 ### Canonical Zerg and Protoss builds
 
-The standard Zerg build includes its first four missions; the standard
+The standard Zerg build includes its first six missions; the standard
 Protoss build includes its first five. Prepare each profile from your verified ROM, then use the standard
 commands; no extra staged-profile selection is needed:
 
@@ -1135,24 +1161,28 @@ commands; no extra staged-profile selection is needed:
 ```
 
 Replace `zerg` with `protoss` for the Protoss campaign. The canonical output
-pairs are `build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf`
-and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba` / `build/starcraft-protoss-p5-shuttle.elf`. The
-`zerg-z4` target also builds the canonical Zerg pair. Explicit `zerg-z3`
+pairs are `build/StarCraft-Zerg-Z6-GBA.gba` / `build/starcraft-zerg-z6.elf`
+and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba` / `build/starcraft-protoss-p5-shuttle.elf`.
+Explicit `zerg-z4` (`--profile zerg-z4`) preserves the earlier four-entry
+`build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf` pair, its
+`SCZ4` generation-20 saves and `make test-zerg-z4`. Explicit `zerg-z3`
 preserves `build/StarCraft-Zerg-GBA.gba` / `build/starcraft-zerg.elf` and its
 save identity; versioned `-Z3` names are aliases. `protoss-p3` preserves the
 legacy P3 real files, code and save path. Retain matching
 frozen ROM/ELF pairs for replay.
 
-The canonical Zerg test target runs the fourth-mission runtime and controller
-suite, normal-menu startup/save fixtures for all four campaign entries, and
-all 234 combinations
+The canonical Zerg test target runs ordinary-input controllers for all six
+chapters under the canonical flags, normal-menu startup/save fixtures for all
+six campaign entries, and all 234 combinations
 of map, human race and independently selected AI races. The setup/save matrix
 does not prove a completed match for every combination. Build guards still
 enforce the same IWRAM and EWRAM reserves.
 
-Canonical Zerg uses `SCZ4`, save generation 20, the Z4 runtime and the same
-qualified canonical drawing flags. Its save directory is separate from the
-legacy Z3 profile. Canonical Protoss uses `SCPB`, generation 26 and
+Canonical Zerg uses `SCZ6`, save generation 32, the Z6 storage/runtime and
+query flags, a word-packed six-chapter sprite bank under
+`.local/sc64/zerg-z6/generated`, and the canonical drawing flags. Preparing
+`zerg` also generates the Z5/Z6 inputs and that bank. Its save directory,
+`.local/play/zerg-z6`, is separate from the legacy Z4 and Z3 profiles. Canonical Protoss uses `SCPB`, generation 26 and
 `.local/play/protoss-p5-shuttle`; it includes the P5 Shuttle transport runtime.
 Explicit `protoss-p4-storm` retains `SCP5`, generation 21 and its P4 save path;
 `protoss-p3` retains `SCP3`, generation 7. Older standard two-mission generation-2
@@ -1175,8 +1205,8 @@ first-five-chapter ARM, cargo/save, timing and memory evidence.
 
 ### Staged Zerg and Protoss chapter 4
 
-Zerg 4 is enabled in the canonical profile. The `zerg-z4` spelling builds the
-same versioned ROM. Canonical Protoss includes **The Hunt for Tassadar** and
+Zerg 4 is enabled in the canonical profile, which now continues through Zerg 6.
+The explicit `zerg-z4` profile builds the earlier four-entry Z4 ROM. Canonical Protoss includes **The Hunt for Tassadar** and
 P5 through the Shuttle profile. Explicit `protoss-p4-storm` keeps the
 four-entry Storm profile and its own real files/save format. The plain `protoss-p4`
 build remains a separate internal experiment. Preparing later map data does
@@ -2376,6 +2406,31 @@ Menus and skirmish maps keep mode 4. `test-sc64-p7-tile` composes the emulated
 layers on the host and requires every rendered frame to match the mode-4
 build, pixel for pixel. See
 [Validation](VALIDATION.md#p7-mode-0-tile-renderer) for its limits.
+
+A second default-off probe adds `SC64_FACT_TABLES` to the movement-probe flags:
+
+```sh
+make test-sc64-fact-tables
+make test-sc64-p7-fact-tables
+make protoss-p7-fact-probe
+```
+
+It produces `build/StarCraft-Protoss-P7-Fact-Probe-GBA.gba`. Before compiling,
+`tools/sc64_fact_tables_gen.c` is built on the host with the probe's exact
+flags. It writes packed per-type ROM tables to
+`build/generated/p7-fact-tables/sc64_fact_tables_generated.h`. The tables hold
+unit actor flags, collision radius and flight, plus building actor flags. They
+come from the unchanged functions, which stay available as `*_reference`. The
+generated header records the actor gates it was built with, and a build with
+different gates fails to compile. Types outside the roster still use the
+reference functions. `test-sc64-fact-tables` needs no game data. For every
+actor-gate configuration, with and without `SC64_ZP_FACT_RANGE_CULL`, it
+compares each table entry with the reference functions. It also checks that
+every fact-selecting macro is recorded and that a table built for other gates
+is rejected. `test-sc64-p7-fact-tables` repeats the table check under the P7
+flags. It also compares the P7 movement trace and the menu/save-load fixture
+with the reference builds. See
+[Validation](VALIDATION.md#p7-build-time-fact-tables) for ARM measurements.
 
 ## Mineral gathering before a base exists
 

@@ -27,8 +27,19 @@
 enum {
     SC64_P7_INTERCEPTOR_NO_LINK = 0,
     SC64_P7_INTERCEPTOR_TRAINING = 1,
-    SC64_P7_INTERCEPTOR_INSIDE = 2
+    SC64_P7_INTERCEPTOR_INSIDE = 2,
+    /* Generation 43 (SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) only. */
+    SC64_P7_INTERCEPTOR_OUTSIDE = 3,
+    SC64_P7_INTERCEPTOR_DETACHED = 4
 };
+
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+static void race_p7_interceptor_flight_detach(int child);
+static void race_p7_interceptor_flight_source_tick(void);
+static void race_p7_interceptor_flight_frame_move(void);
+static int race_p7_interceptor_flight_child_valid_in(const Unit *actors,
+                                                     int count, int slot);
+#endif
 
 static unsigned sc64_p7_carrier_child_state(const Unit *child)
 {
@@ -107,6 +118,10 @@ static int sc64_p7_carrier_count_children_in(const Unit *actors, int count,
         state = sc64_p7_carrier_child_state(child);
         if (state == SC64_P7_INTERCEPTOR_INSIDE) ++in;
         else if (state == SC64_P7_INTERCEPTOR_TRAINING) ++work;
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+        /* Launched children still occupy one of the Carrier's slots. */
+        else if (state == SC64_P7_INTERCEPTOR_OUTSIDE) ++in;
+#endif
         else return 0;
     }
     if (inside) *inside = in;
@@ -191,8 +206,21 @@ static int race_p7_carrier_training_candidate_valid(const Unit *actors,
                                                     &inside, &training) ||
                 training > 1 || inside + training + (unsigned)q->carry >
                     SC64_P7_CARRIER_CAPACITY) return 0;
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+            /* Generation 43 keeps the 7-tick release timer in work_timer. */
+            if (q->work_timer > 7) return 0;
+#endif
         }
         if (q->type != U_P7_INTERCEPTOR) continue;
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+        state = sc64_p7_carrier_child_state(q);
+        if (state == SC64_P7_INTERCEPTOR_OUTSIDE ||
+            state == SC64_P7_INTERCEPTOR_DETACHED) {
+            if (!race_p7_interceptor_flight_child_valid_in(actors, count, i))
+                return 0;
+            continue;
+        }
+#endif
         if (!sc64_p7_carrier_child_valid_in(actors, count, i) ||
             q->maxhp != 40 || q->hp < 1 || q->hp > 40 ||
             q->shield != 40 || q->carry < 0 || q->carry > 255 ||
@@ -367,6 +395,11 @@ static void race_p7_carrier_training_source_tick(void)
         Unit *child = &u[i];
         if (!child->alive || child->type != U_P7_INTERCEPTOR ||
             child->raw_type != SC64_P7_INTERCEPTOR_RAW) continue;
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+        /* Flight owns launched and detached children. */
+        if (sc64_p7_carrier_child_state(child) >= SC64_P7_INTERCEPTOR_OUTSIDE)
+            continue;
+#endif
         if (child->build < 0 || child->build >= MAX_UNITS ||
             !sc64_p7_carrier_parent_valid(child->build)) {
             race_p7_carrier_training_clear_slot(i);
@@ -396,8 +429,15 @@ static void race_p7_carrier_training_source_tick(void)
  * by the projectile and Observer systems, without introducing another clock. */
 static void race_p7_carrier_training_frame_tick(void)
 {
-    if (race_p7_active() && race_p7.reserved[0] != 4u)
+    if (race_p7_active() && race_p7.reserved[0] != 4u) {
         race_p7_carrier_training_source_tick();
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+        race_p7_interceptor_flight_source_tick();
+#endif
+    }
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+    if (race_p7_active()) race_p7_interceptor_flight_frame_move();
+#endif
 }
 
 /* Compact the parent's visible hangar order after a child dies. */
@@ -441,8 +481,18 @@ static void race_p7_carrier_training_parent_died(
     if (carrier < 0 || carrier >= MAX_UNITS || !clear_projectile_refs) return;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].type == U_P7_INTERCEPTOR &&
-            u[i].raw_type == SC64_P7_INTERCEPTOR_RAW && u[i].build == carrier)
+            u[i].raw_type == SC64_P7_INTERCEPTOR_RAW && u[i].build == carrier) {
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+            /* Native: launched fighters outlive the Carrier for 15-45
+             * source ticks; hangar children die with it. */
+            if (u[i].alive && sc64_p7_carrier_child_state(&u[i]) ==
+                    SC64_P7_INTERCEPTOR_OUTSIDE) {
+                race_p7_interceptor_flight_detach(i);
+                continue;
+            }
+#endif
             sc64_p7_carrier_child_remove(i, clear_projectile_refs);
+        }
     u[carrier].carry = 0;
 }
 
@@ -462,6 +512,16 @@ static void race_p7_carrier_training_end_frame(void)
         if (child->type != U_P7_INTERCEPTOR ||
             child->raw_type != SC64_P7_INTERCEPTOR_RAW) continue;
         state = sc64_p7_carrier_child_state(child);
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+        if (state == SC64_P7_INTERCEPTOR_OUTSIDE && child->alive &&
+            (child->build < 0 || child->build >= MAX_UNITS ||
+             !sc64_p7_carrier_parent_valid(child->build) ||
+             u[child->build].owner != child->owner ||
+             u[child->build].raw_owner != child->raw_owner)) {
+            race_p7_interceptor_flight_detach(i);
+            continue;
+        }
+#endif
         if (state != SC64_P7_INTERCEPTOR_TRAINING &&
             state != SC64_P7_INTERCEPTOR_INSIDE) continue;
         if (!child->alive || child->build < 0 || child->build >= MAX_UNITS ||
