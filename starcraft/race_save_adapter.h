@@ -424,10 +424,12 @@ static int race_p7_carrier_training_save_valid(const RaceSave *candidate,
     /* The save occupies 16292 bytes; the candidate actor table fits in the
      * unused tail of the existing 32768-byte route scratch union. */
     Unit *actors=sc64_zp_route_save_scratch.carrier_candidate.units;
+#ifndef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
     /* This generation cannot launch: reject impossible in-flight packets,
      * including a packet that names a valid but docked child as its shooter. */
     if (sc64_codec_allocated_count(candidate->interceptor_projectiles,
                                   SC64_CODEC_BYTES)!=0) return 0;
+#endif
     for (unsigned i=0;i<MAX_UNITS;++i)
         if (!race_save_decode_unit(candidate,i,ww,wh,&actors[i])) return 0;
     return race_p7_carrier_training_candidate_valid(actors,MAX_UNITS);

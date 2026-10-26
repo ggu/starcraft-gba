@@ -1,9 +1,11 @@
 # Interceptor order decisions
 
 `starcraft/sc64_interceptor_orders.h` provides an asset-free decision model for
-the Interceptor's attack passes and return to its Carrier. It has no gameplay
-caller. Adding this module does not enable Carrier combat or qualify another
-campaign mission.
+the Interceptor's attack passes and return to its Carrier. Its only gameplay
+caller is the default-off generation-43 flight adapter
+(`starcraft/sc64_p7_interceptor_flight.h`; see
+[Carrier projectiles](CARRIER-PROJECTILES.md#generation-43-interceptor-flight)).
+It does not qualify another campaign mission.
 
 The module is excluded from `STARCRAFT` runtime sources until that adapter is
 ready. Its isolated host target links the implementation explicitly.
