@@ -22,6 +22,12 @@
 #error "SC64_TANK_SOURCE_VFX requires imported race sprites"
 #endif
 #include "sc64_weapon_vfx.h"
+#ifdef SC64_WEAPON_SOURCE_VFX
+#if !defined(SC64_RACES) || !defined(SC64_HAS_SPRITES)
+#error "Source weapon effects require imported race sprites"
+#endif
+#include "sc64_weapon_source_runtime.h"
+#endif
 #ifdef SC64_TANK_SOURCE_VFX
 #include "sc64_tank_source_vfx.h"
 #endif
@@ -438,6 +444,9 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #include "sc64_death_sprites_generated.h"
 #endif
 #endif
+#endif
+#ifdef SC64_UNIT_ATTACK_POSES_ENABLED
+#include "sc64_unit_attack_source.h"
 #endif
 #if defined(SC64_Z5_RUNTIME) && defined(SC64_HAS_SPRITES)
 #if !defined(SC64_Z5_SPRITE_SET_COMPLETE) || \
@@ -3151,6 +3160,32 @@ sc64_direct_attack_tick_unit(int slot)
 }
 #endif
 
+/* Reconstruct presentation age from existing endpoints; no new saved state. */
+static int __attribute__((noinline))
+sc64_trace_duration(int packed, int x0, int y0, int x1, int y1)
+{
+#ifdef SC64_WEAPON_SOURCE_VFX
+    if (sc64_weapon_source_vfx_is_tagged((uint32_t)packed)) {
+        Sc64WeaponSourceVfxKey key;
+        const Sc64WeaponSourceAttackProfile *profile =
+            sc64_weapon_source_trace_profile((uint32_t)packed);
+        if (!profile || !sc64_weapon_source_vfx_unpack((uint32_t)packed, &key)) return 0;
+        unsigned duration = sc64_weapon_source_trace_duration_heading(profile,key.direction,x0,y0,x1,y1);
+#ifdef SC64_UNIT_ATTACK_POSES_ENABLED
+        if (key.actor_slot_plus1) {
+            unsigned pose = sc64_weapon_source_vfx_gba_duration(
+                sc64_unit_attack_source_full_duration(key.actor_raw,key.target_air));
+            if (pose > duration) duration = pose;
+        }
+#endif
+        return (int)duration;
+    }
+#else
+    (void)x0; (void)y0; (void)x1; (void)y1;
+#endif
+    return sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(packed));
+}
+
 static void __attribute__((noinline))
 add_tracer(int x0, int y0, int x1, int y1, int color)
 {
@@ -3158,10 +3193,12 @@ add_tracer(int x0, int y0, int x1, int y1, int color)
     if (!color) return; /* Non-combat actor: no invented weapon. */
     if (!sc64_weapon_vfx_style(color))
         color=sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_MUZZLE,color);
+    int duration=sc64_trace_duration(color,x0,y0,x1,y1);
+    if (duration<=0) return;
     for (int i=0;i<MAX_TRACERS;++i) {
         if (!tracers[i].life) { slot=i; break; }
-        int age=sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(tracers[i].color))+1-
-            tracers[i].life;
+        int age=sc64_trace_duration(tracers[i].color,tracers[i].x0,tracers[i].y0,
+                    tracers[i].x1,tracers[i].y1)+1-tracers[i].life;
         if (age>oldest) { oldest=age; slot=i; }
     }
     /* Cosmetic overflow replaces the oldest effect, never a damage event.
@@ -3170,8 +3207,72 @@ add_tracer(int x0, int y0, int x1, int y1, int color)
     tracers[slot].x1=x1; tracers[slot].y1=y1;
     tracers[slot].color=color;
     /* Combat emits before end-of-update aging, including the first draw. */
-    tracers[slot].life=sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(color))+1;
+    tracers[slot].life=duration+1;
 }
+
+#ifdef SC64_WEAPON_SOURCE_VFX
+static int
+sc64_source_effect_direction(int dx,int dy)
+{
+    static const short vector[32][2] = {
+        {0,-256},{50,-251},{98,-237},{142,-213},{181,-181},{213,-142},{237,-98},{251,-50},
+        {256,0},{251,50},{237,98},{213,142},{181,181},{142,213},{98,237},{50,251},
+        {0,256},{-50,251},{-98,237},{-142,213},{-181,181},{-213,142},{-237,98},{-251,50},
+        {-256,0},{-251,-50},{-237,-98},{-213,-142},{-181,-181},{-142,-213},{-98,-237},{-50,-251}
+    };
+    int best=0; long score=-0x7fffffffL;
+    for(int i=0;i<32;++i) {
+        long dot=(long)dx*vector[i][0]+(long)dy*vector[i][1];
+        if(dot>score) {score=dot;best=i;}
+    }
+    return best;
+}
+
+static int __attribute__((noinline))
+sc64_source_emit(int raw,int slot_plus1,int weapon,int air,
+                 int x0,int y0,int x1,int y1)
+{
+    if(raw<0 || raw>=228 || weapon<0 || weapon>=130) return 0;
+    unsigned variant=raw>=106 ? 2u : (raw==83 && weapon==82) ? 1u : 0u;
+    const Sc64WeaponSourceAttackProfile *profile =
+        sc64_weapon_source_profile_lookup((uint8_t)raw,(uint8_t)weapon,(uint8_t)air,(uint8_t)variant);
+    if(!profile) return 0;
+    unsigned count=profile->weapon_count==2 ? 2u : 1u;
+    for(unsigned shot=0;shot<count;++shot) {
+        Sc64WeaponSourceVfxKey key = {
+            .actor_raw=(uint8_t)raw,.actor_slot_plus1=(uint8_t)slot_plus1,
+            .weapon_id=(uint8_t)weapon,
+            .direction=(uint8_t)sc64_source_effect_direction(x1-x0,y1-y0),
+            .target_air=(uint8_t)!!air,.variant=(uint8_t)(variant?variant:shot)
+        };
+        uint32_t packed;
+        if(sc64_weapon_source_vfx_pack(key,&packed))
+            add_tracer(x0,y0,x1,y1,(int)packed);
+    }
+    return 1;
+}
+
+static int
+sc64_source_unit_vfx(Unit *q,int x1,int y1,int air)
+{
+    int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
+    Sc64StockAttack attack;
+    int weapon;
+    if(sc64_stock_attack_select(raw,air,&attack)) weapon=attack.weapon_id;
+    else if(raw==83 && !air) weapon=82; /* Existing Reaver/Scarab adapter. */
+    else return 0;
+    return sc64_source_emit(raw,(int)(q-u)+1,weapon,air,q->x,q->y,x1,y1);
+}
+
+static int
+sc64_source_building_vfx(const Building *q,int x1,int y1,int air)
+{
+    int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_building(q->type);
+    Sc64StockAttack attack;
+    return sc64_stock_attack_select(raw,air,&attack) &&
+        sc64_source_emit(raw,0,attack.weapon_id,air,q->x,q->y,x1,y1);
+}
+#endif
 
 static void
 hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
@@ -5389,6 +5490,9 @@ tick_combat(Unit * q, int target)
             }
 #endif
 #endif
+#ifdef SC64_WEAPON_SOURCE_VFX
+            if (!sc64_source_unit_vfx(q,target_x(target),target_y(target),flying))
+#endif
             add_tracer(q->x,q->y,target_x(target),target_y(target),visual_color);
 	#ifdef SC64_RACES
 #ifdef SC64_SIEGE_SPLASH
@@ -7076,6 +7180,31 @@ draw_worker_cargo_badge(int x, int y, int gas)
     }
 }
 
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+static const Sc64SpriteFrame *
+sc64_source_unit_attack_pose(const Unit *q)
+{
+    int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
+    int slot=(int)(q-u)+1, newest=0x7fffffff;
+    const Sc64SpriteFrame *pose=0;
+    if(!q->cd) return 0;
+    for(int i=0;i<MAX_TRACERS;++i) {
+        const Tracer *t=&tracers[i]; Sc64WeaponSourceVfxKey key;
+        if(t->life<=0 || !sc64_weapon_source_vfx_unpack((uint32_t)t->color,&key) ||
+           key.actor_slot_plus1!=slot || key.actor_raw!=raw ||
+           q->x!=t->x0 || q->y!=t->y0) continue;
+        int age=sc64_trace_duration(t->color,t->x0,t->y0,t->x1,t->y1)-t->life;
+        if(age<0) age=0;
+        if(age>=newest) continue;
+        const Sc64SpriteFrame *candidate=sc64_unit_attack_source_full_frame(
+            (unsigned short)raw,key.target_air,key.direction,
+            sc64_weapon_source_vfx_source_tick((unsigned)age));
+        if(candidate) {pose=candidate;newest=age;}
+    }
+    return pose;
+}
+#endif
+
 static void
 draw_unit(Unit * q)
 {
@@ -7120,6 +7249,10 @@ draw_unit(Unit * q)
     if (!sprite && facing_raw >= 0)
         sprite = sc64_unit_facing_frames((unsigned short)facing_raw);
 #endif
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+    const Sc64SpriteFrame *attack_pose=sc64_source_unit_attack_pose(q);
+    if(attack_pose) sprite=attack_pose;
+#endif
     int sprite_x = sprite ? x - sprite->canvas_w / 2 + sprite->offset_x : x - 4;
     int sprite_y = sprite ? y - sprite->canvas_h / 2 + sprite->offset_y : y - 4;
     int sprite_w = sprite ? sprite->w : 8;
@@ -7130,6 +7263,10 @@ draw_unit(Unit * q)
 #ifdef SC64_HAS_SPRITES
 #ifdef SC64_UNIT_FACING
     sc64_facing_track(q);
+#if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
+    if(attack_pose) draw_mission_sprite(attack_pose,x,y);
+    else
+#endif
     if (sprite && sc64_facing_draw(q, facing_raw, x, y)) {}
     else
 #endif
@@ -7213,10 +7350,24 @@ draw_unit(Unit * q)
 #include "sc64_tank_source_vfx_render.h"
 #endif
 
+#ifdef SC64_WEAPON_SOURCE_VFX
+#include "sc64_weapon_source_vfx_render.h"
+#endif
+
 static void
 draw_tracers(void)
 {
     for (int i=0;i<MAX_TRACERS;++i) if (tracers[i].life) {
+#ifdef SC64_WEAPON_SOURCE_VFX
+        if(sc64_weapon_source_vfx_is_tagged((uint32_t)tracers[i].color)) {
+            int age=sc64_trace_duration(tracers[i].color,tracers[i].x0,tracers[i].y0,
+                    tracers[i].x1,tracers[i].y1)-tracers[i].life;
+            sc64_weapon_source_vfx_draw_trace((uint32_t)tracers[i].color,
+                tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,
+                tracers[i].life,(unsigned)(age<0?0:age));
+            continue;
+        }
+#endif
         int style=sc64_weapon_vfx_style(tracers[i].color);
         /* Legacy original-art saves may contain an untagged tracer color. */
         if (!style) style=SC64_WEAPON_VFX_STYLE_MUZZLE;

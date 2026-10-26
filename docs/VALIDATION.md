@@ -5532,3 +5532,24 @@ Pylons, and 5,400 updates with 5,380 full renders. It passed with three complete
 Pylons and normal play still active. It does not exercise slot exhaustion or
 prove that the hardware crash is fixed. The exact ROM/save from KODAK and the
 freeze/audio behavior are still needed to narrow that report.
+
+
+## Source weapon artwork qualification (2026-10-26)
+
+The source weapon/attack presentation pipeline is described in
+[Native weapon effects](native-weapon-effects.md). Local verification includes
+asset-free importer/sampler tests, the integrated 66-profile weapon renderer,
+canonical framebuffer/cache comparisons and four ARM ROM links. These checks
+do not establish pixel-identical N64 output or physical GBA performance.
+
+The full Terran controller suite currently stops at T9's 500000-update limit.
+An isolated build of main commit `cd1b7b8a97553e13b51bd992225ba5b10485a822`
+reproduces the same failure as this presentation change: frame 495064, 13
+Protoss buildings, 21 Zerg buildings, 13 side units, wallet 26/73066 and zero
+reported faults. T1–T8 passed before that stop; T10 was run separately and won
+at update 3511 with zero faults. Treat the T9 automated completion qualification
+as unresolved rather than describing the whole suite as passing.
+
+The reported physical Showcase Blood Bath/Protoss multi-Pylon crash also
+remains unresolved. Host rendering checks and synthetic ARM tests have not
+reproduced that exact hardware failure.

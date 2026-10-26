@@ -81,6 +81,14 @@ not implement the original walking cycles, turn rates or independent turret
 tracking. Canonical campaigns and Showcase use packed directional frames.
 `make -B showcase SHOWCASE_UNIT_WORD_FLAGS=` selects the indexed comparison path.
 
+## Source weapon and attack animations
+
+Canonical race ROMs and Showcase now require both the source weapon bank and
+full attack-pose bank. Refresh existing inputs with `./dev sc64 prepare --rom
+PATH --profile terran` (or `zerg` / `protoss`) before building. See
+[Native weapon effects](native-weapon-effects.md) for coverage, local checks
+and the remaining differences from the source engine.
+
 ## Tank firing effects and siege splash
 
 Canonical race builds and Showcase use source Tank muzzle and target-impact
@@ -110,8 +118,8 @@ light lookup projected into the GBA palette. The N64 light-table binding is
 inferred, and palette reduction changes colors; this is not a pixel-identical
 N64 rendering claim. Source waits are converted from 24 to 30 simulation
 updates per second. The engine still applies damage immediately when firing;
-native attack windup, independently moving turrets and a complete projectile
-state machine remain unfinished. The visual pool is cosmetic and carries no
+source visual attack windup now plays, while gameplay windup, independently
+moving turrets and a complete projectile state machine remain unfinished. The visual pool is cosmetic and carries no
 pending damage or new save fields.
 
 ## Canonical minimap rendering

@@ -34,6 +34,39 @@ FACING_SPRITE_HEADER = (
     'static inline const Sc64SpriteFrame *sc64_unit_facing_frames(unsigned short raw_type) { return 0; }\n'
     'static inline const Sc64UnitFacingWordFrame *sc64_unit_facing_word_frame(unsigned short raw_type, unsigned char direction) { return 0; }\n'
 )
+ATTACK_POSE_HEADER = (
+    '#define SC64_UNIT_ATTACK_POSE_BANK_VERSION 1\n'
+    '#define SC64_UNIT_ATTACK_POSE_METADATA 1\n'
+    'static const unsigned char sc64_unit_attack_pixels_0[1] = {1};\n'
+    'static inline unsigned char sc64_unit_attack_source_release_tick(unsigned short raw_type, int target_air) { return 0; }\n'
+    'static inline unsigned char sc64_unit_attack_source_duration(unsigned short raw_type, int target_air) { return 1; }\n'
+    'static inline unsigned short sc64_unit_attack_source_full_duration(unsigned short raw_type, int target_air) { return 2; }\n'
+    'static inline const Sc64SpriteFrame *sc64_unit_attack_source_frame(unsigned short raw_type, int target_air, unsigned char heading32, unsigned int post_release_tick) { return 0; }\n'
+    'static inline const Sc64SpriteFrame *sc64_unit_attack_source_full_frame(unsigned short raw_type, int target_air, unsigned char heading32, unsigned int attack_tick) { return 0; }\n'
+    '#define SC64_UNIT_ATTACK_POSE_PIXEL_BYTES 1u\n'
+)
+WEAPON_SOURCE_HEADER = (
+    '#define SC64_WEAPON_SOURCE_BANK_VERSION 1\n'
+    '#define SC64_WEAPON_SOURCE_METADATA 1\n'
+    '#define SC64_WEAPON_SOURCE_PROFILE_COUNT 1\n'
+    '#define SC64_WEAPON_SOURCE_IMAGE_COUNT 1\n'
+    '#define SC64_WEAPON_SOURCE_FRAME_COUNT 1\n'
+    '#define SC64_WEAPON_SOURCE_ANIMATION_COUNT 1\n'
+    '#define SC64_WEAPON_SOURCE_LUT_COUNT 1\n'
+    'static const Sc64WeaponSourceAttackProfile sc64_weapon_source_profiles[1] = {{0}};\n'
+    'static const Sc64WeaponSourceImage sc64_weapon_source_images[1] = {{0}};\n'
+    'static const Sc64WeaponSourceFrame sc64_weapon_source_frames[1] = {{0}};\n'
+    'static const Sc64WeaponSourceAnimation sc64_weapon_source_animations[1] = {{0}};\n'
+    'static const Sc64WeaponSourceLut sc64_weapon_source_luts[1] = {{0}};\n'
+    'static const uint8_t sc64_weapon_source_pixels[1] = {1};\n'
+    'static const uint8_t sc64_weapon_source_lut_bytes[1] = {1};\n'
+    'sc64_weapon_source_profile_lookup(\n'
+    'sc64_weapon_source_image_lookup(\n'
+    'sc64_weapon_source_frame_lookup(\n'
+    'sc64_weapon_source_frame_pixels(\n'
+    'sc64_weapon_source_animation_lookup(\n'
+    'sc64_weapon_source_lut_for_image(\n'
+)
 TANK_VFX_HEADER = (
     '#define SC64_TANK_SOURCE_VFX_VERSION 1\n'
     'static const Sc64TankSourceFrame sc64_tank_frames_533[14] = {{0}};\n'
@@ -63,6 +96,24 @@ def emit_facing_header(root):
     path = root / dev.TANK_VFX_HEADER
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(TANK_VFX_HEADER, encoding='ascii')
+    path = root / dev.ATTACK_POSE_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(ATTACK_POSE_HEADER, encoding='ascii')
+    path = root / dev.WEAPON_SOURCE_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(WEAPON_SOURCE_HEADER, encoding='ascii')
+
+
+def emit_attack_pose_header(root):
+    path = root / dev.ATTACK_POSE_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(ATTACK_POSE_HEADER, encoding='ascii')
+
+
+def emit_weapon_source_header(root):
+    path = root / dev.WEAPON_SOURCE_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(WEAPON_SOURCE_HEADER, encoding='ascii')
 
 
 P4_SCENARIO_HEADER = (
@@ -134,6 +185,52 @@ class OnboardingTests(unittest.TestCase):
             header.write_text(FACING_SPRITE_HEADER, encoding='ascii')
             self.assertTrue(dev.facing_sprite_input_ready(header))
 
+    def test_attack_pose_readiness_requires_version_accessors_and_pixels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'attack.h'
+            self.assertFalse(dev.attack_pose_input_ready(header))
+            invalid = (
+                ATTACK_POSE_HEADER.replace('BANK_VERSION 1', 'BANK_VERSION 2'),
+                ATTACK_POSE_HEADER.replace('POSE_METADATA 1', 'POSE_METADATA 0'),
+                ATTACK_POSE_HEADER.replace('source_release_tick(', 'missing_release('),
+                ATTACK_POSE_HEADER.replace('source_duration(', 'missing_duration('),
+                ATTACK_POSE_HEADER.replace('source_frame(', 'missing_frame('),
+                ATTACK_POSE_HEADER.replace('source_full_duration(', 'missing_full_duration('),
+                ATTACK_POSE_HEADER.replace('source_full_frame(', 'missing_full_frame('),
+                ATTACK_POSE_HEADER.replace('attack_pixels_0[1]', 'attack_pixels_0[0]'),
+                ATTACK_POSE_HEADER.replace('POSE_PIXEL_BYTES 1u', 'POSE_PIXEL_BYTES 0u'),
+            )
+            for text in invalid:
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.attack_pose_input_ready(header))
+            header.write_text(ATTACK_POSE_HEADER, encoding='ascii')
+            self.assertTrue(dev.attack_pose_input_ready(header))
+
+    def test_weapon_source_readiness_requires_selectors_frames_and_luts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'weapon.h'
+            self.assertFalse(dev.weapon_source_input_ready(header))
+            invalid = (
+                WEAPON_SOURCE_HEADER.replace('BANK_VERSION 1', 'BANK_VERSION 2'),
+                WEAPON_SOURCE_HEADER.replace('SOURCE_METADATA 1', 'SOURCE_METADATA 0'),
+                WEAPON_SOURCE_HEADER.replace('source_profile_lookup(', 'missing_profile('),
+                WEAPON_SOURCE_HEADER.replace('source_image_lookup(', 'missing_image('),
+                WEAPON_SOURCE_HEADER.replace('source_frame_lookup(', 'missing_frame('),
+                WEAPON_SOURCE_HEADER.replace('source_frame_pixels(', 'missing_pixels('),
+                WEAPON_SOURCE_HEADER.replace('source_animation_lookup(', 'missing_animation('),
+                WEAPON_SOURCE_HEADER.replace('source_lut_for_image(', 'missing_lut('),
+                WEAPON_SOURCE_HEADER.replace('source_pixels[1]', 'source_pixels[0]'),
+                WEAPON_SOURCE_HEADER.replace('source_lut_bytes[1]', 'source_lut_bytes[0]'),
+                WEAPON_SOURCE_HEADER.replace('PROFILE_COUNT 1', 'PROFILE_COUNT 0'),
+                WEAPON_SOURCE_HEADER.replace('FRAME_COUNT 1', 'FRAME_COUNT 0'),
+                WEAPON_SOURCE_HEADER.replace('LUT_COUNT 1', 'LUT_COUNT 0'),
+            )
+            for text in invalid:
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.weapon_source_input_ready(header))
+            header.write_text(WEAPON_SOURCE_HEADER, encoding='ascii')
+            self.assertTrue(dev.weapon_source_input_ready(header))
+
     def test_terran_build_requires_directional_bank_before_make(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -150,6 +247,16 @@ class OnboardingTests(unittest.TestCase):
                 run.reset_mock()
                 (root / dev.TANK_VFX_HEADER).unlink()
                 with self.assertRaisesRegex(RuntimeError, 'source Tank effects'):
+                    dev.build('terran')
+                run.assert_not_called()
+                emit_facing_header(root)
+                (root / dev.ATTACK_POSE_HEADER).unlink()
+                with self.assertRaisesRegex(RuntimeError, 'source attack-pose data'):
+                    dev.build('terran')
+                run.assert_not_called()
+                emit_facing_header(root)
+                (root / dev.WEAPON_SOURCE_HEADER).unlink()
+                with self.assertRaisesRegex(RuntimeError, 'source weapon VFX data'):
                     dev.build('terran')
                 run.assert_not_called()
                 emit_facing_header(root)
@@ -608,6 +715,10 @@ class OnboardingTests(unittest.TestCase):
                         emit_construction_header(root)
                     elif script == 'sc64_unit_facing.py':
                         emit_facing_header(root)
+                    elif script == 'sc64_unit_attack_sprites.py':
+                        emit_attack_pose_header(root)
+                    elif script == 'sc64_weapon_source_sprites.py':
+                        emit_weapon_source_header(root)
                     elif script == 'sc64_menu_assets.py':
                         output = root / '.local/sc64/races/generated/sc64_menu_generated.h'
                         output.parent.mkdir(parents=True, exist_ok=True)
@@ -852,6 +963,10 @@ class OnboardingTests(unittest.TestCase):
                     emit_construction_header(root)
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
+                elif script == 'sc64_unit_attack_sprites.py':
+                    emit_attack_pose_header(root)
+                elif script == 'sc64_weapon_source_sprites.py':
+                    emit_weapon_source_header(root)
                 elif script == 'sc64_z4_pack.py':
                     output = local / 'z4/manifest.json'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -938,6 +1053,10 @@ class OnboardingTests(unittest.TestCase):
                     emit_construction_header(root)
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
+                elif script == 'sc64_unit_attack_sprites.py':
+                    emit_attack_pose_header(root)
+                elif script == 'sc64_weapon_source_sprites.py':
+                    emit_weapon_source_header(root)
                 elif script == 'sc64_z4_pack.py':
                     output = local / 'z4/manifest.json'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -955,8 +1074,24 @@ class OnboardingTests(unittest.TestCase):
 
             scripts = [Path(call[1]).name for call in calls]
             for required in ('sc64_races_pack.py', 'sc64_race_sprites.py',
-                             'sc64_z4_pack.py', 'sc64_z4_scenario_pack.py'):
+                             'sc64_z4_pack.py', 'sc64_z4_scenario_pack.py',
+                             'sc64_unit_attack_sprites.py',
+                             'sc64_weapon_source_sprites.py'):
                 self.assertIn(required, scripts)
+            pose_calls = [call for call in calls
+                          if Path(call[1]).name == 'sc64_unit_attack_sprites.py']
+            self.assertEqual(len(pose_calls), 1)
+            self.assertIn('--rom', pose_calls[0])
+            self.assertIn('--remap', pose_calls[0])
+            self.assertIn(str(root / dev.ATTACK_POSE_HEADER), pose_calls[0])
+            self.assertTrue(dev.attack_pose_input_ready(root / dev.ATTACK_POSE_HEADER))
+            weapon_calls = [call for call in calls
+                            if Path(call[1]).name == 'sc64_weapon_source_sprites.py']
+            self.assertEqual(len(weapon_calls), 1)
+            self.assertIn('--rom', weapon_calls[0])
+            self.assertIn('--out', weapon_calls[0])
+            self.assertIn(str((root / dev.WEAPON_SOURCE_HEADER).parent), weapon_calls[0])
+            self.assertTrue(dev.weapon_source_input_ready(root / dev.WEAPON_SOURCE_HEADER))
             self.assertTrue(all(dev.canonical_zerg_input_ready(label, root / relative)
                                 for label, relative, _ in dev.CANONICAL_ZERG_INPUTS))
             canonical_sprite_calls = [call for call in calls
@@ -1028,7 +1163,9 @@ class OnboardingTests(unittest.TestCase):
                 'Terran T5 scenario', 'Terran T5 availability',
                 'Terran T6 scenario', 'Terran T6 availability',
                 'Full Terran maps', 'Full Terran sprites',
-                'Terran T7 scenario', 'Terran T10 availability', 'Built ROM',
+                'Terran T7 scenario', 'Terran T10 availability',
+                'Directional unit sprites', 'Tank firing effects',
+                'Unit attack poses', 'Source weapon effects', 'Built ROM',
             ):
                 with self.subTest(dependency=dependency):
                     self.assertIn(f'MISSING {dependency}', text)
@@ -1085,6 +1222,10 @@ class OnboardingTests(unittest.TestCase):
                     emit_construction_header(root)
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
+                elif script == 'sc64_unit_attack_sprites.py':
+                    emit_attack_pose_header(root)
+                elif script == 'sc64_weapon_source_sprites.py':
+                    emit_weapon_source_header(root)
                 elif script == 'sc64_menu_assets.py':
                     touch(race / 'sc64_menu_generated.h')
                 elif script == 'sc64_skirmish_pack.py':
