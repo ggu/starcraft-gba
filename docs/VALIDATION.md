@@ -11,6 +11,12 @@ The newer [P4 promotion](audits/2026-10-26-p4-promotion/README.md) and
 requalify their stated ARM traces after those combat corrections. Older
 measurement sections below remain records of their frozen images.
 
+The [construction lifecycle recheck](audits/2026-10-26-construction-lifecycle/README.md)
+corrects the Protoss pre-completion visual to the source Warp Anchor's `Init`
+animation. It keeps the existing build timer and save layout. The campaign
+ARM timings below precede that artwork correction; no new full-mission ARM
+timing or physical-GBA result is claimed for the updated art.
+
 Canonical profiles expose Terran 1–10, Zerg 1–4 and Protoss 1–4: 18/30
 entries. Canonical Zerg uses `SCZ4` and `.local/play/zerg-z4`; canonical
 Protoss uses the P4 Storm files, `SCP5`, generation 21 and
@@ -27,7 +33,7 @@ to its frozen build. P1–P4 have fresh host and input-only ARM wins in the
 canonical P4 pools, retaining Fenix in P1/P2 and both heroes in P4. P4 also
 has a live mid-mission SRAM cold-load/continued-win proof.
 
-The 30-fps goal remains unfinished. Current full-replay averages are about
+The 30-fps goal remains unfinished. PR 35's full-replay averages are about
 22.4/18.8 fps equivalent for Terran T7/T10 and 16.3 for P4. These are scoped
 emulator cycle measurements, not physical-GBA guarantees. Historical staged
 coverage spans 22/30 across recorded builds, not fresh qualification of all
@@ -4432,9 +4438,12 @@ and unified ROMs retain `4ad80ce0…f9aee` and `6bab5be2…979f9` respectively.
 Historical preview evidence follows. The subsequent
 [stock profile and art follow-up](audits/2026-10-26-stock-profiles-and-art/README.md)
 enables layered source construction art in canonical prepared race builds,
-adds Protoss WarpIn and expands coverage to all 50 constructible buildings,
+adds Protoss source art and expands coverage to all 50 constructible buildings,
 including the Greater Spire morph. The preview counts and ROM hashes below refer
-to the earlier implementation, not the current builds.
+to the earlier implementation, not the current builds. The newer
+[lifecycle recheck](audits/2026-10-26-construction-lifecycle/README.md) selects
+the source Warp Anchor during Protoss build progress; later materialization
+states remain incomplete.
 
 The default-off `SC64_CONSTRUCTION_SOURCE_ART` profile imports verified local
 ROM art and compiles a bounded primary-frame timeline for supported Terran and

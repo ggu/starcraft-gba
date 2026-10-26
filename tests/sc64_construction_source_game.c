@@ -53,6 +53,15 @@ static void draw_at_progress(int slot, int progress, u8 *pixels)
     assert(!memcmp(&b[slot],&before,sizeof(before)));
 }
 
+static void draw_current_progress(int slot, u8 *pixels)
+{
+    Building before=b[slot];
+    gfx_begin(C_BLACK);
+    draw_building_overlay(&b[slot]);
+    capture(pixels);
+    assert(!memcmp(&b[slot],&before,sizeof(before)));
+}
+
 static u8 source_pixel(const Sc64SpriteFrame *sprite, int left, int top,
                       int screen_x, int screen_y)
 {
@@ -139,7 +148,8 @@ static void assert_source_layer_pixels(int slot, int progress)
     }
 }
 
-static void check_source_pixels(int slot, int progress)
+static void check_source_pixels_impl(int slot, int progress,
+                                     int set_progress, int check_frozen)
 {
     unsigned stage_index, frame_index;
     uint32_t elapsed;
@@ -156,7 +166,8 @@ static void check_source_pixels(int slot, int progress)
     const Sc64SpriteFrame *sprite=
         sc64_construction_image_frame(stage->image_id,frame_index);
     assert(sprite);
-    draw_at_progress(slot,progress,first);
+    if (set_progress) draw_at_progress(slot,progress,first);
+    else draw_current_progress(slot,first);
     int center_x=building->x-camx;
     int center_y=building->y-camy+12;
     const Sc64SpriteFrame *completed=building->raw_type>=0 ?
@@ -207,9 +218,40 @@ static void check_source_pixels(int slot, int progress)
     }
     assert(compared>8);
     /* A frozen build is independent of the global render clock. */
-    frame+=100;
-    draw_at_progress(slot,progress,second);
-    assert(!memcmp(first,second,sizeof(first)));
+    if (check_frozen) {
+        frame+=100;
+        draw_at_progress(slot,progress,second);
+        assert(!memcmp(first,second,sizeof(first)));
+    }
+}
+
+static void check_source_pixels(int slot, int progress)
+{
+    check_source_pixels_impl(slot,progress,1,1);
+}
+
+static uint32_t check_current_source_pixels(int slot)
+{
+    int progress=b[slot].build_progress;
+    check_source_pixels_impl(slot,progress,0,0);
+    int center_x=b[slot].x-camx, center_y=b[slot].y-camy+12;
+    const Sc64SpriteFrame *completed=mission_building_sprite(b[slot].type);
+    int ui_top=completed ? center_y-completed->canvas_h/2+
+                           completed->offset_y : center_y-12;
+    int ui_height=completed ? completed->h : 24;
+    /* Hash a fixed visible crop, including transparent/background pixels so
+     * silhouette changes count. Exclude both HUD bar bands; they must not
+     * create a false animation signal as build progress advances. */
+    uint32_t hash=2166136261u;
+    for (int y=40;y<90;++y) {
+        if ((y>=ui_top-8 && y<ui_top+2) ||
+            (y>=ui_top+ui_height+3 && y<ui_top+ui_height+5)) continue;
+        for (int x=20;x<220;++x) {
+            hash^=first[y*240+x];
+            hash*=16777619u;
+        }
+    }
+    return hash;
 }
 
 static void test_stages_and_morph_loop(void)
@@ -241,17 +283,22 @@ static void test_stages_and_morph_loop(void)
         check_source_pixels(slot,total/2);
         check_source_pixels(slot,total-1);
     }
-    /* Source composition includes Terran/Zerg underlays and Protoss warp
-       overlays. All three images link their child frames to the parent frame. */
+    /* Terran/Zerg construction programs include spawned layers. Protoss's
+       OpenBW WarpAnchor Init program is a single animated source image. */
     int layered_terran=start_building(R_TER,B_COMMAND);
     assert_source_layer_pixels(layered_terran,2);
     write_contact_sample("terran",first);
     int layered_zerg=start_building(R_ZERG,B_HATCHERY);
     assert_source_layer_pixels(layered_zerg,2);
     write_contact_sample("zerg",first);
-    int layered_protoss=start_building(R_PROTOSS,B_NEXUS);
-    assert_source_layer_pixels(layered_protoss,2);
+    int protoss_warp=start_building(R_PROTOSS,B_PYLON);
+    check_source_pixels(protoss_warp,2);
     write_contact_sample("protoss",first);
+    draw_at_progress(protoss_warp,2,first);
+    uint32_t warp_start=check_current_source_pixels(protoss_warp);
+    draw_at_progress(protoss_warp,80,first);
+    uint32_t warp_loop=check_current_source_pixels(protoss_warp);
+    assert(warp_start!=warp_loop); /* Authored WarpAnchor frame loop. */
     int slot=start_building(R_ZERG,B_HATCHERY);
     draw_at_progress(slot,0,first);
     draw_at_progress(slot,15,second);
@@ -318,6 +365,126 @@ static void test_every_constructible_raw_building(void)
     }
     assert(tested==50);
     assert(by_race[0]==18 && by_race[1]==16 && by_race[2]==16);
+}
+
+static void check_completed_source_pixels(int slot)
+{
+    Building *building=&b[slot];
+    const Sc64SpriteFrame *sprite=mission_building_sprite(building->type);
+    assert(sprite && !building->under_construction);
+    Building before=*building;
+    gfx_begin(C_BLACK);
+    draw_building_art(building);
+    draw_building_overlay(building);
+    capture(first);
+    assert(!memcmp(building,&before,sizeof(before)));
+    memset(second,0,sizeof(second));
+    int cx=building->x-camx, cy=building->y-camy+12;
+    composite_source_sprite(second,sprite,cx,cy);
+    int sprite_top=cy-sprite->canvas_h/2+sprite->offset_y;
+    unsigned matches=0;
+    for (int y=0;y<160;++y) for (int x=0;x<240;++x) {
+        u8 pixel=second[y*240+x];
+        if (!pixel || (y>=sprite_top-8 && y<sprite_top+2)) continue;
+        assert(first[y*240+x]==pixel);
+        ++matches;
+    }
+    assert(matches>8);
+}
+
+static void test_live_builder_construction(void)
+{
+    static const int races[]={R_TER,R_ZERG,R_PROTOSS};
+    static const int workers[]={U_SCV,U_DRONE,U_PROBE};
+    static const int buildings[]={B_DEPOT,B_HATCHERY,B_PYLON};
+    static const int raw_buildings[]={109,131,156};
+    static const char *names[]={"Terran","Zerg","Protoss"};
+
+    for (unsigned r=0;r<3;++r) {
+        const int site_x=320, site_y=320;
+        game_init();
+        race_mode=1;
+        race_human=races[r];
+        race_bots=1;
+        race_skirmish_map=0;
+        race_skirmish_init();
+        screen=SCREEN_PLAY;
+        minerals=3000;
+        gas=1000;
+        camx=site_x-100;
+        camy=site_y-53;
+        memset(visible,0xff,sizeof(visible));
+
+        /* The worker begins just outside the new footprint, as it does after
+         * a player places the blueprint; the 32px gap is inside work range. */
+        int worker=spawn_unit(SIDE,workers[r],site_x+32,site_y);
+        assert(worker>=0 && u[worker].alive);
+        if (!race_start_build(SIDE,worker,buildings[r],site_x,site_y)) {
+            fprintf(stderr,"live build start failed race=%d type=%d identity=%d checks=%d/%d minerals=%d gas=%d\n",
+                    races[r],buildings[r],race_owner_identity(SIDE),
+                    race_can_site(SIDE,buildings[r],site_x,site_y),
+                    can_place(buildings[r],site_x,site_y),minerals,gas);
+            assert(0);
+        }
+        int slot=u[worker].target;
+        assert(slot>=0 && b[slot].alive && b[slot].under_construction);
+        assert(b[slot].build_progress==(r==0 ? 0 : -1));
+        assert(b[slot].type==buildings[r]);
+        assert(b[slot].raw_type<0 || b[slot].raw_type==raw_buildings[r]);
+        assert(sc64_race_raw_building(buildings[r])==raw_buildings[r]);
+        int duration=building_build_time(buildings[r]);
+        assert(duration>0);
+
+        int previous_progress=b[slot].build_progress;
+        int sampled=0, pixel_changes=0;
+        uint32_t previous_hash=0;
+        unsigned stage_mask=0;
+        int zerg_builder_consumed=0;
+        for (int tick=0;tick<duration+8 && b[slot].under_construction;++tick) {
+            int old_frame=frame;
+            game_update(0,0);
+            assert(frame==old_frame+1);
+            assert(camx==site_x-100 && camy==site_y-53);
+            assert(b[slot].alive);
+            assert(b[slot].type==buildings[r]);
+            if (r==1 && tick==0) {
+                /* Arrival consumes the Drone before the Hatchery clock runs.
+                 * Check immediately, before any later unit can reuse its slot. */
+                assert(!u[worker].alive);
+                zerg_builder_consumed=1;
+            }
+            if (b[slot].under_construction) {
+                int progress=b[slot].build_progress;
+                assert(progress>=0 && progress>previous_progress);
+                previous_progress=progress;
+                if (progress==1 || progress%8==0) {
+                    unsigned stage;
+                    uint32_t elapsed;
+                    assert(sc64_construction_source_phase(races[r]+1,progress,
+                        duration,&stage,&elapsed));
+                    const SC64ConstructionSourceStage *program=
+                        sc64_construction_stage(raw_buildings[r],stage);
+                    assert(program && program->layer_count>0);
+                    stage_mask|=1u<<stage;
+                    uint32_t hash=check_current_source_pixels(slot);
+                    if (sampled && hash!=previous_hash) ++pixel_changes;
+                    previous_hash=hash;
+                    ++sampled;
+                }
+            }
+        }
+        assert(!b[slot].under_construction);
+        assert(sampled>2 && pixel_changes>0);
+        if (r==0) assert(stage_mask==0x0fu);
+        else if (r==1) assert(stage_mask==0x07u);
+        else assert(stage_mask==0x01u);
+        if (r==1) assert(zerg_builder_consumed); /* Drone becomes the Hatchery. */
+        else assert(u[worker].alive &&
+                    (u[worker].order!=ORDER_BUILD || u[worker].target!=slot));
+        check_completed_source_pixels(slot);
+        printf("%s live build: %d ticks, %u visual samples, %u pixel changes, completed source sprite\n",
+               names[r],frame,sampled,(unsigned)pixel_changes);
+    }
 }
 
 static void test_save_load_and_completion(void)
@@ -399,7 +566,11 @@ static void test_gas_overlay_source_requests(void)
         assert(sc64_construction_image_frame_count(
             SC64_CONSTRUCTION_GAS_SMOKE_DEPLETED_IMAGE_BASE+request->selector)>0);
     }
-    assert(assimilator->layers[0].gas_overlay_request_count==6);
+    /* Pre-timer Assimilator construction uses WarpAnchor, not its normal
+     * completed-image WarpIn script; dynamic geyser attachment remains a
+     * separate order-side effect. */
+    assert(assimilator->image_id==211);
+    assert(assimilator->layers[0].gas_overlay_request_count==0);
 }
 
 int main(void)
@@ -421,6 +592,7 @@ int main(void)
     assert(stages==136); /* Full imported constructible/morph census. */
     test_stages_and_morph_loop();
     test_every_constructible_raw_building();
+    test_live_builder_construction();
     test_save_load_and_completion();
     test_waiting_and_unsupported_fallback();
     test_gas_overlay_source_requests();
