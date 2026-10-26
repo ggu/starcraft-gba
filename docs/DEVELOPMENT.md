@@ -1631,6 +1631,24 @@ It preserves damage through the 375-tick morph and applies the reference's
 max-HP adjustment at completion. The explicit colony-defense gate is enabled
 only in the Z7 development profile.
 
+The optional full-render candidate can be built and host-checked with:
+
+```sh
+make zerg-z7-full-render-probe
+make test-sc64-z7-full-render
+```
+
+It produces a generation-36 SCZR title/profile candidate. The full-render
+audit records are in [the Z7 full-render audit](audits/2026-10-27-z7-full-render/README.md).
+The fresh-process ARM restart confirmed byte-identical 16,296-byte SRAM
+payloads with six worker depot caches retained after reload. The paired
+12,000-tick ARM prefix had 34 zero-mismatch projection checks; it does not
+compare the full world or pixels or complete the mission. Mean full-frame
+cost was 1,069,633 cycles versus 1,026,851 for the reference (+4.17%). These
+are emulator measurements, not hardware or 30-fps qualifications. The Z6
+canonical profile remains unchanged, and staged campaign qualification stays
+at 22/30.
+
 P7 has an isolated world foundation with separate source-Force wallets; its
 canonical roster fails closed on missing raw68/71/72 actor bindings. It still
 lacks shared menu/save integration. Neither seventh mission has a completed

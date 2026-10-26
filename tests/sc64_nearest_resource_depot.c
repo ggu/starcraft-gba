@@ -186,12 +186,72 @@ static void check_sram_roundtrip_cached_home(void)
     u[worker].target = 0;
     u[worker].carry = 7;
     assert(race_nearest_resource_depot(&u[worker]) == 1);
+
+    /* Construction jobs use positive build slots too; loading must leave that
+     * non-cache meaning untouched. */
+    u[worker].order = ORDER_BUILD;
+    u[worker].build = 1;
     assert(race_save_game());
+    Unit decoded;
+    assert(race_save_decode_unit(&race_data, (unsigned)worker,
+                                 (unsigned)(race_cols * 16),
+                                 (unsigned)(race_rows * 16), &decoded));
+    assert(decoded.build == 1 && u[worker].build == 1);
+    u[worker].build = -1;
+    assert(race_load_game());
+    assert(u[worker].order == ORDER_BUILD && u[worker].build == 1);
+
+    u[worker].order = ORDER_MINE;
+    u[worker].build = 1;
+    u[worker].x = 340; /* Now nearer depot 0, but this trip committed to 1. */
+    /* Match the load-time exploration refresh before taking a byte snapshot. */
+    update_exploration();
+    RaceSave canonical_save;
+    assert(race_save_game());
+    assert(u[worker].build == 1); /* Saving never mutates the live cache. */
+    canonical_save = race_data;
+    assert(race_save_decode_unit(&race_data, (unsigned)worker,
+                                 (unsigned)(race_cols * 16),
+                                 (unsigned)(race_rows * 16), &decoded));
+    assert(decoded.build == 1); /* The committed destination is persistent. */
+
     u[worker].build = -1;
     u[worker].carry = 0;
     assert(race_load_game());
-    assert(u[worker].alive && u[worker].carry == 7 && u[worker].build == -1);
-    assert(race_nearest_resource_depot(&u[worker]) == 1);
+    assert(u[worker].alive && u[worker].carry == 7 && u[worker].build == 1);
+    assert(race_save_game());
+    assert(memcmp(&canonical_save, &race_data, sizeof(canonical_save)) == 0);
+
+    /* A save/load boundary must preserve the committed route and its exact
+     * next simulation update, even though another depot is now nearer. */
+    path_grid_valid = 0;
+    sc64_routes_reset();
+    update_orders();
+    Unit uninterrupted = u[worker];
+    race_data = canonical_save;
+    assert(race_load_game());
+    update_orders();
+    assert(memcmp(&uninterrupted, &u[worker], sizeof(uninterrupted)) == 0);
+
+    /* Previously written saves with a now-invalid cached home still load;
+     * load-time validation drops the stale slot and live selection recovers. */
+    b[1].type = B_GATEWAY;
+    assert(race_save_game());
+    RaceSave stale_cache_save = race_data;
+    assert(race_save_decode_unit(&stale_cache_save, (unsigned)worker,
+                                 (unsigned)(race_cols * 16),
+                                 (unsigned)(race_rows * 16), &decoded));
+    assert(decoded.build == 1);
+    race_data = stale_cache_save;
+    assert(race_load_game());
+    assert(u[worker].build == -1);
+    assert(race_nearest_resource_depot(&u[worker]) == 0);
+    assert(race_save_game());
+    RaceSave refreshed_cache_save = race_data;
+    assert(race_save_game());
+    assert(memcmp(&refreshed_cache_save, &race_data,
+                  sizeof(refreshed_cache_save)) == 0);
+
 }
 
 static void check_ineligible_depots_and_topology(void)

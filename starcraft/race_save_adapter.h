@@ -2034,7 +2034,25 @@ static int race_load_game(void) {
     if (!race_p7_projectile_restore(race_data.interceptor_projectiles)) return 0;
 #endif
     memset(tracers,0,sizeof(tracers));death_vfx_reset();mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
-    invalidate_path_grid();sc64_visibility_reset();update_exploration();reset_selection_gestures();
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+    /* Loading restores the same serialized topology as the payload. Rebuild
+     * routes, but do not treat the restore as a topology change that would
+     * discard a worker's committed home-depot trip. */
+    path_grid_valid=0;
+#ifdef SC64_IMPORTED_MISSION
+    sc64_routes_reset();
+#endif
+    for (int i=0;i<MAX_UNITS;i++)
+        if (u[i].alive && IS_WORKER(u[i].type) &&
+            (u[i].order == ORDER_MINE || u[i].order == ORDER_GAS) &&
+            u[i].build >= 0 &&
+            (!race_resource_depot_valid_for(&u[i], u[i].build) ||
+             !race_resource_depot_reachable(&u[i], u[i].build)))
+            u[i].build=-1;
+#else
+    invalidate_path_grid();
+#endif
+    sc64_visibility_reset();update_exploration();reset_selection_gestures();
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;
 }
