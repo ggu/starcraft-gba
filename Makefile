@@ -3159,11 +3159,11 @@ Z7_CONTROLLER_REFERENCE_FLAGS := $(Z7_SCOURGE_PROBE_FLAGS) -DSC64_NEAREST_RESOUR
 # Qualified only for this experimental probe; standard race flags stay separate.
 Z7_CONTROLLER_FLAGS := $(Z7_CONTROLLER_REFERENCE_FLAGS) -DSC64_Z7_PREVALIDATED_TICK -DSC64_Z7_COUNT_SNAPSHOT
 build/test-sc64-z7-controller: tests/sc64_z7_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_CONTROLLER_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_CONTROLLER_FLAGS) -DSC64_REACHABLE_FORMATION $< common/gba.c -o $@
 .PHONY: test-sc64-z7-controller zerg-z7-controller-probe
 test-sc64-z7-controller: build/test-sc64-z7-controller
 	mkdir -p .local/build/z7-controller
-	./build/test-sc64-z7-controller --trace .local/build/z7-controller/controller-trace.json
+	./build/test-sc64-z7-controller --limit 300000 --trace .local/build/z7-controller/controller-trace.json
 build/starcraft-zerg-z7-controller-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(Z7_CONTROLLER_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-controller-probe.map -lgcc -o $@
 	$(SIZE) $@

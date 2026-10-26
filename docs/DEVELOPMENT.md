@@ -1683,8 +1683,10 @@ Canonical race flags and the earlier full-render probe stay unchanged.
 
 P7 has an isolated world foundation with separate source-Force wallets; its
 canonical roster fails closed on missing raw68/71/72 actor bindings. It still
-lacks shared menu/save integration. Neither seventh mission has a completed
-controller playthrough.
+lacks shared menu/save integration. The indexed Z7 controller now has a [reproduced host win](audits/2026-10-27-z7-controller-win/README.md)
+via `make test-sc64-z7-controller`; optimized ARM replay and fresh-process SRAM
+continuation remain required before campaign promotion. P7 still lacks a
+completed controller playthrough.
 
 
 The sixth-mission probes require their authenticated spell metadata:
