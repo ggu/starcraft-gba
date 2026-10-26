@@ -167,7 +167,13 @@ CANONICAL_MINIMAP_FLAGS ?= -DSC64_MINIMAP_BLIT
 CANONICAL_STATIC_FLAGS ?= $(if $(filter -DGBA_SCENE_CLIP,$(CANONICAL_DRAW_FLAGS)),-DSC64_STATIC_DIRTY_ROWS)
 TERRAN_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 TERRAN_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(TERRAN_FULL_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) $(TERRAN_UNIT_WORD_FLAGS)
-CANONICAL_WEAPON_FLAGS ?= -DSC64_TANK_SOURCE_VFX -I.local/sc64/tank-vfx/generated
+WEAPON_SOURCE_DIR := .local/sc64/weapon-vfx/generated
+WEAPON_SOURCE_HEADER := $(WEAPON_SOURCE_DIR)/sc64_weapon_source_generated.h
+ATTACK_POSE_DIR := .local/sc64/attack-poses/generated
+ATTACK_POSE_HEADER := $(ATTACK_POSE_DIR)/sc64_unit_attack_source_generated.h
+SOURCE_WEAPON_INPUTS := $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER)
+SOURCE_WEAPON_FLAGS := -DSC64_WEAPON_SOURCE_VFX -I$(WEAPON_SOURCE_DIR) -DSC64_UNIT_ATTACK_POSES_ENABLED -I$(ATTACK_POSE_DIR)
+CANONICAL_WEAPON_FLAGS ?= -DSC64_TANK_SOURCE_VFX -I.local/sc64/tank-vfx/generated $(SOURCE_WEAPON_FLAGS)
 TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS)
 ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS)
@@ -175,8 +181,10 @@ ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDO
 ZERG_Z4_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS)
 # Canonical Z1-Z6: the Z6 storage/runtime/query vector, with a word-packed
 # copy of its sprite bank in place of the probe bank, and canonical drawing.
+# Like P5 Shuttle and Z7, it restores the defense-target lists, which keep
+# the full-scan defense fallback out of IWRAM in the larger storage profiles.
 ZERG_Z6_BANK := .local/sc64/zerg-z6/generated
-ZERG_Z6_FLAGS = $(patsubst -I.local/sc64/z6/generated,-I$(ZERG_Z6_BANK),$(Z6_PROBE_FLAGS))
+ZERG_Z6_FLAGS = $(patsubst -I.local/sc64/z6/generated,-I$(ZERG_Z6_BANK),$(Z6_PROBE_FLAGS)) -DSC64_ZP_DEFENSE_TARGETS
 ZERG_Z6_INPUTS = $(filter-out .local/sc64/z5/generated/sc64_race_sprites_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h,$(Z6_PROBE_INPUTS)) $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h
 ZERG_ROM_FLAGS = $(ZERG_Z6_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS)
 ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
@@ -3119,6 +3127,33 @@ $(eval $(call SKIRMISH_CONTROLLER_PROFILE,terran,$(TERRAN_FULL_FLAGS),$(TERRAN_F
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,zerg,$(Z3_FLAGS),$(RACE_CAMPAIGN_INPUTS)))
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss,$(P3_FLAGS),$(RACE_CAMPAIGN_INPUTS)))
 
+# Cargo indicators are render-only and share the source-sprite placement used
+# by indexed and packed canonical profiles.
+build/test-sc64-worker-cargo-indexed: tests/sc64_worker_cargo_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(CONSTRUCTION_ART_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(RACES_FLAGS) $< common/gba.c -o $@
+build/test-sc64-worker-cargo-packed: tests/sc64_worker_cargo_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) $(CONSTRUCTION_ART_HEADER) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-worker-cargo
+test-sc64-worker-cargo: build/test-sc64-worker-cargo-indexed build/test-sc64-worker-cargo-packed
+	./build/test-sc64-worker-cargo-indexed
+	./build/test-sc64-worker-cargo-packed
+
+# Actual visible geyser pixels select a centered gas structure; includes a
+# Protoss field-menu construction/harvest round trip on Blood Bath.
+build/test-sc64-protoss-gas-placement: tests/sc64_protoss_gas_placement.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(CONSTRUCTION_ART_HEADER) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-protoss-gas-placement
+test-sc64-protoss-gas-placement: build/test-sc64-protoss-gas-placement
+	./build/test-sc64-protoss-gas-placement
+
+# Optional normal-controller reproduction of Protoss Pylon construction on
+# Blood Bath, under the same full profile as the shipped Showcase ROM.
+build/test-sc64-protoss-skirmish-pylons: tests/sc64_protoss_skirmish_pylons.c tests/sc64_skirmish_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(CONSTRUCTION_ART_HEADER) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-protoss-skirmish-pylons
+test-sc64-protoss-skirmish-pylons: build/test-sc64-protoss-skirmish-pylons
+	./build/test-sc64-protoss-skirmish-pylons
+
 .PHONY: test-sc64-skirmish-matches
 test-sc64-skirmish-matches: $(addprefix build/test-sc64-skirmish-match-,terran zerg protoss)
 	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller build/test-sc64-skirmish-match-terran --output .local/sc64/skirmish/terran-matches
@@ -3325,11 +3360,12 @@ $(UNIT_FACING_HEADER): tools/sc64_unit_facing.py tools/sc64_race_sprites.py tool
 $(TANK_SOURCE_HEADER): tools/sc64_tank_source_vfx.py tools/sc64_construction_sprites.py tools/sc64_sprites.py .local/sc64/backwater/generated/palette-remap.bin .local/sc64/backwater/generated/palette.json
 	$(PYTHON) tools/sc64_tank_source_vfx.py --out $(dir $@)
 
-# Exercise the production tank tracer path and source-LUT oracle with/without
-# the scene clip API; the source renderer must still protect the HUD itself.
-TANK_SOURCE_TEST_NOCLIP_FLAGS = $(filter-out -DGBA_SCENE_CLIP -DSC64_STATIC_DIRTY_ROWS,$(TERRAN_ROM_FLAGS))
+# Retain the earlier Tank-only renderer and source-LUT oracle with/without
+# scene clipping. The new canonical pipeline has separate source-bank fixtures.
+TANK_SOURCE_LEGACY_TEST_FLAGS = $(filter-out -DSC64_WEAPON_SOURCE_VFX -DSC64_UNIT_ATTACK_POSES_ENABLED,$(TERRAN_ROM_FLAGS))
+TANK_SOURCE_TEST_NOCLIP_FLAGS = $(filter-out -DGBA_SCENE_CLIP -DSC64_STATIC_DIRTY_ROWS,$(TANK_SOURCE_LEGACY_TEST_FLAGS))
 build/test-sc64-tank-source-vfx-game: tests/sc64_tank_source_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TANK_SOURCE_LEGACY_TEST_FLAGS) $< common/gba.c -o $@
 build/test-sc64-tank-source-vfx-game-no-clip: tests/sc64_tank_source_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TANK_SOURCE_TEST_NOCLIP_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-tank-source-vfx-game
@@ -3586,3 +3622,41 @@ test-gfx-unit-facing-clip: build/test-gfx-unit-facing-clip
 .PHONY: test-sc64-unit-facing-importer
 test-sc64-unit-facing-importer:
 	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_unit_facing.py'
+
+
+# Optional native weapon-art banks. Nothing in the asset-free default target
+# prepares private data; canonical imported ROMs require both versioned banks.
+$(WEAPON_SOURCE_HEADER): tools/sc64_weapon_source_sprites.py tools/sc64_weapon_source_audit.py tools/sc64_effect_palette.py tools/sc64_construction_sprites.py tools/sc64_sprites.py common/gba.c common/gba.h starcraft/sc64_display.h .local/sc64/backwater/generated/palette-remap.bin .local/sc64/backwater/generated/palette.json
+	$(PYTHON) tools/sc64_weapon_source_sprites.py --out $(WEAPON_SOURCE_DIR)
+$(ATTACK_POSE_HEADER): tools/sc64_unit_attack_sprites.py tools/sc64_construction_sprites.py tools/sc64_sprites.py .local/sc64/backwater/generated/palette-remap.bin
+	$(PYTHON) tools/sc64_unit_attack_sprites.py --out $(ATTACK_POSE_DIR) --header $(ATTACK_POSE_HEADER)
+build/starcraft-terran.elf build/starcraft-zerg-z4.elf build/starcraft-zerg-z6.elf build/starcraft-protoss-p5-shuttle.elf build/starcraft-showcase.elf: $(SOURCE_WEAPON_INPUTS)
+build/test-terran build/test-zerg build/test-zerg-z4 build/test-sc64-zerg-z4-promoted-profile build/test-protoss build/test-sc64-terran-full-profile build/test-sc64-zerg-promoted-profile build/test-sc64-protoss-promoted-profile build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-protoss-skirmish-pylons build/test-sc64-protoss-gas-placement build/test-sc64-worker-cargo-packed build/test-sc64-protoss-warp-color build/test-sc64-protoss-warp-color-no-clip build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-z4-frame-coverage build/test-sc64-zerg-canonical-hud build/test-sc64-protoss-canonical-frame build/test-sc64-protoss-canonical-hud: $(SOURCE_WEAPON_INPUTS)
+
+SOURCE_SAMPLER_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined
+build/test-sc64-weapon-source-sampling: tests/sc64_weapon_source_vfx_sampling.c starcraft/sc64_weapon_source_vfx.h | build
+	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) $< -o $@
+build/test-sc64-weapon-source-raster: tests/sc64_weapon_source_vfx_render.c starcraft/sc64_weapon_source_vfx_render.h common/gba.h | build
+	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) $< -o $@
+build/test-sc64-weapon-source-runtime: tests/sc64_weapon_source_runtime.c starcraft/sc64_weapon_source_runtime.h starcraft/sc64_weapon_source_vfx.h tests/fixtures/weapon_source_mock.h | build
+	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) -Itests/fixtures $< -o $@
+.PHONY: test-sc64-weapon-source-sampling
+test-sc64-weapon-source-sampling: build/test-sc64-weapon-source-sampling build/test-sc64-weapon-source-raster build/test-sc64-weapon-source-runtime
+	./build/test-sc64-weapon-source-sampling
+	./build/test-sc64-weapon-source-raster
+	./build/test-sc64-weapon-source-runtime
+test: test-sc64-weapon-source-sampling
+
+# The actual engine emitter/renderer, using only already prepared private art.
+build/test-sc64-native-weapon-game: tests/sc64_native_weapon_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(SOURCE_WEAPON_INPUTS) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-native-weapon-game
+test-sc64-native-weapon-game: build/test-sc64-native-weapon-game
+	./build/test-sc64-native-weapon-game
+
+# Source event/LO/trail timing against the already prepared private bank.
+build/test-sc64-weapon-source-generated: tests/sc64_weapon_source_generated_compile.c starcraft/sc64_weapon_source_runtime.h starcraft/sc64_weapon_source_vfx.h starcraft/sc64_weapon_source_vfx_render.h $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER) common/gba.h Makefile | build
+	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) -I$(WEAPON_SOURCE_DIR) -I$(ATTACK_POSE_DIR) -DSC64_UNIT_ATTACK_POSES_ENABLED $< -o $@
+.PHONY: test-sc64-weapon-source-generated
+test-sc64-weapon-source-generated: build/test-sc64-weapon-source-generated
+	./build/test-sc64-weapon-source-generated

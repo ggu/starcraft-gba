@@ -25,7 +25,11 @@ The canonical flag vector is the Z6 storage/runtime/query vector
 (`Z6_PROBE_FLAGS`) with three changes. A word-packed copy of the six-chapter
 sprite bank (`.local/sc64/zerg-z6/generated`) takes the probe bank's place.
 The canonical drawing, Zerg tuning, minimap, directional-sprite and
-source Tank-effect flags are added, matching the Z4 product on base. Preparing
+source weapon-effect flags are added, matching the Z4 product on base.
+Like P5 Shuttle and Z7, it also restores the defense-target lists
+(`-DSC64_ZP_DEFENSE_TARGETS`) that Z4 already uses. With the source weapon
+effects inlined, the full-scan defense fallback would otherwise sit in IWRAM
+and end it at `0x03005138`, past the guard. Preparing
 `zerg` now also generates the Z5/Z6 programs and that bank. Readiness checks
 require the chapter 5/6 programs, the Z6 map gate and the real packed word
 payload, not just markers.
@@ -195,10 +199,10 @@ Z6's 1,809,270-cycle worst window is the heaviest in the campaign; it falls
 early in the mission. Before the save change, its victory update was
 93,097,165 cycles.
 
-Before the base merge, an experiment added the Z4/P5 defense-target lists
-(`-DSC64_ZP_DEFENSE_TARGETS`) to the Z6 product. It cut Z4's mean by 8% but
-added about 2% to Z1 and Z5, and left Z6 unchanged. The canonical vector does
-not include it.
+Before the base merges, the same defense-target flag was measured as an
+experiment. It cut Z4's mean by 8%, added about 2% to Z1 and Z5, left Z6
+unchanged, and gave identical wins. It is now part of the canonical vector,
+for the IWRAM reason above.
 
 None of these numbers is a hardware measurement or a frame-rate claim.
 

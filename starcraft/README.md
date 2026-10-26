@@ -49,3 +49,11 @@ The opening scenario averaged about 21.92 updates/second in a 240-tick mGBA ARM 
 BWAPI's public stat tables were checked at repository commit `d727fed68558c506163048ea889131d8cbb33915`. Unit identities are in [`UnitType.h`](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/include/BWAPI/UnitType.h); default HP, armor, mineral/gas costs, build times, and doubled supply values are in [`UnitType.cpp`](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/UnitType.cpp#L559-L919); default damage, cooldown, and range values are in [`WeaponType.cpp`](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/WeaponType.cpp#L152-L216). The extracted reference records are in [`../docs/reference-stats.json`](../docs/reference-stats.json). BWAPI reports supply in doubled internal units and weapon ranges in pixels; the demake stores supply in half-units and maps the 32-pixel original terrain tile to a 16-pixel GBA tile.
 
 OpenBW's mining loop extracts up to eight minerals at a time, including the remaining amount in a depleted patch: [`bwgame.h`](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L2149-L2156). BWAPI stat times and cooldowns are simulation frame counts; this game scales those frame counts by 30/24 to retain their approximate durations at the GBA renderer's 30 updates per second.
+
+
+Gas buildings can be placed by selecting a worker, opening the field menu with
+B, choosing REFINERY / EXTRACTOR / ASSIMILATOR for its race, and pressing A over
+the geyser. Placement and its preview snap to the geyser center when the cursor
+hits its body. With a worker selected, press A on a completed friendly gas
+building to gather gas. Harvesting workers show a blue/cyan mineral cue or a
+green gas cue beside their sprite while loaded.
