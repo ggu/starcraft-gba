@@ -172,24 +172,50 @@ int main(void) {
         profiles = (
             ("terran", "build/test-sc64-terran-full-frame",
              Path(".local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h"),
+             (".local/sc64/terran-late/import-stage/sc64_races_generated.h",
+              ".local/sc64/races/generated/sc64_t4_scenario_generated.h",
+              ".local/sc64/races/generated/sc64_t5_scenario_generated.h",
+              ".local/sc64/races/generated/sc64_t5_availability_generated.h",
+              ".local/sc64/races/generated/sc64_t6_scenario_generated.h",
+              ".local/sc64/races/generated/sc64_t6_availability_generated.h",
+              *tuple(f".local/sc64/terran-late/import-stage/sc64_t{n}_{suffix}_generated.h"
+                     for n in range(7, 11) for suffix in ("scenario", "availability"))),
              set(T4_UNIT_IDS.values()) | set(T6_UNIT_IDS.values()) |
              set(LATE_UNIT_IDS.values()),
              set(T4_BUILDING_IDS.values()) | set(LATE_BUILDING_IDS.values()), set()),
             ("zerg", "build/test-sc64-z4-frame-coverage",
              Path(".local/sc64/zp-stage/generated/sc64_race_sprites_generated.h"),
+             (".local/sc64/zp-stage/generated/sc64_races_generated.h",
+              ".local/sc64/z4/generated/sc64_z4_scenario_generated.h"),
              set(ZP_UNIT_IDS.values()), set(), set(ZP_BUILDING_IDS.values())),
             ("protoss", "build/test-sc64-protoss-canonical-frame",
              Path(".local/sc64/races/generated/sc64_race_sprites_generated.h"),
+             (),
              set(), set(), set()),
         )
 
         def opaque_check(call: str, label: str) -> str:
             return (f'check_sprite({call}, "{label}");\n')
 
-        for profile, target, header, extra_units, extra_buildings, zp_buildings in profiles:
+        common_inputs = (
+            ".local/sc64/backwater/generated/sc64_mission_generated.h",
+            ".local/sc64/backwater/generated/sc64_assets_generated.h",
+            ".local/sc64/backwater/generated/sc64_sprites_generated.h",
+            ".local/sc64/races/generated/sc64_races_generated.h",
+            ".local/sc64/races/generated/sc64_race_sprites_generated.h",
+            ".local/sc64/races/generated/sc64_menu_generated.h",
+            ".local/sc64/skirmish/generated/sc64_skirmish_generated.h",
+        )
+
+        for profile, target, header, profile_inputs, extra_units, extra_buildings, zp_buildings in profiles:
             with self.subTest(profile=profile):
                 if not (ROOT / header).is_file():
                     self.skipTest(f"prepared {profile} sprite header is unavailable: {header}")
+                missing_inputs = [path for path in common_inputs + profile_inputs
+                                  if not (ROOT / path).is_file()]
+                if missing_inputs:
+                    self.skipTest("prepared private inputs are incomplete: " +
+                                  ", ".join(missing_inputs))
 
                 explicit_units = sorted(set(RACE_UNIT_IDS.values()) | extra_units)
                 explicit_buildings = sorted(extra_buildings | zp_buildings)
@@ -267,6 +293,13 @@ int main(void) {
                     dry_run = subprocess.run(
                         ["make", "-Bn", "--no-print-directory", target],
                         cwd=ROOT, capture_output=True, text=True)
+                    optional_banks = (
+                        ".local/sc64/audio/generated/sc64_audio_generated.bin",
+                        ".local/sc64/construction/generated/sc64_construction_sprites_generated.h",
+                    )
+                    if (dry_run.returncode and "No rule to make target" in dry_run.stderr
+                            and any(path in dry_run.stderr for path in optional_banks)):
+                        self.skipTest("prepared private audio or construction bank is incomplete")
                     self.assertEqual(dry_run.returncode, 0, dry_run.stderr)
                     compile_commands = [shlex.split(line)
                                         for line in dry_run.stdout.splitlines()]
@@ -278,6 +311,22 @@ int main(void) {
                     self.assertTrue(compile_commands, dry_run.stdout)
                     command = compile_commands[-1]
                     command[0] = compiler
+
+                    required = [ROOT / path for path in common_inputs + profile_inputs]
+                    if "-DSC64_CONSTRUCTION_SOURCE_ART" in command:
+                        required.append(ROOT / ".local/sc64/construction/generated/"
+                                        "sc64_construction_sprites_generated.h")
+                    if "-DSC64_AUDIO_IMPORTED" in command:
+                        required.extend((ROOT / ".local/sc64/audio/generated/"
+                                         "sc64_audio_generated.h",
+                                         ROOT / ".local/sc64/audio/generated/"
+                                         "sc64_audio_generated.bin"))
+                    missing = [path.relative_to(ROOT).as_posix()
+                               for path in required if not path.is_file()]
+                    if missing:
+                        self.skipTest("prepared private inputs are incomplete: " +
+                                       ", ".join(missing))
+
                     command = [str(source) if item.startswith("tests/") and item.endswith(".c")
                                else item for item in command]
                     out = command.index("-o")

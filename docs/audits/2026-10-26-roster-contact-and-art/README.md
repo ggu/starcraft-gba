@@ -65,3 +65,64 @@ behavior or physical-GBA performance.
 
 All verification is local. GitHub Actions remains disabled/manual-only;
 ROMs, generated art and private evidence are excluded from the repository.
+
+## Verification
+
+Focused checks pass with the prepared private inputs:
+
+```sh
+make test-sc64-stock-profiles-facts SC64_STOCK_FACTS=.local/build/stock-art-runtime/reference.json
+make test-sc64-stock-motion test-sc64-stock-motion-runtime test-sc64-stock-combat-runtime
+make test-sc64-building-stock test-sc64-scv-contact test-sc64-scv-contact-zp
+make test-sc64-zp-defense-targets test-sc64-construction-source test-sc64-static-dirty-rows-game
+python3 -m unittest tests.test_sc64_photon_cannon_renderer
+```
+
+The new melee fixture covers SCV, Drone, Probe and Zealot direct orders against
+an Ultralisk, reciprocal contact, the exact 10/11-pixel attack boundary and
+Siege Tank minimum range. The defense fixture tests all four defenses through
+both the campaign-list and skirmish full-scan dispatchers, including the
+absence of early shots and the exact next-shot update.
+
+Fresh ARM links of the canonical race ROMs and Showcase retain the existing
+RAM guards and 32 MiB ROM limit:
+
+| ROM | IWRAM end | BSS end |
+| --- | --- | --- |
+| Terran | `0x03004f10` | `0x0203ddd4` |
+| Zerg Z4 | `0x03004e70` | `0x0203c410` |
+| Protoss P3 | `0x03004c70` | `0x02039e00` |
+| Showcase | `0x030049e8` | `0x0203dee8` |
+
+These builds do not promote a campaign chapter or add a new full-mission
+ARM timing or physical-GBA qualification.
+
+The corrected combat cadence changes the outcome of two older test-controller
+strategies. Z3's controller now reacts to nearby Chrysalis threats every 120
+frames with ordinary local box selection and attack-move orders, instead of
+waiting for its 1,800-frame strategic command. It wins both the carried Z4
+profile and legacy Z3 profile at frame 51,360. P3's controller begins its
+ordinary assault at frame 10,000 with 14 army units, before the old defensive
+buildup suffers attrition; its fresh canonical win is at frame 47,626. Neither
+controller edits simulation state, resources, caps or mission conditions.
+
+P1's controller now uses a bounded unit drag to select the moving Probe for
+its existing Pylon attempt, avoiding the Nexus click hitbox. Two fresh runs
+win at frame 9,303 with Fenix alive. This route completes the ordinary Probe
+queue; it does not report a completed Pylon/Gateway reinforcement, so no new
+combat-force resupply is claimed. P2's carried controller still wins at frame
+31,623 with Fenix alive. These controller changes preserve strict native
+mission outcome checks.
+
+The default build and suite pass (488 Python tests plus host fixtures), as
+does the full ten-mission Terran host-controller target. The renderer module
+passes all four private-input tests without skips after its partial-input
+guards were added. ROM preparation also now retains packed sprite metadata
+when preparing shared/staged banks, preventing another profile's preparation
+from invalidating the canonical Zerg bank. Private logs are in
+`.local/build/current-roster-*.log`.
+
+The final combined `make test-unified test-canonical-render
+test-race-campaigns test-sc64-showcase` run passes. This includes the carried
+campaign controllers, all three race frontend matrices (54 launches total),
+702 startup/save configurations, and Showcase scene/save-isolation checks.

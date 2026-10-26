@@ -183,6 +183,43 @@ static int controller_train_at_building(int building, int count)
     return b[building].queue_count == count;
 }
 
+/* A worker can stand inside the Nexus click target; an ordinary click then
+ * selects the building. Use a moving L-button unit box for the construction
+ * order so the Probe stays inside it while mining. */
+static int controller_select_worker_box(int worker)
+{
+    int steps = 0;
+    if (worker < 0 || worker >= MAX_UNITS || !u[worker].alive ||
+        u[worker].owner != SIDE || !sc64_race_is_worker(u[worker].type)) return 0;
+    /* Follow the mining Probe to its current position, then drag while
+     * tracking its short mining walk. A stationary click can hit a nearby
+     * Nexus instead. */
+    while (u[worker].alive && dist2(cx, cy, u[worker].x, u[worker].y) > 8 &&
+           screen == SCREEN_PLAY && !won && !lost && steps++ < 200) {
+        u16 held = KEY_R;
+        if (cx < u[worker].x) held |= KEY_RIGHT;
+        if (cx > u[worker].x) held |= KEY_LEFT;
+        if (cy < u[worker].y) held |= KEY_DOWN;
+        if (cy > u[worker].y) held |= KEY_UP;
+        controller_frame(held);
+    }
+    if (screen != SCREEN_PLAY || won || lost || !u[worker].alive ||
+        dist2(cx, cy, u[worker].x, u[worker].y) > 8) return 0;
+    controller_frame(KEY_L);
+    for (steps = 0; steps < 16 && screen == SCREEN_PLAY && !won && !lost; ++steps) {
+        u16 held = KEY_L;
+        if (cx < u[worker].x) held |= KEY_RIGHT;
+        if (cx > u[worker].x) held |= KEY_LEFT;
+        if (cy < u[worker].y) held |= KEY_DOWN;
+        if (cy > u[worker].y) held |= KEY_UP;
+        controller_frame(held);
+    }
+    if (screen != SCREEN_PLAY || won || lost) return 0;
+    controller_frame(0);
+    return screen == SCREEN_PLAY && !won && !lost &&
+           selected_count() == 1 && u[worker].selected;
+}
+
 static int controller_build_pylon_near(int gateway)
 {
     int probe = -1, i, slot;
@@ -192,7 +229,7 @@ static int controller_build_pylon_near(int gateway)
         return -1;
     for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
         u[i].type == U_PROBE && u[i].order != ORDER_BUILD) { probe = i; break; }
-    if (probe < 0 || !controller_select_actor(probe)) return -1;
+    if (probe < 0 || !controller_select_worker_box(probe)) return -1;
     controller_press(KEY_B);
     for (i = 0; i < MENU_COUNT && menu_cursor != MENU_DEPOT; ++i)
         controller_press(KEY_DOWN);

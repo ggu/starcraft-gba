@@ -834,7 +834,7 @@ int main(int argc, char **argv)
             next_queue = frame + 360;
         }
         if (frame >= next_order) {
-            if (!assault_started && frame >= 24000 && owner_army(SIDE) >= 26)
+            if (!assault_started && frame >= 10000 && owner_army(SIDE) >= 14)
                 assault_started = 1;
             if (assault_started) {
                 issue_sweep_order();

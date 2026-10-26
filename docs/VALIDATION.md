@@ -4,6 +4,12 @@ This page records reproducible checks for the source snapshot. Automated host ch
 
 ## Current campaign status (2026-10-26)
 
+The [stock roster follow-up](audits/2026-10-26-roster-contact-and-art/README.md)
+corrects melee contact, defense cooldown expiry and selected building art.
+Its fresh checks are local host regressions and ARM build/RAM checks. The
+full-mission ARM win and timing measurements cited below precede those combat
+corrections; they have not been repeated for this follow-up's ROMs.
+
 Canonical campaign profiles currently expose Terran 1–10, Zerg 1–4, and
 Protoss 1–3. Zerg 4 is the promoted canonical Zerg entry and uses its own
 versioned ROM/save identity (`SCZ4`, `.local/play/zerg-z4`); the explicit
