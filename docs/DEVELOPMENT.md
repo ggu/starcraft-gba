@@ -1849,20 +1849,28 @@ After preparing the P6 probe inputs described above, run:
 make test-sc64-p6-controller
 ```
 
-The host test replays an authored opening input fixture through the ordinary
-HOME/menu controls, then uses the adaptive Marine/hero escort policy. The
-fixture contains only held-key masks and run lengths; game assets still come
-from local preparation. No private opening input file is required. The default
-180,000-gameplay-frame limit covers the full win. To write a separate trace:
+The host test enters the probe through ordinary HOME/menu controls, then
+steers from the live actors. It recruits the two early Marine groups,
+regroups them, and sends their escort ahead of Tassadar before completing
+the Zeratul rescue and extraction. The earlier 102,005-tick opening fixture
+is historical regression data; it is no longer the default route.
+Game assets still come from local preparation, and no private opening input
+file is required. The default 180,000-gameplay-frame limit covers the full
+win. To write a separate trace without replacing the default proof file:
 
 ```sh
-build/test-sc64-p6-controller --trace .local/sc64/p6-my-run.json
+make test-sc64-p6-controller P6_CONTROLLER_TRACE=.local/build/p6-my-run.json
 ```
 
 Full trace replay on ARM requires a dense probe build because some input
 windows exceed the standard queue's 1,000-tick capacity; see the dense replay
 section. This target is a deterministic regression route, with exact source
 hero/extraction/completion assertions at victory.
+The current live route wins at frame 49,599; an input-only ARM replay matches
+all 57 observed mission/hero checkpoints. Its measured throughput remains
+about 10.5 fps equivalent, and this is still the P6 probe rather than the
+canonical Protoss product. See the
+[live-route qualification](audits/2026-10-27-p6-live-route/README.md).
 
 The expanded Z/P collision lookup has a dedicated
 sanitizer differential target after Z6 inputs are prepared:

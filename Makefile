@@ -2134,12 +2134,13 @@ build/StarCraft-Protoss-P6-Probe-GBA.gba: build/starcraft-protoss-p6-probe.elf t
 .PHONY: protoss-p6-probe
 protoss-p6-probe: build/StarCraft-Protoss-P6-Probe-GBA.gba
 
-build/test-sc64-p6-controller: tests/sc64_p6_campaign_run.c tests/sc64_p6_opening.h $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+build/test-sc64-p6-controller: tests/sc64_p6_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P6_PROBE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-p6-controller
+P6_CONTROLLER_TRACE ?= .local/sc64/p6-controller-win.json
 test-sc64-p6-controller: build/test-sc64-p6-controller
-	mkdir -p .local/sc64
-	./build/test-sc64-p6-controller --trace .local/sc64/p6-controller-win.json
+	mkdir -p "$(dir $(P6_CONTROLLER_TRACE))"
+	./build/test-sc64-p6-controller --trace "$(P6_CONTROLLER_TRACE)"
 
 build/test-sc64-z5-campaign-run: tests/sc64_z5_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z5_CLOAK_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z5_CONSUME_FLAGS) $< common/gba.c -o $@

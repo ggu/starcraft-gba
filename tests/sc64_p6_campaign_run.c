@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Input-driven P6 campaign attempt. The controller observes the live world
  * for steering; every gameplay change is issued through game_update input. */
 #include "../starcraft/game.c"
@@ -6,7 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include "sc64_p6_opening.h"
 
 #define P6_RUN_LIMIT 180000
 #define P6_CHECKPOINT_PERIOD 900
@@ -478,57 +478,23 @@ static void replay_prefix_inputs(const char *path)
     deployed = 1;
 }
 
-/* Replay the authored regression opening without depending on an ignored
- * private input file. Each RLE run is fed through the ordinary game_update
- * path; it is controller test data, not a world-state fixture. */
-static void replay_authored_opening(void)
+/* Enter the six-entry probe through its ordinary campaign menu. Route
+ * commands below follow the live actors rather than a frozen input opening. */
+static void start_live_route(void)
 {
     game_init();
     prior_keys = 0;
-    for (unsigned r = 0; r < SC64_P6_OPENING_RUN_COUNT; ++r) {
-        const Sc64P6OpeningRun *run = &sc64_p6_opening_runs[r];
-        assert(run->ticks != 0 && run->held <= 0x3ffu);
-        for (unsigned n = 0; n < run->ticks; ++n) {
-            step(run->held);
-            if (host_ticks == 12 && !start_checkpoint_written) {
-                assert(screen == SCREEN_PLAY && !won && !lost &&
-                       race_p6_active());
-                deployed = 1;
-                checkpoint("start");
-                start_checkpoint_written = 1;
-            }
-            if (screen == SCREEN_RESULT || won || lost ||
-                (deployed && frame >= run_limit)) break;
-        }
-        if (screen == SCREEN_RESULT || won || lost ||
-            (deployed && frame >= run_limit)) break;
-    }
-    if (frame < run_limit) assert(host_ticks == SC64_P6_OPENING_TICKS);
-    assert(screen == SCREEN_PLAY && !won && !lost && race_p6_active());
-    assert(start_checkpoint_written);
-    if (path_diagnostics) {
-        int hero = raw_unit(SC64_P6_RAW_HERO, SIDE);
-        int near = 0x7fffffff, near_slot = -1, close = 0;
-        if (hero >= 0) for (int i = 0; i < MAX_UNITS; ++i)
-            if (i != hero && u[i].alive &&
-                race_p6_owners_hostile(SIDE, u[i].owner)) {
-                int d = dist2(u[hero].x, u[hero].y, u[i].x, u[i].y);
-                if (d < near) { near = d; near_slot = i; }
-                if (d <= 240 * 240) ++close;
-            }
-        fprintf(stderr,
-            "P6 authored opening host=%u frame=%u hero=%d at=%d,%d hp=%d shield=%d energy_q8=%d nearest_slot=%d raw=%d owner=%d at=%d,%d d2=%d hostile_within240=%d cursor=%d,%d mode=%d menu=%d\n",
-            host_ticks, (unsigned)frame, hero,
-            hero >= 0 ? u[hero].x : -1, hero >= 0 ? u[hero].y : -1,
-            hero >= 0 ? u[hero].hp : 0, hero >= 0 ? u[hero].shield : 0,
-            hero >= 0 ? u[hero].carry : -1, near_slot,
-            near_slot >= 0 ? u[near_slot].raw_type : -1,
-            near_slot >= 0 ? u[near_slot].owner : -1,
-            near_slot >= 0 ? u[near_slot].x : -1,
-            near_slot >= 0 ? u[near_slot].y : -1,
-            near, close, cx, cy, mode, menu_open);
-    }
+    tap(KEY_A);
+    tap(KEY_RIGHT);
+    tap(KEY_RIGHT);
+    tap(KEY_DOWN);
+    tap(KEY_A);
+    tap(KEY_A);
+    assert(host_ticks == 12 && screen == SCREEN_PLAY && !won && !lost &&
+           race_p6_active());
     deployed = 1;
+    checkpoint("start");
+    start_checkpoint_written = 1;
 }
 
 static int snap4(int current, int target, int bound)
@@ -1960,7 +1926,7 @@ int main(int argc, char **argv)
                    "\"policy\":\"normal-input-rescue-zeratul-and-reach-extraction\",\"events\":[\n");
     gba_init();
     if (prefix_inputs_path) replay_prefix_inputs(prefix_inputs_path);
-    else replay_authored_opening();
+    else start_live_route();
     if (!start_checkpoint_written) {
         checkpoint("start");
         start_checkpoint_written = 1;
@@ -1978,6 +1944,7 @@ int main(int argc, char **argv)
     int south_safe_x = 0, south_safe_y = 0;
     int south_stage = 0;
     int marine_team_phase = team_escort ? 0 : 3;
+    int rescued_marine_rally_phase=0;
     int team_front_action_issued = 0;
     unsigned team_support_order_frame=0,team_storm_wait_until=0;
     int team_support_x=-1,team_support_y=-1,team_storm_casts=0;
@@ -1989,7 +1956,7 @@ int main(int argc, char **argv)
     int route_direct_rescue=0;
     u8 team_east_slots[MAX_UNITS]={0};
     const int marine_stage_x = 720, marine_stage_y = 1640;
-    const int marine_front_x = 500, marine_front_y = 1800;
+    const int marine_front_x = 860, marine_front_y = 1800;
     while (frame < run_limit && screen == SCREEN_PLAY && !won && !lost) {
         int zeratul_rescue = raw_unit(SC64_P6_RAW_TEMPLAR, RESCUABLE);
         int zeratul = raw_unit(SC64_P6_RAW_TEMPLAR, SIDE);
@@ -2004,6 +1971,111 @@ int main(int argc, char **argv)
         for (int j=0;j<6;++j)
             gate_pending |= !sc64_p6_trigger_started(&race_p6.runtime.model,
                                                        gate_trigger[j]);
+        /* Recruit living source Marines using Tassadar's normal movement.
+         * The campaign tick converts a RESCUABLE unit to SIDE only when a
+         * living SIDE actor comes within 32 pixels, so approach the live
+         * cluster with a reachable point inside that radius. */
+        int rescue_marine=-1, rescue_dist=0x7fffffff;
+        if (tassadar>=0 && raw_count(0,SIDE)<9) for (int i=0;i<MAX_UNITS;++i)
+            if (u[i].alive && u[i].owner==RESCUABLE && u[i].raw_type==0 &&
+                u[i].x<1200 && u[i].y<900) {
+                int d=dist2(u[tassadar].x,u[tassadar].y,u[i].x,u[i].y);
+                if(d<rescue_dist){rescue_dist=d;rescue_marine=i;}
+            }
+        if (rescue_marine>=0 && tassadar>=0 &&
+            (frame>=next_order_frame || rescue_dist<=32*32)) {
+            int rx=u[rescue_marine].x, ry=u[rescue_marine].y;
+            static const int rescue_offsets[][2]={{24,0},{-24,0},{0,24},{0,-24},
+                {16,16},{-16,16},{16,-16},{-16,-16},{32,0},{-32,0},{0,32},{0,-32}};
+            int approach_x=-1,approach_y=-1,route_nx=-1,route_ny=-1;
+            if(rescue_dist>32*32) for(unsigned k=0;k<sizeof(rescue_offsets)/sizeof(rescue_offsets[0]);++k){
+                int x=rx+rescue_offsets[k][0], y=ry+rescue_offsets[k][1];
+                if(x<0||x>=WORLD_W||y<0||y>=WORLD_H||terrain_blocked(x/16,y/16)||
+                   !SC64_GRID_GET(path_walkable,x/16+(y/16)*MAP_COLS))continue;
+                if(terrain_only_route(u[tassadar].x,u[tassadar].y,x,y,&route_nx,&route_ny,1)){
+                    approach_x=x;approach_y=y;break;
+                }
+            }
+            if(rescue_dist>32*32 && approach_x>=0){
+                int cx=approach_x,cy=approach_y;
+                if(dist2(u[tassadar].x,u[tassadar].y,cx,cy)>64*64)
+                    (void)route_point_ahead(u[tassadar].x,u[tassadar].y,cx,cy,6,&cx,&cy);
+                int issued=issue_actor_move(tassadar,cx,cy);
+                next_order_frame=frame+180;
+                if(path_diagnostics)fprintf(stderr,
+                    "P6 Marine rescue approach frame=%u slot=%d at=%d,%d distance2=%d Tassadar=%d,%d goal=%d,%d command=%d,%d route=%d next=%d,%d issued=%d host=%u\n",
+                    (unsigned)frame,rescue_marine,rx,ry,rescue_dist,
+                    u[tassadar].x,u[tassadar].y,approach_x,approach_y,cx,cy,
+                    1,route_nx,route_ny,issued,host_ticks);
+                if(path_diagnostics)fprintf(stderr,"P6 Marine rescue census owned=%d unresolved=%d\n",
+                    raw_count(0,SIDE),raw_count(0,RESCUABLE));
+                if(path_diagnostics)fprintf(stderr,
+                    "P6 Marine rescue actor slot=%d xy=%d,%d order=%d target=%d,%d path=%d,%d retry=%u hp=%d shield=%d energy=%d\n",
+                    tassadar,u[tassadar].x,u[tassadar].y,u[tassadar].order,
+                    u[tassadar].tx,u[tassadar].ty,u[tassadar].path_x,
+                    u[tassadar].path_y,u[tassadar].path_retry,u[tassadar].hp,
+                    u[tassadar].shield,u[tassadar].carry);
+                step(0);
+                continue;
+            }
+            if(rescue_dist<=32*32){
+                if(u[tassadar].order!=ORDER_IDLE)(void)stop_actor(tassadar);
+                next_order_frame=frame+30;
+                if(path_diagnostics&&frame%30==0)fprintf(stderr,
+                    "P6 Marine rescue contact frame=%u slot=%d dist2=%d converted=%d living-marines=%d at=%d,%d host=%u\n",
+                    (unsigned)frame,rescue_marine,rescue_dist,
+                    u[rescue_marine].owner==SIDE,raw_count(0,SIDE),rx,ry,host_ticks);
+                step(0);
+                continue;
+            }
+        }
+        /* Regroup the two safe rescue clusters before sending them ahead of
+         * Tassadar. Keep the four western Marines together on a short move to
+         * the five eastern Marines, then issue one group attack-move when the
+         * hero reaches the southern lane. */
+        if (!gate_pending && raw_count(0,SIDE)>=9 && tassadar>=0) {
+            if(rescued_marine_rally_phase==0){
+                int n=select_marine_group_near(276,713,112);
+                int ordered=n>=3&&issue_selected_order(996,500,0);
+                if(ordered)rescued_marine_rally_phase=1;
+                if(path_diagnostics)fprintf(stderr,
+                    "P6 Marine regroup order frame=%u selected=%d ordered=%d target=996,500 host=%u\n",
+                    (unsigned)frame,n,ordered,host_ticks);
+                step(0);continue;
+            }
+            if(rescued_marine_rally_phase==1 &&
+               eastern_marine_count_near(996,500,128)>=8){
+                rescued_marine_rally_phase=2;
+                if(path_diagnostics)fprintf(stderr,
+                    "P6 Marine regroup ready frame=%u count=%d T=%d,%d\n",
+                    (unsigned)frame,eastern_marine_count_near(996,500,128),
+                    u[tassadar].x,u[tassadar].y);
+            }
+            if(rescued_marine_rally_phase==2 && u[tassadar].y>=1500 &&
+               u[tassadar].carry>=250*256 && u[tassadar].shield>=230){
+                int n=select_marine_group_near(996,500,180);
+                int ordered=n>=8&&issue_selected_order(marine_front_x,
+                                                       marine_front_y,1);
+                if(ordered)rescued_marine_rally_phase=3;
+                if(path_diagnostics)fprintf(stderr,
+                    "P6 Marine escort commit frame=%u selected=%d ordered=%d target=%d,%d T=%d,%d host=%u\n",
+                    (unsigned)frame,n,ordered,marine_front_x,marine_front_y,
+                    u[tassadar].x,u[tassadar].y,host_ticks);
+                step(0);continue;
+            }
+        }
+        if(path_diagnostics&&frame>=30000&&frame%600==0){
+            int near=eastern_marine_count_near(marine_front_x,marine_front_y,112);
+            int printed=0;
+            fprintf(stderr,"P6 marine escort census frame=%u owned=%d near-front=%d T=%d,%d\n",
+                (unsigned)frame,raw_count(0,SIDE),near,tassadar>=0?u[tassadar].x:-1,
+                tassadar>=0?u[tassadar].y:-1);
+            for(int i=0;i<MAX_UNITS&&printed<8;++i)
+                if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==0){
+                    fprintf(stderr,"  escort slot=%d at=%d,%d order=%d target=%d,%d hp=%d\n",
+                        i,u[i].x,u[i].y,u[i].order,u[i].tx,u[i].ty,u[i].hp);++printed;
+                }
+        }
         if(path_diagnostics&&team_escort&&frame>=108000&&frame%600==0)
             fprintf(stderr,"P6 team policy frame=%u gates=%d wait=%d pursuit=%d next_order=%u next_storm=%u lane=%d,%d follow=%d flank=%d reposition=%d host=%u\n",
                 (unsigned)frame,gate_pending,waiting_for_storm,

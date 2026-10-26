@@ -88,9 +88,14 @@ Those P6 wins are historical frozen-build evidence. A fresh P6 probe controller
 run against `c3c8ac9` lost at frame 143,714 with zero trigger faults. Replaying
 the earlier winning input tape also diverged under the current movement and
 combat rules; the first recorded mismatch was a missed selection by the
-900-frame checkpoint. P6 needs a repaired controller and new current-build
-qualification before canonical promotion. The memory-valid probe is not an
-additional mission in the current P5 product.
+900-frame checkpoint. The subsequent live-route repair now wins at frame
+49,599, with all 57 observed checkpoints matching an input-only ARM replay.
+Current P6 probe throughput is about 10.5 fps equivalent on that route.
+The full canonical-feature candidate fits the ROM/RAM guards, but still needs
+canonical-feature runtime, carried P1–P5 and current save-restart qualification
+before promotion. The
+probe is not an additional mission in the current P5 product. See the
+[P6 live-route audit](audits/2026-10-27-p6-live-route/README.md).
 
 The internal Z7 profile also exposes the missing colony defense commands:
 Drone-only selection adds CREEP COLONY below SPIRE (75 minerals), and a
