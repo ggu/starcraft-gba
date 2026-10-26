@@ -57,8 +57,9 @@ class OnboardingTests(unittest.TestCase):
 
     def test_canonical_race_verifiers_use_current_mission_identities(self):
         self.assertEqual(verify_roms.TARGETS['--zerg'],
+                         ('StarCraft-Zerg-Z6-GBA', 'starcraft-zerg-z6', 'SCZ6', 'SC ZERG Z6'))
+        self.assertEqual(verify_roms.TARGETS['--zerg-z4'],
                          ('StarCraft-Zerg-Z4-GBA', 'starcraft-zerg-z4', 'SCZ4', 'SC ZERG Z4'))
-        self.assertEqual(verify_roms.TARGETS['--zerg-z4'], verify_roms.TARGETS['--zerg'])
         self.assertEqual(verify_roms.TARGETS['--zerg-z3'],
                          ('StarCraft-Zerg-GBA', 'starcraft-zerg', 'SCZ3', 'SC ZERG Z3'))
         self.assertEqual(verify_roms.TARGETS['--protoss'],
@@ -72,19 +73,21 @@ class OnboardingTests(unittest.TestCase):
 
     def test_dev_race_tests_include_full_campaign_targets(self):
         self.assertEqual(dev.SC64_TEST_TARGETS['zerg'], 'test-zerg')
+        self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z4'], 'test-zerg-z4')
         self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z3'], 'test-zerg-z3')
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
-        self.assertEqual(dev.GAMES['zerg'], ('zerg', 'build/StarCraft-Zerg-Z4-GBA.gba'))
+        self.assertEqual(dev.GAMES['zerg'], ('zerg', 'build/StarCraft-Zerg-Z6-GBA.gba'))
+        self.assertEqual(dev.GAMES['zerg-z4'], ('zerg-z4', 'build/StarCraft-Zerg-Z4-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg-z3'], ('zerg-z3', 'build/StarCraft-Zerg-GBA.gba'))
         self.assertEqual(dev.PLAY_SAVE_PROFILES,
-                         {'zerg': 'zerg-z4', 'zerg-z3': 'zerg',
+                         {'zerg': 'zerg-z6', 'zerg-z4': 'zerg-z4', 'zerg-z3': 'zerg',
                           'protoss': 'protoss-p5-shuttle', 'protoss-p3': 'protoss',
                           'protoss-p4-storm': 'protoss-p4-storm',
                           'protoss-p5-shuttle': 'protoss-p5-shuttle'})
         self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['zerg'],
-                         ('StarCraft-Zerg-Z4-GBA.gba', 'starcraft-zerg-z4.elf'))
+                         ('StarCraft-Zerg-Z6-GBA.gba', 'starcraft-zerg-z6.elf'))
         self.assertEqual(sc64_split_profile.PROFILE_BUILD_PATHS['zerg'],
-                         ('StarCraft-Zerg-Z4-GBA.gba', 'starcraft-zerg-z4.elf'))
+                         ('StarCraft-Zerg-Z6-GBA.gba', 'starcraft-zerg-z6.elf'))
         for routes in (sc64_split_profile.PROFILE_BUILD_PATHS, sc64_split_smoke.PROFILE_BUILD_PATHS):
             self.assertEqual(routes['protoss'],
                              ('StarCraft-Protoss-P5-Shuttle-GBA.gba', 'starcraft-protoss-p5-shuttle.elf'))
@@ -226,19 +229,61 @@ class OnboardingTests(unittest.TestCase):
                                      encoding='ascii')
             output = io.StringIO()
             with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(output):
-                self.assertEqual(dev.status('zerg'), 1)
+                self.assertEqual(dev.status('zerg-z4'), 1)
             self.assertIn('MISSING Zerg chapter 4 sprites', output.getvalue())
-            self.assertIn('./dev sc64 prepare --rom PATH --profile zerg', output.getvalue())
+            self.assertIn('./dev sc64 prepare --rom PATH --profile zerg-z4', output.getvalue())
             sprite_header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
             output = io.StringIO()
             with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(output):
-                self.assertEqual(dev.status('zerg'), 0)
+                self.assertEqual(dev.status('zerg-z4'), 0)
             self.assertIn('Zerg chapter 4 scenario:', output.getvalue())
             (root / '.local/sc64/z4/manifest.json').write_text(
                 '{"schema":1,"mission":{"id":"Z4","global_catalog_index":14,"source_map_path":"008/017"}}',
                 encoding='ascii')
             with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(io.StringIO()):
-                self.assertEqual(dev.status('zerg'), 1)
+                self.assertEqual(dev.status('zerg-z4'), 1)
+
+    def test_canonical_zerg_requires_chapter_five_and_six_inputs(self):
+        z6_gate = ('#if defined(SC64_UNIFIED) && defined(SC64_Z6_DATA_ENABLED)\nsc64_race_z6_units\n'
+                   '#endif /* SC64_UNIFIED && SC64_Z6_DATA_ENABLED */\n')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for label, relative, marker in dev.CANONICAL_ZERG_Z6_INPUTS:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f'#define {marker} 1\n', encoding='ascii')
+            bank = root / '.local/sc64/zerg-z6/generated/sc64_race_sprites_generated.h'
+            label = 'Zerg six-chapter sprites'
+            # Markers without a packed payload, or without the Z5 props, fail.
+            self.assertFalse(dev.canonical_zerg_z6_input_ready(label, bank))
+            bank.write_text(UNIT_WORD_SPRITE_HEADER +
+                            '#define SC64_Z6_BUILDING_SPRITE_SET_COMPLETE 1\n', encoding='ascii')
+            self.assertFalse(dev.canonical_zerg_z6_input_ready(label, bank))
+            bank.write_text(UNIT_WORD_SPRITE_HEADER +
+                            '#define SC64_Z6_BUILDING_SPRITE_SET_COMPLETE 1\n'
+                            '#define SC64_Z5_DOODAD_SPRITE_SET_COMPLETE 1\n', encoding='ascii')
+            self.assertTrue(dev.canonical_zerg_z6_input_ready(label, bank))
+            for label, relative, _ in dev.CANONICAL_ZERG_Z6_INPUTS:
+                self.assertTrue(dev.canonical_zerg_z6_input_ready(label, root / relative))
+            scenario = root / dev.CANONICAL_ZERG_Z6_INPUTS[3][1]
+            scenario.write_text('stale', encoding='ascii')
+            self.assertFalse(dev.canonical_zerg_z6_input_ready('Zerg chapter 6 scenario', scenario))
+            # The build gate also requires the chapter 6 map payload.
+            stage = root / '.local/sc64/zp-stage/generated'
+            (stage / 'sc64_race_sprites_generated.h').write_text(UNIT_WORD_SPRITE_HEADER,
+                                                                 encoding='ascii')
+            scenario.write_text('#define SC64_Z6_SOURCE_GLOBAL_ID 17u\n', encoding='ascii')
+            (stage / 'sc64_races_generated.h').write_text('no Z6 gate', encoding='ascii')
+            with patch.object(dev, 'ROOT', root), patch.object(
+                    dev, 'run', side_effect=AssertionError('make must not run')):
+                with self.assertRaisesRegex(RuntimeError, 'SC64_Z6_DATA_ENABLED map gate'):
+                    dev.build('zerg')
+            (stage / 'sc64_races_generated.h').write_text(z6_gate, encoding='ascii')
+            calls = []
+            with patch.object(dev, 'ROOT', root), patch.object(
+                    dev, 'run', side_effect=lambda command, **_: calls.append(command)):
+                dev.build('zerg')
+            self.assertEqual(calls, [['make', 'zerg']])
 
     def test_canonical_zerg_build_rejects_stale_sprite_header_before_make(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -817,7 +862,106 @@ class OnboardingTests(unittest.TestCase):
 
             with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
                  patch.object(dev, 'run', side_effect=fake_run):
+                dev.prepare(rom, 'zerg-z4')
+
+            scripts = [Path(call[1]).name for call in calls]
+            for required in ('sc64_races_pack.py', 'sc64_race_sprites.py',
+                             'sc64_z4_pack.py', 'sc64_z4_scenario_pack.py'):
+                self.assertIn(required, scripts)
+            self.assertTrue(all(dev.canonical_zerg_input_ready(label, root / relative)
+                                for label, relative, _ in dev.CANONICAL_ZERG_INPUTS))
+            canonical_sprite_calls = [call for call in calls
+                                      if Path(call[1]).name == 'sc64_race_sprites.py'
+                                      and '--header' in call
+                                      and str(root / '.local/sc64/zp-stage/generated/'
+                                              'sc64_race_sprites_generated.h') in call]
+            self.assertEqual(len(canonical_sprite_calls), 1)
+            self.assertIn('--prepack-unit-words', canonical_sprite_calls[0])
+
+    def test_canonical_zerg_prepare_adds_chapter_five_and_six_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rom = root / 'owned-rom.z64'
+            rom.write_bytes(b'user supplied ROM fixture')
+            calls = []
+
+            def fake_run(command, *, cwd=dev.ROOT):
+                calls.append(command)
+                script = Path(command[1]).name
+                local = root / '.local/sc64'
+                if script == 'sc64_workspace.py':
+                    (local / 'rom').mkdir(parents=True, exist_ok=True)
+                    (local / 'rom/StarCraft64-USA.z64').write_bytes(b'prepared ROM')
+                elif script == 'sc64_races_pack.py':
+                    output = (Path(command[command.index('--out') + 1]) if '--out' in command
+                              else local / 'races/generated/sc64_races_generated.h')
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(
+                        '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
+                        'sc64_race_z3_units\n#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n' +
+                        ('#if defined(SC64_UNIFIED) && defined(SC64_Z4_DATA_ENABLED)\n'
+                         'sc64_race_z4_units\n'
+                         '#endif /* SC64_UNIFIED && SC64_Z4_DATA_ENABLED */\n'
+                         if output.parent == local / 'zp-stage/generated' else ''),
+                        encoding='ascii')
+                elif script == 'sc64_race_sprites.py':
+                    if '--header' in command:
+                        output = Path(command[command.index('--header') + 1])
+                    else:
+                        output = local / 'races/generated/sc64_race_sprites_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(UNIT_WORD_SPRITE_HEADER if '--prepack-unit-words' in command
+                                      else '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
+                                      encoding='ascii')
+                elif script == 'sc64_z4_pack.py':
+                    output = local / 'z4/manifest.json'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(
+                        '{"schema":1,"mission":{"id":"Z4","global_catalog_index":15,'
+                        '"source_map_path":"008/017"}}', encoding='ascii')
+                elif script == 'sc64_z4_scenario_pack.py':
+                    output = local / 'z4/generated/sc64_z4_scenario_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('#define SC64_Z4_SCENARIO_GENERATED_H 1\n', encoding='ascii')
+
+            staged = []
+
+            def fake_staged(profile, private_rom):
+                staged.append(profile)
+                local = root / '.local/sc64'
+                (local / 'zp-stage/generated/sc64_races_generated.h').write_text(
+                    '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\nsc64_race_z3_units\n'
+                    '#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n'
+                    '#if defined(SC64_UNIFIED) && defined(SC64_Z4_DATA_ENABLED)\nsc64_race_z4_units\n'
+                    '#endif /* SC64_UNIFIED && SC64_Z4_DATA_ENABLED */\n'
+                    '#if defined(SC64_UNIFIED) && defined(SC64_Z6_DATA_ENABLED)\nsc64_race_z6_units\n'
+                    '#endif /* SC64_UNIFIED && SC64_Z6_DATA_ENABLED */\n', encoding='ascii')
+                for label, relative, marker in dev.CANONICAL_ZERG_Z6_INPUTS[:-1]:
+                    path = root / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(f'#define {marker} 1\n', encoding='ascii')
+
+            def fake_bank_run(command, *, cwd=dev.ROOT):
+                fake_run(command, cwd=cwd)
+                if '--include-z6-buildings' in command:
+                    output = Path(command[command.index('--header') + 1])
+                    output.write_text(UNIT_WORD_SPRITE_HEADER +
+                                      '#define SC64_Z6_BUILDING_SPRITE_SET_COMPLETE 1\n'
+                                      '#define SC64_Z5_DOODAD_SPRITE_SET_COMPLETE 1\n',
+                                      encoding='ascii')
+
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
+                 patch.object(dev, 'run', side_effect=fake_bank_run), \
+                 patch.object(dev, 'prepare_staged_campaign', side_effect=fake_staged):
                 dev.prepare(rom, 'zerg')
+            self.assertEqual(staged, ['zerg-z6'])
+            bank_calls = [call for call in calls if '--include-z6-buildings' in call]
+            self.assertEqual(len(bank_calls), 1)
+            self.assertIn('--prepack-unit-words', bank_calls[0])
+            self.assertIn(str(root / '.local/sc64/zerg-z6/generated/sc64_race_sprites_generated.h'),
+                          bank_calls[0])
+            self.assertTrue(all(dev.canonical_zerg_z6_input_ready(label, root / relative)
+                                for label, relative, _ in dev.CANONICAL_ZERG_Z6_INPUTS))
 
             scripts = [Path(call[1]).name for call in calls]
             for required in ('sc64_races_pack.py', 'sc64_race_sprites.py',

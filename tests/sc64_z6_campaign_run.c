@@ -483,7 +483,8 @@ static int z6_point_threatened(int hero,int x,int y,int margin)
 static int z6_hold_safely(void)
 {
     int hero=kerrigan(),best_x=-1,best_y=-1,best_d=0x7fffffff;
-    if(hero<0||!u[hero].alive||!z6_point_threatened(hero,u[hero].x,u[hero].y,48))return 0;
+    if(hero<0||!u[hero].alive||SC64_TRANSPORT_LOADED(&u[hero])||
+       !z6_point_threatened(hero,u[hero].x,u[hero].y,48))return 0;
     for(int dy=-320;dy<=320;dy+=16)for(int dx=-320;dx<=320;dx+=16) {
         int x=u[hero].x+dx,y=u[hero].y+dy,d=dx*dx+dy*dy,col=x/16,row=y/16;
         if(d<48*48||d>320*320||d>=best_d||x<0||y<0||col>=MAP_COLS||row>=MAP_ROWS||
@@ -1063,6 +1064,7 @@ static int z6_transport_campaign(void)
     if(!clear_force2_locations()) {
         fprintf(stderr,"source Force2 zones were not cleared within bounded normal-input attempts\n");return 0;
     }
+    z6_rest_guard=0; /* Storm support ends with the Force2 zones. */
 
     while((minerals<(int)SC64_Z6_TRANSPORT_MINERAL_COST||
            gas<(int)SC64_Z6_TRANSPORT_GAS_COST)&&host_ticks-phase_start<20000u&&
