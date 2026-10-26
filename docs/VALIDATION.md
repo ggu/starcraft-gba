@@ -5555,3 +5555,47 @@ as unresolved rather than describing the whole suite as passing.
 The reported physical Showcase Blood Bath/Protoss multi-Pylon crash also
 remains unresolved. Host rendering checks and synthetic ARM tests have not
 reproduced that exact hardware failure.
+
+
+## Canonical source death art (2026-10-26)
+
+The Siege Line pink bands reproduced on the PR49 source: at update 60,
+suppressing death effects removed all 333 fixed-palette purple pixels while
+leaving the same living-unit state. Thirteen authored Zergling remnants in the
+original spawn grid formed those bands. They were placeholder corpse puddles,
+not surviving unit health bars. The earlier rounded-puddle change had not
+resolved clustered deaths.
+
+Canonical Terran, Zerg, Protoss and Showcase now select source death/corpse
+art. The authenticated bank covers 167 actors in 61 image banks (770522
+indexed pixel bytes); nine unsupported actors retain authored fallbacks.
+Fixed waits use exact source ticks; random waits use a deterministic midpoint.
+Combat-unit under layers have 891408 bytes of packed word sidecars. Other
+actors retain the same source pixels through indexed drawing to keep the
+full Terran ROM below 32 MiB. No RAM pool or save schema changed.
+
+`make test-sc64-showcase-death-source` simulates ordinary Siege Line combat
+through update 450, requires raw-37 deaths to use source art, compares the
+rendered layers with source-frame composites and checks expiry. The packed
+source tests compare indexed and packed pixels, including HUD-edge fallback
+with and without scene clipping. Private before/after captures were inspected;
+they are deliberately absent from this source-only repository.
+
+An owned no-GDB mGBA benchmark ran identical scene-1 inputs for 180 updates,
+measuring updates 60–179. All three variants reached the same simulation hash
+`2519c37e018c2fe2`, with 14 average / 16 peak active corpses. Repeated results:
+
+| Average cycles | Authored | Source indexed | Source packed |
+| --- | ---: | ---: | ---: |
+| Update | 336921 | 336616 | 336784 |
+| Audio | 126 | 126 | 126 |
+| Render | 579214 | 736355 | 651918 |
+| Total | 916449 | 1073284 | 989015 |
+
+Packing saves 7.85% of source-indexed total cost, but source art still costs
+7.92% more on average than the authored placeholder in this crowded sample.
+Peak render cost is 813470 cycles versus 811967 authored (1075219 indexed).
+This scene exceeds a 30-fps frame budget in every variant; it remains a
+performance target, not a physical-hardware or sustained-30-fps qualification.
+Source palette ramps, unsupported script control flow and remnant lifetime
+caps remain documented limitations of this importer.
