@@ -59,20 +59,35 @@ The regenerated scenario header SHA-256 is
 Private wrapper, ROM, log and flag manifests remain under
 `.local/build/p4-create-prefix-public/`; they are not source artifacts.
 
-Fresh-process ARM save continuation remains pending. Earlier failed ARM suffix
-checks are discarded: a copied nested wrapper's quoted relative include fell
-through the compiler's search paths into an older checkout. Hashing the intended
-source did not establish what the compiler actually read. Replacement wrappers
-use verified source dependencies; private wrappers should use absolute source
-paths or retain compiler dependency output.
+Fresh-process ARM save continuation passes. Earlier failed ARM suffix checks
+are discarded: a copied nested wrapper's quoted relative include fell through
+the compiler's search paths into an older checkout. Hashing the intended source
+did not establish what the compiler actually read. The accepted save, direct
+and resume wrappers have compiler include traces proving that they read the
+current worktree's source. Private wrappers should use absolute source paths
+or retain compiler dependency output.
 
 The original tape checkpoint also depended on building selection and a held
 gesture, which loading intentionally resets. A neutral checkpoint at update
-35,500 / frame 35,308 avoids those assumptions. Its preserved 32-KiB SRAM
-loads in a fresh host process through title-screen B; all 138 remaining
-500-update world checkpoints and the strict final win match uninterrupted
-play. The corresponding correct-source ARM check is still required before
-this draft qualifies fresh-process continued-win behavior.
+35,500 / frame 35,308 avoids those assumptions. The prefix-off baseline saves
+through the ordinary pause/B path. Its preserved 32-KiB SRAM loads in a new
+prefix/hot mGBA process through title-screen B and reaches the strict native
+win at update 104,850 / frame 104,346 with every input consumed, both heroes
+alive/in the escape area, no fault, 87 creates and fired bits 8,184.
+
+The loaded checkpoint plus 138 subsequent 500-update world checkpoints match
+the direct ARM route for serialized units, buildings/queues, minerals, campaign,
+P4/Storm, economy, selection and cursor. Camera coordinates match after the
+first normal render: loading initially leaves the derived camera at zero.
+Active mode/menu/box states also match the captured direct host route. A broad
+hash of dormant frontend and reset gesture fields is diagnostic only; those
+unserialized presentation fields are not claimed to be byte-identical.
+The same preserved SRAM also wins in a fresh host process.
+
+The SRAM SHA-256 is
+`732ceedd5a488bbec92b49d874e51eb23afd2dcf5f3045a9a1c87943795f87a6`.
+Accepted private evidence is under
+`.local/build/p4-create-prefix-public/checkpoint/{old35500,directdiag,resumediag}`.
 
 ## Local regression
 
@@ -81,6 +96,10 @@ this draft qualifies fresh-process continued-win behavior.
 - `make test-protoss test-canonical-render`: passed, including the native P4
   controller win, malformed-state checks and the new prefix differential fixture.
 - `make race-campaigns showcase`: all four ARM links passed existing reserves.
+
+Canonical P4 ends at IWRAM `0x03004680` and BSS `0x0203d490`; its save remains
+15,364 bytes and the padded ROM is 32 MiB. Existing reserve assertions remain
+unchanged.
 
 The Cannon test's Make dry-run parser now joins continued recipe lines before
 shell tokenization; pixel assertions are unchanged. No private assets, ROMs,

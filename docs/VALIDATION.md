@@ -13,9 +13,11 @@ measurement sections below remain records of their frozen images.
 
 The [construction lifecycle recheck](audits/2026-10-26-construction-lifecycle/README.md)
 corrects the Protoss pre-completion visual to the source Warp Anchor's `Init`
-animation. It keeps the existing build timer and save layout. The campaign
-ARM timings below precede that artwork correction; no new full-mission ARM
-timing or physical-GBA result is claimed for the updated art.
+animation. It keeps the existing build timer and save layout. The older
+campaign ARM timings below precede that artwork correction. The
+[P4 prefix follow-up](audits/2026-10-26-p4-create-prefix/README.md) records a
+current-art paired full-mission ARM replay, a 2.16% full-cost reduction and
+fresh-process SRAM continued win. It does not establish physical-GBA performance.
 
 Canonical profiles expose Terran 1–10, Zerg 1–4 and Protoss 1–4: 18/30
 entries. Canonical Zerg uses `SCZ4` and `.local/play/zerg-z4`; canonical
