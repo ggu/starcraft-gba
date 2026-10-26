@@ -24,7 +24,8 @@ is converted; Z4 and Z6 loaders reject each other's generations.
 The canonical flag vector is the Z6 storage/runtime/query vector
 (`Z6_PROBE_FLAGS`) with three changes. A word-packed copy of the six-chapter
 sprite bank (`.local/sc64/zerg-z6/generated`) takes the probe bank's place.
-The canonical drawing, Zerg tuning and minimap flags are added. Preparing
+The canonical drawing, Zerg tuning, minimap, directional-sprite and
+source Tank-effect flags are added, matching the Z4 product on base. Preparing
 `zerg` now also generates the Z5/Z6 programs and that bank. Readiness checks
 require the chapter 5/6 programs, the Z6 map gate and the real packed word
 payload, not just markers.
@@ -132,7 +133,7 @@ same tape.
   It then unloads and wins at frame 305,772, the same as the uninterrupted
   run.
 
-Both round trips were rerun at the tested commit. The Z6 SRAM image is
+Both round trips were rerun at the tested commit, with identical hashes. The Z6 SRAM image is
 byte-identical before and after the save-validator change below.
 
 ## Z6 save cost
@@ -151,7 +152,7 @@ as before. Every key holds only fields that the decoder already bounds to the
 packed width, so comparisons are exact and accept/reject results do not
 change.
 
-| Diagnostic at update 20,000 | Before | After |
+| Diagnostic at update 20,000 (pre-merge build) | Before | After |
 | --- | ---: | ---: |
 | Z6 candidate validator | 100,229,093 | 6,121,690 |
 | Whole `save_game()` | 109,467,683 | 16,864,162 |
@@ -164,36 +165,37 @@ candidates.
 ## Performance
 
 All figures are mGBA emulated cycles for the full ordinary-input route, one
-`game_update` plus render per row. Each number is the mean per update and
-draw, the worst individual update and full frame, the worst 1,000-update
-window mean, and the share of updates over 561,792 cycles (two 59.7 Hz
-frames). The baseline is the legacy Z4 product's flag vector and inputs on the
+`game_update` plus render per row. Columns give the mean update, draw and
+full-frame cycles, the worst 1,000-update window mean, the worst single
+update before the winning one, the winning update itself (which includes the
+automatic victory save), and the share of updates over 561,792 cycles (two
+59.7 Hz frames). The baseline is the legacy Z4 product's flag vector and inputs on the
 same tapes, built from the same checkout. Z5 and Z6 have no Z4 baseline.
 
 | Mission | Product | Mean update | Mean draw | Mean full | Worst window | Worst in-mission update | Victory update | Updates over 561,792 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Z1 | Z4 baseline | 234,054 | 341,093 | 654,631 | 980,342 | 8,937,337 | 5,380,416 | 47.4% |
-| Z1 | Z6 | 257,987 | 376,123 | 713,276 | 1,049,723 | 9,107,089 | 10,871,156 | 66.6% |
-| Z2 | Z4 baseline | 260,328 | 335,120 | 694,215 | 780,350 | 7,009,647 | 4,831,978 | 52.8% |
-| Z2 | Z6 | 310,585 | 373,980 | 750,165 | 862,085 | 7,047,380 | 9,598,615 | 66.2% |
-| Z3 | Z4 baseline | 361,774 | 340,050 | 793,308 | 1,335,955 | 16,110,706 | 7,108,151 | 79.7% |
-| Z3 | Z6 | 422,516 | 376,527 | 884,166 | 1,394,376 | 16,276,489 | 10,373,128 | 88.9% |
-| Z4 | Z4 baseline | 294,195 | 403,019 | 781,413 | 993,895 | 4,354,836 | 4,699,124 | 92.1% |
-| Z4 | Z6 | 414,169 | 441,688 | 934,303 | 1,130,618 | 4,465,646 | 10,568,325 | 99.7% |
-| Z5 | Z6 | 533,597 | 299,716 | 930,607 | 1,224,998 | 5,207,816 | 11,749,342 | 99.0% |
-| Z6 | Z6 | 455,160 | 346,671 | 868,765 | 1,807,021 | 12,181,762 | 16,361,215 | 92.9% |
+| Z1 | Z4 baseline | 234,132 | 337,175 | 653,407 | 1,017,139 | 8,938,817 | 6,032,519 | 45.0% |
+| Z1 | Z6 | 258,128 | 374,063 | 706,531 | 1,052,812 | 9,107,145 | 11,626,630 | 63.0% |
+| Z2 | Z4 baseline | 260,464 | 337,073 | 695,453 | 779,788 | 7,014,356 | 4,978,021 | 52.7% |
+| Z2 | Z6 | 310,792 | 377,596 | 752,680 | 865,457 | 7,047,535 | 10,386,646 | 66.5% |
+| Z3 | Z4 baseline | 361,825 | 329,707 | 776,956 | 1,330,618 | 16,110,663 | 7,108,061 | 75.4% |
+| Z3 | Z6 | 422,643 | 367,985 | 878,102 | 1,392,679 | 16,276,353 | 11,161,713 | 88.4% |
+| Z4 | Z4 baseline | 294,258 | 345,930 | 727,348 | 897,481 | 4,356,599 | 5,350,358 | 87.4% |
+| Z4 | Z6 | 414,220 | 386,217 | 869,433 | 1,019,320 | 4,467,838 | 11,356,617 | 99.7% |
+| Z5 | Z6 | 533,684 | 302,825 | 931,768 | 1,226,121 | 5,207,785 | 12,537,676 | 99.0% |
+| Z6 | Z6 | 453,742 | 348,453 | 869,015 | 1,809,270 | 12,180,086 | 17,148,000 | 92.8% |
 
-On the same tapes, the six-chapter product costs 9.0%, 8.1%, 11.5% and 19.6%
+On the same tapes, the six-chapter product costs 8.1%, 8.2%, 13.0% and 19.5%
 more mean full-frame cycles than the Z4 product for Z1–Z4. It also roughly
 doubles each victory update, because the larger save carries the Z5/Z6 state
 and its validators. The in-mission worst updates are mission-load and
 scripted-event spikes that both products share.
 
-Z6's 1,807,021-cycle worst window is the heaviest in the campaign; it falls
+Z6's 1,809,270-cycle worst window is the heaviest in the campaign; it falls
 early in the mission. Before the save change, its victory update was
 93,097,165 cycles.
 
-An experiment added the Z4/P5 defense-target lists
+Before the base merge, an experiment added the Z4/P5 defense-target lists
 (`-DSC64_ZP_DEFENSE_TARGETS`) to the Z6 product. It cut Z4's mean by 8% but
 added about 2% to Z1 and Z5, and left Z6 unchanged. The canonical vector does
 not include it.
@@ -205,19 +207,21 @@ None of these numbers is a hardware measurement or a frame-rate claim.
 | Check | Z6 product | Limit |
 | --- | --- | --- |
 | IWRAM end | `0x03004f18` | `< 0x03005000` |
-| BSS end | `0x0203dd88` | `< 0x0203e000` |
+| BSS end | `0x0203de78` | `< 0x0203e000` |
 | Save payload | 16,296 bytes (`sizeof(RaceSave)`) | `<= 16,368`, static assert |
-| ROM | 33,554,432 bytes, SHA-256 `f1cb1e84…b073c627` | `<= 32 MiB` |
+| ROM | 33,554,432 bytes, SHA-256 `c4723582…188200f6f` | `<= 32 MiB` |
 
 The legacy Z4 ROM rebuilt at the tested commit is 33,554,432 bytes, SHA-256
-`5849766f910176a73af14be52018887abc61f6bf78019139b3ef22fb97a271a3`. That is
-byte-identical to the same build from `codex/source-release` at `b2ff82f`.
-The explicit Z3 ROM is also unchanged
-(`132d3435cda193cec9ee1692b70ee6ca198a038443c094942010bb8c212d304b`).
+`bd4358c8ec8074bb15576db42f3f0227fed41d2050c3fd45ef566d8285c8785a`. That is
+byte-identical to the canonical Z4 build from `codex/source-release` at
+`83b572d`, which includes directional sprites and source Tank effects. The
+explicit Z3 ROM is identical to base as well
+(`a9163bbeac0f9a0e11711ff76b2b0456eb6c0bb785386bdadf4c71e6819ae0af`).
 
 ## Commands run at the tested commit
 
-All of the following ran at `6bc901625f3b23b5978a1939140b13ca283e2f08`. Every
+All of the following ran at `8ad406bbdf073f52d128844d07b711ea75985038`, the
+merge of `codex/source-release` at `83b572d`. Every
 command exited 0.
 
 ```sh
@@ -253,9 +257,9 @@ folders.
   These include authored AI, incomplete Ensnare and Shield Battery recharge,
   and bounded hallucinations.
 - **Frame time:** emulated frame time is over a two-frame budget for most
-  updates in Z4–Z6 on both products. Z6 and Z1–Z4 under the six-chapter
-  product are 8–20% heavier than the Z4 product.
-- **Victory saves:** each victory save remains a single ~10–16M-cycle stall.
+  updates in Z4–Z6 on both products. On Z1–Z4, the six-chapter product is
+  8.1%–19.5% heavier than the Z4 product.
+- **Victory saves:** each victory save remains a single ~10–17M-cycle stall.
 - **Hardware:** no 30 fps or hardware performance claim is made.
 - **Inputs:** the replay tapes come from host controllers. Each one is one
   winning ordinary-input route, not proof that every route is winnable.
