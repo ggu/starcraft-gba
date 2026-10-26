@@ -40,6 +40,16 @@ does not generate the full Terran input set; preparing Terran alone does not
 authenticate the P4 scenario. The asset-free `./dev test`
 also exercises all three frontend variants without requiring those inputs.
 
+With all three canonical profiles prepared,
+`make test-sc64-canonical-skirmish-resume` checks their mid-match SRAM continuation.
+It is also included in `test-race-campaigns`. Each profile runs 24 menu-driven
+cases: both maps, every human race and one to three mixed-race opponents,
+plus three-opponent groups of each race. The checks save after 1,800 economy
+updates, load through HOME after reinitializing the game, and compare live
+state and 900 resumed updates with the uninterrupted path. This is a host
+regression check, not fresh-process emulator or physical-GBA qualification.
+See the [canonical skirmish resume audit](audits/2026-10-27-canonical-skirmish-resume/README.md).
+
 ## Campaign progress
 
 The Terran profile presents ten missions, canonical Zerg six and Protoss five,
@@ -73,6 +83,14 @@ with shared menu, source objectives and generation-35 saves; its host checks
 establish integration readiness, with no completed playthrough. P7 retains
 an isolated world foundation and numeric scheduler. The remaining staged
 missions still need completion and ARM qualification.
+
+Those P6 wins are historical frozen-build evidence. A fresh P6 probe controller
+run against `c3c8ac9` lost at frame 143,714 with zero trigger faults. Replaying
+the earlier winning input tape also diverged under the current movement and
+combat rules; the first recorded mismatch was a missed selection by the
+900-frame checkpoint. P6 needs a repaired controller and new current-build
+qualification before canonical promotion. The memory-valid probe is not an
+additional mission in the current P5 product.
 
 The internal Z7 profile also exposes the missing colony defense commands:
 Drone-only selection adds CREEP COLONY below SPIRE (75 minerals), and a
