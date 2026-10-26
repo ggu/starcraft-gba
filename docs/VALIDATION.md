@@ -84,6 +84,24 @@ does not prove fresh-process SRAM, physical-GBA behavior, a complete match,
 every possible bot-race permutation, or near-30-fps performance. See the
 [audit and reproduction commands](audits/2026-10-27-canonical-skirmish-resume/README.md).
 
+## P6 live-route repair (2026-10-27)
+
+The current P6 probe controller replaces its stale 102,005-tick opening with
+live Marine rescue, regroup and escort orders. It wins at frame 49,599 after
+50,252 controller updates, preserving Tassadar and bringing Zeratul into the
+authenticated extraction area with zero trigger faults. A separate input-only
+host replay and an owned no-GDB ARM replay match all 57 observed mission,
+action-timer and hero checkpoints through that win.
+
+The instrumented probe averages 1,148,439 update cycles and 448,493 audio/draw
+cycles over 50,241 play-screen calls: about 10.51 fps equivalent throughput.
+These calls include play-screen command-menu inputs that do not advance the
+simulation. This is a different route/window from historical 12.75-fps P6
+results, not an apples-to-apples speed comparison or physical-GBA guarantee.
+The changed code is the host controller, not the game rules or player ROM.
+Current codec fixtures pass, but no fresh-process SRAM proof or canonical
+promotion is added. See the [qualification audit](audits/2026-10-27-p6-live-route/README.md).
+
 ## Standalone snapshot checks (2026-10-22)
 
 - Before any private data or reference checkout was prepared, `make verify`
