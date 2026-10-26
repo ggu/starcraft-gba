@@ -12,6 +12,10 @@
 #if defined(SC64_Z7_COUNT_SNAPSHOT) && !defined(SC64_Z7_PREVALIDATED_TICK)
 #error "Z7 count snapshot requires the authenticated prevalidated tick path"
 #endif
+#if defined(SC64_Z7_PRUNE_STARTED) && \
+    (!defined(SC64_Z7_PREVALIDATED_TICK) || !defined(SC64_Z7_COUNT_SNAPSHOT))
+#error "Z7 started-trigger pruning requires prevalidated ticks and count snapshots"
+#endif
 
 #include "sc64_z7_state.h"
 #include "sc64_z7_world_adapter.h"
@@ -227,6 +231,8 @@ static int race_z7_action_callback(void *context,const Sc64Z7SourceAction *a)
 #if defined(SC64_Z7_PREVALIDATED_TICK)
 /* These callbacks are deliberately tied to the adapter's private context so
  * serialized or caller-constructed contexts cannot assert the fast-path bit. */
+static int race_z7_prevalidated_action_callback(void *context,
+                                                const Sc64Z7SourceAction *a);
 static int race_z7_prevalidated_condition_callback(void *context,
                                                     const Sc64Z7RuntimeState *state,
                                                     const Sc64Z7SourceCondition *c)
@@ -235,6 +241,43 @@ static int race_z7_prevalidated_condition_callback(void *context,
         state!=&race_z7.runtime) return -1;
     return sc64_z7_world_condition_prevalidated(context,state,c);
 }
+
+#ifdef SC64_Z7_PRUNE_STARTED
+/* Game-private condition adapter. Every source trigger is authenticated as
+ * non-preserved by race_z7_runtime_metadata_valid() during map binding. The
+ * model also permanently records its first start, so an already-started
+ * trigger's condition cannot produce another start; its action clocks still
+ * advance in sc64_z7_runtime_tick_internal before this result is consumed. */
+static int race_z7_pruned_condition_callback(void *context,
+                                             const Sc64Z7RuntimeState *state,
+                                             const Sc64Z7SourceCondition *c)
+{
+    const Sc64Z7SourceCondition *canonical;
+    if (context!=&race_z7_world || state!=&race_z7.runtime || !c ||
+        !race_z7_active() || race_z7_map!=&sc64_race_maps[SC64_Z7_GLOBAL_ID] ||
+        !race_z7_world.source_tables_prevalidated ||
+        race_z7_ops.context!=&race_z7_world ||
+        race_z7_ops.condition!=race_z7_prevalidated_condition_callback ||
+        race_z7_ops.action!=race_z7_prevalidated_action_callback ||
+        !sc64_z7_condition_row(c->trigger,c->index,&canonical) || canonical!=c ||
+        sc64_z7_source_triggers[c->trigger].execution_flags!=0u) return -1;
+    if (state->model.started&(1u<<c->trigger)) return 0;
+    return sc64_z7_world_condition_prevalidated(context,state,c);
+}
+
+/* Called only after the normal per-tick live-world validation. This confirms
+ * the private context/map and baseline callback binding before the masked
+ * snapshot can replace the fully checked reference census. */
+static int race_z7_pruned_binding_valid(void)
+{
+    return race_z7_active() &&
+        race_z7_map==&sc64_race_maps[SC64_Z7_GLOBAL_ID] &&
+        race_z7_world.source_tables_prevalidated &&
+        race_z7_ops.context==&race_z7_world &&
+        race_z7_ops.condition==race_z7_prevalidated_condition_callback &&
+        race_z7_ops.action==race_z7_prevalidated_action_callback;
+}
+#endif
 
 static int race_z7_prevalidated_action_callback(void *context,
                                                 const Sc64Z7SourceAction *a)
@@ -434,14 +477,34 @@ static int race_z7_runtime_tick(int user_paused,u32 elapsed_frames)
     if (race_z7_world.source_tables_prevalidated && race_z7_map==&sc64_race_maps[SC64_Z7_GLOBAL_ID])
 #if defined(SC64_Z7_COUNT_SNAPSHOT)
     {
+#ifdef SC64_Z7_PRUNE_STARTED
+        if (race_z7_pruned_binding_valid()) {
+            Sc64Z7WorldOps pruned_ops=race_z7_ops;
+            if (sc64_z7_count_snapshot_begin_pruned(&race_z7_world,
+                    race_z7.runtime.model.started)) {
+                pruned_ops.condition=race_z7_pruned_condition_callback;
+                result=sc64_z7_runtime_tick_prevalidated(&race_z7.runtime,&pruned_ops,0);
+            } else {
+                (void)sc64_z7_count_snapshot_begin(&race_z7_world);
+                result=sc64_z7_runtime_tick_prevalidated(&race_z7.runtime,&race_z7_ops,0);
+            }
+        } else {
+            /* Preserve the ordinary authenticated path's binding checks. */
+            (void)sc64_z7_count_snapshot_begin(&race_z7_world);
+            result=sc64_z7_runtime_tick_prevalidated(&race_z7.runtime,&race_z7_ops,0);
+        }
+#else
         (void)sc64_z7_count_snapshot_begin(&race_z7_world);
         result=sc64_z7_runtime_tick_prevalidated(&race_z7.runtime,&race_z7_ops,0);
+#endif
         sc64_z7_count_snapshot_invalidate(&race_z7_world);
     }
 #else
         result=sc64_z7_runtime_tick_prevalidated(&race_z7.runtime,&race_z7_ops,0);
 #endif
-    else result=sc64_z7_runtime_tick(&race_z7.runtime,&race_z7_ops,0);
+    else {
+        result=sc64_z7_runtime_tick(&race_z7.runtime,&race_z7_ops,0);
+    }
 #else
     result=sc64_z7_runtime_tick(&race_z7.runtime,&race_z7_ops,0);
 #endif

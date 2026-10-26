@@ -11,6 +11,11 @@
 #if defined(SC64_REACHABLE_FORMATION) && !defined(SC64_RACES)
 #error "SC64_REACHABLE_FORMATION requires SC64_RACES"
 #endif
+#if defined(SC64_Z7_PRUNE_STARTED) && \
+    (!defined(SC64_RACES) || !defined(SC64_Z7_RUNTIME) || \
+     !defined(SC64_Z7_PREVALIDATED_TICK) || !defined(SC64_Z7_COUNT_SNAPSHOT))
+#error "Z7 started-trigger pruning requires the race runtime, prevalidated ticks and count snapshots"
+#endif
 #ifdef SC64_DIRECT_ATTACK
 #include "sc64_direct_attack.h"
 #endif

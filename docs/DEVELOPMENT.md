@@ -1663,6 +1663,14 @@ reachability implementation. The optional target also checks retained route
 hints against an independent graph oracle. The formation feature remains off
 in canonical builds; the selection-count hoist applies to all builds.
 
+The separate default-off `SC64_Z7_PRUNE_STARTED` experiment skips census work
+for authenticated one-shot triggers that have already started, while retaining
+per-tick live-world validation and pending action clocks. With the existing
+private Z7 inputs, `make test-sc64-z7-prune-started` runs paired ASan/UBSan
+fixtures. See the [started-trigger pruning audit](audits/2026-10-27-z7-started-pruning/README.md)
+for the opening and real-save ARM digest comparisons and measured limits.
+It does not promote Z7 or enable the option in canonical build flags.
+
 P7 has an isolated world foundation with separate source-Force wallets; its
 canonical roster fails closed on missing raw68/71/72 actor bindings. It still
 lacks shared menu/save integration. Neither seventh mission has a completed

@@ -193,6 +193,213 @@ static int sc64_z7_world_count(const Sc64Z7WorldContext *ctx,unsigned selector,
  * loss-any-unit, hostile-force buildings, their named-region building probe,
  * and the two human-force region probes. Keep this exact, source-row-bound,
  * bounded cache private to prevalidated ticks. */
+#if defined(SC64_Z7_PRUNE_STARTED)
+static int sc64_z7_count_snapshot_begin_full(Sc64Z7WorldContext *ctx)
+{
+    static const u8 trigger[5]={0,2,4,6,7};
+    static const u8 opcode[5]={2,2,3,3,3};
+    static const u8 selector[5]={13,19,19,18,18};
+    static const u16 wanted[5]={229,231,231,229,229};
+    static const u8 location[5]={0,0,4,3,5};
+    static const u8 comparison[5]={1,1,1,0,0};
+    static const u32 amount[5]={0,0,0,1,1};
+    u32 counts[5]={0,0,0,0,0};
+    unsigned left[5]={0},top[5]={0},right[5]={0},bottom[5]={0};
+    if (!ctx) return 0;
+    ctx->count_snapshot.active=0;
+    for(unsigned q=0;q<5;++q) ctx->count_snapshot.count[q]=0;
+    if (!ctx->source_tables_prevalidated) return 0;
+    for (unsigned q=0;q<5;++q) {
+        const Sc64Z7SourceCondition *c;
+        if (!sc64_z7_condition_row(trigger[q],0,&c) ||
+            c->opcode!=opcode[q] || c->player!=selector[q] ||
+            c->unit!=wanted[q] || c->location!=location[q] ||
+            c->comparison!=comparison[q] || c->amount!=amount[q] ||
+            c->resource || c->flags!=16u || c->mask ||
+            (location[q] && !sc64_z7_world_location_source(ctx,location[q],
+                &left[q],&top[q],&right[q],&bottom[q]))) return 0;
+    }
+    for (int pass=0;pass<2;++pass) {
+        int limit=pass?MAX_BUILDINGS:MAX_UNITS;
+        for (int i=0;i<limit;++i) {
+            int alive=pass?b[i].alive:u[i].alive;
+            int raw_owner=pass?b[i].raw_owner:u[i].raw_owner;
+            int x=pass?b[i].x:u[i].x, y=pass?b[i].y:u[i].y;
+            int raw,owner13,owner19,owner18,actor_left=0,actor_top=0;
+            int actor_right=0,actor_bottom=0,have_rect=0;
+            if (!alive) continue;
+            raw=pass?(b[i].raw_type>=0?b[i].raw_type:
+                      sc64_race_raw_building(b[i].type)):
+                     (u[i].raw_type>=0?u[i].raw_type:
+                      sc64_race_raw_unit(u[i].type));
+            owner13=sc64_z7_world_owner_matches(ctx,13u,raw_owner);
+            owner19=sc64_z7_world_owner_matches(ctx,19u,raw_owner);
+            owner18=sc64_z7_world_owner_matches(ctx,18u,raw_owner);
+            if (owner13<0 || owner19<0 || owner18<0) return 0;
+            if (!(owner13 || owner19 || owner18)) continue;
+            if (raw<0 || raw>227 || (pass?
+                sc64_race_building_from_raw(raw)<0:
+                sc64_race_unit_from_raw(raw)<0)) return 0;
+            if (owner13) ++counts[0];
+            if (pass && owner19) ++counts[1];
+            if (pass && owner19) {
+                if (!sc64_z7_world_building_rect((unsigned)raw,x,y,&actor_left,
+                    &actor_top,&actor_right,&actor_bottom)) return 0;
+                have_rect=1;
+                if ((int)left[2]<actor_right && actor_left<(int)right[2] &&
+                    (int)top[2]<actor_bottom && actor_top<(int)bottom[2])
+                    ++counts[2];
+            }
+            if (owner18) {
+                if (!have_rect) {
+                    if (pass) {
+                        if (!sc64_z7_world_building_rect((unsigned)raw,x,y,
+                            &actor_left,&actor_top,&actor_right,&actor_bottom)) return 0;
+                    } else if (!sc64_z7_world_actor_rect((unsigned)raw,x,y,
+                        &actor_left,&actor_top,&actor_right,&actor_bottom)) return 0;
+                    have_rect=1;
+                }
+                if (owner18 && (int)left[3]<actor_right && actor_left<(int)right[3] &&
+                    (int)top[3]<actor_bottom && actor_top<(int)bottom[3])
+                    ++counts[3];
+                if (owner18 && (int)left[4]<actor_right && actor_left<(int)right[4] &&
+                    (int)top[4]<actor_bottom && actor_top<(int)bottom[4])
+                    ++counts[4];
+            }
+        }
+    }
+    for (unsigned q=0;q<5;++q) ctx->count_snapshot.count[q]=counts[q];
+    ctx->count_snapshot.active=31u;
+    return 1;
+}
+
+static int sc64_z7_count_snapshot_begin_masked(Sc64Z7WorldContext *ctx,
+                                               unsigned needed_mask,
+                                               int actors_prevalidated)
+{
+    static const u8 trigger[5]={0,2,4,6,7};
+    static const u8 opcode[5]={2,2,3,3,3};
+    static const u8 selector[5]={13,19,19,18,18};
+    static const u16 wanted[5]={229,231,231,229,229};
+    static const u8 location[5]={0,0,4,3,5};
+    static const u8 comparison[5]={1,1,1,0,0};
+    static const u32 amount[5]={0,0,0,1,1};
+    u32 counts[5]={0,0,0,0,0};
+    unsigned left[5]={0},top[5]={0},right[5]={0},bottom[5]={0};
+    if (!ctx) return 0;
+    ctx->count_snapshot.active=0;
+    for(unsigned q=0;q<5;++q) ctx->count_snapshot.count[q]=0;
+    if (!ctx->source_tables_prevalidated || (needed_mask&~31u) ||
+        (actors_prevalidated!=0 && actors_prevalidated!=1)) return 0;
+    /* Preserve the full checked reference census when all predicates are
+       needed. This common opening case avoids masked-loop overhead. */
+    if (needed_mask==31u) return sc64_z7_count_snapshot_begin_full(ctx);
+    /* Even omitted counters retain the full canonical source-row and region
+       checks. Only their actor census work is pruned. */
+    for (unsigned q=0;q<5;++q) {
+        const Sc64Z7SourceCondition *c;
+        if (!sc64_z7_condition_row(trigger[q],0,&c) ||
+            c->opcode!=opcode[q] || c->player!=selector[q] ||
+            c->unit!=wanted[q] || c->location!=location[q] ||
+            c->comparison!=comparison[q] || c->amount!=amount[q] ||
+            c->resource || c->flags!=16u || c->mask ||
+            (location[q] && !sc64_z7_world_location_source(ctx,location[q],
+                &left[q],&top[q],&right[q],&bottom[q]))) return 0;
+    }
+    /* Late Z7 often leaves only source player 13's loss check and force 1's
+       hostile building check active. After race_z7_live_world_valid() has
+       authenticated every actor, these predicates depend only on owner slots;
+       neither uses type or geometry. */
+    if (needed_mask==3u && actors_prevalidated) {
+        unsigned current=ctx->source_current_player;
+        if (current>=12u || !ctx->source_slot_active[current]) return 0;
+        for (int i=0;i<MAX_UNITS;++i)
+            if (u[i].alive && u[i].raw_owner==(int)current) ++counts[0];
+        for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive) {
+            int raw_owner=b[i].raw_owner;
+            if (raw_owner==(int)current) ++counts[0];
+            if (raw_owner>=0 && raw_owner<8 && ctx->source_slot_active[raw_owner] &&
+                ctx->source_force_for_slot[raw_owner]==1u) ++counts[1];
+        }
+        for (unsigned q=0;q<5;++q) ctx->count_snapshot.count[q]=counts[q];
+        ctx->count_snapshot.active=3u;
+        return 1;
+    }
+
+    if (needed_mask) for (int pass=0;pass<2;++pass) {
+        int limit=pass?MAX_BUILDINGS:MAX_UNITS;
+        for (int i=0;i<limit;++i) {
+            int alive=pass?b[i].alive:u[i].alive;
+            int raw_owner=pass?b[i].raw_owner:u[i].raw_owner;
+            int x=pass?b[i].x:u[i].x, y=pass?b[i].y:u[i].y;
+            int need13=(needed_mask&1u)!=0;
+            int need19=(needed_mask&6u)!=0;
+            int need18=(needed_mask&24u)!=0;
+            int raw,owner13=0,owner19=0,owner18=0;
+            int actor_left=0,actor_top=0,actor_right=0,actor_bottom=0,have_rect=0;
+            if (!alive) continue;
+            if (need13) owner13=sc64_z7_world_owner_matches(ctx,13u,raw_owner);
+            if (need19) owner19=sc64_z7_world_owner_matches(ctx,19u,raw_owner);
+            if (need18) owner18=sc64_z7_world_owner_matches(ctx,18u,raw_owner);
+            if ((!actors_prevalidated && (owner13<0 || owner19<0 || owner18<0)) ||
+                (actors_prevalidated && ((need13&&owner13<0) ||
+                                         (need19&&owner19<0) ||
+                                         (need18&&owner18<0)))) return 0;
+            if (!(owner13 || owner19 || owner18)) continue;
+            raw=pass?(b[i].raw_type>=0?b[i].raw_type:sc64_race_raw_building(b[i].type)):
+                     (u[i].raw_type>=0?u[i].raw_type:sc64_race_raw_unit(u[i].type));
+            if (raw<0 || raw>227 || (pass?sc64_race_building_from_raw(raw)<0:
+                                      sc64_race_unit_from_raw(raw)<0)) return 0;
+            if ((needed_mask&1u) && owner13) ++counts[0];
+            if (pass && (needed_mask&2u) && owner19) ++counts[1];
+            if (pass && (needed_mask&4u) && owner19) {
+                if (!sc64_z7_world_building_rect((unsigned)raw,x,y,&actor_left,
+                    &actor_top,&actor_right,&actor_bottom)) return 0;
+                have_rect=1;
+                if ((int)left[2]<actor_right && actor_left<(int)right[2] &&
+                    (int)top[2]<actor_bottom && actor_top<(int)bottom[2]) ++counts[2];
+            }
+            if (owner18 && (needed_mask&24u)) {
+                if (!have_rect) {
+                    if (pass) {
+                        if (!sc64_z7_world_building_rect((unsigned)raw,x,y,
+                            &actor_left,&actor_top,&actor_right,&actor_bottom)) return 0;
+                    } else if (!sc64_z7_world_actor_rect((unsigned)raw,x,y,
+                        &actor_left,&actor_top,&actor_right,&actor_bottom)) return 0;
+                    have_rect=1;
+                }
+                if ((needed_mask&8u) && (int)left[3]<actor_right &&
+                    actor_left<(int)right[3] && (int)top[3]<actor_bottom &&
+                    actor_top<(int)bottom[3]) ++counts[3];
+                if ((needed_mask&16u) && (int)left[4]<actor_right &&
+                    actor_left<(int)right[4] && (int)top[4]<actor_bottom &&
+                    actor_top<(int)bottom[4]) ++counts[4];
+            }
+        }
+    }
+    for (unsigned q=0;q<5;++q) ctx->count_snapshot.count[q]=counts[q];
+    ctx->count_snapshot.active=(u8)needed_mask;
+    return 1;
+}
+
+static int sc64_z7_count_snapshot_begin(Sc64Z7WorldContext *ctx)
+{ return sc64_z7_count_snapshot_begin_full(ctx); }
+
+/* Caller must be the game adapter after its per-tick actor validation. */
+static int sc64_z7_count_snapshot_begin_pruned(Sc64Z7WorldContext *ctx,
+                                               u16 started_mask)
+{
+    static const u8 trigger[5]={0,2,4,6,7};
+    unsigned needed=0;
+    if (!ctx) return 0;
+    ctx->count_snapshot.active=0;
+    for(unsigned q=0;q<5;++q) ctx->count_snapshot.count[q]=0;
+    if (started_mask&~0xffu) return 0;
+    for (unsigned q=0;q<5;++q)
+        if (!(started_mask&(1u<<trigger[q]))) needed|=1u<<q;
+    return sc64_z7_count_snapshot_begin_masked(ctx,needed,1);
+}
+#else
 static int sc64_z7_count_snapshot_begin(Sc64Z7WorldContext *ctx)
 {
     static const u8 trigger[5]={0,2,4,6,7};
@@ -271,6 +478,7 @@ static int sc64_z7_count_snapshot_begin(Sc64Z7WorldContext *ctx)
     ctx->count_snapshot.active=1;
     return 1;
 }
+#endif
 
 static int sc64_z7_count_snapshot_lookup(const Sc64Z7WorldContext *ctx,
     const Sc64Z7SourceCondition *c,u32 *count)
@@ -282,6 +490,9 @@ static int sc64_z7_count_snapshot_lookup(const Sc64Z7WorldContext *ctx,
         const Sc64Z7SourceCondition *canonical;
         if (c->index || !sc64_z7_condition_row(trigger[q],0,&canonical) ||
             canonical!=c) return 0;
+#if defined(SC64_Z7_PRUNE_STARTED)
+        if (!(ctx->count_snapshot.active&(1u<<q))) return 0;
+#endif
         *count=ctx->count_snapshot.count[q];
         return 1;
     }

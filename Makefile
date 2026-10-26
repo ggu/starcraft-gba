@@ -3259,6 +3259,13 @@ test-sc64-z7-reachable-formation: build/test-sc64-z7-full-render-formation-refer
 	./build/test-sc64-z7-full-render-formation
 	./build/test-sc64-z7-full-render-formation-graph
 
+$(eval $(call Z7_FULL_RENDER_FIXTURE,prune-reference,sc64_z7_prune_game.c))
+$(eval $(call Z7_FULL_RENDER_FIXTURE,prune,sc64_z7_prune_game.c,-DSC64_Z7_PRUNE_STARTED))
+.PHONY: test-sc64-z7-prune-started
+test-sc64-z7-prune-started: build/test-sc64-z7-full-render-prune-reference build/test-sc64-z7-full-render-prune
+	./build/test-sc64-z7-full-render-prune-reference
+	./build/test-sc64-z7-full-render-prune
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
