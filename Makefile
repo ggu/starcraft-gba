@@ -25,9 +25,14 @@ build/test-sc64-minimap-terrain-scalar: tests/sc64_minimap_terrain.c starcraft/s
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -Icommon -Istarcraft $< build/gba-minimap-test.o -o $@
 build/test-sc64-minimap-terrain-blit: tests/sc64_minimap_terrain.c starcraft/sc64_minimap_terrain.h build/gba-minimap-test.o common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DSC64_MINIMAP_BLIT -Icommon -Istarcraft $< build/gba-minimap-test.o -o $@
-test-sc64-minimap-terrain: build/test-sc64-minimap-terrain-scalar build/test-sc64-minimap-terrain-blit
+build/gba-minimap-words-test.o: common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DGBA_SPRITE_WORDS -Wno-unused-variable -Icommon -c $< -o $@
+build/test-sc64-minimap-terrain-words: tests/sc64_minimap_terrain.c starcraft/sc64_minimap_terrain.h build/gba-minimap-words-test.o common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DGBA_SPRITE_WORDS -DSC64_MINIMAP_BLIT -Icommon -Istarcraft $< build/gba-minimap-words-test.o -o $@
+test-sc64-minimap-terrain: build/test-sc64-minimap-terrain-scalar build/test-sc64-minimap-terrain-blit build/test-sc64-minimap-terrain-words
 	./build/test-sc64-minimap-terrain-scalar
 	./build/test-sc64-minimap-terrain-blit
+	./build/test-sc64-minimap-terrain-words
 test: test-sc64-minimap-terrain
 
 # Asset-free Interceptor order decisions; no gameplay integration is enabled.

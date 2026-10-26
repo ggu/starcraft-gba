@@ -132,14 +132,17 @@ pending damage or new save fields.
 
 Canonical Terran, Zerg and Protoss builds and Showcase batch the same 24-by-24
 visibility raster through the existing sprite compositor. No new private inputs
-are needed. `make test-sc64-minimap-terrain` checks both scalar and batched
-paths without a source ROM. To compare a prepared profile with scalar drawing,
+are needed. `make test-sc64-minimap-terrain` checks scalar, batched and
+word-compositor paths without a source ROM. To compare a prepared profile with scalar drawing,
 use `make -B protoss CANONICAL_MINIMAP_FLAGS=` (replace `protoss` with another
 canonical target as needed); force rebuilding when changing flags.
 
 The [minimap audit](audits/2026-10-26-minimap-terrain/README.md) records the
 pixel oracle, byte-identical public replay and scoped ARM timing. P3/Z3 legacy
 and staged profiles retain their existing flag selections.
+Word-sprite builds phase-align the temporary raster with its screen position;
+the [alignment audit](audits/2026-10-27-minimap-phase/README.md) records the
+clipping oracle and small measured cycle reduction.
 
 ## Source geyser art
 
