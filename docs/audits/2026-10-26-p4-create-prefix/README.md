@@ -59,14 +59,20 @@ The regenerated scenario header SHA-256 is
 Private wrapper, ROM, log and flag manifests remain under
 `.local/build/p4-create-prefix-public/`; they are not source artifacts.
 
-The fresh-process save continuation check is still under investigation. The
-same baseline generation-21 SRAM image loads into both flag selections at
-frame 29,817 in mission 23. Six semantic groups (units, buildings, minerals,
-campaign, P4/Storm and clock/economy) match the saved checkpoint exactly.
-Both resumed suffix replays then produce the same running state rather than
-the direct replay's win. The discrepancy therefore also occurs with the old
-validator; it is not evidence of an effect from the new flags. This draft
-audit does not qualify that continuation or a merge of this change.
+Fresh-process ARM save continuation remains pending. Earlier failed ARM suffix
+checks are discarded: a copied nested wrapper's quoted relative include fell
+through the compiler's search paths into an older checkout. Hashing the intended
+source did not establish what the compiler actually read. Replacement wrappers
+use verified source dependencies; private wrappers should use absolute source
+paths or retain compiler dependency output.
+
+The original tape checkpoint also depended on building selection and a held
+gesture, which loading intentionally resets. A neutral checkpoint at update
+35,500 / frame 35,308 avoids those assumptions. Its preserved 32-KiB SRAM
+loads in a fresh host process through title-screen B; all 138 remaining
+500-update world checkpoints and the strict final win match uninterrupted
+play. The corresponding correct-source ARM check is still required before
+this draft qualifies fresh-process continued-win behavior.
 
 ## Local regression
 
