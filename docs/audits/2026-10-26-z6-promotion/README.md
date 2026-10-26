@@ -174,16 +174,16 @@ same tapes, built from the same checkout. Z5 and Z6 have no Z4 baseline.
 
 | Mission | Product | Mean update | Mean draw | Mean full | Worst window | Worst in-mission update | Victory update | Updates over 561,792 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Z1 | Z4 baseline | 234,132 | 337,175 | 653,407 | 1,017,139 | 8,938,817 | 6,032,519 | 45.0% |
-| Z1 | Z6 | 258,128 | 374,063 | 706,531 | 1,052,812 | 9,107,145 | 11,626,630 | 63.0% |
-| Z2 | Z4 baseline | 260,464 | 337,073 | 695,453 | 779,788 | 7,014,356 | 4,978,021 | 52.7% |
+| Z1 | Z4 baseline | 234,147 | 337,176 | 653,426 | 1,017,139 | 8,938,825 | 6,682,872 | 45.0% |
+| Z1 | Z6 | 258,128 | 374,069 | 706,531 | 1,052,812 | 9,107,145 | 11,626,630 | 63.0% |
+| Z2 | Z4 baseline | 260,547 | 337,066 | 695,558 | 779,788 | 7,014,346 | 5,629,248 | 52.7% |
 | Z2 | Z6 | 310,792 | 377,596 | 752,680 | 865,457 | 7,047,535 | 10,386,646 | 66.5% |
-| Z3 | Z4 baseline | 361,825 | 329,707 | 776,956 | 1,330,618 | 16,110,663 | 7,108,061 | 75.4% |
+| Z3 | Z4 baseline | 361,838 | 329,702 | 776,967 | 1,330,618 | 16,110,685 | 7,108,061 | 75.4% |
 | Z3 | Z6 | 422,643 | 367,985 | 878,102 | 1,392,679 | 16,276,353 | 11,161,713 | 88.4% |
-| Z4 | Z4 baseline | 294,258 | 345,930 | 727,348 | 897,481 | 4,356,599 | 5,350,358 | 87.4% |
-| Z4 | Z6 | 414,220 | 386,217 | 869,433 | 1,019,320 | 4,467,838 | 11,356,617 | 99.7% |
+| Z4 | Z4 baseline | 294,269 | 345,929 | 727,348 | 897,481 | 4,356,649 | 6,000,150 | 87.4% |
+| Z4 | Z6 | 414,220 | 386,221 | 869,437 | 1,019,320 | 4,467,748 | 11,356,804 | 99.7% |
 | Z5 | Z6 | 533,684 | 302,825 | 931,768 | 1,226,121 | 5,207,785 | 12,537,676 | 99.0% |
-| Z6 | Z6 | 453,742 | 348,453 | 869,015 | 1,809,270 | 12,180,086 | 17,148,000 | 92.8% |
+| Z6 | Z6 | 453,742 | 348,453 | 869,018 | 1,809,270 | 12,180,086 | 17,148,202 | 92.8% |
 
 On the same tapes, the six-chapter product costs 8.1%, 8.2%, 13.0% and 19.5%
 more mean full-frame cycles than the Z4 product for Z1–Z4. It also roughly
@@ -209,19 +209,20 @@ None of these numbers is a hardware measurement or a frame-rate claim.
 | IWRAM end | `0x03004f18` | `< 0x03005000` |
 | BSS end | `0x0203de78` | `< 0x0203e000` |
 | Save payload | 16,296 bytes (`sizeof(RaceSave)`) | `<= 16,368`, static assert |
-| ROM | 33,554,432 bytes, SHA-256 `c4723582…188200f6f` | `<= 32 MiB` |
+| ROM | 33,554,432 bytes, SHA-256 `d54d7fee…2bb9a5b` | `<= 32 MiB` |
 
 The legacy Z4 ROM rebuilt at the tested commit is 33,554,432 bytes, SHA-256
-`bd4358c8ec8074bb15576db42f3f0227fed41d2050c3fd45ef566d8285c8785a`. That is
+`fafa8018801ddbbcc220cee7e2c865e0de84d883e88027f41f4e1d2d5ff2b986`. That is
 byte-identical to the canonical Z4 build from `codex/source-release` at
-`83b572d`, which includes directional sprites and source Tank effects. The
+`6f440a4`, which includes directional sprites, source Tank effects and the
+Protoss warp-in glow. The
 explicit Z3 ROM is identical to base as well
-(`a9163bbeac0f9a0e11711ff76b2b0456eb6c0bb785386bdadf4c71e6819ae0af`).
+(`57b309a48f4f11310cf6b4fffec603b1e4b660cbd8af3ec749f8913031e453ed`).
 
 ## Commands run at the tested commit
 
-All of the following ran at `8ad406bbdf073f52d128844d07b711ea75985038`, the
-merge of `codex/source-release` at `83b572d`. Every
+All of the following ran at `9ea062d18cf7d37a29e8963f4eddb8cf38378427`, the
+merge of `codex/source-release` at `6f440a4`. Every
 command exited 0.
 
 ```sh
