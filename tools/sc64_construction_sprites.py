@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import re
 import struct
 import sys
 from pathlib import Path
@@ -30,6 +31,10 @@ TABLE_HASHES = {
     "00C/002": "e0bfdff3b35ff417eee003a7d85fccce4787959dcf18d14995a75a4144ddf75a",
     "00C/003": "3e5ea29bf9937558d0a3a302cd85852c220cd126ec049c0da176c77739bb4a71",
     "012/002": "f8e5f3d0fcca644470c37de65486e44b09eb30141eedccea3445afe7bc0f65bc",
+}
+CONSTRUCTION_MODIFIER_TABLE_HASHES = {
+    "00B/004": "32ae82250ec8c471bf583099ef370ca4d34ed5693e8be7f6ed3c23d020355403",
+    "00B/008": "f9a05ba0c117529befc69610eeff8af4c04f710ecec8518b45364a060d506e8e",
 }
 UNIT_COUNT = 228
 FLINGY_COUNT = 209
@@ -459,16 +464,121 @@ def audit_construction_flipstate(payload: bytes,
     return {"reachable_animation_count": len(seen_animations),
             "instruction_visits": instructions_seen, "setflipstate_count": 0}
 
+def _rgb555(value: int) -> tuple[int, int, int]:
+    return value & 31, (value >> 5) & 31, (value >> 10) & 31
+
+def _rgb_distance(a: tuple[int, int, int], b: tuple[int, int, int]) -> int:
+    return sum((a[i] - b[i]) ** 2 for i in range(3))
+
+def _palette_initializer(body: str, pattern: str, label: str) -> list[tuple[str, ...]]:
+    """Every initializer token must be understood; never skip a new override."""
+    body = re.sub(r"/\*.*?\*/|//[^\n]*", "", body, flags=re.S)
+    matches = list(re.finditer(pattern, body))
+    if re.sub(pattern, "", body).strip(" \r\n\t,"):
+        raise ValueError(f"unsupported {label} initializer")
+    return [match.groups() for match in matches]
+
+def _actual_gba_palette(gba_rgb555: Sequence[int]) -> tuple[list[tuple[int, int, int]], dict[str, str]]:
+    """Read palette installation inputs from runtime C, failing closed on drift."""
+    gba_c = (ROOT / "common/gba.c").read_text(encoding="ascii")
+    gba_h = (ROOT / "common/gba.h").read_text(encoding="ascii")
+    display_h = (ROOT / "starcraft/sc64_display.h").read_text(encoding="ascii")
+    hashes = {"common/gba.c": hashlib.sha256(gba_c.encode()).hexdigest(),
+              "common/gba.h": hashlib.sha256(gba_h.encode()).hexdigest(),
+              "starcraft/sc64_display.h": hashlib.sha256(display_h.encode()).hexdigest()}
+    color_match = re.search(r"static const u16 colors\[32\]\s*=\s*\{(.*?)\};", gba_c, re.S)
+    enum_match = re.search(r"enum\s*\{\s*(C_BLACK\s*=.*?)};", gba_h, re.S)
+    lcd_match = re.search(r"static const u8 lcd\[32\]\s*=\s*\{(.*?)\};", display_h, re.S)
+    ui_match = re.search(r"static const struct \{u8 index,r,g,b;} ui\[\]\s*=\s*\{(.*?)\};", display_h, re.S)
+    if not all((color_match, enum_match, lcd_match, ui_match)):
+        raise ValueError("GBA display palette source shape changed; update modifier projection parser")
+    ui_colors = [tuple(map(int, row)) for row in _palette_initializer(
+        color_match.group(1), r"RGB\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", "UI colors")]
+    lcd = [int(row[0]) for row in _palette_initializer(
+        lcd_match.group(1), r"\b(\d+)\b", "LCD curve")]
+    if len(ui_colors) != 32 or len(lcd) != 32 or len(gba_rgb555) != 256:
+        raise ValueError("unexpected GBA palette initializer sizes")
+    if any(not 0 <= c <= 31 for row in ui_colors for c in row) or any(not 0 <= c <= 31 for c in lcd):
+        raise ValueError("palette channels must fit RGB555")
+    enum_values: dict[str, int] = {}
+    next_value = 0
+    for item in enum_match.group(1).split(","):
+        item = item.strip()
+        if not item:
+            continue
+        match = re.fullmatch(r"(C_[A-Z0-9_]+)(?:\s*=\s*(\d+))?", item)
+        if not match:
+            raise ValueError(f"unsupported GBA color enum item: {item}")
+        name, explicit = match.groups()
+        if explicit is not None:
+            next_value = int(explicit)
+        enum_values[name] = next_value
+        next_value += 1
+    palette = list(ui_colors)
+    for value in gba_rgb555[32:]:
+        channels = _rgb555(int(value))
+        palette.append(tuple(lcd[channel] for channel in channels))
+    overrides = []
+    for name, r, g, b in _palette_initializer(ui_match.group(1),
+            r"\{\s*(C_[A-Z0-9_]+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}", "UI overrides"):
+        if name not in enum_values:
+            raise ValueError(f"unknown display palette override: {name}")
+        index = enum_values[name]
+        if not 0 <= index < 256 or any(not 0 <= int(c) <= 31 for c in (r, g, b)):
+            raise ValueError(f"invalid display palette override: {name}")
+        palette[index] = (int(r), int(g), int(b))
+        overrides.append(index)
+    if len(palette) != 256 or len(set(overrides)) != len(overrides):
+        raise ValueError("invalid parsed actual display palette")
+    return palette, hashes
+
+def warp_anchor_modifier_lut(source_palette_data: bytes, bfire: bytes,
+                             gba_rgb555: Sequence[int]) -> bytes:
+    """Project modifier-9 source strengths through the live 8-bit GBA palette.
+
+    Source output RGB is quantized to the nearest actual post-display GBA color
+    among all 256 entries. A current framebuffer destination is represented by
+    its nearest source-palette color among all 256 entries. Restricting that
+    inverse projection to the importer's source-index remap preimages is wrong:
+    display transforms and UI overrides can make the actual destination color
+    differ from the original source color that mapped to that index.
+    """
+    if len(source_palette_data) != 512 or len(bfire) != 40 * 256 or len(gba_rgb555) != 256:
+        raise ValueError("invalid authenticated WarpAnchor palette inputs")
+    source_palette = [((value >> 11) & 31, (value >> 6) & 31, (value >> 1) & 31)
+                      for value in struct.unpack(">256H", source_palette_data)]
+    actual_palette, _ = _actual_gba_palette(gba_rgb555)
+    representatives = []
+    for gba_index, destination in enumerate(actual_palette):
+        representatives.append(min(range(256),
+            key=lambda source_index: (_rgb_distance(source_palette[source_index], destination), source_index)))
+    nearest_output = [min(range(256),
+        key=lambda gba_index: (_rgb_distance(source_palette[source_index], actual_palette[gba_index]), gba_index))
+        for source_index in range(256)]
+    projected = bytearray(40 * 256)
+    for strength_row in range(40):
+        for destination in range(256):
+            raw_output = bfire[strength_row * 256 + representatives[destination]]
+            projected[strength_row * 256 + destination] = nearest_output[raw_output]
+    return bytes(projected)
+
 def write_header(path: Path, images: Sequence[dict[str, Any]], remap: bytes,
-                 stage_programs: Sequence[dict[str, Any]] = ()) -> None:
+                 stage_programs: Sequence[dict[str, Any]] = (),
+                 modifier_lut: bytes = b"") -> None:
     if len(remap) != 256:
         raise ValueError(f"palette remap must be 256 bytes, got {len(remap)}")
+    anchor = next((image for image in images if image["image_id"] == 211), None)
+    if anchor is not None and len(anchor["frames"]) != 14:
+        raise ValueError("WarpAnchor image 211 must provide all 14 source frames")
+    if (anchor is not None or modifier_lut) and len(modifier_lut) != 40 * 256:
+        raise ValueError("WarpAnchor modifier LUT must be exactly 40x256 bytes")
     lines = [
         "/* Private generated source art. Do not commit. */",
         "#ifndef SC64_CONSTRUCTION_SPRITES_GENERATED_H",
         "#define SC64_CONSTRUCTION_SPRITES_GENERATED_H",
         "#ifdef SC64_CONSTRUCTION_SOURCE_ART",
         '#include "sc64_construction_source.h"',
+        "#define SC64_CONSTRUCTION_COLOR_MODIFIERS_VERSION 1u",
         "",
     ]
     for image in images:
@@ -491,9 +601,52 @@ def write_header(path: Path, images: Sequence[dict[str, Any]], remap: bytes,
                 "};",
                 f"static const Sc64SpriteFrame {symbol} = {{ {x}, {y}, {fw}, {fh}, {f['width']}, {f['height']}, {symbol}_pixels }};",
             ])
+            if iid == 211:
+                strength_symbol = f"sc64_construction_image_211_strengths_{fi}"
+                strengths = bytearray()
+                for row in range(fh):
+                    for col in range(fw):
+                        source_index = (y + row) * f["width"] + x + col
+                        value = f["pixels"][source_index]
+                        if f["alpha"][source_index] and not 1 <= value <= 40:
+                            raise ValueError(f"WarpAnchor frame {fi} has invalid opaque strength {value}")
+                        strengths.append(value if f["alpha"][source_index] else 0)
+                lines.append(f"static const unsigned char {strength_symbol}[{len(strengths)}] = {{")
+                for offset in range(0, len(strengths), 16):
+                    values = ", ".join(f"0x{value:02x}" for value in strengths[offset:offset + 16])
+                    lines.append(f"    {values},")
+                lines.extend(["};", f"static const SC64ConstructionModifierFrame sc64_construction_image_211_modifier_frame_{fi} = {{ {x}, {y}, {fw}, {fh}, {f['width']}, {f['height']}, {strength_symbol} }};"])
         lines.append(f"static const Sc64SpriteFrame *const sc64_construction_image_{iid}_frames[] = {{")
         lines.extend(f"    &sc64_construction_image_{iid}_frame_{index}," for index in range(len(frames)))
         lines.extend(["};", f"#define SC64_CONSTRUCTION_IMAGE_{iid}_FRAME_COUNT {len(frames)}u", ""])
+    if anchor is not None:
+        lines.append("static const unsigned char sc64_construction_image_211_modifier_lut[10240] = {")
+        for offset in range(0, len(modifier_lut), 16):
+            values = ", ".join(f"0x{value:02x}" for value in modifier_lut[offset:offset + 16])
+            lines.append(f"    {values},")
+        lines.extend(["};", ""])
+        lines.append("static const SC64ConstructionModifierFrame *const sc64_construction_image_211_modifier_frames[14] = {")
+        lines.extend(f"    &sc64_construction_image_211_modifier_frame_{fi}," for fi in range(14))
+        lines.extend(["};", "",
+            "static inline unsigned sc64_construction_image_modifier(unsigned short image_id) {",
+            "    return image_id == 211u ? 9u : 0u;", "}",
+            "static inline unsigned sc64_construction_image_color_shift(unsigned short image_id) {",
+            "    return image_id == 211u ? 3u : 0u;", "}",
+            "static inline const SC64ConstructionModifierFrame *sc64_construction_modifier_frame(unsigned short image_id, unsigned short frame_index) {",
+            "    return image_id == 211u && frame_index < 14u ? sc64_construction_image_211_modifier_frames[frame_index] : (const SC64ConstructionModifierFrame *)0;",
+            "}",
+            "static inline const unsigned char *sc64_construction_modifier_lookup(unsigned short image_id, unsigned *rows) {",
+            "    if (rows) *rows = image_id == 211u ? 40u : 0u;",
+            "    return image_id == 211u ? sc64_construction_image_211_modifier_lut : (const unsigned char *)0;",
+            "}", ""])
+    else:
+        # Partial synthetic banks still exercise ordinary frame/stage writing.
+        # They advertise the ABI but contain no Warp Anchor payload.
+        lines.extend([
+            "static inline unsigned sc64_construction_image_modifier(unsigned short id) { (void)id; return 0; }",
+            "static inline unsigned sc64_construction_image_color_shift(unsigned short id) { (void)id; return 0; }",
+            "static inline const SC64ConstructionModifierFrame *sc64_construction_modifier_frame(unsigned short id, unsigned short frame) { (void)id; (void)frame; return 0; }",
+            "static inline const unsigned char *sc64_construction_modifier_lookup(unsigned short id, unsigned *rows) { (void)id; if (rows) *rows=0; return 0; }", ""])
     for program in stage_programs:
         raw, stage = program["raw_unit_id"], program["stage"]
         symbol = f"sc64_construction_raw_{raw}_stage_{stage}"
@@ -586,6 +739,22 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path,
     palette = read("00B/004")
     if len(palette) != 512:
         raise ValueError(f"Badlands palette must contain 512 bytes, got {len(palette)}")
+    modifier_tables = {"00B/004": palette}
+    for path, expected_hash in CONSTRUCTION_MODIFIER_TABLE_HASHES.items():
+        data = read(path)
+        actual_hash = hashlib.sha256(data).hexdigest()
+        if actual_hash != expected_hash:
+            raise ValueError(f"authenticated modifier table hash mismatch: {path}")
+        modifier_tables[path] = data
+    image_draw_function = tables["00C/000"][8 * IMAGE_COUNT:9 * IMAGE_COUNT]
+    image_color_shift = tables["00C/000"][9 * IMAGE_COUNT:10 * IMAGE_COUNT]
+    if (image_draw_function[211], image_color_shift[211]) != (9, 3):
+        raise ValueError("WarpAnchor image 211 no longer matches modifier 9/color_shift 3")
+    palette_json_path = remap_path.parent / "palette.json"
+    palette_json = json.loads(palette_json_path.read_text(encoding="utf8"))
+    modifier_lut = warp_anchor_modifier_lut(
+        palette, modifier_tables["00B/008"], palette_json["gba_rgb555"])
+    _, palette_source_hashes = _actual_gba_palette(palette_json["gba_rgb555"])
     output = []
     for image_id, item in selected.items():
         grp_data = read(item["grp_path"])
@@ -595,6 +764,8 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path,
         output.append({**item, "grp_sha1": hashlib.sha1(grp_data).hexdigest(),
                        "frame_count": len(grp["frames"]), "frames": grp["frames"]})
     frame_counts = {image["image_id"]: image["frame_count"] for image in output}
+    if frame_counts.get(PROTOSS_WARP_ANCHOR_IMAGE) != 14:
+        raise ValueError("Authenticated construction bank requires all 14 WarpAnchor frames")
     image_iscript = table_data[5]
     script_offsets = script_index(script_data)
     animation_starts: dict[tuple[int, str], int] = {}
@@ -615,7 +786,7 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path,
             raise ValueError(f"{stage_input['building']} {stage_input['animation']} "
                              f"(image {stage_input['image_id']}): {exc}") from exc
         stage_programs.append({**stage_input, "program": {"layers": compiled_layers}})
-    write_header(header_path, output, remap, stage_programs)
+    write_header(header_path, output, remap, stage_programs, modifier_lut)
     manifest = {
         "generator": {
             "extractor_commit": base.UPSTREAM_COMMIT,
@@ -631,7 +802,20 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path,
         "source": {"rom_filename": rom_path.name, "rom_sha1": rom_sha,
                    "rom_input_sha1": hashlib.sha1(rom_raw).hexdigest(),
                    "table_sha256": {path: hashlib.sha256(data).hexdigest()
-                                    for path, data in tables.items()}},
+                                    for path, data in tables.items()},
+                   "modifier_table_sha256": {path: hashlib.sha256(data).hexdigest()
+                                             for path, data in modifier_tables.items()}},
+        "color_modifier": {
+            "version": 1, "scope": "WarpAnchor image 211 only",
+            "image_id": 211, "modifier": 9, "color_shift": 3,
+            "bfire_table": "00B/008", "lookup_rows": 40, "lookup_columns": 256,
+            "projection": "nearest actual post-display GBA RGB555 output; each framebuffer destination represented by nearest source-palette RGB across all source entries",
+            "projection_source_sha256": {
+                **palette_source_hashes,
+                "palette.json": hashlib.sha256(palette_json_path.read_bytes()).hexdigest(),
+            },
+            "lookup_sha256": hashlib.sha256(modifier_lut).hexdigest(),
+            "limitations": ["GBA destination projection is quantized; BOLT 00B/008 role is associated by ordering and dimensions, without executable resource-index xref proof."]},
         "selection": {
             "unit_lookup": "units.dat->flingy.dat->sprites.dat->images.dat",
             "construction_images": "units.dat construction_animation column",

@@ -84,6 +84,30 @@ static void composite_source_sprite(u8 *pixels, const Sc64SpriteFrame *sprite,
     }
 }
 
+static void composite_source_image(u8 *pixels, unsigned image, unsigned frame,
+                                   const Sc64SpriteFrame *sprite, int cx, int cy)
+{
+    const SC64ConstructionModifierFrame *modifier =
+        sc64_construction_modifier_frame(image, frame);
+    if (!modifier) {
+        composite_source_sprite(pixels, sprite, cx, cy);
+        return;
+    }
+    unsigned rows = 0;
+    const u8 *lookup = sc64_construction_modifier_lookup(image, &rows);
+    assert(lookup && rows == 40);
+    int left = cx - modifier->canvas_w / 2 + modifier->x;
+    int top = cy - modifier->canvas_h / 2 + modifier->y;
+    for (unsigned y = 0; y < modifier->h; ++y)
+        for (unsigned x = 0; x < modifier->w; ++x) {
+            unsigned strength = modifier->strengths[y * modifier->w + x];
+            int sx = left + (int)x, sy = top + (int)y;
+            if (!strength || sx < 0 || sx >= 240 || sy < 12 || sy >= 120) continue;
+            assert(strength <= rows);
+            pixels[sy * 240 + sx] = lookup[(strength - 1) * 256 + pixels[sy * 240 + sx]];
+        }
+}
+
 static const SC64ConstructionSourceStage *source_stage_for(
     Building *building, int progress, uint32_t *elapsed, unsigned *frame_index)
 {
@@ -189,10 +213,10 @@ static void check_source_pixels_impl(int slot, int progress,
                 elapsed-child->start_source_updates,&child_frame));
         const Sc64SpriteFrame *art=sc64_construction_image_frame(
             child->image_id,(unsigned short)child_frame);
-        composite_source_sprite(second,art,center_x+child->x_offset,
+        composite_source_image(second,child->image_id,child_frame,art,center_x+child->x_offset,
                                 center_y+child->y_offset);
     }
-    composite_source_sprite(second,sprite,center_x,center_y);
+    composite_source_image(second,stage->image_id,frame_index,sprite,center_x,center_y);
     for (unsigned li=1;li<stage->layer_count;++li) {
         const SC64ConstructionSourceLayer *child=&stage->layers[li];
         if (child->under || elapsed<child->start_source_updates) continue;
@@ -202,7 +226,7 @@ static void check_source_pixels_impl(int slot, int progress,
                 elapsed-child->start_source_updates,&child_frame));
         const Sc64SpriteFrame *art=sc64_construction_image_frame(
             child->image_id,(unsigned short)child_frame);
-        composite_source_sprite(second,art,center_x+child->x_offset,
+        composite_source_image(second,child->image_id,child_frame,art,center_x+child->x_offset,
                                 center_y+child->y_offset);
     }
     /* Progress/vital bars are separate UI and may overlap the source canvas. */

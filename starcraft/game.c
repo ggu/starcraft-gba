@@ -429,6 +429,9 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #ifdef SC64_CONSTRUCTION_SOURCE_ART
 #include "sc64_construction_source.h"
 #include "sc64_construction_sprites_generated.h"
+#if !defined(SC64_CONSTRUCTION_COLOR_MODIFIERS_VERSION) || SC64_CONSTRUCTION_COLOR_MODIFIERS_VERSION != 1
+#error "Regenerate construction art with tools/sc64_construction_sprites.py for blue warp blending"
+#endif
 #endif
 #ifdef SC64_DEATH_SOURCE_ART
 #include "sc64_death_source.h"
@@ -6896,6 +6899,44 @@ draw_mission_sprite(const Sc64SpriteFrame *s, int cx, int cy)
     gfx_blit_sprite(cx - s->canvas_w / 2 + s->offset_x,
 	cy - s->canvas_h / 2 + s->offset_y, s->w, s->h, s->pixels);
 }
+#ifdef SC64_CONSTRUCTION_SOURCE_ART
+static int
+draw_construction_image(unsigned short image_id, unsigned short frame_index,
+                        const Sc64SpriteFrame *fallback, int cx, int cy)
+{
+    unsigned rows = 0;
+    const SC64ConstructionModifierFrame *modifier_frame =
+        sc64_construction_modifier_frame(image_id, frame_index);
+    const unsigned char *lookup =
+        sc64_construction_modifier_lookup(image_id, &rows);
+    if (sc64_construction_image_modifier(image_id) == 9u &&
+        sc64_construction_image_color_shift(image_id) == 3u &&
+        modifier_frame && lookup && rows == 40u) {
+        int x = cx - modifier_frame->canvas_w / 2 + modifier_frame->x;
+        int y = cy - modifier_frame->canvas_h / 2 + modifier_frame->y;
+        int top = 0, bottom = modifier_frame->h;
+        /* Map art always stays between the HUD and command bar, even in
+         * profiles that don't enable the general scene-clip API. */
+        if (y + top < 12) top = 12 - y;
+        if (y + bottom > 120) bottom = 120 - y;
+#ifdef GBA_SCENE_CLIP
+        unsigned short clip = gfx_get_clip_y();
+        int clip_top = clip & 255, clip_bottom = clip >> 8;
+        if (y + top < clip_top) top = clip_top - y;
+        if (y + bottom > clip_bottom) bottom = clip_bottom - y;
+#endif
+        if (top < 0) top = 0;
+        if (bottom > modifier_frame->h) bottom = modifier_frame->h;
+        if (top < bottom)
+            gfx_blit_sprite_mapped(x, y + top, modifier_frame->w, bottom - top,
+                                   modifier_frame->strengths + top * modifier_frame->w,
+                                   lookup, rows);
+        return 1;
+    }
+    if (fallback) draw_mission_sprite(fallback, cx, cy);
+    return fallback != 0;
+}
+#endif
 #endif
 
 /* Use the same footprint in the painter and its cached-object key. Geyser
@@ -7498,7 +7539,8 @@ draw_building_overlay(Building *q)
                         const Sc64SpriteFrame *construction =
                             sc64_construction_image_frame(stage->image_id,source_frame);
                         if (construction) {
-                            draw_mission_sprite(construction,x,y);
+                            draw_construction_image(stage->image_id,source_frame,
+                                                    construction,x,y);
                             source_drawn=1;
                         }
                     }
@@ -7513,7 +7555,8 @@ draw_building_overlay(Building *q)
                         const Sc64SpriteFrame *art=
                             sc64_construction_image_frame(child->image_id,child_frame);
                         if (art) {
-                            draw_mission_sprite(art,x+child->x_offset,y+child->y_offset);
+                            draw_construction_image(child->image_id,child_frame,art,
+                                                    x+child->x_offset,y+child->y_offset);
                             source_drawn=1;
                         }
                     }
