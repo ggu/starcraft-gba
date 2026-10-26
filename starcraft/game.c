@@ -18,7 +18,13 @@
     (!defined(GBA_SCENE_CLIP) || !defined(SC64_IMPORTED_MISSION))
 #error "SC64_STATIC_DIRTY_ROWS requires GBA_SCENE_CLIP and SC64_IMPORTED_MISSION"
 #endif
+#if defined(SC64_TANK_SOURCE_VFX) && (!defined(SC64_RACES) || !defined(SC64_HAS_SPRITES))
+#error "SC64_TANK_SOURCE_VFX requires imported race sprites"
+#endif
 #include "sc64_weapon_vfx.h"
+#ifdef SC64_TANK_SOURCE_VFX
+#include "sc64_tank_source_vfx.h"
+#endif
 #ifdef SC64_RACES
 #include "sc64_construction_vfx.h"
 #endif
@@ -1186,6 +1192,12 @@ static int race_p6_combat_tick_traps(void);
 #endif
 #ifdef SC64_P7_ARCHON_SPLASH
 static int race_p7_archon_splash_attack(Unit *q, int target);
+#endif
+enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
+       SC64_HIT_SKIP_HALLUCINATION_SCALE=4 };
+#ifdef SC64_SIEGE_SPLASH
+static void hit_target_impl_ex(int,int,int,int,int,int);
+static void race_siege_splash_attack(Unit *,int,int);
 #endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
 static int race_p7_active(void);
@@ -3133,25 +3145,29 @@ add_tracer(int x0, int y0, int x1, int y1, int color)
 }
 
 static void
-hit_target_impl(int target, int damage, int source_type, int source_owner,
-                int stock_damage_class)
+hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
+                   int stock_damage_class, int hit_flags)
 {
     int i, tx, ty;
 #ifndef SC64_RACES
     (void)stock_damage_class;
 #endif
+#ifndef SC64_SIEGE_SPLASH
+    (void)hit_flags;
+#endif
 #ifdef SC64_TEST_HIT_OBSERVER
     SC64_TEST_HIT_OBSERVER(target, damage, source_type, source_owner);
 #endif
 #ifdef SC64_Z6_RUNTIME
-    damage = race_z6_hallucination_incoming_damage(target, damage);
+    if (!(hit_flags & SC64_HIT_SKIP_HALLUCINATION_SCALE)) damage = race_z6_hallucination_incoming_damage(target, damage);
 #endif
 #ifdef SC64_P6_COMBAT_ENABLED
     if (target >= 0 && target < MAX_UNITS && race_p6_combat_unit_burrowed(target) &&
-        source_type != U_P6_INFESTED_TERRAN) return;
+        source_type != U_P6_INFESTED_TERRAN && !(hit_flags & SC64_HIT_ALLOW_SPLASH_BURROW)) return;
 #endif
 #ifdef SC64_T6_RUNTIME
-    if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target)) return;
+    if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target) &&
+        !(hit_flags & SC64_HIT_ALLOW_SPLASH_BURROW)) return;
 #endif
 #ifdef SC64_T5_RUNTIME
     if (target >= 0 && target < MAX_UNITS && SC64_TRANSPORT_LOADED(&u[target]))
@@ -3175,7 +3191,9 @@ hit_target_impl(int target, int damage, int source_type, int source_owner,
     int flags=target<MAX_UNITS?u[target].flags:b[target-MAX_UNITS].flags;
     if(flags&16)return;
     int *shield=target<MAX_UNITS?&u[target].shield:&b[target-MAX_UNITS].shield;
-    int absorbed=*shield<damage?*shield:damage;*shield-=absorbed;damage-=absorbed;
+    if (!(hit_flags & SC64_HIT_PRECOMPUTED_HP)) {
+        int absorbed=*shield<damage?*shield:damage;*shield-=absorbed;damage-=absorbed;
+    }
     if(!damage)return;
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
@@ -3185,7 +3203,8 @@ hit_target_impl(int target, int damage, int source_type, int source_owner,
 	tx = u[target].x;
 	ty = u[target].y;
 #ifdef SC64_RACES
-        if (stock_damage_class>=0) {
+        if (hit_flags & SC64_HIT_PRECOMPUTED_HP) { /* Q8 splash damage already resolved. */ }
+        else if (stock_damage_class>=0) {
             int raw=u[target].raw_type>=0?u[target].raw_type:
                     sc64_race_raw_unit(u[target].type);
             const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
@@ -3323,7 +3342,8 @@ hit_target_impl(int target, int damage, int source_type, int source_owner,
 	tx = q->x;
 	ty = q->y;
 	#ifdef SC64_RACES
-    if (stock_damage_class>=0) {
+    if (hit_flags & SC64_HIT_PRECOMPUTED_HP) { /* Q8 splash damage already resolved. */ }
+    else if (stock_damage_class>=0) {
         int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_building(q->type);
         const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
         damage=sc64_stock_hp_damage_after_armor(damage,
@@ -3343,7 +3363,7 @@ hit_target_impl(int target, int damage, int source_type, int source_owner,
 #endif
     damage-=sc64_race_building_armor(q->type);
     }
-    q->hp-=damage>0?damage:1;
+    q->hp-=(hit_flags & SC64_HIT_PRECOMPUTED_HP)?damage:(damage>0?damage:1);
 #else
     q->hp -= damage > 1 ? damage - 1 : 1;
 #endif
@@ -3399,6 +3419,9 @@ hit_target_impl(int target, int damage, int source_type, int source_owner,
 
 /* Special adapters pass already-resolved packets through the legacy path;
  * ordinary stock weapons supply an explicit damage class below. */
+static void hit_target_impl(int target,int damage,int source_type,int source_owner,
+                            int stock_damage_class)
+{ hit_target_impl_ex(target,damage,source_type,source_owner,stock_damage_class,0); }
 static void hit_target(int target,int damage,int source_type,int source_owner)
 { hit_target_impl(target,damage,source_type,source_owner,-1); }
 
@@ -5253,9 +5276,13 @@ tick_combat(Unit * q, int target)
         damage = sc64_t5_actor_weapon_damage(q->type,
                      q->owner == SIDE ? weapons_level : 0, flying);
 #endif
-    Sc64StockAttack stock_attack;
+    Sc64StockAttack stock_attack={0};
     int attack_raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
     int stock_weapon=sc64_stock_attack_select(attack_raw,flying,&stock_attack);
+#ifdef SC64_SIEGE_SPLASH
+    int siege_splash_weapon=stock_weapon &&
+        (stock_attack.weapon_id==27 || stock_attack.weapon_id==28);
+#endif
     if (!stock_weapon) {
         const Sc64StockUnitProfile *identity=sc64_stock_unit_profile(attack_raw);
         /* An alias may advertise another raw unit's weapon eligibility.
@@ -5312,8 +5339,7 @@ tick_combat(Unit * q, int target)
 #ifdef SC64_UNIT_FACING
 	    SC64_FACING_FIRE(q, target);
 #endif
-	    add_tracer(q->x, q->y, target_x(target), target_y(target),
-                sc64_weapon_vfx_unit_profile(
+	    int visual_color=sc64_weapon_vfx_unit_profile(
 #ifdef SC64_RACES
                     q->type==U_RAYNOR && q->raw_type==19 ? U_VULTURE :
 #endif
@@ -5323,8 +5349,24 @@ tick_combat(Unit * q, int target)
 #else
                     0
 #endif
-                ));
+                );
+#ifdef SC64_RACES
+#ifdef SC64_TANK_SOURCE_VFX
+            if (q->type==U_TANK || q->type==U_SIEGE_TANK) {
+                int source_style=q->type==U_SIEGE_TANK ? SC64_TANK_SOURCE_SIEGE : SC64_TANK_SOURCE_TANK;
+                int dir=sc64_private_tank_direction(target_x(target)-q->x,
+                                                    target_y(target)-q->y);
+                visual_color=sc64_weapon_vfx_pack(source_style,dir);
+            }
+#endif
+#endif
+            add_tracer(q->x,q->y,target_x(target),target_y(target),visual_color);
 	#ifdef SC64_RACES
+#ifdef SC64_SIEGE_SPLASH
+        if (siege_splash_weapon) race_siege_splash_attack(q,target,damage);
+        else
+#endif
+        {
         int hits=stock_weapon?(int)sc64_stock_attack_impact_count(&stock_attack):
                               sc64_race_unit_hits_vs(q->type,flying);
 #ifdef SC64_Z6_RUNTIME
@@ -5334,6 +5376,7 @@ tick_combat(Unit * q, int target)
             if (stock_weapon) hit_target_impl(target,damage,q->type,q->owner,
                                              stock_attack.weapon->damage_class);
             else hit_target(target,damage,q->type,q->owner);
+        }
         }
 #if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
     defined(SC64_Z7_SCOURGE_COMBAT)
@@ -7036,6 +7079,9 @@ draw_unit(Unit * q)
 #define SC64_WEAPON_VFX_VISIBLE(x,y) currently_visible((x)+camx,(y)+camy-12)
 #include "sc64_weapon_vfx_render.h"
 #undef SC64_WEAPON_VFX_VISIBLE
+#ifdef SC64_TANK_SOURCE_VFX
+#include "sc64_tank_source_vfx_render.h"
+#endif
 
 static void
 draw_tracers(void)
@@ -7044,6 +7090,13 @@ draw_tracers(void)
         int style=sc64_weapon_vfx_style(tracers[i].color);
         /* Legacy original-art saves may contain an untagged tracer color. */
         if (!style) style=SC64_WEAPON_VFX_STYLE_MUZZLE;
+#ifdef SC64_TANK_SOURCE_VFX
+        if (style==SC64_TANK_SOURCE_TANK || style==SC64_TANK_SOURCE_SIEGE) {
+            sc64_private_tank_vfx_draw(style,sc64_weapon_vfx_color(tracers[i].color),
+                tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,tracers[i].life);
+            continue;
+        }
+#endif
         sc64_weapon_vfx_draw(style,sc64_weapon_vfx_color(tracers[i].color),
             tracers[i].x0-camx,tracers[i].y0-camy+12,
             tracers[i].x1-camx,tracers[i].y1-camy+12,tracers[i].life);
@@ -8986,6 +9039,9 @@ game_self_test(void)
 #include "race_combat.h"
 #ifdef SC64_P7_ARCHON_SPLASH
 #include "sc64_p7_archon_adapter.h"
+#endif
+#ifdef SC64_SIEGE_SPLASH
+#include "sc64_siege_splash.h"
 #endif
 #ifdef SC64_T5_RUNTIME
 #include "sc64_t5_availability_adapter.h"

@@ -103,6 +103,7 @@ STAGED_CAMPAIGN_INPUTS = {
 
 FACING_PROFILES = ("terran", "zerg", "protoss", "protoss-p5-shuttle")
 FACING_HEADER = ".local/sc64/facing/generated/sc64_unit_facing_generated.h"
+TANK_VFX_HEADER = ".local/sc64/tank-vfx/generated/sc64_tank_source_vfx_generated.h"
 
 
 def run(command: list[str], *, cwd: Path = ROOT) -> None:
@@ -179,6 +180,22 @@ def facing_sprite_input_ready(path: Path) -> bool:
             re.search(r"static const Sc64SpriteFrame sc64_unit_facing_\d+\[17\]",
                       text) is not None and
             re.search(r"static const unsigned char sc64_unit_facing_\d+_0_pixels\[[1-9]\d*\]",
+                      text) is not None)
+
+
+def tank_vfx_input_ready(path: Path) -> bool:
+    """Require versioned source-effect frames and a destination lookup table."""
+    try:
+        text = path.read_text(encoding="ascii")
+    except (OSError, UnicodeError):
+        return False
+    return (re.search(r"^#define\s+SC64_TANK_SOURCE_VFX_VERSION\s+1\s*$",
+                      text, re.MULTILINE) is not None and
+            re.search(r"static const Sc64TankSourceFrame sc64_tank_frames_533\[14\]",
+                      text) is not None and
+            re.search(r"static const uint8_t sc64_tank_source_pixels\[[1-9]\d*\]",
+                      text) is not None and
+            re.search(r"static const uint8_t sc64_tank_projected_lut\[63\s*\*\s*256\]",
                       text) is not None)
 
 
@@ -360,6 +377,10 @@ def build(game: str) -> None:
         raise RuntimeError(
             "canonical race builds require the metadata-aware directional sprite bank; "
             "regenerate with ./dev sc64 prepare --rom PATH --profile " + game)
+    if game in FACING_PROFILES and not tank_vfx_input_ready(ROOT / TANK_VFX_HEADER):
+        raise RuntimeError(
+            "canonical race builds require source Tank effects; "
+            "regenerate with ./dev sc64 prepare --rom PATH --profile " + game)
     make_target, _ = GAMES[game]
     run(["make", make_target])
 
@@ -517,6 +538,10 @@ def prepare(rom: Path, profile: str) -> None:
              "--rom", str(private_rom), "--out", str((ROOT / FACING_HEADER).parent)])
         if not facing_sprite_input_ready(ROOT / FACING_HEADER):
             raise RuntimeError("directional sprite preparation produced a stale or empty bank")
+        run([sys.executable, str(ROOT / "tools/sc64_tank_source_vfx.py"),
+             "--rom", str(private_rom), "--out", str((ROOT / TANK_VFX_HEADER).parent)])
+        if not tank_vfx_input_ready(ROOT / TANK_VFX_HEADER):
+            raise RuntimeError("Tank effect preparation produced a stale or empty bank")
     print(f"Prepared local StarCraft 64 data for profile '{profile}'. Generated files stay under .local/.")
 
 
@@ -574,6 +599,7 @@ def status(profile: str) -> int:
                      for mission in range(7, 11) for kind in ("scenario", "availability"))
     if profile in FACING_PROFILES:
         paths.append(("Directional unit sprites", ROOT / FACING_HEADER))
+        paths.append(("Tank firing effects", ROOT / TANK_VFX_HEADER))
     _, rom_rel = GAMES[profile]
     paths.append(("Built ROM", ROOT / rom_rel))
     audio = ROOT / ".local/sc64/audio/generated/sc64_audio_generated.h"
@@ -582,6 +608,8 @@ def status(profile: str) -> int:
         ready = path.is_file()
         if label == "Directional unit sprites":
             ready = facing_sprite_input_ready(path)
+        elif label == "Tank firing effects":
+            ready = tank_vfx_input_ready(path)
         elif label.endswith("gated map data"):
             map_profile = ("protoss-p5-shuttle" if label == "Protoss chapter 5 gated map data"
                            else "zerg" if profile == "zerg-z3" else profile)
@@ -603,6 +631,7 @@ def status(profile: str) -> int:
         print(f"{'READY  ' if ready else 'MISSING'} {label}: {path}{note}")
     return int(any(not path.is_file() for _, path in paths) or
                (profile in FACING_PROFILES and not facing_sprite_input_ready(ROOT / FACING_HEADER)) or
+               (profile in FACING_PROFILES and not tank_vfx_input_ready(ROOT / TANK_VFX_HEADER)) or
                (profile in ("zerg", "zerg-z3", "protoss", "protoss-p3") and not race_campaign_input_ready(
                    "zerg" if profile == "zerg-z3" else profile,
                    ROOT / ".local/sc64/races/generated/sc64_races_generated.h")) or

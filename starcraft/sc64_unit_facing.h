@@ -72,7 +72,7 @@ sc64_facing_track(const Unit *q)
 {
     int slot = (int)(q - u), dx, dy;
     if (slot < 0 || slot >= MAX_UNITS || q->order == ORDER_IDLE) return;
-    if (q->cd && q->order != ORDER_MOVE && q->order != ORDER_ATTACK_MOVE) return;
+    if (q->cd && q->order == ORDER_ATTACK_TARGET) return;
     if (sc64_race_unit_flying(q->type)) {
         dx = q->tx - q->x;
         dy = q->ty - q->y;

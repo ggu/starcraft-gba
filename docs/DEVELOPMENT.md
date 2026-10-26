@@ -78,8 +78,41 @@ game, scene restart, accepted load or reused actor slot starts at north until
 the unit moves or fires. It does not change the save format or combat rules.
 This adds directional idle poses, including Tank hull/turret layers; it does
 not implement the original walking cycles, turn rates or independent turret
-tracking. Canonical campaigns use packed directional frames; Showcase uses
-the indexed compositor within its existing memory limits.
+tracking. Canonical campaigns and Showcase use packed directional frames.
+`make -B showcase SHOWCASE_UNIT_WORD_FLAGS=` selects the indexed comparison path.
+
+## Tank firing effects and siege splash
+
+Canonical race builds and Showcase use source Tank muzzle and target-impact
+frames. Refresh their private inputs with `./dev sc64 prepare --rom PATH
+--profile terran` (or `zerg` / `protoss`). The standalone importer is
+`python3 tools/sc64_tank_source_vfx.py --out .local/sc64/tank-vfx/generated`.
+It verifies the USA ROM, weapon/image chains and supported script sequences;
+generated graphics, lookup tables and manifests stay ignored under `.local/`.
+`make -B showcase CANONICAL_WEAPON_FLAGS= SHOWCASE_SIEGE_FLAGS=` selects the earlier weapon behavior
+for comparison. The same override applies to the three canonical race targets.
+
+Showcase enables the `SC64_SIEGE_SPLASH` prototype. Campaign builds retain
+their earlier primary-target damage rule: the stock splash change causes the
+Z3 normal-controller completion regression to reach its 180000-update limit,
+so campaign promotion requires fresh completion qualification. This does not
+block the source firing graphics or directional rendering. In Showcase,
+siege-mode shots apply radial damage to eligible nearby ground actors,
+including allies, with full/half/quarter packets at inclusive source radii
+10/25/40. Distance uses the target's source rectangle. Armor and explosive size
+scaling follow the radius split; inner-ring splash can hit burrowed actors.
+The shooter, loaded units, air units and invincible actors are excluded.
+An unknown nearby actor identity falls back to primary-only damage rather than
+guessing its dimensions. HP/shields retain the engine's integer precision.
+
+The effects preserve source strength pixels and use a destination-dependent
+light lookup projected into the GBA palette. The N64 light-table binding is
+inferred, and palette reduction changes colors; this is not a pixel-identical
+N64 rendering claim. Source waits are converted from 24 to 30 simulation
+updates per second. The engine still applies damage immediately when firing;
+native attack windup, independently moving turrets and a complete projectile
+state machine remain unfinished. The visual pool is cosmetic and carries no
+pending damage or new save fields.
 
 ## Canonical minimap rendering
 

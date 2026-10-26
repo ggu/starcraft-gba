@@ -24,6 +24,16 @@ static int fail(const char *message)
 }
 
 #ifdef SC64_UNIT_FACING
+static void facing_test_clip(int top, int bottom)
+{
+#ifdef GBA_SCENE_CLIP
+    gfx_set_clip_y(top, bottom);
+#else
+    (void)top;
+    (void)bottom;
+#endif
+}
+
 static int facing_is_zero(void)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
@@ -57,7 +67,7 @@ static int check_facing_word_bank(void)
                 return fail("missing/mismatched packed direction sidecar");
             for (unsigned ci = 0; ci < sizeof(clip)/sizeof(clip[0]); ++ci) {
                 gfx_begin(0);
-                gfx_set_clip_y(clip[ci][0], clip[ci][1]);
+                facing_test_clip(clip[ci][0], clip[ci][1]);
                 if (!sc64_facing_blit((unsigned)raws[ri], direction, 119, 79))
                     return fail("packed source direction did not draw");
                 unsigned actual[240*160];
@@ -66,7 +76,7 @@ static int check_facing_word_bank(void)
                         actual[y*240+x] = gfx_test_pixel(x,y);
 
                 gfx_begin(0);
-                gfx_set_clip_y(clip[ci][0], clip[ci][1]);
+                facing_test_clip(clip[ci][0], clip[ci][1]);
                 const Sc64SpriteFrame *f = &frames[direction <= 16 ? direction : 32-direction];
                 if (direction <= 16)
                     gfx_blit_sprite(119-f->canvas_w/2+f->offset_x,
@@ -80,7 +90,7 @@ static int check_facing_word_bank(void)
                             return fail("packed direction differs from indexed/mirrored source pixels");
             }
             gfx_begin(0);
-            gfx_set_clip_y(0,160);
+            facing_test_clip(0,160);
             (void)sc64_facing_blit((unsigned)raws[ri], direction, 119, 79);
             direction_hash[direction] = framebuffer_hash();
         }
@@ -95,12 +105,14 @@ static int check_facing_word_bank(void)
 static int check_movement_facing(void)
 {
     static const int headings[8] = {0,4,8,12,16,20,24,28};
-    const int types[2] = {U_MARINE, U_SCOUT};
-    for (unsigned ti = 0; ti < 2; ++ti) {
+    const int types[3] = {U_MARINE, U_SCOUT, U_SCV};
+    for (unsigned ti = 0; ti < 3; ++ti) {
         Unit *q = &u[0];
         memset(q, 0, sizeof(*q));
         q->alive = 1; q->owner = SIDE; q->type = types[ti]; q->raw_type = -1;
-        q->x = q->y = 128; q->order = ORDER_MOVE; q->cd = 20;
+        q->x = q->y = 128;
+        q->order = types[ti] == U_SCV ? ORDER_MINE : ORDER_MOVE;
+        q->cd = 20;
         int raw = sc64_race_raw_unit(q->type);
         if (raw < 0 || !sc64_unit_facing_frames((unsigned short)raw))
             return fail("movement-facing test unit lacks imported source frames");

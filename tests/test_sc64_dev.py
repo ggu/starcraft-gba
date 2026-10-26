@@ -34,12 +34,21 @@ FACING_SPRITE_HEADER = (
     'static inline const Sc64SpriteFrame *sc64_unit_facing_frames(unsigned short raw_type) { return 0; }\n'
     'static inline const Sc64UnitFacingWordFrame *sc64_unit_facing_word_frame(unsigned short raw_type, unsigned char direction) { return 0; }\n'
 )
+TANK_VFX_HEADER = (
+    '#define SC64_TANK_SOURCE_VFX_VERSION 1\n'
+    'static const Sc64TankSourceFrame sc64_tank_frames_533[14] = {{0}};\n'
+    'static const uint8_t sc64_tank_source_pixels[1] = {1};\n'
+    'static const uint8_t sc64_tank_projected_lut[63*256] = {0};\n'
+)
 
 
 def emit_facing_header(root):
     path = root / dev.FACING_HEADER
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(FACING_SPRITE_HEADER, encoding='ascii')
+    path = root / dev.TANK_VFX_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(TANK_VFX_HEADER, encoding='ascii')
 
 
 P4_SCENARIO_HEADER = (
@@ -59,6 +68,21 @@ verify_loader.exec_module(verify_roms)
 
 
 class OnboardingTests(unittest.TestCase):
+    def test_tank_effect_readiness_rejects_empty_or_stale_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'tank.h'
+            self.assertFalse(dev.tank_vfx_input_ready(header))
+            for text in (
+                TANK_VFX_HEADER.replace('VFX_VERSION 1', 'VFX_VERSION 10'),
+                TANK_VFX_HEADER.replace('sc64_tank_frames_533[14]', 'sc64_tank_frames_533[1]'),
+                TANK_VFX_HEADER.replace('sc64_tank_source_pixels[1]', 'sc64_tank_source_pixels[0]'),
+                TANK_VFX_HEADER.replace('sc64_tank_projected_lut[63*256]', 'missing_lut[63*256]'),
+            ):
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.tank_vfx_input_ready(header))
+            header.write_text(TANK_VFX_HEADER, encoding='ascii')
+            self.assertTrue(dev.tank_vfx_input_ready(header))
+
     def test_directional_readiness_rejects_legacy_markers_and_empty_bank(self):
         with tempfile.TemporaryDirectory() as directory:
             header = Path(directory) / 'facing.h'
@@ -93,6 +117,11 @@ class OnboardingTests(unittest.TestCase):
                 emit_facing_header(root)
                 dev.build('terran')
                 run.assert_called_once_with(['make', 'terran'])
+                run.reset_mock()
+                (root / dev.TANK_VFX_HEADER).unlink()
+                with self.assertRaisesRegex(RuntimeError, 'source Tank effects'):
+                    dev.build('terran')
+                run.assert_not_called()
 
     def test_z3_and_p3_profile_gates_are_required_and_distinct(self):
         with tempfile.TemporaryDirectory() as directory:
