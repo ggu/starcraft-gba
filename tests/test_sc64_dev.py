@@ -62,9 +62,11 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(verify_roms.TARGETS['--zerg-z3'],
                          ('StarCraft-Zerg-GBA', 'starcraft-zerg', 'SCZ3', 'SC ZERG Z3'))
         self.assertEqual(verify_roms.TARGETS['--protoss'],
+                         ('StarCraft-Protoss-P5-Shuttle-GBA', 'starcraft-protoss-p5-shuttle',
+                          'SCPB', 'SC P5 CARGO'))
+        self.assertEqual(verify_roms.TARGETS['--protoss-p4-storm'],
                          ('StarCraft-Protoss-P4-Storm-GBA', 'starcraft-protoss-p4-storm',
                           'SCP5', 'SC P4 STORM'))
-        self.assertEqual(verify_roms.TARGETS['--protoss-p4-storm'], verify_roms.TARGETS['--protoss'])
         self.assertEqual(verify_roms.TARGETS['--protoss-p3'],
                          ('StarCraft-Protoss-GBA', 'starcraft-protoss', 'SCP3', 'SC PROTOSS3'))
 
@@ -76,22 +78,36 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(dev.GAMES['zerg-z3'], ('zerg-z3', 'build/StarCraft-Zerg-GBA.gba'))
         self.assertEqual(dev.PLAY_SAVE_PROFILES,
                          {'zerg': 'zerg-z4', 'zerg-z3': 'zerg',
-                          'protoss': 'protoss-p4-storm', 'protoss-p3': 'protoss'})
+                          'protoss': 'protoss-p5-shuttle', 'protoss-p3': 'protoss',
+                          'protoss-p4-storm': 'protoss-p4-storm',
+                          'protoss-p5-shuttle': 'protoss-p5-shuttle'})
         self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['zerg'],
                          ('StarCraft-Zerg-Z4-GBA.gba', 'starcraft-zerg-z4.elf'))
         self.assertEqual(sc64_split_profile.PROFILE_BUILD_PATHS['zerg'],
                          ('StarCraft-Zerg-Z4-GBA.gba', 'starcraft-zerg-z4.elf'))
         for routes in (sc64_split_profile.PROFILE_BUILD_PATHS, sc64_split_smoke.PROFILE_BUILD_PATHS):
             self.assertEqual(routes['protoss'],
-                             ('StarCraft-Protoss-P4-Storm-GBA.gba', 'starcraft-protoss-p4-storm.elf'))
+                             ('StarCraft-Protoss-P5-Shuttle-GBA.gba', 'starcraft-protoss-p5-shuttle.elf'))
 
     def test_p4_storm_and_legacy_p3_have_explicit_build_and_save_routes(self):
         self.assertEqual(dev.GAMES['protoss-p3'],
                          ('protoss-p3', 'build/StarCraft-Protoss-GBA.gba'))
         self.assertEqual(dev.GAMES['protoss-p4-storm'],
                          ('protoss-p4-storm', 'build/StarCraft-Protoss-P4-Storm-GBA.gba'))
-        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p4-storm'], 'test-protoss')
-        self.assertEqual(dev.GAMES['protoss'][1], dev.GAMES['protoss-p4-storm'][1])
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p4-storm'], 'test-protoss-p4-storm')
+        makefile = (ROOT / 'Makefile').read_text(encoding='utf-8')
+        p4_test = next(line for line in makefile.splitlines()
+                       if line.startswith('test-protoss-p4-storm:'))
+        self.assertIn('test-sc64-p4-runtime', p4_test)
+        self.assertIn('test-sc64-p4-campaign', p4_test)
+        self.assertIn('test-sc64-p4-occupancy-targets', p4_test)
+        p5_rule = next(line for line in makefile.splitlines()
+                       if line.startswith('build/test-sc64-protoss-carried-campaign:'))
+        self.assertIn('$(P5_INPUTS)', p5_rule)
+        self.assertNotEqual(dev.GAMES['protoss'][1], dev.GAMES['protoss-p4-storm'][1])
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss'], 'protoss-p5-shuttle')
+        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p4-storm'], ('protoss-p4-storm', 'build/StarCraft-Protoss-P4-Storm-GBA.gba'))
         self.assertEqual(dev.PLAY_SAVE_PROFILES.get('protoss-p4-storm', 'protoss-p4-storm'),
                          'protoss-p4-storm')
         self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss-p3'], 'protoss')
@@ -136,7 +152,7 @@ class OnboardingTests(unittest.TestCase):
 
             with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
                     patch.object(dev, 'run', side_effect=fake_run):
-                dev.prepare(rom, 'protoss')
+                dev.prepare(rom, 'protoss-p4-storm')
             self.assertTrue(all(dev.protoss_p4_input_ready(label, root / relative)
                                 for label, relative, _ in dev.PROTOSS_P4_INPUTS))
             self.assertIn('sc64_skirmish_pack.py', [Path(call[1]).name for call in calls])
@@ -254,6 +270,21 @@ class OnboardingTests(unittest.TestCase):
                 dev.build('terran')
             run.assert_called_once_with(['make', 'terran'])
 
+    def test_canonical_p5_requires_source_gate_and_prepacked_sprite_payload(self):
+        label = 'Protoss chapter 5 sprites'
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'p5_sprites.h'
+            header.write_text('#define SC64_Z6_SPRITE_SET_COMPLETE 1\n', encoding='ascii')
+            self.assertFalse(dev.staged_campaign_input_ready('protoss-p5-shuttle', label, header))
+            stale = UNIT_WORD_SPRITE_HEADER.replace(
+                '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 1',
+                '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 0')
+            header.write_text('#define SC64_Z6_SPRITE_SET_COMPLETE 1\n' + stale, encoding='ascii')
+            self.assertFalse(dev.staged_campaign_input_ready('protoss-p5-shuttle', label, header))
+            header.write_text('#define SC64_Z6_SPRITE_SET_COMPLETE 1\n' + UNIT_WORD_SPRITE_HEADER,
+                              encoding='ascii')
+            self.assertTrue(dev.staged_campaign_input_ready('protoss-p5-shuttle', label, header))
+
     def test_staged_z6_and_p5_profiles_have_explicit_build_and_test_routes(self):
         self.assertEqual(dev.GAMES['zerg-z6'],
                          ('zerg-z6-probe', 'build/StarCraft-Zerg-Z6-Probe-GBA.gba'))
@@ -264,6 +295,13 @@ class OnboardingTests(unittest.TestCase):
             'test-sc64-z6-frame-coverage', 'test-sc64-z6-controller'))
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p5-shuttle'],
                          ('test-sc64-p5-shuttle-runtime', 'test-sc64-p5-campaign-run'))
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
+        makefile = (ROOT / 'Makefile').read_text(encoding='utf-8')
+        self.assertIn('PROTOSS_P5_CANONICAL_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P5_SHUTTLE_FLAGS)', makefile)
+        self.assertIn('test-protoss: ', makefile)
+        canonical_test = next(line for line in makefile.splitlines() if line.startswith('test-protoss:'))
+        self.assertIn('test-sc64-p5-canonical', canonical_test)
+        self.assertIn('build/test-sc64-p5-canonical-campaign-run', makefile)
 
     def test_staged_campaign_preparation_uses_existing_private_packers(self):
         for profile, expected in (
@@ -294,6 +332,9 @@ class OnboardingTests(unittest.TestCase):
                 else:
                     observed.add(f'{name}:{mission}' if mission else name)
             self.assertEqual(observed, expected)
+            p5_sprite_commands = [command for command in calls if Path(command[1]).name == 'sc64_race_sprites.py' and '--include-z6-actors' in command]
+            if profile == 'protoss-p5-shuttle':
+                self.assertTrue(all('--prepack-unit-words' in command for command in p5_sprite_commands))
             self.assertTrue(all('/private/StarCraft64-USA.z64' not in command
                                 for command in calls if Path(command[1]).name not in
                                 ('sc64_z4_pack.py', 'sc64_p4_pack.py', 'sc64_race_sprites.py')))
@@ -364,8 +405,10 @@ class OnboardingTests(unittest.TestCase):
                     if output is not None:
                         output.parent.mkdir(parents=True, exist_ok=True)
                         marker_set = markers_by_path.get(str(output.relative_to(root)), set())
-                        output.write_text('\n'.join(f'#define {marker} 1' for marker in marker_set) + '\n',
-                                          encoding='ascii')
+                        content = '\n'.join(f'#define {marker} 1' for marker in marker_set) + '\n'
+                        if relative.endswith('/p5/generated/sc64_race_sprites_generated.h'):
+                            content += UNIT_WORD_SPRITE_HEADER
+                        output.write_text(content, encoding='ascii')
 
                 with patch.object(dev, 'ROOT', root), patch.object(dev, 'run', side_effect=fake_pack):
                     dev.prepare_staged_campaign(profile, private_rom)

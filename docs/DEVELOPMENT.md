@@ -1041,10 +1041,10 @@ still needs gameplay mappings, larger building/mineral pools, its countdown
 and hatch sequence, victory/defeat behavior, persistence and controller/ARM
 qualification. Source staging alone does not establish a playable mission.
 
-### Canonical Zerg and Protoss chapter 3 builds
+### Canonical Zerg and Protoss builds
 
-The standard Zerg and Protoss build targets include their first four
-missions. Prepare each profile from your verified ROM, then use the standard
+The standard Zerg build includes its first four missions; the standard
+Protoss build includes its first five. Prepare each profile from your verified ROM, then use the standard
 commands; no extra staged-profile selection is needed:
 
 ```sh
@@ -1056,7 +1056,7 @@ commands; no extra staged-profile selection is needed:
 
 Replace `zerg` with `protoss` for the Protoss campaign. The canonical output
 pairs are `build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf`
-and `build/StarCraft-Protoss-P4-Storm-GBA.gba` / `build/starcraft-protoss-p4-storm.elf`. The
+and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba` / `build/starcraft-protoss-p5-shuttle.elf`. The
 `zerg-z4` target also builds the canonical Zerg pair. Explicit `zerg-z3`
 preserves `build/StarCraft-Zerg-GBA.gba` / `build/starcraft-zerg.elf` and its
 save identity; versioned `-Z3` names are aliases. `protoss-p3` preserves the
@@ -1072,16 +1072,33 @@ enforce the same IWRAM and EWRAM reserves.
 
 Canonical Zerg uses `SCZ4`, save generation 20, the Z4 runtime and the same
 qualified canonical drawing flags. Its save directory is separate from the
-legacy Z3 profile. Canonical Protoss uses `SCP5`, generation 21, and the P4
-Storm runtime; explicit `protoss-p3` retains `SCP3`, generation 7. Older standard two-mission generation-2
+legacy Z3 profile. Canonical Protoss uses `SCPB`, generation 26 and
+`.local/play/protoss-p5-shuttle`; it includes the P5 Shuttle transport runtime.
+Explicit `protoss-p4-storm` retains `SCP5`, generation 21 and its P4 save path;
+`protoss-p3` retains `SCP3`, generation 7. Older standard two-mission generation-2
 saves are incompatible and are rejected. The asset-free default build
 continues to require no imported inputs.
+
+Older prepared Protoss workspaces must regenerate P5 data before building:
+
+```sh
+./dev sc64 prepare --rom "/path/to/StarCraft 64 USA ROM" --profile protoss
+./dev sc64 build --profile protoss
+./dev sc64 test --profile protoss
+```
+
+P5 preparation requires its source scenario/map gate and prepacked unit-word
+bank. No P3/P4 save conversion is performed. `protoss-p5-shuttle` is an explicit
+spelling for the same canonical product; `protoss-p4-storm` retains the previous
+real files. See the [P5 audit](audits/2026-10-26-p5-promotion/README.md) for
+first-five-chapter ARM, cargo/save, timing and memory evidence.
 
 ### Staged Zerg and Protoss chapter 4
 
 Zerg 4 is enabled in the canonical profile. The `zerg-z4` spelling builds the
-same versioned ROM. Canonical Protoss now includes **The Hunt for Tassadar**
-through the Storm-enabled fourth-chapter profile. The plain `protoss-p4`
+same versioned ROM. Canonical Protoss includes **The Hunt for Tassadar** and
+P5 through the Shuttle profile. Explicit `protoss-p4-storm` keeps the
+four-entry Storm profile and its own real files/save format. The plain `protoss-p4`
 build remains a separate internal experiment. Preparing later map data does
 not enable unqualified later missions in the frontend.
 
@@ -1103,7 +1120,7 @@ the wrapper does not convert saves between them. See the
 [P4 audit](audits/2026-10-26-p4-promotion/README.md) for current-source ARM
 mission and live-save qualification, separate from preparation.
 
-Canonical P4 also enables the generated create-action prefix and hot validator.
+P4 Storm and canonical P5 enable the generated P4 create-action prefix and hot validator.
 An older prepared workspace must regenerate its numeric scenario header before
 building:
 

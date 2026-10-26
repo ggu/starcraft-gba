@@ -32,7 +32,13 @@ static void launch_from_normal_menu(void)
     press(KEY_A);
     input(KEY_A);
     assert(screen == SCREEN_PLAY && race_p4_active());
+#ifdef SC64_P5_SHUTTLE_ENABLED
+    /* P4 remains the selected mission, but the combined P5 ROM owns the
+     * shared save identity and generation. */
+    assert(SAVE_VERSION == 0x53435030u + 26u);
+#else
     assert(SAVE_VERSION == 0x53435030u + 21u);
+#endif
 }
 
 static int source_unit(int raw)
@@ -258,6 +264,15 @@ static void test_menu_cast_damage_and_friendly_fire(void)
     assert(!race_p4.storm.storm[0].active && u[final_target].hp == 86);
 }
 
+static int encode_storm_test_unit(RaceSave *save, unsigned slot, const Unit *unit)
+{
+#ifdef SC64_ZP_FULL_STORAGE
+    return sc64_zp_unit_save_encode(&save->units[slot], unit, WORLD_W, WORLD_H);
+#else
+    return sc64_unit_save_encode(&save->units[slot], unit, WORLD_W, WORLD_H);
+#endif
+}
+
 static void test_pause_and_save_validation(void)
 {
     launch_from_normal_menu();
@@ -294,9 +309,9 @@ static void test_pause_and_save_validation(void)
 
     corrupt = good;
     Unit candidate;
-    assert(sc64_unit_save_decode(&candidate, &corrupt.units[caster], WORLD_W, WORLD_H));
+    assert(race_save_decode_unit(&corrupt, (unsigned)caster, WORLD_W, WORLD_H, &candidate));
     candidate.carry = SC64_STORM_MAX_ENERGY * SC64_STORM_ENERGY_ONE + 1;
-    assert(sc64_unit_save_encode(&corrupt.units[caster], &candidate, WORLD_W, WORLD_H));
+    assert(encode_storm_test_unit(&corrupt, (unsigned)caster, &candidate));
     save_write(&corrupt, sizeof(corrupt), SAVE_VERSION);
     assert(!race_load_game());
     assert(!memcmp(before_units, u, sizeof(u)));

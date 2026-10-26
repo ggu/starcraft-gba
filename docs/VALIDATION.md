@@ -22,28 +22,33 @@ The [minimap follow-up](audits/2026-10-26-minimap-terrain/README.md) reduces
 P4's measured full cost by another 1.60%, to about 17.0 fps equivalent, with
 pixel-identical terrain drawing and unchanged worst-frame stalls.
 
-Canonical profiles expose Terran 1–10, Zerg 1–4 and Protoss 1–4: 18/30
+Canonical profiles expose Terran 1–10, Zerg 1–4 and Protoss 1–5: 19/30
 entries. Canonical Zerg uses `SCZ4` and `.local/play/zerg-z4`; canonical
-Protoss uses the P4 Storm files, `SCP5`, generation 21 and
-`.local/play/protoss-p4-storm`. Explicit `zerg-z3` and `protoss-p3` preserve
-their earlier real files, identities and save paths. No save conversion is
+Protoss uses the P5 Shuttle files, `SCPB`, generation 26 and
+`.local/play/protoss-p5-shuttle`. Explicit `protoss-p4-storm` retains the real
+P4 files, `SCP5`, generation 21 and its own save path. Explicit `zerg-z3` and
+`protoss-p3` preserve their earlier real files, identities and save paths. No save conversion is
 provided. The old P3 compatibility filenames still point to the P3 real
-files, never to the new P4 ROM.
+files, never to the newer canonical ROM.
 
 All ten Terran missions pass the actual canonical-flag host controller
 target. T7/T10 have current paired ARM wins from explicit mission probe entry;
 other Terran ARM wins remain evidence for their earlier frozen builds. All
 four Zerg chapters have current host wins; the older Z4 ARM timing applies
-to its frozen build. P1–P4 have fresh host and input-only ARM wins in the
-canonical P4 pools, retaining Fenix in P1/P2 and both heroes in P4. P4 also
-has a live mid-mission SRAM cold-load/continued-win proof.
+to its frozen build. P1–P5 have fresh host and input-only ARM wins in the
+canonical P5 pools, retaining Fenix in P1/P2 and both heroes in P4. P5 has an
+exact fresh-process cargo SRAM restore and continued win. Earlier P4 save
+qualification remains scoped to its preserved P4 build. See the
+[P5 audit](audits/2026-10-26-p5-promotion/README.md).
 
-The 30-fps goal remains unfinished. PR 35's full-replay averages are about
+The 30-fps goal remains unfinished. Canonical P5 measures 26.6 fps equivalent
+on P1/P2, 18.9 on P3, 16.1 on carried P4 and 17.1 on P5; carried P4 is about
+5.3% slower than the standalone P4/minimap build. PR 35's earlier averages were about
 22.4/18.8 fps equivalent for Terran T7/T10 and 16.3 for P4. These are scoped
 emulator cycle measurements, not physical-GBA guarantees. Historical staged
 coverage spans 22/30 across recorded builds, not fresh qualification of all
 chapters on current source. The generic split-profile report checker only
-covers earlier mission models; dedicated Z4/P4 codec/input checks establish
+covers earlier mission models; dedicated Z4/P4/P5 codec/input checks establish
 their stated save continuity.
 
 ## Reproducible checks

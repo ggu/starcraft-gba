@@ -2,9 +2,9 @@
 
 This project is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
 
-Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. The canonical profiles expose Terran 1–10, Zerg 1–4, and Protoss 1–4: 18 of 30 campaign entries. P4 now has a current-source normal-input host/ARM win and a live SRAM cold-load/continued-win proof; P1–P3 were requalified in its larger pools. See the [P4 promotion audit](docs/audits/2026-10-26-p4-promotion/README.md).
+Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. The canonical profiles expose Terran 1–10, Zerg 1–4, and Protoss 1–5: 19 of 30 campaign entries. P1–P5 have current-source input-only ARM wins; P5 also has a fresh-process cargo save/load and continued-win proof. See the [P5 promotion audit](docs/audits/2026-10-26-p5-promotion/README.md).
 
-Performance remains below the 30-fps goal. P4's current optimized full ARM replay averages 16.3 fps equivalent. The current Terran renderer improves full means by 2.9% on T7 and 0.5% on T10 (about 22.4 and 18.8 fps equivalent on those probe-entry traces). The [Terran audit](docs/audits/2026-10-26-terran-word-promotion/README.md) records the scope; older Z4/P3 measurements apply to their frozen builds. No physical GBA result is claimed. This adaptation uses a user-supplied, verified StarCraft 64 USA ROM and does not reproduce the N64 engine. Imported maps and graphics stay local.
+Performance remains below the 30-fps goal. The canonical P5 build measures about 26.6 fps equivalent on P1/P2 and 16.1–18.9 on P3–P5. Earlier Terran T7/T10 probe-entry traces measured about 22.4/18.8; see the [Terran audit](docs/audits/2026-10-26-terran-word-promotion/README.md) for scope. No physical GBA result is claimed. This adaptation uses a user-supplied, verified StarCraft 64 USA ROM and does not reproduce the N64 engine. Imported maps and graphics stay local.
 
 ## Purpose and rights
 
@@ -49,16 +49,16 @@ This profile requires a legally obtained StarCraft 64 USA ROM that you are entit
 ./dev sc64 play --profile terran
 ```
 
-The canonical Terran profile includes all ten Terran campaign missions; canonical Zerg and Protoss include their first four. Use `--profile zerg` or `--profile protoss` with the same build/test/play commands. Each ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. Separate staged builds record wins through the first six missions of both Zerg and Protoss, for historical combined coverage of 22/30 missions; eight remain unqualified.
+The canonical Terran profile includes all ten Terran campaign missions; canonical Zerg includes its first four and Protoss its first five. Use `--profile zerg` or `--profile protoss` with the same build/test/play commands. Each ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. Separate staged builds record wins through the first six missions of both Zerg and Protoss, for historical combined coverage of 22/30 missions; eight remain unqualified.
 
-Preparing Terran generates its complete ten-mission input set; preparing only Zerg or Protoss does not. Prepare each canonical race before `make race-campaigns`. Canonical Zerg uses the Z4 identity and `.local/play/zerg-z4`; canonical Protoss uses P4 Storm and `.local/play/protoss-p4-storm`. Explicit `zerg-z3` and `protoss-p3` retain their old ROMs and save paths. No save conversion is performed. See [the campaign guide](docs/RACE-CAMPAIGNS.md) for mission and save-format details.
+Preparing Terran generates its complete ten-mission input set; preparing only Zerg or Protoss does not. Prepare each canonical race before `make race-campaigns`. Canonical Zerg uses the Z4 identity and `.local/play/zerg-z4`; canonical Protoss uses P5 Shuttle and `.local/play/protoss-p5-shuttle`. Explicit `zerg-z3`, `protoss-p3` and `protoss-p4-storm` retain their real ROMs and save paths. No save conversion is performed. See [the campaign guide](docs/RACE-CAMPAIGNS.md) for mission and save-format details.
 
 The first preparation fetches the pinned `sc64-maps` extractor into ignored `references/`, so Git and network access are needed. ROMs, extracted data, generated headers, captures containing imported art, and saves stay in ignored local directories; do not commit or distribute them. Contributors can work on the default skirmish without this profile. See [the unified guide](docs/SC64-UNIFIED.md) and [development](docs/DEVELOPMENT.md) for details and troubleshooting.
 
 The [campaign guide](docs/RACE-CAMPAIGNS.md) records the staged profile
 history, current mission status, and shared skirmish setup. The combined
 Terran profile uses bounded pools of 192 units, 96 buildings, and 80 mineral
-fields; its generated GBA ROM is 8 MiB. The original 32 MiB N64 image and
+fields; prepared canonical GBA ROMs are padded to 32 MiB. The original 32 MiB N64 image and
 every converted map, sprite, and generated header remain private local inputs.
 
 ## Contributing and provenance
