@@ -66,6 +66,24 @@ These checks build the StarCraft ROM and run the host-side rule regressions. For
 
 To validate play in mGBA, use `./dev play starcraft` for the default game or `./dev play unified` after preparing the optional profile. Emulator results are not physical GBA results.
 
+## Canonical skirmish resume checks (2026-10-27)
+
+`make test-sc64-canonical-skirmish-resume` compiles the real canonical Terran,
+Z6 and P5 profile flags. The sanitizer-enabled fixture runs 24 normal-menu
+cases per profile, covering both maps, all human races, one to three mixed
+opponents and three-opponent groups of each race. All 72 cases pass: mining
+depletes resources before saving, map/race/opponent configuration survives
+SRAM loading, and the restored live-state hash and subsequent 900 updates
+match the uninterrupted path. Each continuation also earns player minerals
+and further depletes the map's resources.
+
+This closes a current-profile continuation coverage gap; earlier split-profile
+and match-controller checks remain separate. `game_init()` clears actors and
+frontend state in the same host process while retaining emulated SRAM. This
+does not prove fresh-process SRAM, physical-GBA behavior, a complete match,
+every possible bot-race permutation, or near-30-fps performance. See the
+[audit and reproduction commands](audits/2026-10-27-canonical-skirmish-resume/README.md).
+
 ## Standalone snapshot checks (2026-10-22)
 
 - Before any private data or reference checkout was prepared, `make verify`

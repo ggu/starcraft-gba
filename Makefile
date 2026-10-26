@@ -3768,3 +3768,21 @@ test-sc64-death-source-packed: build/test-sc64-death-source-packed build/test-sc
 # Full-campaign controller binaries compile the canonical presentation flags.
 # Refresh them when their generated art changes as well as when code changes.
 $(addprefix build/test-sc64-full-,t1-run t2-run t3-run t3-save t3-resume t4-run t4-save t5-save t5-run t6-run) $(addprefix build/test-sc64-t,7-campaign-run 8-campaign-run 9-campaign-run 10-campaign-run): $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS)
+
+# Exercise mid-match SRAM continuation in the actual canonical race runtimes,
+# rather than relying on the earlier Z3/P3 split-profile save fixtures.
+CANONICAL_SKIRMISH_RESUME_ART_INPUTS = $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
+CANONICAL_SKIRMISH_RESUME_HOST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+define CANONICAL_SKIRMISH_RESUME_PROFILE
+build/test-sc64-skirmish-resume-$(1): tests/sc64_skirmish_resume.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(2) $$< common/gba.c -o $$@
+endef
+$(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,terran,$(TERRAN_ROM_FLAGS),$(TERRAN_FULL_INPUTS)))
+$(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,zerg,$(ZERG_ROM_FLAGS),$(ZERG_Z6_INPUTS)))
+$(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,protoss,$(PROTOSS_ROM_FLAGS),$(P5_INPUTS)))
+.PHONY: test-sc64-canonical-skirmish-resume
+test-sc64-canonical-skirmish-resume: $(addprefix build/test-sc64-skirmish-resume-,terran zerg protoss)
+	./build/test-sc64-skirmish-resume-terran
+	./build/test-sc64-skirmish-resume-zerg
+	./build/test-sc64-skirmish-resume-protoss
+test-race-campaigns: test-sc64-canonical-skirmish-resume
