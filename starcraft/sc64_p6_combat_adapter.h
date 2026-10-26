@@ -581,6 +581,9 @@ race_p6_combat_infested_explode(int slot)
     if (!source->alive || race_p6_combat_raw_unit(source) !=
         SC64_P6_RAW_INFESTED_TERRAN) return 0;
     cx = source->x * 2; cy = source->y * 2; source_owner = source->owner;
+#ifdef SC64_WEAPON_SOURCE_BANK_VERSION
+    if (!sc64_source_unit_vfx(source, source->x, source->y, 0))
+#endif
     add_tracer(source->x,source->y,source->x,source->y,
         sc64_weapon_vfx_pack(SC64_WEAPON_VFX_STYLE_BURST,C_GREEN));
     for (int i = 0; i < MAX_UNITS; ++i) {
@@ -733,6 +736,9 @@ race_p6_combat_tick_traps(void)
         if (best<0) continue;
         if (race_p6_combat_apply_explosive(best,SC64_P6_WALL_TRAP_DAMAGE,1u,
                 SC64_P6_TRAP_DAMAGE_SOURCE,trap->owner)) {
+#ifdef SC64_WEAPON_SOURCE_BANK_VERSION
+            if (!sc64_source_building_vfx(trap,target_x(best),target_y(best),0))
+#endif
             add_tracer(trap->x,trap->y,target_x(best),target_y(best),
                 sc64_weapon_vfx_building_profile(trap->type));
             trap->shield_remainder=SC64_P6_WALL_TRAP_COOLDOWN_GBA_TICKS;
