@@ -61,6 +61,19 @@ current stock-combat replay evidence and memory limits. See the
 [rendering audit](audits/2026-10-26-unit-word-rendering/README.md) for exact
 pixel/state checks, measurements and memory limits.
 
+## Canonical minimap rendering
+
+Canonical Terran, Zerg and Protoss builds and Showcase batch the same 24-by-24
+visibility raster through the existing sprite compositor. No new private inputs
+are needed. `make test-sc64-minimap-terrain` checks both scalar and batched
+paths without a source ROM. To compare a prepared profile with scalar drawing,
+use `make -B protoss CANONICAL_MINIMAP_FLAGS=` (replace `protoss` with another
+canonical target as needed); force rebuilding when changing flags.
+
+The [minimap audit](audits/2026-10-26-minimap-terrain/README.md) records the
+pixel oracle, byte-identical public replay and scoped ARM timing. P3/Z3 legacy
+and staged profiles retain their existing flag selections.
+
 ## Source construction art
 
 Prepared imported race builds now use the source construction art, including

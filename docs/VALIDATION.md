@@ -18,6 +18,9 @@ campaign ARM timings below precede that artwork correction. The
 [P4 prefix follow-up](audits/2026-10-26-p4-create-prefix/README.md) records a
 current-art paired full-mission ARM replay, a 2.16% full-cost reduction and
 fresh-process SRAM continued win. It does not establish physical-GBA performance.
+The [minimap follow-up](audits/2026-10-26-minimap-terrain/README.md) reduces
+P4's measured full cost by another 1.60%, to about 17.0 fps equivalent, with
+pixel-identical terrain drawing and unchanged worst-frame stalls.
 
 Canonical profiles expose Terran 1–10, Zerg 1–4 and Protoss 1–4: 18/30
 entries. Canonical Zerg uses `SCZ4` and `.local/play/zerg-z4`; canonical

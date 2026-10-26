@@ -2,6 +2,9 @@
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
 #include "sc64_construction_hp.h"
+#ifdef SC64_IMPORTED_MISSION
+#include "sc64_minimap_terrain.h"
+#endif
 #if defined(SC64_DIRECT_ATTACK) && !defined(SC64_RACES)
 #error "SC64_DIRECT_ATTACK requires SC64_RACES"
 #endif
@@ -7074,20 +7077,17 @@ draw_death_vfx(int under)
 static void
 draw_minimap(void)
 {
-    int row, col, x, y, i;
 #ifdef SC64_IMPORTED_MISSION
-	const int map_x = 197, map_y = 129, map_size = 24;
+    int x, y, i;
+    const int map_x = 197, map_y = 129, map_size = 24;
+#else
+    int row, col, x, y, i;
 #endif
     gfx_rect(181, 124, 56, 34, C_BLACK);
     gfx_frame(181, 124, 56, 34, C_EDGE);
 #ifdef SC64_IMPORTED_MISSION
-    for (row = 0; row < 24; row++)
-        for (col = 0; col < 24; col++) {
-            int cell = row * 24 + col;
-            if (sc64_minimap_visible[cell] || sc64_minimap_explored[cell])
-                gfx_pixel(map_x + col, map_y + row,
-                    sc64_minimap_visible[cell] ? C_GRASS : C_FOG);
-        }
+    sc64_minimap_draw_terrain(map_x, map_y,
+                              sc64_minimap_visible, sc64_minimap_explored);
 #else
     for (row = 0; row < MAP_ROWS; row++)
 	for (col = 0; col < MAP_COLS; col++) {

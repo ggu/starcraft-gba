@@ -7,6 +7,19 @@ test-sc64-stock-motion: build/test-sc64-stock-motion
 	./build/test-sc64-stock-motion
 test: test-sc64-stock-motion
 
+# Asset-free minimap terrain renderer oracle; exercise both implementations.
+.PHONY: test-sc64-minimap-terrain
+build/gba-minimap-test.o: common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -Wno-unused-variable -Icommon -c $< -o $@
+build/test-sc64-minimap-terrain-scalar: tests/sc64_minimap_terrain.c starcraft/sc64_minimap_terrain.h build/gba-minimap-test.o common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -Icommon -Istarcraft $< build/gba-minimap-test.o -o $@
+build/test-sc64-minimap-terrain-blit: tests/sc64_minimap_terrain.c starcraft/sc64_minimap_terrain.h build/gba-minimap-test.o common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DSC64_MINIMAP_BLIT -Icommon -Istarcraft $< build/gba-minimap-test.o -o $@
+test-sc64-minimap-terrain: build/test-sc64-minimap-terrain-scalar build/test-sc64-minimap-terrain-blit
+	./build/test-sc64-minimap-terrain-scalar
+	./build/test-sc64-minimap-terrain-blit
+test: test-sc64-minimap-terrain
+
 # Asset-free Interceptor order decisions; no gameplay integration is enabled.
 .PHONY: test-sc64-interceptor-orders
 build/test-sc64-interceptor-orders: tests/sc64_interceptor_orders.c starcraft/sc64_interceptor_orders.c starcraft/sc64_interceptor_orders.h | build
@@ -138,20 +151,21 @@ TERRAN_FULL_FLAGS := $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_T6_CAMPAIGN_ENTRY -DSC6
 # Keep qualified canonical draw options separate from experimental campaign
 # probes, which retain their own RAM and timing qualification.
 CANONICAL_DRAW_FLAGS ?= -DGBA_SPRITE_WORDS -DGBA_SCENE_CLIP -DSC64_HUD_BUFFER_REUSE
+CANONICAL_MINIMAP_FLAGS ?= -DSC64_MINIMAP_BLIT
 CANONICAL_STATIC_FLAGS ?= $(if $(filter -DGBA_SCENE_CLIP,$(CANONICAL_DRAW_FLAGS)),-DSC64_STATIC_DIRTY_ROWS)
 TERRAN_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 TERRAN_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(TERRAN_FULL_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) $(TERRAN_UNIT_WORD_FLAGS)
-TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS)
+TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS)
 ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS)
-ZERG_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS)
+ZERG_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS)
 ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
 PROTOSS_P3_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
 PROTOSS_P3_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_P3_CANONICAL_FLAGS)
 PROTOSS_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 PROTOSS_CANONICAL_FLAGS ?= $(PROTOSS_P3_CANONICAL_FLAGS) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL -DSC64_P4_COUNT_CENSUS_ENABLED $(PROTOSS_UNIT_WORD_FLAGS)
 P4_CREATE_PREFIX_FLAGS ?= -DSC64_P4_CREATE_PREFIX -DSC64_P4_VALIDATOR_HOT
-PROTOSS_ROM_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P4_STORM_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS)
+PROTOSS_ROM_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P4_STORM_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS)
 TERRAN_FULL_INPUTS = $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER)
 
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
@@ -3216,7 +3230,7 @@ protoss-p7-carrier-training-probe: build/StarCraft-Protoss-P7-Carrier-Training-P
 
 # Dedicated filming build. Hidden menu and transient scenes stay off in all
 # canonical profiles; the P7 bundle supplies Carrier/Ultralisk render actors.
-SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED
+SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED $(CANONICAL_MINIMAP_FLAGS)
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
 	$(SIZE) $@
