@@ -171,6 +171,22 @@ Canonical imported race profiles enable `SC64_CONSTRUCTION_SOURCE_ART` and
 depend on the generated construction header. Original-art builds do not use
 this flag or require the header.
 
+Warp Anchor image 211 preserves its source intensity bytes and uses a
+40-row destination-color lookup for its blue-white glow. The importer reads the
+actual UI palette, world palette transform, and UI overrides from the runtime
+sources, then projects the source lookup through those displayed GBA colors.
+Regenerate the bank after changing those palette sources; preparation and build
+checks reject older banks without the modifier payload. The N64 BFire table
+association is inferred from its structure and reference light-table ordering,
+not proven by an executable cross-reference. GBA color quantization remains an
+approximation. The bright core and saturated blue/cyan halo are consistent with
+[the N64 longplay at 5:03](https://www.youtube.com/watch?v=rkyLf7lELXE&t=303s).
+
+With prepared inputs, `make test-sc64-protoss-warp-color` checks early, middle,
+and late source frames through the production building overlay, including
+map/HUD clipping with and without the scene-clip API. Asset-free Python tests
+check palette parsing against the C runtime and synthetic lookup projection.
+
 The bounded sampler uses existing saved build progress and adds no per-actor
 state or save-generation change. Stage timing is an adaptation: Terran uses
 progress thresholds instead of native HP/order states; Zerg uses progress

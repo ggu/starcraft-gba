@@ -34,6 +34,12 @@ typedef struct {
     unsigned char layer_count;
 } SC64ConstructionSourceStage;
 
+/* Source strengths for destination-dependent IScript modifier 9 images. */
+typedef struct {
+    unsigned short x, y, w, h, canvas_w, canvas_h;
+    const unsigned char *strengths;
+} SC64ConstructionModifierFrame;
+
 /* This visual-only adaptation has no persistent order/IScript state. Terran
  * stages follow progress at 20/40/60 percent instead of the native HP/order
  * transitions. Zerg follows the 25/50 percent morph thresholds. Protoss runs
