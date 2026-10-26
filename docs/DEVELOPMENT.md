@@ -1680,6 +1680,9 @@ stack context and a ROM builder to fit the unchanged product guards. See the
 [Z7 steering audit](audits/2026-10-27-z7-steering-list/README.md) for the actual
 standalone link, paired ARM digests, stack canary and cycle measurements.
 Canonical race flags and the earlier full-render probe stay unchanged.
+The [Z7 raw-density preflight audit](audits/2026-10-27-z7-steering-preflight/README.md)
+records a later exact-fallback optimization within that same optional steering
+profile, its boundary tests and measured continuation costs.
 
 P7 has an isolated world foundation with separate source-Force wallets; its
 canonical roster fails closed on missing raw68/71/72 actor bindings. It still

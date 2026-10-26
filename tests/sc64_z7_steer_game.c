@@ -93,6 +93,97 @@ static void test_dense_z7_actor_oracle(void)
     memcpy(u,saved,sizeof(u));
 }
 
+static int original_best_direction(Unit *q, int speed, int target_x, int target_y)
+{
+    int from_cell = q->x / 16 + (q->y / 16) * MAP_COLS;
+    int best = -1, best_cost = 0x7fffffff;
+    for (int d = 0; d < 8; ++d) {
+        int nx = q->x + (int)dx8[d] * speed;
+        int ny = q->y + (int)dy8[d] * speed;
+        int cost = dist2(nx, ny, target_x, target_y);
+        if (cost < best_cost && is_traversable(nx / 16, ny / 16, from_cell) &&
+            unit_step_clear(q, nx, ny)) {
+            best = d;
+            best_cost = cost;
+        }
+    }
+    return best;
+}
+
+static void assert_fallback_direction(Unit *q, int speed)
+{
+    q->path_x = q->x + 24;
+    q->path_y = q->y + 8;
+    assert(sc64_steer_best_direction(q, speed,
+        q->x / 16 + (q->y / 16) * MAP_COLS, q->path_x, q->path_y) ==
+        original_best_direction(q, speed, q->path_x, q->path_y));
+}
+
+static void test_raw_density_threshold_and_filter_fallback(void)
+{
+    static Unit saved[MAX_UNITS];
+    memcpy(saved, u, sizeof(u));
+    memset(u, 0, sizeof(u));
+    u[0].alive = 1; u[0].type = U_ZERGLING; u[0].raw_type = 37;
+    u[0].raw_owner = 3; u[0].x = 512; u[0].y = 512;
+    u[0].order = ORDER_IDLE;
+    /* Exactly 48 raw nodes (including the mover) remain eligible for a list. */
+    for (int i = 1; i < 48; ++i) {
+        u[i].alive = 1; u[i].type = U_OVERLORD; u[i].raw_type = 42;
+        u[i].raw_owner = 3; u[i].x = 513; u[i].y = 513;
+        u[i].order = ORDER_IDLE;
+    }
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    Sc64SteerList list;
+    assert(sc64_steer_list_build(&list, &u[0], 1));
+    for (int d = 0; d < 8; ++d) {
+        int nx = u[0].x + dx8[d], ny = u[0].y + dy8[d];
+        assert(sc64_steer_list_step_clear(&list, &u[0], nx, ny) ==
+               unit_step_clear(&u[0], nx, ny));
+    }
+    sc64_unit_buckets_end();
+
+    /* The 49th raw node forces the original path even though all 48 other
+     * actors are flying and would have been filtered from the candidate list. */
+    u[48].alive = 1; u[48].type = U_OVERLORD; u[48].raw_type = 42;
+    u[48].raw_owner = 3; u[48].x = 513; u[48].y = 513;
+    u[48].order = ORDER_IDLE;
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active);
+    assert(!sc64_steer_list_build(&list, &u[0], 1));
+    assert_fallback_direction(&u[0], 1);
+    ++oracle_fallbacks;
+    sc64_unit_buckets_end();
+    memcpy(u, saved, sizeof(u));
+}
+
+static void test_dense_edge_fallbacks(void)
+{
+    static Unit saved[MAX_UNITS];
+    const int cx[4] = {2, WORLD_W - 3, 2, WORLD_W - 3};
+    const int cy[4] = {2, 2, WORLD_H - 3, WORLD_H - 3};
+    memcpy(saved, u, sizeof(u));
+    for (int edge = 0; edge < 4; ++edge) {
+        memset(u, 0, sizeof(u));
+        for (int i = 0; i < 56; ++i) {
+            u[i].alive = 1; u[i].type = U_ZERGLING; u[i].raw_type = 37;
+            u[i].raw_owner = 3;
+            u[i].x = (s16)limit(cx[edge] + (i % 3) - 1, 0, WORLD_W - 1);
+            u[i].y = (s16)limit(cy[edge] + (i % 4) - 1, 0, WORLD_H - 1);
+            u[i].order = ORDER_IDLE;
+        }
+        sc64_unit_buckets_begin();
+        assert(sc64_unit_bucket_active);
+        Sc64SteerList list;
+        assert(!sc64_steer_list_build(&list, &u[0], 2));
+        assert_fallback_direction(&u[0], 2);
+        sc64_unit_buckets_end();
+        ++oracle_fallbacks;
+    }
+    memcpy(u, saved, sizeof(u));
+}
+
 static void test_worker_fallback(void)
 {
     int worker=-1, old_order;
@@ -177,6 +268,8 @@ int main(void)
     launch_z7();
     compare_live_world();
     test_dense_z7_actor_oracle();
+    test_raw_density_threshold_and_filter_fallback();
+    test_dense_edge_fallbacks();
     test_worker_fallback();
     test_overflow_fallback();
     test_class_slot_reuse();
