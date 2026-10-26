@@ -22,8 +22,10 @@ The [minimap follow-up](audits/2026-10-26-minimap-terrain/README.md) reduces
 P4's measured full cost by another 1.60%, to about 17.0 fps equivalent, with
 pixel-identical terrain drawing and unchanged worst-frame stalls.
 
-Canonical profiles expose Terran 1–10, Zerg 1–4 and Protoss 1–5: 19/30
-entries. Canonical Zerg uses `SCZ4` and `.local/play/zerg-z4`; canonical
+Canonical profiles expose Terran 1–10, Zerg 1–6 and Protoss 1–5: 21/30
+entries (see the [Z6 promotion audit](audits/2026-10-26-z6-promotion/README.md)).
+Canonical Zerg uses `SCZ6`, generation 32 and `.local/play/zerg-z6`; explicit
+`zerg-z4` keeps `SCZ4`, generation 20 and `.local/play/zerg-z4`; canonical
 Protoss uses the P5 Shuttle files, `SCPB`, generation 26 and
 `.local/play/protoss-p5-shuttle`. Explicit `protoss-p4-storm` retains the real
 P4 files, `SCP5`, generation 21 and its own save path. Explicit `zerg-z3` and
