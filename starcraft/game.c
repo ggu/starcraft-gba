@@ -1293,6 +1293,9 @@ static void race_complete_building(int building);
 static void race_tick_buildings(void),race_tick_state(void),race_tick_ai(void),race_tick_defenses(void);
 static void race_skirmish_init(void),race_skirmish_outcome(void);
 static void race_skirmish_geometry(void);
+#if defined(SC64_RACES) && defined(SC64_HAS_SPRITES)
+static const Sc64SpriteFrame *mission_geyser_sprite(void);
+#endif
 static int race_owner_supply(int owner),race_owner_supply_cap(int owner),race_owner_reserved_supply(int owner);
 static int race_owner_queued_supply(int owner);
 static void race_add_owner_resources(int owner,int ore,int vespene);
@@ -1933,9 +1936,25 @@ static int
 geyser_at(int x, int y)
 {
     int i;
-    for (i = 0; i < geyser_count; i++)
-	if (dist2(x, y, geysers[i].x, geysers[i].y) < 15 * 15)
-	    return i;
+    for (i = 0; i < geyser_count; i++) {
+        if (dist2(x, y, geysers[i].x, geysers[i].y) < 15 * 15)
+            return i;
+#if defined(SC64_RACES) && defined(SC64_HAS_SPRITES)
+        /* Match the actual opaque geyser art. The crop is wider than the
+         * 15-pixel center radius, and its canvas offset is asymmetric. */
+        const Sc64SpriteFrame *sprite = mission_geyser_sprite();
+        if (sprite && sprite->pixels && sprite->w && sprite->h) {
+            int left = geysers[i].x - sprite->canvas_w / 2 + sprite->offset_x;
+            int top = geysers[i].y - sprite->canvas_h / 2 + sprite->offset_y;
+            if (x >= left && x < left + sprite->w &&
+                y >= top && y < top + sprite->h) {
+                int px = x - left, py = y - top;
+                if (sprite->pixels[py * sprite->w + px]) return i;
+            }
+            continue;
+        }
+#endif
+    }
     return -1;
 }
 
@@ -2088,8 +2107,15 @@ can_place(int type, int x, int y)
         ||type==B_EXTRACTOR||type==B_ASSIMILATOR
 #endif
         ) {
-	if (geyser_at(x, y) < 0)
+	int geyser = geyser_at(x, y);
+	if (geyser < 0)
 	    return 0;
+#ifdef SC64_RACES
+	/* The cursor may be anywhere on the visible source geyser crop; keep the
+	 * placed race gas structure centered on the resource it will harvest. */
+	x = geysers[geyser].x;
+	y = geysers[geyser].y;
+#endif
 	for (i = 0; i < MAX_BUILDINGS; i++)
 	    if (b[i].alive
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
@@ -7018,6 +7044,38 @@ draw_actor_vitals(int x,int hp_y,int width,int hp,int maxhp,
         sc64_draw_vital_bar(left,hp_y-3,width,shield,maxshield,C_CYAN,C_BLUE_DARK);
 }
 
+/* A compact UI cue for carried resources. The stock unit bank has no cargo
+ * attachment frames, so this deliberately stays separate from source art. */
+static void
+draw_worker_cargo_badge(int x, int y, int gas)
+{
+    if (gas) {
+        static const u8 widths[5] = {3,5,5,5,3};
+        for (int row = 0; row < 5; ++row) {
+            int py = y + row - 2;
+            if (py < 12 || py >= 120) continue;
+            int width = widths[row];
+            gfx_rect(x - width / 2, py, width, 1,
+                     row == 0 || row == 4 ? C_GREEN_DARK : C_GREEN);
+        }
+        if (y - 1 >= 12 && y - 1 < 120)
+            gfx_pixel(x - 1, y - 1, C_WHITE);
+    } else {
+        static const u8 widths[7] = {1,3,5,5,3,2,1};
+        static const u8 colors[7] = {
+            C_CYAN,C_BLUE,C_BLUE_DARK,C_BLUE,C_BLUE_DARK,C_BLUE_DARK,C_CYAN
+        };
+        for (int row = 0; row < 7; ++row) {
+            int py = y + row - 3;
+            if (py < 12 || py >= 120) continue;
+            int width = widths[row];
+            gfx_rect(x - width / 2, py, width, 1, colors[row]);
+        }
+        if (y - 2 >= 12 && y - 2 < 120)
+            gfx_pixel(x, y - 2, C_WHITE);
+    }
+}
+
 static void
 draw_unit(Unit * q)
 {
@@ -7142,6 +7200,10 @@ draw_unit(Unit * q)
             owner_color(q->owner));
     if (q->selected)
 	gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
+    if (q->carry > 0 && IS_WORKER(q->type) &&
+        (q->order == ORDER_MINE || q->order == ORDER_GAS))
+        draw_worker_cargo_badge(sprite_x + sprite_w + 2,
+            sprite_y + sprite_h / 2, q->order == ORDER_GAS);
 }
 
 #define SC64_WEAPON_VFX_VISIBLE(x,y) currently_visible((x)+camx,(y)+camy-12)
@@ -8077,7 +8139,17 @@ draw_map(void)
 #endif
     }
     if (mode == MODE_BUILD && box_state != 2) {
-	gfx_frame(x - 8, y - 6, 17, 13, (can_place(menu, cx, cy)
+        int build_x = cx, build_y = cy;
+#ifdef SC64_RACES
+        if (menu == B_REFINERY || menu == B_EXTRACTOR || menu == B_ASSIMILATOR) {
+            int geyser = geyser_at(cx, cy);
+            if (geyser >= 0) {
+                build_x = geysers[geyser].x;
+                build_y = geysers[geyser].y;
+            }
+        }
+#endif
+	gfx_frame(build_x - camx - 8, build_y - camy + 12 - 6, 17, 13, (can_place(menu, cx, cy)
 #ifdef SC64_RACES
             &&race_can_site(SIDE,menu,cx,cy)
 #endif

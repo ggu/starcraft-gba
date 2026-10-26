@@ -530,6 +530,12 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
             worker >= 0 && worker < MAX_UNITS ? u[worker].raw_owner : -1,
             type)) return 0;
 #endif
+    if (type == B_REFINERY || type == B_EXTRACTOR || type == B_ASSIMILATOR) {
+        int geyser = geyser_at(x, y);
+        if (geyser < 0) return 0;
+        x = geysers[geyser].x;
+        y = geysers[geyser].y;
+    }
     if (!r || r->race != race_owner_identity(owner) || worker < 0 || worker >= MAX_UNITS ||
         !u[worker].alive || u[worker].owner != owner || u[worker].type != r->worker ||
         !race_can_site(owner, type, x, y) || !can_place(type, x, y)) return 0;

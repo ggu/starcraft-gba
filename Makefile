@@ -3094,6 +3094,33 @@ $(eval $(call SKIRMISH_CONTROLLER_PROFILE,terran,$(TERRAN_FULL_FLAGS),$(TERRAN_F
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,zerg,$(Z3_FLAGS),$(RACE_CAMPAIGN_INPUTS)))
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss,$(P3_FLAGS),$(RACE_CAMPAIGN_INPUTS)))
 
+# Cargo indicators are render-only and share the source-sprite placement used
+# by indexed and packed canonical profiles.
+build/test-sc64-worker-cargo-indexed: tests/sc64_worker_cargo_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(CONSTRUCTION_ART_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(RACES_FLAGS) $< common/gba.c -o $@
+build/test-sc64-worker-cargo-packed: tests/sc64_worker_cargo_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) $(CONSTRUCTION_ART_HEADER) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-worker-cargo
+test-sc64-worker-cargo: build/test-sc64-worker-cargo-indexed build/test-sc64-worker-cargo-packed
+	./build/test-sc64-worker-cargo-indexed
+	./build/test-sc64-worker-cargo-packed
+
+# Actual visible geyser pixels select a centered gas structure; includes a
+# Protoss field-menu construction/harvest round trip on Blood Bath.
+build/test-sc64-protoss-gas-placement: tests/sc64_protoss_gas_placement.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(CONSTRUCTION_ART_HEADER) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-protoss-gas-placement
+test-sc64-protoss-gas-placement: build/test-sc64-protoss-gas-placement
+	./build/test-sc64-protoss-gas-placement
+
+# Optional normal-controller reproduction of Protoss Pylon construction on
+# Blood Bath, under the same full profile as the shipped Showcase ROM.
+build/test-sc64-protoss-skirmish-pylons: tests/sc64_protoss_skirmish_pylons.c tests/sc64_skirmish_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(CONSTRUCTION_ART_HEADER) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-protoss-skirmish-pylons
+test-sc64-protoss-skirmish-pylons: build/test-sc64-protoss-skirmish-pylons
+	./build/test-sc64-protoss-skirmish-pylons
+
 .PHONY: test-sc64-skirmish-matches
 test-sc64-skirmish-matches: $(addprefix build/test-sc64-skirmish-match-,terran zerg protoss)
 	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller build/test-sc64-skirmish-match-terran --output .local/sc64/skirmish/terran-matches
