@@ -442,6 +442,17 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #ifdef SC64_DEATH_SOURCE_ART
 #include "sc64_death_source.h"
 #include "sc64_death_sprites_generated.h"
+#if !defined(SC64_DEATH_SOURCE_BANK_VERSION) || SC64_DEATH_SOURCE_BANK_VERSION != 2 || \
+    !defined(SC64_DEATH_SOURCE_METADATA_VERSION) || SC64_DEATH_SOURCE_METADATA_VERSION != 1 || \
+    !defined(SC64_DEATH_SOURCE_PIXEL_BYTES) || SC64_DEATH_SOURCE_PIXEL_BYTES == 0
+#error "Regenerate source death art with tools/sc64_death_sprites.py (bank v2)"
+#endif
+#ifdef SC64_UNIT_WORD_SPRITES
+#if !defined(SC64_DEATH_SOURCE_WORD_METADATA) || SC64_DEATH_SOURCE_WORD_METADATA != 1 || \
+    !defined(SC64_DEATH_SOURCE_WORD_BYTES) || SC64_DEATH_SOURCE_WORD_BYTES == 0
+#error "Regenerate source death art with packed remnant frames"
+#endif
+#endif
 #endif
 #endif
 #endif
@@ -7387,37 +7398,27 @@ draw_tracers(void)
 #ifndef SC64_DEATH_VFX_DISABLED
 #include "sc64_death_vfx_render.h"
 #ifdef SC64_DEATH_SOURCE_ART
-/* Clip source frames to the battlefield rows above the cached lower HUD.
- * With SC64_SPAN_BLIT (IWRAM permitting), frames wholly inside the screen
- * width draw from their span stream, which skips transparent pixels; frames
- * crossing a side edge, and other builds, draw the pixels. */
+/* Clip source frames to the battlefield rows above the cached lower HUD. */
 static void
-death_vfx_blit(const Sc64SpriteFrame *s, const u16 *spans, int cx, int cy)
+death_vfx_blit(const Sc64SpriteFrame *s, int cx, int cy)
 {
     int x = cx - s->canvas_w / 2 + s->offset_x;
-    int y = cy - s->canvas_h / 2 + s->offset_y, h = s->h, skip = 0;
+    int y = cy - s->canvas_h / 2 + s->offset_y, h = s->h;
+    const u8 *pixels = s->pixels;
     if (y < 12) {
-        skip = 12 - y;
+        int skip = 12 - y;
         if (skip >= h) return;
-        h -= skip; y = 12;
+        pixels += skip * s->w; h -= skip; y = 12;
     }
     if (y + h > 120) h = 120 - y;
-    if (h <= 0 || x >= 240 || x + s->w <= 0) return;
-#ifdef SC64_SPAN_BLIT
-    if (spans && x >= 0 && x + s->w <= 240) gfx_blit_spans(x, y, skip, h, spans);
-    else
-#else
-    (void)spans;
-#endif
-    gfx_blit_sprite(x, y, s->w, h, s->pixels + skip * s->w);
+    if (h > 0) gfx_blit_sprite(x, y, s->w, h, pixels);
 }
 
 static int
 death_vfx_draw_source(const Sc64DeathVfx *e, int x, int y, u32 age, int under)
 {
-    /* Validated when the effect spawned; each layer sampler still fails closed. */
     const Sc64DeathSource *art = sc64_death_source(e->raw);
-    if (!art) return 0;
+    if (!sc64_death_source_valid(art)) return 0;
     for (unsigned i = 0; i < art->layer_count; ++i) {
         const Sc64DeathSourceLayer *layer = &art->layers[i];
         unsigned frame_index;
@@ -7425,9 +7426,21 @@ death_vfx_draw_source(const Sc64DeathVfx *e, int x, int y, u32 age, int under)
             !sc64_death_source_layer_frame(layer, age, &frame_index)) continue;
         const Sc64SpriteFrame *sprite =
             sc64_death_image_frame(layer->image_id, (unsigned short)frame_index);
-        if (sprite)
-            death_vfx_blit(sprite, sc64_death_image_spans(layer->image_id, (unsigned short)frame_index),
-                           x + layer->x, y + layer->y);
+        if (sprite) {
+#if defined(SC64_UNIT_WORD_SPRITES) && !defined(SC64_DEATH_INDEXED_REMNANTS)
+            const GbaSpriteWordFrame *words =
+                sc64_death_image_word_frame(layer->image_id,(unsigned short)frame_index);
+            int left=x+layer->x-sprite->canvas_w/2+sprite->offset_x;
+            int top=y+layer->y-sprite->canvas_h/2+sprite->offset_y;
+            /* Packed collapse/remnant frames use the word compositor and no extra
+             * RAM. The indexed fallback explicitly clips partial HUD-edge
+             * frames even in builds without the scene-clip API. */
+            if (words && top>=12 && top+(int)sprite->h<=120)
+                gfx_blit_sprite_words(left,top,words);
+            else
+#endif
+                death_vfx_blit(sprite, x + layer->x, y + layer->y);
+        }
     }
     return 1;
 }

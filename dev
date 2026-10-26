@@ -106,6 +106,7 @@ FACING_HEADER = ".local/sc64/facing/generated/sc64_unit_facing_generated.h"
 TANK_VFX_HEADER = ".local/sc64/tank-vfx/generated/sc64_tank_source_vfx_generated.h"
 WEAPON_SOURCE_HEADER = ".local/sc64/weapon-vfx/generated/sc64_weapon_source_generated.h"
 ATTACK_POSE_HEADER = ".local/sc64/attack-poses/generated/sc64_unit_attack_source_generated.h"
+DEATH_SOURCE_HEADER = ".local/sc64/death/generated/sc64_death_sprites_generated.h"
 CONSTRUCTION_HEADER = ".local/sc64/construction/generated/sc64_construction_sprites_generated.h"
 CONSTRUCTION_PROFILES = ("races", "unified", "terran", "zerg", "zerg-z3", "protoss",
                          "protoss-p3", "protoss-p4-storm", "zerg-z6", "protoss-p5-shuttle")
@@ -249,6 +250,37 @@ def weapon_source_input_ready(path: Path) -> bool:
             re.search(r"static const Sc64WeaponSourceAnimation sc64_weapon_source_animations\[[1-9]\d*\]",
                       text) is not None and
             re.search(r"static const Sc64WeaponSourceLut sc64_weapon_source_luts\[[1-9]\d*\]",
+                      text) is not None)
+
+
+def death_source_input_ready(path: Path) -> bool:
+    """Require a populated, versioned source death-animation bank."""
+    try:
+        text = path.read_text(encoding="ascii")
+    except (OSError, UnicodeError):
+        return False
+    return (re.search(r"^#define\s+SC64_DEATH_SOURCE_BANK_VERSION\s+2u?\s*$",
+                      text, re.MULTILINE) is not None and
+            re.search(r"^#define\s+SC64_DEATH_SOURCE_METADATA_VERSION\s+1u?\s*$",
+                      text, re.MULTILINE) is not None and
+            re.search(r"^#define\s+SC64_DEATH_SOURCE_PIXEL_BYTES\s+[1-9]\d*u?\s*$",
+                      text, re.MULTILINE) is not None and
+            re.search(r"^#define\s+SC64_DEATH_SOURCE_ACTOR_COUNT\s+[1-9]\d*u?\s*$",
+                      text, re.MULTILINE) is not None and
+            "sc64_death_image_frame(" in text and
+            "sc64_death_source(" in text and
+            re.search(r"static const Sc64DeathSource sc64_death_raw_\d+\s*=", text) is not None and
+            re.search(r"static const unsigned char sc64_death_image_\d+_frame_\d+_pixels\[[1-9]\d*\]",
+                      text) is not None and
+            re.search(r"^#define\s+SC64_DEATH_SOURCE_WORD_METADATA\s+1u?\s*$",
+                      text, re.MULTILINE) is not None and
+            re.search(r"^#define\s+SC64_DEATH_SOURCE_WORD_BYTES\s+[1-9]\d*u?\s*$",
+                      text, re.MULTILINE) is not None and
+            "sc64_death_image_word_frame(" in text and
+            all(re.search(
+                rf"static const u32 sc64_death_image_\d+_frame_\d+_words_p{phase}\[[1-9]\d*\]",
+                text) is not None for phase in range(4)) and
+            re.search(r"static const GbaSpriteWordFrame sc64_death_image_\d+_frame_\d+_words\s*=",
                       text) is not None)
 
 
@@ -474,6 +506,10 @@ def build(game: str) -> None:
         raise RuntimeError(
             "canonical race builds require source weapon VFX data; "
             "regenerate with ./dev sc64 prepare --rom PATH --profile " + game)
+    if game in FACING_PROFILES and not death_source_input_ready(ROOT / DEATH_SOURCE_HEADER):
+        raise RuntimeError(
+            "canonical race builds require source death-art data; "
+            "regenerate with ./dev sc64 prepare --rom PATH --profile " + game)
     if game in CONSTRUCTION_PROFILES and not construction_color_input_ready(ROOT / CONSTRUCTION_HEADER):
         raise RuntimeError(
             "source construction art requires the blue-glow modifier bank; "
@@ -653,6 +689,13 @@ def prepare(rom: Path, profile: str) -> None:
              "--out", str((ROOT / WEAPON_SOURCE_HEADER).parent)])
         if not weapon_source_input_ready(ROOT / WEAPON_SOURCE_HEADER):
             raise RuntimeError("weapon VFX preparation produced a stale or empty bank")
+        run([sys.executable, str(ROOT / "tools/sc64_death_sprites.py"),
+             "--rom", str(private_rom),
+             "--palette-remap", str(ROOT / ".local/sc64/backwater/generated/palette-remap.bin"),
+             "--out", str((ROOT / DEATH_SOURCE_HEADER).parent),
+             "--header", str(ROOT / DEATH_SOURCE_HEADER)])
+        if not death_source_input_ready(ROOT / DEATH_SOURCE_HEADER):
+            raise RuntimeError("source death-art preparation produced a stale or empty bank")
     print(f"Prepared local StarCraft 64 data for profile '{profile}'. Generated files stay under .local/.")
 
 
@@ -711,6 +754,7 @@ def status(profile: str) -> int:
         paths.append(("Tank firing effects", ROOT / TANK_VFX_HEADER))
         paths.append(("Unit attack poses", ROOT / ATTACK_POSE_HEADER))
         paths.append(("Source weapon effects", ROOT / WEAPON_SOURCE_HEADER))
+        paths.append(("Source death art", ROOT / DEATH_SOURCE_HEADER))
     _, rom_rel = GAMES[profile]
     paths.append(("Built ROM", ROOT / rom_rel))
     audio = ROOT / ".local/sc64/audio/generated/sc64_audio_generated.h"
@@ -725,6 +769,8 @@ def status(profile: str) -> int:
             ready = attack_pose_input_ready(path)
         elif label == "Source weapon effects":
             ready = weapon_source_input_ready(path)
+        elif label == "Source death art":
+            ready = death_source_input_ready(path)
         elif label == "Source construction art":
             ready = construction_color_input_ready(path)
         elif label.endswith("gated map data"):
@@ -747,7 +793,7 @@ def status(profile: str) -> int:
                 if profile == "zerg" and label == "Zerg chapter 4 sprites" and not ready else "")
         if (profile in FACING_PROFILES and not ready and label in
                 ("Directional unit sprites", "Tank firing effects", "Unit attack poses",
-                 "Source weapon effects")):
+                 "Source weapon effects", "Source death art")):
             note = f" (run ./dev sc64 prepare --rom PATH --profile {profile} to regenerate)"
         print(f"{'READY  ' if ready else 'MISSING'} {label}: {path}{note}")
     return int(any(not path.is_file() for _, path in paths) or
@@ -755,6 +801,7 @@ def status(profile: str) -> int:
                (profile in FACING_PROFILES and not tank_vfx_input_ready(ROOT / TANK_VFX_HEADER)) or
                (profile in FACING_PROFILES and not attack_pose_input_ready(ROOT / ATTACK_POSE_HEADER)) or
                (profile in FACING_PROFILES and not weapon_source_input_ready(ROOT / WEAPON_SOURCE_HEADER)) or
+               (profile in FACING_PROFILES and not death_source_input_ready(ROOT / DEATH_SOURCE_HEADER)) or
                (profile in CONSTRUCTION_PROFILES and not construction_color_input_ready(ROOT / CONSTRUCTION_HEADER)) or
                (profile in ("zerg", "zerg-z3", "protoss", "protoss-p3") and not race_campaign_input_ready(
                    "zerg" if profile == "zerg-z3" else profile,

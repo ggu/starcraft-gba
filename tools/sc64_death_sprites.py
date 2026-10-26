@@ -25,6 +25,7 @@ from typing import Any, Callable, Sequence
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools import sc64_construction_sprites as cs  # noqa: E402
+from tools.sc64_unit_facing import pack_word_phases  # noqa: E402
 
 ROM_DEFAULT = ROOT / ".local/sc64/rom/StarCraft64-USA.z64"
 REMAP_DEFAULT = ROOT / ".local/sc64/backwater/generated/palette-remap.bin"
@@ -41,6 +42,9 @@ MAX_DEPTH = 3
 HOLD_LAST = 0xFF
 # Source rubble decays over minutes; keep at most 30 seconds (24-Hz updates).
 REMNANT_CAP_SU = 720
+# The word-renderer ROM budget permits packed under-layer art for combat
+# units/heroes. Higher raw IDs (critters, props and buildings) keep indexed art.
+WORD_PACK_RAW_ID_LIMIT = 89
 # Ignored instructions: setflipstate, playsnd, playsndrand, playsndbtwn,
 # setfldirect, and liftoffcondjmp (the grounded fall-through is followed).
 SKIP_OPS = {23, 24, 25, 26, 52, 63}
@@ -85,6 +89,22 @@ def intensity_band(value: int) -> int:
 def ramp_indices(remap_id: int, ui: dict[str, int]) -> list[int]:
     """GBA UI palette indices for one fire ramp (unknown ids use ofire)."""
     return [ui[name] for name in REMAP_RAMPS.get(remap_id, REMAP_RAMPS[1])]
+
+
+def packed_under_image_ids(sources: dict[int, dict[str, Any]]) -> set[int]:
+    return {layer["image_id"] for raw, source in sources.items()
+            if raw < WORD_PACK_RAW_ID_LIMIT
+            for layer in source["layers"] if layer["under"]}
+
+
+def word_payload_bytes(sources: dict[int, dict[str, Any]],
+                       images: dict[int, dict[str, Any]]) -> int:
+    """Bytes in packed under-layer arrays for common combat-unit raw IDs."""
+    packed_images = packed_under_image_ids(sources)
+    return sum(sum(len(phase) * 4 for phase in pack_word_phases(
+        frame["w"], frame["h"], frame["pixels"]))
+        for iid, image in images.items() if iid in packed_images
+        for frame in image["frames"])
 
 
 class Unsupported(ValueError):
@@ -134,7 +154,14 @@ def compile_death(payload: bytes, scripts: dict[int, int], image_iscript: Sequen
             if opcode == 0:
                 frame = args[0]
             elif opcode in (5, 6):
-                wait = args[0] + 1 if opcode == 5 else (args[0] + args[1]) // 2 + 1
+                if opcode == 5:
+                    wait = args[0]
+                else:
+                    if args[0] > args[1]:
+                        raise Unsupported("waitrand minimum exceeds maximum")
+                    wait = (args[0] + args[1]) // 2
+                if wait <= 0:
+                    raise Unsupported("wait duration must be positive")
                 if frame is not None:
                     if layer["start"] is None:
                         layer["start"] = at + elapsed
@@ -209,58 +236,19 @@ def timing(layers: Sequence[dict[str, Any]]) -> dict[str, int]:
             "total_su": total}
 
 
-SPAN_ROW_END = 0xFFFF
-
-
-def span_stream(pixels: bytes, w: int, h: int) -> list[int]:
-    """Encode a frame as mode-4 halfword spans for even and odd screen x.
-
-    The stream is [len(even), even..., odd...]. Each row holds ops ending in
-    SPAN_ROW_END: (column << 8) | n followed by n opaque halfwords, or n = 0
-    followed by one halfword whose zero byte is transparent. Columns count
-    halfwords from x >> 1, so empty pixels cost nothing at runtime."""
-    streams = []
-    for parity in (0, 1):
-        out: list[int] = []
-        for r in range(h):
-            row = bytes(parity) + pixels[r * w:(r + 1) * w]
-            row += bytes(len(row) & 1)
-            run: list[int] = []
-            start = 0
-            for j in range(len(row) // 2):
-                a, b = row[2 * j], row[2 * j + 1]
-                if a and b:
-                    if not run:
-                        start = j
-                    run.append(a | b << 8)
-                    continue
-                if run:
-                    out += [start << 8 | len(run), *run]
-                    run = []
-                if a or b:
-                    out += [j << 8, a | b << 8]
-            if run:
-                out += [start << 8 | len(run), *run]
-            out.append(SPAN_ROW_END)
-        streams.append(out)
-    return [len(streams[0]), *streams[0], *streams[1]]
-
-
-def span_lines(symbol: str, f: dict[str, Any]) -> list[str]:
-    spans = span_stream(f["pixels"], f["w"], f["h"])
-    lines = [f"static const unsigned short {symbol}_spans[{len(spans)}] = {{"]
-    for offset in range(0, len(spans), 12):
-        lines.append("    " + ", ".join(f"0x{v:04x}" for v in spans[offset:offset + 12]) + ",")
-    lines.append("};")
-    return lines
-
-
 def write_header(path: Path, sources: dict[int, dict[str, Any]],
                  images: dict[int, dict[str, Any]]) -> None:
+    packed_images = packed_under_image_ids(sources)
+    word_bytes = word_payload_bytes(sources, images)
     lines = [
         "/* Private generated source death art. Do not commit. */",
         "#ifndef SC64_DEATH_SPRITES_GENERATED_H",
         "#define SC64_DEATH_SPRITES_GENERATED_H",
+        "#define SC64_DEATH_SOURCE_BANK_VERSION 2u",
+        "#define SC64_DEATH_SOURCE_METADATA_VERSION 1u",
+        f"#define SC64_DEATH_SOURCE_PIXEL_BYTES {sum(len(f['pixels']) for im in images.values() for f in im['frames'])}u",
+        "#define SC64_DEATH_SOURCE_WORD_METADATA 1u",
+        f"#define SC64_DEATH_SOURCE_WORD_BYTES {word_bytes}u",
         "#ifdef SC64_DEATH_SOURCE_ART",
         '#include "sc64_death_source.h"',
         "",
@@ -273,11 +261,24 @@ def write_header(path: Path, sources: dict[int, dict[str, Any]],
                 lines.append("    " + ", ".join(f"0x{v:02x}" for v in f["pixels"][offset:offset + 16]) + ",")
             lines.extend(["};", f"static const Sc64SpriteFrame {symbol} = {{ {f['x']}, {f['y']}, "
                           f"{f['w']}, {f['h']}, {f['canvas_w']}, {f['canvas_h']}, {symbol}_pixels }};"])
-            lines.extend(span_lines(symbol, f))
+            if iid in packed_images:
+                phases = pack_word_phases(f["w"], f["h"], f["pixels"])
+                lines.extend(["#ifdef SC64_UNIT_WORD_SPRITES"])
+                phase_symbols = []
+                word_symbol = f"sc64_death_image_{iid}_frame_{index}_words"
+                for phase, words in enumerate(phases):
+                    phase_symbol = f"{word_symbol}_p{phase}"
+                    phase_symbols.append(phase_symbol)
+                    lines.append(f"static const u32 {phase_symbol}[{len(words)}] = {{")
+                    for offset in range(0, len(words), 8):
+                        lines.append("    " + ", ".join(
+                            f"0x{word:08x}u" for word in words[offset:offset + 8]) + ",")
+                    lines.append("};")
+                lines.extend([f"static const GbaSpriteWordFrame {word_symbol} = {{",
+                              f"    {f['w']}u, {f['h']}u, {{ {', '.join(phase_symbols)} }}",
+                              "};", "#endif /* SC64_UNIT_WORD_SPRITES */"])
         lines.append(f"static const Sc64SpriteFrame *const sc64_death_image_{iid}_frames[] = {{")
         lines.extend(f"    &sc64_death_image_{iid}_frame_{i}," for i in range(len(image["frames"])))
-        lines.extend(["};", f"static const unsigned short *const sc64_death_image_{iid}_spans[] = {{"])
-        lines.extend(f"    sc64_death_image_{iid}_frame_{i}_spans," for i in range(len(image["frames"])))
         lines.extend(["};", ""])
     programs: dict[tuple, str] = {}
     layer_sets: dict[tuple, str] = {}
@@ -314,18 +315,22 @@ def write_header(path: Path, sources: dict[int, dict[str, Any]],
         lines.append(f"    case {iid}: return frame_index < {count}u ? "
                      f"sc64_death_image_{iid}_frames[frame_index] : (const Sc64SpriteFrame *)0;")
     lines.extend(["    default: return (const Sc64SpriteFrame *)0;", "    }", "}",
-                  "static inline const unsigned short *",
-                  "sc64_death_image_spans(unsigned short image_id, unsigned short frame_index)",
-                  "{", "    switch (image_id) {"])
-    for iid, image in images.items():
-        count = len(image["frames"])
-        lines.append(f"    case {iid}: return frame_index < {count}u ? "
-                     f"sc64_death_image_{iid}_spans[frame_index] : (const unsigned short *)0;")
-    lines.extend(["    default: return (const unsigned short *)0;", "    }", "}",
                   "static inline const Sc64DeathSource *", "sc64_death_source(int raw_unit_id)",
                   "{", "    switch (raw_unit_id) {"])
     lines.extend(f"    case {raw}: return &sc64_death_raw_{raw};" for raw in sources)
     lines.extend(["    default: return (const Sc64DeathSource *)0;", "    }", "}",
+                  "#ifdef SC64_UNIT_WORD_SPRITES",
+                  "static inline const GbaSpriteWordFrame *",
+                  "sc64_death_image_word_frame(unsigned short image_id, unsigned short frame_index)",
+                  "{", "    switch (image_id) {"])
+    for iid in sorted(packed_images):
+        count = len(images[iid]["frames"])
+        lines.extend([f"    case {iid}: switch (frame_index) {{"])
+        lines.extend(f"        case {index}: return &sc64_death_image_{iid}_frame_{index}_words;"
+                     for index in range(count))
+        lines.extend(["        default: return (const GbaSpriteWordFrame *)0;", "    }"])
+    lines.extend(["    default: return (const GbaSpriteWordFrame *)0;", "    }", "}",
+                  "#endif /* SC64_UNIT_WORD_SPRITES */",
                   f"#define SC64_DEATH_SOURCE_ACTOR_COUNT {len(sources)}u",
                   "#endif /* SC64_DEATH_SOURCE_ART */",
                   "#endif /* SC64_DEATH_SPRITES_GENERATED_H */", ""])
@@ -432,15 +437,22 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path, out_dir: Path,
                        "grp_sha1": hashlib.sha1(grp_data).hexdigest(),
                        "draw_function": draw_function[iid], "remapping": remapping[iid],
                        "source_frames": frames}
+    word_bytes = word_payload_bytes(sources, images)
     write_header(header_path, sources, images)
     pixel_bytes = sum(len(f["pixels"]) for image in images.values() for f in image["frames"])
     manifest = {
         "generator": {
+            "death_bank_version": 2,
+            "metadata_version": 1,
+            "word_metadata_version": 1,
+            "word_bytes": word_bytes,
+            "word_image_count": len(packed_under_image_ids(sources)),
             "extractor_commit": base.UPSTREAM_COMMIT,
             "source_sha256": {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
                               for name in ("tools/sc64_death_sprites.py",
                                            "tools/sc64_construction_sprites.py",
                                            "tools/sc64_sprites.py",
+                                           "tools/sc64_unit_facing.py",
                                            "starcraft/sc64_death_source.h",
                                            "common/gba.h",
                                            "starcraft/sc64_construction_animation.h")},
@@ -452,6 +464,7 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path, out_dir: Path,
         "selection": {
             "unit_lookup": "units.dat->flingy.dat->sprites.dat->images.dat",
             "animation": "Death of the actor image; Init of spawned images/sprites",
+            "word_packing": f"under layers for raw unit ids below {WORD_PACK_RAW_ID_LIMIT}; higher ids stay indexed",
             "iscript_walk": "linear and unconditional goto; liftoffcondjmp follows the grounded path",
             "remnant_cap_source_updates": REMNANT_CAP_SU,
             "remap_draw_function_9": "intensity bands mapped to GBA UI palette ramps; faintest band dropped, next dithered",

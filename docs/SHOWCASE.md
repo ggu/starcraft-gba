@@ -68,18 +68,6 @@ building state whether facing is on or off. The facing frames add about
 Canonical ROMs leave the flag off. A tank cannot yet aim its turret
 independently while driving.
 
-## Death animations
-
-The showcase build also turns on `SC64_DEATH_SOURCE_ART`: units and
-buildings play the source death frames that `tools/sc64_death_sprites.py`
-imports into `.local/sc64/death/generated/` (see
-[Death animations](DEVELOPMENT.md#death-animations)). Deaths are
-presentation-only and do not change simulation or saves. They draw through
-`SC64_SPAN_BLIT`, which skips transparent pixels. The death frames and their
-span streams add about 1.8 MB of ROM and move the IWRAM end from 0x03004bb0
-to 0x03004d00; BSS still ends at 0x0203dfd8. `make -B showcase
-SHOWCASE_DEATH_FLAGS=` builds the authored deaths for comparison.
-
 For a controller-only mGBA replay, captures and timings:
 
 ```sh

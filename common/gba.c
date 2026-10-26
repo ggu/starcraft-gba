@@ -461,28 +461,6 @@ HOT void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame) {
  }
 }
 #endif
-#if defined(SC64_SPAN_BLIT) || defined(GBA_HOST)
-/* Draw rows [skip, skip+rows) of an importer span stream (see span_stream in
-   tools/sc64_death_sprites.py) at y. The caller keeps 0 <= x and the sprite's
-   right edge <= 240; only opaque halfwords are touched. */
-HOT void gfx_blit_spans(int x,int y,int skip,int rows,const u16 *s) {
-#ifdef GBA_SCENE_CLIP
- if(y<gfx_clip_top){skip+=gfx_clip_top-y;rows-=gfx_clip_top-y;y=gfx_clip_top;}
- if(y+rows>gfx_clip_bottom)rows=gfx_clip_bottom-y;
-#endif
- if(!s||x<0||x>=240||y<0||rows<=0||y+rows>160)return;
- s+=(x&1)?1+s[0]:1;
- for(;skip>0;skip--)for(u32 h;(h=*s++)!=0xffffu;)s+=(h&255)?(h&255):1;
- volatile u16 *line=pixels+y*120+(x>>1);
- for(;rows>0;rows--,line+=120)
-  for(u32 h;(h=*s++)!=0xffffu;) {
-   volatile u16 *d=line+(h>>8);
-   u32 n=h&255;
-   if(!n){u32 v=*s++;*d=(v&255)?(*d&0xff00)|(u16)v:(*d&255)|(u16)v;}
-   else do *d++=*s++; while(--n);
-  }
-}
-#endif
 #if defined(D2_DEN_OF_EVIL) || defined(GBA_HOST)
 /* Transparent nearest-neighbour 2x sprite expansion for the Den scene. */
 HOT void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *src) {

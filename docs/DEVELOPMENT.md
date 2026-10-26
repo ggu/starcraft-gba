@@ -225,7 +225,7 @@ family StarCraft 64 uses for that actor:
 - Vehicles, aircraft, SCVs and Firebats explode in orange, with a larger
   blast for tanks, Science Vessels and Battlecruisers.
 - Protoss units release a blue energy burst. In the source, Zealots,
-  Dragoons and Templar collapse instead; the source-art preview below shows
+  Dragoons and Templar collapse instead; canonical source-art builds show
   that, while the authored fallback uses the burst for them too.
 - Buildings explode in their race's colors and leave rubble for 30 seconds.
 
@@ -297,10 +297,18 @@ render the result screen through the production `draw_result_screen()`.
 The feature-on/off workload digests include the outcome frame and 120
 frozen result updates.
 
-### Source death art preview
+### Source death and corpse art
 
-After preparing the unified inputs, this separate preview draws the original
-StarCraft 64 death frames:
+Canonical Terran, Zerg, Protoss and Showcase ROMs use the extracted death and
+corpse frames. This replaces the authored purple Zerg puddles that formed
+segmented health-bar-like rows in Siege Line. Refresh older prepared inputs
+with `./dev sc64 prepare --rom PATH --profile terran` (or `zerg` / `protoss`)
+before building. The source bank must have version 2 timing metadata and a
+nonempty pixel payload; setup/build reject stale banks. Keep generated banks local to
+each checkout when branches use different formats; parallel preparation in
+another worktree must not overwrite this checkout's generated header.
+
+The same art is available in the separate unified preview:
 
 ```sh
 python3 tools/sc64_death_sprites.py
@@ -317,7 +325,8 @@ layers:
 - explosion overlays, plus any overlays they spawn (`imgol`/`imgul`);
 - remnant and rubble sprites (`lowsprul`).
 
-Each layer keeps its source frame order and waits. IScript `end` removes the
+Each layer keeps its source frame order; a fixed `wait N` spans N source
+updates. Random waits use a deterministic midpoint, without an extra update. IScript `end` removes the
 layer, as in the source. Remnant streams are capped at 720 source updates
 (30 seconds). Only the frames that the animations reference are imported.
 
@@ -332,22 +341,21 @@ checkerboard-dithered. Generated art and its manifest stay under
 `--out` and `--upstream` for other local paths.
 
 The importer currently compiles 167 actors from 61 image banks (about 770 KB
-of pixels). The preview ROM is `build/StarCraft-Death-Preview-GBA.gba`; its
-menus and missions match the unified profile. Showcase also uses the source
-deaths; `make -B showcase SHOWCASE_DEATH_FLAGS=` restores the authored
-effects. Canonical race ROMs keep the authored effects. To use the source art
-in another prepared race profile, compile with `SC64_DEATH_SOURCE_ART` and
-include the generated directory.
-
-The importer also emits each frame as a span stream for even and odd screen
-x: runs of opaque framebuffer halfwords, plus single half-transparent
-halfwords. With `SC64_SPAN_BLIT`, frames that fit the screen width draw from
-these streams in IWRAM, so transparent pixels cost nothing and opaque pairs
-need no read-modify-write. Frames crossing a side edge, and builds without the
-flag, use the frame pixels. Showcase enables it; the death preview ROM has no
-IWRAM to spare and keeps the pixel path.
-See [Validation](VALIDATION.md#death-animations-2026-10-25) for coverage and
-memory figures.
+of pixels). Canonical builds also prepack combat-unit collapse and remnant frames
+for the existing word compositor (about 891 KB of ROM data, no new RAM).
+Neutral actors and buildings use the same source pixels through indexed drawing
+to fit the complete Terran ROM. The indexed fallback handles HUD-edge clipping. Adding
+`-DSC64_DEATH_INDEXED_REMNANTS` to the source death flags selects identical
+indexed pixels for a performance comparison. The preview ROM is `build/StarCraft-Death-Preview-GBA.gba`; its
+menus and missions match the unified profile. Canonical race builds and
+Showcase select this bank by default. `CANONICAL_DEATH_FLAGS=` selects the
+authored comparison path when forcing a rebuild; it leaves gameplay unchanged.
+The original-art build and explicit older profiles retain authored effects.
+Unsupported source actors also keep their bounded authored fallback.
+`make test-sc64-showcase-death-source` exercises actual Siege Line deaths
+and compares rendered layers to source-frame composites. See
+[Validation](VALIDATION.md#canonical-source-death-art-2026-10-26) for current
+coverage and limits; older preview measurements remain historical.
 
 ## Install the tools
 

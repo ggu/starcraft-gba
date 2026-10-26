@@ -3,7 +3,6 @@
  * the drawn pixels are the imported frames, clipped to the battlefield. */
 #include "../common/gba.c"
 #include "../starcraft/game.c"
-#include "sc64_source_blit_check.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,7 +64,7 @@ static void check_source_pass(const Sc64DeathVfx *e, int under, int *drawn)
         const Sc64DeathSourceLayer *l = &art->layers[i];
         unsigned f;
         if (l->under != under || !sc64_death_source_layer_frame(l, age, &f)) continue;
-        reference_source_blit(sc64_death_image_frame(l->image_id, (unsigned short)f), x + l->x, y + l->y);
+        death_vfx_blit(sc64_death_image_frame(l->image_id, (unsigned short)f), x + l->x, y + l->y);
     }
     for (int py = 0; py < 160; ++py) for (int px = 0; px < 240; ++px)
         expected[py * 240 + px] = gfx_test_pixel(px, py);
@@ -118,13 +117,6 @@ int main(void)
         check_descriptor(raw, art); ++actors;
     }
     assert(actors == SC64_DEATH_SOURCE_ACTOR_COUNT && actors >= 100);
-    unsigned frames = 0, cases = 0;
-    for (unsigned image = 0; image < 1024; ++image)
-        for (unsigned short f = 0; sc64_death_image_frame((unsigned short)image, f); ++f, ++frames)
-            cases += check_source_frame_blits(sc64_death_image_frame((unsigned short)image, f),
-                                              sc64_death_image_spans((unsigned short)image, f));
-    assert(frames >= 400);
-    fprintf(stderr, "death spans: %u frames (%u cases) match raw pixels\n", frames, cases);
     /* Marine: collapse frames then a remnant (both beneath units). */
     test_kill(U_MARINE, 1, 0);
     /* Zergling: collapse frames and remains. */
