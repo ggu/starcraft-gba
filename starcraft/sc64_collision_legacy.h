@@ -305,14 +305,32 @@ sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
         MAP_COLS > 256 || MAP_ROWS > 256) return 0;
     if (IS_WORKER(q->type) && (q->order == ORDER_MINE || q->order == ORDER_GAS))
         return 0;
+#ifndef SC64_Z7_RUNTIME
     (void)sc64_unit_collision_class((int)(q - u), q->type,
         &mover_radius, &mover_flying, &mover_collidable);
+#endif
     minx = (q->x - speed - reach) >> 4; maxx = (q->x + speed + reach) >> 4;
     miny = (q->y - speed - reach) >> 4; maxy = (q->y + speed + reach) >> 4;
     if (minx < 0) minx = 0;
     if (miny < 0) miny = 0;
     if (maxx >= MAP_COLS) maxx = MAP_COLS - 1;
     if (maxy >= MAP_ROWS) maxy = MAP_ROWS - 1;
+#ifdef SC64_Z7_RUNTIME
+    /* Dense raw buckets conservatively fall back before class lookup/list
+     * writes. The caller then uses the original exact step-clear path. */
+    {
+        int raw_nodes = 0;
+        for (row = miny; row <= maxy; ++row)
+            for (col = minx; col <= maxx; ++col) {
+                int i;
+                for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
+                     i = sc64_unit_bucket_next[i])
+                    if (++raw_nodes > SC64_STEER_LIST_CAPACITY) return 0;
+            }
+    }
+    (void)sc64_unit_collision_class((int)(q - u), q->type,
+        &mover_radius, &mover_flying, &mover_collidable);
+#endif
     for (row = miny; row <= maxy; ++row)
         for (col = minx; col <= maxx; ++col) {
             int i;
