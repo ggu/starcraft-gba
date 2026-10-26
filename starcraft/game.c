@@ -6880,6 +6880,16 @@ mission_mineral_sprite(int style)
     return 0;
 }
 
+static const Sc64SpriteFrame *
+mission_geyser_sprite(void)
+{
+#ifdef SC64_RACES
+    return sc64_race_unit_sprite(188);
+#else
+    return &sc64_sprite_geyser;
+#endif
+}
+
 static void
 draw_mission_sprite(const Sc64SpriteFrame *s, int cx, int cy)
 {
@@ -6887,6 +6897,23 @@ draw_mission_sprite(const Sc64SpriteFrame *s, int cx, int cy)
 	cy - s->canvas_h / 2 + s->offset_y, s->w, s->h, s->pixels);
 }
 #endif
+
+/* Use the same footprint in the painter and its cached-object key. Geyser
+ * art can remain visible when its center has left the playfield. */
+static int
+geyser_in_view(int x, int y)
+{
+#ifdef SC64_HAS_SPRITES
+    const Sc64SpriteFrame *sprite = mission_geyser_sprite();
+    if (sprite) {
+        int left = x - sprite->canvas_w / 2 + sprite->offset_x;
+        int top = y - sprite->canvas_h / 2 + sprite->offset_y;
+        return left < 240 && left + sprite->w > 0 &&
+               top < 120 && top + sprite->h > 12;
+    }
+#endif
+    return x > 0 && x < 240 && y > 12 && y < 120;
+}
 
 /* Presentation queries the canonical shield capacity, independently of HP.
  * In particular an Archon's tiny HP pool must not scale its large shields. */
@@ -7576,7 +7603,7 @@ sc64_static_objects_key(void)
         {
             int x = geysers[i].x - camx;
             int y = geysers[i].y - camy + 12;
-            int in_bounds = i < geyser_count && x > 0 && x < 240 && y > 12 && y < 120;
+            int in_bounds = i < geyser_count && geyser_in_view(x, y);
             values[n++] = in_bounds && currently_visible(geysers[i].x, geysers[i].y);
         }
     }
@@ -7666,9 +7693,15 @@ draw_map_static_objects(void)
     for (i = 0; i < geyser_count; i++) {
 	x = geysers[i].x - camx;
 	y = geysers[i].y - camy + 12;
-	if (x > 0 && x < 240 && y > 12 && y < 120 &&
-	    currently_visible(geysers[i].x, geysers[i].y))
-	    gfx_diamond(x, y, 6, 4, C_GREEN);
+	if (geyser_in_view(x, y) &&
+	    currently_visible(geysers[i].x, geysers[i].y)) {
+#ifdef SC64_HAS_SPRITES
+            const Sc64SpriteFrame *sprite = mission_geyser_sprite();
+            if (sprite) draw_mission_sprite(sprite, x, y);
+            else
+#endif
+	        gfx_diamond(x, y, 6, 4, C_GREEN);
+        }
     }
 #ifdef SC64_IMPORTED_MISSION
     for (i = 0; i < MAX_BUILDINGS; i++)

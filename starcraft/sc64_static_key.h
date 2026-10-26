@@ -59,8 +59,8 @@ sc64_static_objects_key(void)
     }
     for (int i = 0; i < MAX_RACE_GEYSERS; ++i) {
         int x = geysers[i].x - camx, y = geysers[i].y - camy + 12;
-        int drawn = i < geyser_count && x > 0 && x < 240 &&
-                    y > 12 && y < 120 && currently_visible(geysers[i].x, geysers[i].y);
+        int drawn = i < geyser_count && geyser_in_view(x, y) &&
+                    currently_visible(geysers[i].x, geysers[i].y);
         SC64_STATIC_FIELD(drawn);
         if (drawn) {
             SC64_STATIC_FIELD(geysers[i].x);

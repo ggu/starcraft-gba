@@ -127,6 +127,17 @@ The [minimap audit](audits/2026-10-26-minimap-terrain/README.md) records the
 pixel oracle, byte-identical public replay and scoped ARM timing. P3/Z3 legacy
 and staged profiles retain their existing flag selections.
 
+## Source geyser art
+
+Imported profiles draw the existing raw-188 geyser sprite instead of the
+original green diamond. The painter and static-cache key use the sprite's
+actual bounds, including partially visible geysers at the playfield edges.
+Existing prepared banks already contain this art; no new private inputs or
+save fields are required. The asset-free profile retains its authored marker.
+This selects the static source frame; native gas-smoke animation is separate.
+With the canonical Protoss inputs prepared, `make test-sc64-geyser-art` checks
+source pixels, edge clipping, fog, all three gas buildings and warm-cache reuse.
+
 ## Source construction art
 
 Prepared imported race builds now use the source construction art, including

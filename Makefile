@@ -1340,6 +1340,12 @@ test-canonical-render: build/test-sc64-terran-full-frame build/test-sc64-terran-
 	./build/test-sc64-zerg-canonical-hud
 	./build/test-sc64-protoss-canonical-frame
 	./build/test-sc64-protoss-canonical-hud
+
+build/test-sc64-geyser-art: tests/sc64_geyser_art.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-geyser-art
+test-sc64-geyser-art: build/test-sc64-geyser-art
+	./build/test-sc64-geyser-art
 .PHONY: test-sc64-terran-late-count-cache test-sc64-present test-sc64-terran-defense-targets test-sc64-terran-full-targets test-sc64-terran-full-spatial-hud
 test-sc64-terran-late-count-cache: build/test-sc64-terran-late-count-cache
 	./$<
