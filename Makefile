@@ -3266,6 +3266,23 @@ build/StarCraft-Protoss-P7-Carrier-Training-Probe-GBA.gba: build/starcraft-proto
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 HANG42' SC7K
 protoss-p7-carrier-training-probe: build/StarCraft-Protoss-P7-Carrier-Training-Probe-GBA.gba
 
+# Generation 43: launched Interceptor flight, attack passes and return.
+# The order model is outside $(STARCRAFT) until this profile links it.
+P7_INTERCEPTOR_FLIGHT_FLAGS := $(P7_CARRIER_TRAINING_FLAGS) -DSC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+P7_INTERCEPTOR_FLIGHT_SOURCES := starcraft/sc64_interceptor_orders.c
+build/test-sc64-p7-interceptor-flight: tests/sc64_p7_interceptor_flight_game.c $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_INTERCEPTOR_FLIGHT_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+.PHONY: test-sc64-p7-interceptor-flight protoss-p7-interceptor-flight-probe
+test-sc64-p7-interceptor-flight: build/test-sc64-p7-interceptor-flight
+	./build/test-sc64-p7-interceptor-flight
+build/starcraft-protoss-p7-interceptor-flight-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_INTERCEPTOR_FLIGHT_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-interceptor-flight-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Interceptor-Flight-Probe-GBA.gba: build/starcraft-protoss-p7-interceptor-flight-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 FLY43' SC7L
+protoss-p7-interceptor-flight-probe: build/StarCraft-Protoss-P7-Interceptor-Flight-Probe-GBA.gba
+
 # Dedicated filming build. Hidden menu and transient scenes stay off in all
 # canonical profiles; the P7 bundle supplies Carrier/Ultralisk render actors.
 SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED $(CANONICAL_MINIMAP_FLAGS)

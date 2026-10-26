@@ -80,11 +80,17 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
 {
     Sc64ProjectileRow row;
     u8 id,native_index;
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && \
+    !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
     /* All children in this profile are still inside the hangar. */
     (void)shooter; (void)target; (void)heading;
     (void)source_x_q8; (void)source_y_q8;
     return 0;
+#endif
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+    /* Only launched Interceptors fire; hangar rows stay inert. */
+    if (shooter>=0 && shooter<MAX_UNITS && SC64_CARRIER_HANGAR_HIDDEN(&u[shooter]))
+        return 0;
 #endif
     if (!race_p7_active() || race_p7_projectile_fault || shooter<0 ||
         shooter>=MAX_UNITS || !u[shooter].alive ||

@@ -27,7 +27,7 @@ race_can_attack(int attacker,int target) {
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     if(target<MAX_UNITS) {
         unsigned actor = sc64_game_unit_actor_flags(u[target].type);
-        if(actor & SC64_GAME_ACTOR_HIDDEN) return 0;
+        if((actor & SC64_GAME_ACTOR_HIDDEN) || SC64_CARRIER_STATE_HIDDEN(&u[target])) return 0;
     } else {
         unsigned actor = sc64_game_building_actor_flags(b[target-MAX_UNITS].type);
         if(actor & SC64_GAME_ACTOR_INVINCIBLE) return 0;

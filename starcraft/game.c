@@ -191,6 +191,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && !defined(SC64_P7_PROJECTILES_ENABLED)
 #error "Carrier training requires P7 projectile storage and typed actor state"
 #endif
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && !defined(SC64_P7_CARRIER_TRAINING_ENABLED)
+#error "Interceptor flight requires the P7 Carrier training stage"
+#endif
 
 #if defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED) && \
     !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
@@ -249,7 +252,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_P7_CARRIER_TRAINING_ENABLED)
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
+#define SC64_RACE_SAVE_GENERATION 43u
+#elif defined(SC64_P7_CARRIER_TRAINING_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 42u
 #elif defined(SC64_P7_PROJECTILES_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 41u
@@ -738,11 +743,23 @@ enum {
 #else
 #define SC64_TRANSPORT_LOADED(q) 0
 #endif
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+/* Training (state 1) and inside (state 2) children stay off-map; launched
+ * and detached Interceptors fly, but the flight adapter owns their orders. */
+#define SC64_CARRIER_HANGAR_HIDDEN(q) ((q)->type==U_P7_INTERCEPTOR && \
+    ((((unsigned)(q)->flags >> 8) & 7u) - 1u) < 2u)
+#define SC64_CARRIER_CHILD_SCRIPTED(q) ((q)->type==U_P7_INTERCEPTOR)
+/* Raw73 keeps no type-level hidden flag here, so per-row checks replace it. */
+#define SC64_CARRIER_STATE_HIDDEN(q) SC64_CARRIER_HANGAR_HIDDEN(q)
+#elif defined(SC64_P7_CARRIER_TRAINING_ENABLED)
 /* This stage has only training/inside children; all raw73 rows stay off-map. */
 #define SC64_CARRIER_HANGAR_HIDDEN(q) ((q)->type==U_P7_INTERCEPTOR)
+#define SC64_CARRIER_CHILD_SCRIPTED(q) ((q)->type==U_P7_INTERCEPTOR)
+#define SC64_CARRIER_STATE_HIDDEN(q) 0 /* the raw73 type flag hides them */
 #else
 #define SC64_CARRIER_HANGAR_HIDDEN(q) 0
+#define SC64_CARRIER_CHILD_SCRIPTED(q) 0
+#define SC64_CARRIER_STATE_HIDDEN(q) 0
 #endif
 enum {
     SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSE, SCREEN_RESULT
@@ -1215,6 +1232,10 @@ static void race_p7_carrier_training_clear_slot(int slot);
 static void race_p7_carrier_training_end_frame(void);
 static int race_p7_carrier_training_slots_available(unsigned wanted);
 static unsigned race_p7_carrier_training_child_count(int carrier);
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+static int race_p7_interceptor_flight_carrier_holds(int carrier);
+static int race_p7_interceptor_flight_carrier_order(int carrier);
+#endif
 #endif
 #ifdef SC64_P7_OBSERVER_ENABLED
 static int sc64_p7_observer_can_attack_from(int attacker, int target,
@@ -2909,7 +2930,8 @@ target_alive(int target)
 #endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (target >= 0 && target < MAX_UNITS && u[target].alive &&
-        sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_HIDDEN)) return 0;
+        (sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_HIDDEN) ||
+         SC64_CARRIER_STATE_HIDDEN(&u[target]))) return 0;
 #endif
     return target >= 0 && (target < MAX_UNITS ? u[target].alive : b[target - MAX_UNITS].alive);
 }
@@ -2954,7 +2976,8 @@ sc64_direct_target_state(int entity, int source_live_owner,
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
         immune |= (sc64_game_unit_actor_flags(u[entity].type) &
-                   (SC64_GAME_ACTOR_HIDDEN | SC64_GAME_ACTOR_INVINCIBLE)) != 0;
+                   (SC64_GAME_ACTOR_HIDDEN | SC64_GAME_ACTOR_INVINCIBLE)) != 0 ||
+                   SC64_CARRIER_STATE_HIDDEN(&u[entity]);
 #endif
     } else {
         int bi = entity - MAX_UNITS;
@@ -3153,6 +3176,7 @@ hit_target_impl(int target, int damage, int source_type, int source_owner,
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     if (target >= 0 && target < MAX_UNITS &&
         (sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_HIDDEN) ||
+         SC64_CARRIER_STATE_HIDDEN(&u[target]) ||
          sc64_game_unit_has_flag(u[target].type, SC64_GAME_ACTOR_INVINCIBLE))) return;
     if (target >= MAX_UNITS && target < MAX_UNITS + MAX_BUILDINGS &&
         sc64_game_building_has_flag(b[target-MAX_UNITS].type,
@@ -5418,7 +5442,12 @@ target_lists_unavailable:
 	if (!q->alive)
 	    continue;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-        if (SC64_CARRIER_HANGAR_HIDDEN(q)) continue;
+        if (SC64_CARRIER_CHILD_SCRIPTED(q)) continue;
+#endif
+#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+        /* An engaged Carrier stops and launches instead of closing in. */
+        if (q->type == U_P7_CARRIER && race_p7_interceptor_flight_carrier_order(i))
+            continue;
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
         if (q->type == U_Z7_EGG) {
@@ -6908,7 +6937,7 @@ draw_unit(Unit * q)
 #endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     unsigned actor_flags = sc64_game_unit_actor_flags(q->type);
-    if (actor_flags & SC64_GAME_ACTOR_HIDDEN) return;
+    if ((actor_flags & SC64_GAME_ACTOR_HIDDEN) || SC64_CARRIER_STATE_HIDDEN(q)) return;
     if (actor_flags && !(actor_flags & SC64_GAME_ACTOR_DRAWABLE)) return;
 #endif
 #ifdef SC64_HAS_SPRITES
@@ -7163,6 +7192,7 @@ draw_minimap(void)
 #endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
         if (sc64_game_unit_has_flag(u[i].type, SC64_GAME_ACTOR_HIDDEN) ||
+            SC64_CARRIER_STATE_HIDDEN(&u[i]) ||
             (sc64_game_unit_actor_flags(u[i].type) &&
              !(sc64_game_unit_actor_flags(u[i].type) & SC64_GAME_ACTOR_DRAWABLE))) continue;
 #endif
@@ -8964,6 +8994,7 @@ game_self_test(void)
 #include "sc64_p7_battery_adapter.h"
 #include "sc64_p7_projectile_adapter.h"
 #include "sc64_p7_carrier_training.h"
+#include "sc64_p7_interceptor_flight.h"
 #endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
 #include "sc64_z7_colony_adapter.h"
