@@ -16,6 +16,11 @@ static u16 host_palette[256];
 #else
 #define HOT __attribute__((section(".iwram"),long_call,target("arm")))
 #endif
+#if defined(SC64_TILE_RENDERER) && !defined(GBA_HOST)
+#define HOT_MODE4
+#else
+#define HOT_MODE4 HOT
+#endif
 #define RGB(r,g,b) ((r)|((g)<<5)|((b)<<10))
 /* Direct GBA mode-4 double buffering. All framebuffer stores are halfwords. */
 #ifdef GBA_HOST
@@ -32,6 +37,194 @@ static u8 gfx_clip_top, gfx_clip_bottom;
 static int tone_frames, noise_frames;
 volatile u32 gfx_draw_cycles;
 static u32 draw_start;
+#ifdef SC64_TILE_RENDERER
+#ifdef GBA_HOST
+u16 gfx_host_vram[49152];
+u16 gfx_host_io[64];
+static u16 host_obj_palette[256];
+static u16 host_oam[512];
+#define GFX_OAM16 ((volatile u16 *)host_oam)
+#define GFX_OBJ_PAL16 ((volatile u16 *)host_obj_palette)
+#define GFX_BG_PAL16 ((volatile u16 *)host_palette)
+#else
+#define GFX_OAM16 ((volatile u16 *)0x07000000)
+#define GFX_OBJ_PAL16 ((volatile u16 *)0x05000200)
+#define GFX_BG_PAL16 ((volatile u16 *)0x05000000)
+#endif
+static u8 gfx_tile_buffer[240*160] __attribute__((aligned(4)));
+u32 gfx_tile_dirty[20], gfx_tile_drawn[20], gfx_tile_art_marks[20];
+u8 gfx_tile_band_top, gfx_tile_band_bottom;
+void (*gfx_tile_present_hook)(void);
+static u8 gfx_tile_on, gfx_tile_zero, gfx_tile_capture;
+#define GFX_TILE_COLOR(c) ((c) ? (c) : gfx_tile_zero)
+#define GFX_TILE_TOUCH(x0,y0,x1,y1) do { if (gfx_tile_on) gfx_tile_touch((x0),(y0),(x1),(y1)); } while (0)
+/* Mark the 8x8 tiles covered by [x0,x1) x [y0,y1). Art capture records a
+ * separate map so the static-art pass never reaches the sprite overlay. */
+static HOT void gfx_tile_touch(int x0,int y0,int x1,int y1) {
+    if(x0<0)x0=0; if(y0<0)y0=0; if(x1>240)x1=240; if(y1>160)y1=160;
+    if(x0>=x1||y0>=y1)return;
+    if(y0<GFX_TILE_WORLD_TOP)gfx_tile_band_top=1;
+    if(y1>GFX_TILE_WORLD_BOTTOM)gfx_tile_band_bottom=1;
+    u32 mask=((2u<<((x1-1)>>3))-1u)&~((1u<<(x0>>3))-1u);
+    for(int ty=y0>>3;ty<=(y1-1)>>3;ty++) {
+        if(gfx_tile_capture)gfx_tile_art_marks[ty]|=mask;
+        else {gfx_tile_dirty[ty]|=mask;gfx_tile_drawn[ty]|=mask;}
+    }
+}
+int gfx_tile_active(void){return gfx_tile_on;}
+u8 *gfx_tile_buffer_pixels(void){return gfx_tile_buffer;}
+void gfx_tile_art_capture(int enable){
+    gfx_tile_capture=(u8)(enable!=0);
+    if(enable)for(int i=0;i<20;i++)gfx_tile_art_marks[i]=0;
+}
+/* Clear last frame's dynamic pixels in the world rows only; the HUD bands
+ * persist and are redrawn when something drew over them. */
+HOT void gfx_tile_clear_world(void) {
+    for(int ty=GFX_TILE_WORLD_TOP>>3;ty<GFX_TILE_WORLD_BOTTOM>>3;ty++) {
+        u32 m=gfx_tile_drawn[ty];
+        if(!m)continue;
+        int y0=ty*8<GFX_TILE_WORLD_TOP?GFX_TILE_WORLD_TOP:ty*8;
+        u32 *base=(u32*)(gfx_tile_buffer+y0*240);
+        int rows=ty*8+8-y0;
+        for(u32 bits=m,tx=0;bits;bits>>=1,tx++) if(bits&1) {
+            u32 *row=base+2*tx;
+            for(int y=0;y<rows;y++,row+=60){row[0]=0;row[1]=0;}
+        }
+        gfx_tile_dirty[ty]|=m;
+        gfx_tile_drawn[ty]=0;
+    }
+}
+static void gfx_tile_palette_sync(void) {
+    for(int i=0;i<256;i++)GFX_OBJ_PAL16[i]=GFX_BG_PAL16[i];
+    GFX_BG_PAL16[GFX_TILE_BLACK_INDEX]=GFX_BG_PAL16[0];
+    GFX_OBJ_PAL16[GFX_TILE_BLACK_INDEX]=GFX_BG_PAL16[0];
+}
+void gfx_tile_enter(void) {
+    volatile u16 *vram=GFX_VRAM16;
+    for(int i=0;i<49152;i++)vram[i]=0;
+    for(int i=0;i<32;i++){vram[GFX_TILE_FOG*32+i]=0;}
+    /* Solid fog and opaque-black tiles for the fog layer. */
+    for(int i=0;i<32;i++){
+        vram[GFX_TILE_FOG*32+i]=(u16)(C_FOG|(C_FOG<<8));
+        vram[GFX_TILE_BLACK*32+i]=(u16)(GFX_TILE_BLACK_INDEX|(GFX_TILE_BLACK_INDEX<<8));
+    }
+    for(int ty=15;ty<20;ty++)for(int tx=0;tx<30;tx++)
+        vram[GFX_TILE_SBB_HUD*1024+ty*32+tx]=(u16)(GFX_TILE_HUD_FIRST+(ty-15)*30+tx);
+    for(int i=0;i<128;i++){GFX_OAM16[i*4]=0x0200;GFX_OAM16[i*4+1]=0;GFX_OAM16[i*4+2]=0;}
+    for(int k=0;k<8;k++){
+        GFX_OAM16[k*4]=(u16)(((k>>2)*64)|0x2000);
+        GFX_OAM16[k*4+1]=(u16)(((k&3)*64)|0xC000);
+        GFX_OAM16[k*4+2]=(u16)(k*128);
+    }
+    for(int i=0;i<240*160/4;i++)((u32*)gfx_tile_buffer)[i]=0;
+    for(int i=0;i<20;i++)gfx_tile_dirty[i]=gfx_tile_drawn[i]=gfx_tile_art_marks[i]=0;
+    gfx_tile_band_top=gfx_tile_band_bottom=1;
+    gfx_tile_palette_sync();
+    GFX_IO16(0x08)=(u16)(0x0080|(GFX_TILE_SBB_HUD<<8));
+    GFX_IO16(0x0a)=(u16)(0x0081|(GFX_TILE_SBB_ART<<8));
+    GFX_IO16(0x0c)=(u16)(0x0082|(GFX_TILE_SBB_FOG<<8));
+    GFX_IO16(0x0e)=(u16)(0x0083|(GFX_TILE_SBB_TERRAIN<<8));
+    for(int r=0x10;r<0x20;r+=2)GFX_IO16(r)=0;
+    GFX_IO16(0x40)=240; /* WIN0H: x 0..240 */
+    GFX_IO16(0x44)=(u16)((GFX_TILE_WORLD_TOP<<8)|GFX_TILE_WORLD_BOTTOM);
+    GFX_IO16(0x48)=0x001f; /* inside WIN0: BG0-3 and OBJ */
+    GFX_IO16(0x4a)=0x0011; /* HUD bands: BG0 and OBJ over the backdrop */
+    GFX_IO16(0x00)=0x3f40; /* mode 0, BG0-3, OBJ 1D, WIN0 */
+    gfx_tile_on=1;gfx_tile_zero=GFX_TILE_BLACK_INDEX;gfx_tile_capture=0;
+    pixels=(volatile u16*)gfx_tile_buffer;
+}
+void gfx_tile_leave(void) {
+    gfx_tile_on=0;gfx_tile_zero=0;gfx_tile_capture=0;
+    GFX_IO16(0x00)=(u16)(0x0404|(front?16:0));
+#ifdef GBA_HOST
+    pixels=host_fb[front^1];
+#else
+    pixels=(volatile u16*)(front?0x06000000:0x0600a000);
+#endif
+}
+/* Copy changed tiles top to bottom; rows convert faster than they scan out. */
+static HOT void gfx_tile_present_tiles(void) {
+    volatile u16 *vram=GFX_VRAM16;
+    for(int ty=0;ty<20;ty++) {
+        u32 m=gfx_tile_dirty[ty];
+        if(!m)continue;
+        gfx_tile_dirty[ty]=0;
+        for(int tx=0;m;m>>=1,tx++) if(m&1) {
+            volatile u32 *dst;
+            if(ty<15) {
+                int sprite=(ty>>3)*4+(tx>>3);
+                dst=(volatile u32*)(vram+0x8000+(sprite*64+(ty&7)*8+(tx&7))*32);
+            } else dst=(volatile u32*)(vram+(GFX_TILE_HUD_FIRST+(ty-15)*30+tx)*32);
+            const u32 *src=(const u32*)(gfx_tile_buffer+ty*8*240+tx*8);
+            for(int r=0;r<8;r++){dst[r*2]=src[r*60];dst[r*2+1]=src[r*60+1];}
+        }
+    }
+}
+#ifdef GBA_HOST
+static u16 host_rgb[2][38400];
+static u8 host_rgb_valid[2];
+static int host_bg_pixel(int bg,int x,int y,u8 *out) {
+    u16 cnt=GFX_IO16(0x08+bg*2);
+    int bx=(x+GFX_IO16(0x10+bg*4))&255,by=(y+GFX_IO16(0x12+bg*4))&255;
+    u16 e=gfx_host_vram[((cnt>>8)&31)*1024+(by>>3)*32+(bx>>3)];
+    int px=bx&7,py=by&7;
+    if(e&0x400)px=7-px;
+    if(e&0x800)py=7-py;
+    int byte=((cnt>>2)&3)*16384+(e&1023)*64+py*8+px;
+    u16 pair=gfx_host_vram[byte>>1];
+    *out=(u8)(byte&1?pair>>8:pair);
+    return *out!=0;
+}
+static u8 host_obj_list[128],host_obj_count;
+static int host_obj_pixel(int x,int y,u8 *out) {
+    for(int n=0;n<host_obj_count;n++) {
+        int k=host_obj_list[n];
+        u16 a0=host_oam[k*4],a1=host_oam[k*4+1],a2=host_oam[k*4+2];
+        int oy=a0&255,ox=a1&511;
+        if(x<ox||x>=ox+64||y<oy||y>=oy+64)continue;
+        int sx=x-ox,sy=y-oy;
+        int byte=0x10000+(a2&1023)*32+((sy>>3)*8+(sx>>3))*64+(sy&7)*8+(sx&7);
+        u16 pair=gfx_host_vram[byte>>1];
+        *out=(u8)(byte&1?pair>>8:pair);
+        if(*out)return 1;
+    }
+    return 0;
+}
+/* Compose the emulated mode-0 layers exactly as configured above. */
+static void host_tile_compose(u16 *rgb) {
+    host_obj_count=0;
+    for(int k=0;k<128;k++)if(!(host_oam[k*4]&0x0200))host_obj_list[host_obj_count++]=(u8)k;
+    for(int y=0;y<160;y++)for(int x=0;x<240;x++) {
+        int inside=x>=(GFX_IO16(0x40)>>8)&&x<(GFX_IO16(0x40)&255)&&
+                   y>=(GFX_IO16(0x44)>>8)&&y<(GFX_IO16(0x44)&255);
+        u16 enable=(inside?GFX_IO16(0x48):GFX_IO16(0x4a))&(GFX_IO16(0x00)>>8);
+        u16 color=GFX_BG_PAL16[0];
+        u8 index;
+        int done=0;
+        for(int prio=0;prio<4&&!done;prio++) {
+            if(prio==0&&(enable&0x10)&&host_obj_pixel(x,y,&index)){color=host_obj_palette[index];done=1;break;}
+            for(int bg=0;bg<4;bg++)
+                if((enable&(1<<bg))&&(GFX_IO16(0x08+bg*2)&3)==prio&&host_bg_pixel(bg,x,y,&index)){
+                    color=host_palette[index];done=1;break;
+                }
+        }
+        rgb[y*240+x]=color;
+    }
+}
+#endif
+#else
+#define GFX_TILE_COLOR(c) (c)
+#define GFX_TILE_TOUCH(x0,y0,x1,y1) ((void)0)
+#endif
+#ifdef GBA_HOST
+/* RGB555 of the frame currently on screen, in either presentation mode. */
+void gfx_host_frame_rgb(u16 *rgb) {
+#ifdef SC64_TILE_RENDERER
+    if(host_rgb_valid[front]){for(int i=0;i<38400;i++)rgb[i]=host_rgb[front][i];return;}
+#endif
+    for(int i=0;i<38400;i++){u16 a=host_fb[front][i/2];rgb[i]=host_palette[(i&1)?a>>8:a&255];}
+}
+#endif
 static u32 previous_present;
 #ifdef SC64_UNIT_WORD_SPRITE_DIAGNOSTICS
 volatile u32 gfx_sprite_words_calls;
@@ -95,6 +288,9 @@ void gfx_set_palette(int first,int count,const u16 *rgb555) {
  volatile u16 *pal=(volatile u16*)0x05000000;
  for(int i=0;i<count;i++)pal[first+i]=rgb555[i];
 #endif
+#ifdef SC64_TILE_RENDERER
+ if(gfx_tile_on)gfx_tile_palette_sync();
+#endif
 }
 u32 gba_clock(void){
 #ifdef GBA_HOST
@@ -118,6 +314,9 @@ void gfx_begin(u8 color) {
  gfx_clip_top=0; gfx_clip_bottom=160;
 #endif
  draw_start=gba_clock();
+#ifdef SC64_TILE_RENDERER
+ if(gfx_tile_on){gfx_rect(0,0,240,160,color);return;}
+#endif
  backbuffer_index=(u8)(front^1);
  clear_generation[backbuffer_index]++;
 #ifdef GBA_HOST
@@ -141,6 +340,9 @@ void gfx_begin_preserve(void) {
  gfx_clip_top=0; gfx_clip_bottom=160;
 #endif
  draw_start=gba_clock();
+#ifdef SC64_TILE_RENDERER
+ if(gfx_tile_on)return;
+#endif
  backbuffer_index=(u8)(front^1);
 #ifdef GBA_HOST
  pixels=host_fb[backbuffer_index];
@@ -154,7 +356,7 @@ void gfx_begin_preserve(void) {
 static int gfx_band_valid(int y,int height,const void *buffer) {
  return buffer&&(((uintptr_t)buffer&3)==0)&&y>=0&&height>0&&height<=160&&y<=160-height;
 }
-HOT int gfx_read_band(int y,int height,u8 *dst) {
+HOT_MODE4 int gfx_read_band(int y,int height,u8 *dst) {
  if(!gfx_band_valid(y,height,dst))return 0;
 #ifdef GBA_HOST
  for(int row=0;row<height;row++) {
@@ -172,8 +374,9 @@ HOT int gfx_read_band(int y,int height,u8 *dst) {
 #endif
  return 1;
 }
-HOT int gfx_blit_band(int y,int height,const u8 *src) {
+HOT_MODE4 int gfx_blit_band(int y,int height,const u8 *src) {
  if(!gfx_band_valid(y,height,src))return 0;
+ GFX_TILE_TOUCH(0,y,240,y+height);
 #ifdef GBA_HOST
  for(int row=0;row<height;row++) {
   volatile u16 *out=pixels+(y+row)*120;
@@ -191,9 +394,10 @@ HOT int gfx_blit_band(int y,int height,const u8 *src) {
 /* Opaque clipped 240-pixel window from aligned, padded source rows. Areas
    outside the source keep the framebuffer's current background. The shifted
    word path preserves every camera pixel without unaligned ARM7 loads. */
-HOT int gfx_blit_window(int y,int height,const u8 *source,int stride,int rows,int left,int top) {
+HOT_MODE4 int gfx_blit_window(int y,int height,const u8 *source,int stride,int rows,int left,int top) {
  if(!source||((uintptr_t)source&3)||stride<=0||(stride&3)||rows<=0||
     y<0||height<=0||height>160||y>160-height)return 0;
+ GFX_TILE_TOUCH(0,y,240,y+height);
 #ifdef GBA_WINDOW_BANDS
  /* A vertical scroll of a full-width cache is one contiguous transfer. Keep
     out-of-source rows untouched, just as the generic per-row path does. */
@@ -280,6 +484,30 @@ void gfx_end(void) {
     vblank();
 #endif
 #endif
+#ifdef SC64_TILE_RENDERER
+    if(gfx_tile_on) {
+#ifdef SC64_DIAGNOSTIC_TILES
+        u32 present_start=gba_clock();
+        extern volatile u32 sc64_tile_diag_present,sc64_tile_diag_tiles_out;
+        for(int ty=0;ty<20;ty++)for(u32 m=gfx_tile_dirty[ty];m;m&=m-1)sc64_tile_diag_tiles_out++;
+#endif
+        if(gfx_tile_present_hook)gfx_tile_present_hook();
+        gfx_tile_present_tiles();
+#ifdef SC64_DIAGNOSTIC_TILES
+        sc64_tile_diag_present+=gba_clock()-present_start;
+#endif
+        front^=1;
+#ifdef GBA_HOST
+        host_tile_compose(host_rgb[front]);host_rgb_valid[front]=1;
+#else
+        previous_present=gba_clock();
+#endif
+        return;
+    }
+#ifdef GBA_HOST
+    host_rgb_valid[front^1]=0;
+#endif
+#endif
     front^=1;
 #ifndef GBA_HOST
     REG16(0x04000000)=0x0404|(front?16:0);
@@ -297,8 +525,9 @@ HOT void gfx_pixel(int x,int y,u8 c){if((unsigned)x>=240)return;
 #else
  if((unsigned)y>=160)return;
 #endif
+ c=GFX_TILE_COLOR(c);GFX_TILE_TOUCH(x,y,x+1,y+1);
  volatile u16*p=pixels+y*120+(x>>1);u16 old=*p;*p=(x&1)?((old&255)|((u16)c<<8)):((old&0xff00)|c);}
-HOT void gfx_blit16(int x,int y,const u8 *src) {
+HOT_MODE4 void gfx_blit16(int x,int y,const u8 *src) {
  if(!src||x>=240||x<=-16)return;
 #ifdef GBA_SCENE_CLIP
  if(y>=gfx_clip_bottom||y+16<=gfx_clip_top)return;
@@ -308,6 +537,7 @@ HOT void gfx_blit16(int x,int y,const u8 *src) {
  if(y>=160||y<=-16)return;
  int top=y<0?-y:0,bottom=y+16>160?160-y:16;
 #endif
+ GFX_TILE_TOUCH(x,y,x+16,y+16);
  if(x>=0&&x<=224&&!(x&3)&&!((uintptr_t)src&3)) {
   for(int row=top;row<bottom;row++) {
    const u32 *s=(const u32*)(src+row*16);
@@ -351,6 +581,7 @@ HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
  if(y>=160||y+height<=0)return;
  int top=y<0?-y:0,bottom=y+height>160?160-y:height;
 #endif
+ GFX_TILE_TOUCH(x,y,x+width,y+height);
  int left=x<0?-x:0,right=x+width>240?240-x:width;
  for(int row=top;row<bottom;row++) {
   int col=left;const u8*s=src+row*width;
@@ -532,6 +763,8 @@ HOT void gfx_rect(int x,int y,int w,int h,u8 color) {
 #ifndef GBA_SCENE_CLIP
     if(y+h>160)h=160-y;
 #endif
+    color=GFX_TILE_COLOR(color);
+    GFX_TILE_TOUCH(x,y,x+w,y+h);
     const u16 pair=color|((u16)color<<8);
     const u32 quad=(u32)pair|((u32)pair<<16);
     for(int row=y;row<y+h;row++) {
@@ -561,6 +794,8 @@ HOT void gfx_circle(int x,int y,int r,u8 c){if(r<0||r>240)return;for(int yy=-r;y
 HOT void gfx_diamond(int x,int y,int rx,int ry,u8 color) {
     if(rx<0||ry<0||rx>480||ry>320)return;
     if(!ry){gfx_rect(x-rx,y,rx*2+1,1,color);return;}
+    color=GFX_TILE_COLOR(color);
+    GFX_TILE_TOUCH(x-rx,y-ry,x+rx+1,y+ry+1);
     const u16 pair=color|((u16)color<<8);
     for(int yy=-ry;yy<=ry;yy++) {
         int span=ry-(yy<0?-yy:yy);
@@ -674,7 +909,11 @@ static HOT void glyph_row(int x,int y,u8 bits,u8 color) {
         }
     }
 }
-HOT void gfx_text(int x,int y,const char*t,u8 c){int origin=x;for(;*t;t++){u8 ch=(u8)*t;if(ch=='\n'){x=origin;y+=9;continue;}if(ch>='a'&&ch<='z')ch-=32;if(ch>=32&&ch<128&&x>-6&&x<240)for(int row=0;row<7;row++)glyph_row(x,y+row,font[ch-32][row],c);x+=6;}}
+HOT void gfx_text(int x,int y,const char*t,u8 c){int origin=x;
+#ifdef SC64_TILE_RENDERER
+if(gfx_tile_on){c=GFX_TILE_COLOR(c);int w=0,h=1,line=0;for(const char*q=t;*q;q++){if(*q=='\n'){h++;line=0;}else if(++line>w)w=line;}gfx_tile_touch(x,y,x+w*6,y+(h-1)*9+7);}
+#endif
+for(;*t;t++){u8 ch=(u8)*t;if(ch=='\n'){x=origin;y+=9;continue;}if(ch>='a'&&ch<='z')ch-=32;if(ch>=32&&ch<128&&x>-6&&x<240)for(int row=0;row<7;row++)glyph_row(x,y+row,font[ch-32][row],c);x+=6;}}
 #if defined(SC64_ZP_FULL_STORAGE) || defined(GBA_SCENE_CLIP)
 /* Later campaign actors need the hot-code reserve; number formatting can
  * run from ROM while glyph drawing stays in IWRAM. Scene clipping also uses

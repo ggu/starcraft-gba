@@ -2381,6 +2381,32 @@ opening and a controller-only attack-move. It checks 619,216 list answers
 against the original query, then repeats the menu/save-load fixture. See
 [Validation](VALIDATION.md#p7-movement-steering-list) for ARM measurements.
 
+An experimental mode-0 renderer builds on that movement probe:
+
+```sh
+make test-sc64-p7-tile
+make protoss-p7-tile-probe
+```
+
+`tools/sc64_tile8_pack.py` first derives
+`.local/sc64/tile8/generated/sc64_races_generated.h` from the existing
+imported header without modifying it. Each map's 16x16 terrain tiles become
+8x8 tiles that are flip-deduplicated across maps compiled together, plus four
+GBA-style entries per source tile. `SC64_TILE_RENDERER` then shows imported
+race-campaign play screens in mode 0:
+
+- BG3: terrain, streamed through a 464-slot VRAM tile cache.
+- BG2: fog.
+- BG1: static art (minerals, geysers and building art).
+- BG0: the HUD band.
+- Eight 64x64 sprites carry units, overlays, the cursor and text from the
+  unchanged software primitives.
+
+Menus and skirmish maps keep mode 4. `test-sc64-p7-tile` composes the emulated
+layers on the host and requires every rendered frame to match the mode-4
+build, pixel for pixel. See
+[Validation](VALIDATION.md#p7-mode-0-tile-renderer) for its limits.
+
 A second default-off probe adds `SC64_FACT_TABLES` to the movement-probe flags:
 
 ```sh

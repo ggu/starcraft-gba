@@ -2628,6 +2628,33 @@ build/StarCraft-Protoss-P7-Move-Probe-GBA.gba: build/starcraft-protoss-p7-move-p
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
 protoss-p7-move-probe: build/StarCraft-Protoss-P7-Move-Probe-GBA.gba
+# Default-off mode-0 renderer on the movement probe. The derived header puts
+# terrain in flip-deduplicated 8x8 pools and leaves the shared input untouched.
+TILE8_SOURCE := .local/sc64/zp-stage/generated/sc64_races_generated.h
+TILE8_HEADER := .local/sc64/tile8/generated/sc64_races_generated.h
+$(TILE8_HEADER): tools/sc64_tile8_pack.py $(TILE8_SOURCE)
+	$(PYTHON) tools/sc64_tile8_pack.py --input $(TILE8_SOURCE) --output $@
+# Mode 0 needs the VRAM gap the sampled-audio buffers use between the mode-4
+# pages (see common/gba.c), so the tile probe builds silent, as SC64_AUDIO=0.
+P7_TILE_FLAGS := -I.local/sc64/tile8/generated $(filter-out $(SC64_AUDIO_FLAGS),$(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS)) -DSC64_TILE_RENDERER
+build/test-sc64-p7-tile-reference: tests/sc64_p7_tile_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_MOVE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-tile-candidate: tests/sc64_p7_tile_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) $(TILE8_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_TILE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-tile protoss-p7-tile-probe
+test-sc64-p7-tile: build/test-sc64-p7-tile-reference build/test-sc64-p7-tile-candidate
+	./build/test-sc64-p7-tile-reference > build/sc64-p7-tile-reference.txt
+	./build/test-sc64-p7-tile-candidate > build/sc64-p7-tile-candidate.txt
+	cmp build/sc64-p7-tile-reference.txt build/sc64-p7-tile-candidate.txt
+	tail -n 3 build/sc64-p7-tile-candidate.txt
+build/starcraft-protoss-p7-tile-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) $(TILE8_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_TILE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-tile-probe.map -lgcc -o $@
+	$(SIZE) $@
+	$(PYTHON) tools/sc64_tile8_pack.py --check-elf $@
+build/StarCraft-Protoss-P7-Tile-Probe-GBA.gba: build/starcraft-protoss-p7-tile-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+protoss-p7-tile-probe: build/StarCraft-Protoss-P7-Tile-Probe-GBA.gba
 # Default-off P7 fact-table probe: the movement probe plus SC64_FACT_TABLES.
 # A host generator evaluates the unchanged fact functions under the probe's
 # exact flags and writes packed per-type ROM tables to an ignored build path.

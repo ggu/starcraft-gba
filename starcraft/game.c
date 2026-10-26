@@ -7442,6 +7442,19 @@ draw_minimap(void)
     gfx_rect(181, 124, 56, 34, C_BLACK);
     gfx_frame(181, 124, 56, 34, C_EDGE);
 #ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_TILE_RENDERER
+    if (gfx_tile_active()) {
+        /* The panel fill above already marked these tiles; store the same
+         * colors straight into the linear software layer. */
+        u8 *panel = gfx_tile_buffer_pixels() + map_y * 240 + map_x;
+        for (int row = 0; row < 24; row++, panel += 240)
+            for (int col = 0; col < 24; col++) {
+                int cell = row * 24 + col;
+                if (sc64_minimap_visible[cell]) panel[col] = C_GRASS;
+                else if (sc64_minimap_explored[cell]) panel[col] = C_FOG;
+            }
+    } else
+#endif
     sc64_minimap_draw_terrain(map_x, map_y,
                               sc64_minimap_visible, sc64_minimap_explored);
 #else
@@ -7897,6 +7910,9 @@ sc64_static_objects_key(void)
 #endif
 #define SC64_TERRAIN_STATIC_KEY sc64_static_objects_key()
 #include "sc64_terrain_cache.h"
+#ifdef SC64_TILE_RENDERER
+#include "sc64_tile_renderer.h"
+#endif
 #endif
 
 #if defined(SC64_STATIC_DIRTY_ROWS)
@@ -7977,6 +7993,68 @@ draw_map(void)
     col1 = limit((camx + 240) / 16 + 1, 0, MAP_COLS);
     row0 = limit(camy / 16, 0, MAP_ROWS - 1);
     row1 = limit((camy + 108) / 16 + 1, 0, MAP_ROWS);
+#endif
+#ifdef SC64_TILE_RENDERER
+    if (gfx_tile_active()) {
+        unsigned int tile_static_key = SC64_TERRAIN_STATIC_KEY;
+        int refresh;
+#ifdef SC64_DIAGNOSTIC_TILES
+        u32 tile_diag = gba_clock();
+        ++sc64_tile_diag_frames;
+#endif
+        gfx_tile_clear_world();
+#ifdef SC64_DIAGNOSTIC_TILES
+        SC64_TILE_DIAG(sc64_tile_diag_clear, tile_diag); tile_diag = gba_clock();
+#endif
+        sc64_tile_world_update(camx, camy);
+#ifdef SC64_DIAGNOSTIC_TILES
+        SC64_TILE_DIAG(sc64_tile_diag_world, tile_diag); tile_diag = gba_clock();
+#endif
+        refresh = sc64_tile_art_needs_refresh(camx, camy, tile_static_key);
+        if (refresh || sc64_tile_art_overflow) {
+            /* The same static-object code as the mode-4 background below. */
+            if (refresh) gfx_tile_art_capture(1);
+            for (i = 0; i < MAX_MINERALS; i++)
+                if (m[i].amount > 0 && currently_visible(m[i].x, m[i].y)) {
+                    x = m[i].x - camx;
+                    y = m[i].y - camy + 12;
+                    if (x > -6 && x < 245 && y > 7 && y < 123) {
+#ifdef SC64_HAS_SPRITES
+                        const Sc64SpriteFrame *sprite = mission_mineral_sprite(m[i].style);
+                        if (sprite) draw_mission_sprite(sprite, x, y);
+                        else {
+#endif
+                        gfx_diamond(x, y, 7, 4, C_CYAN);
+                        gfx_pixel(x, y, C_WHITE);
+#ifdef SC64_HAS_SPRITES
+                        }
+#endif
+                    }
+                }
+            for (i = 0; i < geyser_count; i++)
+                if (currently_visible(geysers[i].x, geysers[i].y)) {
+                    x = geysers[i].x - camx;
+                    y = geysers[i].y - camy + 12;
+                    if (x > 0 && x < 240 && y > 12 && y < 120)
+                        gfx_diamond(x, y, 6, 4, C_GREEN);
+                }
+            for (i = 0; i < MAX_BUILDINGS; i++)
+                if (b[i].alive)
+                    draw_building_art(&b[i]);
+            if (refresh) {
+                gfx_tile_art_capture(0);
+#ifdef SC64_DIAGNOSTIC_TILES
+                SC64_TILE_DIAG(sc64_tile_diag_art_draw, tile_diag); tile_diag = gba_clock();
+#endif
+                if (sc64_tile_art_lift(camx, camy, tile_static_key)) sc64_tile_art_clear_pixels();
+                else sc64_tile_art_keep_pixels();
+#ifdef SC64_DIAGNOSTIC_TILES
+                SC64_TILE_DIAG(sc64_tile_diag_lift, tile_diag);
+#endif
+            }
+        }
+        goto sc64_tile_background_done;
+    }
 #endif
     /* Each tile gets one terrain/fog pass. Unknown space stays black from
      * gfx_begin, so it needs no second opaque fill after sprites are drawn. */
@@ -8102,6 +8180,9 @@ draw_map(void)
     sc64_terrain_store(camx, camy);
 #endif
     }
+#ifdef SC64_TILE_RENDERER
+sc64_tile_background_done:
+#endif
     sc64_background_cycles = gba_clock() - profile_stage_start;
     profile_stage_start = gba_clock();
 #endif
@@ -8712,7 +8793,9 @@ draw_hud_commands(void)
 }
 
 #ifdef SC64_IMPORTED_MISSION
+#ifndef SC64_TILE_RENDERER
 static _Alignas(4) u8 sc64_hud_top[240 * 12], sc64_hud_bottom[240 * 40];
+#endif
 enum { SC64_HUD_KEY_COUNT=26 };
 static int sc64_hud_previous[SC64_HUD_KEY_COUNT], sc64_hud_valid;
 #ifdef SC64_RACES
@@ -8851,6 +8934,26 @@ draw_hud(void)
     sc64_hud_buffer_dirty[buffer] = dirty;
     sc64_hud_buffer_clear_generation[buffer] = generation;
     sc64_hud_valid = 1;
+#elif defined(SC64_TILE_RENDERER)
+    /* The software layer keeps the HUD bands. Redraw a band only when its
+     * values changed or anything else drew over it, exactly as the mode-4
+     * band restore would have overwritten those pixels. */
+    int changed = sc64_hud_changed();
+    if (!gfx_tile_active()) changed = 3;
+    if (gfx_tile_band_top || sc64_tile_hud_invalid) changed |= 1;
+    if (gfx_tile_band_bottom || sc64_tile_hud_invalid) changed |= 2;
+#ifdef SC64_DIAGNOSTIC_TILES
+    u32 hud_diag = gba_clock();
+    sc64_tile_diag_hud_top += (changed & 1) != 0;
+    sc64_tile_diag_hud_bottom += (changed & 2) != 0;
+#endif
+    if (changed & 1) draw_hud_resources();
+    if (changed & 2) draw_hud_commands();
+#ifdef SC64_DIAGNOSTIC_TILES
+    SC64_TILE_DIAG(sc64_tile_diag_hud_bands, hud_diag);
+#endif
+    sc64_tile_hud_invalid = 0;
+    sc64_hud_valid = 1;
 #else
     int changed = sc64_hud_changed();
     if (changed & 1) {
@@ -8870,7 +8973,13 @@ draw_hud(void)
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_TERRAIN)
     u32 minimap_start = gba_clock();
 #endif
+#ifdef SC64_DIAGNOSTIC_TILES
+    u32 minimap_diag = gba_clock();
+#endif
     draw_minimap();
+#ifdef SC64_DIAGNOSTIC_TILES
+    SC64_TILE_DIAG(sc64_tile_diag_minimap, minimap_diag);
+#endif
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_TERRAIN)
     sc64_hud_minimap_cycles = gba_clock() - minimap_start;
 #endif
@@ -8893,6 +9002,10 @@ draw_hud(void)
 	gfx_frame(54, 105, 132, 12, C_EDGE);
 	gfx_text(59, 108, toast_text[toast_id], C_GOLD);
     }
+#ifdef SC64_TILE_RENDERER
+    /* Anything drawn over a band after this point forces a redraw next frame. */
+    gfx_tile_band_top = gfx_tile_band_bottom = 0;
+#endif
 }
 
 #include "game_audio.h"
@@ -8907,6 +9020,17 @@ game_render(void)
     /* Imported live scenes overwrite every pixel in the map and HUD bands.
      * Title pages retain the regular clear; coverage fixtures exercise live,
      * paused and result scenes over poisoned backbuffers. */
+#ifdef SC64_TILE_RENDERER
+    {
+        int want_tiles = screen != SCREEN_TITLE && sc64_tile_map_supported();
+        if (want_tiles && (!gfx_tile_active() ||
+                           sc64_tile_map != &sc64_race_maps[race_selected_mission])) {
+            gfx_tile_enter();
+            sc64_tile_reset();
+            gfx_tile_present_hook = sc64_tile_present;
+        } else if (!want_tiles && gfx_tile_active()) gfx_tile_leave();
+    }
+#endif
     if (screen == SCREEN_TITLE) gfx_begin(C_BLACK);
     else gfx_begin_preserve();
 #else

@@ -5566,6 +5566,71 @@ Controller-only showcase replay effective fps against base `d085310`:
 The last stands stay at 29.857 fps and still lose at update 150. This is
 emulator timing only.
 
+### P7 mode-0 tile renderer
+
+`SC64_TILE_RENDERER` is a default-off render probe over the movement probe.
+The goal was to move terrain and fog onto GBA hardware layers. Profiling
+the mode-4 renderer first showed that a still camera already restores a
+cached 240x108 background, about 83k cycles per frame. Vertical panning
+costs 270-350k cycles, while horizontal panning already stays near 83k. The
+minimap costs about 122k cycles every frame in both renderers. Mode 4 cannot
+share the screen with tile layers, so the probe moves the whole play screen
+to mode 0:
+
+- BG3 terrain: a 32x32 world ring with a 464-slot VRAM cache of 8x8 tiles.
+  Tiles stay protected until the next present after their last use.
+- BG2 fog: opaque fog and unexplored tiles.
+- BG1 static art: minerals, geysers and building art are drawn by the
+  unchanged code into the back buffer, then lifted into a double-buffered
+  world ring. If its 183 slots run out, the art stays in the software layer
+  for that frame.
+- Sprites: eight 64x64 sprites carry everything else, drawn by the unchanged
+  primitives into a persistent 240x160 EWRAM buffer. That buffer replaces the
+  terrain and HUD band caches. Changed 8x8 tiles are copied top to bottom at
+  VBlank.
+- BG0: the bottom HUD band.
+
+A WIN0 window hides the world layers behind the HUD bands. Palette entry 255
+becomes an opaque copy of color 0. The build fails if any linked sprite or
+tile pool uses it. Menus, briefings and skirmish maps keep mode 4.
+
+Imported terrain moves into 8x8 pools, flip-deduplicated across maps
+compiled under the same conditions (`tools/sc64_tile8_pack.py`). The worst
+32x16 window across all 30 imported maps needs 460 unique tiles, which is
+checked at build time against the cache. In this build, ROM text falls from
+2,967,864 to 2,305,248 bytes (22.3 percent). IWRAM ends at `0x03004ca8` and
+BSS at `0x0203dc58`, within the unchanged guards. The mode-4-only blitters
+move to ROM in this build only. RaceSave and the actor ABI are unchanged.
+After merging sampled audio, death animations, the mission outro and the
+canonical race-rendering update, IWRAM ends at `0x03004c60` and BSS at
+`0x0203dfdc`, 36 bytes inside the BSS guard. Scene clipping and full-width
+band blits from that update stay outside this probe; its builds do not
+define `GBA_SCENE_CLIP` or `GBA_WINDOW_BANDS`. Sampled audio keeps its mix
+buffers in the VRAM gap between the mode-4 pages, which mode 0 uses, so the
+tile probe builds without the imported audio bank and plays the PSG tones.
+
+`make test-sc64-p7-tile` renders 2,095 frames in reference and candidate
+ASan/UBSan builds. The session covers menu launch, still play, four 160-update
+camera pans, pause/resume, a controller attack-move and 600 combat updates. The
+host builds emulate the mode-0 registers, VRAM and OAM. Every frame's RGB555
+hash and the final simulation hash match the mode-4 build. A private mGBA
+check also compared both ARM ROMs at 17 checkpoints across still play and
+four pans: every displayed pixel matched. That check reconstructs the
+write-only scroll and window registers from the renderer's own state; the host
+test exercises the register writes themselves.
+
+The public workload runner shows no frame-rate gain. Movement probe → tile
+probe: 600-update opening 12.694 → 12.632 fps, 2,400 neutral updates 11.188 →
+11.156 fps, attack-move 10.055 → 10.060 fps. All checkpoints and inputs match.
+During D-pad pans the averages are 10.87/9.96/10.66/9.70 fps for right, down,
+left and up, versus 11.08/10.35/10.35/9.50. Draw time falls from about 308k
+to 264k cycles on still frames and from roughly 500k to 410k during vertical
+pans. VBlank tile copies (about 50-90k cycles) and static-art lifts while the
+camera moves take most of that back. Frames that miss early VBlank could tear
+in the top rows on hardware; this was not observed or measured. The probe
+stays off by default. Its ROM saving is separable: the 8x8 pools could also
+feed the mode-4 terrain blitter.
+
 
 ### Blood Bath gas placement, cargo cues, and crash investigation (2026-10-26)
 
