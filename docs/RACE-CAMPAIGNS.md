@@ -90,8 +90,9 @@ Extractor. Gas depletion is still outside the shared engine model.
 
 Zerg 3 **The New Dominion**, Zerg 4 **Agent of the Swarm**, and Protoss 3
 **Higher Ground** are on the second campaign menu page. Canonical Zerg is
-`StarCraft-Zerg-Z4-GBA.gba` / `starcraft-zerg-z4.elf`, code `SCZ4`, generation
-20. The explicit legacy `zerg-z3` target retains `StarCraft-Zerg-GBA.gba` /
+`StarCraft-Zerg-Z6-GBA.gba` / `starcraft-zerg-z6.elf`, code `SCZ6`, generation
+32. The explicit legacy `zerg-z4` target retains `StarCraft-Zerg-Z4-GBA.gba` /
+`starcraft-zerg-z4.elf`, code `SCZ4`, generation 20. The explicit legacy `zerg-z3` target retains `StarCraft-Zerg-GBA.gba` /
 `starcraft-zerg.elf` (versioned `-Z3` names alias these), code `SCZ3`,
 generation 5. Canonical Protoss uses `StarCraft-Protoss-P5-Shuttle-GBA.gba` /
 `starcraft-protoss-p5-shuttle.elf`, code `SCPB`, generation 26. Explicit
@@ -100,8 +101,8 @@ generation 5. Canonical Protoss uses `StarCraft-Protoss-P5-Shuttle-GBA.gba` /
 code `SCP3`, generation 7. Loaders reject incompatible saves without changing live game state; no save
 conversion is performed.
 
-Zerg 4 **Agent of the Swarm** is now the canonical fourth entry; `zerg-z4`
-remains a compatibility spelling for the same versioned ROM. Protoss 4
+Zerg 4 **Agent of the Swarm** is the canonical fourth entry, followed by Zerg 5
+and Zerg 6; `zerg-z4` builds the separate earlier four-entry ROM. Protoss 4
 **The Hunt for Tassadar** remains included in the five-entry canonical build;
 `protoss-p4-storm` retains the separate four-entry product. See
 [staged chapter setup](DEVELOPMENT.md#staged-zerg-and-protoss-chapter-4) and

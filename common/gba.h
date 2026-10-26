@@ -64,6 +64,9 @@ void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame);
 void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *indexed_pixels);
 #endif
 void gfx_pixel(int x,int y,u8 color);
+#ifdef SC64_UNIT_FACING
+void gfx_blit_sprite_hflip(int x,int y,int width,int height,const u8 *indexed_pixels);
+#endif
 void gfx_rect(int x,int y,int w,int h,u8 color);
 void gfx_frame(int x,int y,int w,int h,u8 color);
 void gfx_line(int x0,int y0,int x1,int y1,u8 color);

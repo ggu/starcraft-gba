@@ -23,6 +23,34 @@ UNIT_WORD_SPRITE_HEADER = (
     '    return (const GbaSpriteWordFrame *)0;\n'
     '}\n'
 )
+FACING_SPRITE_HEADER = (
+    '#define SC64_UNIT_FACING_BANK_VERSION 2\n'
+    '#define SC64_UNIT_FACING_DIRECTIONAL_METADATA 1\n'
+    '#define SC64_UNIT_FACING_WORD_METADATA 1\n'
+    'static const unsigned char sc64_unit_facing_0_0_pixels[1] = {1};\n'
+    'static const Sc64SpriteFrame sc64_unit_facing_0[17] = {{0}};\n'
+    'static const u32 sc64_unit_facing_0_word_0_p0[1] = {1};\n'
+    'static const GbaSpriteWordFrame sc64_unit_facing_0_word_0 = {0};\n'
+    'static inline const Sc64SpriteFrame *sc64_unit_facing_frames(unsigned short raw_type) { return 0; }\n'
+    'static inline const Sc64UnitFacingWordFrame *sc64_unit_facing_word_frame(unsigned short raw_type, unsigned char direction) { return 0; }\n'
+)
+TANK_VFX_HEADER = (
+    '#define SC64_TANK_SOURCE_VFX_VERSION 1\n'
+    'static const Sc64TankSourceFrame sc64_tank_frames_533[14] = {{0}};\n'
+    'static const uint8_t sc64_tank_source_pixels[1] = {1};\n'
+    'static const uint8_t sc64_tank_projected_lut[63*256] = {0};\n'
+)
+
+
+def emit_facing_header(root):
+    path = root / dev.FACING_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(FACING_SPRITE_HEADER, encoding='ascii')
+    path = root / dev.TANK_VFX_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(TANK_VFX_HEADER, encoding='ascii')
+
+
 P4_SCENARIO_HEADER = (
     '#define SC64_P4_SCENARIO_GENERATED_H 1\n'
     '#define SC64_P4_CREATE_PREFIX_VERSION 1\n'
@@ -40,6 +68,61 @@ verify_loader.exec_module(verify_roms)
 
 
 class OnboardingTests(unittest.TestCase):
+    def test_tank_effect_readiness_rejects_empty_or_stale_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'tank.h'
+            self.assertFalse(dev.tank_vfx_input_ready(header))
+            for text in (
+                TANK_VFX_HEADER.replace('VFX_VERSION 1', 'VFX_VERSION 10'),
+                TANK_VFX_HEADER.replace('sc64_tank_frames_533[14]', 'sc64_tank_frames_533[1]'),
+                TANK_VFX_HEADER.replace('sc64_tank_source_pixels[1]', 'sc64_tank_source_pixels[0]'),
+                TANK_VFX_HEADER.replace('sc64_tank_projected_lut[63*256]', 'missing_lut[63*256]'),
+            ):
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.tank_vfx_input_ready(header))
+            header.write_text(TANK_VFX_HEADER, encoding='ascii')
+            self.assertTrue(dev.tank_vfx_input_ready(header))
+
+    def test_directional_readiness_rejects_legacy_markers_and_empty_bank(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'facing.h'
+            invalid = (
+                '#define SC64_UNIT_FACING_PIXEL_BYTES 1\n',
+                FACING_SPRITE_HEADER.replace('BANK_VERSION 2', 'BANK_VERSION 20'),
+                FACING_SPRITE_HEADER.replace('DIRECTIONAL_METADATA 1', 'DIRECTIONAL_METADATA 0'),
+                FACING_SPRITE_HEADER.replace('WORD_METADATA 1', 'WORD_METADATA 0'),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_word_frame(', 'missing_accessor('),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_0_word_0 =', 'missing_frame ='),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_0_word_0_p0[1]', 'sc64_unit_facing_0_word_0_p0[0]'),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_0[17]', 'sc64_unit_facing_0[1]'),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_0_0_pixels[1]', 'sc64_unit_facing_0_0_pixels[0]'),
+            )
+            self.assertFalse(dev.facing_sprite_input_ready(header))
+            for text in invalid:
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.facing_sprite_input_ready(header))
+            header.write_text(FACING_SPRITE_HEADER, encoding='ascii')
+            self.assertTrue(dev.facing_sprite_input_ready(header))
+
+    def test_terran_build_requires_directional_bank_before_make(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            header = root / '.local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h'
+            header.parent.mkdir(parents=True)
+            header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'run') as run:
+                with self.assertRaisesRegex(RuntimeError, 'directional sprite bank'):
+                    dev.build('terran')
+                run.assert_not_called()
+                emit_facing_header(root)
+                dev.build('terran')
+                run.assert_called_once_with(['make', 'terran'])
+                run.reset_mock()
+                (root / dev.TANK_VFX_HEADER).unlink()
+                with self.assertRaisesRegex(RuntimeError, 'source Tank effects'):
+                    dev.build('terran')
+                run.assert_not_called()
+
     def test_z3_and_p3_profile_gates_are_required_and_distinct(self):
         with tempfile.TemporaryDirectory() as directory:
             header = Path(directory) / 'sc64_races_generated.h'
@@ -198,6 +281,7 @@ class OnboardingTests(unittest.TestCase):
     def test_canonical_zerg_readiness_requires_z4_stage_inputs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            emit_facing_header(root)
             markers = {
                 '.local/sc64/rom/StarCraft64-USA.z64': 'source ROM fixture',
                 '.local/sc64/backwater/generated/sc64_mission_generated.h': 'input',
@@ -279,6 +363,7 @@ class OnboardingTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'SC64_Z6_DATA_ENABLED map gate'):
                     dev.build('zerg')
             (stage / 'sc64_races_generated.h').write_text(z6_gate, encoding='ascii')
+            emit_facing_header(root)
             calls = []
             with patch.object(dev, 'ROOT', root), patch.object(
                     dev, 'run', side_effect=lambda command, **_: calls.append(command)):
@@ -311,6 +396,7 @@ class OnboardingTests(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, 'prepacked unit-word sprite metadata'):
                         dev.build('terran')
             header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+            emit_facing_header(root)
             with patch.object(dev, 'ROOT', root), patch.object(dev, 'run') as run:
                 dev.build('terran')
             run.assert_called_once_with(['make', 'terran'])
@@ -527,6 +613,8 @@ class OnboardingTests(unittest.TestCase):
                         if '--prepack-unit-words' in command:
                             content += UNIT_WORD_SPRITE_HEADER
                         output.write_text(content, encoding='ascii')
+                    elif script == 'sc64_unit_facing.py':
+                        emit_facing_header(root)
                     elif script == 'sc64_menu_assets.py':
                         output = root / '.local/sc64/races/generated/sc64_menu_generated.h'
                         output.parent.mkdir(parents=True, exist_ok=True)
@@ -767,6 +855,8 @@ class OnboardingTests(unittest.TestCase):
                     output.parent.mkdir(parents=True, exist_ok=True)
                     output.write_text('#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
                                       encoding='ascii')
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
                 elif script == 'sc64_z4_pack.py':
                     output = local / 'z4/manifest.json'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -849,6 +939,8 @@ class OnboardingTests(unittest.TestCase):
                     output.write_text(UNIT_WORD_SPRITE_HEADER if '--prepack-unit-words' in command
                                       else '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
                                       encoding='ascii')
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
                 elif script == 'sc64_z4_pack.py':
                     output = local / 'z4/manifest.json'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -913,6 +1005,8 @@ class OnboardingTests(unittest.TestCase):
                     output.write_text(UNIT_WORD_SPRITE_HEADER if '--prepack-unit-words' in command
                                       else '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
                                       encoding='ascii')
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
                 elif script == 'sc64_z4_pack.py':
                     output = local / 'z4/manifest.json'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -1091,6 +1185,8 @@ class OnboardingTests(unittest.TestCase):
                     touch(header)
                     if '--prepack-unit-words' in command:
                         header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
                 elif script == 'sc64_menu_assets.py':
                     touch(race / 'sc64_menu_generated.h')
                 elif script == 'sc64_skirmish_pack.py':

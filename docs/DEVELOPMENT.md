@@ -61,6 +61,59 @@ current stock-combat replay evidence and memory limits. See the
 [rendering audit](audits/2026-10-26-unit-word-rendering/README.md) for exact
 pixel/state checks, measurements and memory limits.
 
+## Directional unit sprites
+
+Canonical Terran, Zerg, Protoss and Showcase builds select directional frames
+from the source unit images instead of always drawing frame zero. Refresh an
+older workspace with `./dev sc64 prepare --rom PATH --profile terran` (or
+`zerg` / `protoss`). Preparation writes the private bank under
+`.local/sc64/facing/generated/`; status/build reject older banks without the
+directional metadata and packed-frame payload. The source image's directional
+flag determines whether its frames represent headings; frame count alone does
+not qualify an image.
+
+Ground units face their movement waypoint, flyers face their destination, and
+units aim toward their target when firing. Facing is presentation state: a new
+game, scene restart, accepted load or reused actor slot starts at north until
+the unit moves or fires. It does not change the save format or combat rules.
+This adds directional idle poses, including Tank hull/turret layers; it does
+not implement the original walking cycles, turn rates or independent turret
+tracking. Canonical campaigns and Showcase use packed directional frames.
+`make -B showcase SHOWCASE_UNIT_WORD_FLAGS=` selects the indexed comparison path.
+
+## Tank firing effects and siege splash
+
+Canonical race builds and Showcase use source Tank muzzle and target-impact
+frames. Refresh their private inputs with `./dev sc64 prepare --rom PATH
+--profile terran` (or `zerg` / `protoss`). The standalone importer is
+`python3 tools/sc64_tank_source_vfx.py --out .local/sc64/tank-vfx/generated`.
+It verifies the USA ROM, weapon/image chains and supported script sequences;
+generated graphics, lookup tables and manifests stay ignored under `.local/`.
+`make -B showcase CANONICAL_WEAPON_FLAGS= SHOWCASE_SIEGE_FLAGS=` selects the earlier weapon behavior
+for comparison. The same override applies to the three canonical race targets.
+
+Showcase enables the `SC64_SIEGE_SPLASH` prototype. Campaign builds retain
+their earlier primary-target damage rule: the stock splash change causes the
+Z3 normal-controller completion regression to reach its 180000-update limit,
+so campaign promotion requires fresh completion qualification. This does not
+block the source firing graphics or directional rendering. In Showcase,
+siege-mode shots apply radial damage to eligible nearby ground actors,
+including allies, with full/half/quarter packets at inclusive source radii
+10/25/40. Distance uses the target's source rectangle. Armor and explosive size
+scaling follow the radius split; inner-ring splash can hit burrowed actors.
+The shooter, loaded units, air units and invincible actors are excluded.
+An unknown nearby actor identity falls back to primary-only damage rather than
+guessing its dimensions. HP/shields retain the engine's integer precision.
+
+The effects preserve source strength pixels and use a destination-dependent
+light lookup projected into the GBA palette. The N64 light-table binding is
+inferred, and palette reduction changes colors; this is not a pixel-identical
+N64 rendering claim. Source waits are converted from 24 to 30 simulation
+updates per second. The engine still applies damage immediately when firing;
+native attack windup, independently moving turrets and a complete projectile
+state machine remain unfinished. The visual pool is cosmetic and carries no
+pending damage or new save fields.
+
 ## Canonical minimap rendering
 
 Canonical Terran, Zerg and Protoss builds and Showcase batch the same 24-by-24
@@ -73,6 +126,17 @@ canonical target as needed); force rebuilding when changing flags.
 The [minimap audit](audits/2026-10-26-minimap-terrain/README.md) records the
 pixel oracle, byte-identical public replay and scoped ARM timing. P3/Z3 legacy
 and staged profiles retain their existing flag selections.
+
+## Source geyser art
+
+Imported profiles draw the existing raw-188 geyser sprite instead of the
+original green diamond. The painter and static-cache key use the sprite's
+actual bounds, including partially visible geysers at the playfield edges.
+Existing prepared banks already contain this art; no new private inputs or
+save fields are required. The asset-free profile retains its authored marker.
+This selects the static source frame; native gas-smoke animation is separate.
+With the canonical Protoss inputs prepared, `make test-sc64-geyser-art` checks
+source pixels, edge clipping, fog, all three gas buildings and warm-cache reuse.
 
 ## Source construction art
 
@@ -1099,8 +1163,8 @@ first-five-chapter ARM, cargo/save, timing and memory evidence.
 
 ### Staged Zerg and Protoss chapter 4
 
-Zerg 4 is enabled in the canonical profile. The `zerg-z4` spelling builds the
-same versioned ROM. Canonical Protoss includes **The Hunt for Tassadar** and
+Zerg 4 is enabled in the canonical profile, which now continues through Zerg 6.
+The explicit `zerg-z4` profile builds the earlier four-entry Z4 ROM. Canonical Protoss includes **The Hunt for Tassadar** and
 P5 through the Shuttle profile. Explicit `protoss-p4-storm` keeps the
 four-entry Storm profile and its own real files/save format. The plain `protoss-p4`
 build remains a separate internal experiment. Preparing later map data does

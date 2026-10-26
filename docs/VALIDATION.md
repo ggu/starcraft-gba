@@ -36,8 +36,8 @@ files, never to the newer canonical ROM.
 All ten Terran missions pass the actual canonical-flag host controller
 target. T7/T10 have current paired ARM wins from explicit mission probe entry;
 other Terran ARM wins remain evidence for their earlier frozen builds. All
-four Zerg chapters have current host wins; the older Z4 ARM timing applies
-to its frozen build. P1–P5 have fresh host and input-only ARM wins in the
+six Zerg chapters have current host and input-only ARM wins in the canonical
+Z6 build, with Z5/Z6 fresh-process SRAM continuity. P1–P5 have fresh host and input-only ARM wins in the
 canonical P5 pools, retaining Fenix in P1/P2 and both heroes in P4. P5 has an
 exact fresh-process cargo SRAM restore and continued win. Earlier P4 save
 qualification remains scoped to its preserved P4 build. See the
