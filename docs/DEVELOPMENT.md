@@ -1168,7 +1168,7 @@ commands; no extra staged-profile selection is needed:
 
 Replace `zerg` with `protoss` for the Protoss campaign. The canonical output
 pairs are `build/StarCraft-Zerg-Z6-GBA.gba` / `build/starcraft-zerg-z6.elf`
-and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba` / `build/starcraft-protoss-p5-shuttle.elf`.
+and `build/StarCraft-Protoss-P6-GBA.gba` / `build/starcraft-protoss-p6.elf`.
 Explicit `zerg-z4` (`--profile zerg-z4`) preserves the earlier four-entry
 `build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf` pair, its
 `SCZ4` generation-20 saves and `make test-zerg-z4`. Explicit `zerg-z3`
@@ -1188,14 +1188,18 @@ Canonical Zerg uses `SCZ6`, save generation 32, the Z6 storage/runtime and
 query flags, a word-packed six-chapter sprite bank under
 `.local/sc64/zerg-z6/generated`, and the canonical drawing flags. Preparing
 `zerg` also generates the Z5/Z6 inputs and that bank. Its save directory,
-`.local/play/zerg-z6`, is separate from the legacy Z4 and Z3 profiles. Canonical Protoss uses `SCPB`, generation 26 and
-`.local/play/protoss-p5-shuttle`; it includes the P5 Shuttle transport runtime.
+`.local/play/zerg-z6`, is separate from the legacy Z4 and Z3 profiles. Canonical Protoss uses `SCP6`, generation 30 and
+`.local/play/protoss-p6`; it carries P1–P5 including Shuttle transport, then P6
+with Storm and the source rescue/extraction mission. Its separate packed sprite
+bank is `.local/sc64/protoss-p6/generated`; the internal probe bank is unchanged.
+Explicit `protoss-p5-shuttle` retains `SCPB`, generation 26 and
+`.local/play/protoss-p5-shuttle`.
 Explicit `protoss-p4-storm` retains `SCP5`, generation 21 and its P4 save path;
 `protoss-p3` retains `SCP3`, generation 7. Older standard two-mission generation-2
 saves are incompatible and are rejected. The asset-free default build
 continues to require no imported inputs.
 
-Older prepared Protoss workspaces must regenerate P5 data before building:
+Older prepared Protoss workspaces must prepare P6 inputs before building:
 
 ```sh
 ./dev sc64 prepare --rom "/path/to/StarCraft 64 USA ROM" --profile protoss
@@ -1203,17 +1207,20 @@ Older prepared Protoss workspaces must regenerate P5 data before building:
 ./dev sc64 test --profile protoss
 ```
 
-P5 preparation requires its source scenario/map gate and prepacked unit-word
-bank. No P3/P4 save conversion is performed. `protoss-p5-shuttle` is an explicit
-spelling for the same canonical product; `protoss-p4-storm` retains the previous
-real files. See the [P5 audit](audits/2026-10-26-p5-promotion/README.md) for
-first-five-chapter ARM, cargo/save, timing and memory evidence.
+P6 preparation requires authenticated P4/P5/P6 map/scenario gates, P6 abilities
+and doodads, and its complete packed sprite bank. `protoss-p6` is an explicit
+alias for the canonical product. `protoss-p5-shuttle` preserves the earlier
+five-entry ROM and its separate saves. No P3/P4/P5 save conversion is performed.
+The P6 runtime retains generation 30; its ROM title/code are `SC PROTOSS6` /
+`SCP6`. See the [P6 audit](audits/2026-10-27-p6-promotion/README.md) for current
+host, ARM, save, timing and memory evidence. P5's earlier evidence remains in
+the [P5 audit](audits/2026-10-26-p5-promotion/README.md).
 
 ### Staged Zerg and Protoss chapter 4
 
 Zerg 4 is enabled in the canonical profile, which now continues through Zerg 6.
 The explicit `zerg-z4` profile builds the earlier four-entry Z4 ROM. Canonical Protoss includes **The Hunt for Tassadar** and
-P5 through the Shuttle profile. Explicit `protoss-p4-storm` keeps the
+P5 through the Shuttle runtime and P6. Explicit `protoss-p4-storm` keeps the
 four-entry Storm profile and its own real files/save format. The plain `protoss-p4`
 build remains a separate internal experiment. Preparing later map data does
 not enable unqualified later missions in the frontend.
@@ -1236,7 +1243,7 @@ the wrapper does not convert saves between them. See the
 [P4 audit](audits/2026-10-26-p4-promotion/README.md) for current-source ARM
 mission and live-save qualification, separate from preparation.
 
-P4 Storm and canonical P5 enable the generated P4 create-action prefix and hot validator.
+P4 Storm, preserved P5 and canonical P6 enable the generated P4 create-action prefix and hot validator.
 An older prepared workspace must regenerate its numeric scenario header before
 building:
 
@@ -1838,10 +1845,25 @@ These generate the required maps, art, scenario, ability and transport headers
 under `.local/`; Z6 also generates its inherited Z5 sprite bank. Inspect
 readiness with `./dev sc64 status --profile zerg-z6` or the corresponding
 Protoss profile. The output ROMs are `build/StarCraft-Zerg-Z6-Probe-GBA.gba`
-and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The ordinary `zerg` and
-`protoss` profile names still build their canonical three-mission versions.
+and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The ordinary `zerg` and `protoss` names select the canonical six-mission
+products; these explicit staged names keep their own files.
 
-### Reproduce the P6 host win
+### Reproduce the canonical P6 host win
+
+After preparing `--profile protoss`, the normal test command runs the full
+canonical feature set and all carried missions:
+
+```sh
+./dev sc64 test --profile protoss
+make test-sc64-p6-canonical PROTOSS_P6_CONTROLLER_TRACE=.local/build/p6-my-run.json
+```
+
+The canonical product pins validated P5/P6 query choices. `P5_QUERY_FLAGS`,
+`P6_QUERY_FLAGS` and `P6_EXTRA_FLAGS` are for their internal experiments and do
+not change this product. Keep canonical P6, internal P6 probe and legacy P5
+ROM/ELF/save files separate.
+
+### Reproduce the internal P6 probe host win
 
 After preparing the P6 probe inputs described above, run:
 
@@ -1869,7 +1891,8 @@ hero/extraction/completion assertions at victory.
 The current live route wins at frame 49,599; an input-only ARM replay matches
 all 57 observed mission/hero checkpoints. Its measured throughput remains
 about 10.5 fps equivalent, and this is still the P6 probe rather than the
-canonical Protoss product. See the
+canonical Protoss product. The newer canonical P6 qualification is recorded
+separately in the [promotion audit](audits/2026-10-27-p6-promotion/README.md). See the
 [live-route qualification](audits/2026-10-27-p6-live-route/README.md).
 
 The expanded Z/P collision lookup has a dedicated

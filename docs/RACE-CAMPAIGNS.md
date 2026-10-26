@@ -8,9 +8,10 @@ qualified on earlier frozen ROMs. These Terran timings precede the latest
 minimap change, whose current ARM measurements cover Protoss. The current
 full-profile ARM T10 result is below the 30-fps target, and no physical GBA
 result is claimed. The canonical `terran` profile includes all ten Terran
-missions. Canonical Zerg includes its first six missions and Protoss its first five.
+missions. Canonical Zerg and Protoss each include their first six missions.
 `zerg-z4`, `zerg-z3` and `protoss-p3` remain explicit legacy builds with their original
-ROMs and save identities; `protoss-p4-storm` also preserves its real four-entry files. Canonical Protoss uses P5 Shuttle. The
+ROMs and save identities; `protoss-p4-storm` also preserves its real four-entry files. Canonical Protoss uses P6, including the carried Shuttle runtime; explicit
+`protoss-p5-shuttle` preserves the earlier five-entry product. The
 catalog records all 30 mission identifiers.
 
 The stage sections below preserve dated implementation history. The
@@ -31,7 +32,7 @@ campaign startup/save checks and the Outpost/Blood Bath race-and-AI matrix.
 
 Use `zerg` or `protoss` in place of `terran` for the other builds. `prepare` accepts a `.z64`, `.v64`, or `.n64` image, or a ZIP containing exactly one supported image. It verifies the image and uses the pinned `sc64-maps` extractor; the first preparation requires Git and network access to fetch that tool. `status` checks preparation and build outputs. Build and test do not need an emulator; `play` requires mGBA. See [Development](DEVELOPMENT.md) for tool requirements and [SC64 development notes](SC64.md) for import details.
 
-The canonical ROMs are `build/StarCraft-Terran-GBA.gba`, `build/StarCraft-Zerg-Z6-GBA.gba`, and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The explicit legacy `zerg-z4` target retains `build/StarCraft-Zerg-Z4-GBA.gba` and its Z4 save identity; `zerg-z3` retains `build/StarCraft-Zerg-GBA.gba` and its Z3 save identity; `protoss-p3` retains `build/StarCraft-Protoss-GBA.gba` and its P3 identity. Canonical Z6 uses `.local/play/zerg-z6`, Z4 uses `.local/play/zerg-z4`, P5 uses `.local/play/protoss-p5-shuttle`, and explicit P4 uses `.local/play/protoss-p4-storm`; the legacy profiles continue using `.local/play/zerg` and `.local/play/protoss`. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
+The canonical ROMs are `build/StarCraft-Terran-GBA.gba`, `build/StarCraft-Zerg-Z6-GBA.gba`, and `build/StarCraft-Protoss-P6-GBA.gba`. The explicit legacy `zerg-z4` target retains `build/StarCraft-Zerg-Z4-GBA.gba` and its Z4 save identity; `zerg-z3` retains `build/StarCraft-Zerg-GBA.gba` and its Z3 save identity; `protoss-p3` retains `build/StarCraft-Protoss-GBA.gba` and its P3 identity. Canonical Z6 uses `.local/play/zerg-z6`, Z4 uses `.local/play/zerg-z4`, P6 uses `.local/play/protoss-p6`, explicit P5 uses `.local/play/protoss-p5-shuttle`, and explicit P4 uses `.local/play/protoss-p4-storm`; the legacy profiles continue using `.local/play/zerg` and `.local/play/protoss`. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
 
 To build and test all three race campaigns, prepare `terran`, `zerg` and
 `protoss` with the same verified ROM, then run
@@ -52,8 +53,8 @@ See the [canonical skirmish resume audit](audits/2026-10-27-canonical-skirmish-r
 
 ## Campaign progress
 
-The Terran profile presents ten missions, canonical Zerg six and Protoss five,
-exposing 21 of 30 entries. All six Zerg chapters have current-source host
+The Terran profile presents ten missions, canonical Zerg six and Protoss six,
+exposing 22 of 30 entries. All six Zerg chapters have current-source host
 controller wins and input-only ARM wins in the canonical Z6 build; Z5 and Z6
 also have exact fresh-process SRAM restores followed by continued wins. See
 the [Z6 promotion audit](audits/2026-10-26-z6-promotion/README.md). P1–P5 have current-source host and input-only ARM wins in the canonical
@@ -61,41 +62,31 @@ P5 build; P5 also has an exact fresh-process cargo SRAM restore and continued
 win. P1/P2 retain Fenix. See the
 [P5 promotion audit](audits/2026-10-26-p5-promotion/README.md).
 
-Performance remains unfinished: the canonical P5 build measures about 26.6 fps
-equivalent on P1/P2, 18.9 on P3, 16.1 on carried P4 and 17.1 on P5. Carried
-P4 is about 5.3% slower than the standalone P4/minimap build. Current Terran T7/T10 probe-entry traces average about
-22.4/18.8 fps equivalent after packed rendering. Earlier Z4/P3 measurements
-apply to their frozen images, not to a new hardware guarantee. See the
-[Terran rendering audit](audits/2026-10-26-terran-word-promotion/README.md).
-Earlier frozen P5 Shuttle builds have a complete controller/ARM win and an
-exact fresh-process cargo save. Earlier frozen Z5 Consume builds have a
-controller/ARM win and exact mid-mission save; Z6 records a full ARM win and
-exact fresh-process SRAM restore. Earlier P6 builds record a full ARM win and
-opening/late fresh-process SRAM continuity.
-Historical canonical and staged playthrough coverage spans 22/30 across
-recorded builds (Terran 10, Zerg 6, Protoss 6); it is not fresh qualification
-of every chapter on the current source. The remaining staged chapter builds have separate save formats and ROM
-identities. The P5 island objective requires the optional Shuttle
-profile. Z6 has normal-input host and full ARM wins plus exact cold-load continuity.
-P6 has reproducible normal-input host and full ARM wins, with opening and late
-fresh-process SRAM continuity. Its qualified fast dense build averages 12.75 fps. Z7 has an internal seventh-entry ROM
-with shared menu, source objectives and generation-35 saves; its host checks
-establish integration readiness, with no completed playthrough. P7 retains
-an isolated world foundation and numeric scheduler. The remaining staged
-missions still need completion and ARM qualification.
+Canonical P6 has current normal-input host wins for P1–P6. The P3 controller
+now selects reachable targets across both enemy forces, recovers blocked
+builders through STOP, balances worker income and rebuilds before the final
+assault; it wins at frame 120,733. A separate input-only rendered host replay
+matches all 122 recorded state checkpoints without controller path queries.
+P6 completes at frame 49,599, preserving both heroes, with an input-only ARM
+replay and fresh-process SRAM continued win. See the
+[P6 promotion audit](audits/2026-10-27-p6-promotion/README.md).
 
-Those P6 wins are historical frozen-build evidence. A fresh P6 probe controller
-run against `c3c8ac9` lost at frame 143,714 with zero trigger faults. Replaying
-the earlier winning input tape also diverged under the current movement and
-combat rules; the first recorded mismatch was a missed selection by the
-900-frame checkpoint. The subsequent live-route repair now wins at frame
-49,599, with all 57 observed checkpoints matching an input-only ARM replay.
-Current P6 probe throughput is about 10.5 fps equivalent on that route.
-The full canonical-feature candidate fits the ROM/RAM guards, but still needs
-canonical-feature runtime, carried P1–P5 and current save-restart qualification
-before promotion. The
-probe is not an additional mission in the current P5 product. See the
-[P6 live-route audit](audits/2026-10-27-p6-live-route/README.md).
+Performance remains unfinished. P6's current canonical timing is recorded in
+that audit; the mission/order profile shows update work dominates. The
+preserved P5 build measured about 26.6 fps equivalent on P1/P2, 18.9 on P3,
+16.1 on P4 and 17.1 on P5. Those earlier timings and P1–P5 ARM wins are scoped
+to the P5 image, rather than new measurements of every carried mission in P6.
+Current Terran T7/T10 probe-entry traces average about 22.4/18.8 fps equivalent
+after packed rendering; see the
+[Terran rendering audit](audits/2026-10-26-terran-word-promotion/README.md).
+None of these are physical GBA guarantees.
+
+Z7 has an internal seventh-entry ROM with shared menu, source objectives and
+generation-35 saves, but no completed playthrough. P7 retains an isolated world
+foundation and numeric scheduler. Zerg 7–10 and Protoss 7–10 still need
+completion and ARM qualification. The internal P6 probe retains its own
+`SCPC` identity and its historical
+[live-route audit](audits/2026-10-27-p6-live-route/README.md).
 
 The internal Z7 profile also exposes the missing colony defense commands:
 Drone-only selection adds CREEP COLONY below SPIRE (75 minerals), and a
@@ -117,8 +108,10 @@ Zerg 3 **The New Dominion**, Zerg 4 **Agent of the Swarm**, and Protoss 3
 32. The explicit legacy `zerg-z4` target retains `StarCraft-Zerg-Z4-GBA.gba` /
 `starcraft-zerg-z4.elf`, code `SCZ4`, generation 20. The explicit legacy `zerg-z3` target retains `StarCraft-Zerg-GBA.gba` /
 `starcraft-zerg.elf` (versioned `-Z3` names alias these), code `SCZ3`,
-generation 5. Canonical Protoss uses `StarCraft-Protoss-P5-Shuttle-GBA.gba` /
-`starcraft-protoss-p5-shuttle.elf`, code `SCPB`, generation 26. Explicit
+generation 5. Canonical Protoss uses `StarCraft-Protoss-P6-GBA.gba` /
+`starcraft-protoss-p6.elf`, code `SCP6`, generation 30. Explicit
+`protoss-p5-shuttle` keeps `StarCraft-Protoss-P5-Shuttle-GBA.gba` /
+`starcraft-protoss-p5-shuttle.elf`, `SCPB`, generation 26. Explicit
 `protoss-p4-storm` preserves its real P4 Storm files, `SCP5`, generation 21. Explicit legacy
 `protoss-p3` retains `StarCraft-Protoss-GBA.gba` / `starcraft-protoss.elf`,
 code `SCP3`, generation 7. Loaders reject incompatible saves without changing live game state; no save
@@ -126,7 +119,7 @@ conversion is performed.
 
 Zerg 4 **Agent of the Swarm** is the canonical fourth entry, followed by Zerg 5
 and Zerg 6; `zerg-z4` builds the separate earlier four-entry ROM. Protoss 4
-**The Hunt for Tassadar** remains included in the five-entry canonical build;
+**The Hunt for Tassadar** remains included in the six-entry canonical build;
 `protoss-p4-storm` retains the separate four-entry product. See
 [staged chapter setup](DEVELOPMENT.md#staged-zerg-and-protoss-chapter-4) and
 [Validation](VALIDATION.md) for its controls, hashes and limits.
@@ -542,7 +535,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Canonical profiles expose T1–T10, Z1–Z6 and P1–P5 (21/30). Current Zerg controllers complete all six chapters, with input-only ARM wins and Z5/Z6 fresh-process SRAM continuity; P1–P5 have current host and input-only ARM wins in the P5 pools. P5 also has exact fresh-process cargo SRAM continuity and a continued win. Explicit P4 retains its own earlier save proof and files. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds. Historical staged coverage spans 22/30, with eight chapters still lacking a staged playthrough.
+- Canonical profiles expose T1–T10, Z1–Z6 and P1–P6 (22/30). All six Protoss chapters have current canonical host wins; P6 has input-only ARM and fresh-process SRAM continuation. Earlier P1–P5 ARM/cargo evidence remains scoped to P5. Zerg controllers complete all six chapters, with canonical Z6 ARM wins and Z5/Z6 save continuity. Terran ARM wins span all ten missions across frozen builds. Eight campaign chapters and near-30-fps performance remain unfinished.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

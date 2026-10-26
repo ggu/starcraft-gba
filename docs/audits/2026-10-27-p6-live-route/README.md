@@ -1,6 +1,9 @@
 # P6 live rescue route qualification — 2026-10-27
 
 Base main: `dc4b8fad639f913d4645272675c1c12927764beb`.
+This audit records the earlier probe repair. The later canonical product,
+packed-bank, carried-mission and SRAM qualification are recorded in the
+[P6 promotion audit](../2026-10-27-p6-promotion/README.md).
 The game runtime matches the earlier `c3c8ac9` baseline; PR52 added only tests
 and status documentation. This change repairs the host controller, without
 changing mission actors, source objectives, stock stats, player controls,
@@ -94,7 +97,7 @@ collision/range optimizations. It links under the unchanged guards:
 
 | Bound | Canonical-feature P6 candidate |
 | --- | --- |
-| ROM load end | `0x09e0120c` (1,043,956 bytes below 32 MiB end) |
+| ROM load end | `0x09e0120c` (2092532 bytes below 32 MiB end) |
 | IWRAM end | `0x03004990` (1,648 bytes below guard) |
 | BSS end | `0x0203dc68` (920 bytes below guard) |
 

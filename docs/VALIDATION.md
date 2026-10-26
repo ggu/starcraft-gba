@@ -2,7 +2,7 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
-## Current campaign status (2026-10-26)
+## Current campaign status (2026-10-27)
 
 The [stock roster follow-up](audits/2026-10-26-roster-contact-and-art/README.md)
 corrects melee contact, defense cooldown expiry and selected building art.
@@ -22,11 +22,12 @@ The [minimap follow-up](audits/2026-10-26-minimap-terrain/README.md) reduces
 P4's measured full cost by another 1.60%, to about 17.0 fps equivalent, with
 pixel-identical terrain drawing and unchanged worst-frame stalls.
 
-Canonical profiles expose Terran 1–10, Zerg 1–6 and Protoss 1–5: 21/30
+Canonical profiles expose Terran 1–10, Zerg 1–6 and Protoss 1–6: 22/30
 entries (see the [Z6 promotion audit](audits/2026-10-26-z6-promotion/README.md)).
 Canonical Zerg uses `SCZ6`, generation 32 and `.local/play/zerg-z6`; explicit
 `zerg-z4` keeps `SCZ4`, generation 20 and `.local/play/zerg-z4`; canonical
-Protoss uses the P5 Shuttle files, `SCPB`, generation 26 and
+Protoss uses the P6 files, `SCP6`, generation 30 and `.local/play/protoss-p6`.
+Explicit `protoss-p5-shuttle` keeps its P5 files, `SCPB`, generation 26 and
 `.local/play/protoss-p5-shuttle`. Explicit `protoss-p4-storm` retains the real
 P4 files, `SCP5`, generation 21 and its own save path. Explicit `zerg-z3` and
 `protoss-p3` preserve their earlier real files, identities and save paths. No save conversion is
@@ -43,7 +44,12 @@ exact fresh-process cargo SRAM restore and continued win. Earlier P4 save
 qualification remains scoped to its preserved P4 build. See the
 [P5 audit](audits/2026-10-26-p5-promotion/README.md).
 
-The 30-fps goal remains unfinished. Canonical P5 measures 26.6 fps equivalent
+Current P6 adds six canonical-flag host mission wins, a 57-checkpoint input-only
+ARM win and fresh-process SRAM continuation; the P3 input-only rendered host
+replay matches 122 checkpoints. See the
+[P6 promotion audit](audits/2026-10-27-p6-promotion/README.md) for exact scope.
+
+The 30-fps goal remains unfinished. The preserved P5 build measures 26.6 fps equivalent
 on P1/P2, 18.9 on P3, 16.1 on carried P4 and 17.1 on P5; carried P4 is about
 5.3% slower than the standalone P4/minimap build. PR 35's earlier averages were about
 22.4/18.8 fps equivalent for Terran T7/T10 and 16.3 for P4. These are scoped
@@ -69,7 +75,8 @@ To validate play in mGBA, use `./dev play starcraft` for the default game or `./
 ## Canonical skirmish resume checks (2026-10-27)
 
 `make test-sc64-canonical-skirmish-resume` compiles the real canonical Terran,
-Z6 and P5 profile flags. The sanitizer-enabled fixture runs 24 normal-menu
+Z6 and current P6 profile flags. The original audit used P5; the P6 promotion
+reruns the Protoss cases with its expanded flags. The sanitizer-enabled fixture runs 24 normal-menu
 cases per profile, covering both maps, all human races, one to three mixed
 opponents and three-opponent groups of each race. All 72 cases pass: mining
 depletes resources before saving, map/race/opponent configuration survives
