@@ -23,6 +23,11 @@ UNIT_WORD_SPRITE_HEADER = (
     '    return (const GbaSpriteWordFrame *)0;\n'
     '}\n'
 )
+P4_SCENARIO_HEADER = (
+    '#define SC64_P4_SCENARIO_GENERATED_H 1\n'
+    '#define SC64_P4_CREATE_PREFIX_VERSION 1\n'
+    'static const unsigned char sc64_p4_source_create_prefix[2] = {0,1};\n'
+)
 loader = importlib.machinery.SourceFileLoader('starcraft_dev', str(ROOT / 'dev'))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 dev = importlib.util.module_from_spec(spec)
@@ -127,7 +132,7 @@ class OnboardingTests(unittest.TestCase):
                          '"source_map_path":"008/021"}}')
                 elif script == 'sc64_p4_scenario_pack.py':
                     emit(local / 'p4/generated/sc64_p4_scenario_generated.h',
-                         '#define SC64_P4_SCENARIO_GENERATED_H 1\n')
+                         P4_SCENARIO_HEADER)
 
             with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
                     patch.object(dev, 'run', side_effect=fake_run):
@@ -153,6 +158,23 @@ class OnboardingTests(unittest.TestCase):
                 '"source_map_path":"008/021"}}', encoding='ascii')
             self.assertFalse(dev.protoss_p4_input_ready(
                 'Protoss chapter 4 authenticated source', manifest))
+
+    def test_p4_scenario_readiness_rejects_stale_prefix_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'sc64_p4_scenario_generated.h'
+            label = 'Protoss chapter 4 scenario'
+            header.write_text(P4_SCENARIO_HEADER, encoding='ascii')
+            self.assertTrue(dev.protoss_p4_input_ready(label, header))
+            stale_headers = (
+                '#define SC64_P4_SCENARIO_GENERATED_H 1\n',
+                P4_SCENARIO_HEADER.replace('PREFIX_VERSION 1', 'PREFIX_VERSION 0'),
+                P4_SCENARIO_HEADER.replace('PREFIX_VERSION 1', 'PREFIX_VERSION 10'),
+                P4_SCENARIO_HEADER.replace('sc64_p4_source_create_prefix', 'old_prefix'),
+            )
+            for text in stale_headers:
+                with self.subTest(header=text):
+                    header.write_text(text, encoding='ascii')
+                    self.assertFalse(dev.protoss_p4_input_ready(label, header))
 
     def test_canonical_zerg_readiness_requires_z4_stage_inputs(self):
         with tempfile.TemporaryDirectory() as directory:

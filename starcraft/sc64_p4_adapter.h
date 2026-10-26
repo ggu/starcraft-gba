@@ -4,11 +4,28 @@
 #if defined(SC64_P4_COUNT_CENSUS_ENABLED) && !defined(SC64_P4_RUNTIME)
 #error "SC64_P4_COUNT_CENSUS_ENABLED requires the P4 runtime"
 #endif
+#if defined(SC64_P4_CREATE_PREFIX) && !defined(SC64_P4_RUNTIME)
+#error "SC64_P4_CREATE_PREFIX requires the P4 runtime"
+#endif
+#if defined(SC64_P4_VALIDATOR_HOT) && !defined(SC64_P4_RUNTIME)
+#error "SC64_P4_VALIDATOR_HOT requires the P4 runtime"
+#endif
 
 #if defined(SC64_P4_RUNTIME)
 
 #include "sc64_p4.h"
 #include "sc64_p4_scenario_generated.h"
+
+#if defined(SC64_P4_CREATE_PREFIX)
+#if !defined(SC64_P4_CREATE_PREFIX_VERSION) || SC64_P4_CREATE_PREFIX_VERSION != 1
+#error "SC64_P4_CREATE_PREFIX requires generated create-prefix version 1"
+#endif
+_Static_assert(sizeof(sc64_p4_source_create_prefix) /
+               sizeof(sc64_p4_source_create_prefix[0]) ==
+               sizeof(sc64_p4_source_actions) /
+               sizeof(sc64_p4_source_actions[0]) + 1,
+               "P4 create-prefix endpoints must cover every source action");
+#endif
 
 /* P4's presentation payloads and original AI script are not included. Numeric
  * source action order, waits, actor creation and predicates are retained; text
@@ -74,7 +91,12 @@ static unsigned race_p4_reserved_units(void)
         SC64_P4_SOURCE_CREATE_COUNT - race_p4.created_count : 0;
 }
 
-static int race_p4_runtime_state_valid(const Sc64P4RuntimeState *s)
+#if defined(SC64_P4_VALIDATOR_HOT)
+static int GBA_HOT __attribute__((noinline))
+#else
+static int
+#endif
+race_p4_runtime_state_valid(const Sc64P4RuntimeState *s)
 {
     if (!s || !sc64_p4_state_valid(&s->model) || s->faults ||
         s->switch_bits & (u8)~3u || s->source_paused > 1 ||
@@ -98,11 +120,17 @@ static int race_p4_runtime_state_valid(const Sc64P4RuntimeState *s)
         }
         if (s->model.fired & (1u << t)) {
             unsigned dispatched = s->action_cursor[t] ? s->action_cursor[t] : n;
+#ifdef SC64_P4_CREATE_PREFIX
+            unsigned first = sc64_p4_source_triggers[t].first_action;
+            expected_creates += sc64_p4_source_create_prefix[first + dispatched] -
+                                sc64_p4_source_create_prefix[first];
+#else
             for (unsigned a = 0; a < dispatched; ++a) {
                 const Sc64P4SourceAction *row = &sc64_p4_source_actions[
                     sc64_p4_source_triggers[t].first_action + a];
                 if (row->opcode == 11) ++expected_creates;
             }
+#endif
         }
     }
     if (expected_creates != s->created_count) return 0;
@@ -407,15 +435,44 @@ static int race_p4_init(void)
     if (live + SC64_P4_SOURCE_CREATE_COUNT > MAX_UNITS) {
         race_p4.faults |= 1u << (SC64_P4_FAULT_CAPACITY - 1u); return 0;
     }
-    for (unsigned t=0, base=0; t<SC64_P4_TRIGGER_COUNT; ++t) {
+#ifdef SC64_P4_CREATE_PREFIX
+    unsigned source_create_rows = 0;
+#endif
+    unsigned base = 0;
+    for (unsigned t=0; t<SC64_P4_TRIGGER_COUNT; ++t) {
         const Sc64P4SourceTrigger *tr=&sc64_p4_source_triggers[t];
+#ifdef SC64_P4_CREATE_PREFIX
+        unsigned action_total = sizeof(sc64_p4_source_actions) /
+                                sizeof(sc64_p4_source_actions[0]);
+        if (base > action_total || tr->first_action > action_total ||
+            tr->action_count > action_total - tr->first_action ||
+            tr->first_action != base)
+            return 0;
+#endif
         if (tr->first_action != base || tr->action_count==0) return 0;
+#ifdef SC64_P4_CREATE_PREFIX
+        if (!base && sc64_p4_source_create_prefix[0] != 0) return 0;
+#endif
         for (unsigned i=0;i<tr->action_count;++i) {
             const Sc64P4SourceAction *a=&sc64_p4_source_actions[base+i];
             if (a->trigger != t || a->index != i || !a->opcode) return 0;
+#ifdef SC64_P4_CREATE_PREFIX
+            if (a->opcode == 11) ++source_create_rows;
+            if (sc64_p4_source_create_prefix[base+i+1] != source_create_rows)
+                return 0;
+#endif
         }
         base += tr->action_count;
     }
+#ifdef SC64_P4_CREATE_PREFIX
+    if (base != sizeof(sc64_p4_source_actions) /
+                sizeof(sc64_p4_source_actions[0]) ||
+        source_create_rows != SC64_P4_SOURCE_CREATE_COUNT ||
+        sc64_p4_source_create_prefix[sizeof(sc64_p4_source_actions) /
+                                     sizeof(sc64_p4_source_actions[0])] !=
+            source_create_rows)
+        return 0;
+#endif
     race_minerals[SIDE]=SC64_P4_START_MINERALS;
     minerals=SC64_P4_START_MINERALS;
     race_minerals[ENEMY]=SC64_P4_FORCE2_START_RESOURCES;

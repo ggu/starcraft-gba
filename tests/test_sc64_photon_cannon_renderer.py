@@ -302,8 +302,9 @@ int main(void) {
                             and any(path in dry_run.stderr for path in optional_banks)):
                         self.skipTest("prepared private audio or construction bank is incomplete")
                     self.assertEqual(dry_run.returncode, 0, dry_run.stderr)
-                    compile_commands = [shlex.split(line)
-                                        for line in dry_run.stdout.splitlines()]
+                    compile_commands = [
+                        shlex.split(line)
+                        for line in dry_run.stdout.replace("\\\n", " ").splitlines()]
                     compile_commands = [argv for argv in compile_commands
                                         if "common/gba.c" in argv and "-o" in argv and
                                         any(item.endswith(".c") and
