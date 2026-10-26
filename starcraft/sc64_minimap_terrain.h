@@ -13,7 +13,16 @@ sc64_minimap_draw_terrain(int x, int y,
                           const u8 *visible, const u8 *explored)
 {
 #if defined(SC64_MINIMAP_BLIT)
+#if defined(GBA_SPRITE_WORDS)
+    /* Match source and destination byte phases so the shared compositor can
+     * use aligned four-pixel stores. Each 24-byte row keeps the same phase;
+     * the three padding bytes also cover negative/clipped x positions. */
+    u8 storage[SC64_MINIMAP_TERRAIN_SIDE * SC64_MINIMAP_TERRAIN_SIDE + 3]
+        __attribute__((aligned(4)));
+    u8 *pixels = storage + ((unsigned)x & 3u);
+#else
     u8 pixels[SC64_MINIMAP_TERRAIN_SIDE * SC64_MINIMAP_TERRAIN_SIDE];
+#endif
     unsigned nonempty = 0;
     for (int cell = 0; cell < SC64_MINIMAP_TERRAIN_SIDE * SC64_MINIMAP_TERRAIN_SIDE; ++cell) {
         unsigned color = visible[cell] ? C_GRASS : explored[cell] ? C_FOG : C_BLACK;

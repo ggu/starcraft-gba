@@ -49,29 +49,40 @@ static void setup_pattern(unsigned mode)
 int main(void)
 {
     static const int clips[4][2] = {{0, 160}, {120, 160}, {12, 120}, {130, 160}};
+    static const int origins[][2] = {
+        {196,129}, {197,129}, {198,129}, {199,129},
+        {-4,129}, {-3,129}, {-2,129}, {-1,129},
+        {220,129}, {221,129}, {222,129}, {223,129},
+        {-24,129}, {240,129}, {197,-7}, {197,153},
+    };
+    unsigned cases = 0;
     gba_init();
     for (unsigned mode = 0; mode < 5; ++mode) {
         setup_pattern(mode);
         for (unsigned clip = 0; clip < 4; ++clip) {
-            poison_surface();
-            gfx_set_clip_y(clips[clip][0], clips[clip][1]);
-            reference_terrain(197, 129);
-            for (int y = 0; y < 160; ++y)
-                for (int x = 0; x < 240; ++x)
-                    expected[y * 240 + x] = gfx_test_pixel(x, y);
+            for (unsigned origin = 0; origin < sizeof(origins)/sizeof(origins[0]); ++origin) {
+                int ox = origins[origin][0], oy = origins[origin][1];
+                poison_surface();
+                gfx_set_clip_y(clips[clip][0], clips[clip][1]);
+                reference_terrain(ox, oy);
+                for (int y = 0; y < 160; ++y)
+                    for (int x = 0; x < 240; ++x)
+                        expected[y * 240 + x] = gfx_test_pixel(x, y);
 
-            poison_surface();
-            gfx_set_clip_y(clips[clip][0], clips[clip][1]);
-            sc64_minimap_draw_terrain(197, 129, visible, explored);
-            for (int y = 0; y < 160; ++y)
-                for (int x = 0; x < 240; ++x)
-                    if (expected[y * 240 + x] != gfx_test_pixel(x, y)) {
-                        fprintf(stderr, "terrain mismatch mode=%u clip=%u x=%d y=%d\n",
-                                mode, clip, x, y);
-                        return 1;
-                    }
+                poison_surface();
+                gfx_set_clip_y(clips[clip][0], clips[clip][1]);
+                sc64_minimap_draw_terrain(ox, oy, visible, explored);
+                for (int y = 0; y < 160; ++y)
+                    for (int x = 0; x < 240; ++x)
+                        if (expected[y * 240 + x] != gfx_test_pixel(x, y)) {
+                            fprintf(stderr, "terrain mismatch mode=%u clip=%u origin=%u x=%d y=%d\n",
+                                    mode, clip, origin, x, y);
+                            return 1;
+                        }
+                ++cases;
+            }
         }
     }
-    puts("minimap terrain helper: 20 poisoned-background and clip cases passed");
+    printf("minimap terrain helper: %u poisoned-background, phase and clip cases passed\n", cases);
     return 0;
 }
