@@ -89,6 +89,12 @@ PATH --profile terran` (or `zerg` / `protoss`) before building. See
 [Native weapon effects](native-weapon-effects.md) for coverage, local checks
 and the remaining differences from the source engine.
 
+Weapon frames, from this bank and from the Tank effect bank below, are hidden
+per 16-by-16 map tile. When every tile under a clipped frame is visible, as in
+the fully revealed showcase arenas, each row is drawn in one call; otherwise
+the renderers split rows at tile boundaries and skip hidden tiles. Both paths
+produce the same pixels.
+
 ## Tank firing effects and siege splash
 
 Canonical race builds and Showcase use source Tank muzzle and target-impact
