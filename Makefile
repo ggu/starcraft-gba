@@ -3252,10 +3252,12 @@ test-sc64-z7-full-render: $(addprefix build/test-sc64-z7-full-render-,profile sa
 
 $(eval $(call Z7_FULL_RENDER_FIXTURE,formation-reference,sc64_reachable_formation.c))
 $(eval $(call Z7_FULL_RENDER_FIXTURE,formation,sc64_reachable_formation.c,-DSC64_REACHABLE_FORMATION))
+$(eval $(call Z7_FULL_RENDER_FIXTURE,formation-graph,sc64_formation_reachability.c,-DSC64_REACHABLE_FORMATION))
 .PHONY: test-sc64-z7-reachable-formation
-test-sc64-z7-reachable-formation: build/test-sc64-z7-full-render-formation-reference build/test-sc64-z7-full-render-formation
+test-sc64-z7-reachable-formation: build/test-sc64-z7-full-render-formation-reference build/test-sc64-z7-full-render-formation build/test-sc64-z7-full-render-formation-graph
 	./build/test-sc64-z7-full-render-formation-reference
 	./build/test-sc64-z7-full-render-formation
+	./build/test-sc64-z7-full-render-formation-graph
 
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE

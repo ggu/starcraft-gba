@@ -2225,6 +2225,28 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
 #endif
 }
 
+#ifdef SC64_REACHABLE_FORMATION
+static int __attribute__((noinline))
+formation_route_pair(int sx, int sy, int slot_x, int slot_y, int tx, int ty,
+                     int *hint_slots, int *hint_roots, int *hint_next)
+{
+#ifdef SC64_IMPORTED_MISSION
+    int reachable = sc64_route_formation_fallback_with_hint(
+        sx, sy, slot_x, slot_y, tx, ty, hint_slots, hint_roots, hint_next);
+    if (reachable >= 0) return reachable;
+#else
+    (void)hint_slots;
+    (void)hint_roots;
+    (void)hint_next;
+#endif
+    {
+        int next_x, next_y;
+        if (path_next_tile(sx, sy, slot_x, slot_y, &next_x, &next_y)) return 0;
+        return path_next_tile(sx, sy, tx, ty, &next_x, &next_y) ? 1 : 0;
+    }
+}
+#endif
+
 /* Cheap direct routing handles the open map. Run the full BFS only when the
  * straight corridor intersects terrain or a structure. */
 static int GBA_HOT
@@ -4253,8 +4275,11 @@ static void
 issue_order(int order, int tx, int ty)
 {
     int i, n = 0;
-#ifdef SC64_REACHABLE_FORMATION
     int group_order = selected_count() > 1;
+#ifdef SC64_REACHABLE_FORMATION
+    int route_hint_slots[4] = {-1, -1, -1, -1};
+    int route_hint_roots[4] = {-1, -1, -1, -1};
+    int route_hint_next = 0;
 #endif
     selected_building = -1;
     for (i = 0; i < MAX_UNITS; i++)
@@ -4278,12 +4303,14 @@ issue_order(int order, int tx, int ty)
 	    if (group_order) {
 	        int slot_x = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
 	        int slot_y = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);
-	        int next_x, next_y;
-	        if (!sc64_race_unit_flying(u[i].type) &&
-	            !path_next_tile(u[i].x, u[i].y, slot_x, slot_y, &next_x, &next_y) &&
-	            path_next_tile(u[i].x, u[i].y, tx, ty, &next_x, &next_y)) {
-	            slot_x = tx;
-	            slot_y = ty;
+	        if (!sc64_race_unit_flying(u[i].type)) {
+	            int use_cursor = formation_route_pair(u[i].x, u[i].y,
+                slot_x, slot_y, tx, ty, route_hint_slots, route_hint_roots,
+                &route_hint_next);
+	            if (use_cursor) {
+	                slot_x = tx;
+	                slot_y = ty;
+	            }
 	        }
 	        u[i].tx = slot_x;
 	        u[i].ty = slot_y;
@@ -4292,7 +4319,7 @@ issue_order(int order, int tx, int ty)
 	        u[i].ty = ty;
 	    }
 	#else
-	    if (selected_count() > 1) {
+	    if (group_order) {
 		u[i].tx = limit(tx + ((n % 5) - 2) * 8, 8, WORLD_W - 8);
 		u[i].ty = limit(ty + ((n / 5) - 1) * 8, 8, WORLD_H - 8);
 	    } else {

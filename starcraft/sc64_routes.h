@@ -774,6 +774,228 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
     *next_x = col * 16 + 8; *next_y = row * 16 + 8;
     return 1;
 }
+
+/* Group formation only needs a reachability decision, not a next step. On
+ * complete imported-race fields, any walkable-rooted reverse field is an exact
+ * connected-component label: membership in the same field is equivalent to
+ * four-neighbour reachability. Blocked starts/targets expand to the same
+ * cardinal/diagonal open-cell sets as sc64_route_next. Partial floods and
+ * visit-grid builds retain the path-query implementation as their oracle. */
+#ifdef SC64_REACHABLE_FORMATION
+#if defined(SC64_RACES) && defined(SC64_IMPORTED_MISSION) && \
+    !defined(SC64_ROUTE_PARTIAL_FLOOD) && !defined(SC64_ROUTE_VISIT_GRID)
+#define SC64_ROUTE_COMPONENT_HINTS 4
+static int __attribute__((noinline))
+sc64_route_cells_connected(const int *starts, int start_count,
+                           const int *goals, int goal_count,
+                           const int *other_goals, int other_goal_count,
+                           int *hint_slots, int *hint_roots, int *hint_next,
+                           int stop_if_slot_reachable)
+{
+    int i, j, k, reached = 0;
+    if (start_count <= 0) return 0;
+    if (goal_count <= 0 && other_goal_count <= 0) return 0;
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    if (!sc64_route_configure()) return -1;
+#endif
+    if (SC64_ROUTE_ACTIVE_SLOTS <= 0) return -1;
+    if (!path_grid_valid) build_path_grid();
+    for (i = 0; i < start_count; ++i) {
+        int slot = -1;
+        int source = starts[i];
+#ifdef SC64_ROUTE_DECAY_FREQ
+        sc64_route_age_request();
+#endif
+        if (hint_slots && hint_roots) for (j = 0; j < SC64_ROUTE_COMPONENT_HINTS; ++j) {
+            int hs = hint_slots[j], hr = hint_roots[j];
+            if (hs >= 0 && hs < SC64_ROUTE_ACTIVE_SLOTS &&
+                sc64_route_valid[hs] == 1 && sc64_route_goal[hs] == (u16)hr &&
+                hr >= 0 && hr < MAP_CELLS && SC64_GRID_GET(path_walkable, hr) &&
+                sc64_route_get(hs, source) != SC64_ROUTE_UNREACHABLE) {
+                slot = hs;
+#ifdef SC64_ROUTE_DECAY_FREQ
+                sc64_route_age_touch(hs, 1);
+#else
+                sc64_route_age[hs] = ++sc64_route_clock;
+#endif
+                sc64_route_hits++;
+                break;
+            }
+        }
+        /* Reuse a complete field rooted at any walkable point in this
+         * component; field goals seeded from blocked cells are not labels. */
+        for (k = 0; slot < 0 && k < SC64_ROUTE_ACTIVE_SLOTS; ++k) {
+            int root;
+            if (sc64_route_valid[k] != 1) continue;
+            root = (int)sc64_route_goal[k];
+            if (root < 0 || root >= MAP_CELLS ||
+                !SC64_GRID_GET(path_walkable, root) ||
+                sc64_route_get(k, source) == SC64_ROUTE_UNREACHABLE)
+                continue;
+            slot = k;
+#ifdef SC64_ROUTE_DECAY_FREQ
+            sc64_route_age_touch(k, 1);
+#else
+            sc64_route_age[k] = ++sc64_route_clock;
+#endif
+            sc64_route_hits++;
+            break;
+        }
+        /* No cached field covers this component: build one from this open
+         * source and inspect every requested destination before any further
+         * allocation can evict it. */
+        if (slot < 0) slot = sc64_route_slot(source);
+        if (slot < 0) return -1;
+        if (hint_slots && hint_roots && hint_next) {
+            int h = (*hint_next)++ % SC64_ROUTE_COMPONENT_HINTS;
+            hint_slots[h] = slot;
+            hint_roots[h] = (int)sc64_route_goal[slot];
+        }
+        for (j = 0; j < goal_count; ++j)
+            if (sc64_route_get(slot, goals[j]) != SC64_ROUTE_UNREACHABLE) {
+                reached |= 1;
+                break;
+            }
+        if (stop_if_slot_reachable && (reached & 1)) return 0;
+        for (j = 0; j < other_goal_count; ++j)
+            if (sc64_route_get(slot, other_goals[j]) != SC64_ROUTE_UNREACHABLE) {
+                reached |= 2;
+                break;
+            }
+        if (!stop_if_slot_reachable && reached == 3) return reached;
+    }
+    if (stop_if_slot_reachable) return (reached & 2) != 0;
+    return reached;
+}
+
+static int __attribute__((noinline))
+sc64_route_reachable_pair_with_hint(int sx, int sy,
+                                    int tx1, int ty1, int tx2, int ty2,
+                                    int *hint_slots, int *hint_roots, int *hint_next,
+                                    int stop_if_slot_reachable)
+{
+    static const s8 start_dx[4] = {1, -1, 0, 0};
+    static const s8 start_dy[4] = {0, 0, 1, -1};
+    static const s8 goal_dx[8] = {0, 1, 1, 1, 0, -1, -1, -1};
+    static const s8 goal_dy[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
+    int start_col, start_row, goal1_col, goal1_row, goal2_col, goal2_row, start;
+    int starts[4], goals1[8], goals2[8], start_count = 0, goal1_count = 0, goal2_count = 0;
+    int i, result;
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    if (!sc64_route_configure()) return -1;
+#endif
+    if (!path_grid_valid) build_path_grid();
+    start_col = limit(sx / 16, 0, MAP_COLS - 1);
+    start_row = limit(sy / 16, 0, MAP_ROWS - 1);
+    goal1_col = limit(tx1 / 16, 0, MAP_COLS - 1);
+    goal1_row = limit(ty1 / 16, 0, MAP_ROWS - 1);
+    goal2_col = limit(tx2 / 16, 0, MAP_COLS - 1);
+    goal2_row = limit(ty2 / 16, 0, MAP_ROWS - 1);
+    start = start_col + start_row * MAP_COLS;
+    if (SC64_GRID_GET(path_walkable, start)) starts[start_count++] = start;
+    else for (i = 0; i < 4; ++i) {
+        int col = start_col + start_dx[i], row = start_row + start_dy[i];
+        int cell;
+        if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS) continue;
+        cell = col + row * MAP_COLS;
+        if (SC64_GRID_GET(path_walkable, cell)) starts[start_count++] = cell;
+    }
+    {
+        int goal = goal1_col + goal1_row * MAP_COLS;
+        if (SC64_GRID_GET(path_walkable, goal)) goals1[goal1_count++] = goal;
+        else for (i = 0; i < 8; ++i) {
+            int col = goal1_col + goal_dx[i], row = goal1_row + goal_dy[i];
+            int cell;
+            if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS) continue;
+            cell = col + row * MAP_COLS;
+            if (SC64_GRID_GET(path_walkable, cell)) goals1[goal1_count++] = cell;
+        }
+    }
+    {
+        int goal = goal2_col + goal2_row * MAP_COLS;
+        if (SC64_GRID_GET(path_walkable, goal)) goals2[goal2_count++] = goal;
+        else for (i = 0; i < 8; ++i) {
+            int col = goal2_col + goal_dx[i], row = goal2_row + goal_dy[i];
+            int cell;
+            if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS) continue;
+            cell = col + row * MAP_COLS;
+            if (SC64_GRID_GET(path_walkable, cell)) goals2[goal2_count++] = cell;
+        }
+    }
+    result = sc64_route_cells_connected(starts, start_count,
+                                        goals1, goal1_count, goals2, goal2_count,
+                                        hint_slots, hint_roots, hint_next,
+                                        stop_if_slot_reachable);
+    return result;
+}
+
+static int __attribute__((noinline))
+sc64_route_reachable_with_hint(int sx, int sy, int tx, int ty,
+                               int *hint_slots, int *hint_roots, int *hint_next)
+{
+    int result = sc64_route_reachable_pair_with_hint(sx, sy, tx, ty, tx, ty,
+                                                     hint_slots, hint_roots, hint_next, 0);
+    return result < 0 ? -1 : (result & 1) != 0;
+}
+
+static int __attribute__((noinline))
+sc64_route_reachable_pair(int sx, int sy, int tx1, int ty1, int tx2, int ty2)
+{
+    return sc64_route_reachable_pair_with_hint(sx, sy, tx1, ty1, tx2, ty2, 0, 0, 0, 0);
+}
+static int __attribute__((noinline))
+sc64_route_formation_fallback_with_hint(int sx, int sy,
+                                        int slot_x, int slot_y, int tx, int ty,
+                                        int *hint_slots, int *hint_roots, int *hint_next)
+{
+    return sc64_route_reachable_pair_with_hint(sx, sy, slot_x, slot_y, tx, ty,
+                                               hint_slots, hint_roots, hint_next, 1);
+}
+static int __attribute__((noinline))
+sc64_route_reachable(int sx, int sy, int tx, int ty)
+{
+    return sc64_route_reachable_with_hint(sx, sy, tx, ty, 0, 0, 0);
+}
+#else
+static int __attribute__((noinline))
+sc64_route_reachable_pair_with_hint(int sx, int sy,
+                                    int tx1, int ty1, int tx2, int ty2,
+                                    int *hint_slots, int *hint_roots, int *hint_next,
+                                    int stop_if_slot_reachable)
+{
+    (void)sx; (void)sy; (void)tx1; (void)ty1; (void)tx2; (void)ty2;
+    (void)hint_slots; (void)hint_roots; (void)hint_next;
+    (void)stop_if_slot_reachable;
+    return -1;
+}
+static int __attribute__((noinline))
+sc64_route_reachable_with_hint(int sx, int sy, int tx, int ty,
+                               int *hint_slots, int *hint_roots, int *hint_next)
+{
+    int result = sc64_route_reachable_pair_with_hint(sx, sy, tx, ty, tx, ty,
+                                                     hint_slots, hint_roots, hint_next, 0);
+    return result < 0 ? -1 : (result & 1) != 0;
+}
+static int __attribute__((noinline))
+sc64_route_reachable(int sx, int sy, int tx, int ty)
+{
+    return sc64_route_reachable_with_hint(sx, sy, tx, ty, 0, 0, 0);
+}
+static int __attribute__((noinline))
+sc64_route_reachable_pair(int sx, int sy, int tx1, int ty1, int tx2, int ty2)
+{
+    return sc64_route_reachable_pair_with_hint(sx, sy, tx1, ty1, tx2, ty2, 0, 0, 0, 0);
+}
+static int __attribute__((noinline))
+sc64_route_formation_fallback_with_hint(int sx, int sy,
+                                        int slot_x, int slot_y, int tx, int ty,
+                                        int *hint_slots, int *hint_roots, int *hint_next)
+{
+    return sc64_route_reachable_pair_with_hint(sx, sy, slot_x, slot_y, tx, ty,
+                                               hint_slots, hint_roots, hint_next, 1);
+}
+#endif
+#endif /* SC64_REACHABLE_FORMATION */
 #ifdef SC64_ROUTES_LOCAL_GRID_GET
 #undef SC64_GRID_GET
 #undef SC64_ROUTES_LOCAL_GRID_GET
