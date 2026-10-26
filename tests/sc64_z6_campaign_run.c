@@ -37,6 +37,10 @@ static void trace_storm_candidates(int slot)
         owners_hostile(SIDE,ENEMY));
 }
 
+static int z6_hold_safely(void);
+/* Set while Kerrigan rests for Storm energy; input() then keeps her clear of
+ * attackers between the controller's own steps. */
+static int z6_rest_guard,z6_rest_guard_busy;
 static void input(u16 held)
 {
     u16 pressed=(u16)(held & (u16)~prior);
@@ -61,6 +65,12 @@ static void input(u16 held)
             hero_track_slot=hero;hero_track_hp=u[hero].hp;hero_track_shield=u[hero].shield;
             hero_track_x=u[hero].x;hero_track_y=u[hero].y;
         }
+    }
+    if(z6_rest_guard&&!z6_rest_guard_busy&&host_ticks%30u==0u&&
+       mode==MODE_NORMAL&&!menu_open) {
+        z6_rest_guard_busy=1;
+        (void)z6_hold_safely();
+        z6_rest_guard_busy=0;
     }
     if(controller_trace&&changed) {
         fprintf(controller_trace,"%s{\"kind\":\"input\",\"host_tick\":%u,\"held\":%u,\"pressed\":%u}",
@@ -445,6 +455,69 @@ static int z6_detector_sees_at(int slot,int x,int y)
     probe.x=x;probe.y=y;
     return !race_z6_cloak_target_box(&probe,&box)||race_z6_cloak_enemy_detector_sees(&box);
 }
+/* True when a hostile attacker could hit Kerrigan resting at x,y. Ranges use
+ * the stock weapon table, plus a margin for closing movement; a cloak
+ * no detector covers keeps her untargetable, as in the source. */
+static int z6_point_threatened(int hero,int x,int y,int margin)
+{
+    if(hero<0||!u[hero].alive)return 1;
+    if(race_z6.cloak.active&&!z6_detector_sees_at(hero,x,y))return 0;
+    for(int i=0;i<MAX_UNITS;i++) {
+        int range;
+        if(!u[i].alive||!owners_hostile(SIDE,u[i].owner))continue;
+        range=unit_range(u[i].type);
+        /* Reaver scarabs are outside the generic weapon table that
+         * race_can_attack consults; use the per-type damage instead. */
+        if(range<=0||unit_damage(u[i].type)<=0)continue;
+        if(dist2(x,y,u[i].x,u[i].y)<=(range+margin)*(range+margin))return 1;
+    }
+    for(int i=0;i<MAX_BUILDINGS;i++)
+        if(building_complete(i)&&b[i].hp>0&&b[i].raw_type==162&&
+           owners_hostile(SIDE,b[i].owner)&&
+           dist2(x,y,b[i].x,b[i].y)<=(112+margin)*(112+margin))return 1;
+    return 0;
+}
+/* The rest point behind the cleared northern base can fall inside a
+ * Reaver's 8-tile range. Move to the nearest walkable cell within 320 px
+ * that no attacker reaches; the ordinary Move order routes there. */
+static int z6_hold_safely(void)
+{
+    int hero=kerrigan(),best_x=-1,best_y=-1,best_d=0x7fffffff;
+    if(hero<0||!u[hero].alive||!z6_point_threatened(hero,u[hero].x,u[hero].y,48))return 0;
+    for(int dy=-320;dy<=320;dy+=16)for(int dx=-320;dx<=320;dx+=16) {
+        int x=u[hero].x+dx,y=u[hero].y+dy,d=dx*dx+dy*dy,col=x/16,row=y/16;
+        if(d<48*48||d>320*320||d>=best_d||x<0||y<0||col>=MAP_COLS||row>=MAP_ROWS||
+           !SC64_GRID_GET(path_walkable,col+row*MAP_COLS)||
+           z6_point_threatened(hero,x,y,80))continue;
+        best_x=x;best_y=y;best_d=d;
+    }
+    if(best_x<0||!hero_move(best_x,best_y))return 0;
+    unsigned start=host_ticks;
+    while(hero>=0&&u[hero].alive&&dist2(u[hero].x,u[hero].y,best_x,best_y)>24*24&&
+          host_ticks-start<900u&&screen==SCREEN_PLAY&&!won&&!lost)input(0);
+    fprintf(stderr,"normal-input Kerrigan held clear of attackers at%d,%d xy%d,%d hp%d tick%u\n",
+        best_x,best_y,hero>=0?u[hero].x:-1,hero>=0?u[hero].y:-1,hero>=0?u[hero].hp:-1,host_ticks);
+    return 1;
+}
+/* Unaided Overlords are slow. Wait while the flight keeps closing on its
+ * point: stop after 900 ticks without getting closer, or 20000 in total. */
+static int z6_wait_closing(int mover,int guard,int x,int y,int radius)
+{
+    unsigned start=host_ticks,last_progress=host_ticks;
+    int best=dist2(u[mover].x,u[mover].y,x,y);
+    while(host_ticks-start<20000u&&host_ticks-last_progress<900u&&
+          screen==SCREEN_PLAY&&!won&&!lost&&u[mover].alive&&
+          (guard<0||u[guard].alive)&&best>radius*radius) {
+        input(0);
+        int d=dist2(u[mover].x,u[mover].y,x,y);
+        if(d<best) { best=d; last_progress=host_ticks; }
+        if(host_ticks%500u==0)
+            fprintf(stderr,"flight tick%u mover xy%d,%d order%d d2%d\n",
+                host_ticks,u[mover].x,u[mover].y,u[mover].order,d);
+    }
+    return u[mover].alive&&(guard<0||u[guard].alive)&&
+        dist2(u[mover].x,u[mover].y,x,y)<=radius*radius;
+}
 static void z6_log_detectors(void)
 {
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==84&&owners_hostile(SIDE,u[i].owner))
@@ -747,6 +820,7 @@ static int clear_force2_locations(void)
                 started,frame,screen,mode,menu_open);
             while(host_ticks-started<2500u&&screen==SCREEN_PLAY&&!won&&!lost) {
                 input(0);
+                if(support_waiting&&(host_ticks-started)%60u==0u)(void)z6_hold_safely();
                 int resting_hero=kerrigan();
                 if(support_waiting&&resting_hero>=0&&u[resting_hero].carry>=240*256&&
                    !z6_detector_sees_at(resting_hero,u[resting_hero].x,u[resting_hero].y)) {
@@ -761,6 +835,7 @@ static int clear_force2_locations(void)
                         if(resting_hero>=0&&dist2(u[resting_hero].x,u[resting_hero].y,
                                                   support_x,support_y)<=64*64) {
                             support_waiting=0;
+                            z6_rest_guard=0;
                             fprintf(stderr,"normal-input Kerrigan rejoined safe Storm point xy%d,%d energy%d tick%u\n",
                                 u[resting_hero].x,u[resting_hero].y,u[resting_hero].carry/256,host_ticks);
                         } else fprintf(stderr,"Kerrigan failed safe-point return xy%d,%d detector%d tick%u\n",
@@ -817,6 +892,8 @@ static int clear_force2_locations(void)
                             }
                             casts_since_retreat=0;
                             support_waiting=hero>=0&&u[hero].alive;
+                            z6_rest_guard=support_waiting;
+                            if(support_waiting)(void)z6_hold_safely();
                         }
                     }
                     last_cast=host_ticks;
@@ -1017,10 +1094,7 @@ static int z6_transport_campaign(void)
         if(!issue_selected_unit_move(carrier,bx,by)) {
             fprintf(stderr,"normal-input Overlord rendezvous order failed\n");return 0;
         }
-        unsigned rendezvous_start=host_ticks;
-        while(host_ticks-rendezvous_start<3000u&&screen==SCREEN_PLAY&&!won&&!lost&&
-              u[carrier].alive&&u[k].alive&&dist2(u[carrier].x,u[carrier].y,u[k].x,u[k].y)>28*28)
-            input(0);
+        (void)z6_wait_closing(carrier,k,bx,by,28);
         best=dist2(u[carrier].x,u[carrier].y,u[k].x,u[k].y);
         fprintf(stderr,"normal-input ferry rendezvous end tick%u carrier%d,%d Kerrigan%d,%d d2%d\n",
             host_ticks,u[carrier].x,u[carrier].y,u[k].x,u[k].y,best);
@@ -1049,15 +1123,7 @@ static int z6_transport_campaign(void)
             u[carrier].order,mode,u[carrier].selected,selected_count(),u[carrier].target,
             u[carrier].tx,u[carrier].ty,u[carrier].x,u[carrier].y); return 0;
     }
-    unsigned flight_start=host_ticks;
-    while(host_ticks-flight_start<6000u&&screen==SCREEN_PLAY&&!won&&!lost&&
-          u[carrier].alive&&u[k].alive&&
-          dist2(u[carrier].x,u[carrier].y,goal_x,goal_y)>28*28) {
-        input(0);
-        if(host_ticks%500u==0)
-            fprintf(stderr,"flight tick%u carrier xy%d,%d order%d Kerrigan%d\n",
-                host_ticks,u[carrier].x,u[carrier].y,u[carrier].order,u[k].alive);
-    }
+    (void)z6_wait_closing(carrier,k,goal_x,goal_y,28);
     if(!u[carrier].alive||!u[k].alive||
        dist2(u[carrier].x,u[carrier].y,goal_x,goal_y)>28*28) {
         fprintf(stderr,"Overlord flight failed at tick%u\n",host_ticks); return 0;

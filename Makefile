@@ -168,7 +168,14 @@ TERRAN_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3
 TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS)
 ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS)
-ZERG_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS)
+# Explicit legacy Z1-Z4 product: SCZ4, save generation 20, unchanged flags.
+ZERG_Z4_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS)
+# Canonical Z1-Z6: the Z6 storage/runtime/query vector, with a word-packed
+# copy of its sprite bank in place of the probe bank, and canonical drawing.
+ZERG_Z6_BANK := .local/sc64/zerg-z6/generated
+ZERG_Z6_FLAGS = $(patsubst -I.local/sc64/z6/generated,-I$(ZERG_Z6_BANK),$(Z6_PROBE_FLAGS))
+ZERG_Z6_INPUTS = $(filter-out .local/sc64/z6/generated/sc64_race_sprites_generated.h,$(Z6_PROBE_INPUTS)) $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h
+ZERG_ROM_FLAGS = $(ZERG_Z6_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS)
 ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
 PROTOSS_P3_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
 PROTOSS_P3_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_P3_CANONICAL_FLAGS)
@@ -1327,7 +1334,7 @@ build/test-sc64-protoss-canonical-frame: tests/sc64_z3_frame_coverage.c $(STARCR
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
 build/test-sc64-protoss-canonical-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
-build/test-sc64-zerg-canonical-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
+build/test-sc64-zerg-canonical-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
 .PHONY: test-canonical-render
 test-canonical-render: build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-z4-frame-coverage build/test-sc64-zerg-canonical-hud build/test-sc64-protoss-canonical-frame build/test-sc64-protoss-canonical-hud
@@ -1356,16 +1363,25 @@ test-sc64-zp-models: build/test-sc64-z4-model build/test-sc64-p4-model
 	./build/test-sc64-p4-model
 test-starcraft: test-sc64-zp-models
 
-# Canonical four-entry Zerg ROM. The paired Z3 target above remains available.
+# Explicit legacy four-entry Zerg ROM; the paired Z3 target above also remains.
 build/starcraft-zerg-z4.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(ZERG_ROM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z4.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(ZERG_Z4_ROM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z4.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z4-GBA.gba: build/starcraft-zerg-z4.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z4' SCZ4
-.PHONY: zerg-z4
-zerg-z4: verify-zerg
+.PHONY: zerg-z4 verify-zerg-z4
+verify-zerg-z4: build/StarCraft-Zerg-Z4-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z4
+zerg-z4: verify-zerg-z4
+
+# Canonical six-entry Zerg ROM: SCZ6, save generation 32.
+build/starcraft-zerg-z6.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(ZERG_ROM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z6.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z6-GBA.gba: build/starcraft-zerg-z6.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z6' SCZ6
 
 build/starcraft-protoss-p4.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(P4_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p4.map -lgcc -o $@
@@ -1560,7 +1576,7 @@ build/test-sc64-z4-runtime: tests/sc64_z4_runtime.c $(STARCRAFT) $(wildcard star
 build/test-sc64-p4-runtime: tests/sc64_p4_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z4-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z4_ROM_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p4-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(P4_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z4-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -1576,7 +1592,7 @@ build/test-sc64-zp-protoss-storage: tests/sc64_zp_storage.c $(STARCRAFT) $(wildc
 build/test-sc64-zp-air-tech: tests/sc64_zp_air_tech.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z4_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z4-campaign-run: tests/sc64_z4_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z4_ROM_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z4-runtime test-sc64-p4-runtime test-sc64-p4-create-prefix test-sc64-zp-storage
 
 
@@ -1871,16 +1887,25 @@ build/starcraft-zerg.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard st
 build/StarCraft-Zerg-GBA.gba: build/starcraft-zerg.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z3' SCZ3
-verify-zerg: build/StarCraft-Zerg-Z4-GBA.gba
+verify-zerg: build/StarCraft-Zerg-Z6-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg
-build/test-zerg: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
+build/test-zerg: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) tests/sc64_split_run.c common/gba.c -o $@
-build/test-sc64-zerg-promoted-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
+build/test-sc64-zerg-promoted-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
-test-zerg: build/test-zerg build/test-sc64-zerg-promoted-profile test-sc64-z4-campaign
+test-zerg: build/test-zerg build/test-sc64-zerg-promoted-profile
 	./build/test-zerg
 	./build/test-sc64-zerg-promoted-profile
 test-zerg-z3: test-sc64-z3-runtime
+# Explicit legacy four-entry Zerg product.
+build/test-zerg-z4: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z4_ROM_FLAGS) tests/sc64_split_run.c common/gba.c -o $@
+build/test-sc64-zerg-z4-promoted-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z4_ROM_FLAGS) $< common/gba.c -o $@
+.PHONY: test-zerg-z4
+test-zerg-z4: build/test-zerg-z4 build/test-sc64-zerg-z4-promoted-profile test-sc64-z4-campaign
+	./build/test-zerg-z4
+	./build/test-sc64-zerg-z4-promoted-profile
 
 build/starcraft-protoss.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) common/gba.h common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(PROTOSS_P3_ROM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss.map -lgcc -o $@
@@ -3430,19 +3455,30 @@ test-sc64-vital-bars: build/test-sc64-vital-bars-reference build/test-sc64-vital
 	./build/test-sc64-vital-bars-fast
 test: test-sc64-vital-bars
 
-# Requalify carried chapters with the canonical four-entry Zerg pools and
-# flags, rather than relying on a win from the smaller legacy Z3 profile.
-build/test-sc64-zerg-carried-z1: tests/race_z1_controls.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+# Requalify every carried chapter with the canonical six-entry Zerg pools and
+# flags, rather than relying on wins from smaller or staged profiles.
+ZERG_CARRIED_DEPS = $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile
+build/test-sc64-zerg-carried-z1: tests/race_z1_controls.c $(ZERG_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
-build/test-sc64-zerg-carried-z2: tests/race_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+build/test-sc64-zerg-carried-z2: tests/race_campaign_run.c $(ZERG_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
-build/test-sc64-zerg-carried-z3: tests/sc64_z3_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+build/test-sc64-zerg-carried-z3: tests/sc64_z3_campaign_run.c $(ZERG_CARRIED_DEPS) | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-zerg-carried-z4: tests/sc64_z4_campaign_run.c $(ZERG_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-zerg-carried-z5: tests/sc64_z5_campaign_run.c $(ZERG_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-zerg-carried-z6: tests/sc64_z6_campaign_run.c $(ZERG_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-zerg-carried-missions
-test-sc64-zerg-carried-missions: build/test-sc64-zerg-carried-z1 build/test-sc64-zerg-carried-z2 build/test-sc64-zerg-carried-z3
-	./build/test-sc64-zerg-carried-z1 --trace .local/sc64/z4-carried-z1-controller.json
-	./build/test-sc64-zerg-carried-z2 --controller 1 --trace .local/sc64/z4-carried-z2-controller.json
-	./build/test-sc64-zerg-carried-z3 --trace .local/sc64/z4-carried-z3-controller.json
+test-sc64-zerg-carried-missions: build/test-sc64-zerg-carried-z1 build/test-sc64-zerg-carried-z2 build/test-sc64-zerg-carried-z3 build/test-sc64-zerg-carried-z4 build/test-sc64-zerg-carried-z5 build/test-sc64-zerg-carried-z6
+	mkdir -p .local/sc64
+	./build/test-sc64-zerg-carried-z1 --trace .local/sc64/z6-carried-z1-controller.json
+	./build/test-sc64-zerg-carried-z2 --controller 1 --trace .local/sc64/z6-carried-z2-controller.json
+	./build/test-sc64-zerg-carried-z3 --trace .local/sc64/z6-carried-z3-controller.json
+	./build/test-sc64-zerg-carried-z4 --limit 150000 --trace .local/sc64/z6-carried-z4-controller.json
+	./build/test-sc64-zerg-carried-z5 --limit 60000 --trace .local/sc64/z6-carried-z5-diagnostics.json --attempt .local/sc64/z6-carried-z5-attempt.json --verified .local/sc64/z6-carried-z5-controller.json
+	./build/test-sc64-zerg-carried-z6 --trace .local/sc64/z6-carried-z6-controller.json
 test-zerg: test-sc64-zerg-carried-missions
 
 # P2's timed source roster must not become a false Fenix death when the
