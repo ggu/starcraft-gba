@@ -26,6 +26,7 @@ TARGETS = {
     "--zerg-z5": ("StarCraft-Zerg-Z5-GBA", "starcraft-zerg-z5", "SCZ5", "SC ZERG Z5"),
     "--zerg-z5-consume": ("StarCraft-Zerg-Z5-Consume-GBA", "starcraft-zerg-z5-consume", "SCZD", "SC Z5 FEED"),
     "--zerg-z5-cloak": ("StarCraft-Zerg-Z5-Cloak-GBA", "starcraft-zerg-z5-cloak", "SCZC", "SC Z5 CLOAK"),
+    "--zerg-z7-full-render": ("StarCraft-Zerg-Z7-Full-Render-Probe-GBA", "starcraft-zerg-z7-full-render-probe", "SCZR", "SC Z7 FULL36"),
     "--protoss": ("StarCraft-Protoss-P6-GBA", "starcraft-protoss-p6", "SCP6", "SC PROTOSS6"),
     "--protoss-p3": ("StarCraft-Protoss-GBA", "starcraft-protoss", "SCP3", "SC PROTOSS3"),
     "--protoss-p4": ("StarCraft-Protoss-P4-GBA", "starcraft-protoss-p4", "SCP4", "SC PROTOSS4"),

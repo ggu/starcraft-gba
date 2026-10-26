@@ -3217,6 +3217,34 @@ build/StarCraft-Zerg-Z7-Defense-Targets-Probe-GBA.gba: build/starcraft-zerg-z7-d
 	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 DEF36' SCZY
 zerg-z7-defense-targets-probe: build/StarCraft-Zerg-Z7-Defense-Targets-Probe-GBA.gba
 
+# Unpromoted Z7 qualification with the full canonical presentation vector.
+# The standard `zerg` product remains the separately qualified Z1-Z6 ROM.
+Z7_FULL_RENDER_FLAGS = $(patsubst -I.local/sc64/z6/generated,-I$(ZERG_Z6_BANK),$(Z7_DEFENSE_TARGET_FLAGS)) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
+Z7_FULL_RENDER_INPUTS = $(filter-out .local/sc64/z5/generated/sc64_race_sprites_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h,$(Z7_PROBE_INPUTS)) $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
+build/starcraft-zerg-z7-full-render-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_FULL_RENDER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_FULL_RENDER_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-full-render-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Full-Render-Probe-GBA.gba: build/starcraft-zerg-z7-full-render-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 FULL36' SCZR
+.PHONY: zerg-z7-full-render-probe test-sc64-z7-full-render
+zerg-z7-full-render-probe: build/StarCraft-Zerg-Z7-Full-Render-Probe-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z7-full-render
+
+define Z7_FULL_RENDER_FIXTURE
+build/test-sc64-z7-full-render-$(1): tests/$(2) $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(Z7_FULL_RENDER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(Z7_FULL_RENDER_FLAGS) $$< common/gba.c -o $$@
+endef
+$(eval $(call Z7_FULL_RENDER_FIXTURE,profile,sc64_promoted_race_profile.c))
+$(eval $(call Z7_FULL_RENDER_FIXTURE,save,sc64_z7_game_save.c))
+$(eval $(call Z7_FULL_RENDER_FIXTURE,frame,sc64_z3_frame_coverage.c))
+$(eval $(call Z7_FULL_RENDER_FIXTURE,scourge,sc64_z7_scourge_game.c))
+test-sc64-z7-full-render: $(addprefix build/test-sc64-z7-full-render-,profile save frame scourge)
+	./build/test-sc64-z7-full-render-profile
+	./build/test-sc64-z7-full-render-save
+	./build/test-sc64-z7-full-render-frame
+	./build/test-sc64-z7-full-render-scourge
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
