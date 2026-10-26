@@ -98,6 +98,13 @@ untouched, and every world change is an ordinary key input.
   The slow unupgraded Overlord also outlasted fixed 3,000/6,000-tick ferry
   waits, so those waits now follow flight progress.
 
+- **Z1 (after base PR #48).** Base's sprite-accurate geyser hit test shifts the
+  Z1 opening by one tick, which sent the attack into a defended target with a
+  thinner group. `make test-zerg` failed on base's own Z4 product for the
+  same reason. Before each new target, the controller now regroups at the
+  north-front rally and rebuilds to 26 Hydralisks from banked resources
+  whenever fewer than 20 remain.
+
 ## Normal-input qualification
 
 The six host controllers run under the canonical flags with ASan/UBSan
@@ -109,9 +116,9 @@ writes. The same tapes win on the host and on ARM in isolated mGBA processes
 
 | Mission | Input updates | Transitions | Final frame | Result |
 | --- | ---: | ---: | ---: | --- |
-| Z1 | 43,604 | 1,602 | 43,438 | won |
+| Z1 | 59,308 | 1,935 | 59,087 | won |
 | Z2 | 7,735 | 732 | 7,537 | won |
-| Z3 | 51,653 | 1,217 | 51,360 | won |
+| Z3 | 49,530 | 1,095 | 49,252 | won |
 | Z4 | 59,270 | 812 | 59,111 | won, outcome WON |
 | Z5 | 50,301 | 896 | 49,786 | won, outcome WON, Kerrigan alive |
 | Z6 | 309,357 | 10,859 | 305,772 | won, outcome WON, fault 0, Kerrigan alive |
@@ -137,7 +144,9 @@ same tape.
   It then unloads and wins at frame 305,772, the same as the uninterrupted
   run.
 
-Both round trips were rerun at the tested commit, with identical hashes. The Z6 SRAM image is
+Both round trips were rerun at the tested commit. The Z5 image is unchanged.
+Base's later gameplay changes alter the Z6 world state, so its image and world
+hash differ from earlier runs, but save and load still match exactly. The Z6 SRAM image is
 byte-identical before and after the save-validator change below.
 
 ## Z6 save cost
@@ -178,24 +187,24 @@ same tapes, built from the same checkout. Z5 and Z6 have no Z4 baseline.
 
 | Mission | Product | Mean update | Mean draw | Mean full | Worst window | Worst in-mission update | Victory update | Updates over 561,792 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Z1 | Z4 baseline | 234,147 | 337,176 | 653,426 | 1,017,139 | 8,938,825 | 6,682,872 | 45.0% |
-| Z1 | Z6 | 258,128 | 374,069 | 706,531 | 1,052,812 | 9,107,145 | 11,626,630 | 63.0% |
-| Z2 | Z4 baseline | 260,547 | 337,066 | 695,558 | 779,788 | 7,014,346 | 5,629,248 | 52.7% |
-| Z2 | Z6 | 310,792 | 377,596 | 752,680 | 865,457 | 7,047,535 | 10,386,646 | 66.5% |
-| Z3 | Z4 baseline | 361,838 | 329,702 | 776,967 | 1,330,618 | 16,110,685 | 7,108,061 | 75.4% |
-| Z3 | Z6 | 422,643 | 367,985 | 878,102 | 1,392,679 | 16,276,353 | 11,161,713 | 88.4% |
-| Z4 | Z4 baseline | 294,269 | 345,929 | 727,348 | 897,481 | 4,356,649 | 6,000,150 | 87.4% |
-| Z4 | Z6 | 414,220 | 386,221 | 869,437 | 1,019,320 | 4,467,748 | 11,356,804 | 99.7% |
-| Z5 | Z6 | 533,684 | 302,825 | 931,768 | 1,226,121 | 5,207,785 | 12,537,676 | 99.0% |
-| Z6 | Z6 | 453,742 | 348,453 | 869,018 | 1,809,270 | 12,180,086 | 17,148,202 | 92.8% |
+| Z1 | Z4 baseline | 217,741 | 357,802 | 664,782 | 1,047,405 | 9,548,271 | 7,533,607 | 41.4% |
+| Z1 | Z6 | 254,826 | 394,314 | 724,830 | 1,128,917 | 9,674,843 | 12,522,226 | 58.1% |
+| Z2 | Z4 baseline | 260,863 | 381,678 | 736,194 | 942,623 | 6,974,836 | 5,628,700 | 56.8% |
+| Z2 | Z6 | 290,810 | 422,512 | 785,209 | 1,011,233 | 7,034,545 | 10,373,367 | 65.3% |
+| Z3 | Z4 baseline | 337,491 | 348,408 | 765,086 | 1,175,001 | 16,143,134 | 5,938,364 | 67.9% |
+| Z3 | Z6 | 384,451 | 386,847 | 854,133 | 1,254,212 | 16,336,802 | 11,093,753 | 86.7% |
+| Z4 | Z4 baseline | 295,922 | 387,322 | 770,949 | 1,717,697 | 4,564,305 | 5,999,572 | 88.5% |
+| Z4 | Z6 | 330,168 | 427,473 | 857,580 | 1,784,550 | 4,626,193 | 11,300,870 | 98.9% |
+| Z5 | Z6 | 556,130 | 304,798 | 949,783 | 1,237,638 | 5,231,261 | 12,559,824 | 99.0% |
+| Z6 | Z6 | 457,034 | 361,401 | 884,412 | 1,803,891 | 12,147,491 | 17,149,603 | 94.7% |
 
-On the same tapes, the six-chapter product costs 8.1%, 8.2%, 13.0% and 19.5%
+On the same tapes, the six-chapter product costs 9.0%, 6.7%, 11.6% and 11.2%
 more mean full-frame cycles than the Z4 product for Z1–Z4. It also roughly
 doubles each victory update, because the larger save carries the Z5/Z6 state
 and its validators. The in-mission worst updates are mission-load and
 scripted-event spikes that both products share.
 
-Z6's 1,809,270-cycle worst window is the heaviest in the campaign; it falls
+Z6's 1,803,891-cycle worst window is the heaviest in the campaign; it falls
 early in the mission. Before the save change, its victory update was
 93,097,165 cycles.
 
@@ -210,23 +219,23 @@ None of these numbers is a hardware measurement or a frame-rate claim.
 
 | Check | Z6 product | Limit |
 | --- | --- | --- |
-| IWRAM end | `0x03004f18` | `< 0x03005000` |
+| IWRAM end | `0x03004e00` | `< 0x03005000` |
 | BSS end | `0x0203de78` | `< 0x0203e000` |
 | Save payload | 16,296 bytes (`sizeof(RaceSave)`) | `<= 16,368`, static assert |
-| ROM | 33,554,432 bytes, SHA-256 `d54d7fee…2bb9a5b` | `<= 32 MiB` |
+| ROM | 33,554,432 bytes, SHA-256 `f8d25fad…71ce616` | `<= 32 MiB` |
 
 The legacy Z4 ROM rebuilt at the tested commit is 33,554,432 bytes, SHA-256
-`fafa8018801ddbbcc220cee7e2c865e0de84d883e88027f41f4e1d2d5ff2b986`. That is
+`4b6adc9bd5855427052da99091a5aa7c922b974c9ad6aab76c51d90ee66e0f74`. That is
 byte-identical to the canonical Z4 build from `codex/source-release` at
-`6f440a4`, which includes directional sprites, source Tank effects and the
-Protoss warp-in glow. The
+`aa64d05`, which includes directional sprites, source weapon effects,
+attack poses, geyser hit testing and the Protoss warp-in glow. The
 explicit Z3 ROM is identical to base as well
-(`57b309a48f4f11310cf6b4fffec603b1e4b660cbd8af3ec749f8913031e453ed`).
+(`da51cac4d80a6c31d1c8a7de9fc46b28273f758f96a0fb14964f4fbca9dfce29`).
 
 ## Commands run at the tested commit
 
-All of the following ran at `9ea062d18cf7d37a29e8963f4eddb8cf38378427`, the
-merge of `codex/source-release` at `6f440a4`. Every
+All of the following ran at `75ab58a3d35512ab55804ef82f2089a19fc74d13`, after
+merging `codex/source-release` at `aa64d05`. Every
 command exited 0.
 
 ```sh
@@ -263,7 +272,7 @@ folders.
   and bounded hallucinations.
 - **Frame time:** emulated frame time is over a two-frame budget for most
   updates in Z4–Z6 on both products. On Z1–Z4, the six-chapter product is
-  8.1%–19.5% heavier than the Z4 product.
+  6.7%–11.6% heavier than the Z4 product.
 - **Victory saves:** each victory save remains a single ~10–17M-cycle stall.
 - **Hardware:** no 30 fps or hardware performance claim is made.
 - **Inputs:** the replay tapes come from host controllers. Each one is one
