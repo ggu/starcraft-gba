@@ -189,9 +189,10 @@ int main(void) {
               ".local/sc64/z4/generated/sc64_z4_scenario_generated.h"),
              set(ZP_UNIT_IDS.values()), set(), set(ZP_BUILDING_IDS.values())),
             ("protoss", "build/test-sc64-protoss-canonical-frame",
-             Path(".local/sc64/races/generated/sc64_race_sprites_generated.h"),
-             (),
-             set(), set(), set()),
+             Path(".local/sc64/zp-stage/generated/sc64_race_sprites_generated.h"),
+             (".local/sc64/zp-stage/generated/sc64_races_generated.h",
+              ".local/sc64/p4/generated/sc64_p4_scenario_generated.h"),
+             set(ZP_UNIT_IDS.values()), set(), set(ZP_BUILDING_IDS.values())),
         )
 
         def opaque_check(call: str, label: str) -> str:

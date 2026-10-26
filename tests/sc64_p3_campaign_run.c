@@ -670,6 +670,14 @@ static void build_pylons_and_gateways(void)
         build_near_nexus(B_FORGE, MENU_ENG_BAY);
         if (side_construction_count() > before) return;
     }
+#ifdef SC64_P4_STORM_ENABLED
+    /* The P4 carried roster outproduces the legacy P3 profile. Get a second
+       production lane online before filling the defensive cannon roster. */
+    if (side_building_count(B_GATEWAY) < 4 && minerals >= 150) {
+        build_near_nexus(B_GATEWAY, MENU_BARRACKS);
+        if (side_construction_count() > before) return;
+    }
+#endif
     if (side_building(B_FORGE, 1) >= 0 && minerals >= 150 &&
         side_building_count(B_PHOTON_CANNON) < 6) {
         build_photon_cannon_near_nexus();
@@ -831,7 +839,11 @@ int main(int argc, char **argv)
                 queue_dragoon();
             else
                 queue_zealot();
+#ifdef SC64_P4_STORM_ENABLED
+            next_queue = frame + 240;
+#else
             next_queue = frame + 360;
+#endif
         }
         if (frame >= next_order) {
             if (!assault_started && frame >= 10000 && owner_army(SIDE) >= 14)

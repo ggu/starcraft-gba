@@ -57,8 +57,11 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(verify_roms.TARGETS['--zerg-z3'],
                          ('StarCraft-Zerg-GBA', 'starcraft-zerg', 'SCZ3', 'SC ZERG Z3'))
         self.assertEqual(verify_roms.TARGETS['--protoss'],
+                         ('StarCraft-Protoss-P4-Storm-GBA', 'starcraft-protoss-p4-storm',
+                          'SCP5', 'SC P4 STORM'))
+        self.assertEqual(verify_roms.TARGETS['--protoss-p4-storm'], verify_roms.TARGETS['--protoss'])
+        self.assertEqual(verify_roms.TARGETS['--protoss-p3'],
                          ('StarCraft-Protoss-GBA', 'starcraft-protoss', 'SCP3', 'SC PROTOSS3'))
-        self.assertEqual(verify_roms.TARGETS['--protoss-p3'], verify_roms.TARGETS['--protoss'])
 
     def test_dev_race_tests_include_full_campaign_targets(self):
         self.assertEqual(dev.SC64_TEST_TARGETS['zerg'], 'test-zerg')
@@ -66,11 +69,90 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
         self.assertEqual(dev.GAMES['zerg'], ('zerg', 'build/StarCraft-Zerg-Z4-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg-z3'], ('zerg-z3', 'build/StarCraft-Zerg-GBA.gba'))
-        self.assertEqual(dev.PLAY_SAVE_PROFILES, {'zerg': 'zerg-z4', 'zerg-z3': 'zerg'})
+        self.assertEqual(dev.PLAY_SAVE_PROFILES,
+                         {'zerg': 'zerg-z4', 'zerg-z3': 'zerg',
+                          'protoss': 'protoss-p4-storm', 'protoss-p3': 'protoss'})
         self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['zerg'],
                          ('StarCraft-Zerg-Z4-GBA.gba', 'starcraft-zerg-z4.elf'))
         self.assertEqual(sc64_split_profile.PROFILE_BUILD_PATHS['zerg'],
                          ('StarCraft-Zerg-Z4-GBA.gba', 'starcraft-zerg-z4.elf'))
+        for routes in (sc64_split_profile.PROFILE_BUILD_PATHS, sc64_split_smoke.PROFILE_BUILD_PATHS):
+            self.assertEqual(routes['protoss'],
+                             ('StarCraft-Protoss-P4-Storm-GBA.gba', 'starcraft-protoss-p4-storm.elf'))
+
+    def test_p4_storm_and_legacy_p3_have_explicit_build_and_save_routes(self):
+        self.assertEqual(dev.GAMES['protoss-p3'],
+                         ('protoss-p3', 'build/StarCraft-Protoss-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p4-storm'],
+                         ('protoss-p4-storm', 'build/StarCraft-Protoss-P4-Storm-GBA.gba'))
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p4-storm'], 'test-protoss')
+        self.assertEqual(dev.GAMES['protoss'][1], dev.GAMES['protoss-p4-storm'][1])
+        self.assertEqual(dev.PLAY_SAVE_PROFILES.get('protoss-p4-storm', 'protoss-p4-storm'),
+                         'protoss-p4-storm')
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss-p3'], 'protoss')
+
+    def test_p4_prepare_authenticates_fresh_chapter_inputs_before_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rom = root / 'owned-rom.z64'
+            rom.write_bytes(b'user supplied fixture')
+            calls = []
+
+            def emit(path, text):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text, encoding='ascii')
+
+            def fake_run(command, **_kwargs):
+                calls.append(command)
+                script = Path(command[1]).name
+                local = root / '.local/sc64'
+                if script == 'sc64_workspace.py':
+                    emit(local / 'rom/StarCraft64-USA.z64', 'prepared source fixture')
+                elif script == 'sc64_races_pack.py':
+                    output = (Path(command[command.index('--out') + 1]) if '--out' in command
+                              else local / 'races/generated/sc64_races_generated.h')
+                    emit(output, ''.join(
+                        f'#if defined(SC64_UNIFIED) && defined({gate})\n{payload}\n'
+                        f'#endif /* SC64_UNIFIED && {gate} */\n'
+                        for gate, payload in (dev.RACE_CAMPAIGN_GATES['protoss-p3'],
+                                              dev.RACE_CAMPAIGN_GATES['protoss-p4-storm'])))
+                elif script == 'sc64_race_sprites.py':
+                    output = (Path(command[command.index('--header') + 1]) if '--header' in command
+                              else local / 'races/generated/sc64_race_sprites_generated.h')
+                    self.assertIn('--prepack-unit-words', command)
+                    emit(output, UNIT_WORD_SPRITE_HEADER)
+                elif script == 'sc64_p4_pack.py':
+                    emit(local / 'p4/manifest.json',
+                         '{"schema":1,"mission":{"id":"P4","global_catalog_index":23,'
+                         '"source_map_path":"008/021"}}')
+                elif script == 'sc64_p4_scenario_pack.py':
+                    emit(local / 'p4/generated/sc64_p4_scenario_generated.h',
+                         '#define SC64_P4_SCENARIO_GENERATED_H 1\n')
+
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
+                    patch.object(dev, 'run', side_effect=fake_run):
+                dev.prepare(rom, 'protoss')
+            self.assertTrue(all(dev.protoss_p4_input_ready(label, root / relative)
+                                for label, relative, _ in dev.PROTOSS_P4_INPUTS))
+            self.assertIn('sc64_skirmish_pack.py', [Path(call[1]).name for call in calls])
+            # Existence is insufficient: stale maps, art, scenarios and source
+            # identities must all be rejected before invoking Make.
+            for label, relative, _ in dev.PROTOSS_P4_INPUTS:
+                path = root / relative
+                original = path.read_text()
+                path.write_text('stale fixture\n', encoding='ascii')
+                with self.subTest(label=label), patch.object(dev, 'ROOT', root), \
+                        patch.object(dev, 'run', side_effect=AssertionError('Make must not run')):
+                    for game in ('protoss', 'protoss-p4-storm'):
+                        with self.assertRaisesRegex(RuntimeError, 'authenticated chapter inputs'):
+                            dev.build(game)
+                path.write_text(original, encoding='ascii')
+            manifest = root / '.local/sc64/p4/manifest.json'
+            manifest.write_text(
+                '{"schema":1,"mission":{"id":"P4","global_catalog_index":22,'
+                '"source_map_path":"008/021"}}', encoding='ascii')
+            self.assertFalse(dev.protoss_p4_input_ready(
+                'Protoss chapter 4 authenticated source', manifest))
 
     def test_canonical_zerg_readiness_requires_z4_stage_inputs(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -131,6 +213,24 @@ class OnboardingTests(unittest.TestCase):
                     dev, 'run', side_effect=AssertionError('make must not run')):
                 with self.assertRaisesRegex(RuntimeError, 'prepacked unit-word sprite metadata'):
                     dev.build('zerg')
+
+    def test_terran_build_requires_real_word_metadata_before_make(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            header = root / '.local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h'
+            header.parent.mkdir(parents=True)
+            for stale in ('ordinary indexed sprites',
+                          '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 1\n',
+                          UNIT_WORD_SPRITE_HEADER.replace('METADATA 1', 'METADATA 10')):
+                header.write_text(stale, encoding='ascii')
+                with self.subTest(stale=stale[:50]), patch.object(dev, 'ROOT', root), \
+                        patch.object(dev, 'run', side_effect=AssertionError('Make must not run')):
+                    with self.assertRaisesRegex(RuntimeError, 'prepacked unit-word sprite metadata'):
+                        dev.build('terran')
+            header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'run') as run:
+                dev.build('terran')
+            run.assert_called_once_with(['make', 'terran'])
 
     def test_staged_z6_and_p5_profiles_have_explicit_build_and_test_routes(self):
         self.assertEqual(dev.GAMES['zerg-z6'],
@@ -780,6 +880,8 @@ class OnboardingTests(unittest.TestCase):
                     else:
                         header = race / 'sc64_race_sprites_generated.h'
                     touch(header)
+                    if '--prepack-unit-words' in command:
+                        header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
                 elif script == 'sc64_menu_assets.py':
                     touch(race / 'sc64_menu_generated.h')
                 elif script == 'sc64_skirmish_pack.py':

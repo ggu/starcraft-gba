@@ -1,6 +1,10 @@
 #ifndef SC64_P4_ADAPTER_H
 #define SC64_P4_ADAPTER_H
 
+#if defined(SC64_P4_COUNT_CENSUS_ENABLED) && !defined(SC64_P4_RUNTIME)
+#error "SC64_P4_COUNT_CENSUS_ENABLED requires the P4 runtime"
+#endif
+
 #if defined(SC64_P4_RUNTIME)
 
 #include "sc64_p4.h"
@@ -171,8 +175,8 @@ static int race_p4_source_owner_matches(unsigned selector, int raw_owner,
     return -1;
 }
 
-static int race_p4_count_type(unsigned selector, unsigned raw, int buildings,
-                              int in_escape)
+static int __attribute__((unused))
+race_p4_count_type(unsigned selector, unsigned raw, int buildings, int in_escape)
 {
     int count = 0, l = 0, t = 0, r = WORLD_W, b0 = WORLD_H;
     if (in_escape && !race_p4_location(SC64_P4_LOCATION_ESCAPE,&l,&t,&r,&b0))
@@ -193,6 +197,64 @@ static int race_p4_count_type(unsigned selector, unsigned raw, int buildings,
     }
     return count;
 }
+
+#ifdef SC64_P4_COUNT_CENSUS_ENABLED
+typedef struct {
+    int side_any;
+    int all_ray;
+    int all_tass;
+    int cur_ray;
+    int cur_tass;
+    int esc_ray;
+    int esc_tass;
+} RaceP4CountSnapshot;
+
+/* P4 evaluates seven related count conditions each active update. Preserve
+ * the source's two ownership models in one pass: Current Player follows live
+ * owner after rescue, while All Players follows raw source-owner provenance.
+ * Source location tests use the actor center and half-open runtime rectangle. */
+static int race_p4_count_snapshot(RaceP4CountSnapshot *out)
+{
+    int l, t, r, b0;
+    if (!out || !race_p4_location(SC64_P4_LOCATION_ESCAPE, &l, &t, &r, &b0))
+        return 0;
+    out->side_any = 0;
+    out->all_ray = 0;
+    out->all_tass = 0;
+    out->cur_ray = 0;
+    out->cur_tass = 0;
+    out->esc_ray = 0;
+    out->esc_tass = 0;
+
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive) {
+        int type = u[i].raw_type >= 0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type);
+        int current_player = u[i].owner == SIDE;
+        int all_players = u[i].raw_owner >= 0 && u[i].raw_owner < 8;
+        int in_escape = u[i].x >= l && u[i].x < r &&
+                        u[i].y >= t && u[i].y < b0;
+        if (current_player) {
+            ++out->side_any;
+            if (type == SC64_P4_RAW_RAYNOR_VULTURE) {
+                ++out->cur_ray;
+                if (in_escape) ++out->esc_ray;
+            }
+            if (type == SC64_P4_RAW_TASSADAR) {
+                ++out->cur_tass;
+                if (in_escape) ++out->esc_tass;
+            }
+        }
+        if (all_players) {
+            if (type == SC64_P4_RAW_RAYNOR_VULTURE) ++out->all_ray;
+            if (type == SC64_P4_RAW_TASSADAR) ++out->all_tass;
+        }
+    }
+    /* The Current Player Any Unit predicate includes buildings as in the
+     * source selector; its other six predicates concern unit types only. */
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE) ++out->side_any;
+    return 1;
+}
+#endif
 
 static unsigned race_p4_ticks(u32 ms)
 {
@@ -374,16 +436,27 @@ static int race_p4_campaign_tick(void)
         if (race_p4.action_ticks[t] && !--race_p4.action_ticks[t]) completed |= (u16)(1u<<t);
 
     Sc64P4Input in; memset(&in,0,sizeof(in));
-    int side_any=race_p4_count_type(13,229,0,0);
-    int all_ray=race_p4_count_type(17,19,0,0);
-    int all_tass=race_p4_count_type(17,79,0,0);
-    int cur_ray=race_p4_count_type(13,19,0,0);
-    int cur_tass=race_p4_count_type(13,79,0,0);
-    int esc_ray=race_p4_count_type(13,19,0,1);
-    int esc_tass=race_p4_count_type(13,79,0,1);
+    int side_any, all_ray, all_tass, cur_ray, cur_tass, esc_ray, esc_tass;
+#ifdef SC64_P4_COUNT_CENSUS_ENABLED
+    RaceP4CountSnapshot counts;
+    if (!race_p4_count_snapshot(&counts)) {
+        race_p4.faults |= 1u << (SC64_P4_FAULT_SELECTOR-1u); return 0;
+    }
+    side_any=counts.side_any; all_ray=counts.all_ray; all_tass=counts.all_tass;
+    cur_ray=counts.cur_ray; cur_tass=counts.cur_tass;
+    esc_ray=counts.esc_ray; esc_tass=counts.esc_tass;
+#else
+    side_any=race_p4_count_type(13,229,0,0);
+    all_ray=race_p4_count_type(17,19,0,0);
+    all_tass=race_p4_count_type(17,79,0,0);
+    cur_ray=race_p4_count_type(13,19,0,0);
+    cur_tass=race_p4_count_type(13,79,0,0);
+    esc_ray=race_p4_count_type(13,19,0,1);
+    esc_tass=race_p4_count_type(13,79,0,1);
     if (side_any<0 || all_ray<0 || all_tass<0 || cur_ray<0 || cur_tass<0 || esc_ray<0 || esc_tass<0) {
         race_p4.faults |= 1u << (SC64_P4_FAULT_SELECTOR-1u); return 0;
     }
+#endif
     in.current_any_units=(u16)side_any; in.all_ray_vultures=(u16)all_ray;
     in.all_tassadars=(u16)all_tass; in.current_ray_vultures=(u16)cur_ray;
     in.current_tassadars=(u16)cur_tass; in.escape_ray_vultures=(u16)esc_ray;
