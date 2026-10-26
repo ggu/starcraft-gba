@@ -442,6 +442,17 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #ifdef SC64_DEATH_SOURCE_ART
 #include "sc64_death_source.h"
 #include "sc64_death_sprites_generated.h"
+#if !defined(SC64_DEATH_SOURCE_BANK_VERSION) || SC64_DEATH_SOURCE_BANK_VERSION != 2 || \
+    !defined(SC64_DEATH_SOURCE_METADATA_VERSION) || SC64_DEATH_SOURCE_METADATA_VERSION != 1 || \
+    !defined(SC64_DEATH_SOURCE_PIXEL_BYTES) || SC64_DEATH_SOURCE_PIXEL_BYTES == 0
+#error "Regenerate source death art with tools/sc64_death_sprites.py (bank v2)"
+#endif
+#ifdef SC64_UNIT_WORD_SPRITES
+#if !defined(SC64_DEATH_SOURCE_WORD_METADATA) || SC64_DEATH_SOURCE_WORD_METADATA != 1 || \
+    !defined(SC64_DEATH_SOURCE_WORD_BYTES) || SC64_DEATH_SOURCE_WORD_BYTES == 0
+#error "Regenerate source death art with packed remnant frames"
+#endif
+#endif
 #endif
 #endif
 #endif
@@ -7415,7 +7426,21 @@ death_vfx_draw_source(const Sc64DeathVfx *e, int x, int y, u32 age, int under)
             !sc64_death_source_layer_frame(layer, age, &frame_index)) continue;
         const Sc64SpriteFrame *sprite =
             sc64_death_image_frame(layer->image_id, (unsigned short)frame_index);
-        if (sprite) death_vfx_blit(sprite, x + layer->x, y + layer->y);
+        if (sprite) {
+#if defined(SC64_UNIT_WORD_SPRITES) && !defined(SC64_DEATH_INDEXED_REMNANTS)
+            const GbaSpriteWordFrame *words =
+                sc64_death_image_word_frame(layer->image_id,(unsigned short)frame_index);
+            int left=x+layer->x-sprite->canvas_w/2+sprite->offset_x;
+            int top=y+layer->y-sprite->canvas_h/2+sprite->offset_y;
+            /* Packed collapse/remnant frames use the word compositor and no extra
+             * RAM. The indexed fallback explicitly clips partial HUD-edge
+             * frames even in builds without the scene-clip API. */
+            if (words && top>=12 && top+(int)sprite->h<=120)
+                gfx_blit_sprite_words(left,top,words);
+            else
+#endif
+                death_vfx_blit(sprite, x + layer->x, y + layer->y);
+        }
     }
     return 1;
 }

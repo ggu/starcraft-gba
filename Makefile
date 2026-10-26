@@ -174,10 +174,14 @@ ATTACK_POSE_HEADER := $(ATTACK_POSE_DIR)/sc64_unit_attack_source_generated.h
 SOURCE_WEAPON_INPUTS := $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER)
 SOURCE_WEAPON_FLAGS := -DSC64_WEAPON_SOURCE_VFX -I$(WEAPON_SOURCE_DIR) -DSC64_UNIT_ATTACK_POSES_ENABLED -I$(ATTACK_POSE_DIR)
 CANONICAL_WEAPON_FLAGS ?= -DSC64_TANK_SOURCE_VFX -I.local/sc64/tank-vfx/generated $(SOURCE_WEAPON_FLAGS)
-TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS)
+DEATH_ART_DIR := .local/sc64/death/generated
+DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
+CANONICAL_DEATH_FLAGS ?= -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
+CANONICAL_DEATH_INPUTS = $(if $(filter -DSC64_DEATH_SOURCE_ART,$(CANONICAL_DEATH_FLAGS)),$(DEATH_ART_HEADER))
+TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
 ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS)
-ZERG_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS)
+ZERG_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
 ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
 PROTOSS_P3_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
 PROTOSS_P3_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_P3_CANONICAL_FLAGS)
@@ -185,7 +189,7 @@ PROTOSS_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 PROTOSS_CANONICAL_FLAGS ?= $(PROTOSS_P3_CANONICAL_FLAGS) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL -DSC64_P4_COUNT_CENSUS_ENABLED $(PROTOSS_UNIT_WORD_FLAGS)
 P4_CREATE_PREFIX_FLAGS ?= -DSC64_P4_CREATE_PREFIX -DSC64_P4_VALIDATOR_HOT
 PROTOSS_P4_STORM_ROM_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P4_STORM_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS)
-PROTOSS_P5_CANONICAL_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P5_SHUTTLE_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS)
+PROTOSS_P5_CANONICAL_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P5_SHUTTLE_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
 PROTOSS_ROM_FLAGS = $(PROTOSS_P5_CANONICAL_FLAGS)
 TERRAN_FULL_INPUTS = $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) $(UNIT_FACING_HEADER)
 
@@ -2848,10 +2852,8 @@ test-starcraft: test-sc64-death-vfx test-sc64-death-vfx-default
 test-unified: test-sc64-death-vfx-unified
 
 # Optional source death art preview, built like the construction preview.
-DEATH_ART_DIR := .local/sc64/death/generated
-DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
 DEATH_ART_FLAGS := $(UNIFIED_FLAGS) -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
-$(DEATH_ART_HEADER): tools/sc64_death_sprites.py tools/sc64_construction_sprites.py tools/sc64_sprites.py
+$(DEATH_ART_HEADER): tools/sc64_death_sprites.py tools/sc64_construction_sprites.py tools/sc64_sprites.py tools/sc64_unit_facing.py
 	$(PYTHON) tools/sc64_death_sprites.py
 build/test-sc64-death-source: tests/sc64_death_source_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(DEATH_ART_FLAGS) $< -o $@
@@ -3350,7 +3352,7 @@ build/test-terran build/test-sc64-terran-full-profile build/test-zerg build/test
 UNIT_FACING_FLAGS := -I.local/sc64/facing/generated -DSC64_UNIT_FACING
 SHOWCASE_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 SHOWCASE_SIEGE_FLAGS ?= -DSC64_SIEGE_SPLASH
-SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS)
+SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS) $(CANONICAL_DEATH_FLAGS)
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
 	$(SIZE) $@
@@ -3622,3 +3624,27 @@ build/test-sc64-weapon-source-generated: tests/sc64_weapon_source_generated_comp
 .PHONY: test-sc64-weapon-source-generated
 test-sc64-weapon-source-generated: build/test-sc64-weapon-source-generated
 	./build/test-sc64-weapon-source-generated
+
+# Canonical source death/corpse art; default original-art/unified remains asset-free.
+build/starcraft-terran.elf build/starcraft-zerg-z4.elf build/starcraft-protoss-p5-shuttle.elf build/starcraft-showcase.elf: $(CANONICAL_DEATH_INPUTS)
+build/test-terran build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-z4-frame-coverage build/test-sc64-zerg-canonical-hud build/test-sc64-protoss-canonical-frame build/test-sc64-protoss-canonical-hud build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-native-weapon-game build/test-sc64-protoss-skirmish-pylons build/test-sc64-protoss-gas-placement build/test-sc64-worker-cargo-packed build/test-sc64-protoss-warp-color build/test-sc64-protoss-warp-color-no-clip: $(CANONICAL_DEATH_INPUTS)
+
+build/test-sc64-showcase-death-source: tests/sc64_showcase_death_source.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(SOURCE_WEAPON_INPUTS) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(DEATH_ART_HEADER) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-showcase-death-source
+test-sc64-showcase-death-source: build/test-sc64-showcase-death-source
+	./build/test-sc64-showcase-death-source
+
+# Packed source remains must match indexed pixels, including HUD-edge fallback.
+build/test-sc64-death-source-packed: tests/sc64_death_source_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(DEATH_ART_FLAGS) -DSC64_UNIT_WORD_SPRITES -DGBA_SPRITE_WORDS -DGBA_SCENE_CLIP $< -o $@
+build/test-sc64-death-source-packed-no-clip: tests/sc64_death_source_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(DEATH_ART_HEADER) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(DEATH_ART_FLAGS) -DSC64_UNIT_WORD_SPRITES -DGBA_SPRITE_WORDS $< -o $@
+.PHONY: test-sc64-death-source-packed
+test-sc64-death-source-packed: build/test-sc64-death-source-packed build/test-sc64-death-source-packed-no-clip
+	./build/test-sc64-death-source-packed
+	./build/test-sc64-death-source-packed-no-clip
+
+# Full-campaign controller binaries compile the canonical presentation flags.
+# Refresh them when their generated art changes as well as when code changes.
+$(addprefix build/test-sc64-full-,t1-run t2-run t3-run t3-save t3-resume t4-run t4-save t5-save t5-run t6-run) $(addprefix build/test-sc64-t,7-campaign-run 8-campaign-run 9-campaign-run 10-campaign-run): $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS)
