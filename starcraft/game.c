@@ -2377,6 +2377,34 @@ sc64_stock_flying_move(Unit *q,int tx,int ty)
 }
 #endif
 
+#if defined(SC64_COLLISION_STEER_LIST) && defined(SC64_Z7_RUNTIME)
+/* The bounded neighbor candidate list is a short-lived local to blocked
+ * steering. Keep its 388 bytes off BSS and off move_toward()'s common path. */
+static int __attribute__((noinline))
+sc64_steer_best_direction(Unit *q, int speed, int from_cell,
+                          int tx, int ty)
+{
+    static const s8 dx[8] = {1,1,0,-1,-1,-1,0,1};
+    static const s8 dy[8] = {0,1,1,1,0,-1,-1,-1};
+    Sc64SteerList list;
+    int best = -1, best_cost = 0x7fffffff;
+    int built = sc64_steer_list_build(&list, q, speed);
+    for (int i = 0; i < 8; ++i) {
+        int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
+        int cost = dist2(sx, sy, tx, ty);
+        if (cost >= best_cost ||
+            !is_traversable(sx / 16, sy / 16, from_cell))
+            continue;
+        if (built ? sc64_steer_list_step_clear(&list, q, sx, sy)
+                  : unit_step_clear(q, sx, sy)) {
+            best = i;
+            best_cost = cost;
+        }
+    }
+    return best;
+}
+#endif
+
 static void GBA_HOT
 #if defined(SC64_T6_RUNTIME) && !defined(GBA_HOST)
 __attribute__((optimize("Os")))
@@ -2457,12 +2485,19 @@ move_toward(Unit * q, int tx, int ty)
     if (!unit_step_clear(q, nx, ny)) {
 	static const s8 dx[8] = {1,1,0,-1,-1,-1,0,1};
 	static const s8 dy[8] = {0,1,1,1,0,-1,-1,-1};
-	int i, best = -1, best_cost = 0x7fffffff;
+	int best = -1;
+#if !defined(SC64_Z7_RUNTIME) || !defined(SC64_COLLISION_STEER_LIST)
+	int i, best_cost = 0x7fffffff;
+#endif
 	int from_cell = q->x / 16 + (q->y / 16) * MAP_COLS;
 	/* Local steering avoids repeatedly retrying the same occupied waypoint.
 	 * Static terrain still uses BFS; candidates may leave an occupied tile
 	 * but may never enter a different blocked cell. */
 #ifdef SC64_COLLISION_STEER_LIST
+	#if defined(SC64_Z7_RUNTIME)
+	best = sc64_steer_best_direction(q, speed, from_cell,
+	                                  q->path_x, q->path_y);
+	#else
 	/* Build the neighbor list lazily, where the first query would run. */
 	int steer_list = -1;
 	for (i = 0; i < 8; i++) {
@@ -2474,6 +2509,7 @@ move_toward(Unit * q, int tx, int ty)
 	    if (steer_list ? sc64_steer_list_step_clear(q, sx, sy)
 	                   : unit_step_clear(q, sx, sy)) { best = i; best_cost = cost; }
 	}
+	#endif
 #else
 	for (i = 0; i < 8; i++) {
 	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;

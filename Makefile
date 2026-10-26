@@ -3266,6 +3266,21 @@ test-sc64-z7-prune-started: build/test-sc64-z7-full-render-prune-reference build
 	./build/test-sc64-z7-full-render-prune-reference
 	./build/test-sc64-z7-full-render-prune
 
+# Separate full-render Z7 collision qualification; canonical products stay off.
+Z7_STEERING_FLAGS = $(Z7_FULL_RENDER_FLAGS) -DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST
+$(eval $(call Z7_FULL_RENDER_FIXTURE,steering,sc64_z7_steer_game.c,-DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST))
+.PHONY: test-sc64-z7-steering zerg-z7-steering-probe
+test-sc64-z7-steering: build/test-sc64-z7-full-render-steering
+	./build/test-sc64-z7-full-render-steering
+build/starcraft-zerg-z7-steering-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_FULL_RENDER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_STEERING_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-steering-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba: build/starcraft-zerg-z7-steering-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 STEP36' SCZS
+zerg-z7-steering-probe: build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z7-steering
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
 build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build

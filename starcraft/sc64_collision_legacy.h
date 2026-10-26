@@ -264,12 +264,39 @@ typedef struct {
     s16 x, y;
     u8 radius, col, row, pad;
 } Sc64SteerCandidate;
+#if defined(SC64_Z7_RUNTIME)
+/* Z7 keeps the 48 candidates on the blocked mover's stack frame rather than
+ * adding 388 bytes to BSS, whose product reserve is intentionally tight. */
+typedef struct {
+    Sc64SteerCandidate entries[SC64_STEER_LIST_CAPACITY];
+    int count;
+} Sc64SteerList;
+_Static_assert(sizeof(Sc64SteerList) == 388,
+               "Z7 blocked-steering context must remain a 388-byte stack local");
+#define SC64_STEER_BUILD_ARGS Sc64SteerList *list, const Unit *q, int speed
+#define SC64_STEER_STEP_ARGS const Sc64SteerList *list, const Unit *q, int nx, int ny
+#define SC64_STEER_COUNT (list->count)
+#define SC64_STEER_ENTRY(i) (list->entries[i])
+#define SC64_STEER_STEP_COUNT(list_arg) ((list_arg)->count)
+#define SC64_STEER_STEP_ENTRY(list_arg, i) ((list_arg)->entries[i])
+#else
 static Sc64SteerCandidate sc64_steer_list[SC64_STEER_LIST_CAPACITY];
 static int sc64_steer_list_count;
+#define SC64_STEER_BUILD_ARGS const Unit *q, int speed
+#define SC64_STEER_STEP_ARGS const Unit *q, int nx, int ny
+#define SC64_STEER_COUNT (sc64_steer_list_count)
+#define SC64_STEER_ENTRY(i) (sc64_steer_list[i])
+#define SC64_STEER_STEP_COUNT(list_arg) (sc64_steer_list_count)
+#define SC64_STEER_STEP_ENTRY(list_arg, i) (sc64_steer_list[i])
+#endif
 
 /* Returns 0 when the caller must use unit_step_clear() unchanged. */
+#if defined(SC64_Z7_RUNTIME) && !defined(GBA_HOST)
+static int __attribute__((noinline))
+#else
 static int GBA_HOT
-sc64_steer_list_build(const Unit *q, int speed)
+#endif
+sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
 {
     int mover_radius, mover_flying, mover_collidable;
     const int reach = 9;
@@ -304,30 +331,30 @@ sc64_steer_list_build(const Unit *q, int speed)
                 int radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
                 if (count >= SC64_STEER_LIST_CAPACITY || radius < 0 || radius > 255)
                     return 0;
-                sc64_steer_list[count].x = (s16)u[i].x;
-                sc64_steer_list[count].y = (s16)u[i].y;
-                sc64_steer_list[count].radius = (u8)radius;
-                sc64_steer_list[count].col = (u8)col;
-                sc64_steer_list[count].row = (u8)row;
+                SC64_STEER_ENTRY(count).x = (s16)u[i].x;
+                SC64_STEER_ENTRY(count).y = (s16)u[i].y;
+                SC64_STEER_ENTRY(count).radius = (u8)radius;
+                SC64_STEER_ENTRY(count).col = (u8)col;
+                SC64_STEER_ENTRY(count).row = (u8)row;
                 ++count;
             }
         }
-    sc64_steer_list_count = count;
+    SC64_STEER_COUNT = count;
     return 1;
 }
 
 /* Same result as unit_step_clear(q, nx, ny) for the movable mover after a
  * successful build; move_toward() has already returned for immovable ones. */
 static int GBA_HOT
-sc64_steer_list_step_clear(const Unit *q, int nx, int ny)
+sc64_steer_list_step_clear(SC64_STEER_STEP_ARGS)
 {
     const int reach = 9;
     int minx, maxx, miny, maxy, k;
     if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) return 0;
     minx = (nx - reach) >> 4; maxx = (nx + reach) >> 4;
     miny = (ny - reach) >> 4; maxy = (ny + reach) >> 4;
-    for (k = 0; k < sc64_steer_list_count; ++k) {
-        const Sc64SteerCandidate *c = &sc64_steer_list[k];
+    for (k = 0; k < SC64_STEER_STEP_COUNT(list); ++k) {
+        const Sc64SteerCandidate *c = &SC64_STEER_STEP_ENTRY(list, k);
         int radius = c->radius, dx, dy;
         if (c->col < minx || c->col > maxx || c->row < miny || c->row > maxy)
             continue;
@@ -342,6 +369,13 @@ sc64_steer_list_step_clear(const Unit *q, int nx, int ny)
     }
     return 1;
 }
+#undef SC64_STEER_BUILD_ARGS
+#undef SC64_STEER_STEP_ARGS
+#undef SC64_STEER_COUNT
+#undef SC64_STEER_ENTRY
+#undef SC64_STEER_STEP_COUNT
+#undef SC64_STEER_STEP_ENTRY
+
 #endif
 
 static void
