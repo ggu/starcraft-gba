@@ -159,6 +159,24 @@ static int race_z6_save_is_ai_product(int raw)
     return raw == 65 || raw == 66 || raw == 70 || raw == 83;
 }
 
+/* Decoded unit and building identity fields fit their packed save widths,
+ * so each candidate slot is decoded once and later scans compare keys. */
+static u32 race_z6_save_unit_key(const Unit *q)
+{
+    return (u32)(q->raw_type + 1) | (u32)(q->raw_owner + 1) << 9 |
+           (u32)q->type << 18 | (u32)q->owner << 24 | (u32)q->alive << 27;
+}
+static u32 race_z6_save_building_key(const Building *q)
+{
+    return (u32)(q->raw_type + 1) | (u32)(q->raw_owner + 1) << 9 |
+           (u32)q->type << 18 | (u32)q->owner << 24 | (u32)q->alive << 27;
+}
+#define RACE_Z6_KEY_RAW(k) ((int)((k) & 511u) - 1)
+#define RACE_Z6_KEY_RAW_OWNER(k) ((int)(((k) >> 9) & 511u) - 1)
+#define RACE_Z6_KEY_TYPE(k) ((int)(((k) >> 18) & 63u))
+#define RACE_Z6_KEY_OWNER(k) ((int)(((k) >> 24) & 7u))
+#define RACE_Z6_KEY_ALIVE(k) ((int)(((k) >> 27) & 1u))
+
 static int race_z6_save_candidate_valid(const RaceSave *candidate,
                                          const Sc64Z6PersistentState *state,
                                          unsigned width, unsigned height)
@@ -168,6 +186,10 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
     u8 seen_buildings[(MAX_BUILDINGS + 7) / 8] = {0};
     u8 seen_minerals[(MAX_MINERALS + 7) / 8] = {0};
     u8 seen_geysers[(MAX_RACE_GEYSERS + 7) / 8] = {0};
+    u32 unit_keys[MAX_UNITS];
+    u32 building_keys[MAX_BUILDINGS], building_xy[MAX_BUILDINGS];
+    u32 mineral_keys[MAX_MINERALS];
+    u8 mineral_ready[(MAX_MINERALS + 7) / 8] = {0};
     unsigned unit_deaths[SC64_Z6_SOURCE_SLOT_COUNT] = {0};
     unsigned building_deaths[SC64_Z6_SOURCE_SLOT_COUNT] = {0};
     unsigned live = 0, queued = 0, human_drone_missing = 0, source_geysers = 0;
@@ -205,12 +227,19 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
                                    &decoded) ||
             !race_z6_hallucination_unit_state_valid(&decoded,
                 race_z6_save_expected_owner(map, 2))) return 0;
+        unit_keys[i] = race_z6_save_unit_key(&decoded);
 #ifdef SC64_Z6_CLOAK_ENABLED
         if (decoded.raw_type==51 && decoded.raw_owner==3 &&
             (decoded.carry<0 || decoded.carry>SC64_Z5_CLOAK_MAX_ENERGY_Q8 ||
              (!decoded.alive && (state->cloak.active || state->cloak.regen_remainder))))
             return 0;
 #endif
+    }
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+        Building decoded;
+        if (!race_save_decode_building(candidate, i, &decoded)) return 0;
+        building_keys[i] = race_z6_save_building_key(&decoded);
+        building_xy[i] = (u32)decoded.x | (u32)decoded.y << 11;
     }
     for (unsigned owner = 0; owner < 5; ++owner)
         if (candidate->ore[owner] < 0 || candidate->ore[owner] > 65535 ||
@@ -245,15 +274,14 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
             owner = race_z6_save_expected_owner(map, src->owner);
             if (owner < 0) return 0;
             for (unsigned i = 0; i < MAX_UNITS; ++i) {
-                Unit saved;
-                if (!race_save_decode_unit(candidate, i, width * 16u,
-                                           height * 16u, &saved)) return 0;
+                u32 key = unit_keys[i];
                 if (!(seen_units[i >> 3] & (1u << (i & 7u))) &&
-                    saved.raw_type == (int)raw && saved.raw_owner == src->owner &&
-                    saved.type == type && saved.owner == owner) {
+                    RACE_Z6_KEY_RAW(key) == (int)raw &&
+                    RACE_Z6_KEY_RAW_OWNER(key) == src->owner &&
+                    RACE_Z6_KEY_TYPE(key) == type && RACE_Z6_KEY_OWNER(key) == owner) {
                     seen_units[i >> 3] |= (u8)(1u << (i & 7u));
                     found = 1;
-                    if (!saved.alive) {
+                    if (!RACE_Z6_KEY_ALIVE(key)) {
                         ++unit_deaths[src->owner];
                         if (raw==41u && src->owner==3u) ++human_drone_missing;
                     }
@@ -271,18 +299,20 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
         owner = race_z6_save_expected_owner(map, src->owner);
         if (owner < 0) return 0;
         for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
-            Building saved;
-            if (!race_save_decode_building(candidate, i, &saved)) return 0;
+            u32 key = building_keys[i];
+            int saved_raw = RACE_Z6_KEY_RAW(key), saved_type = RACE_Z6_KEY_TYPE(key);
             if (!(seen_buildings[i >> 3] & (1u << (i & 7u))) &&
-                saved.raw_owner == src->owner && saved.owner == owner &&
-                ((saved.raw_type == (int)raw && saved.type == type) ||
+                RACE_Z6_KEY_RAW_OWNER(key) == src->owner &&
+                RACE_Z6_KEY_OWNER(key) == owner &&
+                ((saved_raw == (int)raw && saved_type == type) ||
                  (raw == 131u && src->owner == 3u && owner == SIDE &&
-                  (saved.raw_type == 132 || saved.raw_type == 133) &&
-                  saved.type == race_z6_save_building_type((unsigned)saved.raw_type))) &&
-                saved.x == src->x_px && saved.y == src->y_px) {
+                  (saved_raw == 132 || saved_raw == 133) &&
+                  saved_type == race_z6_save_building_type((unsigned)saved_raw))) &&
+                (int)(building_xy[i] & 2047u) == src->x_px &&
+                (int)(building_xy[i] >> 11) == src->y_px) {
                 seen_buildings[i >> 3] |= (u8)(1u << (i & 7u));
                 found = 1;
-                if (!saved.alive) ++building_deaths[src->owner];
+                if (!RACE_Z6_KEY_ALIVE(key)) ++building_deaths[src->owner];
                 break;
             }
         }
@@ -303,12 +333,19 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
         if (raw >= 176u && raw <= 178u) {
             int found = 0;
             for (unsigned i = 0; i < MAX_MINERALS; ++i) {
-                Mineral saved;
-                if (!race_save_decode_mineral(candidate, i, width * 16u,
-                                              height * 16u, &saved)) return 0;
+                /* Decoded on first visit, in the order a rescan would. */
+                if (!(mineral_ready[i >> 3] & (1u << (i & 7u)))) {
+                    Mineral saved;
+                    if (!race_save_decode_mineral(candidate, i, width * 16u,
+                                                  height * 16u, &saved)) return 0;
+                    mineral_keys[i] = (u32)saved.x | (u32)saved.y << 11 |
+                        (u32)(saved.style >= 176 && saved.style <= 178 ?
+                              saved.style - 175 : 0) << 22;
+                    mineral_ready[i >> 3] |= (u8)(1u << (i & 7u));
+                }
                 if (!(seen_minerals[i >> 3] & (1u << (i & 7u))) &&
-                    saved.style == (int)raw && saved.x == src->x_px &&
-                    saved.y == src->y_px) {
+                    mineral_keys[i] == ((u32)src->x_px | (u32)src->y_px << 11 |
+                                        (raw - 175u) << 22)) {
                     seen_minerals[i >> 3] |= (u8)(1u << (i & 7u));
                     found = 1; break;
                 }
@@ -342,9 +379,11 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
     if (!ai_dispatched && (state->ai_plan_ticks || state->ai_plan_phase)) return 0;
 
     for (unsigned i = 0; i < MAX_UNITS; ++i) {
-        Unit saved;
-        if (!race_save_decode_unit(candidate, i, width * 16u, height * 16u, &saved))
-            return 0;
+        u32 key = unit_keys[i];
+        struct { int alive, owner, type, raw_type, raw_owner; } saved = {
+            RACE_Z6_KEY_ALIVE(key), RACE_Z6_KEY_OWNER(key), RACE_Z6_KEY_TYPE(key),
+            RACE_Z6_KEY_RAW(key), RACE_Z6_KEY_RAW_OWNER(key)
+        };
         if (!saved.alive) continue;
         if (saved.owner < SIDE || saved.owner > 4 || RACE_SAVE_INV_U(candidate, i) > 1)
             return 0;
@@ -361,13 +400,10 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
                 for (unsigned row = 0; row < map->unit_count; ++row)
                     if (map->units[row].source_type == (unsigned)raw &&
                         map->units[row].owner == source) ++start_count;
-                for (unsigned j = 0; j < MAX_UNITS; ++j) {
-                    Unit other;
-                    if (!race_save_decode_unit(candidate, j, width * 16u,
-                                               height * 16u, &other)) return 0;
-                    if (other.alive && other.raw_type == raw &&
-                        other.raw_owner == (int)source) ++saved_count;
-                }
+                for (unsigned j = 0; j < MAX_UNITS; ++j)
+                    if (RACE_Z6_KEY_ALIVE(unit_keys[j]) &&
+                        RACE_Z6_KEY_RAW(unit_keys[j]) == raw &&
+                        RACE_Z6_KEY_RAW_OWNER(unit_keys[j]) == (int)source) ++saved_count;
                 unsigned scripted = race_z6_save_dispatched_creates(state, source,
                                                                      (unsigned)raw);
                 unsigned ai_limit = source == SC64_Z6_AI_OWNER_SLOT &&
@@ -407,6 +443,11 @@ static int race_z6_save_candidate_valid(const RaceSave *candidate,
     if (live + queued + race_z6_save_remaining_creates(state) > MAX_UNITS) return 0;
     return 1;
 }
+#undef RACE_Z6_KEY_RAW
+#undef RACE_Z6_KEY_RAW_OWNER
+#undef RACE_Z6_KEY_TYPE
+#undef RACE_Z6_KEY_OWNER
+#undef RACE_Z6_KEY_ALIVE
 
 #endif /* SC64_Z6_RUNTIME */
 #endif /* SC64_Z6_SAVE_H */

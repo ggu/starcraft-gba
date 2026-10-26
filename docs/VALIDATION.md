@@ -22,8 +22,10 @@ The [minimap follow-up](audits/2026-10-26-minimap-terrain/README.md) reduces
 P4's measured full cost by another 1.60%, to about 17.0 fps equivalent, with
 pixel-identical terrain drawing and unchanged worst-frame stalls.
 
-Canonical profiles expose Terran 1–10, Zerg 1–4 and Protoss 1–5: 19/30
-entries. Canonical Zerg uses `SCZ4` and `.local/play/zerg-z4`; canonical
+Canonical profiles expose Terran 1–10, Zerg 1–6 and Protoss 1–5: 21/30
+entries (see the [Z6 promotion audit](audits/2026-10-26-z6-promotion/README.md)).
+Canonical Zerg uses `SCZ6`, generation 32 and `.local/play/zerg-z6`; explicit
+`zerg-z4` keeps `SCZ4`, generation 20 and `.local/play/zerg-z4`; canonical
 Protoss uses the P5 Shuttle files, `SCPB`, generation 26 and
 `.local/play/protoss-p5-shuttle`. Explicit `protoss-p4-storm` retains the real
 P4 files, `SCP5`, generation 21 and its own save path. Explicit `zerg-z3` and
@@ -34,8 +36,8 @@ files, never to the newer canonical ROM.
 All ten Terran missions pass the actual canonical-flag host controller
 target. T7/T10 have current paired ARM wins from explicit mission probe entry;
 other Terran ARM wins remain evidence for their earlier frozen builds. All
-four Zerg chapters have current host wins; the older Z4 ARM timing applies
-to its frozen build. P1–P5 have fresh host and input-only ARM wins in the
+six Zerg chapters have current host and input-only ARM wins in the canonical
+Z6 build, with Z5/Z6 fresh-process SRAM continuity. P1–P5 have fresh host and input-only ARM wins in the
 canonical P5 pools, retaining Fenix in P1/P2 and both heroes in P4. P5 has an
 exact fresh-process cargo SRAM restore and continued win. Earlier P4 save
 qualification remains scoped to its preserved P4 build. See the

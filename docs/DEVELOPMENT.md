@@ -1149,7 +1149,7 @@ qualification. Source staging alone does not establish a playable mission.
 
 ### Canonical Zerg and Protoss builds
 
-The standard Zerg build includes its first four missions; the standard
+The standard Zerg build includes its first six missions; the standard
 Protoss build includes its first five. Prepare each profile from your verified ROM, then use the standard
 commands; no extra staged-profile selection is needed:
 
@@ -1161,24 +1161,28 @@ commands; no extra staged-profile selection is needed:
 ```
 
 Replace `zerg` with `protoss` for the Protoss campaign. The canonical output
-pairs are `build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf`
-and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba` / `build/starcraft-protoss-p5-shuttle.elf`. The
-`zerg-z4` target also builds the canonical Zerg pair. Explicit `zerg-z3`
+pairs are `build/StarCraft-Zerg-Z6-GBA.gba` / `build/starcraft-zerg-z6.elf`
+and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba` / `build/starcraft-protoss-p5-shuttle.elf`.
+Explicit `zerg-z4` (`--profile zerg-z4`) preserves the earlier four-entry
+`build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf` pair, its
+`SCZ4` generation-20 saves and `make test-zerg-z4`. Explicit `zerg-z3`
 preserves `build/StarCraft-Zerg-GBA.gba` / `build/starcraft-zerg.elf` and its
 save identity; versioned `-Z3` names are aliases. `protoss-p3` preserves the
 legacy P3 real files, code and save path. Retain matching
 frozen ROM/ELF pairs for replay.
 
-The canonical Zerg test target runs the fourth-mission runtime and controller
-suite, normal-menu startup/save fixtures for all four campaign entries, and
-all 234 combinations
+The canonical Zerg test target runs ordinary-input controllers for all six
+chapters under the canonical flags, normal-menu startup/save fixtures for all
+six campaign entries, and all 234 combinations
 of map, human race and independently selected AI races. The setup/save matrix
 does not prove a completed match for every combination. Build guards still
 enforce the same IWRAM and EWRAM reserves.
 
-Canonical Zerg uses `SCZ4`, save generation 20, the Z4 runtime and the same
-qualified canonical drawing flags. Its save directory is separate from the
-legacy Z3 profile. Canonical Protoss uses `SCPB`, generation 26 and
+Canonical Zerg uses `SCZ6`, save generation 32, the Z6 storage/runtime and
+query flags, a word-packed six-chapter sprite bank under
+`.local/sc64/zerg-z6/generated`, and the canonical drawing flags. Preparing
+`zerg` also generates the Z5/Z6 inputs and that bank. Its save directory,
+`.local/play/zerg-z6`, is separate from the legacy Z4 and Z3 profiles. Canonical Protoss uses `SCPB`, generation 26 and
 `.local/play/protoss-p5-shuttle`; it includes the P5 Shuttle transport runtime.
 Explicit `protoss-p4-storm` retains `SCP5`, generation 21 and its P4 save path;
 `protoss-p3` retains `SCP3`, generation 7. Older standard two-mission generation-2
@@ -1201,8 +1205,8 @@ first-five-chapter ARM, cargo/save, timing and memory evidence.
 
 ### Staged Zerg and Protoss chapter 4
 
-Zerg 4 is enabled in the canonical profile. The `zerg-z4` spelling builds the
-same versioned ROM. Canonical Protoss includes **The Hunt for Tassadar** and
+Zerg 4 is enabled in the canonical profile, which now continues through Zerg 6.
+The explicit `zerg-z4` profile builds the earlier four-entry Z4 ROM. Canonical Protoss includes **The Hunt for Tassadar** and
 P5 through the Shuttle profile. Explicit `protoss-p4-storm` keeps the
 four-entry Storm profile and its own real files/save format. The plain `protoss-p4`
 build remains a separate internal experiment. Preparing later map data does
