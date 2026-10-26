@@ -1,5 +1,15 @@
 .DEFAULT_GOAL := all
 
+.PHONY: test-gba-mapped-sprite
+build/test-gba-mapped-sprite: tests/gba_mapped_sprite.c common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -Icommon tests/gba_mapped_sprite.c common/gba.c -o $@
+build/test-gba-mapped-sprite-full-screen: tests/gba_mapped_sprite.c common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon tests/gba_mapped_sprite.c common/gba.c -o $@
+test-gba-mapped-sprite: build/test-gba-mapped-sprite build/test-gba-mapped-sprite-full-screen
+	./build/test-gba-mapped-sprite
+	./build/test-gba-mapped-sprite-full-screen
+test: test-gba-mapped-sprite
+
 .PHONY: test-sc64-stock-motion test-sc64-stock-motion-runtime
 build/test-sc64-stock-motion: tests/sc64_stock_motion.c starcraft/sc64_stock_motion.h starcraft/sc64_stock_profiles.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
