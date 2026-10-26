@@ -141,13 +141,16 @@ sc64_death_vfx_gibs(int x, int y, int extent, int t, int fluid, int chunk)
     }
 }
 
-/* Flat two-row puddle in one fill call. Many remains can be on screen, and
- * per-call overhead, not pixels, is what each one costs. */
+/* Rounded three-row puddle in two fill calls: a wide middle row over a
+ * narrower three-row core. A flat two-row strip read as an orphaned health
+ * bar (same height and dark red as an empty bar). Many remains can be on
+ * screen, and per-call overhead, not pixels, is what each one costs. */
 static void
-sc64_death_vfx_puddle(int x, int y, int w, int color)
+sc64_death_vfx_puddle(int x, int y, int w, int edge, int core)
 {
     if (w < 1) w = 1;
-    sc64_death_vfx_band(x - w, x + w, y, 2, color);
+    sc64_death_vfx_band(x - w, x + w, y, 1, edge);
+    sc64_death_vfx_band(x - w * 2 / 3, x + w * 2 / 3, y - 1, 3, core);
 }
 
 /* Source remnants decay through three frames; authored remains shrink in
@@ -165,14 +168,15 @@ sc64_death_vfx_rubble(int style, int x, int y, int extent, int stage,
                       uint32_t seed)
 {
     static const u8 terran[4] = { C_STONE, C_DIM, C_SHADOW, C_BROWN };
-    static const u8 zerg[4] = { C_RED_DARK, C_BROWN, C_BLOOD, C_SHADOW };
+    static const u8 zerg[4] = { C_PURPLE, C_BROWN, C_BLOOD, C_SHADOW };
     static const u8 protoss[4] = { C_STONE, C_BLUE_DARK, C_SHADOW, C_SILVER };
     const u8 *pal = style == SC64_DEATH_VFX_BUILDING_ZERG ? zerg :
                     style == SC64_DEATH_VFX_BUILDING_PROTOSS ? protoss : terran;
     int rx = extent, ry = extent * 2 / 3;
     int pieces = stage == 0 ? 10 : stage == 1 ? 7 : 4;
     sc64_death_vfx_puddle(x, y + 2, rx * (4 - stage) / 5,
-                          style == SC64_DEATH_VFX_BUILDING_ZERG ? C_RED_DARK : C_SHADOW);
+                          style == SC64_DEATH_VFX_BUILDING_ZERG ? C_BROWN : C_SHADOW,
+                          style == SC64_DEATH_VFX_BUILDING_ZERG ? C_BLOOD : C_SHADOW);
     for (int i = 0; i < pieces; ++i) {
         uint32_t h = sc64_death_vfx_hash(seed + (uint32_t)i * 0x9e3779b9u);
         int px = x + (int)(h % (unsigned)(2 * rx + 1)) - rx;
@@ -199,12 +203,15 @@ sc64_death_vfx_draw_remnant(const Sc64DeathVfx *e, int x, int y, uint32_t age_su
     switch (e->style) {
     case SC64_DEATH_VFX_INFANTRY:
         sc64_death_vfx_puddle(x, y, extent * (3 - stage) / 4 + 1,
-                              stage == 0 ? C_BLOOD : C_RED_DARK);
+                              stage == 2 ? C_BROWN : C_BLOOD,
+                              stage == 2 ? C_BROWN : C_BLOOD);
         break;
     case SC64_DEATH_VFX_ZERG_SMALL:
     case SC64_DEATH_VFX_ZERG_LARGE:
-        sc64_death_vfx_puddle(x, y, extent * (3 - stage) / 3 + 1, C_RED_DARK);
-        if (stage < 2) sc64_death_vfx_band(x - extent / 3, x - extent / 3 + 1, y, 2, C_PURPLE);
+        /* Purple ichor at the core while fresh, drying to brown. */
+        sc64_death_vfx_puddle(x, y, extent * (3 - stage) / 3 + 1,
+                              stage == 2 ? C_BROWN : C_BLOOD,
+                              stage == 2 ? C_BROWN : C_PURPLE);
         break;
     case SC64_DEATH_VFX_BUILDING_TERRAN:
     case SC64_DEATH_VFX_BUILDING_ZERG:

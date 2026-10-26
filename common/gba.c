@@ -610,6 +610,46 @@ HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
   if(col<right&&s[col])*d=(*d&0xff00)|s[col];
  }
 }
+/* Keep this optional compositor in ROM: prepared profiles have little spare
+ * IWRAM. Mode-4 VRAM requires halfword stores, including odd clipped edges. */
+void gfx_blit_sprite_mapped(int x,int y,int width,int height,const u8 *src,
+                            const u8 *lookup,unsigned rows) {
+ if(!src||!lookup||!rows||rows>255||width<=0||height<=0||width>256||height>256||
+    x>=240||x<=-width)return;
+#ifdef GBA_SCENE_CLIP
+ int clip_top=gfx_clip_top,clip_bottom=gfx_clip_bottom;
+#else
+ int clip_top=0,clip_bottom=160;
+#endif
+ if(y>=clip_bottom||y<=clip_top-height)return;
+ int top=y<clip_top?clip_top-y:0;
+ int bottom=y>clip_bottom-height?clip_bottom-y:height;
+ int left=x<0?-x:0,right=x>240-width?240-x:width;
+ for(int row=top;row<bottom;++row) {
+  const u8 *s=src+row*width;
+  int col=left;
+  volatile u16 *d=pixels+(y+row)*120+((x+col)>>1);
+  if((x+col)&1) {
+   unsigned a=s[col];
+   if(a&&a<=rows) {u16 old=*d;*d=(old&255)|((u16)lookup[(a-1)*256+(old>>8)]<<8);}
+   ++col;++d;
+  }
+  for(;col+1<right;col+=2,++d) {
+   unsigned a=s[col],b=s[col+1];
+   if((a&&a<=rows)||(b&&b<=rows)) {
+    u16 old=*d;
+    u8 lo=(u8)old,hi=(u8)(old>>8);
+    if(a&&a<=rows)lo=lookup[(a-1)*256+lo];
+    if(b&&b<=rows)hi=lookup[(b-1)*256+hi];
+    *d=(u16)(lo|((u16)hi<<8));
+   }
+  }
+  if(col<right) {
+   unsigned a=s[col];
+   if(a&&a<=rows) {u16 old=*d;*d=(old&0xff00)|lookup[(a-1)*256+(old&255)];}
+  }
+ }
+}
 #ifdef SC64_UNIT_WORD_SPRITES
 /* Phase-aligned four-pixel raster used only for generated unit frames.
  * The sidecar's transparent lanes are already zero-padded at frame edges. */
@@ -674,6 +714,34 @@ HOT void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *src) {
     else {if(dx>=0&&dx<240)gfx_pixel(dx,dy+yy,c);if(dx+1>=0&&dx+1<240)gfx_pixel(dx+1,dy+yy,c);}
    }
   }
+ }
+}
+#endif
+#ifdef SC64_UNIT_FACING
+/* gfx_blit_sprite with each source row mirrored horizontally. */
+void gfx_blit_sprite_hflip(int x,int y,int width,int height,const u8 *src) {
+ if(!src||width<=0||height<=0||width>256||height>256||x>=240||x+width<=0)return;
+#ifdef GBA_SCENE_CLIP
+ if(y>=gfx_clip_bottom||y+height<=gfx_clip_top)return;
+ int top=y<gfx_clip_top?gfx_clip_top-y:0;
+ int bottom=y+height>gfx_clip_bottom?gfx_clip_bottom-y:height;
+#else
+ if(y>=160||y+height<=0)return;
+ int top=y<0?-y:0,bottom=y+height>160?160-y:height;
+#endif
+ int left=x<0?-x:0,right=x+width>240?240-x:width;
+ for(int row=top;row<bottom;row++) {
+  const u8*s=src+row*width+width-1;
+  int col=left;
+  volatile u16*d=pixels+(y+row)*120+((x+col)>>1);
+  if((x+col)&1){u8 a=s[-col];if(a)*d=(*d&255)|((u16)a<<8);d++;col++;}
+  for(;col+1<right;col+=2,d++){
+   u8 a=s[-col],b=s[-(col+1)];
+   if(a&&b)*d=a|((u16)b<<8);
+   else if(a)*d=(*d&0xff00)|a;
+   else if(b)*d=(*d&255)|((u16)b<<8);
+  }
+  if(col<right){u8 a=s[-col];if(a)*d=(*d&0xff00)|a;}
  }
 }
 #endif

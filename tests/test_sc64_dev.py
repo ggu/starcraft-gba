@@ -23,6 +23,48 @@ UNIT_WORD_SPRITE_HEADER = (
     '    return (const GbaSpriteWordFrame *)0;\n'
     '}\n'
 )
+FACING_SPRITE_HEADER = (
+    '#define SC64_UNIT_FACING_BANK_VERSION 2\n'
+    '#define SC64_UNIT_FACING_DIRECTIONAL_METADATA 1\n'
+    '#define SC64_UNIT_FACING_WORD_METADATA 1\n'
+    'static const unsigned char sc64_unit_facing_0_0_pixels[1] = {1};\n'
+    'static const Sc64SpriteFrame sc64_unit_facing_0[17] = {{0}};\n'
+    'static const u32 sc64_unit_facing_0_word_0_p0[1] = {1};\n'
+    'static const GbaSpriteWordFrame sc64_unit_facing_0_word_0 = {0};\n'
+    'static inline const Sc64SpriteFrame *sc64_unit_facing_frames(unsigned short raw_type) { return 0; }\n'
+    'static inline const Sc64UnitFacingWordFrame *sc64_unit_facing_word_frame(unsigned short raw_type, unsigned char direction) { return 0; }\n'
+)
+TANK_VFX_HEADER = (
+    '#define SC64_TANK_SOURCE_VFX_VERSION 1\n'
+    'static const Sc64TankSourceFrame sc64_tank_frames_533[14] = {{0}};\n'
+    'static const uint8_t sc64_tank_source_pixels[1] = {1};\n'
+    'static const uint8_t sc64_tank_projected_lut[63*256] = {0};\n'
+)
+CONSTRUCTION_COLOR_HEADER = (
+    '#define SC64_CONSTRUCTION_COLOR_MODIFIERS_VERSION 1\n'
+    'static const unsigned char sc64_warp_211_strengths_0[1] = {32};\n'
+    'static const unsigned char sc64_construction_blue_lookup[40*256] = {0};\n'
+    'sc64_construction_modifier_frame(int image_id, int frame);\n'
+    'sc64_construction_modifier_lookup(int image_id, int *rows);\n'
+)
+
+
+def emit_construction_header(root):
+    path = root / dev.CONSTRUCTION_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(CONSTRUCTION_COLOR_HEADER, encoding='ascii')
+
+
+def emit_facing_header(root):
+    emit_construction_header(root)
+    path = root / dev.FACING_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(FACING_SPRITE_HEADER, encoding='ascii')
+    path = root / dev.TANK_VFX_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(TANK_VFX_HEADER, encoding='ascii')
+
+
 P4_SCENARIO_HEADER = (
     '#define SC64_P4_SCENARIO_GENERATED_H 1\n'
     '#define SC64_P4_CREATE_PREFIX_VERSION 1\n'
@@ -40,6 +82,82 @@ verify_loader.exec_module(verify_roms)
 
 
 class OnboardingTests(unittest.TestCase):
+    def test_construction_readiness_requires_glow_version_and_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'construction.h'
+            self.assertFalse(dev.construction_color_input_ready(header))
+            for text in (
+                '#define SC64_CONSTRUCTION_SPRITES_GENERATED_H\n',
+                CONSTRUCTION_COLOR_HEADER.replace('MODIFIERS_VERSION 1', 'MODIFIERS_VERSION 10'),
+                CONSTRUCTION_COLOR_HEADER.replace('sc64_construction_modifier_frame(', 'old_frame('),
+                CONSTRUCTION_COLOR_HEADER.replace('211_strengths_0[1]', '211_strengths_0[0]'),
+                CONSTRUCTION_COLOR_HEADER.replace('blue_lookup[40*256]', 'blue_lookup[0]'),
+            ):
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.construction_color_input_ready(header))
+            header.write_text(CONSTRUCTION_COLOR_HEADER, encoding='ascii')
+            self.assertTrue(dev.construction_color_input_ready(header))
+
+    def test_tank_effect_readiness_rejects_empty_or_stale_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'tank.h'
+            self.assertFalse(dev.tank_vfx_input_ready(header))
+            for text in (
+                TANK_VFX_HEADER.replace('VFX_VERSION 1', 'VFX_VERSION 10'),
+                TANK_VFX_HEADER.replace('sc64_tank_frames_533[14]', 'sc64_tank_frames_533[1]'),
+                TANK_VFX_HEADER.replace('sc64_tank_source_pixels[1]', 'sc64_tank_source_pixels[0]'),
+                TANK_VFX_HEADER.replace('sc64_tank_projected_lut[63*256]', 'missing_lut[63*256]'),
+            ):
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.tank_vfx_input_ready(header))
+            header.write_text(TANK_VFX_HEADER, encoding='ascii')
+            self.assertTrue(dev.tank_vfx_input_ready(header))
+
+    def test_directional_readiness_rejects_legacy_markers_and_empty_bank(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'facing.h'
+            invalid = (
+                '#define SC64_UNIT_FACING_PIXEL_BYTES 1\n',
+                FACING_SPRITE_HEADER.replace('BANK_VERSION 2', 'BANK_VERSION 20'),
+                FACING_SPRITE_HEADER.replace('DIRECTIONAL_METADATA 1', 'DIRECTIONAL_METADATA 0'),
+                FACING_SPRITE_HEADER.replace('WORD_METADATA 1', 'WORD_METADATA 0'),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_word_frame(', 'missing_accessor('),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_0_word_0 =', 'missing_frame ='),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_0_word_0_p0[1]', 'sc64_unit_facing_0_word_0_p0[0]'),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_0[17]', 'sc64_unit_facing_0[1]'),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_0_0_pixels[1]', 'sc64_unit_facing_0_0_pixels[0]'),
+            )
+            self.assertFalse(dev.facing_sprite_input_ready(header))
+            for text in invalid:
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.facing_sprite_input_ready(header))
+            header.write_text(FACING_SPRITE_HEADER, encoding='ascii')
+            self.assertTrue(dev.facing_sprite_input_ready(header))
+
+    def test_terran_build_requires_directional_bank_before_make(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            header = root / '.local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h'
+            header.parent.mkdir(parents=True)
+            header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'run') as run:
+                with self.assertRaisesRegex(RuntimeError, 'directional sprite bank'):
+                    dev.build('terran')
+                run.assert_not_called()
+                emit_facing_header(root)
+                dev.build('terran')
+                run.assert_called_once_with(['make', 'terran'])
+                run.reset_mock()
+                (root / dev.TANK_VFX_HEADER).unlink()
+                with self.assertRaisesRegex(RuntimeError, 'source Tank effects'):
+                    dev.build('terran')
+                run.assert_not_called()
+                emit_facing_header(root)
+                (root / dev.CONSTRUCTION_HEADER).unlink()
+                with self.assertRaisesRegex(RuntimeError, 'blue-glow modifier bank'):
+                    dev.build('terran')
+                run.assert_not_called()
+
     def test_z3_and_p3_profile_gates_are_required_and_distinct(self):
         with tempfile.TemporaryDirectory() as directory:
             header = Path(directory) / 'sc64_races_generated.h'
@@ -62,9 +180,11 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(verify_roms.TARGETS['--zerg-z3'],
                          ('StarCraft-Zerg-GBA', 'starcraft-zerg', 'SCZ3', 'SC ZERG Z3'))
         self.assertEqual(verify_roms.TARGETS['--protoss'],
+                         ('StarCraft-Protoss-P5-Shuttle-GBA', 'starcraft-protoss-p5-shuttle',
+                          'SCPB', 'SC P5 CARGO'))
+        self.assertEqual(verify_roms.TARGETS['--protoss-p4-storm'],
                          ('StarCraft-Protoss-P4-Storm-GBA', 'starcraft-protoss-p4-storm',
                           'SCP5', 'SC P4 STORM'))
-        self.assertEqual(verify_roms.TARGETS['--protoss-p4-storm'], verify_roms.TARGETS['--protoss'])
         self.assertEqual(verify_roms.TARGETS['--protoss-p3'],
                          ('StarCraft-Protoss-GBA', 'starcraft-protoss', 'SCP3', 'SC PROTOSS3'))
 
@@ -76,22 +196,36 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(dev.GAMES['zerg-z3'], ('zerg-z3', 'build/StarCraft-Zerg-GBA.gba'))
         self.assertEqual(dev.PLAY_SAVE_PROFILES,
                          {'zerg': 'zerg-z4', 'zerg-z3': 'zerg',
-                          'protoss': 'protoss-p4-storm', 'protoss-p3': 'protoss'})
+                          'protoss': 'protoss-p5-shuttle', 'protoss-p3': 'protoss',
+                          'protoss-p4-storm': 'protoss-p4-storm',
+                          'protoss-p5-shuttle': 'protoss-p5-shuttle'})
         self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['zerg'],
                          ('StarCraft-Zerg-Z4-GBA.gba', 'starcraft-zerg-z4.elf'))
         self.assertEqual(sc64_split_profile.PROFILE_BUILD_PATHS['zerg'],
                          ('StarCraft-Zerg-Z4-GBA.gba', 'starcraft-zerg-z4.elf'))
         for routes in (sc64_split_profile.PROFILE_BUILD_PATHS, sc64_split_smoke.PROFILE_BUILD_PATHS):
             self.assertEqual(routes['protoss'],
-                             ('StarCraft-Protoss-P4-Storm-GBA.gba', 'starcraft-protoss-p4-storm.elf'))
+                             ('StarCraft-Protoss-P5-Shuttle-GBA.gba', 'starcraft-protoss-p5-shuttle.elf'))
 
     def test_p4_storm_and_legacy_p3_have_explicit_build_and_save_routes(self):
         self.assertEqual(dev.GAMES['protoss-p3'],
                          ('protoss-p3', 'build/StarCraft-Protoss-GBA.gba'))
         self.assertEqual(dev.GAMES['protoss-p4-storm'],
                          ('protoss-p4-storm', 'build/StarCraft-Protoss-P4-Storm-GBA.gba'))
-        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p4-storm'], 'test-protoss')
-        self.assertEqual(dev.GAMES['protoss'][1], dev.GAMES['protoss-p4-storm'][1])
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p4-storm'], 'test-protoss-p4-storm')
+        makefile = (ROOT / 'Makefile').read_text(encoding='utf-8')
+        p4_test = next(line for line in makefile.splitlines()
+                       if line.startswith('test-protoss-p4-storm:'))
+        self.assertIn('test-sc64-p4-runtime', p4_test)
+        self.assertIn('test-sc64-p4-campaign', p4_test)
+        self.assertIn('test-sc64-p4-occupancy-targets', p4_test)
+        p5_rule = next(line for line in makefile.splitlines()
+                       if line.startswith('build/test-sc64-protoss-carried-campaign:'))
+        self.assertIn('$(P5_INPUTS)', p5_rule)
+        self.assertNotEqual(dev.GAMES['protoss'][1], dev.GAMES['protoss-p4-storm'][1])
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss'], 'protoss-p5-shuttle')
+        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p4-storm'], ('protoss-p4-storm', 'build/StarCraft-Protoss-P4-Storm-GBA.gba'))
         self.assertEqual(dev.PLAY_SAVE_PROFILES.get('protoss-p4-storm', 'protoss-p4-storm'),
                          'protoss-p4-storm')
         self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss-p3'], 'protoss')
@@ -126,6 +260,8 @@ class OnboardingTests(unittest.TestCase):
                               else local / 'races/generated/sc64_race_sprites_generated.h')
                     self.assertIn('--prepack-unit-words', command)
                     emit(output, UNIT_WORD_SPRITE_HEADER)
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
                 elif script == 'sc64_p4_pack.py':
                     emit(local / 'p4/manifest.json',
                          '{"schema":1,"mission":{"id":"P4","global_catalog_index":23,'
@@ -136,7 +272,7 @@ class OnboardingTests(unittest.TestCase):
 
             with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
                     patch.object(dev, 'run', side_effect=fake_run):
-                dev.prepare(rom, 'protoss')
+                dev.prepare(rom, 'protoss-p4-storm')
             self.assertTrue(all(dev.protoss_p4_input_ready(label, root / relative)
                                 for label, relative, _ in dev.PROTOSS_P4_INPUTS))
             self.assertIn('sc64_skirmish_pack.py', [Path(call[1]).name for call in calls])
@@ -179,6 +315,7 @@ class OnboardingTests(unittest.TestCase):
     def test_canonical_zerg_readiness_requires_z4_stage_inputs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            emit_facing_header(root)
             markers = {
                 '.local/sc64/rom/StarCraft64-USA.z64': 'source ROM fixture',
                 '.local/sc64/backwater/generated/sc64_mission_generated.h': 'input',
@@ -188,7 +325,7 @@ class OnboardingTests(unittest.TestCase):
                     '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\nsc64_race_z3_units\n#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */',
                 '.local/sc64/races/generated/sc64_race_sprites_generated.h': 'input',
                 '.local/sc64/races/generated/sc64_menu_generated.h': 'input',
-                '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': 'input',
+                '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': CONSTRUCTION_COLOR_HEADER,
                 '.local/sc64/skirmish/generated/sc64_skirmish_generated.h': 'input',
                 '.local/sc64/zp-stage/generated/sc64_races_generated.h':
                     '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\nsc64_race_z3_units\n#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n'
@@ -250,9 +387,25 @@ class OnboardingTests(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, 'prepacked unit-word sprite metadata'):
                         dev.build('terran')
             header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+            emit_facing_header(root)
             with patch.object(dev, 'ROOT', root), patch.object(dev, 'run') as run:
                 dev.build('terran')
             run.assert_called_once_with(['make', 'terran'])
+
+    def test_canonical_p5_requires_source_gate_and_prepacked_sprite_payload(self):
+        label = 'Protoss chapter 5 sprites'
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'p5_sprites.h'
+            header.write_text('#define SC64_Z6_SPRITE_SET_COMPLETE 1\n', encoding='ascii')
+            self.assertFalse(dev.staged_campaign_input_ready('protoss-p5-shuttle', label, header))
+            stale = UNIT_WORD_SPRITE_HEADER.replace(
+                '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 1',
+                '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 0')
+            header.write_text('#define SC64_Z6_SPRITE_SET_COMPLETE 1\n' + stale, encoding='ascii')
+            self.assertFalse(dev.staged_campaign_input_ready('protoss-p5-shuttle', label, header))
+            header.write_text('#define SC64_Z6_SPRITE_SET_COMPLETE 1\n' + UNIT_WORD_SPRITE_HEADER,
+                              encoding='ascii')
+            self.assertTrue(dev.staged_campaign_input_ready('protoss-p5-shuttle', label, header))
 
     def test_staged_z6_and_p5_profiles_have_explicit_build_and_test_routes(self):
         self.assertEqual(dev.GAMES['zerg-z6'],
@@ -264,6 +417,13 @@ class OnboardingTests(unittest.TestCase):
             'test-sc64-z6-frame-coverage', 'test-sc64-z6-controller'))
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p5-shuttle'],
                          ('test-sc64-p5-shuttle-runtime', 'test-sc64-p5-campaign-run'))
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
+        makefile = (ROOT / 'Makefile').read_text(encoding='utf-8')
+        self.assertIn('PROTOSS_P5_CANONICAL_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P5_SHUTTLE_FLAGS)', makefile)
+        self.assertIn('test-protoss: ', makefile)
+        canonical_test = next(line for line in makefile.splitlines() if line.startswith('test-protoss:'))
+        self.assertIn('test-sc64-p5-canonical', canonical_test)
+        self.assertIn('build/test-sc64-p5-canonical-campaign-run', makefile)
 
     def test_staged_campaign_preparation_uses_existing_private_packers(self):
         for profile, expected in (
@@ -294,6 +454,9 @@ class OnboardingTests(unittest.TestCase):
                 else:
                     observed.add(f'{name}:{mission}' if mission else name)
             self.assertEqual(observed, expected)
+            p5_sprite_commands = [command for command in calls if Path(command[1]).name == 'sc64_race_sprites.py' and '--include-z6-actors' in command]
+            if profile == 'protoss-p5-shuttle':
+                self.assertTrue(all('--prepack-unit-words' in command for command in p5_sprite_commands))
             self.assertTrue(all('/private/StarCraft64-USA.z64' not in command
                                 for command in calls if Path(command[1]).name not in
                                 ('sc64_z4_pack.py', 'sc64_p4_pack.py', 'sc64_race_sprites.py')))
@@ -364,8 +527,10 @@ class OnboardingTests(unittest.TestCase):
                     if output is not None:
                         output.parent.mkdir(parents=True, exist_ok=True)
                         marker_set = markers_by_path.get(str(output.relative_to(root)), set())
-                        output.write_text('\n'.join(f'#define {marker} 1' for marker in marker_set) + '\n',
-                                          encoding='ascii')
+                        content = '\n'.join(f'#define {marker} 1' for marker in marker_set) + '\n'
+                        if relative.endswith('/p5/generated/sc64_race_sprites_generated.h'):
+                            content += UNIT_WORD_SPRITE_HEADER
+                        output.write_text(content, encoding='ascii')
 
                 with patch.object(dev, 'ROOT', root), patch.object(dev, 'run', side_effect=fake_pack):
                     dev.prepare_staged_campaign(profile, private_rom)
@@ -439,6 +604,10 @@ class OnboardingTests(unittest.TestCase):
                         if '--prepack-unit-words' in command:
                             content += UNIT_WORD_SPRITE_HEADER
                         output.write_text(content, encoding='ascii')
+                    elif script == 'sc64_construction_sprites.py':
+                        emit_construction_header(root)
+                    elif script == 'sc64_unit_facing.py':
+                        emit_facing_header(root)
                     elif script == 'sc64_menu_assets.py':
                         output = root / '.local/sc64/races/generated/sc64_menu_generated.h'
                         output.parent.mkdir(parents=True, exist_ok=True)
@@ -621,7 +790,7 @@ class OnboardingTests(unittest.TestCase):
                     '#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n',
                 '.local/sc64/races/generated/sc64_race_sprites_generated.h': 'sprites',
                 '.local/sc64/races/generated/sc64_menu_generated.h': 'menu',
-                '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': 'art',
+                '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': CONSTRUCTION_COLOR_HEADER,
                 '.local/sc64/skirmish/generated/sc64_skirmish_generated.h': 'skirmish',
                 '.local/sc64/zp-stage/generated/sc64_races_generated.h':
                     '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
@@ -679,6 +848,10 @@ class OnboardingTests(unittest.TestCase):
                     output.parent.mkdir(parents=True, exist_ok=True)
                     output.write_text('#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
                                       encoding='ascii')
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
                 elif script == 'sc64_z4_pack.py':
                     output = local / 'z4/manifest.json'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -761,6 +934,10 @@ class OnboardingTests(unittest.TestCase):
                     output.write_text(UNIT_WORD_SPRITE_HEADER if '--prepack-unit-words' in command
                                       else '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
                                       encoding='ascii')
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
                 elif script == 'sc64_z4_pack.py':
                     output = local / 'z4/manifest.json'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -904,6 +1081,10 @@ class OnboardingTests(unittest.TestCase):
                     touch(header)
                     if '--prepack-unit-words' in command:
                         header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
                 elif script == 'sc64_menu_assets.py':
                     touch(race / 'sc64_menu_generated.h')
                 elif script == 'sc64_skirmish_pack.py':

@@ -61,6 +61,59 @@ current stock-combat replay evidence and memory limits. See the
 [rendering audit](audits/2026-10-26-unit-word-rendering/README.md) for exact
 pixel/state checks, measurements and memory limits.
 
+## Directional unit sprites
+
+Canonical Terran, Zerg, Protoss and Showcase builds select directional frames
+from the source unit images instead of always drawing frame zero. Refresh an
+older workspace with `./dev sc64 prepare --rom PATH --profile terran` (or
+`zerg` / `protoss`). Preparation writes the private bank under
+`.local/sc64/facing/generated/`; status/build reject older banks without the
+directional metadata and packed-frame payload. The source image's directional
+flag determines whether its frames represent headings; frame count alone does
+not qualify an image.
+
+Ground units face their movement waypoint, flyers face their destination, and
+units aim toward their target when firing. Facing is presentation state: a new
+game, scene restart, accepted load or reused actor slot starts at north until
+the unit moves or fires. It does not change the save format or combat rules.
+This adds directional idle poses, including Tank hull/turret layers; it does
+not implement the original walking cycles, turn rates or independent turret
+tracking. Canonical campaigns and Showcase use packed directional frames.
+`make -B showcase SHOWCASE_UNIT_WORD_FLAGS=` selects the indexed comparison path.
+
+## Tank firing effects and siege splash
+
+Canonical race builds and Showcase use source Tank muzzle and target-impact
+frames. Refresh their private inputs with `./dev sc64 prepare --rom PATH
+--profile terran` (or `zerg` / `protoss`). The standalone importer is
+`python3 tools/sc64_tank_source_vfx.py --out .local/sc64/tank-vfx/generated`.
+It verifies the USA ROM, weapon/image chains and supported script sequences;
+generated graphics, lookup tables and manifests stay ignored under `.local/`.
+`make -B showcase CANONICAL_WEAPON_FLAGS= SHOWCASE_SIEGE_FLAGS=` selects the earlier weapon behavior
+for comparison. The same override applies to the three canonical race targets.
+
+Showcase enables the `SC64_SIEGE_SPLASH` prototype. Campaign builds retain
+their earlier primary-target damage rule: the stock splash change causes the
+Z3 normal-controller completion regression to reach its 180000-update limit,
+so campaign promotion requires fresh completion qualification. This does not
+block the source firing graphics or directional rendering. In Showcase,
+siege-mode shots apply radial damage to eligible nearby ground actors,
+including allies, with full/half/quarter packets at inclusive source radii
+10/25/40. Distance uses the target's source rectangle. Armor and explosive size
+scaling follow the radius split; inner-ring splash can hit burrowed actors.
+The shooter, loaded units, air units and invincible actors are excluded.
+An unknown nearby actor identity falls back to primary-only damage rather than
+guessing its dimensions. HP/shields retain the engine's integer precision.
+
+The effects preserve source strength pixels and use a destination-dependent
+light lookup projected into the GBA palette. The N64 light-table binding is
+inferred, and palette reduction changes colors; this is not a pixel-identical
+N64 rendering claim. Source waits are converted from 24 to 30 simulation
+updates per second. The engine still applies damage immediately when firing;
+native attack windup, independently moving turrets and a complete projectile
+state machine remain unfinished. The visual pool is cosmetic and carries no
+pending damage or new save fields.
+
 ## Canonical minimap rendering
 
 Canonical Terran, Zerg and Protoss builds and Showcase batch the same 24-by-24
@@ -73,6 +126,17 @@ canonical target as needed); force rebuilding when changing flags.
 The [minimap audit](audits/2026-10-26-minimap-terrain/README.md) records the
 pixel oracle, byte-identical public replay and scoped ARM timing. P3/Z3 legacy
 and staged profiles retain their existing flag selections.
+
+## Source geyser art
+
+Imported profiles draw the existing raw-188 geyser sprite instead of the
+original green diamond. The painter and static-cache key use the sprite's
+actual bounds, including partially visible geysers at the playfield edges.
+Existing prepared banks already contain this art; no new private inputs or
+save fields are required. The asset-free profile retains its authored marker.
+This selects the static source frame; native gas-smoke animation is separate.
+With the canonical Protoss inputs prepared, `make test-sc64-geyser-art` checks
+source pixels, edge clipping, fog, all three gas buildings and warm-cache reuse.
 
 ## Source construction art
 
@@ -106,6 +170,22 @@ mission set match the canonical unified profile. It adds no campaign entries.
 Canonical imported race profiles enable `SC64_CONSTRUCTION_SOURCE_ART` and
 depend on the generated construction header. Original-art builds do not use
 this flag or require the header.
+
+Warp Anchor image 211 preserves its source intensity bytes and uses a
+40-row destination-color lookup for its blue-white glow. The importer reads the
+actual UI palette, world palette transform, and UI overrides from the runtime
+sources, then projects the source lookup through those displayed GBA colors.
+Regenerate the bank after changing those palette sources; preparation and build
+checks reject older banks without the modifier payload. The N64 BFire table
+association is inferred from its structure and reference light-table ordering,
+not proven by an executable cross-reference. GBA color quantization remains an
+approximation. The bright core and saturated blue/cyan halo are consistent with
+[the N64 longplay at 5:03](https://www.youtube.com/watch?v=rkyLf7lELXE&t=303s).
+
+With prepared inputs, `make test-sc64-protoss-warp-color` checks early, middle,
+and late source frames through the production building overlay, including
+map/HUD clipping with and without the scene-clip API. Asset-free Python tests
+check palette parsing against the C runtime and synthetic lookup projection.
 
 The bounded sampler uses existing saved build progress and adds no per-actor
 state or save-generation change. Stage timing is an adaptation: Terran uses
@@ -1041,10 +1121,10 @@ still needs gameplay mappings, larger building/mineral pools, its countdown
 and hatch sequence, victory/defeat behavior, persistence and controller/ARM
 qualification. Source staging alone does not establish a playable mission.
 
-### Canonical Zerg and Protoss chapter 3 builds
+### Canonical Zerg and Protoss builds
 
-The standard Zerg and Protoss build targets include their first four
-missions. Prepare each profile from your verified ROM, then use the standard
+The standard Zerg build includes its first four missions; the standard
+Protoss build includes its first five. Prepare each profile from your verified ROM, then use the standard
 commands; no extra staged-profile selection is needed:
 
 ```sh
@@ -1056,7 +1136,7 @@ commands; no extra staged-profile selection is needed:
 
 Replace `zerg` with `protoss` for the Protoss campaign. The canonical output
 pairs are `build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf`
-and `build/StarCraft-Protoss-P4-Storm-GBA.gba` / `build/starcraft-protoss-p4-storm.elf`. The
+and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba` / `build/starcraft-protoss-p5-shuttle.elf`. The
 `zerg-z4` target also builds the canonical Zerg pair. Explicit `zerg-z3`
 preserves `build/StarCraft-Zerg-GBA.gba` / `build/starcraft-zerg.elf` and its
 save identity; versioned `-Z3` names are aliases. `protoss-p3` preserves the
@@ -1072,16 +1152,33 @@ enforce the same IWRAM and EWRAM reserves.
 
 Canonical Zerg uses `SCZ4`, save generation 20, the Z4 runtime and the same
 qualified canonical drawing flags. Its save directory is separate from the
-legacy Z3 profile. Canonical Protoss uses `SCP5`, generation 21, and the P4
-Storm runtime; explicit `protoss-p3` retains `SCP3`, generation 7. Older standard two-mission generation-2
+legacy Z3 profile. Canonical Protoss uses `SCPB`, generation 26 and
+`.local/play/protoss-p5-shuttle`; it includes the P5 Shuttle transport runtime.
+Explicit `protoss-p4-storm` retains `SCP5`, generation 21 and its P4 save path;
+`protoss-p3` retains `SCP3`, generation 7. Older standard two-mission generation-2
 saves are incompatible and are rejected. The asset-free default build
 continues to require no imported inputs.
+
+Older prepared Protoss workspaces must regenerate P5 data before building:
+
+```sh
+./dev sc64 prepare --rom "/path/to/StarCraft 64 USA ROM" --profile protoss
+./dev sc64 build --profile protoss
+./dev sc64 test --profile protoss
+```
+
+P5 preparation requires its source scenario/map gate and prepacked unit-word
+bank. No P3/P4 save conversion is performed. `protoss-p5-shuttle` is an explicit
+spelling for the same canonical product; `protoss-p4-storm` retains the previous
+real files. See the [P5 audit](audits/2026-10-26-p5-promotion/README.md) for
+first-five-chapter ARM, cargo/save, timing and memory evidence.
 
 ### Staged Zerg and Protoss chapter 4
 
 Zerg 4 is enabled in the canonical profile. The `zerg-z4` spelling builds the
-same versioned ROM. Canonical Protoss now includes **The Hunt for Tassadar**
-through the Storm-enabled fourth-chapter profile. The plain `protoss-p4`
+same versioned ROM. Canonical Protoss includes **The Hunt for Tassadar** and
+P5 through the Shuttle profile. Explicit `protoss-p4-storm` keeps the
+four-entry Storm profile and its own real files/save format. The plain `protoss-p4`
 build remains a separate internal experiment. Preparing later map data does
 not enable unqualified later missions in the frontend.
 
@@ -1103,7 +1200,7 @@ the wrapper does not convert saves between them. See the
 [P4 audit](audits/2026-10-26-p4-promotion/README.md) for current-source ARM
 mission and live-save qualification, separate from preparation.
 
-Canonical P4 also enables the generated create-action prefix and hot validator.
+P4 Storm and canonical P5 enable the generated P4 create-action prefix and hot validator.
 An older prepared workspace must regenerate its numeric scenario header before
 building:
 

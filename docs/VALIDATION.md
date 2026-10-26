@@ -22,28 +22,33 @@ The [minimap follow-up](audits/2026-10-26-minimap-terrain/README.md) reduces
 P4's measured full cost by another 1.60%, to about 17.0 fps equivalent, with
 pixel-identical terrain drawing and unchanged worst-frame stalls.
 
-Canonical profiles expose Terran 1–10, Zerg 1–4 and Protoss 1–4: 18/30
+Canonical profiles expose Terran 1–10, Zerg 1–4 and Protoss 1–5: 19/30
 entries. Canonical Zerg uses `SCZ4` and `.local/play/zerg-z4`; canonical
-Protoss uses the P4 Storm files, `SCP5`, generation 21 and
-`.local/play/protoss-p4-storm`. Explicit `zerg-z3` and `protoss-p3` preserve
-their earlier real files, identities and save paths. No save conversion is
+Protoss uses the P5 Shuttle files, `SCPB`, generation 26 and
+`.local/play/protoss-p5-shuttle`. Explicit `protoss-p4-storm` retains the real
+P4 files, `SCP5`, generation 21 and its own save path. Explicit `zerg-z3` and
+`protoss-p3` preserve their earlier real files, identities and save paths. No save conversion is
 provided. The old P3 compatibility filenames still point to the P3 real
-files, never to the new P4 ROM.
+files, never to the newer canonical ROM.
 
 All ten Terran missions pass the actual canonical-flag host controller
 target. T7/T10 have current paired ARM wins from explicit mission probe entry;
 other Terran ARM wins remain evidence for their earlier frozen builds. All
 four Zerg chapters have current host wins; the older Z4 ARM timing applies
-to its frozen build. P1–P4 have fresh host and input-only ARM wins in the
-canonical P4 pools, retaining Fenix in P1/P2 and both heroes in P4. P4 also
-has a live mid-mission SRAM cold-load/continued-win proof.
+to its frozen build. P1–P5 have fresh host and input-only ARM wins in the
+canonical P5 pools, retaining Fenix in P1/P2 and both heroes in P4. P5 has an
+exact fresh-process cargo SRAM restore and continued win. Earlier P4 save
+qualification remains scoped to its preserved P4 build. See the
+[P5 audit](audits/2026-10-26-p5-promotion/README.md).
 
-The 30-fps goal remains unfinished. PR 35's full-replay averages are about
+The 30-fps goal remains unfinished. Canonical P5 measures 26.6 fps equivalent
+on P1/P2, 18.9 on P3, 16.1 on carried P4 and 17.1 on P5; carried P4 is about
+5.3% slower than the standalone P4/minimap build. PR 35's earlier averages were about
 22.4/18.8 fps equivalent for Terran T7/T10 and 16.3 for P4. These are scoped
 emulator cycle measurements, not physical-GBA guarantees. Historical staged
 coverage spans 22/30 across recorded builds, not fresh qualification of all
 chapters on current source. The generic split-profile report checker only
-covers earlier mission models; dedicated Z4/P4 codec/input checks establish
+covers earlier mission models; dedicated Z4/P4/P5 codec/input checks establish
 their stated save continuity.
 
 ## Reproducible checks
@@ -4440,6 +4445,27 @@ and unified ROMs retain `4ad80ce0…f9aee` and `6bab5be2…979f9` respectively.
 
 ### Source construction art preview
 
+The later blue-glow correction preserves image 211's raw 1..40 strengths and
+composites them through a destination-dependent 40x256 table. Ordinary palette
+remapping had treated those strengths as color indices, producing an opaque,
+washed-out orb. The new projection uses the displayed GBA palette, including
+UI overrides, rather than only the source-remap preimages. The N64 table role
+is structurally inferred and the RGB555 projection is approximate; this does
+not establish pixel parity or finish the native post-timer materialization.
+
+Local validation for this correction includes an asset-free compiled C palette
+oracle (256 colors), a synthetic 10,240-cell lookup oracle, preparation guards,
+and sanitizer fixtures for three source animation phases. The production
+overlay fixture compares every visible effect pixel against its original
+framebuffer destination, checks blue-dominant pixels, distinct frame hashes,
+unchanged building state, and 371 above-map pixels with and without scene clip.
+The construction lifecycle/save fixture covers all three races; the Cannon
+fixture now checks exact modifier output while retaining its completed sprite,
+firing, and power-loss assertions. All four production ARM builds retain their
+existing IWRAM/BSS ends and save layout. These are local checks, not a new
+physical GBA frame-rate measurement.
+
+
 Historical preview evidence follows. The subsequent
 [stock profile and art follow-up](audits/2026-10-26-stock-profiles-and-art/README.md)
 enables layered source construction art in canonical prepared race builds,
@@ -5533,3 +5559,41 @@ camera moves take most of that back. Frames that miss early VBlank could tear
 in the top rows on hardware; this was not observed or measured. The probe
 stays off by default. Its ROM saving is separable: the 8x8 pools could also
 feed the mode-4 terrain blitter.
+
+
+### Blood Bath gas placement, cargo cues, and crash investigation (2026-10-26)
+
+Gas-building placement previously required the cursor to be inside a strict
+15-pixel center circle. The imported geyser's offset 56x26 opaque crop extends
+outside that circle. The hit test now retains center tolerance and accepts
+opaque source-art pixels; gas-building validation, preview, and creation snap
+to the same geyser center. Occupied geysers still reject construction.
+`make test-sc64-protoss-gas-placement` covers three races at all four Blood Bath
+geysers plus a Protoss field-menu build, completion, worker assignment, and
+actual gas income under the Showcase flags and host sanitizers. The placement
+matrix uses seeded setup; the final case exercises ordinary field controls.
+
+Imported worker sprites did not draw their resource cargo. A small authored
+blue/cyan mineral crystal or green gas cue now appears beside harvesting SCVs,
+Drones, and Probes while their carry amount is positive. This is an authored UI
+cue, not extracted cargo animation. It adds no actor fields or save changes.
+`make test-sc64-worker-cargo` checks indexed and packed profiles, resource type,
+empty/order clearing, nonworker exclusion, fog, HUD clipping, and unchanged
+unit state.
+
+A reported physical-GBA fuzzy-screen crash in Showcase's Blood Bath skirmish
+as Protoss versus one AI remains unresolved. The card's last recorded Showcase
+source was b2ff82f, predating the blue-orb modifier change. Host sanitizer runs
+using both current and b2ff82f source with prepared inputs passed a synthetic
+paid-construction stress workload reaching 147/160 building slots; this is not
+a byte-identical replay of the shipped cartridge. A private no-GDB ARM test
+also passed synthetic construction/rendering with sampled audio active and
+canaries after BSS and below the main stack; its modified main loop is not a
+production-controller or physical-hardware qualification.
+
+`make test-sc64-protoss-skirmish-pylons` adds a bounded normal-controller check:
+HOME/custom menu, Blood Bath, Protoss, one Terran AI, earned resources, two new
+Pylons, and 5,400 updates with 5,380 full renders. It passed with three completed
+Pylons and normal play still active. It does not exercise slot exhaustion or
+prove that the hardware crash is fixed. The exact ROM/save from KODAK and the
+freeze/audio behavior are still needed to narrow that report.

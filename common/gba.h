@@ -44,6 +44,12 @@ int gfx_blit_window_2x(int y,int height,const u8 *source,int stride,int rows,int
 void gfx_set_palette(int first,int count,const u16 *rgb555);
 void gfx_blit16(int x,int y,const u8 *indexed_pixels);
 void gfx_blit_sprite(int x,int y,int width,int height,const u8 *indexed_pixels);
+/* Destination-dependent indexed effect. Source zero is transparent; source
+ * 1..rows selects a 256-byte lookup row indexed by the previous destination
+ * colour. Out-of-range source values preserve the destination. rows is 1..255.
+ * The caller supplies rows*256 bytes. Uses the current scene clip. */
+void gfx_blit_sprite_mapped(int x,int y,int width,int height,const u8 *strengths,
+                            const u8 *lookup,unsigned rows);
 #ifdef SC64_UNIT_WORD_SPRITES
 /* Optional phase-aligned unit raster metadata. Each phase contains one
  * {color, alpha-byte-mask} word per four destination pixels, row-major.
@@ -58,6 +64,9 @@ void gfx_blit_sprite_words(int x,int y,const GbaSpriteWordFrame *frame);
 void gfx_blit_sprite_2x(int x,int y,int width,int height,const u8 *indexed_pixels);
 #endif
 void gfx_pixel(int x,int y,u8 color);
+#ifdef SC64_UNIT_FACING
+void gfx_blit_sprite_hflip(int x,int y,int width,int height,const u8 *indexed_pixels);
+#endif
 void gfx_rect(int x,int y,int w,int h,u8 color);
 void gfx_frame(int x,int y,int w,int h,u8 color);
 void gfx_line(int x0,int y0,int x1,int y1,u8 color);
