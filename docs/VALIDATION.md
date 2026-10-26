@@ -2,6 +2,57 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
+## Current campaign status (2026-10-26)
+
+The [stock roster follow-up](audits/2026-10-26-roster-contact-and-art/README.md)
+corrects melee contact, defense cooldown expiry and selected building art.
+The newer [P4 promotion](audits/2026-10-26-p4-promotion/README.md) and
+[Terran renderer](audits/2026-10-26-terran-word-promotion/README.md) audits
+requalify their stated ARM traces after those combat corrections. Older
+measurement sections below remain records of their frozen images.
+
+The [construction lifecycle recheck](audits/2026-10-26-construction-lifecycle/README.md)
+corrects the Protoss pre-completion visual to the source Warp Anchor's `Init`
+animation. It keeps the existing build timer and save layout. The older
+campaign ARM timings below precede that artwork correction. The
+[P4 prefix follow-up](audits/2026-10-26-p4-create-prefix/README.md) records a
+current-art paired full-mission ARM replay, a 2.16% full-cost reduction and
+fresh-process SRAM continued win. It does not establish physical-GBA performance.
+The [minimap follow-up](audits/2026-10-26-minimap-terrain/README.md) reduces
+P4's measured full cost by another 1.60%, to about 17.0 fps equivalent, with
+pixel-identical terrain drawing and unchanged worst-frame stalls.
+
+Canonical profiles expose Terran 1–10, Zerg 1–6 and Protoss 1–5: 21/30
+entries (see the [Z6 promotion audit](audits/2026-10-26-z6-promotion/README.md)).
+Canonical Zerg uses `SCZ6`, generation 32 and `.local/play/zerg-z6`; explicit
+`zerg-z4` keeps `SCZ4`, generation 20 and `.local/play/zerg-z4`; canonical
+Protoss uses the P5 Shuttle files, `SCPB`, generation 26 and
+`.local/play/protoss-p5-shuttle`. Explicit `protoss-p4-storm` retains the real
+P4 files, `SCP5`, generation 21 and its own save path. Explicit `zerg-z3` and
+`protoss-p3` preserve their earlier real files, identities and save paths. No save conversion is
+provided. The old P3 compatibility filenames still point to the P3 real
+files, never to the newer canonical ROM.
+
+All ten Terran missions pass the actual canonical-flag host controller
+target. T7/T10 have current paired ARM wins from explicit mission probe entry;
+other Terran ARM wins remain evidence for their earlier frozen builds. All
+six Zerg chapters have current host and input-only ARM wins in the canonical
+Z6 build, with Z5/Z6 fresh-process SRAM continuity. P1–P5 have fresh host and input-only ARM wins in the
+canonical P5 pools, retaining Fenix in P1/P2 and both heroes in P4. P5 has an
+exact fresh-process cargo SRAM restore and continued win. Earlier P4 save
+qualification remains scoped to its preserved P4 build. See the
+[P5 audit](audits/2026-10-26-p5-promotion/README.md).
+
+The 30-fps goal remains unfinished. Canonical P5 measures 26.6 fps equivalent
+on P1/P2, 18.9 on P3, 16.1 on carried P4 and 17.1 on P5; carried P4 is about
+5.3% slower than the standalone P4/minimap build. PR 35's earlier averages were about
+22.4/18.8 fps equivalent for Terran T7/T10 and 16.3 for P4. These are scoped
+emulator cycle measurements, not physical-GBA guarantees. Historical staged
+coverage spans 22/30 across recorded builds, not fresh qualification of all
+chapters on current source. The generic split-profile report checker only
+covers earlier mission models; dedicated Z4/P4/P5 codec/input checks establish
+their stated save continuity.
+
 ## Reproducible checks
 
 For the asset-free skirmish, run:
@@ -1917,6 +1968,40 @@ version, without changing live state.
 
 No new campaign mission is enabled by this promotion: the completed count
 remains Terran 10, Zerg 3 and Protoss 3, or 16/30.
+
+## Weapon-family effects and Protoss shield display (2026-10-25)
+
+Authored weapon-family effects now present the existing attack paths for the
+implemented actors and defenses, including T4 traps and T5 mines. They only
+change rendering: combat continues to apply damage on the existing attack
+tick. Effect pixels are clipped to the playfield rows 12–119 so they cannot
+overwrite the HUD. Protoss unit and building overlays draw shields separately
+from health using canonical shield capacity; the selection panel shows current
+shields for shielded selections. No campaign mission or combat/save rule was
+changed by this visual work.
+
+Focused host checks passed: `make test-sc64-weapon-vfx`,
+`make test-sc64-weapon-vfx-game`, `make test-sc64-shield-bars`,
+`make build/test-unified-hud && ./build/test-unified-hud`, and
+`make build/test-starcraft`. The renderer test exercises palette styles,
+extreme-coordinate clipping, visibility gating and the row-119 boundary. The
+attack fixture checks 30 armed unit/target-class profiles, ground and air
+attacks, effect lifetimes, camera/fog behavior, pool overflow and unchanged
+immediate-damage behavior. Shield checks compare unit/building bar pixels and
+verify shield-only HUD cache invalidation against a forced full redraw.
+
+All three canonical race ROMs build and pass the unchanged reserve guards.
+IWRAM/BSS ends are Terran `0x03004e58/0x0203dbd4`, Zerg
+`0x03004fb0/0x02039a30` and Protoss `0x03004f30/0x02039bd8`.
+Race HUD key construction runs in ROM so the new keys fit without reducing
+the existing fast-RAM stack reserve. The race effect pool uses 32 transient
+slots; original-art saves retain 12. Actor rows and save generations are
+unchanged. The canonical campaign count remains T10/Z3/P3 (16/30).
+
+Full regressions use `./dev build && ./dev test`, `make unified test-unified`,
+`make race-campaigns test-race-campaigns`, and
+`./dev sc64 test --profile terran`. These host/build checks do not establish
+ARM performance, physical GBA behavior or a new full campaign replay.
 
 ### 2026-10-24 — staged Z4/P4 engine foundations
 
@@ -4362,6 +4447,37 @@ and unified ROMs retain `4ad80ce0…f9aee` and `6bab5be2…979f9` respectively.
 
 ### Source construction art preview
 
+The later blue-glow correction preserves image 211's raw 1..40 strengths and
+composites them through a destination-dependent 40x256 table. Ordinary palette
+remapping had treated those strengths as color indices, producing an opaque,
+washed-out orb. The new projection uses the displayed GBA palette, including
+UI overrides, rather than only the source-remap preimages. The N64 table role
+is structurally inferred and the RGB555 projection is approximate; this does
+not establish pixel parity or finish the native post-timer materialization.
+
+Local validation for this correction includes an asset-free compiled C palette
+oracle (256 colors), a synthetic 10,240-cell lookup oracle, preparation guards,
+and sanitizer fixtures for three source animation phases. The production
+overlay fixture compares every visible effect pixel against its original
+framebuffer destination, checks blue-dominant pixels, distinct frame hashes,
+unchanged building state, and 371 above-map pixels with and without scene clip.
+The construction lifecycle/save fixture covers all three races; the Cannon
+fixture now checks exact modifier output while retaining its completed sprite,
+firing, and power-loss assertions. All four production ARM builds retain their
+existing IWRAM/BSS ends and save layout. These are local checks, not a new
+physical GBA frame-rate measurement.
+
+
+Historical preview evidence follows. The subsequent
+[stock profile and art follow-up](audits/2026-10-26-stock-profiles-and-art/README.md)
+enables layered source construction art in canonical prepared race builds,
+adds Protoss source art and expands coverage to all 50 constructible buildings,
+including the Greater Spire morph. The preview counts and ROM hashes below refer
+to the earlier implementation, not the current builds. The newer
+[lifecycle recheck](audits/2026-10-26-construction-lifecycle/README.md) selects
+the source Warp Anchor during Protoss build progress; later materialization
+states remain incomplete.
+
 The default-off `SC64_CONSTRUCTION_SOURCE_ART` profile imports verified local
 ROM art and compiles a bounded primary-frame timeline for supported Terran and
 Zerg construction stages. The self-contained importer authenticates the ROM
@@ -5209,3 +5325,346 @@ showcase `0x0203dcd8`; all existing reserve guards pass. Default build/tests
 (414 Python checks plus host fixtures) and unified build/tests pass. Full Terran build/controller/save/skirmish
 checks also pass. This visual update does not qualify a new campaign mission, physical hardware,
 ARM SRAM continuation or a new performance result; staged progress stays 22/30.
+
+### Z6 controller final-zone cleanup
+
+After the newer worker and depot economy changes, `make test-sc64-z6-controller`
+stalled in source location 5 with a mining Probe and a Pylon left. Kerrigan
+stood beside both targets, idle, while single Hydralisk reinforcements walked
+in from the main base and ran out the round budget. When at most two Force2
+actors remain and no escort is within 320 pixels, the controller now gives
+Kerrigan an ordinary attack-move. The final-building Hydra stepping is skipped
+on those rounds. When no target is found, the controller re-reads the source
+count before deciding the zone is unfinished; previously a stale count
+reported a Probe that had already died.
+
+Only controller strategy changed. Victory still requires the result screen,
+`won` and the source outcome WON. The host route now wins at host tick 297013,
+gameplay frame 293497, with started mask `0x1be` and zero faults. Kerrigan is
+alive and unloaded at `(950,1009)`, research is complete and the Overlord has
+no cargo. The earlier route won at frame 268694. ARM replay, save continuity
+and performance were not re-measured for this route.
+
+### Sampled audio (2026-10-25)
+
+Imported profiles can play StarCraft 64 sound effects, unit responses and
+music from a private bank; the default ROM uses PSG placeholder tones for the
+same events. The design and import details are in
+[Development](DEVELOPMENT.md#optional-starcraft-64-sound-effects-and-music).
+Audio is presentation only: it reads simulation state at the start of each
+rendered frame, keeps its snapshot outside saves and the game RNG, and never
+writes game state.
+
+Host checks:
+
+- `make test-audio` (in `./dev test`): mixer silence, single-voice copy,
+  two/three-voice saturation, partial-frame retirement, exact multi-frame
+  length, speech interruption, effect allocation, duplicate suppression,
+  stealing and refusal, queue bounds and wrap, and the music start, loop,
+  one-shot, change, stop and absent-track paths. The hook fixtures cover a
+  real skirmish fight producing shot and death events, the cooldown shot
+  contract, off-screen silence, the two-effect frame cap, selection, command
+  response only on a new key press, new player units, completed buildings,
+  and no events after a tick discontinuity or pause.
+- The same 12,000-tick controller-driven run from the title screen gives the
+  same state hash with the observer compiled in and with `GAME_AUDIO_OFF`:
+  `4f8e47da` for the default profile (395 shot, 40 death, 95 selection and
+  three command events in the audible build).
+- `make test-game-audio-unified` (in `make test-unified`): the same hook
+  fixtures with the imported bank, checking that a selection plays one of the
+  unit's own response samples and that the race theme and menu theme are
+  requested; the unified run's state hash `602d8534` matches with audio off.
+
+Memory, from a full rebuild of every ARM ELF target whose inputs are prepared
+(46 of the 55; the T6 storage family needs `make sc64-t6-prepare`, and
+`zerg-z5-cloak` already exceeds the IWRAM guard at base `d085310` with the
+same `__iwram_end = 0x03005040`):
+
+- `__iwram_end` is byte-identical to the base on every build: the mixer runs
+  as Thumb code from ROM and its small ARM interrupt entry is in ROM too.
+- BSS grows by 144 bytes with the bank (mixer state, counters and observer
+  state) and by 16-24 bytes without it. The tightest builds, the P7 Carrier
+  training, projectile and showcase ROMs, keep 660 bytes below the
+  `0x0203e000` guard. The mix buffers, a 64-byte zero guard and the
+  per-unit/per-building snapshot use the unused VRAM between the mode-4
+  pages (416 + 2 x (units + buildings) bytes, at most 1216 of 2560).
+- The default ROM stays 64 KiB. Imported ROMs gain the 15.6 MB bank and pad
+  to 32 MiB.
+
+CPU, measured in mGBA from the emulated timer around the VBlank handler
+(`audio_irq_cycles`, `audio_irq_frames`, `audio_irq_peak`). The unified ROM
+sat on the title screen streaming the menu theme while a debugger forced 0-4
+voices onto long bank samples for 120 VBlanks each. Cycles per video frame
+(280,896 available):
+
+| Active voices | Average | Peak | Share of a frame |
+|---|---:|---:|---:|
+| 0 (music streaming only) | 1,115 | 1,136 | 0.40% |
+| 1 | 1,433 | 1,454 | 0.51% |
+| 2 | 6,193 | 7,843 | 2.2% |
+| 3 | 8,047 | 9,614 | 2.9% |
+| 4 | 9,100 | 11,326 | 3.2% |
+
+Music never costs mixing time because DMA streams it from ROM. At the
+experimental P7 mission's ~1.3M cycles per game tick (about 4.6 video
+frames), four busy voices cost about 42k cycles per tick. A first version
+that added samples one by one cost 18,510 cycles with four voices; reading
+four samples per word and repacking unclipped words halved that.
+
+ARM gameplay differential: `tools/sc64_p7_move_workload.py --neutral-ticks
+2400 --attack-ticks 1200` ran the experimental P7 move probe built with the
+bank and with `SC64_AUDIO=0`, launched through the normal menus, with 2,400
+neutral ticks and then a controller attack-move. `--compare` found every one
+of the 38 checkpoints identical (unit, building, resource, visibility and
+campaign state hashes), with the same 25 inputs and the same end at frame
+4105. Measured fps, silent then audible: neutral 10.935 and 10.892 (-0.4%),
+attack-move 9.054 and 8.957 (-1.1%). The runner now records the audio
+counters: the handler averaged 1,123 cycles per video frame in the neutral
+phase and 1,173 in the attack-move phase (0.40-0.42%), peaking at 6,415.
+
+Limits: these are emulator measurements, not physical-GBA results, and the
+audio itself was not checked by ear in this run. Direct Sound is 8-bit mono at
+10512 Hz, below StarCraft 64's 16-bit stereo 11025 Hz mix. There are four
+voices, with no distance attenuation or panning, and at most two new effects
+per frame. Annoyed responses, transmissions, advisor lines and briefing audio
+are not played. Building completion uses the building's selection sound.
+Shots are inferred from a raised cooldown, so a weapon sounds once per
+cooldown cycle. Victory and defeat stingers come from the N64 result flag and
+have not been confirmed by ear.
+### Death animations (2026-10-25)
+
+Units and buildings now play death effects instead of disappearing. Deaths
+are observed from actor rows that change from alive to dead with HP at or
+below zero; the simulation never reads the pool or the alive shadow. The
+authored, asset-free renderer follows the StarCraft 64 Death families:
+
+- infantry, Zerg ground units and critters collapse and leave remains;
+- vehicles and aircraft explode, with a large blast for heavy units;
+- Zerg air units splash;
+- Protoss units burst in blue;
+- buildings explode and leave rubble.
+
+Timelines use the source frame lengths. Remains last 153 source updates;
+rubble is capped at 30 seconds.
+
+The optional source preview compiles 167 actors from the authenticated ROM
+(61 image banks, 770,522 pixel bytes). Nine actors keep the authored
+fallback because their Death animation draws no frames. The fixture checks
+every compiled layer frame. It also confirms that the drawn pixels equal the
+clipped imported frames for:
+
+- Marine, Zergling and Dragoon: collapse and remains;
+- Vulture and Probe: orange and blue explosion overlays.
+
+Approximations:
+
+- The faintest remap blend band is dropped and the next is dithered,
+  because GBA mode 4 cannot blend.
+- Remnants are capped at 30 seconds.
+- Hallucination puffs, Scourge suicides and spider-mine detonations play no
+  death, because those removals keep positive HP.
+- A death reaches the pool at most one update late.
+- A death and a new unit in the same slot within one scan window would hide
+  that death.
+
+Asset-free checks run in `./dev test`: 420 Python checks and the default
+fixtures. They cover timing, families, eviction, clipping at every viewport
+edge, and real unit and building kills. They also cover expiry, fog,
+scripted removals, load re-priming and pool overflow. The same game fixture
+passes in the unified, full Terran, Z7 and P7 profiles. Each profile is also
+built with `SC64_DEATH_VFX_DISABLED` and runs a combat workload that renders
+every frame. Both builds print the same field-wise state digest and the same
+SRAM digest after saving. The same holds for the source-art build.
+
+The following pass:
+
+- default build and tests;
+- unified build and tests;
+- full Terran, Zerg and Protoss profile builds and tests;
+- `test-sc64-death-vfx-profiles`;
+- `test-sc64-death-source` and `death-visuals`.
+
+Memory: IWRAM ends are unchanged in all 21 rebuilt race, probe and showcase
+ROMs. The race pool holds 16 rows of 20 bytes, plus a 50-byte alive shadow.
+Race-profile BSS grows by 0x158–0x178 bytes:
+
+| Profile | BSS end |
+| --- | --- |
+| Terran | `0x0203dd3c` |
+| Zerg | `0x02039bc0` |
+| Protoss | `0x02039d68` |
+| Unified | `0x0203d328` |
+| Showcase | `0x0203de50` |
+| P7 Carrier training and projectile probes (largest) | `0x0203de54` |
+
+The largest leaves 428 bytes under the reserve guard. The original-art ROM
+ends BSS at `0x020043ec` with a 12-row pool. The new code is about 5 KB of
+ROM per profile and adds no IWRAM.
+
+Emulator timing comes from controller-only showcase replays. Cycle counters
+compare this build with the base `d085310` over the first 60 updates of
+each scene:
+
+- The scan adds 6.4k cycles per update, about 1.5% of a dense battle update.
+- Drawing adds 1k–19k cycles per frame.
+- Effective fps falls 1.3–2.7% in four battle scenes and 5.2% in Base Under
+  Siege (22.05 versus 23.27).
+- The three last stands stay at 29.857 fps and still end at update 150.
+
+The renderer was profiled and tightened to two fill calls per remnant and a
+table-driven ellipse. This is emulator timing, not physical-hardware
+qualification. ROMs, generated art and captures remain local.
+
+### End-of-mission outro (2026-10-25)
+
+The result screen now waits for the final deaths. The simulation still stops
+on the outcome update (`won`/`lost`, the screen change and saves are
+untouched). A presentation-only counter keeps death effects aging over the
+frozen battlefield; it is neither saved nor read by input handling. The
+result panel appears when every collapse or explosion has finished: at least
+24 updates (0.8 s), at most 96 (3.2 s), then a six-update panel opening.
+
+The default and unified game fixtures destroy the opposition and check:
+
+- the outcome arrives on the next update;
+- the final structures are exploding after the first result-screen update,
+  which scans the final deaths;
+- battlefield pixels, not the panel, are shown during the outro;
+- the state digest and frame stay frozen through the outro;
+- the panel opens after 45 updates (original art) and 53 updates (unified
+  Protoss buildings);
+- the full panel is drawn afterwards;
+- A during the outro restarts at once, as before;
+- a load shows the panel immediately.
+
+The P3 frame-coverage oracle renders a mid-outro frame over poisoned buffers
+with `SC64_NO_FRAME_CLEAR`, and it matches the clear reference. Both
+frame-coverage oracles now render the result screen through the production
+`draw_result_screen()` rather than calling `draw_result()` directly. The
+feature-off builds print the same outcome frame and the same state and
+SRAM digests after 120 frozen result updates. Host captures of a unified
+skirmish victory show the final Protoss structures bursting blue and leaving
+rubble, then the panel opening. The showcase controller replay still loses
+all three last stands at update 150 and restarts from the result screen
+with the same inputs.
+
+The outro adds no IWRAM in any of the 21 rebuilt ROMs and 4–8 BSS bytes over
+the death-animation branch. The largest BSS end is `0x0203de5c`, 420 bytes
+under the guard. Moving the death scan to the start of each update shifts
+which effects are on screen during the timing windows.
+
+Controller-only showcase replay effective fps against base `d085310`:
+
+| Scene | Base | With outro |
+| --- | --- | --- |
+| 0 | 12.800 | 12.665 |
+| 1 | 19.529 | 18.714 |
+| 5 | 17.965 | 17.526 |
+| 6 | 19.476 | 19.062 |
+| 7 | 23.270 | 21.785 |
+
+The last stands stay at 29.857 fps and still lose at update 150. This is
+emulator timing only.
+
+
+### Blood Bath gas placement, cargo cues, and crash investigation (2026-10-26)
+
+Gas-building placement previously required the cursor to be inside a strict
+15-pixel center circle. The imported geyser's offset 56x26 opaque crop extends
+outside that circle. The hit test now retains center tolerance and accepts
+opaque source-art pixels; gas-building validation, preview, and creation snap
+to the same geyser center. Occupied geysers still reject construction.
+`make test-sc64-protoss-gas-placement` covers three races at all four Blood Bath
+geysers plus a Protoss field-menu build, completion, worker assignment, and
+actual gas income under the Showcase flags and host sanitizers. The placement
+matrix uses seeded setup; the final case exercises ordinary field controls.
+
+Imported worker sprites did not draw their resource cargo. A small authored
+blue/cyan mineral crystal or green gas cue now appears beside harvesting SCVs,
+Drones, and Probes while their carry amount is positive. This is an authored UI
+cue, not extracted cargo animation. It adds no actor fields or save changes.
+`make test-sc64-worker-cargo` checks indexed and packed profiles, resource type,
+empty/order clearing, nonworker exclusion, fog, HUD clipping, and unchanged
+unit state.
+
+A reported physical-GBA fuzzy-screen crash in Showcase's Blood Bath skirmish
+as Protoss versus one AI remains unresolved. The card's last recorded Showcase
+source was b2ff82f, predating the blue-orb modifier change. Host sanitizer runs
+using both current and b2ff82f source with prepared inputs passed a synthetic
+paid-construction stress workload reaching 147/160 building slots; this is not
+a byte-identical replay of the shipped cartridge. A private no-GDB ARM test
+also passed synthetic construction/rendering with sampled audio active and
+canaries after BSS and below the main stack; its modified main loop is not a
+production-controller or physical-hardware qualification.
+
+`make test-sc64-protoss-skirmish-pylons` adds a bounded normal-controller check:
+HOME/custom menu, Blood Bath, Protoss, one Terran AI, earned resources, two new
+Pylons, and 5,400 updates with 5,380 full renders. It passed with three completed
+Pylons and normal play still active. It does not exercise slot exhaustion or
+prove that the hardware crash is fixed. The exact ROM/save from KODAK and the
+freeze/audio behavior are still needed to narrow that report.
+
+
+## Source weapon artwork qualification (2026-10-26)
+
+The source weapon/attack presentation pipeline is described in
+[Native weapon effects](native-weapon-effects.md). Local verification includes
+asset-free importer/sampler tests, the integrated 66-profile weapon renderer,
+canonical framebuffer/cache comparisons and four ARM ROM links. These checks
+do not establish pixel-identical N64 output or physical GBA performance.
+
+The full Terran controller suite currently stops at T9's 500000-update limit.
+An isolated build of main commit `cd1b7b8a97553e13b51bd992225ba5b10485a822`
+reproduces the same failure as this presentation change: frame 495064, 13
+Protoss buildings, 21 Zerg buildings, 13 side units, wallet 26/73066 and zero
+reported faults. T1–T8 passed before that stop; T10 was run separately and won
+at update 3511 with zero faults. Treat the T9 automated completion qualification
+as unresolved rather than describing the whole suite as passing.
+
+The reported physical Showcase Blood Bath/Protoss multi-Pylon crash also
+remains unresolved. Host rendering checks and synthetic ARM tests have not
+reproduced that exact hardware failure.
+
+
+## Canonical source death art (2026-10-26)
+
+The Siege Line pink bands reproduced on the PR49 source: at update 60,
+suppressing death effects removed all 333 fixed-palette purple pixels while
+leaving the same living-unit state. Thirteen authored Zergling remnants in the
+original spawn grid formed those bands. They were placeholder corpse puddles,
+not surviving unit health bars. The earlier rounded-puddle change had not
+resolved clustered deaths.
+
+Canonical Terran, Zerg, Protoss and Showcase now select source death/corpse
+art. The authenticated bank covers 167 actors in 61 image banks (770522
+indexed pixel bytes); nine unsupported actors retain authored fallbacks.
+Fixed waits use exact source ticks; random waits use a deterministic midpoint.
+Combat-unit under layers have 891408 bytes of packed word sidecars. Other
+actors retain the same source pixels through indexed drawing to keep the
+full Terran ROM below 32 MiB. No RAM pool or save schema changed.
+
+`make test-sc64-showcase-death-source` simulates ordinary Siege Line combat
+through update 450, requires raw-37 deaths to use source art, compares the
+rendered layers with source-frame composites and checks expiry. The packed
+source tests compare indexed and packed pixels, including HUD-edge fallback
+with and without scene clipping. Private before/after captures were inspected;
+they are deliberately absent from this source-only repository.
+
+An owned no-GDB mGBA benchmark ran identical scene-1 inputs for 180 updates,
+measuring updates 60–179. All three variants reached the same simulation hash
+`2519c37e018c2fe2`, with 14 average / 16 peak active corpses. Repeated results:
+
+| Average cycles | Authored | Source indexed | Source packed |
+| --- | ---: | ---: | ---: |
+| Update | 336921 | 336616 | 336784 |
+| Audio | 126 | 126 | 126 |
+| Render | 579214 | 736355 | 651918 |
+| Total | 916449 | 1073284 | 989015 |
+
+Packing saves 7.85% of source-indexed total cost, but source art still costs
+7.92% more on average than the authored placeholder in this crowded sample.
+Peak render cost is 813470 cycles versus 811967 authored (1075219 indexed).
+This scene exceeds a 30-fps frame budget in every variant; it remains a
+performance target, not a physical-hardware or sustained-30-fps qualification.
+Source palette ramps, unsupported script control flow and remnant lifetime
+caps remain documented limitations of this importer.

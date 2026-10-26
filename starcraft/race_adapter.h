@@ -530,6 +530,12 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
             worker >= 0 && worker < MAX_UNITS ? u[worker].raw_owner : -1,
             type)) return 0;
 #endif
+    if (type == B_REFINERY || type == B_EXTRACTOR || type == B_ASSIMILATOR) {
+        int geyser = geyser_at(x, y);
+        if (geyser < 0) return 0;
+        x = geysers[geyser].x;
+        y = geysers[geyser].y;
+    }
     if (!r || r->race != race_owner_identity(owner) || worker < 0 || worker >= MAX_UNITS ||
         !u[worker].alive || u[worker].owner != owner || u[worker].type != r->worker ||
         !race_can_site(owner, type, x, y) || !can_place(type, x, y)) return 0;
@@ -1036,6 +1042,7 @@ static void race_skirmish_init(void)
     memset(race_minerals, 0, sizeof(race_minerals)); memset(race_gas, 0, sizeof(race_gas));
     race_skirmish_geometry();
     frame = 0; won = lost = 0; supply_used = 0; supply_cap = 0;
+    death_vfx_reset();
     minerals = 200; gas = 0; geyser_count = 4;
     for (i = 0; i < 4; ++i) {
         int sx = (i == 0 || i == 3) ? -1 : 1;

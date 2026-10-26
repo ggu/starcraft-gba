@@ -18,6 +18,11 @@
 #error "SC64_ROUTE_PARTIAL_FLOOD requires SC64_RACES and SC64_ROUTE_PACK3"
 #endif
 #endif
+#ifdef SC64_ROUTE_FLOOD_SPLIT
+#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3)
+#error "SC64_ROUTE_FLOOD_SPLIT requires SC64_RACES and SC64_ROUTE_PACK3"
+#endif
+#endif
 #ifdef SC64_ROUTE_VISIT_GRID
 #if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3)
 #error "SC64_ROUTE_VISIT_GRID requires SC64_RACES and SC64_ROUTE_PACK3"
@@ -336,7 +341,71 @@ static int sc64_route_origin_ready(int slot, int origin, int origin_walkable)
 }
 #endif
 
-static int GBA_HOT
+#ifdef SC64_ROUTE_FLOOD_SPLIT
+/* Keep lookup/metadata cold while preserving a hot flood loop. The caller
+ * passes the existing seed queue and partial-completeness state unchanged. */
+static int GBA_HOT __attribute__((noinline))
+sc64_route_flood(int slot, int head, int *tail, int origin,
+                 int origin_walkable, int complete)
+{
+    int qtail = *tail;
+#ifndef SC64_ROUTE_PARTIAL_FLOOD
+    (void)origin;
+    (void)origin_walkable;
+#endif
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+    if (sc64_route_origin_ready(slot, origin, origin_walkable))
+        complete = (qtail == 0);
+    else
+#endif
+    while (head < qtail) {
+#ifdef SC64_RACES
+        int cell = bfs_queue[head++], col = sc64_cell_col(cell), row = sc64_cell_row(cell);
+#else
+        int cell = bfs_queue[head++], col = cell % MAP_COLS, row = cell / MAP_COLS;
+#endif
+        int next;
+        /* The stored direction takes the neighbour back toward this cell. */
+#ifdef SC64_RACES
+#ifdef SC64_ROUTE_VISIT_GRID
+#define SC64_FLOOD(condition, neighbour, direction) \
+        if (condition) { next = (neighbour); \
+            if (SC64_GRID_GET(path_walkable, next)) { \
+                sc64_route_put(slot, next, (direction)); bfs_queue[qtail++] = (u16)next; \
+                SC64_GRID_SET(path_walkable, next, 0); } }
+#else
+#define SC64_FLOOD(condition, neighbour, direction) \
+        if (condition) { next = (neighbour); \
+            if (SC64_GRID_GET(path_walkable, next) && sc64_route_get(slot, next) == SC64_ROUTE_UNREACHABLE) { \
+                sc64_route_put(slot, next, (direction)); bfs_queue[qtail++] = (u16)next; } }
+#endif
+#else
+#define SC64_FLOOD(condition, neighbour, direction) \
+        if (condition) { next = (neighbour); \
+            if (SC64_GRID_GET(path_walkable, next) && field[next] == 0xFFFF) { \
+                field[next] = (u16)(((field[cell] & ~7u) + 8u) | (direction)); \
+                bfs_queue[qtail++] = (u16)next; } }
+#endif
+        SC64_FLOOD(col > 0, cell - 1, 1);
+        SC64_FLOOD(col + 1 < MAP_COLS, cell + 1, 2);
+        SC64_FLOOD(row > 0, cell - MAP_COLS, 3);
+        SC64_FLOOD(row + 1 < MAP_ROWS, cell + MAP_COLS, 4);
+#undef SC64_FLOOD
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+        if (sc64_route_origin_ready(slot, origin, origin_walkable)) {
+            if (head < qtail) complete = 0;
+            break;
+        }
+#endif
+    }
+    *tail = qtail;
+    return complete;
+}
+#define SC64_ROUTE_SLOT_ATTR __attribute__((noinline))
+#else
+#define SC64_ROUTE_SLOT_ATTR GBA_HOT
+#endif
+static int SC64_ROUTE_SLOT_ATTR
 #ifdef SC64_ROUTE_PARTIAL_FLOOD
 sc64_route_slot_for_origin(int goal, int origin, int origin_walkable)
 #else
@@ -444,6 +513,15 @@ sc64_route_slot(int goal)
             }
         }
     }
+#ifdef SC64_ROUTE_FLOOD_SPLIT
+#ifdef SC64_ROUTE_PARTIAL_FLOOD
+    complete = sc64_route_flood(slot, head, &tail,
+                                origin, origin_walkable, complete
+                                );
+#else
+    (void)sc64_route_flood(slot, head, &tail, -1, 0, 1);
+#endif
+#else
 #ifdef SC64_ROUTE_PARTIAL_FLOOD
     if (sc64_route_origin_ready(slot, origin, origin_walkable)) complete = (tail == 0);
     else
@@ -488,6 +566,7 @@ sc64_route_slot(int goal)
         }
 #endif
     }
+#endif
 #ifdef SC64_ROUTE_VISIT_GRID
     /* Each enqueued cell was cleared exactly once, so bfs_queue is a compact
      * restoration list for the temporarily borrowed walkability bits. */
@@ -512,6 +591,8 @@ sc64_route_slot(int goal)
     sc64_route_builds++;
     return slot;
 }
+
+#undef SC64_ROUTE_SLOT_ATTR
 
 #ifdef SC64_ROUTE_PARTIAL_FLOOD
 /* Keep the legacy complete-field API for callers that do not have an origin. */

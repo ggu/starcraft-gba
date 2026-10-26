@@ -796,8 +796,14 @@ static int all_source_count(int raw, int building, int owner)
 static int source_units_at_location(int raw,int owner,unsigned location)
 {
     int n=0;
+    Sc64T4QueryRect area;
+    if(!sc64_t6_area(location,&area))return 0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==raw&&u[i].owner==owner&&
-       !SC64_TRANSPORT_LOADED(&u[i])&&point_in_location(location,u[i].x,u[i].y))++n;
+       !SC64_TRANSPORT_LOADED(&u[i])){
+        Sc64T4QueryRect actor;
+        if(sc64_t6_actor_rect((unsigned)raw,0,u[i].x,u[i].y,&actor)&&
+           sc64_t4_query_rect_overlap(&area,&actor))++n;
+    }
     return n;
 }
 
@@ -1011,5 +1017,6 @@ int main(int argc,char **argv)
                        race_campaign.phase==SC64_RACE_PHASE_COMPLETE&&
                        (race_campaign.objective_flags&SC64_RACE_OBJECTIVE_PRIMARY)&&
                        (race_completed&(1<<SC64_T6_GLOBAL_ID))&&goal_raynors>=1&&goal_ships>=2&&
-                       hero_slot>=0&&u[hero_slot].alive&&norad_slot>=0&&b[norad_slot].alive&&!loaded) ? 0 : 1;
+                       hero_slot>=0&&u[hero_slot].alive&&norad_slot>=0&&b[norad_slot].alive&&
+                       all_source_count(11,0,SIDE)>=2&&!loaded) ? 0 : 1;
 }

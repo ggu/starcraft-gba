@@ -309,6 +309,31 @@ race_campaign_build_site(int owner, int type, int base_x, int base_y, int *x, in
     return 0;
 }
 
+/* P2's 900-second trigger creates thirteen escort units and Fenix in one
+ * event. Keep the campaign AI's own production backlog from consuming those
+ * slots before the trigger. This is only a queue budget: player production
+ * and imported actors remain untouched, so the scripted event retries if
+ * they leave fewer than fourteen free slots. */
+static int
+race_campaign_p2_ai_queue_room(void)
+{
+    int i, j, free_slots = 0, queued_slots = 0;
+    if (race_mode || race_campaign.mission != SC64_RACE_MISSION_P2 ||
+        (race_campaign.objective_flags & SC64_RACE_OBJECTIVE_FENIX_READY) ||
+        race_campaign.phase == SC64_RACE_PHASE_COMPLETE ||
+        race_campaign.phase == SC64_RACE_PHASE_FAILED) return MAX_UNITS;
+    for (i = 0; i < MAX_UNITS; ++i) free_slots += !u[i].alive;
+    /* Count every owner's pending products because any of them can occupy
+     * the slots needed by the source trigger. Zerglings hatch as pairs. */
+    for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive)
+        for (j = 0; j < b[i].queue_count; ++j) {
+            int type = b[i].queue[(b[i].queue_head + j) % 5];
+            if (sc64_race_unit_rule(type)) queued_slots += type == U_ZERGLING ? 2 : 1;
+        }
+    queued_slots += 14; /* five Dragoons, five Zealots, three Reavers, Fenix */
+    return free_slots > queued_slots ? free_slots - queued_slots : 0;
+}
+
 static void
 race_campaign_ai_tick(void)
 {
@@ -337,7 +362,7 @@ race_campaign_ai_tick(void)
                  enemy_race == R_PROTOSS ? U_ZEALOT : U_MARINE;
     producer_type = enemy_race == R_ZERG ? B_HATCHERY :
                      enemy_race == R_PROTOSS ? B_NEXUS : B_COMMAND;
-    if (producer >= 0 && workers < 7)
+    if (producer >= 0 && workers < 7 && race_campaign_p2_ai_queue_room() >= 1)
         (void)race_queue_unit(ENEMY, producer, worker_type);
 
     if (enemy_race == R_ZERG) {
@@ -354,7 +379,8 @@ race_campaign_ai_tick(void)
         if (builder >= 0 && race_start_build(ENEMY, builder, next_build, x, y)) return;
     }
 
-    if (producer >= 0 && b[producer].queue_count < 2)
+    if (producer >= 0 && b[producer].queue_count < 2 &&
+        race_campaign_p2_ai_queue_room() >= (train_type == U_ZERGLING ? 2 : 1))
         (void)race_queue_unit(ENEMY, producer, train_type);
     /* Imported enemy squads start as map guards. Release only a small group
      * on a long cadence so the original bases do not turn into an immediate
@@ -574,6 +600,7 @@ race_campaign_init(void)
     memset(explored, 0, sizeof(explored));
     memset(visible, 0, sizeof(visible));
     memset(tracers, 0, sizeof(tracers));
+    death_vfx_reset();
     reset_selection_gestures();
     geyser_count = 0;
     supply_used = 0;
@@ -745,6 +772,15 @@ race_campaign_init(void)
             u[slot].raw_type = raw;
             u[slot].raw_owner = src->owner;
             u[slot].flags = src->flags;
+            /* Mission identity aliases (notably early Raynor) must retain
+             * their objective enum while using the actual source unit's
+             * stock capacities before applying scenario percentages. */
+            const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
+            if (stock) {
+                u[slot].hp=u[slot].maxhp=(int)stock->hp;
+                u[slot].shield=(int)stock->shields;
+                u[slot].armor=(u8)stock->armor;
+            }
             if (src->hp_percent && src->hp_percent <= 100)
                 u[slot].hp = u[slot].maxhp * src->hp_percent / 100;
             if (type == U_FENIX) race_campaign.rescue_unit = (unsigned short)slot;
@@ -954,35 +990,46 @@ race_campaign_init(void)
     update_exploration();
 }
 
-static void
+static int
 race_campaign_spawn_p2_reinforcements(void)
 {
-    int i, type, slot;
+    static const int raw_types[14] = {
+        66, 66, 66, 66, 66, 65, 65, 65, 65, 65, 83, 83, 83, 77
+    };
+    int i, type, slot, free_slots = 0, created[14], old_supply_used = supply_used;
     /* P2 TRIG record 5: CountdownTimer(900), MRGN 1/3/4/5. */
-    for (i = 0; i < 5; ++i) {
-        type = sc64_race_unit_from_raw(66);
-        slot = spawn_unit(SIDE, type, 1400 + (i % 2) * 8, 64 + (i / 2) * 8);
-        if (slot >= 0) { u[slot].raw_type = 66; u[slot].raw_owner = 13; }
+    for (i = 0; i < MAX_UNITS; ++i) free_slots += !u[i].alive;
+    if (free_slots < 14) return 0;
+    for (i = 0; i < 14; ++i)
+        if (sc64_race_unit_from_raw(raw_types[i]) < 0) return 0;
+
+    /* The update loop is single-threaded. Preflight all slots, then create
+     * the complete event before publishing FENIX_READY. On an unexpected
+     * failure, roll back only units created by this call and retry later. */
+    for (i = 0; i < 14; ++i) {
+        int x, y, owner = i == 13 ? RESCUABLE : SIDE;
+        if (i < 5) { x = 1400 + (i % 2) * 8; y = 64 + (i / 2) * 8; }
+        else if (i < 10) { int n = i - 5; x = 1344 + (n % 2) * 8; y = 96 + (n / 2) * 8; }
+        else if (i < 13) { int n = i - 10; x = 1400 + (n % 2) * 8; y = 128 + (n / 2) * 8; }
+        else { x = 1312; y = 96; }
+        type = sc64_race_unit_from_raw(raw_types[i]);
+        slot = spawn_unit(owner, type, x, y);
+        if (slot < 0) {
+            while (i > 0) u[created[--i]].alive = 0;
+            supply_used = old_supply_used;
+            return 0;
+        }
+        created[i] = slot;
     }
-    for (i = 0; i < 5; ++i) {
-        type = sc64_race_unit_from_raw(65);
-        slot = spawn_unit(SIDE, type, 1344 + (i % 2) * 8, 96 + (i / 2) * 8);
-        if (slot >= 0) { u[slot].raw_type = 65; u[slot].raw_owner = 13; }
+    for (i = 0; i < 14; ++i) {
+        u[created[i]].raw_type = raw_types[i];
+        u[created[i]].raw_owner = i == 13 ? 2 : 13;
     }
-    for (i = 0; i < 3; ++i) {
-        type = sc64_race_unit_from_raw(83);
-        slot = spawn_unit(SIDE, type, 1400 + (i % 2) * 8, 128 + (i / 2) * 8);
-        if (slot >= 0) { u[slot].raw_type = 83; u[slot].raw_owner = 13; }
-    }
-    type = sc64_race_unit_from_raw(77);
-    slot = spawn_unit(RESCUABLE, type, 1312, 96);
-    if (slot >= 0) {
-        u[slot].raw_type = 77; u[slot].raw_owner = 2;
-        race_campaign.rescue_unit = (unsigned short)slot;
-    }
+    race_campaign.rescue_unit = (unsigned short)created[13];
     race_campaign.objective_flags |= SC64_RACE_OBJECTIVE_FENIX_READY;
     race_campaign.phase = SC64_RACE_PHASE_REINFORCEMENTS;
     race_campaign_set_message(6);
+    return 1;
 }
 
 static int

@@ -1,6 +1,5 @@
-/* Opt-in Zerg/Protoss storage foundation checks. This fixture exercises the
- * enlarged geometry and compact record codecs; it does not enable campaign
- * missions or assert full-campaign pool capacity. */
+/* Opt-in Zerg/Protoss storage checks. This fixture exercises enlarged geometry
+ * and selected compact codecs; it does not enable campaign missions. */
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -40,7 +39,9 @@
 #error "Compile with the opt-in Zerg/Protoss storage gate"
 #endif
 
-#ifdef SC64_P4_STORM_ENABLED
+#ifdef SC64_P5_SHUTTLE_ENABLED
+_Static_assert(SC64_RACE_SAVE_GENERATION == 26u, "distinct P5 Shuttle storage generation");
+#elif defined(SC64_P4_STORM_ENABLED)
 _Static_assert(SC64_RACE_SAVE_GENERATION == 21u, "distinct Storm storage generation");
 #else
 _Static_assert(SC64_RACE_SAVE_GENERATION == 20u, "distinct Z/P storage generation");
@@ -50,10 +51,25 @@ _Static_assert(MAX_UNITS == 240, "first-stage Protoss unit bound");
 #else
 _Static_assert(MAX_UNITS == 192, "first-stage Zerg unit bound");
 #endif
+#ifdef SC64_ZP_FULL_STORAGE
+_Static_assert(MAX_BUILDINGS == 160, "P5 full-profile building bound");
+_Static_assert(MAX_MINERALS == 144, "P5 full-profile mineral bound");
+#else
 _Static_assert(MAX_BUILDINGS == 96, "first-stage Z/P building bound");
 _Static_assert(MAX_MINERALS == 48, "first-stage Z/P mineral bound");
+#endif
 _Static_assert(sizeof(Unit) == 56, "compact live Unit layout");
-_Static_assert(sizeof(Sc64PackedUnitSave) == 38, "compact Unit save row");
+#ifdef SC64_ZP_FULL_STORAGE
+typedef Sc64ZpPackedUnitSave StorageFixtureUnitSave;
+#define storage_fixture_unit_encode sc64_zp_unit_save_encode
+#define storage_fixture_unit_decode sc64_zp_unit_save_decode
+_Static_assert(sizeof(StorageFixtureUnitSave) == 35, "ZP Unit save row");
+#else
+typedef Sc64PackedUnitSave StorageFixtureUnitSave;
+#define storage_fixture_unit_encode sc64_unit_save_encode
+#define storage_fixture_unit_decode sc64_unit_save_decode
+_Static_assert(sizeof(StorageFixtureUnitSave) == 38, "legacy compact Unit save row");
+#endif
 _Static_assert(sizeof(Sc64PackedBuildingSave) == 28, "compact Building save row");
 _Static_assert(sizeof(RaceSave) <= 16368, "save record remains bounded");
 _Static_assert(SC64_ROUTE_SLOTS == 14, "large-map route cache has a fixed bound");
@@ -163,8 +179,12 @@ static void test_nine_bit_visibility_sources(void)
     for (int i = 0; i < MAX_UNITS + MAX_BUILDINGS; ++i)
         sc64_visibility_source_change(cell, 1);
     assert(sc64_visibility_source_count(cell) == MAX_UNITS + MAX_BUILDINGS);
+#ifdef SC64_ZP_FULL_STORAGE
+    assert(sc64_visibility_source_count(cell) == 400);
+#else
     assert(sc64_visibility_source_count(cell) ==
            (SC64_CAMPAIGN_RACE == 2 ? 336 : 288));
+#endif
     assert(SC64_GRID_GET(visible, cell));
     assert(sc64_visible_sources_high[(unsigned)cell >> 3] &
            (u8)(1u << ((unsigned)cell & 7u)));
@@ -177,7 +197,7 @@ static void test_nine_bit_visibility_sources(void)
 static void test_compact_unit_roundtrip_and_rejection(void)
 {
     Unit source = {0}, decoded;
-    Sc64PackedUnitSave row, damaged;
+    StorageFixtureUnitSave row, damaged;
     source.hp = source.maxhp = 131071;
     source.carry = -65536;
     source.shield = 4095;
@@ -190,22 +210,40 @@ static void test_compact_unit_roundtrip_and_rejection(void)
     source.alive = 1;
     source.selected = 1;
     source.order = ORDER_ATTACK_MOVE;
-    source.cd = source.work_timer = source.path_timer = source.path_retry = 65535;
+    source.cd = source.work_timer = 65535;
+#ifdef SC64_ZP_FULL_STORAGE
+    source.path_timer = 24;
+    source.path_retry = 12;
+#else
+    source.path_timer = source.path_retry = 65535;
+#endif
     source.weapon = source.flags = 65535;
     source.armor = 255;
     source.raw_type = source.raw_owner = 255;
     source.shield_remainder = 1279;
     race_cols = race_rows = 128;
-    assert(sc64_unit_save_encode(&row, &source, 2048, 2048));
-    assert(sc64_unit_save_decode(&decoded, &row, 2048, 2048));
+    assert(storage_fixture_unit_encode(&row, &source, 2048, 2048));
+    assert(storage_fixture_unit_decode(&decoded, &row, 2048, 2048));
     assert(memcmp(&decoded, &source, sizeof(source)) == 0);
     damaged = row;
+#ifdef SC64_ZP_FULL_STORAGE
+    /* The 35-byte ZP record uses all 280 bits and has no padding. Set the
+     * packed path_timer field (bits 187..191) to the invalid value 25. */
+    for (unsigned i = 0; i < 5; ++i) {
+        unsigned bit = 187u + i;
+        u8 mask = (u8)(1u << (bit & 7u));
+        if ((25u >> i) & 1u) damaged.bytes[bit >> 3] |= mask;
+        else damaged.bytes[bit >> 3] &= (u8)~mask;
+    }
+#else
+    /* Legacy 38-byte format has an explicit reserved high padding bit. */
     damaged.bytes[SC64_PACKED_UNIT_SAVE_BYTES - 1] |= 0x80;
+#endif
     memset(&decoded, 0xA5, sizeof(decoded));
     Unit before = decoded;
-    assert(!sc64_unit_save_decode(&decoded, &damaged, 2048, 2048));
+    assert(!storage_fixture_unit_decode(&decoded, &damaged, 2048, 2048));
     assert(memcmp(&decoded, &before, sizeof(decoded)) == 0);
-    assert(!sc64_unit_save_encode(&row, &source, 2047, 2048));
+    assert(!storage_fixture_unit_encode(&row, &source, 2047, 2048));
 }
 
 static void test_compact_building_roundtrip_and_rejection(void)
@@ -245,7 +283,7 @@ static void test_save_union_and_generation(void)
     static RaceSave save, loaded;
     Unit source, decoded;
     Building building, decoded_building;
-    Sc64PackedUnitSave bad_unit;
+    StorageFixtureUnitSave bad_unit;
     memset(&save, 0, sizeof(save));
     memset(&loaded, 0, sizeof(loaded));
     save.version = SAVE_VERSION;
@@ -255,7 +293,7 @@ static void test_save_union_and_generation(void)
     source.x = source.y = 2047;
     source.hp = 8; source.maxhp = 10; source.owner = 2; source.type = U_DRONE;
     source.alive = 1; source.order = ORDER_IDLE; source.target = -1;
-    assert(sc64_unit_save_encode(&save.units[MAX_UNITS - 1], &source, 2048, 2048));
+    assert(storage_fixture_unit_encode(&save.units[MAX_UNITS - 1], &source, 2048, 2048));
     memset(&building, 0, sizeof(building));
     building.x = building.y = 2047;
     building.hp = 10; building.maxhp = 10; building.owner = 2;
@@ -266,7 +304,7 @@ static void test_save_union_and_generation(void)
     save_write(&save, sizeof(save), SAVE_VERSION);
     assert(save_read(&loaded, sizeof(loaded), SAVE_VERSION));
     assert(loaded.version == SAVE_VERSION);
-    assert(sc64_unit_save_decode(&decoded, &loaded.units[MAX_UNITS - 1], 2048, 2048));
+    assert(storage_fixture_unit_decode(&decoded, &loaded.units[MAX_UNITS - 1], 2048, 2048));
     assert(memcmp(&decoded, &source, sizeof(source)) == 0);
     assert(sc64_building_save_decode(&decoded_building,
                                      &loaded.buildings[MAX_BUILDINGS - 1]));
@@ -274,14 +312,29 @@ static void test_save_union_and_generation(void)
     assert((loaded.fog[(MAP_CELLS - 1) >> 3] &
             (u8)(1u << ((MAP_CELLS - 1) & 7))) != 0);
     bad_unit = loaded.units[MAX_UNITS - 1];
+#ifdef SC64_ZP_FULL_STORAGE
+    /* Same invalid path_timer value as the standalone malformed-row case. */
+    for (unsigned i = 0; i < 5; ++i) {
+        unsigned bit = 187u + i;
+        u8 mask = (u8)(1u << (bit & 7u));
+        if ((25u >> i) & 1u) bad_unit.bytes[bit >> 3] |= mask;
+        else bad_unit.bytes[bit >> 3] &= (u8)~mask;
+    }
+#else
     bad_unit.bytes[SC64_PACKED_UNIT_SAVE_BYTES - 1] |= 0x80;
-    assert(!sc64_unit_save_decode(&decoded, &bad_unit, 2048, 2048));
+#endif
+    assert(!storage_fixture_unit_decode(&decoded, &bad_unit, 2048, 2048));
     assert(sizeof(sc64_zp_route_save_scratch) >= sizeof(RaceSave));
     assert(sizeof(sc64_zp_route_save_scratch) >= MAP_CELLS * sizeof(u16));
+#ifdef SC64_ZP_FULL_STORAGE
+    /* P5 opts into the full campaign pools, including its scripted arrivals. */
+    assert(MAX_UNITS == 240 && MAX_BUILDINGS == 160 && MAX_MINERALS == 144);
+#else
     /* These are staged bounds, not full-campaign capacity. P4 needs room for
      * 87 scripted creations in addition to its initial roster; production
      * must preserve those slots rather than consuming them in advance. */
     assert(MAX_UNITS < 256 && MAX_BUILDINGS < 150 && MAX_MINERALS < 142);
+#endif
 }
 
 int main(void)

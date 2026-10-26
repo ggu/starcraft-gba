@@ -14,10 +14,21 @@ A compact Terran-versus-Zerg RTS skirmish for the shared 240×160 mode-4 rendere
 
 Box selection requires a ROM rebuilt from the updated source; an older copied ROM does not include it.
 
+An optional build replaces menu scrolling with a hold-B command ring: aim, hold B, press a direction and release. See [`docs/COMMAND-RING.md`](../docs/COMMAND-RING.md).
+
 In the optional race ROMs, the light-blue bar above a Protoss unit or building
 shows shields; the lower bar shows HP. An empty blue track means shields are
 depleted. The selection panel displays shields as `SH` separately from `HP`.
 Shields absorb damage first and regenerate independently of health.
+
+Destroyed units and buildings play a short death effect instead of vanishing.
+Infantry and Zerg ground units collapse and leave remains, vehicles and
+aircraft explode, Protoss units burst in blue, and buildings explode and
+leave rubble for 30 seconds. These original-art effects follow the death
+families and timing of StarCraft 64. They are not its frames, and they do
+not affect combat or saves.
+When a mission ends, the last explosions finish before the result panel
+opens; buttons on the result screen still respond immediately.
 
 SCVs automatically gather mineral trips of up to eight minerals and return to the nearest Command Center. To build, select an SCV, open B, choose a structure, move to the site, and press A. Barracks require a completed Supply Depot; Academies require a completed Barracks. Refineries can only be placed on one of the two marked geysers. Select a worker and press A on a completed Refinery to assign gas harvesting, or select the Refinery and press A to assign an idle worker.
 
@@ -29,6 +40,8 @@ This is an original-art RTS demake rather than a full StarCraft engine. It uses 
 
 It omits campaign triggers, air units, large tech trees, unit abilities, damage-type/size modifiers, pathing influence from other mobile units, multiplayer, and original game art/audio. Firebat splash, upgrades, fog visibility, and Zerg wave behavior are compact approximations for a short handheld mission. Medics do not have a healing order yet.
 
+Combat effects use small authored weapon-family animations for the implemented attacks. They are presentation only: attacks still apply damage immediately, and the short effect timing does not reproduce the original game's projectile or IScript behavior. In Protoss profiles, unit and building overlays show shields in a separate blue bar above health, and the selection panel reports current shields for shielded actors.
+
 The opening scenario averaged about 21.92 updates/second in a 240-tick mGBA ARM sample, with pathfinding hitches. Unit timers use a fixed step, so slowdown also slows in-game time. The renderer targets about 30 updates/second when update and drawing costs fit the frame budget. See the [validation record](../docs/VALIDATION.md); physical hardware performance has not been measured.
 
 ## Rule references
@@ -36,3 +49,11 @@ The opening scenario averaged about 21.92 updates/second in a 240-tick mGBA ARM 
 BWAPI's public stat tables were checked at repository commit `d727fed68558c506163048ea889131d8cbb33915`. Unit identities are in [`UnitType.h`](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/include/BWAPI/UnitType.h); default HP, armor, mineral/gas costs, build times, and doubled supply values are in [`UnitType.cpp`](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/UnitType.cpp#L559-L919); default damage, cooldown, and range values are in [`WeaponType.cpp`](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/WeaponType.cpp#L152-L216). The extracted reference records are in [`../docs/reference-stats.json`](../docs/reference-stats.json). BWAPI reports supply in doubled internal units and weapon ranges in pixels; the demake stores supply in half-units and maps the 32-pixel original terrain tile to a 16-pixel GBA tile.
 
 OpenBW's mining loop extracts up to eight minerals at a time, including the remaining amount in a depleted patch: [`bwgame.h`](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L2149-L2156). BWAPI stat times and cooldowns are simulation frame counts; this game scales those frame counts by 30/24 to retain their approximate durations at the GBA renderer's 30 updates per second.
+
+
+Gas buildings can be placed by selecting a worker, opening the field menu with
+B, choosing REFINERY / EXTRACTOR / ASSIMILATOR for its race, and pressing A over
+the geyser. Placement and its preview snap to the geyser center when the cursor
+hits its body. With a worker selected, press A on a completed friendly gas
+building to gather gas. Harvesting workers show a blue/cyan mineral cue or a
+green gas cue beside their sprite while loaded.

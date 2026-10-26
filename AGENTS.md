@@ -47,3 +47,18 @@ replay and fresh-process SRAM qualification are separate checks described in
 profile limits.
 
 Do not fetch or generate private game inputs just to complete a default-profile task. If an optional check cannot run because its local inputs are absent, say so in the handoff and report the default checks completed.
+
+## Local verification and Actions usage
+
+- Run normal source-boundary, doctor, build and test checks on the local machine.
+  Use `python3 tools/check_source_tree.py`, `./dev doctor`, `./dev build` and
+  `./dev test`, plus the applicable prepared-profile checks above.
+- The source-check workflow is intentionally disabled in repository settings
+  and accepts only manual dispatch. Do not enable or dispatch it, add automatic
+  push/PR/scheduled runs, or select paid runners without an explicit user request.
+- Local evidence is sufficient for review and merge when applicable checks pass;
+  do not wait for or create a redundant Actions run. Record the tested commit,
+  commands and results in the PR or handoff.
+- A requested Linux compatibility check may use the standard Ubuntu runner for
+  this public repository. Keep its manual-event guard and cancellation of
+  superseded runs. Do not automatically run public PR code on personal runners.

@@ -92,6 +92,20 @@ race_save_invincible_padding_valid(const RaceSave *candidate)
 #define RACE_SAVE_INV_U(candidate, i) ((candidate)->invincible_units[(i)])
 #define RACE_SAVE_INV_B(candidate, i) ((candidate)->invincible_buildings[(i)])
 #endif
+
+/* Legacy unified SRAM rows store each Building word as s16. Preserve the
+ * exact source 100000 HP for the static Zerg Beacon without changing the row
+ * shape or save generation. This sentinel is valid only for raw 194 mapped
+ * to B_ZERG_BEACON; all other health values remain range-checked normally. */
+#define SC64_LEGACY_BEACON_HP_SENTINEL (-32768)
+static int
+sc64_legacy_beacon_hp_sentinel(int type, int raw_type, int hp, int maxhp)
+{
+    return type == B_ZERG_BEACON && raw_type == 194 &&
+           hp == SC64_LEGACY_BEACON_HP_SENTINEL &&
+           maxhp == SC64_LEGACY_BEACON_HP_SENTINEL;
+}
+
 #ifdef SC64_P6_RUNTIME
 #include "sc64_p6_save.h"
 #endif
@@ -410,10 +424,12 @@ static int race_p7_carrier_training_save_valid(const RaceSave *candidate,
     /* The save occupies 16292 bytes; the candidate actor table fits in the
      * unused tail of the existing 32768-byte route scratch union. */
     Unit *actors=sc64_zp_route_save_scratch.carrier_candidate.units;
+#ifndef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
     /* This generation cannot launch: reject impossible in-flight packets,
      * including a packet that names a valid but docked child as its shooter. */
     if (sc64_codec_allocated_count(candidate->interceptor_projectiles,
                                   SC64_CODEC_BYTES)!=0) return 0;
+#endif
     for (unsigned i=0;i<MAX_UNITS;++i)
         if (!race_save_decode_unit(candidate,i,ww,wh,&actors[i])) return 0;
     return race_p7_carrier_training_candidate_valid(actors,MAX_UNITS);
@@ -482,6 +498,17 @@ static int race_save_game(void) {
             b[i].raw_type!=sc64_race_raw_building(b[i].type) || b[i].under_construction ||
             b[i].queue_count || b[i].shield || !invincible_buildings[i]))return 0;
 #endif
+#if !defined(SC64_T6_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
+    /* A malformed or partially-damaged beacon cannot be represented by the
+     * legacy 16-bit row. Fail closed instead of truncating either HP field. */
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].type == B_ZERG_BEACON &&
+            (b[i].raw_type != 194 ||
+             !((b[i].hp == 100000 && b[i].maxhp == 100000) ||
+               (b[i].maxhp == 10000 && b[i].hp > 0 && b[i].hp <= 10000)) ||
+             b[i].under_construction ||
+             b[i].queue_count || b[i].shield)) return 0;
+#endif
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
     memset(&race_data, 0, sizeof(race_data));
 #elif defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
@@ -533,6 +560,13 @@ static int race_save_game(void) {
 #else
     for(int i=0;i<MAX_BUILDINGS;i++)for(unsigned j=0;j<RACE_BUILD_WORDS;j++) {
         int n;memcpy(&n,(u8*)&b[i]+j*sizeof(int),sizeof(n));
+#if !defined(SC64_T6_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
+        if (b[i].alive && b[i].type == B_ZERG_BEACON && b[i].raw_type == 194 &&
+            b[i].hp == 100000 && b[i].maxhp == 100000 &&
+            (j == offsetof(Building,hp)/sizeof(int) ||
+             j == offsetof(Building,maxhp)/sizeof(int)))
+            n = SC64_LEGACY_BEACON_HP_SENTINEL;
+#endif
 #ifdef SC64_T4_RUNTIME
         if(sc64_race_t4_building_intrinsically_invincible(b[i].type) &&
            (j==offsetof(Building,hp)/sizeof(int) ||
@@ -621,8 +655,9 @@ static int race_save_game(void) {
     if (race_p5_active()) {
         if (!race_p5_runtime_state_valid()) return 0;
         race_data.p5 = race_p5;
+    }
 #if defined(SC64_P6_RUNTIME) || defined(SC64_P7_BATTERY_ENABLED)
-    } else if (
+    else if (
 #ifdef SC64_P6_RUNTIME
                !race_p6_active() &&
 #endif
@@ -630,9 +665,9 @@ static int race_save_game(void) {
                !race_p7_active() &&
 #endif
                1) {
-#endif
         memset(&race_data.p5, 0, sizeof(race_data.p5));
     }
+#endif
 #endif
 #ifdef SC64_P6_RUNTIME
     if (race_p6_active()) {
@@ -1165,17 +1200,24 @@ static int race_load_game(void) {
             RACE_B(i,shield)!=0||RACE_SAVE_INV_B(&race_data, i)!=1))return 0;
 #endif
         if(!RACE_B(i,alive))continue;
+        int health_ok=RACE_B(i,hp)>0&&RACE_B(i,maxhp)>0&&
+                      RACE_B(i,hp)<=RACE_B(i,maxhp);
+        if (sc64_legacy_beacon_hp_sentinel(RACE_B(i,type),RACE_B(i,raw_type),
+                                           RACE_B(i,hp),RACE_B(i,maxhp)) ||
+            (RACE_B(i,type)==B_ZERG_BEACON && RACE_B(i,raw_type)==194 &&
+             RACE_B(i,maxhp)==10000 && RACE_B(i,hp)>0 &&
+             RACE_B(i,hp)<=10000)) {
+            /* The legacy s16 codec uses this exact pair only for the
+             * invulnerable stock Zerg Beacon. */
+            health_ok = !RACE_B(i,under_construction) &&
+                        !RACE_B(i,queue_count) && !RACE_B(i,shield);
+        }
 #ifdef SC64_T4_RUNTIME
-        int health_ok=RACE_B(i,hp)>0&&RACE_B(i,maxhp)>0&&RACE_B(i,hp)<=RACE_B(i,maxhp);
         if(sc64_race_t4_building_intrinsically_invincible(RACE_B(i,type)))
             health_ok=1; /* The profile-specific exact prop value was checked above. */
 #endif
         if(RACE_B(i,type)<0||RACE_B(i,type)>=SC_RB_COUNT||RACE_B(i,owner)<0||RACE_B(i,owner)>4||
-#ifdef SC64_T4_RUNTIME
             !health_ok||
-#else
-            RACE_B(i,hp)<=0||RACE_B(i,maxhp)<=0||RACE_B(i,hp)>RACE_B(i,maxhp)||
-#endif
             RACE_B(i,x)<0||RACE_B(i,x)>=width*16||RACE_B(i,y)<0||RACE_B(i,y)>=height*16||
             RACE_B(i,queue_count)<0||RACE_B(i,queue_count)>5||RACE_B(i,queue_head)<0||RACE_B(i,queue_head)>4||
             RACE_B(i,queue_progress)<0||RACE_B(i,build_progress)<-1||RACE_B(i,shield)<0||
@@ -1827,6 +1869,12 @@ static int race_load_game(void) {
         int n=j==offsetof(Building,flags)/sizeof(int)?(u16)race_data.buildings[i][j]:race_data.buildings[i][j];
         memcpy((u8*)&b[i]+j*sizeof(int),&n,sizeof(n));
     }
+#if !defined(SC64_T6_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (sc64_legacy_beacon_hp_sentinel(b[i].type,b[i].raw_type,
+                                           b[i].hp,b[i].maxhp))
+            b[i].hp = b[i].maxhp = 100000;
+#endif
 #endif
 #ifdef SC64_T4_RUNTIME
     for(int i=0;i<MAX_BUILDINGS;i++)
@@ -1985,7 +2033,7 @@ static int race_load_game(void) {
      * projectile arena. The candidate packet already passed full preflight. */
     if (!race_p7_projectile_restore(race_data.interceptor_projectiles)) return 0;
 #endif
-    memset(tracers,0,sizeof(tracers));mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
+    memset(tracers,0,sizeof(tracers));death_vfx_reset();mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
     invalidate_path_grid();sc64_visibility_reset();update_exploration();reset_selection_gestures();
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
     screen=won||lost?SCREEN_RESULT:SCREEN_PLAY;toast(7);return 1;

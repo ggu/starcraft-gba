@@ -17,6 +17,8 @@ static int last_logged_keys = -1;
 static int trace_first = 1;
 static const char *trace_path;
 static int run_limit = RUN_LIMIT_DEFAULT;
+static int controller_input_error;
+static int controller_limit_reached;
 static int deployed;
 static int last_order_frame = -1;
 static int last_production_frame = -1;
@@ -195,6 +197,13 @@ static void checkpoint(const char *kind)
 static void step(u16 held)
 {
     if (deployed && (screen != SCREEN_PLAY || won || lost)) return;
+    /* The UI helpers below may run several updates without advancing the
+     * campaign clock (for example, while a command menu is open). Keep both
+     * clocks bounded so a missed menu action cannot spin forever. */
+    if (deployed && (frame >= run_limit || host_ticks >= (u32)run_limit + 10000u)) {
+        controller_limit_reached = 1;
+        return;
+    }
     u16 pressed = held & (u16)~prior_keys;
     game_update(held, pressed);
     prior_keys = held;
@@ -228,29 +237,53 @@ static void move_cursor(int x, int y)
 {
     x = snap4(cx, x, WORLD_W);
     y = snap4(cy, y, WORLD_H);
-    while ((cx != x || cy != y) && screen == SCREEN_PLAY && !won && !lost) {
+    int stalled = 0;
+    while ((cx != x || cy != y) && screen == SCREEN_PLAY && !won && !lost &&
+           !controller_input_error && !controller_limit_reached) {
         u16 held = KEY_R;
         if (cx < x) held |= KEY_RIGHT;
         if (cx > x) held |= KEY_LEFT;
         if (cy < y) held |= KEY_DOWN;
         if (cy > y) held |= KEY_UP;
+        int old_x = cx, old_y = cy;
         step(held);
+        if (cx == old_x && cy == old_y) {
+            if (!controller_limit_reached && ++stalled >= 120) {
+                fprintf(stderr, "Z4 cursor unreachable: from=%d,%d target=%d,%d frame=%d menu=%d mode=%d\n",
+                        old_x, old_y, x, y, frame, menu_open, mode);
+                controller_input_error = 1;
+            }
+        } else stalled = 0;
     }
-    step(0);
+    if (!controller_input_error && !controller_limit_reached) step(0);
+    if ((cx != x || cy != y) && !won && !lost && !controller_limit_reached)
+        controller_input_error = 1;
 }
 
 static void move_cursor_held(int x, int y, u16 held)
 {
     x = snap4(cx, x, WORLD_W);
     y = snap4(cy, y, WORLD_H);
-    while ((cx != x || cy != y) && screen == SCREEN_PLAY && !won && !lost) {
+    int stalled = 0;
+    while ((cx != x || cy != y) && screen == SCREEN_PLAY && !won && !lost &&
+           !controller_input_error && !controller_limit_reached) {
         u16 keys = held;
         if (cx < x) keys |= KEY_RIGHT;
         if (cx > x) keys |= KEY_LEFT;
         if (cy < y) keys |= KEY_DOWN;
         if (cy > y) keys |= KEY_UP;
+        int old_x = cx, old_y = cy;
         step(keys);
+        if (cx == old_x && cy == old_y) {
+            if (!controller_limit_reached && ++stalled >= 120) {
+                fprintf(stderr, "Z4 box cursor unreachable: from=%d,%d target=%d,%d frame=%d menu=%d mode=%d\n",
+                        old_x, old_y, x, y, frame, menu_open, mode);
+                controller_input_error = 1;
+            }
+        } else stalled = 0;
     }
+    if ((cx != x || cy != y) && !won && !lost && !controller_limit_reached)
+        controller_input_error = 1;
 }
 
 static void select_box(int x, int y, int radius)
@@ -406,8 +439,24 @@ static int select_worker_slot(int worker)
 {
     if (worker < 0 || worker >= MAX_UNITS || !u[worker].alive || u[worker].owner != SIDE ||
         !sc64_race_is_worker(u[worker].type)) return 0;
-    select_box(u[worker].x, u[worker].y, 10);
-    return selected_building < 0 && find_selected_worker() >= 0;
+    /* Walk the ordinary cursor toward the live worker position. Drones can
+     * keep moving while a fixed-coordinate cursor trip is in progress, so
+     * refresh the target each update and click once inside the select radius. */
+    int steps = 0;
+    while (u[worker].alive && dist2(cx, cy, u[worker].x, u[worker].y) > 20 * 20 &&
+           screen == SCREEN_PLAY && !won && !lost && !controller_input_error &&
+           !controller_limit_reached && steps++ < 120) {
+        u16 held = KEY_R;
+        if (cx < u[worker].x) held |= KEY_RIGHT;
+        if (cx > u[worker].x) held |= KEY_LEFT;
+        if (cy < u[worker].y) held |= KEY_DOWN;
+        if (cy > u[worker].y) held |= KEY_UP;
+        step(held);
+    }
+    if (!u[worker].alive) return 0;
+    if (dist2(cx, cy, u[worker].x, u[worker].y) > 20 * 20) return 0;
+    tap(KEY_A);
+    return selected_building < 0 && find_selected_worker() == worker;
 }
 
 static int choose_menu_row(int row)
@@ -459,12 +508,13 @@ static void assign_gas_workers(void)
 {
     int refinery = side_building_type(B_EXTRACTOR, 1);
     if (refinery < 0) return;
-    for (int i = 0; i < MAX_UNITS && side_gas_workers() < 3; ++i)
+    for (int i = 0; i < MAX_UNITS && side_gas_workers() < 3; ++i) {
         if (u[i].alive && u[i].owner == SIDE && sc64_race_is_worker(u[i].type) &&
             u[i].order != ORDER_BUILD && u[i].order != ORDER_GAS && select_worker_slot(i)) {
             move_cursor(b[refinery].x, b[refinery].y);
             tap(KEY_A);
         }
+    }
 }
 
 static void advance_air_tech(void)
@@ -575,7 +625,7 @@ int main(int argc, char **argv)
     last_order_frame = frame;
     last_production_frame = frame;
     last_tech_frame = frame;
-    while (frame < run_limit && screen == SCREEN_PLAY && !won && !lost) {
+    while (frame < run_limit && screen == SCREEN_PLAY && !won && !lost && !controller_input_error && !controller_limit_reached) {
         if (frame >= last_tech_frame + 300) {
             advance_air_tech();
             last_tech_frame = frame;
@@ -595,11 +645,11 @@ int main(int argc, char **argv)
         }
         step(0);
     }
-    checkpoint(won ? "won" : lost ? "lost" : "limit");
+    checkpoint(won ? "won" : lost ? "lost" : controller_input_error ? "input-error" : "limit");
     fprintf(trace, "]}\n");
     fclose(trace);
     printf("Z4 controller attempt result=%s frame=%d host_tick=%u outcome=%u hatch=0x%x remaining_force3_CC=%d side_units=%d side_buildings=%d trace=%s\n",
-           won ? "WON" : lost ? "LOST" : "LIMIT", frame, (unsigned)host_ticks,
+           won ? "WON" : lost ? "LOST" : controller_input_error ? "INPUT_ERROR" : "LIMIT", frame, (unsigned)host_ticks,
            race_z4.model.outcome, race_z4.hatch_effects, force3_command_centers(),
            owner_units(SIDE), owner_buildings(SIDE), trace_path);
     if (!won) print_blocker();

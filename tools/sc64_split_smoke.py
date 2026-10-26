@@ -30,6 +30,11 @@ PROFILE_IDS = {"terran": R_TERRAN, "zerg": R_ZERG, "protoss": R_PROTOSS}
 MISSIONS_PER_PAGE = 2
 FRONT_FIELDS: dict[str, int] = {}
 MAP_DIMS = ((64, 64), (64, 64))
+PROFILE_BUILD_PATHS = {
+    "terran": ("StarCraft-Terran-GBA.gba", "starcraft-terran.elf"),
+    "zerg": ("StarCraft-Zerg-Z6-GBA.gba", "starcraft-zerg-z6.elf"),
+    "protoss": ("StarCraft-Protoss-P5-Shuttle-GBA.gba", "starcraft-protoss-p5-shuttle.elf"),
+}
 
 
 def i32(rsp, address: int) -> int:
@@ -444,8 +449,9 @@ def main() -> None:
     if args.mission is not None and args.profile == "all":
         matching = []
         for candidate in profiles:
-            candidate_rom = ROOT / "build" / f"StarCraft-{candidate.capitalize()}-GBA.gba"
-            candidate_elf = ROOT / "build" / f"starcraft-{candidate}.elf"
+            rom_name, elf_name = PROFILE_BUILD_PATHS[candidate]
+            candidate_rom = ROOT / "build" / rom_name
+            candidate_elf = ROOT / "build" / elf_name
             if not candidate_rom.is_file() or not candidate_elf.is_file():
                 continue
             if args.mission in read_campaign_metadata(candidate_rom, candidate_elf,
@@ -459,8 +465,9 @@ def main() -> None:
     run_out.mkdir(parents=False, exist_ok=False)
     results = []
     for profile in profiles:
-        rom = args.rom or ROOT / "build" / f"StarCraft-{profile.capitalize()}-GBA.gba"
-        elf = args.elf or ROOT / "build" / f"starcraft-{profile}.elf"
+        rom_name, elf_name = PROFILE_BUILD_PATHS[profile]
+        rom = args.rom or ROOT / "build" / rom_name
+        elf = args.elf or ROOT / "build" / elf_name
         results.append(run_one(profile, rom, elf, args.map, args.race,
                                args.bots, args.ticks, run_out, args.mission))
     result = {"profiles": results}

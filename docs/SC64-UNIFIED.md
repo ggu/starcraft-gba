@@ -66,8 +66,10 @@ preserved; they are not automatically imported into this new save format.
 ## Fidelity and validation
 
 This combines the implemented GBA adaptations. It does not add later missions,
-full original AI, complete CHK interpretation, spells, cinematics or original
-audio. The original scenario terrain and placements, reduced mechanics and
+full original AI, complete CHK interpretation, spells, cinematics, transmission
+dialogue or annoyed unit responses. Imported sound effects, unit responses and
+music play when the optional audio bank is prepared; see
+[Development](DEVELOPMENT.md#optional-starcraft-64-sound-effects-and-music). The original scenario terrain and placements, reduced mechanics and
 remaining limitations are described in [Terran campaign](SC64-CAMPAIGN.md) and
 [Races](SC64-RACES.md). Reference revisions and license status are listed in
 [REFERENCES.md](REFERENCES.md) and [third-party notices](../THIRD_PARTY_NOTICES.md).

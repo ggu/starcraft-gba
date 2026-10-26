@@ -10,8 +10,142 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from tools import sc64_split_profile, sc64_split_smoke
 
 ROOT = Path(__file__).resolve().parents[1]
+UNIT_WORD_SPRITE_HEADER = (
+    '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n'
+    '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 1\n'
+    'static const u32 sc64_race_unit_words_0_p0[1] = {0};\n'
+    'static const GbaSpriteWordFrame sc64_race_unit_words_0 = {1,1,{0,0,0,0}};\n'
+    'static inline const GbaSpriteWordFrame *sc64_race_unit_words_sprite(unsigned short raw_type, const Sc64SpriteFrame *frame) {\n'
+    '    switch (raw_type) { case 0: return &sc64_race_unit_words_0; }\n'
+    '    return (const GbaSpriteWordFrame *)0;\n'
+    '}\n'
+)
+FACING_SPRITE_HEADER = (
+    '#define SC64_UNIT_FACING_BANK_VERSION 2\n'
+    '#define SC64_UNIT_FACING_DIRECTIONAL_METADATA 1\n'
+    '#define SC64_UNIT_FACING_WORD_METADATA 1\n'
+    'static const unsigned char sc64_unit_facing_0_0_pixels[1] = {1};\n'
+    'static const Sc64SpriteFrame sc64_unit_facing_0[17] = {{0}};\n'
+    'static const u32 sc64_unit_facing_0_word_0_p0[1] = {1};\n'
+    'static const GbaSpriteWordFrame sc64_unit_facing_0_word_0 = {0};\n'
+    'static inline const Sc64SpriteFrame *sc64_unit_facing_frames(unsigned short raw_type) { return 0; }\n'
+    'static inline const Sc64UnitFacingWordFrame *sc64_unit_facing_word_frame(unsigned short raw_type, unsigned char direction) { return 0; }\n'
+)
+ATTACK_POSE_HEADER = (
+    '#define SC64_UNIT_ATTACK_POSE_BANK_VERSION 1\n'
+    '#define SC64_UNIT_ATTACK_POSE_METADATA 1\n'
+    'static const unsigned char sc64_unit_attack_pixels_0[1] = {1};\n'
+    'static inline unsigned char sc64_unit_attack_source_release_tick(unsigned short raw_type, int target_air) { return 0; }\n'
+    'static inline unsigned char sc64_unit_attack_source_duration(unsigned short raw_type, int target_air) { return 1; }\n'
+    'static inline unsigned short sc64_unit_attack_source_full_duration(unsigned short raw_type, int target_air) { return 2; }\n'
+    'static inline const Sc64SpriteFrame *sc64_unit_attack_source_frame(unsigned short raw_type, int target_air, unsigned char heading32, unsigned int post_release_tick) { return 0; }\n'
+    'static inline const Sc64SpriteFrame *sc64_unit_attack_source_full_frame(unsigned short raw_type, int target_air, unsigned char heading32, unsigned int attack_tick) { return 0; }\n'
+    '#define SC64_UNIT_ATTACK_POSE_PIXEL_BYTES 1u\n'
+)
+WEAPON_SOURCE_HEADER = (
+    '#define SC64_WEAPON_SOURCE_BANK_VERSION 1\n'
+    '#define SC64_WEAPON_SOURCE_METADATA 1\n'
+    '#define SC64_WEAPON_SOURCE_PROFILE_COUNT 1\n'
+    '#define SC64_WEAPON_SOURCE_IMAGE_COUNT 1\n'
+    '#define SC64_WEAPON_SOURCE_FRAME_COUNT 1\n'
+    '#define SC64_WEAPON_SOURCE_ANIMATION_COUNT 1\n'
+    '#define SC64_WEAPON_SOURCE_LUT_COUNT 1\n'
+    'static const Sc64WeaponSourceAttackProfile sc64_weapon_source_profiles[1] = {{0}};\n'
+    'static const Sc64WeaponSourceImage sc64_weapon_source_images[1] = {{0}};\n'
+    'static const Sc64WeaponSourceFrame sc64_weapon_source_frames[1] = {{0}};\n'
+    'static const Sc64WeaponSourceAnimation sc64_weapon_source_animations[1] = {{0}};\n'
+    'static const Sc64WeaponSourceLut sc64_weapon_source_luts[1] = {{0}};\n'
+    'static const uint8_t sc64_weapon_source_pixels[1] = {1};\n'
+    'static const uint8_t sc64_weapon_source_lut_bytes[1] = {1};\n'
+    'sc64_weapon_source_profile_lookup(\n'
+    'sc64_weapon_source_image_lookup(\n'
+    'sc64_weapon_source_frame_lookup(\n'
+    'sc64_weapon_source_frame_pixels(\n'
+    'sc64_weapon_source_animation_lookup(\n'
+    'sc64_weapon_source_lut_for_image(\n'
+)
+DEATH_SOURCE_HEADER = (
+    '#define SC64_DEATH_SOURCE_BANK_VERSION 2u\n'
+    '#define SC64_DEATH_SOURCE_METADATA_VERSION 1u\n'
+    '#define SC64_DEATH_SOURCE_ACTOR_COUNT 1u\n'
+    '#define SC64_DEATH_SOURCE_PIXEL_BYTES 1u\n'
+    '#define SC64_DEATH_SOURCE_WORD_METADATA 1u\n'
+    '#define SC64_DEATH_SOURCE_WORD_BYTES 1u\n'
+    'static const unsigned char sc64_death_image_1_frame_0_pixels[1] = {1};\n'
+    'static const u32 sc64_death_image_1_frame_0_words_p0[1] = {1};\n'
+    'static const u32 sc64_death_image_1_frame_0_words_p1[1] = {1};\n'
+    'static const u32 sc64_death_image_1_frame_0_words_p2[1] = {1};\n'
+    'static const u32 sc64_death_image_1_frame_0_words_p3[1] = {1};\n'
+    'static const GbaSpriteWordFrame sc64_death_image_1_frame_0_words = {0};\n'
+    'static const Sc64DeathSource sc64_death_raw_1 = {0};\n'
+    'sc64_death_image_frame(unsigned short image_id, unsigned short frame_index)\n'
+    'sc64_death_image_word_frame(unsigned short image_id, unsigned short frame_index)\n'
+    'sc64_death_source(int raw_unit_id)\n'
+)
+TANK_VFX_HEADER = (
+    '#define SC64_TANK_SOURCE_VFX_VERSION 1\n'
+    'static const Sc64TankSourceFrame sc64_tank_frames_533[14] = {{0}};\n'
+    'static const uint8_t sc64_tank_source_pixels[1] = {1};\n'
+    'static const uint8_t sc64_tank_projected_lut[63*256] = {0};\n'
+)
+CONSTRUCTION_COLOR_HEADER = (
+    '#define SC64_CONSTRUCTION_COLOR_MODIFIERS_VERSION 1\n'
+    'static const unsigned char sc64_warp_211_strengths_0[1] = {32};\n'
+    'static const unsigned char sc64_construction_blue_lookup[40*256] = {0};\n'
+    'sc64_construction_modifier_frame(int image_id, int frame);\n'
+    'sc64_construction_modifier_lookup(int image_id, int *rows);\n'
+)
+
+
+def emit_construction_header(root):
+    path = root / dev.CONSTRUCTION_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(CONSTRUCTION_COLOR_HEADER, encoding='ascii')
+
+
+def emit_facing_header(root):
+    emit_construction_header(root)
+    path = root / dev.FACING_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(FACING_SPRITE_HEADER, encoding='ascii')
+    path = root / dev.TANK_VFX_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(TANK_VFX_HEADER, encoding='ascii')
+    path = root / dev.ATTACK_POSE_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(ATTACK_POSE_HEADER, encoding='ascii')
+    path = root / dev.WEAPON_SOURCE_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(WEAPON_SOURCE_HEADER, encoding='ascii')
+    emit_death_source_header(root)
+
+
+def emit_attack_pose_header(root):
+    path = root / dev.ATTACK_POSE_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(ATTACK_POSE_HEADER, encoding='ascii')
+
+
+def emit_weapon_source_header(root):
+    path = root / dev.WEAPON_SOURCE_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(WEAPON_SOURCE_HEADER, encoding='ascii')
+
+
+def emit_death_source_header(root):
+    path = root / dev.DEATH_SOURCE_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(DEATH_SOURCE_HEADER, encoding='ascii')
+
+
+P4_SCENARIO_HEADER = (
+    '#define SC64_P4_SCENARIO_GENERATED_H 1\n'
+    '#define SC64_P4_CREATE_PREFIX_VERSION 1\n'
+    'static const unsigned char sc64_p4_source_create_prefix[2] = {0,1};\n'
+)
 loader = importlib.machinery.SourceFileLoader('starcraft_dev', str(ROOT / 'dev'))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 dev = importlib.util.module_from_spec(spec)
@@ -24,6 +158,138 @@ verify_loader.exec_module(verify_roms)
 
 
 class OnboardingTests(unittest.TestCase):
+    def test_construction_readiness_requires_glow_version_and_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'construction.h'
+            self.assertFalse(dev.construction_color_input_ready(header))
+            for text in (
+                '#define SC64_CONSTRUCTION_SPRITES_GENERATED_H\n',
+                CONSTRUCTION_COLOR_HEADER.replace('MODIFIERS_VERSION 1', 'MODIFIERS_VERSION 10'),
+                CONSTRUCTION_COLOR_HEADER.replace('sc64_construction_modifier_frame(', 'old_frame('),
+                CONSTRUCTION_COLOR_HEADER.replace('211_strengths_0[1]', '211_strengths_0[0]'),
+                CONSTRUCTION_COLOR_HEADER.replace('blue_lookup[40*256]', 'blue_lookup[0]'),
+            ):
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.construction_color_input_ready(header))
+            header.write_text(CONSTRUCTION_COLOR_HEADER, encoding='ascii')
+            self.assertTrue(dev.construction_color_input_ready(header))
+
+    def test_tank_effect_readiness_rejects_empty_or_stale_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'tank.h'
+            self.assertFalse(dev.tank_vfx_input_ready(header))
+            for text in (
+                TANK_VFX_HEADER.replace('VFX_VERSION 1', 'VFX_VERSION 10'),
+                TANK_VFX_HEADER.replace('sc64_tank_frames_533[14]', 'sc64_tank_frames_533[1]'),
+                TANK_VFX_HEADER.replace('sc64_tank_source_pixels[1]', 'sc64_tank_source_pixels[0]'),
+                TANK_VFX_HEADER.replace('sc64_tank_projected_lut[63*256]', 'missing_lut[63*256]'),
+            ):
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.tank_vfx_input_ready(header))
+            header.write_text(TANK_VFX_HEADER, encoding='ascii')
+            self.assertTrue(dev.tank_vfx_input_ready(header))
+
+    def test_directional_readiness_rejects_legacy_markers_and_empty_bank(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'facing.h'
+            invalid = (
+                '#define SC64_UNIT_FACING_PIXEL_BYTES 1\n',
+                FACING_SPRITE_HEADER.replace('BANK_VERSION 2', 'BANK_VERSION 20'),
+                FACING_SPRITE_HEADER.replace('DIRECTIONAL_METADATA 1', 'DIRECTIONAL_METADATA 0'),
+                FACING_SPRITE_HEADER.replace('WORD_METADATA 1', 'WORD_METADATA 0'),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_word_frame(', 'missing_accessor('),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_0_word_0 =', 'missing_frame ='),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_0_word_0_p0[1]', 'sc64_unit_facing_0_word_0_p0[0]'),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_0[17]', 'sc64_unit_facing_0[1]'),
+                FACING_SPRITE_HEADER.replace('sc64_unit_facing_0_0_pixels[1]', 'sc64_unit_facing_0_0_pixels[0]'),
+            )
+            self.assertFalse(dev.facing_sprite_input_ready(header))
+            for text in invalid:
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.facing_sprite_input_ready(header))
+            header.write_text(FACING_SPRITE_HEADER, encoding='ascii')
+            self.assertTrue(dev.facing_sprite_input_ready(header))
+
+    def test_attack_pose_readiness_requires_version_accessors_and_pixels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'attack.h'
+            self.assertFalse(dev.attack_pose_input_ready(header))
+            invalid = (
+                ATTACK_POSE_HEADER.replace('BANK_VERSION 1', 'BANK_VERSION 2'),
+                ATTACK_POSE_HEADER.replace('POSE_METADATA 1', 'POSE_METADATA 0'),
+                ATTACK_POSE_HEADER.replace('source_release_tick(', 'missing_release('),
+                ATTACK_POSE_HEADER.replace('source_duration(', 'missing_duration('),
+                ATTACK_POSE_HEADER.replace('source_frame(', 'missing_frame('),
+                ATTACK_POSE_HEADER.replace('source_full_duration(', 'missing_full_duration('),
+                ATTACK_POSE_HEADER.replace('source_full_frame(', 'missing_full_frame('),
+                ATTACK_POSE_HEADER.replace('attack_pixels_0[1]', 'attack_pixels_0[0]'),
+                ATTACK_POSE_HEADER.replace('POSE_PIXEL_BYTES 1u', 'POSE_PIXEL_BYTES 0u'),
+            )
+            for text in invalid:
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.attack_pose_input_ready(header))
+            header.write_text(ATTACK_POSE_HEADER, encoding='ascii')
+            self.assertTrue(dev.attack_pose_input_ready(header))
+
+    def test_weapon_source_readiness_requires_selectors_frames_and_luts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'weapon.h'
+            self.assertFalse(dev.weapon_source_input_ready(header))
+            invalid = (
+                WEAPON_SOURCE_HEADER.replace('BANK_VERSION 1', 'BANK_VERSION 2'),
+                WEAPON_SOURCE_HEADER.replace('SOURCE_METADATA 1', 'SOURCE_METADATA 0'),
+                WEAPON_SOURCE_HEADER.replace('source_profile_lookup(', 'missing_profile('),
+                WEAPON_SOURCE_HEADER.replace('source_image_lookup(', 'missing_image('),
+                WEAPON_SOURCE_HEADER.replace('source_frame_lookup(', 'missing_frame('),
+                WEAPON_SOURCE_HEADER.replace('source_frame_pixels(', 'missing_pixels('),
+                WEAPON_SOURCE_HEADER.replace('source_animation_lookup(', 'missing_animation('),
+                WEAPON_SOURCE_HEADER.replace('source_lut_for_image(', 'missing_lut('),
+                WEAPON_SOURCE_HEADER.replace('source_pixels[1]', 'source_pixels[0]'),
+                WEAPON_SOURCE_HEADER.replace('source_lut_bytes[1]', 'source_lut_bytes[0]'),
+                WEAPON_SOURCE_HEADER.replace('PROFILE_COUNT 1', 'PROFILE_COUNT 0'),
+                WEAPON_SOURCE_HEADER.replace('FRAME_COUNT 1', 'FRAME_COUNT 0'),
+                WEAPON_SOURCE_HEADER.replace('LUT_COUNT 1', 'LUT_COUNT 0'),
+            )
+            for text in invalid:
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.weapon_source_input_ready(header))
+            header.write_text(WEAPON_SOURCE_HEADER, encoding='ascii')
+            self.assertTrue(dev.weapon_source_input_ready(header))
+
+    def test_terran_build_requires_directional_bank_before_make(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            header = root / '.local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h'
+            header.parent.mkdir(parents=True)
+            header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'run') as run:
+                with self.assertRaisesRegex(RuntimeError, 'directional sprite bank'):
+                    dev.build('terran')
+                run.assert_not_called()
+                emit_facing_header(root)
+                dev.build('terran')
+                run.assert_called_once_with(['make', 'terran'])
+                run.reset_mock()
+                (root / dev.TANK_VFX_HEADER).unlink()
+                with self.assertRaisesRegex(RuntimeError, 'source Tank effects'):
+                    dev.build('terran')
+                run.assert_not_called()
+                emit_facing_header(root)
+                (root / dev.ATTACK_POSE_HEADER).unlink()
+                with self.assertRaisesRegex(RuntimeError, 'source attack-pose data'):
+                    dev.build('terran')
+                run.assert_not_called()
+                emit_facing_header(root)
+                (root / dev.WEAPON_SOURCE_HEADER).unlink()
+                with self.assertRaisesRegex(RuntimeError, 'source weapon VFX data'):
+                    dev.build('terran')
+                run.assert_not_called()
+                emit_facing_header(root)
+                (root / dev.CONSTRUCTION_HEADER).unlink()
+                with self.assertRaisesRegex(RuntimeError, 'blue-glow modifier bank'):
+                    dev.build('terran')
+                run.assert_not_called()
+
     def test_z3_and_p3_profile_gates_are_required_and_distinct(self):
         with tempfile.TemporaryDirectory() as directory:
             header = Path(directory) / 'sc64_races_generated.h'
@@ -39,17 +305,293 @@ class OnboardingTests(unittest.TestCase):
             header.write_text('sc64_race_z3_units\n', encoding='utf-8')
             self.assertFalse(dev.race_campaign_input_ready('zerg', header))
 
-    def test_canonical_race_verifiers_use_third_mission_identities(self):
+    def test_canonical_race_verifiers_use_current_mission_identities(self):
         self.assertEqual(verify_roms.TARGETS['--zerg'],
+                         ('StarCraft-Zerg-Z6-GBA', 'starcraft-zerg-z6', 'SCZ6', 'SC ZERG Z6'))
+        self.assertEqual(verify_roms.TARGETS['--zerg-z4'],
+                         ('StarCraft-Zerg-Z4-GBA', 'starcraft-zerg-z4', 'SCZ4', 'SC ZERG Z4'))
+        self.assertEqual(verify_roms.TARGETS['--zerg-z3'],
                          ('StarCraft-Zerg-GBA', 'starcraft-zerg', 'SCZ3', 'SC ZERG Z3'))
-        self.assertEqual(verify_roms.TARGETS['--zerg-z3'], verify_roms.TARGETS['--zerg'])
         self.assertEqual(verify_roms.TARGETS['--protoss'],
+                         ('StarCraft-Protoss-P5-Shuttle-GBA', 'starcraft-protoss-p5-shuttle',
+                          'SCPB', 'SC P5 CARGO'))
+        self.assertEqual(verify_roms.TARGETS['--protoss-p4-storm'],
+                         ('StarCraft-Protoss-P4-Storm-GBA', 'starcraft-protoss-p4-storm',
+                          'SCP5', 'SC P4 STORM'))
+        self.assertEqual(verify_roms.TARGETS['--protoss-p3'],
                          ('StarCraft-Protoss-GBA', 'starcraft-protoss', 'SCP3', 'SC PROTOSS3'))
-        self.assertEqual(verify_roms.TARGETS['--protoss-p3'], verify_roms.TARGETS['--protoss'])
 
     def test_dev_race_tests_include_full_campaign_targets(self):
         self.assertEqual(dev.SC64_TEST_TARGETS['zerg'], 'test-zerg')
+        self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z4'], 'test-zerg-z4')
+        self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z3'], 'test-zerg-z3')
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
+        self.assertEqual(dev.GAMES['zerg'], ('zerg', 'build/StarCraft-Zerg-Z6-GBA.gba'))
+        self.assertEqual(dev.GAMES['zerg-z4'], ('zerg-z4', 'build/StarCraft-Zerg-Z4-GBA.gba'))
+        self.assertEqual(dev.GAMES['zerg-z3'], ('zerg-z3', 'build/StarCraft-Zerg-GBA.gba'))
+        self.assertEqual(dev.PLAY_SAVE_PROFILES,
+                         {'zerg': 'zerg-z6', 'zerg-z4': 'zerg-z4', 'zerg-z3': 'zerg',
+                          'protoss': 'protoss-p5-shuttle', 'protoss-p3': 'protoss',
+                          'protoss-p4-storm': 'protoss-p4-storm',
+                          'protoss-p5-shuttle': 'protoss-p5-shuttle'})
+        self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['zerg'],
+                         ('StarCraft-Zerg-Z6-GBA.gba', 'starcraft-zerg-z6.elf'))
+        self.assertEqual(sc64_split_profile.PROFILE_BUILD_PATHS['zerg'],
+                         ('StarCraft-Zerg-Z6-GBA.gba', 'starcraft-zerg-z6.elf'))
+        for routes in (sc64_split_profile.PROFILE_BUILD_PATHS, sc64_split_smoke.PROFILE_BUILD_PATHS):
+            self.assertEqual(routes['protoss'],
+                             ('StarCraft-Protoss-P5-Shuttle-GBA.gba', 'starcraft-protoss-p5-shuttle.elf'))
+
+    def test_p4_storm_and_legacy_p3_have_explicit_build_and_save_routes(self):
+        self.assertEqual(dev.GAMES['protoss-p3'],
+                         ('protoss-p3', 'build/StarCraft-Protoss-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p4-storm'],
+                         ('protoss-p4-storm', 'build/StarCraft-Protoss-P4-Storm-GBA.gba'))
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p4-storm'], 'test-protoss-p4-storm')
+        makefile = (ROOT / 'Makefile').read_text(encoding='utf-8')
+        p4_test = next(line for line in makefile.splitlines()
+                       if line.startswith('test-protoss-p4-storm:'))
+        self.assertIn('test-sc64-p4-runtime', p4_test)
+        self.assertIn('test-sc64-p4-campaign', p4_test)
+        self.assertIn('test-sc64-p4-occupancy-targets', p4_test)
+        p5_rule = next(line for line in makefile.splitlines()
+                       if line.startswith('build/test-sc64-protoss-carried-campaign:'))
+        self.assertIn('$(P5_INPUTS)', p5_rule)
+        self.assertNotEqual(dev.GAMES['protoss'][1], dev.GAMES['protoss-p4-storm'][1])
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss'], 'protoss-p5-shuttle')
+        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p4-storm'], ('protoss-p4-storm', 'build/StarCraft-Protoss-P4-Storm-GBA.gba'))
+        self.assertEqual(dev.PLAY_SAVE_PROFILES.get('protoss-p4-storm', 'protoss-p4-storm'),
+                         'protoss-p4-storm')
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss-p3'], 'protoss')
+
+    def test_p4_prepare_authenticates_fresh_chapter_inputs_before_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rom = root / 'owned-rom.z64'
+            rom.write_bytes(b'user supplied fixture')
+            calls = []
+
+            def emit(path, text):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text, encoding='ascii')
+
+            def fake_run(command, **_kwargs):
+                calls.append(command)
+                script = Path(command[1]).name
+                local = root / '.local/sc64'
+                if script == 'sc64_workspace.py':
+                    emit(local / 'rom/StarCraft64-USA.z64', 'prepared source fixture')
+                elif script == 'sc64_races_pack.py':
+                    output = (Path(command[command.index('--out') + 1]) if '--out' in command
+                              else local / 'races/generated/sc64_races_generated.h')
+                    emit(output, ''.join(
+                        f'#if defined(SC64_UNIFIED) && defined({gate})\n{payload}\n'
+                        f'#endif /* SC64_UNIFIED && {gate} */\n'
+                        for gate, payload in (dev.RACE_CAMPAIGN_GATES['protoss-p3'],
+                                              dev.RACE_CAMPAIGN_GATES['protoss-p4-storm'])))
+                elif script == 'sc64_race_sprites.py':
+                    output = (Path(command[command.index('--header') + 1]) if '--header' in command
+                              else local / 'races/generated/sc64_race_sprites_generated.h')
+                    self.assertIn('--prepack-unit-words', command)
+                    emit(output, UNIT_WORD_SPRITE_HEADER)
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
+                elif script == 'sc64_p4_pack.py':
+                    emit(local / 'p4/manifest.json',
+                         '{"schema":1,"mission":{"id":"P4","global_catalog_index":23,'
+                         '"source_map_path":"008/021"}}')
+                elif script == 'sc64_p4_scenario_pack.py':
+                    emit(local / 'p4/generated/sc64_p4_scenario_generated.h',
+                         P4_SCENARIO_HEADER)
+
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
+                    patch.object(dev, 'run', side_effect=fake_run):
+                dev.prepare(rom, 'protoss-p4-storm')
+            self.assertTrue(all(dev.protoss_p4_input_ready(label, root / relative)
+                                for label, relative, _ in dev.PROTOSS_P4_INPUTS))
+            self.assertIn('sc64_skirmish_pack.py', [Path(call[1]).name for call in calls])
+            # Existence is insufficient: stale maps, art, scenarios and source
+            # identities must all be rejected before invoking Make.
+            for label, relative, _ in dev.PROTOSS_P4_INPUTS:
+                path = root / relative
+                original = path.read_text()
+                path.write_text('stale fixture\n', encoding='ascii')
+                with self.subTest(label=label), patch.object(dev, 'ROOT', root), \
+                        patch.object(dev, 'run', side_effect=AssertionError('Make must not run')):
+                    for game in ('protoss', 'protoss-p4-storm'):
+                        with self.assertRaisesRegex(RuntimeError, 'authenticated chapter inputs'):
+                            dev.build(game)
+                path.write_text(original, encoding='ascii')
+            manifest = root / '.local/sc64/p4/manifest.json'
+            manifest.write_text(
+                '{"schema":1,"mission":{"id":"P4","global_catalog_index":22,'
+                '"source_map_path":"008/021"}}', encoding='ascii')
+            self.assertFalse(dev.protoss_p4_input_ready(
+                'Protoss chapter 4 authenticated source', manifest))
+
+    def test_p4_scenario_readiness_rejects_stale_prefix_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'sc64_p4_scenario_generated.h'
+            label = 'Protoss chapter 4 scenario'
+            header.write_text(P4_SCENARIO_HEADER, encoding='ascii')
+            self.assertTrue(dev.protoss_p4_input_ready(label, header))
+            stale_headers = (
+                '#define SC64_P4_SCENARIO_GENERATED_H 1\n',
+                P4_SCENARIO_HEADER.replace('PREFIX_VERSION 1', 'PREFIX_VERSION 0'),
+                P4_SCENARIO_HEADER.replace('PREFIX_VERSION 1', 'PREFIX_VERSION 10'),
+                P4_SCENARIO_HEADER.replace('sc64_p4_source_create_prefix', 'old_prefix'),
+            )
+            for text in stale_headers:
+                with self.subTest(header=text):
+                    header.write_text(text, encoding='ascii')
+                    self.assertFalse(dev.protoss_p4_input_ready(label, header))
+
+    def test_canonical_zerg_readiness_requires_z4_stage_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            emit_facing_header(root)
+            markers = {
+                '.local/sc64/rom/StarCraft64-USA.z64': 'source ROM fixture',
+                '.local/sc64/backwater/generated/sc64_mission_generated.h': 'input',
+                '.local/sc64/backwater/generated/sc64_assets_generated.h': 'input',
+                '.local/sc64/backwater/generated/sc64_sprites_generated.h': 'input',
+                '.local/sc64/races/generated/sc64_races_generated.h':
+                    '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\nsc64_race_z3_units\n#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */',
+                '.local/sc64/races/generated/sc64_race_sprites_generated.h': 'input',
+                '.local/sc64/races/generated/sc64_menu_generated.h': 'input',
+                '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': CONSTRUCTION_COLOR_HEADER,
+                '.local/sc64/skirmish/generated/sc64_skirmish_generated.h': 'input',
+                '.local/sc64/zp-stage/generated/sc64_races_generated.h':
+                    '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\nsc64_race_z3_units\n#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n'
+                    '#if defined(SC64_UNIFIED) && defined(SC64_Z4_DATA_ENABLED)\nsc64_race_z4_units\n#endif /* SC64_UNIFIED && SC64_Z4_DATA_ENABLED */',
+                '.local/sc64/zp-stage/generated/sc64_race_sprites_generated.h':
+                    UNIT_WORD_SPRITE_HEADER,
+                '.local/sc64/z4/generated/sc64_z4_scenario_generated.h':
+                    '#define SC64_Z4_SCENARIO_GENERATED_H 1',
+                '.local/sc64/z4/manifest.json':
+                    '{"schema":1,"mission":{"id":"Z4","global_catalog_index":15,"source_map_path":"008/017"}}',
+                'build/StarCraft-Zerg-Z4-GBA.gba': 'rom',
+                dev.DEATH_SOURCE_HEADER: DEATH_SOURCE_HEADER,
+            }
+            for relative, content in markers.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding='ascii')
+            sprite_header = root / '.local/sc64/zp-stage/generated/sc64_race_sprites_generated.h'
+            sprite_header.write_text('#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
+                                     encoding='ascii')
+            output = io.StringIO()
+            with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(output):
+                self.assertEqual(dev.status('zerg-z4'), 1)
+            self.assertIn('MISSING Zerg chapter 4 sprites', output.getvalue())
+            self.assertIn('./dev sc64 prepare --rom PATH --profile zerg-z4', output.getvalue())
+            sprite_header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+            output = io.StringIO()
+            death_header = root / dev.DEATH_SOURCE_HEADER
+            death_header.unlink()
+            with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(output):
+                self.assertEqual(dev.status('zerg'), 1)
+            self.assertIn('MISSING Source death art', output.getvalue())
+            death_header.write_text(DEATH_SOURCE_HEADER, encoding='ascii')
+            output = io.StringIO()
+            with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(output):
+                self.assertEqual(dev.status('zerg-z4'), 0)
+            self.assertIn('Zerg chapter 4 scenario:', output.getvalue())
+            (root / '.local/sc64/z4/manifest.json').write_text(
+                '{"schema":1,"mission":{"id":"Z4","global_catalog_index":14,"source_map_path":"008/017"}}',
+                encoding='ascii')
+            with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(dev.status('zerg-z4'), 1)
+
+    def test_canonical_zerg_requires_chapter_five_and_six_inputs(self):
+        z6_gate = ('#if defined(SC64_UNIFIED) && defined(SC64_Z6_DATA_ENABLED)\nsc64_race_z6_units\n'
+                   '#endif /* SC64_UNIFIED && SC64_Z6_DATA_ENABLED */\n')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for label, relative, marker in dev.CANONICAL_ZERG_Z6_INPUTS:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f'#define {marker} 1\n', encoding='ascii')
+            bank = root / '.local/sc64/zerg-z6/generated/sc64_race_sprites_generated.h'
+            label = 'Zerg six-chapter sprites'
+            # Markers without a packed payload, or without the Z5 props, fail.
+            self.assertFalse(dev.canonical_zerg_z6_input_ready(label, bank))
+            bank.write_text(UNIT_WORD_SPRITE_HEADER +
+                            '#define SC64_Z6_BUILDING_SPRITE_SET_COMPLETE 1\n', encoding='ascii')
+            self.assertFalse(dev.canonical_zerg_z6_input_ready(label, bank))
+            bank.write_text(UNIT_WORD_SPRITE_HEADER +
+                            '#define SC64_Z6_BUILDING_SPRITE_SET_COMPLETE 1\n'
+                            '#define SC64_Z5_DOODAD_SPRITE_SET_COMPLETE 1\n', encoding='ascii')
+            self.assertTrue(dev.canonical_zerg_z6_input_ready(label, bank))
+            for label, relative, _ in dev.CANONICAL_ZERG_Z6_INPUTS:
+                self.assertTrue(dev.canonical_zerg_z6_input_ready(label, root / relative))
+            scenario = root / dev.CANONICAL_ZERG_Z6_INPUTS[3][1]
+            scenario.write_text('stale', encoding='ascii')
+            self.assertFalse(dev.canonical_zerg_z6_input_ready('Zerg chapter 6 scenario', scenario))
+            # The build gate also requires the chapter 6 map payload.
+            stage = root / '.local/sc64/zp-stage/generated'
+            (stage / 'sc64_race_sprites_generated.h').write_text(UNIT_WORD_SPRITE_HEADER,
+                                                                 encoding='ascii')
+            scenario.write_text('#define SC64_Z6_SOURCE_GLOBAL_ID 17u\n', encoding='ascii')
+            (stage / 'sc64_races_generated.h').write_text('no Z6 gate', encoding='ascii')
+            with patch.object(dev, 'ROOT', root), patch.object(
+                    dev, 'run', side_effect=AssertionError('make must not run')):
+                with self.assertRaisesRegex(RuntimeError, 'SC64_Z6_DATA_ENABLED map gate'):
+                    dev.build('zerg')
+            (stage / 'sc64_races_generated.h').write_text(z6_gate, encoding='ascii')
+            emit_facing_header(root)
+            calls = []
+            with patch.object(dev, 'ROOT', root), patch.object(
+                    dev, 'run', side_effect=lambda command, **_: calls.append(command)):
+                dev.build('zerg')
+            self.assertEqual(calls, [['make', 'zerg']])
+
+    def test_canonical_zerg_build_rejects_stale_sprite_header_before_make(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            header = root / '.local/sc64/zp-stage/generated/sc64_race_sprites_generated.h'
+            header.parent.mkdir(parents=True)
+            header.write_text('#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
+                              encoding='ascii')
+            with patch.object(dev, 'ROOT', root), patch.object(
+                    dev, 'run', side_effect=AssertionError('make must not run')):
+                with self.assertRaisesRegex(RuntimeError, 'prepacked unit-word sprite metadata'):
+                    dev.build('zerg')
+
+    def test_terran_build_requires_real_word_metadata_before_make(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            header = root / '.local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h'
+            header.parent.mkdir(parents=True)
+            for stale in ('ordinary indexed sprites',
+                          '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 1\n',
+                          UNIT_WORD_SPRITE_HEADER.replace('METADATA 1', 'METADATA 10')):
+                header.write_text(stale, encoding='ascii')
+                with self.subTest(stale=stale[:50]), patch.object(dev, 'ROOT', root), \
+                        patch.object(dev, 'run', side_effect=AssertionError('Make must not run')):
+                    with self.assertRaisesRegex(RuntimeError, 'prepacked unit-word sprite metadata'):
+                        dev.build('terran')
+            header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+            emit_facing_header(root)
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'run') as run:
+                dev.build('terran')
+            run.assert_called_once_with(['make', 'terran'])
+
+    def test_canonical_p5_requires_source_gate_and_prepacked_sprite_payload(self):
+        label = 'Protoss chapter 5 sprites'
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'p5_sprites.h'
+            header.write_text('#define SC64_Z6_SPRITE_SET_COMPLETE 1\n', encoding='ascii')
+            self.assertFalse(dev.staged_campaign_input_ready('protoss-p5-shuttle', label, header))
+            stale = UNIT_WORD_SPRITE_HEADER.replace(
+                '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 1',
+                '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 0')
+            header.write_text('#define SC64_Z6_SPRITE_SET_COMPLETE 1\n' + stale, encoding='ascii')
+            self.assertFalse(dev.staged_campaign_input_ready('protoss-p5-shuttle', label, header))
+            header.write_text('#define SC64_Z6_SPRITE_SET_COMPLETE 1\n' + UNIT_WORD_SPRITE_HEADER,
+                              encoding='ascii')
+            self.assertTrue(dev.staged_campaign_input_ready('protoss-p5-shuttle', label, header))
 
     def test_staged_z6_and_p5_profiles_have_explicit_build_and_test_routes(self):
         self.assertEqual(dev.GAMES['zerg-z6'],
@@ -61,6 +603,13 @@ class OnboardingTests(unittest.TestCase):
             'test-sc64-z6-frame-coverage', 'test-sc64-z6-controller'))
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p5-shuttle'],
                          ('test-sc64-p5-shuttle-runtime', 'test-sc64-p5-campaign-run'))
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
+        makefile = (ROOT / 'Makefile').read_text(encoding='utf-8')
+        self.assertIn('PROTOSS_P5_CANONICAL_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P5_SHUTTLE_FLAGS)', makefile)
+        self.assertIn('test-protoss: ', makefile)
+        canonical_test = next(line for line in makefile.splitlines() if line.startswith('test-protoss:'))
+        self.assertIn('test-sc64-p5-canonical', canonical_test)
+        self.assertIn('build/test-sc64-p5-canonical-campaign-run', makefile)
 
     def test_staged_campaign_preparation_uses_existing_private_packers(self):
         for profile, expected in (
@@ -91,6 +640,9 @@ class OnboardingTests(unittest.TestCase):
                 else:
                     observed.add(f'{name}:{mission}' if mission else name)
             self.assertEqual(observed, expected)
+            p5_sprite_commands = [command for command in calls if Path(command[1]).name == 'sc64_race_sprites.py' and '--include-z6-actors' in command]
+            if profile == 'protoss-p5-shuttle':
+                self.assertTrue(all('--prepack-unit-words' in command for command in p5_sprite_commands))
             self.assertTrue(all('/private/StarCraft64-USA.z64' not in command
                                 for command in calls if Path(command[1]).name not in
                                 ('sc64_z4_pack.py', 'sc64_p4_pack.py', 'sc64_race_sprites.py')))
@@ -161,8 +713,10 @@ class OnboardingTests(unittest.TestCase):
                     if output is not None:
                         output.parent.mkdir(parents=True, exist_ok=True)
                         marker_set = markers_by_path.get(str(output.relative_to(root)), set())
-                        output.write_text('\n'.join(f'#define {marker} 1' for marker in marker_set) + '\n',
-                                          encoding='ascii')
+                        content = '\n'.join(f'#define {marker} 1' for marker in marker_set) + '\n'
+                        if relative.endswith('/p5/generated/sc64_race_sprites_generated.h'):
+                            content += UNIT_WORD_SPRITE_HEADER
+                        output.write_text(content, encoding='ascii')
 
                 with patch.object(dev, 'ROOT', root), patch.object(dev, 'run', side_effect=fake_pack):
                     dev.prepare_staged_campaign(profile, private_rom)
@@ -232,8 +786,20 @@ class OnboardingTests(unittest.TestCase):
                             markers.add('SC64_Z6_SPRITE_SET_COMPLETE')
                         if '--include-z6-buildings' in command:
                             markers.add('SC64_Z6_BUILDING_SPRITE_SET_COMPLETE')
-                        output.write_text('\n'.join(f'#define {marker} 1' for marker in markers) + '\n',
-                                          encoding='ascii')
+                        content = '\n'.join(f'#define {marker} 1' for marker in markers) + '\n'
+                        if '--prepack-unit-words' in command:
+                            content += UNIT_WORD_SPRITE_HEADER
+                        output.write_text(content, encoding='ascii')
+                    elif script == 'sc64_construction_sprites.py':
+                        emit_construction_header(root)
+                    elif script == 'sc64_unit_facing.py':
+                        emit_facing_header(root)
+                    elif script == 'sc64_unit_attack_sprites.py':
+                        emit_attack_pose_header(root)
+                    elif script == 'sc64_weapon_source_sprites.py':
+                        emit_weapon_source_header(root)
+                    elif script == 'sc64_death_sprites.py':
+                        emit_death_source_header(root)
                     elif script == 'sc64_menu_assets.py':
                         output = root / '.local/sc64/races/generated/sc64_menu_generated.h'
                         output.parent.mkdir(parents=True, exist_ok=True)
@@ -274,6 +840,13 @@ class OnboardingTests(unittest.TestCase):
                 with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
                         patch.object(dev, 'run', side_effect=fake_run):
                     dev.prepare(rom, profile)
+
+                # Preparing a later staged profile rewrites the same shared
+                # bank as canonical Zerg; it must not erase the packed data.
+                shared = root / '.local/sc64/zp-stage/generated/sc64_race_sprites_generated.h'
+                self.assertTrue(dev.canonical_zerg_input_ready('Zerg chapter 4 sprites', shared))
+                base = root / '.local/sc64/races/generated/sc64_race_sprites_generated.h'
+                self.assertIn('SC64_RACE_UNIT_WORD_SPRITE_METADATA 1', base.read_text())
 
                 produced = set()
                 for _, relative, _ in dev.STAGED_CAMPAIGN_INPUTS[profile]:
@@ -348,6 +921,221 @@ class OnboardingTests(unittest.TestCase):
             self.assertEqual(status, 1)
             self.assertIn('MISSING Zerg chapter 3 gated map data', output.getvalue())
 
+    def test_canonical_zerg_map_requires_both_z3_and_z4_payload_guards(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'sc64_races_generated.h'
+            label = 'Zerg chapter 4 maps'
+            header.write_text(
+                '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
+                'sc64_race_z3_units\n'
+                '#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n', encoding='ascii')
+            self.assertFalse(dev.canonical_zerg_input_ready(label, header))
+
+            header.write_text(
+                '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
+                'sc64_race_z3_units\n'
+                '#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n'
+                '#if defined(SC64_UNIFIED)\n'
+                'sc64_race_z4_units\n'
+                '#endif /* SC64_UNIFIED && SC64_Z4_DATA_ENABLED */\n', encoding='ascii')
+            self.assertFalse(dev.canonical_zerg_input_ready(label, header))
+
+            header.write_text(
+                '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
+                'sc64_race_z3_units\n'
+                '#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n'
+                '#if defined(SC64_UNIFIED) && defined(SC64_Z4_DATA_ENABLED)\n'
+                'sc64_race_z4_units\n'
+                '#endif /* SC64_UNIFIED && SC64_Z4_DATA_ENABLED */\n', encoding='ascii')
+            self.assertTrue(dev.canonical_zerg_input_ready(label, header))
+
+    def test_canonical_zerg_sprite_readiness_requires_word_metadata_and_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'sc64_race_sprites_generated.h'
+            label = 'Zerg chapter 4 sprites'
+            header.write_text(
+                '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n', encoding='ascii')
+            self.assertFalse(dev.canonical_zerg_input_ready(label, header))
+            header.write_text(
+                '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n'
+                'static inline const GbaSpriteWordFrame *sc64_race_unit_words_sprite(void) { }\n',
+                encoding='ascii')
+            self.assertFalse(dev.canonical_zerg_input_ready(label, header))
+            header.write_text(UNIT_WORD_SPRITE_HEADER.replace(
+                '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 1\n',
+                '#define SC64_RACE_UNIT_WORD_SPRITE_METADATA 0\n'), encoding='ascii')
+            self.assertFalse(dev.canonical_zerg_input_ready(label, header))
+            header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+            self.assertTrue(dev.canonical_zerg_input_ready(label, header))
+
+    def test_death_source_readiness_requires_versioned_nonempty_bank(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'sc64_death_sprites_generated.h'
+            self.assertFalse(dev.death_source_input_ready(header))
+            header.write_text(DEATH_SOURCE_HEADER.replace(
+                '#define SC64_DEATH_SOURCE_METADATA_VERSION 1u\n', ''), encoding='ascii')
+            self.assertFalse(dev.death_source_input_ready(header))
+            header.write_text(DEATH_SOURCE_HEADER.replace(
+                '#define SC64_DEATH_SOURCE_PIXEL_BYTES 1u',
+                '#define SC64_DEATH_SOURCE_PIXEL_BYTES 0u'), encoding='ascii')
+            self.assertFalse(dev.death_source_input_ready(header))
+            header.write_text(DEATH_SOURCE_HEADER.replace(
+                '#define SC64_DEATH_SOURCE_ACTOR_COUNT 1u',
+                '#define SC64_DEATH_SOURCE_ACTOR_COUNT 0u'), encoding='ascii')
+            self.assertFalse(dev.death_source_input_ready(header))
+            header.write_text(DEATH_SOURCE_HEADER.replace(
+                '#define SC64_DEATH_SOURCE_WORD_METADATA 1u\n', ''), encoding='ascii')
+            self.assertFalse(dev.death_source_input_ready(header))
+            header.write_text(DEATH_SOURCE_HEADER.replace(
+                '#define SC64_DEATH_SOURCE_WORD_BYTES 1u',
+                '#define SC64_DEATH_SOURCE_WORD_BYTES 0u'), encoding='ascii')
+            self.assertFalse(dev.death_source_input_ready(header))
+            header.write_text(DEATH_SOURCE_HEADER.replace(
+                'sc64_death_image_word_frame(', 'sc64_death_image_frame('), encoding='ascii')
+            self.assertFalse(dev.death_source_input_ready(header))
+            for phase in range(4):
+                array = f'sc64_death_image_1_frame_0_words_p{phase}[1]'
+                header.write_text(DEATH_SOURCE_HEADER.replace(
+                    array, array.replace('[1]', '[0]')), encoding='ascii')
+                self.assertFalse(dev.death_source_input_ready(header),
+                                 f'empty packed phase p{phase} passed readiness')
+                header.write_text(DEATH_SOURCE_HEADER.replace(
+                    f'static const u32 sc64_death_image_1_frame_0_words_p{phase}[1] = {{1}};\n',
+                    ''), encoding='ascii')
+                self.assertFalse(dev.death_source_input_ready(header),
+                                 f'missing packed phase p{phase} passed readiness')
+            header.write_text(DEATH_SOURCE_HEADER, encoding='ascii')
+            self.assertTrue(dev.death_source_input_ready(header))
+
+    def test_canonical_race_build_requires_current_death_bank(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / '.local/sc64/terran-late/import-stage').mkdir(parents=True)
+            (root / '.local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h').write_text(
+                UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+            for relative, content in (
+                (dev.FACING_HEADER, FACING_SPRITE_HEADER),
+                (dev.TANK_VFX_HEADER, TANK_VFX_HEADER),
+                (dev.ATTACK_POSE_HEADER, ATTACK_POSE_HEADER),
+                (dev.WEAPON_SOURCE_HEADER, WEAPON_SOURCE_HEADER),
+                (dev.CONSTRUCTION_HEADER, CONSTRUCTION_COLOR_HEADER),
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding='ascii')
+            death = root / dev.DEATH_SOURCE_HEADER
+            death.parent.mkdir(parents=True, exist_ok=True)
+            death.write_text(DEATH_SOURCE_HEADER.replace(
+                '#define SC64_DEATH_SOURCE_WORD_BYTES 1u',
+                '#define SC64_DEATH_SOURCE_WORD_BYTES 0u'), encoding='ascii')
+            with patch.object(dev, 'ROOT', root), patch.object(
+                    dev, 'run', side_effect=AssertionError('Make must not run')):
+                with self.assertRaisesRegex(RuntimeError, 'source death-art data'):
+                    dev.build('terran')
+            death.write_text(DEATH_SOURCE_HEADER, encoding='ascii')
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'run') as run:
+                dev.build('terran')
+            run.assert_called_once_with(['make', 'terran'])
+
+    def test_canonical_zerg_status_rejects_stale_z3_only_stage_map(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            inputs = {
+                '.local/sc64/rom/StarCraft64-USA.z64': 'ROM',
+                '.local/sc64/backwater/generated/sc64_mission_generated.h': 'input',
+                '.local/sc64/backwater/generated/sc64_assets_generated.h': 'input',
+                '.local/sc64/backwater/generated/sc64_sprites_generated.h': 'input',
+                '.local/sc64/races/generated/sc64_races_generated.h':
+                    '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
+                    'sc64_race_z3_units\n'
+                    '#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n',
+                '.local/sc64/races/generated/sc64_race_sprites_generated.h': 'sprites',
+                '.local/sc64/races/generated/sc64_menu_generated.h': 'menu',
+                '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': CONSTRUCTION_COLOR_HEADER,
+                '.local/sc64/skirmish/generated/sc64_skirmish_generated.h': 'skirmish',
+                '.local/sc64/zp-stage/generated/sc64_races_generated.h':
+                    '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
+                    'sc64_race_z3_units\n'
+                    '#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n',
+                '.local/sc64/zp-stage/generated/sc64_race_sprites_generated.h':
+                    '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
+                '.local/sc64/z4/generated/sc64_z4_scenario_generated.h':
+                    '#define SC64_Z4_SCENARIO_GENERATED_H 1\n',
+                '.local/sc64/z4/manifest.json':
+                    '{"schema":1,"mission":{"id":"Z4","global_catalog_index":15,'
+                    '"source_map_path":"008/017"}}',
+                'build/StarCraft-Zerg-Z4-GBA.gba': 'ROM',
+            }
+            for relative, content in inputs.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding='ascii')
+
+            output = io.StringIO()
+            with patch.object(dev, 'ROOT', root), contextlib.redirect_stdout(output):
+                self.assertEqual(dev.status('zerg'), 1)
+            self.assertIn('MISSING Zerg chapter 4 maps', output.getvalue())
+            self.assertIn('READY   Zerg chapter 4 authenticated source', output.getvalue())
+
+    def test_canonical_zerg_prepare_rejects_z3_only_stage_map(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rom = root / 'owned-rom.z64'
+            rom.write_bytes(b'user supplied ROM fixture')
+
+            def fake_run(command, *, cwd=dev.ROOT):
+                script = Path(command[1]).name
+                local = root / '.local/sc64'
+                if script == 'sc64_workspace.py':
+                    for relative in (
+                        '.local/sc64/rom/StarCraft64-USA.z64',
+                        '.local/sc64/backwater/generated/sc64_mission_generated.h',
+                        '.local/sc64/backwater/generated/sc64_assets_generated.h',
+                        '.local/sc64/backwater/generated/sc64_sprites_generated.h',
+                    ):
+                        path = root / relative
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_text('prepared\n', encoding='ascii')
+                elif script == 'sc64_races_pack.py':
+                    output = (Path(command[command.index('--out') + 1]) if '--out' in command
+                              else local / 'races/generated/sc64_races_generated.h')
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(
+                        '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
+                        'sc64_race_z3_units\n'
+                        '#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n', encoding='ascii')
+                elif script == 'sc64_race_sprites.py' and '--header' in command:
+                    output = Path(command[command.index('--header') + 1])
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
+                                      encoding='ascii')
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
+                elif script == 'sc64_unit_attack_sprites.py':
+                    emit_attack_pose_header(root)
+                elif script == 'sc64_weapon_source_sprites.py':
+                    emit_weapon_source_header(root)
+                elif script == 'sc64_death_sprites.py':
+                    emit_death_source_header(root)
+                elif script == 'sc64_z4_pack.py':
+                    output = local / 'z4/manifest.json'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(
+                        '{"schema":1,"mission":{"id":"Z4","global_catalog_index":15,'
+                        '"source_map_path":"008/017"}}', encoding='ascii')
+                elif script == 'sc64_z4_scenario_pack.py':
+                    output = local / 'z4/generated/sc64_z4_scenario_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('#define SC64_Z4_SCENARIO_GENERATED_H 1\n',
+                                      encoding='ascii')
+
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
+                 patch.object(dev, 'run', side_effect=fake_run):
+                with self.assertRaisesRegex(RuntimeError, 'SC64_Z4_DATA_ENABLED map gate'):
+                    dev.prepare(rom, 'zerg')
+
     def test_race_prepare_fails_if_generated_map_gate_is_wrong(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -377,6 +1165,211 @@ class OnboardingTests(unittest.TestCase):
                  patch.object(dev, 'run', side_effect=fake_run):
                 with self.assertRaisesRegex(RuntimeError, 'SC64_Z3_ENABLED map gate'):
                     dev.prepare(rom, 'zerg')
+
+    def test_canonical_zerg_prepare_generates_private_z4_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rom = root / 'owned-rom.z64'
+            rom.write_bytes(b'user supplied ROM fixture')
+            calls = []
+
+            def fake_run(command, *, cwd=dev.ROOT):
+                calls.append(command)
+                script = Path(command[1]).name
+                local = root / '.local/sc64'
+                if script == 'sc64_workspace.py':
+                    (local / 'rom').mkdir(parents=True, exist_ok=True)
+                    (local / 'rom/StarCraft64-USA.z64').write_bytes(b'prepared ROM')
+                elif script == 'sc64_races_pack.py':
+                    output = (Path(command[command.index('--out') + 1]) if '--out' in command
+                              else local / 'races/generated/sc64_races_generated.h')
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(
+                        '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
+                        'sc64_race_z3_units\n#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n' +
+                        ('#if defined(SC64_UNIFIED) && defined(SC64_Z4_DATA_ENABLED)\n'
+                         'sc64_race_z4_units\n'
+                         '#endif /* SC64_UNIFIED && SC64_Z4_DATA_ENABLED */\n'
+                         if output.parent == local / 'zp-stage/generated' else ''),
+                        encoding='ascii')
+                elif script == 'sc64_race_sprites.py':
+                    if '--header' in command:
+                        output = Path(command[command.index('--header') + 1])
+                    else:
+                        output = local / 'races/generated/sc64_race_sprites_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(UNIT_WORD_SPRITE_HEADER if '--prepack-unit-words' in command
+                                      else '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
+                                      encoding='ascii')
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
+                elif script == 'sc64_unit_attack_sprites.py':
+                    emit_attack_pose_header(root)
+                elif script == 'sc64_weapon_source_sprites.py':
+                    emit_weapon_source_header(root)
+                elif script == 'sc64_death_sprites.py':
+                    emit_death_source_header(root)
+                elif script == 'sc64_z4_pack.py':
+                    output = local / 'z4/manifest.json'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(
+                        '{"schema":1,"mission":{"id":"Z4","global_catalog_index":15,'
+                        '"source_map_path":"008/017"}}', encoding='ascii')
+                elif script == 'sc64_z4_scenario_pack.py':
+                    output = local / 'z4/generated/sc64_z4_scenario_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('#define SC64_Z4_SCENARIO_GENERATED_H 1\n', encoding='ascii')
+
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
+                 patch.object(dev, 'run', side_effect=fake_run):
+                dev.prepare(rom, 'zerg-z4')
+
+            scripts = [Path(call[1]).name for call in calls]
+            for required in ('sc64_races_pack.py', 'sc64_race_sprites.py',
+                             'sc64_z4_pack.py', 'sc64_z4_scenario_pack.py'):
+                self.assertIn(required, scripts)
+            self.assertTrue(all(dev.canonical_zerg_input_ready(label, root / relative)
+                                for label, relative, _ in dev.CANONICAL_ZERG_INPUTS))
+            canonical_sprite_calls = [call for call in calls
+                                      if Path(call[1]).name == 'sc64_race_sprites.py'
+                                      and '--header' in call
+                                      and str(root / '.local/sc64/zp-stage/generated/'
+                                              'sc64_race_sprites_generated.h') in call]
+            self.assertEqual(len(canonical_sprite_calls), 1)
+            self.assertIn('--prepack-unit-words', canonical_sprite_calls[0])
+
+    def test_canonical_zerg_prepare_adds_chapter_five_and_six_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rom = root / 'owned-rom.z64'
+            rom.write_bytes(b'user supplied ROM fixture')
+            calls = []
+
+            def fake_run(command, *, cwd=dev.ROOT):
+                calls.append(command)
+                script = Path(command[1]).name
+                local = root / '.local/sc64'
+                if script == 'sc64_workspace.py':
+                    (local / 'rom').mkdir(parents=True, exist_ok=True)
+                    (local / 'rom/StarCraft64-USA.z64').write_bytes(b'prepared ROM')
+                elif script == 'sc64_races_pack.py':
+                    output = (Path(command[command.index('--out') + 1]) if '--out' in command
+                              else local / 'races/generated/sc64_races_generated.h')
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(
+                        '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\n'
+                        'sc64_race_z3_units\n#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n' +
+                        ('#if defined(SC64_UNIFIED) && defined(SC64_Z4_DATA_ENABLED)\n'
+                         'sc64_race_z4_units\n'
+                         '#endif /* SC64_UNIFIED && SC64_Z4_DATA_ENABLED */\n'
+                         if output.parent == local / 'zp-stage/generated' else ''),
+                        encoding='ascii')
+                elif script == 'sc64_race_sprites.py':
+                    if '--header' in command:
+                        output = Path(command[command.index('--header') + 1])
+                    else:
+                        output = local / 'races/generated/sc64_race_sprites_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(UNIT_WORD_SPRITE_HEADER if '--prepack-unit-words' in command
+                                      else '#define SC64_ZP_CAMPAIGN_SPRITE_SET_COMPLETE 1\n',
+                                      encoding='ascii')
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
+                elif script == 'sc64_z4_pack.py':
+                    output = local / 'z4/manifest.json'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(
+                        '{"schema":1,"mission":{"id":"Z4","global_catalog_index":15,'
+                        '"source_map_path":"008/017"}}', encoding='ascii')
+                elif script == 'sc64_z4_scenario_pack.py':
+                    output = local / 'z4/generated/sc64_z4_scenario_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('#define SC64_Z4_SCENARIO_GENERATED_H 1\n', encoding='ascii')
+
+            staged = []
+
+            def fake_staged(profile, private_rom):
+                staged.append(profile)
+                local = root / '.local/sc64'
+                (local / 'zp-stage/generated/sc64_races_generated.h').write_text(
+                    '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\nsc64_race_z3_units\n'
+                    '#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n'
+                    '#if defined(SC64_UNIFIED) && defined(SC64_Z4_DATA_ENABLED)\nsc64_race_z4_units\n'
+                    '#endif /* SC64_UNIFIED && SC64_Z4_DATA_ENABLED */\n'
+                    '#if defined(SC64_UNIFIED) && defined(SC64_Z6_DATA_ENABLED)\nsc64_race_z6_units\n'
+                    '#endif /* SC64_UNIFIED && SC64_Z6_DATA_ENABLED */\n', encoding='ascii')
+                for label, relative, marker in dev.CANONICAL_ZERG_Z6_INPUTS[:-1]:
+                    path = root / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(f'#define {marker} 1\n', encoding='ascii')
+
+            def fake_bank_run(command, *, cwd=dev.ROOT):
+                fake_run(command, cwd=cwd)
+                if '--include-z6-buildings' in command:
+                    output = Path(command[command.index('--header') + 1])
+                    output.write_text(UNIT_WORD_SPRITE_HEADER +
+                                      '#define SC64_Z6_BUILDING_SPRITE_SET_COMPLETE 1\n'
+                                      '#define SC64_Z5_DOODAD_SPRITE_SET_COMPLETE 1\n',
+                                      encoding='ascii')
+
+            with patch.object(dev, 'ROOT', root), patch.object(dev, 'ensure_extractor'), \
+                 patch.object(dev, 'run', side_effect=fake_bank_run), \
+                 patch.object(dev, 'prepare_staged_campaign', side_effect=fake_staged):
+                dev.prepare(rom, 'zerg')
+            self.assertEqual(staged, ['zerg-z6'])
+            bank_calls = [call for call in calls if '--include-z6-buildings' in call]
+            self.assertEqual(len(bank_calls), 1)
+            self.assertIn('--prepack-unit-words', bank_calls[0])
+            self.assertIn(str(root / '.local/sc64/zerg-z6/generated/sc64_race_sprites_generated.h'),
+                          bank_calls[0])
+            self.assertTrue(all(dev.canonical_zerg_z6_input_ready(label, root / relative)
+                                for label, relative, _ in dev.CANONICAL_ZERG_Z6_INPUTS))
+
+            scripts = [Path(call[1]).name for call in calls]
+            for required in ('sc64_races_pack.py', 'sc64_race_sprites.py',
+                             'sc64_z4_pack.py', 'sc64_z4_scenario_pack.py',
+                             'sc64_unit_attack_sprites.py',
+                             'sc64_weapon_source_sprites.py',
+                             'sc64_death_sprites.py'):
+                self.assertIn(required, scripts)
+            pose_calls = [call for call in calls
+                          if Path(call[1]).name == 'sc64_unit_attack_sprites.py']
+            self.assertEqual(len(pose_calls), 1)
+            self.assertIn('--rom', pose_calls[0])
+            self.assertIn('--remap', pose_calls[0])
+            self.assertIn(str(root / dev.ATTACK_POSE_HEADER), pose_calls[0])
+            self.assertTrue(dev.attack_pose_input_ready(root / dev.ATTACK_POSE_HEADER))
+            weapon_calls = [call for call in calls
+                            if Path(call[1]).name == 'sc64_weapon_source_sprites.py']
+            self.assertEqual(len(weapon_calls), 1)
+            self.assertIn('--rom', weapon_calls[0])
+            self.assertIn('--out', weapon_calls[0])
+            self.assertIn(str((root / dev.WEAPON_SOURCE_HEADER).parent), weapon_calls[0])
+            self.assertTrue(dev.weapon_source_input_ready(root / dev.WEAPON_SOURCE_HEADER))
+            death_calls = [call for call in calls
+                           if Path(call[1]).name == 'sc64_death_sprites.py']
+            self.assertEqual(len(death_calls), 1)
+            self.assertIn('--rom', death_calls[0])
+            self.assertIn('--palette-remap', death_calls[0])
+            self.assertIn(str(root / '.local/sc64/backwater/generated/palette-remap.bin'), death_calls[0])
+            self.assertIn('--header', death_calls[0])
+            self.assertIn(str(root / dev.DEATH_SOURCE_HEADER), death_calls[0])
+            self.assertIn('--out', death_calls[0])
+            self.assertIn(str((root / dev.DEATH_SOURCE_HEADER).parent), death_calls[0])
+            self.assertTrue(dev.death_source_input_ready(root / dev.DEATH_SOURCE_HEADER))
+            self.assertTrue(all(dev.canonical_zerg_input_ready(label, root / relative)
+                                for label, relative, _ in dev.CANONICAL_ZERG_INPUTS))
+            canonical_sprite_calls = [call for call in calls
+                                      if Path(call[1]).name == 'sc64_race_sprites.py'
+                                      and '--header' in call
+                                      and str(root / '.local/sc64/zp-stage/generated/'
+                                              'sc64_race_sprites_generated.h') in call]
+            self.assertEqual(len(canonical_sprite_calls), 1)
+            self.assertIn('--prepack-unit-words', canonical_sprite_calls[0])
 
     def check_doctor(self, *, require_emulator=False, emulator=None, missing=None):
         output = io.StringIO()
@@ -439,7 +1432,9 @@ class OnboardingTests(unittest.TestCase):
                 'Terran T5 scenario', 'Terran T5 availability',
                 'Terran T6 scenario', 'Terran T6 availability',
                 'Full Terran maps', 'Full Terran sprites',
-                'Terran T7 scenario', 'Terran T10 availability', 'Built ROM',
+                'Terran T7 scenario', 'Terran T10 availability',
+                'Directional unit sprites', 'Tank firing effects',
+                'Unit attack poses', 'Source weapon effects', 'Built ROM',
             ):
                 with self.subTest(dependency=dependency):
                     self.assertIn(f'MISSING {dependency}', text)
@@ -490,6 +1485,18 @@ class OnboardingTests(unittest.TestCase):
                     else:
                         header = race / 'sc64_race_sprites_generated.h'
                     touch(header)
+                    if '--prepack-unit-words' in command:
+                        header.write_text(UNIT_WORD_SPRITE_HEADER, encoding='ascii')
+                elif script == 'sc64_construction_sprites.py':
+                    emit_construction_header(root)
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
+                elif script == 'sc64_unit_attack_sprites.py':
+                    emit_attack_pose_header(root)
+                elif script == 'sc64_weapon_source_sprites.py':
+                    emit_weapon_source_header(root)
+                elif script == 'sc64_death_sprites.py':
+                    emit_death_source_header(root)
                 elif script == 'sc64_menu_assets.py':
                     touch(race / 'sc64_menu_generated.h')
                 elif script == 'sc64_skirmish_pack.py':

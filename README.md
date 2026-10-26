@@ -1,8 +1,18 @@
-# StarCraft: GBA Outpost
+# StarCraft GBA Demake Project
 
-StarCraft: GBA Outpost is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
+This project is an original-art, asset-free RTS skirmish for the Game Boy Advance. Defend a small Terran base, gather minerals and gas, build an army, and destroy the Zerg Hatchery. It is a compact demake with a hand-authored scenario and simplified rules, not a full StarCraft port.
 
-Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. Controller-driven host runs and normal-menu ARM replays have now completed all ten Terran missions across the recorded frozen builds. The latest optimization build has full T7 and T10 ARM wins at 25.00 and 18.77 effective fps; other ARM qualifications remain on earlier frozen builds. These rates remain below the 30-fps target. This is a GBA adaptation built from a user-supplied, verified StarCraft 64 USA ROM. It does not execute or reproduce the original N64 engine. Imported maps and graphics stay local and are not part of the source release.
+Optional StarCraft 64 profiles add imported campaign scenarios and three-faction custom games. The canonical profiles expose Terran 1–10, Zerg 1–4, and Protoss 1–5: 19 of 30 campaign entries. P1–P5 have current-source input-only ARM wins; P5 also has a fresh-process cargo save/load and continued-win proof. See the [P5 promotion audit](docs/audits/2026-10-26-p5-promotion/README.md).
+
+Performance remains below the 30-fps goal. The canonical P5 build measures about 26.6 fps equivalent on P1/P2 and 16.1–18.9 on P3–P5. Earlier Terran T7/T10 probe-entry traces measured about 22.4/18.8; see the [Terran audit](docs/audits/2026-10-26-terran-word-promotion/README.md) for scope. No physical GBA result is claimed. This adaptation uses a user-supplied, verified StarCraft 64 USA ROM and does not reproduce the N64 engine. Imported maps and graphics stay local.
+
+## Purpose and rights
+
+This independent research and hobby project explores real-time strategy engine design on the Game Boy Advance's resource-constrained hardware. It is not affiliated with, sponsored by, or endorsed by Blizzard Entertainment or Nintendo. References to their games, platforms, and trademarks identify the subject of the work or compatibility; they do not imply authorization.
+
+The default skirmish uses project-authored game art and requires no commercial game files. The optional StarCraft 64 importer requires user-supplied, lawfully obtained game data. The project does not distribute original StarCraft or StarCraft 64 ROMs or extracted game assets. Do not upload those materials or generated builds containing imported game assets to this repository, its issues, or its releases.
+
+Import tools grant no additional rights in game content. Importing, using, or sharing that content requires the necessary rights or applicable legal authorization; possession of a ROM alone does not establish those rights. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party material and licensing boundaries.
 
 ## Get started
 
@@ -39,16 +49,16 @@ This profile requires a legally obtained StarCraft 64 USA ROM that you are entit
 ./dev sc64 play --profile terran
 ```
 
-The canonical Terran profile includes all ten Terran campaign missions; Zerg and Protoss each include their first three. Use `--profile zerg` or `--profile protoss` with the same build/test/play commands. Each ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. Separate staged builds qualify the first six missions of both Zerg and Protoss, for 22/30 staged missions overall; eight remain unqualified. Measured campaign rates remain below 30 fps. No physical GBA result is claimed.
+The canonical Terran profile includes all ten Terran campaign missions; canonical Zerg includes its first six and Protoss its first five. Use `--profile zerg` or `--profile protoss` with the same build/test/play commands. Each ROM retains Outpost and Blood Bath and supports any human race with one to three independently selected AI races. Separate staged builds record wins through the first six missions of both Zerg and Protoss, for historical combined coverage of 22/30 missions; eight remain unqualified.
 
-Preparing Terran also generates the shared inputs needed by `make race-campaigns`; preparing only Zerg or Protoss does not generate the complete Terran input set. The promoted Zerg and Protoss builds use their third-mission save formats and reject saves from the older two-mission builds. See [the campaign guide](docs/RACE-CAMPAIGNS.md) for mission and save-format details.
+Preparing Terran generates its complete ten-mission input set; preparing only Zerg or Protoss does not. Prepare each canonical race before `make race-campaigns`. Canonical Zerg uses the Z6 identity and `.local/play/zerg-z6`; canonical Protoss uses P5 Shuttle and `.local/play/protoss-p5-shuttle`. Explicit `zerg-z4`, `zerg-z3`, `protoss-p3` and `protoss-p4-storm` retain their real ROMs and save paths. No save conversion is performed. See [the campaign guide](docs/RACE-CAMPAIGNS.md) for mission and save-format details.
 
 The first preparation fetches the pinned `sc64-maps` extractor into ignored `references/`, so Git and network access are needed. ROMs, extracted data, generated headers, captures containing imported art, and saves stay in ignored local directories; do not commit or distribute them. Contributors can work on the default skirmish without this profile. See [the unified guide](docs/SC64-UNIFIED.md) and [development](docs/DEVELOPMENT.md) for details and troubleshooting.
 
 The [campaign guide](docs/RACE-CAMPAIGNS.md) records the staged profile
 history, current mission status, and shared skirmish setup. The combined
 Terran profile uses bounded pools of 192 units, 96 buildings, and 80 mineral
-fields; its generated GBA ROM is 8 MiB. The original 32 MiB N64 image and
+fields; prepared canonical GBA ROMs are padded to 32 MiB. The original 32 MiB N64 image and
 every converted map, sprite, and generated header remain private local inputs.
 
 ## Contributing and provenance
@@ -66,7 +76,7 @@ Copyright (C) 2026 StarCraft GBA contributors.
 
 The project-authored files in this repository are free software: you may redistribute and modify them under the GNU General Public License, version 3 or, at your option, any later version (`GPL-3.0-or-later`). They are provided without warranty; see [LICENSE](LICENSE) for the full terms.
 
-Preserve existing file-level copyright and license notices. Third-party material and external dependencies retain their own terms, as described in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). This license grants no rights to StarCraft or StarCraft 64 ROMs, artwork, maps, sounds, or other game content.
+Preserve existing file-level copyright and license notices. Third-party material and external dependencies retain their own terms, as described in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). This license grants no rights to StarCraft or StarCraft 64 ROMs, artwork, maps, sounds, or other game content, or to Blizzard or Nintendo trademarks.
 
 ## Validation
 

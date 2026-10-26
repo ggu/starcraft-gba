@@ -47,17 +47,7 @@ static int sc64_p7_typed_building_zero(const Sc64P7TypedBuildingSave *r)
 
 static int sc64_p7_typed_building_maxhp(int type)
 {
-    int hp=sc64_zp_building_default_hp(type);
-    if (!hp) {
-        const Sc64RaceBuildingRule *rule=sc64_race_building_rule(type);
-        if (rule) hp=rule->hp;
-    }
-#ifdef SC64_T4_RUNTIME
-    if (type==B_TERRAN_BEACON || type==B_UPPER_DOOR ||
-        type==B_RIGHT_UPPER_DOOR || type==B_PIT_DOOR ||
-        type==B_RIGHT_PIT_DOOR) hp=100000;
-#endif
-    return hp;
+    return sc64_race_building_max_hp(type);
 }
 
 static int sc64_p7_typed_building_fields_valid(const Building *q,

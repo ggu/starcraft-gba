@@ -1,12 +1,13 @@
 #ifndef SC64_WEAPON_VFX_H
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 #define SC64_WEAPON_VFX_H
 
 #include <stdint.h>
 
-/* Temporary, authored projectile styling. This tags the existing transient
- * tracer without changing its layout or the instant-damage combat model. The
- * low byte remains the ordinary gfx color; the upper byte is visual metadata
- * consumed by the renderer only. */
+/* Visual styles tag the existing transient tracer without changing its
+ * layout or the instant-damage combat model. The upper byte selects the
+ * renderer. Authored styles use the low byte as a gfx color; source Tank
+ * styles use it as a 32-direction heading. Neither byte schedules damage. */
 #define SC64_WEAPON_VFX_STYLE_SHIFT 8
 #define SC64_WEAPON_VFX_COLOR_MASK 0xff
 #define SC64_WEAPON_VFX_STYLE_MASK 0xff00
@@ -25,6 +26,9 @@ enum {
     SC64_WEAPON_VFX_STYLE_BURST,
     SC64_WEAPON_VFX_STYLE_SPINES,
     SC64_WEAPON_VFX_STYLE_BEAM
+#ifdef SC64_TANK_SOURCE_VFX
+    ,SC64_TANK_SOURCE_TANK, SC64_TANK_SOURCE_SIEGE
+#endif
 };
 
 /* Number of visible renderer calls for an authored style. Callers seed a
@@ -46,6 +50,10 @@ sc64_weapon_vfx_lifetime(int style)
     case SC64_WEAPON_VFX_STYLE_BURST: return 6;
     case SC64_WEAPON_VFX_STYLE_SPINES: return 5;
     case SC64_WEAPON_VFX_STYLE_BEAM: return 8;
+#ifdef SC64_TANK_SOURCE_VFX
+    case SC64_TANK_SOURCE_TANK: return 28;
+    case SC64_TANK_SOURCE_SIEGE: return 20;
+#endif
     default: return 0;
     }
 }

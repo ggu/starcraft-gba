@@ -29,6 +29,10 @@ CONFIGS.update({
     "zp_p7_carrier": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_P7_ACTORS",
                       "SC64_P7_PROJECTILES_ENABLED",
                       "SC64_P7_CARRIER_TRAINING_ENABLED"),
+    "zp_p7_carrier_flight": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS",
+                              "SC64_P7_ACTORS", "SC64_P7_PROJECTILES_ENABLED",
+                              "SC64_P7_CARRIER_TRAINING_ENABLED",
+                              "SC64_P7_INTERCEPTOR_FLIGHT_ENABLED"),
     "zp_z6_runtime": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_Z6_ACTORS",
                       "SC64_Z6_RUNTIME"),
     "zp_z7_egg": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_Z6_ACTORS",
@@ -75,7 +79,9 @@ class FactTablesTest(unittest.TestCase):
         listed = set(re.findall(r"X\((SC64_[A-Z0-9_]+)\)", GENERATOR.read_text()))
         used = set()
         for header in FACT_HEADERS:
-            for line in (ROOT / "starcraft" / header).read_text().splitlines():
+            source = (ROOT / "starcraft" / header).read_text()
+            source = re.sub(r"\\\s*\n\s*", " ", source)
+            for line in source.splitlines():
                 if re.match(r"\s*#\s*(if|ifdef|ifndef|elif)\b", line):
                     used.update(re.findall(r"SC64_[A-Z0-9_]+", line))
         used = {name for name in used
@@ -108,6 +114,18 @@ class FactTablesTest(unittest.TestCase):
                         directory, other + "-mismatch", ("-I", str(table_dir)))
                     self.assertNotEqual(built.returncode, 0)
                     self.assertIn(b"fact tables were generated", built.stderr)
+
+    def test_tables_reject_carrier_flight_gate_mismatch(self):
+        with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-flight-") as directory:
+            table_dir = generate(self.compiler, CONFIGS["zp_p7_carrier"],
+                                 directory, "carrier-without-flight")
+            built, _ = compile_program(
+                self.compiler, CHECK,
+                CONFIGS["zp_p7_carrier_flight"] + ("SC64_FACT_TABLES",),
+                directory, "carrier-flight-mismatch", ("-I", str(table_dir)))
+            self.assertNotEqual(built.returncode, 0)
+            self.assertIn(b"fact tables were generated without SC64_P7_INTERCEPTOR_FLIGHT_ENABLED",
+                          built.stderr)
 
 
 if __name__ == "__main__":

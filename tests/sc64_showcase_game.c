@@ -23,6 +23,130 @@ static int fail(const char *message)
     return 1;
 }
 
+#ifdef SC64_UNIT_FACING
+static void facing_test_clip(int top, int bottom)
+{
+#ifdef GBA_SCENE_CLIP
+    gfx_set_clip_y(top, bottom);
+#else
+    (void)top;
+    (void)bottom;
+#endif
+}
+
+static int facing_is_zero(void)
+{
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (sc64_facing[i]) return 0;
+    return 1;
+}
+
+static unsigned framebuffer_hash(void)
+{
+    unsigned hash = 2166136261u;
+    for (int y = 0; y < 160; ++y)
+        for (int x = 0; x < 240; ++x)
+            hash = (hash ^ gfx_test_pixel(x, y)) * 16777619u;
+    return hash;
+}
+
+static int check_facing_word_bank(void)
+{
+#if defined(SC64_UNIT_WORD_SPRITES) && defined(SC64_UNIT_FACING_WORD_METADATA)
+    static const int clip[][2] = {{0,160},{12,120},{35,42},{150,160},{0,0}};
+    const int raws[] = {0, 5, 30}; /* Marine, Tank hull, static siege hull */
+    unsigned direction_hash[32];
+    for (unsigned ri = 0; ri < sizeof(raws)/sizeof(raws[0]); ++ri) {
+        const Sc64SpriteFrame *frames = sc64_unit_facing_frames((unsigned short)raws[ri]);
+        if (!frames) return fail("missing directional source bank");
+        for (int direction = 0; direction < 32; ++direction) {
+            const Sc64UnitFacingWordFrame *word =
+                sc64_unit_facing_word_frame((unsigned short)raws[ri], (unsigned char)direction);
+            if (!word || word->sprite->width != frames[direction <= 16 ? direction : 32-direction].w ||
+                word->sprite->height != frames[direction <= 16 ? direction : 32-direction].h)
+                return fail("missing/mismatched packed direction sidecar");
+            for (unsigned ci = 0; ci < sizeof(clip)/sizeof(clip[0]); ++ci) {
+                gfx_begin(0);
+                facing_test_clip(clip[ci][0], clip[ci][1]);
+                if (!sc64_facing_blit((unsigned)raws[ri], direction, 119, 79))
+                    return fail("packed source direction did not draw");
+                unsigned actual[240*160];
+                for (int y = 0; y < 160; ++y)
+                    for (int x = 0; x < 240; ++x)
+                        actual[y*240+x] = gfx_test_pixel(x,y);
+
+                gfx_begin(0);
+                facing_test_clip(clip[ci][0], clip[ci][1]);
+                const Sc64SpriteFrame *f = &frames[direction <= 16 ? direction : 32-direction];
+                if (direction <= 16)
+                    gfx_blit_sprite(119-f->canvas_w/2+f->offset_x,
+                                    79-f->canvas_h/2+f->offset_y,f->w,f->h,f->pixels);
+                else
+                    gfx_blit_sprite_hflip(119+f->canvas_w/2-f->offset_x-f->w,
+                                          79-f->canvas_h/2+f->offset_y,f->w,f->h,f->pixels);
+                for (int y = 0; y < 160; ++y)
+                    for (int x = 0; x < 240; ++x)
+                        if (actual[y*240+x] != gfx_test_pixel(x,y))
+                            return fail("packed direction differs from indexed/mirrored source pixels");
+            }
+            gfx_begin(0);
+            facing_test_clip(0,160);
+            (void)sc64_facing_blit((unsigned)raws[ri], direction, 119, 79);
+            direction_hash[direction] = framebuffer_hash();
+        }
+        if (ri < 2 && (direction_hash[0] == direction_hash[8] ||
+                       direction_hash[8] == direction_hash[24]))
+            return fail("directional frame pixels did not change across headings");
+    }
+#endif
+    return 0;
+}
+
+static int check_movement_facing(void)
+{
+    static const int headings[8] = {0,4,8,12,16,20,24,28};
+    const int types[3] = {U_MARINE, U_SCOUT, U_SCV};
+    for (unsigned ti = 0; ti < 3; ++ti) {
+        Unit *q = &u[0];
+        memset(q, 0, sizeof(*q));
+        q->alive = 1; q->owner = SIDE; q->type = types[ti]; q->raw_type = -1;
+        q->x = q->y = 128;
+        q->order = types[ti] == U_SCV ? ORDER_MINE : ORDER_MOVE;
+        q->cd = 20;
+        int raw = sc64_race_raw_unit(q->type);
+        if (raw < 0 || !sc64_unit_facing_frames((unsigned short)raw))
+            return fail("movement-facing test unit lacks imported source frames");
+        unsigned hashes[8];
+        for (unsigned hi = 0; hi < 8; ++hi) {
+            int dir = headings[hi];
+            int dx = sc64_facing_vector[dir][0], dy = sc64_facing_vector[dir][1];
+            if (sc64_race_unit_flying(q->type)) {
+                q->tx = q->x + dx; q->ty = q->y + dy;
+            } else {
+                q->path_x = q->x + dx; q->path_y = q->y + dy;
+            }
+            sc64_facing_track(q);
+            if (sc64_facing[0] != dir)
+                return fail("moving unit did not track one of eight headings during cooldown");
+            gfx_begin(0);
+            if (!sc64_facing_draw(q, raw, 120, 80))
+                return fail("moving unit did not render its selected heading");
+            hashes[hi] = framebuffer_hash();
+        }
+        for (unsigned hi = 1; hi < 8; ++hi)
+            if (hashes[hi] == hashes[hi-1])
+                return fail("movement heading did not alter the rendered source frame");
+        q->order = ORDER_ATTACK_TARGET;
+        sc64_facing[0] = 3;
+        sc64_facing_track(q);
+        if (sc64_facing[0] != 3)
+            return fail("stationary firing cooldown lost its aimed direction");
+    }
+    return 0;
+}
+
+#endif
+
 static int unit_count(int type)
 {
     int count = 0;
@@ -119,6 +243,13 @@ static int enter_showcase_menu(void)
 int main(void)
 {
     gba_init();
+#ifdef SC64_UNIT_FACING
+    game_init();
+    memset(sc64_facing, 0x17, sizeof(sc64_facing));
+    game_init();
+    if (!facing_is_zero()) return fail("game_init retained stale facing bytes");
+    if (check_facing_word_bank() || check_movement_facing()) return 1;
+#endif
     if (!enter_showcase_menu()) return fail("HOME shoulder chord did not open showcase");
     press(KEY_A);
     if (screen != SCREEN_PAUSE || sc64_showcase_scene != 0)
@@ -133,7 +264,33 @@ int main(void)
     race_bots = 1;
     race_skirmish_map = 0;
     init_state();
+#ifdef SC64_UNIT_FACING
+    int reused = spawn_unit(SIDE, U_MARINE, 210, 210);
+    if (reused < 0) return fail("could not allocate slot-reuse fixture");
+    u[reused].raw_type = -1;
+    sc64_facing[reused] = 29;
+    u[reused].alive = 0;
+    int reclaimed = spawn_unit(SIDE, U_MARINE, 210, 210);
+    if (reclaimed != reused || sc64_facing[reclaimed] != 0)
+        return fail("spawn reused stale per-slot facing");
+    unsigned marine_raw = (unsigned)sc64_race_raw_unit(U_MARINE);
+    sc64_facing[reclaimed] = 8;
+    gfx_begin(0);
+    if (!sc64_facing_draw(&u[reclaimed], (int)marine_raw, 120, 80) ||
+        framebuffer_hash() == 2166136261u)
+        return fail("raw_type=-1 generic unit did not resolve its directional sprite");
+#endif
     if (!race_mode || !save_game()) return fail("could not seed ordinary skirmish save");
+#ifdef SC64_UNIT_FACING
+    memset(sc64_facing, 0x1b, sizeof(sc64_facing));
+    static Unit rejected_save_world[MAX_UNITS];
+    memcpy(rejected_save_world, u, sizeof(u));
+    save_test_corrupt_latest(sizeof(race_data), SAVE_VERSION);
+    if (load_game() || sc64_facing[0] != 0x1b ||
+        memcmp(rejected_save_world, u, sizeof(u)))
+        return fail("rejected save changed presentation-facing state");
+    if (!save_game()) return fail("could not reseed save after rejection fixture");
+#endif
     int saved_minerals = minerals;
     int saved_side_units = owner_count(SIDE);
 
@@ -158,12 +315,19 @@ int main(void)
         if (sc64_showcase_ticks != frozen_ticks)
             return fail("scene advanced while paused");
         game_render();
+#ifdef SC64_UNIT_FACING
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive) { sc64_facing[i] = 31; break; }
+#endif
         press(KEY_R); /* replay current scene */
         if (screen != SCREEN_PAUSE || sc64_showcase_scene != scene ||
             !check_scene_contents(scene) || !valid_world() ||
             memcmp(replay_units,u,sizeof(u)) ||
             memcmp(replay_buildings,b,sizeof(b)))
             return fail("pause replay did not deterministically reseed scene");
+#ifdef SC64_UNIT_FACING
+        if (!facing_is_zero()) return fail("scene replay retained old facing state");
+#endif
         press(KEY_A); /* resume; release update is simulation tick 1 */
         if (screen != SCREEN_PLAY) return fail("A did not resume the scene");
         for (int tick = 0; tick < 300 && screen == SCREEN_PLAY; ++tick) {
@@ -200,9 +364,15 @@ int main(void)
 
     game_init();
     previous = 0;
+#ifdef SC64_UNIT_FACING
+    memset(sc64_facing, 0x1d, sizeof(sc64_facing));
+#endif
     press(KEY_B); /* HOME load: restore the actual ordinary skirmish save */
     if (!race_mode || minerals != saved_minerals || owner_count(SIDE) != saved_side_units)
         return fail("showcase changed or invalidated the ordinary skirmish save");
+#ifdef SC64_UNIT_FACING
+    if (!facing_is_zero()) return fail("successful load restored/retained stale facing bytes");
+#endif
     puts("Showcase menu, scene runtime, pause controls, and save isolation: ok");
     return 0;
 }

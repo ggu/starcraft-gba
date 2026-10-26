@@ -204,6 +204,79 @@ static void tie_range_and_early_kill(void)
     assert(u[0].hp == 90); /* exactly range is outside the strict radius */
 }
 
+static void sunken_explosive_size_shields_and_armor(void)
+{
+    /* Expected HP packets are asserted independently of the differential
+     * snapshot: Sunken's 40 explosive damage is reduced after shields and
+     * armor, with the stock size ratio applied last. */
+    static const struct {
+        int unit_type, raw_type, armor, shield, expected_hp_damage;
+    } cases[] = {
+        { U_ZERGLING, 37, 0, 0, 20 }, /* small: 40 / 2 */
+        { U_HYDRALISK, 38, 0, 0, 30 }, /* medium: 40 * 3 / 4 */
+        { U_GOLIATH, 3, 0, 0, 40 }, /* large: full damage */
+        { U_DRAGOON, 66, 2, 17, 21 } /* large: 40 - 17 shield - 2 armor */
+    };
+    for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        clear_world();
+        b[0] = (Building){ .x=240, .y=240, .hp=300, .maxhp=300,
+            .owner=SIDE, .type=B_SUNKEN_COLONY, .raw_type=146, .alive=1 };
+        u[0] = (Unit){ .x=256, .y=240, .hp=100, .maxhp=100,
+            .shield=cases[i].shield, .armor=cases[i].armor,
+            .owner=ENEMY, .type=(u8)cases[i].unit_type,
+            .raw_type=(s8)cases[i].raw_type, .alive=1 };
+        compare_paths();
+        race_tick_defenses_zp_targets();
+        assert(u[0].hp == 100 - cases[i].expected_hp_damage);
+        assert(u[0].shield == 0);
+    }
+}
+
+static void air_defense_filters_ground_goliath(void)
+{
+    clear_world();
+    b[0] = (Building){ .x=240, .y=240, .hp=300, .maxhp=300,
+        .owner=SIDE, .type=B_SPORE_COLONY, .raw_type=144, .alive=1 };
+    /* The closer Goliath is a large ground unit. The farther Mutalisk is the
+     * only valid target for the Spore Colony's air weapon. */
+    u[0] = (Unit){ .x=248, .y=240, .hp=125, .maxhp=125,
+        .owner=ENEMY, .type=U_GOLIATH, .raw_type=3, .alive=1 };
+    u[1] = (Unit){ .x=264, .y=240, .hp=100, .maxhp=100,
+        .owner=ENEMY, .type=U_MUTALISK, .raw_type=43, .alive=1 };
+    compare_paths();
+    race_tick_defenses_zp_targets();
+    assert(u[0].hp == 125);
+    assert(u[1].hp == 85);
+    assert(b[0].queue_progress == 19);
+}
+
+static void same_update_mutations_precede_defense_query(void)
+{
+    clear_world();
+    b[0] = (Building){ .x=240, .y=240, .hp=300, .maxhp=300,
+        .owner=SIDE, .type=B_CREEP_COLONY, .raw_type=143,
+        .alive=1, .under_construction=1 };
+    u[0] = (Unit){ .x=248, .y=240, .hp=10, .maxhp=10,
+        .owner=ENEMY, .type=U_ZERGLING, .raw_type=37, .alive=1 };
+    u[1] = (Unit){ .x=256, .y=240, .hp=100, .maxhp=100,
+        .owner=SIDE, .type=U_MARINE, .raw_type=0, .alive=1 };
+
+    /* Model changes made by the mission/state stage immediately before the
+     * defense phase: the nearest enemy died, the Marine changed sides, and
+     * the colony finished morphing into a Sunken Colony. */
+    u[0].alive = 0;
+    u[1].owner = ENEMY;
+    b[0].type = B_SUNKEN_COLONY;
+    b[0].raw_type = 146;
+    b[0].under_construction = 0;
+
+    compare_paths();
+    race_tick_defenses_zp_targets();
+    assert(!u[0].alive);
+    assert(u[1].hp == 80); /* the newly hostile small target receives 20 */
+    assert(b[0].queue_progress == 40); /* completed morph fired this tick */
+}
+
 static void invalid_owner_falls_back_before_mutation(void)
 {
     for (int invalid_kind = 0; invalid_kind < 2; ++invalid_kind) {
@@ -262,14 +335,70 @@ static void dispatcher_preserves_p3_and_skirmish_paths(void)
     assert(!memcmp(&expected, &actual, sizeof(expected)));
 }
 
+static void assert_stock_defense_interval(int defense_type, int defense_raw,
+                                          int cooldown, int target_type,
+                                          int target_raw, int powered,
+                                          int skirmish)
+{
+    clear_world();
+    race_mode = skirmish;
+    b[0] = (Building){ .x=240, .y=240, .hp=500, .maxhp=500,
+        .owner=SIDE, .type=(u8)defense_type, .raw_type=defense_raw,
+        .alive=1 };
+    if (powered) {
+        b[1] = (Building){ .x=240, .y=240, .hp=500, .maxhp=500,
+            .owner=SIDE, .type=B_PYLON, .raw_type=156, .alive=1 };
+    }
+    u[0] = (Unit){ .x=256, .y=240, .hp=1000, .maxhp=1000,
+        .owner=ENEMY, .type=(u8)target_type, .raw_type=target_raw,
+        .alive=1 };
+
+    race_tick_defenses();
+    int first_hp = u[0].hp;
+    assert(first_hp < 1000);
+    assert(b[0].queue_progress == cooldown);
+    /* Both campaign target lists and skirmish fullscan dispatch through
+     * this fixture's caller-selected mode. Expiry must attack on tick N. */
+    for (int tick = 1; tick < cooldown; ++tick) {
+        race_tick_defenses();
+        assert(u[0].hp == first_hp);
+    }
+    race_tick_defenses();
+    assert(u[0].hp < first_hp);
+    assert(b[0].queue_progress == cooldown);
+}
+
+static void stock_defense_attack_intervals(void)
+{
+    static const struct {
+        int building, raw, cooldown, target, target_raw, powered;
+    } defenses[] = {
+        { B_PHOTON_CANNON, 162, 28, U_MARINE, 0, 1 },
+        { B_MISSILE_TURRET, 124, 19, U_MUTALISK, 43, 0 },
+        { B_SPORE_COLONY, 144, 19, U_MUTALISK, 43, 0 },
+        { B_SUNKEN_COLONY, 146, 40, U_ZERGLING, 37, 0 },
+    };
+    for (int skirmish = 0; skirmish <= 1; ++skirmish) {
+        for (unsigned i = 0; i < sizeof(defenses) / sizeof(defenses[0]); ++i) {
+            assert_stock_defense_interval(defenses[i].building, defenses[i].raw,
+                defenses[i].cooldown, defenses[i].target, defenses[i].target_raw,
+                defenses[i].powered, skirmish);
+        }
+    }
+}
+
 int main(void)
 {
     gba_init();
     game_init();
     randomized_differential();
     tie_range_and_early_kill();
+    sunken_explosive_size_shields_and_armor();
+    air_defense_filters_ground_goliath();
+    same_update_mutations_precede_defense_query();
     invalid_owner_falls_back_before_mutation();
     dispatcher_preserves_p3_and_skirmish_paths();
+    stock_defense_attack_intervals();
     puts("Z/P defense target differential tests passed");
     return 0;
 }

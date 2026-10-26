@@ -3,13 +3,14 @@
 The standard Terran, Zerg and Protoss targets remain separate ROMs. The
 integrated Terran runtime now has controller-driven host wins and recorded
 normal-menu ARM wins for all ten Terran missions across frozen builds. The
-latest optimization build has full T7 and T10 ARM wins; T8 and T9 remain
-qualified on earlier frozen ROMs. The current
+recorded optimization proofs include full T7 and T10 ARM wins; T8 and T9 remain
+qualified on earlier frozen ROMs. These Terran timings precede the latest
+minimap change, whose current ARM measurements cover Protoss. The current
 full-profile ARM T10 result is below the 30-fps target, and no physical GBA
 result is claimed. The canonical `terran` profile includes all ten Terran
-missions. The standard Zerg and Protoss profiles include their first three
-missions. The older `zerg-z3` and `protoss-p3` target names now alias those
-canonical builds and their ROM/ELF files. The
+missions. Canonical Zerg includes its first six missions and Protoss its first five.
+`zerg-z4`, `zerg-z3` and `protoss-p3` remain explicit legacy builds with their original
+ROMs and save identities; `protoss-p4-storm` also preserves its real four-entry files. Canonical Protoss uses P5 Shuttle. The
 catalog records all 30 mission identifiers.
 
 The stage sections below preserve dated implementation history. The
@@ -30,26 +31,41 @@ campaign startup/save checks and the Outpost/Blood Bath race-and-AI matrix.
 
 Use `zerg` or `protoss` in place of `terran` for the other builds. `prepare` accepts a `.z64`, `.v64`, or `.n64` image, or a ZIP containing exactly one supported image. It verifies the image and uses the pinned `sc64-maps` extractor; the first preparation requires Git and network access to fetch that tool. `status` checks preparation and build outputs. Build and test do not need an emulator; `play` requires mGBA. See [Development](DEVELOPMENT.md) for tool requirements and [SC64 development notes](SC64.md) for import details.
 
-The ROMs are `build/StarCraft-Terran-GBA.gba`, `build/StarCraft-Zerg-GBA.gba`, and `build/StarCraft-Protoss-GBA.gba`. Each profile has its own save identity, so its saves do not load as another race's campaign. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
+The canonical ROMs are `build/StarCraft-Terran-GBA.gba`, `build/StarCraft-Zerg-Z6-GBA.gba`, and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The explicit legacy `zerg-z4` target retains `build/StarCraft-Zerg-Z4-GBA.gba` and its Z4 save identity; `zerg-z3` retains `build/StarCraft-Zerg-GBA.gba` and its Z3 save identity; `protoss-p3` retains `build/StarCraft-Protoss-GBA.gba` and its P3 identity. Canonical Z6 uses `.local/play/zerg-z6`, Z4 uses `.local/play/zerg-z4`, P5 uses `.local/play/protoss-p5-shuttle`, and explicit P4 uses `.local/play/protoss-p4-storm`; the legacy profiles continue using `.local/play/zerg` and `.local/play/protoss`. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
 
-To build and test all three race campaigns, first prepare the shared inputs
-with `./dev sc64 prepare --rom "/path/to/your/StarCraft 64 ROM or ZIP" --profile terran`, then run
+To build and test all three race campaigns, prepare `terran`, `zerg` and
+`protoss` with the same verified ROM, then run
 `make race-campaigns test-race-campaigns`. Preparing Zerg or Protoss alone
-does not generate the complete shared input set. The asset-free `./dev test`
+does not generate the full Terran input set; preparing Terran alone does not
+authenticate the P4 scenario. The asset-free `./dev test`
 also exercises all three frontend variants without requiring those inputs.
 
 ## Campaign progress
 
-The Terran profile presents ten missions. Standard Zerg and Protoss profiles
-present three each. Controller-driven host runs complete 16 of the 30 missions
-across these profiles: Terran 1–10, Zerg 1–3 and Protoss 1–3. Separate internal
-Z4 and P4 Storm builds additionally have normal-controller host and full ARM
-wins. P5 Shuttle also has a complete normal-controller host and ARM win plus
-an exact fresh-process cargo save. Z5 Consume also has a complete host and ARM
-win with an exact mid-mission save, with Z6 now also passing a full ARM win and exact fresh-process SRAM restore.
-P6 now also has a full ARM win and opening/late fresh-process SRAM continuity.
-This brings the staged total to 22/30 (Terran 10, Zerg 6, Protoss 6). These staged builds have separate save formats
-and ROM identities. The P5 island objective requires the optional Shuttle
+The Terran profile presents ten missions, canonical Zerg six and Protoss five,
+exposing 21 of 30 entries. All six Zerg chapters have current-source host
+controller wins and input-only ARM wins in the canonical Z6 build; Z5 and Z6
+also have exact fresh-process SRAM restores followed by continued wins. See
+the [Z6 promotion audit](audits/2026-10-26-z6-promotion/README.md). P1–P5 have current-source host and input-only ARM wins in the canonical
+P5 build; P5 also has an exact fresh-process cargo SRAM restore and continued
+win. P1/P2 retain Fenix. See the
+[P5 promotion audit](audits/2026-10-26-p5-promotion/README.md).
+
+Performance remains unfinished: the canonical P5 build measures about 26.6 fps
+equivalent on P1/P2, 18.9 on P3, 16.1 on carried P4 and 17.1 on P5. Carried
+P4 is about 5.3% slower than the standalone P4/minimap build. Current Terran T7/T10 probe-entry traces average about
+22.4/18.8 fps equivalent after packed rendering. Earlier Z4/P3 measurements
+apply to their frozen images, not to a new hardware guarantee. See the
+[Terran rendering audit](audits/2026-10-26-terran-word-promotion/README.md).
+Earlier frozen P5 Shuttle builds have a complete controller/ARM win and an
+exact fresh-process cargo save. Earlier frozen Z5 Consume builds have a
+controller/ARM win and exact mid-mission save; Z6 records a full ARM win and
+exact fresh-process SRAM restore. Earlier P6 builds record a full ARM win and
+opening/late fresh-process SRAM continuity.
+Historical canonical and staged playthrough coverage spans 22/30 across
+recorded builds (Terran 10, Zerg 6, Protoss 6); it is not fresh qualification
+of every chapter on the current source. The remaining staged chapter builds have separate save formats and ROM
+identities. The P5 island objective requires the optional Shuttle
 profile. Z6 has normal-input host and full ARM wins plus exact cold-load continuity.
 P6 has reproducible normal-input host and full ARM wins, with opening and late
 fresh-process SRAM continuity. Its qualified fast dense build averages 12.75 fps. Z7 has an internal seventh-entry ROM
@@ -66,25 +82,31 @@ SPORE for 50 minerals. Both morphs use the same building and no additional
 Drone. Spore attacks use the existing air-only defense policy; native detector
 behavior and full source sight are still missing.
 This feature rejects earlier Z7 generation-33/34 saves; it is not yet enabled
-in the canonical three-mission Zerg profile or skirmishes.
+in the canonical six-entry Zerg profile or skirmishes.
 
 Z7 also restores a neutral gas node when a source Extractor is destroyed.
 The restored location persists through SRAM and can be rebuilt with a paid
 Extractor. Gas depletion is still outside the shared engine model.
 
-Zerg 3 **The New Dominion** and Protoss 3 **Higher Ground** are on the second
-campaign menu page. The canonical files remain `StarCraft-Zerg-GBA.gba` and
-`StarCraft-Protoss-GBA.gba`. They now use game codes `SCZ3` / `SCP3` and save
-generations 5 / 7. Their loaders reject saves from the older standard
-two-mission format (generation 2), without changing the live game state.
-Do not rename an older save and expect format conversion.
+Zerg 3 **The New Dominion**, Zerg 4 **Agent of the Swarm**, and Protoss 3
+**Higher Ground** are on the second campaign menu page. Canonical Zerg is
+`StarCraft-Zerg-Z6-GBA.gba` / `starcraft-zerg-z6.elf`, code `SCZ6`, generation
+32. The explicit legacy `zerg-z4` target retains `StarCraft-Zerg-Z4-GBA.gba` /
+`starcraft-zerg-z4.elf`, code `SCZ4`, generation 20. The explicit legacy `zerg-z3` target retains `StarCraft-Zerg-GBA.gba` /
+`starcraft-zerg.elf` (versioned `-Z3` names alias these), code `SCZ3`,
+generation 5. Canonical Protoss uses `StarCraft-Protoss-P5-Shuttle-GBA.gba` /
+`starcraft-protoss-p5-shuttle.elf`, code `SCPB`, generation 26. Explicit
+`protoss-p4-storm` preserves its real P4 Storm files, `SCP5`, generation 21. Explicit legacy
+`protoss-p3` retains `StarCraft-Protoss-GBA.gba` / `starcraft-protoss.elf`,
+code `SCP3`, generation 7. Loaders reject incompatible saves without changing live game state; no save
+conversion is performed.
 
-The opt-in `zerg-z4` and `protoss-p4-storm` builds preserve the complete
-starting rosters for **Agent of the Swarm** and **The Hunt for Tassadar**.
-See [staged chapter setup](DEVELOPMENT.md#staged-zerg-and-protoss-chapter-4)
-and [Validation](VALIDATION.md) for their controls, frozen hashes and limits.
-These remain development targets while the canonical race outputs retain
-their separately qualified three-entry campaign menus.
+Zerg 4 **Agent of the Swarm** is the canonical fourth entry, followed by Zerg 5
+and Zerg 6; `zerg-z4` builds the separate earlier four-entry ROM. Protoss 4
+**The Hunt for Tassadar** remains included in the five-entry canonical build;
+`protoss-p4-storm` retains the separate four-entry product. See
+[staged chapter setup](DEVELOPMENT.md#staged-zerg-and-protoss-chapter-4) and
+[Validation](VALIDATION.md) for its controls, hashes and limits.
 
 Terran 3, Desperate Alliance, has an experimental runtime behind
 `SC64_T3_ENABLED`. After preparing a race profile, build and check it with:
@@ -114,13 +136,12 @@ Jacobs Installation to the normal campaign flow. Performance remains below the
 Historical Z3 implementation and performance evidence
 ------------------------------------------------------
 
-The following commands and measurements document the earlier experimental
-build. Z3 is now part of the canonical three-mission Zerg profile; the legacy
-target name aliases that profile and no longer selects a separate build.
+The following commands and measurements document the legacy Z3 build.
+Canonical Zerg now uses the separate Z4 ROM; the `zerg-z3` target explicitly
+builds the older three-mission profile.
 
-The legacy `zerg-z3` target and `build/StarCraft-Zerg-Z3-GBA.gba` output
-name now resolve to the canonical Zerg profile. Use `make zerg test-zerg` for
-the current profile and runtime suite.
+Use `make zerg-z3 test-zerg-z3` to build and test the preserved Z3 profile.
+Use `make zerg test-zerg` for the canonical four-entry Zerg profile.
 
 The historical target enabled three-bit route fields and exact row-span sight
 updates.
@@ -131,7 +152,7 @@ profile. For a comparison build, use `make -B zerg Z3_OPTIMIZATION_FLAGS=`;
 rebuild with `make -B zerg` to restore the optimized version. Retain each
 ROM/ELF pair separately before comparing runs.
 
-New Dominion appears on page two of the Zerg campaign. The canonical ROM is
+New Dominion appears on page two of the Zerg campaign. The legacy ROM is
 `build/StarCraft-Zerg-GBA.gba`. Protect the Mature Chrysalis and eliminate
 the Terran presence.
 The source victory gates are at most six remaining enemy units/buildings
@@ -390,7 +411,7 @@ Center; tap A on the existing structure to select it.
 
 ## Current limits
 
-Higher Ground (Protoss 3, global catalog ID 22) now has an experimental runtime.
+Higher Ground (Protoss 3, global catalog ID 22) is in the canonical Protoss ROM.
 After preparing a race profile, run `make protoss-p3 test-sc64-p3`. This creates
 `build/StarCraft-Protoss-P3-GBA.gba`, with Higher Ground on campaign page two.
 It retains the full 128×96 terrain, all 96 units, 42 buildings, 48 mineral
@@ -406,36 +427,37 @@ mining assignments and periodic small guard attacks. Original transmission
 dialogue/audio are absent; their holds use documented adapter timings. Scourge
 combat has an air-only suicide attack with fixed source-backed damage. This
 profile has a separate save generation, including quest actions and their
-remaining hold time. A controller-only ASan/UBSan host run now completes the
-mission at frame 151,088 after building a gas economy, Cybernetics Core and
-Gateway army, then destroying all 38 hostile buildings. It retains 14 units
-and 11 buildings. The frozen 5,809-transition input trace fits the paged
-256-entry debugger queue, with at most 90 transitions per 1,000-tick page.
+remaining hold time. The current stock-stat controller completes the unchanged
+native mission at frame 59,586 after building a protected economy, Photon
+Cannons and a Gateway army, then destroying all hostile buildings. Its trace
+records 2,999 input transitions and 59 live checkpoints. A fresh input-only
+host replay reaches the native result. The earlier ARM proof and performance
+measurement used commit `9a2e281`, before the imported-worker healing
+correction; an ARM replay of the current source has not yet been run.
 After the build/test command, replay it with:
 
 ```sh
-python3 tools/sc64_p3_controller_replay.py --trace .local/sc64/p3-controller-asan-win.json
+python3 tools/sc64_p3_controller_replay.py --route stock --trace .local/sc64/p3-controller-stock-asan-win.json
 ```
 
 The helper supports frozen `--rom`/`--elf` paths, separate `--output` folders,
 and bounded `--ticks` prefixes with optional normal-control `--save-at-end`.
 It verifies the final quest model, completion bit, roster and global wallets.
-The current default completes the full 152,107-tick ARM input replay at the
-same frame, with 154 retained observations and verified final quest, roster
-and wallet state. It averages 23.28 effective fps over 150,004 counted live
-frames; the worst observed interval is 17.72 fps. The final captured result
-matches the earlier baseline's RGB pixels. A fresh ARM process has also
-restored and continued a normal controller-created save. In that same
-saved scene, filtering defense candidates raised effective performance from
-19.72 to 28.92 fps with identical reported gameplay state and captured pixels.
-That is a bounded scene comparison, not a full-mission frame-rate result.
-The near-30-fps mission target and physical GBA validation remain unmet.
+The stock route is the replay CLI default. Explicit `--route garrison` and
+`--route expansion` retain their historical contracts; their older wins do not
+qualify the current stock-stat engine. The previously measured 58,063-update
+ARM replay and 839,963-cycle whole-route mean (about 20.0 fps equivalent) apply
+to commit `9a2e281` before the worker-heal correction. Opening skirmish samples
+near 29 fps do not establish
+mission-wide performance. The near-30-fps mission target, current-stock
+fresh-process SRAM replay and physical GBA validation remain unmet. See the
+[current redraw and P3 audit](audits/2026-10-26-static-art-and-p3/README.md).
 
 P3 enables sorted defense candidate lists, a paged debugger input queue and
 clear-free live rendering after full-frame coverage checks, terrain reuse
 across small camera moves, exact drawable-object keys and visibility spans.
 For an unoptimized
-comparison build, use `make -B protoss-p3 P3_OPTIMIZATION_FLAGS=`; retain ROM/ELF
+comparison build, use `make -B protoss-p3 P3_OPTIMIZATION_FLAGS= CANONICAL_DRAW_FLAGS= CANONICAL_STATIC_FLAGS= PROTOSS_CANONICAL_FLAGS=`; retain ROM/ELF
 pairs separately, then restore the default with `make -B protoss-p3`.
 
 The same 10,000-tick controller prefix improves from 21.53 to 23.39 effective
@@ -497,7 +519,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Host controller runs complete 16 missions: Terran 1–10, Zerg 1–3 and Protoss 1–3. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds; T9's win is on an earlier ROM. Separate staged profiles qualify Z4–Z6 and P4–P6, bringing the staged total to 22/30. Eight missions remain unqualified.
+- Canonical profiles expose T1–T10, Z1–Z6 and P1–P5 (21/30). Current Zerg controllers complete all six chapters, with input-only ARM wins and Z5/Z6 fresh-process SRAM continuity; P1–P5 have current host and input-only ARM wins in the P5 pools. P5 also has exact fresh-process cargo SRAM continuity and a continued win. Explicit P4 retains its own earlier save proof and files. Normal-menu ARM wins are recorded for all ten Terran missions across frozen builds. Historical staged coverage spans 22/30, with eight chapters still lacking a staged playthrough.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

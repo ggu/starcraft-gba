@@ -132,7 +132,8 @@ static int race_p4_storm_tick(void)
             int hp_q8, shields_q8, dx, dy;
             unsigned flags;
             if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) ||
-                (flags = sc64_game_unit_actor_flags(u[i].type)) & SC64_GAME_ACTOR_HIDDEN)
+                ((flags = sc64_game_unit_actor_flags(u[i].type)) & SC64_GAME_ACTOR_HIDDEN) ||
+                SC64_CARRIER_STATE_HIDDEN(&u[i]))
                 continue;
             dx = (int)pulses[p].x - u[i].x;
             dy = (int)pulses[p].y - u[i].y;

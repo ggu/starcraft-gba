@@ -206,7 +206,15 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     [U_MEDIC]     = { R_TER, 0, B_BARRACKS, 2, 50, 25, 450, 60, 0, 0 },
     [U_ZERGLING]  = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 1, 50, 0, 420, 35, 0, SC_PR_SPAWNING_POOL },
     [U_HYDRALISK] = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 2, 75, 25, 420, 80, 0, SC_PR_HYDRALISK_DEN },
-    [U_RAYNOR]    = { R_TER, 0, B_BARRACKS, 2, 0, 0, 0, 200, 0, 0 },
+    /* Legacy Raynor is a scenario alias: its zero purchase price/time and
+       doubled supply policy are retained for the old early-mission loader. */
+    [U_RAYNOR]    = { R_TER, 0, B_BARRACKS, 2, 0, 0, 0,
+#ifdef SC64_T4_RUNTIME
+        300,
+#else
+        200,
+#endif
+        0, 0 },
     [U_DRONE]     = { R_ZERG, SC_RACE_F_WORKER | SC_RACE_F_LARVA, B_HATCHERY, 2, 50, 0, 300, 40, 0, 0 },
     [U_OVERLORD]  = { R_ZERG, SC_RACE_F_LARVA | SC_RACE_F_PROVIDES_SUPPLY, B_HATCHERY, 0, 100, 0, 600, 200, 0, 0 },
     [U_PROBE]     = { R_PROTOSS, SC_RACE_F_WORKER, B_NEXUS, 2, 50, 0, 300, 20, 20, 0 },
@@ -215,6 +223,8 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     [U_SCOUT]     = { R_PROTOSS, SC_RACE_F_SHIELDS, B_STARGATE, 6, 275, 125, 1200, 150, 100, 0 },
     [U_TASSADAR]  = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 0, 100, 300, 1500, 80, 300, 0 },
     [U_FENIX]     = { R_PROTOSS, SC_RACE_F_SHIELDS, B_GATEWAY, 0, 200, 0, 1200, 240, 240, 0 },
+    /* Mission powerup only: the source's 1/1/1 sentinel costs are not a
+       production offer, so keep the authored zero-cost, nonproducer policy. */
     [U_CHRYSALIS] = { R_ZERG, 0, B_HATCHERY, 0, 0, 0, 0, 800, 0, 0 },
     [U_QUEEN]     = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 4, 100, 100, 750, 120, 0, SC_PR_SPAWNING_POOL },
     [U_GOLIATH]   = { R_TER, 0, B_FACTORY, 4, 100, 50, 600, 125, 0, 0 },
@@ -331,6 +341,7 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     [B_ACADEMY] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 150, 0, 1200, 600, 0 },
     [B_ENG_BAY] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 125, 0, 900, 850, 0 },
     [B_BUNKER] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 100, 0, 450, 350, 0 },
+    /* Scenario building with no stock whatBuilds producer; retain no-cost UI. */
     [B_INFESTED_COMMAND] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 0, 0, 0, 1500, 0 },
     [B_HATCHERY] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_PROVIDES_SUPPLY | SC_RACE_F_CONSUMES_WORKER, U_DRONE, 2, 300, 0, 1800, 1250, 0 },
     [B_SPAWNING_POOL] = { R_ZERG, SC_RACE_F_BUILDING | SC_RACE_F_CONSUMES_WORKER, U_DRONE, 0, 200, 0, 1200, 750, SC_PR_HATCHERY },
@@ -365,6 +376,7 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     },
     [B_MISSILE_TURRET] = { R_TER, SC_RACE_F_BUILDING, U_SCV, 0, 75, 0, 450, 200, 0 },
     [B_SPORE_COLONY] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 50, 0, 300, 400, SC_PR_HATCHERY },
+    /* Legacy u16 fallback; sc64_race_building_max_hp returns stock 100000. */
     [B_ZERG_BEACON] = { R_ZERG, SC_RACE_F_BUILDING, U_DRONE, 0, 250, 0, 0, 10000, 0 },
     [B_FACTORY] = { R_TER, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER, U_SCV, 0, 200, 100, 1200, 1250, SC_PR_BARRACKS },
     [B_ROBOTICS_FACILITY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_PRODUCER | SC_RACE_F_REQUIRES_POWER, U_PROBE, 0, 200, 200, 1200, 500, SC_PR_CYBERNETICS_CORE | SC_PR_PYLON },
@@ -579,6 +591,10 @@ static inline const char *sc64_race_building_name(int type)
 
 static inline unsigned short sc64_race_building_shields(int type)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpBuildingFact *zp = sc64_zp_building_fact(type);
+    if (zp) return (unsigned short)zp->shields;
+#endif
 #ifdef SC64_TERRAN_LATE_ACTORS
     const Sc64TerranLateActorFact *late = sc64_terran_late_building_fact(type);
     if (late) return (unsigned short)late->shields;
@@ -592,6 +608,7 @@ static inline unsigned short sc64_race_building_shields(int type)
     case B_CYBERNETICS_CORE: return 500; case B_FORGE: return 550;
     case B_ASSIMILATOR: return 450; case B_PYLON: return 300;
     case B_PHOTON_CANNON: return 100; case B_STARGATE: return 600;
+    case B_ROBOTICS_FACILITY: return 500;
     default: return 0;
     }
 }
@@ -754,24 +771,6 @@ static inline int sc64_race_t4_unit_intrinsically_invincible(int type)
     ; }
 static inline int sc64_race_t4_building_intrinsically_invincible(int type)
 { return type == B_TERRAN_BEACON || sc64_race_t4_is_door(type); }
-static inline int sc64_race_building_max_hp(int type)
-{ const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
-#if defined(SC64_Z5_DOODADS) || defined(SC64_P6_ACTORS)
-  const Sc64ZpBuildingFact *zp = sc64_zp_building_fact(type);
-  if (zp) return zp->hp;
-#endif
-#ifdef SC64_TERRAN_LATE_ACTORS
-  const Sc64TerranLateActorFact *late = sc64_terran_late_building_fact(type);
-  if (late) return late->hp;
-#endif
-  return type == B_TERRAN_BEACON || sc64_race_t4_is_door(type)
-#ifdef SC64_ZP_CAMPAIGN_ACTORS
-      || type == B_ZP_PROTOSS_BEACON
-#endif
-#ifdef SC64_Z5_ACTORS
-      || type == B_Z5_TERRAN_BEACON
-#endif
-      ? 100000 : r ? r->hp : 0; }
 /* C-10 Canister Rifle is Concussive, and Terran Infantry Weapons add one
    point per level. This model has no cloak/lockdown/nuke state. */
 enum { SC64_RACE_DAMAGE_NORMAL, SC64_RACE_DAMAGE_CONCUSSIVE };
@@ -870,6 +869,33 @@ static inline int sc64_race_t4_ghost_hp_damage(int raw_target, int raw_damage,
 }
 #endif
 
+/* Return full int HP for scenario buildings whose stock 100000 value does not
+ * fit Sc64RaceBuildingRule.hp. Available in every profile so map imports and
+ * building construction share one max-HP path. */
+static inline int sc64_race_building_max_hp(int type)
+{
+    const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpBuildingFact *zp = sc64_zp_building_fact(type);
+    if (zp) return zp->hp;
+#endif
+#ifdef SC64_TERRAN_LATE_ACTORS
+    const Sc64TerranLateActorFact *late = sc64_terran_late_building_fact(type);
+    if (late) return late->hp;
+#endif
+    if (type == B_ZERG_BEACON) return 100000;
+#ifdef SC64_T4_RUNTIME
+    if (type == B_TERRAN_BEACON || sc64_race_t4_is_door(type)) return 100000;
+#endif
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    if (type == B_ZP_PROTOSS_BEACON) return 100000;
+#endif
+#ifdef SC64_Z5_ACTORS
+    if (type == B_Z5_TERRAN_BEACON) return 100000;
+#endif
+    return r ? r->hp : 0;
+}
+
 /* Combat tuning uses BWAPI public default damage/range/cooldown facts and
  * retains pixel ranges and simulation-frame cooldowns. */
 static inline int sc64_race_unit_damage(int type)
@@ -887,6 +913,12 @@ static inline int sc64_race_unit_damage(int type)
 #endif
     switch (type) {
     case U_SCV: case U_DRONE: case U_PROBE: return 5;
+    case U_RAYNOR:
+#ifdef SC64_T4_RUNTIME
+        return 30;
+#else
+        return 18;
+#endif
 #ifdef SC64_T4_RUNTIME
     case U_GHOST: return 10;
     case U_RAYNOR_MARINE: return 18;
@@ -902,7 +934,7 @@ static inline int sc64_race_unit_damage(int type)
     case U_HUNTER_KILLER: return 20; case U_REAVER: return 100;
     case U_FENIX: return 20; case U_FENIX_DRAGOON: return 45;
     case U_TASSADAR: return 20; case U_SCOUT: return 8;
-    case U_SIEGE_TANK: return 50;
+    case U_SIEGE_TANK: return 70;
     case U_VULTURE: return 20;
     default: return 0;
     }
@@ -922,7 +954,7 @@ static inline int sc64_race_unit_range(int type)
     if (late) return late->ground_range;
 #endif
     switch (type) {
-    case U_WRAITH: case U_VULTURE: return 160;
+    case U_WRAITH: case U_VULTURE: case U_RAYNOR: return 160;
 #ifdef SC64_T4_RUNTIME
     case U_GHOST: return 224;
     case U_RAYNOR_MARINE: return 160;
@@ -934,12 +966,15 @@ static inline int sc64_race_unit_range(int type)
     case U_GOLIATH: return 192;
     case U_TANK: return 224;
     case U_MARINE: case U_HYDRALISK: case U_DRAGOON: case U_SCOUT:
-    case U_FENIX_DRAGOON: case U_HUNTER_KILLER: return 128;
+    case U_FENIX_DRAGOON: return 128;
+    case U_HUNTER_KILLER: return 160;
     case U_TASSADAR: return 96;
     case U_SIEGE_TANK: return 384;
     case U_MUTALISK: return 96; case U_REAVER: return 256;
     case U_FIREBAT: return 32; case U_ZEALOT: case U_FENIX: return 15;
-    case U_SCV: case U_DRONE: case U_PROBE: case U_ZERGLING: return 15;
+    case U_SCV: return 10;
+    case U_DRONE: case U_PROBE: return 32;
+    case U_ZERGLING: return 15;
     default: return 0;
     }
 }
@@ -962,6 +997,9 @@ static inline int sc64_race_unit_cooldown(int type)
 #ifdef SC64_T4_RUNTIME
     case U_GHOST: return 22;
     case U_RAYNOR_MARINE: return 15;
+    case U_RAYNOR: return 22;
+#else
+    case U_RAYNOR: return 15;
 #endif
 #ifdef SC64_T5_RUNTIME
     case U_KERRIGAN: case U_RAYNOR_VULTURE: return 22;
@@ -969,11 +1007,13 @@ static inline int sc64_race_unit_cooldown(int type)
     case U_VULTURE: return 30;
     case U_HYDRALISK: return 15; case U_FIREBAT: return 22;
     case U_ZEALOT: return 22; case U_DRAGOON: return 30;
+    case U_FENIX: return 22;
     case U_GOLIATH: return 22; case U_TANK: return 37;
     case U_WRAITH: return 30; case U_MUTALISK: return 30;
     case U_REAVER: return 60; case U_SCOUT: return 30;
     case U_TASSADAR: return 22; case U_FENIX_DRAGOON: return 22;
     case U_SIEGE_TANK: return 75;
+    case U_DRONE: case U_PROBE: return 22;
     default: return 15;
     }
 }
@@ -1028,6 +1068,9 @@ static inline int sc64_race_unit_can_attack_air(int type)
 #ifdef SC64_T4_RUNTIME
     case U_GHOST: case U_RAYNOR_MARINE:
 #endif
+#ifndef SC64_T4_RUNTIME
+    case U_RAYNOR:
+#endif
 #ifdef SC64_T5_RUNTIME
     case U_KERRIGAN:
 #endif
@@ -1057,6 +1100,7 @@ static inline int sc64_race_unit_damage_vs(int type, int target_flying)
 #endif
 #ifdef SC64_T4_RUNTIME
     if (type == U_GHOST) return 10;
+    if (type == U_RAYNOR && target_flying) return 0;
 #endif
 #ifdef SC64_T5_RUNTIME
     if (type == U_KERRIGAN) return 30;
@@ -1094,6 +1138,7 @@ static inline int sc64_race_unit_range_vs(int type, int target_flying)
 #endif
 #ifdef SC64_T4_RUNTIME
     if (type == U_GHOST) return 224;
+    if (type == U_RAYNOR && target_flying) return 0;
 #endif
 #ifdef SC64_T5_RUNTIME
     if (type == U_KERRIGAN) return 192;
@@ -1127,6 +1172,7 @@ static inline int sc64_race_unit_cooldown_vs(int type, int target_flying)
 #endif
 #ifdef SC64_T4_RUNTIME
     if (type == U_GHOST) return 22;
+    if (type == U_RAYNOR && target_flying) return 0;
 #endif
 #ifdef SC64_T5_RUNTIME
     if (type == U_KERRIGAN || type == U_RAYNOR_VULTURE) return 22;
@@ -1173,6 +1219,7 @@ static inline int sc64_race_unit_armor(int type)
     if (late) return late->armor;
 #endif
     switch (type) {
+    case U_RAYNOR: return 3;
 #ifdef SC64_T4_RUNTIME
     case U_RAYNOR_MARINE: return 3;
 #endif
@@ -1189,6 +1236,10 @@ static inline int sc64_race_unit_armor(int type)
 }
 static inline int sc64_race_building_armor(int type)
 {
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    const Sc64ZpBuildingFact *zp = sc64_zp_building_fact(type);
+    if (zp) return zp->armor;
+#endif
 #ifdef SC64_P6_ACTORS
     if (type == B_P6_WALL_MISSILE_TRAP)
         return sc64_zp_building_fact(type)->armor;

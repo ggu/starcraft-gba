@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
@@ -128,6 +129,11 @@ test_viewport_clipping_and_extreme_coordinates(void)
     assert(drawn_pixels==0);
     sc64_weapon_vfx_draw(SC64_WEAPON_VFX_STYLE_BURST,C_GOLD,50,150,80,150,6);
     assert(drawn_pixels==0);
+    reset_draw();
+    sc64_weapon_vfx_draw(SC64_WEAPON_VFX_STYLE_BURST,C_GOLD,50,120,80,120,6);
+    assert(drawn_pixels>0);
+    for(int y=120;y<128;++y) for(int x=0;x<240;++x)
+        assert(!pixel_seen[x][y]); /* Row 120 belongs to the command HUD. */
 }
 
 static void
