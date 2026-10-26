@@ -2381,6 +2381,31 @@ opening and a controller-only attack-move. It checks 619,216 list answers
 against the original query, then repeats the menu/save-load fixture. See
 [Validation](VALIDATION.md#p7-movement-steering-list) for ARM measurements.
 
+A second default-off probe adds `SC64_FACT_TABLES` to the movement-probe flags:
+
+```sh
+make test-sc64-fact-tables
+make test-sc64-p7-fact-tables
+make protoss-p7-fact-probe
+```
+
+It produces `build/StarCraft-Protoss-P7-Fact-Probe-GBA.gba`. Before compiling,
+`tools/sc64_fact_tables_gen.c` is built on the host with the probe's exact
+flags. It writes packed per-type ROM tables to
+`build/generated/p7-fact-tables/sc64_fact_tables_generated.h`. The tables hold
+unit actor flags, collision radius and flight, plus building actor flags. They
+come from the unchanged functions, which stay available as `*_reference`. The
+generated header records the actor gates it was built with, and a build with
+different gates fails to compile. Types outside the roster still use the
+reference functions. `test-sc64-fact-tables` needs no game data. For every
+actor-gate configuration, with and without `SC64_ZP_FACT_RANGE_CULL`, it
+compares each table entry with the reference functions. It also checks that
+every fact-selecting macro is recorded and that a table built for other gates
+is rejected. `test-sc64-p7-fact-tables` repeats the table check under the P7
+flags. It also compares the P7 movement trace and the menu/save-load fixture
+with the reference builds. See
+[Validation](VALIDATION.md#p7-build-time-fact-tables) for ARM measurements.
+
 ## Mineral gathering before a base exists
 
 The shared first-depot worker path lets an empty mineral worker gather before
