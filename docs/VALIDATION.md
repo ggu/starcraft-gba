@@ -5494,3 +5494,41 @@ Controller-only showcase replay effective fps against base `d085310`:
 
 The last stands stay at 29.857 fps and still lose at update 150. This is
 emulator timing only.
+
+
+### Blood Bath gas placement, cargo cues, and crash investigation (2026-10-26)
+
+Gas-building placement previously required the cursor to be inside a strict
+15-pixel center circle. The imported geyser's offset 56x26 opaque crop extends
+outside that circle. The hit test now retains center tolerance and accepts
+opaque source-art pixels; gas-building validation, preview, and creation snap
+to the same geyser center. Occupied geysers still reject construction.
+`make test-sc64-protoss-gas-placement` covers three races at all four Blood Bath
+geysers plus a Protoss field-menu build, completion, worker assignment, and
+actual gas income under the Showcase flags and host sanitizers. The placement
+matrix uses seeded setup; the final case exercises ordinary field controls.
+
+Imported worker sprites did not draw their resource cargo. A small authored
+blue/cyan mineral crystal or green gas cue now appears beside harvesting SCVs,
+Drones, and Probes while their carry amount is positive. This is an authored UI
+cue, not extracted cargo animation. It adds no actor fields or save changes.
+`make test-sc64-worker-cargo` checks indexed and packed profiles, resource type,
+empty/order clearing, nonworker exclusion, fog, HUD clipping, and unchanged
+unit state.
+
+A reported physical-GBA fuzzy-screen crash in Showcase's Blood Bath skirmish
+as Protoss versus one AI remains unresolved. The card's last recorded Showcase
+source was b2ff82f, predating the blue-orb modifier change. Host sanitizer runs
+using both current and b2ff82f source with prepared inputs passed a synthetic
+paid-construction stress workload reaching 147/160 building slots; this is not
+a byte-identical replay of the shipped cartridge. A private no-GDB ARM test
+also passed synthetic construction/rendering with sampled audio active and
+canaries after BSS and below the main stack; its modified main loop is not a
+production-controller or physical-hardware qualification.
+
+`make test-sc64-protoss-skirmish-pylons` adds a bounded normal-controller check:
+HOME/custom menu, Blood Bath, Protoss, one Terran AI, earned resources, two new
+Pylons, and 5,400 updates with 5,380 full renders. It passed with three completed
+Pylons and normal play still active. It does not exercise slot exhaustion or
+prove that the hardware crash is fixed. The exact ROM/save from KODAK and the
+freeze/audio behavior are still needed to narrow that report.
