@@ -97,6 +97,47 @@ passes the offline trace validator. It is a host controller run, distinct
 from ARM replay of a fixed input tape. The public bounded replay is a
 performance regression fixture, not the full winning tape.
 
+## Full ARM replay of the current cache profile
+
+A subsequent fixed-input ARM replay qualifies the complete winning tape
+with the V2/contact-cache profile from PR83, including format-2 audio. The
+235 frozen authored `common/` and `starcraft/` files match that source tree;
+only the replay harness adds sparse timer reads and diagnostic output. It
+does not change the controller tape or game state. Host control and sampled
+builds first matched all 67 frozen state records and the strict verdict.
+
+The sampled ARM run then matched the same 67 state records, including both
+32-bit and 64-bit digests, and the full terminal verdict. It wins at call
+39,976 / frame 39,738, consumes all 1,667 input transitions and retains all
+three heroes. The strict source-victory predicate passes with no runtime or
+projectile fault. This is ARM replay of recorded ordinary inputs, rather
+than execution of the adaptive host controller on ARM.
+
+The diagnostic image links to 12,904,408 bytes and pads to 16 MiB. BSS ends at
+`0x0203d620`, IWRAM at `0x03004a70`, and measured main-stack high-water use is
+5,036 bytes, leaving 6,740 bytes above the reserved boundary. Its header is
+`SC P7 SPARSE` / `S7SP`; it is a replay image, separate from the playable
+probe above. The owned emulator process was stopped after its validated win
+and stack record.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Full ARM diagnostic ROM | `4584a9a0c0883fc5c2a8bcdb8152a696751774c9f28c369b07e6525c04841259` |
+| ARM state/profile log | `43716a3c1217fe27fb1f6a845739c2b606b84799922c9dea6093465a1bb1f0b3` |
+| Validated result | `aa9be6903ce4dfa8d7c15540732f34ea6973146af37b6923028ed7296dca134f` |
+| Compiler argument record | `8717541879e7f2c8fbcd742298269cd65cde7db33bcf12267f38a5fde3cc0aef` |
+
+There are 22 sparse in-play timing samples across the winning tape, each
+with update, audio, render and existing subsystem counters. Transition to
+RESULT is excluded from those samples. Unit orders account for 61.1–70.3%
+of update cycles in these samples. That points to order processing for the
+next investigation; it does not attribute that cost between its internal
+movement, detection and other work. Sparse samples are not a full-mission
+average, a comparison with an uninstrumented control, or a 30-fps result.
+
+These private artifacts, source hashes, host parity checks and the launch
+record are under `.local/build/p7-current-full-sparse-20261027/`.
+
 Private evidence is under `.local/build/p7-mission-20261027/`: the three
 compiler plans, generated tables, host logs, ROM identities, ARM process
 identities, state records and timing results. No ROMs, generated banks,
