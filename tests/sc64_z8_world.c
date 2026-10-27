@@ -12,6 +12,7 @@ typedef struct {
     unsigned present_opcode;
     unsigned kills_owner, kills_raw;
     u32 kills;
+    Sc64Z8ActorView *spawn_slot;
 } FakeEngine;
 
 static int create(void *context, const Sc64Z8Action *a, unsigned owner,
@@ -22,6 +23,12 @@ static int create(void *context, const Sc64Z8Action *a, unsigned owner,
     assert(a->opcode == 11);
     e->owner=owner; e->count=count; e->property=property;
     e->x1=x1; e->y1=y1; e->x2=x2; e->y2=y2;
+    if (e->spawn_slot) {
+        *e->spawn_slot=(Sc64Z8ActorView){.raw_type=a->unit,.source_owner=(s16)owner,
+            .x=(s16)((x1+x2)/4u),.y=(s16)((y1+y2)/4u),
+            .alive=1,.completed=1,.men=1,.type_known=1};
+        e->spawn_slot=0;
+    }
     return 1;
 }
 
@@ -50,12 +57,19 @@ static int kill_count(void *context, unsigned owner, unsigned raw, u32 *out)
     return 1;
 }
 
+static int read_actor(void *context, unsigned index, Sc64Z8ActorView *out)
+{
+    Sc64Z8ActorView *actors = context;
+    *out = actors[index];
+    return 1;
+}
+
 int main(void)
 {
     FakeEngine engine={0};
     u8 invincible0=0, invincible1=0;
     Sc64ResourceActionState wallets[8]={{0}};
-    Sc64Z8ActorView actors[3]={
+    Sc64Z8ActorView actors[5]={
         {.raw_type=154,.source_owner=1,.x=20,.y=20,
          .left=8,.top=8,.right=8,.bottom=8,.alive=1,.completed=1,
          .men=1,.type_known=1,.invincible=&invincible0},
@@ -64,7 +78,10 @@ int main(void)
          .men=1,.type_known=1,.invincible=&invincible1},
         {.raw_type=171,.source_owner=2,.x=20,.y=20,
          .left=16,.top=16,.right=16,.bottom=16,.alive=1,.completed=1,
-         .building=1,.type_known=1}
+         .building=1,.type_known=1},
+        {.raw_type=154,.source_owner=11,.x=20,.y=20,
+         .left=8,.top=8,.right=8,.bottom=8,.alive=1,.completed=1,
+         .men=1,.type_known=1}
     };
     Sc64Z8WorldView w={0};
     Sc64Z8Rect rect={48,48,64,64};
@@ -76,7 +93,6 @@ int main(void)
     w.actors=actors; w.actor_count=3;
     w.active_mask=(u8)((1u<<1)|(1u<<2)|(1u<<3));
     w.force[1]=2; w.force[2]=3; w.force[3]=1;
-    w.source_current_player=1;
     for (unsigned i=0;i<8;++i) w.wallet[i]=&wallets[i];
     w.services.context=&engine;
     w.services.create=create; w.services.run_ai=run_ai;
@@ -90,6 +106,14 @@ int main(void)
     assert(sc64_z8_world_count(&w,&c,1,&rect,&count)==1 && count==1);
     rect.left=49; rect.top=48; rect.right=64; rect.bottom=64;
     assert(sc64_z8_world_count(&w,&c,1,&rect,&count)==1 && count==0);
+
+    /* Current Player (13) follows the scheduler's invocation owner, not a
+     * cached world-wide player value. */
+    c=(Sc64Z8Condition){.opcode=2,.player=13,.unit=154,.comparison=0};
+    assert(sc64_z8_world_count(&w,&c,1,0,&count)==1 && count==1);
+    assert(sc64_z8_world_count(&w,&c,2,0,&count)==1 && count==0);
+    { unsigned resolved=0;
+      assert(sc64_z8_world_resolve_one(&w,13,2,&resolved) && resolved==2); }
 
     c.opcode=5; c.player=13; c.unit=154; c.comparison=0; c.amount=1;
     engine.kills=4;
@@ -135,6 +159,24 @@ int main(void)
     assert(sc64_z8_world_action(&w,&a,3,&rect)==1 && engine.present_opcode==9);
     assert(sc64_z8_world_ops.count && sc64_z8_world_ops.action &&
            sc64_z8_world_ops.timed && sc64_z8_world_ops.find_unit);
+
+    /* Game binding can enumerate the real engine arrays without allocating
+     * a parallel actor snapshot; mutations still reach the live flag pointer. */
+    w.actors=0; w.actor_count=5; w.actor_context=actors; w.actor_at=read_actor;
+    c=(Sc64Z8Condition){.opcode=2,.player=19,.unit=154,.comparison=0,.amount=1};
+    assert(sc64_z8_world_count(&w,&c,3,0,&count)==1 && count==1);
+    c=(Sc64Z8Condition){.opcode=2,.player=17,.unit=154,.comparison=0};
+    assert(sc64_z8_world_count(&w,&c,3,0,&count)==1 && count==1);
+    a=(Sc64Z8Action){.opcode=43,.location=1,.group1=19,.unit=154,.modifier=4};
+    assert(sc64_z8_world_action(&w,&a,3,&rect)==1 && invincible0==1);
+
+    /* Pool-capacity enumeration sees a newly created live slot later in the
+     * same pass; a one-time actor snapshot would miss this Command target. */
+    engine.spawn_slot=&actors[4];
+    a=(Sc64Z8Action){.opcode=11,.location=1,.group1=19,.unit=74,.modifier=0};
+    assert(sc64_z8_world_action(&w,&a,3,&rect)==1 && actors[4].alive);
+    c=(Sc64Z8Condition){.opcode=2,.player=19,.unit=74,.comparison=0,.amount=1};
+    assert(sc64_z8_world_count(&w,&c,3,0,&count)==1 && count==1);
 
     actors[2].type_known=0;
     c=(Sc64Z8Condition){.opcode=2,.player=17,.unit=229,.comparison=0};

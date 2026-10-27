@@ -17,7 +17,8 @@
 
 enum {
     SC64_Z8_RAW_UNIT_LIMIT = 228u,
-    SC64_Z8_WORLD_ACTOR_LIMIT = 512u
+    SC64_Z8_WORLD_ACTOR_LIMIT = 512u,
+    SC64_Z8_SOURCE_OWNER_LIMIT = 12u
 };
 
 typedef struct {
@@ -54,26 +55,50 @@ typedef struct {
 
 typedef struct {
     Sc64Z8ActorView *actors; /* Canonical engine enumeration order. */
-    u16 actor_count;
+    u16 actor_count; /* Provider mode may expose pool capacity, including dead slots. */
+    void *actor_context;
+    /* Optional zero-copy bridge to private engine pools. Returns 1 and fills
+     * the row, or -1 when that actor cannot be represented. To expose actors
+     * created during this scheduler pass, provider mode must enumerate pool
+     * capacity (including dead slots); each read must reflect current state. */
+    int (*actor_at)(void *context, unsigned index, Sc64Z8ActorView *out);
     u8 active_mask;
     u8 force[SC64_Z8_OWNER_LIMIT]; /* CHK force IDs, 1..4; 0 means unassigned. */
-    u8 source_current_player;
     Sc64ResourceActionState *wallet[SC64_Z8_OWNER_LIMIT];
     Sc64Z8WorldServices services;
 } Sc64Z8WorldView;
 
 static inline int
-sc64_z8_world_owner_matches(const Sc64Z8WorldView *w, unsigned selector,
-                            unsigned owner)
+sc64_z8_world_actor_at(const Sc64Z8WorldView *w, unsigned index,
+                       Sc64Z8ActorView *out)
 {
-    if (!w || owner >= SC64_Z8_OWNER_LIMIT) return -1;
+    if (!w || !out || index >= w->actor_count) return -1;
+    if (w->actor_at) return w->actor_at(w->actor_context, index, out);
+    if (!w->actors) return -1;
+    *out = w->actors[index];
+    return 1;
+}
+
+static inline int
+sc64_z8_world_actor_source_available(const Sc64Z8WorldView *w)
+{
+    return w && w->actor_count <= SC64_Z8_WORLD_ACTOR_LIMIT &&
+           (w->actor_at || w->actors || !w->actor_count);
+}
+
+static inline int
+sc64_z8_world_owner_matches(const Sc64Z8WorldView *w, unsigned selector,
+                            unsigned current_owner, unsigned owner)
+{
+    if (!w) return -1;
+    /* CHK neutral/doodad owners 8..11 are valid actors but are not entries in
+     * the eight-player enabled-player table. */
+    if (owner >= SC64_Z8_OWNER_LIMIT) return owner < SC64_Z8_SOURCE_OWNER_LIMIT ? 0 : -1;
     if (!(w->active_mask & (1u << owner))) return 0;
     if (selector < SC64_Z8_OWNER_LIMIT) return selector == owner;
-    if (selector == 13u) {
-        if (w->source_current_player >= SC64_Z8_OWNER_LIMIT ||
-            !(w->active_mask & (1u << w->source_current_player))) return -1;
-        return owner == w->source_current_player;
-    }
+    if (selector == 13u)
+        return current_owner < SC64_Z8_OWNER_LIMIT &&
+               (w->active_mask & (1u << current_owner)) ? owner == current_owner : -1;
     if (selector == SC64_Z8_SELECT_ALL_PLAYERS) return owner < 8u;
     if (selector >= SC64_Z8_SELECT_FORCE1 && selector <= SC64_Z8_SELECT_FORCE4) {
         if (w->force[owner] > 4u) return -1;
@@ -87,12 +112,12 @@ sc64_z8_world_owner_matches(const Sc64Z8WorldView *w, unsigned selector,
  * action-specific expansion is modeled. */
 static inline int
 sc64_z8_world_resolve_one(const Sc64Z8WorldView *w, unsigned selector,
-                          unsigned *owner_out)
+                          unsigned current_owner, unsigned *owner_out)
 {
     unsigned found = SC64_Z8_OWNER_LIMIT;
     if (!w || !owner_out) return 0;
     for (unsigned owner = 0; owner < SC64_Z8_OWNER_LIMIT; ++owner) {
-        int match = sc64_z8_world_owner_matches(w, selector, owner);
+        int match = sc64_z8_world_owner_matches(w, selector, current_owner, owner);
         if (match < 0) return 0;
         if (match) {
             if (found != SC64_Z8_OWNER_LIMIT) return 0;
@@ -145,14 +170,13 @@ sc64_z8_world_count(void *context, const Sc64Z8Condition *c,
     unsigned source_owner;
     u32 count = 0;
     (void)trigger_owner;
-    if (!w || !c || !out || w->actor_count > SC64_Z8_WORLD_ACTOR_LIMIT ||
-        (w->actor_count && !w->actors) ||
+    if (!w || !c || !out || !sc64_z8_world_actor_source_available(w) ||
         c->unit > 231u || (c->player > 13u && c->player < 17u) ||
         c->player > 21u ||
         (c->opcode != 2 && c->opcode != 3 && c->opcode != 5)) return -1;
     if (c->opcode == 5) {
         if (!w->services.kill_count ||
-            !sc64_z8_world_resolve_one(w, c->player, &source_owner) ||
+            !sc64_z8_world_resolve_one(w, c->player, trigger_owner, &source_owner) ||
             w->services.kill_count(w->services.context, source_owner,
                                    c->unit, &count) != 1) return -1;
         *out = count;
@@ -160,12 +184,14 @@ sc64_z8_world_count(void *context, const Sc64Z8Condition *c,
     }
     if (c->opcode == 3 && !rect) return -1;
     for (unsigned i = 0; i < w->actor_count; ++i) {
-        Sc64Z8ActorView *a = &w->actors[i];
+        Sc64Z8ActorView actor;
+        Sc64Z8ActorView *a = &actor;
         int owner, type, overlap = 1;
+        if (sc64_z8_world_actor_at(w, i, a) != 1) return -1;
         if (!a->alive) continue;
-        if (a->source_owner < 0 || a->source_owner >= SC64_Z8_OWNER_LIMIT)
+        if (a->source_owner < 0 || a->source_owner >= SC64_Z8_SOURCE_OWNER_LIMIT)
             return -1;
-        owner = sc64_z8_world_owner_matches(w, c->player,
+        owner = sc64_z8_world_owner_matches(w, c->player, trigger_owner,
                                              (unsigned)a->source_owner);
         if (owner < 0) return -1;
         if (!owner) continue;
@@ -191,17 +217,18 @@ sc64_z8_world_find_unit(void *context, const Sc64Z8Action *a,
     Sc64Z8WorldView *w = (Sc64Z8WorldView *)context;
     (void)trigger_owner;
     if (!w || !a || a->unit >= SC64_Z8_RAW_UNIT_LIMIT || !rect || !x || !y ||
-        w->actor_count > SC64_Z8_WORLD_ACTOR_LIMIT ||
-        (w->actor_count && !w->actors)) return -1;
+        !sc64_z8_world_actor_source_available(w)) return -1;
     /* The supplied array order must be the caller's native actor enumeration
      * order; this adapter does not invent a unit-before-building ordering. */
     for (unsigned i = 0; i < w->actor_count; ++i) {
-        Sc64Z8ActorView *actor = &w->actors[i];
+        Sc64Z8ActorView actor_row;
+        Sc64Z8ActorView *actor = &actor_row;
         int owner, type, overlap;
+        if (sc64_z8_world_actor_at(w, i, actor) != 1) return -1;
         if (!actor->alive) continue;
-        if (actor->source_owner < 0 || actor->source_owner >= SC64_Z8_OWNER_LIMIT)
+        if (actor->source_owner < 0 || actor->source_owner >= SC64_Z8_SOURCE_OWNER_LIMIT)
             return -1;
-        owner = sc64_z8_world_owner_matches(w, a->group1,
+        owner = sc64_z8_world_owner_matches(w, a->group1, trigger_owner,
                                              (unsigned)actor->source_owner);
         if (owner < 0) return -1;
         if (!owner) continue;
@@ -225,14 +252,13 @@ sc64_z8_world_action(void *context, const Sc64Z8Action *a,
 {
     Sc64Z8WorldView *w = (Sc64Z8WorldView *)context;
     unsigned owner;
-    if (!w || !a || w->actor_count > SC64_Z8_WORLD_ACTOR_LIMIT ||
-        (w->actor_count && !w->actors)) return -1;
+    if (!w || !a || !sc64_z8_world_actor_source_available(w)) return -1;
     switch (a->opcode) {
     case 11: /* CreateUnitWithProperties */
         if (a->unit >= SC64_Z8_RAW_UNIT_LIMIT || !rect || rect->left < 0 || rect->top < 0 ||
             rect->right < rect->left || rect->bottom < rect->top ||
             !w->services.create ||
-            !sc64_z8_world_resolve_one(w, a->group1, &owner)) return -1;
+            !sc64_z8_world_resolve_one(w, a->group1, trigger_owner, &owner)) return -1;
         return w->services.create(w->services.context, a, owner,
                                   sc64_z8_create_count(a), a->group2,
                                   (unsigned)rect->left, (unsigned)rect->top,
@@ -252,12 +278,14 @@ sc64_z8_world_action(void *context, const Sc64Z8Action *a,
          * late view entry cannot leave a partial action behind. */
         for (unsigned pass = 0; pass < 2; ++pass) {
             for (unsigned i = 0; i < w->actor_count; ++i) {
-                Sc64Z8ActorView *actor = &w->actors[i];
+                Sc64Z8ActorView actor_row;
+                Sc64Z8ActorView *actor = &actor_row;
                 int owner, type, overlap;
+                if (sc64_z8_world_actor_at(w, i, actor) != 1) return -1;
                 if (!actor->alive) continue;
-                if (actor->source_owner < 0 || actor->source_owner >= SC64_Z8_OWNER_LIMIT)
+                if (actor->source_owner < 0 || actor->source_owner >= SC64_Z8_SOURCE_OWNER_LIMIT)
                     return -1;
-                owner = sc64_z8_world_owner_matches(w, a->group1,
+                owner = sc64_z8_world_owner_matches(w, a->group1, trigger_owner,
                                                      (unsigned)actor->source_owner);
                 if (owner < 0) return -1;
                 if (!owner) continue;
@@ -274,7 +302,7 @@ sc64_z8_world_action(void *context, const Sc64Z8Action *a,
         return 1;
     }
     case 26: { /* Apply to exactly one resolved source owner. */
-        if (!sc64_z8_world_resolve_one(w, a->group1, &owner) ||
+        if (!sc64_z8_world_resolve_one(w, a->group1, trigger_owner, &owner) ||
             !w->wallet[owner] || a->unit > SC64_RESOURCE_BOTH ||
             (a->modifier != SC64_RESOURCE_MOD_SET &&
              a->modifier != SC64_RESOURCE_MOD_ADD &&
