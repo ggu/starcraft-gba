@@ -36,6 +36,9 @@ enum {
     SC64_NYDUS_SIGHT_PX = 256,
     SC64_NYDUS_MAX_SOURCE_RECORDS = 8,
     SC64_NYDUS_MAX_LINKS = SC64_NYDUS_MAX_SOURCE_RECORDS / 2,
+    /* Candidate endpoints a caller may collect for one bind: every source
+     * position plus one duplicate each, enough to prove ambiguity. */
+    SC64_NYDUS_MAX_VIEWS = 2 * SC64_NYDUS_MAX_SOURCE_RECORDS,
     SC64_NYDUS_NO_RECORD = 0xffff,
     SC64_NYDUS_NO_SLOT = 0xff,
     /* OpenBW find_unit_placement(u, pos, false) searches a 256x256 source
@@ -72,10 +75,11 @@ typedef struct {
     unsigned char a, b;
 } Sc64NydusSourcePair;
 
+/* A live raw-134 building, identified by its runtime building slot. */
 typedef struct {
     short x, y;
     unsigned short raw_type;
-    unsigned char alive, complete, owner, reserved;
+    unsigned char alive, complete, owner, slot;
 } Sc64NydusEndpointView;
 
 /* Runtime link: two building slots and the owner both endpoints share. */
@@ -157,7 +161,9 @@ static inline int sc64_nydus_find_endpoint(const Sc64NydusSourceRecord *want,
     return found;
 }
 
-/* Bind validated source pairs to live building slots. With require_all, both
+/* Bind validated source pairs to live building slots. The view list may be
+ * any subset of buildings that includes every raw-134 building standing on a
+ * source position; distinct slots are required. With require_all, both
  * endpoints of every pair must exist (mission start). Otherwise a pair may be
  * absent as a whole (destroyed). One surviving endpoint is never valid: the
  * partner kill is immediate, so a save cannot legitimately contain it. */
@@ -169,9 +175,14 @@ static inline int sc64_nydus_bind(const Sc64NydusSourceRecord *rec,
                                   Sc64NydusState *out)
 {
     Sc64NydusState next;
-    if (!out || !rec || !pair || !view || pair_count > SC64_NYDUS_MAX_LINKS ||
-        view_count > SC64_NYDUS_NO_SLOT || (require_all != 0 && require_all != 1))
+    if (!out || !rec || !pair || (!view && view_count) ||
+        pair_count > SC64_NYDUS_MAX_LINKS || view_count > SC64_NYDUS_MAX_VIEWS ||
+        (require_all != 0 && require_all != 1))
         return 0;
+    for (unsigned i = 0; i < view_count; ++i)
+        for (unsigned j = 0; j < i; ++j)
+            if (view[i].slot == view[j].slot || view[i].slot == SC64_NYDUS_NO_SLOT)
+                return 0;
     for (unsigned i = 0; i < sizeof(next); ++i) ((unsigned char *)&next)[i] = 0;
     for (unsigned p = 0; p < pair_count; ++p) {
         int a = sc64_nydus_find_endpoint(&rec[pair[p].a], view, view_count);
@@ -184,8 +195,8 @@ static inline int sc64_nydus_bind(const Sc64NydusSourceRecord *rec,
             continue;
         }
         if (a < 0 || b < 0 || view[a].owner != view[b].owner) return 0;
-        link->slot[0] = (unsigned char)a;
-        link->slot[1] = (unsigned char)b;
+        link->slot[0] = view[a].slot;
+        link->slot[1] = view[b].slot;
         link->owner = view[a].owner;
         link->active = 1;
     }
@@ -308,6 +319,36 @@ static inline int sc64_nydus_exit_candidate(unsigned n, int cx, int cy,
     *x = cx + ox;
     *y = cy + oy;
     return 1;
+}
+
+/* The same candidate order without division (Thumb has no divider): call
+ * accept() per candidate until it returns nonzero. Returns the accepted
+ * candidate index, or -1 after all SC64_NYDUS_EXIT_CANDIDATES fail. */
+static inline int sc64_nydus_exit_scan(int cx, int cy,
+                                       int (*accept)(void *, int, int),
+                                       void *ctx, int *x, int *y)
+{
+    int n = 0;
+    if (!accept || !x || !y) return -1;
+    for (int ring = 1; ring <= SC64_NYDUS_EXIT_RINGS; ++ring) {
+        int r = ring * SC64_NYDUS_EXIT_STEP_PX, len = 2 * ring;
+        int side = 0, pos = ring;
+        for (int t = 0; t < 8 * ring; ++t, ++n) {
+            int ox, oy, step = pos * SC64_NYDUS_EXIT_STEP_PX;
+            switch (side) {
+            case 0: ox = -r + step; oy = r; break;
+            case 1: ox = r; oy = r - step; break;
+            case 2: ox = r - step; oy = -r; break;
+            default: ox = -r; oy = -r + step; break;
+            }
+            if (accept(ctx, cx + ox, cy + oy)) {
+                *x = cx + ox; *y = cy + oy;
+                return n;
+            }
+            if (++pos == len) { pos = 0; if (++side == 4) side = 0; }
+        }
+    }
+    return -1;
 }
 
 #endif /* SC64_NYDUS_RULES_H */

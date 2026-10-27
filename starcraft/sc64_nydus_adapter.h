@@ -25,12 +25,23 @@
 
 _Static_assert(MAX_BUILDINGS < SC64_NYDUS_NO_SLOT,
                "Nydus links store building slots in one byte");
+_Static_assert(ORDER_NYDUS_ENTER <= 15 && SC_RB_COUNT <= 64,
+               "packed unit order and building type fields");
 
 static const Sc64NydusSourceRecord *race_nydus_source;
 static Sc64NydusSourcePair race_nydus_pairs[SC64_NYDUS_MAX_LINKS];
 static unsigned char race_nydus_pair_count;
 static int race_nydus_source_mission = -1;
 static Sc64NydusState race_nydus;
+#ifdef SC64_NYDUS_PROBE_CYCLES
+/* Diagnostic ARM probes only: cycles spent in Nydus services. */
+static u32 race_nydus_probe_cycles, race_nydus_probe_searches;
+#define SC64_NYDUS_PROBE_BEGIN u32 sc64_nydus_probe_start = gba_clock()
+#define SC64_NYDUS_PROBE_END (race_nydus_probe_cycles += gba_clock() - sc64_nydus_probe_start)
+#else
+#define SC64_NYDUS_PROBE_BEGIN do { } while (0)
+#define SC64_NYDUS_PROBE_END do { } while (0)
+#endif
 
 static void race_nydus_clear(void)
 {
@@ -66,6 +77,7 @@ static Sc64NydusEndpointView race_nydus_view_of(const Building *q)
 {
     Sc64NydusEndpointView v;
     memset(&v, 0, sizeof(v));
+    v.slot = SC64_NYDUS_NO_SLOT;
     if (!q->alive || q->type != B_NYDUS_CANAL || q->raw_type != SC64_NYDUS_RAW)
         return v;
     v.x = (short)q->x; v.y = (short)q->y;
@@ -76,21 +88,41 @@ static Sc64NydusEndpointView race_nydus_view_of(const Building *q)
     return v;
 }
 
-static int race_nydus_bind_buildings(const Building *buildings, int require_all,
-                                     Sc64NydusState *out)
+/* Keep only raw-134 rows standing on a source position: a bounded list (no
+ * pool-sized scratch). Too many matches means duplicates and fails closed. */
+static int race_nydus_collect(const Building *q, int slot,
+                              Sc64NydusEndpointView *views, unsigned *count)
 {
-    static Sc64NydusEndpointView views[MAX_BUILDINGS];
-    if (!race_nydus_source_current()) return 0;
-    for (int i = 0; i < MAX_BUILDINGS; ++i) views[i] = race_nydus_view_of(&buildings[i]);
-    return sc64_nydus_bind(race_nydus_source, race_nydus_pairs, race_nydus_pair_count,
-                           views, MAX_BUILDINGS, require_all, out);
+    Sc64NydusEndpointView v = race_nydus_view_of(q);
+    unsigned i, records = 2u * race_nydus_pair_count;
+    if (!v.alive) return 1;
+    for (i = 0; i < records; ++i)
+        if (race_nydus_source[i].x == v.x && race_nydus_source[i].y == v.y) break;
+    if (i == records) return 1;
+    if (*count >= SC64_NYDUS_MAX_VIEWS) return 0;
+    v.slot = (unsigned char)slot;
+    views[(*count)++] = v;
+    return 1;
+}
+
+static int race_nydus_bind_views(const Sc64NydusEndpointView *views, unsigned count,
+                                 int require_all, Sc64NydusState *out)
+{
+    return race_nydus_source_current() &&
+        sc64_nydus_bind(race_nydus_source, race_nydus_pairs, race_nydus_pair_count,
+                        views, count, require_all, out);
 }
 
 /* Mission start: both endpoints of every source pair must be live. */
 static int race_nydus_bind_world(int require_all)
 {
+    Sc64NydusEndpointView views[SC64_NYDUS_MAX_VIEWS];
     Sc64NydusState next;
-    if (!race_nydus_bind_buildings(b, require_all, &next)) return 0;
+    unsigned count = 0;
+    if (!race_nydus_source_current()) return 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (!race_nydus_collect(&b[i], i, views, &count)) return 0;
+    if (!race_nydus_bind_views(views, count, require_all, &next)) return 0;
     race_nydus = next;
     return 1;
 }
@@ -233,17 +265,49 @@ static void race_nydus_clear_unit_references(int passenger)
 #endif
 }
 
+static int race_nydus_exit_open(void *ctx, int x, int y)
+{
+    return x >= 0 && y >= 0 && x < WORLD_W && y < WORLD_H &&
+        is_traversable(x / 16, y / 16, -1) && unit_step_clear((const Unit *)ctx, x, y);
+}
+
 static int race_nydus_place(int passenger, int exit, int *px, int *py)
 {
-    Unit *q = &u[passenger];
-    for (unsigned n = 0; n < SC64_NYDUS_EXIT_CANDIDATES; ++n) {
-        int x, y;
-        if (!sc64_nydus_exit_candidate(n, b[exit].x, b[exit].y, &x, &y) ||
-            x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ||
-            !is_traversable(x / 16, y / 16, -1) || !unit_step_clear(q, x, y))
-            continue;
-        *px = x; *py = y;
-        return 1;
+#ifdef SC64_NYDUS_PROBE_CYCLES
+    ++race_nydus_probe_searches;
+#endif
+    return sc64_nydus_exit_scan(b[exit].x, b[exit].y, race_nydus_exit_open,
+                                &u[passenger], px, py) >= 0;
+}
+
+/* GBA bound: a full failed search costs a few hundred candidate checks. Once
+ * one fails at an exit in this tick, a later passenger of equal or larger
+ * collision radius skips its search and retries next tick. Space freed by
+ * movement later in the same order loop is therefore seen one tick late;
+ * OpenBW retries every passenger every frame. Derived per tick, not saved. */
+static int race_nydus_fail_frame[2 * SC64_NYDUS_MAX_LINKS];
+static unsigned char race_nydus_fail_radius[2 * SC64_NYDUS_MAX_LINKS];
+
+static int race_nydus_exit_key(int exit)
+{
+    for (unsigned i = 0; i < race_nydus.count && i < SC64_NYDUS_MAX_LINKS; ++i)
+        for (unsigned e = 0; e < 2; ++e)
+            if (race_nydus.link[i].active && race_nydus.link[i].slot[e] == exit)
+                return (int)(2 * i + e);
+    return -1;
+}
+
+static int race_nydus_place_bounded(int passenger, int exit, int *px, int *py)
+{
+    int key = race_nydus_exit_key(exit);
+    int radius = sc64_game_unit_collision_radius(u[passenger].type);
+    if (key >= 0 && race_nydus_fail_frame[key] == frame + 1 &&
+        radius >= race_nydus_fail_radius[key]) return 0;
+    if (race_nydus_place(passenger, exit, px, py)) return 1;
+    if (key >= 0 && (race_nydus_fail_frame[key] != frame + 1 ||
+                     radius < race_nydus_fail_radius[key])) {
+        race_nydus_fail_frame[key] = frame + 1;
+        race_nydus_fail_radius[key] = (unsigned char)radius;
     }
     return 0;
 }
@@ -270,7 +334,17 @@ static int race_nydus_approach_point(int passenger, int entrance, int *px, int *
 
 /* ORDER_NYDUS_ENTER service. Slot order makes simultaneous arrivals
  * deterministic: each placement sees every earlier passenger's new spot. */
+static int race_nydus_tick_unit_impl(int slot);
 static int __attribute__((noinline)) race_nydus_tick_unit(int slot)
+{
+    int handled;
+    SC64_NYDUS_PROBE_BEGIN;
+    handled = race_nydus_tick_unit_impl(slot);
+    SC64_NYDUS_PROBE_END;
+    return handled;
+}
+
+static int race_nydus_tick_unit_impl(int slot)
 {
     Unit *q = &u[slot];
     int entrance = q->target, exit, x, y;
@@ -290,7 +364,7 @@ static int __attribute__((noinline)) race_nydus_tick_unit(int slot)
         return 1;
     }
     /* Blocked exit: hold at the entrance and retry next order step. */
-    if (!race_nydus_place(slot, exit, &x, &y)) return 1;
+    if (!race_nydus_place_bounded(slot, exit, &x, &y)) return 1;
     race_nydus_clear_unit_references(slot);
     q->x = x; q->y = y;
     sc64_unit_bucket_move(q);
@@ -332,19 +406,31 @@ static int race_nydus_issue_selected(int x, int y)
 /* Save preflight against the decoded candidate. Binding the candidate's own
  * buildings proves endpoint identity without trusting live state; every
  * ORDER_NYDUS_ENTER must name an active endpoint the passenger may enter. */
+static const Sc64NydusEndpointView *race_nydus_view_slot(
+    const Sc64NydusEndpointView *views, unsigned count, int slot)
+{
+    for (unsigned i = 0; i < count; ++i) if (views[i].slot == slot) return &views[i];
+    return 0;
+}
+
 static int race_nydus_save_candidate_valid(const RaceSave *candidate, int width,
                                            int height)
 {
-    static Building buildings[MAX_BUILDINGS];
+    Sc64NydusEndpointView views[SC64_NYDUS_MAX_VIEWS];
+    unsigned count = 0;
     Sc64NydusState s;
     memset(&s, 0, sizeof(s));
-    for (int i = 0; i < MAX_BUILDINGS; ++i)
-        if (!race_save_decode_building(candidate, (unsigned)i, &buildings[i])) return 0;
-    if (race_nydus_source_current() &&
-        !race_nydus_bind_buildings(buildings, 0, &s)) return 0;
+    if (race_nydus_source_current()) {
+        for (int i = 0; i < MAX_BUILDINGS; ++i) {
+            Building q;
+            if (!race_save_decode_building(candidate, (unsigned)i, &q) ||
+                !race_nydus_collect(&q, i, views, &count)) return 0;
+        }
+        if (!race_nydus_bind_views(views, count, 0, &s)) return 0;
+    }
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit q;
-        Sc64NydusEndpointView in, out;
+        const Sc64NydusEndpointView *in, *out;
         Sc64NydusPassengerView p;
         int partner;
         if (!race_save_decode_unit(candidate, (unsigned)i, (unsigned)width * 16u,
@@ -354,10 +440,10 @@ static int race_nydus_save_candidate_valid(const RaceSave *candidate, int width,
             return 0;
         partner = sc64_nydus_partner(&s, (unsigned)q.target);
         if (partner < 0) return 0;
-        in = race_nydus_view_of(&buildings[q.target]);
-        out = race_nydus_view_of(&buildings[partner]);
+        in = race_nydus_view_slot(views, count, q.target);
+        out = race_nydus_view_slot(views, count, partner);
         p = race_nydus_passenger_view(&q, -1);
-        if (!sc64_nydus_can_enter(&p, &in, &out)) return 0;
+        if (!sc64_nydus_can_enter(&p, in, out)) return 0;
     }
     return 1;
 }

@@ -76,6 +76,7 @@ static Sc64NydusEndpointView view(int x, int y, int owner)
     memset(&v, 0, sizeof(v));
     v.x = (short)x; v.y = (short)y; v.raw_type = SC64_NYDUS_RAW;
     v.alive = v.complete = 1; v.owner = (unsigned char)owner;
+    v.slot = SC64_NYDUS_NO_SLOT;
     return v;
 }
 
@@ -93,6 +94,7 @@ static void binding_is_stable_and_fail_closed(void)
     v[0] = view(100, 100, 0); v[0].raw_type = 131;
     v[5] = view(100, 100, 1); v[2] = view(200, 100, 1);
     v[7] = view(300, 300, 1); v[1] = view(400, 300, 1);
+    for (unsigned i = 0; i < 8; ++i) v[i].slot = (unsigned char)i;
     assert(sc64_nydus_bind(r, p, n, v, 8, 1, &s));
     assert(s.count == 2 && sc64_nydus_state_valid(&s, 8));
     assert(s.link[0].active && s.link[0].slot[0] == 5 && s.link[0].slot[1] == 2);
@@ -104,7 +106,14 @@ static void binding_is_stable_and_fail_closed(void)
     { Sc64NydusEndpointView w[8]; memcpy(w, v, sizeof(w)); w[2].owner = 2;
       assert(!sc64_nydus_bind(r, p, n, w, 8, 1, &s)); }
     { Sc64NydusEndpointView w[8]; memcpy(w, v, sizeof(w)); w[3] = view(400, 300, 1);
+      w[3].slot = 3; assert(!sc64_nydus_bind(r, p, n, w, 8, 1, &s)); }
+    /* Views must name distinct, real slots; the list is a compact subset. */
+    { Sc64NydusEndpointView w[8]; memcpy(w, v, sizeof(w)); w[3].slot = 5;
       assert(!sc64_nydus_bind(r, p, n, w, 8, 1, &s)); }
+    { Sc64NydusEndpointView w[4] = { v[5], v[2], v[7], v[1] };
+      assert(sc64_nydus_bind(r, p, n, w, 4, 1, &s) &&
+             s.link[0].slot[0] == 5 && s.link[1].slot[1] == 1); }
+    assert(!sc64_nydus_bind(r, p, n, v, SC64_NYDUS_MAX_VIEWS + 1, 1, &s));
     /* A whole destroyed pair is valid after start, never at start. */
     { Sc64NydusEndpointView w[8]; memcpy(w, v, sizeof(w)); w[7].alive = w[1].alive = 0;
       assert(!sc64_nydus_bind(r, p, n, w, 8, 1, &s));
@@ -209,6 +218,28 @@ static void exit_candidates_are_unique_bounded_and_nearest_first(void)
     assert(!sc64_nydus_exit_candidate(0, 0, 0, NULL, &y));
 }
 
+typedef struct { unsigned seen, stop; int cx, cy, ok; } ScanCheck;
+static int scan_accept(void *ctx, int x, int y)
+{
+    ScanCheck *c = ctx;
+    int ex, ey;
+    if (!sc64_nydus_exit_candidate(c->seen, c->cx, c->cy, &ex, &ey) || ex != x || ey != y)
+        c->ok = 0;
+    return c->seen++ == c->stop;
+}
+
+static void division_free_scan_matches_indexed_order(void)
+{
+    ScanCheck c = { 0, SC64_NYDUS_EXIT_CANDIDATES, -40, 900, 1 };
+    int x, y;
+    assert(sc64_nydus_exit_scan(c.cx, c.cy, scan_accept, &c, &x, &y) == -1);
+    assert(c.ok && c.seen == SC64_NYDUS_EXIT_CANDIDATES);
+    c.seen = 0; c.stop = 37;
+    assert(sc64_nydus_exit_scan(c.cx, c.cy, scan_accept, &c, &x, &y) == 37 && c.ok);
+    assert(sc64_nydus_exit_candidate(37, c.cx, c.cy, &c.cx, &c.cy) && c.cx == x && c.cy == y);
+    assert(sc64_nydus_exit_scan(0, 0, NULL, &c, &x, &y) == -1);
+}
+
 int main(void)
 {
     source_pairs_validate_and_order();
@@ -218,6 +249,7 @@ int main(void)
     ownership_follows_the_transferred_endpoint();
     eligibility_matches_the_reference_predicate();
     exit_candidates_are_unique_bounded_and_nearest_first();
+    division_free_scan_matches_indexed_order();
     puts("sc64 nydus rules: ok");
     return 0;
 }

@@ -37,6 +37,8 @@ CONFIGS.update({
                       "SC64_Z6_RUNTIME"),
     "zp_z7_egg": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_Z6_ACTORS",
                   "SC64_Z7_EGG_PRODUCTION"),
+    "zp_nydus": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_Z6_ACTORS",
+                 "SC64_Z6_RUNTIME", "SC64_NYDUS_ENABLED"),
     "p7_move_profile": ("SC64_RACES", "SC64_UNIFIED", "SC64_P3_ENABLED",
                         "SC64_ZP_CAMPAIGN_ACTORS", "SC64_ZP_CAMPAIGN_STORAGE",
                         "SC64_P5_ACTORS", "SC64_Z6_ACTORS", "SC64_P6_ACTORS",
