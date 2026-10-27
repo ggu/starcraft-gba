@@ -120,6 +120,22 @@ int main(void) {{
                                     text=True, timeout=30)
         self.assertIn(f'native rows: create {create_count}', result.stdout)
 
+    def test_game_pool_actor_kinds_match_verified_descriptor(self) -> None:
+        descriptor_path = os.environ.get('SC64_Z8_DESCRIPTOR')
+        if not descriptor_path:
+            self.skipTest('SC64_Z8_DESCRIPTOR is not set')
+        descriptor = json.loads(Path(descriptor_path).read_text(encoding='utf-8'))
+        from tools import sc64_z8_pack
+        sc64_z8_pack.validate_structure(descriptor)
+
+        units = {37, 38, 39, 41, 42, 51, 64, 65, 66, 67, 70, 83, 84}
+        buildings = {131, 134, 143, 154, 155, 156, 159, 160,
+                     162, 163, 164, 165, 166, 167, 171, 194}
+        source_types = {int(raw) for raw in
+                        descriptor['histograms']['unit_raw_type']}
+        non_actors = {176, 177, 178, 188, 214}
+        self.assertEqual(source_types - non_actors, units | buildings)
+
 
 if __name__ == '__main__':
     unittest.main()

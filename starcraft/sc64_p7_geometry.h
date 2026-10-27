@@ -38,8 +38,8 @@ static int sc64_p7_actor_rect_source(unsigned raw,int x,int y,int building,
     if (type<0) return 0;
     if (building) {
         if (!sc64_zp_building_bounds_source(type,&l,&u,&r,&d)) {
-            /* Exact UnitType::dimension{Left,Up,Right,Down} values for the
-             * ordinary Protoss structures placed in P7's authenticated map. */
+            /* Exact pinned UnitType::dimension{Left,Up,Right,Down} values
+             * for mapped structures without a ZP feature-fact row. */
             switch(raw) {
             case 154:l=56;u=39;r=56;d=39;break; /* Nexus */
             case 155:l=36;u=16;r=40;d=20;break; /* Robotics Facility */
@@ -50,6 +50,7 @@ static int sc64_p7_actor_rect_source(unsigned raw,int x,int y,int building,
             case 164:l=40;u=24;r=40;d=24;break; /* Cybernetics Core */
             case 166:l=36;u=24;r=40;d=18;break; /* Forge */
             case 167:l=48;u=40;r=48;d=32;break; /* Stargate */
+            case 194:l=48;u=32;r=47;d=31;break; /* Special Zerg Beacon */
             default:return 0;
             }
         }

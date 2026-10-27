@@ -27,7 +27,7 @@ typedef struct {
     s16 x, y;                 /* Engine world pixels; CHK source pixels / 2. */
     s16 left, top, right, bottom; /* Pinned unit-dimension offsets, source px. */
     u8 alive, completed, building, men, type_known;
-    u8 *invincible;           /* Live engine flag; required by opcode 43. */
+    u8 *invincible;           /* Dedicated live invincible_* slot, never Unit.flags. */
 } Sc64Z8ActorView;
 
 typedef struct {
@@ -65,6 +65,10 @@ typedef struct {
     u8 active_mask;
     u8 force[SC64_Z8_OWNER_LIMIT]; /* CHK force IDs, 1..4; 0 means unassigned. */
     Sc64ResourceActionState *wallet[SC64_Z8_OWNER_LIMIT];
+    /* Optional independent current-resource storage for source slots that
+     * collapse to one live SIDE/ENEMY owner. The caller owns persistence. */
+    u32 *source_minerals[SC64_Z8_OWNER_LIMIT];
+    u32 *source_gas[SC64_Z8_OWNER_LIMIT];
     Sc64Z8WorldServices services;
 } Sc64Z8WorldView;
 
@@ -303,12 +307,24 @@ sc64_z8_world_action(void *context, const Sc64Z8Action *a,
     }
     case 26: { /* Apply to exactly one resolved source owner. */
         if (!sc64_z8_world_resolve_one(w, a->group1, trigger_owner, &owner) ||
-            !w->wallet[owner] || a->unit > SC64_RESOURCE_BOTH ||
+            a->unit > SC64_RESOURCE_BOTH ||
             (a->modifier != SC64_RESOURCE_MOD_SET &&
              a->modifier != SC64_RESOURCE_MOD_ADD &&
              a->modifier != SC64_RESOURCE_MOD_SUBTRACT)) return -1;
-        return sc64_resource_action_apply_one_player(w->wallet[owner],
-                   a->unit, a->modifier, a->group2) ? 1 : -1;
+        if (w->wallet[owner])
+            return sc64_resource_action_apply_one_player(w->wallet[owner],
+                       a->unit, a->modifier, a->group2) ? 1 : -1;
+        if (w->source_minerals[owner] && w->source_gas[owner]) {
+            Sc64ResourceActionState resources = {
+                *w->source_minerals[owner], *w->source_gas[owner], 0, 0
+            };
+            if (!sc64_resource_action_apply_one_player(&resources,
+                    a->unit, a->modifier, a->group2)) return -1;
+            *w->source_minerals[owner] = resources.current_minerals;
+            *w->source_gas[owner] = resources.current_gas;
+            return 1;
+        }
+        return -1;
     }
     case 8: case 9: case 12: case 28:
         if (!w->services.present || (a->location && !rect)) return -1;

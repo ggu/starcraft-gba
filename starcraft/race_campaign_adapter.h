@@ -698,18 +698,7 @@ race_campaign_init(void)
         int raw = src->source_type, owner, type, slot;
         int x = src->x_px, y = src->y_px;
         if (x >= map->width * 16 || y >= map->height * 16) continue;
-#ifdef SC64_Z5_RUNTIME
-        if (race_selected_mission == SC64_Z5_GLOBAL_ID && raw == 214) continue;
-#endif
-#ifdef SC64_P6_RUNTIME
-        if (race_selected_mission == SC64_P6_GLOBAL_ID && raw == 214) continue;
-#endif
-#ifdef SC64_Z6_RUNTIME
-            if (race_selected_mission == SC64_Z6_GLOBAL_ID && raw == 214) continue;
-#endif
-#ifdef SC64_Z7_RUNTIME
-            if (race_selected_mission == SC64_Z7_GLOBAL_ID && raw == 214) continue;
-#endif
+        if (raw == 214) continue; /* Native Start Location marker, not an actor. */
         if (raw == 176 || raw == 177 || raw == 178) {
             int j;
             for (j = 0; j < MAX_MINERALS; ++j) if (m[j].amount <= 0) break;

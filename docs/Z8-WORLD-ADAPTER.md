@@ -2,16 +2,31 @@
 
 `starcraft/sc64_z8_world_adapter.h` binds the isolated Z8 scheduler callbacks
 to a typed view of live actors, buildings, force membership, and resource
-wallets. It is not included by `game.c` and does not add a mission profile,
+wallets. `game.c` includes an opt-in pool-reader helper, but no build profile
+enables it and nothing initializes the scheduler or adds a mission profile,
 menu entry, save state, or playable claim.
 
-The caller refreshes `Sc64Z8ActorView[]` from its real bounded engine pools
-before each scheduler pass. Each element carries the authenticated source
-owner/type, completion state, world-pixel center, pinned source-pixel
-dimensions, and a pointer to the actual invincibility flag. The array order is
-also the actor traversal order used by `MoveLocation`; the adapter does not
-invent a unit/building order. The caller supplies source owner activity and
-force IDs, and resource wallet pointers to the engine state.
+The caller can expose the real bounded engine pools as an ordered
+`Sc64Z8ActorView[]`, or provide `actor_at` to read each actual unit/building
+row on demand without a parallel snapshot. Each view carries the authenticated
+source owner/type, completion state, world-pixel center, pinned source-pixel
+dimensions, and a pointer to the actual invincibility flag. The enumeration
+order is also the actor traversal order used by `MoveLocation`; the adapter
+does not invent a unit/building order. The caller supplies source owner
+activity and force IDs, and resource wallet pointers to the engine state.
+With `actor_at`, enumerate pool capacity including dead slots and read the
+current slot each time. This lets a later trigger in the same pass see an
+actor created by an earlier action without allocating a full actor snapshot.
+The opt-in game helper does this over `u[]` and `b[]`, preserves each row's
+`raw_owner`, resolves source-backed raw type bounds, and points invincibility
+at `invincible_units[]` or `invincible_buildings[]`. Its build gate requires
+the existing P6/P7 actor facts and Nydus support used by Z8's raw type census.
+Do not bind it to packed
+`Unit.flags`. Unsupported live actor facts fail the query instead of
+substituting approximate dimensions.
+SetResources can target either a live wallet or independent 32-bit
+source-owner mineral/gas values. The game helper binds the latter so source
+slots that share a combat owner do not share their trigger resource pools.
 
 The adapter implements bounded Command/Bring censuses, exact/current-player/
 all-player/Force selectors, rectangle overlap using source-pixel actor bounds,

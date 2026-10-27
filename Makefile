@@ -2279,6 +2279,9 @@ build/test-sc64-z7-frame-coverage: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z7-game-save: tests/sc64_z7_game_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@
+Z8_GAME_POOL_BRIDGE_FLAGS := $(Z7_SCOURGE_PROBE_FLAGS) -DSC64_P6_ACTORS -DSC64_P7_ACTORS -DSC64_NYDUS_ENABLED -DSC64_Z8_GAME_POOL_BRIDGE
+build/test-sc64-z8-game-bridge: tests/sc64_z8_game_bridge.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z8_GAME_POOL_BRIDGE_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z7-derived-save: tests/sc64_z7_game_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_DERIVED_SAVE_FLAGS) $< common/gba.c -o $@
 build/test-sc64-z7-derived-egg-save: tests/sc64_z7_egg_save_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
@@ -2306,13 +2309,15 @@ build/StarCraft-Zerg-Z7-Derived-Save-Probe-GBA.gba: build/starcraft-zerg-z7-deri
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 SAVE' SCZ7
 zerg-z7-derived-save-probe: build/StarCraft-Zerg-Z7-Derived-Save-Probe-GBA.gba
-.PHONY: test-sc64-z7-profile test-sc64-z7-frame-coverage test-sc64-z7-game-save
+.PHONY: test-sc64-z7-profile test-sc64-z7-frame-coverage test-sc64-z7-game-save test-sc64-z8-game-bridge
 test-sc64-z7-profile: build/test-sc64-z7-profile
 	./build/test-sc64-z7-profile
 test-sc64-z7-frame-coverage: build/test-sc64-z7-frame-coverage
 	./build/test-sc64-z7-frame-coverage
 test-sc64-z7-game-save: build/test-sc64-z7-game-save
 	./build/test-sc64-z7-game-save
+test-sc64-z8-game-bridge: build/test-sc64-z8-game-bridge
+	./build/test-sc64-z8-game-bridge
 
 build/test-sc64-z7-gas-restore: tests/sc64_z7_gas_restore.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) $< common/gba.c -o $@

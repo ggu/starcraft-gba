@@ -148,6 +148,26 @@ int main(void)
     assert(wallets[1].current_minerals==350 && wallets[1].current_gas==350);
     assert(wallets[1].total_minerals_gathered==350);
 
+    /* Two source players can share a live combat owner without sharing the
+     * independent 32-bit economy used by trigger SetResources actions. */
+    {
+        u32 source_minerals[8]={0}, source_gas[8]={0};
+        source_minerals[1]=10; source_minerals[2]=20;
+        for (unsigned i=0;i<8;++i) w.wallet[i]=0;
+        w.source_minerals[1]=&source_minerals[1];
+        w.source_gas[1]=&source_gas[1];
+        w.source_minerals[2]=&source_minerals[2];
+        w.source_gas[2]=&source_gas[2];
+        a=(Sc64Z8Action){.opcode=26,.group1=19,.group2=350,
+                         .unit=SC64_RESOURCE_MINERALS,
+                         .modifier=SC64_RESOURCE_MOD_ADD};
+        assert(sc64_z8_world_action(&w,&a,3,0)==1);
+        a.group1=20;
+        assert(sc64_z8_world_action(&w,&a,3,0)==1);
+        assert(source_minerals[1]==360u && source_minerals[2]==370u);
+        assert(source_gas[1]==0u && source_gas[2]==0u);
+    }
+
     a=(Sc64Z8Action){.opcode=16,.location=4,.group2=SC64_Z8_AI_ZER8};
     w.services.run_ai=0;
     assert(sc64_z8_world_action(&w,&a,3,&rect)==-1); /* No invented AI. */
