@@ -3501,18 +3501,30 @@ $(eval $(call Z7_CANONICAL_FIXTURE,save,sc64_z7_game_save.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,frame,sc64_z3_frame_coverage.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,scourge,sc64_z7_scourge_game.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,controller,sc64_z7_campaign_run.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,carried-z5,sc64_z5_campaign_run.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,carried-z6,sc64_z6_campaign_run.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,z6-controller-policy,sc64_z6_controller_policy.c))
+build/test-sc64-z7-canonical-z6-controller-policy: tests/sc64_z6_campaign_run.c
 ZERG_Z7_CONTROLLER_TRACE ?= .local/sc64/zerg-z7-canonical-controller.jsonl
 .PHONY: test-sc64-z7-canonical-controller test-zerg-z7
 test-sc64-z7-canonical-controller: build/test-sc64-z7-canonical-controller tools/sc64_zp_controller_replay.py
 	mkdir -p "$(dir $(ZERG_Z7_CONTROLLER_TRACE))"
 	./build/test-sc64-z7-canonical-controller --limit 240000 --trace "$(ZERG_Z7_CONTROLLER_TRACE)"
 	$(PYTHON) tools/sc64_zp_controller_replay.py --profile zerg-z7 --trace "$(ZERG_Z7_CONTROLLER_TRACE)" --validate-only
-test-zerg-z7: build/test-sc64-z7-canonical-profile build/test-sc64-z7-canonical-save build/test-sc64-z7-canonical-frame build/test-sc64-z7-canonical-scourge test-sc64-z7-canonical-controller build/test-sc64-z7-full-render-carried-z5 build/test-sc64-z7-full-render-carried-z6 build/test-sc64-z7-full-render-z6-controller-policy test-sc64-z7-carried-missions test-sc64-z7-canonical-skirmish
+.PHONY: test-sc64-z7-canonical-carried-z5 test-sc64-z7-canonical-carried-z6
+test-sc64-z7-canonical-carried-z5: build/test-sc64-z7-canonical-carried-z5
+	mkdir -p .local/build/z7-canonical-carried-z5 .local/sc64
+	./build/test-sc64-z7-canonical-carried-z5 --limit 60000 --trace .local/build/z7-canonical-carried-z5/diagnostics.json --attempt .local/build/z7-canonical-carried-z5/attempt.json --verified .local/build/z7-canonical-carried-z5/controller.json
+test-sc64-z7-canonical-carried-z6: build/test-sc64-z7-canonical-carried-z6 build/test-sc64-z7-canonical-z6-controller-policy tools/sc64_zp_controller_replay.py
+	mkdir -p .local/build/z7-canonical-carried-z6
+	./build/test-sc64-z7-canonical-z6-controller-policy
+	./build/test-sc64-z7-canonical-carried-z6 --trace .local/build/z7-canonical-carried-z6/controller.json
+	$(PYTHON) tools/sc64_zp_controller_replay.py --profile zerg-z6 --trace .local/build/z7-canonical-carried-z6/controller.json --validate-only
+test-zerg-z7: build/test-sc64-z7-canonical-profile build/test-sc64-z7-canonical-save build/test-sc64-z7-canonical-frame build/test-sc64-z7-canonical-scourge test-sc64-z7-canonical-controller test-sc64-z7-canonical-carried-z5 test-sc64-z7-canonical-carried-z6 test-sc64-z7-carried-missions test-sc64-z7-canonical-skirmish
 	./build/test-sc64-z7-canonical-profile
 	./build/test-sc64-z7-canonical-save
 	./build/test-sc64-z7-canonical-frame
 	./build/test-sc64-z7-canonical-scourge
-	$(MAKE) test-sc64-z7-carried-z5 test-sc64-z7-carried-z6
 
 build/test-sc64-skirmish-match-zerg-z7: tests/sc64_skirmish_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) $(RACE_CAMPAIGN_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@

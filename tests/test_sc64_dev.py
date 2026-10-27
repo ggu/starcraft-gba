@@ -740,6 +740,18 @@ class OnboardingTests(unittest.TestCase):
         self.assertIn('$(CC) $(CFLAGS) $(ZERG_Z7_RELEASE_FLAGS)', makefile)
         self.assertIn('Z7_STEERING_FLAGS = $(Z7_FULL_RENDER_FLAGS) $(Z7_STEERING_OPTIONS)',
                       makefile)
+        for fixture in (
+            '$(eval $(call Z7_CANONICAL_FIXTURE,carried-z5,sc64_z5_campaign_run.c))',
+            '$(eval $(call Z7_CANONICAL_FIXTURE,carried-z6,sc64_z6_campaign_run.c))',
+            '$(eval $(call Z7_CANONICAL_FIXTURE,z6-controller-policy,sc64_z6_controller_policy.c))',
+        ):
+            self.assertIn(fixture, makefile)
+        canonical_z7_target = next(
+            line for line in makefile.splitlines() if line.startswith('test-zerg-z7:'))
+        self.assertIn('test-sc64-z7-canonical-carried-z5', canonical_z7_target)
+        self.assertIn('test-sc64-z7-canonical-carried-z6', canonical_z7_target)
+        self.assertNotIn('test-sc64-z7-carried-z5', canonical_z7_target)
+        self.assertNotIn('test-sc64-z7-carried-z6', canonical_z7_target)
         self.assertIn('Z7_EGG_PROBE_FLAGS := $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_ATTACK -DSC64_Z7_EGG_PRODUCTION',
                       makefile)
         self.assertIn('Z7_FULL_RENDER_FLAGS =', makefile)
