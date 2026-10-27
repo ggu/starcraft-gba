@@ -1,6 +1,7 @@
 /* Host coverage for the hidden unified-profile showcase scenes.
  * Compile with SC64_SHOWCASE_ENABLED and the full P7 typed/rect profile. */
 #include <stdio.h>
+#include <string.h>
 #include "../starcraft/game.c"
 
 static u16 previous;
@@ -240,6 +241,82 @@ static int enter_showcase_menu(void)
     return screen == SCREEN_TITLE && race_front.page == SC_FRONT_SHOWCASE;
 }
 
+#ifdef SC64_FIELD_CONTROLS
+/* Default-profile controls ported to the race engine (field_controls.h),
+ * exercised on the live Carrier Approach scene. */
+static int check_field_controls(void)
+{
+    if (!enter_showcase_menu()) return fail("controls: could not open showcase");
+    press(KEY_A); press(KEY_A);
+    if (screen != SCREEN_PLAY || sc64_showcase_scene != 0) return fail("controls: scene 0 did not start");
+
+    clear_selection();
+    press(KEY_R);
+    if (selected_count() < 2) return fail("controls: R tap did not select the army");
+
+    int carrier = -1;
+    for (int i = 0; i < MAX_UNITS && carrier < 0; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_P7_CARRIER) carrier = i;
+    if (carrier < 0) return fail("controls: no Carrier in scene 0");
+    clear_selection();
+    u[carrier].selected = 1;
+    frame_input(KEY_R);
+    for (int i = 0; i < 6; ++i) frame_input(KEY_R | KEY_RIGHT);
+    frame_input(0);
+    if (selected_count() != 1 || !u[carrier].selected)
+        return fail("controls: holding R to steer replaced the selection");
+
+    int nexus = -1;
+    for (int i = 0; i < MAX_BUILDINGS && nexus < 0; ++i)
+        if (b[i].alive && b[i].owner == SIDE && !b[i].under_construction) nexus = i;
+    if (nexus < 0) return fail("controls: no friendly structure in scene 0");
+    clear_selection();
+    selected_building = nexus;
+    int queued = b[nexus].queue_count;
+    cx = b[nexus].x + 40; cy = b[nexus].y + 40;
+    if (selection_target() >= 0) return fail("controls: deselect fixture is not empty ground");
+    press(KEY_A);
+    if (selected_building >= 0 || b[nexus].queue_count != queued)
+        return fail("controls: A on empty ground trained instead of deselecting");
+
+    clear_selection();
+    press(KEY_R);
+    press(KEY_B);
+    if (!menu_open || menu_cursor != MENU_MOVE) return fail("controls: order list did not open on Move");
+    press(KEY_DOWN);
+    press(KEY_A);
+    field_ui_refresh();
+    if (mode != MODE_ATTACK || field_controls_title_color() != C_RED ||
+        !field_controls_hint() || strcmp(field_controls_hint(), "A ATTACK HERE  B BACK"))
+        return fail("controls: armed Attack Move is not shown in the HUD");
+    press(KEY_A);
+    if (mode != MODE_NORMAL || !ping_life || ping_color != C_RED)
+        return fail("controls: Attack Move left no red ground marker");
+    press(KEY_B);
+    if (!menu_open || menu_cursor != MENU_ATTACK) return fail("controls: B did not reopen on the last command");
+    press(KEY_B);
+
+    int hydra = -1;
+    for (int i = 0; i < MAX_UNITS && hydra < 0; ++i)
+        if (u[i].alive && u[i].owner == ENEMY && currently_visible(u[i].x, u[i].y)) hydra = i;
+    if (hydra < 0) return fail("controls: no visible enemy in scene 0");
+    clear_selection();
+    press(KEY_R);
+    cx = u[hydra].x; cy = u[hydra].y;
+    frame_input(0); /* the HUD resolves once per update, as the cursor moves */
+    ping_life = 0;
+    field_ui_refresh();
+    if (ui_action != UI_A_ATTACK) return fail("controls: hint does not offer an attack on the enemy");
+    press(KEY_A);
+    int attacking = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].selected && u[i].order == ORDER_ATTACK_MOVE) attacking = 1;
+    if (!attacking || !ping_life || ping_color != C_RED)
+        return fail("controls: A on a visible enemy did not attack");
+    return 0;
+}
+#endif
+
 int main(void)
 {
     gba_init();
@@ -372,6 +449,9 @@ int main(void)
         return fail("showcase changed or invalidated the ordinary skirmish save");
 #ifdef SC64_UNIT_FACING
     if (!facing_is_zero()) return fail("successful load restored/retained stale facing bytes");
+#endif
+#ifdef SC64_FIELD_CONTROLS
+    if (check_field_controls()) return 1;
 #endif
     puts("Showcase menu, scene runtime, pause controls, and save isolation: ok");
     return 0;
