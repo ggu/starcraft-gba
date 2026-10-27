@@ -4179,3 +4179,38 @@ build/test-sc64-p7-fact-v2-campaign-controller: $(P7_CAMPAIGN_CONTROLLER) $(P7_F
 test-sc64-p7-fact-v2-campaign-controller: build/test-sc64-p7-fact-v2-campaign-controller tools/sc64_p7_campaign_trace.py
 	./build/test-sc64-p7-fact-v2-campaign-controller $(P7_FACT_V2_CAMPAIGN_TRACE)
 	$(PYTHON) tools/sc64_p7_campaign_trace.py --require-win $(P7_FACT_V2_CAMPAIGN_TRACE)
+
+# Full P7 cache profile with the qualified mode-4 drawing paths. Keep the
+# earlier FACT V2 flags and products available for exact replay comparisons.
+P7_RENDER_FLAGS := $(P7_FACT_V2_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(CANONICAL_MINIMAP_FLAGS) -DSC64_UNIT_WORD_SPRITES -DSC64_VITAL_BAR_FAST
+P7_RENDER_FRAME_TEST := tests/sc64_p7_tile_render.c
+define P7_RENDER_FRAME_FIXTURE
+build/test-sc64-p7-render-$(1): $$(P7_RENDER_FRAME_TEST) $$(P7_FACT_V2_HEADER) $$(STARCRAFT) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) $$(wildcard starcraft/*.h) $$(P7_ARBITER_INPUTS) common/gba.c $$(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $(2) $$< common/gba.c $$(P7_PROJECTILE_SOURCES) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $$@
+endef
+$(eval $(call P7_RENDER_FRAME_FIXTURE,reference,$(P7_FACT_V2_FLAGS)))
+$(eval $(call P7_RENDER_FRAME_FIXTURE,candidate,$(P7_RENDER_FLAGS)))
+.PHONY: test-sc64-p7-render
+test-sc64-p7-render: build/test-sc64-p7-render-reference build/test-sc64-p7-render-candidate
+	./build/test-sc64-p7-render-reference > build/sc64-p7-render-reference.txt
+	./build/test-sc64-p7-render-candidate > build/sc64-p7-render-candidate.txt
+	cmp build/sc64-p7-render-reference.txt build/sc64-p7-render-candidate.txt
+
+build/sc64-p7-render-normal-input.elf: $(P7_NORMAL_INPUT_REPLAY) tests/sc64_p7_normal_input_tape.h $(P7_FACT_V2_HEADER) $(P7_NORMAL_INPUT_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_RENDER_FLAGS) $(P7_NORMAL_INPUT_COMMON) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/sc64-p7-render-normal-input.map -lgcc -o $@
+build/starcraft-protoss-p7-render-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(P7_FACT_V2_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_RENDER_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-render-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Render-Probe-GBA.gba: build/starcraft-protoss-p7-render-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 DRAW' S7DR
+.PHONY: protoss-p7-render-probe
+protoss-p7-render-probe: build/StarCraft-Protoss-P7-Render-Probe-GBA.gba
+
+P7_RENDER_CAMPAIGN_TRACE := build/sc64-p7-render-campaign-controller.jsonl
+build/test-sc64-p7-render-campaign-controller: $(P7_CAMPAIGN_CONTROLLER) $(P7_FACT_V2_HEADER) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_RENDER_FLAGS) -DP7_CONTROLLER_PROFILE=\"P7_RENDER_FLAGS\" $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+.PHONY: test-sc64-p7-render-campaign-controller
+test-sc64-p7-render-campaign-controller: build/test-sc64-p7-render-campaign-controller tools/sc64_p7_campaign_trace.py
+	./build/test-sc64-p7-render-campaign-controller $(P7_RENDER_CAMPAIGN_TRACE)
+	$(PYTHON) tools/sc64_p7_campaign_trace.py --require-win $(P7_RENDER_CAMPAIGN_TRACE)
