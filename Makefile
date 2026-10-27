@@ -649,6 +649,14 @@ build/test-sc64-transport-rules: tests/sc64_transport_rules.c starcraft/sc64_tra
 test-sc64-transport-rules: build/test-sc64-transport-rules
 	./build/test-sc64-transport-rules
 test-starcraft: test-sc64-transport-rules
+
+# Asset-free Nydus Canal link/eligibility/exit rules; gameplay stays opt-in.
+build/test-sc64-nydus-rules: tests/sc64_nydus_rules.c starcraft/sc64_nydus_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-nydus-rules
+test-sc64-nydus-rules: build/test-sc64-nydus-rules
+	./build/test-sc64-nydus-rules
+test-starcraft: test-sc64-nydus-rules
 build/test-sc64-unit-availability: tests/sc64_unit_availability.c starcraft/sc64_unit_availability.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-unit-availability
