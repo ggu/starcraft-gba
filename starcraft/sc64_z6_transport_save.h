@@ -1,5 +1,9 @@
 #ifndef SC64_Z6_TRANSPORT_SAVE_H
 #define SC64_Z6_TRANSPORT_SAVE_H
+#ifndef SC64_NYDUS_ORDER
+/* Standalone fixtures include this header without game.c's order enum. */
+#define SC64_NYDUS_ORDER(o) 0
+#endif
 
 #if defined(SC64_Z6_TRANSPORT_ENABLED)
 #if !defined(SC64_Z6_RUNTIME) || !defined(SC64_TRANSPORT_RUNTIME) || \
@@ -52,7 +56,8 @@ static int race_z6_transport_save_candidate_valid(
                                    (unsigned)width * 16u,
                                    (unsigned)height * 16u, &actor)) return 0;
         if (!actor.alive) continue;
-        if (actor.order < ORDER_IDLE || actor.order > ORDER_UNLOAD) return 0;
+        if (actor.order < ORDER_IDLE ||
+            (actor.order > ORDER_UNLOAD && !SC64_NYDUS_ORDER(actor.order))) return 0;
 
         if (actor.order != ORDER_BOARD && actor.order != ORDER_TRANSPORTED &&
             actor.order != ORDER_UNLOAD) continue;

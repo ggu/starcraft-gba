@@ -2,6 +2,14 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
+## Optional Nydus Canal runtime (2026-10-27)
+
+`SC64_NYDUS_ENABLED` is off in every shipped profile. Flag-off default, Z7
+probe and Z7 controller ROMs are byte-identical to `codex/source-release`
+`0fd5a29`. A Z7-hosted actual-engine test and an mGBA debug-log probe
+exercise linked transit with ordinary input. Neither is Z8 gameplay or
+physical-GBA evidence. See [Nydus Canal](NYDUS-CANAL.md).
+
 ## Current campaign status (2026-10-27)
 
 The [stock roster follow-up](audits/2026-10-26-roster-contact-and-art/README.md)

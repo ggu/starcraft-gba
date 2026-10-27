@@ -703,7 +703,16 @@ enum {
 #ifdef SC64_P7_BATTERY_ENABLED
     , ORDER_P7_RECHARGE
 #endif
+#ifdef SC64_NYDUS_ENABLED
+    /* Always last: profiles without Nydus keep their order values. */
+    , ORDER_NYDUS_ENTER
+#endif
 };
+#ifdef SC64_NYDUS_ENABLED
+#define SC64_NYDUS_ORDER(o) ((o) == ORDER_NYDUS_ENTER)
+#else
+#define SC64_NYDUS_ORDER(o) 0
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
 #define SC64_TRANSPORT_LOADED(q) ((q)->order == ORDER_TRANSPORTED)
 #else
@@ -1178,6 +1187,12 @@ static void race_siege_splash_attack(Unit *,int,int);
 #endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
 static int race_p7_active(void);
+#endif
+#ifdef SC64_NYDUS_ENABLED
+static void race_nydus_note_building_lost(int slot);
+static void race_nydus_tick_world(void);
+static int race_nydus_tick_unit(int slot);
+static int race_nydus_issue_selected(int x, int y);
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
 static int race_p7_battery_command_available(void);
@@ -1767,6 +1782,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
     race_p7_battery_clear_building_references(i);
+#endif
+#ifdef SC64_NYDUS_ENABLED
+    race_nydus_note_building_lost(i);
 #endif
     b[i].x = x;
 #if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
@@ -3568,6 +3586,9 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #ifdef SC64_P7_BATTERY_ENABLED
             race_p7_battery_clear_building_references(target-MAX_UNITS);
 #endif
+#ifdef SC64_NYDUS_ENABLED
+            race_nydus_note_building_lost(target-MAX_UNITS);
+#endif
 	    invalidate_path_grid();
 	}
     }
@@ -5004,6 +5025,12 @@ interact(void)
 	start_build(menu);
 	return;
     }
+#ifdef SC64_NYDUS_ENABLED
+    /* Ordinary A on an owned linked endpoint sends eligible selected units. */
+    if (mode == MODE_NORMAL && race_nydus_issue_selected(cx, cy)) {
+        toast(0); return;
+    }
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     if (mode == MODE_UNLOAD) {
         int issued = 0;
@@ -5712,6 +5739,7 @@ target_lists_unavailable:
 #ifdef SC64_P7_BATTERY_ENABLED
             && q->order != ORDER_P7_RECHARGE
 #endif
+            && !SC64_NYDUS_ORDER(q->order)
             ) {
             race_transport_activity = 1;
             if (race_transport_tick_unit(i)) continue;
@@ -5743,6 +5771,9 @@ target_lists_unavailable:
 #endif
 #ifdef SC64_Z5_CONSUME_ENABLED
         if (q->order == ORDER_Z5_CONSUME && race_z5_consume_tick_unit(i)) continue;
+#endif
+#ifdef SC64_NYDUS_ENABLED
+        if (q->order == ORDER_NYDUS_ENTER && race_nydus_tick_unit(i)) continue;
 #endif
 
 	if (q->owner == ENEMY && q->order != ORDER_ATTACK_MOVE
@@ -6846,6 +6877,9 @@ game_update(u16 held, u16 pressed)
 #endif
 #ifdef SC64_IMPORTED_MISSION
     profile_start = gba_clock();
+#endif
+#ifdef SC64_NYDUS_ENABLED
+    race_nydus_tick_world();
 #endif
     update_orders();
 #ifdef SC64_P7_PROJECTILES_ENABLED
@@ -9606,5 +9640,10 @@ game_self_test(void)
 #endif
 #endif
 #include "race_campaign_adapter.h"
+#ifdef SC64_NYDUS_ENABLED
+static int race_save_decode_unit(const RaceSave *, unsigned, unsigned, unsigned, Unit *);
+static int race_save_decode_building(const RaceSave *, unsigned, Building *);
+#include "sc64_nydus_adapter.h"
+#endif
 #include "race_save_adapter.h"
 #endif

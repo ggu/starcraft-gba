@@ -907,6 +907,9 @@ static int race_save_game(void) {
 #ifdef SC64_Z5_CONSUME_ENABLED
     if (!race_z5_consume_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
+#ifdef SC64_NYDUS_ENABLED
+    if (!race_nydus_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
+#endif
 #ifdef SC64_P7_BATTERY_ENABLED
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
@@ -1065,7 +1068,9 @@ static int race_load_game(void) {
             RACE_U(i,hp)<=0||RACE_U(i,maxhp)<=0||RACE_U(i,hp)>RACE_U(i,maxhp)||
             RACE_U(i,x)<0||RACE_U(i,x)>=width*16||RACE_U(i,y)<0||RACE_U(i,y)>=height*16||
             RACE_U(i,order)<ORDER_IDLE||RACE_U(i,order)>
-#ifdef SC64_P7_BATTERY_ENABLED
+#ifdef SC64_NYDUS_ENABLED
+            ORDER_NYDUS_ENTER||
+#elif defined(SC64_P7_BATTERY_ENABLED)
             ORDER_P7_RECHARGE||
 #elif defined(SC64_T6_RUNTIME)
             ORDER_REPAIR||
@@ -1275,6 +1280,9 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_Z5_CONSUME_ENABLED
     if (!race_z5_consume_save_candidate_valid(&race_data, width, height)) return 0;
+#endif
+#ifdef SC64_NYDUS_ENABLED
+    if (!race_nydus_save_candidate_valid(&race_data, width, height)) return 0;
 #endif
 #ifdef SC64_ZP_FULL_STORAGE
     for (int i = 0; i < MAX_MINERALS; ++i) {
@@ -2005,6 +2013,10 @@ static int race_load_game(void) {
         memset(&race_z7_ops,0,sizeof(race_z7_ops));
         race_z7_map=0;
     }
+#endif
+#ifdef SC64_NYDUS_ENABLED
+    /* After mission rebinds: a mission adapter may install its source. */
+    if (!race_nydus_rebind_loaded_world()) return 0;
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
     if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID) {

@@ -1,5 +1,9 @@
 #ifndef SC64_TRANSPORT_SAVE_ADAPTER_H
 #define SC64_TRANSPORT_SAVE_ADAPTER_H
+#ifndef SC64_NYDUS_ORDER
+/* Standalone fixtures include this header without game.c's order enum. */
+#define SC64_NYDUS_ORDER(o) 0
+#endif
 
 #ifdef SC64_T5_RUNTIME
 /* Validate compact cargo references before any live world state changes. */
@@ -37,7 +41,8 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
 #ifdef SC64_T6_RUNTIME
         if (order < ORDER_IDLE || order > max_order) return 0;
 #else
-        if (order < ORDER_IDLE || order > ORDER_UNLOAD) return 0;
+        if (order < ORDER_IDLE ||
+            (order > ORDER_UNLOAD && !SC64_NYDUS_ORDER(order))) return 0;
 #endif
         if (order == ORDER_UNLOAD) {
             if (actor.type != U_DROPSHIP || actor.raw_type != 11 ||
@@ -78,7 +83,8 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
 #ifdef SC64_T6_RUNTIME
         if (order < ORDER_IDLE || order > max_order) return 0;
 #else
-        if (order < ORDER_IDLE || order > ORDER_UNLOAD) return 0;
+        if (order < ORDER_IDLE ||
+            (order > ORDER_UNLOAD && !SC64_NYDUS_ORDER(order))) return 0;
 #endif
         if (order == ORDER_UNLOAD) {
             if (CARGO_U(i, type) != U_DROPSHIP || CARGO_U(i, raw_type) != 11 ||

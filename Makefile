@@ -649,6 +649,14 @@ build/test-sc64-transport-rules: tests/sc64_transport_rules.c starcraft/sc64_tra
 test-sc64-transport-rules: build/test-sc64-transport-rules
 	./build/test-sc64-transport-rules
 test-starcraft: test-sc64-transport-rules
+
+# Asset-free Nydus Canal link/eligibility/exit rules; gameplay stays opt-in.
+build/test-sc64-nydus-rules: tests/sc64_nydus_rules.c starcraft/sc64_nydus_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-nydus-rules
+test-sc64-nydus-rules: build/test-sc64-nydus-rules
+	./build/test-sc64-nydus-rules
+test-starcraft: test-sc64-nydus-rules
 build/test-sc64-unit-availability: tests/sc64_unit_availability.c starcraft/sc64_unit_availability.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-unit-availability
@@ -3104,6 +3112,37 @@ test-sc64-z7-source-sight: build/test-sc64-z7-source-sight build/test-sc64-z7-so
 	./build/test-sc64-z7-source-sight-eggs
 
 Z7_SCOURGE_PROBE_FLAGS := $(Z7_EGG_PROBE_FLAGS) -DSC64_Z7_SOURCE_SIGHT -DSC64_Z7_SCOURGE_COMBAT
+
+# Optional Nydus Canal runtime, hosted by the Z7 Zerg actor/save profile. The
+# fixture places linked raw-134 endpoints; canonical Z7 builds leave it off.
+NYDUS_PROBE_FLAGS := $(Z7_SCOURGE_PROBE_FLAGS) -DSC64_NYDUS_ENABLED
+build/test-sc64-nydus-game: tests/sc64_nydus_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(NYDUS_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-nydus-game
+test-sc64-nydus-game: build/test-sc64-nydus-game
+	./build/test-sc64-nydus-game
+# ARM evidence for the same option on the Z7 controller profile. The -off ELF
+# is the identical profile without the gate, for memory A/B; the probe ELF
+# replaces common/main.c with an embedded-tape driver that logs via mGBA.
+NYDUS_ARM_FLAGS = $(Z7_CONTROLLER_FLAGS) -DSC64_NYDUS_ENABLED
+NYDUS_ARM_COMMON := common/start.s common/gba.c common/memory.c common/audio_bank.S
+build/starcraft-nydus-z7-off.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_CONTROLLER_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-nydus-z7-off.map -lgcc -o $@
+	$(SIZE) $@
+build/starcraft-nydus-z7-on.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(NYDUS_ARM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-nydus-z7-on.map -lgcc -o $@
+	$(SIZE) $@
+build/starcraft-nydus-arm-probe.elf: tests/sc64_nydus_arm_probe.c $(NYDUS_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(NYDUS_ARM_FLAGS) -DSC64_NYDUS_PROBE_CYCLES $(NYDUS_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -Wl,-Map,build/starcraft-nydus-arm-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Nydus-Z7-%-GBA.gba: build/starcraft-nydus-z7-%.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC NYDUS $*' SCNY
+build/StarCraft-Nydus-ARM-Probe-GBA.gba: build/starcraft-nydus-arm-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC NYDUS PRB' SCNP
+.PHONY: nydus-arm-probe
+nydus-arm-probe: build/StarCraft-Nydus-Z7-off-GBA.gba build/StarCraft-Nydus-Z7-on-GBA.gba build/StarCraft-Nydus-ARM-Probe-GBA.gba
 build/test-sc64-z7-scourge: tests/sc64_z7_scourge_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SCOURGE_PROBE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z7-scourge

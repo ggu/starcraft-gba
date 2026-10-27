@@ -38,6 +38,15 @@ adapter; no OpenBW implementation is copied. Source unload time 15 becomes
 search, placeholder add-on art and Men-selector classification remain
 explicit approximations, as detailed in [Validation](VALIDATION.md).
 
+Optional Nydus Canal transit follows the same pinned OpenBW revision:
+`unit_can_enter_nydus` (2634–2642), the Follow conversion (4762–4766),
+`order_EnterNydusCanal` (6724–6758), `hide_unit` (17045–17071), endpoint
+death (16101–16107) and ownership transfer (3223). Raw-134 numeric facts come
+from the pinned BWAPI tables already transcribed in the stock profiles. The
+links come from authenticated Z8 UNIT relation and serial fields. Native
+N64 Nydus handlers were not traced. See [Nydus Canal](NYDUS-CANAL.md) for
+the authored GBA policies and remaining differences.
+
 ## Campaign production availability
 
 PUNI is a 5,700-byte CHK section: 12×228 per-player availability bytes,
