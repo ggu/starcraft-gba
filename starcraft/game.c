@@ -9798,6 +9798,7 @@ game_self_test(void)
 #endif
 #endif
 #include "race_campaign_adapter.h"
+#include "sc64_z8_game_bridge.h"
 #ifdef SC64_NYDUS_ENABLED
 static int race_save_decode_unit(const RaceSave *, unsigned, unsigned, unsigned, Unit *);
 static int race_save_decode_building(const RaceSave *, unsigned, Building *);
