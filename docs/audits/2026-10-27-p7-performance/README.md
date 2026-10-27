@@ -35,6 +35,7 @@ input tapes, extracted data, captures and generated headers remain private.
 | Packed collision hit cache | 2,214,309 | 2,670,730 | Defer P7 activation; about 0.46% / 1.01% gain |
 | Fact tables | 2,211,500 | 2,681,765 | Defer activation; about 0.59% / 0.60% gain |
 | Frequency-based route eviction | 2,224,609 | 2,698,418 | Reject activation; no useful gain |
+| Lazy cannon-power preparation | 2,225,077 | 2,701,227 | Reject activation; slightly slower |
 
 The candidates were tested separately, not as a combined optimization. Fact
 tables additionally save 5,132 linked ROM-load-image bytes and 464 IWRAM bytes in this profile.
@@ -105,8 +106,26 @@ gameplay semantics is not justified by these measurements.
 
 ## Evidence retention
 
-This audit records a frozen local investigation; it does not add a public
-benchmark target or qualify regeneration of the historical asset pack.
+This audit records a frozen local investigation. An opt-in authored replay
+is now available after preparing the authenticated private inputs described
+in `docs/DEVELOPMENT.md`:
+
+```sh
+make test-sc64-p7-normal-input-replay
+make build/sc64-p7-normal-input-replay.elf
+```
+
+The first command runs the ordinary-input replay under host sanitizers and
+prints 20 semantic snapshots and a terminal state. Host cycle counters are
+zero; use the ARM ELF for timing. It defines its own main and excludes the
+normal game entry point. It adds no default build or test cost. The probe
+uses the full P7 Interceptor-flight flags; enabling them does not mean the
+opening exercises Carrier production or flight. Compare identical workloads
+and inputs when evaluating an optimization. This is a bounded development
+probe, not a mission-win or performance qualification target.
+
+The newly published source harness does not establish regeneration parity
+for the historical asset pack or replace the frozen evidence below.
 The private evidence directories below contain explicit compiler argv,
 postlink guards, host goldens, owned-process launch records and ARM results:
 
@@ -114,6 +133,7 @@ postlink guards, host goldens, owned-process launch records and ARM results:
 - `.local/build/p7-gen43-packed-hit-20261027/root-stage-profile-v3/`
 - `.local/build/p7-gen43-fact-tables-20261027/root-arm-reviewed/`
 - `.local/build/p7-gen43-route-frequency-20261027/`
+- `.local/build/z7-live-20261027/p7-arbiter-lazy-powered-v3/root-reviewed/`
 - `.local/build/p7-gen43-orders-sampled-20261027-v2/`
 - `.local/build/p7-gen43-orders-sampled-20261027-v3/root-reviewed/`
 

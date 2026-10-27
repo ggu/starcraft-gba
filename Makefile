@@ -3969,3 +3969,17 @@ test-sc64-collision-bounds: $(addprefix build/test-sc64-collision-bounds-,cached
 	./build/test-sc64-collision-bounds-hoisted
 	./build/test-sc64-collision-bounds-plain
 test: test-sc64-collision-bounds
+
+# Optional P7 ordinary-input performance replay; excluded from default targets.
+# Requires the same authenticated generated P7 data inputs as other P7 probes.
+P7_NORMAL_INPUT_REPLAY := tests/sc64_p7_normal_input_replay.c
+P7_NORMAL_INPUT_COMMON := common/start.s common/gba.c common/memory.c common/audio_bank.S
+
+build/test-sc64-p7-normal-input-replay: $(P7_NORMAL_INPUT_REPLAY) tests/sc64_p7_normal_input_tape.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_INTERCEPTOR_FLIGHT_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+.PHONY: test-sc64-p7-normal-input-replay
+test-sc64-p7-normal-input-replay: build/test-sc64-p7-normal-input-replay
+	./build/test-sc64-p7-normal-input-replay
+
+build/sc64-p7-normal-input-replay.elf: $(P7_NORMAL_INPUT_REPLAY) tests/sc64_p7_normal_input_tape.h $(P7_NORMAL_INPUT_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_INTERCEPTOR_FLIGHT_FLAGS) $(P7_NORMAL_INPUT_COMMON) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/sc64-p7-normal-input-replay.map -lgcc -o $@
