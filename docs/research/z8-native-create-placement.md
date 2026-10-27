@@ -50,23 +50,32 @@ map width/height.
 
 ## Z8's two authored unit types
 
-The branch at `0x800C99DC + 4 * type` is strongly consistent with the native
-`units.dat` flags array: it is a 32-bit value per unit type, and pinned OpenBW
-defines bit 0 as `unit_type_t::flag_building` (`data_types.h`) and loads a
-32-bit flags value for each of the 228 types (`data_loading.h`,
-`load_units_dat`). Z8's create rows use raw 74 (Hero Dark Templar, represented
-as an actor fact in `sc64_p6_actor_rules.h`) and raw 101 (Special Map Revealer,
-represented as a hidden actor fact in `sc64_zp_actor_rules.h`); neither is a
-building in the pinned source type model. This strongly suggests those two
-rows take the non-building branch and skip the 32-pixel building-placement
-preflight. That exact N64 runtime flag value is still an inference: the
-corresponding static ROM bytes are zero, and no initialized native type-table
-capture is part of this analysis.
+The branch at `0x800C99DC + 4 * type` reads a 32-bit per-type flag word and
+tests bit 0. A canonical 8 MiB RDRAM snapshot from the existing ordinary-input
+First Strike gameplay capture directly establishes these initialized values:
 
-If this inferred branch applies, the shared type-footprint edge clamp and
-`0x801338D0` strict bounds check still apply, but the native path does not run
-the tile occupancy / nearby-unit preflight for these authored actors. The
-source midpoint should not be snapped to the building grid for these rows.
+| Raw type | Meaning | Runtime flags | Bit 0 |
+|---:|---|---:|---:|
+| 37 | Control actor | `0x18110480` | clear |
+| 74 | Hero Dark Templar | `0x18410000` | clear |
+| 101 | Special Map Revealer | `0x00000004` | clear |
+| 154 | Control building | `0xC4001001` | set |
+
+The capture event for final gameplay task 1473 at field 3597 records RDRAM
+SHA-256 `d547813f6c9bce416ecf70602a15795dbc16176784c0bcede357293413de0761`;
+the existing offline reconstruction has the same size and hash. The virtual
+table base maps to physical RDRAM offset `0x000C99DC`, and its words were read
+big-endian. The set bit on building control 154 cross-checks the address and
+endianness. This directly proves raw 74 and 101 take the clear-bit branch in
+that initialized retail session and bypass its building placement grid and
+tile/nearby-unit preflight.
+
+The semantic cross-reference remains pinned OpenBW: `unit_type_t::flag_building`
+is bit 0 (`data_types.h`) and `load_units_dat` reads a 32-bit flags value per
+type (`data_loading.h`). This does not prove that every native mode/build uses
+the exact PC table layout. The shared type-footprint edge clamp and
+`0x801338D0` strict bounds check still apply; the native midpoint should not
+be snapped to the building grid for these two types.
 
 ## Provenance and limits
 
@@ -80,7 +89,7 @@ the already-installed Rabbitizer from the pinned checkout. No ROM bytes,
 generated code, or extracted payloads are included here.
 
 The precise collision mask meanings and all preflight return-status
-combinations, exact runtime table values for raw 74/101, pathing/terrain-equivalence
-requirements, and Z8 raw-101 owner-vision behavior remain open. Any GBA
+combinations, pathing/terrain-equivalence requirements, and Z8 raw-101
+owner-vision behavior remain open. Any GBA
 adaptation must state which current-engine overlap checks it uses instead of
 claiming native collision parity.

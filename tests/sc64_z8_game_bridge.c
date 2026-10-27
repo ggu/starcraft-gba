@@ -58,6 +58,127 @@ static void assert_building_extent(unsigned raw, unsigned slot)
     assert(actor.completed == !b[slot].under_construction);
 }
 
+static unsigned alive_unit_count(void)
+{
+    unsigned count = 0;
+    for (unsigned i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive) ++count;
+    return count;
+}
+
+static unsigned raw_unit_count(unsigned raw)
+{
+    unsigned count = 0;
+    for (unsigned i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].raw_type == (int)raw) ++count;
+    return count;
+}
+
+static void test_create_service(Sc64Z8WorldView *world)
+{
+    s8 owners[SC64_Z8_SOURCE_OWNER_LIMIT];
+    Sc64Z8GameContext context;
+    Sc64Z8Action action = {
+        .location = 13, .group1 = 19, .group2 = 0,
+        .unit = 74, .opcode = 11, .modifier = 0, .flags = 0x10
+    };
+    int left, top, right, bottom, blocker, slot;
+    unsigned before;
+
+    race_cols = 128; race_rows = 128;
+    for (unsigned i = 0; i < SC64_Z8_SOURCE_OWNER_LIMIT; ++i) owners[i] = -1;
+    owners[4] = ENEMY;
+    owners[5] = SIDE;
+    assert(sc64_z8_game_context_init(&context, owners, 4096, 4096));
+    assert(sc64_z8_game_source_extents(74, 0, 0, 0,
+                                       &left, &top, &right, &bottom));
+
+    /* Deliberately put a different live actor at the requested center. The
+     * sampled native type flag is clear, so CreateUnit does not run the
+     * building-only occupancy preflight for this raw actor. */
+    blocker = spawn_unit(SIDE, U_MARINE, 55, 105);
+    assert(blocker >= 0);
+    u[blocker].raw_type = 37; u[blocker].raw_owner = 0;
+    before = alive_unit_count();
+    slot = find_unit_slot();
+    assert(slot >= 0);
+    assert(world != 0);
+    world->active_mask = (u8)(1u << 4);
+    world->force[4] = 2; /* The authored group 19 selector is Force 2. */
+    sc64_z8_game_bind_create_service(world, &context);
+    Sc64Z8Rect placement = {100, 200, 120, 220};
+    assert(sc64_z8_world_action(world, &action, 0, &placement) == 1);
+    assert(alive_unit_count() == before + 1u);
+    assert(u[slot].alive && u[slot].owner == ENEMY);
+    assert(u[slot].type == sc64_race_unit_from_raw(74));
+    assert(u[slot].raw_type == 74 && u[slot].raw_owner == 4);
+    assert(u[slot].x == 55 && u[slot].y == 105);
+    assert(u[slot].hp == u[slot].maxhp);
+    assert(u[slot].maxhp == sc64_race_unit_rules[u[slot].type].hp);
+    assert(u[slot].shield == sc64_race_unit_rules[u[slot].type].shields);
+
+    /* Native clamps the unsnapped source midpoint by inclusive extents at the
+     * right/bottom map edges. The engine stores half-scale world pixels. */
+    assert(sc64_z8_game_source_extents(101, 0, 0, 0,
+                                       &left, &top, &right, &bottom));
+    action.unit = 101;
+    slot = find_unit_slot();
+    before = alive_unit_count();
+    assert(sc64_z8_game_create(&context, &action, 4, 1, 0,
+                               4070, 4070, 4095, 4095) == 1);
+    assert(alive_unit_count() == before + 1u);
+    assert(u[slot].alive && u[slot].owner == ENEMY);
+    assert(u[slot].raw_type == 101 && u[slot].raw_owner == 4);
+    assert(sc64_game_unit_actor_flags(u[slot].type) & SC64_GAME_ACTOR_HIDDEN);
+    assert(u[slot].x * 2 == 4096 - right - 1);
+    assert(u[slot].y * 2 == 4096 - bottom - 1);
+    assert(left > 0 && top > 0);
+
+    /* Refuse non-default properties, unsupported source units/counts, and
+     * rectangles beyond the map without changing the pool. */
+    before = alive_unit_count();
+    action.unit = 74;
+    assert(sc64_z8_game_create(&context, &action, 4, 1, 1,
+                               100, 200, 120, 220) == -1);
+    assert(alive_unit_count() == before);
+    assert(sc64_z8_game_create(&context, &action, 4, 2, 0,
+                               100, 200, 120, 220) == -1);
+    assert(alive_unit_count() == before);
+    action.unit = 65;
+    assert(sc64_z8_game_create(&context, &action, 4, 1, 0,
+                               100, 200, 120, 220) == -1);
+    assert(alive_unit_count() == before);
+    action.unit = 74;
+    assert(sc64_z8_game_create(&context, &action, 8, 1, 0,
+                               100, 200, 120, 220) == -1);
+    assert(alive_unit_count() == before);
+    assert(sc64_z8_game_create(&context, &action, 4, 1, 0,
+                               100, 200, 4097, 220) == -1);
+    assert(alive_unit_count() == before);
+
+    /* An ENEMY-owned hidden raw-101 actor retains its owner instead of being
+     * projected to SIDE to gain player vision. */
+    assert(u[slot].owner == ENEMY && u[slot].raw_owner == 4);
+    assert(raw_unit_count(101) == 1);
+
+    /* Pool exhaustion is a clean failed create with no partial allocation. */
+    for (unsigned i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive) {
+            u[i].alive = 1;
+            u[i].owner = ENEMY;
+            u[i].type = U_MARINE;
+            u[i].raw_type = 37;
+            u[i].raw_owner = 4;
+        }
+    }
+    before = alive_unit_count();
+    unsigned before74 = raw_unit_count(74);
+    assert(before == MAX_UNITS);
+    assert(sc64_z8_game_create(&context, &action, 4, 1, 0,
+                               100, 200, 120, 220) == -1);
+    assert(alive_unit_count() == before && raw_unit_count(74) == before74);
+}
+
 int main(void)
 {
     /* Native Z8 descriptor actor kinds after resource/start-marker filtering.
@@ -198,6 +319,8 @@ int main(void)
     assert(minerals[1] == 17 && minerals[2] == 111);
     assert(gas[1] == 20 && gas[2] == 200);
 
-    puts("sc64_z8_game_bridge: actual pools, native extents, invincibility and source wallets passed");
+    test_create_service(&world);
+
+    puts("sc64_z8_game_bridge: actual pools, native extents, invincibility, wallets and create service passed");
     return 0;
 }

@@ -13,7 +13,38 @@
 #endif
 
 #include "sc64_z8_world_adapter.h"
+#include "sc64_z8_source.h"
 #include "sc64_p7_geometry.h"
+
+typedef struct {
+    s8 live_owner_for_source[SC64_Z8_SOURCE_OWNER_LIMIT];
+    u16 map_pixel_width, map_pixel_height;
+} Sc64Z8GameContext;
+
+static int
+sc64_z8_game_context_init(Sc64Z8GameContext *context,
+                          const s8 live_owner_for_source[SC64_Z8_SOURCE_OWNER_LIMIT],
+                          unsigned map_pixel_width, unsigned map_pixel_height)
+{
+    if (!context || !live_owner_for_source || !map_pixel_width ||
+        !map_pixel_height || map_pixel_width > (unsigned)WORLD_W * 2u ||
+        map_pixel_height > (unsigned)WORLD_H * 2u ||
+        map_pixel_width != SC64_Z8_SOURCE_MAP_COLS * 32u ||
+        map_pixel_height != SC64_Z8_SOURCE_MAP_ROWS * 32u)
+        return 0;
+    for (unsigned owner = 0; owner < SC64_Z8_SOURCE_OWNER_LIMIT; ++owner) {
+        int live = live_owner_for_source[owner];
+        if (owner < SC64_Z8_OWNER_LIMIT) {
+            if (live < -1 || live > 4) return 0;
+        } else if (live != -1) {
+            return 0;
+        }
+        context->live_owner_for_source[owner] = (s8)live;
+    }
+    context->map_pixel_width = (u16)map_pixel_width;
+    context->map_pixel_height = (u16)map_pixel_height;
+    return 1;
+}
 
 /* Return actor extents in the world-view's source-pixel offset form. Prefer
  * feature facts, then the pinned P7 raw helper and Z7's audited raw table for
@@ -132,6 +163,85 @@ sc64_z8_game_bind_source_wallets(Sc64Z8WorldView *world,
         world->source_minerals[owner] = &minerals[owner];
         world->source_gas[owner] = &gas[owner];
     }
+}
+
+/* CreateUnit rows currently authored in Z8 use only raw 74 (Hero Dark
+ * Templar) and raw 101 (Special Map Revealer), one unit per action, with no
+ * UPRP selector. Both types had bit 0 clear in an initialized retail P1
+ * snapshot at native table 0x800C99DC + 4*type. Native code centers the
+ * requested location and clamps the actor footprint to the map; these rows
+ * bypass the building grid/placement preflight and retain the unsnapped
+ * center. The hidden raw-101 actor is created with the configured live owner
+ * and exact source owner. This does not implement owner-specific enemy fog
+ * awareness or enable the Z8 gameplay profile.
+ */
+static int
+sc64_z8_game_create(void *opaque, const Sc64Z8Action *action,
+                    unsigned source_owner, unsigned count,
+                    unsigned property_id, unsigned x1, unsigned y1,
+                    unsigned x2, unsigned y2)
+{
+    Sc64Z8GameContext *context = (Sc64Z8GameContext *)opaque;
+    int raw, type, live_owner, left, top, right, bottom;
+    int x, y, slot;
+    if (!context || !action || action->opcode != 11u ||
+        action->flags != 0x10u || action->modifier != 0u ||
+        action->group2 != 0u || property_id != 0u || count != 1u ||
+        !action->location || action->string_id || action->wav_id ||
+        action->time || source_owner >= SC64_Z8_OWNER_LIMIT ||
+        source_owner >= SC64_Z8_SOURCE_OWNER_LIMIT ||
+        context->live_owner_for_source[source_owner] < SIDE ||
+        context->live_owner_for_source[source_owner] > 4 ||
+        x2 < x1 || y2 < y1 || x2 > context->map_pixel_width ||
+        y2 > context->map_pixel_height ||
+        context->map_pixel_width != (unsigned)WORLD_W * 2u ||
+        context->map_pixel_height != (unsigned)WORLD_H * 2u)
+        return -1;
+
+    raw = action->unit;
+    if (raw != 74 && raw != 101) return -1;
+    type = sc64_race_unit_from_raw(raw);
+    if (type < 0 || !sc64_z8_game_source_extents((unsigned)raw, 0, 0, 0,
+                                                 &left, &top, &right, &bottom))
+        return -1;
+
+    /* The native midpoint is integer-truncated for these nonnegative source
+     * coordinates. Its unit center is then clamped so inclusive footprint
+     * edges lie inside [0, map_dimension). No tile-grid snap is used here. */
+    x = (int)((x1 + x2) / 2u);
+    y = (int)((y1 + y2) / 2u);
+    if ((unsigned)left > context->map_pixel_width ||
+        (unsigned)top > context->map_pixel_height ||
+        (unsigned)right >= context->map_pixel_width ||
+        (unsigned)bottom >= context->map_pixel_height)
+        return -1;
+    if (x < left) x = left;
+    if (y < top) y = top;
+    if (x + right >= context->map_pixel_width)
+        x = context->map_pixel_width - right - 1;
+    if (y + bottom >= context->map_pixel_height)
+        y = context->map_pixel_height - bottom - 1;
+    if (x < left || y < top || x + right >= context->map_pixel_width ||
+        y + bottom >= context->map_pixel_height)
+        return -1;
+
+    live_owner = context->live_owner_for_source[source_owner];
+    slot = find_unit_slot();
+    if (slot < 0) return -1;
+    slot = spawn_unit(live_owner, type, x / 2, y / 2);
+    if (slot < 0) return -1;
+    u[slot].raw_type = (s16)raw;
+    u[slot].raw_owner = (s16)source_owner;
+    return 1;
+}
+
+static void
+sc64_z8_game_bind_create_service(Sc64Z8WorldView *world,
+                                 Sc64Z8GameContext *context)
+{
+    if (!world || !context) return;
+    world->services.context = context;
+    world->services.create = sc64_z8_game_create;
 }
 #endif /* SC64_Z8_GAME_POOL_BRIDGE */
 
