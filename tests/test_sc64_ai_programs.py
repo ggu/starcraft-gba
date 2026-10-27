@@ -71,13 +71,17 @@ class Sc64AiProgramTests(unittest.TestCase):
             programs.analyze_catalog(payload, catalog)
 
     def test_reachable_shared_region_gotos_are_validated_transitively(self):
-        # Zer8 enters Ze8T's region. The latter contains a malformed goto that
-        # points either into its own operand bytes or out of the leaf bounds.
-        for target_bytes, error in ((bytes((8, 0)), 'not an instruction boundary'),
+        # The fourth script is not a requested target. Its malformed goto must
+        # still be checked when Zer8 enters it; checking only TARGET_IDS misses it.
+        for target_bytes, error in ((bytes((14, 0)), 'not an instruction boundary'),
                                     (bytes((0xff, 0x7f)), 'outside code/table bounds')):
             with self.subTest(target=target_bytes):
-                code = bytes((0, 7, 0, 0)) + target_bytes + bytes((38, 36))
-                payload, catalog = catalog_for(code, (4, 7, 10))
+                code = bytes((0, 13, 0, 36, 38, 36, 36, 36, 36, 0)) + target_bytes
+                rows = b''.join(struct.pack('<4sIII', name, offset, 1, 3)
+                                for name, offset in ((b'Zer8', 4), (b'Ze8T', 7),
+                                                     (b'MvTe', 8), (b'Shrd', 13)))
+                payload = struct.pack('<I', 4 + len(code)) + code + rows + b'\0' * 4
+                catalog = catalog_tool.parse_catalog(payload)
                 with self.assertRaisesRegex(ValueError, error):
                     programs.analyze_catalog(payload, catalog)
 

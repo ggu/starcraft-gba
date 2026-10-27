@@ -261,7 +261,7 @@ def main() -> None:
         parser.error(str(exc))
     counts = ', '.join(f"{row['id']}={row['instruction_count']} ops"
                        for row in result['analysis']['programs'])
-    print(f'validated {counts}; private sanitized metadata written')
+    print(f'validated {counts}; private decoded program report written')
 
 
 if __name__ == '__main__':
