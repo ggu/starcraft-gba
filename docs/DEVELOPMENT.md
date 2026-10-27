@@ -2493,6 +2493,33 @@ opening and a controller-only attack-move. It checks 619,216 list answers
 against the original query, then repeats the menu/save-load fixture. See
 [Validation](VALIDATION.md#p7-movement-steering-list) for ARM measurements.
 
+The canonical Terran, Zerg and Protoss ROMs now enable `SC64_CONTACT_CACHE`
+(`starcraft/sc64_contact.h`): the race collision query reads one cached byte
+of type facts per candidate instead of repeating the radius, flight,
+collidable and burrow lookups, and a blocked ground mover answers all eight
+steering offsets in one bucket pass instead of eight queries. The stock
+movement step also drops its software division. The collision predicate, the
+steering candidate order and tie-breaking, movement speeds and the save
+format are unchanged. A P7 probe carries the same option on the
+count-snapshot flags:
+
+```sh
+make test-sc64-contact-cache
+make test-sc64-p7-contact
+make protoss-p7-contact-probe
+```
+
+`test-sc64-contact-cache` compares the cached query, the steering mask and
+the division-free step with the original query, eight `unit_step_clear()`
+calls and `sc64_stock_motion_step()` over randomized dense worlds with
+morphs, deaths, slot reuse, loads, burrow flags and bucket moves, in the
+unified race, P7, canonical Terran and Nydus Z7 flag sets. `test-sc64-p7-contact`
+requires the plain P7 reference trace byte for byte. To compare a canonical
+ROM without the option, build with `make -B terran CONTACT_CACHE_FLAGS=`
+(or `zerg` / `protoss`). See
+[Validation](VALIDATION.md#contact-cache-movement-measurement-2026-10-27) for the ARM
+measurements and the benchmark recipe.
+
 An experimental mode-0 renderer builds on that movement probe:
 
 ```sh

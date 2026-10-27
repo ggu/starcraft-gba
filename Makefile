@@ -175,7 +175,10 @@ CANONICAL_DRAW_FLAGS ?= -DGBA_SPRITE_WORDS -DGBA_SCENE_CLIP -DSC64_HUD_BUFFER_RE
 CANONICAL_MINIMAP_FLAGS ?= -DSC64_MINIMAP_BLIT
 CANONICAL_STATIC_FLAGS ?= $(if $(filter -DGBA_SCENE_CLIP,$(CANONICAL_DRAW_FLAGS)),-DSC64_STATIC_DIRTY_ROWS)
 TERRAN_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
-TERRAN_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(TERRAN_FULL_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) $(TERRAN_UNIT_WORD_FLAGS)
+# Per-slot cached collision facts and one-pass blocked steering for the race
+# collision predicate. Empty this to compare a canonical ROM without it.
+CONTACT_CACHE_FLAGS ?= -DSC64_CONTACT_CACHE
+TERRAN_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(TERRAN_FULL_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) $(TERRAN_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS)
 WEAPON_SOURCE_DIR := .local/sc64/weapon-vfx/generated
 WEAPON_SOURCE_HEADER := $(WEAPON_SOURCE_DIR)/sc64_weapon_source_generated.h
 ATTACK_POSE_DIR := .local/sc64/attack-poses/generated
@@ -189,7 +192,7 @@ CANONICAL_DEATH_FLAGS ?= -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
 CANONICAL_DEATH_INPUTS = $(if $(filter -DSC64_DEATH_SOURCE_ART,$(CANONICAL_DEATH_FLAGS)),$(DEATH_ART_HEADER))
 TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
 ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
-ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS)
+ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS)
 # Explicit legacy Z1-Z4 product: SCZ4, save generation 20, unchanged flags.
 ZERG_Z4_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
 # Canonical Z1-Z6: the Z6 storage/runtime/query vector, with a word-packed
@@ -204,7 +207,7 @@ ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
 PROTOSS_P3_CANONICAL_FLAGS ?= -DSC64_VITAL_BAR_FAST $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
 PROTOSS_P3_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_P3_CANONICAL_FLAGS)
 PROTOSS_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
-PROTOSS_CANONICAL_FLAGS ?= $(PROTOSS_P3_CANONICAL_FLAGS) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL -DSC64_P4_COUNT_CENSUS_ENABLED $(PROTOSS_UNIT_WORD_FLAGS)
+PROTOSS_CANONICAL_FLAGS ?= $(PROTOSS_P3_CANONICAL_FLAGS) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL -DSC64_P4_COUNT_CENSUS_ENABLED $(PROTOSS_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS)
 P4_CREATE_PREFIX_FLAGS ?= -DSC64_P4_CREATE_PREFIX -DSC64_P4_VALIDATOR_HOT
 PROTOSS_P4_STORM_ROM_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P4_STORM_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS)
 PROTOSS_P5_CANONICAL_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P5_SHUTTLE_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
@@ -2681,6 +2684,30 @@ build/StarCraft-Protoss-P7-Move-Probe-GBA.gba: build/starcraft-protoss-p7-move-p
 	$(OBJCOPY) -O binary $< $@
 	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
 protoss-p7-move-probe: build/StarCraft-Protoss-P7-Move-Probe-GBA.gba
+# Default-off P7 contact-cache probe: the same base as the movement probe with
+# the per-slot collision facts and one-pass steering in place of the class
+# cache and steering list. The host trace must match the plain reference.
+P7_CONTACT_FLAGS := -DSC64_ZP_FACT_RANGE_CULL -DSC64_CONTACT_CACHE
+build/test-sc64-p7-contact-candidate: tests/sc64_p7_steer_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_CONTACT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p7-contact-runtime: tests/sc64_p7_prevalidated_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P7_MOVE_BASE_FLAGS) $(P7_CONTACT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p7-contact protoss-p7-contact-probe
+test-sc64-p7-contact: build/test-sc64-p7-move-reference build/test-sc64-p7-contact-candidate build/test-sc64-p7-count-snapshot build/test-sc64-p7-contact-runtime
+	./build/test-sc64-p7-move-reference > build/sc64-p7-move-reference.txt
+	./build/test-sc64-p7-contact-candidate > build/sc64-p7-contact-candidate.txt
+	cmp build/sc64-p7-move-reference.txt build/sc64-p7-contact-candidate.txt
+	./build/test-sc64-p7-count-snapshot > build/sc64-p7-count-snapshot.txt
+	./build/test-sc64-p7-contact-runtime > build/sc64-p7-contact-runtime.txt
+	cmp build/sc64-p7-count-snapshot.txt build/sc64-p7-contact-runtime.txt
+	cat build/sc64-p7-contact-candidate.txt
+build/starcraft-protoss-p7-contact-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_MOVE_BASE_FLAGS) $(P7_CONTACT_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-contact-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Contact-Probe-GBA.gba: build/starcraft-protoss-p7-contact-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 PROBE' SCP7
+protoss-p7-contact-probe: build/StarCraft-Protoss-P7-Contact-Probe-GBA.gba
 # Default-off mode-0 renderer on the movement probe. The derived header puts
 # terrain in flip-deduplicated 8x8 pools and leaves the shared input untouched.
 TILE8_SOURCE := .local/sc64/zp-stage/generated/sc64_races_generated.h
@@ -3977,6 +4004,33 @@ test-sc64-collision-bounds: $(addprefix build/test-sc64-collision-bounds-,cached
 	./build/test-sc64-collision-bounds-hoisted
 	./build/test-sc64-collision-bounds-plain
 test: test-sc64-collision-bounds
+
+# SC64_CONTACT_CACHE differential checks: the cached-fact bucket query, the
+# one-pass blocked-steering mask and the stock-rate cache against the original
+# query, unit_step_clear() and sc64_stock_motion_step(). Each variant needs its
+# profile's private generated inputs, so none of them is part of `make test`.
+CONTACT_CACHE_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+build/test-sc64-contact-cache-races: tests/sc64_contact_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(CONTACT_CACHE_TEST_FLAGS) $(RACES_FLAGS) -DSC64_CONTACT_CACHE $< common/gba.c -o $@
+build/test-sc64-contact-cache-p7: tests/sc64_contact_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(CONTACT_CACHE_TEST_FLAGS) $(P7_MOVE_BASE_FLAGS) $(P7_CONTACT_FLAGS) $< common/gba.c -o $@
+build/test-sc64-contact-cache-terran: tests/sc64_contact_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(CONTACT_CACHE_TEST_FLAGS) $(TERRAN_ROM_FLAGS) $< common/gba.c -o $@
+build/test-sc64-contact-cache-nydus: tests/sc64_contact_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) $(CONTACT_CACHE_TEST_FLAGS) $(NYDUS_PROBE_FLAGS) -DSC64_CONTACT_CACHE $< common/gba.c -o $@
+.PHONY: test-sc64-contact-cache test-sc64-contact-cache-races test-sc64-contact-cache-p7 test-sc64-contact-cache-terran test-sc64-contact-cache-nydus
+test-sc64-contact-cache-races: build/test-sc64-contact-cache-races
+	./build/test-sc64-contact-cache-races
+test-sc64-contact-cache-p7: build/test-sc64-contact-cache-p7
+	./build/test-sc64-contact-cache-p7
+test-sc64-contact-cache-terran: build/test-sc64-contact-cache-terran
+	./build/test-sc64-contact-cache-terran
+test-sc64-contact-cache-nydus: build/test-sc64-contact-cache-nydus
+	./build/test-sc64-contact-cache-nydus
+test-sc64-contact-cache: test-sc64-contact-cache-races test-sc64-contact-cache-p7 test-sc64-contact-cache-terran test-sc64-contact-cache-nydus
+test-unified: test-sc64-contact-cache-races
+test-sc64-terran-full-campaign: test-sc64-contact-cache-terran
+test-sc64-p7-contact: test-sc64-contact-cache-p7
 
 # Optional P7 ordinary-input performance replay; excluded from default targets.
 # Requires the same authenticated generated P7 data inputs as other P7 probes.

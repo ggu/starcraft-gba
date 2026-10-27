@@ -10,6 +10,27 @@ probe and Z7 controller ROMs are byte-identical to `codex/source-release`
 exercise linked transit with ordinary input. Neither is Z8 gameplay or
 physical-GBA evidence. See [Nydus Canal](NYDUS-CANAL.md).
 
+## Contact cache movement measurement (2026-10-27)
+
+`SC64_CONTACT_CACHE` is now part of the canonical Terran, Zerg and Protoss
+ROM flags. It caches each unit type's collision facts in one byte, answers
+all eight blocked-steering offsets in one bucket pass and removes the
+software division from the stock movement step, without changing the
+collision predicate, steering order, speeds, routes or save formats. On the
+public P7 movement workload the attack-move phase falls from 1,890,055 to
+1,551,295 timer cycles per update (−17.9%, 8.88 → 10.82 fps) and the
+opening from 1,582,381 to 1,426,952 (−9.8%); last-tick update cycles fall
+21.3% and orders-stage cycles 30.1%, with all 23 state checkpoints matching.
+Canonical Terran 3-bot skirmishes match every checkpoint and stay at their
+frame cap. The differential fixture (`make test-sc64-contact-cache`) checks
+about 10 million step, mask and stock-step answers against the original
+code under four flag sets, and `make test-sc64-p7-contact` reproduces the
+reference P7 trace byte for byte. Linker guards hold in every measured
+build. The Zerg Z6 and Protoss P6 canonical ROMs could not be linked on the
+measuring machine (their sprite banks are not prepared), so they are covered
+by host flag sets only, and no near-30-fps or hardware claim is made. See
+the [contact cache audit](audits/2026-10-27-contact-cache/README.md).
+
 ## Current campaign status (2026-10-27)
 
 The [stock roster follow-up](audits/2026-10-26-roster-contact-and-art/README.md)
