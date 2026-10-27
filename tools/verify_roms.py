@@ -21,6 +21,8 @@ TARGETS = {
     "--terran": ("StarCraft-Terran-GBA", "starcraft-terran", "SCT8", "SC TERRAN 10"),
     "--terran-t3": ("StarCraft-Terran-T3-GBA", "starcraft-terran-t3", "SCT3", "SC TERRAN T3"),
     "--zerg": ("StarCraft-Zerg-Z6-GBA", "starcraft-zerg-z6", "SCZ6", "SC ZERG Z6"),
+    "--zerg-z6": ("StarCraft-Zerg-Z6-GBA", "starcraft-zerg-z6", "SCZ6", "SC ZERG Z6"),
+    "--zerg-z7": ("StarCraft-Zerg-Z7-GBA", "starcraft-zerg-z7", "SCZ7", "SC ZERG Z7"),
     "--zerg-z3": ("StarCraft-Zerg-GBA", "starcraft-zerg", "SCZ3", "SC ZERG Z3"),
     "--zerg-z4": ("StarCraft-Zerg-Z4-GBA", "starcraft-zerg-z4", "SCZ4", "SC ZERG Z4"),
     "--zerg-z5": ("StarCraft-Zerg-Z5-GBA", "starcraft-zerg-z5", "SCZ5", "SC ZERG Z5"),

@@ -1991,6 +1991,8 @@ build/test-sc64-zerg-promoted-profile: tests/sc64_promoted_race_profile.c $(STAR
 test-zerg: build/test-zerg build/test-sc64-zerg-promoted-profile
 	./build/test-zerg
 	./build/test-sc64-zerg-promoted-profile
+.PHONY: test-zerg-z6
+test-zerg-z6: test-zerg
 test-zerg-z3: test-sc64-z3-runtime
 # Explicit legacy four-entry Zerg product.
 build/test-zerg-z4: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
@@ -3467,6 +3469,73 @@ build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba: build/starcraft-zerg-z7-steering
 	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 STEP36' SCZS
 zerg-z7-steering-probe: build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z7-steering
+
+# Unpromoted canonical Z7 candidate. Keep the Z6 product and default aliases
+# unchanged until the complete host/ARM qualification matrix passes.
+ZERG_Z7_CANONICAL_FLAGS = $(Z7_STEERING_FLAGS) -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ
+ZERG_Z7_CANONICAL_INPUTS = $(Z7_FULL_RENDER_INPUTS)
+build/starcraft-zerg-z7.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(ZERG_Z7_CANONICAL_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-GBA.gba: build/starcraft-zerg-z7.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z7' SCZ7
+.PHONY: verify-zerg-z7 zerg-z7
+verify-zerg-z7: build/StarCraft-Zerg-Z7-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z7
+zerg-z7: verify-zerg-z7
+
+# Preserve a named six-entry product alongside the existing `zerg` alias.
+.PHONY: verify-zerg-z6 zerg-z6
+verify-zerg-z6: build/StarCraft-Zerg-Z6-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z6
+zerg-z6: verify-zerg-z6
+
+define Z7_CANONICAL_FIXTURE
+build/test-sc64-z7-canonical-$(1): tests/$(2) $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_Z7_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(ZERG_Z7_CANONICAL_FLAGS) $(3) $$< common/gba.c -o $$@
+endef
+$(eval $(call Z7_CANONICAL_FIXTURE,profile,sc64_promoted_race_profile.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,save,sc64_z7_game_save.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,frame,sc64_z3_frame_coverage.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,scourge,sc64_z7_scourge_game.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,controller,sc64_z7_campaign_run.c))
+ZERG_Z7_CONTROLLER_TRACE ?= .local/sc64/zerg-z7-canonical-controller.jsonl
+.PHONY: test-sc64-z7-canonical-controller test-zerg-z7
+test-sc64-z7-canonical-controller: build/test-sc64-z7-canonical-controller tools/sc64_zp_controller_replay.py
+	mkdir -p "$(dir $(ZERG_Z7_CONTROLLER_TRACE))"
+	./build/test-sc64-z7-canonical-controller --trace "$(ZERG_Z7_CONTROLLER_TRACE)"
+	$(PYTHON) tools/sc64_zp_controller_replay.py --profile zerg-z7 --trace "$(ZERG_Z7_CONTROLLER_TRACE)" --validate-only
+test-zerg-z7: build/test-sc64-z7-canonical-profile build/test-sc64-z7-canonical-save build/test-sc64-z7-canonical-frame build/test-sc64-z7-canonical-scourge build/test-sc64-z7-canonical-controller build/test-sc64-z7-full-render-carried-z5 build/test-sc64-z7-full-render-carried-z6 build/test-sc64-z7-full-render-z6-controller-policy test-sc64-z7-carried-missions test-sc64-z7-canonical-skirmish
+	./build/test-sc64-z7-canonical-profile
+	./build/test-sc64-z7-canonical-save
+	./build/test-sc64-z7-canonical-frame
+	./build/test-sc64-z7-canonical-scourge
+	$(MAKE) test-sc64-z7-carried-z5 test-sc64-z7-carried-z6
+
+build/test-sc64-skirmish-match-zerg-z7: tests/sc64_skirmish_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) $(RACE_CAMPAIGN_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-canonical-skirmish
+test-sc64-z7-canonical-skirmish: build/test-sc64-skirmish-match-zerg-z7
+	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller $< --output .local/sc64/skirmish/zerg-z7-matches
+
+# Recheck every carried Z1-Z4 controller under the exact Z7 candidate vector.
+ZERG_Z7_CARRIED_DEPS = $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile
+build/test-sc64-z7-carried-z1: tests/race_z1_controls.c $(ZERG_Z7_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-carried-z2: tests/race_campaign_run.c $(ZERG_Z7_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-carried-z3: tests/sc64_z3_campaign_run.c $(ZERG_Z7_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-carried-z4: tests/sc64_z4_campaign_run.c $(ZERG_Z7_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-carried-missions
+test-sc64-z7-carried-missions: build/test-sc64-z7-carried-z1 build/test-sc64-z7-carried-z2 build/test-sc64-z7-carried-z3 build/test-sc64-z7-carried-z4
+	mkdir -p .local/sc64/z7-carried
+	./build/test-sc64-z7-carried-z1 --trace .local/sc64/z7-carried/z1.json
+	./build/test-sc64-z7-carried-z2 --controller 1 --trace .local/sc64/z7-carried/z2.json
+	./build/test-sc64-z7-carried-z3 --trace .local/sc64/z7-carried/z3.json
+	./build/test-sc64-z7-carried-z4 --limit 150000 --trace .local/sc64/z7-carried/z4.json
 
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
