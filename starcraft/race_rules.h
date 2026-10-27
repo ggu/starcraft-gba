@@ -145,6 +145,10 @@ enum {
     /* Z6 starting structures; keep earlier actor/profile enum values intact. */
     B_Z6_ROBOTICS_SUPPORT_BAY, B_Z6_SHIELD_BATTERY,
 #endif
+#ifdef SC64_NYDUS_ENABLED
+    /* Raw 134, appended last so every disabled profile keeps its values. */
+    B_NYDUS_CANAL,
+#endif
     SC_RB_COUNT
 };
 
@@ -474,6 +478,11 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
 #if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
     , [B_Z6_ROBOTICS_SUPPORT_BAY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 150, 100, 450, 450, 0 }
     , [B_Z6_SHIELD_BATTERY] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 100, 0, 450, 200, 0 }
+#endif
+#ifdef SC64_NYDUS_ENABLED
+    /* Preplaced source endpoints only: Drone construction and BuildNydusExit
+     * are not implemented, so no runtime producer is exposed. */
+    , [B_NYDUS_CANAL] = { R_ZERG, SC_RACE_F_BUILDING, 255, 0, 150, 0, 600, 250, 0 }
 #endif
 };
 
@@ -1421,6 +1430,9 @@ static inline int sc64_race_raw_building(int type)
     case B_P7_ROBOTICS_SUPPORT_BAY: return 171;
     case B_P7_SHIELD_BATTERY: return 172;
 #endif
+#ifdef SC64_NYDUS_ENABLED
+    case B_NYDUS_CANAL: return 134;
+#endif
     default: return -1;
     }
 }
@@ -1613,6 +1625,9 @@ static inline int sc64_race_building_from_raw(int raw)
 #endif
 #ifdef SC64_P6_ACTORS
     case SC64_P6_RAW_WALL_MISSILE_TRAP: return B_P6_WALL_MISSILE_TRAP;
+#endif
+#ifdef SC64_NYDUS_ENABLED
+    case 134: return B_NYDUS_CANAL;
 #endif
     default: return -1;
     }

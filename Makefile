@@ -3112,6 +3112,15 @@ test-sc64-z7-source-sight: build/test-sc64-z7-source-sight build/test-sc64-z7-so
 	./build/test-sc64-z7-source-sight-eggs
 
 Z7_SCOURGE_PROBE_FLAGS := $(Z7_EGG_PROBE_FLAGS) -DSC64_Z7_SOURCE_SIGHT -DSC64_Z7_SCOURGE_COMBAT
+
+# Optional Nydus Canal runtime, hosted by the Z7 Zerg actor/save profile. The
+# fixture places linked raw-134 endpoints; canonical Z7 builds leave it off.
+NYDUS_PROBE_FLAGS := $(Z7_SCOURGE_PROBE_FLAGS) -DSC64_NYDUS_ENABLED
+build/test-sc64-nydus-game: tests/sc64_nydus_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(NYDUS_PROBE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-nydus-game
+test-sc64-nydus-game: build/test-sc64-nydus-game
+	./build/test-sc64-nydus-game
 build/test-sc64-z7-scourge: tests/sc64_z7_scourge_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_SCOURGE_PROBE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-z7-scourge
