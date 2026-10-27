@@ -7,6 +7,10 @@ Together with Terran 10 and Zerg 6, canonical campaign coverage is 23/30.
 This does not complete the Protoss campaign: P8–P10 and the near-30-fps goal
 remain open.
 
+The artifact identities and timing below describe the PR88 promotion build.
+The subsequent [hot movement profile](p7-canonical-hot-profile.md) retains its
+campaign/save behavior and records the current configuration's separate proof.
+
 ## Canonical host profile
 
 The host tests used the P7 candidate composition from `PROTOSS_P7_CANONICAL_FLAGS`
