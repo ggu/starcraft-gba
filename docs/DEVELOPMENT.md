@@ -2632,6 +2632,19 @@ strict mission win and validates its input trace. Neither test promotes P7
 into the canonical campaign. See the [P7 V2 qualification](research/p7-fact-v2-qualification.md)
 for measured costs and remaining enemy-AI, performance and hardware limits.
 
+The same full P7 runtime has an opt-in mode-4 drawing profile:
+
+```sh
+make test-sc64-p7-render
+make test-sc64-p7-render-campaign-controller
+make protoss-p7-render-probe
+```
+
+It builds `build/StarCraft-Protoss-P7-Render-Probe-GBA.gba`. The frame test
+compares all displayed RGB555 pixels with the FACT V2 profile across camera
+pans, pause/resume and combat. See the [drawing qualification](research/p7-render-profile-qualification.md)
+for the modest measured gains, unchanged memory guards and remaining limits.
+
 ## Mineral gathering before a base exists
 
 The shared first-depot worker path lets an empty mineral worker gather before

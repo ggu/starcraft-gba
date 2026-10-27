@@ -4,6 +4,10 @@
 #if defined(SC64_P7_SIGHT_AXIS_CULL) && !defined(SC64_P7_ACTORS)
 #error "SC64_P7_SIGHT_AXIS_CULL requires SC64_P7_ACTORS"
 #endif
+#if defined(SC64_P7_ARBITER_AURA_ONCE) && \
+    !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+#error "SC64_P7_ARBITER_AURA_ONCE requires the P7 Arbiter cache"
+#endif
 
 #ifdef SC64_P7_OBSERVER_ENABLED
 /* Current roster maxima after source-pixel conversion, including fallbacks.
@@ -451,6 +455,9 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                     while(ent!=SC64_TARGET_NONE) {
                         int slot=(int)ent;
                         if(slot<MAX_UNITS && slot!=(int)i &&
+#ifdef SC64_P7_ARBITER_AURA_ONCE
+                           !aura[slot] &&
+#endif
                            sc64_p7_observer_arbiter_aura_candidate(slot) &&
                            sc64_p7_arbiter_same_source((int)i,slot) &&
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
@@ -477,6 +484,9 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                 }
         } else {
             for (j=0;j<MAX_UNITS;++j) if (j!=i &&
+#ifdef SC64_P7_ARBITER_AURA_ONCE
+                !aura[j] &&
+#endif
                 sc64_p7_observer_arbiter_aura_candidate((int)j) &&
                 sc64_p7_arbiter_same_source((int)i,(int)j) &&
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
