@@ -46,3 +46,12 @@ the candidate instructions shows halfword stores for VRAM reset, row,
 seen-shadow, and counter writes. The storage path adds a 320-byte local pool
 staging array in `death_vfx_scan`; whole-mission timing and stack-canary runs
 remain unqualified.
+
+A separate paired ARM run compared the corrected storage path on a bounded
+2,000-call ordinary-input suffix from an ARM-written Z7 generation-36 save.
+The six emitted state/RGB/VFX records matched exactly, and both runs ended at
+the same nonterminal frame (`173794`) with no fault. The candidate was 0.0616%
+slower overall (`9,543,335,680` versus `9,537,458,884` measured cycles); this
+small bounded comparison is not a mission-wide performance result or a win
+replay. Stack high-water was the same in both runs, with a 256-byte reported
+gap, so this does not replace a broader stack-canary qualification.
