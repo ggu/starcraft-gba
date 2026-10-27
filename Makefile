@@ -4266,3 +4266,28 @@ build/test-sc64-p7-render-campaign-controller: $(P7_CAMPAIGN_CONTROLLER) $(P7_FA
 test-sc64-p7-render-campaign-controller: build/test-sc64-p7-render-campaign-controller tools/sc64_p7_campaign_trace.py
 	./build/test-sc64-p7-render-campaign-controller $(P7_RENDER_CAMPAIGN_TRACE)
 	$(PYTHON) tools/sc64_p7_campaign_trace.py --require-win $(P7_RENDER_CAMPAIGN_TRACE)
+
+# These canonical targets are declared before the optional P7 inputs above are
+# assigned. Add their effective prerequisites here so clean builds generate
+# the assets they consume and rebuild when those inputs change.
+build/starcraft-protoss-p7.elf \
+build/test-sc64-protoss-canonical-frame \
+build/test-sc64-protoss-canonical-hud \
+build/test-sc64-geyser-art \
+build/test-protoss \
+build/test-sc64-protoss-promoted-profile \
+build/test-sc64-protoss-canonical-storm \
+build/test-sc64-protoss-canonical-storage \
+build/test-sc64-protoss-canonical-controller \
+build/test-sc64-p4-census \
+build/test-sc64-protoss-canonical-p7-controller \
+build/test-sc64-protoss-canonical-p7-save \
+build/test-sc64-protoss-warp-color \
+build/test-sc64-protoss-warp-color-no-clip \
+build/test-sc64-worker-cargo-packed \
+build/test-sc64-p2-reinforcements-canonical \
+build/test-sc64-protoss-carried-campaign \
+build/test-sc64-protoss-carried-p3 \
+build/test-sc64-protoss-carried-p5 \
+build/test-sc64-skirmish-resume-protoss \
+build/test-sc64-contact-cache-protoss: $(PROTOSS_P7_CANONICAL_INPUTS) $(P7_ARBITER_INPUTS) $(P7_FACT_V2_HEADER) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
