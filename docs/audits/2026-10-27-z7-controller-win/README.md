@@ -4,6 +4,12 @@ Date: 2026-10-27
 Status: host campaign win reproduced; qualification is **22/30** pending the
 optimized ARM replay and fresh-process SRAM continuation.
 
+Follow-up: the [full-render ARM replay](../2026-10-27-z7-full-win/README.md)
+has now completed all 365 checkpoints through victory. That separate build
+still fails the performance target; ARM save continuation and broader
+profile qualification remain separate gates. The indexed host evidence
+below is retained as its original reference.
+
 ## Result
 
 The Z7 campaign controller won through ordinary input handling. The frozen

@@ -5776,3 +5776,20 @@ This scene exceeds a 30-fps frame budget in every variant; it remains a
 performance target, not a physical-hardware or sustained-30-fps qualification.
 Source palette ramps, unsupported script control flow and remnant lifetime
 caps remain documented limitations of this importer.
+
+## Z7 full-render winning ARM replay (2026-10-27)
+
+The separate full-render Z7 candidate completed the normal-input winning
+tape at host tick 209485/game frame 205764. All 365 host/ARM actor and
+game-state digest checkpoints matched. The terminal predicate additionally
+required the source victory, a surviving human force, zero source Force 1
+buildings, no runtime fault, and no pending action cursors or wait clocks.
+See the [full replay audit](audits/2026-10-27-z7-full-win/README.md) for the
+exact flag composition, frozen artifact hashes, and measurement scope.
+
+The instrumented combined mean was 5877025 GBA cycles per advancing PLAY
+update (about 2.85 rendered updates/second), far below 30 fps. This is not a
+physical-hardware measurement. This result supersedes the earlier absence
+of a full Z7 ARM win; it does not establish fresh-process ARM SRAM
+continuation or qualify the seven-mission profile's carried missions.
+Canonical menus and qualified staged progress remain unchanged at 22/30.
