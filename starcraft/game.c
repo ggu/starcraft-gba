@@ -1312,8 +1312,10 @@ static u8 pause_notice, pause_notice_ticks, r_tap_state;
 static u8 ping_life, ping_color;
 static s16 ping_x, ping_y;
 #elif defined(SC64_FIELD_CONTROLS)
-/* The same controls and feedback state for field_controls.h; never saved. */
-static u8 menu_last, r_tap_state, ping_life, ping_color;
+/* The same controls and feedback state for field_controls.h; never saved.
+ * Bytes: the Showcase build has little working RAM left. ui_tick and
+ * ui_tick_mode key field_ui_refresh()'s cached ui_action. */
+static u8 menu_last, r_tap_state, ping_life, ping_color, ui_action, ui_tick, ui_tick_mode;
 static s16 ping_x, ping_y;
 #endif
 static int box_suppress_a;
@@ -3708,6 +3710,9 @@ load_game(void)
 #ifdef SC64_UNIT_FACING
     if (loaded) sc64_facing_reset_all();
 #endif
+#ifdef SC64_FIELD_CONTROLS
+    if (loaded) ui_action = ui_tick_mode = 0; /* frame jumped: resolve A afresh */
+#endif
     return loaded;
 #else
     int i, j, computed_supply = 0, computed_cap =
@@ -3964,6 +3969,10 @@ init_state(void)
     sc64_visibility_reset();
     race_campaign_init();
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
+#ifdef SC64_FIELD_CONTROLS
+    /* A restart jumps frame back, so the cached A action must resolve afresh. */
+    menu_last=ping_life=r_tap_state=0;ui_action=ui_tick_mode=0;
+#endif
     return;
 #endif
     int i;
@@ -4049,7 +4058,7 @@ init_state(void)
 #ifdef SC_DEFAULT_UI
     menu_last = 0; ping_life = 0; pause_cursor = 0; pause_notice = pause_notice_ticks = 0;
 #elif defined(SC64_FIELD_CONTROLS)
-    menu_last = 0; ping_life = 0;
+    menu_last = 0; ping_life = 0; ui_action = 0; ui_tick_mode = 0;
 #endif
     won = 0;
     lost = 0;

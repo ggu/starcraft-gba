@@ -242,6 +242,8 @@ static int enter_showcase_menu(void)
 }
 
 #ifdef SC64_FIELD_CONTROLS
+static int check_field_controls_review(void);
+
 /* Default-profile controls ported to the race engine (field_controls.h),
  * exercised on the live Carrier Approach scene. */
 static int check_field_controls(void)
@@ -313,6 +315,202 @@ static int check_field_controls(void)
         if (u[i].alive && u[i].selected && u[i].order == ORDER_ATTACK_MOVE) attacking = 1;
     if (!attacking || !ping_life || ping_color != C_RED)
         return fail("controls: A on a visible enemy did not attack");
+    return check_field_controls_review();
+}
+#endif
+
+#ifdef SC64_FIELD_CONTROLS
+/* An open, visible spot with nothing nearby, for injected targets. */
+static int open_spot(int *x, int *y)
+{
+    for (int sy = 48; sy < WORLD_H - 48; sy += 16)
+        for (int sx = 48; sx < WORLD_W - 48; sx += 16) {
+            int clear = currently_visible(sx, sy);
+            for (int i = 0; i < MAX_UNITS && clear; ++i)
+                if (u[i].alive && dist2(sx, sy, u[i].x, u[i].y) < 40 * 40) clear = 0;
+            for (int i = 0; i < MAX_BUILDINGS && clear; ++i)
+                if (b[i].alive && dist2(sx, sy, b[i].x, b[i].y) < 48 * 48) clear = 0;
+            if (clear) { *x = sx; *y = sy; return 1; }
+        }
+    return 0;
+}
+
+/* Select every friendly fighter except one slot; orders start idle. */
+static int select_army(int except)
+{
+    int n = 0;
+    clear_selection();
+    reset_selection_gestures();
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (i != except && u[i].alive && u[i].owner == SIDE && !IS_WORKER(u[i].type)) {
+            u[i].selected = 1; u[i].order = ORDER_IDLE; ++n;
+        }
+    return n;
+}
+
+static void resolve_now(void)
+{
+    ui_tick_mode = 0;
+    field_ui_refresh();
+}
+
+/* A on a unit or structure of one owner, with the army selected: the
+ * resolver and the press both attack exactly when owners_hostile() does. */
+static int check_target_owner(int building, int slot, int owner)
+{
+    char message[96];
+    int hostile = owners_hostile(SIDE, owner), attacked = 0, x, y;
+    if (building) { b[slot].owner = owner; x = b[slot].x; y = b[slot].y; }
+    else { u[slot].owner = owner; x = u[slot].x; y = u[slot].y; }
+    if (!select_army(building ? -1 : slot)) return fail("controls: no army to select");
+    cx = x; cy = y; ping_life = 0;
+    resolve_now();
+    snprintf(message, sizeof message, "controls: %s owner %d: hint %d, hostile %d",
+             building ? "structure" : "unit", owner, ui_action, hostile);
+    if ((ui_action == UI_A_ATTACK) != hostile) return fail(message);
+    press(KEY_A);
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].order == ORDER_ATTACK_MOVE &&
+            dist2(u[i].tx, u[i].ty, x, y) < 24 * 24) attacked = 1;
+    if (attacked != hostile || (hostile && (!ping_life || ping_color != C_RED ||
+                                            ping_x != x || ping_y != y)))
+        return fail(message);
+    return 0;
+}
+
+static unsigned hint_band_hash(void)
+{
+    unsigned hash = 2166136261u;
+    for (int y = 137; y < 146; ++y)
+        for (int x = 0; x < 132; ++x)
+            hash = (hash ^ gfx_test_pixel(x, y)) * 16777619u;
+    return hash;
+}
+
+static int red_cursor_pixels(void)
+{
+    int n = 0;
+    gfx_rect(100, 60, 40, 40, C_PANEL);
+    field_controls_draw_cursor(120, 80);
+    for (int y = 60; y < 100; ++y)
+        for (int x = 100; x < 140; ++x) n += gfx_test_pixel(x, y) == C_RED;
+    return n;
+}
+
+/* Review regressions: every skirmish opponent owner, gas, the open order
+ * list, and a restart that lands on the cached frame byte. */
+static int check_field_controls_review(void)
+{
+    static const int owners[] = {SIDE, ENEMY, NEUTRAL, 3, 4};
+    int x, y, hydra = -1, nexus = -1, spare = -1, worker = -1;
+#ifdef GBA_SCENE_CLIP
+    gfx_set_clip_y(0, 160);
+#endif
+    if (!race_mode || owners_hostile(SIDE, SIDE) || owners_hostile(SIDE, NEUTRAL) ||
+        !owners_hostile(SIDE, ENEMY) || !owners_hostile(SIDE, 3) || !owners_hostile(SIDE, 4))
+        return fail("controls: scene 0 is not a skirmish with opponents 1, 3 and 4");
+    for (int i = 0; i < MAX_UNITS && hydra < 0; ++i)
+        if (u[i].alive && u[i].owner == ENEMY) hydra = i;
+    for (int i = 0; i < MAX_BUILDINGS; ++i) {
+        if (nexus < 0 && b[i].alive && b[i].owner == SIDE && !b[i].under_construction) nexus = i;
+        if (spare < 0 && !b[i].alive) spare = i;
+    }
+    for (int i = 0; i < MAX_UNITS && worker < 0; ++i)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type != U_P7_CARRIER) worker = i;
+    if (hydra < 0 || nexus < 0 || spare < 0 || worker < 0 || !open_spot(&x, &y))
+        return fail("controls: review fixture is incomplete");
+
+    u[hydra].x = x; u[hydra].y = y;
+    for (unsigned k = 0; k < sizeof owners / sizeof owners[0]; ++k)
+        if (check_target_owner(0, hydra, owners[k])) return 1;
+    u[hydra].alive = 0;
+    b[spare] = b[nexus];
+    b[spare].x = x; b[spare].y = y; b[spare].queue_count = 0;
+    for (unsigned k = 0; k < sizeof owners / sizeof owners[0]; ++k)
+        if (check_target_owner(1, spare, owners[k])) return 1;
+
+    /* A selected worker over a friendly Assimilator gathers gas, ahead of
+     * selecting the structure. */
+    b[spare].owner = SIDE; b[spare].type = B_ASSIMILATOR;
+    u[worker].type = U_PROBE; u[worker].order = ORDER_IDLE;
+    clear_selection();
+    reset_selection_gestures();
+    u[worker].selected = 1;
+    cx = x; cy = y;
+    resolve_now();
+    if (ui_action != UI_A_GAS) return fail("controls: Probe over an Assimilator does not offer gas");
+    press(KEY_A);
+    if (u[worker].order != ORDER_GAS || u[worker].target != spare)
+        return fail("controls: A with a Probe over an Assimilator did not gather gas");
+    b[spare].alive = 0;
+
+    /* With the list open, A and B choose and close: no field hint and no
+     * attack cursor. Nothing selected, cursor on a friendly unit. */
+    clear_selection();
+    reset_selection_gestures();
+    cx = u[worker].x; cy = u[worker].y;
+    resolve_now();
+    if (ui_action != UI_A_SELECT || !field_controls_hint() ||
+        strcmp(field_controls_hint(), "B COMMANDS  A SELECT"))
+        return fail("controls: menu fixture does not start on A SELECT");
+    press(KEY_B);
+    if (!menu_open) return fail("controls: B did not open the order list");
+    resolve_now();
+    if (!field_controls_hint() || strcmp(field_controls_hint(), "A CHOOSE  B CLOSE"))
+        return fail("controls: the open order list kept the field hint");
+    draw_hud_commands();
+    unsigned drawn = hint_band_hash();
+    gfx_rect(0, 137, 132, 9, C_PANEL);
+    gfx_text(5, 137, "A CHOOSE  B CLOSE", C_GOLD);
+    if (hint_band_hash() != drawn) return fail("controls: HUD row does not show the menu hint");
+    press(KEY_B);
+
+    hydra = -1;
+    for (int i = 0; i < MAX_UNITS && hydra < 0; ++i)
+        if (u[i].alive && u[i].owner == ENEMY && currently_visible(u[i].x, u[i].y)) hydra = i;
+    if (hydra < 0 || !select_army(-1)) return fail("controls: no enemy left for the cursor checks");
+    cx = u[hydra].x; cy = u[hydra].y;
+    resolve_now();
+    if (ui_action != UI_A_ATTACK || !red_cursor_pixels())
+        return fail("controls: no attack cursor over a hostile unit");
+    press(KEY_B);
+    resolve_now();
+    if (!menu_open || red_cursor_pixels()) return fail("controls: attack cursor drawn over the open list");
+    press(KEY_B);
+
+    /* Restart lands on frame 0; a normal-mode ATTACK cached at frame 256
+     * shares its low byte and must not survive. */
+    press(KEY_START);
+    if (screen != SCREEN_PAUSE) return fail("controls: Start did not pause");
+    select_army(-1);
+    cx = u[hydra].x; cy = u[hydra].y;
+    frame = 256;
+    resolve_now();
+    if (ui_action != UI_A_ATTACK) return fail("controls: restart fixture is not on ATTACK");
+    press(KEY_R);
+    if ((u8)frame != 0 || mode != MODE_NORMAL || selected_count())
+        return fail("controls: restart did not land on frame 0 with nothing selected");
+    field_ui_refresh();
+    if (ui_action != field_ui_a_action(0)) return fail("controls: ATTACK cache survived a restart");
+    return 0;
+}
+
+/* A successful load restores another frame; a cache from before the load
+ * that matches its low byte must not survive. Leaves the skirmish loaded. */
+static int check_field_controls_load(void)
+{
+    int loaded_frame;
+    game_init(); previous = 0;
+    press(KEY_B);
+    if (!race_mode || screen == SCREEN_TITLE) return fail("controls: skirmish save did not load");
+    loaded_frame = frame;
+    game_init(); previous = 0;
+    ui_action = UI_A_ATTACK; ui_tick = (u8)loaded_frame; ui_tick_mode = (u8)(MODE_NORMAL + 1);
+    press(KEY_B);
+    if (frame != loaded_frame || mode != MODE_NORMAL) return fail("controls: reload did not repeat");
+    field_ui_refresh();
+    if (ui_action != field_ui_a_action(selected_count()))
+        return fail("controls: ATTACK cache survived a load");
     return 0;
 }
 #endif
@@ -451,7 +649,7 @@ int main(void)
     if (!facing_is_zero()) return fail("successful load restored/retained stale facing bytes");
 #endif
 #ifdef SC64_FIELD_CONTROLS
-    if (check_field_controls()) return 1;
+    if (check_field_controls() || check_field_controls_load()) return 1;
 #endif
     puts("Showcase menu, scene runtime, pause controls, and save isolation: ok");
     return 0;

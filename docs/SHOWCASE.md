@@ -54,19 +54,24 @@ controls:
 
 - A on empty ground clears the selection. With a structure selected, A trains
   only when the cursor is on that structure.
-- A on a visible enemy with units selected attack-moves onto it.
+- A on a visible unit or structure the engine treats as hostile
+  (`owners_hostile`, so every skirmish opponent) attack-moves onto it when
+  units are selected. A selected worker over a friendly gas building still
+  gathers gas first, as before.
 - R acts on a clean tap; holding R to speed the cursor keeps the selection.
 - B reopens the order list on the last command, so B, A repeats it.
 - Armed orders change the cursor (green arrow for Move, red reticle for
   Attack Move) and the HUD title colour. The hint row names what A does
-  (`A MOVE HERE  B BACK`, `B COMMANDS  A DESELECT`, …), and orders and
-  placements leave a short green, red or gold marker.
+  (`A MOVE HERE  B BACK`, `B COMMANDS  A DESELECT`, …), or `A CHOOSE  B CLOSE`
+  while the order list is open, and orders and placements leave a short
+  green, red or gold marker.
 
 The StarCraft 64 title, pause and result screens and the race command lists
 are unchanged. Other SC64 profiles do not enable the flag, and the default,
 ring and unified ROMs are byte-identical to builds without this port. The
 HUD resolves the A action once per simulation update rather than per drawn
-frame, because crowded scenes draw several frames per update.
+frame, because crowded scenes draw several frames per update; a scene
+restart or a load clears that result, since both jump the update counter.
 
 ## Unit facing
 
