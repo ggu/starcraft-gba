@@ -937,8 +937,16 @@ enum {
     SC64_DEATH_VFX_VRAM_OUTRO_END_WORD = SC64_DEATH_VFX_VRAM_OUTRO_WORD + 1,
     SC64_DEATH_VFX_VRAM_TOTAL_WORDS = SC64_DEATH_VFX_VRAM_OUTRO_END_WORD + 1
 };
-_Static_assert(SC64_DEATH_VFX_VRAM_TOTAL_WORDS * 2 <= GBA_AUDIO_ARENA_BYTES - GBA_AUDIO_MIX_BYTES,
-               "death-VFX state exceeds unused Mode-4 VRAM tail");
+/* The gap after the sampled-audio arena is not free: imported game audio
+ * keeps a live actor snapshot there. Use only the 2.5 KiB padding after the
+ * second Mode-4 framebuffer page, before the projectile OBJ arena. */
+#define SC64_DEATH_VFX_VRAM_BASE 0x06013600u
+#define SC64_DEATH_VFX_VRAM_LIMIT 0x06014000u
+_Static_assert(SC64_DEATH_VFX_VRAM_BASE >=
+               GBA_AUDIO_ARENA + GBA_AUDIO_MIX_BYTES + (MAX_UNITS + MAX_BUILDINGS) * 2u,
+               "death-VFX storage overlaps the imported game-audio snapshot");
+_Static_assert(SC64_DEATH_VFX_VRAM_BASE + SC64_DEATH_VFX_VRAM_TOTAL_WORDS * 2u <= SC64_DEATH_VFX_VRAM_LIMIT,
+               "death-VFX state exceeds Mode-4 page padding or overlaps projectile VRAM");
 _Static_assert(((MAX_UNITS + 7) / 8 + (MAX_BUILDINGS + 7) / 8) <=
                SC64_DEATH_VFX_VRAM_SEEN_WORDS * 2,
                "death-VFX alive shadow exceeds packed VRAM words");
@@ -956,7 +964,7 @@ static int death_vfx_test_storage_guards_ok(void)
            sc64_death_vfx_vram_host[SC64_DEATH_VFX_VRAM_TOTAL_WORDS + 1] == 0x5aa5u;
 }
 #else
-#define SC64_DEATH_VFX_VRAM_WORDS ((volatile u16 *)(GBA_AUDIO_ARENA + GBA_AUDIO_MIX_BYTES))
+#define SC64_DEATH_VFX_VRAM_WORDS ((volatile u16 *)SC64_DEATH_VFX_VRAM_BASE)
 #endif
 static void
 death_vfx_load_row(int slot, Sc64DeathVfx *e)

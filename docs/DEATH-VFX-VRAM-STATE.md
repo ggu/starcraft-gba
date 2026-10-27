@@ -1,16 +1,18 @@
 # Optional death-effect VRAM storage
 
 `SC64_DEATH_VFX_VRAM_STORAGE` places the transient death-effect pool, alive
-shadow, and result-outro counters in the unused Mode-4 VRAM tail. The option is
-off by default and the canonical campaign flags do not enable it. Builds using
-the tile renderer reject the option because that renderer owns a different
-VRAM layout.
+shadow, and result-outro counters in the padding after the second Mode-4 page.
+The option is off by default and the canonical campaign flags do not enable
+it. Builds using the tile renderer reject the option because that renderer
+owns a different VRAM layout.
 
 The mode-4 frame pages occupy `0x06000000`–`0x060095ff` and
-`0x0600a000`–`0x060135ff`. The existing sampled-audio arena starts at
-`0x06009600`; the mixer uses its first 1,600 bytes. This feature starts at
-`0x06009c40` and compile-time bounds its state to the remaining 960 bytes.
-The audio VBlank handler and DMA buffers do not use this tail.
+`0x0600a000`–`0x060135ff`. The 2.5 KiB pad after the second page is
+`0x06013600`–`0x06013fff`; this feature starts at `0x06013600` and compile-time
+bounds its state before the P7 projectile arena at `0x06014000`. The earlier
+audio gap is not free: imported game audio stores its live actor snapshot at
+`0x06009c40`. Compile-time assertions keep this feature beyond the entire
+snapshot and before the projectile arena.
 
 The death pool retains the existing `Sc64DeathVfx` interface through a
 halfword storage facade. Rows are loaded into ordinary RAM staging objects
@@ -35,11 +37,10 @@ save, and RGB555 framebuffer digests:
 | Save digest | `db37d166` | `db37d166` |
 | RGB555 framebuffer digest | `45262b01` | `45262b01` |
 
-The optional ARM link pair uses the full-render Z7 vector and passes the
-unchanged linker guards. The baseline BSS ends at `0x0203dfe8`; the candidate
-ends at `0x0203de68`, freeing 384 bytes. Both end IWRAM at `0x03004d10`.
-Inspection of the generated ARM instructions shows halfword stores for the
-VRAM reset, row, seen-shadow, and counter writes. The storage path adds a
-320-byte local pool staging array in `death_vfx_scan`; the ARM link does not
-measure runtime performance or stack use. Keep the option experimental until
-whole-mission timing and stack-canary runs qualify it on the intended profile.
+The corrected optional ARM link pair uses the full-render Z7 vector and passes
+the linker guards. Baseline BSS ends at `0x0203dfe8`; the candidate ends at
+`0x0203de68`, freeing 384 bytes. Both end IWRAM at `0x03004d10`. Inspection of
+the candidate instructions shows halfword stores for VRAM reset, row,
+seen-shadow, and counter writes. The storage path adds a 320-byte local pool
+staging array in `death_vfx_scan`; whole-mission timing and stack-canary runs
+remain unqualified.
