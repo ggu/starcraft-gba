@@ -1684,12 +1684,22 @@ The [Z7 raw-density preflight audit](audits/2026-10-27-z7-steering-preflight/REA
 records a later exact-fallback optimization within that same optional steering
 profile, its boundary tests and measured continuation costs.
 
-P7 has an isolated world foundation with separate source-Force wallets; its
-canonical roster fails closed on missing raw68/71/72 actor bindings. It still
-lacks shared menu/save integration. The indexed Z7 controller now has a [reproduced host win](audits/2026-10-27-z7-controller-win/README.md)
-via `make test-sc64-z7-controller`; optimized ARM replay and fresh-process SRAM
-continuation remain required before campaign promotion. P7 still lacks a
-completed controller playthrough.
+P7's separate seven-mission composition has host completion and bounded ARM
+completion/save evidence, while native AI, Carrier combat, and performance
+qualification remain unfinished; see [the P7 controller report](P7-CONTROLLER.md).
+The indexed Z7 controller has a [reproduced host win](audits/2026-10-27-z7-controller-win/README.md)
+via `make test-sc64-z7-controller`. A separate full-render ARM replay now
+[matches all 365 checkpoints through victory](audits/2026-10-27-z7-full-win/README.md),
+but its instrumented mean is about 2.85 rendered updates/second. The frequency
+candidate improves that to about 2.99 and has also passed an actual ARM save
+and fresh-process winning continuation. Performance and carried-mission
+regression checks remain required before campaign promotion.
+
+`make test-sc64-z7-carried-z5` checks the normal-input Z5 controller with the
+full experimental Z7 frequency-cache feature set. It keeps direct attack
+enabled and selects clear ground when its policy intends Attack-Move. It
+does not add Z7 to canonical menus or establish a passing Z6 carried replay;
+see the [full replay audit](audits/2026-10-27-z7-full-win/README.md).
 
 
 The sixth-mission probes require their authenticated spell metadata:

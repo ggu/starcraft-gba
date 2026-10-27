@@ -1,8 +1,14 @@
 # Z7 normal-input controller win audit
 
 Date: 2026-10-27  
-Status: host campaign win reproduced; qualification is **22/30** pending the
-optimized ARM replay and fresh-process SRAM continuation.
+Status: host campaign win reproduced; qualification remains **22/30**.
+Later full-profile evidence and remaining promotion gates are linked below.
+
+Follow-up: the [full-render ARM replay](../2026-10-27-z7-full-win/README.md)
+has now completed all 365 checkpoints through victory, and the frequency
+profile passed an actual ARM save/fresh-process winning continuation.
+Performance and broader profile qualification remain unfinished. The
+indexed host evidence below is retained as its original reference.
 
 ## Result
 

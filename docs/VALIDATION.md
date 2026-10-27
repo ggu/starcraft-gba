@@ -5776,3 +5776,34 @@ This scene exceeds a 30-fps frame budget in every variant; it remains a
 performance target, not a physical-hardware or sustained-30-fps qualification.
 Source palette ramps, unsupported script control flow and remnant lifetime
 caps remain documented limitations of this importer.
+
+## Z7 full-render winning ARM replay (2026-10-27)
+
+The separate full-render Z7 candidate completed the normal-input winning
+tape at host tick 209485/game frame 205764. All 365 host/ARM actor and
+game-state digest checkpoints matched. The terminal predicate additionally
+required the source victory, a surviving human force, zero source Force 1
+buildings, no runtime fault, and no pending action cursors or wait clocks.
+See the [full replay audit](audits/2026-10-27-z7-full-win/README.md) for the
+exact flag composition, frozen artifact hashes, and measurement scope.
+
+The instrumented combined mean was 5877025 GBA cycles per advancing PLAY
+update (about 2.85 rendered updates/second), far below 30 fps. This is not a
+physical-hardware measurement. This result supersedes the earlier absence
+of a full Z7 ARM win; it does not qualify the seven-mission profile's carried
+missions.
+Canonical menus and qualified staged progress remain unchanged at 22/30.
+
+The same replay with only `SC64_ROUTE_DECAY_FREQ` added also matched all 365
+checkpoints through the source win. Its instrumented combined mean was
+5617463 cycles (about 2.99 rendered updates/second), a 4.42% reduction from
+the baseline. This is a whole-replay emulator comparison, still far below
+the performance target; it does not promote a canonical profile. The audit
+records both fixed ROM/ELF identities and separate results.
+
+The frequency profile subsequently passed an actual ARM UI-save and
+fresh-process HOME-L continuation. Its 16296-byte payload matched the host
+save golden; 334 prefix checkpoints and 31 resumed checkpoints passed,
+ending in the same source win. Only the inactive menu cursor is normalized
+in persistent digests. The audit records source-force checks, the exact
+SRAM/prefix/resume identities, and remaining hardware/performance limits.
