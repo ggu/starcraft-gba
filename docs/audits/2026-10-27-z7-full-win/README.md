@@ -190,15 +190,37 @@ ASan/UBSan controller wins at frame 134,932 / host tick 136,446, with Kerrigan
 alive at the island objective, Ventral Sacs researched, no cargo remaining,
 zero Force2 actors in both required locations, and no runtime fault. Its
 trace SHA-256 is
-`16ea7121070706633a9e290709fea792e652466857873988b7e86f086534962d`.
+`56e038eacaf7d0b6a6dd4d09cc8a6eb7085b24825489b4b03dbc66a7225aae4f`.
 
 The same controller also wins with DirectAttack disabled and with the
 canonical six-mission Zerg flags. Those two traces are byte-identical:
 frame 115,413 / host tick 116,527, SHA-256
-`64a79647b36b7633a4283179ec492bd2a0634193f162cc84eacab8c06039c2d3`.
-These are host campaign wins, not ARM replay or fresh-process SRAM evidence
-for the new tape. Canonical progress remains 22/30; performance and remaining
-target qualification still prevent promotion.
+`baa85cc4de68d771b5118d042dac944a52f2d213a776d93a74a8792e290205c5`.
+The controller records each input immediately after its own tick, before a
+retreat can recursively issue more inputs. The earlier `16ea712…` full trace
+and `64a796…` canonical trace captured host wins but contained delayed input
+timestamps; they are superseded and must not be used for replay. All 4,725
+transitions in the corrected full trace and 3,657 in the canonical trace pass
+strict ordering, held-state and pressed-edge validation. The Make target now
+runs that validation automatically. An offline check is also available:
+
+```sh
+python3 tools/sc64_zp_controller_replay.py --profile zerg-z6 --trace PATH --validate-only
+```
+
+Offline validation checks recorded contracts without launching an emulator.
+A separate fixed-input host replay with update/audio/render passed all 198
+actor/Z6-state checkpoints and the same source victory. The corresponding
+ARM replay then matched all 198 checkpoints and won at tick 136,446 / frame
+134,932, with no runtime fault and the same objective state. Its ROM SHA-256
+is `ad0d35ef2bbabf9e058ae6a5996ea6e6d21355da87719ab3a46ccd9889ab0e0a`.
+The linked image used 32,229,996 bytes, ended BSS at `0x0203d7ac` and IWRAM
+at `0x03004d10`, and retained a measured 7,560-byte stack margin. These
+checks apply to the complete experimental Z7 feature vector, not a newly
+promoted canonical build. No fresh-process SRAM continuation or performance
+qualification is established for this corrected tape. Canonical progress
+remains 22/30; performance and remaining target qualification still prevent
+promotion.
 
 All eighteen rotated skirmish configurations (two maps, three human races,
 one to three AI opponents) reached terminal losses in this host matrix. A

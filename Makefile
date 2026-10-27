@@ -3325,6 +3325,7 @@ test-sc64-z7-carried-z6: build/test-sc64-z7-full-render-carried-z6 build/test-sc
 	mkdir -p .local/build/z7-carried-z6
 	./build/test-sc64-z7-full-render-z6-controller-policy
 	./build/test-sc64-z7-full-render-carried-z6 --trace .local/build/z7-carried-z6/controller.json
+	$(PYTHON) tools/sc64_zp_controller_replay.py --profile zerg-z6 --trace .local/build/z7-carried-z6/controller.json --validate-only
 .PHONY: test-sc64-z7-carried-z5
 test-sc64-z7-carried-z5: build/test-sc64-z7-full-render-carried-z5
 	mkdir -p .local/build/z7-carried-z5 .local/sc64

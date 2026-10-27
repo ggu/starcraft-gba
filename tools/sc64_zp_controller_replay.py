@@ -4,6 +4,7 @@
 ROM/ELF catalog metadata and debugger symbols are checked before launch. The
 replay writes the controller queue and scheduler metadata; game/model state is
 read through symbols and DWARF at the compiled scheduler checkpoint period.
+Use --validate-only for offline trace-contract and controller-edge checks.
 """
 from __future__ import annotations
 
@@ -1358,8 +1359,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=tuple(MISSION_BY_PROFILE), required=True)
     parser.add_argument("--trace", type=Path, help="controller trace (profile-specific private default)")
-    parser.add_argument("--rom", type=Path, required=True)
-    parser.add_argument("--elf", type=Path, required=True)
+    parser.add_argument("--rom", type=Path)
+    parser.add_argument("--elf", type=Path)
+    parser.add_argument("--validate-only", action="store_true",
+                        help="validate trace schema, edges and recorded state without launching an emulator; print JSON to stdout (--output is replay-only)")
+    parser.add_argument("--validation-capacity", type=int, default=256,
+                        help="controller queue capacity for --validate-only")
+    parser.add_argument("--validation-window-ticks", type=int, choices=(250, 1000), default=250,
+                        help="scheduler window for --validate-only")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--ticks", type=int, help="replay a positive trace prefix")
     parser.add_argument("--attempt-prefix", action="store_true",
@@ -1369,8 +1376,31 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expect-elf-sha256")
     parser.add_argument("--expect-trace-sha256")
     args = parser.parse_args(argv)
+    if not args.validate_only and (args.rom is None or args.elf is None):
+        parser.error("--rom and --elf are required unless --validate-only is used")
     try:
         trace_path = args.trace or DEFAULT_TRACES[args.profile]
+        if args.validate_only:
+            if args.expect_rom_sha256 or args.expect_elf_sha256:
+                raise ValueError("ROM/ELF hash expectations require an emulated replay; offline mode checks only the trace")
+            raw = trace_path.read_bytes()
+            trace_hash = hashlib.sha256(raw).hexdigest()
+            if args.attempt_prefix and (args.profile != "zerg-z7" or args.ticks is None or args.save_at_end):
+                raise ValueError("--attempt-prefix requires zerg-z7 with --ticks and forbids --save-at-end")
+            if args.expect_trace_sha256 and trace_hash != args.expect_trace_sha256.lower():
+                raise ValueError("trace SHA256 differs from the expected value")
+            plan = validate_trace(json.loads(raw), args.validation_capacity, args.profile,
+                                  windowed=True, window_ticks=args.validation_window_ticks,
+                                  attempt_prefix=args.attempt_prefix,
+                                  prefix_ticks=args.ticks if args.attempt_prefix else None)
+            requested, prefix = scheduler.run_length(plan, args.ticks, args.save_at_end)
+            print(json.dumps({"status": "trace_validated_offline", "profile": args.profile,
+                              "trace_sha256": trace_hash, "input_count": plan["input_count"],
+                              "stop_tick": plan["stop_tick"],
+                              "requested_ticks": requested, "prefix": prefix,
+                              "peak_page_transitions": plan["peak_page_transitions"],
+                              "scope": "recorded trace contract only; no emulation"}, indent=2))
+            return 0
         run(trace_path, args.output, args.rom, args.elf, args.profile, args.ticks,
             args.save_at_end, args.expect_rom_sha256, args.expect_elf_sha256,
             args.expect_trace_sha256, args.attempt_prefix)
