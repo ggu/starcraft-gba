@@ -48,6 +48,7 @@ void gfx_blit_sprite(int x,int y,int width,int height,const u8 *indexed_pixels);
  * 1..rows selects a 256-byte lookup row indexed by the previous destination
  * colour. Out-of-range source values preserve the destination. rows is 1..255.
  * The caller supplies rows*256 bytes. Uses the current scene clip. */
+void gfx_reverse_bytes(u8 *dst,const u8 *src,unsigned n);
 void gfx_blit_sprite_mapped(int x,int y,int width,int height,const u8 *strengths,
                             const u8 *lookup,unsigned rows);
 #ifdef SC64_UNIT_WORD_SPRITES
