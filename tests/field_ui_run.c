@@ -285,6 +285,88 @@ title_and_pause_tests(void)
     check(count_color(28, 30, 184, 16, C_RED_DARK) > 100, "defeat panel header");
 }
 
+/* start_build()'s toast for each placement status, so the HUD can be checked
+ * against what A actually reports. */
+static int
+site_toast(int status, int type)
+{
+    switch (status) {
+    case UI_SITE_TECH: return type == B_ACADEMY ? 10 : 8;
+    case UI_SITE_MINERALS: return 1;
+    case UI_SITE_GAS: return 12;
+    case UI_SITE_BLOCKED: return 6;
+    case UI_SITE_WORKER: return 5;
+    case UI_SITE_FULL: return 11;
+    default: return 3;
+    }
+}
+
+static void
+arm_site(int type, int x, int y, int with_worker, int money, int keep_depot)
+{
+    int depot;
+    fixture();
+    depot = building_of(SIDE, B_DEPOT);
+    if (!keep_depot) b[depot].alive = 0;
+    clear_selection();
+    if (with_worker) u[slot_of(SIDE, U_SCV)].selected = 1;
+    minerals = money;
+    mode = MODE_BUILD;
+    menu = type;
+    cx = x; cy = y;
+    toast_timer = 0; toast_id = -1;
+}
+
+/* Several requirements fail at once: the HUD names start_build()'s first
+ * failure, and the footprint stays red whenever the ground is blocked. */
+static void
+simultaneous_failure_tests(void)
+{
+    static const struct {
+        int type, x, y, worker, money, depot, status, blocked;
+        const char *what;
+    } cases[] = {
+        {B_BARRACKS, 40, 24, 0, 500, 0, UI_SITE_TECH, 0, "no SCV + no Depot: prerequisite first"},
+        {B_BARRACKS, 120, 48, 0, 0, 0, UI_SITE_TECH, 1, "everything missing on a blocked site: prerequisite first"},
+        {B_DEPOT, 40, 24, 0, 50, 1, UI_SITE_MINERALS, 0, "no SCV + short minerals: minerals first"},
+        {B_DEPOT, 120, 48, 1, 50, 1, UI_SITE_MINERALS, 1, "blocked + short minerals: minerals first, red site"},
+        {B_DEPOT, 120, 48, 0, 500, 1, UI_SITE_BLOCKED, 1, "blocked + no SCV: blocked first"},
+        {B_DEPOT, 40, 24, 0, 500, 1, UI_SITE_WORKER, 0, "clear site, only the SCV missing"},
+        {B_DEPOT, 40, 24, 1, 500, 1, UI_SITE_OK, 0, "everything present"},
+    };
+    for (unsigned i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        int before;
+        arm_site(cases[i].type, cases[i].x, cases[i].y, cases[i].worker, cases[i].money, cases[i].depot);
+        render();
+        check(ui_site == cases[i].status, cases[i].what);
+        check(ui_site_blocked == cases[i].blocked, cases[i].what);
+        {
+            int sx = ui_site_x - camx, sy = ui_site_y - camy + 12;
+            int red = count_color(sx - 10, sy - 10, 21, 20, C_RED);
+            int green = count_color(sx - 10, sy - 10, 21, 20, C_GREEN);
+            check(cases[i].blocked ? red > 20 && !green :
+                  cases[i].status == UI_SITE_OK ? green > 20 && !red : !green && !red,
+                  "footprint colour follows the site policy");
+        }
+        before = minerals;
+        start_build(cases[i].type);
+        check(toast_id == site_toast(cases[i].status, cases[i].type), "HUD status matches start_build");
+        check((cases[i].status == UI_SITE_OK) == (minerals != before), "only a ready site spends");
+    }
+
+    /* The command list uses the same order, minus the placement checks. */
+    arm_site(B_BARRACKS, 40, 24, 0, 0, 0);
+    mode = MODE_NORMAL;
+    field_ui_refresh();
+    {
+        int cost;
+        check(ui_command_state(MENU_BARRACKS, &cost) == UI_SITE_TECH, "list: prerequisite before minerals and SCV");
+        check(ui_command_state(MENU_DEPOT, &cost) == UI_SITE_MINERALS, "list: minerals before SCV");
+        minerals = 500;
+        check(ui_command_state(MENU_DEPOT, &cost) == UI_SITE_WORKER, "list: SCV last");
+    }
+}
+
 static void
 render_smoke(void)
 {
@@ -316,11 +398,18 @@ main(void)
     deselect_tests();
     smart_attack_tests();
     r_gesture_tests();
+#ifndef SC_COMMAND_RING /* the ring build opens its list on Move */
     menu_memory_tests();
+#endif
+    simultaneous_failure_tests();
     refinery_snap_tests();
     title_and_pause_tests();
     render_smoke();
     if (failures) return 1;
-    puts("Default menus and controls: deselect, smart attack, R tap, list memory, snapping, title/pause/result: ok");
+#ifdef SC_COMMAND_RING
+    puts("Default menus and controls (ring build): deselect, smart attack, R tap, placement status order, snapping, title/pause/result: ok");
+#else
+    puts("Default menus and controls: deselect, smart attack, R tap, list memory, placement status order, snapping, title/pause/result: ok");
+#endif
     return 0;
 }

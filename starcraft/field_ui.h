@@ -23,7 +23,7 @@ enum {
 
 /* Facts the cursor, list and HUD all need, gathered in one pass per drawn
  * frame (field_ui_refresh) instead of a pool scan per row. */
-static int ui_selected, ui_worker, ui_action, ui_site, ui_site_x, ui_site_y;
+static int ui_selected, ui_worker, ui_action, ui_site, ui_site_x, ui_site_y, ui_site_blocked;
 static unsigned ui_built; /* completed friendly structure types, as bits */
 
 static const char *const ui_command_label[MENU_COUNT] = {
@@ -203,7 +203,7 @@ ui_building_name(int type)
  * Mirrors start_build()'s checks and order. */
 enum {
     UI_SITE_OK, UI_SITE_WORKER, UI_SITE_TECH, UI_SITE_MINERALS,
-    UI_SITE_BLOCKED, UI_SITE_FULL
+    UI_SITE_BLOCKED, UI_SITE_FULL, UI_SITE_GAS
 };
 
 /* has_tech_for() over the cached structure bits. */
@@ -218,10 +218,11 @@ ui_has_tech(int type)
 static int
 ui_site_problem(int type, int x, int y)
 {
-    if (ui_worker < 0) return UI_SITE_WORKER;
     if (!ui_has_tech(type)) return UI_SITE_TECH;
     if (minerals < building_cost(type)) return UI_SITE_MINERALS;
+    if (gas < building_gas_cost(type)) return UI_SITE_GAS;
     if (!can_place(type, x, y)) return UI_SITE_BLOCKED;
+    if (ui_worker < 0) return UI_SITE_WORKER;
     if (find_build_slot() < 0) return UI_SITE_FULL;
     return UI_SITE_OK;
 }
@@ -312,6 +313,7 @@ field_ui_refresh(void)
         ui_site_x = cx; ui_site_y = cy;
         field_ui_site(menu, &ui_site_x, &ui_site_y);
         ui_site = ui_site_problem(menu, ui_site_x, ui_site_y);
+        ui_site_blocked = ui_site == UI_SITE_BLOCKED || !can_place(menu, ui_site_x, ui_site_y);
     }
 }
 
@@ -401,7 +403,11 @@ field_ui_draw_cursor(int x, int y)
     }
     if (mode == MODE_BUILD && box_state != 2) {
         int sx = ui_site_x - camx, sy = ui_site_y - camy + 12, big = menu == B_COMMAND;
-        u8 site = ui_site == UI_SITE_OK ? C_GREEN : ui_site == UI_SITE_BLOCKED ? C_RED : C_GOLD;
+        /* Colour describes the ground: red whenever the site itself is
+         * blocked, even if A would first fail for another reason; gold for a
+         * clear site that still lacks tech, resources or an SCV; green when
+         * A places it. The HUD text names start_build()'s first failure. */
+        u8 site = ui_site_blocked ? C_RED : ui_site == UI_SITE_OK ? C_GREEN : C_GOLD;
         /* Ghost of the structure footprint plus a clearance outline. */
         gfx_frame(sx - (big ? 12 : 8), sy - (big ? 8 : 7), big ? 25 : 17, big ? 18 : 15, site);
         gfx_frame(sx - (big ? 13 : 9), sy - (big ? 9 : 8), big ? 27 : 19, big ? 20 : 17, site);
@@ -450,10 +456,12 @@ ui_command_state(int command, int *cost)
         if (!(ui_built >> B_ENG_BAY & 1) || level >= 2 || busy) return UI_SITE_TECH;
         return minerals < 100 || gas < 100 ? UI_SITE_MINERALS : UI_SITE_OK;
     }
+    /* start_build() order, without the site checks made at placement. */
     *cost = building_cost(type);
-    if (ui_worker < 0) return UI_SITE_WORKER;
     if (!ui_has_tech(type)) return UI_SITE_TECH;
-    return minerals < *cost ? UI_SITE_MINERALS : UI_SITE_OK;
+    if (minerals < *cost) return UI_SITE_MINERALS;
+    if (gas < building_gas_cost(type)) return UI_SITE_GAS;
+    return ui_worker < 0 ? UI_SITE_WORKER : UI_SITE_OK;
 }
 
 static void
@@ -463,7 +471,8 @@ field_ui_draw_command_menu(void)
     ui_panel(x, y, w, 96, C_GOLD, 0);
     for (i = 0; i < MENU_COUNT; i++) {
         int row = y + 4 + i * 9, cost, state = ui_command_state(i, &cost);
-        u8 label = state == UI_SITE_OK || state == UI_SITE_MINERALS ? C_SILVER : C_DIM;
+        int short_funds = state == UI_SITE_MINERALS || state == UI_SITE_GAS;
+        u8 label = state == UI_SITE_OK || short_funds ? C_SILVER : C_DIM;
         if (i == menu_cursor) {
             ui_highlight(x + 2, row - 1, w - 4);
             if (label == C_SILVER) label = C_WHITE;
@@ -471,7 +480,7 @@ field_ui_draw_command_menu(void)
         ui_command_icon(i, x + 9, row + 3);
         gfx_text(x + 17, row, ui_command_label[i], label);
         if (cost && label != C_DIM) /* the footer explains disabled rows */
-            ui_num_right(x + w - 5, row, cost, state == UI_SITE_MINERALS ? C_RED : C_GOLD);
+            ui_num_right(x + w - 5, row, cost, short_funds ? C_RED : C_GOLD);
     }
 }
 
@@ -514,7 +523,8 @@ static void
 ui_status(int x, int y, int problem, int type)
 {
     static const char *const text[] = {
-        "READY", "SELECT AN SCV", "NEEDS ", "NEED MINERALS", "SITE BLOCKED", "NO FREE SLOT"
+        "READY", "SELECT AN SCV", "NEEDS ", "NEED MINERALS", "SITE BLOCKED", "NO FREE SLOT",
+        "NEED GAS"
     };
     if (problem == UI_SITE_TECH) {
         gfx_text(x, y, "NEEDS", C_RED);
