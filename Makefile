@@ -3087,6 +3087,29 @@ test-sc64-death-vfx-profiles: test-sc64-death-vfx-unified build/test-sc64-death-
 	$(call DEATH_VFX_RUN,terran)
 	$(call DEATH_VFX_RUN,zerg)
 	$(call DEATH_VFX_RUN,protoss)
+
+# Optional Z7 presentation-state placement experiment. Both binaries use the
+# same full-render/canonical feature vector; only the candidate places the
+# transient death-VFX pool in the unused halfword VRAM tail.
+Z7_DEATH_VFX_VRAM_FLAGS = $(Z7_STEERING_FLAGS) -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ
+build/test-sc64-death-vfx-z7-canonical: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_FULL_RENDER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(Z7_DEATH_VFX_VRAM_FLAGS) $< -o $@
+build/test-sc64-death-vfx-z7-vram: tests/sc64_death_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_FULL_RENDER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) $(Z7_DEATH_VFX_VRAM_FLAGS) -DSC64_DEATH_VFX_VRAM_STORAGE $< -o $@
+.PHONY: test-sc64-death-vfx-z7-vram
+test-sc64-death-vfx-z7-vram: build/test-sc64-death-vfx-z7-canonical build/test-sc64-death-vfx-z7-vram
+	./build/test-sc64-death-vfx-z7-vram
+	SC64_DEATH_VFX_HASH=1 SC64_DEATH_VFX_PIXEL_HASH=1 ./build/test-sc64-death-vfx-z7-canonical > build/death-vfx-z7-canonical.hash
+	SC64_DEATH_VFX_HASH=1 SC64_DEATH_VFX_PIXEL_HASH=1 ./build/test-sc64-death-vfx-z7-vram > build/death-vfx-z7-vram.hash
+	cmp build/death-vfx-z7-canonical.hash build/death-vfx-z7-vram.hash
+	@echo "PASS Z7 death-VFX VRAM storage matches canonical RGB/state/save digests"
+
+# Explicit optional ARM link pair; neither output is a canonical ROM target.
+build/starcraft-zerg-z7-death-vfx-vram-baseline.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_FULL_RENDER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_DEATH_VFX_VRAM_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-death-vfx-vram-baseline.map -lgcc -o $@
+build/starcraft-zerg-z7-death-vfx-vram.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_FULL_RENDER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(Z7_DEATH_VFX_VRAM_FLAGS) -DSC64_DEATH_VFX_VRAM_STORAGE $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-death-vfx-vram.map -lgcc -o $@
+
 test-starcraft: test-sc64-death-vfx test-sc64-death-vfx-default
 test-unified: test-sc64-death-vfx-unified
 

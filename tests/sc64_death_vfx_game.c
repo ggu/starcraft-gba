@@ -16,6 +16,17 @@ static u32 fnv(u32 h, const void *data, unsigned n)
     return h;
 }
 #define MIX(h, v) do { int value_ = (int)(v); h = fnv(h, &value_, sizeof(value_)); } while (0)
+static int pixel_hash_enabled;
+static u32 pixel_hash = 2166136261u;
+static void hash_frame_pixels(void)
+{
+    if (!pixel_hash_enabled) return;
+    for (int y = 0; y < 160; ++y) for (int x = 0; x < 240; ++x) {
+        u16 rgb555 = host_palette[(u8)gfx_test_pixel(x, y)];
+        pixel_hash ^= (u8)rgb555; pixel_hash *= 16777619u;
+        pixel_hash ^= (u8)(rgb555 >> 8); pixel_hash *= 16777619u;
+    }
+}
 
 /* Field-wise digest: struct padding is not simulation state. */
 static u32 state_hash(void)
@@ -119,10 +130,13 @@ static int run_hash_workload(void)
         int before = count_alive();
         game_update(0, 0);
         game_render();
+        hash_frame_pixels();
         int after = count_alive();
         if (after < before) deaths += before - after;
 #ifndef SC64_DEATH_VFX_DISABLED
-        int active = sc64_death_vfx_active(death_vfx, SC64_DEATH_VFX_POOL, (u32)frame);
+        Sc64DeathVfx pool[SC64_DEATH_VFX_POOL];
+        death_vfx_test_load_pool(pool);
+        int active = sc64_death_vfx_active(pool, SC64_DEATH_VFX_POOL, (u32)frame);
         if (active > peak) peak = active;
 #endif
     }
@@ -132,17 +146,22 @@ static int run_hash_workload(void)
         destroy_opposition();
         game_update(0, 0);
         game_render();
+        hash_frame_pixels();
         outcome_frame = frame;
     }
-    for (int step = 0; step < 120; ++step) { game_update(0, 0); game_render(); }
+    for (int step = 0; step < 120; ++step) { game_update(0, 0); game_render(); hash_frame_pixels(); }
     printf("OUTCOME screen %d won %d lost %d frame %d\n", screen, won, lost, outcome_frame);
     u32 state = state_hash();
     save_game();
     u32 save = fnv(2166136261u, host_save, sizeof(host_save));
     printf("STATE %08x SAVE %08x\n", (unsigned)state, (unsigned)save);
+    if (pixel_hash_enabled) printf("RGB555 %08x\n", (unsigned)pixel_hash);
     fprintf(stderr, "death workload: %d actor deaths, peak %d active effects\n", deaths, peak);
 #ifndef SC64_DEATH_VFX_DISABLED
     assert(deaths > 0 && peak > 0);
+#endif
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+    assert(death_vfx_test_storage_guards_ok());
 #endif
     return 0;
 }
@@ -150,16 +169,34 @@ static int run_hash_workload(void)
 #ifndef SC64_DEATH_VFX_DISABLED
 static int active_now(void)
 {
-    return sc64_death_vfx_active(death_vfx, SC64_DEATH_VFX_POOL, death_vfx_now());
+    Sc64DeathVfx pool[SC64_DEATH_VFX_POOL];
+    death_vfx_test_load_pool(pool);
+    return sc64_death_vfx_active(pool, SC64_DEATH_VFX_POOL, death_vfx_now());
 }
 
 static const Sc64DeathVfx *only_effect(void)
 {
-    const Sc64DeathVfx *found = 0;
+    static Sc64DeathVfx found;
+    int count = 0;
     for (int i = 0; i < SC64_DEATH_VFX_POOL; ++i)
-        if (!sc64_death_vfx_expired(&death_vfx[i], death_vfx_now())) { assert(!found); found = &death_vfx[i]; }
-    assert(found);
-    return found;
+    {
+        Sc64DeathVfx e;
+        death_vfx_test_load_row(i, &e);
+        if (!sc64_death_vfx_expired(&e, death_vfx_now())) { assert(!count); found = e; ++count; }
+    }
+    assert(count == 1);
+    return &found;
+}
+
+static int spawn_test_effect(int style, int raw, int x, int y, int extent,
+                             const Sc64DeathVfxTiming *timing, int source, int color)
+{
+    Sc64DeathVfx pool[SC64_DEATH_VFX_POOL];
+    death_vfx_test_load_pool(pool);
+    int slot = sc64_death_vfx_spawn(pool, SC64_DEATH_VFX_POOL, (u32)frame,
+                                    style, raw, x, y, extent, timing, source, color);
+    death_vfx_test_store_pool(pool);
+    return slot;
 }
 
 static int drawn_pixels(int under)
@@ -313,13 +350,13 @@ static void test_result_outro(void)
     u32 frozen = state_hash();
     game_update(0, 0);   /* first result update: final deaths are scanned */
     assert(death_vfx_bursting(death_vfx_now()));   /* final buildings exploding */
-    assert(!result_outro_end);
+    assert(!result_outro_end_get());
     memset(visible, 0xff, sizeof(visible));
     int full = 180 * 62;
     game_render();
     assert(panel_pixels() < full / 2);              /* battlefield, not the panel */
     int ticks = 1;
-    while (!result_outro_end) { game_update(0, 0); ++ticks; assert(ticks <= (int)SC64_RESULT_OUTRO_MAX); }
+    while (!result_outro_end_get()) { game_update(0, 0); ++ticks; assert(ticks <= (int)SC64_RESULT_OUTRO_MAX); }
     assert(ticks >= (int)SC64_RESULT_OUTRO_MIN);
     assert(ticks == (int)SC64_RESULT_OUTRO_MAX || !death_vfx_bursting(death_vfx_now()));
     for (unsigned i = 0; i < SC64_RESULT_PANEL_OPEN; ++i) {
@@ -335,12 +372,12 @@ static void test_result_outro(void)
     /* Input is unchanged: A during the outro acts at once. */
     setup_world(); find_base();
     game_update(0, 0); destroy_opposition(); game_update(0, 0);
-    assert(screen == SCREEN_RESULT && !result_outro_end);
+    assert(screen == SCREEN_RESULT && !result_outro_end_get());
     game_update(KEY_A, KEY_A);
     assert(screen == SCREEN_PLAY && !won);
     /* A world loaded on its result screen shows the panel at once. */
     death_vfx_reset();
-    assert(result_outro_end && result_outro >= result_outro_end + SC64_RESULT_PANEL_OPEN);
+    assert(result_outro_end_get() && result_outro_get() >= result_outro_end_get() + SC64_RESULT_PANEL_OPEN);
     screen = SCREEN_RESULT; won = 1;
     game_render();
     assert(panel_pixels() > full * 3 / 4);
@@ -356,9 +393,10 @@ static void dump_gallery(void)
         Sc64DeathVfxTiming t = sc64_death_vfx_timing(style);
         int col = (style - 1) % 4, row = (style - 1) / 4;
         static const int raws[] = { 0, 0, 7, 5, 37, 39, 43, 65, 83, 111, 142, 160 };
-        sc64_death_vfx_spawn(death_vfx, SC64_DEATH_VFX_POOL, (u32)frame, style, raws[style],
-                             camx + 30 + col * 60, camy - 12 + 30 + row * 36,
-                             style >= SC64_DEATH_VFX_BUILDING_TERRAN ? 18 : 6, &t, 0, C_GREEN);
+        assert(spawn_test_effect(style, raws[style], camx + 30 + col * 60,
+                                 camy - 12 + 30 + row * 36,
+                                 style >= SC64_DEATH_VFX_BUILDING_TERRAN ? 18 : 6,
+                                 &t, 0, C_GREEN) >= 0);
     }
     memset(visible, 0xff, sizeof(visible));
     u32 born = (u32)frame;
@@ -376,6 +414,10 @@ static void dump_gallery(void)
 int main(void)
 {
     gba_init();
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+    death_vfx_test_storage_guards_init();
+#endif
+    pixel_hash_enabled = getenv("SC64_DEATH_VFX_PIXEL_HASH") != 0;
     if (getenv("SC64_DEATH_VFX_HASH")) return run_hash_workload();
 #ifdef SC64_DEATH_VFX_DISABLED
     puts("death VFX disabled build: run with SC64_DEATH_VFX_HASH=1");
@@ -387,6 +429,9 @@ int main(void)
     test_pool_overflow();
     test_result_outro();
     dump_gallery();
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+    assert(death_vfx_test_storage_guards_ok());
+#endif
     puts("PASS observed unit/building deaths, expiry, fog, removals, load re-prime, pool overflow and result outro");
     return 0;
 #endif
