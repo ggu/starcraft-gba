@@ -5993,3 +5993,8 @@ does not promote a campaign chapter or change canonical progress from 22/30.
 A separate attempt to postpone steering-list overflow until after filtering
 also matched all 365 host checkpoints and all 20 bounded ARM checkpoints,
 but increased combined ARM cycles by 2.56%; it remains private and disabled.
+
+The separate Z7 CONTACT candidate has a [frozen ARM win and fresh-process
+save audit](audits/2026-10-28-z7-arm-save-win/README.md). It remains below
+the near-30-fps target; current-source host coverage and ARM source boundaries
+are reported separately.

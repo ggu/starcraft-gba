@@ -2,8 +2,9 @@
 
 This audit records the standalone `zerg-z7` release candidate after selecting
 the CONTACT movement implementation and removing debugger input storage from
-the main loop. It is a link and host-replay qualification only. It does not
-promote Z7 or establish a full ARM win for this exact flag vector.
+the main loop. This section preserves the initial link and host-replay evidence. The later
+[ARM mission and save audit](../2026-10-28-z7-arm-save-win/README.md) records the
+frozen CONTACT full win and the post-PR93 source boundary. Z7 is not promoted.
 
 ## Selected release flags
 
@@ -56,8 +57,9 @@ The matching CONTACT host replay log has SHA-256
 
 ## Limits
 
-This exact release vector has not completed a full ARM replay or a fresh
-process SRAM continuation. The older full ARM win and SRAM evidence used the
+At the time of this link check, this exact release vector had not completed
+a full ARM replay or fresh-process SRAM continuation. See the later audit above
+for the completed frozen run and current-source qualification limits. The older full ARM win and SRAM evidence used the
 previous collision flags and does not qualify this link. No ROM was launched
 in an emulator for this link check; the recorded artifact is an ELF, not a
 fixed ROM. Z7 remains an unpromoted candidate; Z7

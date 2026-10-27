@@ -85,9 +85,11 @@ None of these are physical GBA guarantees.
 
 Z7 now has a separate `zerg-z7` candidate ROM and save route; `zerg` and
 explicit `zerg-z6` remain the six-entry product. The candidate is not promoted:
-its earlier full ordinary-input ARM replay and bounded fresh-process SRAM
-continuation are historical evidence, not qualification of this source and
-flag vector. P7 is
+the CONTACT candidate has a full frozen ARM win with fresh-process SRAM
+continuation and current-source host regression coverage. The full path is
+about 3.69 advancing frames/s, so it remains an explicit candidate while
+performance work continues. See the [mission/save audit](audits/2026-10-28-z7-arm-save-win/README.md)
+for the exact runtime boundaries. P7 is
 now in the canonical Protoss profile. Its host campaign/save fixtures, 18-match
 skirmish matrix and menu-driven save/reload pass. The P7 controller itself was
 qualified on host; ARM replayed its recorded inputs, including an ordinary
