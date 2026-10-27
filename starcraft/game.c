@@ -2398,12 +2398,25 @@ unit_step_clear(const Unit *q, int nx, int ny)
 #ifdef SC64_RACES
 /* Keep fact lookup and endpoint arithmetic in ROM: large campaign profiles
  * have very little spare IWRAM. The path/collision loops remain hot. */
+#if defined(SC64_CONTACT_CACHE) && !defined(SC64_T5_RUNTIME) && !defined(SC64_CONTACT_STOCK_ROM)
+/* Without the division the step is a short table read; keep it inline in the
+ * hot mover where the IWRAM reserve allows (the late Terran profile does not,
+ * and SC64_CONTACT_STOCK_ROM keeps it out of line for other tight profiles). */
+static inline __attribute__((always_inline)) unsigned
+#else
 static unsigned __attribute__((noinline))
+#endif
 sc64_unit_stock_step(const Unit *q,int tx,int ty)
 {
+#ifdef SC64_CONTACT_CACHE
+    return sc64_contact_stock_step(q->raw_type>=0?q->raw_type:
+        sc64_race_raw_unit(q->type),(unsigned)frame,(unsigned)(q-u),
+        tx!=q->x && ty!=q->y);
+#else
     return sc64_stock_motion_step(q->raw_type>=0?q->raw_type:
         sc64_race_raw_unit(q->type),(unsigned)frame,(unsigned)(q-u),
         tx!=q->x && ty!=q->y);
+#endif
 }
 
 static void __attribute__((noinline))
@@ -2533,7 +2546,17 @@ move_toward(Unit * q, int tx, int ty)
 	/* Local steering avoids repeatedly retrying the same occupied waypoint.
 	 * Static terrain still uses BFS; candidates may leave an occupied tile
 	 * but may never enter a different blocked cell. */
-#ifdef SC64_COLLISION_STEER_LIST
+#if defined(SC64_CONTACT_CACHE)
+	/* One bucket pass answers all eight unit_step_clear() offsets; the
+	 * selection order and tie-breaking below are unchanged. */
+	unsigned blocked = sc64_contact_blocked_mask(q, speed);
+	for (i = 0; i < 8; i++) {
+	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
+	    int cost = dist2(sx, sy, q->path_x, q->path_y);
+	    if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell) &&
+		!(blocked & (1u << i))) { best = i; best_cost = cost; }
+	}
+#elif defined(SC64_COLLISION_STEER_LIST)
 	#if defined(SC64_Z7_RUNTIME)
 	best = sc64_steer_best_direction(q, speed, from_cell,
 	                                  q->path_x, q->path_y);

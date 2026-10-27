@@ -128,9 +128,11 @@ sc64_unit_bucket_insert(int slot, int cell)
 /* Once-per-frame setup stays in ROM to preserve the unchanged IWRAM stack
  * reserve as transport checks expand the hot actor loop. */
 static void __attribute__((noinline))
-#elif defined(SC64_FACT_TABLES)
+#elif defined(SC64_FACT_TABLES) || defined(SC64_CONTACT_CACHE)
 /* The smaller table-backed update_orders() would otherwise absorb this
- * once-per-frame IWRAM setup into its ROM Thumb body. */
+ * once-per-frame IWRAM setup into its ROM Thumb body. The contact cache
+ * removes the class-cache clear from this setup, which otherwise makes
+ * the inliner absorb it the same way. */
 static void GBA_HOT __attribute__((noinline))
 #else
 static void GBA_HOT
@@ -182,7 +184,12 @@ sc64_unit_bucket_move(Unit *q)
     sc64_unit_bucket_insert(slot, new_cell);
 }
 
-#ifdef SC64_NYDUS_ENABLED
+#ifdef SC64_CONTACT_CACHE
+/* The original query stays in ROM as the reference for actors whose facts
+ * the per-slot byte cannot describe, and for the host differential tests. */
+static int __attribute__((noinline))
+sc64_unit_bucket_step_clear_reference(const Unit *q, int nx, int ny, int strict)
+#elif defined(SC64_NYDUS_ENABLED)
 static int GBA_HOT
 sc64_unit_bucket_step_clear_mode(const Unit *q, int nx, int ny, int strict)
 #else
@@ -191,7 +198,7 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
 #endif
 {
 #ifdef SC64_RACES
-#ifdef SC64_NYDUS_ENABLED
+#if defined(SC64_NYDUS_ENABLED) || defined(SC64_CONTACT_CACHE)
     if (!strict && IS_WORKER(q->type) &&
         (q->order == ORDER_MINE || q->order == ORDER_GAS)) return 1;
 #else
@@ -285,7 +292,7 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
                     dx *= dx;
                     dy *= dy;
                     if (dx + dy < radius * radius) {
-#ifdef SC64_NYDUS_ENABLED
+#if defined(SC64_NYDUS_ENABLED) || defined(SC64_CONTACT_CACHE)
                         int ox = u[i].x - q->x, oy = u[i].y - q->y;
                         if (strict || dx + dy <= ox * ox + oy * oy) return 0;
 #else
@@ -298,13 +305,26 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
     return 1;
 }
 
-#ifdef SC64_NYDUS_ENABLED
+#ifdef SC64_CONTACT_CACHE
+#include "sc64_contact.h"
+static int GBA_HOT
+sc64_unit_bucket_step_clear_mode(const Unit *q, int nx, int ny, int strict)
+{
+    if (!strict && IS_WORKER(q->type) &&
+        (q->order == ORDER_MINE || q->order == ORDER_GAS)) return 1;
+    return sc64_contact_step_clear(q, nx, ny, strict);
+}
+#endif
+
+#if defined(SC64_NYDUS_ENABLED) || defined(SC64_CONTACT_CACHE)
 static int GBA_HOT
 sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
 {
     return sc64_unit_bucket_step_clear_mode(q, nx, ny, 0);
 }
+#endif
 
+#ifdef SC64_NYDUS_ENABLED
 static int GBA_HOT
 sc64_unit_bucket_placement_clear(const Unit *q, int nx, int ny)
 {

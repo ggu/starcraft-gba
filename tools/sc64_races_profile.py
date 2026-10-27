@@ -197,7 +197,11 @@ def race_bank_profile(elf: Path, sizes: dict[str, int]) -> dict:
     legacy_bank = unit_capacity in UNIT_CAPACITIES and building_capacity == MAX_BUILDINGS
     compact_zp_bank = (unit_capacity == 240 and building_capacity == 160 and
                        unit_stride == 56 and building_stride == 48)
-    if not legacy_bank and not compact_zp_bank:
+    # The canonical late-Terran ROM keeps compact 56-byte units beside the
+    # legacy int-field buildings; each field is read at its DWARF width.
+    late_terran_bank = (unit_capacity == 192 and building_capacity == 96 and
+                        unit_stride == 56)
+    if not legacy_bank and not compact_zp_bank and not late_terran_bank:
         raise RuntimeError(f'Unexpected Races bank capacity: {unit_capacity}/{building_capacity}')
     def validate_fields(label: str, fields: DwarfOffsets, stride: int,
                         required: dict[str, int], optional: dict[str, int]) -> None:
@@ -208,6 +212,8 @@ def race_bank_profile(elf: Path, sizes: dict[str, int]) -> dict:
             width = fields.widths.get(field)
             offset = fields[field]
             expected_width = (legacy_width if compact_zp_bank else 4)
+            if late_terran_bank and width in (legacy_width, 4):
+                expected_width = width
             if (width != expected_width or offset < 0 or offset + expected_width > stride):
                 raise RuntimeError(f'DWARF {label} field {field} has an unsupported or unbounded ABI width')
 
