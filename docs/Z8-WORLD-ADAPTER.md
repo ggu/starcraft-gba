@@ -42,6 +42,30 @@ property selector, and source rectangle. Invincibility changes the live flag;
 SetResources reuses `sc64_resource_action_apply_one_player()`. Presentation
 and timed actions are dispatched to explicit services.
 
+The opt-in game bridge also provides a bounded default-property CreateUnit
+service for raw 74 (Hero Dark Templar) and raw 101 (Special Map Revealer).
+It accepts only the descriptor's opcode 11/default-property shape, one unit
+per action, and a valid source owner mapping. It uses the native location
+midpoint, inclusive footprint edge clamp, and half-scale world coordinates;
+it does not grid-snap or run building-only placement collision preflight.
+An initialized ordinary native First Strike capture reads bit 0 clear for raw
+74 (`0x18410000`) and raw 101 (`0x00000004`) at `0x800C99DC + 4*type`, while
+control building raw 154 is set (`0xC4001001`). Snapshot provenance and the
+limits of this single-session evidence are recorded in
+[`research/z8-native-create-placement.md`](research/z8-native-create-placement.md).
+Raw 101 remains a hidden actor; the bridge keeps its exact `raw_owner` and
+configured live owner and does not project an enemy source to SIDE to grant
+human vision. Enemy AI fog awareness remains unimplemented. This service is
+not initialized by a mission profile. The generic action dispatcher rejects
+Force selectors that resolve to multiple active owners. The authored Z8
+Force2/Force3 selectors identify source owners 1/2 respectively; they can
+resolve as singletons when the caller binds the authenticated active-player
+and force tables. Scheduler and mission initialization remain separate work.
+The game binder stores its private context in the optional `create_context`
+slot, leaving the shared `context` available to AI, presentation, kill-count,
+and timed callbacks. If `create_context` is null, existing callers continue to
+use the shared context for creation.
+
 `Zer8`, `Ze8T`, and `MvTe` are passed to a required AI service. This adapter
 does not implement them; a missing service or failed policy returns an error
 to the scheduler. Unknown types, malformed ownership, missing mutable flags,
@@ -77,8 +101,14 @@ pools. It checks every authenticated Z8 actor/building raw kind and bounds,
 dead pool slots, neutral owner 11 handling, opcode 43 mutation of the actual
 invincibility arrays without changing packed unit flags, distinct source
 mineral/gas slots, and Egg-to-product completion. Cargo census assertions run
-when `SC64_TRANSPORT_RUNTIME` is part of the build. It is a host fixture with
-synthetic pool rows, not a native mission run or campaign qualification.
+when `SC64_TRANSPORT_RUNTIME` is part of the build. It also checks default
+CreateUnit placement for raw 74 and hidden raw 101, preserved source/live
+owners, overlap acceptance for the clear-bit unit path, edge clamping,
+unsupported property/type/count rejection, and unit-pool exhaustion. It is a
+host fixture with synthetic pool rows. It also binds a distinct creation
+context and invokes AI, presentation, kill-count, and timed callbacks to verify
+their shared context remains intact. This is not a native mission run or
+campaign qualification.
 
 Neither test enables the Z8 profile, scheduler, menu entry, save state, or
 mission. Before enabling a profile, a caller must bind source kill accounting,

@@ -10,8 +10,8 @@
  *
  * Still-unimplemented semantic domains include the 39-trigger scheduler and
  * PreserveTrigger lifecycle, Kill conditions, native AI FourCC behavior,
- * property-aware actor creation, MoveLocation/SetInvincibility, Observer
- * detection/cloak, and linked Nydus transport.
+ * non-default property-aware actor creation, MoveLocation/SetInvincibility,
+ * Observer detection/cloak, and linked Nydus transport.
  */
 #ifndef SC64_Z8_SOURCE_H
 #define SC64_Z8_SOURCE_H
