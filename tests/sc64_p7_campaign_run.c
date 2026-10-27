@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifndef P7_CONTROLLER_PROFILE
+#define P7_CONTROLLER_PROFILE "P7_TYPED_MOVE_FLAGS"
+#endif
+
 #define RUN_LIMIT 60000u
 #define KEY_TAP(k) do { input((k)); input(0); } while (0)
 
@@ -18,7 +22,8 @@ static int army_center(int *x,int *y);
  * builds its walkability plane as part of ordinary simulation; if it is not
  * current/available, wait for the engine rather than rebuilding its cache
  * from this observer. */
-static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out)
+static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out,
+                       int *path_distance_out)
 {
     enum { WAYPOINT_STEPS = 8 };
     int cells=MAP_COLS*MAP_ROWS;
@@ -60,6 +65,7 @@ static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out)
     for(int c=best;c>=0&&len<cells;c=prev[c])path[len++]=c;
     if(!len)return 0;
     int distance=len-1;
+    if(path_distance_out)*path_distance_out=distance;
     int pick=distance>WAYPOINT_STEPS?distance-WAYPOINT_STEPS:0;
     int cell=path[pick];
     *wx=(cell%MAP_COLS)*16+8;*wy=(cell/MAP_COLS)*16+8;
@@ -107,16 +113,42 @@ static int nexus_source(int raw_owner)
     return best;
 }
 
-static int routeable_nexus(int raw_owner,int *wx,int *wy,int *steps)
+static int routeable_nexus(int raw_owner,int *wx,int *wy,int *steps,
+                           int *path_distance,int excluded_slot)
 {
-    int best=-1,best_d=0x7fffffff,ax=0,ay=0,bx=0,by=0,bs=0;
+    int best=-1,best_d=0x7fffffff,best_path=0x7fffffff;
+    int ax=0,ay=0,bx=0,by=0,bs=0;
     (void)army_center(&ax,&ay);
-    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].raw_type==154&&b[i].raw_owner==raw_owner){
-        int x,y,n,d=dist2(ax,ay,b[i].x,b[i].y);
-        if(d>=best_d||!waypoint_to(b[i].x,b[i].y,&x,&y,&n))continue;
-        best=i;best_d=d;bx=x;by=y;bs=n;
+    for(int i=0;i<MAX_BUILDINGS;i++)if(i!=excluded_slot&&b[i].alive&&b[i].raw_type==154&&b[i].raw_owner==raw_owner){
+        int x,y,n,path,d=dist2(ax,ay,b[i].x,b[i].y);
+        if(!waypoint_to(b[i].x,b[i].y,&x,&y,&n,&path))continue;
+        if(path>best_path||(path==best_path&&d>=best_d))continue;
+        best=i;best_d=d;best_path=path;bx=x;by=y;bs=n;
     }
-    if(best>=0){*wx=bx;*wy=by;*steps=bs;}
+    if(best>=0){*wx=bx;*wy=by;*steps=bs;if(path_distance)*path_distance=best_path;}
+    return best;
+}
+
+/* Pick the nearest source Nexus by measured walkable route length. A force
+ * count heuristic can send the army to a single remote base while a closer
+ * victory-gate force is available. */
+static int routeable_nexus_any(int *raw_owner,int *wx,int *wy,int *steps,
+                               int *path_distance,int excluded_slot)
+{
+    int best=-1,best_owner=-1,best_path=0x7fffffff;
+    int best_x=0,best_y=0,best_steps=0;
+    const int owners[2]={0,4};
+    for(unsigned k=0;k<2;k++){
+        int x,y,n,distance;
+        int slot=routeable_nexus(owners[k],&x,&y,&n,&distance,excluded_slot);
+        if(slot<0||distance>=best_path)continue;
+        best=slot;best_owner=owners[k];best_path=distance;
+        best_x=x;best_y=y;best_steps=n;
+    }
+    if(best>=0){
+        *raw_owner=best_owner;*wx=best_x;*wy=best_y;*steps=best_steps;
+        if(path_distance)*path_distance=best_path;
+    }
     return best;
 }
 
@@ -436,7 +468,7 @@ int main(int argc,char **argv)
     snprintf(mkdir_cmd,sizeof(mkdir_cmd),"mkdir -p '%s'", ".local/build/p7-controller");
     (void)system(mkdir_cmd);
     trace=fopen(path,"w");if(!trace){perror(path);return 2;}
-    fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":26,\"profile\":\"P7_TYPED_MOVE_FLAGS\",\"input_policy\":\"ordinary game_update held/pressed only\"}\n");
+    fprintf(trace,"{\"kind\":\"metadata\",\"schema\":1,\"mission\":26,\"profile\":\"%s\",\"input_policy\":\"ordinary game_update held/pressed only\"}\n",P7_CONTROLLER_PROFILE);
     game_init();prior=0;
     assert(screen==SCREEN_TITLE&&race_front.page==SC_FRONT_HOME);
     KEY_TAP(KEY_A);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);
@@ -444,15 +476,15 @@ int main(int argc,char **argv)
     assert(screen==SCREEN_PLAY&&!won&&!lost&&race_selected_mission==26);
     census("launch");
     int force0_start=source_force_military(0),force4_start=source_force_military(4);
-    int first_force=force0_start<=force4_start?0:4;
-    fprintf(trace,"{\"kind\":\"force-plan\",\"frame\":%u,\"rawowner0_military\":%d,\"rawowner4_military\":%d,\"first_target_force\":%d}\n",
-        (unsigned)frame,force0_start,force4_start,first_force);
+    fprintf(trace,"{\"kind\":\"force-plan\",\"frame\":%u,\"rawowner0_military\":%d,\"rawowner4_military\":%d,\"route_policy\":\"shortest-walkable-source-force\"}\n",
+        (unsigned)frame,force0_start,force4_start);
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&(u[i].raw_type==75||u[i].raw_type==78||u[i].raw_type==79))
         fprintf(stderr,"hero slot=%d raw=%d owner=%d rawowner=%d xy=%d,%d hp=%d\n",i,u[i].raw_type,u[i].owner,u[i].raw_owner,u[i].x,u[i].y,u[i].hp);
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].raw_type==154)
         fprintf(stderr,"nexus slot=%d owner=%d rawowner=%d xy=%d,%d\n",i,b[i].owner,b[i].raw_owner,b[i].x,b[i].y);
 
     unsigned next_checkpoint=1000;
+    int locked_target_owner=-1;
     int last_order=-10000,next_probe=300,next_gas=5000,next_production=5500,next_build=7000,next_pylon=5000;
     while(host_tick<RUN_LIMIT&&screen==SCREEN_PLAY&&!won&&!lost){
         if(frame>=next_probe&&probe_count()<10){
@@ -472,33 +504,53 @@ int main(int argc,char **argv)
             next_pylon=frame+1500;
         }
         if(frame>=next_build){
-            if(frame>=7000&&probe_count()>=8&&count_gateway()<2&&build_gateway())
+            if(frame>=7000&&probe_count()>=8&&count_gateway()<4&&build_gateway())
                 fprintf(trace,"{\"kind\":\"build\",\"frame\":%u,\"building\":\"gateway\",\"count\":%d}\n",
                     (unsigned)frame,count_gateway());
-            next_build=frame+1800;
+            next_build=frame+1200;
         }
         if(frame>=next_production&&probe_count()>=8){
             (void)queue_combat_unit();
-            next_production=frame+360;
+            next_production=frame+180;
         }
-        if(frame-last_order>=900){
+        if(frame-last_order>=480){
             int ax=0,ay=0;army_center(&ax,&ay);
             int threat_x=-1,threat_y=-1,threat=nearest_hero_threat(&threat_x,&threat_y);
-            int force4=nexus_source(4),force0=nexus_source(0);
-            /* Start with the weaker source garrison; still clear every source
-             * Nexus in that force before switching to the other source force. */
-            int t=first_force==0?force0:force4;
+            int target_owner=-1,target_path=-1;
+            static int prior_goal=-1,prior_path=0x7fffffff,stalled_orders=0;
+            int t=-1;
             int use_threat=threat>=0&&frame<10000;
             int target_x=use_threat?threat_x:(t>=0?b[t].x:-1),
                 target_y=use_threat?threat_y:(t>=0?b[t].y:-1);
             int command_x=target_x,command_y=target_y,route_steps=-1,has_route=0;
-            if(!use_threat&&frame<10000)target_x=target_y=-1;
             if(!use_threat&&path_grid_valid){
-                t=routeable_nexus(first_force,&command_x,&command_y,&route_steps);
-                if(t<0)t=routeable_nexus(first_force==0?4:0,&command_x,&command_y,&route_steps);
+                if(locked_target_owner<0){
+                    (void)routeable_nexus_any(&locked_target_owner,
+                        &command_x,&command_y,&route_steps,&target_path,-1);
+                    fprintf(trace,"{\"kind\":\"goal-lock\",\"frame\":%u,\"source_owner\":%d,\"route_distance\":%d}\n",
+                        (unsigned)frame,locked_target_owner,target_path);
+                }
+                if(locked_target_owner>=0){
+                    target_owner=locked_target_owner;
+                    t=routeable_nexus(target_owner,&command_x,&command_y,
+                                      &route_steps,&target_path,-1);
+                }
+                if(t>=0&&t==prior_goal){
+                    if(target_path+2<prior_path)stalled_orders=0;
+                    else ++stalled_orders;
+                }else stalled_orders=0;
+                if(t>=0&&stalled_orders>=2){
+                    int alternate_path=-1;
+                    int alternate=routeable_nexus(target_owner,
+                        &command_x,&command_y,&route_steps,&alternate_path,t);
+                    if(alternate>=0){
+                        t=alternate;target_path=alternate_path;stalled_orders=0;
+                    }
+                }
+                if(t>=0){prior_goal=t;prior_path=target_path;}
                 if(t>=0){target_x=b[t].x;target_y=b[t].y;has_route=1;}
                 else {
-                    int raw=nexus_source(first_force)>=0?first_force:(first_force==0?4:0);
+                    int raw=nexus_source(0)>=0?0:4;
                     fprintf(trace,"{\"kind\":\"route\",\"frame\":%u,\"source_force\":%d,\"army_center\":[%d,%d],\"grid_valid\":1,\"reachable\":0,\"targets\":[",
                         (unsigned)frame,raw,ax,ay);
                     int comma=0;
@@ -510,7 +562,7 @@ int main(int argc,char **argv)
                 }
             }
             if(target_x>=0){
-                if(use_threat)has_route=waypoint_to(target_x,target_y,&command_x,&command_y,&route_steps);
+                if(use_threat)has_route=waypoint_to(target_x,target_y,&command_x,&command_y,&route_steps,NULL);
                 if(!has_route&&t>=0&&!use_threat){
                     fprintf(trace,"{\"kind\":\"route\",\"frame\":%u,\"target_slot\":%d,\"target_xy\":[%d,%d],\"army_center\":[%d,%d],\"grid_valid\":%d,\"reachable\":0}\n",
                         (unsigned)frame,t,target_x,target_y,ax,ay,path_grid_valid);
@@ -519,12 +571,13 @@ int main(int argc,char **argv)
                 }
                 if((has_route||use_threat)&&issue_attack(command_x,command_y)){
                     last_order=frame;
-                    fprintf(trace,"{\"kind\":\"command\",\"frame\":%u,\"target\":\"%s\",\"target_slot\":%d,\"target_xy\":[%d,%d],\"command_xy\":[%d,%d],\"route_steps\":%d,\"army_center\":[%d,%d],\"heroes_alive\":%d}\n",
-                        (unsigned)frame,use_threat?"hero-threat":"nexus",use_threat?threat:t,target_x,target_y,command_x,command_y,route_steps,ax,ay,heroes_alive());
+                    fprintf(trace,"{\"kind\":\"command\",\"frame\":%u,\"target\":\"%s\",\"target_slot\":%d,\"target_owner\":%d,\"path_distance\":%d,\"stalled_orders\":%d,\"target_xy\":[%d,%d],\"command_xy\":[%d,%d],\"route_steps\":%d,\"army_center\":[%d,%d],\"heroes_alive\":%d}\n",
+                        (unsigned)frame,use_threat?"hero-threat":"nexus",use_threat?threat:t,target_owner,target_path,stalled_orders,target_x,target_y,command_x,command_y,route_steps,ax,ay,heroes_alive());
                     fprintf(stderr,"order frame=%u target=%s slot=%d at=%d,%d waypoint=%d,%d steps=%d heroes=%d army=%d\n",
                         (unsigned)frame,use_threat?"threat":"nexus",use_threat?threat:t,target_x,target_y,command_x,command_y,route_steps,heroes_alive(),live_units(SIDE));
                 }
             }
+            if(!last_order||frame-last_order>=480)last_order=frame;
         }
         input(0);
         if((unsigned)frame>=next_checkpoint){
@@ -538,8 +591,8 @@ int main(int argc,char **argv)
     for(int i=0;i<MAX_BUILDINGS;i++)
         fprintf(trace,"{\"kind\":\"source-building\",\"slot\":%d,\"alive\":%d,\"raw\":%d,\"source_owner\":%d,\"owner\":%d,\"x\":%d,\"y\":%d,\"hp\":%d}\n",
             i,b[i].alive,b[i].raw_type,b[i].raw_owner,b[i].owner,b[i].x,b[i].y,b[i].hp);
-    fprintf(trace,"{\"kind\":\"final\",\"frame\":%u,\"screen\":%d,\"won\":%d,\"lost\":%d,\"heroes_alive\":%d,\"units\":%d,\"buildings\":%d}\n",
-        (unsigned)frame,screen,won,lost,heroes_alive(),live_units(-1),live_buildings(-1));
+    fprintf(trace,"{\"kind\":\"final\",\"total_calls\":%u,\"frame\":%u,\"screen\":%d,\"won\":%d,\"lost\":%d,\"heroes_alive\":%d,\"units\":%d,\"buildings\":%d}\n",
+        (unsigned)host_tick,(unsigned)frame,screen,won,lost,heroes_alive(),live_units(-1),live_buildings(-1));
     int strict_win=strict_campaign_win();
     fclose(trace);
     fprintf(stderr,"P7 run frame=%u won=%d lost=%d heroes=%d units=%d buildings=%d\n",

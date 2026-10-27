@@ -4013,3 +4013,14 @@ protoss-p7-sight-axis-probe: build/StarCraft-Protoss-P7-Sight-Axis-Probe-GBA.gba
 
 build/sc64-p7-sight-axis-normal-input.elf: $(P7_NORMAL_INPUT_REPLAY) tests/sc64_p7_normal_input_tape.h $(P7_NORMAL_INPUT_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(P7_SIGHT_AXIS_FLAGS) $(P7_NORMAL_INPUT_COMMON) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/sc64-p7-sight-axis-normal-input.map -lgcc -o $@
+
+# Optional full P7 ordinary-input controller qualification; excluded from default targets.
+P7_CAMPAIGN_CONTROLLER := tests/sc64_p7_campaign_run.c
+P7_CAMPAIGN_TRACE := build/sc64-p7-campaign-controller.jsonl
+
+build/test-sc64-p7-campaign-controller: $(P7_CAMPAIGN_CONTROLLER) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_SIGHT_AXIS_FLAGS) -DP7_CONTROLLER_PROFILE=\"P7_SIGHT_AXIS_FLAGS\" $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+.PHONY: test-sc64-p7-campaign-controller
+test-sc64-p7-campaign-controller: build/test-sc64-p7-campaign-controller tools/sc64_p7_campaign_trace.py
+	./build/test-sc64-p7-campaign-controller $(P7_CAMPAIGN_TRACE)
+	$(PYTHON) tools/sc64_p7_campaign_trace.py --require-win $(P7_CAMPAIGN_TRACE)
