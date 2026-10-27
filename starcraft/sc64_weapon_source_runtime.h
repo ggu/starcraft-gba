@@ -36,6 +36,21 @@ sc64_weapon_source_trace_profile(uint32_t packed)
 static inline uint32_t
 sc64_weapon_source_trace_sqroot(uint64_t n)
 {
+    if (n <= UINT32_MAX) {
+        /* Map-sized distances: the same digit-by-digit root in 32 bits. */
+        uint32_t m = (uint32_t)n, bit32 = UINT32_C(1) << 30, root32 = 0;
+        while (bit32 > m) bit32 >>= 2;
+        while (bit32) {
+            if (m >= root32 + bit32) {
+                m -= root32 + bit32;
+                root32 = (root32 >> 1) + bit32;
+            } else {
+                root32 >>= 1;
+            }
+            bit32 >>= 2;
+        }
+        return root32;
+    }
     uint64_t bit = UINT64_C(1) << 62;
     uint64_t root = 0;
     while (bit > n) bit >>= 2;
@@ -101,16 +116,19 @@ sc64_weapon_source_trace_flight_ticks(const Sc64WeaponSourceAttackProfile *p,
         return 0;
     if (top <= 0) return 0;
     if (accel <= 0) speed = top;
-    for (uint32_t tick = 1; tick <= limit; ++tick) {
-        if (accel > 0) {
-            speed += accel;
-            if (speed > top) speed = top;
-        }
+    /* Step tick by tick only while accelerating toward top speed. */
+    uint32_t tick = 1;
+    for (; tick <= limit && accel > 0 && speed < top; ++tick) {
+        speed += accel;
+        if (speed > top) speed = top;
         if (speed <= 0) speed = top;
         if ((uint64_t)speed >= remaining) return tick;
         remaining -= (uint64_t)speed;
     }
-    return limit;
+    if (tick > limit) return limit;
+    /* At top speed the first covering tick is ceil(remaining / top) away. */
+    uint64_t arrival = (uint64_t)tick - 1u + (remaining + (uint64_t)top - 1u) / (uint64_t)top;
+    return arrival > limit ? limit : (uint32_t)arrival;
 }
 
 static inline int
@@ -205,16 +223,20 @@ sc64_weapon_source_trace_position(const Sc64WeaponSourceAttackProfile *p,
     int64_t speed = 0, top = p->speed_raw;
     int64_t accel = p->accel_raw;
     uint64_t travelled = 0;
-    for (uint32_t tick = 0; tick < source_age; ++tick) {
-        if (accel > 0) {
-            speed += accel;
-            if (speed > top) speed = top;
-        } else {
-            speed = top;
-        }
+    /* Step tick by tick only while accelerating; top > 0 since flight > 0. */
+    uint32_t tick = 0;
+    for (; tick < source_age && accel > 0 && speed < top; ++tick) {
+        speed += accel;
+        if (speed > top) speed = top;
         if (speed <= 0) speed = top;
         travelled += (uint64_t)speed;
         if (travelled >= distance) { travelled = distance; break; }
+    }
+    if (travelled < distance && tick < source_age) {
+        /* The remaining ticks each cover top, capped at the distance. */
+        uint64_t rest = source_age - tick, room = distance - travelled;
+        travelled = rest >= (room + (uint64_t)top - 1u) / (uint64_t)top ?
+                    distance : travelled + rest * (uint64_t)top;
     }
     *x = (int)((int64_t)x0 + dx * (int64_t)travelled / (int64_t)distance);
     *y = (int)((int64_t)y0 + dy * (int64_t)travelled / (int64_t)distance);
@@ -252,6 +274,22 @@ sc64_weapon_source_trace_duration(const Sc64WeaponSourceAttackProfile *p,
     }
     if (actor_ticks > source_ticks) source_ticks = actor_ticks;
     return sc64_weapon_source_vfx_gba_duration(source_ticks);
+}
+
+/* Nonzero exactly when sc64_weapon_source_trace_duration() is nonzero. A
+ * projectile with frames always has a duration, so the overlay walks run only
+ * for frameless projectiles. */
+static inline int
+sc64_weapon_source_trace_has_duration(const Sc64WeaponSourceAttackProfile *p,
+                                      int x0, int y0, int x1, int y1)
+{
+    if (!p || !p->projectile_image ||
+        !sc64_weapon_source_image_lookup(p->projectile_image)) return 0;
+    if (!sc64_weapon_source_bullet_is_stationary(p->weapon_bullet_type) &&
+        sc64_weapon_source_trace_distance_raw(x0, y0, x1, y1) &&
+        !sc64_weapon_source_trace_flight_ticks(p, x0, y0, x1, y1)) return 0;
+    if (p->projectile_frame_count) return 1;
+    return sc64_weapon_source_trace_duration(p, x0, y0, x1, y1) != 0;
 }
 
 static inline uint32_t

@@ -33,6 +33,11 @@ static void paint(int x, int y, int w, int h, const u8 *src)
             canvas[y + yy][x + xx] = src[yy * w + xx];
 }
 
+void gfx_reverse_bytes(u8 *dst, const u8 *src, unsigned n)
+{
+    for (unsigned i = 0; i < n; ++i) dst[i] = src[n - 1 - i];
+}
+
 void gfx_blit_sprite(int x, int y, int w, int h, const u8 *src)
 {
     assert(call_count < sizeof(calls) / sizeof(calls[0]));
@@ -103,6 +108,7 @@ static void fog_paths_match_the_oracle(void)
         for (int ty = 0; ty < MAP_ROWS; ++ty) for (int tx = 0; tx < MAP_COLS; ++tx)
             visible_tiles[ty][tx] = (unsigned char)(pattern ? (tx + ty) & 1 : 1);
         check_fogged_raster(&r, 120, 60, 1);
+        if (!pattern) assert(call_count == r.height); /* reversed rows, one call each */
     }
     fog_mode = 0; camx = camy = 0;
 }
@@ -129,13 +135,16 @@ int main(void)
     assert(calls[0].x == 14 && calls[0].y == 30 && calls[0].w == 2);
     assert(calls[0].src == ordinary && calls[1].src == ordinary + 4);
 
-    /* Mirroring keeps the canvas center fixed and reverses source order. */
+    /* Mirroring keeps the canvas center fixed and reverses source order:
+     * each row is drawn reversed, one call per visible tile run. */
     reset_calls();
     r.pixels = ordinary;
+    for (int y = 0; y < 160; ++y) for (int x = 0; x < 240; ++x) canvas[y][x] = -1;
     sc64_weapon_source_vfx_draw_raster(&r, 16, 20, 1);
-    assert(call_count == 4);
-    assert(calls[0].x == 14 && calls[0].w == 1 && calls[0].src == ordinary + 3);
-    assert(calls[1].src == ordinary + 2);
+    assert(call_count == 2);
+    assert(calls[0].x == 14 && calls[0].w == 2 && calls[1].y == 31);
+    assert(canvas[30][14] == 4 && canvas[30][15] == 3 && canvas[30][16] == -1);
+    assert(canvas[31][14] == 8 && canvas[31][15] == 7 && canvas[31][16] == -1);
 
     reset_calls();
     for (unsigned i = 0; i < sizeof(tall); ++i) tall[i] = (uint8_t)(i + 1);

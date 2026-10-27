@@ -273,11 +273,13 @@ static void candidate_fill_paid_units(RaceSave *candidate,unsigned target)
     template.raw_type=template.raw_owner=-1;
 #ifdef SC64_Z7_DERIVED_SAVE
     template.maxhp=sc64_derived_unit_hp(template.type);
-    template.armor=sc64_race_unit_armor(template.type);
 #else
-    template.maxhp=1;
+    template.maxhp=sc64_race_unit_rules[template.type].hp;
+    { int zp_hp=sc64_zp_actor_default_hp(template.type);
+      if (zp_hp) template.maxhp=zp_hp; }
 #endif
-    template.hp=1; template.alive=1; template.selected=0;
+    template.armor=sc64_race_unit_armor(template.type);
+    template.hp=template.maxhp; template.alive=1; template.selected=0;
     template.order=ORDER_IDLE; template.target=-1;
     for (unsigned i=0;i<MAX_UNITS && live<target;++i) {
         Unit old;
@@ -289,6 +291,248 @@ static void candidate_fill_paid_units(RaceSave *candidate,unsigned target)
         ++live;
     }
     assert(live==target);
+}
+
+/* An impossible row is rejected either by the row codec or by the Z7
+ * candidate validator. Keep the two stages explicit so each test records a
+ * real acceptance boundary without depending on malformed bytes. */
+static int candidate_unit_change_rejected(const RaceSave *source,unsigned slot,
+                                           const Unit *changed)
+{
+    RaceSave bad=*source;
+    if (!TEST_UNIT_ENCODE(&bad.units[slot],changed,
+                          SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u))
+        return 1;
+    return !race_z7_save_candidate_valid(&bad,&bad.z7,
+                                         SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS);
+}
+
+static void test_ling_egg_capacity(const RaceSave *checkpoint);
+
+#ifdef SC64_Z7_EGG_PRODUCTION
+static void test_enemy_egg_budget(const RaceSave *checkpoint,
+                                  const Unit *human_egg)
+{
+    const Sc64RaceMap *map=&sc64_race_maps[SC64_Z7_GLOBAL_ID];
+    RaceSave candidate=*checkpoint;
+    unsigned source_lings=(unsigned)race_z7_save_source_unit_count(map,4u,37u);
+    unsigned live_lings=0,egg_count=0;
+
+    /* Isolate the authored initial production budget so the test exercises
+     * the egg allowance rather than an already-large elapsed-time allowance. */
+    candidate.campaign.elapsed_frames=0;
+    candidate.state[7]=0;
+    candidate.z7.runtime.ai_script_mask=0;
+    for (unsigned i=0;i<MAX_UNITS;++i) {
+        Unit q;
+        assert(race_save_decode_unit(&candidate,i,SC64_Z7_MAP_COLS*16u,
+                                     SC64_Z7_MAP_ROWS*16u,&q));
+        if (q.alive && q.raw_owner==4 && q.raw_type==37) ++live_lings;
+        if (q.alive && q.type==U_Z7_EGG && q.raw_owner==4 &&
+            q.target==U_ZERGLING) ++egg_count;
+    }
+    assert(source_lings>=live_lings);
+    assert(race_z7_save_candidate_valid(&candidate,&candidate.z7,
+                                        SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+
+    /* Add source-authentic enemy Eggs to unused slots. The last Egg crosses
+     * the two-Ling-per-Egg allowance; the immediately preceding state remains
+     * valid. The live unit array is not involved in this save-candidate test. */
+    for (unsigned i=0; live_lings+egg_count*2u<=source_lings; ++i) {
+        Unit enemy_egg=*human_egg;
+        unsigned slot=MAX_UNITS;
+        assert(i<MAX_UNITS);
+        for (unsigned j=0;j<MAX_UNITS;++j) {
+            Unit q;
+            assert(race_save_decode_unit(&candidate,j,SC64_Z7_MAP_COLS*16u,
+                                         SC64_Z7_MAP_ROWS*16u,&q));
+            if (race_z7_save_unused_unit(&q)) { slot=j; break; }
+        }
+        assert(slot<MAX_UNITS);
+        enemy_egg.owner=ENEMY;
+        enemy_egg.raw_owner=4;
+        enemy_egg.raw_type=36;
+        assert(TEST_UNIT_ENCODE(&candidate.units[slot],&enemy_egg,
+               SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
+        ++egg_count;
+        if (live_lings+egg_count*2u<=source_lings)
+            assert(race_z7_save_candidate_valid(&candidate,&candidate.z7,
+                                                SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+    }
+    assert(live_lings+egg_count*2u>source_lings);
+    assert(!race_z7_save_candidate_valid(&candidate,&candidate.z7,
+                                         SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+}
+#endif
+
+static int candidate_find_unused_unit(const RaceSave *save)
+{
+    for (unsigned i=0;i<MAX_UNITS;++i) {
+        Unit q;
+        assert(race_save_decode_unit(save,i,SC64_Z7_MAP_COLS*16u,
+                                     SC64_Z7_MAP_ROWS*16u,&q));
+        if (race_z7_save_unused_unit(&q)) return (int)i;
+    }
+    return -1;
+}
+
+static void test_save_candidate_census_records(const RaceSave *good)
+{
+    RaceSave changed;
+    Unit source={0};
+    int source_slot=-1,unused_slot=candidate_find_unused_unit(good);
+    assert(unused_slot>=0);
+    assert(race_z7_save_candidate_valid(good,&good->z7,
+                                        SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+
+    /* An explicit zeroed unused row is accepted, while a retained-dead source
+     * row below still participates in source-count bounds. */
+    {
+        Unit zero={0};
+        changed=*good;
+        assert(TEST_UNIT_ENCODE(&changed.units[unused_slot],&zero,
+               SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
+        assert(race_z7_save_candidate_valid(&changed,&changed.z7,
+                                            SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+    }
+    for (unsigned i=0;i<MAX_UNITS;++i) {
+        Unit q;
+        assert(race_save_decode_unit(good,i,SC64_Z7_MAP_COLS*16u,
+                                     SC64_Z7_MAP_ROWS*16u,&q));
+        if (q.alive && q.raw_owner>=0 && q.raw_type>=0 && q.raw_type!=36) {
+            source=q; source_slot=(int)i; break;
+        }
+    }
+    assert(source_slot>=0);
+    changed=*good;
+    {
+        Unit dead=source; dead.alive=0; dead.hp=0;
+        assert(TEST_UNIT_ENCODE(&changed.units[source_slot],&dead,
+               SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
+    }
+    assert(race_z7_save_candidate_valid(&changed,&changed.z7,
+                                        SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+    assert(race_z7_save_candidate_valid(good,&good->z7,
+                                        SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+
+    {
+        Unit bad=source; bad.raw_owner=8;
+        assert(candidate_unit_change_rejected(good,(unsigned)source_slot,&bad));
+        bad=source; bad.raw_type=228;
+        assert(candidate_unit_change_rejected(good,(unsigned)source_slot,&bad));
+        bad=source; bad.type=source.type==U_ZERGLING?U_DRONE:U_ZERGLING;
+        assert(candidate_unit_change_rejected(good,(unsigned)source_slot,&bad));
+        bad=source; bad.owner=source.owner==SIDE?ENEMY:SIDE;
+        assert(candidate_unit_change_rejected(good,(unsigned)source_slot,&bad));
+    }
+
+    /* Duplicate a capped non-human, non-Ling source tuple after retaining its
+     * original record as dead. This proves the bound counts dead provenance,
+     * rather than relying on a human product or the paid-Ling exception. */
+    {
+        const Sc64RaceMap *map=&sc64_race_maps[SC64_Z7_GLOBAL_ID];
+        int duplicate_slot=-1; Unit capped={0};
+        for (unsigned row=0;row<map->unit_count && duplicate_slot<0;++row) {
+            unsigned owner=map->units[row].owner,raw=map->units[row].source_type;
+            int initial=(int)race_z7_save_source_unit_count(map,owner,raw);
+            unsigned total=0; int live_slot=-1; Unit first={0};
+            if (owner==3u || (owner==4u && raw==37u) || raw==36u ||
+                sc64_race_unit_from_raw((int)raw)<0 || initial<=0) continue;
+            for (unsigned i=0;i<MAX_UNITS;++i) {
+                Unit q;
+                assert(race_save_decode_unit(good,i,SC64_Z7_MAP_COLS*16u,
+                                             SC64_Z7_MAP_ROWS*16u,&q));
+                if (q.raw_owner==(int)owner && q.raw_type==(int)raw) {
+                    ++total;
+                    if (q.alive && live_slot<0) { live_slot=(int)i; first=q; }
+                }
+            }
+            if (live_slot>=0 && total==(unsigned)initial) {
+                duplicate_slot=live_slot; capped=first;
+            }
+        }
+        assert(duplicate_slot>=0);
+        Unit dead=capped; dead.alive=0; dead.hp=0;
+        RaceSave retained=*good;
+        assert(TEST_UNIT_ENCODE(&retained.units[duplicate_slot],&dead,
+               SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
+        assert(race_z7_save_candidate_valid(&retained,&retained.z7,
+                                            SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+        RaceSave duplicate=retained;
+        assert(TEST_UNIT_ENCODE(&duplicate.units[unused_slot],&dead,
+               SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
+        assert(!race_z7_save_candidate_valid(&duplicate,&duplicate.z7,
+                                             SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+    }
+
+    /* A human Zergling with pending raw=-1 provenance is valid when it is
+     * encoded with canonical type health and armor in both row formats. */
+    {
+        Unit pending=source; int human_template=0;
+        for (unsigned i=0;i<MAX_UNITS;++i) {
+            Unit q;
+            assert(race_save_decode_unit(good,i,SC64_Z7_MAP_COLS*16u,
+                                         SC64_Z7_MAP_ROWS*16u,&q));
+            if (q.alive && q.owner==SIDE && q.raw_owner==3 && q.raw_type!=36) {
+                pending=q; human_template=1; break;
+            }
+        }
+        assert(human_template);
+        pending.type=U_ZERGLING; pending.owner=SIDE;
+        pending.raw_type=pending.raw_owner=-1;
+#ifdef SC64_Z7_DERIVED_SAVE
+        pending.maxhp=sc64_derived_unit_hp(U_ZERGLING);
+#else
+        pending.maxhp=sc64_race_unit_rules[U_ZERGLING].hp;
+        { int zp_hp=sc64_zp_actor_default_hp(U_ZERGLING);
+          if (zp_hp) pending.maxhp=zp_hp; }
+#endif
+        pending.hp=pending.maxhp;
+        pending.armor=sc64_race_unit_armor(U_ZERGLING);
+        pending.shield=sc64_race_unit_rules[U_ZERGLING].shields;
+        pending.carry=0; pending.selected=0; pending.cd=0;
+        pending.order=ORDER_IDLE; pending.build=-1; pending.target=-1;
+        pending.tx=pending.x; pending.ty=pending.y;
+        pending.path_x=pending.x; pending.path_y=pending.y;
+        pending.path_timer=0; pending.path_retry=0; pending.work_timer=0;
+        pending.flags=0; pending.shield_remainder=0;
+        pending.weapon=weapons_level;
+        changed=*good;
+        assert(TEST_UNIT_ENCODE(&changed.units[unused_slot],&pending,
+               SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
+        assert(race_z7_save_candidate_valid(&changed,&changed.z7,
+                                            SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+    }
+
+#ifdef SC64_Z7_EGG_PRODUCTION
+    /* Exercise retained Egg validity and malformed Egg provenance while the
+     * real paid human Egg is present in the baseline snapshot. */
+    {
+        Unit egg={0}; int egg_slot=-1;
+        for (unsigned i=0;i<MAX_UNITS;++i) {
+            Unit q;
+            assert(race_save_decode_unit(good,i,SC64_Z7_MAP_COLS*16u,
+                                         SC64_Z7_MAP_ROWS*16u,&q));
+            if (q.alive && (q.type==U_Z7_EGG || q.raw_type==36)) {
+                egg=q; egg_slot=(int)i; break;
+            }
+        }
+        assert(egg_slot>=0);
+        Unit dead_egg=egg; dead_egg.alive=0; dead_egg.hp=0;
+        changed=*good;
+        assert(TEST_UNIT_ENCODE(&changed.units[egg_slot],&dead_egg,
+               SC64_Z7_MAP_COLS*16u,SC64_Z7_MAP_ROWS*16u));
+        assert(race_z7_save_candidate_valid(&changed,&changed.z7,
+                                            SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+        Unit bad_egg=egg; bad_egg.raw_owner=4;
+        assert(candidate_unit_change_rejected(good,(unsigned)egg_slot,&bad_egg));
+        bad_egg=egg; bad_egg.raw_type=37;
+        assert(candidate_unit_change_rejected(good,(unsigned)egg_slot,&bad_egg));
+        bad_egg=egg; bad_egg.target=U_DRONE;
+        assert(candidate_unit_change_rejected(good,(unsigned)egg_slot,&bad_egg));
+        test_enemy_egg_budget(good,&egg);
+    }
+#endif
 }
 
 static void test_ling_egg_capacity(const RaceSave *checkpoint)
@@ -691,6 +935,7 @@ static void test_z7_candidate_and_live_roundtrip(void)
 #endif
     assert(race_z7_save_candidate_valid(&good,&good.z7,
                                         SC64_Z7_MAP_COLS,SC64_Z7_MAP_ROWS));
+    test_save_candidate_census_records(&good);
     assert(sizeof(RaceSave)<=16368u);
     for (unsigned i=sizeof(good.z7);i<sizeof(good.z5);++i)
         assert(((const u8 *)&good.z7)[i]==0);

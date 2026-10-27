@@ -14,6 +14,11 @@ static unsigned draw_calls;
 static int last_x, last_y;
 static const u8 *draw_sources[4096];
 static int draw_xs[4096];
+void gfx_reverse_bytes(u8 *dst, const u8 *src, unsigned n)
+{
+    for (unsigned i = 0; i < n; ++i) dst[i] = src[n - 1 - i];
+}
+
 void gfx_blit_sprite(int x, int y, int w, int h, const u8 *src)
 { (void)w; (void)h; if (draw_calls < 4096) { draw_sources[draw_calls] = src; draw_xs[draw_calls] = x; } ++draw_calls; last_x = x; last_y = y; }
 void gfx_blit_sprite_mapped(int x, int y, int w, int h, const u8 *src,
