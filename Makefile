@@ -3567,7 +3567,7 @@ build/test-terran build/test-sc64-terran-full-profile build/test-zerg build/test
 UNIT_FACING_FLAGS := -I.local/sc64/facing/generated -DSC64_UNIT_FACING
 SHOWCASE_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 SHOWCASE_SIEGE_FLAGS ?= -DSC64_SIEGE_SPLASH
-SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS) $(CANONICAL_DEATH_FLAGS)
+SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
 	$(SIZE) $@
@@ -3834,10 +3834,13 @@ build/test-sc64-weapon-source-raster: tests/sc64_weapon_source_vfx_render.c star
 build/test-sc64-weapon-source-runtime: tests/sc64_weapon_source_runtime.c starcraft/sc64_weapon_source_runtime.h starcraft/sc64_weapon_source_vfx.h tests/fixtures/weapon_source_mock.h | build
 	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) -Itests/fixtures $< -o $@
 .PHONY: test-sc64-weapon-source-sampling
-test-sc64-weapon-source-sampling: build/test-sc64-weapon-source-sampling build/test-sc64-weapon-source-raster build/test-sc64-weapon-source-runtime
+build/test-gfx-reverse-bytes: tests/gfx_reverse_bytes.c common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
+test-sc64-weapon-source-sampling: build/test-sc64-weapon-source-sampling build/test-sc64-weapon-source-raster build/test-sc64-weapon-source-runtime build/test-gfx-reverse-bytes
 	./build/test-sc64-weapon-source-sampling
 	./build/test-sc64-weapon-source-raster
 	./build/test-sc64-weapon-source-runtime
+	./build/test-gfx-reverse-bytes
 test: test-sc64-weapon-source-sampling
 
 # The actual engine emitter/renderer, using only already prepared private art.

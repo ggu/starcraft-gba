@@ -610,8 +610,29 @@ HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
   if(col<right&&s[col])*d=(*d&0xff00)|s[col];
  }
 }
+/* dst[i] = src[n-1-i]. Source art lives in ROM, so the aligned middle is read
+ * a word at a time from the end. Showcase runs it from IWRAM. */
+#if defined(GBA_MAPPED_BLIT_IWRAM) && !defined(GBA_HOST)
+HOT
+#endif
+void gfx_reverse_bytes(u8 *dst,const u8 *src,unsigned n) {
+ typedef u32 __attribute__((may_alias)) word;
+ const u8 *s=src+n;
+ while(n&&((uintptr_t)s&3u)){*dst++=*--s;--n;}
+ for(;n>=4;n-=4,dst+=4) {
+  s-=4;
+  u32 w=*(const word*)(const void*)s;
+  dst[0]=(u8)(w>>24);dst[1]=(u8)(w>>16);dst[2]=(u8)(w>>8);dst[3]=(u8)w;
+ }
+ while(n){*dst++=*--s;--n;}
+}
 /* Keep this optional compositor in ROM: prepared profiles have little spare
- * IWRAM. Mode-4 VRAM requires halfword stores, including odd clipped edges. */
+ * IWRAM. Showcase, which draws many source weapon effects and has room, opts
+ * into IWRAM with GBA_MAPPED_BLIT_IWRAM. Mode-4 VRAM requires halfword
+ * stores, including odd clipped edges. */
+#if defined(GBA_MAPPED_BLIT_IWRAM) && !defined(GBA_HOST)
+HOT
+#endif
 void gfx_blit_sprite_mapped(int x,int y,int width,int height,const u8 *src,
                             const u8 *lookup,unsigned rows) {
  if(!src||!lookup||!rows||rows>255||width<=0||height<=0||width>256||height>256||

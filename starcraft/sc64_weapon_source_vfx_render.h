@@ -17,6 +17,28 @@ typedef struct {
     uint8_t modifier, lookup_rows;
 } Sc64WeaponSourceVfxRaster;
 
+/* One source row: the frame's own bytes, or a reversed copy in `buffer`. */
+static inline const uint8_t *
+sc64_weapon_source_vfx_row(const uint8_t *pixels, unsigned width, int row,
+                           int reverse, uint8_t *buffer)
+{
+    const uint8_t *src = pixels + (unsigned)row * width;
+    if (!reverse) return src;
+    gfx_reverse_bytes(buffer, src, width);
+    return buffer;
+}
+
+/* Blit `width` pixels of one row with the raster's modifier. */
+static inline void
+sc64_weapon_source_vfx_blit_run(const Sc64WeaponSourceVfxRaster *r, int x, int y,
+                                int width, const uint8_t *src)
+{
+    if (r->modifier == 9 || r->modifier == 10)
+        gfx_blit_sprite_mapped(x, y, width, 1, src, r->lookup, r->lookup_rows);
+    else
+        gfx_blit_sprite(x, y, width, 1, src);
+}
+
 /* Project one already selected source frame. `world_x/y` is the source
  * image center in world pixels. `hflip` mirrors around the image canvas
  * center. Fog is checked per map tile, and the common sprite blitter applies
@@ -38,6 +60,9 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
     if (hflip && r->mirror_x + (int)r->width > r->canvas_w) return;
 
     int use_mirror_pixels = hflip && r->mirror_pixels;
+    /* A flipped frame without mirror pixels reads each row reversed. */
+    int reverse = hflip && !use_mirror_pixels;
+    uint8_t reversed[256];
     int src_x = hflip ? (int)r->mirror_x : r->x;
     const uint8_t *frame_pixels = use_mirror_pixels ? r->mirror_pixels : r->pixels;
     int left = world_x - camx - (int)r->canvas_w / 2 + src_x;
@@ -46,72 +71,37 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
         top + r->height <= 12) return;
 
     /* Fast path: when every map tile under the clipped raster is visible, the
-     * tile loop below would draw each row whole, so draw it in one call. The
-     * per-pixel reversed branch (no mirror pixels) keeps the tile loop. */
-    if (!(hflip && !use_mirror_pixels)) {
-        int sy0 = top < 12 ? 12 : top;
-        int sy1 = top + (int)r->height > 120 ? 120 : top + (int)r->height;
-        int wx0 = left + camx, wx1 = left + (int)r->width - 1 + camx;
-        int wy0 = sy0 + camy - 12, wy1 = sy1 - 1 + camy - 12;
-        int whole = wx0 >= 0 && wx1 < MAP_COLS * 16 && wy0 >= 0 && wy1 < MAP_ROWS * 16;
-        for (int ty = wy0 >> 4; whole && ty <= wy1 >> 4; ++ty)
-            for (int tx = wx0 >> 4; whole && tx <= wx1 >> 4; ++tx)
-                whole = currently_visible(tx * 16, ty * 16);
-        if (whole) {
-            for (int sy = sy0; sy < sy1; ++sy) {
-                const uint8_t *src = frame_pixels + (sy - top) * r->width;
-                if (r->modifier == 9 || r->modifier == 10)
-                    gfx_blit_sprite_mapped(left, sy, r->width, 1, src,
-                                           r->lookup, r->lookup_rows);
-                else
-                    gfx_blit_sprite(left, sy, r->width, 1, src);
-            }
-            return;
-        }
-    }
+     * tile loop below would draw each row whole, so draw it in one call. */
+    int sy0 = top < 12 ? 12 : top;
+    int sy1 = top + (int)r->height > 120 ? 120 : top + (int)r->height;
+    int wx0 = left + camx, wx1 = left + (int)r->width - 1 + camx;
+    int wy0 = sy0 + camy - 12, wy1 = sy1 - 1 + camy - 12;
+    int whole = wx0 >= 0 && wx1 < MAP_COLS * 16 && wy0 >= 0 && wy1 < MAP_ROWS * 16;
+    for (int ty = wy0 >> 4; whole && ty <= wy1 >> 4; ++ty)
+        for (int tx = wx0 >> 4; whole && tx <= wx1 >> 4; ++tx)
+            whole = currently_visible(tx * 16, ty * 16);
 
-    for (int row = 0; row < r->height; ++row) {
-        int sy = top + row;
-        if (sy < 12 || sy >= 120) continue;
+    for (int sy = sy0; sy < sy1; ++sy) {
+        const uint8_t *row_src = sc64_weapon_source_vfx_row(
+            frame_pixels, r->width, sy - top, reverse, reversed);
         int col = 0;
+        if (whole) {
+            sc64_weapon_source_vfx_blit_run(r, left, sy, r->width, row_src);
+            col = r->width;
+        }
         while (col < r->width) {
-            int source_col = hflip && !use_mirror_pixels ? (int)r->width - 1 - col : col;
             int wx = left + col + camx;
             int wy = sy + camy - 12;
             int visible = wx >= 0 && wx < MAP_COLS * 16 && wy >= 0 &&
                           wy < MAP_ROWS * 16 && currently_visible(wx, wy);
             if (!visible) { ++col; continue; }
-
-            if (hflip && !use_mirror_pixels) {
-                const uint8_t *pixel = frame_pixels + row * r->width + source_col;
-                if (r->modifier == 9 || r->modifier == 10)
-                    gfx_blit_sprite_mapped(left + col, sy, 1, 1, pixel,
-                                           r->lookup, r->lookup_rows);
-                else
-                    gfx_blit_sprite(left + col, sy, 1, 1, pixel);
-                ++col;
-                continue;
-            }
-
             /* Bound each blit to one tile so unseen neighboring tiles never
-             * leak through a partially visible projectile or impact. */
+             * leak through a partially visible projectile or impact. The
+             * starting coordinate was checked above; visibility is tile-wide. */
             int run = 16 - (wx & 15);
             if (run > (int)r->width - col) run = (int)r->width - col;
-            /* Visibility is tile-wide and run ends at this tile's edge.
-             * The starting coordinate was checked above; do not repeat a
-             * visibility lookup for every pixel in the same tile. */
-            int pixels = run;
-            if (pixels) {
-                const uint8_t *src = frame_pixels + row * r->width + col;
-                if (r->modifier == 9 || r->modifier == 10)
-                    gfx_blit_sprite_mapped(left + col, sy, pixels, 1, src,
-                                           r->lookup, r->lookup_rows);
-                else
-                    gfx_blit_sprite(left + col, sy, pixels, 1, src);
-                col += pixels;
-            } else {
-                ++col;
-            }
+            sc64_weapon_source_vfx_blit_run(r, left + col, sy, run, row_src + col);
+            col += run;
         }
     }
 }
@@ -315,7 +305,7 @@ sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
     if (!image || !image->source_frame_count ||
         image->frame_first >= SC64_WEAPON_SOURCE_FRAME_COUNT) return;
 
-    if (!sc64_weapon_source_trace_duration(p, launch_x, launch_y, x1, y1)) return;
+    if (!sc64_weapon_source_trace_has_duration(p, launch_x, launch_y, x1, y1)) return;
     uint32_t attack_age = sc64_weapon_source_vfx_source_tick(gba_age);
     uint32_t release_ticks = sc64_weapon_source_trace_release_ticks(p);
     /* The captured tracer begins at attack-init. Keep the attacker animation
