@@ -90,6 +90,9 @@ qualified on host; ARM replayed its recorded inputs. See the [Z7 full-win
 audit](audits/2026-10-27-z7-full-win/README.md) and [P7 controller
 qualification](research/p7-full-controller-qualification.md) for the exact
 profiles and limits.
+The current experimental P7 cache profile also replays the full winning tape
+on ARM with all 67 state records matching; see its
+[cache qualification](research/p7-fact-v2-qualification.md#full-arm-replay-of-the-current-cache-profile).
 
 These internal results do not promote either seventh mission into the
 canonical campaigns: Zerg and Protoss remain Z1–Z6 and P1–P6, or 22/30 entries.
