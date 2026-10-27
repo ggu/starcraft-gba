@@ -34,7 +34,9 @@
 #endif
 #endif
 volatile u32 demo_frame;
+#ifndef GBA_NO_DEBUG_INPUTS
 volatile u16 demo_inject_keys;
+#endif
 volatile u16 demo_keys;
 volatile u32 demo_last_cycles, demo_peak_cycles;
 volatile u32 demo_update_cycles;
@@ -42,6 +44,7 @@ volatile uint64_t demo_total_cycles;
 volatile u32 demo_tick_buckets[8];
 /* Optional debugger-fed controller events. Disabled in ordinary play. This
  * avoids a debugger round trip every tick during full-mission ARM replays. */
+#ifndef GBA_NO_DEBUG_INPUTS
 #if defined(SC64_BACKWATER) || defined(D2_DEN_OF_EVIL) || defined(SC64_RACES)
 #ifdef SC64_WINDOWED_SCHEDULE
 #define DEMO_SCHEDULE_CAPACITY DEMO_SCHEDULE_WINDOW_CAPACITY
@@ -76,17 +79,21 @@ __attribute__((noinline)) void demo_replay_dense_checkpoint(void) {
 #define DEMO_WINDOW_TICKS 1000u
 #define DEMO_WINDOW_CHECKPOINT demo_replay_checkpoint
 #endif
+#endif
 int main(void) {
     gba_init();
     game_init();
     u16 previous=0;
+#ifndef GBA_NO_DEBUG_INPUTS
 #ifdef SC64_WINDOWED_SCHEDULE
     u16 schedule_keys=0;
 #else
     u32 schedule_index=0;
     u16 schedule_keys=0;
 #endif
+#endif
     for (;;) {
+#ifndef GBA_NO_DEBUG_INPUTS
         u32 schedule_count=demo_schedule_count;
 #ifdef SC64_WINDOWED_SCHEDULE
         u32 schedule_active=demo_schedule_active;
@@ -97,8 +104,11 @@ int main(void) {
         if(schedule_count && !demo_schedule_tick && !schedule_index)
             demo_replay_checkpoint();
 #endif
+#endif
         u32 start=gba_clock();
-        u16 held=gba_keys() | demo_inject_keys;
+        u16 held=gba_keys();
+#ifndef GBA_NO_DEBUG_INPUTS
+        held|=demo_inject_keys;
 #ifdef SC64_WINDOWED_SCHEDULE
         if(schedule_enabled) {
             held=demo_schedule_window_held(demo_schedule_events,schedule_count,
@@ -115,6 +125,7 @@ int main(void) {
             held=schedule_keys;
         }
 #endif
+#endif
         demo_keys=held;
         game_update(held, held & (u16)~previous);
         demo_update_cycles=gba_clock()-start;
@@ -127,6 +138,7 @@ int main(void) {
         if(demo_last_cycles>demo_peak_cycles)demo_peak_cycles=demo_last_cycles;
         previous=held;
         demo_frame++;
+#ifndef GBA_NO_DEBUG_INPUTS
 #ifdef SC64_WINDOWED_SCHEDULE
         if(schedule_enabled) {
             demo_schedule_tick++;
@@ -144,6 +156,7 @@ int main(void) {
             if(demo_schedule_tick%1000u==0 || demo_schedule_tick==demo_schedule_length)
                 demo_replay_checkpoint();
         }
+#endif
 #endif
     }
 }
