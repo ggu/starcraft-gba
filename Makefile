@@ -4139,3 +4139,43 @@ build/test-sc64-p7-campaign-controller: $(P7_CAMPAIGN_CONTROLLER) $(STARCRAFT) $
 test-sc64-p7-campaign-controller: build/test-sc64-p7-campaign-controller tools/sc64_p7_campaign_trace.py
 	./build/test-sc64-p7-campaign-controller $(P7_CAMPAIGN_TRACE)
 	$(PYTHON) tools/sc64_p7_campaign_trace.py --require-win $(P7_CAMPAIGN_TRACE)
+
+# Opt-in full P7 performance profile; canonical campaigns remain unchanged.
+# The contact cache supersedes the older per-slot class/steering caches.
+# V2 sight/rectangle facts use a separate path from existing V1 headers.
+P7_FACT_V2_DIR := build/generated/p7-fact-v2
+P7_FACT_V2_HEADER := $(P7_FACT_V2_DIR)/sc64_fact_tables_generated.h
+P7_FACT_V2_FEATURES := -DSC64_FACT_SIGHT_TABLES -DSC64_P7_RECT_TABLES
+P7_FACT_V2_FLAGS := $(filter-out -DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST,$(P7_SIGHT_AXIS_FLAGS)) -DSC64_CONTACT_CACHE $(P7_FACT_V2_FEATURES) -DSC64_FACT_TABLES -I$(P7_FACT_V2_DIR)
+$(P7_FACT_V2_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile | build
+	mkdir -p $(P7_FACT_V2_DIR)
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(filter-out -DSC64_FACT_TABLES,$(P7_FACT_V2_FLAGS)) $< -o build/sc64-p7-fact-v2-gen
+	./build/sc64-p7-fact-v2-gen > $@.tmp
+	mv $@.tmp $@
+.PHONY: test-sc64-fact-v2 test-sc64-p7-fact-v2-normal-input
+test-sc64-fact-v2:
+	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_fact_v2.py'
+	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_p7_sight_runtime.py'
+build/test-sc64-p7-fact-v2-normal-input: $(P7_NORMAL_INPUT_REPLAY) tests/sc64_p7_normal_input_tape.h $(P7_FACT_V2_HEADER) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_FACT_V2_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+test-sc64-p7-fact-v2-normal-input: build/test-sc64-p7-fact-v2-normal-input
+	./build/test-sc64-p7-fact-v2-normal-input
+build/sc64-p7-fact-v2-normal-input.elf: $(P7_NORMAL_INPUT_REPLAY) tests/sc64_p7_normal_input_tape.h $(P7_FACT_V2_HEADER) $(P7_NORMAL_INPUT_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_FACT_V2_FLAGS) $(P7_NORMAL_INPUT_COMMON) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/sc64-p7-fact-v2-normal-input.map -lgcc -o $@
+
+build/starcraft-protoss-p7-fact-v2-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(P7_FACT_V2_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_FACT_V2_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-fact-v2-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Fact-V2-Probe-GBA.gba: build/starcraft-protoss-p7-fact-v2-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 FACTV2' S7V2
+.PHONY: protoss-p7-fact-v2-probe
+protoss-p7-fact-v2-probe: build/StarCraft-Protoss-P7-Fact-V2-Probe-GBA.gba
+
+P7_FACT_V2_CAMPAIGN_TRACE := build/sc64-p7-fact-v2-campaign-controller.jsonl
+build/test-sc64-p7-fact-v2-campaign-controller: $(P7_CAMPAIGN_CONTROLLER) $(P7_FACT_V2_HEADER) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_FACT_V2_FLAGS) -DP7_CONTROLLER_PROFILE=\"P7_FACT_V2_FLAGS\" $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+.PHONY: test-sc64-p7-fact-v2-campaign-controller
+test-sc64-p7-fact-v2-campaign-controller: build/test-sc64-p7-fact-v2-campaign-controller tools/sc64_p7_campaign_trace.py
+	./build/test-sc64-p7-fact-v2-campaign-controller $(P7_FACT_V2_CAMPAIGN_TRACE)
+	$(PYTHON) tools/sc64_p7_campaign_trace.py --require-win $(P7_FACT_V2_CAMPAIGN_TRACE)

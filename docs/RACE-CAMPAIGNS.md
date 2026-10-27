@@ -81,11 +81,25 @@ after packed rendering; see the
 [Terran rendering audit](audits/2026-10-26-terran-word-promotion/README.md).
 None of these are physical GBA guarantees.
 
-Z7 has an internal seventh-entry ROM with shared menu, source objectives and
-generation-35 saves, but no completed playthrough. P7 retains an isolated world
-foundation and numeric scheduler. Zerg 7–10 and Protoss 7–10 still need
-completion and ARM qualification. The internal P6 probe retains its own
-`SCPC` identity and its historical
+Z7 and P7 each have an internal seventh-entry candidate with a full
+ordinary-input ARM replay to the source win. Z7's generation-36 candidate also
+has a bounded fresh-process SRAM continuation; P7 has a current-controller
+host win, a 67-checkpoint full-profile ARM replay of its frozen input tape, and
+a bounded fresh-process SRAM continuation. The P7 controller itself was
+qualified on host; ARM replayed its recorded inputs. See the [Z7 full-win
+audit](audits/2026-10-27-z7-full-win/README.md) and [P7 controller
+qualification](research/p7-full-controller-qualification.md) for the exact
+profiles and limits.
+
+These internal results do not promote either seventh mission into the
+canonical campaigns: Zerg and Protoss remain Z1–Z6 and P1–P6, or 22/30 entries.
+The Z7 frequency-profile replay averages about 2.99 updates per second and is
+far below the 30-fps target. P7 performance has not been qualified over its
+full mission. Neither result establishes native enemy-AI equivalence, arbitrary
+save-state coverage or physical-GBA behavior. Zerg and Protoss missions 8–10
+remain unfinished; promotion of Z7/P7 still requires canonical campaign/save
+integration and the remaining gameplay qualification.
+The internal P6 probe retains its own `SCPC` identity and its historical
 [live-route audit](audits/2026-10-27-p6-live-route/README.md).
 
 The internal Z7 profile also exposes the missing colony defense commands:

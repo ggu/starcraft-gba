@@ -2607,6 +2607,31 @@ flags. It also compares the P7 movement trace and the menu/save-load fixture
 with the reference builds. See
 [Validation](VALIDATION.md#p7-build-time-fact-tables) for ARM measurements.
 
+The full P7 profile has a separate opt-in V2 performance probe:
+
+```sh
+make test-sc64-fact-v2
+# The following need the prepared private P7 inputs:
+make test-sc64-p7-fact-v2-normal-input
+make test-sc64-p7-fact-v2-campaign-controller
+make protoss-p7-fact-v2-probe
+```
+
+It writes `build/StarCraft-Protoss-P7-Fact-V2-Probe-GBA.gba` and generates
+its facts separately under `build/generated/p7-fact-v2`. The profile combines
+the one-pass contact cache with packed optical radii and source-pixel actor
+rectangle extents. It includes the experimental projectile, Carrier training
+and Interceptor flight paths. The older V1 fact probe and canonical P6 ROM
+keep their existing flags and generated headers. A mismatched roster, format
+or requested feature fails at compile time; out-of-roster sight requests use
+the original policy.
+
+`test-sc64-fact-v2` is asset-free. The ordinary-input performance replay
+covers 2,000 in-play frames; the separate campaign controller requires a
+strict mission win and validates its input trace. Neither test promotes P7
+into the canonical campaign. See the [P7 V2 qualification](research/p7-fact-v2-qualification.md)
+for measured costs and remaining enemy-AI, performance and hardware limits.
+
 ## Mineral gathering before a base exists
 
 The shared first-depot worker path lets an empty mineral worker gather before
