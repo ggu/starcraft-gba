@@ -67,10 +67,49 @@ static int race_nydus_set_source(int mission, const Sc64NydusSourceRecord *recor
     return 1;
 }
 
+static int race_nydus_live_mission(void)
+{
+    return race_mode ? -1 : race_selected_mission;
+}
+
+/* Resolve a mission's source rows: the installed table, else the optional
+ * profile hook SC64_NYDUS_SOURCE_FOR_MISSION(mission, &records, &count).
+ * The hook lets save preflight and a fresh-boot load resolve links before
+ * any mission adapter has run. Nothing global changes here. */
+static int race_nydus_resolve(int mission, const Sc64NydusSourceRecord **records,
+                              Sc64NydusSourcePair *pairs, unsigned *pair_count)
+{
+    if (mission < 0) return 0;
+    if (race_nydus_source && race_nydus_source_mission == mission) {
+        *records = race_nydus_source;
+        memcpy(pairs, race_nydus_pairs, sizeof(race_nydus_pairs));
+        *pair_count = race_nydus_pair_count;
+        return 1;
+    }
+#ifdef SC64_NYDUS_SOURCE_FOR_MISSION
+    {
+        const Sc64NydusSourceRecord *hook = 0;
+        unsigned count = 0;
+        if (SC64_NYDUS_SOURCE_FOR_MISSION(mission, &hook, &count) &&
+            sc64_nydus_source_pairs(hook, count, pairs, pair_count)) {
+            *records = hook;
+            return 1;
+        }
+    }
+#endif
+    return 0;
+}
+
+/* Install the live mission's source (from the hook if needed). */
 static int race_nydus_source_current(void)
 {
-    return race_nydus_source && !race_mode &&
-        race_nydus_source_mission == race_selected_mission;
+    const Sc64NydusSourceRecord *records;
+    Sc64NydusSourcePair pairs[SC64_NYDUS_MAX_LINKS];
+    unsigned count;
+    int mission = race_nydus_live_mission();
+    if (race_nydus_source && race_nydus_source_mission == mission) return 1;
+    if (!race_nydus_resolve(mission, &records, pairs, &count)) return 0;
+    return race_nydus_set_source(mission, records, 2u * count);
 }
 
 static Sc64NydusEndpointView race_nydus_view_of(const Building *q)
@@ -90,27 +129,20 @@ static Sc64NydusEndpointView race_nydus_view_of(const Building *q)
 
 /* Keep only raw-134 rows standing on a source position: a bounded list (no
  * pool-sized scratch). Too many matches means duplicates and fails closed. */
-static int race_nydus_collect(const Building *q, int slot,
+static int race_nydus_collect(const Sc64NydusSourceRecord *source, unsigned pairs,
+                              const Building *q, int slot,
                               Sc64NydusEndpointView *views, unsigned *count)
 {
     Sc64NydusEndpointView v = race_nydus_view_of(q);
-    unsigned i, records = 2u * race_nydus_pair_count;
+    unsigned i, records = 2u * pairs;
     if (!v.alive) return 1;
     for (i = 0; i < records; ++i)
-        if (race_nydus_source[i].x == v.x && race_nydus_source[i].y == v.y) break;
+        if (source[i].x == v.x && source[i].y == v.y) break;
     if (i == records) return 1;
     if (*count >= SC64_NYDUS_MAX_VIEWS) return 0;
     v.slot = (unsigned char)slot;
     views[(*count)++] = v;
     return 1;
-}
-
-static int race_nydus_bind_views(const Sc64NydusEndpointView *views, unsigned count,
-                                 int require_all, Sc64NydusState *out)
-{
-    return race_nydus_source_current() &&
-        sc64_nydus_bind(race_nydus_source, race_nydus_pairs, race_nydus_pair_count,
-                        views, count, require_all, out);
 }
 
 /* Mission start: both endpoints of every source pair must be live. */
@@ -121,8 +153,10 @@ static int race_nydus_bind_world(int require_all)
     unsigned count = 0;
     if (!race_nydus_source_current()) return 0;
     for (int i = 0; i < MAX_BUILDINGS; ++i)
-        if (!race_nydus_collect(&b[i], i, views, &count)) return 0;
-    if (!race_nydus_bind_views(views, count, require_all, &next)) return 0;
+        if (!race_nydus_collect(race_nydus_source, race_nydus_pair_count, &b[i], i,
+                                views, &count)) return 0;
+    if (!sc64_nydus_bind(race_nydus_source, race_nydus_pairs, race_nydus_pair_count,
+                         views, count, require_all, &next)) return 0;
     race_nydus = next;
     return 1;
 }
@@ -417,16 +451,21 @@ static int race_nydus_save_candidate_valid(const RaceSave *candidate, int width,
                                            int height)
 {
     Sc64NydusEndpointView views[SC64_NYDUS_MAX_VIEWS];
-    unsigned count = 0;
+    Sc64NydusSourcePair pairs[SC64_NYDUS_MAX_LINKS];
+    const Sc64NydusSourceRecord *source = 0;
+    unsigned count = 0, pair_count = 0;
+    /* The candidate's own mission selects the source, not live state. */
+    int mission = candidate->state[0] == 0 ? (int)candidate->state[2] : -1;
+    int resolved = race_nydus_resolve(mission, &source, pairs, &pair_count);
     Sc64NydusState s;
     memset(&s, 0, sizeof(s));
-    if (race_nydus_source_current()) {
+    if (resolved) {
         for (int i = 0; i < MAX_BUILDINGS; ++i) {
             Building q;
             if (!race_save_decode_building(candidate, (unsigned)i, &q) ||
-                !race_nydus_collect(&q, i, views, &count)) return 0;
+                !race_nydus_collect(source, pair_count, &q, i, views, &count)) return 0;
         }
-        if (!race_nydus_bind_views(views, count, 0, &s)) return 0;
+        if (!sc64_nydus_bind(source, pairs, pair_count, views, count, 0, &s)) return 0;
     }
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit q;
@@ -436,8 +475,7 @@ static int race_nydus_save_candidate_valid(const RaceSave *candidate, int width,
         if (!race_save_decode_unit(candidate, (unsigned)i, (unsigned)width * 16u,
                                    (unsigned)height * 16u, &q)) return 0;
         if (!q.alive || q.order != ORDER_NYDUS_ENTER) continue;
-        if (!race_nydus_source_current() || q.target < 0 || q.target >= MAX_BUILDINGS)
-            return 0;
+        if (!resolved || q.target < 0 || q.target >= MAX_BUILDINGS) return 0;
         partner = sc64_nydus_partner(&s, (unsigned)q.target);
         if (partner < 0) return 0;
         in = race_nydus_view_slot(views, count, q.target);

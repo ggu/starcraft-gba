@@ -12,6 +12,21 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include "../starcraft/sc64_nydus_rules.h"
+
+/* Profile hook, as a Z8 build would supply from its generated source rows. */
+static int hook_mission = -1;
+static const Sc64NydusSourceRecord *hook_records;
+static int test_nydus_source_for(int mission, const Sc64NydusSourceRecord **records,
+                                 unsigned *count)
+{
+    if (mission != hook_mission || !hook_records) return 0;
+    *records = hook_records;
+    *count = 4;
+    return 1;
+}
+#define SC64_NYDUS_SOURCE_FOR_MISSION(mission, records, count) \
+    test_nydus_source_for((mission), (records), (count))
 #include "../starcraft/game.c"
 
 #if !defined(SC64_NYDUS_ENABLED) || !defined(SC64_Z7_RUNTIME)
@@ -532,6 +547,34 @@ static void foreign_source_is_not_trusted(void)
     assert(race_load_game() && u[h].order == ORDER_NYDUS_ENTER);
 }
 
+/* A fresh boot has no installed source: the save is validated and rebound
+ * through the mission hook, keyed by the candidate's own mission. */
+static void fresh_boot_load_resolves_through_hook(void)
+{
+    RaceSave good;
+    int h;
+    launch_with_canals();
+    h = side_hydra(0);
+    select_unit_normal(h);
+    assert(command_enter(ent) == 1);
+    assert(race_save_game());
+    good = race_data;
+    race_nydus_clear();
+    hook_mission = -1; hook_records = 0;
+    reject_save_without_live_mutation(&good); /* no source anywhere */
+    hook_mission = SC64_Z7_GLOBAL_ID; hook_records = records;
+    assert(race_nydus_save_candidate_valid(&good, race_cols, race_rows));
+    save_write(&good, sizeof(good), SAVE_VERSION);
+    assert(race_load_game());
+    assert(race_nydus_source == records && race_nydus_source_mission == SC64_Z7_GLOBAL_ID);
+    assert(sc64_nydus_partner(&race_nydus, (unsigned)ent) == ex &&
+           u[h].order == ORDER_NYDUS_ENTER && u[h].target == ent);
+    for (int f = 0; f < 900 && u[h].order == ORDER_NYDUS_ENTER; ++f) input(0);
+    assert(u[h].order == ORDER_IDLE && near_exit(h, ex));
+    hook_mission = -1; hook_records = 0;
+    printf("fresh boot: hook-resolved preflight, rebind and transit\n");
+}
+
 int main(void)
 {
     _Static_assert(ORDER_NYDUS_ENTER <= 15, "packed unit order field is four bits");
@@ -544,6 +587,7 @@ int main(void)
     ownership_change_follows_link();
     save_resume_and_malformed_saves();
     foreign_source_is_not_trusted();
+    fresh_boot_load_resolves_through_hook();
     puts("sc64 nydus game: ok");
     return 0;
 }
