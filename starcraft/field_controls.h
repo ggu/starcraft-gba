@@ -171,6 +171,7 @@ field_controls_hint(void)
     case UI_A_ATTACK: return "B COMMANDS  A ATTACK";
     case UI_A_SELECT: return "B COMMANDS  A SELECT";
     case UI_A_DESELECT: return "B COMMANDS  A DESELECT";
+    case UI_A_GAS: return "B COMMANDS  A GATHER GAS";
     default: return 0;
     }
 }

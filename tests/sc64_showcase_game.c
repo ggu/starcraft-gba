@@ -439,6 +439,8 @@ static int check_field_controls_review(void)
     cx = x; cy = y;
     resolve_now();
     if (ui_action != UI_A_GAS) return fail("controls: Probe over an Assimilator does not offer gas");
+    if (!field_controls_hint() || strcmp(field_controls_hint(), "B COMMANDS  A GATHER GAS"))
+        return fail("controls: gas hint does not describe the A action");
     press(KEY_A);
     if (u[worker].order != ORDER_GAS || u[worker].target != spare)
         return fail("controls: A with a Probe over an Assimilator did not gather gas");
