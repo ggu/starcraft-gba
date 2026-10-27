@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
 import struct
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
@@ -33,6 +36,25 @@ def catalog_for(code: bytes, starts: tuple[int, int, int]) -> tuple[bytes, dict]
 
 
 class Sc64AiProgramTests(unittest.TestCase):
+    def test_output_cannot_overwrite_owned_rom_or_its_hardlink(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            local = root / '.local'
+            local.mkdir()
+            rom = local / 'owned.z64'
+            original = b'owned ROM fixture'
+            rom.write_bytes(original)
+            alias = local / 'report.json'
+            os.link(rom, alias)
+            with mock.patch.object(programs, 'ROOT', root), \
+                    mock.patch.object(programs, 'audit') as audit:
+                for output in (rom, alias):
+                    with self.subTest(output=output):
+                        with self.assertRaisesRegex(ValueError, 'overwrite or alias'):
+                            programs.run(rom, output)
+                        self.assertEqual(rom.read_bytes(), original)
+                audit.assert_not_called()
+
     def test_decodes_known_command_operands_and_offsets(self):
         # wait(1), build(1, type 154, priority 150), stop
         data = b'\0' * 4 + bytes((2, 1, 0, 6, 1, 154, 0, 150, 36))
