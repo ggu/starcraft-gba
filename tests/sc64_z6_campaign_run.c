@@ -20,6 +20,7 @@ static int assign_gas_worker(int worker);
 static int order_group(int attack,int x,int y);
 static int box_select(int left,int top,int right,int bottom);
 static int best_storm_point(int slot,int *out_x,int *out_y);
+static int controller_cast_storm_pair(int hero,int x,int y,int cluster_count);
 static void trace_storm_candidates(int slot)
 {
     if(slot<0)return;
@@ -66,7 +67,7 @@ static void input(u16 held)
             hero_track_x=u[hero].x;hero_track_y=u[hero].y;
         }
     }
-    if(z6_rest_guard&&!z6_rest_guard_busy&&host_ticks%30u==0u&&
+    if(z6_rest_guard&&!z6_rest_guard_busy&&
        mode==MODE_NORMAL&&!menu_open) {
         z6_rest_guard_busy=1;
         (void)z6_hold_safely();
@@ -296,6 +297,125 @@ static void move_cursor(int x,int y)
     input(0);
     if(cx!=x||cy!=y)fprintf(stderr,"cursor stalled target=%d,%d current=%d,%d screen=%d mode=%d host=%u\n",x,y,cx,cy,screen,mode,host_ticks);
 }
+#ifdef SC64_DIRECT_ATTACK
+static int controller_attackmove_member_reachable(int sx,int sy,int px,int py,
+                                                   int flying)
+{
+    int nx,ny;
+    return flying || path_next_tile(sx,sy,px,py,&nx,&ny);
+}
+
+static int controller_attackmove_group_reachable(int px,int py)
+{
+    for(int i=0;i<MAX_UNITS;i++)
+        if(u[i].alive&&u[i].selected&&u[i].owner==SIDE&&
+           !SC64_TRANSPORT_LOADED(&u[i])&&
+           controller_attackmove_member_reachable(u[i].x,u[i].y,px,py,
+                                                   sc64_race_unit_flying(u[i].type)))
+            return 1;
+    return 0;
+}
+
+
+/* The engine's direct-target picker uses dist2 < 31^2 for units and
+ * dist2 < 26^2 for buildings (game.c: sc64_direct_attack_find_target).
+ * Stay 9/17 pixels outside the applicable edge, still within the 64px
+ * Hydralisk range used by this controller. A click on open ground keeps
+ * the normal Attack-Move semantics. */
+static int controller_attackmove_click_point(int sx,int sy,int x,int y,
+                                              int *out_x,int *out_y)
+{
+    static const int cardinal[4][2]={{1,0},{-1,0},{0,1},{0,-1}};
+    static const int diagonal[4][2]={{1,1},{1,-1},{-1,1},{-1,-1}};
+    int target=sc64_direct_attack_find_target(x,y);
+    int pick_radius=target>=0 ? (target<MAX_UNITS ? 31 : 26) : 31;
+    unsigned out_of_bounds=0,targeted=0,blocked=0,unreachable=0;
+    /* Search 40/48px cardinal offsets, plus 32x32 diagonals (~45px). The
+     * source picker bounds are 31px for units and 26px for buildings; all
+     * points stay outside that bound and within the 64px Hydra range. */
+    for(int extra=9;extra<=17;extra+=8) for(int d=0;d<4;d++) {
+        int radius=pick_radius+extra;
+        int px=x+cardinal[d][0]*radius,py=y+cardinal[d][1]*radius,nx,ny;
+        if(px<0||py<0||px>=WORLD_W||py>=WORLD_H) { ++out_of_bounds; continue; }
+        if(sc64_direct_attack_find_target(px,py)>=0) { ++targeted; continue; }
+        if(!is_traversable(px/16,py/16,-1)) { ++blocked; continue; }
+        if(!controller_attackmove_group_reachable(px,py)) { ++unreachable; continue; }
+        *out_x=px;*out_y=py;return 1;
+    }
+    for(int d=0;d<4;d++) {
+        int px=x+diagonal[d][0]*32,py=y+diagonal[d][1]*32,nx,ny;
+        if(px<0||py<0||px>=WORLD_W||py>=WORLD_H) { ++out_of_bounds; continue; }
+        if(sc64_direct_attack_find_target(px,py)>=0) { ++targeted; continue; }
+        if(!is_traversable(px/16,py/16,-1)) { ++blocked; continue; }
+        if(!controller_attackmove_group_reachable(px,py)) { ++unreachable; continue; }
+        *out_x=px;*out_y=py;return 1;
+    }
+    /* Diagnostics only: report nearest live hostile, rejection totals, and
+     * selected group coordinates. This does not affect candidate choice. */
+    {
+        int entity=-1,best=0x7fffffff,tx=-1,ty=-1,raw=-1,owner=-1;
+        for(int i=0;i<MAX_UNITS;i++) if(u[i].alive&&owners_hostile(SIDE,u[i].owner)) {
+            int d=dist2(x,y,u[i].x,u[i].y); if(d<best) {best=d;entity=i;tx=u[i].x;ty=u[i].y;raw=u[i].raw_type;owner=u[i].owner;}
+        }
+        for(int i=0;i<MAX_BUILDINGS;i++) if(b[i].alive&&owners_hostile(SIDE,b[i].owner)) {
+            int d=dist2(x,y,b[i].x,b[i].y); if(d<best) {best=d;entity=MAX_UNITS+i;tx=b[i].x;ty=b[i].y;raw=b[i].raw_type;owner=b[i].owner;}
+        }
+        fprintf(stderr,"no Attack-Move point objective=(%d,%d) nearest=%d raw%d owner%d xy%d,%d d2%d group-centroid=%d,%d rejects bounds=%u targeted=%u blocked=%u unreachable=%u\n",
+            x,y,entity,raw,owner,tx,ty,best,sx,sy,out_of_bounds,targeted,blocked,unreachable);
+        for(int i=0;i<MAX_UNITS;i++) if(u[i].alive&&u[i].selected&&u[i].owner==SIDE)
+            fprintf(stderr,"  selected slot%d raw%d xy%d,%d order%d tx%d,%d\\n",i,u[i].raw_type,u[i].x,u[i].y,u[i].order,u[i].tx,u[i].ty);
+    }
+    return 0;
+}
+
+static void controller_cancel_armed_attack(void)
+{
+    if(mode==MODE_ATTACK) tap(KEY_B);
+    if(menu_open) tap(KEY_B);
+    if(mode!=MODE_NORMAL||menu_open)
+        fprintf(stderr,"Attack-Move cancel cleanup incomplete mode%d menu%d\\n",mode,menu_open);
+}
+
+static int controller_click_attackmove(int sx,int sy,int x,int y)
+{
+    int px=x,py=y;
+    /* Moving the cursor advances the simulation. Re-plan from the original
+     * objective whenever a hostile enters the point's pick radius. Never
+     * issue a direct-target order as a fallback for a controller Attack-Move. */
+    for(int retry=0;retry<4;retry++) {
+        if(!controller_attackmove_click_point(sx,sy,x,y,&px,&py)) {
+            controller_cancel_armed_attack();
+            return 0;
+        }
+        move_cursor(px,py);
+        int target_now=sc64_direct_attack_find_target(cx,cy);
+        if(target_now<0) {
+            fprintf(stderr,"attackmove click try%d pre-A mode%d screen%d menu%d point%d,%d\n",
+                retry,mode,screen,menu_open,cx,cy);
+            tap(KEY_A);
+            fprintf(stderr,"attackmove click post-A mode%d screen%d menu%d selected%d\n",
+                mode,screen,menu_open,selected_count());
+            return 1;
+        }
+    }
+    controller_cancel_armed_attack();
+    return 0;
+}
+
+static int controller_selected_attackmove(void)
+{
+    int count=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected&&u[i].owner==SIDE) {
+        ++count;
+        if(u[i].order==ORDER_ATTACK_TARGET) return 0;
+        if(u[i].order!=ORDER_ATTACK_MOVE &&
+           (u[i].order!=ORDER_IDLE || dist2(u[i].x,u[i].y,u[i].tx,u[i].ty)>16*16))
+            return 0;
+    }
+    return count>0;
+}
+#endif
+
 static int order_group(int attack,int x,int y)
 {
     if(menu_open) tap(KEY_B);
@@ -333,9 +453,35 @@ static int order_group(int attack,int x,int y)
             host_ticks,mode,menu_open,menu_cursor,selected_count());
         return 0;
     }
-    move_cursor(x,y);tap(KEY_A);
+#ifdef SC64_DIRECT_ATTACK
+    if(attack) {
+        int sx=0,sy=0,n=0;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected) {sx+=u[i].x;sy+=u[i].y;++n;}
+        int clicked=0;
+        if(n) {
+            int guard_was_busy=z6_rest_guard_busy;
+            z6_rest_guard_busy=1;
+            clicked=controller_click_attackmove(sx/n,sy/n,x,y);
+            z6_rest_guard_busy=guard_was_busy;
+        }
+        if(!n||!clicked) {
+            controller_cancel_armed_attack();
+            fprintf(stderr,"Attack-Move controller found no stable safe click for %d,%d at%u\n",x,y,host_ticks);
+            return 0;
+        }
+        if(!controller_selected_attackmove()) {
+            fprintf(stderr,"Attack-Move acceptance mismatch at%u cursor%d,%d selected%d mode%d menu%d screen%d\n",
+                host_ticks,cx,cy,selected_count(),mode,menu_open,screen);
+            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected)
+                fprintf(stderr,"  accepted order slot%d raw%d order%d target%d tx%d,%d\n",
+                    i,u[i].raw_type,u[i].order,u[i].target,u[i].tx,u[i].ty);
+            assert(controller_selected_attackmove());
+        }
+    } else
+#endif
+    { move_cursor(x,y);tap(KEY_A); }
     fprintf(stderr,"B+R command destination%d,%d at%u frame%d screen%d mode%d menuopen%d selected%d:",
-        x,y,host_ticks,frame,screen,mode,menu_open,selected_count());
+        cx,cy,host_ticks,frame,screen,mode,menu_open,selected_count());
     for(int i=0;i<MAX_UNITS;i++)if(u[i].selected)
         fprintf(stderr," %d/raw%d/o%d->%d,%d",i,u[i].raw_type,u[i].order,u[i].tx,u[i].ty);
     fputc('\n',stderr);
@@ -441,8 +587,25 @@ static int hero_attack_move(int x,int y)
     for(int i=0;i<count&&menu_cursor!=MENU_ATTACK;i++)tap(KEY_DOWN);
     if(menu_cursor!=MENU_ATTACK) { tap(KEY_B); return 0; }
     tap(KEY_A);
-    if(mode!=MODE_ATTACK)return 0;
+    if(mode!=MODE_ATTACK) {
+#ifdef SC64_DIRECT_ATTACK
+        controller_cancel_armed_attack();
+#endif
+        return 0;
+    }
+#ifdef SC64_DIRECT_ATTACK
+    int guard_was_busy=z6_rest_guard_busy;
+    z6_rest_guard_busy=1;
+    int clicked=controller_click_attackmove(u[k].x,u[k].y,x,y);
+    z6_rest_guard_busy=guard_was_busy;
+    if(!clicked) {
+        controller_cancel_armed_attack();
+        return 0;
+    }
+    assert(u[k].order!=ORDER_ATTACK_TARGET);
+#else
     move_cursor(x,y);tap(KEY_A);
+#endif
     fprintf(stderr,"normal-input Kerrigan attack-move selected%d order%d dest%d,%d xy%d,%d\n",
         selected_count(),u[k].order,u[k].tx,u[k].ty,u[k].x,u[k].y);
     return mode==MODE_NORMAL&&u[k].alive&&u[k].order==ORDER_ATTACK_MOVE;
@@ -495,11 +658,18 @@ static int z6_hold_safely(void)
     if(best_x<0||!hero_move(best_x,best_y))return 0;
     unsigned start=host_ticks;
     while(hero>=0&&u[hero].alive&&dist2(u[hero].x,u[hero].y,best_x,best_y)>24*24&&
+          !z6_point_threatened(hero,best_x,best_y,80)&&
           host_ticks-start<900u&&screen==SCREEN_PLAY&&!won&&!lost)input(0);
+    if(hero>=0&&u[hero].alive&&z6_point_threatened(hero,best_x,best_y,80)) {
+        fprintf(stderr,"normal-input Kerrigan safe-point invalidated; replan target%d,%d xy%d,%d tick%u\n",
+            best_x,best_y,u[hero].x,u[hero].y,host_ticks);
+        return 1;
+    }
     fprintf(stderr,"normal-input Kerrigan held clear of attackers at%d,%d xy%d,%d hp%d tick%u\n",
         best_x,best_y,hero>=0?u[hero].x:-1,hero>=0?u[hero].y:-1,hero>=0?u[hero].hp:-1,host_ticks);
     return 1;
 }
+
 /* Unaided Overlords are slow. Wait while the flight keeps closing on its
  * point: stop after 900 ticks without getting closer, or 20000 in total. */
 static int z6_wait_closing(int mover,int guard,int x,int y,int radius)
@@ -664,6 +834,7 @@ static int clear_force2_locations(void)
 {
     int support_prepared=0,support_x=-1,support_y=-1,support_targets=0;
     int support_casts=0,casts_since_retreat=0,support_waiting=0;
+    (void)support_casts; /* Also compile under canonical Z6 flags without the DirectAttack controller. */
     for(unsigned loc=4;loc<=5&&screen==SCREEN_PLAY&&!won&&!lost;loc++) {
         int ll,tt,rr,bb;u32 before=0,after=0;unsigned rounds=0;
         if(!sc64_z6_world_location(&race_z6_world,loc,&ll,&tt,&rr,&bb)||
@@ -868,12 +1039,14 @@ static int clear_force2_locations(void)
                 }
                 if(host_ticks-last_cast>=300u) {
                     int hero=kerrigan(),sx=0,sy=0,n=best_storm_point(hero,&sx,&sy);
-                    if(hero>=0&&n>=2&&u[hero].carry>=75*256&&hero_storm(sx,sy)) {
-                        ++support_casts;
-                        ++casts_since_retreat;
-                        ++z6_storms_cast;
-                        fprintf(stderr,"normal-input Kerrigan Storm%d cluster%d at%d,%d tick%u\n",
-                            support_casts,n,sx,sy,host_ticks);
+                    if(hero>=0&&n>=2&&u[hero].carry>=150*256) {
+                        int fired=controller_cast_storm_pair(hero,sx,sy,n);
+                        if(fired>0) {
+                            support_casts+=fired;
+                            casts_since_retreat++;
+                            z6_storms_cast+=fired;
+                            fprintf(stderr,"normal-input Kerrigan Storm pair result%d initialcluster%d at%d,%d tick%u\n",
+                                fired,n,sx,sy,host_ticks);
                         if(casts_since_retreat>=1) {
                             hero=kerrigan();
                             if(hero>=0&&u[hero].alive&&hero_move(1728,1456)) {
@@ -896,6 +1069,7 @@ static int clear_force2_locations(void)
                             z6_rest_guard=support_waiting;
                             if(support_waiting)(void)z6_hold_safely();
                         }
+                    }
                     }
                     last_cast=host_ticks;
                 }
@@ -1250,11 +1424,15 @@ static int best_storm_point(int slot,int *out_x,int *out_y)
 {
     int best=-1,best_score=0,best_count=0,best_d2=0x7fffffff;
     if(slot<0)return 0;
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&owners_hostile(SIDE,u[i].owner)) {
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&!SC64_TRANSPORT_LOADED(&u[i])&&
+        owners_hostile(SIDE,u[i].owner)&&
+        currently_visible(u[i].x,u[i].y)) {
         int dx=u[i].x-u[slot].x,dy=u[i].y-u[slot].y,d2=dx*dx+dy*dy;
         int count=0,friendly=0;
         if(d2>144*144)continue;
-        for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&owners_hostile(SIDE,u[j].owner)) {
+        for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&!SC64_TRANSPORT_LOADED(&u[j])&&
+            owners_hostile(SIDE,u[j].owner)&&
+            currently_visible(u[j].x,u[j].y)) {
             int sx=u[j].x-u[i].x,sy=u[j].y-u[i].y;
             if(sx*sx+sy*sy<=24*24)count++;
         }
@@ -1271,6 +1449,105 @@ static int best_storm_point(int slot,int *out_x,int *out_y)
     }
     if(best<0)return 0;
     *out_x=u[best].x;*out_y=u[best].y;return best_count;
+}
+
+typedef struct {
+    int valid,raw_type,raw_owner,owner,hp,shield;
+} ControllerStormTarget;
+
+static void controller_storm_snapshot(int x,int y,ControllerStormTarget *before)
+{
+    memset(before,0,sizeof(ControllerStormTarget)*MAX_UNITS);
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&!SC64_TRANSPORT_LOADED(&u[i])&&
+        owners_hostile(SIDE,u[i].owner)&&
+        currently_visible(u[i].x,u[i].y)&&dist2(x,y,u[i].x,u[i].y)<=24*24) {
+        before[i].valid=1;before[i].raw_type=u[i].raw_type;
+        before[i].raw_owner=u[i].raw_owner;before[i].owner=u[i].owner;
+        before[i].hp=u[i].hp;before[i].shield=u[i].shield;
+    }
+}
+
+static void controller_storm_damage_report(const char *label,int x,int y,
+                                             const ControllerStormTarget *before)
+{
+    for(int i=0;i<MAX_UNITS;i++)if(before[i].valid) {
+        int same=u[i].raw_type==before[i].raw_type&&u[i].raw_owner==before[i].raw_owner&&
+                 u[i].owner==before[i].owner;
+        int hp=same&&u[i].alive?u[i].hp:0;
+        int shield=same&&u[i].alive?u[i].shield:0;
+        fprintf(stderr,"Storm %s target slot%d raw%d owner%d rawowner%d center%d,%d hp%d->%d shield%d->%d identity%d alive%d\n",
+            label,i,before[i].raw_type,before[i].owner,before[i].raw_owner,x,y,
+            before[i].hp,hp,before[i].shield,shield,same,same&&u[i].alive);
+    }
+}
+
+static int controller_wait_storm_expire(int effect)
+{
+    unsigned start=host_ticks;
+    while(effect>=0&&effect<SC64_STORM_MAX_ACTIVE&&
+          race_z6.storm.storm[effect].active&&host_ticks-start<120u&&
+          screen==SCREEN_PLAY&&!won&&!lost)input(0);
+    return effect>=0&&effect<SC64_STORM_MAX_ACTIVE&&
+           !race_z6.storm.storm[effect].active;
+}
+
+static int controller_cast_storm_pair(int hero,int x,int y,int cluster_count)
+{
+    ControllerStormTarget before[MAX_UNITS];
+    int effect=-1,cast_x,cast_y,second_x=0,second_y=0,second_count=0,overlap=0;
+    unsigned cast_start=host_ticks;
+    if(hero<0||!u[hero].alive||u[hero].carry<150*256||cluster_count<2||
+       !currently_visible(x,y)||dist2(u[hero].x,u[hero].y,x,y)>144*144) return 0;
+    if(!hero_storm(x,y)) {
+        fprintf(stderr,"observed Storm1 command rejected target%d,%d latency%u energy%d\n",
+            x,y,host_ticks-cast_start,u[hero].carry/256);
+        return 0;
+    }
+    cast_x=cx;cast_y=cy;
+    for(int i=0;i<SC64_STORM_MAX_ACTIVE;i++)
+        if(race_z6.storm.storm[i].active&&race_z6.storm.storm[i].x==cast_x&&
+           race_z6.storm.storm[i].y==cast_y) {effect=i;break;}
+    fprintf(stderr,"observed Storm1 cast cluster%d requested%d,%d actual%d,%d latency%u energy%d effect%d\n",
+        cluster_count,x,y,cast_x,cast_y,host_ticks-cast_start,u[hero].carry/256,effect);
+    if(effect<0)return 1;
+    controller_storm_snapshot(cast_x,cast_y,before);
+    if(!controller_wait_storm_expire(effect)) {
+        fprintf(stderr,"observed Storm1 did not expire within120 ticks\n");return 1;
+    }
+    controller_storm_damage_report("1",cast_x,cast_y,before);
+    hero=kerrigan();
+    second_count=best_storm_point(hero,&second_x,&second_y);
+    if(hero>=0)for(int i=0;i<MAX_UNITS;i++)if(before[i].valid&&u[i].alive&&
+        u[i].raw_type==before[i].raw_type&&u[i].raw_owner==before[i].raw_owner&&
+        u[i].owner==before[i].owner&&currently_visible(u[i].x,u[i].y)&&
+        dist2(second_x,second_y,u[i].x,u[i].y)<=24*24)overlap++;
+    if(hero<0||!u[hero].alive||u[hero].carry<75*256||second_count<2||overlap<2||
+       dist2(x,y,second_x,second_y)>48*48||
+       dist2(u[hero].x,u[hero].y,second_x,second_y)>144*144||
+       !currently_visible(second_x,second_y)) {
+        fprintf(stderr,"observed Storm2 skipped: cluster%d overlap%d point%d,%d from%d,%d energy%d\n",
+            second_count,overlap,second_x,second_y,x,y,hero>=0?u[hero].carry/256:-1);
+        return 1;
+    }
+    cast_start=host_ticks;
+    if(!hero_storm(second_x,second_y)) {
+        fprintf(stderr,"observed Storm2 command rejected point%d,%d latency%u energy%d\n",
+            second_x,second_y,host_ticks-cast_start,u[hero].carry/256);
+        return 1;
+    }
+    int actual_second_x=cx,actual_second_y=cy;
+    effect=-1;
+    for(int i=0;i<SC64_STORM_MAX_ACTIVE;i++)
+        if(race_z6.storm.storm[i].active&&race_z6.storm.storm[i].x==actual_second_x&&
+           race_z6.storm.storm[i].y==actual_second_y) {effect=i;break;}
+    fprintf(stderr,"observed Storm2 cast cluster%d overlap%d requested%d,%d actual%d,%d latency%u energy%d effect%d\n",
+        second_count,overlap,second_x,second_y,actual_second_x,actual_second_y,host_ticks-cast_start,
+        u[hero].carry/256,effect);
+    if(effect>=0)controller_storm_snapshot(actual_second_x,actual_second_y,before);
+    if(effect>=0&&controller_wait_storm_expire(effect))
+        controller_storm_damage_report("2",actual_second_x,actual_second_y,before);
+    else fprintf(stderr,"observed Storm2 effect did not expire within120 ticks\n");
+    return 2;
 }
 static void launch(void)
 {

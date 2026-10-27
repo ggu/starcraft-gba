@@ -167,10 +167,38 @@ six-mission Zerg flags. Both retain the prepatch gate-off trace byte-for-byte:
 `4fd6cce64853c8f98e5069d6798c092ff7a303cc5da2fe5fd29c9a0fd736b205`.
 Only the test controller changes; production direct-attack rules remain intact.
 
-Z6 still has a bounded non-win under the full development combination. A
-private policy that avoided direct-target orders did not restore its win,
-so that change is not adopted. Its original source victory predicates remain
-required before promotion.
+Z6 now also has a host win under the full development combination. Its
+controller preserves intended Attack-Move with ground clicks, checks
+reachability from actual selected members rather than a possibly impassable
+group centroid, and cancels armed UI state when it cannot find a safe click.
+Kerrigan's retreat guard rechecks moving threats while traveling. Storm
+support targets currently visible hostiles and uses sequential casts after
+the first effect expires, with ordinary energy costs and controller input.
+The engine and source victory predicates are unchanged.
+
+With the same prepared private inputs, run:
+
+```sh
+make test-sc64-z7-carried-z6
+```
+
+This runs the focused controller-policy fixture in a separate process, then
+the input-only campaign controller. Synthetic actor edits appear only in the
+focused fixture, never in the controller that generates the winning tape.
+Under the complete Z7 frequency/formation/packed-cache feature vector the
+ASan/UBSan controller wins at frame 134,932 / host tick 136,446, with Kerrigan
+alive at the island objective, Ventral Sacs researched, no cargo remaining,
+zero Force2 actors in both required locations, and no runtime fault. Its
+trace SHA-256 is
+`16ea7121070706633a9e290709fea792e652466857873988b7e86f086534962d`.
+
+The same controller also wins with DirectAttack disabled and with the
+canonical six-mission Zerg flags. Those two traces are byte-identical:
+frame 115,413 / host tick 116,527, SHA-256
+`64a79647b36b7633a4283179ec492bd2a0634193f162cc84eacab8c06039c2d3`.
+These are host campaign wins, not ARM replay or fresh-process SRAM evidence
+for the new tape. Canonical progress remains 22/30; performance and remaining
+target qualification still prevent promotion.
 
 All eighteen rotated skirmish configurations (two maps, three human races,
 one to three AI opponents) reached terminal losses in this host matrix. A
