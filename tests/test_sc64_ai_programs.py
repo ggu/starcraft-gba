@@ -70,6 +70,17 @@ class Sc64AiProgramTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'outside code/table bounds'):
             programs.analyze_catalog(payload, catalog)
 
+    def test_reachable_shared_region_gotos_are_validated_transitively(self):
+        # Zer8 enters Ze8T's region. The latter contains a malformed goto that
+        # points either into its own operand bytes or out of the leaf bounds.
+        for target_bytes, error in ((bytes((8, 0)), 'not an instruction boundary'),
+                                    (bytes((0xff, 0x7f)), 'outside code/table bounds')):
+            with self.subTest(target=target_bytes):
+                code = bytes((0, 7, 0, 0)) + target_bytes + bytes((38, 36))
+                payload, catalog = catalog_for(code, (4, 7, 10))
+                with self.assertRaisesRegex(ValueError, error):
+                    programs.analyze_catalog(payload, catalog)
+
 
 if __name__ == '__main__':
     unittest.main()

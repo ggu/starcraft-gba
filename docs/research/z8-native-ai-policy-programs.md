@@ -19,10 +19,12 @@ and `MvTe`. Opcode names and operand widths were cross-checked against the
 pinned PyMS `AIBIN.py` revision
 `bfc5d3aad0b5614a5aff72c223f8efa00afddfa4`. The decoder rejects unknown
 opcodes, truncated arguments, out-of-leaf branches, and branches into operand
-bytes. It allows an explicit `goto` to target an instruction in a later
-script region; it does not equate the next catalog entry with a semantic
-program end. The tool writes numeric command metadata only under `.local/`;
-it does not save the ROM leaf or emit instruction bytes.
+bytes. It follows `goto` targets through every reached region, including
+shared code, and validates each reached region's further branches. It does not
+equate the next catalog entry with a semantic program end. The tool writes
+decoded program metadata only under `.local/`; that output is private program
+data, not a redistributable asset. The ROM leaf and instruction bytes are never
+saved.
 
 The report was generated with:
 
@@ -39,9 +41,10 @@ The Z8 source descriptor at
 contains the scenario's `RunAIScriptAtLocation` actions. Raw source fields are
 preserved below where their semantics are not established.
 
-The UnitType, UpgradeType, and TechType names below use the pinned BWAPI
-headers at `d727fed68558c506163048ea889131d8cbb33915`. That crosswalk helps
-interpret the source numeric IDs, but does not itself prove N64 enum identity.
+Numeric type, upgrade, and tech IDs were cross-checked against the pinned BWAPI
+headers at `d727fed68558c506163048ea889131d8cbb33915`; those per-command values
+and names are not reproduced here. The crosswalk helps interpret source IDs,
+but does not itself prove N64 enum identity.
 
 ## Decoded program facts
 
@@ -59,47 +62,24 @@ opcode followed by `stop`; that command has no encoded operands. Its attached
 trigger action has source location index 9. The relationship between that
 location and the N64 `move_dt` implementation has not been runtime traced.
 
-`Zer8` begins with `start_campaign`, `wait(1)`, `start_town`,
-`defaultbuild_off`, `default_min(0)`, and another `wait(1)`. Its five `build`
-triples are `(1,154,150)`, `(1,64,130)`, `(4,64,80)`, `(1,160,80)`, and
-`(1,167,80)`. The pinned BWAPI `UnitType.h` enum maps these type IDs to Nexus,
-Probe, Probe, Gateway, and Stargate. `build(count, unit, priority)` is also the
-syntax documented by PyMS's AI Basics tutorial; the numeric operands remain
-the ground truth in the extracted report.
+`Zer8` begins with the campaign/town initialization commands, disables
+default building, and sets its default minimum. It has five build requests,
+several ground/air defense build/use categories, a force-size setting, and
+eight upgrade requests. Its repeating body assembles and executes ten attack
+groups, with a `goto` back into the script body. The exact unit IDs, request
+arguments, group compositions, and wait operands are retained only in the
+ignored metadata report.
 
-`Zer8` contains ground/air defense build/use pairs for type IDs 65, 83, 66,
-and 70, followed by `max_force(1300)`. BWAPI maps those IDs to Zealot, Reaver,
-Dragoon, and Scout. It then requests eight upgrades with operand triples
-`(1,37,0)`, `(1,15,0)`, `(1,33,0)`, `(1,35,0)`, `(1,5,0)`, `(1,6,0)`,
-`(1,13,0)`, `(1,14,0)`, each followed by `defenseclear_aa`. Later it repeatedly
-builds attack groups from these decoded counts: 2 Zealots; 1 Scout; 4
-Dragoons; 2 Scouts; 8 Zealots plus 1 Reaver; 2 Zealots plus 2 Dragoons plus 1
-Reaver; 4 Scouts; 4 Dragoons plus 4 Zealots plus 2 Reavers; 3 Scouts; and 1
-Reaver plus 4 Dragoons plus 1 Scout. These sequences use `attack_prepare`,
-`attack_do`, and `attack_clear`; the program contains 24 `wait` instructions,
-including encoded operands 500, 1,500, 6,000, 7,500, and 9,000. Its final
-`goto` returns to offset 18,015. These are source command sequences and
-operand values; completion or exact delay units on the N64 have not been
-observed.
+`Ze8T` has the same broad initialization categories, six build requests,
+ground/air defense build/use categories, upgrade and technology requests, and
+four attack-group executions before its `goto` loop. The exact unit IDs,
+request arguments, group compositions, and wait operands are retained only in
+the ignored metadata report.
 
-`Ze8T` has the same initial campaign/town setup. Its six `build` triples are
-`(1,154,150)`, `(1,64,130)`, `(4,64,80)`, `(1,165,80)`, `(1,160,80)`, and
-`(1,155,80)`, mapping to Nexus, Probe, Probe, Templar Archives, Gateway, and
-Robotics Facility. Its defense build/use requests cover Zealot, Archon, Reaver,
-and Dragoon. Upgrade/technology operands include `(1,15,0)`, `(1,5,0)`,
-`(20,30)`, `(1,13,0)`, `(1,40,0)`, `(1,35,0)`, and `(19,30)`. BWAPI maps tech
-IDs 20 and 19 to Hallucination and Psionic Storm; upgrade IDs 15, 5, 13, 40,
-and 35 to Protoss Plasma Shields, Protoss Ground Armor, Protoss Ground
-Weapons, Khaydarin Amulet, and Scarab Damage. Its four attack groups are one
-Archon, two Archons, one Archon, and one Archon; the script uses wait operands
-1, 500, 4,500, 6,000, 7,500, 18,000, and 19,500, then loops to offset 17,769.
-
-The trigger descriptor associates `Zer8` with trigger 8, source location 4,
-and enabled player slot 20; `Ze8T` with trigger 9, location 5, and slot 19.
-`MvTe` is used by triggers 10, 11, 12, 19, 20, and 21 at locations 6, 7, and
-9, all enabled for slot 19. Their associated conditions have source opcodes
-and raw fields retained in the descriptor; this note does not assign an
-unverified meaning to the source player indices or condition IDs.
+The trigger descriptor associates the two longer scripts with distinct
+trigger/player/location rows, and uses `MvTe` in six more rows. Their source
+conditions are preserved in the private descriptor; this note does not
+reinterpret the source player indices or condition IDs.
 
 ## Limits and implementation consequence
 

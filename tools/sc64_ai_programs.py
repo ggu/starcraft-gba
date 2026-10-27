@@ -125,20 +125,33 @@ def analyze_catalog(data: bytes, catalog: dict) -> dict:
         start = row['code_offset']
         if start not in regions:
             raise ValueError(f'{script_id} has no valid code region')
-        lo, hi = regions[start]
-        instructions = decoded_regions.setdefault(start, decode_segment(data, lo, hi))
-        boundaries = {i['offset'] for i in instructions}
-        local_targets = []
-        for instruction in instructions:
-            if 'branch_target' not in instruction:
+        reachable_regions: set[int] = set()
+        worklist = [start]
+        reachable_targets = []
+        while worklist:
+            region_start = worklist.pop()
+            if region_start in reachable_regions:
                 continue
-            target = instruction['branch_target']
-            target_lo, target_hi = region_for(target)
-            target_instructions = decoded_regions.setdefault(
-                target_lo, decode_segment(data, target_lo, target_hi))
-            if target not in {i['offset'] for i in target_instructions}:
-                raise ValueError(f'{script_id} goto target {target} is not an instruction boundary')
-            local_targets.append(target)
+            reachable_regions.add(region_start)
+            lo, hi = regions[region_start]
+            region_instructions = decoded_regions.setdefault(
+                region_start, decode_segment(data, lo, hi))
+            boundaries = {instruction['offset'] for instruction in region_instructions}
+            for instruction in region_instructions:
+                if 'branch_target' not in instruction:
+                    continue
+                target = instruction['branch_target']
+                target_start, target_end = region_for(target)
+                target_instructions = decoded_regions.setdefault(
+                    target_start, decode_segment(data, target_start, target_end))
+                if target not in {item['offset'] for item in target_instructions}:
+                    raise ValueError(
+                        f'{script_id} goto target {target} is not an instruction boundary')
+                reachable_targets.append(target)
+                if target_start not in reachable_regions:
+                    worklist.append(target_start)
+        lo, hi = regions[start]
+        instructions = decoded_regions[start]
         op_counts: dict[str, int] = {}
         for instruction in instructions:
             name = instruction['name']
@@ -153,7 +166,8 @@ def analyze_catalog(data: bytes, catalog: dict) -> dict:
                 {key: value for key, value in item.items() if key != 'opcode'}
                 for item in instructions
             ],
-            'goto_targets': local_targets,
+            'reachable_code_regions': sorted(reachable_regions),
+            'goto_targets': reachable_targets,
         })
     return {
         'reference': {
