@@ -8,9 +8,12 @@ qualified on earlier frozen ROMs. These Terran timings precede the latest
 minimap change, whose current ARM measurements cover Protoss. The current
 full-profile ARM T10 result is below the 30-fps target, and no physical GBA
 result is claimed. The canonical `terran` profile includes all ten Terran
-missions. Canonical Zerg and Protoss each include their first six missions.
+missions. Canonical Zerg includes its first six missions. This integration
+branch wires the default Protoss target to the P7 candidate, while the last
+fully qualified Protoss campaign remains P1–P6. Explicit `protoss-p6` retains
+that generation-30 product.
 `zerg-z4`, `zerg-z3` and `protoss-p3` remain explicit legacy builds with their original
-ROMs and save identities; `protoss-p4-storm` also preserves its real four-entry files. Canonical Protoss uses P6, including the carried Shuttle runtime; explicit
+ROMs and save identities; `protoss-p4-storm` also preserves its real four-entry files. The P7 candidate carries the P1–P6 campaign and the seventh menu entry; explicit
 `protoss-p5-shuttle` preserves the earlier five-entry product. The
 catalog records all 30 mission identifiers.
 
@@ -32,7 +35,7 @@ campaign startup/save checks and the Outpost/Blood Bath race-and-AI matrix.
 
 Use `zerg` or `protoss` in place of `terran` for the other builds. `prepare` accepts a `.z64`, `.v64`, or `.n64` image, or a ZIP containing exactly one supported image. It verifies the image and uses the pinned `sc64-maps` extractor; the first preparation requires Git and network access to fetch that tool. `status` checks preparation and build outputs. Build and test do not need an emulator; `play` requires mGBA. See [Development](DEVELOPMENT.md) for tool requirements and [SC64 development notes](SC64.md) for import details.
 
-The canonical ROMs are `build/StarCraft-Terran-GBA.gba`, `build/StarCraft-Zerg-Z6-GBA.gba`, and `build/StarCraft-Protoss-P6-GBA.gba`. The explicit legacy `zerg-z4` target retains `build/StarCraft-Zerg-Z4-GBA.gba` and its Z4 save identity; `zerg-z3` retains `build/StarCraft-Zerg-GBA.gba` and its Z3 save identity; `protoss-p3` retains `build/StarCraft-Protoss-GBA.gba` and its P3 identity. Canonical Z6 uses `.local/play/zerg-z6`, Z4 uses `.local/play/zerg-z4`, P6 uses `.local/play/protoss-p6`, explicit P5 uses `.local/play/protoss-p5-shuttle`, and explicit P4 uses `.local/play/protoss-p4-storm`; the legacy profiles continue using `.local/play/zerg` and `.local/play/protoss`. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
+The default ROM targets are `build/StarCraft-Terran-GBA.gba`, `build/StarCraft-Zerg-Z6-GBA.gba`, and the P7 candidate `build/StarCraft-Protoss-P7-GBA.gba`. Explicit `protoss-p6` retains `build/StarCraft-Protoss-P6-GBA.gba` and its generation-30 identity. The candidate uses `.local/play/protoss-p7`; P6 uses `.local/play/protoss-p6`. Z6 uses `.local/play/zerg-z6`, Z4 uses `.local/play/zerg-z4`, explicit P5 uses `.local/play/protoss-p5-shuttle`, and explicit P4 uses `.local/play/protoss-p4-storm`; the legacy profiles continue using `.local/play/zerg` and `.local/play/protoss`. Extracted inputs and generated headers stay under ignored `.local/sc64/`; ROMs, ELF files, and test outputs stay under ignored `build/`. Do not commit or distribute the supplied ROM, imported map or art data, generated headers, saves, or captures containing imported game graphics.
 
 To build and test all three race campaigns, prepare `terran`, `zerg` and
 `protoss` with the same verified ROM, then run
@@ -94,8 +97,10 @@ The current experimental P7 cache profile also replays the full winning tape
 on ARM with all 67 state records matching; see its
 [cache qualification](research/p7-fact-v2-qualification.md#full-arm-replay-of-the-current-cache-profile).
 
-These internal results do not promote either seventh mission into the
-canonical campaigns: Zerg and Protoss remain Z1–Z6 and P1–P6, or 22/30 entries.
+These internal results do not qualify either seventh mission for promotion:
+Zerg and Protoss remain documented as Z1–Z6 and P1–P6, or 22/30 entries, until
+the new P7 canonical render profile passes its own link, save, and campaign
+checks.
 The Z7 frequency-profile replay averages about 2.99 updates per second and is
 far below the 30-fps target. P7 performance has not been qualified over its
 full mission. Neither result establishes native enemy-AI equivalence, arbitrary
@@ -125,8 +130,10 @@ Zerg 3 **The New Dominion**, Zerg 4 **Agent of the Swarm**, and Protoss 3
 32. The explicit legacy `zerg-z4` target retains `StarCraft-Zerg-Z4-GBA.gba` /
 `starcraft-zerg-z4.elf`, code `SCZ4`, generation 20. The explicit legacy `zerg-z3` target retains `StarCraft-Zerg-GBA.gba` /
 `starcraft-zerg.elf` (versioned `-Z3` names alias these), code `SCZ3`,
-generation 5. Canonical Protoss uses `StarCraft-Protoss-P6-GBA.gba` /
-`starcraft-protoss-p6.elf`, code `SCP6`, generation 30. Explicit
+generation 5. The P7 candidate uses `StarCraft-Protoss-P7-GBA.gba` /
+`starcraft-protoss-p7.elf`, code `SCP7`, generation 43. Explicit `protoss-p6`
+retains `StarCraft-Protoss-P6-GBA.gba` / `starcraft-protoss-p6.elf`, code
+`SCP6`, generation 30. Explicit
 `protoss-p5-shuttle` keeps `StarCraft-Protoss-P5-Shuttle-GBA.gba` /
 `starcraft-protoss-p5-shuttle.elf`, `SCPB`, generation 26. Explicit
 `protoss-p4-storm` preserves its real P4 Storm files, `SCP5`, generation 21. Explicit legacy

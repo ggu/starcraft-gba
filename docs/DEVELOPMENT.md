@@ -1187,9 +1187,12 @@ qualification. Source staging alone does not establish a playable mission.
 
 ### Canonical Zerg and Protoss builds
 
-The standard Zerg build includes its first six missions; the standard
-Protoss build includes its first five. Prepare each profile from your verified ROM, then use the standard
-commands; no extra staged-profile selection is needed:
+The standard Zerg build includes its first six missions. The Protoss target is
+wired to the P7 candidate, which carries the first six missions and opens the
+seventh. Its new canonical presentation and save profile still require final
+qualification; explicit `protoss-p6` builds the previously qualified P1–P6
+image. Prepare either profile from your verified ROM, then use the standard
+commands:
 
 ```sh
 ./dev sc64 prepare --rom /path/to/StarCraft64-USA.z64 --profile zerg
@@ -1198,9 +1201,11 @@ commands; no extra staged-profile selection is needed:
 ./dev sc64 play --profile zerg
 ```
 
-Replace `zerg` with `protoss` for the Protoss campaign. The canonical output
-pairs are `build/StarCraft-Zerg-Z6-GBA.gba` / `build/starcraft-zerg-z6.elf`
-and `build/StarCraft-Protoss-P6-GBA.gba` / `build/starcraft-protoss-p6.elf`.
+Replace `zerg` with `protoss` for the P7 candidate. The output pairs are
+`build/StarCraft-Zerg-Z6-GBA.gba` / `build/starcraft-zerg-z6.elf` and
+`build/StarCraft-Protoss-P7-GBA.gba` / `build/starcraft-protoss-p7.elf`.
+Explicit `protoss-p6` builds `build/StarCraft-Protoss-P6-GBA.gba` /
+`build/starcraft-protoss-p6.elf`.
 Explicit `zerg-z4` (`--profile zerg-z4`) preserves the earlier four-entry
 `build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf` pair, its
 `SCZ4` generation-20 saves and `make test-zerg-z4`. Explicit `zerg-z3`
@@ -1220,10 +1225,12 @@ Canonical Zerg uses `SCZ6`, save generation 32, the Z6 storage/runtime and
 query flags, a word-packed six-chapter sprite bank under
 `.local/sc64/zerg-z6/generated`, and the canonical drawing flags. Preparing
 `zerg` also generates the Z5/Z6 inputs and that bank. Its save directory,
-`.local/play/zerg-z6`, is separate from the legacy Z4 and Z3 profiles. Canonical Protoss uses `SCP6`, generation 30 and
+`.local/play/zerg-z6`, is separate from the legacy Z4 and Z3 profiles. The P7
+candidate uses `SCP7`, generation 43 and `.local/play/protoss-p7`; its all-chapter
+packed sprite bank is `.local/sc64/protoss-p7/generated`, separate from the
+probe and P6 banks. Explicit `protoss-p6` uses `SCP6`, generation 30 and
 `.local/play/protoss-p6`; it carries P1–P5 including Shuttle transport, then P6
-with Storm and the source rescue/extraction mission. Its separate packed sprite
-bank is `.local/sc64/protoss-p6/generated`; the internal probe bank is unchanged.
+with Storm and the source rescue/extraction mission.
 Explicit `protoss-p5-shuttle` retains `SCPB`, generation 26 and
 `.local/play/protoss-p5-shuttle`.
 Explicit `protoss-p4-storm` retains `SCP5`, generation 21 and its P4 save path;
@@ -1231,7 +1238,8 @@ Explicit `protoss-p4-storm` retains `SCP5`, generation 21 and its P4 save path;
 saves are incompatible and are rejected. The asset-free default build
 continues to require no imported inputs.
 
-Older prepared Protoss workspaces must prepare P6 inputs before building:
+Older prepared Protoss workspaces must prepare P7 inputs before building the
+candidate. The explicit P6 build remains available:
 
 ```sh
 ./dev sc64 prepare --rom "/path/to/StarCraft 64 USA ROM" --profile protoss
@@ -1239,20 +1247,25 @@ Older prepared Protoss workspaces must prepare P6 inputs before building:
 ./dev sc64 test --profile protoss
 ```
 
-P6 preparation requires authenticated P4/P5/P6 map/scenario gates, P6 abilities
-and doodads, and its complete packed sprite bank. `protoss-p6` is an explicit
-alias for the canonical product. `protoss-p5-shuttle` preserves the earlier
+P7 preparation requires authenticated P4/P5/P6/P7 map and scenario inputs, P6
+abilities and doodads, P7 Battery properties, and a complete packed P1–P7
+sprite bank. P7 uses generation 43 and rejects incompatible P6 generation-30
+saves without converting or migrating them. `protoss-p6` preserves the separate
+generation-30 product and save directory. `protoss-p5-shuttle` preserves the earlier
 five-entry ROM and its separate saves. No P3/P4/P5 save conversion is performed.
-The P6 runtime retains generation 30; its ROM title/code are `SC PROTOSS6` /
-`SCP6`. See the [P6 audit](audits/2026-10-27-p6-promotion/README.md) for current
-host, ARM, save, timing and memory evidence. P5's earlier evidence remains in
+The P7 ROM title/code are `SC PROTOSS7` / `SCP7`; P6 retains `SC PROTOSS6` /
+`SCP6`. The existing [P7 controller qualification](research/p7-full-controller-qualification.md)
+covers its earlier fact-profile replay; it does not qualify the new canonical
+render build or establish 30-fps performance. See the [P6 audit](audits/2026-10-27-p6-promotion/README.md) for
+the explicit P6 product's host, ARM, save, timing and memory evidence. P5's earlier evidence remains in
 the [P5 audit](audits/2026-10-26-p5-promotion/README.md).
 
 ### Staged Zerg and Protoss chapter 4
 
 Zerg 4 is enabled in the canonical profile, which now continues through Zerg 6.
-The explicit `zerg-z4` profile builds the earlier four-entry Z4 ROM. Canonical Protoss includes **The Hunt for Tassadar** and
-P5 through the Shuttle runtime and P6. Explicit `protoss-p4-storm` keeps the
+The explicit `zerg-z4` profile builds the earlier four-entry Z4 ROM. The P7
+candidate carries **The Hunt for Tassadar** and P5 through the Shuttle runtime
+and P6 before opening P7. Explicit `protoss-p4-storm` keeps the
 four-entry Storm profile and its own real files/save format. The plain `protoss-p4`
 build remains a separate internal experiment. Preparing later map data does
 not enable unqualified later missions in the frontend.
