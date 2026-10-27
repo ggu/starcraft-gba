@@ -729,8 +729,17 @@ class OnboardingTests(unittest.TestCase):
                          ('test-sc64-p5-shuttle-runtime', 'test-sc64-p5-campaign-run'))
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
         makefile = (ROOT / 'Makefile').read_text(encoding='utf-8')
-        self.assertIn('ZERG_Z7_CANONICAL_FLAGS = $(Z7_STEERING_FLAGS)', makefile)
-        self.assertIn('-DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ', makefile)
+        self.assertIn(
+            'ZERG_Z7_CANONICAL_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) '
+            '-DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM '
+            '-DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ',
+            makefile)
+        self.assertIn('ZERG_Z7_RELEASE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS',
+                      makefile)
+        self.assertIn('ZERG_Z7_CANONICAL_FLAGS) $(3) $$< common/gba.c -o $$@', makefile)
+        self.assertIn('$(CC) $(CFLAGS) $(ZERG_Z7_RELEASE_FLAGS)', makefile)
+        self.assertIn('Z7_STEERING_FLAGS = $(Z7_FULL_RENDER_FLAGS) $(Z7_STEERING_OPTIONS)',
+                      makefile)
         self.assertIn('Z7_EGG_PROBE_FLAGS := $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_ATTACK -DSC64_Z7_EGG_PRODUCTION',
                       makefile)
         self.assertIn('Z7_FULL_RENDER_FLAGS =', makefile)

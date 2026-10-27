@@ -3390,9 +3390,8 @@ zerg-z7-defense-targets-probe: build/StarCraft-Zerg-Z7-Defense-Targets-Probe-GBA
 
 # Unpromoted Z7 qualification with the full canonical presentation vector.
 # The standard `zerg` product remains the separately qualified Z1-Z6 ROM.
-# The Z7 vector keeps its own collision options (Z7_STEERING_OPTIONS below),
-# which the contact cache supersedes and rejects, so the contact cache flags
-# are removed from every Z7 full-render target.
+# Keep the historical full-render probe and its low-level fixtures on the
+# collision-list path. The selected canonical game vector below uses CONTACT.
 Z7_FULL_RENDER_FLAGS = $(patsubst -I.local/sc64/z6/generated,-I$(ZERG_Z6_BANK),$(Z7_DEFENSE_TARGET_FLAGS)) $(CANONICAL_DRAW_FLAGS) $(filter-out -DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM,$(ZERG_CANONICAL_FLAGS)) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
 Z7_FULL_RENDER_INPUTS = $(filter-out .local/sc64/z5/generated/sc64_race_sprites_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h,$(Z7_PROBE_INPUTS)) $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 build/starcraft-zerg-z7-full-render-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_FULL_RENDER_INPUTS) common/gba.ld Makefile | build
@@ -3470,12 +3469,11 @@ build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba: build/starcraft-zerg-z7-steering
 zerg-z7-steering-probe: build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z7-steering
 
-# Keep the tested full-render vector for host fixtures and historical probes.
-# The standalone Z7 release candidate substitutes the CONTACT movement path
-# and omits debugger input queues; Z6, probe ROMs and replay fixtures retain
-# their original flags.
-ZERG_Z7_CANONICAL_FLAGS = $(Z7_STEERING_FLAGS) -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ
-ZERG_Z7_RELEASE_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(ZERG_Z7_CANONICAL_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM -DGBA_NO_DEBUG_INPUTS
+# The canonical gameplay flags match the CONTACT standalone release. Keep
+# physical-input-only main-loop selection local to that standalone target.
+# Historical Z7 probes and their tests continue to use Z7_FULL_RENDER_FLAGS.
+ZERG_Z7_CANONICAL_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ
+ZERG_Z7_RELEASE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z7_CANONICAL_INPUTS = $(Z7_FULL_RENDER_INPUTS)
 build/starcraft-zerg-z7.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(ZERG_Z7_RELEASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7.map -lgcc -o $@
