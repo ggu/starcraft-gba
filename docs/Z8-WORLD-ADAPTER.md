@@ -52,13 +52,35 @@ Run the asset-free sanitizer fixture with:
 
 ```sh
 python3 -m unittest discover -s tests -p 'test_sc64_z8_world.py' -v
+python3 -m unittest discover -s tests -p 'test_sc64_z8_triggers.py' -v
 ```
 
 The fixture checks owner/force resolution, completed Command counts, Bring
 edge overlap, Kill callback forwarding, actor-order anchoring, property-aware
 creation dispatch, live invincibility/resource mutation, presentation
 forwarding, and the explicit missing-AI failure. It uses synthetic typed
-views; it is not a live-game or mission qualification test. Before enabling a
-profile, a caller must bind real pools, source kill accounting, creation and
-presentation services, all three authored AI policies, Z8 actor support,
-initialization, save/restore, and performance qualification.
+views; it is not a live-game or mission qualification test. If
+`SC64_Z8_DESCRIPTOR` points to the authenticated private descriptor, the world
+tests also compare the native Z8 actor census with the bridge's supported raw
+unit/building kinds. Without that variable, only the descriptor-dependent
+check is skipped.
+
+With the repository's existing private Z7 generated headers available, run
+the host sanitizer fixture against the actual game pools with:
+
+```sh
+SC64_AUDIO=0 SC64_CONSTRUCTION_ART=0 make test-sc64-z8-game-bridge
+```
+
+This test compiles `game.c` and spawns rows into its real `u[]` and `b[]`
+pools. It checks every authenticated Z8 actor/building raw kind and bounds,
+dead pool slots, neutral owner 11 handling, opcode 43 mutation of the actual
+invincibility arrays without changing packed unit flags, distinct source
+mineral/gas slots, and Egg-to-product completion. Cargo census assertions run
+when `SC64_TRANSPORT_RUNTIME` is part of the build. It is a host fixture with
+synthetic pool rows, not a native mission run or campaign qualification.
+
+Neither test enables the Z8 profile, scheduler, menu entry, save state, or
+mission. Before enabling a profile, a caller must bind source kill accounting,
+creation and presentation services, all three authored AI policies, all Z8
+actor support, initialization, save/restore, and performance qualification.
