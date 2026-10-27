@@ -3470,12 +3470,15 @@ build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba: build/starcraft-zerg-z7-steering
 zerg-z7-steering-probe: build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z7-steering
 
-# Unpromoted canonical Z7 candidate. Keep the Z6 product and default aliases
-# unchanged until the complete host/ARM qualification matrix passes.
+# Keep the tested full-render vector for host fixtures and historical probes.
+# The standalone Z7 release candidate substitutes the CONTACT movement path
+# and omits debugger input queues; Z6, probe ROMs and replay fixtures retain
+# their original flags.
 ZERG_Z7_CANONICAL_FLAGS = $(Z7_STEERING_FLAGS) -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ
+ZERG_Z7_RELEASE_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(ZERG_Z7_CANONICAL_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM -DGBA_NO_DEBUG_INPUTS
 ZERG_Z7_CANONICAL_INPUTS = $(Z7_FULL_RENDER_INPUTS)
 build/starcraft-zerg-z7.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.ld Makefile | build
-	$(CC) $(CFLAGS) $(ZERG_Z7_CANONICAL_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7.map -lgcc -o $@
+	$(CC) $(CFLAGS) $(ZERG_Z7_RELEASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7.map -lgcc -o $@
 	$(SIZE) $@
 build/StarCraft-Zerg-Z7-GBA.gba: build/starcraft-zerg-z7.elf tools/fix_rom.py
 	$(OBJCOPY) -O binary $< $@
