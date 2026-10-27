@@ -3317,6 +3317,14 @@ test-sc64-z7-steering: build/test-sc64-z7-full-render-steering
 # Direct AttackUnit remains enabled; the controller must issue ground clicks
 # when its policy requests Attack-Move. This does not promote the profile.
 $(eval $(call Z7_FULL_RENDER_FIXTURE,carried-z5,sc64_z5_campaign_run.c,$(Z7_STEERING_OPTIONS) -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ))
+$(eval $(call Z7_FULL_RENDER_FIXTURE,carried-z6,sc64_z6_campaign_run.c,$(Z7_STEERING_OPTIONS) -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ))
+$(eval $(call Z7_FULL_RENDER_FIXTURE,z6-controller-policy,sc64_z6_controller_policy.c,$(Z7_STEERING_OPTIONS) -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ))
+build/test-sc64-z7-full-render-z6-controller-policy: tests/sc64_z6_campaign_run.c
+.PHONY: test-sc64-z7-carried-z6
+test-sc64-z7-carried-z6: build/test-sc64-z7-full-render-carried-z6 build/test-sc64-z7-full-render-z6-controller-policy
+	mkdir -p .local/build/z7-carried-z6
+	./build/test-sc64-z7-full-render-z6-controller-policy
+	./build/test-sc64-z7-full-render-carried-z6 --trace .local/build/z7-carried-z6/controller.json
 .PHONY: test-sc64-z7-carried-z5
 test-sc64-z7-carried-z5: build/test-sc64-z7-full-render-carried-z5
 	mkdir -p .local/build/z7-carried-z5 .local/sc64
