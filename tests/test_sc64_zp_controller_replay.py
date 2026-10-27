@@ -1,5 +1,10 @@
 import copy
+import contextlib
+import hashlib
+import io
+import json
 import sys
+import tempfile
 import unittest
 from unittest import mock
 from pathlib import Path
@@ -741,6 +746,44 @@ class TraceTests(unittest.TestCase):
         incomplete = copy.deepcopy(final); del incomplete["tassadar_y"]
         with self.assertRaisesRegex(RuntimeError, "complete tassadar"):
             replay.verify_p4_hero_extraction(incomplete, state)
+
+
+class OfflineTraceValidationTests(unittest.TestCase):
+    def test_validates_without_rom_or_emulator(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.json"
+            path.write_text(json.dumps(z6_trace()))
+            output = io.StringIO()
+            with mock.patch.object(replay, "run") as launch, contextlib.redirect_stdout(output):
+                code = replay.main(["--profile", "zerg-z6", "--trace", str(path), "--validate-only",
+                                    "--ticks", "1", "--expect-trace-sha256",
+                                    hashlib.sha256(path.read_bytes()).hexdigest().upper()])
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(output.getvalue())["status"], "trace_validated_offline")
+            self.assertEqual(json.loads(output.getvalue())["requested_ticks"], 1)
+            self.assertTrue(json.loads(output.getvalue())["prefix"])
+            launch.assert_not_called()
+
+    def test_rejects_binary_hash_expectations_offline(self):
+        for option in ("--expect-rom-sha256", "--expect-elf-sha256"):
+            with self.subTest(option=option), mock.patch.object(replay, "run") as launch:
+                error = io.StringIO()
+                with contextlib.redirect_stderr(error):
+                    code = replay.main(["--profile", "zerg-z6", "--validate-only", option, "a" * 64])
+                self.assertEqual(code, 1)
+                self.assertIn("ROM/ELF hash expectations", error.getvalue())
+                launch.assert_not_called()
+
+    def test_rejects_bad_edges_without_emulator(self):
+        trace = z6_trace()
+        trace["events"][2]["pressed"] = 0
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.json"
+            path.write_text(json.dumps(trace))
+            with mock.patch.object(replay, "run") as launch, contextlib.redirect_stderr(io.StringIO()):
+                code = replay.main(["--profile", "zerg-z6", "--trace", str(path), "--validate-only"])
+            self.assertEqual(code, 1)
+            launch.assert_not_called()
 
 
 if __name__ == "__main__":

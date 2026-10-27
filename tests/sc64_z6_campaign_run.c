@@ -50,6 +50,12 @@ static void input(u16 held)
     game_update(held,pressed);
     prior=held;
     ++host_ticks;
+    /* A retreat can recursively advance input; record this tick first. */
+    if(controller_trace&&changed) {
+        fprintf(controller_trace,"%s{\"kind\":\"input\",\"host_tick\":%u,\"held\":%u,\"pressed\":%u}",
+            trace_event_started?",":"",host_ticks,(unsigned)held,(unsigned)pressed);
+        trace_event_started=1;
+    }
     int hero=kerrigan();
     if(hero_track_slot==-2) {
         if(hero>=0) {
@@ -73,11 +79,7 @@ static void input(u16 held)
         (void)z6_hold_safely();
         z6_rest_guard_busy=0;
     }
-    if(controller_trace&&changed) {
-        fprintf(controller_trace,"%s{\"kind\":\"input\",\"host_tick\":%u,\"held\":%u,\"pressed\":%u}",
-            trace_event_started?",":"",host_ticks,(unsigned)held,(unsigned)pressed);
-        trace_event_started=1;
-    }
+
 }
 static void tap(u16 key) { input(key); input(0); }
 static void move_cursor(int x,int y);
