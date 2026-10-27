@@ -73,6 +73,11 @@ routines; no native code or generated C is included. The pinned OpenBW
 `bwgame.h` (`4b046d5f…`) supports cross-checks for the PC engine. Its
 differences are listed where they occur.
 
+The native timing rules below are derived from static control-flow analysis.
+The synthetic tests check this scheduler model; they do not constitute a
+differential runtime trace against the N64 executable. Native runtime
+comparison remains an integration qualification step.
+
 | Behavior | Evidence | Scheduler |
 | --- | --- | --- |
 | Pass cadence | `0x8008DAEC` decrements a counter each frame; on underflow it reloads 30 and runs a pass. Mission init (`0x8008DFA4` → `0x8008CE00`) sets it to 1. OpenBW also starts at 1 (19983) and reloads 30 (13126). | Passes on frames 2, 33, 64, … |
