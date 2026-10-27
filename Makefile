@@ -4194,7 +4194,7 @@ test-sc64-p7-fact-v2-campaign-controller: build/test-sc64-p7-fact-v2-campaign-co
 
 # Full P7 cache profile with the qualified mode-4 drawing paths. Keep the
 # earlier FACT V2 flags and products available for exact replay comparisons.
-P7_RENDER_FLAGS := $(P7_FACT_V2_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(CANONICAL_MINIMAP_FLAGS) -DSC64_UNIT_WORD_SPRITES -DSC64_VITAL_BAR_FAST
+P7_RENDER_FLAGS := $(P7_FACT_V2_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(CANONICAL_MINIMAP_FLAGS) -DSC64_UNIT_WORD_SPRITES -DSC64_VITAL_BAR_FAST -DSC64_P7_ARBITER_AURA_ONCE
 P7_RENDER_FRAME_TEST := tests/sc64_p7_tile_render.c
 define P7_RENDER_FRAME_FIXTURE
 build/test-sc64-p7-render-$(1): $$(P7_RENDER_FRAME_TEST) $$(P7_FACT_V2_HEADER) $$(STARCRAFT) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) $$(wildcard starcraft/*.h) $$(P7_ARBITER_INPUTS) common/gba.c $$(COMMON_HEADERS) Makefile | build
