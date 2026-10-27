@@ -4139,3 +4139,24 @@ build/test-sc64-p7-campaign-controller: $(P7_CAMPAIGN_CONTROLLER) $(STARCRAFT) $
 test-sc64-p7-campaign-controller: build/test-sc64-p7-campaign-controller tools/sc64_p7_campaign_trace.py
 	./build/test-sc64-p7-campaign-controller $(P7_CAMPAIGN_TRACE)
 	$(PYTHON) tools/sc64_p7_campaign_trace.py --require-win $(P7_CAMPAIGN_TRACE)
+
+# Opt-in V2 sight/rectangle caches; separate from existing V1 generated facts.
+P7_FACT_V2_DIR := build/generated/p7-fact-v2
+P7_FACT_V2_HEADER := $(P7_FACT_V2_DIR)/sc64_fact_tables_generated.h
+P7_FACT_V2_FEATURES := -DSC64_FACT_SIGHT_TABLES -DSC64_P7_RECT_TABLES
+P7_FACT_V2_FLAGS := $(P7_SIGHT_AXIS_FLAGS) $(P7_FACT_V2_FEATURES) -DSC64_FACT_TABLES -I$(P7_FACT_V2_DIR)
+$(P7_FACT_V2_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile | build
+	mkdir -p $(P7_FACT_V2_DIR)
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(P7_SIGHT_AXIS_FLAGS) $(P7_FACT_V2_FEATURES) $< -o build/sc64-p7-fact-v2-gen
+	./build/sc64-p7-fact-v2-gen > $@.tmp
+	mv $@.tmp $@
+.PHONY: test-sc64-fact-v2 test-sc64-p7-fact-v2-normal-input
+test-sc64-fact-v2:
+	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_fact_v2.py'
+	$(PYTHON) -m unittest discover -s tests -p 'test_sc64_p7_sight_runtime.py'
+build/test-sc64-p7-fact-v2-normal-input: $(P7_NORMAL_INPUT_REPLAY) tests/sc64_p7_normal_input_tape.h $(P7_FACT_V2_HEADER) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_FACT_V2_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+test-sc64-p7-fact-v2-normal-input: build/test-sc64-p7-fact-v2-normal-input
+	./build/test-sc64-p7-fact-v2-normal-input
+build/sc64-p7-fact-v2-normal-input.elf: $(P7_NORMAL_INPUT_REPLAY) tests/sc64_p7_normal_input_tape.h $(P7_FACT_V2_HEADER) $(P7_NORMAL_INPUT_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_FACT_V2_FLAGS) $(P7_NORMAL_INPUT_COMMON) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/sc64-p7-fact-v2-normal-input.map -lgcc -o $@

@@ -10,17 +10,29 @@
 #include "race_rules.h"
 #include <limits.h>
 
+#if defined(SC64_P7_RECT_TABLES) && !defined(SC64_FACT_TABLE_GENERATOR)
+#if !defined(SC64_FACT_TABLES) || !defined(SC64_P7_ACTORS)
+#error "SC64_P7_RECT_TABLES requires FACT_TABLES and P7 actors"
+#endif
+#endif
 #ifdef SC64_P7_ACTORS
 static int sc64_p7_actor_rect_source(unsigned raw,int x,int y,int building,
                                       int *left,int *top,int *right,int *bottom)
 {
+#if defined(SC64_P7_RECT_TABLES) && !defined(SC64_FACT_TABLE_GENERATOR)
+    int l,u,r,d;
+#else
     int type,l,u,r,d;
+#endif
     /* Source centers are doubled below. Keep room for the largest supported
      * actor extents on the positive edge so malformed INT_MAX coordinates
      * cannot overflow either the multiply or the rectangle edge additions. */
     if (!left || !top || !right || !bottom || raw>227u || x<0 || y<0 ||
         x>(INT_MAX-256)/2 || y>(INT_MAX-256)/2)
         return 0;
+#if defined(SC64_P7_RECT_TABLES) && !defined(SC64_FACT_TABLE_GENERATOR)
+    if (!sc64_fact_p7_rect_extents(raw,building,&l,&u,&r,&d)) return 0;
+#else
     type=building ? sc64_race_building_from_raw((int)raw) :
                     sc64_race_unit_from_raw((int)raw);
     if (type<0) return 0;
@@ -57,6 +69,7 @@ static int sc64_p7_actor_rect_source(unsigned raw,int x,int y,int building,
         default:return 0;
         }
     }
+#endif
     int cx=x*2,cy=y*2;
     *left=cx-l; *top=cy-u;
     *right=cx+r+1; *bottom=cy+d+1;

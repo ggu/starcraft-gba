@@ -8,9 +8,24 @@
  * gates were defined and fails the target compile if they differ. */
 #include <stdio.h>
 #include <stdlib.h>
+/* This generator always evaluates reference helpers; this internal mode is
+ * never part of the emitted actor-gate fingerprint. */
+#ifndef SC64_FACT_TABLE_GENERATOR
+#define SC64_FACT_TABLE_GENERATOR 1
+#endif
 #include "race_rules.h"
 #include "sc64_game_actor_facts.h"
 #include "sc64_fact_table_format.h"
+#include "sc64_p7_sight_policy.h"
+#ifdef SC64_P7_RECT_TABLES
+#if !defined(SC64_FACT_TABLE_GENERATOR)
+#error "rectangle table generation requires the internal reference mode"
+#endif
+#if !defined(SC64_P7_ACTORS)
+#error "P7 rectangle tables require SC64_P7_ACTORS"
+#endif
+#include "sc64_p7_geometry.h"
+#endif
 
 #ifdef SC64_FACT_TABLES
 #error "Generate fact tables from the reference build flags"
@@ -31,7 +46,8 @@
     X(SC64_Z7_SCOURGE_COMBAT) X(SC64_P5_ACTORS) X(SC64_P6_ACTORS) \
     X(SC64_P6_COMBAT_ENABLED) X(SC64_P7_ACTORS) X(SC64_P7_BATTERY_ENABLED) \
     X(SC64_P7_PROJECTILES_ENABLED) X(SC64_P7_CARRIER_TRAINING_ENABLED) \
-    X(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) X(SC64_NYDUS_ENABLED)
+    X(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) X(SC64_NYDUS_ENABLED) \
+    X(SC64_FACT_SIGHT_TABLES) X(SC64_P7_RECT_TABLES)
 
 #define SC64_FACT_STR(x) #x
 #define SC64_FACT_XSTR(x) SC64_FACT_STR(x)
@@ -62,6 +78,19 @@ int main(void)
     puts("#ifndef SC64_FACT_TABLES_GENERATED_H");
     puts("#define SC64_FACT_TABLES_GENERATED_H");
     SC64_FACT_GATES(SC64_FACT_EMIT_GATE)
+#if defined(SC64_FACT_SIGHT_TABLES) || defined(SC64_P7_RECT_TABLES)
+    puts("#define SC64_FACT_TABLE_FORMAT_VERSION SC64_FACT_TABLE_FORMAT_V2");
+#else
+    puts("#define SC64_FACT_TABLE_FORMAT_VERSION SC64_FACT_TABLE_FORMAT_V1");
+#endif
+    puts("#define SC64_FACT_GENERATED_FEATURES ("
+#ifdef SC64_FACT_SIGHT_TABLES
+         "SC64_FACT_FEATURE_SIGHT | "
+#endif
+#ifdef SC64_P7_RECT_TABLES
+         "SC64_FACT_FEATURE_P7_RECT | "
+#endif
+         "0u)");
     printf("#define SC64_FACT_UNIT_COUNT %du\n", (int)SC_RU_COUNT);
     printf("#define SC64_FACT_BUILDING_COUNT %du\n", (int)SC_RB_COUNT);
     printf("_Static_assert(SC_RU_COUNT == %d && SC_RB_COUNT == %d,\n"
@@ -79,6 +108,15 @@ int main(void)
         if (flying != 0 && flying != 1) fail("flying", t, flying);
         word = flags | ((unsigned)radius << SC64_FACT_UNIT_RADIUS_SHIFT) |
                (flying ? SC64_FACT_UNIT_FLYING : 0u);
+#ifdef SC64_FACT_SIGHT_TABLES
+        {
+            int sight=sc64_p7_sight_radius_policy(
+                t,0,sc64_zp_actor_sight_source_pixels(t));
+            if(sight<0||sight>(int)SC64_FACT_UNIT_SIGHT_MASK)
+                fail("unit sight radius",t,sight);
+            word|=(unsigned)sight<<SC64_FACT_UNIT_SIGHT_SHIFT;
+        }
+#endif
         printf("%s0x%08xu", t ? (t % 6 ? ", " : ",\n    ") : "\n    ", word);
     }
     puts("\n};");
@@ -90,6 +128,47 @@ int main(void)
         printf("%s0x%04xu", t ? (t % 8 ? ", " : ",\n    ") : "\n    ", flags);
     }
     puts("\n};");
+#ifdef SC64_FACT_SIGHT_TABLES
+    printf("static const unsigned char sc64_fact_building_sight_radius_table[%d] = {",
+           (int)SC_RB_COUNT);
+    for(t=0;t<SC_RB_COUNT;++t) {
+        int sight=sc64_p7_sight_radius_policy(
+            t,1,sc64_zp_building_sight_source_pixels(t));
+        if(sight<0||sight>255) fail("building sight radius",t,sight);
+        printf("%s%du",t?(t%12?", ":",\n    "):"\n    ",sight);
+    }
+    puts("\n};");
+#endif
+#ifdef SC64_P7_RECT_TABLES
+    {
+        int building,raw;
+        for(building=0;building<=1;++building) {
+            const char *name=building ? "sc64_fact_p7_building_rect_table" :
+                                        "sc64_fact_p7_unit_rect_table";
+            printf("static const unsigned int %s[%u] = {",name,
+                   (unsigned)SC64_FACT_RECT_RAW_COUNT);
+            for(raw=0;raw<(int)SC64_FACT_RECT_RAW_COUNT;++raw) {
+                int left,top,right,bottom,valid;
+                unsigned word=0;
+                valid=sc64_p7_actor_rect_source((unsigned)raw,0,0,building,
+                                                 &left,&top,&right,&bottom);
+                if(valid) {
+                    int l=-left,u=-top,r=right-1,d=bottom-1;
+                    if(l<0||l>127) fail("rect left extent",raw,l);
+                    if(u<0||u>127) fail("rect up extent",raw,u);
+                    if(r<0||r>127) fail("rect right extent",raw,r);
+                    if(d<0||d>127) fail("rect down extent",raw,d);
+                    word=SC64_FACT_RECT_VALID | (unsigned)l |
+                         ((unsigned)u<<SC64_FACT_RECT_UP_SHIFT) |
+                         ((unsigned)r<<SC64_FACT_RECT_RIGHT_SHIFT) |
+                         ((unsigned)d<<SC64_FACT_RECT_DOWN_SHIFT);
+                }
+                printf("%s0x%08xu",raw?(raw%6?", ":",\n    "):"\n    ",word);
+            }
+            puts("\n};");
+        }
+    }
+#endif
     puts("#endif");
     return 0;
 }
