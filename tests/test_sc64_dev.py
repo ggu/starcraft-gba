@@ -313,6 +313,9 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(verify_roms.TARGETS['--zerg-z3'],
                          ('StarCraft-Zerg-GBA', 'starcraft-zerg', 'SCZ3', 'SC ZERG Z3'))
         self.assertEqual(verify_roms.TARGETS['--protoss'],
+                         ('StarCraft-Protoss-P7-GBA', 'starcraft-protoss-p7',
+                          'SCP7', 'SC PROTOSS7'))
+        self.assertEqual(verify_roms.TARGETS['--protoss-p6'],
                          ('StarCraft-Protoss-P6-GBA', 'starcraft-protoss-p6',
                           'SCP6', 'SC PROTOSS6'))
         self.assertEqual(verify_roms.TARGETS['--protoss-p5-shuttle'],
@@ -329,9 +332,11 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z4'], 'test-zerg-z4')
         self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z3'], 'test-zerg-z3')
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
-        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p6'], 'test-protoss')
-        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P6-GBA.gba'))
-        self.assertEqual(dev.GAMES['protoss-p6'], ('protoss', 'build/StarCraft-Protoss-P6-GBA.gba'))
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p7'], 'test-protoss')
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p6'], 'test-protoss-p6')
+        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P7-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p7'], ('protoss-p7', 'build/StarCraft-Protoss-P7-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p6'], ('protoss-p6', 'build/StarCraft-Protoss-P6-GBA.gba'))
         self.assertEqual(dev.GAMES['protoss-p5-shuttle'],
                          ('protoss-p5-shuttle', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg'], ('zerg', 'build/StarCraft-Zerg-Z6-GBA.gba'))
@@ -339,7 +344,8 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(dev.GAMES['zerg-z3'], ('zerg-z3', 'build/StarCraft-Zerg-GBA.gba'))
         self.assertEqual(dev.PLAY_SAVE_PROFILES,
                          {'zerg': 'zerg-z6', 'zerg-z4': 'zerg-z4', 'zerg-z3': 'zerg',
-                          'protoss': 'protoss-p6', 'protoss-p6': 'protoss-p6', 'protoss-p3': 'protoss',
+                          'protoss': 'protoss-p7', 'protoss-p7': 'protoss-p7',
+                          'protoss-p6': 'protoss-p6', 'protoss-p3': 'protoss',
                           'protoss-p4-storm': 'protoss-p4-storm',
                           'protoss-p5-shuttle': 'protoss-p5-shuttle'})
         self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['zerg'],
@@ -348,7 +354,9 @@ class OnboardingTests(unittest.TestCase):
                          ('StarCraft-Zerg-Z6-GBA.gba', 'starcraft-zerg-z6.elf'))
         for routes in (sc64_split_profile.PROFILE_BUILD_PATHS, sc64_split_smoke.PROFILE_BUILD_PATHS):
             self.assertEqual(routes['protoss'],
-                             ('StarCraft-Protoss-P6-GBA.gba', 'starcraft-protoss-p6.elf'))
+                             ('StarCraft-Protoss-P7-GBA.gba', 'starcraft-protoss-p7.elf'))
+        self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['protoss-p6'],
+                         ('StarCraft-Protoss-P6-GBA.gba', 'starcraft-protoss-p6.elf'))
 
     def test_p4_storm_and_legacy_p3_have_explicit_build_and_save_routes(self):
         self.assertEqual(dev.GAMES['protoss-p3'],
@@ -371,8 +379,8 @@ class OnboardingTests(unittest.TestCase):
         p5_recipe = makefile.splitlines()[makefile.splitlines().index(p5_rule) + 1]
         self.assertIn('$(PROTOSS_P5_CANONICAL_FLAGS)', p5_recipe)
         self.assertNotEqual(dev.GAMES['protoss'][1], dev.GAMES['protoss-p4-storm'][1])
-        self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss'], 'protoss-p6')
-        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P6-GBA.gba'))
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss'], 'protoss-p7')
+        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P7-GBA.gba'))
         self.assertEqual(dev.GAMES['protoss-p5-shuttle'],
                          ('protoss-p5-shuttle', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
         self.assertEqual(dev.GAMES['protoss-p4-storm'], ('protoss-p4-storm', 'build/StarCraft-Protoss-P4-Storm-GBA.gba'))

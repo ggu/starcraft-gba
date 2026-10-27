@@ -232,7 +232,7 @@ static void test_parent_death_detaches(void)
     assert(race_save_game() && race_load_game());
 }
 
-static void reject_without_live_mutation(const RaceSave *bad)
+static void reject_without_live_mutation(const RaceSave *bad, u32 container_version)
 {
     static Unit before_u[MAX_UNITS];
     static Building before_b[MAX_BUILDINGS];
@@ -241,7 +241,7 @@ static void reject_without_live_mutation(const RaceSave *bad)
     int before_frame = frame, before_minerals = minerals;
     memcpy(before_u, u, sizeof(u)); memcpy(before_b, b, sizeof(b));
     memcpy(before_pool, race_p7_projectile_host_words, sizeof(before_pool));
-    save_write(bad, sizeof(*bad), SAVE_VERSION);
+    save_write(bad, sizeof(*bad), container_version);
     assert(!race_load_game());
     assert(memcmp(before_u, u, sizeof(u)) == 0 && memcmp(before_b, b, sizeof(b)) == 0);
     assert(memcmp(before_pool, race_p7_projectile_host_words, sizeof(before_pool)) == 0);
@@ -276,9 +276,15 @@ static void test_save_rejection(void)
         bad = good;
         assert(sc64_p7_typed_unit_encode(&bad.units[slot], &actor,
             (unsigned)(race_cols * 16), (unsigned)(race_rows * 16)));
-        reject_without_live_mutation(&bad);
+        reject_without_live_mutation(&bad, SAVE_VERSION);
         save_write(&good, sizeof(good), SAVE_VERSION); assert(race_load_game());
     }
+    /* P6 used the same Protoss magic with generation 30. A save carrying that
+     * container identity must be rejected before touching the P7 live world. */
+    bad = good;
+    bad.version = 0x53435030u + 30u;
+    reject_without_live_mutation(&bad, 0x53435030u + 30u);
+    save_write(&good, sizeof(good), SAVE_VERSION); assert(race_load_game());
 }
 
 /* Full game updates: an attack-moving Carrier fights through the mission

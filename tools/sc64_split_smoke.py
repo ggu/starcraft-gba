@@ -26,14 +26,16 @@ KEY_A, KEY_B, KEY_START, KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_L = 1, 2, 8,
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSE = 0, 1, 2
 FRONT_HOME, FRONT_CAMPAIGN, FRONT_MISSION, FRONT_BRIEFING, FRONT_SKIRMISH = range(5)
 R_TERRAN, R_ZERG, R_PROTOSS = range(3)
-PROFILE_IDS = {"terran": R_TERRAN, "zerg": R_ZERG, "protoss": R_PROTOSS}
+PROFILE_IDS = {"terran": R_TERRAN, "zerg": R_ZERG, "protoss": R_PROTOSS,
+               "protoss-p6": R_PROTOSS}
 MISSIONS_PER_PAGE = 2
 FRONT_FIELDS: dict[str, int] = {}
 MAP_DIMS = ((64, 64), (64, 64))
 PROFILE_BUILD_PATHS = {
     "terran": ("StarCraft-Terran-GBA.gba", "starcraft-terran.elf"),
     "zerg": ("StarCraft-Zerg-Z6-GBA.gba", "starcraft-zerg-z6.elf"),
-    "protoss": ("StarCraft-Protoss-P6-GBA.gba", "starcraft-protoss-p6.elf"),
+    "protoss": ("StarCraft-Protoss-P7-GBA.gba", "starcraft-protoss-p7.elf"),
+    "protoss-p6": ("StarCraft-Protoss-P6-GBA.gba", "starcraft-protoss-p6.elf"),
 }
 
 
@@ -427,7 +429,7 @@ def run_one(profile: str, rom: pathlib.Path, elf: pathlib.Path,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--profile", choices=("all", "terran", "zerg", "protoss"), default="all")
+    parser.add_argument("--profile", choices=("all", "terran", "zerg", "protoss", "protoss-p6"), default="all")
     parser.add_argument("--map", type=int, choices=range(2))
     parser.add_argument("--race", type=int, choices=range(3))
     parser.add_argument("--bots", type=int, choices=range(1, 4))
