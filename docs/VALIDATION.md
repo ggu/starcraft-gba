@@ -5908,6 +5908,14 @@ of a full Z7 ARM win; it does not qualify the seven-mission profile's carried
 missions.
 Canonical menus and qualified staged progress remain unchanged at 22/30.
 
+The 2026-10-28 standalone Z7 release candidate changes the movement options to
+the CONTACT cache and compiles out debugger input storage. Its standalone ARM
+link passes with BSS end `0x0203d7e0` and IWRAM end `0x03004d28`; its CONTACT
+host replay still matches all 365 frozen checkpoints. The earlier full ARM
+win and SRAM continuation used the previous collision flags. This exact
+release vector has no full ARM win or fresh-process SRAM qualification. See
+the [CONTACT release-candidate audit](audits/2026-10-28-z7-contact-release/README.md).
+
 The same replay with only `SC64_ROUTE_DECAY_FREQ` added also matched all 365
 checkpoints through the source win. Its instrumented combined mean was
 5617463 cycles (about 2.99 rendered updates/second), a 4.42% reduction from
@@ -5985,3 +5993,8 @@ does not promote a campaign chapter or change canonical progress from 22/30.
 A separate attempt to postpone steering-list overflow until after filtering
 also matched all 365 host checkpoints and all 20 bounded ARM checkpoints,
 but increased combined ARM cycles by 2.56%; it remains private and disabled.
+
+The separate Z7 CONTACT candidate has a [frozen ARM win and fresh-process
+save audit](audits/2026-10-28-z7-arm-save-win/README.md). It remains below
+the near-30-fps target; current-source host coverage and ARM source boundaries
+are reported separately.

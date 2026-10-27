@@ -1991,6 +1991,8 @@ build/test-sc64-zerg-promoted-profile: tests/sc64_promoted_race_profile.c $(STAR
 test-zerg: build/test-zerg build/test-sc64-zerg-promoted-profile
 	./build/test-zerg
 	./build/test-sc64-zerg-promoted-profile
+.PHONY: test-zerg-z6
+test-zerg-z6: test-zerg
 test-zerg-z3: test-sc64-z3-runtime
 # Explicit legacy four-entry Zerg product.
 build/test-zerg-z4: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z4_INPUTS) common/gba.h common/gba.c Makefile | build
@@ -3388,9 +3390,8 @@ zerg-z7-defense-targets-probe: build/StarCraft-Zerg-Z7-Defense-Targets-Probe-GBA
 
 # Unpromoted Z7 qualification with the full canonical presentation vector.
 # The standard `zerg` product remains the separately qualified Z1-Z6 ROM.
-# The Z7 vector keeps its own collision options (Z7_STEERING_OPTIONS below),
-# which the contact cache supersedes and rejects, so the contact cache flags
-# are removed from every Z7 full-render target.
+# Keep the historical full-render probe and its low-level fixtures on the
+# collision-list path. The selected canonical game vector below uses CONTACT.
 Z7_FULL_RENDER_FLAGS = $(patsubst -I.local/sc64/z6/generated,-I$(ZERG_Z6_BANK),$(Z7_DEFENSE_TARGET_FLAGS)) $(CANONICAL_DRAW_FLAGS) $(filter-out -DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM,$(ZERG_CANONICAL_FLAGS)) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_DEATH_FLAGS)
 Z7_FULL_RENDER_INPUTS = $(filter-out .local/sc64/z5/generated/sc64_race_sprites_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h,$(Z7_PROBE_INPUTS)) $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 build/starcraft-zerg-z7-full-render-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_FULL_RENDER_INPUTS) common/gba.ld Makefile | build
@@ -3467,6 +3468,87 @@ build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba: build/starcraft-zerg-z7-steering
 	$(PYTHON) tools/fix_rom.py $@ 'SC Z7 STEP36' SCZS
 zerg-z7-steering-probe: build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z7-steering
+
+# The canonical gameplay flags match the CONTACT standalone release. Keep
+# physical-input-only main-loop selection local to that standalone target.
+# Historical Z7 probes and their tests continue to use Z7_FULL_RENDER_FLAGS.
+ZERG_Z7_CANONICAL_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ
+ZERG_Z7_RELEASE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
+ZERG_Z7_CANONICAL_INPUTS = $(Z7_FULL_RENDER_INPUTS)
+build/starcraft-zerg-z7.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(ZERG_Z7_RELEASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z7-GBA.gba: build/starcraft-zerg-z7.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z7' SCZ7
+.PHONY: verify-zerg-z7 zerg-z7
+verify-zerg-z7: build/StarCraft-Zerg-Z7-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z7
+zerg-z7: verify-zerg-z7
+
+# Preserve a named six-entry product alongside the existing `zerg` alias.
+.PHONY: verify-zerg-z6 zerg-z6
+verify-zerg-z6: build/StarCraft-Zerg-Z6-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z6
+zerg-z6: verify-zerg-z6
+
+define Z7_CANONICAL_FIXTURE
+build/test-sc64-z7-canonical-$(1): tests/$(2) $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(ZERG_Z7_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(ZERG_Z7_CANONICAL_FLAGS) $(3) $$< common/gba.c -o $$@
+endef
+$(eval $(call Z7_CANONICAL_FIXTURE,profile,sc64_promoted_race_profile.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,save,sc64_z7_game_save.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,frame,sc64_z3_frame_coverage.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,scourge,sc64_z7_scourge_game.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,controller,sc64_z7_campaign_run.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,carried-z5,sc64_z5_campaign_run.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,carried-z6,sc64_z6_campaign_run.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,z6-controller-policy,sc64_z6_controller_policy.c))
+build/test-sc64-z7-canonical-z6-controller-policy: tests/sc64_z6_campaign_run.c
+ZERG_Z7_CONTROLLER_TRACE ?= .local/sc64/zerg-z7-canonical-controller.jsonl
+.PHONY: test-sc64-z7-canonical-controller test-zerg-z7
+test-sc64-z7-canonical-controller: build/test-sc64-z7-canonical-controller tools/sc64_zp_controller_replay.py
+	mkdir -p "$(dir $(ZERG_Z7_CONTROLLER_TRACE))"
+	./build/test-sc64-z7-canonical-controller --limit 240000 --trace "$(ZERG_Z7_CONTROLLER_TRACE)"
+	$(PYTHON) tools/sc64_zp_controller_replay.py --profile zerg-z7 --trace "$(ZERG_Z7_CONTROLLER_TRACE)" --validate-only
+.PHONY: test-sc64-z7-canonical-carried-z5 test-sc64-z7-canonical-carried-z6
+test-sc64-z7-canonical-carried-z5: build/test-sc64-z7-canonical-carried-z5
+	mkdir -p .local/build/z7-canonical-carried-z5 .local/sc64
+	./build/test-sc64-z7-canonical-carried-z5 --limit 60000 --trace .local/build/z7-canonical-carried-z5/diagnostics.json --attempt .local/build/z7-canonical-carried-z5/attempt.json --verified .local/build/z7-canonical-carried-z5/controller.json
+test-sc64-z7-canonical-carried-z6: build/test-sc64-z7-canonical-carried-z6 build/test-sc64-z7-canonical-z6-controller-policy tools/sc64_zp_controller_replay.py
+	mkdir -p .local/build/z7-canonical-carried-z6
+	./build/test-sc64-z7-canonical-z6-controller-policy
+	./build/test-sc64-z7-canonical-carried-z6 --trace .local/build/z7-canonical-carried-z6/controller.json
+	$(PYTHON) tools/sc64_zp_controller_replay.py --profile zerg-z6 --trace .local/build/z7-canonical-carried-z6/controller.json --validate-only
+test-zerg-z7: build/test-sc64-z7-canonical-profile build/test-sc64-z7-canonical-save build/test-sc64-z7-canonical-frame build/test-sc64-z7-canonical-scourge test-sc64-z7-canonical-controller test-sc64-z7-canonical-carried-z5 test-sc64-z7-canonical-carried-z6 test-sc64-z7-carried-missions test-sc64-z7-canonical-skirmish
+	./build/test-sc64-z7-canonical-profile
+	./build/test-sc64-z7-canonical-save
+	./build/test-sc64-z7-canonical-frame
+	./build/test-sc64-z7-canonical-scourge
+
+build/test-sc64-skirmish-match-zerg-z7: tests/sc64_skirmish_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) $(RACE_CAMPAIGN_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-canonical-skirmish
+test-sc64-z7-canonical-skirmish: build/test-sc64-skirmish-match-zerg-z7
+	$(PYTHON) tools/sc64_skirmish_controller_matrix.py --controller $< --output .local/sc64/skirmish/zerg-z7-matches
+
+# Recheck every carried Z1-Z4 controller under the exact Z7 candidate vector.
+ZERG_Z7_CARRIED_DEPS = $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile
+build/test-sc64-z7-carried-z1: tests/race_z1_controls.c $(ZERG_Z7_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-carried-z2: tests/race_campaign_run.c $(ZERG_Z7_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-carried-z3: tests/sc64_z3_campaign_run.c $(ZERG_Z7_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
+build/test-sc64-z7-carried-z4: tests/sc64_z4_campaign_run.c $(ZERG_Z7_CARRIED_DEPS) | build
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z7_CANONICAL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-z7-carried-missions
+test-sc64-z7-carried-missions: build/test-sc64-z7-carried-z1 build/test-sc64-z7-carried-z2 build/test-sc64-z7-carried-z3 build/test-sc64-z7-carried-z4
+	mkdir -p .local/sc64/z7-carried
+	./build/test-sc64-z7-carried-z1 --trace .local/sc64/z7-carried/z1.json
+	./build/test-sc64-z7-carried-z2 --controller 1 --trace .local/sc64/z7-carried/z2.json
+	./build/test-sc64-z7-carried-z3 --trace .local/sc64/z7-carried/z3.json
+	./build/test-sc64-z7-carried-z4 --limit 150000 --trace .local/sc64/z7-carried/z4.json
 
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE

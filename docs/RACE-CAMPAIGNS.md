@@ -83,8 +83,13 @@ after packed rendering; see the
 [Terran rendering audit](audits/2026-10-26-terran-word-promotion/README.md).
 None of these are physical GBA guarantees.
 
-Z7 remains an internal seventh-entry candidate with a full ordinary-input ARM
-replay to the source win and bounded fresh-process SRAM continuation. P7 is
+Z7 now has a separate `zerg-z7` candidate ROM and save route; `zerg` and
+explicit `zerg-z6` remain the six-entry product. The candidate is not promoted:
+the CONTACT candidate has a full frozen ARM win with fresh-process SRAM
+continuation and current-source host regression coverage. The full path is
+about 3.69 advancing frames/s, so it remains an explicit candidate while
+performance work continues. See the [mission/save audit](audits/2026-10-28-z7-arm-save-win/README.md)
+for the exact runtime boundaries. P7 is
 now in the canonical Protoss profile. Its host campaign/save fixtures, 18-match
 skirmish matrix and menu-driven save/reload pass. The P7 controller itself was
 qualified on host; ARM replayed its recorded inputs, including an ordinary
@@ -93,6 +98,14 @@ See the [Z7 full-win audit](audits/2026-10-27-z7-full-win/README.md), [P7
 controller qualification](research/p7-full-controller-qualification.md) and
 [canonical P7 qualification](research/p7-canonical-candidate-qualification.md)
 for exact profiles and limits.
+
+The current standalone Z7 release candidate uses the CONTACT movement path
+and omits debugger input queues; it keeps the generation-36 save identity.
+Its ARM link passes the existing RAM guards, and the CONTACT host replay
+matches all 365 frozen checkpoints through the source win. The bounded late
+ARM comparison is not a full-mission result. This exact release vector has
+not completed a full ARM win or fresh-process SRAM continuation and remains
+unpromoted. See the [CONTACT release-candidate audit](audits/2026-10-28-z7-contact-release/README.md).
 The current experimental P7 cache profile also replays the full winning tape
 on ARM with all 67 state records matching; see its
 [cache qualification](research/p7-fact-v2-qualification.md#full-arm-replay-of-the-current-cache-profile).
