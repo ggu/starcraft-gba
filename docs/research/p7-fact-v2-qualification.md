@@ -138,6 +138,51 @@ average, a comparison with an uninstrumented control, or a 30-fps result.
 These private artifacts, source hashes, host parity checks and the launch
 record are under `.local/build/p7-current-full-sparse-20261027/`.
 
+## Current-profile fresh-process SRAM continuation
+
+A separate two-process ARM run now covers one pause-menu save/load path on
+the exact FACT V2/contact-cache flags, including the current format-2 audio
+bank. It freezes the current 235 authored source files, uses a private copy
+of the generated fact header, and replays the same 1,667 input transitions.
+Both postlinked 16 MiB images have valid headers and pass the original RAM
+guards. Each emulator process has an isolated configuration and uses the
+same private cartridge/save path; the second process starts fresh.
+
+The prefix saves at tick 28,166 / frame 28,000 after 1,174 input transitions.
+Its 16,292-byte generation-43 payload fits the 16,368-byte limit, validates
+its checksum and matches the host payload. The fresh process loads through
+the title screen, records the expected selected-building reset from 4 to -1,
+and reaches the strict win at call 39,976 / frame 39,738 with all three
+heroes. All 493 resumed UI events and 31 each of gameplay, UI and source-output
+projection records match the reference. The immediate load source-output
+elapsed field resets from 28,000 to 0; later output projections match.
+
+The prefix and resume respectively validate 1,321 and 591 host-corresponding
+records, excluding their stack records. The original slot at offset 0,
+sequence 1, remains byte-identical; a second checksum-valid payload appears
+at offset 16,384, sequence 2. Payload SHA-256 values are the same as the
+earlier frozen-profile proof:
+`b401174ce8531e6cb48b016afd49f1274a173d1a4d4652db0950e0a9205e5d43`
+and `42221acf76b607845857dbc4fcf344c27ff98f696d8209ebca7e87091d3d4114`.
+
+| Run | Unpadded bytes | BSS end | IWRAM end | Main stack used / margin |
+| --- | ---: | --- | --- | ---: |
+| Prefix | 12,936,728 | `0x0203d618` | `0x03004a70` | 5,036 / 6,740 bytes |
+| Resume | 12,896,896 | `0x0203d608` | `0x03004a70` | 4,128 / 7,648 bytes |
+
+Prefix ROM SHA-256 is
+`a12ca015375c94c56519683c9bf58e62c3de6e9c73855fbf2c41a1fc20cb966d`;
+resume is `c08b10f96c13835bcf655b53b4943110671eb4fc33b5c54a93cb42e7e305c12e`.
+The validated result SHA-256 is
+`50d3cae9487586790df3e07c4c935006555722adafa3bcf00eca292b7ec0b3b7`.
+Private source manifests, host results, actual compiler commands, launch/exit
+records, logs and SRAM images are under
+`.local/build/p7-fact-v2-sram-qualification-20261027/`.
+
+This qualifies one fixed-tape continuation on the core FACT V2 profile. It
+does not establish arbitrary save-state compatibility, the additional flags
+of the drawing probe, a performance target or physical-GBA behavior.
+
 Private evidence is under `.local/build/p7-mission-20261027/`: the three
 compiler plans, generated tables, host logs, ROM identities, ARM process
 identities, state records and timing results. No ROMs, generated banks,
@@ -149,8 +194,8 @@ This does not implement enemy Interceptor purchases. The existing owner-4
 training fixture seeds an order manually; the mission AI currently issues
 attack-move orders and does not establish the native fighter-request policy.
 That native policy requires separate characterization and implementation.
-The new profile also needs full-mission ARM performance work, fresh SRAM
-continuation on its exact flags, canonical P1–P7 integration and save
-compatibility, broader gameplay coverage and physical-GBA testing before
-promotion. The earlier bounded SRAM proof applies to its frozen profile;
-it is not automatically transferred to this cache combination.
+The new profile still needs full-mission ARM performance work, canonical
+P1–P7 integration and earlier-profile save compatibility, broader gameplay
+coverage and physical-GBA testing before promotion. The current bounded
+SRAM result above closes the exact-profile continuation gap for its tested
+cut; it does not automatically qualify other drawing or gameplay flags.
