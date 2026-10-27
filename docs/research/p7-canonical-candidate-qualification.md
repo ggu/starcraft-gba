@@ -78,6 +78,14 @@ The canonical standalone output is `StarCraft-Protoss-P7-GBA.gba`; explicit
 Both products reject each other's incompatible save generation rather than
 silently migrating or replacing saves.
 
+The frozen 237 authored `common/` and `starcraft/` files match the candidate
+source. The 32 MiB standalone playable ROM has SHA-256
+`a65b295b5c9e46ba0e29615cea1d9c61076e22cc4a16b252f3fbc86bfe770206`.
+The paired ARM SRAM result record has SHA-256
+`224bcd3b8034e51dd3fe9e4a3c26e6342b65ded1189436479b647b464846426f`.
+These identities describe private local artifacts; no ROM or imported asset
+is distributed with the source.
+
 ## Bounded performance sample
 
 A separate canonical ARM probe checked 600 opening updates and 1,400 attack

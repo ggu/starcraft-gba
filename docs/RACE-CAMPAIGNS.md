@@ -64,8 +64,8 @@ P5 build; P5 also has an exact fresh-process cargo SRAM restore and continued
 win. P1/P2 retain Fenix. See the
 [P5 promotion audit](audits/2026-10-26-p5-promotion/README.md).
 
-Canonical P6 has current normal-input host wins for P1–P6. The P3 controller
-now selects reachable targets across both enemy forces, recovers blocked
+The P6 promotion audit records normal-input host wins for P1–P6. That P3 controller
+selects reachable targets across both enemy forces, recovers blocked
 builders through STOP, balances worker income and rebuilds before the final
 assault; it wins at frame 120,733. A separate input-only rendered host replay
 matches all 122 recorded state checkpoints without controller path queries.
@@ -102,8 +102,8 @@ continuation checks. A separate canonical ARM sample measured mean full costs
 of 2,155,200 cycles in 600 opening updates and 2,426,615 cycles in 1,400 attack
 updates, below the 30-fps target. This is a bounded sample, not a mission-wide
 average. Neither profile establishes native enemy-AI equivalence, arbitrary
-save-state coverage or physical-GBA behavior. Zerg and Protoss missions 8–10
-remain unfinished.
+save-state coverage or physical-GBA behavior. Zerg 7–10 and Protoss 8–10
+remain unqualified in the canonical profiles.
 
 For P7, the canonical-render candidate passes its host startup/save fixtures,
 normal-input campaign win, 18-match skirmish matrix and menu-driven save/reload.

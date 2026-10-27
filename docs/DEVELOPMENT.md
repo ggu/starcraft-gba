@@ -1692,8 +1692,8 @@ payloads with six worker depot caches retained after reload. The paired
 compare the full world or pixels or complete the mission. Mean full-frame
 cost was 1,069,633 cycles versus 1,026,851 for the reference (+4.17%). These
 are emulator measurements, not hardware or 30-fps qualifications. The Z6
-canonical profile remains unchanged, and staged campaign qualification stays
-at 22/30.
+canonical profile remains unchanged. Campaign qualification was 22/30 at this
+Z7 audit; subsequent canonical P7 integration brings the current total to 23/30.
 
 `make test-sc64-z7-reachable-formation` checks the default-off
 `SC64_REACHABLE_FORMATION` group-order fallback against the original slot
@@ -2486,9 +2486,12 @@ make protoss-p7-runtime-reference protoss-p7-runtime-probe
 The ROMs are `build/StarCraft-Protoss-P7-Runtime-Reference-GBA.gba` and
 `build/StarCraft-Protoss-P7-Runtime-Probe-GBA.gba`. Both expose P7 through the
 normal single-race mission menu under `SC64_P7_CAMPAIGN_ENTRY`. This is an
-internal candidate entry: Carrier/Arbiter mechanics, production/AI fidelity,
-a full normal-input win and campaign performance remain unfinished. Canonical
-race ROMs do not enable this entry and qualified staged progress stays 22/30.
+earlier internal candidate entry, whose original qualification did not cover
+the later Carrier/Arbiter work or full normal-input win. These historical
+probe targets remain separate. The current canonical Protoss build enables P7
+with the full runtime and bounded ARM save continuation described in the
+[canonical qualification](research/p7-canonical-candidate-qualification.md);
+campaign coverage is 23/30. Native AI fidelity and performance remain unfinished.
 
 The optimized probe additionally enables `SC64_P7_PREVALIDATED_TICK`. It
 validates immutable mission data at initialization and load, then checks
