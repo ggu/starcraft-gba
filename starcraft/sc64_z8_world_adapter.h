@@ -26,7 +26,7 @@ typedef struct {
     s16 source_owner;
     s16 x, y;                 /* Engine world pixels; CHK source pixels / 2. */
     s16 left, top, right, bottom; /* Pinned unit-dimension offsets, source px. */
-    u8 alive, completed, building, men, type_known;
+    u8 alive, completed, building, men, loaded, type_known;
     u8 *invincible;           /* Dedicated live invincible_* slot, never Unit.flags. */
 } Sc64Z8ActorView;
 
@@ -203,6 +203,9 @@ sc64_z8_world_count(void *context, const Sc64Z8Condition *c,
         if (type < 0) return -1;
         if (!type) continue;
         if (sc64_z8_condition_counts_completed(c) && !a->completed) continue;
+        /* Bring checks world presence; cargo still counts for Command, as in
+         * the existing P5 provider contract. */
+        if (c->opcode == 3 && a->loaded) continue;
         if (c->opcode == 3) {
             overlap = sc64_z8_world_overlap(a, rect);
             if (overlap < 0) return -1;

@@ -24,6 +24,11 @@ the existing P6/P7 actor facts and Nydus support used by Z8's raw type census.
 Do not bind it to packed
 `Unit.flags`. Unsupported live actor facts fail the query instead of
 substituting approximate dimensions.
+The game view marks a live Z7 Egg incomplete until its slot changes to the
+paid product type. If transport support is compiled, cargo remains in the
+global Command census and is excluded from location-based Bring checks, as in
+the existing world-provider behavior. P7 Interceptor hangar state is not
+treated as unit incompletion by this bridge.
 SetResources can target either a live wallet or independent 32-bit
 source-owner mineral/gas values. The game helper binds the latter so source
 slots that share a combat owner do not share their trigger resource pools.

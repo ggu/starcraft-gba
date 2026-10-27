@@ -127,6 +127,49 @@ int main(void)
     Sc64Z8ActorView dead;
     assert(sc64_z8_game_actor_at(0, MAX_UNITS - 1u, &dead) == 1 && !dead.alive);
 
+#ifdef SC64_Z7_EGG_PRODUCTION
+    /* Pending Z7 Eggs are alive but not complete; after the production tick
+     * changes the same slot to its product type, Command counts it complete. */
+    int egg_type = sc64_race_unit_from_raw(36);
+    assert(egg_type == U_Z7_EGG);
+    int egg = spawn_unit(SIDE, egg_type, 180, 180);
+    assert(egg >= 0);
+    u[egg].raw_type = 36; u[egg].raw_owner = 0; u[egg].alive = 1;
+    u[egg].target = U_DRONE; u[egg].work_timer = 10;
+    Sc64Z8ActorView egg_view;
+    assert(sc64_z8_game_actor_at(0, (unsigned)egg, &egg_view) == 1);
+    assert(egg_view.alive && !egg_view.completed);
+    Sc64Z8Condition completed_egg = {
+        .player = 0, .unit = 36, .opcode = 2, .comparison = 0
+    };
+    count = 99;
+    assert(sc64_z8_world_count(&world, &completed_egg, 0, 0, &count) == 1);
+    assert(count == 0);
+    completed_egg.comparison = 1; /* AtMost includes in-progress actors. */
+    assert(sc64_z8_world_count(&world, &completed_egg, 0, 0, &count) == 1);
+    assert(count == 1);
+    u[egg].type = U_DRONE; u[egg].raw_type = 41; u[egg].work_timer = 0;
+    assert(sc64_z8_game_actor_at(0, (unsigned)egg, &egg_view) == 1);
+    assert(egg_view.completed && egg_view.raw_type == 41);
+#endif
+
+#ifdef SC64_TRANSPORT_RUNTIME
+    /* Cargo remains in Command census, but cannot satisfy a location-based
+     * Bring condition. This follows the existing game world-provider rule. */
+    unsigned cargo_slot = unit_slots[0];
+    u[cargo_slot].order = ORDER_TRANSPORTED;
+    Sc64Z8Condition cargo = {
+        .player = u[cargo_slot].raw_owner, .unit = unit_raw[0],
+        .opcode = 2, .comparison = 1
+    };
+    count = 0;
+    assert(sc64_z8_world_count(&world, &cargo, 0, 0, &count) == 1);
+    assert(count == 1);
+    cargo.opcode = 3;
+    assert(sc64_z8_world_count(&world, &cargo, 0, &world_rect, &count) == 1);
+    assert(count == 0);
+#endif
+
     /* Opcode 43 updates the actual per-slot invincibility byte, not flags. */
     unsigned selected_slot = unit_slots[6]; /* raw Probe 64 */
     u[selected_slot].raw_owner = 2;

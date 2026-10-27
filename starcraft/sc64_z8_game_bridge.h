@@ -73,8 +73,15 @@ sc64_z8_game_actor_at(void *context, unsigned index, Sc64Z8ActorView *out)
         out->x = (s16)actor->x; out->y = (s16)actor->y;
         out->left = (s16)left; out->top = (s16)up;
         out->right = (s16)right; out->bottom = (s16)down;
-        out->completed = 1; out->men =
-            (sc64_game_unit_actor_flags(type) & SC64_GAME_ACTOR_MEN) != 0;
+        out->completed = 1;
+#ifdef SC64_Z7_EGG_PRODUCTION
+        /* An Egg is in progress until the unit tick changes its type to the
+         * paid product. P7's separate Interceptor training state does not
+         * change generic completion for hidden hangar children. */
+        if (actor->type == U_Z7_EGG) out->completed = 0;
+#endif
+        out->men = (sc64_game_unit_actor_flags(type) & SC64_GAME_ACTOR_MEN) != 0;
+        out->loaded = SC64_TRANSPORT_LOADED(actor) != 0;
         out->type_known = 1;
         out->invincible = &invincible_units[index];
         return 1;
