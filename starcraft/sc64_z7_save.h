@@ -248,8 +248,18 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
     u8 seen_units[(MAX_UNITS+7u)/8u]={0};
     u8 seen_building_rows[32]={0};
     u8 seen_minerals[(MAX_MINERALS+7u)/8u]={0};
+    /* Candidate-validation census only: no persistent or BSS storage. The
+     * owner/raw tables count every decoded slot, including retained-dead and
+     * canonical zero rows, exactly as the original repeated scans did. */
+    u8 unit_owner_meta[MAX_UNITS], unit_raw_meta[MAX_UNITS];
+    u8 unit_type_meta[MAX_UNITS], unit_player_meta[MAX_UNITS];
+    u8 unit_flags[MAX_UNITS];
+    u8 unit_counts[8][228]={{0}};
     unsigned live=0,queued=0,source_geysers=0,source_extractors=0;
     unsigned live_human_source_actors=0,live_enemy_source_buildings=0;
+    unsigned live_enemy_ling_eggs=0;
+    unsigned enemy_ling_bound;
+    _Static_assert(MAX_UNITS <= 255, "save census counters must fit u8");
 
     map=&sc64_race_maps[SC64_Z7_GLOBAL_ID];
     for (unsigned row=0;row<map->unit_count;++row) {
@@ -292,6 +302,53 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
         if (candidate->ore[owner]<0 || candidate->ore[owner]>65535 ||
             candidate->vespene[owner]<0 || candidate->vespene[owner]>65535) return 0;
 
+    enemy_ling_bound=race_z7_save_enemy_ling_bound(candidate,state);
+    for (unsigned i=0;i<MAX_UNITS;++i) {
+        Unit saved;
+        int unused;
+        if (!race_save_decode_unit(candidate,i,width*16u,height*16u,&saved)) return 0;
+        unused=race_z7_save_unused_unit(&saved);
+        unit_flags[i]=(u8)((saved.alive?1u:0u)|(unused?2u:0u)
+#ifdef SC64_Z7_EGG_PRODUCTION
+            | ((saved.type==U_Z7_EGG || saved.raw_type==36)?4u:0u)
+#endif
+            );
+        unit_owner_meta[i]=saved.raw_owner>=0 && saved.raw_owner<8
+            ? (u8)saved.raw_owner : 255u;
+        unit_raw_meta[i]=saved.raw_type>=0 && saved.raw_type<228
+            ? (u8)saved.raw_type : 255u;
+        unit_type_meta[i]=saved.type>=0 && saved.type<255 ? (u8)saved.type : 255u;
+        unit_player_meta[i]=saved.owner>=0 && saved.owner<255 ? (u8)saved.owner : 255u;
+        if (unit_owner_meta[i]<8u && unit_raw_meta[i]<228u) {
+            if (unit_counts[unit_owner_meta[i]][unit_raw_meta[i]]==255u) return 0;
+            ++unit_counts[unit_owner_meta[i]][unit_raw_meta[i]];
+        }
+#ifdef SC64_Z7_EGG_PRODUCTION
+        if (saved.alive && saved.type==U_Z7_EGG && saved.raw_owner==4 &&
+            saved.target==U_ZERGLING) ++live_enemy_ling_eggs;
+#endif
+        /* The old second pass validated every retained source row, including
+         * dead records. Do that once here so later row matching can use the
+         * exact decoded metadata without another full decode. */
+        if (!unused) {
+#ifdef SC64_Z7_EGG_PRODUCTION
+            if (saved.type==U_Z7_EGG || saved.raw_type==36) {
+                if (!race_z7_save_egg_valid(map,&saved,width,height)) return 0;
+                continue;
+            }
+#endif
+            if (saved.raw_owner>=0 || saved.raw_type>=0) {
+                int raw=saved.raw_type; unsigned source=(unsigned)saved.raw_owner;
+                if (saved.raw_owner<0 || saved.raw_owner>=8 || raw<0 || raw>=228 ||
+                    sc64_race_unit_from_raw(raw)!=saved.type ||
+                    saved.owner!=race_z7_save_source_owner(map,source) ||
+                    !sc64_race_unit_rule(saved.type) ||
+                    sc64_race_unit_rule(saved.type)->race!=map->owner_races[source]) return 0;
+            } else if (saved.alive && (saved.raw_owner!=-1 || saved.raw_type!=-1)) return 0;
+            if (saved.alive && saved.raw_owner==-1 && saved.owner!=SIDE) return 0;
+        }
+    }
+
     for (unsigned i=0; i<MAX_UNITS; ++i) {
         Unit saved;
         if (!race_save_decode_unit(candidate,i,width*16u,height*16u,&saved) ||
@@ -323,74 +380,37 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
             expected=race_z7_save_source_owner(map,source);
             if (saved.owner!=expected || !sc64_race_unit_rule(saved.type) ||
                 sc64_race_unit_rule(saved.type)->race!=map->owner_races[source]) return 0;
-            if (!(source==3u && saved.owner==SIDE &&
-                  race_z7_save_human_unit_type(saved.type)) &&
-                !(source==4u && raw==37u)) {
-                /* Neutral and other source actors may move or die, but may
-                 * not be synthesized as new actors. */
-                unsigned initial=(unsigned)race_z7_save_source_unit_count(
-                    map,source,(unsigned)raw);
-                unsigned total=0;
-                for (unsigned j=0;j<MAX_UNITS;++j) {
-                    Unit other;
-                    if (!race_save_decode_unit(candidate,j,width*16u,height*16u,&other)) return 0;
-                    total+=(other.raw_type==raw && other.raw_owner==(int)source);
-                }
-                if (total>initial) return 0;
-            }
-            if (source==4u && raw!=37u) {
-                unsigned initial=(unsigned)race_z7_save_source_unit_count(map,4u,(unsigned)raw);
-                unsigned total=0;
-                for (unsigned j=0;j<MAX_UNITS;++j) {
-                    Unit other;
-                    if (!race_save_decode_unit(candidate,j,width*16u,height*16u,&other)) return 0;
-                    total+=(other.raw_type==raw && other.raw_owner==4);
-                }
-                if (!initial || total>initial) return 0;
-            } else if (source==4u && raw==37u) {
-                unsigned initial=(unsigned)race_z7_save_source_unit_count(map,4u,37u);
-                unsigned total=0;
-                for (unsigned j=0;j<MAX_UNITS;++j) {
-                    Unit other;
-                    if (!race_save_decode_unit(candidate,j,width*16u,height*16u,&other)) return 0;
-                    total+=(other.raw_type==37 && other.raw_owner==4);
-                }
-                /* The authored AI queues at most one paid egg per 240-tick
-                 * pulse; each egg creates two Zerglings. */
-                unsigned bound=race_z7_save_enemy_ling_bound(candidate,state);
-#ifdef SC64_Z7_EGG_PRODUCTION
-                unsigned eggs=race_z7_save_live_enemy_ling_eggs(candidate,width,height);
-                if (eggs==~0u || eggs > (~0u-total)/2u) return 0;
-                total += eggs * 2u;
-#endif
-                if (total>bound) return 0;
-            }
         }
     }
 
-    /* Every live or retained source-provenance unit must be a real mapped
-     * actor. Human raw=-1 is reserved for a just-created product awaiting the
-     * runtime's ordinary reconciliation pass. */
+    /* Apply the original per-actor provenance totals after the single census
+     * pass has counted every slot. These are the same predicate boundaries as
+     * the former nested decode loops. */
     for (unsigned i=0;i<MAX_UNITS;++i) {
-        Unit saved;
-        if (!race_save_decode_unit(candidate,i,width*16u,height*16u,&saved)) return 0;
-        if (race_z7_save_unused_unit(&saved)) continue;
+        unsigned source=unit_owner_meta[i], raw=unit_raw_meta[i];
+        int alive=(unit_flags[i]&1u)!=0, egg=(unit_flags[i]&4u)!=0;
+        if (!alive || egg || source>=8u || raw>=228u) continue;
+        if (source==3u && unit_player_meta[i]==SIDE &&
+            race_z7_save_human_unit_type(unit_type_meta[i])) continue;
+        if (source==4u && raw==37u) continue;
+        if (unit_counts[source][raw]>
+            (unsigned)race_z7_save_source_unit_count(map,source,raw)) return 0;
+    }
+    for (unsigned i=0;i<MAX_UNITS;++i) {
+        unsigned source=unit_owner_meta[i], raw=unit_raw_meta[i];
+        if ((unit_flags[i]&1u) && !(unit_flags[i]&4u) && source==4u &&
+            raw<228u && raw!=37u) {
+            unsigned initial=(unsigned)race_z7_save_source_unit_count(map,4u,raw);
+            if (!initial || unit_counts[4][raw]>initial) return 0;
+        } else if ((unit_flags[i]&1u) && !(unit_flags[i]&4u) &&
+                   source==4u && raw==37u) {
+            if (unit_counts[4][37]>enemy_ling_bound) return 0;
 #ifdef SC64_Z7_EGG_PRODUCTION
-        if (saved.type == U_Z7_EGG || saved.raw_type == 36) {
-            if (!race_z7_save_egg_valid(map, &saved, width, height)) return 0;
-            continue;
-        }
+            if (live_enemy_ling_eggs >
+                (~0u-unit_counts[4][37])/2u ||
+                unit_counts[4][37]+live_enemy_ling_eggs*2u>enemy_ling_bound) return 0;
 #endif
-        if (saved.raw_owner>=0 || saved.raw_type>=0) {
-            if (saved.raw_owner<0 || saved.raw_owner>=8 || saved.raw_type<0 ||
-                saved.raw_type>=228 ||
-                sc64_race_unit_from_raw(saved.raw_type)!=saved.type ||
-                saved.owner!=race_z7_save_source_owner(map,(unsigned)saved.raw_owner) ||
-                !sc64_race_unit_rule(saved.type) ||
-                sc64_race_unit_rule(saved.type)->race!=map->owner_races[saved.raw_owner]) return 0;
-        } else if (saved.alive && (saved.raw_owner!=-1 || saved.raw_type!=-1)) return 0;
-        if (!saved.alive) continue;
-        if (saved.raw_owner==-1 && saved.owner!=SIDE) return 0;
+        }
     }
 
     for (unsigned row=0; row<map->unit_count; ++row) {
@@ -399,11 +419,12 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
         if (raw==214u || (raw>=176u && raw<=178u) || raw==188u ||
             sc64_race_unit_from_raw((int)raw)<0) continue;
         for (unsigned i=0;i<MAX_UNITS;++i) {
-            Unit saved;
-            if (!race_save_decode_unit(candidate,i,width*16u,height*16u,&saved)) return 0;
-            if (!(seen_units[i>>3]&(1u<<(i&7u))) && saved.raw_owner==(int)src->owner &&
-                saved.raw_type==(int)raw && saved.type==sc64_race_unit_from_raw((int)raw) &&
-                saved.owner==race_z7_save_source_owner(map,src->owner)) {
+            unsigned source_owner=unit_owner_meta[i], source_raw=unit_raw_meta[i];
+            int saved_type=unit_type_meta[i], saved_owner=unit_player_meta[i];
+            if (!(seen_units[i>>3]&(1u<<(i&7u))) &&
+                source_owner==(unsigned)src->owner && source_raw==raw &&
+                saved_type==sc64_race_unit_from_raw((int)raw) &&
+                saved_owner==race_z7_save_source_owner(map,src->owner)) {
                 seen_units[i>>3]|=(u8)(1u<<(i&7u));
                 break;
             }
@@ -417,15 +438,14 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
         const Sc64ImportedUnit *src=&map->units[row];
         unsigned raw=src->source_type;
         if (sc64_race_unit_from_raw((int)raw)<0 || src->owner==3u) continue;
-        unsigned total=0;
-        for (unsigned i=0;i<MAX_UNITS;++i) {
-            Unit saved;
-            if (!race_save_decode_unit(candidate,i,width*16u,height*16u,&saved)) return 0;
-            total+=(saved.raw_owner==(int)src->owner && saved.raw_type==(int)raw);
-        }
-        unsigned initial=(unsigned)race_z7_save_source_unit_count(map,src->owner,raw);
-        if (src->owner==4u && raw==37u)
-            initial=race_z7_save_enemy_ling_bound(candidate,state);
+        /* The canonical Z7 map validator fixes unit_count=231 and rejects
+         * unit owners >=8/unknown raw IDs before this loop; keep local bounds
+         * explicit at the census lookup as a fail-closed invariant. */
+        if (src->owner>=8u || raw>=228u) return 0;
+        unsigned total=unit_counts[src->owner][raw];
+        unsigned initial=(src->owner==4u && raw==37u)
+            ? enemy_ling_bound
+            : (unsigned)race_z7_save_source_unit_count(map,src->owner,raw);
         if (total>initial) return 0;
     }
 
@@ -434,19 +454,9 @@ static int race_z7_save_candidate_valid(const RaceSave *candidate,
      * placements. Validate their provenance above and bound the enemy's
      * unfinished Ling obligations against the same authored AI pulse budget. */
     {
-        unsigned enemy_lings = 0;
-        unsigned enemy_eggs = race_z7_save_live_enemy_ling_eggs(
-            candidate, width, height);
-        if (enemy_eggs == ~0u) return 0;
-        for (unsigned i = 0; i < MAX_UNITS; ++i) {
-            Unit saved;
-            if (!race_save_decode_unit(candidate, i, width * 16u,
-                                       height * 16u, &saved)) return 0;
-            enemy_lings += saved.raw_owner == 4 && saved.raw_type == 37;
-        }
-        if (enemy_eggs > (~0u - enemy_lings) / 2u ||
-            enemy_lings + enemy_eggs * 2u >
-                race_z7_save_enemy_ling_bound(candidate, state)) return 0;
+        unsigned enemy_lings=unit_counts[4][37];
+        if (live_enemy_ling_eggs > (~0u-enemy_lings)/2u ||
+            enemy_lings+live_enemy_ling_eggs*2u>enemy_ling_bound) return 0;
     }
 #endif
 
