@@ -59,6 +59,10 @@ human vision. Enemy AI fog awareness remains unimplemented. This service is
 not initialized by a mission profile. The generic action dispatcher still
 rejects ambiguous multi-owner Force selectors, so this work does not claim the
 authored Force-targeted actions can yet execute through the Z8 scheduler.
+The game binder stores its private context in the optional `create_context`
+slot, leaving the shared `context` available to AI, presentation, kill-count,
+and timed callbacks. If `create_context` is null, existing callers continue to
+use the shared context for creation.
 
 `Zer8`, `Ze8T`, and `MvTe` are passed to a required AI service. This adapter
 does not implement them; a missing service or failed policy returns an error
@@ -99,8 +103,10 @@ when `SC64_TRANSPORT_RUNTIME` is part of the build. It also checks default
 CreateUnit placement for raw 74 and hidden raw 101, preserved source/live
 owners, overlap acceptance for the clear-bit unit path, edge clamping,
 unsupported property/type/count rejection, and unit-pool exhaustion. It is a
-host fixture with synthetic pool rows, not a native mission run or campaign
-qualification.
+host fixture with synthetic pool rows. It also binds a distinct creation
+context and invokes AI, presentation, kill-count, and timed callbacks to verify
+their shared context remains intact. This is not a native mission run or
+campaign qualification.
 
 Neither test enables the Z8 profile, scheduler, menu entry, save state, or
 mission. Before enabling a profile, a caller must bind source kill accounting,

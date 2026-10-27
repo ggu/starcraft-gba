@@ -6,6 +6,52 @@
 #include <string.h>
 #include "../starcraft/game.c"
 
+typedef struct {
+    unsigned ai_calls, present_calls, kill_calls, timed_calls;
+    unsigned kill_owner, kill_raw;
+} Z8SharedServiceProbe;
+
+static int z8_probe_ai(void *opaque, u32 fourcc, unsigned owner,
+                       unsigned location, const Sc64Z8Rect *rect)
+{
+    Z8SharedServiceProbe *probe = opaque;
+    assert(fourcc == SC64_Z8_AI_ZER8 && owner == 0 && location == 13 && rect);
+    ++probe->ai_calls;
+    return 1;
+}
+
+static int z8_probe_present(void *opaque, const Sc64Z8Action *action,
+                            unsigned owner, const Sc64Z8Rect *rect)
+{
+    Z8SharedServiceProbe *probe = opaque;
+    assert(action->opcode == 9 && owner == 0 && rect);
+    ++probe->present_calls;
+    return 1;
+}
+
+static int z8_probe_kill_count(void *opaque, unsigned owner, unsigned raw,
+                               u32 *count)
+{
+    Z8SharedServiceProbe *probe = opaque;
+    assert(count);
+    ++probe->kill_calls;
+    probe->kill_owner = owner;
+    probe->kill_raw = raw;
+    *count = 7;
+    return 1;
+}
+
+static int z8_probe_timed(void *opaque, int phase, const Sc64Z8Action *action,
+                          unsigned owner, const Sc64Z8Rect *rect,
+                          u32 *duration_ms)
+{
+    Z8SharedServiceProbe *probe = opaque;
+    assert(phase == 1 && action->opcode == 28 && owner == 0 && rect && duration_ms);
+    ++probe->timed_calls;
+    *duration_ms = 1234;
+    return 1;
+}
+
 static void reset_pools(void)
 {
     memset(u, 0, sizeof(u));
@@ -78,6 +124,7 @@ static void test_create_service(Sc64Z8WorldView *world)
 {
     s8 owners[SC64_Z8_SOURCE_OWNER_LIMIT];
     Sc64Z8GameContext context;
+    Z8SharedServiceProbe shared_probe = {0};
     Sc64Z8Action action = {
         .location = 13, .group1 = 19, .group2 = 0,
         .unit = 74, .opcode = 11, .modifier = 0, .flags = 0x10
@@ -105,7 +152,14 @@ static void test_create_service(Sc64Z8WorldView *world)
     assert(world != 0);
     world->active_mask = (u8)(1u << 4);
     world->force[4] = 2; /* The authored group 19 selector is Force 2. */
+    world->services.context = &shared_probe;
+    world->services.run_ai = z8_probe_ai;
+    world->services.present = z8_probe_present;
+    world->services.kill_count = z8_probe_kill_count;
+    world->services.timed = z8_probe_timed;
     sc64_z8_game_bind_create_service(world, &context);
+    assert(world->services.context == &shared_probe);
+    assert(world->services.create_context == &context);
     Sc64Z8Rect placement = {100, 200, 120, 220};
     assert(sc64_z8_world_action(world, &action, 0, &placement) == 1);
     assert(alive_unit_count() == before + 1u);
@@ -116,6 +170,27 @@ static void test_create_service(Sc64Z8WorldView *world)
     assert(u[slot].hp == u[slot].maxhp);
     assert(u[slot].maxhp == sc64_race_unit_rules[u[slot].type].hp);
     assert(u[slot].shield == sc64_race_unit_rules[u[slot].type].shields);
+
+    /* The create binder must leave the shared context intact for every other
+     * callback. Invoke each through its real adapter entry point. */
+    Sc64Z8Condition kills = {
+        .player = 4, .unit = 74, .opcode = 5
+    };
+    u32 count = 0, duration = 0;
+    assert(sc64_z8_world_count(world, &kills, 0, 0, &count) == 1 && count == 7);
+    assert(shared_probe.kill_calls == 1 && shared_probe.kill_owner == 4 &&
+           shared_probe.kill_raw == 74);
+    Sc64Z8Action other = {
+        .location = 13, .group2 = SC64_Z8_AI_ZER8, .opcode = 16
+    };
+    assert(sc64_z8_world_action(world, &other, 0, &placement) == 1);
+    assert(shared_probe.ai_calls == 1);
+    other = (Sc64Z8Action){.location = 13, .opcode = 9};
+    assert(sc64_z8_world_action(world, &other, 0, &placement) == 1);
+    assert(shared_probe.present_calls == 1);
+    other = (Sc64Z8Action){.location = 13, .opcode = 28};
+    assert(sc64_z8_world_timed(world, 1, &other, 0, &placement, &duration) == 1);
+    assert(duration == 1234 && shared_probe.timed_calls == 1);
 
     /* Native clamps the unsnapped source midpoint by inclusive extents at the
      * right/bottom map edges. The engine stores half-scale world pixels. */

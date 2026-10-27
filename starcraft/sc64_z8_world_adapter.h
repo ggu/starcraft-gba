@@ -31,7 +31,7 @@ typedef struct {
 } Sc64Z8ActorView;
 
 typedef struct {
-    void *context;
+    void *context; /* Shared context for non-create services by default. */
     /* Apply a CreateUnitWithProperties row through the engine's creation
      * routine. property_id is the source UPRP selector; do not ignore it. */
     int (*create)(void *context, const Sc64Z8Action *action,
@@ -51,6 +51,9 @@ typedef struct {
     int (*timed)(void *context, int phase, const Sc64Z8Action *action,
                  unsigned trigger_owner, const Sc64Z8Rect *rect,
                  u32 *duration_ms);
+    /* Optional per-service context. NULL keeps the shared `context` above.
+     * Appended to preserve existing positional initializers. */
+    void *create_context;
 } Sc64Z8WorldServices;
 
 typedef struct {
@@ -266,7 +269,9 @@ sc64_z8_world_action(void *context, const Sc64Z8Action *a,
             rect->right < rect->left || rect->bottom < rect->top ||
             !w->services.create ||
             !sc64_z8_world_resolve_one(w, a->group1, trigger_owner, &owner)) return -1;
-        return w->services.create(w->services.context, a, owner,
+        return w->services.create(w->services.create_context ?
+                                  w->services.create_context : w->services.context,
+                                  a, owner,
                                   sc64_z8_create_count(a), a->group2,
                                   (unsigned)rect->left, (unsigned)rect->top,
                                   (unsigned)rect->right, (unsigned)rect->bottom) == 1

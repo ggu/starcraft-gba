@@ -240,8 +240,8 @@ sc64_z8_game_bind_create_service(Sc64Z8WorldView *world,
                                  Sc64Z8GameContext *context)
 {
     if (!world || !context) return;
-    world->services.context = context;
     world->services.create = sc64_z8_game_create;
+    world->services.create_context = context;
 }
 #endif /* SC64_Z8_GAME_POOL_BRIDGE */
 
