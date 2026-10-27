@@ -3306,8 +3306,9 @@ test-sc64-z7-prune-started: build/test-sc64-z7-full-render-prune-reference build
 	./build/test-sc64-z7-full-render-prune
 
 # Separate full-render Z7 collision qualification; canonical products stay off.
-Z7_STEERING_FLAGS = $(Z7_FULL_RENDER_FLAGS) -DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST
-$(eval $(call Z7_FULL_RENDER_FIXTURE,steering,sc64_z7_steer_game.c,-DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST))
+Z7_STEERING_OPTIONS := -DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST -DSC64_COLLISION_PACKED_HIT
+Z7_STEERING_FLAGS = $(Z7_FULL_RENDER_FLAGS) $(Z7_STEERING_OPTIONS)
+$(eval $(call Z7_FULL_RENDER_FIXTURE,steering,sc64_z7_steer_game.c,$(Z7_STEERING_OPTIONS)))
 .PHONY: test-sc64-z7-steering zerg-z7-steering-probe
 test-sc64-z7-steering: build/test-sc64-z7-full-render-steering
 	./build/test-sc64-z7-full-render-steering
@@ -3315,7 +3316,7 @@ test-sc64-z7-steering: build/test-sc64-z7-full-render-steering
 # Carried Z5 controller under the complete experimental Z7 feature vector.
 # Direct AttackUnit remains enabled; the controller must issue ground clicks
 # when its policy requests Attack-Move. This does not promote the profile.
-$(eval $(call Z7_FULL_RENDER_FIXTURE,carried-z5,sc64_z5_campaign_run.c,-DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ))
+$(eval $(call Z7_FULL_RENDER_FIXTURE,carried-z5,sc64_z5_campaign_run.c,$(Z7_STEERING_OPTIONS) -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ))
 .PHONY: test-sc64-z7-carried-z5
 test-sc64-z7-carried-z5: build/test-sc64-z7-full-render-carried-z5
 	mkdir -p .local/build/z7-carried-z5 .local/sc64
@@ -3946,12 +3947,16 @@ build/test-sc64-collision-bounds-$(1): tests/sc64_collision_bounds.c $$(wildcard
 endef
 $(eval $(call COLLISION_BOUNDS_TEST,cached-list,-DSC64_Z7_RUNTIME -DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST))
 $(eval $(call COLLISION_BOUNDS_TEST,cached,-DSC64_Z7_RUNTIME -DSC64_COLLISION_CLASS_CACHE))
+$(eval $(call COLLISION_BOUNDS_TEST,packed-list,-DSC64_Z7_RUNTIME -DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST -DSC64_COLLISION_PACKED_HIT))
+$(eval $(call COLLISION_BOUNDS_TEST,packed,-DSC64_Z7_RUNTIME -DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_PACKED_HIT))
 $(eval $(call COLLISION_BOUNDS_TEST,hoisted,-DSC64_COLLISION_FACT_HOIST))
 $(eval $(call COLLISION_BOUNDS_TEST,plain,))
 .PHONY: test-sc64-collision-bounds
-test-sc64-collision-bounds: $(addprefix build/test-sc64-collision-bounds-,cached-list cached hoisted plain)
+test-sc64-collision-bounds: $(addprefix build/test-sc64-collision-bounds-,cached-list cached packed-list packed hoisted plain)
 	./build/test-sc64-collision-bounds-cached-list
 	./build/test-sc64-collision-bounds-cached
+	./build/test-sc64-collision-bounds-packed-list
+	./build/test-sc64-collision-bounds-packed
 	./build/test-sc64-collision-bounds-hoisted
 	./build/test-sc64-collision-bounds-plain
 test: test-sc64-collision-bounds

@@ -30,7 +30,28 @@ static Unit u[MAX_UNITS];
 #define SC64_TRANSPORT_LOADED(p) ((p)->loaded)
 
 #include "race_rules.h"
+#ifdef SC64_COLLISION_PACKED_HIT
+/* Keep synthetic out-of-range facts local to this fixture. Real actor cases
+ * still use the public providers, and product headers remain unchanged. */
+#define sc64_game_unit_actor_flags collision_bounds_source_flags
+#define sc64_game_unit_collision_radius collision_bounds_source_radius
+#endif
 #include "sc64_game_actor_facts.h"
+#ifdef SC64_COLLISION_PACKED_HIT
+#undef sc64_game_unit_actor_flags
+#undef sc64_game_unit_collision_radius
+static unsigned sc64_game_unit_actor_flags(int type)
+{
+    if (type == 253) return SC64_GAME_ACTOR_MOVABLE;
+    return collision_bounds_source_flags(type);
+}
+static int sc64_game_unit_collision_radius(int type)
+{
+    if (type == 254) return 64;
+    if (type == 253) return 0;
+    return collision_bounds_source_radius(type);
+}
+#endif
 static int race_p6_combat_unit_burrowed(int slot)
 { return slot >= 0 && slot < MAX_UNITS && u[slot].burrowed; }
 #include "sc64_collision_legacy.h"
@@ -263,8 +284,66 @@ static void steer_list_matches_oracle_and_falls_back(void)
 }
 #endif
 
+#ifdef SC64_COLLISION_PACKED_HIT
+static void packed_hit_wrapper_contract(void)
+{
+    int r, f, c, cold_r, cold_f, cold_c;
+    u8 packed;
+    clear_world();
+    u[1] = (Unit){.x=512,.y=512,.type=U_MARINE,.alive=1};
+    assert(sc64_unit_collision_class_cache[1] == 0);
+    packed = sc64_unit_collision_class_packed_hit(1, U_MARINE, &r, &f, &c);
+    assert(packed == sc64_unit_collision_class_cache[1]);
+    assert(r == 6 && f == 0 && c == 1);
+    assert(sc64_unit_collision_class_packed_hit(1, -1, &r, &f, &c) == packed);
+    assert(r == 6 && f == 0 && c == 1);
+    /* A nonzero valid cache byte decodes locally without consulting the type. */
+    sc64_unit_collision_class_cache[2] = sc64_unit_collision_class_pack(63,1,1);
+    assert(sc64_unit_collision_class_packed_hit(2, -1, &r, &f, &c) == 255);
+    assert(r == 63 && f == 1 && c == 1);
+    /* Miss/zero sentinel calls the original helper and preserves its outputs. */
+    assert(sc64_unit_collision_class_cache[3] == 0);
+    packed = sc64_unit_collision_class_packed_hit(3, SC_RU_COUNT, &r, &f, &c);
+    assert(packed == sc64_unit_collision_class(3, SC_RU_COUNT,
+                                               &cold_r, &cold_f, &cold_c));
+    assert(r == cold_r && f == cold_f && c == cold_c);
+    assert(sc64_unit_collision_class_cache[3] == packed);
+    /* Out-of-range slots use the original helper and never alter any slot. */
+    u8 cache_before[MAX_UNITS];
+    memcpy(cache_before, sc64_unit_collision_class_cache, sizeof(cache_before));
+    packed = sc64_unit_collision_class_packed_hit(-1, U_MARINE, &r, &f, &c);
+    assert(packed == sc64_unit_collision_class(-1, U_MARINE,
+                                               &cold_r, &cold_f, &cold_c));
+    assert(r == cold_r && f == cold_f && c == cold_c);
+    packed = sc64_unit_collision_class_packed_hit(MAX_UNITS, U_MARINE,
+                                                  &r, &f, &c);
+    assert(packed == sc64_unit_collision_class(MAX_UNITS, U_MARINE,
+                                               &cold_r, &cold_f, &cold_c));
+    assert(r == cold_r && f == cold_f && c == cold_c);
+    assert(memcmp(cache_before, sc64_unit_collision_class_cache,
+                  sizeof(cache_before)) == 0);
+    assert(sc64_unit_collision_class_pack(64,1,1) == 0);
+    assert(sc64_unit_collision_class_pack(-1,1,1) == 0);
+    assert(sc64_unit_collision_class_pack(0,0,0) == 0);
+    /* Synthetic source facts force the helper's nonrepresentable-radius and
+     * all-zero tuple cases. The wrapper must delegate on a zero cache byte. */
+    sc64_unit_collision_class_invalidate(6);
+    packed = sc64_unit_collision_class_packed_hit(6, 254, &r, &f, &c);
+    assert(packed == 0 && r == 64 && f == 0 && c == 1);
+    assert(sc64_unit_collision_class_cache[6] == 0);
+    sc64_unit_collision_class_invalidate(7);
+    packed = sc64_unit_collision_class_packed_hit(7, 253, &r, &f, &c);
+    assert(packed == 0 && r == 0 && f == 0 && c == 0);
+    assert(sc64_unit_collision_class_cache[7] == 0);
+    puts("packed hit/miss/slot/unrepresentable/zero-tuple contract: PASS");
+}
+#endif
+
 int main(void)
 {
+#ifdef SC64_COLLISION_PACKED_HIT
+    packed_hit_wrapper_contract();
+#endif
     exhaustive_public_radius_bounds();
     exact_radius_regressions();
     grid_phase_direction_speed_matrix();
