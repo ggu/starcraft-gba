@@ -104,6 +104,48 @@ caveat. This probe ends BSS at `0x0203d7c0`, IWRAM at `0x03004c68`, and retains
 9,468 bytes of measured stack margin. Reducing simulation cadence or changing
 gameplay semantics is not justified by these measurements.
 
+## Optional sight-distance cull
+
+`SC64_P7_SIGHT_AXIS_CULL` skips a sight-radius lookup only when an actor is
+outside the conservative maximum-radius square. The current roster and
+fallbacks are bounded by 176 GBA pixels for units and 160 for buildings.
+Actors on the boundary still reach the original inclusive circle test.
+Alive, owner, loaded-unit, hangar and construction-sight rules are unchanged.
+The bounds fixture enumerates the actual radius helper over every runtime
+type and invalid/extreme type IDs, checks radius/boundary/corner geometry,
+and exercises the actual owner-visibility query on synthetic single actors.
+Positions in this differential fixture are valid map coordinates.
+
+After preparing private inputs, the opt-in checks and builds are:
+
+```sh
+make test-sc64-p7-sight-axis-bounds
+make test-sc64-p7-sight-axis-normal-input
+make build/sc64-p7-normal-input-replay.elf
+make build/sc64-p7-sight-axis-normal-input.elf
+make protoss-p7-sight-axis-probe
+```
+
+The last command builds an internal gameplay probe. Existing default and
+canonical profiles do not enable the new gate. The disabled branches retain
+the original evaluation order. The gate requires P7 actor support.
+
+The final public-source ARM benchmark matches all 20 snapshots and terminal
+state. Its ROM is byte-identical to the reviewed candidate. Compared against
+the hardened ordinary-input reference harness:
+
+| Full mean cycles | Reference | Sight cull | Reduction |
+| --- | ---: | ---: | ---: |
+| Opening | 2,224,609 | 2,168,075 | 2.54% |
+| Attack | 2,698,019 | 2,614,352 | 3.10% |
+
+Both retain 9,572 bytes of measured stack margin, BSS end `0x0203d6e4` and
+IWRAM end `0x03004ae8`. The separate gameplay probe links a 20,128,124-byte
+load image, with BSS end `0x0203deec` and IWRAM end `0x03004ae8`; its final
+ROM is padded to 32 MiB. Its gameplay stack is not qualified by the benchmark
+stack measurement. The smaller cycle count remains far outside the 30-fps
+budget; there is no new campaign-win, Carrier-flight or physical-GBA claim.
+
 ## Evidence retention
 
 This audit records a frozen local investigation. An opt-in authored replay
@@ -136,6 +178,8 @@ postlink guards, host goldens, owned-process launch records and ARM results:
 - `.local/build/z7-live-20261027/p7-arbiter-lazy-powered-v3/root-reviewed/`
 - `.local/build/p7-gen43-orders-sampled-20261027-v2/`
 - `.local/build/p7-gen43-orders-sampled-20261027-v3/root-reviewed/`
+- `.local/build/p7-sight-axis-root-reviewed-20261027/`
+- `.local/build/p7-sight-axis-public-root-final-20261027/`
 
 These are ignored local paths, not downloadable artifacts. Do not regenerate
 shared banks to reproduce this audit. Another machine must first prepare

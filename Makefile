@@ -3983,3 +3983,33 @@ test-sc64-p7-normal-input-replay: build/test-sc64-p7-normal-input-replay
 
 build/sc64-p7-normal-input-replay.elf: $(P7_NORMAL_INPUT_REPLAY) tests/sc64_p7_normal_input_tape.h $(P7_NORMAL_INPUT_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(P7_INTERCEPTOR_FLIGHT_FLAGS) $(P7_NORMAL_INPUT_COMMON) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/sc64-p7-normal-input-replay.map -lgcc -o $@
+
+# Optional sight-radius axis-cull qualification targets; no default profile changes.
+P7_SIGHT_AXIS_FLAGS := $(P7_INTERCEPTOR_FLIGHT_FLAGS) -DSC64_P7_SIGHT_AXIS_CULL
+P7_SIGHT_AXIS_BOUNDS_TEST := tests/sc64_p7_sight_axis_cull.c
+
+build/test-sc64-p7-sight-axis-bounds: $(P7_SIGHT_AXIS_BOUNDS_TEST) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_SIGHT_AXIS_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+.PHONY: test-sc64-p7-sight-axis-bounds
+test-sc64-p7-sight-axis-bounds: build/test-sc64-p7-sight-axis-bounds
+	./build/test-sc64-p7-sight-axis-bounds
+
+# Ordinary-input replay with the candidate enabled; remains opt-in.
+build/test-sc64-p7-sight-axis-normal-input: $(P7_NORMAL_INPUT_REPLAY) tests/sc64_p7_normal_input_tape.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_SIGHT_AXIS_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+.PHONY: test-sc64-p7-sight-axis-normal-input
+test-sc64-p7-sight-axis-normal-input: build/test-sc64-p7-sight-axis-normal-input
+	./build/test-sc64-p7-sight-axis-normal-input
+
+# Internal probe only; the canonical P7 targets stay unchanged.
+build/starcraft-protoss-p7-sight-axis-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_SIGHT_AXIS_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-sight-axis-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P7-Sight-Axis-Probe-GBA.gba: build/starcraft-protoss-p7-sight-axis-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC P7 AXIS' S7AX
+.PHONY: protoss-p7-sight-axis-probe
+protoss-p7-sight-axis-probe: build/StarCraft-Protoss-P7-Sight-Axis-Probe-GBA.gba
+
+build/sc64-p7-sight-axis-normal-input.elf: $(P7_NORMAL_INPUT_REPLAY) tests/sc64_p7_normal_input_tape.h $(P7_NORMAL_INPUT_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(P7_SIGHT_AXIS_FLAGS) $(P7_NORMAL_INPUT_COMMON) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/sc64-p7-sight-axis-normal-input.map -lgcc -o $@

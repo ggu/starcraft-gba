@@ -217,10 +217,55 @@ is `ad0d35ef2bbabf9e058ae6a5996ea6e6d21355da87719ab3a46ccd9889ab0e0a`.
 The linked image used 32,229,996 bytes, ended BSS at `0x0203d7ac` and IWRAM
 at `0x03004d10`, and retained a measured 7,560-byte stack margin. These
 checks apply to the complete experimental Z7 feature vector, not a newly
-promoted canonical build. No fresh-process SRAM continuation or performance
-qualification is established for this corrected tape. Canonical progress
-remains 22/30; performance and remaining target qualification still prevent
-promotion.
+promoted canonical build. Fresh-process emulator SRAM continuation for this
+corrected tape is verified below. Performance and physical-cartridge behavior
+remain unqualified. Canonical progress remains 22/30; performance and remaining
+target qualification still prevent promotion.
+
+### Corrected Z6 tape: fresh-process ARM SRAM continuation
+
+A separate ARM prefix replays the corrected tape through tick 130,000 and
+matches all 188 original checkpoints up to that cut. At live frame 128,515,
+normal START/release/B/release input saves the game. The owned emulator is
+then stopped and its actual flushed 32 KiB SRAM is checked: tag `0x53435a54`,
+16,296-byte payload, sequence 1 and valid FNV checksum. The payload SHA-256
+matches the independent host save:
+`d200dcbf65f06bd4adf9731a5503b046217be9ced1aa2d47d9747c2669b6a1b4`.
+No host-created SRAM payload is injected into the emulator.
+
+A new emulator process loads that file through ordinary HOME-L input. Its
+immediate persistent-state comparison matches, and the unchanged suffix
+matches all 10 remaining projected checkpoints and the source victory at
+tick 136,446 / frame 134,932. Kerrigan remains at (950,1009), Ventral Sacs is
+researched, cargo and both objective-location counts are zero, and no fault
+is reported.
+
+Load intentionally resets a closed menu selection, initially rebuilds the
+derived Z6 elapsed field, and discards five nonserialized event outputs:
+`presentation_opcode`, `last_string_id`, `center_x`, `center_y`, and
+`center_requested`. The comparison projects only those listed differences;
+tail checkpoints retain actual elapsed time, camera/world/persistent state,
+open-menu selection and the unchanged `last_wav_id`. This is not equality of
+all transient in-memory bytes.
+
+The runner initially rejected a changed final SRAM file after every load,
+checkpoint and victory check had passed. Source review confirmed the normal
+victory autosave: the original slot is byte-identical, and the alternate slot
+contains a valid sequence-2 record. The post-run review corrects that invalid
+file-equality assumption without changing SRAM or rerunning the evidence.
+
+| Frozen ARM artifact | SHA-256 |
+| --- | --- |
+| Prefix ROM | `8985a8f811d417a122b7e7dc7fa163af1eac50f154e58de1fdc2bdd3a034abe9` |
+| Resume ROM | `bc2c5140a9873e313c8179cedfc51e14f9d1e028f4c0fee8df58021d916cd5b3` |
+
+The prefix/resume linked load images are 32,229,956 / 32,241,080 bytes; final
+ROMs fit 32 MiB. BSS ends at `0x0203d7ac` / `0x0203d7a4`, IWRAM at
+`0x03004d10`, and measured stack margins are 7,088 / 7,144 bytes. Private
+logs, raw saves, exact argv and `run/reviewed-result.json` are retained under
+`.local/build/z6-sram-continuation-20261027/arm-root-reviewed-v3/`.
+This establishes the tested emulator continuation only, not physical GBA
+SRAM or near-30-fps performance.
 
 All eighteen rotated skirmish configurations (two maps, three human races,
 one to three AI opponents) reached terminal losses in this host matrix. A
