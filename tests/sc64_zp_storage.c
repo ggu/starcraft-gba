@@ -19,6 +19,7 @@
 #define sc64_unit_buckets_begin zp_persist_buckets_begin
 #define sc64_unit_bucket_move zp_persist_bucket_move
 #define sc64_unit_bucket_step_clear zp_persist_bucket_step_clear
+#define sc64_unit_bucket_step_clear_reference zp_persist_bucket_step_clear_reference
 #define sc64_unit_buckets_end zp_persist_buckets_end
 #include "../starcraft/sc64_persistent_collision.h"
 #undef sc64_unit_bucket_head
@@ -33,6 +34,7 @@
 #undef sc64_unit_buckets_begin
 #undef sc64_unit_bucket_move
 #undef sc64_unit_bucket_step_clear
+#undef sc64_unit_bucket_step_clear_reference
 #undef sc64_unit_buckets_end
 
 #ifndef SC64_ZP_CAMPAIGN_STORAGE
@@ -129,7 +131,13 @@ static void collision_case(int qx, int qy, int nx, int ny,
     zp_persist_bucket_initialized = 0;
     zp_persist_buckets_begin();
     assert(zp_persist_bucket_active);
+#ifdef SC64_CONTACT_CACHE
+    /* The cached query reads the profile-selected index; the persistent
+     * copy's own index is exercised through its reference query. */
+    assert(zp_persist_bucket_step_clear_reference(&u[0], nx, ny, 0) == oracle);
+#else
     assert(zp_persist_bucket_step_clear(&u[0], nx, ny) == oracle);
+#endif
     zp_persist_buckets_end();
 }
 

@@ -1,0 +1,206 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "../starcraft/sc64_z8_world_adapter.h"
+
+typedef struct {
+    unsigned owner, count, property, x1, y1, x2, y2;
+    u32 ai;
+    unsigned ai_owner, ai_location;
+    unsigned present_opcode;
+    unsigned kills_owner, kills_raw;
+    u32 kills;
+    Sc64Z8ActorView *spawn_slot;
+} FakeEngine;
+
+static int create(void *context, const Sc64Z8Action *a, unsigned owner,
+                  unsigned count, unsigned property, unsigned x1, unsigned y1,
+                  unsigned x2, unsigned y2)
+{
+    FakeEngine *e = context;
+    assert(a->opcode == 11);
+    e->owner=owner; e->count=count; e->property=property;
+    e->x1=x1; e->y1=y1; e->x2=x2; e->y2=y2;
+    if (e->spawn_slot) {
+        *e->spawn_slot=(Sc64Z8ActorView){.raw_type=a->unit,.source_owner=(s16)owner,
+            .x=(s16)((x1+x2)/4u),.y=(s16)((y1+y2)/4u),
+            .alive=1,.completed=1,.men=1,.type_known=1};
+        e->spawn_slot=0;
+    }
+    return 1;
+}
+
+static int run_ai(void *context, u32 fourcc, unsigned owner, unsigned location,
+                  const Sc64Z8Rect *rect)
+{
+    FakeEngine *e = context;
+    assert(rect && rect->left == 32 && rect->top == 32);
+    e->ai=fourcc; e->ai_owner=owner; e->ai_location=location;
+    return 1;
+}
+
+static int present(void *context, const Sc64Z8Action *a, unsigned owner,
+                   const Sc64Z8Rect *rect)
+{
+    FakeEngine *e = context;
+    (void)owner; (void)rect;
+    e->present_opcode=a->opcode;
+    return 1;
+}
+
+static int kill_count(void *context, unsigned owner, unsigned raw, u32 *out)
+{
+    FakeEngine *e = context;
+    e->kills_owner=owner; e->kills_raw=raw; *out=e->kills;
+    return 1;
+}
+
+static int read_actor(void *context, unsigned index, Sc64Z8ActorView *out)
+{
+    Sc64Z8ActorView *actors = context;
+    *out = actors[index];
+    return 1;
+}
+
+int main(void)
+{
+    FakeEngine engine={0};
+    u8 invincible0=0, invincible1=0;
+    Sc64ResourceActionState wallets[8]={{0}};
+    Sc64Z8ActorView actors[5]={
+        {.raw_type=154,.source_owner=1,.x=20,.y=20,
+         .left=8,.top=8,.right=8,.bottom=8,.alive=1,.completed=1,
+         .men=1,.type_known=1,.invincible=&invincible0},
+        {.raw_type=154,.source_owner=1,.x=22,.y=20,
+         .left=8,.top=8,.right=8,.bottom=8,.alive=1,.completed=0,
+         .men=1,.type_known=1,.invincible=&invincible1},
+        {.raw_type=171,.source_owner=2,.x=20,.y=20,
+         .left=16,.top=16,.right=16,.bottom=16,.alive=1,.completed=1,
+         .building=1,.type_known=1},
+        {.raw_type=154,.source_owner=11,.x=20,.y=20,
+         .left=8,.top=8,.right=8,.bottom=8,.alive=1,.completed=1,
+         .men=1,.type_known=1}
+    };
+    Sc64Z8WorldView w={0};
+    Sc64Z8Rect rect={48,48,64,64};
+    u32 count=0;
+    s16 x=0,y=0;
+    Sc64Z8Condition c={0};
+    Sc64Z8Action a={0};
+
+    w.actors=actors; w.actor_count=3;
+    w.active_mask=(u8)((1u<<1)|(1u<<2)|(1u<<3));
+    w.force[1]=2; w.force[2]=3; w.force[3]=1;
+    for (unsigned i=0;i<8;++i) w.wallet[i]=&wallets[i];
+    w.services.context=&engine;
+    w.services.create=create; w.services.run_ai=run_ai;
+    w.services.present=present; w.services.kill_count=kill_count;
+
+    c.opcode=2; c.player=19; c.unit=154; c.comparison=0; c.amount=1;
+    assert(sc64_z8_world_count(&w,&c,3,0,&count)==1 && count==1);
+    c.comparison=1; c.amount=2;
+    assert(sc64_z8_world_count(&w,&c,3,0,&count)==1 && count==2);
+    c.opcode=3; c.player=1; c.comparison=0; c.amount=1;
+    assert(sc64_z8_world_count(&w,&c,1,&rect,&count)==1 && count==1);
+    rect.left=49; rect.top=48; rect.right=64; rect.bottom=64;
+    assert(sc64_z8_world_count(&w,&c,1,&rect,&count)==1 && count==0);
+
+    /* Current Player (13) follows the scheduler's invocation owner, not a
+     * cached world-wide player value. */
+    c=(Sc64Z8Condition){.opcode=2,.player=13,.unit=154,.comparison=0};
+    assert(sc64_z8_world_count(&w,&c,1,0,&count)==1 && count==1);
+    assert(sc64_z8_world_count(&w,&c,2,0,&count)==1 && count==0);
+    { unsigned resolved=0;
+      assert(sc64_z8_world_resolve_one(&w,13,2,&resolved) && resolved==2); }
+
+    c.opcode=5; c.player=13; c.unit=154; c.comparison=0; c.amount=1;
+    engine.kills=4;
+    assert(sc64_z8_world_count(&w,&c,1,0,&count)==1 && count==4);
+    assert(engine.kills_owner==1 && engine.kills_raw==154);
+
+    rect=(Sc64Z8Rect){32,32,80,80};
+    a.opcode=38; a.unit=154; a.group1=19;
+    assert(sc64_z8_world_find_unit(&w,&a,3,&rect,&x,&y)==1);
+    assert(x==40 && y==40); /* First matching actor in caller's actor order. */
+
+    a=(Sc64Z8Action){.opcode=11,.location=1,.group1=19,.group2=4,
+                     .unit=74,.modifier=0};
+    assert(sc64_z8_world_action(&w,&a,3,&rect)==1);
+    assert(engine.owner==1 && engine.count==1 && engine.property==4);
+    assert(engine.x1==32 && engine.y1==32 && engine.x2==80 && engine.y2==80);
+
+    a=(Sc64Z8Action){.opcode=43,.location=1,.group1=19,.unit=154,.modifier=4};
+    actors[1].invincible=0;
+    assert(sc64_z8_world_action(&w,&a,3,&rect)==-1);
+    assert(invincible0==0); /* Invalid late entry does not partially mutate. */
+    actors[1].invincible=&invincible1;
+    assert(sc64_z8_world_action(&w,&a,3,&rect)==1);
+    assert(invincible0==1 && invincible1==1);
+    a.modifier=5;
+    assert(sc64_z8_world_action(&w,&a,3,&rect)==1);
+    assert(invincible0==0 && invincible1==0);
+
+    a=(Sc64Z8Action){.opcode=26,.group1=19,.group2=350,
+                     .unit=SC64_RESOURCE_BOTH,.modifier=SC64_RESOURCE_MOD_SET};
+    assert(sc64_z8_world_action(&w,&a,3,0)==1);
+    assert(wallets[1].current_minerals==350 && wallets[1].current_gas==350);
+    assert(wallets[1].total_minerals_gathered==350);
+
+    /* Two source players can share a live combat owner without sharing the
+     * independent 32-bit economy used by trigger SetResources actions. */
+    {
+        u32 source_minerals[8]={0}, source_gas[8]={0};
+        source_minerals[1]=10; source_minerals[2]=20;
+        for (unsigned i=0;i<8;++i) w.wallet[i]=0;
+        w.source_minerals[1]=&source_minerals[1];
+        w.source_gas[1]=&source_gas[1];
+        w.source_minerals[2]=&source_minerals[2];
+        w.source_gas[2]=&source_gas[2];
+        a=(Sc64Z8Action){.opcode=26,.group1=19,.group2=350,
+                         .unit=SC64_RESOURCE_MINERALS,
+                         .modifier=SC64_RESOURCE_MOD_ADD};
+        assert(sc64_z8_world_action(&w,&a,3,0)==1);
+        a.group1=20;
+        assert(sc64_z8_world_action(&w,&a,3,0)==1);
+        assert(source_minerals[1]==360u && source_minerals[2]==370u);
+        assert(source_gas[1]==0u && source_gas[2]==0u);
+    }
+
+    a=(Sc64Z8Action){.opcode=16,.location=4,.group2=SC64_Z8_AI_ZER8};
+    w.services.run_ai=0;
+    assert(sc64_z8_world_action(&w,&a,3,&rect)==-1); /* No invented AI. */
+    w.services.run_ai=run_ai;
+    assert(sc64_z8_world_action(&w,&a,3,&rect)==1);
+    assert(engine.ai==SC64_Z8_AI_ZER8 && engine.ai_owner==3 && engine.ai_location==4);
+
+    a=(Sc64Z8Action){.opcode=9,.location=1};
+    assert(sc64_z8_world_action(&w,&a,3,&rect)==1 && engine.present_opcode==9);
+    assert(sc64_z8_world_ops.count && sc64_z8_world_ops.action &&
+           sc64_z8_world_ops.timed && sc64_z8_world_ops.find_unit);
+
+    /* Game binding can enumerate the real engine arrays without allocating
+     * a parallel actor snapshot; mutations still reach the live flag pointer. */
+    w.actors=0; w.actor_count=5; w.actor_context=actors; w.actor_at=read_actor;
+    c=(Sc64Z8Condition){.opcode=2,.player=19,.unit=154,.comparison=0,.amount=1};
+    assert(sc64_z8_world_count(&w,&c,3,0,&count)==1 && count==1);
+    c=(Sc64Z8Condition){.opcode=2,.player=17,.unit=154,.comparison=0};
+    assert(sc64_z8_world_count(&w,&c,3,0,&count)==1 && count==1);
+    a=(Sc64Z8Action){.opcode=43,.location=1,.group1=19,.unit=154,.modifier=4};
+    assert(sc64_z8_world_action(&w,&a,3,&rect)==1 && invincible0==1);
+
+    /* Pool-capacity enumeration sees a newly created live slot later in the
+     * same pass; a one-time actor snapshot would miss this Command target. */
+    engine.spawn_slot=&actors[4];
+    a=(Sc64Z8Action){.opcode=11,.location=1,.group1=19,.unit=74,.modifier=0};
+    assert(sc64_z8_world_action(&w,&a,3,&rect)==1 && actors[4].alive);
+    c=(Sc64Z8Condition){.opcode=2,.player=19,.unit=74,.comparison=0,.amount=1};
+    assert(sc64_z8_world_count(&w,&c,3,0,&count)==1 && count==1);
+
+    actors[2].type_known=0;
+    c=(Sc64Z8Condition){.opcode=2,.player=17,.unit=229,.comparison=0};
+    assert(sc64_z8_world_count(&w,&c,1,0,&count)==-1); /* Unknown relevant actor. */
+    puts("sc64_z8_world: ok (live typed view, exact selectors, fail-closed services)");
+    return 0;
+}

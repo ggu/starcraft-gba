@@ -1,7 +1,8 @@
-/* P7 rendered-frame differential for the experimental tile renderer.
+/* P7 displayed-frame differential for optional rendering profiles.
  *
- * The reference build renders through mode 4; the SC64_TILE_RENDERER build
- * composes its emulated mode-0 layers. Both run the same controller-only
+ * The reference uses mode 4. A candidate either uses the canonical mode-4
+ * draw flags or defines SC64_TILE_RENDERER to compose emulated mode-0 layers.
+ * Both run the same controller-only
  * session (menu launch, neutral play, four camera pans, pause, a controller
  * attack-move and combat) with one game_render() per update, and print the
  * RGB555 hash of every displayed frame plus a simulation-state hash. The two
@@ -65,6 +66,8 @@ static void tap(u16 key, const char *phase)
 
 int main(void)
 {
+    /* Include the normal low-index HUD palette in the displayed RGB oracle. */
+    gba_init();
     game_init();
     game_render();
     tap(KEY_A, "menu");

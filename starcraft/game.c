@@ -919,25 +919,158 @@ static Tracer tracers[MAX_TRACERS];
 #else
 #define SC64_DEATH_VFX_POOL 12
 #endif
+/* Result outro: the simulation stops on the outcome update, but final deaths
+ * keep animating on a presentation clock before the result panel appears. */
+#define SC64_RESULT_OUTRO_MIN 24u
+#define SC64_RESULT_OUTRO_MAX 96u
+#define SC64_RESULT_PANEL_OPEN 6u
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+#ifdef SC64_TILE_RENDERER
+#error "death-VFX VRAM storage conflicts with the tile renderer"
+#endif
+enum {
+    SC64_DEATH_VFX_VRAM_ROW_WORDS = 10,
+    SC64_DEATH_VFX_VRAM_POOL_WORDS = SC64_DEATH_VFX_POOL * SC64_DEATH_VFX_VRAM_ROW_WORDS,
+    SC64_DEATH_VFX_VRAM_SEEN_WORDS =
+        ((((MAX_UNITS + 7) / 8) + ((MAX_BUILDINGS + 7) / 8) + 1) / 2),
+    SC64_DEATH_VFX_VRAM_PRIMED_WORD = SC64_DEATH_VFX_VRAM_POOL_WORDS + SC64_DEATH_VFX_VRAM_SEEN_WORDS,
+    SC64_DEATH_VFX_VRAM_OUTRO_WORD = SC64_DEATH_VFX_VRAM_PRIMED_WORD + 1,
+    SC64_DEATH_VFX_VRAM_OUTRO_END_WORD = SC64_DEATH_VFX_VRAM_OUTRO_WORD + 1,
+    SC64_DEATH_VFX_VRAM_TOTAL_WORDS = SC64_DEATH_VFX_VRAM_OUTRO_END_WORD + 1
+};
+/* The gap after the sampled-audio arena is not free: imported game audio
+ * keeps a live actor snapshot there. Use only the 2.5 KiB padding after the
+ * second Mode-4 framebuffer page, before the projectile OBJ arena. */
+#define SC64_DEATH_VFX_VRAM_BASE 0x06013600u
+#define SC64_DEATH_VFX_VRAM_LIMIT 0x06014000u
+_Static_assert(SC64_DEATH_VFX_VRAM_BASE >=
+               GBA_AUDIO_ARENA + GBA_AUDIO_MIX_BYTES + (MAX_UNITS + MAX_BUILDINGS) * 2u,
+               "death-VFX storage overlaps the imported game-audio snapshot");
+_Static_assert(SC64_DEATH_VFX_VRAM_BASE + SC64_DEATH_VFX_VRAM_TOTAL_WORDS * 2u <= SC64_DEATH_VFX_VRAM_LIMIT,
+               "death-VFX state exceeds Mode-4 page padding or overlaps projectile VRAM");
+_Static_assert(((MAX_UNITS + 7) / 8 + (MAX_BUILDINGS + 7) / 8) <=
+               SC64_DEATH_VFX_VRAM_SEEN_WORDS * 2,
+               "death-VFX alive shadow exceeds packed VRAM words");
+#ifdef GBA_HOST
+static u16 sc64_death_vfx_vram_host[SC64_DEATH_VFX_VRAM_TOTAL_WORDS + 2];
+#define SC64_DEATH_VFX_VRAM_WORDS ((volatile u16 *)(sc64_death_vfx_vram_host + 1))
+static void death_vfx_test_storage_guards_init(void)
+{
+    sc64_death_vfx_vram_host[0] = 0xa55au;
+    sc64_death_vfx_vram_host[SC64_DEATH_VFX_VRAM_TOTAL_WORDS + 1] = 0x5aa5u;
+}
+static int death_vfx_test_storage_guards_ok(void)
+{
+    return sc64_death_vfx_vram_host[0] == 0xa55au &&
+           sc64_death_vfx_vram_host[SC64_DEATH_VFX_VRAM_TOTAL_WORDS + 1] == 0x5aa5u;
+}
+#else
+#define SC64_DEATH_VFX_VRAM_WORDS ((volatile u16 *)SC64_DEATH_VFX_VRAM_BASE)
+#endif
+static void
+death_vfx_load_row(int slot, Sc64DeathVfx *e)
+{
+    volatile u16 *p = SC64_DEATH_VFX_VRAM_WORDS + slot * SC64_DEATH_VFX_VRAM_ROW_WORDS;
+    e->x = (int16_t)p[0]; e->y = (int16_t)p[1];
+    e->birth = (uint32_t)p[2] | ((uint32_t)p[3] << 16);
+    e->raw = p[4]; e->burst_su = p[5]; e->remnant_start = p[6]; e->total_su = p[7];
+    e->style = (uint8_t)p[8]; e->extent = (uint8_t)(p[8] >> 8);
+    e->source = (uint8_t)p[9]; e->color = (uint8_t)(p[9] >> 8);
+}
+static void
+death_vfx_store_row(int slot, const Sc64DeathVfx *e)
+{
+    volatile u16 *p = SC64_DEATH_VFX_VRAM_WORDS + slot * SC64_DEATH_VFX_VRAM_ROW_WORDS;
+    p[0] = (u16)e->x; p[1] = (u16)e->y;
+    p[2] = (u16)e->birth; p[3] = (u16)(e->birth >> 16);
+    p[4] = e->raw; p[5] = e->burst_su; p[6] = e->remnant_start; p[7] = e->total_su;
+    p[8] = (u16)e->style | ((u16)e->extent << 8);
+    p[9] = (u16)e->source | ((u16)e->color << 8);
+}
+static u16
+death_vfx_seen_word(unsigned word)
+{
+    return SC64_DEATH_VFX_VRAM_WORDS[SC64_DEATH_VFX_VRAM_POOL_WORDS + word];
+}
+static void
+death_vfx_seen_set_word(unsigned word, u16 value)
+{
+    SC64_DEATH_VFX_VRAM_WORDS[SC64_DEATH_VFX_VRAM_POOL_WORDS + word] = value;
+}
+static int
+death_vfx_seen_chunk(unsigned byte)
+{
+    u16 word = death_vfx_seen_word(byte >> 1);
+    return (byte & 1u) ? word >> 8 : word & 0xffu;
+}
+static void
+death_vfx_seen_set_chunk(unsigned byte, unsigned value)
+{
+    unsigned word_index = byte >> 1;
+    u16 word = death_vfx_seen_word(word_index);
+    if (byte & 1u) word = (u16)((word & 0x00ffu) | ((value & 0xffu) << 8));
+    else word = (u16)((word & 0xff00u) | (value & 0xffu));
+    death_vfx_seen_set_word(word_index, word);
+}
+static void death_vfx_seen_clear(void)
+{
+    for (unsigned i = 0; i < SC64_DEATH_VFX_VRAM_SEEN_WORDS; ++i)
+        death_vfx_seen_set_word(i, 0);
+}
+static int death_vfx_primed_get(void) { return SC64_DEATH_VFX_VRAM_WORDS[SC64_DEATH_VFX_VRAM_PRIMED_WORD]; }
+static void death_vfx_primed_set(int v) { SC64_DEATH_VFX_VRAM_WORDS[SC64_DEATH_VFX_VRAM_PRIMED_WORD] = (u16)(v != 0); }
+static u16 result_outro_get(void) { return SC64_DEATH_VFX_VRAM_WORDS[SC64_DEATH_VFX_VRAM_OUTRO_WORD]; }
+static void result_outro_set(u16 v) { SC64_DEATH_VFX_VRAM_WORDS[SC64_DEATH_VFX_VRAM_OUTRO_WORD] = v; }
+static u16 result_outro_end_get(void) { return SC64_DEATH_VFX_VRAM_WORDS[SC64_DEATH_VFX_VRAM_OUTRO_END_WORD]; }
+static void result_outro_end_set(u16 v) { SC64_DEATH_VFX_VRAM_WORDS[SC64_DEATH_VFX_VRAM_OUTRO_END_WORD] = v; }
+static void death_vfx_pool_clear(void)
+{
+    for (int i = 0; i < SC64_DEATH_VFX_POOL * SC64_DEATH_VFX_VRAM_ROW_WORDS; ++i)
+        SC64_DEATH_VFX_VRAM_WORDS[i] = 0;
+}
+static void death_vfx_test_load_pool(Sc64DeathVfx *out)
+{
+    for (int i = 0; i < SC64_DEATH_VFX_POOL; ++i) death_vfx_load_row(i, &out[i]);
+}
+static void death_vfx_test_store_pool(const Sc64DeathVfx *in)
+{
+    for (int i = 0; i < SC64_DEATH_VFX_POOL; ++i) death_vfx_store_row(i, &in[i]);
+}
+static void death_vfx_test_load_row(int slot, Sc64DeathVfx *out) { death_vfx_load_row(slot, out); }
+static void death_vfx_test_store_row(int slot, const Sc64DeathVfx *in) { death_vfx_store_row(slot, in); }
+static int death_vfx_seen_get_byte(unsigned byte) { return death_vfx_seen_chunk(byte); }
+static void death_vfx_seen_set_byte(unsigned byte, unsigned value) { death_vfx_seen_set_chunk(byte, value); }
+#else
 static Sc64DeathVfx death_vfx[SC64_DEATH_VFX_POOL];
 static u8 death_vfx_seen[(MAX_UNITS + 7) / 8 + (MAX_BUILDINGS + 7) / 8];
 static u8 death_vfx_primed;
-/* Result outro: the simulation stops on the outcome update, but final deaths
- * keep animating on a presentation clock before the result panel appears.
- * The counter is never read by the simulation, input handling or saves. */
-#define SC64_RESULT_OUTRO_MIN 24u  /* 0.8 s, even with nothing exploding */
-#define SC64_RESULT_OUTRO_MAX 96u  /* 3.2 s cap for long explosions */
-#define SC64_RESULT_PANEL_OPEN 6u  /* panel grows open over 0.2 s */
 static u16 result_outro, result_outro_end;
+#define death_vfx_primed_get() (death_vfx_primed)
+#define death_vfx_primed_set(v) (death_vfx_primed = (u8)((v) != 0))
+#define result_outro_get() (result_outro)
+#define result_outro_set(v) (result_outro = (u16)(v))
+#define result_outro_end_get() (result_outro_end)
+#define result_outro_end_set(v) (result_outro_end = (u16)(v))
+#define death_vfx_pool_clear() memset(death_vfx, 0, sizeof(death_vfx))
+static void death_vfx_test_load_pool(Sc64DeathVfx *out) { memcpy(out, death_vfx, sizeof(death_vfx)); }
+static void death_vfx_test_store_pool(const Sc64DeathVfx *in) { memcpy(death_vfx, in, sizeof(death_vfx)); }
+static void death_vfx_test_load_row(int slot, Sc64DeathVfx *out) { *out = death_vfx[slot]; }
+static void death_vfx_test_store_row(int slot, const Sc64DeathVfx *in) { death_vfx[slot] = *in; }
+static int death_vfx_seen_get_byte(unsigned byte) { return death_vfx_seen[byte]; }
+static void death_vfx_seen_set_byte(unsigned byte, unsigned value) { death_vfx_seen[byte] = (u8)value; }
+#endif
 /* New worlds and loads re-prime the shadow, so stale dead rows never play.
  * A world loaded on its result screen shows the panel at once. */
 static void
 death_vfx_reset(void)
 {
-    memset(death_vfx, 0, sizeof(death_vfx));
-    death_vfx_primed = 0;
-    result_outro_end = SC64_RESULT_OUTRO_MAX;
-    result_outro = SC64_RESULT_OUTRO_MAX + SC64_RESULT_PANEL_OPEN;
+    death_vfx_pool_clear();
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+    death_vfx_seen_clear();
+#endif
+    death_vfx_primed_set(0);
+    result_outro_end_set(SC64_RESULT_OUTRO_MAX);
+    result_outro_set(SC64_RESULT_OUTRO_MAX + SC64_RESULT_PANEL_OPEN);
 }
 #else
 #define death_vfx_reset() ((void)0)
@@ -2400,12 +2533,25 @@ unit_step_clear(const Unit *q, int nx, int ny)
 #ifdef SC64_RACES
 /* Keep fact lookup and endpoint arithmetic in ROM: large campaign profiles
  * have very little spare IWRAM. The path/collision loops remain hot. */
+#if defined(SC64_CONTACT_CACHE) && !defined(SC64_T5_RUNTIME) && !defined(SC64_CONTACT_STOCK_ROM)
+/* Without the division the step is a short table read; keep it inline in the
+ * hot mover where the IWRAM reserve allows (the late Terran profile does not,
+ * and SC64_CONTACT_STOCK_ROM keeps it out of line for other tight profiles). */
+static inline __attribute__((always_inline)) unsigned
+#else
 static unsigned __attribute__((noinline))
+#endif
 sc64_unit_stock_step(const Unit *q,int tx,int ty)
 {
+#ifdef SC64_CONTACT_CACHE
+    return sc64_contact_stock_step(q->raw_type>=0?q->raw_type:
+        sc64_race_raw_unit(q->type),(unsigned)frame,(unsigned)(q-u),
+        tx!=q->x && ty!=q->y);
+#else
     return sc64_stock_motion_step(q->raw_type>=0?q->raw_type:
         sc64_race_raw_unit(q->type),(unsigned)frame,(unsigned)(q-u),
         tx!=q->x && ty!=q->y);
+#endif
 }
 
 static void __attribute__((noinline))
@@ -2535,7 +2681,17 @@ move_toward(Unit * q, int tx, int ty)
 	/* Local steering avoids repeatedly retrying the same occupied waypoint.
 	 * Static terrain still uses BFS; candidates may leave an occupied tile
 	 * but may never enter a different blocked cell. */
-#ifdef SC64_COLLISION_STEER_LIST
+#if defined(SC64_CONTACT_CACHE)
+	/* One bucket pass answers all eight unit_step_clear() offsets; the
+	 * selection order and tie-breaking below are unchanged. */
+	unsigned blocked = sc64_contact_blocked_mask(q, speed);
+	for (i = 0; i < 8; i++) {
+	    int sx = q->x + dx[i] * speed, sy = q->y + dy[i] * speed;
+	    int cost = dist2(sx, sy, q->path_x, q->path_y);
+	    if (cost < best_cost && is_traversable(sx / 16, sy / 16, from_cell) &&
+		!(blocked & (1u << i))) { best = i; best_cost = cost; }
+	}
+#elif defined(SC64_COLLISION_STEER_LIST)
 	#if defined(SC64_Z7_RUNTIME)
 	best = sc64_steer_best_direction(q, speed, from_cell,
 	                                  q->path_x, q->path_y);
@@ -6311,7 +6467,7 @@ update_tracers(void)
 static u32
 death_vfx_now(void)
 {
-    return (u32)frame + result_outro;
+    return (u32)frame + result_outro_get();
 }
 
 static int
@@ -6358,7 +6514,7 @@ death_vfx_extent(int slot, int raw)
 }
 
 static void
-death_vfx_spawn_slot(int slot, int x, int y, int owner)
+death_vfx_spawn_slot(Sc64DeathVfx *pool, int slot, int x, int y, int owner)
 {
     int raw = death_vfx_raw(slot), building = slot >= MAX_UNITS;
     int style = sc64_death_vfx_style_for_raw(raw, building), source = 0;
@@ -6372,7 +6528,7 @@ death_vfx_spawn_slot(int slot, int x, int y, int owner)
         source = 1;
     }
 #endif
-    sc64_death_vfx_spawn(death_vfx, SC64_DEATH_VFX_POOL, death_vfx_now(), style, raw,
+    sc64_death_vfx_spawn(pool, SC64_DEATH_VFX_POOL, death_vfx_now(), style, raw,
                          x, y, death_vfx_extent(slot, raw), &timing, source,
                          owner_color(owner));
 }
@@ -6384,8 +6540,14 @@ death_vfx_spawn_slot(int slot, int x, int y, int owner)
 static void __attribute__((noinline))
 death_vfx_scan(void)
 {
-    int primed = death_vfx_primed;
-    result_outro = result_outro_end = 0; /* playing: no outro offset */
+    int primed = death_vfx_primed_get();
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+    Sc64DeathVfx pool[SC64_DEATH_VFX_POOL];
+    death_vfx_test_load_pool(pool);
+#else
+    Sc64DeathVfx *pool = death_vfx;
+#endif
+    result_outro_set(0); result_outro_end_set(0); /* playing: no outro offset */
     /* Build each 8-row alive mask in a register and compare it with the
      * shadow byte once: the common no-change path stays a short scan. */
     for (int base = 0; base < MAX_UNITS; base += 8) {
@@ -6393,31 +6555,34 @@ death_vfx_scan(void)
         int end = base + 8 < MAX_UNITS ? base + 8 : MAX_UNITS;
         for (int i = base; i < end; ++i)
             if (u[i].alive) now |= 1u << (i - base);
-        gone = death_vfx_seen[base >> 3] & ~now;
-        death_vfx_seen[base >> 3] = (u8)now;
+        gone = death_vfx_seen_get_byte(base >> 3) & ~now;
+        death_vfx_seen_set_byte(base >> 3, now);
         if (!gone || !primed) continue;
         /* Cargo destroyed with its transport and hangar-hidden children
          * still carry those orders/types: they were off the battlefield. */
         for (int i = base; i < end; ++i)
             if ((gone >> (i - base)) & 1u && u[i].hp <= 0 &&
                 !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_CARRIER_HANGAR_HIDDEN(&u[i]))
-                death_vfx_spawn_slot(i, u[i].x, u[i].y, u[i].owner);
+                death_vfx_spawn_slot(pool, i, u[i].x, u[i].y, u[i].owner);
     }
     /* Building shadow bits follow the unit bits (byte aligned). */
     for (int base = 0; base < MAX_BUILDINGS; base += 8) {
         unsigned now = 0, gone;
         int end = base + 8 < MAX_BUILDINGS ? base + 8 : MAX_BUILDINGS;
-        u8 *seen = &death_vfx_seen[(MAX_UNITS + 7) / 8 + (base >> 3)];
+        unsigned seen_byte = (MAX_UNITS + 7) / 8 + (base >> 3);
         for (int i = base; i < end; ++i)
             if (b[i].alive) now |= 1u << (i - base);
-        gone = *seen & ~now;
-        *seen = (u8)now;
+        gone = death_vfx_seen_get_byte(seen_byte) & ~now;
+        death_vfx_seen_set_byte(seen_byte, now);
         if (!gone || !primed) continue;
         for (int i = base; i < end; ++i)
             if ((gone >> (i - base)) & 1u && b[i].hp <= 0)
-                death_vfx_spawn_slot(MAX_UNITS + i, b[i].x, b[i].y, b[i].owner);
+                death_vfx_spawn_slot(pool, MAX_UNITS + i, b[i].x, b[i].y, b[i].owner);
     }
-    death_vfx_primed = 1;
+    death_vfx_primed_set(1);
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+    death_vfx_test_store_pool(pool);
+#endif
 }
 
 /* An effect still in its collapse/explosion phase keeps the outro running. */
@@ -6425,9 +6590,15 @@ static int
 death_vfx_bursting(u32 now)
 {
     for (int i = 0; i < SC64_DEATH_VFX_POOL; ++i) {
-        const Sc64DeathVfx *e = &death_vfx[i];
-        if (!sc64_death_vfx_expired(e, now) &&
-            sc64_death_vfx_age_su(e->birth, now) < e->burst_su) return 1;
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+        Sc64DeathVfx e;
+        death_vfx_test_load_row(i, &e);
+        const Sc64DeathVfx *row = &e;
+#else
+        const Sc64DeathVfx *row = &death_vfx[i];
+#endif
+        if (!sc64_death_vfx_expired(row, now) &&
+            sc64_death_vfx_age_su(row->birth, now) < row->burst_su) return 1;
     }
     return 0;
 }
@@ -6437,12 +6608,14 @@ death_vfx_bursting(u32 now)
 static void
 result_outro_tick(void)
 {
-    if (result_outro >= SC64_RESULT_OUTRO_MAX + SC64_RESULT_PANEL_OPEN) return;
-    ++result_outro;
-    if (result_outro_end) return;
-    if (result_outro >= SC64_RESULT_OUTRO_MAX ||
-        (result_outro >= SC64_RESULT_OUTRO_MIN && !death_vfx_bursting(death_vfx_now())))
-        result_outro_end = result_outro;
+    u16 outro = result_outro_get(), end = result_outro_end_get();
+    if (outro >= SC64_RESULT_OUTRO_MAX + SC64_RESULT_PANEL_OPEN) return;
+    ++outro;
+    result_outro_set(outro);
+    if (end) return;
+    if (outro >= SC64_RESULT_OUTRO_MAX ||
+        (outro >= SC64_RESULT_OUTRO_MIN && !death_vfx_bursting(death_vfx_now())))
+        result_outro_end_set(outro);
 }
 
 /* Runs at the top of every update, before input and simulation. During play
@@ -6457,7 +6630,7 @@ death_vfx_update(void)
         return;
     }
     if (screen != SCREEN_RESULT) return;
-    if (!result_outro && !result_outro_end) death_vfx_scan();
+    if (!result_outro_get() && !result_outro_end_get()) death_vfx_scan();
     result_outro_tick();
 }
 #endif
@@ -7742,21 +7915,29 @@ draw_death_vfx(int under)
 {
     u32 now = death_vfx_now();
     for (int i = 0; i < SC64_DEATH_VFX_POOL; ++i) {
-        const Sc64DeathVfx *e = &death_vfx[i];
-        if (!e->style) continue;
-        u32 age = sc64_death_vfx_age_su(e->birth, now);
-        if (age >= e->total_su) continue;
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+        Sc64DeathVfx e;
+        death_vfx_test_load_row(i, &e);
+#else
+        const Sc64DeathVfx *row = &death_vfx[i];
+#endif
+#ifdef SC64_DEATH_VFX_VRAM_STORAGE
+        const Sc64DeathVfx *row = &e;
+#endif
+        if (!row->style) continue;
+        u32 age = sc64_death_vfx_age_su(row->birth, now);
+        if (age >= row->total_su) continue;
         /* Skip a pass this effect has nothing for before the fog lookup:
          * authored remnants start late, and bursts end early. Source
          * collapse frames draw beneath units from the start. */
-        if (under ? !e->source && age < e->remnant_start : age >= e->burst_su) continue;
-        int x = e->x - camx, y = e->y - camy + 12;
-        if (x < -64 || x > 304 || y < -52 || y > 172 || !currently_visible(e->x, e->y)) continue;
+        if (under ? !row->source && age < row->remnant_start : age >= row->burst_su) continue;
+        int x = row->x - camx, y = row->y - camy + 12;
+        if (x < -64 || x > 304 || y < -52 || y > 172 || !currently_visible(row->x, row->y)) continue;
 #ifdef SC64_DEATH_SOURCE_ART
-        if (e->source && death_vfx_draw_source(e, x, y, age, under)) continue;
+        if (row->source && death_vfx_draw_source(row, x, y, age, under)) continue;
 #endif
-        if (under) sc64_death_vfx_draw_remnant(e, x, y, age);
-        else sc64_death_vfx_draw_burst(e, x, y, age);
+        if (under) sc64_death_vfx_draw_remnant(row, x, y, age);
+        else sc64_death_vfx_draw_burst(row, x, y, age);
     }
 }
 #endif
@@ -8792,9 +8973,9 @@ static void
 draw_result_screen(void)
 {
 #ifndef SC64_DEATH_VFX_DISABLED
-    if (!result_outro_end) return;
-    unsigned open = result_outro >= result_outro_end ?
-                    (unsigned)(result_outro - result_outro_end) : 0u;
+    u16 outro_end = result_outro_end_get(), outro = result_outro_get();
+    if (!outro_end) return;
+    unsigned open = outro >= outro_end ? (unsigned)(outro - outro_end) : 0u;
     if (open < SC64_RESULT_PANEL_OPEN) {
         int w = 16 + (int)(168u * (open + 1u) / (SC64_RESULT_PANEL_OPEN + 1u));
 #if defined(SC_DEFAULT_UI) || defined(SC64_FIELD_CONTROLS)
@@ -9836,6 +10017,7 @@ game_self_test(void)
 #endif
 #endif
 #include "race_campaign_adapter.h"
+#include "sc64_z8_game_bridge.h"
 #ifdef SC64_NYDUS_ENABLED
 static int race_save_decode_unit(const RaceSave *, unsigned, unsigned, unsigned, Unit *);
 static int race_save_decode_building(const RaceSave *, unsigned, Building *);

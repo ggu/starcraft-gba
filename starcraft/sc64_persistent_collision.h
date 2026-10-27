@@ -114,11 +114,21 @@ sc64_unit_bucket_move(Unit *q)
     sc64_unit_bucket_insert(slot, new_cell);
 }
 
+#ifdef SC64_CONTACT_CACHE
+static int __attribute__((noinline))
+sc64_unit_bucket_step_clear_reference(const Unit *q, int nx, int ny, int strict)
+#else
 static int GBA_HOT
 sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
+#endif
 {
 #ifdef SC64_RACES
+#ifdef SC64_CONTACT_CACHE
+    if (!strict && IS_WORKER(q->type) &&
+        (q->order == ORDER_MINE || q->order == ORDER_GAS)) return 1;
+#else
     if(IS_WORKER(q->type)&&(q->order==ORDER_MINE||q->order==ORDER_GAS))return 1;
+#endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     int mover_radius = sc64_game_unit_collision_radius(q->type);
 #endif
@@ -174,11 +184,25 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
 #endif
 #endif
                     int ox = u[i].x - q->x, oy = u[i].y - q->y;
+#ifdef SC64_CONTACT_CACHE
+                    if (strict || dx + dy <= ox * ox + oy * oy) return 0;
+#else
                     if (dx + dy <= ox * ox + oy * oy) return 0;
+#endif
                 }
         }
     return 1;
 }
+
+#ifdef SC64_CONTACT_CACHE
+#include "sc64_contact.h"
+static int GBA_HOT
+sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
+{
+    if (IS_WORKER(q->type) && (q->order == ORDER_MINE || q->order == ORDER_GAS)) return 1;
+    return sc64_contact_step_clear(q, nx, ny, 0);
+}
+#endif
 
 static void
 sc64_unit_buckets_end(void)

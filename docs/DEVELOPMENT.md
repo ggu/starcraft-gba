@@ -440,22 +440,48 @@ The default `./dev test` includes the asset-free weapon-effect renderer check. A
 
 `./dev sc64 prepare` also runs `tools/sc64_audio_pack.py`, which converts the
 ROM's sound effects and music into a private bank under ignored
-`.local/sc64/audio/generated/`: `sc64_audio_generated.bin` (signed 8-bit PCM),
-`sc64_audio_generated.h` (sample and per-unit index tables) and a manifest
-with counts and hashes. To refresh only the bank:
+`.local/sc64/audio/generated/`: `sc64_audio_generated.bin` (losslessly
+compressed signed 8-bit PCM streams, codec format 2), `sc64_audio_generated.h`
+(stream offsets, sample counts and per-unit index tables) and a manifest with
+counts, sizes and hashes. To refresh only the bank:
 
 ```sh
 python3 tools/sc64_audio_pack.py
 python3 tools/sc64_audio_pack.py --music 0,4,5   # fewer music tracks, smaller ROM
+python3 tools/sc64_audio_pack.py --predictors 012 # ~70 KB smaller, costlier music decode
+python3 tools/sc64_audio_pack.py --verify-bank .local/sc64/audio/generated
 ```
 
 Every imported (`SC64_*`) ARM profile links the bank automatically when the
 header exists. `make <target> SC64_AUDIO=0` builds the same profile silent, for
 example for performance baselines; `SC64_AUDIO=1` fails if the bank is absent.
 The default original-art ROM never uses it: it keeps short PSG placeholder
-tones for the same events. The bank is about 15.6 MB, so imported ROMs grow
-to the 32 MiB cartridge size. Like other imported data, the bank and any audio
+tones for the same events. The decoded PCM is 15.6 MB; the compressed bank is
+about 8.3 MB (47% smaller), which leaves room in the 32 MiB cartridge for the
+remaining campaign content. Like other imported data, the bank and any audio
 captured from it are game content: do not commit, attach or distribute them.
+
+Bank codec (`tools/sc64_audio_pack.py` encodes, `common/audio_codec.h`
+decodes; `SC64_AUDIO_FORMAT` in the generated header must equal
+`AUDIO_CODEC_FORMAT`):
+
+- Every clip and every music track is an independent stream starting at a
+  word-aligned offset. A stream begins with a 2-bit predictor choice made per
+  stream (`x1`, `2*x1 - x2` or `(3*x1 - x2) >> 1` from the previous two
+  samples; by default the pack tool uses only the first two, which decode
+  cheapest, and `--predictors 012` allows the third) and continues in blocks
+  of eight samples. Each block has a width
+  `k` of 0-8 bits, coded relative to the previous block (`0` same, `10` one
+  less, `110` one more, `111` plus four explicit bits), followed by eight
+  `k`-bit two's-complement residuals. Residuals are the difference from the
+  prediction wrapped to eight bits, so decoding is exact: the pack tool decodes
+  every stream again before writing the bank and records the PCM hash in the
+  manifest. Clips are padded with silence to a multiple of eight samples.
+- Bits are packed least-significant first into little-endian halfwords, so the
+  decoder refills its accumulator with one ROM halfword load and extracts a
+  residual with a mask: constant work per sample, no tables, no per-sample
+  variable-length loops. Measured sizes and decode costs are in
+  [Validation](VALIDATION.md#compressed-audio-bank-2026-10-27).
 
 What is imported:
 
@@ -481,22 +507,25 @@ What is imported:
 Engine design (`common/audio_mixer.h`, `common/gba.c`):
 
 - Timer 0 runs at 10512 Hz and feeds both Direct Sound FIFOs. DMA1 plays a
-  352-byte double buffer of sound effects on channel A; DMA2 streams the
-  current music track on channel B (50% volume) straight from ROM, so music
-  costs no mixing. A 64-byte zero guard follows the double buffer: when the
-  interrupt is delayed (for example behind a long DMA3 blit) the FIFO reads a
-  few samples of silence instead of unrelated memory.
+  352-byte double buffer of sound effects on channel A; DMA2 plays a second
+  352-byte double buffer holding the decoded music frame on channel B (50%
+  volume). Both are re-armed every second frame and each is followed by a
+  64-byte zero guard: when the interrupt is delayed (for example behind a long
+  DMA3 blit) the FIFO reads a few samples of silence instead of unrelated
+  memory. The music buffer stays zero while no track plays.
 - A VBlank interrupt drains an 8-entry request ring, assigns requests to four
-  fixed voices and mixes 176 samples with saturation. Voice 0 is reserved for
-  unit responses, which interrupt each other as in StarCraft; effects take a
-  free voice or steal a lower-priority, older one, and the same effect is not
-  retriggered within four frames. Samples are word-aligned, so the mixer
-  reads four samples per ROM word and adds them in two 16-bit lanes, clamping
-  only lanes that overflow. It runs as Thumb code from ROM: IWRAM has no room
-  for it.
-- The mix buffer and the event snapshot live in the unused VRAM gap between
-  the two mode-4 pages (`0x06009600`-`0x06009FFF`), so EWRAM grows only by the
-  mixer state.
+  fixed voices, decodes one frame of each active voice into its own 176-byte
+  scratch slot, mixes 176 samples with saturation and decodes the next music
+  frame. Voice 0 is reserved for unit responses, which interrupt each other as
+  in StarCraft; effects take a free voice or steal a lower-priority, older
+  one, and the same effect is not retriggered within four frames. The mixer
+  reads four decoded samples per word and adds them in two 16-bit lanes,
+  clamping only lanes that overflow. Decoder and mixer run as Thumb code from
+  ROM: IWRAM has no room for them.
+- The mix and music buffers, the voice scratch, the five stream decoder
+  states and the event snapshot live in the unused VRAM gap between the two
+  mode-4 pages (`0x06009600`-`0x06009FFF`), so EWRAM holds only the mixer's
+  queue and voice table.
 - `starcraft/game_audio.h` derives events at the start of each rendered frame
   from read-only comparisons with the previous frame: a raised weapon
   cooldown on a visible unit (a shot), alive 1->0 (a death), a new player unit
@@ -1158,9 +1187,18 @@ qualification. Source staging alone does not establish a playable mission.
 
 ### Canonical Zerg and Protoss builds
 
-The standard Zerg build includes its first six missions; the standard
-Protoss build includes its first five. Prepare each profile from your verified ROM, then use the standard
-commands; no extra staged-profile selection is needed:
+The standard Zerg build includes its first six missions. The canonical Protoss
+target includes P1–P7 and has passed its canonical presentation, save, host
+campaign and bounded ARM continuation checks. Explicit `protoss-p6` still builds
+the separately identified P1–P6 generation-30 image. Prepare either profile
+from your verified ROM, then use the standard commands. See the [canonical P7
+qualification](research/p7-canonical-candidate-qualification.md) for evidence
+and limits:
+
+The current P7 build uses its available IWRAM for movement and the validated
+Arbiter aura shortcut. Its [performance qualification](research/p7-canonical-hot-profile.md)
+records exact state/save continuation and the bounded cycle comparison. P6's
+flags and save identity remain separate.
 
 ```sh
 ./dev sc64 prepare --rom /path/to/StarCraft64-USA.z64 --profile zerg
@@ -1169,9 +1207,11 @@ commands; no extra staged-profile selection is needed:
 ./dev sc64 play --profile zerg
 ```
 
-Replace `zerg` with `protoss` for the Protoss campaign. The canonical output
-pairs are `build/StarCraft-Zerg-Z6-GBA.gba` / `build/starcraft-zerg-z6.elf`
-and `build/StarCraft-Protoss-P6-GBA.gba` / `build/starcraft-protoss-p6.elf`.
+Replace `zerg` with `protoss` for the P7 candidate. The output pairs are
+`build/StarCraft-Zerg-Z6-GBA.gba` / `build/starcraft-zerg-z6.elf` and
+`build/StarCraft-Protoss-P7-GBA.gba` / `build/starcraft-protoss-p7.elf`.
+Explicit `protoss-p6` builds `build/StarCraft-Protoss-P6-GBA.gba` /
+`build/starcraft-protoss-p6.elf`.
 Explicit `zerg-z4` (`--profile zerg-z4`) preserves the earlier four-entry
 `build/StarCraft-Zerg-Z4-GBA.gba` / `build/starcraft-zerg-z4.elf` pair, its
 `SCZ4` generation-20 saves and `make test-zerg-z4`. Explicit `zerg-z3`
@@ -1191,10 +1231,12 @@ Canonical Zerg uses `SCZ6`, save generation 32, the Z6 storage/runtime and
 query flags, a word-packed six-chapter sprite bank under
 `.local/sc64/zerg-z6/generated`, and the canonical drawing flags. Preparing
 `zerg` also generates the Z5/Z6 inputs and that bank. Its save directory,
-`.local/play/zerg-z6`, is separate from the legacy Z4 and Z3 profiles. Canonical Protoss uses `SCP6`, generation 30 and
+`.local/play/zerg-z6`, is separate from the legacy Z4 and Z3 profiles. The P7
+candidate uses `SCP7`, generation 43 and `.local/play/protoss-p7`; its all-chapter
+packed sprite bank is `.local/sc64/protoss-p7/generated`, separate from the
+probe and P6 banks. Explicit `protoss-p6` uses `SCP6`, generation 30 and
 `.local/play/protoss-p6`; it carries P1–P5 including Shuttle transport, then P6
-with Storm and the source rescue/extraction mission. Its separate packed sprite
-bank is `.local/sc64/protoss-p6/generated`; the internal probe bank is unchanged.
+with Storm and the source rescue/extraction mission.
 Explicit `protoss-p5-shuttle` retains `SCPB`, generation 26 and
 `.local/play/protoss-p5-shuttle`.
 Explicit `protoss-p4-storm` retains `SCP5`, generation 21 and its P4 save path;
@@ -1202,7 +1244,8 @@ Explicit `protoss-p4-storm` retains `SCP5`, generation 21 and its P4 save path;
 saves are incompatible and are rejected. The asset-free default build
 continues to require no imported inputs.
 
-Older prepared Protoss workspaces must prepare P6 inputs before building:
+Older prepared Protoss workspaces must prepare P7 inputs before building the
+candidate. The explicit P6 build remains available:
 
 ```sh
 ./dev sc64 prepare --rom "/path/to/StarCraft 64 USA ROM" --profile protoss
@@ -1210,20 +1253,25 @@ Older prepared Protoss workspaces must prepare P6 inputs before building:
 ./dev sc64 test --profile protoss
 ```
 
-P6 preparation requires authenticated P4/P5/P6 map/scenario gates, P6 abilities
-and doodads, and its complete packed sprite bank. `protoss-p6` is an explicit
-alias for the canonical product. `protoss-p5-shuttle` preserves the earlier
+P7 preparation requires authenticated P4/P5/P6/P7 map and scenario inputs, P6
+abilities and doodads, P7 Battery properties, and a complete packed P1–P7
+sprite bank. P7 uses generation 43 and rejects incompatible P6 generation-30
+saves without converting or migrating them. `protoss-p6` preserves the separate
+generation-30 product and save directory. `protoss-p5-shuttle` preserves the earlier
 five-entry ROM and its separate saves. No P3/P4/P5 save conversion is performed.
-The P6 runtime retains generation 30; its ROM title/code are `SC PROTOSS6` /
-`SCP6`. See the [P6 audit](audits/2026-10-27-p6-promotion/README.md) for current
-host, ARM, save, timing and memory evidence. P5's earlier evidence remains in
+The P7 ROM title/code are `SC PROTOSS7` / `SCP7`; P6 retains `SC PROTOSS6` /
+`SCP6`. The existing [P7 controller qualification](research/p7-full-controller-qualification.md)
+covers its earlier fact-profile replay; it does not qualify the new canonical
+render build or establish 30-fps performance. See the [P6 audit](audits/2026-10-27-p6-promotion/README.md) for
+the explicit P6 product's host, ARM, save, timing and memory evidence. P5's earlier evidence remains in
 the [P5 audit](audits/2026-10-26-p5-promotion/README.md).
 
 ### Staged Zerg and Protoss chapter 4
 
 Zerg 4 is enabled in the canonical profile, which now continues through Zerg 6.
-The explicit `zerg-z4` profile builds the earlier four-entry Z4 ROM. Canonical Protoss includes **The Hunt for Tassadar** and
-P5 through the Shuttle runtime and P6. Explicit `protoss-p4-storm` keeps the
+The explicit `zerg-z4` profile builds the earlier four-entry Z4 ROM. The P7
+candidate carries **The Hunt for Tassadar** and P5 through the Shuttle runtime
+and P6 before opening P7. Explicit `protoss-p4-storm` keeps the
 four-entry Storm profile and its own real files/save format. The plain `protoss-p4`
 build remains a separate internal experiment. Preparing later map data does
 not enable unqualified later missions in the frontend.
@@ -1649,8 +1697,8 @@ payloads with six worker depot caches retained after reload. The paired
 compare the full world or pixels or complete the mission. Mean full-frame
 cost was 1,069,633 cycles versus 1,026,851 for the reference (+4.17%). These
 are emulator measurements, not hardware or 30-fps qualifications. The Z6
-canonical profile remains unchanged, and staged campaign qualification stays
-at 22/30.
+canonical profile remains unchanged. Campaign qualification was 22/30 at this
+Z7 audit; subsequent canonical P7 integration brings the current total to 23/30.
 
 `make test-sc64-z7-reachable-formation` checks the default-off
 `SC64_REACHABLE_FORMATION` group-order fallback against the original slot
@@ -2443,9 +2491,12 @@ make protoss-p7-runtime-reference protoss-p7-runtime-probe
 The ROMs are `build/StarCraft-Protoss-P7-Runtime-Reference-GBA.gba` and
 `build/StarCraft-Protoss-P7-Runtime-Probe-GBA.gba`. Both expose P7 through the
 normal single-race mission menu under `SC64_P7_CAMPAIGN_ENTRY`. This is an
-internal candidate entry: Carrier/Arbiter mechanics, production/AI fidelity,
-a full normal-input win and campaign performance remain unfinished. Canonical
-race ROMs do not enable this entry and qualified staged progress stays 22/30.
+earlier internal candidate entry, whose original qualification did not cover
+the later Carrier/Arbiter work or full normal-input win. These historical
+probe targets remain separate. The current canonical Protoss build enables P7
+with the full runtime and bounded ARM save continuation described in the
+[canonical qualification](research/p7-canonical-candidate-qualification.md);
+campaign coverage is 23/30. Native AI fidelity and performance remain unfinished.
 
 The optimized probe additionally enables `SC64_P7_PREVALIDATED_TICK`. It
 validates immutable mission data at initialization and load, then checks
@@ -2492,6 +2543,40 @@ inactive bucket index or more than 48 candidates use the original query.
 opening and a controller-only attack-move. It checks 619,216 list answers
 against the original query, then repeats the menu/save-load fixture. See
 [Validation](VALIDATION.md#p7-movement-steering-list) for ARM measurements.
+
+The canonical Terran, Zerg and Protoss ROMs now enable `SC64_CONTACT_CACHE`
+(`starcraft/sc64_contact.h`): the race collision query reads one cached byte
+of type facts per candidate instead of repeating the radius, flight,
+collidable and burrow lookups, and a blocked ground mover answers all eight
+steering offsets in one bucket pass instead of eight queries. The stock
+movement step also drops its software division. The collision predicate, the
+steering candidate order and tie-breaking, movement speeds and the save
+format are unchanged. Placement is a per-product size choice: the Z6 and P6
+canonical ROMs (and the late Terran profile) keep the steering pass and the
+stock step in ROM through `CONTACT_ROM_PLACEMENT_FLAGS`
+(`-DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM`) because their IWRAM
+reserve has no room for them; the P7 contact probe keeps both in IWRAM. The
+Z7 full-render qualification targets keep their own collision options and
+do not take the contact cache. A P7 probe carries the option on the
+count-snapshot flags:
+
+```sh
+make test-sc64-contact-cache
+make test-sc64-p7-contact
+make protoss-p7-contact-probe
+```
+
+`test-sc64-contact-cache` compares the cached query, the steering mask and
+the division-free step with the original query, eight `unit_step_clear()`
+calls and `sc64_stock_motion_step()` over randomized dense worlds with
+morphs, deaths, slot reuse, loads, burrow flags and bucket moves, in the
+unified race, P7, canonical Terran, Nydus Z7, canonical Zerg and canonical
+Protoss flag sets (the last two are also part of `test-zerg` and
+`test-protoss`). `test-sc64-p7-contact` requires the plain P7 reference
+trace byte for byte. To compare a canonical ROM without the option, build
+with `make -B terran CONTACT_CACHE_FLAGS=` (or `zerg` / `protoss`). See
+[Validation](VALIDATION.md#contact-cache-movement-measurement-2026-10-27) for the ARM
+measurements and the benchmark recipe.
 
 An experimental mode-0 renderer builds on that movement probe:
 
@@ -2543,6 +2628,44 @@ is rejected. `test-sc64-p7-fact-tables` repeats the table check under the P7
 flags. It also compares the P7 movement trace and the menu/save-load fixture
 with the reference builds. See
 [Validation](VALIDATION.md#p7-build-time-fact-tables) for ARM measurements.
+
+The full P7 profile has a separate opt-in V2 performance probe:
+
+```sh
+make test-sc64-fact-v2
+# The following need the prepared private P7 inputs:
+make test-sc64-p7-fact-v2-normal-input
+make test-sc64-p7-fact-v2-campaign-controller
+make protoss-p7-fact-v2-probe
+```
+
+It writes `build/StarCraft-Protoss-P7-Fact-V2-Probe-GBA.gba` and generates
+its facts separately under `build/generated/p7-fact-v2`. The profile combines
+the one-pass contact cache with packed optical radii and source-pixel actor
+rectangle extents. It includes the experimental projectile, Carrier training
+and Interceptor flight paths. The older V1 fact probe and canonical P6 ROM
+keep their existing flags and generated headers. A mismatched roster, format
+or requested feature fails at compile time; out-of-roster sight requests use
+the original policy.
+
+`test-sc64-fact-v2` is asset-free. The ordinary-input performance replay
+covers 2,000 in-play frames; the separate campaign controller requires a
+strict mission win and validates its input trace. Neither test promotes P7
+into the canonical campaign. See the [P7 V2 qualification](research/p7-fact-v2-qualification.md)
+for measured costs and remaining enemy-AI, performance and hardware limits.
+
+The same full P7 runtime has an opt-in mode-4 drawing profile:
+
+```sh
+make test-sc64-p7-render
+make test-sc64-p7-render-campaign-controller
+make protoss-p7-render-probe
+```
+
+It builds `build/StarCraft-Protoss-P7-Render-Probe-GBA.gba`. The frame test
+compares all displayed RGB555 pixels with the FACT V2 profile across camera
+pans, pause/resume and combat. See the [drawing qualification](research/p7-render-profile-qualification.md)
+for the modest measured gains, unchanged memory guards and remaining limits.
 
 ## Mineral gathering before a base exists
 
@@ -2719,3 +2842,19 @@ last-stand timing and save isolation with the existing private P7 inputs.
 The frontend input model also runs in the asset-free host suite. See
 [Showcase scenes](SHOWCASE.md) for all eight setups, recording controls,
 Carrier preview limits and the controller-only emulator replay.
+
+
+### Physical-input-only main loop
+
+The optional `GBA_NO_DEBUG_INPUTS` compiler flag removes the debugger-fed key
+queue and injection fields from `common/main.c`. The physical keypad, held and
+pressed edges, frame counter and cycle metrics remain available. The default
+configuration retains the debugger interface, and historical probes are
+unchanged. Enable the flag only in an explicitly selected release profile;
+debugger-fed replay tools require a build that retains their schedule symbols.
+
+`make test-gba-no-debug-inputs` checks ordinary physical-key transitions and
+metrics, then rechecks the existing scheduled/injected-input loop. An optional
+Z7 link comparison recovers 2,072 BSS bytes with the same IWRAM end and
+unchanged memory guards. This is input infrastructure and does not change
+gameplay, save formats, actor limits or the campaign qualification scope.

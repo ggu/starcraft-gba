@@ -308,11 +308,18 @@ class OnboardingTests(unittest.TestCase):
     def test_canonical_race_verifiers_use_current_mission_identities(self):
         self.assertEqual(verify_roms.TARGETS['--zerg'],
                          ('StarCraft-Zerg-Z6-GBA', 'starcraft-zerg-z6', 'SCZ6', 'SC ZERG Z6'))
+        self.assertEqual(verify_roms.TARGETS['--zerg-z6'],
+                         ('StarCraft-Zerg-Z6-GBA', 'starcraft-zerg-z6', 'SCZ6', 'SC ZERG Z6'))
+        self.assertEqual(verify_roms.TARGETS['--zerg-z7'],
+                         ('StarCraft-Zerg-Z7-GBA', 'starcraft-zerg-z7', 'SCZ7', 'SC ZERG Z7'))
         self.assertEqual(verify_roms.TARGETS['--zerg-z4'],
                          ('StarCraft-Zerg-Z4-GBA', 'starcraft-zerg-z4', 'SCZ4', 'SC ZERG Z4'))
         self.assertEqual(verify_roms.TARGETS['--zerg-z3'],
                          ('StarCraft-Zerg-GBA', 'starcraft-zerg', 'SCZ3', 'SC ZERG Z3'))
         self.assertEqual(verify_roms.TARGETS['--protoss'],
+                         ('StarCraft-Protoss-P7-GBA', 'starcraft-protoss-p7',
+                          'SCP7', 'SC PROTOSS7'))
+        self.assertEqual(verify_roms.TARGETS['--protoss-p6'],
                          ('StarCraft-Protoss-P6-GBA', 'starcraft-protoss-p6',
                           'SCP6', 'SC PROTOSS6'))
         self.assertEqual(verify_roms.TARGETS['--protoss-p5-shuttle'],
@@ -326,20 +333,28 @@ class OnboardingTests(unittest.TestCase):
 
     def test_dev_race_tests_include_full_campaign_targets(self):
         self.assertEqual(dev.SC64_TEST_TARGETS['zerg'], 'test-zerg')
+        self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z6'], 'test-zerg-z6')
+        self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z7'], 'test-zerg-z7')
         self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z4'], 'test-zerg-z4')
         self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z3'], 'test-zerg-z3')
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
-        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p6'], 'test-protoss')
-        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P6-GBA.gba'))
-        self.assertEqual(dev.GAMES['protoss-p6'], ('protoss', 'build/StarCraft-Protoss-P6-GBA.gba'))
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p7'], 'test-protoss')
+        self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p6'], 'test-protoss-p6')
+        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P7-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p7'], ('protoss-p7', 'build/StarCraft-Protoss-P7-GBA.gba'))
+        self.assertEqual(dev.GAMES['protoss-p6'], ('protoss-p6', 'build/StarCraft-Protoss-P6-GBA.gba'))
         self.assertEqual(dev.GAMES['protoss-p5-shuttle'],
                          ('protoss-p5-shuttle', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg'], ('zerg', 'build/StarCraft-Zerg-Z6-GBA.gba'))
+        self.assertEqual(dev.GAMES['zerg-z6'], ('zerg-z6', 'build/StarCraft-Zerg-Z6-GBA.gba'))
+        self.assertEqual(dev.GAMES['zerg-z7'], ('zerg-z7', 'build/StarCraft-Zerg-Z7-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg-z4'], ('zerg-z4', 'build/StarCraft-Zerg-Z4-GBA.gba'))
         self.assertEqual(dev.GAMES['zerg-z3'], ('zerg-z3', 'build/StarCraft-Zerg-GBA.gba'))
         self.assertEqual(dev.PLAY_SAVE_PROFILES,
-                         {'zerg': 'zerg-z6', 'zerg-z4': 'zerg-z4', 'zerg-z3': 'zerg',
-                          'protoss': 'protoss-p6', 'protoss-p6': 'protoss-p6', 'protoss-p3': 'protoss',
+                         {'zerg': 'zerg-z6', 'zerg-z6': 'zerg-z6', 'zerg-z7': 'zerg-z7',
+                          'zerg-z6-probe': 'zerg-z6', 'zerg-z4': 'zerg-z4', 'zerg-z3': 'zerg',
+                          'protoss': 'protoss-p7', 'protoss-p7': 'protoss-p7',
+                          'protoss-p6': 'protoss-p6', 'protoss-p3': 'protoss',
                           'protoss-p4-storm': 'protoss-p4-storm',
                           'protoss-p5-shuttle': 'protoss-p5-shuttle'})
         self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['zerg'],
@@ -348,7 +363,9 @@ class OnboardingTests(unittest.TestCase):
                          ('StarCraft-Zerg-Z6-GBA.gba', 'starcraft-zerg-z6.elf'))
         for routes in (sc64_split_profile.PROFILE_BUILD_PATHS, sc64_split_smoke.PROFILE_BUILD_PATHS):
             self.assertEqual(routes['protoss'],
-                             ('StarCraft-Protoss-P6-GBA.gba', 'starcraft-protoss-p6.elf'))
+                             ('StarCraft-Protoss-P7-GBA.gba', 'starcraft-protoss-p7.elf'))
+        self.assertEqual(sc64_split_smoke.PROFILE_BUILD_PATHS['protoss-p6'],
+                         ('StarCraft-Protoss-P6-GBA.gba', 'starcraft-protoss-p6.elf'))
 
     def test_p4_storm_and_legacy_p3_have_explicit_build_and_save_routes(self):
         self.assertEqual(dev.GAMES['protoss-p3'],
@@ -371,8 +388,8 @@ class OnboardingTests(unittest.TestCase):
         p5_recipe = makefile.splitlines()[makefile.splitlines().index(p5_rule) + 1]
         self.assertIn('$(PROTOSS_P5_CANONICAL_FLAGS)', p5_recipe)
         self.assertNotEqual(dev.GAMES['protoss'][1], dev.GAMES['protoss-p4-storm'][1])
-        self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss'], 'protoss-p6')
-        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P6-GBA.gba'))
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['protoss'], 'protoss-p7')
+        self.assertEqual(dev.GAMES['protoss'], ('protoss', 'build/StarCraft-Protoss-P7-GBA.gba'))
         self.assertEqual(dev.GAMES['protoss-p5-shuttle'],
                          ('protoss-p5-shuttle', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
         self.assertEqual(dev.GAMES['protoss-p4-storm'], ('protoss-p4-storm', 'build/StarCraft-Protoss-P4-Storm-GBA.gba'))
@@ -700,21 +717,64 @@ class OnboardingTests(unittest.TestCase):
 
     def test_staged_z6_and_p5_profiles_have_explicit_build_and_test_routes(self):
         self.assertEqual(dev.GAMES['zerg-z6'],
+                         ('zerg-z6', 'build/StarCraft-Zerg-Z6-GBA.gba'))
+        self.assertEqual(dev.GAMES['zerg-z6-probe'],
                          ('zerg-z6-probe', 'build/StarCraft-Zerg-Z6-Probe-GBA.gba'))
         self.assertEqual(dev.GAMES['protoss-p5-shuttle'],
                          ('protoss-p5-shuttle', 'build/StarCraft-Protoss-P5-Shuttle-GBA.gba'))
-        self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z6'], (
+        self.assertEqual(dev.SC64_TEST_TARGETS['zerg-z6-probe'], (
             'test-sc64-z6-runtime', 'test-sc64-z6-save', 'test-sc64-z6-profile',
             'test-sc64-z6-frame-coverage', 'test-sc64-z6-controller'))
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss-p5-shuttle'],
                          ('test-sc64-p5-shuttle-runtime', 'test-sc64-p5-campaign-run'))
         self.assertEqual(dev.SC64_TEST_TARGETS['protoss'], 'test-protoss')
         makefile = (ROOT / 'Makefile').read_text(encoding='utf-8')
+        self.assertIn(
+            'ZERG_Z7_CANONICAL_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) '
+            '-DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM '
+            '-DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ',
+            makefile)
+        self.assertIn('ZERG_Z7_RELEASE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS',
+                      makefile)
+        self.assertIn('ZERG_Z7_CANONICAL_FLAGS) $(3) $$< common/gba.c -o $$@', makefile)
+        self.assertIn('$(CC) $(CFLAGS) $(ZERG_Z7_RELEASE_FLAGS)', makefile)
+        self.assertIn('Z7_STEERING_FLAGS = $(Z7_FULL_RENDER_FLAGS) $(Z7_STEERING_OPTIONS)',
+                      makefile)
+        for fixture in (
+            '$(eval $(call Z7_CANONICAL_FIXTURE,carried-z5,sc64_z5_campaign_run.c))',
+            '$(eval $(call Z7_CANONICAL_FIXTURE,carried-z6,sc64_z6_campaign_run.c))',
+            '$(eval $(call Z7_CANONICAL_FIXTURE,z6-controller-policy,sc64_z6_controller_policy.c))',
+        ):
+            self.assertIn(fixture, makefile)
+        canonical_z7_target = next(
+            line for line in makefile.splitlines() if line.startswith('test-zerg-z7:'))
+        self.assertIn('test-sc64-z7-canonical-carried-z5', canonical_z7_target)
+        self.assertIn('test-sc64-z7-canonical-carried-z6', canonical_z7_target)
+        self.assertNotIn('test-sc64-z7-carried-z5', canonical_z7_target)
+        self.assertNotIn('test-sc64-z7-carried-z6', canonical_z7_target)
+        self.assertIn('Z7_EGG_PROBE_FLAGS := $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_ATTACK -DSC64_Z7_EGG_PRODUCTION',
+                      makefile)
+        self.assertIn('Z7_FULL_RENDER_FLAGS =', makefile)
+        self.assertIn('build/StarCraft-Zerg-Z7-GBA.gba', makefile)
+        self.assertIn("'SC ZERG Z7' SCZ7", makefile)
+        self.assertIn('test-sc64-z7-canonical-skirmish', makefile)
+        self.assertIn('test-zerg-z6: test-zerg', makefile)
         self.assertIn('PROTOSS_P5_CANONICAL_FLAGS = $(P4_CREATE_PREFIX_FLAGS) $(P5_SHUTTLE_FLAGS)', makefile)
         self.assertIn('test-protoss: ', makefile)
         canonical_test = next(line for line in makefile.splitlines() if line.startswith('test-protoss:'))
         self.assertIn('test-sc64-p5-canonical', canonical_test)
         self.assertIn('build/test-sc64-p5-canonical-campaign-run', makefile)
+
+    def test_z7_candidate_has_separate_generation_and_scenario_route(self):
+        self.assertIn('zerg-z7', dev.SC64_PROFILES)
+        self.assertEqual(dev.PLAY_SAVE_PROFILES['zerg-z7'], 'zerg-z7')
+        self.assertEqual(dev.RACE_CAMPAIGN_GATES['zerg-z7'],
+                         ('SC64_Z7_DATA_ENABLED', 'sc64_race_z7_units'))
+        self.assertEqual(dev.STAGED_CAMPAIGN_INPUTS['zerg-z7'], (
+            ('Zerg chapter 7 scenario',
+             '.local/sc64/zp-stage/generated/scenarios/sc64_z7_scenario_generated.h',
+             'SC64_Z7_SOURCE_GLOBAL_ID'),
+        ))
 
     def test_staged_campaign_preparation_uses_existing_private_packers(self):
         for profile, expected in (
@@ -845,7 +905,7 @@ class OnboardingTests(unittest.TestCase):
             '.local/sc64/races/generated/sc64_menu_generated.h',
             '.local/sc64/skirmish/generated/sc64_skirmish_generated.h',
         }
-        for profile in ('zerg-z6', 'protoss-p5-shuttle'):
+        for profile in ('zerg-z6', 'zerg-z7', 'protoss-p5-shuttle'):
             with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 rom = root / 'user-rom.z64'
@@ -868,7 +928,16 @@ class OnboardingTests(unittest.TestCase):
                                   else root / '.local/sc64/races/generated/sc64_races_generated.h')
                         output.parent.mkdir(parents=True, exist_ok=True)
                         if output.parent == root / '.local/sc64/zp-stage/generated':
-                            gate, payload = dev.RACE_CAMPAIGN_GATES[profile]
+                            gate_profiles = (('zerg', 'zerg-z4', 'zerg-z6', 'zerg-z7')
+                                             if profile.startswith('zerg') else (profile,))
+                            text = ''.join(
+                                f'#if defined(SC64_UNIFIED) && defined({dev.RACE_CAMPAIGN_GATES[item][0]})\n'
+                                f'{dev.RACE_CAMPAIGN_GATES[item][1]}\n'
+                                f'#endif /* SC64_UNIFIED && {dev.RACE_CAMPAIGN_GATES[item][0]} */\n'
+                                for item in gate_profiles)
+                            output.write_text(text, encoding='ascii')
+                        elif profile in ('zerg-z6', 'zerg-z7'):
+                            gate, payload = dev.RACE_CAMPAIGN_GATES['zerg']
                             output.write_text(f'#if defined(SC64_UNIFIED) && defined({gate})\n'
                                               f'{payload}\n#endif /* SC64_UNIFIED && {gate} */\n',
                                               encoding='ascii')
@@ -924,6 +993,7 @@ class OnboardingTests(unittest.TestCase):
                         outputs = {
                             'Z5': '.local/sc64/zp-stage/generated/scenarios/sc64_z5_scenario_generated.h',
                             'Z6': '.local/sc64/zp-stage/generated/scenarios/sc64_z6_scenario_generated.h',
+                            'Z7': '.local/sc64/zp-stage/generated/scenarios/sc64_z7_scenario_generated.h',
                             'P5': '.local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h',
                         }
                         relative = outputs.get(mission)
@@ -938,7 +1008,10 @@ class OnboardingTests(unittest.TestCase):
                         if relative:
                             path = root / relative
                             path.parent.mkdir(parents=True, exist_ok=True)
-                            marker = next((marker for _, item, marker in dev.STAGED_CAMPAIGN_INPUTS[profile]
+                            marker_sets = [dev.STAGED_CAMPAIGN_INPUTS[profile]]
+                            if profile == 'zerg-z7':
+                                marker_sets.append(dev.STAGED_CAMPAIGN_INPUTS['zerg-z6'])
+                            marker = next((marker for items in marker_sets for _, item, marker in items
                                            if item == relative and marker), 'numeric payload')
                             path.write_text(f'#define {marker} 1\n', encoding='ascii')
 
@@ -957,8 +1030,11 @@ class OnboardingTests(unittest.TestCase):
                 for _, relative, _ in dev.STAGED_CAMPAIGN_INPUTS[profile]:
                     produced.add(relative)
                 produced |= base_inputs
-                if profile == 'zerg-z6':
+                if profile in ('zerg-z6', 'zerg-z7'):
                     produced.add('.local/sc64/zp-stage/generated/scenarios/sc64_z5_doodads_generated.h')
+                    produced |= {relative for _, relative, _ in dev.CANONICAL_ZERG_Z6_INPUTS}
+                if profile == 'zerg-z7':
+                    produced.add('.local/sc64/zp-stage/generated/scenarios/sc64_z7_scenario_generated.h')
                 for relative in produced:
                     self.assertTrue((root / relative).is_file(),
                                     f'{profile} fresh prepare omitted Make input {relative}')

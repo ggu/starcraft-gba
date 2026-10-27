@@ -183,22 +183,24 @@ that earlier instances completed in the same pass are kept.
   - Transmission or CenterView eligibility changing while armed
   - the multiplayer player-order table in `0x8007E9D4`
 
-## World callbacks still to implement
+## Typed world bridge (not bound to the game)
 
-A gameplay adapter must provide these, each faithful to the cited handler:
+`starcraft/sc64_z8_world_adapter.h` now supplies callback implementations
+against a typed ordered view of live actors/buildings, source force ownership,
+wallets, and explicit engine services. It implements Command/Bring census and
+source-pixel overlap, delegates Kill census to a required per-owner/type
+service, dispatches property-aware creation to an explicit engine service,
+mutates live invincibility flags, applies SetResources, and routes timed and
+presentation actions. Its asset-free sanitizer fixture covers these adapter
+contracts. See [Z8-WORLD-ADAPTER](Z8-WORLD-ADAPTER.md).
 
-- **Census counts.** Command and Bring counts by player group, actor type,
-  completion and location rectangle, plus the Kill census.
-- **CreateUnitwithProperties.** Placement, the fixed-seed RNG bracket, default
-  and UPRP properties, and owner groups 18/19 relative to the trigger owner.
-- **SetInvincibility.** A mutable invincible flag on matching actors.
-- **RunAIScriptAtLocation.** Distinct behavior for `Zer8`, `Ze8T` and `MvTe`.
-  A generic AI substitute is not acceptable.
-- **SetResources.** Per-player minerals and gas.
-- **MoveLocation anchor search.** The first matching actor in the source
-  location.
-- **Presentation.** Transmission, CenterView with completion release, PlayWAV,
-  DisplayTextMessage, SetMissionObjectives and MinimapPing.
+This bridge is not included in `game.c` and does not create the live view,
+provide kill accounting, create actors, render/audio presentation, or persist
+mission state. `MoveLocation` searches the supplied actor order, which must be
+bound to the native traversal order before it can claim parity. The engine
+services for all three AI FourCCs remain unimplemented and fail closed; a
+generic AI substitute is not acceptable. Thus this adapter does not make the
+mission playable or complete.
 
 ## Integration follow-up
 
@@ -206,8 +208,10 @@ The scheduler deliberately does not touch these:
 
 - **Tables.** Generate private ROM tables from the descriptor under an ignored
   path, reusing `sc64_z8_pack.py` validation.
-- **World adapter.** Bind the callbacks to the engine in a Z8 adapter,
-  together with linked Nydus transit and Observer detection.
+- **Game binding.** Construct the typed view from real game pools, provide a
+  per-owner/type kill census, bind creation/presentation/timed services, and
+  verify native actor traversal order. Then integrate linked Nydus transit
+  and Observer detection.
 - **Frame mapping.** Map the GBA update loop to native frames and choose the
   speed-table entry.
 - **Saves.** Add the 876-byte state to the shared SRAM save structure and
