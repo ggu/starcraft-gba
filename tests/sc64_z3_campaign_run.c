@@ -126,6 +126,16 @@ static void tap(u16 key)
     step(0);
 }
 
+/* Field controls reopen the order list on the last command. These
+ * sequences were written for a list that opens on Move, so a fresh
+ * open starts there (no extra input, so the run's timing is unchanged). */
+static void tap_b(void)
+{
+    int fresh = !menu_open && mode == MODE_NORMAL;
+    tap(KEY_B);
+    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+}
+
 static int snap_cursor_axis(int current, int target, int limit)
 {
     int delta = target - current;
@@ -261,7 +271,7 @@ static void build_extractor_at_geyser(void)
         if (d < worker_distance) { worker_distance = d; worker = i; }
     }
     if (worker < 0 || select_worker_at(u[worker].x, u[worker].y) < 0) return;
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < 4; ++i) tap(KEY_DOWN); /* Zerg menu: Extractor */
     tap(KEY_A);
     move_cursor(geysers[geyser].x, geysers[geyser].y);
@@ -304,7 +314,7 @@ static void build_hydralisk_den(void)
         if (d < worker_distance) { worker_distance = d; worker = i; }
     }
     if (worker < 0 || select_worker_at(u[worker].x, u[worker].y) < 0) return;
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < 5; ++i) tap(KEY_DOWN); /* Zerg menu: Hydralisk Den */
     tap(KEY_A);
     move_cursor(site_x, site_y);
@@ -347,13 +357,13 @@ static void issue_attack_order_at(int x, int y)
     fprintf(stderr, "controller attack target=%d,%d from=%d,%d distance2=%d selected_building=%d\n",
             x, y, cx, cy, dist2(cx, cy, x, y), selected_building);
     if (selected_building >= 0) {
-        tap(KEY_B);
+        tap_b();
         tap(KEY_DOWN);
         tap(KEY_A);
         tap(KEY_A);
     }
     tap(KEY_R);             /* select all eligible player combat units */
-    tap(KEY_B);             /* open command menu */
+    tap_b();             /* open command menu */
     tap(KEY_DOWN);          /* ATTACK MOVE */
     tap(KEY_A);             /* choose command */
     move_cursor(x, y);
@@ -372,12 +382,12 @@ static int local_combat_count(int x, int y, int radius)
 static void issue_selected_attack_order_at(int x, int y)
 {
     if (selected_building>=0) {
-        tap(KEY_B);
+        tap_b();
         tap(KEY_DOWN);
         tap(KEY_A);
         tap(KEY_A);
     }
-    tap(KEY_B);
+    tap_b();
     tap(KEY_DOWN);
     tap(KEY_A);
     move_cursor(x,y);
@@ -395,13 +405,13 @@ static void issue_order_at(int x, int y)
     /* R cycles a selected producer's train type instead of selecting combat.
      * Clear that building selection through its normal attack command first. */
     if (selected_building >= 0) {
-        tap(KEY_B);
+        tap_b();
         tap(KEY_DOWN);
         tap(KEY_A);
         tap(KEY_A);
     }
     tap(KEY_R);
-    tap(KEY_B);
+    tap_b();
     tap(KEY_DOWN);
     tap(KEY_A);
     move_cursor(x, y);

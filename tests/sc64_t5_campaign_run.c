@@ -300,11 +300,21 @@ static void tap(u16 key)
     step(0);
 }
 
+/* Field controls reopen the order list on the last command. These
+ * sequences were written for a list that opens on Move, so a fresh
+ * open starts there (no extra input, so the run's timing is unchanged). */
+static void tap_b(void)
+{
+    int fresh = !menu_open && mode == MODE_NORMAL;
+    tap(KEY_B);
+    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+}
+
 static int controller_normalize_field(void)
 {
     if (screen != SCREEN_PLAY || won || lost) return 0;
     for (int i = 0; i < 2 && (menu_open || mode != MODE_NORMAL); ++i) {
-        tap(KEY_B);
+        tap_b();
         if (host_ticks >= (u32)run_limit) return 0;
     }
     if (menu_open || mode != MODE_NORMAL) {
@@ -379,7 +389,7 @@ static int select_human_group(void)
 static int command_group_to(int x, int y, int attack_move)
 {
     if (!select_human_group()) return 0;
-    tap(KEY_B);
+    tap_b();
     if (attack_move) tap(KEY_DOWN);
     tap(KEY_A);
     move_cursor(x, y);
@@ -415,7 +425,7 @@ static int controller_order_actor(int slot, int x, int y, int attack_move)
                 slot, u[slot].selected, selected_count(), selected_building);
         return 0;
     }
-    tap(KEY_B);
+    tap_b();
     if (attack_move) tap(KEY_DOWN);
     tap(KEY_A);
     move_cursor(x, y);
@@ -462,7 +472,7 @@ static int controller_select_building(int slot)
 static int controller_choose_menu_row(int row)
 {
     if (row < 0 || row >= 14 || host_ticks >= (u32)run_limit) return 0;
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < row; ++i) tap(KEY_DOWN);
     tap(KEY_A);
     return screen == SCREEN_PLAY && !won && !lost;
@@ -482,6 +492,17 @@ static int find_side_worker(void)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV &&
             !SC64_TRANSPORT_LOADED(&u[i])) return i;
     return -1;
+}
+
+/* The structure lands where placement puts it: field controls snap the
+ * cursor to the 8-pixel grid. */
+static void placed_site(int type, int *x, int *y)
+{
+#ifdef SC64_FIELD_CONTROLS
+    field_ui_site(type, x, y);
+#else
+    (void)type; (void)x; (void)y;
+#endif
 }
 
 static int controller_find_starport_site(int factory, int *out_x, int *out_y)
@@ -538,8 +559,19 @@ static int controller_build_supply_depot(int *out_slot)
         for (int cx0 = b[command].x - 192; cx0 <= b[command].x + 192; cx0 += 16) {
             int px = snap4_local(cx, cx0, WORLD_W);
             int py = snap4_local(cy, candidate_y, WORLD_H);
+            int sx = px, sy = py;
+            placed_site(B_DEPOT, &sx, &sy);
             if (dist2(px, py, b[command].x, b[command].y) > 192 * 192 ||
-                !race_can_site(SIDE, B_DEPOT, px, py) || !can_place(B_DEPOT, px, py)) continue;
+                !race_can_site(SIDE, B_DEPOT, sx, sy) || !can_place(B_DEPOT, sx, sy)) continue;
+            /* Grid-snapped Depots pack tighter than the old cursor lattice.
+               Keep them off the Command Center apron and leave a lane beside
+               each structure, or the coarse path grid can strand the SCV
+               between its own Depots. */
+            int crowded = dist2(sx, sy, b[command].x, b[command].y) < 128 * 128;
+            for (int j = 0; j < MAX_BUILDINGS && !crowded; ++j)
+                crowded = b[j].alive && b[j].owner == SIDE && dist2(sx, sy, b[j].x, b[j].y) < 48 * 48;
+            int nx, ny;
+            if (crowded || !path_next_tile(u[worker].x, u[worker].y, sx, sy, &nx, &ny)) continue;
             int hostile = 0x7fffffff;
             for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == ENEMY) {
                 int d = dist2(px, py, u[j].x, u[j].y);
@@ -562,6 +594,7 @@ static int controller_build_supply_depot(int *out_slot)
     int planned_x = x, planned_y = y;
     move_cursor(x, y);
     x = cx; y = cy;
+    placed_site(B_DEPOT, &x, &y);
     if (!race_can_site(SIDE, B_DEPOT, x, y) || !can_place(B_DEPOT, x, y)) {
         fprintf(stderr, "T5 Supply Depot rounded site invalid planned=%d,%d actual=%d,%d\n",
                 planned_x, planned_y, cx, cy);
@@ -1128,7 +1161,7 @@ static int controller_order_paid_wraiths(void)
                 live, new_members, selected_wraiths, seed, target,
                 b[target].x, b[target].y, (unsigned)host_ticks);
         if (trace_file) checkpoint("wraith-wing-before-attack");
-        tap(KEY_B);
+        tap_b();
         tap(KEY_DOWN);
         tap(KEY_A);
         move_cursor(b[target].x, b[target].y);
@@ -1402,7 +1435,7 @@ static int controller_hold_visible_marines(void)
                 controller_marine_count(), selected);
         return 0;
     }
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < 9; ++i) tap(KEY_DOWN);
     tap(KEY_A); /* ordinary STOP / HOLD */
     fprintf(stderr, "T5 held visible Marine defenders=%d total-live=%d\n",
@@ -1498,7 +1531,7 @@ static int controller_defend_command_center(void)
         last_order_tick = host_ticks;
         return 0;
     }
-    tap(KEY_B); tap(KEY_DOWN); tap(KEY_A); /* normal Attack mode */
+    tap_b(); tap(KEY_DOWN); tap(KEY_A); /* normal Attack mode */
     move_cursor(u[target].x, u[target].y);
     tap(KEY_A);
     fprintf(stderr, "T5 CC defense Attack-Move issued selected-Marines=%d target=%d remaining-hp=%d\n",
@@ -1573,7 +1606,7 @@ home_next:
 static int controller_hold_actor(int actor)
 {
     if (!controller_select_unit(actor)) return 0;
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < 9; ++i) tap(KEY_DOWN);
     tap(KEY_A);
     return u[actor].alive && u[actor].order == ORDER_IDLE;

@@ -225,6 +225,16 @@ static void tap(u16 key)
     step(0);
 }
 
+/* Field controls reopen the order list on the last command. These
+ * sequences were written for a list that opens on Move, so a fresh
+ * open starts there (no extra input, so the run's timing is unchanged). */
+static void tap_b(void)
+{
+    int fresh = !menu_open && mode == MODE_NORMAL;
+    tap(KEY_B);
+    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+}
+
 static int snap4(int current, int target, int bound)
 {
     int delta = target - current;
@@ -306,7 +316,7 @@ static void issue_attack_move(int x, int y)
 {
     select_army();
     if (!selected_count()) return;
-    tap(KEY_B);
+    tap_b();
     tap(KEY_DOWN); /* ATTACK */
     tap(KEY_A);
     move_cursor(x, y);
@@ -462,7 +472,7 @@ static int select_worker_slot(int worker)
 static int choose_menu_row(int row)
 {
     if (row < 0 || row >= field_menu_count()) return 0;
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < row; ++i) tap(KEY_DOWN);
     tap(KEY_A);
     return 1;

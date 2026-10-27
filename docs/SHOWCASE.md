@@ -48,28 +48,43 @@ it does not rebuild or change the setup.
 
 ## Field controls
 
-The showcase build also turns on `SC64_FIELD_CONTROLS`
-(`starcraft/field_controls.h`), the race-engine port of the default profile's
-controls:
+Every race-engine ROM (Showcase, the Terran, Zerg and Protoss ROMs, unified
+and the race test profiles) builds with `SC64_FIELD_CONTROLS`
+(`starcraft/field_controls.h`), the race-engine port of the default
+profile's controls and menus:
 
-- A on empty ground clears the selection. With a structure selected, A trains
-  only when the cursor is on that structure.
-- A on a visible unit or structure the engine treats as hostile
-  (`owners_hostile`, so every skirmish opponent) attack-moves onto it when
-  units are selected. A selected worker over a friendly gas building still
-  gathers gas first, as before.
+- With units selected, A on open ground moves them there and A on a visible
+  unit or structure the engine treats as hostile (`owners_hostile`, so every
+  skirmish opponent) attack-moves onto it. A selected worker over a friendly
+  gas building still gathers gas first. SELECT drops the selection; with
+  nothing selected it pauses, as before. With a structure selected, A trains
+  only when the cursor is on that structure and clears the selection
+  elsewhere.
 - R acts on a clean tap; holding R to speed the cursor keeps the selection.
-- B reopens the order list on the last command, so B, A repeats it.
+- B opens the framed order list: each row has an icon and its mineral cost,
+  rows that cannot be used are dimmed, and the HUD names the highlighted
+  command and its gas cost, or why it is unavailable (missing structure,
+  minerals or gas short by an amount, no free worker, nothing selected,
+  fully upgraded). Contextual rows (Nexus, Cannon, Lair, Spire, Creep
+  Colony, spells, transports, lift/land) keep their places. The list
+  reopens on the last command, so B, A repeats it.
+- Placement snaps to an 8-pixel grid; gas structures snap to their geyser.
+  The footprint is green when A places it, gold on clear ground that still
+  lacks tech, funds or a worker, and red when the ground rejects it, with the
+  reason (blocked, Pylon power, creep, geyser) in the HUD. No worker needs
+  to be selected: the selected one builds, or else the nearest free one.
 - Armed orders change the cursor (green arrow for Move, red reticle for
-  Attack Move) and the HUD title colour. The hint row names what A does
-  (`A MOVE HERE  B BACK`, `B COMMANDS  A DESELECT`, …), or `A CHOOSE  B CLOSE`
-  while the order list is open, and orders and placements leave a short
-  green, red or gold marker.
+  Attack Move) and the HUD title colour; the hint row names what A does.
+  Orders and placements leave a short green, red or gold marker.
+- Pause is a list (Resume, Save, Load, Restart) with the old one-key
+  shortcuts, a clock, "game saved"/"no save found" notices, the mission
+  objective and a controls reminder. The result panel shows time, units
+  and buildings, and offers the next campaign mission when there is one.
 
-The StarCraft 64 title, pause and result screens and the race command lists
-are unchanged. Other SC64 profiles do not enable the flag, and the default,
-ring and unified ROMs are byte-identical to builds without this port. The
-HUD resolves the A action once per simulation update rather than per drawn
+The StarCraft 64 title and briefing screens keep their own navigable
+menus, and Showcase scenes keep their own pause and result panels. All of
+it is presentation and input routing: no saved state is added. The HUD
+resolves the A action once per simulation update rather than per drawn
 frame, because crowded scenes draw several frames per update; a scene
 restart or a load clears that result, since both jump the update counter.
 

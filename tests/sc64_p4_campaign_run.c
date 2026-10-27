@@ -35,6 +35,7 @@ static char final_attempt_path[160] = ".local/sc64/p4-controller-attempt.json";
 static char verified_path[160] = ".local/sc64/p4-controller-win.json";
 
 static void tap(u16 key);
+static void tap_b(void);
 static void move_cursor(int x, int y);
 static int alive_units(void);
 static int escort_combat_count(void);
@@ -169,7 +170,7 @@ static int build_gateway_from_probe(int gateway_index)
         }
     if (x < 0) return 0;
     if (!cycle_select_actor(worker)) return 0;
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < 2; ++i) tap(KEY_DOWN); /* Gateway is menu item two. */
     tap(KEY_A);
     if (mode != MODE_BUILD) return 0;
@@ -180,8 +181,8 @@ static int build_gateway_from_probe(int gateway_index)
                   b[target].owner == SIDE && b[target].type == B_GATEWAY &&
                   dist2(b[target].x, b[target].y, x, y) <= 8 * 8 ? target : -1;
     if (gateway >= 0 && u[worker].order == ORDER_BUILD) return 1;
-    if (mode == MODE_BUILD) tap(KEY_B);
-    if (menu_open) tap(KEY_B);
+    if (mode == MODE_BUILD) tap_b();
+    if (menu_open) tap_b();
     return 0;
 }
 
@@ -207,7 +208,7 @@ static int build_cybernetics_core_from_probe(void)
     if (x < 0 || !cycle_select_actor(worker)) {
         return 0;
     }
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < 5; ++i) tap(KEY_DOWN); /* Cybernetics Core is field-menu row five. */
     tap(KEY_A);
     if (mode != MODE_BUILD) return 0;
@@ -218,8 +219,8 @@ static int build_cybernetics_core_from_probe(void)
                b[target].owner == SIDE && b[target].type == B_CYBERNETICS_CORE &&
                dist2(b[target].x, b[target].y, x, y) <= 8 * 8 ? target : -1;
     if (core >= 0 && u[worker].order == ORDER_BUILD) return 1;
-    if (mode == MODE_BUILD) tap(KEY_B);
-    if (menu_open) tap(KEY_B);
+    if (mode == MODE_BUILD) tap_b();
+    if (menu_open) tap_b();
     return 0;
 }
 
@@ -248,9 +249,9 @@ static int assign_probe_to_gas(void)
     if (u[worker].order == ORDER_MOVE &&
         dist2(u[worker].tx, u[worker].ty, b[assimilator].x, b[assimilator].y) < 24 * 24)
         return 0;
-    tap(KEY_B);
+    tap_b();
     tap(KEY_A); /* normal Move order */
-    if (mode != MODE_MOVE) { if (menu_open) tap(KEY_B); return 0; }
+    if (mode != MODE_MOVE) { if (menu_open) tap_b(); return 0; }
     move_cursor(b[assimilator].x, b[assimilator].y);
     tap(KEY_A);
     int moving = u[worker].alive && u[worker].order == ORDER_MOVE;
@@ -275,7 +276,7 @@ static int build_cannon_from_probe(int cannon_index)
             x = spot[i][0]; y = spot[i][1]; break;
         }
     if (x < 0 || !cycle_select_actor(worker)) return 0;
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < MENU_STOP + 2; ++i) tap(KEY_DOWN);
     tap(KEY_A);
     if (mode != MODE_BUILD) return 0;
@@ -286,8 +287,8 @@ static int build_cannon_from_probe(int cannon_index)
                  b[target].owner == SIDE && b[target].type == B_PHOTON_CANNON &&
                  dist2(b[target].x, b[target].y, x, y) <= 8 * 8 ? target : -1;
     if (cannon >= 0 && u[worker].order == ORDER_BUILD) return 1;
-    if (mode == MODE_BUILD) tap(KEY_B);
-    if (menu_open) tap(KEY_B);
+    if (mode == MODE_BUILD) tap_b();
+    if (menu_open) tap_b();
     return 0;
 }
 
@@ -327,7 +328,7 @@ static int build_pylon_from_probe(void)
         }
     if (x < 0) return 0;
     if (!cycle_select_actor(worker)) return 0;
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < 3; ++i) tap(KEY_DOWN); /* Protoss Depot slot is Pylon. */
     tap(KEY_A);
     if (mode != MODE_BUILD) return 0;
@@ -340,8 +341,8 @@ static int build_pylon_from_probe(void)
         dist2(b[target].x, b[target].y, x, y) <= 8 * 8) return 1;
     /* A rejected placement leaves the build cursor armed. Cancel through the
      * ordinary field menu so the next placement attempt starts cleanly. */
-    if (mode == MODE_BUILD) tap(KEY_B);
-    if (menu_open) tap(KEY_B);
+    if (mode == MODE_BUILD) tap_b();
+    if (menu_open) tap_b();
     return 0;
 }
 
@@ -458,6 +459,16 @@ static void wait_for_controller(void)
     while (deployed && screen == SCREEN_PLAY && !won && !lost &&
            race_p4.source_paused)
         step(0);
+}
+
+/* Field controls reopen the order list on the last command. These
+ * sequences were written for a list that opens on Move, so a fresh
+ * open starts there (no extra input, so the run's timing is unchanged). */
+static void tap_b(void)
+{
+    int fresh = !menu_open && mode == MODE_NORMAL;
+    tap(KEY_B);
+    if (fresh && menu_open) menu_cursor = MENU_MOVE;
 }
 
 static int snap4(int current, int target, int bound)
@@ -591,7 +602,7 @@ static int try_cast_storm(void)
     int effects_before = 0;
     for (int i = 0; i < SC64_STORM_MAX_ACTIVE; ++i)
         effects_before += race_p4.storm.storm[i].active != 0;
-    wait_for_controller(); tap(KEY_B);
+    wait_for_controller(); tap_b();
     for (int i = 0; i < 10; ++i) { wait_for_controller(); tap(KEY_DOWN); }
     wait_for_controller(); tap(KEY_A);
     if (mode != MODE_P4_STORM) return 0;
@@ -657,7 +668,7 @@ static int stop_rescue_hero(int slot)
     wait_for_controller();
     tap(KEY_A);
     if (!u[slot].selected || selected_count() != 1) return 0;
-    wait_for_controller(); tap(KEY_B);
+    wait_for_controller(); tap_b();
     for (int i = 0; i < MENU_STOP; ++i) { wait_for_controller(); tap(KEY_DOWN); }
     wait_for_controller(); tap(KEY_A);
     return u[slot].alive && u[slot].order == ORDER_IDLE;
@@ -668,7 +679,7 @@ static int move_rescue_hero_to_safety(int slot, int safe_x, int safe_y)
     if (slot < 0 || !u[slot].alive || u[slot].owner != SIDE) return 0;
     wait_for_controller();
     if (!cycle_select_actor(slot)) return 0;
-    wait_for_controller(); tap(KEY_B);
+    wait_for_controller(); tap_b();
     wait_for_controller(); tap(KEY_A); /* ordinary Move, first field-menu item */
     if (mode != MODE_MOVE) return 0;
     move_cursor(safe_x, safe_y);
@@ -681,7 +692,7 @@ static int issue_hero_attack_move(int slot, int x, int y)
     if (slot < 0 || !u[slot].alive || u[slot].owner != SIDE) return 0;
     wait_for_controller();
     if (!cycle_select_actor(slot)) return 0;
-    wait_for_controller(); tap(KEY_B);
+    wait_for_controller(); tap_b();
     wait_for_controller(); tap(KEY_DOWN);
     wait_for_controller(); tap(KEY_A);
     if (mode != MODE_ATTACK) return 0;
@@ -695,7 +706,7 @@ static int issue_hero_move(int slot, int x, int y)
     if (slot < 0 || !u[slot].alive || u[slot].owner != SIDE) return 0;
     wait_for_controller();
     if (!cycle_select_actor(slot)) return 0;
-    wait_for_controller(); tap(KEY_B);
+    wait_for_controller(); tap_b();
     wait_for_controller(); tap(KEY_A); /* ordinary Move */
     if (mode != MODE_MOVE) return 0;
     move_cursor(x, y);
@@ -880,7 +891,7 @@ static int issue_group_order(int x, int y, int army_only, int attack_move)
     }
     if (!selected_count()) return 0;
     wait_for_controller();
-    tap(KEY_B);
+    tap_b();
     wait_for_controller();
     if (attack_move) { tap(KEY_DOWN); wait_for_controller(); }
     tap(KEY_A); /* Move is first; Attack Move is the second field choice. */

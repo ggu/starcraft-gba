@@ -76,6 +76,15 @@ static void tap(u16 key)
     step(0);
 }
 
+/* B reopens the order list on the last command; walk to the wanted row. */
+static void choose_order(int row)
+{
+    tap(KEY_B);
+    for (int guard = 0; menu_open && menu_cursor != row && guard < 32; ++guard)
+        tap(menu_cursor < row ? KEY_DOWN : KEY_UP);
+    tap(KEY_A);
+}
+
 static int snap4(int current, int target, int bound)
 {
     int delta = target - current;
@@ -402,9 +411,7 @@ static int controller_move_actor_to(int x, int y, int attack_move)
                 actor_slot, u[actor_slot].selected, selected_count(), selected_building);
         return 0;
     }
-    tap(KEY_B);
-    if (attack_move) tap(KEY_DOWN);
-    tap(KEY_A); /* Ordinary unit command: MOVE or ATTACK MOVE. */
+    choose_order(attack_move ? MENU_ATTACK : MENU_MOVE); /* Ordinary unit command. */
     move_cursor(x, y);
     tap(KEY_A);
     return 1;
@@ -422,8 +429,7 @@ static int controller_move_unit_to(int slot, int x, int y, int attack_move)
 static int controller_move_group_to(int x, int y, int excluded_slot)
 {
     if (!select_human_group_except(excluded_slot)) return 0;
-    tap(KEY_B);
-    tap(KEY_A);
+    choose_order(MENU_MOVE);
     move_cursor(x, y);
     tap(KEY_A);
     fprintf(stderr, "T4 controller group move target=%d,%d count=%d\n",
