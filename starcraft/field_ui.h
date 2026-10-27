@@ -288,7 +288,8 @@ field_ui_a_action(void)
     }
     if (selected_building >= 0 && b[selected_building].alive && field_ui_on_selected_building()) {
         int type = b[selected_building].type;
-        if (type == B_COMMAND || type == B_BARRACKS) return UI_A_TRAIN;
+        if (type == B_COMMAND || type == B_BARRACKS)
+            return b[selected_building].under_construction ? UI_A_NONE : UI_A_TRAIN;
         return type == B_REFINERY ? UI_A_ASSIGN_GAS : UI_A_NONE;
     }
     if (n && ui_hostile_at(cx, cy, &hx, &hy)) return UI_A_ATTACK;

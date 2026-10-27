@@ -126,6 +126,29 @@ deselect_tests(void)
 }
 
 static void
+unfinished_producer_tests(void)
+{
+    const int producers[] = {B_COMMAND, B_BARRACKS};
+    for (unsigned n = 0; n < sizeof producers / sizeof producers[0]; ++n) {
+        fixture();
+        int slot = building_of(SIDE, producers[n]);
+        check(slot >= 0, "producer exists in fixture");
+        if (slot < 0) continue;
+        selected_building = slot;
+        b[slot].under_construction = 1;
+        move_cursor(b[slot].x, b[slot].y);
+        int before = minerals;
+        check(a_action() == UI_A_NONE, "unfinished producer does not offer TRAIN");
+        tap(KEY_A);
+        check(b[slot].queue_count == 0 && minerals == before,
+              "unfinished producer cannot queue or spend minerals");
+        check(toast_id == 9, "unfinished producer reports building unfinished");
+        b[slot].under_construction = 0;
+        check(a_action() == UI_A_TRAIN, "completed producer offers TRAIN again");
+    }
+}
+
+static void
 smart_attack_tests(void)
 {
     int marine, ling;
@@ -396,6 +419,7 @@ main(void)
     gba_init();
     game_init();
     deselect_tests();
+    unfinished_producer_tests();
     smart_attack_tests();
     r_gesture_tests();
 #ifndef SC_COMMAND_RING /* the ring build opens its list on Move */
