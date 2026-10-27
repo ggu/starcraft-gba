@@ -2842,3 +2842,19 @@ last-stand timing and save isolation with the existing private P7 inputs.
 The frontend input model also runs in the asset-free host suite. See
 [Showcase scenes](SHOWCASE.md) for all eight setups, recording controls,
 Carrier preview limits and the controller-only emulator replay.
+
+
+### Physical-input-only main loop
+
+The optional `GBA_NO_DEBUG_INPUTS` compiler flag removes the debugger-fed key
+queue and injection fields from `common/main.c`. The physical keypad, held and
+pressed edges, frame counter and cycle metrics remain available. The default
+configuration retains the debugger interface, and historical probes are
+unchanged. Enable the flag only in an explicitly selected release profile;
+debugger-fed replay tools require a build that retains their schedule symbols.
+
+`make test-gba-no-debug-inputs` checks ordinary physical-key transitions and
+metrics, then rechecks the existing scheduled/injected-input loop. An optional
+Z7 link comparison recovers 2,072 BSS bytes with the same IWRAM end and
+unchanged memory guards. This is input infrastructure and does not change
+gameplay, save formats, actor limits or the campaign qualification scope.
