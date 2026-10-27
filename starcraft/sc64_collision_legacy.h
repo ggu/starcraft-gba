@@ -3,6 +3,10 @@
 
 _Static_assert(MAX_UNITS < 255, "Spatial unit indices must fit below the sentinel");
 
+#if defined(SC64_COLLISION_PACKED_HIT) && !defined(SC64_COLLISION_CLASS_CACHE)
+#error "SC64_COLLISION_PACKED_HIT requires SC64_COLLISION_CLASS_CACHE"
+#endif
+
 /* Exact broad-phase index for moving units. Built only for update_orders();
  * all candidates still use the engine's original overlap predicate. */
 static u8 sc64_unit_bucket_head[MAP_CELLS];
@@ -69,6 +73,31 @@ sc64_unit_collision_class(int slot, int type, int *radius, int *flying,
         sc64_unit_collision_class_cache[slot] = packed;
     return packed;
 }
+
+#ifdef SC64_COLLISION_PACKED_HIT
+/* Inline only the common nonzero-cache decode at callers. Misses (including
+ * unrepresentable facts and the all-zero sentinel tuple) retain the original
+ * helper's output initialization and cache-fill behavior. */
+static inline __attribute__((always_inline)) u8
+sc64_unit_collision_class_packed_hit(int slot, int type, int *radius,
+                                     int *flying, int *collidable)
+{
+    u8 packed = slot >= 0 && slot < MAX_UNITS
+        ? sc64_unit_collision_class_cache[slot] : 0;
+    if (packed) {
+        *radius = packed >> 2;
+        *flying = (packed >> 1) & 1;
+        *collidable = packed & 1;
+        return packed;
+    }
+    return sc64_unit_collision_class(slot, type, radius, flying, collidable);
+}
+#define SC64_UNIT_COLLISION_CLASS(slot, type, radius, flying, collidable) \
+    sc64_unit_collision_class_packed_hit((slot), (type), (radius), (flying), (collidable))
+#else
+#define SC64_UNIT_COLLISION_CLASS(slot, type, radius, flying, collidable) \
+    sc64_unit_collision_class((slot), (type), (radius), (flying), (collidable))
+#endif
 #endif
 
 static int GBA_HOT
@@ -170,7 +199,7 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
 #endif
 #if defined(SC64_COLLISION_CLASS_CACHE)
     int mover_radius, mover_flying, mover_collidable;
-    (void)sc64_unit_collision_class((int)(q - u), q->type,
+    (void)SC64_UNIT_COLLISION_CLASS((int)(q - u), q->type,
         &mover_radius, &mover_flying, &mover_collidable);
 #elif defined(SC64_COLLISION_FACT_HOIST) && defined(SC64_ZP_CAMPAIGN_ACTORS)
     /* These mover facts are immutable during this read-only collision query.
@@ -212,7 +241,7 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
 #if defined(SC64_COLLISION_CLASS_CACHE)
                     int candidate_radius, candidate_flying, candidate_collidable;
-                    (void)sc64_unit_collision_class(i, u[i].type,
+                    (void)SC64_UNIT_COLLISION_CLASS(i, u[i].type,
                         &candidate_radius, &candidate_flying,
                         &candidate_collidable);
                     int radius = mover_radius > candidate_radius ? mover_radius : candidate_radius;
@@ -345,7 +374,7 @@ sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
     if (IS_WORKER(q->type) && (q->order == ORDER_MINE || q->order == ORDER_GAS))
         return 0;
 #ifndef SC64_Z7_RUNTIME
-    (void)sc64_unit_collision_class((int)(q - u), q->type,
+    (void)SC64_UNIT_COLLISION_CLASS((int)(q - u), q->type,
         &mover_radius, &mover_flying, &mover_collidable);
 #endif
     minx = (q->x - speed - reach) >> 4; maxx = (q->x + speed + reach) >> 4;
@@ -367,7 +396,7 @@ sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
                     if (++raw_nodes > SC64_STEER_LIST_CAPACITY) return 0;
             }
     }
-    (void)sc64_unit_collision_class((int)(q - u), q->type,
+    (void)SC64_UNIT_COLLISION_CLASS((int)(q - u), q->type,
         &mover_radius, &mover_flying, &mover_collidable);
 #endif
     for (row = miny; row <= maxy; ++row)
@@ -381,7 +410,7 @@ sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
 #ifdef SC64_P6_COMBAT_ENABLED
                 if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
-                (void)sc64_unit_collision_class(i, u[i].type,
+                (void)SC64_UNIT_COLLISION_CLASS(i, u[i].type,
                     &candidate_radius, &candidate_flying, &candidate_collidable);
                 if (u[i].type == U_CHRYSALIS || candidate_flying != mover_flying ||
                     !candidate_collidable || !mover_collidable) continue;

@@ -5845,3 +5845,37 @@ in both variants, but mean combined cycles increased from 6667463 to 6722515
 (0.83%). Both retained 7408 bytes of measured stack margin. This is bounded
 emulator evidence, not a full campaign or physical-hardware qualification.
 The coordinate-culling gate is not part of this change.
+
+## Z7 packed collision-cache hits (2026-10-27)
+
+The experimental Z7 steering profile enables `SC64_COLLISION_PACKED_HIT`
+with its existing class cache. A nonzero cached byte is decoded in the caller,
+avoiding a function call and three output-pointer writes on each warm lookup.
+Zero bytes and invalid slots still call the original helper; its provider
+lookups, unrepresentable-fact outputs, and cache-fill behavior are unchanged.
+There is no added cache storage, persistent state, or save-format change.
+Canonical release profiles do not enable this gate.
+
+`make test-sc64-collision-bounds` also runs packed cache-only and packed
+cache/list variants. They retain the public real-actor scalar oracle and test
+cold/warm hits, maximum packed fields, invalid slots without cache writes,
+and synthetic radius-64 and all-zero facts. Synthetic providers are local to
+the fixture; no product actor facts change. The candidate and baseline full
+host replays match all 365 checkpoints and the source win byte for byte.
+
+In a separate paired mGBA replay of the late Z7 save (2000 advancing updates,
+20 exact checkpoints), mean update cycles fell from 6227197 to 5374247
+(13.70%), and combined update/audio/render cycles from 6667463 to 5815221
+(12.78%). Both variants measured 7408 bytes of stack margin. Replay BSS is
+unchanged at `0x0203d7a4`; IWRAM end rises from `0x03004c78` to `0x03004d10`.
+The ordinary experimental steering-probe link ends BSS at `0x0203dff0`
+(16 bytes before the reserve) and IWRAM at `0x03004d10`.
+
+These measurements qualify the bounded workload, not a full ARM campaign
+replay with the new gate, physical hardware, or sustained 30 fps. The mean
+combined cost is still about 2.9 updates/second at GBA clock speed. The gate
+does not promote a campaign chapter or change canonical progress from 22/30.
+
+A separate attempt to postpone steering-list overflow until after filtering
+also matched all 365 host checkpoints and all 20 bounded ARM checkpoints,
+but increased combined ARM cycles by 2.56%; it remains private and disabled.
