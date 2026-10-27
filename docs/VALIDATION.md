@@ -5815,3 +5815,33 @@ save golden; 334 prefix checkpoints and 31 resumed checkpoints passed,
 ending in the same source win. Only the inactive menu cursor is normalized
 in persistent digests. The audit records source-force checks, the exact
 SRAM/prefix/resume identities, and remaining hardware/performance limits.
+
+## Collision coverage for larger flying actors (2026-10-27)
+
+The Z/P bucket query previously searched only nine pixels from the proposed
+position. Public actor facts include collidable flying actors with radii above
+ten: Guardian (raw 44) has radius 11 and the P5 Battlecruiser (raw 12) has radius
+19. A query moving from x=5 to x=6 can miss a blocker in the next cell at x=16
+or x=24 respectively, although the full-scan predicate rejects the step.
+
+The query now searches 18 pixels for flying movers and nine for ground movers.
+These are the maximum strict-interior distances for the tested air/ground
+radius bounds of 19/10. Collision pairs require matching flight state. The
+optional bounded steering list remains ground-only; flying movers fall back
+to the corrected bucket query. The strict Nydus placement query shares this
+coverage. There is no new persistent state or save-format change.
+
+`make test-sc64-collision-bounds` needs no ROM or generated assets. Four
+ASan/UBSan variants exercise the actual header with public actor providers:
+class cache plus steering list, cache only, fact hoisting, and plain queries.
+Each checks more than 1.7 million cases against an independent full scan,
+including all 16x16 cell phases, eight directions, speeds zero through three,
+tangencies, slot reuse, filters, and strict placement. Bounds assertions cover
+the 55 compiled actor types; extending the roster requires rechecking them.
+
+A separate coordinate-culling optimization was rejected. On the corrected
+baseline, the paired 2000-update late Z7 ARM replay matched all 20 checkpoints
+in both variants, but mean combined cycles increased from 6667463 to 6722515
+(0.83%). Both retained 7408 bytes of measured stack margin. This is bounded
+emulator evidence, not a full campaign or physical-hardware qualification.
+The coordinate-culling gate is not part of this change.
