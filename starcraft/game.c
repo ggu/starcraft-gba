@@ -410,6 +410,8 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #define MAX_UNITS 40
 #define MAX_MINERALS 8
 #define SAVE_VERSION 0x53434733u
+/* The original-art skirmish owns its menus; see field_ui.h. */
+#define SC_DEFAULT_UI 1
 #endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
@@ -1299,6 +1301,13 @@ static int screen, menu_open, menu_cursor, help, won, lost, result_timer;
 static int cx, cy, camx, camy, toast_timer, toast_id, enemy_timer, wave;
 /* Transient controller gesture, deliberately outside the persistent save. */
 static int box_state, box_anchor_x, box_anchor_y, box_end_x, box_end_y;
+#ifdef SC_DEFAULT_UI
+/* Default-profile menu and feedback state (field_ui.h); never saved. */
+static u8 menu_last, title_cursor, title_notice, pause_cursor;
+static u8 pause_notice, pause_notice_ticks, r_tap_state;
+static u8 ping_life, ping_color;
+static s16 ping_x, ping_y;
+#endif
 static int box_suppress_a;
 static int unit_tap = -1, unit_tap_x, unit_tap_y;
 static u32 unit_tap_frame;
@@ -1483,6 +1492,9 @@ reset_selection_gestures(void)
     box_state = 0;
     box_suppress_a = 0;
     reset_unit_tap();
+#ifdef SC_DEFAULT_UI
+    r_tap_state = 0;
+#endif
 }
 static const char *toast_text[] = {"Command issued", "Need more minerals", "Supply limit reached", "Building placed", "Training unit", "Select a worker", "Site blocked", "Game saved", "Tech prerequisite missing", "Building unfinished", "Research unavailable", "Queue full", "No gas", "Unit pool full", "Mission data skipped"};
 static int
@@ -4026,6 +4038,9 @@ init_state(void)
     menu_open = 0;
     menu_cursor = 0;
     help = 0;
+#ifdef SC_DEFAULT_UI
+    menu_last = 0; ping_life = 0; pause_cursor = 0; pause_notice = pause_notice_ticks = 0;
+#endif
     won = 0;
     lost = 0;
     result_timer = 0;
@@ -4442,6 +4457,10 @@ race_probe_cannon_command_available(void)
 }
 #endif
 
+#ifdef SC_DEFAULT_UI
+#include "field_ui.h"
+#endif
+
 static void
 start_build(int type)
 {
@@ -4449,7 +4468,10 @@ start_build(int type)
     if(race_start_build(SIDE,find_selected_worker(),type,cx,cy)){mode=MODE_NORMAL;toast(3);}else toast(8);
     return;
 #endif
-    int cost = building_cost(type), i, slot;
+    int cost = building_cost(type), i, slot, px = cx, py = cy;
+#ifdef SC_DEFAULT_UI
+    field_ui_site(type, &px, &py);
+#endif
     if (!has_tech_for(type)) {
 	toast(type == B_ACADEMY ? 10 : 8);
 	return;
@@ -4462,7 +4484,7 @@ start_build(int type)
 	toast(12);
 	return;
     }
-    if (!can_place(type, cx, cy)) {
+    if (!can_place(type, px, py)) {
 	toast(6);
 	return;
     }
@@ -4478,19 +4500,22 @@ start_build(int type)
     }
     minerals -= cost;
     gas -= building_gas_cost(type);
-    slot = spawn_build(SIDE, type, cx, cy, 1);
+    slot = spawn_build(SIDE, type, px, py, 1);
     if (slot < 0) {
 	minerals += cost;
 	return;
     }
     u[i].order = ORDER_BUILD;
     u[i].target = slot;
-    u[i].tx = cx;
-    u[i].ty = cy;
+    u[i].tx = px;
+    u[i].ty = py;
     u[i].path_timer = 0;
     u[i].path_retry = 0;
     toast(3);
     mode = MODE_NORMAL;
+#ifdef SC_DEFAULT_UI
+    field_ui_ping(px, py, C_GOLD);
+#endif
 }
 
 static void
@@ -4617,6 +4642,9 @@ static int race_z7_creep_command_available(void)
 static void
 choose_command(int choice)
 {
+#ifdef SC_DEFAULT_UI
+    menu_last = (u8)choice;
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) {
         menu_open=0; mode=MODE_NORMAL;
@@ -4774,11 +4802,15 @@ choose_command(int choice)
     switch (choice) {
     case MENU_MOVE:
 	mode = MODE_MOVE;
-	toast(0);
+#ifndef SC_DEFAULT_UI
+	toast(0); /* the default HUD names the armed order instead */
+#endif
 	break;
     case MENU_ATTACK:
 	mode = MODE_ATTACK;
+#ifndef SC_DEFAULT_UI
 	toast(0);
+#endif
 	break;
     case MENU_BARRACKS:
 	mode = MODE_BUILD;
@@ -5006,6 +5038,9 @@ interact(void)
 #endif
 	issue_order(ORDER_MOVE, cx, cy);
 	mode = MODE_NORMAL;
+#ifdef SC_DEFAULT_UI
+	if (selected_count()) field_ui_ping(cx, cy, C_GREEN);
+#endif
 	return;
     }
     if (mode == MODE_ATTACK) {
@@ -5019,6 +5054,9 @@ interact(void)
 #endif
 	issue_order(ORDER_ATTACK_MOVE, cx, cy);
 	mode = MODE_NORMAL;
+#ifdef SC_DEFAULT_UI
+	if (selected_count()) field_ui_ping(cx, cy, C_RED);
+#endif
 	return;
     }
     if (mode == MODE_BUILD) {
@@ -5079,6 +5117,11 @@ interact(void)
 	}
     }
     if (selected_building >= 0
+#ifdef SC_DEFAULT_UI
+        /* A trains only on the selected building; elsewhere it reselects,
+         * and on empty ground it clears the selection. */
+        && field_ui_on_selected_building()
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
         && (!race_late_active() ||
             dist2(cx, cy, b[selected_building].x, b[selected_building].y) < 26 * 26)
@@ -5121,6 +5164,9 @@ interact(void)
 	}
 	return;
     }
+#ifdef SC_DEFAULT_UI
+    if (field_ui_smart_attack()) return;
+#endif
     {
         int picked = select_at();
         if (picked >= 0) remember_unit_tap(picked);
@@ -6594,6 +6640,10 @@ update_selection_box(u16 held, u16 pressed, int old_x, int old_y)
 static void
 pause_action(u16 pressed)
 {
+#ifdef SC_DEFAULT_UI
+    field_ui_pause_input(pressed);
+    return;
+#endif
     if (pressed & KEY_A)
 	screen = SCREEN_PLAY;
     else if (pressed & KEY_B)
@@ -6671,6 +6721,10 @@ game_update(u16 held, u16 pressed)
 #ifdef SC64_SKIRMISH
         if (pressed & KEY_UP) skirmish_bots = skirmish_bots % 3 + 1;
         if (pressed & KEY_DOWN) skirmish_bots = (skirmish_bots + 1) % 3 + 1;
+#endif
+#ifdef SC_DEFAULT_UI
+        field_ui_title_input(pressed);
+        return;
 #endif
 	if (pressed & KEY_A)
 	    init_state();
@@ -6808,7 +6862,11 @@ game_update(u16 held, u16 pressed)
 	    menu_open = 1;
 	} else {
 	    menu_open = 1;
+#ifdef SC_DEFAULT_UI
+	    menu_cursor = menu_last; /* B, A repeats the last command */
+#else
 	    menu_cursor = 0;
+#endif
 	}
     }
     if (menu_open) {
@@ -6843,7 +6901,11 @@ game_update(u16 held, u16 pressed)
     if (unit_tap >= 0 && dist2(cx, cy, unit_tap_x, unit_tap_y) >
         UNIT_DOUBLE_TAP_RADIUS * UNIT_DOUBLE_TAP_RADIUS) reset_unit_tap();
     pressed = update_selection_box(held, pressed, old_cx, old_cy);
+#ifdef SC_DEFAULT_UI
+    if (field_ui_r_tap(held, pressed)
+#else
     if ((pressed & KEY_R)
+#endif
 #ifdef SC64_RACES
         &&!(held&(KEY_LEFT|KEY_RIGHT|KEY_UP|KEY_DOWN))
 #endif
@@ -8363,6 +8425,9 @@ sc64_tile_background_done:
 #endif
     x = cx - camx;
     y = cy - camy + 12;
+#ifdef SC_DEFAULT_UI
+    field_ui_draw_cursor(x, y);
+#else
     gfx_frame(x - 4, y - 4, 9, 9, (mode == MODE_BUILD
 #ifdef SC64_P7_BATTERY_ENABLED
               || mode == MODE_P7_RECHARGE
@@ -8382,6 +8447,7 @@ sc64_tile_background_done:
 #endif
     gfx_line(x - 7, y, x + 7, y, C_HIGHLIGHT);
     gfx_line(x, y - 7, x, y + 7, C_HIGHLIGHT);
+#endif
     if (box_state == 2) {
         int left = box_anchor_x < box_end_x ? box_anchor_x : box_end_x;
         int top = box_anchor_y < box_end_y ? box_anchor_y : box_end_y;
@@ -8392,6 +8458,9 @@ sc64_tile_background_done:
 #ifdef SC_COMMAND_RING
     command_ring_draw(x, y);
 #endif
+#ifdef SC_DEFAULT_UI
+    if (menu_open) field_ui_draw_command_menu();
+#else
     if (menu_open) {
 	#ifdef SC64_RACES
         static const char *race_labels[3][
@@ -8492,6 +8561,8 @@ sc64_tile_background_done:
 	}
 #endif
     }
+#endif
+#ifndef SC_DEFAULT_UI /* field_ui_draw_cursor previews the snapped site */
     if (mode == MODE_BUILD && box_state != 2) {
         int build_x = cx, build_y = cy;
 #ifdef SC64_RACES
@@ -8509,6 +8580,7 @@ sc64_tile_background_done:
 #endif
             ) ? C_GREEN : C_RED);
     }
+#endif
     gfx_frame(0, 12, 240, 108, C_EDGE);
 }
 
@@ -8521,6 +8593,10 @@ draw_title(void)
 {
 #ifdef SC64_RACES
     sc64_frontend_draw();return;
+#endif
+#ifdef SC_DEFAULT_UI
+    field_ui_draw_title();
+    return;
 #endif
     gfx_rect(0, 0, 240, 160, C_BLACK);
     gfx_rect(15, 18, 210, 124, C_PANEL);
@@ -8588,6 +8664,10 @@ draw_pause(void)
         return;
     }
 #endif
+#ifdef SC_DEFAULT_UI
+    field_ui_draw_pause();
+    return;
+#endif
     gfx_rect(29, 18, 182, 124, C_PANEL);
     gfx_frame(29, 18, 182, 124, C_CYAN);
     gfx_text(47, 27, "FIELD COMMAND", C_GOLD);
@@ -8613,6 +8693,10 @@ draw_result(void)
         gfx_text(39,87,"A REPLAY  B/SEL SCENES",C_CYAN);
         return;
     }
+#endif
+#ifdef SC_DEFAULT_UI
+    field_ui_draw_result();
+    return;
 #endif
     gfx_rect(28, 40, 184, 66, C_PANEL);
     gfx_frame(28, 40, 184, 66, won ? C_GOLD : C_RED);
@@ -8649,7 +8733,11 @@ draw_result_screen(void)
                     (unsigned)(result_outro - result_outro_end) : 0u;
     if (open < SC64_RESULT_PANEL_OPEN) {
         int w = 16 + (int)(168u * (open + 1u) / (SC64_RESULT_PANEL_OPEN + 1u));
+#ifdef SC_DEFAULT_UI
+        int h = 8 + (int)(78u * (open + 1u) / (SC64_RESULT_PANEL_OPEN + 1u));
+#else
         int h = 8 + (int)(58u * (open + 1u) / (SC64_RESULT_PANEL_OPEN + 1u));
+#endif
         gfx_rect(120 - w / 2, 73 - h / 2, w, h, C_PANEL);
         gfx_frame(120 - w / 2, 73 - h / 2, w, h, won ? C_GOLD : C_RED);
         return;
@@ -8717,6 +8805,10 @@ draw_hud_commands(void)
     gfx_line(0, 120, 240, 120, C_EDGE);
 #ifdef SC_COMMAND_RING
     if (command_ring_draw_hud()) return;
+#endif
+#ifdef SC_DEFAULT_UI
+    field_ui_draw_hud();
+    return;
 #endif
     if (box_state == 2) {
         gfx_text(5, 126, "BOX SELECT", C_CYAN);
@@ -9180,6 +9272,9 @@ game_render(void)
     else {
 #ifdef SC64_IMPORTED_MISSION
         profile_start = gba_clock();
+#endif
+#ifdef SC_DEFAULT_UI
+        field_ui_refresh();
 #endif
 #ifdef GBA_SCENE_CLIP
         gfx_set_clip_y(12,120);

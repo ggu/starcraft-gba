@@ -5,12 +5,15 @@ A compact Terran-versus-Zerg RTS skirmish for the shared 240×160 mode-4 rendere
 ## Controls
 
 - D-pad moves the command cursor. Hold R with the D-pad for faster cursor movement, including while dragging a selection box.
-- A selects a unit or structure, confirms a menu choice, issues the selected command, queues production, or places a building. A single tap acts immediately. Tap A twice quickly on the same friendly unit (within about 0.4 seconds) to select all living friendly units of the same type currently on screen. Offscreen units are not included. This shortcut applies to units; building selection and contextual commands keep their existing behavior.
-- B opens the command menu. Choose Move, Attack Move, a building, a weapon or armor upgrade, or Stop/Hold with the D-pad, then press A. B cancels the active order mode.
+- A selects a unit or structure, confirms a menu choice, issues the selected command, or places a building. A single tap acts immediately. Tap A twice quickly on the same friendly unit (within about 0.4 seconds) to select all living friendly units of the same type currently on screen. Offscreen units are not included.
+- With a structure selected, A on that structure queues production (or assigns an idle worker to a Refinery). A anywhere else selects what is under the cursor, and A on empty ground clears the selection. With units selected, A on empty ground also clears the selection, and A on a visible enemy attack-moves the selected units onto it.
+- B opens the command list. It shows each command's icon and mineral cost; unavailable commands are dimmed, and the panel below explains why. Choose a command with the D-pad and press A. The list reopens on the last command chosen, so B, A repeats an order or another copy of the same building. In an order or placement mode, B returns to the list.
 - Tap L to cycle friendly units. Hold L with the D-pad to drag a box; release L to select living friendly units inside it. Dragging works from ground or a selected building. B cancels the box and preserves the previous selection; A is ignored while dragging. A committed drag cancels a pending move/build mode and returns to normal command mode. With a Barracks selected, tap L to cancel its oldest queued unit and refund 75% of its mineral and gas cost.
-- Tap R to select the Marine, Firebat, and Medic group. Holding R during a box drag only speeds cursor movement; tap R separately after release to select the group. With a Barracks selected, tap R to cycle its selected training unit.
-- START or SELECT opens the pause screen. There, A resumes, B saves, L loads, and R restarts.
-- On the title screen, A starts a mission and B loads the last save. On the result screen, A retries and B returns to the title.
+- Tap R (press and release without the D-pad) to select the Marine, Firebat, and Medic group. Holding R to speed the cursor never changes the selection. With a Barracks selected, tap R to cycle its selected training unit.
+- START or SELECT opens the pause screen. Choose Resume, Save, Load, or Restart with the D-pad and A, or use the shortcuts: B saves, L loads, R restarts, and START resumes. A save is confirmed on the pause screen.
+- On the title screen, choose New Mission or Load Saved Game with the D-pad and A; B or L also loads. On the result screen, A retries and B returns to the title.
+
+The bottom panel always names what A will do at the cursor (for example SELECT, TRAIN, DESELECT, ATTACK, or PLACE), and the cursor changes with it: green arrows while a move is armed, a red reticle for attack-move or an enemy target, and a structure footprint during placement. Orders, attacks, and placements leave a short green, red, or gold marker where they were issued.
 
 Box selection requires a ROM rebuilt from the updated source; an older copied ROM does not include it.
 
@@ -30,7 +33,7 @@ not affect combat or saves.
 When a mission ends, the last explosions finish before the result panel
 opens; buttons on the result screen still respond immediately.
 
-SCVs automatically gather mineral trips of up to eight minerals and return to the nearest Command Center. To build, select an SCV, open B, choose a structure, move to the site, and press A. Barracks require a completed Supply Depot; Academies require a completed Barracks. Refineries can only be placed on one of the two marked geysers. Select a worker and press A on a completed Refinery to assign gas harvesting, or select the Refinery and press A to assign an idle worker.
+SCVs automatically gather mineral trips of up to eight minerals and return to the nearest Command Center. To build, select an SCV, open B, choose a structure, move to the site, and press A. Sites snap to an 8-pixel grid and a Refinery snaps to its geyser. The footprint is green when A will place it, red when the site is blocked, and gold when the site is clear but the build still needs minerals, a prerequisite, or a selected SCV; the panel below names the reason. Barracks require a completed Supply Depot; Academies require a completed Barracks. Refineries can only be placed on one of the two marked geysers. Select a worker and press A on a completed Refinery to assign gas harvesting, or select the Refinery and press A to assign an idle worker.
 
 Command Centers train SCVs. Barracks train Marines by default; select a Barracks and press R to choose Firebat or Medic. Production queues hold five units and reserve supply while training. A completed Depot provides eight displayed supply. The Engineering Bay offers up to two weapon and armor upgrades.
 
