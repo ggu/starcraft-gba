@@ -93,12 +93,17 @@ void audio_play_music(int track,int loop);
 /* Current or pending music track, or -1 when silent. */
 int audio_music_track(void);
 /* Unused VRAM between the two mode-4 pages: 0x06009600-0x06009FFF. The
- * first 416 bytes hold the two 176-sample mix halves and a zero guard that a
- * late VBlank interrupt lets DMA run into; the rest is free for
- * halfword-sized presentation state. */
+ * first GBA_AUDIO_MIX_BYTES belong to the sampled-audio mixer:
+ *   +0    mix double buffer, 2 x 176 bytes + 64-byte zero guard (DMA1, Direct Sound A)
+ *   +416  music double buffer, 2 x 176 bytes + 64-byte zero guard (DMA2, Direct Sound B)
+ *   +832  voice decode scratch, 4 x 176 bytes
+ *   +1536 stream decoder states, 5 x 12 bytes (4 voices, then music), + 4 spare
+ * A late VBlank interrupt lets DMA run into a guard, which is never written
+ * and reads as silence. The rest is free for halfword-sized presentation
+ * state. */
 #define GBA_AUDIO_ARENA 0x06009600u
 #define GBA_AUDIO_ARENA_BYTES 2560u
-#define GBA_AUDIO_MIX_BYTES 416u
+#define GBA_AUDIO_MIX_BYTES 1600u
 void game_init(void);
 void game_update(u16 held,u16 pressed);
 void game_render(void);

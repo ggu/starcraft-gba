@@ -3664,12 +3664,45 @@ build/StarCraft-Protoss-P7-Typed-Probe-GBA.gba: build/starcraft-protoss-p7-typed
 .PHONY: protoss-p7-typed-probe
 protoss-p7-typed-probe: build/StarCraft-Protoss-P7-Typed-Probe-GBA.gba
 
-# Audio: mixer/sequencer checks, presentation hook fixtures, and a long
-# controller run whose state hash must not change when the audio observer is
-# compiled out (GAME_AUDIO_OFF).
-AUDIO_TEST_DEPS := common/gba.c common/gba.h common/audio_mixer.h $(STARCRAFT) $(wildcard starcraft/*.h) Makefile
-build/test-audio-mixer: tests/audio_mixer.c common/audio_mixer.h common/gba.h | build
+# Audio: codec and mixer/sequencer checks, a Python/C codec cross check on
+# synthetic PCM, presentation hook fixtures, and a long controller run whose
+# state hash must not change when the audio observer is compiled out
+# (GAME_AUDIO_OFF).
+AUDIO_TEST_DEPS := common/gba.c common/gba.h common/audio_mixer.h common/audio_codec.h $(STARCRAFT) $(wildcard starcraft/*.h) Makefile
+AUDIO_CODEC_TEST_DEPS := common/audio_codec.h tests/audio_codec_ref.h common/gba.h
+build/test-audio-codec: tests/audio_codec.c $(AUDIO_CODEC_TEST_DEPS) | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+build/test-audio-mixer: tests/audio_mixer.c common/audio_mixer.h $(AUDIO_CODEC_TEST_DEPS) | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+
+# Both directions on generated vectors: Python-encoded streams decode with the
+# C decoder, C-encoded streams with the pack tool's reference decoder. The
+# codec pads to whole 8-sample blocks with zeros (NAME.pcm8).
+AUDIO_CROSS_DIR := build/audio-codec-cross
+.PHONY: test-audio-codec-cross
+test-audio-codec-cross: build/test-audio-codec tests/audio_codec_vectors.py tools/sc64_audio_pack.py
+	rm -rf $(AUDIO_CROSS_DIR)
+	$(PYTHON) tests/audio_codec_vectors.py $(AUDIO_CROSS_DIR)
+	set -e; for pcm in $(AUDIO_CROSS_DIR)/*.pcm; do \
+	  base=$${pcm%.pcm}; n=$$(wc -c < $$pcm | tr -d ' '); padded=$$(( (n + 7) / 8 * 8 )); \
+	  $(PYTHON) tools/sc64_audio_pack.py --encode-pcm $$pcm --out $$base.py.stream > $$base.py.json; \
+	  ./build/test-audio-codec decode $$base.py.stream $$padded $$base.c.pcm; \
+	  cmp $$base.pcm8 $$base.c.pcm; \
+	  ./build/test-audio-codec encode $$pcm $$base.c.stream > $$base.c.json; \
+	  $(PYTHON) tools/sc64_audio_pack.py --decode-stream $$base.c.stream --samples $$padded --out $$base.py.pcm; \
+	  cmp $$base.pcm8 $$base.py.pcm; \
+	  if cmp -s $$base.py.stream $$base.c.stream; then same=identical; else same=different; fi; \
+	  echo "  $$(basename $$base): $$n samples, python $$(wc -c < $$base.py.stream | tr -d ' ') bytes, C $$(wc -c < $$base.c.stream | tr -d ' ') bytes, streams $$same"; \
+	done
+	@echo "audio codec cross check: Python and C streams decode identically both ways"
+
+# Optional private check, not part of ./dev test: the C decoder reproduces the
+# generated bank's manifest pcm_sha256 (needs a format-2 bank in SC64_AUDIO_DIR).
+build/test-audio-bank: tests/audio_bank.c common/audio_codec.h common/gba.h $(SC64_AUDIO_DIR)/sc64_audio_generated.h | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon -DSC64_AUDIO_IMPORTED -I$(SC64_AUDIO_DIR) $< -o $@
+.PHONY: test-audio-bank
+test-audio-bank: build/test-audio-bank
+	./build/test-audio-bank $(SC64_AUDIO_DIR)/sc64_audio_generated.bin $(SC64_AUDIO_DIR)/sc64_audio_manifest.json
 
 define GAME_AUDIO_PROFILE
 build/test-game-audio-$(1)-on: tests/game_audio_run.c $$(AUDIO_TEST_DEPS) $(3) | build
@@ -3689,7 +3722,8 @@ $(eval $(call GAME_AUDIO_PROFILE,default,,))
 $(eval $(call GAME_AUDIO_PROFILE,unified,$(UNIFIED_FLAGS),$(RACES_INPUTS)))
 
 .PHONY: test-audio
-test-audio: build/test-audio-mixer test-game-audio-default
+test-audio: build/test-audio-codec build/test-audio-mixer test-audio-codec-cross test-game-audio-default
+	./build/test-audio-codec
 	./build/test-audio-mixer
 test-starcraft: test-audio
 test-unified: test-game-audio-unified

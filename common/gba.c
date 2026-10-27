@@ -1044,17 +1044,29 @@ if(noise_frames>0&&!--noise_frames)REG16(0x04000078)=0;
 #include "sc64_audio_generated.h"
 #ifdef GBA_HOST
 /* Host builds queue requests but never mix the bank. */
-static const s8 sc64_audio_blob[2];
+static const u8 sc64_audio_blob[4];
 #else
 /* Linked from common/audio_bank.S; private data under .local/ only. */
-extern const s8 sc64_audio_blob[];
+extern const u8 sc64_audio_blob[];
 #endif
 static const AudioBank audio_bank={
  sc64_audio_blob,sc64_audio_sample_offset,sc64_audio_sample_length,SC64_AUDIO_SAMPLE_COUNT,
  sc64_audio_music_offset,sc64_audio_music_frames,SC64_AUDIO_MUSIC_TRACKS
 };
+#ifndef SC64_AUDIO_FORMAT
+#error "sc64_audio_generated.h predates codec format 2; rerun tools/sc64_audio_pack.py"
+#else
+_Static_assert(SC64_AUDIO_FORMAT==AUDIO_CODEC_FORMAT,"audio bank and decoder formats differ");
+#endif
 _Static_assert(SC64_AUDIO_SAMPLES_PER_FRAME==AUDIO_FRAME_SAMPLES,"bank and mixer frame sizes differ");
-_Static_assert(GBA_AUDIO_MIX_BYTES>=2*AUDIO_FRAME_SAMPLES+64,"mix buffer lacks its guard");
+/* Mix and music double buffers with their guards, the decode scratch, then
+ * the decoder states (see the arena layout in gba.h). */
+#define AUDIO_DOUBLE_BYTES (2*AUDIO_FRAME_SAMPLES+64)
+#define AUDIO_DECODER_OFFSET (2*AUDIO_DOUBLE_BYTES+AUDIO_VOICES*AUDIO_FRAME_SAMPLES)
+#ifndef GBA_HOST
+_Static_assert(sizeof(AudioDecoder)==12,"decoder state is not 12 bytes");
+_Static_assert(GBA_AUDIO_MIX_BYTES>=AUDIO_DECODER_OFFSET+AUDIO_DECODERS*sizeof(AudioDecoder),"audio arena lacks a buffer, guard or decoder");
+#endif
 static AudioMixer audio_mixer;
 int audio_sampled_available(void){return 1;}
 void audio_play_sample(u16 sample,u8 priority,u8 kind){
@@ -1078,33 +1090,38 @@ int audio_music_track(void){
 #ifdef SC64_TILE_RENDERER
 #error "The audio buffers use the gap between the two mode-4 pages"
 #endif
-/* Two contiguous 176-sample halves between the mode-4 pages (VRAM
- * 0x06009600-0x06009FFF is unused). DMA1 plays them back to back and is
- * re-armed at the first half every second frame; each VBlank mixes the half
- * that just finished. Both halves stay halfword-written; the zero guard after
- * them is never written, so a delayed re-arm reads silence. */
+/* Two double buffers between the mode-4 pages (VRAM 0x06009600-0x06009FFF
+ * is unused), each two contiguous 176-sample halves: DMA1 plays the mix on
+ * Direct Sound A, DMA2 the music on Direct Sound B. Both DMAs run back to
+ * back and are re-armed at their first half every second frame; each VBlank
+ * mixes and decodes into the halves that just finished. Everything stays
+ * halfword-written; the zero guard after each pair is never written, so a
+ * delayed re-arm reads silence. Voices decode into the scratch slots. */
 #define AUDIO_MIX_BUFFER ((volatile u16*)GBA_AUDIO_ARENA)
+#define AUDIO_MUSIC_BUFFER ((volatile u16*)(GBA_AUDIO_ARENA+AUDIO_DOUBLE_BYTES))
+#define AUDIO_SCRATCH ((volatile u16*)(GBA_AUDIO_ARENA+2*AUDIO_DOUBLE_BYTES))
+/* Word and halfword fields only, so VRAM takes every store. */
+#define AUDIO_DECODER_STATES ((AudioDecoder*)(GBA_AUDIO_ARENA+AUDIO_DECODER_OFFSET))
 volatile u32 audio_irq_cycles,audio_irq_peak,audio_irq_frames;
-static u8 audio_half;
-static void audio_music_dma(const s8 *data){
- REG32(0x040000d0)=0;
- if(!data){REG16(0x04000082)=(u16)((REG16(0x04000082)&~0x3000)|0x8000);return;}
- REG32(0x040000c8)=(u32)data;REG32(0x040000cc)=0x040000a4;
- REG32(0x040000d0)=0xb6400000u;
- REG16(0x04000082)|=0x3000;
-}
+/* audio_music_clear: the mixer zeroed one music half when music stopped;
+ * the other half still holds the last frame and is zeroed next VBlank. */
+static u8 audio_half,audio_music_clear;
 /* Thumb, from ROM: the IWRAM reserve is too small for the mixer. */
 static void __attribute__((noinline)) audio_vblank(void){
  u32 start=gba_clock();
- volatile u16 *mix;
+ u32 half=0;
  if(audio_half){
   REG32(0x040000c4)=0;REG32(0x040000bc)=(u32)AUDIO_MIX_BUFFER;REG32(0x040000c4)=0xb6400000u;
-  mix=AUDIO_MIX_BUFFER+AUDIO_FRAME_SAMPLES/2;
- } else mix=AUDIO_MIX_BUFFER;
+  REG32(0x040000d0)=0;REG32(0x040000c8)=(u32)AUDIO_MUSIC_BUFFER;REG32(0x040000d0)=0xb6400000u;
+  half=AUDIO_FRAME_SAMPLES/2;
+ }
  audio_half^=1;
- int music=audio_mixer_frame(&audio_mixer,&audio_bank,mix);
- if(music==AUDIO_MUSIC_RESTART)audio_music_dma(audio_mixer_music_data(&audio_mixer,&audio_bank));
- else if(music==AUDIO_MUSIC_SILENCE)audio_music_dma(0);
+ int music=audio_mixer_frame(&audio_mixer,&audio_bank,AUDIO_MIX_BUFFER+half,AUDIO_SCRATCH,AUDIO_MUSIC_BUFFER+half);
+ if(audio_music_clear&&audio_mixer.music_track==AUDIO_MUSIC_NONE){
+  volatile u32 *z=(volatile u32*)(volatile void*)(AUDIO_MUSIC_BUFFER+half);
+  for(u32 i=0;i<AUDIO_FRAME_SAMPLES/4;i++)z[i]=0;
+ }
+ audio_music_clear=music==AUDIO_MUSIC_SILENCE;
  u32 spent=gba_clock()-start;
  audio_irq_cycles+=spent;++audio_irq_frames;
  if(spent>audio_irq_peak)audio_irq_peak=spent;
@@ -1117,15 +1134,17 @@ __attribute__((target("arm"),noinline)) static void audio_irq(void){
  *(volatile u16*)0x03007ff8|=flags;
 }
 static void audio_hw_init(void){
- audio_mixer_reset(&audio_mixer);
+ audio_mixer_reset(&audio_mixer,AUDIO_DECODER_STATES);
  for(u32 i=0;i<GBA_AUDIO_MIX_BYTES/2;i++)AUDIO_MIX_BUFFER[i]=0;
- audio_half=0;
- /* PSG 100%, Direct Sound A 100% and B 50%, both on timer 0, both FIFOs reset;
-  * music enables B's outputs when a track starts. */
- REG16(0x04000082)=0x0002|0x0004|0x0300|0x0800|0x8000;
+ audio_half=0;audio_music_clear=0;
+ /* PSG 100%, Direct Sound A 100% and B 50%, both on timer 0, both FIFOs
+  * reset, both output to left and right; silent music is a zero buffer. */
+ REG16(0x04000082)=0x0002|0x0004|0x0300|0x3000|0x0800|0x8000;
  REG16(0x04000102)=0;REG16(0x04000100)=(u16)(65536u-280896u/AUDIO_FRAME_SAMPLES);REG16(0x04000102)=0x0080;
  REG32(0x040000c4)=0;REG32(0x040000bc)=(u32)AUDIO_MIX_BUFFER;REG32(0x040000c0)=0x040000a0;
  REG32(0x040000c4)=0xb6400000u;
+ REG32(0x040000d0)=0;REG32(0x040000c8)=(u32)AUDIO_MUSIC_BUFFER;REG32(0x040000cc)=0x040000a4;
+ REG32(0x040000d0)=0xb6400000u;
  *(volatile u32*)0x03007ffc=(u32)audio_irq;
  REG16(0x04000004)|=0x0008;
  REG16(0x04000200)=0x0001;
