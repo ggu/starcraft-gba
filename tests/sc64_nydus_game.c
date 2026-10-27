@@ -319,6 +319,40 @@ static void concurrent_passengers_are_deterministic(void)
     printf("concurrent transit: 6 passengers, replay identical\n");
 }
 
+/* Placement is not movement: a passenger may separate from a stacked unit
+ * during ordinary movement, but an exit point must never retain that overlap. */
+static void strict_exit_placement_rejects_overlap_escape(void)
+{
+    int h, blocker, px = -1, py = -1, radius, found = 0;
+    launch_with_canals();
+    h = side_hydra(0); blocker = side_hydra(1);
+    radius = sc64_game_unit_collision_radius(U_HYDRALISK);
+    assert(radius >= 5);
+    for (unsigned n = 0; n < SC64_NYDUS_EXIT_CANDIDATES && !found; ++n) {
+        int x, y, clear = 1;
+        if (!sc64_nydus_exit_candidate(n, b[ex].x, b[ex].y, &x, &y) ||
+            x < 96 || y < 96 || x >= WORLD_W - 96 || y >= WORLD_H - 96 ||
+            !is_traversable(x / 16, y / 16, -1)) continue;
+        for (int i = 0; i < MAX_UNITS && clear; ++i)
+            if (i != h && i != blocker && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) &&
+                !sc64_race_unit_flying(u[i].type) &&
+                FAST_ABS(u[i].x - x) < radius + 12 && FAST_ABS(u[i].y - y) < radius + 12)
+                clear = 0;
+        if (clear) { px = x; py = y; found = 1; }
+    }
+    assert(found);
+    u[h].x = (short)(px + radius - 3); u[h].y = (short)py;
+    b[ent].x = (short)(px + 48); b[ent].y = (short)py;
+    u[blocker].x = (short)(px + radius - 1); u[blocker].y = (short)py;
+    invalidate_path_grid();
+    sc64_unit_buckets_begin();
+    assert(sc64_unit_bucket_active && is_traversable(px / 16, py / 16, -1));
+    assert(unit_step_clear(&u[h], px, py));
+    assert(!race_nydus_exit_open(&u[h], px, py));
+    sc64_unit_buckets_end();
+    printf("strict exit: separating overlap rejected for placement\n");
+}
+
 /* Surround the exit with structures: the passenger holds at the entrance
  * with its order intact, then leaves as soon as one blocker is destroyed. */
 static void blocked_exit_waits_then_retries(void)
@@ -518,6 +552,12 @@ static void save_resume_and_malformed_saves(void)
     bad = good;
     rewrite_building(&bad, ex, move_building);
     reject_save_without_live_mutation(&bad);
+    /* The unreferenced second pair must not masquerade as destroyed. Moving
+     * the first pair would already reject its passengers' orphaned orders. */
+    bad = good;
+    rewrite_building(&bad, ent2, move_building);
+    rewrite_building(&bad, ex2, move_building);
+    reject_save_without_live_mutation(&bad);
     /* A whole destroyed pair is a valid save; its rows bind as inactive. */
     bad = good;
     rewrite_building(&bad, ex2, remove_building);
@@ -525,7 +565,7 @@ static void save_resume_and_malformed_saves(void)
     save_write(&bad, sizeof(bad), SAVE_VERSION);
     assert(race_load_game());
     assert(!race_nydus.link[1].active && race_nydus.link[0].active);
-    printf("save/resume: 4 passengers resumed identically; 5 malformed saves rejected\n");
+    printf("save/resume: 4 passengers resumed identically; 6 malformed saves rejected\n");
 }
 
 /* A save made while the source belongs to another mission cannot carry Nydus
@@ -580,6 +620,7 @@ int main(void)
     _Static_assert(ORDER_NYDUS_ENTER <= 15, "packed unit order field is four bits");
     _Static_assert(SC_RB_COUNT <= 64, "packed building type field is six bits");
     single_passenger_transits();
+    strict_exit_placement_rejects_overlap_escape();
     eligibility_and_unavailable_destination();
     concurrent_passengers_are_deterministic();
     blocked_exit_waits_then_retries();

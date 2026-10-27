@@ -301,8 +301,11 @@ static void race_nydus_clear_unit_references(int passenger)
 
 static int race_nydus_exit_open(void *ctx, int x, int y)
 {
+    /* During an order update the bounded bucket is live. Fail closed if it
+     * is unavailable; do not do a full pool scan for each exit candidate. */
     return x >= 0 && y >= 0 && x < WORLD_W && y < WORLD_H &&
-        is_traversable(x / 16, y / 16, -1) && unit_step_clear((const Unit *)ctx, x, y);
+        is_traversable(x / 16, y / 16, -1) && sc64_unit_bucket_active &&
+        sc64_unit_bucket_placement_clear((const Unit *)ctx, x, y);
 }
 
 static int race_nydus_place(int passenger, int exit, int *px, int *py)
@@ -462,8 +465,18 @@ static int race_nydus_save_candidate_valid(const RaceSave *candidate, int width,
     if (resolved) {
         for (int i = 0; i < MAX_BUILDINGS; ++i) {
             Building q;
-            if (!race_save_decode_building(candidate, (unsigned)i, &q) ||
-                !race_nydus_collect(source, pair_count, &q, i, views, &count)) return 0;
+            int source_position = 0;
+            if (!race_save_decode_building(candidate, (unsigned)i, &q)) return 0;
+            if (q.alive && (q.type == B_NYDUS_CANAL || q.raw_type == SC64_NYDUS_RAW)) {
+                if (q.type != B_NYDUS_CANAL || q.raw_type != SC64_NYDUS_RAW) return 0;
+                for (unsigned j = 0; j < 2u * pair_count; ++j)
+                    if (source[j].x == q.x && source[j].y == q.y) {
+                        source_position = 1;
+                        break;
+                    }
+                if (!source_position) return 0;
+            }
+            if (!race_nydus_collect(source, pair_count, &q, i, views, &count)) return 0;
         }
         if (!sc64_nydus_bind(source, pairs, pair_count, views, count, 0, &s)) return 0;
     }

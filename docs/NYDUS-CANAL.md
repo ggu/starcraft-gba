@@ -42,7 +42,7 @@ located, so any N64-specific difference remains unknown.
 | Command | `order_Follow` (4762–4766): right-click Follow on a canal becomes EnterNydusCanal | Press A on an owned, linked endpoint with units selected (the GBA smart command). Ineligible selected units are ignored. With no eligible unit, A selects the building as before. |
 | Approach | `move_to_target_reset`, then wait until at the move target | Walk to the nearest walkable point on the canal's contact ring, then enter within ±32 px of its centre. **GBA policy:** imported-map routes cannot target a blocked centre. |
 | Transit | `order_EnterNydusCanal` (6724–6758): hide, place near the exit and finish in one order step | Atomic in the passenger's order step. No frame, save, query or render ever sees a unit inside a canal, so no cargo storage exists. |
-| Exit placement | `find_unit_placement(u, exit, false)` within ±128 source px (16692–16694) | ±64 GBA px (the same box at half scale), with 8 px rings searched nearest first. **GBA policy:** the candidate order is authored, not OpenBW's. |
+| Exit placement | `find_unit_placement(u, exit, false)` within ±128 source px (16692–16694) | ±64 GBA px (the same box at half scale), with 8 px rings searched nearest first and strict destination clearance, including when the passenger starts overlapped. **GBA policy:** the candidate order is authored, not OpenBW's. |
 | Blocked exit | Failed placement restores the unit and retries next step | The passenger holds at the entrance with its order intact and retries. **GBA bound:** after one failed search at an exit in a tick, later passengers there with an equal or larger radius wait one tick. |
 | Simultaneous passengers | Unit-list order | Ascending unit slot. Each placement sees earlier passengers' new positions. |
 | Targeting during transit | `hide_unit` clears visible units' references (17045–17071) | Attack-target and Consume orders on the passenger end. Attack-move, idle and move acquisitions drop it. Direct-attack references clear. Selection is kept (`hide_unit(u, false)`). |
@@ -93,10 +93,10 @@ Measured on the Z7 controller profile, with and without the flag:
 
 | Resource | Off | On | Cost | Guard |
 | --- | --- | --- | --- | --- |
-| ROM text | 20,086,908 B | 20,092,020 B | +5,112 B | ROM ≤ 32 MiB |
+| ROM text | 20,086,668 B | 20,092,020 B | +5,352 B | ROM ≤ 32 MiB |
 | Initialized data | 492 B | 500 B | +8 B | — |
 | BSS | 252,944 B | 253,016 B | +72 B | end `0x0203de00` → `0x0203de50` < `0x0203e000` |
-| IWRAM | end `0x03004cd0` | end `0x03004d08` | +56 B | < `0x03005000` |
+| IWRAM | end `0x03004cd0` | end `0x03004da8` | +216 B | < `0x03005000` |
 | SRAM payload | 16,296 B | 16,296 B | 0 | ≤ 16,368 B |
 
 Runtime state is a 20-byte link table, the installed source pointer and pair
@@ -117,8 +117,11 @@ ordinary input under ASan and UBSan. It covers single transit,
 eligibility, unavailable and unlinked destinations, six concurrent
 passengers with replay-identical exits, a blocked exit that holds and then
 releases, endpoint death and removal, slot reuse, ownership transfer,
-mid-approach save/resume, five malformed saves, a foreign-mission source,
-and hook-resolved fresh-boot loads. This is host proof only.
+mid-approach save/resume, six malformed saves, a foreign-mission source,
+and hook-resolved fresh-boot loads. Extra regression cases reject separating
+overlap at an exit and moving both endpoints of the unreferenced second pair;
+the latter must fail before live state changes. A genuinely dead pair still
+loads successfully. This is host proof only.
 
 The probe ROM boots the same flag-on profile with an embedded key tape and
 reports through the mGBA debug log; no debugger reads or writes state. In
@@ -129,12 +132,19 @@ fully blocked return trip. Results are emulated cycles. A vblank is
 | Phase | Frame avg | Nydus service avg / peak |
 | --- | --- | --- |
 | Z7 opening, no canals (240 frames) | 996,603 | 0 |
-| Six passengers approaching (134) | 1,340,984 | 20,930 / 31,688 |
-| Transfer frames (6) | 1,213,683 | 35,919 / 45,670 |
-| Six passengers at a blocked exit (900) | 1,122,709 | 69,416 / 70,792 |
+| Six passengers approaching (134) | 1,340,981 | 21,698 / 32,445 |
+| Transfer frames (6) | 1,213,740 | 36,437 / 47,025 |
+| Six passengers at a blocked exit (900) | 1,122,709 | 69,979 / 71,409 |
 
 Approach frames include ordinary movement and a camera move, so the
 whole-frame difference is not a Nydus cost. Before the search bound and the
 division-free scan, the blocked case cost 1.13 M cycles of Nydus service
 per frame. This is emulator evidence only. No physical GBA was tested,
 no fresh-process SRAM continuation was run, and no Z8 mission was played.
+
+The table above was rerun after the strict-clearance and displaced-pair fixes
+on 2026-10-27. All six transfers, blocked passengers, and the in-process save
+rebind passed. The strict query shares the bounded bucket traversal with
+ordinary collision checks; it adds no full-pool scan per exit candidate.
+Feature-off preprocessing remains byte-identical. Local evidence is retained
+under `.local/build/z7-live-20261027/pr67-fixed-root/`, outside the source tree.
