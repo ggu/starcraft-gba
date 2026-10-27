@@ -2410,6 +2410,16 @@ allocate a projectile pool or establish any frame-rate improvement. See
 remaining qualification work.
 
 
+## Z8 authenticated source descriptor
+
+`tools/sc64_z8_pack.py` authenticates previously retained Z8 scenario data
+and writes a complete numeric descriptor to a new ignored
+`.local/build/z8-*` path. Its `verify` command compares all rows with the
+authenticated source, rather than trusting a self-reported fingerprint.
+It does not regenerate shared banks or enable Z8 gameplay. See the
+[Z8 source foundation audit](audits/2026-10-27-z8-source-foundation/README.md)
+for explicit commands, provenance, supported data and remaining runtime work.
+
 ## Experimental P7 menu and prevalidated tick
 
 After preparing the current private P6/P7 inputs, build separate Homeland
