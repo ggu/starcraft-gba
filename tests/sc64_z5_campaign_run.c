@@ -26,6 +26,10 @@ static int replay_last_keys = -1;
 static int run_limit = Z5_RUN_LIMIT;
 static int deployed;
 static int order_count;
+#ifdef SC64_DIRECT_ATTACK
+static int controller_last_kerrigan_attackmove_x = -1;
+static int controller_last_kerrigan_attackmove_y = -1;
+#endif
 static int controller_retreat_order;
 static int controller_retreat_requested;
 static int cloak_controller_busy;
@@ -634,6 +638,31 @@ static void move_cursor(int x, int y)
     }
     step(0);
 }
+/* Direct-attack profiles interpret clicks on visible actors as Attack Target.
+ * Preserve this controller's intended Attack-Move behavior by choosing
+ * a nearby reachable open point outside that target-pick radius. This reads
+ * visible targeting/path state only and emits the same ordinary UI command. */
+static int controller_attackmove_click_point(int sx,int sy,int x,int y,int *out_x,int *out_y)
+{
+#ifdef SC64_DIRECT_ATTACK
+    if(sc64_direct_attack_find_target(x,y)>=0) {
+        static const int dirs[8][2]={{1,0},{-1,0},{0,1},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1}};
+        for(int radius=32;radius<=96;radius+=16) for(int d=0;d<8;d++) {
+            int px=x+dirs[d][0]*radius,py=y+dirs[d][1]*radius,nx,ny;
+            if(px<0||py<0||px>=WORLD_W||py>=WORLD_H)continue;
+            if(sc64_direct_attack_find_target(px,py)>=0)continue;
+            if(!is_traversable(px/16,py/16,-1))continue;
+            if(!path_next_tile(sx,sy,px,py,&nx,&ny))continue;
+            *out_x=px;*out_y=py;return 1;
+        }
+        return 0;
+    }
+#else
+    (void)sx; (void)sy;
+#endif
+    *out_x=x;*out_y=y;return 1;
+}
+
 
 /* Label the current walk grid after a source doodad transition.  This is test
  * steering only; it does not write game state or substitute for game pathing. */
@@ -1031,16 +1060,43 @@ static int order_combat_group_to(int x, int y, int zerglings_only)
     (void)zerglings_only;
     if (select_zerglings_only() < 1) return 0;
     if (screen != SCREEN_PLAY || won || lost) return 0;
+    int sx=0,sy=0,nsel=0,command_x=x,command_y=y;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected){sx+=u[i].x;sy+=u[i].y;nsel++;}
+    if(nsel){sx/=nsel;sy/=nsel;}
+    if(!controller_attackmove_click_point(sx,sy,x,y,&command_x,&command_y)) {
+        fprintf(stderr,"Z5 attackmove clear point unavailable at%d,%d; skipping command\n",x,y);
+        return 0;
+    }
     tap(KEY_B);                 /* Normal command menu. */
     if (screen != SCREEN_PLAY || won || lost) return 0;
     tap(KEY_DOWN);              /* Attack Move is the second command. */
     tap(KEY_A);
     if (screen != SCREEN_PLAY || won || lost) return 0;
     if (mode != MODE_ATTACK) return 0;
-    move_cursor(x, y);
+    move_cursor(command_x, command_y);
+#ifdef SC64_DIRECT_ATTACK
+    {
+        int checked_x=command_x,checked_y=command_y;
+        if(!controller_attackmove_click_point(sx,sy,command_x,command_y,&checked_x,&checked_y)) {
+            fprintf(stderr,"Z5 attackmove point became targetable; skipping command at%d,%d\n",command_x,command_y);
+            return 0;
+        }
+        if(checked_x!=command_x||checked_y!=command_y) {
+            command_x=checked_x;command_y=checked_y;move_cursor(command_x,command_y);
+        }
+    }
+#endif
     if (screen != SCREEN_PLAY || won || lost || controller_retreat_requested) return 0;
     tap(KEY_A);
     if (screen != SCREEN_PLAY || won || lost) return 0;
+#ifdef SC64_DIRECT_ATTACK
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected&&u[i].owner==SIDE&&
+        u[i].order!=ORDER_ATTACK_MOVE) {
+        fprintf(stderr,"Z5 combat Attack-Move rejected slot%d order%d target%d goal%d,%d\n",
+                i,u[i].order,u[i].target,u[i].tx,u[i].ty);
+        return 0;
+    }
+#endif
     ++order_count;
     return 1;
 }
@@ -1177,7 +1233,7 @@ static int order_kerrigan_move_to(int x, int y)
 
 static int order_kerrigan_attack_move_to(int x, int y)
 {
-    int k = kerrigan_slot();
+    int k = kerrigan_slot(),command_x=x,command_y=y;
     if (k < 0) return 0;
     if (menu_open) tap(KEY_B);
     if (mode != MODE_NORMAL) {
@@ -1195,15 +1251,41 @@ static int order_kerrigan_attack_move_to(int x, int y)
         if (!u[k].selected || selected_count() != 1 || selected_building >= 0)
             return 0;
     }
+    if(!controller_attackmove_click_point(u[k].x,u[k].y,x,y,&command_x,&command_y)) {
+        fprintf(stderr,"Z5 Kerrigan attackmove clear point unavailable at%d,%d; skipping command\n",x,y);
+        return 0;
+    }
     tap(KEY_B);
     if (screen != SCREEN_PLAY || won || lost) return 0;
     tap(KEY_DOWN);
     tap(KEY_A);
     if (screen != SCREEN_PLAY || won || lost || mode != MODE_ATTACK) return 0;
-    move_cursor(x, y);
+    move_cursor(command_x, command_y);
+#ifdef SC64_DIRECT_ATTACK
+    {
+        int checked_x=command_x,checked_y=command_y;
+        if(!controller_attackmove_click_point(u[k].x,u[k].y,command_x,command_y,&checked_x,&checked_y)) {
+            fprintf(stderr,"Z5 Kerrigan attackmove point became targetable; skipping command at%d,%d\n",command_x,command_y);
+            return 0;
+        }
+        if(checked_x!=command_x||checked_y!=command_y) {
+            command_x=checked_x;command_y=checked_y;move_cursor(command_x,command_y);
+        }
+    }
+#endif
     if (screen != SCREEN_PLAY || won || lost || controller_retreat_requested) return 0;
     tap(KEY_A);
     if (screen != SCREEN_PLAY || won || lost) return 0;
+#ifdef SC64_DIRECT_ATTACK
+    if(u[k].order!=ORDER_ATTACK_MOVE) {
+        fprintf(stderr,"Z5 Kerrigan Attack-Move rejected goal%d,%d actual order%d goal%d,%d\n",
+                command_x,command_y,u[k].order,u[k].tx,u[k].ty);
+        return 0;
+    }
+    /* Capture the exact destination normalized by ordinary issue_order. */
+    controller_last_kerrigan_attackmove_x=u[k].tx;
+    controller_last_kerrigan_attackmove_y=u[k].ty;
+#endif
     ++order_count;
     return 1;
 }
@@ -1668,23 +1750,53 @@ int main(int argc, char **argv)
         if (!retreating && target_trigger == 0) {
             int trap_slot = kerrigan_detecting_trap_slot();
             if (trap_slot >= 0) {
+#ifdef SC64_DIRECT_ATTACK
+                if (terminal_trap_slot != trap_slot ||
+                    terminal_trap_raw != b[trap_slot].raw_type ||
+                    u[k].order != ORDER_ATTACK_MOVE ||
+                    controller_last_kerrigan_attackmove_x < 0 ||
+                    u[k].tx != controller_last_kerrigan_attackmove_x ||
+                    u[k].ty != controller_last_kerrigan_attackmove_y ||
+                    sc64_direct_attack_find_target(u[k].tx,u[k].ty)>=0) {
+#else
                 if (terminal_trap_slot != trap_slot ||
                     terminal_trap_raw != b[trap_slot].raw_type ||
                     dist2(u[k].tx,u[k].ty,b[trap_slot].x,b[trap_slot].y) > 24*24) {
+#endif
                     int accepted = order_kerrigan_attack_move_to(
                         b[trap_slot].x,b[trap_slot].y);
+#ifdef SC64_DIRECT_ATTACK
+                    accepted = accepted && u[k].order == ORDER_ATTACK_MOVE &&
+                        u[k].tx == controller_last_kerrigan_attackmove_x &&
+                        u[k].ty == controller_last_kerrigan_attackmove_y;
+#else
                     accepted = accepted && u[k].order == ORDER_ATTACK_MOVE &&
                         u[k].tx == b[trap_slot].x && u[k].ty == b[trap_slot].y;
+#endif
                     fprintf(stderr,"Z5 terminal gate0 detector response slot=%d raw=%u xy=%d,%d hp=%d accepted=%d source_goal=%d,%d frame=%u\n",
                             trap_slot,b[trap_slot].raw_type,b[trap_slot].x,
                             b[trap_slot].y,b[trap_slot].hp,accepted,
                             source_goal_x,source_goal_y,(unsigned)frame);
+#ifdef SC64_DIRECT_ATTACK
+                    if(accepted) {
+                        target_changed = 0;
+                        reset_target_progress();
+                        terminal_trap_slot=trap_slot;
+                        terminal_trap_raw=b[trap_slot].raw_type;
+                        target_force_attack=1;
+                    } else {
+                        target_force_attack=0;
+                    }
+#else
                     target_changed = 0;
                     reset_target_progress();
+#endif
                 }
+#ifndef SC64_DIRECT_ATTACK
                 terminal_trap_slot=trap_slot;
                 terminal_trap_raw=b[trap_slot].raw_type;
                 target_force_attack=1;
+#endif
             } else if (terminal_trap_slot >= 0) {
                 int same_trap=terminal_trap_slot<MAX_BUILDINGS &&
                     b[terminal_trap_slot].alive &&
@@ -1747,13 +1859,32 @@ int main(int argc, char **argv)
                     if (trap_slot >= 0) {
                         accepted = order_kerrigan_attack_move_to(
                             b[trap_slot].x,b[trap_slot].y);
+#ifdef SC64_DIRECT_ATTACK
+                        accepted = accepted && u[k].order == ORDER_ATTACK_MOVE &&
+                            u[k].tx == controller_last_kerrigan_attackmove_x &&
+                            u[k].ty == controller_last_kerrigan_attackmove_y;
+                        if(accepted) {
+                            terminal_trap_slot=trap_slot;
+                            terminal_trap_raw=b[trap_slot].raw_type;
+                        }
+#else
                         accepted = accepted && u[k].order == ORDER_ATTACK_MOVE &&
                             u[k].tx == b[trap_slot].x && u[k].ty == b[trap_slot].y;
+#endif
                         target_force_attack = accepted;
                         fprintf(stderr,"Z5 terminal gate0 clearing detecting trap slot=%d raw=%u xy=%d,%d hp=%d accepted=%d; retain source goal=%d,%d frame=%u\n",
                                 trap_slot,b[trap_slot].raw_type,b[trap_slot].x,
                                 b[trap_slot].y,b[trap_slot].hp,accepted,
                                 source_goal_x,source_goal_y,(unsigned)frame);
+#ifdef SC64_DIRECT_ATTACK
+                        if (!accepted) {
+                            /* A blocked click can fail before emitting any
+                             * input. Advance the normal clock so retries
+                             * cannot bypass the controller's tick bound. */
+                            step(0);
+                            continue;
+                        }
+#endif
                         target_changed = 0;
                         reset_target_progress();
                         continue;

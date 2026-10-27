@@ -1690,9 +1690,16 @@ qualification remain unfinished; see [the P7 controller report](P7-CONTROLLER.md
 The indexed Z7 controller has a [reproduced host win](audits/2026-10-27-z7-controller-win/README.md)
 via `make test-sc64-z7-controller`. A separate full-render ARM replay now
 [matches all 365 checkpoints through victory](audits/2026-10-27-z7-full-win/README.md),
-but its instrumented mean is about 2.85 rendered updates/second. Performance,
-carried-mission regression checks, and fresh-process ARM SRAM continuation
-remain required before campaign promotion.
+but its instrumented mean is about 2.85 rendered updates/second. The frequency
+candidate improves that to about 2.99 and has also passed an actual ARM save
+and fresh-process winning continuation. Performance and carried-mission
+regression checks remain required before campaign promotion.
+
+`make test-sc64-z7-carried-z5` checks the normal-input Z5 controller with the
+full experimental Z7 frequency-cache feature set. It keeps direct attack
+enabled and selects clear ground when its policy intends Attack-Move. It
+does not add Z7 to canonical menus or establish a passing Z6 carried replay;
+see the [full replay audit](audits/2026-10-27-z7-full-win/README.md).
 
 
 The sixth-mission probes require their authenticated spell metadata:

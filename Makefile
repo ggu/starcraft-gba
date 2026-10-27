@@ -3272,6 +3272,16 @@ $(eval $(call Z7_FULL_RENDER_FIXTURE,steering,sc64_z7_steer_game.c,-DSC64_COLLIS
 .PHONY: test-sc64-z7-steering zerg-z7-steering-probe
 test-sc64-z7-steering: build/test-sc64-z7-full-render-steering
 	./build/test-sc64-z7-full-render-steering
+
+# Carried Z5 controller under the complete experimental Z7 feature vector.
+# Direct AttackUnit remains enabled; the controller must issue ground clicks
+# when its policy requests Attack-Move. This does not promote the profile.
+$(eval $(call Z7_FULL_RENDER_FIXTURE,carried-z5,sc64_z5_campaign_run.c,-DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ))
+.PHONY: test-sc64-z7-carried-z5
+test-sc64-z7-carried-z5: build/test-sc64-z7-full-render-carried-z5
+	mkdir -p .local/build/z7-carried-z5 .local/sc64
+	./build/test-sc64-z7-full-render-carried-z5 --limit 60000 --trace .local/build/z7-carried-z5/diagnostics.json --attempt .local/build/z7-carried-z5/attempt.json --verified .local/build/z7-carried-z5/controller.json
+
 build/starcraft-zerg-z7-steering-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_FULL_RENDER_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(Z7_STEERING_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-steering-probe.map -lgcc -o $@
 	$(SIZE) $@

@@ -5790,6 +5790,20 @@ exact flag composition, frozen artifact hashes, and measurement scope.
 The instrumented combined mean was 5877025 GBA cycles per advancing PLAY
 update (about 2.85 rendered updates/second), far below 30 fps. This is not a
 physical-hardware measurement. This result supersedes the earlier absence
-of a full Z7 ARM win; it does not establish fresh-process ARM SRAM
-continuation or qualify the seven-mission profile's carried missions.
+of a full Z7 ARM win; it does not qualify the seven-mission profile's carried
+missions.
 Canonical menus and qualified staged progress remain unchanged at 22/30.
+
+The same replay with only `SC64_ROUTE_DECAY_FREQ` added also matched all 365
+checkpoints through the source win. Its instrumented combined mean was
+5617463 cycles (about 2.99 rendered updates/second), a 4.42% reduction from
+the baseline. This is a whole-replay emulator comparison, still far below
+the performance target; it does not promote a canonical profile. The audit
+records both fixed ROM/ELF identities and separate results.
+
+The frequency profile subsequently passed an actual ARM UI-save and
+fresh-process HOME-L continuation. Its 16296-byte payload matched the host
+save golden; 334 prefix checkpoints and 31 resumed checkpoints passed,
+ending in the same source win. Only the inactive menu cursor is normalized
+in persistent digests. The audit records source-force checks, the exact
+SRAM/prefix/resume identities, and remaining hardware/performance limits.
