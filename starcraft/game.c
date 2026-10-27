@@ -416,6 +416,10 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
 #endif
+#if defined(SC_DEFAULT_UI) || defined(SC64_FIELD_CONTROLS)
+/* Default controls: field_ui.h, or field_controls.h in the race engine. */
+#define SC_FIELD_FEEDBACK 1
+#endif
 #ifdef SC64_ZP_FULL_STORAGE
 #define MAX_RACE_GEYSERS 12
 #else
@@ -1307,6 +1311,12 @@ static u8 menu_last, title_cursor, title_notice, pause_cursor;
 static u8 pause_notice, pause_notice_ticks, r_tap_state;
 static u8 ping_life, ping_color;
 static s16 ping_x, ping_y;
+#elif defined(SC64_FIELD_CONTROLS)
+/* The same controls and feedback state for field_controls.h; never saved.
+ * Bytes: the Showcase build has little working RAM left. ui_tick and
+ * ui_tick_mode key field_ui_refresh()'s cached ui_action. */
+static u8 menu_last, r_tap_state, ping_life, ping_color, ui_action, ui_tick, ui_tick_mode;
+static s16 ping_x, ping_y;
 #endif
 static int box_suppress_a;
 static int unit_tap = -1, unit_tap_x, unit_tap_y;
@@ -1492,7 +1502,7 @@ reset_selection_gestures(void)
     box_state = 0;
     box_suppress_a = 0;
     reset_unit_tap();
-#ifdef SC_DEFAULT_UI
+#ifdef SC_FIELD_FEEDBACK
     r_tap_state = 0;
 #endif
 }
@@ -3700,6 +3710,9 @@ load_game(void)
 #ifdef SC64_UNIT_FACING
     if (loaded) sc64_facing_reset_all();
 #endif
+#ifdef SC64_FIELD_CONTROLS
+    if (loaded) ui_action = ui_tick_mode = 0; /* frame jumped: resolve A afresh */
+#endif
     return loaded;
 #else
     int i, j, computed_supply = 0, computed_cap =
@@ -3956,6 +3969,10 @@ init_state(void)
     sc64_visibility_reset();
     race_campaign_init();
     supply_used=race_owner_supply(SIDE);supply_cap=race_owner_supply_cap(SIDE);
+#ifdef SC64_FIELD_CONTROLS
+    /* A restart jumps frame back, so the cached A action must resolve afresh. */
+    menu_last=ping_life=r_tap_state=0;ui_action=ui_tick_mode=0;
+#endif
     return;
 #endif
     int i;
@@ -4040,6 +4057,8 @@ init_state(void)
     help = 0;
 #ifdef SC_DEFAULT_UI
     menu_last = 0; ping_life = 0; pause_cursor = 0; pause_notice = pause_notice_ticks = 0;
+#elif defined(SC64_FIELD_CONTROLS)
+    menu_last = 0; ping_life = 0; ui_action = 0; ui_tick_mode = 0;
 #endif
     won = 0;
     lost = 0;
@@ -4460,12 +4479,20 @@ race_probe_cannon_command_available(void)
 #ifdef SC_DEFAULT_UI
 #include "field_ui.h"
 #endif
+#ifdef SC64_FIELD_CONTROLS
+#include "field_controls.h"
+#endif
 
 static void
 start_build(int type)
 {
 #ifdef SC64_RACES
-    if(race_start_build(SIDE,find_selected_worker(),type,cx,cy)){mode=MODE_NORMAL;toast(3);}else toast(8);
+    if(race_start_build(SIDE,find_selected_worker(),type,cx,cy)){
+        mode=MODE_NORMAL;toast(3);
+#ifdef SC64_FIELD_CONTROLS
+        field_ui_ping(cx,cy,C_GOLD);
+#endif
+    }else toast(8);
     return;
 #endif
     int cost = building_cost(type), i, slot, px = cx, py = cy;
@@ -4642,7 +4669,7 @@ static int race_z7_creep_command_available(void)
 static void
 choose_command(int choice)
 {
-#ifdef SC_DEFAULT_UI
+#ifdef SC_FIELD_FEEDBACK
     menu_last = (u8)choice;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
@@ -4802,13 +4829,13 @@ choose_command(int choice)
     switch (choice) {
     case MENU_MOVE:
 	mode = MODE_MOVE;
-#ifndef SC_DEFAULT_UI
+#ifndef SC_FIELD_FEEDBACK
 	toast(0); /* the default HUD names the armed order instead */
 #endif
 	break;
     case MENU_ATTACK:
 	mode = MODE_ATTACK;
-#ifndef SC_DEFAULT_UI
+#ifndef SC_FIELD_FEEDBACK
 	toast(0);
 #endif
 	break;
@@ -5038,7 +5065,7 @@ interact(void)
 #endif
 	issue_order(ORDER_MOVE, cx, cy);
 	mode = MODE_NORMAL;
-#ifdef SC_DEFAULT_UI
+#ifdef SC_FIELD_FEEDBACK
 	if (selected_count()) field_ui_ping(cx, cy, C_GREEN);
 #endif
 	return;
@@ -5054,7 +5081,7 @@ interact(void)
 #endif
 	issue_order(ORDER_ATTACK_MOVE, cx, cy);
 	mode = MODE_NORMAL;
-#ifdef SC_DEFAULT_UI
+#ifdef SC_FIELD_FEEDBACK
 	if (selected_count()) field_ui_ping(cx, cy, C_RED);
 #endif
 	return;
@@ -5117,7 +5144,7 @@ interact(void)
 	}
     }
     if (selected_building >= 0
-#ifdef SC_DEFAULT_UI
+#ifdef SC_FIELD_FEEDBACK
         /* A trains only on the selected building; elsewhere it reselects,
          * and on empty ground it clears the selection. */
         && field_ui_on_selected_building()
@@ -5164,7 +5191,7 @@ interact(void)
 	}
 	return;
     }
-#ifdef SC_DEFAULT_UI
+#ifdef SC_FIELD_FEEDBACK
     if (field_ui_smart_attack()) return;
 #endif
     {
@@ -6862,7 +6889,7 @@ game_update(u16 held, u16 pressed)
 	    menu_open = 1;
 	} else {
 	    menu_open = 1;
-#ifdef SC_DEFAULT_UI
+#ifdef SC_FIELD_FEEDBACK
 	    menu_cursor = menu_last; /* B, A repeats the last command */
 #else
 	    menu_cursor = 0;
@@ -6901,7 +6928,7 @@ game_update(u16 held, u16 pressed)
     if (unit_tap >= 0 && dist2(cx, cy, unit_tap_x, unit_tap_y) >
         UNIT_DOUBLE_TAP_RADIUS * UNIT_DOUBLE_TAP_RADIUS) reset_unit_tap();
     pressed = update_selection_box(held, pressed, old_cx, old_cy);
-#ifdef SC_DEFAULT_UI
+#ifdef SC_FIELD_FEEDBACK
     if (field_ui_r_tap(held, pressed)
 #else
     if ((pressed & KEY_R)
@@ -8447,6 +8474,9 @@ sc64_tile_background_done:
 #endif
     gfx_line(x - 7, y, x + 7, y, C_HIGHLIGHT);
     gfx_line(x, y - 7, x, y + 7, C_HIGHLIGHT);
+#ifdef SC64_FIELD_CONTROLS
+    field_controls_draw_cursor(x, y);
+#endif
 #endif
     if (box_state == 2) {
         int left = box_anchor_x < box_end_x ? box_anchor_x : box_end_x;
@@ -8921,10 +8951,20 @@ draw_hud_commands(void)
 #ifdef SC64_Z5_CONSUME_ENABLED
                  mode == MODE_Z5_CONSUME ? "CONSUME FRIENDLY ZERGLING" :
 #endif
-		 mode == MODE_ATTACK ? "ATTACK MOVE" : mode == MODE_MOVE ? "MOVE ORDER" : "FIELD COMMAND", C_WHITE);
+		 mode == MODE_ATTACK ? "ATTACK MOVE" : mode == MODE_MOVE ? "MOVE ORDER" : "FIELD COMMAND",
+#ifdef SC64_FIELD_CONTROLS
+                 field_controls_title_color());
+#else
+                 C_WHITE);
+#endif
 #if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
         if (mode == MODE_P4_STORM)
             gfx_text(5, 137, "A CAST  B CANCEL", C_GOLD);
+        else
+#endif
+#ifdef SC64_FIELD_CONTROLS
+        if (field_controls_hint())
+            gfx_text(5, 137, field_controls_hint(), C_GOLD);
         else
 #endif
 	gfx_text(5, 137,
@@ -9273,7 +9313,7 @@ game_render(void)
 #ifdef SC64_IMPORTED_MISSION
         profile_start = gba_clock();
 #endif
-#ifdef SC_DEFAULT_UI
+#ifdef SC_FIELD_FEEDBACK
         field_ui_refresh();
 #endif
 #ifdef GBA_SCENE_CLIP
