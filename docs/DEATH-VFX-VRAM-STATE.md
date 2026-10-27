@@ -25,10 +25,12 @@ mission state.
 ## Focused evidence
 
 The opt-in `test-sc64-death-vfx-z7-vram` target builds the same full-render Z7
-host profile with and without the storage flag. Its combat, reuse, load-reset,
-fog, and result-outro fixture passes under ASan/UBSan. A paired 900-update
-combat workload reaches the same outcome and matches the canonical state,
-save, and RGB555 framebuffer digests:
+host profile with and without the storage flag. Its synthetic regression
+fixture covers combat, reuse, load-reset, fog, and result-outro behavior and
+passes under ASan/UBSan. A separate paired 900-update synthetic combat
+workload reaches the same fixture outcome and matches the canonical state,
+save, and RGB555 framebuffer digests. These are regression checks, not a
+canonical mission-win replay:
 
 | Check | Baseline | VRAM storage |
 | --- | --- | --- |
