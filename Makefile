@@ -3937,3 +3937,21 @@ test-sc64-canonical-skirmish-resume: $(addprefix build/test-sc64-skirmish-resume
 	./build/test-sc64-skirmish-resume-zerg
 	./build/test-sc64-skirmish-resume-protoss
 test-race-campaigns: test-sc64-canonical-skirmish-resume
+
+# Public actor facts only: no generated maps, art, or ROM required.
+COLLISION_BOUNDS_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -fno-omit-frame-pointer -Istarcraft -DGBA_HOST -DSC64_RACES -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS -DSC64_Z6_ACTORS -DSC64_TERRAN_LATE_ACTORS -DSC64_P5_ACTORS -DSC64_P6_ACTORS -DSC64_P7_ACTORS -DSC64_P6_COMBAT_ENABLED -DSC64_NYDUS_ENABLED
+define COLLISION_BOUNDS_TEST
+build/test-sc64-collision-bounds-$(1): tests/sc64_collision_bounds.c $$(wildcard starcraft/*.h) Makefile | build
+	$$(CLANG) $$(COLLISION_BOUNDS_TEST_FLAGS) $(2) $$< -o $$@
+endef
+$(eval $(call COLLISION_BOUNDS_TEST,cached-list,-DSC64_Z7_RUNTIME -DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST))
+$(eval $(call COLLISION_BOUNDS_TEST,cached,-DSC64_Z7_RUNTIME -DSC64_COLLISION_CLASS_CACHE))
+$(eval $(call COLLISION_BOUNDS_TEST,hoisted,-DSC64_COLLISION_FACT_HOIST))
+$(eval $(call COLLISION_BOUNDS_TEST,plain,))
+.PHONY: test-sc64-collision-bounds
+test-sc64-collision-bounds: $(addprefix build/test-sc64-collision-bounds-,cached-list cached hoisted plain)
+	./build/test-sc64-collision-bounds-cached-list
+	./build/test-sc64-collision-bounds-cached
+	./build/test-sc64-collision-bounds-hoisted
+	./build/test-sc64-collision-bounds-plain
+test: test-sc64-collision-bounds

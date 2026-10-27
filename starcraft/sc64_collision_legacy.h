@@ -182,10 +182,14 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
         (mover_flags & SC64_GAME_ACTOR_COLLIDABLE);
 #endif
 #endif
-    /* The audited Z/P roster has a maximum ten-pixel collision radius.
-     * Search every cell that can contain a point strictly inside it. */
+    /* Collisions are only tested between units with matching flight state.
+     * Authored Z/P facts bound ground radii at 10 and flying radii at 19. */
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
-    const int reach = 9;
+#if defined(SC64_COLLISION_CLASS_CACHE)
+    const int reach = mover_flying ? 18 : 9;
+#else
+    const int reach = sc64_race_unit_flying(q->type) ? 18 : 9;
+#endif
 #else
     const int reach = 5;
 #endif
@@ -328,10 +332,16 @@ static int GBA_HOT
 sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
 {
     int mover_radius, mover_flying, mover_collidable;
+    /* Ground-only list: strict radius <= 10, so reach 9 is exact. */
     const int reach = 9;
     int minx, maxx, miny, maxy, row, col, count = 0;
     if (!sc64_unit_bucket_active || speed < 0 || speed > 2 ||
         MAP_COLS > 256 || MAP_ROWS > 256) return 0;
+#ifdef SC64_ZP_CAMPAIGN_ACTORS
+    /* Keep the bounded candidate list ground-only; air movement uses the
+     * class-aware bucket query below. */
+    if (sc64_race_unit_flying(q->type)) return 0;
+#endif
     if (IS_WORKER(q->type) && (q->order == ORDER_MINE || q->order == ORDER_GAS))
         return 0;
 #ifndef SC64_Z7_RUNTIME
@@ -395,6 +405,7 @@ sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
 static int GBA_HOT
 sc64_steer_list_step_clear(SC64_STEER_STEP_ARGS)
 {
+    /* Z/P flying movers fall back before this list path. */
     const int reach = 9;
     int minx, maxx, miny, maxy, k;
     if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) return 0;
