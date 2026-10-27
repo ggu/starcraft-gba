@@ -3506,7 +3506,7 @@ test-sc64-z7-canonical-controller: build/test-sc64-z7-canonical-controller tools
 	mkdir -p "$(dir $(ZERG_Z7_CONTROLLER_TRACE))"
 	./build/test-sc64-z7-canonical-controller --trace "$(ZERG_Z7_CONTROLLER_TRACE)"
 	$(PYTHON) tools/sc64_zp_controller_replay.py --profile zerg-z7 --trace "$(ZERG_Z7_CONTROLLER_TRACE)" --validate-only
-test-zerg-z7: build/test-sc64-z7-canonical-profile build/test-sc64-z7-canonical-save build/test-sc64-z7-canonical-frame build/test-sc64-z7-canonical-scourge build/test-sc64-z7-canonical-controller build/test-sc64-z7-full-render-carried-z5 build/test-sc64-z7-full-render-carried-z6 build/test-sc64-z7-full-render-z6-controller-policy test-sc64-z7-carried-missions test-sc64-z7-canonical-skirmish
+test-zerg-z7: build/test-sc64-z7-canonical-profile build/test-sc64-z7-canonical-save build/test-sc64-z7-canonical-frame build/test-sc64-z7-canonical-scourge test-sc64-z7-canonical-controller build/test-sc64-z7-full-render-carried-z5 build/test-sc64-z7-full-render-carried-z6 build/test-sc64-z7-full-render-z6-controller-policy test-sc64-z7-carried-missions test-sc64-z7-canonical-skirmish
 	./build/test-sc64-z7-canonical-profile
 	./build/test-sc64-z7-canonical-save
 	./build/test-sc64-z7-canonical-frame
