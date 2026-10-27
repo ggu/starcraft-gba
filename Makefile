@@ -1392,9 +1392,9 @@ build/test-sc64-terran-full-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard 
 build/test-sc64-terran-full-frame: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) $< common/gba.c -o $@
 build/test-sc64-protoss-canonical-frame: tests/sc64_z3_frame_coverage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.h common/gba.c Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-protoss-canonical-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.h common/gba.c Makefile | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-zerg-canonical-hud: tests/sc64_hud_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
 .PHONY: test-canonical-render
@@ -1407,7 +1407,7 @@ test-canonical-render: build/test-sc64-terran-full-frame build/test-sc64-terran-
 	./build/test-sc64-protoss-canonical-hud
 
 build/test-sc64-geyser-art: tests/sc64_geyser_art.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 .PHONY: test-sc64-geyser-art
 test-sc64-geyser-art: build/test-sc64-geyser-art
 	./build/test-sc64-geyser-art
@@ -2006,17 +2006,17 @@ verify-protoss-p6: build/StarCraft-Protoss-P6-GBA.gba
 verify-protoss-p3: build/StarCraft-Protoss-GBA.gba
 	$(PYTHON) tools/verify_roms.py --protoss-p3
 build/test-protoss: tests/sc64_split_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.h common/gba.c Makefile | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) tests/sc64_split_run.c common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) tests/sc64_split_run.c common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-protoss-promoted-profile: tests/sc64_promoted_race_profile.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.h common/gba.c Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-protoss-canonical-storm: tests/sc64_p4_storm.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-protoss-canonical-storage: tests/sc64_zp_storage.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-protoss-canonical-controller: tests/sc64_p4_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-p4-census: tests/sc64_p4_census.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(filter-out -DSC64_P4_COUNT_CENSUS_ENABLED,$(PROTOSS_ROM_FLAGS)) -DSC64_P4_COUNT_CENSUS_ENABLED $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(filter-out -DSC64_P4_COUNT_CENSUS_ENABLED,$(PROTOSS_ROM_FLAGS)) -DSC64_P4_COUNT_CENSUS_ENABLED $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 .PHONY: test-sc64-p4-census
 test-sc64-p4-census: build/test-sc64-p4-census
 	./build/test-sc64-p4-census
@@ -3016,9 +3016,9 @@ build/test-sc64-construction-source: tests/sc64_construction_source_game.c $(STA
 WARP_COLOR_TEST_FLAGS = -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
 WARP_COLOR_NOCLIP_FLAGS = $(filter-out -DGBA_SCENE_CLIP -DSC64_STATIC_DIRTY_ROWS,$(PROTOSS_ROM_FLAGS))
 build/test-sc64-protoss-warp-color: tests/sc64_protoss_warp_color.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) $(CONSTRUCTION_ART_HEADER) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) common/gba.h common/gba.c Makefile | build
-	$(CLANG) $(WARP_COLOR_TEST_FLAGS) $(PROTOSS_ROM_FLAGS) $< -o $@
+	$(CLANG) $(WARP_COLOR_TEST_FLAGS) $(PROTOSS_ROM_FLAGS) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-protoss-warp-color-no-clip: tests/sc64_protoss_warp_color.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) $(CONSTRUCTION_ART_HEADER) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) common/gba.h common/gba.c Makefile | build
-	$(CLANG) $(WARP_COLOR_TEST_FLAGS) $(WARP_COLOR_NOCLIP_FLAGS) $< -o $@
+	$(CLANG) $(WARP_COLOR_TEST_FLAGS) $(WARP_COLOR_NOCLIP_FLAGS) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 .PHONY: test-sc64-protoss-warp-color
 test-sc64-protoss-warp-color: build/test-sc64-protoss-warp-color build/test-sc64-protoss-warp-color-no-clip
 	./build/test-sc64-protoss-warp-color
@@ -3437,8 +3437,8 @@ zerg-z7-steering-probe: build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba
 
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 define SKIRMISH_CONTROLLER_PROFILE
-build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c common/gba.h Makefile | build
-	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c -o $$@
+build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $(if $(filter protoss,$(1)),$(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c $(if $(filter protoss,$(1)),$(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)) -o $$@
 endef
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,terran,$(TERRAN_FULL_FLAGS),$(TERRAN_FULL_INPUTS)))
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,zerg,$(Z3_FLAGS),$(RACE_CAMPAIGN_INPUTS)))
@@ -3449,7 +3449,7 @@ $(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss,$(P3_FLAGS),$(RACE_CAMPAIGN_IN
 build/test-sc64-worker-cargo-indexed: tests/sc64_worker_cargo_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) $(CONSTRUCTION_ART_HEADER) common/gba.c common/gba.h Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(RACES_FLAGS) $< common/gba.c -o $@
 build/test-sc64-worker-cargo-packed: tests/sc64_worker_cargo_render.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) $(CONSTRUCTION_ART_HEADER) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) common/gba.c common/gba.h Makefile | build
-	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 .PHONY: test-sc64-worker-cargo
 test-sc64-worker-cargo: build/test-sc64-worker-cargo-indexed build/test-sc64-worker-cargo-packed
 	./build/test-sc64-worker-cargo-indexed
@@ -3951,18 +3951,18 @@ test-zerg: test-sc64-zerg-carried-missions
 build/test-sc64-p2-reinforcements: tests/sc64_p2_reinforcements.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
 	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
 build/test-sc64-p2-reinforcements-canonical: tests/sc64_p2_reinforcements.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 test-sc64-p2-reinforcements: build/test-sc64-p2-reinforcements build/test-sc64-p2-reinforcements-canonical
 	./build/test-sc64-p2-reinforcements
 	./build/test-sc64-p2-reinforcements-canonical
 test-unified test-protoss: test-sc64-p2-reinforcements
 
 build/test-sc64-protoss-carried-campaign: tests/race_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-protoss-carried-p3: tests/sc64_p3_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
-	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-protoss-carried-p5: tests/sc64_p5_campaign_run.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 .PHONY: test-sc64-protoss-carried-missions
 test-sc64-protoss-carried-missions: build/test-sc64-protoss-carried-campaign build/test-sc64-protoss-carried-p3 build/test-sc64-protoss-carried-p5
 	./build/test-sc64-protoss-carried-campaign --controller 2 --trace .local/sc64/p3-carried-p1-controller.json
@@ -4064,8 +4064,8 @@ $(addprefix build/test-sc64-full-,t1-run t2-run t3-run t3-save t3-resume t4-run 
 CANONICAL_SKIRMISH_RESUME_ART_INPUTS = $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 CANONICAL_SKIRMISH_RESUME_HOST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
 define CANONICAL_SKIRMISH_RESUME_PROFILE
-build/test-sc64-skirmish-resume-$(1): tests/sc64_skirmish_resume.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile | build
-	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(2) $$< common/gba.c -o $$@
+build/test-sc64-skirmish-resume-$(1): tests/sc64_skirmish_resume.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $(if $(filter protoss,$(1)),$(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(2) $$< common/gba.c $(if $(filter protoss,$(1)),$(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)) -o $$@
 endef
 $(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,terran,$(TERRAN_ROM_FLAGS),$(TERRAN_FULL_INPUTS)))
 $(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,zerg,$(ZERG_ROM_FLAGS),$(ZERG_Z6_INPUTS)))
@@ -4116,7 +4116,7 @@ build/test-sc64-contact-cache-nydus: tests/sc64_contact_cache.c $(STARCRAFT) $(w
 build/test-sc64-contact-cache-zerg: tests/sc64_contact_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) $(CONTACT_CACHE_TEST_FLAGS) $(ZERG_ROM_FLAGS) $< common/gba.c -o $@
 build/test-sc64-contact-cache-protoss: tests/sc64_contact_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.h common/gba.c Makefile | build
-	$(CLANG) $(CONTACT_CACHE_TEST_FLAGS) $(PROTOSS_ROM_FLAGS) $< common/gba.c -o $@
+	$(CLANG) $(CONTACT_CACHE_TEST_FLAGS) $(PROTOSS_ROM_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 .PHONY: test-sc64-contact-cache test-sc64-contact-cache-races test-sc64-contact-cache-p7 test-sc64-contact-cache-terran test-sc64-contact-cache-nydus test-sc64-contact-cache-zerg test-sc64-contact-cache-protoss
 test-sc64-contact-cache-zerg: build/test-sc64-contact-cache-zerg
 	./build/test-sc64-contact-cache-zerg
