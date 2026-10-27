@@ -2622,6 +2622,18 @@ test-sc64-p7-arbiter-host: build/test-sc64-p7-arbiter-initial-save build/test-sc
 	./build/test-sc64-p7-battery-no-cache
 	./build/test-sc64-p7-arbiter-initial-save
 
+# Opt-in differential for the Arbiter's boolean aura union. This preserves the
+# ordinary cache path as the reference and does not enable the gate in products.
+P7_ARBITER_AURA_TEST := tests/sc64_p7_arbiter_aura.c
+build/test-sc64-p7-arbiter-aura-reference: $(P7_ARBITER_AURA_TEST) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT -DSC64_P7_GEOMETRY_RECT_HOIST_ENABLED $< common/gba.c -o $@
+build/test-sc64-p7-arbiter-aura-once: $(P7_ARBITER_AURA_TEST) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_ARBITER_FLAGS) -DSC64_P7_PREVALIDATED_TICK -DSC64_P7_COUNT_SNAPSHOT -DSC64_P7_GEOMETRY_RECT_HOIST_ENABLED -DSC64_P7_ARBITER_AURA_ONCE $< common/gba.c -o $@
+.PHONY: test-sc64-p7-arbiter-aura-once
+test-sc64-p7-arbiter-aura-once: build/test-sc64-p7-arbiter-aura-reference build/test-sc64-p7-arbiter-aura-once
+	./build/test-sc64-p7-arbiter-aura-reference
+	./build/test-sc64-p7-arbiter-aura-once
+
 # Optional profile link only; no gameplay or timing qualification is implied.
 build/starcraft-protoss-p7-arbiter-cache-probe.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(P7_ARBITER_PROBE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p7-arbiter-cache-probe.map -lgcc -o $@
