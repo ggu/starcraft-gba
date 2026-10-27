@@ -8,10 +8,9 @@ qualified on earlier frozen ROMs. These Terran timings precede the latest
 minimap change, whose current ARM measurements cover Protoss. The current
 full-profile ARM T10 result is below the 30-fps target, and no physical GBA
 result is claimed. The canonical `terran` profile includes all ten Terran
-missions. Canonical Zerg includes its first six missions. This integration
-branch wires the default Protoss target to the P7 candidate, while the last
-fully qualified Protoss campaign remains P1–P6. Explicit `protoss-p6` retains
-that generation-30 product.
+missions. Canonical Zerg includes its first six missions. The default Protoss
+target is the qualified P7 candidate. Explicit `protoss-p6` remains a separate
+P1–P6 product with its generation-30 save identity.
 `zerg-z4`, `zerg-z3` and `protoss-p3` remain explicit legacy builds with their original
 ROMs and save identities; `protoss-p4-storm` also preserves its real four-entry files. The P7 candidate carries the P1–P6 campaign and the seventh menu entry; explicit
 `protoss-p5-shuttle` preserves the earlier five-entry product. The
@@ -56,8 +55,8 @@ See the [canonical skirmish resume audit](audits/2026-10-27-canonical-skirmish-r
 
 ## Campaign progress
 
-The Terran profile presents ten missions, canonical Zerg six and Protoss six,
-exposing 22 of 30 entries. All six Zerg chapters have current-source host
+The Terran profile presents ten missions, canonical Zerg six and Protoss seven,
+exposing 23 of 30 entries. All six Zerg chapters have current-source host
 controller wins and input-only ARM wins in the canonical Z6 build; Z5 and Z6
 also have exact fresh-process SRAM restores followed by continued wins. See
 the [Z6 promotion audit](audits/2026-10-26-z6-promotion/README.md). P1–P5 have current-source host and input-only ARM wins in the canonical
@@ -84,29 +83,35 @@ after packed rendering; see the
 [Terran rendering audit](audits/2026-10-26-terran-word-promotion/README.md).
 None of these are physical GBA guarantees.
 
-Z7 and P7 each have an internal seventh-entry candidate with a full
-ordinary-input ARM replay to the source win. Z7's generation-36 candidate also
-has a bounded fresh-process SRAM continuation; P7 has a current-controller
-host win, a 67-checkpoint full-profile ARM replay of its frozen input tape, and
-a bounded fresh-process SRAM continuation. The P7 controller itself was
-qualified on host; ARM replayed its recorded inputs. See the [Z7 full-win
-audit](audits/2026-10-27-z7-full-win/README.md) and [P7 controller
-qualification](research/p7-full-controller-qualification.md) for the exact
-profiles and limits.
+Z7 remains an internal seventh-entry candidate with a full ordinary-input ARM
+replay to the source win and bounded fresh-process SRAM continuation. P7 is
+now in the canonical Protoss profile. Its host campaign/save fixtures, 18-match
+skirmish matrix and menu-driven save/reload pass. The P7 controller itself was
+qualified on host; ARM replayed its recorded inputs, including an ordinary
+pause-menu SRAM save and fresh-title-load continuation through the source win.
+See the [Z7 full-win audit](audits/2026-10-27-z7-full-win/README.md), [P7
+controller qualification](research/p7-full-controller-qualification.md) and
+[canonical P7 qualification](research/p7-canonical-candidate-qualification.md)
+for exact profiles and limits.
 The current experimental P7 cache profile also replays the full winning tape
 on ARM with all 67 state records matching; see its
 [cache qualification](research/p7-fact-v2-qualification.md#full-arm-replay-of-the-current-cache-profile).
 
-These internal results do not qualify either seventh mission for promotion:
-Zerg and Protoss remain documented as Z1–Z6 and P1–P6, or 22/30 entries, until
-the new P7 canonical render profile passes its own link, save, and campaign
-checks.
-The Z7 frequency-profile replay averages about 2.99 updates per second and is
-far below the 30-fps target. P7 performance has not been qualified over its
-full mission. Neither result establishes native enemy-AI equivalence, arbitrary
+P7's canonical profile has passed those link, campaign and bounded save
+continuation checks. A separate canonical ARM sample measured mean full costs
+of 2,155,200 cycles in 600 opening updates and 2,426,615 cycles in 1,400 attack
+updates, below the 30-fps target. This is a bounded sample, not a mission-wide
+average. Neither profile establishes native enemy-AI equivalence, arbitrary
 save-state coverage or physical-GBA behavior. Zerg and Protoss missions 8–10
-remain unfinished; promotion of Z7/P7 still requires canonical campaign/save
-integration and the remaining gameplay qualification.
+remain unfinished.
+
+For P7, the canonical-render candidate passes its host startup/save fixtures,
+normal-input campaign win, 18-match skirmish matrix and menu-driven save/reload.
+The paired full-tape ARM SRAM replay saves at frame 28,000, resumes in a fresh
+process and reaches the strict source win. P3's 180,000-call test-limit result
+is byte-identical to the retained P6 canonical baseline; this remains a
+separately documented controller limitation. See the [canonical P7 candidate
+qualification](research/p7-canonical-candidate-qualification.md).
 The internal P6 probe retains its own `SCPC` identity and its historical
 [live-route audit](audits/2026-10-27-p6-live-route/README.md).
 
@@ -559,7 +564,7 @@ save check covers the maximum fog buffer and high resource slots, not a
 128-column catalog mission's complete load/resume behavior. Standard build
 flags and save layouts remain unchanged.
 
-- Canonical profiles expose T1–T10, Z1–Z6 and P1–P6 (22/30). All six Protoss chapters have current canonical host wins; P6 has input-only ARM and fresh-process SRAM continuation. Earlier P1–P5 ARM/cargo evidence remains scoped to P5. Zerg controllers complete all six chapters, with canonical Z6 ARM wins and Z5/Z6 save continuity. Terran ARM wins span all ten missions across frozen builds. Eight campaign chapters and near-30-fps performance remain unfinished.
+- Canonical profiles expose T1–T10, Z1–Z6 and P1–P7 (23/30). P7 has a current canonical host win, a fixed-input ARM replay and fresh-process SRAM continuation. Explicit P6 retains its separate generation-30 product. Earlier P1–P5 ARM/cargo evidence remains scoped to P5. Zerg controllers complete all six chapters, with canonical Z6 ARM wins and Z5/Z6 save continuity. Terran ARM wins span all ten missions across frozen builds. Seven campaign chapters and near-30-fps performance remain unfinished.
 - Skirmishes offer Outpost and Blood Bath, with one to three independently-raced opponents. They exercise the shared reduced engine rather than the original N64 engine or complete scenario scripting.
 - Imported data must be generated locally from the user's own supported ROM. The source repository alone cannot build imported campaign profiles until that preparation has been done.
 - Emulated and physical-hardware performance must be measured separately. This guide makes no frame-rate guarantee, and physical GBA validation remains a separate step.

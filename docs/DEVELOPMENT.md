@@ -1187,12 +1187,13 @@ qualification. Source staging alone does not establish a playable mission.
 
 ### Canonical Zerg and Protoss builds
 
-The standard Zerg build includes its first six missions. The Protoss target is
-wired to the P7 candidate, which carries the first six missions and opens the
-seventh. Its new canonical presentation and save profile still require final
-qualification; explicit `protoss-p6` builds the previously qualified P1–P6
-image. Prepare either profile from your verified ROM, then use the standard
-commands:
+The standard Zerg build includes its first six missions. The canonical Protoss
+target includes P1–P7 and has passed its canonical presentation, save, host
+campaign and bounded ARM continuation checks. Explicit `protoss-p6` still builds
+the separately identified P1–P6 generation-30 image. Prepare either profile
+from your verified ROM, then use the standard commands. See the [canonical P7
+qualification](research/p7-canonical-candidate-qualification.md) for evidence
+and limits:
 
 ```sh
 ./dev sc64 prepare --rom /path/to/StarCraft64-USA.z64 --profile zerg
