@@ -48,23 +48,35 @@ each of its eight steering offsets.
   gives `n = 68,262`. The step amount, phase and diagonal scaling are
   unchanged.
 - The original query stays in ROM as `sc64_unit_bucket_step_clear_reference`
-  for the fallback paths and the host differential tests. The late Terran
-  profile keeps the steering pass in ROM (`SC64_CONTACT_STEER_ROM`) because
-  its IWRAM reserve has no room for it.
+  for the fallback paths and the host differential tests.
+- Placement is a per-product size choice that does not change any answer.
+  The P7 contact probe keeps the steering pass and the inlined stock step in
+  IWRAM. The late Terran profile keeps the steering pass in ROM
+  (`SC64_CONTACT_STEER_ROM`), and the canonical Zerg Z6 and Protoss P6
+  products keep both the steering pass and the stock step in ROM
+  (`CONTACT_ROM_PLACEMENT_FLAGS` = `-DSC64_CONTACT_STEER_ROM
+  -DSC64_CONTACT_STOCK_ROM`), because the IWRAM pass (about 1.0–1.2 KB) and
+  the inlined step (about 0.3 KB) do not fit their reserves (see below).
 
 Movement speeds, cadence, path timers, route fields, collision geometry,
 terrain traversal, target selection, worker trips, placement, topology
 invalidation and the save formats are untouched. The option is incompatible
 with `SC64_COLLISION_CLASS_CACHE` and `SC64_COLLISION_STEER_LIST`, which it
-supersedes; the Z7 probe targets that use those flags are unchanged.
+supersedes, so the Z7 full-render qualification vector
+(`Z7_FULL_RENDER_FLAGS`, which carries those options in its steering,
+carried-Z5/Z6 and controller-policy fixtures and the steering probe ROM)
+filters the contact cache flags out of the canonical Zerg flags it reuses
+and keeps its original collision options.
 
 ## Equivalence evidence
 
-`make test-sc64-contact-cache` builds `tests/sc64_contact_cache.c` under four
+`make test-sc64-contact-cache` builds `tests/sc64_contact_cache.c` under six
 flag sets and runs it with ASan/UBSan: unified race (`RACES_FLAGS`), P7
 (`P7_MOVE_BASE_FLAGS` + `P7_CONTACT_FLAGS`, with P6 burrow checks live in a
 quarter of the worlds), canonical Terran (`TERRAN_ROM_FLAGS`, persistent
-collision) and the Nydus Z7 probe (strict placement mode). Each variant runs
+collision), the Nydus Z7 probe (strict placement mode), and the canonical
+Zerg Z6 and Protoss P6 vectors (`ZERG_ROM_FLAGS` / `PROTOSS_ROM_FLAGS`,
+also run by `test-zerg` / `test-protoss`). Each variant runs
 400 randomized worlds for three passes without cache resets, with clusters at
 map edges and corners, workers gathering, chrysalises, loaded units, burrow
 raw types and flags, stray `raw_type` values, and mid-pass morphs, deaths,
@@ -80,6 +92,8 @@ against `sc64_stock_motion_step()` for raw ids −48..319 and extremes.
 | P7 | 3,287,076 | 0 | 505,704 | 130,504 | 171,024 | 0 |
 | Canonical Terran | 2,674,113 | 0 | 411,402 | 106,460 | 142,320 | 0 |
 | Nydus Z7 | 3,291,197 | 3,291,197 | 506,338 | 130,292 | 171,024 | 0 |
+| Canonical Zerg Z6 (ROM placement) | 3,289,104 | 0 | 506,016 | 130,098 | 171,024 | 0 |
+| Canonical Protoss P6 (ROM placement) | 3,296,293 | 0 | 507,122 | 130,458 | 171,024 | 0 |
 
 An earlier revision of the header used a 9-pixel candidate window for every
 mover; this fixture caught that flying Z/P movers need the 18-pixel window
@@ -120,8 +134,8 @@ of each of the 23 checkpoints give the direct CPU view:
 | `sc64_orders_cycles` (orders stage, movement included) | 870,163 | 608,211 | −30.1% |
 | `gfx_draw_cycles` | 423,506 | 423,140 | −0.1% |
 
-Route counters are identical in both runs (29,822 hits, 40 field builds),
-as expected for an unchanged route cache. Against the instrumented
+Route counters are identical in both runs (365,257 hits, 361 field builds
+summed over the checkpoints), as expected for an unchanged route cache. Against the instrumented
 attribution above (movement about 482K / 788K cycles per update), the
 orders-stage saving of about 262K cycles per sampled tick is roughly a
 third to a half of the movement cost; the arbiter refresh, target queries
@@ -131,6 +145,31 @@ ROM SHA-256: baseline movement probe
 `850b8bd8777ba790a720758ebd5ac06af345ea052b683e75000ef7ee608971f8`,
 contact probe
 `885864938e7a35435b36a08e82408c6e2fb83619c699bfa349a812f2ccbcdf1d`.
+
+### ROM placement (the Z6 and P6 product configuration)
+
+The canonical Zerg Z6 and Protoss P6 ROMs cannot hold the steering pass
+and the inlined stock step in IWRAM (see the memory table below), so they
+build with `CONTACT_ROM_PLACEMENT_FLAGS`. The same P7 workload was rerun on
+the P7 contact probe built with those two flags
+(`make protoss-p7-contact-probe P7_CONTACT_FLAGS='-DSC64_ZP_FACT_RANGE_CULL
+-DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM'`,
+ROM SHA-256
+`813e8662388339c2367e15c99481a9a3c4d7651e7a4e2c0bf53aa7b9804c36fa`, IWRAM
+end `0x03004660`). It matches all 23 checkpoints, inputs and the terminal
+state of the baseline, and keeps about half of the IWRAM placement's gain:
+
+| Workload | Baseline | IWRAM placement (P7 probe) | ROM placement (Z6/P6 configuration) |
+| --- | ---: | ---: | ---: |
+| Opening cycles/update | 1,582,381 | 1,426,952 (−9.8%) | 1,447,575 (−8.5%) |
+| Attack-move cycles/update | 1,890,055 | 1,551,295 (−17.9%) | 1,744,951 (−7.7%) |
+| Attack-move fps | 8.877 | 10.815 | 9.615 |
+| Last-tick `demo_update_cycles` | 1,228,985 | 966,880 (−21.3%) | 1,086,950 (−11.6%) |
+| Last-tick `sc64_orders_cycles` | 870,163 | 608,211 (−30.1%) | 727,920 (−16.3%) |
+
+The Z6 and P6 products therefore get the cached-fact query in IWRAM and the
+one-pass steering and division-free step in ROM; the larger gain needs the
+IWRAM reserve those products do not have.
 
 ### Canonical Terran skirmish
 
@@ -176,16 +215,29 @@ inputs and emulator setup.
 
 ## Memory and stack
 
+Every product that takes the option was linked against the unchanged
+`common/gba.ld` guards from the base commit (f8eea2b) and from this branch,
+with the same prepared private banks:
+
 | Build | IWRAM end (base → candidate) | BSS end (base → candidate) |
 | --- | --- | --- |
-| P7 move probe → P7 contact probe | `0x03004c28` → `0x03004c18` | `0x0203ded4` → `0x0203dd60` |
+| P7 move probe → P7 contact probe (IWRAM placement) | `0x03004c28` → `0x03004c18` | `0x0203ded4` → `0x0203dd60` |
 | Canonical Terran | `0x03004e08` → `0x03004eb0` | `0x0203de94` → `0x0203df94` |
+| Canonical Zerg Z6 (ROM placement) | `0x03004e70` → `0x03004ea8` | `0x0203de78` → `0x0203df78` |
+| Legacy Zerg Z4 (ROM placement) | `0x03004f20` → `0x03004ef8` | `0x0203c4d0` → `0x0203c5d0` |
+| Canonical Protoss P6 (ROM placement) | `0x030049a0` → `0x03004ae8` | `0x0203dc68` → `0x0203dd68` |
+| Explicit Protoss P5 Shuttle (ROM placement) | `0x030047d0` → `0x03004940` | `0x0203da70` → `0x0203db70` |
+| Explicit Protoss P4 Storm (ROM placement) | `0x03004730` → `0x03004878` | `0x0203d490` → `0x0203d590` |
 
-Both guards (`0x03005000` IWRAM, `0x0203e000` BSS) hold unchanged. The P7
-probe drops the 240-byte collision-class cache and the 388-byte static
-steering list in favour of the 256-byte type table, and inlines the
-division-free stock step into the IWRAM mover (not in the late Terran
-profile). `-fstack-usage` frames:
+Both guards (`0x03005000` IWRAM, `0x0203e000` BSS) hold unchanged. An
+earlier revision of this branch kept the steering pass and the inlined
+stock step in IWRAM for every product; the review link showed Zerg Z6 at
+`0x030053b0` and Protoss P6 at `0x030050a8` (the pass costs about 1.0–1.2 KB
+and the inlined step about 0.3 KB of IWRAM in those profiles), which is why
+those products now use the ROM placement. The P7 probe drops the 240-byte
+collision-class cache and the 388-byte static steering list in favour of
+the 256-byte type table, and inlines the division-free stock step into the
+IWRAM mover (not in the late Terran, Z6 or P6 profiles). `-fstack-usage` frames:
 `sc64_contact_blocked_mask` 168 bytes (Terran ROM placement), `move_toward`
 152 (P7) / 64 (Terran), `unit_step_clear` 112 / 88, reference query 128 / 88,
 cold helpers 16–56 bytes; the blocked path no longer carries the 388-byte Z7
@@ -193,10 +245,10 @@ steering context on the stack.
 
 ## Limits
 
-- The Zerg Z6 and Protoss P6 canonical sprite banks are not prepared on the
-  measuring machine, so those two ROMs were compiled only through their host
-  flag sets (unified race and P7 variants above); their ARM link and timing
-  are not measured here.
+- The Zerg Z6 and Protoss P6 ROMs are linked and their host differential
+  variants (`test-sc64-contact-cache-zerg` / `-protoss`) run, but their ARM
+  timing is not measured directly; the ROM placement numbers above come from
+  the P7 probe built with the same placement flags.
 - Route field builds (about 2.77M cycles each on the 128×128 P7 map) are
   untouched; they remain a per-new-goal hitch.
 - These are emulator cycle measurements on bounded workloads, not physical

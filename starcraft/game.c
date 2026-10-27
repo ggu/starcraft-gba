@@ -2388,9 +2388,10 @@ unit_step_clear(const Unit *q, int nx, int ny)
 #ifdef SC64_RACES
 /* Keep fact lookup and endpoint arithmetic in ROM: large campaign profiles
  * have very little spare IWRAM. The path/collision loops remain hot. */
-#if defined(SC64_CONTACT_CACHE) && !defined(SC64_T5_RUNTIME)
+#if defined(SC64_CONTACT_CACHE) && !defined(SC64_T5_RUNTIME) && !defined(SC64_CONTACT_STOCK_ROM)
 /* Without the division the step is a short table read; keep it inline in the
- * hot mover where the IWRAM reserve allows (the late Terran profile does not). */
+ * hot mover where the IWRAM reserve allows (the late Terran profile does not,
+ * and SC64_CONTACT_STOCK_ROM keeps it out of line for other tight profiles). */
 static inline __attribute__((always_inline)) unsigned
 #else
 static unsigned __attribute__((noinline))

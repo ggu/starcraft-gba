@@ -21,15 +21,22 @@ public P7 movement workload the attack-move phase falls from 1,890,055 to
 1,551,295 timer cycles per update (−17.9%, 8.88 → 10.82 fps) and the
 opening from 1,582,381 to 1,426,952 (−9.8%); last-tick update cycles fall
 21.3% and orders-stage cycles 30.1%, with all 23 state checkpoints matching.
-Canonical Terran 3-bot skirmishes match every checkpoint and stay at their
-frame cap. The differential fixture (`make test-sc64-contact-cache`) checks
-about 10 million step, mask and stock-step answers against the original
-code under four flag sets, and `make test-sc64-p7-contact` reproduces the
-reference P7 trace byte for byte. Linker guards hold in every measured
-build. The Zerg Z6 and Protoss P6 canonical ROMs could not be linked on the
-measuring machine (their sprite banks are not prepared), so they are covered
-by host flag sets only, and no near-30-fps or hardware claim is made. See
-the [contact cache audit](audits/2026-10-27-contact-cache/README.md).
+Those figures are for the P7 probe, which keeps the steering pass and the
+stock step in IWRAM. The canonical Zerg Z6 and Protoss P6 ROMs have no IWRAM
+reserve for them and build with `CONTACT_ROM_PLACEMENT_FLAGS` (steering
+pass and stock step in ROM); the P7 probe built with the same flags keeps
+all 23 checkpoints and falls from 1,890,055 to 1,744,951 attack-move cycles
+per update (−7.7%, 8.88 → 9.62 fps) and 1,582,381 to 1,447,575 in the
+opening (−8.5%). Canonical Terran 3-bot skirmishes match every checkpoint
+and stay at their frame cap. The differential fixture
+(`make test-sc64-contact-cache`) checks about 10 million step, mask and
+stock-step answers against the original code under six flag sets, including
+the canonical Zerg and Protoss vectors, and `make test-sc64-p7-contact`
+reproduces the reference P7 trace byte for byte. The canonical Terran, Zerg
+Z6, Zerg Z4, Protoss P6, P5 Shuttle and P4 Storm products all link under the
+unchanged linker guards (Zerg Z6 IWRAM end `0x03004ea8`, Protoss P6
+`0x03004ae8`). No near-30-fps or hardware claim is made. See the
+[contact cache audit](audits/2026-10-27-contact-cache/README.md).
 
 ## Current campaign status (2026-10-27)
 

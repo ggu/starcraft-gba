@@ -2500,7 +2500,13 @@ collidable and burrow lookups, and a blocked ground mover answers all eight
 steering offsets in one bucket pass instead of eight queries. The stock
 movement step also drops its software division. The collision predicate, the
 steering candidate order and tie-breaking, movement speeds and the save
-format are unchanged. A P7 probe carries the same option on the
+format are unchanged. Placement is a per-product size choice: the Z6 and P6
+canonical ROMs (and the late Terran profile) keep the steering pass and the
+stock step in ROM through `CONTACT_ROM_PLACEMENT_FLAGS`
+(`-DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM`) because their IWRAM
+reserve has no room for them; the P7 contact probe keeps both in IWRAM. The
+Z7 full-render qualification targets keep their own collision options and
+do not take the contact cache. A P7 probe carries the option on the
 count-snapshot flags:
 
 ```sh
@@ -2513,10 +2519,11 @@ make protoss-p7-contact-probe
 the division-free step with the original query, eight `unit_step_clear()`
 calls and `sc64_stock_motion_step()` over randomized dense worlds with
 morphs, deaths, slot reuse, loads, burrow flags and bucket moves, in the
-unified race, P7, canonical Terran and Nydus Z7 flag sets. `test-sc64-p7-contact`
-requires the plain P7 reference trace byte for byte. To compare a canonical
-ROM without the option, build with `make -B terran CONTACT_CACHE_FLAGS=`
-(or `zerg` / `protoss`). See
+unified race, P7, canonical Terran, Nydus Z7, canonical Zerg and canonical
+Protoss flag sets (the last two are also part of `test-zerg` and
+`test-protoss`). `test-sc64-p7-contact` requires the plain P7 reference
+trace byte for byte. To compare a canonical ROM without the option, build
+with `make -B terran CONTACT_CACHE_FLAGS=` (or `zerg` / `protoss`). See
 [Validation](VALIDATION.md#contact-cache-movement-measurement-2026-10-27) for the ARM
 measurements and the benchmark recipe.
 

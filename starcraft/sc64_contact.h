@@ -35,9 +35,13 @@
 #define SC64_CONTACT_TYPES 256
 static u8 sc64_contact_class[SC64_CONTACT_TYPES];
 
+/* Placement: SC64_CONTACT_STEER_ROM keeps the one-pass steering mask in ROM
+ * and SC64_CONTACT_STOCK_ROM keeps the stock step out of line in ROM. Both
+ * are size choices only; the answers do not depend on them. The late Terran
+ * profile has no IWRAM left for the steering pass, so it always keeps it in
+ * ROM, where it still replaces eight full queries with one. The Z6 and P6
+ * canonical products select both ROM placements in the Makefile. */
 #if defined(SC64_T5_RUNTIME) && !defined(GBA_HOST) && !defined(SC64_CONTACT_STEER_ROM)
-/* The late Terran profile has no IWRAM left for the steering pass; keep it
- * in ROM there, where it still replaces eight full queries with one. */
 #define SC64_CONTACT_STEER_ROM 1
 #endif
 
