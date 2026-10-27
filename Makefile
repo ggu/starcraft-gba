@@ -376,13 +376,21 @@ build/test-sc64-demo-schedule: tests/sc64_demo_schedule.c common/demo_schedule.h
 build/test-sc64-demo-schedule-runtime: tests/sc64_demo_schedule_runtime.c common/main.c common/demo_schedule.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
 
+build/test-gba-no-debug-inputs: tests/gba_no_debug_inputs.c common/main.c common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST -DGBA_NO_DEBUG_INPUTS -DSC64_RACES -DSC64_UNIFIED -DSC64_Z3_ENABLED -DSC64_CAMPAIGN_RACE=1 -DSC64_Z3_WINDOWED_SCHEDULE -DSC64_DENSE_SCHEDULE -Icommon $< -o $@
+
+.PHONY: test-gba-no-debug-inputs
+test-gba-no-debug-inputs: build/test-gba-no-debug-inputs build/test-sc64-demo-schedule-runtime
+	./build/test-gba-no-debug-inputs
+	./build/test-sc64-demo-schedule-runtime
+
 build/test-sc64-dense-schedule: tests/sc64_demo_schedule_runtime.c common/main.c common/demo_schedule.h common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_DENSE_SCHEDULE -Icommon $< -o $@
 
 .PHONY: test-sc64-dense-schedule
 test-sc64-dense-schedule: build/test-sc64-dense-schedule
 	./build/test-sc64-dense-schedule
-test-starcraft: test-sc64-dense-schedule
+test-starcraft: test-sc64-dense-schedule test-gba-no-debug-inputs
 
 build/test-sc64-bitgrid: tests/sc64_bitgrid.c starcraft/sc64_bitgrid.h common/gba.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon tests/sc64_bitgrid.c -o $@
