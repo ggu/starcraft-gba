@@ -56,9 +56,11 @@ limits of this single-session evidence are recorded in
 Raw 101 remains a hidden actor; the bridge keeps its exact `raw_owner` and
 configured live owner and does not project an enemy source to SIDE to grant
 human vision. Enemy AI fog awareness remains unimplemented. This service is
-not initialized by a mission profile. The generic action dispatcher still
-rejects ambiguous multi-owner Force selectors, so this work does not claim the
-authored Force-targeted actions can yet execute through the Z8 scheduler.
+not initialized by a mission profile. The generic action dispatcher rejects
+Force selectors that resolve to multiple active owners. The authored Z8
+Force2/Force3 selectors identify source owners 1/2 respectively; they can
+resolve as singletons when the caller binds the authenticated active-player
+and force tables. Scheduler and mission initialization remain separate work.
 The game binder stores its private context in the optional `create_context`
 slot, leaving the shared `context` available to AI, presentation, kill-count,
 and timed callbacks. If `create_context` is null, existing callers continue to

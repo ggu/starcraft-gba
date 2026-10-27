@@ -93,3 +93,9 @@ combinations, pathing/terrain-equivalence requirements, and Z8 raw-101
 owner-vision behavior remain open. Any GBA
 adaptation must state which current-engine overlap checks it uses instead of
 claiming native collision parity.
+
+The current GBA service covers position selection for these two clear-bit
+types, then projects source coordinates to the engine's two-source-pixel
+resolution and uses its existing actor initialization. It does not reproduce
+the native RNG-byte-dependent creation argument or claim complete native
+actor-initialization equivalence.
