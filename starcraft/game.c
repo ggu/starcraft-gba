@@ -880,6 +880,7 @@ _Static_assert(sizeof(SaveData) <= 16368, "Save exceeds an alternating SRAM reco
 static SaveData data;
 #endif
 static Unit u[MAX_UNITS];
+#include "sc64_unit_walk.h"
 #ifdef SC64_UNIT_FACING
 static void sc64_facing_reset_all(void);
 static void sc64_facing_reset_slot(int slot);
@@ -1666,6 +1667,7 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+    sc64_walk_reset_slot(i);
 #ifdef SC64_UNIT_FACING
     sc64_facing_reset_slot(i);
 #endif
@@ -3707,6 +3709,7 @@ load_game(void)
 #endif
 #ifdef SC64_RACES
     int loaded = race_load_game();
+    if (loaded) sc64_walk_reset_all();
 #ifdef SC64_UNIT_FACING
     if (loaded) sc64_facing_reset_all();
 #endif
@@ -3951,6 +3954,7 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+    sc64_walk_reset_all();
 #ifdef SC64_RACES
 #ifdef SC64_UNIT_FACING
     sc64_facing_reset_all();
@@ -4187,6 +4191,7 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+    sc64_walk_reset_all();
 #ifdef SC64_UNIT_FACING
     sc64_facing_reset_all();
 #endif
@@ -7431,6 +7436,8 @@ draw_unit(Unit * q)
     if ((actor_flags & SC64_GAME_ACTOR_HIDDEN) || SC64_CARRIER_STATE_HIDDEN(q)) return;
     if (actor_flags && !(actor_flags & SC64_GAME_ACTOR_DRAWABLE)) return;
 #endif
+    int walk = sc64_walk_track(q);
+    int body_y = y - SC64_WALK_LIFT(walk);
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
@@ -7460,10 +7467,10 @@ draw_unit(Unit * q)
 #ifdef SC64_UNIT_FACING
     sc64_facing_track(q);
 #if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
-    if(attack_pose) draw_mission_sprite(attack_pose,x,y);
+    if(attack_pose) draw_mission_sprite(attack_pose,x,body_y);
     else
 #endif
-    if (sprite && sc64_facing_draw(q, facing_raw, x, y)) {}
+    if (sprite && sc64_facing_draw(q, facing_raw, x, body_y)) {}
     else
 #endif
     if (sprite) {
@@ -7477,49 +7484,61 @@ draw_unit(Unit * q)
             if(q->raw_type>=0)++sc64_unit_words_explicit_raw_calls;
             else ++sc64_unit_words_derived_raw_calls;
 #endif
-            gfx_blit_sprite_words(sprite_x,sprite_y,word_sprite);
+            gfx_blit_sprite_words(sprite_x,sprite_y+body_y-y,word_sprite);
 #ifdef SC64_UNIT_WORD_SPRITE_DIAGNOSTICS
         }
 #endif
         else
-            draw_mission_sprite(sprite,x,y);
+            draw_mission_sprite(sprite,x,body_y);
 #else
-        draw_mission_sprite(sprite,x,y);
+        draw_mission_sprite(sprite,x,body_y);
 #endif
     }
     else
 #endif
     {
+    /* Legs stay on the ground while the body rises between footfalls. */
+    int feet = y;
+    y = body_y;
     if (IS_WORKER(q->type)) {
 	gfx_rect(x - 3, y - 2, 7, 5, col);
 	gfx_pixel(x + 2, y - 3, C_SILVER);
 	gfx_pixel(x - 3, y + 3, C_GOLD);
+	if (walk) sc64_walk_treads(x, feet + 3, walk, C_SHADOW);
     } else if (q->type == U_MARINE) {
 	gfx_rect(x - 2, y - 4, 5, 8, col);
 	gfx_rect(x - 3, y - 5, 6, 2, C_SILVER);
 	gfx_line(x + 1, y, x + 5, y - 2, C_SILVER);
+	if (walk) sc64_walk_legs(x, feet + 4, walk, C_SILVER);
     } else if (q->type == U_FIREBAT) {
 	gfx_rect(x - 3, y - 4, 7, 8, col);
 	gfx_rect(x - 4, y - 5, 8, 2, C_ORANGE);
 	gfx_pixel(x + 5, y, C_ORANGE);
+	if (walk) sc64_walk_legs(x, feet + 4, walk, C_ORANGE);
     } else if (q->type == U_MEDIC) {
 	gfx_rect(x - 3, y - 4, 7, 8, C_WHITE);
 	gfx_pixel(x, y - 1, C_RED);
 	gfx_pixel(x, y, C_RED);
 	gfx_pixel(x, y + 1, C_RED);
+	if (walk) sc64_walk_legs(x, feet + 4, walk, C_SILVER);
     } else if (q->type == U_ZERGLING) {
 	gfx_diamond(x, y, 5, 3, col);
 	gfx_line(x - 3, y - 1, x - 6, y - 4, C_BLOOD);
 	gfx_line(x + 3, y - 1, x + 6, y - 4, C_BLOOD);
+	if (walk) sc64_walk_scuttle(x, feet + 3, 4, walk, C_BLOOD);
 	} else if (q->type == U_RAYNOR) {
 	gfx_diamond(x, y, 6, 5, C_GOLD);
 	gfx_rect(x - 2, y - 5, 5, 3, C_SILVER);
 	gfx_pixel(x, y, C_WHITE);
+	/* The hover bike has no legs; its exhaust flickers instead. */
+	if (walk) gfx_pixel(x, y + 6, (walk & 1) ? C_ORANGE : C_GOLD);
     } else {
 	gfx_diamond(x, y, 5, 4, col);
 	gfx_pixel(x - 4, y - 3, C_PURPLE);
 	gfx_pixel(x + 4, y - 3, C_PURPLE);
+	if (walk) sc64_walk_scuttle(x, feet + 4, 4, walk, C_PURPLE);
     }
+    y = feet;
     }
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (!(actor_flags & SC64_GAME_ACTOR_INVINCIBLE))
