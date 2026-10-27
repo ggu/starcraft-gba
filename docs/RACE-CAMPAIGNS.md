@@ -98,9 +98,10 @@ on ARM with all 67 state records matching; see its
 [cache qualification](research/p7-fact-v2-qualification.md#full-arm-replay-of-the-current-cache-profile).
 
 P7's canonical profile has passed those link, campaign and bounded save
-continuation checks. A separate canonical ARM sample measured mean full costs
-of 2,155,200 cycles in 600 opening updates and 2,426,615 cycles in 1,400 attack
-updates, below the 30-fps target. This is a bounded sample, not a mission-wide
+continuation checks. The subsequent [hot movement profile](research/p7-canonical-hot-profile.md)
+reduces mean full costs from 2,155,200 to 2,113,065 cycles in 600 opening
+updates and from 2,426,615 to 2,233,602 cycles in 1,400 attack updates.
+Both remain below the 30-fps target. These are bounded samples, not a mission-wide
 average. Neither profile establishes native enemy-AI equivalence, arbitrary
 save-state coverage or physical-GBA behavior. Zerg 7–10 and Protoss 8–10
 remain unqualified in the canonical profiles.

@@ -1195,6 +1195,11 @@ from your verified ROM, then use the standard commands. See the [canonical P7
 qualification](research/p7-canonical-candidate-qualification.md) for evidence
 and limits:
 
+The current P7 build uses its available IWRAM for movement and the validated
+Arbiter aura shortcut. Its [performance qualification](research/p7-canonical-hot-profile.md)
+records exact state/save continuation and the bounded cycle comparison. P6's
+flags and save identity remain separate.
+
 ```sh
 ./dev sc64 prepare --rom /path/to/StarCraft64-USA.z64 --profile zerg
 ./dev sc64 build --profile zerg
