@@ -222,6 +222,15 @@ int main(void)
         hs[0]=SC64_ROUTE_SLOTS-1;hr[0]=12+10*MAP_COLS;
         assert(sc64_route_cells_connected(starts,1,goals,1,other,1,hs,hr,&hn,0)==1);
         assert(sc64_route_valid[SC64_ROUTE_SLOTS-1]==3);
+        /* A direct-waypoint marker may leave old multi-component bytes in
+           the reserved field. They must be ignored just like region bytes. */
+        for(int i=0;i<SC64_ROUTE_POINT_SLOTS;i++)sc64_route_valid[i]=0;
+        for(int i=0;i<SC64_ROUTE_COMPONENT_HINTS;i++)hs[i]=hr[i]=-1;
+        sc64_route_valid[SC64_ROUTE_SLOTS-1]=5;
+        sc64_route_goal[SC64_ROUTE_SLOTS-1]=(u16)starts[0];
+        hs[0]=SC64_ROUTE_SLOTS-1;hr[0]=starts[0];hn=0;
+        assert(sc64_route_cells_connected(starts,1,goals,1,other,1,hs,hr,&hn,0)==1);
+        assert(sc64_route_valid[SC64_ROUTE_SLOTS-1]==5);
     }
 #endif
     puts("SC64 attack-range route checks passed");

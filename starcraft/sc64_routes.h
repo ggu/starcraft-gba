@@ -226,8 +226,8 @@ static int sc64_route_configure(void)
 #endif
 #ifdef SC64_ATTACK_RANGE_ROUTES
 /* One existing field is reserved for a shared firing region. A multi-source
- * region can span disconnected components, so valid=3 (partial) or 4 (full)
- * must never be used as a component label (formation requires valid=1). */
+ * region can span disconnected components, so valid=3 (partial), 4 (full)
+ * or 5 (one direct waypoint) must never be a component label (requires 1). */
 #define SC64_ROUTE_POINT_SLOTS (SC64_ROUTE_ACTIVE_SLOTS - 1)
 static u16 sc64_route_range_x, sc64_route_range_y;
 static u16 sc64_route_range_min, sc64_route_range_max;
@@ -654,6 +654,18 @@ sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out
 #endif
 
 #ifdef SC64_ATTACK_RANGE_ROUTES
+static int sc64_route_range_key_matches(int tx, int ty, int minimum, int maximum)
+{
+    return sc64_route_range_x == tx && sc64_route_range_y == ty &&
+        sc64_route_range_min == minimum && sc64_route_range_max == maximum;
+}
+
+static void sc64_route_range_key_set(int tx, int ty, int minimum, int maximum)
+{
+    sc64_route_range_x = (u16)tx; sc64_route_range_y = (u16)ty;
+    sc64_route_range_min = (u16)minimum; sc64_route_range_max = (u16)maximum;
+}
+
 /* A region field only needs to discover this origin, not every remote map
  * cell. A later query outside the discovered prefix rebuilds for its origin;
  * queries along an existing gradient reuse it. Exhausted fields cache failure
@@ -722,8 +734,7 @@ sc64_route_range_next(int x, int y, int tx, int ty,
     cell = col + row * MAP_COLS;
     origin_walkable = SC64_GRID_GET(path_walkable, cell);
     if ((sc64_route_valid[slot] != 3 && sc64_route_valid[slot] != 4) ||
-        sc64_route_range_x != tx || sc64_route_range_y != ty ||
-        sc64_route_range_min != min_range || sc64_route_range_max != max_range ||
+        !sc64_route_range_key_matches(tx, ty, min_range, max_range) ||
         (sc64_route_valid[slot] == 3 &&
          !sc64_route_range_origin_ready(slot, cell, origin_walkable))) {
         int tail = 0, complete, origin = cell;
@@ -754,8 +765,7 @@ sc64_route_range_next(int x, int y, int tx, int ty,
         }
         complete = sc64_route_range_flood(slot, &tail, origin, origin_walkable);
         sc64_route_goal[slot] = (u16)goal;
-        sc64_route_range_x = (u16)tx; sc64_route_range_y = (u16)ty;
-        sc64_route_range_min = (u16)min_range; sc64_route_range_max = (u16)max_range;
+        sc64_route_range_key_set(tx, ty, min_range, max_range);
         sc64_route_valid[slot] = complete ? 4 : 3;
         ++sc64_route_builds;
     } else ++sc64_route_hits;
