@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_RANGE_WORK_H
 #define SC64_RANGE_WORK_H
 

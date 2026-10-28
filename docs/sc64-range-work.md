@@ -57,6 +57,8 @@ engine behavior or SRAM claims.
 Asset-free verification command:
 
 ```sh
+make test-sc64-range-work
+# Also included by ./dev test. Equivalent direct compiler invocation:
 clang -std=c11 -Wall -Wextra -Werror -Wno-unused-function \
   -fsanitize=address,undefined -fno-omit-frame-pointer -g \
   tests/sc64_range_work.c -o /tmp/sc64_range_work
