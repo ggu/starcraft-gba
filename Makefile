@@ -120,6 +120,18 @@ build/test-sc64-p8-live-create: tests/sc64_p8_live_create.c $(STARCRAFT) $(wildc
 test-sc64-p8-live-create: build/test-sc64-p8-live-create
 	./build/test-sc64-p8-live-create
 
+# Prepared P8 map actor/capacity preflight; never regenerates private inputs or
+# adds a P8 menu entry. Point P8_PRIVATE_ROOT at the checkout holding prepared
+# ignored data when this source worktree has no private imports of its own.
+P8_PRIVATE_ROOT ?= .
+P8_PREFLIGHT_SCENARIO_DIR ?= $(P8_PRIVATE_ROOT)/.local/sc64/zp-stage/generated/scenarios
+P8_PREFLIGHT_FLAGS = $(subst -I.local/sc64,-I$(P8_PRIVATE_ROOT)/.local/sc64,$(P7_RUNTIME_FLAGS)) -DSC64_P8_DATA_ENABLED
+build/test-sc64-p8-campaign-preflight: tests/sc64_p8_campaign_preflight.c starcraft/sc64_p8_preflight.h starcraft/sc64_p8_source_adapter.h $(STARCRAFT) $(wildcard starcraft/*.h) $(P8_PRIVATE_ROOT)/.local/sc64/zp-stage/generated/sc64_races_generated.h $(P8_PREFLIGHT_SCENARIO_DIR)/sc64_p8_scenario_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft $(P8_PREFLIGHT_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p8-campaign-preflight
+test-sc64-p8-campaign-preflight: build/test-sc64-p8-campaign-preflight
+	./build/test-sc64-p8-campaign-preflight
+
 PREFIX ?= arm-none-eabi-
 CC := $(PREFIX)gcc
 OBJCOPY := $(PREFIX)objcopy
