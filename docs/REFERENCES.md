@@ -106,8 +106,12 @@ The 1,280-byte property loader at `0x8002C394` copies its section to
 `0x800C7654`; `0x80085EDC` then converts 64 records in place at a 20-byte
 stride. The create-property path validates an action number in 1–64 and
 addresses `0x800C7640 + number*20`, so number 1 selects source UPRP entry 0.
-The authored index helper follows that mapping. Applying the individual
-property override fields to live actors remains unimplemented.
+The authored index helper follows that mapping. Native application helper
+`0x8002D220` dispatches HP, shield and energy using field-valid bits 2, 4 and 8;
+the status handler at `0x8002D074` maps enabled status bit `0x10` to actor state
+bit `0x20`. The opt-in P8 live-pool bridge applies the three required records
+using these semantics. Other property records and general override support
+remain unimplemented; P8 spell casting and energy regeneration are not wired.
 
 
 P6's upper-level door props follow the pinned PC reference's dynamic actor

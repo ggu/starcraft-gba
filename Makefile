@@ -89,8 +89,8 @@ test-sc64-p8-world-source-contract: build/test-sc64-p8-world-source-contract
 
 # Optional live-pool P8 adapter check using already-prepared Z7 actor facts.
 # Run only after the listed private inputs have been reviewed as read-only.
-build/test-sc64-p8-game-pool-bridge: tests/sc64_p8_game_pool_bridge.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -Itests/fixtures/p8 $(Z8_GAME_POOL_BRIDGE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p8-game-pool-bridge: tests/sc64_p8_game_pool_bridge.c build/p8-fixture/sc64_p8_scenario_generated.h $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -Ibuild/p8-fixture $(Z8_GAME_POOL_BRIDGE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-p8-game-pool-bridge
 test-sc64-p8-game-pool-bridge: build/test-sc64-p8-game-pool-bridge
 	./build/test-sc64-p8-game-pool-bridge
