@@ -242,10 +242,20 @@ static void tap(u16 key)
     step(0);
 }
 
+/* Field controls reopen the order list on the last command. These
+ * sequences were written for a list that opens on Move, so a fresh
+ * open starts there (no extra input, so the run's timing is unchanged). */
+static void tap_b(void)
+{
+    int fresh = !menu_open && mode == MODE_NORMAL;
+    tap(KEY_B);
+    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+}
+
 static void ensure_normal_ui(void)
 {
     for (int i = 0; i < 3 && (menu_open || mode != MODE_NORMAL); ++i) {
-        if (menu_open || mode != MODE_NORMAL) tap(KEY_B);
+        if (menu_open || mode != MODE_NORMAL) tap_b();
     }
     if (menu_open || mode != MODE_NORMAL) {
         fprintf(stderr, "controller UI did not normalize at frame=%d mode=%d menu_open=%d menu=%d\n",
@@ -264,7 +274,7 @@ static int snap4(int current, int target, int bound)
 
 static void move_cursor(int x, int y)
 {
-    if (menu_open) tap(KEY_B);
+    if (menu_open) tap_b();
     x = snap4(cx, x, WORLD_W);
     y = snap4(cy, y, WORLD_H);
     int ticks = 0;
@@ -325,7 +335,7 @@ static int select_group_for_control(void)
 static int attack_move_selected(int x, int y)
 {
     if (selected_count() <= 0 || selected_building >= 0) return 0;
-    tap(KEY_B);
+    tap_b();
     tap(KEY_DOWN); /* ATTACK MOVE */
     tap(KEY_A);
     move_cursor(x, y);
@@ -466,7 +476,7 @@ static void ensure_gateway(void)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_PROBE &&
             u[i].order != ORDER_BUILD) { worker = i; break; }
     if (worker < 0 || select_worker_at(u[worker].x, u[worker].y) < 0) return;
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < MENU_BARRACKS; ++i) tap(KEY_DOWN);
     tap(KEY_A); /* Protoss first building-menu entry is Gateway. */
     move_cursor(site_x, site_y);
@@ -482,7 +492,7 @@ static void build_near_nexus(int type, int menu_row)
     worker = nearest_available_probe(site_x, site_y);
     if (worker >= 0) best = dist2(u[worker].x, u[worker].y, site_x, site_y);
     if (worker < 0 || select_worker_at(u[worker].x, u[worker].y) < 0) return;
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < menu_row; ++i) tap(KEY_DOWN);
     tap(KEY_A);
     move_cursor(site_x, site_y);
@@ -524,7 +534,7 @@ static void build_on_site(int type, int menu_row, int site_x, int site_y)
         int nx, ny;
         if (!path_next_tile(u[worker].x, u[worker].y, site_x, site_y, &nx, &ny)) return;
     }
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < menu_row; ++i) tap(KEY_DOWN);
     tap(KEY_A);
     move_cursor(site_x, site_y);
@@ -563,7 +573,7 @@ static void build_photon_cannon_near_nexus(void)
     if (best == 0x7fffffff) return;
     worker = nearest_available_probe(site_x, site_y);
     if (worker < 0 || select_worker_at(u[worker].x, u[worker].y) < 0) return;
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < 12 && menu_open && menu_cursor != MENU_STOP + 2; ++i)
         tap(KEY_DOWN);
     if (!menu_open || menu_cursor != MENU_STOP + 2 ||
@@ -581,7 +591,7 @@ static void build_mineral_expansion(void)
         !find_expansion_site(&site_x, &site_y)) return;
     worker = nearest_available_probe(site_x, site_y);
     if (worker < 0 || select_worker_at(u[worker].x, u[worker].y) < 0) return;
-    tap(KEY_B);
+    tap_b();
     for (int i = 0; i < 12 && menu_open && menu_cursor != MENU_STOP + 1; ++i)
         tap(KEY_DOWN);
     if (!menu_open || menu_cursor != MENU_STOP + 1 ||
@@ -637,7 +647,7 @@ static void assign_gas_probe(void)
                 int patch = nearest_mineral(u[j].x, u[j].y);
                 if (patch < 0) return;
                 select_box(u[j].x, u[j].y, 8);
-                tap(KEY_B); tap(KEY_A); /* choose ordinary MOVE */
+                tap_b(); tap(KEY_A); /* choose ordinary MOVE */
                 move_cursor(m[patch].x, m[patch].y);
                 tap(KEY_A);
                 return;
@@ -662,7 +672,7 @@ static void assign_gas_probe(void)
                 }
             if (nearest >= 0 && u[nearest].order != ORDER_MOVE) {
                 select_box(u[nearest].x, u[nearest].y, 8);
-                tap(KEY_B); tap(KEY_A); /* choose normal MOVE order */
+                tap_b(); tap(KEY_A); /* choose normal MOVE order */
                 move_cursor(b[i].x, b[i].y);
                 tap(KEY_A);
             }
@@ -683,7 +693,7 @@ static int recover_stalled_builder(void)
             int wx = u[i].x, wy = u[i].y;
             select_box(wx, wy, 8);
             if (selected_count() != 1 || selected_building >= 0) return 0;
-            tap(KEY_B);
+            tap_b();
             for (int row = 0; row < MENU_COUNT && menu_open && menu_cursor != MENU_STOP; ++row)
                 tap(KEY_DOWN);
             if (!menu_open || menu_cursor != MENU_STOP) return 0;
@@ -783,16 +793,17 @@ static void issue_defense_order(void)
 static void issue_sweep_order(void)
 {
     ensure_normal_ui();
-    int army = -1, best = 0x7fffffff;
+    int army = -1, best = 0x7fffffff, target = -1;
+    /* Aim from the fighter nearest the cursor that can reach a foe base;
+       one boxed in by the home buildings must not stall the assault. */
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && !sc64_race_is_worker(u[i].type) &&
             u[i].type != U_OVERLORD && u[i].type != U_CHRYSALIS) {
-            int d = dist2(cx, cy, u[i].x, u[i].y);
-            if (d < best) { best = d; army = i; }
+            int d = dist2(cx, cy, u[i].x, u[i].y), reach;
+            if (d >= best || (reach = closest_foe_building(u[i].x, u[i].y)) < 0) continue;
+            best = d; army = i; target = reach;
         }
-    if (army < 0) return;
-    int target = closest_foe_building(u[army].x, u[army].y);
-    if (target >= 0) issue_attack_move(b[target].x, b[target].y);
+    if (army >= 0) issue_attack_move(b[target].x, b[target].y);
 }
 
 static void print_blocker(void)
