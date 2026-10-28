@@ -107,6 +107,42 @@ trigger starts with a batch of 28 creates. Its pool/storage and property
 decoder requirements make it a poor next integration target despite its
 moderate trigger count.
 
+### P8 scheduler scaffold
+
+P8 now has a compact source-order trigger runner and a typed view over its
+compact generated trigger rows. The runner accepts condition/action callbacks,
+keeps an independent cursor for each of eight trigger records, and bounds each
+record to 16 conditions and 64 actions. The caller chooses when to run a pass;
+this scaffold does not encode or qualify P8's native scheduler cadence.
+
+An asynchronous action resumes at the same cursor. A callback can return
+`BLOCKED` when a timed action cannot start because its owner already has a
+shared wait; that action is retried on the next pass without the resume marker,
+while later triggers and immediate actions still run in source order. As in the
+existing native-backed Z8 action model, the callback must own the shared timer
+per source owner and the armed marker per action. This repository does not yet
+provide P8 world callbacks that implement those wait semantics. Terminal
+results are accumulated across the source-order pass, with Victory taking
+precedence over Defeat, and are accepted only from matching final
+Victory/Defeat actions. Unknown conditions or actions fault the run instead of
+being silently skipped.
+
+P8 is not wired into gameplay, menus or saves. Its three opaque AI identifiers
+are not implemented or executed as bytecode; creation, resource, switch,
+location, presentation, speech and other effects still need exact world
+handlers. No P8 native cadence/replay, runtime callback coverage, save/load or
+ordinary-input qualification exists. The scaffold does not establish that the
+mission starts, progresses, or reaches a source victory.
+
+`make test-sc64-p8-runtime` is an asset-free synthetic check and is part of
+`test-starcraft`. If a P8 generated scenario header already exists locally,
+`make test-sc64-p8-source-contract` checks its compact table bounds and
+fail-closed callback bridge. That target checks the generated header only; it
+does not authenticate its CHK provenance, run the importer, or create generated
+data. Source authentication remains a separate packer verification step.
+With the existing staged CHK and manifest, that read-only step is
+`python3 tools/sc64_zp_scenario_pack.py --mission P8 --verify-staged`.
+
 The terminal rules are compactly source-expressible, but still need exact
 runtime tests. Z5 wins on a set switch and loses when selector 18 has no raw
 51. Z6 combines a switch and a raw-79 count condition for victory; its defeat
