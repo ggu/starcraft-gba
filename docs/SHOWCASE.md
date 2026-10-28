@@ -67,7 +67,7 @@ profile's controls and menus:
   minerals or gas short by an amount, no free worker, nothing selected,
   fully upgraded). Contextual rows (Nexus, Cannon, Lair, Spire, Creep
   Colony, spells, transports, lift/land) keep their places. The list
-  reopens on the last command, so B, A repeats it.
+  reopens on the last command, so B, A repeats it. The Showcase draws this list as a command card (below).
 - Placement snaps to an 8-pixel grid; gas structures snap to their geyser.
   The footprint is green when A places it, gold on clear ground that still
   lacks tech, funds or a worker, and red when the ground rejects it, with the
@@ -87,6 +87,46 @@ it is presentation and input routing: no saved state is added. The HUD
 resolves the A action once per simulation update rather than per drawn
 frame, because crowded scenes draw several frames per update; a scene
 restart or a load clears that result, since both jump the update counter.
+
+## Command card and HUD icons
+
+The Showcase build also turns on `SC64_COMMAND_ICONS`, which replaces the
+text order list with StarCraft's command card and the HUD's resource labels
+with StarCraft's own art. Before building, `tools/sc64_command_icons.py`
+imports from the verified ROM into `.local/sc64/command-icons/generated/`
+(about 19 KB):
+
+- every portrait from the command-button sheet, indexed by raw unit id, and
+  the Move, Stop, Attack, Unload and Lift/Land buttons and the upgrade and
+  spell buttons named by `upgrades.dat` and `techdata.dat`. The importer
+  checks each order and spell icon against the ROM's own button sets and
+  each upgrade against its stat_txt name. Buttons keep their native size of
+  up to 20 by 20 pixels, in three shades; the few portraits that are full
+  art rather than buttons are left out;
+- the N64 HUD's own resource icons (`011/014`, in StarCraft's icons.grp
+  order): minerals, the gas icon the N64 draws for every race, and each
+  race's supply icon, without their 1-pixel frame so they fit the
+  12-pixel top bar, matched to the nearest runtime palette colours.
+
+- B opens the card bottom right: Move, Stop and Attack on the top row, then
+  the list's other commands three to a row in their usual order. Buttons are
+  green when usable, grey when not, and gold and framed when highlighted; a
+  red pip marks a command that is only short of minerals or gas.
+- The D-pad moves on the card. Left and right wrap within a row, up and down
+  within a column, so B, Left, A arms Attack Move.
+- The HUD shows the highlighted command's button beside its name, cost and
+  explanation, and keeps the button while a move, attack or placement is
+  armed.
+- The top bar draws the N64 mineral and gas icons and the player race's
+  supply icon in place of MIN, GAS and SUP.
+- With units selected, the HUD shows the first unit's portrait, its name or
+  the group's size, and shield and health bars in place of the SH and HP
+  numbers.
+
+The card only changes drawing and D-pad routing: the list's row numbers,
+B, A repeating the last command, and every order and build path are
+unchanged. A list longer than 15 commands keeps the framed text list. Other
+race ROMs keep the text list.
 
 ## Unit facing
 
