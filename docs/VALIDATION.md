@@ -10,6 +10,34 @@ probe and Z7 controller ROMs are byte-identical to `codex/source-release`
 exercise linked transit with ordinary input. Neither is Z8 gameplay or
 physical-GBA evidence. See [Nydus Canal](NYDUS-CANAL.md).
 
+## Contact cache movement measurement (2026-10-27)
+
+`SC64_CONTACT_CACHE` is now part of the canonical Terran, Zerg and Protoss
+ROM flags. It caches each unit type's collision facts in one byte, answers
+all eight blocked-steering offsets in one bucket pass and removes the
+software division from the stock movement step, without changing the
+collision predicate, steering order, speeds, routes or save formats. On the
+public P7 movement workload the attack-move phase falls from 1,890,055 to
+1,551,295 timer cycles per update (−17.9%, 8.88 → 10.82 fps) and the
+opening from 1,582,381 to 1,426,952 (−9.8%); last-tick update cycles fall
+21.3% and orders-stage cycles 30.1%, with all 23 state checkpoints matching.
+Those figures are for the P7 probe, which keeps the steering pass and the
+stock step in IWRAM. The canonical Zerg Z6 and Protoss P6 ROMs have no IWRAM
+reserve for them and build with `CONTACT_ROM_PLACEMENT_FLAGS` (steering
+pass and stock step in ROM); the P7 probe built with the same flags keeps
+all 23 checkpoints and falls from 1,890,055 to 1,744,951 attack-move cycles
+per update (−7.7%, 8.88 → 9.62 fps) and 1,582,381 to 1,447,575 in the
+opening (−8.5%). Canonical Terran 3-bot skirmishes match every checkpoint
+and stay at their frame cap. The differential fixture
+(`make test-sc64-contact-cache`) checks about 10 million step, mask and
+stock-step answers against the original code under six flag sets, including
+the canonical Zerg and Protoss vectors, and `make test-sc64-p7-contact`
+reproduces the reference P7 trace byte for byte. The canonical Terran, Zerg
+Z6, Zerg Z4, Protoss P6, P5 Shuttle and P4 Storm products all link under the
+unchanged linker guards (Zerg Z6 IWRAM end `0x03004ea8`, Protoss P6
+`0x03004ae8`). No near-30-fps or hardware claim is made. See the
+[contact cache audit](audits/2026-10-27-contact-cache/README.md).
+
 ## Current campaign status (2026-10-27)
 
 The [stock roster follow-up](audits/2026-10-26-roster-contact-and-art/README.md)
@@ -5482,6 +5510,84 @@ are not played. Building completion uses the building's selection sound.
 Shots are inferred from a raised cooldown, so a weapon sounds once per
 cooldown cycle. Victory and defeat stingers come from the N64 result flag and
 have not been confirmed by ear.
+### Compressed audio bank (2026-10-27)
+
+The sampled-audio bank is now stored losslessly compressed (codec format 2,
+described in [Development](DEVELOPMENT.md#optional-starcraft-64-sound-effects-and-music))
+and decoded in the VBlank handler; the mixer, voice policy, music sequencing
+and the presentation hooks are unchanged. The decoded PCM is the same signed
+8-bit 10512 Hz data as before, except that each clip is padded with silence to
+a multiple of eight samples.
+
+Sizes, from the private bank generated with the default predictor policy
+(`--predictors 01`):
+
+| | PCM bytes | Encoded bytes | Saved |
+|---|---:|---:|---:|
+| 501 sound effect clips | 7,417,600 | 4,564,280 | 2,853,320 (38.5%) |
+| 13 music tracks | 8,231,520 | 3,798,692 | 4,432,828 (53.9%) |
+| Bank (with the 208-byte guard) | 15,648,312 | 8,363,180 | 7,285,132 (46.6%) |
+
+Allowing the second-order predictor as well (`--predictors 012`) saves
+7,355,706 bytes but makes most music streams about half again as expensive to
+decode, so it is not the default. The experimental P7 move probe's ROM text
+shrinks from 20,100,040 to 12,822,924 bytes, and the unified ROM text is 11,804,812 bytes (the previous audio
+qualification build on an older base linked 17,766,376), so these images no
+longer need the full 32 MiB cartridge.
+
+Correctness:
+
+- `make test-audio` (in `./dev test`) now also runs `build/test-audio-codec`
+  (round trips through a plain reference encoder for silence, DC, ramps,
+  full-scale squares, noise, random walks, every width and predictor, chunked
+  versus whole-stream decoding, exact-size allocations under ASan and
+  hand-built byte vectors) and `test-audio-codec-cross`, which encodes
+  synthetic PCM with the Python pack tool and decodes it with the C decoder,
+  then the reverse, comparing every sample. The mixer checks build their
+  fixture bank with the reference encoder and keep every earlier assertion.
+- `tools/sc64_audio_pack.py` decodes every stream with its own reference
+  decoder before writing the bank and records the PCM hash;
+  `--verify-bank` repeats that check on an existing bank.
+- `make test-audio-bank` (private, needs the bank) decodes all 514 streams of
+  the real bank frame by frame with the C decoder and matched the manifest
+  hash `9979d9b9…b185eb10`: the GBA decoder reproduces the previous
+  uncompressed bank exactly.
+- `tools/sc64_p7_move_workload.py --compare` on the P7 move probe built with
+  the compressed bank against the uncompressed baseline: all 14 checkpoints
+  identical (unit, building, resource, visibility and campaign state hashes),
+  the same 25 inputs and the same end at frame 1705.
+
+Memory, from a rebuild of every ARM ELF target whose inputs are prepared:
+`__iwram_end` is byte-identical to the base on every build (the decoder runs
+as Thumb code from ROM; IWRAM has 32-270 bytes left in the shipping race
+ROMs, so an IWRAM decoder was rejected). BSS shrinks by 12 bytes: the mixer
+keeps only a pointer to the five stream decoder states (four voices and
+music), which live in the VRAM arena as word and halfword fields. The arena
+now holds the mix and music double buffers with their guards, the four voice
+scratch slots and the decoder states (1,600 bytes) plus the event snapshot,
+at most 2,400 of 2,560 bytes. The showcase ROM, the tightest build, ends BSS
+at `0x0203dfc8` (56 bytes under the guard; an earlier draft that kept the
+decoders in EWRAM overflowed it by 24 bytes).
+
+CPU, measured in mGBA with the same workload (600 neutral ticks then a 600
+tick attack-move on the P7 move probe, menu theme and mission music playing):
+
+| Build | Audio VBlank cycles, average | Peak | Neutral fps | Attack-move fps |
+|---|---:|---:|---:|---:|
+| Uncompressed bank (base) | 1,134 | 1,719 | 10.603 | 9.646 |
+| Compressed, first decoder | 8,805 | 16,397 | 10.262 | 9.277 |
+| Compressed, tuned decoder, state in VRAM | 6,328 | 11,486 | 10.348 | 9.384 |
+
+Music costs decode time now (it was free DMA from ROM before), so the audio
+handler's steady cost is higher than with the raw bank; the tuned decoder
+spends about 30 cycles per decoded sample: 9.8 (first-order) to 11.4
+(second-order) Thumb instructions per sample on real streams, fetched
+from ROM, with the per-block header at 6 instructions when the width repeats.
+
+Limits: emulator measurements, not hardware; the audio was not checked by
+ear in this run (the decoded samples are proven identical, so the mix is the
+same as before); a physical cartridge test of the DMA2 double buffer is still
+outstanding, as it was for DMA1.
 ### Death animations (2026-10-25)
 
 Units and buildings now play death effects instead of disappearing. Deaths
@@ -5802,6 +5908,14 @@ of a full Z7 ARM win; it does not qualify the seven-mission profile's carried
 missions.
 Canonical menus and qualified staged progress remain unchanged at 22/30.
 
+The 2026-10-28 standalone Z7 release candidate changes the movement options to
+the CONTACT cache and compiles out debugger input storage. Its standalone ARM
+link passes with BSS end `0x0203d7e0` and IWRAM end `0x03004d28`; its CONTACT
+host replay still matches all 365 frozen checkpoints. The earlier full ARM
+win and SRAM continuation used the previous collision flags. This exact
+release vector has no full ARM win or fresh-process SRAM qualification. See
+the [CONTACT release-candidate audit](audits/2026-10-28-z7-contact-release/README.md).
+
 The same replay with only `SC64_ROUTE_DECAY_FREQ` added also matched all 365
 checkpoints through the source win. Its instrumented combined mean was
 5617463 cycles (about 2.99 rendered updates/second), a 4.42% reduction from
@@ -5879,3 +5993,8 @@ does not promote a campaign chapter or change canonical progress from 22/30.
 A separate attempt to postpone steering-list overflow until after filtering
 also matched all 365 host checkpoints and all 20 bounded ARM checkpoints,
 but increased combined ARM cycles by 2.56%; it remains private and disabled.
+
+The separate Z7 CONTACT candidate has a [frozen ARM win and fresh-process
+save audit](audits/2026-10-28-z7-arm-save-win/README.md). It remains below
+the near-30-fps target; current-source host coverage and ARM source boundaries
+are reported separately.

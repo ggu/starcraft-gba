@@ -4,6 +4,10 @@
 #if defined(SC64_P7_SIGHT_AXIS_CULL) && !defined(SC64_P7_ACTORS)
 #error "SC64_P7_SIGHT_AXIS_CULL requires SC64_P7_ACTORS"
 #endif
+#if defined(SC64_P7_ARBITER_AURA_ONCE) && \
+    !defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED)
+#error "SC64_P7_ARBITER_AURA_ONCE requires the P7 Arbiter cache"
+#endif
 
 #ifdef SC64_P7_OBSERVER_ENABLED
 /* Current roster maxima after source-pixel conversion, including fallbacks.
@@ -12,6 +16,7 @@
 enum { SC64_P7_SIGHT_UNIT_AXIS_BOUND=176, SC64_P7_SIGHT_BUILDING_AXIS_BOUND=160 };
 #include "sc64_p7_observer_rules.h"
 #include "sc64_p7_geometry.h"
+#include "sc64_p7_sight_runtime.h"
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
 #include "sc64_p7_power_geometry.h"
 #endif
@@ -31,17 +36,6 @@ static int sc64_p7_observer_source_matches(int raw_owner, int live_owner,
     return live_owner == source_live_owner;
 }
 
-static int sc64_p7_observer_sight_radius_runtime(int type, int building)
-{
-    int source_pixels = building ?
-        sc64_zp_building_sight_source_pixels(type) :
-        sc64_zp_actor_sight_source_pixels(type);
-    if (source_pixels > 0) return source_pixels / 2;
-    if (building)
-        return (type == B_COMMAND || sc64_race_is_zerg_townhall(type) ||
-                type == B_NEXUS) ? 112 : 64;
-    return IS_WORKER(type) ? 56 : 72;
-}
 
 static int sc64_p7_observer_owner_sees_cell(int source_owner, int live_owner,
                                            int cell)
@@ -461,6 +455,9 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                     while(ent!=SC64_TARGET_NONE) {
                         int slot=(int)ent;
                         if(slot<MAX_UNITS && slot!=(int)i &&
+#ifdef SC64_P7_ARBITER_AURA_ONCE
+                           !aura[slot] &&
+#endif
                            sc64_p7_observer_arbiter_aura_candidate(slot) &&
                            sc64_p7_arbiter_same_source((int)i,slot) &&
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
@@ -487,6 +484,9 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                 }
         } else {
             for (j=0;j<MAX_UNITS;++j) if (j!=i &&
+#ifdef SC64_P7_ARBITER_AURA_ONCE
+                !aura[j] &&
+#endif
                 sc64_p7_observer_arbiter_aura_candidate((int)j) &&
                 sc64_p7_arbiter_same_source((int)i,(int)j) &&
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
