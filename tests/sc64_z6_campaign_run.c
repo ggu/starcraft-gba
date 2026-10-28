@@ -214,7 +214,7 @@ static int build_spire(void)
     if(raw_building(141,SIDE)>=0||hatch<0)return raw_building(141,SIDE)>=0;
     for(int i=0;i<MAX_UNITS;i++)
         if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==41&&
-           u[i].order!=ORDER_BUILD){worker=i;break;}
+           !SC64_BUILD_WORKER_ORDER(u[i].order)){worker=i;break;}
     if(worker<0)return 0;
     int best=0x7fffffff;
     for(int y=360;y<720;y+=32)for(int x=480;x<880;x+=32)if(can_place(B_SPIRE,x,y)){
@@ -229,11 +229,11 @@ static int build_spire(void)
     if(mode!=MODE_BUILD||menu!=B_SPIRE)return 0;
     move_cursor(site_x,site_y);tap(KEY_A);
     fprintf(stderr,"spire order site%d,%d worker%d order%d mode%d menu%d ownerminerals%d gas%d\n",site_x,site_y,worker,u[worker].order,mode,menu,minerals,gas);
-    return u[worker].order==ORDER_BUILD;
+    return SC64_BUILD_WORKER_ORDER(u[worker].order);
 }
 static int build_extractor(void)
 {
-    int worker=-1,geyser=-1;
+    int worker=-1,geyser=-1,intent=-1;
     if(raw_building(149,SIDE)>=0)return 1;
     for(int i=0;i<geyser_count;i++) {
         int used=0;
@@ -242,7 +242,7 @@ static int build_extractor(void)
         if(!used){geyser=i;break;}
     }
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==41&&
-        u[i].order!=ORDER_BUILD){worker=i;break;}
+        !SC64_BUILD_WORKER_ORDER(u[i].order)){worker=i;break;}
     if(worker<0||geyser<0){fprintf(stderr,"extractor prereq fail worker%d geyser%d count%d\n",worker,geyser,geyser_count);return 0;}
     /* A Drone moves while the cursor is steered, so capture the base group
      * with a broad ordinary drag. start_build consumes only its first worker. */
@@ -253,11 +253,34 @@ static int build_extractor(void)
     fprintf(stderr,"extractor attempt geyser%d xy%d,%d worker%d order%d building%d mode%d bank%d/%d\n",
         geyser,geysers[geyser].x,geysers[geyser].y,worker,u[worker].order,
         raw_building(149,SIDE),mode,minerals,gas);
+    if(raw_building(149,SIDE)>=0)return 1;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+        u[i].order==ORDER_BUILD_PENDING&&u[i].target==B_EXTRACTOR&&
+        u[i].tx==geysers[geyser].x&&u[i].ty==geysers[geyser].y){intent=i;break;}
+    if(intent<0) {
+        fprintf(stderr,"Extractor click did not issue matching pending intent worker%d order%d target%d\n",
+            worker,u[worker].order,u[worker].target);
+        return 0;
+    }
+    unsigned arrival_start=host_ticks;
+    while(raw_building(149,SIDE)<0&&host_ticks-arrival_start<10000u&&
+          u[intent].alive&&u[intent].order==ORDER_BUILD_PENDING&&
+          u[intent].target==B_EXTRACTOR&&screen==SCREEN_PLAY&&!won&&!lost) input(0);
+    if(raw_building(149,SIDE)<0) {
+        fprintf(stderr,"Extractor pending intent ended without a foundation after%u ticks: worker%d alive%d order%d target%d site%d,%d\n",
+            host_ticks-arrival_start,intent,u[intent].alive,u[intent].order,
+            u[intent].target,u[intent].tx,u[intent].ty);
+        return 0;
+    }
+    fprintf(stderr,"normal-input Extractor foundation arrived slot%d after%u ticks progress%d\n",
+        raw_building(149,SIDE),host_ticks-arrival_start,
+        b[raw_building(149,SIDE)].build_progress);
     return raw_building(149,SIDE)>=0;
 }
 static int build_extra_hatchery(void)
 {
     int worker=-1,site_x=-1,site_y=-1,hatch=raw_building(132,SIDE),best=-1;
+    int existing=owned_building_count(B_HATCHERY),intent=-1;
     if(hatch<0)hatch=raw_building(131,SIDE);
     if(owned_building_count(B_HATCHERY)>=2)return 1;
     if(hatch<0||minerals<300)return 0;
@@ -274,7 +297,29 @@ static int build_extra_hatchery(void)
     if(mode!=MODE_BUILD||menu!=B_HATCHERY)return 0;
     move_cursor(site_x,site_y);tap(KEY_A);
     fprintf(stderr,"extra Hatchery attempt site%d,%d worker%d order%d buildingcount%d bank%d/%d\n",site_x,site_y,worker,u[worker].order,owned_building_count(B_HATCHERY),minerals,gas);
-    return owned_building_count(B_HATCHERY)>0;
+    if(owned_building_count(B_HATCHERY)>existing)return 1;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+        u[i].order==ORDER_BUILD_PENDING&&u[i].target==B_HATCHERY&&
+        u[i].tx==site_x&&u[i].ty==site_y){intent=i;break;}
+    if(intent<0) {
+        fprintf(stderr,"second Hatchery click did not issue matching pending intent worker%d order%d target%d\n",
+            worker,u[worker].order,u[worker].target);
+        return 0;
+    }
+    unsigned arrival_start=host_ticks;
+    while(owned_building_count(B_HATCHERY)<=existing&&host_ticks-arrival_start<10000u&&
+          u[intent].alive&&u[intent].order==ORDER_BUILD_PENDING&&
+          u[intent].target==B_HATCHERY&&screen==SCREEN_PLAY&&!won&&!lost) input(0);
+    if(owned_building_count(B_HATCHERY)<=existing) {
+        fprintf(stderr,"second Hatchery intent ended without a foundation after%u ticks: worker%d alive%d order%d target%d site%d,%d\n",
+            host_ticks-arrival_start,intent,u[intent].alive,u[intent].order,
+            u[intent].target,u[intent].tx,u[intent].ty);
+        return 0;
+    }
+    fprintf(stderr,"normal-input second Hatchery foundation arrived slot%d after%u ticks progress%d\n",
+        raw_building(131,SIDE),host_ticks-arrival_start,
+        raw_building(131,SIDE)>=0?b[raw_building(131,SIDE)].build_progress:-1);
+    return 1;
 }
 static int assign_gas_worker(int worker)
 {

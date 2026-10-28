@@ -70,3 +70,52 @@ BSS/IWRAM guards. These are link checks, not campaign or frame-rate evidence.
 Additional lifecycle, save, normal-menu and carried-mission results must be
 recorded before promoting this branch. In particular, a whole current-controls
 Z7 win and near-30-fps performance are not established by these checks.
+
+
+### Local results at runtime `bacfd64`
+
+The runtime tree (`common/` and `starcraft/`) remains identical to that revision
+through the subsequent fixture/controller changes. Default doctor/build and
+full tests pass: 609 Python tests with 18 optional skips, plus C fixtures. The
+source-boundary check passes on the staged source-only tree.
+
+Both lifecycle and actual Save fixtures pass in Terran, Z6, typed P7 and derived
+Z7, each checking all three player races. Coverage includes travel interruption,
+Drone/Extractor recovery, self versus other-unit occupancy, resource/technology
+revalidation, building slots filling after admission, successful race-specific
+commit, dead slots and transactional rejection of malformed pending identities.
+These authored worlds exercise the actual engine but are not hardware or
+whole-campaign evidence. Save coverage here is in-process host SRAM.
+
+Normal-menu skirmish/save/reload/continued-state checks pass all 72 cases across
+Terran, Z6 and P7: both maps, every player race, 1–3 AIs and focused three-AI race
+compositions. Four normal-product ARM links with actual prepared briefing and
+advisor audio inputs retain the unchanged guards:
+
+| Product | BSS end | IWRAM end |
+| --- | --- | --- |
+| Terran | `0x0203de14` | `0x03004e20` |
+| Z6 | `0x0203de78` | `0x03004f18` |
+| P7 | `0x0203dd78` | `0x03004b68` |
+| Showcase | `0x0203ded8` | `0x03004fa8` |
+
+Existing race, gas placement/harvest, construction-rendering, blue warp-anchor,
+Z7 Colony/morph and Egg fixtures pass after updating their synchronous
+foundation assumptions. Source effects and completed-sprite assertions remain.
+
+P7 reaches strict source victory at frame 36,488 with its three heroes alive.
+Z6 initially failed because its controller checked for an Extractor and second
+Hatchery immediately after placement. Waiting via ordinary neutral input for
+their actual foundations restores strict victory at host tick 116,025, frame
+114,898, without changing the mission conditions. The current-main `f17a184`
+baseline wins at host tick 119,892.
+
+Terran T1, T2, T3, T4, T6, T7, T8 and T10 host controllers pass. T1/T6/T8 need
+the same controller-only travel/foundation distinction. T5 still fails after
+its asynchronous construction helpers were migrated, whereas current-main
+`f17a184` passes with the same canonical flags and limit. This is a remaining
+regression gate. T9 also reaches its limit, including on that current-main
+baseline; it remains unqualified. None of these results establishes a new Z7
+full win, fresh-process SRAM continuity, physical-GBA behavior or near-30-fps
+performance. Keep the change draft until the outstanding campaign gates are
+resolved.

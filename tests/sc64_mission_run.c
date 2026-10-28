@@ -392,9 +392,10 @@ start_barracks(void)
         return 0;
     }
     press_key(KEY_A);
-    if (barracks_slot() < 0 || u[worker].order != ORDER_BUILD) {
-        fprintf(stderr, "Barracks issue failed slot=%d worker=%d order=%d target=%d,%d minerals=%d\n",
-                barracks_slot(),worker,u[worker].order,site_x,site_y,minerals);
+    if (barracks_slot() >= 0 || u[worker].order != ORDER_BUILD_PENDING ||
+        u[worker].target != B_BARRACKS) {
+        fprintf(stderr, "Barracks pending issue failed slot=%d worker=%d order=%d product=%d target=%d,%d minerals=%d\n",
+                barracks_slot(),worker,u[worker].order,u[worker].target,site_x,site_y,minerals);
         return 0;
     }
     /* B exits build mode via its menu; a second B closes that menu. */
@@ -402,6 +403,15 @@ start_barracks(void)
     press_key(KEY_B);
     if (mode != MODE_NORMAL || menu_open)
         fprintf(stderr, "Barracks menu close failed mode=%d menu=%d\n",mode,menu_open);
+    /* Placement now records an unpaid travel intent first. Let the selected SCV travel
+     * to the authored site; the foundation must not exist until arrival. */
+    for (i = 0; i < 3000 && barracks_slot() < 0 && screen != SCREEN_RESULT; i++)
+        input_frame(movement_base);
+    if (barracks_slot() < 0 || !u[worker].alive || u[worker].order != ORDER_BUILD) {
+        fprintf(stderr, "Barracks arrival failed slot=%d worker=%d alive=%d order=%d frame=%d\n",
+                barracks_slot(),worker,u[worker].alive,u[worker].order,frame);
+        return 0;
+    }
     return mode == MODE_NORMAL && !menu_open;
 }
 
