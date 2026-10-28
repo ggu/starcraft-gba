@@ -4282,7 +4282,14 @@ test-sc64-collision-bounds: $(addprefix build/test-sc64-collision-bounds-,cached
 	./build/test-sc64-collision-bounds-packed
 	./build/test-sc64-collision-bounds-hoisted
 	./build/test-sc64-collision-bounds-plain
-test: test-sc64-collision-bounds
+test: test-sc64-collision-bounds test-sc64-contact-bucket-birth
+
+# A post-build spawn's first move must not unlink an unrelated live bucket.
+build/test-sc64-contact-bucket-birth: tests/sc64_contact_bucket_birth.c starcraft/sc64_collision_legacy.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST $< -o $@
+.PHONY: test-sc64-contact-bucket-birth
+test-sc64-contact-bucket-birth: build/test-sc64-contact-bucket-birth
+	./build/test-sc64-contact-bucket-birth
 
 # SC64_CONTACT_CACHE differential checks: the cached-fact bucket query, the
 # one-pass blocked-steering mask and the stock-rate cache against the original
