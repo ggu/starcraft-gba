@@ -755,11 +755,29 @@ static int check_field_controls_races(void)
         cx = x + 3; cy = y + 2;
         game_render();
         before = minerals;
+        int gas_before = gas;
+        int build_type = menu;
         press(KEY_A);
-        for (slot = 0; slot < MAX_BUILDINGS; ++slot)
-            if (b[slot].alive && b[slot].owner == SIDE && b[slot].type == menu &&
-                dist2(b[slot].x, b[slot].y, x + 3, y + 2) < 8 * 8) placed = slot;
+        /* The placement click records a travel order. The worker commits the
+         * foundation only after arriving, so advance the live simulation
+         * with ordinary input frames before looking for a building slot. */
+        int foundation_mineral_delta = 0, foundation_gas_delta = 0;
+        for (int wait = 0; wait < 2400 && placed < 0; ++wait) {
+            int minerals_before_tick = minerals, gas_before_tick = gas;
+            frame_input(0);
+            for (slot = 0; slot < MAX_BUILDINGS; ++slot)
+                if (b[slot].alive && b[slot].owner == SIDE && b[slot].type == build_type &&
+                    dist2(b[slot].x, b[slot].y, x + 3, y + 2) < 8 * 8) placed = slot;
+            if (placed >= 0) {
+                foundation_mineral_delta = minerals_before_tick - minerals;
+                foundation_gas_delta = gas_before_tick - gas;
+            }
+        }
         if (placed < 0 || minerals >= before) return fail("races: placement without a selected worker failed");
+        const Sc64RaceBuildingRule *rule = sc64_race_building_rule(build_type);
+        if (!rule || foundation_mineral_delta != rule->minerals ||
+            foundation_gas_delta != rule->gas)
+            return fail("races: foundation did not charge the selected structure price");
         if ((b[placed].x & 7) || (b[placed].y & 7)) return fail("races: placement did not snap to the grid");
         if (selected_count()) return fail("races: the builder replaced the selection");
 

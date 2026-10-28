@@ -43,7 +43,8 @@ static int select_free_probe(void)
 {
     for (int tries = 0; tries < MAX_UNITS; ++tries) {
         int worker = find_selected_worker();
-        if (worker >= 0 && u[worker].type == U_PROBE && u[worker].order != ORDER_BUILD &&
+        if (worker >= 0 && u[worker].type == U_PROBE &&
+            u[worker].order != ORDER_BUILD && !SC64_PENDING_BUILD_ORDER(u[worker].order) &&
             selected_count() == 1) return worker;
         /* L tap cycles the normal field selection to the next unit. */
         tap_rendered(KEY_L);
@@ -51,14 +52,39 @@ static int select_free_probe(void)
     return -1;
 }
 
+/* choose_build_site() checks terrain and buildings but not arriving units.
+ * Leave a short movement buffer around the UI site so another unit does not
+ * enter the Pylon footprint before its builder arrives. */
+static int choose_pylon_site(int worker, int *x, int *y)
+{
+    int best_distance = 0x7fffffff, found = 0;
+    for (int ring = 0; ring < 3; ++ring)
+        for (int sy = race_base_y[0] - 96 - ring * 32;
+             sy <= race_base_y[0] + 96 + ring * 32; sy += 16)
+            for (int sx = race_base_x[0] - 96 - ring * 32;
+                 sx <= race_base_x[0] + 96 + ring * 32; sx += 16) {
+                if (sx < 24 || sy < 24 || sx >= WORLD_W - 24 || sy >= WORLD_H - 24 ||
+                    !race_can_site(SIDE, B_PYLON, sx, sy) || !can_place(B_PYLON, sx, sy)) continue;
+                int clear = 1;
+                for (int i = 0; i < MAX_UNITS; ++i)
+                    if (i != worker && u[i].alive &&
+                        dist2(u[i].x, u[i].y, sx, sy) < 40 * 40) clear = 0;
+                if (!clear) continue;
+                int d = dist2(cx, cy, sx, sy);
+                if (d < best_distance) { best_distance = d; *x = sx; *y = sy; found = 1; }
+            }
+    return found;
+}
+
 static int issue_pylon(void)
 {
     int worker, x = -1, y = -1;
     int before = count_buildings(SIDE, B_PYLON);
-    if (minerals < sc64_race_building_rule(B_PYLON)->minerals ||
-        !choose_build_site(B_PYLON, &x, &y)) return 0;
+    const Sc64RaceBuildingRule *rule = sc64_race_building_rule(B_PYLON);
+    if (!rule || minerals < rule->minerals) return 0;
     worker = select_free_probe();
     if (worker < 0) return 0;
+    if (!choose_pylon_site(worker, &x, &y)) return 0;
 
     tap_rendered(KEY_B);
 #ifdef SC64_COMMAND_ICONS /* the command card: right to Pylon's column, then down */
@@ -73,10 +99,42 @@ static int issue_pylon(void)
     tap_rendered(KEY_A);
     if (mode != MODE_BUILD || menu != B_PYLON) return 0;
     move_cursor_rendered(x, y);
-    tap_rendered(KEY_A);
-    /* A nearby Probe may arrive and return to mining during the click's
-     * update; count the world result rather than assuming it remains busy. */
-    return count_buildings(SIDE, B_PYLON) > before;
+    int before_click_minerals = minerals;
+    int before_click_pylons = count_buildings(SIDE, B_PYLON);
+    input(KEY_A);
+    render_snapshot();
+    int click_buildings = count_buildings(SIDE, B_PYLON);
+    int click_mineral_delta = before_click_minerals - minerals;
+    if (click_buildings > before_click_pylons)
+        return click_mineral_delta > 0 && click_mineral_delta <= rule->minerals;
+    int pending = u[worker].order == ORDER_BUILD_PENDING && u[worker].target == B_PYLON;
+    if (!pending || click_mineral_delta != 0) return 0;
+
+    int before_release_minerals = minerals;
+    int before_release_pylons = click_buildings;
+    input(0);
+    render_snapshot();
+    int release_buildings = count_buildings(SIDE, B_PYLON);
+    if (release_buildings > before_release_pylons)
+        return before_release_minerals - minerals > 0 &&
+               before_release_minerals - minerals <= rule->minerals;
+    for (int wait = 0; wait < 2400 && count_buildings(SIDE, B_PYLON) == before; ++wait) {
+        int minerals_before_tick = minerals;
+        int pylons_before_tick = count_buildings(SIDE, B_PYLON);
+        int order_before_tick = u[worker].order;
+        input(0);
+        render_snapshot();
+        int pylons_after_tick = count_buildings(SIDE, B_PYLON);
+        if (pylons_after_tick > pylons_before_tick) {
+            int debit = minerals_before_tick - minerals;
+            /* A Probe can deposit minerals on the same tick as foundation
+             * commit, so the observed net debit can be smaller than cost. */
+            return debit > 0 && debit <= rule->minerals;
+        }
+        if (order_before_tick == ORDER_BUILD_PENDING &&
+            u[worker].order != ORDER_BUILD_PENDING) return 0;
+    }
+    return 0;
 }
 
 int main(void)
@@ -127,5 +185,5 @@ int main(void)
     /* This bounded fixture validates setup and UI-issued work; it does not
      * exercise slot exhaustion or qualify the physical-cartridge report. */
     return issued == TARGET_NEW_PYLONS && pylons >= starting_pylons + TARGET_NEW_PYLONS &&
-           host_ticks >= RUN_UPDATES ? 0 : 2;
+           completed >= starting_pylons + TARGET_NEW_PYLONS && host_ticks >= RUN_UPDATES ? 0 : 2;
 }
