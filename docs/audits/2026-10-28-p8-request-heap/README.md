@@ -54,3 +54,8 @@ heap are not evidence that a request has completed. The native pass-entry
 call `0x8004CD30(player, 1)` sets a state flag; it does not reset this heap.
 No campaign success, GBA memory budget or frame-rate qualification is claimed
 by this inactive service.
+
+The native request-admission block flag is now implemented as a caller-owned
+pure service in [the P8 AI admission audit](../2026-10-28-p8-ai-admission/README.md).
+It reproduces only the proven cap/count predicate; it does not satisfy the
+remaining production, save or world-loop integration work above.
