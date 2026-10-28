@@ -35,6 +35,9 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
 #endif
 }
 #endif
+#ifdef SC64_WORKER_CARGO_KIND
+#include "sc64_worker_cargo_save.h"
+#endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 static int
 race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *out)
@@ -469,6 +472,10 @@ static int race_p7_union_tail_valid(const RaceSave *candidate)
 }
 #endif
 static int race_save_game(void) {
+#ifdef SC64_WORKER_CARGO_KIND
+    for (unsigned i=0;i<MAX_UNITS;++i)
+        if (!sc64_worker_cargo_state_valid(&u[i])) return 0;
+#endif
 #ifdef SC64_Z5_CLOAK_ENABLED
     if (race_z5_active() && !race_z5_cloak_world_state_valid()) return 0;
 #endif
@@ -941,7 +948,18 @@ static int race_load_game(void) {
     Sc64TerranLateMissionState expanded_terran_late;
     int expanded_terran_late_valid = 0;
 #endif
+#ifdef SC64_WORKER_CARGO_KIND
+    int legacy_worker_cargo = 0;
+    if (!save_read(&race_data,sizeof(race_data),SAVE_VERSION)) {
+        if (!save_read(&race_data,sizeof(race_data),
+                        SC64_WORKER_CARGO_LEGACY_SAVE_VERSION)) return 0;
+        legacy_worker_cargo = 1;
+    }
+    if (race_data.version != (legacy_worker_cargo ?
+            SC64_WORKER_CARGO_LEGACY_SAVE_VERSION : SAVE_VERSION)) return 0;
+#else
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
+#endif
 #ifdef SC64_P7_BATTERY_ENABLED
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
@@ -1040,6 +1058,14 @@ static int race_load_game(void) {
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
+#ifdef SC64_WORKER_CARGO_KIND
+    /* Only the private candidate buffer is changed. Mission-specific checks
+     * still run before any live actor, resource bank or projectile mutation. */
+    if (!race_save_worker_cargo_prepare(&race_data,(unsigned)(width*16),
+                                       (unsigned)(height*16),legacy_worker_cargo))
+        return 0;
+    race_data.version = SAVE_VERSION;
+#endif
     if(v[8]<0||v[8]>=width*16||v[9]<0||v[9]>=height*16||v[11]<0||v[11]>2||
        v[12]<0||v[12]>2||v[18]<0||v[18]>1||v[19]<0||v[19]>1)return 0;
     for(int i=0;i<5;i++)if(race_data.players[i]<-1||race_data.players[i]>2||

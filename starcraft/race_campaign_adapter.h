@@ -515,6 +515,22 @@ race_campaign_init(void)
         );
 #endif
     map = &sc64_race_maps[race_selected_mission];
+#ifdef SC64_WORKER_CARGO_KIND
+    /* Source UNIT flags remain owned by the imported map. Reject any worker
+     * row using a runtime cargo/pending bit before actors are spawned or
+     * their flags are copied into Unit records. */
+    if (map->unit_count && !map->units) {
+        ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+    }
+    for (i = 0; i < map->unit_count; ++i) {
+        const Sc64ImportedUnit *src = &map->units[i];
+        int type = sc64_race_unit_from_raw(src->source_type);
+        if (type >= 0 && IS_WORKER(type) &&
+            (src->flags & SC64_WORKER_CARGO_MASK)) {
+            ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
+        }
+    }
+#endif
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active() && !race_z7_source_row_counts(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
