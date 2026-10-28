@@ -725,6 +725,7 @@ race_p6_combat_tick_traps(void)
             }
             if (race_p6_owners_hostile(trap->owner,owner)==0 || flying ||
                 race_p6_combat_target_is_invincible(j) ||
+                !sc64_auto_target_visible(j,trap->owner) ||
                 !race_p6_combat_target_detected(j,trap->owner) ||
                 !race_p6_combat_box_for_target(j,&target_box)) continue;
             dist=sc64_z5_box_distance(&trap_box,&target_box);

@@ -109,7 +109,7 @@ static void GBA_HOT race_tick_defenses(void) {
             if(!owners_hostile(q->owner,u[j].owner)||(u[j].flags&16))continue;
             int flying=sc64_race_unit_flying(u[j].type);
             if((flying&&!air)||(!flying&&!ground)||
-               !SC64_CAN_ATTACK_FROM_SOURCE(-1,j,q->owner,q->raw_owner))continue;
+               !sc64_auto_target_candidate_allowed(-1,j,q->owner,q->raw_owner))continue;
             int d=dist2(q->x,q->y,u[j].x,u[j].y);
             if(d<bestd){bestd=d;best=j;}
         }
@@ -141,8 +141,8 @@ race_defense_target_from_zp_lists(const Building *q, int ground, int air,
                 if (!u[j].alive || u[j].owner != owner) continue;
                 if (FAST_ABS(q->x - u[j].x) >= range ||
                     FAST_ABS(q->y - u[j].y) >= range || (u[j].flags & 16) ||
-                    !SC64_CAN_ATTACK_FROM_SOURCE(-1, j, q->owner,
-                                                 q->raw_owner)) continue;
+                    !sc64_auto_target_candidate_allowed(-1, j, q->owner,
+                                                        q->raw_owner)) continue;
                 int d = dist2(q->x, q->y, u[j].x, u[j].y);
                 /* The original ascending scan retains the lowest slot on ties. */
                 if (d < bestd || (best >= 0 && d == bestd && j < best)) {
@@ -260,8 +260,8 @@ static __attribute__((noinline)) void race_tick_defenses_p3_targets(void) {
             if (!owners_hostile(q->owner, u[j].owner) || (u[j].flags & 16)) continue;
             int flying = sc64_race_unit_flying(u[j].type);
             if ((flying && !air) || (!flying && !ground) ||
-                !SC64_CAN_ATTACK_FROM_SOURCE(-1, j, q->owner,
-                                             q->raw_owner)) continue;
+                !sc64_auto_target_candidate_allowed(-1, j, q->owner,
+                                                    q->raw_owner)) continue;
             int d = dist2(q->x, q->y, u[j].x, u[j].y);
             if (d < bestd) { bestd = d; best = j; }
         }
@@ -305,8 +305,8 @@ race_defense_target_from_owner_lists(const Building *q, int ground, int air,
                 if (!u[j].alive || u[j].owner != owner) continue;
                 if (FAST_ABS(q->x - u[j].x) >= range ||
                     FAST_ABS(q->y - u[j].y) >= range || (u[j].flags & 16) ||
-                    !SC64_CAN_ATTACK_FROM_SOURCE(-1, j, q->owner,
-                                                 q->raw_owner)) continue;
+                    !sc64_auto_target_candidate_allowed(-1, j, q->owner,
+                                                        q->raw_owner)) continue;
                 int d = dist2(q->x, q->y, u[j].x, u[j].y);
                 /* The original ascending full scan keeps the lowest slot on ties. */
                 if (d < bestd || (best >= 0 && d == bestd && j < best)) {

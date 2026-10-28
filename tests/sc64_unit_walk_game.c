@@ -7,6 +7,25 @@
 
 static u8 shot[160][240];
 
+static void rebuild_owner_lists(void)
+{
+    for (int owner = 0; owner < 5; ++owner)
+        target_unit_head[owner] = target_building_head[owner] = -1;
+    for (int i = 0; i < MAX_UNITS; ++i) target_unit_next[i] = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i) target_building_next[i] = -1;
+    for (int i = MAX_UNITS - 1; i >= 0; --i) if (u[i].alive) {
+        int owner = u[i].owner;
+        target_unit_next[i] = target_unit_head[owner];
+        target_unit_head[owner] = i;
+    }
+    for (int i = MAX_BUILDINGS - 1; i >= 0; --i) if (b[i].alive) {
+        int owner = b[i].owner;
+        target_building_next[i] = target_building_head[owner];
+        target_building_head[owner] = i;
+    }
+    target_lists_valid = 1;
+}
+
 static void capture(int slot)
 {
     gfx_begin(C_PANEL);
@@ -60,6 +79,47 @@ static void test_type(int type, const char *name)
     printf("PASS %s walk cycle\n", name);
 }
 
+static void test_auto_target_fog(void)
+{
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
+    target_lists_valid = 0;
+    SC64_GRID_CLEAR(visible);
+    u[0].alive = u[1].alive = 1;
+    u[0].owner = u[1].owner = ENEMY;
+    u[0].type = u[1].type = U_ZERGLING;
+    u[0].x = 176; u[0].y = 160;
+    u[1].x = 208; u[1].y = 160;
+    SC64_GRID_SET(visible, 208 / 16 + (160 / 16) * MAP_COLS, 1);
+    assert(nearest_enemy_typed(160, 160, SIDE, 96, -1) == 1);
+    SC64_GRID_CLEAR(visible);
+    assert(nearest_enemy_typed(160, 160, SIDE, 96, -1) == -1);
+    SC64_GRID_SET(visible, 176 / 16 + (160 / 16) * MAP_COLS, 1);
+    assert(nearest_enemy_typed(160, 160, SIDE, 96, -1) == 0);
+    SC64_GRID_SET(visible, 176 / 16 + (160 / 16) * MAP_COLS, 0);
+    SC64_GRID_SET(visible, 208 / 16 + (160 / 16) * MAP_COLS, 1);
+    rebuild_owner_lists();
+    assert(nearest_enemy_typed(160, 160, SIDE, 96, -1) == 1);
+    SC64_GRID_SET(visible, 208 / 16 + (160 / 16) * MAP_COLS, 0);
+    assert(nearest_enemy_typed(160, 160, SIDE, 96, -1) == -1);
+    SC64_GRID_SET(visible, 208 / 16 + (160 / 16) * MAP_COLS, 1);
+
+    b[0].alive = 1; b[0].owner = ENEMY; b[0].type = B_HATCHERY;
+    b[0].x = 168; b[0].y = 160;
+    rebuild_owner_lists();
+    assert(nearest_enemy_typed(160, 160, SIDE, 96, -1) == 1);
+    SC64_GRID_SET(visible, 168 / 16 + (160 / 16) * MAP_COLS, 1);
+    assert(nearest_enemy_typed(160, 160, SIDE, 96, -1) == MAX_UNITS);
+
+    /* Non-player queries remain independent of SIDE's visibility bits. */
+    SC64_GRID_CLEAR(visible);
+    u[2].alive = 1; u[2].owner = SIDE; u[2].type = U_MARINE;
+    u[2].x = 176; u[2].y = 160;
+    rebuild_owner_lists();
+    assert(nearest_enemy_typed(160, 160, ENEMY, 96, -1) == 2);
+    target_lists_valid = 0;
+}
+
 int main(void)
 {
     game_init();
@@ -70,5 +130,6 @@ int main(void)
     test_type(U_MEDIC, "medic");
     test_type(U_HYDRALISK, "hydralisk");
     test_type(U_RAYNOR, "raynor");
+    test_auto_target_fog();
     return 0;
 }

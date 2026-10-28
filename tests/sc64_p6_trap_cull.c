@@ -30,6 +30,7 @@ static void reset_world(void)
     sc64_p6_runtime_init(&race_p6.runtime);
     race_p6_world.source_current_player=7;
     race_p6_world.map_cols=128;race_p6_world.map_rows=128;
+    for(int cell=0;cell<MAP_CELLS;++cell)SC64_GRID_SET(visible,cell,1);
 }
 
 static void enable_trap(unsigned slot)
@@ -164,9 +165,29 @@ static void assert_actual_matches_exhaustive_reference(unsigned iteration)
     (void)iteration;
 }
 
+static void player_trap_respects_current_visibility(void)
+{
+    reset_world();
+    b[0].alive=1;b[0].owner=SIDE;b[0].raw_owner=7;
+    b[0].raw_type=SC64_P6_RAW_WALL_MISSILE_TRAP;
+    b[0].type=sc64_race_building_from_raw(SC64_P6_RAW_WALL_MISSILE_TRAP);
+    b[0].x=500;b[0].y=500;enable_trap(0);
+    u[0].alive=1;u[0].owner=ENEMY;u[0].raw_owner=3;
+    u[0].raw_type=0;u[0].type=U_MARINE;u[0].x=510;u[0].y=500;
+    u[0].hp=u[0].maxhp=100;
+    SC64_GRID_CLEAR(visible);
+    assert(!currently_visible(u[0].x,u[0].y));
+    assert(race_p6_combat_tick_traps()==0);
+    assert(u[0].hp==100);
+    SC64_GRID_SET(visible,u[0].x/16+(u[0].y/16)*MAP_COLS,1);
+    assert(race_p6_combat_tick_traps()==1);
+    assert(u[0].hp<100);
+}
+
 int main(void)
 {
     trap_geometry();
+    player_trap_respects_current_visibility();
     for(unsigned i=0;i<150u;++i)assert_actual_matches_exhaustive_reference(i);
     puts("P6 wall-trap cull: 100000 box proofs and 150 full-array worlds match exhaustive target selection");
     return 0;

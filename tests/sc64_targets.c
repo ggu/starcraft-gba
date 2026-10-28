@@ -30,6 +30,9 @@ static int reference_target(int x, int y, int owner, int range, int attacker)
     int best = -1, bestd = range * range;
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive &&
         FAST_ABS(x - u[i].x) < range && FAST_ABS(y - u[i].y) < range &&
+        (owner != SIDE || (u[i].x >= 0 && u[i].y >= 0 &&
+         u[i].x < WORLD_W && u[i].y < WORLD_H &&
+         SC64_GRID_GET(visible, u[i].x / 16 + (u[i].y / 16) * MAP_COLS))) &&
         owners_hostile(owner, u[i].owner) && reference_can_attack(attacker, i, owner)) {
         int d = dist2(x, y, u[i].x, u[i].y);
         if (d < bestd || (best >= 0 && d == bestd && i < best)) {
@@ -38,6 +41,9 @@ static int reference_target(int x, int y, int owner, int range, int attacker)
     }
     for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive &&
         FAST_ABS(x - b[i].x) < range && FAST_ABS(y - b[i].y) < range &&
+        (owner != SIDE || (b[i].x >= 0 && b[i].y >= 0 &&
+         b[i].x < WORLD_W && b[i].y < WORLD_H &&
+         SC64_GRID_GET(visible, b[i].x / 16 + (b[i].y / 16) * MAP_COLS))) &&
         owners_hostile(owner, b[i].owner) &&
         reference_can_attack(attacker, MAX_UNITS + i, owner)) {
         int candidate = MAX_UNITS + i, d = dist2(x, y, b[i].x, b[i].y);
@@ -89,6 +95,91 @@ static void compare_attacker_matrix(void)
                           queries[q][3], attacker);
 }
 
+static void test_player_auto_acquisition_fog(void)
+{
+    int before_hidden, before_visible;
+    memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b));
+    SC64_GRID_CLEAR(visible);
+    target_lists_valid = 0;
+    sc64_target_index_end();
+
+    /* A closer unseen unit must not mask the farther visible unit. */
+    u[0].alive = u[1].alive = 1;
+    u[0].owner = u[1].owner = ENEMY;
+    u[0].type = u[1].type = U_ZERGLING;
+    u[0].x = 416; u[0].y = 400;
+    u[1].x = 448; u[1].y = 400;
+    SC64_GRID_SET(visible, 448 / 16 + (400 / 16) * MAP_COLS, 1);
+    assert(nearest_enemy_typed(400, 400, SIDE, 96, U_MARINE) == 1);
+    /* The player cannot auto-acquire when every candidate is hidden. */
+    SC64_GRID_CLEAR(visible);
+    assert(nearest_enemy_typed(400, 400, SIDE, 96, U_MARINE) == -1);
+    /* Enemy AI uses its own model and is not constrained by the player's fog. */
+    assert(nearest_enemy_typed(400, 400, 4, 96, U_MARINE) == -1);
+    u[2].alive = 1; u[2].owner = SIDE; u[2].type = U_ZERGLING;
+    u[2].x = 416; u[2].y = 400;
+    assert(nearest_enemy_typed(400, 400, ENEMY, 96, U_MARINE) == 2);
+
+    /* Revealing a unit enables acquisition; visibility loss removes it again. */
+    SC64_GRID_SET(visible, 416 / 16 + (400 / 16) * MAP_COLS, 1);
+    assert(nearest_enemy_typed(400, 400, SIDE, 96, U_MARINE) == 0);
+    SC64_GRID_SET(visible, 416 / 16 + (400 / 16) * MAP_COLS, 0);
+    SC64_GRID_SET(visible, 448 / 16 + (400 / 16) * MAP_COLS, 1);
+    assert(nearest_enemy_typed(400, 400, SIDE, 96, U_MARINE) == 1);
+
+    /* Hidden buildings are filtered by the same shared candidate predicate. */
+    b[0].alive = 1; b[0].owner = ENEMY; b[0].type = B_HATCHERY;
+    b[0].x = 408; b[0].y = 400;
+    assert(nearest_enemy_typed(400, 400, SIDE, 96, U_MARINE) == 1);
+    SC64_GRID_SET(visible, 408 / 16 + (400 / 16) * MAP_COLS, 1);
+    assert(nearest_enemy_typed(400, 400, SIDE, 96, U_MARINE) == MAX_UNITS);
+    SC64_GRID_CLEAR(visible);
+    assert(nearest_enemy_typed(400, 400, 4, 96, U_MARINE) == MAX_UNITS);
+
+    /* Auto-acquisition does not rewrite an explicit last-seen target order;
+     * already-released attacks still enter the ordinary hit resolver. */
+    u[3].alive = 1; u[3].owner = SIDE; u[3].type = U_MARINE;
+    u[3].x = 400; u[3].y = 400; u[3].cd = 0;
+    u[3].order = ORDER_ATTACK_TARGET; u[3].target = 0;
+    u[0].hp = u[0].maxhp = 40;
+    before_hidden = u[0].hp;
+    SC64_GRID_SET(visible, 448 / 16 + (400 / 16) * MAP_COLS, 1);
+    assert(nearest_enemy_typed(400, 400, SIDE, 96, U_MARINE) == 1);
+    assert(u[3].order == ORDER_ATTACK_TARGET && u[3].target == 0);
+    hit_target(0, 1, U_MARINE, SIDE);
+    assert(u[0].hp < before_hidden);
+
+    /* Actual idle controller path: the visible target takes a hit while the
+     * closer hidden candidate is ignored. Available in imported campaign
+     * target fixtures, whose idle defense calls nearest_enemy_typed(). */
+#ifdef SC64_IMPORTED_MISSION
+    memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b));
+    SC64_GRID_CLEAR(visible);
+    u[0].alive = u[1].alive = u[2].alive = 1;
+    u[0].owner = u[1].owner = ENEMY; u[2].owner = SIDE;
+    u[0].type = u[1].type = u[2].type = U_MARINE;
+    u[0].x = 416; u[0].y = 400;
+    u[1].x = 448; u[1].y = 400;
+    u[2].x = 400; u[2].y = 400;
+    u[0].hp = u[0].maxhp = 40;
+    u[1].hp = u[1].maxhp = 40;
+    u[2].hp = u[2].maxhp = 40;
+    u[0].cd = u[1].cd = u[2].cd = 0;
+    u[0].order = u[1].order = u[2].order = ORDER_IDLE;
+    u[0].target = u[1].target = u[2].target = -1;
+    SC64_GRID_SET(visible, 448 / 16 + (400 / 16) * MAP_COLS, 1);
+    assert(!currently_visible(u[0].x, u[0].y));
+    assert(currently_visible(u[1].x, u[1].y));
+    before_hidden = u[0].hp; before_visible = u[1].hp;
+    game_update(0, 0);
+    assert(u[0].hp == before_hidden);
+    assert(u[1].hp < before_visible);
+#else
+    (void)before_visible;
+#endif
+    for (int cell = 0; cell < MAP_CELLS; ++cell) SC64_GRID_SET(visible, cell, 1);
+}
+
 int main(void)
 {
     int moving;
@@ -96,6 +187,9 @@ int main(void)
     race_mode = 1; race_human = R_TER; race_bots = 2;
     race_skirmish_init(); screen = SCREEN_PLAY;
     memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b));
+    /* Preserve the historical target oracle's all-visible setup; dedicated
+     * fog cases below toggle individual cells independently. */
+    for (int cell = 0; cell < MAP_CELLS; ++cell) SC64_GRID_SET(visible, cell, 1);
 
     /* Crowd several neighboring cells with mixed owners and attack classes;
      * deterministic positions include strict range boundaries and ties. */
@@ -331,6 +425,7 @@ int main(void)
     assert(nearest_enemy_typed(32, 32, ENEMY, 64, U_MARINE) == 0);
     sc64_target_index_end();
     target_lists_valid = 0;
+    test_player_auto_acquisition_fog();
 #if defined(SC64_TARGET_OCCUPANCY) && \
     (defined(SC64_Z4_RUNTIME) || defined(SC64_P4_RUNTIME))
     /* Rebuild hostility masks after an alliance/rescue ownership transition.
