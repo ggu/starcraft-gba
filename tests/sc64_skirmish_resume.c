@@ -176,7 +176,31 @@ static void verify_resume(int map, int human, int bots, int forced_bot_race)
     /* Reinitialize actors and the frontend while retaining host SRAM. This is
        an in-process reload, not a fresh emulator/process SRAM qualification. */
     game_init(); previous = 0;
+#ifdef SC64_ATTACK_RANGE_ROUTES
+    /* Warm a direct tile in the two-bot cases, and even a cached-unreachable
+     * region in the others. Neither derived mode may survive the SRAM load. */
+    {
+        int nx, ny;
+        if (bots == 2) {
+            int cell;
+            if (!path_grid_valid) build_path_grid();
+            for (cell = 0; cell < MAP_COLS * MAP_ROWS; ++cell)
+                if (SC64_GRID_GET(path_walkable, cell)) break;
+            assert(cell < MAP_COLS * MAP_ROWS);
+            int x = sc64_cell_col(cell) * 16 + 8, y = sc64_cell_row(cell) * 16 + 8;
+            assert(sc64_direct_firing_waypoint(x, y, x, y, 0, 64, &nx, &ny));
+            assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] == 5);
+        } else {
+            (void)sc64_route_range_next(8, 8, 8, 8, 0, 64, &nx, &ny);
+            assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] >= 3 &&
+                   sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] <= 4);
+        }
+    }
+#endif
     input(KEY_L); /* load action returns directly to play without a tick */
+#ifdef SC64_ATTACK_RANGE_ROUTES
+    assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] == 0);
+#endif
     assert(screen == SCREEN_PLAY && race_mode);
     assert(race_skirmish_map == map && race_human == human && race_bots == bots);
     for (int i = 0; i < 3; ++i) assert(race_bot_races[i] == expected_bot_races[i]);

@@ -53,6 +53,12 @@
 #endif
 #endif
 
+#ifdef SC64_ATTACK_RANGE_ROUTES
+#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3)
+#error "SC64_ATTACK_RANGE_ROUTES requires packed race route fields"
+#endif
+#endif
+
 /* Shared shortest-path fields on the same four-neighbour collision grid.
  * A mineral, base or group destination costs one reverse flood, rather than
  * one flood per moving unit per tile. Dynamic actors still use local steering.
@@ -217,6 +223,16 @@ static int sc64_route_configure(void)
 #define SC64_ROUTE_ACTIVE_SLOTS ((int)sc64_route_active_slots)
 #else
 #define SC64_ROUTE_ACTIVE_SLOTS SC64_ROUTE_SLOTS
+#endif
+#ifdef SC64_ATTACK_RANGE_ROUTES
+/* One existing field is reserved for a shared firing region. A multi-source
+ * region can span disconnected components, so valid=3 (partial), 4 (full)
+ * or 5 (one direct waypoint) must never be a component label (requires 1). */
+#define SC64_ROUTE_POINT_SLOTS (SC64_ROUTE_ACTIVE_SLOTS - 1)
+static u16 sc64_route_range_x, sc64_route_range_y;
+static u16 sc64_route_range_min, sc64_route_range_max;
+#else
+#define SC64_ROUTE_POINT_SLOTS SC64_ROUTE_ACTIVE_SLOTS
 #endif
 volatile u32 sc64_route_hits, sc64_route_builds;
 
@@ -401,6 +417,8 @@ sc64_route_flood(int slot, int head, int *tail, int origin,
     *tail = qtail;
     return complete;
 }
+#endif
+#ifdef SC64_ROUTE_FLOOD_SPLIT
 #define SC64_ROUTE_SLOT_ATTR __attribute__((noinline))
 #else
 #define SC64_ROUTE_SLOT_ATTR GBA_HOT
@@ -425,7 +443,7 @@ sc64_route_slot(int goal)
 #ifdef SC64_ROUTE_DECAY_FREQ
     sc64_route_age_request();
 #endif
-    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; i++) {
+    for (i = 0; i < SC64_ROUTE_POINT_SLOTS; i++) {
         if (sc64_route_valid[i] && sc64_route_goal[i] == goal) {
 #ifdef SC64_ROUTE_PARTIAL_FLOOD
             if (sc64_route_valid[i] == 1 ||
@@ -631,6 +649,138 @@ sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out
     }
     if(best<0)return 0;
     *out_col=col+dx[best];*out_row=row+dy[best];
+    return 1;
+}
+#endif
+
+#ifdef SC64_ATTACK_RANGE_ROUTES
+static int sc64_route_range_key_matches(int tx, int ty, int minimum, int maximum)
+{
+    return sc64_route_range_x == tx && sc64_route_range_y == ty &&
+        sc64_route_range_min == minimum && sc64_route_range_max == maximum;
+}
+
+static void sc64_route_range_key_set(int tx, int ty, int minimum, int maximum)
+{
+    sc64_route_range_x = (u16)tx; sc64_route_range_y = (u16)ty;
+    sc64_route_range_min = (u16)minimum; sc64_route_range_max = (u16)maximum;
+}
+
+/* A region field only needs to discover this origin, not every remote map
+ * cell. A later query outside the discovered prefix rebuilds for its origin;
+ * queries along an existing gradient reuse it. Exhausted fields cache failure
+ * too. Keep these checks in ROM, outside the ordinary hot point-route flood. */
+static int
+sc64_route_range_origin_ready(int slot, int origin, int origin_walkable)
+{
+    int col, row;
+    if (sc64_route_get(slot, origin) != SC64_ROUTE_UNREACHABLE) return 1;
+    if (origin_walkable) return 0;
+    col = sc64_cell_col(origin); row = sc64_cell_row(origin);
+    return (col > 0 && sc64_route_get(slot, origin - 1) != SC64_ROUTE_UNREACHABLE) ||
+        (col + 1 < MAP_COLS && sc64_route_get(slot, origin + 1) != SC64_ROUTE_UNREACHABLE) ||
+        (row > 0 && sc64_route_get(slot, origin - MAP_COLS) != SC64_ROUTE_UNREACHABLE) ||
+        (row + 1 < MAP_ROWS && sc64_route_get(slot, origin + MAP_COLS) != SC64_ROUTE_UNREACHABLE);
+}
+
+static int __attribute__((noinline))
+sc64_route_range_flood(int slot, int *tail, int origin, int origin_walkable)
+{
+    int head = 0, end = *tail;
+    if (sc64_route_range_origin_ready(slot, origin, origin_walkable)) return 0;
+    while (head < end) {
+        int cell = bfs_queue[head++], col = sc64_cell_col(cell), row = sc64_cell_row(cell);
+        int next;
+#define SC64_RANGE_FLOOD(condition, neighbour, direction) \
+        if (condition) { next = (neighbour); \
+            if (SC64_GRID_GET(path_walkable, next) && \
+                sc64_route_get(slot, next) == SC64_ROUTE_UNREACHABLE) { \
+                sc64_route_put(slot, next, (direction)); bfs_queue[end++] = (u16)next; \
+            } }
+        SC64_RANGE_FLOOD(col > 0, cell - 1, 1);
+        SC64_RANGE_FLOOD(col + 1 < MAP_COLS, cell + 1, 2);
+        SC64_RANGE_FLOOD(row > 0, cell - MAP_COLS, 3);
+        SC64_RANGE_FLOOD(row + 1 < MAP_ROWS, cell + MAP_COLS, 4);
+#undef SC64_RANGE_FLOOD
+        if (sc64_route_range_origin_ready(slot, origin, origin_walkable)) {
+            *tail = end;
+            return 0;
+        }
+    }
+    *tail = end;
+    return 1;
+}
+
+/* An unreachable target center need not imply an unreachable firing point.
+ * Seed every walkable tile center inside the *existing* weapon band, then
+ * reuse its discovered gradient for attackers of that target/range. No actor,
+ * save row or field pool grows. Exact target coordinates are part of the key;
+ * firing still uses tick_combat's ordinary distance/visibility checks. */
+static int __attribute__((noinline))
+sc64_route_range_next(int x, int y, int tx, int ty,
+                      int min_range, int max_range, int *next_x, int *next_y)
+{
+    int slot, col, row, cell, direction, goal, origin_walkable;
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    if (!sc64_route_configure()) return 0;
+#endif
+    if (SC64_ROUTE_ACTIVE_SLOTS < 2 || !next_x || !next_y ||
+        tx < 0 || ty < 0 || tx >= MAP_COLS * 16 || ty >= MAP_ROWS * 16 ||
+        min_range < 0 || max_range < min_range || max_range > 4096) return 0;
+    if (!path_grid_valid) build_path_grid();
+    slot = SC64_ROUTE_ACTIVE_SLOTS - 1;
+    goal = tx / 16 + (ty / 16) * MAP_COLS;
+    col = limit(x / 16, 0, MAP_COLS - 1); row = limit(y / 16, 0, MAP_ROWS - 1);
+    cell = col + row * MAP_COLS;
+    origin_walkable = SC64_GRID_GET(path_walkable, cell);
+    if ((sc64_route_valid[slot] != 3 && sc64_route_valid[slot] != 4) ||
+        !sc64_route_range_key_matches(tx, ty, min_range, max_range) ||
+        (sc64_route_valid[slot] == 3 &&
+         !sc64_route_range_origin_ready(slot, cell, origin_walkable))) {
+        int tail = 0, complete, origin = cell;
+        int left = limit((tx - max_range) / 16, 0, MAP_COLS - 1);
+        int right = limit((tx + max_range) / 16, 0, MAP_COLS - 1);
+        int top = limit((ty - max_range) / 16, 0, MAP_ROWS - 1);
+        int bottom = limit((ty + max_range) / 16, 0, MAP_ROWS - 1);
+        int minimum2 = min_range * min_range, maximum2 = max_range * max_range;
+#ifdef SC64_ROUTE_WORD_CLEAR
+        sc64_route_field_clear(sc64_route_field[slot]);
+#else
+        memset(sc64_route_field[slot], 255,
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+               sc64_route_active_bytes
+#else
+               SC64_ROUTE_BYTES
+#endif
+               );
+#endif
+        for (row = top; row <= bottom; ++row) for (col = left; col <= right; ++col) {
+            int dx = col * 16 + 8 - tx, dy = row * 16 + 8 - ty;
+            int distance2 = dx * dx + dy * dy;
+            cell = col + row * MAP_COLS;
+            if (distance2 < minimum2 || distance2 > maximum2 ||
+                !SC64_GRID_GET(path_walkable, cell)) continue;
+            sc64_route_put(slot, cell, 0);
+            bfs_queue[tail++] = (u16)cell;
+        }
+        complete = sc64_route_range_flood(slot, &tail, origin, origin_walkable);
+        sc64_route_goal[slot] = (u16)goal;
+        sc64_route_range_key_set(tx, ty, min_range, max_range);
+        sc64_route_valid[slot] = complete ? 4 : 3;
+        ++sc64_route_builds;
+    } else ++sc64_route_hits;
+    col = limit(x / 16, 0, MAP_COLS - 1); row = limit(y / 16, 0, MAP_ROWS - 1);
+    cell = col + row * MAP_COLS;
+    direction = sc64_route_get(slot, cell);
+    if (direction == SC64_ROUTE_UNREACHABLE) {
+        if (SC64_GRID_GET(path_walkable, cell) ||
+            !sc64_route_blocked_start(slot, col, row, -1, &col, &row)) return 0;
+    } else if (direction == 1) ++col;
+    else if (direction == 2) --col;
+    else if (direction == 3) ++row;
+    else if (direction == 4) --row;
+    /* A region seed returns its own tile center, never the target center. */
+    *next_x = col * 16 + 8; *next_y = row * 16 + 8;
     return 1;
 }
 #endif

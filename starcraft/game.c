@@ -2,6 +2,9 @@
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
 #include "sc64_construction_hp.h"
+#if defined(SC64_ATTACK_RANGE_ROUTES) && !defined(SC64_IMPORTED_MISSION)
+#error "SC64_ATTACK_RANGE_ROUTES requires imported race routes"
+#endif
 #ifdef SC64_IMPORTED_MISSION
 #include "sc64_minimap_terrain.h"
 #endif
@@ -5859,6 +5862,95 @@ unit_damage(int type)
 #include "sc64_unit_facing.h"
 #endif
 
+#ifdef SC64_ATTACK_RANGE_ROUTES
+/* Normal movement already takes a clear diagonal-then-axis corridor without
+ * flooding the map. Apply that same corridor test to nearby firing tiles
+ * before paying for the obstructed-region search. Search at most a 34x34
+ * tile box, retain eight closest candidates on the stack, and check at most
+ * eight corridors. A cached direct tile uses existing route metadata only;
+ * each origin rechecks the corridor and the exact weapon-band key. */
+static int __attribute__((noinline))
+sc64_direct_firing_waypoint(int x, int y, int tx, int ty,
+                            int minimum, int maximum, int *nx, int *ny)
+{
+    int slot, cell, col, row;
+    int points[8], costs[8], count = 0;
+    if (minimum < 0 || maximum < minimum || maximum > 256 ||
+        tx < 0 || ty < 0 || tx >= MAP_COLS * 16 || ty >= MAP_ROWS * 16) return 0;
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    if (!sc64_route_configure()) return 0;
+#endif
+    if (SC64_ROUTE_ACTIVE_SLOTS < 2) return 0;
+    if (!path_grid_valid) build_path_grid();
+    slot = SC64_ROUTE_ACTIVE_SLOTS - 1;
+    if (sc64_route_range_key_matches(tx, ty, minimum, maximum)) {
+        if (sc64_route_valid[slot] == 5) {
+            cell = sc64_route_goal[slot];
+            col = sc64_cell_col(cell); row = sc64_cell_row(cell);
+            if (cell < MAP_COLS * MAP_ROWS && SC64_GRID_GET(path_walkable, cell) &&
+                direct_path_clear(x, y, col * 16 + 8, row * 16 + 8)) {
+                *nx = col * 16 + 8; *ny = row * 16 + 8;
+                return 1;
+            }
+        } else if (sc64_route_valid[slot] == 3 || sc64_route_valid[slot] == 4) {
+            cell = limit(x / 16, 0, MAP_COLS - 1) +
+                limit(y / 16, 0, MAP_ROWS - 1) * MAP_COLS;
+            /* Keep already discovered region gradients instead of replacing
+             * them with a single point or rebuilding a known failure. */
+            if (sc64_route_valid[slot] == 4 ||
+                sc64_route_range_origin_ready(slot, cell, SC64_GRID_GET(path_walkable, cell)))
+                return sc64_route_range_next(x, y, tx, ty, minimum, maximum, nx, ny);
+        }
+    }
+    int left = limit((tx - maximum) / 16, 0, MAP_COLS - 1);
+    int right = limit((tx + maximum) / 16, 0, MAP_COLS - 1);
+    int top = limit((ty - maximum) / 16, 0, MAP_ROWS - 1);
+    int bottom = limit((ty + maximum) / 16, 0, MAP_ROWS - 1);
+    int minimum2 = minimum * minimum, maximum2 = maximum * maximum;
+    for (row = top; row <= bottom; ++row) for (col = left; col <= right; ++col) {
+        int px = col * 16 + 8, py = row * 16 + 8;
+        int d = dist2(px, py, tx, ty), cost, i;
+        cell = col + row * MAP_COLS;
+        if (d < minimum2 || d > maximum2 ||
+            !SC64_GRID_GET(path_walkable, cell)) continue;
+        cost = dist2(x, y, px, py);
+        if (count == 8 && cost >= costs[7]) continue;
+        i = count < 8 ? count++ : 7;
+        while (i > 0 && cost < costs[i - 1]) {
+            points[i] = points[i - 1]; costs[i] = costs[i - 1]; --i;
+        }
+        points[i] = cell; costs[i] = cost;
+    }
+    for (int i = 0; i < count; ++i) {
+        cell = points[i]; col = sc64_cell_col(cell); row = sc64_cell_row(cell);
+        if (!direct_path_clear(x, y, col * 16 + 8, row * 16 + 8)) continue;
+        *nx = col * 16 + 8; *ny = row * 16 + 8;
+        sc64_route_range_key_set(tx, ty, minimum, maximum);
+        sc64_route_goal[slot] = (u16)cell; sc64_route_valid[slot] = 5;
+        return 1;
+    }
+    return 0;
+}
+
+/* Only a failed center-route plan needs the shared firing-region fallback.
+ * Leave normal moves, flying units, local collision retries and fog pursuit
+ * on their existing paths. The next ordinary movement tick follows the
+ * selected waypoint; tick_combat still decides when a shot is in range. */
+static void __attribute__((noinline))
+move_toward_weapon_range(Unit *q, int tx, int ty, int minimum, int maximum)
+{
+    int may_plan = q->path_retry == 0 && q->path_timer <= 0;
+    int nx, ny;
+    move_toward(q, tx, ty);
+    if (!may_plan || q->path_retry != 12 || maximum < 32 ||
+        sc64_race_unit_flying(q->type)) return;
+    if (!sc64_direct_firing_waypoint(q->x, q->y, tx, ty, minimum, maximum, &nx, &ny) &&
+        !sc64_route_range_next(q->x, q->y, tx, ty, minimum, maximum, &nx, &ny)) return;
+    q->path_x = nx; q->path_y = ny;
+    q->path_retry = 0; q->path_timer = 24;
+}
+#endif
+
 #ifdef SC64_Z6_RUNTIME
 /* The large weapon body is already in ROM; keep its validation wrapper
  * there as well rather than duplicating it in every ARM order branch. */
@@ -6051,7 +6143,11 @@ tick_combat(Unit * q, int target)
 #endif
 	}
     } else {
+#ifdef SC64_ATTACK_RANGE_ROUTES
+	move_toward_weapon_range(q, target_x(target), target_y(target), minimum_range, range);
+#else
 	move_toward(q, target_x(target), target_y(target));
+#endif
     }
 }
 
