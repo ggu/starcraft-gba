@@ -59,6 +59,11 @@ static void range_route_pump_to_done(unsigned max_ticks, int target,
     for (unsigned tick = 0; tick < max_ticks; ++tick) {
         int next_col = -1, next_row = -1;
         if (sc64_range_route_active.valid &&
+            sc64_range_route_active.target == (u16)target &&
+            sc64_range_route_active.tx == (u16)tx &&
+            sc64_range_route_active.ty == (u16)ty &&
+            sc64_range_route_active.minimum == 0 &&
+            sc64_range_route_active.maximum == 64 &&
             sc64_range_route_work.phase == SC64_RANGE_WORK_DONE) return;
         /* A pending combat order needs 12 retry ticks plus one timer-drain
          * tick before its next plan. Refresh at that 14-frame cadence. */
@@ -86,6 +91,56 @@ static int range_route_queued_target(int target)
         if (sc64_range_route_pending[i].valid &&
             sc64_range_route_pending[i].target == target) return 1;
     return 0;
+}
+
+static int range_route_request_present(int target, int tx, int ty)
+{
+    if (sc64_range_route_active.valid &&
+        sc64_range_route_active.target == (u16)target &&
+        sc64_range_route_active.tx == (u16)tx &&
+        sc64_range_route_active.ty == (u16)ty &&
+        sc64_range_route_active.minimum == 0 &&
+        sc64_range_route_active.maximum == 64) return 1;
+    for (int i = 0; i < SC64_RANGE_ROUTE_QUEUE_CAPACITY; ++i) {
+        const Sc64RangeRouteJob *job = &sc64_range_route_pending[i];
+        if (job->valid && job->target == (u16)target &&
+            job->tx == (u16)tx && job->ty == (u16)ty &&
+            job->minimum == 0 && job->maximum == 64) return 1;
+    }
+    return 0;
+}
+
+static int range_route_active_position_was_requested(int target,
+                                                      int first_tx,
+                                                      int latest_tx,
+                                                      int first_ty)
+{
+    const Sc64RangeRouteJob *job = &sc64_range_route_active;
+    if (!job->valid || job->target != (u16)target ||
+        job->minimum != 0 || job->maximum != 64 ||
+        job->tx < (u16)first_tx || job->tx > (u16)latest_tx) return 0;
+    if (job->ty == (u16)first_ty && job->tx == (u16)first_tx) return 1;
+    return job->ty == (u16)(first_ty + 16) &&
+        ((job->tx - (u16)first_tx) % 16u) == 0u;
+}
+
+static Sc64RangeRouteJob range_route_stale_guidance_source(int target)
+{
+    if (sc64_range_route_active.valid &&
+        sc64_range_route_active.target == (u16)target &&
+        sc64_range_route_active.minimum == 0 &&
+        sc64_range_route_active.maximum == 64 &&
+        (sc64_range_route_work.phase == SC64_RANGE_WORK_FLOOD ||
+         sc64_range_route_work.phase == SC64_RANGE_WORK_DONE))
+        return sc64_range_route_active;
+    assert(sc64_range_route_snapshot_slot >= 0 &&
+           sc64_range_route_snapshot_slot < SC64_ROUTE_ACTIVE_SLOTS &&
+           sc64_route_valid[sc64_range_route_snapshot_slot] == 3 &&
+           sc64_range_route_snapshot_key.valid &&
+           sc64_range_route_snapshot_key.target == (u16)target &&
+           sc64_range_route_snapshot_key.minimum == 0 &&
+           sc64_range_route_snapshot_key.maximum == 64);
+    return sc64_range_route_snapshot_key;
 }
 
 static void test_range_scheduler_stays_lazy_and_releases_abandoned_copy(void)
@@ -244,55 +299,82 @@ static void test_range_work_scheduler_contracts(void)
     assert(sc64_range_route_active.valid &&
            sc64_range_route_active.target == 71);
 
-    /* Move the target every 12-frame retry while game_update pumps a bounded
-       step each frame. The active snapshot must keep progressing, while the
-       queue coalesces to the latest target position without exposing stale
-       gradients. */
+    /* Move the target at each 14-frame replan cadence while game_update pumps
+       bounded work. Completed jobs may roll forward at the default quota, so
+       validate the active key against requested positions and require the
+       newest request to remain active or queued. */
     {
-        int latest_tx = tx - 128;
+        const int first_tx = tx - 128;
+        int latest_tx = first_tx, latest_ty = ty + 16;
         int stale_guidance_count = 0;
+        int have_guidance_key = 0;
+        Sc64RangeRouteJob guidance_key = {0};
         for (int move = 0; move < 8; ++move) {
             for (int tick = 0; tick < 14; ++tick)
                 range_route_game_update_tick();
             latest_tx += 16;
-            status = sc64_range_route_next(71, latest_tx, ty + 16,
+            status = sc64_range_route_next(71, latest_tx, latest_ty,
                                            0, 64, 4, 40, &nc, &nr);
-            if (status == SC64_RANGE_ROUTE_STALE_GUIDANCE)
+            if (status == SC64_RANGE_ROUTE_STALE_GUIDANCE) {
                 ++stale_guidance_count;
-            else assert(status == SC64_RANGE_ROUTE_CANCELLED);
-            assert(sc64_range_route_active.valid &&
-                   sc64_range_route_active.tx == tx - 128);
-            assert(range_route_queued_target(71));
+                if (!have_guidance_key) {
+                    guidance_key = range_route_stale_guidance_source(71);
+                    have_guidance_key = 1;
+                }
+            } else assert(status == SC64_RANGE_ROUTE_CANCELLED ||
+                          status == SC64_RANGE_ROUTE_PENDING ||
+                          status == SC64_RANGE_ROUTE_FOUND);
+            assert(range_route_request_present(71, latest_tx, latest_ty));
+            if (sc64_range_route_active.valid)
+                assert(range_route_active_position_was_requested(
+                    71, first_tx, latest_tx, ty));
         }
         for (int tick = 0; stale_guidance_count == 0 &&
              tick < MAP_COLS * MAP_ROWS * 2; ++tick) {
             if (tick % 14 == 0) {
-                status = sc64_range_route_next(71, latest_tx, ty + 16,
+                status = sc64_range_route_next(71, latest_tx, latest_ty,
                     0, 64, 4, 40, &nc, &nr);
-                if (status == SC64_RANGE_ROUTE_STALE_GUIDANCE)
+                if (status == SC64_RANGE_ROUTE_STALE_GUIDANCE) {
                     ++stale_guidance_count;
-                else assert(status == SC64_RANGE_ROUTE_CANCELLED);
+                    guidance_key = range_route_stale_guidance_source(71);
+                    have_guidance_key = 1;
+                } else assert(status == SC64_RANGE_ROUTE_CANCELLED ||
+                              status == SC64_RANGE_ROUTE_PENDING ||
+                              status == SC64_RANGE_ROUTE_FOUND);
+                assert(range_route_request_present(71, latest_tx, latest_ty));
             }
             if (!stale_guidance_count) range_route_game_update_tick();
         }
-        assert(stale_guidance_count > 0);
-        /* Follow the stale gradient across the wall all the way to the old
-         * firing ring. This proves useful progress, not just job completion. */
+        assert(stale_guidance_count > 0 && have_guidance_key);
+        assert(guidance_key.target == 71 && guidance_key.minimum == 0 &&
+               guidance_key.maximum == 64 &&
+               guidance_key.tx >= (u16)first_tx &&
+               guidance_key.tx <= (u16)latest_tx);
+        /* Make the current position far enough from this witnessed field's
+           seed that following it demonstrates useful stale guidance. */
+        latest_tx = (int)guidance_key.tx + 128;
+        latest_ty = (int)guidance_key.ty + 16;
+        status = sc64_range_route_next(71, latest_tx, latest_ty,
+            0, 64, 4, 40, &nc, &nr);
+        assert(status == SC64_RANGE_ROUTE_STALE_GUIDANCE);
+        assert(range_route_request_present(71, latest_tx, latest_ty));
+        /* Follow the actual stale field across the wall to its firing ring,
+           then verify that ring is outside the moved target's current range. */
         {
             int col = 4, row = 40, reached_seed = 0;
             for (int step = 0; step < MAP_COLS * MAP_ROWS; ++step) {
                 int next_col = -1, next_row = -1;
-                status = sc64_range_route_next(71, latest_tx, ty + 16,
+                status = sc64_range_route_next(71, latest_tx, latest_ty,
                     0, 64, col, row, &next_col, &next_row);
                 assert(status == SC64_RANGE_ROUTE_STALE_GUIDANCE);
                 assert(SC64_GRID_GET(path_walkable,
                     next_col + next_row * MAP_COLS));
                 if (next_col == col && next_row == row) {
-                    int dx = col * 16 + 8 - (tx - 128);
-                    int dy = row * 16 + 8 - ty;
+                    int dx = col * 16 + 8 - guidance_key.tx;
+                    int dy = row * 16 + 8 - guidance_key.ty;
                     assert(dx * dx + dy * dy <= 64 * 64);
                     assert(dist2(col * 16 + 8, row * 16 + 8,
-                                 latest_tx, ty + 16) > 64 * 64);
+                                 latest_tx, latest_ty) > 64 * 64);
                     reached_seed = 1;
                     break;
                 }
@@ -301,16 +383,25 @@ static void test_range_work_scheduler_contracts(void)
             assert(reached_seed);
         }
         range_route_pump_to_done((MAP_COLS * MAP_ROWS) + 1000u,
-                                 71, latest_tx, ty + 16, 4, 40);
-        for (int tick = 0; tick < 14; ++tick) range_route_pump_one_tick();
+                                 71, latest_tx, latest_ty, 4, 40);
         assert(sc64_range_route_active.valid &&
+               sc64_range_route_active.target == 71 &&
                sc64_range_route_active.tx == latest_tx &&
-               sc64_range_route_active.ty == ty + 16);
-        status = sc64_range_route_next(71, latest_tx + 16, ty + 16, 0, 64,
+               sc64_range_route_active.ty == latest_ty &&
+               sc64_range_route_work.phase == SC64_RANGE_WORK_DONE);
+        status = sc64_range_route_next(71, latest_tx + 16, latest_ty, 0, 64,
                                        4, 40, &nc, &nr);
         assert(status == SC64_RANGE_ROUTE_STALE_GUIDANCE);
+        for (unsigned tick = 0; tick < 1000u &&
+             (sc64_range_route_snapshot_slot < 0 ||
+              sc64_range_route_snapshot_key.tx != (u16)latest_tx ||
+              sc64_range_route_snapshot_key.ty != (u16)latest_ty); ++tick)
+            range_route_pump_one_tick();
         assert(sc64_range_route_snapshot_slot >= 0 &&
-               sc64_route_valid[sc64_range_route_snapshot_slot] == 3);
+               sc64_route_valid[sc64_range_route_snapshot_slot] == 3 &&
+               sc64_range_route_snapshot_key.target == 71 &&
+               sc64_range_route_snapshot_key.tx == (u16)latest_tx &&
+               sc64_range_route_snapshot_key.ty == (u16)latest_ty);
     }
 
     /* A topology reset discards active and queued derived work. */

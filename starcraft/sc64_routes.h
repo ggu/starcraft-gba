@@ -546,6 +546,29 @@ static int sc64_range_route_snapshot_begin_copy(void)
     return 1;
 }
 
+/* Copy only the current bounded chunk. Word transfers are used when both
+ * addresses can be aligned together; mismatched offsets stay bytewise. */
+typedef u32 sc64_range_copy_word __attribute__((__may_alias__));
+static void sc64_range_copy_bytes(u8 *dst, const u8 *src, unsigned bytes)
+{
+    if ((((uintptr_t)dst ^ (uintptr_t)src) & 3u) != 0u) {
+        while (bytes--) *dst++ = *src++;
+        return;
+    }
+    while (bytes && ((uintptr_t)dst & 3u)) {
+        *dst++ = *src++;
+        --bytes;
+    }
+    while (bytes >= sizeof(sc64_range_copy_word)) {
+        *(sc64_range_copy_word *)(void *)dst =
+            *(const sc64_range_copy_word *)(const void *)src;
+        dst += sizeof(sc64_range_copy_word);
+        src += sizeof(sc64_range_copy_word);
+        bytes -= sizeof(sc64_range_copy_word);
+    }
+    while (bytes--) *dst++ = *src++;
+}
+
 static int sc64_range_route_snapshot_copy(unsigned budget)
 {
     unsigned bytes = sc64_range_route_work.gradient_bytes;
@@ -553,10 +576,11 @@ static int sc64_range_route_snapshot_copy(unsigned budget)
     while (budget-- && sc64_range_route_copy_cursor < bytes) {
         unsigned count = bytes - sc64_range_route_copy_cursor;
         if (count > 64u) count = 64u;
-        memcpy(sc64_route_field[sc64_range_route_copy_slot] +
-                   sc64_range_route_copy_cursor,
-               sc64_range_route_work.gradient + sc64_range_route_copy_cursor,
-               count);
+        sc64_range_copy_bytes(
+            sc64_route_field[sc64_range_route_copy_slot] +
+                sc64_range_route_copy_cursor,
+            sc64_range_route_work.gradient + sc64_range_route_copy_cursor,
+            count);
         sc64_range_route_copy_cursor = (unsigned short)
             (sc64_range_route_copy_cursor + count);
         ++used;

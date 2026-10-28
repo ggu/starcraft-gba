@@ -4712,11 +4712,51 @@ test-sc64-direct-firing-points-game: test-sc64-direct-firing-flags build/test-sc
 
 # Private-input actual-engine fixture for the opt-in bounded fallback.
 # It consumes only prepared Z7 headers; it never invokes their asset builders.
-build/test-sc64-range-work-engine: tests/sc64_direct_firing_points_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c Makefile | build
+RANGE_WORK_TEST_BUILD_DIR ?= build/range-work-adoption
+$(RANGE_WORK_TEST_BUILD_DIR):
+	mkdir -p $@
+# The range-work contract already runs in the engine fixture. Keep these
+# assertions next to the production helper so every profile checks alignment.
+$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-engine: tests/sc64_direct_firing_points_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c Makefile | $(RANGE_WORK_TEST_BUILD_DIR)
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_FIRING_POINTS -DSC64_RANGE_WORK -DSC64_RANGE_WORK_BUDGET_PER_TICK=8 $< common/gba.c -o $@
+$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-engine-default: tests/sc64_direct_firing_points_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c Makefile | $(RANGE_WORK_TEST_BUILD_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_FIRING_POINTS -DSC64_RANGE_WORK $< common/gba.c -o $@
 .PHONY: test-sc64-range-work-engine
-test-sc64-range-work-engine: build/test-sc64-range-work-engine
-	./build/test-sc64-range-work-engine
+test-sc64-range-work-engine: $(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-engine
+	./$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-engine
+.PHONY: test-sc64-range-work-engine-default
+test-sc64-range-work-engine-default: $(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-engine-default
+	./$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-engine-default
+
+# Standalone sanitizer oracle for the exact helper used by bounded snapshot
+# copies. The active-stride variant covers odd route-field strides too.
+RANGE_COPY_TEST_FLAGS = -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS -DSC64_IMPORTED_MISSION -DSC64_RACES -DSC64_ROUTE_PACK3
+RANGE_COPY_TEST_BUILD_DIR ?= build/range-copy-alignment
+$(RANGE_COPY_TEST_BUILD_DIR):
+	mkdir -p $@
+$(RANGE_COPY_TEST_BUILD_DIR)/test-sc64-range-copy-alignment-default: tests/sc64_range_copy_alignment.c starcraft/sc64_routes.h starcraft/sc64_range_work.h Makefile | $(RANGE_COPY_TEST_BUILD_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -fno-omit-frame-pointer $(RANGE_COPY_TEST_FLAGS) -I. $< -o $@
+$(RANGE_COPY_TEST_BUILD_DIR)/test-sc64-range-copy-alignment-active-stride: tests/sc64_range_copy_alignment.c starcraft/sc64_routes.h starcraft/sc64_range_work.h Makefile | $(RANGE_COPY_TEST_BUILD_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -fno-omit-frame-pointer $(RANGE_COPY_TEST_FLAGS) -DSC64_ROUTE_ACTIVE_STRIDE -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_LARGE_MAPS -DSC64_ROUTE_VISIT_GRID -DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_L_FAST_PATH -DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ -I. $< -o $@
+.PHONY: test-sc64-range-copy-alignment
+test-sc64-range-copy-alignment: $(RANGE_COPY_TEST_BUILD_DIR)/test-sc64-range-copy-alignment-default $(RANGE_COPY_TEST_BUILD_DIR)/test-sc64-range-copy-alignment-active-stride
+	./$(RANGE_COPY_TEST_BUILD_DIR)/test-sc64-range-copy-alignment-default
+	./$(RANGE_COPY_TEST_BUILD_DIR)/test-sc64-range-copy-alignment-active-stride
+
+# Explicit prepared-Terran integration checks. These compile against the
+# canonical flags and already-prepared ignored headers; they never generate
+# or import game data. Use a private output directory to keep them isolated.
+RANGE_WORK_TERRAN_BASE_FLAGS = $(filter-out -DSC64_RANGE_WORK -DSC64_RANGE_WORK_BUDGET_PER_TICK=%,$(TERRAN_ROM_FLAGS))
+RANGE_WORK_TERRAN_DEFAULT_FLAGS = $(RANGE_WORK_TERRAN_BASE_FLAGS) -DSC64_DIRECT_FIRING_POINTS -DSC64_RANGE_WORK
+RANGE_WORK_TERRAN_BUDGET8_FLAGS = $(RANGE_WORK_TERRAN_DEFAULT_FLAGS) -DSC64_RANGE_WORK_BUDGET_PER_TICK=8
+$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-save-resume-default: tests/sc64_range_work_save_resume.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c Makefile | $(RANGE_WORK_TEST_BUILD_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RANGE_WORK_TERRAN_DEFAULT_FLAGS) $< common/gba.c -o $@
+$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-save-resume-budget8: tests/sc64_range_work_save_resume.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c Makefile | $(RANGE_WORK_TEST_BUILD_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RANGE_WORK_TERRAN_BUDGET8_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-range-work-save-resume
+test-sc64-range-work-save-resume: $(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-save-resume-default $(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-save-resume-budget8
+	./$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-save-resume-default
+	./$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-save-resume-budget8
 
 .PHONY: range-work-print-flags test-sc64-range-work-flags
 range-work-print-flags:

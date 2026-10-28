@@ -930,7 +930,14 @@ static int race_save_game(void) {
     if (!race_p7_carrier_training_save_valid(&race_data,
             (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
 #endif
-    save_write(&race_data,sizeof(race_data),SAVE_VERSION);toast(7);return 1;
+    save_write(&race_data,sizeof(race_data),SAVE_VERSION);
+#ifdef SC64_RANGE_WORK
+    /* The codec stores world state, not incremental route-search progress.
+     * Restart the derived worker at this successful save boundary so an
+     * uninterrupted continuation and a loaded continuation start alike. */
+    sc64_range_route_reset();
+#endif
+    toast(7);return 1;
 }
 static int race_load_game(void) {
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
