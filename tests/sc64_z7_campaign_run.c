@@ -89,7 +89,6 @@ static unsigned scourge_guard_retry_frame;
 static void z7_mineral_cover_point(int hatch,int *x,int *y);
 static int raw_building(int raw,int owner);
 static int z7_townhall(int owner);
-static int z7_front_colony_site(int hatch,int *out_x,int *out_y);
 static int geyser_target_x=-1,geyser_target_y=-1;
 static int geyser_clear_order_frame;
 static int actions_taken;
@@ -97,6 +96,9 @@ static int last_build_fail_type=-1;
 static int last_build_fail_frame=-10000;
 static int build_probe_done;
 static int hatch_probe_x=-1,hatch_probe_y=-1;
+/* Opening phase advances only when an initial Hatchery A command is sent.
+   Sitefinder calls and failed UI preconditions do not consume a request. */
+static unsigned initial_hatch_a_requests;
 static const char *trace_path=".local/build/z7-controller/z7-controller-attempt.json";
 
 static void z7_hit_observer(int target, int damage, int source_type, int source_owner)
@@ -776,85 +778,21 @@ static int find_build_site(int type,int *out_x,int *out_y)
     int bx,by,best=0x7fffffff,found=0;
     if(!out_x||!out_y)return 0;
     if(!base_center(&bx,&by)){bx=cx;by=cy;}
-    /* The initial four Drones start well south of their nearest mineral
-       field. Move the first Hatchery toward that field without placing it
-       on the resource-cluster edge; live placement still decides legality. */
-    if(type==B_HATCHERY) {
-        if(hatch_probe_x>=0&&hatch_probe_y>=0&&!owned_townhall_count()) {
-            int px=cursor_lattice_coordinate(cx,hatch_probe_x,WORLD_W);
-            int py=cursor_lattice_coordinate(cy,hatch_probe_y,WORLD_H);
-            int unsafe=-1;
-            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
-               currently_visible(u[i].x,u[i].y)&&
-               SC64_CAN_ATTACK_FROM_SOURCE(u[i].type,B_HATCHERY,u[i].owner,u[i].raw_owner)&&
-               dist2(px,py,u[i].x,u[i].y)<160*160) {unsafe=i;break;}
-            if(unsafe>=0) {
-                static unsigned last_hatch_safety_log;
-                if(!last_hatch_safety_log||frame-last_hatch_safety_log>=600u) {
-                    fprintf(stderr,"Z7 near-mineral Hatch wait frame%u site%d,%d visibleAttacker%d raw%d xy%d,%d d2%d\n",
-                        (unsigned)frame,px,py,unsafe,u[unsafe].raw_type,u[unsafe].x,u[unsafe].y,
-                        dist2(px,py,u[unsafe].x,u[unsafe].y));
-                    last_hatch_safety_log=frame;
-                }
-                return 0;
-            }
-            *out_x=hatch_probe_x;*out_y=hatch_probe_y;return 1;
-        }
-        if(owned_townhall_count()) {
-            for(int p=0;p<MAX_MINERALS;p++)if(m[p].amount>0) {
-                int px=m[p].x,py=m[p].y,near_base=0x7fffffff;
-                for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
-                    sc64_race_is_zerg_townhall(b[i].type)) {
-                    int d=dist2(px,py,b[i].x,b[i].y);if(d<near_base)near_base=d;
-                }
-                if(near_base<208*208)continue;
-                for(int y=py-160;y<=py+160;y+=16)for(int x=px-160;x<=px+160;x+=16) {
-                    if(x<16||y<20||x>=WORLD_W-16||y>=WORLD_H-16)continue;
-                    int d=dist2(x,y,px,py),threat=0x7fffffff;
-                    if(d<48*48||d>160*160)continue;
-                    if(!race_can_site(SIDE,type,x,y)||!can_place(type,x,y)||
-                       !z7_worker_can_reach_site(x,y))continue;
-                    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
-                       currently_visible(u[i].x,u[i].y)&&sc64_race_unit_damage(u[i].type)>0) {
-                        int enemy_d=dist2(x,y,u[i].x,u[i].y);if(enemy_d<threat)threat=enemy_d;
-                    }
-                    if(threat<144*144)continue;
-                    int score=near_base+d*2-threat/8;
-                    if(score<best){best=score;*out_x=x;*out_y=y;found=1;}
-                }
-            }
-            return found;
-        }
-        int patch=-1,patch_d=0x7fffffff;
-        for(int i=0;i<MAX_MINERALS;i++)if(m[i].amount>0) {
-            int d=dist2(bx,by,m[i].x,m[i].y);
-            if(d<patch_d){patch=i;patch_d=d;}
-        }
-        if(patch>=0) {
-            int px=m[patch].x,py=m[patch].y;
-            best=0x7fffffff;found=0;
-            for(int y=py-192;y<=py+192;y+=8)
-                for(int x=px-192;x<=px+192;x+=8) {
-                    if(x<16||y<20||x>=WORLD_W-16||y>=WORLD_H-16)continue;
-                    int sx=(x+2)&~3,sy=(y+2)&~3;
-                    int d=dist2(sx,sy,px,py),threat=0x7fffffff;
-                    if(d<64*64||d>192*192)continue;
-                    if(!race_can_site(SIDE,type,sx,sy)||!can_place(type,sx,sy)||
-                       !z7_worker_can_reach_site(sx,sy))continue;
-                    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY) {
-                        int enemy_d=dist2(sx,sy,u[i].x,u[i].y);
-                        if(enemy_d<threat)threat=enemy_d;
-                    }
-                    /* The staged source army includes a raw37 at the old
-                       midpoint site. Avoid a 1HP Zerg foundation being
-                       attacked on the same update it is placed. */
-                    if(threat<120*120)continue;
-                    int base_d=dist2(sx,sy,bx,by);
-                    int score=d*2+base_d;
-                    if(score<best){best=score;*out_x=sx;*out_y=sy;found=1;}
-                }
-            if(found)return 1;
-        }
+    /* Reproduce the opening's observed legal Hatch sites without scoring
+       hidden enemy positions. The first two actual A dispatches target the
+       initial site; later retries target the nearby fallback until a townhall
+       foundation exists. Calling this finder never advances the phase. */
+    if(type==B_HATCHERY&&!owned_townhall_count()) {
+        int x=initial_hatch_a_requests<2?1128:992;
+        int y=initial_hatch_a_requests<2?1768:1552;
+        if(x<16||y<20||x>=WORLD_W-16||y>=WORLD_H-16||
+           !race_can_site(SIDE,type,x,y)||!can_place(type,x,y)||
+           !z7_worker_can_reach_site(x,y))return 0;
+        /* Risk checks use only enemies whose positions are currently visible. */
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
+           currently_visible(u[i].x,u[i].y)&&sc64_race_unit_damage(u[i].type)>0&&
+           dist2(x,y,u[i].x,u[i].y)<120*120)return 0;
+        *out_x=x;*out_y=y;return 1;
     }
     if(type==B_SPAWNING_POOL&&hatch_probe_x>=0&&hatch_probe_y>=0) {
         int hatch=z7_townhall(SIDE);
@@ -886,63 +824,19 @@ static int find_build_site(int type,int *out_x,int *out_y)
             }
         }
     }
-    /* Keep the first colony and its in-place Spore morph inside the defended
-       base footprint. The generic base-center search can average the initial
-       army westward and choose a site close to the source Zergling pack. */
-    if(type==B_CREEP_COLONY&&owned_building_count(B_SUNKEN_COLONY)==0) {
-        int hatch=z7_townhall(SIDE);
-        if(hatch>=0) {
-            if(z7_front_colony_site(hatch,out_x,out_y))return 1;
-            int hx=b[hatch].x,hy=b[hatch].y,best_score=0x7fffffff;
-            int site_x=0,site_y=0;
-            for(int dy=-160;dy<=160;dy+=16)for(int dx=-160;dx<=160;dx+=16) {
-                int x=cursor_lattice_coordinate(cx,hx+dx,WORLD_W);
-                int y=cursor_lattice_coordinate(cy,hy+dy,WORLD_H);
-                if(x<24||y<24||x>=WORLD_W-24||y>=WORLD_H-24||
-                   dist2(x,y,hx,hy)<64*64||!race_can_site(SIDE,type,x,y)||
-                       !can_place(type,x,y)||!z7_worker_can_reach_site(x,y))continue;
-                int nearest=0x7fffffff,reachable=0;
-                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY) {
-                    int d=dist2(x,y,u[i].x,u[i].y);if(d<nearest)nearest=d;
-                }
-                if(nearest<144*144)continue;
-                for(int i=0;i<MAX_UNITS&&!reachable;i++)if(u[i].alive&&
-                    u[i].owner==SIDE&&u[i].raw_type==41&&u[i].order!=ORDER_BUILD) {
-                    int nx,ny;
-                    reachable=path_next_tile(u[i].x,u[i].y,x,y,&nx,&ny);
-                }
-                if(!reachable)continue;
-                int score=dist2(x,y,hx,hy)-nearest/2;
-                if(score<best_score){best_score=score;site_x=x;site_y=y;found=1;}
-            }
-            if(found){*out_x=site_x;*out_y=site_y;return 1;}
-        }
-    }
-    /* Put the second Sunken Colony behind the first defense, south of the
-       Hatchery. This remains a normal legal site search; prefer buildable
-       cells with the greatest current enemy clearance on the first ring. */
-    if(type==B_CREEP_COLONY&&owned_building_count(B_SUNKEN_COLONY)>0) {
-        int hatch=z7_townhall(SIDE);
-        if(hatch>=0) {
-            if(z7_front_colony_site(hatch,out_x,out_y))return 1;
-            int hx=b[hatch].x,hy=b[hatch].y;
-            for(int radius=96;radius<=192;radius+=16) {
-                int danger_best=-1,site_x=0,site_y=0;
-                for(int dx=-96;dx<=96;dx+=16) {
-                    int x=cursor_lattice_coordinate(cx,hx+dx,WORLD_W);
-                    int y=cursor_lattice_coordinate(cy,hy+radius,WORLD_H);
-                    if(x<16||y<20||x>=WORLD_W-16||y>=WORLD_H-16||
-                       !race_can_site(SIDE,type,x,y)||!can_place(type,x,y)||
-                       !z7_worker_can_reach_site(x,y))continue;
-                    int nearest=0x7fffffff;
-                    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY) {
-                        int d=dist2(x,y,u[i].x,u[i].y);if(d<nearest)nearest=d;
-                    }
-                    if(nearest>danger_best){danger_best=nearest;site_x=x;site_y=y;}
-                }
-                if(danger_best>=0){*out_x=site_x;*out_y=site_y;return 1;}
-            }
-        }
+    /* Use the two observed opening defense sites directly. Placement still
+       passes ordinary live legality, terrain, and first-builder reach checks;
+       enemy clearance only considers currently visible units. */
+    if(type==B_CREEP_COLONY) {
+        int second=owned_building_count(B_SUNKEN_COLONY)>0;
+        int x=second?1008:944,y=1624;
+        if(x<16||y<20||x>=WORLD_W-16||y>=WORLD_H-16||
+           !race_can_site(SIDE,type,x,y)||!can_place(type,x,y)||
+           !z7_worker_can_reach_site(x,y))return 0;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
+           currently_visible(u[i].x,u[i].y)&&sc64_race_unit_damage(u[i].type)>0&&
+           dist2(x,y,u[i].x,u[i].y)<144*144)return 0;
+        *out_x=x;*out_y=y;return 1;
     }
     if(type==B_EXTRACTOR) {
         /* Prefer Z7's recovered raw-149 node over its distant baseline node. */
@@ -1024,6 +918,7 @@ static void log_hatch_probe(const char *stage,int worker)
 static int start_building(int type,int menu_row)
 {
     int worker=-1,x=-1,y=-1,before=owned_building_count(type);
+    int opening_hatch=type==B_HATCHERY&&!owned_townhall_count();
     if(before&&type!=B_HATCHERY&&type!=B_CREEP_COLONY)return 1;
     /* Public construction pays and creates the foundation only when the
        Drone reaches its site. Preserve that ordinary pending order instead
@@ -1090,6 +985,7 @@ static int start_building(int type,int menu_row)
     if(type==B_HATCHERY&&!build_probe_done) {
         log_hatch_probe("pre-A",worker);
         step(KEY_A);
+        if(opening_hatch&&initial_hatch_a_requests<2)++initial_hatch_a_requests;
         fprintf(stderr,"Z7 build probe after A frame%u mode%d menu%d menuopen%d bank%d/%d worker%d alive%d order%d target%d pos%d,%d count%d\n",
             (unsigned)frame,mode,menu,menu_open,minerals,gas,worker,u[worker].alive,u[worker].order,u[worker].target,
             u[108].x,u[108].y,building_count(-1));
@@ -1100,7 +996,10 @@ static int start_building(int type,int menu_row)
             building_count(-1));
         log_hatch_probe("post-release",worker);
         build_probe_done=1;
-    } else tap(KEY_A);
+    } else {
+        tap(KEY_A);
+        if(opening_hatch&&initial_hatch_a_requests<2)++initial_hatch_a_requests;
+    }
     int made=owned_building_count(type)>before;
     int pending=0;
     if(type==B_EXTRACTOR)for(int i=0;i<MAX_UNITS;i++)
@@ -2934,38 +2833,6 @@ static int z7_mutas_near_point(int x,int y,int radius)
         ++total;if(dist2(x,y,u[i].x,u[i].y)<=limit2)++near;
     }
     return total>0&&near*2>=total;
-}
-
-/* Search real, reachable building cells around the worker-field cover point
-   before considering a safer but distant fallback site. The current site
-   checks remain authoritative, including snapped cursor placement. */
-static int z7_front_colony_site(int hatch,int *out_x,int *out_y)
-{
-    int cover_x,cover_y;
-    z7_mineral_cover_point(hatch,&cover_x,&cover_y);
-    int best=0x7fffffff,found=0,site_x=0,site_y=0;
-    for(int dy=-96;dy<=96;dy+=16)for(int dx=-96;dx<=96;dx+=16) {
-        int x=cursor_lattice_coordinate(cx,cover_x+dx,WORLD_W);
-        int y=cursor_lattice_coordinate(cy,cover_y+dy,WORLD_H);
-        int field_d=dist2(x,y,cover_x,cover_y);
-        if(x<24||y<24||x>=WORLD_W-24||y>=WORLD_H-24||
-           field_d>96*96||dist2(x,y,b[hatch].x,b[hatch].y)<64*64||
-           !race_can_site(SIDE,B_CREEP_COLONY,x,y)||!can_place(B_CREEP_COLONY,x,y))continue;
-        int nearest=0x7fffffff,reachable=0;
-        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY) {
-            int d=dist2(x,y,u[i].x,u[i].y);if(d<nearest)nearest=d;
-        }
-        if(nearest<144*144)continue;
-        for(int i=0;i<MAX_UNITS&&!reachable;i++)if(u[i].alive&&u[i].owner==SIDE&&
-            u[i].raw_type==41&&u[i].order!=ORDER_BUILD) {
-            int nx,ny;reachable=path_next_tile(u[i].x,u[i].y,x,y,&nx,&ny);
-        }
-        if(!reachable)continue;
-        int score=field_d*2+dist2(x,y,b[hatch].x,b[hatch].y)/8-nearest/32;
-        if(score<best){best=score;site_x=x;site_y=y;found=1;}
-    }
-    if(found){*out_x=site_x;*out_y=site_y;}
-    return found;
 }
 
 /* After the first Sunken finishes, reserve a usable Drone and minerals for
