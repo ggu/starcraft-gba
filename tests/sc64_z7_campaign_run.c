@@ -2439,16 +2439,47 @@ static int campaign_assault_retarget(void)
             if(building>=0){tx=b[building].x;ty=b[building].y;}
         }
         if(building>=0) {
-            if(campaign_recon_active)campaign_recon_stage++;
-            campaign_recon_active=0;
+            int recon_was_active=campaign_recon_active;
+            int recon_stage_before=campaign_recon_stage;
+            int building_x=b[building].x,building_y=b[building].y;
+            int building_raw=b[building].raw_type;
             accepted=(unsigned)frame>=45000u?army_order(1,tx,ty):
                 typed_attack_move(U_HYDRALISK,tx,ty);
+            /* A stock Attack click may become a direct attack-target order.
+               The generic army helper also accepts Attack-Move orders; if it
+               returns false, witness a live selected order for this exact
+               currently visible building before treating the click as accepted. */
+            int selected_count_after=0,building_attackers=0;
+            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].selected) {
+                selected_count_after++;
+                if(u[i].order==ORDER_ATTACK_TARGET&&u[i].target==MAX_UNITS+building&&
+                   b[building].alive&&b[building].owner==ENEMY&&
+                   currently_visible(b[building].x,b[building].y))building_attackers++;
+            }
+            if(!accepted&&building_attackers>0) {
+                accepted=1;
+                fprintf(stderr,"Z7 visible-building target witness slot%d attackers%d selected%d frame%u\n",
+                    building,building_attackers,selected_count_after,(unsigned)frame);
+            }
+            if(!accepted&&recon_was_active) {
+                fprintf(stderr,"Z7 recon preserved after rejected visible-building order stage%d slot%d raw%d xy%d,%d nowVis%d selected%d frame%u\n",
+                    recon_stage_before,building,building_raw,building_x,building_y,
+                    b[building].alive&&b[building].owner==ENEMY&&
+                       currently_visible(b[building].x,b[building].y),selected_count_after,(unsigned)frame);
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].selected)
+                    fprintf(stderr,"  rejected-building selected slot%d type%d order%d target%d pos%d,%d to%d,%d\n",
+                        i,u[i].type,u[i].order,u[i].target,u[i].x,u[i].y,u[i].tx,u[i].ty);
+            }
             if(accepted) {
-                campaign_assault_target=building;campaign_assault_target_raw=b[building].raw_type;
+                if(recon_was_active) {
+                    campaign_recon_stage++;
+                    campaign_recon_active=0;
+                }
+                campaign_assault_target=building;campaign_assault_target_raw=building_raw;
                 campaign_assault_is_building=1;campaign_assault_hold_set=0;
                 fprintf(stderr,"Z7 full-army assault visible %s building slot%d raw%d xy%d,%d frame%u army%d\n",
                     (unsigned)frame<9000u?"priority":"",
-                    building,b[building].raw_type,tx,ty,(unsigned)frame,combat_count(SIDE));
+                    building,building_raw,tx,ty,(unsigned)frame,combat_count(SIDE));
             }
         } else if((unsigned)frame>=100000u&&campaign_recon_stage>=19&&
                   worker_count(-1)>=6&&combat_count(SIDE)>=10) {
