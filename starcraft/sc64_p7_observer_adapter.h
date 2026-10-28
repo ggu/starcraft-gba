@@ -573,7 +573,8 @@ sc64_p7_arbiter_cache_process_due(void)
     sc64_p7_arbiter_cache_source_tick();
 }
 
-static int sc64_p7_arbiter_cache_unit_valid(const Unit *actor)
+static int sc64_p7_arbiter_cache_unit_valid_with_mask(const Unit *actor,
+                                                      unsigned allowed_sources)
 {
     unsigned w,mask;
     if (!actor) return 0;
@@ -581,8 +582,7 @@ static int sc64_p7_arbiter_cache_unit_valid(const Unit *actor)
     w=(unsigned)actor->weapon;
     if (!SC64_P7_ARBITER_CACHE_VALID(w)) return 0;
     mask=SC64_P7_ARBITER_DETECTED_MASK(w);
-    for (unsigned owner=0;owner<8;++owner)
-        if ((mask&(1u<<owner)) && race_p7_source_owner(owner)<0) return 0;
+    if (mask & ~allowed_sources) return 0;
     if (actor->alive && !(w&SC64_P7_ARBITER_TRACKED) && mask) return 0;
     if (actor->alive && (w&SC64_P7_ARBITER_AURA) &&
         !(w&SC64_P7_ARBITER_TRACKED)) return 0;
@@ -592,10 +592,26 @@ static int sc64_p7_arbiter_cache_unit_valid(const Unit *actor)
     return 1;
 }
 
+static unsigned sc64_p7_valid_source_mask(void)
+{
+    unsigned mask=0;
+    for (unsigned owner=0;owner<8;++owner)
+        if (race_p7_source_owner(owner)>=0) mask|=1u<<owner;
+    return mask;
+}
+
+static int sc64_p7_arbiter_cache_unit_valid(const Unit *actor)
+{
+    return sc64_p7_arbiter_cache_unit_valid_with_mask(
+        actor, sc64_p7_valid_source_mask());
+}
+
 static int sc64_p7_arbiter_cache_world_valid(void)
 {
+    unsigned allowed_sources=sc64_p7_valid_source_mask();
     for (int i=0;i<MAX_UNITS;++i)
-        if (!sc64_p7_arbiter_cache_unit_valid(&u[i])) return 0;
+        if (!sc64_p7_arbiter_cache_unit_valid_with_mask(&u[i],
+                                                        allowed_sources)) return 0;
     return 1;
 }
 #endif /* SC64_P7_ARBITER_CLOAK_CACHE_ENABLED */
