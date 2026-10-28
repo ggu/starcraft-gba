@@ -387,6 +387,15 @@ static unsigned hint_band_hash(void)
     return hash;
 }
 
+/* The cached HUD band must show what a fresh draw would. */
+static int cached_hint_is_current(void)
+{
+    draw_hud();
+    unsigned cached = hint_band_hash();
+    draw_hud_commands();
+    return hint_band_hash() == cached;
+}
+
 static int red_cursor_pixels(void)
 {
     int n = 0;
@@ -455,11 +464,23 @@ static int check_field_controls_review(void)
     if (ui_action != UI_A_SELECT || !field_controls_hint() ||
         strcmp(field_controls_hint(), "B COMMANDS  A SELECT"))
         return fail("controls: menu fixture does not start on A SELECT");
+    if (!cached_hint_is_current()) return fail("controls: cached HUD lost the A SELECT hint");
+    /* Empty ground and the open list change only the hint, not the
+     * selection: the cached band has to follow both. */
+    if (!open_spot(&x, &y)) return fail("controls: no empty ground for the hint check");
+    cx = x; cy = y;
+    resolve_now();
+    if (ui_action == UI_A_SELECT || !cached_hint_is_current())
+        return fail("controls: cached HUD kept A SELECT over empty ground");
+    cx = u[worker].x; cy = u[worker].y;
+    resolve_now();
+    draw_hud();
     press(KEY_B);
     if (!menu_open) return fail("controls: B did not open the order list");
     resolve_now();
     if (!field_controls_hint() || strcmp(field_controls_hint(), "A CHOOSE  B CLOSE"))
         return fail("controls: the open order list kept the field hint");
+    if (!cached_hint_is_current()) return fail("controls: cached HUD kept the field hint with the list open");
     /* The HUD explains the highlighted row: Move needs a selection. */
     menu_cursor = MENU_MOVE;
     draw_hud_commands();
