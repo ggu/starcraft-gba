@@ -54,7 +54,7 @@ build qualification.
 | Recorded held/pressed transitions | 70,561 |
 | Screen / win / loss | RESULT / 1 / 0 |
 | Native Z7 model outcome | `SC64_Z7_WON` |
-| Started / fired actions | 254 / 254 |
+| Started / fired trigger masks | `0x00fe` / `0x00fe` (bitsets, not action counts) |
 | Runtime fault | 0 |
 | Enemy buildings at terminal | 0 |
 | Own units / buildings / workers | 89 / 8 / 12 |
@@ -108,8 +108,9 @@ or generated files are included in this checkpoint.
 
 An additional ordinary-input run of the same tracked source and runtime with
 `SC64_DIRECT_FIRING_POINTS` omitted ended at the 1,000,000 host-input limit
-with 18 enemy buildings remaining (`model=0`, `started=250`, `fired=250`).
-Its trace SHA-256 is `23e9b5f1950aea91b051441d0bf2d3215ade59b5329ded6f043f95b66faef552`.
+with 18 enemy buildings remaining (`model=0`). Its started/fired trigger
+masks were `0x00fa` / `0x00fa` (bitsets, not action counts). Its trace
+SHA-256 is `23e9b5f1950aea91b051441d0bf2d3215ade59b5329ded6f043f95b66faef552`.
 This is evidence that the direct-firing helper is material to the recorded
 win; it is not a win qualification for the DIRECT-off build. The helper is
 enabled only in the unpromoted Z7 canonical candidate flags here; this does
