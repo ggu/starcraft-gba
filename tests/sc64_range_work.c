@@ -104,6 +104,13 @@ static void check_map(int cols, int rows, int tx, int ty, int lo, int hi)
                gradient_store + 1, field_bytes,
                frontier_store + 1, scratch_bytes,
                tx, ty, lo, hi) == SC64_RANGE_WORK_PENDING);
+    if (((unsigned)cols & ((unsigned)cols - 1u)) == 0u) {
+        unsigned shift = 0, stride = (unsigned)cols;
+        while (stride > 1u) { stride >>= 1; ++shift; }
+        assert(work.column_shift == shift + 1u);
+    } else {
+        assert(work.column_shift == 0);
+    }
     /* Poisoned gradient/frontier cannot become visible before clear+seed. */
     {
         int nx = -10, ny = -10;
@@ -345,6 +352,7 @@ static void test_sparse_long_layers(void)
     assert(sc64_range_work_begin(&work,128,128,walk_store+1,2048,
         gradient_store+1,6144,frontier_store+1,scratch,
         127*16+8,64*16+8,0,0)==SC64_RANGE_WORK_PENDING);
+    assert(work.column_shift == 8);
     while(work.phase!=SC64_RANGE_WORK_FLOOD && work.phase!=SC64_RANGE_WORK_DONE)
         assert(sc64_range_work_pump(&work,64,&used)==SC64_RANGE_WORK_PENDING);
     assert(work.phase==SC64_RANGE_WORK_FLOOD);

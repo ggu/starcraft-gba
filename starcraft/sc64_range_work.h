@@ -41,6 +41,8 @@ typedef struct Sc64RangeWork {
     unsigned short seed_col, seed_row;
     unsigned char summary_depth;
     unsigned char phase;
+    /* Zero means general stride; otherwise this stores log2(cols) + 1. */
+    unsigned char column_shift;
 } Sc64RangeWork;
 
 static void sc64_range_work_reset(Sc64RangeWork *work);
@@ -199,6 +201,12 @@ static int sc64_range_work_begin(Sc64RangeWork *work,
     work->target_y = target_y;
     work->min_range = min_range;
     work->max_range = max_range;
+    work->column_shift = 0;
+    if (((unsigned)cols & ((unsigned)cols - 1u)) == 0u) {
+        unsigned shift = 0, stride = (unsigned)cols;
+        while (stride > 1u) { stride >>= 1; ++shift; }
+        work->column_shift = (unsigned char)(shift + 1u);
+    }
     work->seed_left = (unsigned short)(target_x > max_range ?
         (target_x - max_range) / 16 : 0);
     work->seed_top = (unsigned short)(target_y > max_range ?
@@ -247,6 +255,7 @@ static void sc64_range_work_reset(Sc64RangeWork *work)
     work->seed_col = work->seed_row = 0;
     work->summary_depth = 0;
     work->phase = SC64_RANGE_WORK_IDLE;
+    work->column_shift = 0;
 }
 
 /* One unit clears at most 64 bytes, tests one seed cell, or pops one frontier
@@ -325,8 +334,13 @@ static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
             if (sc64_range_work_frontier_pop(work, work->current_plane, &cell)) {
                 int col, row;
                 ++done;
-                col = (int)(cell % (unsigned)work->cols);
-                row = (int)(cell / (unsigned)work->cols);
+                if (work->column_shift) {
+                    col = (int)(cell & ((unsigned)work->cols - 1u));
+                    row = (int)(cell >> (work->column_shift - 1u));
+                } else {
+                    col = (int)(cell % (unsigned)work->cols);
+                    row = (int)(cell / (unsigned)work->cols);
+                }
 #define SC64_RANGE_WORK_EXPAND(ok, next_cell, direction) do { \
     if (ok) { unsigned n_ = (unsigned)(next_cell); \
         if (sc64_range_work_walkable(work, n_) && \
