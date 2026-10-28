@@ -555,9 +555,12 @@ static void test_save_load_and_completion(void)
         assert(!b[slot].under_construction);
         unsigned stage; uint32_t elapsed;
         assert(!sc64_construction_source_phase(races[i]+1,total,total,&stage,&elapsed));
+        /* A completed, selected structure shows its vital bar. */
+        selected_building=slot;
         gfx_begin(C_BLACK);
         draw_building_overlay(&b[slot]);
         capture(second);
+        selected_building=-1;
         unsigned visible_pixels=0;
         for (unsigned p=0;p<sizeof(second);++p) visible_pixels+=second[p]!=C_BLACK;
         assert(visible_pixels>30);

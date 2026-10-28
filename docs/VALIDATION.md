@@ -6187,3 +6187,43 @@ After the fix, merged with main at `eaf07ca`, the P7 frame oracle and the
 Protoss, Zerg and Terran HUD-cache fixtures still pass, the projectile probe
 passes, and the P7, Zerg Z1-Z6 and Terran ROMs link inside both guards (P7
 BSS end `0x02038258`, IWRAM end `0x03004b30`).
+
+## StarCraft-style selected vital bars (2026-10-28)
+
+Vital bars now follow the StarCraft/StarCraft 64 selection convention as
+reproduced by OpenBW's `draw_health_bars`: only selected units and the
+selected building show them, below the sprite rather than above it. Each bar is
+a black frame of 2-pixel cells split by 1-pixel black dividers, filled in whole
+cells. HP is green at 66% or more, yellow from 33% and red below 33%. Shields
+are a blue strip stacked above HP, and caster energy is a purple strip one row
+below it. Empty cells are grey. The GBA version keeps two shade rows per strip
+instead of the reference's three and uses the existing fixed palette entries.
+It is a visual approximation of the reference layout, not a pixel-exact
+palette or size match. Energy appears only for casters whose energy a campaign
+adapter persists: the Z5/Z6 Kerrigan cloak, the P4 High Templar/Tassadar and
+P6 Tassadar Storm casters, and the Z6 Kerrigan Storm caster. Bars no longer
+carry owner color. Because only player-side actors are selectable, enemy HP is
+no longer drawn on the battlefield. Worker cargo badges still draw for every
+worker.
+
+`SC64_VITAL_BAR_FAST` is removed. It sped up the always-on two-row bar, which no
+longer exists, and drawing now happens only for the current selection. The
+asset-free `make test-sc64-vital-bars` oracle now derives every expected pixel
+of the new bar independently of the rectangle calls. It covers 6,240 cases
+across widths, viewport edges, scene clipping, health tiers, and shield and
+energy fills. `make test-sc64-shield-bars` passes under ASan/UBSan in the unified
+and P7 profiles. It checks frame and divider pixels, tier boundaries,
+shield-only row changes, unselected actors, a selected Pylon, energy cells and
+battlefield clipping. The late-building, unit-word spawn, construction-source and
+Photon Cannon renderer fixtures now select the actor before comparing vitals.
+
+`./dev build` and `./dev test` (614 Python checks, 18 skipped without private
+inputs, plus host fixtures) pass, as does the unified ROM build. Every
+`test-unified` binary passes except `test-unified-menu` ("briefing text exceeds
+visible page"). That check also fails on an unmodified `codex/source-release`
+built from the same private inputs. The full Terran build passes. Its test
+command stops at the T9 controller (`won=0`, no Wraiths, wallet 34/14 at the
+500,000-tick limit); the unmodified base fails identically with these inputs.
+T1–T8 and the other Terran checks pass before that point, and T10 run directly
+wins at tick 3,552. No frame-rate, physical-hardware or ARM replay result is
+claimed.

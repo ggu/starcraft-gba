@@ -1983,6 +1983,10 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     int i = find_build_slot();
     if (i < 0)
 	return -1;
+    /* Destruction leaves the selection index on the dead slot; a new
+       structure there must not inherit it (and its selected vital bar). */
+    if (selected_building == i)
+        selected_building = -1;
 #ifdef SC64_P7_PROJECTILES_ENABLED
     race_p7_projectile_clear_references(MAX_UNITS+i);
 #endif
@@ -7677,37 +7681,90 @@ sc64_actor_max_shields(int type,int building)
 #endif
 }
 
-static void
-sc64_draw_vital_bar(int left,int top,int width,int value,int maximum,
-                    int color,int empty)
+/* Caster energy in Q8, where a campaign adapter persists it; 0 otherwise. */
+static int
+sc64_unit_energy(const Unit *q,int *maximum)
 {
-    int bottom=top+2;
-    if (top<12) top=12;
-    if (bottom>120) bottom=120;
-    if (top>=bottom || maximum<=0) return;
-    if (value<0) value=0;
-    if (value>maximum) value=maximum;
-#ifdef SC64_VITAL_BAR_FAST
-    /* Actor UI widths are 12/18 pixels and stock capacities fit the product.
-     * Full and empty bars need neither division nor an overwritten fill. */
-    if (!value || value==maximum) {
-        gfx_rect(left,top,width,bottom-top,(u8)(value ? color : empty));
-        return;
-    }
+    *maximum=0;
+#ifdef SC64_Z6_CLOAK_ENABLED
+    if (race_z6_cloak_actor(q)) *maximum=SC64_Z5_CLOAK_MAX_ENERGY_Q8;
 #endif
-    gfx_rect(left,top,width,bottom-top,(u8)empty);
-    int fill=(int)((u32)value*(unsigned)width/(unsigned)maximum);
-    if (fill) gfx_rect(left,top,fill,bottom-top,(u8)color);
+#ifdef SC64_Z5_CLOAK_ENABLED
+    if (race_z5_cloak_actor(q)) *maximum=SC64_Z5_CLOAK_MAX_ENERGY_Q8;
+#endif
+#ifdef SC64_P6_STORM_ENABLED
+    if (race_p6_active() && q->raw_type==79 && q->raw_owner==2)
+        *maximum=SC64_STORM_HERO_MAX_ENERGY*SC64_STORM_ENERGY_ONE;
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+    if (race_z6_active() && q->raw_type==51 && q->raw_owner==3)
+        *maximum=SC64_STORM_HERO_MAX_ENERGY*SC64_STORM_ENERGY_ONE;
+#endif
+#ifdef SC64_P4_STORM_ENABLED
+    if (race_p4_active() && q->owner==SIDE &&
+        (q->raw_type==67 || q->raw_type==SC64_P4_RAW_TASSADAR))
+        *maximum=(q->raw_type==67 ? SC64_STORM_MAX_ENERGY :
+                  SC64_STORM_HERO_MAX_ENERGY)*SC64_STORM_ENERGY_ONE;
+#endif
+    return *maximum ? q->carry : 0;
+}
+
+/* StarCraft's selected-unit vitals, after OpenBW's draw_health_bars: a black
+ * frame of 2-pixel cells split by 1-pixel dividers and filled in whole cells.
+ * Shields stack above HP and energy sits below. Each strip keeps two shade
+ * rows instead of three to suit the GBA sprite scale. Battlefield rows only. */
+static void
+vital_rect(int x,int y,int w,int h,u8 color)
+{
+    if (y<12) { h-=12-y; y=12; }
+    if (y+h>120) h=120-y;
+    gfx_rect(x,y,w,h,color);
+}
+
+static int
+vital_fill(int value,int maximum,int width)
+{
+    if (value<=0 || maximum<=0) return 0;
+    if (value>=maximum) return width;
+    int r=(int)((u32)value*100u/(unsigned)maximum)*width/100;
+    if (r<3) return 3;
+    return r%3>1 ? r+3-r%3 : r-r%3;
+}
+
+static void
+vital_strip(int left,int top,int width,int fill,u8 light,u8 dark)
+{
+    vital_rect(left,top,fill,1,light);
+    vital_rect(left,top+1,fill,1,dark);
+    vital_rect(left+fill,top,width-fill,1,C_STONE);
+    vital_rect(left+fill,top+1,width-fill,1,C_UI);
 }
 
 static void __attribute__((noinline))
-draw_actor_vitals(int x,int hp_y,int width,int hp,int maxhp,
-                   int shield,int maxshield,int health_color)
+draw_actor_vitals(int x,int top,int width,int hp,int maxhp,
+                   int shield,int maxshield,int energy,int maxenergy)
 {
-    int left=x-width/2;
-    sc64_draw_vital_bar(left,hp_y,width,hp,maxhp,health_color,C_RED_DARK);
+    width-=(width-1)%3;
+    if (width<13) width=13;
+    if (maxhp<=0) return;
+    int left=x-width/2,hp_top=top+(maxshield>0?3:0),bottom=hp_top+4;
+    int percent=hp>0?(int)((u32)hp*100u/(unsigned)maxhp):0;
+    vital_rect(left,top,width,bottom-top,C_BLACK);
     if (maxshield>0)
-        sc64_draw_vital_bar(left,hp_y-3,width,shield,maxshield,C_CYAN,C_BLUE_DARK);
+        vital_strip(left,top+1,width,vital_fill(shield,maxshield,width),
+                    C_BLUE,C_BLUE_DARK);
+    vital_strip(left,hp_top+1,width,vital_fill(hp,maxhp,width),
+                percent>=66 ? C_GREEN : percent>=33 ? C_GOLD : C_RED,
+                percent>=66 ? C_GREEN_DARK : percent>=33 ? C_GOLD_DARK : C_RED_DARK);
+    if (maxenergy>0) {
+        vital_rect(left,bottom+1,width,4,C_BLACK);
+        vital_strip(left,bottom+2,width,vital_fill(energy,maxenergy,width),
+                    C_PURPLE,C_ZERG);
+    }
+    for (int dx=0;dx<width;dx+=3) {
+        vital_rect(left+dx,top+1,1,bottom-top-2,C_BLACK);
+        if (maxenergy>0) vital_rect(left+dx,bottom+2,1,2,C_BLACK);
+    }
 }
 
 /* A compact UI cue for carried resources. The stock unit bank has no cargo
@@ -7901,22 +7958,23 @@ draw_unit(Unit * q)
     }
     y = feet;
     }
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
-    if (!(actor_flags & SC64_GAME_ACTOR_INVINCIBLE))
-#endif
-        draw_actor_vitals(x,sprite_y-4,12,q->hp,q->maxhp,
-#ifdef SC64_RACES
-            q->shield,sc64_actor_max_shields(q->type,0),
-#else
-            0,0,
-#endif
-            owner_color(q->owner));
-    if (q->selected)
-	gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
     if (q->carry > 0 && IS_WORKER(q->type) &&
         (q->order == ORDER_MINE || q->order == ORDER_GAS))
         draw_worker_cargo_badge(sprite_x + sprite_w + 2,
             sprite_y + sprite_h / 2, q->order == ORDER_GAS);
+    if (!q->selected) return;
+    gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    if (actor_flags & SC64_GAME_ACTOR_INVINCIBLE) return;
+#endif
+    int maxenergy, energy = sc64_unit_energy(q, &maxenergy);
+    draw_actor_vitals(x, sprite_y + sprite_h + 3, sprite_w + 4, q->hp, q->maxhp,
+#ifdef SC64_RACES
+        q->shield,
+#else
+        0,
+#endif
+        sc64_actor_max_shields(q->type, 0), energy, maxenergy);
 }
 
 #define SC64_WEAPON_VFX_VISIBLE(x,y) currently_visible((x)+camx,(y)+camy-12)
@@ -8439,13 +8497,20 @@ draw_building_overlay(Building *q)
             gfx_bar(x-12,sprite_y+sprite_h+3,24,2,progress,duration,C_CYAN,C_PANEL);
     }
 #endif
-    draw_actor_vitals(x,sprite_y-4,18,q->hp,q->maxhp,
+    if (selected_building >= 0 && q == &b[selected_building]) {
+        int vitals_y = sprite_y + sprite_h + 3;
 #ifdef SC64_RACES
-        q->shield,sc64_actor_max_shields(q->type,1),
-#else
-        0,0,
+        if (q->under_construction) vitals_y += 3;
 #endif
-        owner_color(q->owner));
+        draw_actor_vitals(x, vitals_y, sprite_w > 46 ? 46 : sprite_w,
+                          q->hp, q->maxhp,
+#ifdef SC64_RACES
+                          q->shield,
+#else
+                          0,
+#endif
+                          sc64_actor_max_shields(q->type, 1), 0, 0);
+    }
 #ifndef SC64_RACES
     if (q->under_construction)
         gfx_text(x - 3, y, "C", C_GOLD);
