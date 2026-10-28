@@ -311,10 +311,11 @@ sc64_p8_world_trigger_complete(void *context, unsigned trigger,
     Sc64P8WorldContext *ctx = (Sc64P8WorldContext *)context;
     if (!ctx || trigger >= SC64_P8_TRIGGER_LIMIT ||
         trigger_owner >= SC64_Z8_OWNER_LIMIT) return -1;
-    return ctx->pause_trigger_end
-        ? ctx->pause_trigger_end(ctx->pause_end_context ?
-              ctx->pause_end_context : ctx->context, trigger, trigger_owner)
-        : 1;
+    if (!ctx->pause_trigger_end) return 1;
+    int result = ctx->pause_trigger_end(ctx->pause_end_context ?
+        ctx->pause_end_context : ctx->context, trigger, trigger_owner);
+    return result == SC64_P8_PAUSE_APPLIED ||
+           result == SC64_P8_PAUSE_IGNORED ? 1 : -1;
 }
 
 static inline Sc64P8SourceWorldOps
