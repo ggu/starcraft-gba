@@ -80,6 +80,14 @@ test-sc64-p8-world: build/test-sc64-p8-world
 	./build/test-sc64-p8-world
 test-starcraft: test-sc64-p8-world
 
+# Asset-free shared-owner wait/presentation and source-pause tail fixture.
+.PHONY: test-sc64-p8-timed-service
+build/test-sc64-p8-timed-service: tests/sc64_p8_timed_service.c build/p8-fixture/sc64_p8_scenario_generated.h starcraft/sc64_p8_timed_service.h starcraft/sc64_p8_world_adapter.h starcraft/sc64_p8_source_adapter.h starcraft/sc64_z8_world_adapter.h starcraft/sc64_z8_triggers.h starcraft/sc64_resource_actions.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft -Ibuild/p8-fixture $< -o $@
+test-sc64-p8-timed-service: build/test-sc64-p8-timed-service
+	./build/test-sc64-p8-timed-service
+test-starcraft: test-sc64-p8-timed-service
+
 # Optional bridge check against an already-prepared authenticated P8 header.
 .PHONY: test-sc64-p8-world-source-contract
 build/test-sc64-p8-world-source-contract: tests/sc64_p8_world_source.c starcraft/sc64_p8_world_adapter.h starcraft/sc64_p8_source_adapter.h starcraft/sc64_z8_world_adapter.h starcraft/sc64_z8_triggers.h starcraft/sc64_resource_actions.h $(P8_SCENARIO_DIR)/sc64_p8_scenario_generated.h common/gba.h Makefile | build

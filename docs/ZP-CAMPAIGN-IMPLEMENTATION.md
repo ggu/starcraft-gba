@@ -118,14 +118,25 @@ this scaffold does not encode or qualify P8's native scheduler cadence.
 An asynchronous action resumes at the same cursor. A callback can return
 `BLOCKED` when a timed action cannot start because its owner already has a
 shared wait; that action is retried on the next pass without the resume marker,
-while later triggers and immediate actions still run in source order. As in the
-existing native-backed Z8 action model, the callback must own the shared timer
-per source owner and the armed marker per action. This repository does not yet
-provide P8 world callbacks that implement those wait semantics. Terminal
-results are accumulated across the source-order pass, with Victory taking
-precedence over Defeat, and are accepted only from matching final
-Victory/Defeat actions. Unknown conditions or actions fault the run instead of
-being silently skipped.
+while later triggers still run in source order. Later actions in that same
+trigger remain behind the blocked cursor. As in the existing native-backed Z8
+action model, the callback must own the shared timer per source owner and the
+armed marker per action. `sc64_p8_timed_service.h` now supplies that bounded
+callback policy, but it is not wired into the game loop or a save format.
+The pinned native scheduler evidence (ROM SHA-1
+`a36d91b5aac7bb95df0d7de5f9814f5270e25c2b`) shows that source PauseGame completes
+immediately, marks its trigger instance, and allows later actions/triggers to
+run while its source-pause marker is active. A normal user pause freezes the
+trigger/timer clock; source pause does not. At action-list completion, native
+dispatches action-table entry 6 at runtime address `0x800C757C`; its ROM word
+at file offset `0xC817C` points to the UnpauseGame handler `0x8008086C`, which
+clears the source marker. The timed service models this clock distinction
+and per-owner/per-trigger lifetime, while caller callbacks must apply the
+actual PauseGame and automatic tail UnpauseGame effects. P8's pass cadence is
+still caller-owned and unqualified. Terminal results are accumulated across the
+source-order pass, with Victory taking precedence over Defeat, and are
+accepted only from matching final Victory/Defeat actions. Unknown conditions
+or actions fault the run instead of being silently skipped.
 
 P8 is not wired into gameplay, menus or saves. Its three opaque AI identifiers
 are not implemented or executed as bytecode; creation, resource, switch,

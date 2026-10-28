@@ -47,7 +47,7 @@ int main(void)
 
     int action_result = SC64_P8_ACTION_COMPLETE;
     Sc64P8SourceWorldOps checked_world = {&action_result, condition_true,
-                                           selected_action_result};
+                                           selected_action_result, 0};
     unsigned victory_trigger = SC64_P8_TRIGGER_LIMIT;
     unsigned victory_slot = 0;
     unsigned defeat_trigger = SC64_P8_TRIGGER_LIMIT;
@@ -90,7 +90,7 @@ int main(void)
     assert(sc64_p8_source_action_dispatch(&checked_world, immediate_trigger,
              immediate_slot, 0, 0) == -1);
 
-    Sc64P8SourceWorldOps world = {0, condition_true, unsupported_action};
+    Sc64P8SourceWorldOps world = {0, condition_true, unsupported_action, 0};
     Sc64P8WorldOps ops = sc64_p8_source_world_ops(&world);
     Sc64P8RuntimeState state;
     assert(sc64_p8_source_runtime_init(&state, 0, 1));

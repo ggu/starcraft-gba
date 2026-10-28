@@ -47,7 +47,7 @@ static int action(void *context, unsigned trigger, unsigned slot, unsigned owner
 
 static Sc64P8WorldOps make_ops(Fixture *f)
 {
-    Sc64P8WorldOps ops = {f, trigger_info, condition, action};
+    Sc64P8WorldOps ops = {f, trigger_info, condition, action, 0};
     return ops;
 }
 

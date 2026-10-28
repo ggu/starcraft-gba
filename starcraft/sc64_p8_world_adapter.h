@@ -5,6 +5,11 @@
 #include "sc64_p8_source_adapter.h"
 #include "sc64_z8_world_adapter.h"
 
+enum {
+    SC64_P8_PAUSE_IGNORED = 0,
+    SC64_P8_PAUSE_APPLIED = 1
+};
+
 /* Live-world services for the bounded P8 source contract. This is an adapter,
  * not mission wiring: the caller owns these mutable views and any save format.
  * Actor census, owner resolution, placement dispatch, SetResources,
@@ -30,6 +35,7 @@ typedef struct {
     int (*async_action)(void *context, const Sc64P8SourceAction *action,
                         unsigned trigger_owner, const Sc64Z8Rect *rect,
                         int resume);
+    void *async_context;
     /* Optional property-aware P8 creation service. The selector is one-based;
      * property_bytes points to the authenticated immutable UPRP record. A
      * service must interpret every requested field it supports exactly and
@@ -42,6 +48,17 @@ typedef struct {
                                 const u8 property_bytes[SC64_P8_SOURCE_PROPERTY_BYTES],
                                 const Sc64Z8Rect *rect);
     void *create_context;
+    /* PauseGame/UnpauseGame need explicit engine and trigger-tail bindings.
+     * Return APPLIED when native eligibility permits the side effect, IGNORED
+     * when native control/global gates make it a successful no-op, and a
+     * negative value on an unsupported/error path. The tail callback uses the
+     * same result contract so an ignored native Unpause preserves its marker. */
+    int (*pause_game)(void *context, const Sc64P8SourceAction *action,
+                      unsigned trigger_owner, int paused);
+    void *pause_context;
+    int (*pause_trigger_end)(void *context, unsigned trigger,
+                             unsigned trigger_owner);
+    void *pause_end_context;
 } Sc64P8WorldContext;
 
 static inline int
@@ -212,8 +229,22 @@ sc64_p8_world_action(void *context, const Sc64P8SourceAction *source,
         if (a.opcode != 4u && !a.location)
             return SC64_P8_ACTION_COMPLETE;
         if (!ctx->async_action) return -1;
-        return ctx->async_action(ctx->context, source, trigger_owner, rect,
+        return ctx->async_action(ctx->async_context ? ctx->async_context :
+                                 ctx->context, source, trigger_owner, rect,
                                  resume);
+    case 5: case 6: /* PauseGame / UnpauseGame. */
+        if (!ctx->pause_game || a.location || a.string_id || a.wav_id ||
+            a.time || a.group1 || a.group2 || a.unit || a.modifier || a.flags)
+            return -1;
+        {
+            int result = ctx->pause_game(ctx->pause_context ?
+                ctx->pause_context : ctx->context, source, trigger_owner,
+                a.opcode == 5u);
+            if (result == SC64_P8_PAUSE_APPLIED ||
+                result == SC64_P8_PAUSE_IGNORED)
+                return SC64_P8_ACTION_COMPLETE;
+            return -1;
+        }
     case 11: case 28: case 43:
         /* Native location-zero actions return success before touching the
          * world; in particular, don't call an AI/create service here. */
@@ -273,11 +304,26 @@ sc64_p8_world_action(void *context, const Sc64P8SourceAction *source,
     }
 }
 
+static inline int
+sc64_p8_world_trigger_complete(void *context, unsigned trigger,
+                               unsigned trigger_owner)
+{
+    Sc64P8WorldContext *ctx = (Sc64P8WorldContext *)context;
+    if (!ctx || trigger >= SC64_P8_TRIGGER_LIMIT ||
+        trigger_owner >= SC64_Z8_OWNER_LIMIT) return -1;
+    if (!ctx->pause_trigger_end) return 1;
+    int result = ctx->pause_trigger_end(ctx->pause_end_context ?
+        ctx->pause_end_context : ctx->context, trigger, trigger_owner);
+    return result == SC64_P8_PAUSE_APPLIED ||
+           result == SC64_P8_PAUSE_IGNORED ? 1 : -1;
+}
+
 static inline Sc64P8SourceWorldOps
 sc64_p8_world_ops(Sc64P8WorldContext *context)
 {
     Sc64P8SourceWorldOps ops = {context, sc64_p8_world_condition,
-                                sc64_p8_world_action};
+                                sc64_p8_world_action,
+                                sc64_p8_world_trigger_complete};
     return ops;
 }
 

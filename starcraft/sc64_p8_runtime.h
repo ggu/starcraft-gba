@@ -75,6 +75,10 @@ typedef struct {
      * P8 itself has no cadence/runtime trace qualification here. */
     int (*action)(void *context, unsigned trigger, unsigned action,
                   unsigned owner, int resume);
+    /* Called once when a trigger's action list completes. P8 PauseGame marks
+     * its trigger instance and the native scheduler dispatches a tail callback
+     * at this boundary; callers that support PauseGame forward that event. */
+    int (*trigger_complete)(void *context, unsigned trigger, unsigned owner);
 } Sc64P8WorldOps;
 
 static inline int
@@ -214,6 +218,14 @@ sc64_p8_runtime_step(Sc64P8RuntimeState *state, const Sc64P8WorldOps *ops,
                 pass_outcome = SC64_P8_OUTCOME_LOST;
             ++state->cursor[trigger];
             if (state->cursor[trigger] == info.action_count) {
+                if (ops->trigger_complete &&
+                    ops->trigger_complete(ops->context, trigger,
+                                          state->owner) != 1) {
+                    state->fault = SC64_P8_FAULT_ACTION;
+                    state->fault_trigger = (u8)trigger;
+                    state->fault_slot = (u8)slot;
+                    return 0;
+                }
                 state->running &= (u8)~(1u << trigger);
                 state->done |= (u8)(1u << trigger);
                 state->cursor[trigger] = 0;
