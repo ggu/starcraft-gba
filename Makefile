@@ -179,8 +179,29 @@ RACE_CONSTRUCTION_INPUTS := $(CONSTRUCTION_ART_HEADER)
 endif
 # Every race-engine ROM uses the default profile's controls and menus
 # (starcraft/field_controls.h).
-RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated $(RACE_CONSTRUCTION_FLAGS)
-RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(RACE_CONSTRUCTION_INPUTS)
+SC64_INTERFACE_DIR := .local/sc64/interface/generated
+SC64_INTERFACE_INPUTS := $(addprefix $(SC64_INTERFACE_DIR)/,sc64_font_generated.h sc64_icons_generated.h sc64_chrome_generated.h)
+RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated -I$(SC64_INTERFACE_DIR) $(RACE_CONSTRUCTION_FLAGS)
+RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(SC64_INTERFACE_INPUTS) $(RACE_CONSTRUCTION_INPUTS)
+
+.PHONY: sc64-interface test-sc64-font test-sc64-icons
+sc64-interface:
+	python3 tools/sc64_font_assets.py
+	python3 tools/sc64_briefing_assets.py
+	python3 tools/sc64_icon_assets.py
+	python3 tools/sc64_chrome_assets.py
+$(SC64_INTERFACE_INPUTS):
+	@echo 'Private interface data is missing. Run make sc64-interface with the prepared local ROM and reference checkout.'
+	@false
+build/test-sc64-font: tests/sc64_font.c starcraft/sc64_font.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+test-sc64-font: build/test-sc64-font
+	./build/test-sc64-font
+build/test-sc64-icons: tests/sc64_icons.c starcraft/sc64_icons.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+test-sc64-icons: build/test-sc64-icons
+	./build/test-sc64-icons
+test-starcraft: test-sc64-font test-sc64-icons
 
 .PHONY: sc64-briefings test-sc64-briefing
 sc64-briefings:
@@ -4592,3 +4613,22 @@ test-sc64-construction-arrival-$(1): build/test-sc64-construction-arrival-$(1) b
 	./build/test-sc64-construction-arrival-save-$(1)
 endef
 $(foreach profile,terran zerg-z6 protoss-p7 zerg-z7,$(eval $(call CONSTRUCTION_ARRIVAL_TESTS,$(profile))))
+
+# No-GDB ARM probe of the imported interface: an embedded key tape drives the
+# menus, briefing, orders, pause, save and load; results go to the mGBA debug
+# log (tests/sc64_ui_arm_probe.c). Run twice with one isolated save directory.
+UI_ARM_COMMON := $(filter-out common/main.c,$(COMMON))
+build/starcraft-showcase-ui-probe.elf: tests/sc64_ui_arm_probe.c $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) $(COMMAND_ICON_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase-ui-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/starcraft64-races-ui-probe.elf: tests/sc64_ui_arm_probe.c $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(RACES_FLAGS) $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -Wl,-Map,build/starcraft64-races-ui-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Showcase-UI-Probe-GBA.gba: build/starcraft-showcase-ui-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC UI PROBE' SCUP
+build/StarCraft64-Races-UI-Probe-GBA.gba: build/starcraft64-races-ui-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC UI PROBE' SCUR
+.PHONY: ui-arm-probe
+ui-arm-probe: build/StarCraft-Showcase-UI-Probe-GBA.gba build/StarCraft64-Races-UI-Probe-GBA.gba

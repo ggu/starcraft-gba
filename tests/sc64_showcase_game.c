@@ -692,6 +692,43 @@ static int check_command_card(void)
         if (!card_pixels(27, 140, 22, 4, C_RED_DARK)) return fail("card: the health bar ignores damage");
         clear_selection();
     }
+
+    /* The combined layout. The card draws after the HUD bands, so the
+     * resource bar and the HUD edge must match a frame without it. Source-
+     * font unit and building titles stay left of x 166 on the HUD rows. */
+    {
+        unsigned top[2];
+        int building = -1, unit = -1;
+        for (int pass = 0; pass < 2; ++pass) {
+            menu_open = pass;
+            menu_cursor = MENU_MOVE;
+            game_render();
+            top[pass] = 2166136261u;
+            for (int yy = 0; yy < 12; ++yy)
+                for (int xx = 0; xx < 240; ++xx) top[pass] = (top[pass] ^ gfx_test_pixel(xx, yy)) * 16777619u;
+            if (card_pixels(0, 120, 240, 1, C_EDGE) != 240) return fail("card: the HUD edge is painted over");
+        }
+        menu_open = 0;
+        if (top[0] != top[1]) return fail("card: the open card paints the resource bar");
+        for (int i = 0; i < MAX_UNITS && unit < 0; ++i)
+            if (u[i].alive && u[i].owner == SIDE && card_unit_icon(&u[i]) >= 0) unit = i;
+        for (int i = 0; i < MAX_BUILDINGS && building < 0; ++i)
+            if (b[i].alive && b[i].owner == SIDE) building = i;
+        if (unit < 0 || building < 0) return fail("card: no friendly unit and building to title");
+        clear_selection();
+        u[unit].selected = 1;
+        draw_hud_commands();
+        if (card_pixels(27, 124, 139, 12, C_PANEL) == 139 * 12) return fail("card: the unit has no title");
+        if (card_pixels(166, 121, 74, 16, C_PANEL) != 74 * 16) return fail("card: the unit title runs past x 165");
+        if (card_pixels(27, 140, 22, 4, C_PANEL)) return fail("card: the unit title covers the health bar");
+        clear_selection();
+        selected_building = building;
+        draw_hud_commands();
+        if (card_pixels(3, 124, 23, 23, C_PANEL) == 23 * 23) return fail("card: the building has no source icon");
+        if (card_pixels(30, 124, 94, 12, C_PANEL) == 94 * 12) return fail("card: the building has no title");
+        if (card_pixels(166, 121, 74, 16, C_PANEL) != 74 * 16) return fail("card: the building title runs past x 165");
+        selected_building = -1;
+    }
     return 0;
 }
 #endif
@@ -719,7 +756,7 @@ static int check_field_controls_races(void)
         if (!u[worker].selected) return fail("races: A did not select the worker");
         cx = x; cy = y;
         resolve_now();
-        if (ui_action != UI_A_MOVE || strcmp(field_controls_unit_hint(), "A MOVE  B ORDERS"))
+        if (ui_action != UI_A_MOVE || strcmp(field_controls_unit_hint(), "A MOVE B ORDERS"))
             return fail("races: open ground does not offer a move");
         press(KEY_A);
         if (!u[worker].selected || u[worker].order != ORDER_MOVE || ping_color != C_GREEN)

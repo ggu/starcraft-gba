@@ -445,6 +445,13 @@ class OnboardingTests(unittest.TestCase):
                     emit(output, UNIT_WORD_SPRITE_HEADER)
                 elif script == 'sc64_construction_sprites.py':
                     emit_construction_header(root)
+                elif script in ('sc64_font_assets.py', 'sc64_icon_assets.py', 'sc64_chrome_assets.py'):
+                    names = {'sc64_font_assets.py': 'sc64_font_generated.h',
+                             'sc64_icon_assets.py': 'sc64_icons_generated.h',
+                             'sc64_chrome_assets.py': 'sc64_chrome_generated.h'}
+                    output = root / '.local/sc64/interface/generated' / names[script]
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('source-only interface fixture\n', encoding='ascii')
                 elif script == 'sc64_briefing_assets.py':
                     output = local / 'briefings/generated/sc64_briefing_generated.h'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -514,6 +521,9 @@ class OnboardingTests(unittest.TestCase):
                 '.local/sc64/races/generated/sc64_race_sprites_generated.h': 'input',
                 '.local/sc64/races/generated/sc64_menu_generated.h': 'input',
                 '.local/sc64/briefings/generated/sc64_briefing_generated.h': BRIEFING_HEADER,
+                '.local/sc64/interface/generated/sc64_font_generated.h': 'interface fixture',
+                '.local/sc64/interface/generated/sc64_icons_generated.h': 'interface fixture',
+                '.local/sc64/interface/generated/sc64_chrome_generated.h': 'interface fixture',
                 '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': CONSTRUCTION_COLOR_HEADER,
                 '.local/sc64/skirmish/generated/sc64_skirmish_generated.h': 'input',
                 '.local/sc64/zp-stage/generated/sc64_races_generated.h':
@@ -926,6 +936,9 @@ class OnboardingTests(unittest.TestCase):
             '.local/sc64/races/generated/sc64_race_sprites_generated.h',
             '.local/sc64/races/generated/sc64_menu_generated.h',
             '.local/sc64/briefings/generated/sc64_briefing_generated.h',
+            '.local/sc64/interface/generated/sc64_font_generated.h',
+            '.local/sc64/interface/generated/sc64_icons_generated.h',
+            '.local/sc64/interface/generated/sc64_chrome_generated.h',
             '.local/sc64/skirmish/generated/sc64_skirmish_generated.h',
         }
         for profile in ('zerg-z6', 'zerg-z7', 'protoss-p5-shuttle'):
@@ -1003,6 +1016,13 @@ class OnboardingTests(unittest.TestCase):
                         output = root / '.local/sc64/races/generated/sc64_menu_generated.h'
                         output.parent.mkdir(parents=True, exist_ok=True)
                         output.write_text('menu\n', encoding='ascii')
+                    elif script in ('sc64_font_assets.py', 'sc64_icon_assets.py', 'sc64_chrome_assets.py'):
+                        names = {'sc64_font_assets.py': 'sc64_font_generated.h',
+                                 'sc64_icon_assets.py': 'sc64_icons_generated.h',
+                                 'sc64_chrome_assets.py': 'sc64_chrome_generated.h'}
+                        output = root / '.local/sc64/interface/generated' / names[script]
+                        output.parent.mkdir(parents=True, exist_ok=True)
+                        output.write_text('source-only interface fixture\n', encoding='ascii')
                     elif script == 'sc64_briefing_assets.py':
                         output = root / '.local/sc64/briefings/generated/sc64_briefing_generated.h'
                         output.parent.mkdir(parents=True, exist_ok=True)
@@ -1095,6 +1115,9 @@ class OnboardingTests(unittest.TestCase):
                         '.local/sc64/backwater/generated/sc64_assets_generated.h',
                         '.local/sc64/backwater/generated/sc64_sprites_generated.h',
                         '.local/sc64/briefings/generated/sc64_briefing_generated.h',
+                        '.local/sc64/interface/generated/sc64_font_generated.h',
+                        '.local/sc64/interface/generated/sc64_icons_generated.h',
+                        '.local/sc64/interface/generated/sc64_chrome_generated.h',
                         '.local/sc64/skirmish/generated/sc64_skirmish_generated.h',
                     ):
                         path = root / relative
@@ -1265,6 +1288,9 @@ class OnboardingTests(unittest.TestCase):
                 '.local/sc64/races/generated/sc64_race_sprites_generated.h': 'sprites',
                 '.local/sc64/races/generated/sc64_menu_generated.h': 'menu',
                 '.local/sc64/briefings/generated/sc64_briefing_generated.h': BRIEFING_HEADER,
+                '.local/sc64/interface/generated/sc64_font_generated.h': 'interface fixture',
+                '.local/sc64/interface/generated/sc64_icons_generated.h': 'interface fixture',
+                '.local/sc64/interface/generated/sc64_chrome_generated.h': 'interface fixture',
                 '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': CONSTRUCTION_COLOR_HEADER,
                 '.local/sc64/skirmish/generated/sc64_skirmish_generated.h': 'skirmish',
                 '.local/sc64/zp-stage/generated/sc64_races_generated.h':
@@ -1325,6 +1351,13 @@ class OnboardingTests(unittest.TestCase):
                                       encoding='ascii')
                 elif script == 'sc64_construction_sprites.py':
                     emit_construction_header(root)
+                elif script in ('sc64_font_assets.py', 'sc64_icon_assets.py', 'sc64_chrome_assets.py'):
+                    names = {'sc64_font_assets.py': 'sc64_font_generated.h',
+                             'sc64_icon_assets.py': 'sc64_icons_generated.h',
+                             'sc64_chrome_assets.py': 'sc64_chrome_generated.h'}
+                    output = root / '.local/sc64/interface/generated' / names[script]
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('source-only interface fixture\n', encoding='ascii')
                 elif script == 'sc64_briefing_assets.py':
                     output = local / 'briefings/generated/sc64_briefing_generated.h'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -1421,6 +1454,13 @@ class OnboardingTests(unittest.TestCase):
                                       encoding='ascii')
                 elif script == 'sc64_construction_sprites.py':
                     emit_construction_header(root)
+                elif script in ('sc64_font_assets.py', 'sc64_icon_assets.py', 'sc64_chrome_assets.py'):
+                    names = {'sc64_font_assets.py': 'sc64_font_generated.h',
+                             'sc64_icon_assets.py': 'sc64_icons_generated.h',
+                             'sc64_chrome_assets.py': 'sc64_chrome_generated.h'}
+                    output = root / '.local/sc64/interface/generated' / names[script]
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('source-only interface fixture\n', encoding='ascii')
                 elif script == 'sc64_briefing_assets.py':
                     output = local / 'briefings/generated/sc64_briefing_generated.h'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -1500,6 +1540,13 @@ class OnboardingTests(unittest.TestCase):
                                       encoding='ascii')
                 elif script == 'sc64_construction_sprites.py':
                     emit_construction_header(root)
+                elif script in ('sc64_font_assets.py', 'sc64_icon_assets.py', 'sc64_chrome_assets.py'):
+                    names = {'sc64_font_assets.py': 'sc64_font_generated.h',
+                             'sc64_icon_assets.py': 'sc64_icons_generated.h',
+                             'sc64_chrome_assets.py': 'sc64_chrome_generated.h'}
+                    output = root / '.local/sc64/interface/generated' / names[script]
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('source-only interface fixture\n', encoding='ascii')
                 elif script == 'sc64_briefing_assets.py':
                     output = local / 'briefings/generated/sc64_briefing_generated.h'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -1728,6 +1775,13 @@ class OnboardingTests(unittest.TestCase):
                     emit_death_source_header(root)
                 elif script == 'sc64_menu_assets.py':
                     touch(race / 'sc64_menu_generated.h')
+                elif script in ('sc64_font_assets.py', 'sc64_icon_assets.py', 'sc64_chrome_assets.py'):
+                    names = {'sc64_font_assets.py': 'sc64_font_generated.h',
+                             'sc64_icon_assets.py': 'sc64_icons_generated.h',
+                             'sc64_chrome_assets.py': 'sc64_chrome_generated.h'}
+                    output = root / '.local/sc64/interface/generated' / names[script]
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text('source-only interface fixture\n', encoding='ascii')
                 elif script == 'sc64_briefing_assets.py':
                     output = local / 'briefings/generated/sc64_briefing_generated.h'
                     output.parent.mkdir(parents=True, exist_ok=True)

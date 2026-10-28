@@ -37,6 +37,8 @@ static int race_t6_building_product_available(int owner, int raw_owner, int type
 #endif
 
 #include "ui_widgets.h"
+#include "sc64_font.h"
+#include "sc64_icons.h"
 
 /* ui_action (game.c, beside the other field state) holds one of these. */
 enum {
@@ -411,12 +413,82 @@ ui_structure_glyph(int x, int y)
     }
 }
 
+/* Public to game.c's shared HUD painter. The caller owns the 22px panel and
+ * surrounding health/resource text; source IDs always come from the imported
+ * raw identity, with the race adapter as a fallback for synthetic actors. */
+static int
+field_controls_draw_selected_icon(int center_x, int center_y, int size)
+{
+    int raw = -1;
+    if (selected_building >= 0 && selected_building < MAX_BUILDINGS &&
+        b[selected_building].alive) {
+        raw = b[selected_building].raw_type >= 0 ? b[selected_building].raw_type :
+              sc64_race_raw_building(b[selected_building].type);
+    } else {
+        int i;
+        for (i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].selected && !SC64_TRANSPORT_LOADED(&u[i])) {
+                raw = u[i].raw_type >= 0 ? u[i].raw_type : sc64_race_raw_unit(u[i].type);
+                break;
+            }
+    }
+    return raw >= 0 && raw < 228 && sc64_icon_draw_centered((unsigned)raw,
+                                                             center_x, center_y, size);
+}
+
+/* Source icon binding for the visible command row. All menu decisions and
+ * costs remain in the existing rule paths; an unavailable source frame keeps
+ * the compact procedural mark below. */
+static int
+ui_source_icon_for_row(int i, int kind, int type)
+{
+#ifdef SC64_ICON_TABLE_PRESENT
+    const char *label;
+    if (i == MENU_MOVE) return SC64_ICON_MOVE;
+    if (i == MENU_ATTACK) return SC64_ICON_ATTACK;
+    if (i == MENU_STOP) return SC64_ICON_STOP;
+    if (kind == UI_ROW_RESEARCH) {
+        if (i == MENU_WEAPONS)
+            return race_human == R_ZERG ? SC64_ICON_ZERG_WEAPONS :
+                   race_human == R_PROTOSS ? SC64_ICON_PROTOSS_WEAPONS : SC64_ICON_TERRAN_WEAPONS;
+        return race_human == R_ZERG ? SC64_ICON_ZERG_ARMOR :
+               race_human == R_PROTOSS ? SC64_ICON_PROTOSS_ARMOR : SC64_ICON_TERRAN_ARMOR;
+    }
+    if ((kind == UI_ROW_BUILD || kind == UI_ROW_MORPH) && type >= 0) {
+        int raw = sc64_race_raw_building(type);
+        return raw >= 0 && raw < SC64_ICON_UNIT_COUNT ? raw : -1;
+    }
+    if (kind != UI_ROW_SPECIAL) return -1;
+    label = race_menu_label(i);
+    if (ui_same(label, "STORM")) return SC64_ICON_STORM;
+    if (ui_same(label, "CLOAK")) return SC64_ICON_CLOAK;
+    if (ui_same(label, "CONSUME")) return SC64_ICON_CONSUME;
+    if (ui_same(label, "VENTRAL SACS")) return SC64_ICON_VENTRAL_SACS;
+    if (ui_same(label, "UNLOAD CARGO")) return SC64_ICON_UNLOAD;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (ui_same(label, "LIFT / LAND"))
+        return race_late_airborne(selected_building) ? SC64_ICON_LAND : SC64_ICON_LIFT;
+#endif
+    if (ui_same(label, "BUILD INTERCEPTOR")) return 73;
+    if (ui_same(label, "CANCEL EGG")) return 36;
+    if (ui_same(label, "SUNKEN")) return 146;
+    if (ui_same(label, "SPORE")) return 144;
+    if (ui_same(label, "RECHARGE")) return 172;
+#else
+    (void)i; (void)kind; (void)type;
+#endif
+    return -1;
+}
+
 static void
 ui_row_icon(int i, int x, int y)
 {
     int type, kind;
-    if (ui_order_icon(i, x, y)) return;
+    int source_icon;
     kind = ui_row_kind(i, &type);
+    source_icon = ui_source_icon_for_row(i, kind, type);
+    if (source_icon >= 0 && sc64_icon_draw_centered((unsigned)source_icon, x, y, 18)) return;
+    if (ui_order_icon(i, x, y)) return;
     if (kind == UI_ROW_BUILD || kind == UI_ROW_MORPH) ui_structure_glyph(x, y);
     else { /* a unit's own command: a spark */
         gfx_diamond(x, y, 4, 4, C_CYAN);
@@ -428,22 +500,29 @@ ui_row_icon(int i, int x, int y)
 #include "command_card.h"
 #endif
 
-/* The framed order list: icon, label and cost per row, unavailable rows
- * dimmed, at most ten rows with scroll marks. */
+/* The framed order list: readable source icons, labels and costs. Four rows
+ * fit within the playfield; scrolling follows the unchanged command cursor.
+ * With the command card, lists that fit the card draw as its grid instead. */
 static void
 field_controls_draw_command_menu(void)
 {
-    int i, count = field_menu_count(), first = menu_cursor >= 10 ? menu_cursor - 9 : 0;
-    int rows = count < 10 ? count : 10, x = 104, y = 14, w = 134;
+    enum { UI_MENU_VISIBLE_ROWS = 4, UI_MENU_ROW_HEIGHT = 22 };
+    int i, count = field_menu_count();
+    int first = menu_cursor >= UI_MENU_VISIBLE_ROWS ? menu_cursor - UI_MENU_VISIBLE_ROWS + 1 : 0;
+    int rows = count - first < UI_MENU_VISIBLE_ROWS ? count - first : UI_MENU_VISIBLE_ROWS;
+    int x = 100, y = 14, w = 138;
 #ifdef SC64_COMMAND_ICONS
     if (card_fits()) {
         field_controls_draw_command_card();
         return;
     }
 #endif
-    ui_panel(x, y, w, rows * 9 + 6, C_GOLD, 0);
-    for (i = first; i < count && i < first + 10; i++) {
-        int row = y + 4 + (i - first) * 9, cost, gas_cost;
+    gfx_rect(x,y,w,rows*UI_MENU_ROW_HEIGHT+4,C_PANEL);
+    sc64_chrome_panel_world(x,y,w,rows*UI_MENU_ROW_HEIGHT+4);
+    for (i = first; i < first + rows; i++) {
+        int row = y + 4 + (i - first) * UI_MENU_ROW_HEIGHT, cost, gas_cost;
+        int label_width;
+        char clipped[32];
         const char *need;
         int state = ui_row_state(i, &cost, &gas_cost, &need);
         int short_funds = state == UI_SITE_MINERALS || state == UI_SITE_GAS;
@@ -452,13 +531,16 @@ field_controls_draw_command_menu(void)
             ui_highlight(x + 2, row - 1, w - 4);
             if (label == C_SILVER) label = C_WHITE;
         }
-        ui_row_icon(i, x + 9, row + 3);
-        gfx_text(x + 17, row, race_menu_label(i), label);
+        ui_row_icon(i, x + 14, row + 9);
+        label_width = cost ? 78 : 106;
+        sc64_font_ellipsis(race_menu_label(i), label_width, clipped, sizeof(clipped));
+        sc64_font_text(x + 23, row + 6, label_width, clipped, label);
         if (cost && label != C_DIM) /* the HUD explains disabled rows */
             ui_num_right(x + w - 5, row, cost, short_funds ? C_RED : C_GOLD);
     }
     if (first) gfx_diamond(x + w - 8, y + 1, 2, 1, C_GOLD);
-    if (first + 10 < count) gfx_diamond(x + w - 8, y + rows * 9 + 5, 2, 1, C_GOLD);
+    if (first + UI_MENU_VISIBLE_ROWS < count)
+        gfx_diamond(x + w - 8, y + rows * UI_MENU_ROW_HEIGHT + 3, 2, 1, C_GOLD);
 }
 
 static int
@@ -542,11 +624,11 @@ static const char *
 field_controls_unit_hint(void)
 {
     switch (ui_action) {
-    case UI_A_ATTACK: return "A ATTACK  B ORDERS";
-    case UI_A_SELECT: return "A SELECT  B ORDERS";
-    case UI_A_GAS: return "A GAS  B ORDERS";
-    case UI_A_MOVE: return "A MOVE  B ORDERS";
-    default: return "B ORDERS  SEL DROP";
+    case UI_A_ATTACK: return "A ATTACK B ORDERS";
+    case UI_A_SELECT: return "A SELECT B ORDERS";
+    case UI_A_GAS: return "A GAS B ORDERS";
+    case UI_A_MOVE: return "A MOVE B ORDERS";
+    default: return "B ORDERS SEL DROP";
     }
 }
 
@@ -691,12 +773,14 @@ field_controls_draw_pause(void)
     static const char *const keys[4] = { "A", "B", "L", "R" };
     const Sc64MissionInfo *info = race_mode ? 0 : sc64_catalog_get(race_selected_mission);
     int i;
-    ui_panel(24, 14, 192, 132, C_CYAN, "PAUSED");
-    ui_clock(178, 18, (unsigned)frame, C_WHITE);
+    gfx_rect(24,14,192,132,C_PANEL);
+    sc64_chrome_panel_world(24,14,192,132);
+    sc64_font_text(36,20,130,"Paused",C_GOLD);
+    ui_clock(178,21,(unsigned)frame,C_WHITE);
     for (i = 0; i < 4; i++) {
         int y = 33 + i * 11;
         if (i == pause_cursor) ui_highlight(30, y - 1, 92);
-        gfx_text(36, y, items[i], i == pause_cursor ? C_WHITE : C_SILVER);
+        sc64_font_text(36,y,72,items[i],i==pause_cursor?C_WHITE:C_SILVER);
         ui_key(110, y, keys[i], 0, C_DIM);
     }
     if (pause_notice) {
@@ -706,11 +790,15 @@ field_controls_draw_pause(void)
     }
     gfx_rect(30, 79, 180, 1, C_EDGE);
     gfx_text(30, 83, race_mode ? "SKIRMISH" : "OBJECTIVE", C_GOLD);
-    if (info) gfx_text(90, 83, info->title, C_DIM);
+    if (info) {
+        char title[64];
+        sc64_font_ellipsis(info->title,120,title,sizeof(title));
+        sc64_font_text(90,81,120,title,C_DIM);
+    }
     ui_text_wrap(30, 93, 30, 3, race_mode ? "Destroy all enemy buildings." :
                  race_campaign_objective_text(), C_SILVER);
     gfx_rect(30, 120, 180, 1, C_EDGE);
-    ui_key(ui_key(ui_key(30, 124, "A", "SELECT MOVE", C_SILVER), 124, "B", "ORDERS", C_SILVER),
+    ui_key(ui_key(ui_key(30, 124, "A", "SELECT", C_SILVER), 124, "B", "ORDERS", C_SILVER),
            124, "SEL", "DROP", C_SILVER);
     ui_key(ui_key(30, 135, "L", "NEXT  HOLD: BOX", C_SILVER), 135, "R", "ARMY", C_SILVER);
 }
@@ -725,9 +813,9 @@ field_controls_draw_result(void)
     const char *title = won ? "MISSION CLEAR" : "MISSION FAILED";
     for (i = 0; i < MAX_UNITS; i++) units += u[i].alive && u[i].owner == SIDE;
     for (i = 0; i < MAX_BUILDINGS; i++) buildings += b[i].alive && b[i].owner == SIDE;
-    ui_panel(28, 30, 184, 86, accent, 0);
-    gfx_rect(30, 32, 180, 13, won ? C_GOLD_DARK : C_RED_DARK);
-    gfx_text(120 - ui_text_width(title) / 2, 35, title, won ? C_HIGHLIGHT : C_WHITE);
+    gfx_rect(28,30,184,86,C_PANEL);
+    sc64_chrome_panel_world(28,30,184,86);
+    sc64_font_text(120-sc64_font_width(title)/2,35,172,title,accent);
     ui_text_wrap(34, 49, 29, 2, won ? (race_mode ? "OPPONENTS ELIMINATED" : race_campaign_victory_text()) :
                  race_mode ? "YOUR FORCES WERE ELIMINATED" : race_campaign_failure_text(), C_WHITE);
     gfx_rect(40, 68, 160, 1, C_EDGE);

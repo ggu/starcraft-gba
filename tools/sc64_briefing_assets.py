@@ -23,7 +23,8 @@ WIDTH, HEIGHT = 240, 160
 PORTRAIT_WIDTH, PORTRAIT_HEIGHT = 40, 38
 PORTRAIT_COUNT = 23
 PALETTE_FIRST, PALETTE_SIZE = 32, 224
-TEXT_COLUMNS, TEXT_ROWS = 36, 7
+TEXT_COLUMNS, TEXT_ROWS = 108, 6
+TEXT_PIXEL_WIDTH, TEXT_LINE_HEIGHT = 216, 10
 
 # The source BOLT order is unrelated to catalog global IDs. Each value is the
 # hexadecimal index of the briefing in 007; 007/i pairs with map 008/(i+8).
@@ -286,20 +287,33 @@ def nearest_masked(rgb: bytes, mask: bytes, colors: list[tuple[int, int, int]]) 
     return bytes(lut[tuple(rgb[i * 3:i * 3 + 3])] if mask[i] else 0 for i in range(len(mask)))
 
 
-def wrap_text(text: str, columns: int = TEXT_COLUMNS, rows: int = TEXT_ROWS) -> list[str]:
-    """Wrap whitespace-normalized source copy into bounded page strings."""
+def wrap_text(text: str, columns: int = TEXT_COLUMNS, rows: int = TEXT_ROWS,
+              advances: dict[int, int] | None = None,
+              pixel_width: int = TEXT_PIXEL_WIDTH) -> list[str]:
+    """Wrap source words using the same source-font advances as the renderer.
+
+    Explicit character-only limits remain useful for synthetic importer tests;
+    production conversion always supplies the verified source font metrics.
+    """
     if any(not 0x20 <= ord(char) <= 0x7e for char in text):
         raise ValueError('Source text contains characters outside printable ASCII')
     words = text.split()
     if any(len(word) > columns for word in words):
         raise ValueError('A source word exceeds the configured line width')
+    if columns < 1 or rows < 1 or pixel_width < 1:
+        raise ValueError('Text layout bounds must be positive')
+    def width(value: str) -> int:
+        return sum(advances[ord(char)] for char in value) if advances is not None else len(value)
+    limit = pixel_width if advances is not None else columns
+    if any(width(word) > limit for word in words):
+        raise ValueError('A source word exceeds the configured pixel width')
     if not words:
         return ['']
     lines: list[str] = []
     current = ''
     for word in words:
         candidate = word if not current else current + ' ' + word
-        if len(candidate) > columns:
+        if len(candidate) > columns or width(candidate) > limit:
             lines.append(current)
             current = word
         else:
@@ -309,18 +323,18 @@ def wrap_text(text: str, columns: int = TEXT_COLUMNS, rows: int = TEXT_ROWS) -> 
     return ['\n'.join(lines[i:i + rows]) for i in range(0, len(lines), rows)]
 
 
-def briefing_pages(briefing) -> list[tuple[str, str, int]]:
+def briefing_pages(briefing, advances: dict[int, int] | None = None) -> list[tuple[str, str, int]]:
     pages: list[tuple[str, str, int]] = []
     for transmission in briefing.transmissions:
         if transmission.kind == 'TEXTC':
             continue  # Fixed "End of Briefing" UI copy, not spoken dialogue.
         body = ' '.join(line.strip() for line in transmission.body if line.strip())
-        for text in wrap_text(body):
+        for text in wrap_text(body, advances=advances):
             portrait = transmission.portrait if transmission.portrait is not None else -1
             pages.append((transmission.speaker, text, portrait))
     objective_lines = []
     for objective in briefing.objectives:
-        for wrapped in wrap_text(objective, rows=255):
+        for wrapped in wrap_text(objective, rows=255, advances=advances):
             objective_lines.extend(wrapped.split('\n'))
     for start in range(0, len(objective_lines), TEXT_ROWS):
         pages.append(('OBJECTIVES', '\n'.join(objective_lines[start:start + TEXT_ROWS]), -1))
@@ -351,7 +365,8 @@ def indexed_array(name: str, pixels: bytes, width: int, height: int) -> str:
 
 
 def build_header(background: bytes, portraits: list[bytes], palette: list[int],
-                 pages_by_mission: list[list[tuple[str, str, int]]]) -> str:
+                 pages_by_mission: list[list[tuple[str, str, int]]],
+                 advances: dict[int, int] | None = None) -> str:
     if len(background) != WIDTH * HEIGHT:
         raise ValueError('Briefing background must be 240x160')
     if len(portraits) != PORTRAIT_COUNT or any(len(p) != PORTRAIT_WIDTH * PORTRAIT_HEIGHT for p in portraits):
@@ -368,6 +383,9 @@ def build_header(background: bytes, portraits: list[bytes], palette: list[int],
         '/* Generated privately from the supplied ROM. Do not publish. */\n',
         f'/* Artwork decoded with references/sc64-maps at commit {REFERENCE_COMMIT}. */\n',
         '#pragma once\n#include "gba.h"\n#include "sc64_briefing.h"\n',
+        '#define SC64_BRIEFING_LAYOUT_VERSION 2\n',
+        f'#define SC64_BRIEFING_TEXT_PIXEL_WIDTH {TEXT_PIXEL_WIDTH}\n',
+        f'#define SC64_BRIEFING_TEXT_LINE_HEIGHT {TEXT_LINE_HEIGHT}\n',
         f'#define SC64_BRIEFING_BACKGROUND_WIDTH {WIDTH}\n',
         f'#define SC64_BRIEFING_BACKGROUND_HEIGHT {HEIGHT}\n',
         f'#define SC64_BRIEFING_PALETTE_FIRST {PALETTE_FIRST}\n',
@@ -396,7 +414,10 @@ def build_header(background: bytes, portraits: list[bytes], palette: list[int],
             if portrait < -1 or portrait >= PORTRAIT_COUNT:
                 raise ValueError(f'Mission {mission} has invalid portrait ID {portrait}')
             if len(text.split('\n')) > TEXT_ROWS or any(len(line) > TEXT_COLUMNS for line in text.split('\n')):
-                raise ValueError(f'Mission {mission} page is not wrapped to 36x7')
+                raise ValueError(f'Mission {mission} page exceeds bounded source-font rows')
+            if advances is not None and any(sum(advances[ord(ch)] for ch in line) > TEXT_PIXEL_WIDTH
+                                            for line in text.split('\n')):
+                raise ValueError(f'Mission {mission} page exceeds source-font pixel width')
         lines.append(f'static const Sc64BriefingPage sc64_briefing_pages_{mission}[] = {{\n')
         lines.extend(f'    {{{c_string(speaker)}, {c_string(text)}, {portrait}}},\n'
                      for speaker, text, portrait in pages)
@@ -447,6 +468,12 @@ def verify_inputs(rom_path: Path, reference: Path) -> tuple[bytes, str]:
 
 def convert(rom_path: Path, out: Path, reference: Path) -> dict:
     rom, rom_sha1 = verify_inputs(rom_path, reference)
+    sys.path.insert(0, str(ROOT))
+    from tools.sc64_font_assets import font_advance, load_source_fonts
+    small_font, _ = load_source_fonts(rom_path, reference)
+    advances = {ch: font_advance(small_font, ch) for ch in range(32, 127)}
+    if small_font.line_height != TEXT_LINE_HEIGHT:
+        raise ValueError('The imported briefing font no longer matches its line-height contract')
     sys.path.insert(0, str(reference))
     from extract_sc64_maps import BoltArchive
     import decode_art
@@ -490,7 +517,7 @@ def convert(rom_path: Path, out: Path, reference: Path) -> dict:
         (frame_pixels[BAR_FRAME_ASSET], frame_sizes[BAR_FRAME_ASSET], (6, 5, 228, 16), 48),
         (portrait_frame, portrait_frame_size, (8, 15, 54, 55), 48),
         (body_frame, body_frame_size, (6, 62, 228, 75), 48),
-        (frame_pixels[BAR_FRAME_ASSET], frame_sizes[BAR_FRAME_ASSET], (6, 138, 228, 16), 48),
+        (frame_pixels[BAR_FRAME_ASSET], frame_sizes[BAR_FRAME_ASSET], (6, 138, 228, 20), 48),
     ])
 
     portrait_rgb, portrait_masks = [], []
@@ -517,7 +544,7 @@ def convert(rom_path: Path, out: Path, reference: Path) -> dict:
         briefing = by_path.get(source_path)
         if briefing is None or briefing.is_stub:
             raise ValueError(f'Global mission {global_id} has no written source briefing at {source_path}')
-        mission_pages = briefing_pages(briefing)
+        mission_pages = briefing_pages(briefing, advances)
         if (mission_pages[0][0] == 'OBJECTIVES' or not mission_pages[0][1].strip()
                 or mission_pages[-1][0] != 'OBJECTIVES'):
             raise ValueError(f'{source_path} must begin with spoken dialogue and end with objectives')
@@ -535,7 +562,7 @@ def convert(rom_path: Path, out: Path, reference: Path) -> dict:
     portraits_indexed = [nearest_masked(rgb, mask, colors)
                          for rgb, mask in zip(portrait_rgb, portrait_masks)]
     palette = [((b >> 3) << 10) | ((g >> 3) << 5) | (r >> 3) for r, g, b in colors]
-    header = build_header(bg_indexed, portraits_indexed, palette, pages_by_mission)
+    header = build_header(bg_indexed, portraits_indexed, palette, pages_by_mission, advances)
 
     out.mkdir(parents=True, exist_ok=True)
     header_path = out / 'sc64_briefing_generated.h'
@@ -575,6 +602,8 @@ def convert(rom_path: Path, out: Path, reference: Path) -> dict:
                  'source_size': [room_w, room_h],
                  'source_image_sha256': hashlib.sha256(raw_images[ROOM_ASSET]).hexdigest()},
         'composition': {'body_rect_xywh': [12, 69, 216, 61],
+                        'font_source': '013/000', 'line_height': TEXT_LINE_HEIGHT,
+                        'text_rows': TEXT_ROWS, 'text_width': TEXT_PIXEL_WIDTH,
                         'body_frame_xywh': [6, 62, 228, 75],
                         'body_glass': 'multiply room RGB by 96/255; original 006/03B bevel rails are nine-sliced outside text bounds',
                         'green_key_rgb': [0, 255, 0]},
