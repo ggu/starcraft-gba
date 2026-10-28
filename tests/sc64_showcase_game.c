@@ -285,7 +285,11 @@ static int check_field_controls(void)
     press(KEY_R);
     press(KEY_B);
     if (!menu_open || menu_cursor != MENU_MOVE) return fail("controls: order list did not open on Move");
+#ifdef SC64_COMMAND_ICONS
+    press(KEY_LEFT); /* Move, Stop, Attack: left wraps to Attack */
+#else
     press(KEY_DOWN);
+#endif
     press(KEY_A);
     field_ui_refresh();
     if (mode != MODE_ATTACK || field_controls_title_color() != C_RED ||
@@ -485,8 +489,13 @@ static int check_field_controls_review(void)
     menu_cursor = MENU_MOVE;
     draw_hud_commands();
     unsigned drawn = hint_band_hash();
+#ifdef SC64_COMMAND_ICONS /* the command's button is left of the rows */
+    gfx_rect(26, 137, 106, 9, C_PANEL);
+    gfx_text(27, 137, "SELECT UNITS FIRST", C_RED);
+#else
     gfx_rect(0, 137, 132, 9, C_PANEL);
     gfx_text(5, 137, "SELECT UNITS FIRST", C_RED);
+#endif
     if (hint_band_hash() != drawn) return fail("controls: HUD row does not explain the unavailable command");
     press(KEY_B);
 
@@ -519,6 +528,100 @@ static int check_field_controls_review(void)
     if (ui_action != field_ui_a_action(0)) return fail("controls: ATTACK cache survived a restart");
     return 0;
 }
+
+#ifdef SC64_COMMAND_ICONS
+static int card_pixels(int x, int y, int w, int h, u8 color)
+{
+    int n = 0;
+    for (int yy = y; yy < y + h; ++yy)
+        for (int xx = x; xx < x + w; ++xx) n += gfx_test_pixel(xx, yy) == color;
+    return n;
+}
+
+/* The command card: every base row of every race has its ROM button, the
+ * grid order is a permutation of the list, the D-pad reaches every slot,
+ * and the card and HUD draw the highlighted, usable and unavailable states. */
+static int check_command_card(void)
+{
+    int saved_race = race_human, count, x, y, w, h;
+    for (int race = 0; race < 3; ++race) {
+        race_human = race;
+        for (int i = 0; i <= MENU_STOP; ++i) {
+            int icon = card_icon(i);
+            if (icon < 0 || icon >= SC64_CMD_ICON_COUNT) return fail("card: a base row has no button");
+            for (int j = 0; j < i; ++j)
+                if (card_icon(j) == icon) return fail("card: two rows share a button");
+        }
+    }
+    race_human = saved_race;
+    if (card_icon(MENU_MOVE) != SC64_CMD_ICON_MOVE || card_icon(MENU_ATTACK) != SC64_CMD_ICON_ATTACK ||
+        card_icon(MENU_STOP) != SC64_CMD_ICON_STOP)
+        return fail("card: orders do not use the Move, Attack and Stop buttons");
+
+    if (!enter_showcase_menu()) return fail("card: could not open showcase");
+    press(KEY_A); press(KEY_A);
+    if (screen != SCREEN_PLAY) return fail("card: scene 0 did not start");
+    count = field_menu_count();
+    if (!card_fits()) return fail("card: the Showcase list does not fit the card");
+    for (int s = 0; s < count; ++s) {
+        int i = card_slot_command(s);
+        if (i < 0 || i >= count || card_command_slot(i) != s) return fail("card: slots are not a permutation");
+    }
+    if (card_slot_command(0) != MENU_MOVE || card_slot_command(1) != MENU_STOP ||
+        card_slot_command(2) != MENU_ATTACK)
+        return fail("card: the top row is not Move, Stop, Attack");
+
+    clear_selection();
+    press(KEY_B);
+    if (!menu_open || menu_cursor != MENU_MOVE) return fail("card: B did not open the card on Move");
+    press(KEY_RIGHT);
+    if (menu_cursor != MENU_STOP) return fail("card: RIGHT from Move is not Stop");
+    press(KEY_RIGHT); press(KEY_RIGHT);
+    if (menu_cursor != MENU_MOVE) return fail("card: RIGHT does not wrap within the row");
+    press(KEY_DOWN);
+    if (menu_cursor != card_slot_command(3)) return fail("card: DOWN from Move is not the next row");
+    press(KEY_UP);
+    press(KEY_UP);
+    if (card_command_slot(menu_cursor) % 3 != 0 || card_command_slot(menu_cursor) / 3 == 0)
+        return fail("card: UP from the top row does not wrap to the bottom");
+    {
+        unsigned seen = 0;
+        menu_cursor = MENU_MOVE;
+        for (int r = 0; r < 6; ++r) {
+            for (int c = 0; c < 3; ++c) { seen |= 1u << card_command_slot(menu_cursor); press(KEY_RIGHT); }
+            press(KEY_DOWN);
+        }
+        if (seen != (1u << count) - 1) return fail("card: the D-pad does not reach every button");
+    }
+
+    /* Nothing selected: Move is unavailable and grey; the highlighted
+     * button is gold and framed; usable buttons are green. */
+    menu_cursor = MENU_ATTACK;
+    game_render();
+    w = 3 * CARD_PITCH + 3; h = (count + 2) / 3 * CARD_PITCH + 3;
+    x = 238 - w; y = 119 - h;
+    if (card_pixels(x + 2, y + 2, CARD_CELL, CARD_CELL, C_GREEN) ||
+        !card_pixels(x + 2, y + 2, CARD_CELL, CARD_CELL, C_DIM))
+        return fail("card: Move is not grey without a selection");
+    if (!card_pixels(x + 2 + 2 * CARD_PITCH, y + 2, CARD_CELL, CARD_CELL, C_GOLD))
+        return fail("card: the highlighted Attack button is not gold");
+    {
+        int slot = card_command_slot(MENU_ARMOR), cx = x + 2 + slot % 3 * CARD_PITCH;
+        int cy = y + 2 + slot / 3 * CARD_PITCH, cost, gas_cost;
+        const char *need;
+        if (ui_row_state(MENU_ARMOR, &cost, &gas_cost, &need) == UI_SITE_OK &&
+            !card_pixels(cx, cy, CARD_CELL, CARD_CELL, C_GREEN))
+            return fail("card: a usable button is not green");
+    }
+    if (card_pixels(3, 124, CARD_CELL, CARD_CELL, C_HIGHLIGHT) +
+        card_pixels(3, 124, CARD_CELL, CARD_CELL, C_GREEN) < 20)
+        return fail("card: the HUD does not show the highlighted button");
+    press(KEY_B);
+    if (menu_open) return fail("card: B did not close the card");
+    return 0;
+}
+#endif
+
 
 /* Each race's skirmish: A on open ground moves, SELECT drops the selection,
  * every list row resolves and draws, placement snaps and finds its own
@@ -835,6 +938,9 @@ int main(void)
 #endif
 #ifdef SC64_FIELD_CONTROLS
     if (check_field_controls() || check_field_controls_load() || check_field_controls_races()) return 1;
+#ifdef SC64_COMMAND_ICONS
+    if (check_command_card()) return 1;
+#endif
 #endif
     puts("Showcase menu, scene runtime, pause controls, and save isolation: ok");
     return 0;

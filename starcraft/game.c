@@ -7181,10 +7181,15 @@ game_update(u16 held, u16 pressed)
     }
     if (menu_open) {
 	reset_selection_gestures();
-	if (pressed & KEY_UP)
-	    menu_cursor = (menu_cursor + field_menu_count() - 1) % field_menu_count();
-	if (pressed & KEY_DOWN)
-	    menu_cursor = (menu_cursor + 1) % field_menu_count();
+#ifdef SC64_COMMAND_ICONS
+	if (!field_card_navigate(pressed))
+#endif
+	{
+	    if (pressed & KEY_UP)
+		menu_cursor = (menu_cursor + field_menu_count() - 1) % field_menu_count();
+	    if (pressed & KEY_DOWN)
+		menu_cursor = (menu_cursor + 1) % field_menu_count();
+	}
 	if (pressed & KEY_A)
 	    choose_command(menu_cursor);
 	return;
