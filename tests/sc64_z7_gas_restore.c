@@ -21,7 +21,7 @@ static void launch_z7(void)
     game_init(); held_keys=0;
     press(KEY_A);
     for (unsigned page=0;page<3;++page) press(KEY_RIGHT);
-    press(KEY_A); press(KEY_A);
+    press(KEY_A); press(KEY_START);
     assert(screen==SCREEN_PLAY && race_z7_active());
     assert(race_z7_map==&sc64_race_maps[SC64_Z7_GLOBAL_ID]);
     assert(geyser_count==1);

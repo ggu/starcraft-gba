@@ -108,90 +108,53 @@ static void front_uplink(void)
     }
 }
 
+static void front_load_error(void)
+{
+    if(race_front_load_error) {
+        gfx_rect(36,106,168,29,C_BLACK);gfx_frame(36,106,168,29,C_RED_DARK);
+        gfx_text(63,116,"NO SAVED GAME FOUND",C_GOLD);
+    }
+}
+
+/* Text is authored by the source script and wrapped offline to the visible
+ * area. Never clip words or substitute objective summaries for dialogue. */
 static void front_briefing(void)
 {
-#ifdef SC64_UNIFIED
-#if defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
-    static const char *lines[14][5]={
-#elif defined(SC64_T6_CAMPAIGN_ENTRY)
-    static const char *lines[10][5]={
-#elif defined(SC64_T3_ENABLED)
-    static const char *lines[7][5]={
-#else
-    static const char *lines[6][5]={
-#endif
-        {"CREATE SPAWNING POOL","CREATE HYDRALISK DEN","PROTECT THE CHRYSALIS","DESTROY TERRAN BASE",""},
-        {"ESCORT THE CHRYSALIS","TO THE WARP POINT","","KEEP THE CARRIER","ALIVE"},
-        {"RESCUE FENIX","RECLAIM THE BASE","","DESTROY THE ZERG","FENIX MUST SURVIVE"},
-        {"WAIT FOR FENIX","DESTROY THE CEREBRATE","","FENIX MUST SURVIVE",""},
-        {"FIND JIM RAYNOR","TRAIN 10 MARINES","BUILD A BARRACKS","KEEP RAYNOR ALIVE",""},
-        {"DESTROY THE INFESTED","COMMAND CENTER","RAYNOR MUST SURVIVE","",""}
-#if defined(SC64_T3_ENABLED)
-        ,{"SURVIVE 30 MINUTES","PROTECT YOUR BASE","OPTIONAL OBJECTIVE","DESTROY ZERG HATCHERY",""}
-#endif
-#ifdef SC64_T6_CAMPAIGN_ENTRY
-        ,{"RECOVER DATA DISKS","KEEP RAYNOR ALIVE","","",""},
-        {"AID THE ANTIGAN REBELLION","DESTROY CONFEDERATE BASES","","",""},
-        {"FIND NORAD II","RESCUE RAYNOR","BRING TWO DROPSHIPS","KEEP BOTH ALIVE",""}
-#endif
-#ifdef SC64_TERRAN_FULL_CAMPAIGN_ENTRY
-        ,{"DELIVER THE PSI EMITTER","KEEP KERRIGAN ALIVE","","",""},
-        {"CLEAR OPPOSING BASES","PROTECT NORAD II","","",""},
-        {"CLEAR THE OPPOSING BASE","","","",""},
-        {"DESTROY THE ION CANNON","KEEP RAYNOR ALIVE","","",""}
-#endif
-    };
-#else
-    static const char *lines[4][5]={
-        {"CREATE SPAWNING POOL","CREATE HYDRALISK DEN","PROTECT THE CHRYSALIS","DESTROY TERRAN BASE",""},
-        {"ESCORT THE CHRYSALIS","TO THE WARP POINT","","KEEP THE CARRIER","ALIVE"},
-        {"RESCUE FENIX","RECLAIM THE BASE","","DESTROY THE ZERG","FENIX MUST SURVIVE"},
-        {"WAIT FOR FENIX","DESTROY THE CEREBRATE","","FENIX MUST SURVIVE",""}};
-#endif
-    static const char *generic_lines[5]={"COMPLETE THE MISSION","FOLLOW THE BRIEFING","","",""};
-    const char *const *mission_lines = race_front.mission <
-#ifdef SC64_UNIFIED
-#if defined(SC64_TERRAN_FULL_CAMPAIGN_ENTRY)
-        14 ? lines[race_front.mission] : generic_lines;
-#elif defined(SC64_T6_CAMPAIGN_ENTRY)
-        10 ? lines[race_front.mission] : generic_lines;
-#elif defined(SC64_T3_ENABLED)
-        7 ? lines[race_front.mission] : generic_lines;
-#else
-        6 ? lines[race_front.mission] : generic_lines;
-#endif
-#else
-        4 ? lines[race_front.mission] : generic_lines;
-#endif
-#ifdef SC64_T4_REPLAY_ENTRY
-    static const char *t4_lines[5]={"FIND THE DATA DISKS","RAYNOR MUST SURVIVE","","",""};
-    if(race_front.mission==SC64_T4_GLOBAL_ID7)mission_lines=t4_lines;
-#endif
-#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)
-    static const char *z3_lines[5]={"PROTECT THE CHRYSALIS","ELIMINATE TERRAN","PRESENCE","",""};
-    if(race_front.mission==14)mission_lines=z3_lines;
-#endif
-#if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
-    static const char *p3_lines[5]={"DESTROY BOTH ZERG","COLONIES","","",""};
-    if(race_front.mission==SC64_P3_GLOBAL_ID)mission_lines=p3_lines;
-#endif
-    unsigned age=race_front.ticks-race_front_transition;
-    front_header("MISSION BRIEFING",front_mission_title(race_front.mission));
-    gfx_rect(108,45,126,68,C_PANEL);
-    gfx_line(108,45,108,112,C_EDGE);
-    gfx_text(113,48,"PRIMARY OBJECTIVES",C_DIM);
-    for(int i=0;i<5;i++) {
-        char text[22];int n=0,budget=(int)age*2-i*18;
-        while(mission_lines[i][n]&&n<20&&n<budget){text[n]=mission_lines[i][n];n++;}
-        text[n]=0;gfx_text(112,61+i*10,text,C_SILVER);
+    const Sc64BriefingPage *page=race_front_briefing_page();
+    const char *title=front_mission_title(race_front.mission);
+    gfx_text(12,9,title,C_GOLD);
+    if(!page) {
+        gfx_text(62,28,"MISSION ORDERS",C_SILVER);
+        gfx_text(12,69,"BRIEFING UNAVAILABLE",C_SILVER);
+        gfx_text(12,87,"START TO DEPLOY",C_DIM);
+    } else {
+        if(page->portrait>=0 && page->portrait<SC64_BRIEFING_PORTRAIT_COUNT)
+            gfx_blit_sprite(12,23,SC64_BRIEFING_PORTRAIT_WIDTH,
+                            SC64_BRIEFING_PORTRAIT_HEIGHT,
+                            sc64_briefing_portraits[page->portrait]);
+        else {
+            gfx_text(14,35,"ORDERS",C_GOLD);
+            gfx_text(20,47,"DATA",C_DIM);
+        }
+        gfx_text(62,28,page->speaker,C_SILVER);
+        gfx_text(62,43,"PAGE",C_DIM);
+        gfx_num(92,43,(int)race_front.briefing_page+1,C_GOLD);
+        gfx_text(110,43,"/",C_DIM);
+        gfx_num(122,43,(int)race_front.briefing_pages,C_DIM);
+        if(race_front.briefing_page>0)gfx_text(163,43,"< PREV",C_DIM);
+        char text[SC64_BRIEFING_MAX_TEXT_BYTES+1];
+        unsigned visible=sc64_frontend_briefing_visible(&race_front),i=0;
+        while(i<visible && i<SC64_BRIEFING_MAX_TEXT_BYTES && page->text[i]) {
+            text[i]=page->text[i];i++;
+        }
+        text[i]=0;
+        gfx_text(12,69,text,C_SILVER);
     }
-    /* A slow comms scan and level indicators give the static original render
-       a transmission treatment without adding animation buffers. */
-    int scan=43+(race_front.ticks/2)%84;
-    gfx_line(12,scan,99,scan,C_EDGE);
-    front_uplink();
-    front_button(116,120,112,22,"DEPLOY",1);
-    front_footer("A DEPLOY     B BACK");
+    const char *next=!sc64_frontend_briefing_is_revealed(&race_front)?"A REVEAL":
+        race_front.briefing_page+1<race_front.briefing_pages?"A NEXT":"A DEPLOY";
+    gfx_text(12,145,next,C_GOLD);
+    gfx_text(77,145,"B BACK",C_DIM);
+    gfx_text(143,145,"START DEPLOY",C_GOLD);
 }
 
 static void sc64_frontend_draw(void)
@@ -203,16 +166,26 @@ static void sc64_frontend_draw(void)
         background=front_campaign_art(faction);
     if(page==SC_FRONT_SKIRMISH)
         background=race_front.race==R_TER?sc64_menu_terran:race_front.race==R_ZERG?sc64_menu_zerg:sc64_menu_protoss;
+    const u16 *palette=sc64_menu_palette;
+    if(page==SC_FRONT_BRIEFING) {
+        background=sc64_briefing_background;
+        palette=sc64_briefing_palette;
+    }
     unsigned age=race_front.ticks-race_front_transition;
     if(age<12) {
         u16 fade[224];int amount=(int)age+1;
         for(int i=0;i<224;i++) {
-            u16 p=sc64_menu_palette[i];
+            u16 p=palette[i];
             fade[i]=((p&31)*amount/12)|((((p>>5)&31)*amount/12)<<5)|((((p>>10)&31)*amount/12)<<10);
         }
         gfx_set_palette(32,224,fade);
-    } else gfx_set_palette(32,224,sc64_menu_palette);
+    } else gfx_set_palette(32,224,palette);
     gfx_blit_band(0,160,background);
+    if(page==SC_FRONT_BRIEFING) {
+        front_briefing();
+        front_load_error();
+        return;
+    }
     gfx_frame(0,0,240,147,C_EDGE);
     gfx_line(3,3,22,3,C_SILVER);gfx_line(3,3,3,20,C_SILVER);
     gfx_line(217,3,236,3,C_SILVER);gfx_line(236,3,236,20,C_SILVER);
@@ -269,7 +242,7 @@ static void sc64_frontend_draw(void)
         gfx_text(115,121,(race_completed&(1<<(sc64_catalog_playable_at(catalog_faction,race_front.mission_page*2+race_front.row))))?"MISSION COMPLETE":"AWAITING YOUR ORDERS",C_DIM);
         if((available+1)/2>1) gfx_text(199,121,"L/R PAGE",C_GOLD);
         front_uplink();front_footer("UP/DN MISSION  L/R PAGE  A BRIEFING  B BACK");
-    } else if(page==SC_FRONT_BRIEFING)front_briefing();
+    }
 #ifdef SC64_SHOWCASE_ENABLED
     else if(page==SC_FRONT_SHOWCASE) {
         front_header("SHOWCASE SCENES","FILMING SETUPS");
@@ -326,10 +299,7 @@ static void sc64_frontend_draw(void)
         front_footer("UP/DN SELECT L/R CHANGE A ACCEPT");
 #endif
     }
-    if(race_front_load_error) {
-        gfx_rect(36,106,168,29,C_BLACK);gfx_frame(36,106,168,29,C_RED_DARK);
-        gfx_text(63,116,"NO SAVED GAME FOUND",C_GOLD);
-    }
+    front_load_error();
 }
 
 #endif

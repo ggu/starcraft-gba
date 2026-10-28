@@ -179,7 +179,7 @@ static void campaign_start_from_menu(int mission)
     menu_press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING && race_front.mission == mission);
     /* Deploy through the actual normal-menu entry. */
-    frame_input(KEY_A);
+    frame_input(KEY_START);
     assert(screen == SCREEN_PLAY && !race_mode && !won && !lost);
     assert(race_selected_mission == mission && race_campaign.mission == mission);
     assert(race_human == PROFILE_RACE);

@@ -155,6 +155,26 @@ This selects the static source frame; native gas-smoke animation is separate.
 With the canonical Protoss inputs prepared, `make test-sc64-geyser-art` checks
 source pixels, edge clipping, fog, all three gas buildings and warm-cache reuse.
 
+## Campaign briefings and speaker portraits
+
+Canonical imported race profiles include the N64 campaign's pre-mission
+dialogue, speaker names and 23 portrait head frames, adapted to the GBA briefing
+screen. Dialogue pages are generated locally and wrapped to 36 columns by at
+most 7 rows; the imported text and graphics remain private under `.local/`.
+From an already prepared workspace, `make sc64-briefings` regenerates the
+briefing header from the verified USA ROM at
+`.local/sc64/rom/StarCraft64-USA.z64` and the pinned `references/sc64-maps`
+checkout. `./dev sc64 prepare --rom PATH --profile terran` runs this importer
+automatically, as do the canonical `zerg` and `protoss` preparation profiles.
+Status and builds require the generated briefing header.
+
+In the briefing, A reveals the current page and then advances; A on the final
+page deploys the mission. Left/Right browse pages, B returns to mission
+selection, and Start skips straight to deployment. L retains quick-load. This
+adds transient frontend playback state only and does not change campaign save
+data.
+
+
 ## Source construction art
 
 Prepared imported race builds now use the source construction art, including
@@ -167,6 +187,7 @@ selects the older authored fallback for diagnostic comparisons.
 
 When updating an existing prepared workspace, rerun `./dev sc64 prepare` with
 your ROM and profile to refresh its sprite banks as well as construction art.
+
 
 ```sh
 python3 tools/sc64_construction_sprites.py

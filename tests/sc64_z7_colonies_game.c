@@ -59,7 +59,7 @@ static void launch_z7_normally(void)
     press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING &&
            race_front.mission == SC64_Z7_GLOBAL_ID);
-    press(KEY_A);
+    press(KEY_START);
     assert(screen == SCREEN_PLAY && race_z7_active() &&
            race_z7_map == &sc64_race_maps[SC64_Z7_GLOBAL_ID]);
     for (int i = 0; i < 4; ++i) game_update(0, 0);

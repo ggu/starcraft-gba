@@ -109,7 +109,7 @@ int main(void)
     tap(KEY_A);
     tap(KEY_RIGHT); tap(KEY_RIGHT); tap(KEY_RIGHT);
     tap(KEY_A);
-    game_update(KEY_A, KEY_A);
+    game_update(KEY_START, KEY_START);
     assert(screen == SCREEN_PLAY && race_selected_mission == SC64_P7_GLOBAL_ID);
     assert(race_p7_active() && race_p7_runtime_state_valid());
     for (int t = 0; t < 1200; ++t) {

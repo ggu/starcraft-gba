@@ -38,7 +38,7 @@ static void start_p3_through_menu(void)
     assert(race_front.mission_page == 1);
     press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING && race_front.mission == 22);
-    frame_input(KEY_A); /* Deploy without releasing A during live simulation. */
+    frame_input(KEY_START); /* Deploy without a live simulation tick. */
     assert(screen == SCREEN_PLAY && !race_mode && race_selected_mission == 22);
     assert(race_campaign.mission == 22 && sc64_p3_model_state_valid(&race_p3));
     assert(minerals == SC64_P3_HUMAN_MINERALS && gas == SC64_P3_HUMAN_GAS);
@@ -204,7 +204,7 @@ static void test_other_mission_requires_zero_p3_payload(void)
     press(KEY_A); /* P1 list, page 1. */
     press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING && race_front.mission == 2);
-    frame_input(KEY_A);
+    frame_input(KEY_START);
     assert(screen == SCREEN_PLAY && race_selected_mission == 2);
     assert(race_p3.fired == 0 && race_p3_action_ticks == 0);
     assert(race_save_game());

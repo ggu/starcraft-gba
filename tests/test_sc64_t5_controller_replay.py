@@ -33,7 +33,7 @@ def observation(kind: str, tick: int, **updates: int) -> dict:
 def sample_trace() -> dict:
     events = [observation("start", 0)]
     # The frozen trace records a neutral sample at tick 1. This is valid but
-    # has no transition to schedule; the normal menu route already releases A.
+    # has no transition to schedule; the normal menu route already releases Start.
     events.append({"kind": "input", "host_tick": 1, "held": 0, "pressed": 0})
     events.append(observation("opening", 500, frame=500, elapsed=500, minerals=300, gas=300))
     events.append({"kind": "input", "host_tick": 501, "held": 1, "pressed": 1})
@@ -169,7 +169,7 @@ class T5ReplayValidationTests(unittest.TestCase):
         self.assertEqual(plan["source_input_count"], 2)
         self.assertEqual(plan["inputs"][:10], [(i, held) for i, held in enumerate(
             [replay.KEY_A, 0, replay.KEY_RIGHT, 0, replay.KEY_RIGHT,
-             0, replay.KEY_A, 0, replay.KEY_A, 0])])
+             0, replay.KEY_A, 0, replay.KEY_START, 0])])
         self.assertEqual(plan["inputs"][10:], [(509, 1), (513, 0)])
         self.assertEqual(plan["checkpoints"][0]["host_tick"], 509)
         self.assertEqual(plan["checkpoints"][1]["host_tick"], 1009)
@@ -185,7 +185,7 @@ class T5ReplayValidationTests(unittest.TestCase):
         self.assertEqual(sum(len(page["events"]) for page in pages), plan["input_count"])
         self.assertEqual(pages[0]["events"], [(i, h) for i, h in enumerate(
             [replay.KEY_A, 0, replay.KEY_RIGHT, 0, replay.KEY_RIGHT,
-             0, replay.KEY_A, 0, replay.KEY_A])])
+             0, replay.KEY_A, 0, replay.KEY_START])])
 
     def test_prefix_ignores_future_events_but_keeps_exact_stop(self):
         plan = replay.validate_trace(sample_trace(), capacity=256)

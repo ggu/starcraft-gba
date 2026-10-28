@@ -29,6 +29,7 @@ from emulator_smoke import ROOT, capture, symbol_sizes, symbols
 CPU_HZ = 16_777_216
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_RESULT = 0, 1, 3
 MISSION_Z3 = 14
+KEY_START = 8
 MAX_U32 = 0xFFFFFFFF
 CHECKPOINT_TICKS = 1000
 KEY_MASK = 0x3FF
@@ -52,6 +53,7 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False,
         raise ValueError("trace events must be a nonempty array")
 
     inputs: list[tuple[int, int]] = []
+    held_by_tick: dict[int, int] = {}
     previous_tick = 0
     previous_held = 0
     start = None
@@ -74,6 +76,7 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False,
             if type(pressed) is not int or pressed != expected_pressed:
                 raise ValueError(f"input event {index} pressed does not match held transition")
             inputs.append((tick - 1, held))
+            held_by_tick[tick] = held
             previous_tick, previous_held = tick, held
         elif kind == "start":
             if start is not None:
@@ -94,6 +97,8 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = False,
         raise ValueError("trace must contain exactly one start event")
     if start.get("host_tick") != 7 or start.get("frame") != 0 or start.get("screen") != SCREEN_PLAY:
         raise ValueError("trace must record Z3 launch at host_tick=7, frame=0, screen=PLAY")
+    if held_by_tick.get(start.get("host_tick")) != KEY_START:
+        raise ValueError("Z3 menu deployment input must use Start at the recorded launch tick")
     if final is None or rows[-1] is not final:
         raise ValueError("trace must end with its final won event")
     stop_tick = final.get("host_tick")

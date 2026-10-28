@@ -30,6 +30,7 @@ import sc64_z3_controller_replay as scheduler
 from emulator_smoke import ROOT, capture, symbol_sizes, symbols
 
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_RESULT = 0, 1, 3
+KEY_START = 8
 MISSION_BY_PROFILE = {"zerg-z4": 15, "protoss-p4": 23, "zerg-z5": 16,
                       "zerg-z6": 17, "zerg-z7": 18,
                       "protoss-p5": 24, "protoss-p6": 25}
@@ -60,14 +61,14 @@ DEFAULT_TRACES = {"zerg-z4": DEFAULT_TRACE,
 DEFAULT_OUTPUT = ROOT / "build/emulator/zp-controller-replay"
 CHECKPOINT_TICKS = 1000
 MENU_PREFIX = ((1, 1), (2, 0), (3, 16), (4, 0), (5, 128),
-               (6, 0), (7, 1), (8, 0), (9, 1))
+               (6, 0), (7, 1), (8, 0), (9, KEY_START))
 
 FIFTH_MENU_PREFIX = tuple((tick, 16 if tick == 5 else held)
                           for tick, held in MENU_PREFIX)
 SIXTH_MENU_PREFIX = ((1, 1), (2, 0), (3, 16), (4, 0), (5, 16), (6, 0),
-                     (7, 128), (8, 0), (9, 1), (10, 0), (11, 1), (12, 0))
+                     (7, 128), (8, 0), (9, 1), (10, 0), (11, KEY_START), (12, 0))
 SEVENTH_MENU_PREFIX = ((1, 1), (2, 0), (3, 16), (4, 0), (5, 16), (6, 0),
-                       (7, 16), (8, 0), (9, 1), (10, 0), (11, 1), (12, 0))
+                       (7, 16), (8, 0), (9, 1), (10, 0), (11, KEY_START), (12, 0))
 Z7_ACTION_COUNTS = (1, 3, 1, 5, 2, 1, 1, 1)
 P6_ACTION_COUNTS = (1, 1, 2, 2, 2, 2, 2, 2, 5, 2, 2, 8, 8,
                     1, 7, 12, 5, 2, 3, 3, 7, 12, 3, 1, 3, 1)

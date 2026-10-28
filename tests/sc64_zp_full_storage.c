@@ -35,7 +35,7 @@ static void launch_p4(void) {
     press(KEY_RIGHT);         /* page 2 */
     press(KEY_DOWN);          /* mission 23 */
     press(KEY_A);
-    input(KEY_A);             /* enter mission */
+    input(KEY_START);         /* explicitly deploy the mission */
     assert(screen == SCREEN_PLAY && !race_mode && race_selected_mission == 23);
     assert(race_p4_active());
     unsigned live_units = 0, live_buildings = 0, live_minerals = 0;

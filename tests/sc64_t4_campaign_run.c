@@ -492,7 +492,7 @@ static int launch_gated_t4(void)
     step(0);
     step(KEY_A);
     step(0);
-    step(KEY_A);
+    step(KEY_START); /* Skip the briefing explicitly, preserving launch tick. */
     deployed = 1;
     return screen == SCREEN_PLAY && !race_mode &&
            race_selected_mission == SC64_T4_GLOBAL_ID &&

@@ -73,7 +73,7 @@ int main(void)
     tap(KEY_A, "menu");
     tap(KEY_RIGHT, "menu"); tap(KEY_RIGHT, "menu"); tap(KEY_RIGHT, "menu");
     tap(KEY_A, "menu");
-    step(KEY_A, "launch");
+    step(KEY_START, "launch");
     step(0, "launch");
     assert(screen == SCREEN_PLAY && race_selected_mission == SC64_P7_GLOBAL_ID);
     for (int t = 0; t < 300; ++t) step(0, "neutral");

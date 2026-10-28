@@ -27,7 +27,8 @@ def trace_for(profile="zerg-z4", mission=15):
             {"kind": "input", "host_tick": 6, "held": 0, "pressed": 0},
             {"kind": "input", "host_tick": 7, "held": 1, "pressed": 1},
             {"kind": "input", "host_tick": 8, "held": 0, "pressed": 0},
-            {"kind": "input", "host_tick": 9, "held": 1, "pressed": 1},
+            {"kind": "input", "host_tick": 9, "held": replay.KEY_START,
+             "pressed": replay.KEY_START},
             {"kind": "start", "host_tick": 9, "frame": 0, "screen": 1,
              "won": 0, "lost": 0, "outcome": 0},
             {"kind": "periodic", "host_tick": 1000},
@@ -46,7 +47,7 @@ def fifth_trace(profile="zerg-z5", mission=16):
 
 def sixth_trace():
     # P6 is the sixth Protoss entry: two page-rights, second-page down,
-    # confirm, then launch from briefing with the ordinary A input.
+    # confirm, then explicitly deploy from the briefing with Start.
     rows = [
         {"kind": "input", "host_tick": tick, "held": held,
          "pressed": held if held else 0}
@@ -142,7 +143,7 @@ class TraceTests(unittest.TestCase):
                 self.assertEqual(plan["stop_tick"], 2000)
                 self.assertEqual(plan["inputs"][:9], [
                     (0, 1), (1, 0), (2, 16), (3, 0), (4, 16),
-                    (5, 0), (6, 1), (7, 0), (8, 1)])
+            (5, 0), (6, 1), (7, 0), (8, replay.KEY_START)])
                 with self.assertRaisesRegex(ValueError, "5th-entry deployment route"):
                     replay.validate_trace(trace_for(name, mission), 16, name)
 
@@ -152,7 +153,8 @@ class TraceTests(unittest.TestCase):
         self.assertEqual(plan["start"]["host_tick"], 12)
         self.assertEqual(plan["inputs"][:12], [
             (0, 1), (1, 0), (2, 16), (3, 0), (4, 16), (5, 0),
-            (6, 128), (7, 0), (8, 1), (9, 0), (10, 1), (11, 0)])
+            (6, 128), (7, 0), (8, 1), (9, 0),
+            (10, replay.KEY_START), (11, 0)])
         with self.assertRaisesRegex(ValueError, "6th-entry deployment route"):
             replay.validate_trace(fifth_trace("protoss-p6", 25), 16, "protoss-p6")
         bad = copy.deepcopy(trace)

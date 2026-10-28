@@ -308,11 +308,11 @@ int main(void)
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     assert(screen==SCREEN_TITLE);
     /* P7 is still catalog-locked; seed the normal Briefing page with this
-       private fixture's authenticated mission and launch through KEY_A. */
+       private fixture's authenticated mission and launch through Start. */
     sc64_frontend_reset(&race_front,SC64_P7_GLOBAL_ID,R_PROTOSS,1,-1);
     race_front.page=SC_FRONT_BRIEFING;
     race_front.mission=SC64_P7_GLOBAL_ID;
-    game_update(KEY_A,KEY_A); game_update(0,0);
+    game_update(KEY_START,KEY_START); game_update(0,0);
     assert(screen==SCREEN_PLAY && !mission_unsupported_count);
     assert(sc64_p7_arbiter_cache_initialized);
 #else

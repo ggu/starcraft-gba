@@ -3,6 +3,7 @@
 
 #include "gba.h"
 #include "campaign_catalog.h"
+#include "sc64_briefing.h"
 
 #ifdef SC64_T4_REPLAY_ENTRY
 #if !defined(SC64_T4_SCENARIO_RUNTIME)
@@ -90,6 +91,12 @@ typedef struct Sc64Frontend {
     int map;           /* Appended to preserve existing field offsets */
     int bot_races[3];  /* Per-opponent race choices, retained as count changes */
     int mission_page;
+    /* Briefing fields are appended so existing users retain their offsets. */
+    unsigned briefing_page;
+    unsigned briefing_pages;
+    unsigned briefing_page_tick;
+    unsigned briefing_reveal_length;
+    int briefing_revealed;
 } Sc64Frontend;
 
 /* Mission IDs are a stable save/loader contract: Z1,Z2,P1,P2,T1,T2. */
@@ -163,6 +170,50 @@ static inline int sc64_front_campaign_faction_at(int row) {
 
 static inline int sc64_front_clamp(int v, int lo, int hi) {
     return v < lo ? lo : (v > hi ? hi : v);
+}
+
+/* Keep briefing playback independent from rendering and generated campaign
+ * headers. Configure it from the currently-selected generated page before
+ * drawing; page_count is clamped to a small fixed bound and zero means one
+ * page, which preserves the asset-free frontend's historical behavior. The
+ * reveal length counts bytes in the prewrapped page text, including newlines. */
+static inline void sc64_frontend_briefing_configure(Sc64Frontend *f,
+                                                     unsigned page_count,
+                                                     unsigned reveal_length) {
+    if (!f) return;
+    if (page_count == 0) page_count = 1;
+    if (page_count > SC64_BRIEFING_MAX_PAGES)
+        page_count = SC64_BRIEFING_MAX_PAGES;
+    if (reveal_length > SC64_BRIEFING_MAX_TEXT_BYTES)
+        reveal_length = SC64_BRIEFING_MAX_TEXT_BYTES;
+    f->briefing_pages = page_count;
+    if (f->briefing_page >= page_count) f->briefing_page = page_count - 1;
+    f->briefing_reveal_length = reveal_length;
+}
+
+static inline void sc64_frontend_briefing_reset_page(Sc64Frontend *f) {
+    if (!f) return;
+    f->briefing_page = 0;
+    f->briefing_pages = 1;
+    f->briefing_page_tick = f->ticks;
+    f->briefing_reveal_length = 0;
+    f->briefing_revealed = 0;
+}
+
+/* Text reveals at two bytes per frontend tick. Manual reveal wins immediately;
+ * unsigned subtraction also keeps the age calculation valid across tick wrap. */
+static inline unsigned sc64_frontend_briefing_visible(const Sc64Frontend *f) {
+    unsigned elapsed;
+    if (!f) return 0;
+    if (f->briefing_revealed) return f->briefing_reveal_length;
+    elapsed = f->ticks - f->briefing_page_tick;
+    if (elapsed >= (f->briefing_reveal_length + 1u) / 2u)
+        return f->briefing_reveal_length;
+    return elapsed * 2u;
+}
+
+static inline int sc64_frontend_briefing_is_revealed(const Sc64Frontend *f) {
+    return !f || sc64_frontend_briefing_visible(f) >= f->briefing_reveal_length;
 }
 
 #ifdef SC64_SHOWCASE_ENABLED
@@ -266,6 +317,11 @@ static inline void sc64_frontend_reset(Sc64Frontend *f, int mission,
     f->completed = sc64_front_clamp(completed, -1, 3);
 #endif
     f->map = SC64_MAP_OUTPOST;
+    f->briefing_page = 0;
+    f->briefing_pages = 1;
+    f->briefing_page_tick = 0;
+    f->briefing_reveal_length = 0;
+    f->briefing_revealed = 0;
     for (int i = 0; i < 3; ++i) {
         int ai = (f->race + i + 1) % 3;
         if (ai == f->race) ai = (ai + 1) % 3;
@@ -302,6 +358,7 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
         f->mission_page = 0;
         f->row = 0;
         f->page = SC_FRONT_BRIEFING;
+        sc64_frontend_briefing_reset_page(f);
         return SC_FRONT_NONE;
     }
 #endif
@@ -348,6 +405,7 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
             }
 #endif
             f->page = SC_FRONT_MISSION;
+            sc64_frontend_briefing_reset_page(f);
             {
                 int ordinal = sc64_front_mission_ordinal(f);
                 f->mission_page = ordinal < 0 ? 0 : ordinal / 2;
@@ -359,6 +417,21 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
         case SC_FRONT_SHOWCASE: f->page = SC_FRONT_HOME; f->row = 0; break;
 #endif
         default: f->page = SC_FRONT_HOME; f->row = 0; break;
+        }
+        return SC_FRONT_NONE;
+    }
+
+    if (f->page == SC_FRONT_BRIEFING && (edge & (KEY_LEFT | KEY_RIGHT))) {
+        if (edge & KEY_RIGHT) {
+            if (f->briefing_page + 1 < f->briefing_pages) {
+                ++f->briefing_page;
+                f->briefing_page_tick = f->ticks;
+                f->briefing_revealed = 0;
+            }
+        } else if (f->briefing_page > 0) {
+            --f->briefing_page;
+            f->briefing_page_tick = f->ticks;
+            f->briefing_revealed = 0;
         }
         return SC_FRONT_NONE;
     }
@@ -458,8 +531,20 @@ static inline int sc64_frontend_update(Sc64Frontend *f, unsigned held) {
                                                f->mission_page * 2 + f->row);
         if (f->mission < 0) return SC_FRONT_NONE;
         f->page = SC_FRONT_BRIEFING;
+        sc64_frontend_briefing_reset_page(f);
         break;
     case SC_FRONT_BRIEFING:
+        if (edge & KEY_START) return SC_FRONT_START_CAMPAIGN;
+        if (!sc64_frontend_briefing_is_revealed(f)) {
+            f->briefing_revealed = 1;
+            return SC_FRONT_NONE;
+        }
+        if (f->briefing_page + 1 < f->briefing_pages) {
+            ++f->briefing_page;
+            f->briefing_page_tick = f->ticks;
+            f->briefing_revealed = 0;
+            break;
+        }
         return SC_FRONT_START_CAMPAIGN;
     case SC_FRONT_SKIRMISH:
 #ifdef SC64_IMPORTED_SKIRMISH

@@ -291,7 +291,7 @@ static void launch_p3(void)
     tap(KEY_RIGHT);    /* P3 ordinal 2, page two */
     step(KEY_A);       /* briefing */
     step(0);
-    step(KEY_A);       /* launch without a gameplay tick */
+    step(KEY_START);   /* explicit launch without a gameplay tick */
     deployed = 1;
     assert(screen == SCREEN_PLAY && !race_mode &&
            race_selected_mission == SC64_P3_GLOBAL_ID);
