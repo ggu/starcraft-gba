@@ -4659,12 +4659,13 @@ select_at(void)
 }
 
 #ifdef SC64_WORKER_CARGO_KIND
+static int currently_visible(int x, int y);
 static int
 sc64_worker_mineral_at(int x, int y)
 {
     int i, best = -1, best_d = 12 * 12, d;
     for (i = 0; i < MAX_MINERALS; ++i) {
-        if (m[i].amount <= 0) continue;
+        if (m[i].amount <= 0 || !currently_visible(m[i].x, m[i].y)) continue;
         d = dist2(x, y, m[i].x, m[i].y);
         if (d <= best_d) { best = i; best_d = d; }
     }
@@ -5901,7 +5902,7 @@ race_update_resource_worker(Unit *q)
         if (collected > 0) {
             q->carry = collected;
             m[q->target].amount -= collected;
- #ifdef SC64_WORKER_CARGO_KIND
+#ifdef SC64_WORKER_CARGO_KIND
             if (IS_WORKER(q->type)) sc64_worker_cargo_clear(q);
 #endif
         }
@@ -6463,72 +6464,40 @@ target_lists_unavailable:
                 race_late_active() ? race_late_worker_home(q) :
 #endif
                 owner_command_center(q->owner);
-        if ((sc64_worker_gather_pending(q) || !sc64_worker_cargo_matches_order(q)) &&
-            q->order == ORDER_GAS && !building_complete(q->target)) {
+	    if (q->order == ORDER_GAS && !building_complete(q->target)) {
 		q->order = ORDER_IDLE;
-#ifdef SC64_WORKER_CARGO_KIND
-                sc64_worker_gather_pending_set(q, 0);
-#endif
 		continue;
 	    }
-        if ((sc64_worker_gather_pending(q) || !sc64_worker_cargo_matches_order(q)) &&
-            q->order == ORDER_MINE &&
-            (q->target < 0 || q->target >= MAX_MINERALS ||
-             (sc64_worker_gather_pending(q) && m[q->target].amount <= 0))) {
+	    if (q->order == ORDER_MINE && (q->target < 0 || q->target >= MAX_MINERALS)) {
 		q->order = ORDER_IDLE;
-#ifdef SC64_WORKER_CARGO_KIND
-                sc64_worker_gather_pending_set(q, 0);
-#endif
 		continue;
 	    }
-#ifdef SC64_WORKER_CARGO_KIND
-        if (sc64_worker_gather_pending(q)) {
-            int gx = q->order == ORDER_MINE ? m[q->target].x : b[q->target].x;
-            int gy = q->order == ORDER_MINE ? m[q->target].y : b[q->target].y;
-            if (dist2(q->x, q->y, gx, gy) >
-                (q->order == ORDER_GAS ? 24 * 24 : 7 * 7)) {
-                move_toward(q, gx, gy);
-                continue;
-            }
-            sc64_worker_gather_pending_set(q, 0);
-        }
-#endif
 	    int tx, ty;
 	    if (home < 0) {
 		/* Mineral trips can collect before a base exists. Hold loaded cargo
 		 * until a completed friendly depot can receive it. */
-		if (q->order != ORDER_MINE && (!q->carry || sc64_worker_cargo_matches_order(q))) {
+		if (q->order != ORDER_MINE) {
 		    q->order = ORDER_IDLE;
 		    continue;
 		}
-		if (q->carry && sc64_worker_cargo_matches_order(q)) continue;
+		if (q->carry) continue;
 	    }
-	    if (q->carry && sc64_worker_cargo_matches_order(q)) {
+	    tx = q->order == ORDER_MINE ? m[q->target].x : b[q->target].x;
+	    ty = q->order == ORDER_MINE ? m[q->target].y : b[q->target].y;
+	    if (q->carry) {
 		/* Stop at the approach ring outside the structure's blocked cells. */
 		if (dist2(q->x, q->y, b[home].x, b[home].y) > 32 * 32) {
 		    move_toward(q, b[home].x, b[home].y);
 		} else {
-            int gas_cargo = q->order == ORDER_GAS;
-#ifdef SC64_WORKER_CARGO_KIND
-            if (IS_WORKER(q->type)) gas_cargo = sc64_worker_cargo_is_gas(q);
-            if ((q->flags & SC64_WORKER_CARGO_KIND_MASK) != SC64_WORKER_CARGO_UNKNOWN)
-#endif
-                add_owner_resources(q->owner, gas_cargo ? 0 : q->carry,
-                                    gas_cargo ? q->carry : 0);
+                    add_owner_resources(q->owner, q->order == ORDER_MINE ? q->carry : 0,
+                                        q->order == ORDER_GAS ? q->carry : 0);
 		    q->carry = 0;
-#ifdef SC64_WORKER_CARGO_KIND
-                    sc64_worker_cargo_clear(q);
-#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
                     if (race_late_active()) q->build = -1;
 #endif
 		    q->work_timer = 20;
 		}
-	        continue;
-	    }
-	    tx = q->order == ORDER_MINE ? m[q->target].x : b[q->target].x;
-	    ty = q->order == ORDER_MINE ? m[q->target].y : b[q->target].y;
-	    if (dist2(q->x, q->y, tx, ty) >
+	    } else if (dist2(q->x, q->y, tx, ty) >
 #ifdef SC64_RACES
             (q->order==ORDER_GAS?24*24:7*7)
 #else
@@ -6539,28 +6508,19 @@ target_lists_unavailable:
 	    } else if (q->work_timer > 0) {
 		q->work_timer--;
 	    } else if (q->order == ORDER_MINE) {
-                int collected = m[q->target].amount < 8 ? m[q->target].amount : 8;
-                if (collected > 0) {
-                    q->carry = collected;
-                    m[q->target].amount -= collected;
- #ifdef SC64_WORKER_CARGO_KIND
-                    if (IS_WORKER(q->type)) sc64_worker_cargo_clear(q);
-#endif
-                }
+		q->carry = m[q->target].amount < 8 ? m[q->target].amount : 8;
+		m[q->target].amount -= q->carry;
 #ifdef SC64_TERRAN_LATE_RUNTIME
                 if (race_late_active()) q->build = -1;
 #endif
 		q->work_timer = 45;
-		if (collected <= 0)
+		if (q->carry <= 0)
 		    q->order = ORDER_IDLE;
 	    } else {
 		/* OpenBW bwgame.h gather_resource: a normal gas trip carries 8,
 		 * like minerals; depleted geysers (not yet modelled here) yield 2. */
 		#ifdef SC64_RACES
 		q->carry = 8;
-#ifdef SC64_WORKER_CARGO_KIND
-                if (IS_WORKER(q->type)) q->flags = (q->flags & ~SC64_WORKER_CARGO_MASK) | SC64_WORKER_CARGO_GAS;
-#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
                 if (race_late_active()) q->build = -1;
 #endif
@@ -8171,7 +8131,7 @@ draw_unit(Unit * q)
             owner_color(q->owner));
     if (q->selected)
 	gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
- #ifdef SC64_WORKER_CARGO_KIND
+#ifdef SC64_WORKER_CARGO_KIND
     if (sc64_worker_cargo_badge_kind(q) > 0)
         draw_worker_cargo_badge(sprite_x + sprite_w + 2,
             sprite_y + sprite_h / 2, sc64_worker_cargo_badge_kind(q) == 2);

@@ -1,5 +1,7 @@
-/* Real-engine worker cargo/input fixture. Compile with SC64_WORKER_CARGO_KIND
- * and a prepared race profile; no imported recipe or game assets are read. */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Actual interaction-dispatch and worker-tick fixture with authored scenes.
+ * Compile with SC64_WORKER_CARGO_KIND and a prepared race profile. These
+ * direct calls are not normal-menu/button-edge or campaign-win evidence. */
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -305,9 +307,26 @@ test_interrupt_unknown_depleted_and_priority(int race, int worker_type,
     (void)depot_type;
 }
 
+static void
+test_hidden_mineral_context(void)
+{
+    reset_scene(R_TER, R_ZERG);
+    int worker=spawn_unit(SIDE,U_SCV,96,96);
+    assert(worker>=0);
+    u[worker].selected=1;
+    m[0].x=300; m[0].y=300; m[0].amount=40;
+    SC64_GRID_SET(visible, (m[0].x/16)+(m[0].y/16)*MAP_COLS, 0);
+    assert(!currently_visible(300,300));
+    assert(sc64_worker_mineral_at(300,300)==-1);
+    tap_a(300,300);
+    assert(u[worker].order==ORDER_MOVE && u[worker].target==-1);
+    assert(!(u[worker].flags&SC64_WORKER_GATHER_PENDING));
+}
+
 int
 main(void)
 {
+    test_hidden_mineral_context();
     test_mineral_input(R_TER, U_SCV);
     test_mineral_input(R_ZERG, U_DRONE);
     test_mineral_input(R_PROTOSS, U_PROBE);
