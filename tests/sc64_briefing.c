@@ -23,7 +23,7 @@ static void test_static_page_model(void) {
     assert(briefing.pages[0].portrait == 3);
     assert(strcmp(briefing.pages[1].speaker, "OBJECTIVES") == 0);
     assert(briefing.pages[1].portrait == -1);
-    assert(SC64_BRIEFING_COLUMNS == 36u && SC64_BRIEFING_ROWS == 7u);
+    assert(SC64_BRIEFING_COLUMNS == 108u && SC64_BRIEFING_ROWS == 6u);
 }
 
 static void test_reveal_advance_and_wrap(void) {

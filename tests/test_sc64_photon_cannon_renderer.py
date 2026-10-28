@@ -74,6 +74,9 @@ int main(void) {
         required = (
             PRIVATE_HEADER / "sc64_race_sprites_generated.h",
             ROOT / ".local/sc64/briefings/generated/sc64_briefing_generated.h",
+            ROOT / ".local/sc64/interface/generated/sc64_font_generated.h",
+            ROOT / ".local/sc64/interface/generated/sc64_icons_generated.h",
+            ROOT / ".local/sc64/interface/generated/sc64_chrome_generated.h",
             ROOT / ".local/sc64/backwater/generated/sc64_mission_generated.h",
             ROOT / ".local/sc64/backwater/generated/sc64_assets_generated.h",
             ROOT / ".local/sc64/backwater/generated/sc64_sprites_generated.h",
@@ -90,6 +93,7 @@ int main(void) {
                 "-DSC64_IMPORTED_MISSION", "-DSC64_HAS_TERRAIN_ART",
                 "-DSC64_HAS_SPRITES", f"-I{ROOT / '.local/sc64/backwater/generated'}",
                 f"-I{ROOT / '.local/sc64/briefings/generated'}",
+                f"-I{ROOT / '.local/sc64/interface/generated'}",
                 "-DSC64_RACES", f"-I{PRIVATE_HEADER}",
                 f"-I{ROOT / '.local/sc64/races/generated'}",
                 str(ROOT / "tests/sc64_photon_cannon_renderer.c"),
@@ -210,6 +214,9 @@ int main(void) {
             ".local/sc64/races/generated/sc64_race_sprites_generated.h",
             ".local/sc64/races/generated/sc64_menu_generated.h",
             ".local/sc64/briefings/generated/sc64_briefing_generated.h",
+            ".local/sc64/interface/generated/sc64_font_generated.h",
+            ".local/sc64/interface/generated/sc64_icons_generated.h",
+            ".local/sc64/interface/generated/sc64_chrome_generated.h",
             ".local/sc64/skirmish/generated/sc64_skirmish_generated.h",
         )
 
@@ -250,7 +257,8 @@ int main(void) {
                     '  memset(expected_pixels,C_BLACK,sizeof(expected_pixels)); compose(expected_pixels,s,q.x,q.y+12);\n',
                     '  if(memcmp(actual,expected_pixels,sizeof(actual))) fprintf(stderr,"building pixels differ type=%d raw=%d\\n",type,raw); '
                     'assert(memcmp(actual,expected_pixels,sizeof(actual))==0);\n',
-                    '  gfx_begin(C_BLACK); draw_building_overlay(&q); capture(actual);\n',
+                    '  b[0]=q; selected_building=0; gfx_begin(C_BLACK); draw_building_overlay(&b[0]); '
+                    'capture(actual); selected_building=-1;\n',
                     '  int sy=q.y+12-s->canvas_h/2+s->offset_y;\n',
                     '  gfx_begin(C_BLACK);\n',
                     '#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)\n',
@@ -258,8 +266,8 @@ int main(void) {
                     '#else\n',
                     '  {\n',
                     '#endif\n',
-                    '  draw_actor_vitals(q.x,sy-4,18,q.hp,q.maxhp,q.shield, '
-                    'sc64_actor_max_shields(q.type,1),owner_color(q.owner)); } capture(expected_pixels);\n',
+                    '  draw_actor_vitals(q.x,sy+s->h+3,s->w>46?46:s->w,q.hp,q.maxhp,q.shield, '
+                    'sc64_actor_max_shields(q.type,1),0,0); } capture(expected_pixels);\n',
                     '  if(memcmp(actual,expected_pixels,sizeof(actual))) fprintf(stderr,"building vitals differ type=%d raw=%d\\n",type,raw); '
                     'assert(memcmp(actual,expected_pixels,sizeof(actual))==0);\n',
                     '}\n',

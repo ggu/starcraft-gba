@@ -16,6 +16,19 @@ SPEC.loader.exec_module(assets)
 
 
 class Sc64BriefingAssetTests(unittest.TestCase):
+    def test_variable_width_font_wrap_preserves_words_and_pixel_bounds(self):
+        advances = {ch: 3 for ch in range(32, 127)}
+        advances[ord('W')] = 9
+        text = 'WW WW thin letters WW small'
+        pages = assets.wrap_text(text, rows=2, advances=advances, pixel_width=24)
+        self.assertEqual(' '.join(' '.join(pages).split()), text)
+        for page in pages:
+            self.assertLessEqual(len(page.split('\n')), 2)
+            for line in page.split('\n'):
+                self.assertLessEqual(sum(advances[ord(ch)] for ch in line), 24)
+        with self.assertRaisesRegex(ValueError, 'pixel width'):
+            assets.wrap_text('WWW', advances=advances, pixel_width=24)
+
     def test_catalog_ids_map_to_explicit_n64_briefing_order(self):
         self.assertEqual(len(assets.MISSION_BRIEFING_INDEX), 30)
         self.assertEqual(assets.MISSION_BRIEFING_INDEX[:6],

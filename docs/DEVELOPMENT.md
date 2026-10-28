@@ -134,12 +134,35 @@ Canonical Terran, Zerg and Protoss builds and Showcase batch the same 24-by-24
 visibility raster through the existing sprite compositor. No new private inputs
 are needed. `make test-sc64-minimap-terrain` checks scalar, batched and
 word-compositor paths without a source ROM. To compare a prepared profile with scalar drawing,
-use `make -B protoss CANONICAL_MINIMAP_FLAGS=` (replace `protoss` with another
-canonical target as needed); force rebuilding when changing flags.
+use `make -B protoss CANONICAL_MINIMAP_FLAGS= CANONICAL_CACHE_FLAGS=` (replace
+`protoss` with another canonical target as needed); force rebuilding when
+changing flags. This also disables the render-cache group, including its
+persistent minimap raster.
 
 The [minimap audit](audits/2026-10-26-minimap-terrain/README.md) records the
 pixel oracle, byte-identical public replay and scoped ARM timing. P3/Z3 legacy
 and staged profiles retain their existing flag selections.
+
+## Canonical render caches
+
+The canonical ROM flag sets also add `CANONICAL_CACHE_FLAGS`
+(`SC64_TERRAIN_CACHE_VRAM`, `SC64_HUD_VRAM_BANDS`, `SC64_TERRAIN_ROW_MASKS`,
+`SC64_MINIMAP_RASTER`). The raster's 576-byte buffer stays in that memory-qualified
+group; Showcase and standalone probes keep only `SC64_MINIMAP_BLIT` through
+`CANONICAL_MINIMAP_FLAGS`. The caches keep most of the
+saved terrain band in the OBJ tile VRAM that bitmap products leave to data
+(`starcraft/sc64_obj_vram.h` maps that area; the P7 projectile arena comes
+first, so the P7 profile keeps 48 rows there and other profiles 68), restore
+HUD bands from the
+page on screen instead of EWRAM copies, maintain the minimap raster at
+visibility transitions, and compare cached fog rows as bit runs. Each is
+pixel-exact against the uncached renderer and frees about 28 KB of EWRAM in
+the Zerg and Protoss products. To compare a prepared profile without them,
+use `make -B zerg CANONICAL_CACHE_FLAGS= CANONICAL_MINIMAP_FLAGS=-DSC64_MINIMAP_BLIT`.
+The tile-renderer probe needs that VRAM itself and does not take
+`SC64_TERRAIN_CACHE_VRAM`. `make test-sc64-p7-obj-vram` checks the P7 arena
+and cache on one shared host buffer. See the
+[render cache audit](audits/2026-10-28-render-caches/README.md).
 Word-sprite builds phase-align the temporary raster with its screen position;
 the [alignment audit](audits/2026-10-27-minimap-phase/README.md) records the
 clipping oracle and small measured cycle reduction.
@@ -159,14 +182,21 @@ source pixels, edge clipping, fog, all three gas buildings and warm-cache reuse.
 
 Canonical imported race profiles include the N64 campaign's pre-mission
 dialogue, speaker names and 23 portrait head frames, adapted to the GBA briefing
-screen. Dialogue pages are generated locally and wrapped to 36 columns by at
-most 7 rows; the imported text and graphics remain private under `.local/`.
-From an already prepared workspace, `make sc64-briefings` regenerates the
-briefing header from the verified USA ROM at
-`.local/sc64/rom/StarCraft64-USA.z64` and the pinned `references/sc64-maps`
-checkout. `./dev sc64 prepare --rom PATH --profile terran` runs this importer
-automatically, as do the canonical `zerg` and `protoss` preparation profiles.
-Status and builds require the generated briefing header.
+screen. Dialogue pages use the original small font's glyph shapes and letter
+case. The importer wraps text to 216 pixels across at most six 10-pixel font
+lines, fitting the 216-by-61-pixel text pane. Cursor spacing is derived from
+the source glyph bounds for GBA layout; it is not a claim about the original
+N64 text cursor metrics. Imported text and graphics stay private under
+`.local/`.
+
+`make sc64-interface` regenerates the font, icon and menu-chrome banks under
+ignored `.local/sc64/interface/generated/`; it also refreshes the private
+briefing header from the verified USA ROM at `.local/sc64/rom/StarCraft64-USA.z64`
+and the pinned `references/sc64-maps` checkout. `./dev sc64 prepare --rom PATH --profile terran`
+runs these importers automatically. The canonical `zerg` and `protoss`
+preparation profiles do too. Status and builds require all three interface
+headers and the briefing header. The default asset-free build and tests do not
+require the ROM, reference checkout or generated banks.
 
 In the briefing, A reveals the current page and then advances; A on the final
 page deploys the mission. Left/Right browse pages, B returns to mission

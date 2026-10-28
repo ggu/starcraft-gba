@@ -5,6 +5,41 @@ callbacks to the typed world services already used by Z8. It is a caller-owned
 adapter only. P8 is not wired into `game.c`, a menu, campaign state or saves;
 this code does not claim that P8 is playable or qualified.
 
+## Actor and capacity preflight
+
+`sc64_p8_preflight.h` checks a prepared P8 map's dimensions, bounded actor
+rows, coordinates and owners, together with the one-shot property-create
+plan and the unit, building, mineral and geyser pool limits. It requires
+explicit actor and property resolvers and returns an error for unresolved
+actors, invalid property selectors, unsupported create triggers or exhausted
+capacity. This is a census helper; a future runtime caller must authenticate
+the supplied map before using it. It neither spawns actors nor enables P8.
+The prepared-descriptor fixture also checks that each create-bearing trigger
+has exactly one eligible active source owner; counting each action once is
+specific to this P8 plan, not a general multi-owner capacity calculation.
+
+The P8-only building rules now recognize source raw 168 as the Stasis Cell.
+Existing Terran-late bindings and fact-table gate bit positions are retained.
+The prepared map still fails the census because raw 28, Hero Hyperion, lacks
+a canonical actor binding, collision facts and sprite. The fixture verifies
+that failure rather than admitting an incomplete roster. Its synthetic
+resolver isolates the remaining property and capacity checks; it is not
+runtime Hyperion support.
+
+With private inputs already prepared, the optional check is:
+
+```sh
+make test-sc64-p8-campaign-preflight P8_PRIVATE_ROOT=/path/to/prepared/checkout
+```
+
+The fixture runs under ASan/UBSan and includes separate insufficient-capacity
+cases for all four pools, plus invalid row, property, create-trigger and
+create-actor cases. The default asset-free suite also checks the P8 data
+fact-table configuration. No catalog, runtime-loop or save-format activation
+is included in this step.
+
+## World services
+
 Command and Bring reuse the Z8 pool census, source-owner/force resolution,
 completion rules, cargo handling and source-pixel rectangle overlap. Switch and
 ElapsedTime conditions read the caller's current switch bank and seconds

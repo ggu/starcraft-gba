@@ -48,7 +48,9 @@ class UnitWordSpriteTests(unittest.TestCase):
         if generated is None:
             self.skipTest('private generated race sprite header with unit-word metadata is unavailable')
         briefing_header = repo / '.local/sc64/briefings/generated/sc64_briefing_generated.h'
-        if not briefing_header.is_file():
+        interface = repo / '.local/sc64/interface/generated'
+        if (not briefing_header.is_file() or not all((interface / name).is_file()
+                for name in ('sc64_font_generated.h', 'sc64_icons_generated.h', 'sc64_chrome_generated.h'))):
             self.skipTest('private generated campaign briefing header is unavailable')
 
         defines = [
@@ -62,14 +64,14 @@ class UnitWordSpriteTests(unittest.TestCase):
             '-DSC64_Z4_ENABLED', '-DSC64_Z4_RUNTIME', '-DSC64_Z4_CAMPAIGN_ENTRY',
             '-DSC64_ZP_CAMPAIGN_ACTORS', '-DSC64_ZP_CAMPAIGN_STORAGE',
             '-DSC64_ZP_DEFENSE_TARGETS', '-DSC64_HUD_BUFFER_REUSE', '-DSC64_TERRAIN_SCROLL',
-            '-DSC64_STATIC_KEY_CULL', '-DSC64_STATIC_DIRTY_ROWS', '-DSC64_VITAL_BAR_FAST',
+            '-DSC64_STATIC_KEY_CULL', '-DSC64_STATIC_DIRTY_ROWS',
             '-DSC64_ROUTE_FLOOD_SPLIT', '-DSC64_UNIT_WORD_SPRITES',
             '-DSC64_UNIT_WORD_SPRITE_DIAGNOSTICS',
         ]
         includes = [
             repo / 'common', repo / 'starcraft', generated.parent,
             repo / '.local/sc64/backwater/generated', repo / '.local/sc64/audio/generated',
-            repo / '.local/sc64/briefings/generated',
+            repo / '.local/sc64/briefings/generated', interface,
             repo / '.local/sc64/construction/generated', repo / '.local/sc64/skirmish/generated',
             repo / '.local/sc64/zp-stage/generated', repo / '.local/sc64/races/generated',
             repo / '.local/sc64/z4/generated',

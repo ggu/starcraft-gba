@@ -1157,7 +1157,13 @@ static int skirmish_hostile(int a, int b);
 static int skirmish_bot_index(int owner);
 #endif
 #ifdef SC64_RACES
+#include "sc64_font.h"
+#include "sc64_icons.h"
+#include "sc64_chrome.h"
 #include "sc64_briefing_generated.h"
+#if SC64_BRIEFING_LAYOUT_VERSION != 2
+#error "Briefings need source-font pixel wrapping; run make sc64-interface"
+#endif
 static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race_bots=2;
 static int race_skirmish_map;
 static int race_bot_races[3]={R_ZERG,R_PROTOSS,R_TER};
@@ -1179,7 +1185,7 @@ static void race_front_briefing_configure(void)
     const Sc64Briefing *briefing=sc64_briefing_get(race_front.mission);
     const Sc64BriefingPage *page=race_front_briefing_page();
     unsigned length=0;
-    if(page)while(page->text[length] && length<SC64_BRIEFING_MAX_TEXT_BYTES)length++;
+    if(page)while(length<SC64_BRIEFING_MAX_TEXT_BYTES && page->text[length])length++;
     sc64_frontend_briefing_configure(&race_front,
         briefing?briefing->page_count:1,length);
 }
@@ -1983,6 +1989,10 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     int i = find_build_slot();
     if (i < 0)
 	return -1;
+    /* Destruction leaves the selection index on the dead slot; a new
+       structure there must not inherit it (and its selected vital bar). */
+    if (selected_building == i)
+        selected_building = -1;
 #ifdef SC64_P7_PROJECTILES_ENABLED
     race_p7_projectile_clear_references(MAX_UNITS+i);
 #endif
@@ -7677,37 +7687,90 @@ sc64_actor_max_shields(int type,int building)
 #endif
 }
 
-static void
-sc64_draw_vital_bar(int left,int top,int width,int value,int maximum,
-                    int color,int empty)
+/* Caster energy in Q8, where a campaign adapter persists it; 0 otherwise. */
+static int
+sc64_unit_energy(const Unit *q,int *maximum)
 {
-    int bottom=top+2;
-    if (top<12) top=12;
-    if (bottom>120) bottom=120;
-    if (top>=bottom || maximum<=0) return;
-    if (value<0) value=0;
-    if (value>maximum) value=maximum;
-#ifdef SC64_VITAL_BAR_FAST
-    /* Actor UI widths are 12/18 pixels and stock capacities fit the product.
-     * Full and empty bars need neither division nor an overwritten fill. */
-    if (!value || value==maximum) {
-        gfx_rect(left,top,width,bottom-top,(u8)(value ? color : empty));
-        return;
-    }
+    *maximum=0;
+#ifdef SC64_Z6_CLOAK_ENABLED
+    if (race_z6_cloak_actor(q)) *maximum=SC64_Z5_CLOAK_MAX_ENERGY_Q8;
 #endif
-    gfx_rect(left,top,width,bottom-top,(u8)empty);
-    int fill=(int)((u32)value*(unsigned)width/(unsigned)maximum);
-    if (fill) gfx_rect(left,top,fill,bottom-top,(u8)color);
+#ifdef SC64_Z5_CLOAK_ENABLED
+    if (race_z5_cloak_actor(q)) *maximum=SC64_Z5_CLOAK_MAX_ENERGY_Q8;
+#endif
+#ifdef SC64_P6_STORM_ENABLED
+    if (race_p6_active() && q->raw_type==79 && q->raw_owner==2)
+        *maximum=SC64_STORM_HERO_MAX_ENERGY*SC64_STORM_ENERGY_ONE;
+#endif
+#ifdef SC64_Z6_STORM_ENABLED
+    if (race_z6_active() && q->raw_type==51 && q->raw_owner==3)
+        *maximum=SC64_STORM_HERO_MAX_ENERGY*SC64_STORM_ENERGY_ONE;
+#endif
+#ifdef SC64_P4_STORM_ENABLED
+    if (race_p4_active() && q->owner==SIDE &&
+        (q->raw_type==67 || q->raw_type==SC64_P4_RAW_TASSADAR))
+        *maximum=(q->raw_type==67 ? SC64_STORM_MAX_ENERGY :
+                  SC64_STORM_HERO_MAX_ENERGY)*SC64_STORM_ENERGY_ONE;
+#endif
+    return *maximum ? q->carry : 0;
+}
+
+/* StarCraft's selected-unit vitals, after OpenBW's draw_health_bars: a black
+ * frame of 2-pixel cells split by 1-pixel dividers and filled in whole cells.
+ * Shields stack above HP and energy sits below. Each strip keeps two shade
+ * rows instead of three to suit the GBA sprite scale. Battlefield rows only. */
+static void
+vital_rect(int x,int y,int w,int h,u8 color)
+{
+    if (y<12) { h-=12-y; y=12; }
+    if (y+h>120) h=120-y;
+    gfx_rect(x,y,w,h,color);
+}
+
+static int
+vital_fill(int value,int maximum,int width)
+{
+    if (value<=0 || maximum<=0) return 0;
+    if (value>=maximum) return width;
+    int r=(int)((u32)value*100u/(unsigned)maximum)*width/100;
+    if (r<3) return 3;
+    return r%3>1 ? r+3-r%3 : r-r%3;
+}
+
+static void
+vital_strip(int left,int top,int width,int fill,u8 light,u8 dark)
+{
+    vital_rect(left,top,fill,1,light);
+    vital_rect(left,top+1,fill,1,dark);
+    vital_rect(left+fill,top,width-fill,1,C_STONE);
+    vital_rect(left+fill,top+1,width-fill,1,C_UI);
 }
 
 static void __attribute__((noinline))
-draw_actor_vitals(int x,int hp_y,int width,int hp,int maxhp,
-                   int shield,int maxshield,int health_color)
+draw_actor_vitals(int x,int top,int width,int hp,int maxhp,
+                   int shield,int maxshield,int energy,int maxenergy)
 {
-    int left=x-width/2;
-    sc64_draw_vital_bar(left,hp_y,width,hp,maxhp,health_color,C_RED_DARK);
+    width-=(width-1)%3;
+    if (width<13) width=13;
+    if (maxhp<=0) return;
+    int left=x-width/2,hp_top=top+(maxshield>0?3:0),bottom=hp_top+4;
+    int percent=hp>0?(int)((u32)hp*100u/(unsigned)maxhp):0;
+    vital_rect(left,top,width,bottom-top,C_BLACK);
     if (maxshield>0)
-        sc64_draw_vital_bar(left,hp_y-3,width,shield,maxshield,C_CYAN,C_BLUE_DARK);
+        vital_strip(left,top+1,width,vital_fill(shield,maxshield,width),
+                    C_BLUE,C_BLUE_DARK);
+    vital_strip(left,hp_top+1,width,vital_fill(hp,maxhp,width),
+                percent>=66 ? C_GREEN : percent>=33 ? C_GOLD : C_RED,
+                percent>=66 ? C_GREEN_DARK : percent>=33 ? C_GOLD_DARK : C_RED_DARK);
+    if (maxenergy>0) {
+        vital_rect(left,bottom+1,width,4,C_BLACK);
+        vital_strip(left,bottom+2,width,vital_fill(energy,maxenergy,width),
+                    C_PURPLE,C_ZERG);
+    }
+    for (int dx=0;dx<width;dx+=3) {
+        vital_rect(left+dx,top+1,1,bottom-top-2,C_BLACK);
+        if (maxenergy>0) vital_rect(left+dx,bottom+2,1,2,C_BLACK);
+    }
 }
 
 /* A compact UI cue for carried resources. The stock unit bank has no cargo
@@ -7901,22 +7964,23 @@ draw_unit(Unit * q)
     }
     y = feet;
     }
-#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
-    if (!(actor_flags & SC64_GAME_ACTOR_INVINCIBLE))
-#endif
-        draw_actor_vitals(x,sprite_y-4,12,q->hp,q->maxhp,
-#ifdef SC64_RACES
-            q->shield,sc64_actor_max_shields(q->type,0),
-#else
-            0,0,
-#endif
-            owner_color(q->owner));
-    if (q->selected)
-	gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
     if (q->carry > 0 && IS_WORKER(q->type) &&
         (q->order == ORDER_MINE || q->order == ORDER_GAS))
         draw_worker_cargo_badge(sprite_x + sprite_w + 2,
             sprite_y + sprite_h / 2, q->order == ORDER_GAS);
+    if (!q->selected) return;
+    gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4, C_HIGHLIGHT);
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    if (actor_flags & SC64_GAME_ACTOR_INVINCIBLE) return;
+#endif
+    int maxenergy, energy = sc64_unit_energy(q, &maxenergy);
+    draw_actor_vitals(x, sprite_y + sprite_h + 3, sprite_w + 4, q->hp, q->maxhp,
+#ifdef SC64_RACES
+        q->shield,
+#else
+        0,
+#endif
+        sc64_actor_max_shields(q->type, 0), energy, maxenergy);
 }
 
 #define SC64_WEAPON_VFX_VISIBLE(x,y) currently_visible((x)+camx,(y)+camy-12)
@@ -8052,6 +8116,22 @@ draw_death_vfx(int under)
 }
 #endif
 
+#ifdef SC64_IMPORTED_MISSION
+static void sc64_hud_bottom_band_invalidate(void);
+#endif
+
+static void
+sc64_minimap_dot(int x, int y, u8 color)
+{
+    gfx_pixel(x, y, color);
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+    /* A mark outside the 24x24 map lands on the cached panel, which only a
+     * band restore clears; the per-frame panel fill used to do that. */
+    if ((unsigned)(x - 197) >= 24u || (unsigned)(y - 129) >= 24u)
+        sc64_hud_bottom_band_invalidate();
+#endif
+}
+
 static void
 draw_minimap(void)
 {
@@ -8061,9 +8141,15 @@ draw_minimap(void)
 #else
     int row, col, x, y, i;
 #endif
+#ifndef SC64_MINIMAP_RASTER_ACTIVE
     gfx_rect(181, 124, 56, 34, C_BLACK);
     gfx_frame(181, 124, 56, 34, C_EDGE);
+#endif
 #ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+    /* Every map pixel is replaced, including marks left on this page. */
+    gfx_blit_opaque(map_x, map_y, 24, 24, sc64_minimap_raster);
+#else
 #ifdef SC64_TILE_RENDERER
     if (gfx_tile_active()) {
         /* The panel fill above already marked these tiles; store the same
@@ -8079,6 +8165,7 @@ draw_minimap(void)
 #endif
     sc64_minimap_draw_terrain(map_x, map_y,
                               sc64_minimap_visible, sc64_minimap_explored);
+#endif
 #else
     for (row = 0; row < MAP_ROWS; row++)
 	for (col = 0; col < MAP_COLS; col++) {
@@ -8123,7 +8210,7 @@ draw_minimap(void)
 	    x = 185 + b[i].x / 8;
 	    y = 126 + b[i].y / 8;
 #endif
-	    gfx_pixel(x, y,
+	    sc64_minimap_dot(x, y,
 #if defined(SC64_SKIRMISH) || defined(SC64_RACES)
                 owner_color(b[i].owner)
 #else
@@ -8177,7 +8264,7 @@ draw_minimap(void)
 	    x = 185 + u[i].x / 8;
 	    y = 126 + u[i].y / 8;
 #endif
-	    gfx_pixel(x, y,
+	    sc64_minimap_dot(x, y,
 #if defined(SC64_SKIRMISH) || defined(SC64_RACES)
                 owner_color(u[i].owner)
 #else
@@ -8204,6 +8291,11 @@ draw_minimap(void)
 	    int vw = (240 * map_size + WORLD_W - 1) / WORLD_W;
 	    int vh = (108 * map_size + WORLD_H - 1) / WORLD_H;
 	    gfx_frame(vx, vy, vw, vh, C_HIGHLIGHT);
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+	    if (vx < map_x || vy < map_y || vx + vw > map_x + map_size ||
+	        vy + vh > map_y + map_size)
+	        sc64_hud_bottom_band_invalidate();
+#endif
 	}
 #else
 	gfx_frame(185 + camx / 8, 126 + camy / 8, 30, 14, C_HIGHLIGHT);
@@ -8418,13 +8510,20 @@ draw_building_overlay(Building *q)
             gfx_bar(x-12,sprite_y+sprite_h+3,24,2,progress,duration,C_CYAN,C_PANEL);
     }
 #endif
-    draw_actor_vitals(x,sprite_y-4,18,q->hp,q->maxhp,
+    if (selected_building >= 0 && q == &b[selected_building]) {
+        int vitals_y = sprite_y + sprite_h + 3;
 #ifdef SC64_RACES
-        q->shield,sc64_actor_max_shields(q->type,1),
-#else
-        0,0,
+        if (q->under_construction) vitals_y += 3;
 #endif
-        owner_color(q->owner));
+        draw_actor_vitals(x, vitals_y, sprite_w > 46 ? 46 : sprite_w,
+                          q->hp, q->maxhp,
+#ifdef SC64_RACES
+                          q->shield,
+#else
+                          0,
+#endif
+                          sc64_actor_max_shields(q->type, 1), 0, 0);
+    }
 #ifndef SC64_RACES
     if (q->under_construction)
         gfx_text(x - 3, y, "C", C_GOLD);
@@ -8886,7 +8985,8 @@ sc64_tile_background_done:
 #ifdef SC_DEFAULT_UI
     if (menu_open) field_ui_draw_command_menu();
 #elif defined(SC64_FIELD_CONTROLS)
-    if (menu_open) field_controls_draw_command_menu();
+    /* The imported command panel is drawn above transient mission messages
+     * in draw_hud(), after the world and its overlays. */
 #else
     if (menu_open) {
         int first = menu_cursor >= 10 ? menu_cursor - 9 : 0;
@@ -9167,8 +9267,23 @@ draw_hud_shields(int shield,int maximum)
 #endif
 }
 
+static void draw_hud_commands_body(void);
+
+/* The minimap's black panel and edge are static, so with the maintained
+ * raster they join the cached bottom band after every text that can reach
+ * x >= 181; the per-frame opaque raster copy then covers the map area. */
 static void
 draw_hud_commands(void)
+{
+    draw_hud_commands_body();
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+    gfx_rect(181, 124, 56, 34, C_BLACK);
+    gfx_frame(181, 124, 56, 34, C_EDGE);
+#endif
+}
+
+static void
+draw_hud_commands_body(void)
 {
     int i, n = selected_count();
     gfx_rect(0, 121, 240, 39, C_PANEL);
@@ -9180,6 +9295,16 @@ draw_hud_commands(void)
     field_ui_draw_hud();
     return;
 #endif
+    int hud_left=5;
+#if defined(SC64_RACES) && defined(SC64_FIELD_CONTROLS)
+    if(box_state!=2 && !menu_open && mode==MODE_NORMAL &&
+#ifdef SC64_COMMAND_ICONS
+       /* The command card's selection header draws unit portraits and keeps
+          the unit hint at x 52; only buildings take the source icon here. */
+       selected_building>=0 && b[selected_building].alive &&
+#endif
+       field_controls_draw_selected_icon(14,135,22))hud_left=30;
+#endif
     if (box_state == 2) {
         gfx_text(5, 126, "BOX SELECT", C_CYAN);
         gfx_text(5, 137, "RELEASE L SELECT B CANCEL", C_GOLD);
@@ -9189,7 +9314,10 @@ draw_hud_commands(void)
     } else if (selected_building >= 0 && b[selected_building].alive) {
 	Building *q = &b[selected_building];
 	#ifdef SC64_RACES
-        gfx_text(5,126,sc64_race_building_name(q->type),C_WHITE);
+        char title[64];
+        int title_width=q->shield>0?124-hud_left:165-hud_left;
+        sc64_font_ellipsis(sc64_race_building_name(q->type),title_width,title,sizeof(title));
+        sc64_font_text(hud_left,124,title_width,title,C_WHITE);
         draw_hud_shields(q->shield,sc64_actor_max_shields(q->type,1));
 #else
 	gfx_text(5, 126, q->type == B_COMMAND ? "COMMAND CENTER" :
@@ -9208,9 +9336,12 @@ draw_hud_commands(void)
         } else
 #endif
         if(!q->under_construction) {
-            gfx_text(5,137,unit_name(train_type),C_WHITE);
-            gfx_text(65,137,"A TRAIN R TYPE L CANCEL",C_GOLD);
-        } else gfx_text(5,137,"UNDER CONSTRUCTION",C_GOLD);
+            char training[48];
+            sc64_font_ellipsis(unit_name(train_type),81-hud_left-12,training,sizeof(training));
+            gfx_text(hud_left,137,"A",C_GOLD);
+            sc64_font_text(hud_left+12,135,81-hud_left-12,training,C_WHITE);
+            sc64_font_text(85,135,94,"R Type L Cancel",C_GOLD);
+        } else gfx_text(hud_left,137,"UNDER CONSTRUCTION",C_GOLD);
 #else
 	if (q->under_construction)
 	    gfx_text(5, 137, "UNDER CONSTRUCTION", C_GOLD);
@@ -9230,45 +9361,50 @@ draw_hud_commands(void)
 #ifdef SC64_COMMAND_ICONS
 		card_selection_header(i, n);
 #else
-		gfx_text(5, 126, n > 1 ? "COMBAT GROUP" : unit_name(u[i].type), C_WHITE);
 #ifdef SC64_RACES
+                char title[64];
+                int title_width=u[i].shield>0?124-hud_left:165-hud_left;
+                sc64_font_ellipsis(n>1?"Combat group":unit_name(u[i].type),title_width,title,sizeof(title));
+                sc64_font_text(hud_left,124,title_width,title,C_WHITE);
                 draw_hud_shields(u[i].shield,sc64_actor_max_shields(u[i].type,0));
+#else
+                gfx_text(5,126,n>1?"COMBAT GROUP":unit_name(u[i].type),C_WHITE);
 #endif
-		gfx_text(5, 137, "HP", C_CYAN);
-		gfx_num(24, 137, u[i].hp, C_GREEN);
+		gfx_text(hud_left, 137, "HP", C_CYAN);
+		gfx_num(hud_left+19, 137, u[i].hp, C_GREEN);
 #endif
 		if (IS_WORKER(u[i].type))
 #ifdef SC64_FIELD_CONTROLS
-		    gfx_text(52, 137, ui_action == UI_A_MOVE ? "A MOVE  B BUILD" :
+		    gfx_text(hud_left+47, 137, ui_action == UI_A_MOVE ? "A MOVE  B BUILD" :
 			     ui_action == UI_A_GAS ? "A GAS  B BUILD" : "AUTO MINE  B BUILD", C_GOLD);
 #else
-		    gfx_text(52, 137, "AUTO MINE / A GAS", C_GOLD);
+		    gfx_text(hud_left+47, 137, "AUTO MINE / A GAS", C_GOLD);
 #endif
 		else
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
                 if (race_p7_active() && u[i].type==U_P7_CARRIER) {
-                    gfx_text(52,137,"IC",C_CYAN);
-                    gfx_num(70,137,(int)race_p7_carrier_training_child_count(i),C_WHITE);
-                    gfx_text(84,137,"HANGAR / FLIGHT WIP",C_GOLD);
+                    gfx_text(hud_left+47,137,"IC",C_CYAN);
+                    gfx_num(hud_left+65,137,(int)race_p7_carrier_training_child_count(i),C_WHITE);
+                    gfx_text(hud_left+79,137,"HANGAR / FLIGHT WIP",C_GOLD);
                 } else
 #endif
 #ifdef SC64_Z6_CLOAK_ENABLED
                 if (race_z6_cloak_actor(&u[i])) {
-                    gfx_text(52,137,"EN",C_CYAN); gfx_num(70,137,u[i].carry/256,C_WHITE);
-                    gfx_text(100,137,race_z6.cloak.active ? "CLOAKED" : "B SPELLS",C_GOLD);
+                    gfx_text(hud_left+47,137,"EN",C_CYAN); gfx_num(hud_left+65,137,u[i].carry/256,C_WHITE);
+                    gfx_text(hud_left+95,137,race_z6.cloak.active ? "CLOAKED" : "B SPELLS",C_GOLD);
                 } else
 #endif
 #ifdef SC64_P6_STORM_ENABLED
                 if (race_p6_active() && u[i].raw_type==79 && u[i].raw_owner==2) {
-                    gfx_text(52,137,"EN",C_CYAN); gfx_num(70,137,u[i].carry/256,C_WHITE);
-                    gfx_text(100,137,"B STORM",C_GOLD);
+                    gfx_text(hud_left+47,137,"EN",C_CYAN); gfx_num(hud_left+65,137,u[i].carry/256,C_WHITE);
+                    gfx_text(hud_left+95,137,"B STORM",C_GOLD);
                 } else
 #endif
 #ifdef SC64_Z5_CLOAK_ENABLED
                 if (race_z5_cloak_actor(&u[i])) {
-                    gfx_text(52, 137, "EN", C_CYAN);
-                    gfx_num(70, 137, u[i].carry / 256, C_WHITE);
-                    gfx_text(100, 137, race_z5.cloak.active ? "CLOAKED" : "B CLOAK", C_GOLD);
+                    gfx_text(hud_left+47, 137, "EN", C_CYAN);
+                    gfx_num(hud_left+65, 137, u[i].carry / 256, C_WHITE);
+                    gfx_text(hud_left+95, 137, race_z5.cloak.active ? "CLOAKED" : "B CLOAK", C_GOLD);
                 } else
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
@@ -9277,17 +9413,17 @@ draw_hud_commands(void)
 #else
                 if (race_transport_carrier_type(&u[i])) {
 #endif
-                    gfx_text(52, 137, "CARGO", C_GOLD);
-                    gfx_num(90, 137, race_transport_cargo_space(i), C_WHITE);
-                    gfx_text(104, 137, "/8  B UNLOAD", C_GOLD);
+                    gfx_text(hud_left+47, 137, "CARGO", C_GOLD);
+                    gfx_num(hud_left+85, 137, race_transport_cargo_space(i), C_WHITE);
+                    gfx_text(hud_left+99, 137, "/8  B UNLOAD", C_GOLD);
                 } else
 #endif
 #ifdef SC_COMMAND_RING
-		    gfx_text(52, 137, "HOLD B ORDERS", C_GOLD);
+		    gfx_text(hud_left+47, 137, "HOLD B ORDERS", C_GOLD);
 #elif defined(SC64_FIELD_CONTROLS)
-		    gfx_text(52, 137, field_controls_unit_hint(), C_GOLD);
+		    gfx_text(hud_left+47, 137, field_controls_unit_hint(), C_GOLD);
 #else
-		    gfx_text(52, 137, "A ORDER B COMMANDS", C_GOLD);
+		    gfx_text(hud_left+47, 137, "A ORDER B COMMANDS", C_GOLD);
 #endif
 		break;
 	    }
@@ -9417,11 +9553,19 @@ draw_hud_commands(void)
 }
 
 #ifdef SC64_IMPORTED_MISSION
-#ifndef SC64_TILE_RENDERER
+#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
+#define SC64_HUD_BAND_REUSE 1
+#endif
+/* Optional: with reusable bands, each page keeps its own HUD pixels and a
+ * stale page copies from the one on screen, so no EWRAM copy is needed. */
+#if defined(SC64_HUD_VRAM_BANDS) && defined(SC64_HUD_BAND_REUSE) && !defined(SC64_TILE_RENDERER)
+#define SC64_HUD_PAGE_BANDS 1
+#endif
+#if !defined(SC64_TILE_RENDERER) && !defined(SC64_HUD_PAGE_BANDS)
 static _Alignas(4) u8 sc64_hud_top[240 * 12], sc64_hud_bottom[240 * 40];
 #endif
 #ifdef SC64_FIELD_CONTROLS
-enum { SC64_HUD_KEY_COUNT=29 }; /* 26-28: the field controls' rows */
+enum { SC64_HUD_KEY_COUNT=30 }; /* 26-28: commands; 29: source icon identity */
 #else
 enum { SC64_HUD_KEY_COUNT=26 };
 #endif
@@ -9442,6 +9586,10 @@ sc64_hud_race_keys(int *values,int first)
     }
     values[19]=race_campaign.phase;values[20]=race_campaign.message;
 #ifdef SC64_FIELD_CONTROLS
+    /* Source icons depend on raw identity even when the engine type is equal. */
+    values[29]=first>=0?u[first].raw_type:-1;
+    if(selected_building>=0 && b[selected_building].alive)
+        values[29]=b[selected_building].raw_type;
     /* The hint follows the A action; the open list follows its cursor and
        wallet; placement status follows the snapped site and wallet. */
     values[26]=ui_action|menu_open<<4|menu_cursor<<5;
@@ -9482,10 +9630,27 @@ sc64_hud_race_keys(int *values,int first)
 #endif
 }
 #endif
-#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
+#ifdef SC64_HUD_PAGE_BANDS
+/* Band content versions, and per page the version it holds and the clear
+ * count it held it at. A page band is current only when both still match. */
+static u32 sc64_hud_band_version[2];
+static u32 sc64_hud_page_version[2][2] = {{~0u, ~0u}, {~0u, ~0u}};
+static u32 sc64_hud_page_clear_generation[2];
+#elif defined(SC64_HUD_BAND_REUSE)
 static u8 sc64_hud_buffer_dirty[2];
 static u32 sc64_hud_buffer_clear_generation[2];
 #endif
+
+/* Something drew over the current page's bottom band after its restore. */
+static void
+sc64_hud_bottom_band_invalidate(void)
+{
+#ifdef SC64_HUD_PAGE_BANDS
+    sc64_hud_page_version[gfx_backbuffer_index()][1] = ~0u;
+#elif defined(SC64_HUD_BAND_REUSE)
+    sc64_hud_buffer_dirty[gfx_backbuffer_index()] |= 2;
+#endif
+}
 
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
 /* Keep the expanded actor loop and target search in IWRAM. This once-per-
@@ -9542,7 +9707,29 @@ static void
 draw_hud(void)
 {
 #ifdef SC64_IMPORTED_MISSION
-#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
+#ifdef SC64_HUD_PAGE_BANDS
+    int changed = sc64_hud_changed();
+    u8 buffer = gfx_backbuffer_index(), other = (u8)(buffer ^ 1);
+    u32 generation = gfx_clear_generation(buffer);
+    u32 other_generation = gfx_clear_generation(other);
+    int band;
+    if (changed & 1) sc64_hud_band_version[0]++;
+    if (changed & 2) sc64_hud_band_version[1]++;
+    for (band = 0; band < 2; band++) {
+        u32 version = sc64_hud_band_version[band];
+        if (sc64_hud_page_version[buffer][band] == version &&
+            sc64_hud_page_clear_generation[buffer] == generation) continue;
+        if (!(changed & (1 << band)) &&
+            sc64_hud_page_version[other][band] == version &&
+            sc64_hud_page_clear_generation[other] == other_generation)
+            gfx_copy_band_from_front(band ? 120 : 0, band ? 40 : 12);
+        else if (band) draw_hud_commands();
+        else draw_hud_resources();
+        sc64_hud_page_version[buffer][band] = version;
+    }
+    sc64_hud_page_clear_generation[buffer] = generation;
+    sc64_hud_valid = 1;
+#elif defined(SC64_HUD_BAND_REUSE)
     int changed = sc64_hud_changed();
     u8 buffer = gfx_backbuffer_index();
     u8 dirty;
@@ -9638,6 +9825,9 @@ draw_hud(void)
         gfx_text(5,106,line,C_CYAN);
     }
 #endif
+#ifdef SC64_FIELD_CONTROLS
+    if (menu_open) field_controls_draw_command_menu();
+#endif
     if (toast_timer && toast_id >= 0 && toast_id < 15) {
 	gfx_rect(54, 105, 132, 12, C_PANEL);
 	gfx_frame(54, 105, 132, 12, C_EDGE);
@@ -9707,10 +9897,10 @@ game_render(void)
 #endif
 	if (screen == SCREEN_PAUSE) {
 	    draw_pause();
-	#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
+#ifdef SC64_IMPORTED_MISSION
 	    /* The pause panel crosses the bottom cached HUD band. */
-	    sc64_hud_buffer_dirty[gfx_backbuffer_index()] |= 2;
-	#endif
+	    sc64_hud_bottom_band_invalidate();
+#endif
 	} else if (screen == SCREEN_RESULT)
 	    draw_result_screen();
     }

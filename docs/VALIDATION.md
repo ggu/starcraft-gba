@@ -6150,3 +6150,80 @@ keep IWRAM identical to the new base and lower BSS: Terran `0x0203df24` →
 `0x0203def0`. `./dev build`, `test-sc64-showcase`, `test-races`,
 `test-zerg-z3` and `test-sc64-p3` pass; `test-unified` stops only on the
 absent P7 inputs.
+
+## Render caches in spare VRAM and on the second page (2026-10-28)
+
+The canonical Terran, Zerg and Protoss ROM flag sets now keep 68 of the 108
+saved terrain rows (48 in the P7 profile, after its projectile arena) in the
+OBJ tile VRAM that mode-4 products leave to data, restore the HUD bands from the
+page on screen instead of EWRAM copies, maintain the 24x24 minimap raster at
+visibility transitions, and compare cached fog rows as bit runs. The host
+frame oracle compiled with the Zerg Z1-Z6, Protoss P7 and Terran ROM flags
+reports all 22 comparisons pixel-identical, and the promoted-profile,
+split-run, contact-cache, HUD-cache, minimap and terrain-cache fixtures pass.
+
+On the Zerg Z1-Z6 ROM (Blood Bath, three opponents, 3,000 neutral ticks,
+static camera) drawing costs about 43,000 fewer cycles per frame: the
+background stage falls from about 80,000 to 57,000 cycles and the HUD from
+about 65,000 to 47,000, with identical simulation state at every checkpoint.
+That is 7.7 percent of the 30 Hz tick budget; this opening already ran near
+29 fps, so the saving shows in crowded scenes rather than this rate. BSS ends
+at `0x02037198` (Zerg) and `0x02037090` (Protoss P7), 28,120 bytes lower than
+before, and IWRAM ends fall slightly. These are mGBA measurements, not
+hardware results, and no mission qualification changes; see
+[the audit](audits/2026-10-28-render-caches/README.md).
+
+Review of the branch found that the first layout placed the cache rows at
+`0x06014000`, over the P7 interceptor projectile arena enabled by the same
+canonical flags; host fixtures could not see it because each owner had its
+own host array. `starcraft/sc64_obj_vram.h` now assigns disjoint ranges with
+static assertions, the host backs the whole area with one shared array, and
+`tests/sc64_p7_obj_vram.c` (`make test-sc64-p7-obj-vram`, run by
+`test-sc64-protoss-p7-canonical`) checks on that shared space that terrain
+captures preserve the arena and its encoded packet, that arena writes
+preserve the cached rows and the rendered frame, and that an arena placed
+over the cache rows is detected; the fixture fails against the old layout.
+After the fix, merged with main at `eaf07ca`, the P7 frame oracle and the
+Protoss, Zerg and Terran HUD-cache fixtures still pass, the projectile probe
+passes, and the P7, Zerg Z1-Z6 and Terran ROMs link inside both guards (P7
+BSS end `0x02038258`, IWRAM end `0x03004b30`).
+
+## StarCraft-style selected vital bars (2026-10-28)
+
+Vital bars now follow the StarCraft/StarCraft 64 selection convention as
+reproduced by OpenBW's `draw_health_bars`: only selected units and the
+selected building show them, below the sprite rather than above it. Each bar is
+a black frame of 2-pixel cells split by 1-pixel black dividers, filled in whole
+cells. HP is green at 66% or more, yellow from 33% and red below 33%. Shields
+are a blue strip stacked above HP, and caster energy is a purple strip one row
+below it. Empty cells are grey. The GBA version keeps two shade rows per strip
+instead of the reference's three and uses the existing fixed palette entries.
+It is a visual approximation of the reference layout, not a pixel-exact
+palette or size match. Energy appears only for casters whose energy a campaign
+adapter persists: the Z5/Z6 Kerrigan cloak, the P4 High Templar/Tassadar and
+P6 Tassadar Storm casters, and the Z6 Kerrigan Storm caster. Bars no longer
+carry owner color. Because only player-side actors are selectable, enemy HP is
+no longer drawn on the battlefield. Worker cargo badges still draw for every
+worker.
+
+`SC64_VITAL_BAR_FAST` is removed. It sped up the always-on two-row bar, which no
+longer exists, and drawing now happens only for the current selection. The
+asset-free `make test-sc64-vital-bars` oracle now derives every expected pixel
+of the new bar independently of the rectangle calls. It covers 6,240 cases
+across widths, viewport edges, scene clipping, health tiers, and shield and
+energy fills. `make test-sc64-shield-bars` passes under ASan/UBSan in the unified
+and P7 profiles. It checks frame and divider pixels, tier boundaries,
+shield-only row changes, unselected actors, a selected Pylon, energy cells and
+battlefield clipping. The late-building, unit-word spawn, construction-source and
+Photon Cannon renderer fixtures now select the actor before comparing vitals.
+
+`./dev build` and `./dev test` (614 Python checks, 18 skipped without private
+inputs, plus host fixtures) pass, as does the unified ROM build. Every
+`test-unified` binary passes except `test-unified-menu` ("briefing text exceeds
+visible page"). That check also fails on an unmodified `codex/source-release`
+built from the same private inputs. The full Terran build passes. Its test
+command stops at the T9 controller (`won=0`, no Wraiths, wallet 34/14 at the
+500,000-tick limit); the unmodified base fails identically with these inputs.
+T1–T8 and the other Terran checks pass before that point, and T10 run directly
+wins at tick 3,552. No frame-rate, physical-hardware or ARM replay result is
+claimed.

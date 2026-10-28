@@ -63,14 +63,18 @@ static int briefing_bank_valid(void)
                       page->portrait>=-1 && page->portrait<23,
                       "invalid speaker or portrait"))return 0;
             unsigned columns=0,rows=1,length=0;
+            unsigned pixel_width=0;
             for(const char *s=page->text;*s;s++,length++) {
-                if(*s=='\n') {columns=0;rows++;}
+                if(*s=='\n') {columns=0;pixel_width=0;rows++;}
                 else {
                     if(!check(*s>=32 && *s<127,"unrenderable briefing character"))return 0;
                     columns++;
+                    char glyph[2]={*s,0};
+                    pixel_width+=(unsigned)sc64_font_width(glyph);
                 }
                 if(!check(columns<=SC64_BRIEFING_COLUMNS && rows<=SC64_BRIEFING_ROWS,
                           "briefing text exceeds visible page"))return 0;
+                if(!check(pixel_width<=216,"briefing exceeds source-font pixel width"))return 0;
             }
             if(!check(length>0 && length<=SC64_BRIEFING_MAX_TEXT_BYTES,
                       "invalid briefing page length"))return 0;
@@ -258,6 +262,18 @@ int main(void)
     if(!check(screen==SCREEN_PLAY && race_selected_mission==4 && race_human==R_TER,
               "Start did not skip dialogue and deploy Terran"))return 1;
     if(!capture("t1_launch") || !display_palette_is_active("t1_launch"))return 1;
+    press(KEY_L);
+    if(!capture("t1_selected_icon"))return 1;
+    press(KEY_B);
+    if(!check(menu_open,"B did not open source-icon commands"))return 1;
+    if(!capture("t1_source_commands"))return 1;
+    for(int i=0;i<5;i++)press(KEY_DOWN);
+    if(!capture("t1_source_commands_scrolled"))return 1;
+    press(KEY_B);
+    press(KEY_START);
+    if(!check(screen==SCREEN_PAUSE,"Start did not open the source-frame pause panel"))return 1;
+    if(!capture("t1_source_pause"))return 1;
+    press(KEY_START);
 #endif
 
     /* HOME → CUSTOM GAME; race, opponents, launch. */
