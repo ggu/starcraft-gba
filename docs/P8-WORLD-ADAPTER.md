@@ -93,7 +93,11 @@ tracks the source marker and per-owner/per-trigger bit, and requires caller
 callbacks for both the actual PauseGame side effect and the native tail
 UnpauseGame effect. Its game-loop binding, pass cadence and persistence are
 still caller-owned. P8 has active PauseGame rows but no explicit UnpauseGame
-row. Mute/UnmuteUnitSpeech remain unsupported:
+row. Pause and tail callbacks return applied, ignored, or error. Ignored
+represents native global/owner eligibility branches: the source action is
+complete, but pause state does not change. An ignored tail preserves both the
+source marker and that trigger instance's pause bit. Mute/UnmuteUnitSpeech
+remain unsupported:
 the authenticated rows are disabled, and the engine has no shared audio gate
 that gives speech-mute state end-to-end effect. Conditions reject
 unrecognized flag bits and comparisons. Actions reject nonzero reserved

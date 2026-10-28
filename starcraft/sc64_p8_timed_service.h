@@ -100,10 +100,9 @@ sc64_p8_timed_service_tick(Sc64P8TimedService *state, int game_paused)
     return 1;
 }
 
-/* Match the native source-pause instance bookkeeping. The callback applies
- * the actual engine pause side effect and must fail without mutation. A
- * repeated PauseGame while source-pause is already active is a native no-op;
- * UnpauseGame only acts while the source marker is active. */
+/* Match native PauseGame/UnpauseGame eligibility and per-trigger bookkeeping.
+ * The backend returns APPLIED, IGNORED for a native successful no-op, or a
+ * negative value for an unsupported/error path. */
 static inline int
 sc64_p8_timed_service_pause_action(void *opaque,
                                    const Sc64P8SourceAction *action,
@@ -114,11 +113,13 @@ sc64_p8_timed_service_pause_action(void *opaque,
         action->trigger >= SC64_P8_TRIGGER_LIMIT ||
         owner >= SC64_P8_OWNER_COUNT || (paused != 0 && paused != 1) ||
         action->opcode != (paused ? 5u : 6u)) return -1;
-    if (paused && state->source_pause_active) return SC64_P8_ACTION_COMPLETE;
-    if (!paused && !state->source_pause_active) return SC64_P8_ACTION_COMPLETE;
-    if (!state->pause_backend || !state->pause_end_backend ||
-        state->pause_backend(state->pause_context, action, owner, paused) != 1)
-        return -1;
+    if (paused && state->source_pause_active) return SC64_P8_PAUSE_IGNORED;
+    if (!paused && !state->source_pause_active) return SC64_P8_PAUSE_IGNORED;
+    if (!state->pause_backend || !state->pause_end_backend) return -1;
+    int result = state->pause_backend(state->pause_context, action, owner,
+                                      paused);
+    if (result == SC64_P8_PAUSE_IGNORED) return SC64_P8_PAUSE_IGNORED;
+    if (result != SC64_P8_PAUSE_APPLIED) return -1;
     u8 bit = (u8)(1u << action->trigger);
     if (paused) {
         state->source_pause_active = 1;
@@ -131,8 +132,8 @@ sc64_p8_timed_service_pause_action(void *opaque,
 }
 
 /* Native D108 dispatches UnpauseGame through the action-handler table when a
- * PauseGame-marked trigger reaches its action-list tail. The callback applies
- * that engine side effect. */
+ * PauseGame-marked trigger reaches its action-list tail. An ignored backend
+ * result is a successful no-op and retains the source marker and instance bit. */
 static inline int
 sc64_p8_timed_service_trigger_complete(void *opaque, unsigned trigger,
                                        unsigned owner)
@@ -143,9 +144,11 @@ sc64_p8_timed_service_trigger_complete(void *opaque, unsigned trigger,
         return -1;
     u8 bit = (u8)(1u << trigger);
     if (!(state->pause_trigger_mask[owner] & bit)) return 1;
-    if (!state->pause_end_backend ||
-        state->pause_end_backend(state->pause_end_context, trigger, owner) != 1)
-        return -1;
+    if (!state->pause_end_backend) return -1;
+    int result = state->pause_end_backend(state->pause_end_context, trigger,
+                                          owner);
+    if (result == SC64_P8_PAUSE_IGNORED) return 1;
+    if (result != SC64_P8_PAUSE_APPLIED) return -1;
     state->pause_trigger_mask[owner] &= (u8)~bit;
     state->source_pause_active = 0;
     return 1;

@@ -5,6 +5,11 @@
 #include "sc64_p8_source_adapter.h"
 #include "sc64_z8_world_adapter.h"
 
+enum {
+    SC64_P8_PAUSE_IGNORED = 0,
+    SC64_P8_PAUSE_APPLIED = 1
+};
+
 /* Live-world services for the bounded P8 source contract. This is an adapter,
  * not mission wiring: the caller owns these mutable views and any save format.
  * Actor census, owner resolution, placement dispatch, SetResources,
@@ -44,8 +49,10 @@ typedef struct {
                                 const Sc64Z8Rect *rect);
     void *create_context;
     /* PauseGame/UnpauseGame need explicit engine and trigger-tail bindings.
-     * The action callback applies game pause; the tail callback handles the
-     * native marked-trigger completion event. */
+     * Return APPLIED when native eligibility permits the side effect, IGNORED
+     * when native control/global gates make it a successful no-op, and a
+     * negative value on an unsupported/error path. The tail callback uses the
+     * same result contract so an ignored native Unpause preserves its marker. */
     int (*pause_game)(void *context, const Sc64P8SourceAction *action,
                       unsigned trigger_owner, int paused);
     void *pause_context;
@@ -229,9 +236,15 @@ sc64_p8_world_action(void *context, const Sc64P8SourceAction *source,
         if (!ctx->pause_game || a.location || a.string_id || a.wav_id ||
             a.time || a.group1 || a.group2 || a.unit || a.modifier || a.flags)
             return -1;
-        return ctx->pause_game(ctx->pause_context ? ctx->pause_context :
-                ctx->context, source, trigger_owner, a.opcode == 5u) == 1
-            ? SC64_P8_ACTION_COMPLETE : -1;
+        {
+            int result = ctx->pause_game(ctx->pause_context ?
+                ctx->pause_context : ctx->context, source, trigger_owner,
+                a.opcode == 5u);
+            if (result == SC64_P8_PAUSE_APPLIED ||
+                result == SC64_P8_PAUSE_IGNORED)
+                return SC64_P8_ACTION_COMPLETE;
+            return -1;
+        }
     case 11: case 28: case 43:
         /* Native location-zero actions return success before touching the
          * world; in particular, don't call an AI/create service here. */

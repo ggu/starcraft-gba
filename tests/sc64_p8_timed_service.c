@@ -12,6 +12,10 @@ typedef struct {
     unsigned calls, starts, finishes, eligible;
     unsigned trigger_calls[8], slot_calls[8];
     unsigned pause_calls, pause_owner, pause_end_calls, pause_end_trigger;
+    u8 pause_ignored_owners, pause_error_owners;
+    u8 pause_end_ignored_owners, pause_end_error_owners;
+    u8 owner_control_type[SC64_P8_OWNER_COUNT];
+    int pause_global_guard, pause_gate_blocked;
     int pause_value;
     int eligible_result;
     u32 transmission_ms;
@@ -66,6 +70,12 @@ static int pause_request(void *opaque, const Sc64P8SourceAction *action,
     ++f->pause_calls;
     f->pause_owner = owner;
     f->pause_value = paused;
+    if (f->pause_error_owners & (u8)(1u << owner)) return -1;
+    u8 control = f->owner_control_type[owner];
+    if (f->pause_global_guard || f->pause_gate_blocked ||
+        control == 1u || control == 3u || control == 4u || control == 7u ||
+        (f->pause_ignored_owners & (u8)(1u << owner)))
+        return SC64_P8_PAUSE_IGNORED;
     return 1;
 }
 
@@ -78,6 +88,12 @@ static int pause_trigger_end(void *opaque, unsigned trigger, unsigned owner)
     f->pause_end_trigger = trigger;
     f->pause_owner = owner;
     f->pause_value = 0;
+    if (f->pause_end_error_owners & (u8)(1u << owner)) return -1;
+    u8 control = f->owner_control_type[owner];
+    if (f->pause_global_guard || f->pause_gate_blocked ||
+        control == 1u || control == 3u || control == 4u || control == 7u ||
+        (f->pause_end_ignored_owners & (u8)(1u << owner)))
+        return SC64_P8_PAUSE_IGNORED;
     return 1;
 }
 
@@ -349,6 +365,70 @@ int main(void)
     f.eligible_result = 0;
     assert(sc64_p8_timed_service_action(&timer, &transmission, 0, &rect, 1) == -1);
     assert(timer.waiting_mask & 1u);
+
+    /* Native owner/global eligibility can reject PauseGame or UnpauseGame
+     * with success but no state mutation. Preserve the trigger marker when
+     * the native tail Unpause handler is likewise ineligible. */
+    Sc64P8TimedService ignored_timer;
+    assert(sc64_p8_timed_service_init(&ignored_timer, 42));
+    Sc64P8WorldContext ignored_world = world;
+    Fixture ignored_fixture = {0};
+    ignored_world.pause_game = pause_request;
+    ignored_world.pause_trigger_end = pause_trigger_end;
+    ignored_world.pause_context = &ignored_fixture;
+    ignored_world.pause_end_context = &ignored_fixture;
+    sc64_p8_timed_service_bind_world(&ignored_world, &ignored_timer);
+    Sc64P8SourceAction ignored_pause = make_action(5, 0, 0);
+    ignored_pause.trigger = 4;
+    Sc64P8SourceAction ignored_unpause = make_action(6, 0, 0);
+    ignored_unpause.trigger = 4;
+    for (unsigned i = 0; i < 4; ++i) {
+        static const u8 ignored_control_types[4] = {1u, 3u, 4u, 7u};
+        ignored_fixture.owner_control_type[3] = ignored_control_types[i];
+        assert(sc64_p8_world_action(&ignored_world, &ignored_pause, 3, 0) ==
+               SC64_P8_ACTION_COMPLETE);
+        assert(!ignored_timer.source_pause_active &&
+               ignored_timer.pause_trigger_mask[3] == 0u);
+
+        ignored_timer.source_pause_active = 1;
+        ignored_timer.pause_trigger_mask[3] = (u8)(1u << 4);
+        assert(sc64_p8_world_action(&ignored_world, &ignored_unpause, 3, 0) ==
+               SC64_P8_ACTION_COMPLETE);
+        assert(ignored_timer.source_pause_active &&
+               ignored_timer.pause_trigger_mask[3] == (u8)(1u << 4));
+        assert(sc64_p8_timed_service_trigger_complete(&ignored_timer, 4, 3) == 1);
+        assert(ignored_timer.source_pause_active &&
+               ignored_timer.pause_trigger_mask[3] == (u8)(1u << 4));
+        ignored_timer.source_pause_active = 0;
+        ignored_timer.pause_trigger_mask[3] = 0;
+    }
+    ignored_timer.source_pause_active = 0;
+    ignored_timer.pause_trigger_mask[3] = 0;
+    ignored_fixture.pause_global_guard = 1;
+    assert(sc64_p8_world_action(&ignored_world, &ignored_pause, 0, 0) ==
+           SC64_P8_ACTION_COMPLETE && !ignored_timer.source_pause_active);
+    ignored_fixture.pause_global_guard = 0;
+    ignored_fixture.pause_gate_blocked = 1;
+    assert(sc64_p8_world_action(&ignored_world, &ignored_pause, 0, 0) ==
+           SC64_P8_ACTION_COMPLETE && !ignored_timer.source_pause_active);
+    ignored_fixture.pause_gate_blocked = 0;
+
+    /* Errors remain distinct from native ignored results and never mutate
+     * either global or trigger-instance pause state. */
+    ignored_fixture.pause_error_owners = (u8)(1u << 2);
+    ignored_timer.source_pause_active = 1;
+    ignored_timer.pause_trigger_mask[2] = (u8)(1u << 5);
+    Sc64P8SourceAction error_unpause = make_action(6, 0, 0);
+    error_unpause.trigger = 5;
+    assert(sc64_p8_world_action(&ignored_world, &error_unpause, 2, 0) == -1);
+    assert(ignored_timer.source_pause_active &&
+           ignored_timer.pause_trigger_mask[2] == (u8)(1u << 5) &&
+           ignored_timer.pause_trigger_mask[3] == 0u);
+    ignored_fixture.pause_end_ignored_owners = 0;
+    ignored_fixture.pause_end_error_owners = (u8)(1u << 2);
+    assert(sc64_p8_timed_service_trigger_complete(&ignored_timer, 5, 2) == -1);
+    assert(ignored_timer.source_pause_active &&
+           ignored_timer.pause_trigger_mask[2] == (u8)(1u << 5));
     puts("sc64_p8_timed_service: shared waits and source-pause tail pass");
     return 0;
 }
