@@ -34,6 +34,7 @@ static int campaign_assault_is_building;
 static int campaign_assault_target_raw;
 static int campaign_assault_hold_set;
 static int campaign_recon_active,campaign_recon_x,campaign_recon_y,campaign_recon_stage;
+static int campaign_recon_global_active;
 static int campaign_guardian_target=-1;
 static int campaign_guardian_return_set;
 static int campaign_single_sunken_opening=1;
@@ -1050,7 +1051,8 @@ static int start_building(int type,int menu_row)
     }
     int selected=0;
     for(int i=worker;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
-        u[i].raw_type==41&&u[i].order!=ORDER_BUILD) {
+        u[i].raw_type==41&&u[i].order!=ORDER_BUILD&&
+        (type!=B_EXTRACTOR||u[i].order!=ORDER_BUILD_PENDING)) {
         if(select_worker(i)){worker=i;selected=1;break;}
         cancel_ui_mode();
     }
@@ -1106,8 +1108,9 @@ static int start_building(int type,int menu_row)
            u[i].target==type&&u[i].tx==x&&u[i].ty==y) {pending=1;break;}
     if(pending) {
         ++actions_taken;
-        fprintf(stderr,"Z7 normal-input build pending type%d site%d,%d worker%d frame%u bank%d/%d; wait for arrival\n",
-            type,x,y,worker,(unsigned)frame,minerals,gas);
+        fprintf(stderr,"Z7 normal-input build pending type%d site%d,%d worker%d from%d,%d dist2%d frame%u bank%d/%d; wait for arrival\n",
+            type,x,y,worker,u[worker].x,u[worker].y,
+            dist2(u[worker].x,u[worker].y,x,y),(unsigned)frame,minerals,gas);
         cancel_ui_mode();
         return 1;
     }
@@ -2214,6 +2217,50 @@ static int campaign_late_air_scout_step(void)
     return accepted;
 }
 
+/* A visible target can stand on the other side of a disconnected walk-grid
+   cell. Pick a reachable point inside an eligible unit's real weapon range
+   so the ordinary group Attack-Move can flank the target instead of
+   repeatedly ordering the unreachable unit center. */
+static int campaign_visible_attack_flank(int target,int *out_x,int *out_y,
+                                         int *out_attackers)
+{
+    static const int offsets[8][2]={{-1,0},{1,0},{0,-1},{0,1},
+        {-1,-1},{1,-1},{-1,1},{1,1}};
+    static const int radii[4]={16,32,48,64};
+    if(target<0||target>=MAX_UNITS||!out_x||!out_y||
+       !u[target].alive||u[target].owner!=ENEMY||
+       !currently_visible(u[target].x,u[target].y))return 0;
+    int tx=u[target].x,ty=u[target].y;
+    int target_flying=sc64_race_unit_flying(u[target].type);
+    int best_attackers=0,best_routes=0,best_d2=0x7fffffff,best_x=-1,best_y=-1;
+    for(int r=0;r<4;r++)for(int k=0;k<8;k++) {
+        int x=tx+offsets[k][0]*radii[r],y=ty+offsets[k][1]*radii[r];
+        if(x<16||y<16||x>=WORLD_W-16||y>=WORLD_H-16||terrain_blocked(x/16,y/16))continue;
+        int attackable=0,routes=0;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+           !sc64_race_is_worker(u[i].type)&&u[i].type!=U_OVERLORD&&
+           sc64_race_unit_damage(u[i].type)>0&&
+           SC64_CAN_ATTACK_FROM_SOURCE(u[i].type,target,SIDE,3)) {
+            int range=(sc64_race_unit_range_vs(u[i].type,target_flying)+1)/2;
+            if(range<=0)continue;
+            int nx=-1,ny=-1;
+            if(!path_next_tile(u[i].x,u[i].y,x,y,&nx,&ny))continue;
+            ++routes;
+            if(dist2(x,y,tx,ty)<=range*range)++attackable;
+        }
+        int d=dist2(x,y,tx,ty);
+        if(attackable>best_attackers||
+           (attackable==best_attackers&&routes>best_routes)||
+           (attackable==best_attackers&&routes==best_routes&&d<best_d2)) {
+            best_attackers=attackable;best_routes=routes;best_d2=d;best_x=x;best_y=y;
+        }
+    }
+    if(best_attackers<=0||best_routes<=0)return 0;
+    *out_x=best_x;*out_y=best_y;
+    if(out_attackers)*out_attackers=best_attackers;
+    return 1;
+}
+
 static int campaign_assault_retarget(void)
 {
     int full_clear=(unsigned)frame>=9000u&&worker_count(-1)>=6&&combat_count(SIDE)>=16;
@@ -2364,15 +2411,65 @@ static int campaign_assault_retarget(void)
         if(campaign_recon_active)campaign_recon_stage++;
         campaign_recon_active=0;
         tx=u[target].x;ty=u[target].y;
+        int order_x=tx,order_y=ty,flank_attackers=0,flank=0,nx=-1,ny=-1;
+        if((unsigned)frame>=100000u&&
+           !path_next_tile(ax,ay,tx,ty,&nx,&ny))
+            flank=campaign_visible_attack_flank(target,&order_x,&order_y,&flank_attackers);
         accepted=target<0?0:(late_air_breakthrough_active&&unit_type_count(U_MUTALISK,SIDE)>0?
-            campaign_mutalisk_order(tx,ty,target):((unsigned)frame>=100000u?
-            army_order(1,tx,ty):typed_attack_target(U_HYDRALISK,target)));
+            campaign_mutalisk_order(order_x,order_y,target):((unsigned)frame>=100000u?
+            army_order(1,order_x,order_y):typed_attack_target(U_HYDRALISK,target)));
         if(accepted) {
             campaign_assault_target=target;campaign_assault_target_raw=u[target].raw_type;
             campaign_assault_is_building=0;campaign_assault_hold_set=0;
-            fprintf(stderr,"Z7 full-army assault visible %s guard slot%d raw%d xy%d,%d frame%u army%d\n",
+            fprintf(stderr,"Z7 full-army assault visible %s guard slot%d raw%d xy%d,%d approach%d,%d flank%d eligible%d frame%u army%d\n",
                 sc64_race_unit_flying(u[target].type)?"air":"ground",
-                target,u[target].raw_type,tx,ty,(unsigned)frame,combat_count(SIDE));
+                target,u[target].raw_type,tx,ty,order_x,order_y,flank,flank_attackers,
+                (unsigned)frame,combat_count(SIDE));
+            if((unsigned)frame>=100000u&&target==28&&u[target].raw_type==38) {
+                int nearest_h=-1,nearest_z=-1,dh=0x7fffffff,dz=0x7fffffff;
+                int close_h=0,ready_h=0,can_h=SC64_CAN_ATTACK_FROM_SOURCE(U_HYDRALISK,target,SIDE,3);
+                int range_h=(sc64_race_unit_range_vs(U_HYDRALISK,0)+1)/2,inrange_h=0;
+                int flank_h[4]={0,0,0,0},flank_any[4]={0,0,0,0};
+                int hx=z7_townhall(SIDE),nx=-1,ny=-1,route=path_next_tile(ax,ay,tx,ty,&nx,&ny);
+                static const int offsets[8][2]={{-1,0},{1,0},{0,-1},{0,1},
+                    {-1,-1},{1,-1},{-1,1},{1,1}};
+                static const int radii[4]={16,32,48,64};
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE) {
+                    int d=dist2(u[i].x,u[i].y,tx,ty);
+                    if(u[i].type==U_HYDRALISK) {
+                        if(d<dh){dh=d;nearest_h=i;}
+                        if(d<160*160)++close_h;
+                        if(d<160*160&&u[i].cd<=0)++ready_h;
+                        if(d<=range_h*range_h)++inrange_h;
+                    }
+                    if(u[i].type==U_ZERGLING&&d<dz){dz=d;nearest_z=i;}
+                }
+                int hnx=-1,hny=-1,hr=nearest_h>=0?
+                    path_next_tile(u[nearest_h].x,u[nearest_h].y,tx,ty,&hnx,&hny):0;
+                int hbase=hx>=0?dist2(b[hx].x,b[hx].y,tx,ty):-1;
+                for(int r=0;r<4;r++)for(int k=0;k<8;k++) {
+                    int px=tx+offsets[k][0]*radii[r],py=ty+offsets[k][1]*radii[r],qx=-1,qy=-1;
+                    if(nearest_h>=0&&path_next_tile(u[nearest_h].x,u[nearest_h].y,px,py,&qx,&qy))
+                        flank_h[r]|=1<<k;
+                    int any=0;
+                    for(int i=0;i<MAX_UNITS&&!any;i++)
+                        if(u[i].alive&&u[i].owner==SIDE&&
+                           !sc64_race_is_worker(u[i].type)&&u[i].type!=U_OVERLORD&&
+                           sc64_race_unit_damage(u[i].type)>0&&
+                           path_next_tile(u[i].x,u[i].y,px,py,&qx,&qy))any=1;
+                    if(any)flank_any[r]|=1<<k;
+                }
+                fprintf(stderr,"Z7 visible raw38 target diag frame%u slot%d hp%d/%d shield%d flags%x owner%d vis%d order%d target%d cd%d pathTimer%d retry%d terrain%d canHydra%d hydraRange%d hydrasInRange%d townhallDist2%d armyPos%d,%d path%d next%d,%d closestHydra%d d2%d order%d target%d cd%d pos%d,%d path%d next%d,%d flank16%x/%x flank32%x/%x flank48%x/%x flank64%x/%x closestLing%d d2%d atRange160%d ready160%d\n",
+                    (unsigned)frame,target,u[target].hp,u[target].maxhp,u[target].shield,
+                    u[target].flags,u[target].owner,currently_visible(tx,ty),u[target].order,
+                    u[target].target,u[target].cd,u[target].path_timer,u[target].path_retry,
+                    terrain_blocked(tx/16,ty/16),can_h,range_h,inrange_h,hbase,ax,ay,route,nx,ny,
+                    nearest_h,dh,nearest_h>=0?u[nearest_h].order:-1,
+                    nearest_h>=0?u[nearest_h].target:-1,nearest_h>=0?u[nearest_h].cd:-1,
+                    nearest_h>=0?u[nearest_h].x:-1,nearest_h>=0?u[nearest_h].y:-1,
+                    hr,hnx,hny,flank_h[0],flank_any[0],flank_h[1],flank_any[1],
+                    flank_h[2],flank_any[2],flank_h[3],flank_any[3],nearest_z,dz,close_h,ready_h);
+            }
         }
     } else {
         int building=-1,building_d=0x7fffffff;
@@ -2414,6 +2511,16 @@ static int campaign_assault_retarget(void)
                   worker_count(-1)>=6&&combat_count(SIDE)>=10) {
             static int local_recon_activated;
             static unsigned local_recon_retry;
+            /* The small Hydra-only fog sweep can reveal nearby tiles without
+               moving the force toward the remaining map. Once it has
+               advanced through five local waypoints, promote exploration
+               back to the whole combat group using the normal Attack-Move. */
+            if(campaign_recon_stage>=24&&campaign_recon_active&&
+               !campaign_recon_global_active) {
+                fprintf(stderr,"Z7 promote stalled local recon stage%d target%d,%d to whole-army search frame%u\n",
+                    campaign_recon_stage,campaign_recon_x,campaign_recon_y,(unsigned)frame);
+                campaign_recon_active=0;
+            }
             if(!local_recon_activated) {
                 local_recon_activated=1;campaign_recon_active=0;
             }
@@ -2422,14 +2529,59 @@ static int campaign_assault_retarget(void)
             if(campaign_recon_active&&col>=0&&col<MAP_COLS&&row>=0&&row<MAP_ROWS&&
                (SC64_GRID_GET(explored,idx)||SC64_GRID_GET(visible,idx))) {
                 campaign_recon_active=0;campaign_recon_stage++;
+                campaign_recon_global_active=0;
                 fprintf(stderr,"Z7 local recon tile revealed stage%d xy%d,%d frame%u\n",
                     campaign_recon_stage,campaign_recon_x,campaign_recon_y,(unsigned)frame);
             }
+            if(campaign_recon_active&&campaign_recon_global_active) {
+                int matching=0,near_waypoint=0;
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+                   !sc64_race_is_worker(u[i].type)&&u[i].type!=U_OVERLORD&&
+                   sc64_race_unit_damage(u[i].type)>0&&u[i].order==ORDER_ATTACK_MOVE&&
+                   abs(u[i].tx-campaign_recon_x)<=16&&abs(u[i].ty-campaign_recon_y)<=16) {
+                    matching++;
+                    if(dist2(u[i].x,u[i].y,campaign_recon_x,campaign_recon_y)<=128*128)
+                        near_waypoint++;
+                }
+                if(matching==0||near_waypoint*2>=matching) {
+                    fprintf(stderr,"Z7 whole-army recon waypoint %s stage%d xy%d,%d group%d near%d frame%u\n",
+                        matching==0?"orders lost":"reached",
+                        campaign_recon_stage,campaign_recon_x,campaign_recon_y,
+                        matching,near_waypoint,(unsigned)frame);
+                    campaign_recon_active=0;campaign_recon_global_active=0;
+                    campaign_recon_stage++;
+                }
+            }
             if(campaign_recon_active) return 1;
             if((unsigned)frame>=local_recon_retry) {
-                if(campaign_local_cluster_attack_move(ax,ay)) {
+                int promoted=0;
+                if(campaign_recon_stage>=24) {
+                    int scout_x=-1,scout_y=-1;
+                    if(campaign_recon_waypoint(campaign_recon_stage,&scout_x,&scout_y)) {
+                        accepted=army_order(1,scout_x,scout_y);
+                        int movers=0;
+                        if(accepted)for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+                           !sc64_race_is_worker(u[i].type)&&u[i].type!=U_OVERLORD&&
+                           sc64_race_unit_damage(u[i].type)>0&&u[i].selected&&
+                           u[i].order==ORDER_ATTACK_MOVE&&abs(u[i].tx-scout_x)<=16&&
+                           abs(u[i].ty-scout_y)<=16)movers++;
+                        if(movers>0) {
+                            campaign_assault_target=-1;campaign_assault_target_raw=0;
+                            campaign_assault_is_building=0;
+                            campaign_recon_active=1;campaign_recon_global_active=1;
+                            campaign_recon_x=scout_x;campaign_recon_y=scout_y;
+                            fprintf(stderr,"Z7 whole-army recon after local stagnation stage%d xy%d,%d frame%u army%d movers%d\n",
+                                campaign_recon_stage,scout_x,scout_y,(unsigned)frame,
+                                combat_count(SIDE),movers);
+                            return 1;
+                        }
+                    }
+                    promoted=1;
+                }
+                if(!promoted&&campaign_local_cluster_attack_move(ax,ay)) {
                     campaign_assault_target=-1;campaign_assault_target_raw=0;
                     campaign_assault_is_building=0;campaign_recon_active=1;
+                    campaign_recon_global_active=0;
                     return 1;
                 }
                 local_recon_retry=(unsigned)frame+600u;
@@ -3646,6 +3798,22 @@ static void attack_step(void)
     int bx,by,slot;
     int hatch=z7_townhall(SIDE);
     int guard_x=1050,guard_y=1620;
+    int visible_worker_threat=0;
+    for(int w=0;w<MAX_UNITS&&!visible_worker_threat;w++)if(z7_worker_is_exposed(w)) {
+        int threat=-1;
+        int gas_only=u[w].order==ORDER_GAS||u[w].carry>0;
+        if(z7_worker_threat(w,gas_only,&threat))visible_worker_threat=1;
+    }
+    int offense_ready=completed_building_count(B_SUNKEN_COLONY)>=2&&
+        combat_count(SIDE)>=24&&worker_count(-1)>=6&&
+        !visible_worker_threat&&!workers_retreating;
+    static int home_screen_released;
+    if(offense_ready&&!home_screen_released) {
+        fprintf(stderr,"Z7 home screen released for visible-base attack frame%u workers%d combat%d sunkens%d bank%d/%d\n",
+            (unsigned)frame,worker_count(-1),combat_count(SIDE),
+            completed_building_count(B_SUNKEN_COLONY),minerals,gas);
+        home_screen_released=1;
+    }
     /* Research policy: keep pursuing observed targets after the switch and
        periodically reselect to admit paid reinforcements. This has not won. */
     if(early_gas_policy&&campaign_assault_active) {
@@ -3681,6 +3849,30 @@ static void attack_step(void)
         campaign_assault_is_building=0;campaign_assault_target_raw=0;
         fprintf(stderr,"Z7 source switch: replace opening assault with north screen frame%u\n",(unsigned)frame);
     }
+    if(offense_ready&&(unsigned)frame>=9000u&&
+       (int)frame>=next_attack_frame) {
+        static unsigned last_visible_raid_wait;
+        if(nearest_enemy_building(&bx,&by,&slot)) {
+            int raid_type=unit_type_count(U_ZERGLING,SIDE)>0?
+                U_ZERGLING:U_HYDRALISK;
+            int accepted=typed_attack_move(raid_type,bx,by);
+            next_attack_frame=(unsigned)frame+600u;
+            last_attack_building=slot;
+            fprintf(stderr,"Z7 released ground raid accepted%d type%d visibleBuilding%d raw%d xy%d,%d frame%u combat%d workers%d z%d h%d m%d\n",
+                accepted,raid_type,slot,b[slot].raw_type,bx,by,(unsigned)frame,
+                combat_count(SIDE),worker_count(-1),unit_type_count(U_ZERGLING,SIDE),
+                unit_type_count(U_HYDRALISK,SIDE),unit_type_count(U_MUTALISK,SIDE));
+            if(accepted)return;
+        } else {
+            if(!last_visible_raid_wait||
+               (unsigned)frame-last_visible_raid_wait>=600u) {
+                fprintf(stderr,"Z7 released raid waits for visible enemy building frame%u combat%d workers%d\n",
+                    (unsigned)frame,combat_count(SIDE),worker_count(-1));
+                last_visible_raid_wait=(unsigned)frame;
+            }
+            next_attack_frame=(unsigned)frame+600u;
+        }
+    }
     if(!defense_staged&&frame>=100&&hatch>=0&&combat_count(SIDE)) {
         /* Controller strategy: keep the starting army on home worker cover
            instead of spending nine thousand frames on an early assault. */
@@ -3709,7 +3901,8 @@ static void attack_step(void)
     /* The post-switch screen is an authoritative policy. Keep Hydralisks and
        Mutalisks together at the north mineral boundary; direct the air screen
        only at a visible Guardian or Mutalisk near that point, then regroup. */
-    if(defense_staged&&defense_cover_set&&(unsigned)frame>=9000u&&hatch>=0) {
+    if(defense_staged&&defense_cover_set&&(unsigned)frame>=9000u&&hatch>=0&&
+       !offense_ready) {
         int cover_x,cover_y,air_x=1050,air_y=1510;
         z7_defense_screen_point(&cover_x,&cover_y);
         /* Guardians can hit the mineral line from outside Mutalisk sight.
@@ -3737,6 +3930,43 @@ static void attack_step(void)
         }
         if(guardian_threat>=0)fprintf(stderr,"Z7 private Guardian pre-focus frame%u slot%d xy%d,%d d2%d\n",
             (unsigned)frame,guardian_threat,u[guardian_threat].x,u[guardian_threat].y,guardian_best);
+        if(guardian_threat>=0) {
+            static unsigned last_guardian_sample_frame;
+            static int last_guardian_sample_slot=-1,last_guardian_sample_hp=-1;
+            static int last_guardian_hp_event_frame=-1;
+            int hydra_targeting=0,hydra_ready=0,hydra_cd_min=0x7fffffff;
+            int muta_targeting=0;
+            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE) {
+                if(u[i].type==U_HYDRALISK&&u[i].target==guardian_threat) {
+                    ++hydra_targeting;
+                    if(u[i].cd<=0)++hydra_ready;
+                    if(u[i].cd<hydra_cd_min)hydra_cd_min=u[i].cd;
+                }
+                if(u[i].type==U_MUTALISK&&u[i].target==guardian_threat)++muta_targeting;
+            }
+            if(last_guardian_sample_slot==guardian_threat&&last_guardian_sample_hp>=0&&
+               u[guardian_threat].hp<last_guardian_sample_hp&&
+               last_guardian_hp_event_frame!=(int)frame) {
+                fprintf(stderr,"Z7 Guardian hp delta frame%u slot%d hp%d->%d hpHydraTarget%d ready%d cdMin%d mutaTarget%d\n",
+                    (unsigned)frame,guardian_threat,last_guardian_sample_hp,
+                    u[guardian_threat].hp,hydra_targeting,hydra_ready,
+                    hydra_cd_min==0x7fffffff?-1:hydra_cd_min,muta_targeting);
+                last_guardian_hp_event_frame=(int)frame;
+            }
+            if(!last_guardian_sample_frame||
+               (unsigned)frame-last_guardian_sample_frame>=30u) {
+                fprintf(stderr,"Z7 Guardian combat sample frame%u slot%d visible%d xy%d,%d hp%d order%d target%d cd%d hydraTarget%d ready%d cdMin%d mutaTarget%d\n",
+                    (unsigned)frame,guardian_threat,
+                    currently_visible(u[guardian_threat].x,u[guardian_threat].y),
+                    u[guardian_threat].x,u[guardian_threat].y,u[guardian_threat].hp,
+                    u[guardian_threat].order,u[guardian_threat].target,u[guardian_threat].cd,
+                    hydra_targeting,hydra_ready,
+                    hydra_cd_min==0x7fffffff?-1:hydra_cd_min,muta_targeting);
+                last_guardian_sample_frame=(unsigned)frame;
+            }
+            last_guardian_sample_slot=guardian_threat;
+            last_guardian_sample_hp=u[guardian_threat].hp;
+        }
         if(defense_screen_enemy>=0&&
            (defense_screen_enemy>=MAX_UNITS||!u[defense_screen_enemy].alive||
             u[defense_screen_enemy].owner!=ENEMY||
@@ -3796,6 +4026,44 @@ static void attack_step(void)
            visible target. Give Hydralisks their own bounded home-threat
            order before those returns, so the air duel cannot suppress ground
            defense against a visible Ultralisk or other attacker. */
+        if(hydra_ground_target_slot>=0) {
+            int t=hydra_ground_target_slot;
+            int valid=t<MAX_UNITS&&u[t].alive&&u[t].owner==ENEMY&&
+                currently_visible(u[t].x,u[t].y)&&
+                SC64_CAN_ATTACK_FROM_SOURCE(U_HYDRALISK,t,SIDE,3);
+            int still_threatening=valid&&
+                (dist2(u[t].x,u[t].y,b[hatch].x,b[hatch].y)<=160*160||
+                 z7_threat_near_workers(t,128));
+            if(still_threatening) {
+                int hydras_on_target=0;
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+                   u[i].type==U_HYDRALISK&&u[i].target==t)++hydras_on_target;
+                static unsigned last_hydra_focus_hold_log;
+                if(!hydras_on_target&&
+                   (unsigned)frame>=hydra_ground_next_order) {
+                    int accepted=typed_attack_target(U_HYDRALISK,t);
+                    fprintf(stderr,"Z7 retain visible Hydra threat accepted%d slot%d raw%d xy%d,%d targeters%d frame%u\n",
+                        accepted,t,u[t].raw_type,u[t].x,u[t].y,hydras_on_target,(unsigned)frame);
+                    hydra_ground_next_order=frame+(accepted?120u:60u);
+                    if(accepted)return;
+                } else if(!last_hydra_focus_hold_log||
+                          (unsigned)frame-last_hydra_focus_hold_log>=600u) {
+                    fprintf(stderr,"Z7 hold visible Hydra threat slot%d raw%d xy%d,%d targeters%d frame%u\n",
+                        t,u[t].raw_type,u[t].x,u[t].y,hydras_on_target,(unsigned)frame);
+                    last_hydra_focus_hold_log=(unsigned)frame;
+                }
+                return;
+            }
+            fprintf(stderr,"Z7 release Hydra threat focus slot%d valid%d visible%d safe%d frame%u\n",
+                t,valid,valid?currently_visible(u[t].x,u[t].y):0,valid&&!still_threatening,(unsigned)frame);
+            hydra_ground_target_slot=-1;
+            int accepted=typed_attack_move(U_HYDRALISK,cover_x,cover_y);
+            fprintf(stderr,"Z7 Hydra regroup after focus release accepted%d xy%d,%d frame%u\n",
+                accepted,cover_x,cover_y,(unsigned)frame);
+            hydra_ground_return_to_cover=!accepted;
+            hydra_ground_next_order=frame+(accepted?60u:30u);
+            if(accepted)return;
+        }
         if(unit_type_count(U_HYDRALISK,SIDE)>0&&
            (unsigned)frame>=hydra_ground_next_order) {
             int ground=-1,best=160*160;
@@ -3849,7 +4117,7 @@ static void attack_step(void)
     /* Keep later-produced Hydralisks on the same ordinary Attack-Move rally
        that covers the Hatchery and worker route. Reissuing only when the live
        count changes avoids repeatedly pulling an engaged group off its rally. */
-    if(defense_staged&&hatch>=0&&combat_count(SIDE)>=6) {
+    if(defense_staged&&hatch>=0&&combat_count(SIDE)>=6&&!offense_ready) {
         int live_hydras=unit_type_count(U_HYDRALISK,SIDE);
         if(live_hydras<defense_hydras_rallied)
             defense_hydras_rallied=live_hydras;
@@ -3959,7 +4227,8 @@ static void attack_step(void)
     /* After the Hatchery completes, hold a fixed screen just north of the
        mineral cover. This puts Hydralisks inside their normal attack reach of
        the observed Guardian approach before it can reach returning workers. */
-    if(defense_staged&&hatch>=0&&building_complete(hatch)&&combat_count(SIDE)>=6) {
+    if(defense_staged&&hatch>=0&&building_complete(hatch)&&
+       combat_count(SIDE)>=6&&!offense_ready) {
         int ax=0,ay=0,n=0;
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
             !sc64_race_is_worker(u[i].type)&&u[i].type!=U_OVERLORD&&
@@ -4262,8 +4531,19 @@ static void attack_step(void)
     }
     if(frame<9000||frame<next_attack_frame||combat_count(SIDE)<10||
        worker_count(-1)<4||!building_complete(raw_building(135,SIDE))||
-       minerals<25||gas<25)return;
-    if(!nearest_enemy_building(&bx,&by,&slot))return;
+       minerals<25)return;
+    if(!nearest_enemy_building(&bx,&by,&slot)) {
+        static unsigned last_raid_wait_log;
+        if(!last_raid_wait_log||(unsigned)frame-last_raid_wait_log>=600u) {
+            int visible_buildings=0;
+            for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==ENEMY&&
+               b[i].raw_owner==4&&currently_visible(b[i].x,b[i].y))++visible_buildings;
+            fprintf(stderr,"Z7 raid waits no visible enemy building frame%u combat%d workers%d bank%d/%d visibleBuildings%d\n",
+                (unsigned)frame,combat_count(SIDE),worker_count(-1),minerals,gas,visible_buildings);
+            last_raid_wait_log=(unsigned)frame;
+        }
+        return;
+    }
     int active=0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].selected&&
         u[i].order==ORDER_ATTACK_MOVE)active++;
@@ -4432,6 +4712,26 @@ int main(int argc,char **argv)
     fputs("]}\n",trace_file);
     if(fclose(trace_file)!=0){perror("write Z7 controller trace");return 2;}
     trace_file=NULL;
+    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==ENEMY&&
+       currently_visible(b[i].x,b[i].y)) {
+        int reachable=0;
+        for(int j=0;j<MAX_UNITS&&!reachable;j++)if(u[j].alive&&u[j].owner==SIDE&&
+           !sc64_race_is_worker(u[j].type)&&u[j].type!=U_OVERLORD&&
+           !sc64_race_unit_flying(u[j].type)&&sc64_race_unit_damage(u[j].type)>0) {
+            int nx=-1,ny=-1;
+            reachable=path_next_tile(u[j].x,u[j].y,b[i].x,b[i].y,&nx,&ny);
+            if(!reachable) {
+                static const int approach[8][2]={{-32,0},{32,0},{0,-32},{0,32},
+                    {-32,-32},{32,-32},{-32,32},{32,32}};
+                for(int k=0;k<8&&!reachable;k++)
+                    reachable=path_next_tile(u[j].x,u[j].y,
+                        b[i].x+approach[k][0],b[i].y+approach[k][1],&nx,&ny);
+            }
+        }
+        fprintf(stderr,"Z7 terminal visible enemy-building slot%d raw-owner%d raw-type%d type%d hp%d/%d flags%x xy%d,%d ground-approach%d\n",
+            i,b[i].raw_owner,b[i].raw_type,b[i].type,b[i].hp,b[i].maxhp,
+            (unsigned)b[i].flags,b[i].x,b[i].y,reachable);
+    }
     fprintf(stderr,"Z7 controller result=%s host_ticks=%u frame=%u model=%u started=%02x enemy_buildings=%d trace=%s\n",
         terminal,host_ticks,(unsigned)frame,race_z7.runtime.model.outcome,
         race_z7.runtime.model.started,building_count(ENEMY),trace_path);
