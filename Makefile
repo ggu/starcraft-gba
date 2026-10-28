@@ -4318,13 +4318,16 @@ build/test-sc64-weapon-source-raster: tests/sc64_weapon_source_vfx_render.c star
 	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) $< -o $@
 build/test-sc64-weapon-source-runtime: tests/sc64_weapon_source_runtime.c starcraft/sc64_weapon_source_runtime.h starcraft/sc64_weapon_source_vfx.h tests/fixtures/weapon_source_mock.h | build
 	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) -Itests/fixtures $< -o $@
+build/test-sc64-weapon-source-resolved-trace: tests/sc64_weapon_source_resolved_trace.c starcraft/sc64_weapon_source_runtime.h starcraft/sc64_weapon_source_vfx_render.h starcraft/sc64_weapon_source_vfx_bounds.h | build
+	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) -Icommon $< -o $@
 .PHONY: test-sc64-weapon-source-sampling
 build/test-gfx-reverse-bytes: tests/gfx_reverse_bytes.c common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
-test-sc64-weapon-source-sampling: build/test-sc64-weapon-source-sampling build/test-sc64-weapon-source-raster build/test-sc64-weapon-source-runtime build/test-gfx-reverse-bytes
+test-sc64-weapon-source-sampling: build/test-sc64-weapon-source-sampling build/test-sc64-weapon-source-raster build/test-sc64-weapon-source-runtime build/test-sc64-weapon-source-resolved-trace build/test-gfx-reverse-bytes
 	./build/test-sc64-weapon-source-sampling
 	./build/test-sc64-weapon-source-raster
 	./build/test-sc64-weapon-source-runtime
+	./build/test-sc64-weapon-source-resolved-trace
 	./build/test-gfx-reverse-bytes
 test: test-sc64-weapon-source-sampling
 
