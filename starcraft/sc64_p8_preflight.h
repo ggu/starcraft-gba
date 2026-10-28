@@ -2,6 +2,7 @@
 #ifndef SC64_P8_PREFLIGHT_H
 #define SC64_P8_PREFLIGHT_H
 
+#include <string.h>
 #include "sc64_p8_source_adapter.h"
 #include "sc64_types.h"
 
@@ -34,11 +35,12 @@ typedef struct {
     int (*property)(void *context, unsigned selector);
 } Sc64P8PreflightResolvers;
 
-/* Check the authenticated P8 map rows and one-shot CreateUnitWithProperties
- * plan against actual runtime pool limits. This is a bounded initialization
- * guard only: it does not create actors or enable P8 campaign runtime. */
+/* Census the generated P8 map shape and its one-shot CreateUnitWithProperties
+ * plan against actual runtime pool limits. The runtime caller must authenticate
+ * the map pointer before calling this census helper. This does not bind mission
+ * actions or enable P8 campaign runtime. */
 static inline int
-sc64_p8_preflight(const Sc64ImportedUnit *rows, unsigned row_count,
+sc64_p8_preflight(const Sc64RaceMap *map,
                   const Sc64P8SourceAction *actions, unsigned action_count,
                   unsigned unit_capacity, unsigned building_capacity,
                   unsigned mineral_capacity, unsigned geyser_capacity,
@@ -48,14 +50,31 @@ sc64_p8_preflight(const Sc64ImportedUnit *rows, unsigned row_count,
     Sc64P8PreflightReport out = {0};
     int error = SC64_P8_PREFLIGHT_OK;
     if (report) *report = out;
-    if (!rows || !row_count || !actions ||
+    if (!map || SC64_P8_EXPECTED_GLOBAL_ID >= SC64_RACE_MAP_COUNT ||
+        map->width != SC64_P8_EXPECTED_MAP_COLS ||
+        map->height != SC64_P8_EXPECTED_MAP_ROWS ||
+        !map->units || !map->unit_count || !map->owner_modes ||
+        !map->owner_races || !map->mission_id ||
+        strcmp(map->mission_id, "P8") != 0 ||
+        map->unit_count > MAX_UNITS + MAX_BUILDINGS + MAX_MINERALS +
+                              MAX_RACE_GEYSERS ||
+        !actions ||
         action_count != SC64_P8_EXPECTED_ACTION_COUNT ||
         !resolvers || !resolvers->actor_kind || !resolvers->property ||
         !report || !sc64_p8_source_metadata_valid())
         return SC64_P8_PREFLIGHT_BAD_INPUT;
 
-    for (unsigned i = 0; i < row_count; ++i) {
-        unsigned raw = rows[i].source_type;
+    for (unsigned i = 0; i < map->unit_count; ++i) {
+        const Sc64ImportedUnit *row = &map->units[i];
+        unsigned raw = row->source_type;
+        if (row->x_px >= map->width * 16u ||
+            row->y_px >= map->height * 16u ||
+            row->hp_percent > 100u || row->owner >= 12u ||
+            ((raw >= 176u && raw <= 178u) || raw == 188u ?
+                row->owner != 11u : row->owner >= 8u)) {
+            if (error == SC64_P8_PREFLIGHT_OK)
+                error = SC64_P8_PREFLIGHT_BAD_INPUT;
+        }
         ++out.total_rows_seen;
         if (raw == 176u || raw == 177u || raw == 178u) {
             ++out.minerals;
@@ -78,7 +97,7 @@ sc64_p8_preflight(const Sc64ImportedUnit *rows, unsigned row_count,
 
     /* Every row must resolve to exactly one supported actor/resource class. */
     if (out.units + out.buildings + out.minerals + out.geysers +
-            out.unresolved_actors != row_count &&
+            out.unresolved_actors != map->unit_count &&
         error == SC64_P8_PREFLIGHT_OK)
         error = SC64_P8_PREFLIGHT_BAD_INPUT;
 

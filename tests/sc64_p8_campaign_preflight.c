@@ -46,7 +46,7 @@ int main(void)
     ResolverContext source_resolver = {0};
     Sc64P8PreflightResolvers source_ops = resolvers_for(&source_resolver);
     Sc64P8PreflightReport report;
-    int result = sc64_p8_preflight(map->units, map->unit_count,
+    int result = sc64_p8_preflight(map,
         sc64_p8_source_actions, SC64_P8_SOURCE_ACTION_COUNT,
         MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS, MAX_RACE_GEYSERS,
         &source_ops, &report);
@@ -63,12 +63,14 @@ int main(void)
     assert(report.units + report.created_units <= MAX_UNITS &&
            report.buildings + report.created_buildings <= MAX_BUILDINGS);
     assert(report.unresolved_actors > 0u);
+    /* The unresolved Hero Hyperion source actor also lacks a sprite frame. */
+    assert(!sc64_race_unit_sprite((unsigned short)report.first_unresolved_raw));
 
     /* Synthetic resolver fact isolates the rest of the preflight and lets
      * negative fixtures prove unknown actor, selector and capacity rejection. */
     ResolverContext complete_resolver = {1};
     Sc64P8PreflightResolvers complete_ops = resolvers_for(&complete_resolver);
-    int complete_result = sc64_p8_preflight(map->units, map->unit_count,
+    int complete_result = sc64_p8_preflight(map,
         sc64_p8_source_actions, SC64_P8_SOURCE_ACTION_COUNT,
         MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS, MAX_RACE_GEYSERS,
         &complete_ops, &report);
@@ -77,12 +79,27 @@ int main(void)
     assert(map->unit_count <= sizeof(synthetic_rows) / sizeof(synthetic_rows[0]));
     memcpy(synthetic_rows, map->units,
            map->unit_count * sizeof(synthetic_rows[0]));
-    synthetic_rows[0].source_type = 250u;
-    assert(sc64_p8_preflight(synthetic_rows, map->unit_count,
+    unsigned unknown_actor_row = 0;
+    while (unknown_actor_row < map->unit_count &&
+           synthetic_rows[unknown_actor_row].owner >= 8u)
+        ++unknown_actor_row;
+    assert(unknown_actor_row < map->unit_count);
+    synthetic_rows[unknown_actor_row].source_type = 250u;
+    Sc64RaceMap synthetic_map = *map;
+    synthetic_map.units = synthetic_rows;
+    assert(sc64_p8_preflight(&synthetic_map,
         sc64_p8_source_actions, SC64_P8_SOURCE_ACTION_COUNT,
         MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS, MAX_RACE_GEYSERS,
         &complete_ops, &report) == SC64_P8_PREFLIGHT_UNSUPPORTED_ACTOR);
     assert(report.first_unresolved_raw == 250u);
+
+    memcpy(synthetic_rows, map->units,
+           map->unit_count * sizeof(synthetic_rows[0]));
+    synthetic_rows[unknown_actor_row].x_px = (u16)(map->width * 16u);
+    assert(sc64_p8_preflight(&synthetic_map,
+        sc64_p8_source_actions, SC64_P8_SOURCE_ACTION_COUNT,
+        MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS, MAX_RACE_GEYSERS,
+        &complete_ops, &report) == SC64_P8_PREFLIGHT_BAD_INPUT);
 
     memcpy(synthetic_actions, sc64_p8_source_actions,
            sizeof(synthetic_actions));
@@ -92,12 +109,12 @@ int main(void)
             synthetic_actions[i].group2) { property_action = i; break; }
     assert(property_action < SC64_P8_SOURCE_ACTION_COUNT);
     synthetic_actions[property_action].group2 = 64u;
-    assert(sc64_p8_preflight(map->units, map->unit_count,
+    assert(sc64_p8_preflight(map,
         synthetic_actions, SC64_P8_SOURCE_ACTION_COUNT,
         MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS, MAX_RACE_GEYSERS,
         &complete_ops, &report) == SC64_P8_PREFLIGHT_BAD_PROPERTY);
 
-    assert(sc64_p8_preflight(map->units, map->unit_count,
+    assert(sc64_p8_preflight(map,
         sc64_p8_source_actions, SC64_P8_SOURCE_ACTION_COUNT,
         report.units + report.created_units - 1u, MAX_BUILDINGS,
         MAX_MINERALS, MAX_RACE_GEYSERS,

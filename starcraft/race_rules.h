@@ -1395,6 +1395,7 @@ static inline int sc64_race_raw_building(int type)
     case B_ULTRALISK_CAVERN: return 140;
 #endif
     case B_CITADEL_ADUN: return 163;
+    case B_STASIS_CELL_PRISON: return 168;
     case B_FLEET_BEACON: return 169; case B_ROBOTICS_SUPPORT_BAY: return 171;
     case B_SHIELD_BATTERY: return 172; case B_SPECIAL_ION_CANNON: return 127;
     case B_SCIENCE_FACILITY: return 116; case B_PHYSICS_LAB: return 118;
@@ -1616,6 +1617,7 @@ static inline int sc64_race_building_from_raw(int raw)
     case 163: return B_CITADEL_ADUN; case 169: return B_FLEET_BEACON;
     case 171: return B_ROBOTICS_SUPPORT_BAY; case 172: return B_SHIELD_BATTERY;
 #endif
+    case 168: return B_STASIS_CELL_PRISON;
     case 127: return B_SPECIAL_ION_CANNON;
     case 116: return B_SCIENCE_FACILITY; case 118: return B_PHYSICS_LAB;
 #endif
