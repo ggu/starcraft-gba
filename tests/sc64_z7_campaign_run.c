@@ -1024,6 +1024,12 @@ static int start_building(int type,int menu_row)
 {
     int worker=-1,x=-1,y=-1,before=owned_building_count(type);
     if(before&&type!=B_HATCHERY&&type!=B_CREEP_COLONY)return 1;
+    /* Public construction pays and creates the foundation only when the
+       Drone reaches its site. Preserve that ordinary pending order instead
+       of mistaking the absent foundation for a rejected click. */
+    if(type==B_EXTRACTOR)for(int i=0;i<MAX_UNITS;i++)
+        if(u[i].alive&&u[i].owner==SIDE&&
+           u[i].order==ORDER_BUILD_PENDING&&u[i].target==type)return 1;
     if(!find_build_site(type,&x,&y)) {
         if(last_build_fail_type!=type||frame-last_build_fail_frame>=600) {
             fprintf(stderr,"Z7 cannot site type%d frame%d bank%d/%d workers%d geysers%d\n",
@@ -1094,6 +1100,17 @@ static int start_building(int type,int menu_row)
         build_probe_done=1;
     } else tap(KEY_A);
     int made=owned_building_count(type)>before;
+    int pending=0;
+    if(type==B_EXTRACTOR)for(int i=0;i<MAX_UNITS;i++)
+        if(u[i].alive&&u[i].owner==SIDE&&u[i].order==ORDER_BUILD_PENDING&&
+           u[i].target==type&&u[i].tx==x&&u[i].ty==y) {pending=1;break;}
+    if(pending) {
+        ++actions_taken;
+        fprintf(stderr,"Z7 normal-input build pending type%d site%d,%d worker%d frame%u bank%d/%d; wait for arrival\n",
+            type,x,y,worker,(unsigned)frame,minerals,gas);
+        cancel_ui_mode();
+        return 1;
+    }
     if(made){++actions_taken;fprintf(stderr,"Z7 input built raw%d at%d,%d worker%d frame%u bank%d/%d\n",
         sc64_race_raw_building(type),x,y,worker,(unsigned)frame,minerals,gas);}
     else if(last_build_fail_type!=type||frame-last_build_fail_frame>=600) {
@@ -1348,7 +1365,9 @@ static int assign_idle_workers_to_minerals(void)
 {
     int assigned=0;
     for(int worker=0;worker<MAX_UNITS;worker++)if(u[worker].alive&&u[worker].owner==SIDE&&
-        u[worker].raw_type==41&&u[worker].order!=ORDER_BUILD&&u[worker].order!=ORDER_GAS&&
+        u[worker].raw_type==41&&u[worker].order!=ORDER_BUILD&&
+        !(u[worker].order==ORDER_BUILD_PENDING&&u[worker].target==B_EXTRACTOR)&&
+        u[worker].order!=ORDER_GAS&&
         !(u[worker].order==ORDER_MINE&&u[worker].target>=0&&u[worker].target<MAX_MINERALS&&
           m[u[worker].target].amount>0)) {
         int target=-1,best=0x7fffffff;
