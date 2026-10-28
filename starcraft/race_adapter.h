@@ -466,7 +466,7 @@ static int race_queue_unit(int owner, int producer, int type)
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (egg_job) count = sc64_z7_egg_product_count(type);
 #endif
-    if (r->supply && reserved + r->supply * count > cap) return 0;
+    if (r->supply && reserved + r->supply * count > cap) { race_refusal = 2; return 0; }
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (egg_job) {
         int free_slots = 0;
@@ -476,7 +476,10 @@ static int race_queue_unit(int owner, int producer, int type)
 #endif
     bank.minerals = (unsigned short)race_owner_minerals(owner);
     bank.gas = (unsigned short)race_owner_gas(owner);
-    if (!sc64_race_pay_unit(&bank, type)) return 0;
+    if (!sc64_race_pay_unit(&bank, type)) {
+        race_refusal = bank.minerals < r->minerals ? 1 : 12;
+        return 0;
+    }
     if (owner == SIDE) { minerals = bank.minerals; gas = bank.gas; }
     else { race_minerals[owner] = bank.minerals; race_gas[owner] = bank.gas; }
     if (r->flags & SC_RACE_F_LARVA) --b[producer].larva;

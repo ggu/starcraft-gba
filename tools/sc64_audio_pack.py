@@ -14,6 +14,9 @@ Source format (verified against the USA retail image):
   * BOLT 015/000-00F are music streams of the same codec, each with a 12-byte
     header: format byte 2, 0x10, big-endian rate 11025, big-endian data length
     and four zero bytes.
+  * The advisor refusals are sfxdata ids 146-154: "not enough minerals", then
+    "not enough vespene gas", then "supply limit", each for Zerg, Terran and
+    Protoss in that order (identified by transcribing the decoded PCM).
   * The resident N64 code selects music resource 0x1500+track. Track 0 is the
     menu theme; the in-game themes alternate per player race (Terran 4/5,
     Zerg 8/9, Protoss 12/13); the mission-end stingers are 2/3, 6/7 and
@@ -82,6 +85,16 @@ IMAGE_COUNT = 999
 WEAPON_COUNT = 130
 MAX_SET = 4
 MUSIC_TRACKS = 16
+# Advisor refusal sfxdata ids in the game's race order (Terran, Zerg, Protoss),
+# each minerals, gas, supply. Transcribed from the decoded clips:
+#   147 "Not enough minerals"   150 "Insufficient vespene gas"
+#   153 "Additional supply depots required"
+#   146 "We require more minerals"   149 "We require more vespene gas"
+#   152 "Spawn more Overlords"
+#   148 "You have not enough minerals"   151 "You require more vespene gas"
+#   154 "You must construct additional pylons"
+ADVISOR_LINES = ("minerals", "gas", "supply")
+ADVISOR_SOUNDS = ((147, 150, 153), (146, 149, 152), (148, 151, 154))
 # Roles come from the resident N64 music selector (see the module comment).
 MUSIC_ROLES = {
     0: "menu", 1: "unused-1", 2: "terran-result-a", 3: "terran-result-b",
@@ -602,6 +615,12 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
             for sound in sets[kind]:
                 if lengths[sound] > 8 and sound not in selected:
                     selected.append(sound)
+    advisor = [sound for race in ADVISOR_SOUNDS for sound in race]
+    for sound in advisor:
+        if lengths[sound] <= 8:
+            raise ValueError(f"advisor sound {sound} is empty")
+        if sound not in selected:
+            selected.append(sound)
     selected.sort()
 
     clips: list[bytes] = []
@@ -659,6 +678,9 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
         c_array("sc64_audio_unit_first", "u16", unit_first),
         c_array("sc64_audio_unit_count", "u8", unit_count, 24),
         c_array("sc64_audio_unit_sound", "u16", flat or [0]),
+        "/* Advisor refusal clips per player race (Terran, Zerg, Protoss): minerals, gas, supply. */",
+        f"#define SC64_AUDIO_ADVISOR_LINES {len(ADVISOR_LINES)}",
+        c_array("sc64_audio_advisor", "u16", [bank_index[s] for s in advisor], len(ADVISOR_LINES)),
         "/* Byte offset of each imported track's stream. */",
         c_array("sc64_audio_music_offset", "u32", music_offset, 8),
         "/* Track lengths in 176-sample frames; zero when not imported. */",
@@ -683,6 +705,10 @@ def generate(rom_path: Path, out_dir: Path, music: tuple[int, ...],
         "pcm_sha256": bank["pcm_sha256"],
         "verified": verify,
         "units_with_sounds": sum(1 for s in unit_sets if any(s[k] for k in KINDS)),
+        "advisor": {race: {line: {"sound_id": sound, "sample": bank_index[sound],
+                                  "samples": sample_length[bank_index[sound]]}
+                           for line, sound in zip(ADVISOR_LINES, sounds)}
+                    for race, sounds in zip(("terran", "zerg", "protoss"), ADVISOR_SOUNDS)},
     }
     (out_dir / "sc64_audio_manifest.json").write_text(json.dumps(report, indent=2) + "\n")
     return report

@@ -88,6 +88,9 @@ void audio_update(void);
  * Presentation only: these never read or write game state. Without a bank
  * they do nothing and audio_sampled_available() returns 0. */
 int audio_sampled_available(void);
+/* kind: an effect, a unit response (the speech voice) or an advisor line,
+ * which ignores priority and plays one line at a time (audio_mixer.h). */
+enum { AUDIO_CLASS_EFFECT, AUDIO_CLASS_SPEECH, AUDIO_CLASS_ADVISOR };
 void audio_play_sample(u16 sample,u8 priority,u8 kind);
 void audio_play_music(int track,int loop);
 /* Current or pending music track, or -1 when silent. */
