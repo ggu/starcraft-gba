@@ -2057,7 +2057,7 @@ static int race_load_game(void) {
      * projectile arena. The candidate packet already passed full preflight. */
     if (!race_p7_projectile_restore(race_data.interceptor_projectiles)) return 0;
 #endif
-    memset(tracers,0,sizeof(tracers));death_vfx_reset();mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
+    clear_tracers();death_vfx_reset();mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
     /* Loading restores the same serialized topology as the payload. Rebuild
      * routes, but do not treat the restore as a topology change that would

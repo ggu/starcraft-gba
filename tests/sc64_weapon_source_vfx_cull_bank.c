@@ -257,6 +257,14 @@ static void prepared_profiles_keep_pixel_output(void)
 
 int main(void)
 {
+    assert(sc64_weapon_source_vfx_anchor_may_be_visible(0, 0, 0, 0));
+    assert(sc64_weapon_source_vfx_anchor_may_be_visible(239, 107, 0, 0));
+    assert(!sc64_weapon_source_vfx_anchor_may_be_visible(240, 107, 0, 0));
+    assert(!sc64_weapon_source_vfx_anchor_may_be_visible(239, 108, 0, 0));
+    assert(sc64_weapon_source_vfx_anchor_may_be_visible(
+        INT_MIN, INT_MIN, INT_MAX, INT_MAX)); /* wrap fails open */
+    assert(!sc64_weapon_source_vfx_anchor_may_be_visible(
+        INT_MAX, INT_MAX, INT_MIN, INT_MIN));
     assert(SC64_WEAPON_SOURCE_BANK_VERSION == 1);
     assert(sc64_weapon_source_vfx_motion_has_proven_bounds(
         SC64_SOURCE_BULLET_FLY));

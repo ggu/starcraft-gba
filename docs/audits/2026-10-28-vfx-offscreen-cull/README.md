@@ -4,6 +4,8 @@ Status: enabled with the source-weapon renderer in the canonical Terran, Zerg
 Z6, Protoss P7 and Showcase products after current-main integration checks.
 Clear `CANONICAL_SOURCE_VFX_CULL_FLAGS` to retain the renderer without this cull.
 The original-art default build remains independent of the private bank.
+The subsequent [visible-effect audit](../2026-10-28-visible-vfx/README.md)
+records the duration cache, visible-anchor bypass and newer measurements.
 
 ## Behavior and bounds
 

@@ -927,6 +927,29 @@ static Geyser geysers[MAX_RACE_GEYSERS] = {{
 }
 };
 static Tracer tracers[MAX_TRACERS];
+#ifdef SC64_TRACE_DURATION_CACHE
+/* A trace's packed identity and captured endpoints stay fixed until its slot
+ * is replaced. Cache only their derived presentation duration, never age or
+ * simulation state. Long durations deliberately remain uncached. */
+static u16 sc64_trace_durations[MAX_TRACERS];
+static inline void sc64_trace_duration_cache_reset(void)
+{
+    memset(sc64_trace_durations, 0, sizeof(sc64_trace_durations));
+}
+static inline void sc64_trace_duration_cache_store(int slot, int duration)
+{
+    sc64_trace_durations[slot] = duration > 0 && duration <= 65535 ?
+        (u16)duration : 0;
+}
+#else
+#define sc64_trace_duration_cache_reset() ((void)0)
+#define sc64_trace_duration_cache_store(slot, duration) ((void)0)
+#endif
+static inline void clear_tracers(void)
+{
+    memset(tracers, 0, sizeof(tracers));
+    sc64_trace_duration_cache_reset();
+}
 #ifndef SC64_DEATH_VFX_DISABLED
 /* Presentation-only death effects. The pool and the alive shadow are never
  * read by the simulation and are absent from every save format. */
@@ -3482,6 +3505,18 @@ sc64_trace_duration(int packed, int x0, int y0, int x1, int y1)
     return sc64_weapon_vfx_lifetime(sc64_weapon_vfx_style(packed));
 }
 
+static inline int
+sc64_tracer_duration(int slot)
+{
+#ifdef SC64_TRACE_DURATION_CACHE
+    if (sc64_trace_durations[slot]) return sc64_trace_durations[slot];
+#endif
+    const Tracer *t = &tracers[slot];
+    int duration = sc64_trace_duration(t->color,t->x0,t->y0,t->x1,t->y1);
+    sc64_trace_duration_cache_store(slot, duration);
+    return duration;
+}
+
 static void __attribute__((noinline))
 add_tracer(int x0, int y0, int x1, int y1, int color)
 {
@@ -3493,8 +3528,7 @@ add_tracer(int x0, int y0, int x1, int y1, int color)
     if (duration<=0) return;
     for (int i=0;i<MAX_TRACERS;++i) {
         if (!tracers[i].life) { slot=i; break; }
-        int age=sc64_trace_duration(tracers[i].color,tracers[i].x0,tracers[i].y0,
-                    tracers[i].x1,tracers[i].y1)+1-tracers[i].life;
+        int age=sc64_tracer_duration(i)+1-tracers[i].life;
         if (age>oldest) { oldest=age; slot=i; }
     }
     /* Cosmetic overflow replaces the oldest effect, never a damage event.
@@ -3502,6 +3536,7 @@ add_tracer(int x0, int y0, int x1, int y1, int color)
     tracers[slot].x0=x0; tracers[slot].y0=y0;
     tracers[slot].x1=x1; tracers[slot].y1=y1;
     tracers[slot].color=color;
+    sc64_trace_duration_cache_store(slot, duration);
     /* Combat emits before end-of-update aging, including the first draw. */
     tracers[slot].life=duration+1;
 }
@@ -4009,6 +4044,7 @@ load_game(void)
     invalidate_path_grid();
     memcpy(m, data.minerals_map, sizeof(m));
     memcpy(tracers, data.tracer_data, sizeof(tracers));
+    sc64_trace_duration_cache_reset();
     death_vfx_reset();
     memcpy(explored, data.explored_map, sizeof(explored));
 #ifdef SC64_TERRAN_CAMPAIGN
@@ -4193,7 +4229,7 @@ init_state(void)
     train_type=race_mode?(race_human==R_TER?U_SCV:race_human==R_ZERG?U_DRONE:U_PROBE):
         (race_selected_mission<2?U_DRONE:U_PROBE);
     SC64_GRID_CLEAR(explored);SC64_GRID_CLEAR(visible);
-    memset(tracers,0,sizeof(tracers));
+    clear_tracers();
     death_vfx_reset();
     sc64_visibility_reset();
     race_campaign_init();
@@ -4210,7 +4246,7 @@ init_state(void)
     memset(u, 0, sizeof(u));
     memset(b, 0, sizeof(b));
     invalidate_path_grid();
-    memset(tracers, 0, sizeof(tracers));
+    clear_tracers();
     death_vfx_reset();
     SC64_GRID_CLEAR(explored);
     SC64_GRID_CLEAR(visible);
@@ -7819,7 +7855,7 @@ sc64_source_unit_attack_pose(const Unit *q)
         if(t->life<=0 || !sc64_weapon_source_vfx_unpack((uint32_t)t->color,&key) ||
            key.actor_slot_plus1!=slot || key.actor_raw!=raw ||
            q->x!=t->x0 || q->y!=t->y0) continue;
-        int age=sc64_trace_duration(t->color,t->x0,t->y0,t->x1,t->y1)-t->life;
+        int age=sc64_tracer_duration(i)-t->life;
         if(age<0) age=0;
         if(age>=newest) continue;
         const Sc64SpriteFrame *candidate=sc64_unit_attack_source_full_frame(
@@ -8002,14 +8038,17 @@ draw_tracers(void)
 #ifdef SC64_WEAPON_SOURCE_VFX
         if(sc64_weapon_source_vfx_is_tagged((uint32_t)tracers[i].color)) {
 #ifdef SC64_WEAPON_SOURCE_VFX_OFFSCREEN_CULL
-            if (sc64_weapon_source_vfx_trace_provably_offscreen(
+            if (!sc64_weapon_source_vfx_anchor_may_be_visible(
+                    tracers[i].x0, tracers[i].y0, camx, camy) &&
+                !sc64_weapon_source_vfx_anchor_may_be_visible(
+                    tracers[i].x1, tracers[i].y1, camx, camy) &&
+                sc64_weapon_source_vfx_trace_provably_offscreen(
                     (uint32_t)tracers[i].color,
                     tracers[i].x0, tracers[i].y0, tracers[i].x1, tracers[i].y1,
                     camx, camy))
                 continue;
 #endif
-            int age=sc64_trace_duration(tracers[i].color,tracers[i].x0,tracers[i].y0,
-                    tracers[i].x1,tracers[i].y1)-tracers[i].life;
+            int age=sc64_tracer_duration(i)-tracers[i].life;
             sc64_weapon_source_vfx_draw_trace((uint32_t)tracers[i].color,
                 tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,
                 tracers[i].life,(unsigned)(age<0?0:age));
