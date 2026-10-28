@@ -1154,6 +1154,22 @@ static int bfs_prev[MAP_CELLS], bfs_queue[MAP_CELLS];
 static u16 bfs_seen[MAP_CELLS], bfs_generation;
 #endif
 static int path_grid_valid;
+#if defined(SC64_DIRECT_FIRING_POINTS)
+#if !defined(SC64_RACES) || !defined(SC64_IMPORTED_MISSION)
+#error "SC64_DIRECT_FIRING_POINTS requires the imported race runtime"
+#endif
+/* One shared, transient direct firing point. The six u16 fields hold the
+ * exact target/range key and waypoint; valid is cleared with map topology. */
+static struct {
+    u16 tx, ty, minimum, maximum, x, y;
+    u8 valid;
+} sc64_direct_firing_cache;
+static void
+sc64_direct_firing_cache_invalidate(void)
+{
+    sc64_direct_firing_cache.valid = 0;
+}
+#endif
 static int minerals, gas, supply_used, supply_cap, frame, mode, menu, train_type;
 static int geyser_count;
 #ifdef SC64_IMPORTED_MISSION
@@ -2245,6 +2261,9 @@ static void
 invalidate_path_grid(void)
 {
     path_grid_valid = 0;
+#ifdef SC64_DIRECT_FIRING_POINTS
+    sc64_direct_firing_cache_invalidate();
+#endif
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
     race_depot_cache_invalidate_topology();
 #endif
@@ -5852,6 +5871,138 @@ unit_damage(int type)
 #endif
     return 0;
 }
+#ifdef SC64_DIRECT_FIRING_POINTS
+/* When ordinary movement has no route to the target center, look for a
+ * walkable tile center in the exact weapon band with a clear normal movement
+ * corridor. This is bounded to a 33x33 tile box, retains eight nearest
+ * candidates, checks at most eight direct corridors, and then tries at most
+ * two one-corner paths per nearby candidate. The cache stores the final firing
+ * tile; each origin computes and revalidates its own first-leg waypoint. */
+static int __attribute__((noinline))
+sc64_direct_firing_corner(int x, int y, int px, int py, int *nx, int *ny)
+{
+    if (dist2(x, y, px, py) > 128 * 128) return 0;
+    /* Horizontal-first: move to the candidate's x coordinate, then turn. */
+    if (direct_path_clear(x, y, px, y) &&
+        direct_path_clear(px, y, px, py)) {
+        *nx = px; *ny = y;
+        return 1;
+    }
+    /* Vertical-first: move to the candidate's y coordinate, then turn. */
+    if (direct_path_clear(x, y, x, py) &&
+        direct_path_clear(x, py, px, py)) {
+        *nx = x; *ny = py;
+        return 1;
+    }
+    return 0;
+}
+
+static int __attribute__((noinline))
+sc64_direct_firing_approach(int x, int y, int px, int py, int *nx, int *ny)
+{
+    if (direct_path_clear(x, y, px, py)) {
+        *nx = px; *ny = py;
+        return 1;
+    }
+    return sc64_direct_firing_corner(x, y, px, py, nx, ny);
+}
+
+static int __attribute__((noinline))
+sc64_direct_firing_waypoint(int x, int y, int tx, int ty,
+                            int minimum, int maximum, int *nx, int *ny)
+{
+    int col, row, count = 0;
+    int points[8], costs[8];
+    if (minimum < 0 || maximum < minimum || maximum > 256 ||
+        tx < 0 || ty < 0 || tx >= MAP_COLS * 16 || ty >= MAP_ROWS * 16)
+        return 0;
+    if (!path_grid_valid) build_path_grid();
+    if (sc64_direct_firing_cache.valid &&
+        sc64_direct_firing_cache.tx == tx && sc64_direct_firing_cache.ty == ty &&
+        sc64_direct_firing_cache.minimum == minimum &&
+        sc64_direct_firing_cache.maximum == maximum) {
+        int px = sc64_direct_firing_cache.x;
+        int py = sc64_direct_firing_cache.y;
+        int cell = px / 16 + (py / 16) * MAP_COLS;
+        if (px >= 0 && py >= 0 && px < MAP_COLS * 16 && py < MAP_ROWS * 16 &&
+            SC64_GRID_GET(path_walkable, cell)) {
+            int distance = dist2(px, py, tx, ty);
+            if (distance >= minimum * minimum && distance <= maximum * maximum &&
+                sc64_direct_firing_approach(x, y, px, py, nx, ny))
+                return 1;
+        }
+    }
+    {
+        int left = limit((tx - maximum) / 16, 0, MAP_COLS - 1);
+        int right = limit((tx + maximum) / 16, 0, MAP_COLS - 1);
+        int top = limit((ty - maximum) / 16, 0, MAP_ROWS - 1);
+        int bottom = limit((ty + maximum) / 16, 0, MAP_ROWS - 1);
+        int minimum2 = minimum * minimum, maximum2 = maximum * maximum;
+        for (row = top; row <= bottom; ++row) for (col = left; col <= right; ++col) {
+            int px = col * 16 + 8, py = row * 16 + 8;
+            int d = dist2(px, py, tx, ty), cost, i;
+            int cell = col + row * MAP_COLS;
+            if (d < minimum2 || d > maximum2 ||
+                !SC64_GRID_GET(path_walkable, cell)) continue;
+            cost = dist2(x, y, px, py);
+            if (count == 8 && cost >= costs[7]) continue;
+            i = count < 8 ? count++ : 7;
+            while (i > 0 && cost < costs[i - 1]) {
+                points[i] = points[i - 1]; costs[i] = costs[i - 1]; --i;
+            }
+            points[i] = cell; costs[i] = cost;
+        }
+    }
+    /* Preserve the fast corridor path for every retained candidate first. */
+    for (int i = 0; i < count; ++i) {
+        int cell = points[i];
+        int px = (cell % MAP_COLS) * 16 + 8;
+        int py = (cell / MAP_COLS) * 16 + 8;
+        if (!direct_path_clear(x, y, px, py)) continue;
+        *nx = px; *ny = py;
+        sc64_direct_firing_cache.tx = (u16)tx;
+        sc64_direct_firing_cache.ty = (u16)ty;
+        sc64_direct_firing_cache.minimum = (u16)minimum;
+        sc64_direct_firing_cache.maximum = (u16)maximum;
+        sc64_direct_firing_cache.x = (u16)px;
+        sc64_direct_firing_cache.y = (u16)py;
+        sc64_direct_firing_cache.valid = 1;
+        return 1;
+    }
+    /* For nearby final points, allow one axis-aligned turn around a corner.
+     * The final in-band point remains cached; only the returned first leg can
+     * be outside the firing band. Longer paths retain baseline retry behavior. */
+    for (int i = 0; i < count; ++i) {
+        int cell = points[i];
+        int px = (cell % MAP_COLS) * 16 + 8;
+        int py = (cell / MAP_COLS) * 16 + 8;
+        if (!sc64_direct_firing_corner(x, y, px, py, nx, ny)) continue;
+        sc64_direct_firing_cache.tx = (u16)tx;
+        sc64_direct_firing_cache.ty = (u16)ty;
+        sc64_direct_firing_cache.minimum = (u16)minimum;
+        sc64_direct_firing_cache.maximum = (u16)maximum;
+        sc64_direct_firing_cache.x = (u16)px;
+        sc64_direct_firing_cache.y = (u16)py;
+        sc64_direct_firing_cache.valid = 1;
+        return 1;
+    }
+    return 0;
+}
+
+static void __attribute__((noinline))
+move_toward_weapon_range(Unit *q, int tx, int ty, int minimum, int maximum)
+{
+    int may_plan = q->path_retry == 0 && q->path_timer <= 0;
+    int nx, ny;
+    move_toward(q, tx, ty);
+    if (!may_plan || q->path_retry != 12 || maximum < 32 ||
+        sc64_race_unit_flying(q->type)) return;
+    if (!sc64_direct_firing_waypoint(q->x, q->y, tx, ty, minimum, maximum, &nx, &ny))
+        return;
+    q->path_x = nx; q->path_y = ny;
+    q->path_retry = 0; q->path_timer = 24;
+}
+#endif
 #ifdef SC64_UNIT_FACING
 #if !defined(SC64_HAS_SPRITES) || !defined(SC64_RACES)
 #error "SC64_UNIT_FACING requires imported race sprites"
@@ -6051,7 +6202,12 @@ tick_combat(Unit * q, int target)
 #endif
 	}
     } else {
+#ifdef SC64_DIRECT_FIRING_POINTS
+	move_toward_weapon_range(q, target_x(target), target_y(target),
+                                 minimum_range, range);
+#else
 	move_toward(q, target_x(target), target_y(target));
+#endif
     }
 }
 

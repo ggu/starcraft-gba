@@ -2063,6 +2063,9 @@ static int race_load_game(void) {
      * routes, but do not treat the restore as a topology change that would
      * discard a worker's committed home-depot trip. */
     path_grid_valid=0;
+#ifdef SC64_DIRECT_FIRING_POINTS
+    sc64_direct_firing_cache_invalidate();
+#endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_routes_reset();
 #endif
