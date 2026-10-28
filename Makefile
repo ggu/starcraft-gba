@@ -59,6 +59,15 @@ test-sc64-p8-request-queue: build/test-sc64-p8-request-queue
 	./build/test-sc64-p8-request-queue
 test-starcraft: test-sc64-p8-request-queue
 
+# Source-only P8 request-admission predicate; player census rows are supplied
+# by the caller and this does not activate any P8 runtime path.
+.PHONY: test-sc64-p8-ai-admission
+build/test-sc64-p8-ai-admission: tests/sc64_p8_ai_admission.c starcraft/sc64_p8_ai_admission.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft $< -o $@
+test-sc64-p8-ai-admission: build/test-sc64-p8-ai-admission
+	./build/test-sc64-p8-ai-admission
+test-starcraft: test-sc64-p8-ai-admission
+
 # Asset-free P8 compact trigger scheduler contract. This does not include a
 # scenario descriptor or bind P8 actions to game-world effects.
 .PHONY: test-sc64-p8-runtime test-sc64-p8-source-contract
