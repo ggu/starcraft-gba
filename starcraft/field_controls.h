@@ -424,6 +424,10 @@ ui_row_icon(int i, int x, int y)
     }
 }
 
+#ifdef SC64_COMMAND_ICONS
+#include "command_card.h"
+#endif
+
 /* The framed order list: icon, label and cost per row, unavailable rows
  * dimmed, at most ten rows with scroll marks. */
 static void
@@ -431,6 +435,12 @@ field_controls_draw_command_menu(void)
 {
     int i, count = field_menu_count(), first = menu_cursor >= 10 ? menu_cursor - 9 : 0;
     int rows = count < 10 ? count : 10, x = 104, y = 14, w = 134;
+#ifdef SC64_COMMAND_ICONS
+    if (card_fits()) {
+        field_controls_draw_command_card();
+        return;
+    }
+#endif
     ui_panel(x, y, w, rows * 9 + 6, C_GOLD, 0);
     for (i = first; i < count && i < first + 10; i++) {
         int row = y + 4 + (i - first) * 9, cost, gas_cost;
@@ -558,20 +568,26 @@ ui_structure_note(int x, int y, int type, const char *label)
 
 /* Name, then mineral (gold) and gas (cyan) costs, on the HUD title row. */
 static void
-ui_title_costs(const char *name, int cost, int gas_cost)
+ui_title_costs(int x, const char *name, int cost, int gas_cost)
 {
-    int x = 5 + ui_text_width(name) + 7;
-    gfx_text(5, 126, name, C_WHITE);
+    gfx_text(x, 126, name, C_WHITE);
+    x += ui_text_width(name) + 7;
     if (cost) { gfx_num(x, 126, cost, C_GOLD); x += ui_num_width(cost) + 6; }
     if (gas_cost) gfx_num(x, 126, gas_cost, C_CYAN);
 }
 
 /* The HUD's top two rows while the order list is open, a structure is being
- * placed, or a move/attack is armed; 0 leaves the profile's own HUD. */
+ * placed, or a move/attack is armed; 0 leaves the profile's own HUD. With
+ * the command card, the command's button sits left of both rows. */
 static int
 field_controls_draw_hud(void)
 {
     const char *need;
+#ifdef SC64_COMMAND_ICONS
+    const int x = 27;
+#else
+    const int x = 5;
+#endif
     if (menu_open) {
         static const char *const notes[MENU_STOP + 1] = {
             "WALK TO A POINT", "FIGHT ALONG THE WAY", 0, 0, 0, 0, 0,
@@ -580,9 +596,12 @@ field_controls_draw_hud(void)
         int cost, gas_cost, type, state = ui_row_state(menu_cursor, &cost, &gas_cost, &need);
         int kind = ui_row_kind(menu_cursor, &type);
         const char *label = race_menu_label(menu_cursor);
-        ui_title_costs(label, cost, gas_cost);
-        if (state == UI_SITE_OK && type >= 0) ui_structure_note(5, 137, type, label);
-        else ui_status(5, 137, state, need, menu_cursor <= MENU_STOP && notes[menu_cursor] ?
+#ifdef SC64_COMMAND_ICONS
+        card_hud_icon(card_icon(menu_cursor));
+#endif
+        ui_title_costs(x, label, cost, gas_cost);
+        if (state == UI_SITE_OK && type >= 0) ui_structure_note(x, 137, type, label);
+        else ui_status(x, 137, state, need, menu_cursor <= MENU_STOP && notes[menu_cursor] ?
                        notes[menu_cursor] : kind == UI_ROW_SPECIAL ? "A USES IT" : 0, cost, gas_cost);
         return 1;
     }
@@ -590,19 +609,25 @@ field_controls_draw_hud(void)
         int site_x = cx, site_y = cy, ground, problem;
         field_ui_site(menu, &site_x, &site_y);
         problem = ui_site_problem(menu, site_x, site_y, &need, &ground);
-        ui_title_costs(sc64_race_building_name(menu), building_cost(menu), building_gas_cost(menu));
-        if (problem == UI_SITE_OK) gfx_text(5, 137, "A PLACE  B BACK", C_GREEN);
-        else ui_status(5, 137, problem, need, 0, building_cost(menu), building_gas_cost(menu));
+#ifdef SC64_COMMAND_ICONS
+        card_hud_icon(card_building_icon(menu));
+#endif
+        ui_title_costs(x, sc64_race_building_name(menu), building_cost(menu), building_gas_cost(menu));
+        if (problem == UI_SITE_OK) gfx_text(x, 137, "A PLACE  B BACK", C_GREEN);
+        else ui_status(x, 137, problem, need, 0, building_cost(menu), building_gas_cost(menu));
         return 1;
     }
     if (mode == MODE_MOVE || mode == MODE_ATTACK) {
         int n = selected_count();
-        gfx_text(5, 126, mode == MODE_MOVE ? "MOVE ORDER" : "ATTACK MOVE", field_controls_title_color());
+#ifdef SC64_COMMAND_ICONS
+        card_hud_icon(mode == MODE_MOVE ? SC64_CMD_ICON_MOVE : SC64_CMD_ICON_ATTACK);
+#endif
+        gfx_text(x, 126, mode == MODE_MOVE ? "MOVE ORDER" : "ATTACK MOVE", field_controls_title_color());
         if (n) {
-            gfx_num(77, 126, n, C_WHITE);
-            gfx_text(83 + ui_num_width(n), 126, n == 1 ? "UNIT" : "UNITS", C_DIM);
+            gfx_num(x + 72, 126, n, C_WHITE);
+            gfx_text(x + 78 + ui_num_width(n), 126, n == 1 ? "UNIT" : "UNITS", C_DIM);
         }
-        gfx_text(5, 137, mode == MODE_MOVE ? "A MOVE HERE  B BACK" : "A ATTACK HERE  B BACK", C_GOLD);
+        gfx_text(x, 137, mode == MODE_MOVE ? "A MOVE HERE  B BACK" : "A ATTACK HERE  B BACK", C_GOLD);
         return 1;
     }
     return 0;
