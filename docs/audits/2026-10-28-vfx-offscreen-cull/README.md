@@ -1,7 +1,9 @@
 # Source VFX offscreen cull
 
-Status: candidate implementation and one P7 ARM comparison are reviewed; the
-runtime flag remains off by default pending broader integration qualification.
+Status: enabled with the source-weapon renderer in the canonical Terran, Zerg
+Z6, Protoss P7 and Showcase products after current-main integration checks.
+Clear `CANONICAL_SOURCE_VFX_CULL_FLAGS` to retain the renderer without this cull.
+The original-art default build remains independent of the private bank.
 
 ## Behavior and bounds
 
@@ -52,6 +54,57 @@ describe this test vector, not expected game-wide rates.
 
 ## Bounded ARM result
 
+### Current-main integration
+
+The follow-up comparison includes main `523a5e2`, its render caches, N64
+interface and selected vital bars. Enabled and disabled builds use the same
+normal product define union and existing absolute private inputs; the cull
+define is the only runtime switch between each pair. Each run starts Blood
+Bath through the menu, with the ROM's race as human and three mixed-race AIs,
+then leaves the human unattended until defeat. All sampled semantic world
+records match between host and ARM and between enabled/disabled builds.
+Host runs also compare the actual RGB555 frame at each checkpoint: 12 records
+for Terran and 14 each for Zerg and Protoss (world and pixel records combined).
+These are sampled fixed-camera comparisons, not exhaustive visual coverage.
+
+| Profile | Measured-run mean FPS, disabled → enabled | Mean cycle change | Selected busy window FPS |
+| --- | --- | --- | --- |
+| Terran | 28.35 → 28.39 | -0.13% | frame 6001: 28.74 → 28.82 |
+| Zerg Z6 | 27.51 → 28.16 | -2.31% | frame 12001: 25.78 → 27.71 |
+| Protoss P7 | 27.74 → 28.53 | -2.77% | frame 9001: 25.44 → 28.57 |
+
+The final Zerg and Protoss windows regress by 1.23% and 1.47% respectively:
+26.43 → 26.11 and 23.54 → 23.19 FPS. This cull helps the off-screen workload;
+it does not remove the visible-effect cost or guarantee steady 30 FPS.
+The measured-run mean divides all measured cycles by all measured updates;
+it is not an average of rounded window FPS. The seven or six semantic
+checkpoints per run and the unattended defeat do not prove campaign wins,
+all camera positions, every AI configuration or physical-GBA timing.
+
+Additional current-main qualification:
+
+- The full source-only suite passes (643 Python tests, 20 optional skips,
+  plus native fixtures), as do the default ROM, source-boundary and whitespace
+  checks. A later Make/test-only correction scopes activation to the four qualified
+  products and uses an injected temporary Make file to inspect the real
+  product flags; the five focused cases pass again.
+- The prepared-bank ASan/UBSan pixel oracle still passes all 1,410,048 cases.
+- The normal-menu host skirmish/save/reload matrix passes 24 cases in each
+  race profile (72 total); this is in-process continuity, not fresh-process
+  physical SRAM qualification.
+- Four normal ARM product links retain the unchanged IWRAM/BSS guards.
+  No Unit, Tracer, packed save row, save identity or simulation state changes.
+- The directly compiled P7 cull helper retains its 280-byte static stack
+  frame. This is a compiler frame report, not a whole-game stack watermark.
+
+The current detailed evidence is local under
+`.local/build/vfx-current-paired/`, `.local/build/vfx-current-products/` and
+`.local/build/vfx-current-default/`. The paired result records identify the
+ROMs, argv, source hashes, isolated emulator launch handles and terminal
+process exits. No Actions, GDB or private asset generation was used.
+
+### Earlier P7 comparison
+
 The paired direct ARM build used the same prepared P7 long-run input and
 produced identical seven world-state records. At frame 9001, total cycles per
 frame fell from 703,474.6 to 595,449.4 (-15.36%), equivalent measured rate
@@ -65,8 +118,9 @@ benefit, not a whole-game frame-rate guarantee.
 
 The cache object is four bytes; linked BSS end grew by eight bytes because of
 alignment (2,580 bytes remain under the existing BSS guard). IWRAM end did not
-move. The cull helper's recorded stack frame is 280 bytes. Broader profile and
-campaign qualification is still required before enabling the flag by default.
+move. The cull helper's recorded stack frame is 280 bytes. The broader
+current-main checks above supersede the earlier default-off status; full
+campaign and hardware performance qualification remains open.
 
 Detailed local run records from the original audit environment were kept under
 `.local/build/vfx-offscreen-cull/` and
