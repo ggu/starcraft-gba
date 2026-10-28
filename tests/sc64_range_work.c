@@ -104,13 +104,6 @@ static void check_map(int cols, int rows, int tx, int ty, int lo, int hi)
                gradient_store + 1, field_bytes,
                frontier_store + 1, scratch_bytes,
                tx, ty, lo, hi) == SC64_RANGE_WORK_PENDING);
-    if (((unsigned)cols & ((unsigned)cols - 1u)) == 0u) {
-        unsigned shift = 0, stride = (unsigned)cols;
-        while (stride > 1u) { stride >>= 1; ++shift; }
-        assert(work.column_shift == shift + 1u);
-    } else {
-        assert(work.column_shift == 0);
-    }
     /* Poisoned gradient/frontier cannot become visible before clear+seed. */
     {
         int nx = -10, ny = -10;
@@ -352,7 +345,6 @@ static void test_sparse_long_layers(void)
     assert(sc64_range_work_begin(&work,128,128,walk_store+1,2048,
         gradient_store+1,6144,frontier_store+1,scratch,
         127*16+8,64*16+8,0,0)==SC64_RANGE_WORK_PENDING);
-    assert(work.column_shift == 8);
     while(work.phase!=SC64_RANGE_WORK_FLOOD && work.phase!=SC64_RANGE_WORK_DONE)
         assert(sc64_range_work_pump(&work,64,&used)==SC64_RANGE_WORK_PENDING);
     assert(work.phase==SC64_RANGE_WORK_FLOOD);
@@ -368,6 +360,41 @@ static void test_sparse_long_layers(void)
     finish(&work,1,bound);
     assert(sc64_range_work_query(&work,0,64,&nx,&ny,&mask)==SC64_RANGE_WORK_READY);
     assert(nx==1 && ny==64);
+}
+
+static void test_stride_boundaries(void)
+{
+    static const int widths[] = {1,2,3,4,8,16,32,64,128};
+    for (unsigned i=0;i<sizeof(widths)/sizeof(widths[0]);++i) {
+        Sc64RangeWork work;
+        int cols=widths[i],rows=5,tx=(cols-1)*16+8,ty=(rows-1)*16+8;
+        unsigned n=(unsigned)(cols*rows),grid_bytes=(n+7u)/8u;
+        unsigned field_bytes=(n*3u+7u)/8u;
+        unsigned scratch_bytes=sc64_range_work_scratch_required(n);
+        unsigned bound=(field_bytes+63u)/64u+(scratch_bytes+63u)/64u+2u*n+4u;
+        prepare(cols,rows,1,0x5a,0xa5);
+        assert(sc64_range_work_begin(&work,cols,rows,walk_store+1,grid_bytes,
+            gradient_store+1,field_bytes,frontier_store+1,scratch_bytes,
+            tx,ty,0,0)==SC64_RANGE_WORK_PENDING);
+        finish(&work,17,bound);
+        for(int row=0;row<rows;++row)for(int col=0;col<cols;++col){
+            int nx=-1,ny=-1;
+            unsigned mask=0;
+            int status=sc64_range_work_query(&work,col,row,&nx,&ny,&mask);
+            int distance=(cols-1-col)+(rows-1-row);
+            assert(status==SC64_RANGE_WORK_READY);
+            assert(nx>=0&&nx<cols&&ny>=0&&ny<rows);
+            if(distance==0){
+                assert(nx==col&&ny==row);
+            }else{
+                int next_distance=(cols-1-nx)+(rows-1-ny);
+                int dx=nx-col,dy=ny-row;
+                if(dx<0)dx=-dx;if(dy<0)dy=-dy;
+                assert(dx+dy==1);
+                assert(next_distance+1==distance);
+            }
+        }
+    }
 }
 
 static void test_bounded_seed_box(void)
@@ -408,6 +435,7 @@ int main(void)
     test_reset_and_bounds();
     test_sparse_long_layers();
     test_bounded_seed_box();
+    test_stride_boundaries();
     puts("sc64 range work: ok");
     return 0;
 }
