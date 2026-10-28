@@ -183,6 +183,15 @@ int main(void)
             held=(u16)p7_replay_inputs[input_index++].held;
         if(!input_frame(held))return 6;
         if(tick==111u && (screen!=SCREEN_PLAY || race_selected_mission!=SC64_P7_GLOBAL_ID)) return 2;
+        /* Reject tapes that merely pan while never selecting/ordering a unit. */
+        if(tick==619u && (selected_count()==0 || mode!=MODE_ATTACK)) return 7;
+        if(tick==715u) {
+            int accepted=0;
+            for(int i=0;i<MAX_UNITS;i++)
+                if(u[i].alive && u[i].owner==SIDE && u[i].selected &&
+                   u[i].order==ORDER_ATTACK_MOVE) ++accepted;
+            if(!accepted)return 8;
+        }
         if(tick>=111u && tick<=611u && (tick-11u)%100u==0u)
             snapshot("opening",tick-11u);
         if(tick>=815u && (tick-715u)%100u==0u)

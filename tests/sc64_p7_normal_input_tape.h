@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Frozen current-gen43 controller transitions; no world-state writes. */
+/* Ordinary current-field-control transitions; no world-state writes.
+ * START launches the briefing; an L tap cycles the unit selection. */
 #ifndef P7_GEN43_INPUT_TAPE_H
 #define P7_GEN43_INPUT_TAPE_H
 typedef struct { unsigned tick; unsigned short held; } P7ReplayInput;
@@ -14,9 +15,9 @@ static const P7ReplayInput p7_replay_inputs[] = {
     {8u,0u},
     {9u,1u},
     {10u,0u},
-    {11u,1u},
+    {11u,8u},
     {12u,0u},
-    {612u,256u},
+    {612u,512u},
     {613u,0u},
     {614u,2u},
     {615u,0u},
