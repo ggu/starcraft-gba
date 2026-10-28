@@ -219,6 +219,15 @@ int main(void)
     assert(sc64_p8_world_action(&world, &pause, 0, 0) ==
            SC64_P8_ACTION_COMPLETE);
     assert(pause_fixture.pause_calls == 1);
+    /* The source-pause marker is global: a different owner cannot acquire a
+     * second trigger marker while the first source pause is active. */
+    Sc64P8SourceAction competing_pause = make_action(5, 0, 0);
+    competing_pause.trigger = 2;
+    assert(sc64_p8_world_action(&world, &competing_pause, 1, 0) ==
+           SC64_P8_ACTION_COMPLETE);
+    assert(pause_fixture.pause_calls == 1 && timer.source_pause_active &&
+           timer.pause_trigger_mask[0] == 1u &&
+           timer.pause_trigger_mask[1] == 0u);
     assert(sc64_p8_timed_service_clock_paused(&timer, 1) == 0);
     before = timer.wait_ms[0];
     assert(sc64_p8_timed_service_tick(&timer, 1));
