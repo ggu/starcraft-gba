@@ -16,6 +16,7 @@ NON_DELIVERED = ("ZERG_Z4", "PROTOSS_P5", "PROTOSS_P6", "Z7_FULL_RENDER",
                  "P7_RENDER")
 NON_DELIVERED_WITH_SOURCE = NON_DELIVERED[:-1]
 CULL = "-DSC64_WEAPON_SOURCE_VFX_OFFSCREEN_CULL"
+CACHE = "-DSC64_TRACE_DURATION_CACHE"
 SOURCE = "-DSC64_WEAPON_SOURCE_VFX"
 
 
@@ -103,6 +104,31 @@ class VfxCullProfileFlagsTest(unittest.TestCase):
                 if name in NON_DELIVERED_WITH_SOURCE:
                     self.assertIn(SOURCE, profiles[name].split())
                 self.assertNotIn(CULL, profiles[name].split())
+
+    def test_duration_cache_is_limited_to_qualified_source_products(self) -> None:
+        profiles = expanded_profiles()
+        for name in PROFILES:
+            with self.subTest(profile=name):
+                self.assertIn(SOURCE, profiles[name].split())
+                self.assertIn(CACHE, profiles[name].split())
+        self.assertNotIn(CACHE, profiles["CFLAGS"].split())
+        for name in NON_DELIVERED:
+            with self.subTest(profile=name):
+                self.assertNotIn(CACHE, profiles[name].split())
+
+    def test_duration_cache_override_can_disable_cache(self) -> None:
+        profiles = expanded_profiles("CANONICAL_TRACE_DURATION_FLAGS=")
+        for name in PROFILES:
+            with self.subTest(profile=name):
+                self.assertIn(SOURCE, profiles[name].split())
+                self.assertNotIn(CACHE, profiles[name].split())
+
+    def test_duration_cache_requires_source_renderer(self) -> None:
+        profiles = expanded_profiles("SOURCE_WEAPON_FLAGS=")
+        for name in PROFILES:
+            with self.subTest(profile=name):
+                self.assertNotIn(SOURCE, profiles[name].split())
+                self.assertNotIn(CACHE, profiles[name].split())
 
 
 if __name__ == "__main__":
