@@ -41,7 +41,8 @@ static int race_t6_building_product_available(int owner, int raw_owner, int type
 /* ui_action (game.c, beside the other field state) holds one of these. */
 enum {
     UI_A_NONE, UI_A_SELECT, UI_A_DESELECT, UI_A_TRAIN, UI_A_ATTACK,
-    UI_A_MOVE_HERE, UI_A_ATTACK_HERE, UI_A_PLACE, UI_A_GAS, UI_A_MOVE
+    UI_A_MOVE_HERE, UI_A_ATTACK_HERE, UI_A_PLACE, UI_A_GAS, UI_A_MOVE,
+    UI_A_MINE
 };
 
 /* Why a command or site is unavailable, or UI_SITE_OK. */
@@ -108,6 +109,10 @@ field_ui_a_action(int selected)
     if (selected && ui_hostile_at(cx, cy, &hx, &hy)) return UI_A_ATTACK;
     if (target >= 0) return UI_A_SELECT;
     if (selected_building >= 0) return UI_A_DESELECT;
+#ifdef SC64_WORKER_CARGO_KIND
+    if (selected && find_selected_worker() >= 0 &&
+        sc64_worker_mineral_at(cx, cy) >= 0) return UI_A_MINE;
+#endif
     return selected ? UI_A_MOVE : UI_A_NONE;
 }
 
@@ -522,6 +527,7 @@ field_controls_hint(void)
     case UI_A_SELECT: return "B COMMANDS  A SELECT";
     case UI_A_DESELECT: return "B COMMANDS  A DESELECT";
     case UI_A_GAS: return "B COMMANDS  A GATHER GAS";
+    case UI_A_MINE: return "A GATHER MINERALS";
     case UI_A_MOVE: return "B COMMANDS  A MOVE";
     default: return 0;
     }
@@ -535,6 +541,7 @@ field_controls_unit_hint(void)
     case UI_A_ATTACK: return "A ATTACK  B ORDERS";
     case UI_A_SELECT: return "A SELECT  B ORDERS";
     case UI_A_GAS: return "A GAS  B ORDERS";
+    case UI_A_MINE: return "A MINE  B ORDERS";
     case UI_A_MOVE: return "A MOVE  B ORDERS";
     default: return "B ORDERS  SEL DROP";
     }
