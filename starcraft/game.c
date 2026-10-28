@@ -1983,6 +1983,10 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     int i = find_build_slot();
     if (i < 0)
 	return -1;
+    /* Destruction leaves the selection index on the dead slot; a new
+       structure there must not inherit it (and its selected vital bar). */
+    if (selected_building == i)
+        selected_building = -1;
 #ifdef SC64_P7_PROJECTILES_ENABLED
     race_p7_projectile_clear_references(MAX_UNITS+i);
 #endif

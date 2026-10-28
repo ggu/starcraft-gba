@@ -265,6 +265,34 @@ test_building_shield_bar_and_health_independence(void)
     selected_building=-1;
 }
 
+/* Destroying the selected structure leaves its pool index selected; a new
+ * structure allocated into that slot must not inherit the selection or bar. */
+static void
+test_reused_building_slot_drops_stale_selection(void)
+{
+    fixture();
+    int slot=spawn_build(SIDE,B_BARRACKS,100,70,0);
+    assert(slot>=0);
+    selected_building=slot;
+    hit_target_impl_ex(MAX_UNITS+slot,100000,U_MARINE,1,0,0);
+    assert(!b[slot].alive);
+    assert(selected_building==slot); /* the stale handle the fix must clear */
+
+    int reused=spawn_build(SIDE,B_DEPOT,100,70,0);
+    assert(reused==slot);
+    assert(selected_building==-1);
+    capture_building(&b[slot],empty_shield_pixels);
+    for(int i=0;i<FB_PIXELS;++i) assert(empty_shield_pixels[i]==C_BLACK);
+
+    /* Selecting the new structure still shows its own bar. */
+    selected_building=slot;
+    capture_building(&b[slot],full_shield_pixels);
+    BarBox box=building_bar_for_test(&b[slot]);
+    assert_black_row(full_shield_pixels,box,0);
+    assert(count_row(full_shield_pixels,box,1,C_GREEN)>0);
+    selected_building=-1;
+}
+
 static void
 test_energy_strip(void)
 {
@@ -350,6 +378,7 @@ main(void)
     test_health_tier_colors();
     test_unshielded_unit_has_no_added_bar();
     test_building_shield_bar_and_health_independence();
+    test_reused_building_slot_drops_stale_selection();
     test_energy_strip();
 #ifdef SC64_RACES
     test_selected_hud_reads_live_shield_values();
