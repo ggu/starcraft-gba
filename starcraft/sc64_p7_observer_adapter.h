@@ -207,10 +207,10 @@ static unsigned sc64_p7_arbiter_pack(unsigned mask,unsigned timer,int aura,int t
 }
 
 /* U_SCV is enum value zero. Only a byte-for-byte zero Unit row is unused. */
-static int sc64_p7_arbiter_cache_empty_unit(const Unit *actor)
+#include "sc64_zero_bytes.h"
+static int sc64_p7_arbiter_cache_empty_unit(const void *actor)
 {
-    static const Unit zero = {0};
-    return actor && memcmp(actor, &zero, sizeof(zero)) == 0;
+    return sc64_bytes_are_zero(actor, sizeof(Unit));
 }
 
 static int sc64_p7_observer_arbiter_aura_candidate(int target)
