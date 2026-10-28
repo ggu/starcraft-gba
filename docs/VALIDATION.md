@@ -5998,3 +5998,57 @@ The separate Z7 CONTACT candidate has a [frozen ARM win and fresh-process
 save audit](audits/2026-10-28-z7-arm-save-win/README.md). It remains below
 the near-30-fps target; current-source host coverage and ARM source boundaries
 are reported separately.
+
+## Default menus and controls in every race ROM (2026-10-27)
+
+`SC64_FIELD_CONTROLS` moved from the Showcase flags into `RACES_FLAGS`, so
+every race-engine ROM uses `starcraft/field_controls.h`: the framed command
+list, the HUD reason line, grid placement with a coloured footprint, and the
+pause and result panels. All ROMs, including the default one, also gained A
+on open ground to move the selection, SELECT to drop it, and placement that
+picks the nearest free worker. UI state stays transient; `SAVE_VERSION` and
+the campaign save identities are unchanged.
+
+Linker results against base `0de9882` (same shared `.local` inputs):
+
+| ROM | IWRAM end (base → now) | BSS end (base → now) |
+| --- | --- | --- |
+| Default `StarCraft-GBA` | `0x03002ee8` → `0x03002ee8` | `0x02004434` → `0x0200443c` |
+| Unified `StarCraft64-GBA` | `0x03004e28` → `0x03004e28` | `0x0203d3c0` → `0x0203d368` |
+| Races | `0x03004e28` → `0x03004e28` | `0x0203d1a0` → `0x0203d140` |
+| Terran | `0x03004e08` → `0x03004e08` | `0x0203de94` → `0x0203de34` |
+| Zerg Z3 | `0x03004f18` → `0x03004f18` | `0x02039c58` → `0x02039c00` |
+| Zerg Z4 | `0x03004f20` → `0x03004f20` | `0x0203c4d0` → `0x0203c458` |
+| Protoss P3 | `0x03004c70` → `0x03004c70` | `0x02039e00` → `0x02039da8` |
+| Protoss P4 Storm | `0x03004730` → `0x03004730` | `0x0203d490` → `0x0203d420` |
+| Showcase | `0x03004fd8` → `0x03004fd8` | `0x0203dfe8` → `0x0203df68` |
+| Terran Skirmish (no race engine) | `0x030038f0` → `0x030038f0` | `0x02038f34` → `0x02038f34` |
+
+The race label table used to be a writable array; it is now `const`, which
+more than pays for the two new pause bytes and three HUD cache keys. The Zerg
+Z6, Protoss P6 and legacy Terran-campaign inputs were not prepared on this
+machine, so those ROMs were not linked here.
+
+Host results: 261 of 264 commands from `make test`, `test-unified`,
+`test-races`, `test-zerg-z3`, `test-zerg-z4`, `test-sc64-p3`,
+`test-protoss-p4-storm` and `test-sc64-terran-full-campaign` pass. T9's
+500,000-tick controller limit also fails on base `0de9882` in this
+environment. Two Python checks fail on base too (the absent P6 inputs and the
+Z8 pack's symlink refusal under a linked `.local`); targets needing P6 inputs
+were not run.
+
+Scripted controllers were adjusted for the new input rules: the list reopens
+on the last command (a fresh open now starts on Move without extra input),
+an R tap selects on release, and A trains only on the selected structure. The
+P3 and T5 controllers now check the grid-snapped site and avoid sites that
+strand the builder; the P3 controller also aims its sweep from a fighter that
+can reach a target. Recorded ARM/mGBA input replays were not rerun and may
+need re-recording, because R, A and SELECT now behave differently.
+
+After merging base `7ff622c`, silent builds (`SC64_AUDIO=0`, because that
+base requires a codec-format-2 audio bank and the shared bank here is raw)
+keep IWRAM identical to the new base and lower BSS: Terran `0x0203df24` →
+`0x0203dec4`, Races `0x0203d128` → `0x0203d0c8`, Showcase `0x0203df70` →
+`0x0203def0`. `./dev build`, `test-sc64-showcase`, `test-races`,
+`test-zerg-z3` and `test-sc64-p3` pass; `test-unified` stops only on the
+absent P7 inputs.

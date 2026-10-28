@@ -23,6 +23,16 @@ static void press(u16 key)
     input(0);
 }
 
+/* Field controls reopen the order list on the last command. These
+ * sequences were written for a list that opens on Move, so a fresh
+ * open starts there (no extra input, so the run's timing is unchanged). */
+static void press_b(void)
+{
+    int fresh = !menu_open && mode == MODE_NORMAL;
+    press(KEY_B);
+    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+}
+
 static void launch_z4(void)
 {
     game_init();
@@ -81,7 +91,7 @@ static int new_worker(int x, int y)
 static void select_command(int choice)
 {
     int steps;
-    press(KEY_B);
+    press_b();
     for (steps = 0; steps < choice; ++steps) press(KEY_DOWN);
     assert(menu_open && menu_cursor == choice);
     input(KEY_A);
@@ -226,6 +236,7 @@ static void test_spire_and_mutalisk_production(void)
     assert(sc64_race_unit_rules[U_MUTALISK].prereq & SC_PR_SPIRE);
     b[hatch].larva = 2;
     old_minerals = minerals; old_gas = gas;
+    cx = b[hatch].x; cy = b[hatch].y; /* A trains on the selected structure */
     interact();
     assert(b[hatch].queue_count == 1 && b[hatch].queue[0] == U_MUTALISK);
     assert(b[hatch].larva == 1 && minerals == old_minerals - 100 && gas == old_gas - 100);

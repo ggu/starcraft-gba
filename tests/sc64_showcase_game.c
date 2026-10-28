@@ -460,11 +460,13 @@ static int check_field_controls_review(void)
     resolve_now();
     if (!field_controls_hint() || strcmp(field_controls_hint(), "A CHOOSE  B CLOSE"))
         return fail("controls: the open order list kept the field hint");
+    /* The HUD explains the highlighted row: Move needs a selection. */
+    menu_cursor = MENU_MOVE;
     draw_hud_commands();
     unsigned drawn = hint_band_hash();
     gfx_rect(0, 137, 132, 9, C_PANEL);
-    gfx_text(5, 137, "A CHOOSE  B CLOSE", C_GOLD);
-    if (hint_band_hash() != drawn) return fail("controls: HUD row does not show the menu hint");
+    gfx_text(5, 137, "SELECT UNITS FIRST", C_RED);
+    if (hint_band_hash() != drawn) return fail("controls: HUD row does not explain the unavailable command");
     press(KEY_B);
 
     hydra = -1;
@@ -494,6 +496,88 @@ static int check_field_controls_review(void)
         return fail("controls: restart did not land on frame 0 with nothing selected");
     field_ui_refresh();
     if (ui_action != field_ui_a_action(0)) return fail("controls: ATTACK cache survived a restart");
+    return 0;
+}
+
+/* Each race's skirmish: A on open ground moves, SELECT drops the selection,
+ * every list row resolves and draws, placement snaps and finds its own
+ * worker, and the pause list saves. */
+static int check_field_controls_races(void)
+{
+    static const int races[3] = {R_TER, R_ZERG, R_PROTOSS};
+#ifdef GBA_SCENE_CLIP
+    gfx_set_clip_y(0, 160);
+#endif
+    for (int r = 0; r < 3; ++r) {
+        int worker = -1, x, y, before, placed = -1, slot;
+        game_init(); previous = 0;
+        race_mode = 1; race_human = races[r]; race_bots = 1; race_skirmish_map = 0;
+        init_state();
+        for (int i = 0; i < MAX_UNITS && worker < 0; ++i)
+            if (u[i].alive && u[i].owner == SIDE && IS_WORKER(u[i].type)) worker = i;
+        if (worker < 0 || !open_spot(&x, &y)) return fail("races: no worker or open ground");
+        cx = u[worker].x; cy = u[worker].y;
+        press(KEY_A);
+        if (!u[worker].selected) return fail("races: A did not select the worker");
+        cx = x; cy = y;
+        resolve_now();
+        if (ui_action != UI_A_MOVE || strcmp(field_controls_unit_hint(), "A MOVE  B ORDERS"))
+            return fail("races: open ground does not offer a move");
+        press(KEY_A);
+        if (!u[worker].selected || u[worker].order != ORDER_MOVE || ping_color != C_GREEN)
+            return fail("races: A on open ground did not move the worker");
+        press(KEY_SELECT);
+        if (selected_count() || screen != SCREEN_PLAY) return fail("races: SELECT did not drop the selection");
+
+        /* Every row of the open list, nothing selected. */
+        press(KEY_B);
+        if (!menu_open) return fail("races: B did not open the list");
+        for (int i = 0; i < field_menu_count(); ++i) {
+            int cost, gas_cost;
+            const char *need;
+            menu_cursor = i;
+            int state = ui_row_state(i, &cost, &gas_cost, &need);
+            if ((i == MENU_MOVE || i == MENU_STOP) && state != UI_SITE_UNITS)
+                return fail("races: orders are not dimmed without a selection");
+            game_render();
+        }
+
+        /* The supply structure, with no worker selected: the nearest
+         * worker builds it on the 8-pixel grid. */
+        minerals = 1000; gas = 1000;
+        menu_cursor = MENU_DEPOT;
+        {
+            int cost, gas_cost;
+            const char *need;
+            if (ui_row_state(MENU_DEPOT, &cost, &gas_cost, &need) != UI_SITE_OK)
+                return fail("races: the supply structure is unavailable with funds");
+        }
+        press(KEY_A);
+        if (mode != MODE_BUILD) return fail("races: the supply row did not arm placement");
+        cx = x + 3; cy = y + 2;
+        game_render();
+        before = minerals;
+        press(KEY_A);
+        for (slot = 0; slot < MAX_BUILDINGS; ++slot)
+            if (b[slot].alive && b[slot].owner == SIDE && b[slot].type == menu &&
+                dist2(b[slot].x, b[slot].y, x + 3, y + 2) < 8 * 8) placed = slot;
+        if (placed < 0 || minerals >= before) return fail("races: placement without a selected worker failed");
+        if ((b[placed].x & 7) || (b[placed].y & 7)) return fail("races: placement did not snap to the grid");
+        if (selected_count()) return fail("races: the builder replaced the selection");
+
+        /* Pause: down to SAVE GAME, A saves and says so; START resumes. */
+        press(KEY_START);
+        if (screen != SCREEN_PAUSE) return fail("races: START did not pause");
+        press(KEY_DOWN);
+        press(KEY_A);
+        if (pause_cursor != 1 || (pause_notice & 0xc0) != UI_NOTICE_SAVED) return fail("races: pause did not save");
+        game_render();
+        press(KEY_START);
+        if (screen != SCREEN_PLAY || pause_cursor || pause_notice) return fail("races: START did not resume");
+        won = 1; screen = SCREEN_RESULT; result_outro_end = 1; result_outro = 200;
+        game_render();
+        won = 0; screen = SCREEN_PLAY;
+    }
     return 0;
 }
 
@@ -729,7 +813,7 @@ int main(void)
     if (!facing_is_zero()) return fail("successful load restored/retained stale facing bytes");
 #endif
 #ifdef SC64_FIELD_CONTROLS
-    if (check_field_controls() || check_field_controls_load()) return 1;
+    if (check_field_controls() || check_field_controls_load() || check_field_controls_races()) return 1;
 #endif
     puts("Showcase menu, scene runtime, pause controls, and save isolation: ok");
     return 0;
