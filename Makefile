@@ -3936,7 +3936,9 @@ UNIT_FACING_FLAGS := -I.local/sc64/facing/generated -DSC64_UNIT_FACING
 # verified ROM into a private header (see tools/sc64_command_icons.py).
 COMMAND_ICON_HEADER := .local/sc64/command-icons/generated/sc64_command_icons_generated.h
 COMMAND_ICON_FLAGS := -I.local/sc64/command-icons/generated -DSC64_COMMAND_ICONS
-$(COMMAND_ICON_HEADER): tools/sc64_command_icons.py tools/sc64_sprites.py
+# The HUD icons take the nearest runtime palette colours: the UI palette in
+# common/gba.c and the imported entries beside the sprite remap.
+$(COMMAND_ICON_HEADER): tools/sc64_command_icons.py tools/sc64_sprites.py common/gba.c .local/sc64/backwater/generated/palette-remap.bin .local/sc64/backwater/generated/palette.json
 	$(PYTHON) tools/sc64_command_icons.py
 SHOWCASE_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 SHOWCASE_SIEGE_FLAGS ?= -DSC64_SIEGE_SPLASH

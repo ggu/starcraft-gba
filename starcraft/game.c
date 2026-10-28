@@ -9125,9 +9125,13 @@ draw_hud_resources(void)
     card_resource_icon(SC64_HUD_SPRITE_GAS, 60);
     gfx_num(74, 3, gas, C_WHITE);
     card_resource_icon(card_supply_sprite(), 126);
-    gfx_num(140, 3, (supply_used + race_owner_queued_supply(SIDE)) / 2, C_WHITE);
-    gfx_text(154, 3, "/", C_WHITE);
-    gfx_num(162, 3, supply_cap / 2, C_WHITE);
+    {
+        /* The slash follows the used count, so 100/200 keeps its spacing. */
+        int used = (supply_used + race_owner_queued_supply(SIDE)) / 2, x = 140 + ui_num_width(used) + 3;
+        gfx_num(140, 3, used, C_WHITE);
+        gfx_text(x, 3, "/", C_WHITE);
+        gfx_num(x + 8, 3, supply_cap / 2, C_WHITE);
+    }
 #else
     gfx_text(3, 3, "MIN", C_GOLD);
     gfx_num(24, 3, minerals, C_WHITE);

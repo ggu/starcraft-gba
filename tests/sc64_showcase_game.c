@@ -638,6 +638,38 @@ static int check_command_card(void)
             return fail("card: the top bar still draws the MIN or GAS label");
     }
 
+    /* Supply: used (with queued units), slash and cap never overlap, from
+     * 99 to three-digit counts. Overlapping glyphs share white pixels, so
+     * the drawn bar would hold fewer than the three drawn apart. */
+    {
+        static const int cases[][2] = {{99, 100}, {100, 200}, {200, 200}};
+        int producer = -1, saved_used = supply_used, saved_cap = supply_cap;
+        for (int i = 0; i < MAX_BUILDINGS && producer < 0; ++i)
+            if (b[i].alive && b[i].owner == SIDE && !b[i].queue_count) producer = i;
+        if (producer < 0) return fail("card: no friendly structure to queue supply on");
+        b[producer].queue_head = 0;
+        b[producer].queue_count = 1;
+        b[producer].queue[0] = U_ZEALOT;
+        int queued = race_owner_queued_supply(SIDE);
+        if (queued <= 0) return fail("card: the queued Zealot reserves no supply");
+        for (unsigned k = 0; k < sizeof cases / sizeof cases[0]; ++k) {
+            int used = cases[k][0], cap = cases[k][1], apart = 0;
+            supply_used = used * 2 - queued;
+            supply_cap = cap * 2;
+            gfx_rect(0, 0, 240, 12, C_PANEL);
+            gfx_num(10, 3, used, C_WHITE);
+            gfx_text(60, 3, "/", C_WHITE);
+            gfx_num(80, 3, cap, C_WHITE);
+            apart = card_pixels(0, 0, 240, 12, C_WHITE);
+            draw_hud_resources();
+            if (card_pixels(139, 0, 101, 12, C_WHITE) != apart || !card_pixels(140, 0, 5, 12, C_WHITE))
+                return fail("card: the supply count overlaps its slash or cap");
+        }
+        b[producer].queue_count = 0;
+        supply_used = saved_used;
+        supply_cap = saved_cap;
+    }
+
     /* One selected unit: its portrait, full health bar and shield bar. */
     {
         int unit = -1;
