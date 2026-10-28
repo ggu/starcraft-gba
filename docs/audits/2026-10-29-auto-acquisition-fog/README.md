@@ -32,10 +32,52 @@ Those earlier traces cannot qualify a new campaign win.
 
 ## Qualification status
 
-Work in progress: focused regressions and current-product checks are being
-completed locally. No mission is enabled by this change. Three race ROMs,
-map selection, all human races and one to three AIs remain the intended product
-scope. Full campaign completion and steady 30 fps are not established.
+Runtime checkpoint `2abc3d5` is qualified on default branch base
+`4b3717302a4eb7b17de969873ef53a34fea5870d`. Follow-up `f308f95` only initializes
+historical all-visible fixture baselines explicitly. Local results:
+
+- Default build and tests pass: 649 Python checks, 20 optional skips, eight
+  profile/native checks and the asset-free C suites. Source-boundary and
+  whitespace checks pass.
+- Exact tracked-source sanitizer fixtures pass for unit target queries, plain
+  list/array queries, late-Terran defense owner lists, P3 and Z/P defense paths,
+  and P6 wall traps. Regressions check hidden-nearer/visible-farther candidates,
+  all-hidden, reveal/loss, human/AI differences, and a real one-update idle
+  attack. The direct hit-resolver check verifies released damage is not gated
+  by the new acquisition predicate; it is not a projectile lifecycle replay.
+- All four normal ARM products link with unchanged RAM/stack guards and no BSS
+  growth. Remaining IWRAM/BSS bytes: Terran 584/28,532; Z6 168/28,424;
+  P7 1,168/23,880; Showcase 48/200. Four normal 32 MiB ROM headers, game codes
+  and SRAM signatures verify.
+- The current-source host matrix passes 72 normal-menu skirmish/save/load
+  continuations: both maps, all three human races, one to three AIs, and focused
+  mixed-three-AI compositions in each campaign product.
+- Three normal-menu Blood Bath/mixed-three-AI actual ARM replays match fresh
+  current-runtime host world and displayed Mode4 RGB555 checkpoints. Their
+  37,859 counted frames sample an aggregate 28.834 fps, with the slowest P7
+  window at 25.367 fps. These are fixed-camera unattended defeats. Individual
+  full-frame work samples reach about 300 ms; this is not steady 30 fps.
+  Changed combat eligibility can change workloads, so these figures do not
+  isolate the CPU cost of the visibility predicate.
+- Three actual in-place and fresh-process SRAM continuations match their fresh
+  current-source host records at frame 9001 through frame 9901. Six owned SRAM
+  emulator processes and the three rendering/timing emulator processes all
+  terminate and are waited on. Transient-cache markers in these harnesses
+  describe the VFX duration cache only.
+
+Private evidence stays under `.local/build/idle-auto-visibility/`,
+`idle-auto-visibility-products/`, `idle-auto-visibility-rgb/`, and
+`idle-auto-visibility-fresh-sram/`. The two defense fixture baseline changes
+occurred after the pixel probes compiled; compatibility records confirm that
+all compiled runtime inputs are unchanged. Initial optional-fixture failures
+and the private host capture helper's 64-bit pointer-cast compile failure are
+preserved; the exact tracked fixtures and corrected host-only capture guard
+were then rerun successfully.
+
+No mission is enabled by this change. Delivered catalog remains T10/Z6/P7
+(23 missions), with map selection and all human races versus one to three AIs.
+All 30 original missions remain the campaign goal. Full campaign completion,
+steady 30 fps and hardware qualification are not established.
 
 No assets, generated game data, ROMs, saves, captures, private traces or native
 decompilation sources are tracked. No Actions are dispatched.
