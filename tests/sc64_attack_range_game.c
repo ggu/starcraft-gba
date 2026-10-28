@@ -76,7 +76,7 @@ static void preserve_other_movement(void)
     assert(u[victim].hp == 500);
     assert(u[attacker].x == 400 && u[attacker].y == 400);
 #ifdef SC64_ATTACK_RANGE_ROUTES
-    assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] != 3);
+    assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] == 0);
 #endif
 
     setup_scene(U_HYDRALISK, 38);
@@ -86,7 +86,7 @@ static void preserve_other_movement(void)
     assert(u[attacker].x == 400 && u[attacker].y == 400);
     assert(u[victim].hp == 500);
 #ifdef SC64_ATTACK_RANGE_ROUTES
-    assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] != 3);
+    assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] == 0);
 #endif
 }
 
@@ -102,7 +102,7 @@ static void fog_pursuit_uses_last_seen_only(void)
     assert(u[attacker].tx == 400 && u[attacker].ty == 240);
     assert(u[victim].hp == 500);
 #ifdef SC64_ATTACK_RANGE_ROUTES
-    assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] != 3);
+    assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] == 0);
 #endif
 }
 #endif

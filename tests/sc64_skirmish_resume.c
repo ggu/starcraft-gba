@@ -182,7 +182,7 @@ static void verify_resume(int map, int human, int bots, int forced_bot_race)
     {
         int nx, ny;
         (void)sc64_route_range_next(8, 8, 8, 8, 0, 64, &nx, &ny);
-        assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] == 3);
+        assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] >= 3);
     }
 #endif
     input(KEY_L); /* load action returns directly to play without a tick */

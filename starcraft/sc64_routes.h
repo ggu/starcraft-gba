@@ -226,8 +226,8 @@ static int sc64_route_configure(void)
 #endif
 #ifdef SC64_ATTACK_RANGE_ROUTES
 /* One existing field is reserved for a shared firing region. A multi-source
- * region can span disconnected components, so valid=3 must never be used as
- * a single-component label by formation queries (which require valid=1). */
+ * region can span disconnected components, so valid=3 (partial) or 4 (full)
+ * must never be used as a component label (formation requires valid=1). */
 #define SC64_ROUTE_POINT_SLOTS (SC64_ROUTE_ACTIVE_SLOTS - 1)
 static u16 sc64_route_range_x, sc64_route_range_y;
 static u16 sc64_route_range_min, sc64_route_range_max;
@@ -357,14 +357,10 @@ static int sc64_route_origin_ready(int slot, int origin, int origin_walkable)
 }
 #endif
 
-#if defined(SC64_ROUTE_FLOOD_SPLIT) || defined(SC64_ATTACK_RANGE_ROUTES)
+#ifdef SC64_ROUTE_FLOOD_SPLIT
 /* Keep lookup/metadata cold while preserving a hot flood loop. The caller
  * passes the existing seed queue and partial-completeness state unchanged. */
-static int
-#ifdef SC64_ROUTE_FLOOD_SPLIT
-GBA_HOT
-#endif
-__attribute__((noinline))
+static int GBA_HOT __attribute__((noinline))
 sc64_route_flood(int slot, int head, int *tail, int origin,
                  int origin_walkable, int complete)
 {
@@ -658,16 +654,61 @@ sc64_route_blocked_start(int slot,int col,int row,int goal,int *out_col,int *out
 #endif
 
 #ifdef SC64_ATTACK_RANGE_ROUTES
+/* A region field only needs to discover this origin, not every remote map
+ * cell. A later query outside the discovered prefix rebuilds for its origin;
+ * queries along an existing gradient reuse it. Exhausted fields cache failure
+ * too. Keep these checks in ROM, outside the ordinary hot point-route flood. */
+static int
+sc64_route_range_origin_ready(int slot, int origin, int origin_walkable)
+{
+    int col, row;
+    if (sc64_route_get(slot, origin) != SC64_ROUTE_UNREACHABLE) return 1;
+    if (origin_walkable) return 0;
+    col = sc64_cell_col(origin); row = sc64_cell_row(origin);
+    return (col > 0 && sc64_route_get(slot, origin - 1) != SC64_ROUTE_UNREACHABLE) ||
+        (col + 1 < MAP_COLS && sc64_route_get(slot, origin + 1) != SC64_ROUTE_UNREACHABLE) ||
+        (row > 0 && sc64_route_get(slot, origin - MAP_COLS) != SC64_ROUTE_UNREACHABLE) ||
+        (row + 1 < MAP_ROWS && sc64_route_get(slot, origin + MAP_COLS) != SC64_ROUTE_UNREACHABLE);
+}
+
+static int __attribute__((noinline))
+sc64_route_range_flood(int slot, int *tail, int origin, int origin_walkable)
+{
+    int head = 0, end = *tail;
+    if (sc64_route_range_origin_ready(slot, origin, origin_walkable)) return 0;
+    while (head < end) {
+        int cell = bfs_queue[head++], col = sc64_cell_col(cell), row = sc64_cell_row(cell);
+        int next;
+#define SC64_RANGE_FLOOD(condition, neighbour, direction) \
+        if (condition) { next = (neighbour); \
+            if (SC64_GRID_GET(path_walkable, next) && \
+                sc64_route_get(slot, next) == SC64_ROUTE_UNREACHABLE) { \
+                sc64_route_put(slot, next, (direction)); bfs_queue[end++] = (u16)next; \
+            } }
+        SC64_RANGE_FLOOD(col > 0, cell - 1, 1);
+        SC64_RANGE_FLOOD(col + 1 < MAP_COLS, cell + 1, 2);
+        SC64_RANGE_FLOOD(row > 0, cell - MAP_COLS, 3);
+        SC64_RANGE_FLOOD(row + 1 < MAP_ROWS, cell + MAP_COLS, 4);
+#undef SC64_RANGE_FLOOD
+        if (sc64_route_range_origin_ready(slot, origin, origin_walkable)) {
+            *tail = end;
+            return 0;
+        }
+    }
+    *tail = end;
+    return 1;
+}
+
 /* An unreachable target center need not imply an unreachable firing point.
  * Seed every walkable tile center inside the *existing* weapon band, then
- * reuse one reverse flood for all attackers of that target/range. No actor,
+ * reuse its discovered gradient for attackers of that target/range. No actor,
  * save row or field pool grows. Exact target coordinates are part of the key;
  * firing still uses tick_combat's ordinary distance/visibility checks. */
 static int __attribute__((noinline))
 sc64_route_range_next(int x, int y, int tx, int ty,
                       int min_range, int max_range, int *next_x, int *next_y)
 {
-    int slot, col, row, cell, direction, goal;
+    int slot, col, row, cell, direction, goal, origin_walkable;
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
     if (!sc64_route_configure()) return 0;
 #endif
@@ -677,10 +718,15 @@ sc64_route_range_next(int x, int y, int tx, int ty,
     if (!path_grid_valid) build_path_grid();
     slot = SC64_ROUTE_ACTIVE_SLOTS - 1;
     goal = tx / 16 + (ty / 16) * MAP_COLS;
-    if (sc64_route_valid[slot] != 3 ||
+    col = limit(x / 16, 0, MAP_COLS - 1); row = limit(y / 16, 0, MAP_ROWS - 1);
+    cell = col + row * MAP_COLS;
+    origin_walkable = SC64_GRID_GET(path_walkable, cell);
+    if ((sc64_route_valid[slot] != 3 && sc64_route_valid[slot] != 4) ||
         sc64_route_range_x != tx || sc64_route_range_y != ty ||
-        sc64_route_range_min != min_range || sc64_route_range_max != max_range) {
-        int head = 0, tail = 0, i;
+        sc64_route_range_min != min_range || sc64_route_range_max != max_range ||
+        (sc64_route_valid[slot] == 3 &&
+         !sc64_route_range_origin_ready(slot, cell, origin_walkable))) {
+        int tail = 0, complete, origin = cell;
         int left = limit((tx - max_range) / 16, 0, MAP_COLS - 1);
         int right = limit((tx + max_range) / 16, 0, MAP_COLS - 1);
         int top = limit((ty - max_range) / 16, 0, MAP_ROWS - 1);
@@ -705,20 +751,12 @@ sc64_route_range_next(int x, int y, int tx, int ty,
                 !SC64_GRID_GET(path_walkable, cell)) continue;
             sc64_route_put(slot, cell, 0);
             bfs_queue[tail++] = (u16)cell;
-#ifdef SC64_ROUTE_VISIT_GRID
-            SC64_GRID_SET(path_walkable, cell, 0);
-#endif
         }
-        (void)sc64_route_flood(slot, head, &tail, -1, 0, 1);
-#ifdef SC64_ROUTE_VISIT_GRID
-        for (i = 0; i < tail; ++i) SC64_GRID_SET(path_walkable, bfs_queue[i], 1);
-#else
-        (void)i;
-#endif
+        complete = sc64_route_range_flood(slot, &tail, origin, origin_walkable);
         sc64_route_goal[slot] = (u16)goal;
         sc64_route_range_x = (u16)tx; sc64_route_range_y = (u16)ty;
         sc64_route_range_min = (u16)min_range; sc64_route_range_max = (u16)max_range;
-        sc64_route_valid[slot] = 3;
+        sc64_route_valid[slot] = complete ? 4 : 3;
         ++sc64_route_builds;
     } else ++sc64_route_hits;
     col = limit(x / 16, 0, MAP_COLS - 1); row = limit(y / 16, 0, MAP_ROWS - 1);

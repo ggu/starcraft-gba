@@ -122,6 +122,12 @@ int main(void)
     /* The reserved range field does not replace a normal point cache slot. */
     assert(sc64_route_slot(3+3*MAP_COLS)>=0);
     assert(sc64_route_valid[SC64_ROUTE_SLOTS-1]==3);
+    /* Evict every ordinary field, then query the region's exact goal as a
+       point. It must not borrow the region's reachable outer seeds. */
+    for(int i=0;i<SC64_ROUTE_POINT_SLOTS*3;i++)
+        assert(sc64_route_slot(i % MAP_CELLS)>=0);
+    assert(sc64_route_valid[SC64_ROUTE_SLOTS-1]==3);
+    assert(!sc64_route_next(4*16+8,10*16+8,12*16+9,10*16+8,&nx,&ny));
     assert(sc64_route_slot(3+3*MAP_COLS)>=0);
     assert(sc64_route_valid[SC64_ROUTE_SLOTS-1]==3);
     /* Seeds exist, but the attacker's disconnected component cannot reach
@@ -132,6 +138,16 @@ int main(void)
     for(int y=10;y<MAP_ROWS;y++)for(int x=15;x<MAP_COLS;x++)path_walkable[x+y*MAP_COLS]=1;
     assert(oracle_range(18*16+8,15*16+8,32,48)>0);
     assert(!query(2*16+8,2*16+8,18*16+8,15*16+8,32,48,&nx,&ny));
+    builds=sc64_route_builds;
+    assert(!query(2*16+8,2*16+8,18*16+8,15*16+8,32,48,&nx,&ny));
+    assert(sc64_route_builds==builds); /* Exhausted failures are cached. */
+    /* A seed query can leave a partial prefix. A far origin with the same
+       key must extend coverage by rebuilding rather than claim no route. */
+    clear_map();
+    assert(query(15*16+8,10*16+8,15*16+8,10*16+8,0,32,&nx,&ny));
+    builds=sc64_route_builds;
+    assert_descent(1*16+8,1*16+8,15*16+8,10*16+8,0,32);
+    assert(sc64_route_builds>builds);
     /* Blocked starts may step out through a reachable adjacent gradient. */
     clear_map();path_walkable[5+5*MAP_COLS]=0;
     assert(oracle_range(15*16+8,5*16+8,16,48)>0);
@@ -195,12 +211,13 @@ int main(void)
     clear_map();memset(path_walkable,0,sizeof(path_walkable));
     for(int x=2;x<=5;x++)path_walkable[x+10*MAP_COLS]=1;
     for(int x=18;x<=21;x++)path_walkable[x+10*MAP_COLS]=1;
+    path_walkable[12+10*MAP_COLS]=1; /* Open root, independently disconnected. */
     {
         int starts[]={2+10*MAP_COLS},goals[]={5+10*MAP_COLS};
         int other[]={18+10*MAP_COLS},hs[SC64_ROUTE_COMPONENT_HINTS];
         int hr[SC64_ROUTE_COMPONENT_HINTS],hn=0;
         for(int i=0;i<SC64_ROUTE_COMPONENT_HINTS;i++)hs[i]=hr[i]=-1;
-        assert(query(2*16+8,10*16+8,12*16+8,10*16+8,80,160,&nx,&ny));
+        assert(query(2*16+8,10*16+8,12*16+8,10*16+8,0,160,&nx,&ny));
         assert(sc64_route_valid[SC64_ROUTE_SLOTS-1]==3);
         hs[0]=SC64_ROUTE_SLOTS-1;hr[0]=12+10*MAP_COLS;
         assert(sc64_route_cells_connected(starts,1,goals,1,other,1,hs,hr,&hn,0)==1);
