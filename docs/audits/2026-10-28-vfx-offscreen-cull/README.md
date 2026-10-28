@@ -90,8 +90,14 @@ Additional current-main qualification:
   product flags; the five focused cases pass again.
 - The prepared-bank ASan/UBSan pixel oracle still passes all 1,410,048 cases.
 - The normal-menu host skirmish/save/reload matrix passes 24 cases in each
-  race profile (72 total); this is in-process continuity, not fresh-process
-  physical SRAM qualification.
+  race profile (72 total).
+- Separate current-source ARM fresh-process SRAM checks pass for all three
+  race ROM profiles: save at frame 1801, continue to 2701, then start a new
+  process with the same ROM and unchanged SRAM. Restored and continued
+  semantic hashes match their saved/reference records. Each profile has a
+  private HOME/config/save directory, and all six owned processes are
+  confirmed terminal. This is emulator SRAM continuity, not physical-GBA
+  qualification.
 - Four normal ARM product links retain the unchanged IWRAM/BSS guards.
   No Unit, Tracer, packed save row, save identity or simulation state changes.
 - The directly compiled P7 cull helper retains its 280-byte static stack
@@ -99,7 +105,8 @@ Additional current-main qualification:
 
 The current detailed evidence is local under
 `.local/build/vfx-current-paired/`, `.local/build/vfx-current-products/` and
-`.local/build/vfx-current-default/`. The paired result records identify the
+`.local/build/vfx-current-default/`; fresh SRAM records are under
+`.local/build/vfx-current-fresh-sram/`. The paired result records identify the
 ROMs, argv, source hashes, isolated emulator launch handles and terminal
 process exits. No Actions, GDB or private asset generation was used.
 
