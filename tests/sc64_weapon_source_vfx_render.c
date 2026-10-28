@@ -12,6 +12,7 @@ static int currently_visible(int x, int y);
 typedef struct { int x, y, w, h, mapped; const uint8_t *src; unsigned rows; } Call;
 static Call calls[1024];
 static unsigned call_count;
+static unsigned visibility_query_count;
 /* fog_mode 0: the original x < 16 mask; 1: visible[] tile grid. */
 static int fog_mode;
 static unsigned char visible_tiles[MAP_ROWS][MAP_COLS];
@@ -21,6 +22,7 @@ static int canvas[160][240];
 
 static int currently_visible(int x, int y)
 {
+    ++visibility_query_count;
     if (fog_mode) return visible_tiles[y / 16][x / 16];
     (void)y;
     return x < 16; /* Match the engine's tile-wide visibility mask. */
@@ -110,6 +112,36 @@ static void fog_paths_match_the_oracle(void)
         check_fogged_raster(&r, 120, 60, 1);
         if (!pattern) assert(call_count == r.height); /* reversed rows, one call each */
     }
+
+    /* A hidden tile suppresses a whole tile span, not one lookup per pixel.
+     * Keep the pixel oracle active so this also checks that no hidden source
+     * bytes are written while the scan advances to the next tile boundary. */
+    r.mirror_pixels = 0;
+    camx = camy = 0;
+    for (int ty = 0; ty < MAP_ROWS; ++ty)
+        for (int tx = 0; tx < MAP_COLS; ++tx) visible_tiles[ty][tx] = 0;
+    visibility_query_count = 0;
+    check_fogged_raster(&r, 128, 64, 0);
+    assert(call_count == 0);
+    assert(visibility_query_count <= r.height * 3 + 1);
+
+    /* The same tile skips must preserve mapped source strength and dark-mask
+     * LUT dispatch, including mirrored rows and mixed visible/hidden tiles. */
+    static const uint8_t lookup[40 * 256] = {0};
+    for (int ty = 0; ty < MAP_ROWS; ++ty)
+        for (int tx = 0; tx < MAP_COLS; ++tx)
+            visible_tiles[ty][tx] = (unsigned char)((tx + ty) & 1);
+    r.modifier = 9; r.lookup = lookup; r.lookup_rows = 40;
+    visibility_query_count = 0;
+    check_fogged_raster(&r, 128, 64, 1);
+    assert(call_count > 0);
+    for (unsigned i = 0; i < call_count; ++i) assert(calls[i].mapped);
+    r.modifier = 10; r.lookup_rows = 1;
+    visibility_query_count = 0;
+    check_fogged_raster(&r, 128, 64, 0);
+    assert(call_count > 0);
+    for (unsigned i = 0; i < call_count; ++i) assert(calls[i].mapped);
+
     fog_mode = 0; camx = camy = 0;
 }
 
