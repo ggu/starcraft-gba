@@ -2171,8 +2171,16 @@ build/test-sc64-protoss-canonical-p7-controller: $(P7_CAMPAIGN_CONTROLLER) $(STA
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) -DP7_CONTROLLER_PROFILE=\"PROTOSS_P7_CANONICAL_FLAGS\" $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-protoss-canonical-p7-save: tests/sc64_p7_interceptor_flight_game.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P7_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+# The canonical P7 profile shares the OBJ tile VRAM between the projectile
+# arena and the VRAM terrain cache; the host backs both with one array.
+build/test-sc64-p7-obj-vram: tests/sc64_p7_obj_vram.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P7_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+.PHONY: test-sc64-p7-obj-vram
+test-sc64-p7-obj-vram: build/test-sc64-p7-obj-vram
+	./build/test-sc64-p7-obj-vram
 .PHONY: test-sc64-protoss-p7-canonical
-test-sc64-protoss-p7-canonical: build/test-sc64-protoss-canonical-p7-controller build/test-sc64-protoss-canonical-p7-save tools/sc64_p7_campaign_trace.py
+test-sc64-protoss-p7-canonical: build/test-sc64-protoss-canonical-p7-controller build/test-sc64-protoss-canonical-p7-save build/test-sc64-p7-obj-vram tools/sc64_p7_campaign_trace.py
+	./build/test-sc64-p7-obj-vram
 	./build/test-sc64-protoss-canonical-p7-save
 	./build/test-sc64-protoss-canonical-p7-controller $(PROTOSS_P7_CONTROLLER_TRACE)
 	$(PYTHON) tools/sc64_p7_campaign_trace.py --require-win $(PROTOSS_P7_CONTROLLER_TRACE)

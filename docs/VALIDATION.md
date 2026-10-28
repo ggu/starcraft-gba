@@ -6154,7 +6154,8 @@ absent P7 inputs.
 ## Render caches in spare VRAM and on the second page (2026-10-28)
 
 The canonical Terran, Zerg and Protoss ROM flag sets now keep 68 of the 108
-saved terrain rows in the unused OBJ tile VRAM, restore the HUD bands from the
+saved terrain rows (48 in the P7 profile, after its projectile arena) in the
+OBJ tile VRAM that mode-4 products leave to data, restore the HUD bands from the
 page on screen instead of EWRAM copies, maintain the 24x24 minimap raster at
 visibility transitions, and compare cached fog rows as bit runs. The host
 frame oracle compiled with the Zerg Z1-Z6, Protoss P7 and Terran ROM flags
@@ -6171,3 +6172,18 @@ at `0x02037198` (Zerg) and `0x02037090` (Protoss P7), 28,120 bytes lower than
 before, and IWRAM ends fall slightly. These are mGBA measurements, not
 hardware results, and no mission qualification changes; see
 [the audit](audits/2026-10-28-render-caches/README.md).
+
+Review of the branch found that the first layout placed the cache rows at
+`0x06014000`, over the P7 interceptor projectile arena enabled by the same
+canonical flags; host fixtures could not see it because each owner had its
+own host array. `starcraft/sc64_obj_vram.h` now assigns disjoint ranges with
+static assertions, the host backs the whole area with one shared array, and
+`tests/sc64_p7_obj_vram.c` (`make test-sc64-p7-obj-vram`, run by
+`test-sc64-protoss-p7-canonical`) checks on that shared space that terrain
+captures preserve the arena and its encoded packet, that arena writes
+preserve the cached rows and the rendered frame, and that an arena placed
+over the cache rows is detected; the fixture fails against the old layout.
+After the fix, merged with main at `eaf07ca`, the P7 frame oracle and the
+Protoss, Zerg and Terran HUD-cache fixtures still pass, the projectile probe
+passes, and the P7, Zerg Z1-Z6 and Terran ROMs link inside both guards (P7
+BSS end `0x02038258`, IWRAM end `0x03004b30`).

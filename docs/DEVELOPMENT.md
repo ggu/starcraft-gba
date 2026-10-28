@@ -146,14 +146,18 @@ and staged profiles retain their existing flag selections.
 The canonical ROM flag sets also add `CANONICAL_CACHE_FLAGS`
 (`SC64_TERRAIN_CACHE_VRAM`, `SC64_HUD_VRAM_BANDS`, `SC64_TERRAIN_ROW_MASKS`)
 and `SC64_MINIMAP_RASTER` in `CANONICAL_MINIMAP_FLAGS`. They keep most of the
-saved terrain band in the unused OBJ tile VRAM, restore HUD bands from the
+saved terrain band in the OBJ tile VRAM that bitmap products leave to data
+(`starcraft/sc64_obj_vram.h` maps that area; the P7 projectile arena comes
+first, so the P7 profile keeps 48 rows there and other profiles 68), restore
+HUD bands from the
 page on screen instead of EWRAM copies, maintain the minimap raster at
 visibility transitions, and compare cached fog rows as bit runs. Each is
 pixel-exact against the uncached renderer and frees about 28 KB of EWRAM in
 the Zerg and Protoss products. To compare a prepared profile without them,
 use `make -B zerg CANONICAL_CACHE_FLAGS= CANONICAL_MINIMAP_FLAGS=-DSC64_MINIMAP_BLIT`.
 The tile-renderer probe needs that VRAM itself and does not take
-`SC64_TERRAIN_CACHE_VRAM`. See the
+`SC64_TERRAIN_CACHE_VRAM`. `make test-sc64-p7-obj-vram` checks the P7 arena
+and cache on one shared host buffer. See the
 [render cache audit](audits/2026-10-28-render-caches/README.md).
 Word-sprite builds phase-align the temporary raster with its screen position;
 the [alignment audit](audits/2026-10-27-minimap-phase/README.md) records the

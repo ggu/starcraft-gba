@@ -45,8 +45,11 @@ int gfx_copy_band_from_front(int y,int height);
  * including color 0. Uses the current scene clip. */
 void gfx_blit_opaque(int x,int y,int width,int height,const u8 *indexed_pixels);
 /* The two mode-4 pages end at 0x06013600 and bitmap products keep objects
- * off, so the OBJ tile area 0x06014000-0x06017FFF is free for pixel caches.
- * VRAM takes no byte stores: write it with gfx_read_band or word stores. */
+ * off, so the OBJ tile area 0x06014000-0x06017FFF holds data instead. It is
+ * shared, not free: starcraft/sc64_obj_vram.h assigns its ranges (the P7
+ * projectile arena first, pixel caches after), and the host backs the whole
+ * area with one array so overlaps surface in fixtures. VRAM takes no byte
+ * stores: write it with gfx_read_band or word stores. */
 #define GBA_VRAM_SCRATCH_BYTES 16384u
 #ifdef GBA_HOST
 extern u8 gba_vram_scratch[GBA_VRAM_SCRATCH_BYTES];

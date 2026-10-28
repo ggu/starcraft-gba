@@ -12,13 +12,17 @@ frame. It is not a 30 fps or hardware claim.
 
 Four independent options, each exact by construction:
 
-- `SC64_TERRAIN_CACHE_VRAM` keeps the first 68 rows of the saved terrain band
-  in the OBJ tile VRAM at `0x06014000`, which mode-4 products never use
-  because objects stay off. Only the remaining 40 rows stay in EWRAM. The
-  band is written solely by 32-bit DMA (`gfx_read_band`), so VRAM's halfword
-  store rule is respected, and the restore, scrolled restore and capture
-  become two transfers over the same screen rows. VRAM-to-VRAM DMA moves a
-  word in about half the cycles of EWRAM-to-VRAM.
+- `SC64_TERRAIN_CACHE_VRAM` keeps the first rows of the saved terrain band
+  in the OBJ tile VRAM at `0x06014000`, which the mode-4 display leaves to
+  data because objects stay off. That area is shared, not unused:
+  `starcraft/sc64_obj_vram.h` maps it, with the P7 interceptor projectile
+  arena (4,816 bytes) first and the cache after it. Profiles without the
+  arena keep 68 rows there (16,320 bytes) and 40 rows in EWRAM; the canonical
+  P7 profile keeps 48 rows (11,520 bytes from `0x060152d0`) and 60 in EWRAM.
+  The band is written solely by 32-bit DMA (`gfx_read_band`), so VRAM's
+  halfword store rule is respected, and the restore, scrolled restore and
+  capture become two transfers over the same screen rows. VRAM-to-VRAM DMA
+  moves a word in about half the cycles of EWRAM-to-VRAM.
 - `SC64_HUD_VRAM_BANDS` drops the EWRAM copies of the top and bottom HUD
   bands in the reusable-band profiles. Each page keeps a content version per
   band and the clear count it was drawn at; a stale page copies the band
@@ -87,10 +91,41 @@ and IWRAM at `0x03004e80`. The new blit helpers run from ROM because the
 canonical profiles had under 400 bytes of IWRAM reserve left; the Zerg and
 Protoss IWRAM ends still fall by 48 and 56 bytes.
 
+The P7 figures above were measured with all 68 rows in VRAM, which
+overlapped the projectile arena (see Ownership below). With the 48-row P7
+layout, 4,800 bytes return to EWRAM; merged with main at `eaf07ca`, which
+also added briefings and the command card, the P7 link ends BSS at
+`0x02038258` and IWRAM at `0x03004b30`, the Zerg Z1-Z6 link at `0x02039bf0`
+and `0x03004ed8`, and Terran at `0x02037034` and `0x03004df0`, all inside
+the linker guards.
+
+## Ownership of the OBJ tile VRAM
+
+The first version of this cache placed its rows at `0x06014000`, the same
+address as the P7 interceptor projectile arena
+(`sc64_p7_projectile_adapter.h`, 4,816 bytes). The canonical P7 flags enable
+both, so every terrain capture would have overwritten the live arena on
+hardware, and projectile writes would have contaminated the cached rows. The
+host builds gave each its own array, so no host fixture could see it; the
+owner's review caught it. `starcraft/sc64_obj_vram.h` now assigns the two
+ranges, with static assertions that they are disjoint, word aligned and
+inside the 16 KiB, and refuses the tile renderer alongside either. On the
+host both owners now share one backing array (`gba_vram_scratch`), and
+`tests/sc64_p7_obj_vram.c` (`make test-sc64-p7-obj-vram`, part of
+`test-sc64-protoss-p7-canonical`) checks on that shared space that a terrain
+capture leaves every arena word and the encoded projectile packet intact,
+that writing every arena word leaves the cached rows intact and a cached
+frame equal to an uncached one, and that an arena deliberately placed over
+the cache rows is corrupted by one capture. Compiled against the old layout
+the fixture fails in every check.
+
 ## Limits
 
 The OBJ tile area is taken by `SC64_TILE_RENDERER`, so that probe cannot
-enable `SC64_TERRAIN_CACHE_VRAM` and the header refuses the combination. The
+enable `SC64_TERRAIN_CACHE_VRAM` or the projectile arena, and
+`sc64_obj_vram.h` refuses the combination. The 2.5 KiB page padding at
+`0x06013600` belongs to the death-VFX state and the gap after the audio
+arena to the audio snapshot; neither is available to the cache. The
 terrain and HUD options need `SC64_NO_FRAME_CLEAR` with reusable bands to
 matter; elsewhere they compile to the existing paths. Default-profile and
 legacy Z3/P3 builds keep their previous flags and remain byte-identical.

@@ -35,17 +35,21 @@ static int sc64_terrain_store_key(int x, int y, unsigned int k) { (void)x; (void
 #endif
 
 #ifdef SC64_TERRAIN_CACHE_VRAM
-/* The first rows of the saved band live in the unused OBJ tile VRAM. DMA
- * moves them at VRAM speed, and only the remainder occupies EWRAM. */
-#ifdef SC64_TILE_RENDERER
-#error "SC64_TERRAIN_CACHE_VRAM needs the OBJ tile VRAM that the tile renderer uses"
-#endif
-#define SC64_TERRAIN_CACHE_VRAM_ROWS 68
+/* The first rows of the saved band live in the OBJ tile VRAM range that
+ * sc64_obj_vram.h assigns to the cache: the whole 16 KiB (68 rows) in most
+ * products, the part after the P7 projectile arena (48 rows) when that arena
+ * is enabled. DMA moves them at VRAM speed; only the remainder occupies
+ * EWRAM. */
+#include "sc64_obj_vram.h"
+#define SC64_TERRAIN_CACHE_VRAM_ROWS ((int)(SC64_OBJ_VRAM_CACHE_BYTES / 240u))
 #define SC64_TERRAIN_CACHE_RAM_ROWS \
     (SC64_TERRAIN_CACHE_HEIGHT - SC64_TERRAIN_CACHE_VRAM_ROWS)
-_Static_assert(240 * SC64_TERRAIN_CACHE_VRAM_ROWS <= (int)GBA_VRAM_SCRATCH_BYTES,
-               "terrain cache rows exceed the spare VRAM");
-#define sc64_terrain_cache_pixels_vram ((u8 *)GBA_VRAM_SCRATCH)
+_Static_assert(SC64_TERRAIN_CACHE_VRAM_ROWS > 0 &&
+               SC64_TERRAIN_CACHE_VRAM_ROWS < SC64_TERRAIN_CACHE_HEIGHT,
+               "the VRAM terrain cache needs part, not all, of the band in VRAM");
+_Static_assert(SC64_OBJ_VRAM_CACHE_OFFSET + 240u * SC64_TERRAIN_CACHE_VRAM_ROWS <=
+               GBA_VRAM_SCRATCH_BYTES, "terrain cache rows exceed the OBJ tile VRAM");
+#define sc64_terrain_cache_pixels_vram ((u8 *)SC64_OBJ_VRAM_CACHE)
 static u8 sc64_terrain_cache_pixels_ram[240 * SC64_TERRAIN_CACHE_RAM_ROWS]
     __attribute__((aligned(4)));
 #else
