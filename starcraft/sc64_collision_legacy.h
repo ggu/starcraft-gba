@@ -7,6 +7,14 @@ _Static_assert(MAX_UNITS < 255, "Spatial unit indices must fit below the sentine
 #error "SC64_COLLISION_PACKED_HIT requires SC64_COLLISION_CLASS_CACHE"
 #endif
 
+#ifdef SC64_CONTACT_GROUP_INDEX
+#if !defined(SC64_CONTACT_CACHE) || !defined(SC64_Z7_RUNTIME) || \
+    !defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_P6_COMBAT_ENABLED) || \
+    defined(SC64_COLLISION_STEER_LIST) || defined(SC64_LATE_TERRAN_STORAGE)
+#error "CONTACT_GROUP_INDEX is only supported by the Z7 CONTACT profile without P6 or persistent collision"
+#endif
+#endif
+
 /* Exact broad-phase index for moving units. Built only for update_orders();
  * all candidates still use the engine's original overlap predicate. */
 static u8 sc64_unit_bucket_head[MAP_CELLS];
@@ -17,6 +25,21 @@ static u16 sc64_unit_bucket_dirty[MAX_UNITS * 2];
 static u16 sc64_unit_bucket_dirty_count;
 static int sc64_unit_bucket_initialized;
 static int sc64_unit_bucket_active;
+#ifdef SC64_CONTACT_GROUP_INDEX
+/* Group representatives link by cell; bucket_next links members. This uses
+ * actor slots as representatives and adds one byte per slot. */
+static u8 sc64_unit_bucket_group_next[MAX_UNITS];
+#define SC64_UNIT_BUCKET_FOR_EACH(cell, slot) \
+    for (int sc64_bucket_rep = sc64_unit_bucket_head[(cell)]; \
+         sc64_bucket_rep != 0xff; \
+         sc64_bucket_rep = sc64_unit_bucket_group_next[sc64_bucket_rep]) \
+        for ((slot) = sc64_bucket_rep; (slot) != 0xff; \
+             (slot) = sc64_unit_bucket_next[slot])
+#else
+#define SC64_UNIT_BUCKET_FOR_EACH(cell, slot) \
+    for ((slot) = sc64_unit_bucket_head[(cell)]; (slot) != 0xff; \
+         (slot) = sc64_unit_bucket_next[slot])
+#endif
 
 #if defined(SC64_COLLISION_CLASS_CACHE)
 #if !defined(SC64_ZP_CAMPAIGN_ACTORS) || !defined(SC64_RACES)
@@ -106,9 +129,103 @@ sc64_unit_bucket_cell_at(int x, int y)
     return (x >> 4) + (y >> 4) * MAP_COLS;
 }
 
+#ifdef SC64_CONTACT_GROUP_INDEX
+static void GBA_HOT
+sc64_unit_bucket_group_insert(int slot, int cell)
+{
+    u8 rep;
+    for (rep = sc64_unit_bucket_head[cell]; rep != 0xff;
+         rep = sc64_unit_bucket_group_next[rep]) {
+        if (u[rep].type == u[slot].type && u[rep].x == u[slot].x &&
+            u[rep].y == u[slot].y) {
+            sc64_unit_bucket_prev[slot] = rep;
+            sc64_unit_bucket_next[slot] = sc64_unit_bucket_next[rep];
+            sc64_unit_bucket_next[rep] = (u8)slot;
+            sc64_unit_bucket_group_next[slot] = 0xff;
+            sc64_unit_bucket_cell[slot] = (u16)cell;
+            return;
+        }
+    }
+    if (sc64_unit_bucket_head[cell] == 0xff) {
+        if (sc64_unit_bucket_dirty_count >= MAX_UNITS * 2) {
+            sc64_unit_bucket_active = 0;
+            return;
+        }
+        sc64_unit_bucket_dirty[sc64_unit_bucket_dirty_count++] = (u16)cell;
+    }
+    sc64_unit_bucket_prev[slot] = (u8)slot;
+    sc64_unit_bucket_next[slot] = 0xff;
+    sc64_unit_bucket_group_next[slot] = sc64_unit_bucket_head[cell];
+    sc64_unit_bucket_head[cell] = (u8)slot;
+    sc64_unit_bucket_cell[slot] = (u16)cell;
+}
+
+static void GBA_HOT
+sc64_unit_bucket_group_remove(int slot)
+{
+    int cell = sc64_unit_bucket_cell[slot];
+    u8 rep = sc64_unit_bucket_prev[slot];
+    if (cell == 0xffffu) return;
+    if (rep != slot) {
+        u8 before = rep;
+        while (before != 0xff && sc64_unit_bucket_next[before] != (u8)slot)
+            before = sc64_unit_bucket_next[before];
+        if (before == 0xff) {
+            sc64_unit_bucket_active = 0;
+            return;
+        }
+        sc64_unit_bucket_next[before] = sc64_unit_bucket_next[slot];
+    } else {
+        u8 before = 0xff, scan;
+        for (scan = sc64_unit_bucket_head[cell]; scan != 0xff && scan != rep;
+             scan = sc64_unit_bucket_group_next[scan]) before = scan;
+        if (scan == 0xff) {
+            sc64_unit_bucket_active = 0;
+            return;
+        }
+        if (sc64_unit_bucket_next[slot] != 0xff) {
+            u8 promoted = sc64_unit_bucket_next[slot];
+            u8 member;
+            if (before == 0xff)
+                sc64_unit_bucket_head[cell] = promoted;
+            else
+                sc64_unit_bucket_group_next[before] = promoted;
+            sc64_unit_bucket_group_next[promoted] = sc64_unit_bucket_group_next[slot];
+            sc64_unit_bucket_prev[promoted] = promoted;
+            for (member = sc64_unit_bucket_next[promoted]; member != 0xff;
+                 member = sc64_unit_bucket_next[member])
+                sc64_unit_bucket_prev[member] = promoted;
+        } else if (before == 0xff) {
+            sc64_unit_bucket_head[cell] = sc64_unit_bucket_group_next[slot];
+        } else {
+            sc64_unit_bucket_group_next[before] = sc64_unit_bucket_group_next[slot];
+        }
+    }
+    sc64_unit_bucket_next[slot] = 0xff;
+    sc64_unit_bucket_prev[slot] = 0xff;
+    sc64_unit_bucket_group_next[slot] = 0xff;
+    sc64_unit_bucket_cell[slot] = 0xffffu;
+}
+
+static void GBA_HOT
+sc64_unit_bucket_group_rekey(int slot, int cell)
+{
+    if (sc64_unit_bucket_cell[slot] == cell &&
+        sc64_unit_bucket_prev[slot] == (u8)slot &&
+        sc64_unit_bucket_next[slot] == 0xff)
+        return;
+    sc64_unit_bucket_group_remove(slot);
+    if (sc64_unit_bucket_active)
+        sc64_unit_bucket_group_insert(slot, cell);
+}
+#endif
+
 static void GBA_HOT
 sc64_unit_bucket_insert(int slot, int cell)
 {
+#ifdef SC64_CONTACT_GROUP_INDEX
+    sc64_unit_bucket_group_insert(slot, cell);
+#else
     u8 head = sc64_unit_bucket_head[cell];
     if (head == 0xff) {
         if (sc64_unit_bucket_dirty_count >= MAX_UNITS * 2) {
@@ -122,6 +239,7 @@ sc64_unit_bucket_insert(int slot, int cell)
     if (head != 0xff) sc64_unit_bucket_prev[head] = (u8)slot;
     sc64_unit_bucket_head[cell] = (u8)slot;
     sc64_unit_bucket_cell[slot] = (u16)cell;
+#endif
 }
 
 #ifdef SC64_T5_RUNTIME
@@ -156,6 +274,9 @@ sc64_unit_buckets_begin(void)
     for (i = 0; i < MAX_UNITS; ++i) {
         sc64_unit_bucket_next[i] = 0xff;
         sc64_unit_bucket_prev[i] = 0xff;
+#ifdef SC64_CONTACT_GROUP_INDEX
+        sc64_unit_bucket_group_next[i] = 0xff;
+#endif
         /* A unit created after this index build may call bucket_move() on
          * its first movement. Distinguish it from a linked slot so it does
          * not unlink through a stale cell value. */
@@ -175,7 +296,9 @@ static void GBA_HOT
 sc64_unit_bucket_move(Unit *q)
 {
     int slot = (int)(q - u), old_cell, new_cell;
+#ifndef SC64_CONTACT_GROUP_INDEX
     u8 before, after;
+#endif
     if (!sc64_unit_bucket_active || slot < 0 || slot >= MAX_UNITS) return;
     old_cell = sc64_unit_bucket_cell[slot];
     new_cell = sc64_unit_bucket_cell_at(q->x, q->y);
@@ -183,6 +306,9 @@ sc64_unit_bucket_move(Unit *q)
         sc64_unit_bucket_insert(slot, new_cell);
         return;
     }
+#ifdef SC64_CONTACT_GROUP_INDEX
+    sc64_unit_bucket_group_rekey(slot, new_cell);
+#else
     if (old_cell == new_cell) return;
     before = sc64_unit_bucket_prev[slot];
     after = sc64_unit_bucket_next[slot];
@@ -190,7 +316,19 @@ sc64_unit_bucket_move(Unit *q)
     else sc64_unit_bucket_next[before] = after;
     if (after != 0xff) sc64_unit_bucket_prev[after] = before;
     sc64_unit_bucket_insert(slot, new_cell);
+#endif
 }
+
+#ifdef SC64_CONTACT_GROUP_INDEX
+static void GBA_HOT
+sc64_unit_bucket_spawn_rekey(int slot)
+{
+    int cell;
+    if (!sc64_unit_bucket_active || slot < 0 || slot >= MAX_UNITS) return;
+    cell = sc64_unit_bucket_cell[slot];
+    if (cell != 0xffffu) sc64_unit_bucket_group_rekey(slot, cell);
+}
+#endif
 
 #ifdef SC64_CONTACT_CACHE
 /* The original query stays in ROM as the reference for actors whose facts
@@ -247,8 +385,7 @@ sc64_unit_bucket_step_clear(const Unit *q, int nx, int ny)
     for (row = miny; row <= maxy; ++row)
         for (col = minx; col <= maxx; ++col) {
             int i;
-            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
-                 i = sc64_unit_bucket_next[i])
+            SC64_UNIT_BUCKET_FOR_EACH(col + row * MAP_COLS, i)
                 if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
 #ifdef SC64_P6_COMBAT_ENABLED
                     if (race_p6_combat_unit_burrowed(i)) continue;
@@ -419,8 +556,7 @@ sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
         for (row = miny; row <= maxy; ++row)
             for (col = minx; col <= maxx; ++col) {
                 int i;
-                for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
-                     i = sc64_unit_bucket_next[i])
+                SC64_UNIT_BUCKET_FOR_EACH(col + row * MAP_COLS, i)
                     if (++raw_nodes > SC64_STEER_LIST_CAPACITY) return 0;
             }
     }
@@ -430,8 +566,7 @@ sc64_steer_list_build(SC64_STEER_BUILD_ARGS)
     for (row = miny; row <= maxy; ++row)
         for (col = minx; col <= maxx; ++col) {
             int i;
-            for (i = sc64_unit_bucket_head[col + row * MAP_COLS]; i != 0xff;
-                 i = sc64_unit_bucket_next[i]) {
+            SC64_UNIT_BUCKET_FOR_EACH(col + row * MAP_COLS, i) {
                 int candidate_radius, candidate_flying, candidate_collidable;
                 if (&u[i] == q || !u[i].alive || SC64_TRANSPORT_LOADED(&u[i]))
                     continue;

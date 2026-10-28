@@ -298,6 +298,10 @@ mutate(void)
     case 0: /* morph in place */
         u[j].type = random_type();
         if ((next_random() & 1u)) u[j].raw_type = -1;
+#ifdef SC64_CONTACT_GROUP_INDEX
+        if (sc64_unit_bucket_active && sc64_unit_bucket_cell[j] != 0xffffu)
+            sc64_unit_bucket_group_rekey(j, sc64_unit_bucket_cell[j]);
+#endif
         break;
     case 1: /* death */
         u[j].alive = 0;
