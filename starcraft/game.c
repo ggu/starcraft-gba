@@ -5827,6 +5827,9 @@ static void __attribute__((noinline))
 race_update_resource_worker(Unit *q)
 {
     int home, tx, ty;
+#ifdef SC64_WORKER_CARGO_KIND
+    int explicit_trip = sc64_worker_gather_pending(q);
+#endif
     if (sc64_worker_gather_pending(q) || !sc64_worker_cargo_matches_order(q)) {
         if ((q->order == ORDER_GAS &&
              (q->target < 0 || q->target >= MAX_BUILDINGS ||
@@ -5849,7 +5852,10 @@ race_update_resource_worker(Unit *q)
             move_toward(q, tx, ty);
             return;
         }
-        sc64_worker_gather_pending_set(q, 0);
+        /* Same-kind cargo now returns; other trips stay pending through
+         * their gather wait so a missing depot cannot cancel the command. */
+        if (sc64_worker_cargo_matches_order(q))
+            sc64_worker_gather_pending_set(q, 0);
     }
 #endif
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
@@ -5864,7 +5870,17 @@ race_update_resource_worker(Unit *q)
     /* Preserve the trip and its cargo while the no-home cache is asleep.
      * A topology change or completed depot makes it eligible for selection. */
 #ifdef SC64_WORKER_CARGO_KIND
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+    /* Automatic idle-worker assignment keeps its old no-depot hold policy.
+     * An explicit gather trip may reach and collect its chosen resource. */
+    if (home < 0 && (!explicit_trip || sc64_worker_cargo_matches_order(q))) return;
+#else
     if (home < 0 && sc64_worker_cargo_matches_order(q)) return;
+    if (home < 0 && !explicit_trip && q->order == ORDER_GAS && !q->carry) {
+        q->order = ORDER_IDLE;
+        return;
+    }
+#endif
 #else
     if (home < 0) return;
 #endif
@@ -5903,7 +5919,10 @@ race_update_resource_worker(Unit *q)
             q->carry = collected;
             m[q->target].amount -= collected;
 #ifdef SC64_WORKER_CARGO_KIND
-            if (IS_WORKER(q->type)) sc64_worker_cargo_clear(q);
+            if (IS_WORKER(q->type)) {
+                sc64_worker_cargo_clear(q);
+                sc64_worker_gather_pending_set(q, 0);
+            }
 #endif
         }
         if (q->carry > 0) q->build = -1;

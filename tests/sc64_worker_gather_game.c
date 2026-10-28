@@ -307,6 +307,31 @@ test_interrupt_unknown_depleted_and_priority(int race, int worker_type,
     (void)depot_type;
 }
 
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+static void
+test_automatic_no_depot_hold(void)
+{
+    reset_scene(R_ZERG,R_TER);
+    int worker=spawn_unit(SIDE,U_DRONE,96,96);
+    assert(worker>=0);
+    u[worker].selected=1;
+    m[0].x=300; m[0].y=300; m[0].amount=40;
+    u[worker].order=ORDER_MINE; u[worker].target=0;
+    int x=u[worker].x,y=u[worker].y;
+    one_tick();
+    assert(u[worker].x==x && u[worker].y==y && u[worker].carry==0);
+    tap_a(300,300);
+    assert(u[worker].flags&SC64_WORKER_GATHER_PENDING);
+    one_tick();
+    assert(u[worker].x!=x || u[worker].y!=y);
+    u[worker].x=300; u[worker].y=300;
+    one_tick();
+    assert(u[worker].carry==8 && m[0].amount==32);
+    one_tick();
+    assert(u[worker].carry==8 && minerals==0 && gas==0);
+}
+#endif
+
 static void
 test_hidden_mineral_context(void)
 {
@@ -326,6 +351,9 @@ test_hidden_mineral_context(void)
 int
 main(void)
 {
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+    test_automatic_no_depot_hold();
+#endif
     test_hidden_mineral_context();
     test_mineral_input(R_TER, U_SCV);
     test_mineral_input(R_ZERG, U_DRONE);
