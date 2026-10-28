@@ -216,7 +216,7 @@ field_ui_build_worker(void)
     int i, best = find_selected_worker(), d, best_d = 0x7fffffff;
     if (best >= 0) return best;
     for (i = 0; i < MAX_UNITS; i++) {
-        if (!u[i].alive || u[i].owner != SIDE || !IS_WORKER(u[i].type) || u[i].order == ORDER_BUILD)
+        if (!u[i].alive || u[i].owner != SIDE || !IS_WORKER(u[i].type) || SC64_BUILD_WORKER_ORDER(u[i].order))
             continue;
         d = dist2(cx, cy, u[i].x, u[i].y);
         if (d < best_d) { best_d = d; best = i; }
@@ -581,7 +581,7 @@ field_ui_draw_hud(void)
             gfx_bar(30, 135, 50, 3, hp, maxhp, C_GREEN, C_RED_DARK);
             gfx_num(86, 133, hp, C_GREEN);
             if (IS_WORKER(u[first].type))
-                gfx_text(110, 133, u[first].order == ORDER_GAS ? "GAS" : u[first].order == ORDER_BUILD ?
+                gfx_text(110, 133, u[first].order == ORDER_GAS ? "GAS" : SC64_BUILD_WORKER_ORDER(u[first].order) ?
                          "BUILDING" : u[first].order == ORDER_MINE ? "MINING" : "IDLE", C_GOLD);
         } else {
             int x = 30;

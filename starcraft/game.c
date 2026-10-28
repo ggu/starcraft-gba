@@ -710,10 +710,21 @@ enum {
     , ORDER_P7_RECHARGE
 #endif
 #ifdef SC64_NYDUS_ENABLED
-    /* Always last: profiles without Nydus keep their order values. */
+    /* Profiles without Nydus keep their existing order values. */
     , ORDER_NYDUS_ENTER
 #endif
+#ifdef SC64_RACES
+    /* Previously unused in every race profile. Fits the existing four-bit
+     * save fields without moving any established order value. */
+    , ORDER_BUILD_PENDING = 14
+#endif
 };
+#ifdef SC64_RACES
+#define SC64_PENDING_BUILD_ORDER(o) ((o) == ORDER_BUILD_PENDING)
+#else
+#define SC64_PENDING_BUILD_ORDER(o) 0
+#endif
+#define SC64_BUILD_WORKER_ORDER(o) ((o) == ORDER_BUILD || SC64_PENDING_BUILD_ORDER(o))
 #ifdef SC64_NYDUS_ENABLED
 #define SC64_NYDUS_ORDER(o) ((o) == ORDER_NYDUS_ENTER)
 #else
@@ -1441,6 +1452,7 @@ static int race_start_build(int owner,int worker,int type,int x,int y);
 static int race_can_site(int owner,int type,int x,int y);
 static int race_site_powered(int owner,int x,int y);
 static int race_builder_arrived(int worker);
+static void race_pending_build_tick(int worker);
 #ifdef SC64_CONSTRUCTION_HP
 static void race_construction_hp_progress(int building, int progress, int total);
 static void race_complete_building(int building);
@@ -2283,7 +2295,7 @@ build_path_grid(void)
 }
 
 static int
-can_place(int type, int x, int y)
+can_place_except_worker(int type, int x, int y, int worker)
 {
 
     int i, radius = (type == B_COMMAND || type == B_HATCHERY
@@ -2339,7 +2351,7 @@ can_place(int type, int x, int y)
             && dist2(x, y, b[i].x, b[i].y) < (radius + 14) * (radius + 14))
 	    return 0;
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])
+	if (i != worker && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])
 #ifdef SC64_RACES
         && !sc64_race_unit_flying(u[i].type)
 #endif
@@ -2352,6 +2364,12 @@ can_place(int type, int x, int y)
         && dist2(x, y, u[i].x, u[i].y) < (radius + 5) * (radius + 5))
 	    return 0;
     return x > 12 && y > 18 && x < WORLD_W - 12 && y < WORLD_H - 12;
+}
+
+static int
+can_place(int type, int x, int y)
+{
+    return can_place_except_worker(type, x, y, -1);
 }
 
 static int GBA_HOT
@@ -6178,6 +6196,12 @@ target_lists_unavailable:
         }
 #endif
 
+#ifdef SC64_RACES
+        if (q->order == ORDER_BUILD_PENDING) {
+            race_pending_build_tick(i);
+            if (!q->alive || q->order != ORDER_BUILD) continue;
+        }
+#endif
 	if (q->order == ORDER_BUILD) {
 #ifdef SC64_RACES
             if(race_builder_arrived(i))continue;
