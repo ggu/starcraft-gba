@@ -87,6 +87,63 @@ static void test_bounded_search_key_and_origin_revalidation(void)
     assert(!sc64_direct_firing_waypoint(sx, sy, tx, ty, 0, 257, &nx, &ny));
 }
 
+static void test_one_corner_paths_cache_final_firing_tile(void)
+{
+    const int sx = 400, sy = 400, tx = 520, ty = 400;
+    int nx, ny, final_x, final_y;
+
+    /* A local vertical wall blocks every direct final-point corridor. Its
+     * opening is north of the actor; a second wall leaves the target center
+     * disconnected while the in-band firing tile stays on the actor's side. */
+    clear_walk_grid();
+    block_center_ring(tx, ty);
+    for (int row = 0; row < MAP_ROWS; ++row)
+        if (row != 22) SC64_GRID_SET(path_walkable, 26 + row * MAP_COLS, 0);
+    for (int row = 0; row < MAP_ROWS; ++row)
+        SC64_GRID_SET(path_walkable, 30 + row * MAP_COLS, 0);
+    assert(!direct_path_clear(sx, sy, tx, ty));
+    assert(!path_next_tile(sx, sy, tx, ty, &nx, &ny));
+    assert(!direct_path_clear(sx, sy, 472, 360));
+    assert(sc64_direct_firing_waypoint(sx, sy, tx, ty, 0, 64, &nx, &ny));
+    final_x = sc64_direct_firing_cache.x;
+    final_y = sc64_direct_firing_cache.y;
+    assert_band(final_x, final_y, tx, ty, 0, 64);
+    assert(nx == sx && ny != sy); /* vertical-first elbow, not final tile */
+    assert(dist2(nx, ny, tx, ty) > 64 * 64);
+    assert(direct_path_clear(sx, sy, nx, ny));
+    assert(direct_path_clear(nx, ny, final_x, final_y));
+    assert(!direct_path_clear(sx, sy, final_x, final_y));
+    assert(sc64_direct_firing_waypoint(sx + 8, sy, tx, ty, 0, 64, &nx, &ny));
+    assert(sc64_direct_firing_cache.x == final_x &&
+           sc64_direct_firing_cache.y == final_y);
+    assert(direct_path_clear(sx + 8, sy, nx, ny));
+    assert(direct_path_clear(nx, ny, final_x, final_y));
+
+    /* A horizontal local wall requires the horizontal-first elbow. A second
+     * wall keeps the target center unreachable, like the vertical case. */
+    clear_walk_grid();
+    block_center_ring(520, 520);
+    for (int col = 0; col < MAP_COLS; ++col)
+        if (col != 30) SC64_GRID_SET(path_walkable, col + 26 * MAP_COLS, 0);
+    for (int col = 0; col < MAP_COLS; ++col)
+        SC64_GRID_SET(path_walkable, col + 30 * MAP_COLS, 0);
+    assert(!path_next_tile(sx, sy, 520, 520, &nx, &ny));
+    assert(sc64_direct_firing_waypoint(sx, sy, 520, 520, 0, 64, &nx, &ny));
+    final_x = sc64_direct_firing_cache.x;
+    final_y = sc64_direct_firing_cache.y;
+    assert_band(final_x, final_y, 520, 520, 0, 64);
+    assert(nx != sx && ny == sy); /* horizontal-first elbow, not final tile */
+    assert(dist2(nx, ny, 520, 520) > 64 * 64);
+    assert(direct_path_clear(sx, sy, nx, ny));
+    assert(direct_path_clear(nx, ny, final_x, final_y));
+    assert(!direct_path_clear(sx, sy, final_x, final_y));
+    assert(sc64_direct_firing_waypoint(sx + 8, sy, 520, 520, 0, 64, &nx, &ny));
+    assert(sc64_direct_firing_cache.x == final_x &&
+           sc64_direct_firing_cache.y == final_y);
+    assert(direct_path_clear(sx + 8, sy, nx, ny));
+    assert(direct_path_clear(nx, ny, final_x, final_y));
+}
+
 static void test_obstructed_candidates_keep_baseline_retry(void)
 {
     int nx, ny;
@@ -185,6 +242,49 @@ static void test_combat_hook_or_baseline(void)
 #endif
 }
 
+static void test_one_corner_combat_moves_and_only_fires_in_range(void)
+{
+#ifdef SC64_DIRECT_FIRING_POINTS
+    int fired = 0;
+    int weapon_range = (sc64_race_unit_range_vs(U_HYDRALISK, 0) + 1) / 2;
+    setup_combat_scene();
+    u[attacker].x = 400; u[attacker].y = 400;
+    u[victim].x = 520; u[victim].y = 400;
+    clear_walk_grid();
+    block_center_ring(u[victim].x, u[victim].y);
+    for (int row = 0; row < MAP_ROWS; ++row)
+        SC64_GRID_SET(path_walkable, 30 + row * MAP_COLS, 0);
+    for (int row = 0; row < MAP_ROWS; ++row)
+        if (row != 22) SC64_GRID_SET(path_walkable, 26 + row * MAP_COLS, 0);
+    {
+        int nx, ny;
+        assert(!path_next_tile(u[attacker].x, u[attacker].y,
+                               u[victim].x, u[victim].y, &nx, &ny));
+        tick_combat(&u[attacker], victim);
+        assert(sc64_direct_firing_cache.valid);
+        assert(u[attacker].path_x == u[attacker].x &&
+               u[attacker].path_y != u[attacker].y);
+        assert(dist2(sc64_direct_firing_cache.x,
+                     sc64_direct_firing_cache.y,
+                     u[victim].x, u[victim].y) <= weapon_range * weapon_range);
+    }
+    for (int tick = 0; tick < 500; ++tick) {
+        int x = u[attacker].x, y = u[attacker].y;
+        int hp = u[victim].hp;
+        int distance = dist2(x, y, u[victim].x, u[victim].y);
+        tick_combat(&u[attacker], victim);
+        assert(abs(u[attacker].x - x) <= 4 && abs(u[attacker].y - y) <= 4);
+        if (u[victim].hp != hp) {
+            assert(distance <= weapon_range * weapon_range);
+            fired = 1;
+            break;
+        }
+        if (distance > weapon_range * weapon_range) assert(u[victim].hp == hp);
+    }
+    assert(fired && u[victim].hp < 500);
+#endif
+}
+
 static void test_melee_and_explicit_move_are_unchanged(void)
 {
     setup_combat_scene_type(U_ZERGLING);
@@ -206,9 +306,11 @@ int main(void)
     gba_init();
 #ifdef SC64_DIRECT_FIRING_POINTS
     test_bounded_search_key_and_origin_revalidation();
+    test_one_corner_paths_cache_final_firing_tile();
     test_obstructed_candidates_keep_baseline_retry();
 #endif
     test_combat_hook_or_baseline();
+    test_one_corner_combat_moves_and_only_fires_in_range();
     test_melee_and_explicit_move_are_unchanged();
 #ifdef SC64_DIRECT_FIRING_POINTS
     setup_combat_scene();
