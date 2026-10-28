@@ -87,7 +87,8 @@ int main(void)
     assert(sc64_race_raw_unit(U_P8_HYPERION) == 28);
     const Sc64ZpActorFact *hyperion = sc64_zp_actor_fact(U_P8_HYPERION);
     assert(hyperion && hyperion->raw == 28 && hyperion->hp == 850 &&
-           hyperion->armor == 3 && hyperion->ground_damage == 30 &&
+           hyperion->armor == 4 && hyperion->size == 2 &&
+           hyperion->ground_damage == 30 &&
            hyperion->air_damage == 30 && hyperion->ground_cooldown == 22 &&
            hyperion->air_cooldown == 22 && hyperion->left == 37 &&
            hyperion->up == 29 && hyperion->right == 37 && hyperion->down == 29);

@@ -111,12 +111,12 @@ static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
     if (type == U_P5_BATTLECRUISER) return &battlecruiser;
 #endif
 #ifdef SC64_P8_DATA_ENABLED
-    /* Native N64 raw28 facts: 850 HP, armor 3, Large, weapons 23/24
+    /* Native N64 raw28 facts: 850 HP, armor 4, Large, weapons 23/24
        (30 damage, +3, cooldown 22, range 192). The shared flingy/art chain
        is separately verified to match raw12. Sight and edge bounds remain
        pinned BWAPI raw28 facts; they are not N64 pixel-collision claims. */
     static const Sc64ZpActorFact p8_hyperion = {
-        28,850,0,3,0,0,0,352, 37,29,37,29,1,2,
+        28,850,0,4,0,0,0,352, 37,29,37,29,1,2,
         30,3,22,192,1, 30,3,22,192,1,
         SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
         SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|

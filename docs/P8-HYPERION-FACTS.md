@@ -22,8 +22,9 @@ Both resolve to the same 20,877-byte compressed GRP, with 17 frames on a
 The binding therefore reuses the already available raw12 sprite descriptor
 while preserving raw28 as a separate logical unit.
 
-The native raw28 unit row gives 850 HP (217600 in 8.8 fixed point), armor 3,
-zero shields, Large size, ground/air weapon IDs 23/24 and one hit per attack.
+The native raw28 unit row gives 850 HP (217600 in 8.8 fixed point), armor 4,
+zero effective shields, Large size (N64 size value 3, normalized engine size
+2), ground/air weapon IDs 23/24 and one hit per attack.
 Native weapon rows 23/24 each give damage 30, bonus 3, cooldown 22, range
 0..192 source pixels, one projectile/hit and damage type 3. The shared native
 flingy70 row gives speed 640, acceleration 27, halt distance 7585 and turn
@@ -44,13 +45,11 @@ Neither figure is claimed as a native N64 pixel bound.
 
 ## Engine integration limits
 
-The native N64 unit row reports armor 3, while pinned PC raw28 is armor 4.
-The current generic `race_campaign_init()` loader applies the shared
-`Sc64StockUnitProfile` armor after `spawn_unit()`; raw28's existing stock
-profile row therefore writes 4. When a future P8 loader is wired, it must
-select the P8 source fact (or otherwise avoid that generic override) to retain
-native armor 3. The present census and fact binding do not exercise that
-loader path and do not qualify end-to-end combat.
+The N64 raw28 armor value 4 agrees with the pinned PC value 4, and also with
+the existing shared stock profile row. That agreement does not qualify the
+future P8 loader or full combat behavior; the census and fact binding do not
+exercise that loader path. The N64 raw size value 3 is Large and is normalized
+to the engine's size value 2.
 
 The sprite adapter aliases only the base raw28 frame to the proven raw12 GRP.
 It does not add a raw28 facing, animation-mode, turret or attack-pose bank.
