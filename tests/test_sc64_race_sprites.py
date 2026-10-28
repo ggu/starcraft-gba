@@ -253,6 +253,11 @@ int main(void) {
         unit_assets |= set(ZP_UNIT_IDS.values()) | set(Z5_UNIT_IDS.values())
         unit_assets |= set(Z6_UNIT_IDS.values()) | set(P6_UNIT_IDS.values())
         unit_assets |= set(P7_UNIT_IDS.values())
+        p8_adapter = (Path(__file__).resolve().parents[1] /
+                      'starcraft/sc64_p8_sprite_adapter.h').read_text()
+        self.assertIn('#ifdef SC64_P8_DATA_ENABLED', p8_adapter)
+        self.assertIn('raw_type == 28u) raw_type = 12u', p8_adapter)
+        unit_assets.add(28)  # P8 raw28 uses the verified shared raw12 descriptor.
         self.assertEqual(runtime_units - unit_assets, {101},
                          'raw 101 is intentionally source-invisible')
 
