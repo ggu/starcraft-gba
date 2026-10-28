@@ -42,6 +42,20 @@ current engine's inclusive edge offsets. The same pinned revision's
 `sightRangeTiles[28]` value is 11 tiles, or 352 pixels at 32 pixels per tile.
 Neither figure is claimed as a native N64 pixel bound.
 
+## Engine integration limits
+
+The native N64 unit row reports armor 3, while pinned PC raw28 is armor 4.
+The current generic `race_campaign_init()` loader applies the shared
+`Sc64StockUnitProfile` armor after `spawn_unit()`; raw28's existing stock
+profile row therefore writes 4. When a future P8 loader is wired, it must
+select the P8 source fact (or otherwise avoid that generic override) to retain
+native armor 3. The present census and fact binding do not exercise that
+loader path and do not qualify end-to-end combat.
+
+The sprite adapter aliases only the base raw28 frame to the proven raw12 GRP.
+It does not add a raw28 facing, animation-mode, turret or attack-pose bank.
+Those renderer paths remain unqualified.
+
 ## Scope
 
 All new logical identity and fact overrides are under `SC64_P8_DATA_ENABLED`.
