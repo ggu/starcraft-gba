@@ -93,9 +93,20 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
         while (col < r->width) {
             int wx = left + col + camx;
             int wy = sy + camy - 12;
-            int visible = wx >= 0 && wx < MAP_COLS * 16 && wy >= 0 &&
-                          wy < MAP_ROWS * 16 && currently_visible(wx, wy);
-            if (!visible) { ++col; continue; }
+            if (wx < 0 || wx >= MAP_COLS * 16 || wy < 0 ||
+                wy >= MAP_ROWS * 16) {
+                ++col;
+                continue;
+            }
+            if (!currently_visible(wx, wy)) {
+                /* Visibility is tile-wide. Skip the remaining pixels in this
+                 * hidden tile, while keeping the source column aligned. */
+                int hidden = 16 - (wx & 15);
+                if (hidden > (int)r->width - col)
+                    hidden = (int)r->width - col;
+                col += hidden;
+                continue;
+            }
             /* Bound each blit to one tile so unseen neighboring tiles never
              * leak through a partially visible projectile or impact. The
              * starting coordinate was checked above; visibility is tile-wide. */
