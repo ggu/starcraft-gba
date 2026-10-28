@@ -765,7 +765,13 @@ def prepare(rom: Path, profile: str) -> None:
         if not construction_color_input_ready(ROOT / CONSTRUCTION_HEADER):
             raise RuntimeError("construction preparation produced a stale blue-glow bank")
         run([sys.executable, str(ROOT / "tools/sc64_menu_assets.py")])
+        run([sys.executable, str(ROOT / "tools/sc64_font_assets.py"),
+             "--rom", str(private_rom)])
         run([sys.executable, str(ROOT / "tools/sc64_briefing_assets.py"),
+             "--rom", str(private_rom)])
+        run([sys.executable, str(ROOT / "tools/sc64_icon_assets.py"),
+             "--rom", str(private_rom)])
+        run([sys.executable, str(ROOT / "tools/sc64_chrome_assets.py"),
              "--rom", str(private_rom)])
         if profile in ("zerg", "zerg-z6", "zerg-z7", "zerg-z6-probe", "zerg-z4",
                        "protoss", "protoss-p6", "protoss-p7", "protoss-p4-storm"):
@@ -923,6 +929,10 @@ def status(profile: str) -> int:
         paths.append(("Source construction art", ROOT / CONSTRUCTION_HEADER))
         paths.append(("Campaign briefings and portraits", ROOT /
                       ".local/sc64/briefings/generated/sc64_briefing_generated.h"))
+        for label, name in (("Original interface fonts", "sc64_font_generated.h"),
+                            ("Original interface icons", "sc64_icons_generated.h"),
+                            ("Original menu chrome", "sc64_chrome_generated.h")):
+            paths.append((label, ROOT / ".local/sc64/interface/generated" / name))
     if profile in ("terran", "zerg", "zerg-z6", "zerg-z7", "zerg-z6-probe", "zerg-z4", "zerg-z3",
                    "protoss", "protoss-p7", "protoss-p3", "protoss-p4-storm", "protoss-p5-shuttle", "protoss-p6"):
         paths.append(("Skirmish maps", ROOT / ".local/sc64/skirmish/generated/sc64_skirmish_generated.h"))

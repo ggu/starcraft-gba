@@ -74,6 +74,9 @@ int main(void) {
         required = (
             PRIVATE_HEADER / "sc64_race_sprites_generated.h",
             ROOT / ".local/sc64/briefings/generated/sc64_briefing_generated.h",
+            ROOT / ".local/sc64/interface/generated/sc64_font_generated.h",
+            ROOT / ".local/sc64/interface/generated/sc64_icons_generated.h",
+            ROOT / ".local/sc64/interface/generated/sc64_chrome_generated.h",
             ROOT / ".local/sc64/backwater/generated/sc64_mission_generated.h",
             ROOT / ".local/sc64/backwater/generated/sc64_assets_generated.h",
             ROOT / ".local/sc64/backwater/generated/sc64_sprites_generated.h",
@@ -90,6 +93,7 @@ int main(void) {
                 "-DSC64_IMPORTED_MISSION", "-DSC64_HAS_TERRAIN_ART",
                 "-DSC64_HAS_SPRITES", f"-I{ROOT / '.local/sc64/backwater/generated'}",
                 f"-I{ROOT / '.local/sc64/briefings/generated'}",
+                f"-I{ROOT / '.local/sc64/interface/generated'}",
                 "-DSC64_RACES", f"-I{PRIVATE_HEADER}",
                 f"-I{ROOT / '.local/sc64/races/generated'}",
                 str(ROOT / "tests/sc64_photon_cannon_renderer.c"),
@@ -210,6 +214,9 @@ int main(void) {
             ".local/sc64/races/generated/sc64_race_sprites_generated.h",
             ".local/sc64/races/generated/sc64_menu_generated.h",
             ".local/sc64/briefings/generated/sc64_briefing_generated.h",
+            ".local/sc64/interface/generated/sc64_font_generated.h",
+            ".local/sc64/interface/generated/sc64_icons_generated.h",
+            ".local/sc64/interface/generated/sc64_chrome_generated.h",
             ".local/sc64/skirmish/generated/sc64_skirmish_generated.h",
         )
 

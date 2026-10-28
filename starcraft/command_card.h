@@ -133,6 +133,9 @@ field_controls_draw_command_card(void)
     int count = field_menu_count(), rows = (count + CARD_COLUMNS - 1) / CARD_COLUMNS;
     int w = CARD_COLUMNS * CARD_PITCH + 3, h = rows * CARD_PITCH + 3;
     int x = 238 - w, y = 119 - h, slot;
+    /* The card draws after the HUD bands; a full card stays below the
+     * resource bar. */
+    if (y < 12) y = 12;
     ui_panel(x, y, w, h, C_GOLD, 0);
     for (slot = 0; slot < count; slot++) {
         int i = card_slot_command(slot), cost, gas_cost, icon = card_icon(i);
@@ -191,7 +194,8 @@ card_supply_sprite(void)
 }
 
 /* The selected unit's portrait, then its name, or the group's size, over
- * its shield and health bars; the hint keeps its place at x 52. */
+ * its shield and health bars; the hint keeps its place at x 52. The name
+ * uses the source font, ending by x 165 like the other HUD titles. */
 static void
 card_selection_header(int i, int n)
 {
@@ -200,7 +204,11 @@ card_selection_header(int i, int n)
     if (n > 1) {
         gfx_text(27, 126, "X", C_DIM);
         gfx_num(34, 126, n, C_WHITE);
-    } else gfx_text(27, 126, unit_name(u[i].type), C_WHITE);
+    } else {
+        char title[48];
+        sc64_font_ellipsis(unit_name(u[i].type), 138, title, sizeof title);
+        sc64_font_text(27, 124, 138, title, C_WHITE);
+    }
     if (shields > 0) gfx_bar(27, 137, 22, 2, u[i].shield, shields, C_CYAN, C_SHADOW);
     gfx_bar(27, 140, 22, 4, u[i].hp, u[i].maxhp, C_GREEN, C_RED_DARK);
 }
