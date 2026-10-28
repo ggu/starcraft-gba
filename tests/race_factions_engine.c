@@ -166,10 +166,14 @@ int main(void)
         probe = find_worker(SIDE, U_PROBE);
         assert(probe >= 0);
         {
-            int pylon = u[probe].target;
+            int before = race_owner_minerals(SIDE);
+            assert(u[probe].order == ORDER_BUILD_PENDING && u[probe].target == B_PYLON);
+            assert(before >= 100 && find_building(SIDE, B_PYLON) < 0);
+            u[probe].x = 240; u[probe].y = 240;
+            update_orders();
+            int pylon = find_building(SIDE, B_PYLON);
             assert(pylon >= 0 && b[pylon].under_construction);
-            u[probe].x = b[pylon].x; u[probe].y = b[pylon].y;
-            assert(race_builder_arrived(probe));
+            assert(race_owner_minerals(SIDE) == before - 100);
             assert(u[probe].alive && u[probe].order == ORDER_IDLE);
             for (int f = 0; f < 600; ++f) race_tick_buildings();
             assert(building_complete(pylon));
@@ -183,13 +187,18 @@ int main(void)
     {
         int drone = find_worker(SIDE, U_DRONE), pool;
         int before = race_owner_supply(SIDE);
+        int before_minerals = race_owner_minerals(SIDE);
         assert(drone >= 0);
         assert(race_start_build(SIDE, drone, B_SPAWNING_POOL, 208, 160));
-        pool = u[drone].target;
+        assert(u[drone].order == ORDER_BUILD_PENDING && u[drone].target == B_SPAWNING_POOL);
+        assert(find_building(SIDE, B_SPAWNING_POOL) < 0);
+        assert(race_owner_minerals(SIDE) == before_minerals);
+        u[drone].x = 208; u[drone].y = 160;
+        update_orders();
+        pool = find_building(SIDE, B_SPAWNING_POOL);
         assert(pool >= 0 && b[pool].under_construction);
-        u[drone].x = b[pool].x; u[drone].y = b[pool].y;
-        assert(race_builder_arrived(drone));
         assert(!u[drone].alive && race_owner_supply(SIDE) == before - 2);
+        assert(race_owner_minerals(SIDE) == before_minerals - 200);
         for (int f = 0; f < 1600; ++f) race_tick_buildings();
         assert(building_complete(pool));
     }

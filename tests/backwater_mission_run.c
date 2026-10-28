@@ -258,7 +258,7 @@ int main(int argc,char **argv)
     input_frame(KEY_DOWN); input_frame(0); /* T2. */
     input_frame(KEY_A); input_frame(0); /* Briefing. */
     if (race_front.page != SC_FRONT_BRIEFING || race_front.mission != 5) return 66;
-    input_frame(KEY_A); input_frame(0); /* Deploy. */
+    input_frame(KEY_START); input_frame(0); /* Explicit briefing deployment. */
     if (screen != SCREEN_PLAY || race_selected_mission != 5) return 66;
 #else
 #ifdef SC64_TERRAN_CAMPAIGN

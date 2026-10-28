@@ -20,7 +20,7 @@ def valid_trace():
             {"kind": "input", "host_tick": 4, "held": 0, "pressed": 0},
             {"kind": "input", "host_tick": 5, "held": 1, "pressed": 1},
             {"kind": "input", "host_tick": 6, "held": 0, "pressed": 0},
-            {"kind": "input", "host_tick": 7, "held": 1, "pressed": 1},
+            {"kind": "input", "host_tick": 7, "held": 8, "pressed": 8},
             {"kind": "start", "host_tick": 7, "frame": 0, "screen": 1},
             {"kind": "input", "host_tick": 8, "held": 256, "pressed": 256},
             {"kind": "input", "host_tick": 9, "held": 0, "pressed": 0},
@@ -38,8 +38,15 @@ class TraceValidationTests(unittest.TestCase):
         plan = replay.validate_trace(valid_trace(), capacity=16)
         self.assertEqual(plan["stop_tick"], 71186)
         self.assertEqual(plan["inputs"][0], (0, 1))
-        self.assertEqual(plan["inputs"][6], (6, 1))
+        self.assertEqual(plan["inputs"][6], (6, replay.KEY_START))
         self.assertEqual(replay.scheduler_events(plan), plan["inputs"])
+
+    def test_normal_menu_deployment_requires_start_at_the_existing_tick(self):
+        trace = valid_trace()
+        trace["events"][6]["held"] = 1
+        trace["events"][6]["pressed"] = 1
+        with self.assertRaisesRegex(ValueError, "must use Start"):
+            replay.validate_trace(trace, capacity=16)
 
     def test_rejects_wrong_schema_or_mission(self):
         trace = valid_trace()

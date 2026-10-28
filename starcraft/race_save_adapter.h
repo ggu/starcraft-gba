@@ -1,5 +1,6 @@
 #ifndef SC64_RACE_SAVE_ADAPTER_H
 #define SC64_RACE_SAVE_ADAPTER_H
+#include "sc64_construction_save.h"
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 #define race_data sc64_zp_route_save_scratch.save
 #elif defined(SC64_T3_ENABLED)
@@ -594,6 +595,13 @@ static int race_save_game(void) {
         };
     memcpy(race_data.state,state,sizeof(state));
     memcpy(race_data.players,race_player,sizeof(race_player));
+#ifdef SC64_RACES
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && SC64_PENDING_BUILD_ORDER(u[i].order) &&
+            !sc64_pending_build_save_identity_valid(&race_data,
+                u[i].alive, u[i].owner, u[i].type, u[i].target,
+                u[i].tx, u[i].ty, race_cols * 16, race_rows * 16)) return 0;
+#endif
     memcpy(race_data.ore,race_minerals,sizeof(race_minerals));
     memcpy(race_data.vespene,race_gas,sizeof(race_gas));
     memcpy(race_data.geysers,geysers,sizeof(race_data.geysers));
@@ -1067,25 +1075,29 @@ static int race_load_game(void) {
         if(RACE_U(i,type)<0||RACE_U(i,type)>=SC_RU_COUNT||RACE_U(i,owner)<0||RACE_U(i,owner)>4||
             RACE_U(i,hp)<=0||RACE_U(i,maxhp)<=0||RACE_U(i,hp)>RACE_U(i,maxhp)||
             RACE_U(i,x)<0||RACE_U(i,x)>=width*16||RACE_U(i,y)<0||RACE_U(i,y)>=height*16||
-            RACE_U(i,order)<ORDER_IDLE||RACE_U(i,order)>
+            RACE_U(i,order)<ORDER_IDLE||(RACE_U(i,order)>
 #ifdef SC64_NYDUS_ENABLED
-            ORDER_NYDUS_ENTER||
+            ORDER_NYDUS_ENTER && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order)))||
 #elif defined(SC64_P7_BATTERY_ENABLED)
-            ORDER_P7_RECHARGE||
+            ORDER_P7_RECHARGE && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order)))||
 #elif defined(SC64_T6_RUNTIME)
-            ORDER_REPAIR||
+            ORDER_REPAIR && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order)))||
 #elif defined(SC64_TRANSPORT_RUNTIME)
-            ORDER_UNLOAD||
+            ORDER_UNLOAD && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order)))||
 #elif defined(SC64_Z5_CONSUME_ENABLED)
-            ORDER_Z5_CONSUME||
+            ORDER_Z5_CONSUME && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order)))||
 #else
-            ORDER_GAS||
+            ORDER_GAS && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order)))||
 #endif
             RACE_U(i,shield)<0||
             RACE_U(i,shield_remainder)<0||RACE_U(i,shield_remainder)>=1280)return 0;
         int target=RACE_U(i,target),order=RACE_U(i,order);
         if((order==ORDER_MINE&&(target<0||target>=MAX_MINERALS))||
            ((order==ORDER_GAS||order==ORDER_BUILD)&&(target<0||target>=MAX_BUILDINGS)))return 0;
+        if (SC64_PENDING_BUILD_ORDER(order) &&
+            !sc64_pending_build_save_identity_valid(&race_data,
+                RACE_U(i,alive), RACE_U(i,owner), RACE_U(i,type), target,
+                RACE_U(i,tx), RACE_U(i,ty), width * 16, height * 16)) return 0;
 #ifdef SC64_P7_BATTERY_ENABLED
         if (order==ORDER_P7_RECHARGE) {
             /* Validate persistent identities, not temporary availability.

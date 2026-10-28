@@ -943,7 +943,7 @@ static void launch_from_normal_menu(void)
     tap(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING &&
            race_front.mission == SC64_P4_GLOBAL_ID);
-    step(KEY_A);
+    step(KEY_START);
     deployed = 1;
     assert(screen == SCREEN_PLAY && !race_mode && !won && !lost);
     assert(race_selected_mission == SC64_P4_GLOBAL_ID && race_p4_active());

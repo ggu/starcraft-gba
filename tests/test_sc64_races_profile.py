@@ -217,5 +217,21 @@ class RaceProfileTests(unittest.TestCase):
                                  "x": 4, "y": 6})
 
 
+class BriefingRouteTests(unittest.TestCase):
+    def test_campaign_smoke_deploys_with_start_after_opening_dialogue(self) -> None:
+        for profile in ('z1', 'z2', 'p1', 'p2', 't1', 't2'):
+            for unified in (False, True):
+                with self.subTest(profile=profile, unified=unified):
+                    events, first_live = races.campaign_start_events(profile, unified)
+                    self.assertEqual(events[-4][1], races.KEY_A)  # Open briefing.
+                    self.assertEqual(events[-2][1], races.KEY_START)  # Explicit skip.
+                    self.assertEqual(events[-1][1], 0)
+                    self.assertEqual(first_live, events[-1][0] + 1)
+
+    def test_custom_game_keeps_its_a_launch_control(self) -> None:
+        events = races.smoke_events('skirmish', 2, 'zerg')
+        self.assertEqual(events[-2][1], races.KEY_A)
+
+
 if __name__ == "__main__":
     unittest.main()

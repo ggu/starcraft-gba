@@ -36,7 +36,7 @@ static const Sc64RaceMap *load_canonical_z7(void)
     if(ordinal&1) press(KEY_DOWN);
     press(KEY_A);
     assert(race_front.page==SC_FRONT_BRIEFING && race_front.mission==SC64_Z7_GLOBAL_ID);
-    press(KEY_A);
+    press(KEY_START);
     assert(screen==SCREEN_PLAY && !race_mode && !won && !lost && race_z7_active());
     assert(race_z7_map==map && race_z7_world.source_tables_prevalidated);
     memset(&race_z7.runtime,0,sizeof(race_z7.runtime));

@@ -400,7 +400,7 @@ int main(int argc,char **argv)
     press(KEY_A);
     press(KEY_A);
     press(KEY_A);
-    press(KEY_A);
+    press(KEY_START);
     if(screen!=SCREEN_PLAY||race_campaign.mission!=SC64_RACE_MISSION_Z1||race_human!=R_ZERG)
         return fail("title did not start default Z1");
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_HATCHERY)hatch=i;

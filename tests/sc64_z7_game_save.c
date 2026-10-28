@@ -47,7 +47,7 @@ static void launch_z7_from_normal_menu(void)
     press(KEY_A);
     assert(race_front.page==SC_FRONT_BRIEFING &&
            race_front.mission==SC64_Z7_GLOBAL_ID);
-    press(KEY_A);
+    press(KEY_START);
     assert(screen==SCREEN_PLAY && !race_mode && !won && !lost);
     assert(race_selected_mission==SC64_Z7_GLOBAL_ID && race_z7_active());
     assert(race_campaign.mission==SC64_Z7_GLOBAL_ID);
@@ -113,7 +113,7 @@ static void launch_zerg_campaign_mission(int mission)
     for(int page=0;page<ordinal/2;page++)press(KEY_RIGHT);
     if(ordinal&1)press(KEY_DOWN);
     press(KEY_A); assert(race_front.page==SC_FRONT_BRIEFING);
-    press(KEY_A); assert(screen==SCREEN_PLAY&&!race_mode);
+    press(KEY_START); assert(screen==SCREEN_PLAY&&!race_mode);
     assert(race_selected_mission==mission);
 }
 

@@ -95,7 +95,7 @@ static void test_spire_gate_and_playable_selection(void)
     press(KEY_A);
     for (int page = 0; page < ordinal / 2; ++page) press(KEY_RIGHT);
     press(KEY_A);
-    press(KEY_A);
+    press(KEY_START);
     assert(screen == SCREEN_PLAY && race_z7_active());
     hatchery = spawn_build(SIDE, B_HATCHERY, 160, 160, 0);
     assert(hatchery >= 0);

@@ -67,7 +67,7 @@ static void launch_z7_normally(void)
     for (int page = 0; page < ordinal / 2; ++page) press(KEY_RIGHT);
     if (ordinal & 1) press(KEY_DOWN);
     press(KEY_A);
-    press(KEY_A);
+    press(KEY_START);
     assert(screen == SCREEN_PLAY && race_z7_active());
     step(4);
 }

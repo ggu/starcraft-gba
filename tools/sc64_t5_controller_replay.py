@@ -30,7 +30,7 @@ from emulator_smoke import ROOT, capture, symbol_sizes, symbols
 MISSION_T5 = 8
 ENTRY_TICKS = 9
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_RESULT = 0, 1, 3
-KEY_A, KEY_RIGHT = 1, 16
+KEY_A, KEY_START, KEY_RIGHT = 1, 8, 16
 CHECKPOINT_TICKS = 1000
 DEFAULT_TRACE = ROOT / ".local/sc64/t5/controller-probe.json"
 DEFAULT_OUTPUT = ROOT / "build/emulator/sc64-t5-controller-replay"
@@ -61,7 +61,7 @@ OPTIONAL_OBS_FIELDS = ("raynor_alive", "marine_defenders", "paid_wraith_alive")
 def menu_prefix() -> list[tuple[int, int]]:
     """Return (1-based host tick, held keys) for the verified T5 menu route."""
     return [(1, KEY_A), (2, 0), (3, KEY_RIGHT), (4, 0), (5, KEY_RIGHT),
-            (6, 0), (7, KEY_A), (8, 0), (9, KEY_A), (10, 0)]
+            (6, 0), (7, KEY_A), (8, 0), (9, KEY_START), (10, 0)]
 
 
 def require_int_fields(row: dict, fields: tuple[str, ...], label: str) -> None:

@@ -231,10 +231,21 @@ static void test_zerg_build_prerequisites_and_extractor_during_morph(void)
     assert(drone >= 0);
     int before_minerals = minerals, before_gas = gas;
     assert(race_start_build(SIDE, drone, B_EXTRACTOR, 400, 400));
-    int extractor = u[drone].target;
+    assert(u[drone].order == ORDER_BUILD_PENDING && u[drone].target == B_EXTRACTOR);
+    assert(minerals == before_minerals && gas == before_gas);
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        assert(!b[i].alive || b[i].type != B_EXTRACTOR ||
+               b[i].x != 400 || b[i].y != 400);
+    /* Advance the actual pending-order service at the authored geyser site. */
+    u[drone].x = 400; u[drone].y = 400;
+    update_orders();
+    int extractor = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].type == B_EXTRACTOR &&
+            b[i].x == 400 && b[i].y == 400) { extractor = i; break; }
     assert(extractor >= 0 && b[extractor].type == B_EXTRACTOR &&
-           b[extractor].under_construction && b[extractor].build_progress == -1);
-    assert(u[drone].order == ORDER_BUILD && minerals == before_minerals - 50 &&
+           b[extractor].under_construction && b[extractor].build_progress == 0);
+    assert(!u[drone].alive && minerals == before_minerals - 50 &&
            gas == before_gas);
 
     /* No town hall is required for a valid Drone and geyser in active Z7. */
@@ -247,7 +258,11 @@ static void test_zerg_build_prerequisites_and_extractor_during_morph(void)
     assert(drone >= 0 && !race_owner_has_prereq(SIDE, SC_PR_HATCHERY));
     before_minerals = minerals; before_gas = gas;
     assert(race_start_build(SIDE, drone, B_EXTRACTOR, 400, 400));
-    assert(minerals == before_minerals - 50 && gas == before_gas);
+    assert(u[drone].order == ORDER_BUILD_PENDING && u[drone].target == B_EXTRACTOR);
+    assert(minerals == before_minerals && gas == before_gas);
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        assert(!b[i].alive || b[i].type != B_EXTRACTOR ||
+               b[i].x != 400 || b[i].y != 400);
 
     /* Other missions keep the existing table prereq even with the same
      * incomplete-morph and valid-site setup. */

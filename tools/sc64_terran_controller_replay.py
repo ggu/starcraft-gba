@@ -29,7 +29,7 @@ from emulator_smoke import ROOT, capture, symbol_sizes, symbols
 
 CPU_HZ = 16_777_216
 SCREEN_TITLE, SCREEN_PLAY, SCREEN_RESULT = 0, 1, 3
-KEY_A, KEY_RIGHT, KEY_DOWN = 1, 16, 128
+KEY_A, KEY_START, KEY_RIGHT, KEY_DOWN = 1, 8, 16, 128
 CHECKPOINT_TICKS = 1000
 DEFAULT_TRACE = ROOT / ".local/sc64/t6/controller-final-win-c.json"
 DEFAULT_OUTPUT = ROOT / "build/emulator/terran-late-controller-replay"
@@ -50,7 +50,7 @@ def menu_prefix(mission: int) -> tuple[list[tuple[int, int]], int]:
     sequence.extend([KEY_RIGHT] * page)
     if row:
         sequence.append(KEY_DOWN)
-    sequence.extend([KEY_A, KEY_A])  # briefing, deploy
+    sequence.extend([KEY_A, KEY_START])  # open briefing, explicitly deploy
     events: list[tuple[int, int]] = []
     tick = 1
     for key in sequence:

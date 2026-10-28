@@ -107,12 +107,18 @@ int main(void) {
     int building_hp=b[structure].hp;
     tick_combat(&u[melee],MAX_UNITS+structure);
     assert(b[structure].hp==building_hp-14);
-    /* A paid construction order can be saved while its Drone is walking:
-       -1 means construction has not started, rather than invalid progress. */
+    /* Construction remains unpaid and has no foundation while its Drone is
+       walking; the pending order stores a building type, not a building slot. */
     game_init();race_mode=1;race_human=R_ZERG;race_bots=2;init_state();
+    int before_minerals=minerals,before_gas=gas,foundations=0;
     assert(race_start_build(SIDE,1,B_SPAWNING_POOL,208,160));
-    int pending=u[1].target;assert(b[pending].build_progress==-1);
-    assert(save_game());assert(load_game());assert(b[pending].build_progress==-1);
+    assert(u[1].order==ORDER_BUILD_PENDING&&u[1].target==B_SPAWNING_POOL);
+    assert(minerals==before_minerals&&gas==before_gas);
+    for(int i=0;i<MAX_BUILDINGS;i++)foundations+=b[i].alive&&b[i].type==B_SPAWNING_POOL;
+    assert(foundations==0);
+    assert(save_game());assert(load_game());
+    assert(u[1].order==ORDER_BUILD_PENDING&&u[1].target==B_SPAWNING_POOL);
+    assert(minerals==before_minerals&&gas==before_gas);
     for(int cells=64;cells<=96;cells+=32) {
         race_cols=cells;
         for(unsigned cell=0;cell<96u*(unsigned)cells;cell++) {

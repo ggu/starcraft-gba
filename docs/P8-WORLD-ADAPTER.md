@@ -67,18 +67,43 @@ Wait, Transmission and CenterView require `async_action`. It must implement
 one shared timer per source owner and retain an armed marker for each action:
 `PENDING` means the action started and must resume at the same cursor;
 `BLOCKED` means the action did not start because that owner is already
-waiting. The P8 scheduler then clears that trigger's waiting bit and lets
-later immediate actions run. This adapter provides no timer storage or save
-encoding. A missing callback fails closed.
+waiting. The P8 scheduler then clears that trigger's waiting bit and retries
+the action without the resume marker next pass. It continues with later
+triggers in source order; later actions in that same trigger remain behind the
+blocked cursor. `sc64_p8_timed_service.h` supplies shared per-owner timer state,
+the per-action resume contract, and a presentation callback for
+Transmission/CenterView. The caller ticks it once per selected game frame and
+owns timer persistence; the P8 pass cadence remains caller-selected.
 
-PauseGame and Mute/UnmuteUnitSpeech have no service in this slice and fail
-closed. In the authenticated P8 descriptor the Mute and Unmute rows are
-disabled; the engine also has no shared audio gate that gives the existing
-speech-mute state end-to-end effect. Conditions reject unrecognized flag bits
-and comparisons. Actions reject nonzero reserved trailing bytes because the shared Z8 action shape has
-no field that can preserve them. The authenticated P8 rows currently have
-zero in those trailing bytes; this check prevents future data from being
-silently discarded.
+PauseGame returns immediately after the native handler applies its pause
+effect; following actions and later triggers may still run in that pass. The
+handler sets a source-pause marker and a bit on the current trigger instance.
+The native top-level scheduler skips trigger time and passes for an ordinary
+user pause, but continues elapsed-time and wait-timer updates and trigger
+passes when the source-pause marker is set. The trigger scheduler's action
+table is based at runtime address `0x800C7564`; at action-list completion it
+dispatches entry 6 at runtime address `0x800C757C`. In the pinned ROM
+(SHA-1 `a36d91b5aac7bb95df0d7de5f9814f5270e25c2b`), the table word is at file
+offset `0xC817C` and contains `0x8008086C`, the native UnpauseGame handler.
+The ROM file offset is not the same as the runtime address. That tail callback
+clears the marked trigger bit and source marker. A pending Wait keeps its
+trigger from reaching this tail, so its
+source pause remains active while the shared timer advances. The timed service
+tracks the source marker and per-owner/per-trigger bit, and requires caller
+callbacks for both the actual PauseGame side effect and the native tail
+UnpauseGame effect. Its game-loop binding, pass cadence and persistence are
+still caller-owned. P8 has active PauseGame rows but no explicit UnpauseGame
+row. Pause and tail callbacks return applied, ignored, or error. Ignored
+represents native global/owner eligibility branches: the source action is
+complete, but pause state does not change. An ignored tail preserves both the
+source marker and that trigger instance's pause bit. Mute/UnmuteUnitSpeech
+remain unsupported:
+the authenticated rows are disabled, and the engine has no shared audio gate
+that gives speech-mute state end-to-end effect. Conditions reject
+unrecognized flag bits and comparisons. Actions reject nonzero reserved
+trailing bytes because the shared Z8 action shape has no field that can
+preserve them. The authenticated P8 rows currently have zero in those trailing
+bytes; this check prevents future data from being silently discarded.
 
 The default asset-free service fixture is:
 

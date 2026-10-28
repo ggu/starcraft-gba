@@ -241,6 +241,33 @@ int main(void)
     audio_mixer_service(&m, &bank);
     CHECK(m.dropped == dropped + 2, "invalid sample refused");
 
+    /* An advisor line outranks every effect, never shares the speech voice,
+     * plays one line at a time and replays once it has ended. */
+    audio_mixer_reset(&m, decoders);
+    for (u16 s = 0; s < 3; ++s) audio_mixer_request(&m, s, 3, AUDIO_CLASS_EFFECT);
+    audio_mixer_request(&m, 3, 1, AUDIO_CLASS_SPEECH);
+    audio_mixer_service(&m, &bank);
+    m.voice[2].age = 9;
+    audio_mixer_request(&m, 4, 0, AUDIO_CLASS_ADVISOR);
+    audio_mixer_service(&m, &bank);
+    CHECK(m.voice[2].sound == 4 && m.voice[2].priority == AUDIO_PRIORITY_ADVISOR &&
+          m.voice[AUDIO_SPEECH_VOICE].sound == 3, "advisor takes the oldest effect voice");
+    dropped = m.dropped;
+    m.voice[2].age = AUDIO_RETRIGGER_FRAMES + 5;
+    audio_mixer_request(&m, 4, 0, AUDIO_CLASS_ADVISOR);
+    audio_mixer_request(&m, 1, 0, AUDIO_CLASS_ADVISOR);
+    audio_mixer_request(&m, 5, 3, AUDIO_CLASS_EFFECT);
+    audio_mixer_service(&m, &bank);
+    CHECK(m.dropped == dropped + 2 && m.voice[2].sound == 4 && m.voice[2].remaining == 352,
+          "advisor never cuts itself off or overlaps another line");
+    CHECK(m.voice[1].sound == 5 && m.voice[3].sound == 2, "effects cannot take the advisor voice");
+    mix(&m);
+    mix(&m);
+    CHECK(!m.voice[1].remaining && !m.voice[2].remaining && !m.voice[3].remaining, "advisor line ends");
+    audio_mixer_request(&m, 4, 0, AUDIO_CLASS_ADVISOR);
+    audio_mixer_service(&m, &bank);
+    CHECK(m.voice[1].sound == 4 && m.voice[1].remaining == 352, "advisor replays after it ends");
+
     /* The ring holds AUDIO_QUEUE-1 requests and rejects the rest. */
     audio_mixer_reset(&m, decoders);
     for (u32 i = 0; i < AUDIO_QUEUE - 1; ++i) CHECK(audio_mixer_request(&m, 3, 1, AUDIO_CLASS_EFFECT), "queue slot");

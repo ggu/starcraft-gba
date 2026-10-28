@@ -45,7 +45,7 @@ static void launch_z4(void)
     assert(sc64_catalog_playable_at(SC64_FACTION_ZERG, 3) == 15);
     press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING);
-    input(KEY_A);
+    input(KEY_START);
     assert(screen == SCREEN_PLAY && race_selected_mission == 15);
     assert(race_human == R_ZERG && race_z4_active());
 }

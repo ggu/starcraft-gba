@@ -710,10 +710,25 @@ enum {
     , ORDER_P7_RECHARGE
 #endif
 #ifdef SC64_NYDUS_ENABLED
-    /* Always last: profiles without Nydus keep their order values. */
+    /* Profiles without Nydus keep their existing order values. */
     , ORDER_NYDUS_ENTER
 #endif
+#ifdef SC64_RACES
+    /* Previously unused in every race profile. Fits the existing four-bit
+     * save fields without moving any established order value. */
+    , ORDER_PROFILE_END
+    , ORDER_BUILD_PENDING = 14
+#endif
 };
+#ifdef SC64_RACES
+_Static_assert(ORDER_PROFILE_END <= ORDER_BUILD_PENDING,
+               "pending construction must not alias an established order");
+_Static_assert(ORDER_BUILD_PENDING < 16, "four-bit persistent order field");
+#define SC64_PENDING_BUILD_ORDER(o) ((o) == ORDER_BUILD_PENDING)
+#else
+#define SC64_PENDING_BUILD_ORDER(o) 0
+#endif
+#define SC64_BUILD_WORKER_ORDER(o) ((o) == ORDER_BUILD || SC64_PENDING_BUILD_ORDER(o))
 #ifdef SC64_NYDUS_ENABLED
 #define SC64_NYDUS_ORDER(o) ((o) == ORDER_NYDUS_ENTER)
 #else
@@ -1142,12 +1157,32 @@ static int skirmish_hostile(int a, int b);
 static int skirmish_bot_index(int owner);
 #endif
 #ifdef SC64_RACES
+#include "sc64_briefing_generated.h"
 static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race_bots=2;
 static int race_skirmish_map;
 static int race_bot_races[3]={R_ZERG,R_PROTOSS,R_TER};
 static Sc64Frontend race_front;
 static unsigned race_front_transition;
 static int race_front_load_error;
+static const Sc64BriefingPage *race_front_briefing_page(void)
+{
+    const Sc64Briefing *briefing=sc64_briefing_get(race_front.mission);
+    return briefing && race_front.briefing_page < briefing->page_count ?
+        &briefing->pages[race_front.briefing_page] : NULL;
+}
+
+/* Generated text stays in ROM. Only a page cursor and reveal clock live in
+ * RAM, and playback is configured in update rather than as a render effect. */
+static void race_front_briefing_configure(void)
+{
+    if(race_front.page!=SC_FRONT_BRIEFING)return;
+    const Sc64Briefing *briefing=sc64_briefing_get(race_front.mission);
+    const Sc64BriefingPage *page=race_front_briefing_page();
+    unsigned length=0;
+    if(page)while(page->text[length] && length<SC64_BRIEFING_MAX_TEXT_BYTES)length++;
+    sc64_frontend_briefing_configure(&race_front,
+        briefing?briefing->page_count:1,length);
+}
 static void race_frontend_reset(void)
 {
     int completed=-1;
@@ -1240,6 +1275,9 @@ static u16 race_p3_action_ticks;
 static u16 race_p3_action_duration(const Sc64P3State *s);
 #endif
 static int race_queue_unit(int owner,int building,int type);
+/* Set by race_queue_unit() when it refuses for funds or supply: the toast id
+ * of the shortfall (1 minerals, 12 gas, 2 supply). Callers clear it first. */
+static u8 race_refusal;
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int race_start_lair_morph(int building);
 #endif
@@ -1418,6 +1456,7 @@ static int race_start_build(int owner,int worker,int type,int x,int y);
 static int race_can_site(int owner,int type,int x,int y);
 static int race_site_powered(int owner,int x,int y);
 static int race_builder_arrived(int worker);
+static void race_pending_build_tick(int worker);
 #ifdef SC64_CONSTRUCTION_HP
 static void race_construction_hp_progress(int building, int progress, int total);
 static void race_complete_building(int building);
@@ -1674,6 +1713,16 @@ toast(int id)
 {
     toast_id = id;
     toast_timer = 55;
+}
+/* The player's own mineral, gas and supply refusals (toasts 1, 12 and 2) also
+ * cue the race advisor: game_audio_observe() takes the cue at render time, so
+ * the command paths gain only this store. Presentation only, never saved. */
+static u8 toast_advisor;
+static void
+toast_refusal(int id)
+{
+    toast(id);
+    toast_advisor = (u8)id;
 }
 static int
 unit_cost(int type)
@@ -2250,7 +2299,7 @@ build_path_grid(void)
 }
 
 static int
-can_place(int type, int x, int y)
+can_place_except_worker(int type, int x, int y, int worker)
 {
 
     int i, radius = (type == B_COMMAND || type == B_HATCHERY
@@ -2306,7 +2355,7 @@ can_place(int type, int x, int y)
             && dist2(x, y, b[i].x, b[i].y) < (radius + 14) * (radius + 14))
 	    return 0;
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])
+	if (i != worker && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])
 #ifdef SC64_RACES
         && !sc64_race_unit_flying(u[i].type)
 #endif
@@ -2319,6 +2368,12 @@ can_place(int type, int x, int y)
         && dist2(x, y, u[i].x, u[i].y) < (radius + 5) * (radius + 5))
 	    return 0;
     return x > 12 && y > 18 && x < WORLD_W - 12 && y < WORLD_H - 12;
+}
+
+static int
+can_place(int type, int x, int y)
+{
+    return can_place_except_worker(type, x, y, -1);
 }
 
 static int GBA_HOT
@@ -4665,7 +4720,17 @@ start_build(int type)
 #ifdef SC64_FIELD_CONTROLS
             field_ui_ping(site_x,site_y,C_GOLD);
 #endif
-        }else toast(8);
+        }else{
+#ifdef SC64_FIELD_CONTROLS
+            /* The first problem the placement HUD names, funds before site. */
+            const char *need;
+            int ground, problem = ui_site_problem(type, site_x, site_y, &need, &ground);
+            if (problem == UI_SITE_MINERALS || problem == UI_SITE_GAS)
+                toast_refusal(problem == UI_SITE_MINERALS ? 1 : 12);
+            else
+#endif
+            toast(8);
+        }
         return;
     }
 #endif
@@ -4678,11 +4743,11 @@ start_build(int type)
 	return;
     }
     if (minerals < cost) {
-	toast(1);
+	toast_refusal(1);
 	return;
     }
     if (gas < building_gas_cost(type)) {
-	toast(12);
+	toast_refusal(12);
 	return;
     }
     if (!can_place(type, px, py)) {
@@ -4769,7 +4834,7 @@ start_research(int type)
 	return;
     }
     if (minerals < 100 || gas < 100) {
-	toast(gas < 100 ? 12 : 1);
+	toast_refusal(gas < 100 ? 12 : 1);
 	return;
     }
     minerals -= 100;
@@ -5215,7 +5280,11 @@ static void
 queue_unit(int building, int type)
 {
 #ifdef SC64_RACES
-    toast(race_queue_unit(SIDE,building,type)?4:8);return;
+    race_refusal = 0;
+    if (race_queue_unit(SIDE,building,type)) toast(4);
+    else if (race_refusal) toast_refusal(race_refusal);
+    else toast(8);
+    return;
 #endif
     int cost = unit_cost(type), gas_cost = unit_gas_cost(type), tail;
     if (!building_complete(building)) {
@@ -5235,15 +5304,15 @@ queue_unit(int building, int type)
 	return;
     }
     if (minerals < cost) {
-	toast(1);
+	toast_refusal(1);
 	return;
     }
     if (gas < gas_cost) {
-	toast(12);
+	toast_refusal(12);
 	return;
     }
     if (reserved_supply() + unit_supply(type) > supply_cap) {
-	toast(2);
+	toast_refusal(2);
 	return;
     }
     minerals -= cost;
@@ -6059,6 +6128,7 @@ target_lists_unavailable:
             && q->order != ORDER_P7_RECHARGE
 #endif
             && !SC64_NYDUS_ORDER(q->order)
+            && !SC64_PENDING_BUILD_ORDER(q->order)
             ) {
             race_transport_activity = 1;
             if (race_transport_tick_unit(i)) continue;
@@ -6131,6 +6201,12 @@ target_lists_unavailable:
         }
 #endif
 
+#ifdef SC64_RACES
+        if (q->order == ORDER_BUILD_PENDING) {
+            race_pending_build_tick(i);
+            if (!q->alive || q->order != ORDER_BUILD) continue;
+        }
+#endif
 	if (q->order == ORDER_BUILD) {
 #ifdef SC64_RACES
             if(race_builder_arrived(i))continue;
@@ -6992,7 +7068,9 @@ game_update(u16 held, u16 pressed)
     if (screen == SCREEN_TITLE) {
 #ifdef SC64_RACES
         int old_page=race_front.page,old_row=race_front.row;
+        race_front_briefing_configure();
         int action=sc64_frontend_update(&race_front,held);
+        race_front_briefing_configure();
         if(race_front_load_error)race_front_load_error--;
         if(pressed){race_front_load_error=0;audio_tone((pressed&KEY_A)?660:440,2,2);}
         if(old_page!=race_front.page)race_front_transition=race_front.ticks;
@@ -7181,10 +7259,15 @@ game_update(u16 held, u16 pressed)
     }
     if (menu_open) {
 	reset_selection_gestures();
-	if (pressed & KEY_UP)
-	    menu_cursor = (menu_cursor + field_menu_count() - 1) % field_menu_count();
-	if (pressed & KEY_DOWN)
-	    menu_cursor = (menu_cursor + 1) % field_menu_count();
+#ifdef SC64_COMMAND_ICONS
+	if (!field_card_navigate(pressed))
+#endif
+	{
+	    if (pressed & KEY_UP)
+		menu_cursor = (menu_cursor + field_menu_count() - 1) % field_menu_count();
+	    if (pressed & KEY_DOWN)
+		menu_cursor = (menu_cursor + 1) % field_menu_count();
+	}
 	if (pressed & KEY_A)
 	    choose_command(menu_cursor);
 	return;
@@ -9064,6 +9147,20 @@ static void
 draw_hud_resources(void)
 {
     gfx_rect(0, 0, 240, 12, C_PANEL);
+#ifdef SC64_COMMAND_ICONS
+    card_resource_icon(SC64_HUD_SPRITE_MINERAL, 2);
+    gfx_num(16, 3, minerals, C_WHITE);
+    card_resource_icon(SC64_HUD_SPRITE_GAS, 60);
+    gfx_num(74, 3, gas, C_WHITE);
+    card_resource_icon(card_supply_sprite(), 126);
+    {
+        /* The slash follows the used count, so 100/200 keeps its spacing. */
+        int used = (supply_used + race_owner_queued_supply(SIDE)) / 2, x = 140 + ui_num_width(used) + 3;
+        gfx_num(140, 3, used, C_WHITE);
+        gfx_text(x, 3, "/", C_WHITE);
+        gfx_num(x + 8, 3, supply_cap / 2, C_WHITE);
+    }
+#else
     gfx_text(3, 3, "MIN", C_GOLD);
     gfx_num(24, 3, minerals, C_WHITE);
     gfx_text(61, 3, "GAS", C_CYAN);
@@ -9078,6 +9175,7 @@ draw_hud_resources(void)
         C_WHITE);
     gfx_text(165, 3, "/", C_WHITE);
     gfx_num(173, 3, supply_cap / 2, C_WHITE);
+#endif
 }
 
 static void
@@ -9165,12 +9263,16 @@ draw_hud_commands_body(void)
     } else if (n) {
 	for (i = 0; i < MAX_UNITS; i++)
 	    if (u[i].alive && u[i].selected) {
+#ifdef SC64_COMMAND_ICONS
+		card_selection_header(i, n);
+#else
 		gfx_text(5, 126, n > 1 ? "COMBAT GROUP" : unit_name(u[i].type), C_WHITE);
 #ifdef SC64_RACES
                 draw_hud_shields(u[i].shield,sc64_actor_max_shields(u[i].type,0));
 #endif
 		gfx_text(5, 137, "HP", C_CYAN);
 		gfx_num(24, 137, u[i].hp, C_GREEN);
+#endif
 		if (IS_WORKER(u[i].type))
 #ifdef SC64_FIELD_CONTROLS
 		    gfx_text(52, 137, ui_action == UI_A_MOVE ? "A MOVE  B BUILD" :

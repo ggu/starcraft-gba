@@ -13,9 +13,12 @@ import time
 
 from emulator_smoke import ROOT, RSP, capture, require_mgba, symbols
 
-KEY_A, KEY_B, KEY_RIGHT, KEY_DOWN = 1, 2, 16, 128
+KEY_A, KEY_B, KEY_START, KEY_LEFT, KEY_RIGHT, KEY_DOWN = 1, 2, 8, 32, 16, 128
 SCREEN_TITLE, SCREEN_PLAY = 0, 1
 FRONT_HOME, FRONT_CAMPAIGN, FRONT_MISSION, FRONT_BRIEFING, FRONT_SKIRMISH = range(5)
+# Appended Sc64Frontend members; legacy page/row/race offsets remain intact.
+BRIEFING_PAGE_OFFSET, BRIEFING_PAGES_OFFSET = 56, 60
+BRIEFING_REVEALED_OFFSET = 72
 
 
 def u32(rsp: RSP, address: int) -> int:
@@ -97,10 +100,13 @@ def run_scenario(name: str, custom: bool, rom: pathlib.Path,
         front = sym["race_front"]
         inject = sym["demo_inject_keys"]
 
-        def state() -> tuple[int, int, int, int, int, int]:
+        def state() -> tuple[int, int, int, int, int, int, int, int, int]:
             return (u32(rsp, sym["screen"]), u32(rsp, front + 8),
                     u32(rsp, front + 12), u32(rsp, sym["race_mode"]),
-                    u32(rsp, sym["race_human"]), u32(rsp, sym["race_selected_mission"]))
+                    u32(rsp, sym["race_human"]), u32(rsp, sym["race_selected_mission"]),
+                    u32(rsp, front + BRIEFING_PAGE_OFFSET),
+                    u32(rsp, front + BRIEFING_PAGES_OFFSET),
+                    u32(rsp, front + BRIEFING_REVEALED_OFFSET))
 
         def expect(screen: int, page: int | None, where: str) -> None:
             got = state()
@@ -118,6 +124,13 @@ def run_scenario(name: str, custom: bool, rom: pathlib.Path,
         def capture_page(label: str, page: int) -> None:
             expect(SCREEN_TITLE, page, label)
             rsp.tick(80)  # finish page fade and briefing text before capture
+            path = out / f"{name}-{label}.png"
+            result = capture(rsp, path)
+            observations.append({"screen": label, "page": page,
+                                 "path": str(path), **result})
+
+        def capture_now(label: str, page: int) -> None:
+            expect(SCREEN_TITLE, page, label)
             path = out / f"{name}-{label}.png"
             result = capture(rsp, path)
             observations.append({"screen": label, "page": page,
@@ -151,11 +164,45 @@ def run_scenario(name: str, custom: bool, rom: pathlib.Path,
             press(KEY_A)
             capture_page("mission", FRONT_MISSION)
             press(KEY_A)
-            capture_page("briefing", FRONT_BRIEFING)
+            got = state()
+            if got[0] != SCREEN_TITLE or got[1] != FRONT_BRIEFING or got[7] < 2:
+                raise RuntimeError(f"Z1 briefing did not initialize its first dialogue page: {got}")
+            # Keep this early capture before natural reveal completes so the
+            # next A is required to reveal the first page rather than advance.
+            rsp.tick(2)
+            got = state()
+            if got[6] != 0 or got[8]:
+                raise RuntimeError(f"briefing did not begin unrevealed on page zero: {got}")
+            capture_now("briefing", FRONT_BRIEFING)
             press(KEY_A)
             got = state()
+            if got[1] != FRONT_BRIEFING or got[6] != 0 or not got[8]:
+                raise RuntimeError(f"A did not reveal the current briefing page: {got}")
+            capture_now("briefing-revealed", FRONT_BRIEFING)
+            press(KEY_A)
+            got = state()
+            if got[1] != FRONT_BRIEFING or got[6] != 1:
+                raise RuntimeError(f"A did not advance to the next briefing page: {got}")
+            capture_now("briefing-next", FRONT_BRIEFING)
+            press(KEY_LEFT)
+            if state()[6] != 0:
+                raise RuntimeError(f"Left did not return to the previous briefing page: {state()}")
+            press(KEY_RIGHT)
+            if state()[6] != 1:
+                raise RuntimeError(f"Right did not restore the next briefing page: {state()}")
+            page_count = state()[7]
+            for _ in range(2 * 255):
+                if state()[6] + 1 >= page_count:
+                    break
+                press(KEY_A)
+            got = state()
+            if got[6] + 1 != page_count:
+                raise RuntimeError(f"natural A presses did not reach the final objectives page: {got}")
+            capture_page("briefing-objectives", FRONT_BRIEFING)
+            press(KEY_START)
+            got = state()
             if got[0] != SCREEN_PLAY or got[3] != 0 or got[5] != 0:
-                raise RuntimeError(f"Z1 campaign did not launch from the briefing: {got}")
+                raise RuntimeError(f"Start did not deploy Z1 from the briefing: {got}")
             if not world_palette_restored(rsp, sym):
                 raise RuntimeError("campaign launch did not restore the world palette")
             play = capture(rsp, out / f"{name}-play.png")

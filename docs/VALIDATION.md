@@ -2,6 +2,21 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
+## Current race-build continuation (2026-10-28)
+
+After worker-arrival construction, all three canonical race vectors pass a
+normal-menu save followed by a fresh-process physical-SRAM load and 900
+matching skirmish updates. Each uses Blood Bath, its profile's human race and
+three mixed-race AIs. The bounded early-scene timing is about 28–29 fps
+equivalent; later battles and campaign-wide near-30-fps play remain unproven.
+A separate current-source P7 input-only ARM replay matches all 65 checkpoints
+through a strict victory with all three heroes alive. See the
+[current race-build audit](audits/2026-10-28-current-race-sram/README.md)
+for exact images, protocol and limits. These checks cover the runtime shared
+by PR113 and the test-only PR114, rather than requalifying every historical
+mission result below. Current catalog coverage is 23/30 (Terran 10, Zerg 6,
+Protoss 7); the all-30-mission and near-30-fps goals remain unfinished.
+
 ## Optional Nydus Canal runtime (2026-10-27)
 
 `SC64_NYDUS_ENABLED` is off in every shipped profile. Flag-off default, Z7
@@ -5505,8 +5520,9 @@ Limits: these are emulator measurements, not physical-GBA results, and the
 audio itself was not checked by ear in this run. Direct Sound is 8-bit mono at
 10512 Hz, below StarCraft 64's 16-bit stereo 11025 Hz mix. There are four
 voices, with no distance attenuation or panning, and at most two new effects
-per frame. Annoyed responses, transmissions, advisor lines and briefing audio
-are not played. Building completion uses the building's selection sound.
+per frame. Annoyed responses, transmissions, briefing audio and advisor lines
+other than the funds and supply refusals (added later; see
+[Advisor refusal lines](#advisor-refusal-lines-2026-10-28)) are not played. Building completion uses the building's selection sound.
 Shots are inferred from a raised cooldown, so a weapon sounds once per
 cooldown cycle. Victory and defeat stingers come from the N64 result flag and
 have not been confirmed by ear.
@@ -5588,6 +5604,88 @@ Limits: emulator measurements, not hardware; the audio was not checked by
 ear in this run (the decoded samples are proven identical, so the mix is the
 same as before); a physical cartridge test of the DMA2 double buffer is still
 outstanding, as it was for DMA1.
+### Advisor refusal lines (2026-10-28)
+
+The imported profiles now play the player race's advisor when the player's
+own Build, Train or research command is refused for minerals, vespene gas or
+supply. The default ROM plays a short PSG tone for the same refusals.
+
+Identification: every non-empty `014/000` clip (1,143) was decoded to PCM, and
+ids 95-218 in full plus 99 other clips up to id 281 were transcribed with
+Whisper (`small`, English).
+The refusals are `sfxdata` ids 146-154 in three groups of Zerg, Terran,
+Protoss: 146 "We require more minerals", 147 "Not enough minerals", 148 "You
+have not enough minerals", 149-151 the vespene gas lines, 152 "Spawn more
+Overlords", 153 "Additional supply depots required", 154 "You must construct
+additional pylons". The neighbours are other advisor lines (116-133 attack,
+research and upgrade notices, 155-157 "Not enough energy"). The same
+transcription of the nine clips decoded back from the generated bank (8-bit,
+10512 Hz) gave the same lines; Whisper renders "vespene" in the three gas
+lines inconsistently, but each is the race's gas line by position and wording.
+The lines were not checked by ear in this run.
+
+Bank: the nine clips add 210,888 PCM bytes and 126,360 encoded bytes (510
+clips; 8,489,540 bytes in all, up 1.5% from 8,363,180). `--verify-bank`
+decoded all 523 streams against the manifest.
+
+Behaviour (`starcraft/game_audio.h`, `common/audio_mixer.h`):
+
+- The mineral, gas and supply refusal sites in `game.c` store the toast id in
+  a presentation byte; `game_audio_observe()` takes it once per rendered frame
+  and drops it after a tick discontinuity. In the race profiles, Train used to
+  report every refusal as "Tech prerequisite missing"; `race_queue_unit()` now
+  records a funds or supply shortfall, and a refused placement reports the
+  first funds problem the placement HUD names, so those toasts also name the
+  shortfall.
+- An advisor line takes an effect voice at a priority above every effect, so
+  combat sounds and unit responses never cut it off and voice 0 stays the unit
+  response voice. The mixer refuses an advisor request while any advisor line
+  is still playing, so pressing A again during the line neither restarts nor
+  overlaps it; the first refusal after it ends plays it again. The
+  cooldown is therefore the line itself (1.8-3.0 seconds).
+
+Correctness:
+
+- `make test-audio` (in `./dev test`): the mixer checks add an advisor taking
+  the oldest effect voice beside busy speech, refusing a repeat and a second
+  line while it plays, effects unable to take its voice, and a replay once it
+  has ended. The default hook fixtures drive `queue_unit()` with no minerals
+  and at the supply cap: each refusal raises one advisor event, an unchanged
+  frame raises none, a repeated refusal raises another, and a discontinuity
+  drops a pending cue. The 12,000-tick default run keeps state hash
+  `c0b2c7a3` with the observer on and off, as at the base.
+- `make test-game-audio-unified` with the advisor bank: the same fixtures
+  through `race_queue_unit()` play `sc64_audio_advisor`'s minerals and gas
+  clips for the player race. The unified run keeps state hash `441d33b8` with
+  audio on and off, the same as the base.
+- `make test-sc64-terran-full-campaign` (the `./dev sc64 test --profile
+  terran` target) with the advisor bank: every step passes except the T9
+  controller run, which reaches its 500,000-tick limit without a Wraith
+  (2 minerals) and fails the same way at the base, with a byte-identical
+  controller trace. T10 then passes on its own.
+
+Memory, from ARM builds of the base `597ff6b` (with the previous 501-clip
+bank) and of this change (with the advisor bank) on the same private inputs:
+
+| Build | `__iwram_end` (both) | `__bss_end` base -> change | ROM text growth |
+|---|---|---|---:|
+| Unified | `0x03004e58` | `0x0203d3d8` -> `0x0203d3e0` | 126,868 |
+| Terran | `0x03004eb0` | `0x0203df2c` -> `0x0203df34` | 127,012 |
+| Zerg Z6 | `0x03004ee0` | `0x0203df00` (same) | 126,460 |
+| Protoss P7 | `0x03004b68` | `0x0203ddf8` -> `0x0203de00` | 126,956 |
+| P7 Carrier training probe | `0x03004ad8` | `0x0203df5c` (same) | |
+| Showcase | `0x03004fa8` | `0x0203df60` (same) | |
+
+`__iwram_end` is byte-identical on every build: the refusal sites gain one
+store, and the hook runs from `game_render()`. Of each ROM's growth, 126,360
+bytes are the clips; the rest is code. Imported ROMs keep their cartridge
+size. The audio work per frame is unchanged in bound: an advisor line is
+one of the four voices.
+
+Limits: not checked by ear or on hardware in this run, and no CPU
+measurement was made (the four-voice worst case measured above still
+applies). Only Build, Train and research refusals speak; morph, add-on and
+other contextual commands keep their "Tech prerequisite missing" toast.
 ### Death animations (2026-10-25)
 
 Units and buildings now play death effects instead of disappearing. Deaths

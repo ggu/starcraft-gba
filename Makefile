@@ -51,6 +51,14 @@ test-sc64-interceptor-orders: build/test-sc64-interceptor-orders
 	./build/test-sc64-interceptor-orders
 test-starcraft: test-sc64-interceptor-orders
 
+# Fixed-capacity P8 native request-heap storage; source-only synthetic vectors.
+.PHONY: test-sc64-p8-request-queue
+build/test-sc64-p8-request-queue: tests/sc64_p8_request_queue.c starcraft/sc64_p8_request_queue.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft $< -o $@
+test-sc64-p8-request-queue: build/test-sc64-p8-request-queue
+	./build/test-sc64-p8-request-queue
+test-starcraft: test-sc64-p8-request-queue
+
 # Asset-free P8 compact trigger scheduler contract. This does not include a
 # scenario descriptor or bind P8 actions to game-world effects.
 .PHONY: test-sc64-p8-runtime test-sc64-p8-source-contract
@@ -79,6 +87,14 @@ build/test-sc64-p8-world: tests/sc64_p8_world_adapter.c build/p8-fixture/sc64_p8
 test-sc64-p8-world: build/test-sc64-p8-world
 	./build/test-sc64-p8-world
 test-starcraft: test-sc64-p8-world
+
+# Asset-free shared-owner wait/presentation and source-pause tail fixture.
+.PHONY: test-sc64-p8-timed-service
+build/test-sc64-p8-timed-service: tests/sc64_p8_timed_service.c build/p8-fixture/sc64_p8_scenario_generated.h starcraft/sc64_p8_timed_service.h starcraft/sc64_p8_world_adapter.h starcraft/sc64_p8_source_adapter.h starcraft/sc64_z8_world_adapter.h starcraft/sc64_z8_triggers.h starcraft/sc64_resource_actions.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft -Ibuild/p8-fixture $< -o $@
+test-sc64-p8-timed-service: build/test-sc64-p8-timed-service
+	./build/test-sc64-p8-timed-service
+test-starcraft: test-sc64-p8-timed-service
 
 # Optional bridge check against an already-prepared authenticated P8 header.
 .PHONY: test-sc64-p8-world-source-contract
@@ -151,8 +167,21 @@ RACE_CONSTRUCTION_INPUTS := $(CONSTRUCTION_ART_HEADER)
 endif
 # Every race-engine ROM uses the default profile's controls and menus
 # (starcraft/field_controls.h).
-RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated $(RACE_CONSTRUCTION_FLAGS)
-RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h $(RACE_CONSTRUCTION_INPUTS)
+RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated $(RACE_CONSTRUCTION_FLAGS)
+RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(RACE_CONSTRUCTION_INPUTS)
+
+.PHONY: sc64-briefings test-sc64-briefing
+sc64-briefings:
+	python3 tools/sc64_briefing_assets.py
+build/test-sc64-briefing: tests/sc64_briefing.c starcraft/sc64_briefing.h starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+test-sc64-briefing: build/test-sc64-briefing
+	./build/test-sc64-briefing
+test-starcraft: test-sc64-briefing
+
+.local/sc64/briefings/generated/sc64_briefing_generated.h:
+	@echo 'Private briefing data is missing. Run make sc64-briefings with the prepared local ROM and reference checkout.'
+	@false
 build/test-sc64-stock-motion-runtime: tests/sc64_stock_motion_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) $< common/gba.c -o $@
 test-sc64-stock-motion-runtime: build/test-sc64-stock-motion-runtime
@@ -979,7 +1008,14 @@ build/test-sc64-compact-building-save: tests/sc64_compact_building_save.c starcr
 .PHONY: test-sc64-compact-building-save
 test-sc64-compact-building-save: build/test-sc64-compact-building-save
 	./build/test-sc64-compact-building-save
-test-starcraft: test-sc64-compact-building-save
+
+build/test-sc64-construction-save: tests/sc64_construction_save.c starcraft/sc64_construction_save.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-construction-save
+test-sc64-construction-save: build/test-sc64-construction-save
+	./build/test-sc64-construction-save
+
+test-starcraft: test-sc64-compact-building-save test-sc64-construction-save
 build/test-sc64-t6-storage: tests/sc64_t6_storage_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T6_STORAGE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-t6-storage
@@ -3899,11 +3935,20 @@ test-sc64-tank-source-vfx-game: build/test-sc64-tank-source-vfx-game build/test-
 build/starcraft-terran.elf build/starcraft-zerg-z4.elf build/starcraft-protoss-p5-shuttle.elf build/starcraft-protoss-p6.elf build/starcraft-showcase.elf: $(TANK_SOURCE_HEADER)
 build/test-terran build/test-sc64-terran-full-profile build/test-zerg build/test-sc64-zerg-promoted-profile build/test-protoss build/test-sc64-protoss-promoted-profile build/test-sc64-protoss-canonical-storm build/test-sc64-protoss-canonical-storage build/test-sc64-protoss-canonical-controller build/test-sc64-p4-census: $(TANK_SOURCE_HEADER)
 UNIT_FACING_FLAGS := -I.local/sc64/facing/generated -DSC64_UNIT_FACING
+# StarCraft command-card buttons for the race order list, imported from the
+# verified ROM into a private header (see tools/sc64_command_icons.py).
+COMMAND_ICON_HEADER := .local/sc64/command-icons/generated/sc64_command_icons_generated.h
+COMMAND_ICON_FLAGS := -I.local/sc64/command-icons/generated -DSC64_COMMAND_ICONS
+# The HUD icons take the nearest runtime palette colours: the UI palette in
+# common/gba.c and the imported entries beside the sprite remap.
+$(COMMAND_ICON_HEADER): tools/sc64_command_icons.py tools/sc64_sprites.py common/gba.c .local/sc64/backwater/generated/palette-remap.bin .local/sc64/backwater/generated/palette.json
+	$(PYTHON) tools/sc64_command_icons.py
 SHOWCASE_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 SHOWCASE_SIEGE_FLAGS ?= -DSC64_SIEGE_SPLASH
 # Clip world art before it reaches either HUD band. Keep the infrequent
 # procedural diamond fallback in ROM so clipping retains the IWRAM reserve.
-SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS
+SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS)
+build/starcraft-showcase.elf build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-protoss-gas-placement build/test-sc64-protoss-skirmish-pylons build/test-sc64-native-weapon-game build/test-sc64-showcase-death-source: $(COMMAND_ICON_HEADER)
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
 	$(SIZE) $@
@@ -4501,3 +4546,26 @@ build/test-sc64-protoss-carried-p3 \
 build/test-sc64-protoss-carried-p5 \
 build/test-sc64-skirmish-resume-protoss \
 build/test-sc64-contact-cache-protoss: $(PROTOSS_P7_CANONICAL_INPUTS) $(P7_ARBITER_INPUTS) $(P7_FACT_V2_HEADER) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
+
+# Prepared-input regression checks for race construction travel and SRAM.
+CONSTRUCTION_ARRIVAL_FLAGS_terran = $(TERRAN_ROM_FLAGS)
+CONSTRUCTION_ARRIVAL_FLAGS_zerg-z6 = $(ZERG_ROM_FLAGS)
+CONSTRUCTION_ARRIVAL_FLAGS_protoss-p7 = $(PROTOSS_ROM_FLAGS)
+CONSTRUCTION_ARRIVAL_FLAGS_zerg-z7 = $(ZERG_Z7_RELEASE_FLAGS)
+CONSTRUCTION_ARRIVAL_INPUTS_terran = $(TERRAN_FULL_INPUTS)
+CONSTRUCTION_ARRIVAL_INPUTS_zerg-z6 = $(ZERG_Z6_INPUTS)
+CONSTRUCTION_ARRIVAL_INPUTS_protoss-p7 = $(PROTOSS_P7_CANONICAL_INPUTS)
+CONSTRUCTION_ARRIVAL_INPUTS_zerg-z7 = $(ZERG_Z7_CANONICAL_INPUTS)
+CONSTRUCTION_ARRIVAL_SOURCES_protoss-p7 = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
+
+define CONSTRUCTION_ARRIVAL_TESTS
+build/test-sc64-construction-arrival-$(1): tests/sc64_construction_arrival_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(CONSTRUCTION_ARRIVAL_INPUTS_$(1)) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $$(CONSTRUCTION_ARRIVAL_FLAGS_$(1)) $$< common/gba.c $$(CONSTRUCTION_ARRIVAL_SOURCES_$(1)) -o $$@
+build/test-sc64-construction-arrival-save-$(1): tests/sc64_construction_arrival_save_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(CONSTRUCTION_ARRIVAL_INPUTS_$(1)) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $$(CONSTRUCTION_ARRIVAL_FLAGS_$(1)) $$< common/gba.c $$(CONSTRUCTION_ARRIVAL_SOURCES_$(1)) -o $$@
+.PHONY: test-sc64-construction-arrival-$(1)
+test-sc64-construction-arrival-$(1): build/test-sc64-construction-arrival-$(1) build/test-sc64-construction-arrival-save-$(1)
+	./build/test-sc64-construction-arrival-$(1)
+	./build/test-sc64-construction-arrival-save-$(1)
+endef
+$(foreach profile,terran zerg-z6 protoss-p7 zerg-z7,$(eval $(call CONSTRUCTION_ARRIVAL_TESTS,$(profile))))

@@ -50,7 +50,7 @@ static void select_protoss_mission(int mission)
     assert(race_front.row == ordinal % 2);
     press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING && race_front.mission == mission);
-    input(KEY_A);
+    input(KEY_START);
     if (!(screen == SCREEN_PLAY && !race_mode && !won && !lost))
         fprintf(stderr, "P5 launch state screen=%d mission=%d unsupported=%d fault=%u\n",
                 screen, race_selected_mission, mission_unsupported_count,

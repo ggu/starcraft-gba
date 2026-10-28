@@ -338,7 +338,7 @@ static void launch_from_normal_menu(void)
     assert(sc64_catalog_playable_at(SC64_FACTION_ZERG, 3) == 15);
     tap(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING && race_front.mission == 15);
-    step(KEY_A);
+    step(KEY_START);
     deployed = 1;
     assert(screen == SCREEN_PLAY && !race_mode && !won && !lost);
     assert(race_selected_mission == 15 && race_campaign.mission == 15);

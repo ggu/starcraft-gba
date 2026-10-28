@@ -18,7 +18,7 @@ int main(void)
     tap(KEY_A); /* HOME -> Protoss missions */
     tap(KEY_RIGHT); tap(KEY_RIGHT); tap(KEY_RIGHT); /* P7 page */
     tap(KEY_A); /* briefing */
-    game_update(KEY_A,KEY_A); /* launch without a PLAY tick */
+    game_update(KEY_START,KEY_START); /* explicit launch without a PLAY tick */
     assert(screen==SCREEN_PLAY && frame==0);
     assert(!sc64_p7_arbiter_cache_initialized);
 

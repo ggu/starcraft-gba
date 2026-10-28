@@ -27,7 +27,7 @@ static void launch_z7(void)
     press(KEY_A);
     for(int page=0;page<ordinal/2;++page) press(KEY_RIGHT);
     if(ordinal&1) press(KEY_DOWN);
-    press(KEY_A); press(KEY_A);
+    press(KEY_A); press(KEY_START);
     assert(screen==SCREEN_PLAY && race_z7_active() && !race_z7.runtime.fault);
     assert(race_z7_map==&sc64_race_maps[SC64_Z7_GLOBAL_ID]);
 }

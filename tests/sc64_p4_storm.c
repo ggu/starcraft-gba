@@ -30,7 +30,7 @@ static void launch_from_normal_menu(void)
     press(KEY_RIGHT);
     press(KEY_DOWN);
     press(KEY_A);
-    input(KEY_A);
+    input(KEY_START);
     assert(screen == SCREEN_PLAY && race_p4_active());
 #ifdef SC64_P6_STORM_ENABLED
     /* Carried P4 uses the enclosing P6 product's save schema. */

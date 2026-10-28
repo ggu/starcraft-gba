@@ -73,6 +73,7 @@ int main(void) {
             self.skipTest("clang or cc is required for the renderer fixture")
         required = (
             PRIVATE_HEADER / "sc64_race_sprites_generated.h",
+            ROOT / ".local/sc64/briefings/generated/sc64_briefing_generated.h",
             ROOT / ".local/sc64/backwater/generated/sc64_mission_generated.h",
             ROOT / ".local/sc64/backwater/generated/sc64_assets_generated.h",
             ROOT / ".local/sc64/backwater/generated/sc64_sprites_generated.h",
@@ -88,12 +89,15 @@ int main(void) {
                 "-DGBA_HOST", f"-I{ROOT / 'common'}", f"-I{ROOT / 'starcraft'}",
                 "-DSC64_IMPORTED_MISSION", "-DSC64_HAS_TERRAIN_ART",
                 "-DSC64_HAS_SPRITES", f"-I{ROOT / '.local/sc64/backwater/generated'}",
+                f"-I{ROOT / '.local/sc64/briefings/generated'}",
                 "-DSC64_RACES", f"-I{PRIVATE_HEADER}",
                 f"-I{ROOT / '.local/sc64/races/generated'}",
                 str(ROOT / "tests/sc64_photon_cannon_renderer.c"),
                 str(ROOT / "common/gba.c"), "-o", str(executable),
             ]
-            subprocess.run(command, check=True, capture_output=True, text=True)
+            compiled = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(compiled.returncode, 0,
+                             compiled.stderr or compiled.stdout or "renderer fixture did not compile")
             subprocess.run([str(executable)], check=True, capture_output=True, text=True)
 
     def test_every_full_profile_sprite_mapping_has_opaque_pixels(self) -> None:
@@ -205,6 +209,7 @@ int main(void) {
             ".local/sc64/races/generated/sc64_races_generated.h",
             ".local/sc64/races/generated/sc64_race_sprites_generated.h",
             ".local/sc64/races/generated/sc64_menu_generated.h",
+            ".local/sc64/briefings/generated/sc64_briefing_generated.h",
             ".local/sc64/skirmish/generated/sc64_skirmish_generated.h",
         )
 
