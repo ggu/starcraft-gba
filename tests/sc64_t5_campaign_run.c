@@ -490,7 +490,8 @@ static int find_side_worker(void)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV &&
-            !SC64_TRANSPORT_LOADED(&u[i])) return i;
+            !SC64_TRANSPORT_LOADED(&u[i]) &&
+            u[i].order != ORDER_BUILD && u[i].order != ORDER_BUILD_PENDING) return i;
     return -1;
 }
 
@@ -604,13 +605,21 @@ static int controller_build_supply_depot(int *out_slot)
     int before = owner_buildings(SIDE);
     tap(KEY_A);
     int slot = -1;
-    if (owner_buildings(SIDE) > before)
-        for (int i = 0; i < MAX_BUILDINGS; ++i)
-            if (b[i].alive && b[i].owner == SIDE && b[i].type == B_DEPOT &&
-                b[i].under_construction && dist2(x, y, b[i].x, b[i].y) < 64 * 64) {
-                slot = i; break;
-            }
-    if (slot < 0) {
+    if (u[worker].order != ORDER_BUILD_PENDING || u[worker].target != B_DEPOT) {
+        fprintf(stderr, "T5 Supply Depot did not record pending order worker=%d order=%d product=%d at=%d,%d\n",
+                worker, u[worker].order, u[worker].target, x, y);
+        (void)controller_normalize_field();
+        return 0;
+    }
+    for (int t = 0; t < 5000 && screen == SCREEN_PLAY && !won && !lost &&
+         host_ticks < (u32)run_limit && u[worker].alive &&
+         u[worker].order == ORDER_BUILD_PENDING; ++t) step(0);
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_DEPOT &&
+            b[i].under_construction && dist2(x, y, b[i].x, b[i].y) < 64 * 64) {
+            slot = i; break;
+        }
+    if (slot < 0 || owner_buildings(SIDE) <= before) {
         fprintf(stderr, "T5 Supply Depot command did not create building planned=%d,%d actual=%d,%d mode=%d menu=%d wallet=%d\n",
                 x, y, cx, cy, mode, menu_open, minerals);
         (void)controller_normalize_field();
@@ -637,9 +646,19 @@ static int controller_build_starport(int *out_slot)
     if (!controller_select_unit(worker) || !controller_choose_menu_row(11)) return 0;
     move_cursor(x, y);
     tap(KEY_A);
-    int slot = find_side_building(B_STARPORT, 0);
-    if (owner_buildings(SIDE) <= before || slot < 0 || b[slot].x != x || b[slot].y != y)
+    if (u[worker].order != ORDER_BUILD_PENDING || u[worker].target != B_STARPORT) {
+        fprintf(stderr, "T5 Starport did not record pending order worker=%d order=%d product=%d site=%d,%d\n",
+                worker, u[worker].order, u[worker].target, x, y);
         return 0;
+    }
+    for (int t = 0; t < 5000 && screen == SCREEN_PLAY && !won && !lost &&
+         host_ticks < (u32)run_limit && u[worker].alive &&
+         u[worker].order == ORDER_BUILD_PENDING; ++t) step(0);
+    int slot = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_STARPORT &&
+            b[i].under_construction && b[i].x == x && b[i].y == y) { slot = i; break; }
+    if (owner_buildings(SIDE) <= before || slot < 0) return 0;
     fprintf(stderr, "T5 controller started paid Starport slot=%d site=%d,%d worker=%d wallet=%d/%d\n",
             slot, x, y, worker, minerals, gas);
     if (out_slot) *out_slot = slot;
