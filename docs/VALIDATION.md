@@ -6044,3 +6044,11 @@ P3 and T5 controllers now check the grid-snapped site and avoid sites that
 strand the builder; the P3 controller also aims its sweep from a fighter that
 can reach a target. Recorded ARM/mGBA input replays were not rerun and may
 need re-recording, because R, A and SELECT now behave differently.
+
+After merging base `7ff622c`, silent builds (`SC64_AUDIO=0`, because that
+base requires a codec-format-2 audio bank and the shared bank here is raw)
+keep IWRAM identical to the new base and lower BSS: Terran `0x0203df24` →
+`0x0203dec4`, Races `0x0203d128` → `0x0203d0c8`, Showcase `0x0203df70` →
+`0x0203def0`. `./dev build`, `test-sc64-showcase`, `test-races`,
+`test-zerg-z3` and `test-sc64-p3` pass; `test-unified` stops only on the
+absent P7 inputs.
