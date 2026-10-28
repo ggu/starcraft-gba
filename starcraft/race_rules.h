@@ -118,6 +118,9 @@ enum {
     B_STASIS_CELL_PRISON, B_FLEET_BEACON, B_ROBOTICS_SUPPORT_BAY,
     B_SHIELD_BATTERY, B_SPECIAL_ION_CANNON,
     B_SCIENCE_FACILITY, B_PHYSICS_LAB,
+#elif defined(SC64_P8_DATA_ENABLED)
+    /* P8 source raw 168: the scenario's objective Stasis Cell. */
+    B_STASIS_CELL_PRISON,
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     B_ZP_CONTROL_TOWER, B_ZP_MACHINE_SHOP, B_ZP_ARMORY,
@@ -434,6 +437,8 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     , [B_SPECIAL_ION_CANNON] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 200, 0, 900, 2000, 0 }
     , [B_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
     , [B_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
+#elif defined(SC64_P8_DATA_ENABLED)
+    , [B_STASIS_CELL_PRISON] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 150, 0, 1, 2000, 0 }
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     , [B_ZP_CONTROL_TOWER] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 500, 0 }
@@ -1389,10 +1394,13 @@ static inline int sc64_race_raw_building(int type)
     case B_MACHINE_SHOP: return 120; case B_ARMORY: return 123;
     case B_ULTRALISK_CAVERN: return 140;
 #endif
-    case B_CITADEL_ADUN: return 163; case B_STASIS_CELL_PRISON: return 168;
+    case B_CITADEL_ADUN: return 163;
     case B_FLEET_BEACON: return 169; case B_ROBOTICS_SUPPORT_BAY: return 171;
     case B_SHIELD_BATTERY: return 172; case B_SPECIAL_ION_CANNON: return 127;
     case B_SCIENCE_FACILITY: return 116; case B_PHYSICS_LAB: return 118;
+#endif
+#if defined(SC64_P8_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case B_STASIS_CELL_PRISON: return 168;
 #endif
 #if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
     case B_Z6_ROBOTICS_SUPPORT_BAY: return 171;
@@ -1604,13 +1612,15 @@ static inline int sc64_race_building_from_raw(int raw)
 #ifndef SC64_ZP_CAMPAIGN_ACTORS
     case 140: return B_ULTRALISK_CAVERN;
 #endif
-    case 168: return B_STASIS_CELL_PRISON;
 #ifndef SC64_P7_ACTORS
     case 163: return B_CITADEL_ADUN; case 169: return B_FLEET_BEACON;
     case 171: return B_ROBOTICS_SUPPORT_BAY; case 172: return B_SHIELD_BATTERY;
 #endif
     case 127: return B_SPECIAL_ION_CANNON;
     case 116: return B_SCIENCE_FACILITY; case 118: return B_PHYSICS_LAB;
+#endif
+#if defined(SC64_P8_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS)
+    case 168: return B_STASIS_CELL_PRISON;
 #endif
 #if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P7_ACTORS)
     case 171: return B_Z6_ROBOTICS_SUPPORT_BAY;
