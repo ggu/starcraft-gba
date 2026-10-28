@@ -6,24 +6,43 @@ static int camx, camy;
 static int currently_visible(int x, int y) { (void)x; (void)y; return 1; }
 #include "../starcraft/sc64_weapon_source_runtime.h"
 #include "../starcraft/sc64_weapon_source_vfx_render.h"
+
+#include <assert.h>
+#include <string.h>
 #ifdef SC64_UNIT_ATTACK_POSES_ENABLED
 #include "../starcraft/sc64_unit_attack_source.h"
 #endif
 
 static unsigned draw_calls;
 static int last_x, last_y;
+static int canvas[160][240];
+typedef struct { int x, y, w, h, mapped; const u8 *src, *lookup; unsigned rows; } Call;
+static Call calls[4096];
 static const u8 *draw_sources[4096];
 static int draw_xs[4096];
+static void paint_test_canvas(int x, int y, int w, int h, const u8 *src)
+{
+    for (int row = 0; row < h; ++row) for (int col = 0; col < w; ++col)
+        if (x + col >= 0 && x + col < 240 && y + row >= 0 && y + row < 160)
+            canvas[y + row][x + col] = src[row * w + col];
+}
+
+static void clear_test_canvas(void)
+{
+    for (int y = 0; y < 160; ++y) for (int x = 0; x < 240; ++x)
+        canvas[y][x] = -1;
+}
+
 void gfx_reverse_bytes(u8 *dst, const u8 *src, unsigned n)
 {
     for (unsigned i = 0; i < n; ++i) dst[i] = src[n - 1 - i];
 }
 
 void gfx_blit_sprite(int x, int y, int w, int h, const u8 *src)
-{ (void)w; (void)h; if (draw_calls < 4096) { draw_sources[draw_calls] = src; draw_xs[draw_calls] = x; } ++draw_calls; last_x = x; last_y = y; }
+{ paint_test_canvas(x, y, w, h, src); if (draw_calls < 4096) { calls[draw_calls] = (Call){x, y, w, h, 0, src, 0, 0}; draw_sources[draw_calls] = src; draw_xs[draw_calls] = x; } ++draw_calls; last_x = x; last_y = y; }
 void gfx_blit_sprite_mapped(int x, int y, int w, int h, const u8 *src,
                             const u8 *lookup, unsigned rows)
-{ (void)w; (void)h; (void)lookup; (void)rows; if (draw_calls < 4096) { draw_sources[draw_calls] = src; draw_xs[draw_calls] = x; } ++draw_calls; last_x = x; last_y = y; }
+{ (void)lookup; paint_test_canvas(x, y, w, h, src); if (draw_calls < 4096) { calls[draw_calls] = (Call){x, y, w, h, 1, src, lookup, rows}; draw_sources[draw_calls] = src; draw_xs[draw_calls] = x; } ++draw_calls; last_x = x; last_y = y; }
 
 static int saw_image(uint16_t image_id)
 {
@@ -69,8 +88,104 @@ static int image_min_x(uint16_t image_id, int *min_x)
     return found;
 }
 
+static void check_resolved_pixels(uint16_t requested_image_id,
+                                  const Sc64WeaponSourceImage *image,
+                                  const Sc64WeaponSourceFrame *frame,
+                                  int mirror)
+{
+    clear_test_canvas();
+    draw_calls = 0;
+    sc64_weapon_source_vfx_draw_image_frame_resolved(
+        requested_image_id, image, frame, mirror, 64, 64);
+    int actual[160][240];
+    memcpy(actual, canvas, sizeof(actual));
+    unsigned actual_count = draw_calls;
+    assert(actual_count <= 256);
+    Call actual_calls[256];
+    for (unsigned i = 0; i < actual_count; ++i) actual_calls[i] = calls[i];
+
+    /* Independent expected raster assembled from the authored frame and the
+     * requested key's LUT, then sent through the already-covered raster
+     * blitter. This checks visible pixels and alias palette selection. */
+    Sc64WeaponSourceVfxRaster expected = {0};
+    expected.pixels = sc64_weapon_source_frame_pixels(frame, 0);
+    expected.mirror_pixels = sc64_weapon_source_frame_pixels(frame, 1);
+    expected.image_id = requested_image_id;
+    expected.x = frame->x; expected.y = frame->y;
+    expected.mirror_x = frame->mirror_x;
+    expected.width = frame->w; expected.height = frame->h;
+    expected.canvas_w = frame->canvas_w; expected.canvas_h = frame->canvas_h;
+    expected.modifier = image->modifier;
+    const Sc64WeaponSourceLut *lut =
+        sc64_weapon_source_lut_for_image(requested_image_id);
+    if (lut && lut->data_offset < sizeof(sc64_weapon_source_lut_bytes)) {
+        expected.lookup = sc64_weapon_source_lut_bytes + lut->data_offset;
+        expected.lookup_rows = (uint8_t)(lut->rows > 255 ? 255 : lut->rows);
+    }
+    clear_test_canvas();
+    draw_calls = 0;
+    sc64_weapon_source_vfx_draw_raster(&expected, 64, 64, mirror);
+    assert(!memcmp(actual, canvas, sizeof(actual)));
+    assert(draw_calls == actual_count);
+    for (unsigned i = 0; i < actual_count; ++i) {
+        assert(calls[i].x == actual_calls[i].x && calls[i].y == actual_calls[i].y);
+        assert(calls[i].w == actual_calls[i].w && calls[i].h == actual_calls[i].h);
+        assert(calls[i].mapped == actual_calls[i].mapped);
+        assert(calls[i].src == actual_calls[i].src);
+        assert(calls[i].lookup == actual_calls[i].lookup);
+        assert(calls[i].rows == actual_calls[i].rows);
+    }
+}
+
+static void resolved_helper_matches_authored_pixels(uint16_t image_id,
+                                                    uint8_t animation_id,
+                                                    uint32_t age,
+                                                    uint8_t direction)
+{
+    const Sc64WeaponSourceImage *image = sc64_weapon_source_image_lookup(image_id);
+    assert(image);
+    const Sc64WeaponSourceAnimation *anim =
+        sc64_weapon_source_animation_lookup(image_id, animation_id);
+    int mirror = 0;
+    uint16_t id = sc64_weapon_source_vfx_source_frame(
+        image, anim, age, direction, &mirror);
+    assert(id != UINT16_MAX);
+    const Sc64WeaponSourceFrame *frame =
+        sc64_weapon_source_frame_lookup(image_id, id);
+    assert(frame);
+    check_resolved_pixels(image_id, image, frame, mirror);
+}
+
+
+static void resolved_alias_keeps_the_requested_lut_key(void)
+{
+    for (uint16_t i = 0; i < SC64_WEAPON_SOURCE_IMAGE_COUNT; ++i) {
+        const Sc64WeaponSourceImage *image = &sc64_weapon_source_images[i];
+        if (image->modifier != 9u && image->modifier != 10u) continue;
+        uint16_t source_id = sc64_weapon_source_vfx_source_frame(
+            image, 0, 0, 8, &(int){0});
+        if (source_id == UINT16_MAX) continue;
+        const Sc64WeaponSourceFrame *frame =
+            sc64_weapon_source_frame_lookup(image->image_id, source_id);
+        const Sc64WeaponSourceLut *lut =
+            sc64_weapon_source_lut_for_image(image->image_id);
+        if (!frame || !lut) continue;
+
+        Sc64WeaponSourceImage alias = *image;
+        alias.image_id = (uint16_t)(image->image_id ^ 0x8000u);
+        alias.lut_index = (uint8_t)((image->lut_index + 1u) %
+                                    SC64_WEAPON_SOURCE_LUT_COUNT);
+        check_resolved_pixels(image->image_id, &alias, frame, 0);
+        return;
+    }
+    assert(!"synthetic bank must include at least one LUT-backed image");
+}
+
 int main(void)
 {
+    resolved_helper_matches_authored_pixels(531u, 0u, 0u, 8u);
+    resolved_helper_matches_authored_pixels(536u, 0u, 1u, 8u);
+    resolved_alias_keeps_the_requested_lut_key();
     const Sc64WeaponSourceAttackProfile *p =
         sc64_weapon_source_profile_lookup(5, 11, 0, 0);
     if (!p || !sc64_weapon_source_image_lookup(531u)) return 1;
@@ -90,7 +205,7 @@ int main(void)
     sc64_weapon_source_vfx_draw_trace(packed, 50, 50, 80, 50, 1,
         sc64_weapon_source_vfx_first_gba_age(
             sc64_weapon_source_trace_release_ticks(p)));
-    if (draw_calls < 2 || last_x < 40 || last_x > 100 || last_y < 12 || last_y >= 120)
+    if (!saw_image(531) || last_x < 40 || last_x > 100 || last_y < 12 || last_y >= 120)
         return 4;
     /* Tank's image536 muzzle child starts on attack-init tick 1 and remains
      * visible through tick 2, ahead of its attackwith release at tick 3. */
@@ -137,8 +252,7 @@ int main(void)
     sc64_weapon_source_vfx_draw_trace(packed, 50, 50, 80, 50, 1,
         sc64_weapon_source_vfx_first_gba_age(
             sc64_weapon_source_trace_release_ticks(p)));
-    if (draw_calls < 2) return 10; /* projectile + LO-attached image537 */
-    if (!saw_image(537)) return 16;
+    if (!saw_image(537)) return 10; /* authored LO child, independent of row count */
 
     draw_calls = 0;
     key = (Sc64WeaponSourceVfxKey){70, 1, 74, 8, 1, 0};
