@@ -716,10 +716,14 @@ enum {
 #ifdef SC64_RACES
     /* Previously unused in every race profile. Fits the existing four-bit
      * save fields without moving any established order value. */
+    , ORDER_PROFILE_END
     , ORDER_BUILD_PENDING = 14
 #endif
 };
 #ifdef SC64_RACES
+_Static_assert(ORDER_PROFILE_END <= ORDER_BUILD_PENDING,
+               "pending construction must not alias an established order");
+_Static_assert(ORDER_BUILD_PENDING < 16, "four-bit persistent order field");
 #define SC64_PENDING_BUILD_ORDER(o) ((o) == ORDER_BUILD_PENDING)
 #else
 #define SC64_PENDING_BUILD_ORDER(o) 0
@@ -6124,6 +6128,7 @@ target_lists_unavailable:
             && q->order != ORDER_P7_RECHARGE
 #endif
             && !SC64_NYDUS_ORDER(q->order)
+            && !SC64_PENDING_BUILD_ORDER(q->order)
             ) {
             race_transport_activity = 1;
             if (race_transport_tick_unit(i)) continue;
