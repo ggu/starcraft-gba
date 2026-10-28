@@ -156,6 +156,10 @@ sc64_unit_buckets_begin(void)
     for (i = 0; i < MAX_UNITS; ++i) {
         sc64_unit_bucket_next[i] = 0xff;
         sc64_unit_bucket_prev[i] = 0xff;
+        /* A unit created after this index build may call bucket_move() on
+         * its first movement. Distinguish it from a linked slot so it does
+         * not unlink through a stale cell value. */
+        sc64_unit_bucket_cell[i] = 0xffffu;
     }
     for (i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
@@ -175,6 +179,10 @@ sc64_unit_bucket_move(Unit *q)
     if (!sc64_unit_bucket_active || slot < 0 || slot >= MAX_UNITS) return;
     old_cell = sc64_unit_bucket_cell[slot];
     new_cell = sc64_unit_bucket_cell_at(q->x, q->y);
+    if (old_cell == 0xffffu) {
+        sc64_unit_bucket_insert(slot, new_cell);
+        return;
+    }
     if (old_cell == new_cell) return;
     before = sc64_unit_bucket_prev[slot];
     after = sc64_unit_bucket_next[slot];
