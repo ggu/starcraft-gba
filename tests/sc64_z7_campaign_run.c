@@ -2069,27 +2069,6 @@ static int z7_local_extractor_safe(void)
     return 1;
 }
 
-/* Clear local combat first. Before the source AI's 9,000-frame switch, target
-   the visible Lair and Pool, then the nearby extractor to unlock a legitimate
-   local gas node. Leave the Creep Colony and Spire intact while the army holds
-   the cleared approach. */
-static int campaign_any_ground_combat_can_reach_enemy_building(void)
-{
-    static const int offsets[8][2]={{-32,0},{32,0},{0,-32},{0,32},
-        {-32,-32},{32,-32},{-32,32},{32,32}};
-    for(int bslot=0;bslot<MAX_BUILDINGS;bslot++)if(b[bslot].alive&&b[bslot].owner==ENEMY) {
-        for(int unit=0;unit<MAX_UNITS;unit++)if(u[unit].alive&&u[unit].owner==SIDE&&
-            !sc64_race_is_worker(u[unit].type)&&u[unit].type!=U_OVERLORD&&
-            !sc64_race_unit_flying(u[unit].type)&&sc64_race_unit_damage(u[unit].type)>0) {
-            int nx=-1,ny=-1;
-            if(path_next_tile(u[unit].x,u[unit].y,b[bslot].x,b[bslot].y,&nx,&ny))return 1;
-            for(int k=0;k<8;k++)if(path_next_tile(u[unit].x,u[unit].y,
-                b[bslot].x+offsets[k][0],b[bslot].y+offsets[k][1],&nx,&ny))return 1;
-        }
-    }
-    return 0;
-}
-
 /* Preserve a live visible air attack while it damages a target. If the
    selected Mutalisks have gone idle or HP stalls, reissue coordinate
    Attack-Move so fog reconnaissance can continue through ordinary UI. */
@@ -3025,15 +3004,25 @@ static void macro_step(void)
     /* Use live worker and mineral-patch proximity as the evacuation trigger;
        a broad Hatchery radius can strand otherwise productive Drones. */
     int home=z7_townhall(SIDE);
-    /* Only pay for the Lair/Spire/Muta route after at most three remaining
-       enemy structures have no ground-combat path; all actions use normal UI. */
-    if((unsigned)frame>=100000u&&building_count(ENEMY)<=3&&
-       !campaign_any_ground_combat_can_reach_enemy_building()) {
-        if(!late_air_breakthrough_active) {
+    /* Start the paid air route only after ordinary recon has exhausted
+       reachable fog and no currently visible enemy building has a ground
+       attack path. Do not inspect hidden enemy structure counts or positions. */
+    static unsigned next_late_air_gate_check;
+    if((unsigned)frame>=100000u&&!late_air_breakthrough_active&&
+       campaign_recon_stage>=24&&(unsigned)frame>=next_late_air_gate_check) {
+        next_late_air_gate_check=(unsigned)frame+600u;
+        int bx=-1,by=-1,building=-1,fx=-1,fy=-1;
+        int visible_ground_target=nearest_enemy_building(&bx,&by,&building);
+        int reachable_frontier=campaign_recon_waypoint(campaign_recon_stage,&fx,&fy);
+        fprintf(stderr,"Z7 late-air observation gate stage%d visibleGroundTarget%d frontier%d frame%u\n",
+            campaign_recon_stage,visible_ground_target,reachable_frontier,(unsigned)frame);
+        if(!visible_ground_target&&!reachable_frontier) {
             late_air_breakthrough_active=1;muta_scout_leg=0;
-            fprintf(stderr,"Z7 activate late air breakthrough: enemy buildings%d all ground paths blocked frame%u bank%d/%d\n",
-                building_count(ENEMY),(unsigned)frame,minerals,gas);
+            fprintf(stderr,"Z7 activate late air breakthrough after observed recon exhaustion stage%d frame%u bank%d/%d\n",
+                campaign_recon_stage,(unsigned)frame,minerals,gas);
         }
+    }
+    if(late_air_breakthrough_active) {
         int lair=raw_building(132,SIDE);
         if(lair<0) {
             if(minerals>=150&&gas>=100&&start_lair_morph())return;
