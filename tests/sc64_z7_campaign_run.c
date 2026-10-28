@@ -58,6 +58,7 @@ static int muta_scout_leg=-1;
 static int late_air_breakthrough_active;
 static unsigned late_air_scout_retry_frame;
 static int late_air_scout_active,late_air_scout_x,late_air_scout_y;
+static int z7_revisit_cursor,z7_revisit_cursor_target=-1;
 static unsigned muta_scout_order_frame;
 static unsigned muta_scout_retry_frame;
 static int muta_scout_complete;
@@ -425,6 +426,7 @@ static int cursor_lattice_coordinate(int current,int target,int upper);
 static int local_rect_empty_for_selection(int left,int top,int right,int bottom)
 {
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&!SC64_TRANSPORT_LOADED(&u[i])&&
+        (u[i].owner==SIDE||currently_visible(u[i].x,u[i].y))&&
         sc64_game_unit_selectable(u[i].type)) {
         int dx=u[i].x<left?left-u[i].x:(u[i].x>right?u[i].x-right:0);
         int dy=u[i].y<top?top-u[i].y:(u[i].y>bottom?u[i].y-bottom:0);
@@ -432,6 +434,7 @@ static int local_rect_empty_for_selection(int left,int top,int right,int bottom)
         if(dx*dx+dy*dy<=margin*margin)return 0;
     }
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&
+        (b[i].owner==SIDE||currently_visible(b[i].x,b[i].y))&&
         sc64_game_building_selectable(b[i].type)) {
         int dx=b[i].x<left?left-b[i].x:(b[i].x>right?b[i].x-right:0);
         int dy=b[i].y<top?top-b[i].y:(b[i].y>bottom?b[i].y-bottom:0);
@@ -950,6 +953,66 @@ static int find_build_site(int type,int *out_x,int *out_y)
     return 0;
 }
 
+/* Pick a Spire site on an owned completed Hatchery's creep and the exact
+   own Drone that can reach and be selected for that site. */
+static int find_spire_site_for_builder(int *out_x,int *out_y,int *out_worker)
+{
+    static unsigned last_audit_frame;
+    int any_hatch=0;
+    for(int h=0;h<MAX_BUILDINGS;h++)if(b[h].alive&&b[h].owner==SIDE&&
+       sc64_race_is_zerg_townhall(b[h].type)&&building_complete(h)) {
+        any_hatch=1;
+        int legal=0,placeable=0,reachable=0,selectable=0;
+        int origin_x=b[h].x&~15,origin_y=b[h].y&~15;
+        int worker_order[MAX_UNITS],workers=0;
+        for(int i=0;i<MAX_UNITS;i++)if(z7_worker_available_for_new_job(i))worker_order[workers++]=i;
+        for(int i=1;i<workers;i++) {
+            int value=worker_order[i],j=i;
+            int d=dist2(u[value].x,u[value].y,b[h].x,b[h].y);
+            while(j>0&&dist2(u[worker_order[j-1]].x,u[worker_order[j-1]].y,b[h].x,b[h].y)>d) {
+                worker_order[j]=worker_order[j-1];--j;
+            }
+            worker_order[j]=value;
+        }
+        for(int radius=16;radius<=160;radius+=16) {
+            int inner=(radius-16)*(radius-16),outer=radius*radius;
+            for(int y=origin_y-radius;y<=origin_y+radius;y+=16)
+                for(int x=origin_x-radius;x<=origin_x+radius;x+=16) {
+                    if(x<16||y<20||x>=WORLD_W-16||y>=WORLD_H-16)continue;
+                    int site_x=cursor_lattice_coordinate(cx,x,WORLD_W);
+                    int site_y=cursor_lattice_coordinate(cy,y,WORLD_H);
+                    int d=dist2(site_x,site_y,b[h].x,b[h].y);
+                    if(d>outer||(radius>16&&d<=inner)||site_x<16||site_y<20||
+                       site_x>=WORLD_W-16||site_y>=WORLD_H-16||
+                       !currently_visible(site_x,site_y))continue;
+                    if(!race_can_site(SIDE,B_SPIRE,site_x,site_y))continue;
+                    ++legal;
+                    if(!can_place(B_SPIRE,site_x,site_y))continue;
+                    ++placeable;
+                    for(int w=0;w<workers;w++) {
+                        int worker=worker_order[w],nx=-1,ny=-1,cx0=0,cy0=0;
+                        if(!path_next_tile(u[worker].x,u[worker].y,site_x,site_y,&nx,&ny))continue;
+                        ++reachable;
+                        if(!worker_select_point(worker,&cx0,&cy0))continue;
+                        ++selectable;
+                        fprintf(stderr,"Z7 Spire site candidate hatch%d xy%d,%d site%d,%d builder%d xy%d,%d counts legal%d place%d reach%d ui%d frame%u\n",
+                            h,b[h].x,b[h].y,site_x,site_y,worker,u[worker].x,u[worker].y,
+                            legal,placeable,reachable,selectable,(unsigned)frame);
+                        *out_x=site_x;*out_y=site_y;*out_worker=worker;return 1;
+                    }
+                }
+        }
+        if(!last_audit_frame||(unsigned)frame-last_audit_frame>=600u)
+            fprintf(stderr,"Z7 Spire site audit hatch%d xy%d,%d workers%d legal%d place%d reach%d ui%d frame%u\n",
+                h,b[h].x,b[h].y,workers,legal,placeable,reachable,selectable,(unsigned)frame);
+    }
+    if(!any_hatch&&!last_audit_frame)
+        fprintf(stderr,"Z7 Spire site audit no completed own Hatchery workers%d frame%u\n",
+            worker_count(-1),(unsigned)frame);
+    if((unsigned)frame>=last_audit_frame+600u)last_audit_frame=(unsigned)frame;
+    return 0;
+}
+
 /* Diagnostic for the reported midpoint Hatchery loss. Include dead as well
    as live slots so a spawn-then-destroy update cannot look like a rejected
    placement. Unit.cd and target expose the hostile attack state directly. */
@@ -980,7 +1043,16 @@ static int start_building(int type,int menu_row)
     /* Preserve the pre-existing Extractor pending-order behavior. The late
        air branch checks its Spire pending order before calling this helper. */
     if(type==B_EXTRACTOR&&z7_pending_building_order(type))return 1;
-    if(!find_build_site(type,&x,&y)) {
+    if(type==B_SPIRE) {
+        if(!find_spire_site_for_builder(&x,&y,&worker)) {
+            if(last_build_fail_type!=type||frame-last_build_fail_frame>=600) {
+                fprintf(stderr,"Z7 cannot site type%d frame%d bank%d/%d workers%d geysers%d\n",
+                    type,frame,minerals,gas,worker_count(-1),geyser_count);
+                last_build_fail_type=type;last_build_fail_frame=frame;
+            }
+            return 0;
+        }
+    } else if(!find_build_site(type,&x,&y)) {
         if(last_build_fail_type!=type||frame-last_build_fail_frame>=600) {
             fprintf(stderr,"Z7 cannot site type%d frame%d bank%d/%d workers%d geysers%d\n",
                 type,frame,minerals,gas,worker_count(-1),geyser_count);
@@ -988,7 +1060,7 @@ static int start_building(int type,int menu_row)
         }
         return 0;
     }
-    for(int i=0;i<MAX_UNITS;i++)if(z7_worker_available_for_new_job(i)){worker=i;break;}
+    if(worker<0)for(int i=0;i<MAX_UNITS;i++)if(z7_worker_available_for_new_job(i)){worker=i;break;}
     if(worker<0) {
         if(last_build_fail_type!=type||frame-last_build_fail_frame>=600) {
             fprintf(stderr,"Z7 no builder type%d frame%d workers%d bank%d/%d\n",
@@ -998,7 +1070,8 @@ static int start_building(int type,int menu_row)
         return 0;
     }
     int selected=0;
-    for(int i=worker;i<MAX_UNITS;i++)if(z7_worker_available_for_new_job(i)&&
+    if(type==B_SPIRE)selected=select_worker(worker);
+    else for(int i=worker;i<MAX_UNITS;i++)if(z7_worker_available_for_new_job(i)&&
         (type!=B_EXTRACTOR||u[i].order!=ORDER_BUILD_PENDING)) {
         if(select_worker(i)){worker=i;selected=1;break;}
         cancel_ui_mode();
@@ -1021,6 +1094,8 @@ static int start_building(int type,int menu_row)
         return 0;
     }
     move_cursor(x,y);
+    if(type==B_SPIRE)fprintf(stderr,"Z7 Spire final cursor target%d,%d snapped%d,%d builder%d visible%d site%d place%d frame%u\n",
+        x,y,cx,cy,worker,currently_visible(cx,cy),race_can_site(SIDE,type,cx,cy),can_place(type,cx,cy),(unsigned)frame);
     if(type==B_HATCHERY&&!build_probe_done)
         fprintf(stderr,"Z7 build probe before A frame%u mode%d menu%d menuopen%d cursor%d,%d selectedworker%d bank%d/%d site%d place%d\n",
             (unsigned)frame,mode,menu,menu_open,cx,cy,find_selected_worker(),minerals,gas,
@@ -2076,74 +2151,144 @@ static int z7_local_extractor_safe(void)
     return 1;
 }
 
-/* Preserve a live visible air attack while it damages a target. If the
-   selected Mutalisks have gone idle or HP stalls, reissue coordinate
-   Attack-Move so fog reconnaissance can continue through ordinary UI. */
+/* Give one ordinary visible Mutalisk an
+   ordinary Move order to the nearest known-map fog tile. No enemy state is
+   read or modified; tile choice uses only explored/visible and own position. */
+static int campaign_muta_nearest_fog(int slot,int *out_x,int *out_y,int *out_revisit_index)
+{
+    if(slot<0||slot>=MAX_UNITS||!u[slot].alive||u[slot].owner!=SIDE||
+       u[slot].type!=U_MUTALISK||SC64_TRANSPORT_LOADED(&u[slot]))return 0;
+    int best=-1,best_d=0x7fffffff,bx=-1,by=-1;
+    if(out_revisit_index)*out_revisit_index=-1;
+    for(int pass=0;pass<1&&best<0;pass++) {
+        for(int row=0;row<MAP_ROWS;row++)for(int col=0;col<MAP_COLS;col++) {
+            int idx=col+row*MAP_COLS;
+            int seen=SC64_GRID_GET(explored,idx);
+            if(SC64_GRID_GET(visible,idx)||seen!=pass)continue;
+            int x=col*16+8,y=row*16+8;
+            if(x<16||y<16||x>=WORLD_W-16||y>=WORLD_H-16)continue;
+            int d=dist2(u[slot].x,u[slot].y,x,y);
+            if(d<32*32||d>=best_d)continue;
+            best=idx;best_d=d;bx=x;by=y;
+        }
+    }
+    if(best<0) {
+        int coarse_cols=(MAP_COLS+7)/8,coarse_rows=(MAP_ROWS+7)/8;
+        int coarse_total=coarse_cols*coarse_rows;
+        int start_cursor=z7_revisit_cursor;
+        for(int step=0;step<coarse_total;step++) {
+            int c=(start_cursor+step)%coarse_total;
+            int col=(c%coarse_cols)*8+4,row=(c/coarse_cols)*8+4;
+            if(col>=MAP_COLS||row>=MAP_ROWS)continue;
+            int idx=col+row*MAP_COLS,x=col*16+8,y=row*16+8;
+            if(x<16||y<16||x>=WORLD_W-16||y>=WORLD_H-16||
+               !SC64_GRID_GET(explored,idx))continue;
+            if(SC64_GRID_GET(visible,idx)) {z7_revisit_cursor=(c+1)%coarse_total;continue;}
+            if(dist2(u[slot].x,u[slot].y,x,y)<32*32)continue;
+            best=idx;bx=x;by=y;best_d=dist2(u[slot].x,u[slot].y,x,y);
+            if(out_revisit_index)*out_revisit_index=c;
+            break;
+        }
+    }
+    if(best<0)return 0;
+    *out_x=bx;*out_y=by;return 1;
+}
+
+static int campaign_muta_native_move(int slot,int x,int y)
+{
+    if(slot<0||slot>=MAX_UNITS||!u[slot].alive||u[slot].owner!=SIDE||
+       u[slot].type!=U_MUTALISK||SC64_TRANSPORT_LOADED(&u[slot]))return 0;
+    cancel_ui_mode();
+    if(selected_building>=0&&!deselect_with_local_box())return 0;
+    int px=u[slot].x,py=u[slot].y;
+    if(!worker_select_point(slot,&px,&py))return 0;
+    move_cursor(px,py);
+    if(!u[slot].alive||u[slot].owner!=SIDE||u[slot].type!=U_MUTALISK)return 0;
+    tap(KEY_A);
+    if(selected_count()!=1||!u[slot].selected)return 0;
+    if(!menu_open)tap(KEY_B);
+    if(!choose_menu_row(MENU_MOVE)||mode!=MODE_MOVE) {cancel_ui_mode();return 0;}
+    move_cursor(x,y);tap(KEY_A);
+    int issued=u[slot].alive&&u[slot].selected&&
+        u[slot].order==ORDER_MOVE&&
+        abs(u[slot].tx-x)<=16&&abs(u[slot].ty-y)<=16;
+    int cell=x/16+(y/16)*MAP_COLS;
+    int revealed=SC64_GRID_GET(explored,cell)||SC64_GRID_GET(visible,cell);
+    fprintf(stderr,"Z7 native-fog Mutalisk Move slot%d xy%d,%d target%d,%d issued%d revealed%d frame%u\n",
+        slot,u[slot].x,u[slot].y,x,y,issued,revealed,(unsigned)frame);
+    cancel_ui_mode();
+    return issued;
+}
+
+/* Preserve an in-progress ordinary scout Move; otherwise send one visible
+   own Mutalisk to the nearest tile that the map still marks unexplored. */
 static int campaign_late_air_scout_step(void)
 {
-    static const int route[][2]={{1168,104},{1056,80},{1056,176}};
-    static int tracked_kind=-1,tracked_slot=-1,tracked_hp=-1;
-    static unsigned last_target_progress_frame;
+    static int scout_slot=-1,scout_x=-1,scout_y=-1;
+    static unsigned retry_frame,last_diagnostic;
     if(!late_air_breakthrough_active||unit_type_count(U_MUTALISK,SIDE)==0)return 0;
-    if(muta_scout_leg<0||muta_scout_leg>=3)muta_scout_leg=0;
-    int x=route[muta_scout_leg][0],y=route[muta_scout_leg][1];
-    int near=0,total=0;
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_MUTALISK) {
-        ++total;if(dist2(u[i].x,u[i].y,x,y)<=112*112)++near;
-    }
-    int cell=x/16+(y/16)*MAP_COLS;
-    if(late_air_scout_active&&near>0&&
-       (SC64_GRID_GET(explored,cell)||SC64_GRID_GET(visible,cell))) {
-        fprintf(stderr,"Z7 late Muta scout reached leg%d xy%d,%d near%d/%d frame%u\n",
-            muta_scout_leg,x,y,near,total,(unsigned)frame);
-        muta_scout_leg=(muta_scout_leg+1)%3;late_air_scout_active=0;
-        tracked_kind=-1;tracked_slot=-1;tracked_hp=-1;
-    }
-    if(late_air_scout_active) {
-        int useful_orders=0,kind=-1,slot=-1,hp=-1;
+    if((unsigned)frame>=last_diagnostic+600u) {
+        int idle=0,active=0;
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_MUTALISK) {
-            if(u[i].order==ORDER_ATTACK_MOVE&&dist2(u[i].tx,u[i].ty,x,y)<=320*320)
-                ++useful_orders;
-            if(u[i].order==ORDER_ATTACK_TARGET) {
-                int t=u[i].target;
-                if(t>=0&&t<MAX_UNITS&&u[t].alive&&owners_hostile(SIDE,u[t].owner)) {
-                    if(kind<0){kind=0;slot=t;hp=u[t].hp;}
-                    ++useful_orders;
-                } else if(t>=MAX_UNITS&&t<MAX_UNITS+MAX_BUILDINGS) {
-                    int bs=t-MAX_UNITS;
-                    if(b[bs].alive&&owners_hostile(SIDE,b[bs].owner)) {
-                        if(kind<0){kind=1;slot=bs;hp=b[bs].hp;}
-                        ++useful_orders;
-                    }
-                }
-            }
+            if(u[i].order==0)idle++;else active++;
         }
-        if(useful_orders&&kind>=0) {
-            if(kind!=tracked_kind||slot!=tracked_slot) {
-                tracked_kind=kind;tracked_slot=slot;tracked_hp=hp;
-                last_target_progress_frame=(unsigned)frame;
-            } else if(hp!=tracked_hp) {
-                tracked_hp=hp;last_target_progress_frame=(unsigned)frame;
-            }
-            if((unsigned)frame-last_target_progress_frame>=1800u) {
-                fprintf(stderr,"Z7 late Muta attack stalled target kind%d slot%d hp%d no progress1800; refresh scout leg%d xy%d,%d frame%u\n",
-                    kind,slot,hp,muta_scout_leg,x,y,(unsigned)frame);
-                useful_orders=0;tracked_kind=-1;tracked_slot=-1;tracked_hp=-1;
-            } else return 1;
-        }
-        if(useful_orders)return 1;
-        fprintf(stderr,"Z7 late Muta scout assignment stale leg%d xy%d,%d; reissue ordinary Attack-Move frame%u\n",
-            muta_scout_leg,x,y,(unsigned)frame);
-        late_air_scout_active=0;late_air_scout_retry_frame=(unsigned)frame;
-        tracked_kind=-1;tracked_slot=-1;tracked_hp=-1;
+        fprintf(stderr,"Z7 scout step frame%u recon%d stage%d remembered%d,%d slot%d actorxy%d,%d actororder%d actortarget%d idle%d active%d retry%u\n",
+            (unsigned)frame,campaign_recon_active,campaign_recon_stage,scout_x,scout_y,scout_slot,
+            scout_slot>=0&&scout_slot<MAX_UNITS?u[scout_slot].x:-1,
+            scout_slot>=0&&scout_slot<MAX_UNITS?u[scout_slot].y:-1,
+            scout_slot>=0&&scout_slot<MAX_UNITS?u[scout_slot].order:-1,
+            scout_slot>=0&&scout_slot<MAX_UNITS?u[scout_slot].target:-1,idle,active,retry_frame);
+        last_diagnostic=(unsigned)frame;
     }
-    if((unsigned)frame<late_air_scout_retry_frame)return 0;
-    int accepted=campaign_mutalisk_order(x,y,-1);
-    fprintf(stderr,"Z7 late ordinary Muta Attack-Move scout leg%d xy%d,%d accepted%d mutas%d frame%u\n",
-        muta_scout_leg,x,y,accepted,unit_type_count(U_MUTALISK,SIDE),(unsigned)frame);
-    late_air_scout_retry_frame=(unsigned)frame+(accepted?900u:300u);
-    if(accepted){late_air_scout_active=1;late_air_scout_x=x;late_air_scout_y=y;}
-    return accepted;
+    if(scout_slot>=0&&scout_slot<MAX_UNITS&&u[scout_slot].alive&&
+       u[scout_slot].owner==SIDE&&u[scout_slot].type==U_MUTALISK) {
+        if(u[scout_slot].order==ORDER_ATTACK_TARGET||
+           (u[scout_slot].order!=ORDER_MOVE&&u[scout_slot].order!=0)) {
+            scout_slot=-1;scout_x=scout_y=-1;return 0;
+        }
+        int cell=scout_x/16+(scout_y/16)*MAP_COLS;
+        if((SC64_GRID_GET(visible,cell)||
+            dist2(u[scout_slot].x,u[scout_slot].y,scout_x,scout_y)<=24*24)&&
+           (SC64_GRID_GET(explored,cell)||SC64_GRID_GET(visible,cell))) {
+            if(z7_revisit_cursor_target>=0) {
+                int total=((MAP_COLS+7)/8)*((MAP_ROWS+7)/8);
+                if(total>0)z7_revisit_cursor=(z7_revisit_cursor_target+1)%total;
+                z7_revisit_cursor_target=-1;
+            }
+            fprintf(stderr,"Z7 native-fog scout reached slot%d xy%d,%d frame%u\n",
+                scout_slot,scout_x,scout_y,(unsigned)frame);
+            scout_slot=-1;scout_x=scout_y=-1;
+        } else if(u[scout_slot].order==ORDER_MOVE&&
+                  abs(u[scout_slot].tx-scout_x)<=16&&abs(u[scout_slot].ty-scout_y)<=16) {
+            return 1;
+        }
+    } else scout_slot=-1;
+    if((unsigned)frame<retry_frame)return 0;
+    unsigned char tried[MAX_UNITS]={0};
+    for(int attempt=0;attempt<MAX_UNITS;attempt++) {
+        int best=-1,best_d=0x7fffffff;
+        for(int i=0;i<MAX_UNITS;i++)if(!tried[i]&&u[i].alive&&u[i].owner==SIDE&&
+           u[i].type==U_MUTALISK&&!SC64_TRANSPORT_LOADED(&u[i])&&
+           sc64_game_unit_selectable(u[i].type)&&u[i].order==0) {
+            int click_x=0,click_y=0;
+            if(!worker_select_point(i,&click_x,&click_y))continue;
+            int d=dist2(cx,cy,u[i].x,u[i].y);
+            if(d<best_d){best=i;best_d=d;}
+        }
+        if(best<0)break;
+        tried[best]=1;
+        int x=-1,y=-1,revisit_index=-1;
+        if(!campaign_muta_nearest_fog(best,&x,&y,&revisit_index))continue;
+        if(campaign_muta_native_move(best,x,y)) {
+            scout_slot=best;scout_x=x;scout_y=y;retry_frame=0;
+            z7_revisit_cursor_target=revisit_index;
+            return 1;
+        }
+        fprintf(stderr,"Z7 scout native Move rejected frame%u slot%d order%d target%d,%d selected%d count%d mode%d menu%d\n",
+            (unsigned)frame,best,u[best].order,u[best].tx,u[best].ty,u[best].selected,selected_count(),mode,menu_open);
+    }
+    retry_frame=(unsigned)frame+300u;
+    return 0;
 }
 
 /* A visible target can stand on the other side of a disconnected walk-grid
@@ -2200,6 +2345,7 @@ static int campaign_assault_retarget(void)
     static unsigned tracked_unit_progress_frame;
     if((unsigned)frame>=100000u&&!campaign_assault_is_building&&
        campaign_assault_target>=0&&campaign_assault_target<MAX_UNITS&&
+       currently_visible(u[campaign_assault_target].x,u[campaign_assault_target].y)&&
        u[campaign_assault_target].alive&&u[campaign_assault_target].owner==ENEMY) {
         int slot=campaign_assault_target;
         if(tracked_unit_target!=slot) {
@@ -2214,27 +2360,29 @@ static int campaign_assault_retarget(void)
             campaign_assault_target=-1;campaign_assault_target_raw=0;
             campaign_assault_is_building=0;tracked_unit_target=-1;
         }
-    } else if((unsigned)frame>=100000u)tracked_unit_target=-1;
+    } else if((unsigned)frame>=100000u) {
+        tracked_unit_target=-1;tracked_unit_hp=-1;
+        tracked_unit_progress_frame=(unsigned)frame;
+    }
     int local_extractor=-1;
     /* Focus an observed Guardian before it can siege the worker line. The
        nearby enemy Mutalisks remain the next air target; Hydralisks handle
        those and the ground attackers from their worker-cover position. */
     int guardian_phase=(unsigned)frame>=9000u;
     int priority_raw=guardian_phase?44:38;
-    if(guardian_phase&&campaign_guardian_target>=0&&
-       campaign_guardian_target<MAX_UNITS&&u[campaign_guardian_target].alive&&
-       u[campaign_guardian_target].raw_type==43)
+    if(guardian_phase&&campaign_guardian_target>=0&&campaign_guardian_target<MAX_UNITS&&
+       currently_visible(u[campaign_guardian_target].x,u[campaign_guardian_target].y)&&
+       u[campaign_guardian_target].alive&&u[campaign_guardian_target].raw_type==43)
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
            u[i].raw_type==44&&currently_visible(u[i].x,u[i].y)) {
             campaign_guardian_target=-1;break;
         }
     if(unit_type_count(U_MUTALISK,SIDE)>0&&!late_air_breakthrough_active&&
-       (campaign_guardian_target<0||
-        campaign_guardian_target>=MAX_UNITS||!u[campaign_guardian_target].alive||
-        u[campaign_guardian_target].owner!=ENEMY||
+       (campaign_guardian_target<0||campaign_guardian_target>=MAX_UNITS||
+        !currently_visible(u[campaign_guardian_target].x,u[campaign_guardian_target].y)||
+        !u[campaign_guardian_target].alive||u[campaign_guardian_target].owner!=ENEMY||
         (u[campaign_guardian_target].raw_type!=priority_raw&&
-         !(guardian_phase&&u[campaign_guardian_target].raw_type==44))||
-        !currently_visible(u[campaign_guardian_target].x,u[campaign_guardian_target].y))) {
+         !(guardian_phase&&u[campaign_guardian_target].raw_type==44)))) {
         campaign_guardian_target=-1;
         int hatch=z7_townhall(SIDE),best=guardian_phase?400*400:192*192;
         for(int pass=0;pass<(guardian_phase?2:1)&&campaign_guardian_target<0;pass++)
@@ -2277,17 +2425,17 @@ static int campaign_assault_retarget(void)
         }
     if(campaign_assault_is_building) {
         int t=campaign_assault_target;
-        if(t>=0&&t<MAX_BUILDINGS&&b[t].alive&&b[t].owner==ENEMY&&
-           currently_visible(b[t].x,b[t].y)&&
+        if(t>=0&&t<MAX_BUILDINGS&&currently_visible(b[t].x,b[t].y)&&
+           b[t].alive&&b[t].owner==ENEMY&&
            ((unsigned)frame<100000u||campaign_target_assignment_useful(t,1)))return 1;
         if((unsigned)frame>=100000u&&t>=0){campaign_assault_target=-1;
             campaign_assault_target_raw=0;campaign_assault_is_building=0;}
         if(campaign_assault_target_raw==149&&t>=0&&t<MAX_BUILDINGS&&
-           (!b[t].alive||b[t].hp<=0))geyser_secured=1;
+           currently_visible(b[t].x,b[t].y)&&(!b[t].alive||b[t].hp<=0))geyser_secured=1;
     } else {
         int t=campaign_assault_target;
-        if(!full_clear&&t>=0&&t<MAX_UNITS&&u[t].alive&&u[t].owner==ENEMY&&
-           currently_visible(u[t].x,u[t].y)&&local_extractor<0&&
+        if(!full_clear&&t>=0&&t<MAX_UNITS&&currently_visible(u[t].x,u[t].y)&&
+           u[t].alive&&u[t].owner==ENEMY&&local_extractor<0&&
            ((unsigned)frame<100000u||campaign_target_assignment_useful(t,0)))return 1;
         if((unsigned)frame>=100000u&&t>=0){campaign_assault_target=-1;
             campaign_assault_target_raw=0;campaign_assault_is_building=0;}
@@ -2325,10 +2473,10 @@ static int campaign_assault_retarget(void)
             }
         }
     }
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
-        ((unsigned)frame<100000u||!stalled_unit_targets[i])&&
+    for(int i=0;i<MAX_UNITS;i++)if(currently_visible(u[i].x,u[i].y)&&
+        u[i].alive&&u[i].owner==ENEMY&&((unsigned)frame<100000u||!stalled_unit_targets[i])&&
         owners_hostile(SIDE,u[i].owner)&&!sc64_race_is_worker(u[i].type)&&
-        sc64_race_unit_damage(u[i].type)>0&&currently_visible(u[i].x,u[i].y)&&
+        sc64_race_unit_damage(u[i].type)>0&&
         ((unsigned)frame<100000u||campaign_any_combat_has_path_to_attack_point(
             u[i].x,u[i].y,sc64_race_unit_flying(u[i].type)))&&
         ((unsigned)frame>=9000u||campaign_source_region4(u[i].x,u[i].y))) {
@@ -4312,14 +4460,20 @@ static void attack_step(void)
             }
         }
         if(local_air_target_slot>=0) {
-            int t=local_air_target_slot;
-            if(t<MAX_UNITS&&u[t].alive&&u[t].owner==ENEMY&&
+            int t=local_air_target_slot,observed=t<MAX_UNITS&&
+                currently_visible(u[t].x,u[t].y);
+            if(observed&&u[t].alive&&u[t].owner==ENEMY&&
                sc64_race_unit_flying(u[t].type)&&
-               dist2(u[t].x,u[t].y,b[hatch].x,b[hatch].y)<=320*320)
-                return;
-            fprintf(stderr,"Z7 local air threat ended slot%d live%d owner%d xy%d,%d army%d,%d frame%u; return-to-guard\n",
-                t,t<MAX_UNITS?u[t].alive:0,t<MAX_UNITS?u[t].owner:-1,
-                t<MAX_UNITS?u[t].x:-1,t<MAX_UNITS?u[t].y:-1,ax,ay,(unsigned)frame);
+               dist2(u[t].x,u[t].y,b[hatch].x,b[hatch].y)<=320*320)return;
+            if(!observed) {
+                int native_pursuit=0;
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+                   u[i].type==U_MUTALISK&&u[i].order==ORDER_ATTACK_TARGET&&u[i].target==t)
+                    native_pursuit=1;
+                if(native_pursuit)return;
+            }
+            fprintf(stderr,"Z7 local air target no longer observed/actionable slot%d observed%d army%d,%d frame%u; return-to-guard\n",
+                t,observed,ax,ay,(unsigned)frame);
             local_air_target_slot=-1;
             local_air_return_to_cover=1;
         }
@@ -4340,8 +4494,8 @@ static void attack_step(void)
             int threat=-1,best=320*320,best_priority=3;
             int guardian_present=0,guardian_hostile=0,guardian_valid=0;
             int guardian_visible=0,guardian_inrange=0;
-            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
-                u[i].raw_type==44) {
+            for(int i=0;i<MAX_UNITS;i++)if(currently_visible(u[i].x,u[i].y)&&
+                u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type==44) {
                 ++guardian_present;
                 if(!owners_hostile(SIDE,u[i].owner)||SC64_TRANSPORT_LOADED(&u[i]))continue;
                 ++guardian_hostile;
@@ -4352,11 +4506,10 @@ static void attack_step(void)
                 ++guardian_visible;
                 if(dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y)<=320*320)++guardian_inrange;
             }
-            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
-                owners_hostile(SIDE,u[i].owner)&&!SC64_TRANSPORT_LOADED(&u[i])&&
-                u[i].type>=0&&u[i].type<SC_RU_COUNT&&
-                sc64_race_unit_flying(u[i].type)&&sc64_race_unit_damage(u[i].type)>0&&
-                currently_visible(u[i].x,u[i].y)) {
+            for(int i=0;i<MAX_UNITS;i++)if(currently_visible(u[i].x,u[i].y)&&
+                u[i].alive&&u[i].owner==ENEMY&&owners_hostile(SIDE,u[i].owner)&&
+                !SC64_TRANSPORT_LOADED(&u[i])&&u[i].type>=0&&u[i].type<SC_RU_COUNT&&
+                sc64_race_unit_flying(u[i].type)&&sc64_race_unit_damage(u[i].type)>0) {
                 int d=dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y);
                 int priority=u[i].raw_type==44?0:(u[i].raw_type==43?1:2);
                 if(d<=320*320&&(priority<best_priority||
@@ -4510,8 +4663,9 @@ static void attack_step(void)
            Guardian and attacks ground only. Focus the former before the latter. */
         const int priority_raws[]={38,37};
         for(int p=0;p<2&&hostile<0;p++) {
-            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
-                u[i].raw_type==priority_raws[p]&&sc64_race_unit_damage(u[i].type)>0) {
+            for(int i=0;i<MAX_UNITS;i++)if(currently_visible(u[i].x,u[i].y)&&
+                u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type==priority_raws[p]&&
+                sc64_race_unit_damage(u[i].type)>0) {
                 int d=dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y);
                 /* Do not drag the whole defense across the map for a distant
                    patrol; only retarget when the air threat is local. */
@@ -4725,6 +4879,26 @@ int main(int argc,char **argv)
             last_checkpoint=frame;source_checkpoint("checkpoint");log_status();
         }
         step(0);
+    }
+    int fog_cells=0,explored_cells=0,visible_cells=0;
+    for(int row=0;row<MAP_ROWS;row++)for(int col=0;col<MAP_COLS;col++) {
+        int idx=col+row*MAP_COLS;
+        int ex=SC64_GRID_GET(explored,idx),vis=SC64_GRID_GET(visible,idx);
+        explored_cells+=ex;visible_cells+=vis;fog_cells+=!ex&&!vis;
+    }
+    fprintf(stderr,"Z7 scout terminal map explored%d visible%d fog%d reconActive%d global%d stage%d waypoint%d,%d\n",
+        explored_cells,visible_cells,fog_cells,campaign_recon_active,campaign_recon_global_active,
+        campaign_recon_stage,campaign_recon_x,campaign_recon_y);
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_MUTALISK&&!SC64_TRANSPORT_LOADED(&u[i])) {
+        int eligible_unseen=0,eligible_revisit=0;
+        for(int row=0;row<MAP_ROWS;row++)for(int col=0;col<MAP_COLS;col++) {
+            int idx=col+row*MAP_COLS,x=col*16+8,y=row*16+8;
+            if(x<16||y<16||x>=WORLD_W-16||y>=WORLD_H-16||dist2(u[i].x,u[i].y,x,y)<32*32||SC64_GRID_GET(visible,idx))continue;
+            if(SC64_GRID_GET(explored,idx))eligible_revisit++;else eligible_unseen++;
+        }
+        fprintf(stderr,"Z7 scout candidates slot%d order%d unseen%d revisit%d xy%d,%d\n",i,u[i].order,eligible_unseen,eligible_revisit,u[i].x,u[i].y);
+        fprintf(stderr,"Z7 own Muta slot%d xy%d,%d order%d target%d to%d,%d selected%d\n",
+            i,u[i].x,u[i].y,u[i].order,u[i].target,u[i].tx,u[i].ty,u[i].selected);
     }
     const char *terminal=(screen==SCREEN_RESULT&&won&&race_z7.runtime.model.outcome==SC64_Z7_WON)?"won":
         (screen==SCREEN_RESULT&&lost&&race_z7.runtime.model.outcome==SC64_Z7_LOST)?"lost":"limit";
