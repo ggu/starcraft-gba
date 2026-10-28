@@ -10,12 +10,9 @@
 static Sc64ImportedUnit synthetic_rows[SC64_P8_EXPECTED_MAP_COLS * SC64_P8_EXPECTED_MAP_ROWS];
 static Sc64P8SourceAction synthetic_actions[SC64_P8_SOURCE_ACTION_COUNT];
 
-typedef struct { int allow_raw_28; } ResolverContext;
-
 static unsigned resolve_actor(void *context, unsigned raw)
 {
-    ResolverContext *r = context;
-    if (r && r->allow_raw_28 && raw == 28u) return SC64_P8_ACTOR_UNIT;
+    (void)context;
     if (sc64_race_unit_from_raw((int)raw) >= 0) return SC64_P8_ACTOR_UNIT;
     if (sc64_race_building_from_raw((int)raw) >= 0)
         return SC64_P8_ACTOR_BUILDING;
@@ -29,7 +26,7 @@ static int resolve_property(void *context, unsigned selector)
     return sc64_p8_source_property(selector, &record) && record;
 }
 
-static Sc64P8PreflightResolvers resolvers_for(ResolverContext *context)
+static Sc64P8PreflightResolvers resolvers_for(void *context)
 {
     Sc64P8PreflightResolvers out = {context, resolve_actor, resolve_property};
     return out;
@@ -64,18 +61,16 @@ int main(void)
         }
         assert(executors == 1u);
     }
-    ResolverContext source_resolver = {0};
-    Sc64P8PreflightResolvers source_ops = resolvers_for(&source_resolver);
+    Sc64P8PreflightResolvers source_ops = resolvers_for(0);
     Sc64P8PreflightReport report;
     int result = sc64_p8_preflight(map,
         sc64_p8_source_actions, SC64_P8_SOURCE_ACTION_COUNT,
         MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS, MAX_RACE_GEYSERS,
         &source_ops, &report);
 
-    /* The actual prepared map is deliberately blocked by one or more source
-     * rows with no current canonical actor binding. Its resolvable source
-     * rows and creation plan still undergo the same capacity/property checks. */
-    assert(result == SC64_P8_PREFLIGHT_UNSUPPORTED_ACTOR);
+    /* Raw28 now resolves through its P8-only logical identity and the exact
+     * shared native art chain. Census success does not enable the mission. */
+    assert(result == SC64_P8_PREFLIGHT_OK);
     assert(report.total_rows_seen == map->unit_count &&
            report.units + report.buildings + report.minerals +
                report.geysers + report.unresolved_actors == map->unit_count);
@@ -83,14 +78,30 @@ int main(void)
            report.created_buildings > 0u);
     assert(report.units + report.created_units <= MAX_UNITS &&
            report.buildings + report.created_buildings <= MAX_BUILDINGS);
-    assert(report.unresolved_actors > 0u);
-    /* The unresolved Hero Hyperion source actor also lacks a sprite frame. */
-    assert(!sc64_race_unit_sprite((unsigned short)report.first_unresolved_raw));
+    assert(report.unresolved_actors == 0u);
+    unsigned hyperion_rows = 0;
+    for (unsigned i = 0; i < map->unit_count; ++i)
+        hyperion_rows += map->units[i].source_type == 28u;
+    assert(hyperion_rows > 0u);
+    assert(sc64_race_unit_from_raw(28) == U_P8_HYPERION);
+    assert(sc64_race_raw_unit(U_P8_HYPERION) == 28);
+    const Sc64ZpActorFact *hyperion = sc64_zp_actor_fact(U_P8_HYPERION);
+    assert(hyperion && hyperion->raw == 28 && hyperion->hp == 850 &&
+           hyperion->armor == 4 && hyperion->size == 2 &&
+           hyperion->ground_damage == 30 &&
+           hyperion->air_damage == 30 && hyperion->ground_cooldown == 22 &&
+           hyperion->air_cooldown == 22 && hyperion->left == 37 &&
+           hyperion->up == 29 && hyperion->right == 37 && hyperion->down == 29);
+    assert(sc64_p8_unit_sprite_for_raw(28) == sc64_race_unit_sprite(12));
+    assert(sc64_p8_unit_sprite_for_raw(28));
+    Sc64StockAttack hyperion_ground = {0}, hyperion_air = {0};
+    assert(sc64_stock_attack_select(28, 0, &hyperion_ground));
+    assert(sc64_stock_attack_select(28, 1, &hyperion_air));
+    assert(hyperion_ground.weapon_id == 23 && hyperion_air.weapon_id == 24);
 
-    /* Synthetic resolver fact isolates the rest of the preflight and lets
-     * negative fixtures prove unknown actor, selector and capacity rejection. */
-    ResolverContext complete_resolver = {1};
-    Sc64P8PreflightResolvers complete_ops = resolvers_for(&complete_resolver);
+    /* Reuse the real resolver for negative fixtures covering unknown actor,
+     * selector and capacity rejection. */
+    Sc64P8PreflightResolvers complete_ops = resolvers_for(0);
     int complete_result = sc64_p8_preflight(map,
         sc64_p8_source_actions, SC64_P8_SOURCE_ACTION_COUNT,
         MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS, MAX_RACE_GEYSERS,

@@ -451,6 +451,7 @@ _Static_assert(SC64_FRONT_MAP_COUNT == SC64_SKIRMISH_IMPORTED_COUNT + 1,
 #include "sc64_sprites_generated.h"
 #ifdef SC64_RACES
 #include "sc64_race_sprites_generated.h"
+#include "sc64_p8_sprite_adapter.h"
 #ifdef SC64_CONSTRUCTION_SOURCE_ART
 #include "sc64_construction_source.h"
 #include "sc64_construction_sprites_generated.h"
@@ -6628,7 +6629,7 @@ death_vfx_extent(int slot, int raw)
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
-        raw >= 0 ? sc64_race_unit_sprite((unsigned short)raw) : 0;
+        raw >= 0 ? sc64_p8_unit_sprite_for_raw((unsigned short)raw) : 0;
 #else
         slot < MAX_UNITS ? mission_unit_sprite(u[slot].type) :
                            mission_building_sprite(b[slot - MAX_UNITS].type);
@@ -7549,9 +7550,9 @@ mission_unit_sprite(int type)
         const Sc64SpriteFrame *z5 = sc64_z5_actor_sprite((unsigned short)raw);
         if (z5) return z5;
     }
-    return raw >= 0 ? sc64_race_unit_sprite((unsigned short)raw) : 0;
+    return raw >= 0 ? sc64_p8_unit_sprite_for_raw((unsigned short)raw) : 0;
 #else
-    return sc64_race_unit_sprite(sc64_race_raw_unit(type));
+    return sc64_p8_unit_sprite_for_raw(sc64_race_raw_unit(type));
 #endif
 #else
     if (type == U_SCV) return &sc64_sprite_scv;
@@ -7579,7 +7580,7 @@ sc64_race_building_art_sprite(int raw)
     if (zp_sprite) return zp_sprite;
 #endif
     const Sc64SpriteFrame *sprite =
-        raw >= 0 ? sc64_race_unit_sprite((unsigned short)raw) : 0;
+        raw >= 0 ? sc64_p8_unit_sprite_for_raw((unsigned short)raw) : 0;
     if (sprite) return sprite;
     switch (raw) {
     /* These late Terran structures have dedicated source building frames,
@@ -7625,7 +7626,7 @@ static const Sc64SpriteFrame *
 mission_geyser_sprite(void)
 {
 #ifdef SC64_RACES
-    return sc64_race_unit_sprite(188);
+    return sc64_p8_unit_sprite_for_raw(188);
 #else
     return &sc64_sprite_geyser;
 #endif
@@ -7901,7 +7902,7 @@ draw_unit(Unit * q)
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
-        q->raw_type>=0?sc64_race_unit_sprite(q->raw_type):
+        q->raw_type>=0?sc64_p8_unit_sprite_for_raw(q->raw_type):
 #endif
         mission_unit_sprite(q->type);
 #ifdef SC64_UNIT_FACING
@@ -8381,9 +8382,9 @@ draw_building_art(Building *q)
 #ifdef SC64_RACES
 #ifdef SC64_T5_RUNTIME
 #ifdef SC64_T6_RUNTIME
-        q->type == B_CONTROL_TOWER && race_t6_tech_active() ? sc64_race_unit_sprite(115) :
+        q->type == B_CONTROL_TOWER && race_t6_tech_active() ? sc64_p8_unit_sprite_for_raw(115) :
 #endif
-        q->type == B_CONTROL_TOWER ? sc64_race_unit_sprite(sc64_race_t5_building_art_raw(q->type)) :
+        q->type == B_CONTROL_TOWER ? sc64_p8_unit_sprite_for_raw(sc64_race_t5_building_art_raw(q->type)) :
 #endif
         q->raw_type>=0?sc64_race_building_art_sprite(q->raw_type):
 #endif

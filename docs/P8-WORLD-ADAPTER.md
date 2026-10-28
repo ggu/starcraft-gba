@@ -18,13 +18,21 @@ The prepared-descriptor fixture also checks that each create-bearing trigger
 has exactly one eligible active source owner; counting each action once is
 specific to this P8 plan, not a general multi-owner capacity calculation.
 
-The P8-only building rules now recognize source raw 168 as the Stasis Cell.
-Existing Terran-late bindings and fact-table gate bit positions are retained.
-The prepared map still fails the census because raw 28, Hero Hyperion, lacks
-a canonical actor binding, collision facts and sprite. The fixture verifies
-that failure rather than admitting an incomplete roster. Its synthetic
-resolver isolates the remaining property and capacity checks; it is not
-runtime Hyperion support.
+The P8-only bindings recognize source raw 168 as the Stasis Cell and raw 28 as
+a distinct Hero Hyperion actor. The raw28 adapter uses native N64 HP, armor,
+weapon and shared-art evidence, and raw28's own pinned BWAPI dimensions and
+pixel bounds; it reuses the raw12 sprite descriptor only because the verified
+N64 raw12/raw28 source-art chains are identical. This clears the prepared
+map's actor census and the fixture checks the real result, including the
+remaining property and capacity validations. See
+[`P8-HYPERION-FACTS.md`](P8-HYPERION-FACTS.md) for fact provenance and limits.
+
+Passing this census does not activate P8 or establish complete combat support.
+P8 still has no runtime/menu/campaign/save wiring; native AI, full mission
+capacity, renderer and backend behavior remain separate work. Raw28 already
+has its own row in the shared stock combat table, and the fixture confirms its
+weapon selectors resolve to 23/24. This verifies lookup identity, not full
+mission combat behavior or P8 runtime readiness.
 
 With private inputs already prepared, the optional check is:
 

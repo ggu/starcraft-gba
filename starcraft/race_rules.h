@@ -86,6 +86,10 @@ enum {
     /* Independent raw73 identity; child lifecycle is a separate feature. */
     U_P7_INTERCEPTOR,
 #endif
+#ifdef SC64_P8_DATA_ENABLED
+    /* P8 source raw 28 is a distinct actor despite sharing raw12 source art. */
+    U_P8_HYPERION,
+#endif
     SC_RU_COUNT
 };
 enum {
@@ -314,6 +318,9 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #ifdef SC64_P5_ACTORS
     , [U_P5_SHUTTLE] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 4, 200, 0, 900, 80, 60, 0 }
     , [U_P5_BATTLECRUISER] = { R_TER, 0, 255, 12, 400, 300, 2000, 500, 0, 0 }
+#endif
+#ifdef SC64_P8_DATA_ENABLED
+    , [U_P8_HYPERION] = { R_TER, 0, 255, 0, 0, 0, 0, 850, 0, 0 }
 #endif
 #ifdef SC64_P6_ACTORS
     /* Scenario actors have no production path. Supply is source
@@ -1359,6 +1366,9 @@ static inline int sc64_race_raw_unit(int type)
     case U_ZP_RAYNOR_VULTURE: return 19; case U_ZP_HIGH_TEMPLAR: return 67;
     case U_ZP_ULTRALISK: return 39;
 #endif
+#ifdef SC64_P8_DATA_ENABLED
+    case U_P8_HYPERION: return 28;
+#endif
     default: return -1;
     }
 }
@@ -1537,6 +1547,9 @@ static inline int sc64_race_unit_from_raw(int raw)
 #ifdef SC64_P7_PROJECTILES_ENABLED
     case 73: return U_P7_INTERCEPTOR;
 #endif
+#endif
+#ifdef SC64_P8_DATA_ENABLED
+    case 28: return U_P8_HYPERION;
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     case 36: return U_Z7_EGG;
