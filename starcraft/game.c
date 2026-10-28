@@ -7936,6 +7936,13 @@ draw_tracers(void)
     for (int i=0;i<MAX_TRACERS;++i) if (tracers[i].life) {
 #ifdef SC64_WEAPON_SOURCE_VFX
         if(sc64_weapon_source_vfx_is_tagged((uint32_t)tracers[i].color)) {
+#ifdef SC64_WEAPON_SOURCE_VFX_OFFSCREEN_CULL
+            if (sc64_weapon_source_vfx_trace_provably_offscreen(
+                    (uint32_t)tracers[i].color,
+                    tracers[i].x0, tracers[i].y0, tracers[i].x1, tracers[i].y1,
+                    camx, camy))
+                continue;
+#endif
             int age=sc64_trace_duration(tracers[i].color,tracers[i].x0,tracers[i].y0,
                     tracers[i].x1,tracers[i].y1)-tracers[i].life;
             sc64_weapon_source_vfx_draw_trace((uint32_t)tracers[i].color,

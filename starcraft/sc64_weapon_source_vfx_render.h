@@ -3,6 +3,7 @@
 #define SC64_WEAPON_SOURCE_VFX_RENDER_H
 
 #include <stdint.h>
+#include <limits.h>
 #include "../common/gba.h"
 
 /* Compact view over one generated GRP frame. Generated source pixels are
@@ -108,6 +109,7 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
 
 #ifdef SC64_WEAPON_SOURCE_BANK_VERSION
 #include "sc64_weapon_source_runtime.h"
+#include "sc64_weapon_source_vfx_bounds.h"
 
 static inline uint16_t
 sc64_weapon_source_vfx_animation_frame(const Sc64WeaponSourceAnimation *anim,
@@ -208,6 +210,135 @@ sc64_weapon_source_vfx_overlay_is_sprite(uint8_t opcode)
 {
     return opcode == 15u || opcode == 16u || opcode == 17u || opcode == 19u ||
            opcode == 20u || opcode == 21u;
+}
+
+/* Build a process-local, data-derived envelope once. It is never serialized
+ * and has three distinct states: unknown, invalid/unbounded, and valid. */
+static inline uint32_t
+sc64_weapon_source_vfx_cached_bounds(void)
+{
+    static uint32_t cached;
+    if (cached != SC64_WEAPON_SOURCE_VFX_BOUNDS_UNKNOWN) return cached;
+#if !defined(SC64_WEAPON_SOURCE_BANK_VERSION) || \
+    SC64_WEAPON_SOURCE_BANK_VERSION != 1
+    cached = SC64_WEAPON_SOURCE_VFX_BOUNDS_INVALID;
+    return cached;
+#else
+    Sc64WeaponSourceVfxBoundsWork work = {0};
+    for (uint32_t i = 0; i < SC64_WEAPON_SOURCE_FRAME_COUNT; ++i) {
+        const Sc64WeaponSourceFrame *frame = &sc64_weapon_source_frames[i];
+        sc64_weapon_source_vfx_bounds_include_frame(&work,
+            frame->x, frame->y, frame->mirror_x, frame->w, frame->h,
+            frame->canvas_w, frame->canvas_h);
+        if (work.invalid) break;
+    }
+    for (uint32_t i = 0; !work.invalid &&
+         i < SC64_WEAPON_SOURCE_OVERLAY_COUNT; ++i) {
+        const Sc64WeaponSourceOverlay *overlay = &sc64_weapon_source_overlays[i];
+        /* A future positional opcode or renderer transform must opt into a
+         * new bound definition; until then this cache disables culling. */
+        if (!sc64_weapon_source_vfx_overlay_is_image(overlay->opcode)) {
+            work.invalid = 1;
+            break;
+        }
+        sc64_weapon_source_vfx_bounds_include_child_offset(
+            &work, overlay->x, overlay->y);
+    }
+    for (uint32_t i = 0; !work.invalid &&
+         i < SC64_WEAPON_SOURCE_LO_OFFSET_COUNT; ++i) {
+        sc64_weapon_source_vfx_bounds_include_child_offset(&work,
+            sc64_weapon_source_lo_offsets[i].x,
+            sc64_weapon_source_lo_offsets[i].y);
+    }
+    cached = sc64_weapon_source_vfx_bounds_pack(&work);
+    return cached;
+#endif
+}
+
+static inline int
+sc64_weapon_source_vfx_motion_has_proven_bounds(uint8_t bullet_type)
+{
+    switch (bullet_type) {
+    case SC64_SOURCE_BULLET_FLY:
+    case SC64_SOURCE_BULLET_APPEAR_TARGET_UNIT:
+    case SC64_SOURCE_BULLET_PERSIST_TARGET_POS:
+    case SC64_SOURCE_BULLET_APPEAR_TARGET_POS:
+    case SC64_SOURCE_BULLET_APPEAR_SOURCE:
+    case SC64_SOURCE_BULLET_SELF_DESTRUCT:
+    case SC64_SOURCE_BULLET_ATTACK_TARGET_POS:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+static inline int
+sc64_weapon_source_vfx_launch_origin_checked(
+    const Sc64WeaponSourceAttackProfile *profile, uint8_t direction,
+    int x, int y, int *launch_x, int *launch_y)
+{
+    if (!profile || !launch_x || !launch_y || direction > 31u) return 0;
+    const int16_t *v = sc64_weapon_source_direction_q8[direction];
+    int64_t lx = (int64_t)x +
+        ((int64_t)profile->forward_offset * v[0]) / 512;
+    int64_t ly = (int64_t)y +
+        ((int64_t)profile->forward_offset * v[1]) / 512 -
+        (int64_t)profile->upward_offset / 2;
+    if (lx < INT_MIN || lx > INT_MAX || ly < INT_MIN || ly > INT_MAX)
+        return 0;
+    *launch_x = (int)lx;
+    *launch_y = (int)ly;
+    return 1;
+}
+
+/* A straight or stationary trace can only place visible source art around
+ * these anchors: actor x0, computed launch, and target x1. The projectile
+ * position function interpolates within launch->target (or returns a
+ * stationary endpoint), so every timeline frame and SPROL birth is enclosed
+ * by that endpoint box. Child image placement is one-level only: draw_image
+ * does not recursively draw child overlays. The bank-derived frame+offset
+ * radius includes normal/mirror crop origins and all LO table offsets. */
+static inline int
+sc64_weapon_source_vfx_trace_provably_offscreen(uint32_t packed,
+                                                 int x0, int y0,
+                                                 int x1, int y1,
+                                                 int camx, int camy)
+{
+    Sc64WeaponSourceVfxKey key;
+    if (!sc64_weapon_source_vfx_unpack(packed, &key)) return 0;
+    const Sc64WeaponSourceAttackProfile *profile =
+        sc64_weapon_source_trace_profile(packed);
+    if (!profile || !profile->projectile_image) return 0;
+    /* Follow, bounce, and range-extension trajectories are not covered by the
+     * renderer's straight endpoint interpolation proof. Preserve those. */
+    if (!sc64_weapon_source_vfx_motion_has_proven_bounds(
+            profile->weapon_bullet_type)) return 0;
+    int64_t dx = (int64_t)x1 - x0, dy = (int64_t)y1 - y0;
+    uint64_t abs_dx = (uint64_t)(dx < 0 ? -dx : dx);
+    uint64_t abs_dy = (uint64_t)(dy < 0 ? -dy : dy);
+    /* trace_position multiplies a signed endpoint delta by traveled distance.
+     * A 0xffff-pixel span bounds that product below INT64_MAX because
+     * distance_raw <= 512 * (abs_dx + abs_dy). Longer synthetic/API inputs
+     * fail closed before any launch or interpolation arithmetic. */
+    if (abs_dx > UINT16_MAX || abs_dy > UINT16_MAX) return 0;
+    uint16_t radius_x, radius_y;
+    uint32_t bounds = sc64_weapon_source_vfx_cached_bounds();
+    if (!sc64_weapon_source_vfx_bounds_unpack(bounds, &radius_x, &radius_y))
+        return 0;
+    int launch_x, launch_y;
+    if (!sc64_weapon_source_vfx_launch_origin_checked(profile, key.direction,
+            x0, y0, &launch_x, &launch_y)) return 0;
+    int64_t lo_x = x0, hi_x = x0, lo_y = y0, hi_y = y0;
+    if (launch_x < lo_x) lo_x = launch_x;
+    if (launch_x > hi_x) hi_x = launch_x;
+    if (x1 < lo_x) lo_x = x1;
+    if (x1 > hi_x) hi_x = x1;
+    if (launch_y < lo_y) lo_y = launch_y;
+    if (launch_y > hi_y) hi_y = launch_y;
+    if (y1 < lo_y) lo_y = y1;
+    if (y1 > hi_y) hi_y = y1;
+    return sc64_weapon_source_vfx_bounds_miss_clip(lo_x, hi_x, lo_y, hi_y,
+        camx, camy, radius_x, radius_y);
 }
 
 /* Draw attached image overlays and independently spawned sprite trails from
