@@ -176,7 +176,19 @@ static void verify_resume(int map, int human, int bots, int forced_bot_race)
     /* Reinitialize actors and the frontend while retaining host SRAM. This is
        an in-process reload, not a fresh emulator/process SRAM qualification. */
     game_init(); previous = 0;
+#ifdef SC64_ATTACK_RANGE_ROUTES
+    /* Warm even a cached-unreachable derived firing region before loading.
+     * It belongs to this world geometry and must not survive the SRAM load. */
+    {
+        int nx, ny;
+        (void)sc64_route_range_next(8, 8, 8, 8, 0, 64, &nx, &ny);
+        assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] == 3);
+    }
+#endif
     input(KEY_L); /* load action returns directly to play without a tick */
+#ifdef SC64_ATTACK_RANGE_ROUTES
+    assert(sc64_route_valid[SC64_ROUTE_ACTIVE_SLOTS - 1] == 0);
+#endif
     assert(screen == SCREEN_PLAY && race_mode);
     assert(race_skirmish_map == map && race_human == human && race_bots == bots);
     for (int i = 0; i < 3; ++i) assert(race_bot_races[i] == expected_bot_races[i]);
