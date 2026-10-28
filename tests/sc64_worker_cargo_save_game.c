@@ -82,7 +82,7 @@ static void cargo_save_case(int human)
     for (int i=0;i<MAX_MINERALS;++i)
         if (m[i].amount>0) { patch=i; break; }
     assert(patch>=0 && geyser_count>0);
-    int gas_type=human==R_TERRAN ? B_REFINERY :
+    int gas_type=human==0 ? B_REFINERY :
                  human==R_ZERG ? B_EXTRACTOR : B_ASSIMILATOR;
     int refinery=spawn_build(SIDE,gas_type,geysers[0].x,geysers[0].y,0);
     assert(refinery>=0 && building_complete(refinery));

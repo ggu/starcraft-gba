@@ -923,7 +923,7 @@ static int
 sc64_worker_cargo_matches_order(const Unit *q)
 {
     (void)q;
-    return q && q->carry > 0;
+    return q && q->carry != 0;
 }
 static int
 sc64_worker_gather_pending(const Unit *q)
