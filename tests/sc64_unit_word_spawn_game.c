@@ -45,14 +45,14 @@ static void check_unit_render(Unit *unit, int explicit_raw)
     gfx_set_clip_y(12, 120);
     draw_mission_sprite(sprite, x, y);
     int sprite_y = y - sprite->canvas_h / 2 + sprite->offset_y;
-    draw_actor_vitals(x, sprite_y - 4, 12, unit->hp, unit->maxhp,
-                      unit->shield, sc64_actor_max_shields(unit->type, 0),
-                      owner_color(unit->owner));
     if (unit->selected) {
         int sprite_x = x - sprite->canvas_w / 2 + sprite->offset_x;
         int sprite_w = sprite->w, sprite_h = sprite->h;
         gfx_frame(sprite_x - 2, sprite_y - 2, sprite_w + 4, sprite_h + 4,
                   C_HIGHLIGHT);
+        draw_actor_vitals(x, sprite_y + sprite_h + 3, sprite_w + 4, unit->hp,
+                          unit->maxhp, unit->shield,
+                          sc64_actor_max_shields(unit->type, 0), 0, 0);
     }
     assert_frame(expected);
 }

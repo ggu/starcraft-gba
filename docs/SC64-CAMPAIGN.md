@@ -31,7 +31,7 @@ Mission objectives and selected Backwater events are authored for these maps. Th
 ## Controls
 
 - On the campaign title, Up/Down selects Wasteland or Backwater; A starts and B loads. After winning Wasteland, A advances to Backwater. Both missions can be selected immediately.
-- On the skirmish title, Up/Down selects one to three computer opponents; A starts and B loads. Friendly markers and health bars are green; computer sides use red, gold, and purple.
+- On the skirmish title, Up/Down selects one to three computer opponents; A starts and B loads. Friendly minimap markers are green; computer sides use red, gold, and purple. Selected units and the selected building show StarCraft-style segmented vital bars under the sprite: HP is green, yellow or red by remaining health, with blue shields above and purple caster energy below.
 - D-pad moves the cursor. A selects or issues the current order; B opens the command menu. Select an SCV to construct from that menu; select a Barracks to queue Marines.
 - Tap R to select the combat group; with a Barracks selected, R cycles training type. Tap L to cycle friendly units; hold L and move the D-pad to drag a selection box. Double-tap A on a friendly unit to select matching units currently on screen.
 - Start or Select pauses. A resumes, B saves, L loads, and R restarts.
