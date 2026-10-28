@@ -4475,6 +4475,23 @@ test-sc64-contact-cache-terran: build/test-sc64-contact-cache-terran
 test-sc64-contact-cache-nydus: build/test-sc64-contact-cache-nydus
 	./build/test-sc64-contact-cache-nydus
 test-sc64-contact-cache: test-sc64-contact-cache-races test-sc64-contact-cache-p7 test-sc64-contact-cache-terran test-sc64-contact-cache-nydus test-sc64-contact-cache-zerg test-sc64-contact-cache-protoss
+
+# Optional Z7 index experiment. All imported inputs must already be prepared;
+# the feature remains absent from every product's compiler flags.
+define Z7_CONTACT_GROUP_FIXTURE
+build/test-sc64-z7-contact-group-$(1): tests/$(2) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(CONTACT_CACHE_TEST_FLAGS) $$(ZERG_Z7_CANONICAL_FLAGS) $(3) $$< common/gba.c -o $$@
+endef
+$(eval $(call Z7_CONTACT_GROUP_FIXTURE,membership-base,sc64_contact_bucket_membership.c,))
+$(eval $(call Z7_CONTACT_GROUP_FIXTURE,membership,sc64_contact_bucket_membership.c,-DSC64_CONTACT_GROUP_INDEX))
+$(eval $(call Z7_CONTACT_GROUP_FIXTURE,cache-base,sc64_contact_cache.c,))
+$(eval $(call Z7_CONTACT_GROUP_FIXTURE,cache,sc64_contact_cache.c,-DSC64_CONTACT_GROUP_INDEX))
+.PHONY: test-sc64-z7-contact-group
+test-sc64-z7-contact-group: build/test-sc64-z7-contact-group-membership-base build/test-sc64-z7-contact-group-membership build/test-sc64-z7-contact-group-cache-base build/test-sc64-z7-contact-group-cache
+	./build/test-sc64-z7-contact-group-membership-base
+	./build/test-sc64-z7-contact-group-membership
+	./build/test-sc64-z7-contact-group-cache-base
+	./build/test-sc64-z7-contact-group-cache
 test-unified: test-sc64-contact-cache-races
 test-sc64-terran-full-campaign: test-sc64-contact-cache-terran
 test-sc64-p7-contact: test-sc64-contact-cache-p7
