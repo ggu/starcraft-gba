@@ -1005,7 +1005,14 @@ build/test-sc64-compact-building-save: tests/sc64_compact_building_save.c starcr
 .PHONY: test-sc64-compact-building-save
 test-sc64-compact-building-save: build/test-sc64-compact-building-save
 	./build/test-sc64-compact-building-save
-test-starcraft: test-sc64-compact-building-save
+
+build/test-sc64-construction-save: tests/sc64_construction_save.c starcraft/sc64_construction_save.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-construction-save
+test-sc64-construction-save: build/test-sc64-construction-save
+	./build/test-sc64-construction-save
+
+test-starcraft: test-sc64-compact-building-save test-sc64-construction-save
 build/test-sc64-t6-storage: tests/sc64_t6_storage_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T6_STORAGE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-t6-storage
