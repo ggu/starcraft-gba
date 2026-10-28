@@ -9840,7 +9840,7 @@ sc64_hud_race_keys(int *values,int first)
             field_ui_site(menu,&x,&y);
             values[27]=(x>>3)|(y>>3)<<12;
         }
-        values[28]=minerals|gas<<16;
+        values[28]=(int)((u32)minerals|((u32)gas<<16));
     }
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
