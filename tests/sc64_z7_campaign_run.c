@@ -97,6 +97,8 @@ static int last_build_fail_type=-1;
 static int last_build_fail_frame=-10000;
 static int build_probe_done;
 static int hatch_probe_x=-1,hatch_probe_y=-1;
+static unsigned late_air_force_frame=0xffffffffu;
+static int late_air_force_applied;
 /* Opening phase advances only when an initial Hatchery A command is sent.
    Sitefinder calls and failed UI preconditions do not consume a request. */
 static unsigned initial_hatch_a_requests;
@@ -562,6 +564,20 @@ static int worker_count(int order)
     return n;
 }
 
+static int z7_worker_available_for_new_job(int worker)
+{
+    return worker>=0&&worker<MAX_UNITS&&u[worker].alive&&u[worker].owner==SIDE&&
+        u[worker].raw_type==41&&u[worker].order!=ORDER_BUILD&&
+        (!late_air_breakthrough_active||u[worker].order!=ORDER_BUILD_PENDING);
+}
+
+static int z7_pending_building_order(int type)
+{
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+       u[i].order==ORDER_BUILD_PENDING&&u[i].target==type)return 1;
+    return 0;
+}
+
 static int z7_threat_near_workers(int enemy,int radius)
 {
     if(enemy<0||enemy>=MAX_UNITS||!u[enemy].alive)return 0;
@@ -764,8 +780,7 @@ static int base_center(int *x,int *y)
 
 static int z7_worker_can_reach_site(int x,int y)
 {
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
-       u[i].raw_type==41&&u[i].order!=ORDER_BUILD) {
+    for(int i=0;i<MAX_UNITS;i++)if(z7_worker_available_for_new_job(i)) {
         int nx=-1,ny=-1;
         /* start_building chooses the first available Drone, so qualify that
            exact actor instead of accepting a site reachable only by another. */
@@ -826,8 +841,7 @@ static int find_build_site(int type,int *out_x,int *out_y)
         int hatch=z7_townhall(SIDE);
         if(hatch>=0) {
             int hx=b[hatch].x,hy=b[hatch].y,worker=-1;
-            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
-               u[i].raw_type==41&&u[i].order!=ORDER_BUILD){worker=i;break;}
+            for(int i=0;i<MAX_UNITS;i++)if(z7_worker_available_for_new_job(i)){worker=i;break;}
             if(worker>=0) {
                 int best_score=0x7fffffff,site_x=0,site_y=0;
                 for(int dy=80;dy<=176;dy+=8)for(int dx=-80;dx<=80;dx+=8) {
@@ -902,8 +916,7 @@ static int find_build_site(int type,int *out_x,int *out_y)
        first builder before using the general base-center search. */
     if(type!=B_CREEP_COLONY) {
         int worker=-1;
-        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
-           u[i].raw_type==41&&u[i].order!=ORDER_BUILD) {worker=i;break;}
+        for(int i=0;i<MAX_UNITS;i++)if(z7_worker_available_for_new_job(i)){worker=i;break;}
         if(worker>=0)for(int radius=48;radius<=160;radius+=16) {
             int local_best=0x7fffffff,local_x=0,local_y=0;
             for(int y=u[worker].y-radius;y<=u[worker].y+radius;y+=16)
@@ -964,12 +977,9 @@ static int start_building(int type,int menu_row)
     int worker=-1,x=-1,y=-1,before=owned_building_count(type);
     int opening_hatch=type==B_HATCHERY&&!owned_townhall_count();
     if(before&&type!=B_HATCHERY&&type!=B_CREEP_COLONY)return 1;
-    /* Public construction pays and creates the foundation only when the
-       Drone reaches its site. Preserve that ordinary pending order instead
-       of mistaking the absent foundation for a rejected click. */
-    if(type==B_EXTRACTOR)for(int i=0;i<MAX_UNITS;i++)
-        if(u[i].alive&&u[i].owner==SIDE&&
-           u[i].order==ORDER_BUILD_PENDING&&u[i].target==type)return 1;
+    /* Preserve the pre-existing Extractor pending-order behavior. The late
+       air branch checks its Spire pending order before calling this helper. */
+    if(type==B_EXTRACTOR&&z7_pending_building_order(type))return 1;
     if(!find_build_site(type,&x,&y)) {
         if(last_build_fail_type!=type||frame-last_build_fail_frame>=600) {
             fprintf(stderr,"Z7 cannot site type%d frame%d bank%d/%d workers%d geysers%d\n",
@@ -978,8 +988,7 @@ static int start_building(int type,int menu_row)
         }
         return 0;
     }
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
-        u[i].raw_type==41&&u[i].order!=ORDER_BUILD){worker=i;break;}
+    for(int i=0;i<MAX_UNITS;i++)if(z7_worker_available_for_new_job(i)){worker=i;break;}
     if(worker<0) {
         if(last_build_fail_type!=type||frame-last_build_fail_frame>=600) {
             fprintf(stderr,"Z7 no builder type%d frame%d workers%d bank%d/%d\n",
@@ -989,8 +998,7 @@ static int start_building(int type,int menu_row)
         return 0;
     }
     int selected=0;
-    for(int i=worker;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
-        u[i].raw_type==41&&u[i].order!=ORDER_BUILD&&
+    for(int i=worker;i<MAX_UNITS;i++)if(z7_worker_available_for_new_job(i)&&
         (type!=B_EXTRACTOR||u[i].order!=ORDER_BUILD_PENDING)) {
         if(select_worker(i)){worker=i;selected=1;break;}
         cancel_ui_mode();
@@ -1310,8 +1318,7 @@ static int assign_gas_worker(void)
 static int assign_idle_workers_to_minerals(void)
 {
     int assigned=0;
-    for(int worker=0;worker<MAX_UNITS;worker++)if(u[worker].alive&&u[worker].owner==SIDE&&
-        u[worker].raw_type==41&&u[worker].order!=ORDER_BUILD&&
+    for(int worker=0;worker<MAX_UNITS;worker++)if(z7_worker_available_for_new_job(worker)&&
         !(u[worker].order==ORDER_BUILD_PENDING&&u[worker].target==B_EXTRACTOR)&&
         u[worker].order!=ORDER_GAS&&
         !(u[worker].order==ORDER_MINE&&u[worker].target>=0&&u[worker].target<MAX_MINERALS&&
@@ -2785,14 +2792,13 @@ static int retreat_worker_individually(int worker,int threat)
 static int retreat_workers_group(void)
 {
     int seed=-1;
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
-        u[i].raw_type==41&&u[i].order!=ORDER_BUILD) {
+    for(int i=0;i<MAX_UNITS;i++)if(z7_worker_available_for_new_job(i)) {
         seed=i;break;
     }
     if(seed<0)return 0;
     int selected=0,all_selected_are_workers=selected_building<0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected) {
-        if(u[i].owner==SIDE&&u[i].raw_type==41&&u[i].order!=ORDER_BUILD)++selected;
+        if(z7_worker_available_for_new_job(i))++selected;
         else all_selected_are_workers=0;
     }
     int reuse_selection=selected>0&&selected_count()==selected&&all_selected_are_workers;
@@ -2805,8 +2811,8 @@ static int retreat_workers_group(void)
         }
         tap(KEY_A);
         selected=0;
-        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
-            u[i].raw_type==41&&u[i].selected&&u[i].order!=ORDER_BUILD)++selected;
+        for(int i=0;i<MAX_UNITS;i++)if(z7_worker_available_for_new_job(i)&&
+            u[i].selected)++selected;
     }
     if(!selected) {
         fprintf(stderr,"Z7 retreat selection failed frame%u seed%d alive%d order%d xy%d,%d\n",
@@ -2824,8 +2830,8 @@ static int retreat_workers_group(void)
         unsigned ci=(phase+probe)%((unsigned)(sizeof(candidate)/sizeof(candidate[0])));
         int x=candidate[ci][0],y=candidate[ci][1];
         int valid=1,n=0;
-        for(int i=0;i<MAX_UNITS&&valid;i++)if(u[i].alive&&u[i].owner==SIDE&&
-            u[i].raw_type==41&&u[i].selected&&u[i].order!=ORDER_BUILD) {
+        for(int i=0;i<MAX_UNITS&&valid;i++)if(z7_worker_available_for_new_job(i)&&
+            u[i].selected) {
             int tx=limit(x+((n%5)-2)*8,8,WORLD_W-8);
             int ty=limit(y+((n/5)-1)*8,8,WORLD_H-8),nx=-1,ny=-1;
             if(!path_next_tile(u[i].x,u[i].y,tx,ty,&nx,&ny))valid=0;
@@ -2909,8 +2915,7 @@ static int z7_front_colony_site(int hatch,int *out_x,int *out_y)
             int d=dist2(x,y,u[i].x,u[i].y);if(d<nearest)nearest=d;
         }
         if(nearest<144*144)continue;
-        for(int i=0;i<MAX_UNITS&&!reachable;i++)if(u[i].alive&&u[i].owner==SIDE&&
-            u[i].raw_type==41&&u[i].order!=ORDER_BUILD) {
+        for(int i=0;i<MAX_UNITS&&!reachable;i++)if(z7_worker_available_for_new_job(i)) {
             int nx,ny;reachable=path_next_tile(u[i].x,u[i].y,x,y,&nx,&ny);
         }
         if(!reachable)continue;
@@ -3023,6 +3028,13 @@ static void macro_step(void)
         }
     }
     if(late_air_breakthrough_active) {
+        int supply_cap=race_owner_supply_cap(SIDE);
+        int supply_used=race_owner_reserved_supply(SIDE);
+        int supply_short=supply_cap>0&&supply_cap-supply_used<=4;
+        /* A successful native Overlord queue consumes this macro step.
+           Waiting or blocked states fall through to ordinary recovery. */
+        if(supply_short&&queued_unit_count(U_OVERLORD)==0&&minerals>=100&&
+           queue_hatchery_type(U_OVERLORD))return;
         int lair=raw_building(132,SIDE);
         if(lair<0) {
             if(minerals>=150&&gas>=100&&start_lair_morph())return;
@@ -3031,31 +3043,44 @@ static void macro_step(void)
                 fprintf(stderr,"Z7 late air waiting paid Lair bank/menu frame%u bank%d/%d\n",
                     (unsigned)frame,minerals,gas);lair_retry_log=(unsigned)frame;
             }
-            return;
-        }
-        if(!building_complete(lair))return;
-        if(!owned_building_count(B_SPIRE)) {
-            if(minerals>=200&&gas>=150&&worker_count(-1)>=3&&
-               start_building(B_SPIRE,MENU_ZP_SPIRE))return;
+        } else if(!building_complete(lair)) {
+            /* The paid Lair morph is already progressing; run ordinary recovery. */
+        } else if(!owned_building_count(B_SPIRE)) {
+            if(!z7_pending_building_order(B_SPIRE)&&!supply_short&&
+               minerals>=200&&gas>=150&&worker_count(-1)>=3) {
+                int accepted=start_building(B_SPIRE,MENU_ZP_SPIRE);
+                /* A travelling Drone is an accepted paid order even before
+                   the world building slot is occupied. */
+                if(accepted||z7_pending_building_order(B_SPIRE))return;
+            }
             static unsigned spire_retry_log;
             if(!spire_retry_log||(unsigned)frame-spire_retry_log>=600u) {
-                fprintf(stderr,"Z7 late air waiting paid Spire bank/site/menu frame%u bank%d/%d workers%d\n",
-                    (unsigned)frame,minerals,gas,worker_count(-1));spire_retry_log=(unsigned)frame;
+                fprintf(stderr,"Z7 late air waiting paid Spire bank/site/menu frame%u bank%d/%d workers%d pending%d\n",
+                    (unsigned)frame,minerals,gas,worker_count(-1),
+                    z7_pending_building_order(B_SPIRE));spire_retry_log=(unsigned)frame;
             }
-            return;
+        } else {
+            int spire=raw_building(sc64_race_raw_building(B_SPIRE),SIDE);
+            if(spire>=0&&building_complete(spire)) {
+                int live=unit_count(-1,-1),queued=queued_unit_count(U_MUTALISK);
+                int mutas=unit_type_count(U_MUTALISK,SIDE);
+                if(mutas+queued<8&&live+queued<MAX_UNITS&&!supply_short&&
+                   minerals>=100&&gas>=100&&queue_hatchery_type(U_MUTALISK))return;
+                static unsigned muta_queue_log;
+                if(!muta_queue_log||(unsigned)frame-muta_queue_log>=600u) {
+                    fprintf(stderr,"Z7 late air Muta queue gate frame%u live-all%d cap%d live-muta%d queued%d bank%d/%d supply%d/%d larva%d\n",
+                        (unsigned)frame,live,MAX_UNITS,mutas,queued,minerals,gas,
+                        supply_used,supply_cap,home>=0?b[home].larva:0);muta_queue_log=frame;
+                }
+                if(mutas>=8) {
+                    static int support_complete_logged;
+                    if(!support_complete_logged) {
+                        fprintf(stderr,"Z7 late air paid support complete mutas%d frame%u; resume ordinary macro\n",
+                            mutas,(unsigned)frame);support_complete_logged=1;
+                    }
+                }
+            }
         }
-        int spire=raw_building(sc64_race_raw_building(B_SPIRE),SIDE);
-        if(spire<0||!building_complete(spire))return;
-        int live=unit_count(-1,-1),queued=queued_unit_count(U_MUTALISK);
-        if(unit_type_count(U_MUTALISK,SIDE)+queued<8&&live+queued<MAX_UNITS&&
-           minerals>=100&&gas>=100&&queue_hatchery_type(U_MUTALISK))return;
-        static unsigned muta_queue_log;
-        if(!muta_queue_log||(unsigned)frame-muta_queue_log>=600u) {
-            fprintf(stderr,"Z7 late air Muta queue gate frame%u live-all%d cap%d live-muta%d queued%d bank%d/%d larva%d\n",
-                (unsigned)frame,live,MAX_UNITS,unit_type_count(U_MUTALISK,SIDE),queued,
-                minerals,gas,home>=0?b[home].larva:0);muta_queue_log=(unsigned)frame;
-        }
-        return;
     }
     int hatch_egg_producer=home>=0&&
         (building_complete(home)||race_z7_morphing_egg_hall(SIDE,home));
@@ -4665,7 +4690,9 @@ int main(int argc,char **argv)
         else if(!strcmp(argv[i],"--probe-hatch-site")&&i+2<argc) {
             hatch_probe_x=(int)strtol(argv[++i],0,10);hatch_probe_y=(int)strtol(argv[++i],0,10);
         }
-        else {fprintf(stderr,"usage: %s [--policy baseline|early-gas] [--limit HOST_TICKS] [--trace PATH] [--probe-hatch-site X Y]\n",argv[0]);return 2;}
+        else if(!strcmp(argv[i],"--force-late-air-at-frame")&&i+1<argc)
+            late_air_force_frame=(unsigned)strtoul(argv[++i],0,10);
+        else {fprintf(stderr,"usage: %s [--policy baseline|early-gas] [--limit HOST_TICKS] [--trace PATH] [--probe-hatch-site X Y] [--force-late-air-at-frame FRAME]\n",argv[0]);return 2;}
     }
     if(!run_limit||run_limit>1000000u)return 2;
     mkdir(".local",0777);mkdir(".local/sc64",0777);
@@ -4677,6 +4704,16 @@ int main(int argc,char **argv)
     source_checkpoint("start");
     int last_checkpoint=frame;
     while(host_ticks<run_limit&&screen==SCREEN_PLAY&&!won&&!lost) {
+        if(!late_air_force_applied&&(unsigned)frame>=late_air_force_frame) {
+            /* Isolated controller regression only: phase latch is the sole
+               forced state; the game world and resources remain native. */
+            late_air_breakthrough_active=1;muta_scout_leg=0;
+            late_air_force_applied=1;
+            fprintf(stderr,"Z7 ISOLATED CONTROLLER PHASE LATCH frame%u bank%d/%d workers%d mutas%d supply%d/%d (no game-state injection)\n",
+                (unsigned)frame,minerals,gas,worker_count(-1),
+                unit_type_count(U_MUTALISK,SIDE),race_owner_reserved_supply(SIDE),
+                race_owner_supply_cap(SIDE));
+        }
         /* Give the visible combat threat one ordinary-input response before
            the worker evacuation menu consumes its multi-update selection and
            move gestures. Evacuation still runs in the same host iteration. */
