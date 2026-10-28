@@ -40,7 +40,7 @@ normal ARM links passed linker bounds: BSS ends at 0x203708c/0x20370f8/
 0x3004db8/0x3004f58/0x3004b70/0x3004fd0 against 0x3005000. The source tree
 boundary check passed. Terran and Zerg ROM bytes are unchanged; Protoss P7 and
 Showcase are expected to change because both enable the P7 Arbiter cache flag.
-Asset-free P7 cache-generation-43 and immediate-save host fixtures passed; the
+Prepared-input P7 cache-generation-43 and immediate-save host fixtures passed; the
 private cache fixture uses generation-43 assertions matching this runtime.
 
 The approved real P7 campaign RGB replay passed 21/21 world records, 21/21
