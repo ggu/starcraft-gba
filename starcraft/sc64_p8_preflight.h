@@ -2,7 +2,6 @@
 #ifndef SC64_P8_PREFLIGHT_H
 #define SC64_P8_PREFLIGHT_H
 
-#include <string.h>
 #include "sc64_p8_source_adapter.h"
 #include "sc64_types.h"
 
@@ -55,7 +54,8 @@ sc64_p8_preflight(const Sc64RaceMap *map,
         map->height != SC64_P8_EXPECTED_MAP_ROWS ||
         !map->units || !map->unit_count || !map->owner_modes ||
         !map->owner_races || !map->mission_id ||
-        strcmp(map->mission_id, "P8") != 0 ||
+        map->mission_id[0] != 'P' || map->mission_id[1] != '8' ||
+        map->mission_id[2] != '\0' ||
         map->unit_count > MAX_UNITS + MAX_BUILDINGS + MAX_MINERALS +
                               MAX_RACE_GEYSERS ||
         !actions ||

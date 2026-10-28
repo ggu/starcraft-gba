@@ -157,6 +157,15 @@ int main(void)
         MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS,
         positive.geysers - 1u,
         &complete_ops, &report) == SC64_P8_PREFLIGHT_CAPACITY);
+    static const char *const invalid_labels[] = {"", "P", "P8X", "Z8"};
+    synthetic_map = *map;
+    for (unsigned i = 0; i < sizeof(invalid_labels) / sizeof(*invalid_labels); ++i) {
+        synthetic_map.mission_id = invalid_labels[i];
+        assert(sc64_p8_preflight(&synthetic_map,
+            sc64_p8_source_actions, SC64_P8_SOURCE_ACTION_COUNT,
+            MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS, MAX_RACE_GEYSERS,
+            &complete_ops, &report) == SC64_P8_PREFLIGHT_BAD_INPUT);
+    }
     puts("sc64_p8_campaign_preflight: source census and fail-closed actor/property/capacity checks pass");
     return 0;
 }
