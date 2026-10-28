@@ -1157,7 +1157,13 @@ static int skirmish_hostile(int a, int b);
 static int skirmish_bot_index(int owner);
 #endif
 #ifdef SC64_RACES
+#include "sc64_font.h"
+#include "sc64_icons.h"
+#include "sc64_chrome.h"
 #include "sc64_briefing_generated.h"
+#if SC64_BRIEFING_LAYOUT_VERSION != 2
+#error "Briefings need source-font pixel wrapping; run make sc64-interface"
+#endif
 static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race_bots=2;
 static int race_skirmish_map;
 static int race_bot_races[3]={R_ZERG,R_PROTOSS,R_TER};
@@ -1179,7 +1185,7 @@ static void race_front_briefing_configure(void)
     const Sc64Briefing *briefing=sc64_briefing_get(race_front.mission);
     const Sc64BriefingPage *page=race_front_briefing_page();
     unsigned length=0;
-    if(page)while(page->text[length] && length<SC64_BRIEFING_MAX_TEXT_BYTES)length++;
+    if(page)while(length<SC64_BRIEFING_MAX_TEXT_BYTES && page->text[length])length++;
     sc64_frontend_briefing_configure(&race_front,
         briefing?briefing->page_count:1,length);
 }
@@ -8874,7 +8880,8 @@ sc64_tile_background_done:
 #ifdef SC_DEFAULT_UI
     if (menu_open) field_ui_draw_command_menu();
 #elif defined(SC64_FIELD_CONTROLS)
-    if (menu_open) field_controls_draw_command_menu();
+    /* The imported command panel is drawn above transient mission messages
+     * in draw_hud(), after the world and its overlays. */
 #else
     if (menu_open) {
         int first = menu_cursor >= 10 ? menu_cursor - 9 : 0;
@@ -9153,6 +9160,11 @@ draw_hud_commands(void)
     field_ui_draw_hud();
     return;
 #endif
+    int hud_left=5;
+#if defined(SC64_RACES) && defined(SC64_FIELD_CONTROLS)
+    if(box_state!=2 && !menu_open && mode==MODE_NORMAL &&
+       field_controls_draw_selected_icon(14,135,22))hud_left=30;
+#endif
     if (box_state == 2) {
         gfx_text(5, 126, "BOX SELECT", C_CYAN);
         gfx_text(5, 137, "RELEASE L SELECT B CANCEL", C_GOLD);
@@ -9162,7 +9174,10 @@ draw_hud_commands(void)
     } else if (selected_building >= 0 && b[selected_building].alive) {
 	Building *q = &b[selected_building];
 	#ifdef SC64_RACES
-        gfx_text(5,126,sc64_race_building_name(q->type),C_WHITE);
+        char title[64];
+        int title_width=q->shield>0?124-hud_left:165-hud_left;
+        sc64_font_ellipsis(sc64_race_building_name(q->type),title_width,title,sizeof(title));
+        sc64_font_text(hud_left,124,title_width,title,C_WHITE);
         draw_hud_shields(q->shield,sc64_actor_max_shields(q->type,1));
 #else
 	gfx_text(5, 126, q->type == B_COMMAND ? "COMMAND CENTER" :
@@ -9181,9 +9196,12 @@ draw_hud_commands(void)
         } else
 #endif
         if(!q->under_construction) {
-            gfx_text(5,137,unit_name(train_type),C_WHITE);
-            gfx_text(65,137,"A TRAIN R TYPE L CANCEL",C_GOLD);
-        } else gfx_text(5,137,"UNDER CONSTRUCTION",C_GOLD);
+            char training[48];
+            sc64_font_ellipsis(unit_name(train_type),81-hud_left-12,training,sizeof(training));
+            gfx_text(hud_left,137,"A",C_GOLD);
+            sc64_font_text(hud_left+12,135,81-hud_left-12,training,C_WHITE);
+            sc64_font_text(85,135,94,"R Type L Cancel",C_GOLD);
+        } else gfx_text(hud_left,137,"UNDER CONSTRUCTION",C_GOLD);
 #else
 	if (q->under_construction)
 	    gfx_text(5, 137, "UNDER CONSTRUCTION", C_GOLD);
@@ -9200,44 +9218,49 @@ draw_hud_commands(void)
     } else if (n) {
 	for (i = 0; i < MAX_UNITS; i++)
 	    if (u[i].alive && u[i].selected) {
-		gfx_text(5, 126, n > 1 ? "COMBAT GROUP" : unit_name(u[i].type), C_WHITE);
 #ifdef SC64_RACES
+                char title[64];
+                int title_width=u[i].shield>0?124-hud_left:165-hud_left;
+                sc64_font_ellipsis(n>1?"Combat group":unit_name(u[i].type),title_width,title,sizeof(title));
+                sc64_font_text(hud_left,124,title_width,title,C_WHITE);
                 draw_hud_shields(u[i].shield,sc64_actor_max_shields(u[i].type,0));
+#else
+                gfx_text(5,126,n>1?"COMBAT GROUP":unit_name(u[i].type),C_WHITE);
 #endif
-		gfx_text(5, 137, "HP", C_CYAN);
-		gfx_num(24, 137, u[i].hp, C_GREEN);
+		gfx_text(hud_left, 137, "HP", C_CYAN);
+		gfx_num(hud_left+19, 137, u[i].hp, C_GREEN);
 		if (IS_WORKER(u[i].type))
 #ifdef SC64_FIELD_CONTROLS
-		    gfx_text(52, 137, ui_action == UI_A_MOVE ? "A MOVE  B BUILD" :
+		    gfx_text(hud_left+47, 137, ui_action == UI_A_MOVE ? "A MOVE  B BUILD" :
 			     ui_action == UI_A_GAS ? "A GAS  B BUILD" : "AUTO MINE  B BUILD", C_GOLD);
 #else
-		    gfx_text(52, 137, "AUTO MINE / A GAS", C_GOLD);
+		    gfx_text(hud_left+47, 137, "AUTO MINE / A GAS", C_GOLD);
 #endif
 		else
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
                 if (race_p7_active() && u[i].type==U_P7_CARRIER) {
-                    gfx_text(52,137,"IC",C_CYAN);
-                    gfx_num(70,137,(int)race_p7_carrier_training_child_count(i),C_WHITE);
-                    gfx_text(84,137,"HANGAR / FLIGHT WIP",C_GOLD);
+                    gfx_text(hud_left+47,137,"IC",C_CYAN);
+                    gfx_num(hud_left+65,137,(int)race_p7_carrier_training_child_count(i),C_WHITE);
+                    gfx_text(hud_left+79,137,"HANGAR / FLIGHT WIP",C_GOLD);
                 } else
 #endif
 #ifdef SC64_Z6_CLOAK_ENABLED
                 if (race_z6_cloak_actor(&u[i])) {
-                    gfx_text(52,137,"EN",C_CYAN); gfx_num(70,137,u[i].carry/256,C_WHITE);
-                    gfx_text(100,137,race_z6.cloak.active ? "CLOAKED" : "B SPELLS",C_GOLD);
+                    gfx_text(hud_left+47,137,"EN",C_CYAN); gfx_num(hud_left+65,137,u[i].carry/256,C_WHITE);
+                    gfx_text(hud_left+95,137,race_z6.cloak.active ? "CLOAKED" : "B SPELLS",C_GOLD);
                 } else
 #endif
 #ifdef SC64_P6_STORM_ENABLED
                 if (race_p6_active() && u[i].raw_type==79 && u[i].raw_owner==2) {
-                    gfx_text(52,137,"EN",C_CYAN); gfx_num(70,137,u[i].carry/256,C_WHITE);
-                    gfx_text(100,137,"B STORM",C_GOLD);
+                    gfx_text(hud_left+47,137,"EN",C_CYAN); gfx_num(hud_left+65,137,u[i].carry/256,C_WHITE);
+                    gfx_text(hud_left+95,137,"B STORM",C_GOLD);
                 } else
 #endif
 #ifdef SC64_Z5_CLOAK_ENABLED
                 if (race_z5_cloak_actor(&u[i])) {
-                    gfx_text(52, 137, "EN", C_CYAN);
-                    gfx_num(70, 137, u[i].carry / 256, C_WHITE);
-                    gfx_text(100, 137, race_z5.cloak.active ? "CLOAKED" : "B CLOAK", C_GOLD);
+                    gfx_text(hud_left+47, 137, "EN", C_CYAN);
+                    gfx_num(hud_left+65, 137, u[i].carry / 256, C_WHITE);
+                    gfx_text(hud_left+95, 137, race_z5.cloak.active ? "CLOAKED" : "B CLOAK", C_GOLD);
                 } else
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
@@ -9246,17 +9269,17 @@ draw_hud_commands(void)
 #else
                 if (race_transport_carrier_type(&u[i])) {
 #endif
-                    gfx_text(52, 137, "CARGO", C_GOLD);
-                    gfx_num(90, 137, race_transport_cargo_space(i), C_WHITE);
-                    gfx_text(104, 137, "/8  B UNLOAD", C_GOLD);
+                    gfx_text(hud_left+47, 137, "CARGO", C_GOLD);
+                    gfx_num(hud_left+85, 137, race_transport_cargo_space(i), C_WHITE);
+                    gfx_text(hud_left+99, 137, "/8  B UNLOAD", C_GOLD);
                 } else
 #endif
 #ifdef SC_COMMAND_RING
-		    gfx_text(52, 137, "HOLD B ORDERS", C_GOLD);
+		    gfx_text(hud_left+47, 137, "HOLD B ORDERS", C_GOLD);
 #elif defined(SC64_FIELD_CONTROLS)
-		    gfx_text(52, 137, field_controls_unit_hint(), C_GOLD);
+		    gfx_text(hud_left+47, 137, field_controls_unit_hint(), C_GOLD);
 #else
-		    gfx_text(52, 137, "A ORDER B COMMANDS", C_GOLD);
+		    gfx_text(hud_left+47, 137, "A ORDER B COMMANDS", C_GOLD);
 #endif
 		break;
 	    }
@@ -9390,7 +9413,7 @@ draw_hud_commands(void)
 static _Alignas(4) u8 sc64_hud_top[240 * 12], sc64_hud_bottom[240 * 40];
 #endif
 #ifdef SC64_FIELD_CONTROLS
-enum { SC64_HUD_KEY_COUNT=29 }; /* 26-28: the field controls' rows */
+enum { SC64_HUD_KEY_COUNT=30 }; /* 26-28: commands; 29: source icon identity */
 #else
 enum { SC64_HUD_KEY_COUNT=26 };
 #endif
@@ -9411,6 +9434,10 @@ sc64_hud_race_keys(int *values,int first)
     }
     values[19]=race_campaign.phase;values[20]=race_campaign.message;
 #ifdef SC64_FIELD_CONTROLS
+    /* Source icons depend on raw identity even when the engine type is equal. */
+    values[29]=first>=0?u[first].raw_type:-1;
+    if(selected_building>=0 && b[selected_building].alive)
+        values[29]=b[selected_building].raw_type;
     /* The hint follows the A action; the open list follows its cursor and
        wallet; placement status follows the snapped site and wallet. */
     values[26]=ui_action|menu_open<<4|menu_cursor<<5;
@@ -9606,6 +9633,9 @@ draw_hud(void)
         line[n]=0;
         gfx_text(5,106,line,C_CYAN);
     }
+#endif
+#ifdef SC64_FIELD_CONTROLS
+    if (menu_open) field_controls_draw_command_menu();
 #endif
     if (toast_timer && toast_id >= 0 && toast_id < 15) {
 	gfx_rect(54, 105, 132, 12, C_PANEL);

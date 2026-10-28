@@ -167,8 +167,29 @@ RACE_CONSTRUCTION_INPUTS := $(CONSTRUCTION_ART_HEADER)
 endif
 # Every race-engine ROM uses the default profile's controls and menus
 # (starcraft/field_controls.h).
-RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated $(RACE_CONSTRUCTION_FLAGS)
-RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(RACE_CONSTRUCTION_INPUTS)
+SC64_INTERFACE_DIR := .local/sc64/interface/generated
+SC64_INTERFACE_INPUTS := $(addprefix $(SC64_INTERFACE_DIR)/,sc64_font_generated.h sc64_icons_generated.h sc64_chrome_generated.h)
+RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated -I$(SC64_INTERFACE_DIR) $(RACE_CONSTRUCTION_FLAGS)
+RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(SC64_INTERFACE_INPUTS) $(RACE_CONSTRUCTION_INPUTS)
+
+.PHONY: sc64-interface test-sc64-font test-sc64-icons
+sc64-interface:
+	python3 tools/sc64_font_assets.py
+	python3 tools/sc64_briefing_assets.py
+	python3 tools/sc64_icon_assets.py
+	python3 tools/sc64_chrome_assets.py
+$(SC64_INTERFACE_INPUTS):
+	@echo 'Private interface data is missing. Run make sc64-interface with the prepared local ROM and reference checkout.'
+	@false
+build/test-sc64-font: tests/sc64_font.c starcraft/sc64_font.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+test-sc64-font: build/test-sc64-font
+	./build/test-sc64-font
+build/test-sc64-icons: tests/sc64_icons.c starcraft/sc64_icons.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+test-sc64-icons: build/test-sc64-icons
+	./build/test-sc64-icons
+test-starcraft: test-sc64-font test-sc64-icons
 
 .PHONY: sc64-briefings test-sc64-briefing
 sc64-briefings:

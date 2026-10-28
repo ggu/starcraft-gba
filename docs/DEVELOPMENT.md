@@ -159,14 +159,21 @@ source pixels, edge clipping, fog, all three gas buildings and warm-cache reuse.
 
 Canonical imported race profiles include the N64 campaign's pre-mission
 dialogue, speaker names and 23 portrait head frames, adapted to the GBA briefing
-screen. Dialogue pages are generated locally and wrapped to 36 columns by at
-most 7 rows; the imported text and graphics remain private under `.local/`.
-From an already prepared workspace, `make sc64-briefings` regenerates the
-briefing header from the verified USA ROM at
-`.local/sc64/rom/StarCraft64-USA.z64` and the pinned `references/sc64-maps`
-checkout. `./dev sc64 prepare --rom PATH --profile terran` runs this importer
-automatically, as do the canonical `zerg` and `protoss` preparation profiles.
-Status and builds require the generated briefing header.
+screen. Dialogue pages use the original small font's glyph shapes and letter
+case. The importer wraps text to 216 pixels across at most six 10-pixel font
+lines, fitting the 216-by-61-pixel text pane. Cursor spacing is derived from
+the source glyph bounds for GBA layout; it is not a claim about the original
+N64 text cursor metrics. Imported text and graphics stay private under
+`.local/`.
+
+`make sc64-interface` regenerates the font, icon and menu-chrome banks under
+ignored `.local/sc64/interface/generated/`; it also refreshes the private
+briefing header from the verified USA ROM at `.local/sc64/rom/StarCraft64-USA.z64`
+and the pinned `references/sc64-maps` checkout. `./dev sc64 prepare --rom PATH --profile terran`
+runs these importers automatically. The canonical `zerg` and `protoss`
+preparation profiles do too. Status and builds require all three interface
+headers and the briefing header. The default asset-free build and tests do not
+require the ROM, reference checkout or generated banks.
 
 In the briefing, A reveals the current page and then advances; A on the final
 page deploys the mission. Left/Right browse pages, B returns to mission

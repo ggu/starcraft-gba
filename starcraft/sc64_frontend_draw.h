@@ -1,66 +1,56 @@
 #ifndef SC64_FRONTEND_DRAW_H
 #define SC64_FRONTEND_DRAW_H
 
-#include "sc64_menu_generated.h"
+#include "sc64_chrome.h"
+
+static void front_text(int x, int y, const char *text, u8 color)
+{
+    sc64_font_text(x, y, x < 240 ? 240 - x : 0, text, color);
+}
+
+static void front_center_text(int y, const char *text, u8 color)
+{
+    char fitted[64];
+    int width = sc64_font_width(text);
+    if (width > 216) {
+        sc64_font_ellipsis(text,216,fitted,sizeof(fitted));
+        text=fitted;
+        width=sc64_font_width(text);
+    }
+    int x = (240 - width) / 2;
+    if (x < 12) x = 12;
+    sc64_font_text(x, y, 216, text, color);
+}
 
 /* Original N64 artwork is converted offline into ROM tables. These screens
  * draw straight into the existing Mode 4 framebuffer, using a temporary
  * interface palette; launching/loading restores the world palette. */
 static void front_button(int x,int y,int w,int h,const char *label,int selected)
 {
-    gfx_rect(x+2,y+2,w,h,C_BLACK);
-    gfx_rect(x,y,w,h,C_PANEL);
-    gfx_frame(x,y,w,h,selected?C_GOLD:C_EDGE);
-    gfx_line(x+2,y+2,x+w-3,y+2,selected?C_SILVER:C_EDGE);
-    gfx_line(x+2,y+h-3,x+w-3,y+h-3,C_SHADOW);
-    int len=0;while(label[len])len++;
-    gfx_text(x+(w-len*6)/2+(selected?2:0),y+(h-7)/2,label,selected?C_GOLD:C_SILVER);
-    if(selected) {
-        int mid=y+h/2;
-        gfx_line(x+5,mid-3,x+8,mid,C_GOLD);
-        gfx_line(x+8,mid,x+5,mid+3,C_GOLD);
-        int pulse=(race_front.ticks/6)%4;
-        gfx_rect(x+w-10,y+h-6,4,2,pulse<2?C_GOLD:C_GOLD_DARK);
-    }
+    (void)w;
+    sc64_chrome_button(x,y,h<=15,h>=25,label,selected);
 }
 
-/* A compact metallic wordmark, kept as code rather than a replacement raster
- * asset. The original artwork supplies the surrounding space and characters. */
 static void front_logo(void)
 {
-    static const unsigned char glyph[6][7]={
-        {31,16,16,31,1,1,31},{31,4,4,4,4,4,4},
-        {14,17,17,31,17,17,17},{30,17,17,30,20,18,17},
-        {15,16,16,16,16,16,15},{31,16,16,30,16,16,16}};
-    static const unsigned char letters[9]={0,1,2,3,4,3,2,5,1};
-    for(int n=0;n<9;n++)for(int row=0;row<7;row++)for(int col=0;col<5;col++)
-        if(glyph[letters[n]][row]&(16>>col)) {
-            int x=40+n*18+col*3,y=14+row*3;
-            gfx_rect(x+1,y+2,3,3,C_SHADOW);
-            gfx_rect(x,y,3,3,row<2?C_WHITE:row<4?C_SILVER:C_DIM);
-        }
-    gfx_line(39,38,200,38,C_GOLD_DARK);
-    gfx_line(82,41,158,41,C_EDGE);
+    sc64_chrome_draw_title_plate(72,31,"StarCraft");
 }
 
 static void front_header(const char *title,const char *subtitle)
 {
-    int len=0;while(title[len])len++;
-    gfx_rect(8,6,224,15,C_BLACK);
-    gfx_text((240-len*6)/2,10,title,C_GOLD);
-    gfx_line(10,24,230,24,C_EDGE);
-    if(subtitle){gfx_rect(110,29,124,14,C_BLACK);gfx_text(114,33,subtitle,C_SILVER);}
+    front_center_text(34,title,C_GOLD);
+    if(subtitle) front_center_text(45,subtitle,C_SILVER);
 }
 
 static const char *front_mission_title(int mission)
 {
     const Sc64MissionInfo *info = sc64_catalog_get(mission);
-    return info ? info->title : "UNKNOWN MISSION";
+    return info ? info->title : "Unknown Mission";
 }
 
 static const char *front_map_title(int map)
 {
-    static const char *names[2]={"OUTPOST","BLOOD BATH"};
+    static const char *names[2]={"Outpost","Blood Bath"};
     if (map < 0 || map >= SC64_FRONT_MAP_COUNT) return names[0];
     return names[map];
 }
@@ -75,45 +65,41 @@ static const char *front_showcase_title(int scene)
 static const char *front_campaign_title(int faction)
 {
 #ifdef SC64_UNIFIED
-    return faction==SC_FRONT_TERRAN?"TERRAN CAMPAIGN":
-           faction==SC_FRONT_ZERG?"THE OVERMIND":"THE FALL";
+    return faction==SC_FRONT_TERRAN?"Terran Campaign":
+           faction==SC_FRONT_ZERG?"The Overmind":"The Fall";
 #else
-    return faction?"THE FALL":"THE OVERMIND";
+    return faction?"The Fall":"The Overmind";
 #endif
 }
 
 static const u8 *front_campaign_art(int faction)
 {
 #ifdef SC64_UNIFIED
-    return faction==SC_FRONT_TERRAN?sc64_menu_terran:
-           faction==SC_FRONT_PROTOSS?sc64_menu_protoss:sc64_menu_zerg;
+    return faction==SC_FRONT_TERRAN?sc64_chrome_menu_terran:
+           faction==SC_FRONT_PROTOSS?sc64_chrome_menu_protoss:sc64_chrome_menu_zerg;
 #else
-    return faction?sc64_menu_protoss:sc64_menu_zerg;
+    return faction?sc64_chrome_menu_protoss:sc64_chrome_menu_zerg;
 #endif
 }
 
 static void front_footer(const char *text)
 {
-    gfx_rect(0,147,240,13,C_PANEL);
-    gfx_line(0,146,239,146,C_EDGE);
-    gfx_text(9,151,text,C_DIM);
+    sc64_chrome_draw_footer(text);
 }
 
 static void front_uplink(void)
 {
-    gfx_text(12,137,"UPLINK",C_DIM);
+    front_text(24,136,"Uplink",C_DIM);
     for(int i=0;i<8;i++) {
         int level=2+((race_front.ticks/3+i*7)%9);
-        gfx_rect(55+i*5,143-level,3,level,(i+race_front.ticks/5)%3?C_GREEN_DARK:C_GREEN);
+        gfx_rect(55+i*5,135-level,3,level,(i+race_front.ticks/5)%3?C_GREEN_DARK:C_GREEN);
     }
 }
 
 static void front_load_error(void)
 {
-    if(race_front_load_error) {
-        gfx_rect(36,106,168,29,C_BLACK);gfx_frame(36,106,168,29,C_RED_DARK);
-        gfx_text(63,116,"NO SAVED GAME FOUND",C_GOLD);
-    }
+    if(race_front_load_error)
+        sc64_chrome_draw_notice("No Saved Game Found","Start a Campaign or Custom Game");
 }
 
 /* Text is authored by the source script and wrapped offline to the visible
@@ -122,51 +108,51 @@ static void front_briefing(void)
 {
     const Sc64BriefingPage *page=race_front_briefing_page();
     const char *title=front_mission_title(race_front.mission);
-    gfx_text(12,9,title,C_GOLD);
+    front_text(12,9,title,C_GOLD);
     if(!page) {
-        gfx_text(62,28,"MISSION ORDERS",C_SILVER);
-        gfx_text(12,69,"BRIEFING UNAVAILABLE",C_SILVER);
-        gfx_text(12,87,"START TO DEPLOY",C_DIM);
+        front_text(62,28,"Mission Orders",C_SILVER);
+        front_text(12,69,"Briefing unavailable",C_SILVER);
+        front_text(12,87,"Start to deploy",C_DIM);
     } else {
         if(page->portrait>=0 && page->portrait<SC64_BRIEFING_PORTRAIT_COUNT)
             gfx_blit_sprite(12,23,SC64_BRIEFING_PORTRAIT_WIDTH,
                             SC64_BRIEFING_PORTRAIT_HEIGHT,
                             sc64_briefing_portraits[page->portrait]);
         else {
-            gfx_text(14,35,"ORDERS",C_GOLD);
-            gfx_text(20,47,"DATA",C_DIM);
+            front_text(14,35,"Orders",C_GOLD);
+            front_text(20,47,"Data",C_DIM);
         }
-        gfx_text(62,28,page->speaker,C_SILVER);
-        gfx_text(62,43,"PAGE",C_DIM);
-        gfx_num(92,43,(int)race_front.briefing_page+1,C_GOLD);
-        gfx_text(110,43,"/",C_DIM);
-        gfx_num(122,43,(int)race_front.briefing_pages,C_DIM);
-        if(race_front.briefing_page>0)gfx_text(163,43,"< PREV",C_DIM);
+        front_text(62,28,page->speaker,C_SILVER);
+        front_text(62,43,"Page",C_DIM);
+        sc64_font_num(92,43,18,(int)race_front.briefing_page+1,C_GOLD);
+        front_text(110,43,"/",C_DIM);
+        sc64_font_num(122,43,24,(int)race_front.briefing_pages,C_DIM);
+        if(race_front.briefing_page>0)front_text(163,43,"< Prev",C_DIM);
         char text[SC64_BRIEFING_MAX_TEXT_BYTES+1];
         unsigned visible=sc64_frontend_briefing_visible(&race_front),i=0;
         while(i<visible && i<SC64_BRIEFING_MAX_TEXT_BYTES && page->text[i]) {
             text[i]=page->text[i];i++;
         }
         text[i]=0;
-        gfx_text(12,69,text,C_SILVER);
+        sc64_font_text(12,69,216,text,C_SILVER);
     }
-    const char *next=!sc64_frontend_briefing_is_revealed(&race_front)?"A REVEAL":
-        race_front.briefing_page+1<race_front.briefing_pages?"A NEXT":"A DEPLOY";
-    gfx_text(12,145,next,C_GOLD);
-    gfx_text(77,145,"B BACK",C_DIM);
-    gfx_text(143,145,"START DEPLOY",C_GOLD);
+    const char *next=!sc64_frontend_briefing_is_revealed(&race_front)?"A Reveal":
+        race_front.briefing_page+1<race_front.briefing_pages?"A Next":"A Deploy";
+    front_text(12,145,next,C_GOLD);
+    front_text(77,145,"B Back",C_DIM);
+    front_text(143,145,"Start Deploy",C_GOLD);
 }
 
 static void sc64_frontend_draw(void)
 {
     int page=race_front.page,faction=page==SC_FRONT_CAMPAIGN?
         sc64_front_campaign_faction(race_front.row):race_front.faction;
-    const u8 *background=sc64_menu_home;
+    const u8 *background=sc64_chrome_menu_home;
     if(page==SC_FRONT_CAMPAIGN||page==SC_FRONT_MISSION||page==SC_FRONT_BRIEFING)
         background=front_campaign_art(faction);
     if(page==SC_FRONT_SKIRMISH)
-        background=race_front.race==R_TER?sc64_menu_terran:race_front.race==R_ZERG?sc64_menu_zerg:sc64_menu_protoss;
-    const u16 *palette=sc64_menu_palette;
+        background=race_front.race==R_TER?sc64_chrome_menu_terran:race_front.race==R_ZERG?sc64_chrome_menu_zerg:sc64_chrome_menu_protoss;
+    const u16 *palette=sc64_chrome_menu_palette;
     if(page==SC_FRONT_BRIEFING) {
         background=sc64_briefing_background;
         palette=sc64_briefing_palette;
@@ -186,83 +172,80 @@ static void sc64_frontend_draw(void)
         front_load_error();
         return;
     }
-    gfx_frame(0,0,240,147,C_EDGE);
-    gfx_line(3,3,22,3,C_SILVER);gfx_line(3,3,3,20,C_SILVER);
-    gfx_line(217,3,236,3,C_SILVER);gfx_line(236,3,236,20,C_SILVER);
+    sc64_chrome_draw_tab(page==SC_FRONT_HOME?SC64_CHROME_TAB_OVERVIEW:
+        page==SC_FRONT_CAMPAIGN?SC64_CHROME_TAB_UNITS:
+        page==SC_FRONT_MISSION?SC64_CHROME_TAB_BUILDINGS:SC64_CHROME_TAB_RESOURCES);
     if(page==SC_FRONT_HOME) {
         front_logo();
-        gfx_text(134,56,"SECTOR COMMAND",C_DIM);
-        front_button(128,70,103,21,"CAMPAIGN",race_front.row==0);
-        front_button(128,96,103,21,"CUSTOM GAME",race_front.row==1);
-        front_button(128,122,103,21,"LOAD GAME",race_front.row==2);
-        gfx_text(12,123,"KOPRULU SECTOR",C_DIM);
+        front_center_text(57,"Sector Command",C_DIM);
+        front_button(96,68,128,22,"Campaign",race_front.row==0);
+        front_button(96,92,128,22,"Custom Game",race_front.row==1);
+        front_button(96,116,128,22,"Load Game",race_front.row==2);
+        front_text(24,123,"Koprulu Sector",C_DIM);
         front_uplink();
         for(int i=0;i<8;i++) {
             int x=17+(i*37)%96,y=50+(i*23)%62;
             if(((race_front.ticks/8+i)%7)==0)gfx_pixel(x,y,C_SILVER);
         }
-        front_footer("UP/DN SELECT   A ENTER   L LOAD");
+        front_footer("Up/Down Select  A Enter  L Load");
     } else if(page==SC_FRONT_CAMPAIGN) {
 #ifdef SC64_CAMPAIGN_RACE
-        front_header("CAMPAIGN",0);
-        front_button(118,70,112,28,
+        front_header("Campaign",0);
+        front_button(96,70,128,22,
             faction==SC_FRONT_TERRAN?"TERRAN":faction==SC_FRONT_ZERG?"ZERG":"PROTOSS",1);
-        gfx_text(121,108,front_campaign_title(faction),C_GOLD);
+        front_text(121,108,front_campaign_title(faction),C_GOLD);
 #else
 #ifdef SC64_UNIFIED
-        front_header("CHOOSE YOUR CAMPAIGN",0);
-        front_button(118,43,112,24,"TERRAN",race_front.row==0);
-        front_button(118,75,112,24,"ZERG",race_front.row==1);
-        front_button(118,107,112,24,"PROTOSS",race_front.row==2);
-        gfx_text(121,135,front_campaign_title(faction),C_GOLD);
+        front_header("Choose a Campaign",0);
+        front_button(96,52,128,22,"Terran",race_front.row==0);
+        front_button(96,81,128,22,"Zerg",race_front.row==1);
+        front_button(96,110,128,22,"Protoss",race_front.row==2);
+        front_text(24,135,front_campaign_title(faction),C_GOLD);
 #else
-        front_header("CHOOSE YOUR CAMPAIGN",0);
-        front_button(118,52,112,28,"ZERG",race_front.row==0);
-        front_button(118,91,112,28,"PROTOSS",race_front.row==1);
-        gfx_text(121,126,faction?"III: THE FALL":"II: THE OVERMIND",C_GOLD);
+        front_header("Choose a Campaign",0);
+        front_button(96,62,128,22,"Zerg",race_front.row==0);
+        front_button(96,98,128,22,"Protoss",race_front.row==1);
+        front_text(24,128,faction?"III: The Fall":"II: The Overmind",C_GOLD);
 #endif
 #endif
-        front_uplink();front_footer("ARROWS FACTION  A SELECT  B BACK");
+        front_uplink();front_footer("Arrows Change  A Select  B Back");
     } else if(page==SC_FRONT_MISSION) {
         front_header(front_campaign_title(faction),
 #ifdef SC64_UNIFIED
-                     faction==SC_FRONT_TERRAN?"TERRAN CAMPAIGN":faction==SC_FRONT_PROTOSS?"PROTOSS CAMPAIGN":"ZERG CAMPAIGN");
+                     faction==SC_FRONT_TERRAN?"Terran Campaign":faction==SC_FRONT_PROTOSS?"Protoss Campaign":"Zerg Campaign");
 #else
-                     faction?"PROTOSS CAMPAIGN":"ZERG CAMPAIGN");
+                     faction?"Protoss Campaign":"Zerg Campaign");
 #endif
         int catalog_faction=sc64_front_catalog_faction(faction);
         int available=sc64_catalog_playable_count(catalog_faction);
         for(int i=0;i<2;i++) {
             int mission=sc64_catalog_playable_at(catalog_faction,race_front.mission_page*2+i);
             if(mission<0) continue;
-            front_button(110,55+i*33,122,25,front_mission_title(mission),race_front.row==i);
-            if(race_completed&(1<<mission))gfx_rect(102,64+i*33,4,4,C_GREEN);
+            front_button(96,53+i*36,128,30,front_mission_title(mission),race_front.row==i);
+            if(race_completed&(1<<mission))gfx_rect(91,64+i*36,4,4,C_GREEN);
         }
-        gfx_rect(110,117,124,12,C_BLACK);
-        gfx_text(115,121,(race_completed&(1<<(sc64_catalog_playable_at(catalog_faction,race_front.mission_page*2+race_front.row))))?"MISSION COMPLETE":"AWAITING YOUR ORDERS",C_DIM);
-        if((available+1)/2>1) gfx_text(199,121,"L/R PAGE",C_GOLD);
-        front_uplink();front_footer("UP/DN MISSION  L/R PAGE  A BRIEFING  B BACK");
+        front_text(24,127,(race_completed&(1<<(sc64_catalog_playable_at(catalog_faction,race_front.mission_page*2+race_front.row))))?"Mission Complete":"Awaiting Your Orders",C_DIM);
+        if((available+1)/2>1) front_text(174,127,"L/R Page",C_GOLD);
+        front_uplink();front_footer("U/D Pick  L/R Page  A Brief  B Back");
     }
 #ifdef SC64_SHOWCASE_ENABLED
     else if(page==SC_FRONT_SHOWCASE) {
-        front_header("SHOWCASE SCENES","FILMING SETUPS");
-        gfx_rect(106,43,126,82,C_PANEL);
-        gfx_frame(106,43,126,82,C_EDGE);
+        front_header("Showcase Scenes","Filming Setups");
         for(int i=0;i<8;i++)
-            front_button(110,46+i*10,118,10,front_showcase_title(i),race_front.row==i);
-        gfx_text(12,58,"STAGED",C_GOLD);
-        gfx_text(12,70,"BATTLES",C_GOLD);
-        gfx_text(12,94,"QUICK",C_DIM);
-        gfx_text(12,104,"RESTART",C_DIM);
+            front_button(104,44+i*11,120,11,front_showcase_title(i),race_front.row==i);
+        front_text(24,58,"Staged",C_GOLD);
+        front_text(24,70,"Battles",C_GOLD);
+        front_text(24,94,"Quick",C_DIM);
+        front_text(24,104,"Restart",C_DIM);
         if(race_front.row==0) {
-            gfx_text(12,119,"CARRIER",C_SILVER);
-            gfx_text(12,129,"PREVIEW",C_SILVER);
+            front_text(24,119,"Carrier",C_SILVER);
+            front_text(24,129,"Preview",C_SILVER);
         }
-        front_footer("UP/DN SCENE   A START   B BACK");
+        front_footer("Up/Down Scene  A Start  B Back");
     }
 #endif
     else if(page==SC_FRONT_SKIRMISH) {
-        front_header("CUSTOM GAME",0);
+        front_header("Battle Setup",0);
 #ifdef SC64_IMPORTED_SKIRMISH
         char option[24];
         for(int row=0;row<3+race_front.bots;row++) {
@@ -282,21 +265,20 @@ static void sc64_frontend_draw(void)
                 while(value[j]) { option[5+j]=value[j]; ++j; }
                 option[5+j]=0;
             }
-            front_button(112,28+row*17,119,15,option,race_front.row==row);
+            front_button(104,50+row*12,120,11,option,race_front.row==row);
         }
-        front_button(112,28+(3+race_front.bots)*17,119,15,"LAUNCH",race_front.row==3+race_front.bots);
-        front_footer("UP/DN SELECT L/R CHANGE A ACCEPT");
+        front_button(104,50+(3+race_front.bots)*12,120,11,"LAUNCH",race_front.row==3+race_front.bots);
+        front_footer("U/D Row L/R Edit A OK B Back");
 #else
-        gfx_rect(110,31,123,13,C_BLACK);
-        gfx_text(115,36,"FACTION",C_DIM);
-        front_button(112,47,119,22,sc64_race_names[race_front.race],race_front.row==0);
-        gfx_rect(110,74,123,12,C_BLACK);gfx_text(115,78,"COMPUTER OPPONENTS",C_DIM);
+        front_text(24,66,"Faction",C_DIM);
+        front_button(96,61,128,22,sc64_race_names[race_front.race],race_front.row==0);
+        front_text(24,87,"Computer",C_DIM);
+        front_text(24,98,"Opponents",C_DIM);
         char opponents[6]={'<',' ',(char)('0'+race_front.bots),' ','>',0};
-        front_button(112,89,119,22,opponents,race_front.row==1);
-        front_button(112,121,119,22,"LAUNCH",race_front.row==2);
-        gfx_text(12,136,"FREE FOR ALL",C_DIM);
-        for(int i=0;i<race_front.bots;i++)gfx_rect(17+i*15,124,10,5,i==0?C_ZERG:i==1?C_TERRAN:C_PROTOSS);
-        front_footer("UP/DN SELECT L/R CHANGE A ACCEPT");
+        front_button(96,85,128,22,opponents,race_front.row==1);
+        front_button(96,111,128,22,"LAUNCH",race_front.row==2);
+        front_text(24,126,"Free for All",C_DIM);
+        front_footer("U/D Row L/R Edit A OK B Back");
 #endif
     }
     front_load_error();

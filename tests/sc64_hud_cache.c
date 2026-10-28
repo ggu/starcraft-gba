@@ -189,6 +189,14 @@ test_selection_building_box_and_modes_invalidate_bottom(void)
     b[0].queue_count = 2;
     expect_mask_and_match(HUD_TOP | HUD_BOTTOM);
 
+#ifdef SC64_FIELD_CONTROLS
+    /* The imported icon follows raw identity, not just compact engine type. */
+    b[0].raw_type=131;
+    assert_cached_matches_full();
+    b[0].raw_type=132;
+    expect_mask_and_match(HUD_BOTTOM);
+#endif
+
     selected_building = -1;
     box_state = 2;
     expect_mask_and_match(HUD_BOTTOM);
