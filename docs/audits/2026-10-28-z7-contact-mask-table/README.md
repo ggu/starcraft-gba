@@ -40,7 +40,7 @@ predicate.
   and checksum were verified; it was not run in an emulator.
 - The 365-checkpoint host replay and parent-owned bounded ARM timing run are
   validated. The strict continuation reached frame 205,764 with victory,
-  50 live side units, zero remaining Force 1 buildings, and no fault. It
+  50 live player actors, zero remaining Force 1 buildings, and no fault. It
   resumed from the prepared generation-36 UI save and covered the 31 remaining
   checkpoints; it is not a current-source full-prefix replay.
 - On a separate paired 2,000-call ordinary suffix (1,547 advancing PLAY
@@ -54,8 +54,10 @@ predicate.
   update-plus-draw total was 89,669,608,280 cycles versus 161,885,185,038 for
   the arithmetic continuation (44.61% lower on this continuation). The table
   run reported 3,656 bytes of painted-stack high-water use and a 256-byte
-  untouched gap. This begins from a verified pre-PR93 actual UI save, so it is
+  reserved gap. This begins from a verified pre-PR93 actual UI save, so it is
   continuation evidence rather than a current-source full-prefix comparison.
+  It corresponds to about 6.27 advancing simulation frames/s on this tail,
+  below the near-30-fps target; there is no physical-GBA timing result.
 
 The asset-free table generator oracle is available as
 `make test-sc64-contact-mask-table`. This target generates only the mathematical
