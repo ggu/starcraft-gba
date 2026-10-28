@@ -2,6 +2,9 @@
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
 #include "sc64_construction_hp.h"
+#if defined(SC64_ATTACK_RANGE_ROUTES) && !defined(SC64_IMPORTED_MISSION)
+#error "SC64_ATTACK_RANGE_ROUTES requires imported race routes"
+#endif
 #ifdef SC64_IMPORTED_MISSION
 #include "sc64_minimap_terrain.h"
 #endif
@@ -5859,6 +5862,25 @@ unit_damage(int type)
 #include "sc64_unit_facing.h"
 #endif
 
+#ifdef SC64_ATTACK_RANGE_ROUTES
+/* Only a failed center-route plan needs the shared firing-region fallback.
+ * Leave normal moves, flying units, local collision retries and fog pursuit
+ * on their existing paths. The next ordinary movement tick follows the
+ * selected waypoint; tick_combat still decides when a shot is in range. */
+static void __attribute__((noinline))
+move_toward_weapon_range(Unit *q, int tx, int ty, int minimum, int maximum)
+{
+    int may_plan = q->path_retry == 0 && q->path_timer <= 0;
+    int nx, ny;
+    move_toward(q, tx, ty);
+    if (!may_plan || q->path_retry != 12 || maximum < 32 ||
+        sc64_race_unit_flying(q->type)) return;
+    if (!sc64_route_range_next(q->x, q->y, tx, ty, minimum, maximum, &nx, &ny)) return;
+    q->path_x = nx; q->path_y = ny;
+    q->path_retry = 0; q->path_timer = 24;
+}
+#endif
+
 #ifdef SC64_Z6_RUNTIME
 /* The large weapon body is already in ROM; keep its validation wrapper
  * there as well rather than duplicating it in every ARM order branch. */
@@ -6051,7 +6073,11 @@ tick_combat(Unit * q, int target)
 #endif
 	}
     } else {
+#ifdef SC64_ATTACK_RANGE_ROUTES
+	move_toward_weapon_range(q, target_x(target), target_y(target), minimum_range, range);
+#else
 	move_toward(q, target_x(target), target_y(target));
+#endif
     }
 }
 

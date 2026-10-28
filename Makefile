@@ -4668,3 +4668,32 @@ build/StarCraft64-Races-UI-Probe-GBA.gba: build/starcraft64-races-ui-probe.elf t
 	$(PYTHON) tools/fix_rom.py $@ 'SC UI PROBE' SCUR
 .PHONY: ui-arm-probe
 ui-arm-probe: build/StarCraft-Showcase-UI-Probe-GBA.gba build/StarCraft64-Races-UI-Probe-GBA.gba
+
+# Asset-free shared firing-region path checks. Each variant preserves point
+# routes and validates the reserved multi-source field against an independent BFS.
+define ATTACK_RANGE_ROUTE_FIXTURE
+build/test-sc64-attack-range-route-$(1): tests/sc64_attack_range_routes.c starcraft/sc64_routes.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -I. $(2) $$< -o $$@
+endef
+$(eval $(call ATTACK_RANGE_ROUTE_FIXTURE,base,))
+$(eval $(call ATTACK_RANGE_ROUTE_FIXTURE,split,-DSC64_ROUTE_FLOOD_SPLIT))
+$(eval $(call ATTACK_RANGE_ROUTE_FIXTURE,visit-frequency,-DSC64_ROUTE_VISIT_GRID -DSC64_ROUTE_DECAY_FREQ))
+$(eval $(call ATTACK_RANGE_ROUTE_FIXTURE,split-partial-visit-frequency,-DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_VISIT_GRID -DSC64_ROUTE_DECAY_FREQ))
+ATTACK_RANGE_ROUTE_VARIANTS := base split visit-frequency split-partial-visit-frequency
+.PHONY: test-sc64-attack-range-routes
+test-sc64-attack-range-routes: $(addprefix build/test-sc64-attack-range-route-,$(ATTACK_RANGE_ROUTE_VARIANTS))
+	@$(foreach variant,$(ATTACK_RANGE_ROUTE_VARIANTS),./build/test-sc64-attack-range-route-$(variant) &&) true
+test-starcraft: test-sc64-attack-range-routes
+
+# Optional actual-game regression, using already prepared race inputs. The
+# baseline must stall on the synthetic isolated goal; the candidate must fire.
+define ATTACK_RANGE_GAME_FIXTURE
+build/test-sc64-attack-range-game-$(1): tests/sc64_attack_range_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(RACES_FLAGS) -DSC64_ROUTE_PACK3 -DSC64_DIRECT_ATTACK $(2) $$< common/gba.c -o $$@
+endef
+$(eval $(call ATTACK_RANGE_GAME_FIXTURE,off,))
+$(eval $(call ATTACK_RANGE_GAME_FIXTURE,on,-DSC64_ATTACK_RANGE_ROUTES))
+.PHONY: test-sc64-attack-range-game
+test-sc64-attack-range-game: build/test-sc64-attack-range-game-off build/test-sc64-attack-range-game-on
+	./build/test-sc64-attack-range-game-off
+	./build/test-sc64-attack-range-game-on
