@@ -24,7 +24,6 @@ static int fail(const char *message)
     return 1;
 }
 
-#ifdef SC64_UNIT_FACING
 static void facing_test_clip(int top, int bottom)
 {
 #ifdef GBA_SCENE_CLIP
@@ -35,6 +34,7 @@ static void facing_test_clip(int top, int bottom)
 #endif
 }
 
+#ifdef SC64_UNIT_FACING
 static int facing_is_zero(void)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
@@ -517,9 +517,87 @@ static int check_field_controls_load(void)
 }
 #endif
 
+/* Exercise actual imported unit/building paths at both viewport edges,
+ * including mirrored and word-packed facing frames. HUD restoration at the
+ * end of a frame must not be the only thing keeping world art out of it. */
+static int check_world_hud_boundaries(void)
+{
+    static const int headings[] = {0, 8, 16, 24};
+    int visible_pixels = 0;
+    game_init();
+    race_mode = 1; race_human = R_TER; race_bots = 1; race_skirmish_map = 0;
+    init_state(); screen = SCREEN_PLAY;
+    memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b));
+    camx = camy = 0; cx = 120; cy = 54;
+    for (int edge = 0; edge < 2; ++edge) {
+        for (int type = 0; type < SC_RU_COUNT; ++type) {
+            Unit *q = &u[0];
+            memset(q, 0, sizeof(*q));
+            q->alive = 1; q->owner = SIDE; q->type = type;
+            q->raw_type = sc64_race_raw_unit(type);
+            q->x = 120; q->y = edge ? 107 : 0;
+            q->hp = q->maxhp = 100;
+            for (unsigned h = 0; h < sizeof(headings)/sizeof(headings[0]); ++h) {
+                gfx_begin(0xe7);
+                facing_test_clip(12, 120);
+#ifdef SC64_UNIT_FACING
+                sc64_facing[0] = (u8)headings[h];
+#endif
+                draw_unit(q);
+                for (int y = 0; y < 160; ++y)
+                    for (int x = 0; x < 240; ++x) {
+                        int changed = gfx_test_pixel(x,y) != 0xe7;
+                        if (changed && (y < 12 || y >= 120))
+                            return fail("unit art or vitals crossed a HUD boundary");
+                        visible_pixels += changed;
+                    }
+            }
+        }
+        u[0].alive = 0;
+        for (int type = 0; type < SC_RB_COUNT; ++type) {
+            Building *q = &b[0];
+            memset(q, 0, sizeof(*q));
+            q->alive = 1; q->owner = SIDE; q->type = type;
+            q->raw_type = sc64_race_raw_building(type);
+            q->x = 120; q->y = edge ? 107 : 0;
+            q->hp = q->maxhp = 100;
+            gfx_begin(0xe7);
+            facing_test_clip(12, 120);
+            draw_building_art(q); draw_building_overlay(q);
+            for (int y = 0; y < 160; ++y)
+                for (int x = 0; x < 240; ++x)
+                    if ((y < 12 || y >= 120) && gfx_test_pixel(x,y) != 0xe7)
+                        return fail("building art or vitals crossed a HUD boundary");
+        }
+    }
+    if (!visible_pixels) return fail("HUD clipping fixture drew no world art");
+    b[0].alive = 0;
+    facing_test_clip(0, 160);
+    /* Render alternating buffers with unchanged HUD keys, moving large art
+     * along the top edge, then compare against a fresh resource-band draw. */
+    sc64_hud_valid = 0;
+    for (int step = 0; step < 6; ++step) {
+        u[0].alive = 1; u[0].owner = SIDE; u[0].type = U_TANK;
+        u[0].raw_type = sc64_race_raw_unit(U_TANK);
+        u[0].x = 30 + step * 20; u[0].y = 0;
+        game_render();
+        unsigned char top[240 * 12];
+        for (int y = 0; y < 12; ++y)
+            for (int x = 0; x < 240; ++x) top[y*240+x] = gfx_test_pixel(x,y);
+        draw_hud_resources();
+        for (int y = 0; y < 12; ++y)
+            for (int x = 0; x < 240; ++x)
+                if (top[y*240+x] != gfx_test_pixel(x,y))
+                    return fail("completed frame retained world pixels over resource HUD");
+    }
+    game_init();
+    return 0;
+}
+
 int main(void)
 {
     gba_init();
+    if (check_world_hud_boundaries()) return 1;
 #ifdef SC64_UNIT_FACING
     game_init();
     memset(sc64_facing, 0x17, sizeof(sc64_facing));
