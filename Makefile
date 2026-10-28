@@ -51,6 +51,14 @@ test-sc64-interceptor-orders: build/test-sc64-interceptor-orders
 	./build/test-sc64-interceptor-orders
 test-starcraft: test-sc64-interceptor-orders
 
+# Fixed-capacity P8 native request-heap storage; source-only synthetic vectors.
+.PHONY: test-sc64-p8-request-queue
+build/test-sc64-p8-request-queue: tests/sc64_p8_request_queue.c starcraft/sc64_p8_request_queue.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft $< -o $@
+test-sc64-p8-request-queue: build/test-sc64-p8-request-queue
+	./build/test-sc64-p8-request-queue
+test-starcraft: test-sc64-p8-request-queue
+
 # Asset-free P8 compact trigger scheduler contract. This does not include a
 # scenario descriptor or bind P8 actions to game-world effects.
 .PHONY: test-sc64-p8-runtime test-sc64-p8-source-contract
