@@ -261,12 +261,115 @@ test_mission_message_timer_and_minimap_stay_pixel_exact(void)
 
     /* Minimap is deliberately redrawn outside the cached HUD bands. */
     sc64_minimap_visible[0] = 1;
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+    sc64_minimap_raster_update(0);
+#endif
     assert_cached_matches_full();
     sc64_minimap_visible[0] = 0;
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+    sc64_minimap_raster_update(0);
+#endif
     assert_cached_matches_full();
 }
 
+#ifdef SC64_HUD_PAGE_BANDS
+/* A page band is usable only while it holds the current content version and
+ * the page has not been cleared since it was drawn or copied. */
+static int
+page_band_current(u8 buffer, int band)
+{
+    return sc64_hud_page_version[buffer][band] == sc64_hud_band_version[band] &&
+           sc64_hud_page_clear_generation[buffer] == gfx_clear_generation(buffer);
+}
+
+static void
+test_per_buffer_hud_reuse_across_changes_and_scenes(void)
+{
+    u8 buffer, paused_buffer, title_buffer, poisoned_buffer;
+    u32 generation;
+    fixture();
+    screen = SCREEN_PLAY;
+    /* The fixture declares a 64x64 world around a larger mission roster.
+     * Actors beyond it would mark the minimap panel outside the 24x24 map,
+     * which rightly re-stales the bottom band; keep this a band test. */
+    for (int i = 0; i < MAX_UNITS; i++)
+        if (u[i].x < 0 || u[i].x >= WORLD_W || u[i].y < 0 || u[i].y >= WORLD_H)
+            u[i].alive = 0;
+    for (int i = 0; i < MAX_BUILDINGS; i++)
+        if (b[i].x < 0 || b[i].x >= WORLD_W || b[i].y < 0 || b[i].y >= WORLD_H)
+            b[i].alive = 0;
+    sc64_hud_page_version[0][0] = sc64_hud_page_version[0][1] = ~0u;
+    sc64_hud_page_version[1][0] = sc64_hud_page_version[1][1] = ~0u;
+
+    /* The first HUD draw fills one page; the other stays stale until it is
+     * selected, then copies from the page on screen. */
+    game_render();
+    buffer = gfx_backbuffer_index();
+    assert(page_band_current(buffer, 0) && page_band_current(buffer, 1));
+    assert(!page_band_current((u8)(buffer ^ 1), 0) &&
+           !page_band_current((u8)(buffer ^ 1), 1));
+    game_render();
+    assert(page_band_current(gfx_backbuffer_index(), 0) &&
+           page_band_current(gfx_backbuffer_index(), 1));
+    game_render();
+    assert(page_band_current(gfx_backbuffer_index(), 0) &&
+           page_band_current(gfx_backbuffer_index(), 1));
+
+    minerals += 31;
+    game_render();
+    buffer = gfx_backbuffer_index();
+    assert(page_band_current(buffer, 0));
+    assert(!page_band_current((u8)(buffer ^ 1), 0));
+    assert(page_band_current((u8)(buffer ^ 1), 1));
+    game_render();
+    assert(page_band_current(gfx_backbuffer_index(), 0));
+    assert_cached_matches_full();
+
+    /* Pause draws over the bottom HUD strip. That page must repair the band
+     * when it returns to live play, even though the HUD key is unchanged. */
+    screen = SCREEN_PAUSE;
+    game_render();
+    paused_buffer = gfx_backbuffer_index();
+    assert(!page_band_current(paused_buffer, 1));
+    screen = SCREEN_PLAY;
+    game_render();
+    game_render();
+    assert(page_band_current(paused_buffer, 1));
+    assert_cached_matches_full();
+
+    /* Result and title transitions also exercise preserved and cleared
+     * pages; title's gfx_begin clear generation must force a HUD copy. */
+    screen = SCREEN_RESULT;
+    game_render();
+    screen = SCREEN_PLAY;
+    game_render();
+    game_render();
+    screen = SCREEN_TITLE;
+    game_render();
+    title_buffer = gfx_backbuffer_index();
+    generation = gfx_clear_generation(title_buffer);
+    assert(generation != sc64_hud_page_clear_generation[title_buffer]);
+    screen = SCREEN_PLAY;
+    game_render();
+    game_render();
+    assert(sc64_hud_page_clear_generation[title_buffer] == generation);
+    assert_cached_matches_full();
+
+    /* An external poison/clear is observable through the per-page
+     * generation even though game_render subsequently selects preserve mode. */
+    gfx_begin(0xe7);
+    poisoned_buffer = gfx_backbuffer_index();
+    generation = gfx_clear_generation(poisoned_buffer);
+    gfx_end();
+    assert(generation != sc64_hud_page_clear_generation[poisoned_buffer]);
+    game_render();
+    game_render();
+    assert(sc64_hud_page_clear_generation[poisoned_buffer] == generation);
+    assert_cached_matches_full();
+}
+#endif
 #if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
+#ifndef SC64_HUD_PAGE_BANDS
 static void
 test_per_buffer_hud_reuse_across_changes_and_scenes(void)
 {
@@ -339,6 +442,8 @@ test_per_buffer_hud_reuse_across_changes_and_scenes(void)
     assert(sc64_hud_buffer_clear_generation[poisoned_buffer] == generation);
     assert_cached_matches_full();
 }
+
+#endif
 
 static void
 test_full_frame_cache_does_not_retain_map_pixels_in_hud_bands(void)

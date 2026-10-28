@@ -8099,6 +8099,22 @@ draw_death_vfx(int under)
 }
 #endif
 
+#ifdef SC64_IMPORTED_MISSION
+static void sc64_hud_bottom_band_invalidate(void);
+#endif
+
+static void
+sc64_minimap_dot(int x, int y, u8 color)
+{
+    gfx_pixel(x, y, color);
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+    /* A mark outside the 24x24 map lands on the cached panel, which only a
+     * band restore clears; the per-frame panel fill used to do that. */
+    if ((unsigned)(x - 197) >= 24u || (unsigned)(y - 129) >= 24u)
+        sc64_hud_bottom_band_invalidate();
+#endif
+}
+
 static void
 draw_minimap(void)
 {
@@ -8108,9 +8124,15 @@ draw_minimap(void)
 #else
     int row, col, x, y, i;
 #endif
+#ifndef SC64_MINIMAP_RASTER_ACTIVE
     gfx_rect(181, 124, 56, 34, C_BLACK);
     gfx_frame(181, 124, 56, 34, C_EDGE);
+#endif
 #ifdef SC64_IMPORTED_MISSION
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+    /* Every map pixel is replaced, including marks left on this page. */
+    gfx_blit_opaque(map_x, map_y, 24, 24, sc64_minimap_raster);
+#else
 #ifdef SC64_TILE_RENDERER
     if (gfx_tile_active()) {
         /* The panel fill above already marked these tiles; store the same
@@ -8126,6 +8148,7 @@ draw_minimap(void)
 #endif
     sc64_minimap_draw_terrain(map_x, map_y,
                               sc64_minimap_visible, sc64_minimap_explored);
+#endif
 #else
     for (row = 0; row < MAP_ROWS; row++)
 	for (col = 0; col < MAP_COLS; col++) {
@@ -8170,7 +8193,7 @@ draw_minimap(void)
 	    x = 185 + b[i].x / 8;
 	    y = 126 + b[i].y / 8;
 #endif
-	    gfx_pixel(x, y,
+	    sc64_minimap_dot(x, y,
 #if defined(SC64_SKIRMISH) || defined(SC64_RACES)
                 owner_color(b[i].owner)
 #else
@@ -8224,7 +8247,7 @@ draw_minimap(void)
 	    x = 185 + u[i].x / 8;
 	    y = 126 + u[i].y / 8;
 #endif
-	    gfx_pixel(x, y,
+	    sc64_minimap_dot(x, y,
 #if defined(SC64_SKIRMISH) || defined(SC64_RACES)
                 owner_color(u[i].owner)
 #else
@@ -8251,6 +8274,11 @@ draw_minimap(void)
 	    int vw = (240 * map_size + WORLD_W - 1) / WORLD_W;
 	    int vh = (108 * map_size + WORLD_H - 1) / WORLD_H;
 	    gfx_frame(vx, vy, vw, vh, C_HIGHLIGHT);
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+	    if (vx < map_x || vy < map_y || vx + vw > map_x + map_size ||
+	        vy + vh > map_y + map_size)
+	        sc64_hud_bottom_band_invalidate();
+#endif
 	}
 #else
 	gfx_frame(185 + camx / 8, 126 + camy / 8, 30, 14, C_HIGHLIGHT);
@@ -9221,8 +9249,23 @@ draw_hud_shields(int shield,int maximum)
 #endif
 }
 
+static void draw_hud_commands_body(void);
+
+/* The minimap's black panel and edge are static, so with the maintained
+ * raster they join the cached bottom band after every text that can reach
+ * x >= 181; the per-frame opaque raster copy then covers the map area. */
 static void
 draw_hud_commands(void)
+{
+    draw_hud_commands_body();
+#ifdef SC64_MINIMAP_RASTER_ACTIVE
+    gfx_rect(181, 124, 56, 34, C_BLACK);
+    gfx_frame(181, 124, 56, 34, C_EDGE);
+#endif
+}
+
+static void
+draw_hud_commands_body(void)
 {
     int i, n = selected_count();
     gfx_rect(0, 121, 240, 39, C_PANEL);
@@ -9471,7 +9514,15 @@ draw_hud_commands(void)
 }
 
 #ifdef SC64_IMPORTED_MISSION
-#ifndef SC64_TILE_RENDERER
+#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
+#define SC64_HUD_BAND_REUSE 1
+#endif
+/* Optional: with reusable bands, each page keeps its own HUD pixels and a
+ * stale page copies from the one on screen, so no EWRAM copy is needed. */
+#if defined(SC64_HUD_VRAM_BANDS) && defined(SC64_HUD_BAND_REUSE) && !defined(SC64_TILE_RENDERER)
+#define SC64_HUD_PAGE_BANDS 1
+#endif
+#if !defined(SC64_TILE_RENDERER) && !defined(SC64_HUD_PAGE_BANDS)
 static _Alignas(4) u8 sc64_hud_top[240 * 12], sc64_hud_bottom[240 * 40];
 #endif
 #ifdef SC64_FIELD_CONTROLS
@@ -9536,10 +9587,27 @@ sc64_hud_race_keys(int *values,int first)
 #endif
 }
 #endif
-#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
+#ifdef SC64_HUD_PAGE_BANDS
+/* Band content versions, and per page the version it holds and the clear
+ * count it held it at. A page band is current only when both still match. */
+static u32 sc64_hud_band_version[2];
+static u32 sc64_hud_page_version[2][2] = {{~0u, ~0u}, {~0u, ~0u}};
+static u32 sc64_hud_page_clear_generation[2];
+#elif defined(SC64_HUD_BAND_REUSE)
 static u8 sc64_hud_buffer_dirty[2];
 static u32 sc64_hud_buffer_clear_generation[2];
 #endif
+
+/* Something drew over the current page's bottom band after its restore. */
+static void
+sc64_hud_bottom_band_invalidate(void)
+{
+#ifdef SC64_HUD_PAGE_BANDS
+    sc64_hud_page_version[gfx_backbuffer_index()][1] = ~0u;
+#elif defined(SC64_HUD_BAND_REUSE)
+    sc64_hud_buffer_dirty[gfx_backbuffer_index()] |= 2;
+#endif
+}
 
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
 /* Keep the expanded actor loop and target search in IWRAM. This once-per-
@@ -9596,7 +9664,29 @@ static void
 draw_hud(void)
 {
 #ifdef SC64_IMPORTED_MISSION
-#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
+#ifdef SC64_HUD_PAGE_BANDS
+    int changed = sc64_hud_changed();
+    u8 buffer = gfx_backbuffer_index(), other = (u8)(buffer ^ 1);
+    u32 generation = gfx_clear_generation(buffer);
+    u32 other_generation = gfx_clear_generation(other);
+    int band;
+    if (changed & 1) sc64_hud_band_version[0]++;
+    if (changed & 2) sc64_hud_band_version[1]++;
+    for (band = 0; band < 2; band++) {
+        u32 version = sc64_hud_band_version[band];
+        if (sc64_hud_page_version[buffer][band] == version &&
+            sc64_hud_page_clear_generation[buffer] == generation) continue;
+        if (!(changed & (1 << band)) &&
+            sc64_hud_page_version[other][band] == version &&
+            sc64_hud_page_clear_generation[other] == other_generation)
+            gfx_copy_band_from_front(band ? 120 : 0, band ? 40 : 12);
+        else if (band) draw_hud_commands();
+        else draw_hud_resources();
+        sc64_hud_page_version[buffer][band] = version;
+    }
+    sc64_hud_page_clear_generation[buffer] = generation;
+    sc64_hud_valid = 1;
+#elif defined(SC64_HUD_BAND_REUSE)
     int changed = sc64_hud_changed();
     u8 buffer = gfx_backbuffer_index();
     u8 dirty;
@@ -9761,10 +9851,10 @@ game_render(void)
 #endif
 	if (screen == SCREEN_PAUSE) {
 	    draw_pause();
-	#if (defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_HUD_BUFFER_REUSE)) && defined(SC64_NO_FRAME_CLEAR)
+#ifdef SC64_IMPORTED_MISSION
 	    /* The pause panel crosses the bottom cached HUD band. */
-	    sc64_hud_buffer_dirty[gfx_backbuffer_index()] |= 2;
-	#endif
+	    sc64_hud_bottom_band_invalidate();
+#endif
 	} else if (screen == SCREEN_RESULT)
 	    draw_result_screen();
     }
