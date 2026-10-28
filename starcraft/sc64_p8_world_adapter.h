@@ -30,6 +30,17 @@ typedef struct {
     int (*async_action)(void *context, const Sc64P8SourceAction *action,
                         unsigned trigger_owner, const Sc64Z8Rect *rect,
                         int resume);
+    /* Optional property-aware P8 creation service. The selector is one-based;
+     * property_bytes points to the authenticated immutable UPRP record. A
+     * service must interpret every requested field it supports exactly and
+     * reject the action otherwise. This adapter does not define override
+     * semantics or copy/serialize the record. */
+    int (*create_with_property)(void *context,
+                                const Sc64P8SourceAction *action,
+                                unsigned source_owner, unsigned count,
+                                unsigned property_id,
+                                const u8 property_bytes[SC64_P8_SOURCE_PROPERTY_BYTES],
+                                const Sc64Z8Rect *rect);
 } Sc64P8WorldContext;
 
 static inline int
@@ -206,6 +217,19 @@ sc64_p8_world_action(void *context, const Sc64P8SourceAction *source,
         /* Native location-zero actions return success before touching the
          * world; in particular, don't call an AI/create service here. */
         if (!a.location) return SC64_P8_ACTION_COMPLETE;
+        if (a.opcode == 11u && a.group2) {
+            const u8 *property_bytes;
+            unsigned owner;
+            if (a.unit >= SC64_Z8_RAW_UNIT_LIMIT || !rect ||
+                a.flags != 0x18u || !ctx->create_with_property ||
+                !sc64_p8_source_property(a.group2, &property_bytes) ||
+                !sc64_z8_world_resolve_one(ctx->actors, a.group1,
+                                           trigger_owner, &owner)) return -1;
+            return ctx->create_with_property(ctx->context, source, owner,
+                    sc64_z8_create_count(&a), a.group2, property_bytes, rect) == 1
+                ? SC64_P8_ACTION_COMPLETE : -1;
+        }
+        if (a.opcode == 11u && a.flags != 0x10u) return -1;
         return sc64_z8_world_action(ctx->actors, &a, trigger_owner, rect) == 1
             ? SC64_P8_ACTION_COMPLETE : -1;
     case 13: { /* 4=set, 5=clear, 6=toggle over the shared 256 switches. */

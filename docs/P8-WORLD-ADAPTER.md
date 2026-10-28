@@ -21,14 +21,18 @@ descriptor and copies its initial rectangles to caller-owned mutable storage.
 These values are runtime inputs; this header does not define serialization or
 save compatibility.
 
-CreateUnitWithProperties can dispatch through the existing create callback,
-which receives the source action, count, owner and property selector. This is
-only a dispatch path: it does not decode or apply P8's UPRP records. The
-callback must implement each requested P8 property record exactly and check its
-own pool capacity. The adapter does not replace a nonzero selector with
-default properties. Missing or rejecting creation services fail closed. The
-three P8 AI IDs are passed only to a P8-specific `run_ai` callback; no generic
-Z8 AI or attack-move fallback exists.
+CreateUnitWithProperties with selector zero uses the existing default-property
+create service. Nonzero selectors use the optional
+`create_with_property` callback only after the adapter validates the one-based
+UPRP selector against the authenticated UPUS bitmap. The callback receives the
+source action, resolved owner, count, selector, location and immutable
+20-byte property record. This is a dispatch contract: the adapter does not
+interpret or apply override fields. A callback must implement every requested
+field exactly and check its own pool capacity; missing or rejecting services
+fail closed. The optional source-contract test checks the authenticated
+descriptor's create selectors against UPUS without emitting property rows.
+The three P8 AI IDs are passed only to a P8-specific `run_ai` callback; no
+generic Z8 AI or attack-move fallback exists.
 
 Wait, Transmission and CenterView require `async_action`. It must implement
 one shared timer per source owner and retain an armed marker for each action:
@@ -39,8 +43,10 @@ later immediate actions run. This adapter provides no timer storage or save
 encoding. A missing callback fails closed.
 
 PauseGame and Mute/UnmuteUnitSpeech have no service in this slice and fail
-closed. Conditions reject unrecognized flag bits and comparisons. Actions
-reject nonzero reserved trailing bytes because the shared Z8 action shape has
+closed. In the authenticated P8 descriptor the Mute and Unmute rows are
+disabled; the engine also has no shared audio gate that gives the existing
+speech-mute state end-to-end effect. Conditions reject unrecognized flag bits
+and comparisons. Actions reject nonzero reserved trailing bytes because the shared Z8 action shape has
 no field that can preserve them. The authenticated P8 rows currently have
 zero in those trailing bytes; this check prevents future data from being
 silently discarded.
@@ -52,11 +58,11 @@ make test-sc64-p8-world
 ```
 
 It covers Command/Bring counts, completion and cargo, owner/force selectors,
-half-open geometry, switch and elapsed conditions, MoveLocation, property ID
-forwarding and created-slot visibility, resource and invincibility mutation,
+half-open geometry, switch and elapsed conditions, MoveLocation, one-based
+UPUS/property-record forwarding and created-slot visibility, resource and invincibility mutation,
 presentation, opaque-AI failure, and the pending/blocked callback contract.
 Its actors and properties are synthetic. When the authenticated P8 descriptor
-is already prepared locally, the optional location-contract check is:
+is already prepared locally, the optional source-contract check is:
 
 ```sh
 make test-sc64-p8-world-source-contract P8_SCENARIO_DIR=/path/to/prepared/scenarios
