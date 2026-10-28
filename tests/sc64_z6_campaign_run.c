@@ -447,10 +447,9 @@ static int order_group(int attack,int x,int y)
     for(int i=0;i<MAX_UNITS;i++)if(u[i].selected)
         fprintf(stderr," %d/raw%d@%d,%d",i,u[i].raw_type,u[i].x,u[i].y);
     fputc('\n',stderr);
-    tap(KEY_B);
-    if(attack) tap(KEY_DOWN);
-    tap(KEY_A);
-    if(mode!=MODE_MOVE && mode!=MODE_ATTACK) {
+    int command_row=attack?MENU_ATTACK:MENU_MOVE;
+    if(!choose_menu_row(command_row) ||
+       mode!=(attack?MODE_ATTACK:MODE_MOVE)) {
         fprintf(stderr,"B+R attack command mode failed at%u mode%d menuopen%d row%d selected%d\n",
             host_ticks,mode,menu_open,menu_cursor,selected_count());
         return 0;
@@ -498,8 +497,7 @@ static int order_raw_group(unsigned raw,int x,int y)
     if(menu_open)tap(KEY_B);
     move_cursor(u[picked].x,u[picked].y);tap(KEY_A);tap(KEY_A);
     if(!selected_count())return 0;
-    tap(KEY_B);tap(KEY_DOWN);tap(KEY_A);
-    if(mode!=MODE_ATTACK)return 0;
+    if(!choose_menu_row(MENU_ATTACK)||mode!=MODE_ATTACK)return 0;
     move_cursor(x,y);tap(KEY_A);
     return 1;
 }
