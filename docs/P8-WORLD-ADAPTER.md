@@ -34,6 +34,35 @@ descriptor's create selectors against UPUS without emitting property rows.
 The three P8 AI IDs are passed only to a P8-specific `run_ai` callback; no
 generic Z8 AI or attack-move fallback exists.
 
+The opt-in `sc64_p8_game_bridge.h` implements the authenticated P8 Create rows
+for selectors zero through three. It reuses the P8/Z8 source-owner mapping,
+source-rectangle midpoint/clamp and live `spawn_unit()` / `spawn_build()`
+paths. The nonzero path accepts only the three exact authenticated records,
+applies their 100% HP/shield/energy overrides, keeps the resolved action owner
+when the source owner override is invalid, and maps the enabled 0x10 status
+value to the engine invincibility sidecar. Any record drift or unsupported
+field fails before pool allocation. This is a source-derived create service;
+it does not add a general-purpose UPRP interpreter.
+
+The native evidence is the pinned generated call path: the setup loader copies
+the 0x500-byte table to `0x800C7654` and normalizes 64 records of 20 bytes;
+the runtime property path indexes `0x800C7640 + selector * 20` and passes the
+selected row to the property application helper. The helper dispatches HP,
+shield, energy, resource and hangar values from their field-valid masks and
+separately applies status bits. Its 0x10 status handler sets actor state bit
+0x20. In P8, only HP, shields and (for raw unit 79) energy are enabled; resource
+and hangar overrides are not enabled. The owner field is invalid in all three
+rows, so the native action's resolved owner is used. These findings justify
+the narrowly bounded P8 decoder but do not establish other maps' property
+records or a reusable general decoder.
+
+The game has no general energy register, but `Unit.carry` can store Q8 energy
+for raw Tassadar, as used by the P4/P6 storm adapters. P8's raw-79 create
+initializes that field to the native 100% maximum. P8 currently has no cast or
+regeneration service wired to that value; this slice claims only the
+create-time state, not usable spell energy or spell behavior. P8 AI remains
+separate unsupported runtime work.
+
 Wait, Transmission and CenterView require `async_action`. It must implement
 one shared timer per source owner and retain an armed marker for each action:
 `PENDING` means the action started and must resume at the same cursor;
@@ -76,6 +105,14 @@ format, or proves campaign progression on hardware.
 When the already-prepared Z7 runtime inputs are available, the optional
 `make test-sc64-p8-game-pool-bridge` fixture checks that this adapter can read
 and mutate the existing live pool through the Z8 bridge. It uses the spawned
-unit's actual engine raw type. It also verifies that the existing default
-property create service rejects a nonzero P8 selector without allocating an
-actor; it does not test P8 UPRP application.
+unit's actual engine raw type. The generic Z8 default-create service still
+rejects nonzero P8 selectors; P8 uses its separate property-aware service.
+
+With both the authenticated P8 descriptor and prepared Z7 inputs available,
+`make test-sc64-p8-live-create P8_SCENARIO_DIR=/path/to/prepared/scenarios`
+checks the descriptor's selector-zero Create actions against the real bounded
+unit/building pools. It reaches all used nonzero selectors, checks HP, shields,
+energy, owner and invincibility results, and verifies malformed property data
+fails without mutating either pool. The target is optional and does not
+generate its inputs. It does not test P8 mission AI, save/load, spell behavior,
+or campaign victory.

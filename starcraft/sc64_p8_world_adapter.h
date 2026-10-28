@@ -41,6 +41,7 @@ typedef struct {
                                 unsigned property_id,
                                 const u8 property_bytes[SC64_P8_SOURCE_PROPERTY_BYTES],
                                 const Sc64Z8Rect *rect);
+    void *create_context;
 } Sc64P8WorldContext;
 
 static inline int
@@ -225,7 +226,8 @@ sc64_p8_world_action(void *context, const Sc64P8SourceAction *source,
                 !sc64_p8_source_property(a.group2, &property_bytes) ||
                 !sc64_z8_world_resolve_one(ctx->actors, a.group1,
                                            trigger_owner, &owner)) return -1;
-            return ctx->create_with_property(ctx->context, source, owner,
+            return ctx->create_with_property(ctx->create_context ?
+                    ctx->create_context : ctx->context, source, owner,
                     sc64_z8_create_count(&a), a.group2, property_bytes, rect) == 1
                 ? SC64_P8_ACTION_COMPLETE : -1;
         }
