@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-if not (ROOT/'references/sc64-maps/extract_sc64_maps.py').is_file(): raise RuntimeError(f'repository root missing authenticated BOLT extractor: {ROOT}')
+EXTRACTOR = ROOT/'references/sc64-maps/extract_sc64_maps.py'
 TOOL = ROOT/'tools/sc64_tank_source_vfx.py'
 if not TOOL.is_file(): TOOL = Path(__file__).resolve().parent/'sc64_tank_source_vfx.py'
 ROM = ROOT/'.local/sc64/rom/StarCraft64-USA.z64'
@@ -16,7 +16,7 @@ PALETTE = ROOT/'.local/sc64/backwater/generated/palette.json'
 REMAP = ROOT/'.local/sc64/backwater/generated/palette-remap.bin'
 
 class TankSourceVfxImportTest(unittest.TestCase):
-    @unittest.skipUnless(ROM.is_file() and PALETTE.is_file() and REMAP.is_file(), 'requires authenticated local StarCraft64 ROM and palette inputs')
+    @unittest.skipUnless(EXTRACTOR.is_file() and ROM.is_file() and PALETTE.is_file() and REMAP.is_file(), 'requires authenticated BOLT extractor, local StarCraft64 ROM and palette inputs')
     def test_python_generate_api(self):
         spec=importlib.util.spec_from_file_location('sc64_tank_source_vfx',TOOL)
         module=importlib.util.module_from_spec(spec)
@@ -26,7 +26,7 @@ class TankSourceVfxImportTest(unittest.TestCase):
             self.assertEqual(manifest['rom_sha1'],'a36d91b5aac7bb95df0d7de5f9814f5270e25c2b')
             self.assertEqual(len((Path(tmp)/'sc64_tank_source_vfx_generated.h').read_bytes())>0,True)
 
-    @unittest.skipUnless(ROM.is_file() and PALETTE.is_file() and REMAP.is_file(), 'requires authenticated local StarCraft64 ROM and palette inputs')
+    @unittest.skipUnless(EXTRACTOR.is_file() and ROM.is_file() and PALETTE.is_file() and REMAP.is_file(), 'requires authenticated BOLT extractor, local StarCraft64 ROM and palette inputs')
     def test_imports_verified_frames_and_event_clock(self):
         with tempfile.TemporaryDirectory(prefix='sc64-tank-vfx-') as tmp:
             out=Path(tmp)
