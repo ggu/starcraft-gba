@@ -89,6 +89,7 @@ static unsigned scourge_guard_retry_frame;
 static void z7_mineral_cover_point(int hatch,int *x,int *y);
 static int raw_building(int raw,int owner);
 static int z7_townhall(int owner);
+static int z7_front_colony_site(int hatch,int *out_x,int *out_y);
 static int geyser_target_x=-1,geyser_target_y=-1;
 static int geyser_clear_order_frame;
 static int actions_taken;
@@ -794,6 +795,33 @@ static int find_build_site(int type,int *out_x,int *out_y)
            dist2(x,y,u[i].x,u[i].y)<120*120)return 0;
         *out_x=x;*out_y=y;return 1;
     }
+    /* Keep the established expansion search unchanged: its enemy-distance
+       filter already uses only currently visible units. */
+    if(type==B_HATCHERY&&owned_townhall_count()) {
+        for(int p=0;p<MAX_MINERALS;p++)if(m[p].amount>0) {
+            int px=m[p].x,py=m[p].y,near_base=0x7fffffff;
+            for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
+                sc64_race_is_zerg_townhall(b[i].type)) {
+                int d=dist2(px,py,b[i].x,b[i].y);if(d<near_base)near_base=d;
+            }
+            if(near_base<208*208)continue;
+            for(int y=py-160;y<=py+160;y+=16)for(int x=px-160;x<=px+160;x+=16) {
+                if(x<16||y<20||x>=WORLD_W-16||y>=WORLD_H-16)continue;
+                int d=dist2(x,y,px,py),threat=0x7fffffff;
+                if(d<48*48||d>160*160)continue;
+                if(!race_can_site(SIDE,type,x,y)||!can_place(type,x,y)||
+                   !z7_worker_can_reach_site(x,y))continue;
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
+                   currently_visible(u[i].x,u[i].y)&&sc64_race_unit_damage(u[i].type)>0) {
+                    int enemy_d=dist2(x,y,u[i].x,u[i].y);if(enemy_d<threat)threat=enemy_d;
+                }
+                if(threat<144*144)continue;
+                int score=near_base+d*2-threat/8;
+                if(score<best){best=score;*out_x=x;*out_y=y;found=1;}
+            }
+        }
+        return found;
+    }
     if(type==B_SPAWNING_POOL&&hatch_probe_x>=0&&hatch_probe_y>=0) {
         int hatch=z7_townhall(SIDE);
         if(hatch>=0) {
@@ -828,15 +856,19 @@ static int find_build_site(int type,int *out_x,int *out_y)
        passes ordinary live legality, terrain, and first-builder reach checks;
        enemy clearance only considers currently visible units. */
     if(type==B_CREEP_COLONY) {
-        int second=owned_building_count(B_SUNKEN_COLONY)>0;
-        int x=second?1008:944,y=1624;
-        if(x<16||y<20||x>=WORLD_W-16||y>=WORLD_H-16||
-           !race_can_site(SIDE,type,x,y)||!can_place(type,x,y)||
-           !z7_worker_can_reach_site(x,y))return 0;
-        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
-           currently_visible(u[i].x,u[i].y)&&sc64_race_unit_damage(u[i].type)>0&&
-           dist2(x,y,u[i].x,u[i].y)<144*144)return 0;
-        *out_x=x;*out_y=y;return 1;
+        int sunken_count=owned_building_count(B_SUNKEN_COLONY);
+        if(sunken_count<2) {
+            int x=sunken_count?1008:944,y=1624;
+            if(x<16||y<20||x>=WORLD_W-16||y>=WORLD_H-16||
+               !race_can_site(SIDE,type,x,y)||!can_place(type,x,y)||
+               !z7_worker_can_reach_site(x,y))return 0;
+            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
+               currently_visible(u[i].x,u[i].y)&&sc64_race_unit_damage(u[i].type)>0&&
+               dist2(x,y,u[i].x,u[i].y)<144*144)return 0;
+            *out_x=x;*out_y=y;return 1;
+        }
+        int hatch=z7_townhall(SIDE);
+        return hatch>=0&&z7_front_colony_site(hatch,out_x,out_y);
     }
     if(type==B_EXTRACTOR) {
         /* Prefer Z7's recovered raw-149 node over its distant baseline node. */
@@ -2833,6 +2865,39 @@ static int z7_mutas_near_point(int x,int y,int radius)
         ++total;if(dist2(x,y,u[i].x,u[i].y)<=limit2)++near;
     }
     return total>0&&near*2>=total;
+}
+
+/* Later Creep Colonies use a bounded legal search near mineral cover. Any
+   threat scoring here is limited to enemies currently visible to the player. */
+static int z7_front_colony_site(int hatch,int *out_x,int *out_y)
+{
+    int cover_x,cover_y;
+    z7_mineral_cover_point(hatch,&cover_x,&cover_y);
+    int best=0x7fffffff,found=0,site_x=0,site_y=0;
+    for(int dy=-96;dy<=96;dy+=16)for(int dx=-96;dx<=96;dx+=16) {
+        int x=cursor_lattice_coordinate(cx,cover_x+dx,WORLD_W);
+        int y=cursor_lattice_coordinate(cy,cover_y+dy,WORLD_H);
+        int field_d=dist2(x,y,cover_x,cover_y);
+        if(x<24||y<24||x>=WORLD_W-24||y>=WORLD_H-24||
+           field_d>96*96||dist2(x,y,b[hatch].x,b[hatch].y)<64*64||
+           !race_can_site(SIDE,B_CREEP_COLONY,x,y)||!can_place(B_CREEP_COLONY,x,y))continue;
+        int nearest=0x7fffffff,reachable=0;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
+           currently_visible(u[i].x,u[i].y)) {
+            int d=dist2(x,y,u[i].x,u[i].y);if(d<nearest)nearest=d;
+        }
+        if(nearest<144*144)continue;
+        for(int i=0;i<MAX_UNITS&&!reachable;i++)if(u[i].alive&&u[i].owner==SIDE&&
+            u[i].raw_type==41&&u[i].order!=ORDER_BUILD) {
+            int nx,ny;reachable=path_next_tile(u[i].x,u[i].y,x,y,&nx,&ny);
+        }
+        if(!reachable)continue;
+        int visible_threat_bonus=nearest==0x7fffffff?0:nearest/32;
+        int score=field_d*2+dist2(x,y,b[hatch].x,b[hatch].y)/8-visible_threat_bonus;
+        if(score<best){best=score;site_x=x;site_y=y;found=1;}
+    }
+    if(found){*out_x=site_x;*out_y=site_y;}
+    return found;
 }
 
 /* After the first Sunken finishes, reserve a usable Drone and minerals for
