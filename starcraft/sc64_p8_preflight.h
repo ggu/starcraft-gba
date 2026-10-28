@@ -36,7 +36,9 @@ typedef struct {
 
 /* Census the generated P8 map shape and its one-shot CreateUnitWithProperties
  * plan against actual runtime pool limits. The runtime caller must authenticate
- * the map pointer before calling this census helper. This does not bind mission
+ * the map pointer before calling this census helper. The source-contract test
+ * verifies each create has one eligible executor in this fixed descriptor;
+ * this is not a general multi-owner creation planner. It does not bind mission
  * actions or enable P8 campaign runtime. */
 static inline int
 sc64_p8_preflight(const Sc64RaceMap *map,

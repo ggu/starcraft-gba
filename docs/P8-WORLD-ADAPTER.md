@@ -14,6 +14,9 @@ explicit actor and property resolvers and returns an error for unresolved
 actors, invalid property selectors, unsupported create triggers or exhausted
 capacity. This is a census helper; a future runtime caller must authenticate
 the supplied map before using it. It neither spawns actors nor enables P8.
+The prepared-descriptor fixture also checks that each create-bearing trigger
+has exactly one eligible active source owner; counting each action once is
+specific to this P8 plan, not a general multi-owner capacity calculation.
 
 The P8-only building rules now recognize source raw 168 as the Stasis Cell.
 Existing Terran-late bindings and fact-table gate bit positions are retained.

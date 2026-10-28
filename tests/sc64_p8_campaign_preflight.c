@@ -43,6 +43,27 @@ int main(void)
            map->height == SC64_P8_EXPECTED_MAP_ROWS &&
            map->unit_count > 0u && map->units &&
            !strcmp(map->mission_id, "P8"));
+    /* The fixed P8 create plan runs once per action, not once per active
+     * member of a multi-player force. Guard that source-data assumption
+     * before treating the sum of create counts as a capacity bound. FORC
+     * stores zero-based groups; the runtime selector takes groups 1..4. */
+    for (unsigned i = 0; i < SC64_P8_SOURCE_ACTION_COUNT; ++i) {
+        const Sc64P8SourceAction *action = &sc64_p8_source_actions[i];
+        if (action->opcode != 11u || !action->group1) continue;
+        Sc64P8TriggerInfo info = {0};
+        assert(sc64_p8_source_trigger_info(0, action->trigger, &info));
+        unsigned executors = 0;
+        for (unsigned owner = 0; owner < 8u; ++owner) {
+            unsigned mode = sc64_p8_source_owners[owner];
+            if (mode != 5u && mode != 6u) continue; /* Computer and human. */
+            assert(sc64_p8_source_forces[owner] < 4u);
+            int enabled = sc64_p8_runtime_trigger_enabled(
+                &info, owner, sc64_p8_source_forces[owner] + 1u);
+            assert(enabled >= 0);
+            executors += enabled != 0;
+        }
+        assert(executors == 1u);
+    }
     ResolverContext source_resolver = {0};
     Sc64P8PreflightResolvers source_ops = resolvers_for(&source_resolver);
     Sc64P8PreflightReport report;
