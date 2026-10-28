@@ -4684,6 +4684,7 @@ sc64_worker_mineral_issue_selected(int patch)
         u[i].order = ORDER_MINE;
         u[i].target = patch;
         u[i].work_timer = 0;
+        u[i].build = -1; /* A new gather command starts a new home-depot trip. */
         u[i].path_timer = 0;
         u[i].path_retry = 0;
 #ifdef SC64_WORKER_CARGO_KIND

@@ -16,10 +16,15 @@ sentinel below -2, so this design does not overload that field.
 
 MOVE, ATTACK and STOP retain cargo kind and amount. Gather trips retain old
 cargo through travel; successful pickup replaces it with the new resource.
-Same-kind cargo reaches the selected resource before returning. A depleted
+Same-kind cargo reaches the selected resource before returning. This cargo
+switching policy follows the [pinned OpenBW gather paths](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h):
+recognized old cargo remains during travel, and a positive pickup installs
+the new kind and amount. It is behavioral reference evidence, not an N64
+execution or timing-equivalence claim. A depleted
 patch or invalid pending target cancels the trip without inventing a nearby
-target or erasing cargo. Loaded idle workers wait for another command instead
-of being zeroed by the periodic auto-miner. Badges use cargo kind independent
+target or erasing cargo. Loaded idle human workers wait for another command instead
+of being zeroed by the periodic auto-miner. Bot AI explicitly resumes its idle
+loaded workers after construction so its economy can keep working. Badges use cargo kind independent
 of order; unknown cargo has no guessed mineral/gas badge. Repair's existing
 Q8 `carry` payload is treated separately from resources. This prototype does
 not add resource retention to the existing repair state machine.
@@ -55,8 +60,8 @@ make test-sc64-worker-gather-p7
 make test-sc64-worker-gather-z7
 ```
 
-Each opt-in target runs interaction-dispatch/tick checks and actual-codec
-old/new save checks. The first uses authored scenes and direct engine entry
+Each opt-in target runs interaction-dispatch/tick checks, focused bot-worker
+resumption checks and actual-codec old/new save checks. The first uses authored scenes and direct engine entry
 points, not a normal controller replay. The save matrix covers all three
 human races in each profile (12 combinations), including P7's typed codec,
 known/ambiguous old cargo, marker conflicts, version mismatch and atomic

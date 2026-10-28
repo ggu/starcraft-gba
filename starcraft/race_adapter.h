@@ -1179,6 +1179,7 @@ static void race_tick_ai(void)
                 worker->tx = m[patch].x; worker->ty = m[patch].y;
             }
             sc64_worker_gather_pending_set(worker, 1);
+            worker->build = -1;
             worker->work_timer = 0;
             worker->path_timer = 0;
             worker->path_retry = 0;

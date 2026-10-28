@@ -4527,9 +4527,12 @@ build/test-sc64-worker-gather-$(1): tests/sc64_worker_gather_game.c $(STARCRAFT)
 	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(WORKER_CARGO_$(1)_FLAGS) -DSC64_WORKER_CARGO_KIND $$< common/gba.c $$(WORKER_CARGO_$(1)_SOURCES) -o $$@
 build/test-sc64-worker-cargo-save-$(1): tests/sc64_worker_cargo_save_game.c $(STARCRAFT) $$(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile | build
 	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(WORKER_CARGO_$(1)_FLAGS) -DSC64_WORKER_CARGO_KIND $$< common/gba.c $$(WORKER_CARGO_$(1)_SOURCES) -o $$@
+build/test-sc64-worker-cargo-ai-$(1): tests/sc64_worker_cargo_ai_game.c $(STARCRAFT) $$(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$(WORKER_CARGO_$(1)_FLAGS) -DSC64_WORKER_CARGO_KIND $$< common/gba.c $$(WORKER_CARGO_$(1)_SOURCES) -o $$@
 .PHONY: test-sc64-worker-gather-$(1)
-test-sc64-worker-gather-$(1): build/test-sc64-worker-gather-$(1) build/test-sc64-worker-cargo-save-$(1)
+test-sc64-worker-gather-$(1): build/test-sc64-worker-gather-$(1) build/test-sc64-worker-cargo-save-$(1) build/test-sc64-worker-cargo-ai-$(1)
 	./build/test-sc64-worker-gather-$(1)
 	./build/test-sc64-worker-cargo-save-$(1)
+	./build/test-sc64-worker-cargo-ai-$(1)
 endef
 $(foreach profile,terran z6 p7 z7,$(eval $(call SC64_WORKER_GATHER_FIXTURE,$(profile))))

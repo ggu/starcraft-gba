@@ -74,6 +74,7 @@ test_mineral_input(int race, int worker_type)
     assert(worker >= 0 && worker2 >= 0 && bystander >= 0);
     set_depot(0, SIDE, depot_type, 112, 112);
     u[worker].selected = 1;
+    u[worker].build = 0; /* A previous trip's cached depot must not leak. */
     u[worker2].selected = 1;
     u[bystander].selected = 1;
     m[patch].x = 320; m[patch].y = 320; m[patch].amount = 24;
@@ -85,6 +86,7 @@ test_mineral_input(int race, int worker_type)
     tap_a(m[patch].x, m[patch].y);
     assert(u[worker].order == ORDER_MINE && u[worker].target == patch);
     assert(u[worker].flags & SC64_WORKER_GATHER_PENDING);
+    assert(u[worker].build == -1);
     assert(u[worker2].order == ORDER_MINE && u[worker2].target == patch);
     assert(u[bystander].order == ORDER_IDLE); /* workers only */
 #ifdef SC64_T6_RUNTIME
@@ -325,6 +327,11 @@ test_automatic_no_depot_hold(void)
     one_tick();
     assert(u[worker].x!=x || u[worker].y!=y);
     u[worker].x=300; u[worker].y=300;
+    u[worker].work_timer=2;
+    one_tick();
+    assert(u[worker].carry==0 && sc64_worker_gather_pending(&u[worker]));
+    one_tick();
+    assert(u[worker].carry==0 && sc64_worker_gather_pending(&u[worker]));
     one_tick();
     assert(u[worker].carry==8 && m[0].amount==32);
     one_tick();
