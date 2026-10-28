@@ -137,3 +137,68 @@ are retained separately. No assets, generated headers, ROMs, saves, captures,
 private harnesses or native reference implementation are tracked. All checks
 run locally, with no GitHub Actions or SD writes. No mission is newly enabled
 or qualified by this work.
+
+
+## Direct-corridor update at `03d96e2`
+
+The current candidate first checks up to eight nearby firing tiles with the
+same clear-corridor predicate used by ordinary movement. The scan is bounded
+to a 34x34 tile box (range at most 256 GBA pixels); larger bands retain the
+existing general path. A clear waypoint is stored in the reserved slot's
+existing metadata with validity 5 and the exact target/range key. Every new
+origin rechecks the corridor; a blocked cached tile triggers a new candidate
+scan, then the existing BFS if needed. No additional BSS or saved state is
+added. Formation and point fields ignore marker 5, including stale gradient
+bytes left beneath it. A separate direct-only change is being prepared for
+main so these useful clear paths can ship without the synchronous BFS cost or
+reserving an ordinary route field.
+
+The updated hybrid ARM probe reduces the clear 480px-origin/max210 query from
+1,619,485 cycles to about 82,505 cycles (4.9 ms). Sixteen target-subtile rescans
+average about 81,539 cycles; cached corridors average about 2,480 cycles.
+The near Hydra's first fallback tick is about 107,968 cycles. Both Showcase
+and Z6 apply the expected damage and pass the movement/range assertions.
+
+This does not solve obstructed searches. A long wall with a distant gap makes
+the direct shortlist fail, and the correct BFS fallback takes 5,397,201 cycles
+in Showcase and 2,690,747 in Z6 (about 322/160 ms). The candidate remains a
+draft because that work must be incremental. A two-plane frontier bitset can
+fit in one additional existing route field; scheduling, target-motion policy,
+fairness, and explicit pending status need implementation and qualification.
+
+Full-product ends for this update are:
+
+| Product | IWRAM end | BSS end |
+| --- | --- | --- |
+| Terran | `0x03004df0` | `0x02037084` |
+| Zerg Z6 | `0x03004f40` | `0x020370f0` |
+| Protoss P7 | `0x03004b70` | `0x020382b0` |
+| Showcase | `0x03004fd0` | `0x0203df30` |
+
+The helper itself stays in ROM. GCC now emits the existing `direct_path_clear`
+HOT function out of line and shrinks its inline copy in `move_toward`, causing
+the small IWRAM delta. Showcase retains 48 bytes before the unchanged code
+guard. GCC reports static frames of 192 bytes for the candidate finder, 48
+for its combat wrapper and 40 for the existing corridor routine; this is not
+a whole-program peak-stack claim, and no stack reserve is reduced.
+
+Current-source ON/OFF game fixtures pass in Terran/Z6/P7, including exact band
+edges, cache-key changes, alternate-origin rescans, general BFS fallback and
+marker-5 isolation. A separate formation-enabled host build passes. The
+72 menu/save continuations pass with 18 explicitly warmed direct-point caches
+and 54 warmed region caches invalidated at load. Fresh actual ARM SRAM
+continuation passes for all three products. The bounded long ARM replay still
+matches all prior state checkpoints, with average rates around 28.7 fps and
+the same late-P7 limit. Full default build/tests pass (649 Python checks,
+20 optional skips, plus C/ancillary checks); source-boundary and whitespace
+checks pass. These do not qualify another mission or all obstructed frame
+budgets.
+
+Evidence for the update stays under `.local/build/ranged-approach/direct/`,
+`direct-arm-probe/`, `direct-obstructed-probe/`, `direct-stack/` and
+`direct-fresh-sram/`. A benchmark script initially reused a historical output
+folder; the overwritten ELF/map artifacts are explicitly marked as superseded.
+An isolated `git 5995b45` source reconstruction under
+`reproduced-partial-arm-probe/` reproduced both historical ROM hashes and all
+cycle records exactly. Historical logs and that reproduction, rather than the
+overwritten files, support the earlier comparison.
