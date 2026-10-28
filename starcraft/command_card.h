@@ -1,4 +1,5 @@
-/* StarCraft's command card for the race order list (SC64_COMMAND_ICONS).
+/* StarCraft's command card and resource bar for the race HUD
+ * (SC64_COMMAND_ICONS).
  *
  * The order list becomes a grid of the ROM's own command buttons, three to a
  * row, with Move, Stop and Attack on top as in StarCraft, then the list's
@@ -8,12 +9,17 @@
  * names the highlighted button. The icons come from a private header that
  * tools/sc64_command_icons.py writes from a verified ROM; menu_cursor keeps
  * the list's row numbers, so every command path is unchanged. Lists longer
- * than the card keep the framed text list. */
+ * than the card keep the framed text list. The resource bar draws the N64
+ * HUD's mineral and gas icons and the player race's supply icon in place of
+ * the MIN, GAS and SUP labels. */
 #ifndef SC64_COMMAND_ICONS
 #error "command_card.h needs the imported command icons"
 #endif
 
 #include "sc64_command_icons_generated.h"
+
+static const char *unit_name(int type);
+static int sc64_actor_max_shields(int type, int building);
 
 enum { CARD_COLUMNS = 3, CARD_ROWS = 5, CARD_CELL = 20, CARD_PITCH = 21 };
 
@@ -42,52 +48,35 @@ card_command_slot(int i)
     return i;
 }
 
+/* The portrait of a raw unit id, or -1 when the ROM has no button-sized
+ * frame for it. */
+static int
+card_portrait(int raw)
+{
+    return raw >= 0 && raw < SC64_CMD_ICON_PORTRAITS && sc64_command_icon_size[raw][0] > 1 ? raw : -1;
+}
+
 static int
 card_building_icon(int type)
 {
-    switch (type) {
-    case B_COMMAND: return SC64_CMD_ICON_COMMAND_CENTER;
-    case B_BARRACKS: return SC64_CMD_ICON_BARRACKS;
-    case B_DEPOT: return SC64_CMD_ICON_SUPPLY_DEPOT;
-    case B_REFINERY: return SC64_CMD_ICON_REFINERY;
-    case B_ACADEMY: return SC64_CMD_ICON_ACADEMY;
-    case B_ENG_BAY: return SC64_CMD_ICON_ENGINEERING_BAY;
-    case B_FACTORY: return SC64_CMD_ICON_FACTORY;
-    case B_STARPORT: return SC64_CMD_ICON_STARPORT;
-#ifdef SC64_T5_RUNTIME
-    case B_CONTROL_TOWER: return SC64_CMD_ICON_CONTROL_TOWER;
-#endif
-    case B_HATCHERY: return SC64_CMD_ICON_HATCHERY;
-    case B_LAIR: return SC64_CMD_ICON_LAIR;
-    case B_SPAWNING_POOL: return SC64_CMD_ICON_SPAWNING_POOL;
-    case B_HYDRALISK_DEN: return SC64_CMD_ICON_HYDRALISK_DEN;
-    case B_EVOLUTION_CHAMBER: return SC64_CMD_ICON_EVOLUTION_CHAMBER;
-    case B_SPIRE: return SC64_CMD_ICON_SPIRE;
-    case B_CREEP_COLONY: return SC64_CMD_ICON_CREEP_COLONY;
-    case B_EXTRACTOR: return SC64_CMD_ICON_EXTRACTOR;
-    case B_NEXUS: return SC64_CMD_ICON_NEXUS;
-    case B_GATEWAY: return SC64_CMD_ICON_GATEWAY;
-    case B_PYLON: return SC64_CMD_ICON_PYLON;
-    case B_ASSIMILATOR: return SC64_CMD_ICON_ASSIMILATOR;
-    case B_CYBERNETICS_CORE: return SC64_CMD_ICON_CYBERNETICS_CORE;
-    case B_FORGE: return SC64_CMD_ICON_FORGE;
-    case B_PHOTON_CANNON: return SC64_CMD_ICON_PHOTON_CANNON;
-#ifdef SC64_P7_BATTERY_ENABLED
-    case B_P7_SHIELD_BATTERY: return SC64_CMD_ICON_SHIELD_BATTERY;
-#endif
-    }
-    return -1;
+    return card_portrait(sc64_race_raw_building(type));
+}
+
+static int
+card_unit_icon(const Unit *q)
+{
+    return card_portrait(q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type));
 }
 
 /* The button for list row i, or -1 for the drawn fallback glyph. */
 static int
 card_icon(int i)
 {
-    static const u8 weapons[3] = {SC64_CMD_ICON_TERRAN_WEAPONS, SC64_CMD_ICON_ZERG_WEAPONS,
+    static const u16 weapons[3] = {SC64_CMD_ICON_TERRAN_WEAPONS, SC64_CMD_ICON_ZERG_WEAPONS,
                                   SC64_CMD_ICON_PROTOSS_WEAPONS};
-    static const u8 armor[3] = {SC64_CMD_ICON_TERRAN_ARMOR, SC64_CMD_ICON_ZERG_ARMOR,
+    static const u16 armor[3] = {SC64_CMD_ICON_TERRAN_ARMOR, SC64_CMD_ICON_ZERG_ARMOR,
                                 SC64_CMD_ICON_PROTOSS_ARMOR};
-    static const struct { const char *label; u8 icon; } specials[] = {
+    static const struct { const char *label; u16 icon; } specials[] = {
         {"STORM", SC64_CMD_ICON_STORM}, {"CLOAK", SC64_CMD_ICON_CLOAK},
         {"UNCLOAK", SC64_CMD_ICON_CLOAK}, {"CONSUME", SC64_CMD_ICON_CONSUME},
         {"UNLOAD CARGO", SC64_CMD_ICON_UNLOAD}, {"VENTRAL SACS", SC64_CMD_ICON_VENTRAL_SACS},
@@ -183,4 +172,35 @@ field_card_navigate(u16 pressed)
     }
     menu_cursor = card_slot_command(row * CARD_COLUMNS + col);
     return 1;
+}
+
+/* A resource-bar icon centred in the 12-pixel slot at x on the top band. */
+static void
+card_resource_icon(int sprite, int x)
+{
+    int w = sc64_hud_sprite_size[sprite][0], h = sc64_hud_sprite_size[sprite][1];
+    gfx_blit_sprite(x + (12 - w) / 2, (12 - h) / 2, w, h,
+                    sc64_hud_sprite_pixels + sc64_hud_sprite_offset[sprite]);
+}
+
+/* The race's supply icon: Terran, Zerg, Protoss. */
+static int
+card_supply_sprite(void)
+{
+    return SC64_HUD_SPRITE_SUPPLY_TERRAN + race_human;
+}
+
+/* The selected unit's portrait, then its name, or the group's size, over
+ * its shield and health bars; the hint keeps its place at x 52. */
+static void
+card_selection_header(int i, int n)
+{
+    int icon = card_unit_icon(&u[i]), shields = sc64_actor_max_shields(u[i].type, 0);
+    if (icon >= 0) card_icon_draw(icon, 3, 124, card_green);
+    if (n > 1) {
+        gfx_text(27, 126, "X", C_DIM);
+        gfx_num(34, 126, n, C_WHITE);
+    } else gfx_text(27, 126, unit_name(u[i].type), C_WHITE);
+    if (shields > 0) gfx_bar(27, 137, 22, 2, u[i].shield, shields, C_CYAN, C_SHADOW);
+    gfx_bar(27, 140, 22, 4, u[i].hp, u[i].maxhp, C_GREEN, C_RED_DARK);
 }

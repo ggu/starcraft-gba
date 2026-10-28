@@ -618,6 +618,48 @@ static int check_command_card(void)
         return fail("card: the HUD does not show the highlighted button");
     press(KEY_B);
     if (menu_open) return fail("card: B did not close the card");
+
+    /* Resource bar: the mineral chunk, the race's gas and supply sprites
+     * replace the MIN, GAS and SUP labels. */
+    draw_hud_resources();
+    {
+        static const int slots[3] = {2, 60, 126};
+        const int sprites[3] = {SC64_HUD_SPRITE_MINERAL, SC64_HUD_SPRITE_GAS, card_supply_sprite()};
+        for (int k = 0; k < 3; ++k) {
+            int w = sc64_hud_sprite_size[sprites[k]][0], h = sc64_hud_sprite_size[sprites[k]][1];
+            int x0 = slots[k] + (12 - w) / 2, y0 = (12 - h) / 2, match = 0, opaque = 0;
+            const unsigned char *px = sc64_hud_sprite_pixels + sc64_hud_sprite_offset[sprites[k]];
+            for (int yy = 0; yy < h; ++yy)
+                for (int xx = 0; xx < w; ++xx)
+                    if (px[yy * w + xx]) { ++opaque; match += gfx_test_pixel(x0 + xx, y0 + yy) == px[yy * w + xx]; }
+            if (!opaque || match != opaque) return fail("card: a resource sprite is missing from the top bar");
+        }
+        if (card_pixels(0, 0, 60, 12, C_GOLD) || card_pixels(61, 0, 60, 12, C_CYAN))
+            return fail("card: the top bar still draws the MIN or GAS label");
+    }
+
+    /* One selected unit: its portrait, full health bar and shield bar. */
+    {
+        int unit = -1;
+        for (int i = 0; i < MAX_UNITS && unit < 0; ++i)
+            if (u[i].alive && u[i].owner == SIDE && card_unit_icon(&u[i]) >= 0) unit = i;
+        if (unit < 0) return fail("card: no friendly unit has a portrait");
+        clear_selection();
+        u[unit].selected = 1;
+        u[unit].hp = u[unit].maxhp;
+        draw_hud_commands();
+        if (card_pixels(3, 124, CARD_CELL, CARD_CELL, C_GREEN) +
+            card_pixels(3, 124, CARD_CELL, CARD_CELL, C_HIGHLIGHT) < 20)
+            return fail("card: the selected unit has no portrait");
+        if (card_pixels(27, 140, 22, 4, C_GREEN) != 22 * 4)
+            return fail("card: a full health bar is not green");
+        if (sc64_actor_max_shields(u[unit].type, 0) > 0 && !card_pixels(27, 137, 22, 2, C_CYAN))
+            return fail("card: the shield bar is missing");
+        u[unit].hp = u[unit].maxhp / 2 > 0 ? u[unit].maxhp / 2 : 1;
+        draw_hud_commands();
+        if (!card_pixels(27, 140, 22, 4, C_RED_DARK)) return fail("card: the health bar ignores damage");
+        clear_selection();
+    }
     return 0;
 }
 #endif

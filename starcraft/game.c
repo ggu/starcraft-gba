@@ -9041,6 +9041,16 @@ static void
 draw_hud_resources(void)
 {
     gfx_rect(0, 0, 240, 12, C_PANEL);
+#ifdef SC64_COMMAND_ICONS
+    card_resource_icon(SC64_HUD_SPRITE_MINERAL, 2);
+    gfx_num(16, 3, minerals, C_WHITE);
+    card_resource_icon(SC64_HUD_SPRITE_GAS, 60);
+    gfx_num(74, 3, gas, C_WHITE);
+    card_resource_icon(card_supply_sprite(), 126);
+    gfx_num(140, 3, (supply_used + race_owner_queued_supply(SIDE)) / 2, C_WHITE);
+    gfx_text(154, 3, "/", C_WHITE);
+    gfx_num(162, 3, supply_cap / 2, C_WHITE);
+#else
     gfx_text(3, 3, "MIN", C_GOLD);
     gfx_num(24, 3, minerals, C_WHITE);
     gfx_text(61, 3, "GAS", C_CYAN);
@@ -9055,6 +9065,7 @@ draw_hud_resources(void)
         C_WHITE);
     gfx_text(165, 3, "/", C_WHITE);
     gfx_num(173, 3, supply_cap / 2, C_WHITE);
+#endif
 }
 
 static void
@@ -9127,12 +9138,16 @@ draw_hud_commands(void)
     } else if (n) {
 	for (i = 0; i < MAX_UNITS; i++)
 	    if (u[i].alive && u[i].selected) {
+#ifdef SC64_COMMAND_ICONS
+		card_selection_header(i, n);
+#else
 		gfx_text(5, 126, n > 1 ? "COMBAT GROUP" : unit_name(u[i].type), C_WHITE);
 #ifdef SC64_RACES
                 draw_hud_shields(u[i].shield,sc64_actor_max_shields(u[i].type,0));
 #endif
 		gfx_text(5, 137, "HP", C_CYAN);
 		gfx_num(24, 137, u[i].hp, C_GREEN);
+#endif
 		if (IS_WORKER(u[i].type))
 #ifdef SC64_FIELD_CONTROLS
 		    gfx_text(52, 137, ui_action == UI_A_MOVE ? "A MOVE  B BUILD" :

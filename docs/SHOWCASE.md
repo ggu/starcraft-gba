@@ -88,17 +88,25 @@ resolves the A action once per simulation update rather than per drawn
 frame, because crowded scenes draw several frames per update; a scene
 restart or a load clears that result, since both jump the update counter.
 
-## Command card
+## Command card and HUD icons
 
 The Showcase build also turns on `SC64_COMMAND_ICONS`, which replaces the
-text order list with StarCraft's command card. Before building,
-`tools/sc64_command_icons.py` imports 41 command buttons from the verified
-ROM's icon sheet into `.local/sc64/command-icons/generated/` (about 4 KB):
-structure portraits by unit id, the Move, Stop, Attack, Unload and Lift/Land
-buttons, and the upgrade and spell buttons named by `upgrades.dat` and
-`techdata.dat`. The importer checks each order and spell icon against the
-ROM's own button sets and each upgrade against its stat_txt name. It keeps
-the icons at their native size of up to 20 by 20 pixels, in three shades.
+text order list with StarCraft's command card and the HUD's resource labels
+with StarCraft's own art. Before building, `tools/sc64_command_icons.py`
+imports from the verified ROM into `.local/sc64/command-icons/generated/`
+(about 19 KB):
+
+- every portrait from the command-button sheet, indexed by raw unit id, and
+  the Move, Stop, Attack, Unload and Lift/Land buttons and the upgrade and
+  spell buttons named by `upgrades.dat` and `techdata.dat`. The importer
+  checks each order and spell icon against the ROM's own button sets and
+  each upgrade against its stat_txt name. Buttons keep their native size of
+  up to 20 by 20 pixels, in three shades; the few portraits that are full
+  art rather than buttons are left out;
+- the N64 HUD's own resource icons (`011/014`, in StarCraft's icons.grp
+  order): minerals, the gas icon the N64 draws for every race, and each
+  race's supply icon, without their 1-pixel frame so they fit the
+  12-pixel top bar, matched to the nearest runtime palette colours.
 
 - B opens the card bottom right: Move, Stop and Attack on the top row, then
   the list's other commands three to a row in their usual order. Buttons are
@@ -109,6 +117,11 @@ the icons at their native size of up to 20 by 20 pixels, in three shades.
 - The HUD shows the highlighted command's button beside its name, cost and
   explanation, and keeps the button while a move, attack or placement is
   armed.
+- The top bar draws the N64 mineral and gas icons and the player race's
+  supply icon in place of MIN, GAS and SUP.
+- With units selected, the HUD shows the first unit's portrait, its name or
+  the group's size, and shield and health bars in place of the SH and HP
+  numbers.
 
 The card only changes drawing and D-pad routing: the list's row numbers,
 B, A repeating the last command, and every order and build path are

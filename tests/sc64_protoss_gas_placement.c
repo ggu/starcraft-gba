@@ -162,7 +162,12 @@ static void test_protoss_menu_and_harvest(void)
     assert(u[worker].selected);
     tap(KEY_B);
     assert(menu_open);
+#ifdef SC64_COMMAND_ICONS /* the command card: the gas row is below Attack */
+    tap(KEY_DOWN);
+    tap(KEY_LEFT);
+#else
     for (int row = 0; row < 4; ++row) tap(KEY_DOWN);
+#endif
     assert(menu_cursor == 4);
     tap(KEY_A);
     assert(mode == MODE_BUILD && menu == type);
