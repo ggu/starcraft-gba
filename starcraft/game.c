@@ -7265,10 +7265,15 @@ game_update(u16 held, u16 pressed)
     }
     if (menu_open) {
 	reset_selection_gestures();
-	if (pressed & KEY_UP)
-	    menu_cursor = (menu_cursor + field_menu_count() - 1) % field_menu_count();
-	if (pressed & KEY_DOWN)
-	    menu_cursor = (menu_cursor + 1) % field_menu_count();
+#ifdef SC64_COMMAND_ICONS
+	if (!field_card_navigate(pressed))
+#endif
+	{
+	    if (pressed & KEY_UP)
+		menu_cursor = (menu_cursor + field_menu_count() - 1) % field_menu_count();
+	    if (pressed & KEY_DOWN)
+		menu_cursor = (menu_cursor + 1) % field_menu_count();
+	}
 	if (pressed & KEY_A)
 	    choose_command(menu_cursor);
 	return;
@@ -9121,6 +9126,20 @@ static void
 draw_hud_resources(void)
 {
     gfx_rect(0, 0, 240, 12, C_PANEL);
+#ifdef SC64_COMMAND_ICONS
+    card_resource_icon(SC64_HUD_SPRITE_MINERAL, 2);
+    gfx_num(16, 3, minerals, C_WHITE);
+    card_resource_icon(SC64_HUD_SPRITE_GAS, 60);
+    gfx_num(74, 3, gas, C_WHITE);
+    card_resource_icon(card_supply_sprite(), 126);
+    {
+        /* The slash follows the used count, so 100/200 keeps its spacing. */
+        int used = (supply_used + race_owner_queued_supply(SIDE)) / 2, x = 140 + ui_num_width(used) + 3;
+        gfx_num(140, 3, used, C_WHITE);
+        gfx_text(x, 3, "/", C_WHITE);
+        gfx_num(x + 8, 3, supply_cap / 2, C_WHITE);
+    }
+#else
     gfx_text(3, 3, "MIN", C_GOLD);
     gfx_num(24, 3, minerals, C_WHITE);
     gfx_text(61, 3, "GAS", C_CYAN);
@@ -9135,6 +9154,7 @@ draw_hud_resources(void)
         C_WHITE);
     gfx_text(165, 3, "/", C_WHITE);
     gfx_num(173, 3, supply_cap / 2, C_WHITE);
+#endif
 }
 
 static void
@@ -9163,6 +9183,11 @@ draw_hud_commands(void)
     int hud_left=5;
 #if defined(SC64_RACES) && defined(SC64_FIELD_CONTROLS)
     if(box_state!=2 && !menu_open && mode==MODE_NORMAL &&
+#ifdef SC64_COMMAND_ICONS
+       /* The command card's selection header draws unit portraits and keeps
+          the unit hint at x 52; only buildings take the source icon here. */
+       selected_building>=0 && b[selected_building].alive &&
+#endif
        field_controls_draw_selected_icon(14,135,22))hud_left=30;
 #endif
     if (box_state == 2) {
@@ -9218,6 +9243,9 @@ draw_hud_commands(void)
     } else if (n) {
 	for (i = 0; i < MAX_UNITS; i++)
 	    if (u[i].alive && u[i].selected) {
+#ifdef SC64_COMMAND_ICONS
+		card_selection_header(i, n);
+#else
 #ifdef SC64_RACES
                 char title[64];
                 int title_width=u[i].shield>0?124-hud_left:165-hud_left;
@@ -9229,6 +9257,7 @@ draw_hud_commands(void)
 #endif
 		gfx_text(hud_left, 137, "HP", C_CYAN);
 		gfx_num(hud_left+19, 137, u[i].hp, C_GREEN);
+#endif
 		if (IS_WORKER(u[i].type))
 #ifdef SC64_FIELD_CONTROLS
 		    gfx_text(hud_left+47, 137, ui_action == UI_A_MOVE ? "A MOVE  B BUILD" :

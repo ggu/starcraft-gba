@@ -87,8 +87,14 @@ static int issue_pylon(void)
     if (!choose_pylon_site(worker, &x, &y)) return 0;
 
     tap_rendered(KEY_B);
+#ifdef SC64_COMMAND_ICONS /* the command card: right to Pylon's column, then down */
+    for (int guard = 0; menu_cursor != MENU_BARRACKS + 1 && guard < 16; ++guard)
+        tap_rendered(card_fits() && card_command_slot(menu_cursor) % CARD_COLUMNS !=
+                     card_command_slot(MENU_BARRACKS + 1) % CARD_COLUMNS ? KEY_RIGHT : KEY_DOWN);
+#else
     for (int guard = 0; menu_cursor != MENU_BARRACKS + 1 && guard < 8; ++guard)
         tap_rendered(KEY_DOWN);
+#endif
     if (!menu_open || menu_cursor != MENU_BARRACKS + 1) return 0;
     tap_rendered(KEY_A);
     if (mode != MODE_BUILD || menu != B_PYLON) return 0;
