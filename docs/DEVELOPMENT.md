@@ -134,8 +134,10 @@ Canonical Terran, Zerg and Protoss builds and Showcase batch the same 24-by-24
 visibility raster through the existing sprite compositor. No new private inputs
 are needed. `make test-sc64-minimap-terrain` checks scalar, batched and
 word-compositor paths without a source ROM. To compare a prepared profile with scalar drawing,
-use `make -B protoss CANONICAL_MINIMAP_FLAGS=` (replace `protoss` with another
-canonical target as needed); force rebuilding when changing flags.
+use `make -B protoss CANONICAL_MINIMAP_FLAGS= CANONICAL_CACHE_FLAGS=` (replace
+`protoss` with another canonical target as needed); force rebuilding when
+changing flags. This also disables the render-cache group, including its
+persistent minimap raster.
 
 The [minimap audit](audits/2026-10-26-minimap-terrain/README.md) records the
 pixel oracle, byte-identical public replay and scoped ARM timing. P3/Z3 legacy
@@ -144,8 +146,10 @@ and staged profiles retain their existing flag selections.
 ## Canonical render caches
 
 The canonical ROM flag sets also add `CANONICAL_CACHE_FLAGS`
-(`SC64_TERRAIN_CACHE_VRAM`, `SC64_HUD_VRAM_BANDS`, `SC64_TERRAIN_ROW_MASKS`)
-and `SC64_MINIMAP_RASTER` in `CANONICAL_MINIMAP_FLAGS`. They keep most of the
+(`SC64_TERRAIN_CACHE_VRAM`, `SC64_HUD_VRAM_BANDS`, `SC64_TERRAIN_ROW_MASKS`,
+`SC64_MINIMAP_RASTER`). The raster's 576-byte buffer stays in that memory-qualified
+group; Showcase and standalone probes keep only `SC64_MINIMAP_BLIT` through
+`CANONICAL_MINIMAP_FLAGS`. The caches keep most of the
 saved terrain band in the OBJ tile VRAM that bitmap products leave to data
 (`starcraft/sc64_obj_vram.h` maps that area; the P7 projectile arena comes
 first, so the P7 profile keeps 48 rows there and other profiles 68), restore

@@ -1,12 +1,22 @@
 # Render caches in spare VRAM and on the second page
 
 Status: enabled in the canonical Terran, Zerg (Z1-Z4 and Z1-Z6), Protoss
-(P4 Storm, P5, P6 and P7) ROM flag sets through `CANONICAL_CACHE_FLAGS` and
-`CANONICAL_MINIMAP_FLAGS`. Every option is default-off in the source; probes
+(P4 Storm, P5, P6 and P7) ROM flag sets through `CANONICAL_CACHE_FLAGS`.
+`CANONICAL_MINIMAP_FLAGS` retains the existing word blit only. Every option is default-off in the source; probes
 and host fixtures that do not use those flag sets are unchanged. This is a
 rendering and memory change only: no actor, order, save or trigger state is
 touched, and the host pixel oracle matches the uncached reference frame for
 frame. It is not a 30 fps or hardware claim.
+
+The follow-up flag-scope check keeps the persistent minimap raster out of
+Showcase and standalone probes, which do not take the cache group. Enabling
+it there without the memory-saving caches makes the ordinary Showcase link
+fail at BSS end `0x0203e118`, 280 bytes beyond its unchanged guard. The scoped
+flags restore BSS end `0x0203ded8` and IWRAM end `0x03004fa8`. All four cache
+defines remain enabled in the canonical Terran, Z6 and P7 products. The
+asset-free `test_sc64_cache_profile_flags.py` checks the actual Make expansion
+and the cache-group override; it uses a dependency-free dry-run target and
+does not prepare private inputs.
 
 ## What changed
 

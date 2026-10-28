@@ -276,10 +276,13 @@ TERRAN_FULL_FLAGS := $(LATE_TERRAN_RUNTIME_FLAGS) -DSC64_T6_CAMPAIGN_ENTRY -DSC6
 # Keep qualified canonical draw options separate from experimental campaign
 # probes, which retain their own RAM and timing qualification.
 CANONICAL_DRAW_FLAGS ?= -DGBA_SPRITE_WORDS -DGBA_SCENE_CLIP -DSC64_HUD_BUFFER_REUSE
-CANONICAL_MINIMAP_FLAGS ?= -DSC64_MINIMAP_BLIT -DSC64_MINIMAP_RASTER
+CANONICAL_MINIMAP_FLAGS ?= -DSC64_MINIMAP_BLIT
 # Render caches kept in spare VRAM and on the other mode-4 page instead of
 # EWRAM. The tile-renderer probe needs that OBJ VRAM itself and stays out.
-CANONICAL_CACHE_FLAGS ?= -DSC64_TERRAIN_CACHE_VRAM -DSC64_HUD_VRAM_BANDS -DSC64_TERRAIN_ROW_MASKS
+# The persistent minimap raster also consumes EWRAM. Keep it with the cache
+# group that frees that memory, not with flags shared by the tighter Showcase
+# and diagnostic products.
+CANONICAL_CACHE_FLAGS ?= -DSC64_TERRAIN_CACHE_VRAM -DSC64_HUD_VRAM_BANDS -DSC64_TERRAIN_ROW_MASKS -DSC64_MINIMAP_RASTER
 CANONICAL_STATIC_FLAGS ?= $(if $(filter -DGBA_SCENE_CLIP,$(CANONICAL_DRAW_FLAGS)),-DSC64_STATIC_DIRTY_ROWS)
 TERRAN_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 # Per-slot cached collision facts and one-pass blocked steering for the race
