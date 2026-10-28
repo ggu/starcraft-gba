@@ -1158,6 +1158,32 @@ static void race_tick_ai(void)
     for (bot = 0; bot < race_bots; ++bot) {
         owner = race_bot_owner_ids[bot]; race = race_owner_identity(owner);
         workers = army = 0; producer = -1;
+#ifdef SC64_WORKER_CARGO_KIND
+        /* Explicit cargo survives construction and Stop. Resume only bot
+         * workers that are idle with cargo: human commands remain authoritative. */
+        for (i = 0; i < MAX_UNITS; ++i) if (owner != SIDE && u[i].alive &&
+            !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == owner &&
+            sc64_race_is_worker(u[i].type) && u[i].order == ORDER_IDLE && u[i].carry > 0) {
+            Unit *worker = &u[i];
+            if (sc64_worker_cargo_is_gas(worker)) {
+                int ref = race_owner_refinery(owner);
+                if (ref < 0) continue; /* Keep gas cargo until a refinery exists. */
+                worker->order = ORDER_GAS;
+                worker->target = ref;
+                worker->tx = b[ref].x; worker->ty = b[ref].y;
+            } else {
+                int patch = nearest_mineral(worker->x, worker->y);
+                if (patch < 0) continue;
+                worker->order = ORDER_MINE;
+                worker->target = patch;
+                worker->tx = m[patch].x; worker->ty = m[patch].y;
+            }
+            sc64_worker_gather_pending_set(worker, 1);
+            worker->work_timer = 0;
+            worker->path_timer = 0;
+            worker->path_retry = 0;
+        }
+#endif
         for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == owner) {
             if (sc64_race_is_worker(u[i].type)) ++workers;
             else if (sc64_race_unit_damage(u[i].type) > 0) ++army;
