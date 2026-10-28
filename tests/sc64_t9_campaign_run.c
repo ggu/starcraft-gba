@@ -116,14 +116,24 @@ static void step(u16 held)
 
 static void tap(u16 key) { step(key); step(0); }
 
-/* Field controls reopen the order list on the last command. These
- * sequences were written for a list that opens on Move, so a fresh
- * open starts there (no extra input, so the run's timing is unchanged). */
+/* Reopen the command list and select Move using field inputs. */
 static void tap_b(void)
 {
     int fresh = !menu_open && mode == MODE_NORMAL;
     tap(KEY_B);
-    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+    if (fresh && menu_open) {
+        int count = field_menu_count();
+        if (count <= 0 || MENU_MOVE >= count) {
+            failed_action = 1;
+            return;
+        }
+        int up = (menu_cursor - MENU_MOVE + count) % count;
+        int down = (MENU_MOVE - menu_cursor + count) % count;
+        u16 key = up <= down ? KEY_UP : KEY_DOWN;
+        int taps = up <= down ? up : down;
+        for (int i = 0; i < taps; ++i) tap(key);
+        if (!menu_open || menu_cursor != MENU_MOVE) failed_action = 1;
+    }
 }
 static void wait_ticks(int count)
 { for (int i = 0; i < count && host_tick < (u32)limit_ticks && screen == SCREEN_PLAY && !won && !lost; ++i) step(0); }
