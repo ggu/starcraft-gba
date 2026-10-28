@@ -22,13 +22,14 @@ stays `PENDING` until gradient clearing and seed enumeration finish, so
 poisoned old bytes cannot be observed. Caller buffers must remain valid and
 disjoint until reset, including while completed results are queried.
 `pump(budget, &used)` consumes no more
-than `budget` units. A unit clears at most 16 bytes, examines one candidate
-tile for the exact inclusive squared Euclidean range band, or pops one BFS
-node and checks its four neighbors. Large-plane pops descend at most four
-summary levels; each set/clear propagates through at most four levels. Thus
-sparse layers do not require rescanning all `N/8` frontier bytes. The consumed
-frontier bit is removed immediately; the plane is empty when reused for the
-next layer.
+than `budget` units. Seed enumeration scans only the clamped target ± maximum
+range rectangle, then applies the exact inclusive squared Euclidean range
+test to each candidate. Its candidate count is at most `N`. A unit clears at
+most 64 bytes, examines one candidate tile, or pops one BFS node and checks
+its four neighbors. Large-plane pops descend at most four summary levels; each
+set/clear propagates through at most four levels. Thus sparse layers do not
+rescan all `N/8` frontier bytes. The consumed frontier bit is removed
+immediately; the plane is empty when reused for the next layer.
 
 Queries distinguish `ERROR`, `PENDING`, `READY`, and `NO_PATH`. A walkable
 origin is ready once its gradient is known; a seed returns itself. An
@@ -39,12 +40,14 @@ exhausted, after which it is no-path. For a blocked origin, ready returns a
 required after any topology change; stale buffer contents are inaccessible
 until the next begin's bounded clear and seed phases complete.
 
-At most `ceil(ceil(3N/8)/16) + ceil(scratch_required(N)/16) + 2N` work units
-are consumed: bounded clear chunks, one seed candidate per map cell, and at
-most one flood pop per discovered cell. Phase transitions add at most `N+3`
-constant-time checks, since each of at most `N` BFS layers advances once.
-These are completion bounds, not recommended frame quotas. Choosing the
-per-frame quota and integrating a pump remain separate work.
+For a particular target, at most `ceil(ceil(3N/8)/64) +
+ceil(scratch_required(N)/64) + C + V` units are consumed, where `C` is the
+clamped seed-box area and `V` is the number of flood cells discovered. Since
+both `C` and `V` are at most `N`, `ceil(ceil(3N/8)/64) +
+ceil(scratch_required(N)/64) + 2N` is a finite upper bound. Phase transitions
+add at most `N+3` constant-time checks, since each of at most `N` BFS layers
+advances once. These are completion bounds, not recommended frame quotas.
+Choosing the per-frame quota and integrating a pump remain separate work.
 
 This primitive does not solve scheduling multiple target keys, starvation,
 moving-target snapshots, cancellation policy, or how a combat caller should

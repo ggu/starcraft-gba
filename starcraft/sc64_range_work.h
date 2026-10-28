@@ -31,11 +31,13 @@ typedef struct Sc64RangeWork {
     const u8 *walk;
     u8 *gradient;
     u8 *frontier;
-    unsigned cells, gradient_bytes, frontier_bytes, bit_bytes;
-    unsigned plane_bytes;
-    unsigned cursor, current_plane, next_count;
+    unsigned short cells, gradient_bytes, frontier_bytes, bit_bytes;
+    unsigned short plane_bytes;
+    unsigned short cursor, current_plane, next_count;
     int cols, rows, target_x, target_y, min_range, max_range;
     unsigned short summary_offset[5];
+    unsigned short seed_left, seed_top, seed_width, seed_height, seed_total;
+    unsigned short seed_col, seed_row;
     unsigned char summary_depth;
     unsigned char phase;
 } Sc64RangeWork;
@@ -196,6 +198,22 @@ static int sc64_range_work_begin(Sc64RangeWork *work,
     work->target_y = target_y;
     work->min_range = min_range;
     work->max_range = max_range;
+    work->seed_left = (unsigned short)(target_x > max_range ?
+        (target_x - max_range) / 16 : 0);
+    work->seed_top = (unsigned short)(target_y > max_range ?
+        (target_y - max_range) / 16 : 0);
+    {
+        unsigned right = (unsigned)(target_x + max_range) / 16u;
+        unsigned bottom = (unsigned)(target_y + max_range) / 16u;
+        unsigned left = work->seed_left, top = work->seed_top;
+        if (right >= (unsigned)cols) right = (unsigned)cols - 1u;
+        if (bottom >= (unsigned)rows) bottom = (unsigned)rows - 1u;
+        work->seed_width = (unsigned short)(right - left + 1u);
+        work->seed_height = (unsigned short)(bottom - top + 1u);
+        work->seed_total = (unsigned short)(work->seed_width * work->seed_height);
+    }
+    work->seed_col = work->seed_left;
+    work->seed_row = work->seed_top;
     if (walk_need > 8u) {
         unsigned level_bytes = walk_need, offset = walk_need;
         while (level_bytes > 1u) {
@@ -223,11 +241,14 @@ static void sc64_range_work_reset(Sc64RangeWork *work)
     work->target_x = work->target_y = 0;
     work->min_range = work->max_range = 0;
     memset(work->summary_offset, 0, sizeof(work->summary_offset));
+    work->seed_left = work->seed_top = work->seed_width = 0;
+    work->seed_height = work->seed_total = 0;
+    work->seed_col = work->seed_row = 0;
     work->summary_depth = 0;
     work->phase = SC64_RANGE_WORK_IDLE;
 }
 
-/* One unit clears at most 16 bytes, tests one seed cell, or pops one frontier
+/* One unit clears at most 64 bytes, tests one seed cell, or pops one frontier
  * node (summary descent is at most four levels; up to four neighbors). */
 static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
                                 unsigned *used)
@@ -240,7 +261,7 @@ static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
         if (work->phase == SC64_RANGE_WORK_CLEAR_GRADIENT) {
             if (work->cursor < work->gradient_bytes) {
                 unsigned count = work->gradient_bytes - work->cursor;
-                if (count > 16u) count = 16u;
+                if (count > 64u) count = 64u;
                 memset(work->gradient + work->cursor, 0xff, count);
                 work->cursor += count;
                 ++done;
@@ -253,7 +274,7 @@ static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
         if (work->phase == SC64_RANGE_WORK_CLEAR_FRONTIER) {
             if (work->cursor < work->frontier_bytes) {
                 unsigned count = work->frontier_bytes - work->cursor;
-                if (count > 16u) count = 16u;
+                if (count > 64u) count = 64u;
                 memset(work->frontier + work->cursor, 0, count);
                 work->cursor += count;
                 ++done;
@@ -265,13 +286,19 @@ static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
         }
         if (work->phase == SC64_RANGE_WORK_SEED) {
             unsigned cell;
-            if (work->cursor < work->cells) {
+            if (work->cursor < work->seed_total) {
                 int col, row, dx, dy, d2;
-                cell = work->cursor++;
+                col = work->seed_col;
+                row = work->seed_row;
+                cell = (unsigned)col + (unsigned)row * (unsigned)work->cols;
+                ++work->cursor;
+                ++work->seed_col;
+                if (work->seed_col >= work->seed_left + work->seed_width) {
+                    work->seed_col = work->seed_left;
+                    ++work->seed_row;
+                }
                 ++done;
                 if (!sc64_range_work_walkable(work, cell)) continue;
-                col = (int)(cell % (unsigned)work->cols);
-                row = (int)(cell / (unsigned)work->cols);
                 dx = col * 16 + 8 - work->target_x;
                 dy = row * 16 + 8 - work->target_y;
                 d2 = dx * dx + dy * dy;
