@@ -69,8 +69,8 @@ static void assert_reject_atomic(const RaceSave *bad, u32 tag)
 static void cargo_save_case(int human)
 {
     static RaceSave checkpoint,legacy,bad;
-    Unit expected[4];
-    int slots[4],count=0,patch=-1;
+    Unit expected[5];
+    int slots[5],count=0,patch=-1;
     race_mode=1; race_human=human; race_bots=1; race_skirmish_map=0;
     race_bot_races[0]=(human+1)%3;
     init_state();
@@ -79,6 +79,8 @@ static void cargo_save_case(int human)
         if (u[i].alive && u[i].owner==SIDE && IS_WORKER(u[i].type))
             slots[count++]=i;
     assert(count==4);
+    slots[4]=spawn_unit(SIDE,u[slots[0]].type,u[slots[0]].x,u[slots[0]].y);
+    assert(slots[4]>=0);
     for (int i=0;i<MAX_MINERALS;++i)
         if (m[i].amount>0) { patch=i; break; }
     assert(patch>=0 && geyser_count>0);
@@ -86,27 +88,32 @@ static void cargo_save_case(int human)
                  human==R_ZERG ? B_EXTRACTOR : B_ASSIMILATOR;
     int refinery=spawn_build(SIDE,gas_type,geysers[0].x,geysers[0].y,0);
     assert(refinery>=0 && building_complete(refinery));
-    for (int j=0;j<4;++j) {
+    for (int j=0;j<5;++j) {
         Unit *q=&u[slots[j]];
-        q->carry=8; q->flags&=~0x60; q->build=-1; q->work_timer=0;
+        q->carry=j==4 ? 0 : 8; q->flags&=~SC64_WORKER_CARGO_MASK; q->build=-1; q->work_timer=0;
         q->order=j==0 ? ORDER_MINE : j==1 ? ORDER_GAS :
-                 j==2 ? ORDER_MOVE : ORDER_IDLE;
-        q->target=j==1 ? refinery : j==0 ? patch : -1;
+                 j==2 ? ORDER_MOVE : j==3 ? ORDER_IDLE : ORDER_MINE;
+        q->target=j==1 ? refinery : (j==0 || j==4) ? patch : -1;
         if (j==1) q->flags|=0x20;
-        if (j>=2) q->flags|=0x40;
+        if (j==2 || j==3) q->flags|=0x40;
+        if (j==1 || j==4) {
+            q->flags|=SC64_WORKER_GATHER_PENDING;
+            q->work_timer=2;
+        }
         expected[j]=*q;
     }
     clear_fixture_journal();
     assert(race_save_game());
     assert(save_read(&checkpoint,sizeof(checkpoint),SAVE_VERSION));
     assert(checkpoint.version==SAVE_VERSION);
-    for (int j=0;j<4;++j) {
+    for (int j=0;j<5;++j) {
         u[slots[j]].carry=0; u[slots[j]].flags&=~0x60;
     }
     assert(race_load_game());
-    for (int j=0;j<4;++j) {
-        assert(u[slots[j]].carry==8);
+    for (int j=0;j<5;++j) {
+        assert(u[slots[j]].carry==expected[j].carry);
         assert(u[slots[j]].flags==expected[j].flags);
+        assert(u[slots[j]].work_timer==expected[j].work_timer);
         assert(u[slots[j]].order==expected[j].order);
         assert(u[slots[j]].target==expected[j].target);
     }
@@ -115,16 +122,16 @@ static void cargo_save_case(int human)
      * orders do not: retain UNKNOWN instead of crediting a guessed bank. */
     legacy=checkpoint;
     legacy.version=SC64_WORKER_CARGO_LEGACY_SAVE_VERSION;
-    for (int j=0;j<4;++j) {
-        Unit old=expected[j]; old.flags&=~0x60;
+    for (int j=0;j<5;++j) {
+        Unit old=expected[j]; old.flags&=~SC64_WORKER_CARGO_MASK;
         encode_unit(&legacy,(unsigned)slots[j],&old);
     }
     clear_fixture_journal();
     save_write(&legacy,sizeof(legacy),SC64_WORKER_CARGO_LEGACY_SAVE_VERSION);
     assert(race_load_game());
-    for (int j=0;j<4;++j) {
-        assert(u[slots[j]].carry==8);
-        assert((u[slots[j]].flags&0x60)==(j==1 ? 0x20 : j>=2 ? 0x40 : 0));
+    for (int j=0;j<5;++j) {
+        assert(u[slots[j]].carry==expected[j].carry);
+        assert((u[slots[j]].flags&0x60)==(j==1 ? 0x20 : (j==2 || j==3) ? 0x40 : 0));
         assert(u[slots[j]].order==expected[j].order);
     }
     assert(race_save_game());
