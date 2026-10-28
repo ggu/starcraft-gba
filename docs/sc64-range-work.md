@@ -21,6 +21,9 @@ the pop scan is bounded by eight bytes.
 stays `PENDING` until gradient clearing and seed enumeration finish, so
 poisoned old bytes cannot be observed. Caller buffers must remain valid and
 disjoint until reset, including while completed results are queried.
+When `cols` is a power of two, the flood worker maps a popped cell to its row
+and column with a mask and shift. Other widths retain the general division and
+remainder path; supported non-power-of-two map shapes remain unchanged.
 `pump(budget, &used)` consumes no more
 than `budget` units. Seed enumeration scans only the clamped target ± maximum
 range rectangle, then applies the exact inclusive squared Euclidean range
