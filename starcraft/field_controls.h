@@ -764,11 +764,15 @@ field_controls_draw_pause(void)
     }
     gfx_rect(30, 79, 180, 1, C_EDGE);
     gfx_text(30, 83, race_mode ? "SKIRMISH" : "OBJECTIVE", C_GOLD);
-    if (info) gfx_text(90, 83, info->title, C_DIM);
+    if (info) {
+        char title[64];
+        sc64_font_ellipsis(info->title,120,title,sizeof(title));
+        sc64_font_text(90,81,120,title,C_DIM);
+    }
     ui_text_wrap(30, 93, 30, 3, race_mode ? "Destroy all enemy buildings." :
                  race_campaign_objective_text(), C_SILVER);
     gfx_rect(30, 120, 180, 1, C_EDGE);
-    ui_key(ui_key(ui_key(30, 124, "A", "SELECT MOVE", C_SILVER), 124, "B", "ORDERS", C_SILVER),
+    ui_key(ui_key(ui_key(30, 124, "A", "SELECT", C_SILVER), 124, "B", "ORDERS", C_SILVER),
            124, "SEL", "DROP", C_SILVER);
     ui_key(ui_key(30, 135, "L", "NEXT  HOLD: BOX", C_SILVER), 135, "R", "ARMY", C_SILVER);
 }
