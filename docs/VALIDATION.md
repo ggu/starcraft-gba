@@ -5641,7 +5641,13 @@ Correctness:
   `c0b2c7a3` with the observer on and off, as at the base.
 - `make test-game-audio-unified` with the advisor bank: the same fixtures
   through `race_queue_unit()` play `sc64_audio_advisor`'s minerals and gas
-  clips for the player race.
+  clips for the player race. The unified run keeps state hash `441d33b8` with
+  audio on and off, the same as the base.
+- `make test-sc64-terran-full-campaign` (the `./dev sc64 test --profile
+  terran` target) with the advisor bank: every step passes except the T9
+  controller run, which reaches its 500,000-tick limit without a Wraith
+  (2 minerals) and fails the same way at the base, with a byte-identical
+  controller trace. T10 then passes on its own.
 
 Memory, from ARM builds of the base `597ff6b` (with the previous 501-clip
 bank) and of this change (with the advisor bank) on the same private inputs:
