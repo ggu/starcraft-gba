@@ -75,6 +75,7 @@ int main(void)
         MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS, MAX_RACE_GEYSERS,
         &complete_ops, &report);
     assert(complete_result == SC64_P8_PREFLIGHT_OK);
+    const Sc64P8PreflightReport positive = report;
 
     assert(map->unit_count <= sizeof(synthetic_rows) / sizeof(synthetic_rows[0]));
     memcpy(synthetic_rows, map->units,
@@ -114,10 +115,47 @@ int main(void)
         MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS, MAX_RACE_GEYSERS,
         &complete_ops, &report) == SC64_P8_PREFLIGHT_BAD_PROPERTY);
 
+    memcpy(synthetic_actions, sc64_p8_source_actions,
+           sizeof(synthetic_actions));
+    unsigned create_action = SC64_P8_SOURCE_ACTION_COUNT;
+    for (unsigned i = 0; i < SC64_P8_SOURCE_ACTION_COUNT; ++i)
+        if (synthetic_actions[i].opcode == 11u &&
+            synthetic_actions[i].group1) { create_action = i; break; }
+    assert(create_action < SC64_P8_SOURCE_ACTION_COUNT);
+    synthetic_actions[create_action].trigger = SC64_P8_TRIGGER_LIMIT;
+    assert(sc64_p8_preflight(map,
+        synthetic_actions, SC64_P8_SOURCE_ACTION_COUNT,
+        MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS, MAX_RACE_GEYSERS,
+        &complete_ops, &report) == SC64_P8_PREFLIGHT_BAD_CREATE);
+
+    memcpy(synthetic_actions, sc64_p8_source_actions,
+           sizeof(synthetic_actions));
+    synthetic_actions[create_action].unit = 250u;
+    assert(sc64_p8_preflight(map,
+        synthetic_actions, SC64_P8_SOURCE_ACTION_COUNT,
+        MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS, MAX_RACE_GEYSERS,
+        &complete_ops, &report) == SC64_P8_PREFLIGHT_UNSUPPORTED_ACTOR);
+    assert(report.first_unresolved_raw == 250u);
+
     assert(sc64_p8_preflight(map,
         sc64_p8_source_actions, SC64_P8_SOURCE_ACTION_COUNT,
-        report.units + report.created_units - 1u, MAX_BUILDINGS,
+        positive.units + positive.created_units - 1u, MAX_BUILDINGS,
         MAX_MINERALS, MAX_RACE_GEYSERS,
+        &complete_ops, &report) == SC64_P8_PREFLIGHT_CAPACITY);
+    assert(sc64_p8_preflight(map,
+        sc64_p8_source_actions, SC64_P8_SOURCE_ACTION_COUNT,
+        MAX_UNITS, positive.buildings + positive.created_buildings - 1u,
+        MAX_MINERALS, MAX_RACE_GEYSERS,
+        &complete_ops, &report) == SC64_P8_PREFLIGHT_CAPACITY);
+    assert(sc64_p8_preflight(map,
+        sc64_p8_source_actions, SC64_P8_SOURCE_ACTION_COUNT,
+        MAX_UNITS, MAX_BUILDINGS, positive.minerals - 1u,
+        MAX_RACE_GEYSERS,
+        &complete_ops, &report) == SC64_P8_PREFLIGHT_CAPACITY);
+    assert(sc64_p8_preflight(map,
+        sc64_p8_source_actions, SC64_P8_SOURCE_ACTION_COUNT,
+        MAX_UNITS, MAX_BUILDINGS, MAX_MINERALS,
+        positive.geysers - 1u,
         &complete_ops, &report) == SC64_P8_PREFLIGHT_CAPACITY);
     puts("sc64_p8_campaign_preflight: source census and fail-closed actor/property/capacity checks pass");
     return 0;
