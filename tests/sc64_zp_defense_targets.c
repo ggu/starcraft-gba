@@ -387,6 +387,23 @@ static void stock_defense_attack_intervals(void)
     }
 }
 
+static void human_defense_fog_acquisition(void)
+{
+    clear_world();
+    b[0] = (Building){ .x=400, .y=400, .hp=300, .maxhp=300,
+        .owner=SIDE, .type=B_SUNKEN_COLONY, .alive=1 };
+    u[0] = (Unit){ .x=416, .y=400, .hp=100, .maxhp=100,
+        .owner=ENEMY, .type=U_ZERGLING, .alive=1 };
+    u[1] = (Unit){ .x=448, .y=400, .hp=100, .maxhp=100,
+        .owner=ENEMY, .type=U_ZERGLING, .alive=1 };
+    SC64_GRID_CLEAR(visible);
+    SC64_GRID_SET(visible, 448 / 16 + (400 / 16) * MAP_COLS, 1);
+    compare_paths();
+    race_tick_defenses_zp_targets();
+    assert(u[0].hp == 100);
+    assert(u[1].hp < 100);
+}
+
 int main(void)
 {
     gba_init();
@@ -399,6 +416,7 @@ int main(void)
     invalid_owner_falls_back_before_mutation();
     dispatcher_preserves_p3_and_skirmish_paths();
     stock_defense_attack_intervals();
+    human_defense_fog_acquisition();
     puts("Z/P defense target differential tests passed");
     return 0;
 }

@@ -8,6 +8,7 @@ static int reference_target(const Building *q, int ground, int air, int range)
     for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive) {
         if (FAST_ABS(q->x - u[j].x) >= range || FAST_ABS(q->y - u[j].y) >= range) continue;
         if (!owners_hostile(q->owner, u[j].owner) || (u[j].flags & 16)) continue;
+        if (q->owner == SIDE && !currently_visible(u[j].x, u[j].y)) continue;
         int flying = sc64_race_unit_flying(u[j].type);
         if ((flying && !air) || (!flying && !ground) || !race_can_attack(-1, j)) continue;
         int d = dist2(q->x, q->y, u[j].x, u[j].y);
@@ -41,6 +42,7 @@ int main(void)
     race_mode = 1; race_human = R_TER; race_bots = 2;
     race_skirmish_init(); screen = SCREEN_PLAY;
     memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b));
+    for (int cell = 0; cell < MAP_CELLS; ++cell) SC64_GRID_SET(visible, cell, 1);
 
     /* Dense mixed-owner candidates, including slot-order ties, strict range
      * boundaries, hidden/invincible flags, and both attack classes. */
@@ -102,6 +104,31 @@ int main(void)
     assert(race_defense_target_from_owner_lists(&tower, 1, 1, 112, head, next,
                                                 hostile[SIDE]) ==
            reference_target(&tower, 1, 1, 112));
+
+    /* Human defense acquisition obeys current fog in the owner-list backend;
+     * other owners continue using their own target/visibility model. */
+    memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b));
+    u[0] = (Unit){ .x=416, .y=400, .hp=100, .maxhp=100,
+        .owner=ENEMY, .type=U_MARINE, .alive=1 };
+    u[1] = (Unit){ .x=448, .y=400, .hp=100, .maxhp=100,
+        .owner=ENEMY, .type=U_MARINE, .alive=1 };
+    SC64_GRID_CLEAR(visible);
+    SC64_GRID_SET(visible, 448 / 16 + (400 / 16) * MAP_COLS, 1);
+    build_target_lists(head, next, hostile);
+    tower.owner = SIDE; tower.x = 400; tower.y = 400;
+    assert(race_defense_target_from_owner_lists(&tower, 1, 0, 112, head, next,
+                                                hostile[SIDE]) == 1);
+    SC64_GRID_SET(visible, 448 / 16 + (400 / 16) * MAP_COLS, 0);
+    assert(race_defense_target_from_owner_lists(&tower, 1, 0, 112, head, next,
+                                                hostile[SIDE]) == -1);
+    tower.owner = ENEMY;
+    u[2] = (Unit){ .x=416, .y=400, .hp=100, .maxhp=100,
+        .owner=SIDE, .type=U_MARINE, .alive=1 };
+    build_target_lists(head, next, hostile);
+    assert(race_defense_target_from_owner_lists(&tower, 1, 0, 112, head, next,
+                                                hostile[ENEMY]) == 2);
+    tower.owner = SIDE;
+    for (int cell = 0; cell < MAP_CELLS; ++cell) SC64_GRID_SET(visible, cell, 1);
 
     /* Owner changes remain guarded by current ownership and hostility. */
     int moved_owner = head[ENEMY][0];

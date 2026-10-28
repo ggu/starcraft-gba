@@ -188,6 +188,23 @@ static void test_dense_maximum_and_other_mode_dispatch(void)
     world_equal(&expected, &actual);
 }
 
+static void test_human_defense_fog_acquisition(void)
+{
+    clear_world();
+    b[0] = (Building){ .x=400, .y=400, .hp=300, .maxhp=300,
+        .owner=SIDE, .type=B_SUNKEN_COLONY, .alive=1 };
+    u[0] = (Unit){ .x=416, .y=400, .hp=100, .maxhp=100,
+        .owner=ENEMY, .type=U_ZERGLING, .alive=1 };
+    u[1] = (Unit){ .x=448, .y=400, .hp=100, .maxhp=100,
+        .owner=ENEMY, .type=U_ZERGLING, .alive=1 };
+    SC64_GRID_CLEAR(visible);
+    SC64_GRID_SET(visible, 448 / 16 + (400 / 16) * MAP_COLS, 1);
+    compare_paths();
+    race_tick_defenses_p3_targets();
+    assert(u[0].hp == 100);
+    assert(u[1].hp < 100);
+}
+
 int main(void)
 {
     gba_init();
@@ -195,6 +212,7 @@ int main(void)
     test_randomized_worlds();
     test_ties_and_death_between_defenses();
     test_dense_maximum_and_other_mode_dispatch();
+    test_human_defense_fog_acquisition();
     puts("P3 defense target differential tests passed");
     return 0;
 }
