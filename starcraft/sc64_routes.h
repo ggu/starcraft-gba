@@ -1,6 +1,14 @@
 #ifndef SC64_ROUTES_H
 #define SC64_ROUTES_H
 
+#ifdef SC64_RANGE_WORK
+#if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3) || \
+    !defined(SC64_IMPORTED_MISSION) || !defined(SC64_DIRECT_FIRING_POINTS)
+#error "SC64_RANGE_WORK requires packed imported-race routes and direct firing points"
+#endif
+#include "sc64_range_work.h"
+#endif
+
 /* Standalone route fixtures still use byte grids; game.c supplies the packed
  * accessor for SC64_LARGE_MAPS builds. */
 #ifndef SC64_GRID_GET
@@ -104,6 +112,12 @@
 #else
 #define SC64_ROUTE_SLOTS 8
 #endif
+#ifdef SC64_RANGE_WORK
+/* Two of the fourteen fixed maximum-map planes are transient range-query
+ * storage. The remaining twelve planes are shared with normal route LRU
+ * fields; a retained tagged range snapshot dynamically occupies one slot. */
+#define SC64_RANGE_WORK_RESERVED_PLANES 2u
+#endif
 #ifdef SC64_RACES
 /* Default: two cells per byte. Optional PACK3: one 3-bit cell code. In either
  * layout 0 is the goal, 1..4 point toward a shortest-path neighbour, and the
@@ -172,6 +186,9 @@ static u16 sc64_route_field[SC64_ROUTE_SLOTS][MAP_CELLS];
 static u8 sc64_route_valid[SC64_ROUTE_SLOTS];
 static u16 sc64_route_goal[SC64_ROUTE_SLOTS];
 static u32 sc64_route_age[SC64_ROUTE_SLOTS], sc64_route_clock;
+#ifdef SC64_RANGE_WORK
+static void sc64_range_route_reset(void);
+#endif
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 /* Rebind field bases after map-shape changes. Return false for invalid or
  * oversized geometry before any route-grid access can use these fields. */
@@ -183,6 +200,9 @@ static int sc64_route_configure(void)
         (unsigned)cols > (unsigned)MAP_CELLS / (unsigned)rows) {
         if (sc64_route_config_cols != cols || sc64_route_config_rows != rows ||
             sc64_route_active_slots != 0) {
+#ifdef SC64_RANGE_WORK
+            sc64_range_route_reset();
+#endif
             sc64_route_config_cols = cols;
             sc64_route_config_rows = rows;
             sc64_route_active_bytes = 0;
@@ -199,10 +219,17 @@ static int sc64_route_configure(void)
     if (bytes == 0 || bytes > SC64_ROUTE_BYTES || bytes > SC64_ROUTE_POOL_BYTES)
         return 0;
     slots = SC64_ROUTE_POOL_BYTES / bytes;
+#ifdef SC64_RANGE_WORK
+    slots = (SC64_ROUTE_POOL_BYTES -
+             SC64_RANGE_WORK_RESERVED_PLANES * SC64_ROUTE_BYTES) / bytes;
+#endif
     if (slots > SC64_ROUTE_ACTIVE_MAX_SLOTS) slots = SC64_ROUTE_ACTIVE_MAX_SLOTS;
     if (slots == 0) return 0;
     if (sc64_route_config_cols == cols && sc64_route_config_rows == rows &&
         sc64_route_active_bytes == bytes && sc64_route_active_slots == slots) return 1;
+#ifdef SC64_RANGE_WORK
+    sc64_range_route_reset();
+#endif
     sc64_route_config_cols = cols;
     sc64_route_config_rows = rows;
     sc64_route_active_bytes = bytes;
@@ -216,7 +243,11 @@ static int sc64_route_configure(void)
 }
 #define SC64_ROUTE_ACTIVE_SLOTS ((int)sc64_route_active_slots)
 #else
+#ifdef SC64_RANGE_WORK
+#define SC64_ROUTE_ACTIVE_SLOTS ((int)SC64_ROUTE_SLOTS - (int)SC64_RANGE_WORK_RESERVED_PLANES)
+#else
 #define SC64_ROUTE_ACTIVE_SLOTS SC64_ROUTE_SLOTS
+#endif
 #endif
 volatile u32 sc64_route_hits, sc64_route_builds;
 
@@ -300,11 +331,497 @@ sc64_routes_reset(void)
     (void)sc64_route_configure();
 #endif
     memset(sc64_route_valid, 0, sizeof(sc64_route_valid));
+#ifdef SC64_RANGE_WORK
+    sc64_range_route_reset();
+#endif
 #ifdef SC64_ROUTE_DECAY_FREQ
     memset(sc64_route_age, 0, sizeof(sc64_route_age));
     sc64_route_clock = 0;
 #endif
 }
+
+#ifdef SC64_RANGE_WORK
+enum {
+    SC64_RANGE_ROUTE_ERROR = -1,
+    SC64_RANGE_ROUTE_PENDING = 0,
+    SC64_RANGE_ROUTE_FOUND = 1,
+    SC64_RANGE_ROUTE_NO_PATH = 2,
+    SC64_RANGE_ROUTE_CANCELLED = 3,
+    SC64_RANGE_ROUTE_STALE_GUIDANCE = 4,
+    SC64_RANGE_ROUTE_QUEUE_CAPACITY = 4,
+    SC64_RANGE_ROUTE_RESULT_LEASE = 24,
+    SC64_RANGE_ROUTE_IDLE_LIMIT = 48
+};
+#ifndef SC64_RANGE_WORK_BUDGET_PER_TICK
+#define SC64_RANGE_WORK_BUDGET_PER_TICK 96u
+#endif
+
+typedef struct Sc64RangeRouteJob {
+    u16 target, tx, ty, minimum, maximum;
+    u16 last_request;
+    u8 valid;
+} Sc64RangeRouteJob;
+
+static Sc64RangeWork sc64_range_route_work;
+static Sc64RangeRouteJob sc64_range_route_active;
+static Sc64RangeRouteJob
+    sc64_range_route_pending[SC64_RANGE_ROUTE_QUEUE_CAPACITY];
+static u32 sc64_range_route_complete_frame;
+static u8 sc64_range_route_queue_head, sc64_range_route_queue_count;
+static s8 sc64_range_route_snapshot_slot = -1;
+static s8 sc64_range_route_copy_slot = -1;
+static unsigned short sc64_range_route_copy_cursor;
+static unsigned short sc64_range_route_last_units;
+static Sc64RangeRouteJob sc64_range_route_snapshot_key;
+
+static int sc64_range_route_same(const Sc64RangeRouteJob *a,
+                                const Sc64RangeRouteJob *b)
+{
+    return a->valid && b->valid && a->target == b->target &&
+        a->tx == b->tx && a->ty == b->ty &&
+        a->minimum == b->minimum && a->maximum == b->maximum;
+}
+
+static int sc64_range_route_same_actor_band(const Sc64RangeRouteJob *a,
+                                            const Sc64RangeRouteJob *b)
+{
+    return a->valid && b->valid && a->target == b->target &&
+        a->minimum == b->minimum && a->maximum == b->maximum;
+}
+
+static u8 *sc64_range_route_gradient_storage(void)
+{
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    return sc64_route_pool + SC64_ROUTE_POOL_BYTES -
+        SC64_RANGE_WORK_RESERVED_PLANES * SC64_ROUTE_BYTES;
+#else
+    return (u8 *)(void *)sc64_route_field[SC64_ROUTE_SLOTS - 2];
+#endif
+}
+
+static u8 *sc64_range_route_frontier_storage(void)
+{
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    return sc64_route_pool + SC64_ROUTE_POOL_BYTES - SC64_ROUTE_BYTES;
+#else
+    return (u8 *)(void *)sc64_route_field[SC64_ROUTE_SLOTS - 1];
+#endif
+}
+
+static unsigned sc64_range_route_plane_capacity(void)
+{
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    return SC64_ROUTE_BYTES;
+#elif defined(SC64_ROUTE_PACK3)
+    return SC64_ROUTE_BYTES;
+#else
+    return sizeof(sc64_route_field[0]);
+#endif
+}
+
+static void sc64_range_route_snapshot_invalidate(void)
+{
+    if (sc64_range_route_snapshot_slot >= 0)
+        sc64_route_valid[sc64_range_route_snapshot_slot] = 0;
+    if (sc64_range_route_copy_slot >= 0)
+        sc64_route_valid[sc64_range_route_copy_slot] = 0;
+    sc64_range_route_snapshot_slot = -1;
+    sc64_range_route_copy_slot = -1;
+    sc64_range_route_copy_cursor = 0;
+    memset(&sc64_range_route_snapshot_key, 0,
+           sizeof(sc64_range_route_snapshot_key));
+}
+
+static void sc64_range_route_reset(void)
+{
+    sc64_range_work_reset(&sc64_range_route_work);
+    memset(&sc64_range_route_active, 0, sizeof(sc64_range_route_active));
+    memset(sc64_range_route_pending, 0, sizeof(sc64_range_route_pending));
+    sc64_range_route_queue_head = sc64_range_route_queue_count = 0;
+    sc64_range_route_snapshot_invalidate();
+}
+
+static int sc64_range_route_queue_index(unsigned offset)
+{
+    return (sc64_range_route_queue_head + (u8)offset) %
+        SC64_RANGE_ROUTE_QUEUE_CAPACITY;
+}
+
+static void sc64_range_route_queue_remove(unsigned offset)
+{
+    for (unsigned i = offset; i + 1u < sc64_range_route_queue_count; ++i)
+        sc64_range_route_pending[sc64_range_route_queue_index(i)] =
+            sc64_range_route_pending[sc64_range_route_queue_index(i + 1u)];
+    if (sc64_range_route_queue_count) {
+        unsigned last = sc64_range_route_queue_index(
+            sc64_range_route_queue_count - 1u);
+        memset(&sc64_range_route_pending[last], 0,
+               sizeof(sc64_range_route_pending[last]));
+        --sc64_range_route_queue_count;
+    }
+    if (!sc64_range_route_queue_count) sc64_range_route_queue_head = 0;
+}
+
+static int sc64_range_route_enqueue(const Sc64RangeRouteJob *job)
+{
+    for (unsigned i = 0; i < sc64_range_route_queue_count; ++i) {
+        Sc64RangeRouteJob *queued =
+            &sc64_range_route_pending[sc64_range_route_queue_index(i)];
+        if (sc64_range_route_same(queued, job)) {
+            queued->last_request = (u16)frame;
+            return 1;
+        }
+        if (sc64_range_route_same_actor_band(queued, job)) {
+            queued->tx = job->tx; queued->ty = job->ty;
+            queued->last_request = (u16)frame;
+            return 1;
+        }
+    }
+    if (sc64_range_route_queue_count >= SC64_RANGE_ROUTE_QUEUE_CAPACITY) return 0;
+    {
+        unsigned tail = sc64_range_route_queue_index(sc64_range_route_queue_count++);
+        sc64_range_route_pending[tail] = *job;
+        sc64_range_route_pending[tail].last_request = (u16)frame;
+        sc64_range_route_pending[tail].valid = 1;
+    }
+    return 1;
+}
+
+static int sc64_range_route_dequeue(Sc64RangeRouteJob *job)
+{
+    if (!sc64_range_route_queue_count) return 0;
+    *job = sc64_range_route_pending[sc64_range_route_queue_head];
+    memset(&sc64_range_route_pending[sc64_range_route_queue_head], 0,
+           sizeof(sc64_range_route_pending[sc64_range_route_queue_head]));
+    sc64_range_route_queue_head =
+        (sc64_range_route_queue_head + 1u) % SC64_RANGE_ROUTE_QUEUE_CAPACITY;
+    --sc64_range_route_queue_count;
+    if (!sc64_range_route_queue_count) sc64_range_route_queue_head = 0;
+    return 1;
+}
+
+static int sc64_range_route_queue_nonempty(void)
+{
+    return sc64_range_route_queue_count != 0;
+}
+
+static int sc64_range_route_has_replacement(void)
+{
+    for (unsigned i = 0; i < sc64_range_route_queue_count; ++i)
+        if (sc64_range_route_same_actor_band(&sc64_range_route_active,
+            &sc64_range_route_pending[sc64_range_route_queue_index(i)]))
+            return 1;
+    return 0;
+}
+
+static int sc64_range_route_snapshot_begin_copy(void)
+{
+    int slot = sc64_range_route_snapshot_slot;
+    if (slot < 0) {
+        for (int i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i)
+            if (!sc64_route_valid[i]) { slot = i; break; }
+        if (slot < 0) {
+            slot = 0;
+            for (int i = 1; i < SC64_ROUTE_ACTIVE_SLOTS; ++i) {
+#ifdef SC64_ROUTE_DECAY_FREQ
+                if (sc64_route_age_freq(sc64_route_age[i]) <
+                        sc64_route_age_freq(sc64_route_age[slot]) ||
+                    (sc64_route_age_freq(sc64_route_age[i]) ==
+                        sc64_route_age_freq(sc64_route_age[slot]) &&
+                     sc64_route_age_older(sc64_route_age[i],
+                                          sc64_route_age[slot]))) slot = i;
+#else
+                if (sc64_route_age[i] < sc64_route_age[slot]) slot = i;
+#endif
+            }
+        }
+    }
+    if (slot < 0 || slot >= SC64_ROUTE_ACTIVE_SLOTS) return 0;
+    sc64_range_route_snapshot_slot = -1;
+    memset(&sc64_range_route_snapshot_key, 0,
+           sizeof(sc64_range_route_snapshot_key));
+    sc64_range_route_copy_slot = slot;
+    sc64_range_route_copy_cursor = 0;
+    sc64_route_valid[slot] = 3; /* reserved/tagged; ordinary fields ignore it */
+    return 1;
+}
+
+static int sc64_range_route_snapshot_copy(unsigned budget)
+{
+    unsigned bytes = sc64_range_route_work.gradient_bytes;
+    unsigned used = 0;
+    while (budget-- && sc64_range_route_copy_cursor < bytes) {
+        unsigned count = bytes - sc64_range_route_copy_cursor;
+        if (count > 64u) count = 64u;
+        memcpy(sc64_route_field[sc64_range_route_copy_slot] +
+                   sc64_range_route_copy_cursor,
+               sc64_range_route_work.gradient + sc64_range_route_copy_cursor,
+               count);
+        sc64_range_route_copy_cursor = (unsigned short)
+            (sc64_range_route_copy_cursor + count);
+        ++used;
+    }
+    sc64_range_route_last_units = (unsigned short)used;
+    if (sc64_range_route_copy_cursor < bytes) return 0;
+    sc64_range_route_snapshot_slot = sc64_range_route_copy_slot;
+    sc64_range_route_copy_slot = -1;
+    sc64_range_route_snapshot_key = sc64_range_route_active;
+    sc64_range_route_snapshot_key.valid = 1;
+#ifdef SC64_ROUTE_DECAY_FREQ
+    sc64_route_age_touch(sc64_range_route_snapshot_slot, 1);
+#else
+    sc64_route_age[sc64_range_route_snapshot_slot] = ++sc64_route_clock;
+#endif
+    return 1;
+}
+
+static int sc64_range_route_snapshot_query(int target, int tx, int ty,
+                                           int minimum, int maximum,
+                                           int col, int row,
+                                           int *next_col, int *next_row)
+{
+    unsigned cell, direction;
+    int exact;
+    if (sc64_range_route_snapshot_slot < 0 ||
+        sc64_range_route_snapshot_slot >= SC64_ROUTE_ACTIVE_SLOTS ||
+        sc64_route_valid[sc64_range_route_snapshot_slot] != 3 ||
+        !sc64_range_route_snapshot_key.valid || !next_col || !next_row ||
+        sc64_range_route_snapshot_key.target != target ||
+        sc64_range_route_snapshot_key.minimum != minimum ||
+        sc64_range_route_snapshot_key.maximum != maximum ||
+        col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS)
+        return SC64_RANGE_ROUTE_PENDING;
+    exact = sc64_range_route_snapshot_key.tx == tx &&
+            sc64_range_route_snapshot_key.ty == ty;
+    cell = (unsigned)col + (unsigned)row * (unsigned)MAP_COLS;
+    direction = sc64_range_work_get3(
+        (const u8 *)(const void *)sc64_route_field[sc64_range_route_snapshot_slot],
+        cell);
+    if (SC64_GRID_GET(path_walkable, cell)) {
+        *next_col = col; *next_row = row;
+        if (direction == 1u) ++*next_col;
+        else if (direction == 2u) --*next_col;
+        else if (direction == 3u) ++*next_row;
+        else if (direction == 4u) --*next_row;
+        else if (direction != 0u) return exact ? SC64_RANGE_ROUTE_NO_PATH :
+                                                   SC64_RANGE_ROUTE_PENDING;
+    } else {
+        static const s8 dx[4] = {1,0,-1,0};
+        static const s8 dy[4] = {0,1,0,-1};
+        int found = 0;
+        for (int i = 0; i < 4; ++i) {
+            int cx = col + dx[i], cy = row + dy[i];
+            if (cx >= 0 && cy >= 0 && cx < MAP_COLS && cy < MAP_ROWS &&
+                SC64_GRID_GET(path_walkable, cx + cy * MAP_COLS) &&
+                sc64_range_work_get3((const u8 *)(const void *)
+                    sc64_route_field[sc64_range_route_snapshot_slot],
+                    (unsigned)cx + (unsigned)cy * (unsigned)MAP_COLS) != 7u) {
+                *next_col = cx; *next_row = cy; found = 1; break;
+            }
+        }
+        if (!found) return exact ? SC64_RANGE_ROUTE_NO_PATH :
+                                   SC64_RANGE_ROUTE_PENDING;
+    }
+    if (*next_col < 0 || *next_row < 0 || *next_col >= MAP_COLS ||
+        *next_row >= MAP_ROWS || !SC64_GRID_GET(path_walkable,
+            *next_col + *next_row * MAP_COLS))
+        return SC64_RANGE_ROUTE_ERROR;
+#ifdef SC64_ROUTE_DECAY_FREQ
+    sc64_route_age_touch(sc64_range_route_snapshot_slot, 1);
+#else
+    sc64_route_age[sc64_range_route_snapshot_slot] = ++sc64_route_clock;
+#endif
+    return exact ? SC64_RANGE_ROUTE_FOUND : SC64_RANGE_ROUTE_STALE_GUIDANCE;
+}
+
+static int sc64_range_route_snapshot_matches_active(void)
+{
+    return sc64_range_route_snapshot_slot >= 0 &&
+        sc64_range_route_snapshot_slot < SC64_ROUTE_ACTIVE_SLOTS &&
+        sc64_route_valid[sc64_range_route_snapshot_slot] == 3 &&
+        sc64_range_route_same(&sc64_range_route_snapshot_key,
+                              &sc64_range_route_active);
+}
+
+static void sc64_range_route_tick(void)
+{
+    unsigned used = 0, budget = SC64_RANGE_WORK_BUDGET_PER_TICK;
+    int status;
+    sc64_range_route_last_units = 0;
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    /* A changed map shape rebinds/clears the route pool and resets range
+     * jobs. Do this before inspecting or dequeuing a job so no request can be
+     * copied into state that configuration immediately invalidates. */
+    if (!sc64_route_configure()) return;
+#endif
+    for (unsigned i = 0; i < sc64_range_route_queue_count;)
+        if ((u16)((u16)frame - sc64_range_route_pending[
+                sc64_range_route_queue_index(i)].last_request) >
+                SC64_RANGE_ROUTE_IDLE_LIMIT)
+            sc64_range_route_queue_remove(i);
+        else ++i;
+    if (sc64_range_route_active.valid &&
+        sc64_range_route_work.phase != SC64_RANGE_WORK_DONE &&
+        (u16)((u16)frame - sc64_range_route_active.last_request) >
+            SC64_RANGE_ROUTE_IDLE_LIMIT) {
+        sc64_range_work_reset(&sc64_range_route_work);
+        sc64_range_route_active.valid = 0;
+    }
+    /* A queued successor may expire while a bounded snapshot copy is in
+     * progress (for example with a deliberately tiny per-tick budget). Do
+     * not leave its partially copied slot pinned after there is no consumer. */
+    if (!sc64_range_route_queue_nonempty() &&
+        sc64_range_route_copy_slot >= 0)
+        sc64_range_route_snapshot_invalidate();
+    /* Route work should not turn an otherwise idle topology invalidation into
+     * an eager full-grid rebuild. Shape configuration/reset above is constant
+     * time; build the collision grid only when work is actually requested. */
+    if ((!sc64_range_route_active.valid ||
+         sc64_range_route_work.phase == SC64_RANGE_WORK_DONE) &&
+        !sc64_range_route_queue_nonempty()) return;
+    if (!path_grid_valid) build_path_grid();
+    if (sc64_range_route_active.valid &&
+        sc64_range_route_work.phase == SC64_RANGE_WORK_DONE &&
+        sc64_range_route_queue_nonempty() &&
+        (sc64_range_route_has_replacement() ||
+         (u32)frame - sc64_range_route_complete_frame >=
+             SC64_RANGE_ROUTE_RESULT_LEASE)) {
+        /* Preserve the completed route in a tagged ordinary LRU field before
+         * the two scratch planes are reused by the next worker. Copy in
+         * bounded 64-byte chunks, charged against this tick's work budget. */
+        if (sc64_range_route_snapshot_matches_active()) {
+            sc64_range_work_reset(&sc64_range_route_work);
+            sc64_range_route_active.valid = 0;
+        } else {
+            if (sc64_range_route_copy_slot < 0 &&
+                !sc64_range_route_snapshot_begin_copy()) {
+                sc64_range_work_reset(&sc64_range_route_work);
+                sc64_range_route_active.valid = 0;
+            } else {
+                (void)sc64_range_route_snapshot_copy(budget);
+                return;
+            }
+        }
+    }
+    if (!sc64_range_route_active.valid) {
+        if (!sc64_range_route_dequeue(&sc64_range_route_active)) return;
+        status = sc64_range_work_begin(&sc64_range_route_work,
+            MAP_COLS, MAP_ROWS, path_walkable, SC64_GRID_STORAGE_BYTES,
+            sc64_range_route_gradient_storage(), sc64_range_route_plane_capacity(),
+            sc64_range_route_frontier_storage(), sc64_range_route_plane_capacity(),
+            sc64_range_route_active.tx, sc64_range_route_active.ty,
+            sc64_range_route_active.minimum, sc64_range_route_active.maximum);
+        if (status < 0) {
+            sc64_range_route_active.valid = 0;
+            return;
+        }
+    }
+    if (sc64_range_route_work.phase != SC64_RANGE_WORK_DONE) {
+        status = sc64_range_work_pump(&sc64_range_route_work,
+            budget, &used);
+        sc64_range_route_last_units = (unsigned short)used;
+        if (status == SC64_RANGE_WORK_READY)
+            sc64_range_route_complete_frame = (u32)frame;
+        else if (status < 0) {
+            sc64_range_work_reset(&sc64_range_route_work);
+            sc64_range_route_active.valid = 0;
+        }
+    }
+}
+
+/* Return FOUND for the current exact key. On target motion, queue the latest
+ * position and return STALE_GUIDANCE only from a same-target/range field;
+ * current weapon checks still decide whether combat can fire. Pending and
+ * no-path never expose a field for a different target or topology. */
+static int sc64_range_route_next(int target, int tx, int ty,
+                                 int minimum, int maximum,
+                                 int col, int row,
+                                 int *next_col, int *next_row)
+{
+    Sc64RangeRouteJob job = {0};
+    int status, nx = -1, ny = -1;
+    unsigned exits = 0;
+    if (!next_col || !next_row || target < 0 || target > 0xffff ||
+        tx < 0 || ty < 0 || tx >= MAP_COLS * 16 || ty >= MAP_ROWS * 16 ||
+        minimum < 0 || maximum < minimum || maximum > 4096 ||
+        col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS)
+        return SC64_RANGE_ROUTE_ERROR;
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    /* Queries may run before the frame-end worker tick. Rebind variable-size
+     * route slots now so no old-shape gradient is read using new dimensions. */
+    if (!sc64_route_configure()) return SC64_RANGE_ROUTE_ERROR;
+#endif
+    job.target = (u16)target; job.tx = (u16)tx; job.ty = (u16)ty;
+    job.minimum = (u16)minimum; job.maximum = (u16)maximum; job.valid = 1;
+    if (!path_grid_valid) build_path_grid();
+    if (sc64_range_route_active.valid &&
+        sc64_range_route_same_actor_band(&sc64_range_route_active, &job) &&
+        !sc64_range_route_same(&sc64_range_route_active, &job)) {
+        /* Keep bounded work on its original seed snapshot. Repeated target
+         * motion coalesces the latest position, while a discovered gradient
+         * remains usable as explicitly stale movement guidance. */
+        sc64_range_route_active.last_request = (u16)frame;
+        (void)sc64_range_route_enqueue(&job);
+        status = sc64_range_work_query(&sc64_range_route_work,
+                                       col, row, &nx, &ny, &exits);
+        if (status == SC64_RANGE_WORK_READY) {
+            if (exits) {
+                static const s8 dx[4] = {1,0,-1,0};
+                static const s8 dy[4] = {0,1,0,-1};
+                static const u8 bits[4] = {0,2,1,3};
+                for (int i = 0; i < 4; ++i) if (exits & (1u << bits[i])) {
+                    nx = col + dx[i]; ny = row + dy[i]; break;
+                }
+            }
+            if (nx >= 0 && ny >= 0 && nx < MAP_COLS && ny < MAP_ROWS &&
+                SC64_GRID_GET(path_walkable, nx + ny * MAP_COLS)) {
+                *next_col = nx; *next_row = ny;
+                return SC64_RANGE_ROUTE_STALE_GUIDANCE;
+            }
+        }
+        status = sc64_range_route_snapshot_query(target, tx, ty, minimum,
+            maximum, col, row, next_col, next_row);
+        if (status == SC64_RANGE_ROUTE_FOUND ||
+            status == SC64_RANGE_ROUTE_STALE_GUIDANCE) return status;
+        return SC64_RANGE_ROUTE_CANCELLED;
+    }
+    if (sc64_range_route_same(&sc64_range_route_active, &job)) {
+        sc64_range_route_active.last_request = (u32)frame;
+        status = sc64_range_work_query(&sc64_range_route_work,
+                                       col, row, &nx, &ny, &exits);
+        if (status == SC64_RANGE_WORK_READY) {
+            if (exits) {
+                static const s8 dx[4] = {1,0,-1,0};
+                static const s8 dy[4] = {0,1,0,-1};
+                static const u8 bits[4] = {0,2,1,3};
+                for (int i = 0; i < 4; ++i) if (exits & (1u << bits[i])) {
+                    nx = col + dx[i]; ny = row + dy[i]; break;
+                }
+            }
+            if (nx < 0 || ny < 0 || nx >= MAP_COLS || ny >= MAP_ROWS ||
+                !SC64_GRID_GET(path_walkable, nx + ny * MAP_COLS))
+                return SC64_RANGE_ROUTE_ERROR;
+            *next_col = nx; *next_row = ny;
+            return SC64_RANGE_ROUTE_FOUND;
+        }
+        if (status == SC64_RANGE_WORK_NO_PATH) return SC64_RANGE_ROUTE_NO_PATH;
+        if (status == SC64_RANGE_WORK_PENDING) {
+            status = sc64_range_route_snapshot_query(target, tx, ty, minimum,
+                maximum, col, row, next_col, next_row);
+            if (status == SC64_RANGE_ROUTE_FOUND ||
+                status == SC64_RANGE_ROUTE_STALE_GUIDANCE) return status;
+            return SC64_RANGE_ROUTE_PENDING;
+        }
+        return SC64_RANGE_ROUTE_ERROR;
+    }
+    (void)sc64_range_route_enqueue(&job);
+    status = sc64_range_route_snapshot_query(target, tx, ty, minimum,
+        maximum, col, row, next_col, next_row);
+    if (status == SC64_RANGE_ROUTE_FOUND ||
+        status == SC64_RANGE_ROUTE_STALE_GUIDANCE) return status;
+    return SC64_RANGE_ROUTE_PENDING;
+}
+#endif
 
 #ifdef SC64_ROUTE_PARTIAL_FLOOD
 /* A partial field is usable only when it has discovered the query origin's
@@ -426,7 +943,13 @@ sc64_route_slot(int goal)
     sc64_route_age_request();
 #endif
     for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; i++) {
+#ifdef SC64_RANGE_WORK
+        if (i == sc64_range_route_copy_slot) continue;
+        if ((sc64_route_valid[i] == 1 || sc64_route_valid[i] == 2) &&
+            sc64_route_goal[i] == goal) {
+#else
         if (sc64_route_valid[i] && sc64_route_goal[i] == goal) {
+#endif
 #ifdef SC64_ROUTE_PARTIAL_FLOOD
             if (sc64_route_valid[i] == 1 ||
                 sc64_route_origin_ready(i, origin, origin_walkable)) {
@@ -462,6 +985,13 @@ sc64_route_slot(int goal)
     }
 #ifdef SC64_ROUTE_PARTIAL_FLOOD
     if (partial_slot >= 0) slot = partial_slot;
+#endif
+#ifdef SC64_RANGE_WORK
+    if (slot == sc64_range_route_snapshot_slot) {
+        sc64_range_route_snapshot_slot = -1;
+        memset(&sc64_range_route_snapshot_key, 0,
+               sizeof(sc64_range_route_snapshot_key));
+    }
 #endif
 #ifdef SC64_RACES
 #ifdef SC64_ROUTE_WORD_CLEAR

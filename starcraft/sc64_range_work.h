@@ -2,8 +2,6 @@
 #ifndef SC64_RANGE_WORK_H
 #define SC64_RANGE_WORK_H
 
-#include <string.h>
-
 /* Standalone, caller-owned incremental 4-neighbour range-field worker.
  * Include after defining u8. The walk grid is one bit per tile; the gradient
  * is the route pool's existing 3-bit-per-tile encoding (0 seed, 1..4 toward
