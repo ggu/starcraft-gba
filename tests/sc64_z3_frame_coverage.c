@@ -34,6 +34,9 @@ draw_scene_contents(void)
         draw_title();
         return;
     }
+#ifdef SC_FIELD_FEEDBACK
+    field_ui_refresh(); /* as game_render does before drawing the scene */
+#endif
     draw_map();
     draw_hud();
     if (screen == SCREEN_PAUSE) draw_pause();

@@ -21,16 +21,26 @@ static void step(u16 held){if(!active())return;u16 pressed=held&(u16)~prior;game
  if(trace&&(int)held!=last){if(!first)fputs(",\n",trace);first=0;fprintf(trace,"{\"kind\":\"input\",\"host_tick\":%u,\"held\":%u,\"pressed\":%u}",(unsigned)ticks,held,pressed);last=held;}
  if(ticks%1000u==0)checkpoint("periodic");}
 static void tap(u16 key){step(key);step(0);}
+
+/* Field controls reopen the order list on the last command. These
+ * sequences were written for a list that opens on Move, so a fresh
+ * open starts there (no extra input, so the run's timing is unchanged). */
+static void tap_b(void)
+{
+    int fresh = !menu_open && mode == MODE_NORMAL;
+    tap(KEY_B);
+    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+}
 static void wait_ticks(int n){for(int i=0;i<n&&active();i++)step(0);}
-static int normal(void){for(int i=0;i<3&&(menu_open||mode!=MODE_NORMAL);i++)tap(KEY_B);return active()&&!menu_open&&mode==MODE_NORMAL;}
+static int normal(void){for(int i=0;i<3&&(menu_open||mode!=MODE_NORMAL);i++)tap_b();return active()&&!menu_open&&mode==MODE_NORMAL;}
 static int clamp(int v,int max){return v<0?0:v>=max?max-1:v;}
 static int snap4(int from,int to,int max){int d=to-from;return clamp(from+4*(d>=0?(d+2)/4:(d-2)/4),max);}
 static void cursor(int x,int y){x=snap4(cx,x,WORLD_W);y=snap4(cy,y,WORLD_H);for(int i=0;i<3000&&(cx!=x||cy!=y)&&active();i++){u16 key=KEY_R;if(cx<x)key|=KEY_RIGHT;if(cx>x)key|=KEY_LEFT;if(cy<y)key|=KEY_DOWN;if(cy>y)key|=KEY_UP;step(key);}step(0);}
-static void leave_building(void){if(selected_building>=0&&normal()){tap(KEY_B);tap(KEY_DOWN);tap(KEY_A);tap(KEY_A);}}
+static void leave_building(void){if(selected_building>=0&&normal()){tap_b();tap(KEY_DOWN);tap(KEY_A);tap(KEY_A);}}
 static int select_unit(int slot){if(slot<0||!u[slot].alive||u[slot].owner!=SIDE||!normal())return 0;leave_building();for(int n=0;n<=MAX_UNITS&&active();n++){if(u[slot].selected&&selected_count()==1&&selected_building<0)return 1;tap(KEY_L);}return 0;}
 static int select_building(int slot){if(slot<0||!b[slot].alive||b[slot].owner!=SIDE||!normal())return 0;leave_building();cursor(b[slot].x,b[slot].y);tap(KEY_A);return selected_building==slot;}
-static int order_unit(int slot,int x,int y,int attack){if(!select_unit(slot))return 0;tap(KEY_B);if(attack)tap(KEY_DOWN);tap(KEY_A);cursor(x,y);tap(KEY_A);return 1;}
-static int group_type(int type,int x,int y){if(!normal())return 0;leave_building();int slot=-1;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==type&&!SC64_TRANSPORT_LOADED(&u[i])){cursor(u[i].x,u[i].y);if(selection_target()==i){slot=i;break;}}if(slot<0)return 0;tap(KEY_A);tap(KEY_A);if(selected_building>=0||!selected_count())return 0;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected&&(u[i].owner!=SIDE||u[i].type!=type))return 0;tap(KEY_B);tap(KEY_DOWN);tap(KEY_A);cursor(x,y);tap(KEY_A);return 1;}
+static int order_unit(int slot,int x,int y,int attack){if(!select_unit(slot))return 0;tap_b();if(attack)tap(KEY_DOWN);tap(KEY_A);cursor(x,y);tap(KEY_A);return 1;}
+static int group_type(int type,int x,int y){if(!normal())return 0;leave_building();int slot=-1;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==type&&!SC64_TRANSPORT_LOADED(&u[i])){cursor(u[i].x,u[i].y);if(selection_target()==i){slot=i;break;}}if(slot<0)return 0;tap(KEY_A);tap(KEY_A);if(selected_building>=0||!selected_count())return 0;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected&&(u[i].owner!=SIDE||u[i].type!=type))return 0;tap_b();tap(KEY_DOWN);tap(KEY_A);cursor(x,y);tap(KEY_A);return 1;}
 static int source_unit(int raw){for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==raw)return i;return -1;}
 static int own_building(int type){int airborne=-1;for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==type&&building_complete(i)){if(!race_late_airborne(i))return i;airborne=i;}return airborne;}
 static int own_units(int type){int n=0;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&(type<0||u[i].type==type))n++;return n;}
@@ -38,7 +48,7 @@ static int queue_at(int slot,int type){if(!select_building(slot))return 0;for(in
 static int nearest_enemy_building(void){int ax=hero>=0?u[hero].x:cx,ay=hero>=0?u[hero].y:cy;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&!IS_WORKER(u[i].type)&&i!=hero){ax=u[i].x;ay=u[i].y;break;}int best=-1,distance=0x7fffffff;for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&owners_hostile(SIDE,b[i].owner)){int d=dist2(ax,ay,b[i].x,b[i].y);if(d<distance){distance=d;best=i;}}return best;}
 static void inspect(void){fprintf(stderr,"mission=%d frame=%d wallet=%d/%d supply=%d/%d\n",race_selected_mission,frame,minerals,gas,supply_used,supply_cap);for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE)fprintf(stderr,"U %d raw=%d type=%d xy=%d,%d hp=%d order=%d target=%d\n",i,u[i].raw_type,u[i].type,u[i].x,u[i].y,u[i].hp,u[i].order,u[i].target);for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&(b[i].owner==SIDE||b[i].raw_type==127))fprintf(stderr,"B %d raw=%d owner=%d type=%d xy=%d,%d hp=%d complete=%d level=%d flags=%d goal=%u\n",i,b[i].raw_type,b[i].owner,b[i].type,b[i].x,b[i].y,b[i].hp,building_complete(i),b[i].level,b[i].flags,(unsigned)race_late.flight_goals[i]);}
 static void inspect_routes(void){for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&(u[i].raw_type==19||u[i].raw_type==29||u[i].raw_type==20))fprintf(stderr,"HERO %d raw=%d owner=%d xy=%d,%d hp=%d\n",i,u[i].raw_type,u[i].owner,u[i].x,u[i].y,u[i].hp);for(int i=0;i<MAX_MINERALS;i++)if(m[i].amount>0&&m[i].y>WORLD_H/2)fprintf(stderr,"M %d xy=%d,%d amount=%d\n",i,m[i].x,m[i].y,m[i].amount);}
-static int choose_menu(int choice){if(!normal())return 0;tap(KEY_B);for(int i=0;i<choice&&active();i++)tap(KEY_DOWN);tap(KEY_A);return 1;}
+static int choose_menu(int choice){if(!normal())return 0;tap_b();for(int i=0;i<choice&&active();i++)tap(KEY_DOWN);tap(KEY_A);return 1;}
 static int land_building(int slot,int x,int y){if(!select_building(slot))return 0;if(!choose_menu(MENU_LIFT_LAND)||mode!=MODE_LAND)return 0;int px=x,py=y,found=0;for(int rad=0;rad<=24&&!found;rad+=4)for(int dy=-rad;dy<=rad&&!found;dy+=4)for(int dx=-rad;dx<=rad;dx+=4){int qx=snap4(cx,x+dx,WORLD_W),qy=snap4(cy,y+dy,WORLD_H);if(race_late_landing_site(slot,qx,qy)){px=qx;py=qy;found=1;break;}}if(!found)return 0;cursor(px,py);tap(KEY_A);return race_late.flight_goals[slot]!=0;}
 static int choose_landing(int slot,int *x,int *y){int patch=nearest_mineral(b[slot].x,b[slot].y);if(patch<0)return 0;int best=0x7fffffff,found=0;for(int yy=24;yy<WORLD_H-24;yy+=16)for(int xx=24;xx<WORLD_W-24;xx+=16){if(!race_late_landing_site(slot,xx,yy))continue;int d=dist2(xx,yy,m[patch].x,m[patch].y);if(d<48*48||d>144*144)continue;int penalty=0;for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&owners_hostile(SIDE,b[i].owner)&&dist2(xx,yy,b[i].x,b[i].y)<200*200)penalty+=100000;int cost=d+penalty;if(cost<best){best=cost;*x=xx;*y=yy;found=1;}}return found;}
 static void opening_t8(void){int cc=own_building(B_COMMAND),lx=0,ly=0;int w=-1;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_WRAITH){w=i;break;}if(w>=0&&hero>=0){order_unit(w,u[hero].x,u[hero].y,0);wait_ticks(180);checkpoint("norad-contact");}

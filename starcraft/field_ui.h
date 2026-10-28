@@ -18,12 +18,12 @@ static const char *unit_name(int type);
 enum {
     UI_A_NONE, UI_A_SELECT, UI_A_DESELECT, UI_A_TRAIN, UI_A_ASSIGN_GAS,
     UI_A_GATHER_GAS, UI_A_ATTACK, UI_A_MOVE_HERE, UI_A_ATTACK_HERE,
-    UI_A_PLACE, UI_A_GROUP
+    UI_A_PLACE, UI_A_GROUP, UI_A_MOVE
 };
 
 /* Facts the cursor, list and HUD all need, gathered in one pass per drawn
  * frame (field_ui_refresh) instead of a pool scan per row. */
-static int ui_selected, ui_worker, ui_action, ui_site, ui_site_x, ui_site_y, ui_site_blocked;
+static int ui_selected, ui_worker, ui_builder, ui_action, ui_site, ui_site_x, ui_site_y, ui_site_blocked;
 static unsigned ui_built; /* completed friendly structure types, as bits */
 
 static const char *const ui_command_label[MENU_COUNT] = {
@@ -40,74 +40,7 @@ static const u8 ui_command_building[MENU_COUNT] = {
     0, 0, B_BARRACKS, B_DEPOT, B_REFINERY, B_ACADEMY, B_ENG_BAY, 0, 0, 0
 };
 
-static int
-ui_text_width(const char *text)
-{
-    int n = 0;
-    while (text[n]) n++;
-    return n * 6 - 1;
-}
-
-/* Right-aligned number in one text call. */
-static void
-ui_num_right(int right, int y, int value, u8 color)
-{
-    char text[8];
-    int n = 7;
-    text[n] = 0;
-    do { text[--n] = (char)('0' + value % 10); value /= 10; } while (value && n);
-    gfx_text(right - (7 - n) * 6 + 1, y, text + n, color);
-}
-
-static int
-ui_num_width(int value)
-{
-    int n = 1;
-    while (value >= 10) { value /= 10; n++; }
-    return n * 6 - 1;
-}
-
-/* Framed panel: dark fill, edge, an accent rule under an optional title. */
-static void
-ui_panel(int x, int y, int w, int h, u8 accent, const char *title)
-{
-    gfx_rect(x, y, w, h, C_PANEL);
-    gfx_frame(x, y, w, h, C_EDGE);
-    gfx_rect(x, y, 3, 1, accent); gfx_rect(x, y, 1, 3, accent);
-    gfx_rect(x + w - 3, y, 3, 1, accent); gfx_rect(x + w - 1, y, 1, 3, accent);
-    gfx_rect(x, y + h - 1, 3, 1, accent); gfx_rect(x, y + h - 3, 1, 3, accent);
-    gfx_rect(x + w - 3, y + h - 1, 3, 1, accent);
-    gfx_rect(x + w - 1, y + h - 3, 1, 3, accent);
-    if (title) {
-        gfx_rect(x + 2, y + 2, w - 4, 11, C_UI);
-        gfx_rect(x + 2, y + 13, w - 4, 1, accent);
-        gfx_text(x + 5, y + 4, title, accent);
-    }
-}
-
-/* A button cap in front of its action, e.g. [A] SELECT. Returns the x after it. */
-static int
-ui_key(int x, int y, const char *key, const char *action, u8 color)
-{
-    int w = ui_text_width(key) + 4;
-    gfx_rect(x, y - 1, w, 9, C_SILVER);
-    gfx_rect(x, y + 8, w, 1, C_DIM);
-    gfx_text(x + 2, y, key, C_PANEL);
-    x += w + 3;
-    if (action) {
-        gfx_text(x, y, action, color);
-        x += ui_text_width(action) + 6;
-    }
-    return x;
-}
-
-/* Selected-row bar shared by every list. */
-static void
-ui_highlight(int x, int y, int w)
-{
-    gfx_rect(x, y, w, 9, C_UI);
-    gfx_rect(x, y, 2, 9, C_GOLD);
-}
+#include "ui_widgets.h"
 
 static void
 ui_unit_glyph(int type, int x, int y, u8 col)
@@ -164,30 +97,7 @@ ui_building_glyph(int type, int x, int y, u8 col)
 static void
 ui_command_icon(int command, int x, int y)
 {
-    if (command == MENU_MOVE) {
-        gfx_line(x - 4, y + 3, x + 3, y - 4, C_GREEN);
-        gfx_line(x - 3, y + 3, x + 3, y - 3, C_GREEN);
-        gfx_rect(x, y - 4, 4, 1, C_GREEN);
-        gfx_rect(x + 3, y - 4, 1, 4, C_GREEN);
-    } else if (command == MENU_ATTACK) {
-        gfx_frame(x - 3, y - 3, 7, 7, C_RED);
-        gfx_rect(x - 5, y, 11, 1, C_RED);
-        gfx_rect(x, y - 5, 1, 11, C_RED);
-        gfx_pixel(x, y, C_WHITE);
-    } else if (command == MENU_WEAPONS) {
-        gfx_line(x - 3, y + 3, x + 3, y - 3, C_SILVER);
-        gfx_line(x - 2, y + 3, x + 3, y - 2, C_WHITE);
-        gfx_line(x - 4, y + 1, x - 1, y + 4, C_GOLD);
-    } else if (command == MENU_ARMOR) {
-        gfx_rect(x - 3, y - 4, 7, 5, C_SILVER);
-        gfx_rect(x - 2, y + 1, 5, 2, C_SILVER);
-        gfx_pixel(x, y + 3, C_SILVER);
-        gfx_rect(x - 1, y - 3, 3, 4, C_BLUE);
-    } else if (command == MENU_STOP) {
-        gfx_rect(x - 4, y - 4, 9, 9, C_RED);
-        gfx_rect(x - 2, y - 2, 5, 5, C_RED_DARK);
-        gfx_rect(x - 2, y, 5, 1, C_WHITE);
-    } else ui_building_glyph(ui_command_building[command], x, y, C_TERRAN);
+    if (!ui_order_icon(command, x, y)) ui_building_glyph(ui_command_building[command], x, y, C_TERRAN);
 }
 
 static const char *
@@ -222,7 +132,7 @@ ui_site_problem(int type, int x, int y)
     if (minerals < building_cost(type)) return UI_SITE_MINERALS;
     if (gas < building_gas_cost(type)) return UI_SITE_GAS;
     if (!can_place(type, x, y)) return UI_SITE_BLOCKED;
-    if (ui_worker < 0) return UI_SITE_WORKER;
+    if (ui_builder < 0) return UI_SITE_WORKER;
     if (find_build_slot() < 0) return UI_SITE_FULL;
     return UI_SITE_OK;
 }
@@ -294,7 +204,24 @@ field_ui_a_action(void)
     }
     if (n && ui_hostile_at(cx, cy, &hx, &hy)) return UI_A_ATTACK;
     if (tx >= 0) return UI_A_SELECT;
-    return n || selected_building >= 0 ? UI_A_DESELECT : UI_A_NONE;
+    if (selected_building >= 0) return UI_A_DESELECT;
+    return n ? UI_A_MOVE : UI_A_NONE;
+}
+
+/* The SCV that builds: the selected one, else the free one nearest the
+ * cursor, so placing needs no SCV selected first. */
+static int
+field_ui_build_worker(void)
+{
+    int i, best = find_selected_worker(), d, best_d = 0x7fffffff;
+    if (best >= 0) return best;
+    for (i = 0; i < MAX_UNITS; i++) {
+        if (!u[i].alive || u[i].owner != SIDE || !IS_WORKER(u[i].type) || u[i].order == ORDER_BUILD)
+            continue;
+        d = dist2(cx, cy, u[i].x, u[i].y);
+        if (d < best_d) { best_d = d; best = i; }
+    }
+    return best;
 }
 
 static void
@@ -310,6 +237,7 @@ field_ui_refresh(void)
     for (i = 0; i < MAX_BUILDINGS; i++)
         if (b[i].alive && b[i].owner == SIDE && !b[i].under_construction) ui_built |= 1u << b[i].type;
     ui_action = box_state == 2 ? UI_A_NONE : field_ui_a_action();
+    ui_builder = mode == MODE_BUILD || menu_open ? field_ui_build_worker() : ui_worker;
     if (mode == MODE_BUILD) {
         ui_site_x = cx; ui_site_y = cy;
         field_ui_site(menu, &ui_site_x, &ui_site_y);
@@ -333,6 +261,18 @@ field_ui_smart_attack(void)
     if (!selected_count() || !ui_hostile_at(cx, cy, &tx, &ty)) return 0;
     issue_order(ORDER_ATTACK_MOVE, tx, ty);
     field_ui_ping(tx, ty, C_RED);
+    return 1;
+}
+
+/* A on open ground moves the selected units there, as a right-click would;
+ * interact() has already tried every target under the cursor. SELECT drops
+ * the selection instead. */
+static int
+field_ui_smart_move(void)
+{
+    if (selected_building >= 0 || !selected_count() || selection_target() >= 0) return 0;
+    issue_order(ORDER_MOVE, cx, cy);
+    field_ui_ping(cx, cy, C_GREEN);
     return 1;
 }
 
@@ -394,7 +334,7 @@ static void
 field_ui_draw_cursor(int x, int y)
 {
     int action = ui_action;
-    u8 color = mode == MODE_MOVE ? C_GREEN : mode == MODE_ATTACK || action == UI_A_ATTACK ? C_RED :
+    u8 color = mode == MODE_MOVE || action == UI_A_MOVE ? C_GREEN : mode == MODE_ATTACK || action == UI_A_ATTACK ? C_RED :
         mode == MODE_BUILD ? C_GOLD : C_HIGHLIGHT;
     if (ping_life) {
         int r = 3 + ping_life / 2, px = ping_x - camx, py = ping_y - camy + 12;
@@ -462,7 +402,7 @@ ui_command_state(int command, int *cost)
     if (!ui_has_tech(type)) return UI_SITE_TECH;
     if (minerals < *cost) return UI_SITE_MINERALS;
     if (gas < building_gas_cost(type)) return UI_SITE_GAS;
-    return ui_worker < 0 ? UI_SITE_WORKER : UI_SITE_OK;
+    return ui_builder < 0 ? UI_SITE_WORKER : UI_SITE_OK;
 }
 
 static void
@@ -500,7 +440,7 @@ ui_hint_line(int a_action)
 {
     static const char *const a_text[] = {
         0, "SELECT", "DESELECT", "TRAIN", "ADD GAS WORKER", "GATHER GAS",
-        "ATTACK", "MOVE HERE", "ATTACK HERE", "PLACE", "ALL OF TYPE"
+        "ATTACK", "MOVE HERE", "ATTACK HERE", "PLACE", "ALL OF TYPE", "MOVE"
     };
     int x = 3;
     if (a_action == UI_A_TRAIN) {
@@ -524,7 +464,7 @@ static void
 ui_status(int x, int y, int problem, int type)
 {
     static const char *const text[] = {
-        "READY", "SELECT AN SCV", "NEEDS ", "NEED MINERALS", "SITE BLOCKED", "NO FREE SLOT",
+        "READY", "NO FREE SCV", "NEEDS ", "NEED MINERALS", "SITE BLOCKED", "NO FREE SLOT",
         "NEED GAS"
     };
     if (problem == UI_SITE_TECH) {
@@ -571,7 +511,7 @@ field_ui_draw_hud(void)
         if (state == UI_SITE_OK)
             gfx_text(30, 136, ui_command_note[menu_cursor], C_DIM);
         else if (state == UI_SITE_WORKER)
-            gfx_text(30, 136, type ? "SELECT AN SCV FIRST" : "SELECT UNITS FIRST", C_RED);
+            gfx_text(30, 136, type ? "NO FREE SCV" : "SELECT UNITS FIRST", C_RED);
         else if (type) ui_status(30, 136, state, type);
         else if (state == UI_SITE_MINERALS)
             gfx_text(30, 136, gas < 100 ? "NEED 100 GAS" : "NEED 100 MINERALS", C_RED);
@@ -734,12 +674,13 @@ field_ui_draw_pause(void)
     gfx_text(130, 52, "HATCHERY", C_DIM);
     if (pause_notice) gfx_text(130, 66, pause_notice == 1 ? "GAME SAVED" : "NO SAVE FOUND",
                                pause_notice == 1 ? C_GREEN : C_RED);
-    gfx_rect(30, 80, 180, 1, C_EDGE);
-    gfx_text(30, 84, "CONTROLS", C_GOLD);
-    ui_key(30, 96, "A", "SELECT, CONFIRM, ATTACK", C_SILVER);
-    ui_key(30, 107, "B", "ORDER LIST / BACK", C_SILVER);
-    ui_key(30, 118, "L", "NEXT UNIT  HOLD: BOX SELECT", C_SILVER);
-    ui_key(30, 129, "R", "ARMY  HOLD: FAST CURSOR", C_SILVER);
+    gfx_rect(30, 78, 180, 1, C_EDGE);
+    gfx_text(30, 81, "CONTROLS", C_GOLD);
+    ui_key(30, 92, "A", "SELECT, MOVE, ATTACK", C_SILVER);
+    ui_key(30, 102, "B", "ORDER LIST / BACK", C_SILVER);
+    ui_key(30, 112, "L", "NEXT UNIT  HOLD: BOX SELECT", C_SILVER);
+    ui_key(30, 122, "R", "ARMY  HOLD: FAST CURSOR", C_SILVER);
+    ui_key(30, 132, "SEL", "DROP SELECTION", C_SILVER);
 }
 
 static void

@@ -24,7 +24,6 @@ static int fail(const char *message)
     return 1;
 }
 
-#ifdef SC64_UNIT_FACING
 static void facing_test_clip(int top, int bottom)
 {
 #ifdef GBA_SCENE_CLIP
@@ -35,6 +34,7 @@ static void facing_test_clip(int top, int bottom)
 #endif
 }
 
+#ifdef SC64_UNIT_FACING
 static int facing_is_zero(void)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
@@ -460,11 +460,13 @@ static int check_field_controls_review(void)
     resolve_now();
     if (!field_controls_hint() || strcmp(field_controls_hint(), "A CHOOSE  B CLOSE"))
         return fail("controls: the open order list kept the field hint");
+    /* The HUD explains the highlighted row: Move needs a selection. */
+    menu_cursor = MENU_MOVE;
     draw_hud_commands();
     unsigned drawn = hint_band_hash();
     gfx_rect(0, 137, 132, 9, C_PANEL);
-    gfx_text(5, 137, "A CHOOSE  B CLOSE", C_GOLD);
-    if (hint_band_hash() != drawn) return fail("controls: HUD row does not show the menu hint");
+    gfx_text(5, 137, "SELECT UNITS FIRST", C_RED);
+    if (hint_band_hash() != drawn) return fail("controls: HUD row does not explain the unavailable command");
     press(KEY_B);
 
     hydra = -1;
@@ -497,6 +499,88 @@ static int check_field_controls_review(void)
     return 0;
 }
 
+/* Each race's skirmish: A on open ground moves, SELECT drops the selection,
+ * every list row resolves and draws, placement snaps and finds its own
+ * worker, and the pause list saves. */
+static int check_field_controls_races(void)
+{
+    static const int races[3] = {R_TER, R_ZERG, R_PROTOSS};
+#ifdef GBA_SCENE_CLIP
+    gfx_set_clip_y(0, 160);
+#endif
+    for (int r = 0; r < 3; ++r) {
+        int worker = -1, x, y, before, placed = -1, slot;
+        game_init(); previous = 0;
+        race_mode = 1; race_human = races[r]; race_bots = 1; race_skirmish_map = 0;
+        init_state();
+        for (int i = 0; i < MAX_UNITS && worker < 0; ++i)
+            if (u[i].alive && u[i].owner == SIDE && IS_WORKER(u[i].type)) worker = i;
+        if (worker < 0 || !open_spot(&x, &y)) return fail("races: no worker or open ground");
+        cx = u[worker].x; cy = u[worker].y;
+        press(KEY_A);
+        if (!u[worker].selected) return fail("races: A did not select the worker");
+        cx = x; cy = y;
+        resolve_now();
+        if (ui_action != UI_A_MOVE || strcmp(field_controls_unit_hint(), "A MOVE  B ORDERS"))
+            return fail("races: open ground does not offer a move");
+        press(KEY_A);
+        if (!u[worker].selected || u[worker].order != ORDER_MOVE || ping_color != C_GREEN)
+            return fail("races: A on open ground did not move the worker");
+        press(KEY_SELECT);
+        if (selected_count() || screen != SCREEN_PLAY) return fail("races: SELECT did not drop the selection");
+
+        /* Every row of the open list, nothing selected. */
+        press(KEY_B);
+        if (!menu_open) return fail("races: B did not open the list");
+        for (int i = 0; i < field_menu_count(); ++i) {
+            int cost, gas_cost;
+            const char *need;
+            menu_cursor = i;
+            int state = ui_row_state(i, &cost, &gas_cost, &need);
+            if ((i == MENU_MOVE || i == MENU_STOP) && state != UI_SITE_UNITS)
+                return fail("races: orders are not dimmed without a selection");
+            game_render();
+        }
+
+        /* The supply structure, with no worker selected: the nearest
+         * worker builds it on the 8-pixel grid. */
+        minerals = 1000; gas = 1000;
+        menu_cursor = MENU_DEPOT;
+        {
+            int cost, gas_cost;
+            const char *need;
+            if (ui_row_state(MENU_DEPOT, &cost, &gas_cost, &need) != UI_SITE_OK)
+                return fail("races: the supply structure is unavailable with funds");
+        }
+        press(KEY_A);
+        if (mode != MODE_BUILD) return fail("races: the supply row did not arm placement");
+        cx = x + 3; cy = y + 2;
+        game_render();
+        before = minerals;
+        press(KEY_A);
+        for (slot = 0; slot < MAX_BUILDINGS; ++slot)
+            if (b[slot].alive && b[slot].owner == SIDE && b[slot].type == menu &&
+                dist2(b[slot].x, b[slot].y, x + 3, y + 2) < 8 * 8) placed = slot;
+        if (placed < 0 || minerals >= before) return fail("races: placement without a selected worker failed");
+        if ((b[placed].x & 7) || (b[placed].y & 7)) return fail("races: placement did not snap to the grid");
+        if (selected_count()) return fail("races: the builder replaced the selection");
+
+        /* Pause: down to SAVE GAME, A saves and says so; START resumes. */
+        press(KEY_START);
+        if (screen != SCREEN_PAUSE) return fail("races: START did not pause");
+        press(KEY_DOWN);
+        press(KEY_A);
+        if (pause_cursor != 1 || (pause_notice & 0xc0) != UI_NOTICE_SAVED) return fail("races: pause did not save");
+        game_render();
+        press(KEY_START);
+        if (screen != SCREEN_PLAY || pause_cursor || pause_notice) return fail("races: START did not resume");
+        won = 1; screen = SCREEN_RESULT; result_outro_end = 1; result_outro = 200;
+        game_render();
+        won = 0; screen = SCREEN_PLAY;
+    }
+    return 0;
+}
+
 /* A successful load restores another frame; a cache from before the load
  * that matches its low byte must not survive. Leaves the skirmish loaded. */
 static int check_field_controls_load(void)
@@ -517,9 +601,87 @@ static int check_field_controls_load(void)
 }
 #endif
 
+/* Exercise actual imported unit/building paths at both viewport edges,
+ * including mirrored and word-packed facing frames. HUD restoration at the
+ * end of a frame must not be the only thing keeping world art out of it. */
+static int check_world_hud_boundaries(void)
+{
+    static const int headings[] = {0, 8, 16, 24};
+    int visible_pixels = 0;
+    game_init();
+    race_mode = 1; race_human = R_TER; race_bots = 1; race_skirmish_map = 0;
+    init_state(); screen = SCREEN_PLAY;
+    memset(u, 0, sizeof(u)); memset(b, 0, sizeof(b));
+    camx = camy = 0; cx = 120; cy = 54;
+    for (int edge = 0; edge < 2; ++edge) {
+        for (int type = 0; type < SC_RU_COUNT; ++type) {
+            Unit *q = &u[0];
+            memset(q, 0, sizeof(*q));
+            q->alive = 1; q->owner = SIDE; q->type = type;
+            q->raw_type = sc64_race_raw_unit(type);
+            q->x = 120; q->y = edge ? 107 : 0;
+            q->hp = q->maxhp = 100;
+            for (unsigned h = 0; h < sizeof(headings)/sizeof(headings[0]); ++h) {
+                gfx_begin(0xe7);
+                facing_test_clip(12, 120);
+#ifdef SC64_UNIT_FACING
+                sc64_facing[0] = (u8)headings[h];
+#endif
+                draw_unit(q);
+                for (int y = 0; y < 160; ++y)
+                    for (int x = 0; x < 240; ++x) {
+                        int changed = gfx_test_pixel(x,y) != 0xe7;
+                        if (changed && (y < 12 || y >= 120))
+                            return fail("unit art or vitals crossed a HUD boundary");
+                        visible_pixels += changed;
+                    }
+            }
+        }
+        u[0].alive = 0;
+        for (int type = 0; type < SC_RB_COUNT; ++type) {
+            Building *q = &b[0];
+            memset(q, 0, sizeof(*q));
+            q->alive = 1; q->owner = SIDE; q->type = type;
+            q->raw_type = sc64_race_raw_building(type);
+            q->x = 120; q->y = edge ? 107 : 0;
+            q->hp = q->maxhp = 100;
+            gfx_begin(0xe7);
+            facing_test_clip(12, 120);
+            draw_building_art(q); draw_building_overlay(q);
+            for (int y = 0; y < 160; ++y)
+                for (int x = 0; x < 240; ++x)
+                    if ((y < 12 || y >= 120) && gfx_test_pixel(x,y) != 0xe7)
+                        return fail("building art or vitals crossed a HUD boundary");
+        }
+    }
+    if (!visible_pixels) return fail("HUD clipping fixture drew no world art");
+    b[0].alive = 0;
+    facing_test_clip(0, 160);
+    /* Render alternating buffers with unchanged HUD keys, moving large art
+     * along the top edge, then compare against a fresh resource-band draw. */
+    sc64_hud_valid = 0;
+    for (int step = 0; step < 6; ++step) {
+        u[0].alive = 1; u[0].owner = SIDE; u[0].type = U_TANK;
+        u[0].raw_type = sc64_race_raw_unit(U_TANK);
+        u[0].x = 30 + step * 20; u[0].y = 0;
+        game_render();
+        unsigned char top[240 * 12];
+        for (int y = 0; y < 12; ++y)
+            for (int x = 0; x < 240; ++x) top[y*240+x] = gfx_test_pixel(x,y);
+        draw_hud_resources();
+        for (int y = 0; y < 12; ++y)
+            for (int x = 0; x < 240; ++x)
+                if (top[y*240+x] != gfx_test_pixel(x,y))
+                    return fail("completed frame retained world pixels over resource HUD");
+    }
+    game_init();
+    return 0;
+}
+
 int main(void)
 {
     gba_init();
+    if (check_world_hud_boundaries()) return 1;
 #ifdef SC64_UNIT_FACING
     game_init();
     memset(sc64_facing, 0x17, sizeof(sc64_facing));
@@ -651,7 +813,7 @@ int main(void)
     if (!facing_is_zero()) return fail("successful load restored/retained stale facing bytes");
 #endif
 #ifdef SC64_FIELD_CONTROLS
-    if (check_field_controls() || check_field_controls_load()) return 1;
+    if (check_field_controls() || check_field_controls_load() || check_field_controls_races()) return 1;
 #endif
     puts("Showcase menu, scene runtime, pause controls, and save isolation: ok");
     return 0;

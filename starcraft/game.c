@@ -1447,8 +1447,10 @@ static s16 ping_x, ping_y;
 #elif defined(SC64_FIELD_CONTROLS)
 /* The same controls and feedback state for field_controls.h; never saved.
  * Bytes: the Showcase build has little working RAM left. ui_tick and
- * ui_tick_mode key field_ui_refresh()'s cached ui_action. */
+ * ui_tick_mode key field_ui_refresh()'s cached ui_action. pause_notice
+ * holds the pause message and its countdown (field_controls.h). */
 static u8 menu_last, r_tap_state, ping_life, ping_color, ui_action, ui_tick, ui_tick_mode;
+static u8 pause_cursor, pause_notice;
 static s16 ping_x, ping_y;
 #endif
 static int box_suppress_a;
@@ -1773,6 +1775,8 @@ building_gas_cost(int type)
     return type == B_ACADEMY ? 0 : 0;
 }
 
+#include "sc64_unit_walk.h"
+
 static int
 find_unit_slot(void)
 {
@@ -1799,6 +1803,7 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+    sc64_walk_reset_slot(i);
 #ifdef SC64_UNIT_FACING
     sc64_facing_reset_slot(i);
 #endif
@@ -3863,6 +3868,7 @@ load_game(void)
 #endif
 #ifdef SC64_RACES
     int loaded = race_load_game();
+    if (loaded) sc64_walk_reset_all();
 #ifdef SC64_UNIT_FACING
     if (loaded) sc64_facing_reset_all();
 #endif
@@ -4107,6 +4113,7 @@ spawn_imported_mission(void)
 static void
 init_state(void)
 {
+    sc64_walk_reset_all();
 #ifdef SC64_RACES
 #ifdef SC64_UNIT_FACING
     sc64_facing_reset_all();
@@ -4128,6 +4135,7 @@ init_state(void)
 #ifdef SC64_FIELD_CONTROLS
     /* A restart jumps frame back, so the cached A action must resolve afresh. */
     menu_last=ping_life=r_tap_state=0;ui_action=ui_tick_mode=0;
+    pause_cursor=pause_notice=0;
 #endif
     return;
 #endif
@@ -4343,6 +4351,7 @@ check_imported_mission_outcome(void)
 void
 game_init(void)
 {
+    sc64_walk_reset_all();
 #ifdef SC64_UNIT_FACING
     sc64_facing_reset_all();
 #endif
@@ -4643,13 +4652,22 @@ static void
 start_build(int type)
 {
 #ifdef SC64_RACES
-    if(race_start_build(SIDE,find_selected_worker(),type,cx,cy)){
-        mode=MODE_NORMAL;toast(3);
+    {
+        int site_x = cx, site_y = cy, worker = find_selected_worker();
 #ifdef SC64_FIELD_CONTROLS
-        field_ui_ping(cx,cy,C_GOLD);
+        /* Snap to the grid (gas to its geyser); without a selected worker
+         * the nearest free one builds, so the army can stay selected. */
+        field_ui_site(type, &site_x, &site_y);
+        worker = field_ui_build_worker(type);
 #endif
-    }else toast(8);
-    return;
+        if(race_start_build(SIDE,worker,type,site_x,site_y)){
+            mode=MODE_NORMAL;toast(3);
+#ifdef SC64_FIELD_CONTROLS
+            field_ui_ping(site_x,site_y,C_GOLD);
+#endif
+        }else toast(8);
+        return;
+    }
 #endif
     int cost = building_cost(type), i, slot, px = cx, py = cy;
 #ifdef SC_DEFAULT_UI
@@ -4671,7 +4689,11 @@ start_build(int type)
 	toast(6);
 	return;
     }
+#ifdef SC_DEFAULT_UI
+    i = field_ui_build_worker();
+#else
     i = find_selected_worker();
+#endif
     if (i < 0) {
 	toast(5);
 	return;
@@ -5119,6 +5141,74 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
     return choice == MENU_STOP + 1 && race_nexus_command_available() ?
         "NEXUS" : labels[choice];
 }
+
+/* Row i of the command list, with every profile's contextual rows. */
+static const char *race_menu_label(int i)
+{
+    static const char *const race_labels[3][
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+        MENU_COUNT
+#else
+        MENU_STOP + 1
+#endif
+    ]={
+        {"MOVE ORDER","ATTACK MOVE","BARRACKS","SUPPLY DEPOT","REFINERY","ACADEMY","ENGINEERING BAY","WEAPONS","ARMOR","STOP / HOLD"},
+        {"MOVE ORDER","ATTACK MOVE","SPAWNING POOL","HATCHERY","EXTRACTOR","HYDRALISK DEN","EVOLUTION","WEAPONS","ARMOR","STOP / HOLD"
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+         ,"UPGRADE TO LAIR","SPIRE"
+#endif
+#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
+         ,"CREEP COLONY"
+#endif
+        },
+        {"MOVE ORDER","ATTACK MOVE","GATEWAY","PYLON","ASSIMILATOR","CYBERNETICS","FORGE","WEAPONS","ARMOR","STOP / HOLD"}};
+    const char *const *labels=race_labels[race_human];
+#ifdef SC64_T5_RUNTIME
+    static const char *const advanced_labels[] = {
+        "FACTORY", "STARPORT", "CONTROL TOWER", "UNLOAD CARGO"
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        , "LIFT / LAND", "COMMAND CENTER"
+#endif
+    };
+    return race_nexus_command_available() && i == MENU_STOP + 1 ?
+        "NEXUS" : race_probe_cannon_command_available() && i == MENU_STOP + 2 ?
+        "CANNON" : i >= MENU_FACTORY ?
+        advanced_labels[i - MENU_FACTORY] : labels[i];
+#else
+    const char *label = field_menu_base_label(i, labels);
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+#ifdef SC64_P4_STORM_ENABLED
+    if (i == MENU_STOP + 1 && race_p4_storm_menu_available()) label = "STORM";
+#ifdef SC64_P6_STORM_ENABLED
+    if (i == MENU_STOP + 1 && race_p6_storm_menu_available()) label = "STORM";
+#endif
+#ifdef SC64_P5_SHUTTLE_ENABLED
+    if (i == MENU_STOP + 1 && race_p5_shuttle_menu_available()) label = "UNLOAD CARGO";
+#endif
+#else
+#ifdef SC64_Z5_CLOAK_ENABLED
+    label = i == MENU_STOP + 1 && race_z5_cloak_menu_available() ?
+        (race_z5.cloak.active ? "UNCLOAK" : "CLOAK") :
+#ifdef SC64_Z5_CONSUME_ENABLED
+        i == MENU_STOP + 2 && race_z5_cloak_menu_available() ? "CONSUME" :
+#endif
+        label;
+#endif
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+    if (i==MENU_STOP+1 && race_z6_transport_research_selected()) label="VENTRAL SACS";
+    if (i==MENU_STOP+1 && race_z6_overlord_menu_available()) label="UNLOAD CARGO";
+#endif
+#ifdef SC64_Z6_CLOAK_ENABLED
+    if (race_z6_cloak_menu_available()) {
+        if (i==MENU_STOP+1) label=race_z6.cloak.active ? "UNCLOAK" : "CLOAK";
+        if (i==MENU_STOP+2) label="STORM";
+    }
+#endif
+#endif
+#endif
+    return label;
+#endif
+}
 #endif
 
 static void
@@ -5348,7 +5438,7 @@ interact(void)
 	return;
     }
 #ifdef SC_FIELD_FEEDBACK
-    if (field_ui_smart_attack()) return;
+    if (field_ui_smart_attack() || field_ui_smart_move()) return;
 #endif
     {
         int picked = select_at();
@@ -6837,10 +6927,24 @@ update_selection_box(u16 held, u16 pressed, int old_x, int old_y)
 #include "command_ring.h"
 #endif
 
+#ifdef SC_FIELD_FEEDBACK
+/* SELECT in the field drops the selection (A on open ground now moves the
+ * selected units there); with nothing selected it pauses, like START. */
+static __attribute__((noinline)) int
+field_ui_select_key(void)
+{
+    if (!selected_count() && selected_building < 0) return 0;
+    clear_selection();
+    mode = MODE_NORMAL;
+    menu_open = 0;
+    return 1;
+}
+#endif
+
 static void
 pause_action(u16 pressed)
 {
-#ifdef SC_DEFAULT_UI
+#if defined(SC_DEFAULT_UI) || defined(SC64_FIELD_CONTROLS)
     field_ui_pause_input(pressed);
     return;
 #endif
@@ -6981,6 +7085,9 @@ game_update(u16 held, u16 pressed)
     }
     if (pressed & KEY_SELECT) {
 	reset_selection_gestures();
+#ifdef SC_FIELD_FEEDBACK
+	if (field_ui_select_key()) return;
+#endif
 	screen = SCREEN_PAUSE;
 	return;
     }
@@ -7064,6 +7171,9 @@ game_update(u16 held, u16 pressed)
 	    menu_open = 1;
 #ifdef SC_FIELD_FEEDBACK
 	    menu_cursor = menu_last; /* B, A repeats the last command */
+#ifdef SC64_RACES
+	    if (menu_cursor >= field_menu_count()) menu_cursor = 0; /* row left with its unit */
+#endif
 #else
 	    menu_cursor = 0;
 #endif
@@ -7604,6 +7714,8 @@ draw_unit(Unit * q)
     if ((actor_flags & SC64_GAME_ACTOR_HIDDEN) || SC64_CARRIER_STATE_HIDDEN(q)) return;
     if (actor_flags && !(actor_flags & SC64_GAME_ACTOR_DRAWABLE)) return;
 #endif
+    int walk = sc64_walk_track(q);
+    int body_y = y - SC64_WALK_LIFT(walk);
 #ifdef SC64_HAS_SPRITES
     const Sc64SpriteFrame *sprite =
 #ifdef SC64_RACES
@@ -7633,10 +7745,10 @@ draw_unit(Unit * q)
 #ifdef SC64_UNIT_FACING
     sc64_facing_track(q);
 #if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
-    if(attack_pose) draw_mission_sprite(attack_pose,x,y);
+    if(attack_pose) draw_mission_sprite(attack_pose,x,body_y);
     else
 #endif
-    if (sprite && sc64_facing_draw(q, facing_raw, x, y)) {}
+    if (sprite && sc64_facing_draw(q, facing_raw, x, body_y)) {}
     else
 #endif
     if (sprite) {
@@ -7650,49 +7762,61 @@ draw_unit(Unit * q)
             if(q->raw_type>=0)++sc64_unit_words_explicit_raw_calls;
             else ++sc64_unit_words_derived_raw_calls;
 #endif
-            gfx_blit_sprite_words(sprite_x,sprite_y,word_sprite);
+            gfx_blit_sprite_words(sprite_x,sprite_y+body_y-y,word_sprite);
 #ifdef SC64_UNIT_WORD_SPRITE_DIAGNOSTICS
         }
 #endif
         else
-            draw_mission_sprite(sprite,x,y);
+            draw_mission_sprite(sprite,x,body_y);
 #else
-        draw_mission_sprite(sprite,x,y);
+        draw_mission_sprite(sprite,x,body_y);
 #endif
     }
     else
 #endif
     {
+    /* Legs stay on the ground while the body rises between footfalls. */
+    int feet = y;
+    y = body_y;
     if (IS_WORKER(q->type)) {
 	gfx_rect(x - 3, y - 2, 7, 5, col);
 	gfx_pixel(x + 2, y - 3, C_SILVER);
 	gfx_pixel(x - 3, y + 3, C_GOLD);
+	if (walk) sc64_walk_treads(x, feet + 3, walk, C_SHADOW);
     } else if (q->type == U_MARINE) {
 	gfx_rect(x - 2, y - 4, 5, 8, col);
 	gfx_rect(x - 3, y - 5, 6, 2, C_SILVER);
 	gfx_line(x + 1, y, x + 5, y - 2, C_SILVER);
+	if (walk) sc64_walk_legs(x, feet + 4, walk, C_SILVER);
     } else if (q->type == U_FIREBAT) {
 	gfx_rect(x - 3, y - 4, 7, 8, col);
 	gfx_rect(x - 4, y - 5, 8, 2, C_ORANGE);
 	gfx_pixel(x + 5, y, C_ORANGE);
+	if (walk) sc64_walk_legs(x, feet + 4, walk, C_ORANGE);
     } else if (q->type == U_MEDIC) {
 	gfx_rect(x - 3, y - 4, 7, 8, C_WHITE);
 	gfx_pixel(x, y - 1, C_RED);
 	gfx_pixel(x, y, C_RED);
 	gfx_pixel(x, y + 1, C_RED);
+	if (walk) sc64_walk_legs(x, feet + 4, walk, C_SILVER);
     } else if (q->type == U_ZERGLING) {
 	gfx_diamond(x, y, 5, 3, col);
 	gfx_line(x - 3, y - 1, x - 6, y - 4, C_BLOOD);
 	gfx_line(x + 3, y - 1, x + 6, y - 4, C_BLOOD);
+	if (walk) sc64_walk_scuttle(x, feet + 3, 4, walk, C_BLOOD);
 	} else if (q->type == U_RAYNOR) {
 	gfx_diamond(x, y, 6, 5, C_GOLD);
 	gfx_rect(x - 2, y - 5, 5, 3, C_SILVER);
 	gfx_pixel(x, y, C_WHITE);
+	/* The hover bike has no legs; its exhaust flickers instead. */
+	if (walk) gfx_pixel(x, y + 6, (walk & 1) ? C_ORANGE : C_GOLD);
     } else {
 	gfx_diamond(x, y, 5, 4, col);
 	gfx_pixel(x - 4, y - 3, C_PURPLE);
 	gfx_pixel(x + 4, y - 3, C_PURPLE);
+	if (walk) sc64_walk_scuttle(x, feet + 4, 4, walk, C_PURPLE);
     }
+    y = feet;
     }
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (!(actor_flags & SC64_GAME_ACTOR_INVINCIBLE))
@@ -8699,28 +8823,12 @@ sc64_tile_background_done:
 #endif
 #ifdef SC_DEFAULT_UI
     if (menu_open) field_ui_draw_command_menu();
+#elif defined(SC64_FIELD_CONTROLS)
+    if (menu_open) field_controls_draw_command_menu();
 #else
     if (menu_open) {
-	#ifdef SC64_RACES
-        static const char *race_labels[3][
-#ifdef SC64_ZP_CAMPAIGN_STORAGE
-            MENU_COUNT
-#else
-            MENU_STOP + 1
-#endif
-        ]={
-            {"MOVE ORDER","ATTACK MOVE","BARRACKS","SUPPLY DEPOT","REFINERY","ACADEMY","ENGINEERING BAY","WEAPONS","ARMOR","STOP / HOLD"},
-            {"MOVE ORDER","ATTACK MOVE","SPAWNING POOL","HATCHERY","EXTRACTOR","HYDRALISK DEN","EVOLUTION","WEAPONS","ARMOR","STOP / HOLD"
-#ifdef SC64_ZP_CAMPAIGN_STORAGE
-             ,"UPGRADE TO LAIR","SPIRE"
-#endif
-#ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
-             ,"CREEP COLONY"
-#endif
-            },
-            {"MOVE ORDER","ATTACK MOVE","GATEWAY","PYLON","ASSIMILATOR","CYBERNETICS","FORGE","WEAPONS","ARMOR","STOP / HOLD"}};
-        const char **labels=race_labels[race_human];
-#else
+        int first = menu_cursor >= 10 ? menu_cursor - 9 : 0;
+#ifndef SC64_RACES
         static const char *labels[MENU_COUNT] = {
 	    "MOVE ORDER", "ATTACK MOVE", "BUILD BARRACKS", "BUILD DEPOT",
 	    "BUILD REFINERY", "BUILD ACADEMY", "BUILD ENG BAY",
@@ -8729,79 +8837,19 @@ sc64_tile_background_done:
 #endif
 	gfx_rect(137, 14, 100, 96, C_PANEL);
 	gfx_frame(137, 14, 100, 96, C_EDGE);
-#ifdef SC64_T5_RUNTIME
-        int first = 0, count = field_menu_count();
-        static const char *const advanced_labels[] = {
-            "FACTORY", "STARPORT", "CONTROL TOWER", "UNLOAD CARGO"
-#ifdef SC64_TERRAN_LATE_RUNTIME
-            , "LIFT / LAND", "COMMAND CENTER"
-#endif
-        };
-        if (menu_cursor >= 10) first = menu_cursor - 9;
-	for (i = first; i < count && i < first + 10; i++) {
-            const char *label = race_nexus_command_available() && i == MENU_STOP + 1 ?
-                "NEXUS" : race_probe_cannon_command_available() && i == MENU_STOP + 2 ?
-                "CANNON" : i >= MENU_FACTORY ?
-                advanced_labels[i - MENU_FACTORY] : labels[i];
-	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
-	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
-	}
-#elif defined(SC64_ZP_CAMPAIGN_STORAGE)
-        int first = menu_cursor >= 10 ? menu_cursor - 9 : 0;
-#ifdef SC64_P4_STORM_ENABLED
-	for (i = first; i < field_menu_count() && i < first + 10; ++i) {
-	    const char *label = i == MENU_STOP + 1 && race_p4_storm_menu_available() ?
-                "STORM" : field_menu_base_label(i, labels);
-#ifdef SC64_P6_STORM_ENABLED
-            if (i == MENU_STOP + 1 && race_p6_storm_menu_available()) label = "STORM";
-#endif
-#ifdef SC64_P5_SHUTTLE_ENABLED
-            if (i == MENU_STOP + 1 && race_p5_shuttle_menu_available()) label = "UNLOAD CARGO";
-#endif
-	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
-	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
-	}
-#else
-	for (i = first; i < field_menu_count() && i < first + 10; ++i) {
-            const char *label = field_menu_base_label(i, labels);
-#ifdef SC64_Z5_CLOAK_ENABLED
-            label = i == MENU_STOP + 1 && race_z5_cloak_menu_available() ?
-                (race_z5.cloak.active ? "UNCLOAK" : "CLOAK") :
-#ifdef SC64_Z5_CONSUME_ENABLED
-                i == MENU_STOP + 2 && race_z5_cloak_menu_available() ? "CONSUME" :
-#endif
-                label;
-#endif
-#ifdef SC64_Z6_TRANSPORT_ENABLED
-            if (i==MENU_STOP+1 && race_z6_transport_research_selected()) label="VENTRAL SACS";
-            if (i==MENU_STOP+1 && race_z6_overlord_menu_available()) label="UNLOAD CARGO";
-#endif
-#ifdef SC64_Z6_CLOAK_ENABLED
-            if (race_z6_cloak_menu_available()) {
-                if (i==MENU_STOP+1) label=race_z6.cloak.active ? "UNCLOAK" : "CLOAK";
-                if (i==MENU_STOP+2) label="STORM";
-            }
-#endif
-	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
-	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
-	}
-#endif
-#else
-        int first = menu_cursor >= 10 ? menu_cursor - 9 : 0;
 	for (i = first; i < field_menu_count() && i < first + 10; i++) {
             const char *label =
 #ifdef SC64_RACES
-                field_menu_base_label(i, labels);
+                race_menu_label(i);
 #else
                 labels[i];
 #endif
 	    gfx_text(142, 17 + (i - first) * 9, i == menu_cursor ? ">" : " ", C_GOLD);
 	    gfx_text(149, 17 + (i - first) * 9, label, i == menu_cursor ? C_WHITE : C_DIM);
 	}
-#endif
     }
 #endif
-#ifndef SC_DEFAULT_UI /* field_ui_draw_cursor previews the snapped site */
+#if !defined(SC_DEFAULT_UI) && !defined(SC64_FIELD_CONTROLS) /* field_ui previews the snapped site */
     if (mode == MODE_BUILD && box_state != 2) {
         int build_x = cx, build_y = cy;
 #ifdef SC64_RACES
@@ -8906,6 +8954,9 @@ draw_pause(void)
 #ifdef SC_DEFAULT_UI
     field_ui_draw_pause();
     return;
+#elif defined(SC64_FIELD_CONTROLS)
+    field_controls_draw_pause();
+    return;
 #endif
     gfx_rect(29, 18, 182, 124, C_PANEL);
     gfx_frame(29, 18, 182, 124, C_CYAN);
@@ -8935,6 +8986,9 @@ draw_result(void)
 #endif
 #ifdef SC_DEFAULT_UI
     field_ui_draw_result();
+    return;
+#elif defined(SC64_FIELD_CONTROLS)
+    field_controls_draw_result();
     return;
 #endif
     gfx_rect(28, 40, 184, 66, C_PANEL);
@@ -8972,7 +9026,7 @@ draw_result_screen(void)
     unsigned open = outro >= outro_end ? (unsigned)(outro - outro_end) : 0u;
     if (open < SC64_RESULT_PANEL_OPEN) {
         int w = 16 + (int)(168u * (open + 1u) / (SC64_RESULT_PANEL_OPEN + 1u));
-#ifdef SC_DEFAULT_UI
+#if defined(SC_DEFAULT_UI) || defined(SC64_FIELD_CONTROLS)
         int h = 8 + (int)(78u * (open + 1u) / (SC64_RESULT_PANEL_OPEN + 1u));
 #else
         int h = 8 + (int)(58u * (open + 1u) / (SC64_RESULT_PANEL_OPEN + 1u));
@@ -9067,6 +9121,9 @@ draw_hud_commands_body(void)
     if (box_state == 2) {
         gfx_text(5, 126, "BOX SELECT", C_CYAN);
         gfx_text(5, 137, "RELEASE L SELECT B CANCEL", C_GOLD);
+#ifdef SC64_FIELD_CONTROLS
+    } else if (field_controls_draw_hud()) { /* list, placement, armed orders */
+#endif
     } else if (selected_building >= 0 && b[selected_building].alive) {
 	Building *q = &b[selected_building];
 	#ifdef SC64_RACES
@@ -9115,7 +9172,12 @@ draw_hud_commands_body(void)
 		gfx_text(5, 137, "HP", C_CYAN);
 		gfx_num(24, 137, u[i].hp, C_GREEN);
 		if (IS_WORKER(u[i].type))
+#ifdef SC64_FIELD_CONTROLS
+		    gfx_text(52, 137, ui_action == UI_A_MOVE ? "A MOVE  B BUILD" :
+			     ui_action == UI_A_GAS ? "A GAS  B BUILD" : "AUTO MINE  B BUILD", C_GOLD);
+#else
 		    gfx_text(52, 137, "AUTO MINE / A GAS", C_GOLD);
+#endif
 		else
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
                 if (race_p7_active() && u[i].type==U_P7_CARRIER) {
@@ -9156,6 +9218,8 @@ draw_hud_commands_body(void)
 #endif
 #ifdef SC_COMMAND_RING
 		    gfx_text(52, 137, "HOLD B ORDERS", C_GOLD);
+#elif defined(SC64_FIELD_CONTROLS)
+		    gfx_text(52, 137, field_controls_unit_hint(), C_GOLD);
 #else
 		    gfx_text(52, 137, "A ORDER B COMMANDS", C_GOLD);
 #endif
@@ -9298,7 +9362,11 @@ draw_hud_commands_body(void)
 #if !defined(SC64_TILE_RENDERER) && !defined(SC64_HUD_PAGE_BANDS)
 static _Alignas(4) u8 sc64_hud_top[240 * 12], sc64_hud_bottom[240 * 40];
 #endif
+#ifdef SC64_FIELD_CONTROLS
+enum { SC64_HUD_KEY_COUNT=29 }; /* 26-28: the field controls' rows */
+#else
 enum { SC64_HUD_KEY_COUNT=26 };
+#endif
 static int sc64_hud_previous[SC64_HUD_KEY_COUNT], sc64_hud_valid;
 #ifdef SC64_RACES
 /* Keep race presentation key construction in ROM: canonical Z3 has very
@@ -9315,6 +9383,19 @@ sc64_hud_race_keys(int *values,int first)
         values[25]=sc64_actor_max_shields(b[selected_building].type,1);
     }
     values[19]=race_campaign.phase;values[20]=race_campaign.message;
+#ifdef SC64_FIELD_CONTROLS
+    /* The hint follows the A action; the open list follows its cursor and
+       wallet; placement status follows the snapped site and wallet. */
+    values[26]=ui_action|menu_open<<4|menu_cursor<<5;
+    if (menu_open || mode == MODE_BUILD) {
+        int x=cx,y=cy;
+        if (mode == MODE_BUILD) {
+            field_ui_site(menu,&x,&y);
+            values[27]=(x>>3)|(y>>3)<<12;
+        }
+        values[28]=minerals|gas<<16;
+    }
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if(first>=0 && race_p7_active() && u[first].type==U_P7_CARRIER)
         values[20]|=((int)race_p7_carrier_training_child_count(first)+(u[first].carry<<3))<<8;

@@ -468,6 +468,9 @@ main(int argc, char **argv)
 
     /* R selects the in-game combat group. The command wheel then issues an
      * attack-move toward the hostile pair closest to the nearest mineral patch. */
+    /* A clean R tap selects the group; R then stays held as fast cursor. */
+    input_frame(KEY_R);
+    input_frame(0);
     movement_base = KEY_R;
     input_frame(movement_base);
     patch = nearest_patch(cx, cy);

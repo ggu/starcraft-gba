@@ -851,7 +851,12 @@ void gfx_circle(int x,int y,int r,u8 c){if(r<0||r>240)return;for(int yy=-r;yy<=r
 #else
 HOT void gfx_circle(int x,int y,int r,u8 c){if(r<0||r>240)return;for(int yy=-r;yy<=r;yy++)for(int xx=-r;xx<=r;xx++)if(xx*xx+yy*yy<=r*r)gfx_pixel(x+xx,y+yy,c);}
 #endif
-HOT void gfx_diamond(int x,int y,int rx,int ry,u8 color) {
+/* Sprite-heavy profiles can leave this fallback in ROM to make room for
+ * clipping in the sprite compositors without reducing the stack reserve. */
+#ifndef GBA_DIAMOND_ROM
+HOT
+#endif
+void gfx_diamond(int x,int y,int rx,int ry,u8 color) {
     if(rx<0||ry<0||rx>480||ry>320)return;
     if(!ry){gfx_rect(x-rx,y,rx*2+1,1,color);return;}
     color=GFX_TILE_COLOR(color);

@@ -354,7 +354,7 @@ simultaneous_failure_tests(void)
         {B_DEPOT, 40, 24, 0, 50, 1, UI_SITE_MINERALS, 0, "no SCV + short minerals: minerals first"},
         {B_DEPOT, 120, 48, 1, 50, 1, UI_SITE_MINERALS, 1, "blocked + short minerals: minerals first, red site"},
         {B_DEPOT, 120, 48, 0, 500, 1, UI_SITE_BLOCKED, 1, "blocked + no SCV: blocked first"},
-        {B_DEPOT, 40, 24, 0, 500, 1, UI_SITE_WORKER, 0, "clear site, only the SCV missing"},
+        {B_DEPOT, 40, 24, 0, 500, 1, UI_SITE_OK, 0, "clear site, no SCV selected: the nearest free SCV builds"},
         {B_DEPOT, 40, 24, 1, 500, 1, UI_SITE_OK, 0, "everything present"},
     };
     for (unsigned i = 0; i < sizeof cases / sizeof cases[0]; i++) {
@@ -380,13 +380,30 @@ simultaneous_failure_tests(void)
     /* The command list uses the same order, minus the placement checks. */
     arm_site(B_BARRACKS, 40, 24, 0, 0, 0);
     mode = MODE_NORMAL;
+    menu_open = 1; /* the list resolves the SCV that would build */
     field_ui_refresh();
     {
         int cost;
         check(ui_command_state(MENU_BARRACKS, &cost) == UI_SITE_TECH, "list: prerequisite before minerals and SCV");
         check(ui_command_state(MENU_DEPOT, &cost) == UI_SITE_MINERALS, "list: minerals before SCV");
         minerals = 500;
+        check(ui_command_state(MENU_DEPOT, &cost) == UI_SITE_OK, "list: any free SCV can build");
+        for (int i = 0; i < MAX_UNITS; i++)
+            if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV) u[i].order = ORDER_BUILD;
+        field_ui_refresh();
         check(ui_command_state(MENU_DEPOT, &cost) == UI_SITE_WORKER, "list: SCV last");
+    }
+
+    /* With every SCV already building, placement reports the missing SCV. */
+    arm_site(B_DEPOT, 40, 24, 0, 500, 1);
+    for (int i = 0; i < MAX_UNITS; i++)
+        if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV) u[i].order = ORDER_BUILD;
+    render();
+    check(ui_site == UI_SITE_WORKER, "no free SCV: placement names it");
+    {
+        int before = minerals;
+        start_build(B_DEPOT);
+        check(toast_id == 5 && minerals == before, "no free SCV: nothing is spent");
     }
 }
 
@@ -413,12 +430,38 @@ render_smoke(void)
     }
 }
 
+/* A on open ground moves the selection; SELECT drops it, then pauses. */
+static void
+smart_move_tests(void)
+{
+    int scv;
+    fixture();
+    scv = slot_of(SIDE, U_SCV);
+    move_cursor(u[scv].x, u[scv].y);
+    tap(KEY_A);
+    check(u[scv].selected, "smart move fixture selects an SCV");
+    move_cursor(200, 100);
+    check(selection_target() < 0 && a_action() == UI_A_MOVE, "A on open ground offers a move");
+    tap(KEY_A);
+    check(u[scv].selected && u[scv].order == ORDER_MOVE && ping_life && ping_color == C_GREEN,
+          "A on open ground moves the selected units");
+    render();
+    tap(KEY_SELECT);
+    check(!selected_count() && screen == SCREEN_PLAY, "SELECT drops the selection");
+    check(a_action() == UI_A_NONE, "nothing selected: A on open ground does nothing");
+    tap(KEY_SELECT);
+    check(screen == SCREEN_PAUSE, "SELECT with nothing selected pauses");
+    tap(KEY_A);
+    check(screen == SCREEN_PLAY, "A resumes");
+}
+
 int
 main(void)
 {
     gba_init();
     game_init();
     deselect_tests();
+    smart_move_tests();
     unfinished_producer_tests();
     smart_attack_tests();
     r_gesture_tests();
@@ -431,9 +474,9 @@ main(void)
     render_smoke();
     if (failures) return 1;
 #ifdef SC_COMMAND_RING
-    puts("Default menus and controls (ring build): deselect, smart attack, R tap, placement status order, snapping, title/pause/result: ok");
+    puts("Default menus and controls (ring build): deselect, smart move, smart attack, R tap, placement status order, snapping, title/pause/result: ok");
 #else
-    puts("Default menus and controls: deselect, smart attack, R tap, list memory, placement status order, snapping, title/pause/result: ok");
+    puts("Default menus and controls: deselect, smart move, smart attack, R tap, list memory, placement status order, snapping, title/pause/result: ok");
 #endif
     return 0;
 }

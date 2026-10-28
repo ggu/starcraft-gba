@@ -12,7 +12,9 @@ enum {
     SC64_P8_EXPECTED_TRIGGER_COUNT = 8,
     SC64_P8_EXPECTED_ACTION_COUNT = 68,
     SC64_P8_EXPECTED_CONDITION_COUNT = 9,
-    SC64_P8_EXPECTED_LOCATION_COUNT = 64
+    SC64_P8_EXPECTED_LOCATION_COUNT = 64,
+    SC64_P8_SOURCE_PROPERTY_COUNT = 64,
+    SC64_P8_SOURCE_PROPERTY_BYTES = 20
 };
 
 _Static_assert(SC64_P8_SOURCE_GLOBAL_ID == SC64_P8_EXPECTED_GLOBAL_ID,
@@ -77,6 +79,9 @@ static inline int sc64_p8_source_metadata_valid(void)
         const Sc64P8SourceTrigger *tr = &sc64_p8_source_triggers[a->trigger];
         if (i < tr->first_action || i >= tr->first_action + tr->action_count ||
             a->index != i - tr->first_action || a->opcode == 3u) return 0;
+        if (a->opcode == 11u && a->group2 &&
+            (a->group2 > SC64_P8_SOURCE_PROPERTY_COUNT ||
+             !sc64_p8_source_property_used[a->group2 - 1u])) return 0;
         if ((a->opcode == 1u || a->opcode == 2u) &&
             a->index + 1u != tr->action_count) return 0;
     }
@@ -94,6 +99,24 @@ static inline int sc64_p8_source_metadata_valid(void)
             loc->right > SC64_P8_SOURCE_MAP_COLS * 32u ||
             loc->bottom > SC64_P8_SOURCE_MAP_ROWS * 32u) return 0;
     }
+    for (unsigned i = 0; i < SC64_P8_SOURCE_PROPERTY_COUNT; ++i)
+        if (sc64_p8_source_property_used[i] > 1u) return 0;
+    return 1;
+}
+
+/* Native create action selectors are one-based UPRP IDs. This accessor only
+ * authenticates the referenced UPUS slot and exposes its immutable 20-byte
+ * record; it deliberately does not interpret override flags or field values.
+ */
+static inline int
+sc64_p8_source_property(unsigned selector, const u8 **record)
+{
+    if (!record) return 0;
+    *record = 0;
+    if (selector == 0u ||
+        selector > SC64_P8_SOURCE_PROPERTY_COUNT ||
+        !sc64_p8_source_property_used[selector - 1u]) return 0;
+    *record = sc64_p8_source_properties[selector - 1u];
     return 1;
 }
 

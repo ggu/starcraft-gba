@@ -115,12 +115,22 @@ static void step(u16 held)
 }
 
 static void tap(u16 key) { step(key); step(0); }
+
+/* Field controls reopen the order list on the last command. These
+ * sequences were written for a list that opens on Move, so a fresh
+ * open starts there (no extra input, so the run's timing is unchanged). */
+static void tap_b(void)
+{
+    int fresh = !menu_open && mode == MODE_NORMAL;
+    tap(KEY_B);
+    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+}
 static void wait_ticks(int count)
 { for (int i = 0; i < count && host_tick < (u32)limit_ticks && screen == SCREEN_PLAY && !won && !lost; ++i) step(0); }
 
 static int normal_field(void)
 {
-    for (int i = 0; i < 3 && (menu_open || mode != MODE_NORMAL); ++i) tap(KEY_B);
+    for (int i = 0; i < 3 && (menu_open || mode != MODE_NORMAL); ++i) tap_b();
     return screen == SCREEN_PLAY && !menu_open && mode == MODE_NORMAL;
 }
 
@@ -128,7 +138,7 @@ static int select_unit(int slot)
 {
     if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive ||
         u[slot].owner != SIDE || !normal_field()) return 0;
-    if (selected_building >= 0) { tap(KEY_B); tap(KEY_A); tap(KEY_A); }
+    if (selected_building >= 0) { tap_b(); tap(KEY_A); tap(KEY_A); }
     for (int n = 0; n <= MAX_UNITS && host_tick < (u32)limit_ticks; ++n) {
         if (u[slot].selected && selected_count() == 1 && selected_building < 0)
             return 1;
@@ -141,7 +151,7 @@ static int click_select_unit(int slot)
 {
     if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive ||
         u[slot].owner != SIDE || !normal_field()) return 0;
-    if (selected_building >= 0) { tap(KEY_B); tap(KEY_A); tap(KEY_A); }
+    if (selected_building >= 0) { tap_b(); tap(KEY_A); tap(KEY_A); }
     static const int dx[8] = {-16, 16, 0, 0, -24, 24, 0, 0};
     static const int dy[8] = {0, 0, -16, 16, 0, 0, -24, 24};
     for (int attempt = 0; attempt < 9 && u[slot].alive; ++attempt) {
@@ -219,7 +229,7 @@ static int issue_attack_move(int x, int y)
     if (!normal_field()) return 0;
     /* Queueing a Wraith leaves the Starport selected. Clear that building
      * selection through the ordinary menu before drawing a unit selection. */
-    if (selected_building >= 0) { tap(KEY_B); tap(KEY_A); tap(KEY_A); }
+    if (selected_building >= 0) { tap_b(); tap(KEY_A); tap(KEY_A); }
     int left = WORLD_W, top = WORLD_H, right = -1, bottom = -1;
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
         (u[i].type == U_MARINE || u[i].type == U_WRAITH) &&
@@ -248,7 +258,7 @@ static int issue_attack_move(int x, int y)
         ++count;
     }
     if (!count || count != selected_count() || selected_building >= 0) return 0;
-    tap(KEY_B); tap(KEY_DOWN); tap(KEY_A);
+    tap_b(); tap(KEY_DOWN); tap(KEY_A);
     move_cursor(x, y); tap(KEY_A);
     fprintf(stderr, "T9 issued attacker attack-move target=%d,%d selected=%d cursor=%d,%d\n",
             x, y, selected_count(), cx, cy);
@@ -265,7 +275,7 @@ static int issue_wraith_orders(int x, int y)
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_WRAITH &&
             !SC64_TRANSPORT_LOADED(&u[i]) && click_select_unit(i)) {
-            tap(KEY_B); tap(KEY_DOWN); tap(KEY_A);
+            tap_b(); tap(KEY_DOWN); tap(KEY_A);
             move_cursor(x,y); tap(KEY_A);
             if (u[i].alive && u[i].order == ORDER_ATTACK_MOVE) ++ordered;
         }
@@ -375,7 +385,7 @@ static int t9_threat_route(int sx,int sy,int gx,int gy,int out_x[256],int out_y[
 static int issue_wraith_group_move(int x,int y)
 {
     if(!select_visible_wraith_group())return 0;
-    tap(KEY_B);tap(KEY_A);move_cursor(x,y);tap(KEY_A);
+    tap_b();tap(KEY_A);move_cursor(x,y);tap(KEY_A);
     int moved=0;
     for(int i=0;i<MAX_UNITS;++i)if(u[i].alive&&u[i].selected&&
         u[i].owner==SIDE&&u[i].type==U_WRAITH&&u[i].order==ORDER_MOVE)++moved;
@@ -423,7 +433,7 @@ static int send_wraith_wave_to(int target)
 static int issue_wraith_group_order(int x, int y)
 {
     if (!select_visible_wraith_group()) return issue_wraith_orders(x,y);
-    tap(KEY_B); tap(KEY_DOWN); tap(KEY_A);
+    tap_b(); tap(KEY_DOWN); tap(KEY_A);
     move_cursor(x,y); tap(KEY_A);
     int ordered = 0;
     for (int i = 0; i < MAX_UNITS; ++i)
@@ -550,7 +560,7 @@ static int assign_worker_to_mineral(int slot)
      * at the home mineral line with an ordinary Move order, then Stop it so
      * the normal idle-worker economy behavior assigns the nearest patch. */
     if (!click_select_unit(slot)) return 0;
-    tap(KEY_B); tap(KEY_A); /* command menu -> Move */
+    tap_b(); tap(KEY_A); /* command menu -> Move */
     move_cursor(m[patch].x, m[patch].y);
     tap(KEY_A);
     if (!u[slot].alive || u[slot].order != ORDER_MOVE) return 0;
@@ -559,7 +569,7 @@ static int assign_worker_to_mineral(int slot)
         step(0);
     if (!u[slot].alive) return 0;
     int distance_to_patch = dist2(u[slot].x, u[slot].y, m[patch].x, m[patch].y);
-    tap(KEY_B);
+    tap_b();
     for (int row = 0; row < MENU_STOP; ++row) tap(KEY_DOWN);
     tap(KEY_A); /* Stop -> ordinary idle economy can select nearby minerals. */
     for (int tick = 0; tick < 40 && u[slot].alive &&
@@ -576,7 +586,7 @@ static int select_building(int slot)
 {
     if (slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive ||
         b[slot].owner != SIDE || !normal_field()) return 0;
-    if (selected_building >= 0) { tap(KEY_B); tap(KEY_A); tap(KEY_A); }
+    if (selected_building >= 0) { tap_b(); tap(KEY_A); tap(KEY_A); }
     move_cursor(b[slot].x, b[slot].y);
     tap(KEY_A);
     return selected_building == slot && selected_count() == 0;
@@ -633,7 +643,7 @@ static int build_from_worker(int slot, int type, int menu_choice,
     if (slot < 0 || slot >= MAX_UNITS || !u[slot].alive ||
         u[slot].owner != SIDE || !IS_WORKER(u[slot].type) ||
         !click_select_unit(slot)) return 0;
-    tap(KEY_B);
+    tap_b();
     for (int row = 0; row < menu_choice; ++row) tap(KEY_DOWN);
     tap(KEY_A);
     if (mode != MODE_BUILD || menu != type) return 0;
@@ -794,7 +804,7 @@ static int assign_spare_worker_to_minerals(void)
 static int lift_command_center_to(int cc, int gx, int gy, int *land_x, int *land_y)
 {
     if (cc < 0 || cc >= MAX_BUILDINGS || !b[cc].alive || !select_building(cc)) return 0;
-    tap(KEY_B);
+    tap_b();
     for (int row = 0; row < MENU_LIFT_LAND; ++row) tap(KEY_DOWN);
     tap(KEY_A);
     if (!race_late_airborne(cc)) return 0;
@@ -810,13 +820,13 @@ static int lift_command_center_to(int cc, int gx, int gy, int *land_x, int *land
                 }
             }
     if (!found) return 0;
-    tap(KEY_B); tap(KEY_A); /* ordinary Move command for the airborne CC */
+    tap_b(); tap(KEY_A); /* ordinary Move command for the airborne CC */
     move_cursor(*land_x,*land_y); tap(KEY_A);
     for (int i = 0; i < 12000 && b[cc].alive &&
          dist2(b[cc].x,b[cc].y,*land_x,*land_y) > 4*4; ++i) step(0);
     if (!b[cc].alive || !race_late_airborne(cc) ||
         dist2(b[cc].x,b[cc].y,*land_x,*land_y) > 4*4) return 0;
-    tap(KEY_B);
+    tap_b();
     for (int row = 0; row < MENU_LIFT_LAND; ++row) tap(KEY_DOWN);
     tap(KEY_A); move_cursor(*land_x,*land_y); tap(KEY_A);
     for (int i = 0; i < 2000 && race_late_airborne(cc); ++i) step(0);
@@ -875,7 +885,7 @@ static int ferry_scv_to_gas_site(void)
         fprintf(stderr,"T9 gas ferry cannot select worker=%d xy=%d,%d order=%d tick=%u\n",
                 worker,u[worker].x,u[worker].y,u[worker].order,(unsigned)host_tick); return 0;
     }
-    tap(KEY_B); tap(KEY_A); move_cursor(u[carrier].x,u[carrier].y); tap(KEY_A);
+    tap_b(); tap(KEY_A); move_cursor(u[carrier].x,u[carrier].y); tap(KEY_A);
     for (int i = 0; i < 1200 && u[worker].alive &&
          dist2(u[worker].x,u[worker].y,u[carrier].x,u[carrier].y) > 12*12; ++i) step(0);
     if (!u[worker].alive || !u[worker].selected) {
@@ -891,13 +901,13 @@ static int ferry_scv_to_gas_site(void)
                 worker,u[worker].order,u[worker].target,carrier,(unsigned)host_tick); return 0;
     }
     int gx = geysers[geyser].x, gy = geysers[geyser].y;
-    tap(KEY_B); tap(KEY_A);
+    tap_b(); tap(KEY_A);
     move_cursor(gx,gy); tap(KEY_A);
     for (int i = 0; i < 8000 && u[carrier].alive &&
          dist2(u[carrier].x,u[carrier].y,gx,gy) > 24*24; ++i) step(0);
     if (!u[carrier].alive || dist2(u[carrier].x,u[carrier].y,gx,gy) > 24*24 ||
         !click_select_unit(carrier)) return 0;
-    tap(KEY_B);
+    tap_b();
     for (int row = 0; row < MENU_UNLOAD; ++row) tap(KEY_DOWN);
     tap(KEY_A); move_cursor(clamp_coord(gx + 32,WORLD_W),gy); tap(KEY_A);
     for (int i = 0; i < 1800 && SC64_TRANSPORT_LOADED(&u[worker]); ++i) step(0);
@@ -932,12 +942,12 @@ static int ferry_scv_to_gas_site(void)
      * footprint there. Move it away with normal controls before attempting to
      * select the SCV; otherwise A on the SCV's tile can board it again. */
     if (!u[carrier].selected && !select_unit(carrier)) return 0;
-    tap(KEY_B); tap(KEY_A); move_cursor(clamp_coord(gx + 112,WORLD_W),
+    tap_b(); tap(KEY_A); move_cursor(clamp_coord(gx + 112,WORLD_W),
                                          clamp_coord(gy + 96,WORLD_H)); tap(KEY_A);
     for (int i = 0; i < 1000 && dist2(u[carrier].x,u[carrier].y,u[worker].x,u[worker].y) < 48*48; ++i) step(0);
     if (dist2(u[carrier].x,u[carrier].y,u[worker].x,u[worker].y) < 48*48) return 0;
     if (!select_unit(worker)) return 0;
-    tap(KEY_B); tap(KEY_A); move_cursor(clamp_coord(b[refinery].x + 16,WORLD_W),b[refinery].y); tap(KEY_A);
+    tap_b(); tap(KEY_A); move_cursor(clamp_coord(b[refinery].x + 16,WORLD_W),b[refinery].y); tap(KEY_A);
     for (int i = 0; i < 300 && dist2(u[worker].x,u[worker].y,b[refinery].x,b[refinery].y) > 20*20; ++i) step(0);
     if (!select_unit(worker)) {
         fprintf(stderr,"T9 gas worker selection failed slot=%d xy=%d,%d order=%d refinery=%d at=%d,%d tick=%u\n",
@@ -1043,7 +1053,7 @@ static int ferry_marine_assault(void)
     /* Carry the ground group across the island gap to an open point near the
      * observed Protoss building. The cursor only supplies an ordinary move
      * destination; the Dropship and its cargo move through game_update. */
-    tap(KEY_B); tap(KEY_A); /* Move */
+    tap_b(); tap(KEY_A); /* Move */
     move_cursor(clamp_coord(tx - 40, WORLD_W), clamp_coord(ty - 32, WORLD_H));
     tap(KEY_A);
     for (int i = 0; i < 12000 && u[carrier].alive &&
@@ -1053,7 +1063,7 @@ static int ferry_marine_assault(void)
             carrier, u[carrier].x, u[carrier].y, tx, ty, loaded_for(carrier),
             (unsigned)host_tick);
     if (!u[carrier].alive || loaded_for(carrier) <= 0 || !click_select_unit(carrier)) return 0;
-    tap(KEY_B);
+    tap_b();
     for (int row = 0; row < MENU_UNLOAD; ++row) tap(KEY_DOWN);
     tap(KEY_A); /* select the controller's Unload command */
     move_cursor(clamp_coord(tx - 40, WORLD_W), clamp_coord(ty - 32, WORLD_H));
@@ -1068,7 +1078,7 @@ static int ferry_marine_assault(void)
         int slot = cargo_slots[n];
         if (!u[slot].alive || u[slot].owner != SIDE ||
             SC64_TRANSPORT_LOADED(&u[slot]) || !click_select_unit(slot)) continue;
-        tap(KEY_B); tap(KEY_DOWN); tap(KEY_A); /* Attack move */
+        tap_b(); tap(KEY_DOWN); tap(KEY_A); /* Attack move */
         move_cursor(tx, ty); tap(KEY_A);
         if (u[slot].order == ORDER_ATTACK_MOVE) ++ordered;
     }

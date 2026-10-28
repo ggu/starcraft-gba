@@ -17,6 +17,14 @@ test-sc64-stock-motion: build/test-sc64-stock-motion
 	./build/test-sc64-stock-motion
 test: test-sc64-stock-motion
 
+# Presentation-only walk cycle shared by every profile.
+.PHONY: test-sc64-unit-walk
+build/test-sc64-unit-walk: tests/sc64_unit_walk.c starcraft/sc64_unit_walk.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Istarcraft $< -o $@
+test-sc64-unit-walk: build/test-sc64-unit-walk
+	./build/test-sc64-unit-walk
+test: test-sc64-unit-walk
+
 # Asset-free minimap terrain renderer oracle; exercise both implementations.
 .PHONY: test-sc64-minimap-terrain
 build/gba-minimap-test.o: common/gba.c common/gba.h Makefile | build
@@ -59,6 +67,42 @@ build/test-sc64-p8-source-contract: tests/sc64_p8_source_contract.c starcraft/sc
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon -Istarcraft -I$(P8_SCENARIO_DIR) $< -o $@
 test-sc64-p8-source-contract: build/test-sc64-p8-source-contract
 	./build/test-sc64-p8-source-contract
+
+# Asset-free P8 typed-world service bridge. The fixture models the private
+# generated header's row shape without embedding source scenario data.
+.PHONY: test-sc64-p8-world
+build/p8-fixture/sc64_p8_scenario_generated.h: tests/fixtures/p8/sc64_p8_scenario_shape_fixture.h | build
+	mkdir -p build/p8-fixture
+	cp $< $@
+build/test-sc64-p8-world: tests/sc64_p8_world_adapter.c build/p8-fixture/sc64_p8_scenario_generated.h starcraft/sc64_p8_world_adapter.h starcraft/sc64_p8_source_adapter.h starcraft/sc64_z8_world_adapter.h starcraft/sc64_z8_triggers.h starcraft/sc64_resource_actions.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft -Ibuild/p8-fixture $< -o $@
+test-sc64-p8-world: build/test-sc64-p8-world
+	./build/test-sc64-p8-world
+test-starcraft: test-sc64-p8-world
+
+# Optional bridge check against an already-prepared authenticated P8 header.
+.PHONY: test-sc64-p8-world-source-contract
+build/test-sc64-p8-world-source-contract: tests/sc64_p8_world_source.c starcraft/sc64_p8_world_adapter.h starcraft/sc64_p8_source_adapter.h starcraft/sc64_z8_world_adapter.h starcraft/sc64_z8_triggers.h starcraft/sc64_resource_actions.h $(P8_SCENARIO_DIR)/sc64_p8_scenario_generated.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft -I$(P8_SCENARIO_DIR) $< -o $@
+test-sc64-p8-world-source-contract: build/test-sc64-p8-world-source-contract
+	./build/test-sc64-p8-world-source-contract
+
+# Optional live-pool P8 adapter check using already-prepared Z7 actor facts.
+# Run only after the listed private inputs have been reviewed as read-only.
+build/test-sc64-p8-game-pool-bridge: tests/sc64_p8_game_pool_bridge.c build/p8-fixture/sc64_p8_scenario_generated.h $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -Ibuild/p8-fixture $(Z8_GAME_POOL_BRIDGE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p8-game-pool-bridge
+test-sc64-p8-game-pool-bridge: build/test-sc64-p8-game-pool-bridge
+	./build/test-sc64-p8-game-pool-bridge
+
+# Optional private-descriptor P8 create-service check over the real pools.
+# Requires prepared P8/Z7 inputs; this target does not pack or generate them.
+P8_GAME_POOL_FLAGS = $(filter-out -DSC64_CONSTRUCTION_SOURCE_ART,$(Z8_GAME_POOL_BRIDGE_FLAGS)) -DSC64_P8_GAME_POOL_BRIDGE
+build/test-sc64-p8-live-create: tests/sc64_p8_live_create.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) $(P8_SCENARIO_DIR)/sc64_p8_scenario_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Wno-missing-field-initializers -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft -I$(P8_SCENARIO_DIR) $(P8_GAME_POOL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p8-live-create
+test-sc64-p8-live-create: build/test-sc64-p8-live-create
+	./build/test-sc64-p8-live-create
 
 PREFIX ?= arm-none-eabi-
 CC := $(PREFIX)gcc
@@ -105,7 +149,9 @@ ifneq ($(SC64_CONSTRUCTION_ART),0)
 RACE_CONSTRUCTION_FLAGS := -DSC64_CONSTRUCTION_SOURCE_ART -I$(CONSTRUCTION_ART_DIR)
 RACE_CONSTRUCTION_INPUTS := $(CONSTRUCTION_ART_HEADER)
 endif
-RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -I.local/sc64/races/generated $(RACE_CONSTRUCTION_FLAGS)
+# Every race-engine ROM uses the default profile's controls and menus
+# (starcraft/field_controls.h).
+RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated $(RACE_CONSTRUCTION_FLAGS)
 RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h $(RACE_CONSTRUCTION_INPUTS)
 build/test-sc64-stock-motion-runtime: tests/sc64_stock_motion_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) $< common/gba.c -o $@
@@ -371,6 +417,14 @@ build/test-sc64-weapon-vfx: tests/sc64_weapon_vfx.c starcraft/sc64_weapon_vfx.h 
 .PHONY: test-sc64-weapon-vfx
 test-sc64-weapon-vfx: build/test-sc64-weapon-vfx
 	./build/test-sc64-weapon-vfx
+
+# The default profile's units draw a walk cycle while they move.
+build/test-sc64-unit-walk-game: tests/sc64_unit_walk_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
+test-sc64-unit-walk-game: build/test-sc64-unit-walk-game
+	./build/test-sc64-unit-walk-game
+.PHONY: test-sc64-unit-walk-game
+test: test-sc64-unit-walk-game
 
 build/test-sc64-weapon-vfx-game: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) $< common/gba.c -o $@
@@ -3847,7 +3901,9 @@ build/test-terran build/test-sc64-terran-full-profile build/test-zerg build/test
 UNIT_FACING_FLAGS := -I.local/sc64/facing/generated -DSC64_UNIT_FACING
 SHOWCASE_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 SHOWCASE_SIEGE_FLAGS ?= -DSC64_SIEGE_SPLASH
-SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS
+# Clip world art before it reaches either HUD band. Keep the infrequent
+# procedural diamond fallback in ROM so clipping retains the IWRAM reserve.
+SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
 	$(SIZE) $@
@@ -4233,7 +4289,14 @@ test-sc64-collision-bounds: $(addprefix build/test-sc64-collision-bounds-,cached
 	./build/test-sc64-collision-bounds-packed
 	./build/test-sc64-collision-bounds-hoisted
 	./build/test-sc64-collision-bounds-plain
-test: test-sc64-collision-bounds
+test: test-sc64-collision-bounds test-sc64-contact-bucket-birth
+
+# A post-build spawn's first move must not unlink an unrelated live bucket.
+build/test-sc64-contact-bucket-birth: tests/sc64_contact_bucket_birth.c starcraft/sc64_collision_legacy.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST $< -o $@
+.PHONY: test-sc64-contact-bucket-birth
+test-sc64-contact-bucket-birth: build/test-sc64-contact-bucket-birth
+	./build/test-sc64-contact-bucket-birth
 
 # SC64_CONTACT_CACHE differential checks: the cached-fact bucket query, the
 # one-pass blocked-steering mask and the stock-rate cache against the original

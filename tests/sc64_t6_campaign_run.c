@@ -108,6 +108,16 @@ static int normal_field(void)
     return screen == SCREEN_PLAY && !menu_open && mode == MODE_NORMAL;
 }
 
+/* Field controls reopen the order list on the last command. These
+ * sequences were written for a list that opens on Move, so a fresh
+ * open starts there (no extra input, so the run's timing is unchanged). */
+static void tap_b(void)
+{
+    int fresh = !menu_open && mode == MODE_NORMAL;
+    tap(KEY_B);
+    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+}
+
 static void move_cursor(int x, int y)
 {
     x = snap4(cx, x, WORLD_W); y = snap4(cy, y, WORLD_H);
@@ -245,7 +255,7 @@ static int select_building(int slot)
 static int order_actor(int slot, int x, int y, int attack_move)
 {
     if (!select_unit(slot)) return 0;
-    tap(KEY_B); if (attack_move) tap(KEY_DOWN); tap(KEY_A);
+    tap_b(); if (attack_move) tap(KEY_DOWN); tap(KEY_A);
     move_cursor(x, y); tap(KEY_A); return 1;
 }
 
@@ -263,7 +273,7 @@ static int group_to(int x, int y, int attack_move)
     for(int n=0;n<1200&&(cx!=ex||cy!=ey);n++) { u16 h=KEY_L|KEY_R; if(cx<ex)h|=KEY_RIGHT;if(cx>ex)h|=KEY_LEFT;if(cy<ey)h|=KEY_DOWN;if(cy>ey)h|=KEY_UP;step(h); }
     step(0); if(selected_building>=0||!selected_count())return 0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected&&u[i].owner!=SIDE)return 0;
-    tap(KEY_B); if(attack_move)tap(KEY_DOWN);tap(KEY_A);move_cursor(x,y);tap(KEY_A);return 1;
+    tap_b(); if(attack_move)tap(KEY_DOWN);tap(KEY_A);move_cursor(x,y);tap(KEY_A);return 1;
 }
 
 static int group_visible_type_to(int type, int x, int y, int attack_move)
@@ -282,7 +292,7 @@ static int group_visible_type_to(int type, int x, int y, int attack_move)
         ++count;
     }
     if(!count||count!=selected_count()||selected_building>=0)return 0;
-    tap(KEY_B);if(attack_move)tap(KEY_DOWN);tap(KEY_A);move_cursor(x,y);tap(KEY_A);return 1;
+    tap_b();if(attack_move)tap(KEY_DOWN);tap(KEY_A);move_cursor(x,y);tap(KEY_A);return 1;
 }
 
 static int point_in_location(unsigned id,int x,int y)
@@ -537,7 +547,7 @@ static int controller_unload_raynor_at_goal(int ship,int gx,int gy)
     if(!u[ship].alive||!SC64_TRANSPORT_LOADED(&u[hero_slot])||
        u[hero_slot].target!=ship||!point_in_location(2,gx,gy))return 0;
     if(!select_unit(ship)||!normal_field())return 0;
-    tap(KEY_B);for(int i=0;i<13;i++)tap(KEY_DOWN);tap(KEY_A);
+    tap_b();for(int i=0;i<13;i++)tap(KEY_DOWN);tap(KEY_A);
     move_cursor(gx,gy);tap(KEY_A);
     for(int t=0;t<2000&&host_ticks<(u32)run_limit&&screen==SCREEN_PLAY&&!won&&!lost&&
         u[ship].alive&&SC64_TRANSPORT_LOADED(&u[hero_slot]);t++)step(0);
@@ -551,7 +561,7 @@ static int controller_unload_raynor_at_goal(int ship,int gx,int gy)
 
 static int choose_build(int menu_row)
 {
-    if (!normal_field()) return 0; tap(KEY_B);
+    if (!normal_field()) return 0; tap_b();
     for (int i=0;i<menu_row;i++) tap(KEY_DOWN);
     tap(KEY_A); return mode == MODE_BUILD;
 }
@@ -661,7 +671,7 @@ static int controller_build_tower(int starport)
     if(starport<0||starport>=MAX_BUILDINGS||!b[starport].alive||
        !building_complete(starport)||race_t6_starport_has_control_tower(starport))return 0;
     if(!select_building(starport))return 0;
-    tap(KEY_B);
+    tap_b();
     for(int i=0;i<12;i++)tap(KEY_DOWN);
     tap(KEY_A);
     for(int i=0;i<1000&&host_ticks<(u32)run_limit;i++){
@@ -879,7 +889,7 @@ int main(int argc,char **argv)
         int distance=reachable_building_contact(lead,u[lead].x,u[lead].y,rescue_cc,&rx,&ry);
         fprintf(stderr,"T6 controller source6 base contact cc=%d at=%d,%d lead=%d at=%d,%d route=%d target=%d,%d\n",rescue_cc,b[rescue_cc].x,b[rescue_cc].y,lead,u[lead].x,u[lead].y,distance,rx,ry);
         if(distance>=0&&click_select_unit(lead)){
-            tap(KEY_B);tap(KEY_A);move_cursor(rx,ry);tap(KEY_A);
+            tap_b();tap(KEY_A);move_cursor(rx,ry);tap(KEY_A);
             /* Keep the cursor near Norad while the selected actor travels.
              * On the exact tick the rescued SCV group converts, issue repair
              * before its exposed workers have to survive another long cursor

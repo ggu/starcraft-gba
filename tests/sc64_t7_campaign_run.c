@@ -151,6 +151,16 @@ static void wait_frames(int n)
 
 static void tap(u16 key){step(key);step(0);}
 
+/* Field controls reopen the order list on the last command. These
+ * sequences were written for a list that opens on Move, so a fresh
+ * open starts there (no extra input, so the run's timing is unchanged). */
+static void tap_b(void)
+{
+    int fresh = !menu_open && mode == MODE_NORMAL;
+    tap(KEY_B);
+    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+}
+
 static void move_cursor(int x,int y)
 {
     x=clamp_world(x,WORLD_W);y=clamp_world(y,WORLD_H);
@@ -165,7 +175,7 @@ static void move_cursor(int x,int y)
 
 static int normal_field(void)
 {
-    for(int i=0;i<2&&(menu_open||mode!=MODE_NORMAL);i++)tap(KEY_B);
+    for(int i=0;i<2&&(menu_open||mode!=MODE_NORMAL);i++)tap_b();
     return screen==SCREEN_PLAY&&!menu_open&&mode==MODE_NORMAL;
 }
 
@@ -175,7 +185,7 @@ static int leave_building_selection(void)
     if(menu_open||mode!=MODE_NORMAL)return 0;
     /* The engine's L gesture cancels a Barracks queue instead of cycling
        away. Select and commit an ordinary no-unit MOVE to clear it. */
-    tap(KEY_B);tap(KEY_A);tap(KEY_A);
+    tap_b();tap(KEY_A);tap(KEY_A);
     return selected_building<0&&mode==MODE_NORMAL&&!menu_open;
 }
 
@@ -218,7 +228,7 @@ static int order_unit(int slot,int x,int y)
           (unsigned)race_late.emitter_carrier);
         return 0;
     }
-    tap(KEY_B);tap(KEY_A);move_cursor(x,y);
+    tap_b();tap(KEY_A);move_cursor(x,y);
     int cursor_dx=cx-clamp_world(x,WORLD_W),cursor_dy=cy-clamp_world(y,WORLD_H);
     if(cursor_dx < -2 || cursor_dx > 2 || cursor_dy < -2 || cursor_dy > 2){
         fprintf(stderr,"T7 move cursor failed slot=%d cursor=%d,%d target=%d,%d\n",
@@ -236,7 +246,7 @@ static int order_unit(int slot,int x,int y)
 static int order_attack_unit(int slot,int x,int y)
 {
     if(!select_unit(slot))return 0;
-    tap(KEY_B);tap(KEY_DOWN);tap(KEY_A);move_cursor(x,y);tap(KEY_A);return 1;
+    tap_b();tap(KEY_DOWN);tap(KEY_A);move_cursor(x,y);tap(KEY_A);return 1;
 }
 
 static int order_every_type(int type,int x,int y,int attack)
@@ -276,7 +286,7 @@ static int order_visible_type_mode(int type,int x,int y,int attack)
         ++count;
     }
     if(!count||count!=selected_count()||selected_building>=0)return 0;
-    tap(KEY_B);if(attack)tap(KEY_DOWN);tap(KEY_A);move_cursor(x,y);tap(KEY_A);
+    tap_b();if(attack)tap(KEY_DOWN);tap(KEY_A);move_cursor(x,y);tap(KEY_A);
     fprintf(stderr,"T7 escorted group type=%d seed=%d count=%d order=%s target=%d,%d\n",
       type,seed,count,attack?"attack-move":"move",x,y);
     return 1;
@@ -781,7 +791,7 @@ static int stage_emitter_carrier(void)
 {
     int carrier=race_late.emitter_carrier;
     if(carrier<0||carrier>=MAX_UNITS||!u[carrier].alive||!select_unit(carrier))return 0;
-    tap(KEY_B);for(int row=0;row<MENU_STOP;row++)tap(KEY_DOWN);tap(KEY_A);
+    tap_b();for(int row=0;row<MENU_STOP;row++)tap(KEY_DOWN);tap(KEY_A);
     fprintf(stderr,"T7 staged emitter carrier with normal Stop input slot=%d alive=%d at=%d,%d order=%d tick=%u\n",
       carrier,u[carrier].alive,u[carrier].x,u[carrier].y,u[carrier].order,(unsigned)host_tick);
     return u[carrier].alive&&u[carrier].order==ORDER_IDLE;
@@ -996,7 +1006,7 @@ static int controller_air_deliver_emitter(int emitter)
           u[ship].selected,selected_count(),selected_building,mode,menu_open);
         return 0;
     }
-    tap(KEY_B);for(int i=0;i<13;i++)tap(KEY_DOWN);tap(KEY_A);
+    tap_b();for(int i=0;i<13;i++)tap(KEY_DOWN);tap(KEY_A);
     int gx=goal_x,gy=goal_y;
     move_cursor(gx,gy);tap(KEY_A);
     for(int t=0;t<5000&&host_tick<(u32)tick_limit&&screen==SCREEN_PLAY&&!won&&!lost;t++){

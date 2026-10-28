@@ -23,9 +23,14 @@
 /* Ignore waypoints this close; the unit has arrived or is turning in place. */
 #define SC64_FACING_STEP 4
 
-static u8 sc64_facing[MAX_UNITS];
+/* sc64_facing[] is declared by sc64_unit_walk.h, whose stride bits share the
+ * high three bits of each byte. */
+#define SC64_FACING_MASK 31
+#define SC64_FACING_SET(slot, dir) \
+    (sc64_facing[slot] = (u8)((sc64_facing[slot] & ~SC64_FACING_MASK) | (dir)))
 
-/* Presentation-only direction is not part of Unit or any save row. */
+/* Presentation-only direction is not part of Unit or any save row. Resets
+ * clear the stride bits too; they run where the walk cycle resets anyway. */
 static void
 sc64_facing_reset_all(void)
 {
@@ -63,7 +68,7 @@ sc64_facing_fire(const Unit *q, int tx, int ty)
 {
     int slot = (int)(q - u);
     if (slot < 0 || slot >= MAX_UNITS || (tx == q->x && ty == q->y)) return;
-    sc64_facing[slot] = (u8)sc64_facing_direction(tx - q->x, ty - q->y);
+    SC64_FACING_SET(slot, sc64_facing_direction(tx - q->x, ty - q->y));
 }
 
 /* Called before drawing a visible unit: face where it is going. */
@@ -81,7 +86,7 @@ sc64_facing_track(const Unit *q)
         dy = q->path_y - q->y;
     }
     if (FAST_ABS(dx) < SC64_FACING_STEP && FAST_ABS(dy) < SC64_FACING_STEP) return;
-    sc64_facing[slot] = (u8)sc64_facing_direction(dx, dy);
+    SC64_FACING_SET(slot, sc64_facing_direction(dx, dy));
 }
 
 static void
@@ -126,7 +131,7 @@ sc64_facing_draw(const Unit *q, int raw, int x, int y)
 {
     int dir;
     if (raw < 0) return 0;
-    dir = sc64_facing[(int)(q - u)] & 31;
+    dir = sc64_facing[(int)(q - u)] & SC64_FACING_MASK;
 #ifdef SC64_RACES
     if (q->type == U_SIEGE_TANK || q->type == U_TANK) {
         int sieged = q->type == U_SIEGE_TANK;
