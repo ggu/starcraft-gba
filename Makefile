@@ -4587,3 +4587,22 @@ test-sc64-construction-arrival-$(1): build/test-sc64-construction-arrival-$(1) b
 	./build/test-sc64-construction-arrival-save-$(1)
 endef
 $(foreach profile,terran zerg-z6 protoss-p7 zerg-z7,$(eval $(call CONSTRUCTION_ARRIVAL_TESTS,$(profile))))
+
+# No-GDB ARM probe of the imported interface: an embedded key tape drives the
+# menus, briefing, orders, pause, save and load; results go to the mGBA debug
+# log (tests/sc64_ui_arm_probe.c). Run twice with one isolated save directory.
+UI_ARM_COMMON := $(filter-out common/main.c,$(COMMON))
+build/starcraft-showcase-ui-probe.elf: tests/sc64_ui_arm_probe.c $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) $(COMMAND_ICON_HEADER) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase-ui-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/starcraft64-races-ui-probe.elf: tests/sc64_ui_arm_probe.c $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(RACES_FLAGS) $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -Wl,-Map,build/starcraft64-races-ui-probe.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Showcase-UI-Probe-GBA.gba: build/starcraft-showcase-ui-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC UI PROBE' SCUP
+build/StarCraft64-Races-UI-Probe-GBA.gba: build/starcraft64-races-ui-probe.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC UI PROBE' SCUR
+.PHONY: ui-arm-probe
+ui-arm-probe: build/StarCraft-Showcase-UI-Probe-GBA.gba build/StarCraft64-Races-UI-Probe-GBA.gba
