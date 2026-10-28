@@ -291,6 +291,14 @@ sc64_weapon_source_vfx_launch_origin_checked(
     return 1;
 }
 
+static inline int
+sc64_weapon_source_vfx_anchor_may_be_visible(int x, int y,
+                                              int camx, int camy)
+{
+    return (uint32_t)x - (uint32_t)camx < 240u &&
+           (uint32_t)y - (uint32_t)camy < 108u;
+}
+
 /* A straight or stationary trace can only place visible source art around
  * these anchors: actor x0, computed launch, and target x1. The projectile
  * position function interpolates within launch->target (or returns a

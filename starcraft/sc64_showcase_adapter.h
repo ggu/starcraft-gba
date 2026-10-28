@@ -47,7 +47,7 @@ static void sc64_showcase_start(int scene)
     if(scene==3)race_bot_races[0]=R_TER;
     init_state();
     memset(u,0,sizeof(u));memset(b,0,sizeof(b));memset(m,0,sizeof(m));
-    memset(tracers,0,sizeof(tracers));
+    clear_tracers();
     death_vfx_reset();
     memset(invincible_units,0,sizeof(invincible_units));
     memset(invincible_buildings,0,sizeof(invincible_buildings));
