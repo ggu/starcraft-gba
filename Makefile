@@ -33,6 +33,14 @@ test-sc64-range-work: build/test-sc64-range-work
 	./build/test-sc64-range-work
 test: test-sc64-range-work
 
+# Exact object-representation zero check; no imported game data required.
+.PHONY: test-sc64-zero-bytes
+build/test-sc64-zero-bytes: tests/sc64_zero_bytes.c starcraft/sc64_zero_bytes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-sc64-zero-bytes: build/test-sc64-zero-bytes
+	./build/test-sc64-zero-bytes
+test: test-sc64-zero-bytes
+
 # Asset-free minimap terrain renderer oracle; exercise both implementations.
 .PHONY: test-sc64-minimap-terrain
 build/gba-minimap-test.o: common/gba.c common/gba.h Makefile | build
