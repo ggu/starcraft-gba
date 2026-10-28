@@ -26,7 +26,7 @@ static void start_t3_through_menu(void) {
     assert(race_front.mission_page == 1);
     press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING && race_front.mission == 6);
-    press(KEY_A);
+    press(KEY_START);
     assert(screen == SCREEN_PLAY && !race_mode && race_selected_mission == 6);
     assert(sc64_t3_state_valid(&race_t3));
     frame_input(0); /* Establish one real T3 simulation tick for timer checks. */

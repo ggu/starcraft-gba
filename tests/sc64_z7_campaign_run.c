@@ -2552,7 +2552,7 @@ static void launch_from_normal_menu(void)
     assert(race_front.mission_page==page&&race_front.row==row);
     tap(KEY_A);
     assert(race_front.page==SC_FRONT_BRIEFING&&race_front.mission==SC64_Z7_GLOBAL_ID);
-    tap(KEY_A);
+    tap(KEY_START);
     assert(screen==SCREEN_PLAY&&race_selected_mission==SC64_Z7_GLOBAL_ID&&race_z7_active());
     assert(race_z7.runtime.fault==0&&race_z7_map==&sc64_race_maps[SC64_Z7_GLOBAL_ID]);
     for(int i=0;i<MAX_MINERALS;i++)if(m[i].amount>0)

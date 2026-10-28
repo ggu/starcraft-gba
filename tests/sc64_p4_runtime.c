@@ -79,7 +79,7 @@ static void launch_from_normal_menu(void)
     assert(sc64_catalog_playable_at(SC64_FACTION_PROTOSS, 3) == 23);
     press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING && race_front.mission == 23);
-    input(KEY_A);
+    input(KEY_START);
     assert(screen == SCREEN_PLAY && !race_mode && !won && !lost);
     assert(race_selected_mission == 23 && race_campaign.mission == 23);
     assert(race_human == R_PROTOSS && race_p4_active());

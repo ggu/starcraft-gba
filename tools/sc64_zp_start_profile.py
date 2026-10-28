@@ -88,17 +88,17 @@ def _report_kind(profile_name: str) -> str:
 
 
 def startup_input_events(capacity: int, profile_name: str = P6_PROFILE) -> list[tuple[int, int]]:
-    """Return exactly the authenticated sixth-entry input prefix (tick-zero based)."""
+    """Return the sixth-entry menu prefix, using Start to deploy (tick-zero based)."""
     if profile_name not in PROFILE_INFO:
         raise ValueError("startup profile must be protoss-p6 or zerg-z6")
     if type(capacity) is not int or capacity < len(replay.SIXTH_MENU_PREFIX):
         raise ValueError("ELF scheduler capacity is too small for the 12-input sixth-entry menu route")
     expected = (
         (1, 1), (2, 0), (3, 16), (4, 0), (5, 16), (6, 0),
-        (7, 128), (8, 0), (9, 1), (10, 0), (11, 1), (12, 0),
+        (7, 128), (8, 0), (9, 1), (10, 0), (11, 8), (12, 0),
     )
     if tuple(replay.SIXTH_MENU_PREFIX) != expected:
-        raise RuntimeError(f"{profile_name} menu route constant differs from the authenticated 12-input prefix")
+        raise RuntimeError(f"{profile_name} menu route constant differs from the 12-input prefix")
     return [(tick - 1, held) for tick, held in expected]
 
 

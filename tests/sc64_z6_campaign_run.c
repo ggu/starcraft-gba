@@ -1561,7 +1561,7 @@ static void launch(void)
     tap(KEY_A);
     fprintf(stderr,"briefing page=%u mission=%d row=%u ordinal=%d count=%d idord=%d\n",race_front.page,race_front.mission,race_front.row,sc64_catalog_playable_ordinal(SC64_FACTION_ZERG,SC64_Z6_GLOBAL_ID),sc64_catalog_playable_count(SC64_FACTION_ZERG),sc64_catalog_playable_at(SC64_FACTION_ZERG,5));
     assert(race_front.page==SC_FRONT_BRIEFING && race_front.mission==SC64_Z6_GLOBAL_ID);
-    tap(KEY_A);
+    tap(KEY_START);
     assert(screen==SCREEN_PLAY && race_selected_mission==SC64_Z6_GLOBAL_ID && race_z6_active());
 }
 

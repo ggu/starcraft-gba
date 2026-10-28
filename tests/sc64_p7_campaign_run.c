@@ -478,7 +478,7 @@ int main(int argc,char **argv)
     game_init();prior=0;
     assert(screen==SCREEN_TITLE&&race_front.page==SC_FRONT_HOME);
     KEY_TAP(KEY_A);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);KEY_TAP(KEY_RIGHT);
-    KEY_TAP(KEY_A);KEY_TAP(KEY_A);
+    KEY_TAP(KEY_A);KEY_TAP(KEY_START);
     assert(screen==SCREEN_PLAY&&!won&&!lost&&race_selected_mission==26);
     census("launch");
     int force0_start=source_force_military(0),force4_start=source_force_military(4);

@@ -39,7 +39,7 @@ KEY_B, KEY_L, KEY_START = 2, 512, 8
 SCREEN_PLAY, SCREEN_PAUSE = 1, 2
 SCREEN_TITLE = 0
 FRONT_HOME = 0
-MENU_ENTRY_BUTTONS = (1, 16, 16, 1, 1)  # A, RIGHT, RIGHT, briefing A, deploy A
+MENU_ENTRY_BUTTONS = (1, 16, 16, 1, 8)  # A, RIGHT, RIGHT, briefing A, deploy Start
 
 DEFAULT_ROM = ROOT / "build" / "StarCraft-T5-Engine-Probe.gba"
 DEFAULT_ELF = ROOT / "build" / "starcraft-t5-engine-probe.elf"
@@ -87,7 +87,7 @@ def campaign_menu_buttons(mission: int) -> tuple[int, ...]:
     chapter = mission
     page = (chapter - 1) // 2
     row = (chapter - 1) % 2
-    return (1, *(16 for _ in range(page)), *((128,) if row else ()), 1, 1)
+    return (1, *(16 for _ in range(page)), *((128,) if row else ()), 1, 8)
 
 
 def enter_t5_campaign_menu(rsp, inject: int, mission: int = 5) -> None:
@@ -644,7 +644,7 @@ def run(rom: Path, elf: Path, out: Path, ticks: int, generation: int = DEFAULT_G
             "entry": "normal-campaign-menu" if menu_entry else "internal-probe-auto-entry",
             "controller_inputs": (["HOME:A", *["MISSION:RIGHT"] * ((mission - 1) // 2),
                                    *(["MISSION:DOWN"] if mission % 2 == 0 else []),
-                                   "BRIEFING:A", "DEPLOY:A", "START", "B", "START", "L"]
+                                   "BRIEFING:A", "DEPLOY:START", "START", "B", "START", "L"]
                                   if menu_entry else ["START", "B", "START", "L"]),
             "exact_load_state_match": True,
             "save_load_verified": True,

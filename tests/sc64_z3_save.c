@@ -35,7 +35,7 @@ static void start_z3(void)
     assert(race_front.mission_page == 1);
     press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING && race_front.mission == 14);
-    press(KEY_A);
+    press(KEY_START);
     assert(screen == SCREEN_PLAY && race_selected_mission == 14);
     assert(race_campaign.mission == 14 && sc64_z3_state_valid(&race_z3));
 }
@@ -48,7 +48,7 @@ static void start_z1(void)
     assert(race_front.page == SC_FRONT_MISSION);
     press(KEY_A); /* Mission list -> briefing. */
     assert(race_front.page == SC_FRONT_BRIEFING && race_front.mission == 0);
-    frame_input(KEY_A); /* Deploy without a released-button live tick. */
+    frame_input(KEY_START); /* Explicit deploy without a live tick. */
     assert(screen == SCREEN_PLAY && race_selected_mission == 0);
     assert(race_campaign.mission == 0);
 }

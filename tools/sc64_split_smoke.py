@@ -207,7 +207,7 @@ def campaign_launch(rsp, sym, profile: str, mission_id: int, ordinal: int,
     briefing = state(rsp, sym)
     if briefing["page"] != FRONT_BRIEFING or briefing["mission"] != mission_id:
         raise RuntimeError(f"{profile}: mission {mission_id} did not open briefing: {briefing}")
-    key(rsp, sym, KEY_A)
+    key(rsp, sym, KEY_START)
     got = {"screen": i32(rsp, sym["screen"]), "mode": i32(rsp, sym["race_mode"]),
            "human": i32(rsp, sym["race_human"]),
            "mission": i32(rsp, sym["race_selected_mission"]),

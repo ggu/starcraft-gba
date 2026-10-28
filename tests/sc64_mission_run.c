@@ -453,7 +453,7 @@ main(int argc, char **argv)
     if (race_front.page != SC_FRONT_MISSION) return 66;
     input_frame(KEY_A); input_frame(0); /* T1 briefing. */
     if (race_front.page != SC_FRONT_BRIEFING || race_front.mission != 4) return 66;
-    input_frame(KEY_A); input_frame(0); /* Deploy. */
+    input_frame(KEY_START); input_frame(0); /* Explicitly deploy. */
     if (screen != SCREEN_PLAY || race_selected_mission != 4) return 66;
 #else
     input_frame(KEY_A);

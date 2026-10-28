@@ -40,7 +40,7 @@ int main(void)
     Unit before[MAX_UNITS];
     Sc64PsionicStormState effect;
     game_init(); press(KEY_A); press(KEY_RIGHT); press(KEY_RIGHT);
-    press(KEY_DOWN); press(KEY_A); press(KEY_A);
+    press(KEY_DOWN); press(KEY_A); press(KEY_START);
     assert(screen==SCREEN_PLAY && race_selected_mission==SPELL_MISSION);
     int hero=hero_slot(); assert(hero>=0);
     assert(u[hero].carry==250*256);

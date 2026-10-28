@@ -30,11 +30,11 @@ def trace(final_kind: str = "limit", entry: str = "internal-chord") -> dict:
     if entry == "campaign-menu":
         held_states = [(1, replay.KEY_A), (2, 0), (3, replay.KEY_RIGHT), (4, 0),
                        (5, replay.KEY_DOWN), (6, 0), (7, replay.KEY_A), (8, 0),
-                       (9, replay.KEY_A)]
+                       (9, replay.KEY_START)]
         start_tick = 9
     else:
         held_states = [(1, replay.KEY_START | replay.KEY_SELECT), (2, 0),
-                       (3, replay.KEY_A)]
+                       (3, replay.KEY_START)]
         start_tick = 3
     rows = []
     previous_held = 0

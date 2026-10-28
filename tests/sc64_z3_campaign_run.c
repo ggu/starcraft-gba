@@ -474,7 +474,7 @@ static void launch_z3(void)
     tap(KEY_A); /* HOME -> Zerg mission list */
     tap(KEY_RIGHT); /* page two, Z3 ordinal 2 */
     tap(KEY_A); /* briefing */
-    step(KEY_A); /* deploy without a release tick in the mission */
+    step(KEY_START); /* explicit deploy without a release tick in the mission */
     deployed = 1;
     assert(screen == SCREEN_PLAY && !race_mode && race_selected_mission == 14);
     assert(race_campaign.mission == 14 && sc64_z3_state_valid(&race_z3));

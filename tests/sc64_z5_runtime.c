@@ -41,7 +41,7 @@ static void launch_z5_from_normal_menu(void)
     press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING &&
            race_front.mission == SC64_Z5_GLOBAL_ID);
-    input(KEY_A);
+    input(KEY_START);
     assert(screen == SCREEN_PLAY && !race_mode && !won && !lost);
     assert(race_selected_mission == SC64_Z5_GLOBAL_ID && race_z5_active());
     assert(race_campaign.mission == SC64_Z5_GLOBAL_ID);

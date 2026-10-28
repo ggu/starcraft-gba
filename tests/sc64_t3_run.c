@@ -152,7 +152,7 @@ static void launch_t3_through_menus(void)
     assert(race_front.mission_page == 1);
     controller_press(KEY_A); /* Select T3, opening the briefing. */
     assert(race_front.page == SC_FRONT_BRIEFING && race_front.mission == 6);
-    controller_press(KEY_A); /* Briefing -> live mission. */
+    controller_press(KEY_START); /* Explicit deploy from the briefing. */
     assert(screen == SCREEN_PLAY && !race_mode && race_selected_mission == 6);
     assert(race_campaign.mission == 6 && sc64_t3_state_valid(&race_t3));
     assert(mission_unsupported_count == 0);

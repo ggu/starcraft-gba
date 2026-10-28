@@ -1142,12 +1142,32 @@ static int skirmish_hostile(int a, int b);
 static int skirmish_bot_index(int owner);
 #endif
 #ifdef SC64_RACES
+#include "sc64_briefing_generated.h"
 static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race_bots=2;
 static int race_skirmish_map;
 static int race_bot_races[3]={R_ZERG,R_PROTOSS,R_TER};
 static Sc64Frontend race_front;
 static unsigned race_front_transition;
 static int race_front_load_error;
+static const Sc64BriefingPage *race_front_briefing_page(void)
+{
+    const Sc64Briefing *briefing=sc64_briefing_get(race_front.mission);
+    return briefing && race_front.briefing_page < briefing->page_count ?
+        &briefing->pages[race_front.briefing_page] : NULL;
+}
+
+/* Generated text stays in ROM. Only a page cursor and reveal clock live in
+ * RAM, and playback is configured in update rather than as a render effect. */
+static void race_front_briefing_configure(void)
+{
+    if(race_front.page!=SC_FRONT_BRIEFING)return;
+    const Sc64Briefing *briefing=sc64_briefing_get(race_front.mission);
+    const Sc64BriefingPage *page=race_front_briefing_page();
+    unsigned length=0;
+    if(page)while(page->text[length] && length<SC64_BRIEFING_MAX_TEXT_BYTES)length++;
+    sc64_frontend_briefing_configure(&race_front,
+        briefing?briefing->page_count:1,length);
+}
 static void race_frontend_reset(void)
 {
     int completed=-1;
@@ -7019,7 +7039,9 @@ game_update(u16 held, u16 pressed)
     if (screen == SCREEN_TITLE) {
 #ifdef SC64_RACES
         int old_page=race_front.page,old_row=race_front.row;
+        race_front_briefing_configure();
         int action=sc64_frontend_update(&race_front,held);
+        race_front_briefing_configure();
         if(race_front_load_error)race_front_load_error--;
         if(pressed){race_front_load_error=0;audio_tone((pressed&KEY_A)?660:440,2,2);}
         if(old_page!=race_front.page)race_front_transition=race_front.ticks;

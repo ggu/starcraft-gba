@@ -103,7 +103,7 @@ static void enter_higher_ground(void)
     assert(race_front.page == SC_FRONT_BRIEFING &&
            race_front.mission == SC64_P3_GLOBAL_ID);
     frame_input(0);
-    frame_input(KEY_A); /* launch */
+    frame_input(KEY_START); /* explicit launch */
     assert(screen == SCREEN_PLAY && !race_mode);
     assert(race_selected_mission == SC64_P3_GLOBAL_ID);
     assert(screen == SCREEN_PLAY && !won && !lost);

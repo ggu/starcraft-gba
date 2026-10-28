@@ -74,10 +74,10 @@ def validate_trace(trace: object, capacity: int, *, windowed: bool = True) -> di
     entry = trace.get("entry", "internal-chord")
     if entry not in ("internal-chord", "campaign-menu"):
         raise ValueError("trace entry must be 'internal-chord' or 'campaign-menu'")
-    entry_prefix = ([(1, KEY_START | KEY_SELECT), (2, 0), (3, KEY_A)]
+    entry_prefix = ([(1, KEY_START | KEY_SELECT), (2, 0), (3, KEY_START)]
                     if entry == "internal-chord" else
                     [(1, KEY_A), (2, 0), (3, KEY_RIGHT), (4, 0), (5, KEY_DOWN),
-                     (6, 0), (7, KEY_A), (8, 0), (9, KEY_A)])
+                     (6, 0), (7, KEY_A), (8, 0), (9, KEY_START)])
     launch_tick = 3 if entry == "internal-chord" else 9
     if not isinstance(trace.get("policy"), str) or not trace["policy"]:
         raise ValueError("trace policy must be a nonempty string")

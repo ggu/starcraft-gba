@@ -32,11 +32,11 @@ class T5SaveSmokeMenuTests(unittest.TestCase):
     def test_normal_menu_entry_uses_campaign_mission_briefing_deploy_sequence(self):
         rsp = FakeRsp()
         smoke.enter_t5_campaign_menu(rsp, 0x1234)
-        self.assertEqual(smoke.MENU_ENTRY_BUTTONS, (1, 16, 16, 1, 1))
+        self.assertEqual(smoke.MENU_ENTRY_BUTTONS, (1, 16, 16, 1, 8))
         self.assertEqual([data for _, data in rsp.writes], [
             b"\x01\x00", b"\0\0", b"\x10\x00", b"\0\0",
             b"\x10\x00", b"\0\0", b"\x01\x00", b"\0\0",
-            b"\x01\x00", b"\0\0",
+            b"\x08\x00", b"\0\0",
         ])
         self.assertTrue(all(address == 0x1234 for address, _ in rsp.writes))
         self.assertEqual(rsp.ticks, [2] * 10)
@@ -47,18 +47,18 @@ class T5SaveSmokeMenuTests(unittest.TestCase):
         self.assertEqual([data for _, data in rsp.writes], [
             b"\x01\x00", b"\0\0", b"\x10\x00", b"\0\0",
             b"\x10\x00", b"\0\0", b"\x80\x00", b"\0\0",
-            b"\x01\x00", b"\0\0", b"\x01\x00", b"\0\0",
+            b"\x01\x00", b"\0\0", b"\x08\x00", b"\0\0",
         ])
         self.assertEqual(rsp.ticks, [2] * 12)
 
     def test_late_terrans_use_correct_campaign_page_and_row(self):
         expected = {
-            5: (1, 16, 16, 1, 1),
-            6: (1, 16, 16, 128, 1, 1),
-            7: (1, 16, 16, 16, 1, 1),
-            8: (1, 16, 16, 16, 128, 1, 1),
-            9: (1, 16, 16, 16, 16, 1, 1),
-            10: (1, 16, 16, 16, 16, 128, 1, 1),
+            5: (1, 16, 16, 1, 8),
+            6: (1, 16, 16, 128, 1, 8),
+            7: (1, 16, 16, 16, 1, 8),
+            8: (1, 16, 16, 16, 128, 1, 8),
+            9: (1, 16, 16, 16, 16, 1, 8),
+            10: (1, 16, 16, 16, 16, 128, 1, 8),
         }
         for mission, buttons in expected.items():
             with self.subTest(mission=mission):

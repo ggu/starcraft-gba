@@ -123,7 +123,7 @@ def campaign_scenario(mission: int, sym: dict[str, int]) -> dict:
         rsp.tick(80)
         path = OUT / f"mission-{mission}-briefing.png"
         screenshots.append({"kind": "briefing", "mission": mission, "path": str(path), **menu.capture(rsp, path)})
-        controller(rsp, inject, KEY_A)
+        controller(rsp, inject, KEY_START)
         play = read_play_identity(rsp, sym, mission, race_mode=0)
         if not menu.world_palette_restored(rsp, sym):
             raise RuntimeError(f"{name}: campaign launch did not restore the world palette")
