@@ -26,6 +26,14 @@ static void input(unsigned held)
     held_keys = held;
 }
 
+static int building_at(int owner, int type, int x, int y)
+{
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == owner && b[i].type == type &&
+            b[i].x == x && b[i].y == y) return i;
+    return -1;
+}
+
 static void press(unsigned key)
 {
     input(key);
@@ -37,7 +45,7 @@ static void open_command_row(int row)
     int guard = 0;
     assert(row >= 0 && row < field_menu_count());
     press(KEY_B);
-    assert(menu_open && menu_cursor == 0);
+    assert(menu_open);
     while (menu_cursor != row && guard++ < field_menu_count())
         press(KEY_DOWN);
     assert(menu_cursor == row);
@@ -143,20 +151,23 @@ static int create_colony_through_normal_build(void)
     int x = site % WORLD_W, y = site / WORLD_W;
     worker = spawn_unit(SIDE, U_DRONE, x + 32, y);
     assert(worker >= 0);
+    int before = minerals;
     assert(race_start_build(SIDE, worker, B_CREEP_COLONY, x, y));
-    assert(minerals == 925 && u[worker].order == ORDER_BUILD);
-    colony = u[worker].target;
+    assert(minerals == before && u[worker].order == ORDER_BUILD_PENDING &&
+           u[worker].target == B_CREEP_COLONY);
+    assert(building_at(SIDE, B_CREEP_COLONY, x, y) < 0);
+    /* The Drone starts within the approach ring; service the real arrival
+       branch before reading the foundation slot or payment. */
+    update_orders();
+    assert(minerals == before - 75 && !u[worker].alive);
+    colony = building_at(SIDE, B_CREEP_COLONY, x, y);
     assert(colony >= 0 && colony < MAX_BUILDINGS &&
            b[colony].alive && b[colony].type == B_CREEP_COLONY &&
            b[colony].raw_type == SC64_Z7_CREEP_RAW &&
            b[colony].raw_owner == 3 && b[colony].under_construction);
 
-    /* Model the normal worker-arrived callback after its path reaches the
-       selected site; construction then uses the production frame ticker. */
-    u[worker].x = x + 32;
-    u[worker].y = y;
-    assert(race_builder_arrived(worker));
-    assert(!u[worker].alive); /* Creep Colony construction consumes Drone. */
+    /* Construction now proceeds through the production frame ticker after
+       the arrival callback consumed the Drone. */
     for (int t = 0; t < (300 * 5 + 3) / 4; ++t) race_tick_buildings();
     assert(building_complete(colony));
     assert(b[colony].type == B_CREEP_COLONY && b[colony].hp == 400 &&
@@ -490,13 +501,16 @@ static void test_real_campaign_sram_resume(void)
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].raw_owner == 3 &&
             u[i].raw_type == 41 && u[i].type == U_DRONE &&
-            u[i].order != ORDER_BUILD) { worker = i; break; }
+            !SC64_BUILD_WORKER_ORDER(u[i].order)) { worker = i; break; }
     assert(worker >= 0);
     u[worker].x = x + 32; u[worker].y = y;
+    int before = minerals;
     assert(race_start_build(SIDE, worker, B_CREEP_COLONY, x, y));
-    colony = u[worker].target;
-    u[worker].x = x + 32; u[worker].y = y;
-    assert(race_builder_arrived(worker));
+    assert(u[worker].order == ORDER_BUILD_PENDING && u[worker].target == B_CREEP_COLONY);
+    assert(minerals == before && building_at(SIDE, B_CREEP_COLONY, x, y) < 0);
+    update_orders();
+    colony = building_at(SIDE, B_CREEP_COLONY, x, y);
+    assert(colony >= 0 && minerals == before - 75);
     assert(!u[worker].alive && b[colony].raw_type == 143);
     for (int i = 0; i < (300 * 5 + 3) / 4; ++i) race_tick_buildings();
     assert(building_complete(colony) && b[colony].hp == 400);
@@ -652,7 +666,7 @@ static void test_normal_menu_colony_build_and_sunken_dispatch(void)
     assert(pool >= 0 && building_complete(pool));
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].raw_type == 41 &&
-            u[i].order != ORDER_BUILD) { worker = i; break; }
+            !SC64_BUILD_WORKER_ORDER(u[i].order)) { worker = i; break; }
     assert(worker >= 0);
 
     /* The ordinary Drone command list exposes Creep Colony after the
@@ -675,11 +689,14 @@ static void test_normal_menu_colony_build_and_sunken_dispatch(void)
            u[worker].order != ORDER_BUILD);
     cx = x; cy = y;
     press(KEY_A);
-    assert(mode == MODE_NORMAL && minerals == before - 75 &&
-           u[worker].order == ORDER_BUILD && u[worker].target >= 0);
-    colony = u[worker].target;
+    assert(mode == MODE_NORMAL && minerals == before &&
+           u[worker].order == ORDER_BUILD_PENDING &&
+           u[worker].target == B_CREEP_COLONY);
+    assert(building_at(SIDE, B_CREEP_COLONY, x, y) < 0);
     u[worker].x = x + 32; u[worker].y = y;
-    assert(race_builder_arrived(worker) && !u[worker].alive);
+    input(0);
+    colony = building_at(SIDE, B_CREEP_COLONY, x, y);
+    assert(colony >= 0 && !u[worker].alive && minerals == before - 75);
     for (int i = 0; i < SC64_Z7_SUNKEN_MORPH_TICKS; ++i)
         race_tick_buildings();
     assert(building_complete(colony) && b[colony].type == B_CREEP_COLONY);

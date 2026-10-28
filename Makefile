@@ -4534,3 +4534,26 @@ build/test-sc64-protoss-carried-p3 \
 build/test-sc64-protoss-carried-p5 \
 build/test-sc64-skirmish-resume-protoss \
 build/test-sc64-contact-cache-protoss: $(PROTOSS_P7_CANONICAL_INPUTS) $(P7_ARBITER_INPUTS) $(P7_FACT_V2_HEADER) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
+
+# Prepared-input regression checks for race construction travel and SRAM.
+CONSTRUCTION_ARRIVAL_FLAGS_terran = $(TERRAN_ROM_FLAGS)
+CONSTRUCTION_ARRIVAL_FLAGS_zerg-z6 = $(ZERG_ROM_FLAGS)
+CONSTRUCTION_ARRIVAL_FLAGS_protoss-p7 = $(PROTOSS_ROM_FLAGS)
+CONSTRUCTION_ARRIVAL_FLAGS_zerg-z7 = $(ZERG_Z7_RELEASE_FLAGS)
+CONSTRUCTION_ARRIVAL_INPUTS_terran = $(TERRAN_FULL_INPUTS)
+CONSTRUCTION_ARRIVAL_INPUTS_zerg-z6 = $(ZERG_Z6_INPUTS)
+CONSTRUCTION_ARRIVAL_INPUTS_protoss-p7 = $(PROTOSS_P7_CANONICAL_INPUTS)
+CONSTRUCTION_ARRIVAL_INPUTS_zerg-z7 = $(ZERG_Z7_CANONICAL_INPUTS)
+CONSTRUCTION_ARRIVAL_SOURCES_protoss-p7 = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
+
+define CONSTRUCTION_ARRIVAL_TESTS
+build/test-sc64-construction-arrival-$(1): tests/sc64_construction_arrival_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(CONSTRUCTION_ARRIVAL_INPUTS_$(1)) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $$(CONSTRUCTION_ARRIVAL_FLAGS_$(1)) $$< common/gba.c $$(CONSTRUCTION_ARRIVAL_SOURCES_$(1)) -o $$@
+build/test-sc64-construction-arrival-save-$(1): tests/sc64_construction_arrival_save_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(CONSTRUCTION_ARRIVAL_INPUTS_$(1)) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $$(CONSTRUCTION_ARRIVAL_FLAGS_$(1)) $$< common/gba.c $$(CONSTRUCTION_ARRIVAL_SOURCES_$(1)) -o $$@
+.PHONY: test-sc64-construction-arrival-$(1)
+test-sc64-construction-arrival-$(1): build/test-sc64-construction-arrival-$(1) build/test-sc64-construction-arrival-save-$(1)
+	./build/test-sc64-construction-arrival-$(1)
+	./build/test-sc64-construction-arrival-save-$(1)
+endef
+$(foreach profile,terran zerg-z6 protoss-p7 zerg-z7,$(eval $(call CONSTRUCTION_ARRIVAL_TESTS,$(profile))))
