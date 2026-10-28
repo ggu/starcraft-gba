@@ -17,6 +17,14 @@ test-sc64-stock-motion: build/test-sc64-stock-motion
 	./build/test-sc64-stock-motion
 test: test-sc64-stock-motion
 
+# Presentation-only walk cycle shared by every profile.
+.PHONY: test-sc64-unit-walk
+build/test-sc64-unit-walk: tests/sc64_unit_walk.c starcraft/sc64_unit_walk.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Istarcraft $< -o $@
+test-sc64-unit-walk: build/test-sc64-unit-walk
+	./build/test-sc64-unit-walk
+test: test-sc64-unit-walk
+
 # Asset-free minimap terrain renderer oracle; exercise both implementations.
 .PHONY: test-sc64-minimap-terrain
 build/gba-minimap-test.o: common/gba.c common/gba.h Makefile | build
@@ -395,6 +403,14 @@ build/test-sc64-weapon-vfx: tests/sc64_weapon_vfx.c starcraft/sc64_weapon_vfx.h 
 .PHONY: test-sc64-weapon-vfx
 test-sc64-weapon-vfx: build/test-sc64-weapon-vfx
 	./build/test-sc64-weapon-vfx
+
+# The default profile's units draw a walk cycle while they move.
+build/test-sc64-unit-walk-game: tests/sc64_unit_walk_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
+test-sc64-unit-walk-game: build/test-sc64-unit-walk-game
+	./build/test-sc64-unit-walk-game
+.PHONY: test-sc64-unit-walk-game
+test: test-sc64-unit-walk-game
 
 build/test-sc64-weapon-vfx-game: tests/sc64_weapon_vfx_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) $< common/gba.c -o $@
