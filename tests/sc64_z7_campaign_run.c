@@ -859,13 +859,25 @@ static int find_build_site(int type,int *out_x,int *out_y)
         int sunken_count=owned_building_count(B_SUNKEN_COLONY);
         if(sunken_count<2) {
             int x=sunken_count?1008:944,y=1624;
-            if(x<16||y<20||x>=WORLD_W-16||y>=WORLD_H-16||
-               !race_can_site(SIDE,type,x,y)||!can_place(type,x,y)||
-               !z7_worker_can_reach_site(x,y))return 0;
-            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
+            int fixed_legal=x>=16&&y>=20&&x<WORLD_W-16&&y<WORLD_H-16&&
+               race_can_site(SIDE,type,x,y)&&can_place(type,x,y)&&
+               z7_worker_can_reach_site(x,y);
+            for(int i=0;i<MAX_UNITS&&fixed_legal;i++)if(u[i].alive&&u[i].owner==ENEMY&&
                currently_visible(u[i].x,u[i].y)&&sc64_race_unit_damage(u[i].type)>0&&
-               dist2(x,y,u[i].x,u[i].y)<144*144)return 0;
-            *out_x=x;*out_y=y;return 1;
+               dist2(x,y,u[i].x,u[i].y)<144*144)fixed_legal=0;
+            if(fixed_legal){*out_x=x;*out_y=y;return 1;}
+            /* If the familiar second defense tile is blocked, try the existing
+               terrain and reachability search around mineral cover. Its risk
+               check uses only enemies currently visible to the player. */
+            if(sunken_count==1) {
+                int hatch=z7_townhall(SIDE);
+                if(hatch>=0&&z7_front_colony_site(hatch,out_x,out_y)) {
+                    fprintf(stderr,"Z7 second defense fallback site%d,%d frame%u\n",
+                        *out_x,*out_y,(unsigned)frame);
+                    return 1;
+                }
+            }
+            return 0;
         }
         int hatch=z7_townhall(SIDE);
         return hatch>=0&&z7_front_colony_site(hatch,out_x,out_y);
@@ -3101,7 +3113,16 @@ static void macro_step(void)
            worker_count(ORDER_MINE)>=3&&assign_gas_worker())return;
         /* Economic trial: raise the renewable worker floor before any paid
            expansion or optional combat queue can consume the bank. */
-        if(live_workers+pending_workers<8&&minerals>=50&&
+        int ready_second_sunken_colony=-1;
+        if(completed_building_count(B_SUNKEN_COLONY)==1) {
+            int colony=z7_fresh_creep_colony();
+            if(colony>=0&&!b[colony].under_construction&&minerals>=50)
+                ready_second_sunken_colony=colony;
+        }
+        /* A completed Creep Colony needs only the paid Sunken morph, not a
+           live Drone. Dispatch it before replacing workers so the 50-mineral
+           morph cannot be delayed by an unnecessary six-worker placement gate. */
+        if(ready_second_sunken_colony<0&&live_workers+pending_workers<8&&minerals>=50&&
            queue_hatchery_type(U_DRONE))return;
         int supply_cap=race_owner_supply_cap(SIDE);
         int supply_used=race_owner_reserved_supply(SIDE);
@@ -3192,7 +3213,7 @@ static void macro_step(void)
         for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
            b[i].under_construction&&(b[i].flags&SC64_Z7_SUNKEN_MORPH_FLAG))
             morphing_sunkens++;
-        if(live_workers>=6&&completed_sunkens>=1) {
+        if(completed_sunkens>=1) {
             int creep=z7_fresh_creep_colony();
             static int second_creep_state_logged;
             if(!second_creep_state_logged&&(unsigned)frame>=11000u) {
@@ -3206,21 +3227,31 @@ static void macro_step(void)
             if(morphing_sunkens) return;
             if(completed_sunkens<2) {
                 if(creep<0) {
-                    static unsigned last_second_sunken_wait;
-                    if((unsigned)frame>=9000u&&(!last_second_sunken_wait||
-                       (unsigned)frame-last_second_sunken_wait>=600u)) {
-                        fprintf(stderr,"Z7 second-Sunken budget wait frame%u bank%d/%d workers%d hydras%d\n",
-                            (unsigned)frame,minerals,gas,live_workers,
-                            unit_type_count(U_HYDRALISK,SIDE)+queued_unit_count(U_HYDRALISK));
-                        last_second_sunken_wait=frame;
+                    /* Building another Colony still needs a healthy worker
+                       line; a completed Colony below can morph independently. */
+                    if(live_workers>=6) {
+                        static unsigned last_second_sunken_wait;
+                        if((unsigned)frame>=9000u&&(!last_second_sunken_wait||
+                           (unsigned)frame-last_second_sunken_wait>=600u)) {
+                            fprintf(stderr,"Z7 second-Sunken budget wait frame%u bank%d/%d workers%d hydras%d\n",
+                                (unsigned)frame,minerals,gas,live_workers,
+                                unit_type_count(U_HYDRALISK,SIDE)+queued_unit_count(U_HYDRALISK));
+                            last_second_sunken_wait=frame;
+                        }
+                        if(minerals>=125&&start_building(B_CREEP_COLONY,MENU_Z7_CREEP))return;
+                        return;
                     }
-                    if(minerals>=125&&start_building(B_CREEP_COLONY,MENU_Z7_CREEP))return;
+                    /* Let the normal paid Drone replacement path run below. */
+                } else if(b[creep].under_construction) {
+                    return;
+                } else {
+                    if(live_workers<6)
+                        fprintf(stderr,"Z7 second-Sunken morph bypass worker gate frame%u colony%d xy%d,%d bank%d workers%d\n",
+                            (unsigned)frame,creep,b[creep].x,b[creep].y,minerals,live_workers);
+                    if(minerals<50)return;
+                    if(start_sunken_colony())return;
                     return;
                 }
-                if(b[creep].under_construction)return;
-                if(minerals<50)return;
-                if(start_sunken_colony())return;
-                return;
             }
         }
         /* Scale the paid mineral line after the two ordinary Sunken defenses
