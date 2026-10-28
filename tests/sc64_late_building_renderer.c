@@ -149,19 +149,28 @@ test_late_building(const LateBuildingCase *test)
     composite_source_sprite(expected, source, building.x, building.y + 12);
     assert(memcmp(actual, expected, sizeof(actual)) == 0);
 
-    /* The vitals must follow the source frame's canvas and offset. */
+    /* Only a selected building shows vitals, below its source frame. */
     int screen_x = building.x - camx;
     int screen_y = building.y - camy + 12;
     int sprite_y = screen_y - source->canvas_h / 2 + source->offset_y;
     gfx_begin(C_BLACK);
     draw_building_overlay(&building);
     capture(actual);
+    memset(expected, C_BLACK, sizeof(expected));
+    assert(memcmp(actual, expected, sizeof(actual)) == 0);
+
+    b[0] = building;
+    selected_building = 0;
+    gfx_begin(C_BLACK);
+    draw_building_overlay(&b[0]);
+    capture(actual);
+    selected_building = -1;
 
     gfx_begin(C_BLACK);
-    draw_actor_vitals(screen_x, sprite_y - 4, 18, building.hp,
+    draw_actor_vitals(screen_x, sprite_y + source->h + 3,
+                      source->w > 46 ? 46 : source->w, building.hp,
                       building.maxhp, building.shield,
-                      sc64_actor_max_shields(building.type, 1),
-                      owner_color(building.owner));
+                      sc64_actor_max_shields(building.type, 1), 0, 0);
     capture(expected);
     assert(memcmp(actual, expected, sizeof(actual)) == 0);
 }
