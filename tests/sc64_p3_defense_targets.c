@@ -73,6 +73,10 @@ static int random_type(void)
 
 static void clear_world(void)
 {
+    /* Preserve historical differential coverage; the dedicated fog case
+     * below clears and seeds the exact visibility cells it needs. */
+    for (int cell = 0; cell < MAP_CELLS; ++cell)
+        SC64_GRID_SET(visible, cell, 1);
     memset(u, 0, sizeof(u));
     memset(b, 0, sizeof(b));
     memset(tracers, 0, sizeof(tracers));
