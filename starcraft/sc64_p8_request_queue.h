@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_P8_REQUEST_QUEUE_H
 #define SC64_P8_REQUEST_QUEUE_H
 
@@ -11,7 +12,7 @@
  * Native evidence: 8004AB20 stores an 8-byte request (priority, category,
  * raw unit id, opaque 32-bit payload) in a max heap and saturates at 63
  * entries. 8004ACA0 removes the highest-priority entry. Category eligibility
- * for native categories 4 and 8 is checked by the caller before insertion;
+ * for native categories 1, 2, 4 and 8 is checked by the caller before insertion;
  * the heap deliberately does not implement that game-state query.
  *
  * When full, native insertion replaces array slot 62 and sifts it upward.
@@ -34,6 +35,9 @@ typedef struct {
     uint32_t payload;
 } sc64_p8_request;
 
+_Static_assert(sizeof(sc64_p8_request) == 8u,
+               "request records must stay eight bytes");
+
 typedef struct {
     size_t count;
     sc64_p8_request entries[SC64_P8_REQUEST_QUEUE_CAPACITY];
@@ -55,7 +59,7 @@ static inline void sc64_p8_request_queue_init(sc64_p8_request_queue *queue) {
 }
 
 /*
- * `native_gate_allows` is consulted only for categories 4 and 8. The native
+ * `native_gate_allows` is consulted only for categories 1, 2, 4 and 8. The native
  * game-state eligibility routine is outside this storage API. Other category
  * values bypass that native gate, matching 8004AB20.
  */
@@ -66,7 +70,8 @@ static inline sc64_p8_queue_result sc64_p8_request_enqueue(
     if (queue == NULL || queue->count > SC64_P8_REQUEST_QUEUE_CAPACITY) {
         return SC64_P8_QUEUE_ERROR;
     }
-    if ((request.category == 4u || request.category == 8u) &&
+    if ((request.category == 1u || request.category == 2u ||
+         request.category == 4u || request.category == 8u) &&
         !native_gate_allows) {
         return SC64_P8_QUEUE_SKIPPED_INELIGIBLE;
     }
