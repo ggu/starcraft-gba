@@ -37,6 +37,23 @@ void gfx_begin_preserve(void);
 void gfx_end(void);
 int gfx_read_band(int y,int height,u8 *aligned_pixels);
 int gfx_blit_band(int y,int height,const u8 *aligned_pixels);
+/* Copy a full-width band from the page being displayed into the backbuffer.
+ * The displayed page is never written while it is shown, so its bands can
+ * stand in for an EWRAM copy of pixels that both pages must share. */
+int gfx_copy_band_from_front(int y,int height);
+/* Opaque indexed rows at any screen position; every source pixel is stored,
+ * including color 0. Uses the current scene clip. */
+void gfx_blit_opaque(int x,int y,int width,int height,const u8 *indexed_pixels);
+/* The two mode-4 pages end at 0x06013600 and bitmap products keep objects
+ * off, so the OBJ tile area 0x06014000-0x06017FFF is free for pixel caches.
+ * VRAM takes no byte stores: write it with gfx_read_band or word stores. */
+#define GBA_VRAM_SCRATCH_BYTES 16384u
+#ifdef GBA_HOST
+extern u8 gba_vram_scratch[GBA_VRAM_SCRATCH_BYTES];
+#define GBA_VRAM_SCRATCH gba_vram_scratch
+#else
+#define GBA_VRAM_SCRATCH ((u8 *)0x06014000)
+#endif
 int gfx_blit_window(int y,int height,const u8 *source,int stride,int rows,int left,int top);
 #if defined(D2_DEN_OF_EVIL) || defined(GBA_HOST)
 int gfx_blit_window_2x(int y,int height,const u8 *source,int stride,int rows,int left,int top);

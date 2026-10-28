@@ -6,6 +6,7 @@
 #ifdef GBA_HOST
 #include <stdio.h>
 static u16 host_fb[2][19200];
+u8 gba_vram_scratch[GBA_VRAM_SCRATCH_BYTES] __attribute__((aligned(4)));
 static u8 host_save[32768];
 static u16 host_palette[256];
 #endif
@@ -390,6 +391,44 @@ HOT_MODE4 int gfx_blit_band(int y,int height,const u8 *src) {
  while(REG32(0x040000dc)&0x80000000){}
 #endif
  return 1;
+}
+/* Both helpers stay in ROM: the canonical profiles have no IWRAM reserve left,
+   and they move few pixels per frame. */
+int gfx_copy_band_from_front(int y,int height) {
+ if(y<0||height<=0||height>160||y>160-height)return 0;
+ GFX_TILE_TOUCH(0,y,240,y+height);
+#ifdef GBA_HOST
+ const u16 *src=host_fb[backbuffer_index^1]+y*120;
+ volatile u16 *out=pixels+y*120;
+ for(int i=0;i<120*height;i++)out[i]=src[i];
+#else
+ /* pixels addresses the backbuffer; the other page is on screen. */
+ REG32(0x040000d4)=(u32)((const u16*)(front?0x0600a000:0x06000000)+y*120);
+ REG32(0x040000d8)=(u32)(pixels+y*120);
+ REG32(0x040000dc)=0x84000000|(240*height/4);
+ while(REG32(0x040000dc)&0x80000000){}
+#endif
+ return 1;
+}
+void gfx_blit_opaque(int x,int y,int width,int height,const u8 *src) {
+ if(!src||width<=0||height<=0||width>256||height>256||x>=240||x+width<=0)return;
+#ifdef GBA_SCENE_CLIP
+ if(y>=gfx_clip_bottom||y+height<=gfx_clip_top)return;
+ int top=y<gfx_clip_top?gfx_clip_top-y:0;
+ int bottom=y+height>gfx_clip_bottom?gfx_clip_bottom-y:height;
+#else
+ if(y>=160||y+height<=0)return;
+ int top=y<0?-y:0,bottom=y+height>160?160-y:height;
+#endif
+ GFX_TILE_TOUCH(x,y,x+width,y+height);
+ int left=x<0?-x:0,right=x+width>240?240-x:width;
+ for(int row=top;row<bottom;row++) {
+  int col=left;const u8*s=src+row*width;
+  volatile u16*d=pixels+(y+row)*120+((x+col)>>1);
+  if((x+col)&1){*d=(*d&255)|((u16)s[col]<<8);d++;col++;}
+  for(;col+1<right;col+=2,d++)*d=s[col]|((u16)s[col+1]<<8);
+  if(col<right)*d=(*d&0xff00)|s[col];
+ }
 }
 /* Opaque clipped 240-pixel window from aligned, padded source rows. Areas
    outside the source keep the framebuffer's current background. The shifted

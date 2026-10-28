@@ -5998,3 +5998,24 @@ The separate Z7 CONTACT candidate has a [frozen ARM win and fresh-process
 save audit](audits/2026-10-28-z7-arm-save-win/README.md). It remains below
 the near-30-fps target; current-source host coverage and ARM source boundaries
 are reported separately.
+
+## Render caches in spare VRAM and on the second page (2026-10-28)
+
+The canonical Terran, Zerg and Protoss ROM flag sets now keep 68 of the 108
+saved terrain rows in the unused OBJ tile VRAM, restore the HUD bands from the
+page on screen instead of EWRAM copies, maintain the 24x24 minimap raster at
+visibility transitions, and compare cached fog rows as bit runs. The host
+frame oracle compiled with the Zerg Z1-Z6, Protoss P7 and Terran ROM flags
+reports all 22 comparisons pixel-identical, and the promoted-profile,
+split-run, contact-cache, HUD-cache, minimap and terrain-cache fixtures pass.
+
+On the Zerg Z1-Z6 ROM (Blood Bath, three opponents, 3,000 neutral ticks,
+static camera) drawing costs about 43,000 fewer cycles per frame: the
+background stage falls from about 80,000 to 57,000 cycles and the HUD from
+about 65,000 to 47,000, with identical simulation state at every checkpoint.
+That is 7.7 percent of the 30 Hz tick budget; this opening already ran near
+29 fps, so the saving shows in crowded scenes rather than this rate. BSS ends
+at `0x02037198` (Zerg) and `0x02037090` (Protoss P7), 28,120 bytes lower than
+before, and IWRAM ends fall slightly. These are mGBA measurements, not
+hardware results, and no mission qualification changes; see
+[the audit](audits/2026-10-28-render-caches/README.md).
