@@ -34,6 +34,7 @@ typedef struct {
                      unsigned owner);
     int (*action)(void *context, const Sc64P8SourceAction *action,
                   unsigned owner, int resume);
+    int (*trigger_complete)(void *context, unsigned trigger, unsigned owner);
 } Sc64P8SourceWorldOps;
 
 /* Validate the private compact descriptor before any runtime cursor can
@@ -183,10 +184,21 @@ static inline int sc64_p8_source_action_dispatch(void *context,
     return result;
 }
 
+static inline int sc64_p8_source_trigger_complete_dispatch(void *context,
+                                                           unsigned trigger,
+                                                           unsigned owner)
+{
+    Sc64P8SourceWorldOps *ctx = context;
+    if (!ctx || trigger >= SC64_P8_TRIGGER_LIMIT || owner >= 8u) return -1;
+    return ctx->trigger_complete
+        ? ctx->trigger_complete(ctx->context, trigger, owner) : 1;
+}
+
 static inline Sc64P8WorldOps sc64_p8_source_world_ops(Sc64P8SourceWorldOps *ctx)
 {
     Sc64P8WorldOps ops = {ctx, sc64_p8_source_trigger_info,
-        sc64_p8_source_condition_dispatch, sc64_p8_source_action_dispatch};
+        sc64_p8_source_condition_dispatch, sc64_p8_source_action_dispatch,
+        sc64_p8_source_trigger_complete_dispatch};
     return ops;
 }
 
