@@ -67,6 +67,22 @@ WEAPON_SOURCE_HEADER = (
     'sc64_weapon_source_animation_lookup(\n'
     'sc64_weapon_source_lut_for_image(\n'
 )
+BRIEFING_HEADER = (
+    '#include "gba.h"\n'
+    '#include "sc64_briefing.h"\n'
+    '#define SC64_BRIEFING_BACKGROUND_WIDTH 240\n'
+    '#define SC64_BRIEFING_BACKGROUND_HEIGHT 160\n'
+    '#define SC64_BRIEFING_PORTRAIT_WIDTH 32\n'
+    '#define SC64_BRIEFING_PORTRAIT_HEIGHT 32\n'
+    '#define SC64_BRIEFING_PORTRAIT_COUNT 23\n'
+    'static const Sc64BriefingPage sc64_briefing_pages_0[] = {\n'
+    '    {"OBJECTIVES", "Destroy the enemy command center.", -1},\n'
+    '};\n'
+    'static const Sc64Briefing sc64_briefings[30] = {{0}};\n'
+    'static inline const Sc64Briefing *sc64_briefing_get(int global_mission) {\n'
+    '    return global_mission >= 0 && global_mission < 30 ? &sc64_briefings[global_mission] : 0;\n'
+    '}\n'
+)
 DEATH_SOURCE_HEADER = (
     '#define SC64_DEATH_SOURCE_BANK_VERSION 2u\n'
     '#define SC64_DEATH_SOURCE_METADATA_VERSION 1u\n'
@@ -429,6 +445,10 @@ class OnboardingTests(unittest.TestCase):
                     emit(output, UNIT_WORD_SPRITE_HEADER)
                 elif script == 'sc64_construction_sprites.py':
                     emit_construction_header(root)
+                elif script == 'sc64_briefing_assets.py':
+                    output = local / 'briefings/generated/sc64_briefing_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(BRIEFING_HEADER, encoding='ascii')
                 elif script == 'sc64_p4_pack.py':
                     emit(local / 'p4/manifest.json',
                          '{"schema":1,"mission":{"id":"P4","global_catalog_index":23,'
@@ -443,6 +463,7 @@ class OnboardingTests(unittest.TestCase):
             self.assertTrue(all(dev.protoss_p4_input_ready(label, root / relative)
                                 for label, relative, _ in dev.PROTOSS_P4_INPUTS))
             self.assertIn('sc64_skirmish_pack.py', [Path(call[1]).name for call in calls])
+            self.assertIn('sc64_briefing_assets.py', [Path(call[1]).name for call in calls])
             # Existence is insufficient: stale maps, art, scenarios and source
             # identities must all be rejected before invoking Make.
             for label, relative, _ in dev.PROTOSS_P4_INPUTS:
@@ -492,6 +513,7 @@ class OnboardingTests(unittest.TestCase):
                     '#if defined(SC64_UNIFIED) && defined(SC64_Z3_ENABLED)\nsc64_race_z3_units\n#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */',
                 '.local/sc64/races/generated/sc64_race_sprites_generated.h': 'input',
                 '.local/sc64/races/generated/sc64_menu_generated.h': 'input',
+                '.local/sc64/briefings/generated/sc64_briefing_generated.h': BRIEFING_HEADER,
                 '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': CONSTRUCTION_COLOR_HEADER,
                 '.local/sc64/skirmish/generated/sc64_skirmish_generated.h': 'input',
                 '.local/sc64/zp-stage/generated/sc64_races_generated.h':
@@ -903,6 +925,7 @@ class OnboardingTests(unittest.TestCase):
             '.local/sc64/races/generated/sc64_races_generated.h',
             '.local/sc64/races/generated/sc64_race_sprites_generated.h',
             '.local/sc64/races/generated/sc64_menu_generated.h',
+            '.local/sc64/briefings/generated/sc64_briefing_generated.h',
             '.local/sc64/skirmish/generated/sc64_skirmish_generated.h',
         }
         for profile in ('zerg-z6', 'zerg-z7', 'protoss-p5-shuttle'):
@@ -910,8 +933,10 @@ class OnboardingTests(unittest.TestCase):
                 root = Path(directory)
                 rom = root / 'user-rom.z64'
                 rom.write_bytes(b'owned source fixture')
+                calls = []
 
                 def fake_run(command, **_kwargs):
+                    calls.append(command)
                     script = Path(command[1]).name
                     if script == 'sc64_workspace.py':
                         for relative in (
@@ -978,6 +1003,10 @@ class OnboardingTests(unittest.TestCase):
                         output = root / '.local/sc64/races/generated/sc64_menu_generated.h'
                         output.parent.mkdir(parents=True, exist_ok=True)
                         output.write_text('menu\n', encoding='ascii')
+                    elif script == 'sc64_briefing_assets.py':
+                        output = root / '.local/sc64/briefings/generated/sc64_briefing_generated.h'
+                        output.parent.mkdir(parents=True, exist_ok=True)
+                        output.write_text(BRIEFING_HEADER, encoding='ascii')
                     elif script == 'sc64_skirmish_pack.py':
                         output = root / '.local/sc64/skirmish/generated/sc64_skirmish_generated.h'
                         output.parent.mkdir(parents=True, exist_ok=True)
@@ -1030,6 +1059,7 @@ class OnboardingTests(unittest.TestCase):
                 for _, relative, _ in dev.STAGED_CAMPAIGN_INPUTS[profile]:
                     produced.add(relative)
                 produced |= base_inputs
+                self.assertIn('sc64_briefing_assets.py', [Path(call[1]).name for call in calls])
                 if profile in ('zerg-z6', 'zerg-z7'):
                     produced.add('.local/sc64/zp-stage/generated/scenarios/sc64_z5_doodads_generated.h')
                     produced |= {relative for _, relative, _ in dev.CANONICAL_ZERG_Z6_INPUTS}
@@ -1064,11 +1094,13 @@ class OnboardingTests(unittest.TestCase):
                         '.local/sc64/backwater/generated/sc64_mission_generated.h',
                         '.local/sc64/backwater/generated/sc64_assets_generated.h',
                         '.local/sc64/backwater/generated/sc64_sprites_generated.h',
+                        '.local/sc64/briefings/generated/sc64_briefing_generated.h',
                         '.local/sc64/skirmish/generated/sc64_skirmish_generated.h',
                     ):
                         path = root / relative
                         path.parent.mkdir(parents=True, exist_ok=True)
-                        path.write_text('input\n', encoding='ascii')
+                        path.write_text(BRIEFING_HEADER if 'briefing' in relative else 'input\n',
+                                        encoding='ascii')
                     games = dict(dev.GAMES, **{profile: (profile, 'build/staged.gba')})
                     output = io.StringIO()
                     with patch.object(dev, 'ROOT', root), patch.object(dev, 'GAMES', games), \
@@ -1232,6 +1264,7 @@ class OnboardingTests(unittest.TestCase):
                     '#endif /* SC64_UNIFIED && SC64_Z3_ENABLED */\n',
                 '.local/sc64/races/generated/sc64_race_sprites_generated.h': 'sprites',
                 '.local/sc64/races/generated/sc64_menu_generated.h': 'menu',
+                '.local/sc64/briefings/generated/sc64_briefing_generated.h': BRIEFING_HEADER,
                 '.local/sc64/construction/generated/sc64_construction_sprites_generated.h': CONSTRUCTION_COLOR_HEADER,
                 '.local/sc64/skirmish/generated/sc64_skirmish_generated.h': 'skirmish',
                 '.local/sc64/zp-stage/generated/sc64_races_generated.h':
@@ -1292,6 +1325,10 @@ class OnboardingTests(unittest.TestCase):
                                       encoding='ascii')
                 elif script == 'sc64_construction_sprites.py':
                     emit_construction_header(root)
+                elif script == 'sc64_briefing_assets.py':
+                    output = local / 'briefings/generated/sc64_briefing_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(BRIEFING_HEADER, encoding='ascii')
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
                 elif script == 'sc64_unit_attack_sprites.py':
@@ -1384,6 +1421,10 @@ class OnboardingTests(unittest.TestCase):
                                       encoding='ascii')
                 elif script == 'sc64_construction_sprites.py':
                     emit_construction_header(root)
+                elif script == 'sc64_briefing_assets.py':
+                    output = local / 'briefings/generated/sc64_briefing_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(BRIEFING_HEADER, encoding='ascii')
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
                 elif script == 'sc64_unit_attack_sprites.py':
@@ -1409,7 +1450,8 @@ class OnboardingTests(unittest.TestCase):
 
             scripts = [Path(call[1]).name for call in calls]
             for required in ('sc64_races_pack.py', 'sc64_race_sprites.py',
-                             'sc64_z4_pack.py', 'sc64_z4_scenario_pack.py'):
+                             'sc64_z4_pack.py', 'sc64_z4_scenario_pack.py',
+                             'sc64_briefing_assets.py'):
                 self.assertIn(required, scripts)
             self.assertTrue(all(dev.canonical_zerg_input_ready(label, root / relative)
                                 for label, relative, _ in dev.CANONICAL_ZERG_INPUTS))
@@ -1458,6 +1500,10 @@ class OnboardingTests(unittest.TestCase):
                                       encoding='ascii')
                 elif script == 'sc64_construction_sprites.py':
                     emit_construction_header(root)
+                elif script == 'sc64_briefing_assets.py':
+                    output = local / 'briefings/generated/sc64_briefing_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(BRIEFING_HEADER, encoding='ascii')
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
                 elif script == 'sc64_z4_pack.py':
@@ -1513,6 +1559,7 @@ class OnboardingTests(unittest.TestCase):
             scripts = [Path(call[1]).name for call in calls]
             for required in ('sc64_races_pack.py', 'sc64_race_sprites.py',
                              'sc64_z4_pack.py', 'sc64_z4_scenario_pack.py',
+                             'sc64_briefing_assets.py',
                              'sc64_unit_attack_sprites.py',
                              'sc64_weapon_source_sprites.py',
                              'sc64_death_sprites.py'):
@@ -1616,6 +1663,7 @@ class OnboardingTests(unittest.TestCase):
                 'Terran T7 scenario', 'Terran T10 availability',
                 'Directional unit sprites', 'Tank firing effects',
                 'Unit attack poses', 'Source weapon effects', 'Built ROM',
+                'Campaign briefings and portraits',
             ):
                 with self.subTest(dependency=dependency):
                     self.assertIn(f'MISSING {dependency}', text)
@@ -1680,6 +1728,10 @@ class OnboardingTests(unittest.TestCase):
                     emit_death_source_header(root)
                 elif script == 'sc64_menu_assets.py':
                     touch(race / 'sc64_menu_generated.h')
+                elif script == 'sc64_briefing_assets.py':
+                    output = local / 'briefings/generated/sc64_briefing_generated.h'
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    output.write_text(BRIEFING_HEADER, encoding='ascii')
                 elif script == 'sc64_skirmish_pack.py':
                     touch(local / 'skirmish/generated/sc64_skirmish_generated.h')
 
@@ -1713,6 +1765,7 @@ class OnboardingTests(unittest.TestCase):
             self.assertIn('MISSING Built ROM', ready_output)
             commands = [Path(command[1]).name for command in calls]
             self.assertIn('sc64_races_pack.py', commands)
+            self.assertIn('sc64_briefing_assets.py', commands)
             self.assertIn('sc64_t4_scenario_pack.py', commands)
             self.assertIn('sc64_t5_availability.py', commands)
             t4_profile_calls = [command for command in calls

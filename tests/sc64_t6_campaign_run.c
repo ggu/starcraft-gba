@@ -614,6 +614,14 @@ static int controller_build_refinery(int *out)
     move_cursor(x,y);x=cx;y=cy;
     if(!race_can_site(SIDE,B_REFINERY,x,y)||!can_place(B_REFINERY,x,y)){fprintf(stderr,"T6 refinery site invalid geyser=%d at=%d,%d mode=%d\n",gi,x,y,mode);normal_field();return 0;}
     tap(KEY_A);int slot=-1;
+    if(u[worker].order!=ORDER_BUILD_PENDING||u[worker].target!=B_REFINERY){
+        fprintf(stderr,"T6 refinery command did not enter pending arrival worker=%d order=%d product=%d at=%d,%d\n",worker,u[worker].order,u[worker].target,x,y);
+        normal_field();return 0;
+    }
+    /* The command records an unpaid pending order. Advance the ordinary
+       simulation until its SCV arrives and commits the real foundation. */
+    for(int t=0;t<3000&&host_ticks<(u32)run_limit&&screen==SCREEN_PLAY&&!won&&!lost&&
+        u[worker].alive&&u[worker].order==ORDER_BUILD_PENDING;t++)step(0);
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_REFINERY&&b[i].under_construction&&dist2(x,y,b[i].x,b[i].y)<64*64){slot=i;break;}
     if(slot<0||owner_buildings(SIDE)<=before){fprintf(stderr,"T6 refinery command did not start at %d,%d mineral=%d\n",x,y,minerals);normal_field();return 0;}
     fprintf(stderr,"T6 controller started paid Refinery slot=%d site=%d,%d worker=%d wallet=%d/%d\n",slot,x,y,worker,minerals,gas);

@@ -191,9 +191,23 @@ int main(void)
     memset(visible, 0xff, sizeof(visible));
     int worker = spawn_unit(SIDE, U_PROBE, site_x + 32, site_y);
     assert(worker >= 0 && u[worker].alive);
+    unsigned before_minerals = (unsigned)minerals;
     assert(race_start_build(SIDE, worker, B_PYLON, site_x, site_y));
-    int slot = u[worker].target;
+    assert(u[worker].order == ORDER_BUILD_PENDING && u[worker].target == B_PYLON);
+    assert((unsigned)minerals == before_minerals);
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        assert(!b[i].alive || b[i].type != B_PYLON ||
+               b[i].x != site_x || b[i].y != site_y);
+    /* The color fixture begins just outside the 36px approach ring; place the
+       Probe at its authored arrival point and advance the pending-order tick. */
+    u[worker].x = site_x; u[worker].y = site_y;
+    update_orders();
+    int slot = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_PYLON &&
+            b[i].x == site_x && b[i].y == site_y) { slot = i; break; }
     assert(slot >= 0 && b[slot].alive && b[slot].under_construction);
+    assert((unsigned)minerals == before_minerals - 100u);
     unsigned duration = (unsigned)building_build_time(b[slot].type);
     assert(duration > 16);
     uint32_t first = run_warp_frame(&b[slot], duration, 1, 1);

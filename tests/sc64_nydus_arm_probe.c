@@ -146,7 +146,7 @@ int main(void)
     for (int p = 0; p < ordinal / 2; ++p) press(KEY_RIGHT);
     if (ordinal & 1) press(KEY_DOWN);
     press(KEY_A);
-    press(KEY_A);
+    press(KEY_START);
     check(screen == SCREEN_PLAY && race_z7_active(), "menu route");
     for (int f = 0; f < 4; ++f) frame_with(0);
     for (int f = 0; f < 240; ++f) stat_add(&baseline, frame_with(0));

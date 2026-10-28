@@ -41,7 +41,7 @@ static void launch_z7(void)
     press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING &&
            race_front.mission == SC64_Z7_GLOBAL_ID);
-    press(KEY_A);
+    press(KEY_START);
     assert(screen == SCREEN_PLAY && race_z7_active() &&
            race_campaign.mission == SC64_Z7_GLOBAL_ID);
     assert(SC64_RACE_SAVE_GENERATION ==

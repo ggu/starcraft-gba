@@ -98,7 +98,7 @@ int main(void)
     assert(sc64_front_mission_rows(&race_front)==1);
     tap(KEY_A); /* mission page to briefing */
     assert(race_front.page==SC_FRONT_BRIEFING && race_front.mission==SC64_P7_GLOBAL_ID);
-    game_update(KEY_A,KEY_A); /* launch; inspect before another engine tick */
+    game_update(KEY_START,KEY_START); /* explicit launch; inspect before another engine tick */
 
 #ifdef SC64_P7_PREVALIDATED_TICK
     if(screen!=SCREEN_PLAY) fprintf(stderr,"launch screen=%d fault=%u statevalid=%d bind=%d frame=%d\n",screen,race_p7.runtime.fault,race_p7_runtime_state_valid(),race_p7_world_prevalidated_bindings_valid(),frame);
@@ -380,7 +380,7 @@ int main(void)
        predicate through real combat death hooks, then compare dispatch state. */
     game_init();
     tap(KEY_A); tap(KEY_RIGHT); tap(KEY_RIGHT); tap(KEY_RIGHT);
-    tap(KEY_A); game_update(KEY_A,KEY_A);
+    tap(KEY_A); game_update(KEY_START,KEY_START);
     assert(screen==SCREEN_PLAY && race_p7_runtime_state_valid());
     for (unsigned t=1;t<=3;++t) {
         kill_source_condition(t);

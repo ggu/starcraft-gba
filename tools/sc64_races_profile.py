@@ -387,7 +387,7 @@ def smoke_events(profile: str, bots: int, human_race: str,
         press(KEY_A)  # Confirm faction
         if mission & 1: press(KEY_DOWN)
         press(KEY_A)  # Mission selection → briefing
-        press(KEY_A)  # Briefing → play
+        press(KEY_START)  # Explicitly skip briefing → play
     return events
 
 

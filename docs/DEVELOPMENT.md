@@ -155,6 +155,26 @@ This selects the static source frame; native gas-smoke animation is separate.
 With the canonical Protoss inputs prepared, `make test-sc64-geyser-art` checks
 source pixels, edge clipping, fog, all three gas buildings and warm-cache reuse.
 
+## Campaign briefings and speaker portraits
+
+Canonical imported race profiles include the N64 campaign's pre-mission
+dialogue, speaker names and 23 portrait head frames, adapted to the GBA briefing
+screen. Dialogue pages are generated locally and wrapped to 36 columns by at
+most 7 rows; the imported text and graphics remain private under `.local/`.
+From an already prepared workspace, `make sc64-briefings` regenerates the
+briefing header from the verified USA ROM at
+`.local/sc64/rom/StarCraft64-USA.z64` and the pinned `references/sc64-maps`
+checkout. `./dev sc64 prepare --rom PATH --profile terran` runs this importer
+automatically, as do the canonical `zerg` and `protoss` preparation profiles.
+Status and builds require the generated briefing header.
+
+In the briefing, A reveals the current page and then advances; A on the final
+page deploys the mission. Left/Right browse pages, B returns to mission
+selection, and Start skips straight to deployment. L retains quick-load. This
+adds transient frontend playback state only and does not change campaign save
+data.
+
+
 ## Source construction art
 
 Prepared imported race builds now use the source construction art, including
@@ -167,6 +187,7 @@ selects the older authored fallback for diagnostic comparisons.
 
 When updating an existing prepared workspace, rerun `./dev sc64 prepare` with
 your ROM and profile to refresh its sprite banks as well as construction art.
+
 
 ```sh
 python3 tools/sc64_construction_sprites.py
@@ -442,7 +463,8 @@ The default `./dev test` includes the asset-free weapon-effect renderer check. A
 ROM's sound effects and music into a private bank under ignored
 `.local/sc64/audio/generated/`: `sc64_audio_generated.bin` (losslessly
 compressed signed 8-bit PCM streams, codec format 2), `sc64_audio_generated.h`
-(stream offsets, sample counts and per-unit index tables) and a manifest with
+(stream offsets, sample counts, per-unit index tables and the advisor table)
+and a manifest with
 counts, sizes and hashes. To refresh only the bank:
 
 ```sh
@@ -456,8 +478,8 @@ Every imported (`SC64_*`) ARM profile links the bank automatically when the
 header exists. `make <target> SC64_AUDIO=0` builds the same profile silent, for
 example for performance baselines; `SC64_AUDIO=1` fails if the bank is absent.
 The default original-art ROM never uses it: it keeps short PSG placeholder
-tones for the same events. The decoded PCM is 15.6 MB; the compressed bank is
-about 8.3 MB (47% smaller), which leaves room in the 32 MiB cartridge for the
+tones for the same events. The decoded PCM is 15.9 MB; the compressed bank is
+about 8.5 MB (46% smaller), which leaves room in the 32 MiB cartridge for the
 remaining campaign content. Like other imported data, the bank and any audio
 captured from it are game content: do not commit, attach or distribute them.
 
@@ -497,6 +519,15 @@ What is imported:
   `playsndbtwn`, `attackmelee` in attack and death animations, following
   one level of spawned explosion sprites): 501 distinct clips. Annoyed
   responses are not imported.
+- Nine advisor refusal lines are added by `sfxdata` id: 146-148 "not enough
+  minerals", 149-151 "not enough vespene gas" and 152-154 "supply limit" (each
+  Zerg, Terran, Protoss; "Spawn more Overlords", "Additional supply depots
+  required", "You must construct additional pylons"). They were identified by
+  transcribing the decoded clips around the advisor block, then again from
+  the generated bank. The
+  header's `sc64_audio_advisor` lists their clip indices in the game's race
+  order (Terran, Zerg, Protoss), each as minerals, gas, supply, giving 510
+  clips in all.
 - Music roles come from the resident N64 selector, which loads resource
   `0x1500 + track`: 0 is the menu theme; Terran, Zerg and Protoss play
   4/5, 8/9 and 12/13 in game, alternating as each ends; 2/3, 6/7 and 10/11 are
@@ -518,7 +549,11 @@ Engine design (`common/audio_mixer.h`, `common/gba.c`):
   scratch slot, mixes 176 samples with saturation and decodes the next music
   frame. Voice 0 is reserved for unit responses, which interrupt each other as
   in StarCraft; effects take a free voice or steal a lower-priority, older
-  one, and the same effect is not retriggered within four frames. The mixer
+  one, and the same effect is not retriggered within four frames. An advisor
+  line takes an effect voice above every effect's priority, so neither
+  combat nor unit responses cut it off, and while one plays further advisor
+  requests are refused: a repeated refusal is heard again once the line has
+  ended, never restarted or overlapped. The mixer
   reads four decoded samples per word and adds them in two 16-bit lanes,
   clamping only lanes that overflow. Decoder and mixer run as Thumb code from
   ROM: IWRAM has no room for them.
@@ -531,7 +566,12 @@ Engine design (`common/audio_mixer.h`, `common/gba.c`):
   cooldown on a visible unit (a shot), alive 1->0 (a death), a new player unit
   (ready), a cleared construction flag (completed building, which plays the
   building's selection sound because StarCraft has none), and a new selection
-  or changed orders after input (selection and command responses). It never
+  or changed orders after input (selection and command responses). The
+  player's own refusals for minerals, gas or supply (the "Need more minerals",
+  "No gas" and "Supply limit reached" toasts from Build, Train and research)
+  leave a one-byte cue that the observer turns into the player race's
+  advisor line; profiles without the bank play a short PSG tone instead, and a
+  bank generated before the advisor table stays silent for them. It never
   writes simulation state or uses the game RNG, at most two effects start per
   frame, and it ignores any tick discontinuity such as a load or restart.
 

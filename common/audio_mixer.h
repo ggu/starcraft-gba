@@ -30,7 +30,10 @@
 /* Decoders: voice i uses dec[i], music dec[AUDIO_VOICES]. */
 #define AUDIO_DECODERS (AUDIO_VOICES + 1u)
 
-enum { AUDIO_CLASS_EFFECT, AUDIO_CLASS_SPEECH };
+/* Request classes (AUDIO_CLASS_*) are declared in gba.h for the game side.
+ * Advisor lines outrank every effect, so only another advisor line could
+ * take their voice, and that is refused while one plays. */
+#define AUDIO_PRIORITY_ADVISOR 0xffu
 
 typedef struct {
     const u8 *blob;            /* Word-aligned base of all encoded streams. */
@@ -104,19 +107,21 @@ static inline void audio_mixer_music(AudioMixer *m, u8 track, u8 loop)
 }
 
 static inline void audio_mixer_start_voice(AudioMixer *m, AudioVoice *v, const AudioBank *bank,
-                                           const AudioRequest *r)
+                                           const AudioRequest *r, u8 priority)
 {
     audio_decoder_start(&m->dec[v - m->voice], bank->blob + bank->sample_offset[r->sound]);
     v->remaining = bank->sample_length[r->sound] & ~(AUDIO_CODEC_BLOCK - 1u);
     v->sound = r->sound;
-    v->priority = r->priority;
+    v->priority = priority;
     v->age = 0;
 }
 
 /* Interrupt side: assign queued requests to voices. Speech always replaces
  * the speech voice, like a new unit response interrupting the last one.
  * Effects take a free voice, else the lowest-priority (then oldest) voice
- * whose priority does not exceed the request. */
+ * whose priority does not exceed the request. An advisor line is an effect
+ * at AUDIO_PRIORITY_ADVISOR, refused while any advisor line still plays, so
+ * it never cuts itself off and a later request replays it once it ends. */
 static inline void audio_mixer_service(AudioMixer *m, const AudioBank *bank)
 {
     u8 tail = m->tail;
@@ -125,14 +130,17 @@ static inline void audio_mixer_service(AudioMixer *m, const AudioBank *bank)
         tail = (u8)((tail + 1u) % AUDIO_QUEUE);
         if (r->sound >= bank->sample_count) { ++m->dropped; continue; }
         if (r->kind == AUDIO_CLASS_SPEECH) {
-            audio_mixer_start_voice(m, &m->voice[AUDIO_SPEECH_VOICE], bank, r);
+            audio_mixer_start_voice(m, &m->voice[AUDIO_SPEECH_VOICE], bank, r, r->priority);
             continue;
         }
+        int advisor = r->kind == AUDIO_CLASS_ADVISOR;
+        u8 priority = advisor ? AUDIO_PRIORITY_ADVISOR : r->priority;
         AudioVoice *best = 0;
         int duplicate = 0;
         for (u32 i = AUDIO_SPEECH_VOICE + 1u; i < AUDIO_VOICES; ++i) {
             AudioVoice *v = &m->voice[i];
-            if (v->remaining && v->sound == r->sound && v->age < AUDIO_RETRIGGER_FRAMES) {
+            if (v->remaining && ((v->sound == r->sound && v->age < AUDIO_RETRIGGER_FRAMES) ||
+                                 (advisor && v->priority == AUDIO_PRIORITY_ADVISOR))) {
                 duplicate = 1;
                 break;
             }
@@ -144,11 +152,11 @@ static inline void audio_mixer_service(AudioMixer *m, const AudioBank *bank)
                 best = v;
             }
         }
-        if (duplicate || !best || (best->remaining && best->priority > r->priority)) {
+        if (duplicate || !best || (best->remaining && best->priority > priority)) {
             ++m->dropped;
             continue;
         }
-        audio_mixer_start_voice(m, best, bank, r);
+        audio_mixer_start_voice(m, best, bank, r, priority);
     }
     m->tail = tail;
 }

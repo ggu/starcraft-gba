@@ -88,7 +88,7 @@ static int open_mission(int mission)
     if (race_front.row != (mission & 1)) return 0;
     press(KEY_A); /* MISSION → BRIEFING */
     if (race_front.page != SC_FRONT_BRIEFING || race_front.mission != mission) return 0;
-    frame_input(KEY_A); /* BRIEFING → game */
+    frame_input(KEY_START); /* Explicit BRIEFING deployment. */
     if (screen != SCREEN_PLAY) return 0;
     /* Inspect immediately after the launch edge; the following release is a
      * real simulation update and can expose scenario initialization defects. */

@@ -412,7 +412,7 @@ static int controller_mission(int mission)
     if (mission & 1) controller_press(KEY_DOWN);
 #endif
     controller_press(KEY_A);
-    controller_press(KEY_A);
+    controller_press(KEY_START);
     if (screen != SCREEN_PLAY || race_campaign.mission != mission) return 0;
     if (mission == SC64_RACE_MISSION_Z2) {
         int c = race_campaign.chrysalis_unit, drone = side_drone(), guard = 0;

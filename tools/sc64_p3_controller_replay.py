@@ -44,8 +44,9 @@ EXPECTED_FINAL = {
 EXPANSION_POLICY = "protoss-three-expansion-source-cleared"
 GARRISON_POLICY = "protoss-economy-tech-defense-assault"
 STOCK_POLICY = "protoss-stock-economy-cannons-assault"
+KEY_START = 8
 STOCK_OPENING_INPUTS = ((1, 1), (2, 0), (3, 16), (4, 0),
-                        (5, 1), (6, 0), (7, 1))
+                        (5, 1), (6, 0), (7, KEY_START))
 STOCK_EXPECTED_START = {
     "host_tick": 7, "frame": 0, "elapsed": 0, "screen": SCREEN_PLAY,
     "won": 0, "lost": 0, "p3_outcome": 0, "p3_sequence": 0,

@@ -489,7 +489,7 @@ static void start_live_route(void)
     tap(KEY_RIGHT);
     tap(KEY_DOWN);
     tap(KEY_A);
-    tap(KEY_A);
+    tap(KEY_START);
     assert(host_ticks == 12 && screen == SCREEN_PLAY && !won && !lost &&
            race_p6_active());
     deployed = 1;
@@ -1822,7 +1822,7 @@ static void launch_from_menu(void)
     tap(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING &&
            race_front.mission == SC64_P6_GLOBAL_ID);
-    tap(KEY_A);
+    tap(KEY_START);
     deployed = 1;
     assert(screen == SCREEN_PLAY && !race_mode && !won && !lost);
     assert(race_selected_mission == SC64_P6_GLOBAL_ID && race_p6_active());

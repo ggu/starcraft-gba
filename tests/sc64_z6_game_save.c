@@ -47,7 +47,7 @@ static void launch_z6_from_normal_menu(void)
     press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING &&
            race_front.mission == SC64_Z6_GLOBAL_ID);
-    press(KEY_A);
+    press(KEY_START);
     assert(screen == SCREEN_PLAY && !race_mode && !won && !lost);
     assert(race_selected_mission == SC64_Z6_GLOBAL_ID && race_z6_active());
     assert(race_campaign.mission == SC64_Z6_GLOBAL_ID);

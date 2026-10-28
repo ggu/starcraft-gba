@@ -69,7 +69,7 @@ static void launch_z3_through_campaign_menu(void)
     assert(race_front.mission_page == 1);
     controller_press(KEY_A);
     assert(race_front.page == SC_FRONT_BRIEFING && race_front.mission == 14);
-    controller_frame(KEY_A); /* Deploy; do not release into a live simulation tick. */
+    controller_frame(KEY_START); /* Explicit deploy; no release tick in the mission. */
     assert(screen == SCREEN_PLAY && !race_mode);
     assert(race_selected_mission == 14 && race_campaign.mission == 14);
 }

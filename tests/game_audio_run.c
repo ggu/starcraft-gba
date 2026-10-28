@@ -188,6 +188,55 @@ static int hooks(void)
     observe_next();
     if (events(GAME_AUDIO_BUILT) != 1) return fail("construction complete");
 
+    /* A refused train order cues the player race's advisor once per press. */
+    fixture();
+#ifdef SC64_RACES
+    static const int hall[3] = { B_COMMAND, B_HATCHERY, B_NEXUS }, worker[3] = { U_SCV, U_DRONE, U_PROBE };
+    int hall_type = hall[race_human], trainee = worker[race_human];
+#else
+    int hall_type = B_COMMAND, trainee = U_SCV;
+#endif
+    b[0].alive = 1; b[0].owner = SIDE; b[0].type = hall_type; b[0].x = 100; b[0].y = 80;
+    b[0].hp = b[0].maxhp = 1500;
+#ifdef SC64_RACES
+    b[0].larva = 3;
+#endif
+    minerals = gas = 0;
+    observe_next();
+    clear_events();
+    queue_unit(0, trainee);
+    if (toast_id != 1 || b[0].queue_count) return fail("train refusal toast");
+    observe_next();
+    if (events(GAME_AUDIO_ADVISOR) != 1) return fail("minerals advisor");
+#if defined(SC64_AUDIO_IMPORTED) && defined(SC64_AUDIO_ADVISOR_LINES)
+    if (audio_host_last_sample != sc64_audio_advisor[GAME_AUDIO_PLAYER_RACE * SC64_AUDIO_ADVISOR_LINES])
+        return fail("race minerals line");
+#endif
+    observe_next();
+    if (events(GAME_AUDIO_ADVISOR) != 1) return fail("advisor cue repeated without a press");
+    queue_unit(0, trainee);
+    observe_next();
+    if (events(GAME_AUDIO_ADVISOR) != 2) return fail("repeated refusal replays the advisor");
+#ifndef SC64_RACES
+    minerals = 1000;
+    supply_used = supply_cap;
+    queue_unit(0, trainee);
+    observe_next();
+    if (toast_id != 2 || events(GAME_AUDIO_ADVISOR) != 3) return fail("supply advisor");
+#endif
+    toast_refusal(12);
+    observe_next();
+#if defined(SC64_AUDIO_IMPORTED) && defined(SC64_AUDIO_ADVISOR_LINES)
+    if (audio_host_last_sample != sc64_audio_advisor[GAME_AUDIO_PLAYER_RACE * SC64_AUDIO_ADVISOR_LINES + 1])
+        return fail("race gas line");
+#endif
+    clear_events();
+    toast_refusal(1);
+    frame += 40;
+    game_render();
+    observe_next();
+    if (events(GAME_AUDIO_ADVISOR) || toast_advisor) return fail("discontinuity kept an advisor cue");
+
     /* A tick discontinuity (load or restart) and pauses never replay history. */
     put_unit(7, ENEMY, U_ZERGLING, 50, 50);
     observe_next();
@@ -249,9 +298,10 @@ int main(int argc, char **argv)
 #ifndef GAME_AUDIO_OFF
     u32 total = 0;
     for (int k = 0; k < GAME_AUDIO_EVENT_KINDS; k++) total += events(k);
-    printf("events attack=%u death=%u ready=%u what=%u yes=%u built=%u\n",
+    printf("events attack=%u death=%u ready=%u what=%u yes=%u built=%u advisor=%u\n",
            events(GAME_AUDIO_ATTACK), events(GAME_AUDIO_DEATH), events(GAME_AUDIO_READY),
-           events(GAME_AUDIO_WHAT), events(GAME_AUDIO_YES), events(GAME_AUDIO_BUILT));
+           events(GAME_AUDIO_WHAT), events(GAME_AUDIO_YES), events(GAME_AUDIO_BUILT),
+           events(GAME_AUDIO_ADVISOR));
     if (!total) return fail("long run produced no audio events");
 #endif
     return 0;

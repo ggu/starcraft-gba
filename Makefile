@@ -167,8 +167,21 @@ RACE_CONSTRUCTION_INPUTS := $(CONSTRUCTION_ART_HEADER)
 endif
 # Every race-engine ROM uses the default profile's controls and menus
 # (starcraft/field_controls.h).
-RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated $(RACE_CONSTRUCTION_FLAGS)
-RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h $(RACE_CONSTRUCTION_INPUTS)
+RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated $(RACE_CONSTRUCTION_FLAGS)
+RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(RACE_CONSTRUCTION_INPUTS)
+
+.PHONY: sc64-briefings test-sc64-briefing
+sc64-briefings:
+	python3 tools/sc64_briefing_assets.py
+build/test-sc64-briefing: tests/sc64_briefing.c starcraft/sc64_briefing.h starcraft/sc64_frontend.h starcraft/campaign_catalog.h common/gba.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon $< -o $@
+test-sc64-briefing: build/test-sc64-briefing
+	./build/test-sc64-briefing
+test-starcraft: test-sc64-briefing
+
+.local/sc64/briefings/generated/sc64_briefing_generated.h:
+	@echo 'Private briefing data is missing. Run make sc64-briefings with the prepared local ROM and reference checkout.'
+	@false
 build/test-sc64-stock-motion-runtime: tests/sc64_stock_motion_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RACES_FLAGS) $< common/gba.c -o $@
 test-sc64-stock-motion-runtime: build/test-sc64-stock-motion-runtime
@@ -992,7 +1005,14 @@ build/test-sc64-compact-building-save: tests/sc64_compact_building_save.c starcr
 .PHONY: test-sc64-compact-building-save
 test-sc64-compact-building-save: build/test-sc64-compact-building-save
 	./build/test-sc64-compact-building-save
-test-starcraft: test-sc64-compact-building-save
+
+build/test-sc64-construction-save: tests/sc64_construction_save.c starcraft/sc64_construction_save.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-construction-save
+test-sc64-construction-save: build/test-sc64-construction-save
+	./build/test-sc64-construction-save
+
+test-starcraft: test-sc64-compact-building-save test-sc64-construction-save
 build/test-sc64-t6-storage: tests/sc64_t6_storage_save.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T6_STORAGE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-t6-storage
@@ -4521,3 +4541,26 @@ build/test-sc64-protoss-carried-p3 \
 build/test-sc64-protoss-carried-p5 \
 build/test-sc64-skirmish-resume-protoss \
 build/test-sc64-contact-cache-protoss: $(PROTOSS_P7_CANONICAL_INPUTS) $(P7_ARBITER_INPUTS) $(P7_FACT_V2_HEADER) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
+
+# Prepared-input regression checks for race construction travel and SRAM.
+CONSTRUCTION_ARRIVAL_FLAGS_terran = $(TERRAN_ROM_FLAGS)
+CONSTRUCTION_ARRIVAL_FLAGS_zerg-z6 = $(ZERG_ROM_FLAGS)
+CONSTRUCTION_ARRIVAL_FLAGS_protoss-p7 = $(PROTOSS_ROM_FLAGS)
+CONSTRUCTION_ARRIVAL_FLAGS_zerg-z7 = $(ZERG_Z7_RELEASE_FLAGS)
+CONSTRUCTION_ARRIVAL_INPUTS_terran = $(TERRAN_FULL_INPUTS)
+CONSTRUCTION_ARRIVAL_INPUTS_zerg-z6 = $(ZERG_Z6_INPUTS)
+CONSTRUCTION_ARRIVAL_INPUTS_protoss-p7 = $(PROTOSS_P7_CANONICAL_INPUTS)
+CONSTRUCTION_ARRIVAL_INPUTS_zerg-z7 = $(ZERG_Z7_CANONICAL_INPUTS)
+CONSTRUCTION_ARRIVAL_SOURCES_protoss-p7 = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
+
+define CONSTRUCTION_ARRIVAL_TESTS
+build/test-sc64-construction-arrival-$(1): tests/sc64_construction_arrival_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(CONSTRUCTION_ARRIVAL_INPUTS_$(1)) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $$(CONSTRUCTION_ARRIVAL_FLAGS_$(1)) $$< common/gba.c $$(CONSTRUCTION_ARRIVAL_SOURCES_$(1)) -o $$@
+build/test-sc64-construction-arrival-save-$(1): tests/sc64_construction_arrival_save_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(CONSTRUCTION_ARRIVAL_INPUTS_$(1)) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(P7_ARBITER_TEST_FLAGS) $$(CONSTRUCTION_ARRIVAL_FLAGS_$(1)) $$< common/gba.c $$(CONSTRUCTION_ARRIVAL_SOURCES_$(1)) -o $$@
+.PHONY: test-sc64-construction-arrival-$(1)
+test-sc64-construction-arrival-$(1): build/test-sc64-construction-arrival-$(1) build/test-sc64-construction-arrival-save-$(1)
+	./build/test-sc64-construction-arrival-$(1)
+	./build/test-sc64-construction-arrival-save-$(1)
+endef
+$(foreach profile,terran zerg-z6 protoss-p7 zerg-z7,$(eval $(call CONSTRUCTION_ARRIVAL_TESTS,$(profile))))
