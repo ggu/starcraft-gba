@@ -880,7 +880,6 @@ _Static_assert(sizeof(SaveData) <= 16368, "Save exceeds an alternating SRAM reco
 static SaveData data;
 #endif
 static Unit u[MAX_UNITS];
-#include "sc64_unit_walk.h"
 #ifdef SC64_UNIT_FACING
 static void sc64_facing_reset_all(void);
 static void sc64_facing_reset_slot(int slot);
@@ -1773,6 +1772,8 @@ building_gas_cost(int type)
 #endif
     return type == B_ACADEMY ? 0 : 0;
 }
+
+#include "sc64_unit_walk.h"
 
 static int
 find_unit_slot(void)

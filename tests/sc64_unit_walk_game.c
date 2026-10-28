@@ -22,34 +22,39 @@ static void test_type(int type, const char *name)
     memset(u, 0, sizeof(u));
     sc64_walk_reset_all();
     camx = camy = 0;
-    int slot = spawn_unit(SIDE, type, 64, 48);
+    int slot = spawn_unit(SIDE, type, 32, 48);
     assert(slot >= 0);
     capture(slot);
     memcpy(walking, shot, sizeof(shot));
     capture(slot);
     assert(!memcmp(walking, shot, sizeof(shot)));   /* standing is stable */
 
-    for (int step = 0; step < 16; ++step) {
-        u[slot].x += 2;
-        int phase = sc64_walk_track(&u[slot]);
+    for (int step = 0; step < 32; ++step) {
+        int x = u[slot].x;
+        move_toward(&u[slot], 200, 48);
+        assert(u[slot].x > x);
+        capture(slot);
+        int phase = sc64_walk_track(&u[slot]);     /* same tick: held */
         assert(phase >= 1 && phase <= 4);
         seen[phase - 1] = 1;
-        /* draw_unit observes the same position again; stride is held. */
-        capture(slot);
         memcpy(walking, shot, sizeof(shot));
         /* Compare with standing art at the same spot. */
-        u8 key = sc64_walk_key[slot], state = sc64_walk_state[slot];
+        u8 bits = SC64_WALK_BITS[slot];
         sc64_walk_reset_slot(slot);
+        SC64_WALK_BITS[slot] |= (u8)(((unsigned)u[slot].path_timer << SC64_WALK_KEY_SHIFT) &
+                                     SC64_WALK_KEY_MASK);
         capture(slot);
         assert(memcmp(walking, shot, sizeof(shot)));
-        sc64_walk_key[slot] = key; sc64_walk_state[slot] = state;
+        SC64_WALK_BITS[slot] = bits;
     }
     assert(seen[0] && seen[1] && seen[2] && seen[3]);
 
-    /* Once stopped, the unit looks exactly as a freshly placed one. */
-    for (int i = 0; i <= SC64_WALK_HOLD; ++i) capture(slot);
+    /* Once nothing moves it, the unit looks exactly as a freshly placed one. */
+    capture(slot);
+    capture(slot);
     memcpy(walking, shot, sizeof(shot));
     sc64_walk_reset_slot(slot);
+    u[slot].path_timer = 0;
     capture(slot);
     assert(!memcmp(walking, shot, sizeof(shot)));
     printf("PASS %s walk cycle\n", name);

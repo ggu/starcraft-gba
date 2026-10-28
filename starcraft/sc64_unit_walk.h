@@ -5,33 +5,38 @@
 /* Presentation-only walk cycle for every unit in every profile.
  *
  * Neither the original-art shapes nor the imported single-pose sprite frames
- * carry a movement cycle, so a moving unit used to glide. This keeps two
- * bytes per actor slot: a position key, and a packed counter of observed
- * steps plus a short hold that bridges ticks in which a slow unit does not
- * advance. The stride phase advances with distance walked, so it stops when
- * the unit or the game stops. Nothing here is read by the simulation or
- * saved; after a load the first observation only primes the slot. */
+ * carry a movement cycle, so a moving unit used to glide. A ground unit's
+ * path timer counts down once on every tick it is moved, and freezes when
+ * nothing moves it, so it doubles as a step counter. Three bits per actor
+ * slot remember its low bits and bridge one tick, which costs no RAM where
+ * the facing byte already exists (facing uses only its low five bits).
+ * Flyers keep no state: they are moving while an order carries them toward
+ * a different point. Nothing here is read by the simulation or saved; after
+ * a load a unit may hold one stride frame. */
 
-/* Draws a moving unit stays in stride after its last observed step. */
-#define SC64_WALK_HOLD 6
-#define SC64_WALK_PRIMED 0x80
-#define SC64_WALK_HOLD_MASK 0x07
-#define SC64_WALK_STEP_SHIFT 3
-#define SC64_WALK_STEP_MASK 0x0f
+#define SC64_WALK_KEY_SHIFT 5
+#define SC64_WALK_KEY_MASK 0x60
+#define SC64_WALK_HOLD 0x80
 
-static u8 sc64_walk_key[MAX_UNITS];
-static u8 sc64_walk_state[MAX_UNITS];
-
-static void
-sc64_walk_reset_all(void)
-{
-    memset(sc64_walk_state, 0, sizeof(sc64_walk_state));
-}
+#ifdef SC64_UNIT_FACING
+static u8 sc64_facing[MAX_UNITS];
+#define SC64_WALK_BITS sc64_facing
+#else
+static u8 sc64_walk_bits[MAX_UNITS];
+#define SC64_WALK_BITS sc64_walk_bits
+#endif
 
 static void
 sc64_walk_reset_slot(int slot)
 {
-    if ((unsigned)slot < MAX_UNITS) sc64_walk_state[slot] = 0;
+    if ((unsigned)slot < MAX_UNITS)
+        SC64_WALK_BITS[slot] &= (u8)~(SC64_WALK_KEY_MASK | SC64_WALK_HOLD);
+}
+
+static void
+sc64_walk_reset_all(void)
+{
+    for (int i = 0; i < MAX_UNITS; ++i) sc64_walk_reset_slot(i);
 }
 
 /* Called before drawing a visible unit. Returns 0 while the unit stands,
@@ -41,24 +46,20 @@ sc64_walk_track(const Unit *q)
 {
     int slot = (int)(q - u);
     if ((unsigned)slot >= MAX_UNITS) return 0;
-    /* Steps are at most a few pixels, so the low position bits change. */
-    u8 key = (u8)((unsigned)q->x ^ ((unsigned)q->y << 4));
-    unsigned state = sc64_walk_state[slot];
-    unsigned hold = state & SC64_WALK_HOLD_MASK;
-    unsigned steps = (state >> SC64_WALK_STEP_SHIFT) & SC64_WALK_STEP_MASK;
-    if (!(state & SC64_WALK_PRIMED)) {
-        hold = 0;
-        steps = 0;
-    } else if (key != sc64_walk_key[slot]) {
-        hold = SC64_WALK_HOLD;
-        steps = (steps + 1) & SC64_WALK_STEP_MASK;
-    } else if (hold) {
-        --hold;
+#ifdef SC64_RACES
+    if (sc64_race_unit_flying(q->type)) {
+        if (q->order == ORDER_IDLE || (q->cd && q->order == ORDER_ATTACK_TARGET) ||
+            (q->x == q->tx && q->y == q->ty)) return 0;
+        return (int)(((unsigned)frame >> 2) & 3) + 1;
     }
-    sc64_walk_key[slot] = key;
-    sc64_walk_state[slot] = (u8)(SC64_WALK_PRIMED |
-        (steps << SC64_WALK_STEP_SHIFT) | hold);
-    return hold ? (int)((steps >> 1) & 3) + 1 : 0;
+#endif
+    unsigned bits = SC64_WALK_BITS[slot];
+    unsigned key = ((unsigned)q->path_timer << SC64_WALK_KEY_SHIFT) & SC64_WALK_KEY_MASK;
+    unsigned stepped = (bits & SC64_WALK_KEY_MASK) != key;
+    SC64_WALK_BITS[slot] = (u8)((bits & ~(SC64_WALK_KEY_MASK | SC64_WALK_HOLD)) |
+                                key | (stepped ? SC64_WALK_HOLD : 0));
+    if (!stepped && !(bits & SC64_WALK_HOLD)) return 0;
+    return (int)(((unsigned)q->path_timer >> 1) & 3) + 1;
 }
 
 /* Lift the body one pixel between footfalls. */
