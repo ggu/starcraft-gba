@@ -2,6 +2,21 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
+## Current race-build continuation (2026-10-28)
+
+After worker-arrival construction, all three canonical race vectors pass a
+normal-menu save followed by a fresh-process physical-SRAM load and 900
+matching skirmish updates. Each uses Blood Bath, its profile's human race and
+three mixed-race AIs. The bounded early-scene timing is about 28–29 fps
+equivalent; later battles and campaign-wide near-30-fps play remain unproven.
+A separate current-source P7 input-only ARM replay matches all 65 checkpoints
+through a strict victory with all three heroes alive. See the
+[current race-build audit](audits/2026-10-28-current-race-sram/README.md)
+for exact images, protocol and limits. These checks cover the runtime shared
+by PR113 and the test-only PR114, rather than requalifying every historical
+mission result below. Current catalog coverage is 23/30 (Terran 10, Zerg 6,
+Protoss 7); the all-30-mission and near-30-fps goals remain unfinished.
+
 ## Optional Nydus Canal runtime (2026-10-27)
 
 `SC64_NYDUS_ENABLED` is off in every shipped profile. Flag-off default, Z7
