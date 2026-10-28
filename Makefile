@@ -60,6 +60,33 @@ build/test-sc64-p8-source-contract: tests/sc64_p8_source_contract.c starcraft/sc
 test-sc64-p8-source-contract: build/test-sc64-p8-source-contract
 	./build/test-sc64-p8-source-contract
 
+# Asset-free P8 typed-world service bridge. The fixture models the private
+# generated header's row shape without embedding source scenario data.
+.PHONY: test-sc64-p8-world
+build/p8-fixture/sc64_p8_scenario_generated.h: tests/fixtures/p8/sc64_p8_scenario_shape_fixture.h | build
+	mkdir -p build/p8-fixture
+	cp $< $@
+build/test-sc64-p8-world: tests/sc64_p8_world_adapter.c build/p8-fixture/sc64_p8_scenario_generated.h starcraft/sc64_p8_world_adapter.h starcraft/sc64_p8_source_adapter.h starcraft/sc64_z8_world_adapter.h starcraft/sc64_z8_triggers.h starcraft/sc64_resource_actions.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft -Ibuild/p8-fixture $< -o $@
+test-sc64-p8-world: build/test-sc64-p8-world
+	./build/test-sc64-p8-world
+test-starcraft: test-sc64-p8-world
+
+# Optional bridge check against an already-prepared authenticated P8 header.
+.PHONY: test-sc64-p8-world-source-contract
+build/test-sc64-p8-world-source-contract: tests/sc64_p8_world_source.c starcraft/sc64_p8_world_adapter.h starcraft/sc64_p8_source_adapter.h starcraft/sc64_z8_world_adapter.h starcraft/sc64_z8_triggers.h starcraft/sc64_resource_actions.h $(P8_SCENARIO_DIR)/sc64_p8_scenario_generated.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft -I$(P8_SCENARIO_DIR) $< -o $@
+test-sc64-p8-world-source-contract: build/test-sc64-p8-world-source-contract
+	./build/test-sc64-p8-world-source-contract
+
+# Optional live-pool P8 adapter check using already-prepared Z7 actor facts.
+# Run only after the listed private inputs have been reviewed as read-only.
+build/test-sc64-p8-game-pool-bridge: tests/sc64_p8_game_pool_bridge.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -Itests/fixtures/p8 $(Z8_GAME_POOL_BRIDGE_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p8-game-pool-bridge
+test-sc64-p8-game-pool-bridge: build/test-sc64-p8-game-pool-bridge
+	./build/test-sc64-p8-game-pool-bridge
+
 PREFIX ?= arm-none-eabi-
 CC := $(PREFIX)gcc
 OBJCOPY := $(PREFIX)objcopy
