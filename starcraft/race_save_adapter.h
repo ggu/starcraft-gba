@@ -597,7 +597,7 @@ static int race_save_game(void) {
     memcpy(race_data.players,race_player,sizeof(race_player));
 #ifdef SC64_RACES
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (SC64_PENDING_BUILD_ORDER(u[i].order) &&
+        if (u[i].alive && SC64_PENDING_BUILD_ORDER(u[i].order) &&
             !sc64_pending_build_save_identity_valid(&race_data,
                 u[i].alive, u[i].owner, u[i].type, u[i].target,
                 u[i].tx, u[i].ty, race_cols * 16, race_rows * 16)) return 0;
@@ -1071,10 +1071,7 @@ static int race_load_game(void) {
                                   &candidate_unit)) return 0;
 #endif
         if(RACE_U(i,alive)<0||RACE_U(i,alive)>1)return 0;
-        if(!RACE_U(i,alive)) {
-            if (SC64_PENDING_BUILD_ORDER(RACE_U(i,order))) return 0;
-            continue;
-        }
+        if(!RACE_U(i,alive))continue;
         if(RACE_U(i,type)<0||RACE_U(i,type)>=SC_RU_COUNT||RACE_U(i,owner)<0||RACE_U(i,owner)>4||
             RACE_U(i,hp)<=0||RACE_U(i,maxhp)<=0||RACE_U(i,hp)>RACE_U(i,maxhp)||
             RACE_U(i,x)<0||RACE_U(i,x)>=width*16||RACE_U(i,y)<0||RACE_U(i,y)>=height*16||

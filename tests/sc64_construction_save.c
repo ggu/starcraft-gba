@@ -2,6 +2,7 @@
 /* Asset-free identity checks for persistent construction travel intents. */
 #include <assert.h>
 #include <stdio.h>
+#define SC64_RACES 1
 
 enum { R_TER, R_ZERG, R_PROTOSS };
 enum { SC_RB_COUNT = 3 };

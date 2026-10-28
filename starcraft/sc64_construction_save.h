@@ -7,6 +7,7 @@
 #define SC64_PENDING_BUILD_ORDER(o) 0
 #endif
 
+#ifdef SC64_RACES
 /* Pending construction stores a building type in target and the canonical
  * destination in tx/ty. Validate only durable identity here: resources,
  * prerequisites, placement and free slots can change while the worker moves. */
@@ -29,5 +30,10 @@ sc64_pending_build_save_identity_valid(const RaceSave *candidate,
     return building && building->worker == worker_type &&
            building->race == owner_race;
 }
+
+#else
+/* Existing standalone cargo fixtures have no race/building schema. */
+#define sc64_pending_build_save_identity_valid(...) 0
+#endif
 
 #endif
