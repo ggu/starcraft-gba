@@ -102,7 +102,14 @@ static void fog_paths_match_the_oracle(void)
                     visible_tiles[ty][tx] = (unsigned char)(pattern == 0 ? 1 : pattern == 1 ? (tx + ty) & 1 :
                         pattern == 2 ? !(tx == at[a][0] / 16 && ty == at[a][1] / 16) : tx > at[a][0] / 16);
                 check_fogged_raster(&r, at[a][0], at[a][1], hflip);
-                if (a == 0 && pattern == 0) assert(call_count == r.height); /* one call per row */
+                if (pattern == 0 && (a == 0 || a == 1)) {
+                    assert(call_count == 1);
+                    assert(calls[0].w == r.width);
+                    assert(calls[0].h == (a == 0 ? r.height : r.height - 3));
+                    assert(calls[0].y == (a == 0 ? 61 : 12));
+                    const uint8_t *frame_pixels = hflip ? mirrored : frame;
+                    assert(calls[0].src == frame_pixels + (a == 0 ? 0 : 3 * r.width));
+                }
             }
     r.mirror_pixels = 0; /* reversed per-pixel branch */
     for (int pattern = 0; pattern < 2; ++pattern) {
@@ -141,6 +148,18 @@ static void fog_paths_match_the_oracle(void)
     check_fogged_raster(&r, 128, 64, 0);
     assert(call_count > 0);
     for (unsigned i = 0; i < call_count; ++i) assert(calls[i].mapped);
+
+    /* Whole-visible mapped frames use the same single rectangle dispatch. */
+    for (int ty = 0; ty < MAP_ROWS; ++ty)
+        for (int tx = 0; tx < MAP_COLS; ++tx) visible_tiles[ty][tx] = 1;
+    r.modifier = 9; r.lookup_rows = 40;
+    check_fogged_raster(&r, 128, 64, 0);
+    assert(call_count == 1 && calls[0].mapped && calls[0].w == r.width &&
+           calls[0].h == r.height && calls[0].rows == 40 && calls[0].src == frame);
+    r.modifier = 10; r.lookup_rows = 1;
+    check_fogged_raster(&r, 128, 64, 0);
+    assert(call_count == 1 && calls[0].mapped && calls[0].w == r.width &&
+           calls[0].h == r.height && calls[0].rows == 1 && calls[0].src == frame);
 
     fog_mode = 0; camx = camy = 0;
 }

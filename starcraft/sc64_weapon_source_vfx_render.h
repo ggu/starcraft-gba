@@ -29,15 +29,15 @@ sc64_weapon_source_vfx_row(const uint8_t *pixels, unsigned width, int row,
     return buffer;
 }
 
-/* Blit `width` pixels of one row with the raster's modifier. */
+/* Blit a contiguous rectangle with the raster's modifier. */
 static inline void
-sc64_weapon_source_vfx_blit_run(const Sc64WeaponSourceVfxRaster *r, int x, int y,
-                                int width, const uint8_t *src)
+sc64_weapon_source_vfx_blit_rect(const Sc64WeaponSourceVfxRaster *r, int x, int y,
+                                 int width, int height, const uint8_t *src)
 {
     if (r->modifier == 9 || r->modifier == 10)
-        gfx_blit_sprite_mapped(x, y, width, 1, src, r->lookup, r->lookup_rows);
+        gfx_blit_sprite_mapped(x, y, width, height, src, r->lookup, r->lookup_rows);
     else
-        gfx_blit_sprite(x, y, width, 1, src);
+        gfx_blit_sprite(x, y, width, height, src);
 }
 
 /* Project one already selected source frame. `world_x/y` is the source
@@ -72,7 +72,8 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
         top + r->height <= 12) return;
 
     /* Fast path: when every map tile under the clipped raster is visible, the
-     * tile loop below would draw each row whole, so draw it in one call. */
+     * tile loop below would draw each row whole. Contiguous source rows can
+     * be submitted as one rectangle; reversed rows still need row buffers. */
     int sy0 = top < 12 ? 12 : top;
     int sy1 = top + (int)r->height > 120 ? 120 : top + (int)r->height;
     int wx0 = left + camx, wx1 = left + (int)r->width - 1 + camx;
@@ -82,12 +83,20 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
         for (int tx = wx0 >> 4; whole && tx <= wx1 >> 4; ++tx)
             whole = currently_visible(tx * 16, ty * 16);
 
+    if (whole && !reverse) {
+        const uint8_t *rect_src = frame_pixels +
+            (unsigned)(sy0 - top) * r->width;
+        sc64_weapon_source_vfx_blit_rect(r, left, sy0, r->width,
+                                         sy1 - sy0, rect_src);
+        return;
+    }
+
     for (int sy = sy0; sy < sy1; ++sy) {
         const uint8_t *row_src = sc64_weapon_source_vfx_row(
             frame_pixels, r->width, sy - top, reverse, reversed);
         int col = 0;
         if (whole) {
-            sc64_weapon_source_vfx_blit_run(r, left, sy, r->width, row_src);
+            sc64_weapon_source_vfx_blit_rect(r, left, sy, r->width, 1, row_src);
             col = r->width;
         }
         while (col < r->width) {
@@ -112,7 +121,8 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
              * starting coordinate was checked above; visibility is tile-wide. */
             int run = 16 - (wx & 15);
             if (run > (int)r->width - col) run = (int)r->width - col;
-            sc64_weapon_source_vfx_blit_run(r, left + col, sy, run, row_src + col);
+            sc64_weapon_source_vfx_blit_rect(r, left + col, sy, run, 1,
+                                             row_src + col);
             col += run;
         }
     }
