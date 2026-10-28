@@ -32,6 +32,15 @@
 #define SC64_CONTACT_FLYING 0x40u
 #define SC64_CONTACT_VALID 0x80u
 
+#ifdef SC64_CONTACT_MASK_TABLE
+#if !defined(SC64_CONTACT_CACHE) || !defined(SC64_ZP_CAMPAIGN_ACTORS)
+#error "SC64_CONTACT_MASK_TABLE requires CONTACT_CACHE and Z/P actor facts"
+#endif
+#include "sc64_contact_mask_table_generated.h"
+_Static_assert(sizeof(sc64_contact_mask_table_data) ==
+               14u * 15u * 65u * 65u, "contact mask table dimensions changed");
+#endif
+
 #define SC64_CONTACT_TYPES 256
 static u8 sc64_contact_class[SC64_CONTACT_TYPES];
 
@@ -298,6 +307,53 @@ sc64_contact_mask_reference(const Unit *q, int i, int speed, unsigned mask,
 /* Bit k is set when unit_step_clear(q, q->x + dx[k]*speed, q->y + dy[k]*speed)
  * would return 0. One pass over the union of the eight candidate windows
  * replaces eight queries; the any-blocker predicate makes order irrelevant. */
+#ifdef SC64_CONTACT_MASK_TABLE
+static unsigned
+sc64_contact_mask_math_reference(unsigned mask, int radius, int speed,
+                                 int ox, int oy)
+{
+    unsigned pending = ~mask & 0xffu;
+    int od2 = ox * ox + oy * oy;
+    int k;
+    for (k = 0; pending; ++k, pending >>= 1) {
+        int dx, dy, d2;
+        if (!(pending & 1u)) continue;
+        dx = ox - sc64_contact_dx[k] * speed;
+        dy = oy - sc64_contact_dy[k] * speed;
+        if (dx <= -radius || dx >= radius || dy <= -radius || dy >= radius) continue;
+        d2 = dx * dx + dy * dy;
+        if (d2 < radius * radius && d2 <= od2) mask |= 1u << k;
+    }
+    return mask;
+}
+
+static inline int
+sc64_contact_mask_table_domain(int radius, int speed, int ox, int oy)
+{
+    return radius >= 6 && radius <= 19 && speed >= 0 && speed <= 14 &&
+           ox >= -32 && ox <= 32 && oy >= -32 && oy <= 32;
+}
+
+static inline u8
+sc64_contact_mask_table_lookup(int radius, int speed, int ox, int oy)
+{
+    unsigned ri = (unsigned)(radius - 6);
+    unsigned oi = (unsigned)(oy + 32);
+    unsigned xi = (unsigned)(ox + 32);
+    unsigned index = (((ri * 15u + (unsigned)speed) * 65u + oi) * 65u + xi);
+    return sc64_contact_mask_table_data[index];
+}
+
+static inline unsigned
+sc64_contact_mask_apply_geometry(unsigned mask, int radius, int speed,
+                                 int ox, int oy)
+{
+    if (sc64_contact_mask_table_domain(radius, speed, ox, oy))
+        return mask | sc64_contact_mask_table_lookup(radius, speed, ox, oy);
+    return sc64_contact_mask_math_reference(mask, radius, speed, ox, oy);
+}
+#endif
+
 static unsigned
 #if defined(SC64_CONTACT_STEER_ROM)
 __attribute__((noinline))
@@ -306,8 +362,12 @@ GBA_HOT
 #endif
 sc64_contact_blocked_mask(const Unit *q, int speed)
 {
-    unsigned mask, pending;
-    int k, mover_radius, mover_flying, mover_slot = (int)(q - u), p6;
+    unsigned mask;
+#ifndef SC64_CONTACT_MASK_TABLE
+    unsigned pending;
+    int k;
+#endif
+    int mover_radius, mover_flying, mover_slot = (int)(q - u), p6;
     int minx, maxx, miny, maxy, row, col, reach;
     if (sc64_contact_mask_prepare(q, speed, &mask, &mover_radius, &mover_flying))
         return mask;
@@ -326,7 +386,10 @@ sc64_contact_blocked_mask(const Unit *q, int speed)
                  i = sc64_unit_bucket_next[i]) {
                 const Unit *c = &u[i];
                 u8 cc;
-                int radius, ox, oy, od2, limit_axis;
+                int radius, ox, oy, limit_axis;
+#ifndef SC64_CONTACT_MASK_TABLE
+                int od2;
+#endif
                 if (i == mover_slot || !c->alive || SC64_TRANSPORT_LOADED(c)) continue;
                 cc = sc64_contact_class_for(c->type);
                 if (!(cc & SC64_CONTACT_VALID)) {
@@ -344,6 +407,9 @@ sc64_contact_blocked_mask(const Unit *q, int speed)
                 limit_axis = radius + speed;
                 if (ox <= -limit_axis || ox >= limit_axis ||
                     oy <= -limit_axis || oy >= limit_axis) continue;
+#ifdef SC64_CONTACT_MASK_TABLE
+                mask = sc64_contact_mask_apply_geometry(mask, radius, speed, ox, oy);
+#else
                 od2 = ox * ox + oy * oy;
                 pending = ~mask & 0xffu;
                 for (k = 0; pending; ++k, pending >>= 1) {
@@ -355,6 +421,7 @@ sc64_contact_blocked_mask(const Unit *q, int speed)
                     d2 = dx * dx + dy * dy;
                     if (d2 < radius * radius && d2 <= od2) mask |= 1u << k;
                 }
+#endif
                 if (mask == 0xffu) return mask;
             }
         }

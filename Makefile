@@ -3489,9 +3489,10 @@ zerg-z7-steering-probe: build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba
 # The canonical gameplay flags match the CONTACT standalone release. Keep
 # physical-input-only main-loop selection local to that standalone target.
 # Historical Z7 probes and their tests continue to use Z7_FULL_RENDER_FLAGS.
-ZERG_Z7_CANONICAL_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ
+ZERG_Z7_CONTACT_MASK_TABLE_HEADER = build/generated/sc64_contact_mask_table_generated.h
+ZERG_Z7_CANONICAL_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ -DSC64_CONTACT_MASK_TABLE -Ibuild/generated
 ZERG_Z7_RELEASE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
-ZERG_Z7_CANONICAL_INPUTS = $(Z7_FULL_RENDER_INPUTS)
+ZERG_Z7_CANONICAL_INPUTS = $(Z7_FULL_RENDER_INPUTS) $(ZERG_Z7_CONTACT_MASK_TABLE_HEADER)
 build/starcraft-zerg-z7.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(ZERG_Z7_RELEASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7.map -lgcc -o $@
 	$(SIZE) $@
@@ -3537,7 +3538,7 @@ test-sc64-z7-canonical-carried-z6: build/test-sc64-z7-canonical-carried-z6 build
 	./build/test-sc64-z7-canonical-z6-controller-policy
 	./build/test-sc64-z7-canonical-carried-z6 --trace .local/build/z7-canonical-carried-z6/controller.json
 	$(PYTHON) tools/sc64_zp_controller_replay.py --profile zerg-z6 --trace .local/build/z7-canonical-carried-z6/controller.json --validate-only
-test-zerg-z7: build/test-sc64-z7-canonical-profile build/test-sc64-z7-canonical-save build/test-sc64-z7-canonical-frame build/test-sc64-z7-canonical-scourge test-sc64-z7-canonical-controller test-sc64-z7-canonical-carried-z5 test-sc64-z7-canonical-carried-z6 test-sc64-z7-carried-missions test-sc64-z7-canonical-skirmish
+test-zerg-z7: test-sc64-contact-mask-table build/test-sc64-z7-canonical-profile build/test-sc64-z7-canonical-save build/test-sc64-z7-canonical-frame build/test-sc64-z7-canonical-scourge test-sc64-z7-canonical-controller test-sc64-z7-canonical-carried-z5 test-sc64-z7-canonical-carried-z6 test-sc64-z7-carried-missions test-sc64-z7-canonical-skirmish
 	./build/test-sc64-z7-canonical-profile
 	./build/test-sc64-z7-canonical-save
 	./build/test-sc64-z7-canonical-frame
@@ -4266,6 +4267,17 @@ test-sc64-contact-cache: test-sc64-contact-cache-races test-sc64-contact-cache-p
 test-unified: test-sc64-contact-cache-races
 test-sc64-terran-full-campaign: test-sc64-contact-cache-terran
 test-sc64-p7-contact: test-sc64-contact-cache-p7
+
+# The optional CONTACT mask geometry kernel is generated authored math, not a
+# ROM-derived asset. This target has no imported/native input prerequisites.
+CONTACT_MASK_TABLE_HEADER = build/generated/sc64_contact_mask_table_generated.h
+$(CONTACT_MASK_TABLE_HEADER): tools/sc64_contact_mask_table_gen.py | build
+	$(PYTHON) $< --out $@
+build/test-sc64-contact-mask-table: tests/sc64_contact_mask_table_generated.c $(CONTACT_MASK_TABLE_HEADER) Makefile | build
+	$(CLANG) -std=c11 -O2 -Wall -Wextra -Werror -Ibuild/generated $< -o $@
+.PHONY: test-sc64-contact-mask-table
+test-sc64-contact-mask-table: build/test-sc64-contact-mask-table
+	./build/test-sc64-contact-mask-table
 test-zerg: test-sc64-contact-cache-zerg
 test-protoss: test-sc64-contact-cache-protoss
 
