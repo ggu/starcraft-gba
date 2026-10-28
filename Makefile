@@ -43,6 +43,23 @@ test-sc64-interceptor-orders: build/test-sc64-interceptor-orders
 	./build/test-sc64-interceptor-orders
 test-starcraft: test-sc64-interceptor-orders
 
+# Asset-free P8 compact trigger scheduler contract. This does not include a
+# scenario descriptor or bind P8 actions to game-world effects.
+.PHONY: test-sc64-p8-runtime test-sc64-p8-source-contract
+build/test-sc64-p8-runtime: tests/sc64_p8_runtime.c starcraft/sc64_p8_runtime.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon -Istarcraft $< -o $@
+test-sc64-p8-runtime: build/test-sc64-p8-runtime
+	./build/test-sc64-p8-runtime
+test-starcraft: test-sc64-p8-runtime
+
+# Explicit optional check against already-prepared, ignored P8 source input.
+# It must never invoke the scenario packer or create its generated header.
+P8_SCENARIO_DIR ?= .local/sc64/zp-stage/generated/scenarios
+build/test-sc64-p8-source-contract: tests/sc64_p8_source_contract.c starcraft/sc64_p8_source_adapter.h starcraft/sc64_p8_runtime.h $(P8_SCENARIO_DIR)/sc64_p8_scenario_generated.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Icommon -Istarcraft -I$(P8_SCENARIO_DIR) $< -o $@
+test-sc64-p8-source-contract: build/test-sc64-p8-source-contract
+	./build/test-sc64-p8-source-contract
+
 PREFIX ?= arm-none-eabi-
 CC := $(PREFIX)gcc
 OBJCOPY := $(PREFIX)objcopy

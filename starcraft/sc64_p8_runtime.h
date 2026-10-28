@@ -4,12 +4,13 @@
 
 #include "../common/gba.h"
 
-/* Bounded one-source-player policy runner for compact P8 trigger records.
+/* Bounded one-source-owner policy runner for compact P8 trigger records.
  * Callers provide the source table through callbacks, so active rows need not
- * be expanded into 8 x 64 fixed-size records. This is an authored 30 Hz
- * runtime contract, not a claim about native scheduler cadence. Runtime
- * callbacks, mission save encoding and canonical game wiring remain separate
- * work; this model alone does not enable P8 or prove it playable. */
+ * be expanded into 8 x 64 fixed-size records. This is an authored pass
+ * policy; the caller chooses when a pass runs, and this does not claim a
+ * native P8 cadence. Runtime callbacks, mission save encoding and canonical
+ * game wiring remain separate work; this model alone does not enable P8 or
+ * prove it playable. */
 enum {
     SC64_P8_TRIGGER_LIMIT = 8,
     SC64_P8_CONDITION_LIMIT = 16,
@@ -25,7 +26,8 @@ enum {
     SC64_P8_ACTION_PENDING = 0,
     SC64_P8_ACTION_COMPLETE = 1,
     SC64_P8_ACTION_WON = 2,
-    SC64_P8_ACTION_LOST = 3
+    SC64_P8_ACTION_LOST = 3,
+    SC64_P8_ACTION_BLOCKED = 4
 };
 
 typedef struct {
@@ -40,7 +42,7 @@ typedef struct {
     u8 started;
     u8 running;
     u8 done;
-    u8 waiting;
+    u8 waiting; /* Pending async action; BLOCKED owner-wait rows are not set. */
     u8 cursor[SC64_P8_TRIGGER_LIMIT];
     u8 owner;
     u8 force;
@@ -62,9 +64,15 @@ typedef struct {
      * pure: a condition query cannot mutate world or runtime state. */
     int (*condition)(void *context, unsigned trigger, unsigned condition,
                      unsigned owner);
-    /* Return COMPLETE/PENDING/WON/LOST or a negative value when unsupported.
-     * PENDING means the effect has been started and must resume idempotently;
-     * COMPLETE and terminal results mean the source action completed. */
+    /* Return COMPLETE/PENDING/WON/LOST/BLOCKED or a negative value when
+     * unsupported. PENDING means an asynchronous effect has started and must
+     * resume at the same cursor. BLOCKED means the effect was not started
+     * because an owner-wide wait is active; retry it without resume next pass.
+     * For P8 Wait/Transmission/CenterView, callers must own one shared timer
+     * per source owner and an armed marker per action. While a timer is active,
+     * a blocked timed action yields as BLOCKED; immediate actions in later
+     * triggers still execute. This mirrors the native-backed Z8 action model;
+     * P8 itself has no cadence/runtime trace qualification here. */
     int (*action)(void *context, unsigned trigger, unsigned action,
                   unsigned owner, int resume);
 } Sc64P8WorldOps;
@@ -128,6 +136,7 @@ static inline int
 sc64_p8_runtime_step(Sc64P8RuntimeState *state, const Sc64P8WorldOps *ops,
                      int paused)
 {
+    u8 pass_outcome = SC64_P8_OUTCOME_RUNNING;
     if (!state || !ops || paused < 0 || paused > 1 ||
         !sc64_p8_runtime_state_valid(state, ops)) return 0;
     if (paused || state->outcome != SC64_P8_OUTCOME_RUNNING) return 1;
@@ -186,6 +195,10 @@ sc64_p8_runtime_step(Sc64P8RuntimeState *state, const Sc64P8WorldOps *ops,
                 state->waiting |= (u8)(1u << trigger);
                 break;
             }
+            if (result == SC64_P8_ACTION_BLOCKED) {
+                state->waiting &= (u8)~(1u << trigger);
+                break;
+            }
             state->waiting &= (u8)~(1u << trigger);
             if (result < SC64_P8_ACTION_COMPLETE ||
                 result > SC64_P8_ACTION_LOST) {
@@ -194,15 +207,11 @@ sc64_p8_runtime_step(Sc64P8RuntimeState *state, const Sc64P8WorldOps *ops,
                 state->fault_slot = (u8)slot;
                 return 0;
             }
-            if (result == SC64_P8_ACTION_WON ||
-                result == SC64_P8_ACTION_LOST) {
-                state->outcome = result == SC64_P8_ACTION_WON ?
-                    SC64_P8_OUTCOME_WON : SC64_P8_OUTCOME_LOST;
-                state->running &= (u8)~(1u << trigger);
-                state->done |= (u8)(1u << trigger);
-                state->cursor[trigger] = 0;
-                break;
-            }
+            if (result == SC64_P8_ACTION_WON)
+                pass_outcome = SC64_P8_OUTCOME_WON;
+            else if (result == SC64_P8_ACTION_LOST &&
+                     pass_outcome != SC64_P8_OUTCOME_WON)
+                pass_outcome = SC64_P8_OUTCOME_LOST;
             ++state->cursor[trigger];
             if (state->cursor[trigger] == info.action_count) {
                 state->running &= (u8)~(1u << trigger);
@@ -210,8 +219,9 @@ sc64_p8_runtime_step(Sc64P8RuntimeState *state, const Sc64P8WorldOps *ops,
                 state->cursor[trigger] = 0;
             }
         }
-        if (state->outcome != SC64_P8_OUTCOME_RUNNING) break;
     }
+    if (pass_outcome != SC64_P8_OUTCOME_RUNNING)
+        state->outcome = pass_outcome;
     return 1;
 }
 

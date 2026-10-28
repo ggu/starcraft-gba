@@ -52,16 +52,28 @@ int main(void)
     unsigned victory_slot = 0;
     unsigned defeat_trigger = SC64_P8_TRIGGER_LIMIT;
     unsigned defeat_slot = 0;
+    unsigned wait_trigger = SC64_P8_TRIGGER_LIMIT;
+    unsigned wait_slot = 0;
+    unsigned immediate_trigger = SC64_P8_TRIGGER_LIMIT;
+    unsigned immediate_slot = 0;
     for (unsigned t = 0; t < SC64_P8_SOURCE_TRIGGER_COUNT; ++t) {
         const Sc64P8SourceTrigger *tr = &sc64_p8_source_triggers[t];
         for (unsigned i = 0; i < tr->action_count; ++i) {
             unsigned opcode = sc64_p8_source_actions[tr->first_action + i].opcode;
             if (opcode == 1u) { victory_trigger = t; victory_slot = i; }
             if (opcode == 2u) { defeat_trigger = t; defeat_slot = i; }
+            if (opcode == 4u) { wait_trigger = t; wait_slot = i; }
+            if (opcode != 1u && opcode != 2u && opcode != 4u &&
+                opcode != 7u && opcode != 10u &&
+                immediate_trigger == SC64_P8_TRIGGER_LIMIT) {
+                immediate_trigger = t; immediate_slot = i;
+            }
         }
     }
     assert(victory_trigger < SC64_P8_TRIGGER_LIMIT &&
-           defeat_trigger < SC64_P8_TRIGGER_LIMIT);
+           defeat_trigger < SC64_P8_TRIGGER_LIMIT &&
+           wait_trigger < SC64_P8_TRIGGER_LIMIT &&
+           immediate_trigger < SC64_P8_TRIGGER_LIMIT);
     assert(sc64_p8_source_action_dispatch(&checked_world, victory_trigger,
              victory_slot, 0, 0) == -1); /* Complete cannot skip outcome. */
     action_result = SC64_P8_ACTION_WON;
@@ -72,13 +84,18 @@ int main(void)
     action_result = SC64_P8_ACTION_LOST;
     assert(sc64_p8_source_action_dispatch(&checked_world, defeat_trigger,
              defeat_slot, 0, 0) == SC64_P8_ACTION_LOST);
+    action_result = SC64_P8_ACTION_BLOCKED;
+    assert(sc64_p8_source_action_dispatch(&checked_world, wait_trigger,
+             wait_slot, 0, 0) == SC64_P8_ACTION_BLOCKED);
+    assert(sc64_p8_source_action_dispatch(&checked_world, immediate_trigger,
+             immediate_slot, 0, 0) == -1);
 
     Sc64P8SourceWorldOps world = {0, condition_true, unsupported_action};
     Sc64P8WorldOps ops = sc64_p8_source_world_ops(&world);
     Sc64P8RuntimeState state;
     assert(sc64_p8_source_runtime_init(&state, 0, 1));
-    /* This exercises the actual authenticated descriptor through its typed
-     * view; the first unimplemented world action must fault instead of skip. */
+    /* This exercises the prepared compact descriptor through its typed view;
+     * the first unimplemented world action must fault instead of skip. */
     assert(!sc64_p8_runtime_step(&state, &ops, 0));
     assert(state.fault == SC64_P8_FAULT_ACTION);
     assert(state.fault_trigger < SC64_P8_TRIGGER_LIMIT);

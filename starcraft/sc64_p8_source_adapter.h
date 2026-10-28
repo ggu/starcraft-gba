@@ -147,6 +147,10 @@ static inline int sc64_p8_source_action_dispatch(void *context,
     const Sc64P8SourceAction *source =
         &sc64_p8_source_actions[tr->first_action + action];
     int result = ctx->action(ctx->context, source, owner, resume);
+    if ((result == SC64_P8_ACTION_PENDING ||
+         result == SC64_P8_ACTION_BLOCKED) &&
+        source->opcode != 4u && source->opcode != 7u && source->opcode != 10u)
+        return -1;
     if (result == SC64_P8_ACTION_WON && source->opcode != 1u) return -1;
     if (result == SC64_P8_ACTION_LOST && source->opcode != 2u) return -1;
     if (source->opcode == 1u && result != SC64_P8_ACTION_WON &&
