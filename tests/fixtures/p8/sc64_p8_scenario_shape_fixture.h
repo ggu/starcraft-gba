@@ -35,5 +35,13 @@ static const Sc64P8SourceAction sc64_p8_source_actions[68] = {{0}};
 static const Sc64P8SourceCondition sc64_p8_source_conditions[9] = {{0}};
 static const Sc64P8SourceTrigger sc64_p8_source_triggers[8] = {{0}};
 static const Sc64P8SourceLocation sc64_p8_source_locations[64] = {{0}};
+static const unsigned char sc64_p8_source_property_used[64] = {
+    1u, 1u, 1u
+};
+static const unsigned char sc64_p8_source_properties[64][20] = {
+    {0x11u, 0x22u, 0x33u, 0x44u},
+    {0x55u, 0x66u, 0x77u, 0x88u},
+    {0x99u, 0xaau, 0xbbu, 0xccu}
+};
 
 #endif

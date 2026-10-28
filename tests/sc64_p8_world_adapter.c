@@ -7,6 +7,8 @@
 typedef struct {
     Sc64Z8ActorView *actors;
     unsigned created_property, created_owner, created_count;
+    unsigned property_selector, property_owner, property_count;
+    u8 property_copy[SC64_P8_SOURCE_PROPERTY_BYTES];
     u32 ai_id;
     unsigned ai_owner;
     unsigned presented_opcode;
@@ -38,6 +40,28 @@ static int actor_at(void *opaque, unsigned index, Sc64Z8ActorView *out)
     Sc64Z8ActorView *actors=opaque;
     if (!out || index >= 4) return -1;
     *out=actors[index];
+    return 1;
+}
+
+static int create_with_property(void *opaque,
+                                const Sc64P8SourceAction *action,
+                                unsigned owner, unsigned count,
+                                unsigned property_id,
+                                const u8 property[SC64_P8_SOURCE_PROPERTY_BYTES],
+                                const Sc64Z8Rect *rect)
+{
+    FakeP8Engine *e = opaque;
+    assert(action->opcode == 11u && rect && property);
+    e->property_selector = property_id;
+    e->property_owner = owner;
+    e->property_count = count;
+    for (unsigned i = 0; i < SC64_P8_SOURCE_PROPERTY_BYTES; ++i)
+        e->property_copy[i] = property[i];
+    if (e->create_fail) return -1;
+    e->actors[3] = (Sc64Z8ActorView){.raw_type=action->unit,
+        .source_owner=(s16)owner,.x=(s16)((rect->left+rect->right)/4),
+        .y=(s16)((rect->top+rect->bottom)/4),.alive=1,.completed=1,
+        .men=1,.type_known=1};
     return 1;
 }
 
@@ -138,7 +162,7 @@ int main(void)
         .actors=&z8,.locations=locations,.location_count=64,
         .map_pixel_width=4096,.map_pixel_height=4096,
         .switches=switches,.elapsed_seconds=&elapsed,.context=&engine,
-        .async_action=async_action
+        .async_action=async_action,.create_with_property=create_with_property
     };
     assert(sc64_p8_world_context_valid(&context));
     Sc64P8SourceWorldOps ops=sc64_p8_world_ops(&context);
@@ -195,17 +219,40 @@ int main(void)
     assert(locations[1].left==40 && locations[1].top==40 &&
            locations[1].right==60 && locations[1].bottom==60);
 
-    /* Create forwards the source property selector and sees the new slot on
-     * the next census; it does not assume default properties. */
-    a=action(11,1,1,3,74,0);
+    /* Property selectors are one-based and expose only UPUS-marked records.
+     * The live callback receives the exact immutable record but owns semantic
+     * interpretation and pool-capacity decisions. */
+    const u8 *property_bytes=0;
+    assert(sc64_p8_source_property(1,&property_bytes) &&
+           property_bytes[0]==0x11u && property_bytes[3]==0x44u);
+    assert(sc64_p8_source_property(3,&property_bytes) &&
+           property_bytes[0]==0x99u && property_bytes[3]==0xccu);
+    assert(!sc64_p8_source_property(0,&property_bytes) && !property_bytes);
+    assert(sc64_p8_source_property(1,&property_bytes));
+    assert(!sc64_p8_source_property(4,&property_bytes) && !property_bytes);
+    assert(!sc64_p8_source_property(1,0));
+    a=action(11,1,1,3,74,0); a.flags=0x18u;
     z8.actors=0; z8.actor_at=actor_at; z8.actor_context=actors;
     assert(ops.action(ops.context,&a,1,0)==SC64_P8_ACTION_COMPLETE);
+    assert(engine.property_owner==1 && engine.property_count==1 &&
+           engine.property_selector==3 && actors[3].alive);
+    assert(engine.property_copy[0]==0x99u &&
+           engine.property_copy[1]==0xaau &&
+           engine.property_copy[2]==0xbbu &&
+           engine.property_copy[3]==0xccu);
+    context.create_with_property=0;
+    a=action(11,1,1,1,74,0); a.flags=0x18u;
+    assert(ops.action(ops.context,&a,1,0)==-1);
+    assert(engine.property_selector==3);
+    context.create_with_property=create_with_property;
+    a=action(11,1,1,0,74,0); a.flags=0x10u;
+    assert(ops.action(ops.context,&a,1,0)==SC64_P8_ACTION_COMPLETE);
     assert(engine.created_owner==1 && engine.created_count==1 &&
-           engine.created_property==3 && actors[3].alive);
+           engine.created_property==0);
     c=condition(2,1,74,0,1,0,0);
     assert(ops.condition(ops.context,&c,1)==1);
     engine.create_fail=1;
-    a=action(11,1,1,2,74,0);
+    a=action(11,1,1,2,74,0); a.flags=0x18u;
     assert(ops.action(ops.context,&a,1,0)==-1); /* exhausted pool/service */
     engine.create_fail=0;
 
@@ -268,6 +315,12 @@ int main(void)
     assert(engine.wait_starts==2);
     a=action(3,1,0,0,0,0);
     assert(ops.action(ops.context,&a,1,0)==-1); /* repeat not implemented */
+    a=action(5,0,0,0,0,0);
+    assert(ops.action(ops.context,&a,1,0)==-1); /* pause service unproven */
+    a=action(30,0,0,0,0,0);
+    assert(ops.action(ops.context,&a,1,0)==-1); /* mute is not an audio gate */
+    a=action(31,0,0,0,0,0);
+    assert(ops.action(ops.context,&a,1,0)==-1); /* unmute remains unsupported */
 
     puts("sc64_p8_world_adapter: ok (typed conditions/effects, fail-closed services)");
     return 0;

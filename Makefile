@@ -89,11 +89,20 @@ test-sc64-p8-world-source-contract: build/test-sc64-p8-world-source-contract
 
 # Optional live-pool P8 adapter check using already-prepared Z7 actor facts.
 # Run only after the listed private inputs have been reviewed as read-only.
-build/test-sc64-p8-game-pool-bridge: tests/sc64_p8_game_pool_bridge.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
-	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -Itests/fixtures/p8 $(Z8_GAME_POOL_BRIDGE_FLAGS) $< common/gba.c -o $@
+build/test-sc64-p8-game-pool-bridge: tests/sc64_p8_game_pool_bridge.c build/p8-fixture/sc64_p8_scenario_generated.h $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -Ibuild/p8-fixture $(Z8_GAME_POOL_BRIDGE_FLAGS) $< common/gba.c -o $@
 .PHONY: test-sc64-p8-game-pool-bridge
 test-sc64-p8-game-pool-bridge: build/test-sc64-p8-game-pool-bridge
 	./build/test-sc64-p8-game-pool-bridge
+
+# Optional private-descriptor P8 create-service check over the real pools.
+# Requires prepared P8/Z7 inputs; this target does not pack or generate them.
+P8_GAME_POOL_FLAGS = $(filter-out -DSC64_CONSTRUCTION_SOURCE_ART,$(Z8_GAME_POOL_BRIDGE_FLAGS)) -DSC64_P8_GAME_POOL_BRIDGE
+build/test-sc64-p8-live-create: tests/sc64_p8_live_create.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z7_PROBE_INPUTS) $(P8_SCENARIO_DIR)/sc64_p8_scenario_generated.h common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Wno-missing-field-initializers -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft -I$(P8_SCENARIO_DIR) $(P8_GAME_POOL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-p8-live-create
+test-sc64-p8-live-create: build/test-sc64-p8-live-create
+	./build/test-sc64-p8-live-create
 
 PREFIX ?= arm-none-eabi-
 CC := $(PREFIX)gcc
