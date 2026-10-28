@@ -67,9 +67,9 @@ are not part of this audit. Prepared headers, ROMs and captures stay ignored.
 The initial runtime revision `bacfd64` links canonical Terran, Z6, P7 and
 Showcase with imported advisor audio and briefing data under the unchanged
 BSS/IWRAM guards. These are link checks, not campaign or frame-rate evidence.
-Additional lifecycle, save, normal-menu and carried-mission results must be
-recorded before promoting this branch. In particular, a whole current-controls
-Z7 win and near-30-fps performance are not established by these checks.
+The lifecycle, save, normal-menu and carried-mission checks below give their
+own scope. A whole current-controls Z7 win and near-30-fps performance are not
+established by these checks.
 
 
 ### Local results at runtime `bacfd64`
@@ -111,11 +111,18 @@ their actual foundations restores strict victory at host tick 116,025, frame
 baseline wins at host tick 119,892.
 
 Terran T1, T2, T3, T4, T6, T7, T8 and T10 host controllers pass. T1/T6/T8 need
-the same controller-only travel/foundation distinction. T5 still fails after
-its asynchronous construction helpers were migrated, whereas current-main
-`f17a184` passes with the same canonical flags and limit. This is a remaining
-regression gate. T9 also reaches its limit, including on that current-main
-baseline; it remains unqualified. None of these results establishes a new Z7
-full win, fresh-process SRAM continuity, physical-GBA behavior or near-30-fps
-performance. Keep the change draft until the outstanding campaign gates are
-resolved.
+the same controller-only travel/foundation distinction. T5 also initially failed after
+its asynchronous construction helpers were migrated. Differential traces
+showed eight SCVs on stalled old MOVE orders in both candidate and current-main
+`f17a184`; baseline timing happened to recover enough workers later. Its
+controller now recovers one eligible worker through ordinary individual STOP
+and MOVE inputs when mining is starved, verifying actual mineral gathering.
+It reaches strict victory at host tick 114,497, frame 114,061, with the primary
+objective complete and no enemy buildings. The game and victory predicates
+are unchanged by this controller recovery.
+
+T9 still reaches its 500,000-tick limit, including on current-main `f17a184`;
+it remains unqualified and is not claimed as a new passing campaign here.
+None of these results establishes a new Z7 full win, fresh-process SRAM
+continuity, physical-GBA behavior or near-30-fps performance. Those remain
+separate product and full-campaign qualification work.
