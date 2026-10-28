@@ -211,7 +211,7 @@ field_ui_build_worker(int type)
     best = -1;
     for (i = 0; i < MAX_UNITS; i++) {
         if (!u[i].alive || u[i].owner != SIDE || u[i].type != r->worker ||
-            SC64_TRANSPORT_LOADED(&u[i]) || u[i].order == ORDER_BUILD) continue;
+            SC64_TRANSPORT_LOADED(&u[i]) || SC64_BUILD_WORKER_ORDER(u[i].order)) continue;
         d = dist2(cx, cy, u[i].x, u[i].y);
         if (d < best_d) { best_d = d; best = i; }
     }

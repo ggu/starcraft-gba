@@ -1,5 +1,6 @@
 #ifndef SC64_P5_TRANSPORT_SAVE_H
 #define SC64_P5_TRANSPORT_SAVE_H
+#include "sc64_construction_save.h"
 
 #ifdef SC64_P5_SHUTTLE_ENABLED
 #if !defined(SC64_P5_RUNTIME) || !defined(SC64_ZP_FULL_STORAGE)
@@ -65,12 +66,20 @@ static int race_p5_transport_save_candidate_valid(const RaceSave *candidate,
                                    (unsigned)width * 16u,
                                    (unsigned)height * 16u, &actor)) return 0;
         if (!actor.alive) continue;
-        if (actor.order < ORDER_IDLE || actor.order > ORDER_UNLOAD) {
+        if (actor.order < ORDER_IDLE ||
+            (actor.order > ORDER_UNLOAD &&
+             !SC64_PENDING_BUILD_ORDER(actor.order))) {
 #ifdef SC64_P7_BATTERY_ENABLED
             if (actor.order==ORDER_P7_RECHARGE &&
                 race_p5_saved_p7_recharge_valid(candidate,&actor)) continue;
 #endif
             return 0;
+        }
+        if (SC64_PENDING_BUILD_ORDER(actor.order)) {
+            if (!sc64_pending_build_save_identity_valid(candidate, actor.alive,
+                    actor.owner, actor.type, actor.target, actor.tx, actor.ty,
+                    width * 16, height * 16)) return 0;
+            continue;
         }
         if (actor.order >= ORDER_BOARD &&
             (candidate->state[0] || candidate->state[2] != SC64_P5_GLOBAL_ID ||

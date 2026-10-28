@@ -124,11 +124,26 @@ static void test_edge_site(int race, unsigned geyser_index)
     assert(worker >= 0);
     before = minerals;
     assert(race_start_build(SIDE, worker, type, x, y));
+    assert(minerals == before);
+    assert(u[worker].order == ORDER_BUILD_PENDING && u[worker].target == type);
+    assert(find_gas_building(type, geysers[geyser_index].x,
+                             geysers[geyser_index].y) < 0);
+    /* This placement fixture advances directly to the authored geyser arrival
+       point, then ticks the real pending-order commit path. */
+    u[worker].x = geysers[geyser_index].x;
+    u[worker].y = geysers[geyser_index].y;
+    update_orders();
     assert(minerals == before - building_cost(type));
     building = find_gas_building(type, geysers[geyser_index].x,
                                  geysers[geyser_index].y);
     assert(building >= 0 && b[building].under_construction);
-    assert(u[worker].order == ORDER_BUILD && u[worker].target == building);
+    if (race == R_PROTOSS)
+        assert(u[worker].alive && u[worker].order == ORDER_IDLE &&
+               u[worker].target == -1);
+    else if (race == R_ZERG)
+        assert(!u[worker].alive);
+    else
+        assert(u[worker].order == ORDER_BUILD && u[worker].target == building);
     assert(!can_place(type, x, y));
     assert(!race_start_build(SIDE, worker, type, x, y));
 }
@@ -141,7 +156,7 @@ static void test_protoss_menu_and_harvest(void)
     const int type = B_ASSIMILATOR;
     const unsigned geyser_index = 1; /* (32,208), nearest Blood Bath geyser. */
     const Sc64SpriteFrame *sprite = sc64_race_unit_sprite(188);
-    int worker, cursor_x, cursor_y, building, minerals_before;
+    int worker, cursor_x, cursor_y, building, minerals_before, arrival_minerals;
     int geyser_x, geyser_y;
     setup_skirmish(race);
     assert(sprite && sprite->pixels);
@@ -180,12 +195,21 @@ static void test_protoss_menu_and_harvest(void)
 
     minerals_before = minerals;
     tap(KEY_A);
-    assert(mode == MODE_NORMAL && minerals == minerals_before - 100);
+    assert(mode == MODE_NORMAL && minerals == minerals_before);
+    assert(u[worker].order == ORDER_BUILD_PENDING && u[worker].target == type);
+    assert(find_gas_building(type, geyser_x, geyser_y) < 0);
+
+    /* This menu/render fixture pins arrival explicitly so background workers'
+       mineral deliveries cannot blur the construction debit assertion. */
+    arrival_minerals = minerals;
+    u[worker].x = geyser_x; u[worker].y = geyser_y;
+    input(0);
+    assert(minerals == arrival_minerals - 100);
     building = find_gas_building(type, geyser_x, geyser_y);
     assert(building >= 0 && b[building].under_construction);
-    assert(u[worker].order == ORDER_BUILD && u[worker].target == building);
+    assert(u[worker].alive && u[worker].order == ORDER_IDLE &&
+           u[worker].target == -1);
     assert(!can_place(type, cx, cy));
-
     for (int i = 0; i < 1200 && !building_complete(building); ++i)
         input(0);
     if (!building_complete(building))

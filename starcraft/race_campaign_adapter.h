@@ -338,6 +338,7 @@ static void
 race_campaign_ai_tick(void)
 {
     int i, workers = 0, army = 0, producer = -1;
+    int planned_minerals, planned_gas;
     int enemy_race = race_player[ENEMY], worker_type, producer_type;
     int next_build = -1, train_type = -1, x = 0, y = 0, base_x = -1, base_y = -1;
     if (race_campaign.elapsed_frames % 60u) return;
@@ -362,16 +363,19 @@ race_campaign_ai_tick(void)
                  enemy_race == R_PROTOSS ? U_ZEALOT : U_MARINE;
     producer_type = enemy_race == R_ZERG ? B_HATCHERY :
                      enemy_race == R_PROTOSS ? B_NEXUS : B_COMMAND;
-    if (producer >= 0 && workers < 7 && race_campaign_p2_ai_queue_room() >= 1)
+    race_pending_build_cost(ENEMY,&planned_minerals,&planned_gas);
+    if (producer >= 0 && workers < 7 && race_campaign_p2_ai_queue_room() >= 1 &&
+        race_owner_minerals(ENEMY)-planned_minerals >= sc64_race_unit_rule(worker_type)->minerals &&
+        race_owner_gas(ENEMY)-planned_gas >= sc64_race_unit_rule(worker_type)->gas)
         (void)race_queue_unit(ENEMY, producer, worker_type);
 
     if (enemy_race == R_ZERG) {
-        if (!race_owner_has_type(ENEMY, B_SPAWNING_POOL)) next_build = B_SPAWNING_POOL;
-        else if (!race_owner_has_type(ENEMY, B_HYDRALISK_DEN)) next_build = B_HYDRALISK_DEN;
+        if (!race_owner_build_planned(ENEMY, B_SPAWNING_POOL)) next_build = B_SPAWNING_POOL;
+        else if (!race_owner_build_planned(ENEMY, B_HYDRALISK_DEN)) next_build = B_HYDRALISK_DEN;
     } else if (enemy_race == R_PROTOSS) {
-        if (!race_owner_has_type(ENEMY, B_PYLON)) next_build = B_PYLON;
-        else if (!race_owner_has_type(ENEMY, B_GATEWAY)) next_build = B_GATEWAY;
-    } else if (!race_owner_has_type(ENEMY, B_BARRACKS)) {
+        if (!race_owner_build_planned(ENEMY, B_PYLON)) next_build = B_PYLON;
+        else if (!race_owner_build_planned(ENEMY, B_GATEWAY)) next_build = B_GATEWAY;
+    } else if (!race_owner_build_planned(ENEMY, B_BARRACKS)) {
         next_build = B_BARRACKS;
     }
     if (next_build >= 0 && race_campaign_build_site(ENEMY, next_build, base_x, base_y, &x, &y)) {
@@ -380,6 +384,8 @@ race_campaign_ai_tick(void)
     }
 
     if (producer >= 0 && b[producer].queue_count < 2 &&
+        race_owner_minerals(ENEMY)-planned_minerals >= sc64_race_unit_rule(train_type)->minerals &&
+        race_owner_gas(ENEMY)-planned_gas >= sc64_race_unit_rule(train_type)->gas &&
         race_campaign_p2_ai_queue_room() >= (train_type == U_ZERGLING ? 2 : 1))
         (void)race_queue_unit(ENEMY, producer, train_type);
     /* Imported enemy squads start as map guards. Release only a small group

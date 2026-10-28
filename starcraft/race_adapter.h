@@ -290,6 +290,28 @@ static int race_owner_has_type(int owner, int type)
     return 0;
 }
 
+/* AI planning must not queue the same tech/gas structure on every cadence
+ * while the builder walks. This is not an actor or completed-tech query. */
+static int race_owner_build_planned(int owner, int type)
+{
+    if (race_owner_has_type(owner, type)) return 1;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == owner &&
+            u[i].order == ORDER_BUILD_PENDING && u[i].target == type) return 1;
+    return 0;
+}
+
+static void race_pending_build_cost(int owner, int *mineral_cost, int *gas_cost)
+{
+    int minerals_total=0, gas_total=0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==owner&&
+        u[i].order==ORDER_BUILD_PENDING) {
+        const Sc64RaceBuildingRule *plan=sc64_race_building_rule(u[i].target);
+        if(plan){minerals_total+=plan->minerals;gas_total+=plan->gas;}
+    }
+    *mineral_cost=minerals_total; *gas_cost=gas_total;
+}
+
 static int race_owner_refinery(int owner)
 {
     int i;
@@ -371,7 +393,7 @@ static int race_owner_worker(int owner, int type, int x, int y)
 {
     int i, best = -1, d, best_d = 0x7fffffff;
     for (i = 0; i < MAX_UNITS; ++i) {
-        if (!u[i].alive || u[i].owner != owner || u[i].type != type || u[i].order == ORDER_BUILD) continue;
+        if (!u[i].alive || u[i].owner != owner || u[i].type != type || SC64_BUILD_WORKER_ORDER(u[i].order)) continue;
         d = dist2(x, y, u[i].x, u[i].y);
         if (d < best_d) { best_d = d; best = i; }
     }
@@ -512,11 +534,14 @@ static int race_queue_unit(int owner, int producer, int type)
     return 1;
 }
 
-static int race_start_build(int owner, int worker, int type, int x, int y)
+/* A travel order is not a foundation. In particular it must not pay, block
+ * terrain, satisfy source actor counts, or leave an immortal progress=-1
+ * Extractor if its Drone is interrupted. Recheck the same admission at arrival. */
+static int race_build_request_valid(int owner, int worker, int type,
+                                    int *x, int *y, int arriving)
 {
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
-    Sc64RaceBank bank;
-    int slot;
+    if (owner < 0 || owner > 4 || !x || !y) return 0;
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (!race_late_building_product_available(owner,
             worker >= 0 && worker < MAX_UNITS ? u[worker].raw_owner : -1,
@@ -534,37 +559,70 @@ static int race_start_build(int owner, int worker, int type, int x, int y)
             type)) return 0;
 #endif
     if (type == B_REFINERY || type == B_EXTRACTOR || type == B_ASSIMILATOR) {
-        int geyser = geyser_at(x, y);
+        int geyser = geyser_at(*x, *y);
         if (geyser < 0) return 0;
-        x = geysers[geyser].x;
-        y = geysers[geyser].y;
+        *x = geysers[geyser].x;
+        *y = geysers[geyser].y;
     }
     if (!r || r->race != race_owner_identity(owner) || worker < 0 || worker >= MAX_UNITS ||
         !u[worker].alive || u[worker].owner != owner || u[worker].type != r->worker ||
-        !race_can_site(owner, type, x, y) || !can_place(type, x, y)) return 0;
-    slot = find_build_slot();
-    if (slot < 0) return 0;
+        !race_can_site(owner, type, *x, *y) ||
+        !can_place_except_worker(type, *x, *y, arriving ? worker : -1)) return 0;
+    return find_build_slot() >= 0;
+}
+
+static int race_start_build(int owner, int worker, int type, int x, int y)
+{
+    Sc64RaceBank bank;
+    if (!race_build_request_valid(owner, worker, type, &x, &y, 0)) return 0;
     bank.minerals = (unsigned short)race_owner_minerals(owner);
     bank.gas = (unsigned short)race_owner_gas(owner);
     if (!sc64_race_pay_building(&bank, type)) return 0;
-    if (owner == SIDE) { minerals = bank.minerals; gas = bank.gas; }
-    else { race_minerals[owner] = bank.minerals; race_gas[owner] = bank.gas; }
-    slot = spawn_build(owner, type, x, y, 1);
-    if (slot < 0) return 0;
-    /* Non-Terran construction starts only after the worker reaches the site. */
-    if (race_owner_identity(owner) != R_TER) b[slot].build_progress = -1;
 #ifdef SC64_T6_RUNTIME
     if (u[worker].order == ORDER_REPAIR) {
         u[worker].carry = 0; u[worker].work_timer = 0;
     }
 #endif
-    u[worker].order = ORDER_BUILD;
-    u[worker].target = slot;
+    u[worker].order = ORDER_BUILD_PENDING;
+    u[worker].target = type;
     u[worker].tx = x;
     u[worker].ty = y;
     u[worker].path_timer = 0;
     u[worker].path_retry = 0;
     return 1;
+}
+
+/* Rare construction travel/commit work stays in ROM, outside the hot combat
+ * loop and its very small IWRAM reserve. No extra per-worker storage is used. */
+static void __attribute__((noinline)) race_pending_build_tick(int worker)
+{
+    Unit *q = &u[worker];
+    int x = q->tx, y = q->ty, type = q->target, slot;
+    Sc64RaceBank bank;
+    if (dist2(q->x, q->y, x, y) > 36 * 36) {
+        move_toward(q, x, y);
+        return;
+    }
+    if (!race_build_request_valid(q->owner, worker, type, &x, &y, 1)) goto cancel;
+    bank.minerals = (unsigned short)race_owner_minerals(q->owner);
+    bank.gas = (unsigned short)race_owner_gas(q->owner);
+    if (!sc64_race_pay_building(&bank, type)) goto cancel;
+    slot = spawn_build(q->owner, type, x, y, 1);
+    if (slot < 0) goto cancel;
+    /* No yield or callback can spend the wallet between validation and this
+     * commit. A failed slot allocation leaves the real wallet untouched. */
+    if (q->owner == SIDE) { minerals = bank.minerals; gas = bank.gas; }
+    else { race_minerals[q->owner] = bank.minerals; race_gas[q->owner] = bank.gas; }
+    q->order = ORDER_BUILD;
+    q->target = slot;
+    q->tx = x; q->ty = y;
+    q->path_timer = q->path_retry = 0;
+    (void)race_builder_arrived(worker);
+    return;
+cancel:
+    q->order = ORDER_IDLE;
+    q->target = -1;
+    q->path_timer = q->path_retry = 0;
 }
 
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
@@ -1165,6 +1223,8 @@ static void race_tick_ai(void)
                 if(!pending)race_queue_unit(owner,producer,U_OVERLORD);
             } else {
                 int supply_type=race==R_PROTOSS?B_PYLON:B_DEPOT;
+                for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].owner==owner&&
+                    u[j].order==ORDER_BUILD_PENDING&&u[j].target==supply_type)pending=1;
                 for(int j=0;j<MAX_BUILDINGS;j++)if(b[j].alive&&b[j].owner==owner&&
                     b[j].type==supply_type&&b[j].under_construction)pending=1;
                 if(!pending&&race_skirmish_site_for(owner,supply_type,&x,&y)) {
@@ -1183,12 +1243,12 @@ static void race_tick_ai(void)
             if (ref >= 0 && gas_workers < 2) {
                 int w=-1,best=0x7fffffff;
                 for(int j=0;j<MAX_UNITS;j++)if(u[j].alive&&u[j].owner==owner&&
-                    sc64_race_is_worker(u[j].type)&&u[j].order!=ORDER_GAS&&u[j].order!=ORDER_BUILD) {
+                    sc64_race_is_worker(u[j].type)&&u[j].order!=ORDER_GAS&&!SC64_BUILD_WORKER_ORDER(u[j].order)) {
                     int d=dist2(u[j].x,u[j].y,b[ref].x,b[ref].y);
                     if(d<best){best=d;w=j;}
                 }
                 if (w >= 0) { u[w].order = ORDER_GAS; u[w].target = ref; u[w].carry = 0; u[w].work_timer = 0; }
-            } else if (ref < 0 && !race_owner_has_type(owner,gas_type) && (race_owner_has_type(owner, race == R_ZERG ? B_SPAWNING_POOL : race == R_PROTOSS ? B_GATEWAY : B_BARRACKS)) &&
+            } else if (ref < 0 && !race_owner_build_planned(owner,gas_type) && (race_owner_has_type(owner, race == R_ZERG ? B_SPAWNING_POOL : race == R_PROTOSS ? B_GATEWAY : B_BARRACKS)) &&
                        owner != SIDE) {
                 build_type = gas_type;
                 int base=owner==ENEMY?1:owner==RESCUABLE?2:3,best=0x7fffffff;
@@ -1205,19 +1265,19 @@ static void race_tick_ai(void)
             }
         }
         build_type = race == R_ZERG ? B_SPAWNING_POOL : race == R_PROTOSS ? B_PYLON : B_BARRACKS;
-        if (!race_owner_has_type(owner, build_type) && race_skirmish_site_for(owner, build_type, &x, &y)) {
+        if (!race_owner_build_planned(owner, build_type) && race_skirmish_site_for(owner, build_type, &x, &y)) {
             int worker = race_owner_worker(owner, race == R_ZERG ? U_DRONE : race == R_PROTOSS ? U_PROBE : U_SCV, x, y);
             if (worker >= 0) { race_start_build(owner, worker, build_type, x, y); continue; }
         }
         build_type = race == R_ZERG ? B_HYDRALISK_DEN : race == R_PROTOSS ? B_GATEWAY : B_BARRACKS;
         if (race_owner_has_type(owner, race == R_ZERG ? B_SPAWNING_POOL : race == R_PROTOSS ? B_PYLON : B_DEPOT) &&
-            !race_owner_has_type(owner, build_type) && race_skirmish_site_for(owner, build_type, &x, &y)) {
+            !race_owner_build_planned(owner, build_type) && race_skirmish_site_for(owner, build_type, &x, &y)) {
             int worker = race_owner_worker(owner, race == R_ZERG ? U_DRONE : race == R_PROTOSS ? U_PROBE : U_SCV, x, y);
             if (worker >= 0) { race_start_build(owner, worker, build_type, x, y); continue; }
         }
         build_type = B_CYBERNETICS_CORE;
         if (race == R_PROTOSS && race_owner_has_type(owner, B_GATEWAY) &&
-            !race_owner_has_type(owner, build_type) && race_skirmish_site_for(owner, build_type, &x, &y)) {
+            !race_owner_build_planned(owner, build_type) && race_skirmish_site_for(owner, build_type, &x, &y)) {
             int worker = race_owner_worker(owner, U_PROBE, x, y);
             if (worker >= 0) { race_start_build(owner, worker, build_type, x, y); continue; }
         }
@@ -1226,17 +1286,22 @@ static void race_tick_ai(void)
          * refinery's full price can accumulate. Construction above spends
          * this reserve normally; no resources are granted to the AI. */
         int gas_type=race==R_ZERG?B_EXTRACTOR:race==R_PROTOSS?B_ASSIMILATOR:B_REFINERY;
-        int reserve=race_owner_has_type(owner,gas_type)?0:sc64_race_building_rule(gas_type)->minerals;
+        int reserve=race_owner_build_planned(owner,gas_type)?0:sc64_race_building_rule(gas_type)->minerals;
+        int planned_minerals, reserve_gas;
+        race_pending_build_cost(owner,&planned_minerals,&reserve_gas);
+        reserve+=planned_minerals;
         int worker_type=race==R_ZERG?U_DRONE:race==R_PROTOSS?U_PROBE:U_SCV;
         if (producer >= 0 && workers < 8 &&
-            race_owner_minerals(owner)-reserve >= sc64_race_unit_rule(worker_type)->minerals)
+            race_owner_minerals(owner)-reserve >= sc64_race_unit_rule(worker_type)->minerals &&
+            race_owner_gas(owner)-reserve_gas >= sc64_race_unit_rule(worker_type)->gas)
             race_queue_unit(owner, producer, worker_type);
         unit_type = race == R_ZERG ?
             (race_owner_has_type(owner, B_HYDRALISK_DEN) ? U_HYDRALISK : U_ZERGLING) :
             race == R_PROTOSS ? (race_owner_has_type(owner, B_CYBERNETICS_CORE) ? U_DRAGOON : U_ZEALOT) : U_MARINE;
         for (i = 0; i < MAX_BUILDINGS; ++i) if (building_complete(i) && b[i].owner == owner &&
             sc64_race_producer_compatible(b[i].type, sc64_race_unit_rule(unit_type)->producer) && b[i].queue_count < 2) {
-            if(race_owner_minerals(owner)-reserve >= sc64_race_unit_rule(unit_type)->minerals)
+            if(race_owner_minerals(owner)-reserve >= sc64_race_unit_rule(unit_type)->minerals &&
+               race_owner_gas(owner)-reserve_gas >= sc64_race_unit_rule(unit_type)->gas)
                 race_queue_unit(owner, i, unit_type);
             break;
         }

@@ -34,6 +34,7 @@ static int controller_normalize_field(void);
 static void move_cursor(int x, int y);
 static void wait_frames(int amount);
 static int controller_order_actor(int slot, int x, int y, int attack_move);
+static int controller_recover_stalled_miner(void);
 static int dump_final;
 static int trace_ship_slot = -1;
 static int trace_isolated_wraith_slot = -1;
@@ -490,7 +491,8 @@ static int find_side_worker(void)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].type == U_SCV &&
-            !SC64_TRANSPORT_LOADED(&u[i])) return i;
+            !SC64_TRANSPORT_LOADED(&u[i]) &&
+            u[i].order != ORDER_BUILD && u[i].order != ORDER_BUILD_PENDING) return i;
     return -1;
 }
 
@@ -604,13 +606,21 @@ static int controller_build_supply_depot(int *out_slot)
     int before = owner_buildings(SIDE);
     tap(KEY_A);
     int slot = -1;
-    if (owner_buildings(SIDE) > before)
-        for (int i = 0; i < MAX_BUILDINGS; ++i)
-            if (b[i].alive && b[i].owner == SIDE && b[i].type == B_DEPOT &&
-                b[i].under_construction && dist2(x, y, b[i].x, b[i].y) < 64 * 64) {
-                slot = i; break;
-            }
-    if (slot < 0) {
+    if (u[worker].order != ORDER_BUILD_PENDING || u[worker].target != B_DEPOT) {
+        fprintf(stderr, "T5 Supply Depot did not record pending order worker=%d order=%d product=%d at=%d,%d\n",
+                worker, u[worker].order, u[worker].target, x, y);
+        (void)controller_normalize_field();
+        return 0;
+    }
+    for (int t = 0; t < 5000 && screen == SCREEN_PLAY && !won && !lost &&
+         host_ticks < (u32)run_limit && u[worker].alive &&
+         u[worker].order == ORDER_BUILD_PENDING; ++t) step(0);
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_DEPOT &&
+            b[i].under_construction && dist2(x, y, b[i].x, b[i].y) < 64 * 64) {
+            slot = i; break;
+        }
+    if (slot < 0 || owner_buildings(SIDE) <= before) {
         fprintf(stderr, "T5 Supply Depot command did not create building planned=%d,%d actual=%d,%d mode=%d menu=%d wallet=%d\n",
                 x, y, cx, cy, mode, menu_open, minerals);
         (void)controller_normalize_field();
@@ -637,9 +647,19 @@ static int controller_build_starport(int *out_slot)
     if (!controller_select_unit(worker) || !controller_choose_menu_row(11)) return 0;
     move_cursor(x, y);
     tap(KEY_A);
-    int slot = find_side_building(B_STARPORT, 0);
-    if (owner_buildings(SIDE) <= before || slot < 0 || b[slot].x != x || b[slot].y != y)
+    if (u[worker].order != ORDER_BUILD_PENDING || u[worker].target != B_STARPORT) {
+        fprintf(stderr, "T5 Starport did not record pending order worker=%d order=%d product=%d site=%d,%d\n",
+                worker, u[worker].order, u[worker].target, x, y);
         return 0;
+    }
+    for (int t = 0; t < 5000 && screen == SCREEN_PLAY && !won && !lost &&
+         host_ticks < (u32)run_limit && u[worker].alive &&
+         u[worker].order == ORDER_BUILD_PENDING; ++t) step(0);
+    int slot = -1;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == SIDE && b[i].type == B_STARPORT &&
+            b[i].under_construction && b[i].x == x && b[i].y == y) { slot = i; break; }
+    if (owner_buildings(SIDE) <= before || slot < 0) return 0;
     fprintf(stderr, "T5 controller started paid Starport slot=%d site=%d,%d worker=%d wallet=%d/%d\n",
             slot, x, y, worker, minerals, gas);
     if (out_slot) *out_slot = slot;
@@ -1337,6 +1357,7 @@ static void controller_service_home_base(void)
     if (host_ticks % 900 == 0) {
         (void)controller_assign_idle_scvs_to_gas(3);
         (void)controller_assign_idle_scvs_to_minerals(3);
+        (void)controller_recover_stalled_miner();
     }
 }
 
@@ -1748,6 +1769,70 @@ static int controller_assign_idle_scvs_to_minerals(int maximum)
         }
     }
     return assigned;
+}
+
+/* Workers stranded on old MOVE intents are recoverable through the ordinary
+ * unit command menu. Stop only a worker with repeated failed paths, then issue
+ * the same ordinary MOVE-to-mineral interaction used by the controller's
+ * normal mineral assignment path. */
+static int controller_recover_stalled_miner(void)
+{
+    int mineral_workers, gas_workers, idle_workers, other_workers, live_workers;
+    int command = find_side_building(B_COMMAND, 1);
+    controller_scv_counts(&mineral_workers, &gas_workers, &idle_workers,
+                          &other_workers, &live_workers);
+    if (command < 0 || mineral_workers >= 2 || idle_workers > 0 ||
+        live_workers == 0 || screen != SCREEN_PLAY || won || lost ||
+        host_ticks >= (u32)run_limit) return 0;
+
+    for (int i = 0; i < MAX_UNITS && host_ticks < (u32)run_limit; ++i) {
+        if (!u[i].alive || u[i].owner != SIDE || u[i].type != U_SCV ||
+            SC64_TRANSPORT_LOADED(&u[i]) || u[i].order != ORDER_MOVE ||
+            u[i].target >= 0 || u[i].path_retry <= 0 ||
+            u[i].tx < 0 || u[i].tx >= WORLD_W || u[i].ty < 0 || u[i].ty >= WORLD_H ||
+            dist2(u[i].x, u[i].y, u[i].tx, u[i].ty) <= 288 * 288) continue;
+
+        int slot = i;
+        if (!controller_select_unit(slot)) continue;
+        if (!controller_choose_menu_row(MENU_STOP)) continue;
+        /* The order must actually be canceled before sending the recovery
+         * MOVE; menu navigation alone is not evidence that STOP took effect. */
+        if (!u[slot].alive || u[slot].order != ORDER_IDLE) continue;
+
+        int patch = -1, best_score = 0x7fffffff;
+        for (int j = 0; j < MAX_MINERALS; ++j) if (m[j].amount > 0) {
+            int cc_distance = dist2(m[j].x, m[j].y, b[command].x, b[command].y);
+            int worker_distance = dist2(m[j].x, m[j].y, u[slot].x, u[slot].y);
+            if (cc_distance > 256 * 256 || worker_distance > 288 * 288) continue;
+            int score = worker_distance + cc_distance / 4;
+            if (score < best_score) { best_score = score; patch = j; }
+        }
+        if (patch < 0) {
+            fprintf(stderr, "T5 stalled SCV stop left idle without nearby mineral slot=%d xy=%d,%d\n",
+                    slot, u[slot].x, u[slot].y);
+            return 0;
+        }
+        fprintf(stderr, "T5 recovering stalled SCV=%d old-goal=%d,%d retry=%d to mineral patch=%d at=%d,%d\n",
+                slot, u[slot].tx, u[slot].ty, u[slot].path_retry,
+                patch, m[patch].x, m[patch].y);
+        if (!controller_order_actor(slot, m[patch].x, m[patch].y, 0)) return 0;
+        for (int t = 0; t < 1200 && host_ticks < (u32)run_limit &&
+             screen == SCREEN_PLAY && !won && !lost && u[slot].alive; ++t) {
+            if (u[slot].order == ORDER_MINE && u[slot].target >= 0 &&
+                u[slot].target < MAX_MINERALS && m[u[slot].target].amount > 0) break;
+            step(0);
+        }
+        if (u[slot].alive && u[slot].order == ORDER_MINE && u[slot].target >= 0 &&
+            u[slot].target < MAX_MINERALS && m[u[slot].target].amount > 0) {
+            fprintf(stderr, "T5 stalled SCV mineral recovery verified slot=%d patch=%d at=%d,%d\n",
+                    slot, u[slot].target, m[u[slot].target].x, m[u[slot].target].y);
+            return 1;
+        }
+        fprintf(stderr, "T5 stalled SCV mineral recovery incomplete slot=%d order=%d target=%d xy=%d,%d\n",
+                slot, u[slot].order, u[slot].target, u[slot].x, u[slot].y);
+        return 0;
+    }
+    return 0;
 }
 
 static int controller_wraith_count(void)

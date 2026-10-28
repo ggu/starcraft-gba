@@ -1,5 +1,6 @@
 #ifndef SC64_TRANSPORT_SAVE_ADAPTER_H
 #define SC64_TRANSPORT_SAVE_ADAPTER_H
+#include "sc64_construction_save.h"
 #ifndef SC64_NYDUS_ORDER
 /* Standalone fixtures include this header without game.c's order enum. */
 #define SC64_NYDUS_ORDER(o) 0
@@ -39,11 +40,19 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
         if (!actor.alive) continue;
         int order = actor.order, carrier = actor.target;
 #ifdef SC64_T6_RUNTIME
-        if (order < ORDER_IDLE || order > max_order) return 0;
+        if (order < ORDER_IDLE ||
+            (order > max_order && !SC64_PENDING_BUILD_ORDER(order))) return 0;
 #else
         if (order < ORDER_IDLE ||
-            (order > ORDER_UNLOAD && !SC64_NYDUS_ORDER(order))) return 0;
+            (order > ORDER_UNLOAD && !SC64_NYDUS_ORDER(order) &&
+             !SC64_PENDING_BUILD_ORDER(order))) return 0;
 #endif
+        if (SC64_PENDING_BUILD_ORDER(order)) {
+            if (!sc64_pending_build_save_identity_valid(candidate, actor.alive,
+                    actor.owner, actor.type, actor.target, actor.tx, actor.ty,
+                    width * 16, height * 16)) return 0;
+            continue;
+        }
         if (order == ORDER_UNLOAD) {
             if (actor.type != U_DROPSHIP || actor.raw_type != 11 ||
                 carrier != -1 || actor.work_timer < 0 ||
@@ -81,11 +90,20 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
         if (!CARGO_U(i, alive)) continue;
         int order = CARGO_U(i, order), carrier = CARGO_U(i, target);
 #ifdef SC64_T6_RUNTIME
-        if (order < ORDER_IDLE || order > max_order) return 0;
+        if (order < ORDER_IDLE ||
+            (order > max_order && !SC64_PENDING_BUILD_ORDER(order))) return 0;
 #else
         if (order < ORDER_IDLE ||
-            (order > ORDER_UNLOAD && !SC64_NYDUS_ORDER(order))) return 0;
+            (order > ORDER_UNLOAD && !SC64_NYDUS_ORDER(order) &&
+             !SC64_PENDING_BUILD_ORDER(order))) return 0;
 #endif
+        if (SC64_PENDING_BUILD_ORDER(order)) {
+            if (!sc64_pending_build_save_identity_valid(candidate,
+                    CARGO_U(i, alive), CARGO_U(i, owner), CARGO_U(i, type),
+                    carrier, CARGO_U(i, tx), CARGO_U(i, ty),
+                    width * 16, height * 16)) return 0;
+            continue;
+        }
         if (order == ORDER_UNLOAD) {
             if (CARGO_U(i, type) != U_DROPSHIP || CARGO_U(i, raw_type) != 11 ||
                 carrier != -1 || CARGO_U(i, work_timer) < 0 ||

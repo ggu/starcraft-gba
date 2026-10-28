@@ -443,6 +443,7 @@ static void test_live_builder_construction(void)
          * a player places the blueprint; the 32px gap is inside work range. */
         int worker=spawn_unit(SIDE,workers[r],site_x+32,site_y);
         assert(worker>=0 && u[worker].alive);
+        int minerals_before=minerals, gas_before=gas;
         if (!race_start_build(SIDE,worker,buildings[r],site_x,site_y)) {
             fprintf(stderr,"live build start failed race=%d type=%d identity=%d checks=%d/%d minerals=%d gas=%d\n",
                     races[r],buildings[r],race_owner_identity(SIDE),
@@ -450,9 +451,27 @@ static void test_live_builder_construction(void)
                     can_place(buildings[r],site_x,site_y),minerals,gas);
             assert(0);
         }
-        int slot=u[worker].target;
+        assert(u[worker].order==ORDER_BUILD_PENDING &&
+               u[worker].target==buildings[r]);
+        assert(minerals==minerals_before && gas==gas_before);
+        for (int i=0;i<MAX_BUILDINGS;++i)
+            assert(!b[i].alive || b[i].type!=buildings[r] ||
+                   b[i].x!=site_x || b[i].y!=site_y);
+        /* This authored source-renderer fixture starts inside the 36px
+           approach ring; one real simulation tick commits construction. */
+        game_update(0,0);
+        int slot=-1;
+        for (int i=0;i<MAX_BUILDINGS;++i)
+            if (b[i].alive && b[i].owner==SIDE && b[i].type==buildings[r] &&
+                b[i].x==site_x && b[i].y==site_y) { slot=i; break; }
         assert(slot>=0 && b[slot].alive && b[slot].under_construction);
-        assert(b[slot].build_progress==(r==0 ? 0 : -1));
+        assert(minerals==minerals_before-building_cost(buildings[r]));
+        assert(gas==gas_before-building_gas_cost(buildings[r]));
+        /* The commit tick includes the first construction frame for each
+           race, after the pending order creates the foundation. */
+        assert(b[slot].build_progress==1);
+        if (r==1) assert(!u[worker].alive); /* Arrival consumed the Drone. */
+        int zerg_builder_consumed=(r==1);
         assert(b[slot].type==buildings[r]);
         assert(b[slot].raw_type<0 || b[slot].raw_type==raw_buildings[r]);
         assert(sc64_race_raw_building(buildings[r])==raw_buildings[r]);
@@ -463,7 +482,6 @@ static void test_live_builder_construction(void)
         int sampled=0, pixel_changes=0;
         uint32_t previous_hash=0;
         unsigned stage_mask=0;
-        int zerg_builder_consumed=0;
         for (int tick=0;tick<duration+8 && b[slot].under_construction;++tick) {
             int old_frame=frame;
             game_update(0,0);
@@ -471,12 +489,6 @@ static void test_live_builder_construction(void)
             assert(camx==site_x-100 && camy==site_y-53);
             assert(b[slot].alive);
             assert(b[slot].type==buildings[r]);
-            if (r==1 && tick==0) {
-                /* Arrival consumes the Drone before the Hatchery clock runs.
-                 * Check immediately, before any later unit can reuse its slot. */
-                assert(!u[worker].alive);
-                zerg_builder_consumed=1;
-            }
             if (b[slot].under_construction) {
                 int progress=b[slot].build_progress;
                 assert(progress>=0 && progress>previous_progress);
