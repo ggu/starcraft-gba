@@ -25,6 +25,12 @@ while preserving raw28 as a separate logical unit.
 The native raw28 unit row gives 850 HP (217600 in 8.8 fixed point), armor 4,
 zero effective shields, Large size (N64 size value 3, normalized engine size
 2), ground/air weapon IDs 23/24 and one hit per attack.
+In the 228-row byte columns of `00C/001`, sight starts at offset 8172,
+armor-upgrade ID at 8400, unit size at 8628 and armor at 8856. The
+armor-upgrade column must not be omitted: raw12 has the tuple
+`(11, 2, 3, 3)` and raw28 `(11, 2, 3, 4)` in that order. Marine raw0
+`(7, 0, 1, 0)`, Vulture raw2 `(8, 1, 2, 0)` and Goliath raw3
+`(8, 1, 3, 1)` independently check the column interpretation.
 Native weapon rows 23/24 each give damage 30, bonus 3, cooldown 22, range
 0..192 source pixels, one projectile/hit and damage type 3. The shared native
 flingy70 row gives speed 640, acceleration 27, halt distance 7585 and turn
