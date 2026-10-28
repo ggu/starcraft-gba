@@ -29,15 +29,15 @@ sc64_weapon_source_vfx_row(const uint8_t *pixels, unsigned width, int row,
     return buffer;
 }
 
-/* Blit `width` pixels of one row with the raster's modifier. */
+/* Blit a contiguous rectangle with the raster's modifier. */
 static inline void
-sc64_weapon_source_vfx_blit_run(const Sc64WeaponSourceVfxRaster *r, int x, int y,
-                                int width, const uint8_t *src)
+sc64_weapon_source_vfx_blit_rect(const Sc64WeaponSourceVfxRaster *r, int x, int y,
+                                 int width, int height, const uint8_t *src)
 {
     if (r->modifier == 9 || r->modifier == 10)
-        gfx_blit_sprite_mapped(x, y, width, 1, src, r->lookup, r->lookup_rows);
+        gfx_blit_sprite_mapped(x, y, width, height, src, r->lookup, r->lookup_rows);
     else
-        gfx_blit_sprite(x, y, width, 1, src);
+        gfx_blit_sprite(x, y, width, height, src);
 }
 
 /* Project one already selected source frame. `world_x/y` is the source
@@ -72,7 +72,8 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
         top + r->height <= 12) return;
 
     /* Fast path: when every map tile under the clipped raster is visible, the
-     * tile loop below would draw each row whole, so draw it in one call. */
+     * tile loop below would draw each row whole. Contiguous source rows can
+     * be submitted as one rectangle; reversed rows still need row buffers. */
     int sy0 = top < 12 ? 12 : top;
     int sy1 = top + (int)r->height > 120 ? 120 : top + (int)r->height;
     int wx0 = left + camx, wx1 = left + (int)r->width - 1 + camx;
@@ -82,12 +83,20 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
         for (int tx = wx0 >> 4; whole && tx <= wx1 >> 4; ++tx)
             whole = currently_visible(tx * 16, ty * 16);
 
+    if (whole && !reverse) {
+        const uint8_t *rect_src = frame_pixels +
+            (unsigned)(sy0 - top) * r->width;
+        sc64_weapon_source_vfx_blit_rect(r, left, sy0, r->width,
+                                         sy1 - sy0, rect_src);
+        return;
+    }
+
     for (int sy = sy0; sy < sy1; ++sy) {
         const uint8_t *row_src = sc64_weapon_source_vfx_row(
             frame_pixels, r->width, sy - top, reverse, reversed);
         int col = 0;
         if (whole) {
-            sc64_weapon_source_vfx_blit_run(r, left, sy, r->width, row_src);
+            sc64_weapon_source_vfx_blit_rect(r, left, sy, r->width, 1, row_src);
             col = r->width;
         }
         while (col < r->width) {
@@ -112,7 +121,8 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
              * starting coordinate was checked above; visibility is tile-wide. */
             int run = 16 - (wx & 15);
             if (run > (int)r->width - col) run = (int)r->width - col;
-            sc64_weapon_source_vfx_blit_run(r, left + col, sy, run, row_src + col);
+            sc64_weapon_source_vfx_blit_rect(r, left + col, sy, run, 1,
+                                             row_src + col);
             col += run;
         }
     }
@@ -169,6 +179,44 @@ sc64_weapon_source_vfx_source_frame(const Sc64WeaponSourceImage *image,
     return frame;
 }
 
+/* Internal hot path for callers that already resolved these immutable bank
+ * records. Keep image_id explicit: aliases may share a record pointer while
+ * still selecting a different image/LUT key. */
+static inline void
+sc64_weapon_source_vfx_draw_image_frame_resolved(
+    uint16_t image_id, const Sc64WeaponSourceImage *image,
+    const Sc64WeaponSourceFrame *frame, int mirror,
+    int world_x, int world_y)
+{
+    if (!image || !frame || !image->frame_count ||
+        image->frame_first >= SC64_WEAPON_SOURCE_FRAME_COUNT ||
+        image->modifier > 10u) return;
+
+    Sc64WeaponSourceVfxRaster raster = {0};
+    raster.pixels = sc64_weapon_source_frame_pixels(frame, 0);
+    raster.mirror_pixels = sc64_weapon_source_frame_pixels(frame, 1);
+    raster.image_id = image_id;
+    raster.x = frame->x;
+    raster.y = frame->y;
+    raster.mirror_x = frame->mirror_x;
+    raster.width = frame->w;
+    raster.height = frame->h;
+    raster.canvas_w = frame->canvas_w;
+    raster.canvas_h = frame->canvas_h;
+    raster.modifier = image->modifier;
+    const Sc64WeaponSourceLut *lut = image->image_id == image_id &&
+        image->lut_index < SC64_WEAPON_SOURCE_LUT_COUNT ?
+        &sc64_weapon_source_luts[image->lut_index] :
+        sc64_weapon_source_lut_for_image(image_id);
+    if (lut && lut->data_offset < sizeof(sc64_weapon_source_lut_bytes)) {
+        raster.lookup = sc64_weapon_source_lut_bytes + lut->data_offset;
+        raster.lookup_rows = (uint8_t)(lut->rows > 255 ? 255 : lut->rows);
+    }
+    sc64_weapon_source_vfx_draw_raster(&raster, world_x, world_y, mirror);
+}
+
+/* Public key-based entry point retains the original lookup and failure
+ * behavior. Trace/overlay callers can skip the repeated lookups above. */
 static inline void
 sc64_weapon_source_vfx_draw_image(uint16_t image_id, uint8_t animation_id,
                                   uint32_t source_age, uint8_t direction,
@@ -187,25 +235,8 @@ sc64_weapon_source_vfx_draw_image(uint16_t image_id, uint8_t animation_id,
     const Sc64WeaponSourceFrame *frame =
         sc64_weapon_source_frame_lookup(image_id, source_frame);
     if (!frame) return;
-
-    Sc64WeaponSourceVfxRaster raster = {0};
-    raster.pixels = sc64_weapon_source_frame_pixels(frame, 0);
-    raster.mirror_pixels = sc64_weapon_source_frame_pixels(frame, 1);
-    raster.image_id = image_id;
-    raster.x = frame->x;
-    raster.y = frame->y;
-    raster.mirror_x = frame->mirror_x;
-    raster.width = frame->w;
-    raster.height = frame->h;
-    raster.canvas_w = frame->canvas_w;
-    raster.canvas_h = frame->canvas_h;
-    raster.modifier = image->modifier;
-    const Sc64WeaponSourceLut *lut = sc64_weapon_source_lut_for_image(image_id);
-    if (lut && lut->data_offset < sizeof(sc64_weapon_source_lut_bytes)) {
-        raster.lookup = sc64_weapon_source_lut_bytes + lut->data_offset;
-        raster.lookup_rows = (uint8_t)(lut->rows > 255 ? 255 : lut->rows);
-    }
-    sc64_weapon_source_vfx_draw_raster(&raster, world_x, world_y, mirror);
+    sc64_weapon_source_vfx_draw_image_frame_resolved(
+        image_id, image, frame, mirror, world_x, world_y);
 }
 
 static inline int
@@ -428,8 +459,27 @@ sc64_weapon_source_vfx_draw_overlays(const Sc64WeaponSourceAnimation *anim,
                 draw_x = born_x;
                 draw_y = born_y;
             }
-            sc64_weapon_source_vfx_draw_image(overlay->image_id, 0u, child_age,
-                direction, draw_x + source_dx / 2, draw_y + source_dy / 2);
+            const Sc64WeaponSourceImage *child_image =
+                sc64_weapon_source_image_lookup(overlay->image_id);
+            if (!child_image || !child_image->frame_count ||
+                child_image->frame_first >= SC64_WEAPON_SOURCE_FRAME_COUNT ||
+                child_image->modifier > 10u) continue;
+            /* child_init is the same keyed Init lookup used to determine
+             * lifetime, but retain key checks before reusing it. */
+            const Sc64WeaponSourceAnimation *child_anim =
+                child_init && child_init->image_id == overlay->image_id &&
+                child_init->animation_id == 0u ? child_init :
+                sc64_weapon_source_animation_lookup(overlay->image_id, 0u);
+            int child_mirror = 0;
+            uint16_t child_frame_id = sc64_weapon_source_vfx_source_frame(
+                child_image, child_anim, child_age, direction, &child_mirror);
+            if (child_frame_id == UINT16_MAX) continue;
+            const Sc64WeaponSourceFrame *child_frame =
+                sc64_weapon_source_frame_lookup(overlay->image_id, child_frame_id);
+            if (!child_frame) continue;
+            sc64_weapon_source_vfx_draw_image_frame_resolved(
+                overlay->image_id, child_image, child_frame, child_mirror,
+                draw_x + source_dx / 2, draw_y + source_dy / 2);
         }
     }
 }
@@ -514,9 +564,34 @@ sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
     int projectile_mirror = 0;
     uint16_t projectile_frame = sc64_weapon_source_vfx_source_frame(
         image, active, local_tick, key.direction, &projectile_mirror);
-    (void)projectile_mirror;
-    sc64_weapon_source_vfx_draw_image(image->image_id, active_id, local_tick,
-                                       key.direction, px, py);
+    /* The old wrapper was called with image->image_id, which can differ from
+     * the key that produced the current pointer. Resolve that key again before
+     * reusing image, animation, or frame records. */
+    uint16_t draw_image_id = image->image_id;
+    const Sc64WeaponSourceImage *draw_image = image;
+    if (draw_image_id != p->projectile_image)
+        draw_image = sc64_weapon_source_image_lookup(draw_image_id);
+    const Sc64WeaponSourceAnimation *draw_anim = active &&
+        active->image_id == draw_image_id &&
+        active->animation_id == active_id ? active :
+        sc64_weapon_source_animation_lookup(draw_image_id, active_id);
+    int draw_mirror = projectile_mirror;
+    uint16_t draw_frame_id = projectile_frame;
+    /* Preserve draw_image's historical NULL-active behavior: it samples
+     * animation zero, even though overlay placement uses the NULL fallback.
+     * Re-sample as well when the keyed image/animation pointer differs. */
+    if (!active || draw_image != image || draw_anim != active) {
+        draw_frame_id = draw_image ? sc64_weapon_source_vfx_source_frame(
+            draw_image, draw_anim, local_tick, key.direction, &draw_mirror) :
+            UINT16_MAX;
+    }
+    if (draw_image && draw_frame_id != UINT16_MAX) {
+        const Sc64WeaponSourceFrame *draw_frame =
+            sc64_weapon_source_frame_lookup(draw_image_id, draw_frame_id);
+        if (draw_frame)
+            sc64_weapon_source_vfx_draw_image_frame_resolved(
+                draw_image_id, draw_image, draw_frame, draw_mirror, px, py);
+    }
 
     /* Child images from each missile script remain independent while their
      * own Init animation is alive. This covers projectile trails and impact
