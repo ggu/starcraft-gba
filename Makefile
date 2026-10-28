@@ -351,11 +351,12 @@ CANONICAL_WEAPON_FLAGS ?= -DSC64_TANK_SOURCE_VFX -I.local/sc64/tank-vfx/generate
 # Direct firing points only replace a failed center route with a bounded set
 # of clear corridors. Clearing this override opts out of the staged fix.
 CANONICAL_DIRECT_FIRING_FLAGS ?= -DSC64_DIRECT_FIRING_POINTS
+CANONICAL_RANGE_WORK_FLAGS ?=
 DEATH_ART_DIR := .local/sc64/death/generated
 DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
 CANONICAL_DEATH_FLAGS ?= -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
 CANONICAL_DEATH_INPUTS = $(if $(filter -DSC64_DEATH_SOURCE_ART,$(CANONICAL_DEATH_FLAGS)),$(DEATH_ART_HEADER))
-TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS)
+TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_DEATH_FLAGS)
 ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS) $(CONTACT_ROM_PLACEMENT_FLAGS)
 # Explicit legacy Z1-Z4 product: SCZ4, save generation 20, unchanged flags.
@@ -367,7 +368,7 @@ ZERG_Z4_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS)
 ZERG_Z6_BANK := .local/sc64/zerg-z6/generated
 ZERG_Z6_FLAGS = $(patsubst -I.local/sc64/z6/generated,-I$(ZERG_Z6_BANK),$(Z6_PROBE_FLAGS)) -DSC64_ZP_DEFENSE_TARGETS
 ZERG_Z6_INPUTS = $(filter-out .local/sc64/z5/generated/sc64_race_sprites_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h,$(Z6_PROBE_INPUTS)) $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h
-ZERG_ROM_FLAGS = $(ZERG_Z6_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS)
+ZERG_ROM_FLAGS = $(ZERG_Z6_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_DEATH_FLAGS)
 ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
 PROTOSS_P3_CANONICAL_FLAGS ?= $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
 PROTOSS_P3_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_P3_CANONICAL_FLAGS)
@@ -388,7 +389,7 @@ PROTOSS_P7_SPRITE_DIR := .local/sc64/protoss-p7/generated
 PROTOSS_P7_SPRITE_HEADER := $(PROTOSS_P7_SPRITE_DIR)/sc64_race_sprites_generated.h
 # P7 has room for the steering pass and inline stock step in IWRAM. Keep the
 # P6 placement choices and historical P7 probes independent of this profile.
-PROTOSS_P7_CANONICAL_FLAGS = -I$(PROTOSS_P7_SPRITE_DIR) $(P7_FACT_V2_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(filter-out -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM,$(PROTOSS_CANONICAL_FLAGS)) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) -DSC64_P7_ARBITER_AURA_ONCE
+PROTOSS_P7_CANONICAL_FLAGS = -I$(PROTOSS_P7_SPRITE_DIR) $(P7_FACT_V2_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(filter-out -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM,$(PROTOSS_CANONICAL_FLAGS)) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(CANONICAL_DEATH_FLAGS) -DSC64_P7_ARBITER_AURA_ONCE
 PROTOSS_P7_CANONICAL_INPUTS = $(filter-out .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p7/generated/sc64_race_sprites_generated.h,$(P7_ARBITER_INPUTS)) $(PROTOSS_P7_SPRITE_HEADER) $(P7_FACT_V2_HEADER) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 PROTOSS_ROM_FLAGS = $(PROTOSS_P7_CANONICAL_FLAGS)
 PROTOSS_CANONICAL_INPUTS = $(PROTOSS_P7_CANONICAL_INPUTS)
@@ -4020,7 +4021,7 @@ SHOWCASE_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 SHOWCASE_SIEGE_FLAGS ?= -DSC64_SIEGE_SPLASH
 # Clip world art before it reaches either HUD band. Keep the infrequent
 # procedural diamond fallback in ROM so clipping retains the IWRAM reserve.
-SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS)
+SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_RANGE_WORK_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS)
 build/starcraft-showcase.elf build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-protoss-gas-placement build/test-sc64-protoss-skirmish-pylons build/test-sc64-native-weapon-game build/test-sc64-showcase-death-source: $(COMMAND_ICON_HEADER)
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
@@ -4708,3 +4709,57 @@ $(eval $(call DIRECT_FIRING_GAME_FIXTURE,on,-DSC64_DIRECT_FIRING_POINTS))
 test-sc64-direct-firing-points-game: test-sc64-direct-firing-flags build/test-sc64-direct-firing-points-off build/test-sc64-direct-firing-points-on
 	./build/test-sc64-direct-firing-points-off
 	./build/test-sc64-direct-firing-points-on
+
+# Private-input actual-engine fixture for the opt-in bounded fallback.
+# It consumes only prepared Z7 headers; it never invokes their asset builders.
+RANGE_WORK_TEST_BUILD_DIR ?= build/range-work-adoption
+$(RANGE_WORK_TEST_BUILD_DIR):
+	mkdir -p $@
+# The range-work contract already runs in the engine fixture. Keep these
+# assertions next to the production helper so every profile checks alignment.
+$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-engine: tests/sc64_direct_firing_points_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c Makefile | $(RANGE_WORK_TEST_BUILD_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_FIRING_POINTS -DSC64_RANGE_WORK -DSC64_RANGE_WORK_BUDGET_PER_TICK=8 $< common/gba.c -o $@
+$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-engine-default: tests/sc64_direct_firing_points_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c Makefile | $(RANGE_WORK_TEST_BUILD_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(Z7_PROBE_FLAGS) -DSC64_CONSTRUCTION_HP -DSC64_DIRECT_FIRING_POINTS -DSC64_RANGE_WORK $< common/gba.c -o $@
+.PHONY: test-sc64-range-work-engine
+test-sc64-range-work-engine: $(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-engine
+	./$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-engine
+.PHONY: test-sc64-range-work-engine-default
+test-sc64-range-work-engine-default: $(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-engine-default
+	./$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-engine-default
+
+# Standalone sanitizer oracle for the exact helper used by bounded snapshot
+# copies. The active-stride variant covers odd route-field strides too.
+RANGE_COPY_TEST_FLAGS = -DSC64_RANGE_WORK -DSC64_DIRECT_FIRING_POINTS -DSC64_IMPORTED_MISSION -DSC64_RACES -DSC64_ROUTE_PACK3
+RANGE_COPY_TEST_BUILD_DIR ?= build/range-copy-alignment
+$(RANGE_COPY_TEST_BUILD_DIR):
+	mkdir -p $@
+$(RANGE_COPY_TEST_BUILD_DIR)/test-sc64-range-copy-alignment-default: tests/sc64_range_copy_alignment.c starcraft/sc64_routes.h starcraft/sc64_range_work.h Makefile | $(RANGE_COPY_TEST_BUILD_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -fno-omit-frame-pointer $(RANGE_COPY_TEST_FLAGS) -I. $< -o $@
+$(RANGE_COPY_TEST_BUILD_DIR)/test-sc64-range-copy-alignment-active-stride: tests/sc64_range_copy_alignment.c starcraft/sc64_routes.h starcraft/sc64_range_work.h Makefile | $(RANGE_COPY_TEST_BUILD_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -fno-omit-frame-pointer $(RANGE_COPY_TEST_FLAGS) -DSC64_ROUTE_ACTIVE_STRIDE -DSC64_ZP_CAMPAIGN_STORAGE -DSC64_LARGE_MAPS -DSC64_ROUTE_VISIT_GRID -DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_L_FAST_PATH -DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ -I. $< -o $@
+.PHONY: test-sc64-range-copy-alignment
+test-sc64-range-copy-alignment: $(RANGE_COPY_TEST_BUILD_DIR)/test-sc64-range-copy-alignment-default $(RANGE_COPY_TEST_BUILD_DIR)/test-sc64-range-copy-alignment-active-stride
+	./$(RANGE_COPY_TEST_BUILD_DIR)/test-sc64-range-copy-alignment-default
+	./$(RANGE_COPY_TEST_BUILD_DIR)/test-sc64-range-copy-alignment-active-stride
+
+# Explicit prepared-Terran integration checks. These compile against the
+# canonical flags and already-prepared ignored headers; they never generate
+# or import game data. Use a private output directory to keep them isolated.
+RANGE_WORK_TERRAN_BASE_FLAGS = $(filter-out -DSC64_RANGE_WORK -DSC64_RANGE_WORK_BUDGET_PER_TICK=%,$(TERRAN_ROM_FLAGS))
+RANGE_WORK_TERRAN_DEFAULT_FLAGS = $(RANGE_WORK_TERRAN_BASE_FLAGS) -DSC64_DIRECT_FIRING_POINTS -DSC64_RANGE_WORK
+RANGE_WORK_TERRAN_BUDGET8_FLAGS = $(RANGE_WORK_TERRAN_DEFAULT_FLAGS) -DSC64_RANGE_WORK_BUDGET_PER_TICK=8
+$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-save-resume-default: tests/sc64_range_work_save_resume.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c Makefile | $(RANGE_WORK_TEST_BUILD_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RANGE_WORK_TERRAN_DEFAULT_FLAGS) $< common/gba.c -o $@
+$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-save-resume-budget8: tests/sc64_range_work_save_resume.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.h common/gba.c Makefile | $(RANGE_WORK_TEST_BUILD_DIR)
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(RANGE_WORK_TERRAN_BUDGET8_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-range-work-save-resume
+test-sc64-range-work-save-resume: $(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-save-resume-default $(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-save-resume-budget8
+	./$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-save-resume-default
+	./$(RANGE_WORK_TEST_BUILD_DIR)/test-sc64-range-work-save-resume-budget8
+
+.PHONY: range-work-print-flags test-sc64-range-work-flags
+range-work-print-flags:
+	@printf '%s\n' 'terran=$(TERRAN_ROM_FLAGS)' 'zerg=$(ZERG_ROM_FLAGS)' 'protoss=$(PROTOSS_P7_CANONICAL_FLAGS)' 'showcase=$(SHOWCASE_FLAGS)'
+test-sc64-range-work-flags:
+	python3 tests/test_sc64_range_work_flags.py
