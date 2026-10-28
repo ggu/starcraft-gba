@@ -89,6 +89,7 @@ class VfxCullProfileFlagsTest(unittest.TestCase):
             with self.subTest(profile=name):
                 self.assertNotIn(SOURCE, profiles[name].split())
                 self.assertNotIn(CULL, profiles[name].split())
+                self.assertNotIn(CACHE, profiles[name].split())
 
     def test_source_weapon_override_off_removes_cull(self) -> None:
         profiles = expanded_profiles("SOURCE_WEAPON_FLAGS=")
