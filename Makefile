@@ -25,6 +25,14 @@ test-sc64-unit-walk: build/test-sc64-unit-walk
 	./build/test-sc64-unit-walk
 test: test-sc64-unit-walk
 
+# Caller-owned incremental range search; no runtime integration or assets.
+.PHONY: test-sc64-range-work
+build/test-sc64-range-work: tests/sc64_range_work.c starcraft/sc64_range_work.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer $< -o $@
+test-sc64-range-work: build/test-sc64-range-work
+	./build/test-sc64-range-work
+test: test-sc64-range-work
+
 # Asset-free minimap terrain renderer oracle; exercise both implementations.
 .PHONY: test-sc64-minimap-terrain
 build/gba-minimap-test.o: common/gba.c common/gba.h Makefile | build
