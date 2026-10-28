@@ -813,7 +813,8 @@ static int find_build_site(int type,int *out_x,int *out_y)
                     if(d<48*48||d>160*160)continue;
                     if(!race_can_site(SIDE,type,x,y)||!can_place(type,x,y)||
                        !z7_worker_can_reach_site(x,y))continue;
-                    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY) {
+                    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
+                       currently_visible(u[i].x,u[i].y)&&sc64_race_unit_damage(u[i].type)>0) {
                         int enemy_d=dist2(x,y,u[i].x,u[i].y);if(enemy_d<threat)threat=enemy_d;
                     }
                     if(threat<144*144)continue;
@@ -3017,7 +3018,7 @@ static void macro_step(void)
                 workers_retreating);
             last_expansion_diag=(unsigned)frame;
         }
-        if(0&&expansion_hatches==1&&expansion_sunkens>=2&&live_workers>=10&&
+        if(expansion_hatches==1&&expansion_sunkens>=2&&live_workers>=10&&
            (!early_gas_policy||(expansion_sunkens>=2&&combat_count(SIDE)>=20&&
                                !enemy_at_minerals&&!workers_retreating))) {
             if(minerals>=300) {
