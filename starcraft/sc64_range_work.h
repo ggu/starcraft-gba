@@ -1,10 +1,13 @@
 #ifndef SC64_RANGE_WORK_H
 #define SC64_RANGE_WORK_H
 
+#include <string.h>
+
 /* Standalone, caller-owned incremental 4-neighbour range-field worker.
  * Include after defining u8. The walk grid is one bit per tile; the gradient
  * is the route pool's existing 3-bit-per-tile encoding (0 seed, 1..4 toward
- * a seed, 7 undiscovered). Both frontier planes share one packed route field.
+ * a seed, 7 undiscovered). Both frontier planes and their occupancy summaries
+ * share one packed route field.
  * This header deliberately knows nothing about engine globals or save data. */
 
 enum {
@@ -28,9 +31,12 @@ typedef struct Sc64RangeWork {
     const u8 *walk;
     u8 *gradient;
     u8 *frontier;
-    unsigned cells, walk_bytes, gradient_bytes, frontier_bytes, bit_bytes;
+    unsigned cells, gradient_bytes, frontier_bytes, bit_bytes;
+    unsigned plane_bytes;
     unsigned cursor, current_plane, next_count;
     int cols, rows, target_x, target_y, min_range, max_range;
+    unsigned short summary_offset[5];
+    unsigned char summary_depth;
     unsigned char phase;
 } Sc64RangeWork;
 
@@ -38,6 +44,21 @@ static void sc64_range_work_reset(Sc64RangeWork *work);
 
 static unsigned sc64_range_work_ceil8(unsigned n) { return (n + 7u) / 8u; }
 static unsigned sc64_range_work_ceil3(unsigned n) { return (n * 3u + 7u) / 8u; }
+
+static unsigned sc64_range_work_plane_bytes(unsigned cells)
+{
+    unsigned base = sc64_range_work_ceil8(cells), bytes = base;
+    if (base > 8u) while (base > 1u) {
+        base = sc64_range_work_ceil8(base);
+        bytes += base;
+    }
+    return bytes;
+}
+
+static unsigned sc64_range_work_scratch_required(unsigned cells)
+{
+    return 2u * sc64_range_work_plane_bytes(cells);
+}
 
 static int sc64_range_work_get3(const u8 *field, unsigned cell)
 {
@@ -62,6 +83,75 @@ static int sc64_range_work_walkable(const Sc64RangeWork *work, unsigned cell)
     return (work->walk[cell >> 3] >> (cell & 7u)) & 1u;
 }
 
+static unsigned sc64_range_work_lowbit(unsigned bits)
+{
+    unsigned bit = 0;
+    while ((bits & 1u) == 0u) { bits >>= 1; ++bit; }
+    return bit;
+}
+
+static void sc64_range_work_frontier_set(Sc64RangeWork *work,
+                                        unsigned plane_index, unsigned cell)
+{
+    u8 *plane = work->frontier + plane_index * work->plane_bytes;
+    unsigned byte_index = cell >> 3, mask = 1u << (cell & 7u);
+    if (plane[byte_index] & mask) return;
+    if (plane[byte_index] == 0u && work->summary_depth) {
+        unsigned child_index = byte_index;
+        for (unsigned level = 0; level < work->summary_depth; ++level) {
+            unsigned summary_byte = child_index >> 3;
+            u8 *summary = plane + work->summary_offset[level] + summary_byte;
+            unsigned summary_mask = 1u << (child_index & 7u);
+            int was_empty = *summary == 0;
+            *summary |= (u8)summary_mask;
+            if (!was_empty) break;
+            child_index = summary_byte;
+        }
+    }
+    plane[byte_index] |= (u8)mask;
+}
+
+/* Remove and return the lowest-index set cell. Flat maps inspect at most
+ * eight bytes; larger maps descend a summary chain of at most four levels. */
+static int sc64_range_work_frontier_pop(Sc64RangeWork *work,
+                                        unsigned plane_index,
+                                        unsigned *cell_out)
+{
+    u8 *plane = work->frontier + plane_index * work->plane_bytes;
+    unsigned byte_index = 0, bits = 0, bit;
+    if (work->summary_depth) {
+        unsigned top = work->summary_depth - 1u;
+        bits = plane[work->summary_offset[top]];
+        if (!bits) return 0;
+        byte_index = sc64_range_work_lowbit(bits);
+        for (int level = (int)top - 1; level >= 0; --level) {
+            bits = plane[work->summary_offset[level] + byte_index];
+            if (!bits) return 0;
+            byte_index = byte_index * 8u + sc64_range_work_lowbit(bits);
+        }
+        bits = plane[byte_index];
+        if (!bits) return 0;
+    } else {
+        while (byte_index < work->bit_bytes && !plane[byte_index]) ++byte_index;
+        if (byte_index == work->bit_bytes) return 0;
+        bits = plane[byte_index];
+    }
+    bit = sc64_range_work_lowbit(bits);
+    *cell_out = byte_index * 8u + bit;
+    plane[byte_index] &= (u8)~(1u << bit);
+    if (plane[byte_index] == 0u && work->summary_depth) {
+        unsigned child_index = byte_index;
+        for (unsigned level = 0; level < work->summary_depth; ++level) {
+            unsigned summary_byte = child_index >> 3;
+            u8 *summary = plane + work->summary_offset[level] + summary_byte;
+            *summary &= (u8)~(1u << (child_index & 7u));
+            if (*summary) break;
+            child_index = summary_byte;
+        }
+    }
+    return 1;
+}
+
 static int sc64_range_work_begin(Sc64RangeWork *work,
                                  int cols, int rows,
                                  const u8 *walk, unsigned walk_bytes,
@@ -70,7 +160,7 @@ static int sc64_range_work_begin(Sc64RangeWork *work,
                                  int target_x, int target_y,
                                  int min_range, int max_range)
 {
-    unsigned cells, walk_need, gradient_need, frontier_need;
+    unsigned cells, walk_need, gradient_need, plane_need, frontier_need;
     if (!work) return SC64_RANGE_WORK_ERROR;
     sc64_range_work_reset(work);
     if (cols <= 0 || rows <= 0 || cols > 128 || rows > 128 ||
@@ -84,7 +174,8 @@ static int sc64_range_work_begin(Sc64RangeWork *work,
     cells = (unsigned)cols * (unsigned)rows;
     walk_need = sc64_range_work_ceil8(cells);
     gradient_need = sc64_range_work_ceil3(cells);
-    frontier_need = 2u * walk_need;
+    plane_need = sc64_range_work_plane_bytes(cells);
+    frontier_need = 2u * plane_need;
     if (walk_bytes < walk_need || gradient_bytes < gradient_need ||
         frontier_bytes < frontier_need ||
         frontier_need > gradient_need) {
@@ -95,16 +186,25 @@ static int sc64_range_work_begin(Sc64RangeWork *work,
     work->gradient = gradient;
     work->frontier = frontier;
     work->cells = cells;
-    work->walk_bytes = walk_need;
     work->gradient_bytes = gradient_need;
     work->frontier_bytes = frontier_need;
     work->bit_bytes = walk_need;
+    work->plane_bytes = plane_need;
     work->cols = cols;
     work->rows = rows;
     work->target_x = target_x;
     work->target_y = target_y;
     work->min_range = min_range;
     work->max_range = max_range;
+    if (walk_need > 8u) {
+        unsigned level_bytes = walk_need, offset = walk_need;
+        while (level_bytes > 1u) {
+            level_bytes = sc64_range_work_ceil8(level_bytes);
+            if (work->summary_depth >= 5u) break;
+            work->summary_offset[work->summary_depth++] = (unsigned short)offset;
+            offset += level_bytes;
+        }
+    }
     work->phase = SC64_RANGE_WORK_CLEAR_GRADIENT;
     return SC64_RANGE_WORK_PENDING;
 }
@@ -115,18 +215,20 @@ static void sc64_range_work_reset(Sc64RangeWork *work)
     work->walk = 0;
     work->gradient = 0;
     work->frontier = 0;
-    work->cells = work->walk_bytes = work->gradient_bytes = 0;
+    work->cells = work->gradient_bytes = 0;
     work->frontier_bytes = work->bit_bytes = 0;
+    work->plane_bytes = 0;
     work->cursor = work->current_plane = work->next_count = 0;
     work->cols = work->rows = 0;
     work->target_x = work->target_y = 0;
     work->min_range = work->max_range = 0;
+    memset(work->summary_offset, 0, sizeof(work->summary_offset));
+    work->summary_depth = 0;
     work->phase = SC64_RANGE_WORK_IDLE;
 }
 
-/* One work unit is one clear byte, one seed candidate cell, or one frontier
- * byte (at most eight nodes times four neighbors). No work unit scans an
- * unbounded run. `used` reports the exact units consumed, never > budget. */
+/* One unit clears at most 16 bytes, tests one seed cell, or pops one frontier
+ * node (summary descent is at most four levels; up to four neighbors). */
 static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
                                 unsigned *used)
 {
@@ -137,7 +239,10 @@ static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
     while (done < budget) {
         if (work->phase == SC64_RANGE_WORK_CLEAR_GRADIENT) {
             if (work->cursor < work->gradient_bytes) {
-                work->gradient[work->cursor++] = 0xffu;
+                unsigned count = work->gradient_bytes - work->cursor;
+                if (count > 16u) count = 16u;
+                memset(work->gradient + work->cursor, 0xff, count);
+                work->cursor += count;
                 ++done;
                 continue;
             }
@@ -147,7 +252,10 @@ static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
         }
         if (work->phase == SC64_RANGE_WORK_CLEAR_FRONTIER) {
             if (work->cursor < work->frontier_bytes) {
-                work->frontier[work->cursor++] = 0;
+                unsigned count = work->frontier_bytes - work->cursor;
+                if (count > 16u) count = 16u;
+                memset(work->frontier + work->cursor, 0, count);
+                work->cursor += count;
                 ++done;
                 continue;
             }
@@ -170,7 +278,7 @@ static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
                 if (d2 < work->min_range * work->min_range ||
                     d2 > work->max_range * work->max_range) continue;
                 sc64_range_work_put3(work->gradient, cell, 0);
-                work->frontier[cell >> 3] |= (u8)(1u << (cell & 7u));
+                sc64_range_work_frontier_set(work, 0u, cell);
                 ++work->next_count;
                 continue;
             }
@@ -185,26 +293,18 @@ static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
             continue;
         }
         if (work->phase == SC64_RANGE_WORK_FLOOD) {
-            unsigned char *plane = work->frontier +
-                work->current_plane * work->bit_bytes;
-            if (work->cursor < work->bit_bytes) {
-                unsigned byte_index = work->cursor++;
-                unsigned bits = plane[byte_index];
-                plane[byte_index] = 0;
+            unsigned cell;
+            if (sc64_range_work_frontier_pop(work, work->current_plane, &cell)) {
+                int col, row;
                 ++done;
-                for (unsigned bit = 0; bit < 8; ++bit) if (bits & (1u << bit)) {
-                    unsigned cell = byte_index * 8u + bit;
-                    int col, row;
-                    if (cell >= work->cells) continue;
-                    col = (int)(cell % (unsigned)work->cols);
-                    row = (int)(cell / (unsigned)work->cols);
+                col = (int)(cell % (unsigned)work->cols);
+                row = (int)(cell / (unsigned)work->cols);
 #define SC64_RANGE_WORK_EXPAND(ok, next_cell, direction) do { \
     if (ok) { unsigned n_ = (unsigned)(next_cell); \
         if (sc64_range_work_walkable(work, n_) && \
             sc64_range_work_get3(work->gradient, n_) == 7) { \
             sc64_range_work_put3(work->gradient, n_, (direction)); \
-            work->frontier[(1u - work->current_plane) * work->bit_bytes + (n_ >> 3)] |= \
-                (u8)(1u << (n_ & 7u)); \
+            sc64_range_work_frontier_set(work, 1u - work->current_plane, n_); \
             ++work->next_count; \
         } \
     } \
@@ -215,7 +315,6 @@ static int sc64_range_work_pump(Sc64RangeWork *work, unsigned budget,
                     SC64_RANGE_WORK_EXPAND(row + 1 < work->rows,
                                            cell + (unsigned)work->cols, 4u);
 #undef SC64_RANGE_WORK_EXPAND
-                }
                 continue;
             }
             if (work->next_count == 0) {

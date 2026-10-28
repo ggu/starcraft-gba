@@ -9,7 +9,7 @@ typedef uint8_t u8;
 #define MAX_N (128 * 128)
 #define GRID_BYTES ((MAX_N + 7) / 8)
 #define FIELD_BYTES ((MAX_N * 3 + 7) / 8)
-#define SCRATCH_BYTES (2 * GRID_BYTES)
+#define SCRATCH_BYTES FIELD_BYTES
 
 static u8 walk_store[GRID_BYTES + 2];
 static u8 gradient_store[FIELD_BYTES + 2];
@@ -92,9 +92,10 @@ static void check_map(int cols, int rows, int tx, int ty, int lo, int hi)
     unsigned n = (unsigned)(cols * rows);
     unsigned grid_bytes = (n + 7u) / 8u;
     unsigned field_bytes = (n * 3u + 7u) / 8u;
-    unsigned scratch_bytes = 2u * grid_bytes;
+    unsigned scratch_bytes = sc64_range_work_scratch_required(n);
     unsigned queue_count;
-    unsigned bound = field_bytes + scratch_bytes + n + n * grid_bytes;
+    unsigned bound = (field_bytes + 15u) / 16u +
+        (scratch_bytes + 15u) / 16u + 2u * n + 4u;
     prepare(cols, rows, 0, 0x00, 0xff);
     queue_count = oracle(cols, rows, tx, ty, lo, hi);
     assert(sc64_range_work_begin(&work, cols, rows,
@@ -176,8 +177,8 @@ static void test_random_maps(void)
         {
             Sc64RangeWork work;
             unsigned n = (unsigned)(cols * rows), qb=(n+7u)/8u;
-            unsigned gb=(n*3u+7u)/8u, sb=2u*qb;
-            unsigned bound=gb+sb+n+n*qb;
+            unsigned gb=(n*3u+7u)/8u, sb=sc64_range_work_scratch_required(n);
+            unsigned bound=(gb+15u)/16u+(sb+15u)/16u+2u*n+4u;
             unsigned total=0, calls=0;
             oracle(cols,rows,tx,ty,lo,hi);
             assert(sc64_range_work_begin(&work,cols,rows,walk_store+1,qb,
@@ -186,6 +187,9 @@ static void test_random_maps(void)
                 unsigned used=0, budget=1u+(random_u32()%13u);
                 int status=sc64_range_work_pump(&work,budget,&used);
                 assert(used<=budget); total+=used; calls++;
+                if (!(total<=bound && calls<=bound+1u))
+                    fprintf(stderr,"quota bound fail trial=%d phase=%u n=%u total=%u bound=%u calls=%u budget=%u used=%u\n",
+                            trial,work.phase,n,total,bound,calls,budget,used);
                 assert(total<=bound && calls<=bound+1u);
                 assert(status==SC64_RANGE_WORK_PENDING || status==SC64_RANGE_WORK_READY);
             }
@@ -226,7 +230,7 @@ static void test_partial_and_blocked(void)
     }
     assert(sc64_range_work_query(&work,14,1,&nx,&ny,&mask)==SC64_RANGE_WORK_READY);
     assert(sc64_range_work_query(&work,0,1,&nx,&ny,&mask)==SC64_RANGE_WORK_PENDING);
-    finish(&work,16,18+12+48+48*6);
+    finish(&work,16,(18+15u)/16u+(12+15u)/16u+2u*48u+4u);
     assert(sc64_range_work_query(&work,0,1,&nx,&ny,&mask)==SC64_RANGE_WORK_READY);
     /* Blocked origin adjacent to a known reachable tile gets a bounded mask. */
     assert(sc64_range_work_query(&work,13,1,&nx,&ny,&mask)==SC64_RANGE_WORK_READY);
@@ -244,13 +248,13 @@ static void test_disconnected_no_band(void)
     /* Place a wall between two walkable components; seed only right side. */
     assert(sc64_range_work_begin(&work,7,5,walk_store+1,5,
        gradient_store+1,14,frontier_store+1,10,6*16+8,2*16+8,0,0)==0);
-    finish(&work,3,14+10+35+35*5);
+    finish(&work,3,(14+15u)/16u+(10+15u)/16u+2u*35u+4u);
     assert(sc64_range_work_query(&work,0,2,&nx,&ny,&mask)==SC64_RANGE_WORK_NO_PATH);
     assert(sc64_range_work_query(&work,6,2,&nx,&ny,&mask)==SC64_RANGE_WORK_READY);
     /* Empty annulus yields immediate finite no-path after seed scan. */
     assert(sc64_range_work_begin(&work,7,5,walk_store+1,5,
        gradient_store+1,14,frontier_store+1,10,3*16+8,2*16+8,500,600)==0);
-    finish(&work,11,14+10+35+35*5);
+    finish(&work,11,(14+15u)/16u+(10+15u)/16u+2u*35u+4u);
     assert(sc64_range_work_query(&work,6,2,&nx,&ny,&mask)==SC64_RANGE_WORK_NO_PATH);
 }
 
@@ -294,6 +298,18 @@ static void test_reset_and_bounds(void)
        gradient_store+1,4,frontier_store+1,6,8,8,-1,1)==SC64_RANGE_WORK_ERROR);
     assert(sc64_range_work_begin(&work,3,3,walk_store+1,2,
        gradient_store+1,4,frontier_store+1,6,8,8,1,0)==SC64_RANGE_WORK_ERROR);
+    sc64_range_work_reset(&work);
+    prepare(5,5,1,0x44,0x77);
+    assert(sc64_range_work_begin(&work,5,5,walk_store+1,4,
+       gradient_store+1,10,frontier_store+1,8,40,40,0,20)==0);
+    finish(&work,5,1u+1u+50u+4u);
+    sc64_range_work_reset(&work);
+    put_walk(12,0); /* topology change is paired with an explicit reset */
+    assert(sc64_range_work_begin(&work,5,5,walk_store+1,4,
+       gradient_store+1,10,frontier_store+1,8,40,40,0,20)==0);
+    finish(&work,5,1u+1u+50u+4u);
+    assert(sc64_range_work_query(&work,2,2,&nx,&ny,&mask)==SC64_RANGE_WORK_READY);
+    assert(mask != 0);
 }
 
 static void test_capacity_rounding(void)
@@ -301,16 +317,47 @@ static void test_capacity_rounding(void)
     Sc64RangeWork work;
     unsigned used;
     for (unsigned n = 3; n <= 128u * 128u; ++n)
-        assert(2u * ((n + 7u) / 8u) <= (3u * n + 7u) / 8u);
-    assert(2u * ((1u + 7u) / 8u) > (3u * 1u + 7u) / 8u);
-    assert(2u * ((2u + 7u) / 8u) > (3u * 2u + 7u) / 8u);
+        assert(sc64_range_work_scratch_required(n) <= (3u * n + 7u) / 8u);
+    assert(2u * sc64_range_work_plane_bytes(1u) > (3u * 1u + 7u) / 8u);
+    assert(2u * sc64_range_work_plane_bytes(2u) > (3u * 2u + 7u) / 8u);
     assert(sizeof(work) <= 96u);
     prepare(128,128,0,0x5a,0xa5);
     assert(sc64_range_work_begin(&work,128,128,walk_store+1,2048,
-        gradient_store+1,6144,frontier_store+1,4096,8,8,0,32)==
+        gradient_store+1,6144,frontier_store+1,
+        sc64_range_work_scratch_required(128u*128u),8,8,0,32)==
         SC64_RANGE_WORK_PENDING);
     assert(sc64_range_work_pump(&work,7,&used)==SC64_RANGE_WORK_PENDING);
     assert(used==7);
+}
+
+static void test_sparse_long_layers(void)
+{
+    Sc64RangeWork work;
+    unsigned used, n=128u*128u;
+    int nx=-1,ny=-1;
+    unsigned mask=0;
+    unsigned scratch=sc64_range_work_scratch_required(n);
+    unsigned bound=(6144u+15u)/16u+(scratch+15u)/16u+2u*n+4u;
+    prepare(128,128,0,0x69,0x96);
+    for(int col=0;col<128;col++)put_walk(col+64*128,1);
+    assert(sc64_range_work_begin(&work,128,128,walk_store+1,2048,
+        gradient_store+1,6144,frontier_store+1,scratch,
+        127*16+8,64*16+8,0,0)==SC64_RANGE_WORK_PENDING);
+    while(work.phase!=SC64_RANGE_WORK_FLOOD && work.phase!=SC64_RANGE_WORK_DONE)
+        assert(sc64_range_work_pump(&work,64,&used)==SC64_RANGE_WORK_PENDING);
+    assert(work.phase==SC64_RANGE_WORK_FLOOD);
+    assert(sc64_range_work_query(&work,0,64,&nx,&ny,&mask)==SC64_RANGE_WORK_PENDING);
+    for(int i=0;i<8;i++){
+        assert(sc64_range_work_pump(&work,1,&used)==SC64_RANGE_WORK_PENDING);
+        assert(used==1);
+        if(sc64_range_work_query(&work,126,64,&nx,&ny,&mask)==SC64_RANGE_WORK_READY)
+            break;
+    }
+    assert(sc64_range_work_query(&work,126,64,&nx,&ny,&mask)==SC64_RANGE_WORK_READY);
+    assert(sc64_range_work_query(&work,0,64,&nx,&ny,&mask)==SC64_RANGE_WORK_PENDING);
+    finish(&work,1,bound);
+    assert(sc64_range_work_query(&work,0,64,&nx,&ny,&mask)==SC64_RANGE_WORK_READY);
+    assert(nx==1 && ny==64);
 }
 
 int main(void)
@@ -323,6 +370,7 @@ int main(void)
     test_partial_and_blocked();
     test_disconnected_no_band();
     test_reset_and_bounds();
+    test_sparse_long_layers();
     puts("sc64 range work: ok");
     return 0;
 }
