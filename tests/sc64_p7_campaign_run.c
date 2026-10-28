@@ -260,7 +260,13 @@ static int issue_attack(int x,int y)
     clear_selected_building();
     KEY_TAP(KEY_R); /* standard whole-army selection shortcut */
     if(selected_count()<=0)return 0;
-    KEY_TAP(KEY_B);KEY_TAP(KEY_DOWN);KEY_TAP(KEY_A);
+    KEY_TAP(KEY_B);
+    /* The field menu remembers the last command. Reach Attack using input
+     * from the current row instead of assuming that B opens on Move. */
+    for(int n=0;n<field_menu_count()&&menu_open&&menu_cursor!=MENU_ATTACK;n++)
+        KEY_TAP(KEY_DOWN);
+    if(!menu_open||menu_cursor!=MENU_ATTACK)return 0;
+    KEY_TAP(KEY_A);
     if(mode!=MODE_ATTACK)return 0;
     move_cursor(x,y);KEY_TAP(KEY_A);
     return 1;
