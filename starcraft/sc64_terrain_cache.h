@@ -34,10 +34,52 @@ static int sc64_terrain_store_key(int x, int y, unsigned int k) { (void)x; (void
 #define SC64_TERRAIN_STATIC_KEY 0u
 #endif
 
+#ifdef SC64_TERRAIN_CACHE_VRAM
+/* The first rows of the saved band live in the OBJ tile VRAM range that
+ * sc64_obj_vram.h assigns to the cache: the whole 16 KiB (68 rows) in most
+ * products, the part after the P7 projectile arena (48 rows) when that arena
+ * is enabled. DMA moves them at VRAM speed; only the remainder occupies
+ * EWRAM. */
+#include "sc64_obj_vram.h"
+#define SC64_TERRAIN_CACHE_VRAM_ROWS ((int)(SC64_OBJ_VRAM_CACHE_BYTES / 240u))
+#define SC64_TERRAIN_CACHE_RAM_ROWS \
+    (SC64_TERRAIN_CACHE_HEIGHT - SC64_TERRAIN_CACHE_VRAM_ROWS)
+_Static_assert(SC64_TERRAIN_CACHE_VRAM_ROWS > 0 &&
+               SC64_TERRAIN_CACHE_VRAM_ROWS < SC64_TERRAIN_CACHE_HEIGHT,
+               "the VRAM terrain cache needs part, not all, of the band in VRAM");
+_Static_assert(SC64_OBJ_VRAM_CACHE_OFFSET + 240u * SC64_TERRAIN_CACHE_VRAM_ROWS <=
+               GBA_VRAM_SCRATCH_BYTES, "terrain cache rows exceed the OBJ tile VRAM");
+#define sc64_terrain_cache_pixels_vram ((u8 *)SC64_OBJ_VRAM_CACHE)
+static u8 sc64_terrain_cache_pixels_ram[240 * SC64_TERRAIN_CACHE_RAM_ROWS]
+    __attribute__((aligned(4)));
+#else
 static u8 sc64_terrain_cache_pixels[240 * SC64_TERRAIN_CACHE_HEIGHT]
     __attribute__((aligned(4)));
+#endif
 static u8 sc64_terrain_cache_mask[SC64_TERRAIN_CACHE_CELLS];
 static u8 sc64_terrain_cache_dirty[SC64_TERRAIN_CACHE_CELLS];
+#if defined(SC64_TERRAIN_ROW_MASKS) && \
+    (defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE))
+/* Packed-grid profiles can compare a whole cached row of fog state at once.
+ * Each entry holds the visible or explored bits of one view row's columns
+ * [col0, col1), at most 17 bits, read straight from the bit grids. The
+ * per-tile mask stays authoritative for scrolled reuse and tile redraws. */
+#define SC64_TERRAIN_ROW_MASKS_ACTIVE 1
+#define SC64_TERRAIN_CACHE_MAX_ROWS 10
+static u32 sc64_terrain_row_visible[SC64_TERRAIN_CACHE_MAX_ROWS];
+static u32 sc64_terrain_row_explored[SC64_TERRAIN_CACHE_MAX_ROWS];
+
+static unsigned
+sc64_terrain_grid_run(const u8 *grid, int row, int col0, int width)
+{
+    unsigned base = (unsigned)(row * MAP_COLS + col0);
+    unsigned first = base >> 3, last = (base + (unsigned)width - 1u) >> 3;
+    unsigned bits = grid[first];
+    if (last > first) bits |= (unsigned)grid[first + 1] << 8;
+    if (last > first + 1) bits |= (unsigned)grid[first + 2] << 16;
+    return (bits >> (base & 7u)) & ((1u << width) - 1u);
+}
+#endif
 static int sc64_terrain_cache_valid;
 static volatile unsigned sc64_terrain_requests, sc64_terrain_hits, sc64_terrain_partial;
 static int sc64_terrain_cache_reused_base;
@@ -85,6 +127,58 @@ static volatile u32 sc64_terrain_diag_dirty_tiles;
 /* dirty[] is indexed for the camera currently being rendered; mask[] and
  * camx/camy continue to describe the last captured framebuffer until store. */
 static int sc64_terrain_cache_view_camx, sc64_terrain_cache_view_camy;
+#endif
+
+/* Whole-band transfers between the framebuffer and the saved pixels. With
+ * the VRAM split, each is two transfers over the same screen rows. */
+static int
+sc64_terrain_cache_restore(void)
+{
+#ifdef SC64_TERRAIN_CACHE_VRAM
+    return gfx_blit_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_VRAM_ROWS,
+                         sc64_terrain_cache_pixels_vram) &&
+           gfx_blit_band(SC64_TERRAIN_CACHE_Y + SC64_TERRAIN_CACHE_VRAM_ROWS,
+                         SC64_TERRAIN_CACHE_RAM_ROWS, sc64_terrain_cache_pixels_ram);
+#else
+    return gfx_blit_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
+                         sc64_terrain_cache_pixels);
+#endif
+}
+
+static int
+sc64_terrain_cache_capture(void)
+{
+#ifdef SC64_TERRAIN_CACHE_VRAM
+    return gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_VRAM_ROWS,
+                         sc64_terrain_cache_pixels_vram) &&
+           gfx_read_band(SC64_TERRAIN_CACHE_Y + SC64_TERRAIN_CACHE_VRAM_ROWS,
+                         SC64_TERRAIN_CACHE_RAM_ROWS, sc64_terrain_cache_pixels_ram);
+#else
+    return gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
+                         sc64_terrain_cache_pixels);
+#endif
+}
+
+#ifdef SC64_TERRAIN_SCROLL
+/* Scrolled restore: rows outside each segment are skipped by the window
+ * helper, so the two segment calls together cover exactly the old band. */
+static int
+sc64_terrain_cache_restore_window(int dx, int dy)
+{
+#ifdef SC64_TERRAIN_CACHE_VRAM
+    return gfx_blit_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
+                           sc64_terrain_cache_pixels_vram, 240,
+                           SC64_TERRAIN_CACHE_VRAM_ROWS, dx, dy) &&
+           gfx_blit_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
+                           sc64_terrain_cache_pixels_ram, 240,
+                           SC64_TERRAIN_CACHE_RAM_ROWS, dx,
+                           dy - SC64_TERRAIN_CACHE_VRAM_ROWS);
+#else
+    return gfx_blit_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
+                           sc64_terrain_cache_pixels, 240,
+                           SC64_TERRAIN_CACHE_HEIGHT, dx, dy);
+#endif
+}
 #endif
 
 static int
@@ -174,8 +268,7 @@ sc64_terrain_cached(int x, int y)
             sc64_terrain_cache_valid = 0;
             return 0;
         }
-        if (!gfx_blit_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
-                           sc64_terrain_cache_pixels)) {
+        if (!sc64_terrain_cache_restore()) {
 #ifdef SC64_DIAGNOSTIC_TERRAIN
             SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_blit_failure, 1);
 #endif
@@ -189,6 +282,51 @@ sc64_terrain_cached(int x, int y)
         sc64_terrain_cache_view_camx = x;
         sc64_terrain_cache_view_camy = y;
         sc64_terrain_cache_reused_base = 1;
+#ifdef SC64_TERRAIN_ROW_MASKS_ACTIVE
+        {
+            int width = old_col1 - old_col0, rows = old_row1 - old_row0, r;
+            unsigned changed_rows = 0;
+            for (r = 0; r < rows; r++)
+                if (sc64_terrain_grid_run(visible, old_row0 + r, old_col0, width) !=
+                        sc64_terrain_row_visible[r] ||
+                    sc64_terrain_grid_run(explored, old_row0 + r, old_col0, width) !=
+                        sc64_terrain_row_explored[r])
+                    changed_rows |= 1u << r;
+            /* Nothing reads the per-tile dirty flags after a complete hit. */
+            if (!changed_rows) {
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+                SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_tiles_checked, width * rows);
+#endif
+                sc64_terrain_hits++;
+                return 1;
+            }
+            for (r = 0; r < rows; r++) {
+                if (!(changed_rows & (1u << r))) {
+                    memset(sc64_terrain_cache_dirty + i, 0, (size_t)width);
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+                    SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_tiles_checked, width);
+#endif
+                    i += width;
+                    continue;
+                }
+                row = old_row0 + r;
+                for (col = old_col0; col < old_col1; col++) {
+                    int cell = col + row * MAP_COLS;
+                    u8 state = (SC64_GRID_GET(visible, cell) ? 1 : 0) |
+                               (SC64_GRID_GET(explored, cell) ? 2 : 0);
+                    sc64_terrain_cache_dirty[i] = sc64_terrain_cache_mask[i] != state;
+#ifdef SC64_DIAGNOSTIC_TERRAIN
+                    SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_tiles_checked, 1);
+                    if (sc64_terrain_cache_dirty[i])
+                        SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_dirty_tiles, 1);
+#endif
+                    i++;
+                }
+            }
+            sc64_terrain_partial++;
+            return 0;
+        }
+#else
         for (row = old_row0; row < old_row1; row++)
             for (col = old_col0; col < old_col1; col++) {
                 int cell = col + row * MAP_COLS;
@@ -206,6 +344,7 @@ sc64_terrain_cached(int x, int y)
         if (unchanged) sc64_terrain_hits++;
         else sc64_terrain_partial++;
         return unchanged;
+#endif
     }
     if (!sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1)) {
 #ifdef SC64_DIAGNOSTIC_TERRAIN
@@ -221,9 +360,7 @@ sc64_terrain_cached(int x, int y)
         sc64_terrain_cache_valid = 0;
         return 0;
     }
-    if (!gfx_blit_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
-                                sc64_terrain_cache_pixels, 240,
-                                SC64_TERRAIN_CACHE_HEIGHT, dx, dy)) {
+    if (!sc64_terrain_cache_restore_window(dx, dy)) {
 #ifdef SC64_DIAGNOSTIC_TERRAIN
         SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_blit_failure, 1);
 #endif
@@ -285,8 +422,7 @@ sc64_terrain_cached(int x, int y)
 #endif
         return 0;
     }
-    if (!gfx_blit_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
-                       sc64_terrain_cache_pixels)) {
+    if (!sc64_terrain_cache_restore()) {
 #ifdef SC64_DIAGNOSTIC_TERRAIN
         SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_blit_failure, 1);
 #endif
@@ -370,8 +506,7 @@ sc64_terrain_store(int x, int y)
 {
     int col0, row0, col1, row1, col, row, i = 0;
     if (!sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1) ||
-        !gfx_read_band(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
-                       sc64_terrain_cache_pixels)) {
+        !sc64_terrain_cache_capture()) {
 #ifdef SC64_DIAGNOSTIC_TERRAIN
         if (!sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1))
             SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_invalid_view, 1);
@@ -390,6 +525,19 @@ sc64_terrain_store(int x, int y)
                 (SC64_GRID_GET(explored, cell) ? 2 : 0);
         }
     sc64_terrain_cache_mask_count = i;
+#ifdef SC64_TERRAIN_ROW_MASKS_ACTIVE
+    if (row1 - row0 > SC64_TERRAIN_CACHE_MAX_ROWS) {
+        sc64_terrain_cache_valid = 0;
+        sc64_terrain_cache_reused_base = 0;
+        return 0;
+    }
+    for (row = row0; row < row1; row++) {
+        sc64_terrain_row_visible[row - row0] =
+            sc64_terrain_grid_run(visible, row, col0, col1 - col0);
+        sc64_terrain_row_explored[row - row0] =
+            sc64_terrain_grid_run(explored, row, col0, col1 - col0);
+    }
+#endif
 #ifdef SC64_DIAGNOSTIC_TERRAIN
     SC64_TERRAIN_DIAG_ADD(sc64_terrain_diag_captured_pixels,
                           240 * SC64_TERRAIN_CACHE_HEIGHT);

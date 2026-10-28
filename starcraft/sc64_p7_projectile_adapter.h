@@ -3,15 +3,18 @@
 #define SC64_P7_PROJECTILE_ADAPTER_H
 #ifdef SC64_P7_PROJECTILES_ENABLED
 
-/* Mode 4 leaves the upper 16 KiB of OBJ VRAM unused. This pool owns its
- * first 4816 bytes. All access goes through the halfword arena API; never
- * memcpy/memset a byte buffer onto video memory. The experimental Mode 0
- * renderer uses this region and is intentionally excluded by game.c. */
+/* Mode 4 leaves the upper 16 KiB of OBJ VRAM unused by the display. This
+ * pool owns its first 4816 bytes through the map in sc64_obj_vram.h, which
+ * places the VRAM terrain cache after it; on the host both share one backing
+ * array so an overlap would show in fixtures. All access goes through the
+ * halfword arena API; never memcpy/memset a byte buffer onto video memory.
+ * The experimental Mode 0 renderer uses this region and is excluded there. */
+#include "sc64_obj_vram.h"
+static Sc64Arena race_p7_projectiles={SC64_OBJ_VRAM_PROJECTILES,SC64_ARENA_WORDS};
 #ifdef GBA_HOST
-static u16 race_p7_projectile_host_words[SC64_ARENA_WORDS];
-static Sc64Arena race_p7_projectiles={race_p7_projectile_host_words,SC64_ARENA_WORDS};
-#else
-static Sc64Arena race_p7_projectiles={(volatile u16 *)0x06014000,SC64_ARENA_WORDS};
+/* Host fixtures snapshot the arena as plain words; it now starts the shared
+ * OBJ VRAM backing array, so keep that storage reachable by its old name. */
+#define race_p7_projectile_host_words ((u16 *)(void *)GBA_VRAM_SCRATCH)
 #endif
 static u8 race_p7_projectile_fault;
 
