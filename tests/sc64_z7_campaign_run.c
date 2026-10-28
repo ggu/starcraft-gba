@@ -372,9 +372,19 @@ static void step(u16 held)
     prior_keys=held;
 }
 
+static void cancel_ui_mode(void);
+
 static void move_cursor(int x,int y)
 {
     unsigned guard=0;
+    if(menu_open) {
+        tap(KEY_B);
+        if(menu_open) {
+            fprintf(stderr,"Z7 cursor move refused with command menu open frame%u host%u\n",
+                (unsigned)frame,host_ticks);
+            return;
+        }
+    }
     x=limit(cx+((x-cx)>=0?((x-cx+2)/4):((x-cx-2)/4))*4,0,WORLD_W-1);
     y=limit(cy+((y-cy)>=0?((y-cy+2)/4):((y-cy-2)/4))*4,0,WORLD_H-1);
     while((cx!=x||cy!=y)&&screen==SCREEN_PLAY&&!won&&!lost&&guard++<6000u) {
@@ -391,8 +401,7 @@ static void move_cursor(int x,int y)
 
 static int box_select(int left,int top,int right,int bottom)
 {
-    if(menu_open)tap(KEY_B);
-    if(mode!=MODE_NORMAL)tap(KEY_B);
+    cancel_ui_mode();
     move_cursor(left,top); step(KEY_L);
     unsigned guard=0;
     while((cx<right||cy<bottom)&&screen==SCREEN_PLAY&&!won&&!lost&&guard++<6000u) {
@@ -433,8 +442,7 @@ static int local_rect_empty_for_selection(int left,int top,int right,int bottom)
 static int deselect_with_local_box(void)
 {
     if(selected_count()==0&&selected_building<0)return 1;
-    if(menu_open)tap(KEY_B);
-    if(mode!=MODE_NORMAL)tap(KEY_B);
+    cancel_ui_mode();
     for(int radius=0;radius<=256;radius+=16)
         for(int dy=-radius;dy<=radius;dy+=16)
             for(int dx=-radius;dx<=radius;dx+=16) {
@@ -703,8 +711,7 @@ static int select_worker(int slot)
 {
     if(slot<0||slot>=MAX_UNITS||!u[slot].alive||u[slot].owner!=SIDE||
        u[slot].raw_type!=41)return 0;
-    if(menu_open)tap(KEY_B);
-    if(mode!=MODE_NORMAL)tap(KEY_B);
+    cancel_ui_mode();
     /* A normal A click on a unit clears the prior unit selection itself.
        Avoid a full-map box-selection detour: its live cursor travel lets
        miners finish a retreat and get autoassigned before the next order. */
@@ -729,8 +736,7 @@ static int select_worker(int slot)
 static int select_building_slot(int slot)
 {
     if(slot<0||slot>=MAX_BUILDINGS||!b[slot].alive||b[slot].owner!=SIDE)return 0;
-    if(menu_open)tap(KEY_B);
-    if(mode!=MODE_NORMAL)tap(KEY_B);
+    cancel_ui_mode();
     /* A selected nonproducer building makes A clicks queue at that old
        building. Clear building selection through the ordinary box gesture
        before selecting another building. */
@@ -1440,8 +1446,7 @@ static void z7_defense_screen_point(int *x,int *y)
 
 static int army_order(int attack,int x,int y)
 {
-    if(menu_open)tap(KEY_B);
-    if(mode!=MODE_NORMAL)tap(KEY_B);
+    cancel_ui_mode();
     if(selected_building>=0&&!deselect_with_local_box())return 0;
     tap(KEY_R); /* Normal combat-group selection. */
     if(!selected_count())return 0;
@@ -1477,8 +1482,7 @@ static int typed_attack_order(int type,int target_x,int target_y,int direct_targ
     unsigned start_frame=(unsigned)frame;
     unsigned select_finish=start_frame,menu_finish=start_frame;
     int representative=-1,clicked=-1,px=0,py=0;
-    if(menu_open)tap(KEY_B);
-    if(mode!=MODE_NORMAL)tap(KEY_B);
+    cancel_ui_mode();
     int selected=0,wrong=0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&!SC64_TRANSPORT_LOADED(&u[i])&&u[i].selected) {
         if(u[i].owner==SIDE&&u[i].type==type)++selected;else ++wrong;
@@ -1794,8 +1798,7 @@ static int unit_type_attack_order(int type,int x,int y)
             (unsigned)frame,worker_count(-1));
         return 0;
     }
-    if(menu_open)tap(KEY_B);
-    if(mode!=MODE_NORMAL)tap(KEY_B);
+    cancel_ui_mode();
     if((selected_building>=0||selected_count())&&!deselect_with_local_box())return 0;
     move_cursor(u[seed].x,u[seed].y);
     tap(KEY_A);tap(KEY_A);
@@ -1984,8 +1987,7 @@ static int campaign_local_unexplored(int *out_x,int *out_y)
    issue Attack-Move through the normal command menu. */
 static int campaign_local_cluster_attack_move(int target_x,int target_y)
 {
-    if(menu_open)tap(KEY_B);
-    if(mode!=MODE_NORMAL)tap(KEY_B);
+    cancel_ui_mode();
     if((selected_count()||selected_building>=0)&&!deselect_with_local_box())return 0;
     int seed=-1,best_count=-1,best_dist=0x7fffffff;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_HYDRALISK) {
@@ -3768,6 +3770,29 @@ static void attack_step(void)
                     defense_screen_order_retry_frame=frame+180u;return;
                 }
                 defense_screen_order_retry_frame=frame+60u;
+            }
+        }
+        /* The air-screen controller returns early while Mutalisks hold a
+           visible target. Give Hydralisks their own bounded home-threat
+           order before those returns, so the air duel cannot suppress ground
+           defense against a visible Ultralisk or other attacker. */
+        if(unit_type_count(U_HYDRALISK,SIDE)>0&&
+           (unsigned)frame>=hydra_ground_next_order) {
+            int ground=-1,best=160*160;
+            for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
+               owners_hostile(SIDE,u[i].owner)&&!SC64_TRANSPORT_LOADED(&u[i])&&
+               currently_visible(u[i].x,u[i].y)&&
+               SC64_CAN_ATTACK_FROM_SOURCE(U_HYDRALISK,i,SIDE,3)) {
+                int d=dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y);
+                if((d<=best||z7_threat_near_workers(i,128))&&
+                   (ground<0||d<best)){ground=i;best=d;}
+            }
+            if(ground>=0) {
+                int accepted=typed_attack_target(U_HYDRALISK,ground);
+                fprintf(stderr,"Z7 post-Hatch Hydra threat accepted%d slot%d raw%d xy%d,%d d2%d frame%u\n",
+                    accepted,ground,u[ground].raw_type,u[ground].x,u[ground].y,best,(unsigned)frame);
+                hydra_ground_next_order=frame+(accepted?180u:60u);
+                if(accepted){hydra_ground_target_slot=ground;return;}
             }
         }
         if(defense_screen_enemy>=0)return;
