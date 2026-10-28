@@ -1240,6 +1240,9 @@ static u16 race_p3_action_ticks;
 static u16 race_p3_action_duration(const Sc64P3State *s);
 #endif
 static int race_queue_unit(int owner,int building,int type);
+/* Set by race_queue_unit() when it refuses for funds or supply: the toast id
+ * of the shortfall (1 minerals, 12 gas, 2 supply). Callers clear it first. */
+static u8 race_refusal;
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int race_start_lair_morph(int building);
 #endif
@@ -1674,6 +1677,16 @@ toast(int id)
 {
     toast_id = id;
     toast_timer = 55;
+}
+/* The player's own mineral, gas and supply refusals (toasts 1, 12 and 2) also
+ * cue the race advisor: game_audio_observe() takes the cue at render time, so
+ * the command paths gain only this store. Presentation only, never saved. */
+static u8 toast_advisor;
+static void
+toast_refusal(int id)
+{
+    toast(id);
+    toast_advisor = (u8)id;
 }
 static int
 unit_cost(int type)
@@ -4665,7 +4678,17 @@ start_build(int type)
 #ifdef SC64_FIELD_CONTROLS
             field_ui_ping(site_x,site_y,C_GOLD);
 #endif
-        }else toast(8);
+        }else{
+#ifdef SC64_FIELD_CONTROLS
+            /* The first problem the placement HUD names, funds before site. */
+            const char *need;
+            int ground, problem = ui_site_problem(type, site_x, site_y, &need, &ground);
+            if (problem == UI_SITE_MINERALS || problem == UI_SITE_GAS)
+                toast_refusal(problem == UI_SITE_MINERALS ? 1 : 12);
+            else
+#endif
+            toast(8);
+        }
         return;
     }
 #endif
@@ -4678,11 +4701,11 @@ start_build(int type)
 	return;
     }
     if (minerals < cost) {
-	toast(1);
+	toast_refusal(1);
 	return;
     }
     if (gas < building_gas_cost(type)) {
-	toast(12);
+	toast_refusal(12);
 	return;
     }
     if (!can_place(type, px, py)) {
@@ -4769,7 +4792,7 @@ start_research(int type)
 	return;
     }
     if (minerals < 100 || gas < 100) {
-	toast(gas < 100 ? 12 : 1);
+	toast_refusal(gas < 100 ? 12 : 1);
 	return;
     }
     minerals -= 100;
@@ -5215,7 +5238,11 @@ static void
 queue_unit(int building, int type)
 {
 #ifdef SC64_RACES
-    toast(race_queue_unit(SIDE,building,type)?4:8);return;
+    race_refusal = 0;
+    if (race_queue_unit(SIDE,building,type)) toast(4);
+    else if (race_refusal) toast_refusal(race_refusal);
+    else toast(8);
+    return;
 #endif
     int cost = unit_cost(type), gas_cost = unit_gas_cost(type), tail;
     if (!building_complete(building)) {
@@ -5235,15 +5262,15 @@ queue_unit(int building, int type)
 	return;
     }
     if (minerals < cost) {
-	toast(1);
+	toast_refusal(1);
 	return;
     }
     if (gas < gas_cost) {
-	toast(12);
+	toast_refusal(12);
 	return;
     }
     if (reserved_supply() + unit_supply(type) > supply_cap) {
-	toast(2);
+	toast_refusal(2);
 	return;
     }
     minerals -= cost;

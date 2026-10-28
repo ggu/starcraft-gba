@@ -7,14 +7,16 @@
  * a raised weapon cooldown is a shot, alive 1->0 a death, a new player unit a
  * completed unit, a cleared construction flag a completed building, and a new
  * player selection or changed orders after input a selection or command
- * response. It reads simulation state and never writes it, never touches the
+ * response, and a refusal cue from game.c (toast_refusal) the player race's
+ * advisor line. It reads simulation state and never writes it, never touches the
  * game RNG and keeps its snapshot outside the save. Events are skipped after
  * any tick discontinuity (load, restart, pause), so a resumed game never
  * replays history.
  *
  * With an imported bank the events select StarCraft 64 samples through the
- * generated unit tables, and music follows the menu, the player race and the
- * mission result. Without one, short PSG tones stand in.
+ * generated unit tables, advisor lines through sc64_audio_advisor, and music
+ * follows the menu, the player race and the mission result. Without one,
+ * short PSG tones stand in.
  */
 #ifdef SC64_AUDIO_IMPORTED
 #include "sc64_audio_generated.h"
@@ -22,7 +24,7 @@
 
 enum {
     GAME_AUDIO_ATTACK, GAME_AUDIO_DEATH, GAME_AUDIO_READY, GAME_AUDIO_WHAT,
-    GAME_AUDIO_YES, GAME_AUDIO_BUILT, GAME_AUDIO_EVENT_KINDS
+    GAME_AUDIO_YES, GAME_AUDIO_BUILT, GAME_AUDIO_ADVISOR, GAME_AUDIO_EVENT_KINDS
 };
 /* Per observed frame; StarCraft also caps simultaneous combat sounds. */
 #define GAME_AUDIO_EFFECTS_PER_FRAME 2
@@ -146,6 +148,26 @@ static void game_audio_emit(int kind, int raw)
     }
 }
 
+/* One refusal cue per observed frame; the mixer plays one advisor line at a
+ * time, so presses while it speaks are dropped and the next one replays it. */
+static void game_audio_advisor(int cue)
+{
+    int line = cue == 1 ? 0 : cue == 12 ? 1 : 2;  /* minerals, gas, supply */
+#ifdef GBA_HOST
+    ++game_audio_events[GAME_AUDIO_ADVISOR];
+#endif
+#ifdef SC64_AUDIO_IMPORTED
+#ifdef SC64_AUDIO_ADVISOR_LINES
+    audio_play_sample(sc64_audio_advisor[GAME_AUDIO_PLAYER_RACE * SC64_AUDIO_ADVISOR_LINES + line],
+                      0, AUDIO_CLASS_ADVISOR);
+#endif
+    /* A bank from before the advisor table stays silent. */
+    return;
+#else
+    audio_tone(line == 0 ? 330 : line == 1 ? 294 : 262, 8, 2);
+#endif
+}
+
 #ifdef SC64_AUDIO_IMPORTED
 static void game_audio_music(void)
 {
@@ -176,11 +198,13 @@ static void game_audio_observe(void)
     u32 selection = 0, orders = 0;
     int first_selected = -1;
     u16 held = GAME_AUDIO_HELD(), pressed = held & (u16)~game_audio_previous_held;
+    int advisor = toast_advisor;
     game_audio_previous_held = held;
+    toast_advisor = 0;
 #ifdef GAME_AUDIO_OFF
     /* Differential test builds: the same simulation with no observer work. */
     (void)snap; (void)fresh; (void)i; (void)selection; (void)orders; (void)first_selected;
-    (void)pressed;
+    (void)pressed; (void)advisor;
     return;
 #endif
 #ifdef SC64_AUDIO_IMPORTED
@@ -193,6 +217,7 @@ static void game_audio_observe(void)
     if (frame == game_audio_last_frame) return;
     game_audio_last_frame = frame;
     game_audio_effects = 0;
+    if (advisor && !fresh) game_audio_advisor(advisor);
     for (i = 0; i < MAX_UNITS; i++) {
         const Unit *q = &u[i];
         u32 prev = snap[i], cd = q->cd > 255 ? 255u : (u32)q->cd;
