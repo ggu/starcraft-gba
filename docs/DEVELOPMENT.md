@@ -2007,6 +2007,23 @@ The foundation-loss setup is synthetic; the ordinary match controller never
 writes actors, resources or AI. Its full-world reads make it a deterministic
 input workload, not a demonstration of a human player's information limits.
 
+### Worker depot-circle routing checks
+
+Loaded workers route to a reachable point inside the existing 32-pixel deposit
+circle. Imported profiles share a multi-source field in the existing route
+cache, keyed separately from ordinary point destinations. The original-art
+profile uses its existing bounded BFS storage for the same destination rule.
+No save field or cache buffer was added. Normal topology changes and loading
+clear these derived fields; committed worker waypoints keep their existing
+save semantics.
+
+Asset-free geometry, BFS and default worker tests run in `./dev test`. With
+private inputs prepared, run `make test-sc64-depot-approach` for real Blood Bath
+mineral return, synthetic gas return, live-waypoint saves and depot lifecycle
+checks under all three canonical race profiles and Showcase, both with and
+without optional nearest-depot selection. `make test-sc64-skirmish-matches`
+then checks complete ordinary-input matches; it still treats a limit as failure.
+
 ### Dense input replay without a larger queue
 
 Some full controller routes exceed 256 transitions in a 1,000-tick window.
