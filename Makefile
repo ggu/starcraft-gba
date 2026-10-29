@@ -2708,6 +2708,19 @@ test-sc64-route-flood-split: $(addprefix build/test-sc64-route-policy-split-,$(R
 	@$(foreach variant,$(ROUTE_POLICY_VARIANTS),./build/test-sc64-route-policy-split-$(variant) &&) true
 test-starcraft: test-sc64-route-flood-split
 
+# Asset-free component-reachability oracle with VISIT_GRID's borrowed walkability
+# bits. Run byte-grid and packed-grid variants with exact restoration checks.
+ROUTE_COMPONENT_VISIT_FLAGS = -Icommon -I. -DSC64_RACES -DSC64_IMPORTED_MISSION -DSC64_ROUTE_PACK3 -DSC64_ROUTE_DECAY_FREQ -DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_VISIT_GRID -DSC64_REACHABLE_FORMATION
+build/test-sc64-route-component-visit-byte: tests/sc64_route_component_visit.c starcraft/sc64_routes.h starcraft/sc64_bitgrid.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $(ROUTE_COMPONENT_VISIT_FLAGS) -DRACE_TEST_COLS=64 -DRACE_TEST_ROWS=64 $< -o $@
+build/test-sc64-route-component-visit-packed: tests/sc64_route_component_visit.c starcraft/sc64_routes.h starcraft/sc64_bitgrid.h common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $(ROUTE_COMPONENT_VISIT_FLAGS) -DSC64_LARGE_MAPS -DRACE_TEST_COLS=128 -DRACE_TEST_ROWS=96 $< -o $@
+.PHONY: test-sc64-route-component-visit
+test-sc64-route-component-visit: build/test-sc64-route-component-visit-byte build/test-sc64-route-component-visit-packed
+	./build/test-sc64-route-component-visit-byte
+	./build/test-sc64-route-component-visit-packed
+test-starcraft: test-sc64-route-component-visit
+
 build/test-sc64-nearest-resource-depot-p5: tests/sc64_nearest_resource_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P5_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(P5_SHUTTLE_FLAGS) -DSC64_NEAREST_RESOURCE_DEPOT $< common/gba.c -o $@
 build/test-sc64-nearest-resource-depot-z6: tests/sc64_nearest_resource_depot.c $(STARCRAFT) $(wildcard starcraft/*.h) $(Z6_PROBE_INPUTS) common/gba.c common/gba.h Makefile | build

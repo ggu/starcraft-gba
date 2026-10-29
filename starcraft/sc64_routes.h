@@ -779,11 +779,12 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
  * complete imported-race fields, any walkable-rooted reverse field is an exact
  * connected-component label: membership in the same field is equivalent to
  * four-neighbour reachability. Blocked starts/targets expand to the same
- * cardinal/diagonal open-cell sets as sc64_route_next. Partial floods and
- * visit-grid builds retain the path-query implementation as their oracle. */
+ * cardinal/diagonal open-cell sets as sc64_route_next. Partial floods retain
+ * the path-query implementation as their oracle; visit-grid floods restore all
+ * borrowed walkability bits before exposing a complete field (valid == 1). */
 #ifdef SC64_REACHABLE_FORMATION
 #if defined(SC64_RACES) && defined(SC64_IMPORTED_MISSION) && \
-    !defined(SC64_ROUTE_PARTIAL_FLOOD) && !defined(SC64_ROUTE_VISIT_GRID)
+    !defined(SC64_ROUTE_PARTIAL_FLOOD)
 #define SC64_ROUTE_COMPONENT_HINTS 4
 static int __attribute__((noinline))
 sc64_route_cells_connected(const int *starts, int start_count,
