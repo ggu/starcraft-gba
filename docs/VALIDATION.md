@@ -6252,8 +6252,9 @@ Provenance of the qualifying run:
   `2d575f6509137cd986c04fbe03e2f48aa32a2e83`. The ROMs, trace and tape below
   were built from that tree.
 - **Build-provenance capture:** commit
-  `7f595810dcc83cc0e4f6b6283101beace8cfde59`, which adds only the capture tool
-  and its test. It rebuilt both ROMs byte for byte (see "Build provenance").
+  `70b86da7111c9ce0e838078de4490f1ba719dbbf`. After `2d575f6` the branch adds
+  only the capture tool, its test and documentation. The capture rebuilt both
+  ROMs byte for byte (see "Build provenance").
 
 ### Why the earlier controller stalled
 
