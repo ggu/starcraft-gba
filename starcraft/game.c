@@ -9485,7 +9485,7 @@ static void
 draw_hud_resources(void)
 {
     gfx_rect(0, 0, 240, 12, C_PANEL);
-#ifdef SC64_COMMAND_ICONS
+#ifdef SC64_HUD_ICONS
     card_resource_icon(SC64_HUD_SPRITE_MINERAL, 2);
     gfx_num(16, 3, minerals, C_WHITE);
     card_resource_icon(SC64_HUD_SPRITE_GAS, 60);

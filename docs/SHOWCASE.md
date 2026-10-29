@@ -126,7 +126,10 @@ imports from the verified ROM into `.local/sc64/command-icons/generated/`
 The card only changes drawing and D-pad routing: the list's row numbers,
 B, A repeating the last command, and every order and build path are
 unchanged. A list longer than 15 commands keeps the framed text list. Other
-race ROMs keep the text list.
+race ROMs keep the framed source-icon list and their source-icon selection
+portrait, but every race-engine ROM (`races`, `unified`, the race campaigns)
+turns on `SC64_HUD_ICONS`, which draws the same N64 resource icons in the
+top bar from the same imported header.
 
 ## Unit facing
 

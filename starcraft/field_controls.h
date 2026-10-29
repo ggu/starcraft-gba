@@ -496,6 +496,9 @@ ui_row_icon(int i, int x, int y)
     }
 }
 
+#ifdef SC64_HUD_ICONS
+#include "hud_icons.h"
+#endif
 #ifdef SC64_COMMAND_ICONS
 #include "command_card.h"
 #endif

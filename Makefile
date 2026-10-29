@@ -235,8 +235,18 @@ endif
 # (starcraft/field_controls.h).
 SC64_INTERFACE_DIR := .local/sc64/interface/generated
 SC64_INTERFACE_INPUTS := $(addprefix $(SC64_INTERFACE_DIR)/,sc64_font_generated.h sc64_icons_generated.h sc64_chrome_generated.h)
-RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated -I$(SC64_INTERFACE_DIR) $(RACE_CONSTRUCTION_FLAGS)
-RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(SC64_INTERFACE_INPUTS) $(RACE_CONSTRUCTION_INPUTS)
+# The N64 HUD's resource icons (minerals, gas, each race's supply) and the
+# command-card buttons, imported from the verified ROM into a private header
+# (see tools/sc64_command_icons.py). Every race-engine ROM draws the resource
+# icons (SC64_HUD_ICONS); only the Showcase adds the card (COMMAND_ICON_FLAGS).
+COMMAND_ICON_HEADER := .local/sc64/command-icons/generated/sc64_command_icons_generated.h
+HUD_ICON_FLAGS := -I.local/sc64/command-icons/generated -DSC64_HUD_ICONS
+RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated -I$(SC64_INTERFACE_DIR) $(HUD_ICON_FLAGS) $(RACE_CONSTRUCTION_FLAGS)
+RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(SC64_INTERFACE_INPUTS) $(COMMAND_ICON_HEADER) $(RACE_CONSTRUCTION_INPUTS)
+# The HUD icons take the nearest runtime palette colours: the UI palette in
+# common/gba.c and the imported entries beside the sprite remap.
+$(COMMAND_ICON_HEADER): tools/sc64_command_icons.py tools/sc64_sprites.py common/gba.c .local/sc64/backwater/generated/palette-remap.bin .local/sc64/backwater/generated/palette.json
+	$(PYTHON) tools/sc64_command_icons.py
 
 .PHONY: sc64-interface test-sc64-font test-sc64-icons
 sc64-interface:
@@ -4066,14 +4076,9 @@ test-sc64-tank-source-vfx-game: build/test-sc64-tank-source-vfx-game build/test-
 build/starcraft-terran.elf build/starcraft-zerg-z4.elf build/starcraft-protoss-p5-shuttle.elf build/starcraft-protoss-p6.elf build/starcraft-showcase.elf: $(TANK_SOURCE_HEADER)
 build/test-terran build/test-sc64-terran-full-profile build/test-zerg build/test-sc64-zerg-promoted-profile build/test-protoss build/test-sc64-protoss-promoted-profile build/test-sc64-protoss-canonical-storm build/test-sc64-protoss-canonical-storage build/test-sc64-protoss-canonical-controller build/test-sc64-p4-census: $(TANK_SOURCE_HEADER)
 UNIT_FACING_FLAGS := -I.local/sc64/facing/generated -DSC64_UNIT_FACING
-# StarCraft command-card buttons for the race order list, imported from the
-# verified ROM into a private header (see tools/sc64_command_icons.py).
-COMMAND_ICON_HEADER := .local/sc64/command-icons/generated/sc64_command_icons_generated.h
-COMMAND_ICON_FLAGS := -I.local/sc64/command-icons/generated -DSC64_COMMAND_ICONS
-# The HUD icons take the nearest runtime palette colours: the UI palette in
-# common/gba.c and the imported entries beside the sprite remap.
-$(COMMAND_ICON_HEADER): tools/sc64_command_icons.py tools/sc64_sprites.py common/gba.c .local/sc64/backwater/generated/palette-remap.bin .local/sc64/backwater/generated/palette.json
-	$(PYTHON) tools/sc64_command_icons.py
+# StarCraft command-card buttons for the race order list. The HUD icons'
+# header comes first, beside the race-engine flags.
+COMMAND_ICON_FLAGS := $(HUD_ICON_FLAGS) -DSC64_COMMAND_ICONS
 SHOWCASE_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 SHOWCASE_SIEGE_FLAGS ?= -DSC64_SIEGE_SPLASH
 # Clip world art before it reaches either HUD band. Keep the infrequent
