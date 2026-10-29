@@ -6259,3 +6259,58 @@ and follows moving workers when selecting them. It emits action witnesses
 only for accepted clicks. Matrix failures are retained while the remaining
 configurations continue, and stale trace files cannot satisfy a new run.
 This host evidence does not establish ARM performance or hardware behavior.
+
+
+### Shared worker depot-circle routing (2026-10-29)
+
+A loaded worker could fail to route to its depot center even though its
+32-pixel drop-off area was reachable. This stalled four mineral carriers in
+three canonical matrix cases. Return movement and optional nearest-depot
+reachability now use the same complete set of walkable cells intersecting the
+existing deposit circle. The imported engine stores one multi-source field per
+cached depot in the existing route pool, with a separate goal-key namespace;
+ordinary point routes cannot reuse it as a connected-component or suffix hint.
+The original-art path uses its existing forward-BFS storage. Cargo amounts,
+drop-off distance, order state and save schema are unchanged.
+
+An independent pixel-enumeration/BFS oracle passes 11 sanitizer configurations,
+including legacy distance fields, packed fields, partial and split floods,
+borrowed grids, active stride, rectangles and 128-by-128 maps. The real Blood
+Bath reproduction, mineral/gas trips, a forced long detour, live-waypoint
+save/load, depot-slot reuse, lift/land and nearest reachable-depot cases pass.
+All eight prepared depot fixture variants pass (four products, normal and
+nearest-depot paths). All 54 canonical normal-input matches finish within the
+unchanged 120,000-tick limit: Terran 3 wins/15 losses, Zerg 3/15, Protoss 4/14.
+The three earlier stalled cases now finish. Canonical startup/save/UI checks
+also pass, including 702 skirmish startup/save combinations. The promoted
+Protoss fixture had stale P6-only expectations; it now checks P7's exact
+save generation 43, identity and seven-entry catalog while retaining P6 checks.
+These startup/save checks do not demonstrate full campaign wins.
+
+All four ARM links pass the unchanged guards. EWRAM headroom is 28,480 bytes
+for Terran, 28,372 for Zerg, 23,828 for Protoss P7 and 200 for Showcase. IWRAM
+headroom is respectively 496, 72, 960 and 56 bytes. Captured actual per-TU
+commands, raw dependencies, consumed input hashes, link maps and output hashes
+are retained privately. Frozen imported inputs were copied from available
+files matching the recorded hashes; some historical source links had been
+removed externally. The old failed single-point/eager-scan prototype was
+rejected and is not included.
+
+The unchanged production-loop headless replay of the new Terran ROM matches
+the completed host trace (loss at frame 9,428) and measures 28.08 effective fps
+over 9,426 advancing PLAY frames. A separate late three-AI window measures
+20.36 fps over 992 advancing frames, with eight nonadvancing PLAY updates
+reported separately. This fails the near-30-fps objective for that workload.
+The new and old traces differ, so these are separate workload measurements,
+not an isolated patch speed comparison or physical-GBA qualification.
+
+Read-only profiling of that same three-AI replay reproduces all 9,000 timing
+rows exactly. Mean frame work is 823,830 guest cycles: update-entry to audio
+249,145; audio to render 64; render to next update 574,621 (includes presentation
+and loop overhead). The drawing counter averages 480,890 cycles, including
+206,532 for the unit/effect phase and 124,372 for background. The unit/effect
+phase includes death effects, tracers and projectiles; it does not isolate sprite
+compositing. The 27 route-build frames have
+the largest update spikes; even zero-build frames average only 21.67 fps.
+Rendering is the next sustained-cost target; route construction remains a
+separate spike target. Counters overlap and must not all be added together.
