@@ -1,6 +1,15 @@
 #ifndef SC64_RACE_SAVE_ADAPTER_H
 #define SC64_RACE_SAVE_ADAPTER_H
 #include "sc64_construction_save.h"
+#define SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX 25
+#define SC64_BUILDING_DAMAGE_SAVE_MARKER 0x42443031
+/* state[0..23] is the historical gameplay state; the remaining words have
+ * never been assigned by its serializer. Distinguish old construction rules
+ * without changing the save record size or rejecting completed old worlds. */
+#ifdef SC64_CONSTRUCTION_HP
+#define SC64_CONSTRUCTION_SAVE_MARKER_INDEX 24
+#define SC64_CONSTRUCTION_SAVE_MARKER 0x43485031
+#endif
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 #define race_data sc64_zp_route_save_scratch.save
 #elif defined(SC64_T3_ENABLED)
@@ -594,6 +603,10 @@ static int race_save_game(void) {
 #endif
         };
     memcpy(race_data.state,state,sizeof(state));
+    race_data.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX]=SC64_BUILDING_DAMAGE_SAVE_MARKER;
+#ifdef SC64_CONSTRUCTION_HP
+    race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = SC64_CONSTRUCTION_SAVE_MARKER;
+#endif
     memcpy(race_data.players,race_player,sizeof(race_player));
 #ifdef SC64_RACES
     for (int i = 0; i < MAX_UNITS; ++i)
@@ -954,6 +967,13 @@ static int race_load_game(void) {
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
     const int *v=race_data.state;
+    int building_damage_marker=v[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX];
+    if (building_damage_marker && building_damage_marker!=SC64_BUILDING_DAMAGE_SAVE_MARKER) return 0;
+#ifdef SC64_CONSTRUCTION_HP
+    int construction_save_marker = v[SC64_CONSTRUCTION_SAVE_MARKER_INDEX];
+    if (construction_save_marker != 0 &&
+        construction_save_marker != SC64_CONSTRUCTION_SAVE_MARKER) return 0;
+#endif
     if(v[0]<0||v[0]>1||v[1]<0||v[1]>2||v[2]<0||v[2]>=SC64_RACE_MAP_COUNT||v[4]<1||v[4]>3||
        v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||v[16]<0||v[16]>MAX_RACE_GEYSERS)return 0;
 #ifdef SC64_CAMPAIGN_RACE
@@ -1204,6 +1224,13 @@ static int race_load_game(void) {
                                      &race_data.buildings[i])) return 0;
 #endif
         if(RACE_B(i,alive)<0||RACE_B(i,alive)>1)return 0;
+#ifdef SC64_CONSTRUCTION_HP
+        /* The legacy clock saved no incremental HP. Its partially built
+         * foundations and morphs cannot be converted without inventing lost
+         * health; fail before applying any candidate state to the world. */
+        if (!construction_save_marker && RACE_B(i,alive) &&
+            RACE_B(i,under_construction)) return 0;
+#endif
 #ifdef SC64_T4_RUNTIME
         if(RACE_B(i,type)>=0&&RACE_B(i,type)<SC_RB_COUNT&&
            sc64_race_t4_building_intrinsically_invincible(RACE_B(i,type))&&
@@ -1896,6 +1923,13 @@ static int race_load_game(void) {
             b[i].hp = b[i].maxhp = 100000;
 #endif
 #endif
+/* Historical completed saves predate fractional burn and attacker storage.
+     * Initialize their previously unused Terran shield word explicitly; zero
+     * would otherwise falsely credit player zero for an environmental death. */
+    if (!building_damage_marker)
+        for (int i=0;i<MAX_BUILDINGS;++i)
+            if (b[i].alive && race_building_can_burn(&b[i]))
+                b[i].shield_remainder=NEUTRAL*256;
 #ifdef SC64_T4_RUNTIME
     for(int i=0;i<MAX_BUILDINGS;i++)
         if(sc64_race_t4_building_intrinsically_invincible(b[i].type))

@@ -687,6 +687,35 @@ static int race_builder_arrived(int worker)
     return 1;
 }
 
+/* Terran buildings have no shields. Their serialized remainder word stores
+ * a Q8 HP deficit in bits 0..7 and last damage owner 0..4 above it. This uses
+ * the existing 0..1279 codec range, without growing GBA actor storage. */
+static int __attribute__((noinline)) race_building_can_burn(const Building *q)
+{
+    const Sc64RaceBuildingRule *rule=sc64_race_building_rule(q->type);
+    int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_building(q->type);
+    const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
+    return rule && rule->race==R_TER && raw>=106 && raw<=129 && stock &&
+           (stock->flags&SC64_STOCK_F_BUILDING) && !stock->shields;
+}
+
+static void __attribute__((noinline)) race_tick_building_damage(int slot)
+{
+    Building *q=&b[slot];
+    unsigned before,after,hp,packed;
+    if (q->under_construction || q->hp<=0 || q->maxhp<=0 ||
+        (unsigned)q->hp*100u >= (unsigned)q->maxhp*34u ||
+        !sc64_building_burn_source_frame((unsigned)frame) ||
+        !race_building_can_burn(q)) return;
+    packed=(unsigned)q->shield_remainder;
+    before=sc64_building_burn_hp_q8((unsigned)q->hp,packed);
+    after=sc64_building_burn_tick(before,(unsigned)q->maxhp,1,1,1,0,(unsigned)frame);
+    if (before==after) return;
+    sc64_building_burn_store_hp(after,&hp,&packed);
+    q->hp=(int)hp; q->shield_remainder=(int)packed;
+    if (!after) destroy_building(slot,(int)sc64_building_burn_owner(packed));
+}
+
 static void race_tick_state(void)
 {
     int i,used=0,cap=0;
@@ -741,6 +770,8 @@ static void race_tick_state(void)
         }
     }
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
+        race_tick_building_damage(i);
+        if (!b[i].alive) continue;
         if(b[i].owner==SIDE&&!b[i].under_construction)cap+=sc64_race_building_rules[b[i].type].supply_provided;
         unsigned short max = sc64_race_building_shields(b[i].type);
         if (max && b[i].shield < max) {
@@ -841,6 +872,24 @@ static void race_complete_building(int i)
     if (r && r->supply_provided && b[i].owner == SIDE) supply_cap += r->supply_provided;
     if (sc64_race_is_zerg_townhall(b[i].type)) b[i].larva = 3;
 }
+
+#ifdef SC64_CONSTRUCTION_HP
+/* Construction is uncommon beside movement/combat. Keep its full progression
+ * in ROM so sharing the mechanic does not consume the tight hot-code reserve. */
+static void __attribute__((noinline)) race_construction_worker_tick(int worker)
+{
+    Unit *q = &u[worker];
+    int slot = q->target;
+    int total = building_build_time(b[slot].type);
+    int progress = ++b[slot].build_progress;
+    race_construction_hp_progress(slot, progress, total);
+    if (progress >= total) {
+        race_complete_building(slot);
+        q->order = ORDER_IDLE;
+        q->target = -1;
+    }
+}
+#endif
 
 #ifdef SC64_P3_PRODUCTION_EXIT
 typedef struct {
