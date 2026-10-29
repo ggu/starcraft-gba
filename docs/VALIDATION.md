@@ -6696,3 +6696,31 @@ prepared oracle targets pass. Private proof lives in `.local/build/p7-owner-*`,
 including `p7-owner-final-v1` for per-TU provenance and
 `p7-owner-campaign-sram-final-v1` for the mission-state continuation. Full roster,
 remaining campaigns and near-30-fps work remain open; no Actions or SD writes.
+
+### T7 and T9 controller repairs (2026-10-30)
+
+With runtime source `5ad0adc`, the repaired T7 controller wins twice at input
+call 47,735 / frame 47,101 within the unchanged 60,000-call bound. Both traces
+are identical, with zero faults, Kerrigan alive and the emitter delivered to
+the native goal. Menu normalization now uses D-pad inputs, route planning waits
+for the engine's path grid, and the escort retries the paid Dropship transfer
+or ground relay when its carrier dies. The inherited risk planner reads unseen
+hostile positions; this is not an information-limited playthrough.
+
+The T9 controller wins twice at input call 45,625 / frame 44,896 within its
+unchanged 500,000-call bound. Both traces are identical, with zero faults,
+Kerrigan alive, no remaining Protoss buildings and 21 remaining Zerg buildings.
+Its policy uses ordinary commands, visible enemies, remembered buildings and
+immutable scenario placement hints. Neither controller writes actors, wallets,
+mission state or the menu cursor, or forces a path-grid rebuild.
+
+These are host probe-entry checks, not normal-menu ARM, SRAM continuation or
+performance qualification. The T7 source SHA-256 is
+`d2e67fc965e7031be0a516f607b73c2e2d87816b9d445bacf2da947fce7758c3`,
+and the T9 source SHA-256 is
+`cba1eeb7878f7e686f8be804d3874dfe3453bd9fc9dfbe881044ca4a61af2d2d`.
+Executed compiler arguments, raw dependencies, consumed-input hashes and both
+run logs/traces are retained in `.local/build/t7-repair-v3` and
+`.local/build/t9-policy-port-v1`. T8 remains the unresolved Terran controller;
+the full current aggregate has not yet passed. Runtime rules and limits are
+unchanged by these controller repairs.
