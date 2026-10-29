@@ -7063,7 +7063,7 @@ gates; commands, per-TU arguments, dependencies and hashes are in
 campaign progression.
 
 Private evidence is retained under `shared-bunker-native-v4`,
-`shared-bunker-campaign-v2`, `bunker-plain-save-v1`, `shared-bunker-skirmish-v1`,
+`shared-bunker-campaign-v3`, `bunker-plain-save-v2`, `shared-bunker-skirmish-v1`,
 `shared-bunker-arm-v3`, `shared-bunker-sram-v3`, `shared-bunker-unload-v3`,
 `shared-bunker-zerg-v3`, `shared-bunker-occupied-sample-v3`,
 `shared-bunker-p7-prefix-v3`, `shared-bunker-p7-full-v3` and
@@ -7073,3 +7073,22 @@ intermediate failed runs are not counted as final qualification. Canonical ROMs
 are packaged locally in `.local/releases/20261030-shared-bunker-candidate`.
 No SD delivery or Actions run is claimed. The full roster, remaining campaign
 stages and near-30-fps goal remain incomplete.
+
+The seeded campaign and plain unified checks were rerun against committed
+runtime `b15c582`; their consumed project dependencies match exactly. Earlier
+runs before the no-op index fix remain historical evidence. The four ARM
+products, native game/save matrix and ordinary skirmish matrix also have
+committed-source closure records. The broad default/unified/Terran snapshot
+differs from the final tracked tree only in documentation; optional per-TU
+dependencies match, while default build/test provenance uses the full source
+snapshot rather than a per-TU capture.
+
+Existing read-only stage latches over the same busy Zerg sample identify map
+rendering as the largest measured stage (mean 302,434 cycles), followed by
+orders (173,311) and HUD (72,515). Map includes background (132,256), building
+(9,944) and unit/effect drawing (116,449); these are not additive independent
+totals. Render latches describe the latest completed draw and may not align
+one-to-one with update entries. The orders maximum is 2,174,022 cycles. Timing
+rows are identical to the original v3 sample; no instrumentation build or actor
+state writes were used. Distributions and provenance are retained in
+`shared-bunker-stage-profile-v3`, to guide the next rendering/spike optimization.
