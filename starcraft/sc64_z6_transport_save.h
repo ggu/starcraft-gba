@@ -76,6 +76,10 @@ static int race_z6_transport_save_candidate_valid(
 
         if (actor.order != ORDER_BOARD && actor.order != ORDER_TRANSPORTED &&
             actor.order != ORDER_UNLOAD) continue;
+#ifdef SC64_SHARED_BUNKER
+        if ((actor.order==ORDER_BOARD || actor.order==ORDER_TRANSPORTED) &&
+            actor.target>=MAX_UNITS) continue; /* candidate-wide pass */
+#endif
         if (!is_z6 || candidate->state[0] != 0 ||
             candidate->state[1] != R_ZERG ||
             candidate->state[2] != SC64_Z6_GLOBAL_ID || !tech ||

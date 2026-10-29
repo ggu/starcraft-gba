@@ -6982,3 +6982,94 @@ ROMs in `.local/releases/20261030-shared-battery-profile-fixes` match these
 qualified products outside the standard header. No SD delivery, physical
 hardware qualification or steady-30-fps result is claimed. The full roster
 services and remaining campaign stages still require implementation.
+
+### Shared Bunker service (2026-10-30)
+
+Raw 125 now has a common garrison service across Terran, Zerg, Protoss and
+Showcase, with the common capability also enabled in plain race/unified builds.
+The authored eligibility/fire-class rules were checked against the existing
+pinned BWAPI UnitType facts and OpenBW behavior: four cargo points, same-player
+Terran one-space occupants, the occupant's own weapon plus 64 source pixels of
+range, and attempted ejection on destruction. The current imported unit set has
+no authentic zero-space Terran passenger. Custom live owners, rescued human
+campaign identities and distinct nonhuman source owners are checked separately.
+
+The eight frozen native game/save fixtures pass under ASan/UBSan in all four
+canonical compiler vectors. They cover missing prerequisites, paid SCV travel
+and construction, unfinished-building rejection, five simultaneous board orders
+with four arrivals, ordinary contextual boarding/unload, an 80-pixel approach
+and a diagonal route around a blocked cell, cooldown/range/immunity, tagged
+source-weapon effects, Firebat air exclusion, unarmed SCV/Medic passengers,
+transport-command coexistence, successful ejection, fixture-blocked failed
+ejection, supply/corpse cleanup, pending cancellation and slot reuse. High-ID
+building targets still take damage and save successfully without overflowing
+the P7 target cache. Nine malformed candidate cases reject without replacing
+the actor banks or wallet. No save schema or actor limit was expanded.
+
+Four additional seeded actual-first-campaign fixtures pass boarding, firing,
+unload and save/load while preserving mission phase/objective state. These are
+host fixtures with injected actors, not ordinary-acquisition or ARM campaign
+playthroughs. A separate plain unified host boarding/save/load round trip passes.
+The ordinary-input skirmish matrix again completes all 54 matches (10 wins,
+44 losses); every individual result matches the preceding Battery matrix.
+All 702 startup/save configurations and 27 construction cases pass too.
+
+Four final v3 ARM links pass the unchanged guards with the same EWRAM/IWRAM
+margins as the preceding build: 28,480/488, 28,372/48, 23,828/952 and 200/56
+bytes respectively. Fresh/in-place SRAM continuation matches full snapshots
+and actor banks through updates 0, 1, 2, 3, 4, 100 and 1,000 in every product.
+The native seeds contain three Marines and a Firebat, active cooldowns and a
+cached target. Separate fresh-boot ARM runs select the Bunker and unload all
+four passengers through ordinary A/B/directional input. No guest actor writes
+or edited SRAM payloads are used. The native fixture setup remains distinct
+from ordinary acquisition on hardware.
+
+The first ARM stress comparison found an unnecessary spatial-index invalidation
+on every building-slot creation. Cleanup now invalidates only actual cargo or
+boarding transitions. The corrected v3 Zerg three-AI replay matches all 8,928
+advancing unit/building/visibility/resource observations and actual framebuffer
+hashes. The observer's pixel record includes a hardware frame counter; an
+initial comparison incorrectly counted that counter as a pixel difference.
+The displayed 240-by-160 image hashes match, including the first flagged frames.
+The measured 1,000-update sample takes 748,598,135 cycles (22.41 effective fps),
+about 0.15 percent more than the preceding 747,475,403-cycle build. This is a
+small feature overhead, not a performance improvement or a 30-fps result.
+
+One separate native-seeded four-occupant scene averages 29.26–29.61 effective
+fps across the four products over 1,000 updates after 100 warmup updates.
+There is no paired empty-Bunker control, so it does not isolate service cost
+or establish a worst-case bound. P7's 9,000-call normal-menu prefix matches its
+preceding unit/building/mission/visibility/framebuffer hashes. A read-only ARM
+capture confirms the Bunker capacity/unload HUD fits and loaded infantry bodies
+stay hidden; the image alone is not proof of a particular weapon's provenance.
+Exact N64 Bunker overlay geometry and original order timing remain separate
+fidelity work, as do whole-program stack and physical-hardware qualification.
+
+The full current P7 normal-menu winning tape also passes all 49,229 calls,
+ending at frame 48,939 with a win. All 50 milestone observations and the final
+observed snapshot match the preceding Battery run. It takes 123,827,664,277
+guest cycles including menus, versus 123,808,001,557 before this service
+(about 0.016 percent more). This is complete tape coverage, not a steady-30-fps
+or all-campaign-progression claim. The pinned runner command, result and
+comparison are under `shared-bunker-p7-full-v3`.
+
+The final frozen aggregate passes default doctor/build/test (685 Python checks,
+17 optional skips, the separate eight-test suite and C checks), unified ARM
+build and host tests, and all ten full-Terran host controllers with their
+included checks. The plain unified link leaves 3,216 EWRAM and 600 IWRAM bytes
+before the unchanged guards. Source/Make inputs stayed frozen throughout these
+gates; commands, per-TU arguments, dependencies and hashes are in
+`shared-bunker-final-gates-v1`. These host campaign results are not full ARM
+campaign progression.
+
+Private evidence is retained under `shared-bunker-native-v4`,
+`shared-bunker-campaign-v2`, `bunker-plain-save-v1`, `shared-bunker-skirmish-v1`,
+`shared-bunker-arm-v3`, `shared-bunker-sram-v3`, `shared-bunker-unload-v3`,
+`shared-bunker-zerg-v3`, `shared-bunker-occupied-sample-v3`,
+`shared-bunker-p7-prefix-v3`, `shared-bunker-p7-full-v3` and
+`shared-bunker-visual-v3`.
+Compiler arguments, raw dependencies, consumed hashes and maps are captured;
+intermediate failed runs are not counted as final qualification. Canonical ROMs
+are packaged locally in `.local/releases/20261030-shared-bunker-candidate`.
+No SD delivery or Actions run is claimed. The full roster, remaining campaign
+stages and near-30-fps goal remain incomplete.

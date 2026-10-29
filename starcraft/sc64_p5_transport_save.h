@@ -87,6 +87,10 @@ static int race_p5_transport_save_candidate_valid(const RaceSave *candidate,
                     width * 16, height * 16)) return 0;
             continue;
         }
+#ifdef SC64_SHARED_BUNKER
+        if ((actor.order==ORDER_BOARD || actor.order==ORDER_TRANSPORTED) &&
+            actor.target>=MAX_UNITS) continue; /* candidate-wide pass */
+#endif
         if (actor.order >= ORDER_BOARD &&
             (candidate->state[0] || candidate->state[2] != SC64_P5_GLOBAL_ID ||
              actor.owner != SIDE)) return 0;

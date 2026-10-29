@@ -68,7 +68,7 @@ static void sc64_contact_memo_invalidate(void);
 #ifndef SC64_DEATH_VFX_DISABLED
 #include "sc64_death_vfx.h"
 #endif
-#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED)
+#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED) || defined(SC64_SHARED_BUNKER)
 #define SC64_TRANSPORT_RUNTIME
 #endif
 #if defined(SC64_P5_SHUTTLE_ENABLED) && !defined(SC64_P5_RUNTIME)
@@ -1625,6 +1625,9 @@ static int nearest_refinery(int x, int y);
 static void update_exploration(void);
 static int owner_command_center(int owner);
 static int currently_visible(int x, int y);
+#ifdef SC64_SHARED_BUNKER
+static void race_bunker_clear_slot(int slot);
+#endif
 #ifdef SC64_DIRECT_ATTACK
 static int target_alive(int target);
 static int target_x(int target), target_y(int target);
@@ -2098,6 +2101,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     race_battery_clear_building_references(i);
+#endif
+#ifdef SC64_SHARED_BUNKER
+    race_bunker_clear_slot(i);
 #endif
 #ifdef SC64_NYDUS_ENABLED
     race_nydus_note_building_lost(i);
@@ -3434,7 +3440,7 @@ target_alive(int target)
 #ifdef SC64_T6_RUNTIME
     if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target)) return 0;
 #endif
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_TRANSPORT_RUNTIME
     if (target >= 0 && target < MAX_UNITS && SC64_TRANSPORT_LOADED(&u[target]))
         return 0;
 #endif
@@ -3768,6 +3774,9 @@ destroy_building(int slot, int source_owner)
 {
     Building *q = &b[slot];
     if (!q->alive) return;
+#ifdef SC64_SHARED_BUNKER
+    if (q->type == B_BUNKER) race_bunker_destroy_cargo(slot, source_owner);
+#endif
 
 #ifdef SC64_TERRAN_LATE_RUNTIME
             if (q->alive && race_late_active())
@@ -3845,7 +3854,7 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
     if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target) &&
         !(hit_flags & SC64_HIT_ALLOW_SPLASH_BURROW)) return;
 #endif
-#ifdef SC64_T5_RUNTIME
+#ifdef SC64_TRANSPORT_RUNTIME
     if (target >= 0 && target < MAX_UNITS && SC64_TRANSPORT_LOADED(&u[target]))
         return;
 #endif
@@ -5107,11 +5116,26 @@ static int race_z7_creep_command_available(void)
 }
 #endif
 
+#ifdef SC64_SHARED_BUNKER
+static int __attribute__((noinline)) race_bunker_menu_available(void)
+{
+    return selected_building>=0 && selected_building<MAX_BUILDINGS &&
+        b[selected_building].owner==SIDE && race_bunker_cargo_space(selected_building)>0;
+}
+#endif
+
 static void
 choose_command(int choice)
 {
 #ifdef SC_FIELD_FEEDBACK
     menu_last = (u8)choice;
+#endif
+#ifdef SC64_SHARED_BUNKER
+    if (choice==(race_mode?(int)sc64_skirmish_menu_count((unsigned)race_human):MENU_STOP+1) &&
+        race_bunker_menu_available()) {
+        menu_open=0;mode=MODE_NORMAL;
+        toast(race_bunker_request_unload(selected_building)?0:8);return;
+    }
 #endif
 #ifdef SC64_RACES
     if (race_mode) {
@@ -5351,6 +5375,9 @@ static int race_skirmish_command_count(void)
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     count += race_battery_command_available();
 #endif
+#ifdef SC64_SHARED_BUNKER
+    count += race_bunker_menu_available();
+#endif
     return count;
 }
 #endif
@@ -5361,6 +5388,9 @@ static int race_skirmish_command_count(void)
 static int field_menu_count(void)
 {
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_SHARED_BUNKER
+    if (race_bunker_menu_available()) return MENU_STOP+2;
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (race_p7_carrier_training_menu_available()) return MENU_STOP+2;
 #endif
@@ -5413,6 +5443,9 @@ static int field_menu_count(void)
 static int field_menu_count(void)
 {
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_SHARED_BUNKER
+    if (race_bunker_menu_available()) return MENU_STOP+2;
+#endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     if (race_battery_command_available()) return MENU_STOP+2;
 #endif
@@ -5424,6 +5457,9 @@ static int field_menu_count(void)
 static int field_menu_count(void)
 {
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_SHARED_BUNKER
+    if (race_bunker_menu_available()) return MENU_STOP+2;
+#endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     if (race_battery_command_available()) return MENU_STOP+2;
 #endif
@@ -5459,6 +5495,10 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
+#ifdef SC64_SHARED_BUNKER
+    if (i==(race_mode?(int)sc64_skirmish_menu_count((unsigned)race_human):MENU_STOP+1) &&
+        race_bunker_menu_available()) return "UNLOAD CARGO";
+#endif
     if (race_mode) {
         Sc64SkirmishMenuRow row;
 #ifdef SC64_BATTERY_SERVICE_ENABLED
@@ -5684,6 +5724,19 @@ interact(void)
     if (mode == MODE_NORMAL && race_nydus_issue_selected(cx, cy)) {
         toast(0); return;
     }
+#endif
+#ifdef SC64_SHARED_BUNKER
+    /* Selected infantry use the same contextual A action as transports. */
+    if (mode==MODE_NORMAL)
+    for (int slot=0;slot<MAX_BUILDINGS;++slot)
+        if (race_bunker_carrier_valid(slot) && b[slot].owner==SIDE &&
+            dist2(cx,cy,b[slot].x,b[slot].y)<20*20) {
+            int issued=0;
+            for (int i=0;i<MAX_UNITS;++i)
+                if (u[i].alive && u[i].selected && u[i].owner==SIDE &&
+                    race_bunker_request_board(i,slot)) ++issued;
+            if (issued) {toast(0);return;}
+        }
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
     if (mode == MODE_UNLOAD) {
@@ -6367,6 +6420,9 @@ tick_combat(Unit * q, int target)
         damage=sc64_stock_attack_damage_per_impact(&stock_attack,
                      q->owner==SIDE?weapons_level:0);
     }
+#ifdef SC64_SHARED_BUNKER
+    if (q->order==ORDER_TRANSPORTED && q->target>=MAX_UNITS) range+=32;
+#endif
 #endif
 #if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
     #ifndef SC64_RACES
@@ -6448,6 +6504,9 @@ tick_combat(Unit * q, int target)
 #endif
 	}
     } else {
+#ifdef SC64_SHARED_BUNKER
+        if (q->order==ORDER_TRANSPORTED && q->target>=MAX_UNITS) return;
+#endif
 #ifdef SC64_DIRECT_FIRING_POINTS
 	move_toward_weapon_range(q, target_x(target), target_y(target),
                                  minimum_range, range);
@@ -6456,6 +6515,10 @@ tick_combat(Unit * q, int target)
 #endif
     }
 }
+
+#ifdef SC64_SHARED_BUNKER
+#include "sc64_bunker_combat.h"
+#endif
 
 static int GBA_HOT
 nearest_command_target(int x, int y)
@@ -7175,7 +7238,7 @@ update_exploration(void)
     int i, col, row;
     SC64_GRID_CLEAR(visible);
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && u[i].owner == SIDE) {
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE) {
 	    int c = u[i].x / 16, r = u[i].y / 16, radius = IS_WORKER(u[i].type) ? 4 : 5;
 	    for (row = r - radius; row <= r + radius; row++)
 		for (col = c - radius; col <= c + radius; col++)
@@ -9804,6 +9867,15 @@ draw_hud_commands_body(void)
             gfx_num(hud_left+18,137,q->queue_progress/256,C_WHITE);
             sc64_font_text(85,135,94,race_battery_powered_live(selected_building) ?
                            "B RECHARGE" : "UNPOWERED",C_GOLD);
+        } else
+#endif
+#ifdef SC64_SHARED_BUNKER
+        if (!q->under_construction && sc64_race_raw_building(q->type)==125) {
+            int cargo=race_bunker_cargo_space(selected_building);
+            gfx_text(hud_left,137,"LOAD",C_CYAN);
+            gfx_num(hud_left+30,137,cargo>0?cargo:0,C_WHITE);
+            gfx_text(hud_left+38,137,"/4",C_WHITE);
+            sc64_font_text(85,135,94,cargo>0?"B UNLOAD":"SELECT INFANTRY",C_GOLD);
         } else
 #endif
         if(!q->under_construction) {

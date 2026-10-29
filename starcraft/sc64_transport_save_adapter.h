@@ -71,6 +71,9 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
                 actor.ty < 0 || actor.ty >= height * 16) return 0;
         }
         if (order != ORDER_BOARD && order != ORDER_TRANSPORTED) continue;
+#ifdef SC64_SHARED_BUNKER
+        if (carrier>=MAX_UNITS) continue; /* candidate-wide Bunker pass */
+#endif
         unsigned space;
         if (carrier < 0 || carrier >= MAX_UNITS || carrier == i) return 0;
         Unit ship;
@@ -131,6 +134,9 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
                 CARGO_U(i, ty) < 0 || CARGO_U(i, ty) >= height * 16) return 0;
         }
         if (order != ORDER_BOARD && order != ORDER_TRANSPORTED) continue;
+#ifdef SC64_SHARED_BUNKER
+        if (carrier>=MAX_UNITS) continue; /* candidate-wide Bunker pass */
+#endif
         unsigned space;
         int raw = CARGO_U(i, raw_type), type = CARGO_U(i, type);
         if (carrier < 0 || carrier >= MAX_UNITS || carrier == i ||

@@ -280,7 +280,7 @@ SC64_ORDER_MARKER_FLAGS := -DSC64_ORDER_MARKER_ART -I$(SC64_ORDER_MARKER_DIR)
 $(SC64_ORDER_MARKER_HEADER): tools/sc64_order_marker_pack.py tools/sc64_construction_sprites.py tools/sc64_death_sprites.py tools/sc64_sprites.py tools/sc64_unit_facing.py common/gba.c common/gba.h starcraft/sc64_display.h
 	python3 tools/sc64_order_marker_pack.py
 
-SC64_SHARED_ENGINE_FLAGS := -DSC64_CONSTRUCTION_HP -DSC64_SIEGE_SPLASH -DSC64_SHARED_SCOURGE_COMBAT -DSC64_SHARED_BATTERY
+SC64_SHARED_ENGINE_FLAGS := -DSC64_CONSTRUCTION_HP -DSC64_SIEGE_SPLASH -DSC64_SHARED_SCOURGE_COMBAT -DSC64_SHARED_BATTERY -DSC64_SHARED_BUNKER
 RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_ENGINE_CORE_REQUIRED $(SC64_SHARED_ENGINE_FLAGS) -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated -I$(SC64_INTERFACE_DIR) $(HUD_ICON_FLAGS) $(RACE_CONSTRUCTION_FLAGS) $(SC64_BUILDING_FIRE_FLAGS) $(SC64_ORDER_MARKER_FLAGS)
 RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(SC64_INTERFACE_INPUTS) $(COMMAND_ICON_HEADER) $(RACE_CONSTRUCTION_INPUTS) $(SC64_BUILDING_FIRE_HEADER) $(SC64_ORDER_MARKER_HEADER)
 
@@ -5180,3 +5180,29 @@ build/test-sc64-shared-battery-plain: tests/sc64_shared_battery_plain.c $(STARCR
 test-sc64-shared-battery-plain: build/test-sc64-shared-battery-plain
 	./build/test-sc64-shared-battery-plain
 test-unified: test-sc64-shared-battery-plain
+
+# Building garrisons use the common transport storage in every race product.
+define SHARED_BUNKER_FIXTURE
+build/test-sc64-shared-bunker-$(1)-$(2): tests/sc64_shared_bunker_$(1).c $(STARCRAFT) $(wildcard starcraft/*.h) $($(4)) $(SKIRMISH_CONTROLLER_EXTRA_INPUTS) $(5) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(SKIRMISH_RUNTIME_TEST_FLAGS) $$($(3)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(5) -o $$@
+endef
+$(foreach case,game save,$(eval $(call SHARED_BUNKER_FIXTURE,$(case),terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,)))
+$(foreach case,game save,$(eval $(call SHARED_BUNKER_FIXTURE,$(case),zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS,)))
+$(foreach case,game save,$(eval $(call SHARED_BUNKER_FIXTURE,$(case),protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,$(P7_INTERCEPTOR_FLIGHT_SOURCES))))
+$(foreach case,game save,$(eval $(call SHARED_BUNKER_FIXTURE,$(case),showcase,SHOWCASE_FLAGS,P7_ARBITER_INPUTS,)))
+$(eval $(call SHARED_BUNKER_FIXTURE,campaign,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,))
+$(eval $(call SHARED_BUNKER_FIXTURE,campaign,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS,))
+$(eval $(call SHARED_BUNKER_FIXTURE,campaign,protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call SHARED_BUNKER_FIXTURE,campaign,showcase,SHOWCASE_FLAGS,P7_ARBITER_INPUTS,))
+SHARED_BUNKER_BINARIES := $(foreach profile,terran zerg protoss showcase,$(foreach case,game save,build/test-sc64-shared-bunker-$(case)-$(profile)))
+.PHONY: test-sc64-shared-bunker test-sc64-shared-bunker-campaign
+test-sc64-shared-bunker: $(SHARED_BUNKER_BINARIES)
+	@set -e; for binary in $(SHARED_BUNKER_BINARIES); do ./$$binary; done
+test-sc64-shared-bunker-campaign: $(foreach profile,terran zerg protoss showcase,build/test-sc64-shared-bunker-campaign-$(profile))
+	@set -e; for profile in terran zerg protoss showcase; do ./build/test-sc64-shared-bunker-campaign-$$profile; done
+build/test-sc64-bunker-rules: tests/sc64_bunker_rules.c starcraft/sc64_bunker_rules.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-bunker-rules
+test-sc64-bunker-rules: build/test-sc64-bunker-rules
+	./build/test-sc64-bunker-rules
+test: test-sc64-bunker-rules

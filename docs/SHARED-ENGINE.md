@@ -182,3 +182,44 @@ predicate. `make test-sc64-shared-battery-plain` verifies this configuration,
 including rejection of forged building identities; it is part of
 `make test-unified`. Shared Scourge target protection and impact effects likewise
 follow their compiled capabilities rather than requiring a campaign flag.
+
+## Shared Bunker garrisons
+
+`SC64_SHARED_BUNKER` is part of the common race-engine capability set, including
+the plain unified build. A completed raw-125 Bunker holds four eligible Terran
+one-space occupants in the existing unit pool. Select passengers and press A on
+a friendly Bunker to board; select the Bunker and choose **UNLOAD CARGO** from
+the B command list to unload. Its HUD shows the occupied capacity. Ordinary
+construction, cost and Barracks prerequisites remain in the shared catalog.
+
+Marine, Firebat and Ghost classes, including mapped source heroes, fire their
+own stock weapon with the reference two-tile range bonus. The existing damage,
+shield, armor, cooldown and source-weapon effect path applies; noncombat
+passengers do not gain a weapon. Loaded bodies stay out of collision, selection,
+visibility, minimap and enemy damage paths. An unload preserves weapon cooldown
+rather than applying the flying transport's delay. Destruction attempts to
+unload passengers and kills only those that cannot be placed. Hidden casualties
+do not produce an infantry corpse on the battlefield.
+
+The existing BOARD/TRANSPORTED orders distinguish a unit carrier target from
+`MAX_UNITS + building_slot`. There is no new order, actor array or save record.
+The firing target uses the existing unit cache only for values below 240;
+higher building targets remain attackable and are reacquired when the weapon
+is ready. This respects the P7 typed codec's narrower cache field. Candidate
+validation checks occupancy, ownership, source identity, position and path state
+before replacing live actors. Empty-slot cleanup leaves spatial indexes intact;
+real boarding, unloading and removal invalidate them immediately.
+
+Custom games use live player ownership; rescued human campaign actors may keep
+their source identities, while nonhuman campaign actors must match exact source
+owners. Mission objectives and persistent unions remain separate. The body and
+weapon effects use imported assets, but the approach/unload search, deterministic
+target choice and center/footprint distances use this engine's policies. A
+dedicated N64 Bunker muzzle overlay and exact original order timing are not
+claimed.
+
+With prepared inputs, run `make test-sc64-shared-bunker` and
+`make test-sc64-shared-bunker-campaign` for the four-product game/save and seeded
+campaign checks. `make test-sc64-bunker-rules` is asset-free and runs in the
+default suite. ARM save continuation, ordinary unload and performance evidence
+are recorded in [`VALIDATION.md`](VALIDATION.md).

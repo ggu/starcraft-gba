@@ -27,6 +27,16 @@ body art. Existing P7 source properties remain authenticated; the service does
 not activate P7 objectives in other modes. See [SHARED-ENGINE.md](SHARED-ENGINE.md)
 for the shield-phase save migration and remaining actor services.
 
+Bunkers now use a shared four-occupant garrison service in all four products.
+Paid SCV construction requires the Barracks; infantry boards through the normal
+context action and unloads through the Bunker command row. Marine/Firebat/Ghost
+classes fire their own weapons with the stock two-tile bonus, while noncombat
+occupants remain unarmed. Capacity, source ownership, hidden passengers,
+destruction/ejection and candidate-save validation are implemented without a
+new actor pool or save schema. This closes the previously inert Bunker service;
+other late-tech gaps below remain open. See the shared-engine page for controls
+and the remaining geometry, overlay and original-order fidelity limits.
+
 ## Opt-in identity extension
 
 `SC64_SKIRMISH_ROSTER` appends the ordinary raw identities missing from each

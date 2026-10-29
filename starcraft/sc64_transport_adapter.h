@@ -1,7 +1,7 @@
 #ifndef SC64_TRANSPORT_ADAPTER_H
 #define SC64_TRANSPORT_ADAPTER_H
 
-#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED)
+#if defined(SC64_T5_RUNTIME) || defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED) || defined(SC64_SHARED_BUNKER)
 #include "sc64_transport_rules.h"
 
 #if defined(SC64_P5_SHUTTLE_ENABLED) && \
@@ -202,12 +202,29 @@ static int race_transport_land_point(int passenger, int x, int y, int *px, int *
     return 0;
 }
 
+#ifdef SC64_SHARED_BUNKER
+static void race_bunker_fire_unit(int unit, int slot);
+#include "sc64_bunker_adapter.h"
+#endif
+
 /* Handle only transport orders; return 1 when the ordinary order loop must
  * leave this actor alone. Other units retain the existing engine behavior. */
 static int __attribute__((noinline)) race_transport_tick_unit(int slot)
 {
     Unit *q = &u[slot];
-    if (SC64_TRANSPORT_LOADED(q)) return 1;
+    if (SC64_TRANSPORT_LOADED(q)) {
+#ifdef SC64_SHARED_BUNKER
+        if (q->target>=MAX_UNITS) {
+            if (q->cd>0) --q->cd;
+            return race_bunker_tick_loaded(slot);
+        }
+#endif
+        return 1;
+    }
+#ifdef SC64_SHARED_BUNKER
+    if (q->order==ORDER_BOARD && q->target>=MAX_UNITS)
+        return race_bunker_tick_board(slot);
+#endif
     if (q->order == ORDER_BOARD) {
         int carrier = q->target, space = race_transport_passenger_space(q);
         int used = race_transport_cargo_space(carrier);
@@ -268,6 +285,18 @@ static void race_transport_tick_after_orders(void)
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && SC64_TRANSPORT_LOADED(&u[i])) {
             int carrier = u[i].target;
+#ifdef SC64_SHARED_BUNKER
+            if (carrier>=MAX_UNITS) {
+                int slot=sc64_bunker_target_decode(MAX_UNITS,MAX_BUILDINGS,carrier);
+                if (slot<0) race_bunker_kill_passenger(i,-1);
+                else if (!race_bunker_carrier_valid(slot) ||
+                    !sc64_bunker_owner_matches(u[i].owner,u[i].raw_owner,
+                        b[slot].owner,b[slot].raw_owner,race_mode,SIDE))
+                    race_bunker_destroy_cargo(slot,-1);
+                else {u[i].x=b[slot].x;u[i].y=b[slot].y;}
+                continue;
+            }
+#endif
             if (!race_transport_carrier_valid(carrier) ||
                 u[i].owner != u[carrier].owner) {
                 /* Includes carriers removed by scenario effects or direct

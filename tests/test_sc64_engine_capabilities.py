@@ -115,6 +115,7 @@ class EngineCapabilityProfiles(unittest.TestCase):
                 self.assertIn("-DSC64_CONSTRUCTION_HP", args)
                 self.assertIn("-DSC64_SIEGE_SPLASH", args)
                 self.assertIn("-DSC64_SHARED_BATTERY", args)
+                self.assertIn("-DSC64_SHARED_BUNKER", args)
                 result = self._compile_probe(values[name])
                 self.assertEqual(result.returncode, 0, result.stderr)
 
@@ -125,6 +126,7 @@ class EngineCapabilityProfiles(unittest.TestCase):
             "-USC64_CONSTRUCTION_HP",
             "-USC64_SIEGE_SPLASH",
             "-USC64_SHARED_BATTERY",
+            "-USC64_SHARED_BUNKER",
         ):
             with self.subTest(removed=removal):
                 result = self._compile_probe(flags, removal)

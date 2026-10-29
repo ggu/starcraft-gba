@@ -715,6 +715,10 @@ ui_structure_note(int x, int y, int type, const char *label)
     else if (sc64_race_raw_building(type)==172)
         gfx_text(x,y,"RECHARGES SHIELDS",C_DIM);
 #endif
+#ifdef SC64_SHARED_BUNKER
+    else if (sc64_race_raw_building(type)==125)
+        gfx_text(x,y,"GARRISON FOUR INFANTRY",C_DIM);
+#endif
     else if (r && r->supply_provided) {
         gfx_text(x, y, "+", C_DIM);
         gfx_num(x + 6, y, r->supply_provided / 2, C_DIM);

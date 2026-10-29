@@ -514,6 +514,62 @@ static int race_battery_saved_world_valid(const RaceSave *candidate, int width, 
 }
 #endif
 
+#ifdef SC64_SHARED_BUNKER
+/* Building cargo is validated solely against the decoded candidate. */
+static int race_bunker_save_reference(const RaceSave *candidate, const Unit *actor)
+{
+    Building bunker;
+    int slot, raw;
+    if (!candidate || !actor || !actor->alive ||
+        (actor->order!=ORDER_BOARD && actor->order!=ORDER_TRANSPORTED) ||
+        actor->target<MAX_UNITS || actor->target>=MAX_UNITS+MAX_BUILDINGS)
+        return 0;
+    slot=actor->target-MAX_UNITS;
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+    if (!race_save_decode_building(candidate,(unsigned)slot,&bunker)) return 0;
+#else
+    for (unsigned j=0;j<RACE_BUILD_WORDS;++j) {
+        int n=candidate->buildings[slot][j];
+        memcpy((u8 *)&bunker+j*sizeof(int),&n,sizeof(n));
+    }
+#endif
+    raw=actor->raw_type>=0 ? actor->raw_type : sc64_race_raw_unit(actor->type);
+    if (!bunker.alive || bunker.under_construction ||
+        sc64_race_raw_building(bunker.type)!=125 ||
+        (bunker.raw_type!=-1 && bunker.raw_type!=125) ||
+        !sc64_bunker_owner_matches(actor->owner,actor->raw_owner,
+             bunker.owner,bunker.raw_owner,candidate->state[0],SIDE) ||
+        actor->raw_type < -1 || !sc64_bunker_passenger_raw(raw) ||
+        sc64_race_unit_from_raw(raw)!=actor->type ||
+        sc64_race_unit_flying(actor->type) || (actor->flags & 2)) return 0;
+    if (actor->order==ORDER_TRANSPORTED &&
+        (actor->selected || actor->x!=bunker.x || actor->y!=bunker.y ||
+         actor->path_timer || actor->path_retry || actor->build < -1 ||
+         actor->build >= MAX_UNITS+MAX_BUILDINGS || actor->build > 239)) return 0;
+    return 1;
+}
+static int race_bunker_save_world_valid(const RaceSave *candidate, int width, int height)
+{
+    u8 used[MAX_BUILDINGS]={0};
+    if (!candidate || width<1 || height<1 || width>128 || height>128) return 0;
+    for (unsigned i=0;i<MAX_UNITS;++i) {
+        Unit actor;
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+        if (!race_save_decode_unit(candidate,i,(unsigned)width*16u,(unsigned)height*16u,&actor)) return 0;
+#else
+        for (unsigned j=0;j<RACE_UNIT_WORDS;++j) {
+            int n=candidate->units[i][j];
+            memcpy((u8 *)&actor+j*sizeof(int),&n,sizeof(n));
+        }
+#endif
+        if (!actor.alive || (actor.order!=ORDER_BOARD && actor.order!=ORDER_TRANSPORTED) ||
+            actor.target<MAX_UNITS) continue;
+        if (!race_bunker_save_reference(candidate,&actor)) return 0;
+        if (actor.order==ORDER_TRANSPORTED && ++used[actor.target-MAX_UNITS]>SC64_BUNKER_CAPACITY) return 0;
+    }
+    return 1;
+}
+#endif
 #ifdef SC64_T5_RUNTIME
 #include "sc64_t5_save_adapter.h"
 #include "sc64_transport_save_adapter.h"
@@ -718,6 +774,9 @@ static int race_skirmish_transport_save_valid(const RaceSave *candidate,
                 return 0;
         }
         if (actor.order != ORDER_BOARD && actor.order != ORDER_TRANSPORTED) continue;
+#ifdef SC64_SHARED_BUNKER
+        if (actor.target>=MAX_UNITS) continue; /* checked by candidate-wide pass */
+#endif
         Unit carrier; unsigned space;
         int raw = actor.raw_type < 0 ? sc64_race_raw_unit(actor.type) : actor.raw_type;
         if (actor.target < 0 || actor.target >= MAX_UNITS || actor.target == i ||
@@ -1182,6 +1241,9 @@ static int race_save_game(void) {
             if (payload[i]) return 0;
     }
 #endif
+#ifdef SC64_SHARED_BUNKER
+    if (!race_bunker_save_world_valid(&race_data, race_cols, race_rows)) return 0;
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     if (race_data.state[0] && !race_skirmish_transport_save_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
@@ -1606,6 +1668,9 @@ static int race_load_game(void) {
     }
 #undef RACE_U
 #undef RACE_B
+#ifdef SC64_SHARED_BUNKER
+    if (!race_bunker_save_world_valid(&race_data, width, height)) return 0;
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
     if (race_data.state[0] && !race_skirmish_transport_save_valid(&race_data, width, height)) return 0;
 #endif
