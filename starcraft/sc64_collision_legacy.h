@@ -139,6 +139,10 @@ static void GBA_HOT
 #endif
 sc64_unit_buckets_begin(void)
 {
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+
     int i;
     if (!sc64_unit_bucket_initialized) {
         memset(sc64_unit_bucket_head, 0xff, sizeof(sc64_unit_bucket_head));
@@ -174,6 +178,10 @@ sc64_unit_buckets_begin(void)
 static void GBA_HOT
 sc64_unit_bucket_move(Unit *q)
 {
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+
     int slot = (int)(q - u), old_cell, new_cell;
     u8 before, after;
     if (!sc64_unit_bucket_active || slot < 0 || slot >= MAX_UNITS) return;
@@ -496,6 +504,10 @@ sc64_steer_list_step_clear(SC64_STEER_STEP_ARGS)
 static void
 sc64_unit_buckets_end(void)
 {
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+
     sc64_unit_bucket_active = 0;
 }
 

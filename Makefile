@@ -4500,7 +4500,7 @@ test-sc64-contact-bucket-birth: build/test-sc64-contact-bucket-birth
 # one-pass blocked-steering mask and the stock-rate cache against the original
 # query, unit_step_clear() and sc64_stock_motion_step(). Each variant needs its
 # profile's private generated inputs, so none of them is part of `make test`.
-CONTACT_CACHE_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+CONTACT_CACHE_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_CONTACT_MEMO_ORACLE -Icommon
 build/test-sc64-contact-cache-races: tests/sc64_contact_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) $(CONTACT_CACHE_TEST_FLAGS) $(RACES_FLAGS) -DSC64_CONTACT_CACHE $< common/gba.c -o $@
 build/test-sc64-contact-cache-p7: tests/sc64_contact_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.h common/gba.c Makefile | build
@@ -4768,3 +4768,16 @@ $(eval $(call DIRECT_FIRING_GAME_FIXTURE,on,-DSC64_DIRECT_FIRING_POINTS))
 test-sc64-direct-firing-points-game: test-sc64-direct-firing-flags build/test-sc64-direct-firing-points-off build/test-sc64-direct-firing-points-on
 	./build/test-sc64-direct-firing-points-off
 	./build/test-sc64-direct-firing-points-on
+
+# Asset-free exact contact memo contract fixture; the same collision headers
+# are compiled in their per-frame and persistent bucket lifecycle variants.
+SC64_CONTACT_MEMO_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST
+build/test-sc64-contact-memo-legacy: tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_collision_legacy.h common/gba.h Makefile | build
+	$(CLANG) $(SC64_CONTACT_MEMO_TEST_FLAGS) $< -o $@
+build/test-sc64-contact-memo-persistent: tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_persistent_collision.h common/gba.h Makefile | build
+	$(CLANG) $(SC64_CONTACT_MEMO_TEST_FLAGS) -DSC64_PERSISTENT_COLLISION $< -o $@
+.PHONY: test-sc64-contact-memo
+test-sc64-contact-memo: build/test-sc64-contact-memo-legacy build/test-sc64-contact-memo-persistent
+	./build/test-sc64-contact-memo-legacy
+	./build/test-sc64-contact-memo-persistent
+test: test-sc64-contact-memo
