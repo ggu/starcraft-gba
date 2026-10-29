@@ -4782,6 +4782,17 @@ find_selected_worker(void)
     return -1;
 }
 
+/* Automatic construction selection must not steal an existing build order.
+ * Explicit player orders may still interrupt construction normally. */
+static int
+build_worker_available(int worker, int owner, int type)
+{
+    return worker >= 0 && worker < MAX_UNITS && u[worker].alive &&
+        u[worker].owner == owner &&
+        (type < 0 ? IS_WORKER(u[worker].type) : u[worker].type == type) &&
+        !SC64_TRANSPORT_LOADED(&u[worker]) && !SC64_BUILD_WORKER_ORDER(u[worker].order);
+}
+
 #ifdef SC64_RACES
 static int
 race_nexus_command_available(void)
@@ -4877,7 +4888,7 @@ start_build(int type)
 #else
     i = find_selected_worker();
 #endif
-    if (i < 0) {
+    if (!build_worker_available(i, SIDE, -1)) {
 	toast(5);
 	return;
     }

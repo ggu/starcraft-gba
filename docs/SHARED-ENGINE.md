@@ -124,3 +124,22 @@ global feature parity or a hardware release. Emulated timing, fresh-process
 SRAM qualification, complete campaign playthroughs, and physical GBA testing
 remain separate checks. The remaining engine services above still need to be
 shared and validated.
+
+## Automatic builder ownership
+
+A new automatic construction request must choose an eligible worker before
+preferring the current selection. Pending and active constructors, transported
+workers, dead actors, and workers of another owner/type are not candidates.
+The same predicate protects the common race build entry point and AI worker
+selection; arriving pending workers still use their existing arrival checks.
+This prevents a second auto-build request from stealing an SCV from its first
+foundation. Explicit Move/Stop cancellation remains available. Probes become
+available when warp construction releases them; consumed Drones do not.
+
+`make test-shared-builders` checks the actual production compiler vectors.
+The fixtures include two simultaneous paid Terran builds, busy-worker
+rejection without order/wallet mutation, and the existing all-race travel,
+arrival, cancellation, payment and AI checks. `make test-build-worker-default`
+covers the original-art auto-builder selection and is in the default suite.
+The separate opt-in roster adapter must use the same predicate before it can
+be described as fixed; its integration is tracked by PR #147.

@@ -397,7 +397,7 @@ static int race_owner_worker(int owner, int type, int x, int y)
 {
     int i, best = -1, d, best_d = 0x7fffffff;
     for (i = 0; i < MAX_UNITS; ++i) {
-        if (!u[i].alive || u[i].owner != owner || u[i].type != type || SC64_BUILD_WORKER_ORDER(u[i].order)) continue;
+        if (!build_worker_available(i, owner, type)) continue;
         d = dist2(x, y, u[i].x, u[i].y);
         if (d < best_d) { best_d = d; best = i; }
     }
@@ -578,7 +578,8 @@ static int race_build_request_valid(int owner, int worker, int type,
 static int race_start_build(int owner, int worker, int type, int x, int y)
 {
     Sc64RaceBank bank;
-    if (!race_build_request_valid(owner, worker, type, &x, &y, 0)) return 0;
+    if (!build_worker_available(worker, owner, -1) ||
+        !race_build_request_valid(owner, worker, type, &x, &y, 0)) return 0;
     bank.minerals = (unsigned short)race_owner_minerals(owner);
     bank.gas = (unsigned short)race_owner_gas(owner);
     if (!sc64_race_pay_building(&bank, type)) return 0;

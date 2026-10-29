@@ -4913,3 +4913,30 @@ test-sc64-order-marker-unified: build/test-sc64-order-marker-game-unified build/
 	./build/test-sc64-order-marker-game-unified
 	./build/test-sc64-order-marker-game-direct
 test-unified: test-sc64-order-marker-unified
+
+.PHONY: test-build-worker-default
+test: test-build-worker-default
+test-build-worker-default: build/test-build-worker-default
+	./build/test-build-worker-default
+build/test-build-worker-default: tests/sc64_build_worker_default_game.c $(STARCRAFT_HEADERS) $(COMMON_HEADERS) Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
+
+# Shared builder safety and arrival semantics in all normal race products.
+define SHARED_BUILDER_FIXTURE
+build/test-shared-builder-$(1): tests/sc64_construction_arrival_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(RACES_INPUTS) $(3) common/gba.c $$(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) $$($(2)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(4) -o $$@
+endef
+$(eval $(call SHARED_BUILDER_FIXTURE,terran,TERRAN_ROM_FLAGS,$(TERRAN_FULL_INPUTS)))
+$(eval $(call SHARED_BUILDER_FIXTURE,zerg,ZERG_ROM_FLAGS,$(ZERG_Z6_INPUTS)))
+$(eval $(call SHARED_BUILDER_FIXTURE,protoss,PROTOSS_P7_CANONICAL_FLAGS,$(PROTOSS_P7_CANONICAL_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call SHARED_BUILDER_FIXTURE,showcase,SHOWCASE_FLAGS,$(SHOWCASE_INPUTS)))
+$(eval $(call SHARED_BUILDER_FIXTURE,races,RACES_FLAGS))
+$(eval $(call SHARED_BUILDER_FIXTURE,unified,UNIFIED_FLAGS))
+.PHONY: test-shared-builders
+test-shared-builders: $(addprefix build/test-shared-builder-,terran zerg protoss showcase races unified)
+	./build/test-shared-builder-terran
+	./build/test-shared-builder-zerg
+	./build/test-shared-builder-protoss
+	./build/test-shared-builder-showcase
+	./build/test-shared-builder-races
+	./build/test-shared-builder-unified
