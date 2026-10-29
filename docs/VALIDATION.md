@@ -6913,6 +6913,72 @@ Private evidence lives in `.local/build/shared-battery-arm-v3`,
 `shared-battery-sram-v3`, `shared-battery-p7-prefix-v3`,
 `battery-public-targets-v1`, `shared-battery-matrix-v1`,
 `battery-save-integrated-v3`, `battery-art-review-v1`,
-`zerg-visible-vfx-v1` and `battery-zerg-net-v1`. The final default and campaign
-aggregates and a full current P7 ARM win are recorded separately when complete;
-these scoped results are not substitutes for those gates or full roster parity.
+`zerg-visible-vfx-v1` and `battery-zerg-net-v1`. The v3 P7 normal-menu replay
+subsequently completed all 49,229 calls and won at frame 48,939, taking
+123,808,001,557 guest cycles including menus. All 50 milestone observations and
+the observed final snapshot match the previous count candidate. Evidence is in
+`shared-battery-p7-full-v3`. The native v1 matrix completed 54 matches (10 wins,
+44 losses, zero harness failures), 702 startup/save configurations and 27
+construction cases. The v1 campaign gates passed the full Terran host aggregate,
+P7 canonical checks and legacy Battery checks; these remain distinct from full
+ARM campaign progression and full roster parity.
+
+### Shared-profile guard and Scourge effect corrections (2026-10-30)
+
+Checking the plain unified product exposed two missing capability guards in
+the preceding integration. Battery mobility validation referenced the extended
+actor-facts API even when that API was absent, and shared Scourge target checks
+referenced mission invincibility storage in plain race builds that do not
+allocate it. Runtime and candidate-save Battery checks now share a guarded
+predicate; its native shielded Protoss identities are movable. The
+Scourge check retains invincibility protection wherever its storage exists.
+
+The unified weapon fixture then found a real effect defect: the Scourge burst
+mapping was enabled for P3/Z7 but omitted the shared Scourge capability. The
+mapping now follows the shared mechanic. The added impact regression checks the
+burst profile, shields/armor damage, attacker consumption, supply decrement and
+absence of repeated damage. Existing weapon assertions were retained. A separate
+plain-profile Battery fixture checks native Zealot eligibility and rejects a
+forged Battery target in both runtime and candidate validation, without a skip.
+Fresh `make unified` and `make test-unified` pass in the frozen v5 snapshot.
+The unified ARM image leaves 3,224 EWRAM and 752 IWRAM bytes before the guards.
+Earlier failed snapshots and compiler logs are retained rather than counted as
+passing checks.
+
+All four v6 canonical ARM links pass unchanged memory guards. Protoss and
+Showcase ROMs are byte-identical to v3, so their v3 SRAM and P7 replay proofs
+apply to the same executable bytes. Terran and Zerg changed with the effect
+mapping. Their new Battery saves match complete fresh/in-place actor banks and
+state at updates 0, 1, 2, 3, 4, 100 and 1,000. These are host-fixture-seeded
+saves, not ordinary-acquisition qualification. The Zerg three-AI sample remains
+747,475,403 cycles over 1,000 updates (22.45 effective fps); all 8,928 advancing
+prefix observations match v3's unit fields, building bank, visibility, resources
+and rendered pixels. This broad parity check does not substitute for the
+targeted Scourge impact fixtures.
+
+The v2 native matrix again passes all 54 terminal matches across both maps,
+all human races and one to three AIs, plus 702 startup/save configurations and
+27 construction cases. The four-profile Battery game/save and shared Scourge
+fixtures pass all 12 cases. The public VFX profile target passes with its
+designated flags. An exploratory invocation with canonical source-effect flags
+was incompatible with that fixture's legacy-tracer assertions and is not used
+as qualification. No production assertion was relaxed to accommodate it.
+
+The fresh full Terran host aggregate also passes all ten controllers and its
+included combat, world, repair, save and startup checks. The final default
+doctor/build/test gates pass: 685 Python checks with 23 optional skips, the
+additional eight-test suite and the host C checks. These snapshots precede
+only a two-line Battery comment correction; no C tokens or line counts changed.
+The subsequent v7 four-profile ARM rebuild consumes that final header and is
+byte-identical to v6, with unchanged bounds. Default, unified and Terran gate
+evidence is in `shared-battery-fallback-final-gates-v2`,
+`shared-battery-unified-v5` and `shared-battery-campaign-gates-v2`.
+
+Actual compiler vectors, raw dependencies, input hashes and maps are under
+`shared-battery-unified-v5`, `shared-battery-arm-v6`, `shared-battery-arm-v7`,
+`shared-battery-skirmish-v2`, `shared-battery-sram-v6`,
+`shared-battery-zerg-v6` and `shared-battery-vfx-public-v6`. The four canonical
+ROMs in `.local/releases/20261030-shared-battery-profile-fixes` match these
+qualified products outside the standard header. No SD delivery, physical
+hardware qualification or steady-30-fps result is claimed. The full roster
+services and remaining campaign stages still require implementation.

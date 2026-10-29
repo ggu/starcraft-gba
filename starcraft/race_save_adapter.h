@@ -484,8 +484,7 @@ static int race_battery_saved_recharge_valid(const RaceSave *candidate,
         actor->shield<0 || actor->shield>rule->shields || actor->shield_remainder<0 ||
         actor->shield_remainder>=1280 ||
         (actor->shield==rule->shields && actor->shield_remainder!=0) ||
-        (sc64_game_unit_actor_flags(actor->type) &&
-         !(sc64_game_unit_actor_flags(actor->type)&SC64_GAME_ACTOR_MOVABLE)) ||
+        SC64_BATTERY_UNIT_IMMOVABLE(actor->type) ||
         !race_battery_save_building(candidate,(unsigned)actor->target,&battery) ||
         !race_battery_saved_fields_valid(&battery) || battery.under_construction ||
         battery.owner!=actor->owner) return 0;

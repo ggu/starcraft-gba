@@ -5172,3 +5172,11 @@ $(eval $(call OWNER_LIST_FIXTURE,showcase,SHOWCASE_FLAGS,P7_ARBITER_INPUTS,))
 .PHONY: test-sc64-owner-lists
 test-sc64-owner-lists: $(foreach profile,terran zerg protoss showcase,build/test-sc64-owner-lists-$(profile))
 	@set -e; for profile in terran zerg protoss showcase; do ./build/test-sc64-owner-lists-$$profile; done
+
+# The plain unified profile has native actors but no extended actor-facts API.
+build/test-sc64-shared-battery-plain: tests/sc64_shared_battery_plain.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(UNIFIED_FLAGS) $< common/gba.c -o $@
+.PHONY: test-sc64-shared-battery-plain
+test-sc64-shared-battery-plain: build/test-sc64-shared-battery-plain
+	./build/test-sc64-shared-battery-plain
+test-unified: test-sc64-shared-battery-plain

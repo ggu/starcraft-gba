@@ -2999,7 +2999,10 @@ sc64_p3_can_attack_from(int attacker, int target, int owner)
     if (attacker == U_SCOURGE &&
         (target < 0 || target >= MAX_UNITS || !u[target].alive ||
          !sc64_race_unit_flying(u[target].type) || (u[target].flags & 16) ||
-         invincible_units[target] || !owners_hostile(owner, u[target].owner))) return 0;
+#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+         invincible_units[target] ||
+#endif
+         !owners_hostile(owner, u[target].owner))) return 0;
 #ifdef SC64_T6_RUNTIME
     if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target)) return 0;
 #endif

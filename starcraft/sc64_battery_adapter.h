@@ -150,6 +150,15 @@ static int race_battery_powered_live(int battery)
 }
 static int race_battery_target_valid(int battery)
 { return race_battery_fields_valid(battery) && !b[battery].under_construction && race_battery_powered_live(battery); }
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+#define SC64_BATTERY_UNIT_IMMOVABLE(type) \
+    (sc64_game_unit_actor_flags(type) && \
+     !(sc64_game_unit_actor_flags(type)&SC64_GAME_ACTOR_MOVABLE))
+#else
+/* Native shielded Protoss identities are movable; immovable scenario actors
+ * require the extended actor facts. Keep their API out of plain profiles. */
+#define SC64_BATTERY_UNIT_IMMOVABLE(type) 0
+#endif
 static int race_battery_unit_valid(int unit,int battery)
 {
     if(unit<0 || unit>=MAX_UNITS || battery<0 || battery>=MAX_BUILDINGS) return 0;
@@ -162,7 +171,7 @@ static int race_battery_unit_valid(int unit,int battery)
        (race_battery_p7_context() && q->raw_type<0) ||
        !rule || rule->race!=R_PROTOSS || !(rule->flags&SC_RACE_F_SHIELDS) ||
        q->shield>=rule->shields || q->shield<0 || q->shield_remainder<0 || q->shield_remainder>=1280 ||
-       (sc64_game_unit_actor_flags(q->type) && !(sc64_game_unit_actor_flags(q->type)&SC64_GAME_ACTOR_MOVABLE))) return 0;
+       SC64_BATTERY_UNIT_IMMOVABLE(q->type)) return 0;
     return 1;
 }
 static int race_battery_distance_unit(int unit,int battery)

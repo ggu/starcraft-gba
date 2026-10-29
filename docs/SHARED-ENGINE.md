@@ -175,3 +175,10 @@ is not promised.
 four canonical compiler vectors. The source-art fixture also checks Battery
 body pixels and clipping. Prepared-profile ARM links and fresh-process SRAM
 continuation are recorded separately in [`VALIDATION.md`](VALIDATION.md).
+
+The plain race/unified build does not compile the extended actor-facts API.
+Its native units use the same Battery checks through a capability-aware mobility
+predicate. `make test-sc64-shared-battery-plain` verifies this configuration,
+including rejection of forged building identities; it is part of
+`make test-unified`. Shared Scourge target protection and impact effects likewise
+follow their compiled capabilities rather than requiring a campaign flag.
