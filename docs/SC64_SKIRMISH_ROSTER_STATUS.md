@@ -8,6 +8,40 @@ The authored raw-ID catalog in [`sc64_skirmish_catalog.h`](../starcraft/sc64_ski
 
 The product queue is still the engine's bounded queue and unit representation. A catalog row does not itself supply missing movement, combat, morph, spell, cargo, ammunition, or subunit behavior. In particular, catalog modes and morphs are not generic training products. The UI and adapter work is under test; this page does not claim full custom-game roster completion or hardware qualification.
 
+The local integration fixture exercises Barracks and Factory construction,
+Machine Shop payment and completion, per-Factory Tank admission, Tank payment
+and birth, Stargate prerequisites and psi, and Zerg building morph clocks.
+It passed under host address/undefined-behavior sanitizers for all four normal
+profile flag sets. The existing normal-input Blood Bath pylon regression also
+passed for Showcase. Four normal ARM products linked within the existing RAM
+guards; these checks do not establish a new frame-rate measurement.
+
+## Opt-in identity extension
+
+`SC64_SKIRMISH_ROSTER` appends the ordinary raw identities missing from each
+profile, retaining all previous enum values. It is currently **off in normal
+ROM targets**. The asset-free rule fixture checks all three races in each
+profile: 40 ordinary unit/morph rows and 51 building/addon/morph rows, with
+numeric stock facts checked for newly appended rows.
+
+| Compile profile | Unit enum count | Building enum count |
+| --- | ---: | ---: |
+| Terran | 58 | 66 |
+| Zerg | 55 | 64 |
+| Protoss P7 | 58 | 65 |
+| Showcase | 57 | 65 |
+
+Run `make test-sc64-skirmish-catalog test-sc64-skirmish-menu
+test-sc64-skirmish-rules` for the asset-free checks, and
+`make test-sc64-skirmish-runtime` with the corresponding prepared inputs.
+Identity/rule coverage does not supply a missing sprite or behavior. Before
+enabling the extension in normal ROMs, qualify the remaining runtime paths,
+fact-table generation, imported art, and every active save codec. Expanded
+building types also require a new save generation or explicit migration.
+The compact and P7 typed building codecs have a seventh type bit in reserved
+padding without increasing their row sizes; unchanged old low-type rows retain
+their existing field offsets and bytes.
+
 ## Sprite and facing coverage
 
 The four prepared normal profile flag sets inspected for this status are Terran, Zerg, Protoss P7, and Showcase. They all enable the authored race sprite adapter and unit-facing rendering, but they do not enable the same campaign actor banks. Unit sprite lookup uses an explicit raw-ID source-frame switch. If no source frame or facing frame exists, `game.c` falls through to its compact authored placeholder drawing; a fallback is not counted as sprite coverage. Facing uses a separate source-frame sidecar and mirrors the 17 source directions to cover the runtime's 32 directions ([`sc64_unit_facing.h`](../starcraft/sc64_unit_facing.h)).

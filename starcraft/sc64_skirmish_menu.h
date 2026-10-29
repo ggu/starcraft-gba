@@ -62,6 +62,28 @@ static inline unsigned sc64_skirmish_menu_count(unsigned race)
     return n;
 }
 
+/* Keep controller labels short enough to leave room for mineral/gas costs
+ * in the GBA HUD. The catalog retains the longer descriptive names. */
+static inline const char *sc64_skirmish_menu_label(const Sc64SkirmishRecord *r)
+{
+    switch (r->raw_id) {
+    case 107: return "COMSAT";
+    case 108: return "NUCLEAR SILO";
+    case 115: return "CONTROL TOWER";
+    case 117: return "COVERT OPS";
+    case 118: return "PHYSICS LAB";
+    case 120: return "MACHINE SHOP";
+    case 130: return "INFEST COMMAND";
+    case 132: return "MORPH LAIR";
+    case 133: return "MORPH HIVE";
+    case 137: return "GREATER SPIRE";
+    case 144: return "MORPH SPORE";
+    case 146: return "MORPH SUNKEN";
+    case 171: return "SUPPORT BAY";
+    default: return r->name;
+    }
+}
+
 static inline int sc64_skirmish_menu_at(unsigned race, unsigned index,
                                          Sc64SkirmishMenuRow *out)
 {
@@ -101,7 +123,7 @@ static inline int sc64_skirmish_menu_at(unsigned race, unsigned index,
         if (sc64_skirmish_menu_is_basic(race, r->raw_id)) continue;
         if (n++ != index) continue;
         out->record = r;
-        out->label = r->name;
+        out->label = sc64_skirmish_menu_label(r);
         out->kind = r->kind == SC64_SK_ADDON ? SC64_SK_MENU_ADDON :
                     r->kind == SC64_SK_BUILDING_MORPH ? SC64_SK_MENU_MORPH :
                     SC64_SK_MENU_BUILD;

@@ -77,7 +77,11 @@ static void check_menu_race(unsigned race)
             if (ordinal++ == i) { expected_record = r; break; }
         }
         assert(expected_record && row.record == expected_record);
-        assert(!strcmp(row.label, expected_record->name));
+        /* 17 six-pixel cells leave room for both three-digit costs before
+         * the minimap starts at x=178 in the command-icon HUD. */
+        assert(row.label && strlen(row.label) <= 17);
+        if (row.record->raw_id == 120) assert(!strcmp(row.label, "MACHINE SHOP"));
+        if (row.record->raw_id == 132) assert(!strcmp(row.label, "MORPH LAIR"));
         if (expected_record->kind == SC64_SK_ADDON)
             assert(row.kind == SC64_SK_MENU_ADDON);
         else if (expected_record->kind == SC64_SK_BUILDING_MORPH)
