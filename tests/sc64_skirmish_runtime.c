@@ -123,6 +123,13 @@ static void terran_construction_and_addon(void)
     barracks = build_with_worker(111, worker);
     assert(barracks >= 0 && sc64_race_raw_building(b[barracks].type) == 111);
     assert(race_skirmish_requirements(SIDE, factory_row));
+    {
+        int wrong_worker = spawn_unit(SIDE, U_PROBE, 700, 700);
+        int x = 700, y = 700;
+        assert(wrong_worker >= 0);
+        assert(!race_build_request_valid(SIDE, wrong_worker, building_raw(113), &x, &y, 0));
+        u[wrong_worker].alive = 0;
+    }
     choose_command(menu_row_raw(113));
     assert(mode == MODE_BUILD && menu == building_raw(113));
     factory = build_with_worker(113, worker);

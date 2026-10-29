@@ -592,7 +592,8 @@ static int race_build_request_valid(int owner, int worker, int type,
     }
     if (!r || r->race != race_owner_identity(owner) || worker < 0 || worker >= MAX_UNITS ||
         !u[worker].alive || u[worker].owner != owner ||
-        (race_mode ? !sc64_race_is_worker(u[worker].type) : u[worker].type != r->worker) ||
+        (race_mode ? (!sc64_race_is_worker(u[worker].type) ||
+            sc64_race_unit_rule(u[worker].type)->race != r->race) : u[worker].type != r->worker) ||
         !race_can_site(owner, type, *x, *y) ||
         !can_place_except_worker(type, *x, *y, arriving ? worker : -1)) return 0;
     return find_build_slot() >= 0;
