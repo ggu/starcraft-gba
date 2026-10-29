@@ -6308,7 +6308,9 @@ Read-only profiling of that same three-AI replay reproduces all 9,000 timing
 rows exactly. Mean frame work is 823,830 guest cycles: update-entry to audio
 249,145; audio to render 64; render to next update 574,621 (includes presentation
 and loop overhead). The drawing counter averages 480,890 cycles, including
-206,532 for units and 124,372 for background. The 27 route-build frames have
+206,532 for the unit/effect phase and 124,372 for background. The unit/effect
+phase includes death effects, tracers and projectiles; it does not isolate sprite
+compositing. The 27 route-build frames have
 the largest update spikes; even zero-build frames average only 21.67 fps.
 Rendering is the next sustained-cost target; route construction remains a
 separate spike target. Counters overlap and must not all be added together.
