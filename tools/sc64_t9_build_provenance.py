@@ -7,7 +7,8 @@ driver wrapped. The driver runs with -v, -MD and -wrapper, which only add
 logging: every driver and subcommand argv (cc1, as, collect2) is recorded
 verbatim and in order, and each cc1 writes its own raw dependency file instead
 of every unit overwriting one. Every file those dependency files, the commands
-and the link maps name is then hashed.
+and the link maps name is then hashed. Every output is a .txt file, so the
+bundle passes tools/check_source_tree.py when committed.
 
 The host controller binary, trace and tape are held with make -o, and a dry
 run refuses any recipe other than the two links, size, objcopy and
@@ -165,7 +166,7 @@ def capture(out: Path, expect: dict[str, str], retained: dict[str, Path]) -> int
         env = dict(os.environ, T9_PROV_DIR=str(log), T9_PROV_SUB=str(sub),
                    T9_PROV_CC=shutil.which(PREFIX + "gcc") or PREFIX + "gcc")
         made = subprocess.run(make_cmd(driver), cwd=ROOT, env=env, capture_output=True, text=True)
-        (out / "make.log").write_text(made.stdout.replace(str(driver), "CAPTURE_CC"))
+        (out / "make-log.txt").write_text(made.stdout.replace(str(driver), "CAPTURE_CC"))
         if made.returncode:
             sys.stderr.write(made.stderr[-4000:])
             return made.returncode
@@ -195,7 +196,7 @@ def collect(dest: Path, log: Path, name: str, rom: str, expected: str | None,
     for argv_file in sorted(log.glob("*.argv")):
         args = read_argv(argv_file)
         stem = argv_file.stem
-        (dest / "commands" / f"{stem}.args").write_text("\n".join(args) + "\n")
+        (dest / "commands" / f"{stem}.args.txt").write_text("\n".join(args) + "\n")
         if stem == "00-driver":
             prev = ""
             for a in args:
@@ -215,7 +216,7 @@ def collect(dest: Path, log: Path, name: str, rom: str, expected: str | None,
             flag_lines.append("")
     (dest / "tu-flags.txt").write_text("\n".join(flag_lines))
     for dep in sorted((log / "deps").glob("*.d")):
-        shutil.copyfile(dep, dest / "deps" / dep.name)
+        shutil.copyfile(dep, dest / "deps" / f"{dep.name}.txt")
         for path in dep_prerequisites(dep.read_text()):
             note(path, "dependency")
     for line in (ROOT / f"build/{name}.map").read_text(errors="replace").splitlines():
@@ -230,7 +231,7 @@ def collect(dest: Path, log: Path, name: str, rom: str, expected: str | None,
                 if l.startswith(" /")]
     (dest / "driver-v-commands.txt").write_text("\n".join(commands) + "\n")
 
-    with (dest / "inputs.sha256").open("w") as f:
+    with (dest / "inputs-sha256.txt").open("w") as f:
         for path in sorted(inputs):
             f.write(f"{sha256(ROOT / path if not Path(path).is_absolute() else Path(path))}  {path}\n")
     with (dest / "inputs-kind.txt").open("w") as f:
@@ -238,11 +239,11 @@ def collect(dest: Path, log: Path, name: str, rom: str, expected: str | None,
             f.write(f"{inputs[path]}\t{path}\n")
     tool_paths = set(tools) | {run([PREFIX + "gcc", "-print-prog-name=ld"]).strip()}
     tool_paths |= {shutil.which(PREFIX + t) or "" for t in ("gcc", "size", "objcopy")}
-    with (dest / "toolchain.sha256").open("w") as f:
+    with (dest / "toolchain-sha256.txt").open("w") as f:
         for path in sorted(os.path.realpath(p) for p in tool_paths if p):
             f.write(f"{sha256(Path(path))}  {path}\n")
     outputs = {p: sha256(ROOT / p) for p in (rom, f"build/{name}.elf", f"build/{name}.map")}
-    with (dest / "outputs.sha256").open("w") as f:
+    with (dest / "outputs-sha256.txt").open("w") as f:
         for path, digest in outputs.items():
             f.write(f"{digest}  {path}\n")
     if retained:

@@ -6237,6 +6237,11 @@ inputs in mGBA, on the commits and private inputs listed below. It does not
 cover physical hardware, saving and resuming inside T9, or the other open
 Terran controllers (T5, T7 and T8).
 
+The result applies only to runtime `9ff7f7c`. It does not qualify any later
+runtime. `codex/source-release` has since moved to `8d1e653`, 15 commits on,
+which change 15 files under `starcraft/` and `common/`. T9 needs a fresh host
+completion and ARM replay on any runtime that is to be qualified.
+
 Provenance of the qualifying run:
 
 - **Runtime:** `codex/source-release` at
@@ -6246,6 +6251,9 @@ Provenance of the qualifying run:
 - **Controller, probe and driver:** commit
   `2d575f6509137cd986c04fbe03e2f48aa32a2e83`. The ROMs, trace and tape below
   were built from that tree.
+- **Build-provenance capture:** commit
+  `7f595810dcc83cc0e4f6b6283101beace8cfde59`, which adds only the capture tool
+  and its test. It rebuilt both ROMs byte for byte (see "Build provenance").
 
 ### Why the earlier controller stalled
 
@@ -6381,12 +6389,11 @@ Superseded runs are not part of this record's evidence:
 | Item | SHA-256 |
 | --- | --- |
 | Canonical Terran ROM `build/StarCraft-Terran-GBA.gba` (32 MiB) | `685788ff1909fd532d4d128e18d5bd4c108b13b581c4d248672e9900783954df` |
-| Its ELF | `5fcb78f02d5c4cce8608c13b1786283328ac8a9a4ea289bae544325f58119a18` |
+| Its retained ELF | `5fcb78f02d5c4cce8608c13b1786283328ac8a9a4ea289bae544325f58119a18` |
 | Replay ROM `build/StarCraft-Terran-T9-ARM-Replay.gba` (32 MiB) | `3a8986dcf5e71e1c4aef7d984e883904ad80cf2e912ccb8740da40e0f19d5276` |
-| Its ELF | `0a57e591b1dab8a30426b581006d3f4b54f59b84836ad2b39da07f49a9ef4e49` |
+| Its retained ELF | `0a57e591b1dab8a30426b581006d3f4b54f59b84836ad2b39da07f49a9ef4e49` |
 | Host trace `build/t9-arm/t9-controller.json` | `8868402d01d8a2d66a5b80d6f2f7d873f6ac8343b8fd817e98378d2e66ed1f74` |
 | Generated tape header | `3a70737c14a909f48752f287854287e96b27a3a427c6f54270315b585eb45a9a` |
-| Sorted `-D` set of the canonical Terran ROM link (59 flags) | `012ef3224a1e0c26806ff62a6f51bf14fa3c7446f1552fbeb41f099769c88144` |
 | Private T9 scenario header | `e879cf500ce748efff5ede644e4d1790b5cdf9380de9fc95406ca362175cc0bd` |
 | Private T9 availability header | `cf4996518f08027a487fc499c188c7855dbf9c77a77b3e9c467f28a1649ab517` |
 | Private late-Terran race header | `9231da838e256a48dfd3d06f63708f5f05c9afe2326ccfeceb07e337cc35c0bf` |
@@ -6397,15 +6404,32 @@ The private inputs come from the StarCraft 64 USA ROM with SHA-1
 `a36d91b5aac7bb95df0d7de5f9814f5270e25c2b` and the pinned `sc64-maps`
 checkout at `09b57f787a247107d1de82b8c5eab2734667ea1d`. They are prepared
 locally and stay out of Git, as do the trace, tape, ROMs and emulator logs.
-The flag set is computed as
-`make -n -W Makefile build/starcraft-terran.elf | grep -o '\-D[A-Z0-9_=]*' | sort -u | tr '\n' ' ' | shasum -a 256`.
-It is the `a4ff09d` set plus `SC64_ROUTE_MONOTONE_PROBE`, which arrived with the
-merged base; without that flag the same command gives the earlier
-`57cf3522…`. The replay ROM links within the unchanged IWRAM guard
+The replay ROM links within the unchanged IWRAM guard
 (`__iwram_end = 0x03004e38 < 0x03005000`) and BSS guard
-(`__bss_end = 0x020369b0 < 0x0203e000`) in `common/gba.ld`. Rebuilding the
-replay ROM reproduced the same ROM hash, but the ELF hash changed between
-rebuilds, so the ROM hash identifies the build.
+(`__bss_end = 0x020369b0 < 0x0203e000`) in `common/gba.ld`.
+
+### Build provenance
+
+`docs/provenance/t9-9ff7f7c/` records the executed builds of both ROMs. It was
+captured by `tools/sc64_t9_build_provenance.py` from the real `make` recipes
+with the compiler driver wrapped, not from a dry run. For each ROM it holds:
+
+- the driver argv and every executed `cc1`, `as` and `collect2` argv, in order
+- each unit's ordered `-D` and `-I` options as `cc1` received them, with every
+  `-I` ahead of the `-D` options and the driver-added `-D__USES_INITFINI__`
+- each unit's raw `-MD` dependency file
+- SHA-256 manifests of every consumed source, generated header, audio blob,
+  linker script, library and toolchain binary
+
+Its README gives the command and method. The rebuild matched both ROM hashes
+above byte for byte. Against the retained ELFs that produced the qualifying ROMs, the
+rebuilt ELFs differ in 12 bytes, all in `.strtab`. Those bytes are two local
+`FILE` symbols named after the driver's random temporary objects. Every other
+section, including code, data, IWRAM and DWARF, is identical. The ELF hash
+therefore changes on every build, and the ROM hash identifies the build. The
+sorted `make -n` flag-set hash in earlier revisions of this record could not
+establish include order or the consumed inputs, and the provenance folder
+replaces it.
 
 ### Other checks in this environment
 
