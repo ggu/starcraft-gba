@@ -387,10 +387,9 @@ static int race_can_site(int owner, int type, int x, int y)
     /* Imported Lairs/Hives and Greater Spires are recognized structures,
        but this adapter does not implement their morph/build operations. */
     if (type == B_LAIR || type == B_HIVE || type == B_GREATER_SPIRE) return 0;
-#ifdef SC64_P7_BATTERY_ENABLED
-    if ((r->flags & SC_RACE_F_REQUIRES_POWER) && race_p7_active() &&
-        type==B_P7_SHIELD_BATTERY) {
-        if (!race_p7_battery_site_powered(owner,x,y)) return 0;
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    if (sc64_race_raw_building(type)==172 && race_battery_active()) {
+        if (!race_battery_site_powered(owner,x,y)) return 0;
     } else
 #endif
     if (((r->flags & SC_RACE_F_REQUIRES_POWER) ||
@@ -812,8 +811,8 @@ static void race_tick_state(void)
         if (r->shields && u[i].shield < r->shields) {
             unsigned short value = (unsigned short)u[i].shield;
             unsigned short rem = (unsigned short)u[i].shield_remainder;
-#ifdef SC64_P7_BATTERY_ENABLED
-            if (race_p7_active()) {
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+            if (race_battery_active()) {
                 unsigned shield_value=value, shield_rem=rem;
                 sc64_p7_battery_passive_shield_tick(&shield_value,r->shields,
                                                      &shield_rem);
@@ -840,8 +839,8 @@ static void race_tick_state(void)
             b[i].shield = value;
             b[i].shield_remainder = rem;
         }
-#ifdef SC64_P7_BATTERY_ENABLED
-        if (race_p7_active() && b[i].type==B_P7_SHIELD_BATTERY &&
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+        if (race_battery_active() && sc64_race_raw_building(b[i].type)==172 &&
             !b[i].under_construction && b[i].queue_count==0) {
             unsigned energy=(unsigned)b[i].queue_progress;
             unsigned phase=(unsigned)b[i].level;

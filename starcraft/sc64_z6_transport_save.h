@@ -57,6 +57,12 @@ static int race_z6_transport_save_candidate_valid(
                                    (unsigned)width * 16u,
                                    (unsigned)height * 16u, &actor)) return 0;
         if (!actor.alive) continue;
+#ifdef SC64_SHARED_BATTERY
+        if (actor.order==ORDER_RECHARGE) {
+            if (!race_battery_saved_recharge_valid(candidate,&actor)) return 0;
+            continue;
+        }
+#endif
         if (actor.order < ORDER_IDLE ||
             (actor.order > ORDER_UNLOAD && !SC64_NYDUS_ORDER(actor.order) &&
              !SC64_PENDING_BUILD_ORDER(actor.order))) return 0;

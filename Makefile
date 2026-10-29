@@ -280,7 +280,7 @@ SC64_ORDER_MARKER_FLAGS := -DSC64_ORDER_MARKER_ART -I$(SC64_ORDER_MARKER_DIR)
 $(SC64_ORDER_MARKER_HEADER): tools/sc64_order_marker_pack.py tools/sc64_construction_sprites.py tools/sc64_death_sprites.py tools/sc64_sprites.py tools/sc64_unit_facing.py common/gba.c common/gba.h starcraft/sc64_display.h
 	python3 tools/sc64_order_marker_pack.py
 
-SC64_SHARED_ENGINE_FLAGS := -DSC64_CONSTRUCTION_HP -DSC64_SIEGE_SPLASH -DSC64_SHARED_SCOURGE_COMBAT
+SC64_SHARED_ENGINE_FLAGS := -DSC64_CONSTRUCTION_HP -DSC64_SIEGE_SPLASH -DSC64_SHARED_SCOURGE_COMBAT -DSC64_SHARED_BATTERY
 RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_ENGINE_CORE_REQUIRED $(SC64_SHARED_ENGINE_FLAGS) -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated -I$(SC64_INTERFACE_DIR) $(HUD_ICON_FLAGS) $(RACE_CONSTRUCTION_FLAGS) $(SC64_BUILDING_FIRE_FLAGS) $(SC64_ORDER_MARKER_FLAGS)
 RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(SC64_INTERFACE_INPUTS) $(COMMAND_ICON_HEADER) $(RACE_CONSTRUCTION_INPUTS) $(SC64_BUILDING_FIRE_HEADER) $(SC64_ORDER_MARKER_HEADER)
 
@@ -5139,3 +5139,36 @@ test-sc64-p7-count-snapshot-reference: build/test-sc64-p7-count-snapshot-referen
 	./build/test-sc64-p7-count-snapshot-reference
 test-sc64-showcase-count-snapshot-reference: build/test-sc64-showcase-count-snapshot-reference
 	./build/test-sc64-showcase-count-snapshot-reference
+
+# Shared Battery mechanics and candidate-only save validation in each product.
+define SHARED_BATTERY_FIXTURE
+build/test-sc64-shared-battery-$(1)-$(2): tests/sc64_shared_battery_$(1).c $(STARCRAFT) $(wildcard starcraft/*.h) $($(4)) $(SKIRMISH_CONTROLLER_EXTRA_INPUTS) $(5) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(SKIRMISH_RUNTIME_TEST_FLAGS) $$($(3)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(5) -o $$@
+endef
+$(foreach case,game save,$(eval $(call SHARED_BATTERY_FIXTURE,$(case),terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,)))
+$(foreach case,game save,$(eval $(call SHARED_BATTERY_FIXTURE,$(case),zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS,)))
+$(foreach case,game save,$(eval $(call SHARED_BATTERY_FIXTURE,$(case),protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,$(P7_INTERCEPTOR_FLIGHT_SOURCES))))
+$(foreach case,game save,$(eval $(call SHARED_BATTERY_FIXTURE,$(case),showcase,SHOWCASE_FLAGS,P7_ARBITER_INPUTS,)))
+SHARED_BATTERY_BINARIES := $(foreach profile,terran zerg protoss showcase,$(foreach case,game save,build/test-sc64-shared-battery-$(case)-$(profile)))
+.PHONY: test-sc64-shared-battery
+test-sc64-shared-battery: $(SHARED_BATTERY_BINARIES)
+	@set -e; for binary in $(SHARED_BATTERY_BINARIES); do ./$$binary; done
+
+build/test-sc64-source-animation-frame-reference: tests/sc64_source_animation_frame_reference.c tests/sc64_motion_reuse_render.c $(wildcard starcraft/sc64_weapon_source*.h) common/gba.h Makefile | build
+	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) -Icommon $< -o $@
+.PHONY: test-sc64-source-animation-frame-reference
+test-sc64-source-animation-frame-reference: build/test-sc64-source-animation-frame-reference
+	./build/test-sc64-source-animation-frame-reference
+test: test-sc64-source-animation-frame-reference
+
+define OWNER_LIST_FIXTURE
+build/test-sc64-owner-lists-$(1): tests/sc64_owner_lists_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $($(3)) $(SKIRMISH_CONTROLLER_EXTRA_INPUTS) $(4) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(SKIRMISH_CONTROLLER_HOST_FLAGS) $$($(2)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(4) -o $$@
+endef
+$(eval $(call OWNER_LIST_FIXTURE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,))
+$(eval $(call OWNER_LIST_FIXTURE,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS,))
+$(eval $(call OWNER_LIST_FIXTURE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call OWNER_LIST_FIXTURE,showcase,SHOWCASE_FLAGS,P7_ARBITER_INPUTS,))
+.PHONY: test-sc64-owner-lists
+test-sc64-owner-lists: $(foreach profile,terran zerg protoss showcase,build/test-sc64-owner-lists-$(profile))
+	@set -e; for profile in terran zerg protoss showcase; do ./build/test-sc64-owner-lists-$$profile; done

@@ -114,6 +114,7 @@ class EngineCapabilityProfiles(unittest.TestCase):
                 self.assertIn("-DSC64_ENGINE_CORE_REQUIRED", args)
                 self.assertIn("-DSC64_CONSTRUCTION_HP", args)
                 self.assertIn("-DSC64_SIEGE_SPLASH", args)
+                self.assertIn("-DSC64_SHARED_BATTERY", args)
                 result = self._compile_probe(values[name])
                 self.assertEqual(result.returncode, 0, result.stderr)
 
@@ -123,6 +124,7 @@ class EngineCapabilityProfiles(unittest.TestCase):
             "-USC64_ENGINE_CORE_REQUIRED",
             "-USC64_CONSTRUCTION_HP",
             "-USC64_SIEGE_SPLASH",
+            "-USC64_SHARED_BATTERY",
         ):
             with self.subTest(removed=removal):
                 result = self._compile_probe(flags, removal)
@@ -141,6 +143,7 @@ class EngineCapabilityProfiles(unittest.TestCase):
         self.assertIn("-DSC64_ENGINE_CORE_REQUIRED", flags)
         self.assertIn("-DSC64_CONSTRUCTION_HP", flags)
         self.assertIn("-DSC64_SIEGE_SPLASH", flags)
+        self.assertIn("-DSC64_SHARED_BATTERY", flags)
         self.assertNotIn("-DSC64_CONSTRUCTION_SOURCE_ART", flags)
         self.assertFalse(any(".local/sc64/construction/generated" in arg for arg in flags))
         self.assertNotIn("sc64_construction_sprites_generated.h",

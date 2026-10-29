@@ -43,6 +43,12 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
                                    (unsigned)height * 16u, &actor)) return 0;
         if (!actor.alive) continue;
         int order = actor.order, carrier = actor.target;
+#ifdef SC64_SHARED_BATTERY
+        if (order==ORDER_RECHARGE) {
+            if (!race_battery_saved_recharge_valid(candidate,&actor)) return 0;
+            continue;
+        }
+#endif
 #ifdef SC64_T6_RUNTIME
         if (order < ORDER_IDLE ||
             (order > max_order && !SC64_PENDING_BUILD_ORDER(order))) return 0;
@@ -93,6 +99,15 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
     for (int i = 0; i < MAX_UNITS; ++i) {
         if (!CARGO_U(i, alive)) continue;
         int order = CARGO_U(i, order), carrier = CARGO_U(i, target);
+#ifdef SC64_SHARED_BATTERY
+        if (order==ORDER_RECHARGE) {
+            Unit actor;
+            if (!race_battery_save_unit(candidate,(unsigned)i,(unsigned)width*16u,
+                                        (unsigned)height*16u,&actor) ||
+                !race_battery_saved_recharge_valid(candidate,&actor)) return 0;
+            continue;
+        }
+#endif
 #ifdef SC64_T6_RUNTIME
         if (order < ORDER_IDLE ||
             (order > max_order && !SC64_PENDING_BUILD_ORDER(order))) return 0;

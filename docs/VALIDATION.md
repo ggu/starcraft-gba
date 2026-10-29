@@ -6856,3 +6856,63 @@ The canonical packages in
 builds outside the standard header. No SD write is claimed. Integration remains
 draft while other late-tech structures with unavailable actor services are
 resolved; neither a mapped identity nor a catalog row is full roster support.
+
+### Shared Shield Battery and bounded hot-loop work (2026-10-30)
+
+The common race-engine capability set now includes Shield Battery services.
+All four canonical products use the same raw-172 construction, exact psi power,
+energy regeneration, command-driven transfer, owner validation, power-loss and
+dead-slot cancellation. The selected Battery shows energy and a Recharge hint.
+P7 map properties and source ownership remain authenticated, without widening
+its mission-active predicate or writing another mission's persistent union.
+
+New recharge order 15 uses an unused four-bit encoding; legacy P7 order values
+are unchanged. Unit shield fractions consistently use 1/1280 points. Save word
+26 carries an SH12 marker; markerless non-P7 shield phases are multiplied by
+four before live-state replacement, while P7 phases and non-shield regeneration
+fields remain unchanged. Markerless empty Battery queues normalize inert stale
+cells left by old slot reuse, preserving energy; marked malformed queues stay
+invalid. Unknown markers, incompatible orders and malformed identities reject
+before replacing the live actors. New-to-old binary downgrade loading is not
+promised. Record sizes, actor limits and the reserved stack space are unchanged.
+
+The eight public game/save fixtures pass under sanitizers in Terran, Zerg, P7
+and Showcase. The intended legacy P7 Battery fixture passes after replacing its
+obsolete immediate-build expectation with actual pending travel and arrival
+payment. Native save tests cover partial energy, phase and recharge state,
+malformed candidate rejection, marker migration and P5/P6 union isolation.
+Imported Battery body pixels and clipping pass in all four art banks; source
+construction selects the Protoss warp image/blend data. A full visual review of
+the complete construction animation is not part of those art checks.
+
+Two bounded performance changes remove redundant clearing of unreachable owner
+list links and scan animation events backward for the original last eligible
+frame. Actual owner-list rebuild fixtures pass 10,000 randomized updates in each
+profile, including invalid-owner fallback; the frame selector matches its frozen
+forward reference in 320,000 sanitizer-backed comparisons. The isolated paired
+Zerg three-AI sample improves 1.07 percent before adding Battery behavior.
+
+The combined v3 Zerg map-0/human-Zerg/three-AI workload takes 747,475,403 versus
+754,769,344 cycles over 1,000 advancing frames, a net 0.966 percent reduction.
+Across 8,928 advancing prefix frames, live unit fields (normalizing the old
+shield fraction denominator), complete building banks, visibility, resources
+and displayed pixels match. Timing-dependent hardware frame counters are
+excluded. This is one busy workload and remains below 30 fps, not a steady-rate
+or hardware claim.
+
+All four v3 ARM links pass the unchanged guards with EWRAM/IWRAM margins of
+28,480/488 bytes (Terran), 28,372/48 (Zerg), 23,828/952 (P7), and 200/56
+(Showcase). No global service pool or clock is allocated. Each native-host-seeded
+ARM save resumes an active recharge; fresh/in-place full state and actor banks
+match at updates 0, 1, 2, 3, 4, 100 and 1,000, through recharge completion.
+These seeds do not establish ordinary player acquisition; native fixtures
+separately exercise paid construction and menu controls. P7's 9,000-call prefix
+also matches the previous qualified state and pixel digests at every update.
+
+Private evidence lives in `.local/build/shared-battery-arm-v3`,
+`shared-battery-sram-v3`, `shared-battery-p7-prefix-v3`,
+`battery-public-targets-v1`, `shared-battery-matrix-v1`,
+`battery-save-integrated-v3`, `battery-art-review-v1`,
+`zerg-visible-vfx-v1` and `battery-zerg-net-v1`. The final default and campaign
+aggregates and a full current P7 ARM win are recorded separately when complete;
+these scoped results are not substitutes for those gates or full roster parity.

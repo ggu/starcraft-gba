@@ -18,6 +18,15 @@ passed for Showcase. Four normal ARM products linked within the existing RAM
 guards; these checks do not establish a new frame-rate measurement.
 The default build/tests and prepared-input unified build/test suite also pass.
 
+Shield Batteries now use a shared service in all four canonical products.
+Normal custom-game Probe construction pays on arrival, requires the exact psi
+footprint and starts with 100 energy. Selecting a powered Battery offers
+command-driven recharge, with shared transfer, regeneration, ownership checks,
+power-loss cancellation and dead-slot cleanup. Each product has imported Battery
+body art. Existing P7 source properties remain authenticated; the service does
+not activate P7 objectives in other modes. See [SHARED-ENGINE.md](SHARED-ENGINE.md)
+for the shield-phase save migration and remaining actor services.
+
 ## Opt-in identity extension
 
 `SC64_SKIRMISH_ROSTER` appends the ordinary raw identities missing from each

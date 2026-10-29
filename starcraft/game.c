@@ -745,8 +745,14 @@ enum {
      * save fields without moving any established order value. */
     , ORDER_PROFILE_END
     , ORDER_BUILD_PENDING = 14
+#ifdef SC64_SHARED_BATTERY
+    , ORDER_RECHARGE = 15
+#endif
 #endif
 };
+#if defined(SC64_P7_BATTERY_ENABLED) && !defined(SC64_SHARED_BATTERY)
+#define ORDER_RECHARGE ORDER_P7_RECHARGE
+#endif
 #ifdef SC64_RACES
 _Static_assert(ORDER_PROFILE_END <= ORDER_BUILD_PENDING,
                "pending construction must not alias an established order");
@@ -821,7 +827,13 @@ enum {
 #if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
     , MODE_P4_STORM
 #endif
+#if defined(SC64_SHARED_BATTERY) && !defined(SC64_P7_BATTERY_ENABLED)
+    , MODE_RECHARGE
+#endif
 };
+#ifdef SC64_P7_BATTERY_ENABLED
+#define MODE_RECHARGE MODE_P7_RECHARGE
+#endif
 
 #ifdef SC64_P4_STORM_ENABLED
 static int race_p4_active(void);
@@ -1443,12 +1455,19 @@ static void race_nydus_tick_world(void);
 static int race_nydus_tick_unit(int slot);
 static int race_nydus_issue_selected(int x, int y);
 #endif
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+static int race_battery_active(void);
+static int race_battery_recharge_order(void);
+static int race_battery_order_is_recharge(int order);
+static int race_battery_site_powered(int owner,int x,int y);
+static int race_battery_powered_live(int battery);
+static int race_battery_command_available(void);
+static int race_battery_build_available(void);
+static int race_battery_issue_command(int building, int x, int y);
+static int __attribute__((noinline)) race_battery_tick_unit(int slot);
+static void race_battery_clear_building_references(int slot);
+#endif
 #ifdef SC64_P7_BATTERY_ENABLED
-static int race_p7_battery_command_available(void);
-static int race_p7_battery_build_available(void);
-static int race_p7_battery_issue_command(int building, int x, int y);
-static int __attribute__((noinline)) race_p7_battery_tick_unit(int slot);
-static void race_p7_battery_clear_building_references(int slot);
 static int race_p7_battery_initialize_source(const Sc64RaceMap *map);
 static int race_p7_battery_live_world_valid(void);
 #endif
@@ -2077,8 +2096,8 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #ifdef SC64_DIRECT_ATTACK
     sc64_direct_attack_clear_references(MAX_UNITS + i);
 #endif
-#ifdef SC64_P7_BATTERY_ENABLED
-    race_p7_battery_clear_building_references(i);
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    race_battery_clear_building_references(i);
 #endif
 #ifdef SC64_NYDUS_ENABLED
     race_nydus_note_building_lost(i);
@@ -2155,10 +2174,11 @@ spawn_build(int owner, int type, int x, int y, int constructing)
         b[i].raw_owner = 7;
     }
 #endif
-#ifdef SC64_P7_BATTERY_ENABLED
-    if (race_p7_active() && type == B_P7_SHIELD_BATTERY) {
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    if (race_battery_active() && sc64_race_raw_building(type) == 172) {
         b[i].queue_progress = 100 * 256;
         b[i].level = 0;
+        for (int q=0;q<5;++q) b[i].queue[q]=0;
     }
 #endif
 #ifdef SC64_T5_RUNTIME
@@ -3783,8 +3803,8 @@ destroy_building(int slot, int source_owner)
             if (q->type == B_COMMAND && q->owner == SIDE && !q->under_construction) supply_cap -= 20;
 #endif
 	    q->alive = 0;
-#ifdef SC64_P7_BATTERY_ENABLED
-            race_p7_battery_clear_building_references(slot);
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+            race_battery_clear_building_references(slot);
 #endif
 #ifdef SC64_NYDUS_ENABLED
             race_nydus_note_building_lost(slot);
@@ -5099,6 +5119,12 @@ choose_command(int choice)
             menu_open = 0; mode = MODE_UNLOAD; return;
         }
 #endif
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+        if (choice == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
+            race_battery_command_available()) {
+            menu_open=0; mode=MODE_RECHARGE; return;
+        }
+#endif
         if (!sc64_skirmish_menu_at((unsigned)race_human, (unsigned)choice, &row)) {
             menu_open = 0; mode = MODE_NORMAL; toast(8); return;
         }
@@ -5140,12 +5166,12 @@ choose_command(int choice)
 #ifdef SC64_RACES
     /* Contextual eleventh row: spell and transport rows belong to their
        selected actors, while a selected Probe exposes base expansion. */
-#ifdef SC64_P7_BATTERY_ENABLED
-    if (choice==MENU_STOP+1 && race_p7_battery_command_available()) {
-        menu_open=0; mode=MODE_P7_RECHARGE; return;
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    if (choice==MENU_STOP+1 && race_battery_command_available()) {
+        menu_open=0; mode=MODE_RECHARGE; return;
     }
-    if (choice==MENU_STOP+3 && race_p7_battery_build_available()) {
-        menu_open=0; mode=MODE_BUILD; menu=B_P7_SHIELD_BATTERY; return;
+    if (choice==MENU_STOP+3 && race_battery_build_available()) {
+        menu_open=0; mode=MODE_BUILD; menu=sc64_race_building_from_raw(172); return;
     }
 #endif
     if (choice == MENU_STOP + 1 && race_nexus_command_available()) {
@@ -5319,6 +5345,9 @@ static int race_skirmish_command_count(void)
 #ifdef SC64_TRANSPORT_RUNTIME
     count += race_skirmish_dropship_menu_available();
 #endif
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    count += race_battery_command_available();
+#endif
     return count;
 }
 #endif
@@ -5332,9 +5361,9 @@ static int field_menu_count(void)
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (race_p7_carrier_training_menu_available()) return MENU_STOP+2;
 #endif
-#ifdef SC64_P7_BATTERY_ENABLED
-    if (race_p7_battery_command_available()) return MENU_STOP+2;
-    if (race_p7_battery_build_available()) return MENU_STOP+4;
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    if (race_battery_command_available()) return MENU_STOP+2;
+    if (race_battery_build_available()) return MENU_STOP+4;
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (race_z7_egg_cancel_available()) return MENU_STOP + 2;
@@ -5381,14 +5410,22 @@ static int field_menu_count(void)
 static int field_menu_count(void)
 {
     if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    if (race_battery_command_available()) return MENU_STOP+2;
+#endif
     if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
     return race_human == R_TER ? MENU_COUNT : MENU_STOP + 1;
 }
 #elif defined(SC64_RACES)
 static int field_menu_count(void)
-{ return race_mode ? race_skirmish_command_count() :
-    MENU_STOP + 1 + race_nexus_command_available() + race_probe_cannon_command_available(); }
+{
+    if (race_mode) return race_skirmish_command_count();
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    if (race_battery_command_available()) return MENU_STOP+2;
+#endif
+    return MENU_STOP + 1 + race_nexus_command_available() + race_probe_cannon_command_available();
+}
 #else
 #define field_menu_count() MENU_COUNT
 #endif
@@ -5406,9 +5443,9 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
     if (choice==MENU_STOP+1 && race_z7_colony_command_available()) return "SUNKEN";
     if (choice==MENU_STOP+2 && race_z7_spore_morph_command_available()) return "SPORE";
 #endif
-#ifdef SC64_P7_BATTERY_ENABLED
-    if (choice==MENU_STOP+1 && race_p7_battery_command_available()) return "RECHARGE";
-    if (choice==MENU_STOP+3 && race_p7_battery_build_available()) return "SHIELD BATTERY";
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    if (choice==MENU_STOP+1 && race_battery_command_available()) return "RECHARGE";
+    if (choice==MENU_STOP+3 && race_battery_build_available()) return "SHIELD BATTERY";
 #endif
     if (choice == MENU_STOP + 2 && race_probe_cannon_command_available())
         return "CANNON";
@@ -5421,12 +5458,19 @@ static const char *race_menu_label(int i)
 {
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+        if (i == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
+            race_battery_command_available()) return "RECHARGE";
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
         if (i == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
             race_skirmish_dropship_menu_available()) return "UNLOAD CARGO";
 #endif
         return sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row) ? row.label : "";
     }
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    if (i==MENU_STOP+1 && race_battery_command_available()) return "RECHARGE";
+#endif
     static const char *const race_labels[3][
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
         MENU_COUNT
@@ -5582,9 +5626,9 @@ interact(void)
         mode = MODE_NORMAL; return;
     }
     #endif
-#ifdef SC64_P7_BATTERY_ENABLED
-    if (mode==MODE_P7_RECHARGE) {
-        int issued=race_p7_battery_issue_command(selected_building,cx,cy);
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    if (mode==MODE_RECHARGE) {
+        int issued=race_battery_issue_command(selected_building,cx,cy);
         mode=MODE_NORMAL; toast(issued ? 0 : 8); return;
     }
 #endif
@@ -6461,8 +6505,6 @@ update_orders(void)
 #endif
     target_lists_valid = 0;
     for (i = 0; i < 5; ++i) target_unit_head[i] = target_building_head[i] = -1;
-    for (i = 0; i < MAX_UNITS; ++i) target_unit_next[i] = -1;
-    for (i = 0; i < MAX_BUILDINGS; ++i) target_building_next[i] = -1;
     for (i = MAX_UNITS - 1; i >= 0; --i) if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
         int owner = u[i].owner;
         if (owner < 0 || owner >= 5) goto target_lists_unavailable;
@@ -6477,6 +6519,15 @@ update_orders(void)
     }
     target_lists_valid = 1;
 target_lists_unavailable:
+#ifdef SC64_OWNER_LIST_TEST
+#ifndef GBA_HOST
+#error "Owner-list assertion hook is host-test only"
+#endif
+    sc64_owner_lists_test_probe();
+#ifdef SC64_OWNER_LIST_TEST_ONLY
+    return;
+#endif
+#endif
 #ifdef SC64_RACES
     if (target_lists_valid) sc64_target_index_begin();
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
@@ -6510,8 +6561,8 @@ target_lists_unavailable:
 #ifdef SC64_P6_COMBAT_ENABLED
         if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
-#ifdef SC64_P7_BATTERY_ENABLED
-        int p7_recharge_order=q->order==ORDER_P7_RECHARGE;
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+        int p7_recharge_order=race_battery_order_is_recharge(q->order);
 #endif
 #ifdef SC64_T6_RUNTIME
         /* Keep burrowed actors out of every ordinary movement/weapon path.
@@ -6526,8 +6577,8 @@ target_lists_unavailable:
 #endif
 	#ifdef SC64_TRANSPORT_RUNTIME
         if (q->order >= ORDER_BOARD
-#ifdef SC64_P7_BATTERY_ENABLED
-            && q->order != ORDER_P7_RECHARGE
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+            && !race_battery_order_is_recharge(q->order)
 #endif
             && !SC64_NYDUS_ORDER(q->order)
             && !SC64_PENDING_BUILD_ORDER(q->order)
@@ -6551,8 +6602,8 @@ target_lists_unavailable:
 	#endif
 	if (q->cd > 0)
 	    q->cd--;
-#ifdef SC64_P7_BATTERY_ENABLED
-        if (p7_recharge_order && race_p7_battery_tick_unit(i)) continue;
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+        if (p7_recharge_order && race_battery_tick_unit(i)) continue;
 #endif
 #ifdef SC64_DIRECT_ATTACK
         if (q->order == ORDER_ATTACK_TARGET && q->owner == SIDE) {
@@ -9359,8 +9410,8 @@ sc64_tile_background_done:
     field_ui_draw_cursor(x, y);
 #else
     gfx_frame(x - 4, y - 4, 9, 9, (mode == MODE_BUILD
-#ifdef SC64_P7_BATTERY_ENABLED
-              || mode == MODE_P7_RECHARGE
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+              || mode == MODE_RECHARGE
 #endif
               ) ? C_GOLD :
 #if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
@@ -9744,6 +9795,14 @@ draw_hud_commands_body(void)
             gfx_text(119,137,"SECONDS",C_GOLD);
         } else
 #endif
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+        if (!q->under_construction && sc64_race_raw_building(q->type)==172) {
+            gfx_text(hud_left,137,"EN",C_CYAN);
+            gfx_num(hud_left+18,137,q->queue_progress/256,C_WHITE);
+            sc64_font_text(85,135,94,race_battery_powered_live(selected_building) ?
+                           "B RECHARGE" : "UNPOWERED",C_GOLD);
+        } else
+#endif
         if(!q->under_construction) {
             char training[48];
             sc64_font_ellipsis(unit_name(train_type),81-hud_left-12,training,sizeof(training));
@@ -9841,8 +9900,8 @@ draw_hud_commands_body(void)
 #ifdef SC64_TERRAN_LATE_RUNTIME
                  mode == MODE_LAND ? "LANDING SITE" :
 #endif
-#ifdef SC64_P7_BATTERY_ENABLED
-                 mode == MODE_P7_RECHARGE ? "RECHARGE SHIELDS" :
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+                 mode == MODE_RECHARGE ? "RECHARGE SHIELDS" :
 #endif
 #if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
                  mode == MODE_P4_STORM ? "PSIONIC STORM TARGET" :
@@ -10703,6 +10762,9 @@ game_self_test(void)
 #ifdef SC64_P7_OBSERVER_ENABLED
 #include "sc64_p7_runtime_adapter.h"
 #include "sc64_p7_observer_adapter.h"
+#endif
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+#include "sc64_battery_adapter.h"
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_runtime_adapter.h"

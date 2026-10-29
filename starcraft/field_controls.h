@@ -711,6 +711,10 @@ ui_structure_note(int x, int y, int type, const char *label)
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     const char *name = sc64_race_building_name(type);
     if (!ui_same(name, label)) gfx_text(x, y, name, C_DIM);
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    else if (sc64_race_raw_building(type)==172)
+        gfx_text(x,y,"RECHARGES SHIELDS",C_DIM);
+#endif
     else if (r && r->supply_provided) {
         gfx_text(x, y, "+", C_DIM);
         gfx_num(x + 6, y, r->supply_provided / 2, C_DIM);

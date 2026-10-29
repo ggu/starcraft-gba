@@ -3,6 +3,10 @@
 #include "sc64_construction_save.h"
 #define SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX 25
 #define SC64_BUILDING_DAMAGE_SAVE_MARKER 0x42443031
+#ifdef SC64_SHARED_BATTERY
+#define SC64_SHIELD_PHASE_SAVE_MARKER_INDEX 26
+#define SC64_SHIELD_PHASE_SAVE_MARKER 0x53483132
+#endif
 /* state[0..23] is the historical gameplay state; the remaining words have
  * never been assigned by its serializer. Distinguish old construction rules
  * without changing the save record size or rejecting completed old worlds. */
@@ -118,6 +122,9 @@ sc64_legacy_beacon_hp_sentinel(int type, int raw_type, int hp, int maxhp)
 
 #ifdef SC64_P6_RUNTIME
 #include "sc64_p6_save.h"
+#endif
+#ifdef SC64_SHARED_BATTERY
+static int race_battery_saved_recharge_valid(const RaceSave *, const Unit *);
 #endif
 #ifdef SC64_Z6_RUNTIME
 #include "sc64_z6_save.h"
@@ -321,6 +328,193 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
     return 1;
 }
 #endif
+#ifdef SC64_SHARED_BATTERY
+#include "sc64_p7_battery_rules.h"
+/* Decode and validate only the candidate: recharge availability may change
+ * between a unit update and save, so power and current energy are not
+ * prerequisites for retaining an order. */
+static int race_battery_save_unit(const RaceSave *candidate, unsigned slot,
+                                  unsigned ww, unsigned wh, Unit *out)
+{
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+    return race_save_decode_unit(candidate, slot, ww, wh, out);
+#else
+    if (!candidate || !out || slot >= MAX_UNITS) return 0;
+    (void)ww; (void)wh;
+    for (unsigned j=0; j<RACE_UNIT_WORDS; ++j) {
+        int n=candidate->units[slot][j];
+        memcpy((u8 *)out+j*sizeof(int), &n, sizeof(n));
+    }
+    return 1;
+#endif
+}
+static int race_battery_save_encode_unit(RaceSave *candidate, unsigned slot,
+                                         unsigned ww, unsigned wh, const Unit *q)
+{
+    if (!candidate || !q || slot>=MAX_UNITS) return 0;
+#ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    return sc64_p7_typed_unit_encode(&candidate->units[slot],q,ww,wh);
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    return sc64_derived_unit_encode(&candidate->units[slot],q,ww,wh);
+#else
+    return sc64_zp_unit_save_encode(&candidate->units[slot],q,ww,wh);
+#endif
+#elif defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+    return sc64_unit_save_encode(&candidate->units[slot],q,ww,wh);
+#else
+    (void)ww; (void)wh;
+    for (unsigned j=0;j<RACE_UNIT_WORDS;++j) {
+        int n; memcpy(&n,(const u8 *)q+j*sizeof(int),sizeof(n));
+        candidate->units[slot][j]=(s16)n;
+    }
+    return 1;
+#endif
+}
+static int race_battery_save_building(const RaceSave *, unsigned, Building *);
+static int race_battery_save_encode_building(RaceSave *candidate, unsigned slot,
+                                             unsigned ww, unsigned wh,
+                                             const Building *q)
+{
+    if (!candidate || !q || slot>=MAX_BUILDINGS) return 0;
+#ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    return sc64_p7_typed_building_encode(&candidate->buildings[slot],q,ww,wh);
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    return sc64_derived_building_encode(&candidate->buildings[slot],q,ww,wh);
+#else
+    return sc64_building_save_encode(&candidate->buildings[slot],q,ww,wh);
+#endif
+#elif defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+    return sc64_building_save_encode(&candidate->buildings[slot],q,ww,wh);
+#else
+    (void)ww; (void)wh;
+    for (unsigned j=0;j<RACE_BUILD_WORDS;++j) {
+        int n; memcpy(&n,(const u8 *)q+j*sizeof(int),sizeof(n));
+        candidate->buildings[slot][j]=(s16)n;
+    }
+    return 1;
+#endif
+}
+/* Legacy non-P7 shields used 1/320 point units. Convert only candidate
+ * shielded actors; P7 already used 1/1280 and non-shield remainders may
+ * carry unrelated regeneration state. This never touches the live world. */
+static int race_battery_migrate_shield_phase(RaceSave *candidate, int width, int height)
+{
+    int marker, legacy_p7=0;
+    if (!candidate || width<1 || height<1 || width>128 || height>128) return 0;
+    marker=candidate->state[SC64_SHIELD_PHASE_SAVE_MARKER_INDEX];
+    if (marker!=0 && marker!=SC64_SHIELD_PHASE_SAVE_MARKER) return 0;
+    if (marker) return 1;
+    /* Old slot reuse did not clear inactive queue cells. They are not
+     * producer state when both count and head are zero. Normalize only the
+     * decoded legacy candidate; marked saves remain strictly canonical. */
+    for (unsigned i=0;i<MAX_BUILDINGS;++i) {
+        Building q; int changed=0;
+        if (!race_battery_save_building(candidate,i,&q)) return 0;
+        if (!q.alive || (sc64_race_raw_building(q.type)!=172 && q.raw_type!=172)) continue;
+        if (q.queue_count!=0 || q.queue_head!=0) return 0;
+        for (unsigned j=0;j<5;++j) if (q.queue[j]) { q.queue[j]=0; changed=1; }
+        if (changed && !race_battery_save_encode_building(candidate,i,(unsigned)width*16u,
+                                                           (unsigned)height*16u,&q)) return 0;
+    }
+#ifdef SC64_P7_BATTERY_ENABLED
+    legacy_p7=!candidate->state[0] && candidate->state[2]==SC64_P7_GLOBAL_ID;
+#endif
+    for (unsigned i=0;i<MAX_UNITS;++i) {
+        Unit actor; const Sc64RaceUnitRule *rule;
+        if (!race_battery_save_unit(candidate,i,(unsigned)width*16u,(unsigned)height*16u,&actor)) return 0;
+        if (!actor.alive) continue;
+        if (actor.order==ORDER_RECHARGE) return 0; /* Did not exist before SH12. */
+        rule=sc64_race_unit_rule(actor.type);
+        if (!rule || !rule->shields || legacy_p7) continue;
+        if (actor.shield_remainder<0 || actor.shield_remainder>=320) return 0;
+        actor.shield_remainder*=4;
+        if (!race_battery_save_encode_unit(candidate,i,(unsigned)width*16u,
+                                           (unsigned)height*16u,&actor)) return 0;
+    }
+    candidate->state[SC64_SHIELD_PHASE_SAVE_MARKER_INDEX]=SC64_SHIELD_PHASE_SAVE_MARKER;
+    return 1;
+}
+static int race_battery_save_building(const RaceSave *candidate, unsigned slot,
+                                      Building *out)
+{
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+    return race_save_decode_building(candidate, slot, out);
+#else
+    if (!candidate || !out || slot >= MAX_BUILDINGS) return 0;
+    for (unsigned j=0; j<RACE_BUILD_WORDS; ++j) {
+        int n=candidate->buildings[slot][j];
+        memcpy((u8 *)out+j*sizeof(int), &n, sizeof(n));
+    }
+    return 1;
+#endif
+}
+static int race_battery_saved_fields_valid(const Building *q)
+{
+    if (!q || !q->alive || sc64_race_raw_building(q->type)!=172 ||
+        (q->raw_type!=-1 && q->raw_type!=172) || q->owner<0 || q->owner>=5 ||
+        q->raw_owner < -1 || q->raw_owner >= 8 ||
+        q->queue_count!=0 || q->queue_head!=0 || q->queue_progress<0 ||
+        q->level<0 || !sc64_p7_battery_energy_valid((unsigned)q->queue_progress,
+                                                      (unsigned)q->level)) return 0;
+    for (unsigned i=0;i<5;++i) if (q->queue[i]!=0) return 0;
+    return 1;
+}
+static int race_battery_saved_recharge_valid(const RaceSave *candidate,
+                                              const Unit *actor)
+{
+    Building battery;
+    const Sc64RaceUnitRule *rule;
+    if (!candidate || !actor || !actor->alive || actor->order!=ORDER_RECHARGE ||
+        actor->owner<0 || actor->owner>=5 || actor->work_timer!=0 ||
+        actor->target<0 || actor->target>=MAX_BUILDINGS ||
+        actor->raw_type==73 || actor->raw_type==85 ||
+        actor->raw_owner < -1 || actor->raw_owner >= 8 ||
+        sc64_race_raw_unit(actor->type)<0 ||
+        sc64_race_raw_unit(actor->type)==73 || sc64_race_raw_unit(actor->type)==85 ||
+        SC64_CARRIER_HANGAR_HIDDEN(actor) ||
+        (actor->raw_type!=-1 && actor->raw_type!=sc64_race_raw_unit(actor->type)) ||
+        SC64_TRANSPORT_LOADED(actor)) return 0;
+#ifdef SC64_P7_RUNTIME
+    if (!candidate->state[0] && candidate->state[2]==SC64_P7_GLOBAL_ID) return 0;
+#endif
+    rule=sc64_race_unit_rule(actor->type);
+    if (!rule || rule->race!=R_PROTOSS || !(rule->flags&SC_RACE_F_SHIELDS) ||
+        actor->shield<0 || actor->shield>rule->shields || actor->shield_remainder<0 ||
+        actor->shield_remainder>=1280 ||
+        (actor->shield==rule->shields && actor->shield_remainder!=0) ||
+        (sc64_game_unit_actor_flags(actor->type) &&
+         !(sc64_game_unit_actor_flags(actor->type)&SC64_GAME_ACTOR_MOVABLE)) ||
+        !race_battery_save_building(candidate,(unsigned)actor->target,&battery) ||
+        !race_battery_saved_fields_valid(&battery) || battery.under_construction ||
+        battery.owner!=actor->owner) return 0;
+    /* Custom units may lack source identities. In campaign, human rescued
+     * actors share SIDE; hostile actors with identities must match exactly. */
+    if (!candidate->state[0] && actor->owner!=SIDE &&
+        (actor->raw_owner<0 || actor->raw_owner!=battery.raw_owner)) return 0;
+    return 1;
+}
+static int race_battery_saved_world_valid(const RaceSave *candidate, int width, int height)
+{
+    if (!candidate || width<1 || height<1 || width>128 || height>128) return 0;
+    for (int i=0;i<MAX_BUILDINGS;++i) {
+        Building q;
+        if (!race_battery_save_building(candidate,(unsigned)i,&q)) return 0;
+        if (q.alive && (sc64_race_raw_building(q.type)==172 || q.raw_type==172) &&
+            !race_battery_saved_fields_valid(&q)) return 0;
+    }
+    for (int i=0;i<MAX_UNITS;++i) {
+        Unit q;
+        if (!race_battery_save_unit(candidate,(unsigned)i,(unsigned)width*16u,
+                                    (unsigned)height*16u,&q)) return 0;
+        if (q.alive && q.order==ORDER_RECHARGE &&
+            !race_battery_saved_recharge_valid(candidate,&q)) return 0;
+    }
+    return 1;
+}
+#endif
+
 #ifdef SC64_T5_RUNTIME
 #include "sc64_t5_save_adapter.h"
 #include "sc64_transport_save_adapter.h"
@@ -674,6 +868,9 @@ static int race_save_game(void) {
         };
     memcpy(race_data.state,state,sizeof(state));
     race_data.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX]=SC64_BUILDING_DAMAGE_SAVE_MARKER;
+#ifdef SC64_SHARED_BATTERY
+    race_data.state[SC64_SHIELD_PHASE_SAVE_MARKER_INDEX]=SC64_SHIELD_PHASE_SAVE_MARKER;
+#endif
 #ifdef SC64_CONSTRUCTION_HP
     race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = SC64_CONSTRUCTION_SAVE_MARKER;
 #endif
@@ -989,6 +1186,9 @@ static int race_save_game(void) {
 #ifdef SC64_TRANSPORT_RUNTIME
     if (race_data.state[0] && !race_skirmish_transport_save_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
+#ifdef SC64_SHARED_BATTERY
+    if (!race_battery_saved_world_valid(&race_data, race_cols, race_rows)) return 0;
+#endif
 #ifdef SC64_T5_RUNTIME
     if (!race_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
@@ -1141,6 +1341,9 @@ static int race_load_game(void) {
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
+#ifdef SC64_SHARED_BATTERY
+    if (!race_battery_migrate_shield_phase(&race_data,width,height)) return 0;
+#endif
     if(v[8]<0||v[8]>=width*16||v[9]<0||v[9]>=height*16||v[11]<0||v[11]>2||
        v[12]<0||v[12]>2||v[18]<0||v[18]>1||v[19]<0||v[19]>1)return 0;
     for(int i=0;i<5;i++)if(race_data.players[i]<-1||race_data.players[i]>2||
@@ -1170,17 +1373,41 @@ static int race_load_game(void) {
             RACE_U(i,x)<0||RACE_U(i,x)>=width*16||RACE_U(i,y)<0||RACE_U(i,y)>=height*16||
             RACE_U(i,order)<ORDER_IDLE||(RACE_U(i,order)>
 #ifdef SC64_NYDUS_ENABLED
-            ORDER_NYDUS_ENTER && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order)))||
+            ORDER_NYDUS_ENTER && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order))
+#ifdef SC64_SHARED_BATTERY
+            && RACE_U(i,order)!=ORDER_RECHARGE
+#endif
+            )||
 #elif defined(SC64_P7_BATTERY_ENABLED)
-            ORDER_P7_RECHARGE && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order)))||
+            ORDER_P7_RECHARGE && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order))
+#ifdef SC64_SHARED_BATTERY
+            && RACE_U(i,order)!=ORDER_RECHARGE
+#endif
+            )||
 #elif defined(SC64_T6_RUNTIME)
-            ORDER_REPAIR && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order)))||
+            ORDER_REPAIR && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order))
+#ifdef SC64_SHARED_BATTERY
+            && RACE_U(i,order)!=ORDER_RECHARGE
+#endif
+            )||
 #elif defined(SC64_TRANSPORT_RUNTIME)
-            ORDER_UNLOAD && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order)))||
+            ORDER_UNLOAD && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order))
+#ifdef SC64_SHARED_BATTERY
+            && RACE_U(i,order)!=ORDER_RECHARGE
+#endif
+            )||
 #elif defined(SC64_Z5_CONSUME_ENABLED)
-            ORDER_Z5_CONSUME && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order)))||
+            ORDER_Z5_CONSUME && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order))
+#ifdef SC64_SHARED_BATTERY
+            && RACE_U(i,order)!=ORDER_RECHARGE
+#endif
+            )||
 #else
-            ORDER_GAS && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order)))||
+            ORDER_GAS && !SC64_PENDING_BUILD_ORDER(RACE_U(i,order))
+#ifdef SC64_SHARED_BATTERY
+            && RACE_U(i,order)!=ORDER_RECHARGE
+#endif
+            )||
 #endif
             RACE_U(i,shield)<0||
             RACE_U(i,shield_remainder)<0||RACE_U(i,shield_remainder)>=1280)return 0;
@@ -1382,6 +1609,9 @@ static int race_load_game(void) {
 #undef RACE_B
 #ifdef SC64_TRANSPORT_RUNTIME
     if (race_data.state[0] && !race_skirmish_transport_save_valid(&race_data, width, height)) return 0;
+#endif
+#ifdef SC64_SHARED_BATTERY
+    if (!race_battery_saved_world_valid(&race_data, width, height)) return 0;
 #endif
 #ifdef SC64_T5_RUNTIME
     if (!race_t5_candidate_queues_available(&race_data)) return 0;

@@ -152,11 +152,11 @@ sc64_weapon_source_vfx_animation_frame(const Sc64WeaponSourceAnimation *anim,
     }
     if (anim->duration_ticks && bounded >= anim->duration_ticks)
         bounded = anim->duration_ticks - 1u;
-    for (uint32_t n = 0; n < anim->event_count; ++n) {
+    for (uint32_t n = anim->event_count; n > 0; --n) {
         const Sc64WeaponSourceEvent *event =
-            &sc64_weapon_source_events[anim->event_first + n];
+            &sc64_weapon_source_events[anim->event_first + n - 1u];
         if (event->opcode == 0u && event->source_tick <= bounded)
-            result = event->source_frame;
+            return event->source_frame;
     }
     return result;
 }

@@ -17,7 +17,7 @@ static unsigned char background(int x, int y)
 
 static const Sc64SpriteFrame *source_frame(unsigned raw)
 {
-    if (raw == 120) return sc64_race_building_sprite(120, 0);
+    if (raw == 120 || raw == 172) return sc64_race_building_sprite((unsigned short)raw, 0);
     return sc64_race_unit_sprite((unsigned short)raw);
 }
 
@@ -75,7 +75,7 @@ static void check(unsigned raw, int x, int y, int clip_top, int clip_bottom)
 
 int main(void)
 {
-    static const unsigned ids[] = {113, 120, 167};
+    static const unsigned ids[] = {113, 120, 167, 172};
     static const int positions[][4] = {
         {120, 70, 0, 160}, {2, 16, 12, 128},
         {238, 120, 12, 128}, {121, 124, 12, 128},
@@ -84,6 +84,6 @@ int main(void)
     for (unsigned i = 0; i < sizeof(ids) / sizeof(ids[0]); ++i)
         for (unsigned j = 0; j < sizeof(positions) / sizeof(positions[0]); ++j)
             check(ids[i], positions[j][0], positions[j][1], positions[j][2], positions[j][3]);
-    puts("PASS Factory, Machine Shop and Stargate source art and scene clipping");
+    puts("PASS Factory, Machine Shop, Stargate and Shield Battery source art and scene clipping");
     return 0;
 }
