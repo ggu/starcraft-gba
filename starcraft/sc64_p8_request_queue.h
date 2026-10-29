@@ -23,8 +23,9 @@
  *
  * Native pop assumes a nonempty queue (an empty native pop underflows its
  * count byte). This wrapper returns EMPTY without mutation for empty queues.
- * Callers should peek and retain a request while its build action is pending;
- * pop it only after the native action-completion condition succeeds.
+ * Queue storage alone does not define whether an action should retain or pop a
+ * request. Caller-specific outcomes and AI-record accounting are modeled by
+ * sc64_p8_request_settlement.h; no gameplay caller is wired to that service.
  */
 #define SC64_P8_REQUEST_QUEUE_CAPACITY 63u
 
