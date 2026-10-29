@@ -132,7 +132,12 @@ field_ui_refresh(void)
 static void
 field_ui_ping(int x, int y, u8 color)
 {
-    ping_x = (s16)x; ping_y = (s16)y; ping_color = color; ping_life = 18;
+    ping_x = (s16)x; ping_y = (s16)y; ping_color = color;
+#ifdef SC64_ORDER_MARKER_ART
+    ping_life = color==C_GREEN || color==C_RED ? SC64_ORDER_MARKER_GBA_TICKS : 18;
+#else
+    ping_life = 18;
+#endif
 }
 
 /* A on a visible enemy with units selected attacks it; selection keeps
@@ -142,8 +147,7 @@ field_ui_smart_attack(void)
 {
     int tx, ty;
     if (!selected_count() || !ui_hostile_at(cx, cy, &tx, &ty)) return 0;
-    issue_order(ORDER_ATTACK_MOVE, tx, ty);
-    field_ui_ping(tx, ty, C_RED);
+    if (issue_order(ORDER_ATTACK_MOVE, tx, ty)) field_ui_ping(tx, ty, C_RED);
     return 1;
 }
 
@@ -153,8 +157,7 @@ static int
 field_ui_smart_move(void)
 {
     if (selected_building >= 0 || !selected_count() || selection_target() >= 0) return 0;
-    issue_order(ORDER_MOVE, cx, cy);
-    field_ui_ping(cx, cy, C_GREEN);
+    if (issue_order(ORDER_MOVE, cx, cy)) field_ui_ping(cx, cy, C_GREEN);
     return 1;
 }
 
@@ -208,12 +211,11 @@ static int
 field_ui_build_worker(int type)
 {
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
-    int i, best = find_selected_worker(), d, best_d = 0x7fffffff;
-    if (!r || (best >= 0 && u[best].type == r->worker)) return best;
-    best = -1;
+    int i, best = -1, d, best_d = 0x7fffffff;
+    if (!r) return -1;
     for (i = 0; i < MAX_UNITS; i++) {
-        if (!u[i].alive || u[i].owner != SIDE || u[i].type != r->worker ||
-            SC64_TRANSPORT_LOADED(&u[i]) || SC64_BUILD_WORKER_ORDER(u[i].order)) continue;
+        if (!build_worker_available(i, SIDE, r->worker)) continue;
+        if (u[i].selected) return i;
         d = dist2(cx, cy, u[i].x, u[i].y);
         if (d < best_d) { best_d = d; best = i; }
     }
@@ -559,9 +561,16 @@ field_controls_draw_cursor(int x, int y)
 {
     if (ping_life) {
         int r = 3 + ping_life / 2, px = ping_x - camx, py = ping_y - camy + 12;
-        ping_life--;
+#ifdef SC64_ORDER_MARKER_ART
+        if (ping_color==C_GREEN || ping_color==C_RED) {
+            unsigned phase;
+            if (sc64_order_marker_phase(ping_life,&phase)) sc64_order_marker_draw(px,py,phase);
+        } else
+#endif
+        {
         gfx_diamond(px, py, r, r / 2 + 1, ping_color);
         if (ping_life > 9) gfx_diamond(px, py, r - 3, (r - 3) / 2 + 1, ping_color);
+        }
     }
     if (mode == MODE_BUILD && box_state != 2) {
         int site_x = cx, site_y = cy, ground, problem, big = ui_footprint_big(menu);
@@ -573,10 +582,22 @@ field_controls_draw_cursor(int x, int y)
              * funds or a worker are missing. Green: A places it. */
             int sx = site_x - camx, sy = site_y - camy + 12;
             u8 color = !ground ? C_RED : problem == UI_SITE_OK ? C_GREEN : C_GOLD;
+#ifdef SC64_HAS_SPRITES
+            const Sc64SpriteFrame *ghost=mission_building_sprite(menu);
+            if (ghost && sc64_building_placement_outline(sx,sy,
+                    ghost->canvas_w,ghost->canvas_h,ghost->offset_x,ghost->offset_y,
+                    ghost->w,ghost->h,ghost->pixels,
+                    problem==UI_SITE_OK ? C_GREEN : C_RED)) {
+                /* Actual building alpha supplies the shape. Manual-confirmed
+                 * red/green meanings; exact N64 placement raster is untraced. */
+            } else
+#endif
+            {
             gfx_frame(sx - (big ? 12 : 8), sy - (big ? 8 : 7), big ? 25 : 17, big ? 18 : 15, color);
             gfx_frame(sx - (big ? 13 : 9), sy - (big ? 9 : 8), big ? 27 : 19, big ? 20 : 17, color);
             gfx_rect(sx - 6, sy - 10, 13, 3, color);
             if (sx != x || sy != y) gfx_line(x, y, sx, sy, C_DIM);
+            }
         }
     }
     if (mode == MODE_ATTACK) {
