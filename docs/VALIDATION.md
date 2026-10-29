@@ -6416,3 +6416,48 @@ entity/configuration state: 9,426 advancing frames, 5,626,410,088 to
 5,623,881,694 cycles (0.045 percent), still about 28.12 fps. These are narrow
 paired emulator measurements, not physical-hardware or all-campaign proof.
 The late three-AI near-30-fps target remains unmet.
+
+### Reuse source projectile motion within a draw (2026-10-30)
+
+Source trace drawing now computes distance and flight ticks once and reuses
+them for duration, projectile placement and matching flight/death children.
+The 16-byte automatic record is internal to a synchronous draw. A non-NULL
+record requires the same immutable profile and launch/end coordinates;
+actor/init overlays and the pre-existing public wrappers request fresh values.
+No saved or persistent RAM state, source timelines or pixels change.
+
+An independent copy of the original arithmetic matches 26,896 boundary and
+deterministic random cases under ASan/UBSan, including null
+outputs, zero distance/speed, stationary/unknown bullet types and unsigned
+32-bit ages. Full-int in-flight cases that already overflow the original signed
+64-bit product are outside this equivalence claim. A separate authored moving
+projectile fixture asserts all 27 original draw events across 40 ages, including
+child birth positions and no extra calls after expiry. Existing source VFX
+sampling, raster, runtime, alias-resolution and reverse-byte fixtures pass.
+
+Four retained canonical ARM products pass unchanged ROM/RAM guards, with
+identical margins to the remnant baseline. Actual per-TU compiler/link argv,
+raw dependencies, consumed input/audio hashes and output maps/hashes are
+retained. Only the two source runtime/render headers differ in consumed inputs;
+ordered feature/include vectors and imported assets match.
+
+Exact-argv recompilation with stack-usage reporting preserves every executable
+object section. Compiler static trace/overlay frames shrink across all four
+profiles; for example Terran draw_tracers is 888 to 608 bytes and its overlay
+helper 328 to 272. The new preparation helper has a 72-byte static frame.
+The inspected Terran path through preparation and nonzero 64-bit division
+sums to 1,504 bytes including main, game_render and outgoing argument areas,
+compared with 1,768 for the corresponding baseline overlay/division path.
+These specific paths are not a whole-program stack bound; deeper sprite
+helpers, startup and interrupts are not covered. The fixed reserve is unchanged.
+
+The identical late three-AI replay retains all 9,000 tick/frame/phase rows and
+992 advancing frames: 779,509,400 to 757,021,353 cycles (2.88 percent lower),
+about 21.35 to 21.98 fps. A separate read-only observer reproduces every pinned
+cycle row and all 992 full-frame hashes match, with 602 distinct baseline
+hashes. The full one-AI replay retains all 9,488 observations and decoded
+terminal state, still losing at frame 9,428; 9,426 advancing frames cost
+5,623,881,694 to 5,624,163,624 cycles (0.005 percent higher), still about
+28.12 fps. This is a mixed workload result, not a universal speedup.
+These narrow emulator checks do not establish hardware, all-scene or near-30-fps
+qualification; the full goal remains open.

@@ -5026,3 +5026,14 @@ build/test-sc64-death-remnant-words: tests/sc64_death_remnant_word_bank.c common
 .PHONY: test-sc64-death-remnant-words
 test-sc64-death-remnant-words: build/test-sc64-death-remnant-words
 	./build/test-sc64-death-remnant-words
+
+# Source-motion reuse must preserve original arithmetic and child draw events.
+build/test-sc64-motion-reuse-oracle: tests/sc64_motion_reuse_oracle.c starcraft/sc64_weapon_source_runtime.h starcraft/sc64_weapon_source_vfx.h tests/fixtures/weapon_source_mock.h Makefile | build
+	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) $< -o $@
+build/test-sc64-motion-reuse-render: tests/sc64_motion_reuse_render.c starcraft/sc64_weapon_source_runtime.h starcraft/sc64_weapon_source_vfx_render.h starcraft/sc64_weapon_source_vfx.h common/gba.h Makefile | build
+	$(CLANG) $(SOURCE_SAMPLER_TEST_FLAGS) -Icommon $< -o $@
+.PHONY: test-sc64-motion-reuse
+test-sc64-motion-reuse: build/test-sc64-motion-reuse-oracle build/test-sc64-motion-reuse-render
+	./build/test-sc64-motion-reuse-oracle
+	./build/test-sc64-motion-reuse-render
+test: test-sc64-motion-reuse
