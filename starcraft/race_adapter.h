@@ -143,6 +143,10 @@ static int race_z7_morphing_egg_hall(int owner, int producer)
  * mission state is needed. Morphing keeps the Egg slot and its HP fraction. */
 static int __attribute__((noinline)) race_z7_egg_tick_unit(int slot)
 {
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+
     Unit *q;
     const Sc64RaceUnitRule *product;
     int old_hp, new_hp, old_supply, owner, x, y, second;

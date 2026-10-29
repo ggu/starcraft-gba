@@ -1,3 +1,13 @@
+#if defined(SC64_CONTACT_MEMO_ORACLE) && \
+    (!defined(GBA_HOST) || \
+     !defined(SC64_CONTACT_CACHE))
+#error "contact memo oracle requires the host contact-memo build"
+#endif
+#if defined(SC64_CONTACT_CACHE)
+#define SC64_CONTACT_MEMO_ENABLED 1
+static void sc64_contact_memo_invalidate(void);
+#define SC64_CONTACT_MEMO_INVALIDATE() sc64_contact_memo_invalidate()
+#endif
 #include "../common/gba.h"
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
@@ -1895,6 +1905,10 @@ find_build_slot(void)
 static int
 spawn_unit(int owner, int type, int x, int y)
 {
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
@@ -3673,6 +3687,10 @@ static void
 hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
                    int stock_damage_class, int hit_flags)
 {
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+
     int i, tx, ty;
 #ifndef SC64_RACES
     (void)stock_damage_class;

@@ -33,6 +33,27 @@ test-sc64-range-work: build/test-sc64-range-work
 	./build/test-sc64-range-work
 test: test-sc64-range-work
 
+# Asset-free complete-field subpath reuse: independent BFS oracle, packed
+# route/grid variants, active-pool geometry, cache history and decay metadata.
+.PHONY: test-sc64-route-subpath test-sc64-route-subpath-partial-compile
+build/test-sc64-route-subpath-nibble: tests/sc64_route_subpath.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $< -o $@
+build/test-sc64-route-subpath-packed: tests/sc64_route_subpath.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DTEST_PACK3 $< -o $@
+build/test-sc64-route-subpath-active: tests/sc64_route_subpath.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DTEST_PACK3 -DTEST_ACTIVE -DTEST_BIT_GRID $< -o $@
+build/test-sc64-route-subpath-decay: tests/sc64_route_subpath.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DTEST_PACK3 -DTEST_ACTIVE -DTEST_BIT_GRID -DTEST_DECAY $< -o $@
+build/test-sc64-route-subpath-partial.o: tests/sc64_route_subpath.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DTEST_PACK3 -DSC64_ROUTE_PARTIAL_FLOOD -c $< -o $@
+test-sc64-route-subpath-partial-compile: build/test-sc64-route-subpath-partial.o
+test-sc64-route-subpath: build/test-sc64-route-subpath-nibble build/test-sc64-route-subpath-packed build/test-sc64-route-subpath-active build/test-sc64-route-subpath-decay test-sc64-route-subpath-partial-compile
+	./build/test-sc64-route-subpath-nibble
+	./build/test-sc64-route-subpath-packed
+	./build/test-sc64-route-subpath-active
+	./build/test-sc64-route-subpath-decay
+test: test-sc64-route-subpath
+
 # Exact object-representation zero check; no imported game data required.
 .PHONY: test-sc64-zero-bytes
 build/test-sc64-zero-bytes: tests/sc64_zero_bytes.c starcraft/sc64_zero_bytes.h Makefile | build
@@ -342,6 +363,9 @@ TERRAN_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 # Per-slot cached collision facts and one-pass blocked steering for the race
 # collision predicate. Empty this to compare a canonical ROM without it.
 CONTACT_CACHE_FLAGS ?= -DSC64_CONTACT_CACHE
+# Exact bounded shortest-step witness before a full route-field miss.
+# Empty this only for comparison builds of the delivered profiles.
+CANONICAL_ROUTE_PROBE_FLAGS ?= -DSC64_ROUTE_MONOTONE_PROBE
 # The Z6 and P6 storage profiles have no IWRAM reserve left for the hot
 # steering pass or the inlined stock step, so both stay in ROM there (the late
 # Terran profile makes the same choice in sc64_contact.h). Probe builds that
@@ -371,7 +395,7 @@ DEATH_ART_DIR := .local/sc64/death/generated
 DEATH_ART_HEADER := $(DEATH_ART_DIR)/sc64_death_sprites_generated.h
 CANONICAL_DEATH_FLAGS ?= -DSC64_DEATH_SOURCE_ART -I$(DEATH_ART_DIR)
 CANONICAL_DEATH_INPUTS = $(if $(filter -DSC64_DEATH_SOURCE_ART,$(CANONICAL_DEATH_FLAGS)),$(DEATH_ART_HEADER))
-TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS)
+TERRAN_ROM_FLAGS = $(TERRAN_FULL_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(TERRAN_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS)
 ZERG_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 ZERG_CANONICAL_FLAGS ?= -DSC64_TERRAIN_SCROLL -DSC64_STATIC_KEY_CULL -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(if $(filter -DSC64_ROUTE_PACK3,$(Z4_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT) -DSC64_COLLISION_FACT_HOIST -DSC64_ZP_FACT_RANGE_CULL $(ZERG_UNIT_WORD_FLAGS) $(CONTACT_CACHE_FLAGS) $(CONTACT_ROM_PLACEMENT_FLAGS)
 # Explicit legacy Z1-Z4 product: SCZ4, save generation 20, unchanged flags.
@@ -383,7 +407,7 @@ ZERG_Z4_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS)
 ZERG_Z6_BANK := .local/sc64/zerg-z6/generated
 ZERG_Z6_FLAGS = $(patsubst -I.local/sc64/z6/generated,-I$(ZERG_Z6_BANK),$(Z6_PROBE_FLAGS)) -DSC64_ZP_DEFENSE_TARGETS
 ZERG_Z6_INPUTS = $(filter-out .local/sc64/z5/generated/sc64_race_sprites_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h,$(Z6_PROBE_INPUTS)) $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h
-ZERG_ROM_FLAGS = $(ZERG_Z6_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS)
+ZERG_ROM_FLAGS = $(ZERG_Z6_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS)
 ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
 PROTOSS_P3_CANONICAL_FLAGS ?= $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
 PROTOSS_P3_ROM_FLAGS = $(P3_FLAGS) $(CANONICAL_DRAW_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(PROTOSS_P3_CANONICAL_FLAGS)
@@ -404,7 +428,7 @@ PROTOSS_P7_SPRITE_DIR := .local/sc64/protoss-p7/generated
 PROTOSS_P7_SPRITE_HEADER := $(PROTOSS_P7_SPRITE_DIR)/sc64_race_sprites_generated.h
 # P7 has room for the steering pass and inline stock step in IWRAM. Keep the
 # P6 placement choices and historical P7 probes independent of this profile.
-PROTOSS_P7_CANONICAL_FLAGS = -I$(PROTOSS_P7_SPRITE_DIR) $(P7_FACT_V2_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(filter-out -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM,$(PROTOSS_CANONICAL_FLAGS)) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) -DSC64_P7_ARBITER_AURA_ONCE
+PROTOSS_P7_CANONICAL_FLAGS = -I$(PROTOSS_P7_SPRITE_DIR) $(P7_FACT_V2_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) -DGBA_WINDOW_BANDS $(CANONICAL_STATIC_FLAGS) $(filter-out -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM,$(PROTOSS_CANONICAL_FLAGS)) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) -DSC64_P7_ARBITER_AURA_ONCE $(CANONICAL_ROUTE_PROBE_FLAGS)
 PROTOSS_P7_CANONICAL_INPUTS = $(filter-out .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p7/generated/sc64_race_sprites_generated.h,$(P7_ARBITER_INPUTS)) $(PROTOSS_P7_SPRITE_HEADER) $(P7_FACT_V2_HEADER) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 PROTOSS_ROM_FLAGS = $(PROTOSS_P7_CANONICAL_FLAGS)
 PROTOSS_CANONICAL_INPUTS = $(PROTOSS_P7_CANONICAL_INPUTS)
@@ -3685,7 +3709,7 @@ zerg-z7-steering-probe: build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba
 # physical-input-only main-loop selection local to that standalone target.
 # Historical Z7 probes and their tests continue to use Z7_FULL_RENDER_FLAGS.
 ZERG_Z7_CONTACT_MASK_TABLE_HEADER = build/generated/sc64_contact_mask_table_generated.h
-ZERG_Z7_CANONICAL_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ -DSC64_CONTACT_MASK_TABLE -Ibuild/generated
+ZERG_Z7_CANONICAL_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ -DSC64_CONTACT_MASK_TABLE -Ibuild/generated $(CANONICAL_DIRECT_FIRING_FLAGS)
 ZERG_Z7_RELEASE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z7_CANONICAL_INPUTS = $(Z7_FULL_RENDER_INPUTS) $(ZERG_Z7_CONTACT_MASK_TABLE_HEADER)
 build/starcraft-zerg-z7.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.ld Makefile | build
@@ -3714,15 +3738,20 @@ $(eval $(call Z7_CANONICAL_FIXTURE,save,sc64_z7_game_save.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,frame,sc64_z3_frame_coverage.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,scourge,sc64_z7_scourge_game.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,controller,sc64_z7_campaign_run.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,last-seen,sc64_z7_last_seen.c))
+build/test-sc64-z7-canonical-last-seen: tests/sc64_z7_campaign_run.c
 $(eval $(call Z7_CANONICAL_FIXTURE,carried-z5,sc64_z5_campaign_run.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,carried-z6,sc64_z6_campaign_run.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,z6-controller-policy,sc64_z6_controller_policy.c))
 build/test-sc64-z7-canonical-z6-controller-policy: tests/sc64_z6_campaign_run.c
 ZERG_Z7_CONTROLLER_TRACE ?= .local/sc64/zerg-z7-canonical-controller.jsonl
-.PHONY: test-sc64-z7-canonical-controller test-zerg-z7
-test-sc64-z7-canonical-controller: build/test-sc64-z7-canonical-controller tools/sc64_zp_controller_replay.py
+ZERG_Z7_CONTROLLER_LIMIT ?= 1000000
+.PHONY: test-sc64-z7-last-seen test-sc64-z7-canonical-controller test-zerg-z7
+test-sc64-z7-last-seen: build/test-sc64-z7-canonical-last-seen
+	./build/test-sc64-z7-canonical-last-seen
+test-sc64-z7-canonical-controller: build/test-sc64-z7-canonical-controller tools/sc64_zp_controller_replay.py test-sc64-z7-last-seen
 	mkdir -p "$(dir $(ZERG_Z7_CONTROLLER_TRACE))"
-	./build/test-sc64-z7-canonical-controller --limit 240000 --trace "$(ZERG_Z7_CONTROLLER_TRACE)"
+	./build/test-sc64-z7-canonical-controller --limit $(ZERG_Z7_CONTROLLER_LIMIT) --trace "$(ZERG_Z7_CONTROLLER_TRACE)"
 	$(PYTHON) tools/sc64_zp_controller_replay.py --profile zerg-z7 --trace "$(ZERG_Z7_CONTROLLER_TRACE)" --validate-only
 .PHONY: test-sc64-z7-canonical-carried-z5 test-sc64-z7-canonical-carried-z6
 test-sc64-z7-canonical-carried-z5: build/test-sc64-z7-canonical-carried-z5
@@ -4049,7 +4078,7 @@ SHOWCASE_UNIT_WORD_FLAGS ?= -DSC64_UNIT_WORD_SPRITES
 SHOWCASE_SIEGE_FLAGS ?= -DSC64_SIEGE_SPLASH
 # Clip world art before it reaches either HUD band. Keep the infrequent
 # procedural diamond fallback in ROM so clipping retains the IWRAM reserve.
-SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS)
+SHOWCASE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(SHOWCASE_SIEGE_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS)
 build/starcraft-showcase.elf build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-protoss-gas-placement build/test-sc64-protoss-skirmish-pylons build/test-sc64-native-weapon-game build/test-sc64-showcase-death-source: $(COMMAND_ICON_HEADER)
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) common/gba.ld Makefile | build
 	$(CC) $(CFLAGS) $(SHOWCASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-showcase.map -lgcc -o $@
@@ -4479,7 +4508,7 @@ test-sc64-contact-bucket-birth: build/test-sc64-contact-bucket-birth
 # one-pass blocked-steering mask and the stock-rate cache against the original
 # query, unit_step_clear() and sc64_stock_motion_step(). Each variant needs its
 # profile's private generated inputs, so none of them is part of `make test`.
-CONTACT_CACHE_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+CONTACT_CACHE_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DSC64_CONTACT_MEMO_ORACLE -Icommon
 build/test-sc64-contact-cache-races: tests/sc64_contact_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACES_INPUTS) common/gba.h common/gba.c Makefile | build
 	$(CLANG) $(CONTACT_CACHE_TEST_FLAGS) $(RACES_FLAGS) -DSC64_CONTACT_CACHE $< common/gba.c -o $@
 build/test-sc64-contact-cache-p7: tests/sc64_contact_cache.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_BATTERY_INPUTS) common/gba.h common/gba.c Makefile | build
@@ -4521,6 +4550,16 @@ build/test-sc64-contact-mask-table: tests/sc64_contact_mask_table_generated.c $(
 .PHONY: test-sc64-contact-mask-table
 test-sc64-contact-mask-table: build/test-sc64-contact-mask-table
 	./build/test-sc64-contact-mask-table
+
+# Exercise the real contact-header arithmetic fallback and its table-domain
+# wrapper without compiling game.c or requiring imported campaign inputs.
+CONTACT_MASK_MATH_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined
+build/test-sc64-contact-mask-math: tests/sc64_contact_mask_math.c starcraft/sc64_contact.h $(CONTACT_MASK_TABLE_HEADER) Makefile | build
+	$(CLANG) $(CONTACT_MASK_MATH_TEST_FLAGS) -DSC64_RACES -DSC64_CONTACT_CACHE -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_CONTACT_MASK_TABLE -Ibuild/generated $< -o $@
+.PHONY: test-sc64-contact-mask-math
+test-sc64-contact-mask-math: build/test-sc64-contact-mask-math
+	./build/test-sc64-contact-mask-math
+test: test-sc64-contact-mask-math
 test-zerg: test-sc64-contact-cache-zerg
 test-protoss: test-sc64-contact-cache-protoss
 
@@ -4759,3 +4798,31 @@ $(eval $(call DIRECT_FIRING_GAME_FIXTURE,on,-DSC64_DIRECT_FIRING_POINTS))
 test-sc64-direct-firing-points-game: test-sc64-direct-firing-flags build/test-sc64-direct-firing-points-off build/test-sc64-direct-firing-points-on
 	./build/test-sc64-direct-firing-points-off
 	./build/test-sc64-direct-firing-points-on
+
+# Asset-free exact contact memo contract fixture; the same collision headers
+# are compiled in their per-frame and persistent bucket lifecycle variants.
+SC64_CONTACT_MEMO_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST
+build/test-sc64-contact-memo-legacy: tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_collision_legacy.h common/gba.h Makefile | build
+	$(CLANG) $(SC64_CONTACT_MEMO_TEST_FLAGS) $< -o $@
+build/test-sc64-contact-memo-persistent: tests/sc64_contact_memo.c starcraft/sc64_contact.h starcraft/sc64_persistent_collision.h common/gba.h Makefile | build
+	$(CLANG) $(SC64_CONTACT_MEMO_TEST_FLAGS) -DSC64_PERSISTENT_COLLISION $< -o $@
+.PHONY: test-sc64-contact-memo
+test-sc64-contact-memo: build/test-sc64-contact-memo-legacy build/test-sc64-contact-memo-persistent
+	./build/test-sc64-contact-memo-legacy
+	./build/test-sc64-contact-memo-persistent
+test: test-sc64-contact-memo
+
+# Asset-free route-dispatch oracle for the exact monotone shortest-step probe.
+ROUTE_MONOTONE_TEST_BASE = -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -I.
+build/test-sc64-route-monotone: tests/sc64_route_monotone.c starcraft/sc64_routes.h starcraft/sc64_route_monotone_probe.h starcraft/sc64_map_math.h Makefile | build
+	$(CLANG) $(ROUTE_MONOTONE_TEST_BASE) $< -o $@
+build/test-sc64-route-monotone-active: tests/sc64_route_monotone.c starcraft/sc64_routes.h starcraft/sc64_route_monotone_probe.h starcraft/sc64_map_math.h Makefile | build
+	$(CLANG) $(ROUTE_MONOTONE_TEST_BASE) -DTEST_ACTIVE $< -o $@
+build/test-sc64-route-monotone-partial: tests/sc64_route_monotone.c starcraft/sc64_routes.h starcraft/sc64_route_monotone_probe.h starcraft/sc64_map_math.h Makefile | build
+	$(CLANG) $(ROUTE_MONOTONE_TEST_BASE) -DTEST_PARTIAL $< -o $@
+.PHONY: test-sc64-route-monotone
+test-sc64-route-monotone: build/test-sc64-route-monotone build/test-sc64-route-monotone-active build/test-sc64-route-monotone-partial
+	./build/test-sc64-route-monotone
+	./build/test-sc64-route-monotone-active
+	./build/test-sc64-route-monotone-partial
+test: test-sc64-route-monotone

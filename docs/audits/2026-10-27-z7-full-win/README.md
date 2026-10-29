@@ -273,3 +273,46 @@ separate print-only observer found no Z7 runtime faults and confirmed its
 mission runtime was inactive in skirmish. These outcomes establish bounded
 completion for those configurations, not AI balance, every possible AI-race
 assignment, physical hardware behavior, or 30-fps performance.
+
+## Frozen full-run replay v3
+
+A later full-render ARM replay completed the ordinary-input Z7 tape on the
+frozen runtime at `a8764ef5ed76b5d350883bac4ebe05d68a1e7d1c`. Its archived
+feature vector has `DIRECT_ATTACK` and `DIRECT_FIRING_POINTS` enabled,
+`RANGE_WORK` disabled, and `GBA_NO_DEBUG_INPUTS` enabled. The source worktree
+was clean; the run pinned 258 tracked source files and 172 included files.
+This is a source- and flag-specific emulator result, not qualification of a
+newer runtime or a normal product ROM.
+
+The fixed 32 MiB ROM (`SC Z7 WIN36`, code `SZ7W`) consumed 70,561 ordinary
+input events through tick 821,565 / frame 808,493. All 910 trace checkpoints
+matched the host reference. All 33 semantic world digests and all 33 Mode 4
+RGB555 screen hashes also matched their host references. The terminal source check
+reported a strict win, zero Force 1 buildings, no loss, and no runtime fault.
+Its `started` field is the eight-program bitmask `0xfe`, not a count of 254
+actions. The owned emulator process was terminated and waited for after the
+terminal record.
+
+| Frozen item | Commit / SHA-256 |
+| --- | --- |
+| Runtime source commit | `a8764ef5ed76b5d350883bac4ebe05d68a1e7d1c` |
+| Fixed ARM ROM | `7a4301b4cf813ddab18fd0c9982ca6da2536f494133c5e8724e2dca4bb9ffd65` |
+| Input tape | `1575e1b70a273bf371f4077af55dd1976cbad330cef2dd407d5e477a58f9faba` |
+| Host checkpoint goldens | `2cdd0f384fe8d3abdcc9cc54bf4421bbbf515902b15a3cf2bd87ec12349a42a4` |
+| ARM runner | `53658892f61ab6ea5e48e934b36ecff05cbe1071639470fd51902f2c7cf2c5d1` |
+| Host validation summary | `09df32ebff29cff994e1055cb4a34696fc2ecb5470a72b4069a73a200bd02af8` |
+
+The earlier v2 raw-log-cap failure remains preserved. V3 retained the same
+protocol and raw-validation checks while filtering only complete raw lines
+beginning exactly `[INFO] GBA DMA:`; it retained every other raw line and all
+GBA Debug records. The completed run filtered 49,049,647 DMA information lines
+and retained 56,911 raw bytes. This logging adjustment does not change the
+replay inputs or runtime source.
+
+The worst sampled window reached 55,310,988 combined update/audio/render
+cycles, including a 54,554,947-cycle game update. These instrumented mGBA
+measurements are not a 30-fps qualification. This result also does not qualify
+current normal product builds, an SRAM save/load continuation, carried
+missions, or physical GBA behavior. The controller's global placement/path
+query observability gate also remains open. It does not promote Z7 or change its
+draft/disabled status.

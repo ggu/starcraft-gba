@@ -2648,6 +2648,23 @@ with `make -B terran CONTACT_CACHE_FLAGS=` (or `zerg` / `protoss`). See
 [Validation](VALIDATION.md#contact-cache-movement-measurement-2026-10-27) for the ARM
 measurements and the benchmark recipe.
 
+The contact-cache builds also retain up to four exact blocked-steering masks
+between collision-world mutations. The memo clears at movement and actor
+lifecycle boundaries and adds no save data. `make test-sc64-contact-memo`
+checks both bucket implementations without imported assets; the optional
+profile differential fixtures enable a host-only hit oracle. See the
+[memo audit](audits/2026-10-29-contact-query-memo/README.md) for measured scope
+and remaining qualification. Showcase uses its separate collision flags.
+
+The delivered race and Showcase profiles also enable
+`CANONICAL_ROUTE_PROBE_FLAGS` for an exact shortest-step shortcut. After cache
+and suffix hits, a bounded Manhattan-monotone search can avoid building a
+complete route field. Unsupported or unproved paths retain the full BFS.
+The search borrows existing scratch only for the call and adds no save state.
+`make test-sc64-route-monotone` checks the public dispatch without imported
+assets. See the [route-step audit](audits/2026-10-29-monotone-route-step/README.md)
+for tie-order reasoning, measured gains, workload limits and remaining stalls.
+
 An experimental mode-0 renderer builds on that movement probe:
 
 ```sh
@@ -2736,6 +2753,20 @@ It builds `build/StarCraft-Protoss-P7-Render-Probe-GBA.gba`. The frame test
 compares all displayed RGB555 pixels with the FACT V2 profile across camera
 pans, pause/resume and combat. See the [drawing qualification](research/p7-render-profile-qualification.md)
 for the modest measured gains, unchanged memory guards and remaining limits.
+
+## Asset-free contact geometry checks
+
+Run the runtime geometry and independent table checks without campaign inputs:
+
+```sh
+make test-sc64-contact-mask-math test-sc64-contact-mask-table
+```
+
+The math target is also part of `./dev test`. It compiles the real contact
+header with minimal context stubs, checks all 887,250 table tuples and 153,600
+out-of-domain wrapper cases under ASan/UBSan, and exercises seeded masks.
+It checks the geometry kernel rather than full game integration. The table
+header is generated from authored integer arithmetic and needs no game data.
 
 ## Mineral gathering before a base exists
 

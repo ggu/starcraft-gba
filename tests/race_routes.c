@@ -378,13 +378,15 @@ int main(void)
     assert(sc64_route_builds==SC64_ROUTE_SLOTS&&sc64_route_hits==SC64_ROUTE_SLOTS);
 
     /* Capacity+1 independent destinations exercise the real LRU boundary.
-       The scalar BFS oracle checks exact tie direction, not merely distance. */
+       Space roots beyond the bounded subpath-reuse neighborhood so every
+       new key really requires its own field. Clustered reuse is checked by
+       sc64_route_subpath.c. The scalar BFS oracle still checks exact ties. */
     memset(path_walkable,1,sizeof(path_walkable));
     reset_routes(); sc64_route_clock=0; sc64_route_builds=0; sc64_route_hits=0;
     const int start_x=MAP_COLS/2,start_y=MAP_ROWS/2;
     int goals[SC64_ROUTE_SLOTS+2];
     for(int i=0;i<SC64_ROUTE_SLOTS+2;i++) {
-        int gx=10+i%10,gy=10+i/10;
+        int gx=10+5*(i%10),gy=10+5*(i/10);
         goals[i]=gx+gy*MAP_COLS;
     }
     for(int i=0;i<SC64_ROUTE_SLOTS+1;i++) {

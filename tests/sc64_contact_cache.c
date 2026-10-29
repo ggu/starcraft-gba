@@ -294,6 +294,13 @@ mutate(void)
 {
     int j = (int)(next_random() % MAX_UNITS);
     ++mutations;
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    /* This randomized fixture edits Unit records directly instead of using
+     * engine lifecycle APIs. Flush the memo for that synthetic mutation; the
+     * real bucket begin/move/end hooks are exercised separately by the memo
+     * contract fixture. This keeps oracle windows scoped to query phases. */
+    sc64_contact_memo_invalidate();
+#endif
     switch (next_random() % 7u) {
     case 0: /* morph in place */
         u[j].type = random_type();
@@ -340,6 +347,11 @@ static void
 set_p6(int on)
 {
 #ifdef SC64_P6_COMBAT_ENABLED
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    /* The host fixture toggles mission state directly; production updates
+     * it between bucket windows, whose begin hook flushes the memo. */
+    sc64_contact_memo_invalidate();
+#endif
     race_mode = 0;
     race_selected_mission = on ? SC64_P6_GLOBAL_ID : SC64_P6_GLOBAL_ID + 1;
     if (sc64_contact_p6_active()) ++p6_passes;
@@ -367,8 +379,18 @@ world_passes(void)
                     check_unit(i);
                 }
             }
-            /* Bucket-inactive fallback: the mask must match the full scan. */
+            /* Bucket-inactive fallback is a direct fixture state toggle. */
+#ifdef SC64_CONTACT_MEMO_ENABLED
+            sc64_contact_memo_invalidate();
+#endif
             sc64_unit_bucket_active = 0;
+            for (i = 0; i < MAX_UNITS; i += 3) check_unit(i);
+#ifdef SC64_CONTACT_MEMO_ENABLED
+            /* Restore the fixture flag directly and start a fresh oracle
+             * window before checking the indexed path again. */
+            sc64_contact_memo_invalidate();
+#endif
+            sc64_unit_bucket_active = 1;
             for (i = 0; i < MAX_UNITS; i += 3) check_unit(i);
             sc64_unit_buckets_end();
             /* Between passes: morphs and slot reuse without cache resets. */
@@ -470,6 +492,10 @@ main(void)
                "flying movers %lu, ground movers %lu\n", step_fail_inmap,
                step_fail_offmap, mask_fail, stock_fail, fail_flying_mover,
                fail_ground_mover);
+#ifdef SC64_CONTACT_MEMO_ORACLE
+    sc64_contact_memo_report(0);
+    assert(sc64_contact_memo_oracle_passed());
+#endif
     assert(failures == 0);
     return 0;
 }
