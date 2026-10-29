@@ -84,9 +84,18 @@ thresholds, fractional rates and saved state, lifted/construction exclusions,
 destruction, both repair adapters where compiled, and invincible shield
 protection. Renderer tests use authored synthetic art to check attachment
 slots, stages, frame timing, mirrored paths and clipping. Source art remains
-private. Normal ARM memory guards, menu replays, hardware timing and full
-campaign completion are separate qualification steps; this page does not
-claim new 30 fps or physical-GBA results.
+private. The four normal ARM products and final unified build passed unchanged memory
+guards. Private host framebuffer captures verified aligned race effects, a
+firing Photon Cannon, and unchanged HUD bands at viewport edges. These are
+separate from menu replays, hardware timing and full campaign completion; this
+page does not claim new 30 fps or physical-GBA results.
+
+The normal Terran host test command currently fails its scripted T5 regression.
+The same regression also fails on the pre-burn checkpoint and earlier mainline
+`9ff7f7c`, with byte-identical baseline traces and logs. Shared burn/repair/save
+fixtures and `test-unified` pass; the full Terran campaign is not qualified as
+passing. Resolve the controller/gameplay failure before treating this as a
+campaign release.
 
 ## Provenance
 

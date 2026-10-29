@@ -55,3 +55,9 @@ and [Validation](VALIDATION.md) for provenance and existing limits.
   N64-derived damage overlays are implemented in [BUILDING-DAMAGE.md](BUILDING-DAMAGE.md).
   Native N64 burn logic, random overlay history, blending and alternate-pose
   anchors remain unqualified.
+
+The current normal Terran qualification also exposes a scripted T5 loss. It
+reproduces on earlier mainline `9ff7f7c` and pre-burn `07de5d0`; those baseline
+traces/logs match byte for byte. This remains a campaign qualification blocker,
+not evidence that the new building mechanics complete the campaign. Candidate
+controller behavior differs, so it still needs a normal gameplay investigation.
