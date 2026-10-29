@@ -6752,3 +6752,51 @@ compiler arguments, raw dependencies and consumed-input hashes accompany the
 seed fixtures in `.local/build/p7-owner-cargo-morph-sram-v1`, together with the
 ARM state/bank comparisons. Other cargo types, malformed lifecycle combinations,
 whole resumed missions and physical hardware remain outside these cases.
+
+### T8 resource expansion and P7 count optimization (2026-10-30)
+
+The dedicated T8 controller replaces the shared assault runner in the public
+T8 Make target; T10 is unchanged. It uses ordinary lift/land, boarding, unloading,
+construction, production and attack commands to sustain its economy across
+three mineral fields, preserve gas collection and add a second Starport.
+Two host probe-entry runs win identically at input call 193,336 / frame 185,476,
+within the unchanged 200,000-call bound. Norad remains alive, hostile buildings
+reach zero, the native primary objective and completion bit are set, and no
+faults occur. The source SHA-256 is
+`c8c7eb642f9bbf6e9a8331a5ab5a9cba6c9788a8099a17a012f22ed7580d4146`.
+Both traces hash to
+`5d17c5ab0be19d89b515aee1f3c4b50dfd0243580dc83f8a01ccd2ffc2a97279`.
+Evidence in `.local/build/t8-policy-port-v1` includes the executed compiler
+arguments, raw dependencies and 172 input hashes. The inherited policy reads
+unseen enemy and mineral positions. This is neither an information-limited
+playthrough nor normal-menu ARM qualification. The full aggregate is checked
+separately from these individual wins.
+
+The P7 Command census now skips type-match calls for unequal exact raw IDs
+and reuses the identical Nexus match for the two applicable owner selectors.
+The authenticated trigger-row check, owner/raw validation, kind-aware matching
+and fail-closed behavior are unchanged. No cache, persistent storage, mission
+predicate or compiler flag is added. A frozen preceding census remains only in
+`tests/sc64_p7_count_snapshot_reference.c`. The P7 and Showcase public sanitizer
+targets pass explicit nonzero witnesses for all eight count rows, 500 populated
+valid worlds, 3,000 mixed valid/malformed cases, wrong-kind raw IDs, inactive and
+mismatched contexts, null context and failed-snapshot sentinel preservation.
+
+The complete normal-menu P7 winning tape takes 124,487,769,867 cycles versus
+127,213,865,473 on the preceding owner-optimized build, a 2.14 percent reduction.
+All 50 checkpoint positions/outcomes and the complete observed final gameplay
+snapshot match. Across 9,000 prefix updates, unit/building/P7-state/visibility
+and rendered-framebuffer hashes match. The 1,000-update measured window takes
+2,394,919,369 versus 2,442,974,059 cycles, a 1.97 percent reduction. The campaign
+still falls far short of 30 fps; these results do not establish audio equivalence.
+
+All four production links retain their exact previous RAM bounds. Terran and
+Zerg ROMs are byte-identical to the preceding builds; Protoss and Showcase
+consume only the intended changed runtime header. Native three-AI samples in
+P7 and Showcase remain cycle-identical at 645,500,178 and 693,760,156 respectively.
+A new P7 save at update 5,000 / frame 4,966 roundtrips its complete actor banks
+and persistent mission state, with fresh/in-place continuations equal through
+1,000 updates. Executed per-TU arguments, dependencies, input hashes, maps,
+replays and SRAM evidence are under `.local/build/p7-count-{opt,final}-v1` and
+`.local/build/p7-count-campaign-sram-final-v1`. Canonical candidates are packaged
+locally; no SD delivery or physical-hardware qualification is claimed.
