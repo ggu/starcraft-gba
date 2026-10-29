@@ -152,6 +152,7 @@ STAGED_CAMPAIGN_INPUTS["zerg-z6-probe"] = STAGED_CAMPAIGN_INPUTS["zerg-z6"]
 
 FACING_PROFILES = ("terran", "zerg", "zerg-z6", "zerg-z7", "zerg-z4", "protoss", "protoss-p7", "protoss-p5-shuttle", "protoss-p6")
 FACING_HEADER = ".local/sc64/facing/generated/sc64_unit_facing_generated.h"
+WALK_HEADER = ".local/sc64/walk/generated/sc64_unit_walk_generated.h"
 TANK_VFX_HEADER = ".local/sc64/tank-vfx/generated/sc64_tank_source_vfx_generated.h"
 WEAPON_SOURCE_HEADER = ".local/sc64/weapon-vfx/generated/sc64_weapon_source_generated.h"
 ATTACK_POSE_HEADER = ".local/sc64/attack-poses/generated/sc64_unit_attack_source_generated.h"
@@ -265,6 +266,21 @@ def facing_sprite_input_ready(path: Path) -> bool:
             re.search(r"static const Sc64SpriteFrame sc64_unit_facing_\d+\[17\]",
                       text) is not None and
             re.search(r"static const unsigned char sc64_unit_facing_\d+_0_pixels\[[1-9]\d*\]",
+                      text) is not None)
+
+
+def walk_cycle_input_ready(path: Path) -> bool:
+    """Require the 32-heading walk-cycle bank with at least one cycle."""
+    try:
+        text = path.read_text(encoding="ascii")
+    except (OSError, UnicodeError):
+        return False
+    return (re.search(r"^#define\s+SC64_UNIT_WALK_BANK_VERSION\s+1\s*$",
+                      text, re.MULTILINE) is not None and
+            re.search(r"^#define\s+SC64_UNIT_WALK_HEADINGS\s+32u\s*$",
+                      text, re.MULTILINE) is not None and
+            "sc64_unit_walk_cycle(" in text and
+            re.search(r"static const Sc64UnitWalkCycle sc64_unit_walk_i\d+ =",
                       text) is not None)
 
 
@@ -667,6 +683,11 @@ def build(game: str) -> None:
         raise RuntimeError(
             "source construction art requires the blue-glow modifier bank; "
             "regenerate with ./dev sc64 prepare --rom PATH --profile " + game)
+    if game in CONSTRUCTION_PROFILES and not (facing_sprite_input_ready(ROOT / FACING_HEADER) and
+                                              walk_cycle_input_ready(ROOT / WALK_HEADER)):
+        raise RuntimeError(
+            "race-engine builds require the directional sprite and walk-cycle banks; "
+            "regenerate with ./dev sc64 prepare --rom PATH --profile " + game)
     make_target, _ = GAMES[game]
     run(["make", make_target])
 
@@ -764,6 +785,15 @@ def prepare(rom: Path, profile: str) -> None:
              "--rom", str(private_rom)])
         if not construction_color_input_ready(ROOT / CONSTRUCTION_HEADER):
             raise RuntimeError("construction preparation produced a stale blue-glow bank")
+        # Every race-engine product draws directional frames and walk cycles.
+        run([sys.executable, str(ROOT / "tools/sc64_unit_facing.py"),
+             "--rom", str(private_rom), "--out", str((ROOT / FACING_HEADER).parent)])
+        if not facing_sprite_input_ready(ROOT / FACING_HEADER):
+            raise RuntimeError("directional sprite preparation produced a stale or empty bank")
+        run([sys.executable, str(ROOT / "tools/sc64_unit_walk_frames.py"),
+             "--rom", str(private_rom), "--out", str((ROOT / WALK_HEADER).parent)])
+        if not walk_cycle_input_ready(ROOT / WALK_HEADER):
+            raise RuntimeError("walk-cycle preparation produced a stale or empty bank")
         run([sys.executable, str(ROOT / "tools/sc64_menu_assets.py")])
         run([sys.executable, str(ROOT / "tools/sc64_font_assets.py"),
              "--rom", str(private_rom)])
@@ -878,10 +908,6 @@ def prepare(rom: Path, profile: str) -> None:
                  "--out", str(stage / "sprites"),
                  "--header", str(stage / "sc64_race_sprites_generated.h")])
     if profile in FACING_PROFILES:
-        run([sys.executable, str(ROOT / "tools/sc64_unit_facing.py"),
-             "--rom", str(private_rom), "--out", str((ROOT / FACING_HEADER).parent)])
-        if not facing_sprite_input_ready(ROOT / FACING_HEADER):
-            raise RuntimeError("directional sprite preparation produced a stale or empty bank")
         run([sys.executable, str(ROOT / "tools/sc64_tank_source_vfx.py"),
              "--rom", str(private_rom), "--out", str((ROOT / TANK_VFX_HEADER).parent)])
         if not tank_vfx_input_ready(ROOT / TANK_VFX_HEADER):
@@ -927,6 +953,8 @@ def status(profile: str) -> int:
             ("Menu artwork", "sc64_menu_generated.h"),
         ))
         paths.append(("Source construction art", ROOT / CONSTRUCTION_HEADER))
+        paths.append(("Directional unit sprites", ROOT / FACING_HEADER))
+        paths.append(("Unit walk cycles", ROOT / WALK_HEADER))
         paths.append(("Campaign briefings and portraits", ROOT /
                       ".local/sc64/briefings/generated/sc64_briefing_generated.h"))
         for label, name in (("Original interface fonts", "sc64_font_generated.h"),
@@ -981,7 +1009,6 @@ def status(profile: str) -> int:
         paths.extend((f"Terran T{mission} {kind}", stage / f"sc64_t{mission}_{kind}_generated.h")
                      for mission in range(7, 11) for kind in ("scenario", "availability"))
     if profile in FACING_PROFILES:
-        paths.append(("Directional unit sprites", ROOT / FACING_HEADER))
         paths.append(("Tank firing effects", ROOT / TANK_VFX_HEADER))
         paths.append(("Unit attack poses", ROOT / ATTACK_POSE_HEADER))
         paths.append(("Source weapon effects", ROOT / WEAPON_SOURCE_HEADER))
@@ -1004,6 +1031,8 @@ def status(profile: str) -> int:
             ready = death_source_input_ready(path)
         elif label == "Source construction art":
             ready = construction_color_input_ready(path)
+        elif label == "Unit walk cycles":
+            ready = walk_cycle_input_ready(path)
         elif label.endswith("gated map data"):
             map_profile = ("protoss-p6" if label == "Protoss chapter 6 gated map data" or
                            label == "Protoss P6 gated map data" else
@@ -1030,13 +1059,14 @@ def status(profile: str) -> int:
         note = (f" (run ./dev sc64 prepare --rom PATH --profile {profile} to regenerate unit-word metadata)"
                 if profile in ("zerg", "zerg-z4") and label == "Zerg chapter 4 sprites" and not ready
                 else "")
-        if (profile in FACING_PROFILES and not ready and label in
-                ("Directional unit sprites", "Tank firing effects", "Unit attack poses",
-                 "Source weapon effects", "Source death art")):
+        if (profile in CONSTRUCTION_PROFILES and not ready and label in
+                ("Directional unit sprites", "Unit walk cycles", "Tank firing effects",
+                 "Unit attack poses", "Source weapon effects", "Source death art")):
             note = f" (run ./dev sc64 prepare --rom PATH --profile {profile} to regenerate)"
         print(f"{'READY  ' if ready else 'MISSING'} {label}: {path}{note}")
     return int(any(not path.is_file() for _, path in paths) or
-               (profile in FACING_PROFILES and not facing_sprite_input_ready(ROOT / FACING_HEADER)) or
+               (profile in CONSTRUCTION_PROFILES and not facing_sprite_input_ready(ROOT / FACING_HEADER)) or
+               (profile in CONSTRUCTION_PROFILES and not walk_cycle_input_ready(ROOT / WALK_HEADER)) or
                (profile in FACING_PROFILES and not tank_vfx_input_ready(ROOT / TANK_VFX_HEADER)) or
                (profile in FACING_PROFILES and not attack_pose_input_ready(ROOT / ATTACK_POSE_HEADER)) or
                (profile in FACING_PROFILES and not weapon_source_input_ready(ROOT / WEAPON_SOURCE_HEADER)) or

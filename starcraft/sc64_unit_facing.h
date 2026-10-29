@@ -11,10 +11,15 @@
  * to and a flyer faces its move target, so the 8-way movement steps do not
  * jitter. A unit turns toward its target when it fires. Movement orders keep
  * updating facing during cooldown; stationary firing units keep their aim.
+ * With SC64_UNIT_WALK_FRAMES a moving unit also plays the poses of its
+ * source Walking animation, imported into a second private header.
  * Nothing here is read by the simulation or saved; after a load, units face
  * north until they move or fire. */
 
 #include "sc64_unit_facing_generated.h"
+#ifdef SC64_UNIT_WALK_FRAMES
+#include "sc64_unit_walk_generated.h"
+#endif
 
 #if defined(SC64_UNIT_WORD_SPRITES) && !defined(SC64_UNIT_FACING_WORD_METADATA)
 #error "SC64_UNIT_WORD_SPRITES requires generated unit-facing word sidecars"
@@ -122,25 +127,78 @@ sc64_facing_blit(unsigned raw, int dir, int x, int y)
     return 1;
 }
 
-/* Draw a unit with its facing frame. Siege Tanks draw their hull and turret
- * subunits (raw 5/6 in tank mode, 30/31 when sieged); the sieged hull has a
- * single frame. Muzzle/impact effects remain with the stock VFX renderer.
- * Returns 0 when no facing art exists for this unit. */
-static int
-sc64_facing_draw(const Unit *q, int raw, int x, int y)
+#ifdef SC64_UNIT_WALK_FRAMES
+/* Source ticks run at four per five game ticks. Cache the conversion so a
+ * frame divides once, not once per unit. */
+static int sc64_walk_clock_frame = -1;
+static unsigned sc64_walk_clock_ticks;
+
+/* The 32 directional frames (western ones pre-mirrored) of the walk pose a
+ * moving unit shows now, or 0 when the source has no walk cycle for it. The
+ * cycle runs on the game clock while the unit moves; the slot offsets its
+ * phase so a group does not march in lockstep. */
+static const Sc64SpriteFrame *
+sc64_walk_pose(unsigned raw, int slot)
 {
-    int dir;
+    const Sc64UnitWalkCycle *cycle = sc64_unit_walk_cycle((unsigned short)raw);
+    if (!cycle) return 0;
+    if (sc64_walk_clock_frame != frame) {
+        sc64_walk_clock_frame = frame;
+        sc64_walk_clock_ticks = (unsigned)frame * 4u / 5u;
+    }
+    unsigned tick = (sc64_walk_clock_ticks + (unsigned)slot * 3u) % cycle->cycle_ticks;
+    unsigned step = 0;
+    while (step + 1 < cycle->count && cycle->steps[step + 1].tick <= tick) ++step;
+    return cycle->steps[step].frames;
+}
+
+/* Walk frames are stored for every heading, so they never need the mirrored
+ * blitter, which runs from ROM. */
+static void
+sc64_walk_blit(const Sc64SpriteFrame *pose, int dir, int x, int y)
+{
+    const Sc64SpriteFrame *s = &pose[dir];
+    gfx_blit_sprite(x - s->canvas_w / 2 + s->offset_x, y - s->canvas_h / 2 + s->offset_y,
+                    s->w, s->h, s->pixels);
+}
+#endif
+
+/* Draw a unit with its facing frame, or its walk pose while it moves
+ * (walk is sc64_walk_track's stride phase). Units without a source walk
+ * cycle keep the one-pixel stride lift above ground row y. Siege Tanks draw
+ * their hull and turret subunits (raw 5/6 in tank mode, 30/31 when sieged);
+ * the sieged hull has a single frame. Muzzle/impact effects remain with the
+ * stock VFX renderer. Returns 0 when no facing art exists for this unit. */
+static int
+sc64_facing_draw(const Unit *q, int raw, int x, int y, int walk)
+{
+    int dir, slot = (int)(q - u);
     if (raw < 0) return 0;
-    dir = sc64_facing[(int)(q - u)] & SC64_FACING_MASK;
+    dir = sc64_facing[slot] & SC64_FACING_MASK;
 #ifdef SC64_RACES
     if (q->type == U_SIEGE_TANK || q->type == U_TANK) {
-        int sieged = q->type == U_SIEGE_TANK;
-        if (!sc64_facing_blit(sieged ? 30u : 5u, dir, x, y)) return 0;
-        if (!sc64_facing_blit(sieged ? 31u : 6u, dir, x, y)) return 0;
+        int sieged = q->type == U_SIEGE_TANK, lift = SC64_WALK_LIFT(walk);
+#ifdef SC64_UNIT_WALK_FRAMES
+        /* Rolling treads replace the lift for the hull and its turret. */
+        const Sc64SpriteFrame *pose = walk && !sieged ? sc64_walk_pose(5u, slot) : 0;
+        if (pose) { sc64_walk_blit(pose, dir, x, y); lift = 0; }
+        else
+#endif
+        if (!sc64_facing_blit(sieged ? 30u : 5u, dir, x, y - lift)) return 0;
+        if (!sc64_facing_blit(sieged ? 31u : 6u, dir, x, y - lift)) return 0;
         return 1;
     }
 #endif
-    return sc64_facing_blit((unsigned)raw, dir, x, y);
+#ifdef SC64_UNIT_WALK_FRAMES
+    if (walk) {
+        const Sc64SpriteFrame *pose = sc64_walk_pose((unsigned)raw, slot);
+        if (pose) {
+            sc64_walk_blit(pose, dir, x, y);
+            return 1;
+        }
+    }
+#endif
+    return sc64_facing_blit((unsigned)raw, dir, x, y - SC64_WALK_LIFT(walk));
 }
 
 #define SC64_FACING_FIRE(q, target) sc64_facing_fire((q), target_x(target), target_y(target))

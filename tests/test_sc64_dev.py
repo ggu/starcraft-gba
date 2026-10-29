@@ -115,6 +115,20 @@ CONSTRUCTION_COLOR_HEADER = (
     'sc64_construction_modifier_lookup(int image_id, int *rows);\n'
 )
 
+WALK_CYCLE_HEADER = (
+    '#define SC64_UNIT_WALK_BANK_VERSION 1\n'
+    'static const Sc64UnitWalkStep sc64_unit_walk_i54_steps[1] = {{0}};\n'
+    'static const Sc64UnitWalkCycle sc64_unit_walk_i54 = {0};\n'
+    'static inline const Sc64UnitWalkCycle *sc64_unit_walk_cycle(unsigned short raw_type) { return 0; }\n'
+    '#define SC64_UNIT_WALK_HEADINGS 32u\n'
+)
+
+
+def emit_walk_header(root):
+    path = root / dev.WALK_HEADER
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(WALK_CYCLE_HEADER, encoding='ascii')
+
 
 def emit_construction_header(root):
     path = root / dev.CONSTRUCTION_HEADER
@@ -127,6 +141,7 @@ def emit_facing_header(root):
     path = root / dev.FACING_HEADER
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(FACING_SPRITE_HEADER, encoding='ascii')
+    emit_walk_header(root)
     path = root / dev.TANK_VFX_HEADER
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(TANK_VFX_HEADER, encoding='ascii')
@@ -225,6 +240,22 @@ class OnboardingTests(unittest.TestCase):
                 self.assertFalse(dev.facing_sprite_input_ready(header))
             header.write_text(FACING_SPRITE_HEADER, encoding='ascii')
             self.assertTrue(dev.facing_sprite_input_ready(header))
+
+    def test_walk_cycle_readiness_requires_version_headings_and_a_cycle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / 'walk.h'
+            invalid = (
+                WALK_CYCLE_HEADER.replace('BANK_VERSION 1', 'BANK_VERSION 10'),
+                WALK_CYCLE_HEADER.replace('HEADINGS 32u', 'HEADINGS 17u'),
+                WALK_CYCLE_HEADER.replace('sc64_unit_walk_cycle(', 'missing_accessor('),
+                WALK_CYCLE_HEADER.replace('sc64_unit_walk_i54 =', 'missing_cycle ='),
+            )
+            self.assertFalse(dev.walk_cycle_input_ready(header))
+            for text in invalid:
+                header.write_text(text, encoding='ascii')
+                self.assertFalse(dev.walk_cycle_input_ready(header))
+            header.write_text(WALK_CYCLE_HEADER, encoding='ascii')
+            self.assertTrue(dev.walk_cycle_input_ready(header))
 
     def test_attack_pose_readiness_requires_version_accessors_and_pixels(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -445,6 +476,10 @@ class OnboardingTests(unittest.TestCase):
                     emit(output, UNIT_WORD_SPRITE_HEADER)
                 elif script == 'sc64_construction_sprites.py':
                     emit_construction_header(root)
+                elif script == 'sc64_unit_facing.py':
+                    emit_facing_header(root)
+                elif script == 'sc64_unit_walk_frames.py':
+                    emit_walk_header(root)
                 elif script in ('sc64_font_assets.py', 'sc64_icon_assets.py', 'sc64_chrome_assets.py'):
                     names = {'sc64_font_assets.py': 'sc64_font_generated.h',
                              'sc64_icon_assets.py': 'sc64_icons_generated.h',
@@ -1006,6 +1041,8 @@ class OnboardingTests(unittest.TestCase):
                         emit_construction_header(root)
                     elif script == 'sc64_unit_facing.py':
                         emit_facing_header(root)
+                    elif script == 'sc64_unit_walk_frames.py':
+                        emit_walk_header(root)
                     elif script == 'sc64_unit_attack_sprites.py':
                         emit_attack_pose_header(root)
                     elif script == 'sc64_weapon_source_sprites.py':
@@ -1251,6 +1288,7 @@ class OnboardingTests(unittest.TestCase):
                 UNIT_WORD_SPRITE_HEADER, encoding='ascii')
             for relative, content in (
                 (dev.FACING_HEADER, FACING_SPRITE_HEADER),
+                (dev.WALK_HEADER, WALK_CYCLE_HEADER),
                 (dev.TANK_VFX_HEADER, TANK_VFX_HEADER),
                 (dev.ATTACK_POSE_HEADER, ATTACK_POSE_HEADER),
                 (dev.WEAPON_SOURCE_HEADER, WEAPON_SOURCE_HEADER),
@@ -1364,6 +1402,8 @@ class OnboardingTests(unittest.TestCase):
                     output.write_text(BRIEFING_HEADER, encoding='ascii')
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
+                elif script == 'sc64_unit_walk_frames.py':
+                    emit_walk_header(root)
                 elif script == 'sc64_unit_attack_sprites.py':
                     emit_attack_pose_header(root)
                 elif script == 'sc64_weapon_source_sprites.py':
@@ -1467,6 +1507,8 @@ class OnboardingTests(unittest.TestCase):
                     output.write_text(BRIEFING_HEADER, encoding='ascii')
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
+                elif script == 'sc64_unit_walk_frames.py':
+                    emit_walk_header(root)
                 elif script == 'sc64_unit_attack_sprites.py':
                     emit_attack_pose_header(root)
                 elif script == 'sc64_weapon_source_sprites.py':
@@ -1553,6 +1595,8 @@ class OnboardingTests(unittest.TestCase):
                     output.write_text(BRIEFING_HEADER, encoding='ascii')
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
+                elif script == 'sc64_unit_walk_frames.py':
+                    emit_walk_header(root)
                 elif script == 'sc64_z4_pack.py':
                     output = local / 'z4/manifest.json'
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -1767,6 +1811,8 @@ class OnboardingTests(unittest.TestCase):
                     emit_construction_header(root)
                 elif script == 'sc64_unit_facing.py':
                     emit_facing_header(root)
+                elif script == 'sc64_unit_walk_frames.py':
+                    emit_walk_header(root)
                 elif script == 'sc64_unit_attack_sprites.py':
                     emit_attack_pose_header(root)
                 elif script == 'sc64_weapon_source_sprites.py':
