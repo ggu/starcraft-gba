@@ -42,6 +42,11 @@ CONFIGS.update({
                   "SC64_Z7_EGG_PRODUCTION"),
     "zp_nydus": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_Z6_ACTORS",
                  "SC64_Z6_RUNTIME", "SC64_NYDUS_ENABLED"),
+    "zp_z6_shared_scourge": ("SC64_RACES", "SC64_UNIFIED", "SC64_ZP_CAMPAIGN_ACTORS",
+                              "SC64_Z6_ACTORS", "SC64_Z6_RUNTIME", "SC64_SHARED_SCOURGE_COMBAT"),
+    "p7_shared_scourge": ("SC64_RACES", "SC64_UNIFIED", "SC64_P3_ENABLED",
+                          "SC64_ZP_CAMPAIGN_ACTORS", "SC64_P7_ACTORS",
+                          "SC64_SHARED_SCOURGE_COMBAT"),
     "zp_p8_data": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS",
                    "SC64_P8_DATA_ENABLED"),
     "p7_move_profile": ("SC64_RACES", "SC64_UNIFIED", "SC64_P3_ENABLED",
@@ -121,6 +126,21 @@ class FactTablesTest(unittest.TestCase):
                         directory, other + "-mismatch", ("-I", str(table_dir)))
                     self.assertNotEqual(built.returncode, 0)
                     self.assertIn(b"fact tables were generated", built.stderr)
+
+    def test_tables_reject_shared_scourge_mismatch_both_directions(self):
+        base = CONFIGS["zp_z6_runtime"]
+        shared = base + ("SC64_SHARED_SCOURGE_COMBAT",)
+        with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-scourge-") as directory:
+            for name, generated, used, message in (
+                ("off-to-on", base, shared, b"generated without SC64_SHARED_SCOURGE_COMBAT"),
+                ("on-to-off", shared, base, b"generated with SC64_SHARED_SCOURGE_COMBAT"),
+            ):
+                with self.subTest(direction=name):
+                    table_dir = generate(self.compiler, generated, directory, name)
+                    built, _ = compile_program(self.compiler, CHECK, used + ("SC64_FACT_TABLES",),
+                                               directory, name + "-check", ("-I", str(table_dir)))
+                    self.assertNotEqual(built.returncode, 0)
+                    self.assertIn(message, built.stderr)
 
     def test_tables_reject_carrier_flight_gate_mismatch(self):
         with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-flight-") as directory:
