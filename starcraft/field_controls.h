@@ -26,6 +26,8 @@ static int field_menu_count(void);
 static const char *race_menu_label(int i);
 static int race_owner_identity(int owner);
 static int race_owner_has_prereq(int owner, unsigned short prereq);
+/* Defined by the custom-game adapter included after the UI declarations. */
+static int race_skirmish_record_available(const Sc64SkirmishRecord *record);
 static const char *race_campaign_objective_text(void);
 static const char *race_campaign_victory_text(void);
 static const char *race_campaign_failure_text(void);
@@ -207,6 +209,7 @@ field_ui_site(int type, int *x, int *y)
 static int
 field_ui_build_worker(int type)
 {
+    if (race_mode) return race_skirmish_worker(type);
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
     int i, best = find_selected_worker(), d, best_d = 0x7fffffff;
     if (!r || (best >= 0 && u[best].type == r->worker)) return best;
@@ -225,6 +228,11 @@ field_ui_build_worker(int type)
 static const char *
 ui_missing_tech(int type, int worker)
 {
+    if (race_mode) {
+        const Sc64SkirmishRecord *record = sc64_skirmish_menu_record((unsigned)race_human,
+            (unsigned)sc64_race_raw_building(type));
+        return record && race_skirmish_record_available(record) ? 0 : "";
+    }
     static const char *const names[14] = {
         "HATCHERY", "SPAWNING POOL", "HYDRALISK DEN", "NEXUS", "GATEWAY",
         "CYBERNETICS CORE", "PYLON", "FORGE", "SUPPLY DEPOT", "BARRACKS",
@@ -269,6 +277,23 @@ ui_row_kind(int i, int *type)
         {B_GATEWAY, B_PYLON, B_ASSIMILATOR, B_CYBERNETICS_CORE, B_FORGE}};
     const char *label;
     *type = -1;
+    /* Custom games use catalog row kinds directly. The campaign menu below
+     * keeps its legacy label mapping and compile-profile-specific rows. */
+    if (race_mode) {
+        Sc64SkirmishMenuRow row;
+        if (!sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row))
+            return UI_ROW_SPECIAL;
+        if (row.kind == SC64_SK_MENU_MOVE || row.kind == SC64_SK_MENU_ATTACK ||
+            row.kind == SC64_SK_MENU_STOP) return UI_ROW_ORDER;
+        if (row.kind == SC64_SK_MENU_WEAPONS || row.kind == SC64_SK_MENU_ARMOR)
+            return UI_ROW_RESEARCH;
+        if (!row.record) return UI_ROW_SPECIAL;
+        *type = sc64_race_building_from_raw(row.record->raw_id);
+        if (row.kind == SC64_SK_MENU_BUILD) return UI_ROW_BUILD;
+        if (row.kind == SC64_SK_MENU_ADDON || row.kind == SC64_SK_MENU_MORPH)
+            return UI_ROW_MORPH;
+        return UI_ROW_SPECIAL;
+    }
     if (i == MENU_MOVE || i == MENU_ATTACK || i == MENU_STOP) return UI_ROW_ORDER;
     if (i == MENU_WEAPONS || i == MENU_ARMOR) return UI_ROW_RESEARCH;
     if (i < MENU_STOP) { *type = base[race_human][i - MENU_BARRACKS]; return UI_ROW_BUILD; }
@@ -322,6 +347,23 @@ ui_row_state(int i, int *cost, int *gas_cost, const char **need)
         return ui_research_state(i, need);
     }
     if (kind == UI_ROW_SPECIAL) return UI_SITE_OK;
+    if (race_mode) {
+        Sc64SkirmishMenuRow row;
+        const Sc64StockUnitProfile *profile;
+        if (!sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row) || !row.record)
+            return UI_SITE_OK;
+        profile = sc64_stock_unit_profile(row.record->raw_id);
+        if (!profile) return UI_SITE_TECH;
+        *cost = profile->minerals;
+        *gas_cost = profile->gas;
+        if (!race_skirmish_record_available(row.record)) return UI_SITE_TECH;
+        if (type < 0) return UI_SITE_TECH;
+        if (kind == UI_ROW_BUILD && field_ui_build_worker(type) < 0)
+            return UI_SITE_WORKER;
+        if (minerals < *cost) return UI_SITE_MINERALS;
+        if (gas < *gas_cost) return UI_SITE_GAS;
+        return UI_SITE_OK;
+    }
     *cost = building_cost(type);
     *gas_cost = building_gas_cost(type);
     if (kind == UI_ROW_BUILD) {
@@ -444,6 +486,11 @@ ui_source_icon_for_row(int i, int kind, int type)
 {
 #ifdef SC64_ICON_TABLE_PRESENT
     const char *label;
+    if (race_mode) {
+        Sc64SkirmishMenuRow row;
+        if (sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row) && row.record &&
+            row.record->raw_id < SC64_ICON_UNIT_COUNT) return row.record->raw_id;
+    }
     if (i == MENU_MOVE) return SC64_ICON_MOVE;
     if (i == MENU_ATTACK) return SC64_ICON_ATTACK;
     if (i == MENU_STOP) return SC64_ICON_STOP;

@@ -615,6 +615,7 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 
 #ifdef SC64_RACES
 #include "race_rules.h"
+#include "sc64_skirmish_menu.h"
 #include "sc64_stock_motion.h"
 #include "sc64_stock_combat.h"
 #ifdef SC64_Z7_EGG_PRODUCTION
@@ -1509,6 +1510,10 @@ static int race_z5_consume_issue_selected(int x, int y);
 static int race_z5_consume_tick_unit(int slot);
 #endif
 static int race_start_build(int owner,int worker,int type,int x,int y);
+static int race_skirmish_choose_record(const Sc64SkirmishRecord *record);
+static int race_skirmish_record_available(const Sc64SkirmishRecord *record);
+static int race_skirmish_worker(int type);
+static int race_skirmish_product_available(const Sc64SkirmishRecord *record, void *context);
 static int race_can_site(int owner,int type,int x,int y);
 static int race_site_powered(int owner,int x,int y);
 static int race_builder_arrived(int worker);
@@ -5044,6 +5049,20 @@ choose_command(int choice)
 #ifdef SC_FIELD_FEEDBACK
     menu_last = (u8)choice;
 #endif
+#ifdef SC64_RACES
+    if (race_mode) {
+        Sc64SkirmishMenuRow row;
+        if (!sc64_skirmish_menu_at((unsigned)race_human, (unsigned)choice, &row)) {
+            menu_open = 0; mode = MODE_NORMAL; toast(8); return;
+        }
+        if (row.record) {
+            menu_open = 0;
+            if (!race_skirmish_choose_record(row.record)) { mode = MODE_NORMAL; toast(8); }
+            return;
+        }
+        /* Fixed first-ten control rows deliberately retain their old IDs. */
+    }
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) {
         menu_open=0; mode=MODE_NORMAL;
@@ -5251,6 +5270,7 @@ choose_command(int choice)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+    if (race_mode) return (int)sc64_skirmish_menu_count((unsigned)race_human);
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (race_p7_carrier_training_menu_available()) return MENU_STOP+2;
 #endif
@@ -5302,13 +5322,15 @@ static int field_menu_count(void)
 #elif defined(SC64_T5_RUNTIME)
 static int field_menu_count(void)
 {
+    if (race_mode) return (int)sc64_skirmish_menu_count((unsigned)race_human);
     if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
     return race_human == R_TER ? MENU_COUNT : MENU_STOP + 1;
 }
 #elif defined(SC64_RACES)
 static int field_menu_count(void)
-{ return MENU_STOP + 1 + race_nexus_command_available() + race_probe_cannon_command_available(); }
+{ return race_mode ? (int)sc64_skirmish_menu_count((unsigned)race_human) :
+    MENU_STOP + 1 + race_nexus_command_available() + race_probe_cannon_command_available(); }
 #else
 #define field_menu_count() MENU_COUNT
 #endif
@@ -5339,6 +5361,10 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
+    if (race_mode) {
+        Sc64SkirmishMenuRow row;
+        return sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row) ? row.label : "";
+    }
     static const char *const race_labels[3][
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
         MENU_COUNT
@@ -5599,6 +5625,26 @@ interact(void)
 #endif
         ) {
 #ifdef SC64_RACES
+        if (race_mode) {
+            int producer_raw = sc64_race_raw_building(b[selected_building].type);
+            if (sc64_race_is_zerg_townhall(b[selected_building].type)) producer_raw = 35;
+            const Sc64SkirmishRecord *product = 0;
+            int current_raw = sc64_race_raw_unit(train_type);
+            unsigned count = sc64_skirmish_product_count((unsigned)producer_raw);
+            for (unsigned p = 0; p < count; ++p) {
+                const Sc64SkirmishRecord *candidate = sc64_skirmish_product_at((unsigned)producer_raw, p);
+                if (candidate->raw_id == current_raw &&
+                    race_skirmish_product_available(candidate, &selected_building)) product = candidate;
+            }
+            if (!product) {
+                int raw = sc64_skirmish_menu_next_product((unsigned)producer_raw, SC64_SK_NONE,
+                    race_skirmish_product_available, &selected_building);
+                if (raw == SC64_SK_NONE || sc64_race_unit_from_raw(raw) < 0) { toast(8); return; }
+                train_type = sc64_race_unit_from_raw(raw);
+            }
+            if (train_type < 0) { toast(8); return; }
+            queue_unit(selected_building, train_type); return;
+        }
         if(b[selected_building].type==B_COMMAND)train_type=U_SCV;
         if(b[selected_building].type==B_NEXUS)train_type=U_PROBE;
         if(b[selected_building].type==B_GATEWAY&&train_type!=U_ZEALOT&&train_type!=U_DRAGOON)train_type=U_ZEALOT;
@@ -7129,6 +7175,17 @@ select_combat_group(void)
 static void
 select_next_train_type(void)
 {
+#ifdef SC64_RACES
+    if (race_mode && selected_building >= 0 && selected_building < MAX_BUILDINGS &&
+        b[selected_building].alive && b[selected_building].owner == SIDE) {
+        unsigned producer = (unsigned)sc64_race_raw_building(b[selected_building].type);
+        if (sc64_race_is_zerg_townhall(b[selected_building].type)) producer = 35;
+        int raw = sc64_skirmish_menu_next_product(producer,
+            (unsigned)sc64_race_raw_unit(train_type), race_skirmish_product_available, &selected_building);
+        if (raw != SC64_SK_NONE) train_type = sc64_race_unit_from_raw(raw);
+        return;
+    }
+#endif
 #ifdef SC64_T5_RUNTIME
     if (selected_building >= 0 && b[selected_building].alive &&
         (b[selected_building].type == B_FACTORY || b[selected_building].type == B_STARPORT)) {

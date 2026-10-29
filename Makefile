@@ -1,5 +1,22 @@
 .DEFAULT_GOAL := all
 
+# Asset-free raw-ID capability catalog for the complete standard skirmish roster.
+.PHONY: test-sc64-skirmish-catalog
+build/test-sc64-skirmish-catalog: tests/sc64_skirmish_catalog.c starcraft/sc64_skirmish_catalog.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-sc64-skirmish-catalog: build/test-sc64-skirmish-catalog
+	./build/test-sc64-skirmish-catalog
+test: test-sc64-skirmish-catalog
+
+# Asset-free test for the bounded shared skirmish menu and producer rotation.
+.PHONY: test-sc64-skirmish-menu
+build/test-sc64-skirmish-menu: tests/sc64_skirmish_menu.c starcraft/sc64_skirmish_menu.h starcraft/sc64_skirmish_catalog.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-sc64-skirmish-menu: build/test-sc64-skirmish-menu
+	./build/test-sc64-skirmish-menu
+test: test-sc64-skirmish-menu
+
+
 .PHONY: test-gba-mapped-sprite
 build/test-gba-mapped-sprite: tests/gba_mapped_sprite.c common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -Icommon tests/gba_mapped_sprite.c common/gba.c -o $@
@@ -4799,3 +4816,22 @@ test-sc64-route-monotone: build/test-sc64-route-monotone build/test-sc64-route-m
 	./build/test-sc64-route-monotone-active
 	./build/test-sc64-route-monotone-partial
 test: test-sc64-route-monotone
+
+# Prepared-input integration gate. These tests include the actual engine;
+# unlike the catalog checks, they require the corresponding local art banks.
+.PHONY: test-sc64-skirmish-runtime
+SKIRMISH_RUNTIME_TEST_FLAGS = -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon
+build/test-sc64-skirmish-runtime-terran: tests/sc64_skirmish_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SKIRMISH_RUNTIME_TEST_FLAGS) $(TERRAN_ROM_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+build/test-sc64-skirmish-runtime-zerg: tests/sc64_skirmish_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SKIRMISH_RUNTIME_TEST_FLAGS) $(ZERG_ROM_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+build/test-sc64-skirmish-runtime-protoss: tests/sc64_skirmish_runtime.c $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P7_CANONICAL_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SKIRMISH_RUNTIME_TEST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+build/test-sc64-skirmish-runtime-showcase: tests/sc64_skirmish_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) $(COMMAND_ICON_HEADER) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SKIRMISH_RUNTIME_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+test-sc64-skirmish-runtime: build/test-sc64-skirmish-runtime-terran build/test-sc64-skirmish-runtime-zerg build/test-sc64-skirmish-runtime-protoss build/test-sc64-skirmish-runtime-showcase
+	./build/test-sc64-skirmish-runtime-terran
+	./build/test-sc64-skirmish-runtime-zerg
+	./build/test-sc64-skirmish-runtime-protoss
+	./build/test-sc64-skirmish-runtime-showcase
+
