@@ -48,6 +48,15 @@ The initial set is deliberately small. It establishes the rule and prevents
 these two behaviors from drifting between products; it does not prove that
 every historical game service, actor, or visual treatment is now shared.
 
+Construction health changes the meaning of unfinished-building save rows.
+New saves carry an explicit construction-semantics marker. Unmarked older
+saves remain loadable when no live building is under construction. If an
+older save contains an unfinished building or morph, loading fails before
+changing the live world; the saved bytes remain intact. Start a new match,
+or finish construction using the older ROM and save again before upgrading.
+Guessing a migration from the old HP values would risk healing damage or
+leaving completed buildings permanently below their intended health.
+
 ## Remaining engine debt
 
 | Area | Current boundary | Work still needed |
@@ -78,22 +87,38 @@ providing only a partial shared override fails. It also checks the retired
 Showcase-only override and that optional construction source art is not
 required for the engine capability contract.
 
-The test script is present but has not yet been added to a Make test aggregate
-in this snapshot. Its source establishes the configuration checks described
-above; it does not report that they have passed.
+The five configuration tests passed against 13 actual Make compiler vectors.
+They run in the normal `./dev test` aggregate and can also be run with
+`make test-sc64-engine-capabilities`.
 
-These are build-configuration and compile-contract checks, not gameplay
-fixtures. They do not prove construction health progression, Siege splash
-damage, mission behavior, save/load continuity, or correct visual output in
-each runtime mode. Add runtime-mode fixtures for Showcase, skirmish/unified,
-and campaign/chapter use, including construction interruption/morph and siege
-collateral cases, before calling this shared contract behavior-qualified.
+[`tests/sc64_shared_mechanics_game.c`](../tests/sc64_shared_mechanics_game.c)
+uses the actual engine and production flags, without locally enabling the two
+mechanics. `make test-sc64-shared-mechanics` passed under AddressSanitizer and
+UndefinedBehaviorSanitizer for Terran, Zerg, P7, Showcase, generic race, and
+unified profiles. Each profile exercises campaign and custom modes. The
+fixtures check construction HP/shield progression and preservation of damage
+through completion for all three races, worker release/consumption rules, and
+Siege primary damage, friendly and hostile collateral, air exclusion, and
+invincibility flags. Save fixtures exercise the real serializer/loader in
+legacy and packed codecs: completed legacy worlds load, legacy unfinished
+foundations/morphs and unknown markers fail without replacing actors,
+buildings or resources, and marked damaged foundations preserve HP/shields
+through reload and completion. These are host SRAM checks, not fresh-process
+emulator qualification. They do not establish every interruption/morph
+lifecycle, mission completion, or visual parity.
 
-Normal ARM links and RAM/IWRAM guard measurements after this central flag
-change are still pending, as is the corresponding production/gameplay-mode
-matrix. Run the default asset-free checks and, when their prepared inputs are
-already available, the unified and Terran profile checks; record missing
-private inputs rather than substituting an older generated bank. Emulated
-timing and physical GBA qualification remain separate evidence. Nothing on
-this page claims global feature parity or release qualification from the two
-centralized flags alone.
+The default build and asset-free suite passed locally (654 Python tests, 20
+skipped, plus the separate eight-test suite and C checks). A prepared unified
+build and its engine/campaign/menu checks passed. The four normal Terran,
+Zerg, P7, and Showcase ARM images linked at 32 MiB with unchanged RAM and
+stack-reserve guards. Their remaining EWRAM/IWRAM margins were respectively
+28,480/536, 28,372/96, 23,828/960, and 200/56 bytes. Rare SCV construction work
+was outlined into ROM to preserve the strict IWRAM reserve. Compiler vectors,
+source and generated-input hashes, linker maps, and local logs were retained
+outside the source tree.
+
+These results qualify the initial mechanics and build configuration, not
+global feature parity or a hardware release. Emulated timing, fresh-process
+SRAM qualification, complete campaign playthroughs, and physical GBA testing
+remain separate checks. The remaining engine services above still need to be
+shared and validated.

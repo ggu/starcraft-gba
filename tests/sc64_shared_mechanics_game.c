@@ -125,6 +125,90 @@ static void test_siege_splash_shared_in_both_modes(int mode)
     assert(u[immune].hp == 100);
 }
 
+static RaceSave saved_candidate;
+static Unit saved_world_units[MAX_UNITS];
+static Building saved_world_buildings[MAX_BUILDINGS];
+static u8 saved_world_explored[SC64_GRID_STORAGE_BYTES];
+
+static void expect_candidate_rejected(void)
+{
+    /* Make scalar and fog state differ from the candidate so a partial load
+       cannot pass merely because both worlds started with the same values. */
+    ++frame;
+    cx = (cx + 1) % (race_cols * 16);
+    SC64_GRID_SET(explored, 0, !SC64_GRID_GET(explored, 0));
+    memcpy(saved_world_units, u, sizeof(u));
+    memcpy(saved_world_buildings, b, sizeof(b));
+    memcpy(saved_world_explored, explored, sizeof(explored));
+    int old_minerals = minerals, old_gas = gas;
+    int old_frame = frame, old_cx = cx, old_cy = cy;
+    int old_mode = race_mode, old_human = race_human;
+    int old_mission = race_selected_mission, old_completed = race_completed;
+    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+    assert(!race_load_game());
+    assert(memcmp(saved_world_units, u, sizeof(u)) == 0);
+    assert(memcmp(saved_world_buildings, b, sizeof(b)) == 0);
+    assert(memcmp(saved_world_explored, explored, sizeof(explored)) == 0);
+    assert(minerals == old_minerals && gas == old_gas);
+    assert(frame == old_frame && cx == old_cx && cy == old_cy);
+    assert(race_mode == old_mode && race_human == old_human &&
+           race_selected_mission == old_mission && race_completed == old_completed);
+}
+
+static void test_construction_save_compatibility(void)
+{
+    game_init();
+    race_mode = 1; race_human = R_PROTOSS; race_bots = 1;
+    race_skirmish_map = 0;
+    race_skirmish_init();
+    screen = SCREEN_PLAY;
+
+    /* Historical completed worlds remain usable and are marked on resave. */
+    assert(race_save_game());
+    assert(race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] ==
+           SC64_CONSTRUCTION_SAVE_MARKER);
+    saved_candidate = race_data;
+    saved_candidate.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = 0;
+    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+    assert(race_load_game());
+    assert(race_save_game());
+    assert(race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] ==
+           SC64_CONSTRUCTION_SAVE_MARKER);
+
+    int building = spawn_build(SIDE, B_GATEWAY, 320, 320, 1);
+    assert(building >= 0);
+    for (int i = 0; i < 4; ++i) update_production();
+    b[building].hp -= 10;
+    b[building].shield -= 5;
+    int hp = b[building].hp, shield = b[building].shield;
+    int progress = b[building].build_progress;
+    assert(hp > 0 && shield > 0 && progress > 0);
+    assert(race_save_game());
+    saved_candidate = race_data;
+    b[building].hp = 1; b[building].shield = 0;
+    assert(race_load_game());
+    assert(b[building].hp == hp && b[building].shield == shield &&
+           b[building].build_progress == progress);
+    for (int i = 0; b[building].under_construction && i < 2000; ++i)
+        update_production();
+    assert(!b[building].under_construction);
+    assert(b[building].hp == b[building].maxhp - 10);
+    assert(b[building].shield == sc64_race_building_shields(B_GATEWAY) - 5);
+
+    saved_candidate.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = 0;
+    expect_candidate_rejected();
+    saved_candidate.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = 12345;
+    expect_candidate_rejected();
+
+    /* Legacy in-place morphs also had different completion semantics. */
+    b[building].alive = 0;
+    building = spawn_build(SIDE, B_LAIR, 320, 320, 1);
+    assert(building >= 0 && race_save_game());
+    saved_candidate = race_data;
+    saved_candidate.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = 0;
+    expect_candidate_rejected();
+}
+
 int main(void)
 {
     for (int mode = 0; mode <= 1; ++mode) {
@@ -133,5 +217,6 @@ int main(void)
         test_construction_shared_in_both_modes(mode, R_ZERG);
         test_siege_splash_shared_in_both_modes(mode);
     }
+    test_construction_save_compatibility();
     return 0;
 }
