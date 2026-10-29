@@ -94,7 +94,10 @@ static int build_with_worker(int raw, int worker)
                        gas == old_gas - rule->gas);
             }
             for (int tick = 0; tick < building_build_time(type) + 8 &&
-                 !building_complete(slot); ++tick) update_orders();
+                 !building_complete(slot); ++tick) {
+                update_orders();
+                race_tick_buildings();
+            }
             assert(building_complete(slot));
             return slot;
         }
@@ -185,7 +188,7 @@ static void terran_construction_and_addon(void)
 
 static void protoss_admission(void)
 {
-    int pylon, gateway, core, stargate;
+    int pylon, gateway, core, stargate, probe, old_minerals, old_gas, scouts_before;
     const Sc64SkirmishRecord *row;
     start_race(R_PROTOSS);
     row = build_record(R_PROTOSS, 167);
@@ -202,11 +205,39 @@ static void protoss_admission(void)
     assert(pylon >= 0 && race_site_powered(SIDE, 500, 500));
     stargate = building_raw(167);
     assert(stargate >= 0 && race_can_site(SIDE, stargate, 500, 500));
+    if (unit_raw(70) < 0) return;
+    probe = find_worker_raw(SIDE, 64);
+    assert(probe >= 0);
+    /* Freeze mining during the long warp-in so the exact debit stays visible. */
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && sc64_race_raw_unit(u[i].type) == 64)
+            u[i].order = ORDER_IDLE;
+    old_minerals = minerals; old_gas = gas;
+    stargate = build_with_worker(167, probe);
+    assert(stargate >= 0 && building_complete(stargate));
+    assert(minerals == old_minerals - 150 && gas == old_gas - 150);
+    scouts_before = 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive && u[i].owner == SIDE && sc64_race_raw_unit(u[i].type) == 70)
+            ++scouts_before;
+    old_minerals = minerals; old_gas = gas;
+    assert(race_queue_unit(SIDE, stargate, unit_raw(70)));
+    assert(minerals == old_minerals - 275 && gas == old_gas - 125);
+    for (int tick = 0; tick < unit_build_time(unit_raw(70)) + 8 && b[stargate].queue_count;
+         ++tick) race_tick_buildings();
+    assert(!b[stargate].queue_count);
+    {
+        int scouts_after = 0;
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && sc64_race_raw_unit(u[i].type) == 70)
+                ++scouts_after;
+        assert(scouts_after == scouts_before + 1);
+    }
 }
 
 static void zerg_morph_chain(void)
 {
-    int hatch, pool, nest, lair, hive, spire, colony;
+    int hatch, pool, nest, lair, hive, spire, colony, drone, drones_before;
     const Sc64SkirmishRecord *lair_row, *hive_row, *greater_row, *sunken_row;
     start_race(R_ZERG);
     hatch = find_building_raw(SIDE, 131);
@@ -228,9 +259,46 @@ static void zerg_morph_chain(void)
     assert(race_skirmish_has_raw(SIDE, 131) && !race_skirmish_has_raw(SIDE, 132));
     assert(race_owner_supply_cap(SIDE) >= 2);
     assert(race_site_creep(SIDE, b[hatch].x + 48, b[hatch].y));
+
+    /* Morphing halls continue to regenerate and spend their own larva. The
+     * queued Drone must finish before the longer Lair morph and completion
+     * must preserve the remaining larva instead of restoring a full batch. */
+    if (unit_raw(41) >= 0) {
+        const Sc64RaceUnitRule *drone_rule = sc64_race_unit_rule(unit_raw(41));
+        int old_minerals = minerals, old_gas = gas;
+        drones_before = 0;
+        for (int i = 0; i < MAX_UNITS; ++i)
+            if (u[i].alive && u[i].owner == SIDE && sc64_race_raw_unit(u[i].type) == 41)
+                ++drones_before;
+        b[hatch].larva = 1; b[hatch].larva_timer = 427;
+        race_tick_state();
+        assert(b[hatch].under_construction && b[hatch].larva == 2 &&
+               b[hatch].larva_timer == 0);
+        assert(drone_rule && race_queue_unit(SIDE, hatch, unit_raw(41)));
+        assert(b[hatch].larva == 1 && b[hatch].queue_count == 1);
+        assert(minerals == old_minerals - drone_rule->minerals &&
+               gas == old_gas - drone_rule->gas);
+        for (int tick = 0; tick < unit_build_time(unit_raw(41)) + 8; ++tick) {
+            int count = 0;
+            for (int i = 0; i < MAX_UNITS; ++i)
+                if (u[i].alive && u[i].owner == SIDE && sc64_race_raw_unit(u[i].type) == 41)
+                    ++count;
+            if (count > drones_before) break;
+            race_tick_buildings();
+        }
+        {
+            int count = 0;
+            for (int i = 0; i < MAX_UNITS; ++i)
+                if (u[i].alive && u[i].owner == SIDE && sc64_race_raw_unit(u[i].type) == 41)
+                    ++count;
+            assert(count == drones_before + 1);
+        }
+        assert(b[hatch].under_construction && b[hatch].larva == 1);
+    }
     for (int tick = 0; tick < building_build_time(b[hatch].type) + 8 &&
          !building_complete(hatch); ++tick) race_tick_buildings();
     assert(building_complete(hatch));
+    assert(b[hatch].larva == 1);
 
     hive_row = build_record(R_ZERG, 133);
     assert(hive_row && race_skirmish_requirements(SIDE, hive_row));

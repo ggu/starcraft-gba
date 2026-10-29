@@ -10,11 +10,13 @@ The product queue is still the engine's bounded queue and unit representation. A
 
 The local integration fixture exercises Barracks and Factory construction,
 Machine Shop payment and completion, per-Factory Tank admission, Tank payment
-and birth, Stargate prerequisites and psi, and Zerg building morph clocks.
+and birth, Probe-built Stargate completion and Scout production, and Zerg
+building morph clocks with parallel Drone production and larva preservation.
 It passed under host address/undefined-behavior sanitizers for all four normal
 profile flag sets. The existing normal-input Blood Bath pylon regression also
 passed for Showcase. Four normal ARM products linked within the existing RAM
 guards; these checks do not establish a new frame-rate measurement.
+The default build/tests and prepared-input unified build/test suite also pass.
 
 ## Opt-in identity extension
 
