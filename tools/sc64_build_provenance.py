@@ -9,7 +9,7 @@ reruns each compiler command with `-M` instead of its output and link options
 to obtain the raw dependency rules. It writes:
 
 - `commands.txt`: the executed commands, verbatim;
-- `deps/<n>.deps`: the raw `-M` dependency output of compiler command n;
+- `deps/<n>.txt`: the raw `-M` dependency output of compiler command n;
 - `inputs.txt`: `sha256  path` for every dependency and every file named on
   a command line (sources, linker script, blobs named in -D values), sorted
   by path;
@@ -75,7 +75,7 @@ def parse_deps(text: str) -> list[str]:
 
 def record(out: pathlib.Path, targets: list[str]) -> int:
     out.mkdir(parents=True, exist_ok=True)
-    for old in (out / 'deps').glob('*.deps'):
+    for old in (out / 'deps').glob('*.txt'):
         old.unlink()
     (out / 'deps').mkdir(exist_ok=True)
     for t in targets:
@@ -111,7 +111,7 @@ def record(out: pathlib.Path, targets: list[str]) -> int:
             for name in (a, a.split('=', 1)[-1].strip('"'), a[2:] if a.startswith('-T') else ''):
                 if name and not name.startswith('-') and pathlib.Path(name).is_file():
                     inputs.add(name)
-        depfile = out / 'deps' / f'{n}.deps'
+        depfile = out / 'deps' / f'{n}.txt'
         dep = subprocess.run(dependency_argv(argv, depfile), capture_output=True, text=True)
         if dep.returncode:
             sys.stderr.write(dep.stderr[-4000:])

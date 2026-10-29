@@ -245,7 +245,7 @@ records are in [`provenance/`](provenance/):
 
 - `commands.txt`: the executed compile, link, objcopy and ROM-fix commands,
   with every `-D`/`-I` in its real order.
-- `deps/*.deps`: the raw compiler `-M` output for each compile command.
+- `deps/*.txt`: the raw compiler `-M` output for each compile command.
 - `inputs.txt`: the SHA-256 of every dependency and every file named on a
   command line, including the linker script and the audio blob.
 - `outputs.txt`: the SHA-256 of each output.
