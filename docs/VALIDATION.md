@@ -6329,8 +6329,11 @@ reached (ticks 1,000–35,000) matched the host trace exactly: frame, screen,
 win and loss, faults, phase, objective flags, completion bits, Protoss and Zerg
 building counts, Kerrigan, unit counts, both resources and the selection. It
 was then stopped by the driver's 90-minute wall-clock cap with 28 Protoss
-buildings left. It is partial evidence, not a win. A rerun with a longer cap is
-in progress; its result is reported in the pull request.
+buildings left. A second run, under heavier host load, matched all 42
+observations through tick 42,000 (13 Protoss buildings left) before its
+four-hour cap. Both are partial evidence, not a win, and the guest-cycle totals
+are emitted only at the end of a run. A longer run is in progress; its result
+is reported in the pull request.
 
 ### Hashes and inputs
 
