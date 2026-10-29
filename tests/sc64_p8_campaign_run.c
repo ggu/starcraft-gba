@@ -11,7 +11,7 @@
 #define P8_CONTROLLER_PROFILE "PROTOSS_P8_FLAGS"
 #endif
 #ifndef P8_RUN_LIMIT
-#define P8_RUN_LIMIT 120000u
+#define P8_RUN_LIMIT 160000u
 #endif
 /* One ordinary pause-menu save; the replay tools resume from this record. */
 #ifndef P8_SAVE_FRAME
@@ -25,11 +25,14 @@ static unsigned host_tick;
 
 static void input(u16 held)
 {
+    /* Once the mission ends, later calls are not inputs: the trace stops at
+     * the deciding call, so a replay ends there too. */
+    if(screen==SCREEN_RESULT||won||lost)return;
     u16 pressed=(u16)(held & (u16)~prior);
     int changed=held!=prior;
     unsigned call_index=host_tick;
     unsigned frame_before=(unsigned)frame;
-    if (screen!=SCREEN_RESULT && !won && !lost) game_update(held,pressed);
+    game_update(held,pressed);
     prior=held;
     ++host_tick;
     if(trace && changed)
@@ -80,6 +83,20 @@ static int stasis_cell(void)
 {
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].raw_type==168)return i;
     return -1;
+}
+
+/* The human Carrier (source slot 7) that the shared services serve. */
+static int human_carrier(void)
+{
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].raw_type==72&&
+        u[i].raw_owner==7)return i;
+    return -1;
+}
+
+static int under_construction(void)
+{
+    int n=0;for(int i=0;i<MAX_BUILDINGS;i++)n+=b[i].alive&&b[i].owner==SIDE&&b[i].under_construction;
+    return n;
 }
 
 static int home_nexus(void)
@@ -141,25 +158,83 @@ static int command_selected(int which,int x,int y)
     return 1;
 }
 
-/* R is the ordinary whole-army selection shortcut. */
+/* Order the army by type groups: a double tap on a Zealot or Dragoon
+ * selects that type on screen, which never includes Fenix, the Hyperion or
+ * the Carrier (R's whole-army shortcut would). Units already carrying this
+ * order are skipped; repeat for off-screen clusters. */
+static int army_force;  /* Nonzero: re-order every group. */
+static int army_only;   /* Nonzero: order only this unit type. */
 static int army_command(int which,int x,int y)
 {
-    close_menus();
-    clear_selected_building();
-    KEY_TAP(KEY_R);
-    if(selected_count()<=0)return 0;
-    return command_selected(which,x,y);
+    static u8 ordered[MAX_UNITS];
+    int groups=0;
+    for(int i=0;i<MAX_UNITS;i++)
+        ordered[i]=!army_force&&((u[i].order==(which==MENU_ATTACK?ORDER_ATTACK_MOVE:ORDER_MOVE)&&
+            dist2(u[i].tx,u[i].ty,x,y)<96*96)||
+            (which==MENU_ATTACK&&u[i].order==ORDER_ATTACK_TARGET));
+    for(int round=0;round<6;round++){
+        int anchor=-1,bd=0x7fffffff;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&!ordered[i]&&
+            (u[i].type==U_ZEALOT||u[i].type==U_DRAGOON)&&(!army_only||u[i].type==army_only)){
+            int d=dist2(u[i].x,u[i].y,x,y);
+            if(d<bd){bd=d;anchor=i;}
+        }
+        if(anchor<0)break;
+        close_menus();
+        clear_selected_building();
+        move_cursor(u[anchor].x,u[anchor].y);
+        KEY_TAP(KEY_A);KEY_TAP(KEY_A);
+        int bad=0,count=0;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected){
+            ++count;
+            if(u[i].type!=U_ZEALOT&&u[i].type!=U_DRAGOON)bad=1;
+        }
+        ordered[anchor]=1;
+        if(!count||bad)continue;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected)ordered[i]=1;
+        if(command_selected(which,x,y))++groups;
+    }
+    return groups>0;
 }
 
-/* Tap one hero to select it alone, then move it. */
-static int hero_command(int slot,int x,int y)
+/* Tap one actor to select it alone. A tap can pick an overlapping unit; an
+ * L tap cycles the single selection through the side's units. */
+static int select_single(int slot)
 {
     if(slot<0||!u[slot].alive||u[slot].owner!=SIDE)return 0;
     close_menus();
     clear_selected_building();
     move_cursor(u[slot].x,u[slot].y);KEY_TAP(KEY_A);
-    if(!u[slot].selected||selected_count()!=1)return 0;
-    return command_selected(MENU_MOVE,x,y);
+    for(int n=0;n<40&&(!u[slot].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
+    return u[slot].selected&&selected_count()==1;
+}
+
+static int unit_order(int slot,int which,int x,int y)
+{ return select_single(slot)&&command_selected(which,x,y); }
+
+static int hero_command(int slot,int x,int y)
+{ return unit_order(slot,MENU_MOVE,x,y); }
+
+/* The human Carrier's BUILD INTERCEPTOR row (shared Protoss service). */
+static int train_interceptors(int carrier,int wanted)
+{
+    int queued=0;
+    for(int k=0;k<wanted&&minerals>=SC64_P7_INTERCEPTOR_COST;k++){
+        if(!select_single(carrier))break;
+        /* A paid order can start training at once, moving from the
+         * parent's queue into its hangar count. */
+        int before=u[carrier].carry+(int)race_p7_carrier_training_child_count(carrier);
+        KEY_TAP(KEY_B);
+        for(int n=0;n<field_menu_count()&&menu_open&&menu_cursor!=MENU_STOP+1;n++)KEY_TAP(KEY_DOWN);
+        if(!menu_open||menu_cursor!=MENU_STOP+1){close_menus();break;}
+        KEY_TAP(KEY_A);
+        close_menus();
+        if(u[carrier].carry+(int)race_p7_carrier_training_child_count(carrier)<=before)break;
+        ++queued;
+    }
+    if(queued)fprintf(trace,"{\"kind\":\"interceptors\",\"frame\":%u,\"queued\":%d,\"hangar\":%u}\n",
+        (unsigned)frame,queued,race_p7_carrier_training_child_count(carrier));
+    return queued;
 }
 
 static int live_units_owner(int owner)
@@ -236,6 +311,29 @@ static int free_builder(void)
     return -1;
 }
 
+/* Sites the game refused once are not tried again. */
+static int refused_x[64],refused_y[64],refused_count;
+
+/* Keep a 16-pixel walkable lane between a new structure's pinned BWAPI tile
+ * footprint and every structure and mineral patch, so the base cannot wall
+ * its own army in. Refused and occupied sites are skipped. */
+static int site_ok(int type,int x,int y)
+{
+    for(int k=0;k<refused_count;k++)
+        if(FAST_ABS(refused_x[k]-x)<16&&FAST_ABS(refused_y[k]-y)<16)return 0;
+    int raw=sc64_race_raw_building(type);
+    if(raw<0||raw>=228)return 0;
+    int hw=siege_bounds[raw][0]*8,hh=siege_bounds[raw][1]*8;
+    for(int k=0;k<MAX_BUILDINGS;k++)if(b[k].alive&&b[k].owner==SIDE&&b[k].raw_type>=0&&b[k].raw_type<228){
+        int kw=siege_bounds[b[k].raw_type][0]*8,kh=siege_bounds[b[k].raw_type][1]*8;
+        if(FAST_ABS(b[k].x-x)<hw+kw+16&&FAST_ABS(b[k].y-y)<hh+kh+16)return 0;
+    }
+    for(int k=0;k<MAX_MINERALS;k++)if(m[k].amount>0&&
+        FAST_ABS(m[k].x-x)<hw+16+16&&FAST_ABS(m[k].y-y)<hh+8+16)return 0;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&dist2(u[i].x,u[i].y,x,y)<32*32)return 0;
+    return 1;
+}
+
 /* Place `type` through the Probe build menu at the nearest legal site. */
 static int build_structure(int type,int menu_row,int min_r,int max_r,int fixed_x,int fixed_y)
 {
@@ -247,6 +345,7 @@ static int build_structure(int type,int menu_row,int min_r,int max_r,int fixed_x
             int x=b[home].x+dx,y=b[home].y+dy,d=dx*dx+dy*dy;
             if(d<min_r*min_r||x<32||x>=WORLD_W-32||y<32||y>=WORLD_H-32||d>=best||
                !race_can_site(SIDE,type,x,y)||!can_place(type,x,y))continue;
+            if(!site_ok(type,x,y))continue;
             best=d;site_x=x;site_y=y;
         }
     }
@@ -256,7 +355,8 @@ static int build_structure(int type,int menu_row,int min_r,int max_r,int fixed_x
     close_menus();
     clear_selected_building();
     move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
-    if(!u[worker].selected)return 0;
+    for(int n=0;n<40&&(!u[worker].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
+    if(!u[worker].selected||selected_count()!=1)return 0;
     KEY_TAP(KEY_B);
     for(int n=0;n<field_menu_count()&&menu_open&&menu_cursor!=menu_row;n++)KEY_TAP(KEY_DOWN);
     if(!menu_open||menu_cursor!=menu_row){close_menus();return 0;}
@@ -269,9 +369,44 @@ static int build_structure(int type,int menu_row,int min_r,int max_r,int fixed_x
     if(mode!=MODE_NORMAL)close_menus();
     if(!SC64_BUILD_WORKER_ORDER(u[worker].order)){
         fprintf(stderr,"build refused frame=%d type=%d site=%d,%d order=%d\n",frame,type,site_x,site_y,u[worker].order);
+        if(refused_count<64){refused_x[refused_count]=site_x;refused_y[refused_count++]=site_y;}
         return 0;
     }
     fprintf(trace,"{\"kind\":\"build\",\"frame\":%u,\"type\":%d,\"site\":[%d,%d]}\n",(unsigned)frame,type,site_x,site_y);
+    return 1;
+}
+
+/* A Photon Cannon through the Probe menu's CANNON row (MENU_STOP+2): it
+ * defends the base and detects cloaked raiders. */
+static int build_cannon(int near_x,int near_y)
+{
+    int best=0x7fffffff,site_x=-1,site_y=-1,worker=free_builder();
+    const Sc64RaceBuildingRule *rule=sc64_race_building_rule(B_PHOTON_CANNON);
+    if(!rule||minerals<(int)rule->minerals||worker<0)return 0;
+    for(int dy=-96;dy<=96;dy+=8)for(int dx=-96;dx<=96;dx+=8){
+        int x=near_x+dx,y=near_y+dy,d=dx*dx+dy*dy;
+        if(d<32*32||d>=best||x<48||x>=WORLD_W-48||y<48||y>=WORLD_H-48||
+           !race_can_site(SIDE,B_PHOTON_CANNON,x,y)||!can_place(B_PHOTON_CANNON,x,y)||
+           !site_ok(B_PHOTON_CANNON,x,y))continue;
+        best=d;site_x=x;site_y=y;
+    }
+    if(site_x<0)return 0;
+    close_menus();clear_selected_building();
+    move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
+    for(int n=0;n<40&&(!u[worker].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
+    if(!u[worker].selected||selected_count()!=1)return 0;
+    KEY_TAP(KEY_B);
+    for(int n=0;n<field_menu_count()&&menu_open&&menu_cursor!=MENU_STOP+2;n++)KEY_TAP(KEY_DOWN);
+    if(!menu_open||menu_cursor!=MENU_STOP+2){close_menus();return 0;}
+    KEY_TAP(KEY_A);
+    if(mode!=MODE_BUILD||menu!=B_PHOTON_CANNON){close_menus();return 0;}
+    move_cursor(site_x,site_y);KEY_TAP(KEY_A);
+    if(mode!=MODE_NORMAL)close_menus();
+    if(!SC64_BUILD_WORKER_ORDER(u[worker].order)){
+        if(refused_count<64){refused_x[refused_count]=site_x;refused_y[refused_count++]=site_y;}
+        return 0;
+    }
+    fprintf(trace,"{\"kind\":\"build\",\"frame\":%u,\"type\":%d,\"site\":[%d,%d]}\n",(unsigned)frame,B_PHOTON_CANNON,site_x,site_y);
     return 1;
 }
 
@@ -287,6 +422,32 @@ static int build_assimilator(void)
     return build_structure(B_ASSIMILATOR,MENU_REFINERY,0,0,geysers[best].x,geysers[best].y);
 }
 
+/* A builder that cannot reach its site stays pending; after 900 frames send
+ * it back to the nearest mineral patch and never try that site again. */
+static int pending_since[MAX_UNITS];
+static int remine_stuck_builder(void)
+{
+    int worker=-1,home=home_nexus(),patch=-1,best=0x7fffffff;
+    for(int i=0;i<MAX_UNITS;i++){
+        if(!(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&SC64_PENDING_BUILD_ORDER(u[i].order))){
+            pending_since[i]=-1;continue;
+        }
+        if(pending_since[i]<0)pending_since[i]=frame;
+        if(worker<0&&frame-pending_since[i]>900)worker=i;
+    }
+    if(worker<0||home<0)return 0;
+    for(int k=0;k<MAX_MINERALS;k++)if(m[k].amount>0){
+        int d=dist2(m[k].x,m[k].y,b[home].x,b[home].y);
+        if(d<best){best=d;patch=k;}
+    }
+    if(patch<0)return 0;
+    if(refused_count<64){refused_x[refused_count]=u[worker].tx;refused_y[refused_count++]=u[worker].ty;}
+    if(!select_single(worker))return 0;
+    move_cursor(m[patch].x,m[patch].y);KEY_TAP(KEY_A);
+    pending_since[worker]=-1;
+    return u[worker].order==ORDER_MINE;
+}
+
 static int assign_gas_worker(void)
 {
     int refinery=-1,gas_workers=0,worker=-1;
@@ -300,22 +461,34 @@ static int assign_gas_worker(void)
     if(gas_workers>=3||worker<0)return 0;
     close_menus();
     clear_selected_building();move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
-    if(!u[worker].selected)return 0;
+    for(int n=0;n<40&&(!u[worker].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
+    if(!u[worker].selected||selected_count()!=1)return 0;
     move_cursor(b[refinery].x,b[refinery].y);KEY_TAP(KEY_A);
     return u[worker].order==ORDER_GAS;
 }
 
+static int launch_peak;  /* Most human Interceptors outside at once. */
 static void census(const char *label)
 {
-    int cell=stasis_cell(),f=hero(78),h=hero(28);
-    int enemy=0,enemy_b=0;
+    int cell=stasis_cell(),f=hero(78),h=hero(28),c=human_carrier();
+    int enemy=0,enemy_b=0,cloaked=0,launched=0,battery_energy=0;
+    /* Shared Protoss service evidence: the human Carrier's hangar and
+     * launched Interceptors, cloaked enemies, and Battery energy. */
+    for(int i=0;i<MAX_UNITS;i++){
+        if(u[i].alive&&u[i].owner==ENEMY&&sc64_p7_observer_target_is_cloaked(i))++cloaked;
+        if(u[i].alive&&c>=0&&u[i].raw_type==73&&u[i].build==c&&
+           sc64_p7_carrier_child_state(&u[i])==SC64_P7_INTERCEPTOR_OUTSIDE)++launched;
+    }
+    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].type==B_P7_SHIELD_BATTERY)
+        battery_energy+=b[i].queue_progress/256;
     for(int i=0;i<MAX_UNITS;i++)enemy+=u[i].alive&&u[i].owner==ENEMY;
     for(int i=0;i<MAX_BUILDINGS;i++)enemy_b+=b[i].alive&&b[i].owner==ENEMY;
     fprintf(trace,"{\"kind\":\"checkpoint\",\"label\":\"%s\",\"frame\":%u,\"call_index\":%u,\"screen\":%d,\"won\":%d,\"lost\":%d,"
         "\"side_units\":%d,\"army\":%d,\"probes\":%d,\"enemy_units\":%d,\"enemy_buildings\":%d,"
         "\"stasis_hp\":%d,\"fenix\":[%d,%d,%d],\"hyperion\":[%d,%d,%d],\"bank\":[%d,%d],\"supply\":[%d,%d],"
         "\"gateways\":%d,\"cursor\":[%d,%d],\"triggers_done\":[%u,%u,%u],\"outcome\":%u,\"fault\":[%u,%u,%u],"
-        "\"towns\":[%u,%u,%u],\"waves\":[%u,%u],\"ai_wallets\":[%u,%u,%u,%u]}\n",
+        "\"towns\":[%u,%u,%u],\"waves\":[%u,%u],\"ai_wallets\":[%u,%u,%u,%u],"
+        "\"carrier\":[%d,%u,%d,%d],\"cloaked_enemies\":%d,\"battery_energy\":%d}\n",
         label,(unsigned)frame,host_tick,screen,won,lost,
         live_units_owner(SIDE),army_count(),probe_count(),enemy,enemy_b,
         cell>=0?b[cell].hp:-1,f>=0?u[f].owner:-1,f>=0?u[f].hp:-1,f>=0?u[f].shield:-1,
@@ -325,7 +498,9 @@ static void census(const char *label)
         race_p8.runtime[0].outcome,race_p8.runtime[0].fault,race_p8.runtime[1].fault,race_p8.runtime[2].fault,
         race_p8.towns[0].script,race_p8.towns[1].script,race_p8.towns[2].script,
         race_p8.towns[0].wave,race_p8.towns[1].wave,
-        race_p8.ai_minerals[0],race_p8.ai_gas[0],race_p8.ai_minerals[1],race_p8.ai_gas[1]);
+        race_p8.ai_minerals[0],race_p8.ai_gas[0],race_p8.ai_minerals[1],race_p8.ai_gas[1],
+        c>=0?u[c].hp:-1,c>=0?race_p7_carrier_training_child_count(c):0u,launched,launch_peak,
+        cloaked,battery_energy);
     fflush(trace);
 }
 
@@ -342,11 +517,12 @@ int main(int argc,char **argv)
     KEY_TAP(KEY_DOWN);KEY_TAP(KEY_A);KEY_TAP(KEY_START);
     assert(screen==SCREEN_PLAY&&!won&&!lost&&race_selected_mission==27);
     census("launch");
+    for(int i=0;i<MAX_UNITS;i++)pending_since[i]=-1;
 
     int saved=0;
     int next_checkpoint=2000;
     int next_probe=60,next_supply=400,next_build=600,next_gas=3000,next_production=900;
-    int next_order=120,next_hero=240;
+    int next_order=120,next_hero=240,next_carrier=3000,next_save_build=0,next_evade=600;
     int attacking=0,prior_distance=-1,stalls=0;
     while(host_tick<limit_ticks&&screen==SCREEN_PLAY&&!won&&!lost){
         static int stuck_reported;
@@ -364,9 +540,12 @@ int main(int argc,char **argv)
             for(int i=0;i<MAX_BUILDINGS;i++)pending+=b[i].alive&&b[i].owner==SIDE&&
                 b[i].type==B_PYLON&&b[i].under_construction;
             for(int i=0;i<MAX_UNITS;i++)pending+=u[i].alive&&u[i].owner==SIDE&&
-                SC64_PENDING_BUILD_ORDER(u[i].order);
-            if(pending<2&&race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<=12)
-                (void)build_structure(B_PYLON,MENU_DEPOT,64,256,-1,-1);
+                SC64_PENDING_BUILD_ORDER(u[i].order)&&u[i].target==B_PYLON;
+            if(pending<2&&race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<=12){
+                int ok=build_structure(B_PYLON,MENU_DEPOT,64,448,-1,-1);
+                if(getenv("P8_BLOG")&&!ok)fprintf(stderr,"pylon fail f=%d pending=%d min=%d builder=%d\n",frame,pending,minerals,free_builder());
+            } else if(getenv("P8_BLOG")&&race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<=12)
+                fprintf(stderr,"pylon wait f=%d pending=%d\n",frame,pending);
             next_supply=frame+300;
         }
         if(frame>=next_build){
@@ -375,13 +554,51 @@ int main(int argc,char **argv)
             else if(!count_type(B_ASSIMILATOR,0))(void)build_assimilator();
             else if(!count_type(B_CYBERNETICS_CORE,0)&&count_type(B_GATEWAY,1))
                 (void)build_structure(B_CYBERNETICS_CORE,MENU_ACADEMY,80,224,-1,-1);
+            else if(!count_type(B_FORGE,0)&&count_type(B_GATEWAY,0)>=3)
+                (void)build_structure(B_FORGE,MENU_ENG_BAY,80,224,-1,-1);
+            else if(count_type(B_FORGE,1)&&count_type(B_PHOTON_CANNON,0)<4&&home>=0)
+                (void)build_cannon(b[home].x,b[home].y-48);
             next_build=frame+(minerals>=400?240:600);
         }
-        if(frame>=next_gas){(void)assign_gas_worker();next_gas=frame+700;}
+        if(frame>=next_gas){
+            (void)assign_gas_worker();
+            for(int k=0;k<4&&remine_stuck_builder();k++){}
+            next_gas=frame+700;
+        }
         if(frame>=next_production){
             int queued=0;
             while(queued<3&&queue_combat_unit())++queued;
             next_production=frame+60;
+        }
+        /* Fill the Carrier's hangar through its BUILD INTERCEPTOR row. */
+        if(frame>=next_carrier){
+            int c=human_carrier();
+            if(c>=0&&home>=0&&minerals>=SC64_P7_INTERCEPTOR_COST){
+                int have=(int)race_p7_carrier_training_child_count(c)+u[c].carry;
+                if(have<SC64_P7_CARRIER_CAPACITY)
+                    (void)train_interceptors(c,SC64_P7_CARRIER_CAPACITY-have);
+            }
+            next_carrier=frame+1200;
+        }
+        /* A hero with an enemy close by steps away from it, past the Nexus;
+         * Protoss hit points do not regenerate. */
+        if(frame>=next_evade&&home>=0){
+            int heroes[2]={f,h};
+            for(int k=0;k<2;k++){
+                int z=heroes[k],threat=-1,td=192*192;
+                if(z<0||u[z].owner!=SIDE)continue;
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY){
+                    int d=dist2(u[i].x,u[i].y,u[z].x,u[z].y);
+                    if(d<td){td=d;threat=i;}
+                }
+                if(threat<0)continue;
+                int vx=b[home].x-u[threat].x,vy=b[home].y-u[threat].y,len=FAST_ABS(vx)+FAST_ABS(vy);
+                if(len<=0)continue;
+                int ex=limit(b[home].x+vx*160/len,48,WORLD_W-48),ey=limit(b[home].y+vy*160/len,48,WORLD_H-48);
+                if(dist2(u[z].tx,u[z].ty,ex,ey)>48*48)(void)hero_command(z,ex,ey);
+                next_hero=frame+900;
+            }
+            next_evade=frame+150;
         }
         /* Collect the rescuable heroes, then keep them at home. */
         if(frame>=next_hero){
@@ -414,14 +631,72 @@ int main(int argc,char **argv)
             int cell=stasis_cell();
             if(!attacking&&army_count()>=24)attacking=1;
             if(attacking&&cell>=0){
-                int sx=0,sy=0,n=0;
-                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&!IS_WORKER(u[i].type)&&
-                    u[i].raw_type!=28&&u[i].raw_type!=78){sx+=u[i].x;sy+=u[i].y;++n;}
+                /* Route from the army unit nearest the Cell; new units at
+                 * home would skew an average. A unit in a building pocket has
+                 * no grid route, so try the next nearest ones. */
+                static u8 tried[MAX_UNITS],stuck[MAX_UNITS];
+                static int last_front=-1;
+                /* A front unit whose route stopped shrinking is stuck (for
+                 * example behind a cliff); route from another one. */
+                if(stalls>=3&&last_front>=0){stuck[last_front]=1;stalls=0;prior_distance=-1;}
+                int sx=0,sy=0,n=0,front=-1,fd=0x7fffffff;
+                for(int i=0;i<MAX_UNITS;i++){
+                    tried[i]=stuck[i]&&u[i].alive;
+                    if(!u[i].alive)stuck[i]=0;
+                    if(!u[i].alive||u[i].owner!=SIDE||tried[i]||(u[i].type!=U_ZEALOT&&u[i].type!=U_DRAGOON))continue;
+                    int d=dist2(u[i].x,u[i].y,b[cell].x,b[cell].y);
+                    if(d<fd){fd=d;front=i;}
+                }
                 int wx=b[cell].x,wy=b[cell].y,distance=-1;
-                if(n)(void)waypoint_to(sx/n,sy/n,b[cell].x,b[cell].y,&wx,&wy,&distance);
+                for(int k=0;k<8&&front>=0;k++){
+                    if(waypoint_to(u[front].x,u[front].y,b[cell].x,b[cell].y,&wx,&wy,&distance))break;
+                    tried[front]=1;distance=-1;
+                    int next=-1,nd=0x7fffffff;
+                    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&!tried[i]&&
+                        (u[i].type==U_ZEALOT||u[i].type==U_DRAGOON)){
+                        int d=dist2(u[i].x,u[i].y,b[cell].x,b[cell].y);
+                        if(d<nd){nd=d;next=i;}
+                    }
+                    front=next;
+                }
+                if(distance<0){wx=b[cell].x;wy=b[cell].y;}
+                last_front=front;
+                if(front>=0)for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+                    (u[i].type==U_ZEALOT||u[i].type==U_DRAGOON)&&
+                    dist2(u[i].x,u[i].y,u[front].x,u[front].y)<200*200){sx+=u[i].x;sy+=u[i].y;++n;}
+                /* Near the Stasis Cell the army has no detector for the
+                 * defenders its Arbiters cloak: Dragoons strike the Arbiters,
+                 * Zealots the Cell itself (a structure is never cloaked). */
+                int arb=-1;
+                if(distance>=0&&distance<30&&n){
+                    int ad=320*320;
+                    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type==71){
+                        int d=dist2(u[i].x,u[i].y,sx/n,sy/n);
+                        if(d<ad){ad=d;arb=i;}
+                    }
+                }
                 if(distance>=0&&prior_distance>=0&&distance+2>=prior_distance)++stalls;else stalls=0;
                 prior_distance=distance;
-                (void)army_command(MENU_ATTACK,wx,wy);
+                /* At the Cell, give every group a fresh order on the Cell or
+                 * its Arbiters; stale attack orders would otherwise stand. */
+                army_force=distance<0||distance<12;
+                if(distance>=0&&distance<12){
+                    army_only=U_ZEALOT;
+                    (void)army_command(MENU_ATTACK,b[cell].x,b[cell].y);
+                    army_only=U_DRAGOON;
+                    (void)army_command(MENU_ATTACK,arb>=0?u[arb].x:b[cell].x,arb>=0?u[arb].y:b[cell].y);
+                    army_only=0;
+                } else {
+                    if(arb>=0){wx=u[arb].x;wy=u[arb].y;}
+                    (void)army_command(MENU_ATTACK,wx,wy);
+                }
+                army_force=0;
+                {
+                    int c=human_carrier();
+                    if(c>=0&&race_p7_carrier_training_child_count(c)>=2&&
+                       !u[c].selected&&dist2(u[c].tx,u[c].ty,wx,wy)>96*96)
+                        (void)unit_order(c,MENU_ATTACK,wx,wy);
+                }
                 fprintf(trace,"{\"kind\":\"order\",\"frame\":%u,\"target\":[%d,%d],\"route\":%d,\"army\":%d,\"stalls\":%d}\n",
                     (unsigned)frame,wx,wy,distance,army_count(),stalls);
                 /* The whole-army order also moved the heroes; send them home. */
@@ -430,8 +705,35 @@ int main(int argc,char **argv)
             }
             next_order=frame+(attacking?360:600);
         }
-        if(!saved&&frame>=P8_SAVE_FRAME){
+        /* Save while a structure is still warping in, so the record carries
+         * active construction: start a Pylon if nothing is, and fall back
+         * after a bounded wait. */
+        if(!saved&&frame>=P8_SAVE_FRAME&&!under_construction()&&frame>=next_save_build){
+            (void)build_structure(B_PYLON,MENU_DEPOT,64,448,-1,-1);
+            next_save_build=frame+300;
+        }
+        if(!saved&&frame>=P8_SAVE_FRAME&&(under_construction()||frame>=P8_SAVE_FRAME+6000)){
+            int building=under_construction();
+            /* The building selection and the orders menu's remembered row
+             * are UI state, not saved: a fresh process starts with neither.
+             * Return the row to the top and deselect first, so the replayed
+             * inputs mean the same thing before and after a load. */
             close_menus();
+            if(menu_last!=0){
+                /* The menu reopens on the last chosen command: choose MOVE
+                 * ORDER (row 0), then cancel its targeting with B. */
+                int probe=free_builder();
+                if(select_single(probe)){
+                    KEY_TAP(KEY_B);
+                    for(int n=0;n<16&&menu_open&&menu_cursor!=0;n++)KEY_TAP(KEY_UP);
+                    if(menu_open&&menu_cursor==0)KEY_TAP(KEY_A);
+                    close_menus();
+                }
+            }
+            clear_selected_building();
+            /* B from a targeting mode reopens the orders menu; an open menu
+             * holds the game and is not saved, so close everything first. */
+            for(int k=0;k<4&&(menu_open||mode!=MODE_NORMAL);k++)KEY_TAP(KEY_B);
             unsigned first=host_tick;
             KEY_TAP(KEY_START);
             int paused=screen==SCREEN_PAUSE;
@@ -443,9 +745,15 @@ int main(int argc,char **argv)
             FILE *sf=fopen(save_path,"wb");
             if(!sf||fwrite(host_save,1,sizeof(host_save),sf)!=sizeof(host_save)){perror(save_path);return 2;}
             fclose(sf);
-            fprintf(trace,"{\"kind\":\"save\",\"frame\":%u,\"first_call\":%u,\"resume_call\":%u,\"paused\":%d,\"screen\":%d}\n",
-                (unsigned)frame,first,host_tick,paused,screen);
+            fprintf(trace,"{\"kind\":\"save\",\"frame\":%u,\"first_call\":%u,\"resume_call\":%u,\"paused\":%d,\"screen\":%d,\"under_construction\":%d,\"menu_last\":%d}\n",
+                (unsigned)frame,first,host_tick,paused,screen,building,menu_last);
             census("saved");
+        }
+        {
+            int c=human_carrier(),out=0;
+            for(int i=0;c>=0&&i<MAX_UNITS;i++)out+=u[i].alive&&u[i].raw_type==73&&u[i].build==c&&
+                sc64_p7_carrier_child_state(&u[i])==SC64_P7_INTERCEPTOR_OUTSIDE;
+            if(out>launch_peak)launch_peak=out;
         }
         if(frame>=next_checkpoint){census("progress");next_checkpoint=frame+2000;}
         input(0);

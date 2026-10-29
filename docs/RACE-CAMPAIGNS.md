@@ -124,13 +124,16 @@ remain unqualified in the canonical profiles.
 P8 **The Trial of Tassadar** has a separate, unpromoted `protoss-p8`
 candidate. It carries the canonical P1–P7 profile, is built with
 `make protoss-p8` and writes `StarCraft-Protoss-P8-GBA.gba` /
-`starcraft-protoss-p8.elf`, code `SCP8`, generation 44. One ordinary-input
-host controller run wins P8. The input-only ARM replay of its key tape
-matches every host observation through the win. A pause-menu SRAM save,
-loaded in a fresh process, continues to the same win on host and on ARM.
-P8's AI backend, transmission duration and trigger cadence are authored.
-Carrier interceptors, Arbiter cloaking, Observer detection and Shield
-Battery recharge are still P7-only and inactive in P8. See the
+`starcraft-protoss-p8.elf`, code `SCP8`, generation 44. P8 runs the shared
+Protoss unit services: Carrier Interceptor training and flight, Arbiter
+cloaking, Observer and Cannon detection, and Shield Batteries authenticated
+from its own map. One ordinary-input host controller run wins P8, training
+and launching the human Carrier's Interceptors. The input-only ARM replay of
+its key tape matches every host observation through the win. A pause-menu
+SRAM save taken while a structure is under construction, loaded in a fresh
+process, continues to the same win on host and on ARM. P8's AI backend,
+transmission duration and trigger cadence are authored, and the AI does not
+use the Carrier, Arbiter or Battery services. See the
 [P8 candidate audit](audits/2026-10-29-p8-campaign/README.md).
 
 P9 **Shadow Hunters** has a separate, unpromoted `protoss-p9` candidate

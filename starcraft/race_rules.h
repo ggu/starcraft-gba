@@ -572,6 +572,12 @@ static inline const char *sc64_race_unit_name(int type)
 #ifdef SC64_P7_PROJECTILES_ENABLED
         ,"INTERCEPTOR"
 #endif
+#ifdef SC64_P8_DATA_ENABLED
+        ,"HYPERION"
+#endif
+#ifdef SC64_P9_DATA_ENABLED
+        ,"DEFILER"
+#endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
 }
@@ -601,6 +607,8 @@ static inline const char *sc64_race_building_name(int type)
         "ULTRALISK CAVERN","CITADEL OF ADUN","STASIS CELL PRISON","FLEET BEACON",
         "ROBOTICS SUPPORT BAY","SHIELD BATTERY","SPECIAL ION CANNON",
         "SCIENCE FACILITY","PHYSICS LAB"
+#elif defined(SC64_P8_DATA_ENABLED)
+        ,"STASIS CELL PRISON"
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
         ,"CONTROL TOWER","MACHINE SHOP","ARMORY","QUEEN'S NEST","ULTRALISK CAVERN","PROTOSS BEACON"
@@ -621,6 +629,10 @@ static inline const char *sc64_race_building_name(int type)
 #endif
 #if defined(SC64_Z6_RUNTIME) && !defined(SC64_TERRAN_LATE_ACTORS)
         ,"ROBOTICS SUPPORT BAY","SHIELD BATTERY"
+#endif
+#if defined(SC64_P9_DATA_ENABLED) && !defined(SC64_TERRAN_LATE_ACTORS) && \
+    !defined(SC64_NYDUS_ENABLED)
+        ,"DEFILER MOUND"
 #endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";

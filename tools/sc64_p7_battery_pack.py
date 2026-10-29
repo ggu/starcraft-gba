@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Derive private P7 Shield Battery properties from an authenticated source CHK.
+"""Derive private Shield Battery properties from an authenticated source CHK.
 
-Map coordinates and starting properties belong in the generated local header,
-not in the source repository. Authentication uses the shared scenario packer.
+P7 is the default. Later Protoss missions that run the shared unit services
+(currently P8) use --mission. Map coordinates and starting properties belong
+in the generated local header, not in the source repository. Authentication
+uses the shared scenario packer.
 """
 from __future__ import annotations
 
@@ -18,6 +20,8 @@ DEFAULT_SOURCE_ROOT = ROOT / '.local/sc64/zp-stage/generated/source_maps'
 DEFAULT_OUTPUT = ROOT / '.local/sc64/zp-stage/generated/scenarios/sc64_p7_battery_properties_generated.h'
 UNIT_BYTES = 36
 BATTERY_RAW_TYPE = 172
+# Expected source-owner roster per mission; the runtime binds every row.
+MISSION_OWNERS = {'P7': [0, 4], 'P8': [3, 3]}
 
 
 def _scenario_packer():
@@ -53,30 +57,36 @@ def decode_batteries(payload: bytes, width: int, height: int) -> list[dict]:
     return rows
 
 
-def parse_source(source_root: Path) -> dict:
+def parse_source(source_root: Path, mission: str = 'P7') -> dict:
+    mission = mission.upper()
+    if mission not in MISSION_OWNERS:
+        raise ValueError('mission must be one of ' + ', '.join(MISSION_OWNERS))
     decoder = _scenario_packer()
-    scenario = decoder.parse_source(source_root, 'P7')
-    chk = (source_root / 'p7/source.chk').read_bytes()
+    scenario = decoder.parse_source(source_root, mission)
+    chk = (source_root / mission.lower() / 'source.chk').read_bytes()
     digest = hashlib.sha256(chk).hexdigest()
     if digest != scenario['source_chk_sha256']:
-        raise ValueError('P7 CHK changed after scenario authentication')
+        raise ValueError(f'{mission} CHK changed after scenario authentication')
     sections = decoder.parse_chk_sections(chk)
     rows = decode_batteries(sections.get(b'UNIT', b''),
                            scenario['width'], scenario['height'])
-    # The runtime keeps the two original enemy source owners distinct.
-    rows.sort(key=lambda row: row['owner'])
-    if [row['owner'] for row in rows] != [0, 4]:
-        raise ValueError('P7 Battery source-owner roster differs from the runtime')
-    return {'source_chk_sha256': digest, 'rows': rows}
+    # The runtime keeps the original enemy source owners distinct.
+    rows.sort(key=lambda row: (row['owner'], row['row']))
+    if [row['owner'] for row in rows] != MISSION_OWNERS[mission]:
+        raise ValueError(f'{mission} Battery source-owner roster differs from the runtime')
+    return {'mission': mission, 'source_chk_sha256': digest, 'rows': rows}
 
 
 def emit_header(data: dict) -> str:
-    lines = ['/* Generated privately from authenticated P7 source.chk; do not edit. */',
-             '#ifndef SC64_P7_BATTERY_PROPERTIES_GENERATED_H',
-             '#define SC64_P7_BATTERY_PROPERTIES_GENERATED_H',
-             '#define SC64_P7_BATTERY_SOURCE_CHK_SHA256 "' + data['source_chk_sha256'] + '"',
-             'typedef struct { unsigned short row, x_source, y_source, valid; unsigned char owner, hp, shields, energy; } Sc64P7BatterySourceProperty;',
-             'static const Sc64P7BatterySourceProperty sc64_p7_battery_source_properties[2] = {']
+    p = data.get('mission', 'P7')
+    lower = p.lower()
+    lines = [f'/* Generated privately from authenticated {p} source.chk; do not edit. */',
+             f'#ifndef SC64_{p}_BATTERY_PROPERTIES_GENERATED_H',
+             f'#define SC64_{p}_BATTERY_PROPERTIES_GENERATED_H',
+             f'#define SC64_{p}_BATTERY_SOURCE_CHK_SHA256 "' + data['source_chk_sha256'] + '"']
+    if p == 'P7':
+        lines.append('typedef struct { unsigned short row, x_source, y_source, valid; unsigned char owner, hp, shields, energy; } Sc64P7BatterySourceProperty;')
+    lines.append(f'static const Sc64P7BatterySourceProperty sc64_{lower}_battery_source_properties[{len(data["rows"])}] = {{')
     for row in data['rows']:
         values = (row[key] for key in ('row', 'x_source', 'y_source', 'valid',
                                        'owner', 'hp', 'shields', 'energy'))
@@ -85,8 +95,8 @@ def emit_header(data: dict) -> str:
     return '\n'.join(lines)
 
 
-def generate(source_root: Path, output: Path) -> dict:
-    data = parse_source(source_root)
+def generate(source_root: Path, output: Path, mission: str = 'P7') -> dict:
+    data = parse_source(source_root, mission)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(emit_header(data), encoding='utf-8')
     return {'output': str(output), 'source_chk_sha256': data['source_chk_sha256'],
@@ -97,9 +107,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-root', type=Path, default=DEFAULT_SOURCE_ROOT)
     parser.add_argument('--output', type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument('--mission', default='P7', choices=sorted(MISSION_OWNERS))
     args = parser.parse_args()
+    if args.mission != 'P7' and args.output == DEFAULT_OUTPUT:
+        parser.error('a later mission needs its own --output')
     try:
-        result = generate(args.source_root, args.output)
+        result = generate(args.source_root, args.output, args.mission)
     except (OSError, ValueError, RuntimeError) as exc:
         parser.error(str(exc))
     print(json.dumps(result, sort_keys=True))

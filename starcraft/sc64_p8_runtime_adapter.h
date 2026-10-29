@@ -21,6 +21,7 @@
 #include "sc64_p8_timed_service.h"
 #include "sc64_p8_game_bridge.h"
 #include "sc64_p8_ai.h"
+#include "sc64_p8_battery_properties_generated.h"
 
 /* SC64_P8_GLOBAL_ID (27) is defined with the forward declarations in game.c. */
 enum {
@@ -80,10 +81,100 @@ static int race_p8_map_shape_valid(const Sc64RaceMap *map)
     return 1;
 }
 
+/* From the canonical descriptor, so save candidates can be checked before
+ * the world is bound (as race_p7_source_owner does). */
 static int race_p8_source_owner(unsigned slot)
 {
-    if (slot >= 8u || !race_p8_map) return -1;
-    return slot == SC64_P8_HUMAN_SLOT ? SIDE : race_p8_map->owner_modes[slot];
+    const Sc64RaceMap *map;
+    if (slot >= 8u || SC64_P8_GLOBAL_ID >= SC64_RACE_MAP_COUNT) return -1;
+    map = &sc64_race_maps[SC64_P8_GLOBAL_ID];
+    if (map->human_slot != SC64_P8_HUMAN_SLOT || !map->owner_modes) return -1;
+    return slot == SC64_P8_HUMAN_SLOT ? SIDE : map->owner_modes[slot];
+}
+
+/* P8 runs the shared Protoss unit services with its own owner map and clock
+ * (declared with the service macros in game.c). */
+static int race_protoss_later_services_active(void) { return race_p8_active(); }
+static int race_protoss_later_source_owner(unsigned slot)
+{ return race_p8_source_owner(slot); }
+static u8 *race_protoss_later_service_clock(void) { return race_p8.service_clock; }
+static int race_protoss_later_service_mission(int mission)
+{ return mission == SC64_P8_GLOBAL_ID; }
+static int race_protoss_later_mission_source_owner(int mission, unsigned slot)
+{ return mission == SC64_P8_GLOBAL_ID ? race_p8_source_owner(slot) : -1; }
+
+/* The two authenticated map Batteries (source slot 3). Each live Battery
+ * is either one of these rows at its source position or a human one. */
+static int race_p8_battery_row(const Building *q)
+{
+    for (unsigned p = 0; p < 2u; ++p) {
+        const Sc64P7BatterySourceProperty *want = &sc64_p8_battery_source_properties[p];
+        if (q->raw_owner == want->owner && q->x == (int)(want->x_source / 2u) &&
+            q->y == (int)(want->y_source / 2u)) return (int)p;
+    }
+    return -1;
+}
+
+static int race_p8_battery_candidate_ok(const Building *q, unsigned *seen)
+{
+    int row;
+    if (q->raw_type != 172 || q->raw_owner < 0 || q->raw_owner >= 8 ||
+        q->queue_count || q->queue_head || q->queue_progress < 0 ||
+        q->queue_progress > SC64_P7_BATTERY_MAX_ENERGY_Q8 ||
+        q->level < 0 || q->level >= SC64_P7_BATTERY_REGEN_DEN ||
+        !sc64_p7_battery_energy_valid((unsigned)q->queue_progress, (unsigned)q->level) ||
+        q->shield > sc64_race_building_shields(B_P7_SHIELD_BATTERY)) return 0;
+    if (q->raw_owner == SC64_P8_HUMAN_SLOT) return q->owner == SIDE;
+    row = race_p8_battery_row(q);
+    if (row < 0 || q->owner != race_p8_source_owner((unsigned)q->raw_owner) ||
+        (*seen & (1u << (unsigned)row))) return 0;
+    *seen |= 1u << (unsigned)row;
+    return 1;
+}
+
+/* Per-row load preflight. Duplicate rows are rejected after load by
+ * race_protoss_later_battery_world_valid, which the rebind runs. */
+static int race_protoss_later_battery_candidate_valid(int mission, const Building *q)
+{
+    unsigned seen = 0;
+    return mission == SC64_P8_GLOBAL_ID && q && race_p8_battery_candidate_ok(q, &seen);
+}
+
+static int race_protoss_later_battery_world_valid(void)
+{
+    unsigned seen = 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive &&
+        b[i].type == B_P7_SHIELD_BATTERY) {
+        if (!sc64_p7_battery_fields_valid(i) ||
+            !race_p8_battery_candidate_ok(&b[i], &seen)) return 0;
+    }
+    return 1;
+}
+
+/* Bind both map rows to their authenticated starting properties. */
+static int race_protoss_later_battery_initialize(const Sc64RaceMap *map)
+{
+    unsigned seen = 0;
+    if (!race_p8_active() || map != &sc64_race_maps[SC64_P8_GLOBAL_ID]) return 0;
+    for (unsigned p = 0; p < 2u; ++p) {
+        const Sc64P7BatterySourceProperty *want = &sc64_p8_battery_source_properties[p];
+        int found = -1;
+        if (want->valid != 0x0fu || want->hp != 100 || want->shields > 100 ||
+            want->energy > 100) return 0;
+        for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive &&
+            b[i].type == B_P7_SHIELD_BATTERY && b[i].raw_type == 172 &&
+            b[i].raw_owner == want->owner &&
+            b[i].owner == race_p8_source_owner(want->owner) &&
+            b[i].x == (int)(want->x_source / 2u) &&
+            b[i].y == (int)(want->y_source / 2u)) { found = i; break; }
+        if (found < 0) return 0;
+        b[found].shield = (unsigned short)(sc64_race_building_shields(b[found].type) *
+                                           want->shields / 100u);
+        b[found].queue_progress = (int)(SC64_P7_BATTERY_MAX_ENERGY_Q8 * want->energy / 100u);
+        b[found].level = 0;
+        seen |= 1u << p;
+    }
+    return seen == 3u;
 }
 
 /* Tag every engine-created actor with a source identity so the shared census
@@ -283,6 +374,11 @@ static int race_p8_runtime_init(const Sc64RaceMap *map)
                                          sc64_p8_runner_slot[r],
                                          sc64_p8_runner_force[r])) return 0;
     if (!race_p8_bind(map)) return 0;
+    /* Fresh shared-service clock; the first source update seeds the
+     * Arbiter/detection cache. Projectiles were reset with the world. */
+    sc64_p7_arbiter_cache_due = 0;
+    sc64_p7_arbiter_cache_initialized = 0;
+    if (!race_p7_battery_initialize_source(map)) return 0;
     return race_p8_runtime_state_valid();
 }
 
@@ -290,8 +386,12 @@ static int race_p8_rebind_loaded_world(const Sc64RaceMap *map)
 {
     race_p8_product_slot = -1;
     if (!race_p8_active()) return 1;
+    /* As in P7: zero is the saved, not-yet-started service clock. */
+    sc64_p7_arbiter_cache_due = 0;
+    sc64_p7_arbiter_cache_initialized =
+        race_p8.service_clock[1] || race_p8.service_clock[2];
     return sc64_p8_persistent_state_valid(&race_p8) && race_p8_bind(map) &&
-           race_p8_runtime_state_valid();
+           race_p8_runtime_state_valid() && race_p7_battery_live_world_valid();
 }
 
 /* Bounded contact rescue (as in P4/P6): Fenix and the Hyperion join the

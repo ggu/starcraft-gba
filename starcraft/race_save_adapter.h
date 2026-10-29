@@ -1,6 +1,15 @@
 #ifndef SC64_RACE_SAVE_ADAPTER_H
 #define SC64_RACE_SAVE_ADAPTER_H
 #include "sc64_construction_save.h"
+#define SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX 25
+#define SC64_BUILDING_DAMAGE_SAVE_MARKER 0x42443031
+/* state[0..23] is the historical gameplay state; the remaining words have
+ * never been assigned by its serializer. Distinguish old construction rules
+ * without changing the save record size or rejecting completed old worlds. */
+#ifdef SC64_CONSTRUCTION_HP
+#define SC64_CONSTRUCTION_SAVE_MARKER_INDEX 24
+#define SC64_CONSTRUCTION_SAVE_MARKER 0x43485031
+#endif
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 #define race_data sc64_zp_route_save_scratch.save
 #elif defined(SC64_T3_ENABLED)
@@ -608,6 +617,10 @@ static int race_save_game(void) {
 #endif
         };
     memcpy(race_data.state,state,sizeof(state));
+    race_data.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX]=SC64_BUILDING_DAMAGE_SAVE_MARKER;
+#ifdef SC64_CONSTRUCTION_HP
+    race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = SC64_CONSTRUCTION_SAVE_MARKER;
+#endif
     memcpy(race_data.players,race_player,sizeof(race_player));
 #ifdef SC64_RACES
     for (int i = 0; i < MAX_UNITS; ++i)
@@ -748,7 +761,8 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_P8_RUNTIME
     if (race_p8_active()) {
-        if (!race_p8_runtime_state_valid()) return 0;
+        if (!race_p8_runtime_state_valid() ||
+            !race_p7_battery_live_world_valid()) return 0;
         /* Clear the whole shared union so its tail stays zero. */
         memset(&race_data.p6,0,sizeof(race_data.p6));
         race_data.p8=race_p8;
@@ -1027,6 +1041,13 @@ static int race_load_game(void) {
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
     const int *v=race_data.state;
+    int building_damage_marker=v[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX];
+    if (building_damage_marker && building_damage_marker!=SC64_BUILDING_DAMAGE_SAVE_MARKER) return 0;
+#ifdef SC64_CONSTRUCTION_HP
+    int construction_save_marker = v[SC64_CONSTRUCTION_SAVE_MARKER_INDEX];
+    if (construction_save_marker != 0 &&
+        construction_save_marker != SC64_CONSTRUCTION_SAVE_MARKER) return 0;
+#endif
     if(v[0]<0||v[0]>1||v[1]<0||v[1]>2||v[2]<0||v[2]>=SC64_RACE_MAP_COUNT||v[4]<1||v[4]>3||
        v[3]<0||v[3]>=(1<<SC64_RACE_MAP_COUNT)||v[5]<0||v[6]<0||v[7]<0||v[10]<0||v[10]>=SC_RU_COUNT||v[16]<0||v[16]>MAX_RACE_GEYSERS)return 0;
 #ifdef SC64_CAMPAIGN_RACE
@@ -1198,7 +1219,11 @@ static int race_load_game(void) {
             Building target_battery;
             const Sc64RaceUnitRule *unit_rule=sc64_race_unit_rule(candidate_unit.type);
             if (race_data.state[0] != 0 ||
+#ifdef SC64_PROTOSS_SHARED_SERVICES
+                !RACE_PROTOSS_SERVICE_MISSION(race_data.state[2]) ||
+#else
                 race_data.state[2] != SC64_P7_GLOBAL_ID ||
+#endif
                 candidate_unit.raw_type==73 || candidate_unit.raw_type==85 ||
                 candidate_unit.raw_owner<0 || candidate_unit.raw_owner>=8 ||
                 candidate_unit.work_timer!=0 || !unit_rule ||
@@ -1295,6 +1320,13 @@ static int race_load_game(void) {
                                      &race_data.buildings[i])) return 0;
 #endif
         if(RACE_B(i,alive)<0||RACE_B(i,alive)>1)return 0;
+#ifdef SC64_CONSTRUCTION_HP
+        /* The legacy clock saved no incremental HP. Its partially built
+         * foundations and morphs cannot be converted without inventing lost
+         * health; fail before applying any candidate state to the world. */
+        if (!construction_save_marker && RACE_B(i,alive) &&
+            RACE_B(i,under_construction)) return 0;
+#endif
 #ifdef SC64_T4_RUNTIME
         if(RACE_B(i,type)>=0&&RACE_B(i,type)<SC_RB_COUNT&&
            sc64_race_t4_building_intrinsically_invincible(RACE_B(i,type))&&
@@ -1359,6 +1391,14 @@ static int race_load_game(void) {
             if (candidate_building.raw_owner!=0 && candidate_building.raw_owner!=4 &&
                 candidate_building.raw_owner!=7) return 0;
         }
+#ifdef SC64_PROTOSS_SHARED_SERVICES
+        else if (!race_data.state[0] &&
+                 race_protoss_later_service_mission(race_data.state[2]) &&
+                 candidate_building.type==B_P7_SHIELD_BATTERY &&
+                 !race_protoss_later_battery_candidate_valid(race_data.state[2],
+                                                             &candidate_building))
+            return 0;
+#endif
 #endif
         for(int j=0;j<RACE_B(i,queue_count);j++) {
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
@@ -1651,7 +1691,12 @@ static int race_load_game(void) {
             if (!race_save_decode_unit(&race_data,i,(unsigned)(width*16),
                                        (unsigned)(height*16),&candidate)) return 0;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+#ifdef SC64_PROTOSS_SHARED_SERVICES
+            if (!sc64_p7_arbiter_cache_unit_valid_with_mask(&candidate,
+                    sc64_protoss_mission_source_mask(SC64_P7_GLOBAL_ID))) return 0;
+#else
             if (!sc64_p7_arbiter_cache_unit_valid(&candidate)) return 0;
+#endif
 #endif
             live+=candidate.alive!=0;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
@@ -1739,6 +1784,10 @@ static int race_load_game(void) {
                                        (unsigned)(height*16),&candidate)) return 0;
             if (candidate.alive && (candidate.raw_owner<0 || candidate.raw_owner>=8 ||
                 sc64_race_unit_from_raw(candidate.raw_type)<0)) return 0;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+            if (!sc64_p7_arbiter_cache_unit_valid_with_mask(&candidate,
+                    sc64_protoss_mission_source_mask(SC64_P8_GLOBAL_ID))) return 0;
+#endif
         }
         for (unsigned i=0;i<MAX_BUILDINGS;++i) {
             Building candidate;
@@ -2094,6 +2143,13 @@ static int race_load_game(void) {
             b[i].hp = b[i].maxhp = 100000;
 #endif
 #endif
+/* Historical completed saves predate fractional burn and attacker storage.
+     * Initialize their previously unused Terran shield word explicitly; zero
+     * would otherwise falsely credit player zero for an environmental death. */
+    if (!building_damage_marker)
+        for (int i=0;i<MAX_BUILDINGS;++i)
+            if (b[i].alive && race_building_can_burn(&b[i]))
+                b[i].shield_remainder=NEUTRAL*256;
 #ifdef SC64_T4_RUNTIME
     for(int i=0;i<MAX_BUILDINGS;i++)
         if(sc64_race_t4_building_intrinsically_invincible(b[i].type))

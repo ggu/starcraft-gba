@@ -337,7 +337,7 @@ static int race_site_powered(int owner, int x, int y)
 #ifdef SC64_P7_BATTERY_ENABLED
 static int race_p7_battery_site_powered(int owner,int x,int y)
 {
-    if (!race_p7_active() || owner!=SIDE) return 0;
+    if (!race_protoss_services_active() || owner!=SIDE) return 0;
     for (int i=0;i<MAX_BUILDINGS;++i)
         if (building_complete(i) && b[i].type==B_PYLON &&
             b[i].raw_type==156 && b[i].owner==owner && b[i].raw_owner==7 &&
@@ -380,7 +380,7 @@ static int race_can_site(int owner, int type, int x, int y)
        but this adapter does not implement their morph/build operations. */
     if (type == B_LAIR || type == B_HIVE || type == B_GREATER_SPIRE) return 0;
 #ifdef SC64_P7_BATTERY_ENABLED
-    if ((r->flags & SC_RACE_F_REQUIRES_POWER) && race_p7_active() &&
+    if ((r->flags & SC_RACE_F_REQUIRES_POWER) && race_protoss_services_active() &&
         type==B_P7_SHIELD_BATTERY) {
         if (!race_p7_battery_site_powered(owner,x,y)) return 0;
     } else
@@ -397,7 +397,7 @@ static int race_owner_worker(int owner, int type, int x, int y)
 {
     int i, best = -1, d, best_d = 0x7fffffff;
     for (i = 0; i < MAX_UNITS; ++i) {
-        if (!u[i].alive || u[i].owner != owner || u[i].type != type || SC64_BUILD_WORKER_ORDER(u[i].order)) continue;
+        if (!build_worker_available(i, owner, type)) continue;
         d = dist2(x, y, u[i].x, u[i].y);
         if (d < best_d) { best_d = d; best = i; }
     }
@@ -457,7 +457,7 @@ static int race_queue_unit(int owner, int producer, int type)
     if ((r->flags & SC_RACE_F_LARVA) && b[producer].larva < 1) return 0;
     count = type == U_ZERGLING ? 2 : 1;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if (race_p7_active() && !race_p7_carrier_training_slots_available((unsigned)count)) return 0;
+    if (race_protoss_services_active() && !race_p7_carrier_training_slots_available((unsigned)count)) return 0;
 #endif
 #ifdef SC64_P4_RUNTIME
     if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
@@ -578,7 +578,8 @@ static int race_build_request_valid(int owner, int worker, int type,
 static int race_start_build(int owner, int worker, int type, int x, int y)
 {
     Sc64RaceBank bank;
-    if (!race_build_request_valid(owner, worker, type, &x, &y, 0)) return 0;
+    if (!build_worker_available(worker, owner, -1) ||
+        !race_build_request_valid(owner, worker, type, &x, &y, 0)) return 0;
     bank.minerals = (unsigned short)race_owner_minerals(owner);
     bank.gas = (unsigned short)race_owner_gas(owner);
     if (!sc64_race_pay_building(&bank, type)) return 0;
@@ -687,6 +688,35 @@ static int race_builder_arrived(int worker)
     return 1;
 }
 
+/* Terran buildings have no shields. Their serialized remainder word stores
+ * a Q8 HP deficit in bits 0..7 and last damage owner 0..4 above it. This uses
+ * the existing 0..1279 codec range, without growing GBA actor storage. */
+static int __attribute__((noinline)) race_building_can_burn(const Building *q)
+{
+    const Sc64RaceBuildingRule *rule=sc64_race_building_rule(q->type);
+    int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_building(q->type);
+    const Sc64StockUnitProfile *stock=sc64_stock_unit_profile(raw);
+    return rule && rule->race==R_TER && raw>=106 && raw<=129 && stock &&
+           (stock->flags&SC64_STOCK_F_BUILDING) && !stock->shields;
+}
+
+static void __attribute__((noinline)) race_tick_building_damage(int slot)
+{
+    Building *q=&b[slot];
+    unsigned before,after,hp,packed;
+    if (q->under_construction || q->hp<=0 || q->maxhp<=0 ||
+        (unsigned)q->hp*100u >= (unsigned)q->maxhp*34u ||
+        !sc64_building_burn_source_frame((unsigned)frame) ||
+        !race_building_can_burn(q)) return;
+    packed=(unsigned)q->shield_remainder;
+    before=sc64_building_burn_hp_q8((unsigned)q->hp,packed);
+    after=sc64_building_burn_tick(before,(unsigned)q->maxhp,1,1,1,0,(unsigned)frame);
+    if (before==after) return;
+    sc64_building_burn_store_hp(after,&hp,&packed);
+    q->hp=(int)hp; q->shield_remainder=(int)packed;
+    if (!after) destroy_building(slot,(int)sc64_building_burn_owner(packed));
+}
+
 static void race_tick_state(void)
 {
     int i,used=0,cap=0;
@@ -727,7 +757,7 @@ static void race_tick_state(void)
             unsigned short value = (unsigned short)u[i].shield;
             unsigned short rem = (unsigned short)u[i].shield_remainder;
 #ifdef SC64_P7_BATTERY_ENABLED
-            if (race_p7_active()) {
+            if (race_protoss_services_active()) {
                 unsigned shield_value=value, shield_rem=rem;
                 sc64_p7_battery_passive_shield_tick(&shield_value,r->shields,
                                                      &shield_rem);
@@ -741,6 +771,8 @@ static void race_tick_state(void)
         }
     }
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
+        race_tick_building_damage(i);
+        if (!b[i].alive) continue;
         if(b[i].owner==SIDE&&!b[i].under_construction)cap+=sc64_race_building_rules[b[i].type].supply_provided;
         unsigned short max = sc64_race_building_shields(b[i].type);
         if (max && b[i].shield < max) {
@@ -751,7 +783,7 @@ static void race_tick_state(void)
             b[i].shield_remainder = rem;
         }
 #ifdef SC64_P7_BATTERY_ENABLED
-        if (race_p7_active() && b[i].type==B_P7_SHIELD_BATTERY &&
+        if (race_protoss_services_active() && b[i].type==B_P7_SHIELD_BATTERY &&
             !b[i].under_construction && b[i].queue_count==0) {
             unsigned energy=(unsigned)b[i].queue_progress;
             unsigned phase=(unsigned)b[i].level;
@@ -841,6 +873,24 @@ static void race_complete_building(int i)
     if (r && r->supply_provided && b[i].owner == SIDE) supply_cap += r->supply_provided;
     if (sc64_race_is_zerg_townhall(b[i].type)) b[i].larva = 3;
 }
+
+#ifdef SC64_CONSTRUCTION_HP
+/* Construction is uncommon beside movement/combat. Keep its full progression
+ * in ROM so sharing the mechanic does not consume the tight hot-code reserve. */
+static void __attribute__((noinline)) race_construction_worker_tick(int worker)
+{
+    Unit *q = &u[worker];
+    int slot = q->target;
+    int total = building_build_time(b[slot].type);
+    int progress = ++b[slot].build_progress;
+    race_construction_hp_progress(slot, progress, total);
+    if (progress >= total) {
+        race_complete_building(slot);
+        q->order = ORDER_IDLE;
+        q->target = -1;
+    }
+}
+#endif
 
 #ifdef SC64_P3_PRODUCTION_EXIT
 typedef struct {

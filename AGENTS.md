@@ -10,6 +10,17 @@
 
 ## Make changes safely
 
+- Core engine fixes and improvements must apply across Showcase, skirmish and
+  campaign products. Put shared mechanics in the shared engine and common
+  build capability set; do not enable them only in a Showcase flag list or
+  behind a mission-active predicate. Mission objectives, source permissions,
+  content and storage/placement choices may remain profile-specific.
+- Validate shared changes across the production build and gameplay-mode
+  matrix. Missing assets or save-state dependencies are unfinished work to
+  resolve and document, not a reason to advertise an actor with incomplete
+  mechanics. Do not widen a mission-active predicate to activate objectives
+  or reuse incompatible persistent state in other modes.
+
 - Keep runtime data and work bounded for GBA memory and CPU limits. Use integer arithmetic, fixed-size storage and explicit limits; avoid unbounded allocation in game code.
 - Preserve the default profile's independence from game ROMs and imported data. Never add ROMs, extracted game data, generated asset headers, or proprietary screenshots to the source tree.
 - Keep the pinned reference revisions and imported reference checkout unchanged. Preserve the project's GPL-3.0-or-later license and existing third-party and file-level notices; do not relicense code without the owner's authorization.

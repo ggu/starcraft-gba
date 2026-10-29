@@ -7,8 +7,9 @@
 /* Persistent P8 mission state. It shares the Protoss mission save union, so
  * it stores only what the bounded source program and authored services can
  * change: three trigger owners, their shared waits, the switch bank, the one
- * MoveLocation target, the two computer wallets and the town AI schedule.
- * Locations, world views and callback bindings are rebuilt on load. */
+ * MoveLocation target, the two computer wallets, the town AI schedule and
+ * the shared Protoss service clock. Locations, world views and callback
+ * bindings are rebuilt on load. */
 enum {
     SC64_P8_RUNNER_HUMAN = 0,   /* Source slot 7, force 1. */
     SC64_P8_RUNNER_DEFENDERS,   /* Source slot 0, force 2. */
@@ -44,6 +45,10 @@ typedef struct {
     u8 moved_location_valid;
     u8 camera_release;      /* Runner bits whose CenterView wait releases. */
     u8 pass_timer;          /* Updates until the next trigger pass. */
+    /* Shared Protoss service clock, laid out like P7's reserved bytes:
+     * [0] is the source-update phase (0..4), [1..2] the secondary-order
+     * stagger (0..300). Zero means the first source update is pending. */
+    u8 service_clock[3];
 } Sc64P8PersistentState;
 
 _Static_assert(sizeof(Sc64P8PersistentState) <= 180,
@@ -61,6 +66,8 @@ static inline int sc64_p8_runner_for_slot(unsigned slot)
 static inline int sc64_p8_persistent_state_valid(const Sc64P8PersistentState *s)
 {
     if (!s || s->source_pause_active > 1u || s->moved_location_valid > 1u ||
+        s->service_clock[0] > 4u ||
+        ((unsigned)s->service_clock[1] | ((unsigned)s->service_clock[2] << 8)) > 300u ||
         (s->waiting_mask & (u8)~7u) || (s->camera_release & (u8)~s->waiting_mask))
         return 0;
     for (unsigned i = 0; i < SC64_P8_RUNNER_COUNT; ++i) {

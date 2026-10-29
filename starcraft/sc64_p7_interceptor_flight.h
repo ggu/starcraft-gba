@@ -105,7 +105,7 @@ static int race_p7_flight_carrier_target(int carrier)
 static int race_p7_interceptor_flight_carrier_holds(int carrier)
 {
     int target;
-    if (!race_p7_active() || !sc64_p7_carrier_parent_valid(carrier) ||
+    if (!race_protoss_services_active() || !sc64_p7_carrier_parent_valid(carrier) ||
         !race_p7_carrier_training_child_count(carrier)) return 0;
     target = race_p7_flight_carrier_target(carrier);
     return target >= 0 &&
@@ -349,7 +349,7 @@ static void race_p7_flight_carrier_tick(int carrier)
  * newly released child starts its order on the next source tick. */
 static void race_p7_interceptor_flight_source_tick(void)
 {
-    if (!race_p7_active()) return;
+    if (!race_protoss_services_active()) return;
     for (int i = 0; i < MAX_UNITS; ++i) {
         unsigned state;
         if (!u[i].alive || u[i].type != U_P7_INTERCEPTOR ||

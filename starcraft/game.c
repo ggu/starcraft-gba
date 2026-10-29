@@ -9,9 +9,14 @@ static void sc64_contact_memo_invalidate(void);
 #define SC64_CONTACT_MEMO_INVALIDATE() sc64_contact_memo_invalidate()
 #endif
 #include "../common/gba.h"
+#include "sc64_engine_capabilities.h"
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
 #include "sc64_construction_hp.h"
+#include "sc64_building_damage.h"
+#include "sc64_building_fire_vfx.h"
+#include "sc64_order_marker_vfx.h"
+#include "sc64_building_placement_vfx.h"
 #ifdef SC64_IMPORTED_MISSION
 #include "sc64_minimap_terrain.h"
 #endif
@@ -1427,6 +1432,8 @@ static int race_p8_outcome(void);
 static void race_p8_note_unit_spawn(int slot, int owner, int type);
 static void race_p8_note_building_spawn(int slot, int owner, int type);
 static void race_p8_note_product_building(int building);
+/* P8 runs the shared Protoss unit services (see sc64_p7_runtime_adapter.h). */
+#define SC64_PROTOSS_SHARED_SERVICES
 #endif
 #ifdef SC64_P9_RUNTIME
 #define SC64_P9_GLOBAL_ID 28
@@ -1447,6 +1454,40 @@ static void race_siege_splash_attack(Unit *,int,int);
 #endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
 static int race_p7_active(void);
+/* The Protoss unit services (Carrier hangar and Interceptor flight, Arbiter
+ * cloak, Observer and Cannon detection, Shield Battery, Interceptor
+ * projectiles) are unit behavior, not P7 mission state. Later Protoss
+ * missions that carry their own source-owner map and service clock run them
+ * too. Without those missions these expand to the original P7 tokens. */
+#ifdef SC64_PROTOSS_SHARED_SERVICES
+static int race_protoss_later_services_active(void);
+static int race_protoss_later_source_owner(unsigned slot);
+static u8 *race_protoss_later_service_clock(void);
+static int race_protoss_later_service_mission(int mission);
+static int race_protoss_later_mission_source_owner(int mission, unsigned slot);
+static int race_protoss_later_battery_initialize(const Sc64RaceMap *map);
+static int race_protoss_later_battery_world_valid(void);
+static int race_protoss_later_battery_candidate_valid(int mission, const Building *q);
+#define race_protoss_services_active() \
+    (race_p7_active() || race_protoss_later_services_active())
+#define race_protoss_source_owner(slot) \
+    (race_protoss_later_services_active() ? \
+     race_protoss_later_source_owner(slot) : race_p7_source_owner(slot))
+#define RACE_PROTOSS_SERVICE_CLOCK \
+    (race_protoss_later_services_active() ? \
+     race_protoss_later_service_clock() : race_p7.reserved)
+#define RACE_PROTOSS_SERVICE_MISSION(mission) \
+    ((mission)==SC64_P7_GLOBAL_ID || race_protoss_later_service_mission(mission))
+#define RACE_PROTOSS_MISSION_SOURCE_OWNER(mission, slot) \
+    ((mission)==SC64_P7_GLOBAL_ID ? race_p7_source_owner(slot) : \
+     race_protoss_later_mission_source_owner((mission), (slot)))
+#else
+#define race_protoss_services_active() race_p7_active()
+#define race_protoss_source_owner(slot) race_p7_source_owner(slot)
+#define RACE_PROTOSS_SERVICE_CLOCK race_p7.reserved
+#define RACE_PROTOSS_SERVICE_MISSION(mission) (mission)==SC64_P7_GLOBAL_ID
+#define RACE_PROTOSS_MISSION_SOURCE_OWNER(mission, slot) race_p7_source_owner(slot)
+#endif
 #endif
 #ifdef SC64_NYDUS_ENABLED
 static void race_nydus_note_building_lost(int slot);
@@ -1543,12 +1584,15 @@ static void race_pending_build_tick(int worker);
 #ifdef SC64_CONSTRUCTION_HP
 static void race_construction_hp_progress(int building, int progress, int total);
 static void race_complete_building(int building);
+static void race_construction_worker_tick(int worker);
 #endif
+static int race_building_can_burn(const Building *building);
 static void race_tick_buildings(void),race_tick_state(void),race_tick_ai(void),race_tick_defenses(void);
 static void race_skirmish_init(void),race_skirmish_outcome(void);
 static void race_skirmish_geometry(void);
 #if defined(SC64_RACES) && defined(SC64_HAS_SPRITES)
 static const Sc64SpriteFrame *mission_geyser_sprite(void);
+static const Sc64SpriteFrame *mission_building_sprite(int type);
 #endif
 static int race_owner_supply(int owner),race_owner_supply_cap(int owner),race_owner_reserved_supply(int owner);
 static int race_owner_queued_supply(int owner);
@@ -2052,7 +2096,8 @@ spawn_unit(int owner, int type, int x, int y)
     u[i].carry = 0;
     u[i].build = -1;
     u[i].work_timer = 0;
-    u[i].armor = owner == SIDE ? armor_level : 0;
+    /* Stored armor is the unit's base; combat applies the live upgrade. */
+    u[i].armor = 0;
     if (type == U_FIREBAT || type == U_MEDIC)
 	u[i].armor++;
 #ifdef SC64_RACES
@@ -2060,7 +2105,7 @@ spawn_unit(int owner, int type, int x, int y)
 #endif
     u[i].weapon = owner == SIDE ? weapons_level : 0;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-    if (race_p7_active()) u[i].weapon = (u16)(1u << 13);
+    if (race_protoss_services_active()) u[i].weapon = (u16)(1u << 13);
 #endif
     u[i].target = -1;
     u[i].path_timer = 0;
@@ -2130,6 +2175,7 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #endif
     b[i].shield=sc64_race_building_shields(type);
     b[i].raw_type=b[i].raw_owner=-1;b[i].flags=b[i].shield_remainder=0;
+    if (race_building_can_burn(&b[i])) b[i].shield_remainder=NEUTRAL*256;
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     { const Sc64ZpBuildingFact *zp = sc64_zp_building_fact(type);
       if (zp) { b[i].shield = zp->shields;
@@ -2170,7 +2216,7 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     race_p9_note_building_spawn(i, owner, type);
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
-    if (race_p7_active() && type == B_P7_SHIELD_BATTERY) {
+    if (race_protoss_services_active() && type == B_P7_SHIELD_BATTERY) {
         b[i].queue_progress = 100 * 256;
         b[i].level = 0;
     }
@@ -3499,7 +3545,7 @@ sc64_direct_attack_find_target(int x, int y)
         if (!owners_hostile(SIDE, owner) || !currently_visible(tx, ty) ||
             !sc64_direct_target_state(entity, SIDE, &s)) continue;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-        if (race_p7_active() && sc64_p7_observer_target_is_cloaked(entity)) {
+        if (race_protoss_services_active() && sc64_p7_observer_target_is_cloaked(entity)) {
             int eligible=0;
             for (int a=0;a<MAX_UNITS;++a) if (u[a].alive && u[a].selected &&
                 u[a].owner==SIDE && !SC64_TRANSPORT_LOADED(&u[a]) &&
@@ -3722,6 +3768,60 @@ sc64_source_building_vfx(const Building *q,int x1,int y1,int air)
 }
 #endif
 
+/* Weapon damage and environmental burn share one destruction lifecycle. */
+static void __attribute__((noinline))
+destroy_building(int slot, int source_owner)
+{
+    Building *q = &b[slot];
+    if (!q->alive) return;
+
+#ifdef SC64_TERRAN_LATE_RUNTIME
+            if (q->alive && race_late_active())
+                race_late_record_actor_death(source_owner, -1, q->owner,
+                                             q->raw_owner, q->raw_type, 1);
+#endif
+#ifdef SC64_T6_RUNTIME
+            if (q->alive && race_t6_active())
+                race_t6_building_died(q->owner, q->raw_owner);
+#endif
+#ifdef SC64_P5_RUNTIME
+            if (q->alive && race_p5_active()) race_p5_note_building_death(q);
+#endif
+#ifdef SC64_P6_RUNTIME
+            if (q->alive && race_p6_active()) race_p6_note_building_death(q);
+#endif
+#ifdef SC64_Z6_RUNTIME
+            if (q->alive && race_z6_active()) race_z6_note_building_death(q);
+#endif
+#ifdef SC64_Z7_RUNTIME
+            if (q->alive && race_z7_active()) race_z7_note_building_death(q);
+#endif
+#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
+            if(q->alive && !race_mode && race_selected_mission==6 &&
+               q->owner==ENEMY && source_owner==SIDE && race_t3_buildings_killed<65535u)
+                ++race_t3_buildings_killed;
+#endif
+	    if (q->type == B_COMMAND && q->owner == SIDE) {
+#ifndef SC64_IMPORTED_MISSION
+		lost = 1;
+#endif
+	    }
+	    if (q->type == B_DEPOT && q->owner == SIDE && !q->under_construction)
+		supply_cap -= 16;
+#if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
+            if (q->type == B_COMMAND && q->owner == SIDE && !q->under_construction) supply_cap -= 20;
+#endif
+	    q->alive = 0;
+#ifdef SC64_P7_BATTERY_ENABLED
+            race_p7_battery_clear_building_references(slot);
+#endif
+#ifdef SC64_NYDUS_ENABLED
+            race_nydus_note_building_lost(slot);
+#endif
+	    invalidate_path_grid();
+    (void)source_owner;
+}
+
 static void
 hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
                    int stock_damage_class, int hit_flags)
@@ -3730,7 +3830,7 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
     SC64_CONTACT_MEMO_INVALIDATE();
 #endif
 
-    int i, tx, ty;
+    int tx, ty;
 #ifndef SC64_RACES
     (void)stock_damage_class;
 #endif
@@ -3764,6 +3864,9 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
         sc64_game_building_has_flag(b[target-MAX_UNITS].type,
                                     SC64_GAME_ACTOR_INVINCIBLE)) return;
 #endif
+#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+    if (target < MAX_UNITS ? invincible_units[target] : invincible_buildings[target - MAX_UNITS]) return;
+#endif
 #ifdef SC64_RACES
 #ifdef SC64_T4_RUNTIME
     if (target >= 0 && target < MAX_UNITS &&
@@ -3778,9 +3881,6 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
         int absorbed=*shield<damage?*shield:damage;*shield-=absorbed;damage-=absorbed;
     }
     if(!damage)return;
-#endif
-#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
-    if (target < MAX_UNITS ? invincible_units[target] : invincible_buildings[target - MAX_UNITS]) return;
 #endif
     if (target < MAX_UNITS) {
 	tx = u[target].x;
@@ -3873,53 +3973,9 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
             if (race_transport_carrier_type(&u[target])) race_transport_destroy_cargo(target);
 #endif
 	}
-	if (source_type == U_FIREBAT && stock_damage_class<0) {
-	    for (i = 0; i < MAX_UNITS; i++)
-		if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner != source_owner && dist2(tx, ty, u[i].x, u[i].y) < 12 * 12) {
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-                    if (SC64_CARRIER_HANGAR_HIDDEN(&u[i])) continue;
-#endif
-#ifdef SC64_T6_RUNTIME
-                    if (race_t6_active() && (!owners_hostile(source_owner, u[i].owner) ||
-                        race_t6_unit_burrowed(i))) continue;
-#endif
-#ifdef SC64_TERRAN_LATE_RUNTIME
-                    if (race_late_active() &&
-                        (!owners_hostile(source_owner, u[i].owner) ||
-                         invincible_units[i] || (u[i].flags & 16) ||
-                         (sc64_terran_late_unit_actor_flags(u[i].type) &
-                          SC64_LATE_ACTOR_INVINCIBLE))) continue;
-#endif
-		    u[i].hp -= 3;
-		    if (u[i].hp <= 0) {
-#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-                        race_p7_carrier_training_clear_slot(i);
-#endif
-#ifdef SC64_TERRAN_LATE_RUNTIME
-                        if (race_late_active())
-                            race_late_record_actor_death(source_owner, -1, u[i].owner,
-                                                         u[i].raw_owner, u[i].raw_type, 0);
-#endif
-#ifdef SC64_P5_RUNTIME
-                        if (race_p5_active()) race_p5_note_unit_death(&u[i]);
-#endif
-#ifdef SC64_P6_RUNTIME
-                        if (race_p6_active()) race_p6_note_unit_death(&u[i]);
-#endif
-#ifdef SC64_Z6_RUNTIME
-                        if (race_z6_active()) {
-                            race_z6_note_unit_death(&u[i]);
-                        }
-#endif
-			if (u[i].owner == SIDE)
-			    supply_used -= unit_slot_supply(&u[i]);
-			u[i].alive = 0;
-#ifdef SC64_Z6_RUNTIME
-                        if (race_z6_active()) (void)race_z6_hallucination_cleanup_dead(&u[i]);
-#endif
-		    }
-		}
-	}
+        /* Flame collateral needs source geometry and event research. Do not
+         * invent area hits here: this path cannot resolve their eligibility,
+         * shields, armor and death callbacks correctly. */
     } else {
 	Building *q = &b[target - MAX_UNITS];
 	tx = q->x;
@@ -3946,56 +4002,14 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #endif
     damage-=sc64_race_building_armor(q->type);
     }
+    if (race_building_can_burn(q) && source_owner>=0 && source_owner<5)
+        q->shield_remainder=(int)sc64_building_burn_with_owner(
+            (unsigned)q->shield_remainder,(unsigned)source_owner);
     q->hp-=(hit_flags & SC64_HIT_PRECOMPUTED_HP)?damage:(damage>0?damage:1);
 #else
     q->hp -= damage > 1 ? damage - 1 : 1;
 #endif
-	if (q->hp <= 0) {
-#ifdef SC64_TERRAN_LATE_RUNTIME
-            if (q->alive && race_late_active())
-                race_late_record_actor_death(source_owner, -1, q->owner,
-                                             q->raw_owner, q->raw_type, 1);
-#endif
-#ifdef SC64_T6_RUNTIME
-            if (q->alive && race_t6_active())
-                race_t6_building_died(q->owner, q->raw_owner);
-#endif
-#ifdef SC64_P5_RUNTIME
-            if (q->alive && race_p5_active()) race_p5_note_building_death(q);
-#endif
-#ifdef SC64_P6_RUNTIME
-            if (q->alive && race_p6_active()) race_p6_note_building_death(q);
-#endif
-#ifdef SC64_Z6_RUNTIME
-            if (q->alive && race_z6_active()) race_z6_note_building_death(q);
-#endif
-#ifdef SC64_Z7_RUNTIME
-            if (q->alive && race_z7_active()) race_z7_note_building_death(q);
-#endif
-#if defined(SC64_T3_ENABLED) && defined(SC64_UNIFIED)
-            if(q->alive && !race_mode && race_selected_mission==6 &&
-               q->owner==ENEMY && source_owner==SIDE && race_t3_buildings_killed<65535u)
-                ++race_t3_buildings_killed;
-#endif
-	    if (q->type == B_COMMAND && q->owner == SIDE) {
-#ifndef SC64_IMPORTED_MISSION
-		lost = 1;
-#endif
-	    }
-	    if (q->type == B_DEPOT && q->owner == SIDE && !q->under_construction)
-		supply_cap -= 16;
-#if defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES)
-            if (q->type == B_COMMAND && q->owner == SIDE && !q->under_construction) supply_cap -= 20;
-#endif
-	    q->alive = 0;
-#ifdef SC64_P7_BATTERY_ENABLED
-            race_p7_battery_clear_building_references(target-MAX_UNITS);
-#endif
-#ifdef SC64_NYDUS_ENABLED
-            race_nydus_note_building_lost(target-MAX_UNITS);
-#endif
-	    invalidate_path_grid();
-	}
+	if (q->hp <= 0) destroy_building(target - MAX_UNITS, source_owner);
     }
     (void)tx;
     (void)ty;
@@ -4095,7 +4109,7 @@ load_game(void)
     if (loaded) sc64_facing_reset_all();
 #endif
 #ifdef SC64_FIELD_CONTROLS
-    if (loaded) ui_action = ui_tick_mode = 0; /* frame jumped: resolve A afresh */
+    if (loaded) { ping_life=0; ui_action = ui_tick_mode = 0; } /* frame jumped: resolve A afresh */
 #endif
     return loaded;
 #else
@@ -4161,6 +4175,13 @@ load_game(void)
 	data.weapons_level < 0 || data.weapons_level > 2 || data.armor_level < 0 || data.armor_level > 2)
 	return 0;
     memcpy(u, data.units, sizeof(u));
+    /* Older non-race saves recorded the current upgrade in newly spawned
+     * units. Armor is derived from type and the live upgrade is applied on
+     * hit, so normalize the validated living units without changing the save
+     * format or their other state. */
+    for (i = 0; i < MAX_UNITS; ++i)
+        if (u[i].alive)
+            u[i].armor = u[i].type == U_FIREBAT || u[i].type == U_MEDIC;
     memcpy(b, data.buildings, sizeof(b));
     invalidate_path_grid();
     memcpy(m, data.minerals_map, sizeof(m));
@@ -4213,6 +4234,9 @@ load_game(void)
     screen = SCREEN_PLAY;
     won = lost = 0;
     reset_selection_gestures();
+#ifdef SC_FIELD_FEEDBACK
+    ping_life=0;
+#endif
     update_exploration();
     toast(0);
     return 1;
@@ -4755,7 +4779,7 @@ remember_unit_tap(int picked)
     unit_tap_x = cx; unit_tap_y = cy;
 }
 
-static void
+static int
 issue_order(int order, int tx, int ty)
 {
     int i, n = 0;
@@ -4820,6 +4844,7 @@ issue_order(int order, int tx, int ty)
 	toast(0);
     else
 	toast(5);
+    return n;
 }
 
 static int
@@ -4830,6 +4855,17 @@ find_selected_worker(void)
 	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE && u[i].selected && IS_WORKER(u[i].type))
 	    return i;
     return -1;
+}
+
+/* Automatic construction selection must not steal an existing build order.
+ * Explicit player orders may still interrupt construction normally. */
+static int
+build_worker_available(int worker, int owner, int type)
+{
+    return worker >= 0 && worker < MAX_UNITS && u[worker].alive &&
+        u[worker].owner == owner &&
+        (type < 0 ? IS_WORKER(u[worker].type) : u[worker].type == type) &&
+        !SC64_TRANSPORT_LOADED(&u[worker]) && !SC64_BUILD_WORKER_ORDER(u[worker].order);
 }
 
 #ifdef SC64_RACES
@@ -4927,7 +4963,7 @@ start_build(int type)
 #else
     i = find_selected_worker();
 #endif
-    if (i < 0) {
+    if (!build_worker_available(i, SIDE, -1)) {
 	toast(5);
 	return;
     }
@@ -5546,10 +5582,12 @@ interact(void)
             mode = MODE_NORMAL; return;
         }
 #endif
-	issue_order(ORDER_MOVE, cx, cy);
+	int issued=issue_order(ORDER_MOVE, cx, cy);
 	mode = MODE_NORMAL;
 #ifdef SC_FIELD_FEEDBACK
-	if (selected_count()) field_ui_ping(cx, cy, C_GREEN);
+	if (issued) field_ui_ping(cx, cy, C_GREEN);
+#else
+    (void)issued;
 #endif
 	return;
     }
@@ -5557,15 +5595,23 @@ interact(void)
 #ifdef SC64_DIRECT_ATTACK
         int direct_target = sc64_direct_attack_find_target(cx, cy);
         if (direct_target >= 0) {
-            (void)sc64_direct_attack_issue_target(direct_target);
+            int tx=target_x(direct_target),ty=target_y(direct_target);
+            int issued=sc64_direct_attack_issue_target(direct_target);
+#ifdef SC_FIELD_FEEDBACK
+            if (issued) field_ui_ping(tx,ty,C_RED);
+#else
+            (void)tx;(void)ty;(void)issued;
+#endif
             mode = MODE_NORMAL;
             return;
         }
 #endif
-	issue_order(ORDER_ATTACK_MOVE, cx, cy);
+	int issued=issue_order(ORDER_ATTACK_MOVE, cx, cy);
 	mode = MODE_NORMAL;
 #ifdef SC_FIELD_FEEDBACK
-	if (selected_count()) field_ui_ping(cx, cy, C_RED);
+	if (issued) field_ui_ping(cx, cy, C_RED);
+#else
+    (void)issued;
 #endif
 	return;
     }
@@ -6193,10 +6239,9 @@ tick_combat(Unit * q, int target)
         if (identity && (flying?identity->air_weapon:identity->ground_weapon)==130 &&
             (flying || q->type!=U_REAVER)) return;
     }
-    /* Firebat's three maximum hits describe spatial flame segments, not
-     * three guaranteed impacts on its selected target. Preserve the existing
-     * area adapter until native flame geometry/events are implemented. */
-    if (q->type==U_FIREBAT) stock_weapon=0;
+    /* Firebat's maximum hits describe spatial flame segments, not three
+     * guaranteed impacts on the selected target. The stock weapon still
+     * supplies its damage class, upgrade and per-impact values. */
     int minimum_range=0;
     if (stock_weapon) {
         range=(stock_attack.weapon->max_range+1)/2;
@@ -6272,7 +6317,9 @@ tick_combat(Unit * q, int target)
         else
 #endif
         {
-        int hits=stock_weapon?(int)sc64_stock_attack_impact_count(&stock_attack):
+        int hits=stock_weapon?((stock_attack.weapon_id==25 || stock_attack.weapon_id==26) ?
+                              (int)stock_attack.weapon->damage_factor :
+                              (int)sc64_stock_attack_impact_count(&stock_attack)):
                               sc64_race_unit_hits_vs(q->type,flying);
 #ifdef SC64_Z6_RUNTIME
         if (race_z6_hallucination_can_deal_damage((int)(q-u)))
@@ -6383,7 +6430,7 @@ target_lists_unavailable:
 #ifdef SC64_RACES
     if (target_lists_valid) sc64_target_index_begin();
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-    if (race_p7_active()) sc64_p7_arbiter_cache_process_due();
+    if (race_protoss_services_active()) sc64_p7_arbiter_cache_process_due();
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     sc64_target_hostility_snapshot();
@@ -6528,14 +6575,7 @@ target_lists_unavailable:
 	    }
 #ifdef SC64_CONSTRUCTION_HP
             else {
-                int total = building_build_time(b[q->target].type);
-                int progress = ++b[q->target].build_progress;
-                race_construction_hp_progress(q->target, progress, total);
-                if (progress >= total) {
-                    race_complete_building(q->target);
-                    q->order = ORDER_IDLE;
-                    q->target = -1;
-                }
+                race_construction_worker_tick(i);
             }
 #else
             else if (++b[q->target].build_progress >= building_build_time(b[q->target].type)) {
@@ -7508,6 +7548,9 @@ game_update(u16 held, u16 pressed)
         return;
     }
 #endif
+#ifdef SC_FIELD_FEEDBACK
+    if (ping_life) --ping_life;
+#endif
 #if defined(SC64_P6_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
     /* A spell hotkey keeps real-time targeting practical on the GBA pad. */
     if ((held&KEY_B) && (pressed&KEY_R) && !box_state &&
@@ -7644,7 +7687,7 @@ game_update(u16 held, u16 pressed)
     if (sc64_showcase_scene >= 0) ++sc64_showcase_ticks;
 #endif
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-    if (race_p7_active()) sc64_p7_arbiter_cache_frame_tick();
+    if (race_protoss_services_active()) sc64_p7_arbiter_cache_frame_tick();
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     race_p7_carrier_training_frame_tick();
@@ -7750,7 +7793,7 @@ game_update(u16 held, u16 pressed)
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     race_p7_carrier_training_end_frame();
 #endif
-    if (race_p7_active()) race_p7_projectile_clear_dead_references();
+    if (race_protoss_services_active()) race_p7_projectile_clear_dead_references();
 #endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_sight_cycles = gba_clock() - profile_sight_start;
@@ -8723,7 +8766,7 @@ static void
 draw_building_overlay(Building *q)
 {
     int x = q->x - camx, y = q->y - camy + 12;
-    if (x < -20 || x > 260 || y < 2 || y > 130)
+    if (x < -128 || x > 368 || y < -128 || y > 248)
         return;
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
     if (sc64_game_building_has_flag(q->type, SC64_GAME_ACTOR_INVINCIBLE)) return;
@@ -8752,6 +8795,13 @@ draw_building_overlay(Building *q)
         const Sc64SpriteFrame *cannon=sc64_race_building_sprite(162,
                                    sc64_photon_cannon_attack_frame(elapsed));
         if (cannon) draw_mission_sprite(cannon,x,y);
+    }
+#endif
+#ifdef SC64_BUILDING_FIRE_ART
+    if (!q->under_construction && q->hp>0 && q->hp<q->maxhp) {
+        unsigned raw=(unsigned)(q->raw_type>=0?q->raw_type:sc64_race_raw_building(q->type));
+        sc64_building_damage_draw(raw,x,y,(unsigned)q->hp,(unsigned)q->maxhp,
+                                 (u32)frame/5u*4u+((u32)frame%5u)*4u/5u);
     }
 #endif
     if (q->under_construction) {
@@ -9245,7 +9295,7 @@ sc64_tile_background_done:
 #endif
     draw_tracers();
 #ifdef SC64_P7_PROJECTILES_ENABLED
-    if (race_p7_active()) race_p7_projectile_draw();
+    if (race_protoss_services_active()) race_p7_projectile_draw();
 #endif
 #ifdef SC64_P4_STORM_ENABLED
     race_p4_storm_draw();
@@ -9541,7 +9591,7 @@ static void
 draw_hud_resources(void)
 {
     gfx_rect(0, 0, 240, 12, C_PANEL);
-#ifdef SC64_COMMAND_ICONS
+#ifdef SC64_HUD_ICONS
     card_resource_icon(SC64_HUD_SPRITE_MINERAL, 2);
     gfx_num(16, 3, minerals, C_WHITE);
     card_resource_icon(SC64_HUD_SPRITE_GAS, 60);
@@ -9697,7 +9747,7 @@ draw_hud_commands_body(void)
 #endif
 		else
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-                if (race_p7_active() && u[i].type==U_P7_CARRIER) {
+                if (race_protoss_services_active() && u[i].type==U_P7_CARRIER) {
                     gfx_text(hud_left+47,137,"IC",C_CYAN);
                     gfx_num(hud_left+65,137,(int)race_p7_carrier_training_child_count(i),C_WHITE);
                     gfx_text(hud_left+79,137,"HANGAR / FLIGHT WIP",C_GOLD);
@@ -9918,7 +9968,7 @@ sc64_hud_race_keys(int *values,int first)
     }
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if(first>=0 && race_p7_active() && u[first].type==U_P7_CARRIER)
+    if(first>=0 && race_protoss_services_active() && u[first].type==U_P7_CARRIER)
         values[20]|=((int)race_p7_carrier_training_child_count(first)+(u[first].carry<<3))<<8;
 #endif
 #ifdef SC64_Z5_CLOAK_ENABLED
