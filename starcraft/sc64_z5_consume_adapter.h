@@ -61,6 +61,10 @@ static int race_z5_consume_issue_selected(int x, int y)
  * The verified source collision extents are used at the 2:1 map boundary. */
 static int __attribute__((noinline)) race_z5_consume_tick_unit(int slot)
 {
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+
     Unit *caster = &u[slot];
     int target_slot = caster->target;
     if (caster->order != ORDER_Z5_CONSUME) return 0;

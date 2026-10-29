@@ -106,6 +106,10 @@ static int race_z6_overlord_menu_available(void)
  * The existing exact scan fallbacks handle the remainder of this tick. */
 static void race_transport_changed(void)
 {
+#ifdef SC64_CONTACT_MEMO_ENABLED
+    SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+
     sc64_unit_bucket_active = 0;
     sc64_target_index_active = 0;
     target_lists_valid = 0;

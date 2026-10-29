@@ -2648,6 +2648,14 @@ with `make -B terran CONTACT_CACHE_FLAGS=` (or `zerg` / `protoss`). See
 [Validation](VALIDATION.md#contact-cache-movement-measurement-2026-10-27) for the ARM
 measurements and the benchmark recipe.
 
+The contact-cache builds also retain up to four exact blocked-steering masks
+between collision-world mutations. The memo clears at movement and actor
+lifecycle boundaries and adds no save data. `make test-sc64-contact-memo`
+checks both bucket implementations without imported assets; the optional
+profile differential fixtures enable a host-only hit oracle. See the
+[memo audit](audits/2026-10-29-contact-query-memo/README.md) for measured scope
+and remaining qualification. Showcase uses its separate collision flags.
+
 An experimental mode-0 renderer builds on that movement probe:
 
 ```sh

@@ -354,13 +354,202 @@ sc64_contact_mask_apply_geometry(unsigned mask, int radius, int speed,
 }
 #endif
 
+#ifdef SC64_CONTACT_MEMO_ENABLED
+#if !defined(SC64_CONTACT_CACHE)
+#error "contact memo requires the contact-mask implementation"
+#endif
+#define SC64_CONTACT_MEMO_INVALIDATE() sc64_contact_memo_invalidate()
+typedef struct {
+    s16 x, y, raw_type;
+    u8 type, order, speed, p6, mask, valid;
+} Sc64ContactMemoEntry;
+_Static_assert(sizeof(Sc64ContactMemoEntry) <= 16, "contact memo entry exceeds bound");
+static Sc64ContactMemoEntry sc64_contact_memo_entries[4];
+static u8 sc64_contact_memo_count;
+#ifdef SC64_CONTACT_MEMO_ORACLE
+static u32 sc64_contact_memo_generation;
+#endif
+
+static void __attribute__((noinline))
+sc64_contact_memo_invalidate(void)
+{
+    sc64_contact_memo_count = 0;
+#ifdef SC64_CONTACT_MEMO_ORACLE
+    ++sc64_contact_memo_generation;
+#endif
+}
+
+static int __attribute__((noinline))
+sc64_contact_memo_key_equal(const Sc64ContactMemoEntry *e, const Unit *q,
+                            int speed, int p6)
+{
+    return e->valid && e->x == q->x && e->y == q->y &&
+           e->type == q->type && e->raw_type == q->raw_type &&
+           e->order == q->order && e->speed == speed && e->p6 == p6;
+}
+
+static int __attribute__((noinline))
+sc64_contact_memo_lookup(const Unit *q, int speed, int p6, unsigned *mask)
+{
+    unsigned i, j;
+    for (i = 0; i < sc64_contact_memo_count; ++i)
+        if (sc64_contact_memo_key_equal(&sc64_contact_memo_entries[i], q, speed, p6))
+            break;
+    if (i == sc64_contact_memo_count) return 0;
+    {
+        Sc64ContactMemoEntry hit = sc64_contact_memo_entries[i];
+        for (j = i; j; --j) sc64_contact_memo_entries[j] = sc64_contact_memo_entries[j - 1u];
+        sc64_contact_memo_entries[0] = hit;
+    }
+    *mask = sc64_contact_memo_entries[0].mask;
+    return 1;
+}
+
+static void __attribute__((noinline))
+sc64_contact_memo_remember(const Unit *q, int speed, int p6, unsigned mask)
+{
+    unsigned i, j;
+    for (i = 0; i < sc64_contact_memo_count; ++i)
+        if (sc64_contact_memo_key_equal(&sc64_contact_memo_entries[i], q, speed, p6))
+            break;
+    if (i < sc64_contact_memo_count) {
+        for (j = i; j; --j) sc64_contact_memo_entries[j] = sc64_contact_memo_entries[j - 1u];
+    } else {
+        if (sc64_contact_memo_count < 4u) ++sc64_contact_memo_count;
+        for (j = sc64_contact_memo_count - 1u; j; --j)
+            sc64_contact_memo_entries[j] = sc64_contact_memo_entries[j - 1u];
+    }
+    sc64_contact_memo_entries[0].x = (s16)q->x;
+    sc64_contact_memo_entries[0].y = (s16)q->y;
+    sc64_contact_memo_entries[0].raw_type = (s16)q->raw_type;
+    sc64_contact_memo_entries[0].type = (u8)q->type;
+    sc64_contact_memo_entries[0].order = (u8)q->order;
+    sc64_contact_memo_entries[0].speed = (u8)speed;
+    sc64_contact_memo_entries[0].p6 = (u8)p6;
+    sc64_contact_memo_entries[0].mask = (u8)mask;
+    sc64_contact_memo_entries[0].valid = 1;
+}
+
+#ifdef SC64_CONTACT_MEMO_ORACLE
+#include <assert.h>
+#include <stdio.h>
+typedef struct { s16 x, y, type, raw_type; u16 flags; u8 present; } Sc64ContactMemoActorSnapshot;
+typedef struct {
+    u8 p6, buckets_active;
+    Sc64ContactMemoActorSnapshot actors[MAX_UNITS];
+} Sc64ContactMemoWorldSnapshot;
+static Sc64ContactMemoWorldSnapshot sc64_contact_memo_last_world;
+static u32 sc64_contact_memo_last_generation;
+static u8 sc64_contact_memo_have_last_world, sc64_contact_memo_failed;
+static u32 sc64_contact_memo_window;
+static u32 sc64_contact_memo_counts[3][5];
+static void __attribute__((noinline))
+sc64_contact_memo_oracle_observe(void)
+{
+    Sc64ContactMemoWorldSnapshot world;
+    unsigned i;
+    memset(&world, 0, sizeof(world));
+    world.p6 = (u8)!!sc64_contact_p6_active();
+    world.buckets_active = (u8)!!sc64_unit_bucket_active;
+    for (i = 0; i < MAX_UNITS; ++i) {
+        const Unit *c = &u[i];
+        Sc64ContactMemoActorSnapshot *a = &world.actors[i];
+        if (!c->alive || SC64_TRANSPORT_LOADED(c)) continue;
+                a->present = 1; a->x = (s16)c->x; a->y = (s16)c->y;
+                a->type = (s16)c->type; a->raw_type = (s16)c->raw_type;
+                a->flags = (u16)c->flags;
+    }
+    if (sc64_contact_memo_have_last_world &&
+        memcmp(&world, &sc64_contact_memo_last_world, sizeof(world)) != 0 &&
+        sc64_contact_memo_generation == sc64_contact_memo_last_generation) {
+        ++sc64_contact_memo_counts[sc64_contact_memo_window][4];
+        sc64_contact_memo_failed = 1;
+        fprintf(stderr, "CONTACT_MEMO_UNHOOKED window=%u generation=%lu\n",
+                (unsigned)sc64_contact_memo_window,
+                (unsigned long)sc64_contact_memo_generation);
+    }
+    sc64_contact_memo_last_world = world;
+    sc64_contact_memo_last_generation = sc64_contact_memo_generation;
+    sc64_contact_memo_have_last_world = 1;
+}
+static void sc64_contact_memo_set_window(unsigned w)
+{ sc64_contact_memo_window = w < 3u ? w : 2u; }
+static void sc64_contact_memo_report(unsigned w)
+{
+    if (w >= 3u) return;
+    fprintf(stderr, "CONTACT_MEMO window=%u calls=%lu eligible=%lu hits=%lu misses=%lu unhooked=%lu\n",
+        w, (unsigned long)sc64_contact_memo_counts[w][0],
+        (unsigned long)sc64_contact_memo_counts[w][1],
+        (unsigned long)sc64_contact_memo_counts[w][2],
+        (unsigned long)sc64_contact_memo_counts[w][3],
+        (unsigned long)sc64_contact_memo_counts[w][4]);
+}
+static int sc64_contact_memo_oracle_passed(void)
+{ return !sc64_contact_memo_failed; }
+#define SC64_CONTACT_MEMO_ORACLE_CALL() do { \
+    sc64_contact_memo_oracle_observe(); \
+    ++sc64_contact_memo_counts[sc64_contact_memo_window][0]; \
+} while (0)
+#else
+#define SC64_CONTACT_MEMO_ORACLE_CALL() ((void)0)
+#endif
+
+static int __attribute__((noinline))
+sc64_contact_memo_eligible(const Unit *q, int speed)
+{
+    int radius, flying;
+    if (!q || speed <= 0 || speed > 255 || !sc64_unit_bucket_active ||
+        q->x < 0 || q->x >= WORLD_W || q->y < 0 || q->y >= WORLD_H ||
+        q->raw_type < -32768 || q->raw_type > 32767 ||
+        q->order < 0 || q->order > 255) return 0;
+    if (IS_WORKER(q->type) && (q->order == ORDER_MINE || q->order == ORDER_GAS)) return 0;
+#if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
+    { unsigned flags = sc64_game_unit_actor_flags(q->type);
+      if (flags && !(flags & SC64_GAME_ACTOR_MOVABLE)) return 0; }
+#endif
+    return sc64_contact_mover(q, &radius, &flying) == 2;
+}
+
+static unsigned __attribute__((noinline))
+sc64_contact_blocked_mask_uncached(const Unit *q, int speed);
+static unsigned __attribute__((noinline))
+sc64_contact_blocked_mask_memo(const Unit *q, int speed)
+{
+    unsigned mask;
+    int eligible = sc64_contact_memo_eligible(q, speed);
+    int p6 = !!sc64_contact_p6_active();
+#ifdef SC64_CONTACT_MEMO_ORACLE
+    SC64_CONTACT_MEMO_ORACLE_CALL();
+#endif
+    if (eligible) {
+#ifdef SC64_CONTACT_MEMO_ORACLE
+        ++sc64_contact_memo_counts[sc64_contact_memo_window][1];
+#endif
+        if (sc64_contact_memo_lookup(q, speed, p6, &mask)) {
+#ifdef SC64_CONTACT_MEMO_ORACLE
+            unsigned oracle = sc64_contact_blocked_mask_uncached(q, speed);
+            ++sc64_contact_memo_counts[sc64_contact_memo_window][2];
+            assert(mask == oracle);
+#endif
+            return mask;
+        }
+#ifdef SC64_CONTACT_MEMO_ORACLE
+        ++sc64_contact_memo_counts[sc64_contact_memo_window][3];
+#endif
+    }
+    mask = sc64_contact_blocked_mask_uncached(q, speed);
+    if (eligible) sc64_contact_memo_remember(q, speed, p6, mask);
+    return mask;
+}
+#endif
+
 static unsigned
 #if defined(SC64_CONTACT_STEER_ROM)
 __attribute__((noinline))
 #else
 GBA_HOT
 #endif
-sc64_contact_blocked_mask(const Unit *q, int speed)
+sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
 {
     unsigned mask;
 #ifndef SC64_CONTACT_MASK_TABLE
@@ -427,6 +616,14 @@ sc64_contact_blocked_mask(const Unit *q, int speed)
         }
     return mask;
 }
+
+#ifdef SC64_CONTACT_MEMO_ENABLED
+static unsigned __attribute__((noinline))
+sc64_contact_blocked_mask(const Unit *q, int speed)
+{ return sc64_contact_blocked_mask_memo(q, speed); }
+#else
+#define sc64_contact_blocked_mask sc64_contact_blocked_mask_uncached
+#endif
 
 /* Stock motion rate without the software division: (N * 52429) >> 18 equals
  * N / 5 for every N below 81920, which covers the whole profile table
