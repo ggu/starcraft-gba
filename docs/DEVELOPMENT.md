@@ -401,10 +401,12 @@ checkerboard-dithered. Generated art and its manifest stay under
 `--out` and `--upstream` for other local paths.
 
 The importer currently compiles 167 actors from 61 image banks (about 770 KB
-of pixels). Canonical builds also prepack combat-unit collapse and remnant frames
-for the existing word compositor (about 891 KB of ROM data, no new RAM).
-Neutral actors and buildings use the same source pixels through indexed drawing
-to fit the complete Terran ROM. The indexed fallback handles HUD-edge clipping. Adding
+of pixels). Canonical builds also prepack combat-unit collapse/remnant frames
+and persistent building remnants for the existing word compositor (about 1.18 MB
+of ROM data, no new RAM). Neutral actors and building bursts keep indexed art;
+HUD-edge frames use the clipped indexed fallback. `make test-sc64-death-remnant-words`
+compares all newly packed building-remnant frames against their indexed pixels
+using the prepared private bank. Adding
 `-DSC64_DEATH_INDEXED_REMNANTS` to the source death flags selects identical
 indexed pixels for a performance comparison. The preview ROM is `build/StarCraft-Death-Preview-GBA.gba`; its
 menus and missions match the unified profile. Canonical race builds and

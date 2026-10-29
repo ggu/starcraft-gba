@@ -6380,3 +6380,39 @@ million. A long-lived building-remnant image accounts for most indexed
 death drawing. This measured usage motivates a separate remnant-packing
 candidate; static transparency counts alone did not justify the rejected
 facing-span prototype.
+
+### Packed building remnants (2026-10-30)
+
+The authenticated death importer now also packs persistent remnant layers of
+building raw IDs 106..175. This adds six image banks (110, 111, 216, 217, 335,
+336), 24 frames and 291,232 phase-word bytes. Transient bursts and unsupported
+actors retain their existing paths. Indexed pixels, layer timing, colors,
+visibility, lifetimes and the clipped HUD-edge fallback are unchanged.
+
+A fresh baseline generation exactly matches the retained input bank. The
+candidate preserves all non-word header content byte for byte and all 780
+preexisting packed declarations. Ten importer tests pass. The optional private
+bank oracle checks every new frame/phase against indexed bytes and independently
+composites 144 patterned framebuffer cases, including scene edges, under
+ASan/UBSan. No generated bank or game assets are tracked.
+
+All four retained canonical ARM products link within the unchanged ROM/RAM
+limits, with EWRAM/IWRAM margins identical to the preceding row-alignment
+candidate. Actual per-TU argv, raw dependencies, consumed input hashes, linker
+maps and output hashes are retained privately. Only the expected generated
+death-bank header differs in paired consumed inputs; ordered feature/include
+vectors remain identical.
+
+The identical three-AI late window retains all 9,000 tick/frame/phase rows and
+992 advancing frames. Cycles fall from 806,838,185 to 779,509,400 (3.39 percent),
+about 20.63 to 21.35 fps. A separate read-only pixel observer reproduces every
+pinned-observer cycle row for both products and all 992 full-frame pixel hashes
+match (602 distinct hashes), proving picture parity for this window. Earlier
+clock-baseline attribution identified repeated building-remnant image 336 draws;
+the pixel observer itself does not identify individual sprite calls.
+
+The full one-AI replay retains all 9,488 observations and decoded terminal
+entity/configuration state: 9,426 advancing frames, 5,626,410,088 to
+5,623,881,694 cycles (0.045 percent), still about 28.12 fps. These are narrow
+paired emulator measurements, not physical-hardware or all-campaign proof.
+The late three-AI near-30-fps target remains unmet.
