@@ -2022,20 +2022,27 @@ python3 tools/sc64_zp_controller_replay.py --help
 The Z3 and staged Zerg/Protoss replay tools discover the shorter period from
 the ELF. Other existing profilers still expect their documented 1,000-tick
 builds. Rebuild with the original flags before using those profilers.
-For a dense skirmish ROM/ELF, use the dedicated observer:
+For a skirmish ROM/ELF with the existing windowed scheduler, build the
+[port-free mGBA observer](research/sc64-headless-skirmish-replay.md), then run:
 
 ```sh
 python3 tools/sc64_skirmish_controller_replay.py \
   --trace .local/sc64/skirmish/example.json \
   --rom /absolute/path/to/matching.gba \
-  --elf /absolute/path/to/matching.elf
+  --elf /absolute/path/to/matching.elf \
+  --headless-runner /absolute/path/to/sc64-headless-replay \
+  --full-per-update
 ```
 
 Supply the matching build used to generate the trace; profile-specific actor
-capacities can change the outcome. The tool verifies a fresh HOME start,
-feeds only scheduler input fields, and checks the final configuration, frame,
-result and live actor counts. Its FPS mean uses GBA timer deltas between live
-PLAY checkpoints, excluding HOME/start and final RESULT intervals.
+capacities and private inputs can change the outcome. The tool verifies a fresh
+HOME start, feeds only scheduler input fields, and checks the final configuration,
+frame, result and live actor counts. The headless path uses mGBA's 64-bit guest
+cycle clock and records every update, separating menu, nonadvancing PLAY and
+outside-PLAY intervals. A prefix selected with `--sample-start` and
+`--sample-updates` is a nonterminal sample, not a completed replay. The legacy
+GDB path requires an explicit port; its modulo timer counts do not establish
+unwrapped FPS. The headless path opens no debugger socket.
 
 ### Prepare the qualified staged Zerg and Protoss builds
 
