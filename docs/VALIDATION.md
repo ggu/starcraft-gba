@@ -6227,3 +6227,57 @@ command stops at the T9 controller (`won=0`, no Wraiths, wallet 34/14 at the
 T1–T8 and the other Terran checks pass before that point, and T10 run directly
 wins at tick 3,552. No frame-rate, physical-hardware or ARM replay result is
 claimed.
+
+## Moving-projectile damage at impact (2026-10-29)
+
+Moving source projectiles now deal damage at their drawn impact frame through
+a bounded, saved queue; see [Pending projectile impacts](IMPACT-EVENTS.md).
+The candidate is stacked on `761597d`. Base and candidate were built from the
+same private inputs.
+
+`./dev build`, `./dev test`, `python3 tools/check_source_tree.py` and the
+host SRAM checks pass. `make test-sc64-impact-events-game` passes under
+ASan/UBSan for Terran, Zerg, Protoss P7 and Showcase (queue 32; save 32, 10,
+11, 32 rows). Its `races` and `unified` vectors keep immediate damage.
+`make test-unified` passes. Its `test-sc64-weapon-vfx-game` guard now pins the
+compact race `Tracer`.
+
+Five normal 32 MiB ARM products (Showcase, Terran, Zerg Z6/Z7, Protoss P7)
+link within unchanged guards. IWRAM is byte-identical, and EWRAM headroom
+grows by 56–72 B.
+
+Campaign controllers, run with traces in a private workspace:
+
+- **Terran.** T1–T6, T8, T10 and the save, repair, world-save, target, HUD
+  and collision checks pass.
+  - T5 now wins at tick 193,011. Unmodified base loses (Raynor dies), so this
+    is a changed trajectory, not a claimed fix.
+  - T7 (no win at 60,000), T9 (no win at 500,000) and `terran-late-world`'s
+    Firebat splash assertion fail identically on base.
+- **Zerg Z6/Z7.** The Z6 split controller, promoted profile, Z7 profile, save
+  and frame checks pass.
+  - The Z7 normal-input controller regresses. It reaches its 1,000,000-tick
+    limit without a win, while base wins at 821,565.
+  - The impacts-disabled build reproduces base's trace exactly.
+  - At frame 47,500 the scripted policy sends its 11 drones to a distant
+    mineral field through enemy Sunken Colonies, and its economy does not
+    recover.
+- **Protoss.** The split controller, P7 OBJ VRAM and P7 save/projectile checks
+  pass.
+- **Pre-existing on base**, failing identically:
+  - the P4 canonical controller (`LOST`);
+  - the P4 Storm save assertion;
+  - the Z7 Scourge targeting assertion;
+  - the generation-30 promoted/storage asserts;
+  - the P7 controller rule's link error.
+
+In the no-GDB mGBA probe:
+
+- One shot's timing costs 6,161 cycles, and a full-queue step 1,794.
+- The disabled build matches base's digest and update cycles.
+- Equal-load windows cost the same, but the stress battle's heavy phase lasts
+  longer.
+
+The scene exceeds the 30 fps budget on base as well, so no hardware frame-rate
+result is claimed. ARM replays and fresh-process SRAM qualification were not
+run.

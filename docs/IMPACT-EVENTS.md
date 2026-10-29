@@ -166,11 +166,11 @@ check this. Fresh-process SRAM qualification has not been rerun.
 | --- | --- | --- |
 | Showcase | 200 → 272 B | 56 B, unchanged |
 | Terran | 28,480 → 28,536 B | 536 B, unchanged |
-| Zerg Z6 | 28,372 → 28,224 B | 96 B, unchanged |
-| Zerg Z7 | 2,256 → 2,108 B | 648 B, unchanged |
-| Protoss P7 | 23,828 → 23,680 B | 960 B, unchanged |
+| Zerg Z6 | 28,372 → 28,444 B | 96 B, unchanged |
+| Zerg Z7 | 2,256 → 2,328 B | 648 B, unchanged |
+| Protoss P7 | 23,828 → 23,900 B | 960 B, unchanged |
 
-These are the four normal 32 MiB ARM link maps, read from `__bss_end` and
+These are the five normal 32 MiB ARM link maps, read from `__bss_end` and
 `__iwram_end` against the unchanged guards.
 
 - The queue costs 196 B: 32 × 6-byte rows plus 4 bytes of counters.
@@ -178,7 +178,7 @@ These are the four normal 32 MiB ARM link maps, read from `__bss_end` and
   from RaceSave, and race maps are at most 128 cells per side. That frees
   256 B.
 - The extended save record lives in each product's existing route-scratch
-  union (asserted), and the load candidate (at most 66 B) is on the stack.
+  union (asserted), and the load candidate (up to 192 B) is on the stack.
 - No queue code is placed in IWRAM.
 
 ## ARM timing (emulation)
@@ -248,6 +248,9 @@ Results, mGBA 0.10.5:
   their source wind-up and impact frame. They are 3–8 updates early, as
   before.
 - In P7 and Z6/Z7, a save with more than 10–11 pending impacts is refused.
-- Longer battles from overkill change campaign trajectories. Controller
-  qualifications that passed on base were rerun; ARM replays and fresh-process
-  SRAM qualification were not.
+- Longer battles from overkill change campaign trajectories. The scripted
+  Z7 normal-input controller no longer wins within its 1,000,000-tick limit;
+  base wins at tick 821,565, and the disabled build reproduces that exactly.
+  The controller needs re-tuning for impact-time damage before Z7 can be
+  qualified with this change. ARM replays and fresh-process SRAM
+  qualification were not rerun.
