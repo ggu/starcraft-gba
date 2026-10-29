@@ -10,15 +10,23 @@ A frozen 55,000-tick Z7 replay compares default-branch tree `8ef4cad70797d1fea58
 
 | Tick interval | Valid samples | Total cycle change | Full floods before / after |
 | --- | ---: | ---: | ---: |
-| 1–25,000 | 24,153 | −1.087% | 450 / 291 |
-| 25,001–50,000 | 24,765 | +0.037% | 42 / 40 |
-| 50,001–55,000 | 4,901 | −4.077% | 1,794 / 1,489 |
+| 1–25,000 | 24,153 | −1.089% | 450 / 291 |
+| 25,001–50,000 | 24,765 | +0.032% | 42 / 40 |
+| 50,001–55,000 | 4,901 | −4.081% | 1,794 / 1,489 |
 
-Across all valid samples, cycles fell 0.999%. The maximum measured update fell from 44,965,711 to 43,099,160 cycles (4.151%). Total full floods fell from 2,286 to 1,820. The unchanged RAM guards passed: this diagnostic candidate ended at BSS `0x0203da24` and IWRAM `0x03004ed8`; the helper remained in ROM.
+Across all valid samples, cycles fell 1.003%. The maximum measured update fell from 44,965,711 to 43,097,903 cycles (4.154%). Total full floods fell from 2,286 to 1,820. The unchanged RAM guards passed: this diagnostic candidate ended at BSS `0x0203da24` and IWRAM `0x03004eb8`; the helper remained in ROM.
 
-Baseline ROM SHA256: `c547a6a74cd1ea9283c252bdf68a6f9118e0dda10df3d8a90db81da0ca64adc7`. Candidate ROM SHA256: `f3050c0c2a640903297a7c56ccfe226f541858c5bcfd9320d8019cdf90b5a464`. ROMs, inputs, generated data, captures and private harnesses are not distributed.
+Baseline ROM SHA256: `c547a6a74cd1ea9283c252bdf68a6f9118e0dda10df3d8a90db81da0ca64adc7`. Candidate ROM SHA256: `a48936c07b90958fc373a1673e615905a01b4e1db9eeecb2902d9796caebeeab`. ROMs, inputs, generated data, captures and private harnesses are not distributed.
 
 This is a bounded diagnostic comparison, not a full-mission or hardware frame-rate qualification. It does not enable another campaign mission, establish steady 30 fps, or remove the remaining movement and rendering bottlenecks. The small middle-window regression is retained above.
+
+## Corrected source provenance
+
+The original timing image `f3050c0c…90b5a464` used an earlier private helper revision because its harness retained an absolute include to that source directory. Its route header SHA256 was `b498ab288ff10674d6ec7f10d003f0ccdc152d9894d1bcb142ffb7dc142c08da`, rather than the merged header `3c7906f94e0ae219fb358fea10f8e6e745e458daeffb87f4cc47812f5f6fd7ac`. Pinning both files did not detect that source-selection error. Those earlier timings are not exact measurements of the final merged placement.
+
+The table above supersedes that run with a fresh rendered replay of the exact merged runtime (`f0a26676752d2efb4b30fc57d6404a3600b93864`, tree `90b83ee767287ea5e8777319938ba916cace4017`). Actual per-translation-unit dependency files are compared with their manifests, and every authored common/starcraft dependency must resolve within that variant's source directory. Compiler arguments match the original comparison after only source/output namespace rebinding. All 137 traces, three world digests and three displayed pixel digests pass, with unchanged pre/post pins and zero accounting errors. The pre-change baseline's own dependency namespace was also verified. The four normal ROM builds already used the correct committed source; they are unaffected by this correction.
+
+A separate same-source experiment forced the contact geometry fallback out of line. It reduced the main mask function from 964 to 700 bytes and its local allocation from 132 to 100 bytes, but increased fallback-path peak stack across these frames from 168 to 208 bytes. The 55k replay still matched, while cycles increased 0.100% overall (0.135% and 0.182% in the middle and late intervals). That annotation was rejected and is not enabled in the source.
 
 ## Source and product checks
 

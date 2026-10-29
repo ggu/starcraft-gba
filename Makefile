@@ -4542,6 +4542,16 @@ build/test-sc64-contact-mask-table: tests/sc64_contact_mask_table_generated.c $(
 .PHONY: test-sc64-contact-mask-table
 test-sc64-contact-mask-table: build/test-sc64-contact-mask-table
 	./build/test-sc64-contact-mask-table
+
+# Exercise the real contact-header arithmetic fallback and its table-domain
+# wrapper without compiling game.c or requiring imported campaign inputs.
+CONTACT_MASK_MATH_TEST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined
+build/test-sc64-contact-mask-math: tests/sc64_contact_mask_math.c starcraft/sc64_contact.h $(CONTACT_MASK_TABLE_HEADER) Makefile | build
+	$(CLANG) $(CONTACT_MASK_MATH_TEST_FLAGS) -DSC64_RACES -DSC64_CONTACT_CACHE -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_CONTACT_MASK_TABLE -Ibuild/generated $< -o $@
+.PHONY: test-sc64-contact-mask-math
+test-sc64-contact-mask-math: build/test-sc64-contact-mask-math
+	./build/test-sc64-contact-mask-math
+test: test-sc64-contact-mask-math
 test-zerg: test-sc64-contact-cache-zerg
 test-protoss: test-sc64-contact-cache-protoss
 
