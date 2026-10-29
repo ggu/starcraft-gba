@@ -2737,6 +2737,20 @@ compares all displayed RGB555 pixels with the FACT V2 profile across camera
 pans, pause/resume and combat. See the [drawing qualification](research/p7-render-profile-qualification.md)
 for the modest measured gains, unchanged memory guards and remaining limits.
 
+## Asset-free contact geometry checks
+
+Run the runtime geometry and independent table checks without campaign inputs:
+
+```sh
+make test-sc64-contact-mask-math test-sc64-contact-mask-table
+```
+
+The math target is also part of `./dev test`. It compiles the real contact
+header with minimal context stubs, checks all 887,250 table tuples and 153,600
+out-of-domain wrapper cases under ASan/UBSan, and exercises seeded masks.
+It checks the geometry kernel rather than full game integration. The table
+header is generated from authored integer arithmetic and needs no game data.
+
 ## Mineral gathering before a base exists
 
 The shared first-depot worker path lets an empty mineral worker gather before

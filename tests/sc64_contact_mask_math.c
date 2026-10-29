@@ -1,9 +1,52 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Exhaustive oracle for the optional ROM geometry kernel. The reference is
- * the same arithmetic fallback used by the runtime when table bounds miss. */
+/* Exhaustive pure-math fixture for the optional ROM geometry kernel. This
+ * compiles the real contact header with minimal context for unrelated game
+ * paths; it does not test full game.c integration. The arithmetic fallback
+ * under test is the implementation in sc64_contact.h, not a copied oracle. */
 #include <assert.h>
 #include <stdio.h>
-#include "../starcraft/game.c"
+
+typedef unsigned char u8;
+typedef signed char s8;
+typedef struct Unit {
+    int type, raw_type, x, y, alive, order;
+    unsigned flags;
+} Unit;
+typedef struct Sc64StockUnitProfile { unsigned top_speed_q10; } Sc64StockUnitProfile;
+
+#define MAP_COLS 64
+#define MAP_ROWS 64
+#define WORLD_W 1024
+#define WORLD_H 1024
+#define U_CHRYSALIS 255
+#define ORDER_MINE 1
+#define ORDER_GAS 2
+#define GBA_HOT
+#define IS_WORKER(type) 0
+#define SC64_TRANSPORT_LOADED(unitp) 0
+#define SC64_GAME_ACTOR_COLLIDABLE 4u
+#define SC64_GAME_ACTOR_MOVABLE 2u
+
+/* These declarations only satisfy unrelated bucket/mover helpers compiled
+ * from the real header. The tests below call its geometry helpers directly. */
+static Unit u[256];
+static u8 sc64_unit_bucket_head[MAP_COLS * MAP_ROWS];
+static u8 sc64_unit_bucket_next[256];
+static int sc64_unit_bucket_active;
+static int sc64_race_unit_flying(int type) { (void)type; return 0; }
+static unsigned sc64_game_unit_actor_flags(int type) { (void)type; return 0; }
+static int sc64_game_unit_collision_radius(int type) { (void)type; return 6; }
+static int unit_step_clear(const Unit *q, int x, int y);
+static int sc64_unit_bucket_step_clear_reference(const Unit *q, int x, int y, int strict);
+static const Sc64StockUnitProfile *sc64_stock_unit_profile(int raw)
+{ (void)raw; return 0; }
+
+#include "../starcraft/sc64_contact.h"
+
+static int unit_step_clear(const Unit *q, int x, int y)
+{ (void)q; (void)x; (void)y; return 1; }
+static int sc64_unit_bucket_step_clear_reference(const Unit *q, int x, int y, int strict)
+{ (void)q; (void)x; (void)y; (void)strict; return 1; }
 
 #ifndef SC64_CONTACT_MASK_TABLE
 #error "Compile this fixture with SC64_CONTACT_MASK_TABLE"
