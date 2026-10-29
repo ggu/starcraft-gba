@@ -6569,10 +6569,73 @@ entry point. It now names the controller source as the first prerequisite, and a
 Make regression checks the source, dependencies and three companion units. The
 corrected actual build links. Its bounded run reaches a cursor-guard failure,
 which also reproduces on current default with the same recipe repair and that
-base's compatible fact table. P7 campaign completion remains unqualified.
+base's compatible fact table. The subsequent controller repair is recorded below.
 
 Private executed-argv, raw dependencies, input/output hashes, traces and logs are
 retained under `.local/build/skirmish-catalog-{controller-v1,controller-v2,native-final-v1,native-final-v2,arm-preflight-v1,arm-final-v2,runtime-v2,runtime-profiles-v2}`
 and `.local/build/campaign-regression-{v1,base-v1}`. Source artifacts only are
 committed. No Actions, SD writes or debugger sockets were used. Full roster
 services, campaign completion and near-30-fps work remain active.
+
+
+### Campaign-controller and ARM SRAM follow-up (2026-10-30)
+
+Verification commit `e2a80cb` repairs the existing T5/P7 controllers for field
+controls. No production engine source or ROM flags change in this follow-up.
+T5 replaces its direct menu-row assignment with D-pad navigation, maintains
+home defense during tech/hero operations, and continues the Wraith plan if the
+optional Dropship is unavailable. Seven explicit path-grid initialization calls
+are replaced with guards that wait for the real simulation's grid. Two final
+host runs win at tick 159,216 / frame 158,491 with zero faults, both heroes and
+the Command Center alive, and zero enemy buildings. Their traces are identical
+(SHA-256 `4ca8aeb7813eb51d3d5206e3761ecdcf6fdcf501b017b1c10c95882094b4282f`).
+This uses probe entry and inherited unseen-enemy/map knowledge; it is not a
+normal-menu ARM replay or a player-information-limited policy qualification.
+
+P7 closes the field menu before moving its cursor, navigates from the remembered
+row, filters unavailable/pending builders and propagates cursor failure without
+sending an unintended A press. A route starts from a combat unit near the
+combat group's mean, avoiding repeated orders based on a forward straggler.
+Two host runs reproduce the same strict win at frame 48,939 / 49,229 calls,
+within the unchanged 60,000-call bound, with all three heroes alive. The host
+strict verdict checks native outcome, faults, victory conditions and timers.
+A port-free normal-menu ARM replay reaches the same frame, RESULT/win and loss
+clear, matching slot/owner/raw type/position/HP for all 147 live units and 101
+buildings. Guest switch/action-timer internals were not captured; their direct
+ARM parity is not claimed. The whole replay costs 127,596,445,835 guest cycles
+including menus. A separate 997-advancing-frame window measures about 6.82 fps:
+campaign performance remains far below the target despite the completion proof.
+
+The Terran aggregate now passes T5, T6, late-world/save/repair and target checks,
+then stops at T7. Independent T7, T8 and T9 controllers do not win at their
+unchanged limits; T10 wins. A stale Firebat fixture expected invented radial
+collateral that the engine had already removed; the replacement tests direct
+invincibility under both supported flags and controlled direct damage, without
+claiming the unresolved native Flame Thrower splash geometry. The target
+broadphase fixture now recognizes the shared and legacy Z7 Scourge wrapper
+configurations. These are verification repairs, not new weapon mechanics.
+
+The headless transport can boot from read-only 32-KiB SRAM and export a new
+image through the core API, while memory writes remain limited to the five
+scheduler fields. All seven optional real-backend protocol tests pass. A
+no-SRAM-option run reproduces all 9,000 original Zerg timing rows and the exact
+754,769,344-cycle sample. The recorded SDK rebuild has identical file-backed
+Mach-O sections; output-name/signature metadata makes its full file hash differ.
+
+Using the locally packaged canonical candidates, all three native-race one-AI
+skirmishes save/load a human foundation with its HP and construction progress
+preserved. Separate ordinary-input runs save/load a paid production queue with
+its ordered product and progress preserved. A fresh emulator boot with the
+engine-written SRAM matches an in-place load at offsets 0, 100 and 1,000,
+including full runtime actor-bank hashes. All six cases pass. Nine negative
+runs reject corrupted checksums, embedded-version mismatches and outer-version
+mismatches without changing HOME's actor banks or the input files. Record tags,
+lengths, checksums and embedded versions are checked independently. These cases
+do not establish every cargo/morph, mission, pixel or physical-hardware save path.
+
+The final default gates pass on `e2a80cb`: source boundary (1,006 indexed files),
+doctor, build, 685 Python checks (17 optional skips), additional eight-test suite
+and host C checks. Private evidence is retained in `.local/build/e2a80-final-gates`,
+`campaign-regression-v1`, `t5-grid-guard-v1`, `p7-ordinary-arm-v1`,
+`skirmish-sram-v2` and `skirmish-sram-queue-v1`. Shared roster/campaign and
+near-30-fps work remains open. No Actions, debugger sockets or SD writes were used.
