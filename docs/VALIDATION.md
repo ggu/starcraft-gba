@@ -6800,3 +6800,33 @@ and persistent mission state, with fresh/in-place continuations equal through
 replays and SRAM evidence are under `.local/build/p7-count-{opt,final}-v1` and
 `.local/build/p7-count-campaign-sram-final-v1`. Canonical candidates are packaged
 locally; no SD delivery or physical-hardware qualification is claimed.
+
+The public `make test-sc64-terran-full-campaign` aggregate passes on the current
+runtime and controller sources at `89067f3`, including all ten mission runners,
+early and late save/world/repair checks, combat/target/contact checks, and the
+234-configuration startup/save matrix. It was built in a fresh private snapshot
+with held prepared inputs, actual per-TU compiler arguments and raw dependencies;
+all 312 consumed inputs are hashed, and project source/Make inputs match the
+committed versions. Evidence is in `.local/build/terran-controllers-final-v1`.
+This clears the earlier aggregate controller failures, without turning host
+probe entry into an ARM campaign-progression claim. Default source/doctor/build
+and tests pass at `ebacc8a` (685 Python checks with 23 optional skips, the
+additional eight-test suite and host C checks); the count change additionally
+passes its two prepared-profile sanitizer targets and four ARM links. The source
+boundary passes all 1,009 indexed files after adding the two new test sources.
+
+The repaired T9 tape also wins through the normal campaign menu on the canonical
+Terran ARM executable. A fresh HOME boot uses 13 ordinary launch calls before
+the 45,625-call host tape; no SRAM unlock fixture or actor-state writes are used.
+At scheduler tick 45,638 / frame 44,896, the guest reaches RESULT/win, primary
+objective complete, completion bit 4,096, Kerrigan alive, zero trigger faults,
+zero Protoss buildings and 21 Zerg buildings. All recorded host checkpoints
+match. A read-only final host observer retains the original input trace and
+matches the guest's 192 live units by slot, owner/source owner, runtime/raw type,
+position, HP, order and target, and all 42 buildings by slot, owners, types,
+position and construction state. Building HP was not captured by that observer.
+The port-free replay takes 51,972,781,802 64-bit guest cycles including menus;
+it is not steady-30-fps or hardware proof. The controller's scenario-placement
+hints remain part of its information assumptions. The Terran ROM is byte-identical
+to the current four-profile build. Evidence and exact ROM/ELF/backend identities
+are retained in `.local/build/terran-late-new-arm-v1`.

@@ -120,7 +120,16 @@ replays match host terminal state for one native-race, one-AI match in each race
 product. Mean advancing-play rates are 28.17 fps Terran, 28.47 Zerg and 26.64
 Protoss. Separate 1,000-update late three-AI samples measure 25.12, 22.23 and
 25.99 fps respectively. These are distinct workloads, not paired speedup
-measurements or a steady-30-fps result. Campaign regressions, whole-program
-stack bounds, SRAM emulator continuation, broader visual checks and physical
+measurements or a steady-30-fps result. The current full Terran host aggregate
+passes all ten mission controllers, startup/save integration, the 234-case
+skirmish startup/save matrix, and the associated combat, world and repair
+checks. Individual repaired T7/T8/T9 controllers also win twice deterministically;
+their probe entry and policy information limits are documented in
+[`VALIDATION.md`](VALIDATION.md).
+
+Fresh-process ARM SRAM checks cover native-race human foundations and paid
+queues, a P7 mission prefix, and fixture-seeded Dropship unloading and Zerg
+building morphs with a paid Drone queue. Whole-program stack bounds, remaining
+campaign/normal-menu replay coverage, broader visual checks and physical
 hardware qualification remain open. The full standard roster and all 30
 campaign stages remain unfinished.
