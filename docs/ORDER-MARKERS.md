@@ -18,6 +18,8 @@ from the already verified local ROM with:
 python3 tools/sc64_order_marker_pack.py --rom /absolute/path/to/StarCraft64.z64
 ```
 
+Marker colors map each authenticated source RGB to the nearest nontransparent reserved GBA UI color. This keeps the bright green visible against terrain; the limited palette approximates its original shades and does not imply a traced N64 display palette.
+
 The default output stays ignored in `.local/sc64/order-marker/generated/`.
 Only the importer, renderer and synthetic fixtures are distributed. The default
 original-art product retains its authored acknowledgement.

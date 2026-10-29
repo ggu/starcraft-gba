@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -26,6 +27,32 @@ from tools import sc64_sprites as base
 SPRITE_ID = 318
 IMAGE_ID = 445
 GRP_PATH = '00E/0CE'
+
+def ui_colors(gba_c: Path = ROOT / 'common/gba.c', display_h: Path = ROOT / 'starcraft/sc64_display.h') -> list[tuple[int, int, int]]:
+    """Read the 32 initial RGB555 UI colors without importing game art."""
+    text = gba_c.read_text(encoding='utf8')
+    match = re.search(r'static const u16 colors\[32\]\s*=\s*\{(.*?)\};', text, re.S)
+    if not match:
+        raise ValueError('UI palette table not found')
+    values = [tuple(map(int, v)) for v in re.findall(r'RGB\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)', match.group(1))]
+    if len(values) != 32 or any(c > 31 for color in values for c in color):
+        raise ValueError('invalid UI palette table')
+    # Imported profiles apply selected fixed UI overrides at palette install.
+    names = death.ui_palette_indices()
+    overrides = re.findall(r'\{(C_[A-Z_]+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}', display_h.read_text(encoding='utf8'))
+    if not overrides:
+        raise ValueError('display UI palette overrides not found')
+    for name, red, green, blue in overrides:
+        if name not in names:
+            raise ValueError('unknown display UI color')
+        values[names[name]] = (int(red), int(green), int(blue))
+    return [tuple((c << 3) | (c >> 2) for c in color) for color in values]
+
+def nearest_ui_color(rgb: Sequence[int], ui: Sequence[Sequence[int]]) -> int:
+    """Project RGB to nearest opaque reserved UI color; index 0 is transparent."""
+    if len(rgb) != 3 or len(ui) != 32 or any(len(c) != 3 for c in ui):
+        raise ValueError('invalid RGB palette')
+    return min(range(1, 32), key=lambda index: sum((int(rgb[j]) - int(ui[index][j])) ** 2 for j in range(3)))
 
 def compile_timeline(payload: bytes, start: int) -> list[tuple[int, int]]:
     """Accept only frame/wait pairs ending in hidecursormarker."""
@@ -81,10 +108,20 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path, out_dir: Path,
     grp = base.parse_grp(data)
     if grp['width'] != 22 or grp['height'] != 14 or len(grp['frames']) != 5:
         raise ValueError('unexpected marker frame dimensions')
-    remap = remap_path.read_bytes()
-    if len(remap) != 256:
-        raise ValueError('palette remap must contain 256 bytes')
+    # The terrain palette is brown-dominant and nearly erases this vivid
+    # green UI image. Project each authenticated source RGB to the nearest
+    # opaque fixed UI color, preserving source transparency and frame shapes.
+    # Keep the legacy --palette-remap parameter for command compatibility;
+    # this bank no longer depends on that terrain-specific remap.
+    del remap_path
+    palette_data = read('00B/004')
+    if hashlib.sha256(palette_data).hexdigest() != cs.CONSTRUCTION_MODIFIER_TABLE_HASHES['00B/004']:
+        raise ValueError('authenticated unit palette hash mismatch')
+    source_palette = base.decode_rgba5551_palette(palette_data)
+    display_palette = ui_colors()
+    remap = bytes(nearest_ui_color(color[:3], display_palette) for color in source_palette)
     frames = death.convert_frames(grp, range(5), 0, 0, remap, [])
+    source_indices = sorted({f['pixels'][i] for f in grp['frames'] for i in range(len(f['pixels'])) if f['alpha'][i]})
     lines = ['/* Private generated source art. Do not commit. */', '#ifndef SC64_ORDER_MARKER_GENERATED_H', '#define SC64_ORDER_MARKER_GENERATED_H', '#define SC64_ORDER_MARKER_BANK_VERSION 1u']
     for i, f in enumerate(frames):
         if not (0 < f['w'] <= 22 and 0 < f['h'] <= 14):
@@ -102,7 +139,7 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path, out_dir: Path,
     manifest = {'rom_sha1': rom_sha, 'sprite_id': SPRITE_ID, 'image_id': IMAGE_ID,
                 'grp_path': GRP_PATH, 'grp_sha1': hashlib.sha1(data).hexdigest(),
                 'iscript_id': script_id, 'timeline': steps, 'canvas': [22,14],
-                'palette_remap_sha256': hashlib.sha256(remap).hexdigest(),
+                'palette': {'source_bolt_path': '00B/004', 'source_sha256': hashlib.sha256(palette_data).hexdigest(), 'ui_palette_sha256': hashlib.sha256((ROOT/'common/gba.c').read_bytes()).hexdigest(), 'display_overrides_sha256': hashlib.sha256((ROOT/'starcraft/sc64_display.h').read_bytes()).hexdigest(), 'strategy': 'nearest nontransparent reserved UI RGB, squared RGB distance', 'mapping': [{'source_index': i, 'source_rgb': source_palette[i][:3], 'ui_index': remap[i], 'ui_rgb': display_palette[remap[i]]} for i in source_indices]},
                 'identity': 'PC-reference cursor marker; N64 input behavior not traced',
                 'limitations': 'No separate source red/attack marker identified; frame placement uses canvas center'}
     out_dir.mkdir(parents=True, exist_ok=True)

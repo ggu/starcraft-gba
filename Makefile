@@ -249,7 +249,7 @@ $(SC64_BUILDING_FIRE_HEADER): tools/sc64_building_fire_pack.py tools/sc64_constr
 SC64_ORDER_MARKER_DIR := .local/sc64/order-marker/generated
 SC64_ORDER_MARKER_HEADER := $(SC64_ORDER_MARKER_DIR)/sc64_order_marker_generated.h
 SC64_ORDER_MARKER_FLAGS := -DSC64_ORDER_MARKER_ART -I$(SC64_ORDER_MARKER_DIR)
-$(SC64_ORDER_MARKER_HEADER): tools/sc64_order_marker_pack.py tools/sc64_construction_sprites.py tools/sc64_death_sprites.py tools/sc64_sprites.py tools/sc64_unit_facing.py
+$(SC64_ORDER_MARKER_HEADER): tools/sc64_order_marker_pack.py tools/sc64_construction_sprites.py tools/sc64_death_sprites.py tools/sc64_sprites.py tools/sc64_unit_facing.py common/gba.c common/gba.h starcraft/sc64_display.h
 	python3 tools/sc64_order_marker_pack.py
 
 SC64_SHARED_ENGINE_FLAGS := -DSC64_CONSTRUCTION_HP -DSC64_SIEGE_SPLASH
