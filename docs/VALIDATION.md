@@ -6230,15 +6230,27 @@ claimed.
 
 ## T9 ordinary-input qualification (2026-10-29)
 
-This record supersedes the open T9 completion item in the 2026-10-26 and
-2026-10-28 sections. Base is `codex/source-release` at
-`a4ff09dcb42aa29f2c451b443fabcb99adf56746`; the exact branch commit is named in
-the pull request.
+This record closes the T9 completion item left open in the 2026-10-26 and
+2026-10-28 sections, and only for what it measured. It covers a host
+completion with ordinary inputs and a normal-menu ARM replay of the same
+inputs in mGBA, on the commits and private inputs listed below. It does not
+cover physical hardware, saving and resuming inside T9, or the other open
+Terran controllers (T5, T7 and T8).
+
+Provenance of the qualifying run:
+
+- **Runtime:** `codex/source-release` at
+  `9ff7f7c6a8cd93937845203ca69a7ee669f77c58`, merged into this branch as
+  `0c754cc44f07039d657132f88c4c7ce2504b2be8`. `git diff 9ff7f7c 0c754cc --
+  starcraft common` is empty.
+- **Controller, probe and driver:** commit
+  `2d575f6509137cd986c04fbe03e2f48aa32a2e83`. The ROMs, trace and tape below
+  were built from that tree.
 
 ### Why the earlier controller stalled
 
-`tests/sc64_t9_campaign_run.c` stopped at its 500,000-tick limit on the
-current head (43 Protoss buildings, one Wraith, wallet 42/14). The cause was the
+`tests/sc64_t9_campaign_run.c` stopped at its 500,000-tick limit on base
+`a4ff09d` (43 Protoss buildings, one Wraith, wallet 42/14). The cause was the
 controller, not the engine:
 
 - Its ground-reachability check read the lazily built path grid before the
@@ -6303,8 +6315,9 @@ destroyed, all 21 Force 3 buildings intact, Kerrigan alive, zero trigger
 faults, phase 3, and the T9 completion bit set. 42 Wraiths and 13 SCVs
 survive; the wallet ends at 40/5,850. Two runs produce byte-identical traces
 (SHA-256 `8868402d01d8a2d66a5b80d6f2f7d873f6ac8343b8fd817e98378d2e66ed1f74`,
-2,642 input transitions). Before tick 1 was made neutral, the same policy won
-at tick 44,292.
+2,642 input transitions). The earlier runtime `a4ff09d` and the qualifying
+runtime `9ff7f7c` produce the same trace byte for byte. Before tick 1 was made
+neutral, the same policy won at tick 44,292.
 
 ### Normal-menu ARM replay
 
@@ -6323,52 +6336,57 @@ make sc64-t9-arm-replay
 python3 tools/sc64_t9_arm_replay.py run --out build/emulator/t9-arm-replay
 ```
 
-**Result: ARM win.** The qualifying run (ROM and trace hashes below) launched
-mission 12 through the menu at frame 1 with zero faults and played all 2,807
-tape entries. Every one of its 52 observations (launch, ticks 1,000–51,000 and
-the final tick) matched the host trace exactly: frame, screen, win and loss,
-faults, phase, objective flags, completion bits, Protoss and Zerg building
-counts, Kerrigan, unit counts, both resources and the selection. At tick 51,696
+**Result: ARM win.** The qualifying run (hashes below) launched mission 12
+from the menu at frame 1 with zero faults and played all 2,807 tape entries.
+Every one of its 52 observations (launch, ticks 1,000–51,000 and the final
+tick) matched the host trace exactly: frame, screen, win and loss, faults,
+phase, objective flags, completion bits, Protoss and Zerg building counts,
+Kerrigan, unit counts, both resources and the selection. At tick 51,696
 (frame 50,926) the ARM build reports `won=1`, phase 3, objective flag 1,
 `race_completed=4096`, 0/43 Protoss Force 2 buildings, 21/21 Zerg Force 3
-buildings and Kerrigan alive, identical to the host.
+buildings and Kerrigan alive, identical to the host. The driver reported
+`ok: true` after 163 seconds of wall time.
 
-Guest-cycle timing from the GBA timers (TM2/TM3 at 16,777,216 Hz) over the
-51,709 frames the probe ran, menu taps included. These are emulator guest
-cycles, not a physical-hardware measurement:
+Guest-cycle timing comes from the GBA timers (TM2/TM3 at 16,777,216 Hz).
+These are emulator guest cycles, not a physical-hardware measurement. The
+mission counters start on the briefing's START release, which runs tick 1, so
+they cover exactly the 51,696 mission frames. The 13 boot, menu and
+START-press frames before it are reported separately (16,837,365 cycles). The
+driver rejects a run without exactly one well-formed record of each kind, or
+whose mission record does not cover ticks 1..stop, or whose buckets do not sum
+to its frames.
 
-| Measure | Value |
+| Mission measure (ticks 1–51,696) | Value |
 | --- | --- |
-| Total cycles | 57,796,058,855 (3,444.9 guest seconds) |
-| Mean per frame | 1,117,718 cycles (3.98 VBlank periods; effective 15.0 fps) |
-| `game_update()` share | 23,288,716,775 cycles (40.3%) |
-| Peak frame | 12,568,758 cycles (44.7 VBlank periods) |
-| Frames by rounded VBlank periods (0…6, ≥7) | 0, 0, 3,436, 20,871, 13,781, 7,693, 3,199, 2,729 |
+| Total cycles | 57,803,662,926 (3,445.4 guest seconds) |
+| Mean per frame | 1,118,146 cycles (3.98 VBlank periods; effective 15.0 fps) |
+| `game_update()` share | 23,304,360,278 cycles (40.3%) |
+| Peak frame | 12,612,714 cycles (44.9 VBlank periods) |
+| Frames by rounded VBlank periods (0…6, ≥7) | 0, 0, 3,348, 20,666, 14,019, 7,731, 3,239, 2,693 |
 
-The mean is well above one 280,896-cycle VBlank period, so on this build T9
-runs at roughly a quarter of the 60 Hz frame rate in its late, unit-heavy
-phase. That is a performance observation, not a qualification failure;
-performance is tracked separately.
+The mean is well above one 280,896-cycle VBlank period. On this build T9 runs
+at roughly a quarter of the 60 Hz frame rate in its late, unit-heavy phase.
+That is a performance observation, not a qualification failure; performance is
+tracked separately.
 
-Earlier attempts are kept as partial evidence. Three runs logged mGBA at mask
-127, which records every DMA (about 160 MB per run) and slowed the driver to
-hours. They matched every observation they reached (35/35 to tick 35,000,
-42/42 to 42,000 and 44/44 to 44,000) before a wall-clock cap or, in the third,
-a full host disk stopped them. The driver now logs at mask 7 (fatal, error and
-warn, which carries the probe's text) and the qualifying run took 217 seconds
-of wall time.
+Superseded runs are not part of this record's evidence:
+- A replay on runtime `a4ff09d` (branch commit `10fc402`) also matched 52/52,
+  but its timing included the menu frames.
+- Three earlier partial replays were stopped by wall-clock caps and a full host
+  disk. They had logged mGBA at mask 127, which records every DMA. The driver
+  now uses decimal mask 7 (fatal, error and warn).
 
 ### Hashes and inputs
 
 | Item | SHA-256 |
 | --- | --- |
-| Canonical Terran ROM `build/StarCraft-Terran-GBA.gba` (32 MiB) | `25397c3e5a5ecdea33083a53a332c4cb6695af5ba1225dc4a920ada2f6f67c8b` |
-| Its ELF | `95ecd4864ad5d10995365a1337af16b482e2ea2d9229233d115ab416dc9e7216` |
-| Replay ROM `build/StarCraft-Terran-T9-ARM-Replay.gba` (32 MiB) | `1e03186c6fc831255645314929e0ab824b8ba208835bbaaf4d7740e74bfcf91f` |
-| Its ELF | `5b4a95f536df2c4d2463993315fba4439f3e4e3db6d9782ee1d829bda8a8a05e` |
+| Canonical Terran ROM `build/StarCraft-Terran-GBA.gba` (32 MiB) | `685788ff1909fd532d4d128e18d5bd4c108b13b581c4d248672e9900783954df` |
+| Its ELF | `5fcb78f02d5c4cce8608c13b1786283328ac8a9a4ea289bae544325f58119a18` |
+| Replay ROM `build/StarCraft-Terran-T9-ARM-Replay.gba` (32 MiB) | `3a8986dcf5e71e1c4aef7d984e883904ad80cf2e912ccb8740da40e0f19d5276` |
+| Its ELF | `0a57e591b1dab8a30426b581006d3f4b54f59b84836ad2b39da07f49a9ef4e49` |
 | Host trace `build/t9-arm/t9-controller.json` | `8868402d01d8a2d66a5b80d6f2f7d873f6ac8343b8fd817e98378d2e66ed1f74` |
 | Generated tape header | `3a70737c14a909f48752f287854287e96b27a3a427c6f54270315b585eb45a9a` |
-| Sorted `-D` set of the canonical Terran ROM link | `57cf352222878049188eadf06cfe9b4ead5e66e0cfb8e6366181cc48916c2eb6` |
+| Sorted `-D` set of the canonical Terran ROM link (59 flags) | `012ef3224a1e0c26806ff62a6f51bf14fa3c7446f1552fbeb41f099769c88144` |
 | Private T9 scenario header | `e879cf500ce748efff5ede644e4d1790b5cdf9380de9fc95406ca362175cc0bd` |
 | Private T9 availability header | `cf4996518f08027a487fc499c188c7855dbf9c77a77b3e9c467f28a1649ab517` |
 | Private late-Terran race header | `9231da838e256a48dfd3d06f63708f5f05c9afe2326ccfeceb07e337cc35c0bf` |
@@ -6379,21 +6397,40 @@ The private inputs come from the StarCraft 64 USA ROM with SHA-1
 `a36d91b5aac7bb95df0d7de5f9814f5270e25c2b` and the pinned `sc64-maps`
 checkout at `09b57f787a247107d1de82b8c5eab2734667ea1d`. They are prepared
 locally and stay out of Git, as do the trace, tape, ROMs and emulator logs.
-The replay ROM links within the unchanged IWRAM (`< 0x03005000`) and BSS
-(`< 0x0203e000`) guards in `common/gba.ld`.
+The flag set is computed as
+`make -n -W Makefile build/starcraft-terran.elf | grep -o '\-D[A-Z0-9_=]*' | sort -u | tr '\n' ' ' | shasum -a 256`.
+It is the `a4ff09d` set plus `SC64_ROUTE_MONOTONE_PROBE`, which arrived with the
+merged base; without that flag the same command gives the earlier
+`57cf3522…`. The replay ROM links within the unchanged IWRAM guard
+(`__iwram_end = 0x03004e38 < 0x03005000`) and BSS guard
+(`__bss_end = 0x020369b0 < 0x0203e000`) in `common/gba.ld`. Rebuilding the
+replay ROM reproduced the same ROM hash, but the ELF hash changed between
+rebuilds, so the ROM hash identifies the build.
 
 ### Other checks in this environment
 
-`./dev build` passes. `./dev test` runs 655 Python checks; the only failure is
-the Protoss sprite-roster case of `test_sc64_photon_cannon_renderer`, which
-cannot find the private `sc64_fact_tables_generated.h` in this checkout's
-inputs and fails the same way on unmodified base. `./dev sc64 build --profile
-terran` passes. `./dev sc64 test --profile terran` passes T1–T4 and stops at
-the T5 controller (lost at tick 111,945). Unmodified base loses T5 at the same
-tick with the same inputs. Run individually past that stop, T6 wins, the late
-world, save and repair tests pass, T9 wins at tick 51,696, and T10 wins at
-tick 3,552. T7 (no win by its 60,000-tick limit) and T8 (no win by 200,000) do
-not complete; unmodified base gives identical results for both. Those three
-controller regressions are outside this change and remain open.
+All of these ran on the qualifying tree (runtime `9ff7f7c`, branch code
+`2d575f6`):
+
+- `./dev build` passes.
+- `./dev test` runs 663 Python checks. The only failure is the Protoss
+  sprite-roster case of `test_sc64_photon_cannon_renderer`. It cannot find the
+  private `sc64_fact_tables_generated.h` in this checkout's inputs, and it
+  fails the same way on unmodified base.
+- `./dev sc64 build --profile terran` passes.
+- `./dev sc64 test --profile terran` passes T1–T4, then stops at the T5
+  controller, which loses at tick 111,945. Unmodified `a4ff09d` loses T5 at
+  the same tick with the same inputs.
+- Run individually past that stop:
+  - T6 wins at tick 19,552.
+  - The late world, save and repair tests pass.
+  - T9 wins at tick 51,696.
+  - T10 wins at tick 3,552.
+  - T7 does not win by its 60,000-tick limit, and T8 does not win by 200,000.
+    Unmodified `a4ff09d` gives identical results for both.
+
+This branch changes neither the runtime nor the T5, T7 or T8 controllers, so
+those three results are also the results of unmodified `9ff7f7c`. The
+regressions are outside this change and remain open.
 
 No physical-GBA result is claimed.
