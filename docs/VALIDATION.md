@@ -6510,7 +6510,11 @@ and an unseen-target negative case passes with combat flags on and off.
 ### Custom-game integration qualification after fact-table repair
 
 The runtime checkpoint is `8a85d6d`; subsequent controller-vector and canonical
-P7 Make repairs change verification tooling only. The shared Scourge capability
+P7 Make repairs change verification tooling only. At verification commit
+`97531b1`, the full default suite passes: 683 Python checks (16 optional skips),
+the additional eight-test suite and host C checks. Source-boundary, doctor and
+default build checks also pass. Documentation-only updates follow that tested
+commit. The shared Scourge capability
 is now part of the generated fact-table fingerprint. Canonical P7 was rebuilt
 with table SHA-256
 `ed2289496f7587ecd5758931652e6ddd1ff15c4f8184539b0301a22d1e28caf9`.
