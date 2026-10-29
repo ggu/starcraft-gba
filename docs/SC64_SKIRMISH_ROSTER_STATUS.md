@@ -101,7 +101,26 @@ selection/health bounds. Deferred shadow image IDs and offsets remain in the
 private manifest. Separate source shadow rendering is unfinished; body-only
 art must not be called complete original-engine visual fidelity.
 
-All new native paths still require final frozen-source host/controller,
-ARM memory/stack and performance qualification before this stage is promoted.
-Passing synthetic host setups is not normal-match or hardware proof. The full
-standard roster and all 30 campaign stages remain unfinished.
+Frozen-source host qualification now covers 54 normal-input matches across the
+three race products, both maps, all human races and one to three rotated AIs:
+10 wins and 44 losses, with no nonterminal failures at the unchanged 120,000-tick
+cap. Startup/save checks cover 702 configurations, and 27 focused construction
+regressions pass. These controllers exercise ordinary opening production and
+combat, not every newly exposed product. The separate input fixtures cover the
+Factory/Machine Shop/Tank and Stargate/Scout chains.
+
+After adding the shared Scourge gate to the fact-table fingerprint, the P7
+product, six native fixtures, 18 matches, 234 startup/save configurations and
+nine focused regressions were requalified against the regenerated default-off
+table. Native Dropship checks intentionally skip P7/Showcase where raw 11 has
+no identity; that is not transport coverage for those profiles.
+
+All four ARM links retain the existing memory guards. Input-only emulator
+replays match host terminal state for one native-race, one-AI match in each race
+product. Mean advancing-play rates are 28.17 fps Terran, 28.47 Zerg and 26.64
+Protoss. Separate 1,000-update late three-AI samples measure 25.12, 22.23 and
+25.99 fps respectively. These are distinct workloads, not paired speedup
+measurements or a steady-30-fps result. Campaign regressions, whole-program
+stack bounds, SRAM emulator continuation, broader visual checks and physical
+hardware qualification remain open. The full standard roster and all 30
+campaign stages remain unfinished.

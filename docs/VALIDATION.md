@@ -6499,8 +6499,76 @@ not the default-off canonical artifact.
 An early frozen-source ARM link passes unchanged guards in all four canonical
 products with EWRAM headroom 28480/28372/23828/200 bytes and IWRAM
 496/56/952/56 bytes (Terran/Zerg/P7/Showcase). This is a resource preflight,
-not final gameplay/performance or physical-GBA qualification. Full frozen-source
-controller matrices, campaign transport checks and timing remain open. The
+not final gameplay/performance or physical-GBA qualification. The frozen-source
+controller matrices and sampled timing are recorded below; campaign completion
+and fresh-process ARM SRAM qualification remain open. The
 full Z7 Egg fixture now supplies its source-required Spire and explicitly
 visible target cells; adult-over-Egg and Egg-fallback assertions are retained,
 and an unseen-target negative case passes with combat flags on and off.
+
+
+### Custom-game integration qualification after fact-table repair
+
+The runtime checkpoint is `8a85d6d`; subsequent controller-vector and canonical
+P7 Make repairs change verification tooling only. The shared Scourge capability
+is now part of the generated fact-table fingerprint. Canonical P7 was rebuilt
+with table SHA-256
+`ed2289496f7587ecd5758931652e6ddd1ff15c4f8184539b0301a22d1e28caf9`.
+The prior table is not substituted for this qualification. The new table also
+includes the current raw-194 building rectangle; its change is not described as
+metadata-only. Terran, Zerg and Showcase do not consume that P7 table; their
+retained compiled engine input hashes still match the checkpoint.
+
+The actual Make native gate executes four existing runtime fixtures and five
+additional fixtures per product, with production flags and interceptor companion
+translation units. The P7 subset was rebuilt against the repaired table. Runtime,
+button chains, save validation, Scourge and art pass. Dropship runs pass in Terran
+and Zerg; P7/Showcase explicitly skip because their default identity mapping lacks
+raw 11. These skips do not establish transport service coverage.
+
+Host controllers reach valid terminal outcomes in all 54 configurations (two
+maps, three human races, one through three rotated bots, in each race product):
+10 wins, 44 losses, no cap failures. All 702 startup/save configurations and 27
+focused construction regressions pass. The P7 18/234/9 subset was rerun with the
+repaired table. These are normal-input match tests, not proof that every standard
+unit or every campaign can be completed.
+
+Input-only mGBA 0.10.5 replays use the pinned port-free backend, 64-bit guest
+cycle clock, separately counted menu/nonadvancing updates, and exact ROM/ELF/trace
+hashes. One-AI runs reach the same host terminal state. Three-AI runs below are
+nonterminal samples of updates 8,001 through 9,000. The human race matches its
+product for these six workloads.
+
+| Product | One-AI advancing frames | One-AI guest cycles | Mean fps | Three-AI sample cycles / 1,000 frames | Mean fps |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Terran | 9,459 | 5,633,448,297 | 28.17 | 667,976,266 | 25.12 |
+| Zerg | 8,623 | 5,082,001,791 | 28.47 | 754,769,344 | 22.23 |
+| Protoss P7 | 7,183 | 4,523,842,208 | 26.64 | 645,500,178 | 25.99 |
+
+These workloads differ from the preceding main-branch traces. Their rates are
+observations, not paired optimization deltas, stable-30-fps proof, hardware
+qualification or coverage of all race/AI compositions.
+
+Additional existing prepared inputs were resolved into an isolated overlay,
+without changing earlier frozen banks. The actual canonical Terran target passes
+its early mission/save checks but fails to finish T5 at 200,000 ticks. Repeating
+T5 on current default `1d864f4` with the same inputs yields a byte-identical trace
+(SHA-256 `6553d8e2b0c2373f0fbff8e0b76733d29407a68a47a18327bee3e85ad8c27bdf`)
+and the same failure. Transport-engine and Z7 runtime pass; transport-query, P3
+Scourge and Z6 transport fixtures fail identical assertions on the two snapshots.
+These comparisons classify observed existing failures; they do not make the
+aggregate campaign gate pass.
+
+The canonical P7 controller target previously lost its controller prerequisite
+by referring to a later Make rule-template name and compiled `game.c` as its
+entry point. It now names the controller source as the first prerequisite, and a
+Make regression checks the source, dependencies and three companion units. The
+corrected actual build links. Its bounded run reaches a cursor-guard failure,
+which also reproduces on current default with the same recipe repair and that
+base's compatible fact table. P7 campaign completion remains unqualified.
+
+Private executed-argv, raw dependencies, input/output hashes, traces and logs are
+retained under `.local/build/skirmish-catalog-{controller-v1,controller-v2,native-final-v1,native-final-v2,arm-preflight-v1,arm-final-v2,runtime-v2,runtime-profiles-v2}`
+and `.local/build/campaign-regression-{v1,base-v1}`. Source artifacts only are
+committed. No Actions, SD writes or debugger sockets were used. Full roster
+services, campaign completion and near-30-fps work remain active.
