@@ -6639,3 +6639,60 @@ and host C checks. Private evidence is retained in `.local/build/e2a80-final-gat
 `campaign-regression-v1`, `t5-grid-guard-v1`, `p7-ordinary-arm-v1`,
 `skirmish-sram-v2` and `skirmish-sram-queue-v1`. Shared roster/campaign and
 near-30-fps work remains open. No Actions, debugger sockets or SD writes were used.
+
+
+### Visibility-owner short circuit (2026-10-30)
+
+At runtime commit `014c7b8`, the common Arbiter detection helper skips sight-radius
+and squared-distance work once a candidate's exact source-owner bits are already
+present in the accumulated visibility mask. Existing axis culls, invalid-owner
+fallbacks, detector eligibility and owner mapping remain authoritative. No global
+cache, capability flag, save field or mission-active predicate is added.
+
+A frozen copy of the preceding linear implementation lives only in
+`tests/sc64_p7_owner_mask_game.c`. The prepared P7 and Showcase Make targets pass
+2,000 positive randomized cases each, plus explicit human-grid, source-slot,
+aliased-owner, duplicate, loaded/hidden, powered-cannon and map-boundary cases.
+Showcase explicitly skips the unavailable interceptor-specific identity case.
+The 24 native fixture invocations pass (22 actual passes and two intentional
+Dropship identity skips). P7's 18/234/9 match/startup/construction subset passes
+again with the current generated table.
+
+The winning P7 sample uses 2,442,974,059 rather than 2,453,127,565 cycles over
+1,000 updates, a 0.41 percent reduction. The whole 49,229-call winning tape uses
+127,213,865,473 rather than 127,596,445,835 cycles, a 0.30 percent reduction,
+with the same final win/frame and gameplay snapshot. Across 9,000 prefix updates,
+unit/building/P7-state/visibility hashes and the rendered 240x160 framebuffer
+hashes match. The native Protoss three-AI sample remains exactly 645,500,178
+cycles. These are narrow workload results; the campaign remains near 6.8 fps,
+far below the goal.
+
+All four fresh ARM builds record executed per-TU ordered compiler arguments,
+raw dependencies, consumed headers/audio, linker arguments/maps and toolchain
+inputs. Their formatted ROM code/data match the qualified private candidates
+exactly; the unused linear reference was removed from production code before
+promotion. EWRAM/IWRAM bounds are unchanged, and the inspected cache-source-tick
+static frame remains 1,280 bytes. This is not a whole-program stack bound.
+
+Raw VRAM differences are confined to the audio arena between mode-4 pages at
+the inspected checkpoints, not visible frame pages or OBJ VRAM. The initial
+music pointer difference is the exact audio-blob relocation; later decoder/PCM
+phase differs along with elapsed cycles and interrupt counts. Audio source/bank
+hashes match and inspected stream pointers remain in bounds. Bit-identical PCM
+or perceptual audio equivalence is not claimed.
+
+The newly packaged candidates pass the six native-race foundation/production
+queue fresh-process SRAM cases again. A seventh case saves the ordinary P7
+winning tape at call 5,000 / frame 4,966: decoded world fields, the entire
+persistent P7 state and campaign state roundtrip, then fresh/in-place loads
+match those states and full actor-bank hashes at offsets 0, 100 and 1,000.
+Malformed-image rejection remains covered separately. These checks do not prove
+an entire resumed campaign or all cargo/morph paths.
+
+Default gates at `014c7b8` pass: source boundary (1,007 indexed files), doctor,
+build, 685 Python checks (17 optional skips), additional eight-test suite and
+host C checks. The subsequent Showcase-oracle change is test-only and both
+prepared oracle targets pass. Private proof lives in `.local/build/p7-owner-*`,
+including `p7-owner-final-v1` for per-TU provenance and
+`p7-owner-campaign-sram-final-v1` for the mission-state continuation. Full roster,
+remaining campaigns and near-30-fps work remain open; no Actions or SD writes.
