@@ -35,7 +35,7 @@ _Static_assert(SC_RU_COUNT <= 64, "late Terran unit codec uses six-bit types");
 #endif
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
 _Static_assert(SC_RU_COUNT <= 64, "P7 typed unit type field uses six bits");
-_Static_assert(SC_RB_COUNT <= 64, "P7 typed building type field uses six bits");
+_Static_assert(SC_RB_COUNT <= 128, "P7 typed building type field uses seven bits");
 #include "sc64_p7_typed_unit_save.h"
 #include "sc64_p7_typed_building_save.h"
 #endif
