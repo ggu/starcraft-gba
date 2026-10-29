@@ -1,4 +1,7 @@
 #include "gba.h"
+#ifdef SC64_SOFT_FOG
+#include "gba_fog_palette.h"
+#endif
 #include "audio_mixer.h"
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(GBA_PRESENT_DEADLINE)
 #include "gba_present.h"
@@ -293,6 +296,26 @@ void gfx_set_palette(int first,int count,const u16 *rgb555) {
  if(gfx_tile_on)gfx_tile_palette_sync();
 #endif
 }
+#ifdef SC64_SOFT_FOG
+/* Palette changes are rare. Build once from the installed LCD/UI colors;
+ * live fog drawing only performs a byte lookup. VRAM accepts halfword
+ * writes, so stage the map on the stack and commit pairs explicitly. */
+void gfx_fog_palette_prepare(volatile u16 *destination128)
+{
+ u16 palette[256];
+ u8 lookup[256];
+ if(!destination128||((uintptr_t)destination128&1u))return;
+ for(unsigned i=0;i<256;i++) {
+#ifdef GBA_HOST
+  palette[i]=host_palette[i];
+#else
+  palette[i]=((volatile const u16*)0x05000000)[i];
+#endif
+ }
+ gba_fog_palette_make(palette,lookup);
+ for(unsigned i=0;i<128;i++)destination128[i]=(u16)(lookup[2*i]|((u16)lookup[2*i+1]<<8));
+}
+#endif
 u32 gba_clock(void){
 #ifdef GBA_HOST
 return 0;

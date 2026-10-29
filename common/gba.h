@@ -47,7 +47,7 @@ void gfx_blit_opaque(int x,int y,int width,int height,const u8 *indexed_pixels);
 /* The two mode-4 pages end at 0x06013600 and bitmap products keep objects
  * off, so the OBJ tile area 0x06014000-0x06017FFF holds data instead. It is
  * shared, not free: starcraft/sc64_obj_vram.h assigns its ranges (the P7
- * projectile arena first, pixel caches after), and the host backs the whole
+ * projectile arena, optional fog shade map, then pixel caches), and the host backs the whole
  * area with one array so overlaps surface in fixtures. VRAM takes no byte
  * stores: write it with gfx_read_band or word stores. */
 #define GBA_VRAM_SCRATCH_BYTES 16384u
@@ -127,6 +127,11 @@ int audio_music_track(void);
 #define GBA_AUDIO_ARENA 0x06009600u
 #define GBA_AUDIO_ARENA_BYTES 2560u
 #define GBA_AUDIO_MIX_BYTES 1600u
+#ifdef SC64_SOFT_FOG
+/* Fill a caller-reserved, halfword-aligned 256-byte shade map. Rebuild after
+ * installing the gameplay palette; drawing then reads the immutable map. */
+void gfx_fog_palette_prepare(volatile u16 *destination128);
+#endif
 void game_init(void);
 void game_update(u16 held,u16 pressed);
 void game_render(void);
