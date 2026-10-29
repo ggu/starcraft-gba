@@ -6323,17 +6323,40 @@ make sc64-t9-arm-replay
 python3 tools/sc64_t9_arm_replay.py run --out build/emulator/t9-arm-replay
 ```
 
-A first full-length run (ROM and trace hashes below) launched mission 12
-through the menu at frame 1 with zero faults. All 35 ARM observations it
-reached (ticks 1,000–35,000) matched the host trace exactly: frame, screen,
-win and loss, faults, phase, objective flags, completion bits, Protoss and Zerg
-building counts, Kerrigan, unit counts, both resources and the selection. It
-was then stopped by the driver's 90-minute wall-clock cap with 28 Protoss
-buildings left. A second run, under heavier host load, matched all 42
-observations through tick 42,000 (13 Protoss buildings left) before its
-four-hour cap. Both are partial evidence, not a win, and the guest-cycle totals
-are emitted only at the end of a run. A longer run is in progress; its result
-is reported in the pull request.
+**Result: ARM win.** The qualifying run (ROM and trace hashes below) launched
+mission 12 through the menu at frame 1 with zero faults and played all 2,807
+tape entries. Every one of its 52 observations (launch, ticks 1,000–51,000 and
+the final tick) matched the host trace exactly: frame, screen, win and loss,
+faults, phase, objective flags, completion bits, Protoss and Zerg building
+counts, Kerrigan, unit counts, both resources and the selection. At tick 51,696
+(frame 50,926) the ARM build reports `won=1`, phase 3, objective flag 1,
+`race_completed=4096`, 0/43 Protoss Force 2 buildings, 21/21 Zerg Force 3
+buildings and Kerrigan alive, identical to the host.
+
+Guest-cycle timing from the GBA timers (TM2/TM3 at 16,777,216 Hz) over the
+51,709 frames the probe ran, menu taps included. These are emulator guest
+cycles, not a physical-hardware measurement:
+
+| Measure | Value |
+| --- | --- |
+| Total cycles | 57,796,058,855 (3,444.9 guest seconds) |
+| Mean per frame | 1,117,718 cycles (3.98 VBlank periods; effective 15.0 fps) |
+| `game_update()` share | 23,288,716,775 cycles (40.3%) |
+| Peak frame | 12,568,758 cycles (44.7 VBlank periods) |
+| Frames by rounded VBlank periods (0…6, ≥7) | 0, 0, 3,436, 20,871, 13,781, 7,693, 3,199, 2,729 |
+
+The mean is well above one 280,896-cycle VBlank period, so on this build T9
+runs at roughly a quarter of the 60 Hz frame rate in its late, unit-heavy
+phase. That is a performance observation, not a qualification failure;
+performance is tracked separately.
+
+Earlier attempts are kept as partial evidence. Three runs logged mGBA at mask
+127, which records every DMA (about 160 MB per run) and slowed the driver to
+hours. They matched every observation they reached (35/35 to tick 35,000,
+42/42 to 42,000 and 44/44 to 44,000) before a wall-clock cap or, in the third,
+a full host disk stopped them. The driver now logs at mask 7 (fatal, error and
+warn, which carries the probe's text) and the qualifying run took 217 seconds
+of wall time.
 
 ### Hashes and inputs
 

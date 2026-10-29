@@ -128,12 +128,14 @@ def run_mgba(mgba: str, rom: pathlib.Path, out: pathlib.Path, timeout: float) ->
     config = home / ".config" / "mgba"
     config.mkdir(parents=True, exist_ok=True)
     saves.mkdir(parents=True, exist_ok=True)
-    (config / "config.ini").write_text("[ports.qt]\nlogToStdout=1\nlogLevel=127\n")
+    (config / "config.ini").write_text("[ports.qt]\nlogToStdout=1\nlogLevel=7\n")
     env = dict(os.environ, HOME=str(home), XDG_CONFIG_HOME=str(home / ".config"))
     master, slave = pty.openpty()
     began = time.monotonic()
+    # Decimal mask 7 = fatal|error|warn: the probe logs at warn, and INFO
+    # would add every DMA (~160 MB and hours of host I/O per run).
     proc = subprocess.Popen(
-        [mgba, "-l", "127", "-C", "mute=1", "-C", "audioSync=0", "-C", "videoSync=0",
+        [mgba, "-l", "7", "-C", "mute=1", "-C", "audioSync=0", "-C", "videoSync=0",
          "-C", f"savegamePath={saves}", "-C", f"savestatePath={saves}",
          "-C", f"screenshotPath={out}", str(rom)],
         stdin=subprocess.DEVNULL, stdout=slave, stderr=slave, env=env, cwd=out)
@@ -154,8 +156,9 @@ def run_mgba(mgba: str, rom: pathlib.Path, out: pathlib.Path, timeout: float) ->
                 captured.extend(chunk)
                 log.write(chunk)
                 log.flush()
-            if b"T9 DONE" in captured or b"T9 LAUNCH fail" in captured:
-                break
+                tail = captured[-(len(chunk) + 32):]  # not the whole run
+                if b"T9 DONE" in tail or b"T9 LAUNCH fail" in tail:
+                    break
     finally:
         proc.terminate()
         try:
