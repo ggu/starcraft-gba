@@ -9,10 +9,9 @@
  * names the highlighted button. The icons come from a private header that
  * tools/sc64_command_icons.py writes from a verified ROM; menu_cursor keeps
  * the list's row numbers, so every command path is unchanged. Lists longer
- * than the card keep the framed text list. The resource bar draws the N64
- * HUD's mineral and gas icons and the player race's supply icon in place of
- * the MIN, GAS and SUP labels. */
-#ifndef SC64_COMMAND_ICONS
+ * than the card keep the framed text list. The resource bar's icons are in
+ * hud_icons.h. */
+#if !defined(SC64_COMMAND_ICONS) || !defined(SC64_HUD_ICONS)
 #error "command_card.h needs the imported command icons"
 #endif
 
@@ -175,22 +174,6 @@ field_card_navigate(u16 pressed)
     }
     menu_cursor = card_slot_command(row * CARD_COLUMNS + col);
     return 1;
-}
-
-/* A resource-bar icon centred in the 12-pixel slot at x on the top band. */
-static void
-card_resource_icon(int sprite, int x)
-{
-    int w = sc64_hud_sprite_size[sprite][0], h = sc64_hud_sprite_size[sprite][1];
-    gfx_blit_sprite(x + (12 - w) / 2, (12 - h) / 2, w, h,
-                    sc64_hud_sprite_pixels + sc64_hud_sprite_offset[sprite]);
-}
-
-/* The race's supply icon: Terran, Zerg, Protoss. */
-static int
-card_supply_sprite(void)
-{
-    return SC64_HUD_SPRITE_SUPPLY_TERRAN + race_human;
 }
 
 /* The selected unit's portrait, then its name, or the group's size, over

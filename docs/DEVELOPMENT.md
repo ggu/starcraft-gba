@@ -199,8 +199,10 @@ briefing header from the verified USA ROM at `.local/sc64/rom/StarCraft64-USA.z6
 and the pinned `references/sc64-maps` checkout. `./dev sc64 prepare --rom PATH --profile terran`
 runs these importers automatically. The canonical `zerg` and `protoss`
 preparation profiles do too. Status and builds require all three interface
-headers and the briefing header. The default asset-free build and tests do not
-require the ROM, reference checkout or generated banks.
+headers and the briefing header. Race-engine builds also import the N64 HUD's
+resource icons on demand, with `tools/sc64_command_icons.py`, into ignored
+`.local/sc64/command-icons/generated/`. The default asset-free build and tests
+do not require the ROM, reference checkout or generated banks.
 
 In the briefing, A reveals the current page and then advances; A on the final
 page deploys the mission. Left/Right browse pages, B returns to mission
