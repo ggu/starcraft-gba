@@ -54,6 +54,9 @@ static int sc64_p7_actor_rect_source(unsigned raw,int x,int y,int building,
 #ifdef SC64_P8_DATA_ENABLED
             case 168:l=64;u=48;r=63;d=47;break; /* Stasis Cell/Prison */
 #endif
+#ifdef SC64_P9_DATA_ENABLED
+            case 136:l=48;u=32;r=48;d=4;break;  /* Defiler Mound */
+#endif
             default:return 0;
             }
         }
@@ -70,6 +73,9 @@ static int sc64_p7_actor_rect_source(unsigned raw,int x,int y,int building,
         case 78:l=15;u=15;r=16;d=16;break; /* Fenix Dragoon */
         case 79:l=12;u=10;r=11;d=13;break; /* Tassadar */
         case 83:l=16;u=16;r=15;d=15;break; /* Reaver */
+#ifdef SC64_P9_DATA_ENABLED
+        case 46:l=13;u=12;r=13;d=12;break; /* Defiler */
+#endif
         default:return 0;
         }
     }

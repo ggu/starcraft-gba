@@ -282,7 +282,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_P8_RUNTIME)
+#if defined(SC64_P9_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 45u
+#elif defined(SC64_P8_RUNTIME)
 #define SC64_RACE_SAVE_GENERATION 44u
 #elif defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 43u
@@ -1426,6 +1428,17 @@ static void race_p8_note_unit_spawn(int slot, int owner, int type);
 static void race_p8_note_building_spawn(int slot, int owner, int type);
 static void race_p8_note_product_building(int building);
 #endif
+#ifdef SC64_P9_RUNTIME
+#define SC64_P9_GLOBAL_ID 28
+static int race_p9_active(void);
+static int race_p9_map_shape_valid(const Sc64RaceMap *map);
+static int race_p9_runtime_init(const Sc64RaceMap *map);
+static int race_p9_runtime_tick(u32 elapsed_updates);
+static int race_p9_outcome(void);
+static void race_p9_note_unit_spawn(int slot, int owner, int type);
+static void race_p9_note_building_spawn(int slot, int owner, int type);
+static void race_p9_note_product_building(int building);
+#endif
 enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
        SC64_HIT_SKIP_HALLUCINATION_SCALE=4 };
 #ifdef SC64_SIEGE_SPLASH
@@ -2004,6 +2017,9 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_P8_RUNTIME
     race_p8_note_unit_spawn(i, owner, type);
 #endif
+#ifdef SC64_P9_RUNTIME
+    race_p9_note_unit_spawn(i, owner, type);
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) {
         u[i].raw_type = sc64_race_raw_unit(type);
@@ -2149,6 +2165,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
 #endif
 #ifdef SC64_P8_RUNTIME
     race_p8_note_building_spawn(i, owner, type);
+#endif
+#ifdef SC64_P9_RUNTIME
+    race_p9_note_building_spawn(i, owner, type);
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
     if (race_p7_active() && type == B_P7_SHIELD_BATTERY) {
@@ -10635,6 +10654,9 @@ game_self_test(void)
 #include "sc64_z8_game_bridge.h"
 #ifdef SC64_P8_RUNTIME
 #include "sc64_p8_runtime_adapter.h"
+#endif
+#ifdef SC64_P9_RUNTIME
+#include "sc64_p9_runtime_adapter.h"
 #endif
 #ifdef SC64_NYDUS_ENABLED
 static int race_save_decode_unit(const RaceSave *, unsigned, unsigned, unsigned, Unit *);
