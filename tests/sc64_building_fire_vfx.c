@@ -64,7 +64,7 @@ static void render(void) {
     assert(sc64_building_damage_draw(106,100,60,90,90,2)); assert(!calls);
     assert(sc64_building_damage_draw(106,100,60,0,90,2));
     assert(seen_banks[3]==1 && seen_banks[9]==1);
-    assert(first_x==85 && first_y==54); /* LO (-4,-3), frame 1, centered */
+    assert(first_x==69 && first_y==42); /* LO (-40,-30) projected by 1/2, frame 1 */
 #ifdef SC64_UNIT_FACING
     assert(calls==3 && seen_flip==1 && seen_banks[16]==1);
 #else

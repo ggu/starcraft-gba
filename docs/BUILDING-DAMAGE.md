@@ -38,7 +38,8 @@ is a documented approximation to source fractional repair accounting.
 ## Presentation
 
 The importer authenticates image-to-GRP association, IScript frame timing and
-frame-zero LO damage offsets from the local ROM. Small damage overlays
+frame-zero LO damage offsets from the local ROM. Source offsets are projected
+by one half to match the GBA world grid and scaled building art. Small damage overlays
 progress to large ones using the source count of attachment slots and health
 stages. Orange and blue loops have 12 frames; bleeding loops have six, each
 at two source updates per frame. The same bank and renderer serve every race

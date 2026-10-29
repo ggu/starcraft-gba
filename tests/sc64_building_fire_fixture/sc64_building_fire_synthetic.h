@@ -303,7 +303,7 @@ static const Sc64BuildingFireFrame test_bank_19[12] = {
 };
 static const Sc64BuildingFireFrame *const sc64_building_fire_banks[20] = {
     test_bank_0, test_bank_1, test_bank_2, test_bank_3, test_bank_4, test_bank_5, test_bank_6, test_bank_7, test_bank_8, test_bank_9, test_bank_10, test_bank_11, test_bank_12, test_bank_13, test_bank_14, test_bank_15, test_bank_16, test_bank_17, test_bank_18, test_bank_19 };
-static const Sc64BuildingFireAnchor sc64_building_fire_anchors[] = { { -4, -3, 0 }, { 2, 4, 12 }, { 7, -6, 16 } };
+static const Sc64BuildingFireAnchor sc64_building_fire_anchors[] = { { -40, -30, 0 }, { 2, 4, 12 }, { 7, -6, 16 } };
 static const Sc64BuildingFireActor sc64_building_fire_actors[] = { { 106, 0, 3 }, { 107, 0, 0 } };
 #define SC64_BUILDING_FIRE_ACTOR_COUNT 2u
 #endif

@@ -49,7 +49,9 @@ static inline int sc64_building_damage_stages(unsigned hp, unsigned max_hp,
 #include SC64_BUILDING_FIRE_BANK_HEADER
 /* LO placement is source frame 0. Slot allocation is deterministic rather
  * than tracking the source engine's random and repair history. Hit points
- * supplied here are integer values, so fractional source HP is approximated. */
+ * supplied here are integer values, so fractional source HP is approximated.
+ * Source LO coordinates use the 32-pixel grid; this engine projects those
+ * offsets onto its 16-pixel world grid with division toward zero. */
 static inline int sc64_building_damage_draw(unsigned raw, int x, int y,
                                              unsigned hp, unsigned max_hp,
                                              uint32_t elapsed)
@@ -71,10 +73,11 @@ static inline int sc64_building_damage_draw(unsigned raw, int x, int y,
             flip = slot >= 12u;
         } else bank = (big ? 9u : 6u) + (slot - 16u) % 3u;
         const Sc64BuildingFireFrame *f = &sc64_building_fire_banks[bank][(elapsed / 2u) % frame_count];
-        int fx = x + p->x - f->canvas_w / 2 + f->x;
-        int fy = y + p->y - f->canvas_h / 2 + f->y;
+        int anchor_x = x + p->x / 2, anchor_y = y + p->y / 2;
+        int fx = anchor_x - f->canvas_w / 2 + f->x;
+        int fy = anchor_y - f->canvas_h / 2 + f->y;
         if (flip) {
-            fx = x + p->x + f->canvas_w / 2 - f->x - f->w;
+            fx = anchor_x + f->canvas_w / 2 - f->x - f->w;
 #ifdef SC64_UNIT_FACING
             gfx_blit_sprite_hflip(fx, fy, f->w, f->h, f->pixels);
 #else
