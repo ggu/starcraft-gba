@@ -58,14 +58,22 @@ static int sc64_siege_target_alive(int target) {
 }
 static int sc64_siege_hidden_or_immune(int target) {
  if(target<MAX_UNITS) {
-  if(u[target].flags&16u||invincible_units[target])return 1;
+  if(u[target].flags&16u
+#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+     ||invincible_units[target]
+#endif
+    )return 1;
 #if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_T4_RUNTIME)
   if(sc64_game_unit_has_flag(u[target].type,SC64_GAME_ACTOR_HIDDEN)||
      sc64_game_unit_has_flag(u[target].type,SC64_GAME_ACTOR_INVINCIBLE))return 1;
 #endif
  } else {
   int bi=target-MAX_UNITS;
-  if(b[bi].flags&16u||invincible_buildings[bi])return 1;
+  if(b[bi].flags&16u
+#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+     ||invincible_buildings[bi]
+#endif
+    )return 1;
 #if defined(SC64_ZP_CAMPAIGN_ACTORS) || defined(SC64_T4_RUNTIME)
   if(sc64_game_building_has_flag(b[bi].type,SC64_GAME_ACTOR_INVINCIBLE))return 1;
 #endif
