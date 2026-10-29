@@ -75,6 +75,14 @@ test-sc64-p8-request-queue: build/test-sc64-p8-request-queue
 	./build/test-sc64-p8-request-queue
 test-starcraft: test-sc64-p8-request-queue
 
+# Explicit caller-selected P8 queue settlement; not wired into gameplay.
+.PHONY: test-sc64-p8-request-settlement
+build/test-sc64-p8-request-settlement: tests/sc64_p8_request_settlement.c starcraft/sc64_p8_request_settlement.h starcraft/sc64_p8_request_queue.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -Istarcraft $< -o $@
+test-sc64-p8-request-settlement: build/test-sc64-p8-request-settlement
+	./build/test-sc64-p8-request-settlement
+test-starcraft: test-sc64-p8-request-settlement
+
 # Source-only P8 request-admission predicate; player census rows are supplied
 # by the caller and this does not activate any P8 runtime path.
 .PHONY: test-sc64-p8-ai-admission
