@@ -33,6 +33,27 @@ test-sc64-range-work: build/test-sc64-range-work
 	./build/test-sc64-range-work
 test: test-sc64-range-work
 
+# Asset-free complete-field subpath reuse: independent BFS oracle, packed
+# route/grid variants, active-pool geometry, cache history and decay metadata.
+.PHONY: test-sc64-route-subpath test-sc64-route-subpath-partial-compile
+build/test-sc64-route-subpath-nibble: tests/sc64_route_subpath.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $< -o $@
+build/test-sc64-route-subpath-packed: tests/sc64_route_subpath.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DTEST_PACK3 $< -o $@
+build/test-sc64-route-subpath-active: tests/sc64_route_subpath.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DTEST_PACK3 -DTEST_ACTIVE -DTEST_BIT_GRID $< -o $@
+build/test-sc64-route-subpath-decay: tests/sc64_route_subpath.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DTEST_PACK3 -DTEST_ACTIVE -DTEST_BIT_GRID -DTEST_DECAY $< -o $@
+build/test-sc64-route-subpath-partial.o: tests/sc64_route_subpath.c starcraft/sc64_routes.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined -DTEST_PACK3 -DSC64_ROUTE_PARTIAL_FLOOD -c $< -o $@
+test-sc64-route-subpath-partial-compile: build/test-sc64-route-subpath-partial.o
+test-sc64-route-subpath: build/test-sc64-route-subpath-nibble build/test-sc64-route-subpath-packed build/test-sc64-route-subpath-active build/test-sc64-route-subpath-decay test-sc64-route-subpath-partial-compile
+	./build/test-sc64-route-subpath-nibble
+	./build/test-sc64-route-subpath-packed
+	./build/test-sc64-route-subpath-active
+	./build/test-sc64-route-subpath-decay
+test: test-sc64-route-subpath
+
 # Exact object-representation zero check; no imported game data required.
 .PHONY: test-sc64-zero-bytes
 build/test-sc64-zero-bytes: tests/sc64_zero_bytes.c starcraft/sc64_zero_bytes.h Makefile | build
