@@ -399,6 +399,19 @@ static void tap(u16 key)
     step(0);
 }
 
+/* B opens the command menu on the last chosen row; walk to row with DOWN.
+ * On failure close the menu: an open menu holds the world clock. */
+static int open_menu_row(int row)
+{
+    if (!menu_open) tap(KEY_B);
+    int count = field_menu_count();
+    for (int i = 0; i < count && menu_open && menu_cursor != row &&
+         screen == SCREEN_PLAY && !won && !lost; ++i) tap(KEY_DOWN);
+    if (menu_open && menu_cursor == row) return 1;
+    if (menu_open) tap(KEY_B);
+    return 0;
+}
+
 static int kerrigan_near_enemy(void)
 {
     int k = kerrigan_slot();
@@ -521,15 +534,16 @@ static int set_kerrigan_cloak(int enabled)
     if (menu_open) tap(KEY_B);
     if (mode != MODE_NORMAL) tap(KEY_B);
     if (menu_open) tap(KEY_B);
-    move_cursor(u[k].x, u[k].y);
-    tap(KEY_A);
+    /* A off a unit moves the selection there, so tap only to select her. */
+    if (!u[k].selected || selected_count() != 1 || selected_building >= 0) {
+        move_cursor(u[k].x, u[k].y);
+        if (selection_target() == k) tap(KEY_A);
+    }
     if (!u[k].selected || selected_count() != 1 || selected_building >= 0) {
         cloak_controller_busy = 0;
         return 0;
     }
-    tap(KEY_B);
-    for (int row = 0; row < 10; ++row) tap(KEY_DOWN);
-    if (menu_cursor != MENU_STOP + 1 || !menu_open) {
+    if (!open_menu_row(MENU_STOP + 1)) {
         cloak_controller_busy = 0;
         return 0;
     }
@@ -581,14 +595,13 @@ static void manage_kerrigan_consume(void)
     if (ling < 0) return;
     consume_controller_busy = 1;
     if (!u[k].selected || selected_count() != 1 || selected_building >= 0) {
-        move_cursor(u[k].x,u[k].y); tap(KEY_A);
+        move_cursor(u[k].x,u[k].y);
+        if (selection_target() == k) tap(KEY_A);
     }
     if (!u[k].selected || selected_count() != 1 || selected_building >= 0) {
         consume_controller_busy=0; return;
     }
-    tap(KEY_B);
-    for (int row=0; row<11; ++row) tap(KEY_DOWN);
-    if (!menu_open || menu_cursor != MENU_STOP + 2) {
+    if (!open_menu_row(MENU_STOP + 2)) {
         consume_controller_busy=0; return;
     }
     tap(KEY_A);
@@ -955,9 +968,8 @@ static int order_selected_move_to(int x, int y)
     if (menu_open) tap(KEY_B);
     if (mode != MODE_NORMAL) tap(KEY_B);
     if (screen != SCREEN_PLAY || won || lost) return 0;
-    tap(KEY_B);
-    if (screen != SCREEN_PLAY || won || lost) return 0;
-    tap(KEY_A); /* first normal-command row: Move */
+    if (!open_menu_row(MENU_MOVE)) return 0;
+    tap(KEY_A);
     if (screen != SCREEN_PLAY || won || lost || mode != MODE_MOVE) return 0;
     move_cursor(x, y);
     if (screen != SCREEN_PLAY || won || lost) return 0;
@@ -1067,9 +1079,7 @@ static int order_combat_group_to(int x, int y, int zerglings_only)
         fprintf(stderr,"Z5 attackmove clear point unavailable at%d,%d; skipping command\n",x,y);
         return 0;
     }
-    tap(KEY_B);                 /* Normal command menu. */
-    if (screen != SCREEN_PLAY || won || lost) return 0;
-    tap(KEY_DOWN);              /* Attack Move is the second command. */
+    if (!open_menu_row(MENU_ATTACK)) return 0;
     tap(KEY_A);
     if (screen != SCREEN_PLAY || won || lost) return 0;
     if (mode != MODE_ATTACK) return 0;
@@ -1212,14 +1222,13 @@ static int order_kerrigan_move_to(int x, int y)
         for (int attempt = 0; attempt < 12 &&
              dist2(cx, cy, u[k].x, u[k].y) > 22 * 22; ++attempt)
             move_cursor(u[k].x, u[k].y);
-        if (dist2(cx, cy, u[k].x, u[k].y) > 31 * 31) return 0;
+        if (selection_target() != k) return 0; /* A must land on her */
         if (screen != SCREEN_PLAY || won || lost) return 0;
         tap(KEY_A);
         if (screen != SCREEN_PLAY || won || lost) return 0;
         if (!u[k].selected || selected_count() != 1 || selected_building >= 0) return 0;
     }
-    tap(KEY_B);
-    if (screen != SCREEN_PLAY || won || lost) return 0;
+    if (!open_menu_row(MENU_MOVE)) return 0;
     tap(KEY_A);
     if (screen != SCREEN_PLAY || won || lost) return 0;
     if (mode != MODE_MOVE) return 0;
@@ -1245,7 +1254,7 @@ static int order_kerrigan_attack_move_to(int x, int y)
         for (int attempt = 0; attempt < 12 &&
              dist2(cx, cy, u[k].x, u[k].y) > 22 * 22; ++attempt)
             move_cursor(u[k].x, u[k].y);
-        if (dist2(cx, cy, u[k].x, u[k].y) > 31 * 31) return 0;
+        if (selection_target() != k) return 0; /* A must land on her */
         if (screen != SCREEN_PLAY || won || lost) return 0;
         tap(KEY_A);
         if (!u[k].selected || selected_count() != 1 || selected_building >= 0)
@@ -1255,9 +1264,7 @@ static int order_kerrigan_attack_move_to(int x, int y)
         fprintf(stderr,"Z5 Kerrigan attackmove clear point unavailable at%d,%d; skipping command\n",x,y);
         return 0;
     }
-    tap(KEY_B);
-    if (screen != SCREEN_PLAY || won || lost) return 0;
-    tap(KEY_DOWN);
+    if (!open_menu_row(MENU_ATTACK)) return 0;
     tap(KEY_A);
     if (screen != SCREEN_PLAY || won || lost || mode != MODE_ATTACK) return 0;
     move_cursor(command_x, command_y);
@@ -1373,7 +1380,20 @@ int main(int argc, char **argv)
     observed_started_lo = race_z5.runtime.model.started_lo;
     observed_started_hi = race_z5.runtime.model.started_hi;
     u32 extraction_tick = 0;
+    /* --limit counts game frames, which stop while a menu or the source
+     * PauseGame is open. Bound host ticks and passes too, so a stopped
+     * world clock fails the run instead of hanging it. */
+    const u32 host_limit = 2u * (u32)run_limit + 20000u;
+    u32 passes = 0;
+    int host_limited = 0;
     while ((int)frame < run_limit && screen == SCREEN_PLAY && !won && !lost) {
+        if (host_ticks >= host_limit || passes++ >= host_limit) {
+            host_limited = 1;
+            fprintf(stderr, "Z5 host-tick limit %u reached at frame=%u host=%u menu=%d mode=%d paused=%d\n",
+                    (unsigned)host_limit, (unsigned)frame, (unsigned)host_ticks,
+                    menu_open, mode, race_z5_world_paused());
+            break;
+        }
         /* Gate 0 is the extraction: once it starts, the source victory
          * sequence runs on its own. Acknowledge its PauseGame and wait
          * instead of chasing optional gates. Frames stop while paused, so
@@ -1966,7 +1986,8 @@ int main(int argc, char **argv)
         "\"won\":%s,\"lost\":%s,\"screen_result\":%s,\"outcome\":%u,"
         "\"fired\":%llu,\"started_lo\":%u,\"started_hi\":%u,"
         "\"action_cursors\":[",
-        verified ? "verified-normal-result-win" : lost ? "failed-loss" : "failed-limit",
+        verified ? "verified-normal-result-win" : lost ? "failed-loss" :
+            host_limited ? "failed-host-limit" : "failed-limit",
         (unsigned)frame, won ? "true" : "false", lost ? "true" : "false",
         screen == SCREEN_RESULT ? "true" : "false",
         (unsigned)race_z5.runtime.model.outcome,
@@ -2017,7 +2038,8 @@ int main(int argc, char **argv)
         replay_output);
     fclose(attempt);
     printf("Z5 controller attempt=%s frame=%u result=%d/%d screen=%d Kerrigan=%d orders=%d trace=%s attempt=%s\n",
-           verified ? "VERIFIED-WIN" : lost ? "LOSS" : "LIMIT", (unsigned)frame,
+           verified ? "VERIFIED-WIN" : lost ? "LOSS" : host_limited ? "HOST-LIMIT" : "LIMIT",
+           (unsigned)frame,
            won, lost, screen, kerrigan_slot(), order_count, replay_output, attempt_path);
     return verified ? 0 : 1;
 }

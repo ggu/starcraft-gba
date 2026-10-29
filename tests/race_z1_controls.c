@@ -9,6 +9,9 @@
 typedef struct { unsigned tick; unsigned short held; } Z1Event;
 typedef struct { unsigned tick; int minerals,gas,drones,hydras,zerglings,overlords,
     extractor,pool,den,enemy_buildings,enemy_units,won,lost,phase; } Z1Checkpoint;
+/* An open menu or pause holds the world clock; bound host ticks so a
+   stuck controller fails instead of hanging (a win takes about 60k). */
+#define Z1_TICK_LIMIT 240000u
 static Z1Event events[2048];
 static Z1Checkpoint checkpoints[256];
 static unsigned input_tick;
@@ -22,8 +25,10 @@ static int count_units(int owner,int type)
 { int n=0; for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==owner&&u[i].type==type)++n;return n; }
 static int count_buildings(int owner,int type)
 { int n=0; for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==owner&&b[i].type==type)++n;return n; }
+static int fail(const char *why);
 static void controller_frame(unsigned short held)
 {
+    if(input_tick>=Z1_TICK_LIMIT){fail("host-tick limit reached; world clock stopped");exit(1);}
     unsigned short pressed=held&(unsigned short)~previous_held;
     if(held!=previous_held) {
         if(event_count<(int)(sizeof(events)/sizeof(events[0])))
@@ -65,8 +70,11 @@ static int has_pool(void){for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].ow
 static int has_den(void){for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_HYDRALISK_DEN&&!b[i].under_construction)return 1;return 0;}
 static int build_menu(int option,int x,int y)
 {
+    /* B reopens on the last chosen row, so walk to the wanted row. */
+    int guard=0;
     press(KEY_B);
-    for(int i=0;i<option;i++)press(KEY_DOWN);
+    while(menu_cursor!=option&&guard++<MENU_COUNT)press(menu_cursor<option?KEY_DOWN:KEY_UP);
+    if(!menu_open||menu_cursor!=option)return 0;
     press(KEY_A);
     return mode==MODE_BUILD&&cursor_near(x,y)&&(press(KEY_A),1);
 }
@@ -118,6 +126,15 @@ static int start_build_action(int option,int x,int y,int far)
 {
     if(!select_worker(far)){fprintf(stderr,"no selected worker (far=%d, cursor=%d,%d)\n",far,cx,cy);return 0;}
     if(!build_menu(option,x,y)){fprintf(stderr,"build menu failed opt=%d mode=%d menu=%d cursor=%d,%d worker=%d mineral=%d gas=%d\n",option,mode,menu,cx,cy,find_selected_worker(),minerals,gas);return 0;}
+    /* The Drone pays on arrival. Spending first (a queued Drone) cancels
+       the site, so let it arrive before the next controller command. */
+    int type=menu,placed=count_buildings(SIDE,type),pending=1;
+    for(int t=0;t<1200&&pending&&count_buildings(SIDE,type)==placed&&screen==SCREEN_PLAY;t++) {
+        controller_frame(0);
+        pending=0;
+        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+            SC64_PENDING_BUILD_ORDER(u[i].order)&&u[i].target==type)pending=1;
+    }
     return 1;
 }
 static int nearest_geyser(int x,int y,int *gx,int *gy);
