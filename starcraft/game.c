@@ -8890,6 +8890,27 @@ sc64_static_objects_key(void)
 #endif
 #define SC64_TERRAIN_STATIC_KEY sc64_static_objects_key()
 #include "sc64_terrain_cache.h"
+#ifdef SC64_SOFT_FOG
+#if !defined(SC64_HAS_TERRAIN_ART) || \
+    defined(SC64_TILE_RENDERER)
+#error "soft fog requires prepared mode-4 terrain"
+#endif
+
+/* The authored compact arena uses procedural barriers rather than terrain
+ * art. Shade those through the same path instead of painting bright walls
+ * over the explored-fog result. */
+static void __attribute__((noinline))
+sc64_fog_compact_barrier(int x, int y, u16 signature, const u8 *shade)
+{
+    u8 terrain[256] __attribute__((aligned(4)));
+    memset(terrain, C_STONE, sizeof(terrain));
+    for (int i = 2; i < 14; ++i) {
+        terrain[2 * 16 + i] = terrain[13 * 16 + i] = C_SILVER;
+        terrain[i * 16 + 2] = terrain[i * 16 + 13] = C_SILVER;
+    }
+    sc64_fog_raster_cell(x, y, signature, terrain, shade);
+}
+#endif
 #ifdef SC64_TILE_RENDERER
 #include "sc64_tile_renderer.h"
 #endif
@@ -9045,6 +9066,9 @@ draw_map(void)
     if (!sc64_terrain_cached(camx, camy)) {
 #endif
 #endif
+#ifdef SC64_SOFT_FOG
+    const u8 *fog_shade = (const u8 *)(const void *)SC64_OBJ_VRAM_FOG;
+#endif
     for (row = row0; row < row1; row++)
 	for (col = col0; col < col1; col++) {
 	    int idx = col + row * MAP_COLS;
@@ -9052,7 +9076,11 @@ draw_map(void)
             if (sc64_terrain_tile_clean(col, row)) continue;
             if (!SC64_GRID_GET(visible, idx) && !SC64_GRID_GET(explored, idx)) {
                 /* Restored pixels must disappear after load/restart removes fog. */
+#ifdef SC64_SOFT_FOG
+                sc64_fog_raster_cell(col * 16 - camx, 12 + row * 16 - camy, 0, 0, 0);
+#else
                 gfx_rect(col * 16 - camx, 12 + row * 16 - camy, 16, 16, C_BLACK);
+#endif
                 continue;
             }
 #else
@@ -9062,12 +9090,18 @@ draw_map(void)
 	    y = 12 + row * 16 - camy;
 	    if (x >= 240 || x + 16 <= 0 || y >= 120 || y + 16 <= 12)
 		continue;
+#ifndef SC64_SOFT_FOG
 	    if (!SC64_GRID_GET(visible, idx)) {
 		gfx_rect(x, y, 16, 16, C_FOG);
 		continue;
 	    }
+#endif
 #ifdef SC64_HAS_TERRAIN_ART
+#ifdef SC64_SOFT_FOG
+            sc64_fog_raster_cell(x, y, sc64_terrain_state(col, row),
+#else
 	    gfx_blit16(x, y,
+#endif
 #ifdef SC64_RACES
                 race_mode ?
 #ifdef SC64_IMPORTED_SKIRMISH
@@ -9088,6 +9122,9 @@ draw_map(void)
 #endif
                 ]
 #endif
+#ifdef SC64_SOFT_FOG
+                , fog_shade
+#endif
                 );
 #if defined(SC64_SKIRMISH) || defined(SC64_RACES)
             /* The compact arena has authored barriers; make collision visible. */
@@ -9096,8 +9133,12 @@ draw_map(void)
                 race_mode && race_skirmish_map==0 &&
 #endif
                 terrain_blocked(col, row)) {
+#ifdef SC64_SOFT_FOG
+                sc64_fog_compact_barrier(x, y, sc64_terrain_state(col, row), fog_shade);
+#else
                 gfx_rect(x, y, 16, 16, C_STONE);
                 gfx_frame(x + 2, y + 2, 12, 12, C_SILVER);
+#endif
             }
 #endif
 #else

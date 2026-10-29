@@ -2665,6 +2665,14 @@ The search borrows existing scratch only for the call and adds no save state.
 assets. See the [route-step audit](audits/2026-10-29-monotone-route-step/README.md)
 for tie-order reasoning, measured gains, workload limits and remaining stalls.
 
+The normal race and Showcase flag sets also select `CANONICAL_FOG_FLAGS` for
+palette-shaded explored terrain and cosmetic fog edges. Empty it for an A/B
+build. Gameplay visibility retains its existing cell grid. The shade map and
+terrain cache use explicit, disjoint OBJ VRAM reservations; no save field is
+added. Asset-free checks are `make test-sc64-fog test-terrain-soft-fog
+test-gba-fog-palette`. See the [soft-fog audit](audits/2026-10-29-soft-fog/README.md)
+for memory ownership, clipping, tests and the remaining qualification gates.
+
 An experimental mode-0 renderer builds on that movement probe:
 
 ```sh
