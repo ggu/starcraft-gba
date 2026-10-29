@@ -626,12 +626,16 @@ HOT void gfx_blit_sprite(int x,int y,int width,int height,const u8 *src) {
   int col=left;const u8*s=src+row*width;
   volatile u16*d=pixels+(y+row)*120+((x+col)>>1);
   if((x+col)&1){if(s[col])*d=(*d&255)|((u16)s[col]<<8);d++;col++;}
+#ifdef GBA_SPRITE_WORDS
+  /* Advancing both pointers by two preserves their alignment difference. */
+  int word_right=(((uintptr_t)d^(uintptr_t)(s+col))&3u)?0:right;
+#endif
   for(;col+1<right;col+=2,d++){
 #ifdef GBA_SPRITE_WORDS
    /* A quad is word-copied only when ROM and VRAM are both aligned. Mixed
       quads fall through to the exact pair compositor; after one pair, both
       alignments are off and that fallback remains in use until re-aligned. */
-   if(col+3<right && !((uintptr_t)d&3u) && !((uintptr_t)(s+col)&3u)) {
+   if(col+3<word_right && !((uintptr_t)d&3u)) {
     u32 pixels32=*(const u32 *)(const void *)(s+col);
     if(!pixels32 || !(((pixels32-0x01010101u)&~pixels32&0x80808080u))) {
      if(pixels32) *(volatile u32 *)(void *)d=pixels32;

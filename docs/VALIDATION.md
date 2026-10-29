@@ -6348,3 +6348,35 @@ guards, but the identical three-AI workload regressed to 20.31 fps. Its static
 bank transparency ratio did not establish a useful runtime saving. The source
 prototype and failed performance evidence remain private; the original sprite
 renderer and generated data format are retained.
+
+### Indexed sprite row alignment (2026-10-30)
+
+The indexed compositor now checks source/destination alignment compatibility
+once per row. Advancing both pointers by two preserves their modulo-four
+difference, so incompatible rows cannot take the four-pixel word path.
+The existing pair compositor, transparency, odd edges and clipping remain
+unchanged. Independent randomized framebuffer fixtures pass with source
+alignments 0..3, word/non-word variants and vertical scene clipping.
+
+All four retained canonical ARM products pass unchanged RAM guards. EWRAM
+is unchanged; IWRAM grows by eight bytes in Terran/Zerg/P7, with respective
+488/64/952 bytes remaining. Showcase compiles out this optional word-path
+change and its ROM and margins remain identical (200 bytes EWRAM, 56 IWRAM).
+Actual ordered per-TU compiler/link argv, dependencies and output hashes are
+retained privately; only common/gba.c differs in the paired consumed inputs.
+
+Against the preceding clock-math product, the identical three-AI window
+retains all 9,000 tick/frame/phase observations and 992 advancing frames.
+Cycles fall from 810,213,225 to 806,838,185 (0.42 percent), about 20.54 to
+20.63 fps. The full one-AI replay retains all 9,488 observations and captured
+terminal state, with 9,426 advancing frames: 5,627,534,060 to 5,626,410,088
+cycles (0.02 percent). These small paired emulator gains do not establish
+physical-hardware or broad campaign/near-30-fps qualification.
+
+Read-only primitive attribution reproduces every clock-baseline cycle row.
+In that workload, indexed sprites consume 81.6 million cycles, including
+65.2 million in source death art; packed facing sprites consume only 6.9
+million. A long-lived building-remnant image accounts for most indexed
+death drawing. This measured usage motivates a separate remnant-packing
+candidate; static transparency counts alone did not justify the rejected
+facing-span prototype.
