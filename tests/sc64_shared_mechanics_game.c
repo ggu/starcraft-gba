@@ -125,6 +125,142 @@ static void test_siege_splash_shared_in_both_modes(int mode)
     assert(u[immune].hp == 100);
 }
 
+static void test_burn_shared_in_both_modes(int mode, int race)
+{
+    for (int owner = 0; owner <= 4; ++owner) {
+        reset_world(mode, race);
+        int slot = spawn_build(owner, B_BARRACKS, 320, 320, 0);
+        assert(slot >= 0 && race_building_can_burn(&b[slot]));
+        assert(sc64_building_burn_owner((unsigned)b[slot].shield_remainder) == NEUTRAL);
+        b[slot].maxhp = 100;
+        b[slot].hp = 33;
+        frame = 1;
+        race_tick_state();
+        assert(sc64_building_burn_hp_q8((unsigned)b[slot].hp,
+               (unsigned)b[slot].shield_remainder) == 33u * 256u - 20u);
+        /* The lifted state is irrelevant to burn. */
+        b[slot].flags |= 4;
+        frame = 2;
+        race_tick_state();
+        assert(sc64_building_burn_hp_q8((unsigned)b[slot].hp,
+               (unsigned)b[slot].shield_remainder) == 33u * 256u - 40u);
+        b[slot].under_construction = 1;
+        frame = 3;
+        race_tick_state();
+        assert(sc64_building_burn_hp_q8((unsigned)b[slot].hp,
+               (unsigned)b[slot].shield_remainder) == 33u * 256u - 40u);
+        b[slot].under_construction = 0;
+        b[slot].hp = 34;
+        b[slot].shield_remainder = NEUTRAL * 256;
+        frame = 4;
+        race_tick_state();
+        assert(b[slot].hp == 34 && b[slot].shield_remainder == NEUTRAL * 256);
+        b[slot].hp = 33;
+        for (frame = 1; frame <= 100; ++frame) race_tick_state();
+        assert(sc64_building_burn_hp_q8((unsigned)b[slot].hp,
+               (unsigned)b[slot].shield_remainder) == 33u * 256u - 80u * 20u);
+    }
+    reset_world(mode, race);
+    int p = spawn_build(SIDE, B_GATEWAY, 320, 320, 0);
+    int z = spawn_build(SIDE, B_CREEP_COLONY, 400, 320, 0);
+    assert(p >= 0 && z >= 0);
+    assert(!race_building_can_burn(&b[p]) && !race_building_can_burn(&b[z]));
+    b[p].hp = b[z].hp = 1;
+    frame = 1;
+    race_tick_state();
+    assert(b[p].hp == 1 && b[z].hp == 1);
+
+    reset_world(mode, race);
+    int depot = spawn_build(SIDE, B_DEPOT, 320, 320, 0);
+    assert(depot >= 0);
+    b[depot].hp = 1;
+    b[depot].shield_remainder = (int)sc64_building_burn_with_owner(236, ENEMY);
+    path_grid_valid = 1;
+    supply_cap = 16;
+    frame = 1;
+    race_tick_state();
+    assert(!b[depot].alive && !path_grid_valid && supply_cap == 0);
+}
+
+static void test_invincibility_protects_shields(int mode)
+{
+    reset_world(mode, R_PROTOSS);
+    int unit = spawn_unit(SIDE, U_PROBE, 100, 100);
+    int building = spawn_build(SIDE, B_GATEWAY, 320, 320, 0);
+    assert(unit >= 0 && building >= 0);
+    u[unit].shield = b[building].shield = 50;
+    int uhp = u[unit].hp, bhp = b[building].hp;
+    u[unit].flags |= 16;
+    b[building].flags |= 16;
+    hit_target(unit, 20, U_MARINE, ENEMY);
+    hit_target(MAX_UNITS + building, 20, U_MARINE, ENEMY);
+    assert(u[unit].shield == 50 && b[building].shield == 50);
+    assert(u[unit].hp == uhp && b[building].hp == bhp);
+#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+    u[unit].flags &= ~16;
+    b[building].flags &= ~16;
+    invincible_units[unit] = invincible_buildings[building] = 1;
+    hit_target(unit, 20, U_MARINE, ENEMY);
+    hit_target(MAX_UNITS + building, 20, U_MARINE, ENEMY);
+    assert(u[unit].shield == 50 && b[building].shield == 50);
+    assert(u[unit].hp == uhp && b[building].hp == bhp);
+#endif
+}
+
+#ifdef SC64_T6_RUNTIME
+static void test_burn_fraction_repair(int late)
+{
+#if !defined(SC64_TERRAN_LATE_RUNTIME)
+    if (late) return;
+#endif
+    reset_world(0, R_TER);
+    race_selected_mission = late ? 10 : SC64_T6_GLOBAL_ID;
+    int slot = spawn_build(SIDE, B_BARRACKS, 320, 320, 0);
+    int worker = spawn_unit(SIDE, U_SCV, 320, 320);
+    assert(slot >= 0 && worker >= 0);
+    b[slot].raw_type = sc64_race_raw_building(B_BARRACKS);
+    assert(race_building_can_burn(&b[slot]));
+    b[slot].hp = b[slot].maxhp;
+    b[slot].shield_remainder = ENEMY * 256 + 20;
+    u[worker].order = ORDER_REPAIR;
+    u[worker].target = MAX_UNITS + slot;
+    frame = 1;
+    minerals = gas = 0;
+    /* An unpaid step cannot erase the deficit. */
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (late) race_late_repair_tick_unit(worker); else
+#endif
+    race_t6_repair_tick_unit(worker);
+    assert(b[slot].hp == b[slot].maxhp &&
+           b[slot].shield_remainder == ENEMY * 256 + 20);
+    minerals = gas = 10000;
+    u[worker].order = ORDER_REPAIR;
+    u[worker].target = MAX_UNITS + slot;
+    for (int i = 0; i < 2000 && (b[slot].shield_remainder & 255); ++i) {
+        frame = i + 1;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        if (late) race_late_repair_tick_unit(worker); else
+#endif
+        race_t6_repair_tick_unit(worker);
+    }
+    assert(b[slot].hp == b[slot].maxhp && b[slot].shield_remainder == ENEMY * 256);
+    /* A repair to max from a lower displayed HP must also discard the deficit. */
+    b[slot].hp = b[slot].maxhp - 1;
+    b[slot].shield_remainder = 4 * 256 + 100;
+    u[worker].order = ORDER_REPAIR;
+    u[worker].target = MAX_UNITS + slot;
+    u[worker].carry = u[worker].work_timer = 0;
+    for (int i = 0; i < 2000 && b[slot].hp < b[slot].maxhp; ++i) {
+        frame = i + 1;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        if (late) race_late_repair_tick_unit(worker); else
+#endif
+        race_t6_repair_tick_unit(worker);
+    }
+    assert(b[slot].hp == b[slot].maxhp && b[slot].shield_remainder == 4 * 256);
+}
+#endif
+
 static RaceSave saved_candidate;
 static Unit saved_world_units[MAX_UNITS];
 static Building saved_world_buildings[MAX_BUILDINGS];
@@ -153,6 +289,36 @@ static void expect_candidate_rejected(void)
     assert(frame == old_frame && cx == old_cx && cy == old_cy);
     assert(race_mode == old_mode && race_human == old_human &&
            race_selected_mission == old_mission && race_completed == old_completed);
+}
+
+static void test_burn_save_compatibility(void)
+{
+    game_init();
+    race_mode = 1; race_human = R_TER; race_bots = 1;
+    race_skirmish_map = 0;
+    race_skirmish_init();
+    screen = SCREEN_PLAY;
+    int building = spawn_build(SIDE, B_BARRACKS, 320, 320, 0);
+    assert(building >= 0 && race_building_can_burn(&b[building]));
+    b[building].hp = 200;
+    b[building].shield_remainder = (int)sc64_building_burn_with_owner(97, 4);
+    assert(race_save_game());
+    assert(race_data.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX] ==
+           SC64_BUILDING_DAMAGE_SAVE_MARKER);
+    saved_candidate = race_data;
+    b[building].hp = 1; b[building].shield_remainder = 0;
+    assert(race_load_game());
+    assert(b[building].hp == 200 && b[building].shield_remainder == 4 * 256 + 97);
+    saved_candidate.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX] = 0;
+    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+    assert(race_load_game());
+    assert(b[building].hp == 200 && b[building].shield_remainder == NEUTRAL * 256);
+    assert(race_save_game());
+    assert(race_data.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX] ==
+           SC64_BUILDING_DAMAGE_SAVE_MARKER);
+    saved_candidate = race_data;
+    saved_candidate.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX] = 1;
+    expect_candidate_rejected();
 }
 
 static void test_construction_save_compatibility(void)
@@ -216,7 +382,15 @@ int main(void)
         test_construction_shared_in_both_modes(mode, R_PROTOSS);
         test_construction_shared_in_both_modes(mode, R_ZERG);
         test_siege_splash_shared_in_both_modes(mode);
+        for (int race = R_TER; race <= R_PROTOSS; ++race)
+            test_burn_shared_in_both_modes(mode, race);
+        test_invincibility_protects_shields(mode);
     }
     test_construction_save_compatibility();
+    test_burn_save_compatibility();
+#ifdef SC64_T6_RUNTIME
+    test_burn_fraction_repair(0);
+    test_burn_fraction_repair(1);
+#endif
     return 0;
 }

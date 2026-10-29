@@ -29,7 +29,9 @@ separate original-art/Backwater engine has identical building-construction or
 Siege Tank semantics. Compare those products before describing the contract as
 parity across every engine implementation.
 
-The current contract starts with two mechanics:
+The compile-time flag contract starts with two mechanics. Building burn is
+also unconditional in the shared race engine; its common presentation and
+save rules are documented in [BUILDING-DAMAGE.md](BUILDING-DAMAGE.md):
 
 | Capability | Shared behavior | Authored implementation |
 | --- | --- | --- |
@@ -68,7 +70,7 @@ leaving completed buildings permanently below their intended health.
 | Repair | Repair order handling is called from the T6/Terran-late runtime path; the specialized repair adapter validates Terran mechanical targets, SCV ownership, costs and persisted work state. | Keep Terran repair rules, but factor common order/state handling so the engine contract does not depend on a particular Terran chapter being active. Validate saved repair work across applicable modes. |
 | Transport | The transport runtime is compiled from T5, P5 Shuttle, or Z6 transport flags. Boarding, loaded-actor filtering, and cargo persistence use that runtime state. | Provide one shared transport service for every applicable product and mode; account for actor layout and every save codec. Do not enable cargo display or a carrier identity without a working cargo lifecycle. |
 | Zerg eggs and morphs | Independent egg production is gated by the Z7 egg-production feature and has dedicated actor/save validation. Other products use the older sequential Hatchery queue. | Share the lifecycle and persistence contract where independent eggs are promised, including cancel, death, completion and reload behavior. Keep mission-specific Z7 content and objectives separate. |
-| Building fire and burn-down | There is no general Terran building fire state or burn-down mechanic in the shared engine. Repair support does not create one. Explosion/death fire effects are presentation only. | Implement and validate building damage-over-time/fire behavior as an engine mechanic before claiming it is supported anywhere. |
+| Building fire and burn-down | Shared race-engine burn, death cleanup, fractional save state and source damage overlays are implemented; see [BUILDING-DAMAGE.md](BUILDING-DAMAGE.md). | Native N64 burn-handler tracing, random overlay history, source blending and alternate-pose attachment offsets remain unqualified. |
 | Shield bars | Shield/HP vitals already use the shared race renderer for selected units and buildings (`game.c`, `draw_unit` and `draw_building_overlay`). There is no separate profile flag for the bars. | Preserve this shared behavior; distinguish it from asset-bank parity and from always-visible battlefield status bars. |
 
 Other incompleteness remains in race-specific abilities, morphs, unit identity,
