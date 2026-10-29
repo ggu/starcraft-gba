@@ -6724,3 +6724,31 @@ run logs/traces are retained in `.local/build/t7-repair-v3` and
 `.local/build/t9-policy-port-v1`. T8 remains the unresolved Terran controller;
 the full current aggregate has not yet passed. Runtime rules and limits are
 unchanged by these controller repairs.
+
+### Native cargo and building-morph SRAM continuation (2026-10-30)
+
+The qualified `014c7b8` Terran and Zerg products pass three additional
+fresh-process ARM continuation cases. Native host fixtures seed the initial
+actors, prerequisites, resources and larva, then use the engine's boarding,
+paid morph/queue and save paths to create 32-KiB SRAM. ARM loads that image,
+saves through the pause menu, and compares an in-place load with a fresh HOME
+load. These are fixture-seeded lifecycle checks, not ordinary player acquisition.
+
+- Terran Dropship cargo survives load and unloads through ordinary menu inputs.
+  Complete unit/building banks and decoded state match at offsets 0, 55, 100
+  and 1,100 scheduler ticks, with the Marine alive and no longer loaded.
+- A Zerg Lair saved at morph progress 400 completes on both continuations.
+  Complete banks and decoded state match at offsets 0, 100, 1,100 and 2,200
+  simulation updates, retaining larva state.
+- Hive and Greater Spire morphs complete at the same offsets. A paid Drone
+  queue overlaps the Hive morph, completes, and increases the human Drone
+  count from four to five. Larva replenish and morph HP reaches the new maxima
+  identically in both continuations.
+
+The ARM-resaved images have two valid, independently checked record checksums
+with the expected tags and payload sizes. The seed images remain immutable;
+guest memory writes are limited to the existing input scheduler. Actual host
+compiler arguments, raw dependencies and consumed-input hashes accompany the
+seed fixtures in `.local/build/p7-owner-cargo-morph-sram-v1`, together with the
+ARM state/bank comparisons. Other cargo types, malformed lifecycle combinations,
+whole resumed missions and physical hardware remain outside these cases.
