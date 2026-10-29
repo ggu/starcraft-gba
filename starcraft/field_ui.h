@@ -259,8 +259,7 @@ field_ui_smart_attack(void)
 {
     int tx, ty;
     if (!selected_count() || !ui_hostile_at(cx, cy, &tx, &ty)) return 0;
-    issue_order(ORDER_ATTACK_MOVE, tx, ty);
-    field_ui_ping(tx, ty, C_RED);
+    if (issue_order(ORDER_ATTACK_MOVE, tx, ty)) field_ui_ping(tx, ty, C_RED);
     return 1;
 }
 
@@ -271,8 +270,7 @@ static int
 field_ui_smart_move(void)
 {
     if (selected_building >= 0 || !selected_count() || selection_target() >= 0) return 0;
-    issue_order(ORDER_MOVE, cx, cy);
-    field_ui_ping(cx, cy, C_GREEN);
+    if (issue_order(ORDER_MOVE, cx, cy)) field_ui_ping(cx, cy, C_GREEN);
     return 1;
 }
 
@@ -338,7 +336,6 @@ field_ui_draw_cursor(int x, int y)
         mode == MODE_BUILD ? C_GOLD : C_HIGHLIGHT;
     if (ping_life) {
         int r = 3 + ping_life / 2, px = ping_x - camx, py = ping_y - camy + 12;
-        ping_life--;
         gfx_diamond(px, py, r, r / 2 + 1, ping_color);
         if (ping_life > 9) gfx_diamond(px, py, r - 3, (r - 3) / 2 + 1, ping_color);
     }
