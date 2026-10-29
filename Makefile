@@ -2318,7 +2318,7 @@ test-sc64-p6-canonical: build/test-sc64-protoss-canonical-p6 build/test-sc64-pro
 test-protoss-p6: test-sc64-p6-canonical
 
 PROTOSS_P7_CONTROLLER_TRACE ?= .local/sc64/p7-canonical-controller-win.jsonl
-build/test-sc64-protoss-canonical-p7-controller: $(P7_CAMPAIGN_CONTROLLER) $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P7_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+build/test-sc64-protoss-canonical-p7-controller: tests/sc64_p7_campaign_run.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P7_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) -DP7_CONTROLLER_PROFILE=\"PROTOSS_P7_CANONICAL_FLAGS\" $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
 build/test-sc64-protoss-canonical-p7-save: tests/sc64_p7_interceptor_flight_game.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P7_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@

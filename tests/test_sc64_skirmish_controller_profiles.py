@@ -28,6 +28,40 @@ ORDERS = "starcraft/sc64_interceptor_orders.c"
 
 
 class SkirmishControllerProfiles(unittest.TestCase):
+    def test_canonical_p7_controller_source_and_dependencies(self) -> None:
+        make = shutil.which("make")
+        if not make:
+            self.skipTest("make is required")
+        target = "build/test-sc64-protoss-canonical-p7-controller"
+        with tempfile.TemporaryDirectory(prefix="sc64-p7-make-") as td:
+            helper = Path(td) / "inputs.mk"
+            helper.write_text("print-p7-inputs:\n" + "".join(
+                f"\t$(info SC64_INPUT\t{name}\t$({name}))\n" for name in INPUTS),
+                encoding="utf-8")
+            base = [make, "--no-print-directory", "-f", "Makefile", "-f", str(helper)]
+            result = subprocess.run(base + ["-s", "print-p7-inputs"], cwd=ROOT,
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            values = dict(line.split("\t", 2)[1:] for line in result.stdout.splitlines()
+                          if line.startswith("SC64_INPUT\t"))
+            old = sorted({token for value in values.values() for token in shlex.split(value)})
+            old_args = [arg for path in old for arg in ("-o", path)]
+            controller = "tests/sc64_p7_campaign_run.c"
+            dry = subprocess.run(base + ["-n", "-p", "-B", *old_args,
+                                          "CLANG=SC64_TEST_CC", target],
+                                 cwd=ROOT, text=True, capture_output=True)
+            self.assertEqual(dry.returncode, 0, dry.stderr)
+            commands = [shlex.split(line) for line in dry.stdout.splitlines()
+                        if line.startswith("SC64_TEST_CC ")]
+            self.assertEqual(len(commands), 1, dry.stdout)
+            args = commands[0]
+            for source in (controller, "common/gba.c", MOTION, CODEC, ORDERS):
+                self.assertEqual(args.count(source), 1)
+            self.assertNotIn("starcraft/game.c", args)
+            dependencies = next(line for line in dry.stdout.splitlines()
+                                if line.startswith(target + ":"))
+            self.assertIn(controller, shlex.split(dependencies)[1:])
+
     def test_commands_use_late_production_vectors_and_companions(self) -> None:
         make = shutil.which("make")
         if not make:
