@@ -2063,6 +2063,12 @@ outside-PLAY intervals. A prefix selected with `--sample-start` and
 GDB path requires an explicit port; its modulo timer counts do not establish
 unwrapped FPS. The headless path opens no debugger socket.
 
+Qualification harnesses can use the headless transport's optional `save_input`
+and `save_output` paths to boot with an existing 32-KiB SRAM image and export a
+new image. Import happens before boot; live memory writes remain restricted to
+the scheduler. See the [SRAM transport contract](research/sc64-headless-skirmish-replay.md)
+for file ownership, record validation and gameplay-comparison requirements.
+
 ### Prepare the qualified staged Zerg and Protoss builds
 
 The wrapper also supports the six-mission Zerg development profile and the
