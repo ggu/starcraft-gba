@@ -122,10 +122,67 @@ static int race_p9_map_shape_valid(const Sc64RaceMap *map)
     return 1;
 }
 
+/* From the canonical descriptor, so save candidates can be checked before
+ * the world is bound. */
 static int race_p9_source_owner(unsigned slot)
 {
-    if (slot >= 8u || !race_p9_map) return -1;
-    return slot == SC64_P9_HUMAN_SLOT ? SIDE : race_p9_map->owner_modes[slot];
+    const Sc64RaceMap *map;
+    if (slot >= 8u || SC64_P9_GLOBAL_ID >= SC64_RACE_MAP_COUNT) return -1;
+    map = &sc64_race_maps[SC64_P9_GLOBAL_ID];
+    if (map->human_slot != SC64_P9_HUMAN_SLOT || !map->owner_modes) return -1;
+    return slot == SC64_P9_HUMAN_SLOT ? SIDE : map->owner_modes[slot];
+}
+
+/* P9 runs the shared Protoss unit services too (its human Arbiter cloaks,
+ * Zeratul is permanently cloaked). These dispatchers cover P8 and P9; the
+ * P8 adapter's own versions are renamed race_p8_later_* in this build. */
+static int race_protoss_later_services_active(void)
+{ return race_p9_active() || race_p8_later_services_active(); }
+static int race_protoss_later_source_owner(unsigned slot)
+{ return race_p9_active() ? race_p9_source_owner(slot) : race_p8_later_source_owner(slot); }
+static u8 *race_protoss_later_service_clock(void)
+{ return race_p9_active() ? race_p9.service_clock : race_p8_later_service_clock(); }
+static int race_protoss_later_service_mission(int mission)
+{ return mission == SC64_P9_GLOBAL_ID || race_p8_later_service_mission(mission); }
+static int race_protoss_later_mission_source_owner(int mission, unsigned slot)
+{
+    return mission == SC64_P9_GLOBAL_ID ? race_p9_source_owner(slot) :
+        race_p8_later_mission_source_owner(mission, slot);
+}
+
+/* The P9 map places no Shield Battery; only human-built ones exist. */
+static int race_p9_battery_ok(const Building *q)
+{
+    return q->raw_type == 172 && q->raw_owner == SC64_P9_HUMAN_SLOT &&
+        q->owner == SIDE && !q->queue_count && !q->queue_head &&
+        q->queue_progress >= 0 && q->queue_progress <= SC64_P7_BATTERY_MAX_ENERGY_Q8 &&
+        q->level >= 0 && q->level < SC64_P7_BATTERY_REGEN_DEN &&
+        sc64_p7_battery_energy_valid((unsigned)q->queue_progress, (unsigned)q->level) &&
+        q->shield <= sc64_race_building_shields(B_P7_SHIELD_BATTERY);
+}
+
+static int race_protoss_later_battery_candidate_valid(int mission, const Building *q)
+{
+    if (mission == SC64_P9_GLOBAL_ID) return q && race_p9_battery_ok(q);
+    return race_p8_later_battery_candidate_valid(mission, q);
+}
+
+static int race_protoss_later_battery_world_valid(void)
+{
+    if (!race_p9_active()) return race_p8_later_battery_world_valid();
+    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive &&
+        b[i].type == B_P7_SHIELD_BATTERY &&
+        (!sc64_p7_battery_fields_valid(i) || !race_p9_battery_ok(&b[i]))) return 0;
+    return 1;
+}
+
+static int race_protoss_later_battery_initialize(const Sc64RaceMap *map)
+{
+    if (!race_p9_active()) return race_p8_later_battery_initialize(map);
+    if (map != &sc64_race_maps[SC64_P9_GLOBAL_ID]) return 0;
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].type == B_P7_SHIELD_BATTERY) return 0;
+    return 1;
 }
 
 static void race_p9_note_unit_spawn(int slot, int owner, int type)
@@ -443,14 +500,25 @@ static int race_p9_runtime_init(const Sc64RaceMap *map)
     race_p9_map = 0;
     race_p9_product_slot = -1;
     if (!race_p9_active()) return 1;
-    return race_p9_bind(map) && race_p9_runtime_state_valid();
+    if (!race_p9_bind(map)) return 0;
+    /* Fresh shared-service clock; the first source update seeds the
+     * Arbiter/detection cache. */
+    sc64_p7_arbiter_cache_due = 0;
+    sc64_p7_arbiter_cache_initialized = 0;
+    if (!race_p7_battery_initialize_source(map)) return 0;
+    return race_p9_runtime_state_valid();
 }
 
 static int race_p9_rebind_loaded_world(const Sc64RaceMap *map)
 {
     race_p9_product_slot = -1;
     if (!race_p9_active()) return 1;
-    return race_p9_runtime_state_valid() && race_p9_bind(map);
+    /* As in P7: zero is the saved, not-yet-started service clock. */
+    sc64_p7_arbiter_cache_due = 0;
+    sc64_p7_arbiter_cache_initialized =
+        race_p9.service_clock[1] || race_p9.service_clock[2];
+    return race_p9_runtime_state_valid() && race_p9_bind(map) &&
+           race_p7_battery_live_world_valid();
 }
 
 /* Rescue (P4/P6 contact rule). Native rescue gives the actors to the

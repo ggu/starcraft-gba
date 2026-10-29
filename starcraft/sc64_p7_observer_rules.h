@@ -44,6 +44,15 @@ enum {
     SC64_P7_CANNON_RAW = 162,
     SC64_P7_CANNON_DETECTION_SOURCE_PX = 224
 };
+#ifdef SC64_P9_DATA_ENABLED
+/* P9's Zerg detectors (pinned BWAPI sight ranges; structures use 7 tiles). */
+enum {
+    SC64_P9_OVERLORD_RAW = 42,
+    SC64_P9_OVERLORD_DETECTION_SOURCE_PX = 352,
+    SC64_P9_SPORE_COLONY_RAW = 144,
+    SC64_P9_SPORE_DETECTION_SOURCE_PX = 224
+};
+#endif
 
 typedef struct {
     unsigned completed : 1;

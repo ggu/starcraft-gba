@@ -8,8 +8,9 @@
  * mission save union with P5-P8, so it holds only what the bounded source
  * program and the authored services change: four trigger runners and their
  * shared waits, the first eight switches (the only ones P9 uses), the
- * computer and rescuable wallets and the town AI schedule. World views and
- * callback bindings are rebuilt on load. */
+ * computer and rescuable wallets, the town AI schedule and the shared
+ * Protoss service clock. World views and callback bindings are rebuilt on
+ * load. */
 enum {
     SC64_P9_TRIGGER_LIMIT = 12,
     SC64_P9_RUNNER_HUMAN = 0,   /* Source slot 7, force 1. */
@@ -51,6 +52,10 @@ typedef struct {
     u8 waiting_mask;    /* Runner bits with an armed shared wait. */
     u8 pass_timer;      /* Updates until the next trigger pass. */
     u8 reserved;
+    /* Shared Protoss service clock, laid out like P7's reserved bytes:
+     * [0] is the source-update phase (0..4), [1..2] the secondary-order
+     * stagger (0..300). Zero means the first source update is pending. */
+    u8 service_clock[3];
 } Sc64P9PersistentState;
 
 _Static_assert(sizeof(Sc64P9PersistentState) <= 180,
@@ -67,7 +72,10 @@ static inline int sc64_p9_wallet_index(unsigned slot)
 static inline int sc64_p9_persistent_state_valid(const Sc64P9PersistentState *s)
 {
     const u16 trigger_mask = (u16)((1u << SC64_P9_TRIGGER_LIMIT) - 1u);
-    if (!s || s->reserved || (s->waiting_mask & (u8)~0x0fu)) return 0;
+    if (!s || s->reserved || (s->waiting_mask & (u8)~0x0fu) ||
+        s->service_clock[0] > 4u ||
+        ((unsigned)s->service_clock[1] | ((unsigned)s->service_clock[2] << 8)) > 300u)
+        return 0;
     for (unsigned i = 0; i < SC64_P9_RUNNER_COUNT; ++i) {
         const Sc64P9Runner *r = &s->runner[i];
         if (r->reserved || r->outcome > SC64_P9_OUTCOME_LOST ||

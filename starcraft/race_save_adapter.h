@@ -770,7 +770,8 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_P9_RUNTIME
     if (race_p9_active()) {
-        if (!race_p9_runtime_state_valid()) return 0;
+        if (!race_p9_runtime_state_valid() ||
+            !race_p7_battery_live_world_valid()) return 0;
         memset(&race_data.p6,0,sizeof(race_data.p6));
         race_data.p9=race_p9;
     }
@@ -1826,6 +1827,10 @@ static int race_load_game(void) {
                                        (unsigned)(height*16),&candidate)) return 0;
             if (candidate.alive && (candidate.raw_owner<0 || candidate.raw_owner>=8 ||
                 sc64_race_unit_from_raw(candidate.raw_type)<0)) return 0;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+            if (!sc64_p7_arbiter_cache_unit_valid_with_mask(&candidate,
+                    sc64_protoss_mission_source_mask(SC64_P9_GLOBAL_ID))) return 0;
+#endif
         }
         for (unsigned i=0;i<MAX_BUILDINGS;++i) {
             Building candidate;

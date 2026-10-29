@@ -1,0 +1,204 @@
+gba.o: common/gba.c common/gba.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h \
+ common/audio_mixer.h common/audio_codec.h common/gba_present.h \
+ .local/sc64/audio/generated/sc64_audio_generated.h
+memory.o: common/memory.c common/gba.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h
+audio_bank.o: common/audio_bank.S
+sc64_p9_arm_replay.o: tests/sc64_p9_arm_replay.c \
+ tests/../starcraft/game.c tests/../starcraft/../common/gba.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h \
+ tests/../starcraft/sc64_engine_capabilities.h \
+ tests/../starcraft/sc64_bitgrid.h common/gba.h \
+ tests/../starcraft/sc64_map_math.h \
+ tests/../starcraft/sc64_construction_hp.h \
+ tests/../starcraft/sc64_building_damage.h \
+ tests/../starcraft/sc64_building_fire_vfx.h \
+ .local/sc64/building-fire/generated/sc64_building_fire_generated.h \
+ tests/../starcraft/sc64_order_marker_vfx.h \
+ .local/sc64/order-marker/generated/sc64_order_marker_generated.h \
+ tests/../starcraft/sc64_building_placement_vfx.h \
+ tests/../starcraft/sc64_minimap_terrain.h \
+ tests/../starcraft/sc64_weapon_vfx.h \
+ tests/../starcraft/sc64_weapon_source_runtime.h \
+ tests/../starcraft/sc64_weapon_source_vfx.h \
+ .local/sc64/weapon-vfx/generated/sc64_weapon_source_generated.h \
+ tests/../starcraft/sc64_tank_source_vfx.h \
+ tests/../starcraft/sc64_construction_vfx.h \
+ tests/../starcraft/sc64_death_vfx.h tests/../starcraft/sc64_p5.h \
+ tests/../starcraft/sc64_p5_state.h tests/../starcraft/sc64_p5_adapter.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p5_scenario_generated.h \
+ tests/../starcraft/sc64_p6.h tests/../starcraft/sc64_p6_state.h \
+ tests/../starcraft/sc64_p6_adapter.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p6_scenario_generated.h \
+ .local/sc64/p6/generated/sc64_p6_doodads_generated.h \
+ tests/../starcraft/sc64_psionic_storm.h \
+ tests/../starcraft/sc64_interceptor_motion.h \
+ tests/../starcraft/sc64_interceptor_pool_codec.h \
+ .local/sc64/backwater/generated/sc64_mission_generated.h \
+ starcraft/sc64_types.h starcraft/../common/gba.h \
+ .local/sc64/backwater/generated/sc64_assets_generated.h \
+ .local/sc64/zp-stage/generated/sc64_races_generated.h \
+ tests/../starcraft/sc64_frontend.h tests/../starcraft/campaign_catalog.h \
+ tests/../starcraft/sc64_briefing.h \
+ .local/sc64/skirmish/generated/sc64_skirmish_generated.h \
+ .local/sc64/backwater/generated/sc64_sprites_generated.h \
+ .local/sc64/protoss-p7/generated/sc64_race_sprites_generated.h \
+ tests/../starcraft/sc64_p8_sprite_adapter.h \
+ tests/../starcraft/sc64_construction_source.h \
+ tests/../starcraft/sc64_construction_animation.h \
+ .local/sc64/construction/generated/sc64_construction_sprites_generated.h \
+ starcraft/sc64_construction_source.h \
+ tests/../starcraft/sc64_death_source.h \
+ .local/sc64/death/generated/sc64_death_sprites_generated.h \
+ starcraft/sc64_death_source.h \
+ tests/../starcraft/sc64_unit_attack_source.h \
+ .local/sc64/attack-poses/generated/sc64_unit_attack_source_generated.h \
+ tests/../starcraft/sc64_display.h tests/../starcraft/sc64_backwater.h \
+ tests/../starcraft/sc64_types.h tests/../starcraft/race_rules.h \
+ tests/../starcraft/sc64_zp_actor_rules.h \
+ tests/../starcraft/sc64_p7_actor_rules.h \
+ tests/../starcraft/sc64_z5_actor_rules.h \
+ tests/../starcraft/sc64_p6_actor_rules.h \
+ tests/../starcraft/sc64_z6_actor_rules.h \
+ tests/../starcraft/sc64_stock_motion.h \
+ tests/../starcraft/sc64_stock_profiles.h \
+ tests/../starcraft/sc64_stock_combat.h \
+ tests/../starcraft/sc64_game_actor_facts.h \
+ tests/../starcraft/sc64_fact_tables.h \
+ tests/../starcraft/sc64_fact_table_format.h \
+ build/generated/p9-fact-v2/sc64_fact_tables_generated.h \
+ tests/../starcraft/sc64_p7_sight_policy.h \
+ tests/../starcraft/race_missions.h tests/../starcraft/sc64_p3_model.h \
+ tests/../starcraft/sc64_p3.h tests/../starcraft/sc64_p4.h \
+ tests/../starcraft/sc64_weapon_vfx_profiles.h \
+ tests/../starcraft/sc64_zp_building_types.h \
+ tests/../starcraft/sc64_race_save_types.h \
+ tests/../starcraft/sc64_compact_building_save.h \
+ tests/../starcraft/sc64_zp_unit_save.h \
+ tests/../starcraft/sc64_compact_mineral_save.h \
+ tests/../starcraft/sc64_p7_typed_unit_save.h \
+ tests/../starcraft/sc64_p7_typed_building_save.h \
+ tests/../starcraft/sc64_p7_state.h tests/../starcraft/sc64_p7_adapter.h \
+ tests/../starcraft/sc64_p7.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h \
+ tests/../starcraft/sc64_p8_state.h tests/../starcraft/sc64_p8_runtime.h \
+ tests/../starcraft/sc64_p9_state.h tests/../starcraft/sc64_collision.h \
+ tests/../starcraft/sc64_collision_legacy.h \
+ tests/../starcraft/sc64_contact.h tests/../starcraft/sc64_targets.h \
+ tests/../starcraft/sc64_font.h \
+ .local/sc64/interface/generated/sc64_font_generated.h \
+ tests/../starcraft/sc64_icons.h \
+ .local/sc64/interface/generated/sc64_icons_generated.h \
+ tests/../starcraft/sc64_chrome.h \
+ .local/sc64/interface/generated/sc64_chrome_generated.h \
+ .local/sc64/briefings/generated/sc64_briefing_generated.h \
+ starcraft/sc64_briefing.h tests/../starcraft/sc64_visibility.h \
+ tests/../starcraft/sc64_unit_walk.h tests/../starcraft/sc64_routes.h \
+ tests/../starcraft/sc64_route_monotone_probe.h \
+ tests/../starcraft/sc64_transport_adapter.h \
+ tests/../starcraft/sc64_transport_rules.h \
+ tests/../starcraft/sc64_backwater_adapter.h \
+ tests/../starcraft/field_controls.h tests/../starcraft/ui_widgets.h \
+ tests/../starcraft/hud_icons.h \
+ .local/sc64/command-icons/generated/sc64_command_icons_generated.h \
+ tests/../starcraft/sc64_unit_facing.h \
+ .local/sc64/facing/generated/sc64_unit_facing_generated.h \
+ tests/../starcraft/sc64_weapon_vfx_render.h \
+ tests/../starcraft/sc64_tank_source_vfx_render.h \
+ .local/sc64/tank-vfx/generated/sc64_tank_source_vfx_generated.h \
+ tests/../starcraft/sc64_weapon_source_vfx_render.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/limits.h \
+ tests/../starcraft/sc64_weapon_source_vfx_bounds.h \
+ tests/../starcraft/sc64_death_vfx_render.h \
+ tests/../starcraft/sc64_static_key.h \
+ tests/../starcraft/sc64_terrain_cache.h \
+ tests/../starcraft/sc64_obj_vram.h \
+ tests/../starcraft/sc64_static_dirty_rows.h \
+ tests/../starcraft/sc64_frontend_draw.h tests/../starcraft/game_audio.h \
+ .local/sc64/audio/generated/sc64_audio_generated.h \
+ tests/../starcraft/race_combat.h \
+ tests/../starcraft/sc64_p7_archon_adapter.h \
+ tests/../starcraft/sc64_p7_archon_rules.h \
+ tests/../starcraft/sc64_p7_geometry.h \
+ tests/../starcraft/sc64_siege_splash.h \
+ tests/../starcraft/sc64_siege_source_bounds.h \
+ tests/../starcraft/race_adapter.h tests/../starcraft/race_skirmish.h \
+ tests/../starcraft/sc64_p7_battery_rules.h \
+ tests/../starcraft/sc64_p7_power_geometry.h \
+ tests/../starcraft/sc64_p7_runtime_adapter.h \
+ tests/../starcraft/sc64_p7_world_adapter.h \
+ tests/../starcraft/sc64_resource_actions.h \
+ tests/../starcraft/sc64_p7_observer_adapter.h \
+ tests/../starcraft/sc64_p7_observer_rules.h \
+ tests/../starcraft/sc64_p7_sight_runtime.h \
+ tests/../starcraft/sc64_zero_bytes.h \
+ tests/../starcraft/sc64_p7_battery_adapter.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p7_battery_properties_generated.h \
+ tests/../starcraft/sc64_p7_projectile_adapter.h \
+ tests/../starcraft/sc64_p7_carrier_training.h \
+ tests/../starcraft/sc64_p7_interceptor_flight.h \
+ tests/../starcraft/sc64_interceptor_orders.h \
+ tests/../starcraft/race_campaign_adapter.h \
+ tests/../starcraft/sc64_p3_adapter.h \
+ tests/../starcraft/sc64_p4_adapter.h \
+ .local/sc64/p4/generated/sc64_p4_scenario_generated.h \
+ tests/../starcraft/sc64_p4_storm_adapter.h \
+ tests/../starcraft/sc64_p5_runtime_adapter.h \
+ tests/../starcraft/sc64_p5_world_adapter.h \
+ tests/../starcraft/sc64_p5_source_model.h \
+ tests/../starcraft/sc64_p5_count_snapshot.h \
+ tests/../starcraft/sc64_p6_combat_adapter.h \
+ tests/../starcraft/sc64_p6_combat.h \
+ tests/../starcraft/sc64_p6_world_adapter.h \
+ tests/../starcraft/sc64_z5_detection.h \
+ tests/../starcraft/sc64_p6_runtime_adapter.h \
+ tests/../starcraft/sc64_p6_count_snapshot.h \
+ tests/../starcraft/sc64_p6_render_adapter.h \
+ tests/../starcraft/sc64_p6_storm_adapter.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p6_abilities_generated.h \
+ tests/../starcraft/sc64_z8_game_bridge.h \
+ tests/../starcraft/sc64_z8_world_adapter.h \
+ tests/../starcraft/sc64_z8_triggers.h \
+ tests/../starcraft/sc64_z8_source.h \
+ tests/../starcraft/sc64_p8_runtime_adapter.h \
+ tests/../starcraft/sc64_p8_timed_service.h \
+ tests/../starcraft/sc64_p8_world_adapter.h \
+ tests/../starcraft/sc64_p8_source_adapter.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p8_scenario_generated.h \
+ tests/../starcraft/sc64_p8_game_bridge.h tests/../starcraft/sc64_p8_ai.h \
+ tests/../starcraft/sc64_p8_request_queue.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdbool.h \
+ tests/../starcraft/sc64_p8_ai_admission.h \
+ build/generated/p8-battery/sc64_p8_battery_properties_generated.h \
+ tests/../starcraft/sc64_p9_runtime_adapter.h \
+ .local/sc64/zp-stage/generated/scenarios/sc64_p9_scenario_generated.h \
+ tests/../starcraft/sc64_p9_ai.h tests/../starcraft/race_save_adapter.h \
+ tests/../starcraft/sc64_construction_save.h \
+ tests/../starcraft/sc64_p6_save.h \
+ tests/../starcraft/sc64_p5_transport_save.h \
+ tests/../starcraft/sc64_p7_projectile_save_adapter.h \
+ build/p9-arm/sc64_p9_tape_generated.h
+sc64_interceptor_motion.o: starcraft/sc64_interceptor_motion.c \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ starcraft/sc64_interceptor_motion_kernel.h \
+ starcraft/sc64_interceptor_direction_tables.h \
+ starcraft/sc64_interceptor_motion.h \
+ starcraft/sc64_interceptor_pool_codec.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h
+sc64_interceptor_pool_codec.o: starcraft/sc64_interceptor_pool_codec.c \
+ starcraft/sc64_interceptor_pool_codec.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h
+sc64_interceptor_orders.o: starcraft/sc64_interceptor_orders.c \
+ starcraft/sc64_interceptor_orders.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h

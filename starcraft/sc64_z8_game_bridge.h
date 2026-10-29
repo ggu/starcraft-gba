@@ -15,7 +15,7 @@
 #include "sc64_z8_world_adapter.h"
 #include "sc64_z8_source.h"
 #include "sc64_p7_geometry.h"
-#ifndef SC64_Z7_RUNTIME
+#if !defined(SC64_Z7_RUNTIME) && defined(SC64_P9_DATA_ENABLED)
 #include "sc64_siege_source_bounds.h"
 #endif
 
@@ -73,15 +73,19 @@ sc64_z8_game_source_extents(unsigned raw, int x, int y, int building,
                             sc64_z7_world_actor_rect(raw, x, y,
                     &world_left, &world_top, &world_right, &world_bottom);
         if (!ok) return 0;
-#else
+#elif defined(SC64_P9_DATA_ENABLED)
         /* Without the Z7 table, fall back to the pinned BWAPI
-         * unitDimensions rows (inclusive edge offsets). Every P8 actor has
-         * a feature fact or P7 rect; P9's Zerg roster uses this path. */
+         * unitDimensions rows (inclusive edge offsets). P9's Zerg roster
+         * has no feature fact or P7 rect. */
         if (raw >= 228u) return 0;
         world_left = x * 2 - siege_bounds[raw][2];
         world_top = y * 2 - siege_bounds[raw][3];
         world_right = x * 2 + siege_bounds[raw][4] + 1;
         world_bottom = y * 2 + siege_bounds[raw][5] + 1;
+#else
+        /* The Protoss P8 profile carries no Z7 raw table; every P8 actor
+         * has a feature fact or a pinned P7 rect. */
+        return 0;
 #endif
     }
     *left = x * 2 - world_left;

@@ -5,22 +5,26 @@ This page records reproducible checks for the source snapshot. Automated host ch
 ## Protoss P9 candidate (2026-10-29)
 
 The explicit `protoss-p9` candidate (`SCP9`, generation 45) adds P9 to the
-P8 candidate's P1–P8 profile. Canonical Protoss is unchanged and stays P7;
-its rebuilt ROM is byte-identical to the base, and the P8 controller trace
-and tape are unchanged on this branch. One ordinary-input host controller
-run wins P9 at frame 285,137 with no runtime faults, killing both
-Cerebrates with Zeratul present, and is deterministic across runs. The
-input-only ARM replay of its 13,534-transition key tape matches all 288
-host observations, state digests included, through the same win. A
-pause-menu save at frame 30,660 gives an SRAM record that is byte-identical
-on host and ARM. Loading it from the title screen in a fresh process
-continues to the same win, matching the uninterrupted replay at every
-common observation. Whole-tape ARM guest timing averages 1,725,369 cycles
-per frame (about 9.7 fps equivalent). The playable ROM links at
-`__bss_end=0x02038d64` and `__iwram_end=0x03004c70`. The AI backend and
-trigger cadence are authored. Zeratul's cloak, Defiler spells and P7-only
-ability services are inactive in P9. These are emulator and host results
-only, with no hardware claim. See the
+P8 candidate's P1–P8 profile and runs the shared Protoss unit services, with
+Zeratul permanently cloaked and P9-only Overlord and Spore Colony detection.
+Canonical Protoss stays P7 and its rebuilt ROM is byte-identical to
+`codex/source-release` 8d1e653; the P8 candidate ROM rebuilt on this branch
+is byte-identical to its qualified image. One ordinary-input host controller
+run wins P9 at frame 180,921 with no runtime faults, killing both Cerebrates
+with Zeratul present, and is deterministic across runs. The input-only ARM
+replay of its 9,017-transition key tape matches all 183 host observations,
+state digests included, through the same win. A pause-menu save at frame
+33,585, with a structure under construction, gives an SRAM record that is
+byte-identical on host and ARM. Loading it from the title screen in a fresh
+process continues to the same win, matching the uninterrupted replay at
+every common observation. Two of four save points tried win; the other two
+lose Zeratul to controller policy. Whole-tape ARM guest timing averages
+2,035,338 cycles per frame (about 8.2 fps equivalent; frame rate is not
+qualified). The playable ROM links at `__bss_end=0x02038d6c` and
+`__iwram_end=0x03004c70`. Executed build commands, raw dependency output and
+input hashes are recorded in the audit. The AI backend and trigger cadence
+are authored, and Defiler spells are not implemented. These are emulator
+and host results only, with no hardware claim. See the
 [P9 candidate audit](audits/2026-10-29-p9-campaign/README.md).
 
 ## Protoss P8 candidate (2026-10-29)

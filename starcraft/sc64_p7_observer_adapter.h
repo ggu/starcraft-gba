@@ -392,6 +392,35 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
             if(race_protoss_source_owner(owner)==b[i].owner &&
                (visible_owners&(1u<<owner))) detected|=1u<<owner;
     }
+#if defined(SC64_P9_DATA_ENABLED) && defined(SC64_P7_GEOMETRY_RECT_HOIST_ENABLED)
+    /* P9's Zerg detectors. As for the Observer, a mobile detector detects
+     * at its sight range (Overlord, 11 tiles, no Antennae); a structure at 7
+     * tiles once complete (Spore Colony, as the Photon Cannon). */
+    for(int i=0;i<MAX_UNITS;++i) if(u[i].alive &&
+        !SC64_TRANSPORT_LOADED(&u[i]) && u[i].raw_type==SC64_P9_OVERLORD_RAW) {
+        int source=u[i].raw_owner;
+        int ol,ot,or_,ob,distance=-1;
+        if(sc64_p7_actor_rect_source(SC64_P9_OVERLORD_RAW,u[i].x,u[i].y,0,
+                                     &ol,&ot,&or_,&ob))
+            distance=sc64_p7_observer_rect_distance_rects(
+                ol,ot,or_,ob,target_l,target_t,target_r,target_b);
+        if(distance<0||distance>SC64_P9_OVERLORD_DETECTION_SOURCE_PX) continue;
+        if(source>=0&&source<8 && race_protoss_source_owner((unsigned)source)==u[i].owner &&
+           (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
+    }
+    for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive &&
+        b[i].raw_type==SC64_P9_SPORE_COLONY_RAW && building_complete(i)) {
+        int source=b[i].raw_owner;
+        int sl,st,sr,sb,distance=-1;
+        if(sc64_p7_actor_rect_source(SC64_P9_SPORE_COLONY_RAW,b[i].x,b[i].y,1,
+                                     &sl,&st,&sr,&sb))
+            distance=sc64_p7_observer_rect_distance_rects(
+                sl,st,sr,sb,target_l,target_t,target_r,target_b);
+        if(distance<0||distance>SC64_P9_SPORE_DETECTION_SOURCE_PX) continue;
+        if(source>=0&&source<8 && race_protoss_source_owner((unsigned)source)==b[i].owner &&
+           (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
+    }
+#endif
     return detected&255u;
 }
 

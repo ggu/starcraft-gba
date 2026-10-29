@@ -10702,8 +10702,30 @@ game_self_test(void)
 #endif
 #include "race_campaign_adapter.h"
 #include "sc64_z8_game_bridge.h"
+#ifdef SC64_P9_RUNTIME
+/* P9 builds dispatch the shared-service hooks between P8 and P9 (see
+ * sc64_p9_runtime_adapter.h); P8's own definitions take P8-only names. */
+#define race_protoss_later_services_active race_p8_later_services_active
+#define race_protoss_later_source_owner race_p8_later_source_owner
+#define race_protoss_later_service_clock race_p8_later_service_clock
+#define race_protoss_later_service_mission race_p8_later_service_mission
+#define race_protoss_later_mission_source_owner race_p8_later_mission_source_owner
+#define race_protoss_later_battery_initialize race_p8_later_battery_initialize
+#define race_protoss_later_battery_world_valid race_p8_later_battery_world_valid
+#define race_protoss_later_battery_candidate_valid race_p8_later_battery_candidate_valid
+#endif
 #ifdef SC64_P8_RUNTIME
 #include "sc64_p8_runtime_adapter.h"
+#endif
+#ifdef SC64_P9_RUNTIME
+#undef race_protoss_later_services_active
+#undef race_protoss_later_source_owner
+#undef race_protoss_later_service_clock
+#undef race_protoss_later_service_mission
+#undef race_protoss_later_mission_source_owner
+#undef race_protoss_later_battery_initialize
+#undef race_protoss_later_battery_world_valid
+#undef race_protoss_later_battery_candidate_valid
 #endif
 #ifdef SC64_P9_RUNTIME
 #include "sc64_p9_runtime_adapter.h"

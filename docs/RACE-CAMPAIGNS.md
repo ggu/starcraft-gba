@@ -139,12 +139,15 @@ use the Carrier, Arbiter or Battery services. See the
 P9 **Shadow Hunters** has a separate, unpromoted `protoss-p9` candidate
 built on the P8 candidate. It is built with `make protoss-p9` and writes
 `StarCraft-Protoss-P9-GBA.gba` / `starcraft-protoss-p9.elf`, code `SCP9`,
-generation 45. One ordinary-input host controller run wins P9 by killing
-both Cerebrates with Zeratul present. The input-only ARM replay of its key
-tape matches every host observation through the win. A pause-menu SRAM
-save, loaded in a fresh process, continues to the same win on host and on
-ARM. P9's AI backend and trigger cadence are authored. Zeratul's cloak,
-Defiler spells and the P7-only ability services are inactive in P9. See the
+generation 45. P9 runs the shared Protoss unit services: Zeratul is
+permanently cloaked, the human Arbiter cloaks nearby units, and Zerg
+Overlords and Spore Colonies detect. One ordinary-input host controller run
+wins P9 by killing both Cerebrates with Zeratul present. The input-only ARM
+replay of its key tape matches every host observation through the win. A
+pause-menu SRAM save taken while a structure is under construction, loaded
+in a fresh process, continues to the same win on host and on ARM. P9's AI
+backend and trigger cadence are authored, and Defiler spells are not
+implemented. See the
 [P9 candidate audit](audits/2026-10-29-p9-campaign/README.md). P10 remains
 unavailable.
 
