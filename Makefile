@@ -3822,13 +3822,15 @@ test-sc64-z7-carried-missions: build/test-sc64-z7-carried-z1 build/test-sc64-z7-
 	./build/test-sc64-z7-carried-z4 --limit 150000 --trace .local/sc64/z7-carried/z4.json
 
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
+# Pass variable names: some canonical flags and companion sources are defined
+# later. Instantiate at the end so prerequisites also see the complete profiles.
+SKIRMISH_CONTROLLER_HOST_FLAGS = -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
 define SKIRMISH_CONTROLLER_PROFILE
-build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $(if $(filter protoss,$(1)),$(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)) common/gba.c common/gba.h Makefile | build
-	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(2) $$< common/gba.c $(if $(filter protoss,$(1)),$(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)) -o $$@
+build/test-sc64-skirmish-match-$(1): tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$($(3)) $$(SKIRMISH_CONTROLLER_EXTRA_INPUTS) $$($(4)) common/gba.c $$(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(SKIRMISH_CONTROLLER_HOST_FLAGS) $$($(2)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$($(4)) -o $$@
+build/test-sc64-skirmish-build-controller-$(1): tests/sc64_skirmish_build_controller.c tests/sc64_skirmish_campaign_run.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$($(3)) $$(SKIRMISH_CONTROLLER_EXTRA_INPUTS) $$($(4)) common/gba.c $$(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(SKIRMISH_CONTROLLER_HOST_FLAGS) $$($(2)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$($(4)) -o $$@
 endef
-$(eval $(call SKIRMISH_CONTROLLER_PROFILE,terran,$(TERRAN_FULL_FLAGS),$(TERRAN_FULL_INPUTS)))
-$(eval $(call SKIRMISH_CONTROLLER_PROFILE,zerg,$(Z3_FLAGS),$(RACE_CAMPAIGN_INPUTS)))
-$(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss,$(P3_FLAGS),$(RACE_CAMPAIGN_INPUTS)))
 
 # Cargo indicators are render-only and share the source-sprite placement used
 # by indexed and packed canonical profiles.
@@ -4946,3 +4948,21 @@ test-shared-builders: $(addprefix build/test-shared-builder-,terran zerg protoss
 	./build/test-shared-builder-showcase
 	./build/test-shared-builder-races
 	./build/test-shared-builder-unified
+
+# Canonical controller fixtures use the same ordered feature/include vectors
+# as the three race ROMs, including the P7 interceptor companion translation unit.
+SKIRMISH_CONTROLLER_EXTRA_INPUTS = $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
+$(eval $(call SKIRMISH_CONTROLLER_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS))
+$(eval $(call SKIRMISH_CONTROLLER_PROFILE,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS))
+$(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
+.PHONY: test-sc64-skirmish-build-controller
+test-sc64-skirmish-build-controller: $(addprefix build/test-sc64-skirmish-build-controller-,terran zerg protoss)
+	@set -e; for profile in terran zerg protoss; do \
+	  for race in 0 1 2; do \
+	    ./build/test-sc64-skirmish-build-controller-$$profile $$race; \
+	    ./build/test-sc64-skirmish-build-controller-$$profile $$race cancel; \
+	  done; \
+	  ./build/test-sc64-skirmish-build-controller-$$profile 0 loss; \
+	  ./build/test-sc64-skirmish-build-controller-$$profile 0 witness; \
+	  ./build/test-sc64-skirmish-build-controller-$$profile 1 moving; \
+	done
