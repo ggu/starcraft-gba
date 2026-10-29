@@ -6830,3 +6830,29 @@ it is not steady-30-fps or hardware proof. The controller's scenario-placement
 hints remain part of its information assumptions. The Terran ROM is byte-identical
 to the current four-profile build. Evidence and exact ROM/ELF/backend identities
 are retained in `.local/build/terran-late-new-arm-v1`.
+
+### Nuclear Silo admission guard (2026-10-30)
+
+Final enabled-content review found that a mapped Nuclear Silo could be paid
+for despite missing nuclear ammunition/launch services. Commit `6203b45` keeps
+its catalog row visible but unavailable. A native Terran fixture supplies the
+completed prerequisites, a free add-on site and sufficient funds, then checks
+that admission and purchase reject without wallet, selection or actor-bank
+mutation. Positive Machine Shop and Control Tower paths still pass. All four
+runtime fixture vectors pass; the other three explicitly skip the Silo-specific
+fixture because the required native identities are absent.
+
+All four subsequent ARM products retain the same RAM bounds and record their
+per-TU arguments, raw dependencies, maps and input hashes. The P7 campaign prefix
+matches the count-qualified build at all 9,000 state, pixel and timing rows;
+its measured window remains 2,394,919,369 cycles. The Showcase three-AI prefix
+matches state/pixels and its measured window remains 693,760,156 cycles, while
+51 earlier timing rows differ. The earlier full P7 tape result is not a
+full-tape run of these new binaries. Private proof is in
+`.local/build/silo-gate-review-v1` and `.local/build/silo-gate-arm-v1`.
+
+The canonical packages in
+`.local/releases/20261030-custom-catalog-silo-candidate` match their qualified
+builds outside the standard header. No SD write is claimed. Integration remains
+draft while other late-tech structures with unavailable actor services are
+resolved; neither a mapped identity nor a catalog row is full roster support.
