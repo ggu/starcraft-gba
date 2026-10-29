@@ -3709,7 +3709,7 @@ zerg-z7-steering-probe: build/StarCraft-Zerg-Z7-Steering-Probe-GBA.gba
 # physical-input-only main-loop selection local to that standalone target.
 # Historical Z7 probes and their tests continue to use Z7_FULL_RENDER_FLAGS.
 ZERG_Z7_CONTACT_MASK_TABLE_HEADER = build/generated/sc64_contact_mask_table_generated.h
-ZERG_Z7_CANONICAL_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ -DSC64_CONTACT_MASK_TABLE -Ibuild/generated
+ZERG_Z7_CANONICAL_FLAGS = $(filter-out $(Z7_STEERING_OPTIONS),$(Z7_STEERING_FLAGS)) -DSC64_CONTACT_CACHE -DSC64_CONTACT_STEER_ROM -DSC64_CONTACT_STOCK_ROM -DSC64_REACHABLE_FORMATION -DSC64_Z7_PRUNE_STARTED -DSC64_ROUTE_DECAY_FREQ -DSC64_CONTACT_MASK_TABLE -Ibuild/generated $(CANONICAL_DIRECT_FIRING_FLAGS)
 ZERG_Z7_RELEASE_FLAGS = $(ZERG_Z7_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
 ZERG_Z7_CANONICAL_INPUTS = $(Z7_FULL_RENDER_INPUTS) $(ZERG_Z7_CONTACT_MASK_TABLE_HEADER)
 build/starcraft-zerg-z7.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.ld Makefile | build
@@ -3738,15 +3738,20 @@ $(eval $(call Z7_CANONICAL_FIXTURE,save,sc64_z7_game_save.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,frame,sc64_z3_frame_coverage.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,scourge,sc64_z7_scourge_game.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,controller,sc64_z7_campaign_run.c))
+$(eval $(call Z7_CANONICAL_FIXTURE,last-seen,sc64_z7_last_seen.c))
+build/test-sc64-z7-canonical-last-seen: tests/sc64_z7_campaign_run.c
 $(eval $(call Z7_CANONICAL_FIXTURE,carried-z5,sc64_z5_campaign_run.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,carried-z6,sc64_z6_campaign_run.c))
 $(eval $(call Z7_CANONICAL_FIXTURE,z6-controller-policy,sc64_z6_controller_policy.c))
 build/test-sc64-z7-canonical-z6-controller-policy: tests/sc64_z6_campaign_run.c
 ZERG_Z7_CONTROLLER_TRACE ?= .local/sc64/zerg-z7-canonical-controller.jsonl
-.PHONY: test-sc64-z7-canonical-controller test-zerg-z7
-test-sc64-z7-canonical-controller: build/test-sc64-z7-canonical-controller tools/sc64_zp_controller_replay.py
+ZERG_Z7_CONTROLLER_LIMIT ?= 1000000
+.PHONY: test-sc64-z7-last-seen test-sc64-z7-canonical-controller test-zerg-z7
+test-sc64-z7-last-seen: build/test-sc64-z7-canonical-last-seen
+	./build/test-sc64-z7-canonical-last-seen
+test-sc64-z7-canonical-controller: build/test-sc64-z7-canonical-controller tools/sc64_zp_controller_replay.py test-sc64-z7-last-seen
 	mkdir -p "$(dir $(ZERG_Z7_CONTROLLER_TRACE))"
-	./build/test-sc64-z7-canonical-controller --limit 240000 --trace "$(ZERG_Z7_CONTROLLER_TRACE)"
+	./build/test-sc64-z7-canonical-controller --limit $(ZERG_Z7_CONTROLLER_LIMIT) --trace "$(ZERG_Z7_CONTROLLER_TRACE)"
 	$(PYTHON) tools/sc64_zp_controller_replay.py --profile zerg-z7 --trace "$(ZERG_Z7_CONTROLLER_TRACE)" --validate-only
 .PHONY: test-sc64-z7-canonical-carried-z5 test-sc64-z7-canonical-carried-z6
 test-sc64-z7-canonical-carried-z5: build/test-sc64-z7-canonical-carried-z5
