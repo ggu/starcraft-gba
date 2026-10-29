@@ -39,18 +39,22 @@ def sample(final="won", stop=2000, inputs=((2, 256), (5, 0), (9, 1), (10, 0))):
             "policy": "test", "mission": 12, "tick_limit": 500000, "events": rows}
 
 
-def arm_log(rows):
+MENU_TIMING = "T9 MENU_CYCLES frames=13 total=3651648"
+MISSION_TIMING = ("T9 CYCLES frames=2000 total=561792000 update=200000000 peak=600000 "
+                  "buckets=0,1990,10,0,0,0,0,0")
+
+
+def arm_log(rows, timing=(MENU_TIMING, MISSION_TIMING)):
     """Render observations as the probe's two-line debug output."""
     first = ("frame", "screen", "won", "lost", "mission", "faults", "phase",
              "objective_flags", "race_completed")
-    out = ["[WARN] GBA Debug: T9 LAUNCH ok frames=14 frame=1 screen=1 mission=12 race_mode=0"]
+    out = ["[WARN] GBA Debug: T9 LAUNCH ok menu_frames=13 mission_frames=1 frame=1 screen=1 mission=12 race_mode=0"]
     for row in rows:
         a = " ".join(f"{k}={row[k]}" for k in first)
         b = " ".join(f"{k}={row[k]}" for k in replay.COMPARED if k not in first)
         out.append(f"[WARN] GBA Debug: T9 CHECK {row['kind']} host_tick={row['host_tick']} {a}")
         out.append(f"[WARN] GBA Debug: T9 CHECK2 host_tick={row['host_tick']} {b}")
-    out.append("[WARN] GBA Debug: T9 CYCLES frames=1999 total=5617920000 update=1000 peak=9 "
-               "buckets=0,0,0,0,0,0,0,0")
+    out += [f"[WARN] GBA Debug: {line}" for line in timing]
     out.append("[WARN] GBA Debug: T9 DONE cursor=4")
     return "\n".join(out)
 
@@ -116,7 +120,10 @@ class CompareTests(unittest.TestCase):
         self.assertEqual(result["compared_observations"], 2)
         self.assertTrue(result["done"])
         self.assertEqual(result["arm_final"]["won"], 1)
-        self.assertEqual(result["cycles"]["total"], 5617920000)
+        self.assertEqual(result["timing_errors"], [])
+        self.assertEqual(result["guest_timing"]["mission_frames"], 2000)
+        self.assertEqual(result["guest_timing"]["menu_frames"], 13)
+        self.assertTrue(replay.verdict(plan, result))
 
     def test_field_and_missing_observations_are_reported(self):
         plan = self.plan()
@@ -124,6 +131,56 @@ class CompareTests(unittest.TestCase):
         result = replay.compare(plan, arm_log([changed]))
         self.assertIn("tick 1000 gas: ARM=7 host=0", result["mismatches"])
         self.assertIn("missing ARM observation at tick 2000", result["mismatches"])
+
+
+class TimingTests(unittest.TestCase):
+    """A matching log without one valid timing record must not qualify."""
+
+    def check_rejected(self, timing, message):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = Path(tmp.name) / "trace.json"
+        path.write_text(json.dumps(sample()))
+        plan = replay.load_trace(path)
+        rows = [plan["observations"][1000], plan["final"]]
+        result = replay.compare(plan, arm_log(rows, timing))
+        self.assertEqual(result["mismatches"], [])
+        self.assertIsNone(result["guest_timing"])
+        self.assertTrue(any(message in e for e in result["timing_errors"]), result["timing_errors"])
+        self.assertFalse(replay.verdict(plan, result))
+
+    def test_missing_mission_timing(self):
+        self.check_rejected((MENU_TIMING,), "expected one T9 CYCLES record, found 0")
+
+    def test_missing_menu_timing(self):
+        self.check_rejected((MISSION_TIMING,), "expected one T9 MENU_CYCLES record, found 0")
+
+    def test_duplicate_mission_timing(self):
+        self.check_rejected((MENU_TIMING, MISSION_TIMING, MISSION_TIMING),
+                            "expected one T9 CYCLES record, found 2")
+
+    def test_malformed_buckets(self):
+        self.check_rejected((MENU_TIMING, MISSION_TIMING.rsplit(",", 1)[0]), "malformed T9 CYCLES")
+
+    def test_truncated_record(self):
+        self.check_rejected((MENU_TIMING, "T9 CYCLES frames=2000 total=561792000"),
+                            "malformed T9 CYCLES")
+
+    def test_menu_frames_counted_as_mission(self):
+        self.check_rejected((MENU_TIMING, MISSION_TIMING.replace("frames=2000", "frames=2013")
+                             .replace("buckets=0,1990", "buckets=0,2003")),
+                            "expected ticks 1..2000")
+
+    def test_bucket_sum_mismatch(self):
+        self.check_rejected((MENU_TIMING, MISSION_TIMING.replace("0,1990,10", "0,1990,11")),
+                            "buckets sum to 2001")
+
+    def test_inconsistent_cycles(self):
+        self.check_rejected((MENU_TIMING, MISSION_TIMING.replace("update=200000000",
+                                                                 "update=900000000")),
+                            "inconsistent")
+        self.check_rejected((MENU_TIMING, MISSION_TIMING.replace("peak=600000", "peak=0")),
+                            "positive")
 
 
 if __name__ == "__main__":

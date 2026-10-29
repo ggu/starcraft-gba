@@ -23,8 +23,8 @@ volatile u16 demo_keys;
 static char line[240];
 static unsigned line_len;
 static u16 previous_held;
-static u32 frames_run;
-static uint64_t cycles_total, cycles_update;
+static u32 frames_run, menu_frames;
+static uint64_t cycles_total, cycles_update, menu_cycles;
 static u32 cycles_peak;
 static u32 cycle_buckets[8];
 
@@ -69,7 +69,25 @@ static void frame_with(u16 held)
     u32 bucket = (total + 140448u) / 280896u;
     cycle_buckets[bucket < 7 ? bucket : 7]++;
 }
-static void press(u16 key) { frame_with(key); frame_with(0); }
+/* Boot, menu and briefing frames are kept apart, so the mission counters
+ * cover exactly ticks 1..stop. */
+static void start_mission_timing(void)
+{
+    menu_frames = frames_run;
+    menu_cycles = cycles_total;
+    frames_run = 0;
+    cycles_total = cycles_update = 0;
+    cycles_peak = 0;
+    for (int i = 0; i < 8; ++i) cycle_buckets[i] = 0;
+}
+
+static void press(u16 key)
+{
+    frame_with(key);
+    /* The briefing's START release runs mission tick 1. */
+    if (key == KEY_START) start_mission_timing();
+    frame_with(0);
+}
 
 static int count_force_buildings(int raw_owner)
 {
@@ -117,6 +135,9 @@ static void report(const char *kind, u32 tick)
 
 static void report_cycles(void)
 {
+    out_text("T9 MENU_CYCLES frames="); out_num((long)menu_frames);
+    out_text(" total="); out_u64(menu_cycles);
+    out_flush();
     out_text("T9 CYCLES frames="); out_num((long)frames_run);
     out_text(" total="); out_u64(cycles_total);
     out_text(" update="); out_u64(cycles_update);
@@ -146,7 +167,8 @@ int main(void)
     int launched = screen == SCREEN_PLAY && !race_mode &&
         race_selected_mission == 12 && !won && !lost;
     out_text(launched ? "T9 LAUNCH ok" : "T9 LAUNCH fail");
-    out_field("frames", (long)frames_run); out_field("frame", (long)frame);
+    out_field("menu_frames", (long)menu_frames);
+    out_field("mission_frames", (long)frames_run); out_field("frame", (long)frame);
     out_field("screen", screen); out_field("mission", race_selected_mission);
     out_field("race_mode", race_mode);
     out_flush();

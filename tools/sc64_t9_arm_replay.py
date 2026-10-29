@@ -176,6 +176,67 @@ def parse_fields(line: str) -> dict:
     return {k: int(v) for k, v in re.findall(r"(\w+)=(-?\d+)", line)}
 
 
+CYCLES_RE = re.compile(r"T9 CYCLES frames=(\d+) total=(\d+) update=(\d+) peak=(\d+) "
+                       r"buckets=(\d+(?:,\d+){7})")
+MENU_CYCLES_RE = re.compile(r"T9 MENU_CYCLES frames=(\d+) total=(\d+)")
+
+
+def parse_timing(lines: list[str], stop: int) -> tuple[dict | None, list[str]]:
+    """Exactly one well-formed menu record and one mission record, or errors.
+
+    Mission timing covers ticks 1..stop: the briefing's START release runs
+    tick 1. The boot, menu and START-press frames before it are reported
+    separately and never count as mission frames."""
+    errors, records = [], {}
+    for name, pattern in (("MENU_CYCLES", MENU_CYCLES_RE), ("CYCLES", CYCLES_RE)):
+        found = [l for l in lines if l.split(" ", 2)[1:2] == [name]]
+        if len(found) != 1:
+            errors.append(f"expected one T9 {name} record, found {len(found)}")
+            continue
+        match = pattern.fullmatch(found[0].rstrip())
+        if not match:
+            errors.append(f"malformed T9 {name} record: {found[0]!r}")
+            continue
+        records[name] = match.groups()
+    if errors:
+        return None, errors
+    menu_frames, menu_total = (int(v) for v in records["MENU_CYCLES"])
+    frames, total, update, peak = (int(v) for v in records["CYCLES"][:4])
+    buckets = [int(v) for v in records["CYCLES"][4].split(",")]
+    if min(menu_frames, menu_total, frames, total, update, peak) <= 0:
+        errors.append("timing counts must be positive")
+    if frames != stop:
+        errors.append(f"mission timing covers {frames} frames, expected ticks 1..{stop}")
+    if sum(buckets) != frames:
+        errors.append(f"cycle buckets sum to {sum(buckets)}, not {frames} frames")
+    if update > total or peak > total or total > peak * frames:
+        errors.append("update, peak and total cycles are inconsistent")
+    if errors:
+        return None, errors
+    return {"mission_frames": frames, "total_cycles": total, "update_cycles": update,
+            "peak_cycles": peak, "frame_period_buckets": buckets,
+            "mean_cycles_per_frame": round(total / frames),
+            "effective_fps": round(frames * CPU_HZ / total, 2),
+            "guest_seconds": round(total / CPU_HZ, 1),
+            "menu_frames": menu_frames, "menu_cycles": menu_total}, []
+
+
+def verdict(plan: dict, result: dict) -> bool:
+    """A run qualifies only with a clean launch, every observation matched,
+    valid guest timing, and a final state that agrees with the host."""
+    final, host = result["arm_final"], plan["final"]
+    ok = (result["done"] and result["launch"].startswith("T9 LAUNCH ok") and
+          not result["early_end"] and not result["mismatch_count"] and
+          result["guest_timing"] is not None and not result["timing_errors"] and
+          final.get("won") == host.get("won") and final.get("lost") == host.get("lost") and
+          final.get("faults") == 0)
+    if host["kind"] == "won":
+        ok = ok and final.get("screen") == SCREEN_RESULT and final.get("won") == 1 and \
+            final.get("protoss_force2_buildings") == 0 and \
+            final.get("zerg_force3_buildings", 0) > 0 and final.get("raw16_alive") == 1
+    return bool(ok)
+
+
 def compare(plan: dict, text: str) -> dict:
     lines = [l[l.index("T9 "):] for l in text.splitlines() if "T9 " in l]
     checks = {}
@@ -200,13 +261,12 @@ def compare(plan: dict, text: str) -> dict:
         for field in COMPARED:
             if field in expected and expected[field] != actual.get(field):
                 mismatches.append(f"tick {tick} {field}: ARM={actual.get(field)} host={expected[field]}")
-    cycles = next((parse_fields(l) for l in lines if l.startswith("T9 CYCLES")), {})
-    buckets = next((l.split("buckets=")[1] for l in lines if l.startswith("T9 CYCLES")), "")
+    timing, timing_errors = parse_timing(lines, plan["stop"])
     launch = next((l for l in lines if l.startswith("T9 LAUNCH")), "")
     final = checks.get(plan["stop"], (None, {}))[1]
     return {"lines": len(lines), "launch": launch, "compared_observations": compared,
             "mismatches": mismatches[:50], "mismatch_count": len(mismatches),
-            "arm_final": final, "cycles": cycles, "cycle_buckets": buckets,
+            "arm_final": final, "guest_timing": timing, "timing_errors": timing_errors,
             "early_end": any(l.startswith("T9 EARLY_END") for l in lines),
             "done": any(l.startswith("T9 DONE") for l in lines)}
 
@@ -241,31 +301,14 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     text, wall = run_mgba(require_mgba(), args.rom, out, args.timeout)
     result = compare(plan, text)
-    cycles = result["cycles"]
-    frames, total = cycles.get("frames", 0), cycles.get("total", 0)
-    if frames and total:
-        result["guest_timing"] = {
-            "mission_frames": frames, "total_cycles": total,
-            "update_cycles": cycles.get("update"), "peak_cycles": cycles.get("peak"),
-            "mean_cycles_per_frame": round(total / frames),
-            "effective_fps": round(frames * CPU_HZ / total, 2),
-            "guest_seconds": round(total / CPU_HZ, 1)}
     result.update({
         "trace": str(args.trace), "trace_sha256": sha256(args.trace),
         "trace_policy": plan["policy"], "host_final": plan["final"],
         "rom": str(args.rom), "rom_sha256": sha256(args.rom), "elf_sha256": sha256(args.elf),
         "shipped_rom_sha256": sha256(args.shipped_rom) if args.shipped_rom.is_file() else None,
         "wall_seconds": round(wall, 1)})
-    final, host = result["arm_final"], plan["final"]
-    ok = (result["done"] and result["launch"].startswith("T9 LAUNCH ok") and
-          not result["early_end"] and not result["mismatch_count"] and
-          final.get("won") == host.get("won") and final.get("lost") == host.get("lost") and
-          final.get("faults") == 0)
-    if host["kind"] == "won":
-        ok = ok and final.get("screen") == SCREEN_RESULT and final.get("won") == 1 and \
-            final.get("protoss_force2_buildings") == 0 and \
-            final.get("zerg_force3_buildings", 0) > 0 and final.get("raw16_alive") == 1
-    result["ok"] = bool(ok)
+    ok = verdict(plan, result)
+    result["ok"] = ok
     (out / "result.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({k: v for k, v in result.items() if k != "host_final"}, indent=2))
     if not ok:
