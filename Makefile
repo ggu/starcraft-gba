@@ -4859,9 +4859,9 @@ test: test-sc64-building-fire-vfx test-sc64-default-armor
 test-sc64-building-fire-vfx: build/test-sc64-building-fire-vfx build/test-sc64-building-fire-vfx-facing
 	./build/test-sc64-building-fire-vfx
 	./build/test-sc64-building-fire-vfx-facing
-build/test-sc64-building-fire-vfx: tests/sc64_building_fire_vfx.c starcraft/sc64_building_fire_vfx.h tests/sc64_building_fire_fixture/sc64_building_fire_generated.h | build
+build/test-sc64-building-fire-vfx: tests/sc64_building_fire_vfx.c starcraft/sc64_building_fire_vfx.h tests/sc64_building_fire_fixture/sc64_building_fire_synthetic.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Itests/sc64_building_fire_fixture $< -o $@
-build/test-sc64-building-fire-vfx-facing: tests/sc64_building_fire_vfx.c starcraft/sc64_building_fire_vfx.h tests/sc64_building_fire_fixture/sc64_building_fire_generated.h | build
+build/test-sc64-building-fire-vfx-facing: tests/sc64_building_fire_vfx.c starcraft/sc64_building_fire_vfx.h tests/sc64_building_fire_fixture/sc64_building_fire_synthetic.h | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIT_FACING -Itests/sc64_building_fire_fixture $< -o $@
 test-sc64-default-armor: build/test-sc64-default-armor-game
 	./build/test-sc64-default-armor-game

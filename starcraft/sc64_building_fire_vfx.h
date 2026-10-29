@@ -43,7 +43,10 @@ static inline int sc64_building_damage_stages(unsigned hp, unsigned max_hp,
 }
 
 #ifdef SC64_BUILDING_FIRE_ART
-#include "sc64_building_fire_generated.h"
+#ifndef SC64_BUILDING_FIRE_BANK_HEADER
+#define SC64_BUILDING_FIRE_BANK_HEADER "sc64_building_fire_generated.h"
+#endif
+#include SC64_BUILDING_FIRE_BANK_HEADER
 /* LO placement is source frame 0. Slot allocation is deterministic rather
  * than tracking the source engine's random and repair history. Hit points
  * supplied here are integer values, so fractional source HP is approximated. */

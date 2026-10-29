@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #define SC64_BUILDING_FIRE_ART
+#define SC64_BUILDING_FIRE_BANK_HEADER "sc64_building_fire_synthetic.h"
 #include "../starcraft/sc64_building_fire_vfx.h"
 
 static unsigned calls, pixels, seen_banks[20], seen_flip;
