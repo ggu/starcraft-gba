@@ -1,11 +1,20 @@
-# Z7 current-source ARM win and SRAM continuation (2026-10-29)
+# Z7 ARM win and SRAM continuation at runtime base 9ff7f7c (2026-10-29)
 
-This audit closes two of the three gates that kept the separate `zerg-z7`
-candidate out of the canonical Zerg profile: a full ARM win under the exact
-candidate feature vector, and a fresh-process SRAM continuation. Both use the
-current source rather than a frozen runtime. The canonical `zerg` alias and
-the six-entry Z6 product are unchanged. This is emulator evidence, not a
-30-fps or physical-GBA claim.
+**Historical evidence.** Every result here was produced on the runtime of
+`codex/source-release` at `9ff7f7c`. Later merges changed shared runtime code,
+so these results do not qualify current main; current-main qualification
+stays open (see [Current main](#current-main)).
+
+On that base, this audit closes two of the three gates that kept the
+separate `zerg-z7` candidate out of the canonical Zerg profile:
+- a full ARM win under the candidate feature vector;
+- a fresh-process SRAM continuation.
+
+The ARM runs use a replay probe that replaces `common/main.c`. They are
+separate from replaying the unchanged production ROM; see
+[Probe versus production ROM](#probe-versus-production-rom). The canonical
+`zerg` alias and the six-entry Z6 product are unchanged. This is emulator
+evidence, not a 30-fps or physical-GBA claim.
 
 ## Source and inputs
 
@@ -15,7 +24,7 @@ the six-entry Z6 product are unchanged. This is emulator evidence, not a
 - Prepared private inputs were reused read-only. No importer or extractor ran;
   the only generated header is the asset-free contact mask table under `build/`.
 
-## Host controller on current source
+## Host controller at 9ff7f7c
 
 `make test-sc64-z7-canonical-controller` with its trace redirected into the
 worktree reproduced PR #123's ordinary-input result byte for byte. The win
@@ -52,6 +61,95 @@ Make targets: `sc64-z7-arm-replay` (full and prefix ROMs),
 `sc64-z7-arm-resume Z7_ARM_CUT_TICK=N`, and host builds
 `build/test-sc64-z7-replay-{full,prefix,resume-N}`.
 `Z7_ARM_TRACE` selects the controller trace.
+
+## Verdict gates
+
+`tools/sc64_z7_arm_replay.py` qualifies a run only when every gate passes, and
+lists each failure:
+- **Records:** exactly one START record, no early end, and the mode's own
+  terminal record (DONE, SAVED or LOADED). Unknown, malformed, repeated-field
+  and conflicting records all fail.
+- **Coverage:** the run must match exactly the host observations its mode
+  covers. That set must be non-empty, every field must match, and no
+  observation outside the range may appear. A prefix needs one successful
+  SAVED record with a cut inside the tape and one cut observation at that
+  tick. A resume needs a cut inside the tape and one successful LOADED
+  record.
+- **Terminal state:** full and resume runs must end on the host's terminal
+  observation, and a winning trace requires a strict win.
+- **Timing:** exactly one final cycles record (`terminal`, or `cut` for the
+  prefix) at the expected tick and frame count. It and every periodic
+  record must be coherent (positive counts, update ≤ total, peak ≤ total
+  ≤ peak × frames, stack within the painted region). Host logs can only be
+  checked untimed, with `--untimed`.
+- **SRAM:** all present records must have a valid checksum, the generation
+  tag and the expected payload size. Required records:
+  - prefix: exactly one pause save;
+  - full run: one victory autosave when the trace wins;
+  - resume: the seeded pause save kept byte for byte, plus a sequence-2
+    victory autosave.
+
+  SRAM is checked before the verdict; a run without SRAM cannot qualify.
+
+`tests/test_sc64_z7_arm_replay.py` covers these gates:
+- missing timing, duplicate timing, wrong frame counts and incoherent cycles;
+- a SAVED-only prefix, an out-of-range cut and a second save;
+- missing, short and checksum-corrupted SRAM;
+- a resume without its seed;
+- malformed, unknown, conflicting and duplicate check records.
+
+Re-evaluated with these gates, the retained ARM logs and SRAM still qualify:
+- full: 909/909 observations, one victory record;
+- prefix: 669/669 observations at cut 403,482, one pause save;
+- resume: 240/240 observations, with the seed kept and a sequence-2 victory record.
+
+## Build provenance
+
+`tools/sc64_build_provenance.py` deletes one ELF and rebuilds it through
+`make`, never with `-B`, so no private asset generator reruns. It records:
+- the compile and link command Make actually ran;
+- that command's ordered `-D`/`-I` vector;
+- a `-M` dependency pass for each translation unit, run with the same argv;
+- SHA-256 hashes of every dependency, the `.incbin` audio blob and the
+  outputs.
+
+Each rebuilt ROM was byte-identical to its evidence ROM. All four records
+were taken at commit `367df4f`, which adds only tooling and docs to
+`9ff7f7c`, using arm-none-eabi-gcc 16.2.0. Each record has eight
+translation units for the release ROM and seven for a probe (no
+`common/main.c`).
+
+| ROM | ROM SHA-256 | Argv SHA-256 | `-D`/`-I` vector SHA-256 (count) | Input manifest SHA-256 (files) |
+| --- | --- | --- | --- | --- |
+| Release `zerg-z7` | `33664d3138755ef9e78c54028c7551a6f1b4e249b7abc80a5c14273c447f76e8` | `a003fd64088ff006cb1032b053878ed022b9082a7a618c569cb64b9f07263fd0` | `ace159029f921d29ac345c00f2309a2f6cca184640c82b00c40d44861850ab90` (108) | `97538bfcacc4b20ea8fbed01b9ef68925079a184795b9f546da99307c3e57beb` (161) |
+| Probe, full | `b44c6aeaaf84a7f2e511260225e956e48980b0c6605371c9e8da59f0dcd6ac66` | `b31ee9f204b115de10a2879128b777e603e944abfa2391b9ed22a252c77e8a0c` | `885ed85b771b445879b7aef7dfffa77f8cb91ca887a07ea17bbf267a3c8f15c9` (109) | `35b04cd88d0f06451d2196b9aa6751d83aeb7e647000ad7c08c94d402e1f3320` (166) |
+| Probe, prefix | `de2ae3903ed0187dedcae791171bdf9017cf6a72a00ab8cba638e51c835639f8` | `67635c534007378d71f28262c9df8ca9c8be9fdf630130adb9dde8b7a4367c06` | `6c5aec5f0b480b829dfbbf1c633b60b548359a9d5da8323091e46d9701ea07aa` (110) | `35b04cd88d0f06451d2196b9aa6751d83aeb7e647000ad7c08c94d402e1f3320` (166) |
+| Probe, resume | `c8a1ecaadd7c6467e3b1c23aef334460e2e2b3c407e34200110f913ca0508fee` | `c47f3129f14e08d96c96ba656b828a69277b5274a9f11eae34ebf29977f2d875` | `dec4a995b7929aa8066556ceafa316624d4ec7ba48937ef342f31b986e98d740` (110) | `35b04cd88d0f06451d2196b9aa6751d83aeb7e647000ad7c08c94d402e1f3320` (166) |
+
+How to read the hashes:
+- The argv hash covers the NUL-joined argv.
+- The input manifest hash covers sorted `path<TAB>sha256` lines; each probe's
+  manifest includes 28 private generated inputs.
+- The audio blob is `bd0adfd0ce83c0bb054d40c8f6bc69d91a55ca0f846f7ada56d48d98d7f72427`.
+- `starcraft/game.c` is `98f9a968125ce75f39d1e4ec1d903396f589d9941a500cbf47c3e51994c55c22`.
+
+The full records name local paths and private input hashes. They stay in
+the ignored `.local/build/z7-provenance-20261029/`.
+
+## Probe versus production ROM
+
+The probe ROMs differ from the release ROM by design:
+- They link the probe's own main loop instead of `common/main.c`.
+- They drop `GBA_NO_DEBUG_INPUTS`, which only affects `common/main.c`.
+- They add the tape include path and a mode define.
+
+The probes prove that the shipped update/audio/render code, built from
+these flags and inputs, plays the recorded inputs to the win. They do not
+replay the unchanged production ROM: its keypad, VBlank and main-loop timing
+are untested by these runs. Its physical-input path is covered only by the
+separate keypad edge fixture. A production-ROM replay would need inputs
+delivered through the keypad register, without debugger writes, and remains
+open.
 
 ## Save-cut rule
 
@@ -143,6 +241,20 @@ frames, so the tuned timeline shifts. PR #84 adapted the other controllers
 by writing `menu_cursor` directly after B. That is a UI state write, not
 ordinary input, so it was not copied here. Z1 and Z5 need controller work
 under the field controls; that is outside this audit.
+
+## Current main
+
+After `9ff7f7c`, PRs #149 (shared construction, Siege and save mechanics),
+#152 (order markers), #153 (builder safety) and #148 (top-bar icons) landed.
+Together they changed 15 runtime files. None of the results above has been
+repeated on that integrated source. Re-qualifying needs:
+- a current-main host controller run;
+- new ARM full, prefix and resume runs;
+- new provenance records.
+
+`make test-zerg-z7` also fails there until the carried-mission and Scourge
+fixture failures below are resolved. Current-main qualification therefore
+remains open.
 
 ## Limits
 

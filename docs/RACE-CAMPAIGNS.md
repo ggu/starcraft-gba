@@ -85,13 +85,16 @@ None of these are physical GBA guarantees.
 
 Z7 now has a separate `zerg-z7` candidate ROM and save route; `zerg` and
 explicit `zerg-z6` remain the six-entry product. The candidate is not promoted.
-On the current source, an input-only replay of the ordinary-input controller
-tape, built with the exact candidate flags, wins on ARM with all 909
-checkpoints matching. A pause-menu save at tick 403,482, loaded in a fresh
-mGBA process, continues to the same win. That run averages about 8.4 frames/s
+At runtime base `9ff7f7c`, an input-only replay of the ordinary-input
+controller tape wins on ARM with all 909 checkpoints matching. The replay
+probe ROM is built with the candidate flags and its own main loop. A
+pause-menu save at tick 403,482, loaded in a fresh mGBA process, continues
+to the same win. These results are historical: later shared-runtime merges
+leave current-main qualification open, and the unchanged production ROM has
+not been replayed. That run averages about 8.4 frames/s
 in guest cycles, far below 30 fps. `make test-zerg-z7` still fails on this
 base: carried Z1 and Z5 since PR #84, the Scourge fixture since PR #133, and
-carried Z6. See the [current ARM/SRAM audit](audits/2026-10-29-z7-current-arm-sram/README.md);
+carried Z6. See the [9ff7f7c ARM/SRAM audit](audits/2026-10-29-z7-current-arm-sram/README.md);
 the earlier frozen CONTACT win and its 3.69 frames/s are in the
 [mission/save audit](audits/2026-10-28-z7-arm-save-win/README.md). P7 is
 now in the canonical Protoss profile. Its host campaign/save fixtures, 18-match
@@ -116,7 +119,7 @@ and omits debugger input queues; it keeps the generation-36 save identity.
 Its ARM link passes the existing RAM guards, and the CONTACT host replay
 matches all 365 frozen checkpoints through the source win. The bounded late
 ARM comparison is not a full-mission result. That link was not replayed in
-full; the current-source replay above uses the same feature vector with the
+full. The `9ff7f7c` replay above uses the same feature vector with the
 probe's own main loop in place of `common/main.c`. See the [CONTACT
 release-candidate audit](audits/2026-10-28-z7-contact-release/README.md).
 The current experimental P7 cache profile also replays the full winning tape
