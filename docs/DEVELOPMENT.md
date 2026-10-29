@@ -10,6 +10,10 @@ end of this guide.
 
 ## Local-first verification
 
+Core engine improvements belong to every applicable Showcase, skirmish and
+campaign build. See [Shared engine policy and migration status](SHARED-ENGINE.md)
+for the common capability contract and remaining mission-scoped services.
+
 Routine checks run on your development machine:
 
 ```sh

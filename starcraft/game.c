@@ -9,6 +9,7 @@ static void sc64_contact_memo_invalidate(void);
 #define SC64_CONTACT_MEMO_INVALIDATE() sc64_contact_memo_invalidate()
 #endif
 #include "../common/gba.h"
+#include "sc64_engine_capabilities.h"
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
 #include "sc64_construction_hp.h"
@@ -1516,6 +1517,7 @@ static void race_pending_build_tick(int worker);
 #ifdef SC64_CONSTRUCTION_HP
 static void race_construction_hp_progress(int building, int progress, int total);
 static void race_complete_building(int building);
+static void race_construction_worker_tick(int worker);
 #endif
 static void race_tick_buildings(void),race_tick_state(void),race_tick_ai(void),race_tick_defenses(void);
 static void race_skirmish_init(void),race_skirmish_outcome(void);
@@ -6489,14 +6491,7 @@ target_lists_unavailable:
 	    }
 #ifdef SC64_CONSTRUCTION_HP
             else {
-                int total = building_build_time(b[q->target].type);
-                int progress = ++b[q->target].build_progress;
-                race_construction_hp_progress(q->target, progress, total);
-                if (progress >= total) {
-                    race_complete_building(q->target);
-                    q->order = ORDER_IDLE;
-                    q->target = -1;
-                }
+                race_construction_worker_tick(i);
             }
 #else
             else if (++b[q->target].build_progress >= building_build_time(b[q->target].type)) {

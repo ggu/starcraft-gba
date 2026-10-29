@@ -842,6 +842,24 @@ static void race_complete_building(int i)
     if (sc64_race_is_zerg_townhall(b[i].type)) b[i].larva = 3;
 }
 
+#ifdef SC64_CONSTRUCTION_HP
+/* Construction is uncommon beside movement/combat. Keep its full progression
+ * in ROM so sharing the mechanic does not consume the tight hot-code reserve. */
+static void __attribute__((noinline)) race_construction_worker_tick(int worker)
+{
+    Unit *q = &u[worker];
+    int slot = q->target;
+    int total = building_build_time(b[slot].type);
+    int progress = ++b[slot].build_progress;
+    race_construction_hp_progress(slot, progress, total);
+    if (progress >= total) {
+        race_complete_building(slot);
+        q->order = ORDER_IDLE;
+        q->target = -1;
+    }
+}
+#endif
+
 #ifdef SC64_P3_PRODUCTION_EXIT
 typedef struct {
     int producer_type;

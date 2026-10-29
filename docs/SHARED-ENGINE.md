@@ -1,0 +1,99 @@
+# Shared engine contract
+
+Core engine behavior must be consistent across Showcase, custom skirmish, and
+campaign products. A capability must not exist only because a build is called
+Showcase, or because a particular mission happens to be active. Keep mission
+objectives, source content and permissions, generated asset banks, save formats,
+and memory placement decisions profile-specific where they need to be. Those
+choices must not silently remove a core mechanic from one game mode.
+
+This contract follows the project rule in [`AGENTS.md`](../AGENTS.md). It also
+keeps three different questions separate:
+
+- **Engine behavior:** mechanics and presentation rules implemented by the
+  shared game engine. The same mechanic should be available in every applicable
+  mode and product.
+- **Mission and content behavior:** objectives, triggers, actors, maps, source
+  permissions and imported art. These can remain specific to a scenario or
+  profile. Do not widen a mission-active check to enable an objective in a
+  custom match.
+- **Storage and placement:** save encodings, actor layouts, RAM/ROM placement,
+  cache strategy, and generated data selection. These may vary to fit the GBA,
+  but a storage constraint is unfinished work to solve or document, not a
+  reason to advertise incomplete behavior as shared support.
+
+## Initial contract
+
+The marker guards the `SC64_RACES` engine family. It does not assert that the
+separate original-art/Backwater engine has identical building-construction or
+Siege Tank semantics. Compare those products before describing the contract as
+parity across every engine implementation.
+
+The current contract starts with two mechanics:
+
+| Capability | Shared behavior | Authored implementation |
+| --- | --- | --- |
+| Construction HP | New buildings start with partial health and accumulate the remaining HP/shields over construction; morph completion adjusts HP against the new maximum. | [`sc64_construction_hp.h`](../starcraft/sc64_construction_hp.h), used by the shared race adapter. |
+| Siege splash | Siege Tank weapon impacts apply the shared splash tiers and damage rules to eligible nearby actors. | [`sc64_siege_splash.h`](../starcraft/sc64_siege_splash.h) and its authored source bounds table. |
+
+`SC64_SHARED_ENGINE_FLAGS` supplies both mechanics through `RACES_FLAGS`. The
+required `SC64_ENGINE_CORE_REQUIRED` marker makes `game.c` reject a race-engine
+build that omits either mechanic. The old `SHOWCASE_SIEGE_FLAGS` override is
+retired and Make fails if a caller still supplies it. Thus Showcase, generic
+race/unified builds, and the chapter products inheriting `RACES_FLAGS` receive
+the same initial mechanic set. The compile contract is in
+[`sc64_engine_capabilities.h`](../starcraft/sc64_engine_capabilities.h).
+
+The initial set is deliberately small. It establishes the rule and prevents
+these two behaviors from drifting between products; it does not prove that
+every historical game service, actor, or visual treatment is now shared.
+
+## Remaining engine debt
+
+| Area | Current boundary | Work still needed |
+| --- | --- | --- |
+| Separate original-art engine | The required marker is specific to `SC64_RACES`; the original-art/Backwater path does not compile this race-engine contract. | Decide and document which common mechanics apply to that independent engine, then share applicable behavior instead of treating a race-engine flag as universal coverage. |
+| Facing, weapon effects, death art | The four canonical Terran, Zerg, P7, and Showcase products use the prepared facing, weapon-VFX/attack-pose, and death-art banks. Generic `RACES_FLAGS`/`UNIFIED_FLAGS` and several early chapter profiles do not use that same presentation set. Z4/P5/P6 carry some of it, but do not match the canonical four. | Make presentation behavior consistent where the same source art is available. Keep missing source assets visible as a content limitation; do not count placeholder rendering as source-art parity. Track asset inputs and product memory separately from the mechanic contract. |
+| Ranged approach routing | Canonical products include direct firing-point routing; generic race/unified and some chapter builds do not. It also depends on the packed route configuration. | Share the applicable navigation behavior across products while preserving route-field capacity and measuring worst-case GBA time for each storage profile. Do not make flag presence alone the completion criterion. |
+| P7 and chapter services | Battery, Observer/detection, Carrier and other later services are currently tied to P7 or chapter actor/runtime adapters, with mission-active checks around parts of their behavior. | Split reusable engine services from mission-only objectives and actors. Keep campaign triggers scoped to their missions; make ordinary service behavior mode-independent where the same actor capability is supported. |
+| Repair | Repair order handling is called from the T6/Terran-late runtime path; the specialized repair adapter validates Terran mechanical targets, SCV ownership, costs and persisted work state. | Keep Terran repair rules, but factor common order/state handling so the engine contract does not depend on a particular Terran chapter being active. Validate saved repair work across applicable modes. |
+| Transport | The transport runtime is compiled from T5, P5 Shuttle, or Z6 transport flags. Boarding, loaded-actor filtering, and cargo persistence use that runtime state. | Provide one shared transport service for every applicable product and mode; account for actor layout and every save codec. Do not enable cargo display or a carrier identity without a working cargo lifecycle. |
+| Zerg eggs and morphs | Independent egg production is gated by the Z7 egg-production feature and has dedicated actor/save validation. Other products use the older sequential Hatchery queue. | Share the lifecycle and persistence contract where independent eggs are promised, including cancel, death, completion and reload behavior. Keep mission-specific Z7 content and objectives separate. |
+| Building fire and burn-down | There is no general Terran building fire state or burn-down mechanic in the shared engine. Repair support does not create one. Explosion/death fire effects are presentation only. | Implement and validate building damage-over-time/fire behavior as an engine mechanic before claiming it is supported anywhere. |
+| Shield bars | Shield/HP vitals already use the shared race renderer for selected units and buildings (`game.c`, `draw_unit` and `draw_building_overlay`). There is no separate profile flag for the bars. | Preserve this shared behavior; distinguish it from asset-bank parity and from always-visible battlefield status bars. |
+
+Other incompleteness remains in race-specific abilities, morphs, unit identity,
+production, damage rules and actor lifecycle. A mode-specific adapter can be a
+valid staging step, but a feature is not fully shared until its engine contract,
+state ownership and required persistence work in every applicable product.
+
+## Validation stage
+
+[`tests/test_sc64_engine_capabilities.py`](../tests/test_sc64_engine_capabilities.py)
+uses actual Make variable expansion for the normal race products, Showcase,
+generic/unified and representative chapter profiles. It checks that the
+required marker and both mechanics reach each compiler vector, compiles a
+small asset-free contract probe, and checks that removing either mechanic or
+providing only a partial shared override fails. It also checks the retired
+Showcase-only override and that optional construction source art is not
+required for the engine capability contract.
+
+The test script is present but has not yet been added to a Make test aggregate
+in this snapshot. Its source establishes the configuration checks described
+above; it does not report that they have passed.
+
+These are build-configuration and compile-contract checks, not gameplay
+fixtures. They do not prove construction health progression, Siege splash
+damage, mission behavior, save/load continuity, or correct visual output in
+each runtime mode. Add runtime-mode fixtures for Showcase, skirmish/unified,
+and campaign/chapter use, including construction interruption/morph and siege
+collateral cases, before calling this shared contract behavior-qualified.
+
+Normal ARM links and RAM/IWRAM guard measurements after this central flag
+change are still pending, as is the corresponding production/gameplay-mode
+matrix. Run the default asset-free checks and, when their prepared inputs are
+already available, the unified and Terran profile checks; record missing
+private inputs rather than substituting an older generated bank. Emulated
+timing and physical GBA qualification remain separate evidence. Nothing on
+this page claims global feature parity or release qualification from the two
+centralized flags alone.
