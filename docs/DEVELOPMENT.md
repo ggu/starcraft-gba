@@ -1985,6 +1985,28 @@ The arguments are map (0 built-in arena, 1 imported), human race (0 Terran,
 The controller uses ordinary HOME/menu navigation and `game_update` inputs;
 its world reads guide decisions without modifying resources, actors or AI.
 
+The match binaries use `TERRAN_ROM_FLAGS`, `ZERG_ROM_FLAGS` and
+`PROTOSS_ROM_FLAGS`, including the canonical rendering, routing and companion
+translation units. An asset-free Make regression checks the emitted ordered
+feature/include vectors, including flags defined after the target macro.
+Earlier chapter-only controller builds do not establish canonical-profile parity.
+
+To check construction and command navigation separately with prepared inputs:
+
+```sh
+make test-sc64-skirmish-build-controller
+```
+
+Each product tests all three human races through pending travel, paid foundation
+and completion, plus cancellation and retry. It also checks isolated foundation
+loss and a cursor gesture interrupted by the harness tick limit. A pending
+request is accepted before it spends resources; it is not counted as a completed
+producer. The controller observes construction every input tick and navigates
+the menu's actual remembered command rather than assuming it reopens at Move.
+The foundation-loss setup is synthetic; the ordinary match controller never
+writes actors, resources or AI. Its full-world reads make it a deterministic
+input workload, not a demonstration of a human player's information limits.
+
 ### Dense input replay without a larger queue
 
 Some full controller routes exceed 256 transitions in a 1,000-tick window.

@@ -6227,3 +6227,35 @@ command stops at the T9 controller (`won=0`, no Wraiths, wallet 34/14 at the
 T1–T8 and the other Terran checks pass before that point, and T10 run directly
 wins at tick 3,552. No frame-rate, physical-hardware or ARM replay result is
 claimed.
+
+
+### Canonical skirmish controller qualification correction (2026-10-29)
+
+The match targets now expand the actual `TERRAN_ROM_FLAGS`, `ZERG_ROM_FLAGS`
+and `PROTOSS_ROM_FLAGS` at execution, with the required companion translation
+units. The earlier 54-match report above used chapter flag subsets; it does
+not qualify the current canonical products. A dry-run regression checks the
+ordered feature/include vectors and catches both early expansion and an older
+chapter substituted for a canonical profile.
+
+On runtime base `8d1e653`, the corrected controller passes 27 focused
+construction/selection/command-witness cases under host sanitizers. All 54
+map/race/opponent configurations were attempted: 51 finish (4 wins, 47 losses),
+and three hit the unchanged 120,000-input-tick limit. The Terran product stalls
+on imported map 1, human Protoss, three bots; Zerg and Protoss products stall on
+map 1, human Terran, two bots. These are failures, not completed matches. No
+AI thresholds or terminal rules were changed to produce a pass.
+
+The Terran stall exposes a real resource-return routing defect: a Gateway
+beside the Nexus makes its center route unreachable while a point inside the
+existing drop-off ring is reachable. Loaded Probes keep their eight minerals
+and cannot finish the return trip. A normal-input minimal reproduction fails
+on this runtime; shared-engine repair and requalification remain outstanding.
+Other stalled configurations still require diagnosis.
+
+The controller now tracks pending travel separately from paid foundations,
+observes completion/loss on every input tick, navigates remembered menu rows,
+and follows moving workers when selecting them. It emits action witnesses
+only for accepted clicks. Matrix failures are retained while the remaining
+configurations continue, and stale trace files cannot satisfy a new run.
+This host evidence does not establish ARM performance or hardware behavior.
