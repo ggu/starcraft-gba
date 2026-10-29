@@ -2,6 +2,25 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
+## Protoss P8 candidate (2026-10-29)
+
+The explicit `protoss-p8` candidate (`SCP8`, generation 44) adds P8 to the
+canonical P1–P7 profile. Canonical Protoss is unchanged and stays P7; its
+rebuilt ROM is byte-identical to the base. One ordinary-input host
+controller run wins P8 at frame 65,553 with no runtime faults, and is
+deterministic across runs. The input-only ARM replay of its 5,080-transition
+key tape matches all 68 host observations, state digests included, through
+the same win. A pause-menu save at frame 30,001 gives an SRAM record that is
+byte-identical on host and ARM. Loading it from the title screen in a fresh
+process continues to the same win, matching the uninterrupted replay at
+every common observation. Whole-tape ARM guest timing averages 1,669,669
+cycles per frame (about 10 fps equivalent). The playable ROM links at
+`__bss_end=0x0203898c` and `__iwram_end=0x03004c40`. The AI backend,
+transmission duration and trigger cadence are authored, and P7-only ability
+services are inactive in P8. These are emulator and host results only, with
+no hardware claim. See the
+[P8 candidate audit](audits/2026-10-29-p8-campaign/README.md).
+
 ## Current race-build continuation (2026-10-28)
 
 After worker-arrival construction, all three canonical race vectors pass a

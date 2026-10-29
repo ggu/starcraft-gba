@@ -57,6 +57,9 @@ _Static_assert(SC_RB_COUNT <= 64, "P7 typed building type field uses six bits");
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_state.h"
 #endif
+#ifdef SC64_P8_RUNTIME
+#include "sc64_p8_state.h"
+#endif
 
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
 /* Source player 5 is inactive in the T4 scenario. The save validator requires
@@ -177,6 +180,9 @@ typedef struct {
         Sc64P5PersistentState p5;
         Sc64P6PersistentState p6;
         Sc64P7PersistentState p7;
+#ifdef SC64_P8_RUNTIME
+        Sc64P8PersistentState p8;
+#endif
     };
 #elif defined(SC64_P5_RUNTIME) && defined(SC64_P6_RUNTIME)
     union {
@@ -241,6 +247,10 @@ _Static_assert(sizeof(Sc64Z6PersistentState) <= sizeof(Sc64Z5PersistentState),
                "Z6 must fit in the existing Z5 save payload");
 #endif
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
+#ifdef SC64_P8_RUNTIME
+_Static_assert(sizeof(Sc64P8PersistentState) <= sizeof(Sc64P6PersistentState),
+               "P8 must fit in the existing Protoss mission save payload");
+#endif
 #ifdef SC64_T6_STORAGE
 #ifdef SC64_LATE_TERRAN_STORAGE
 #ifdef SC64_TERRAN_LATE_RUNTIME

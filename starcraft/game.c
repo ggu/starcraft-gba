@@ -282,7 +282,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
+#if defined(SC64_P8_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 44u
+#elif defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 43u
 #elif defined(SC64_P7_CARRIER_TRAINING_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 42u
@@ -1412,6 +1414,18 @@ static int race_p6_combat_tick_traps(void);
 #ifdef SC64_P7_ARCHON_SPLASH
 static int race_p7_archon_splash_attack(Unit *q, int target);
 #endif
+#ifdef SC64_P8_RUNTIME
+#define SC64_P8_GLOBAL_ID 27
+static int race_p8_active(void);
+static int race_p8_world_paused(void);
+static int race_p8_map_shape_valid(const Sc64RaceMap *map);
+static int race_p8_runtime_init(const Sc64RaceMap *map);
+static int race_p8_runtime_tick(u32 elapsed_updates);
+static int race_p8_outcome(void);
+static void race_p8_note_unit_spawn(int slot, int owner, int type);
+static void race_p8_note_building_spawn(int slot, int owner, int type);
+static void race_p8_note_product_building(int building);
+#endif
 enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
        SC64_HIT_SKIP_HALLUCINATION_SCALE=4 };
 #ifdef SC64_SIEGE_SPLASH
@@ -1987,6 +2001,9 @@ spawn_unit(int owner, int type, int x, int y)
         u[i].raw_owner = 7;
     }
 #endif
+#ifdef SC64_P8_RUNTIME
+    race_p8_note_unit_spawn(i, owner, type);
+#endif
 #ifdef SC64_T5_RUNTIME
     if (race_t5_active()) {
         u[i].raw_type = sc64_race_raw_unit(type);
@@ -2129,6 +2146,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
         b[i].raw_type = sc64_race_raw_building(type);
         b[i].raw_owner = 7;
     }
+#endif
+#ifdef SC64_P8_RUNTIME
+    race_p8_note_building_spawn(i, owner, type);
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
     if (race_p7_active() && type == B_P7_SHIELD_BATTERY) {
@@ -7452,6 +7472,23 @@ game_update(u16 held, u16 pressed)
         return;
     }
 #endif
+#ifdef SC64_P8_RUNTIME
+    /* P8 PauseGame freezes combat, production, orders and commands while the
+     * source trigger clock and its waits continue (native source pause). */
+    if (race_p8_world_paused()) {
+        ++frame;
+        update_imported_mission();
+        update_exploration();
+        if (won || lost) {
+            if (won) race_completed |= 1 << race_selected_mission;
+            save_game();
+            reset_selection_gestures();
+            screen = SCREEN_RESULT;
+            result_timer = 0;
+        }
+        return;
+    }
+#endif
 #if defined(SC64_P6_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
     /* A spell hotkey keeps real-time targeting practical on the GBA pad. */
     if ((held&KEY_B) && (pressed&KEY_R) && !box_state &&
@@ -10596,6 +10633,9 @@ game_self_test(void)
 #endif
 #include "race_campaign_adapter.h"
 #include "sc64_z8_game_bridge.h"
+#ifdef SC64_P8_RUNTIME
+#include "sc64_p8_runtime_adapter.h"
+#endif
 #ifdef SC64_NYDUS_ENABLED
 static int race_save_decode_unit(const RaceSave *, unsigned, unsigned, unsigned, Unit *);
 static int race_save_decode_building(const RaceSave *, unsigned, Building *);

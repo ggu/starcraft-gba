@@ -1738,6 +1738,79 @@ build/StarCraft-Protoss-P7-GBA.gba: build/starcraft-protoss-p7.elf tools/fix_rom
 .PHONY: protoss-p7
 protoss-p7: verify-protoss
 
+# Explicit P8 candidate: the canonical P1-P7 profile plus The Trial of
+# Tassadar as an eighth entry. It has its own SCP8 code, generation-44 saves
+# and fact tables for its larger roster; canonical Protoss stays P7.
+P8_FACT_V2_DIR := build/generated/p8-fact-v2
+P8_FACT_V2_HEADER := $(P8_FACT_V2_DIR)/sc64_fact_tables_generated.h
+P8_SCENARIO_HEADER := .local/sc64/zp-stage/generated/scenarios/sc64_p8_scenario_generated.h
+P8_CAMPAIGN_DEFINES := -DSC64_P8_DATA_ENABLED -DSC64_P8_RUNTIME -DSC64_P8_CAMPAIGN_ENTRY -DSC64_Z8_GAME_POOL_BRIDGE -DSC64_P8_GAME_POOL_BRIDGE
+PROTOSS_P8_FLAGS = $(patsubst -I$(P7_FACT_V2_DIR),-I$(P8_FACT_V2_DIR),$(PROTOSS_P7_CANONICAL_FLAGS)) $(P8_CAMPAIGN_DEFINES)
+PROTOSS_P8_INPUTS = $(filter-out $(P7_FACT_V2_HEADER),$(PROTOSS_P7_CANONICAL_INPUTS)) $(P8_FACT_V2_HEADER) $(P8_SCENARIO_HEADER)
+$(P8_FACT_V2_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile | build
+	mkdir -p $(P8_FACT_V2_DIR)
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(filter-out -DSC64_FACT_TABLES,$(patsubst -I$(P7_FACT_V2_DIR),-I$(P8_FACT_V2_DIR),$(P7_FACT_V2_FLAGS)) $(P8_CAMPAIGN_DEFINES)) $< -o build/sc64-p8-fact-v2-gen
+	./build/sc64-p8-fact-v2-gen > $@.tmp
+	mv $@.tmp $@
+build/starcraft-protoss-p8.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(PROTOSS_P8_FLAGS) $(COMMON) $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p8.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Protoss-P8-GBA.gba: build/starcraft-protoss-p8.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC PROTOSS8' SCP8
+.PHONY: protoss-p8 verify-protoss-p8
+verify-protoss-p8: build/StarCraft-Protoss-P8-GBA.gba
+	$(PYTHON) tools/verify_roms.py --protoss-p8
+protoss-p8: verify-protoss-p8
+
+# P8 ordinary-input qualification. The host controller writes its trace and
+# pause-menu SRAM image under build/p8-arm; the replay probe source builds as
+# host programs and as ARM ROMs (full tape, save prefix, fresh-process resume).
+P8_ARM_DIR := build/p8-arm
+P8_ARM_TRACE := $(P8_ARM_DIR)/p8-controller.jsonl
+P8_HOST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
+P8_REPLAY_COMMON := $(filter-out common/main.c,$(COMMON))
+build/test-sc64-p8-campaign-run: tests/sc64_p8_campaign_run.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+$(P8_ARM_TRACE): build/test-sc64-p8-campaign-run
+	mkdir -p $(P8_ARM_DIR)
+	./build/test-sc64-p8-campaign-run $@
+.PHONY: test-sc64-p8-controller
+test-sc64-p8-controller: $(P8_ARM_TRACE)
+$(P8_ARM_DIR)/sc64_p8_tape_generated.h: $(P8_ARM_TRACE) tools/sc64_p8_arm_replay.py
+	$(PYTHON) tools/sc64_p8_arm_replay.py tape $< $@
+P8_REPLAY_DEPS = tests/sc64_p8_arm_replay.c $(P8_ARM_DIR)/sc64_p8_tape_generated.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile
+build/test-sc64-p8-replay: $(P8_REPLAY_DEPS) | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) -I$(P8_ARM_DIR) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+build/test-sc64-p8-replay-prefix: $(P8_REPLAY_DEPS) | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) -I$(P8_ARM_DIR) -DP8_REPLAY_PREFIX $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+build/test-sc64-p8-replay-resume: $(P8_REPLAY_DEPS) | build
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) -I$(P8_ARM_DIR) -DP8_REPLAY_RESUME $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+# Host replays: the full tape must win; prefix saves, a fresh process loads
+# that SRAM image and its continuation must match the full replay.
+.PHONY: test-sc64-p8-replay
+test-sc64-p8-replay: build/test-sc64-p8-replay build/test-sc64-p8-replay-prefix build/test-sc64-p8-replay-resume tools/sc64_p8_arm_replay.py
+	./build/test-sc64-p8-replay > $(P8_ARM_DIR)/host-full.txt
+	rm -f $(P8_ARM_DIR)/host-prefix.sav
+	./build/test-sc64-p8-replay-prefix $(P8_ARM_DIR)/host-prefix.sav > $(P8_ARM_DIR)/host-prefix.txt || true
+	./build/test-sc64-p8-replay-resume $(P8_ARM_DIR)/host-prefix.sav > $(P8_ARM_DIR)/host-resume.txt
+	$(PYTHON) tools/sc64_p8_arm_replay.py compare $(P8_ARM_DIR)/host-full.txt $(P8_ARM_DIR)/host-resume.txt
+.PHONY: test-sc64-protoss-p8
+test-sc64-protoss-p8: test-sc64-p8-controller test-sc64-p8-replay
+define P8_ARM_ROM
+build/starcraft-protoss-p8-$(1).elf: $$(P8_REPLAY_DEPS) $$(P8_REPLAY_COMMON) common/gba.ld | build
+	$$(CC) $$(CFLAGS) $$(PROTOSS_P8_FLAGS) -I$$(P8_ARM_DIR) $(2) $$(P8_REPLAY_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) $$(LDFLAGS) -Wl,-Map,build/starcraft-protoss-p8-$(1).map -lgcc -o $$@
+	$$(SIZE) $$@
+build/StarCraft-Protoss-P8-$(3).gba: build/starcraft-protoss-p8-$(1).elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC P8 REPLAY' SCP8
+endef
+$(eval $(call P8_ARM_ROM,replay,,Replay))
+$(eval $(call P8_ARM_ROM,replay-prefix,-DP8_REPLAY_PREFIX,Replay-Prefix))
+$(eval $(call P8_ARM_ROM,replay-resume,-DP8_REPLAY_RESUME,Replay-Resume))
+.PHONY: sc64-p8-arm-replay
+sc64-p8-arm-replay: build/StarCraft-Protoss-P8-Replay.gba build/StarCraft-Protoss-P8-Replay-Prefix.gba build/StarCraft-Protoss-P8-Replay-Resume.gba
+
 build/test-sc64-p5-transport-on: tests/sc64_p5_transport.c starcraft/sc64_transport_rules.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_P5_SHUTTLE_ENABLED $< -o $@
 build/test-sc64-p5-transport-off: tests/sc64_p5_transport.c starcraft/sc64_transport_rules.h Makefile | build

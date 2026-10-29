@@ -12,7 +12,8 @@ missions. Canonical Zerg includes its first six missions. The default Protoss
 target is the qualified P7 candidate. Explicit `protoss-p6` remains a separate
 P1–P6 product with its generation-30 save identity.
 `zerg-z4`, `zerg-z3` and `protoss-p3` remain explicit legacy builds with their original
-ROMs and save identities; `protoss-p4-storm` also preserves its real four-entry files. The P7 candidate carries the P1–P6 campaign and the seventh menu entry; explicit
+ROMs and save identities; `protoss-p4-storm` also preserves its real four-entry files. The P7 candidate carries the P1–P6 campaign and the seventh menu entry. The
+explicit `protoss-p8` candidate adds P8 as an eighth entry; explicit
 `protoss-p5-shuttle` preserves the earlier five-entry product. The
 catalog records all 30 mission identifiers.
 
@@ -118,6 +119,19 @@ Both remain below the 30-fps target. These are bounded samples, not a mission-wi
 average. Neither profile establishes native enemy-AI equivalence, arbitrary
 save-state coverage or physical-GBA behavior. Zerg 7–10 and Protoss 8–10
 remain unqualified in the canonical profiles.
+
+P8 **The Trial of Tassadar** has a separate, unpromoted `protoss-p8`
+candidate. It carries the canonical P1–P7 profile, is built with
+`make protoss-p8` and writes `StarCraft-Protoss-P8-GBA.gba` /
+`starcraft-protoss-p8.elf`, code `SCP8`, generation 44. One ordinary-input
+host controller run wins P8. The input-only ARM replay of its key tape
+matches every host observation through the win. A pause-menu SRAM save,
+loaded in a fresh process, continues to the same win on host and on ARM.
+P8's AI backend, transmission duration and trigger cadence are authored.
+Carrier interceptors, Arbiter cloaking, Observer detection and Shield
+Battery recharge are still P7-only and inactive in P8. See the
+[P8 candidate audit](audits/2026-10-29-p8-campaign/README.md). P9 and P10
+remain unavailable.
 
 For P7, the canonical-render candidate passes its host startup/save fixtures,
 normal-input campaign win, 18-match skirmish matrix and menu-driven save/reload.

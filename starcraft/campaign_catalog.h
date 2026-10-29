@@ -45,6 +45,13 @@
 #error "P7 entry requires the authenticated P1-P7 Protoss runtime, data, actors and ability profile"
 #endif
 #endif
+#ifdef SC64_P8_CAMPAIGN_ENTRY
+#if !defined(SC64_P7_CAMPAIGN_ENTRY) || !defined(SC64_P8_RUNTIME) || \
+    !defined(SC64_P8_DATA_ENABLED) || !defined(SC64_ZP_FULL_STORAGE) || \
+    !defined(SC64_UNIFIED) || !defined(SC64_CAMPAIGN_RACE) || SC64_CAMPAIGN_RACE != 2
+#error "P8 entry requires the authenticated P1-P8 Protoss runtime and data"
+#endif
+#endif
 #ifdef SC64_Z6_CAMPAIGN_ENTRY
 #if !defined(SC64_Z5_CAMPAIGN_ENTRY) || !defined(SC64_Z6_RUNTIME) || \
     !defined(SC64_Z6_DATA_ENABLED) || !defined(SC64_Z6_ACTORS) || \
@@ -239,7 +246,13 @@ static const Sc64MissionInfo sc64_campaign_catalog[SC64_BASE_MISSION_COUNT] = {
      0,
 #endif
      "HOMELAND"},
-    {27, SC64_FACTION_PROTOSS, 8, 0, "THE TRIAL"},
+    {27, SC64_FACTION_PROTOSS, 8,
+#ifdef SC64_P8_CAMPAIGN_ENTRY
+     1,
+#else
+     0,
+#endif
+     "THE TRIAL"},
     {28, SC64_FACTION_PROTOSS, 9, 0, "SHADOW HUNTERS"},
     {29, SC64_FACTION_PROTOSS, 10, 0, "EYE OF THE STORM"}
 };
