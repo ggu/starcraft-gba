@@ -5019,3 +5019,10 @@ build/test-sc64-source-clock-math: tests/sc64_source_clock_math.c starcraft/sc64
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 test-sc64-source-clock-math: build/test-sc64-source-clock-math
 	./build/test-sc64-source-clock-math
+
+# Pixel oracle for source building remnants, using an already prepared bank.
+build/test-sc64-death-remnant-words: tests/sc64_death_remnant_word_bank.c common/gba.c common/gba.h $(DEATH_ART_HEADER) Makefile | build
+	$(CLANG) $(DEATH_VFX_TEST_FLAGS) -Istarcraft -I$(DEATH_ART_DIR) -DSC64_DEATH_SOURCE_ART -DSC64_UNIT_WORD_SPRITES -DGBA_SPRITE_WORDS -DGBA_SCENE_CLIP $< common/gba.c -o $@
+.PHONY: test-sc64-death-remnant-words
+test-sc64-death-remnant-words: build/test-sc64-death-remnant-words
+	./build/test-sc64-death-remnant-words
