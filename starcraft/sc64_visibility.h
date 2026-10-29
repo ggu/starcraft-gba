@@ -20,6 +20,9 @@
 #define SC64_SOURCE_SIGHT_SPANS_ACTIVE() race_z7_active()
 #else
 #define SC64_SOURCE_SIGHT_SPANS_ACTIVE() 1
+/* Moving Terran units walk their source-radius rows in the same IWRAM span
+ * transition as the 56/72 radii, with a per-radius halfwidth row. */
+#define SC64_SHARED_SPAN_TABLES 1
 #endif
 #endif
 
@@ -456,6 +459,9 @@ sc64_visibility_ceil_div16(int value)
 /* Derive exact row intervals in IWRAM without duplicating the helper body. */
 static void GBA_HOT __attribute__((noinline))
 sc64_visibility_row_span(int x, int y, int row, int radius, int extent,
+#ifdef SC64_SHARED_SPAN_TABLES
+                         const u8 *halfwidths,
+#endif
                          int *first, int *last)
 {
     int c = x / 16, r = y / 16;
@@ -467,8 +473,12 @@ sc64_visibility_row_span(int x, int y, int row, int radius, int extent,
     dy = row * 16 + 8 - y;
     if (dy < 0) dy = -dy;
     if (dy > radius) return;
+#ifdef SC64_SHARED_SPAN_TABLES
+    halfwidth = halfwidths[dy];
+#else
     halfwidth = radius == 56 ? sc64_visibility_halfwidth_56[dy] :
                                sc64_visibility_halfwidth_72[dy];
+#endif
     col0 = sc64_visibility_ceil_div16(x - halfwidth - 8);
     col1 = sc64_visibility_floor_div16(x + halfwidth - 8);
     if (col0 < c - extent) col0 = c - extent;
@@ -560,6 +570,7 @@ sc64_z7_adjust_visibility_source(int x, int y, int radius, int delta)
     }
 }
 
+#ifndef SC64_SHARED_SPAN_TABLES
 static void __attribute__((noinline))
 sc64_z7_transition_visibility(int old_x, int old_y, int new_x, int new_y,
                               int radius)
@@ -589,6 +600,7 @@ sc64_z7_transition_visibility(int old_x, int old_y, int new_x, int new_y,
     }
 }
 #endif
+#endif
 
 #endif
 
@@ -599,6 +611,29 @@ static void GBA_HOT
 sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
                                 int type)
 {
+#ifdef SC64_SHARED_SPAN_TABLES
+    int source_pixels = sc64_actor_unit_sight_pixels(type);
+    int radius, extent = 5;
+    const u8 *halfwidths;
+    if (source_pixels > 0) {
+        if (old_x == new_x && old_y == new_y)
+            return;
+        radius = source_pixels / 2;
+        /* The span rows cover radii 64..176 in steps of 16. */
+        if (radius < 64 || radius > 176 || (radius & 15)) {
+            sc64_t4_adjust_visibility_source(old_x, old_y, radius, -1);
+            sc64_t4_adjust_visibility_source(new_x, new_y, radius, 1);
+            return;
+        }
+        halfwidths = sc64_z7_visibility_halfwidths +
+                     sc64_z7_visibility_halfwidth_offsets[(radius - 64) / 16];
+        extent = (radius + 23) / 16;
+    } else {
+        radius = IS_WORKER(type) ? 56 : 72;
+        halfwidths = radius == 56 ? sc64_visibility_halfwidth_56 :
+                                    sc64_visibility_halfwidth_72;
+    }
+#else
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
 #ifdef SC64_SOURCE_SIGHT_SPANS
     int source_pixels = sc64_actor_unit_sight_pixels(type);
@@ -633,9 +668,13 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
         type==U_SCV
 #endif
         ? 56 : 72;
+#endif
 #ifdef SC64_VISIBILITY_SPANS
     int old_row = old_y / 16, new_row = new_y / 16;
     int row;
+#ifndef SC64_SHARED_SPAN_TABLES
+    const int extent = 5;
+#endif
 #else
     int old_col = old_x / 16, old_row = old_y / 16;
     int new_col = new_x / 16, new_row = new_y / 16;
@@ -646,13 +685,19 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
     int col, row;
 #endif
 #ifdef SC64_VISIBILITY_SPANS
-    int row0 = (old_row < new_row ? old_row : new_row) - 5;
-    int row1 = (old_row > new_row ? old_row : new_row) + 5;
+    int row0 = (old_row < new_row ? old_row : new_row) - extent;
+    int row1 = (old_row > new_row ? old_row : new_row) + extent;
     for (row = row0; row <= row1; ++row) {
         int old_first, old_last, new_first, new_last;
-        sc64_visibility_row_span(old_x, old_y, row, radius, 5,
+        sc64_visibility_row_span(old_x, old_y, row, radius, extent,
+#ifdef SC64_SHARED_SPAN_TABLES
+                                 halfwidths,
+#endif
                                  &old_first, &old_last);
-        sc64_visibility_row_span(new_x, new_y, row, radius, 5,
+        sc64_visibility_row_span(new_x, new_y, row, radius, extent,
+#ifdef SC64_SHARED_SPAN_TABLES
+                                 halfwidths,
+#endif
                                  &new_first, &new_last);
         if (old_first > old_last) {
             sc64_visibility_apply_span(row, new_first, new_last, 1);
