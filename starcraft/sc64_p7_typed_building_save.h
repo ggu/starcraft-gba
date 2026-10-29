@@ -89,15 +89,19 @@ static int sc64_p7_typed_building_encode(Sc64P7TypedBuildingSave *row,
     if (!sc64_p7_typed_building_fields_valid(q,ww,wh)) return 0;
 #define PUT(w,v) do { if(!sc64_p7_typed_building_put(&out,&bit,(w),(u32)(v))) return 0; } while(0)
     PUT(11,q->x); PUT(11,q->y); PUT(18,q->hp+131072);
-    PUT(3,q->owner); PUT(6,q->type); PUT(1,q->alive);
+    PUT(3,q->owner); PUT(6,q->type & 63); PUT(1,q->alive);
     for(unsigned i=0;i<5;++i) PUT(6,q->queue[i]);
     PUT(3,q->queue_head); PUT(3,q->queue_count); PUT(16,q->queue_progress);
     PUT(16,q->build_progress+1); PUT(1,q->under_construction);
     PUT(7,q->level); PUT(17,q->shield); PUT(8,q->raw_type+1);
     PUT(4,q->raw_owner+1); PUT(16,q->flags); PUT(2,q->larva);
     PUT(9,q->larva_timer); PUT(11,q->shield_remainder); PUT(1,1);
-#undef PUT
     if (bit!=194) return 0;
+    /* Keep the type's legacy low six bits and all following fields in place;
+     * use the first old padding bit for the seventh bit. */
+    PUT(1,(unsigned)q->type >> 6);
+    if (bit!=195) return 0;
+#undef PUT
     *row=out;
     return 1;
 }
@@ -124,6 +128,9 @@ static int sc64_p7_typed_building_decode(Building *out,
     GET(4,v); q.raw_owner=(int)v-1; GET(16,q.flags); GET(2,q.larva);
     GET(9,q.larva_timer); GET(11,q.shield_remainder);
     if(!sc64_p7_typed_building_get(row,&bit,1,&v)||v!=1||bit!=194) return 0;
+    if(!sc64_p7_typed_building_get(row,&bit,1,&v)) return 0;
+    q.type|=(int)v<<6;
+    if(q.type>=SC_RB_COUNT || bit!=195) return 0;
     for(;bit<200;++bit)
         if((row->bytes[bit>>3]>>(bit&7u))&1u) return 0;
     q.maxhp=sc64_p7_typed_building_maxhp(q.type);
