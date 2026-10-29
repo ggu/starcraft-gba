@@ -1,0 +1,232 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#ifndef SC64_IMPACT_ADAPTER_H
+#define SC64_IMPACT_ADAPTER_H
+
+/* Game binding for pending projectile impacts.
+ *
+ * Timing reuses the imported N64 weapons/flingy/IScript bank that already
+ * draws the projectile: attack release, projectile startup, distance-derived
+ * flight and the Death script's domissiledmg tick. Only moving bullet types
+ * (fly, follow-target, bounce) are queued; appear-at-target, source and
+ * self-destruct weapons, and every attack without a source profile, keep the
+ * immediate path. Resolution uses the ordinary hit path, so shields,
+ * invincibility, armor and death cleanup are evaluated at impact. The packet
+ * keeps its launch owner, type and damage; the attacker slot is not kept, so
+ * an attacker that dies after launch still delivers its projectile.
+ * See docs/IMPACT-EVENTS.md for provenance and limits. */
+
+static Sc64ImpactEvent race_impact_rows[RACE_IMPACT_CAPACITY];
+static u8 race_impact_count;
+/* Diagnostics only; neither is saved and neither affects simulation. */
+static u8 race_impact_high_water;
+static u16 race_impact_deferred;
+
+static void
+race_impact_reset(void)
+{
+    race_impact_count = 0;
+    race_impact_high_water = 0;
+    race_impact_deferred = 0;
+}
+
+static void
+race_impact_clear_target(int ref)
+{
+    if (race_impact_count)
+        (void)sc64_impact_clear_target(race_impact_rows, &race_impact_count, ref);
+}
+
+static unsigned
+race_impact_death_damage_tick(const Sc64WeaponSourceAttackProfile *p)
+{
+    const Sc64WeaponSourceAnimation *death =
+        sc64_weapon_source_animation_lookup(p->projectile_image, 1u);
+    if (!death || death->event_first > SC64_WEAPON_SOURCE_EVENT_COUNT ||
+        death->event_count > SC64_WEAPON_SOURCE_EVENT_COUNT - death->event_first)
+        return 0;
+    for (uint16_t i = 0; i < death->event_count; ++i) {
+        const Sc64WeaponSourceEvent *event =
+            &sc64_weapon_source_events[death->event_first + i];
+        if (event->opcode == 27u) return event->source_tick; /* domissiledmg */
+    }
+    return 0;
+}
+
+/* End-of-update steps from launch to the impact frame, or zero for the
+ * immediate path. The launching update's own step counts, so a projectile
+ * whose impact is first drawn at presentation age k resolves after k + 1
+ * steps, on that same update. */
+static unsigned
+race_impact_profile_steps(const Sc64WeaponSourceAttackProfile *p, int x0, int y0,
+                          int x1, int y1)
+{
+    int launch_x, launch_y;
+    uint32_t flight, source_tick, age;
+    /* Single-target moving bullets only; attack-target-position and
+     * extend-to-max-range bullets hit areas or lines the engine lacks. */
+    if (!p || !p->projectile_image ||
+        (p->weapon_bullet_type != SC64_SOURCE_BULLET_FLY &&
+         p->weapon_bullet_type != SC64_SOURCE_BULLET_FOLLOW &&
+         p->weapon_bullet_type != SC64_SOURCE_BULLET_BOUNCE)) return 0;
+    sc64_weapon_source_trace_launch_origin(p,
+        (uint8_t)sc64_source_effect_direction(x1 - x0, y1 - y0), x0, y0,
+        &launch_x, &launch_y);
+    flight = sc64_weapon_source_trace_flight_ticks(p, launch_x, launch_y, x1, y1);
+    /* The renderer draws no trace for a distant projectile without motion. */
+    if (!flight && sc64_weapon_source_trace_distance_raw(launch_x, launch_y, x1, y1))
+        return 0;
+    source_tick = sc64_weapon_source_trace_release_ticks(p) +
+                  sc64_weapon_source_trace_startup_ticks(p) + flight +
+                  race_impact_death_damage_tick(p);
+    age = sc64_weapon_source_vfx_first_gba_age(source_tick);
+    if (!age) return 0;
+    /* Weapon ranges keep this far below the bound; saturating would only
+     * be reached by an impossible multi-second flight. */
+    return age >= SC64_IMPACT_MAX_STEPS ? SC64_IMPACT_MAX_STEPS : age + 1u;
+}
+
+/* Mirrors sc64_source_emit(): one or two source shots share the packet. */
+static unsigned
+race_impact_source_steps(int raw, int weapon, int air, int x0, int y0, int x1, int y1)
+{
+    unsigned variant, count, steps = 0;
+    const Sc64WeaponSourceAttackProfile *profile;
+    if (raw < 0 || raw >= 228 || weapon < 0 || weapon >= 130) return 0;
+    variant = raw >= 106 ? 2u : (raw == 83 && weapon == 82) ? 1u : 0u;
+    profile = sc64_weapon_source_profile_lookup((uint8_t)raw, (uint8_t)weapon,
+                                                (uint8_t)air, (uint8_t)variant);
+    if (!profile) return 0;
+    count = profile->weapon_count == 2 ? 2u : 1u;
+    for (unsigned shot = 0; shot < count; ++shot) {
+        const Sc64WeaponSourceAttackProfile *p = shot == 0 ? profile :
+            sc64_weapon_source_profile_lookup((uint8_t)raw, (uint8_t)weapon,
+                (uint8_t)air, (uint8_t)(variant ? variant : shot));
+        unsigned s = race_impact_profile_steps(p, x0, y0, x1, y1);
+        if (s > steps) steps = s;
+    }
+    return steps;
+}
+
+static unsigned
+race_impact_unit_steps(const Unit *q, int target, int air)
+{
+    int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+    Sc64StockAttack attack;
+    int weapon;
+    if (sc64_stock_attack_select(raw, air, &attack)) weapon = attack.weapon_id;
+    else if (raw == 83 && !air) weapon = 82; /* Existing Reaver/Scarab adapter. */
+    else return 0;
+    return race_impact_source_steps(raw, weapon, air, q->x, q->y,
+                                    target_x(target), target_y(target));
+}
+
+static unsigned
+race_impact_building_steps(const Building *q, int target, int air)
+{
+    int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_building(q->type);
+    Sc64StockAttack attack;
+    if (!sc64_stock_attack_select(raw, air, &attack)) return 0;
+    return race_impact_source_steps(raw, attack.weapon_id, air, q->x, q->y,
+                                    target_x(target), target_y(target));
+}
+
+static int
+race_impact_full(void)
+{
+    if (race_impact_count < RACE_IMPACT_CAPACITY) return 0;
+    if (race_impact_deferred != 0xffffu) ++race_impact_deferred;
+    return 1;
+}
+
+/* Queue one weapon packet. Callers check race_impact_full() before any
+ * launch side effect; the asserts below make the unrepresentable cases
+ * unreachable for engine actors and stock weapons. */
+static void
+race_impact_launch(int target, int damage, int hits, int owner,
+                   int damage_class, int source_type, unsigned steps)
+{
+    Sc64ImpactHit hit = { target, damage, hits, owner, damage_class, source_type };
+    Sc64ImpactPushResult r = sc64_impact_push(race_impact_rows, RACE_IMPACT_CAPACITY,
+                                              &race_impact_count, &hit, steps);
+    if (r == SC64_IMPACT_QUEUED) {
+        if (race_impact_count > race_impact_high_water)
+            race_impact_high_water = race_impact_count;
+        return;
+    }
+    /* Unreachable after race_impact_full(); never lose the packet. */
+    for (int i = 0; i < hits && target_alive(target); ++i)
+        hit_target_impl(target, damage, source_type, owner, damage_class);
+}
+
+static void
+race_impact_resolve(const Sc64ImpactEvent *e)
+{
+    Sc64ImpactHit hit;
+    sc64_impact_unpack(e, &hit);
+    for (int i = 0; i < hit.hits && target_alive(hit.target); ++i)
+        hit_target_impl(hit.target, hit.damage, hit.source_type, hit.owner,
+                        hit.damage_class);
+}
+
+/* A target that dies or stops being targetable (loaded, hidden, burrowed)
+ * loses its pending impacts for good, even if it reappears before arrival,
+ * as the PC reference clears bullet targets when a unit is killed or hidden.
+ * Survivors then advance one step; due packets resolve in launch order. */
+static void __attribute__((noinline))
+race_impact_tick(void)
+{
+    Sc64ImpactEvent due[RACE_IMPACT_CAPACITY];
+    unsigned ready, keep = 0;
+    if (!race_impact_count) return;
+    for (unsigned i = 0; i < race_impact_count; ++i)
+        if (target_alive(sc64_impact_event_target(&race_impact_rows[i])))
+            race_impact_rows[keep++] = race_impact_rows[i];
+    race_impact_count = (u8)keep;
+    ready = sc64_impact_step(race_impact_rows, &race_impact_count, due);
+    for (unsigned i = 0; i < ready; ++i) race_impact_resolve(&due[i]);
+}
+
+/* Save: an empty queue keeps the historical RaceSave-length record. More
+ * pending impacts than this profile's record holds refuse the save before
+ * any SRAM write; they land within a second of play. */
+static int
+race_impact_save_write(void)
+{
+    u32 bytes = 0;
+    if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
+    if (race_impact_count)
+        bytes = sc64_impact_encode(race_impact_rows, race_impact_count,
+                                   race_impact_record.impacts);
+    save_write(&race_impact_record, (u32)sizeof(RaceSave) + bytes, SAVE_VERSION);
+    return 1;
+}
+
+/* Load preflight: read the newest record of either length into race_data and
+ * validate any impact block into `candidate` without touching live state. */
+static int
+race_impact_save_read(Sc64ImpactEvent *candidate, int *count)
+{
+    u32 len = 0;
+    int rows;
+    *count = 0;
+    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record),
+                          SAVE_VERSION, &len) || len < sizeof(RaceSave)) return 0;
+    if (len == sizeof(RaceSave)) return 1;
+    rows = sc64_impact_decode(race_impact_record.impacts, len - (u32)sizeof(RaceSave),
+                              RACE_IMPACT_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
+                              SC_RU_COUNT, candidate);
+    if (rows < 0) return 0;
+    *count = rows;
+    return 1;
+}
+
+static void
+race_impact_restore(const Sc64ImpactEvent *candidate, int count)
+{
+    race_impact_reset();
+    if (count > 0) memcpy(race_impact_rows, candidate, (size_t)count * sizeof(*candidate));
+    race_impact_count = (u8)count;
+    race_impact_high_water = (u8)count;
+}
+
+#endif

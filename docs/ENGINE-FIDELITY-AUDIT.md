@@ -20,13 +20,16 @@ and [Validation](VALIDATION.md) for provenance and existing limits.
   exercise separate primary and collateral targets, allies, airborne and
   invincible actors, shields and death callbacks. `tests/sc64_firebat_damage_game.c`
   covers the current race primary and absence of invented collateral.
-- **Projectile timing:** Normal stock unit attacks emit visual effects and
-  immediately deal damage in `game.c`'s `tick_combat`. A traveling effect can
-  therefore appear after its target dies. OpenBW instead resolves a normal
-  bullet hit at impact ([pinned `bwgame.h` lines 14086–14099](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L14086-L14099)).
-  Projectile-specialized adapters are separate. A future bounded event design
-  needs tests for launch versus impact, target death/motion, slot reuse and
-  pool overflow, and independent N64 timing evidence.
+- **Projectile timing, implemented for moving projectiles:** In products with
+  source weapon effects, unit and tower attacks whose N64 bullet type flies,
+  follows or bounces queue their damage until the drawn impact frame, using the
+  bank's release, startup, flight and `domissiledmg` records. OpenBW resolves a
+  normal bullet hit at impact ([pinned `bwgame.h` lines 14086–14099](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L14086-L14099)).
+  Appear-at-target weapons still deal damage on the attack decision, before
+  their wind-up, and products without source effects keep immediate damage.
+  Native N64 bullet resolution remains untraced. See
+  [Pending projectile impacts](IMPACT-EVENTS.md) for the queue, overflow, save
+  and test coverage.
 - **Fractional damage and shields:** `sc64_stock_combat.h` uses integer HP
   and a minimum of one per positive hit. The PC reference uses fixed-point
   damage and a half-point minimum, applies plasma shield upgrades, and handles

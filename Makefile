@@ -4913,3 +4913,49 @@ test-sc64-order-marker-unified: build/test-sc64-order-marker-game-unified build/
 	./build/test-sc64-order-marker-game-unified
 	./build/test-sc64-order-marker-game-direct
 test-unified: test-sc64-order-marker-unified
+
+# Pending projectile impacts: asset-free queue contract, then the actual engine
+# with each production vector. Vectors without source weapon effects must keep
+# immediate damage.
+.PHONY: test-sc64-impact-events test-sc64-impact-events-game test-sc64-impact-events-unified
+test: test-sc64-impact-events
+test-sc64-impact-events: build/test-sc64-impact-events
+	./build/test-sc64-impact-events
+build/test-sc64-impact-events: tests/sc64_impact_events.c starcraft/sc64_impact_events.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+define IMPACT_EVENTS_GAME_FIXTURE
+build/test-sc64-impact-events-game-$(1): tests/sc64_impact_events_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(RACES_INPUTS) $(4) common/gba.c $$(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) $$($(2)) $(3) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(5) -o $$@
+endef
+$(eval $(call IMPACT_EVENTS_GAME_FIXTURE,terran,TERRAN_ROM_FLAGS,,$(TERRAN_FULL_INPUTS)))
+$(eval $(call IMPACT_EVENTS_GAME_FIXTURE,zerg,ZERG_ROM_FLAGS,,$(ZERG_Z6_INPUTS)))
+$(eval $(call IMPACT_EVENTS_GAME_FIXTURE,protoss,PROTOSS_P7_CANONICAL_FLAGS,,$(PROTOSS_P7_CANONICAL_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call IMPACT_EVENTS_GAME_FIXTURE,showcase,SHOWCASE_FLAGS,,$(SHOWCASE_INPUTS)))
+$(eval $(call IMPACT_EVENTS_GAME_FIXTURE,races,RACES_FLAGS))
+$(eval $(call IMPACT_EVENTS_GAME_FIXTURE,unified,UNIFIED_FLAGS))
+test-sc64-impact-events-game: $(addprefix build/test-sc64-impact-events-game-,terran zerg protoss showcase races unified)
+	./build/test-sc64-impact-events-game-terran
+	./build/test-sc64-impact-events-game-zerg
+	./build/test-sc64-impact-events-game-protoss
+	./build/test-sc64-impact-events-game-showcase
+	./build/test-sc64-impact-events-game-races
+	./build/test-sc64-impact-events-game-unified
+test-sc64-impact-events-unified: build/test-sc64-impact-events-game-unified
+	./build/test-sc64-impact-events-game-unified
+test-unified: test-sc64-impact-events-unified
+
+# No-GDB ARM timing probe for a projectile-heavy battle; run its ROM with
+# tools/sc64_impact_arm_probe.py. Emulator cycle counts, not hardware results.
+define IMPACT_ARM_PROBE
+build/starcraft-$(1)-impact-probe.elf: tests/sc64_impact_arm_probe.c $$(UI_ARM_COMMON) $$(COMMON_HEADERS) $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.ld Makefile | build
+	$$(CC) $$(CFLAGS) $$($(2)) $$(UI_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(4) $$(LDFLAGS) -lgcc -o $$@
+	$$(SIZE) $$@
+build/StarCraft-$(1)-Impact-Probe-GBA.gba: build/starcraft-$(1)-impact-probe.elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC IMPACT' SCIP
+endef
+$(eval $(call IMPACT_ARM_PROBE,showcase,SHOWCASE_FLAGS,$(SHOWCASE_INPUTS)))
+$(eval $(call IMPACT_ARM_PROBE,zerg,ZERG_ROM_FLAGS,$(ZERG_Z6_INPUTS)))
+$(eval $(call IMPACT_ARM_PROBE,protoss,PROTOSS_P7_CANONICAL_FLAGS,$(PROTOSS_P7_CANONICAL_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+.PHONY: impact-arm-probe
+impact-arm-probe: $(addprefix build/StarCraft-,$(addsuffix -Impact-Probe-GBA.gba,showcase zerg protoss))

@@ -101,6 +101,7 @@ int clampi(int x,int lo,int hi);
 int absi(int x);
 void save_write(const void *data,u32 length,u32 tag);
 int save_read(void *data,u32 length,u32 tag);
+int save_read_latest(void *data,u32 capacity,u32 tag,u32 *length);
 void audio_tone(int frequency,int frames,int volume);
 void audio_noise(int frames,int volume);
 void audio_update(void);
