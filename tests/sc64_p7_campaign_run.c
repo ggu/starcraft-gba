@@ -29,11 +29,13 @@ static int waypoint_to(int tx,int ty,int *wx,int *wy,int *steps_out,
     int cells=MAP_COLS*MAP_ROWS;
     static const int dx[4]={1,-1,0,0},dy[4]={0,0,1,-1};
     static int prev[MAP_CELLS],queue[MAP_CELLS];
-    int sx=0,sy=0,n=0,best_origin=0x7fffffff;
+    int sx=0,sy=0,n=0,best_origin=0x7fffffff, sumx=0,sumy=0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type!=U_PROBE){
-        int d=dist2(u[i].x,u[i].y,tx,ty);
+        sumx+=u[i].x;sumy+=u[i].y;++n;
+    }
+    if(n)for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type!=U_PROBE){
+        int d=dist2(u[i].x,u[i].y,sumx/n,sumy/n);
         if(d<best_origin){best_origin=d;sx=u[i].x;sy=u[i].y;}
-        ++n;
     }
     if(!n||!path_grid_valid)return 0;
     sx=limit(sx/16,0,MAP_COLS-1);sy=limit(sy/16,0,MAP_ROWS-1);
@@ -207,9 +209,10 @@ static int army_center(int *x,int *y)
     *x=sx/n;*y=sy/n;return n;
 }
 
-static void move_cursor(int x,int y)
+static int move_cursor(int x,int y)
 {
     unsigned guard=0;
+    if(menu_open || (mode!=MODE_NORMAL && mode!=MODE_ATTACK && mode!=MODE_BUILD)) return 0;
     x=limit(x,0,WORLD_W-1);y=limit(y,0,WORLD_H-1);
     x=cx+((x-cx)>=0?((x-cx+2)/4):((x-cx-2)/4))*4;
     y=cy+((y-cy)>=0?((y-cy+2)/4):((y-cy-2)/4))*4;
@@ -220,14 +223,18 @@ static void move_cursor(int x,int y)
         input(held);
     }
     input(0);
-    if(cx!=x||cy!=y)
+    if(cx!=x||cy!=y) {
         fprintf(stderr,"cursor guard=%u wanted=%d,%d got=%d,%d frame=%u\n",guard,x,y,cx,cy,(unsigned)frame);
+        return 0;
+    }
+    return 1;
 }
 
-static void clear_selected_building(void)
+static int clear_selected_building(void)
 {
-    if(selected_building<0)return;
-    move_cursor(900,700);input(KEY_L);
+    if(selected_building<0)return 1;
+    if(!move_cursor(900,700))return 0;
+    input(KEY_L);
     unsigned guard=0;
     while((cx<916||cy<716)&&guard++<64){
         u16 held=KEY_L;
@@ -236,6 +243,25 @@ static void clear_selected_building(void)
         input(held);
     }
     input(0);
+    return selected_building<0;
+}
+
+static int normalize_field(void)
+{
+    if(menu_open) KEY_TAP(KEY_B);
+    if(mode!=MODE_NORMAL) KEY_TAP(KEY_B);
+    if(menu_open) KEY_TAP(KEY_B);
+    return !menu_open && mode==MODE_NORMAL;
+}
+
+static int choose_field_row(int row)
+{
+    KEY_TAP(KEY_B);
+    for(int n=0;n<field_menu_count() && menu_open && menu_cursor!=row;n++)
+        KEY_TAP(KEY_DOWN);
+    if(!menu_open || menu_cursor!=row) return 0;
+    KEY_TAP(KEY_A);
+    return !menu_open;
 }
 
 static int nearest_hero_threat(int *out_x,int *out_y)
@@ -255,9 +281,8 @@ static int nearest_hero_threat(int *out_x,int *out_y)
 
 static int issue_attack(int x,int y)
 {
-    if(menu_open)KEY_TAP(KEY_B);
-    if(mode!=MODE_NORMAL)KEY_TAP(KEY_B);
-    clear_selected_building();
+    if(!normalize_field())return 0;
+    if(!clear_selected_building())return 0;
     KEY_TAP(KEY_R); /* standard whole-army selection shortcut */
     if(selected_count()<=0)return 0;
     KEY_TAP(KEY_B);
@@ -268,7 +293,8 @@ static int issue_attack(int x,int y)
     if(!menu_open||menu_cursor!=MENU_ATTACK)return 0;
     KEY_TAP(KEY_A);
     if(mode!=MODE_ATTACK)return 0;
-    move_cursor(x,y);KEY_TAP(KEY_A);
+    if(!move_cursor(x,y))return 0;
+    KEY_TAP(KEY_A);
     return 1;
 }
 
@@ -306,9 +332,9 @@ static int queue_combat_unit(void)
         producer=i;best_queue=b[i].queue_count;
     }
     if(producer>=0){int i=producer;
-        if(menu_open)KEY_TAP(KEY_B);
-        if(mode!=MODE_NORMAL)KEY_TAP(KEY_B);
-        move_cursor(b[i].x,b[i].y);KEY_TAP(KEY_A);
+        if(!normalize_field())return 0;
+        if(!move_cursor(b[i].x,b[i].y))return 0;
+        KEY_TAP(KEY_A);
         if(selected_building!=i)return 0;
         for(int n=0;n<4&&train_type!=wanted;n++)KEY_TAP(KEY_R);
         if(train_type!=wanted)return 0;
@@ -339,9 +365,11 @@ static int queue_probe(void)
         pending+=b[home].queue[(b[home].queue_head+q)%5]==U_PROBE;
     if(home<0||probe_count()+pending>=10||minerals<50||b[home].queue_count>=5||
        race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<2)return 0;
-    if(menu_open)KEY_TAP(KEY_B);
-    if(mode!=MODE_NORMAL)KEY_TAP(KEY_B);
-    if(selected_building!=home){clear_selected_building();move_cursor(b[home].x,b[home].y);KEY_TAP(KEY_A);}
+    if(!normalize_field())return 0;
+    if(selected_building!=home){
+        if(!clear_selected_building() || !move_cursor(b[home].x,b[home].y))return 0;
+        KEY_TAP(KEY_A);
+    }
     if(selected_building!=home)return 0;
     int before=b[home].queue_count,bank=minerals;
     KEY_TAP(KEY_A);
@@ -362,11 +390,13 @@ static int assign_gas_worker(void)
         else if(worker<0&&u[i].order==ORDER_MINE&&!u[i].carry)worker=i;
     }
     if(gas_workers>=2||worker<0)return 0;
-    if(menu_open)KEY_TAP(KEY_B);
-    if(mode!=MODE_NORMAL)KEY_TAP(KEY_B);
-    clear_selected_building();move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
+    if(!normalize_field())return 0;
+    if(!clear_selected_building())return 0;
+    if(!move_cursor(u[worker].x,u[worker].y))return 0;
+    KEY_TAP(KEY_A);
     if(!u[worker].selected)return 0;
-    move_cursor(b[refinery].x,b[refinery].y);KEY_TAP(KEY_A);
+    if(!move_cursor(b[refinery].x,b[refinery].y))return 0;
+    KEY_TAP(KEY_A);
     if(u[worker].order!=ORDER_GAS||u[worker].target!=refinery)return 0;
     fprintf(trace,"{\"kind\":\"economy\",\"frame\":%u,\"action\":\"assign-gas\",\"worker\":%d,\"refinery\":%d,\"gas_workers\":%d}\n",
         (unsigned)frame,worker,refinery,gas_workers+1);
@@ -394,21 +424,19 @@ static int build_gateway(void)
     }
     if(site_x<0)return 0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
-        u[i].type==U_PROBE&&u[i].order!=ORDER_BUILD){worker=i;break;}
+        u[i].type==U_PROBE&&build_worker_available(i,SIDE,-1)){worker=i;break;}
     if(worker<0)return 0;
-    if(menu_open)KEY_TAP(KEY_B);
-    if(mode!=MODE_NORMAL)KEY_TAP(KEY_B);
-    clear_selected_building();
-    move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
-    if(!u[worker].selected)return 0;
-    KEY_TAP(KEY_B);
-    for(int n=0;n<MENU_BARRACKS;n++)KEY_TAP(KEY_DOWN);
+    if(!normalize_field())return 0;
+    if(!clear_selected_building())return 0;
+    if(!move_cursor(u[worker].x,u[worker].y))return 0;
     KEY_TAP(KEY_A);
+    if(!u[worker].selected)return 0;
+    if(!choose_field_row(MENU_BARRACKS))return 0;
     if(mode!=MODE_BUILD||menu!=B_GATEWAY)return 0;
-    move_cursor(site_x,site_y);KEY_TAP(KEY_A);
-    fprintf(stderr,"gateway construction attempt frame=%u worker=%d site=%d,%d order=%d\n",
-        (unsigned)frame,worker,site_x,site_y,u[worker].order);
-    return u[worker].order==ORDER_BUILD;
+    if(!move_cursor(site_x,site_y))return 0;
+    KEY_TAP(KEY_A);
+    return u[worker].order==ORDER_BUILD_PENDING && u[worker].target==B_GATEWAY &&
+        u[worker].tx==site_x && u[worker].ty==site_y;
 }
 
 static int build_pylon(void)
@@ -423,16 +451,19 @@ static int build_pylon(void)
         best=d;site_x=x;site_y=y;
     }
     if(site_x<0)return 0;
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&u[i].order!=ORDER_BUILD){worker=i;break;}
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&build_worker_available(i,SIDE,-1)){worker=i;break;}
     if(worker<0)return 0;
-    if(menu_open)KEY_TAP(KEY_B);
-    if(mode!=MODE_NORMAL)KEY_TAP(KEY_B);
-    clear_selected_building();move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
+    if(!normalize_field())return 0;
+    if(!clear_selected_building())return 0;
+    if(!move_cursor(u[worker].x,u[worker].y))return 0;
+    KEY_TAP(KEY_A);
     if(!u[worker].selected)return 0;
-    KEY_TAP(KEY_B);for(int n=0;n<MENU_DEPOT;n++)KEY_TAP(KEY_DOWN);KEY_TAP(KEY_A);
+    if(!choose_field_row(MENU_DEPOT))return 0;
     if(mode!=MODE_BUILD||menu!=B_PYLON)return 0;
-    move_cursor(site_x,site_y);KEY_TAP(KEY_A);
-    if(u[worker].order!=ORDER_BUILD)return 0;
+    if(!move_cursor(site_x,site_y))return 0;
+    KEY_TAP(KEY_A);
+    if(u[worker].order!=ORDER_BUILD_PENDING || u[worker].target!=B_PYLON ||
+       u[worker].tx!=site_x || u[worker].ty!=site_y)return 0;
     fprintf(trace,"{\"kind\":\"build\",\"frame\":%u,\"building\":\"pylon\",\"worker\":%d,\"site\":[%d,%d],\"count\":%d}\n",
         (unsigned)frame,worker,site_x,site_y,live_buildings(SIDE));
     return 1;
@@ -503,6 +534,8 @@ int main(int argc,char **argv)
         }
         if(frame>=next_pylon){
             int pending=0;
+            for(int i=0;i<MAX_UNITS;i++)pending|=u[i].alive&&u[i].owner==SIDE&&
+                u[i].order==ORDER_BUILD_PENDING&&u[i].target==B_PYLON;
             for(int i=0;i<MAX_BUILDINGS;i++)pending|=b[i].alive&&b[i].owner==SIDE&&
                 b[i].type==B_PYLON&&b[i].under_construction;
             if(!pending&&race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<=6&&minerals>=200)
