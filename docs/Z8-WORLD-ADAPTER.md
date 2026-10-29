@@ -2,9 +2,11 @@
 
 `starcraft/sc64_z8_world_adapter.h` binds the isolated Z8 scheduler callbacks
 to a typed view of live actors, buildings, force membership, and resource
-wallets. `game.c` includes an opt-in pool-reader helper, but no build profile
-enables it and nothing initializes the scheduler or adds a mission profile,
-menu entry, save state, or playable claim.
+wallets. `game.c` includes an opt-in pool-reader helper. The explicit
+`zerg-z8` candidate enables it and binds the scheduler through
+`starcraft/sc64_z8_runtime_adapter.h`; see
+[Z8-TRIGGER-SCHEDULER](Z8-TRIGGER-SCHEDULER.md#game-binding-zerg-z8-candidate).
+No canonical profile enables it.
 
 The caller can expose the real bounded engine pools as an ordered
 `Sc64Z8ActorView[]`, or provide `actor_at` to read each actual unit/building

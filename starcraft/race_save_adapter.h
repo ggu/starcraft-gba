@@ -746,6 +746,9 @@ static int race_save_game(void) {
         race_data.z7 = race_z7;
     }
 #endif
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active() && !race_z8_save_pack(&race_data.z8)) return 0;
+#endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) {
@@ -887,6 +890,11 @@ static int race_save_game(void) {
             /* Z7 is checked below using its smaller shared schema. */
         } else
 #endif
+#ifdef SC64_Z8_RUNTIME
+        if (race_z8_active()) {
+            /* Z8 fills the shared payload; it is checked below. */
+        } else
+#endif
         {
             const u8 *bytes = (const u8 *)&race_data.z6;
             for (unsigned i = 0; i < sizeof(race_data.z6); ++i)
@@ -902,6 +910,12 @@ static int race_save_game(void) {
         for (unsigned i=sizeof(race_data.z7); i<sizeof(race_data.z5); ++i)
             if (payload[i]) return 0;
     }
+#endif
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active() &&
+        !race_z8_save_unpack(&race_data.z8,
+                             &sc64_zp_route_save_scratch.z8_candidate.scheduler, 0))
+        return 0;
 #endif
 #ifdef SC64_T5_RUNTIME
     if (!race_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
@@ -979,6 +993,9 @@ static int race_load_game(void) {
 #ifdef SC64_Z7_RUNTIME
        &&v[2]!=SC64_Z7_GLOBAL_ID
 #endif
+#ifdef SC64_Z8_RUNTIME
+       &&v[2]!=SC64_Z8_GLOBAL_ID
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
        &&(v[2]<SC64_TERRAN_LATE_GLOBAL_T7||
           v[2]>SC64_TERRAN_LATE_GLOBAL_T10)
@@ -1013,6 +1030,9 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_Z7_RUNTIME
         &&v[2]!=SC64_Z7_GLOBAL_ID
+#endif
+#ifdef SC64_Z8_RUNTIME
+        &&v[2]!=SC64_Z8_GLOBAL_ID
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
         &&(v[2]<SC64_TERRAN_LATE_GLOBAL_T7||
@@ -1701,6 +1721,11 @@ static int race_load_game(void) {
             /* Z7 shares the payload; its validation follows below. */
         } else
 #endif
+#ifdef SC64_Z8_RUNTIME
+        if (!v[0] && v[2] == SC64_Z8_GLOBAL_ID) {
+            /* Z8 fills the payload; its validation follows below. */
+        } else
+#endif
         {
         const u8 *bytes = (const u8 *)&race_data.z5;
         for (unsigned i = 0; i < sizeof(race_data.z5); ++i) if (bytes[i]) return 0;
@@ -1732,6 +1757,11 @@ static int race_load_game(void) {
             /* Z7 is validated separately using its smaller schema. */
         } else
 #endif
+#ifdef SC64_Z8_RUNTIME
+        if (!v[0] && v[2] == SC64_Z8_GLOBAL_ID) {
+            /* Z8 is validated separately below. */
+        } else
+#endif
         {
             const u8 *bytes = (const u8 *)&race_data.z6;
             for (unsigned i = 0; i < sizeof(race_data.z6); ++i)
@@ -1747,6 +1777,12 @@ static int race_load_game(void) {
         for (unsigned i=sizeof(race_data.z7); i<sizeof(race_data.z5); ++i)
             if (payload[i]) return 0;
     }
+#endif
+#ifdef SC64_Z8_RUNTIME
+    if (!v[0] && v[2] == SC64_Z8_GLOBAL_ID &&
+        !race_z8_save_unpack(&race_data.z8,
+                             &sc64_zp_route_save_scratch.z8_candidate.scheduler, 0))
+        return 0;
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #ifdef SC64_TERRAN_LATE_RUNTIME
@@ -2024,6 +2060,16 @@ static int race_load_game(void) {
         memset(&race_z7_world,0,sizeof(race_z7_world));
         memset(&race_z7_ops,0,sizeof(race_z7_ops));
         race_z7_map=0;
+    }
+#endif
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) {
+        if (!race_z8_save_unpack(&race_data.z8,
+                                 &sc64_zp_route_save_scratch.z8_candidate.scheduler, 1) ||
+            !race_z8_rebind_loaded_world(&sc64_race_maps[SC64_Z8_GLOBAL_ID]))
+            return 0;
+    } else if (!race_z8_runtime_init(0)) {
+        return 0;
     }
 #endif
 #ifdef SC64_NYDUS_ENABLED

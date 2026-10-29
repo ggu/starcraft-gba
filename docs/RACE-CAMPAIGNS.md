@@ -103,6 +103,14 @@ controller qualification](research/p7-full-controller-qualification.md) and
 [canonical P7 qualification](research/p7-canonical-candidate-qualification.md)
 for exact profiles and limits.
 
+Z8 runs in a separate `zerg-z8` candidate (`make zerg-z8`, code `SCZ8`,
+generation 46): the Z1–Z7 candidate plus Z8 as the eighth Zerg entry. Its
+authenticated 39-trigger program, Nydus links, authored Protoss town AI and
+hero Dark Templar cloak run on the live game. A pause-menu save reloads and
+continues identically on host. Z8 has no ordinary-input win, ARM replay or
+timing yet and is not qualified. See the
+[Z8 candidate audit](audits/2026-10-29-z8-playable/README.md).
+
 The current standalone Z7 release candidate uses the CONTACT movement path
 and omits debugger input queues; it keeps the generation-36 save identity.
 Its ARM link passes the existing RAM guards, and the CONTACT host replay

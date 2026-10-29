@@ -282,7 +282,9 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #error "derived save rows require the complete Zerg ZP/Z5/Z6/Z7 Egg profile"
 #endif
 #endif
-#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
+#if defined(SC64_Z8_RUNTIME)
+#define SC64_RACE_SAVE_GENERATION 46u
+#elif defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 43u
 #elif defined(SC64_P7_CARRIER_TRAINING_ENABLED)
 #define SC64_RACE_SAVE_GENERATION 42u
@@ -1128,13 +1130,24 @@ static u8 explored[SC64_GRID_STORAGE_BYTES];
 static u8 visible[SC64_GRID_STORAGE_BYTES];
 static u8 path_walkable[SC64_GRID_STORAGE_BYTES];
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
+#ifdef SC64_Z8_RUNTIME
+#include "sc64_z8_triggers.h"
+#endif
 typedef union {
     u16 bfs_queue[MAP_CELLS];
     RaceSave save;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     struct { RaceSave save; Unit units[MAX_UNITS]; } carrier_candidate;
 #endif
+#ifdef SC64_Z8_RUNTIME
+    /* A Z8 save candidate expands into this image before it is accepted. */
+    struct { RaceSave save; Sc64Z8SchedulerState scheduler; } z8_candidate;
+#endif
 } Sc64ZpRouteSaveScratch;
+#ifdef SC64_Z8_RUNTIME
+_Static_assert(sizeof(RaceSave)+sizeof(Sc64Z8SchedulerState)<=sizeof(u16)*MAP_CELLS,
+               "Z8 candidate expansion must fit existing route scratch");
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 _Static_assert(sizeof(RaceSave)+sizeof(Unit)*MAX_UNITS<=sizeof(u16)*MAP_CELLS,
                "Carrier candidate decode must fit existing route scratch");
@@ -1411,6 +1424,19 @@ static int race_p6_combat_tick_traps(void);
 #endif
 #ifdef SC64_P7_ARCHON_SPLASH
 static int race_p7_archon_splash_attack(Unit *q, int target);
+#endif
+#ifdef SC64_Z8_RUNTIME
+#define SC64_Z8_GLOBAL_ID 19
+static int race_z8_active(void);
+static int race_z8_map_shape_valid(const Sc64RaceMap *map);
+static int race_z8_source_owner(unsigned slot);
+static int race_z8_runtime_init(const Sc64RaceMap *map);
+static int race_z8_runtime_tick(void);
+static int race_z8_outcome(void);
+static void race_z8_note_unit_spawn(int slot, int owner, int type);
+static void race_z8_note_building_spawn(int slot, int owner, int type);
+static void race_z8_note_product_building(int building);
+static int race_z8_unit_hidden_from_side(int unit);
 #endif
 enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
        SC64_HIT_SKIP_HALLUCINATION_SCALE=4 };
@@ -1981,6 +2007,9 @@ spawn_unit(int owner, int type, int x, int y)
         u[i].raw_owner = race_z7_product_source_owner(owner);
     }
 #endif
+#ifdef SC64_Z8_RUNTIME
+    race_z8_note_unit_spawn(i, owner, type);
+#endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
     if (race_p7_active() && owner == SIDE) {
         u[i].raw_type = sc64_race_raw_unit(type);
@@ -2123,6 +2152,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
         b[i].raw_type = sc64_race_raw_building(type);
         b[i].raw_owner = race_z7_product_source_owner(owner);
     }
+#endif
+#ifdef SC64_Z8_RUNTIME
+    race_z8_note_building_spawn(i, owner, type);
 #endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
     if (race_p7_active() && owner == SIDE) {
@@ -2960,6 +2992,22 @@ static int sc64_p6_can_attack_from(int attacker, int target, int owner)
 #undef SC64_CAN_ATTACK_FROM
 #define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
     sc64_p6_can_attack_from((attacker), (target), (owner))
+#endif
+#ifdef SC64_Z8_RUNTIME
+/* Z8 hero Dark Templars stay cloaked to the human until a human detector
+ * reveals them (sc64_z8_runtime_adapter.h). */
+static int sc64_z8_base_can_attack_from(int attacker, int target, int owner)
+{
+    return SC64_CAN_ATTACK_FROM(attacker, target, owner);
+}
+static int sc64_z8_can_attack_from(int attacker, int target, int owner)
+{
+    if (owner == SIDE && race_z8_unit_hidden_from_side(target)) return 0;
+    return sc64_z8_base_can_attack_from(attacker, target, owner);
+}
+#undef SC64_CAN_ATTACK_FROM
+#define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
+    sc64_z8_can_attack_from((attacker), (target), (owner))
 #endif
 #ifdef SC64_P7_OBSERVER_ENABLED
 #define SC64_CAN_ATTACK_FROM_SOURCE(attacker, target, owner, source_owner) \
@@ -8108,6 +8156,9 @@ draw_unit(Unit * q)
         !sc64_p7_observer_detector_sees((int)(q-u),7,SIDE)) return;
 #endif
 #endif
+#ifdef SC64_Z8_RUNTIME
+    if (q->owner != SIDE && race_z8_unit_hidden_from_side((int)(q - u))) return;
+#endif
 #ifdef SC64_T6_RUNTIME
     if (race_t6_active() && race_t6_unit_burrowed((int)(q - u))) return;
 #endif
@@ -8491,6 +8542,9 @@ draw_minimap(void)
         if (race_p7_active() && u[i].owner != SIDE && u[i].raw_type == 84 &&
             !sc64_p7_observer_detector_sees(i,7,SIDE)) continue;
 #endif
+#endif
+#ifdef SC64_Z8_RUNTIME
+        if (u[i].owner != SIDE && race_z8_unit_hidden_from_side(i)) continue;
 #endif
 #ifdef SC64_T6_RUNTIME
         if (race_t6_unit_burrowed(i)) continue;
@@ -10599,7 +10653,19 @@ game_self_test(void)
 #ifdef SC64_NYDUS_ENABLED
 static int race_save_decode_unit(const RaceSave *, unsigned, unsigned, unsigned, Unit *);
 static int race_save_decode_building(const RaceSave *, unsigned, Building *);
+#ifdef SC64_Z8_RUNTIME
+/* Save preflight and a fresh-boot load resolve Z8 canal links from its
+ * program table before the mission adapter has run. */
+#include "sc64_nydus_rules.h"
+static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **records,
+                                unsigned *count);
+#define SC64_NYDUS_SOURCE_FOR_MISSION(mission, records, count) \
+    race_z8_nydus_source((mission), (records), (count))
+#endif
 #include "sc64_nydus_adapter.h"
+#endif
+#ifdef SC64_Z8_RUNTIME
+#include "sc64_z8_runtime_adapter.h"
 #endif
 #include "race_save_adapter.h"
 #endif

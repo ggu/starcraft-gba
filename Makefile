@@ -898,6 +898,12 @@ build/test-sc64-nydus-rules: tests/sc64_nydus_rules.c starcraft/sc64_nydus_rules
 test-sc64-nydus-rules: build/test-sc64-nydus-rules
 	./build/test-sc64-nydus-rules
 test-starcraft: test-sc64-nydus-rules
+build/test-sc64-z8-state: tests/sc64_z8_state.c starcraft/sc64_z8_state.h starcraft/sc64_z8_triggers.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-z8-state
+test-sc64-z8-state: build/test-sc64-z8-state
+	./build/test-sc64-z8-state
+test-starcraft: test-sc64-z8-state
 build/test-sc64-unit-availability: tests/sc64_unit_availability.c starcraft/sc64_unit_availability.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-unit-availability
@@ -3722,6 +3728,35 @@ build/StarCraft-Zerg-Z7-GBA.gba: build/starcraft-zerg-z7.elf tools/fix_rom.py
 verify-zerg-z7: build/StarCraft-Zerg-Z7-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z7
 zerg-z7: verify-zerg-z7
+
+# Z8 candidate: the Z7 release vector plus Nydus Canals, the P6/P7 actor
+# facts the Z8 census needs, the authenticated Z8 program and a private
+# sprite bank that adds the hero Dark Templar. The program header is
+# rendered from the private descriptor written by `sc64_z8_pack.py pack`.
+ZERG_Z8_BANK := .local/sc64/zerg-z8/generated
+Z8_DESCRIPTOR ?= .local/build/z8-source/descriptor.json
+Z8_PROGRAM_HEADER := build/generated/z8/sc64_z8_program_generated.h
+$(Z8_PROGRAM_HEADER): $(Z8_DESCRIPTOR) tools/sc64_z8_program_pack.py tools/sc64_z8_pack.py | build
+	$(PYTHON) tools/sc64_z8_program_pack.py $< $@
+ZERG_Z8_FEATURES = -DSC64_P6_ACTORS -DSC64_P7_ACTORS -DSC64_NYDUS_ENABLED -DSC64_Z8_GAME_POOL_BRIDGE -DSC64_Z8_DATA_ENABLED -DSC64_Z8_RUNTIME -DSC64_Z8_CAMPAIGN_ENTRY -Ibuild/generated/z8
+ZERG_Z8_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z6_BANK),-I$(ZERG_Z8_BANK),$(ZERG_Z7_CANONICAL_FLAGS)) $(ZERG_Z8_FEATURES)
+ZERG_Z8_RELEASE_FLAGS = $(ZERG_Z8_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
+ZERG_Z8_CANONICAL_INPUTS = $(filter-out $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z7_CANONICAL_INPUTS)) $(ZERG_Z8_BANK)/sc64_race_sprites_generated.h $(Z8_PROGRAM_HEADER)
+build/starcraft-zerg-z8.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z8_CANONICAL_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(ZERG_Z8_RELEASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z8.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z8-GBA.gba: build/starcraft-zerg-z8.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z8' SCZ8
+.PHONY: verify-zerg-z8 zerg-z8
+verify-zerg-z8: build/StarCraft-Zerg-Z8-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z8
+zerg-z8: verify-zerg-z8
+build/test-sc64-z8-game: tests/sc64_z8_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z8_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z8_CANONICAL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-zerg-z8
+test-zerg-z8: build/test-sc64-z8-game
+	./build/test-sc64-z8-game
 
 # Preserve a named six-entry product alongside the existing `zerg` alias.
 .PHONY: verify-zerg-z6 zerg-z6
