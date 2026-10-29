@@ -185,10 +185,14 @@ static void explicit_cases(void)
     observer(1, 0, enemy);
     u[1].order = ORDER_TRANSPORTED;
     expect_mask(0, powered);
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     u[1].order = 0;
     u[1].type = U_P7_INTERCEPTOR;
     u[1].flags = 1u << 8; /* A hangar-hidden child cannot supply sight or detection. */
     expect_mask(0, powered);
+#else
+    puts("SKIP interceptor-specific owner-mask case: profile lacks carrier training");
+#endif
 
     reset_case();
     b[0].alive = 1;
@@ -227,7 +231,12 @@ int main(void)
             u[i].owner = rnd() % 5;
             u[i].raw_owner = (int)(rnd() % 12) - 2;
             u[i].raw_type = (rnd() % 3 == 0) ? SC64_P7_OBSERVER_RAW : rnd() % 90;
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
             u[i].type = (rnd() % 7 == 0) ? U_P7_INTERCEPTOR : rnd() % 10;
+#else
+            (void)rnd();
+            u[i].type = rnd() % 10;
+#endif
             u[i].flags = (rnd() % 5 == 0) ? 1u << 8 : 0;
             u[i].order = (rnd() % 9 == 0) ? ORDER_TRANSPORTED : 0;
             u[i].x = rnd() % WORLD_W;

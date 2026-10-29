@@ -5123,3 +5123,8 @@ build/test-sc64-p7-owner-mask: tests/sc64_p7_owner_mask_game.c $(STARCRAFT) $(P7
 .PHONY: test-sc64-p7-owner-mask
 test-sc64-p7-owner-mask: build/test-sc64-p7-owner-mask
 	./build/test-sc64-p7-owner-mask
+build/test-sc64-showcase-owner-mask: tests/sc64_p7_owner_mask_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) $(COMMAND_ICON_HEADER) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(SKIRMISH_RUNTIME_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+.PHONY: test-sc64-showcase-owner-mask
+test-sc64-showcase-owner-mask: build/test-sc64-showcase-owner-mask
+	./build/test-sc64-showcase-owner-mask
