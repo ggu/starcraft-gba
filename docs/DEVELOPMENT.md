@@ -2656,6 +2656,15 @@ profile differential fixtures enable a host-only hit oracle. See the
 [memo audit](audits/2026-10-29-contact-query-memo/README.md) for measured scope
 and remaining qualification. Showcase uses its separate collision flags.
 
+The delivered race and Showcase profiles also enable
+`CANONICAL_ROUTE_PROBE_FLAGS` for an exact shortest-step shortcut. After cache
+and suffix hits, a bounded Manhattan-monotone search can avoid building a
+complete route field. Unsupported or unproved paths retain the full BFS.
+The search borrows existing scratch only for the call and adds no save state.
+`make test-sc64-route-monotone` checks the public dispatch without imported
+assets. See the [route-step audit](audits/2026-10-29-monotone-route-step/README.md)
+for tie-order reasoning, measured gains, workload limits and remaining stalls.
+
 An experimental mode-0 renderer builds on that movement probe:
 
 ```sh

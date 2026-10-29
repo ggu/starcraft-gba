@@ -8,6 +8,16 @@
 #define SC64_ROUTES_LOCAL_GRID_GET
 #endif
 
+#if defined(SC64_ROUTE_MONOTONE_PROBE) && defined(SC64_RACES) && \
+    !defined(SC64_ROUTE_PARTIAL_FLOOD)
+#define SC64_ROUTE_MONOTONE_ENABLED 1
+#include "sc64_route_monotone_probe.h"
+#endif
+#if defined(GBA_HOST) && defined(SC64_ROUTE_MONOTONE_ENABLED) && \
+    defined(SC64_ROUTE_MONOTONE_DIAGNOSTICS)
+#define SC64_ROUTE_MONOTONE_DIAG_ENABLED 1
+#endif
+
 #ifdef SC64_ROUTE_DECAY_FREQ
 #if !defined(SC64_RACES) || !defined(SC64_ROUTE_PACK3)
 #error "SC64_ROUTE_DECAY_FREQ requires SC64_RACES and SC64_ROUTE_PACK3"
@@ -220,6 +230,42 @@ static int sc64_route_configure(void)
 #define SC64_ROUTE_ACTIVE_SLOTS SC64_ROUTE_SLOTS
 #endif
 volatile u32 sc64_route_hits, sc64_route_builds;
+
+#ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
+typedef struct {
+    unsigned attempts, hits, fails, budget, nodes, candidates, memo_checks, memo_clear_bytes;
+    unsigned have_frame, current_frame, current_floods, current_nodes;
+    unsigned max_flood_frame, max_floods, max_node_frame, max_frame_nodes;
+} sc64_route_probe_host_diag;
+static sc64_route_probe_host_diag sc64_route_probe_diag;
+
+static void sc64_route_probe_host_finish_frame(void)
+{
+    if (!sc64_route_probe_diag.have_frame) return;
+    if (sc64_route_probe_diag.current_floods > sc64_route_probe_diag.max_floods) {
+        sc64_route_probe_diag.max_floods = sc64_route_probe_diag.current_floods;
+        sc64_route_probe_diag.max_flood_frame = sc64_route_probe_diag.current_frame;
+    }
+    if (sc64_route_probe_diag.current_nodes > sc64_route_probe_diag.max_frame_nodes) {
+        sc64_route_probe_diag.max_frame_nodes = sc64_route_probe_diag.current_nodes;
+        sc64_route_probe_diag.max_node_frame = sc64_route_probe_diag.current_frame;
+    }
+}
+
+static void sc64_route_probe_host_flood(unsigned nodes)
+{
+    unsigned now = (unsigned)frame;
+    if (sc64_route_probe_diag.have_frame && sc64_route_probe_diag.current_frame != now) {
+        sc64_route_probe_host_finish_frame();
+        sc64_route_probe_diag.current_floods = 0;
+        sc64_route_probe_diag.current_nodes = 0;
+    }
+    sc64_route_probe_diag.have_frame = 1;
+    sc64_route_probe_diag.current_frame = now;
+    sc64_route_probe_diag.current_floods++;
+    sc64_route_probe_diag.current_nodes += nodes;
+}
+#endif
 
 #ifdef SC64_ROUTE_DECAY_FREQ
 #define SC64_ROUTE_FREQ_SHIFT 26u
@@ -591,6 +637,9 @@ sc64_route_slot(int goal)
     sc64_route_valid[slot] = 1;
 #endif
     sc64_route_builds++;
+#ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
+    sc64_route_probe_host_flood((unsigned)tail);
+#endif
     return slot;
 }
 
@@ -605,6 +654,59 @@ static int GBA_HOT sc64_route_slot(int goal)
 #endif
 
 #if defined(SC64_RACES) && !defined(SC64_ROUTE_PARTIAL_FLOOD)
+#ifdef SC64_ROUTE_MONOTONE_ENABLED
+static int __attribute__((noinline))
+sc64_route_step_slot_mode(int origin, int goal, int allow_build)
+{
+    int i, used = 0;
+    if (origin == goal || !SC64_GRID_GET(path_walkable, origin) ||
+        !SC64_GRID_GET(path_walkable, goal)) return allow_build ? sc64_route_slot(goal) : -1;
+    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i)
+        if (sc64_route_valid[i] && sc64_route_goal[i] == (u16)goal) return sc64_route_slot(goal);
+#ifdef SC64_ROUTE_DECAY_FREQ
+    if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK)
+        return allow_build ? sc64_route_slot(goal) : -1;
+#endif
+    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS && used < 2; ++i) {
+        int root, rx, ry, gx, gy, cur, steps;
+        if (sc64_route_valid[i] != 1) continue;
+        root = (int)sc64_route_goal[i];
+        if (!SC64_GRID_GET(path_walkable, root)) continue;
+        rx = root % MAP_COLS; ry = root / MAP_COLS;
+        gx = goal % MAP_COLS; gy = goal / MAP_COLS;
+        if ((rx > gx ? rx-gx : gx-rx) + (ry > gy ? ry-gy : gy-ry) > 4) continue;
+        ++used;
+        cur = origin;
+        for (steps = 0; steps < 128 && cur != goal; ++steps) {
+            int d, x, y;
+            if (!SC64_GRID_GET(path_walkable, cur)) break;
+            d = sc64_route_get(i, cur);
+            if (d < 1 || d > 4) break;
+            x = cur % MAP_COLS; y = cur / MAP_COLS;
+            if (d == 1) ++x; else if (d == 2) --x;
+            else if (d == 3) ++y; else --y;
+            if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) break;
+            cur = x + y * MAP_COLS;
+            if (!SC64_GRID_GET(path_walkable, cur)) break;
+        }
+        if (cur != goal) continue;
+#ifdef SC64_ROUTE_DECAY_FREQ
+        sc64_route_age_request();
+        sc64_route_age_touch(i, 1);
+#else
+        sc64_route_age[i] = ++sc64_route_clock;
+#endif
+        sc64_route_hits++;
+        return i;
+    }
+    return allow_build ? sc64_route_slot(goal) : -1;
+}
+
+static int __attribute__((noinline)) sc64_route_step_slot(int origin, int goal)
+{
+    return sc64_route_step_slot_mode(origin, goal, 1);
+}
+#else
 /* FIFO L/R/U/D discovery selects the lexicographically first shortest path
  * from the root. Every suffix of that path is the same preferred shortest
  * path from its own root, so a new goal on the cached gradient preserves the
@@ -660,6 +762,7 @@ sc64_route_step_slot(int origin, int goal)
     return sc64_route_slot(goal);
 }
 #endif
+#endif
 
 #if defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
 /* Inflated structure cells are rare actor origins. Keep their gradient walk in
@@ -710,6 +813,52 @@ sc64_route_preferred_l_clear(int start_col, int start_row,
     while (row != start_row) {
         row += start_row > row ? 1 : -1;
         if (!SC64_GRID_GET(path_walkable, col + row * MAP_COLS)) return 0;
+    }
+    return 1;
+}
+#endif
+
+#ifdef SC64_ROUTE_MONOTONE_ENABLED
+static int __attribute__((noinline))
+sc64_route_monotone_next_step(int origin, int goal, int tx, int ty,
+                              int *next_x, int *next_y)
+{
+    int i, predecessor = -1, status, cols = MAP_COLS, rows = MAP_ROWS;
+    sc64_route_probe_stats stats;
+    int active_cells;
+    if (cols <= 0 || rows <= 0 || cols > 128 || rows > 128 ||
+        cols * rows > MAP_CELLS) return 0;
+    active_cells = cols * rows;
+    if (origin < 0 || origin >= active_cells || goal < 0 || goal >= active_cells ||
+        !SC64_GRID_GET(path_walkable, origin)) return 0;
+    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i)
+        if (sc64_route_valid[i] == 1 && sc64_route_goal[i] == (u16)goal) return 0;
+#ifdef SC64_ROUTE_DECAY_FREQ
+    if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK) return 0;
+#endif
+    status = sc64_route_monotone_probe(path_walkable, cols, rows, active_cells,
+                                       bfs_queue, sizeof(bfs_queue), origin, goal,
+                                       512u, &predecessor, &stats);
+#ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
+    sc64_route_probe_diag.attempts++;
+    sc64_route_probe_diag.nodes += stats.nodes;
+    sc64_route_probe_diag.candidates += stats.candidates;
+    sc64_route_probe_diag.memo_checks += stats.memo_checks;
+    sc64_route_probe_diag.memo_clear_bytes += stats.memo_clear_bytes;
+    if (status == 1) sc64_route_probe_diag.hits++;
+    else {
+        sc64_route_probe_diag.fails++;
+        if (status == SC64_ROUTE_PROBE_BUDGET) sc64_route_probe_diag.budget++;
+    }
+#endif
+    if (status != 1) return 0;
+#ifdef SC64_ROUTE_DECAY_FREQ
+    sc64_route_age_request();
+#endif
+    if (predecessor == origin) { *next_x = tx; *next_y = ty; }
+    else {
+        *next_x = (predecessor % cols) * 16 + 8;
+        *next_y = (predecessor / cols) * 16 + 8;
     }
     return 1;
 }
@@ -768,7 +917,15 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
     }
 #endif
 #if defined(SC64_RACES) && !defined(SC64_ROUTE_PARTIAL_FLOOD)
+#ifdef SC64_ROUTE_MONOTONE_ENABLED
+    slot = sc64_route_step_slot_mode(cell, goal, 0);
+    if (slot < 0) {
+        if (sc64_route_monotone_next_step(cell, goal, tx, ty, next_x, next_y)) return 1;
+        slot = sc64_route_slot(goal);
+    }
+#else
     slot = sc64_route_step_slot(cell, goal);
+#endif
 #elif defined(SC64_ROUTE_PARTIAL_FLOOD)
     slot = sc64_route_slot_for_origin(goal, cell, SC64_GRID_GET(path_walkable, cell));
 #else
