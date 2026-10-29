@@ -133,9 +133,23 @@ def write_tape(trace_path: pathlib.Path, out: pathlib.Path) -> dict:
     return plan
 
 
+RECORD_FIELDS = {
+    "CHECK": SCALARS[:11], "CHECK2": LISTS, "CHECK3": SCALARS[11:],
+    "CYCLES": ("frames", "total", "update", "peak", "update_peak"),
+}
+CHECK_KINDS = ("checkpoint", "cut", "won", "lost", "limit")
+CYCLE_KINDS = ("periodic", "cut", "terminal")
+KNOWN_TAGS = ("START", "CHECK", "CHECK2", "CHECK3", "CYCLES", "SAVED", "LOADED",
+              "EARLY_END", "DONE")
+SAVE_TAG = 0x53435A54  # generation tag the Z7 candidate writes ("TZCS")
+SAVE_PAYLOAD_BYTES = 16296
+
+
 def parse_fields(line: str) -> dict:
     fields: dict[str, object] = {}
     for key, value in re.findall(r"(\w+)=(-?\d+(?:,-?\d+)*)", line):
+        if key in fields:
+            raise ValueError(f"field {key} repeats in {line!r}")
         fields[key] = [int(v) for v in value.split(",")] if key in LISTS else int(value)
     return fields
 
@@ -144,55 +158,112 @@ def probe_lines(text: str) -> list[str]:
     return [l[l.index("Z7 "):].rstrip() for l in text.splitlines() if "Z7 " in l]
 
 
-def compare(plan: dict, text: str, *, after: int = 0, through: int | None = None) -> dict:
-    """Match replay observations with host rows for ticks in (after, through]."""
-    lines = probe_lines(text)
+def parse_records(text: str) -> tuple[dict, list[str]]:
+    """Group probe records; malformed, unknown or conflicting rows are errors."""
+    errors: list[str] = []
     checks: dict[int, dict] = {}
     kinds: dict[int, list[str]] = {}
+    cycles: list[dict] = []
+    singles: dict[str, list[str]] = {t: [] for t in ("START", "SAVED", "LOADED", "EARLY_END", "DONE")}
+    lines = probe_lines(text)
     for line in lines:
-        tag = line.split(" ", 2)[1]
-        if tag in ("CHECK", "CHECK2", "CHECK3"):
+        parts = line.split()
+        tag = parts[1] if len(parts) > 1 else ""
+        if tag not in KNOWN_TAGS:
+            errors.append(f"unknown record {line!r}")
+            continue
+        if tag in singles:
+            singles[tag].append(line)
+            continue
+        try:
             row = parse_fields(line)
-            tick = row.pop("host_tick")
-            if tag == "CHECK":
-                kinds.setdefault(tick, []).append(line.split()[2])
-            checks.setdefault(tick, {}).update(row)
-    through = plan["stop"] if through is None else through
+        except ValueError as exc:
+            errors.append(str(exc))
+            continue
+        kind = parts[2] if tag in ("CHECK", "CYCLES") and len(parts) > 2 else None
+        missing = [f for f in ("host_tick",) + RECORD_FIELDS[tag] if f not in row]
+        if missing or (tag == "CHECK" and kind not in CHECK_KINDS) or \
+                (tag == "CYCLES" and kind not in CYCLE_KINDS) or \
+                (tag == "CHECK2" and any(len(row[f]) != 8 for f in LISTS)):
+            errors.append(f"malformed record {line!r}")
+            continue
+        tick = row.pop("host_tick")
+        if tag == "CYCLES":
+            cycles.append(dict(row, kind=kind, host_tick=tick))
+            continue
+        if tag == "CHECK":
+            kinds.setdefault(tick, []).append(kind)
+        merged = checks.setdefault(tick, {})
+        for field, value in row.items():
+            if field in merged and merged[field] != value:
+                errors.append(f"conflicting {field} at tick {tick}")
+            merged[field] = value
+    for tick, row in checks.items():
+        missing = [f for f in SCALARS + LISTS if f not in row]
+        if missing:
+            errors.append(f"tick {tick} lacks {','.join(missing)}")
+        seen = kinds.get(tick, [])
+        if len(seen) != len(set(seen)):
+            errors.append(f"duplicate observation kind at tick {tick}")
+    return {"lines": len(lines), "checks": checks, "kinds": kinds, "cycles": cycles,
+            "singles": singles}, errors
+
+
+def compare(plan: dict, records: dict, *, after: int, through: int) -> tuple[int, list[str]]:
+    """Match every host observation in (after, through] exactly once."""
     mismatches, compared = [], 0
+    checks, kinds = records["checks"], records["kinds"]
     for tick, expected in sorted(plan["observations"].items()):
         if not after < tick <= through:
             continue
         actual = checks.get(tick)
-        if actual is None:
+        if actual is None or "checkpoint" not in kinds.get(tick, []):
             mismatches.append(f"missing replay observation at tick {tick}")
             continue
         compared += 1
         for field in SCALARS + LISTS:
             if expected[field] != actual.get(field):
                 mismatches.append(f"tick {tick} {field}: replay={actual.get(field)} host={expected[field]}")
-    extra = sorted(t for t in checks if t not in plan["observations"] and
-                   "cut" not in kinds.get(t, []))
-    mismatches += [f"unexpected replay observation at tick {t}" for t in extra]
-    cycles = [parse_fields(l) for l in lines if l.startswith("Z7 CYCLES ")]
-    return {"lines": len(lines), "compared_observations": compared,
-            "mismatches": mismatches[:50], "mismatch_count": len(mismatches),
-            "final": checks.get(through, {}), "final_kinds": kinds.get(through, []),
-            "cycles": cycles[-1] if cycles else None,
-            "saved": next((l for l in lines if l.startswith("Z7 SAVED")), None),
-            "loaded": next((l for l in lines if l.startswith("Z7 LOADED")), None),
-            "early_end": any(l.startswith("Z7 EARLY_END") for l in lines),
-            "done": any(l.startswith("Z7 DONE") for l in lines)}
+    for tick in sorted(checks):
+        if tick in plan["observations"] and after < tick <= through:
+            continue
+        if kinds.get(tick) == ["cut"] and tick == through:
+            continue
+        mismatches.append(f"unexpected replay observation at tick {tick}")
+    return compared, mismatches
 
 
-def timing(cycles: dict | None) -> dict | None:
-    if not cycles or cycles.get("frames", 0) <= 0 or cycles.get("total", 0) <= 0:
-        return None
-    frames, total = cycles["frames"], cycles["total"]
-    return {"frames": frames, "total_cycles": total, "update_cycles": cycles["update"],
-            "peak_cycles": cycles["peak"], "update_peak_cycles": cycles["update_peak"],
-            "mean_cycles_per_frame": round(total / frames),
-            "frames_per_second": round(frames * CPU_HZ / total, 3),
-            "stack_untouched_bytes": cycles.get("stack_untouched")}
+def timing(records: dict, final_kind: str, final_tick: int, frames: int) -> tuple[dict | None, list[str]]:
+    """Exactly one coherent final cycles record, plus coherent periodic ones."""
+    errors: list[str] = []
+    finals = [c for c in records["cycles"] if c["kind"] == final_kind]
+    if len(finals) != 1:
+        return None, [f"expected one {final_kind} timing record, found {len(finals)}"]
+    final = finals[0]
+    for c in records["cycles"]:
+        if c["kind"] not in ("periodic", final_kind):
+            errors.append(f"unexpected {c['kind']} timing record")
+            continue
+        if min(c["frames"], c["total"], c["update"], c["peak"], c["update_peak"]) <= 0 or \
+                c["update"] > c["total"] or c["update_peak"] > c["peak"] or \
+                c["peak"] > c["total"] or c["total"] > c["peak"] * c["frames"] or \
+                c["frames"] > final["frames"] or c["total"] > final["total"]:
+            errors.append(f"incoherent timing record at tick {c['host_tick']}")
+        if "stack_painted" in c and not 0 < c.get("stack_untouched", -1) <= c["stack_painted"]:
+            errors.append(f"incoherent stack record at tick {c['host_tick']}")
+    if final["host_tick"] != final_tick or final["frames"] != frames:
+        errors.append(f"final timing covers {final['frames']} frames at tick {final['host_tick']}, "
+                      f"expected {frames} at {final_tick}")
+    if "stack_painted" not in final:
+        errors.append("final timing record lacks stack fields")
+    if errors:
+        return None, errors
+    return {"frames": final["frames"], "total_cycles": final["total"],
+            "update_cycles": final["update"], "peak_cycles": final["peak"],
+            "update_peak_cycles": final["update_peak"],
+            "mean_cycles_per_frame": round(final["total"] / final["frames"]),
+            "frames_per_second": round(final["frames"] * CPU_HZ / final["total"], 3),
+            "stack_untouched_bytes": final["stack_untouched"]}, []
 
 
 def save_records(data: bytes) -> list[dict]:
@@ -278,35 +349,109 @@ def run_mgba(rom: pathlib.Path, out: pathlib.Path, timeout: float,
     return captured.decode(errors="replace"), time.monotonic() - began
 
 
-def verdict(plan: dict, mode: str, result: dict) -> bool:
-    final, host = result["final"], plan["final"]
-    ok = result["mismatch_count"] == 0 and not result["early_end"]
-    if mode == "prefix":
-        return bool(ok and result["saved"] and result["saved"].startswith("Z7 SAVED ok"))
+def sram_check(mode: str, plan: dict, data: bytes | None, seed: bytes | None,
+               tag: int, payload: int) -> tuple[list[dict], list[str]]:
+    """Verify the SRAM records a run must leave before it can qualify."""
+    if data is None:
+        return [], ["SRAM not verified"]
+    if len(data) != SAVE_BYTES:
+        return [], [f"SRAM is {len(data)} bytes, expected {SAVE_BYTES}"]
+    records, errors = save_records(data), []
+    for r in records:
+        if not r["checksum_valid"] or r["tag"] != tag or r["payload_bytes"] != payload:
+            errors.append(f"invalid SRAM record in slot {r['slot']}")
+    sequences = sorted(r["sequence"] for r in records)
+    won = plan["final"]["kind"] == "won"
+    if mode == "prefix" and sequences != [1]:
+        errors.append(f"prefix must leave exactly one pause save, found sequences {sequences}")
+    if mode == "full" and sequences != ([1] if won else []):
+        errors.append(f"full run SRAM sequences {sequences} do not match its outcome")
     if mode == "resume":
-        ok = ok and bool(result["loaded"]) and result["loaded"].startswith("Z7 LOADED ok")
-    ok = ok and result["done"] and all(final.get(f) == host[f] for f in SCALARS + LISTS)
-    if host["kind"] == "won":
-        ok = ok and final.get("screen") == SCREEN_RESULT and final.get("won") == 1 and \
-            final.get("lost") == 0 and final.get("fault") == 0 and final.get("enemy_buildings") == 0
-    return bool(ok)
+        if seed is None or len(seed) != SAVE_BYTES:
+            errors.append("resume SRAM seed not supplied")
+        else:
+            kept = [r for r in records if r["sequence"] == 1]
+            if len(kept) != 1 or data[kept[0]["slot"] * SAVE_SLOT_SIZE:(kept[0]["slot"] + 1) * SAVE_SLOT_SIZE] != \
+                    seed[kept[0]["slot"] * SAVE_SLOT_SIZE:(kept[0]["slot"] + 1) * SAVE_SLOT_SIZE]:
+                errors.append("resume did not keep the seeded pause save")
+        if sequences != ([1, 2] if won else [1]):
+            errors.append(f"resume SRAM sequences {sequences} do not match its outcome")
+    return records, errors
 
 
-def evaluate(plan: dict, mode: str, text: str, cut: int | None) -> dict:
-    lines = probe_lines(text)
+def evaluate(plan: dict, mode: str, text: str, cut: int | None, *, timed: bool = True,
+             sram: bytes | None = None, seed: bytes | None = None) -> dict:
+    """Qualify one replay log. Every gate must pass; failures are listed."""
+    records, failures = parse_records(text)
+    singles = records["singles"]
+    stop = plan["stop"]
+    if len(singles["START"]) != 1:
+        failures.append(f"expected one START record, found {len(singles['START'])}")
+    if singles["EARLY_END"]:
+        failures.append("replay ended early")
+    tag, payload = SAVE_TAG, SAVE_PAYLOAD_BYTES
     if mode == "prefix":
-        saved = next((parse_fields(l) for l in lines if l.startswith("Z7 SAVED")), {})
-        cut = saved.get("cut")
-        result = compare(plan, text, through=cut or 0)
-        result["cut"] = cut
+        saved = singles["SAVED"]
+        fields = {}
+        if len(saved) != 1 or not saved[0].startswith("Z7 SAVED ok"):
+            failures.append(f"expected one successful SAVED record, found {saved}")
+        else:
+            fields = parse_fields(saved[0])
+        cut = fields.get("cut")
+        tag, payload = fields.get("tag", tag), fields.get("payload_bytes", payload)
+        if type(cut) is not int or not 1 <= cut < stop:
+            failures.append(f"prefix cut {cut} is not inside the tape")
+            cut = None
+        elif records["kinds"].get(cut, []).count("cut") != 1:
+            failures.append(f"no single cut observation at tick {cut}")
+        after, through = 0, cut or 0
+        if singles["DONE"] or singles["LOADED"]:
+            failures.append("prefix log has records of another mode")
+        final_kind, frames = "cut", cut or 0
     elif mode == "resume":
-        result = compare(plan, text, after=cut or 0)
-        result["cut"] = cut
+        if type(cut) is not int or not 1 <= cut < stop:
+            failures.append(f"resume cut {cut} is not inside the tape")
+            cut = None
+        loaded = singles["LOADED"]
+        if len(loaded) != 1 or not loaded[0].startswith("Z7 LOADED ok"):
+            failures.append(f"expected one successful LOADED record, found {loaded}")
+        if len(singles["DONE"]) != 1 or singles["SAVED"]:
+            failures.append("resume must end with one DONE record and no SAVED record")
+        after, through = cut or stop, stop
+        final_kind, frames = "terminal", stop - (cut or 0) + 1
     else:
-        result = compare(plan, text)
-    result["guest_timing"] = timing(result.pop("cycles"))
-    result["qualified"] = verdict(plan, mode, result)
-    return result
+        if len(singles["DONE"]) != 1 or singles["SAVED"] or singles["LOADED"]:
+            failures.append("full run must end with one DONE record only")
+        after, through = 0, stop
+        final_kind, frames = "terminal", stop
+    expected_checks = sum(1 for t in plan["observations"] if after < t <= through)
+    compared, mismatches = compare(plan, records, after=after, through=through)
+    if not expected_checks or compared != expected_checks:
+        failures.append(f"compared {compared} of {expected_checks} expected observations")
+    failures += mismatches[:50]
+    if mode != "prefix":
+        final, host = records["checks"].get(stop, {}), plan["final"]
+        if host["kind"] not in records["kinds"].get(stop, []) or \
+                any(final.get(f) != host[f] for f in SCALARS + LISTS):
+            failures.append("terminal observation does not match the host")
+        if host["kind"] == "won" and not (final.get("screen") == SCREEN_RESULT and
+                                          final.get("won") == 1 and final.get("lost") == 0 and
+                                          final.get("fault") == 0 and
+                                          final.get("enemy_buildings") == 0):
+            failures.append("terminal state is not a strict win")
+    guest_timing = None
+    if timed:
+        guest_timing, timing_errors = timing(records, final_kind,
+                                             cut if mode == "prefix" else stop, frames)
+        failures += timing_errors
+    sram_records, sram_errors = sram_check(mode, plan, sram, seed, tag, payload)
+    failures += sram_errors
+    return {"mode": mode, "lines": records["lines"], "cut": cut,
+            "expected_observations": expected_checks, "compared_observations": compared,
+            "mismatch_count": len(mismatches), "guest_timing": guest_timing,
+            "timed": timed, "sram_records": sram_records,
+            "failures": failures[:80], "failure_count": len(failures),
+            "qualified": not failures}
 
 
 def main() -> int:
@@ -315,11 +460,15 @@ def main() -> int:
     tape = sub.add_parser("tape", help="write the embedded key tape")
     tape.add_argument("trace", type=pathlib.Path)
     tape.add_argument("out", type=pathlib.Path)
-    check = sub.add_parser("compare", help="compare a replay log with the trace")
+    check = sub.add_parser("compare", help="qualify a replay log against the trace")
     check.add_argument("trace", type=pathlib.Path)
     check.add_argument("log", type=pathlib.Path)
     check.add_argument("--mode", choices=("full", "prefix", "resume"), default="full")
     check.add_argument("--cut", type=int)
+    check.add_argument("--sav", type=pathlib.Path, help="SRAM the run left (required to qualify)")
+    check.add_argument("--seed-sav", type=pathlib.Path, help="resume: SRAM the run started with")
+    check.add_argument("--untimed", action="store_true",
+                       help="host logs carry no guest timing; skip the timing gate")
     run = sub.add_parser("run", help="one isolated mGBA replay")
     run.add_argument("trace", type=pathlib.Path)
     run.add_argument("rom", type=pathlib.Path)
@@ -329,7 +478,7 @@ def main() -> int:
     run.add_argument("--seed-sav", type=pathlib.Path, help="resume: SRAM written by the prefix")
     run.add_argument("--timeout", type=float, default=6 * 3600)
     args = parser.parse_args()
-    for name in ("trace", "rom", "out", "log", "seed_sav"):
+    for name in ("trace", "rom", "out", "log", "seed_sav", "sav"):
         if getattr(args, name, None) is not None:
             setattr(args, name, getattr(args, name).resolve())
 
@@ -342,8 +491,11 @@ def main() -> int:
     plan = load_trace(args.trace)
     if args.mode == "resume" and args.cut is None:
         parser.error("resume needs --cut")
+    seed = args.seed_sav.read_bytes() if args.seed_sav else None
     if args.command == "compare":
-        result = evaluate(plan, args.mode, args.log.read_text(errors="replace"), args.cut)
+        sram = args.sav.read_bytes() if args.sav else None
+        result = evaluate(plan, args.mode, args.log.read_text(errors="replace"), args.cut,
+                          timed=not args.untimed, sram=sram, seed=seed)
         print(json.dumps(result, indent=2))
         return 0 if result["qualified"] else 1
     if not MGBA.exists():
@@ -353,17 +505,16 @@ def main() -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     markers = (b"Z7 DONE", b"Z7 SAVED", b"Z7 LOADED fail", b"Z7 EARLY_END")
     text, wall = run_mgba(args.rom, args.out, args.timeout, args.seed_sav, markers)
-    result = evaluate(plan, args.mode, text, args.cut)
     sav = args.out / "saves" / "replay.sav"
-    data = sav.read_bytes() if sav.exists() else b""
-    result.update({"mode": args.mode, "trace_sha256": plan["trace_sha256"],
+    data = sav.read_bytes() if sav.exists() else None
+    result = evaluate(plan, args.mode, text, args.cut, sram=data, seed=seed)
+    result.update({"trace_sha256": plan["trace_sha256"],
                    "rom_sha256": sha256(args.rom.read_bytes()), "wall_seconds": round(wall, 1),
-                   "sram_sha256": sha256(data) if data else None,
-                   "sram_records": save_records(data) if len(data) == SAVE_BYTES else []})
+                   "sram_sha256": sha256(data) if data else None})
     (args.out / "result.json").write_text(json.dumps(result, indent=2) + "\n")
-    print(json.dumps({k: result[k] for k in ("qualified", "compared_observations", "mismatch_count",
-                                             "cut", "guest_timing", "wall_seconds", "sram_records")
-                      if k in result}, indent=2))
+    print(json.dumps({k: result[k] for k in ("qualified", "failures", "compared_observations",
+                                             "cut", "guest_timing", "wall_seconds", "sram_records")},
+                     indent=2))
     return 0 if result["qualified"] else 1
 
 

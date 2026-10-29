@@ -6228,7 +6228,12 @@ T1–T8 and the other Terran checks pass before that point, and T10 run directly
 wins at tick 3,552. No frame-rate, physical-hardware or ARM replay result is
 claimed.
 
-### Z7 current-source ARM win and SRAM continuation (2026-10-29)
+### Z7 ARM win and SRAM continuation at runtime base 9ff7f7c (2026-10-29)
+
+These results are historical. They were produced at `9ff7f7c`, and later
+shared-runtime merges (#148, #149, #152, #153) leave current-main
+qualification open. They come from a replay probe ROM that replaces
+`common/main.c`, not from replaying the unchanged production ROM.
 
 On `codex/source-release` `9ff7f7c`, `make test-sc64-z7-canonical-controller`
 reproduces PR #123's ordinary-input Z7 trace byte for byte (SHA-256
@@ -6240,8 +6245,16 @@ update/audio/render loop. Nothing writes game state. At each of the
 trace's 909 checkpoint ticks, it reports the controller's trace fields to
 the mGBA debug log. `tools/sc64_z7_arm_replay.py` builds the tape, runs one
 isolated mGBA process per replay (no debugger) and compares every field.
-Asset-free unit tests cover its trace validation, comparison and SRAM record
-parsing.
+Its verdict fails closed. A run qualifies only if all of these hold:
+- the mode's expected checkpoint coverage is non-empty and fully matched;
+- any cut is inside the tape;
+- there is exactly one coherent final timing record;
+- the SRAM records are verified, which happens before the verdict.
+
+Asset-free unit tests cover the negative cases. The executed build commands,
+ordered `-D`/`-I` vectors, dependencies and input hashes come from
+`tools/sc64_build_provenance.py`. Each rebuilt ROM is byte-identical to its
+evidence ROM.
 
 The full ARM replay matches 909/909 and wins. A prefix ROM saves through the
 ordinary pause menu at tick 403,482, after 669/669 matches. Its single
