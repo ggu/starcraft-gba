@@ -6227,3 +6227,42 @@ command stops at the T9 controller (`won=0`, no Wraiths, wallet 34/14 at the
 T1–T8 and the other Terran checks pass before that point, and T10 run directly
 wins at tick 3,552. No frame-rate, physical-hardware or ARM replay result is
 claimed.
+
+### Z7 current-source ARM win and SRAM continuation (2026-10-29)
+
+On `codex/source-release` `9ff7f7c`, `make test-sc64-z7-canonical-controller`
+reproduces PR #123's ordinary-input Z7 trace byte for byte (SHA-256
+`2d28b63d74ac4438630561b714444ba77a12a9e79e9b4062133c928c447b8198`, win at tick 821,565 / frame 808,493). The new
+`tests/sc64_z7_arm_replay.c` replaces `common/main.c` and compiles the rest
+under `ZERG_Z7_CANONICAL_FLAGS`. It plays that trace's 70,561 held-key
+transitions from the title screen through the shipped
+update/audio/render loop. Nothing writes game state. At each of the
+trace's 909 checkpoint ticks, it reports the controller's trace fields to
+the mGBA debug log. `tools/sc64_z7_arm_replay.py` builds the tape, runs one
+isolated mGBA process per replay (no debugger) and compares every field.
+Asset-free unit tests cover its trace validation, comparison and SRAM record
+parsing.
+
+The full ARM replay matches 909/909 and wins. A prefix ROM saves through the
+ordinary pause menu at tick 403,482, after 669/669 matches. Its single
+SRAM record (generation-36 tag, 16,296 bytes, valid checksum) matches the
+host prefix payload byte for byte. A fresh mGBA process loads it with L on
+the title screen and matches the remaining 240 checkpoints through the same
+win. It writes the victory autosave as sequence 2 and keeps the pause
+save. The cut must be a tick where the field UI's unsaved remembered command row
+and gesture state equal their post-load defaults. A cut at tick 400,350
+replayed the tape into a different command after loading, because the save
+does not keep `menu_last`. The full run averages 1,992,668 guest
+cycles per frame (about 8.4 frames/s); its peak frame is 56.7 M cycles. The
+probe links at IWRAM `0x03004e08` (same as the release ROM) and BSS
+`0x0203d818`; the release ROM is at BSS `0x0203d730`.
+
+`make test-zerg-z7` fails on this base for reasons that predate this work.
+The Scourge fixture fails under PR #133's human-fog gate. Carried Z1 and Z5
+fail under PR #84's field controls, bisected to merge `83b264c` and also
+failing in canonical `make test-zerg`. Carried Z6 does not clear Force 2
+under Z7 flags but wins under canonical flags. Carried Z2–Z4, the Z7
+profile/save/frame fixtures and the 18-match skirmish matrix pass. See the
+[audit](audits/2026-10-29-z7-current-arm-sram/README.md). This is emulator
+evidence for the shipped game loop, not physical-GBA or 30-fps
+qualification. Z7 is not promoted.
