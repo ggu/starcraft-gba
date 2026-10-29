@@ -5011,3 +5011,11 @@ DEPOT_APPROACH_CASES := terran-normal terran-nearest zerg-normal zerg-nearest pr
 .PHONY: test-sc64-depot-approach
 test-sc64-depot-approach: $(addprefix build/test-sc64-depot-approach-,$(DEPOT_APPROACH_CASES))
 	@set -e; for variant in $(DEPOT_APPROACH_CASES); do ./build/test-sc64-depot-approach-$$variant; done
+
+# Exact 24 Hz / 30 Hz source animation clock conversion, asset-free.
+.PHONY: test-sc64-source-clock-math
+test: test-sc64-source-clock-math
+build/test-sc64-source-clock-math: tests/sc64_source_clock_math.c starcraft/sc64_weapon_source_vfx.h Makefile | build
+	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-sc64-source-clock-math: build/test-sc64-source-clock-math
+	./build/test-sc64-source-clock-math

@@ -6314,3 +6314,37 @@ compositing. The 27 route-build frames have
 the largest update spikes; even zero-build frames average only 21.67 fps.
 Rendering is the next sustained-cost target; route construction remains a
 separate spike target. Counters overlap and must not all be added together.
+
+### Exact source-animation clock arithmetic (2026-10-29)
+
+The 30 Hz to 24 Hz presentation clock now computes `floor(4*n/5)` as
+`n - ceil(n/5)` using one 32-bit division. The inverse computes saturated
+`ceil(5*n/4)` as `n + ceil(n/4)` with a checked sum. These identities preserve
+the original result for every unsigned 32-bit input, including wrap-domain
+ages and the saturation boundary. Animation event timing and duration remain
+unchanged. An independent original-64-bit-formula oracle passes 2,062,934
+bounded, boundary and random cases; the existing VFX sampling test also passes.
+The actual Terran attack-pose call site uses `__aeabi_uidiv` in place of
+`__aeabi_uldivmod`; unrelated 64-bit operations remain.
+
+All four ARM products link within the same RAM guards and have unchanged
+EWRAM/IWRAM headroom. Actual per-TU compiler/link commands, dependencies,
+consumed-input hashes and ROM/ELF hashes are recorded privately. The only
+changed consumed source header is the clock helper; imported inputs and
+ordered game feature definitions match the paired baseline.
+
+On the identical recorded three-AI workload, the advancing-frame count remains
+992 and cycles fall from 817,238,918 to 810,213,225 (0.86 percent), moving the
+measured rate from 20.36 to 20.54 fps. All 9,000 tick/frame/phase observations
+match. The full one-AI replay also matches all 9,488 observations and decoded
+terminal entity banks, still losing at frame 9,428; its 9,426 advancing frames
+fall from 5,630,905,715 to 5,627,534,060 cycles (28.08 to 28.10 fps). These are
+paired mGBA guest-cycle measurements. The three-AI near-30-fps goal remains
+unmet; this is a small improvement rather than a completed performance pass.
+
+A larger transparent-edge facing-sprite experiment was rejected before
+promotion. It passed synthetic and real-bank pixel oracles and all four link
+guards, but the identical three-AI workload regressed to 20.31 fps. Its static
+bank transparency ratio did not establish a useful runtime saving. The source
+prototype and failed performance evidence remain private; the original sprite
+renderer and generated data format are retained.
