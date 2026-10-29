@@ -1430,6 +1430,8 @@ static int race_p8_outcome(void);
 static void race_p8_note_unit_spawn(int slot, int owner, int type);
 static void race_p8_note_building_spawn(int slot, int owner, int type);
 static void race_p8_note_product_building(int building);
+/* P8 runs the shared Protoss unit services (see sc64_p7_runtime_adapter.h). */
+#define SC64_PROTOSS_SHARED_SERVICES
 #endif
 enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
        SC64_HIT_SKIP_HALLUCINATION_SCALE=4 };
@@ -1439,6 +1441,40 @@ static void race_siege_splash_attack(Unit *,int,int);
 #endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
 static int race_p7_active(void);
+/* The Protoss unit services (Carrier hangar and Interceptor flight, Arbiter
+ * cloak, Observer and Cannon detection, Shield Battery, Interceptor
+ * projectiles) are unit behavior, not P7 mission state. Later Protoss
+ * missions that carry their own source-owner map and service clock run them
+ * too. Without those missions these expand to the original P7 tokens. */
+#ifdef SC64_PROTOSS_SHARED_SERVICES
+static int race_protoss_later_services_active(void);
+static int race_protoss_later_source_owner(unsigned slot);
+static u8 *race_protoss_later_service_clock(void);
+static int race_protoss_later_service_mission(int mission);
+static int race_protoss_later_mission_source_owner(int mission, unsigned slot);
+static int race_protoss_later_battery_initialize(const Sc64RaceMap *map);
+static int race_protoss_later_battery_world_valid(void);
+static int race_protoss_later_battery_candidate_valid(int mission, const Building *q);
+#define race_protoss_services_active() \
+    (race_p7_active() || race_protoss_later_services_active())
+#define race_protoss_source_owner(slot) \
+    (race_protoss_later_services_active() ? \
+     race_protoss_later_source_owner(slot) : race_p7_source_owner(slot))
+#define RACE_PROTOSS_SERVICE_CLOCK \
+    (race_protoss_later_services_active() ? \
+     race_protoss_later_service_clock() : race_p7.reserved)
+#define RACE_PROTOSS_SERVICE_MISSION(mission) \
+    ((mission)==SC64_P7_GLOBAL_ID || race_protoss_later_service_mission(mission))
+#define RACE_PROTOSS_MISSION_SOURCE_OWNER(mission, slot) \
+    ((mission)==SC64_P7_GLOBAL_ID ? race_p7_source_owner(slot) : \
+     race_protoss_later_mission_source_owner((mission), (slot)))
+#else
+#define race_protoss_services_active() race_p7_active()
+#define race_protoss_source_owner(slot) race_p7_source_owner(slot)
+#define RACE_PROTOSS_SERVICE_CLOCK race_p7.reserved
+#define RACE_PROTOSS_SERVICE_MISSION(mission) (mission)==SC64_P7_GLOBAL_ID
+#define RACE_PROTOSS_MISSION_SOURCE_OWNER(mission, slot) race_p7_source_owner(slot)
+#endif
 #endif
 #ifdef SC64_NYDUS_ENABLED
 static void race_nydus_note_building_lost(int slot);
@@ -2053,7 +2089,7 @@ spawn_unit(int owner, int type, int x, int y)
 #endif
     u[i].weapon = owner == SIDE ? weapons_level : 0;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-    if (race_p7_active()) u[i].weapon = (u16)(1u << 13);
+    if (race_protoss_services_active()) u[i].weapon = (u16)(1u << 13);
 #endif
     u[i].target = -1;
     u[i].path_timer = 0;
@@ -2161,7 +2197,7 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     race_p8_note_building_spawn(i, owner, type);
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
-    if (race_p7_active() && type == B_P7_SHIELD_BATTERY) {
+    if (race_protoss_services_active() && type == B_P7_SHIELD_BATTERY) {
         b[i].queue_progress = 100 * 256;
         b[i].level = 0;
     }
@@ -3490,7 +3526,7 @@ sc64_direct_attack_find_target(int x, int y)
         if (!owners_hostile(SIDE, owner) || !currently_visible(tx, ty) ||
             !sc64_direct_target_state(entity, SIDE, &s)) continue;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-        if (race_p7_active() && sc64_p7_observer_target_is_cloaked(entity)) {
+        if (race_protoss_services_active() && sc64_p7_observer_target_is_cloaked(entity)) {
             int eligible=0;
             for (int a=0;a<MAX_UNITS;++a) if (u[a].alive && u[a].selected &&
                 u[a].owner==SIDE && !SC64_TRANSPORT_LOADED(&u[a]) &&
@@ -6375,7 +6411,7 @@ target_lists_unavailable:
 #ifdef SC64_RACES
     if (target_lists_valid) sc64_target_index_begin();
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-    if (race_p7_active()) sc64_p7_arbiter_cache_process_due();
+    if (race_protoss_services_active()) sc64_p7_arbiter_cache_process_due();
 #endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_TARGET_OCCUPANCY)
     sc64_target_hostility_snapshot();
@@ -7632,7 +7668,7 @@ game_update(u16 held, u16 pressed)
     if (sc64_showcase_scene >= 0) ++sc64_showcase_ticks;
 #endif
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-    if (race_p7_active()) sc64_p7_arbiter_cache_frame_tick();
+    if (race_protoss_services_active()) sc64_p7_arbiter_cache_frame_tick();
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     race_p7_carrier_training_frame_tick();
@@ -7738,7 +7774,7 @@ game_update(u16 held, u16 pressed)
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     race_p7_carrier_training_end_frame();
 #endif
-    if (race_p7_active()) race_p7_projectile_clear_dead_references();
+    if (race_protoss_services_active()) race_p7_projectile_clear_dead_references();
 #endif
 #ifdef SC64_IMPORTED_MISSION
     sc64_sight_cycles = gba_clock() - profile_sight_start;
@@ -9240,7 +9276,7 @@ sc64_tile_background_done:
 #endif
     draw_tracers();
 #ifdef SC64_P7_PROJECTILES_ENABLED
-    if (race_p7_active()) race_p7_projectile_draw();
+    if (race_protoss_services_active()) race_p7_projectile_draw();
 #endif
 #ifdef SC64_P4_STORM_ENABLED
     race_p4_storm_draw();
@@ -9692,7 +9728,7 @@ draw_hud_commands_body(void)
 #endif
 		else
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-                if (race_p7_active() && u[i].type==U_P7_CARRIER) {
+                if (race_protoss_services_active() && u[i].type==U_P7_CARRIER) {
                     gfx_text(hud_left+47,137,"IC",C_CYAN);
                     gfx_num(hud_left+65,137,(int)race_p7_carrier_training_child_count(i),C_WHITE);
                     gfx_text(hud_left+79,137,"HANGAR / FLIGHT WIP",C_GOLD);
@@ -9913,7 +9949,7 @@ sc64_hud_race_keys(int *values,int first)
     }
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if(first>=0 && race_p7_active() && u[first].type==U_P7_CARRIER)
+    if(first>=0 && race_protoss_services_active() && u[first].type==U_P7_CARRIER)
         values[20]|=((int)race_p7_carrier_training_child_count(first)+(u[first].carry<<3))<<8;
 #endif
 #ifdef SC64_Z5_CLOAK_ENABLED

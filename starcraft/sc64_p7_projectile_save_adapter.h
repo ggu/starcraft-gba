@@ -15,14 +15,14 @@ static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
     if (!sc64_codec_validate(packet,SC64_CODEC_BYTES)) return 0;
     count=sc64_codec_allocated_count(packet,SC64_CODEC_BYTES);
     if (count<0) return 0;
-    int p7=!candidate->state[0] && candidate->state[2]==SC64_P7_GLOBAL_ID;
+    int p7=!candidate->state[0] && RACE_PROTOSS_SERVICE_MISSION(candidate->state[2]);
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit actor;
         if (!race_save_decode_unit(candidate,i,ww,wh,&actor)) return 0;
         if ((actor.type==U_P7_INTERCEPTOR)!=(actor.raw_type==73)) return 0;
         if (actor.alive && actor.type==U_P7_INTERCEPTOR &&
             (!p7 || actor.raw_owner<0 || actor.raw_owner>=8 ||
-             actor.owner!=race_p7_source_owner((unsigned)actor.raw_owner))) return 0;
+             actor.owner!=RACE_PROTOSS_MISSION_SOURCE_OWNER(candidate->state[2],(unsigned)actor.raw_owner))) return 0;
     }
     if (!p7)
         return count==0;
@@ -42,7 +42,7 @@ static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
         if (row.turn_rate_raw<127 || row.turn_rate_raw>383 ||
             row.order_signal_bit0 || row.hit_flags_low2 ||
             (row.movement_flags_low4&4u) || row.raw_source_owner>=8 ||
-            race_p7_source_owner(row.raw_source_owner)<0 ||
+            RACE_PROTOSS_MISSION_SOURCE_OWNER(candidate->state[2],row.raw_source_owner)<0 ||
             row.destination_x_source<0 || row.destination_x_source>=(int)(ww*2) ||
             row.destination_y_source<0 || row.destination_y_source>=(int)(wh*2)) return 0;
         if (row.state==0 && (row.script_phase!=1 || row.remaining_time!=255 ||
@@ -56,7 +56,7 @@ static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
             if (!race_save_decode_unit(candidate,row.owner_ref,ww,wh,&shooter) ||
                 !shooter.alive || shooter.type!=U_P7_INTERCEPTOR ||
                 shooter.raw_type!=73 || shooter.raw_owner!=row.raw_source_owner ||
-                shooter.owner!=race_p7_source_owner(row.raw_source_owner)) return 0;
+                shooter.owner!=RACE_PROTOSS_MISSION_SOURCE_OWNER(candidate->state[2],row.raw_source_owner)) return 0;
         }
         if (row.target_ref!=511) {
             if (row.target_ref<MAX_UNITS) {

@@ -32,7 +32,12 @@ static int race_p5_saved_p7_recharge_valid(const RaceSave *candidate,
     const Sc64RaceUnitRule *rule;
     int target;
     if (!candidate || !actor || candidate->state[0] ||
+#ifdef SC64_PROTOSS_SHARED_SERVICES
+        !RACE_PROTOSS_SERVICE_MISSION(candidate->state[2]) ||
+        actor->order != ORDER_P7_RECHARGE ||
+#else
         candidate->state[2] != SC64_P7_GLOBAL_ID || actor->order != ORDER_P7_RECHARGE ||
+#endif
         actor->raw_type == 73 || actor->raw_type == 85 ||
         actor->raw_owner < 0 || actor->raw_owner >= 8 || actor->work_timer != 0 ||
         SC64_TRANSPORT_LOADED(actor)) return 0;

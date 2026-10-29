@@ -189,7 +189,9 @@ static int sc64_p7_arbiter_finder_square_rect(int arbiter,int tl,int tt,
  * bit 13 valid marker, bit 14 current Arbiter aura membership, bit 15 tracked
  * for detection (intrinsically cloaked Observer / Dark Templar / Zeratul, or
  * current Arbiter aura).
- * This state is accepted only by the new save generation and only on P7. */
+ * This state is accepted only by the new save generation and only in
+ * missions that run the shared Protoss services (P7, and P8 in its
+ * candidate). */
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
 #define SC64_P7_ARBITER_DETECTED_MASK(v) ((unsigned)(v) & 0xffu)
 #define SC64_P7_ARBITER_COUNTDOWN(v) (((unsigned)(v) >> 8) & 31u)
@@ -261,8 +263,8 @@ static int sc64_p7_arbiter_same_source(int arbiter,int target)
         u[arbiter].owner!=u[target].owner) return 0;
     /* The compact owner map collapses P7 source forces 0 and 4 to ENEMY.
        Require both identities to match the authenticated runtime mapping. */
-    return race_p7_source_owner((unsigned)raw)==u[arbiter].owner &&
-           race_p7_source_owner((unsigned)u[target].raw_owner)==u[target].owner;
+    return race_protoss_source_owner((unsigned)raw)==u[arbiter].owner &&
+           race_protoss_source_owner((unsigned)u[target].raw_owner)==u[target].owner;
 }
 
 static int sc64_p7_arbiter_aura_cloaks(int target)
@@ -318,10 +320,10 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
 #endif
         if(dx*dx+dy*dy>radius*radius) continue;
         if(source>=0&&source<8) {
-            int live=race_p7_source_owner((unsigned)source);
+            int live=race_protoss_source_owner((unsigned)source);
             if(live>=0&&live==u[i].owner) visible_owners|=1u<<(unsigned)source;
         } else for(unsigned owner=0;owner<7;++owner)
-            if(race_p7_source_owner(owner)==u[i].owner)
+            if(race_protoss_source_owner(owner)==u[i].owner)
                 visible_owners|=1u<<owner;
     }
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive) {
@@ -337,10 +339,10 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
 #endif
         if(dx*dx+dy*dy>radius*radius) continue;
         if(source>=0&&source<8) {
-            int live=race_p7_source_owner((unsigned)source);
+            int live=race_protoss_source_owner((unsigned)source);
             if(live>=0&&live==b[i].owner) visible_owners|=1u<<(unsigned)source;
         } else for(unsigned owner=0;owner<7;++owner)
-            if(race_p7_source_owner(owner)==b[i].owner)
+            if(race_protoss_source_owner(owner)==b[i].owner)
                 visible_owners|=1u<<owner;
     }
     for(int i=0;i<MAX_UNITS;++i) if(u[i].alive &&
@@ -362,10 +364,10 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
             u[i].x,u[i].y,0,(unsigned)u[target].raw_type,u[target].x,u[target].y,0);
 #endif
         if(distance<0||distance>SC64_P7_OBSERVER_BASE_SIGHT_SOURCE_PX) continue;
-        if(source>=0&&source<8 && race_p7_source_owner((unsigned)source)==u[i].owner &&
+        if(source>=0&&source<8 && race_protoss_source_owner((unsigned)source)==u[i].owner &&
            (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
         else if(source<0||source>=8) for(unsigned owner=0;owner<7;++owner)
-            if(race_p7_source_owner(owner)==u[i].owner &&
+            if(race_protoss_source_owner(owner)==u[i].owner &&
                (visible_owners&(1u<<owner))) detected|=1u<<owner;
     }
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive &&
@@ -384,10 +386,10 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
             b[i].x,b[i].y,1,(unsigned)u[target].raw_type,u[target].x,u[target].y,0);
 #endif
         if(distance<0||distance>SC64_P7_CANNON_DETECTION_SOURCE_PX) continue;
-        if(source>=0&&source<8 && race_p7_source_owner((unsigned)source)==b[i].owner &&
+        if(source>=0&&source<8 && race_protoss_source_owner((unsigned)source)==b[i].owner &&
            (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
         else if(source<0||source>=8) for(unsigned owner=0;owner<7;++owner)
-            if(race_p7_source_owner(owner)==b[i].owner &&
+            if(race_protoss_source_owner(owner)==b[i].owner &&
                (visible_owners&(1u<<owner))) detected|=1u<<owner;
     }
     return detected&255u;
@@ -401,13 +403,13 @@ static void sc64_p7_arbiter_cache_source_tick(void)
     for(i=0;i<MAX_BUILDINGS;++i) if(b[i].alive &&
         b[i].raw_type==SC64_P7_CANNON_RAW && building_complete((int)i) &&
         b[i].raw_owner>=0 && b[i].raw_owner<8) {
-        int live=race_p7_source_owner((unsigned)b[i].raw_owner);
+        int live=race_protoss_source_owner((unsigned)b[i].raw_owner);
         if(live==b[i].owner)
             powered_cannons[i]=(u8)sc64_p7_observer_pylon_powers((int)i,
                 b[i].raw_owner,live);
     }
-    unsigned global=(unsigned)race_p7.reserved[1] |
-                    ((unsigned)race_p7.reserved[2]<<8);
+    unsigned global=(unsigned)RACE_PROTOSS_SERVICE_CLOCK[1] |
+                    ((unsigned)RACE_PROTOSS_SERVICE_CLOCK[2]<<8);
     int stagger_reset=0;
     unsigned visible_ordinal=0;
     /* OpenBW decrements the global secondary-order timer and assigns timer
@@ -433,7 +435,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
     for (i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].raw_type==71u &&
         u[i].raw_owner>=0 && u[i].raw_owner<8 && !(u[i].flags&8u) &&
         !SC64_TRANSPORT_LOADED(&u[i]) &&
-        race_p7_source_owner((unsigned)u[i].raw_owner)==u[i].owner) {
+        race_protoss_source_owner((unsigned)u[i].raw_owner)==u[i].owner) {
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
         int al,at,ar,ab;
         if(!sc64_p7_actor_rect_source(71u,u[i].x,u[i].y,0,
@@ -541,15 +543,15 @@ static void sc64_p7_arbiter_cache_source_tick(void)
         }
         u[i].weapon=(u16)sc64_p7_arbiter_pack(mask,timer,(int)aura[i],tracked);
     }
-    race_p7.reserved[1]=(u8)global;
-    race_p7.reserved[2]=(u8)(global>>8);
+    RACE_PROTOSS_SERVICE_CLOCK[1]=(u8)global;
+    RACE_PROTOSS_SERVICE_CLOCK[2]=(u8)(global>>8);
 }
 
 static void sc64_p7_arbiter_cache_frame_tick(void)
 {
-    unsigned phase=(unsigned)race_p7.reserved[0]+4u;
+    unsigned phase=(unsigned)RACE_PROTOSS_SERVICE_CLOCK[0]+4u;
     if (phase>=5u) { phase-=5u; sc64_p7_arbiter_cache_due=1; }
-    race_p7.reserved[0]=(u8)phase;
+    RACE_PROTOSS_SERVICE_CLOCK[0]=(u8)phase;
 }
 
 #ifndef GBA_HOST
@@ -596,9 +598,21 @@ static unsigned sc64_p7_valid_source_mask(void)
 {
     unsigned mask=0;
     for (unsigned owner=0;owner<8;++owner)
-        if (race_p7_source_owner(owner)>=0) mask|=1u<<owner;
+        if (race_protoss_source_owner(owner)>=0) mask|=1u<<owner;
     return mask;
 }
+
+#ifdef SC64_PROTOSS_SHARED_SERVICES
+/* Load preflight runs before the candidate's mission is selected, so it
+ * names the candidate mission's source map explicitly. */
+static unsigned sc64_protoss_mission_source_mask(int mission)
+{
+    unsigned mask=0;
+    for (unsigned owner=0;owner<8;++owner)
+        if (RACE_PROTOSS_MISSION_SOURCE_OWNER(mission,owner)>=0) mask|=1u<<owner;
+    return mask;
+}
+#endif
 
 static int sc64_p7_arbiter_cache_unit_valid(const Unit *actor)
 {
@@ -636,10 +650,10 @@ static int sc64_p7_observer_detector_sees(int target, int source_owner,
     /* Native detected_flags are target-owned and expire on source cadence;
        optical visibility is live and must be checked independently on every
        combat/render/minimap query. */
-    if (!race_p7_active() || target >= MAX_UNITS ||
+    if (!race_protoss_services_active() || target >= MAX_UNITS ||
         !SC64_P7_ARBITER_CACHE_VALID(u[target].weapon) ||
         source_owner < 0 || source_owner >= 8 ||
-        race_p7_source_owner((unsigned)source_owner) != live_owner)
+        race_protoss_source_owner((unsigned)source_owner) != live_owner)
         return 0;
     return (SC64_P7_ARBITER_DETECTED_MASK(u[target].weapon) &
             (1u << (unsigned)source_owner)) != 0;
@@ -689,10 +703,10 @@ static int sc64_p7_observer_can_attack_from(int attacker, int target,
 {
     if (!SC64_CAN_ATTACK_FROM(attacker, target, live_owner)) return 0;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-    if (!race_p7_active() || !sc64_p7_observer_target_is_cloaked(target)) return 1;
+    if (!race_protoss_services_active() || !sc64_p7_observer_target_is_cloaked(target)) return 1;
     return sc64_p7_observer_detector_sees(target,source_owner,live_owner);
 #else
-    if (!race_p7_active() || source_owner >= 8 ||
+    if (!race_protoss_services_active() || source_owner >= 8 ||
         !sc64_p7_observer_is_cloaked(
             (unsigned)sc64_p7_observer_target_raw_type(target))) return 1;
     return sc64_p7_observer_target_allowed(
@@ -709,7 +723,7 @@ static int sc64_p7_observer_can_attack_from(int attacker, int target,
 static int sc64_p7_observer_target_revealed_to(int target,int source_owner,
                                                int live_owner)
 {
-    return !race_p7_active() ||
+    return !race_protoss_services_active() ||
         !sc64_p7_observer_target_is_cloaked(target) ||
         sc64_p7_observer_detector_sees(target,source_owner,live_owner);
 }

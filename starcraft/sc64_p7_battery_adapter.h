@@ -95,7 +95,7 @@ static int sc64_p7_battery_click_overlap(int left,int top,int right,int bottom,
  * allocator can reuse a dead Battery's row, including source-trigger deaths. */
 static void race_p7_battery_clear_building_references(int slot)
 {
-    if (!race_p7_active() || slot<0 || slot>=MAX_BUILDINGS) return;
+    if (!race_protoss_services_active() || slot<0 || slot>=MAX_BUILDINGS) return;
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive &&
         u[i].order==ORDER_P7_RECHARGE && u[i].target==slot) {
         u[i].order=ORDER_IDLE; u[i].target=-1; u[i].work_timer=0;
@@ -113,7 +113,7 @@ static int __attribute__((noinline)) race_p7_battery_tick_unit(int slot)
     int battery, distance;
     unsigned energy, shield, remainder;
     const Sc64RaceUnitRule *rule;
-    if (!race_p7_active() || slot<0 || slot>=MAX_UNITS) return 0;
+    if (!race_protoss_services_active() || slot<0 || slot>=MAX_UNITS) return 0;
     q=&u[slot];
     if (!q->alive || q->order!=ORDER_P7_RECHARGE) return 0;
     battery=q->target;
@@ -141,7 +141,7 @@ cancel:
 
 static int race_p7_battery_command_available(void)
 {
-    if (!race_p7_active() || race_human!=R_PROTOSS || selected_building<0 ||
+    if (!race_protoss_services_active() || race_human!=R_PROTOSS || selected_building<0 ||
         selected_building>=MAX_BUILDINGS) return 0;
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].selected) return 0;
     const Building *q=&b[selected_building];
@@ -152,7 +152,7 @@ static int race_p7_battery_command_available(void)
 static int race_p7_battery_build_available(void)
 {
     int found=0;
-    if (!race_p7_active() || race_human!=R_PROTOSS || selected_building>=0 ||
+    if (!race_protoss_services_active() || race_human!=R_PROTOSS || selected_building>=0 ||
         !race_owner_has_prereq(SIDE,SC_PR_GATEWAY)) return 0;
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].selected) {
         if (u[i].owner!=SIDE || u[i].type!=U_PROBE || u[i].raw_owner!=7 ||
@@ -190,6 +190,10 @@ static int race_p7_battery_issue_command(int battery, int x, int y)
 static int race_p7_battery_initialize_source(const Sc64RaceMap *map)
 {
     unsigned seen=0;
+#ifdef SC64_PROTOSS_SHARED_SERVICES
+    if (race_protoss_later_services_active())
+        return race_protoss_later_battery_initialize(map);
+#endif
     if (!race_p7_active() || !map || map!=&sc64_race_maps[SC64_P7_GLOBAL_ID] ||
         map->unit_count!=357u) return 0;
     for (unsigned row=0;row<map->unit_count;++row) {
@@ -226,6 +230,10 @@ static int race_p7_battery_live_world_valid(void)
     unsigned seen=0;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     if (!sc64_p7_arbiter_cache_world_valid()) return 0;
+#endif
+#ifdef SC64_PROTOSS_SHARED_SERVICES
+    if (race_protoss_later_services_active())
+        return race_protoss_later_battery_world_valid();
 #endif
     for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive &&
         b[i].type==B_P7_SHIELD_BATTERY) {

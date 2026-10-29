@@ -745,7 +745,8 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_P8_RUNTIME
     if (race_p8_active()) {
-        if (!race_p8_runtime_state_valid()) return 0;
+        if (!race_p8_runtime_state_valid() ||
+            !race_p7_battery_live_world_valid()) return 0;
         /* Clear the whole shared union so its tail stays zero. */
         memset(&race_data.p6,0,sizeof(race_data.p6));
         race_data.p8=race_p8;
@@ -1173,7 +1174,11 @@ static int race_load_game(void) {
             Building target_battery;
             const Sc64RaceUnitRule *unit_rule=sc64_race_unit_rule(candidate_unit.type);
             if (race_data.state[0] != 0 ||
+#ifdef SC64_PROTOSS_SHARED_SERVICES
+                !RACE_PROTOSS_SERVICE_MISSION(race_data.state[2]) ||
+#else
                 race_data.state[2] != SC64_P7_GLOBAL_ID ||
+#endif
                 candidate_unit.raw_type==73 || candidate_unit.raw_type==85 ||
                 candidate_unit.raw_owner<0 || candidate_unit.raw_owner>=8 ||
                 candidate_unit.work_timer!=0 || !unit_rule ||
@@ -1341,6 +1346,14 @@ static int race_load_game(void) {
             if (candidate_building.raw_owner!=0 && candidate_building.raw_owner!=4 &&
                 candidate_building.raw_owner!=7) return 0;
         }
+#ifdef SC64_PROTOSS_SHARED_SERVICES
+        else if (!race_data.state[0] &&
+                 race_protoss_later_service_mission(race_data.state[2]) &&
+                 candidate_building.type==B_P7_SHIELD_BATTERY &&
+                 !race_protoss_later_battery_candidate_valid(race_data.state[2],
+                                                             &candidate_building))
+            return 0;
+#endif
 #endif
         for(int j=0;j<RACE_B(i,queue_count);j++) {
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
@@ -1623,7 +1636,12 @@ static int race_load_game(void) {
             if (!race_save_decode_unit(&race_data,i,(unsigned)(width*16),
                                        (unsigned)(height*16),&candidate)) return 0;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+#ifdef SC64_PROTOSS_SHARED_SERVICES
+            if (!sc64_p7_arbiter_cache_unit_valid_with_mask(&candidate,
+                    sc64_protoss_mission_source_mask(SC64_P7_GLOBAL_ID))) return 0;
+#else
             if (!sc64_p7_arbiter_cache_unit_valid(&candidate)) return 0;
+#endif
 #endif
             live+=candidate.alive!=0;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
@@ -1706,6 +1724,10 @@ static int race_load_game(void) {
                                        (unsigned)(height*16),&candidate)) return 0;
             if (candidate.alive && (candidate.raw_owner<0 || candidate.raw_owner>=8 ||
                 sc64_race_unit_from_raw(candidate.raw_type)<0)) return 0;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+            if (!sc64_p7_arbiter_cache_unit_valid_with_mask(&candidate,
+                    sc64_protoss_mission_source_mask(SC64_P8_GLOBAL_ID))) return 0;
+#endif
         }
         for (unsigned i=0;i<MAX_BUILDINGS;++i) {
             Building candidate;

@@ -337,7 +337,7 @@ static int race_site_powered(int owner, int x, int y)
 #ifdef SC64_P7_BATTERY_ENABLED
 static int race_p7_battery_site_powered(int owner,int x,int y)
 {
-    if (!race_p7_active() || owner!=SIDE) return 0;
+    if (!race_protoss_services_active() || owner!=SIDE) return 0;
     for (int i=0;i<MAX_BUILDINGS;++i)
         if (building_complete(i) && b[i].type==B_PYLON &&
             b[i].raw_type==156 && b[i].owner==owner && b[i].raw_owner==7 &&
@@ -380,7 +380,7 @@ static int race_can_site(int owner, int type, int x, int y)
        but this adapter does not implement their morph/build operations. */
     if (type == B_LAIR || type == B_HIVE || type == B_GREATER_SPIRE) return 0;
 #ifdef SC64_P7_BATTERY_ENABLED
-    if ((r->flags & SC_RACE_F_REQUIRES_POWER) && race_p7_active() &&
+    if ((r->flags & SC_RACE_F_REQUIRES_POWER) && race_protoss_services_active() &&
         type==B_P7_SHIELD_BATTERY) {
         if (!race_p7_battery_site_powered(owner,x,y)) return 0;
     } else
@@ -457,7 +457,7 @@ static int race_queue_unit(int owner, int producer, int type)
     if ((r->flags & SC_RACE_F_LARVA) && b[producer].larva < 1) return 0;
     count = type == U_ZERGLING ? 2 : 1;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if (race_p7_active() && !race_p7_carrier_training_slots_available((unsigned)count)) return 0;
+    if (race_protoss_services_active() && !race_p7_carrier_training_slots_available((unsigned)count)) return 0;
 #endif
 #ifdef SC64_P4_RUNTIME
     if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
@@ -757,7 +757,7 @@ static void race_tick_state(void)
             unsigned short value = (unsigned short)u[i].shield;
             unsigned short rem = (unsigned short)u[i].shield_remainder;
 #ifdef SC64_P7_BATTERY_ENABLED
-            if (race_p7_active()) {
+            if (race_protoss_services_active()) {
                 unsigned shield_value=value, shield_rem=rem;
                 sc64_p7_battery_passive_shield_tick(&shield_value,r->shields,
                                                      &shield_rem);
@@ -783,7 +783,7 @@ static void race_tick_state(void)
             b[i].shield_remainder = rem;
         }
 #ifdef SC64_P7_BATTERY_ENABLED
-        if (race_p7_active() && b[i].type==B_P7_SHIELD_BATTERY &&
+        if (race_protoss_services_active() && b[i].type==B_P7_SHIELD_BATTERY &&
             !b[i].under_construction && b[i].queue_count==0) {
             unsigned energy=(unsigned)b[i].queue_progress;
             unsigned phase=(unsigned)b[i].level;
