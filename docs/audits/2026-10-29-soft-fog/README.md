@@ -75,8 +75,18 @@ and C fixtures. The focused checks also pass:
   non-brightening, actual installed-palette preparation, shared-VRAM canaries,
   owner writes and palette regeneration.
 
-Visual previews, native-menu host matrices and timed ARM replay qualification
-are pending. The candidate is not ready for release until its visual result
+The prepared-input `make unified` build and `make test-unified` aggregate
+also pass in an isolated source copy with the fog option disabled. Two
+legacy fixtures first failed identically on pristine base `2dbb45c`: one
+spawned targets outside sight without refreshing exploration, and one
+expected an AI to ignore a hostile AI unit in a free-for-all skirmish.
+The corrected fixtures explicitly check hidden rejection before revealing
+targets and retain the AI's independent acquisition policy. No targeting
+implementation changes were needed.
+
+Visual previews have been inspected, including a separately labeled
+renderer-only fog fixture. Native-menu host matrices with the exact product
+flags and timed ARM replay qualification are pending. The candidate is not ready for release until its visual result
 and measured frame cost are reviewed. Full campaign, hardware and fresh-process
 SRAM qualification are not established by these rendering tests.
 
