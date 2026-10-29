@@ -387,6 +387,59 @@ static void busy_selected_worker(void)
     assert(b[foundation].build_progress>0 && b[second_foundation].build_progress>0);
 }
 
+static void nuclear_silo_service_unavailable(void)
+{
+    static Unit units_before[MAX_UNITS];
+    static Building buildings_before[MAX_BUILDINGS];
+    start_race(R_TER);
+    const Sc64SkirmishRecord *silo = build_record(R_TER, 108);
+    assert(silo && menu_row_raw(108) >= 0); /* Catalog row remains visible. */
+    if (building_raw(108) < 0 || building_raw(116) < 0 || building_raw(117) < 0) {
+        puts("SKIP Nuclear Silo fixture: profile lacks required identities");
+        return;
+    }
+    assert(fixture_building_raw(SIDE, 116, 400, 300) >= 0);
+    assert(fixture_building_raw(SIDE, 117, 500, 300) >= 0);
+    assert(race_skirmish_requirements(SIDE, silo));
+    int cc = -1;
+    for (int y = 96; y < WORLD_H - 100 && cc < 0; y += 24)
+        for (int x = 96; x < WORLD_W - 120 && cc < 0; x += 24)
+            if (can_place(B_COMMAND, x, y) && can_place(building_raw(108), x + 48, y + 8))
+                cc = fixture_building_raw(SIDE, 106, x, y);
+    assert(cc >= 0 && building_complete(cc));
+    assert(can_place(building_raw(108), b[cc].x + 48, b[cc].y + 8));
+    assert(find_build_slot() >= 0);
+    selected_building = cc;
+    int old_minerals = minerals, old_gas = gas, old_mode = mode;
+    memcpy(units_before, u, sizeof(u));
+    memcpy(buildings_before, b, sizeof(b));
+    assert(!race_skirmish_record_available(silo));
+    assert(!race_skirmish_choose_record(silo));
+    assert(minerals == old_minerals && gas == old_gas && mode == old_mode);
+    assert(selected_building == cc);
+    assert(!memcmp(units_before, u, sizeof(u)) && !memcmp(buildings_before, b, sizeof(b)));
+    /* The gate is specific to the Silo: an ordinary Control Tower remains
+     * available and is paid and attached to its selected Starport. */
+    const Sc64SkirmishRecord *tower = build_record(R_TER, 115);
+    if (tower && building_raw(114) >= 0 && building_raw(115) >= 0) {
+        int port = -1;
+        for (int y = 96; y < WORLD_H - 100 && port < 0; y += 24)
+            for (int x = 96; x < WORLD_W - 120 && port < 0; x += 24)
+                if (can_place(building_raw(114), x, y) &&
+                    can_place(building_raw(115), x + 48, y + 8))
+                    port = fixture_building_raw(SIDE, 114, x, y);
+        assert(port >= 0);
+        selected_building = port;
+        const Sc64RaceBuildingRule *rule = sc64_race_building_rule(building_raw(115));
+        int before_m = minerals, before_g = gas;
+        assert(rule && race_skirmish_record_available(tower));
+        assert(race_skirmish_choose_record(tower));
+        assert(minerals == before_m - rule->minerals && gas == before_g - rule->gas);
+        assert(race_skirmish_attached(port, 115, 0));
+    }
+    puts("Nuclear Silo remains visible but unavailable without nuclear service PASS");
+}
+
 static void reaver_service_unavailable(void)
 {
     start_race(R_PROTOSS);
@@ -413,6 +466,7 @@ int main(void)
     reaver_service_unavailable();
     busy_selected_worker();
     terran_construction_and_addon();
+    nuclear_silo_service_unavailable();
     protoss_admission();
     zerg_morph_chain();
     puts("sc64 skirmish runtime: ok");

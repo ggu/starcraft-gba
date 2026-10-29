@@ -118,6 +118,9 @@ static int race_skirmish_worker(int type)
 static int race_skirmish_record_available(const Sc64SkirmishRecord *r)
 {
     int type;
+    /* The catalog retains the Silo row, but production is unavailable until
+     * nuclear ammunition and launch are implemented. */
+    if (r && r->raw_id == 108) return 0;
     if (!race_mode || !race_skirmish_requirements(SIDE, r) ||
         (type = sc64_race_building_from_raw(r->raw_id)) < 0) return 0;
     if (r->kind == SC64_SK_WORKER_BUILD) {
