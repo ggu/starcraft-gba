@@ -478,6 +478,76 @@ static int race_p7_union_tail_valid(const RaceSave *candidate)
     return 1;
 }
 #endif
+#ifdef SC64_TRANSPORT_RUNTIME
+/* Custom-game cargo uses the common Dropship runtime, independently of the
+ * stricter imported-mission Shuttle and Overlord provenance policies. Inspect
+ * only the candidate, before changing the live world. */
+static int race_skirmish_transport_decode(const RaceSave *candidate, int slot,
+                                           int width, int height, Unit *out)
+{
+    if (!candidate || !out || slot < 0 || slot >= MAX_UNITS) return 0;
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+    return race_save_decode_unit(candidate, (unsigned)slot,
+                                 (unsigned)width * 16u, (unsigned)height * 16u, out);
+#else
+    (void)width; (void)height;
+    for (unsigned j=0; j<RACE_UNIT_WORDS; ++j) {
+        int n=candidate->units[slot][j];
+        memcpy((u8 *)out+j*sizeof(int), &n, sizeof(n));
+    }
+    return 1;
+#endif
+}
+
+static int race_skirmish_saved_dropship(const Unit *ship)
+{
+    return ship && ship->alive && ship->type == U_DROPSHIP &&
+        sc64_race_unit_from_raw(SC64_TRANSPORT_DROPSHIP_RAW) == U_DROPSHIP &&
+        (ship->raw_type == -1 || ship->raw_type == SC64_TRANSPORT_DROPSHIP_RAW) &&
+        ship->owner >= 0 && ship->owner < 5 &&
+        ship->order != ORDER_BOARD && ship->order != ORDER_TRANSPORTED;
+}
+
+static int race_skirmish_transport_save_valid(const RaceSave *candidate,
+                                                int width, int height)
+{
+    u8 used[MAX_UNITS] = {0};
+    if (!candidate || candidate->state[0] != 1 || width < 1 || height < 1 ||
+        width > 128 || height > 128) return 0;
+    for (int i=0; i<MAX_UNITS; ++i) {
+        Unit actor;
+        if (!race_skirmish_transport_decode(candidate, i, width, height, &actor)) return 0;
+        if (!actor.alive) continue;
+        if (actor.order == ORDER_UNLOAD) {
+            if (!race_skirmish_saved_dropship(&actor) || actor.target != -1 ||
+                actor.work_timer < 0 || actor.work_timer > SC64_TRANSPORT_UNLOAD_TICKS ||
+                actor.tx < 0 || actor.tx >= width*16 || actor.ty < 0 || actor.ty >= height*16)
+                return 0;
+        }
+        if (actor.order != ORDER_BOARD && actor.order != ORDER_TRANSPORTED) continue;
+        Unit carrier; unsigned space;
+        int raw = actor.raw_type < 0 ? sc64_race_raw_unit(actor.type) : actor.raw_type;
+        if (actor.target < 0 || actor.target >= MAX_UNITS || actor.target == i ||
+            !race_skirmish_transport_decode(candidate, actor.target, width, height, &carrier) ||
+            !race_skirmish_saved_dropship(&carrier) || actor.owner != carrier.owner ||
+            (actor.flags & 2) || sc64_race_unit_flying(actor.type) ||
+            raw < 0 || (sc64_race_unit_from_raw(raw) != actor.type &&
+                        !(raw == 19 && actor.type == U_RAYNOR)) ||
+            !sc64_transport_space_required_raw((unsigned)raw, &space) ||
+            space == SC64_TRANSPORT_SPACE_UNAVAILABLE) return 0;
+        if (actor.order == ORDER_TRANSPORTED) {
+            if (actor.selected || actor.x != carrier.x || actor.y != carrier.y ||
+                actor.path_timer || actor.path_retry ||
+                (unsigned)used[actor.target] + space > SC64_TRANSPORT_DROPSHIP_SPACE) return 0;
+            used[actor.target] = (u8)(used[actor.target] + space);
+        }
+        /* Pending board orders are not reservations: the runtime rechecks
+         * space on arrival and cancels excess orders. */
+    }
+    return 1;
+}
+#endif
+
 static int race_save_game(void) {
 #ifdef SC64_Z5_CLOAK_ENABLED
     if (race_z5_active() && !race_z5_cloak_world_state_valid()) return 0;
@@ -916,14 +986,17 @@ static int race_save_game(void) {
             if (payload[i]) return 0;
     }
 #endif
+#ifdef SC64_TRANSPORT_RUNTIME
+    if (race_data.state[0] && !race_skirmish_transport_save_valid(&race_data, race_cols, race_rows)) return 0;
+#endif
 #ifdef SC64_T5_RUNTIME
     if (!race_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
 #ifdef SC64_P5_SHUTTLE_ENABLED
-    if (!race_p5_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
+    if (!race_data.state[0] && !race_p5_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
-    if (!race_z6_transport_save_candidate_valid(&race_data, &race_data.z6.transport, race_cols, race_rows)) return 0;
+    if (!race_data.state[0] && !race_z6_transport_save_candidate_valid(&race_data, &race_data.z6.transport, race_cols, race_rows)) return 0;
 #endif
 #ifdef SC64_Z5_CONSUME_ENABLED
     if (!race_z5_consume_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
@@ -1307,15 +1380,18 @@ static int race_load_game(void) {
     }
 #undef RACE_U
 #undef RACE_B
+#ifdef SC64_TRANSPORT_RUNTIME
+    if (race_data.state[0] && !race_skirmish_transport_save_valid(&race_data, width, height)) return 0;
+#endif
 #ifdef SC64_T5_RUNTIME
     if (!race_t5_candidate_queues_available(&race_data)) return 0;
     if (!race_transport_save_candidate_valid(&race_data, width, height)) return 0;
 #endif
 #ifdef SC64_P5_SHUTTLE_ENABLED
-    if (!race_p5_transport_save_candidate_valid(&race_data, width, height)) return 0;
+    if (!race_data.state[0] && !race_p5_transport_save_candidate_valid(&race_data, width, height)) return 0;
 #endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
-    if (!race_z6_transport_save_candidate_valid(&race_data, &race_data.z6.transport, width, height)) return 0;
+    if (!race_data.state[0] && !race_z6_transport_save_candidate_valid(&race_data, &race_data.z6.transport, width, height)) return 0;
 #endif
 #ifdef SC64_Z5_CONSUME_ENABLED
     if (!race_z5_consume_save_candidate_valid(&race_data, width, height)) return 0;

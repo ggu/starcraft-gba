@@ -6461,3 +6461,46 @@ terminal state, still losing at frame 9,428; 9,426 advancing frames cost
 28.12 fps. This is a mixed workload result, not a universal speedup.
 These narrow emulator checks do not establish hardware, all-scene or near-30-fps
 qualification; the full goal remains open.
+
+### Custom-game catalog integration checkpoint (2026-10-30)
+
+The current-main/PR147 integration adds shared native production catalogs,
+selected-builder availability, paid addon and building-morph paths. Focused
+four-profile sanitizer fixtures pass input-driven Factory/Machine Shop/Tank
+Mode and Stargate/Scout chains, save/lifecycle and source building-art checks.
+The Scourge service uses source pair cost/larva accounting, two-body supply and
+slot reservation, air-only target guards and suicide damage. Native Dropship
+custom-game boarding, unloading, carrier loss and candidate-only cargo/attachment
+save validation are covered where the profile maps its identity. Campaign
+validation predicates remain separate. Reaver production is unavailable until
+its Scarab lifecycle is implemented; Siege transition and complete roster
+services remain open.
+
+The consumed Terran art bank differed from today's importer. Its historical
+input was reproduced exactly; current source preparation was audited and found
+to flatten modifier-10 shadows as opaque palette pixels, expanding Scout health
+bounds by 42 pixels. The corrected generator defers those shadow layers and
+records their metadata privately. It restores the body crop and adds the real
+Factory body frame. A patterned-framebuffer oracle validates Factory, Machine
+Shop and Stargate source-body mapping and field/HUD clipping across four profile
+vectors; the old Terran bank fails specifically on missing Factory art. Separate
+shadow rendering remains unfinished, and broader bank changes are not claimed
+pixel-identical to the old bank.
+
+Default-off SRAM tags are unchanged. The opt-in expanded identity extension
+reserves bit31 of its profile-specific base tag, with a compile-time collision
+assertion. Runtime fixtures cover both directions of outer/embedded tag rejection,
+valid construction/addon/morph/cargo roundtrips and rejection before live-state
+mutation. Old and integrated codecs produce identical sampled low-type rows
+(9,000 compact and 12,000 P7 typed rows); this is not exhaustive over every
+possible payload. Opt-in P7 host proof uses a separately regenerated fact table,
+not the default-off canonical artifact.
+
+An early frozen-source ARM link passes unchanged guards in all four canonical
+products with EWRAM headroom 28480/28372/23828/200 bytes and IWRAM
+496/56/952/56 bytes (Terran/Zerg/P7/Showcase). This is a resource preflight,
+not final gameplay/performance or physical-GBA qualification. Full frozen-source
+controller matrices, campaign transport checks and timing remain open. The
+full Z7 Egg fixture now supplies its source-required Spire and explicitly
+visible target cells; adult-over-Egg and Egg-fallback assertions are retained,
+and an unseen-target negative case passes with combat flags on and off.

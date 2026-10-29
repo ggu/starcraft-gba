@@ -1,5 +1,22 @@
 .DEFAULT_GOAL := all
 
+# Asset-free raw-ID capability catalog for the complete standard skirmish roster.
+.PHONY: test-sc64-skirmish-catalog
+build/test-sc64-skirmish-catalog: tests/sc64_skirmish_catalog.c starcraft/sc64_skirmish_catalog.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-sc64-skirmish-catalog: build/test-sc64-skirmish-catalog
+	./build/test-sc64-skirmish-catalog
+test: test-sc64-skirmish-catalog
+
+# Asset-free test for the bounded shared skirmish menu and producer rotation.
+.PHONY: test-sc64-skirmish-menu
+build/test-sc64-skirmish-menu: tests/sc64_skirmish_menu.c starcraft/sc64_skirmish_menu.h starcraft/sc64_skirmish_catalog.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-sc64-skirmish-menu: build/test-sc64-skirmish-menu
+	./build/test-sc64-skirmish-menu
+test: test-sc64-skirmish-menu
+
+
 .PHONY: test-gba-mapped-sprite
 build/test-gba-mapped-sprite: tests/gba_mapped_sprite.c common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -Icommon tests/gba_mapped_sprite.c common/gba.c -o $@
@@ -263,7 +280,7 @@ SC64_ORDER_MARKER_FLAGS := -DSC64_ORDER_MARKER_ART -I$(SC64_ORDER_MARKER_DIR)
 $(SC64_ORDER_MARKER_HEADER): tools/sc64_order_marker_pack.py tools/sc64_construction_sprites.py tools/sc64_death_sprites.py tools/sc64_sprites.py tools/sc64_unit_facing.py common/gba.c common/gba.h starcraft/sc64_display.h
 	python3 tools/sc64_order_marker_pack.py
 
-SC64_SHARED_ENGINE_FLAGS := -DSC64_CONSTRUCTION_HP -DSC64_SIEGE_SPLASH
+SC64_SHARED_ENGINE_FLAGS := -DSC64_CONSTRUCTION_HP -DSC64_SIEGE_SPLASH -DSC64_SHARED_SCOURGE_COMBAT
 RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_ENGINE_CORE_REQUIRED $(SC64_SHARED_ENGINE_FLAGS) -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated -I$(SC64_INTERFACE_DIR) $(HUD_ICON_FLAGS) $(RACE_CONSTRUCTION_FLAGS) $(SC64_BUILDING_FIRE_FLAGS) $(SC64_ORDER_MARKER_FLAGS)
 RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(SC64_INTERFACE_INPUTS) $(COMMAND_ICON_HEADER) $(RACE_CONSTRUCTION_INPUTS) $(SC64_BUILDING_FIRE_HEADER) $(SC64_ORDER_MARKER_HEADER)
 
@@ -5037,3 +5054,65 @@ test-sc64-motion-reuse: build/test-sc64-motion-reuse-oracle build/test-sc64-moti
 	./build/test-sc64-motion-reuse-oracle
 	./build/test-sc64-motion-reuse-render
 test: test-sc64-motion-reuse
+
+# Prepared-input integration gate. These tests include the actual engine;
+# unlike the catalog checks, they require the corresponding local art banks.
+.PHONY: test-sc64-skirmish-runtime
+SKIRMISH_RUNTIME_TEST_FLAGS = -std=c11 -O1 -g -fsanitize=address,undefined -DGBA_HOST -Icommon
+build/test-sc64-skirmish-runtime-terran: tests/sc64_skirmish_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SKIRMISH_RUNTIME_TEST_FLAGS) $(TERRAN_ROM_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+build/test-sc64-skirmish-runtime-zerg: tests/sc64_skirmish_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z6_INPUTS) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SKIRMISH_RUNTIME_TEST_FLAGS) $(ZERG_ROM_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+build/test-sc64-skirmish-runtime-protoss: tests/sc64_skirmish_runtime.c $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P7_CANONICAL_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SKIRMISH_RUNTIME_TEST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+build/test-sc64-skirmish-runtime-showcase: tests/sc64_skirmish_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) $(COMMAND_ICON_HEADER) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SKIRMISH_RUNTIME_TEST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o $@
+test-sc64-skirmish-runtime: build/test-sc64-skirmish-runtime-terran build/test-sc64-skirmish-runtime-zerg build/test-sc64-skirmish-runtime-protoss build/test-sc64-skirmish-runtime-showcase
+	./build/test-sc64-skirmish-runtime-terran
+	./build/test-sc64-skirmish-runtime-zerg
+	./build/test-sc64-skirmish-runtime-protoss
+	./build/test-sc64-skirmish-runtime-showcase
+
+
+# These rule fixtures use only authored enum/fact headers, without game assets.
+SKIRMISH_RULE_TEST_FLAGS = -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DSC64_UNIFIED -DSC64_SKIRMISH_ROSTER -DSC64_TEST_EXPECT_UNIT_ROWS=40 -DSC64_TEST_EXPECT_BUILDING_ROWS=51
+SKIRMISH_RULE_T_FLAGS = -DSC64_T4_RUNTIME -DSC64_T5_RUNTIME -DSC64_T6_ENABLED -DSC64_TERRAN_LATE_ACTORS
+SKIRMISH_RULE_Z_FLAGS = -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS -DSC64_Z6_RUNTIME -DSC64_Z6_ACTORS
+SKIRMISH_RULE_P_FLAGS = -DSC64_ZP_CAMPAIGN_ACTORS -DSC64_P5_ACTORS -DSC64_Z6_ACTORS -DSC64_P6_ACTORS -DSC64_Z5_ACTORS -DSC64_Z5_DOODADS -DSC64_P7_ACTORS
+build/test-sc64-skirmish-rules-terran: tests/sc64_skirmish_roster_rules.c $(wildcard starcraft/*.h) Makefile | build
+	$(CLANG) $(SKIRMISH_RULE_TEST_FLAGS) $(SKIRMISH_RULE_T_FLAGS) -DSC64_TEST_EXPECT_UNITS=58 -DSC64_TEST_EXPECT_BUILDINGS=66 $< -o $@
+build/test-sc64-skirmish-rules-zerg: tests/sc64_skirmish_roster_rules.c $(wildcard starcraft/*.h) Makefile | build
+	$(CLANG) $(SKIRMISH_RULE_TEST_FLAGS) $(SKIRMISH_RULE_Z_FLAGS) -DSC64_TEST_EXPECT_UNITS=55 -DSC64_TEST_EXPECT_BUILDINGS=64 $< -o $@
+build/test-sc64-skirmish-rules-protoss: tests/sc64_skirmish_roster_rules.c $(wildcard starcraft/*.h) Makefile | build
+	$(CLANG) $(SKIRMISH_RULE_TEST_FLAGS) $(SKIRMISH_RULE_P_FLAGS) -DSC64_P7_PROJECTILES_ENABLED -DSC64_TEST_EXPECT_UNITS=58 -DSC64_TEST_EXPECT_BUILDINGS=65 $< -o $@
+build/test-sc64-skirmish-rules-showcase: tests/sc64_skirmish_roster_rules.c $(wildcard starcraft/*.h) Makefile | build
+	$(CLANG) $(SKIRMISH_RULE_TEST_FLAGS) $(SKIRMISH_RULE_P_FLAGS) -DSC64_TEST_EXPECT_UNITS=57 -DSC64_TEST_EXPECT_BUILDINGS=65 $< -o $@
+.PHONY: test-sc64-skirmish-rules
+test-sc64-skirmish-rules: build/test-sc64-skirmish-rules-terran build/test-sc64-skirmish-rules-zerg build/test-sc64-skirmish-rules-protoss build/test-sc64-skirmish-rules-showcase
+	./build/test-sc64-skirmish-rules-terran
+	./build/test-sc64-skirmish-rules-zerg
+	./build/test-sc64-skirmish-rules-protoss
+	./build/test-sc64-skirmish-rules-showcase
+test: test-sc64-skirmish-rules
+
+# Prepared-input native catalog, save, pair-combat, cargo and source-art checks.
+# Each fixture uses the ordinary production vector; expanded roster remains off.
+SKIRMISH_NATIVE_CASES := buttons save scourge dropship art
+SKIRMISH_NATIVE_SOURCE_buttons := sc64_skirmish_catalog_buttons
+SKIRMISH_NATIVE_SOURCE_save := sc64_skirmish_catalog_save
+SKIRMISH_NATIVE_SOURCE_scourge := sc64_shared_scourge
+SKIRMISH_NATIVE_SOURCE_dropship := sc64_skirmish_dropship_transport
+SKIRMISH_NATIVE_SOURCE_art := sc64_skirmish_catalog_art
+define SKIRMISH_NATIVE_FIXTURE
+build/test-sc64-skirmish-$(1)-$(2): tests/$(3).c tests/sc64_skirmish_runtime.c $(STARCRAFT) $(wildcard starcraft/*.h) $($(5)) $(SKIRMISH_CONTROLLER_EXTRA_INPUTS) $($(6)) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(SKIRMISH_RUNTIME_TEST_FLAGS) $$($(4)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$($(6)) -o $$@
+endef
+$(foreach case,$(SKIRMISH_NATIVE_CASES),$(eval $(call SKIRMISH_NATIVE_FIXTURE,$(case),terran,$(SKIRMISH_NATIVE_SOURCE_$(case)),TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,)))
+$(foreach case,$(SKIRMISH_NATIVE_CASES),$(eval $(call SKIRMISH_NATIVE_FIXTURE,$(case),zerg,$(SKIRMISH_NATIVE_SOURCE_$(case)),ZERG_ROM_FLAGS,ZERG_Z6_INPUTS,)))
+$(foreach case,$(SKIRMISH_NATIVE_CASES),$(eval $(call SKIRMISH_NATIVE_FIXTURE,$(case),protoss,$(SKIRMISH_NATIVE_SOURCE_$(case)),PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(foreach case,$(SKIRMISH_NATIVE_CASES),$(eval $(call SKIRMISH_NATIVE_FIXTURE,$(case),showcase,$(SKIRMISH_NATIVE_SOURCE_$(case)),SHOWCASE_FLAGS,P7_ARBITER_INPUTS,)))
+SKIRMISH_NATIVE_BINARIES := $(foreach profile,terran zerg protoss showcase,$(foreach case,$(SKIRMISH_NATIVE_CASES),build/test-sc64-skirmish-$(case)-$(profile)))
+.PHONY: test-sc64-skirmish-native test-sc64-skirmish-catalog-integration
+test-sc64-skirmish-native: $(SKIRMISH_NATIVE_BINARIES)
+	@set -e; for binary in $(SKIRMISH_NATIVE_BINARIES); do ./$$binary; done
+test-sc64-skirmish-catalog-integration: test-sc64-skirmish-runtime test-sc64-skirmish-native

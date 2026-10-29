@@ -386,47 +386,57 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 #define MAX_MINERALS 32
 #endif
 #if defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 0
-#define SAVE_VERSION (0x53435430u + SC64_RACE_SAVE_GENERATION)
+#define SC64_BASE_SAVE_VERSION (0x53435430u + SC64_RACE_SAVE_GENERATION)
 #elif defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 1
-#define SAVE_VERSION (0x53435a30u + SC64_RACE_SAVE_GENERATION)
+#define SC64_BASE_SAVE_VERSION (0x53435a30u + SC64_RACE_SAVE_GENERATION)
 #elif defined(SC64_CAMPAIGN_RACE) && SC64_CAMPAIGN_RACE == 2
-#define SAVE_VERSION (0x53435030u + SC64_RACE_SAVE_GENERATION)
+#define SC64_BASE_SAVE_VERSION (0x53435030u + SC64_RACE_SAVE_GENERATION)
 #elif defined(SC64_UNIFIED)
 #if defined(SC64_P3_RUNTIME)
-#define SAVE_VERSION 0x53435536u
+#define SC64_BASE_SAVE_VERSION 0x53435536u
 #elif defined(SC64_LARGE_MAPS)
-#define SAVE_VERSION 0x53435535u
+#define SC64_BASE_SAVE_VERSION 0x53435535u
 #elif defined(SC64_Z3_ENABLED)
-#define SAVE_VERSION 0x53435534u
+#define SC64_BASE_SAVE_VERSION 0x53435534u
 #elif defined(SC64_T3_ENABLED)
-#define SAVE_VERSION 0x53435532u
+#define SC64_BASE_SAVE_VERSION 0x53435532u
 #else
-#define SAVE_VERSION 0x53435531u
+#define SC64_BASE_SAVE_VERSION 0x53435531u
 #endif
 #else
-#define SAVE_VERSION 0x53435231u
+#define SC64_BASE_SAVE_VERSION 0x53435231u
 #endif
 #elif defined(SC64_BACKWATER) || defined(SC64_SKIRMISH) || defined(SC64_RACES) || defined(SC64_TERRAN_CAMPAIGN)
 #define MAX_UNITS 96
 #define MAX_MINERALS 16
 #define MAX_BUILDINGS 32
 #ifdef SC64_TERRAN_CAMPAIGN
-#define SAVE_VERSION 0x53435431u
+#define SC64_BASE_SAVE_VERSION 0x53435431u
 #elif defined(SC64_BACKWATER)
-#define SAVE_VERSION 0x53434232u
+#define SC64_BASE_SAVE_VERSION 0x53434232u
 #else
-#define SAVE_VERSION 0x53434B31u
+#define SC64_BASE_SAVE_VERSION 0x53434B31u
 #endif
 #elif defined(SC64_IMPORTED_MISSION)
 #define MAX_UNITS 48
 #define MAX_MINERALS 16
-#define SAVE_VERSION 0x53433631u
+#define SC64_BASE_SAVE_VERSION 0x53433631u
 #else
 #define MAX_UNITS 40
 #define MAX_MINERALS 8
-#define SAVE_VERSION 0x53434733u
+#define SC64_BASE_SAVE_VERSION 0x53434733u
 /* The original-art skirmish owns its menus; see field_ui.h. */
 #define SC_DEFAULT_UI 1
+#endif
+/* Roster-enabled saves contain identities absent from ordinary profiles.
+ * Preserve every existing tag while reserving a separate high-bit namespace.
+ * Fail at compile time if a future base tag claims that namespace. */
+_Static_assert((SC64_BASE_SAVE_VERSION & 0x80000000u) == 0,
+               "base save tag overlaps roster save namespace");
+#ifdef SC64_SKIRMISH_ROSTER
+#define SAVE_VERSION (SC64_BASE_SAVE_VERSION | 0x80000000u)
+#else
+#define SAVE_VERSION SC64_BASE_SAVE_VERSION
 #endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
@@ -620,6 +630,7 @@ static inline int sc64_minimap_pixel(unsigned pixel,int tiles) {
 
 #ifdef SC64_RACES
 #include "race_rules.h"
+#include "sc64_skirmish_menu.h"
 #include "sc64_stock_motion.h"
 #include "sc64_stock_combat.h"
 #ifdef SC64_Z7_EGG_PRODUCTION
@@ -1514,6 +1525,10 @@ static int race_z5_consume_issue_selected(int x, int y);
 static int race_z5_consume_tick_unit(int slot);
 #endif
 static int race_start_build(int owner,int worker,int type,int x,int y);
+static int race_skirmish_choose_record(const Sc64SkirmishRecord *record);
+static int race_skirmish_record_available(const Sc64SkirmishRecord *record);
+static int race_skirmish_worker(int type);
+static int race_skirmish_product_available(const Sc64SkirmishRecord *record, void *context);
 static int race_can_site(int owner,int type,int x,int y);
 static int race_site_powered(int owner,int x,int y);
 static int race_builder_arrived(int worker);
@@ -2954,34 +2969,24 @@ sc64_auto_target_visible(int target, int owner)
 
 #ifdef SC64_RACES
 static int race_can_attack(int attacker,int target);
-#if defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
-static int sc64_p3_can_attack_from(int attacker, int target, int owner)
+#if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
+    defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
+/* Keep the shared target protections and campaign-specific T6 burrow check
+ * even when multiple scenario capabilities are compiled together. */
+static int __attribute__((noinline))
+sc64_p3_can_attack_from(int attacker, int target, int owner)
 {
-    if (attacker == U_SCOURGE) {
-        return target >= 0 && target < MAX_UNITS && u[target].alive &&
-            sc64_race_unit_flying(u[target].type) && !(u[target].flags & 16) &&
-            !invincible_units[target] && owners_hostile(owner, u[target].owner);
-    }
+    if (attacker == U_SCOURGE &&
+        (target < 0 || target >= MAX_UNITS || !u[target].alive ||
+         !sc64_race_unit_flying(u[target].type) || (u[target].flags & 16) ||
+         invincible_units[target] || !owners_hostile(owner, u[target].owner))) return 0;
+#ifdef SC64_T6_RUNTIME
+    if (target >= 0 && target < MAX_UNITS && race_t6_unit_burrowed(target)) return 0;
+#endif
     return race_can_attack(attacker, target);
 }
 #define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
     sc64_p3_can_attack_from((attacker), (target), (owner))
-#elif defined(SC64_Z7_SCOURGE_COMBAT)
-/* Share the extra Scourge guards from ROM; the Z7 hot-code reserve is full. */
-static int __attribute__((noinline))
-sc64_z7_can_attack_from(int attacker, int target, int owner)
-{
-    if (attacker == U_SCOURGE) {
-        if (target < 0 || target >= MAX_UNITS || !u[target].alive ||
-            !sc64_race_unit_flying(u[target].type) ||
-            (u[target].flags & 16) || invincible_units[target] ||
-            !owners_hostile(owner, u[target].owner)) return 0;
-    }
-    /* Keep common loaded, cloaked, hidden-actor, and scenario immunity checks. */
-    return race_can_attack(attacker, target);
-}
-#define SC64_CAN_ATTACK_FROM(attacker, target, owner) \
-    sc64_z7_can_attack_from((attacker), (target), (owner))
 #elif defined(SC64_T4_RUNTIME)
 static int sc64_t4_can_attack_from(int attacker, int target, int owner)
 {
@@ -3927,16 +3932,16 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
                 race_z6_note_unit_death(&u[target]);
             }
 #endif
+#ifdef SC64_TRANSPORT_RUNTIME
+            /* Carrier recognition stays shared across campaign and skirmish;
+             * inspect the live carrier before clearing its slot. */
+            if (race_transport_carrier_type(&u[target])) race_transport_destroy_cargo(target);
+#endif
 	    if (u[target].owner == SIDE)
 		supply_used -= unit_slot_supply(&u[target]);
 	    u[target].alive = 0;
 #ifdef SC64_Z6_RUNTIME
             if (race_z6_active()) (void)race_z6_hallucination_cleanup_dead(&u[target]);
-#endif
-#ifdef SC64_T5_RUNTIME
-            if (u[target].type == U_DROPSHIP) race_transport_destroy_cargo(target);
-#elif defined(SC64_P5_SHUTTLE_ENABLED) || defined(SC64_Z6_TRANSPORT_ENABLED)
-            if (race_transport_carrier_type(&u[target])) race_transport_destroy_cargo(target);
 #endif
 	}
         /* Flame collateral needs source geometry and event research. Do not
@@ -5085,6 +5090,26 @@ choose_command(int choice)
 #ifdef SC_FIELD_FEEDBACK
     menu_last = (u8)choice;
 #endif
+#ifdef SC64_RACES
+    if (race_mode) {
+        Sc64SkirmishMenuRow row;
+#ifdef SC64_TRANSPORT_RUNTIME
+        if (choice == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
+            race_skirmish_dropship_menu_available()) {
+            menu_open = 0; mode = MODE_UNLOAD; return;
+        }
+#endif
+        if (!sc64_skirmish_menu_at((unsigned)race_human, (unsigned)choice, &row)) {
+            menu_open = 0; mode = MODE_NORMAL; toast(8); return;
+        }
+        if (row.record) {
+            menu_open = 0;
+            if (!race_skirmish_choose_record(row.record)) { mode = MODE_NORMAL; toast(8); }
+            return;
+        }
+        /* Fixed first-ten control rows deliberately retain their old IDs. */
+    }
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (choice==MENU_STOP+1 && race_p7_carrier_training_menu_available()) {
         menu_open=0; mode=MODE_NORMAL;
@@ -5287,11 +5312,23 @@ choose_command(int choice)
     }
 }
 
+#ifdef SC64_RACES
+static int race_skirmish_command_count(void)
+{
+    int count = (int)sc64_skirmish_menu_count((unsigned)race_human);
+#ifdef SC64_TRANSPORT_RUNTIME
+    count += race_skirmish_dropship_menu_available();
+#endif
+    return count;
+}
+#endif
+
 /* Advanced Terran commands are available in the T5 development profile.
  * Other factions retain their existing ten-row command list. */
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+    if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     if (race_p7_carrier_training_menu_available()) return MENU_STOP+2;
 #endif
@@ -5343,13 +5380,15 @@ static int field_menu_count(void)
 #elif defined(SC64_T5_RUNTIME)
 static int field_menu_count(void)
 {
+    if (race_mode) return race_skirmish_command_count();
     if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
     return race_human == R_TER ? MENU_COUNT : MENU_STOP + 1;
 }
 #elif defined(SC64_RACES)
 static int field_menu_count(void)
-{ return MENU_STOP + 1 + race_nexus_command_available() + race_probe_cannon_command_available(); }
+{ return race_mode ? race_skirmish_command_count() :
+    MENU_STOP + 1 + race_nexus_command_available() + race_probe_cannon_command_available(); }
 #else
 #define field_menu_count() MENU_COUNT
 #endif
@@ -5380,6 +5419,14 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
+    if (race_mode) {
+        Sc64SkirmishMenuRow row;
+#ifdef SC64_TRANSPORT_RUNTIME
+        if (i == (int)sc64_skirmish_menu_count((unsigned)race_human) &&
+            race_skirmish_dropship_menu_available()) return "UNLOAD CARGO";
+#endif
+        return sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row) ? row.label : "";
+    }
     static const char *const race_labels[3][
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
         MENU_COUNT
@@ -5650,6 +5697,26 @@ interact(void)
 #endif
         ) {
 #ifdef SC64_RACES
+        if (race_mode) {
+            int producer_raw = sc64_race_raw_building(b[selected_building].type);
+            if (sc64_race_is_zerg_townhall(b[selected_building].type)) producer_raw = 35;
+            const Sc64SkirmishRecord *product = 0;
+            int current_raw = sc64_race_raw_unit(train_type);
+            unsigned count = sc64_skirmish_product_count((unsigned)producer_raw);
+            for (unsigned p = 0; p < count; ++p) {
+                const Sc64SkirmishRecord *candidate = sc64_skirmish_product_at((unsigned)producer_raw, p);
+                if (candidate->raw_id == current_raw &&
+                    race_skirmish_product_available(candidate, &selected_building)) product = candidate;
+            }
+            if (!product) {
+                int raw = sc64_skirmish_menu_next_product((unsigned)producer_raw, SC64_SK_NONE,
+                    race_skirmish_product_available, &selected_building);
+                if (raw == SC64_SK_NONE || sc64_race_unit_from_raw(raw) < 0) { toast(8); return; }
+                train_type = sc64_race_unit_from_raw(raw);
+            }
+            if (train_type < 0) { toast(8); return; }
+            queue_unit(selected_building, train_type); return;
+        }
         if(b[selected_building].type==B_COMMAND)train_type=U_SCV;
         if(b[selected_building].type==B_NEXUS)train_type=U_PROBE;
         if(b[selected_building].type==B_GATEWAY&&train_type!=U_ZEALOT&&train_type!=U_DRAGOON)train_type=U_ZEALOT;
@@ -6157,7 +6224,7 @@ tick_combat(Unit * q, int target)
     if (q->type==U_P7_INTERCEPTOR) return;
 #endif
 #if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
-    defined(SC64_Z7_SCOURGE_COMBAT)
+    defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
     if (q->type == U_SCOURGE && !q->alive) return;
     /* Scourge target validation must precede target_alive(), which indexes
      * the unit or building arrays from this combined target namespace. */
@@ -6194,7 +6261,7 @@ tick_combat(Unit * q, int target)
        navigation grid keeps actors outside the same 18px collision radius. */
     if(target>=MAX_UNITS)range+=18;
 #if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
-    defined(SC64_Z7_SCOURGE_COMBAT)
+    defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
     /* BWAPI lists zero bonus damage for Suicide_Scourge. Keep its fixed
      * 110 damage independent of the generic SIDE weapon upgrade. */
     if (q->type == U_SCOURGE)
@@ -6314,7 +6381,7 @@ tick_combat(Unit * q, int target)
         }
         }
 #if (defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)) || \
-    defined(SC64_Z7_SCOURGE_COMBAT)
+    defined(SC64_Z7_SCOURGE_COMBAT) || defined(SC64_SHARED_SCOURGE_COMBAT)
         /* Suicide Scourge damage is applied by hit_target first, preserving
          * the regular shield/armor/death path, then the attacker is consumed. */
         if (q->type == U_SCOURGE) {
@@ -7191,6 +7258,17 @@ select_combat_group(void)
 static void
 select_next_train_type(void)
 {
+#ifdef SC64_RACES
+    if (race_mode && selected_building >= 0 && selected_building < MAX_BUILDINGS &&
+        b[selected_building].alive && b[selected_building].owner == SIDE) {
+        unsigned producer = (unsigned)sc64_race_raw_building(b[selected_building].type);
+        if (sc64_race_is_zerg_townhall(b[selected_building].type)) producer = 35;
+        int raw = sc64_skirmish_menu_next_product(producer,
+            (unsigned)sc64_race_raw_unit(train_type), race_skirmish_product_available, &selected_building);
+        if (raw != SC64_SK_NONE) train_type = sc64_race_unit_from_raw(raw);
+        return;
+    }
+#endif
 #ifdef SC64_T5_RUNTIME
     if (selected_building >= 0 && b[selected_building].alive &&
         (b[selected_building].type == B_FACTORY || b[selected_building].type == B_STARPORT)) {

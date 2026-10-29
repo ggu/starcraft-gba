@@ -264,6 +264,22 @@ def image_animation_timeline(image_id: int, animation: str,
         image_init_frame(image_id, image_iscript, iscript_payload, scripts))
 
 
+def partition_init_layers(specs: list[tuple[int, int, int, bool]],
+                          draw_functions: bytes) -> tuple[list[tuple[int, int, int, bool]], list[dict]]:
+    """Defer destination-dependent shadows; retain ordinary Init layers."""
+    opaque, deferred = [], []
+    for image_id, x, y, underlay in specs:
+        if not 0 <= image_id < len(draw_functions):
+            raise ValueError(f'Init layer image {image_id} outside images.dat')
+        modifier = draw_functions[image_id]
+        if modifier == 10:
+            deferred.append({'image_id': image_id, 'modifier': modifier,
+                             'x': x, 'y': y, 'underlay': underlay})
+        else:
+            opaque.append((image_id, x, y, underlay))
+    return opaque, deferred
+
+
 def compose_init_layers(frame: dict, layers: list[tuple[dict, int, int, bool]]) -> dict:
     """Flatten source Init imgul/imgol layers while preserving their anchor.
 
@@ -814,8 +830,12 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
     iscript_payload = base._entry_payload(archive, '012/002')
     scripts = script_index(iscript_payload)
     image_grp_indices = base._le_array(images_dat, IMAGE_COUNT, 4, 'images.dat GRP')
+    image_draw_functions = images_dat[IMAGE_COUNT * 8:IMAGE_COUNT * 9]
+    if len(image_draw_functions) != IMAGE_COUNT:
+        raise ValueError('images.dat draw-function table is truncated')
     image_cache = {}
     init_layer_cache = {}
+    deferred_shadow_layers = {}
     from tools.sc64_construction_sprites import (
         animation_instructions, image_animation_starts,
     )
@@ -842,6 +862,12 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
         init_layer_cache[image_id] = layers
         return layers
 
+    def opaque_init_layers(image_id):
+        opaque, deferred = partition_init_layers(init_layer_specs(image_id), image_draw_functions)
+        if deferred:
+            deferred_shadow_layers[image_id] = deferred
+        return opaque
+
     def source_init_frame(image_id, stack=()):
         if image_id in stack:
             raise ValueError(f'cyclic source Init image layers: {stack + (image_id,)}')
@@ -860,7 +886,7 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
         if not any(frame['alpha']):
             raise ValueError(f'image {image_id}: source Init frame {frame_index} is transparent')
         layers = []
-        for child_id, dx, dy, underlay in init_layer_specs(image_id):
+        for child_id, dx, dy, underlay in opaque_init_layers(image_id):
             child_frame = source_init_frame(child_id, stack + (image_id,))
             layers.append((child_frame, dx, dy, underlay))
         composed = compose_init_layers(frame, layers) if layers else frame
@@ -869,7 +895,7 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
 
     def compose_frame_bank(image_id, frames):
         layers = [(source_init_frame(child_id, (image_id,)), dx, dy, underlay)
-                  for child_id, dx, dy, underlay in init_layer_specs(image_id)]
+                  for child_id, dx, dy, underlay in opaque_init_layers(image_id)]
         return [compose_init_layers(frame, layers) for frame in frames] if layers else frames
     t4_refs = base.resolve_grp_indices(archive, T4_UNIT_IDS) if include_t4 else {}
     t4_building_refs = base.resolve_grp_indices(archive, T4_BUILDING_IDS) if include_t4 else {}
@@ -1141,6 +1167,11 @@ def generate(rom: Path = ROM, out: Path = OUT, header: Path = HEADER,
               'base_assets_manifest_sha256': asset_manifest_sha256(manifest_assets[:len(selected)]),
               't4_assets_manifest_sha256': asset_manifest_sha256(manifest_assets[len(selected):legacy_asset_count]) if include_t4 else asset_manifest_sha256([]),
               'assets': manifest_assets,
+              'deferred_shadow_layers': [
+                  {'parent_image_id': parent, **layer}
+                  for parent, layers in sorted(deferred_shadow_layers.items())
+                  for layer in layers],
+              'deferred_shadow_note': 'Modifier 10 requires separate destination-dependent shadow rendering; not included in opaque frames.',
               'generated_header': str(header)}
     cannon_script = image_iscript[cannon_ref['image_id']]
     cannon_starts = (image_animation_starts(iscript_payload, scripts[cannon_script])

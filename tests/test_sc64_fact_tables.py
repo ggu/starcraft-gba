@@ -24,6 +24,9 @@ NON_GATES = {"SC64_ZP_FACT_RANGE_CULL", "SC64_FACT_TABLES"}
 CONFIGS = {name: ("SC64_RACES",) + defines
            for name, defines in FACT_RANGE_CONFIGS.items()}
 CONFIGS.update({
+    "all_race_roster": ("SC64_RACES", "SC64_UNIFIED", "SC64_ZP_CAMPAIGN_ACTORS",
+                        "SC64_Z5_ACTORS", "SC64_Z5_DOODADS", "SC64_Z6_RUNTIME",
+                        "SC64_Z6_ACTORS", "SC64_SKIRMISH_ROSTER"),
     "zp_p7_projectiles": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS",
                           "SC64_P7_ACTORS", "SC64_P7_PROJECTILES_ENABLED"),
     "zp_p7_carrier": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS", "SC64_P7_ACTORS",
@@ -111,7 +114,7 @@ class FactTablesTest(unittest.TestCase):
     def test_tables_reject_a_build_with_different_gates(self):
         with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-gate-") as directory:
             table_dir = generate(self.compiler, CONFIGS["zp_p7"], directory, "zp_p7")
-            for other in ("zp_p7_projectiles", "zp_p6", "zp"):
+            for other in ("zp_p7_projectiles", "zp_p6", "zp", "all_race_roster"):
                 with self.subTest(build=other):
                     built, _ = compile_program(
                         self.compiler, CHECK, CONFIGS[other] + ("SC64_FACT_TABLES",),

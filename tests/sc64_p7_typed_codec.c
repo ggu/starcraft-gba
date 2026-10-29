@@ -11,7 +11,7 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 #define SC64_RACES 1
-enum { SC_RU_COUNT = 64, SC_RB_COUNT = 64, MAX_UNITS = 240, MAX_BUILDINGS = 160 };
+enum { SC_RU_COUNT = 64, SC_RB_COUNT = 100, MAX_UNITS = 240, MAX_BUILDINGS = 160 };
 typedef struct { unsigned char race, flags, producer, supply; unsigned short minerals, gas, build_frames, hp, shields; unsigned short prereq; } Sc64RaceUnitRule;
 typedef struct { unsigned char race, flags, worker, supply_provided; unsigned short minerals, gas, build_frames, hp; unsigned short prereq; } Sc64RaceBuildingRule;
 static Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT];
@@ -49,10 +49,10 @@ static uint32_t rng = 0x49d3a21bu;
 static uint32_t rnd(void) { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return rng; }
 static int pick(int lo, int hi) { return lo + (int)(rnd() % (uint32_t)(hi - lo + 1)); }
 static void init_facts(void) {
+  for (int i=0;i<SC_RB_COUNT;i++) sc64_race_building_rules[i].hp=(unsigned short)(100+i*991);
   for (int i=0;i<64;i++) {
     sc64_race_unit_rules[i].hp=(unsigned short)(100+i*997);
     sc64_race_unit_rules[i].shields=(unsigned short)(i*5);
-    sc64_race_building_rules[i].hp=(unsigned short)(100+i*991);
   }
 }
 static int unit_hp(int t) { return sc64_race_unit_rules[t].hp; }
@@ -152,11 +152,21 @@ int main(void) {
       bad=u; bad.x=2048; assert(!sc64_p7_typed_unit_encode(&us,&bad,2048,2048)); assert(!memcmp(&us,&us0,sizeof(us)));
       bad=u; bad.target=MAX_UNITS+MAX_BUILDINGS; assert(!sc64_p7_typed_unit_encode(&us,&bad,2048,2048)); assert(!memcmp(&us,&us0,sizeof(us)));
       bad=u; bad.type=63; bad.maxhp=unit_hp(63); bad.armor=sc64_race_unit_armor(63); bad.weapon=0xffff; assert(sc64_p7_typed_unit_encode(&us,&bad,2048,2048)); Unit edgeout; assert(sc64_p7_typed_unit_decode(&edgeout,&us,2048,2048)); unit_equal(&bad,&edgeout);
-      Sc64P7TypedBuildingSave bs; memset(&bs,0x3c,sizeof(bs)); Sc64P7TypedBuildingSave bs0=bs; Building bb=b; bb.type=64; assert(!sc64_p7_typed_building_encode(&bs,&bb,2048,2048)); assert(!memcmp(&bs,&bs0,sizeof(bs)));
+      Sc64P7TypedBuildingSave bs; memset(&bs,0x3c,sizeof(bs)); Sc64P7TypedBuildingSave bs0=bs; Building bb=b; bb.type=100; assert(!sc64_p7_typed_building_encode(&bs,&bb,2048,2048)); assert(!memcmp(&bs,&bs0,sizeof(bs)));
       bb=b; bb.flags=65536; assert(!sc64_p7_typed_building_encode(&bs,&bb,2048,2048)); assert(!memcmp(&bs,&bs0,sizeof(bs)));
       bb=b; bb.queue[4]=64; assert(!sc64_p7_typed_building_encode(&bs,&bb,2048,2048)); assert(!memcmp(&bs,&bs0,sizeof(bs)));
       bb=b; bb.queue_count=6; assert(!sc64_p7_typed_building_encode(&bs,&bb,2048,2048)); assert(!memcmp(&bs,&bs0,sizeof(bs)));
       bb=b; bb.flags=0xffff; for(int j=0;j<5;j++) bb.queue[j]=63; assert(sc64_p7_typed_building_encode(&bs,&bb,2048,2048)); Building bout; assert(sc64_p7_typed_building_decode(&bout,&bs,2048,2048)); building_equal(&bb,&bout);
+      /* The extension occupies padding after the legacy end marker, so a
+       * pre-extension type-63 row and a new type-99 row both round-trip. */
+      building_make(&bb,63,1); assert(sc64_p7_typed_building_encode(&bs,&bb,2048,2048));
+      assert(!(bs.bytes[24]&0x04u)); assert(sc64_p7_typed_building_decode(&bout,&bs,2048,2048)); building_equal(&bb,&bout);
+      building_make(&bb,99,1); assert(sc64_p7_typed_building_encode(&bs,&bb,2048,2048));
+      assert(bs.bytes[24]&0x04u); assert(sc64_p7_typed_building_decode(&bout,&bs,2048,2048)); building_equal(&bb,&bout);
+      for(unsigned i=0;i<6;i++) building_setbits(&bs,43+i,1,(36u>>i)&1u);
+      Building bsentinel; memset(&bout,0x74,sizeof(bout)); bsentinel=bout;
+      assert(!sc64_p7_typed_building_decode(&bout,&bs,2048,2048));
+      assert(!memcmp(&bout,&bsentinel,sizeof(bout)));
       Sc64P7TypedUnitSave badrow=ur; badrow.bytes[27]&=(u8)~0x80u; reject_unit_decode_unchanged(&badrow,2048,2048);
       badrow=ur; unit_setbits(&badrow,40,3,7); reject_unit_decode_unchanged(&badrow,2048,2048);
       badrow=ur; unit_setbits(&badrow,146,5,31); reject_unit_decode_unchanged(&badrow,2048,2048); reject_unit_decode_unchanged(&ur,0,2048);

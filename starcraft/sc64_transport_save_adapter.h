@@ -31,6 +31,10 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
 #else
 #define CARGO_B(i, field) candidate->buildings[(i)][offsetof(Building, field) / sizeof(int)]
 #endif
+/* The shared custom-game validator handles cargo there; keep this
+     * mission-specific actor loop unchanged for campaign candidates. The
+     * T5 attachment checks below still run in both modes. */
+    if (!candidate->state[0]) {
 #ifdef SC64_LATE_TERRAN_STORAGE
     for (int i = 0; i < MAX_UNITS; ++i) {
         Unit actor;
@@ -136,6 +140,7 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
     }
 #undef CARGO_U
 #endif
+    }
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
 #ifdef SC64_T6_STORAGE
         Building saved_building;
@@ -143,6 +148,41 @@ static int race_transport_save_candidate_valid(const RaceSave *candidate,
             return 0;
 #endif
         if (!CARGO_B(i, alive) || CARGO_B(i, type) != B_CONTROL_TOWER) continue;
+        if (candidate->state[0]) {
+            /* Custom add-ons attach by geometry, not the T5 mission's level
+             * slot. Their source metadata may be absent. Keep orphan towers
+             * valid while rejecting duplicate or contradictory attachments. */
+            if ((CARGO_B(i, raw_type) != -1 && CARGO_B(i, raw_type) != 115) ||
+                CARGO_B(i, maxhp) != 500 || CARGO_B(i, level) != 0 ||
+                CARGO_B(i, queue_count) ||
+                (CARGO_B(i, under_construction) &&
+                 (CARGO_B(i, build_progress) < 0 ||
+                  CARGO_B(i, build_progress) >= building_build_time(B_CONTROL_TOWER)))) return 0;
+            int parent = -1;
+            for (int j=0; j<MAX_BUILDINGS; ++j) {
+#ifdef SC64_T6_STORAGE
+                Building other;
+                if (!sc64_building_save_decode(&other, &candidate->buildings[j])) return 0;
+#define SK_PARENT(f) other.f
+#else
+#define SK_PARENT(f) CARGO_B(j, f)
+#endif
+                if (SK_PARENT(alive) && SK_PARENT(type) == B_STARPORT &&
+                    SK_PARENT(owner) == CARGO_B(i, owner) &&
+                    SK_PARENT(x) + SC64_T5_ADDON_X_OFFSET == CARGO_B(i, x) &&
+                    SK_PARENT(y) + SC64_T5_ADDON_Y_OFFSET == CARGO_B(i, y)) {
+                    if ((SK_PARENT(raw_type) != -1 && SK_PARENT(raw_type) != 114) ||
+                        parent >= 0) return 0;
+                    parent = j;
+                }
+#undef SK_PARENT
+            }
+            if (parent >= 0) {
+                if (attached[parent]) return 0;
+                attached[parent] = 1;
+            }
+            continue;
+        }
         if (CARGO_B(i, raw_type) != 115 || CARGO_B(i, maxhp) != 500 ||
             CARGO_B(i, level) < 0 || CARGO_B(i, level) > MAX_BUILDINGS ||
             CARGO_B(i, queue_count) ||

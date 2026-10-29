@@ -35,6 +35,12 @@ static int race_transport_carrier_type(const Unit *q)
         q->type==U_OVERLORD && q->raw_type==42 && q->raw_owner==3 && q->owner==SIDE)
         return 1;
 #endif
+    /* Custom games may spawn a mapped native Dropship without source metadata.
+     * A contradictory explicit source identity is never accepted. */
+    if (q->type == U_DROPSHIP && race_mode &&
+        sc64_race_unit_from_raw(SC64_TRANSPORT_DROPSHIP_RAW) == U_DROPSHIP &&
+        (q->raw_type == -1 || q->raw_type == SC64_TRANSPORT_DROPSHIP_RAW))
+        return 1;
 #ifdef SC64_T5_RUNTIME
     if (q->type == U_DROPSHIP && q->raw_type == SC64_TRANSPORT_DROPSHIP_RAW)
         return 1;
@@ -57,6 +63,9 @@ static int race_transport_passenger_space(const Unit *q)
 {
     unsigned space;
     int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+    if (race_mode && (raw < 0 ||
+        (sc64_race_unit_from_raw(raw) != q->type &&
+         !(raw == 19 && q->type == U_RAYNOR)))) return -1;
     if (!q->alive || (q->flags & 2) || sc64_race_unit_flying(q->type) ||
         !sc64_transport_space_required_raw((unsigned)raw, &space) ||
         space == SC64_TRANSPORT_SPACE_UNAVAILABLE) return -1;
@@ -76,6 +85,18 @@ static int race_transport_cargo_space(int carrier)
             if (total > SC64_TRANSPORT_DROPSHIP_SPACE) return -1;
         }
     return total;
+}
+
+/* Context command for ordinary custom games; existing campaign commands
+ * continue to use their mission-specific predicates. */
+static int __attribute__((unused)) race_skirmish_dropship_menu_available(void)
+{
+    if (!race_mode || selected_building >= 0) return 0;
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (u[i].selected && u[i].owner == SIDE &&
+            race_transport_carrier_valid(i) && u[i].type == U_DROPSHIP &&
+            race_transport_cargo_space(i) > 0) return 1;
+    return 0;
 }
 
 #ifdef SC64_P5_SHUTTLE_ENABLED
