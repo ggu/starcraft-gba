@@ -31,9 +31,9 @@ numeric stock facts checked for newly appended rows.
 | Protoss P7 | 58 | 65 |
 | Showcase | 57 | 65 |
 
-Run `make test-sc64-skirmish-catalog test-sc64-skirmish-menu
-test-sc64-skirmish-rules` for the asset-free checks, and
-`make test-sc64-skirmish-runtime` with the corresponding prepared inputs.
+Run `./dev test` for the asset-free checks, or
+`make test-sc64-skirmish-rules` for just the all-race identity/rule matrix.
+Run `make test-sc64-skirmish-runtime` with the corresponding prepared inputs.
 Identity/rule coverage does not supply a missing sprite or behavior. Before
 enabling the extension in normal ROMs, qualify the remaining runtime paths,
 fact-table generation, imported art, and every active save codec. Expanded

@@ -240,10 +240,27 @@ int main(void) {
     def test_all_runtime_raw_actor_and_building_ids_have_source_art(self):
         rules = (Path(__file__).resolve().parents[1] / 'starcraft/race_rules.h').read_text()
 
-        def numeric_raw_ids(function_signature, next_signature):
+        def numeric_raw_ids(function_signature, next_signature, include_roster=False):
             start = rules.index(f'static inline int {function_signature}\n{{')
             end = rules.index(f'static inline int {next_signature}\n{{', start)
             body = rules[start:end]
+            if not include_roster:
+                # The identity-only extension is off in every normal ROM.
+                # Retain the all-gates art audit for shipped actor paths while
+                # checking its explicit missing-art set separately below.
+                lines, depth = [], 0
+                for line in body.splitlines():
+                    if re.match(r'\s*#\s*(if|ifdef|ifndef)\b', line):
+                        if depth or 'SC64_SKIRMISH_ROSTER' in line:
+                            depth += 1
+                            continue
+                    elif re.match(r'\s*#\s*endif\b', line) and depth:
+                        depth -= 1
+                        continue
+                    if not depth:
+                        lines.append(line)
+                self.assertEqual(depth, 0)
+                body = '\n'.join(lines)
             return {int(value) for value in re.findall(r'return (\d+);', body)}
 
         runtime_units = numeric_raw_ids('sc64_race_raw_unit(int type)',
@@ -260,6 +277,11 @@ int main(void) {
         unit_assets.add(28)  # P8 raw28 uses the verified shared raw12 descriptor.
         self.assertEqual(runtime_units - unit_assets, {101},
                          'raw 101 is intentionally source-invisible')
+        extended_units = numeric_raw_ids('sc64_race_raw_unit(int type)',
+                                        'sc64_race_raw_building(int type)', True)
+        self.assertEqual(extended_units - unit_assets - {101}, {58, 60, 61, 62, 63},
+                         'identity-only roster art gaps must stay explicit; '
+                         'these are not enabled in normal ROMs')
 
         runtime_buildings = numeric_raw_ids('sc64_race_raw_building(int type)',
                                             'sc64_race_unit_from_raw(int raw)')
@@ -271,6 +293,10 @@ int main(void) {
         self.assertEqual(runtime_buildings - building_assets, {134},
                          'raw 134 belongs to the default-off Nydus runtime, '
                          'whose source art is not imported yet')
+        extended_buildings = numeric_raw_ids('sc64_race_raw_building(int type)',
+                                            'sc64_race_unit_from_raw(int raw)', True)
+        self.assertEqual(extended_buildings - building_assets, {107, 134},
+                         'Comsat and Nydus source art remain unprepared')
 
     def test_header_remaps_opaque_indices_and_keeps_transparency_zero(self):
         frame = {'pixels': bytes((0, 9, 0, 7)), 'alpha': bytes((0, 1, 0, 1)),
