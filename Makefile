@@ -4721,6 +4721,28 @@ build/StarCraft64-Races-UI-Probe-GBA.gba: build/starcraft64-races-ui-probe.elf t
 .PHONY: ui-arm-probe
 ui-arm-probe: build/StarCraft-Showcase-UI-Probe-GBA.gba build/StarCraft64-Races-UI-Probe-GBA.gba
 
+# T9 ordinary-input qualification. The host controller writes its trace under
+# build/, not the shared .local trace folder; the no-GDB ARM probe replays that
+# trace's key transitions through the normal Terran campaign menu
+# (tests/sc64_t9_arm_replay.c, tools/sc64_t9_arm_replay.py).
+T9_ARM_DIR := build/t9-arm
+T9_ARM_TRACE := $(T9_ARM_DIR)/t9-controller.json
+$(T9_ARM_TRACE): build/test-sc64-t9-campaign-run
+	mkdir -p $(T9_ARM_DIR)
+	./build/test-sc64-t9-campaign-run --trace $@
+.PHONY: test-sc64-t9-controller
+test-sc64-t9-controller: $(T9_ARM_TRACE)
+$(T9_ARM_DIR)/sc64_t9_tape_generated.h: $(T9_ARM_TRACE) tools/sc64_t9_arm_replay.py
+	$(PYTHON) tools/sc64_t9_arm_replay.py tape $< $@
+build/starcraft-terran-t9-arm-replay.elf: tests/sc64_t9_arm_replay.c $(T9_ARM_DIR)/sc64_t9_tape_generated.h $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(TERRAN_ROM_FLAGS) -I$(T9_ARM_DIR) $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -Wl,-Map,build/starcraft-terran-t9-arm-replay.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Terran-T9-ARM-Replay.gba: build/starcraft-terran-t9-arm-replay.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC T9 REPLAY' SCT9
+.PHONY: sc64-t9-arm-replay
+sc64-t9-arm-replay: build/StarCraft-Terran-T9-ARM-Replay.gba
+
 .PHONY: test-sc64-direct-firing-flags
 test-sc64-direct-firing-flags:
 	$(PYTHON) tests/test_sc64_direct_firing_flags.py

@@ -6227,3 +6227,147 @@ command stops at the T9 controller (`won=0`, no Wraiths, wallet 34/14 at the
 T1–T8 and the other Terran checks pass before that point, and T10 run directly
 wins at tick 3,552. No frame-rate, physical-hardware or ARM replay result is
 claimed.
+
+## T9 ordinary-input qualification (2026-10-29)
+
+This record supersedes the open T9 completion item in the 2026-10-26 and
+2026-10-28 sections. Base is `codex/source-release` at
+`a4ff09dcb42aa29f2c451b443fabcb99adf56746`; the exact branch commit is named in
+the pull request.
+
+### Why the earlier controller stalled
+
+`tests/sc64_t9_campaign_run.c` stopped at its 500,000-tick limit on the
+current head (43 Protoss buildings, one Wraith, wallet 42/14). The cause was the
+controller, not the engine:
+
+- Its ground-reachability check read the lazily built path grid before the
+  engine had built it, and it used 8-connected steps where engine routes use
+  four. Every mineral patch and geyser therefore looked unreachable. The
+  controller ferried an SCV to the home geyser by Dropship and tried to place a
+  second Command Center there, which failed. With a single long gas trip, gas
+  stayed near zero and only one Wraith was ever built. The whole T9 map is one
+  4-connected ground component.
+- Clicking an SCV while another SCV was still selected issued the engine's
+  repair order to the selected SCV. When the selected SCV was a builder, that
+  cancelled its construction (a Starport stayed at 1 HP).
+- The home mineral line holds 11,100 minerals and is mined out after roughly
+  20,000 ticks. Idle SCVs then take the nearest patch on the map, in the Zerg
+  base, and die there.
+- Flyers move on eight headings, diagonal first. A Wraith attack-move from the
+  base to the north-east Protoss base clips two Zerg Spore Colonies and
+  auto-acquires them. Any Force 3 building death is a native defeat trigger.
+
+### Controller policy
+
+The rewritten controller still enters through the compile-time mission-12
+probe and changes the world only through `game_update()` with ordinary keys.
+It never writes actors, resources, triggers or mission state, and it does not
+force phases or weaken objectives. Victory is the unchanged native trigger
+(Force 2 commands no buildings). The native defeat triggers stay live:
+Kerrigan's death, losing every unit, and any Force 3 building death.
+
+The policy reads only the player's own units, buildings and wallet; static
+terrain, minerals and geysers; and the immutable scenario placement table.
+From the placement table it takes the 43 Protoss structure sites as briefing
+targets and the 21 Zerg structure sites as no-fly zones. Hostile actors count
+only while their cell is in the player's current `visible` grid. Hostile
+buildings seen once are remembered at their last seen position until that
+cell is visible again without them. Diagnostic output (`--verbose`,
+`--final-inspect`, `--map`) may print more, but no input decision depends on
+it. Tick 1 is left neutral because on the normal menu the briefing's START
+frame runs that tick.
+
+Economy: the opening SCVs walk to the home line and the ordinary idle-worker
+rule assigns them patches. The controller builds a Starport, then a Refinery on
+the home geyser, and trains SCVs up to 20 while that line lasts. It keeps at
+least nine SCVs on minerals and puts up to ten on gas; once the home line is
+gone, every SCV goes to gas. Supply Depots are built ahead of demand and a
+third Starport follows. Fleet: Wraiths gather east of the mineral line. At 24,
+the clump launches as a wave whose membership the controller tracks itself.
+Each leg is planned on 32-pixel cells with a 192-pixel exclusion around Zerg
+structures and visible Zerg actors, plus a soft cost near visible Dragoons and
+remembered Photon Cannons. Waypoints are emitted at heading changes, so each
+eight-direction leg is flown as planned. The final leg is an attack-move on
+the nearest remembered Protoss building or uncleared briefing site.
+
+### Host completion
+
+```sh
+make test-sc64-t9-controller   # writes build/t9-arm/t9-controller.json
+./build/test-sc64-t9-campaign-run --trace PATH --verbose
+```
+
+The run wins at host tick 51,696 (frame 50,926): all 43 Force 2 buildings
+destroyed, all 21 Force 3 buildings intact, Kerrigan alive, zero trigger
+faults, phase 3, and the T9 completion bit set. 42 Wraiths and 13 SCVs
+survive; the wallet ends at 40/5,850. Two runs produce byte-identical traces
+(SHA-256 `8868402d01d8a2d66a5b80d6f2f7d873f6ac8343b8fd817e98378d2e66ed1f74`,
+2,642 input transitions). Before tick 1 was made neutral, the same policy won
+at tick 44,292.
+
+### Normal-menu ARM replay
+
+`tests/sc64_t9_arm_replay.c` replaces `common/main.c` in an otherwise
+canonical Terran build (`TERRAN_ROM_FLAGS`). The ROM boots, taps A, RIGHT×4, A
+and START through the ordinary campaign menu and briefing to mission 12, then
+plays the trace's key transitions through the shipped
+`game_update()`/`audio_update()`/`game_render()` loop. Observations go to the
+mGBA debug log; no debugger port is opened and nothing writes game state.
+`tools/sc64_t9_arm_replay.py run` starts one mGBA process with its own HOME,
+config and save directory and compares every ARM observation with the host
+trace's observation at the same tick.
+
+```sh
+make sc64-t9-arm-replay
+python3 tools/sc64_t9_arm_replay.py run --out build/emulator/t9-arm-replay
+```
+
+A first full-length run (ROM and trace hashes below) launched mission 12
+through the menu at frame 1 with zero faults. All 35 ARM observations it
+reached (ticks 1,000–35,000) matched the host trace exactly: frame, screen,
+win and loss, faults, phase, objective flags, completion bits, Protoss and Zerg
+building counts, Kerrigan, unit counts, both resources and the selection. It
+was then stopped by the driver's 90-minute wall-clock cap with 28 Protoss
+buildings left. It is partial evidence, not a win. A rerun with a longer cap is
+in progress; its result is reported in the pull request.
+
+### Hashes and inputs
+
+| Item | SHA-256 |
+| --- | --- |
+| Canonical Terran ROM `build/StarCraft-Terran-GBA.gba` (32 MiB) | `25397c3e5a5ecdea33083a53a332c4cb6695af5ba1225dc4a920ada2f6f67c8b` |
+| Its ELF | `95ecd4864ad5d10995365a1337af16b482e2ea2d9229233d115ab416dc9e7216` |
+| Replay ROM `build/StarCraft-Terran-T9-ARM-Replay.gba` (32 MiB) | `1e03186c6fc831255645314929e0ab824b8ba208835bbaaf4d7740e74bfcf91f` |
+| Its ELF | `5b4a95f536df2c4d2463993315fba4439f3e4e3db6d9782ee1d829bda8a8a05e` |
+| Host trace `build/t9-arm/t9-controller.json` | `8868402d01d8a2d66a5b80d6f2f7d873f6ac8343b8fd817e98378d2e66ed1f74` |
+| Generated tape header | `3a70737c14a909f48752f287854287e96b27a3a427c6f54270315b585eb45a9a` |
+| Sorted `-D` set of the canonical Terran ROM link | `57cf352222878049188eadf06cfe9b4ead5e66e0cfb8e6366181cc48916c2eb6` |
+| Private T9 scenario header | `e879cf500ce748efff5ede644e4d1790b5cdf9380de9fc95406ca362175cc0bd` |
+| Private T9 availability header | `cf4996518f08027a487fc499c188c7855dbf9c77a77b3e9c467f28a1649ab517` |
+| Private late-Terran race header | `9231da838e256a48dfd3d06f63708f5f05c9afe2326ccfeceb07e337cc35c0bf` |
+| Private late-Terran sprite header | `b7a9f5dde6984567d07e46adabdb3a3bbca4dec1d72c68260bfdd4a39e7b3ae4` |
+| Format-2 audio bank (advisor build) | `bd0adfd0ce83c0bb054d40c8f6bc69d91a55ca0f846f7ada56d48d98d7f72427` |
+
+The private inputs come from the StarCraft 64 USA ROM with SHA-1
+`a36d91b5aac7bb95df0d7de5f9814f5270e25c2b` and the pinned `sc64-maps`
+checkout at `09b57f787a247107d1de82b8c5eab2734667ea1d`. They are prepared
+locally and stay out of Git, as do the trace, tape, ROMs and emulator logs.
+The replay ROM links within the unchanged IWRAM (`< 0x03005000`) and BSS
+(`< 0x0203e000`) guards in `common/gba.ld`.
+
+### Other checks in this environment
+
+`./dev build` passes. `./dev test` runs 655 Python checks; the only failure is
+the Protoss sprite-roster case of `test_sc64_photon_cannon_renderer`, which
+cannot find the private `sc64_fact_tables_generated.h` in this checkout's
+inputs and fails the same way on unmodified base. `./dev sc64 build --profile
+terran` passes. `./dev sc64 test --profile terran` passes T1–T4 and stops at
+the T5 controller (lost at tick 111,945). Unmodified base loses T5 at the same
+tick with the same inputs. Run individually past that stop, T6 wins, the late
+world, save and repair tests pass, T9 wins at tick 51,696, and T10 wins at
+tick 3,552. T7 (no win by its 60,000-tick limit) and T8 (no win by 200,000) do
+not complete; unmodified base gives identical results for both. Those three
+controller regressions are outside this change and remain open.
+
+No physical-GBA result is claimed.
