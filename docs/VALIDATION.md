@@ -2,6 +2,27 @@
 
 This page records reproducible checks for the source snapshot. Automated host checks validate selected rules and data handling; they do not establish complete gameplay balance or physical-hardware behavior.
 
+## Protoss P9 candidate (2026-10-29)
+
+The explicit `protoss-p9` candidate (`SCP9`, generation 45) adds P9 to the
+P8 candidate's P1–P8 profile. Canonical Protoss is unchanged and stays P7;
+its rebuilt ROM is byte-identical to the base, and the P8 controller trace
+and tape are unchanged on this branch. One ordinary-input host controller
+run wins P9 at frame 285,137 with no runtime faults, killing both
+Cerebrates with Zeratul present, and is deterministic across runs. The
+input-only ARM replay of its 13,534-transition key tape matches all 288
+host observations, state digests included, through the same win. A
+pause-menu save at frame 30,660 gives an SRAM record that is byte-identical
+on host and ARM. Loading it from the title screen in a fresh process
+continues to the same win, matching the uninterrupted replay at every
+common observation. Whole-tape ARM guest timing averages 1,725,369 cycles
+per frame (about 9.7 fps equivalent). The playable ROM links at
+`__bss_end=0x02038d64` and `__iwram_end=0x03004c70`. The AI backend and
+trigger cadence are authored. Zeratul's cloak, Defiler spells and P7-only
+ability services are inactive in P9. These are emulator and host results
+only, with no hardware claim. See the
+[P9 candidate audit](audits/2026-10-29-p9-campaign/README.md).
+
 ## Protoss P8 candidate (2026-10-29)
 
 The explicit `protoss-p8` candidate (`SCP8`, generation 44) adds P8 to the

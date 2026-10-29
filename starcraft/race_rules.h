@@ -1268,6 +1268,10 @@ static inline int sc64_race_unit_armor(int type)
     case U_FENIX_DRAGOON: return 3;
     case U_HUNTER_KILLER: case U_FENIX: case U_TASSADAR: return 2;
     case U_MEDIC: return 1;
+#ifdef SC64_P9_DATA_ENABLED
+    /* Stock Zerg_Defiler armor; placed actors take it from the stock row. */
+    case U_P9_DEFILER: return 1;
+#endif
     default: return 0;
     }
 }

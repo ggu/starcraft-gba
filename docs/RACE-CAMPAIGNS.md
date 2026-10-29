@@ -13,7 +13,8 @@ target is the qualified P7 candidate. Explicit `protoss-p6` remains a separate
 P1–P6 product with its generation-30 save identity.
 `zerg-z4`, `zerg-z3` and `protoss-p3` remain explicit legacy builds with their original
 ROMs and save identities; `protoss-p4-storm` also preserves its real four-entry files. The P7 candidate carries the P1–P6 campaign and the seventh menu entry. The
-explicit `protoss-p8` candidate adds P8 as an eighth entry; explicit
+explicit `protoss-p8` candidate adds P8 as an eighth entry, and explicit
+`protoss-p9` adds P9 as a ninth; explicit
 `protoss-p5-shuttle` preserves the earlier five-entry product. The
 catalog records all 30 mission identifiers.
 
@@ -130,8 +131,19 @@ loaded in a fresh process, continues to the same win on host and on ARM.
 P8's AI backend, transmission duration and trigger cadence are authored.
 Carrier interceptors, Arbiter cloaking, Observer detection and Shield
 Battery recharge are still P7-only and inactive in P8. See the
-[P8 candidate audit](audits/2026-10-29-p8-campaign/README.md). P9 and P10
-remain unavailable.
+[P8 candidate audit](audits/2026-10-29-p8-campaign/README.md).
+
+P9 **Shadow Hunters** has a separate, unpromoted `protoss-p9` candidate
+built on the P8 candidate. It is built with `make protoss-p9` and writes
+`StarCraft-Protoss-P9-GBA.gba` / `starcraft-protoss-p9.elf`, code `SCP9`,
+generation 45. One ordinary-input host controller run wins P9 by killing
+both Cerebrates with Zeratul present. The input-only ARM replay of its key
+tape matches every host observation through the win. A pause-menu SRAM
+save, loaded in a fresh process, continues to the same win on host and on
+ARM. P9's AI backend and trigger cadence are authored. Zeratul's cloak,
+Defiler spells and the P7-only ability services are inactive in P9. See the
+[P9 candidate audit](audits/2026-10-29-p9-campaign/README.md). P10 remains
+unavailable.
 
 For P7, the canonical-render candidate passes its host startup/save fixtures,
 normal-input campaign win, 18-match skirmish matrix and menu-driven save/reload.

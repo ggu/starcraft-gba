@@ -11,7 +11,7 @@
 #define P9_CONTROLLER_PROFILE "PROTOSS_P9_FLAGS"
 #endif
 #ifndef P9_RUN_LIMIT
-#define P9_RUN_LIMIT 160000u
+#define P9_RUN_LIMIT 340000u
 #endif
 /* One ordinary pause-menu save; the replay tools resume from this record. */
 #ifndef P9_SAVE_FRAME
@@ -25,11 +25,14 @@ static unsigned host_tick;
 
 static void input(u16 held)
 {
+    /* Once the mission ends, later calls are not inputs: the trace stops at
+     * the deciding call, so a replay ends there too. */
+    if(screen==SCREEN_RESULT||won||lost)return;
     u16 pressed=(u16)(held & (u16)~prior);
     int changed=held!=prior;
     unsigned call_index=host_tick;
     unsigned frame_before=(unsigned)frame;
-    if (screen!=SCREEN_RESULT && !won && !lost) game_update(held,pressed);
+    game_update(held,pressed);
     prior=held;
     ++host_tick;
     if(trace && changed)
@@ -166,12 +169,23 @@ static int zeratul_entering;
 /* Order the army by type groups: a double tap on a Zealot or Dragoon
  * selects that type on screen, which never includes Fenix or Zeratul (R's
  * whole-army shortcut would). Repeat for off-screen clusters. */
+/* Anchors farther than this from the order point are left alone (0: no
+ * limit), so frequent assault orders do not walk the cursor home. */
+static int army_anchor_limit;
+
 static int army_command(int which,int x,int y)
 {
     static u8 ordered[MAX_UNITS];
     int groups=0;
-    for(int i=0;i<MAX_UNITS;i++)ordered[i]=0;
-    for(int round=0;round<8;round++){
+    /* Units already carrying this order, or already fighting during an
+     * attack, need no new one; cursor travel is the controller's main cost. */
+    for(int i=0;i<MAX_UNITS;i++){
+        int same=u[i].order==(which==MENU_ATTACK?ORDER_ATTACK_MOVE:ORDER_MOVE)&&
+            dist2(u[i].tx,u[i].ty,x,y)<96*96;
+        ordered[i]=same||(which==MENU_ATTACK&&u[i].order==ORDER_ATTACK_TARGET)||
+            (army_anchor_limit&&dist2(u[i].x,u[i].y,x,y)>army_anchor_limit*army_anchor_limit);
+    }
+    for(int round=0;round<6;round++){
         int anchor=-1,bd=0x7fffffff;
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&!ordered[i]&&
             (u[i].type==U_ZEALOT||u[i].type==U_DRAGOON)){
@@ -190,6 +204,8 @@ static int army_command(int which,int x,int y)
         }
         /* Whatever happened, do not retry this anchor. */
         ordered[anchor]=1;
+        if(getenv("P9_ALOG"))fprintf(stderr,"group f=%d anchor=%d type=%d at=%d,%d count=%d bad=%d cur=%d,%d\n",
+            frame,anchor,u[anchor].type,u[anchor].x,u[anchor].y,count,bad,cx,cy);
         if(!count||bad)continue;
         for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].selected)ordered[i]=1;
         if(command_selected(which,x,y))++groups;
@@ -283,13 +299,47 @@ static int queue_combat_unit(void)
     return 1;
 }
 
+/* A builder Probe that a single tap can select: the free Probe farthest
+ * from any other unit of the side. */
 static int free_builder(void)
 {
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&
-        u[i].order==ORDER_MINE&&!u[i].carry)return i;
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&
-        !SC64_BUILD_WORKER_ORDER(u[i].order)&&u[i].order!=ORDER_GAS)return i;
-    return -1;
+    int best=-1,best_gap=-1;
+    for(int pass=0;pass<2&&best<0;pass++)
+        for(int i=0;i<MAX_UNITS;i++){
+            if(!u[i].alive||u[i].owner!=SIDE||u[i].type!=U_PROBE||
+               SC64_BUILD_WORKER_ORDER(u[i].order)||u[i].order==ORDER_GAS)continue;
+            if(!pass&&(u[i].order!=ORDER_MINE||u[i].carry))continue;
+            int gap=0x7fffffff;
+            for(int j=0;j<MAX_UNITS;j++)if(j!=i&&u[j].alive&&u[j].owner==SIDE){
+                int d=dist2(u[i].x,u[i].y,u[j].x,u[j].y);
+                if(d<gap)gap=d;
+            }
+            if(gap>best_gap){best_gap=gap;best=i;}
+        }
+    return best;
+}
+
+/* Keep a 16-pixel walkable lane between a new structure's pinned BWAPI tile
+ * footprint and every structure and mineral patch, and keep the base's
+ * north ramp clear, so production exits never seal off. */
+/* Sites the game refused once are not tried again. */
+static int refused_x[64],refused_y[64],refused_count;
+
+static int site_keeps_lanes(int type,int x,int y)
+{
+    for(int k=0;k<refused_count;k++)
+        if(FAST_ABS(refused_x[k]-x)<16&&FAST_ABS(refused_y[k]-y)<16)return 0;
+    int raw=sc64_race_raw_building(type);
+    if(raw<0||raw>=228)return 0;
+    int hw=siege_bounds[raw][0]*8,hh=siege_bounds[raw][1]*8;
+    if(x>=1360&&x<=1630&&y>=1600&&y<=1776)return 0;
+    for(int k=0;k<MAX_BUILDINGS;k++)if(b[k].alive&&b[k].owner==SIDE&&b[k].raw_type>=0&&b[k].raw_type<228){
+        int kw=siege_bounds[b[k].raw_type][0]*8,kh=siege_bounds[b[k].raw_type][1]*8;
+        if(FAST_ABS(b[k].x-x)<hw+kw+16&&FAST_ABS(b[k].y-y)<hh+kh+16)return 0;
+    }
+    for(int k=0;k<MAX_MINERALS;k++)if(m[k].amount>0&&
+        FAST_ABS(m[k].x-x)<hw+16+16&&FAST_ABS(m[k].y-y)<hh+8+16)return 0;
+    return 1;
 }
 
 /* Place `type` through the Probe build menu at the nearest legal site. */
@@ -301,24 +351,44 @@ static int build_structure(int type,int menu_row,int min_r,int max_r,int fixed_x
     if(site_x<0){
         /* A coarse lattice keeps walkable lanes between structures, so the
          * base cannot wall its own production in. */
-        int step=type==B_PYLON?64:96;
+        int step=16;
         for(int dy=-max_r;dy<=max_r;dy+=step)for(int dx=-max_r;dx<=max_r;dx+=step){
             int x=b[home].x+dx,y=b[home].y+dy,d=dx*dx+dy*dy;
             if(d<min_r*min_r||x<32||x>=WORLD_W-32||y<32||y>=WORLD_H-32||d>=best||
                !race_can_site(SIDE,type,x,y)||!can_place(type,x,y))continue;
+            if(!site_keeps_lanes(type,x,y))continue;
+            /* Units standing on a site make the placement fail. */
+            int occupied=0;
+            for(int i=0;i<MAX_UNITS&&!occupied;i++)occupied=u[i].alive&&dist2(u[i].x,u[i].y,x,y)<32*32;
+            if(occupied)continue;
             best=d;site_x=x;site_y=y;
         }
     }
-    if(site_x<0)return 0;
+    if(site_x<0){
+        if(getenv("P9_BLOG"))fprintf(stderr,"no site f=%d type=%d home=%d,%d bank=%d\n",frame,type,b[home].x,b[home].y,minerals);
+        return 0;
+    }
     int worker=free_builder();
-    if(worker<0)return 0;
+    if(worker<0){
+        if(getenv("P9_BLOG"))fprintf(stderr,"no worker f=%d type=%d\n",frame,type);
+        return 0;
+    }
     close_menus();
     clear_selected_building();
     move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
-    if(!u[worker].selected)return 0;
+    for(int n=0;n<40&&(!u[worker].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
+    if(!u[worker].selected||selected_count()!=1){
+        if(getenv("P9_BLOG"))fprintf(stderr,"builder tap fail f=%d type=%d sel=%d count=%d\n",
+            frame,type,u[worker].selected,selected_count());
+        return 0;
+    }
     KEY_TAP(KEY_B);
     for(int n=0;n<field_menu_count()&&menu_open&&menu_cursor!=menu_row;n++)KEY_TAP(KEY_DOWN);
-    if(!menu_open||menu_cursor!=menu_row){close_menus();return 0;}
+    if(!menu_open||menu_cursor!=menu_row){
+        if(getenv("P9_BLOG"))fprintf(stderr,"build row fail f=%d type=%d cursor=%d rows=%d open=%d\n",
+            frame,type,menu_cursor,field_menu_count(),menu_open);
+        close_menus();return 0;
+    }
     KEY_TAP(KEY_A);
     if(mode!=MODE_BUILD||menu!=type){
         fprintf(stderr,"build menu frame=%d type=%d mode=%d menu=%d\n",frame,type,mode,menu);
@@ -328,6 +398,7 @@ static int build_structure(int type,int menu_row,int min_r,int max_r,int fixed_x
     if(mode!=MODE_NORMAL)close_menus();
     if(!SC64_BUILD_WORKER_ORDER(u[worker].order)){
         fprintf(stderr,"build refused frame=%d type=%d site=%d,%d order=%d\n",frame,type,site_x,site_y,u[worker].order);
+        if(refused_count<64){refused_x[refused_count]=site_x;refused_y[refused_count++]=site_y;}
         return 0;
     }
     fprintf(trace,"{\"kind\":\"build\",\"frame\":%u,\"type\":%d,\"site\":[%d,%d]}\n",(unsigned)frame,type,site_x,site_y);
@@ -363,10 +434,11 @@ static int build_nexus(int near_x,int near_y)
         d+=mineral/4;
         if(d<best){best=d;site_x=x;site_y=y;}
     }
-    if(site_x<0)return 0;
+    if(site_x<0){if(getenv("P9_BLOG"))fprintf(stderr,"nexus no site f=%d\n",frame);return 0;}
     close_menus();clear_selected_building();
     move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
-    if(!u[worker].selected||selected_count()!=1)return 0;
+    for(int n=0;n<40&&(!u[worker].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
+    if(!u[worker].selected||selected_count()!=1){if(getenv("P9_BLOG"))fprintf(stderr,"nexus select fail f=%d\n",frame);return 0;}
     KEY_TAP(KEY_B);
     for(int n=0;n<field_menu_count()&&menu_open&&menu_cursor!=MENU_STOP+1;n++)KEY_TAP(KEY_DOWN);
     if(!menu_open||menu_cursor!=MENU_STOP+1){close_menus();return 0;}
@@ -389,7 +461,8 @@ static int build_cannon(int near_x,int near_y)
     for(int dy=-72;dy<=72;dy+=8)for(int dx=-72;dx<=72;dx+=8){
         int x=near_x+dx,y=near_y+dy,d=dx*dx+dy*dy;
         if(d<24*24||d>=best||x<48||x>=WORLD_W-48||y<48||y>=WORLD_H-48||
-           !race_can_site(SIDE,B_PHOTON_CANNON,x,y)||!can_place(B_PHOTON_CANNON,x,y))continue;
+           !race_can_site(SIDE,B_PHOTON_CANNON,x,y)||!can_place(B_PHOTON_CANNON,x,y)||
+           !site_keeps_lanes(B_PHOTON_CANNON,x,y))continue;
         best=d;site_x=x;site_y=y;
     }
     if(site_x<0)return 0;
@@ -408,10 +481,24 @@ static int build_cannon(int near_x,int near_y)
     return 1;
 }
 
-/* Return one idle Probe to the nearest mineral patch near the Nexus. */
+/* Frame at which each Probe's pending build order was first seen. */
+static int pending_since[MAX_UNITS];
+
+/* Return one idle Probe to the nearest mineral patch near the Nexus. A
+ * pending build stuck for 900 frames (its site occupied) is abandoned. */
 static int remine_idle_probe(int home)
 {
     int worker=-1,patch=-1,best=0x7fffffff;
+    for(int i=0;i<MAX_UNITS;i++){
+        if(!(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE&&SC64_PENDING_BUILD_ORDER(u[i].order))){
+            pending_since[i]=-1;continue;
+        }
+        if(pending_since[i]<0)pending_since[i]=frame;
+        if(worker<0&&frame-pending_since[i]>900){
+            worker=i;
+            if(refused_count<64){refused_x[refused_count]=u[i].tx;refused_y[refused_count++]=u[i].ty;}
+        }
+    }
     for(int i=0;i<MAX_UNITS&&worker<0;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE){
         if(u[i].order==ORDER_IDLE){worker=i;break;}
         if(u[i].order==ORDER_MINE&&!u[i].carry&&u[i].target>=0&&u[i].target<MAX_MINERALS){
@@ -431,6 +518,7 @@ static int remine_idle_probe(int home)
     if(patch<0)return 0;
     close_menus();clear_selected_building();
     move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
+    for(int n=0;n<40&&(!u[worker].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
     if(!u[worker].selected||selected_count()!=1)return 0;
     move_cursor(m[patch].x,m[patch].y);KEY_TAP(KEY_A);
     return u[worker].order==ORDER_MINE;
@@ -489,6 +577,7 @@ int main(int argc,char **argv)
     KEY_TAP(KEY_A);KEY_TAP(KEY_START);
     assert(screen==SCREEN_PLAY&&!won&&!lost&&race_selected_mission==28);
     census("launch");
+    for(int i=0;i<MAX_UNITS;i++)pending_since[i]=-1;
     int start_x=0,start_y=0,n=0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE){start_x+=u[i].x;start_y+=u[i].y;++n;}
     if(n){start_x/=n;start_y/=n;}
@@ -497,8 +586,9 @@ int main(int argc,char **argv)
     int next_checkpoint=2000;
     int next_probe=60,next_supply=400,next_build=200,next_gas=3000,next_production=900;
     int next_order=60,next_hero=600;
-    int attacking=0,front_distance=-1,next_zeratul=0,front_unit=-1,next_expand=8000;
+    int attacking=0,front_distance=-1,next_zeratul=0,front_unit=-1,next_expand=8000,next_stage=3000;
     unsigned regrouped_switches=0;
+    int saving_for_nexus=0,regroup_until=0,striking=0;
     while(host_tick<limit_ticks&&screen==SCREEN_PLAY&&!won&&!lost){
         static int stuck_reported;
         if(menu_open&&!stuck_reported){
@@ -520,18 +610,32 @@ int main(int argc,char **argv)
             int left=0;
             for(int k=0;k<MAX_MINERALS;k++)if(m[k].amount>0&&dist2(m[k].x,m[k].y,b[home].x,b[home].y)<320*320)
                 left+=m[k].amount;
-            if(left<2500)(void)build_nexus(1900,1460);
-            next_expand=frame+600;
+            /* Expand to the large western field (source 136,3864), reachable
+             * by ground, before the start field runs out; production waits
+             * for the Nexus money. */
+            static int expand_attempts;
+            saving_for_nexus=left<6000&&expand_attempts<3;
+            next_expand=frame+300;
+            if(saving_for_nexus&&build_nexus(150,1890)){
+                /* One builder at a time: give it time to arrive and warp. */
+                saving_for_nexus=0;
+                ++expand_attempts;
+                next_expand=frame+3000;
+            }
         }
         if(home>=0&&frame>=next_supply){
+            /* Count Pylons already rising; a builder still walking to its
+             * site is covered by the cooldown after each Pylon order. */
+            static int last_pylon_order=-100000;
             int pending=0;
             for(int i=0;i<MAX_BUILDINGS;i++)pending+=b[i].alive&&b[i].owner==SIDE&&
                 b[i].type==B_PYLON&&b[i].under_construction;
-            for(int i=0;i<MAX_UNITS;i++)pending+=u[i].alive&&u[i].owner==SIDE&&
-                SC64_PENDING_BUILD_ORDER(u[i].order);
-            if(pending<2&&race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<=12)
-                (void)build_structure(B_PYLON,MENU_DEPOT,64,448,-1,-1);
-            next_supply=frame+300;
+            if(pending<2&&frame-last_pylon_order>=300&&
+               race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<=12&&
+               build_structure(B_PYLON,MENU_DEPOT,64,448,-1,-1))last_pylon_order=frame;
+            else if(getenv("P9_BLOG")&&race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<=12)
+                fprintf(stderr,"pylon skip f=%d pending=%d since=%d bank=%d\n",frame,pending,frame-last_pylon_order,minerals);
+            next_supply=frame+150;
         }
         if(home>=0&&frame>=next_build){
             int want_gateway=count_type(B_GATEWAY,0)<1||(probe_count()>=10&&count_type(B_GATEWAY,0)<6);
@@ -554,7 +658,7 @@ int main(int argc,char **argv)
             for(int k=0;k<4&&remine_idle_probe(home);k++){}
             next_gas=frame+700;
         }
-        if(frame>=next_production){
+        if(frame>=next_production&&!(saving_for_nexus&&minerals<500)){
             int queued=0;
             while(queued<3&&queue_combat_unit())++queued;
             next_production=frame+60;
@@ -576,6 +680,14 @@ int main(int argc,char **argv)
             }
             next_hero=frame+900;
         }
+        /* Between assaults the army waits west of the build area. */
+        if(!attacking&&home>=0&&frame>=next_stage){
+            int off=0;
+            for(int i=0;i<MAX_UNITS;i++)off+=u[i].alive&&u[i].owner==SIDE&&
+                (u[i].type==U_ZEALOT||u[i].type==U_DRAGOON)&&dist2(u[i].x,u[i].y,1180,1760)>96*96;
+            if(off>=4)(void)army_command(MENU_MOVE,1180,1760);
+            next_stage=frame+1200;
+        }
         if(frame>=next_order&&home>=0&&!attacking){
             int threat=-1,bd=360*360;
             for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY){
@@ -596,20 +708,23 @@ int main(int argc,char **argv)
             int loc=0,c=cerebrate(&loc);
             static int last_target=-1;
             if(loc!=last_target){last_target=loc;front_distance=-1;}
-            int guards=0;
+            int guards=0,escort=0;
             if(c>=0){
+                for(int i=0;i<MAX_UNITS;i++)escort+=u[i].alive&&u[i].owner==SIDE&&
+                    (u[i].type==U_ZEALOT||u[i].type==U_DRAGOON)&&dist2(u[i].x,u[i].y,b[c].x,b[c].y)<160*160;
                 const Sc64P9SourceLocation *gl=&sc64_p9_source_locations[loc-1];
                 int gx0=(int)(gl->left+gl->right)/4,gy0=(int)(gl->top+gl->bottom)/4;
                 for(int i=0;i<MAX_UNITS;i++)guards+=u[i].alive&&u[i].owner==ENEMY&&
                     dist2(u[i].x,u[i].y,gx0,gy0)<120*120;
             }
+            int was_entering=zeratul_entering;
             zeratul_entering=0;
-            if(u[z].shield<300&&fenix_home_x>=0&&c>=0){
+            if((u[z].shield<300||(was_entering&&escort<6))&&fenix_home_x>=0&&c>=0){
                 /* Step away from the Cerebrate until the shields recharge. */
                 int vx=u[z].x-b[c].x,vy=u[z].y-b[c].y,len=FAST_ABS(vx)+FAST_ABS(vy);
                 if(len>0)(void)hero_command(z,u[z].x+vx*96/len,u[z].y+vy*96/len);
             } else if(c>=0&&front_distance>=0&&front_distance<14&&guarding_sunken(c)<0&&
-                      b[c].hp<500&&guards<=2&&u[z].shield>=300){
+                      b[c].hp<500&&guards<=2&&u[z].shield>=300&&escort>=10){
                 const Sc64P9SourceLocation *l=&sc64_p9_source_locations[loc-1];
                 int lx=(int)(l->left+l->right)/4,ly=(int)(l->top+l->bottom)/4;
                 int zx=lx,zy=ly+20,zd=-1;
@@ -618,13 +733,20 @@ int main(int argc,char **argv)
                 zeratul_entering=1;
                 (void)hero_command(z,zx,zy);
             } else if(c>=0&&front_unit>=0&&u[front_unit].alive&&u[front_unit].owner==SIDE){
-                /* Trail 80 pixels behind the frontline, away from the
-                 * Cerebrate. */
-                int ax=u[front_unit].x,ay=u[front_unit].y;
-                int vx=ax-b[c].x,vy=ay-b[c].y,len=FAST_ABS(vx)+FAST_ABS(vy);
-                if(len>0){ax+=vx*80/len;ay+=vy*80/len;}
-                if(dist2(u[z].x,u[z].y,ax,ay)>40*40)(void)hero_command(z,ax,ay);
-            }
+                /* Trail the front group: its centre, 96 pixels back from
+                 * the Cerebrate. */
+                int ax=0,ay=0,an=0;
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+                    (u[i].type==U_ZEALOT||u[i].type==U_DRAGOON)&&
+                    dist2(u[i].x,u[i].y,u[front_unit].x,u[front_unit].y)<160*160){ax+=u[i].x;ay+=u[i].y;++an;}
+                if(an>=6){
+                    ax/=an;ay/=an;
+                    int vx=ax-b[c].x,vy=ay-b[c].y,len=FAST_ABS(vx)+FAST_ABS(vy);
+                    if(len>0){ax+=vx*96/len;ay+=vy*96/len;}
+                    if(dist2(u[z].x,u[z].y,ax,ay)>64*64)(void)hero_command(z,ax,ay);
+                }
+            } else if(fenix_home_x>=0&&dist2(u[z].x,u[z].y,fenix_home_x+24,fenix_home_y)>48*48)
+                (void)hero_command(z,fenix_home_x+24,fenix_home_y);
             next_zeratul=frame+30;
         }
         if(frame>=next_order){
@@ -632,10 +754,11 @@ int main(int argc,char **argv)
             if(attacking&&race_p9.switches!=regrouped_switches){
                 /* A Cerebrate fell: regroup at home before the next one. */
                 regrouped_switches=race_p9.switches;
+                regroup_until=frame+3000;
                 attacking=0;
                 if(home>=0)(void)army_command(MENU_MOVE,b[home].x,b[home].y-96);
             }
-            if(!attacking&&army_count()>=(race_p9.switches?40:32)&&
+            if(!attacking&&frame>=regroup_until&&army_count()>=(race_p9.switches?56:32)&&
                (count_type(B_PHOTON_CANNON,1)>=3||frame>=60000))attacking=1;
             if(attacking&&c>=0&&z>=0&&u[z].owner==SIDE){
                 const Sc64P9SourceLocation *l=&sc64_p9_source_locations[loc-1];
@@ -675,9 +798,26 @@ int main(int argc,char **argv)
                     }
                     if(origin>=0&&distance>=0)front=origin;
                 }
-                /* Near the Cerebrate, clear its Sunken Colonies first. */
+                /* Gather about 25 cells out until most of the army has
+                 * closed up, then strike together. Near the Cerebrate,
+                 * clear its Sunken Colonies first. */
+                int total=0,near_front=0;
+                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&
+                    (u[i].type==U_ZEALOT||u[i].type==U_DRAGOON)){
+                    ++total;
+                    near_front+=dist2(u[i].x,u[i].y,u[front].x,u[front].y)<200*200;
+                }
+                if(!striking&&distance>=0&&distance<=25){
+                    if(near_front*10>=total*8)striking=1;
+                    else{wx=u[front].x;wy=u[front].y;}
+                }
+                if(striking&&distance>25)striking=0;
                 if(sunken>=0&&distance>=0&&distance<16){wx=b[sunken].x;wy=b[sunken].y;}
+                /* Reinforcements far behind are sent only every fifth order. */
+                static int order_round;
+                army_anchor_limit=(order_round++%5)?480:0;
                 (void)army_command(MENU_ATTACK,wx,wy);
+                army_anchor_limit=0;
                 front_distance=distance;
                 front_unit=front;
                 (void)gn;(void)gx;(void)gy;
@@ -706,42 +846,9 @@ int main(int argc,char **argv)
             census("saved");
         }
         if(frame>=next_checkpoint){census("progress");next_checkpoint=frame+2000;}
-        static int next_zlog=56000;if(getenv("P9_ZLOG")&&z>=0&&f>=0&&frame>=next_zlog){next_zlog=frame+60;fprintf(stderr,"F f=%d xy=%d,%d hp=%d sh=%d order=%d tx=%d,%d home=%d,%d\n",frame,u[f].x,u[f].y,u[f].hp,u[f].shield,u[f].order,u[f].tx,u[f].ty,fenix_home_x,fenix_home_y);
-            int en=0;for(int i=0;i<MAX_UNITS;i++)en+=u[i].alive&&u[i].owner==ENEMY&&dist2(u[i].x,u[i].y,u[z].x,u[z].y)<96*96;
-            fprintf(stderr,"Z f=%d xy=%d,%d hp=%d sh=%d order=%d tx=%d,%d sel=%d enemies96=%d fd=%d\n",frame,u[z].x,u[z].y,u[z].hp,u[z].shield,u[z].order,u[z].tx,u[z].ty,u[z].selected,en,front_distance);
-        }
         input(0);
     }
     census("final");
-    if(getenv("P9_MIN")){
-        int home=home_nexus();
-        for(int k=0;k<MAX_MINERALS;k++)if(m[k].amount>0||1){
-            if(home>=0&&dist2(m[k].x,m[k].y,b[home].x,b[home].y)<400*400)
-                fprintf(stderr,"min %d xy=%d,%d amt=%d d=%d\n",k,m[k].x,m[k].y,m[k].amount,(int)dist2(m[k].x,m[k].y,b[home].x,b[home].y)/1000);
-        }
-        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE)
-            fprintf(stderr,"probe %d order=%d target=%d xy=%d,%d carry=%d\n",i,u[i].order,u[i].target,u[i].x,u[i].y,u[i].carry);
-    }
-    if(getenv("P9_GRID")){
-        int c0=1444/16,r0=1828/16;
-        for(int r=r0-12;r<=r0+12&&r<MAP_ROWS;r++){
-            char line[64];int n=0;
-            for(int c=c0-20;c<=c0+20&&c<MAP_COLS;c++){
-                int occ=0;
-                for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].x/16==c&&b[i].y/16==r)occ=1;
-                line[n++]=(c==c0&&r==r0)?'X':occ?'B':SC64_GRID_GET(path_walkable,c+r*MAP_COLS)?'.':'#';
-            }
-            line[n]=0;fprintf(stderr,"%3d %s\n",r,line);
-        }
-    }
-    if(getenv("P9_DUMP")){
-        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&!IS_WORKER(u[i].type))
-            fprintf(stderr,"side u%d raw=%d xy=%d,%d order=%d target=%d tx=%d,%d hp=%d\n",i,u[i].raw_type,u[i].x,u[i].y,u[i].order,u[i].target,u[i].tx,u[i].ty,u[i].hp);
-        for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner!=SIDE&&dist2(b[i].x,b[i].y,1324,325)<200*200)
-            fprintf(stderr,"enemy b%d raw=%d own=%d xy=%d,%d hp=%d vis=%d\n",i,b[i].raw_type,b[i].raw_owner,b[i].x,b[i].y,b[i].hp,currently_visible(b[i].x,b[i].y));
-        for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner!=SIDE&&dist2(u[i].x,u[i].y,1324,325)<200*200)
-            fprintf(stderr,"enemy u%d raw=%d own=%d xy=%d,%d hp=%d\n",i,u[i].raw_type,u[i].raw_owner,u[i].x,u[i].y,u[i].hp);
-    }
     fclose(trace);
     printf("p9 controller: frame=%u calls=%u won=%d lost=%d screen=%d switches=%u\n",
            (unsigned)frame,host_tick,won,lost,screen,race_p9.switches);
