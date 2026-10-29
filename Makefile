@@ -246,9 +246,15 @@ SC64_BUILDING_FIRE_FLAGS := -DSC64_BUILDING_FIRE_ART -I$(SC64_BUILDING_FIRE_DIR)
 $(SC64_BUILDING_FIRE_HEADER): tools/sc64_building_fire_pack.py tools/sc64_construction_sprites.py tools/sc64_death_sprites.py tools/sc64_sprites.py common/gba.h
 	python3 tools/sc64_building_fire_pack.py
 
+SC64_ORDER_MARKER_DIR := .local/sc64/order-marker/generated
+SC64_ORDER_MARKER_HEADER := $(SC64_ORDER_MARKER_DIR)/sc64_order_marker_generated.h
+SC64_ORDER_MARKER_FLAGS := -DSC64_ORDER_MARKER_ART -I$(SC64_ORDER_MARKER_DIR)
+$(SC64_ORDER_MARKER_HEADER): tools/sc64_order_marker_pack.py tools/sc64_construction_sprites.py tools/sc64_death_sprites.py tools/sc64_sprites.py tools/sc64_unit_facing.py common/gba.c common/gba.h starcraft/sc64_display.h
+	python3 tools/sc64_order_marker_pack.py
+
 SC64_SHARED_ENGINE_FLAGS := -DSC64_CONSTRUCTION_HP -DSC64_SIEGE_SPLASH
-RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_ENGINE_CORE_REQUIRED $(SC64_SHARED_ENGINE_FLAGS) -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated -I$(SC64_INTERFACE_DIR) $(RACE_CONSTRUCTION_FLAGS) $(SC64_BUILDING_FIRE_FLAGS)
-RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(SC64_INTERFACE_INPUTS) $(RACE_CONSTRUCTION_INPUTS) $(SC64_BUILDING_FIRE_HEADER)
+RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_ENGINE_CORE_REQUIRED $(SC64_SHARED_ENGINE_FLAGS) -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated -I$(SC64_INTERFACE_DIR) $(RACE_CONSTRUCTION_FLAGS) $(SC64_BUILDING_FIRE_FLAGS) $(SC64_ORDER_MARKER_FLAGS)
+RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(SC64_INTERFACE_INPUTS) $(RACE_CONSTRUCTION_INPUTS) $(SC64_BUILDING_FIRE_HEADER) $(SC64_ORDER_MARKER_HEADER)
 
 .PHONY: sc64-interface test-sc64-font test-sc64-icons
 sc64-interface:
@@ -4867,3 +4873,43 @@ test-sc64-default-armor: build/test-sc64-default-armor-game
 	./build/test-sc64-default-armor-game
 build/test-sc64-default-armor-game: tests/sc64_default_armor_game.c $(STARCRAFT_HEADERS) $(COMMON_HEADERS) | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $< common/gba.c -o $@
+
+.PHONY: test-sc64-order-marker-vfx test-sc64-building-placement-vfx test-sc64-order-marker-game
+test: test-sc64-order-marker-vfx test-sc64-building-placement-vfx
+test-sc64-order-marker-vfx: build/test-sc64-order-marker-vfx
+	./build/test-sc64-order-marker-vfx
+build/test-sc64-order-marker-vfx: tests/sc64_order_marker_vfx.c starcraft/sc64_order_marker_vfx.h tests/sc64_order_marker_fixture/sc64_order_marker_synthetic.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Itests/sc64_order_marker_fixture $< -o $@
+test-sc64-building-placement-vfx: build/test-sc64-building-placement-vfx build/test-sc64-building-placement-vfx-clip
+	./build/test-sc64-building-placement-vfx
+	./build/test-sc64-building-placement-vfx-clip
+build/test-sc64-building-placement-vfx: tests/sc64_building_placement_vfx.c starcraft/sc64_building_placement_vfx.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+build/test-sc64-building-placement-vfx-clip: tests/sc64_building_placement_vfx.c starcraft/sc64_building_placement_vfx.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -DGBA_SCENE_CLIP $< -o $@
+
+# Same field feedback implementation, checked with each production compiler vector.
+define ORDER_MARKER_GAME_FIXTURE
+build/test-sc64-order-marker-game-$(1): tests/sc64_order_marker_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(RACES_INPUTS) $(4) common/gba.c $$(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) $$($(2)) $(3) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(5) -o $$@
+endef
+$(eval $(call ORDER_MARKER_GAME_FIXTURE,terran,TERRAN_ROM_FLAGS,,$(TERRAN_FULL_INPUTS)))
+$(eval $(call ORDER_MARKER_GAME_FIXTURE,zerg,ZERG_ROM_FLAGS,,$(ZERG_Z6_INPUTS)))
+$(eval $(call ORDER_MARKER_GAME_FIXTURE,protoss,PROTOSS_P7_CANONICAL_FLAGS,,$(PROTOSS_P7_CANONICAL_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call ORDER_MARKER_GAME_FIXTURE,showcase,SHOWCASE_FLAGS,,$(SHOWCASE_INPUTS)))
+$(eval $(call ORDER_MARKER_GAME_FIXTURE,races,RACES_FLAGS))
+$(eval $(call ORDER_MARKER_GAME_FIXTURE,unified,UNIFIED_FLAGS))
+$(eval $(call ORDER_MARKER_GAME_FIXTURE,direct,UNIFIED_FLAGS,-DSC64_DIRECT_ATTACK))
+test-sc64-order-marker-game: $(addprefix build/test-sc64-order-marker-game-,terran zerg protoss showcase races unified direct)
+	./build/test-sc64-order-marker-game-terran
+	./build/test-sc64-order-marker-game-zerg
+	./build/test-sc64-order-marker-game-protoss
+	./build/test-sc64-order-marker-game-showcase
+	./build/test-sc64-order-marker-game-races
+	./build/test-sc64-order-marker-game-unified
+	./build/test-sc64-order-marker-game-direct
+.PHONY: test-sc64-order-marker-unified
+test-sc64-order-marker-unified: build/test-sc64-order-marker-game-unified build/test-sc64-order-marker-game-direct
+	./build/test-sc64-order-marker-game-unified
+	./build/test-sc64-order-marker-game-direct
+test-unified: test-sc64-order-marker-unified

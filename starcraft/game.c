@@ -15,6 +15,8 @@ static void sc64_contact_memo_invalidate(void);
 #include "sc64_construction_hp.h"
 #include "sc64_building_damage.h"
 #include "sc64_building_fire_vfx.h"
+#include "sc64_order_marker_vfx.h"
+#include "sc64_building_placement_vfx.h"
 #ifdef SC64_IMPORTED_MISSION
 #include "sc64_minimap_terrain.h"
 #endif
@@ -1527,6 +1529,7 @@ static void race_skirmish_init(void),race_skirmish_outcome(void);
 static void race_skirmish_geometry(void);
 #if defined(SC64_RACES) && defined(SC64_HAS_SPRITES)
 static const Sc64SpriteFrame *mission_geyser_sprite(void);
+static const Sc64SpriteFrame *mission_building_sprite(int type);
 #endif
 static int race_owner_supply(int owner),race_owner_supply_cap(int owner),race_owner_reserved_supply(int owner);
 static int race_owner_queued_supply(int owner);
@@ -4031,7 +4034,7 @@ load_game(void)
     if (loaded) sc64_facing_reset_all();
 #endif
 #ifdef SC64_FIELD_CONTROLS
-    if (loaded) ui_action = ui_tick_mode = 0; /* frame jumped: resolve A afresh */
+    if (loaded) { ping_life=0; ui_action = ui_tick_mode = 0; } /* frame jumped: resolve A afresh */
 #endif
     return loaded;
 #else
@@ -4156,6 +4159,9 @@ load_game(void)
     screen = SCREEN_PLAY;
     won = lost = 0;
     reset_selection_gestures();
+#ifdef SC_FIELD_FEEDBACK
+    ping_life=0;
+#endif
     update_exploration();
     toast(0);
     return 1;
@@ -4698,7 +4704,7 @@ remember_unit_tap(int picked)
     unit_tap_x = cx; unit_tap_y = cy;
 }
 
-static void
+static int
 issue_order(int order, int tx, int ty)
 {
     int i, n = 0;
@@ -4763,6 +4769,7 @@ issue_order(int order, int tx, int ty)
 	toast(0);
     else
 	toast(5);
+    return n;
 }
 
 static int
@@ -5489,10 +5496,12 @@ interact(void)
             mode = MODE_NORMAL; return;
         }
 #endif
-	issue_order(ORDER_MOVE, cx, cy);
+	int issued=issue_order(ORDER_MOVE, cx, cy);
 	mode = MODE_NORMAL;
 #ifdef SC_FIELD_FEEDBACK
-	if (selected_count()) field_ui_ping(cx, cy, C_GREEN);
+	if (issued) field_ui_ping(cx, cy, C_GREEN);
+#else
+    (void)issued;
 #endif
 	return;
     }
@@ -5500,15 +5509,23 @@ interact(void)
 #ifdef SC64_DIRECT_ATTACK
         int direct_target = sc64_direct_attack_find_target(cx, cy);
         if (direct_target >= 0) {
-            (void)sc64_direct_attack_issue_target(direct_target);
+            int tx=target_x(direct_target),ty=target_y(direct_target);
+            int issued=sc64_direct_attack_issue_target(direct_target);
+#ifdef SC_FIELD_FEEDBACK
+            if (issued) field_ui_ping(tx,ty,C_RED);
+#else
+            (void)tx;(void)ty;(void)issued;
+#endif
             mode = MODE_NORMAL;
             return;
         }
 #endif
-	issue_order(ORDER_ATTACK_MOVE, cx, cy);
+	int issued=issue_order(ORDER_ATTACK_MOVE, cx, cy);
 	mode = MODE_NORMAL;
 #ifdef SC_FIELD_FEEDBACK
-	if (selected_count()) field_ui_ping(cx, cy, C_RED);
+	if (issued) field_ui_ping(cx, cy, C_RED);
+#else
+    (void)issued;
 #endif
 	return;
     }
@@ -7427,6 +7444,9 @@ game_update(u16 held, u16 pressed)
         }
         return;
     }
+#endif
+#ifdef SC_FIELD_FEEDBACK
+    if (ping_life) --ping_life;
 #endif
 #if defined(SC64_P6_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
     /* A spell hotkey keeps real-time targeting practical on the GBA pad. */
