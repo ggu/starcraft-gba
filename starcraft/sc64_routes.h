@@ -170,6 +170,7 @@ static u8 sc64_route_field[SC64_ROUTE_SLOTS][SC64_ROUTE_BYTES];
 static u16 sc64_route_field[SC64_ROUTE_SLOTS][MAP_CELLS];
 #endif
 static u8 sc64_route_valid[SC64_ROUTE_SLOTS];
+
 static u16 sc64_route_goal[SC64_ROUTE_SLOTS];
 static u32 sc64_route_age[SC64_ROUTE_SLOTS], sc64_route_clock;
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
@@ -292,6 +293,7 @@ static void GBA_HOT sc64_route_put(int slot, int cell, int direction)
 #endif
 }
 #endif
+
 
 static void
 sc64_routes_reset(void)
@@ -602,6 +604,63 @@ static int GBA_HOT sc64_route_slot(int goal)
 }
 #endif
 
+#if defined(SC64_RACES) && !defined(SC64_ROUTE_PARTIAL_FLOOD)
+/* FIFO L/R/U/D discovery selects the lexicographically first shortest path
+ * from the root. Every suffix of that path is the same preferred shortest
+ * path from its own root, so a new goal on the cached gradient preserves the
+ * exact next step, including ties. Blocked endpoints and partial fields use
+ * the ordinary lookup instead.
+ *
+ * Try at most two nearby-root fields and 128 steps each, then fall back. Keep
+ * the cache search and fallback dispatch in ROM, with no additional state.
+ * Only the next-step caller may consume a field with a different root. */
+static int __attribute__((noinline))
+sc64_route_step_slot(int origin, int goal)
+{
+    int i, used = 0;
+    if (origin == goal || !SC64_GRID_GET(path_walkable, origin) ||
+        !SC64_GRID_GET(path_walkable, goal)) return sc64_route_slot(goal);
+    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i)
+        if (sc64_route_valid[i] && sc64_route_goal[i] == (u16)goal) return sc64_route_slot(goal);
+#ifdef SC64_ROUTE_DECAY_FREQ
+    if ((sc64_route_clock & SC64_ROUTE_RECENCY_MASK) == SC64_ROUTE_RECENCY_MASK) return sc64_route_slot(goal);
+#endif
+    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS && used < 2; ++i) {
+        int root, rx, ry, gx, gy, cur, steps;
+        if (sc64_route_valid[i] != 1) continue;
+        root = (int)sc64_route_goal[i];
+        if (!SC64_GRID_GET(path_walkable, root)) continue;
+        rx = root % MAP_COLS; ry = root / MAP_COLS;
+        gx = goal % MAP_COLS; gy = goal / MAP_COLS;
+        if ((rx > gx ? rx-gx : gx-rx) + (ry > gy ? ry-gy : gy-ry) > 4) continue;
+        ++used;
+        cur = origin;
+        for (steps = 0; steps < 128 && cur != goal; ++steps) {
+            int d, x, y;
+            if (!SC64_GRID_GET(path_walkable, cur)) break;
+            d = sc64_route_get(i, cur);
+            if (d < 1 || d > 4) break;
+            x = cur % MAP_COLS; y = cur / MAP_COLS;
+            if (d == 1) ++x; else if (d == 2) --x;
+            else if (d == 3) ++y; else --y;
+            if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) break;
+            cur = x + y * MAP_COLS;
+            if (!SC64_GRID_GET(path_walkable, cur)) break;
+        }
+        if (cur != goal) continue;
+#ifdef SC64_ROUTE_DECAY_FREQ
+        sc64_route_age_request();
+        sc64_route_age_touch(i, 1);
+#else
+        sc64_route_age[i] = ++sc64_route_clock;
+#endif
+        sc64_route_hits++;
+        return i;
+    }
+    return sc64_route_slot(goal);
+}
+#endif
+
 #if defined(SC64_RACES) && defined(SC64_ROUTE_PACK3)
 /* Inflated structure cells are rare actor origins. Keep their gradient walk in
  * ROM so the hot route query stays small; selection/ties remain identical. */
@@ -708,7 +767,9 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
         return 1;
     }
 #endif
-#ifdef SC64_ROUTE_PARTIAL_FLOOD
+#if defined(SC64_RACES) && !defined(SC64_ROUTE_PARTIAL_FLOOD)
+    slot = sc64_route_step_slot(cell, goal);
+#elif defined(SC64_ROUTE_PARTIAL_FLOOD)
     slot = sc64_route_slot_for_origin(goal, cell, SC64_GRID_GET(path_walkable, cell));
 #else
     slot = sc64_route_slot(goal);
