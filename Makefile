@@ -5116,3 +5116,10 @@ SKIRMISH_NATIVE_BINARIES := $(foreach profile,terran zerg protoss showcase,$(for
 test-sc64-skirmish-native: $(SKIRMISH_NATIVE_BINARIES)
 	@set -e; for binary in $(SKIRMISH_NATIVE_BINARIES); do ./$$binary; done
 test-sc64-skirmish-catalog-integration: test-sc64-skirmish-runtime test-sc64-skirmish-native
+
+# Compare P7 visibility owner-mask short circuit with the original scan.
+build/test-sc64-p7-owner-mask: tests/sc64_p7_owner_mask_game.c $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P7_CANONICAL_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile | build
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+.PHONY: test-sc64-p7-owner-mask
+test-sc64-p7-owner-mask: build/test-sc64-p7-owner-mask
+	./build/test-sc64-p7-owner-mask
