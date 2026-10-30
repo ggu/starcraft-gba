@@ -4791,7 +4791,9 @@ CONSTRUCTION_ARRIVAL_INPUTS_terran = $(TERRAN_FULL_INPUTS)
 CONSTRUCTION_ARRIVAL_INPUTS_zerg-z6 = $(ZERG_Z6_INPUTS)
 CONSTRUCTION_ARRIVAL_INPUTS_protoss-p7 = $(PROTOSS_P7_CANONICAL_INPUTS)
 CONSTRUCTION_ARRIVAL_INPUTS_zerg-z7 = $(ZERG_Z7_CANONICAL_INPUTS)
-CONSTRUCTION_ARRIVAL_SOURCES_protoss-p7 = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
+CONSTRUCTION_ARRIVAL_SOURCES_terran = starcraft/sc64_bc_body_art.c
+CONSTRUCTION_ARRIVAL_SOURCES_zerg-z6 = starcraft/sc64_bc_body_art.c
+CONSTRUCTION_ARRIVAL_SOURCES_protoss-p7 = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c
 
 define CONSTRUCTION_ARRIVAL_TESTS
 build/test-sc64-construction-arrival-$(1): tests/sc64_construction_arrival_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(CONSTRUCTION_ARRIVAL_INPUTS_$(1)) common/gba.c common/gba.h Makefile | build
@@ -5398,3 +5400,12 @@ test-bc-fresh-canonical: $(foreach p,terran zerg protoss showcase,$(foreach c,$(
 	  "$$bin" migrate "$$tmp/$$p-legacy.sav"; \
 	  "$$bin" verify "$$tmp/$$p-legacy.sav"; \
 	done
+
+# Candidate-SRAM fixtures include this shared helper; track it for incremental builds.
+SAVE_CANDIDATE_HELPER := tests/sc64_save_candidate_fixture.h
+build/test-sc64-t3-save build/test-sc64-t3t4-t3-save build/test-sc64-t4-scenario-save build/test-sc64-t3t4-save build/test-sc64-t5-save build/test-sc64-terran-late-save build/test-sc64-p7-interceptor-flight build/test-sc64-protoss-canonical-p7-save: $(SAVE_CANDIDATE_HELPER)
+$(foreach p,t5 t6 full,$(foreach c,t3-save t4-save,$(eval build/test-sc64-$(p)-$(c): $$(SAVE_CANDIDATE_HELPER))))
+build/test-sc64-t6-t5-save build/test-sc64-full-t5-save: $(SAVE_CANDIDATE_HELPER)
+$(foreach p,terran zerg-z6 protoss-p7 zerg-z7,$(eval build/test-sc64-construction-arrival-save-$(p): $$(SAVE_CANDIDATE_HELPER)))
+$(foreach p,terran zerg protoss showcase,$(eval build/test-sc64-shared-battery-save-$(p) build/test-sc64-shared-bunker-save-$(p) build/test-sc64-skirmish-dropship-$(p): $$(SAVE_CANDIDATE_HELPER)))
+$(foreach p,terran zerg protoss showcase,$(foreach c,flight research yamato,$(eval build/test-bc-$(c)-$(p): $$(SAVE_CANDIDATE_HELPER))))

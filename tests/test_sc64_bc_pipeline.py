@@ -65,5 +65,39 @@ class BcPipelineTests(unittest.TestCase):
             self.assertIn('$(BC_FLAGS)', line)
         self.assertIn('$(BC_P7_FACT_HEADER)', text)
 
+class CanonicalLinkTests(unittest.TestCase):
+    def test_expanded_construction_arrival_links_body_once_without_assets(self):
+        import re
+        import subprocess
+        import tarfile
+        with tempfile.TemporaryDirectory() as tmp:
+            tar = subprocess.run(['git', 'archive', 'HEAD'], cwd=ROOT, check=True,
+                                 capture_output=True).stdout
+            import io
+            with tarfile.open(fileobj=io.BytesIO(tar)) as archive:
+                archive.extractall(tmp, filter='data')
+            (Path(tmp) / 'Makefile').write_text((ROOT / 'Makefile').read_text())
+            targets = [f'build/test-sc64-construction-arrival{suffix}-{profile}'
+                       for profile in ('terran', 'zerg-z6', 'protoss-p7')
+                       for suffix in ('', '-save')]
+            held = []
+            for _ in range(300):
+                args = [v for name in held for v in ('-o', name)]
+                result = subprocess.run(['make', '-n', *args, *targets], cwd=tmp,
+                                        capture_output=True, text=True)
+                if result.returncode == 0:
+                    break
+                match = re.search(r"No rule to make target [`']([^'`]+)'", result.stderr)
+                self.assertIsNotNone(match, result.stderr[-2000:])
+                self.assertNotIn(match.group(1), held)
+                held.append(match.group(1))
+            else:
+                self.fail('make prerequisites did not converge')
+            commands = [line for line in result.stdout.splitlines()
+                        if line.startswith('clang ') and any(' -o ' + t in line for t in targets)]
+            self.assertEqual(len(commands), len(targets), result.stdout[-2000:])
+            for command in commands:
+                self.assertEqual(command.split().count('starcraft/sc64_bc_body_art.c'), 1, command)
+
 if __name__ == '__main__':
     unittest.main()
