@@ -54,6 +54,9 @@ int main(void) {
     int a=spawn_unit(ENEMY,U_OVERLORD,401,400);
     int g=spawn_unit(ENEMY,U_MARINE,420,400);
     assert(race_can_attack(U_ZERGLING,a)==0&&race_can_attack(U_HYDRALISK,a));
+    SC64_GRID_CLEAR(visible);
+    assert(nearest_enemy_typed(400,400,SIDE,64,U_ZERGLING)==-1);
+    update_exploration();
     assert(nearest_enemy_typed(400,400,SIDE,64,U_ZERGLING)==g);
     assert(unit_step_clear(&u[z],401,400));
     sc64_unit_buckets_begin();assert(unit_step_clear(&u[z],401,400));sc64_unit_buckets_end();

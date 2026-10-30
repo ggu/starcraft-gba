@@ -1,11 +1,21 @@
 #ifndef SC64_ROUTES_H
 #define SC64_ROUTES_H
 
+#include "sc64_depot_goal.h"
+
+/* Point goals are cell indices; the upper bit identifies depot slots. */
+#define SC64_ROUTE_DEPOT_TAG 0x8000u
+_Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap depot keys");
+
 /* Standalone route fixtures still use byte grids; game.c supplies the packed
  * accessor for SC64_LARGE_MAPS builds. */
 #ifndef SC64_GRID_GET
 #define SC64_GRID_GET(grid, cell) ((grid)[(cell)] != 0)
 #define SC64_ROUTES_LOCAL_GRID_GET
+#if defined(SC64_RACES) && !defined(SC64_GRID_SET)
+#define SC64_GRID_SET(grid, cell, value) ((grid)[(cell)] = (u8)((value) != 0))
+#define SC64_ROUTES_LOCAL_GRID_SET
+#endif
 #endif
 
 #if defined(SC64_ROUTE_MONOTONE_PROBE) && defined(SC64_RACES) && \
@@ -16,6 +26,10 @@
 #if defined(GBA_HOST) && defined(SC64_ROUTE_MONOTONE_ENABLED) && \
     defined(SC64_ROUTE_MONOTONE_DIAGNOSTICS)
 #define SC64_ROUTE_MONOTONE_DIAG_ENABLED 1
+#endif
+
+#if defined(SC64_DEPOT_BOUNDED) && !defined(SC64_RACES)
+#error "SC64_DEPOT_BOUNDED requires SC64_RACES"
 #endif
 
 #ifdef SC64_ROUTE_DECAY_FREQ
@@ -669,7 +683,7 @@ sc64_route_step_slot_mode(int origin, int goal, int allow_build)
 #endif
     for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS && used < 2; ++i) {
         int root, rx, ry, gx, gy, cur, steps;
-        if (sc64_route_valid[i] != 1) continue;
+        if (sc64_route_valid[i] != 1 || (sc64_route_goal[i] & SC64_ROUTE_DEPOT_TAG)) continue;
         root = (int)sc64_route_goal[i];
         if (!SC64_GRID_GET(path_walkable, root)) continue;
         rx = root % MAP_COLS; ry = root / MAP_COLS;
@@ -729,7 +743,7 @@ sc64_route_step_slot(int origin, int goal)
 #endif
     for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS && used < 2; ++i) {
         int root, rx, ry, gx, gy, cur, steps;
-        if (sc64_route_valid[i] != 1) continue;
+        if (sc64_route_valid[i] != 1 || (sc64_route_goal[i] & SC64_ROUTE_DEPOT_TAG)) continue;
         root = (int)sc64_route_goal[i];
         if (!SC64_GRID_GET(path_walkable, root)) continue;
         rx = root % MAP_COLS; ry = root / MAP_COLS;
@@ -989,6 +1003,226 @@ sc64_route_next(int x, int y, int tx, int ty, int *next_x, int *next_y)
     else if (direction == 3) row++;
     else row--;
 #endif
+    *next_x = col * 16 + 8; *next_y = row * 16 + 8;
+    return 1;
+}
+
+/* Depot fields use a separate key namespace and all reachable deposit cells
+ * as roots. A depot moving, being removed or reusing its slot must invalidate
+ * the route cache. The existing topology/load invalidation owns that contract.
+ * Full depot fields serve all workers. With the bounded capability, incomplete
+ * fields serve only already-discovered origins and are never component proofs.
+ * A paired grid accessor may temporarily borrow and restore walkability bits. */
+static int __attribute__((noinline))
+sc64_route_depot_slot_for_origin(int depot_id, int center_x, int center_y, int origin)
+{
+    int i, slot = -1, head = 0, tail = 0;
+    int x0, x1, y0, y1, col, row;
+    int partial_slot=-1, complete=1;
+    u16 key;
+#ifndef SC64_RACES
+    u16 *field;
+#endif
+    if (depot_id < 0 || depot_id >= (int)SC64_ROUTE_DEPOT_TAG ||
+        MAP_COLS <= 0 || MAP_ROWS <= 0 ||
+        (unsigned)MAP_COLS > (unsigned)MAP_CELLS / (unsigned)MAP_ROWS ||
+        center_x < 0 || center_y < 0 || center_x / 16 >= MAP_COLS ||
+        center_y / 16 >= MAP_ROWS || origin < -1 ||
+        (origin >= 0 && (unsigned)origin >= (unsigned)MAP_COLS * (unsigned)MAP_ROWS)) return -1;
+#ifndef SC64_DEPOT_BOUNDED
+    (void)origin;
+#endif
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+    if (!sc64_route_configure()) return -1;
+#endif
+    key = (u16)(SC64_ROUTE_DEPOT_TAG | (unsigned)depot_id);
+    if (!path_grid_valid) build_path_grid();
+#ifdef SC64_DEPOT_BOUNDED
+    if (origin>=0 && !SC64_GRID_GET(path_walkable,origin)) origin=-1;
+#endif
+#ifdef SC64_ROUTE_DECAY_FREQ
+    sc64_route_age_request();
+#endif
+    for (i = 0; i < SC64_ROUTE_ACTIVE_SLOTS; ++i) {
+        if (sc64_route_valid[i] && sc64_route_goal[i] == key) {
+#ifdef SC64_DEPOT_BOUNDED
+            if (sc64_route_valid[i] != 1 &&
+                (origin < 0 || sc64_route_get(i,origin)==SC64_ROUTE_UNREACHABLE)) {
+                partial_slot=i; continue;
+            }
+#else
+            if (sc64_route_valid[i] != 1) continue;
+#endif
+#ifdef SC64_ROUTE_DECAY_FREQ
+            sc64_route_age_touch(i, 1);
+#else
+            sc64_route_age[i] = ++sc64_route_clock;
+#endif
+            sc64_route_hits++;
+            return i;
+        }
+#ifdef SC64_ROUTE_DECAY_FREQ
+        if (slot < 0 || !sc64_route_valid[i] ||
+            (sc64_route_valid[slot] &&
+             (sc64_route_age_freq(sc64_route_age[i]) < sc64_route_age_freq(sc64_route_age[slot]) ||
+              (sc64_route_age_freq(sc64_route_age[i]) == sc64_route_age_freq(sc64_route_age[slot]) &&
+               sc64_route_age_older(sc64_route_age[i], sc64_route_age[slot]))))) slot = i;
+#else
+        if (slot < 0 || !sc64_route_valid[i] ||
+            (sc64_route_valid[slot] && sc64_route_age[i] < sc64_route_age[slot])) slot = i;
+#endif
+    }
+    if (partial_slot>=0) slot=partial_slot;
+    if (slot < 0) return -1;
+#ifdef SC64_RACES
+#ifdef SC64_ROUTE_WORD_CLEAR
+    sc64_route_field_clear(sc64_route_field[slot]);
+#else
+    memset(sc64_route_field[slot], 255,
+#ifdef SC64_ROUTE_ACTIVE_STRIDE
+           sc64_route_active_bytes
+#else
+           SC64_ROUTE_BYTES
+#endif
+           );
+#endif
+#else
+    field = sc64_route_field[slot];
+    memset(field, 255, MAP_CELLS * sizeof(*field));
+#endif
+    x0 = center_x >= 32 ? (center_x - 32) / 16 : 0;
+    y0 = center_y >= 32 ? (center_y - 32) / 16 : 0;
+    x1 = (center_x + 32) / 16; if (x1 >= MAP_COLS) x1 = MAP_COLS - 1;
+    y1 = (center_y + 32) / 16; if (y1 >= MAP_ROWS) y1 = MAP_ROWS - 1;
+    for (row = y0; row <= y1; ++row) for (col = x0; col <= x1; ++col) {
+        int px, py, cell = col + row * MAP_COLS;
+        if (!SC64_GRID_GET(path_walkable, cell) ||
+            !sc64_depot_cell_point(center_x, center_y, col, row, &px, &py)) continue;
+#ifdef SC64_RACES
+        sc64_route_put(slot, cell, 0);
+#ifdef SC64_GRID_SET
+        SC64_GRID_SET(path_walkable, cell, 0);
+#endif
+#else
+        field[cell] = 0;
+#endif
+        bfs_queue[tail++] = (u16)cell;
+    }
+    while (head < tail) {
+#ifdef SC64_DEPOT_BOUNDED
+        if (origin>=0 && sc64_route_get(slot,origin)!=SC64_ROUTE_UNREACHABLE) {
+            complete=0; break;
+        }
+#endif
+        int cell = bfs_queue[head++], next;
+#ifdef SC64_RACES
+        int x = sc64_cell_col(cell), y = sc64_cell_row(cell);
+#else
+        int x = cell % MAP_COLS, y = cell / MAP_COLS;
+#endif
+#ifdef SC64_RACES
+#ifdef SC64_GRID_SET
+/* The game supplies paired accessors. Borrow its walkable bit as visited
+ * during this synchronous flood, then restore every queued cell below.
+ * Read-only custom accessors retain the field-based visited test. */
+#define SC64_DEPOT_FLOOD(condition, neighbour, direction) \
+        if (condition) { next = (neighbour); \
+            if (SC64_GRID_GET(path_walkable, next)) { \
+                sc64_route_put(slot, next, (direction)); bfs_queue[tail++] = (u16)next; \
+                SC64_GRID_SET(path_walkable, next, 0); } }
+#else
+#define SC64_DEPOT_FLOOD(condition, neighbour, direction) \
+        if (condition) { next = (neighbour); \
+            if (SC64_GRID_GET(path_walkable, next) && sc64_route_get(slot, next) == SC64_ROUTE_UNREACHABLE) { \
+                sc64_route_put(slot, next, (direction)); bfs_queue[tail++] = (u16)next; } }
+#endif
+#else
+#define SC64_DEPOT_FLOOD(condition, neighbour, direction) \
+        if (condition) { next = (neighbour); \
+            if (SC64_GRID_GET(path_walkable, next) && field[next] == 0xFFFF) { \
+                field[next] = (u16)(((field[cell] & ~7u) + 8u) | (direction)); bfs_queue[tail++] = (u16)next; } }
+#endif
+        SC64_DEPOT_FLOOD(x > 0, cell - 1, 1);
+        SC64_DEPOT_FLOOD(x + 1 < MAP_COLS, cell + 1, 2);
+        SC64_DEPOT_FLOOD(y > 0, cell - MAP_COLS, 3);
+        SC64_DEPOT_FLOOD(y + 1 < MAP_ROWS, cell + MAP_COLS, 4);
+#undef SC64_DEPOT_FLOOD
+    }
+#if defined(SC64_RACES) && defined(SC64_GRID_SET)
+    for (i=0;i<tail;++i) SC64_GRID_SET(path_walkable,bfs_queue[i],1);
+#endif
+    sc64_route_goal[slot] = key;
+#ifdef SC64_ROUTE_DECAY_FREQ
+    sc64_route_age[slot] = sc64_route_age_pack(1u, sc64_route_clock);
+#else
+    sc64_route_age[slot] = ++sc64_route_clock;
+#endif
+    sc64_route_valid[slot] = complete ? 1 : 2;
+    sc64_route_builds++;
+#ifdef SC64_ROUTE_MONOTONE_DIAG_ENABLED
+    sc64_route_probe_host_flood((unsigned)tail);
+#endif
+    return slot;
+}
+
+static int __attribute__((unused)) sc64_route_depot_slot(int depot_id,int center_x,int center_y)
+{
+    return sc64_route_depot_slot_for_origin(depot_id,center_x,center_y,-1);
+}
+
+static int
+sc64_route_depot_direction(int slot, int cell)
+{
+#ifdef SC64_RACES
+    int d = sc64_route_get(slot, cell);
+    return d == SC64_ROUTE_UNREACHABLE ? -1 : d;
+#else
+    u16 d = sc64_route_field[slot][cell];
+    return d == 0xFFFF ? -1 : d & 7;
+#endif
+}
+
+static int __attribute__((noinline, unused))
+sc64_route_depot_next(int x, int y, int depot_id, int center_x, int center_y,
+                      int *next_x, int *next_y)
+{
+    static const signed char dx[4] = {1, -1, 0, 0}, dy[4] = {0, 0, 1, -1};
+    int slot, col, row, cell, direction;
+    if (!next_x || !next_y || x < 0 || y < 0 ||
+        MAP_COLS <= 0 || MAP_ROWS <= 0 || x / 16 >= MAP_COLS || y / 16 >= MAP_ROWS) return 0;
+    col = x / 16; row = y / 16; cell = col + row * MAP_COLS;
+#ifdef SC64_DEPOT_BOUNDED
+    slot = sc64_route_depot_slot_for_origin(depot_id,center_x,center_y,cell);
+#else
+    slot = sc64_route_depot_slot(depot_id, center_x, center_y);
+#endif
+    if (slot < 0) return 0;
+    direction = sc64_route_depot_direction(slot, cell);
+    if (direction < 0 && !SC64_GRID_GET(path_walkable, cell)) {
+        int i, best = -1, cost = MAP_CELLS + 1;
+        for (i = 0; i < 4; ++i) {
+            int nx = col + dx[i], ny = row + dy[i], current, distance = 0, d;
+            if (nx < 0 || ny < 0 || nx >= MAP_COLS || ny >= MAP_ROWS) continue;
+            current = nx + ny * MAP_COLS;
+            d = sc64_route_depot_direction(slot, current);
+            while (d > 0 && d <= 4 && distance < MAP_CELLS) {
+                if (d == 1) ++current; else if (d == 2) --current;
+                else if (d == 3) current += MAP_COLS; else current -= MAP_COLS;
+                ++distance;
+                d = sc64_route_depot_direction(slot, current);
+            }
+            if (d == 0 && distance < cost) { cost = distance; best = i; }
+        }
+        if (best < 0) return 0;
+        col += dx[best]; row += dy[best];
+    } else if (direction < 0) return 0;
+    else if (direction == 0)
+        return sc64_depot_cell_point(center_x, center_y, col, row, next_x, next_y);
+    else if (direction == 1) ++col;
+    else if (direction == 2) --col;
+    else if (direction == 3) ++row;
+    else if (direction == 4) --row;
+    else return 0;
     *next_x = col * 16 + 8; *next_y = row * 16 + 8;
     return 1;
 }

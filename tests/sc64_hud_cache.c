@@ -608,6 +608,40 @@ test_t5_static_cache_key_and_hud_timer_are_pixel_exact(void)
 }
 #endif
 
+#ifdef SC64_HUD_ICONS
+/* The top bar draws the N64 mineral and gas icons and each race's supply
+   icon in place of the MIN, GAS and SUP labels. */
+static void
+test_top_bar_draws_resource_icons(void)
+{
+    static const int slots[3] = {2, 60, 126};
+    int saved_race = race_human;
+    for (int race = 0; race < 3; ++race) {
+        race_human = race;
+        gfx_begin(C_BLACK);
+        draw_hud_resources();
+        const int sprites[3] = {SC64_HUD_SPRITE_MINERAL, SC64_HUD_SPRITE_GAS, card_supply_sprite()};
+        assert(sprites[2] == SC64_HUD_SPRITE_SUPPLY_TERRAN + race);
+        for (int k = 0; k < 3; ++k) {
+            int w = sc64_hud_sprite_size[sprites[k]][0], h = sc64_hud_sprite_size[sprites[k]][1];
+            int x0 = slots[k] + (12 - w) / 2, y0 = (12 - h) / 2, opaque = 0;
+            const unsigned char *px = sc64_hud_sprite_pixels + sc64_hud_sprite_offset[sprites[k]];
+            for (int yy = 0; yy < h; ++yy)
+                for (int xx = 0; xx < w; ++xx)
+                    if (px[yy * w + xx]) {
+                        ++opaque;
+                        assert(gfx_test_pixel(x0 + xx, y0 + yy) == px[yy * w + xx]);
+                    }
+            assert(opaque > 0);
+        }
+        for (int y = 0; y < 12; ++y)
+            for (int x = 0; x < 121; ++x)
+                assert(gfx_test_pixel(x, y) != (x < 60 ? C_GOLD : x > 60 ? C_CYAN : C_BLACK));
+    }
+    race_human = saved_race;
+}
+#endif
+
 #if defined(SC64_P3_RUNTIME) && defined(SC64_P3_ENABLED) && defined(SC64_UNIFIED)
 /* Direct model-state render fixture: mission 22's sequence is part of the
    bottom-band cache key because its pending transmission changes the footer. */
@@ -635,6 +669,9 @@ main(void)
 {
     gba_init();
     fixture();
+#ifdef SC64_HUD_ICONS
+    test_top_bar_draws_resource_icons();
+#endif
     test_wallet_and_queued_supply_invalidate_top_only();
     test_selection_building_box_and_modes_invalidate_bottom();
     test_mission_message_timer_and_minimap_stay_pixel_exact();

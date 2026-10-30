@@ -14,8 +14,11 @@ race_t6_repair_building_valid(int slot)
     const Sc64RaceBuildingRule *rule = sc64_race_building_rule(b[slot].type);
     if (!rule || rule->race != R_TER ||
         (rule->worker == 255 && b[slot].raw_type != 126)) return 0;
+    int hp = b[slot].hp;
+    if (hp == b[slot].maxhp && race_building_can_burn(&b[slot]) &&
+        (b[slot].shield_remainder & 255)) --hp;
     return sc64_t6_repair_target_valid((unsigned)b[slot].raw_type, 1, 1, 1,
-                                      b[slot].hp, b[slot].maxhp, 1, 1);
+                                      hp, b[slot].maxhp, 1, 1);
 }
 
 static int
@@ -80,8 +83,20 @@ race_t6_repair_tick_unit(int slot)
         return 1;
     }
     int timer = worker->work_timer;
-    int keep = sc64_t6_repair_step(&structure->hp, structure->maxhp,
+    int old_hp = structure->hp;
+    int hp = old_hp;
+    int fractional_only = hp == structure->maxhp &&
+        race_building_can_burn(structure) && (structure->shield_remainder & 255);
+    /* The existing integer repair economy charges and advances as for one HP
+     * when only a fractional deficit remains. This is an approximation of
+     * source fractional repair; preserve the deficit until a full step lands. */
+    if (fractional_only) --hp;
+    int keep = sc64_t6_repair_step(&hp, structure->maxhp,
                                   &worker->carry, &timer, &minerals, &gas, &costs);
+    if (!fractional_only || hp == structure->maxhp) structure->hp = hp;
+    if (hp == structure->maxhp && (fractional_only || hp > old_hp) &&
+        race_building_can_burn(structure))
+        structure->shield_remainder &= ~255;
     worker->work_timer = timer;
     if (!keep) race_t6_repair_stop(worker);
     return 1;
