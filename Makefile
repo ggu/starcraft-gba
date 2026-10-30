@@ -5051,6 +5051,21 @@ SKIRMISH_CONTROLLER_EXTRA_INPUTS = $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS))
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS))
 $(eval $(call SKIRMISH_CONTROLLER_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))
+
+# Long-horizon AI economy/tech/army progression and SRAM continuation in the
+# canonical race runtimes. Inputs are ordinary controller ticks. Variable
+# names are passed because some canonical flags are defined later.
+define SKIRMISH_AI_PROGRESS_PROFILE
+build/test-sc64-skirmish-ai-progress-$(1): tests/sc64_skirmish_ai_progress.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$($(3)) $$($(4)) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $$($(2)) $$< common/gba.c $$($(4)) -o $$@
+endef
+$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,))
+$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS,))
+SKIRMISH_AI_PROTOSS_SOURCES = $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
+$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_CANONICAL_INPUTS,SKIRMISH_AI_PROTOSS_SOURCES))
+SKIRMISH_AI_SHOWCASE_INPUTS = $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) $(COMMAND_ICON_HEADER) $(TANK_SOURCE_HEADER) $(CANONICAL_DEATH_INPUTS) $(SOURCE_WEAPON_INPUTS)
+$(eval $(call SKIRMISH_AI_PROGRESS_PROFILE,showcase,SHOWCASE_FLAGS,SKIRMISH_AI_SHOWCASE_INPUTS,))
+$(eval $(call SKIRMISH_CONTROLLER_PROFILE,showcase,SHOWCASE_FLAGS,SKIRMISH_AI_SHOWCASE_INPUTS,))
 .PHONY: test-sc64-skirmish-build-controller
 test-sc64-skirmish-build-controller: $(addprefix build/test-sc64-skirmish-build-controller-,terran zerg protoss)
 	@set -e; for profile in terran zerg protoss; do \

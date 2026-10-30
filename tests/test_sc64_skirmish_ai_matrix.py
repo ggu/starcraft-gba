@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""Fail-closed validation of AI progression, resume and recovery records."""
+from __future__ import annotations
+
+import copy
+import json
+from pathlib import Path
+import sys
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+import sc64_skirmish_ai_matrix as ai
+
+
+def owner(o, race, **kw):
+    row = {"owner": o, "race": race, "minerals": 50, "gas": 0, "supply": 8, "cap": 18,
+           "workers": 4, "mining": 4, "gas_workers": 0, "idle_workers": 0, "building_workers": 0,
+           "army": 0, "army_supply": 0, "air_army": 0, "anti_air": 0, "depots": 1, "refineries": 0,
+           "buildings": 1, "complete": 1, "queued": 0,
+           "unit_raw": {str(ai.WORKERS[race]): 4}, "building_raw": {"106" if race == 0 else "131" if race == 1 else "154": [1, 0]}}
+    row.update(kw)
+    return row
+
+
+def snapshot(kind, frame, owners, won=0, lost=0):
+    return json.dumps({"kind": kind, "frame": frame, "won": won, "lost": lost,
+                       "max_units": 192, "max_buildings": 96, "owners": owners})
+
+
+def lines(frames=(1800, 3600), final=3601, human=0, bots=(1,)):
+    owners = [owner(0, human)] + [owner(o, r) for o, r in zip(ai.BOT_OWNERS, bots)]
+    out = [snapshot("tick", f, owners) for f in frames]
+    out.append(snapshot("final", final, owners))
+    return out
+
+
+class RunValidation(unittest.TestCase):
+    def test_valid_run(self):
+        records = ai.validate_run(lines(), 0, [1], 1800, 3600)
+        self.assertEqual([r["frame"] for r in records], [1800, 3600, 3601])
+
+    def test_rejects_malformed_json(self):
+        bad = lines()
+        bad[1] = bad[1][:-3]
+        with self.assertRaisesRegex(ai.RecordError, "malformed"):
+            ai.validate_run(bad, 0, [1], 1800, 3600)
+
+    def test_rejects_duplicate_and_missing_snapshots(self):
+        with self.assertRaisesRegex(ai.RecordError, "duplicate|out-of-order"):
+            ai.validate_run(lines(frames=(1800, 1800, 3600)), 0, [1], 1800, 3600)
+        with self.assertRaisesRegex(ai.RecordError, "missing or misaligned"):
+            ai.validate_run(lines(frames=(1800, 5400), final=5401), 0, [1], 1800, 5400)
+        with self.assertRaisesRegex(ai.RecordError, "missing before the final"):
+            ai.validate_run(lines(frames=(1800,), final=5401), 0, [1], 1800, 5400)
+
+    def test_rejects_missing_or_extra_final(self):
+        no_final = lines()[:-1]
+        with self.assertRaisesRegex(ai.RecordError, "missing final"):
+            ai.validate_run(no_final, 0, [1], 1800, 3600)
+        extra = lines() + [lines()[-1]]
+        with self.assertRaisesRegex(ai.RecordError, "after final"):
+            ai.validate_run(extra, 0, [1], 1800, 3600)
+
+    def test_rejects_early_nonterminal_end(self):
+        with self.assertRaisesRegex(ai.RecordError, "nonterminal"):
+            ai.validate_run(lines(), 0, [1], 1800, 36000)
+
+    def test_rejects_wrong_lobby_and_bad_owner_rows(self):
+        with self.assertRaisesRegex(ai.RecordError, "owner list"):
+            ai.validate_run(lines(), 0, [1, 2], 1800, 3600)
+        with self.assertRaisesRegex(ai.RecordError, "owner 1/race 1"):
+            ai.validate_run(lines(), 0, [2], 1800, 3600)
+        for field, value, message in (("workers", -1, "integer"), ("mining", 9, "worker order"),
+                                      ("air_army", 1, "subtotal"), ("buildings", 2, "building_raw total"),
+                                      ("unit_raw", {"7": 0}, "integer"), ("unit_raw", {"07": 4}, "raw ID"),
+                                      ("building_raw", {"106": [1]}, r"\[complete, pending\]"),
+                                      ("bogus", 1, "unknown fields")):
+            bad = [json.loads(t) for t in lines()]
+            bad[0]["owners"][1][field] = value
+            with self.assertRaisesRegex(ai.RecordError, message, msg=field):
+                ai.validate_run([json.dumps(r) for r in bad], 0, [1], 1800, 3600)
+        bad = [json.loads(t) for t in lines()]
+        del bad[0]["owners"][1]["gas"]
+        with self.assertRaisesRegex(ai.RecordError, "lacks"):
+            ai.validate_run([json.dumps(r) for r in bad], 0, [1], 1800, 3600)
+
+    def test_progression_criteria(self):
+        bot = owner(1, 0, workers=12, mining=9, gas_workers=3, army=6, army_supply=14,
+                    unit_raw={"7": 12, "0": 4, "5": 2},
+                    building_raw={"106": [1, 0], "111": [1, 0], "113": [1, 0], "120": [1, 0]}, buildings=4, complete=4)
+        recs = [json.loads(snapshot("tick", f, [owner(0, 1), bot])) for f in (9000, 10800)]
+        recs = [{**r, "owners": [ai.validate_owner(r["owners"][0], 0, 1), ai.validate_owner(r["owners"][1], 1, 0)]} for r in recs]
+        prog = ai.progression(recs)
+        self.assertTrue(prog[1]["ok"], prog[1])
+        weak = copy.deepcopy(recs)
+        weak[1]["owners"][1]["unit_raw"] = {7: 12, 0: 4}
+        weak[0]["owners"][1]["unit_raw"] = {7: 12, 0: 4}
+        self.assertFalse(ai.progression(weak)[1]["ok"])
+        self.assertTrue(ai.progression(weak, "economy")[1]["ok"])
+        early = [recs[0]]
+        self.assertIsNone(ai.progression(early)[1]["ok"])
+
+
+class ResumeAndRecovery(unittest.TestCase):
+    def resume(self, **kw):
+        row = {"kind": "resume", "saved_frame": 15000, "reference_frame": 16800, "resumed_frame": 16800,
+               "saved": "0000abcd", "restored": "0000abcd", "reference": "1234abcd", "resumed": "1234abcd", "match": 1}
+        row.update(kw)
+        return [json.dumps(row)]
+
+    def test_valid_resume(self):
+        self.assertEqual(ai.validate_resume(self.resume())["match"], 1)
+
+    def test_resume_rejects_missing_duplicate_and_inconsistent(self):
+        with self.assertRaisesRegex(ai.RecordError, "exactly one"):
+            ai.validate_resume([])
+        with self.assertRaisesRegex(ai.RecordError, "exactly one"):
+            ai.validate_resume(self.resume() * 2)
+        with self.assertRaisesRegex(ai.RecordError, "disagrees"):
+            ai.validate_resume(self.resume(resumed="1234abce"))
+        with self.assertRaisesRegex(ai.RecordError, "hex digest"):
+            ai.validate_resume(self.resume(saved="xyz"))
+        with self.assertRaisesRegex(ai.RecordError, "integer"):
+            ai.validate_resume(self.resume(saved_frame="15000"))
+        self.assertEqual(ai.validate_resume(self.resume(resumed="1234abce", match=0))["match"], 0)
+
+    def test_evaluate_resume_exit_must_agree(self):
+        case = ("resume", "terran", 1, 0, "zpt", 15000)
+        with self.assertRaisesRegex(ai.RecordError, "disagree"):
+            ai.evaluate(case, 6, "\n".join(self.resume()), 1800)
+        self.assertTrue(ai.evaluate(case, 0, "\n".join(self.resume()), 1800)["ok"])
+
+    def test_recovery_records(self):
+        row = json.dumps({"kind": "recovery", "scenario": "depot-destroyed", "ok": 1})
+        case = ("recovery", "zerg", 0, 2, "z", 3)
+        self.assertTrue(ai.evaluate(case, 0, row, 1800)["ok"])
+        with self.assertRaisesRegex(ai.RecordError, "disagree"):
+            ai.evaluate(case, 7, row, 1800)
+        with self.assertRaisesRegex(ai.RecordError, "does not match"):
+            ai.evaluate(("recovery", "zerg", 0, 2, "z", 2), 0, row, 1800)
+        with self.assertRaisesRegex(ai.RecordError, "exactly one"):
+            ai.evaluate(case, 0, row + "\n" + row, 1800)
+
+    def test_case_list_is_complete_and_unique(self):
+        cases = ai.cases(36000)
+        self.assertEqual(len(cases), len(set(cases)))
+        self.assertEqual(sum(c[0] == "resume-morph" for c in cases), 2 * len(ai.PROFILES))
+        self.assertFalse(any(c[0] == "resume-morph" for c in ai.cases(36000, "economy")))
+        runs = [c for c in cases if c[0] == "run"]
+        self.assertEqual({(c[1], c[2], c[3], len(c[4])) for c in runs if len(set(c[4])) > 1 or len(c[4]) == 1},
+                         {(p, m, h, n) for p in ai.PROFILES for m in (0, 1) for h in range(3) for n in (1, 2, 3)})
+
+
+if __name__ == "__main__":
+    unittest.main()
