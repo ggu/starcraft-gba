@@ -8919,7 +8919,7 @@ draw_unit(Unit * q)
 #ifdef SC64_HAS_SPRITES
 #ifdef SC64_UNIT_FACING
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-    if (sc64_race_raw_unit(q->type)==12) SC64_FACING_SET((int)(q-u),sc64_bc_heading_face((u8)((unsigned)q->work_timer>>3)));
+    if (sc64_race_is_battlecruiser(q->type)) SC64_FACING_SET((int)(q-u),sc64_bc_heading_face((u8)((unsigned)q->work_timer>>3)));
     else
 #endif
     sc64_facing_track(q);
@@ -9045,7 +9045,7 @@ draw_tracers(void)
                 sc64_yamato_raster_draw(541,0,(((unsigned)m.heading+4u)>>3)&31u,(int)(m.x_q8/512u),(int)(m.y_q8/512u));
         }
     }
-    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && sc64_race_raw_unit(u[i].type)==12 &&
+    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && sc64_race_is_battlecruiser(u[i].type) &&
         u[i].order==ORDER_ATTACK_TARGET && (u[i].work_timer&7)>0 && (u[i].work_timer&7)<=6) {
         int f=sc64_yamato_raster_charge_frame(50u-((unsigned)u[i].work_timer&7u));
         if (f>=0) sc64_yamato_raster_draw(543,(unsigned)f,0,u[i].x,u[i].y);
