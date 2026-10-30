@@ -8,6 +8,7 @@ new file; use SC64_WEAPON_SOURCE_BANK_HEADER to select it for an experiment.
 import argparse
 from pathlib import Path
 import re
+import subprocess
 
 
 def make_index(source: str) -> str:
@@ -17,8 +18,10 @@ def make_index(source: str) -> str:
             raise ValueError(f'missing {name} table')
         result = [[int(v.strip(), 0) for v in row.split(',')]
                   for row in re.findall(r'\{([^{}]*)\}', match.group(2))]
-        if len(result) != int(match.group(1)) or not result:
-            raise ValueError(f'invalid {name} row count')
+        macro = {'images': 'IMAGE', 'animations': 'ANIMATION'}[name]
+        counts = re.findall(r'^#define\s+SC64_WEAPON_SOURCE_' + macro + r'_COUNT\s+(\d+)\s*$', source, re.M)
+        if len(counts) != 1 or int(counts[0]) == 0 or int(counts[0]) != len(result) or len(result) != int(match.group(1)):
+            raise ValueError(f'unsupported {name} logical or physical count')
         return result
 
     images, anims = rows('images'), rows('animations')
@@ -43,8 +46,8 @@ def make_index(source: str) -> str:
               array('sc64_vfx_anim_start', 'uint16_t', starts) +
               array('sc64_vfx_anim_count', 'uint8_t', counts))
     names = ('sc64_weapon_source_image_lookup', 'sc64_weapon_source_animation_lookup')
-    patterns = [r'^static inline const Sc64WeaponSourceImage \*' + names[0] + r'\([^\n]*$',
-                r'^static inline const Sc64WeaponSourceAnimation \*' + names[1] + r'\([^\n]*$']
+    patterns = [r'^static inline const Sc64WeaponSourceImage \*' + names[0] + r'\([^\n]*\)[ \t]*\{[^\n]*\}[ \t]*$',
+                r'^static inline const Sc64WeaponSourceAnimation \*' + names[1] + r'\([^\n]*\)[ \t]*\{[^\n]*\}[ \t]*$']
     replacements = [tables + f'''static inline const Sc64WeaponSourceImage *{names[0]}(uint16_t id) {{
     if (id > {maxid}u) return 0;
     unsigned i = sc64_vfx_image_index[id];
@@ -56,9 +59,38 @@ def make_index(source: str) -> str:
     return lo<end && sc64_weapon_source_animations[lo].animation_id==animation_id ? &sc64_weapon_source_animations[lo] : 0;
 }}''']
     for pattern, replacement in zip(patterns, replacements):
-        source, count = re.subn(pattern, lambda _: replacement, source, flags=re.M)
+        def replace(match):
+            original = match.group(0)
+            if original.count('{') != original.count('}'):
+                raise ValueError('unbalanced lookup function')
+            return replacement
+        source, count = re.subn(pattern, replace, source, flags=re.M)
         if count != 1: raise ValueError('unsupported lookup function format')
     return source
+
+
+def validate_output(source: Path, output: Path) -> None:
+    # Check both the spelling and the resolved path, so an ignored symlink
+    # cannot redirect generated private material into a tracked tree.
+    source_resolved = source.resolve(strict=True)
+    if output.exists() or output.is_symlink() or output.resolve() == source_resolved:
+        raise FileExistsError(f'output already exists or aliases source: {output}')
+    for path in (output.absolute(), output.resolve()):
+        parent = path.parent
+        while not parent.exists():
+            parent = parent.parent
+        result = subprocess.run(['git', '-C', str(parent), 'rev-parse', '--show-toplevel'],
+                                text=True, capture_output=True)
+        if result.returncode:
+            continue
+        root = Path(result.stdout.strip())
+        try:
+            relative = path.relative_to(root)
+        except ValueError:
+            continue
+        ignored = subprocess.run(['git', '-C', str(root), 'check-ignore', '--no-index', '-q', '--', str(relative)], capture_output=True)
+        if ignored.returncode != 0:
+            raise ValueError(f'output inside a repository must be ignored: {output}')
 
 
 def main():
@@ -66,6 +98,7 @@ def main():
     parser.add_argument('source', type=Path)
     parser.add_argument('output', type=Path)
     args = parser.parse_args()
+    validate_output(args.source, args.output)
     derived = make_index(args.source.read_text())
     with args.output.open('x') as out: out.write(derived)
 
