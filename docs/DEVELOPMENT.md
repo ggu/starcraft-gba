@@ -3037,3 +3037,17 @@ the two facility body frames to `.local/sc64/bc-body/`, and Yamato art to
 outputs leave the existing imported banks intact. `./dev sc64 status --profile
 terran` (or `zerg`, `protoss`, `protoss-p7`) reports whether the new inputs
 are present. Repeat preparation when the private source inputs change.
+
+### Prepared BC ordinary-input host witness
+
+With the Terran and BC inputs already prepared, run `make test-sc64-bc-normal-input`.
+This opt-in target compiles the controller and separate replay/fresh-load
+programs with the canonical Terran flags, runs ordinary menu and game inputs,
+validates the resulting trace, saves during an in-flight Yamato shot, and
+loads that save through HOME/L in a fresh host process. It does not generate
+or modify imported inputs. The target creates a new ignored directory under
+`.local/build/bc-normal-input/` for its binaries, trace, transitions and SRAM.
+The fixed tick 17937 and frame 17658 are a source-bound witness for this
+controller and runtime, not a general scenario or hardware guarantee; a
+runtime change that alters the controller timeline requires a fresh witness
+and review. This host test is not a physical-GBA or frame-rate qualification.

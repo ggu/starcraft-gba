@@ -5420,3 +5420,19 @@ build/test-sc64-t6-t5-save build/test-sc64-full-t5-save: $(SAVE_CANDIDATE_HELPER
 $(foreach p,terran zerg-z6 protoss-p7 zerg-z7,$(eval build/test-sc64-construction-arrival-save-$(p): $$(SAVE_CANDIDATE_HELPER)))
 $(foreach p,terran zerg protoss showcase,$(eval build/test-sc64-shared-battery-save-$(p) build/test-sc64-shared-bunker-save-$(p) build/test-sc64-skirmish-dropship-$(p): $$(SAVE_CANDIDATE_HELPER)))
 $(foreach p,terran zerg protoss showcase,$(foreach c,flight research yamato,$(eval build/test-bc-$(c)-$(p): $$(SAVE_CANDIDATE_HELPER))))
+
+# Source-bound ordinary-input BC witness. This is opt-in and compiles directly
+# against already-prepared inputs; it never invokes their generator recipes.
+.PHONY: test-sc64-bc-normal-input
+test-sc64-bc-normal-input:
+	@set -eu; \
+	mkdir -p .local/build/bc-normal-input; \
+	run=$$(mktemp -d .local/build/bc-normal-input/run.XXXXXX); \
+	printf 'BC ordinary-input evidence: %s\n' "$$run"; \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable $(TERRAN_ROM_FLAGS) tests/sc64_bc_normal_input_controller.c common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o "$$run/controller"; \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable $(TERRAN_ROM_FLAGS) tests/sc64_bc_normal_input_replay.c tests/sc64_yamato_host_sram_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o "$$run/replay"; \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable $(TERRAN_ROM_FLAGS) tests/sc64_bc_normal_input_fresh_load.c tests/sc64_yamato_host_sram_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) -o "$$run/fresh-load"; \
+	"$$run/controller" "$$run/controller.json"; \
+	$(PYTHON) tools/sc64_bc_normal_input_tape.py --input "$$run/controller.json" --output "$$run/transitions.txt"; \
+	"$$run/replay" "$$run/transitions.txt" 17937 "$$run/pause.sav"; \
+	"$$run/fresh-load" "$$run/pause.sav"
