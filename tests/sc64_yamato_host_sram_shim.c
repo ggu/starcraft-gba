@@ -3,6 +3,27 @@
  * separate-process round trip. This file is not part of the GBA product. */
 #include "../common/gba.c"
 #include <stdio.h>
+/* Fixture-only: replace one existing envelope while preserving its sequence. */
+int sc64_test_replace_payload(u32 tag,const void *data,u32 len)
+{
+    for (int slot=0;slot<2;slot++) {
+        volatile u8 *p=host_save+(unsigned)slot*SAVE_SLOT_SIZE;
+        if (sram_get32(p)!=tag || sram_get32(p+4)!=len) continue;
+        const u8 *src=data;
+        for (u32 i=0;i<len;i++) p[16+i]=src[i];
+        sram_put32(p+8,hash_bytes(src,len));
+        return 1;
+    }
+    return 0;
+}
+int sc64_test_remove_tag(u32 tag)
+{
+    for (int slot=0;slot<2;slot++) {
+        volatile u8 *p=host_save+(unsigned)slot*SAVE_SLOT_SIZE;
+        if (sram_get32(p)==tag) { sram_put32(p,0); return 1; }
+    }
+    return 0;
+}
 int sc64_test_sram_transfer(const char *path,int write_mode)
 {
     FILE *f=fopen(path,write_mode?"wb":"rb"); size_t n;

@@ -4,6 +4,8 @@
 #include "sc64_impact_events_game.c"
 #undef main
 extern int sc64_test_sram_transfer(const char *,int);
+extern int sc64_test_replace_payload(u32,const void *,u32);
+extern int sc64_test_remove_tag(u32);
 int main(int argc,char **argv)
 {
     assert(argc==3); setup();
@@ -24,12 +26,42 @@ int main(int argc,char **argv)
         assert(sc64_test_sram_transfer(argv[2],0));
 #ifdef SC64_SCARAB_RUNTIME
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
-        assert((!strcmp(argv[1],"migrate") || !strcmp(argv[1],"verify")) && race_load_game());
+        if (!strcmp(argv[1],"corrupt")) {
+            u32 len; Unit q;
+            assert(save_read_latest(&race_impact_record,sizeof(race_impact_record),SC64_SCARAB_SAVE_VERSION,&len));
+            assert(race_save_decode_unit(&race_data,0,1024,1024,&q) && q.type==U_REAVER);
+            q.carry=0; q.work_timer=0; /* Not a valid packed parent. */
+            assert(sc64_unit_save_encode(&race_data.units[0],&q,1024,1024));
+            assert(sc64_test_replace_payload(SC64_SCARAB_SAVE_VERSION,&race_impact_record,len));
+            assert(sc64_test_sram_transfer(argv[2],1));
+            puts("wrote checksummed invalid packed parent"); return 0;
+        }
+        if (!strcmp(argv[1],"remove-old")) {
+            assert(sc64_test_remove_tag(SAVE_VERSION));
+            assert(sc64_test_sram_transfer(argv[2],1));return 0;
+        }
+        if (!strcmp(argv[1],"reject")) {
+            Unit before_units[MAX_UNITS]; Building before_buildings[MAX_BUILDINGS];
+            int old_minerals=minerals,old_gas=gas,old_frame=frame;u32 old_seed=seed;
+            memcpy(before_units,u,sizeof(u));memcpy(before_buildings,b,sizeof(b));
+            assert(!race_load_game());
+            assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)));
+            assert(old_minerals==minerals && old_gas==gas && old_frame==frame && old_seed==seed);
+            assert(sc64_test_sram_transfer(argv[2],1));
+            puts("invalid only record rejected; sampled state unchanged");return 0;
+        }
+        assert(!strcmp(argv[1],"migrate") || !strcmp(argv[1],"verify") || !strcmp(argv[1],"fallback"));
+        {
+            RaceLoadPlan candidate; GbaSaveSelection chosen;
+            assert(race_scarab_stage_select(&candidate,&chosen));
+            assert(chosen.tag==(!strcmp(argv[1],"verify") ? SC64_SCARAB_SAVE_VERSION : SAVE_VERSION));
+        }
+        assert(race_load_game());
         Sc64ScarabParentFields f;
         assert(u[0].alive && u[0].type==U_REAVER && u[0].raw_type==-1);
         assert(sc64_scarab_parent_fields_unpack(u[0].carry,u[0].work_timer,&f));
         assert(f.queued==0 && f.active_slot==SC64_SCARAB_FIELD_NO_SLOT && !f.cooldown && !f.progress);
-        if (!strcmp(argv[1],"migrate")) assert(race_save_game() && sc64_test_sram_transfer(argv[2],1));
+        if (!strcmp(argv[1],"migrate") || !strcmp(argv[1],"fallback")) assert(race_save_game() && sc64_test_sram_transfer(argv[2],1));
         puts("gated reader migrated gate-off empty Reaver parent");
 #else
         assert(!strcmp(argv[1],"reject"));

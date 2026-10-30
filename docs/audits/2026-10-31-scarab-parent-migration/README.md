@@ -71,3 +71,16 @@ process. SRAM headers showed old tag `0x73435442` sequence 1 and staged tag
 campaign, other profile, old pre-BC/Yamato/impact-tail or corrupt-fallback
 qualification. Existing post-commit restore failures remain possible; no
 whole-load atomicity or production-readiness claim is made.
+
+The staged reader was also exercised with a checksum-correct newer staged
+record whose Reaver row was changed to invalid packed parent fields. It
+selected and converted the older BC record, then wrote a replacement staged
+record with sequence 2 while preserving every byte of the older slot; a fresh
+reader selected the replacement. With the older tag removed, the bad record
+was rejected while sampled units, buildings, resources, frame and RNG and
+the SRAM image remained unchanged. The fixture deliberately changes the row
+and checksum; this is a semantic-corruption test, not a naturally generated
+save. Compile and seven process invocations with exits, outputs and SRAM hashes
+are retained in `.local/decoder-proof/reaver-stage-edge-{compile,runs}.json`.
+An actual pre-BC writer was not available for this run; its envelope and the
+active Yamato and impact tails remain unqualified in this stage.
