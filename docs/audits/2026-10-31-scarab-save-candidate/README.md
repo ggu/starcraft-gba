@@ -51,3 +51,14 @@ or hardware claim. Receipts remain in the ignored
 The subsequent merge of shared PR #193 changes only a Z7 fixture and audit;
 it does not change the runtime compiled above. Its failed full Z7 controller
 run is preserved and the canonical Z6 menu remains unpromoted.
+
+The actual optional `make test-scarab-save` workflow also passes at equivalent
+validator source `a75909f` (four profile compile/runs, 102 fixed input hashes).
+The exact Make invocation runs sequentially and generates only an isolated
+source-authored numeric P7 fact table. A preceding attempt failed at the P7
+host link with ENOSPC after Terran/Zerg passed; that failed log is preserved.
+After inventorying and retiring completed native host binaries, a fresh run
+exits zero. Its private receipt SHA-256 is
+`caf55cfd3dd46573b5b4255b1a5f2470a4f622e73bff5ffd025c342aa530ea61`.
+The separately tested historical signed-16 production-envelope fixture is not
+part of that four-profile Make target. Namespace/migration remains unfinished.
