@@ -243,6 +243,35 @@ test_static_object_key_invalidates_full_base(void)
     assert(!sc64_terrain_tile_clean(0, 0));
 }
 
+static void
+test_validated_tile_bounds(void)
+{
+    const int xs[] = {0, 1, 15, 16, WORLD_W - 256, WORLD_W - 241, WORLD_W - 240};
+    const int ys[] = {0, 1, 15, 16, WORLD_H - 124, WORLD_H - 109, WORLD_H - 108};
+    for (unsigned xi = 0; xi < sizeof(xs) / sizeof(xs[0]); ++xi)
+        for (unsigned yi = 0; yi < sizeof(ys) / sizeof(ys[0]); ++yi) {
+            int col0, row0, col1, row1;
+            int x = xs[xi], y = ys[yi];
+            assert(sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1));
+            memset(visible, 0, sizeof(visible));
+            memset(explored, 0, sizeof(explored));
+            assert(sc64_terrain_store(x, y));
+            visible[col0 + row0 * MAP_COLS] = 1;
+            assert(!sc64_terrain_cached(x, y));
+            assert(sc64_terrain_cache_reused_base);
+            for (int row = row0 - 1; row <= row1; ++row)
+                for (int col = col0 - 1; col <= col1; ++col) {
+                    int clean = col >= col0 && col < col1 && row >= row0 && row < row1 &&
+                                !(col == col0 && row == row0);
+                    assert(sc64_terrain_tile_clean(col, row) == clean);
+                }
+            /* A failed reuse must invalidate the fast-path precondition. */
+            assert(!sc64_terrain_cached(-1, y));
+            assert(!sc64_terrain_cache_reused_base);
+            assert(!sc64_terrain_tile_clean(col0, row0));
+        }
+}
+
 int
 main(void)
 {
@@ -254,6 +283,7 @@ main(void)
     test_edge_viewport_and_campaign_mission_key();
     test_failed_capture_does_not_validate_cache();
     test_static_object_key_invalidates_full_base();
+    test_validated_tile_bounds();
     return 0;
 }
 #else

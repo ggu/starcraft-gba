@@ -7164,3 +7164,45 @@ Updated normal-Make ROMs are retained locally in
 `.local/releases/20261030-render-performance-candidate`, with hashes and
 header-only equivalence to those qualified products. No SD write or Actions
 run occurred. No claim of complete campaigns, full roster or 30 fps is made.
+
+### Follow-up audio, terrain and animation lookup batch (2026-10-30)
+
+The follow-up skips an audio slot only when the live actor is dead and its
+previous snapshot is already zero. Death transitions, nonzero stale snapshots,
+new/reused actors, construction completion, selection, event admission and
+discontinuous ticks keep their original handling. No sound is removed and no
+new snapshot storage is allocated. A deterministic 10,000-step differential
+matches ordered cues and complete observer snapshots in each canonical profile;
+the public hook fixture also checks deaths, dead-slot clearing, reuse and
+discontinuities in the default and imported profiles.
+
+The terrain tile test derives bounds from the view already validated by a
+successful cache reuse, avoiding repeated validation per tile. Failed reuse
+still clears that precondition. Added edge/phase tests cover 49 camera pairs,
+queries outside the view and failed reuse. Actual renderer comparisons pass
+all four profiles across cold/warm cameras, fog changes, screen transitions,
+resource/building mutation, save/load and restart.
+
+Projectile rendering resolves Init, Death and Flight animation records through
+one lower-bound search and an adjacent scan. The generated table must remain
+strictly ordered by image and animation ID. The real renderer's generated-bank
+fixture compares exact pointers with the original lookup for all 65,536 image
+IDs, including absent images/phases; authored synthetic tables retain the
+existing moving-projectile, child-event and alias-pointer assertions.
+
+The same busy Zerg three-AI sample takes 714,338,530 cycles versus 730,928,748
+for the preceding batch: 2.270% fewer cycles and 22.95 to 23.49 effective fps.
+All 8,928 advancing gameplay-state and actual framebuffer hashes match. The
+combined audio differential also matches the preceding batch. These are
+bounded nonterminal observations, not complete campaign, universal 30-fps or
+physical-hardware qualification. Actor counts and all RAM reserve guards stay
+unchanged; the four canonical links retain their preceding memory margins.
+
+Private measured products, commands and comparisons are in
+`shared-render-followup-v1`. Four-profile ARM links, audio comparisons, actual
+framebuffer coverage, terrain and animation oracles are in
+`shared-render-followup-cross-v1`. Initial malformed harness setups and an
+overstrict authored test assumption about other live actors in the default
+fixture were corrected and are not counted as passes. The final default,
+generated-bank and unified gate evidence is recorded separately under
+`followup-final-gates-v1`.

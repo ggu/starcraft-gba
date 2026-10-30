@@ -67,7 +67,8 @@ typedef struct { int8_t x, y; } Sc64WeaponSourceLoOffset;
 
 static Sc64WeaponSourceAttackProfile test_profile;
 static Sc64WeaponSourceImage test_request_image, test_keyed_image;
-static Sc64WeaponSourceAnimation test_init;
+static Sc64WeaponSourceAnimation sc64_weapon_source_animations[1];
+#define test_init sc64_weapon_source_animations[0]
 static Sc64WeaponSourceEvent sc64_weapon_source_events[2];
 static Sc64WeaponSourceOverlay sc64_weapon_source_overlays[1];
 static const uint8_t test_pixels[4] = {11, 12, 77, 78};
