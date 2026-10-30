@@ -74,6 +74,22 @@ adapter and flight/UI/save integration are not registered in these ROMs.
 
 Showcase must end strictly below `03005000`, preserving the 11 KiB stack
 reserve. No Showcase ELF/ROM was produced, no guard/cap was weakened, and
-the failed candidate is not a user build. New gate-off unified/Terran
-regressions are separately running and must not be reported as completed
-from these component checks. The last packaged user ROMs remain #189.
+the failed candidate is not a user build. The last packaged user ROMs
+remain #189.
+
+A separate exact-ee7ca97, gate-off normal Make aggregate also completed with
+exit zero: `unified test-unified terran test-terran
+test-sc64-terran-full-campaign`. It retained 104 fixed prepared inputs, ran
+the original full Terran startup/save/controller recipes and emitted nine
+controller traces (T3 emits none). This does not qualify the gated service.
+Gate-off binaries are not claimed byte-identical or assigned the earlier
+#189 scene timing; compiler code generation changed despite the false
+feature conditions.
+
+A subsequent isolated scalar-ROM factoring experiment preserved the cheap
+type check inline and moved only payload decoding out of line. Eight host
+fixtures and a broad predicate differential passed, but Showcase grew from
+`03005150` to `03005190`; extra calls, register preservation and veneers
+outweighed the removed bit code. It was rejected, is not integrated here,
+and was not benchmarked after failing the memory guard. Do not assume that
+moving a small repeated expression to ROM saves IWRAM or improves cycles.
