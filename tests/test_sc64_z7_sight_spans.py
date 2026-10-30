@@ -314,6 +314,19 @@ static int run_dense_counts(int step) {
     for (i=0;i<MAX_UNITS;++i) { u[i].alive=0; update(step++); }
     b[0].alive=0; update(step++);
     if (sc64_visibility_source_count(cell) != 0) return 1;
+    /* Fill every source slot, then cross both nine-bit boundaries. */
+    for (i=0;i<MAX_UNITS;++i) u[i]=(Unit){1,SIDE,512,512,44,0};
+    for (i=0;i<MAX_BUILDINGS;++i) b[i]=(Building){1,SIDE,512,512,133,0,0};
+    update(step++);
+    if (sc64_visibility_source_count(cell) != 511) return 1;
+    u[0].alive=0; update(step++);
+    if (sc64_visibility_source_count(cell) != 510) return 1;
+    for (i=1;i<MAX_UNITS;++i) u[i].alive=0;
+    update(step++);
+    if (sc64_visibility_source_count(cell) != 255) return 1;
+    for (i=0;i<MAX_BUILDINGS;++i) b[i].alive=0;
+    update(step++);
+    if (sc64_visibility_source_count(cell) != 0) return 1;
     return 0;
 }
 

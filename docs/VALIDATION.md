@@ -7604,3 +7604,42 @@ Evidence remains private in `terrain-public-extract-v1`. The Terran host gate
 wrote four controller-trace outputs inside its independent copy; all other
 75 preexisting prepared files remained identical. No shared inputs were
 regenerated, no Actions were dispatched and no proprietary data is committed.
+
+
+### Shared visibility count spans (2026-10-30)
+
+Qualified on integration runtime `7871191` at private commit `01cc02bf`, this
+change writes visibility and its minimap occupancy only when a cell crosses
+zero sources, and updates the ninth source-count bit only at 255/256. A
+bounded ROM helper applies row spans without repeated per-cell call setup.
+Source sight geometry, exploration, source-slot limits, saved state and RAM
+reserves are unchanged. Reset clears counts and visibility together before
+rebuilding sources, preserving the count/grid invariant used by the fast path.
+
+The exact three adopted source/test files pass independent ASan/UBSan full-grid
+reference-count, visible/explored-grid and minimap oracles. Cases include
+30-source ownership batches, 250 to 280 to 250 overlap, all-edge out-of-map
+centers, empty spans and a 511 to 510 to 255 to zero source sequence. Default
+source/doctor/build/test, unified build/test and the full Terran host aggregate
+pass on the frozen candidate. Four production-vector ARM builds preserve
+all existing bounds: EWRAM/IWRAM spare bytes remain Terran 28,536/328, Zerg
+28,444/48, Protoss 23,900/952 and Showcase 272/56. Recorded consumed-input
+hashes differ only in the intended header, with no missing dependencies.
+
+A port-free paired T5 replay has 22 nonempty 500-tick windows through tick
+11,000. The ownership-transfer sight peak drops from 3,065,139 to 2,122,219
+guest cycles (30.76 percent); summed sight work drops from 346,715,658 to
+341,592,769 (1.48 percent). Summed full-frame cycles change from 7,613,203,711
+to 7,606,083,937, about 0.094 percent less work for this short interval.
+The reported checkpoint state/fog digests match. Seven separately measured
+palette-resolved 240 by 160 bitmap CRCs at ticks 7,500 through 10,500 also
+match. These observations are not every-frame/full-state equivalence, a full
+campaign result, general FPS improvement or physical-hardware qualification.
+An empty duplicate final timing row is excluded from all aggregates.
+
+Evidence remains private under `sight-span-private-20261030/.local/checks`
+and `.local/probe`, with the earlier candidate retained separately. Four
+controller-trace test outputs changed during the Terran gate; the other 190
+copied inputs were unchanged, with no asset-generation recipes. Source only;
+no Actions were dispatched. Battlecruiser/Yamato remains separate experimental
+work, and full roster/campaign and near-30-fps goals remain unfinished.
