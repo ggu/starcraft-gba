@@ -16,13 +16,20 @@ static inline int sc64_scarab_parent_fields_pack(const Sc64ScarabParentFields *v
         v->progress > 105 || (v->active_slot == SC64_SCARAB_FIELD_NO_SLOT && v->progress) ||
         (v->active_slot != SC64_SCARAB_FIELD_NO_SLOT && !v->queued)) return 0;
     unsigned bits = v->queued | (v->active_slot << 3) | (v->cooldown << 11);
-    *carry = (int)bits - 65536; *timer = (int)v->progress; return 1;
+    /* The legacy race serializer writes each Unit field as signed 16-bit.
+     * Store the low 16 bits with a signed bias; timer bit 7 holds bit 16,
+     * leaving bits 0..6 for the 0..105 progress value. */
+    *carry = (int)(bits & 65535u) - 32768;
+    *timer = (int)(v->progress | ((bits >> 16) << 7)); return 1;
 }
 static inline int sc64_scarab_parent_fields_unpack(int carry, int timer, Sc64ScarabParentFields *out)
 {
-    if (!out || carry < -65536 || carry > 65535 || timer < 0 || timer > 105) return 0;
-    unsigned bits = (unsigned)(carry + 65536); Sc64ScarabParentFields v = {bits & 7u, (bits >> 3) & 255u, bits >> 11, (unsigned)timer};
-    int c,t; if (!sc64_scarab_parent_fields_pack(&v,&c,&t)) return 0; *out=v; return 1;
+    if (!out || carry < -32768 || carry > 32767 || timer < 0 || timer > 255) return 0;
+    unsigned bits = (unsigned)(carry + 32768) | (((unsigned)timer >> 7) << 16);
+    Sc64ScarabParentFields v = {bits & 7u, (bits >> 3) & 255u, bits >> 11, (unsigned)timer & 127u};
+    int c,t;
+    if (!sc64_scarab_parent_fields_pack(&v,&c,&t) || c != carry || t != timer) return 0;
+    *out=v; return 1;
 }
 static inline int sc64_scarab_child_fields_pack(const Sc64ScarabChildFields *v, int *carry, int *timer)
 {

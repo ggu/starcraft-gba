@@ -14,6 +14,15 @@ class ScarabFieldsTest(unittest.TestCase):
         definition = game[start:end]
         fixture = (ROOT / 'tests/sc64_scarab_fields.c').read_text()
         fixture = fixture.replace('/* SC64_REAL_UNIT_DEFINITION */', definition)
+        # Capture the actual legacy save/load loops, including the flag
+        # widening and BC conditional, so this exercises production casts.
+        save = (ROOT / 'starcraft/race_save_adapter.h').read_text()
+        encode_start = save.index('    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {', save.index('static int race_save_game(void)'))
+        encode_end = save.index('\n#endif\n#if defined(SC64_T6_STORAGE)', encode_start)
+        decode_start = save.index('    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {', save.index('static int race_load_game(void)'))
+        decode_end = save.index('\n#endif\n#if defined(SC64_T6_STORAGE)', decode_start)
+        fixture = fixture.replace('/* SC64_REAL_LEGACY_ENCODE */', save[encode_start:encode_end])
+        fixture = fixture.replace('/* SC64_REAL_LEGACY_DECODE */', save[decode_start:decode_end])
         fixture = fixture.replace('"../starcraft/', '"' + str(ROOT / 'starcraft') + '/')
         # These are the enum-affecting capabilities in the four prepared
         # Terran, Zerg, P7 and Showcase vectors, with the shared roster enabled.
@@ -45,6 +54,9 @@ class ScarabFieldsTest(unittest.TestCase):
                         outputs.append(subprocess.check_output([str(binary)], text=True).strip().split(','))
                     self.assertEqual(outputs[0][:-1], outputs[1][:-1])
                     self.assertEqual(int(outputs[1][-1]), int(outputs[0][-1]) + 1)
-                    subprocess.run([*common, *defines, '-DSC64_SCARAB_RUNTIME', str(source), '-o', str(binary)], check=True)
-                    subprocess.run([str(binary)], check=True)
+                    for storage in ('compact', 'legacy'):
+                        with self.subTest(storage=storage):
+                            flags = common if storage == 'compact' else [x for x in common if x != '-DSC64_LATE_TERRAN_STORAGE']
+                            subprocess.run([*flags, *defines, '-DSC64_SCARAB_RUNTIME', str(source), '-o', str(binary)], check=True)
+                            subprocess.run([str(binary)], check=True)
 if __name__ == '__main__': unittest.main()

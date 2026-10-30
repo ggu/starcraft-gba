@@ -55,3 +55,16 @@ isolated source-only fact table generated with the same feature fingerprint.
 No imported bank was generated or modified. The test directly constructs
 controlled worlds and calls adapter operations: it is not an ordinary-menu
 replay, full save/codec test, gameplay claim or ARM performance result.
+
+The inactive parent-field proposal stores its 17 packed queue, slot and
+cooldown bits across two existing actor fields: `carry` holds the low 16 bits
+with a 32768 signed bias, while `work_timer` bit 7 holds the high bit and its
+low seven bits hold progress 0 through 105. The decoder rejects reserved timer
+bits, progress holes, invalid slots and other noncanonical combinations
+without changing its output. Both fields now fit historical signed-16 unit
+rows. The asset-free field test exercises 7,759,566 valid parent combinations
+and 673,400 child combinations in each of four capability sets, including
+compact, ZP, derived and P7 typed codecs and the actual extracted legacy
+race-save field loops. This establishes field representability only: it does
+not establish a whole-world save version, migration, graph validation or
+active gameplay compatibility.
