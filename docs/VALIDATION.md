@@ -6655,3 +6655,37 @@ comparisons are private in `default-resolved-tracer-v1`. The earlier #171
 54-match, 702 startup/save and 27 construction results are baseline evidence
 for unchanged gameplay paths, not new runs of this renderer-only stage.
 No Actions were run and no proprietary inputs are committed.
+
+
+### Default-branch terrain transfer (2026-10-30)
+
+Independently extracted on `ae691253`, the shared terrain cache transfers aligned
+horizontal windows with one bounded DMA3 operation, then redraws exposed edge
+tiles. Generic windows, unaligned shifts, partial boundary rows and narrower
+scene clips retain their existing path. No persistent buffers, actor limits,
+sight ranges or RAM reserves change. The six executable/test files were
+qualified at `dfda937`; the later validation addition changes documentation only.
+
+Local source-boundary, doctor, default build/test, unified build/test and the
+full Terran host aggregate pass. Sanitizer checks cover 5,292 clipped-window
+cases and four prepared profiles with 512 cached/fresh scene comparisons each.
+All four normal ARM links preserve the fixed guards; remaining EWRAM/IWRAM
+bytes are Terran 28,536/328, Zerg 28,444/64, Protoss 23,900/952 and Showcase
+272/56. Captured Make commands, per-TU dependencies and input hashes match the
+private input copies. Public-main weapon and P7 fact banks were used; this
+extraction does not include the draft roster services or source-birth offset fix.
+
+A separate port-free mGBA probe uses actual production flags and replaces only
+main. Over 1,501 play ticks after a normal-menu launch (observed mission field
+8), alternating horizontal camera input produces matching selected-state and
+displayed-framebuffer rolling hashes at all four checkpoints. Timed update,
+audio and rendering work, including presentation waits, falls from 992,093,504
+to 983,925,857 guest cycles, a 0.823 percent reduction for this workload. This
+is hash-based observational evidence, not byte-for-byte state proof, steady
+30 fps or physical-hardware qualification. An initial whole-VRAM hash included
+audio scratch/offscreen data and is superseded by the displayed-page probe.
+
+Evidence remains private in `terrain-public-extract-v1`. The Terran host gate
+wrote four controller-trace outputs inside its independent copy; all other
+75 preexisting prepared files remained identical. No shared inputs were
+regenerated, no Actions were dispatched and no proprietary data is committed.
