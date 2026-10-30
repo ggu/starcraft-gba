@@ -26,7 +26,10 @@ static inline int sc64_scarab_parent_fields_unpack(int carry, int timer, Sc64Sca
 }
 static inline int sc64_scarab_child_fields_pack(const Sc64ScarabChildFields *v, int *carry, int *timer)
 {
-    if (!v || !carry || !timer || v->parent_slot >= SC64_SCARAB_FIELD_SLOT_LIMIT || v->phase > 3 || v->life > 90 || v->no_collision > 7 || v->no_collision > v->life) return 0;
+    if (!v || !carry || !timer || v->phase > 3 ||
+        (v->parent_slot >= SC64_SCARAB_FIELD_SLOT_LIMIT &&
+         !(v->parent_slot == SC64_SCARAB_FIELD_NO_SLOT && v->phase >= 2)) ||
+        v->life > 90 || v->no_collision > 7 || v->no_collision > v->life) return 0;
     *carry = (int)(v->parent_slot | (v->phase << 8)); *timer = (int)(v->life | (v->no_collision << 7)); return 1;
 }
 static inline int sc64_scarab_child_fields_unpack(int carry, int timer, Sc64ScarabChildFields *out)

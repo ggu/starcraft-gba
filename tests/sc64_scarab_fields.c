@@ -51,9 +51,9 @@ int main(void) {
   assert(sc64_scarab_parent_fields_unpack(carry,timer,&y));assert(x.queued==y.queued&&x.active_slot==y.active_slot&&x.cooldown==y.cooldown&&x.progress==y.progress);++parents;
   if((slot==0||slot==239||slot==255)&&(cd==0||cd==60)&&(progress==0||progress==104)){Unit u=unit(0);u.carry=carry;u.work_timer=timer;codecs(u);}
  }
- for(unsigned slot=0;slot<240;slot++)for(unsigned phase=0;phase<4;phase++)for(unsigned life=0;life<=90;life++)for(unsigned nc=0;nc<=7;nc++) {
-  Sc64ScarabChildFields x={slot,phase,life,nc},y;int carry=9,timer=9;int valid=nc<=life;assert(sc64_scarab_child_fields_pack(&x,&carry,&timer)==valid);if(!valid)continue;assert(sc64_scarab_child_fields_unpack(carry,timer,&y));assert(x.parent_slot==y.parent_slot&&x.phase==y.phase&&x.life==y.life&&x.no_collision==y.no_collision);++children;
-  if((slot==0||slot==239)&&(life==0||life==7||life==90)&&(nc==0||nc==7)){Unit u=unit(1);u.carry=carry;u.work_timer=timer;codecs(u);}
+ for(unsigned slot=0;slot<=255;slot++)for(unsigned phase=0;phase<4;phase++)for(unsigned life=0;life<=90;life++)for(unsigned nc=0;nc<=7;nc++) {
+  Sc64ScarabChildFields x={slot,phase,life,nc},y;int carry=9,timer=9;int valid=(slot<240 || (slot==255 && phase>=2)) && nc<=life;assert(sc64_scarab_child_fields_pack(&x,&carry,&timer)==valid);if(!valid)continue;assert(sc64_scarab_child_fields_unpack(carry,timer,&y));assert(x.parent_slot==y.parent_slot&&x.phase==y.phase&&x.life==y.life&&x.no_collision==y.no_collision);++children;
+  if((slot==0||slot==239||slot==255)&&(life==0||life==7||life==90)&&(nc==0||nc==7)){Unit u=unit(1);u.carry=carry;u.work_timer=timer;codecs(u);}
  }
 #ifdef SC64_SCARAB_RUNTIME
  assert(U_SCARAB == SC_RU_COUNT-1 && SC_RU_COUNT <= 64);
