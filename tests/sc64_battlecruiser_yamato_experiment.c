@@ -30,8 +30,8 @@ int main(void)
     assert(!memcmp(&saved_shot,&sc64_bc_shots[0],sizeof(saved_shot)) &&
            minerals==saved_minerals && u[a].carry==50*256);
     assert(race_save_game());
-    for (int n=0;n<100;++n) { ++frame; assert(race_bc_yamato_tick_caster(a)); }
-    assert(sc64_bc_shots[0].age==44 && sc64_bc_shots[0].state==SC64_BC_SHOT_CHARGING);
+    while (sc64_bc_shots[0].age < 43) { ++frame; assert(race_bc_yamato_tick_caster(a)); }
+    assert(sc64_bc_shots[0].age==43 && sc64_bc_shots[0].state==SC64_BC_SHOT_CHARGING);
     u[a].order=ORDER_IDLE; assert(!race_bc_yamato_tick_caster(a));
     assert(!sc64_bc_shots[0].state && u[a].carry==50*256);
     /* The release event is indexed by source ticks, including all five
@@ -46,10 +46,17 @@ int main(void)
             ++frame;
             if (sc64_battlecruiser_source_tick_due()) ++source_ticks;
             assert(race_bc_yamato_tick_caster(a));
-            assert(sc64_bc_shots[0].age==(source_ticks<44?source_ticks:44));
+            if (source_ticks < 44) assert(sc64_bc_shots[0].age==source_ticks);
         }
-        assert(source_ticks==44 && sc64_bc_shots[0].age==44);
+        assert(source_ticks==44);
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+        assert(sc64_bc_shots[0].state==SC64_BC_SHOT_FLIGHT);
+        sc64_bc_shot_clear(&sc64_bc_shots[0]);
+        u[a].order=ORDER_IDLE;
+#else
+        assert(sc64_bc_shots[0].age==44 && sc64_bc_shots[0].state==SC64_BC_SHOT_CHARGING);
         u[a].order=ORDER_IDLE; assert(!race_bc_yamato_tick_caster(a));
+#endif
     }
     /* Target flags allow friendly targets but reject invincible targets. */
     u[t].flags|=16; u[a].work_timer=64<<3;u[a].carry=200*256; u[a].build=-1;

@@ -16,7 +16,11 @@ int main(void) {
     gfx_begin(C_PANEL);sc64_yamato_raster_draw(543,4,0,80,60);capture();
     gfx_begin(C_PANEL);draw_tracers();compare();
     for(int n=0;n<55;++n){++frame;assert(race_bc_yamato_tick_caster(a));}
+    #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+    assert(sc64_bc_shots[0].state==SC64_BC_SHOT_FLIGHT);
+    #else
     assert(race_bc_yamato_launch_resolved(0,64,0,400,120));
+    #endif
     for(int n=0;n<5;++n)assert(race_bc_yamato_projectile_step(0));
     Sc64BcMotionFields m;assert(sc64_bc_motion_unpack(&sc64_bc_shots[0],&m));
     int x=(int)(m.x_q8/512u),y=(int)(m.y_q8/512u),h=(int)(((unsigned)m.heading+4u)>>3)&31;

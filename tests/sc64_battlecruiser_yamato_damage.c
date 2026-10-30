@@ -12,7 +12,11 @@ int main(void) {
         assert(race_bc_yamato_issue(a,t));if(!sc64_battlecruiser_source_tick_due())++frame;
         assert(race_bc_yamato_tick_caster(a));
         for(int n=0;n<55;++n){++frame;assert(race_bc_yamato_tick_caster(a));}
+        #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+        assert(sc64_bc_shots[0].state==SC64_BC_SHOT_FLIGHT);
+        #else
         assert(race_bc_yamato_launch_resolved(0,64,0,1020,1000));
+        #endif
         for(int n=0;n<30 && sc64_bc_shots[0].state;++n)assert(race_bc_yamato_projectile_step(0));
         assert(!sc64_bc_shots[0].state && u[t].hp==500-expected[j]);
     }
@@ -25,7 +29,11 @@ int main(void) {
     assert(race_bc_yamato_issue(a,t));if(!sc64_battlecruiser_source_tick_due())++frame;
     assert(race_bc_yamato_tick_caster(a));
     for(int n=0;n<55;++n){++frame;assert(race_bc_yamato_tick_caster(a));}
+    #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+    assert(sc64_bc_shots[0].state==SC64_BC_SHOT_FLIGHT);
+    #else
     assert(race_bc_yamato_launch_resolved(0,64,0,1020,1000));
+    #endif
     for(int n=0;n<30 && sc64_bc_shots[0].state;++n)assert(race_bc_yamato_projectile_step(0));
     assert(u[t].shield==0 && u[t].hp==388);
     puts("private Yamato explosive damage: small, medium, large and engine shield/armor pass");

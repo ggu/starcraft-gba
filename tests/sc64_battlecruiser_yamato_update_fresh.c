@@ -31,8 +31,12 @@ int main(int argc,char **argv) {
         if (!sc64_battlecruiser_source_tick_due()) ++frame;
         assert(race_bc_yamato_tick_caster(a) && race_bc_yamato_tick_caster(a2));
         for(int n=0;n<55;++n) {++frame;assert(race_bc_yamato_tick_caster(a) && race_bc_yamato_tick_caster(a2));}
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+        assert(sc64_bc_shots[0].state==SC64_BC_SHOT_FLIGHT && sc64_bc_shots[1].state==SC64_BC_SHOT_FLIGHT);
+#else
         assert(race_bc_yamato_launch_resolved(0,64,0,1280,1000));
         assert(race_bc_yamato_launch_resolved(1,64,0,1280,1200));
+#endif
         assert(race_bc_yamato_projectile_step(0) && race_bc_yamato_projectile_step(1) && u[t].alive && u[t2].alive);
         assert(race_save_game() && sc64_test_sram_transfer(argv[2],1));
     } else {

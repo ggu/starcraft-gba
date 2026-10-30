@@ -11,7 +11,11 @@ int main(void) {
     if (!sc64_battlecruiser_source_tick_due()) ++frame;
     assert(race_bc_yamato_tick_caster(a));
     for(int n=0;n<55;++n) {++frame;assert(race_bc_yamato_tick_caster(a));}
+    #ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+    assert(sc64_bc_shots[0].state==SC64_BC_SHOT_FLIGHT);
+    #else
     assert(race_bc_yamato_launch_resolved(0,64,0,1020,1000));
+    #endif
     assert(race_bc_yamato_projectile_step(0) && !u[t].alive && !sc64_bc_shots[0].state);
     assert((u[a].work_timer&7)==6 && u[a].order==ORDER_ATTACK_TARGET);
     assert(race_save_game()); u[a].work_timer&=~7;

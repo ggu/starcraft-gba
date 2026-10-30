@@ -45,11 +45,15 @@ int main(int argc,char **argv) {
     int launched=0;
     for(int n=1;n<=150 && (sc64_bc_shots[0].state||sc64_bc_shots[1].state);++n) {
         game_update(0,0);
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+        if (sc64_bc_shots[0].state==SC64_BC_SHOT_FLIGHT && sc64_bc_shots[1].state==SC64_BC_SHOT_FLIGHT) launched=1;
+#else
         if (!launched && sc64_bc_shots[0].age==44 && sc64_bc_shots[1].age==44) {
             assert(race_bc_yamato_launch_source(0,64,0,0));
             assert(race_bc_yamato_launch_source(1,64,0,0));
             launched=1;
         }
+#endif
         observe(a,t,a2,t2,n);
     }
     assert(launched && !u[t].alive && !u[t2].alive && !sc64_bc_shots[0].state && !sc64_bc_shots[1].state &&
