@@ -6,6 +6,7 @@ from __future__ import annotations
 import importlib.util
 import struct
 import unittest
+from tools.sc64_construction_sprites import decode_instruction
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +23,25 @@ AUDIT_SPEC.loader.exec_module(audit)
 
 
 class WeaponSourceSpriteTests(unittest.TestCase):
+    def test_iscript_signal_ordinals_timing_and_call_boundary(self):
+        # playframe 0; wait 1; setspawnframe 7; sigorder 1; wait 3;
+        # setfldirect 4; call 0x1234.  A call ends this bounded report.
+        data = bytes([0, 0, 0, 5, 1, 35, 7, 36, 1, 5, 3, 52, 4, 53, 0x34, 0x12, 22])
+        events, tick, loop, complete = audit.trace_iscript(data, 0, decode_instruction)
+        self.assertTrue(complete)
+        self.assertIsNone(loop)
+        self.assertEqual(tick, 4)
+        self.assertEqual([(e["pc"], e["opcode"], e["name"], e["args"], e["source_tick"])
+                          for e in events], [
+            (0, 0, "playframe", [0], 0), (3, 5, "wait", [1], 0),
+            (5, 35, "setspawnframe", [7], 1), (7, 36, "sigorder", [1], 1),
+            (9, 5, "wait", [3], 1), (11, 52, "setfldirect", [4], 4),
+            (13, 53, "call", [0x1234], 4)])
+        with self.assertRaisesRegex(ValueError, "truncated IScript operand"):
+            audit.trace_iscript(bytes([36]), 0, decode_instruction)
+        with self.assertRaisesRegex(ValueError, "truncated IScript branch operand"):
+            audit.trace_iscript(bytes([53, 0x34]), 0, decode_instruction)
+
     def test_normal_palette_remap_preserves_transparency_and_opaque(self):
         remap = bytearray(range(256))
         remap[0] = 1
