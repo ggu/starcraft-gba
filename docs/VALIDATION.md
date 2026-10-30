@@ -6497,3 +6497,35 @@ in `default-depot-bounded-v1`. The reused baseline runtime inputs are checked
 against the current default Git tree and the independently qualified PR #169
 products; an earlier mismatching PR #168 comparison is not baseline evidence
 for this batch. No proprietary data is committed and no Actions run occurred.
+
+### Default-branch resolved projectile metadata (2026-10-30)
+
+Independently qualified on default `26a2fec`, this shared rendering change
+unpacks a tagged tracer and resolves its attack profile once, reusing those
+values for offscreen culling and drawing. Packed-key APIs remain available;
+malformed keys and absent profiles retain their no-effect behavior. Values
+live on the stack, with no simulation, damage timing, persistent pool, actor
+limit or RAM-reserve change. This excludes the draft roster/service work.
+
+The frozen preceding default renderer and the new resolved path match all
+1,410,048 generated-bank cases and digest `403bcc76fe61a883`, including
+headings, motion ages, fog, clipping, mirrored poses and child overlays.
+That fixture uses a deterministic test compositor; the separate production
+Zerg replay matches all 8,948 gameplay and framebuffer observations. Its
+1,000-update busy three-AI sample improves from 695,201,548 to 691,839,468
+guest cycles, or 24.13 to 24.25 effective fps. This is one nonterminal
+workload, not steady-30-fps, complete-campaign or hardware qualification.
+
+Default doctor/build/test passes (678 Python tests, 16 optional skips and
+the separate eight-test suite), as do unified build/test and the full Terran
+host aggregate. Host controllers retain their source-map/hidden-world
+information limits. Four canonical ARM builds preserve the fixed guards;
+EWRAM/IWRAM headroom in bytes is Terran 28,480/488, Zerg 28,372/64, Protoss
+23,828/952 and Showcase 200/56. Actual Make flags are recorded without
+injected definitions. Paired consumed inputs differ only in the intended
+game and renderer source; generated assets, other inputs and toolchain match
+the baseline. Commands, raw dependencies, input/source hashes, maps and
+comparisons are private in `default-resolved-tracer-v1`. The earlier #171
+54-match, 702 startup/save and 27 construction results are baseline evidence
+for unchanged gameplay paths, not new runs of this renderer-only stage.
+No Actions were run and no proprietary inputs are committed.
