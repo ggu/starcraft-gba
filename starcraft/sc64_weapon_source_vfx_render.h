@@ -359,15 +359,12 @@ sc64_weapon_source_vfx_anchor_may_be_visible(int x, int y,
  * does not recursively draw child overlays. The bank-derived frame+offset
  * radius includes normal/mirror crop origins and all LO table offsets. */
 static inline int
-sc64_weapon_source_vfx_trace_provably_offscreen(uint32_t packed,
+sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey key,
+                                                 const Sc64WeaponSourceAttackProfile *profile,
                                                  int x0, int y0,
                                                  int x1, int y1,
                                                  int camx, int camy)
 {
-    Sc64WeaponSourceVfxKey key;
-    if (!sc64_weapon_source_vfx_unpack(packed, &key)) return 0;
-    const Sc64WeaponSourceAttackProfile *profile =
-        sc64_weapon_source_trace_profile(packed);
     if (!profile || !profile->projectile_image) return 0;
     /* Follow, bounce, and range-extension trajectories are not covered by the
      * renderer's straight endpoint interpolation proof. Preserve those. */
@@ -399,6 +396,16 @@ sc64_weapon_source_vfx_trace_provably_offscreen(uint32_t packed,
     if (y1 > hi_y) hi_y = y1;
     return sc64_weapon_source_vfx_bounds_miss_clip(lo_x, hi_x, lo_y, hi_y,
         camx, camy, radius_x, radius_y);
+}
+
+static inline int
+sc64_weapon_source_vfx_trace_provably_offscreen(uint32_t packed,
+                                                 int x0,int y0,int x1,int y1,int camx,int camy)
+{
+    Sc64WeaponSourceVfxKey key;
+    if (!sc64_weapon_source_vfx_unpack(packed,&key)) return 0;
+    return sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,
+        sc64_weapon_source_trace_profile(packed),x0,y0,x1,y1,camx,camy);
 }
 
 /* Draw attached image overlays and independently spawned sprite trails from
@@ -537,14 +544,12 @@ sc64_vfx_projectile_animations(uint16_t image_id,
 }
 
 static inline void
-sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
+sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
+                                     const Sc64WeaponSourceAttackProfile *p,
                                      int x0, int y0, int x1, int y1, int live,
                                      uint32_t gba_age)
 {
-    Sc64WeaponSourceVfxKey key;
-    if (!live || !sc64_weapon_source_vfx_unpack(packed, &key)) return;
-    const Sc64WeaponSourceAttackProfile *p =
-        sc64_weapon_source_trace_profile(packed);
+    if (!live) return;
     if (!p || !p->projectile_image) return;
     int launch_x, launch_y;
     sc64_weapon_source_trace_launch_origin(p, key.direction, x0, y0,
@@ -658,6 +663,14 @@ sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
             moving ? flight_ticks : 0u, &motion);
     }
 
+}
+
+static inline void
+sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,int x0,int y0,int x1,int y1,int live,uint32_t age)
+{
+    Sc64WeaponSourceVfxKey key;
+    if (!live || !sc64_weapon_source_vfx_unpack(packed,&key)) return;
+    sc64_weapon_source_vfx_draw_trace_resolved(key,sc64_weapon_source_trace_profile(packed),x0,y0,x1,y1,live,age);
 }
 
 static inline void

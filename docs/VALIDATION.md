@@ -7326,3 +7326,45 @@ in `default-depot-bounded-v1`. The reused baseline runtime inputs are checked
 against the current default Git tree and the independently qualified PR #169
 products; an earlier mismatching PR #168 comparison is not baseline evidence
 for this batch. No proprietary data is committed and no Actions run occurred.
+
+### Reuse resolved source-projectile metadata (2026-10-30)
+
+The shared tracer renderer now unpacks a tagged projectile and resolves its
+attack profile once for offscreen culling and drawing. The packed-key wrappers
+remain available; malformed keys and absent profiles still produce no effect.
+The resolved values live on the stack. No simulation, damage timing, persistent
+storage, actor limits or RAM reserves change.
+
+The actual preceding renderer header and the resolved path produce the same
+frame digest across 1,410,048 generated-bank cases, including headings, motion
+ages, fog, clipping, mirrored poses and child overlays. The fixture reports
+344,832 culls, 163,060 drawn cases and digest `403bcc76fe61a883` for both
+implementations. The fixture uses a deterministic test compositor; the separate
+production replay matches all 8,928 advancing gameplay and actual framebuffer
+observations. The numeric capture counter is not treated as a pixel digest.
+
+The same busy Zerg three-AI window takes 693,601,985 cycles instead of
+697,484,133: 0.557% less work, 24.05 to 24.19 effective fps. This is one
+nonterminal workload, not a universal 30-fps or physical-hardware result.
+The public bank fixture checks both wrapper and direct resolved paths,
+malformed keys and absent profiles. Private independent-oracle sources retain
+the frozen preceding header; wrapper-versus-wrapper checks alone are not
+claimed as an independent implementation comparison.
+
+Default doctor/build/test (686 Python tests, 17 optional skips and the separate
+eight-test suite), unified build/test and the full Terran host aggregate pass
+on the exact final three-file source snapshot. Host-controller information
+limits remain unchanged. All four canonical ARM links keep their preceding
+memory bounds. The final capture uses the actual Make flags without injecting
+an additional depot define; its ROMs are byte-identical to the previously
+qualified canonical products. The timed raw Zerg image has the same game
+payload as the normally packaged image, apart from the cartridge header and
+unused tail padding.
+
+Actual per-TU commands, raw dependencies, source/input hashes, maps, product
+comparisons and logs are private in `vfx-resolved-tracer-v1`,
+`vfx-resolved-final-gates-v1` and `vfx-resolved-final-arm-v1`. The gate closure
+reports no consumed-input drift and no symlinks in its input trees. This stage
+does not claim a repeated full P7 win or fresh Bunker SRAM replay; those remain
+earlier-stage evidence. Full roster services, all campaigns, broader visual
+fidelity and near-30-fps performance remain unfinished.

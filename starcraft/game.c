@@ -8516,19 +8516,23 @@ draw_tracers(void)
     for (int i=0;i<MAX_TRACERS;++i) if (tracers[i].life) {
 #ifdef SC64_WEAPON_SOURCE_VFX
         if(sc64_weapon_source_vfx_is_tagged((uint32_t)tracers[i].color)) {
+            uint32_t packed=(uint32_t)tracers[i].color;
+            Sc64WeaponSourceVfxKey key;
+            if (!sc64_weapon_source_vfx_unpack(packed,&key)) continue;
+            const Sc64WeaponSourceAttackProfile *profile=sc64_weapon_source_trace_profile(packed);
 #ifdef SC64_WEAPON_SOURCE_VFX_OFFSCREEN_CULL
             if (!sc64_weapon_source_vfx_anchor_may_be_visible(
                     tracers[i].x0, tracers[i].y0, camx, camy) &&
                 !sc64_weapon_source_vfx_anchor_may_be_visible(
                     tracers[i].x1, tracers[i].y1, camx, camy) &&
-                sc64_weapon_source_vfx_trace_provably_offscreen(
-                    (uint32_t)tracers[i].color,
+                sc64_weapon_source_vfx_trace_provably_offscreen_resolved(
+                    key,profile,
                     tracers[i].x0, tracers[i].y0, tracers[i].x1, tracers[i].y1,
                     camx, camy))
                 continue;
 #endif
             int age=sc64_tracer_duration(i)-tracers[i].life;
-            sc64_weapon_source_vfx_draw_trace((uint32_t)tracers[i].color,
+            sc64_weapon_source_vfx_draw_trace_resolved(key,profile,
                 tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,
                 tracers[i].life,(unsigned)(age<0?0:age));
             continue;
