@@ -2459,6 +2459,7 @@ build/test-sc64-full-$(1): $(2) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(TERRAN_ROM_FLAGS) $(3) $$< common/gba.c starcraft/sc64_bc_body_art.c -o $$@
 endef
 $(eval $(call TERRAN_FULL_TEST,t1-run,tests/sc64_mission_run.c))
+build/test-sc64-full-t1-run build/test-sc64-full-t2-run: tests/sc64_visible_worker_orders.h
 $(eval $(call TERRAN_FULL_TEST,t2-run,tests/backwater_mission_run.c))
 $(eval $(call TERRAN_FULL_TEST,t3-run,tests/sc64_t3_run.c))
 $(eval $(call TERRAN_FULL_TEST,t3-save,tests/sc64_t3_save.c))
