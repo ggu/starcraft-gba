@@ -22,6 +22,10 @@ def main():
     local = (root / '.local').resolve()
     if not out.is_relative_to(local):
         parser.error('output must be under this worktree .local')
+    if out == args.bwgame.resolve():
+        parser.error('output must not overwrite the source')
+    if out.exists():
+        parser.error('output already exists')
     data = args.bwgame.read_bytes()
     if hashlib.sha256(data).hexdigest() != PINNED_SHA256:
         parser.error('bwgame.h does not match the pinned source hash')
@@ -33,7 +37,8 @@ def main():
     if not fragment.rstrip().endswith(b'};'):
         parser.error('unexpected loader ending')
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(fragment + b'\n\tload_iscript_bin();\n')
+    with out.open('xb') as output:
+        output.write(fragment + b'\n\tload_iscript_bin();\n')
     print('source_sha256=' + PINNED_SHA256)
     print('fragment_sha256=' + hashlib.sha256(fragment).hexdigest())
 
