@@ -915,6 +915,9 @@ static void race_complete_building(int i)
 #ifdef SC64_CONSTRUCTION_HP
     {
         int old_max = race_construction_morph_source_max(b[i].type);
+        /* A custom-game morph to a lower maximum already applied the
+         * difference when it started (race_skirmish_start_record). */
+        if (race_mode && old_max > b[i].maxhp) old_max = b[i].maxhp;
         if (old_max > 0) {
             b[i].hp = sc64_construction_morph_hp(b[i].hp, old_max, b[i].maxhp);
         }

@@ -115,62 +115,96 @@ static int race_skirmish_worker(int type)
     return best;
 }
 
+/* Owner-generic admission for a producer-attached addon or an in-place
+ * building morph. The human command row and computer opponents share it. */
+static int race_skirmish_record_ready(int owner, int producer,
+                                      const Sc64SkirmishRecord *r)
+{
+    /* The catalog retains the Silo row, but production is unavailable until
+     * nuclear ammunition and launch are implemented. */
+    if (r && r->raw_id == 108) return 0;
+    if (!race_mode || !race_skirmish_requirements(owner, r) ||
+        sc64_race_building_from_raw(r->raw_id) < 0) return 0;
+    if (r->kind != SC64_SK_ADDON && r->kind != SC64_SK_BUILDING_MORPH) return 0;
+    /* Infestation is an ability targeting a damaged enemy Command Center,
+     * not an ordinary in-place upgrade of an owned structure. */
+    if (r->raw_id == 130 || producer < 0 || producer >= MAX_BUILDINGS ||
+        !building_complete(producer) || b[producer].owner != owner ||
+        sc64_race_raw_building(b[producer].type) != r->parent_raw ||
+        b[producer].queue_count) return 0;
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    if (race_late_airborne(producer)) return 0;
+#endif
+    if (r->kind == SC64_SK_ADDON &&
+        race_skirmish_attached(producer, SC64_SK_NONE, 0)) return 0;
+    return 1;
+}
+
+/* Pay from the owner's own bank and start the addon foundation or morph
+ * clock. No resources are granted and nothing completes immediately. */
+static int race_skirmish_start_record(int owner, int producer,
+                                      const Sc64SkirmishRecord *r)
+{
+    const Sc64RaceBuildingRule *rule;
+    Sc64RaceBank bank;
+    int type, slot, x, y;
+    if (!race_skirmish_record_ready(owner, producer, r)) return 0;
+    type = sc64_race_building_from_raw(r->raw_id);
+    rule = sc64_race_building_rule(type);
+    if (!rule) return 0;
+    bank.minerals = (unsigned short)race_owner_minerals(owner);
+    bank.gas = (unsigned short)race_owner_gas(owner);
+    if (!sc64_race_pay_building(&bank, type)) return 0;
+    if (r->kind == SC64_SK_ADDON) {
+        x = b[producer].x + 48; y = b[producer].y + 8;
+        if (!can_place(type, x, y) || find_build_slot() < 0) return 0;
+        slot = spawn_build(owner, type, x, y, 1);
+        if (slot < 0) return 0;
+        b[slot].build_progress = 0;
+    } else {
+        slot = producer;
+        b[slot].type = type; b[slot].raw_type = r->raw_id;
+        {
+            /* BW applies the maximum-HP difference when a morph completes.
+             * A morph to a lower maximum (Creep Colony 400 to Sunken Colony
+             * 300) applies it now instead, since saves derive the maximum
+             * from the type and reject more hit points than that maximum;
+             * race_complete_building then leaves those hit points alone. */
+            int old_max = b[slot].maxhp, new_max = sc64_race_building_max_hp(type);
+            b[slot].maxhp = new_max;
+            if (new_max < old_max) {
+                int hp = b[slot].hp + new_max - old_max;
+                b[slot].hp = hp < 1 ? 1 : hp > new_max ? new_max : hp;
+            }
+        }
+        b[slot].under_construction = 1; b[slot].build_progress = 0;
+        invalidate_path_grid();
+    }
+    if (owner == SIDE) { minerals = bank.minerals; gas = bank.gas; }
+    else { race_minerals[owner] = bank.minerals; race_gas[owner] = bank.gas; }
+    return 1;
+}
+
 static int race_skirmish_record_available(const Sc64SkirmishRecord *r)
 {
     int type;
-    /* The catalog retains the Silo row, but production is unavailable until
-     * nuclear ammunition and launch are implemented. */
     if (r && r->raw_id == 108) return 0;
     if (!race_mode || !race_skirmish_requirements(SIDE, r) ||
         (type = sc64_race_building_from_raw(r->raw_id)) < 0) return 0;
     if (r->kind == SC64_SK_WORKER_BUILD) {
         return race_skirmish_worker(type) >= 0;
     }
-    if (r->kind != SC64_SK_ADDON && r->kind != SC64_SK_BUILDING_MORPH) return 0;
-    /* Infestation is an ability targeting a damaged enemy Command Center,
-     * not an ordinary in-place upgrade of an owned structure. */
-    if (r->raw_id == 130 || selected_building < 0 || selected_building >= MAX_BUILDINGS ||
-        !building_complete(selected_building) || b[selected_building].owner != SIDE ||
-        sc64_race_raw_building(b[selected_building].type) != r->parent_raw ||
-        b[selected_building].queue_count) return 0;
-#ifdef SC64_TERRAN_LATE_RUNTIME
-    if (race_late_airborne(selected_building)) return 0;
-#endif
-    if (r->kind == SC64_SK_ADDON &&
-        race_skirmish_attached(selected_building, SC64_SK_NONE, 0)) return 0;
-    return 1;
+    return race_skirmish_record_ready(SIDE, selected_building, r);
 }
 
 static int race_skirmish_choose_record(const Sc64SkirmishRecord *r)
 {
-    const Sc64RaceBuildingRule *rule;
-    Sc64RaceBank bank;
-    int type, slot, x, y;
     if (!race_skirmish_record_available(r)) return 0;
-    type = sc64_race_building_from_raw(r->raw_id);
     if (r->kind == SC64_SK_WORKER_BUILD) {
-        mode = MODE_BUILD; menu = type; return 1;
+        mode = MODE_BUILD; menu = sc64_race_building_from_raw(r->raw_id); return 1;
     }
     mode = MODE_NORMAL;
-    rule = sc64_race_building_rule(type);
-    if (!rule) return 0;
-    bank.minerals = (unsigned short)minerals; bank.gas = (unsigned short)gas;
-    if (!sc64_race_pay_building(&bank, type)) return 0;
-    if (r->kind == SC64_SK_ADDON) {
-        x = b[selected_building].x + 48; y = b[selected_building].y + 8;
-        if (!can_place(type, x, y) || find_build_slot() < 0) return 0;
-        slot = spawn_build(SIDE, type, x, y, 1);
-        if (slot < 0) return 0;
-        b[slot].build_progress = 0;
-    } else {
-        slot = selected_building;
-        b[slot].type = type; b[slot].raw_type = r->raw_id;
-        b[slot].maxhp = sc64_race_building_max_hp(type);
-        b[slot].under_construction = 1; b[slot].build_progress = 0;
-        invalidate_path_grid();
-    }
-    minerals = bank.minerals; gas = bank.gas;
-    return 1;
+    return race_skirmish_start_record(SIDE, selected_building, r);
 }
 
 #endif

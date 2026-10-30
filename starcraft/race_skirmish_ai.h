@@ -12,7 +12,7 @@
  * from the engine's rule tables and the raw-ID skirmish catalog, and every
  * action goes through the same paid services as the human:
  * race_start_build (pays on arrival), race_queue_unit (pays on queue),
- * and ordinary unit orders.
+ * race_skirmish_start_record (addon/morph), and ordinary unit orders.
  * No resources, units, or construction progress are granted.
  *
  * The planner keeps no persistent state of its own. Every decision is derived
@@ -668,21 +668,37 @@ static int race_ai_supply(RaceAiCensus *c)
 }
 
 enum {
-    RACE_AI_STEP_BUILD = 1, RACE_AI_STEP_GAS = 4, RACE_AI_STEP_HALL = 5,
+    RACE_AI_STEP_BUILD = 1, RACE_AI_STEP_ADDON = 2, RACE_AI_STEP_MORPH = 3,
+    RACE_AI_STEP_GAS = 4, RACE_AI_STEP_HALL = 5, RACE_AI_STEP_DEFENSE = 6,
     RACE_AI_IF_AIR = 1, RACE_AI_IF_LATE = 2, RACE_AI_IF_RICH = 4
 };
 
 /* Ordered development plans. raw is the stock raw ID; count is the wanted
  * total for this owner; workers is the minimum worker count. These are
- * authored opening orders over working engine products, not decoded
- * script programs. */
+ * authored opening/tech orders over working engine products, not decoded
+ * script programs. Missing engine capabilities are omitted (see
+ * docs/SKIRMISH-AI.md). */
 typedef struct { unsigned char kind, raw, count, workers, flags; } RaceAiStep;
 
 static const RaceAiStep race_ai_terran_plan[] = {
     { RACE_AI_STEP_BUILD, 111, 1, 9, 0 },        /* Barracks */
     { RACE_AI_STEP_GAS,   110, 1, 11, 0 },       /* Refinery */
     { RACE_AI_STEP_BUILD, 111, 2, 13, 0 },
+    { RACE_AI_STEP_BUILD, 113, 1, 14, 0 },       /* Factory */
+    { RACE_AI_STEP_ADDON, 120, 1, 14, 0 },       /* Machine Shop */
+    { RACE_AI_STEP_BUILD, 112, 1, 15, 0 },       /* Academy: Firebats */
+    { RACE_AI_STEP_BUILD, 122, 1, 15, RACE_AI_IF_AIR }, /* Engineering Bay */
+    { RACE_AI_STEP_DEFENSE, 124, 2, 15, RACE_AI_IF_AIR }, /* Missile Turrets */
+    { RACE_AI_STEP_BUILD, 123, 1, 16, RACE_AI_IF_AIR }, /* Armory: Goliaths */
     { RACE_AI_STEP_HALL,  106, 2, 14, 0 },       /* expansion when ore runs low */
+    { RACE_AI_STEP_BUILD, 114, 1, 15, 0 },       /* Starport: Wraiths */
+    { RACE_AI_STEP_BUILD, 123, 1, 16, RACE_AI_IF_LATE },
+    { RACE_AI_STEP_BUILD, 113, 2, 16, RACE_AI_IF_RICH },
+    { RACE_AI_STEP_ADDON, 120, 2, 16, RACE_AI_IF_RICH },
+    { RACE_AI_STEP_GAS,   110, 2, 16, 0 },
+    { RACE_AI_STEP_BUILD, 111, 3, 16, RACE_AI_IF_RICH },
+    { RACE_AI_STEP_BUILD, 122, 1, 16, RACE_AI_IF_LATE },
+    { RACE_AI_STEP_DEFENSE, 124, 1, 16, RACE_AI_IF_LATE },
 };
 
 /* A Hatchery's larva queue is serial in these products, so Zerg production
@@ -693,6 +709,17 @@ static const RaceAiStep race_ai_zerg_plan[] = {
     { RACE_AI_STEP_GAS,   149, 1, 10, 0 },       /* Extractor */
     { RACE_AI_STEP_HALL,  131, 3, 10, 0 },
     { RACE_AI_STEP_BUILD, 135, 1, 11, 0 },       /* Hydralisk Den */
+    { RACE_AI_STEP_MORPH, 132, 1, 12, 0 },       /* Lair */
+    { RACE_AI_STEP_BUILD, 139, 1, 12, RACE_AI_IF_AIR }, /* Evolution Chamber */
+    { RACE_AI_STEP_DEFENSE, 144, 2, 12, RACE_AI_IF_AIR }, /* Spore Colonies */
+    { RACE_AI_STEP_HALL,  131, 4, 12, RACE_AI_IF_RICH },
+    { RACE_AI_STEP_BUILD, 141, 1, 12, 0 },       /* Spire */
+    { RACE_AI_STEP_DEFENSE, 146, 1, 12, RACE_AI_IF_LATE }, /* Sunken Colony */
+    { RACE_AI_STEP_GAS,   149, 2, 14, 0 },
+    { RACE_AI_STEP_HALL,  131, 5, 14, RACE_AI_IF_RICH },
+    { RACE_AI_STEP_HALL,  131, 6, 14, RACE_AI_IF_RICH | RACE_AI_IF_LATE },
+    { RACE_AI_STEP_BUILD, 139, 1, 14, RACE_AI_IF_LATE },
+    { RACE_AI_STEP_DEFENSE, 146, 2, 14, RACE_AI_IF_LATE },
 };
 
 static const RaceAiStep race_ai_protoss_plan[] = {
@@ -700,12 +727,65 @@ static const RaceAiStep race_ai_protoss_plan[] = {
     { RACE_AI_STEP_GAS,   157, 1, 11, 0 },       /* Assimilator */
     { RACE_AI_STEP_BUILD, 164, 1, 12, 0 },       /* Cybernetics Core */
     { RACE_AI_STEP_BUILD, 160, 2, 13, 0 },
+    { RACE_AI_STEP_BUILD, 166, 1, 15, RACE_AI_IF_AIR }, /* Forge */
+    { RACE_AI_STEP_DEFENSE, 162, 2, 15, RACE_AI_IF_AIR }, /* Photon Cannons */
     { RACE_AI_STEP_HALL,  154, 2, 14, 0 },
+    { RACE_AI_STEP_BUILD, 167, 1, 15, 0 },       /* Stargate: Scouts */
+    { RACE_AI_STEP_BUILD, 160, 3, 15, RACE_AI_IF_RICH },
+    { RACE_AI_STEP_GAS,   157, 2, 16, 0 },
+    { RACE_AI_STEP_BUILD, 166, 1, 16, RACE_AI_IF_LATE },
+    { RACE_AI_STEP_DEFENSE, 162, 1, 16, RACE_AI_IF_LATE },
+    { RACE_AI_STEP_BUILD, 160, 4, 16, RACE_AI_IF_RICH },
 };
 
 static const Sc64SkirmishRecord *race_ai_record(const RaceAiCensus *c, int raw)
 {
     return race_skirmish_build_record(c->owner, raw);
+}
+
+static int race_ai_attach_parent(const RaceAiCensus *c, const Sc64SkirmishRecord *r)
+{
+    for (int i = 0; i < MAX_BUILDINGS; ++i)
+        if (b[i].alive && b[i].owner == c->owner &&
+            sc64_race_raw_building(b[i].type) == r->parent_raw &&
+            race_skirmish_record_ready(c->owner, i, r)) return i;
+    return -1;
+}
+
+/* Start the next addon or morph on an eligible completed producer. An
+ * addon that would seal the producer's unit exit is not started. */
+static int race_ai_start_attached(RaceAiCensus *c, const Sc64SkirmishRecord *r)
+{
+    for (int i = 0; i < MAX_BUILDINGS; ++i) {
+        if (!b[i].alive || b[i].owner != c->owner ||
+            sc64_race_raw_building(b[i].type) != r->parent_raw) continue;
+        if (r->kind == SC64_SK_ADDON &&
+            !race_ai_exit_escapes(i, sc64_race_building_from_raw(r->raw_id), b[i].x + 48, b[i].y + 8))
+            continue;
+        if (race_skirmish_start_record(c->owner, i, r)) {
+            int key = race_ai_key(r->raw_id);
+            if (key >= 0) ++c->pend[key];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Defense structures face the map center. Zerg morph a Creep Colony. */
+static int race_ai_start_defense(RaceAiCensus *c, int raw)
+{
+    int x, y, type = sc64_race_building_from_raw(raw);
+    int ax = c->hx + (WORLD_W / 2 - c->hx) / 8, ay = c->hy + (WORLD_H / 2 - c->hy) / 8;
+    if (type < 0) return 0;
+    if (c->race == R_ZERG) {
+        const Sc64SkirmishRecord *r = race_ai_record(c, raw);
+        if (r && r->kind == SC64_SK_BUILDING_MORPH && race_ai_start_attached(c, r)) return 1;
+        if (c->have[AK_CREEP] + c->pend[AK_CREEP]) return 0; /* wait for the colony */
+        type = B_CREEP_COLONY;
+        ax = c->hx; ay = c->hy;
+    }
+    if (!race_ai_find_site(c, type, ax, ay, 0, c->race == R_ZERG ? 3 : 2, 1, &x, &y)) return 0;
+    return race_ai_start_build(c, type, x, y);
 }
 
 static int race_ai_hall(RaceAiCensus *c, int count)
@@ -772,8 +852,11 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
             continue;
         }
         have = race_ai_count(c, key);
+        if (step->raw == 132) have += c->have[AK_HIVE];
         if (have >= step->count) continue;
         if (!race_skirmish_requirements(c->owner, r)) continue;
+        if ((step->kind == RACE_AI_STEP_ADDON || step->kind == RACE_AI_STEP_MORPH) &&
+            race_ai_attach_parent(c, r) < 0) continue;
         if (step->kind == RACE_AI_STEP_GAS && !race_ai_build_gas(c, 1)) continue;
         if (!race_ai_affordable(c, rule->minerals, rule->gas)) {
             /* Reserve only when the gas side can eventually be met. */
@@ -788,6 +871,9 @@ static void __attribute__((noinline)) race_ai_develop(RaceAiCensus *c)
                 started = race_ai_start_build(c, type, x, y);
             break;
         case RACE_AI_STEP_GAS: started = race_ai_build_gas(c, 0); break;
+        case RACE_AI_STEP_ADDON:
+        case RACE_AI_STEP_MORPH: started = race_ai_start_attached(c, r); break;
+        case RACE_AI_STEP_DEFENSE: started = race_ai_start_defense(c, step->raw); break;
         }
         if (started) return;
     }
@@ -813,18 +899,36 @@ static int race_ai_try_queue(RaceAiCensus *c, int producer, int raw, int honor_r
     return 1;
 }
 
-/* Basic products for this stage: Marines; Zerglings, then Hydralisks;
- * Zealots, then a Zealot/Dragoon mix. */
 static int race_ai_pick_terran(RaceAiCensus *c, int producer)
 {
-    (void)c;
-    return b[producer].type == B_BARRACKS ? 0 : -1;
+    int marines = race_ai_count(c, AK_MARINE), firebats = race_ai_count(c, AK_FIREBAT);
+    int tanks = race_ai_count(c, AK_TANK), goliaths = race_ai_count(c, AK_GOLIATH);
+    int vultures = race_ai_count(c, AK_VULTURE);
+    switch (b[producer].type) {
+    case B_BARRACKS:
+        if (c->have[AK_ACADEMY] && firebats * 4 < marines && c->enemy_air * 2 < c->enemy_army + 1)
+            return 32;
+        return 0;
+    case B_FACTORY:
+        if (c->have[AK_ARMORY] && (c->enemy_air > goliaths || goliaths * 2 < tanks)) return 3;
+        if (race_skirmish_attached(producer, 120, 1)) return 5;
+        if (c->have[AK_ARMORY]) return 3;
+        return vultures < 4 ? 2 : -1;
+    case B_STARPORT:
+        return 8;
+    }
+    return -1;
 }
 
 static int race_ai_pick_zerg(RaceAiCensus *c)
 {
     int lings = race_ai_count(c, AK_ZERGLING), hydras = race_ai_count(c, AK_HYDRALISK);
-    if (c->have[AK_DEN] && (lings >= 8 || hydras * 2 < lings)) return 38;
+    int mutas = race_ai_count(c, AK_MUTALISK), scourge = race_ai_count(c, AK_SCOURGE);
+    if (c->have[AK_SPIRE]) {
+        if (c->enemy_air >= 2 && scourge < c->enemy_air && scourge < 8) return 47;
+        if (mutas * 2 < hydras + 2) return 43;
+    }
+    if (c->have[AK_DEN] && (c->enemy_air || lings >= 8 || hydras * 2 < lings)) return 38;
     if (c->have[AK_POOL]) return 37;
     return -1;
 }
@@ -832,8 +936,9 @@ static int race_ai_pick_zerg(RaceAiCensus *c)
 static int race_ai_pick_protoss(RaceAiCensus *c, int producer)
 {
     int zealots = race_ai_count(c, AK_ZEALOT), dragoons = race_ai_count(c, AK_DRAGOON);
+    if (b[producer].type == B_STARGATE) return 70;
     if (b[producer].type != B_GATEWAY) return -1;
-    if (c->have[AK_CORE] && dragoons <= zealots &&
+    if (c->have[AK_CORE] && (c->enemy_air || dragoons <= zealots) &&
         race_owner_gas(c->owner) - c->reserve_gas >= 50) return 66;
     return 65;
 }

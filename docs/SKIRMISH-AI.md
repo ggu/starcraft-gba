@@ -46,14 +46,28 @@ different updates, so no update runs more than one plan.
   Factory boxed in by its Machine Shop and neighbors otherwise traps its
   products.
 
-**Opening structures**
+**Race development**
 
-This stage keeps the existing opening: Terran build Barracks ×2 and a
-Refinery; Zerg build a Spawning Pool, an Extractor and a Hydralisk Den, plus
-up to two extra Hatcheries as larva sources; Protoss build Gateway ×2, an
-Assimilator and a Cybernetics Core. Each race also builds a depot at a free
-start location when its home field runs low. Opponents train Marines;
-Zerglings, then Hydralisks; and Zealots, then a Zealot/Dragoon mix.
+The ordered plans in `race_ai_terran_plan`, `race_ai_zerg_plan` and
+`race_ai_protoss_plan` use stock raw IDs. Admission, prerequisites, power,
+creep, producer identity and attached addons all come from the same catalog
+checks as the human command menu. Costs and build times come from the engine
+rule tables.
+
+| Race | Structures | Army |
+| --- | --- | --- |
+| Terran | Barracks ×3, Refinery ×2, Factory ×2 with Machine Shops, Academy, Engineering Bay, Missile Turrets, Armory, Starport, Command Center | Marines and Firebats; Siege Tanks (Tank Mode) from Factories with a Machine Shop, otherwise Vultures; Goliaths after the Armory, favored against air; Wraiths |
+| Zerg | Spawning Pool, up to five Hatcheries, Extractor ×2, Hydralisk Den, Lair (morph), Evolution Chamber, Spire, Creep Colonies morphed into Spore and Sunken Colonies | Zerglings, Hydralisks (favored against air or after eight Zerglings), Mutalisks, Scourge against air |
+| Protoss | Gateway ×4, Assimilator ×2, Cybernetics Core, Forge, Photon Cannons, Stargate, Nexus | Zealots and Dragoons (Dragoons favored against air), Scouts |
+
+Addons and building morphs go through `race_skirmish_start_record`. The human
+command row uses the same function. It pays from the owner's own bank and
+starts the normal construction clock. A morph to a lower maximum (Creep
+Colony 400 to Sunken Colony 300) applies the maximum-HP difference when it
+starts rather than when it completes, so the final hit points match the
+Brood War rule. Previously the morphing structure held more hit points than
+its new maximum, which save validators reject. An addon that would seal its producer's unit
+exit is not started.
 
 **Military**
 
@@ -82,15 +96,27 @@ ordinary idle engagement.
 | --- | --- |
 | Unit and building costs, build times, supply, prerequisites, producers, addons | Engine rule tables and the raw-ID catalog. The catalog is checked against pinned BWAPI UnitType data and the Blizzard compendium ([catalog notes](SC64_SKIRMISH_ROSTER_STATUS.md)). |
 | Script inventory | The private SC64 AI catalog (BOLT leaf `012/000`, see [SC64-AI-CATALOG.md](SC64-AI-CATALOG.md)) lists the melee custom scripts `TMCu`, `ZMCu`, `PMCu` and the Brood War `TMCx`, `ZMCx`, `PMCx`. This shows that SC64 ships per-race melee programs. Their bytecode semantics are unaudited, so nothing here is decoded from them. |
-| Opening order | Authored, preserving the previous opponent's structure list. |
+| Plan shape | Authored. The plan follows the general structure that public AIScript documentation (PyMS) gives for stock melee scripts: build orders, defense builds, attack preparation and waves. No program content is copied. |
 | Recovery and placement | Authored. |
 
 ## Missing engine capabilities
+
+The planner uses only products that work in the canonical products. The
+capability audit (`build/test-sc64-skirmish-ai-progress-<profile> --audit`)
+prints how each catalog row maps in a profile. Rows the planner skips, and
+why:
 
 | Missing capability | Effect on opponents |
 | --- | --- |
 | Nearest-depot cargo return (`SC64_NEAREST_RESOURCE_DEPOT`) is off in canonical products. Cargo goes to the owner's first completed depot. | An expansion mines inefficiently until the main depot is gone. Expansions are taken only when the home field runs low, or as recovery depots. |
 | Zerg larva products are queued serially per Hatchery in these products. Parallel eggs exist only in the Z7 runtime. | Zerg production capacity comes from extra Hatcheries. Queues are capped at two items. |
+| Per-owner weapon and armor upgrades: unit levels apply only to the human. | No Forge, Engineering Bay, Evolution Chamber or Armory research. Those buildings are built only for defenses and unit prerequisites. |
+| Medic healing, Queen spells, High Templar, Science Vessel, Defiler and Dark Templar products | Not trained. They have no working ordinary combat role in custom games. |
+| Reaver (Scarab ammunition), Carrier and Interceptors, Arbiter, Observer, Shuttle and Ultralisk ordinary production (producer `255` or explicitly rejected) | Not trained. Robotics, Templar, Fleet Beacon and Ultralisk Cavern paths are omitted. |
+| Unit morphs: Lurker, Guardian, Devourer, Archon | Not available. The Hive and Greater Spire morphs have no payoff and are skipped. |
+| Siege Mode transition and Siege research | Tanks fight in Tank Mode only. |
+| Bunker loading by computer players | Opponents do not build Bunkers. |
+| Comsat Station, Nuclear Silo, Covert Ops, Physics Lab, Valkyrie, Corsair | Unmapped or unavailable in the catalog adapter. |
 | Per-owner fog of war | Opponents have full knowledge of hostile actors (see above). |
 
 ## Budget and saves
