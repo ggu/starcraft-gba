@@ -2,6 +2,7 @@
 #include <string.h>
 #define main sc64_battlecruiser_unused_skirmish_test_main
 #include "sc64_skirmish_runtime.c"
+#include "sc64_save_candidate_fixture.h"
 #undef main
 static void tap(unsigned k) { game_update((u16)k,(u16)k); game_update(0,0); }
 static void choose_row(int row) {
@@ -40,11 +41,14 @@ int main(void)
     assert(race_load_game() && race_bc_facility_airborne(sf));
 #ifdef SC64_SHARED_BATTERY
     assert(race_save_game());
+    static RaceSave bad_record; fixture_capture_save(&bad_record);
     Building invalid=b[sf]; invalid.level=2;
-    assert(race_battery_save_encode_building(&race_data,(unsigned)sf,
+    assert(race_battery_save_encode_building(&bad_record,(unsigned)sf,
                                              race_cols*16u,race_rows*16u,&invalid));
-    save_write(&race_data,sizeof(race_data),SAVE_VERSION);
-    save_write(&race_data,sizeof(race_data),SAVE_VERSION);
+    write_candidate_record(&bad_record);
+    Building decoded;
+    assert(race_save_decode_building(&race_data,(unsigned)sf,&decoded));
+    assert(!race_bc_facility_fields_valid(&decoded,(unsigned)WORLD_W,(unsigned)WORLD_H));
     int saved_x=b[sf].x, saved_energy=minerals;
     assert(!race_load_game());
     assert(race_bc_facility_airborne(sf) && b[sf].x==saved_x && minerals==saved_energy);

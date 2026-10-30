@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/game.c"
+#include "sc64_save_candidate_fixture.h"
 
 static u16 previous;
 
@@ -81,21 +82,24 @@ static void corrupt_t3_payload_is_atomic(void) {
     int saved_frame = frame, saved_x = u[0].x;
     Sc64T3State saved_t3 = race_t3;
     u16 saved_kills = race_t3_buildings_killed;
+    static RaceSave candidate;
 
-    assert(race_save_game());
-    race_data.t3.remaining_ticks++;
-    save_write(&race_data, sizeof(race_data), SAVE_VERSION);
+    assert(race_save_game()); fixture_capture_save(&candidate);
+    candidate.t3.remaining_ticks++;
+    write_candidate_record(&candidate);
+    assert(!sc64_t3_state_valid(&race_data.t3));
     assert(!race_load_game());
     assert(frame == saved_frame && u[0].x == saved_x);
     assert(memcmp(&race_t3, &saved_t3, sizeof(saved_t3)) == 0);
     assert(race_t3_buildings_killed == saved_kills);
 
     /* A valid alternate-objective state still requires evidence of a kill. */
-    assert(race_save_game());
-    race_data.t3.objective = 1;
-    race_data.t3.fired |= SC64_T3_F_ALTERNATE | SC64_T3_F_SWITCH_1;
-    race_data.t3_buildings_killed = 0;
-    save_write(&race_data, sizeof(race_data), SAVE_VERSION);
+    assert(race_save_game()); fixture_capture_save(&candidate);
+    candidate.t3.objective = 1;
+    candidate.t3.fired |= SC64_T3_F_ALTERNATE | SC64_T3_F_SWITCH_1;
+    candidate.t3_buildings_killed = 0;
+    write_candidate_record(&candidate);
+    assert(race_data.t3.objective == 1 && race_data.t3_buildings_killed == 0);
     assert(sc64_t3_state_valid(&race_data.t3));
     assert(!race_load_game());
     assert(frame == saved_frame && u[0].x == saved_x);
@@ -103,26 +107,28 @@ static void corrupt_t3_payload_is_atomic(void) {
     assert(race_t3_buildings_killed == saved_kills);
 
     /* A checksummed payload cannot move the campaign clock independently. */
-    assert(race_save_game());
-    ++race_data.campaign.elapsed_frames;
-    save_write(&race_data, sizeof(race_data), SAVE_VERSION);
+    assert(race_save_game()); fixture_capture_save(&candidate);
+    ++candidate.campaign.elapsed_frames;
+    write_candidate_record(&candidate);
+    assert(race_data.campaign.elapsed_frames != race_data.t3.elapsed_ticks);
     assert(!race_load_game());
     assert(frame == saved_frame && u[0].x == saved_x);
     assert(memcmp(&race_t3, &saved_t3, sizeof(saved_t3)) == 0);
     assert(race_t3_buildings_killed == saved_kills);
 
     /* Nor can it persist an outcome inconsistent with the game's result flags. */
-    assert(race_save_game());
-    race_data.t3.outcome = SC64_T3_WON;
-    race_data.t3.objective = 1;
-    race_data.t3.fired |= SC64_T3_F_ALTERNATE | SC64_T3_F_SWITCH_1 | SC64_T3_F_RESULT;
-    race_data.t3_buildings_killed = 1;
-    race_data.campaign.objective_stage = 1;
-    race_data.campaign.phase = SC64_RACE_PHASE_COMPLETE;
-    race_data.campaign.objective_flags |= SC64_RACE_OBJECTIVE_PRIMARY;
-    race_data.state[18] = 0; /* T3 says won, but the engine result says running. */
-    race_data.state[19] = 0;
-    save_write(&race_data, sizeof(race_data), SAVE_VERSION);
+    assert(race_save_game()); fixture_capture_save(&candidate);
+    candidate.t3.outcome = SC64_T3_WON;
+    candidate.t3.objective = 1;
+    candidate.t3.fired |= SC64_T3_F_ALTERNATE | SC64_T3_F_SWITCH_1 | SC64_T3_F_RESULT;
+    candidate.t3_buildings_killed = 1;
+    candidate.campaign.objective_stage = 1;
+    candidate.campaign.phase = SC64_RACE_PHASE_COMPLETE;
+    candidate.campaign.objective_flags |= SC64_RACE_OBJECTIVE_PRIMARY;
+    candidate.state[18] = 0; /* T3 says won, but the engine result says running. */
+    candidate.state[19] = 0;
+    write_candidate_record(&candidate);
+    assert(race_data.t3.outcome == SC64_T3_WON && race_data.state[18] == 0);
     assert(sc64_t3_state_valid(&race_data.t3));
     assert(!race_load_game());
     assert(frame == saved_frame && u[0].x == saved_x);

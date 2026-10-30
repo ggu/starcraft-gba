@@ -3,6 +3,7 @@
 
 #define main sc64_battlecruiser_unused_skirmish_test_main
 #include "sc64_skirmish_runtime.c"
+#include "sc64_save_candidate_fixture.h"
 #undef main
 static void tap_input(unsigned key)
 { game_update((u16)key,(u16)key); game_update(0,0); }
@@ -50,11 +51,16 @@ int main(void)
 #ifdef SC64_SHARED_BATTERY
     /* A structurally encodable duplicate active job must be rejected before
        any live unit, building, bank or completed-tech state is committed. */
+    static RaceSave bad_record; fixture_capture_save(&bad_record);
     Building bad=b[lab2]; bad.level=SC64_BC_TECH_YAMATO; bad.queue_progress=5;
-    assert(race_battery_save_encode_building(&race_data,(unsigned)lab2,
+    assert(race_battery_save_encode_building(&bad_record,(unsigned)lab2,
                                              race_cols*16u,race_rows*16u,&bad));
-    save_write(&race_data,sizeof(race_data),SAVE_VERSION);
-    save_write(&race_data,sizeof(race_data),SAVE_VERSION);
+    write_candidate_record(&bad_record);
+    Building decoded1, decoded2;
+    assert(race_save_decode_building(&race_data,(unsigned)lab,&decoded1));
+    assert(race_save_decode_building(&race_data,(unsigned)lab2,&decoded2));
+    assert(decoded1.owner==decoded2.owner && decoded1.level==SC64_BC_TECH_YAMATO &&
+           decoded2.level==SC64_BC_TECH_YAMATO && decoded2.queue_progress==5);
     int original_remaining=b[lab].queue_progress, original_ore=minerals;
     unsigned original_bits=sc64_battlecruiser_tech_bits;
     assert(!race_load_game());

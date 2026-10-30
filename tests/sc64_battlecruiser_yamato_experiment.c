@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #define main sc64_battlecruiser_unused_skirmish_test_main
 #include "sc64_skirmish_runtime.c"
+#include "sc64_save_candidate_fixture.h"
 #undef main
 int main(void)
 {
@@ -24,8 +25,10 @@ int main(void)
     /* Invalid queue metadata must be rejected before any live mutation. */
     Sc64BcYamatoShot saved_shot=sc64_bc_shots[0];
     int saved_minerals=minerals;
-    race_data.battlecruiser_shots[0].phase|=0x80u;
-    save_write(&race_data,sizeof(race_data),SAVE_VERSION);
+    static RaceSave bad_record; fixture_capture_save(&bad_record);
+    bad_record.battlecruiser_shots[0].phase|=0x80u;
+    write_candidate_record(&bad_record);
+    assert(!race_bc_shots_candidate_valid(&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H));
     assert(!race_load_game());
     assert(!memcmp(&saved_shot,&sc64_bc_shots[0],sizeof(saved_shot)) &&
            minerals==saved_minerals && u[a].carry==50*256);
@@ -83,8 +86,10 @@ int main(void)
     assert(race_load_game() && !memcmp(&sc64_bc_shots[1],&expected,sizeof(expected)));
     assert(sc64_bc_motion_unpack(&sc64_bc_shots[1],&decoded));
     assert(decoded.destination_x==1040 && decoded.speed==8533 && decoded.heading==201);
-    race_data.battlecruiser_shots[1].motion|=0x80000000u;
-    save_write(&race_data,sizeof(race_data),SAVE_VERSION);
+    fixture_capture_save(&bad_record);
+    bad_record.battlecruiser_shots[1].motion|=0x80000000u;
+    write_candidate_record(&bad_record);
+    assert(!race_bc_shots_candidate_valid(&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H));
     assert(!race_load_game() && !memcmp(&sc64_bc_shots[1],&expected,sizeof(expected)));
     sc64_bc_shot_target_gone(sc64_bc_shots,(unsigned)t);
     assert(sc64_bc_shots[1].state==SC64_BC_SHOT_FLIGHT &&
