@@ -149,6 +149,89 @@ generated headers, audio and other consumed sources remain unchanged. All four
 packaged payload/header/padding checks pass. The four ROMs are experimental
 Mac artifacts, not a new recommendation to replace the preceding tested card.
 
+## Bounded tracer arithmetic follow-up
+
+Runtime `4203255` retains the original checked wide-arithmetic culling path,
+with an exact 32-bit path only when both endpoints and the camera fit signed
+16 bits and the direction is valid. Source offsets, division rounding, clip
+bounds, fog, motion and effect lifetimes retain their existing meaning. The
+renderer reuses its already-decoded source key for the same profile lookup.
+It introduces no runtime state or reduced reserves. Renderer identity cleanup
+`b83fb6b` precedes this change; test wiring is `e6791a8`.
+
+The wide-oracle comparison passes 3,526,824 real-bank, synthetic-offset,
+coordinate-boundary and invalid-direction cases under ASan/UBSan. The existing
+raster culling oracle passes 1,410,048 cases. Separate asset-free processes
+exercise maximum valid 32,767-pixel cached radii and invalid bounds, retaining
+fail-closed behavior. These are arithmetic/raster checks, not proof of complete
+native-engine behavior.
+
+The same debuggerless tape and 1,000-call measurement window compares
+`b83fb6b` with `4203255`: 733,099,732 to 723,533,683 guest cycles, a 1.3049%
+reduction (22.8853 to 23.1879 equivalent calls/s). All 90 sampled state/fog/
+displayed RGB555 checkpoints match. The remaining cycle overhead versus the
+pre-BC 698,580,726 total is 3.57195%. This is one measured configuration, not a
+hardware or general FPS result; no BC is trained by the tape. The separate
+release extraction, [PR183](https://github.com/ggu/starcraft-gba/pull/183), has
+its own source, inputs, qualification and measured result; this BC improvement
+must not be transferred to that configuration.
+
+Private receipts are in `.local/bc-arm-menu-perf-v4/`, including exact ordered
+flags, probe/tape identities, before/after consumed-file hashes, ROM identity
+and the parity/stage result. Probe BSS/IWRAM ends are `0x02036934` and
+`0x03004fd0`; these belong to the instrumented probe rather than the normal
+cartridges. Normal-product and broad qualification records are retained
+separately in `.local/build/bc-cull-qualification-v1/`.
+
+At test wiring `e6791a8`, four normal Make ARM products pass, with the same
+bounds as the idle fast-path products. Their captured compiler vectors match
+and their consumed-source changes are limited to `game.c` and the renderer
+header. Forced execution passes all 68 canonical fixtures and 20
+fresh-process cases. The 54 skirmish traces, three 24-case continuation logs
+and nine emitted full-Terran controller traces match the retained idle-build
+results byte for byte. These are host controllers and fixtures, not a new ARM
+Battlecruiser ability or full-campaign replay.
+
+Those 88 fixture executions used the preceding P7 fact header. At `7110681`,
+the normal P7 Make build consumes the corrected fingerprint header and produces
+exactly the same ROM (`bb338c7688932a248c850697dd77668336fd3713d23f05d1718a1539ab93907d`).
+Its input closure differs only in that header. All 24 relevant P7 fixture and
+controller targets use the same ordered preprocessor context, which accepts
+the corrected guards. The numerical-table and binary comparisons support
+carrying forward runtime results; they are not a claim that the entire
+88-case matrix was rerun with the new metadata.
+
+The independent release configuration at `171db25`, merged as PR183 at
+`633997577df5f2c4c7d39fe579edd750a45ba064`, passes its default suite
+(735 Python tests, 22 skips), unified gates, four ARM products and the full
+Terran host aggregate. Its own paired replay measures 708,511,029 to
+705,978,679 cycles (0.3574% fewer; 23.6795 to 23.7645 equivalent calls/s), with
+90/90 matching sampled state/fog/display checkpoints. Different source and
+capability configurations require these separate results. Neither reaches
+the requested near-30-fps result.
+
+## Fact-table gate correction
+
+The first broad default check after the hot-loop work exposed missing
+`SC64_BATTLECRUISER_ENERGY_EXPERIMENT` and
+`SC64_BATTLECRUISER_YAMATO_EXPERIMENT` declarations in the generated fact-table
+fingerprint. It was a real failed check, not a passed default suite. Fix
+`7110681` records both gates and adds them to the exact BC P7 generator recipe.
+The generated numerical payload is byte-identical to the preceding header
+when exactly the two new guard blocks are removed. All 2,010 positive P7 fact
+checks pass; negative compiles verify the specific generated-gate diagnostics.
+Asset-free tests cover each gate mismatch in both directions. These facts are
+generated from authored engine rules; no ROM/art bank is regenerated or edited.
+The old input and validation failure are preserved in
+`.local/bc-fact-fingerprint-v1/`. Subsequent gate results must be tied to their
+actual source and fact-header identities.
+
+The clean `7110681` archive test log records 703 Python tests with 23 skips,
+the separate eight-test suite and the final C checks completing without a
+logged failure. The numeric process exit receipt was not retained, so this
+record is distinguished from gates with an explicitly captured exit status.
+No new full default-suite exit-0 receipt is claimed for that archive run.
+
 ## Evidence and remaining work
 
 Private evidence is relative to the BC integration worktree:
