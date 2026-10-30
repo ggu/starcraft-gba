@@ -164,7 +164,7 @@ sc64_walk_blit(const Sc64SpriteFrame *pose, int dir, int x, int y)
 #endif
 
 /* Draw a unit with its facing frame, or its walk pose while it moves
- * (walk is sc64_walk_track's stride phase). Units without a source walk
+ * (walk is sc64_walk_track's stride phase) or flies. Units without a source walk
  * cycle keep the one-pixel stride lift above ground row y. Siege Tanks draw
  * their hull and turret subunits (raw 5/6 in tank mode, 30/31 when sieged);
  * the sieged hull has a single frame. Muzzle/impact effects remain with the
@@ -190,7 +190,9 @@ sc64_facing_draw(const Unit *q, int raw, int x, int y, int walk)
     }
 #endif
 #ifdef SC64_UNIT_WALK_FRAMES
-    if (walk) {
+    /* A flyer's source cycle is its wingbeat or pulse, which StarCraft plays
+     * while it hovers too, so idle flyers keep cycling instead of freezing. */
+    if (walk || sc64_race_unit_flying(q->type)) {
         const Sc64SpriteFrame *pose = sc64_walk_pose((unsigned)raw, slot);
         if (pose) {
             sc64_walk_blit(pose, dir, x, y);
