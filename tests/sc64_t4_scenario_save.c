@@ -100,6 +100,27 @@ static void start_fixture(void)
     make_runtime_state();
 }
 
+/* Write a candidate through the same record envelope as the game, then
+ * prove the envelope decodes before testing T4 semantic rejection. */
+static void write_candidate_record(const RaceSave *candidate)
+{
+#ifdef SC64_IMPACT_EVENTS
+    Sc64ImpactEvent impacts[RACE_IMPACT_CAPACITY];
+    int count = -1;
+    race_data = *candidate;
+    assert(race_impact_save_write());
+    assert(race_impact_save_read(impacts, &count));
+    assert(count == race_impact_count);
+    assert(memcmp(&race_data, candidate, sizeof(*candidate)) == 0);
+#else
+    static RaceSave readback;
+    save_write(candidate, sizeof(*candidate), SAVE_VERSION);
+    assert(save_read(&readback, sizeof(readback), SAVE_VERSION));
+    assert(memcmp(&readback, candidate, sizeof(*candidate)) == 0);
+    race_data = readback;
+#endif
+}
+
 static void round_trip_and_atomic_validation(void)
 {
     int changed_building = 8;
@@ -203,7 +224,7 @@ static void round_trip_and_atomic_validation(void)
     }
     assert(sprite_row < 32 && trap_slot < MAX_BUILDINGS);
     for (unsigned bad = 0; bad < 9; ++bad) {
-        RaceSave corrupt = race_data;
+        RaceSave corrupt = good_save;
         if (bad == 0) corrupt.t4.active_mask ^= 1;
         if (bad == 1) corrupt.t4.player[5].elapsed_ticks++;
         if (bad == 2) corrupt.t4.player[0].elapsed_ticks++;
@@ -216,13 +237,14 @@ static void round_trip_and_atomic_validation(void)
         if (bad == 7) corrupt.t4.doodad_enabled[sprite_row] = 1;
         if (bad == 8) corrupt_building_word(&corrupt, trap_slot,
             offsetof(Building,queue_progress)/sizeof(int), 29);
-        save_write(&corrupt, sizeof(corrupt), SAVE_VERSION);
+        write_candidate_record(&corrupt);
+        assert(!race_t4_save_candidate_valid(&race_data, race_cols, race_rows));
         assert(!race_load_game());
         assert(memcmp(saved_units, u, sizeof(u)) == 0);
         assert(memcmp(saved_buildings, b, sizeof(b)) == 0);
         assert(memcmp(&saved_t4, &race_t4, sizeof(race_t4)) == 0);
     }
-    save_write(&good_save, sizeof(good_save), SAVE_VERSION);
+    write_candidate_record(&good_save);
     assert(race_load_game());
 }
 
