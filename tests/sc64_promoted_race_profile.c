@@ -5,6 +5,18 @@
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/game.c"
+#include "sc64_save_candidate_fixture.h"
+
+#ifdef SC64_SKIRMISH_ROSTER
+#define PROFILE_ROSTER_TAG 0x80000000u
+#else
+#define PROFILE_ROSTER_TAG 0u
+#endif
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+#define PROFILE_BC_TAG 0x20000000u
+#else
+#define PROFILE_BC_TAG 0u
+#endif
 
 #if !defined(SC64_UNIFIED) || !defined(SC64_IMPORTED_SKIRMISH) || \
     !defined(SC64_CAMPAIGN_RACE)
@@ -83,7 +95,7 @@ static const char *const profile_titles[] = {
 #endif
 _Static_assert(SC64_RACE_SAVE_GENERATION == 43u,
                "canonical P7 retains its qualified generation-43 save schema");
-_Static_assert(SAVE_VERSION == 0x5343505bu,
+_Static_assert(SAVE_VERSION == (0x5343505bu | PROFILE_ROSTER_TAG | PROFILE_BC_TAG),
                "canonical P7 keeps its generation-43 Protoss save identity");
 _Static_assert(SC64_P7_GLOBAL_ID == 26,
                "canonical Protoss P7 uses its stable global catalog identity");
@@ -103,7 +115,7 @@ static const char *const profile_titles[] = {
 #endif
 _Static_assert(SC64_RACE_SAVE_GENERATION == 30u,
                "canonical P6 retains its qualified generation-30 save schema");
-_Static_assert(SAVE_VERSION == 0x5343504eu,
+_Static_assert(SAVE_VERSION == (0x5343504eu | PROFILE_ROSTER_TAG | PROFILE_BC_TAG),
                "canonical P6 keeps its generation-30 Protoss save identity");
 _Static_assert(SC64_P6_GLOBAL_ID == 25,
                "canonical Protoss P6 uses its stable global catalog identity");
@@ -268,22 +280,60 @@ static void test_p5_inflight_save_payload(void)
 static void reject_generation2_save(int mission, int legacy_container)
 {
     campaign_start_from_menu(mission);
-    for (int tick = 0; tick < 3; ++tick) game_update(0, 0);
-    RaceSave old = race_data;
+    for (int tick = 0; tick < 60; ++tick) game_update(0, 0);
+    static RaceSave old;
+    static unsigned char envelope[sizeof(RaceSave)
+#ifdef SC64_IMPACT_EVENTS
+                                  + RACE_IMPACT_RECORD_MAX
+#endif
+                                  ];
+    u32 length = 0;
+    assert(race_save_game());
+#ifdef SC64_IMPACT_EVENTS
+    fixture_capture_save(&old);
+#else
+    assert(save_read(&race_data, sizeof(race_data), SAVE_VERSION));
+    fixture_capture_save(&old);
+#endif
+    assert(old.version == SAVE_VERSION);
+    assert(save_read_latest(envelope, (u32)sizeof(envelope), SAVE_VERSION, &length));
+    assert(length >= offsetof(RaceSave, version) + sizeof(old.version));
     old.version = PROFILE_OLD_SAVE_TAG;
     if (legacy_container) {
-        /* Invalidate both current-profile records so the loader cannot fall
-         * back to a prior valid current save after rejecting the old tag. */
-        save_test_corrupt_latest(sizeof(RaceSave), SAVE_VERSION);
-        save_test_corrupt_latest(sizeof(RaceSave), SAVE_VERSION);
+        /* Invalidate each current-format slot using its actual envelope length,
+         * so neither can mask the historical container under test. */
+        for (int i = 0; i < 2; ++i) {
+            u32 current_length = 0;
+            if (!save_read_latest(envelope, (u32)sizeof(envelope), SAVE_VERSION,
+                                  &current_length)) break;
+            save_test_corrupt_latest(current_length, SAVE_VERSION);
+        }
+        assert(!save_read_latest(envelope, (u32)sizeof(envelope), SAVE_VERSION, &length));
         save_write(&old, sizeof(old), PROFILE_OLD_SAVE_TAG);
         RaceSave legacy;
         assert(save_read(&legacy, sizeof(legacy), PROFILE_OLD_SAVE_TAG));
         assert(legacy.version == PROFILE_OLD_SAVE_TAG);
     } else {
-        /* A current container carrying the old generation payload checks
-         * the explicit in-payload version guard independently. */
-        save_write(&old, sizeof(old), SAVE_VERSION);
+        /* Preserve the exact current envelope and replace only its payload
+         * version, so the negative reaches the intended format validator. */
+        memcpy(envelope + offsetof(RaceSave, version), &old.version, sizeof(old.version));
+        save_write(envelope, length, SAVE_VERSION);
+        {
+            static unsigned char readback[sizeof(envelope)]; u32 actual = 0;
+            assert(save_read_latest(readback, (u32)sizeof(readback), SAVE_VERSION, &actual));
+            assert(actual == length && memcmp(readback, envelope, length) == 0);
+        }
+#ifdef SC64_IMPACT_EVENTS
+        {
+            Sc64ImpactEvent impacts[RACE_IMPACT_CAPACITY]; int count = -1;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+            assert(!race_impact_save_read(impacts, &count));
+#else
+            assert(race_impact_save_read(impacts, &count));
+            assert(race_data.version == PROFILE_OLD_SAVE_TAG);
+#endif
+        }
+#endif
     }
 
     Unit old_units[MAX_UNITS];
@@ -438,8 +488,9 @@ int main(void)
     assert(SC64_RACE_SAVE_GENERATION == PROFILE_SAVE_GENERATION);
     const unsigned mission_count = sizeof(profile_missions) / sizeof(profile_missions[0]);
     assert(sc64_catalog_playable_count(PROFILE_FACTION) == mission_count);
-    assert(SAVE_VERSION == PROFILE_OLD_SAVE_TAG +
-           (PROFILE_SAVE_GENERATION - 2u));
+    const u32 expected_base = PROFILE_OLD_SAVE_TAG + (PROFILE_SAVE_GENERATION - 2u);
+    assert(SC64_BASE_SAVE_VERSION == expected_base);
+    assert(SAVE_VERSION == (expected_base | PROFILE_ROSTER_TAG | PROFILE_BC_TAG));
     for (unsigned i = 0; i < mission_count; ++i) {
         assert(sc64_campaign_catalog[profile_missions[i]].id == profile_missions[i]);
         assert(sc64_campaign_catalog[profile_missions[i]].faction == PROFILE_FACTION);
