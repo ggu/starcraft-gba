@@ -5583,6 +5583,7 @@ test-sc64-bc-normal-input:
 SCARAB_P7_BASE_FLAGS = $(filter-out -DSC64_FACT_TABLES -I$(BC_P7_FACT_DIR) -I$(P7_FACT_V2_DIR),$(PROTOSS_ROM_FLAGS))
 SCARAB_FIXTURE_unit_adapter := tests/sc64_scarab_unit_adapter_game.c
 SCARAB_FIXTURE_presence := tests/sc64_scarab_presence_game.c
+SCARAB_FIXTURE_save := tests/sc64_scarab_save_game.c
 
 define SCARAB_PREPARED_FIXTURE
 .PHONY: test-scarab-$(1)
@@ -5604,3 +5605,4 @@ test-scarab-$(1):
 endef
 $(eval $(call SCARAB_PREPARED_FIXTURE,unit-adapter,unit_adapter))
 $(eval $(call SCARAB_PREPARED_FIXTURE,presence,presence))
+$(eval $(call SCARAB_PREPARED_FIXTURE,save,save))

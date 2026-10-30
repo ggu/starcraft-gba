@@ -30,7 +30,7 @@ static RaceSave race_data;
 /* Decode a candidate unit without touching the live world. The compact
  * late-Terran profile stores named fields; historical profiles retain their
  * exact s16 word rows and conversion behavior. */
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_SCARAB_RUNTIME)
 static int
 race_save_decode_unit(const RaceSave *candidate, unsigned slot,
                       unsigned world_width, unsigned world_height, Unit *out)
@@ -60,6 +60,71 @@ race_save_decode_unit(const RaceSave *candidate, unsigned slot,
     return sc64_unit_save_decode(out, &candidate->units[slot],
                                  world_width, world_height);
 #endif
+}
+#endif
+#ifdef SC64_SCARAB_RUNTIME
+#include "sc64_scarab_fields.h"
+#include "sc64_scarab_lifecycle.h"
+/* Read candidate rows only; never alias or mutate the live world. This is a
+ * bounded graph check for the inactive Scarab prototype, not a save migration. */
+static int
+race_scarab_save_candidate_valid(const RaceSave *candidate, unsigned width, unsigned height)
+{
+    if (!candidate || !width || !height) return 0;
+    for (unsigned i=0; i<MAX_UNITS; ++i) {
+        Unit q;
+        if (!race_save_decode_unit(candidate,i,width,height,&q)) return 0;
+        if (!q.alive) continue;
+        if ((q.type==U_SCARAB) != (q.raw_type==85)) return 0;
+        if (q.type==U_SCARAB) {
+            Sc64ScarabChildFields child;
+            if ((unsigned)q.owner>=5 || q.raw_owner < -1 || q.raw_owner > 255 || q.selected ||
+                q.build!=-1 || q.maxhp!=20 || q.hp<=0 || q.hp>20 ||
+                q.shield<0 || q.shield>10 ||
+                !sc64_scarab_child_fields_unpack(q.carry,q.work_timer,&child)) return 0;
+            if (child.phase<2 && (child.life || child.no_collision ||
+                                  q.order!=ORDER_IDLE || q.target!=-1)) return 0;
+            if (child.phase==2 && !sc64_scarab_flight_valid(
+                &(Sc64ScarabFlight){(uint8_t)child.life,(uint8_t)child.no_collision})) return 0;
+            if (child.parent_slot!=SC64_SCARAB_FIELD_NO_SLOT) {
+                Unit parent;
+                if (child.parent_slot>=MAX_UNITS || child.parent_slot==i ||
+                    !race_save_decode_unit(candidate,child.parent_slot,width,height,&parent) ||
+                    !parent.alive || sc64_race_raw_unit(parent.type)!=83 ||
+                    (parent.raw_type!=-1 && parent.raw_type!=83) ||
+                    parent.owner!=q.owner || parent.raw_owner!=q.raw_owner) return 0;
+            }
+        }
+        if (sc64_race_raw_unit(q.type)==83) {
+            Sc64ScarabParentFields f;
+            Sc64ScarabCounts counts={0,0}; int training=-1;
+            if ((q.raw_type!=-1 && q.raw_type!=83) || (unsigned)q.owner>=5 ||
+                q.raw_owner < -1 || q.raw_owner > 255 ||
+                !sc64_scarab_parent_fields_unpack(q.carry,q.work_timer,&f)) return 0;
+            for (unsigned j=0; j<MAX_UNITS; ++j) {
+                Unit child; Sc64ScarabChildFields cf;
+                if (!race_save_decode_unit(candidate,j,width,height,&child)) return 0;
+                if (!child.alive || child.type!=U_SCARAB) continue;
+                if (!sc64_scarab_child_fields_unpack(child.carry,child.work_timer,&cf)) return 0;
+                if (cf.parent_slot!=i) continue;
+                if (cf.phase==0) {
+                    unsigned hp;
+                    if (training>=0 || !sc64_scarab_training_hp_q8(f.progress,&hp) ||
+                        child.hp!=(int)(hp>>8)) return 0;
+                    training=(int)j;
+                } else if (cf.phase==1) {
+                    if (child.hp!=20) return 0;
+                    ++counts.inside;
+                } else ++counts.outside;
+            }
+            Sc64ScarabParent p={f.active_slot==SC64_SCARAB_FIELD_NO_SLOT ? -1 : (int)f.active_slot,
+                                (uint16_t)f.progress,(uint8_t)f.queued,(uint8_t)f.cooldown};
+            /* Above-current-capacity worlds may arise after ownership changes;
+             * the lifecycle helper permits them but refuses new admission. */
+            if (training!=p.active_slot || !sc64_scarab_parent_valid(&p,counts,1)) return 0;
+        }
+    }
+    return 1;
 }
 #endif
 #if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_BATTLECRUISER_RESEARCH_EXPERIMENT) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
@@ -1105,6 +1170,10 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_CONSTRUCTION_HP
     race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = SC64_CONSTRUCTION_SAVE_MARKER;
+#endif
+#ifdef SC64_SCARAB_RUNTIME
+    if (!race_scarab_save_candidate_valid(&race_data,(unsigned)race_cols*16u,
+                                           (unsigned)race_rows*16u)) return 0;
 #endif
     memcpy(race_data.players,race_player,sizeof(race_player));
 #ifdef SC64_RACES
@@ -2544,6 +2613,10 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (!race_bc_shots_candidate_valid(&race_data,(unsigned)width*16u,(unsigned)height*16u)) return 0;
+#endif
+#ifdef SC64_SCARAB_RUNTIME
+    if (!race_scarab_save_candidate_valid(&race_data,(unsigned)width*16u,
+                                           (unsigned)height*16u)) return 0;
 #endif
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
