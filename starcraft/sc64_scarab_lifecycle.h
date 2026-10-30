@@ -46,6 +46,7 @@ typedef struct {
     int (*allocate)(void *context, int *slot);
     int (*complete)(void *context, int slot);
     int (*launch)(void *context, int slot);
+    int (*cancel_active)(void *context, int slot);
 } Sc64ScarabOps;
 
 enum {
@@ -64,9 +65,9 @@ static inline void sc64_scarab_parent_init(Sc64ScarabParent *parent)
     parent->cooldown = 0;
 }
 
-/* Shape permits an over-current-capacity inventory after an ownership or
- * upgrade change; that state may finish its paid queue but cannot enqueue more.
- * Loaders additionally must validate actor slot
+/* Shape tolerates an above-current-capacity inventory so admission can fail
+ * safely. It does not implement source ownership-transfer policy; the caller
+ * must cancel paid work before changing the parent owner. Loaders must validate actor slot
  * ranges, generations/identities, owner/parent bindings, child phases, queue
  * payment and cross-owner references against the candidate world before any
  * live mutation. */
@@ -127,6 +128,45 @@ static inline int sc64_scarab_production_tick(Sc64ScarabParent *parent,
     parent->active_slot = SC64_SCARAB_NO_SLOT;
     parent->progress = 0;
     return SC64_SCARAB_COMPLETED;
+}
+
+/* Cancel one paid queue entry and refund exactly once. A nonfront entry has
+ * no actor; canceling the active front additionally retires its real child.
+ * Validate the refund bound before any callback. The callback must be atomic,
+ * enforce actual slot/parent/owner/phase, and have no side effects on failure.
+ * A repeat index can name the next legitimate entry after queue compaction. */
+static inline int sc64_scarab_cancel(Sc64ScarabParent *parent,
+                                     Sc64ScarabCounts counts, int upgraded,
+                                     const Sc64ScarabOps *ops, void *context,
+                                     unsigned queue_index, int *minerals,
+                                     int bank_max)
+{
+    if (!minerals || !sc64_scarab_parent_valid(parent, counts, upgraded) ||
+        queue_index >= parent->queued || bank_max < 0 || *minerals < 0 ||
+        *minerals > bank_max || bank_max - *minerals < SC64_SCARAB_COST) return 0;
+    if (queue_index == 0 && parent->active_slot != SC64_SCARAB_NO_SLOT) {
+        if (!ops || !ops->cancel_active ||
+            !ops->cancel_active(context, parent->active_slot)) return 0;
+        parent->active_slot = SC64_SCARAB_NO_SLOT;
+        parent->progress = 0;
+    }
+    --parent->queued;
+    *minerals += SC64_SCARAB_COST;
+    return 1;
+}
+
+/* A child-loss notification must come from the real actor lifecycle after
+ * validating slot identity/generation. The paid front entry remains queued;
+ * the next production tick can attempt a fresh allocation with no new charge. */
+static inline int sc64_scarab_active_lost(Sc64ScarabParent *parent,
+                                          Sc64ScarabCounts counts, int upgraded,
+                                          int lost_slot)
+{
+    if (!sc64_scarab_parent_valid(parent, counts, upgraded) || lost_slot < 0 ||
+        parent->active_slot != lost_slot) return 0;
+    parent->active_slot = SC64_SCARAB_NO_SLOT;
+    parent->progress = 0;
+    return 1;
 }
 
 /* An actual, completed inside actor is selected by the caller. The callback

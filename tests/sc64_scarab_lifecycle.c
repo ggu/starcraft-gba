@@ -1,12 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include <assert.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/sc64_scarab_lifecycle.h"
 
 enum { EMPTY, BUILDING, INSIDE, OUTSIDE };
 typedef struct { int phase, parent, owner; } Actor;
-typedef struct { Actor actors[16]; int parent, owner, allocations, completions, launches; } World;
+typedef struct { Actor actors[16]; int parent, owner, allocations, completions, launches, cancels; } World;
 static int allocate(void *ctx, int *slot)
 {
     World *w=ctx;
@@ -30,7 +31,14 @@ static int launch(void *ctx, int slot)
         w->actors[slot].parent!=w->parent || w->actors[slot].owner!=w->owner) return 0;
     w->actors[slot].phase=OUTSIDE; ++w->launches; return 1;
 }
-static const Sc64ScarabOps ops={allocate,complete,launch};
+static int cancel_active(void *ctx, int slot)
+{
+    World *w=ctx;
+    if (slot<0 || slot>=16 || w->actors[slot].phase!=BUILDING ||
+        w->actors[slot].parent!=w->parent || w->actors[slot].owner!=w->owner) return 0;
+    w->actors[slot].phase=EMPTY; ++w->cancels; return 1;
+}
+static const Sc64ScarabOps ops={allocate,complete,launch,cancel_active};
 static Sc64ScarabCounts counts(const World *w)
 {
     Sc64ScarabCounts c={0,0};
@@ -110,8 +118,8 @@ static void check_upgrade_and_invalid(void)
     for(int i=0;i<5;i++)assert(sc64_scarab_enqueue(&p,counts(&w),1,&minerals));
     assert(minerals==0 && p.queued==5);
     assert(!sc64_scarab_enqueue(&p,counts(&w),1,&minerals));
-    /* Transfer to a player without capacity upgrade keeps paid work valid;
-     * new admissions stay blocked while the existing queue can progress. */
+    /* Model tolerates an above-current-capacity shape without claiming an
+     * actual transfer path; source transfer first cancels the paid queue. */
     assert(sc64_scarab_parent_valid(&p,counts(&w),0));
     minerals=100;
     assert(!sc64_scarab_enqueue(&p,counts(&w),0,&minerals));
@@ -129,9 +137,49 @@ static void check_upgrade_and_invalid(void)
     assert(!sc64_scarab_flight_valid(&(Sc64ScarabFlight){10,8}));
     assert(!sc64_scarab_flight_valid(&(Sc64ScarabFlight){1,2}));
 }
+static void check_cancellation_and_loss(void)
+{
+    Sc64ScarabParent p; World w={0}; int minerals=100;
+    w.parent=3; w.owner=2; sc64_scarab_parent_init(&p);
+    for(int i=0;i<3;i++)assert(sc64_scarab_enqueue(&p,counts(&w),0,&minerals));
+    assert(minerals==55 && p.queued==3);
+    assert(sc64_scarab_production_tick(&p,counts(&w),0,&ops,&w)==SC64_SCARAB_ALLOCATED);
+    int slot=p.active_slot;
+    for(int i=0;i<10;i++)assert(sc64_scarab_production_tick(&p,counts(&w),0,&ops,&w)==SC64_SCARAB_PROGRESS);
+    /* A later entry refunds without touching the active child. */
+    assert(sc64_scarab_cancel(&p,counts(&w),0,&ops,&w,1,&minerals,65535));
+    assert(minerals==70 && p.queued==2 && p.active_slot==slot && p.progress==10 && !w.cancels);
+    Sc64ScarabParent before=p; int previous=minerals;
+    assert(!sc64_scarab_cancel(&p,counts(&w),0,&ops,&w,2,&minerals,65535));
+    assert(!sc64_scarab_cancel(&p,counts(&w),0,&ops,&w,0,&minerals,84)); /* refund bound */
+    int near_int_max=INT_MAX-14;
+    assert(!sc64_scarab_cancel(&p,counts(&w),0,&ops,&w,0,&near_int_max,INT_MAX));
+    assert(near_int_max==INT_MAX-14);
+    assert(!memcmp(&before,&p,sizeof(p)) && minerals==previous && !w.cancels);
+    w.actors[slot].owner=1; /* callback refusal must be atomic */
+    assert(!sc64_scarab_cancel(&p,counts(&w),0,&ops,&w,0,&minerals,65535));
+    assert(!memcmp(&before,&p,sizeof(p)) && minerals==previous && !w.cancels);
+    w.actors[slot].owner=2;
+    assert(sc64_scarab_cancel(&p,counts(&w),0,&ops,&w,0,&minerals,65535));
+    assert(minerals==85 && p.queued==1 && p.active_slot==-1 && p.progress==0 && w.cancels==1);
+    assert(sc64_scarab_cancel(&p,counts(&w),0,&ops,&w,0,&minerals,65535));
+    assert(minerals==100 && !p.queued);
+    assert(!sc64_scarab_cancel(&p,counts(&w),0,&ops,&w,0,&minerals,65535));
+    assert(minerals==100 && w.cancels==1);
+    assert(sc64_scarab_enqueue(&p,counts(&w),0,&minerals));
+    assert(sc64_scarab_production_tick(&p,counts(&w),0,&ops,&w)==SC64_SCARAB_ALLOCATED);
+    slot=p.active_slot; assert(sc64_scarab_production_tick(&p,counts(&w),0,&ops,&w)==SC64_SCARAB_PROGRESS);
+    assert(!sc64_scarab_active_lost(&p,counts(&w),0,slot+1));
+    w.actors[slot].phase=EMPTY;
+    assert(sc64_scarab_active_lost(&p,counts(&w),0,slot));
+    assert(p.queued==1 && p.active_slot==-1 && p.progress==0 && minerals==85);
+    assert(!sc64_scarab_active_lost(&p,counts(&w),0,slot));
+    assert(sc64_scarab_production_tick(&p,counts(&w),0,&ops,&w)==SC64_SCARAB_ALLOCATED);
+    assert(p.queued==1 && minerals==85); /* paid entry retries, no refund */
+}
 int main(void)
 {
-    check_queue_and_payment(); check_capacity_and_launch(); check_upgrade_and_invalid();
+    check_queue_and_payment(); check_capacity_and_launch(); check_upgrade_and_invalid(); check_cancellation_and_loss();
     puts("Scarab source-tick lifecycle: queue, slots, capacity, ownership and timers passed");
     return 0;
 }

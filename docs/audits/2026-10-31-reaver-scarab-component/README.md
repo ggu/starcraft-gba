@@ -32,10 +32,21 @@ is not a cycle-exact OpenBW implementation.
   actual child slot, parent, owner and phase, and report failure without side
   effects. A callback that reports a successful allocation with a negative or
   reused slot violates the contract and cannot be rolled back by this helper.
-- Inventory can remain above the current owner's normal capacity after a
-  transfer or upgrade change. Existing paid work can continue, but further
-  orders must obey the new owner's current capacity. Inside plus queued still
-  cannot exceed the absolute supported maximum of ten in this component.
+- Shape validation permits an above-current-capacity inventory without asserting
+  that any specific transfer reaches it. Pinned `trigger_give_unit_to` cancels
+  the Reaver's paid queue before changing owner (around 3389–3395), and upgrade
+  grants must also be accounted for. New orders always use the current owner's
+  capacity; inside plus queued cannot exceed ten in this component.
+- Cancellation refunds the full paid cost. A queued nonfront entry has no actor;
+  an active front entry requires atomic retirement of its actual child before
+  the refund commits. The model checks the caller-supplied bank bound first.
+  Real owner-bank maximum, identity and generation remain adapter duties; the
+  supplied bank-bound refusal is an adapter safety policy, not a claim of
+  identical OpenBW overflow behavior. A transfer cancels every entry: preflight
+  the entire refund and active-child retirement before mutating anything, so a
+  later failure cannot leave a partial transfer. On active child loss, the
+  source clears its reference and retries the paid front entry without a second
+  charge; the actor lifecycle must deliver that event.
 - STOP must order an outside Scarab to self-destruct while preserving inside
   children and paid queue state. Both ordinary STOP entry points route through
   `stop_selected` in `game.c`; integrate that behavior there rather than
@@ -59,7 +70,7 @@ is not a cycle-exact OpenBW implementation.
 
 `python3 -m unittest tests.test_sc64_scarab_lifecycle` compiles the isolated
 component fixture with ASan/UBSan. It covers payment, queue/capacity limits,
-full-pool retry, active-child completion, wrong-owner rejection, owner-capacity
-change, one-outside rule and exposed timers. The fixture uses a small fake actor
+full-pool retry, active-child completion, wrong-owner rejection, capacity-shape handling, queued/active cancellation,
+refund bounds, lost-child retry, one-outside rule and exposed timers. The fixture uses a small fake actor
 pool to test the contract; it is not evidence of ordinary-game acquisition,
 real Scarab combat, SRAM persistence, hardware timing, or product admission.
