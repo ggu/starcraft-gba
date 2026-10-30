@@ -5358,7 +5358,8 @@ BC_FIXTURE_cover := tests/sc64_battlecruiser_yamato_cover_game.c
 BC_FIXTURE_heading := tests/sc64_battlecruiser_yamato_heading_game.c
 BC_FIXTURE_range := tests/sc64_battlecruiser_yamato_range_game.c
 BC_FIXTURE_recovery := tests/sc64_battlecruiser_yamato_recovery.c
-BC_FIXTURES := production research flight save transfer yamato art impact migration auto ui damage cover heading range recovery
+BC_FIXTURE_idle := tests/sc64_bc_idle_equivalence.c
+BC_FIXTURES := production research flight save transfer yamato art impact migration auto ui damage cover heading range recovery idle
 define BC_PROFILE_FIXTURE
 build/test-bc-$(1)-$(2): $$(BC_FIXTURE_$(1)) $$(STARCRAFT) $$(wildcard starcraft/*.h) $($(4)) $(5) $$(BC_INPUTS) common/gba.c $$(COMMON_HEADERS) Makefile | build
 	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) $$($(3)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(5) -o $$@
