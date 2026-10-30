@@ -13,7 +13,10 @@ The five accepted logical FSM states occupy three order bits. A future integrati
 must explicitly map native source states, including source state 6, into this
 encoding; this assumption is not proof that source flight or pathing fits it.
 Dead raw-85 rows retain their fields until slot reuse. An expired outside row
-may have zero life only when dead; a live outside row requires positive life.
+may have zero life when dead. A live outside row may have zero life only
+with the logical fresh-release code (1) and zero grace, representing the
+observed source frame before the next-frame flight initialization. This code
+is a bridge mapping, not a raw source FSM value.
 
 A compact wire key ranks the hidden and outside states in 126,353,888 values.
 Mixed-radix digits use the signed-17 carry code, 242 allowed P7 build codes,

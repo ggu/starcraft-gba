@@ -6,6 +6,8 @@
  * by the including engine. Logical build is -1 and order is a 0..4 FSM. */
 #define SC64_SCARAB_FLIGHT_RADIX 131072u
 #define SC64_SCARAB_FLIGHT_KEYS 126353888u
+/* Logical bridge code, not the native source order_state value. */
+#define SC64_SCARAB_FSM_FRESH_RELEASE 1u
 static int sc64_scarab_flight_key(unsigned carry, unsigned timer, unsigned order,
                                    int build, unsigned *key)
 {
@@ -42,7 +44,8 @@ static int sc64_scarab_flight_to_wire(const Unit *in, Unit *out, int current, in
         !sc64_scarab_flight_key((unsigned)in->carry,(unsigned)in->work_timer,
                                 (unsigned)in->order,in->build,&key)) return 0;
     if ((((unsigned)in->carry >> 8)&3u)<2u && in->target!=-1) return 0;
-    if (in->alive && (((unsigned)in->carry >> 8)&3u)==2u && !(in->work_timer&127u)) return 0;
+    if (in->alive && (((unsigned)in->carry >> 8)&3u)==2u &&
+        !(in->work_timer&127u) && (unsigned)in->order!=SC64_SCARAB_FSM_FRESH_RELEASE) return 0;
     q=*in;
     if (legacy) { q.carry=(int)(key&65535u)-32768; q.build=(int)(key>>16); }
     else {
@@ -76,7 +79,8 @@ static int sc64_scarab_flight_from_wire(const Unit *in, Unit *out, int current, 
     if (!sc64_scarab_flight_unkey(key,&carry)) return 0;
     q.carry=(int)carry;
     if (((carry>>8)&3u)<2u && q.target!=-1) return 0;
-    if (q.alive && ((carry>>8)&3u)==2u && !(q.work_timer&127u)) return 0;
+    if (q.alive && ((carry>>8)&3u)==2u && !(q.work_timer&127u) &&
+        (unsigned)q.order!=SC64_SCARAB_FSM_FRESH_RELEASE) return 0;
     if (!sc64_scarab_flight_key(carry,(unsigned)q.work_timer,(unsigned)q.order,q.build,&check) || check!=key) return 0;
     *out=q;return 1;
 }
