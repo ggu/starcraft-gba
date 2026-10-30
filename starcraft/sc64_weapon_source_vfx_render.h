@@ -466,6 +466,25 @@ sc64_weapon_source_vfx_draw_overlays_motion(const Sc64WeaponSourceAnimation *ani
             int64_t child_age_signed = (int64_t)child_clock - trigger;
             if (child_age_signed < 0 || child_age_signed >= child_life) continue;
             uint32_t child_age = (uint32_t)child_age_signed;
+            int child_dx = source_dx, child_dy = source_dy;
+            if (overlay->opcode == 21u) {
+                /* SPROLUSELO samples the parent's frame at sprite birth.
+                 * Later parent animation frames cannot move that sprite. */
+                const Sc64WeaponSourceImage *parent =
+                    sc64_weapon_source_image_lookup(parent_image);
+                int birth_mirror = 0;
+                uint64_t birth_tick = (uint64_t)overlay->source_tick +
+                                      (uint64_t)iteration * loop_len;
+                if (birth_tick > UINT32_MAX) continue;
+                uint16_t birth_frame = sc64_weapon_source_vfx_source_frame(
+                    parent, anim, (uint32_t)birth_tick, direction, &birth_mirror);
+                int16_t lo_dx, lo_dy;
+                if (birth_frame == UINT16_MAX ||
+                    !sc64_weapon_source_lo_lookup(parent_image, overlay->lo_index,
+                                                  birth_frame, 0, &lo_dx, &lo_dy)) continue;
+                child_dx = birth_mirror ? -lo_dx : lo_dx;
+                child_dy = lo_dy;
+            }
             int draw_x = world_x, draw_y = world_y;
             if (sprite && motion) {
                 int born_x, born_y;
@@ -497,7 +516,7 @@ sc64_weapon_source_vfx_draw_overlays_motion(const Sc64WeaponSourceAnimation *ani
             if (!child_frame) continue;
             sc64_weapon_source_vfx_draw_image_frame_resolved(
                 overlay->image_id, child_image, child_frame, child_mirror,
-                draw_x + source_dx / 2, draw_y + source_dy / 2);
+                draw_x + child_dx / 2, draw_y + child_dy / 2);
         }
     }
 }

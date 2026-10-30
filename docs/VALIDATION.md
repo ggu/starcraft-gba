@@ -7401,6 +7401,41 @@ comparisons are private in `default-resolved-tracer-v1`. The earlier #171
 for unchanged gameplay paths, not new runs of this renderer-only stage.
 No Actions were run and no proprietary inputs are committed.
 
+### Source sprite birth offsets and clock domains (2026-10-30)
+
+On terrain integration `d924f54`, source opcode 21 (SPROLUSELO) now uses the
+parent image's imported LO offset at sprite birth, including facing and
+mirroring. The birth sample uses absolute source-animation time even when
+presentation uses time relative to weapon release. Negative relative births
+and loop iterations retain that distinction. Older generated banks are
+rejected at compile time; regenerate them with the updated importer.
+
+The authenticated bank has six such events bound to five attack profiles:
+Hydralisk ground/air, Drone ground and Hunter Killer ground/air. Tests cover
+both headings, imported child pixels and offsets, and the source/relative
+clock counterexample. The old helper fails that counterexample; the corrected
+helper passes. The Drone attack inherits a pre-attack frame unavailable to
+this renderer and retains its existing frame-zero fallback. Global sprite
+elevation/order, general native VM semantics and exact N64 execution remain
+unproven; this is not an all-projectile fidelity claim.
+
+The exact nine source files pass the frozen clock candidate's doctor,
+default build/test, unified build/test and full Terran host aggregate. On
+the combined terrain/source-offset snapshot, all four canonical ARM products
+pass the unchanged reserve guards with captured per-TU dependencies and the
+same authenticated generated bank. Cached/fresh rendering matches 512 scenes
+per profile with actual engine traces, across the five attack profiles, both
+headings and ages 7/8. Separate real-bank child-overlay scenes also match
+512 cases per profile and assert that the child changes pixels; the engine
+trace comparison alone does not instrument the child draw independently.
+All frozen source/input hashes remain unchanged after testing.
+
+Private provenance is in `iscript-event-clock-v1` and
+`terrain-clock-combined-v2`, including the negative oracle, bank/profile
+composition, four ARM links and scene logs. The preceding terrain-only
+timings remain measurements of that stage; no new combined fps or campaign
+completion result is claimed. Source only; no Actions or hardware claim.
+
 ### Shared terrain window transfer (2026-10-30)
 
 On integration base `81fc21b`, the terrain cache uses a specialized aligned

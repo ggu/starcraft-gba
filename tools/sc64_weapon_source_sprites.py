@@ -316,7 +316,7 @@ def _collect_lo_tables(get, image_data: bytes, report: dict):
         for animation in animations.values():
             for child in animation.get("visual_references", []):
                 args = child.get("args", [])
-                if int(child.get("opcode", -1)) in (13, 14) and len(args) >= 2:
+                if int(child.get("opcode", -1)) in (13, 14, 21) and len(args) >= 2:
                     requested.add((parent_image, _first_int(args[1])))
     records, offsets, hashes = [], [], {}
     for image_id, lo_kind in sorted(requested):
@@ -581,9 +581,9 @@ def _emit_header(out: Path, report: dict, remap: bytes, palette_json: dict, get,
                     child = visual_refs.pop(ref_index) if ref_index is not None else {}
                     overlays.append({"parent_image":image_id,"image_id":int(child.get("image_id",0xFFFF)),
                                      "source_tick":int(event["source_tick"]),"relative_tick":int(event["source_tick"])-trigger_tick,
-                                     "x":0 if opcode in (13,14) else (arg1 if len(args)>1 else 0),
-                                     "y":0 if opcode in (13,14) else (arg2 if len(args)>2 else 0),
-                                     "lo_index":arg1 if opcode in (13,14) and len(args)>1 else 0xFF,
+                                     "x":0 if opcode in (13,14,21) else (arg1 if len(args)>1 else 0),
+                                     "y":0 if opcode in (13,14,21) else (arg2 if len(args)>2 else 0),
+                                     "lo_index":arg1 if opcode in (13,14,21) and len(args)>1 else 0xFF,
                                      "aux":arg2 if opcode in (13,14) and len(args)>2 else 0,
                                      "opcode":opcode,
                                      "flags":0,"sprite_id":int(child.get("sprite_id") if child.get("sprite_id") is not None else 0xFFFF)})
@@ -602,6 +602,7 @@ def _emit_header(out: Path, report: dict, remap: bytes, palette_json: dict, get,
              "#ifndef SC64_WEAPON_SOURCE_GENERATED_H", "#define SC64_WEAPON_SOURCE_GENERATED_H",
              "#include <stdint.h>", "#define SC64_WEAPON_SOURCE_BANK_VERSION 1",
              "#define SC64_WEAPON_SOURCE_METADATA 1",
+             "#define SC64_WEAPON_SOURCE_SPROLUSELO_LO 1",
              "#define SC64_WEAPON_SOURCE_PROFILE_COUNT " + str(len(profiles)),
              "#define SC64_WEAPON_SOURCE_IMAGE_COUNT " + str(len(image_rows)),
              "#define SC64_WEAPON_SOURCE_FRAME_COUNT " + str(len(frames)),

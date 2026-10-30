@@ -7,6 +7,7 @@
 #define MAP_COLS 32
 #define MAP_ROWS 32
 #define SC64_WEAPON_SOURCE_BANK_VERSION 1
+#define SC64_WEAPON_SOURCE_SPROLUSELO_LO 1
 #define SC64_WEAPON_SOURCE_METADATA 1
 #define SC64_WEAPON_SOURCE_BANK_HEADER <stdint.h>
 #define SC64_WEAPON_SOURCE_PROFILE_COUNT 1
@@ -126,9 +127,10 @@ static inline int
 sc64_weapon_source_lo_lookup(uint16_t image, uint8_t lo, uint16_t frame,
                              uint8_t offset, int16_t *x, int16_t *y)
 {
-    (void)image; (void)lo; (void)frame; (void)offset; (void)x; (void)y;
     (void)sc64_weapon_source_lo_tables;
-    return 0;
+    if (image != 100 || lo != 0 || frame != 2 || offset != 0) return 0;
+    *x = 4; *y = -8;
+    return 1;
 }
 
 static int camx, camy;
@@ -171,10 +173,15 @@ static const ExpectedDraw expected_draws[]={
 };
 static unsigned active_age;
 static unsigned draw_count;
+static int lo_test, lo_expect_x, lo_pixel_offset;
 void gfx_reverse_bytes(u8 *dst, const u8 *src, unsigned n)
 { for (unsigned i = 0; i < n; ++i) dst[i] = src[n - i - 1u]; }
 void gfx_blit_sprite(int x, int y, int w, int h, const u8 *src)
 {
+ if (lo_test) {
+   assert(x == lo_expect_x && y == 58 && w == 2 && h == 1);
+   assert(src == test_pixels + lo_pixel_offset); ++draw_count; return;
+ }
  assert(draw_count<sizeof(expected_draws)/sizeof(expected_draws[0]));
  const ExpectedDraw *e=&expected_draws[draw_count++];
  assert(active_age==e->age && x==e->x && y==e->y && w==e->w && h==e->h);
@@ -206,5 +213,37 @@ int main(void)
  Sc64WeaponSourceVfxKey key={5,1,11,8,0,0};uint32_t packed;assert(sc64_weapon_source_vfx_pack(key,&packed));
  for(uint32_t age=0;age<40;age++){active_age=age;sc64_weapon_source_vfx_draw_trace(packed,50,50,150,50,1,age);}
  assert(draw_count==sizeof(expected_draws)/sizeof(expected_draws[0]));
- puts("moving projectile and child draw events match original fixture");return 0;
+ /* Image 17 source frame 2 offset is (4,-8). A later parent frame must
+  * not move an already spawned sprite; mirrored direction reverses x. */
+ test_request_image.directional=1;
+ test_flight=(Sc64WeaponSourceAnimation){.image_id=100,.event_count=1,
+   .overlay_count=1,.duration_ticks=20,.loop_pc=UINT32_MAX};
+ sc64_weapon_source_events[0]=(Sc64WeaponSourceEvent){.image_id=100,.source_frame=0,.opcode=0};
+ sc64_weapon_source_overlays[0]=(Sc64WeaponSourceOverlay){.parent_image=100,.image_id=200,
+   .source_tick=0,.lo_index=0,.opcode=21};
+ lo_test=1; draw_count=0; lo_expect_x=51;
+ sc64_weapon_source_vfx_draw_overlays(&test_flight,1,1,100,3,50,50,2,0,0,0,0,0,0,0,0);
+ assert(draw_count==1);
+ lo_expect_x=47;
+ sc64_weapon_source_vfx_draw_overlays(&test_flight,1,1,100,3,50,50,30,1,0,0,0,0,0,0,0);
+ assert(draw_count==2);
+ sc64_weapon_source_vfx_draw_overlays(&test_flight,1,1,100,3,50,50,3,0,0,0,0,0,0,0,0);
+ assert(draw_count==2); /* Missing source frame fails closed. */
+ sc64_weapon_source_vfx_draw_overlays(&test_flight,3,3,100,2,50,50,2,0,0,0,0,0,0,0,0);
+ assert(draw_count==2); /* Child Init has ended at age three. */
+ /* Relative display time is a different clock: birth at source tick 5
+  * samples frame 0 + heading 2 even when its relative tick is 2 or -2.
+  * At source tick 2 the frame is 1, which would select an absent LO. */
+ test_flight.event_count=2;
+ sc64_weapon_source_events[0]=(Sc64WeaponSourceEvent){.image_id=100,.source_tick=2,.source_frame=1,.opcode=0};
+ sc64_weapon_source_events[1]=(Sc64WeaponSourceEvent){.image_id=100,.source_tick=5,.source_frame=0,.opcode=0};
+ sc64_weapon_source_overlays[0].source_tick=5;
+ sc64_weapon_source_overlays[0].relative_tick=2;
+ lo_expect_x=51; lo_pixel_offset=2; draw_count=0;
+ sc64_weapon_source_vfx_draw_overlays(&test_flight,2,2,100,3,50,50,2,0,1,0,0,0,0,0,0);
+ assert(draw_count==1);
+ sc64_weapon_source_overlays[0].relative_tick=-2; draw_count=0;
+ sc64_weapon_source_vfx_draw_overlays(&test_flight,0,0,100,3,50,50,2,0,1,0,0,0,0,0,0);
+ assert(draw_count==1);
+ puts("moving projectile and child draw events match fixture");return 0;
 }
