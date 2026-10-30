@@ -7135,3 +7135,32 @@ hashes, maps and comparisons are in `shared-render-batch-v1` and
 `shared-render-cross-profile-v1`. The rejected terrain row-mask experiment
 showed no useful gain. Separate tile-clean and grouped-animation experiments
 remain private and are not included in the batch's performance claim.
+
+Final qualification of committed runtime `8d96343` passes default
+doctor/build/test (685 Python tests, 17 optional skips, the separate eight-test
+suite and C fixtures), unified build/test, the complete Terran host aggregate
+and the actual T5 facing fixture's 16,785,409 comparisons. Both synthetic
+source-effect fixtures retain their original draw/pointer assertions after
+supplying the authored directory metadata; initial failing runs remain
+historical evidence, not passes. Final default evidence is
+`shared-render-default-gate-v3`; other broad gates and T5 facing are in
+`shared-render-final-gates-v2`.
+
+The corrected source's four canonical ARM products are in
+`shared-render-cross-profile-v2`. Their game payloads equal the timed combined
+candidate's payloads byte for byte, with only normal GBA boot headers and
+padding differing. All 54 individual skirmish result JSONs equal the Bunker
+baseline. Fresh startup/save and construction checks pass 702 and 27 cases;
+four native-seeded garrisons match fresh/in-place ARM state through 1,000
+updates; all 9,000 P7 prefix observations match. These are recorded in
+`shared-render-skirmish-v2`, `shared-render-bunker-sram-v1` and
+`shared-render-p7-prefix-v1`. The full P7 winning run described above predates
+this batch; the current batch has prefix evidence, not a new full winning run.
+
+`shared-render-proof-closure-v1` checks consumed project/input hashes,
+per-TU commands and exact product links to the replay results. It additionally
+verifies the audio assembler blob byte for byte inside each linked ROM.
+Updated normal-Make ROMs are retained locally in
+`.local/releases/20261030-render-performance-candidate`, with hashes and
+header-only equivalence to those qualified products. No SD write or Actions
+run occurred. No claim of complete campaigns, full roster or 30 fps is made.
