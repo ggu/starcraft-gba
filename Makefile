@@ -1,5 +1,19 @@
 .DEFAULT_GOAL := all
 
+.PHONY: test-gfx-shapes
+build/test-gfx-shapes: tests/gfx_shapes_rom.c common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DGBA_SHAPES_ROM_ARM -Icommon $< common/gba.c -o $@
+test-gfx-shapes: build/test-gfx-shapes
+	./build/test-gfx-shapes
+test: test-gfx-shapes
+
+.PHONY: test-gfx-shapes-tile
+build/test-gfx-shapes-tile: tests/gfx_shapes_tile.c common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -Wno-misleading-indentation -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DGBA_SHAPES_ROM_ARM -DSC64_TILE_RENDERER -Icommon $< common/gba.c -o $@
+test-gfx-shapes-tile: build/test-gfx-shapes-tile
+	./build/test-gfx-shapes-tile
+test: test-gfx-shapes-tile
+
 # Asset-free raw-ID capability catalog for the complete standard skirmish roster.
 .PHONY: test-sc64-skirmish-catalog
 build/test-sc64-skirmish-catalog: tests/sc64_skirmish_catalog.c starcraft/sc64_skirmish_catalog.h Makefile | build
@@ -213,6 +227,9 @@ CFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -O2 -g -std=c11 -ffreestandin
 LDFLAGS := -mcpu=arm7tdmi -mthumb -mthumb-interwork -nostdlib -Tcommon/gba.ld -Wl,--gc-sections
 COMMON := common/start.s common/main.c common/gba.c common/memory.c common/audio_bank.S
 COMMON_HEADERS := $(wildcard common/*.h)
+# Shared imported engine: keep line/frame wrappers in ARM ROM and use the
+# exact axis-aligned rectangle path in campaign, custom and Showcase builds.
+SC64_SHAPE_FLAGS ?= -DGBA_SHAPES_ROM_ARM
 # The order-decision foundation is linked only by its isolated host check until
 # a gameplay adapter is implemented and qualified.
 STARCRAFT := $(filter-out starcraft/sc64_interceptor_orders.c,$(wildcard starcraft/*.c))
@@ -231,9 +248,9 @@ else ifeq ($(SC64_AUDIO),1)
 $(error SC64_AUDIO=1 but $(SC64_AUDIO_DIR)/sc64_audio_generated.h is missing; run tools/sc64_audio_pack.py)
 endif
 endif
-SC64_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated $(SC64_AUDIO_FLAGS)
+SC64_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/generated $(SC64_AUDIO_FLAGS) $(SC64_SHAPE_FLAGS)
 SC64_INPUTS := .local/sc64/generated/sc64_mission_generated.h .local/sc64/generated/sc64_assets_generated.h .local/sc64/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
-BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/backwater/generated $(SC64_AUDIO_FLAGS)
+BACKWATER_FLAGS := -DSC64_IMPORTED_MISSION -DSC64_HAS_TERRAIN_ART -DSC64_HAS_SPRITES -Istarcraft -I.local/sc64/backwater/generated $(SC64_AUDIO_FLAGS) $(SC64_SHAPE_FLAGS)
 BACKWATER_INPUTS := .local/sc64/backwater/generated/sc64_mission_generated.h .local/sc64/backwater/generated/sc64_assets_generated.h .local/sc64/backwater/generated/sc64_sprites_generated.h $(SC64_AUDIO_INPUTS)
 CAMPAIGN_FLAGS := $(BACKWATER_FLAGS) -I.local/sc64/campaign/generated
 CAMPAIGN_INPUTS := $(BACKWATER_INPUTS) .local/sc64/campaign/generated/sc64_campaign_generated.h
