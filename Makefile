@@ -4539,6 +4539,16 @@ test-sc64-weapon-source-vfx-cull-bank: | build
 		./build/test-sc64-weapon-source-vfx-cull-bank; \
 	fi
 
+# Optional wide-arithmetic differential; never regenerate private bank inputs.
+.PHONY: test-sc64-weapon-source-cull-fast-diff
+test-sc64-weapon-source-cull-fast-diff: | build
+	@if test ! -f "$(WEAPON_SOURCE_HEADER)"; then \
+		echo "SKIP: prepared weapon source bank not present at $(WEAPON_SOURCE_HEADER)"; \
+	else \
+		$(CLANG) -std=c11 -O2 -g -fsanitize=address,undefined -Wall -Wextra -Werror -Wno-unused-function -I"$(WEAPON_SOURCE_DIR)" tests/sc64_weapon_source_cull_fast_diff.c -o build/test-sc64-weapon-source-cull-fast-diff && \
+		./build/test-sc64-weapon-source-cull-fast-diff; \
+	fi
+
 # Canonical source death/corpse art; default original-art/unified remains asset-free.
 build/starcraft-terran.elf build/starcraft-zerg-z4.elf build/starcraft-zerg-z6.elf build/starcraft-protoss-p5-shuttle.elf build/starcraft-protoss-p6.elf build/starcraft-showcase.elf: $(CANONICAL_DEATH_INPUTS)
 build/test-terran build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-z4-frame-coverage build/test-sc64-zerg-canonical-hud build/test-sc64-protoss-canonical-frame build/test-sc64-protoss-canonical-hud build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-native-weapon-game build/test-sc64-protoss-skirmish-pylons build/test-sc64-protoss-gas-placement build/test-sc64-worker-cargo-packed build/test-sc64-protoss-warp-color build/test-sc64-protoss-warp-color-no-clip: $(CANONICAL_DEATH_INPUTS)
