@@ -992,7 +992,22 @@ static int race_bc_shots_candidate_valid(const RaceSave *candidate,unsigned ww,u
 }
 #endif
 
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+static int race_scarab_stage_previous(GbaSaveSelection *selection);
+#endif
 static int race_save_game(void) {
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    GbaSaveSelection previous;
+    int have_previous=race_scarab_stage_previous(&previous);
+    if (race_mode!=1 || race_skirmish_map!=0) return 0;
+    for (int i=0;i<MAX_UNITS;i++) if (u[i].alive) {
+        Sc64ScarabParentFields f;
+        if (u[i].type==U_SCARAB || u[i].raw_type==85) return 0;
+        if (sc64_race_raw_unit(u[i].type)==83 &&
+            ((u[i].raw_type!=-1 && u[i].raw_type!=83) ||
+             !sc64_scarab_parent_fields_unpack(u[i].carry,u[i].work_timer,&f))) return 0;
+    }
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (sc64_bc_pause_offset>4) return 0;
     race_bc_yamato_sync_references();
@@ -1072,7 +1087,12 @@ static int race_save_game(void) {
      * padding and optional fields before serializing this record. */
     memset(&race_data, 0, sizeof(race_data));
 #endif
-    race_data.version=SAVE_VERSION;
+    race_data.version=
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+        SC64_SCARAB_SAVE_VERSION;
+#else
+        SAVE_VERSION;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     memcpy(race_data.battlecruiser_shots,sc64_bc_shots,sizeof(sc64_bc_shots));
 #endif
@@ -1537,9 +1557,16 @@ static int race_save_game(void) {
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     if (!race_bc_shots_candidate_valid(&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H)) return 0;
 #endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    if (!race_scarab_save_candidate_valid(&race_data,1024,1024)) return 0;
+#endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    if (!race_impact_save_write(have_previous ? &previous : 0)) return 0;
+#else
     if (!race_impact_save_write()) return 0;
+#endif
 #elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
     save_write_migrating_feature(&race_data,sizeof(race_data),SAVE_VERSION,
                          SC64_LEGACY_SAVE_VERSION, offsetof(RaceSave,state)+27u*sizeof(int),
@@ -2610,8 +2637,54 @@ static int race_load_preflight(RaceLoadPlan *plan) {
     return 1;
 }
 
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+/* Stage scope: one 64x64 native skirmish geometry and the Terran compact
+ * codec. The tag, never field values, determines the parent representation. */
+static int race_scarab_stage_prepare(const void *raw,u32 len,u32 tag,void *context) {
+    RaceLoadPlan *plan=context;
+    if (raw != (const void *)&race_impact_record) return 0;
+    memset(plan,0,sizeof(*plan));
+    if (!race_impact_save_decode_selected(len,tag,plan->impact_candidate,
+                                          &plan->impact_candidate_count)) return 0;
+    if (race_data.state[0]!=1 || race_data.state[20]!=0) return 0;
+    for (unsigned i=0;i<MAX_UNITS;i++) {
+        Unit q;
+        if (!race_save_decode_unit(&race_data,i,1024,1024,&q)) return 0;
+        if (!q.alive) continue;
+        if (q.type==U_SCARAB || q.raw_type==85) return 0;
+        if (sc64_race_raw_unit(q.type)==83) {
+            int c,t;
+            if (q.raw_type!=-1 && q.raw_type!=83) return 0;
+            if (!sc64_scarab_parent_convert(tag==SC64_SCARAB_SAVE_VERSION ?
+                    SC64_SCARAB_PARENT_PACKED : SC64_SCARAB_PARENT_LEGACY,
+                    83,q.carry,q.work_timer,&c,&t)) return 0;
+            q.carry=c; q.work_timer=t;
+            if (!sc64_unit_save_encode(&race_data.units[i],&q,1024,1024)) return 0;
+        }
+    }
+    /* A checked new envelope has the existing BC payload layout. Mission
+     * validators still expect the existing internal version token. */
+    if (tag==SC64_SCARAB_SAVE_VERSION) race_data.version=SAVE_VERSION;
+    return race_load_preflight(plan);
+}
+static int race_scarab_stage_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
+    const u32 tags[]={SC64_LEGACY_SAVE_VERSION,SAVE_VERSION,SC64_SCARAB_SAVE_VERSION};
+    if (!save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,3,
+                               race_scarab_stage_prepare,plan,selection)) return 0;
+    return race_scarab_stage_prepare(&race_impact_record,selection->length,
+                                     selection->tag,plan);
+}
+static int race_scarab_stage_previous(GbaSaveSelection *selection) {
+    RaceLoadPlan plan;
+    return race_scarab_stage_select(&plan,selection);
+}
+#endif
 static int race_load_game(void) {
     RaceLoadPlan plan = {0};
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    GbaSaveSelection selected;
+    if (!race_scarab_stage_select(&plan,&selected)) return 0;
+#else
 #ifdef SC64_IMPACT_EVENTS
     /* Decode both queues before validators reuse the scratch tail. */
     if (!race_impact_save_read(plan.impact_candidate,&plan.impact_candidate_count)) return 0;
@@ -2645,6 +2718,7 @@ static int race_load_game(void) {
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
 #endif
     if (!race_load_preflight(&plan)) return 0;
+#endif
     const int *v = race_data.state;
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT

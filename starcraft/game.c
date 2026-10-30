@@ -459,6 +459,15 @@ _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x20000000u) == 0,
 #else
 #define SAVE_VERSION SC64_LEGACY_SAVE_VERSION
 #endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+#if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || !defined(SC64_LATE_TERRAN_STORAGE) || !defined(SC64_IMPACT_EVENTS)
+#error "Scarab namespace stage requires the gated Terran impact/Yamato profile"
+#endif
+_Static_assert((SC64_LEGACY_SAVE_VERSION & 0x08000000u) == 0 &&
+               (SAVE_VERSION & 0x08000000u) == 0,
+               "Scarab tag overlaps an existing save namespace");
+#define SC64_SCARAB_SAVE_VERSION (SAVE_VERSION | 0x08000000u)
+#endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
 #endif
@@ -1641,8 +1650,15 @@ static int race_impact_full(void);
 static void race_impact_launch(int target, int damage, int hits, int owner,
                                int damage_class, int source_type, unsigned steps);
 static void race_impact_tick(void);
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+static int race_impact_save_write(const GbaSaveSelection *previous);
+#else
 static int race_impact_save_write(void);
+#endif
 static int race_impact_save_read(Sc64ImpactEvent *candidate, int *count);
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count);
+#endif
 static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED

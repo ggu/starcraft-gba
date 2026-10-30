@@ -23,6 +23,15 @@ int main(int argc,char **argv)
     } else {
         assert(sc64_test_sram_transfer(argv[2],0));
 #ifdef SC64_SCARAB_RUNTIME
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+        assert((!strcmp(argv[1],"migrate") || !strcmp(argv[1],"verify")) && race_load_game());
+        Sc64ScarabParentFields f;
+        assert(u[0].alive && u[0].type==U_REAVER && u[0].raw_type==-1);
+        assert(sc64_scarab_parent_fields_unpack(u[0].carry,u[0].work_timer,&f));
+        assert(f.queued==0 && f.active_slot==SC64_SCARAB_FIELD_NO_SLOT && !f.cooldown && !f.progress);
+        if (!strcmp(argv[1],"migrate")) assert(race_save_game() && sc64_test_sram_transfer(argv[2],1));
+        puts("gated reader migrated gate-off empty Reaver parent");
+#else
         assert(!strcmp(argv[1],"reject"));
         Unit before_units[MAX_UNITS]; Building before_buildings[MAX_BUILDINGS];
         int before_minerals=minerals,before_gas=gas,before_frame=frame; u32 before_seed=seed;
@@ -32,6 +41,7 @@ int main(int argc,char **argv)
         assert(before_minerals==minerals && before_gas==gas && before_frame==frame && before_seed==seed);
         assert(sc64_test_sram_transfer(argv[2],1));
         puts("gated reader rejected unconverted parent; sampled live state unchanged");
+#endif
 #else
         assert(!strcmp(argv[1],"read") && race_load_game());
         assert(u[0].alive && u[0].type==U_REAVER && u[0].carry==0 && u[0].work_timer==0);

@@ -50,3 +50,24 @@ The compile used source head `c8baa3f` with the subsequently modified fixture;
 the recorded source hashes identify those files but do not cover every compiler
 dependency. The SRAM SHA-256 was `80249bd89536725c84ca2ab6efe16921ab4cf4226762b223016341baf79071f2`
 after writing and unchanged after both readers.
+
+## Isolated namespace stage
+
+`SC64_SCARAB_NAMESPACE_STAGE` is an additional, normally disabled experiment
+restricted to the Terran compact/Yamato/impact profile and the 64x64 native
+skirmish map. It uses bit `0x08000000` with compile-time collision checks,
+selects semantically valid records among pre-BC, BC and the staged tag, and
+rebuilds the winner's plan from reloaded bytes before the existing load
+commit. Old empty Reaver parents are converted only after tag authentication;
+raw-85 actors, other geometries and nonempty old parent fields are rejected.
+The writer selects a predecessor before serializing and writes the staged tag
+only after checking the candidate; fresh storage is protected by the journal
+writer's unknown-record guard. Admission and Scarab children remain disabled.
+
+The retained Terran ASan/UBSan host vector, with this extra macro, loaded the
+gate-off Reaver fixture, wrote the new namespace and reloaded it in another
+process. SRAM headers showed old tag `0x73435442` sequence 1 and staged tag
+`0x7b435442` sequence 2. This is a single synthetic initial-parent case, not
+campaign, other profile, old pre-BC/Yamato/impact-tail or corrupt-fallback
+qualification. Existing post-commit restore failures remain possible; no
+whole-load atomicity or production-readiness claim is made.

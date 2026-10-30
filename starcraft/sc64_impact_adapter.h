@@ -190,7 +190,11 @@ race_impact_tick(void)
  * pending impacts than this profile's record holds refuse the save before
  * any SRAM write; they land within a second of play. */
 static int
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+race_impact_save_write(const GbaSaveSelection *previous)
+#else
 race_impact_save_write(void)
+#endif
 {
     u32 bytes = 0;
     if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
@@ -215,9 +219,16 @@ race_impact_save_write(void)
     if (race_impact_count)
         sc64_impact_encode(race_impact_rows, race_impact_count,
                            (u8 *)&race_impact_record + offset);
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    const u32 tags[]={SC64_LEGACY_SAVE_VERSION,SAVE_VERSION,SC64_SCARAB_SAVE_VERSION};
+    if (previous) {
+        if (!save_write_selected(&race_impact_record,offset+bytes,SC64_SCARAB_SAVE_VERSION,previous,tags,3)) return 0;
+    } else if (!save_write_first(&race_impact_record,offset+bytes,SC64_SCARAB_SAVE_VERSION)) return 0;
+#else
     save_write_migrating_feature(&race_impact_record, offset + bytes, SAVE_VERSION,
                          SC64_LEGACY_SAVE_VERSION, offsetof(RaceSave,state)+27u*sizeof(int),
                          0xffff0000u, 0x42450000u);
+#endif
 #else
     if (race_impact_count)
         bytes = sc64_impact_encode(race_impact_rows, race_impact_count,
@@ -247,10 +258,14 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     Sc64BcYamatoShot shots[SC64_BC_SHOT_LIMIT] = {{0}};
     u32 offset = base, mask = 0, impact_bytes;
     int legacy = selected_tag == SC64_LEGACY_SAVE_VERSION;
-    if (selected_tag != SAVE_VERSION && !legacy) return 0;
+    if (selected_tag != SAVE_VERSION && !legacy
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+        && selected_tag != SC64_SCARAB_SAVE_VERSION
+#endif
+       ) return 0;
     if (len < base) return 0;
     if (!legacy) {
-        if (race_data.version != SAVE_VERSION ||
+        if (race_data.version != selected_tag ||
             ((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u ||
             ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
             ((unsigned)race_data.state[28] & 7u) > 4u) return 0;
