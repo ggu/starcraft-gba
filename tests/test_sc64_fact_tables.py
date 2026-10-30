@@ -24,6 +24,8 @@ NON_GATES = {"SC64_ZP_FACT_RANGE_CULL", "SC64_FACT_TABLES"}
 CONFIGS = {name: ("SC64_RACES",) + defines
            for name, defines in FACT_RANGE_CONFIGS.items()}
 CONFIGS.update({
+    "shared_battlecruiser": ("SC64_RACES", "SC64_ZP_CAMPAIGN_ACTORS",
+                            "SC64_BATTLECRUISER_EXPERIMENT"),
     "all_race_roster": ("SC64_RACES", "SC64_UNIFIED", "SC64_ZP_CAMPAIGN_ACTORS",
                         "SC64_Z5_ACTORS", "SC64_Z5_DOODADS", "SC64_Z6_RUNTIME",
                         "SC64_Z6_ACTORS", "SC64_SKIRMISH_ROSTER"),

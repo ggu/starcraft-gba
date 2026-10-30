@@ -227,6 +227,9 @@ static void race_p4_rescue_tick(void)
             u[j].raw_type != 101 && u[j].raw_type != 150) {
             int dx = u[i].x - u[j].x, dy = u[i].y - u[j].y;
             if (dx * dx + dy * dy <= 32 * 32) {
+                #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+                if (!race_bc_before_unit_transfer(&u[i],SIDE,-1)) break;
+                #endif
                 u[i].owner = SIDE; u[i].selected = 0;
                 u[i].order = ORDER_IDLE; u[i].target = -1;
                 u[i].tx = u[i].x; u[i].ty = u[i].y;
@@ -238,7 +241,10 @@ static void race_p4_rescue_tick(void)
         for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE &&
             u[j].raw_type != 101 && u[j].raw_type != 150) {
             int dx = b[i].x - u[j].x, dy = b[i].y - u[j].y;
-            if (dx * dx + dy * dy <= 32 * 32) { b[i].owner = SIDE; break; }
+            if (dx * dx + dy * dy <= 32 * 32) {
+                if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) b[i].owner = SIDE;
+                break;
+            }
         }
     }
 }
@@ -1332,7 +1338,7 @@ race_campaign_tick(void)
                 }
                 for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive && b[i].owner == RESCUABLE &&
                     b[i].x >= 224 && b[i].x <= 784 && b[i].y >= 848 && b[i].y <= 1200) {
-                    b[i].owner = SIDE; joined = 1;
+                    if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) { b[i].owner = SIDE; joined = 1; }
                 }
                 if (joined) race_campaign_set_message(8);
             }

@@ -10,6 +10,13 @@ static void sc64_contact_memo_invalidate(void);
 #endif
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+#include "sc64_battlecruiser_rules.h"
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+#include "sc64_battlecruiser_yamato_motion_codec.h"
+#include "sc64_bc_heading.h"
+#endif
+#endif
 #include "sc64_bitgrid.h"
 #include "sc64_map_math.h"
 #include "sc64_construction_hp.h"
@@ -79,6 +86,7 @@ static void sc64_contact_memo_invalidate(void);
 #error "P5 Shuttle transport requires the P5 runtime"
 #endif
 void *memcpy(void *dst, const void *src, size_t n);
+void *memmove(void *dst, const void *src, size_t n);
 void *memset(void *dst, int value, size_t n);
 int memcmp(const void *a, const void *b, size_t n);
 
@@ -438,9 +446,16 @@ _Static_assert(0x14000u+SC64_ARENA_WORDS*2u<=0x18000u,
 _Static_assert((SC64_BASE_SAVE_VERSION & 0x80000000u) == 0,
                "base save tag overlaps roster save namespace");
 #ifdef SC64_SKIRMISH_ROSTER
-#define SAVE_VERSION (SC64_BASE_SAVE_VERSION | 0x80000000u)
+#define SC64_LEGACY_SAVE_VERSION (SC64_BASE_SAVE_VERSION | 0x80000000u)
 #else
-#define SAVE_VERSION SC64_BASE_SAVE_VERSION
+#define SC64_LEGACY_SAVE_VERSION SC64_BASE_SAVE_VERSION
+#endif
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+_Static_assert((SC64_LEGACY_SAVE_VERSION & 0x20000000u) == 0,
+               "BC save namespace overlaps legacy tag");
+#define SAVE_VERSION (SC64_LEGACY_SAVE_VERSION | 0x20000000u)
+#else
+#define SAVE_VERSION SC64_LEGACY_SAVE_VERSION
 #endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
@@ -816,13 +831,16 @@ enum {
 };
 enum {
     MODE_NORMAL, MODE_MOVE, MODE_ATTACK, MODE_BUILD
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+    , MODE_YAMATO
+#endif
 #ifdef SC64_Z5_CONSUME_ENABLED
     , MODE_Z5_CONSUME
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
     , MODE_UNLOAD
 #endif
-#ifdef SC64_TERRAN_LATE_RUNTIME
+#if defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_BATTLECRUISER_FLIGHT_EXPERIMENT)
     , MODE_LAND
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
@@ -871,6 +889,9 @@ typedef struct {
 #endif
 #endif
 } Unit;
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+static int sc64_battlecruiser_source_tick_due(void);
+#endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 _Static_assert(sizeof(Unit) == 56, "Late Terran runtime unit budget");
 #endif
@@ -1278,6 +1299,74 @@ static int skirmish_bot_index(int owner);
 #error "Briefings need source-font pixel wrapping; run make sc64-interface"
 #endif
 static int race_mode,race_human=R_ZERG,race_selected_mission,race_completed,race_bots=2;
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+static u16 sc64_battlecruiser_tech_bits;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+static Sc64BcYamatoShot sc64_bc_shots[SC64_BC_SHOT_LIMIT];
+/* Number of frame-counter increments during scripted world pauses, mod 5. */
+static u8 sc64_bc_pause_offset;
+/* Private spell-only LCG: deterministic across saves, but not the complete
+ * OpenBW shared RNG stream used by unrelated events. */
+static u32 sc64_bc_spell_rng=42u;
+static unsigned sc64_bc_spell_random(void)
+{
+    sc64_bc_spell_rng=sc64_bc_spell_rng*22695477u+1u;
+    return (sc64_bc_spell_rng>>16)&0x7fffu;
+}
+static void race_bc_yamato_target_removed(unsigned target)
+{
+    for (int i=0;i<SC64_BC_SHOT_LIMIT;++i) {
+        Sc64BcYamatoShot *shot=&sc64_bc_shots[i];
+        if (shot->state==SC64_BC_SHOT_CHARGING && shot->target==target &&
+            shot->caster<MAX_UNITS && u[shot->caster].alive &&
+            u[shot->caster].order==ORDER_ATTACK_TARGET && u[shot->caster].target==(int)target)
+            u[shot->caster].target=-1;
+    }
+    sc64_bc_shot_target_gone(sc64_bc_shots,target);
+}
+/* Some scenario scripts remove actors without the ordinary damage callback.
+ * Reconcile those removals before simulation and before a save snapshot. */
+static void race_bc_yamato_sync_references(void)
+{
+    for (int i=0;i<SC64_BC_SHOT_LIMIT;++i) {
+        Sc64BcYamatoShot *shot=&sc64_bc_shots[i];
+        if (!shot->state) continue;
+        if (shot->caster<MAX_UNITS && !u[shot->caster].alive)
+            sc64_bc_shot_caster_gone(sc64_bc_shots,shot->caster);
+        if (!shot->state || shot->target==SC64_BC_SHOT_NO_TARGET) continue;
+        if (shot->target<MAX_UNITS) {
+            if (!u[shot->target].alive) race_bc_yamato_target_removed(shot->target);
+        } else if (shot->target<MAX_UNITS+MAX_BUILDINGS &&
+                   !b[shot->target-MAX_UNITS].alive)
+            race_bc_yamato_target_removed(shot->target);
+    }
+}
+#endif
+static int sc64_battlecruiser_owner_key(int custom, int mission, int owner, int raw_owner);
+static int race_bc_before_unit_transfer(Unit *q,int new_owner,int new_raw_owner);
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+static void race_bc_building_destroyed(int slot);
+static void race_bc_parent_detach(int slot);
+static int race_bc_parent_addon_constructing(int slot);
+static void race_bc_parent_relink(int slot);
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+static int race_bc_facility_airborne(int slot);
+static int race_bc_facility_landing_site(int slot,int x,int y);
+static int race_bc_facility_lift(int slot);
+static int race_bc_facility_land(int slot,int x,int y);
+static void race_bc_facility_flight_tick(void);
+#endif
+static int race_bc_lab_start(int slot, unsigned kind);
+static int race_bc_lab_cancel(int slot, int destroyed);
+static int race_bc_before_building_transfer(int slot,int new_owner);
+#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) race_bc_before_building_transfer((slot),(owner))
+#else
+#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) 1
+#endif
+#endif
+#ifndef SC64_BC_ALLOW_BUILDING_TRANSFER
+#define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) 1
+#endif
 static int race_skirmish_map;
 static int race_bot_races[3]={R_ZERG,R_PROTOSS,R_TER};
 static Sc64Frontend race_front;
@@ -1765,6 +1854,9 @@ sc64_t4_building_collidable(int slot)
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_airborne(slot)) return 0;
 #endif
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    if (race_bc_facility_airborne(slot)) return 0;
+#endif
     int type = b[slot].type;
 #ifdef SC64_T4_SCENARIO_RUNTIME
     if (race_t4_active() && sc64_race_t4_is_door(type)) {
@@ -2004,6 +2096,11 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    /* A recycled slot must never inherit a cast or an incoming missile. */
+    sc64_bc_shot_caster_gone(sc64_bc_shots,(unsigned)i);
+    race_bc_yamato_target_removed((unsigned)i);
+#endif
     sc64_walk_reset_slot(i);
 #ifdef SC64_UNIT_FACING
     sc64_facing_reset_slot(i);
@@ -2112,6 +2209,14 @@ spawn_unit(int owner, int type, int x, int y)
     u[i].tx = x;
     u[i].ty = y;
     u[i].carry = 0;
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    if (sc64_race_raw_unit(type) == 12) {
+        int key = sc64_battlecruiser_owner_key(race_mode, race_selected_mission, owner, u[i].raw_owner);
+        int reactor = key >= 0 && sc64_battlecruiser_tech_has(
+            sc64_battlecruiser_tech_bits, (unsigned)key, SC64_BC_TECH_REACTOR);
+        u[i].carry = sc64_battlecruiser_energy_initial(reactor);
+    }
+#endif
     u[i].build = -1;
     u[i].work_timer = 0;
     /* Stored armor is the unit's base; combat applies the live upgrade. */
@@ -2139,6 +2244,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
     int i = find_build_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    race_bc_yamato_target_removed((unsigned)(MAX_UNITS+i));
+#endif
     /* Destruction leaves the selection index on the dead slot; a new
        structure there must not inherit it (and its selected vital bar). */
     if (selected_building == i)
@@ -2331,6 +2439,46 @@ geyser_at(int x, int y)
     return -1;
 }
 
+#if defined(SC64_CV5_COVER) && defined(SC64_RACES) && !defined(SC64_RACES_COVER_DATA)
+#error "CV5 cover requires a cover-encoded race map header"
+#endif
+#if defined(SC64_CV5_COVER) && defined(SC64_IMPORTED_SKIRMISH) && !defined(SC64_SKIRMISH_COVER_DATA)
+#error "CV5 cover requires a cover-encoded skirmish map header"
+#endif
+#if defined(SC64_CV5_COVER) && defined(SC64_HAS_TERRAIN_ART) && !defined(SC64_ASSET_COVER_DATA)
+#error "CV5 cover requires a cover-encoded terrain asset header"
+#endif
+#if defined(SC64_CV5_COVER) && defined(SC64_TERRAN_CAMPAIGN) && !defined(SC64_CAMPAIGN_COVER_DATA)
+#error "CV5 cover requires a cover-encoded campaign map header"
+#endif
+/* Experimental CV5 metadata occupies bit 1 of the existing ROM map byte. */
+#ifdef SC64_CV5_COVER
+static int __attribute__((unused))
+terrain_provides_cover(int x, int y)
+{
+    if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) return 0;
+    int cell = x / 16 + (y / 16) * MAP_COLS;
+#ifdef SC64_RACES
+#ifdef SC64_SHOWCASE_ENABLED
+    if (sc64_showcase_scene >= 0) return 0;
+#endif
+    if (!race_mode) return (sc64_race_maps[race_selected_mission].blocked[cell] & 2) != 0;
+#ifdef SC64_IMPORTED_SKIRMISH
+    if (race_skirmish_map > 0) return (sc64_skirmish_maps[race_skirmish_map-1].blocked[cell] & 2) != 0;
+#endif
+    return 0; /* authored arena has no authenticated CV5 terrain */
+#elif defined(SC64_IMPORTED_MISSION) && defined(SC64_HAS_TERRAIN_ART) && !defined(SC64_SKIRMISH)
+#ifdef SC64_TERRAN_CAMPAIGN
+    return (sc64_campaign_maps[campaign_mission].blocked[cell] & 2) != 0;
+#else
+    return (sc64_terrain_blocked[cell] & 2) != 0;
+#endif
+#else
+    (void)cell; return 0;
+#endif
+}
+#endif
+
 static int
 terrain_blocked(int col, int row)
 {
@@ -2340,9 +2488,9 @@ terrain_blocked(int col, int row)
     /* The filming set is a flat arena; normal skirmish barriers stay intact. */
     if(sc64_showcase_scene>=0)return 0;
 #endif
-    if(!race_mode)return sc64_race_maps[race_selected_mission].blocked[col+row*MAP_COLS]!=0;
+    if(!race_mode)return (sc64_race_maps[race_selected_mission].blocked[col+row*MAP_COLS]&1) != 0;
 #ifdef SC64_IMPORTED_SKIRMISH
-    if(race_skirmish_map>0)return sc64_skirmish_maps[race_skirmish_map-1].blocked[col+row*MAP_COLS]!=0;
+    if(race_skirmish_map>0)return (sc64_skirmish_maps[race_skirmish_map-1].blocked[col+row*MAP_COLS]&1) != 0;
 #endif
     return (col==31&&row>3&&row<60&&!(row>=14&&row<=18)&&!(row>=45&&row<=49))||
            (row==31&&col>3&&col<60&&!(col>=14&&col<=18)&&!(col>=45&&col<=49));
@@ -2359,9 +2507,9 @@ terrain_blocked(int col, int row)
 	if (col < 0 || row < 0 || col >= MAP_COLS || row >= MAP_ROWS)
 	    return 1;
 	#ifdef SC64_TERRAN_CAMPAIGN
-	return sc64_campaign_maps[campaign_mission].blocked[col + row * MAP_COLS] != 0;
+	return (sc64_campaign_maps[campaign_mission].blocked[col + row * MAP_COLS] & 1) != 0;
 	#else
-	return sc64_terrain_blocked[col + row * MAP_COLS] != 0;
+	return (sc64_terrain_blocked[col + row * MAP_COLS] & 1) != 0;
 	#endif
 #else
 	/* The CHK MTXM grid is retained for provenance, but it does not encode
@@ -2406,6 +2554,9 @@ build_path_grid(void)
 	    SC64_GRID_SET(path_walkable, cell, !terrain_blocked(col, row));
 	}
     for (i = 0; i < MAX_BUILDINGS; i++) if (b[i].alive) {
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+        if (race_bc_facility_airborne(i)) continue;
+#endif
 #ifdef SC64_RACES
         if(b[i].type==B_ZERG_BEACON)continue;
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
@@ -2494,6 +2645,9 @@ can_place_except_worker(int type, int x, int y, int worker)
 #endif
 	for (i = 0; i < MAX_BUILDINGS; i++)
 	    if (b[i].alive
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+                && !race_bc_facility_airborne(i)
+#endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
                 && sc64_t4_building_collidable(i)
 #endif
@@ -2520,6 +2674,9 @@ can_place_except_worker(int type, int x, int y, int worker)
 	return 0;
     for (i = 0; i < MAX_BUILDINGS; i++)
 	if (b[i].alive
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+            && !race_bc_facility_airborne(i)
+#endif
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
             && sc64_t4_building_collidable(i)
 #endif
@@ -3516,6 +3673,11 @@ sc64_direct_attack_clear_references(int entity)
     for (i = 0; i < MAX_UNITS; ++i) {
         Unit *q = &u[i];
         if (q->alive && q->order == ORDER_ATTACK_TARGET && q->target == entity) {
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+            if (sc64_race_raw_unit(q->type)==12 && (q->work_timer&7)>0 && (q->work_timer&7)<=6) {
+                q->target=-1; continue; /* cast animation outlives its target */
+            }
+#endif
             q->order = ORDER_IDLE;
             q->target = -1;
             q->tx = q->x;
@@ -3645,6 +3807,9 @@ sc64_direct_attack_issue_target(int target)
             q->work_timer = 0;
         }
 #endif
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+        if (sc64_race_raw_unit(q->type)==12) q->work_timer&=~7;
+#endif
         q->order = ORDER_ATTACK_TARGET;
         q->target = target;
         q->tx = target_x(target);
@@ -3695,10 +3860,34 @@ sc64_direct_attack_tick_unit(int slot)
 }
 #endif
 
+#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+#ifndef SC64_WEAPON_SOURCE_VFX
+#error "Yamato art requires the shared source-VFX renderer"
+#endif
+#define SC64_YAMATO_TRAIL_STYLE 29
+#define SC64_YAMATO_IMPACT_STYLE 30
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+static unsigned sc64_bc_p7_visual_phase(void);
+#endif
+static unsigned sc64_bc_yamato_visual_phase(void)
+{
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    if (race_p7_active()) return sc64_bc_p7_visual_phase();
+#endif
+    return (((unsigned)frame%5u)+5u-sc64_bc_pause_offset)%5u;
+}
+static int sc64_bc_yamato_visual_tag(unsigned style,unsigned heading)
+{ return (int)((style<<8)|((heading&31u)<<3)|sc64_bc_yamato_visual_phase()); }
+#endif
+
 /* Reconstruct presentation age from existing endpoints; no new saved state. */
 static int __attribute__((noinline))
 sc64_trace_duration(int packed, int x0, int y0, int x1, int y1)
 {
+#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+    if (sc64_weapon_vfx_style(packed)==SC64_YAMATO_TRAIL_STYLE) return 9;
+    if (sc64_weapon_vfx_style(packed)==SC64_YAMATO_IMPACT_STYLE) return 36;
+#endif
 #ifdef SC64_WEAPON_SOURCE_VFX
     if (sc64_weapon_source_vfx_is_tagged((uint32_t)packed)) {
         Sc64WeaponSourceVfxKey key;
@@ -3827,6 +4016,12 @@ destroy_building(int slot, int source_owner)
 {
     Building *q = &b[slot];
     if (!q->alive) return;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    race_bc_yamato_target_removed((unsigned)(MAX_UNITS+slot));
+#endif
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+    race_bc_building_destroyed(slot);
+#endif
 #ifdef SC64_SHARED_BUNKER
     if (q->type == B_BUNKER) race_bunker_destroy_cargo(slot, source_owner);
 #endif
@@ -3989,6 +4184,10 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 	}
 	u[target].hp -= damage;
 	if (u[target].hp <= 0) {
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+            race_bc_yamato_target_removed((unsigned)target);
+            sc64_bc_shot_caster_gone(sc64_bc_shots,(unsigned)target);
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
             race_p7_carrier_training_clear_slot(target);
 #endif
@@ -4430,6 +4629,13 @@ static void
 init_state(void)
 {
     sc64_walk_reset_all();
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    sc64_battlecruiser_tech_bits = 0;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    memset(sc64_bc_shots,0,sizeof(sc64_bc_shots));
+    sc64_bc_pause_offset=0; sc64_bc_spell_rng=42u;
+#endif
+#endif
 #ifdef SC64_RACES
 #ifdef SC64_UNIT_FACING
     sc64_facing_reset_all();
@@ -4875,6 +5081,9 @@ issue_order(int order, int tx, int ty)
                 u[i].carry = 0; u[i].work_timer = 0;
             }
 #endif
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+            if (sc64_race_raw_unit(u[i].type)==12) u[i].work_timer&=~7;
+#endif
 	    u[i].order = order;
 	#ifdef SC64_REACHABLE_FORMATION
 	    if (group_order) {
@@ -5073,6 +5282,12 @@ stop_selected(void)
             if (u[i].type == U_Z7_EGG) continue;
 #endif
 	    u[i].order = ORDER_IDLE;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+            if (sc64_race_raw_unit(u[i].type)==12) u[i].work_timer&=~7;
+#endif
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+            if (sc64_race_raw_unit(u[i].type) != 12)
+#endif
 #ifdef SC64_Z5_CLOAK_ENABLED
             if (!race_z5_cloak_actor(&u[i]))
 #endif
@@ -5190,11 +5405,86 @@ static int __attribute__((noinline)) race_bunker_menu_available(void)
 }
 #endif
 
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+static int race_bc_lab_menu_available(void)
+{
+    int i=selected_building;
+    return i>=0 && i<MAX_BUILDINGS && b[i].alive && b[i].owner==SIDE &&
+        building_complete(i) && sc64_race_raw_building(b[i].type)==118;
+}
+static int race_bc_menu_base(void)
+{ return race_mode ? (int)sc64_skirmish_menu_count((unsigned)race_human) : MENU_STOP+1; }
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+static int race_bc_facility_menu_available(void)
+{
+    int i=selected_building;
+    return i>=0 && i<MAX_BUILDINGS && b[i].alive && b[i].owner==SIDE &&
+        !b[i].under_construction && sc64_race_raw_building(b[i].type)==116;
+}
+#endif
+#endif
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+static int race_bc_yamato_target_valid(int target,const Unit *caster,int require_visible);
+static int race_bc_yamato_issue(int slot,int target);
+static int race_bc_yamato_menu_base(void)
+{ return race_mode?(int)sc64_skirmish_menu_count((unsigned)race_human):MENU_STOP+1; }
+static int race_bc_yamato_command_available(void)
+{
+    if (selected_building>=0) return 0;
+    for(int i=0;i<MAX_UNITS;++i) if(u[i].alive && u[i].owner==SIDE && u[i].selected &&
+        sc64_race_raw_unit(u[i].type)==12 && !SC64_TRANSPORT_LOADED(&u[i])) {
+        int key=sc64_battlecruiser_owner_key(race_mode,race_selected_mission,u[i].owner,u[i].raw_owner);
+        if(key>=0 && sc64_battlecruiser_tech_has(sc64_battlecruiser_tech_bits,(unsigned)key,SC64_BC_TECH_YAMATO)) return 1;
+    }
+    return 0;
+}
+static int race_bc_yamato_target_at(int x,int y)
+{
+    int best=-1,best_distance=0x7fffffff;
+    for(int target=0;target<MAX_UNITS+MAX_BUILDINGS;++target) {
+        if(!target_alive(target)) continue;
+        int d=dist2(x,y,target_x(target),target_y(target)),radius=target<MAX_UNITS?12:24,allowed=0;
+        if(d>=radius*radius || d>=best_distance) continue;
+        for(int i=0;i<MAX_UNITS;++i) if(u[i].alive && u[i].owner==SIDE && u[i].selected &&
+            sc64_race_raw_unit(u[i].type)==12 && race_bc_yamato_target_valid(target,&u[i],1)) {allowed=1;break;}
+        if(allowed){best=target;best_distance=d;}
+    }
+    return best;
+}
+#endif
 static void
 choose_command(int choice)
 {
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+    if (race_bc_yamato_command_available() && choice==race_bc_yamato_menu_base()) {
+        menu_open=0;mode=MODE_YAMATO;return;
+    }
+#endif
 #ifdef SC_FIELD_FEEDBACK
     menu_last = (u8)choice;
+#endif
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    if (race_bc_facility_menu_available() && choice==race_bc_menu_base()) {
+        menu_open=0; mode=MODE_NORMAL;
+        if (race_bc_facility_airborne(selected_building)) mode=MODE_LAND;
+        else {
+#ifdef SC64_TERRAN_LATE_RUNTIME
+            if (race_late_active()) toast(race_late_lift(selected_building)?0:8);
+            else
+#endif
+            toast(race_bc_facility_lift(selected_building)?0:8);
+        }
+        return;
+    }
+#endif
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+    if (race_bc_lab_menu_available() && choice>=race_bc_menu_base() &&
+        choice<race_bc_menu_base()+(b[selected_building].level ? 1 : 2)) {
+        int result = b[selected_building].level ? race_bc_lab_cancel(selected_building,0) :
+            race_bc_lab_start(selected_building,choice==race_bc_menu_base() ?
+                              SC64_BC_TECH_YAMATO : SC64_BC_TECH_REACTOR);
+        menu_open=0; mode=MODE_NORMAL; toast(result?0:8); return;
+    }
 #endif
 #ifdef SC64_SHARED_BUNKER
     if (choice==(race_mode?(int)sc64_skirmish_menu_count((unsigned)race_human):MENU_STOP+1) &&
@@ -5453,6 +5743,15 @@ static int race_skirmish_command_count(void)
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 static int field_menu_count(void)
 {
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+    if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
+#endif
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    if (race_bc_facility_menu_available()) return race_bc_menu_base()+1;
+#endif
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+    if (race_bc_lab_menu_available()) return race_bc_menu_base() + (b[selected_building].level ? 1 : 2);
+#endif
     if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_SHARED_BUNKER
     if (race_bunker_menu_available()) return MENU_STOP+2;
@@ -5508,6 +5807,15 @@ static int field_menu_count(void)
 #elif defined(SC64_T5_RUNTIME)
 static int field_menu_count(void)
 {
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+    if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
+#endif
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    if (race_bc_facility_menu_available()) return race_bc_menu_base()+1;
+#endif
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+    if (race_bc_lab_menu_available()) return race_bc_menu_base() + (b[selected_building].level ? 1 : 2);
+#endif
     if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_SHARED_BUNKER
     if (race_bunker_menu_available()) return MENU_STOP+2;
@@ -5522,6 +5830,15 @@ static int field_menu_count(void)
 #elif defined(SC64_RACES)
 static int field_menu_count(void)
 {
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+    if (race_bc_yamato_command_available()) return race_bc_yamato_menu_base()+1;
+#endif
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    if (race_bc_facility_menu_available()) return race_bc_menu_base()+1;
+#endif
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+    if (race_bc_lab_menu_available()) return race_bc_menu_base() + (b[selected_building].level ? 1 : 2);
+#endif
     if (race_mode) return race_skirmish_command_count();
 #ifdef SC64_SHARED_BUNKER
     if (race_bunker_menu_available()) return MENU_STOP+2;
@@ -5561,6 +5878,20 @@ static const char *field_menu_base_label(int choice, const char *const *labels)
 /* Row i of the command list, with every profile's contextual rows. */
 static const char *race_menu_label(int i)
 {
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+    if (race_bc_yamato_command_available() && i==race_bc_yamato_menu_base()) return "YAMATO GUN";
+#endif
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    if (race_bc_facility_menu_available() && i==race_bc_menu_base())
+        return race_bc_facility_airborne(selected_building) ? "LAND" : "LIFT OFF";
+#endif
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+    if (race_bc_lab_menu_available() && i>=race_bc_menu_base()) {
+        if (b[selected_building].level) return i==race_bc_menu_base() ? "CANCEL RESEARCH" : "";
+        if (i==race_bc_menu_base()) return "YAMATO GUN";
+        if (i==race_bc_menu_base()+1) return "COLOSSUS REACTOR";
+    }
+#endif
 #ifdef SC64_SHARED_BUNKER
     if (i==(race_mode?(int)sc64_skirmish_menu_count((unsigned)race_human):MENU_STOP+1) &&
         race_bunker_menu_available()) return "UNLOAD CARGO";
@@ -5708,9 +6039,17 @@ interact(void)
 	choose_command(menu_cursor);
 	return;
     }
-#ifdef SC64_TERRAN_LATE_RUNTIME
+#if defined(SC64_TERRAN_LATE_RUNTIME) || defined(SC64_BATTLECRUISER_FLIGHT_EXPERIMENT)
     if (mode == MODE_LAND) {
-        toast(race_late_flight_order(selected_building, cx, cy, 1) ? 0 : 8);
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        if (race_late_active()) toast(race_late_flight_order(selected_building,cx,cy,1)?0:8);
+        else
+#endif
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+        toast(race_bc_facility_land(selected_building,cx,cy)?0:8);
+#else
+        toast(8);
+#endif
         mode = MODE_NORMAL; return;
     }
 #endif
@@ -5739,6 +6078,15 @@ interact(void)
     if (mode==MODE_RECHARGE) {
         int issued=race_battery_issue_command(selected_building,cx,cy);
         mode=MODE_NORMAL; toast(issued ? 0 : 8); return;
+    }
+#endif
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+    if (mode==MODE_YAMATO) {
+        int target=race_bc_yamato_target_at(cx,cy),issued=0;
+        if(target>=0) for(int i=0;i<MAX_UNITS;++i)
+            if(u[i].alive && u[i].owner==SIDE && u[i].selected && sc64_race_raw_unit(u[i].type)==12)
+                issued+=race_bc_yamato_issue(i,target);
+        mode=MODE_NORMAL;toast(issued?0:8);return;
     }
 #endif
     if (mode == MODE_MOVE) {
@@ -6419,8 +6767,11 @@ tick_combat(Unit * q, int target)
     damage = unit_damage(q->type);
 #ifdef SC64_RACES
     int flying=target<MAX_UNITS&&sc64_race_unit_flying(u[target].type);
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    if (target>=MAX_UNITS && race_bc_facility_airborne(target-MAX_UNITS)) flying=1;
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
-    if (target >= MAX_UNITS) flying = race_late_airborne(target - MAX_UNITS);
+    if (target >= MAX_UNITS && race_late_airborne(target - MAX_UNITS)) flying = 1;
 #endif
     range=(sc64_race_unit_range_vs(q->type,flying)+1)/2;
     /* Weapon reach is measured from a structure's footprint edge. The
@@ -6605,6 +6956,10 @@ tick_combat(Unit * q, int target)
 #ifdef SC64_SHARED_BUNKER
 #include "sc64_bunker_combat.h"
 #endif
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+#include "sc64_battlecruiser_yamato.h"
+#include "sc64_battlecruiser_yamato_projectile.h"
+#endif
 
 static int GBA_HOT
 nearest_command_target(int x, int y)
@@ -6628,6 +6983,24 @@ nearest_command_target(int x, int y)
 	}
     return best < 0 ? -1 : MAX_UNITS + best;
 }
+
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+/* Preserve pre-order, battery service and caster ordering while keeping the
+ * rare Battlecruiser work out of the hot ordinary order loop. */
+static int __attribute__((noinline)) race_bc_order_dispatch(Unit *q,int slot,int recharge)
+{
+    if (sc64_race_raw_unit(q->type)==12 && sc64_battlecruiser_source_tick_due()) {
+        if (q->build>=0) --q->build;
+        race_bc_yamato_heading_tick(q);
+    }
+#ifdef SC64_BATTERY_SERVICE_ENABLED
+    if (recharge && race_battery_tick_unit(slot)) return 1;
+#else
+    (void)recharge;
+#endif
+    return race_bc_yamato_recovery_tick(q) || race_bc_yamato_tick_caster(slot);
+}
+#endif
 
 #if defined(SC64_P7_ARBITER_CLOAK_CACHE_ENABLED) && !defined(GBA_HOST)
 static void __attribute__((noinline,long_call))
@@ -6754,7 +7127,13 @@ target_lists_unavailable:
 	#endif
 	if (q->cd > 0)
 	    q->cd--;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
 #ifdef SC64_BATTERY_SERVICE_ENABLED
+        if (race_bc_order_dispatch(q,i,p7_recharge_order)) continue;
+#else
+        if (race_bc_order_dispatch(q,i,0)) continue;
+#endif
+#elif defined(SC64_BATTERY_SERVICE_ENABLED)
         if (p7_recharge_order && race_battery_tick_unit(i)) continue;
 #endif
 #ifdef SC64_DIRECT_ATTACK
@@ -7787,6 +8166,9 @@ game_update(u16 held, u16 pressed)
      * while combat, production, orders and player commands remain frozen. */
     if (race_p4_world_paused()) {
         ++frame;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+        sc64_bc_pause_offset=(u8)((sc64_bc_pause_offset+1u)%5u);
+#endif
         update_imported_mission();
         update_exploration();
         if (won || lost) {
@@ -7952,7 +8334,16 @@ game_update(u16 held, u16 pressed)
 #ifdef SC64_NYDUS_ENABLED
     race_nydus_tick_world();
 #endif
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    race_bc_yamato_sync_references();
+#endif
     update_orders();
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    if (sc64_battlecruiser_source_tick_due())
+        for (int i=0;i<SC64_BC_SHOT_LIMIT;++i)
+            if (sc64_bc_shots[i].state==SC64_BC_SHOT_FLIGHT)
+                (void)race_bc_yamato_projectile_step(i);
+#endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     race_p7_projectile_tick_if_due();
 #endif
@@ -7983,6 +8374,9 @@ game_update(u16 held, u16 pressed)
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
     sc64_update_mission_cycles = gba_clock() - sc64_update_stage_start;
     sc64_update_stage_start = gba_clock();
+#endif
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    race_bc_facility_flight_tick();
 #endif
     update_production();
 #if defined(SC64_IMPORTED_MISSION) && defined(SC64_DIAGNOSTIC_UPDATE)
@@ -8147,6 +8541,17 @@ sc64_race_building_art_sprite(int raw)
     const Sc64SpriteFrame *zp_sprite =
         raw >= 0 ? sc64_race_building_sprite((unsigned short)raw, 0) : 0;
     if (zp_sprite) return zp_sprite;
+#ifdef SC64_BATTLECRUISER_EXPERIMENT
+    if (raw==116 || raw==118) {
+        static Sc64SpriteFrame bc_body;
+        extern int sc64_bc_body_art(unsigned,short *,short *,unsigned short *,
+                                    unsigned short *,unsigned short *,unsigned short *,
+                                    const unsigned char **);
+        if (sc64_bc_body_art((unsigned)raw,&bc_body.offset_x,&bc_body.offset_y,
+                             &bc_body.w,&bc_body.h,&bc_body.canvas_w,&bc_body.canvas_h,
+                             &bc_body.pixels)) return &bc_body;
+    }
+#endif
 #endif
     const Sc64SpriteFrame *sprite =
         raw >= 0 ? sc64_p8_unit_sprite_for_raw((unsigned short)raw) : 0;
@@ -8298,6 +8703,14 @@ static int
 sc64_unit_energy(const Unit *q,int *maximum)
 {
     *maximum=0;
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    if (sc64_race_raw_unit(q->type)==12) {
+        int key=sc64_battlecruiser_owner_key(race_mode, race_selected_mission,q->owner,q->raw_owner);
+        int reactor=key>=0 && sc64_battlecruiser_tech_has(
+            sc64_battlecruiser_tech_bits,(unsigned)key,SC64_BC_TECH_REACTOR);
+        *maximum=sc64_battlecruiser_energy_cap(reactor);
+    }
+#endif
 #ifdef SC64_Z6_CLOAK_ENABLED
     if (race_z6_cloak_actor(q)) *maximum=SC64_Z5_CLOAK_MAX_ENERGY_Q8;
 #endif
@@ -8495,6 +8908,10 @@ draw_unit(Unit * q)
 #endif
 #ifdef SC64_HAS_SPRITES
 #ifdef SC64_UNIT_FACING
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    if (sc64_race_raw_unit(q->type)==12) SC64_FACING_SET((int)(q-u),sc64_bc_heading_face((u8)((unsigned)q->work_timer>>3)));
+    else
+#endif
     sc64_facing_track(q);
 #if defined(SC64_WEAPON_SOURCE_VFX) && defined(SC64_UNIT_ATTACK_POSES_ENABLED)
     if(attack_pose) draw_mission_sprite(attack_pose,x,body_y);
@@ -8598,12 +9015,48 @@ draw_unit(Unit * q)
 
 #ifdef SC64_WEAPON_SOURCE_VFX
 #include "sc64_weapon_source_vfx_render.h"
+#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+#include "sc64_yamato_raster_adapter.h"
+#endif
 #endif
 
 static void
 draw_tracers(void)
 {
+#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+    for (int i=0;i<SC64_BC_SHOT_LIMIT;++i) {
+        const Sc64BcYamatoShot *shot=&sc64_bc_shots[i];
+        if (shot->state==SC64_BC_SHOT_CHARGING && shot->caster<MAX_UNITS && u[shot->caster].alive) {
+            int f=sc64_yamato_raster_charge_frame(shot->age);
+            if (f>=0) sc64_yamato_raster_draw(543,(unsigned)f,0,u[shot->caster].x,u[shot->caster].y);
+        } else if (shot->state==SC64_BC_SHOT_FLIGHT) {
+            Sc64BcMotionFields m;
+            if (sc64_bc_motion_unpack(shot,&m))
+                sc64_yamato_raster_draw(541,0,(((unsigned)m.heading+4u)>>3)&31u,(int)(m.x_q8/512u),(int)(m.y_q8/512u));
+        }
+    }
+    for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && sc64_race_raw_unit(u[i].type)==12 &&
+        u[i].order==ORDER_ATTACK_TARGET && (u[i].work_timer&7)>0 && (u[i].work_timer&7)<=6) {
+        int f=sc64_yamato_raster_charge_frame(50u-((unsigned)u[i].work_timer&7u));
+        if (f>=0) sc64_yamato_raster_draw(543,(unsigned)f,0,u[i].x,u[i].y);
+    }
+#endif
     for (int i=0;i<MAX_TRACERS;++i) if (tracers[i].life) {
+#ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
+        int ys=sc64_weapon_vfx_style(tracers[i].color);
+        if (ys==SC64_YAMATO_TRAIL_STYLE || ys==SC64_YAMATO_IMPACT_STYLE) {
+            int age=sc64_tracer_duration(i)-tracers[i].life;
+            unsigned p=(unsigned)tracers[i].color&7u;
+            unsigned source_age=(unsigned)(age<=0?0:age-1);
+            source_age-= (source_age+p)/5u;
+            if (ys==SC64_YAMATO_TRAIL_STYLE && source_age<6u)
+                sc64_yamato_raster_draw(542,(source_age/2u)*17u,
+                                         ((unsigned)tracers[i].color>>3)&31u,tracers[i].x0,tracers[i].y0);
+            if (ys==SC64_YAMATO_IMPACT_STYLE && source_age<28u)
+                sc64_yamato_raster_draw(544,source_age/2u,0,tracers[i].x0,tracers[i].y0);
+            continue;
+        }
+#endif
 #ifdef SC64_WEAPON_SOURCE_VFX
         if(sc64_weapon_source_vfx_is_tagged((uint32_t)tracers[i].color)) {
             uint32_t packed=(uint32_t)tracers[i].color;
@@ -10072,6 +10525,9 @@ draw_hud_commands_body(void)
 #ifdef SC64_BATTERY_SERVICE_ENABLED
                  mode == MODE_RECHARGE ? "RECHARGE SHIELDS" :
 #endif
+#ifdef SC64_BATTLECRUISER_YAMATO_AUTOLAUNCH_EXPERIMENT
+                 mode == MODE_YAMATO ? "YAMATO TARGET" :
+#endif
 #if defined(SC64_P4_STORM_ENABLED) || defined(SC64_Z6_STORM_ENABLED)
                  mode == MODE_P4_STORM ? "PSIONIC STORM TARGET" :
 #endif
@@ -10982,8 +11438,55 @@ static int race_save_decode_unit(const RaceSave *, unsigned, unsigned, unsigned,
 static int race_save_decode_building(const RaceSave *, unsigned, Building *);
 #include "sc64_nydus_adapter.h"
 #endif
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+#include "sc64_battlecruiser_facility_flight.h"
+#endif
 #include "race_save_adapter.h"
 #ifdef SC64_IMPACT_EVENTS
 #include "sc64_impact_adapter.h"
 #endif
+#endif
+
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+static int sc64_battlecruiser_owner_key(int custom, int mission, int owner, int raw_owner)
+{
+    if (custom) return owner >= 0 && owner < 5 ? owner : -1;
+    if (owner == SIDE) {
+        if (mission < 0 || mission >= SC64_RACE_MAP_COUNT ||
+            sc64_race_maps[mission].human_slot >= 8) return -1;
+        return sc64_race_maps[mission].human_slot;
+    }
+    return raw_owner >= 0 && raw_owner < 8 ? raw_owner : -1;
+}
+/* Called before a real control transfer, while the previous owner key is
+ * still available. Source raw_owner provenance on the actor is preserved. */
+static int race_bc_before_unit_transfer(Unit *q,int new_owner,int new_raw_owner)
+{
+    unsigned bits;
+    int old_key,new_key;
+    if (!q || !q->alive || sc64_race_raw_unit(q->type)!=12) return 1;
+    if (q->owner==new_owner) return 1;
+    old_key=sc64_battlecruiser_owner_key(race_mode,race_selected_mission,q->owner,q->raw_owner);
+    new_key=sc64_battlecruiser_owner_key(race_mode,race_selected_mission,new_owner,new_raw_owner);
+    if (old_key<0 || new_key<0) return 0;
+    bits=sc64_battlecruiser_tech_bits;
+    /* Pinned OpenBW give_unit_to grants Yamato unconditionally; reactor is
+     * inherited from the previous owner only when present. */
+    (void)sc64_battlecruiser_tech_complete(&bits,(unsigned)new_key,SC64_BC_TECH_YAMATO);
+    if (sc64_battlecruiser_tech_has(bits,(unsigned)old_key,SC64_BC_TECH_REACTOR))
+        (void)sc64_battlecruiser_tech_complete(&bits,(unsigned)new_key,SC64_BC_TECH_REACTOR);
+    sc64_battlecruiser_tech_bits=(u16)bits;
+    return 1;
+}
+static int sc64_battlecruiser_source_tick_due(void)
+{
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    if (race_p7_active()) return race_p7.reserved[0] != 4u;
+#endif
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    return (((unsigned)frame%5u)+5u-sc64_bc_pause_offset)%5u != 0u;
+#else
+    return (unsigned)frame % 5u != 0u;
+#endif
+}
 #endif

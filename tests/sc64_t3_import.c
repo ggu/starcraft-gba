@@ -29,7 +29,7 @@ int main(void)
     assert(vultures == 3 && engineering_bays == 1);
     for (unsigned cell = 0; cell < map->width * map->height; ++cell) {
         assert(map->tile_lookup[cell] < map->tile_count);
-        assert(map->blocked[cell] <= 1);
+        assert(map->blocked[cell] <= 3);
     }
     puts("T3 import: all 196 runtime rows mapped; 138 units, 31 buildings, 25 minerals, 2 geysers");
     return 0;

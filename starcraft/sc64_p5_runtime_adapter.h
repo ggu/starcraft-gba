@@ -417,6 +417,9 @@ static void race_p5_rescue_tick(void)
         for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE) {
             int dx = u[i].x - u[j].x, dy = u[i].y - u[j].y;
             if (dx * dx + dy * dy <= 32 * 32) {
+                #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+                if (!race_bc_before_unit_transfer(&u[i],SIDE,-1)) break;
+                #endif
                 u[i].owner = SIDE; u[i].selected = 0;
                 u[i].order = ORDER_IDLE; u[i].target = -1;
                 u[i].tx = u[i].x; u[i].ty = u[i].y;
@@ -428,7 +431,8 @@ static void race_p5_rescue_tick(void)
         for (int j = 0; j < MAX_UNITS; ++j) if (u[j].alive && u[j].owner == SIDE) {
             int dx = b[i].x - u[j].x, dy = b[i].y - u[j].y;
             if (dx * dx + dy * dy <= 32 * 32) {
-                b[i].owner = SIDE; changed = 1; break;
+                if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) { b[i].owner = SIDE; changed = 1; }
+                break;
             }
         }
     }

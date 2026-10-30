@@ -54,6 +54,10 @@ static int race_late_lift(int slot)
         !b[slot].alive || b[slot].owner != SIDE || b[slot].under_construction ||
         !race_late_can_lift(b[slot].type) || (b[slot].flags & 4) ||
         b[slot].queue_count) return 0;
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+    if (race_bc_parent_addon_constructing(slot)) return 0;
+    race_bc_parent_detach(slot);
+#endif
     b[slot].flags |= 4;
     race_late.flight_goals[slot] = 0;
     /* Lift-off detaches add-ons; the tower remains on the ground. */
@@ -82,6 +86,9 @@ static void race_late_flight_tick(void)
             if (!race_late_landing_site(i, x, y)) continue;
             b[i].flags &= ~4;
             invalidate_path_grid(); target_lists_valid = 0;
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+            race_bc_parent_relink(i);
+#endif
             for (int j = 0; j < MAX_BUILDINGS; ++j)
                 if (b[j].alive && b[j].type == B_CONTROL_TOWER &&
                     b[j].owner == b[i].owner && b[j].x == x + 48 &&

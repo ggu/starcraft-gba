@@ -1084,6 +1084,55 @@ void save_write(const void *data,u32 len,u32 tag) {
     for(u32 i=0;i<len;i++)p[16+i]=src[i];
     sram_put32(p,tag);
 }
+/* Preserve the newest readable predecessor when writing the first record of
+ * a new format. Tags share the same physical two-slot SRAM journal. */
+void save_write_migrating(const void *data,u32 len,u32 tag,u32 legacy_len,u32 legacy_tag) {
+    if(len>SAVE_PAYLOAD_MAX||legacy_len>SAVE_PAYLOAD_MAX||!tag||!legacy_tag)return;
+    volatile u8 *base=(volatile u8*)SRAM_BASE;
+    int current=newest_record(0,tag), legacy=newest_record(legacy_len,legacy_tag), newest;
+    if(current<0)newest=legacy;
+    else if(legacy<0)newest=current;
+    else newest=(s32)(sram_get32(base+current*SAVE_SLOT_SIZE+12)-
+                      sram_get32(base+legacy*SAVE_SLOT_SIZE+12))>0?current:legacy;
+    u32 sequence=newest<0?1:sram_get32(base+newest*SAVE_SLOT_SIZE+12)+1;
+    if(!sequence)sequence=1;
+    volatile u8 *p=base+(newest==0?SAVE_SLOT_SIZE:0);
+    const u8 *src=data;
+    sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));
+    sram_put32(p+12,sequence);
+    for(u32 i=0;i<len;i++)p[16+i]=src[i];
+    sram_put32(p,tag);
+}
+/* An incompatible experimental record may share a tag. It must not displace
+ * the readable legacy predecessor during the first committed feature write. */
+void save_write_migrating_feature(const void *data,u32 len,u32 tag,u32 legacy_tag,
+                                  u32 marker_offset,u32 marker_mask,u32 marker_value) {
+    volatile u8 *base=(volatile u8*)SRAM_BASE;
+    int current=-1, legacy, newest;
+    if (!len || len>SAVE_PAYLOAD_MAX || !tag || !legacy_tag ||
+        marker_offset>SAVE_PAYLOAD_MAX-4u) return;
+    for (int i=0;i<2;++i) {
+        volatile const u8 *p=base+i*SAVE_SLOT_SIZE;
+        if (!valid_record(p,0,tag) || sram_get32(p+4)<marker_offset+4u ||
+            (sram_get32(p+16+marker_offset)&marker_mask)!=marker_value) continue;
+        if (current<0 || (s32)(sram_get32(p+12)-
+            sram_get32(base+current*SAVE_SLOT_SIZE+12))>0) current=i;
+    }
+    legacy=newest_record(0,legacy_tag);
+    if(current<0)newest=legacy;
+    else if(legacy<0)newest=current;
+    else newest=(s32)(sram_get32(base+current*SAVE_SLOT_SIZE+12)-
+                      sram_get32(base+legacy*SAVE_SLOT_SIZE+12))>0?current:legacy;
+    u32 sequence=newest<0?1:sram_get32(base+newest*SAVE_SLOT_SIZE+12)+1;
+    if(!sequence)sequence=1;
+    volatile u8 *p=base+(newest==0?SAVE_SLOT_SIZE:0);
+    const u8 *src=data;
+    sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));
+    sram_put32(p+12,sequence);
+    for(u32 i=0;i<len;i++)p[16+i]=src[i];
+    sram_put32(p,tag);
+}
+
 int save_read(void *data,u32 len,u32 tag) {
     if(len>SAVE_PAYLOAD_MAX||!tag)return 0;
     int newest=newest_record(len,tag);

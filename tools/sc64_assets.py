@@ -34,6 +34,15 @@ def sections(data: bytes) -> dict[bytes, bytes]:
     return result
 
 
+def cv5_cover(tile_id: int, cv5: bytes) -> int:
+    """Return the pinned OpenBW CV5 group cover bit for one MTXM tile."""
+    group = (tile_id >> 4) & 0x7ff
+    offset = group * 52 + 2
+    if offset + 2 > len(cv5):
+        raise ValueError(f'Tile {tile_id}: CV5 flags outside archive')
+    return int(bool(struct.unpack_from('<H', cv5, offset)[0] & 0x10))
+
+
 def decode_tile(tile_id: int, cv5: bytes, vx4: bytes, vf4: bytes, vr4: bytes) -> tuple[bytes, int]:
     """CV5 selects a megatile; VX4 selects/flips sixteen 4×4 N64 minitiles."""
     group, variant = tile_id >> 4, tile_id & 15
@@ -89,7 +98,7 @@ def c_array(name: str, ctype: str, values, width: int = 24) -> str:
     return f'static const {ctype} {name}[{len(values)}] = {{\n' + ',\n'.join(rows) + '\n};\n'
 
 
-def convert(rom_path: Path, entry_path: str, out: Path, reference: Path) -> dict:
+def convert(rom_path: Path, entry_path: str, out: Path, reference: Path, include_cover: bool = False) -> dict:
     sys.path.insert(0, str(reference))
     from extract_sc64_maps import BoltArchive, load_rom
     rom = load_rom(str(rom_path))
@@ -127,7 +136,7 @@ def convert(rom_path: Path, entry_path: str, out: Path, reference: Path) -> dict
         masks.append(walk)
         # The existing GBA pathfinder operates at a whole 16px tile. Require
         # its central 8×8px footprint to be walkable, preserving VF4 evidence.
-        blocked.append(int((walk & 0x0660) != 0x0660))
+        blocked.append(int((walk & 0x0660) != 0x0660) | (cv5_cover(tile, source['cv5']) << 1 if include_cover else 0))
     out.mkdir(parents=True, exist_ok=True)
     header = ['/* Generated privately from the supplied ROM. Do not publish. */\n#pragma once\n#include "gba.h"\n',
               f'#define SC64_HAS_TERRAIN_ART 1\n#define SC64_TILE_COUNT {len(tiles)}\n',
@@ -136,6 +145,7 @@ def convert(rom_path: Path, entry_path: str, out: Path, reference: Path) -> dict
               c_array('sc64_walk_masks', 'u16', masks),
               c_array('sc64_terrain_blocked', 'u8', blocked),
               f'static const u8 sc64_tile_pixels[SC64_TILE_COUNT][256] __attribute__((aligned(4))) = {{\n']
+    if include_cover: header.insert(1, '#define SC64_ASSET_COVER_DATA 1\n')
     header += ['{' + ','.join(map(str, tile)) + '},\n' for tile in tiles]
     header.append('};\n')
     (out / 'sc64_assets_generated.h').write_text(''.join(header))
@@ -155,7 +165,7 @@ def convert(rom_path: Path, entry_path: str, out: Path, reference: Path) -> dict
               'width': width, 'height': height, 'tileset': 'Badlands',
               'unique_source_tiles': len(decoded), 'unique_gba_tiles': len(tiles),
               'terrain_pixel_bytes': len(tiles) * 256, 'palette_reserved_indices': [0, 31],
-              'blocked_cells': sum(blocked), 'cells': len(ids),
+              'blocked_cells': sum(v & 1 for v in blocked), 'cells': len(ids),
               'collision_policy': 'VF4 bit0, central four minitiles required; coarse GBA approximation',
               'sources': {key: hashlib.sha256(data).hexdigest() for key, data in source.items()},
               'generated_header_sha256': hashlib.sha256((out / 'sc64_assets_generated.h').read_bytes()).hexdigest()}
@@ -170,11 +180,12 @@ if __name__ == '__main__':
     p.add_argument('--profile', choices=MISSION_ENTRIES, default='wasteland')
     p.add_argument('--out', type=Path)
     p.add_argument('--reference', type=Path, default=ROOT / 'references/sc64-maps')
+    p.add_argument('--cover', action='store_true', help='include experimental CV5 cover in blocked bit 1')
     args = p.parse_args()
     entry = args.entry or MISSION_ENTRIES[args.profile]
     out = args.out or (ROOT / '.local/sc64/backwater/generated' if args.profile == 'backwater'
                        else ROOT / '.local/sc64/generated')
     try:
-        print(json.dumps(convert(args.rom, entry, out, args.reference), indent=2))
+        print(json.dumps(convert(args.rom, entry, out, args.reference, args.cover), indent=2))
     except (ValueError, OSError, KeyError) as error:
         raise SystemExit(str(error))

@@ -497,7 +497,7 @@ def source_placement_category(raw_type: int, map_index: int,
     return 'unit'
 
 
-def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict:
+def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT, include_cover: bool = False) -> dict:
     verify_extractor_source()
     importer = load('sc64_races_import', ROOT / 'tools/sc64_import.py')
     assets = load('sc64_races_assets', ROOT / 'tools/sc64_assets.py')
@@ -596,7 +596,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
                 dedup[packed] = len(tiles)
                 tiles.append(packed)
             lookup.append(dedup[packed])
-            blocked.append(int((walk & 0x0660) != 0x0660))
+            blocked.append(int((walk & 0x0660) != 0x0660) | (assets.cv5_cover(tile_id, sources['cv5']) << 1 if include_cover else 0))
         units = [u for u in importer.unit_rows(sections.get(b'UNIT', b'')) if u['source_type'] != 214]
         name = mission_id.lower()
         # The race-only binary and tests must not acquire the much larger
@@ -672,7 +672,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
             'chk_sha1': hashlib.sha1(chk).hexdigest(), 'unit_records': len(units),
             'trigger_records': len(triggers), 'objective_text': objectives,
             'unique_source_tiles': len(decoded), 'unique_runtime_tiles': len(tiles),
-            'cells': len(tile_ids), 'blocked_cells': sum(blocked),
+            'cells': len(tile_ids), 'blocked_cells': sum(v & 1 for v in blocked),
             'terrain_assets_sha256': {k: hashlib.sha256(v).hexdigest() for k, v in sources.items()},
         })
         if map_index in (0, 1, 2, 3, 7, 8) or map_index >= 16:
@@ -975,6 +975,7 @@ def pack(rom_path: Path = ROM, base: Path = BASE, output: Path = OUTPUT) -> dict
     lines.extend([emit_descriptor_table(descriptors), '#endif\n'])
     content = ''.join(lines)
     output.parent.mkdir(parents=True, exist_ok=True)
+    if include_cover: content='#define SC64_RACES_COVER_DATA 1\n'+content
     output.write_text(content, encoding='ascii')
     race_campaigns = {}
     for race_name, prefix in [('zerg', 'Z'), ('protoss', 'P')]:
@@ -1028,9 +1029,10 @@ if __name__ == '__main__':
     parser.add_argument('--rom', type=Path, default=ROM)
     parser.add_argument('--backwater-generated', type=Path, default=BASE)
     parser.add_argument('--out', type=Path, default=OUTPUT)
+    parser.add_argument('--cover', action='store_true')
     args = parser.parse_args()
     try:
-        print(json.dumps(pack(args.rom, args.backwater_generated, args.out), indent=2))
+        print(json.dumps(pack(args.rom, args.backwater_generated, args.out, args.cover), indent=2))
     except (OSError, ValueError, RuntimeError, KeyError) as exc:
         print(f'sc64_races_pack: {exc}', file=sys.stderr)
         raise SystemExit(1)
