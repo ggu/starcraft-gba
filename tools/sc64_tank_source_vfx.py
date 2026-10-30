@@ -232,8 +232,8 @@ def generate(rom_path, palette_remap_path, palette_json_path, out_dir):
         'timing': {
             'tank_muzzle_536':'Init playframe0, wait2; parent attaches at tick1; attackwith at tick3. The two pre-windup muzzle poses are omitted because existing tracer state starts at attackwith; show frame0 on first post-fire GBA draw only.',
             'siege_muzzle_537':'Init frames 0,17,34,51,68,85,102 with one-tick waits; parent attaches at tick1 and attackwith is tick3.',
-            'tank_impact_531':'Init wait1, setspawnframe1, wait1, playframe0; domissiledmg at source local tick2; frames advance every2 ticks.',
-            'siege_impact_533':'Init wait1, setspawnframe1, wait1, playframe0, wait1; domissiledmg at source local tick3; frames advance every source tick; clock maps source 3 to GBA age4.',
+            'tank_impact_531':'Init wait1, sigorder1, wait1, playframe0; domissiledmg at source local tick2; frames advance every2 ticks.',
+            'siege_impact_533':'Init wait1, sigorder1, wait1, playframe0, wait1; domissiledmg at source local tick3; frames advance every source tick; clock maps source 3 to GBA age4.',
             'event_scope':'VFX generation schedules no damage. Engine combat resolves at firing; optional Siege splash selects collateral separately. Source domissiledmg ticks describe visual timing, not queued gameplay events.'}})
     (OUT/'manifest.json').write_text(json.dumps(metadata,indent=2)+'\n')
     print(json.dumps({'frames':{k:len(v) for k,v in frames.items()},'header_bytes':len(all_bytes),'lut_sha256':hashlib.sha256(projected).hexdigest(),'header_sha256':metadata['generated_header_sha256']},indent=2))

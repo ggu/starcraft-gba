@@ -22,21 +22,106 @@ ROM_SHA1 = "a36d91b5aac7bb95df0d7de5f9814f5270e25c2b"
 UNIT_COUNT, FLINGY_COUNT, SPRITE_COUNT, IMAGE_COUNT, WEAPON_COUNT = 228, 209, 517, 999, 130
 ATTACK_ANIMS = ("GndAttkInit", "AirAttkInit", "GndAttkRpt", "AirAttkRpt",
                 "GndAttkToIdle", "AirAttkToIdle")
-OP_NAMES = {
-    0: "playframe", 5: "wait", 7: "goto", 8: "imgol", 9: "imgul",
-    10: "imgolorig", 11: "imgulorig", 13: "imgoluselo", 14: "imguluselo",
-    15: "sprol", 16: "sprul", 17: "sprolorig", 19: "sprulorig",
-    20: "sprolrand", 21: "sprulrand", 22: "end", 23: "setflipstate",
-    24: "playsnd", 25: "playsndrand", 26: "playsndbtwn", 27: "domissiledmg",
-    28: "attackmelee", 29: "followmaingraphic", 30: "randcondjmp",
-    31: "turnccwise", 32: "turncwise", 33: "turn1cwise", 34: "turnrand",
-    35: "setflipstate", 36: "setspawnframe", 37: "attackwith", 38: "attack",
-    39: "castspell", 40: "useweapon", 41: "move", 42: "gotorepeatattk",
-    43: "engframe", 44: "engset", 45: "nobrkcodestart", 46: "nobrkcodeend",
-    47: "ignorerest", 48: "attkshiftproj", 49: "tmprmgraphicstart",
-    50: "tmprmgraphicend", 51: "setfldirect", 52: "call", 53: "return",
-    54: "return", 55: "setflspeed", 56: "creategasoverlays", 57: " pwrupcondjmp",
-}
+# Ordinals match OpenBW iscript_opcodes at 4b046d5f65302b10cb0a745f0fecd37ec85b20a8.
+# `playframe` is the
+# established report spelling of OpenBW's `playfram`.
+OP_NAMES = {i: name for i, name in enumerate((
+    'playframe',
+    'playframtile',
+    'sethorpos',
+    'setvertpos',
+    'setpos',
+    'wait',
+    'waitrand',
+    'goto',
+    'imgol',
+    'imgul',
+    'imgolorig',
+    'switchul',
+    'opcode_0c',
+    'imgoluselo',
+    'imguluselo',
+    'sprol',
+    'highsprol',
+    'lowsprul',
+    'uflunstable',
+    'spruluselo',
+    'sprul',
+    'sproluselo',
+    'end',
+    'setflipstate',
+    'playsnd',
+    'playsndrand',
+    'playsndbtwn',
+    'domissiledmg',
+    'attackmelee',
+    'followmaingraphic',
+    'randcondjmp',
+    'turnccwise',
+    'turncwise',
+    'turn1cwise',
+    'turnrand',
+    'setspawnframe',
+    'sigorder',
+    'attackwith',
+    'attack',
+    'castspell',
+    'useweapon',
+    'move',
+    'gotorepeatattk',
+    'engframe',
+    'engset',
+    'opcode_2d',
+    'nobrkcodestart',
+    'nobrkcodeend',
+    'ignorerest',
+    'attkshiftproj',
+    'tmprmgraphicstart',
+    'tmprmgraphicend',
+    'setfldirect',
+    'call',
+    'return',
+    'setflspeed',
+    'creategasoverlays',
+    'pwrupcondjmp',
+    'trgtrangecondjmp',
+    'trgtarccondjmp',
+    'curdirectcondjmp',
+    'imgulnextid',
+    'opcode_3e',
+    'liftoffcondjmp',
+    'warpoverlay',
+    'orderdone',
+    'grdsprol',
+    'opcode_43',
+    'dogrddamage',
+))}
+
+
+def trace_iscript(data, pc, decode_instruction, limit=256):
+    """Read one bounded path; stop at calls/returns without inventing a branch."""
+    visited = set()
+    events = []
+    tick = 0
+    loop_to = None
+    for _ in range(limit):
+        if pc in visited:
+            loop_to = pc
+            break
+        visited.add(pc)
+        op, args, nxt, jump = decode_instruction(data, pc)
+        events.append({"source_tick": tick, "opcode": op,
+                       "name": OP_NAMES.get(op, "opcode_" + str(op)),
+                       "args": args, "pc": pc})
+        if op == 5 and args:
+            tick += args[0]
+        if op in (22, 53, 54):
+            break
+        pc = jump if op == 7 and jump is not None else nxt
+    else:
+        return events, tick, loop_to, False
+    return events, tick, loop_to, True
+
 
 # Special runtime emission paths that do not appear as normal actor cases in
 # sc64_weapon_vfx_profiles.h. The Spider Mine is source raw unit 13 and owns
@@ -205,26 +290,9 @@ def generate(rom_path: Path, out_path: Path) -> dict:
         pc = starts.get(anim)
         if pc is None:
             return {"status": "no_animation", "image": image, "iscript_id": sid, "animation": anim}
-        # Preserve the raw control-flow path. Loop stops at first revisited PC;
-        # callers can see cycle edge and timing instead of a fabricated duration.
-        visited = set(); events = []; tick = 0; loop_to = None
-        for _ in range(256):
-            if pc in visited:
-                loop_to = pc; break
-            visited.add(pc)
-            op, args, nxt, jump = construction.decode_instruction(scriptdata, pc)
-            events.append({"source_tick": tick, "opcode": op, "name": OP_NAMES.get(op, "opcode_" + str(op)),
-                           "args": args, "pc": pc})
-            if op in (30, 57):
-                # Preserve branch instruction and operand, but do not choose a
-                # path without the native unit-state condition/random result.
-                pass
-            if op == 5 and args:
-                tick += args[0]
-            if op in (22, 53, 54):
-                break
-            pc = jump if op == 7 and jump is not None else nxt
-        else:
+        events, tick, loop_to, complete = trace_iscript(
+            scriptdata, pc, construction.decode_instruction)
+        if not complete:
             return {"status": "instruction_limit", "image": image, "iscript_id": sid,
                     "animation": anim, "events": events}
         visual_references = []
@@ -248,11 +316,11 @@ def generate(rom_path: Path, out_path: Path) -> dict:
                               "modifier": image_col["modifier"][child_image],
                               "color_shift": image_col["shift"][child_image]})
             visual_references.append(child)
-        branch_ops = [event for event in events if event["opcode"] in (30, 57, 42, 52)]
+        branch_ops = [event for event in events if event["opcode"] in (30, 57, 42, 53)]
         return {"status": "ok", "image": image, "iscript_id": sid, "animation": anim,
                 "events": events, "source_ticks_before_end_or_loop": tick,
                 "loop_pc": loop_to, "visual_references": visual_references,
-                "control_flow_notes": (["branch/call/repeat semantics retained as raw events; this is one linear fall-through path"]
+                "control_flow_notes": (["branch/repeat semantics retained as raw events; calls stop this bounded path"]
                                         if branch_ops else []),
                 "directional": bool(image_col["directional"][image]),
                 "modifier": image_col["modifier"][image], "color_shift": image_col["shift"][image],
