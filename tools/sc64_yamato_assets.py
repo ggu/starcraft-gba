@@ -9,6 +9,7 @@ from pathlib import Path
 import sc64_weapon_source_sprites as source
 import sc64_weapon_source_audit as audit
 
+ROOT = Path(__file__).resolve().parents[1]
 ROM_SHA1 = 'a36d91b5aac7bb95df0d7de5f9814f5270e25c2b'
 IMAGES = ((541, 68, 0), (542, 68, 0), (543, 11, 9), (544, 14, 9))
 COUNT = 999
@@ -61,6 +62,9 @@ def render(pixels,lut,rows):
     return '\n'.join(lines)+'\n'
 
 def generate(rom_path,out,remap_path,palette_path):
+    target=out.resolve()
+    if target.is_relative_to(ROOT) and not target.is_relative_to(ROOT / ".local"):
+        raise ValueError("output inside the source tree must be under .local")
     rom=rom_path.read_bytes()
     if hashlib.sha1(rom).hexdigest()!=ROM_SHA1: raise ValueError('ROM SHA-1 does not match authenticated StarCraft 64 USA')
     remap=remap_path.read_bytes();palette=json.loads(palette_path.read_text());get,sprites=source._source_bolt(rom)

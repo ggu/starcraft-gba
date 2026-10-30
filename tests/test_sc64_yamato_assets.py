@@ -45,6 +45,16 @@ class TestYamatoAssets(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'modifier'):yamato.collect(paths.__getitem__,Sprites,bytes(range(256)),palette)
         paths=fixture();paths[yamato.audit.grp_path(1)]=bytes([67])
         with self.assertRaisesRegex(ValueError,'frame count'):yamato.collect(paths.__getitem__,Sprites,bytes(range(256)),palette)
+    def test_public_source_output_rejected_before_read(self):
+        out=yamato.ROOT / "tests" / "yamato-rejected-output"
+        self.assertFalse(out.exists())
+        with self.assertRaisesRegex(ValueError,"source tree"):
+            yamato.generate(Path("missing-rom"),out,Path("missing"),Path("missing"))
+        self.assertFalse(out.exists())
+    def test_opaque_zero_remap_rejected(self):
+        paths=fixture()
+        with self.assertRaisesRegex(ValueError,"transparent"):
+            yamato.collect(paths.__getitem__,Sprites,bytes(256),{"gba_rgb555":[0]*256})
     def test_rom_authentication_precedes_output(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);rom=root/'bad.rom';rom.write_bytes(b'wrong');out=root/'out'
