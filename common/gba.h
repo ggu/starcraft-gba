@@ -112,6 +112,18 @@ void save_write_migrating_feature(const void *data,u32 length,u32 tag,u32 legacy
                                   u32 marker_offset,u32 marker_mask,u32 marker_value);
 int save_read(void *data,u32 length,u32 tag);
 int save_read_latest(void *data,u32 capacity,u32 tag,u32 *length);
+#ifdef SC64_SCARAB_RUNTIME
+/* Two-slot semantic selection. The validator may inspect/copy its scratch
+ * payload but must not alter SRAM or live state. The chosen bytes are copied
+ * again after selection. A token names the validated predecessor slot. */
+typedef struct { u32 tag, length, sequence, checksum; int slot; } GbaSaveSelection;
+typedef int (*GbaSaveValidator)(const void *data,u32 length,u32 tag,void *context);
+int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
+                          GbaSaveValidator validate,void *context,GbaSaveSelection *selection);
+int save_write_selected(const void *data,u32 length,u32 tag,const GbaSaveSelection *previous);
+/* Fresh journal only: fail if either slot contains any checksummed record. */
+int save_write_first(const void *data,u32 length,u32 tag);
+#endif
 void audio_tone(int frequency,int frames,int volume);
 void audio_noise(int frames,int volume);
 void audio_update(void);
