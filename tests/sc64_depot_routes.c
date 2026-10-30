@@ -29,7 +29,9 @@ static int sc64_cell_row(unsigned c){return (int)c/MAP_COLS;}
 static int sc64_cell_col(unsigned c){return (int)c%MAP_COLS;}
 static void build_path_grid(void){path_grid_valid=1;}
 #define SC64_GRID_GET(grid,cell) ((grid)[cell]!=0)
+#ifndef SC64_TEST_READONLY_GRID
 #define SC64_GRID_SET(grid,cell,value) ((grid)[cell]=(u8)((value)!=0))
+#endif
 #include "starcraft/sc64_routes.h"
 #ifdef SC64_ROUTE_ACTIVE_STRIDE
 _Static_assert(sizeof(sc64_route_pool)==14u*SC64_ROUTE_BYTES,"depot routes must reuse existing pool");
@@ -132,11 +134,16 @@ static void point_query(int sx,int sy,int gx,int gy)
 static void exercise(int cx,int cy,int id)
 {
     make_bfs(cx,cy,-1);
-    for(int j=0;j<30;j++){int sx=(int)(rnd()%(u32)MAP_COLS),sy=(int)(rnd()%(u32)MAP_ROWS);depot_query(sx,sy,cx,cy,id);if(j==0)check_depot_field(id);}
+    for(int j=0;j<30;j++){int sx=(int)(rnd()%(u32)MAP_COLS),sy=(int)(rnd()%(u32)MAP_ROWS);depot_query(sx,sy,cx,cy,id);}
+    (void)sc64_route_depot_slot(id,cx,cy); check_depot_field(id);
 }
 int main(void)
 {
     geometry_test();
+    { int before=path_grid_valid; path_grid_valid=0;
+      assert(sc64_route_depot_slot_for_origin(0,0,0,-2)==-1 && path_grid_valid==0);
+      assert(sc64_route_depot_slot_for_origin(0,0,0,MAP_COLS*MAP_ROWS)==-1 && path_grid_valid==0);
+      path_grid_valid=before; }
     {int x=91,y=92;assert(!sc64_route_depot_next(-1,0,0,0,0,&x,&y));
      assert(!sc64_route_depot_next(0,0,-1,0,0,&x,&y));
      assert(!sc64_route_depot_next(0,0,32768,0,0,&x,&y));
@@ -183,5 +190,17 @@ int main(void)
     fixture_cols=96;fixture_rows=48;memset(path_walkable,1,sizeof(path_walkable));reset();exercise(1535,767,3);
     fixture_cols=128;fixture_rows=128;memset(path_walkable,1,sizeof(path_walkable));reset();exercise(2047,2047,3);
 #endif
+    /* Churn tagged depots beyond cache capacity and force topology resets. */
+    for(int trial=0;trial<500;++trial) {
+        if(trial%47==0) {
+            for(int i=0;i<MAP_COLS*MAP_ROWS;++i)path_walkable[i]=(rnd()%100)<78;
+            reset();
+        }
+        int id=trial%(SC64_ROUTE_ACTIVE_SLOTS+5);
+        int gx=(id*13+7)%MAP_COLS,gy=(id*17+9)%MAP_ROWS;
+        int cx=gx*16+8,cy=gy*16+8;
+        int sx=(int)(rnd()%(u32)MAP_COLS),sy=(int)(rnd()%(u32)MAP_ROWS);
+        make_bfs(cx,cy,-1);depot_query(sx,sy,cx,cy,id);
+    }
     puts("depot geometry and route BFS oracle passed");return 0;
 }

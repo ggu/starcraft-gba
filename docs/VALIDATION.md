@@ -6461,3 +6461,39 @@ terminal state, still losing at frame 9,428; 9,426 advancing frames cost
 28.12 fps. This is a mixed workload result, not a universal speedup.
 These narrow emulator checks do not establish hardware, all-scene or near-30-fps
 qualification; the full goal remains open.
+
+### Default-branch bounded depot searches (2026-10-30)
+
+This batch is independently qualified on default `fcb5195`; it does not
+include the separate draft roster/service integration. `RACES_FLAGS` now
+supplies `SC64_DEPOT_BOUNDED` across the race-engine products. A depot flood
+can stop after discovering the requesting walkable origin. Partial fields
+serve only discovered origins, never unreachable-component proofs; another
+unassigned origin rebuilds from the roots. Full-field callers and blocked
+origins still request a complete field. All queued walkability bits, including
+the unexpanded frontier, are restored. No new persistent frontier or pool,
+actor-limit reduction or RAM-reserve change is introduced.
+
+Eighteen depot oracle configurations cover packed/nibble directions, partial
+point fields, visited-grid borrowing, read-only grid access, blocked origins,
+cache churn, rectangular maps and 128-by-128 maps. Capability tests verify
+the common flag appears once and reject its use without the race engine.
+Default doctor/build/test passes (678 Python tests, 16 optional skips, the
+separate eight-test suite and C fixtures), as do unified build/test and the
+full Terran host aggregate. The latter remains source-map/hidden-world host
+probe coverage, not ordinary-menu ARM campaign completion. All 54 individual
+normal-input skirmish results match the earlier exact-default evidence; 702
+startup/save configurations and 27 construction cases pass.
+
+The paired busy Zerg three-AI sample decreases from 711,493,203 to 695,201,548
+guest cycles over 1,000 updates: 23.58 to 24.13 effective fps, with all 8,948
+state and framebuffer observations matching. This is a nonterminal sample,
+not steady-30-fps, whole-campaign or physical-hardware qualification. The
+four canonical ARM links retain the fixed guards; EWRAM/IWRAM headroom in
+bytes is Terran 28,480/488, Zerg 28,372/64, Protoss 23,828/952 and Showcase
+200/56. Actual per-TU arguments, raw dependencies, input hashes, ELF/maps/ROMs,
+comparison logs and the zero-mismatch source closure are retained privately
+in `default-depot-bounded-v1`. The reused baseline runtime inputs are checked
+against the current default Git tree and the independently qualified PR #169
+products; an earlier mismatching PR #168 comparison is not baseline evidence
+for this batch. No proprietary data is committed and no Actions run occurred.
