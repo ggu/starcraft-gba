@@ -9072,7 +9072,8 @@ draw_tracers(void)
             uint32_t packed=(uint32_t)tracers[i].color;
             Sc64WeaponSourceVfxKey key;
             if (!sc64_weapon_source_vfx_unpack(packed,&key)) continue;
-            const Sc64WeaponSourceAttackProfile *profile=sc64_weapon_source_trace_profile(packed);
+            const Sc64WeaponSourceAttackProfile *profile=sc64_weapon_source_profile_lookup(
+                key.actor_raw,key.weapon_id,key.target_air,key.variant);
 #ifdef SC64_WEAPON_SOURCE_VFX_OFFSCREEN_CULL
             if (!sc64_weapon_source_vfx_anchor_may_be_visible(
                     tracers[i].x0, tracers[i].y0, camx, camy) &&

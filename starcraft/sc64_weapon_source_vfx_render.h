@@ -370,6 +370,36 @@ sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey 
      * renderer's straight endpoint interpolation proof. Preserve those. */
     if (!sc64_weapon_source_vfx_motion_has_proven_bounds(
             profile->weapon_bullet_type)) return 0;
+    /* Normal map coordinates fit signed 16 bits. The largest possible
+     * signed-byte source offset times a signed 16-bit direction component,
+     * the camera subtraction and 15-bit radius all fit in int32_t. Keep the
+     * wide path below for synthetic/extreme inputs and invalid directions. */
+    if ((uint32_t)x0 + 32768u <= 65535u &&
+        (uint32_t)y0 + 32768u <= 65535u &&
+        (uint32_t)x1 + 32768u <= 65535u &&
+        (uint32_t)y1 + 32768u <= 65535u &&
+        (uint32_t)camx + 32768u <= 65535u &&
+        (uint32_t)camy + 32768u <= 65535u && key.direction <= 31u) {
+        uint16_t rx, ry;
+        if (!sc64_weapon_source_vfx_bounds_unpack(
+                sc64_weapon_source_vfx_cached_bounds(), &rx, &ry)) return 0;
+        const int16_t *v = sc64_weapon_source_direction_q8[key.direction];
+        int lx = x0 + ((int)profile->forward_offset * v[0]) / 512;
+        int ly = y0 + ((int)profile->forward_offset * v[1]) / 512 -
+                 (int)profile->upward_offset / 2;
+        int lo_x = x0, hi_x = x0, lo_y = y0, hi_y = y0;
+        if (lx < lo_x) lo_x = lx;
+        if (lx > hi_x) hi_x = lx;
+        if (x1 < lo_x) lo_x = x1;
+        if (x1 > hi_x) hi_x = x1;
+        if (ly < lo_y) lo_y = ly;
+        if (ly > hi_y) hi_y = ly;
+        if (y1 < lo_y) lo_y = y1;
+        if (y1 > hi_y) hi_y = y1;
+        lo_x -= camx; hi_x -= camx; lo_y -= camy; hi_y -= camy;
+        return hi_x + (int)rx < 0 || lo_x - (int)rx >= 240 ||
+               hi_y + (int)ry < 0 || lo_y - (int)ry >= 108;
+    }
     int64_t dx = (int64_t)x1 - x0, dy = (int64_t)y1 - y0;
     uint64_t abs_dx = (uint64_t)(dx < 0 ? -dx : dx);
     uint64_t abs_dy = (uint64_t)(dy < 0 ? -dy : dy);
