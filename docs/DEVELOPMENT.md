@@ -3026,7 +3026,8 @@ The canonical Terran, Zerg, Protoss and Showcase profiles use the shared
 Battlecruiser and Yamato services. After preparing the ordinary race profile,
 run `./dev sc64 prepare-bc --rom PATH` with the verified USA ROM. This writes
 cover-encoded terrain, race and skirmish tables to `.local/sc64/bc/generated`
-and the two facility body frames to `.local/sc64/bc-body/`. The separate
+the two facility body frames to `.local/sc64/bc-body/`, and Yamato art to
+`.local/sc64/bc-yamato/generated/`. The separate
 outputs leave the existing imported banks intact. `./dev sc64 status --profile
 terran` (or `zerg`, `protoss`, `protoss-p7`) reports whether the new inputs
 are present. Repeat preparation when the private source inputs change.

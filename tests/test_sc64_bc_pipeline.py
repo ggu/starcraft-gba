@@ -25,6 +25,9 @@ class BcPipelineTests(unittest.TestCase):
             body.write_text('#define SC64_BC_BODY_ART_FORMAT_VERSION 1u\n'
                             'sc64_race_sprite_science_facility_frame_0_pixels\n'
                             'sc64_race_sprite_physics_lab_frame_0_pixels\n')
+            yamato = Path(tmp) / dev.BC_YAMATO_HEADER
+            yamato.parent.mkdir(parents=True)
+            yamato.write_text('SC64_YAMATO_FRAME_COUNT sc64_yamato_pixels sc64_yamato_light_lut')
             self.assertTrue(dev.bc_inputs_ready())
             (directory / 'sc64_races_generated.h').write_text('')
             self.assertFalse(dev.bc_inputs_ready())
@@ -44,7 +47,7 @@ class BcPipelineTests(unittest.TestCase):
             remap.write_bytes(b'fixture')
             dev.prepare_bc(rom)
             calls = [call.args[0] for call in run.call_args_list]
-            self.assertEqual(len(calls), 4)
+            self.assertEqual(len(calls), 5)
             for command in calls[:3]:
                 self.assertIn('--cover', command)
                 self.assertTrue(str(root / dev.BC_DIR) in command[command.index('--out') + 1])

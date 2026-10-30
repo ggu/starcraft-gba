@@ -725,6 +725,7 @@ def ensure_extractor() -> None:
 # is rewritten. All four canonical race products consume this same overlay.
 BC_DIR = Path(".local/sc64/bc/generated")
 BC_BODY_HEADER = Path(".local/sc64/bc-body/sc64_bc_body_art_generated.h")
+BC_YAMATO_HEADER = Path(".local/sc64/bc-yamato/generated/yamato_source_generated.h")
 BC_MARKERS = {
     "sc64_assets_generated.h": "SC64_ASSET_COVER_DATA",
     "sc64_races_generated.h": "SC64_RACES_COVER_DATA",
@@ -740,7 +741,10 @@ def bc_inputs_ready() -> bool:
                              (ROOT / BC_DIR / name).read_text(encoding="ascii"), re.MULTILINE):
                 return False
         body = (ROOT / BC_BODY_HEADER).read_text(encoding="ascii")
-        return ("#define SC64_BC_BODY_ART_FORMAT_VERSION 1u" in body and
+        yamato = (ROOT / BC_YAMATO_HEADER).read_text(encoding="ascii")
+        return ("SC64_YAMATO_FRAME_COUNT" in yamato and "sc64_yamato_pixels" in yamato and
+                "sc64_yamato_light_lut" in yamato and
+                "#define SC64_BC_BODY_ART_FORMAT_VERSION 1u" in body and
                 all(name in body for name in ("sc64_race_sprite_science_facility_frame_0_pixels",
                                                "sc64_race_sprite_physics_lab_frame_0_pixels")))
     except (OSError, UnicodeError):
@@ -760,8 +764,12 @@ def prepare_bc(rom: Path) -> None:
              "--backwater-generated", str(out), "--out", str(out / f"sc64_{name}_generated.h"), "--cover"])
     run([sys.executable, str(ROOT / "tools/sc64_bc_body_art.py"), "--rom", str(rom),
          "--remap", str(out / "palette-remap.bin"), "--header", str(ROOT / BC_BODY_HEADER)])
+    run([sys.executable, str(ROOT / "tools/sc64_yamato_assets.py"), "--rom", str(rom),
+         "--out", str((ROOT / BC_YAMATO_HEADER).parent),
+         "--palette-remap", str(out / "palette-remap.bin"),
+         "--palette-json", str(out / "palette.json")])
     if not bc_inputs_ready():
-        raise RuntimeError("BC preparation produced incomplete cover or body data")
+        raise RuntimeError("BC preparation produced incomplete cover, body or Yamato data")
     print("Prepared isolated BC cover and facility art under .local/sc64/.")
 
 
@@ -1082,7 +1090,7 @@ def status(profile: str) -> int:
             note = f" (run ./dev sc64 prepare --rom PATH --profile {profile} to regenerate)"
         print(f"{'READY  ' if ready else 'MISSING'} {label}: {path}{note}")
     if profile in BC_PROFILES:
-        print(f"{'READY  ' if bc_inputs_ready() else 'MISSING'} BC cover and facility art: {ROOT / BC_DIR}")
+        print(f"{'READY  ' if bc_inputs_ready() else 'MISSING'} BC cover, facility and Yamato art: {ROOT / BC_DIR}")
     return int((profile in BC_PROFILES and not bc_inputs_ready()) or
                any(not path.is_file() for _, path in paths) or
                (profile in FACING_PROFILES and not facing_sprite_input_ready(ROOT / FACING_HEADER)) or
