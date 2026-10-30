@@ -25,3 +25,48 @@ T1/T2/T5/T8/T9 controllers and add trace tooling/documentation. Retained host
 controllers pass T1--T5 and T8--T10; T6/T7 remain unqualified. This default
 pass does not promote the change or replace the remaining gameplay checks
 above. Later audit-only changes do not alter tested runtime or controllers.
+
+## Integrated normal-product qualification
+
+At `ce84be3`, the original full Terran host aggregate passes all ten mission
+controllers, its mission save/repair checks, and 234 startup/save configurations.
+The original four-product menu workflows pass 72 terminal ordinary-input
+matches (14 wins, 58 losses, no incomplete cases) and 96 same-process host
+save/reload continuations. Both maps, all human races, 1--3 opponents and
+rotated opponent races are selected through normal menu inputs. These are
+state-observing host policies, not blind-human or ARM replay claims.
+
+The four original normal ARM Make products at that source pass header,
+32-MiB size, ELF payload, padding, prepared audio and strict memory guards.
+No Scarab or profile-cache experiment is enabled. BSS/IWRAM ends are:
+
+| Product | BSS end | IWRAM end |
+| --- | --- | --- |
+| Terran T10 | `020370b8` | `03004c08` |
+| Zerg Z6 | `02037124` | `03004cd8` |
+| Protoss P7 | `020382e4` | `03004ab8` |
+| Showcase | `0203df38` | `03004e38` |
+
+All these workflows freeze the exact 104 existing prepared inputs with
+Make `-o` prerequisites because fresh checkout timestamps otherwise request
+regeneration. Dry runs contain no generators; original recipes and ordered
+BC/CV5 feature vectors remain. The 104 inputs and 95 exporter/tool sources
+match before and after. Post-build compiler dependency scans record all 314
+consumed dependencies; only the recorded frozen inventories have independent
+before/after hashes. Private receipts are under `terran-aggregate-ce84-20261031`,
+`worker-skirmish-matrix-20261031`, and `normal-products-ce84-20261031` in
+their ignored `.local` directories.
+
+`make unified` passes at `ce84be3`. Its test first exposed a stale direct
+call to the removed `economy` helper. Test-only child `1d215ff`, equivalent
+to reviewed `d737c78`, runs the real active-play update from frame 29 to 30
+and retains the idle-carrier assertion; the full original `make test-unified`
+then passes with the same 104 inputs unchanged. Game code and the four normal
+ROMs above are unaffected by that fixture correction.
+
+These checks supersede the earlier integration hold for this limited worker
+change. Source-style local depletion fallback, persistent cargo identity and
+the other resource-order limitations remain separate work. Fresh-process
+SRAM, normal-menu ARM input replays and hardware/performance are not newly
+qualified by this host/build stage. Canonical campaigns remain T10/Z6/P7,
+23 of 30 missions; this change does not add missions or establish 30 fps.
