@@ -50,3 +50,38 @@ particular build rather than asserting that those headers match the reference
 revision. Input extraction also verifies the normalized ROM SHA-1 and the
 script SHA-256. Run `python3 -m unittest discover -s tests -p 'test_sc64_openbw_loader_prepare.py'`
 to exercise the asset-free preparation safety checks.
+
+## Experimental flat-world probe
+
+The optional world probe stages the authenticated N64 DAT, IScript, GRP and LO
+entries into a fresh ignored directory and maps the original image indices to a
+synthetic filename table. It rechecks every staged input against the ROM before
+running. It uses the pinned `global_init`, `load_map_data`, `reset`, unit
+creation, player selection, fighter training and attack actions, and
+`next_frame`. Its 32-by-32 flat map and walkable VF4/CV5 tilesets are synthetic;
+no game map or native N64 execution is represented. The trigger blob is empty,
+and the probe uses a non-melee setup with no trigger execution.
+
+Given the same `OPENBW_REF` and `SC64_ROM` variables above, use fresh paths:
+
+```sh
+python3 tools/sc64_openbw_oracle_tables.py --rom "$SC64_ROM" \
+  --extractor references/sc64-maps/extract_sc64_maps.py --out .local/oracle-run/tables
+python3 tools/sc64_openbw_oracle_images.py --rom "$SC64_ROM" \
+  --extractor references/sc64-maps/extract_sc64_maps.py --out .local/oracle-run/images
+c++ -std=c++17 -O0 -g0 -I"$OPENBW_REF" \
+  tests/sc64_openbw_world_probe.cpp -o .local/oracle-run/world-probe
+python3 tools/sc64_openbw_oracle_run_global.py --rom "$SC64_ROM" \
+  --extractor references/sc64-maps/extract_sc64_maps.py \
+  --tables .local/oracle-run/tables --images .local/oracle-run/images \
+  --probe .local/oracle-run/world-probe
+```
+
+One authenticated source run observed paid fighter completion, native Reaver
+release, projectile creation and victim damage. It is a single synthetic-map
+scenario, not proof for other headings, pool exhaustion, timing boundaries,
+movement geometry, saves or the native game. Reproduction should retain source,
+compiler, dependency and input hashes as described above. The global-init
+compatibility probe also compares every IScript PC and program word to the
+extracted loader after reading the real image and LO entries, then intentionally
+stops before tileset loading.
