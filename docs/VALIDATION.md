@@ -7206,3 +7206,33 @@ overstrict authored test assumption about other live actors in the default
 fixture were corrected and are not counted as passes. The final default,
 generated-bank and unified gate evidence is recorded separately under
 `followup-final-gates-v1`.
+
+Final follow-up gates pass the actual generated-bank oracle, default build/test
+(685 Python tests, 17 optional skips and the separate eight-test suite), plus
+unified build/test. The committed-source closure at `3e2ead3` verifies every
+consumed canonical project/external input and the audio bytes embedded in each
+ROM; the broad snapshot differs only in this validation document. Four
+native-seeded Bunker saves match fresh/in-place ARM continuation through 1,000
+updates. The current P7 9,000-call ordinary-input prefix matches the preceding
+batch for actor, mission, visibility and framebuffer hashes, with no terminal
+win claim. Evidence is in `shared-followup-proof-closure-v1`,
+`shared-followup-bunker-sram-v1` and `shared-followup-p7-prefix-v1`.
+
+Normal-Make packages with header-only differences from qualified products are
+in `.local/releases/20261030-render-followup-candidate`. All four hashes are
+recorded; delivery is local to the Mac, with no SD write or Actions run.
+
+The preceding four-optimization batch was separately extracted onto exact
+default `1d864f4`, qualified independently and merged as PR #168. Its own busy
+Zerg sample improves 751,639,571 to 731,761,211 cycles (22.32 to 22.93 fps),
+with 8,948 observed gameplay/framebuffer rows matching. Its 54 ordinary-match
+traces match exact default, and default/unified gates and four ARM links pass.
+The default full Terran aggregate still fails at the pre-existing T5 controller
+cap: an exact-baseline run has the same result, byte-identical trace and 660
+matching log lines. The stopped aggregate does not qualify T6–T10. That
+standalone failure is not a green campaign gate and must not be conflated with
+the earlier repaired-controller qualification on this integration branch.
+Private records are in `default-perf-evidence-v1`; the skipped-patch first
+attempt was identified and retained as baseline-only, then real candidate
+qualification was performed. Merge `2b08ca3` brings the qualified default
+change into this branch without changing its source tree at all.
