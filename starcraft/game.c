@@ -811,6 +811,7 @@ _Static_assert(ORDER_BUILD_PENDING < 16, "four-bit persistent order field");
 #define SC64_CARRIER_CHILD_SCRIPTED(q) 0
 #define SC64_CARRIER_STATE_HIDDEN(q) 0
 #endif
+#include "sc64_scarab_presence.h"
 enum {
     SCREEN_TITLE, SCREEN_PLAY, SCREEN_PAUSE, SCREEN_RESULT
 };
@@ -2715,7 +2716,7 @@ can_place_except_worker(int type, int x, int y, int worker)
             && dist2(x, y, b[i].x, b[i].y) < (radius + 14) * (radius + 14))
 	    return 0;
     for (i = 0; i < MAX_UNITS; i++)
-	if (i != worker && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])
+	if (i != worker && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_NONCOLLIDING(&u[i])
 #ifdef SC64_RACES
         && !sc64_race_unit_flying(u[i].type)
 #endif
@@ -2921,7 +2922,7 @@ static int __attribute__((noinline))
 unit_step_clear_race_fallback(const Unit *q, int nx, int ny)
 {
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
+        if (&u[i] != q && u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_NONCOLLIDING(&u[i])) {
 #ifdef SC64_P6_COMBAT_ENABLED
             if (race_p6_combat_unit_burrowed(i)) continue;
 #endif
@@ -2958,6 +2959,7 @@ static int GBA_HOT
 unit_step_clear(const Unit *q, int nx, int ny)
 {
     if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) return 0;
+    if (SC64_SCARAB_NONCOLLIDING(q)) return 1;
 #ifdef SC64_RACES
     /* OpenBW bwgame.h unit_can_collide_with(): gathering workers pass
        through ordinary units; static terrain/building checks still apply. */
@@ -3318,6 +3320,14 @@ sc64_auto_target_candidate_allowed(int attacker, int target, int owner,
 {
     int tx, ty;
     (void)source_owner;
+    if (target >= 0 && target < MAX_UNITS && SC64_SCARAB_HIDDEN(&u[target]))
+        return 0;
+#if defined(SC64_BACKWATER) || defined(SC64_UNIFIED)
+    /* Constructors set the source invincibility flag. Keep it a live-world
+     * property so an explicit trigger override can still change it. */
+    if (target >= 0 && target < MAX_UNITS && SC64_SCARAB_CHILD(&u[target]) &&
+        invincible_units[target]) return 0;
+#endif
     if (owner == SIDE) {
         if (target < 0) return 0;
         if (target < MAX_UNITS) {
@@ -3694,6 +3704,8 @@ target_y(int target)
 static int
 target_alive(int target)
 {
+    if (target >= 0 && target < MAX_UNITS && SC64_SCARAB_HIDDEN(&u[target]))
+        return 0;
 #ifdef SC64_P6_COMBAT_ENABLED
     if (target >= 0 && target < MAX_UNITS && race_p6_combat_unit_burrowed(target)) return 0;
 #endif
@@ -4138,6 +4150,8 @@ hit_target_impl_ex(int target, int damage, int source_type, int source_owner,
 #ifndef SC64_SIEGE_SPLASH
     (void)hit_flags;
 #endif
+    if (target >= 0 && target < MAX_UNITS && SC64_SCARAB_HIDDEN(&u[target]))
+        return;
 #ifdef SC64_TEST_HIT_OBSERVER
     SC64_TEST_HIT_OBSERVER(target, damage, source_type, source_owner);
 #endif
@@ -5001,7 +5015,7 @@ selected_count(void)
 {
     int i, n = 0;
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].selected)
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].selected)
 	    n++;
     return n;
 }
@@ -5034,7 +5048,7 @@ selection_target(void)
     int i, best_unit = -1, best_building = -1;
     int unit_distance = 31 * 31, building_distance = 26 * 26, d;
     for (i = 0; i < MAX_UNITS; i++) {
-	if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || u[i].owner != SIDE
+	if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_CHILD(&u[i]) || u[i].owner != SIDE
 #ifdef SC64_RACES
             ||u[i].type==U_CHRYSALIS
 #endif
@@ -5087,7 +5101,7 @@ select_visible_type(int type)
     int i, left = viewport_left(), top = viewport_top();
     clear_selection();
     for (i = 0; i < MAX_UNITS; i++)
-        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE && u[i].type == type &&
+        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE && u[i].type == type &&
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
             sc64_game_unit_selectable(u[i].type) &&
 #endif
@@ -5116,7 +5130,7 @@ issue_order(int order, int tx, int ty)
 #endif
     selected_building = -1;
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE && u[i].selected) {
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE && u[i].selected) {
 #ifdef SC64_Z7_EGG_PRODUCTION
             /* The Egg's target field stores its paid product until birth. It
              * has no movement command; the selected-unit menu owns cancel. */
@@ -5180,7 +5194,7 @@ find_selected_worker(void)
 {
     int i;
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE && u[i].selected && IS_WORKER(u[i].type))
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE && u[i].selected && IS_WORKER(u[i].type))
 	    return i;
     return -1;
 }
@@ -7089,7 +7103,7 @@ update_orders(void)
 #endif
     target_lists_valid = 0;
     for (i = 0; i < 5; ++i) target_unit_head[i] = target_building_head[i] = -1;
-    for (i = MAX_UNITS - 1; i >= 0; --i) if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i])) {
+    for (i = MAX_UNITS - 1; i >= 0; --i) if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_HIDDEN(&u[i])) {
         int owner = u[i].owner;
         if (owner < 0 || owner >= 5) goto target_lists_unavailable;
         target_unit_next[i] = target_unit_head[owner];
@@ -7128,6 +7142,7 @@ target_lists_unavailable:
 	Unit *q = &u[i];
 	if (!q->alive)
 	    continue;
+        if (SC64_SCARAB_CHILD(q)) continue; /* the child adapter owns orders */
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         if (SC64_CARRIER_CHILD_SCRIPTED(q)) continue;
 #endif
@@ -7767,7 +7782,7 @@ update_exploration(void)
     int i, col, row;
     SC64_GRID_CLEAR(visible);
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE) {
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_HIDDEN(&u[i]) && u[i].owner == SIDE) {
 	    int c = u[i].x / 16, r = u[i].y / 16, radius = IS_WORKER(u[i].type) ? 4 : 5;
 	    for (row = r - radius; row <= r + radius; row++)
 		for (col = c - radius; col <= c + radius; col++)
@@ -7831,7 +7846,7 @@ cycle_selection(void)
 	}
     clear_selection();
     for (i = selected + 1; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
@@ -7845,7 +7860,7 @@ cycle_selection(void)
 	    return;
 	}
     for (i = 0; i <= selected && i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
@@ -7859,7 +7874,7 @@ cycle_selection(void)
 	    return;
 	}
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
@@ -7880,7 +7895,7 @@ select_combat_group(void)
     int i;
     clear_selection();
     for (i = 0; i < MAX_UNITS; i++)
-	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE &&
+	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE &&
 	    (u[i].type == U_MARINE || u[i].type == U_FIREBAT || u[i].type == U_MEDIC
 #ifdef SC64_RACES
              ||(!IS_WORKER(u[i].type)&&u[i].type!=U_OVERLORD&&u[i].type!=U_CHRYSALIS)
@@ -7997,7 +8012,7 @@ select_box_units(void)
     int bottom = box_anchor_y > box_end_y ? box_anchor_y : box_end_y;
     clear_selection();
     for (i = 0; i < MAX_UNITS; i++)
-        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE
+        if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && !SC64_SCARAB_CHILD(&u[i]) && u[i].owner == SIDE
 #ifdef SC64_RACES
             &&u[i].type!=U_CHRYSALIS
 #endif
@@ -8912,7 +8927,7 @@ sc64_source_unit_attack_pose(const Unit *q)
 static void
 draw_unit(Unit * q)
 {
-    if (SC64_TRANSPORT_LOADED(q)) return;
+    if (SC64_TRANSPORT_LOADED(q) || SC64_SCARAB_HIDDEN(q)) return;
 #ifdef SC64_P6_COMBAT_ENABLED
     if (race_p6_combat_unit_burrowed((int)(q - u))) return;
 #endif
@@ -9350,7 +9365,7 @@ draw_minimap(void)
 	}
     for (i = 0; i < MAX_UNITS; i++)
 	{
-	if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i])) continue;
+	if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_HIDDEN(&u[i])) continue;
 	if (u[i].owner != SIDE &&
 	    (u[i].x < 0 || u[i].y < 0 || u[i].x >= WORLD_W || u[i].y >= WORLD_H ||
 	     !currently_visible(u[i].x, u[i].y))) continue;

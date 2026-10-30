@@ -60,8 +60,23 @@ static int race_scarab_child_set(int slot, unsigned parent, unsigned phase,
                                  unsigned life, unsigned no_collision)
 {
     Sc64ScarabChildFields f={parent,phase,life,no_collision}; int carry,timer;
-    if (!sc64_scarab_child_fields_pack(&f,&carry,&timer)) return 0;
-    u[slot].carry=carry; u[slot].work_timer=(u16)timer; return 1;
+    if (slot<0 || slot>=MAX_UNITS || !u[slot].alive || u[slot].type!=U_SCARAB ||
+        !sc64_scarab_child_fields_pack(&f,&carry,&timer)) return 0;
+    int was_hidden=SC64_SCARAB_HIDDEN(&u[slot]);
+    int was_noncolliding=!!SC64_SCARAB_NONCOLLIDING(&u[slot]);
+    u[slot].carry=carry; u[slot].work_timer=(u16)timer;
+    if (was_hidden!=!!SC64_SCARAB_HIDDEN(&u[slot]) ||
+        was_noncolliding!=!!SC64_SCARAB_NONCOLLIDING(&u[slot])) {
+        /* Previously hidden/grace rows may not be linked in the active
+         * indexes. Fall back to the checked world scans until next setup. */
+        target_lists_valid=0;
+        sc64_target_index_end();
+        sc64_unit_bucket_active=0;
+#ifdef SC64_CONTACT_MEMO_ENABLED
+        SC64_CONTACT_MEMO_INVALIDATE();
+#endif
+    }
+    return 1;
 }
 
 /* A fresh Reaver only: no actor may already claim this slot. */
