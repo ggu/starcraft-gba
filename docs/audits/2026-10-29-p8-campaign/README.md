@@ -227,7 +227,11 @@ Every comparison uses the strict comparator in `tools/sc64_p8_arm_replay.py`
 candidate must hold exactly the reference's observations from the requested
 tick on, with equal fields, no duplicate or out-of-order ticks, nothing
 before the cutoff and the same final record. At the documented resume
-tick it may open with its own `resume` observation. The full and prefix
+tick it may open with its own `resume` observation. Each file must also keep
+the probe's checkpoint cadence on its own, without reference to the other:
+a `resume` observation at its cutoff (if any), a `periodic` one at every
+multiple of 1,000 ticks after it and a final observation at its last tick.
+So a pair of files holding only the same final record fails. The full and prefix
 runs are compared from tick 0; the resumes from tick 31,948.
 
 Host (`make test-sc64-protoss-p8`):

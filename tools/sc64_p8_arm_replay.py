@@ -15,7 +15,10 @@ directory; no debugger port) on a replay ROM and keeps its `P8 ` debug lines.
 output or ARM logs): B must hold exactly A's observations from `--from-tick`
 on (the resume cutoff, where B may open with its own `resume` observation),
 with equal fields, no duplicate or out-of-order ticks, and the same final
-outcome. `--mission 28 --prefix P9` selects
+outcome. Both files must also keep the replay probe's own checkpoint cadence,
+independently of each other: a `resume` observation at the cutoff (B only,
+when there is one), a `periodic` one at every multiple of 1,000 ticks after
+it, and a final `won`, `lost` or `limit` one. `--mission 28 --prefix P9` selects
 the P9 controller trace, tape macros and probe lines. Emulator evidence only.
 """
 from __future__ import annotations
@@ -193,6 +196,38 @@ def checks(lines: list[str]) -> list[tuple[int, dict]]:
     return rows
 
 
+# The replay probe reports every 1,000 tape ticks and once at its last tick.
+CHECKPOINT_PERIOD = 1000
+FINAL_KINDS = ("won", "lost", "limit")
+
+
+def cadence_errors(rows: list[tuple[int, dict]], start: int, label: str) -> list[str]:
+    """The probe's checkpoint schedule, derived from the run's own start and
+    end rather than from the other file: a `resume` observation at `start`
+    when it is a cutoff, a `periodic` one at every multiple of the period
+    after it and before the last tick, and a final observation at the last
+    tick. A file holding only a final observation fails unless the run
+    really ended within one period."""
+    if not rows:
+        return [f"{label} holds no observations"]
+    end_tick, end = rows[-1]
+    if end["kind"] not in FINAL_KINDS:
+        return [f"{label} does not end in a final observation"]
+    expected = [(start, "resume")] if start > 0 else []
+    tick = (start // CHECKPOINT_PERIOD + 1) * CHECKPOINT_PERIOD
+    while tick < end_tick:
+        expected.append((tick, "periodic"))
+        tick += CHECKPOINT_PERIOD
+    expected.append((end_tick, end["kind"]))
+    got = [(t, f["kind"]) for t, f in rows]
+    if got == expected:
+        return []
+    lost = [t for t, k in expected if (t, k) not in got]
+    stray = [t for t, k in got if (t, k) not in expected]
+    return [f"{label} breaks the {CHECKPOINT_PERIOD}-tick checkpoint cadence "
+            f"(missing {lost[:8]}, unexpected {stray[:8]})"]
+
+
 def compare(a: list[str], b: list[str], from_tick: int) -> dict:
     """Strict comparison of candidate B against reference A from `from_tick`.
 
@@ -208,6 +243,11 @@ def compare(a: list[str], b: list[str], from_tick: int) -> dict:
                 "mismatch_count": 0, "mismatches": [], "final_a": None,
                 "final_b": None, "same_end": False}
     da, db = dict(ra), dict(rb)
+    # A reference that is itself a resume starts its cadence at its own
+    # cutoff; the candidate's starts at the requested one.
+    ref_start = ra[0][0] if ra and ra[0][1]["kind"] == "resume" else 0
+    errors += cadence_errors(ra, ref_start, "reference")
+    errors += cadence_errors(rb, from_tick, "candidate")
     early = [t for t, _ in rb if t < from_tick]
     if early:
         errors.append(f"candidate holds {len(early)} observations before tick {from_tick}")
