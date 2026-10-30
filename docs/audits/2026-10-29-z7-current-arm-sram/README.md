@@ -76,6 +76,16 @@ lists each failure:
   one DONE record whose cursor consumed every tape transition. A prefix ends
   with one successful SAVED record. A resume has one successful LOADED record,
   on the play screen, directly after START. No early end is allowed.
+- **Load state:** a resume is checked against the log of the prefix that
+  wrote its seed (`--prefix-log`). That prefix must itself qualify against
+  the seed SRAM, and its cut must equal the resume cut. The load is one frame
+  with L held on the title screen: it restores the newest valid record and
+  steps no game tick. LOADED's frame, started mask, minerals and gas must
+  therefore equal the prefix's cut observation, whose frame SAVED repeats.
+  The tape resumes at cut + 1. The load frame counts as a guest frame in the
+  timing records but not as a game tick. The cut state between host
+  checkpoints comes from the prefix log; the tool does not decode it from the
+  build-dependent `RaceSave` payload.
 - **Coverage:** the run must match exactly the host observations its mode
   covers. That set must be non-empty, and nothing outside it may appear. A
   prefix cut must be inside the tape, and its SAVED frame must equal the cut
@@ -96,14 +106,17 @@ lists each failure:
 
   SRAM is checked before the verdict; a run without SRAM cannot qualify.
 
-`tests/test_sc64_z7_arm_replay.py` has 13 tests covering these gates, with
+`tests/test_sc64_z7_arm_replay.py` has 14 tests covering these gates, with
 negative cases including:
 - a wrong tag in both the SAVED log and the SRAM header;
 - oversized, torn, zero-sequence and partly overwritten slots;
 - orphan, incomplete, repeated and conflicting bundles, extra tokens and reordered fields;
 - gibberish or mismatched START and DONE payloads;
 - missing, duplicate, misplaced and incoherent timing records;
-- an out-of-range cut, a SAVED-only prefix and a resume without its seed.
+- an out-of-range cut, a SAVED-only prefix and a resume without its seed;
+- a LOADED record with an impossible state (`frame=-1 started=-9
+  minerals=-999 gas=999999`), each field off by one, a missing, failing or
+  differently cut prefix, and a seed that is not the prefix's single pause save.
 
 The reviewer's four reproduced cases also fail when applied to the real ARM
 logs and SRAM.
@@ -112,6 +125,10 @@ Re-evaluated with these gates, the retained ARM logs and SRAM still qualify:
 - full: 909/909 observations, 16 periodic records plus the terminal one, one victory record;
 - prefix: 669/669 observations at cut 403,482, one pause save;
 - resume: 240/240 observations, with the seed kept and a sequence-2 victory record.
+  Its LOADED record (`frame=392580 started=250 minerals=22308 gas=46962`)
+  equals the prefix's cut observation and SAVED frame at tick 403,482. With
+  the reviewer's impossible LOADED record substituted, the same log fails on
+  all four fields.
 
 ## Build provenance
 
