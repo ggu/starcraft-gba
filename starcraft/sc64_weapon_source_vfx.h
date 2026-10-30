@@ -70,14 +70,17 @@ sc64_weapon_source_vfx_unpack(uint32_t packed, Sc64WeaponSourceVfxKey *key)
 static inline uint32_t
 sc64_weapon_source_vfx_source_tick(uint32_t gba_age)
 {
-    return (uint32_t)(((uint64_t)gba_age * 4u) / 5u);
+    /* floor(4*n/5) = n - ceil(n/5), with no overflowing product. */
+    uint32_t fifth = gba_age / 5u;
+    return gba_age - fifth - (gba_age - fifth * 5u != 0u);
 }
 
 static inline uint32_t
 sc64_weapon_source_vfx_first_gba_age(uint32_t source_tick)
 {
-    uint64_t age = ((uint64_t)source_tick * 5u + 3u) / 4u;
-    return age > UINT32_MAX ? UINT32_MAX : (uint32_t)age;
+    /* ceil(5*n/4) = n + ceil(n/4); saturate before the final sum. */
+    uint32_t extra = (source_tick >> 2) + ((source_tick & 3u) != 0u);
+    return source_tick > UINT32_MAX - extra ? UINT32_MAX : source_tick + extra;
 }
 
 /* Convert a source lifetime in 24 Hz updates to the number of 30 Hz GBA

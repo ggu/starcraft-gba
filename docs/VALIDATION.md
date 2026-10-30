@@ -6227,3 +6227,305 @@ command stops at the T9 controller (`won=0`, no Wraiths, wallet 34/14 at the
 T1–T8 and the other Terran checks pass before that point, and T10 run directly
 wins at tick 3,552. No frame-rate, physical-hardware or ARM replay result is
 claimed.
+
+
+### Canonical skirmish controller qualification correction (2026-10-29)
+
+The match targets now expand the actual `TERRAN_ROM_FLAGS`, `ZERG_ROM_FLAGS`
+and `PROTOSS_ROM_FLAGS` at execution, with the required companion translation
+units. The earlier 54-match report above used chapter flag subsets; it does
+not qualify the current canonical products. A dry-run regression checks the
+ordered feature/include vectors and catches both early expansion and an older
+chapter substituted for a canonical profile.
+
+On runtime base `8d1e653`, the corrected controller passes 27 focused
+construction/selection/command-witness cases under host sanitizers. All 54
+map/race/opponent configurations were attempted: 51 finish (4 wins, 47 losses),
+and three hit the unchanged 120,000-input-tick limit. The Terran product stalls
+on imported map 1, human Protoss, three bots; Zerg and Protoss products stall on
+map 1, human Terran, two bots. These are failures, not completed matches. No
+AI thresholds or terminal rules were changed to produce a pass.
+
+The Terran stall exposes a real resource-return routing defect: a Gateway
+beside the Nexus makes its center route unreachable while a point inside the
+existing drop-off ring is reachable. Loaded Probes keep their eight minerals
+and cannot finish the return trip. A normal-input minimal reproduction fails
+on this runtime; shared-engine repair and requalification remain outstanding.
+Other stalled configurations still require diagnosis.
+
+The controller now tracks pending travel separately from paid foundations,
+observes completion/loss on every input tick, navigates remembered menu rows,
+and follows moving workers when selecting them. It emits action witnesses
+only for accepted clicks. Matrix failures are retained while the remaining
+configurations continue, and stale trace files cannot satisfy a new run.
+This host evidence does not establish ARM performance or hardware behavior.
+
+
+### Shared worker depot-circle routing (2026-10-29)
+
+A loaded worker could fail to route to its depot center even though its
+32-pixel drop-off area was reachable. This stalled four mineral carriers in
+three canonical matrix cases. Return movement and optional nearest-depot
+reachability now use the same complete set of walkable cells intersecting the
+existing deposit circle. The imported engine stores one multi-source field per
+cached depot in the existing route pool, with a separate goal-key namespace;
+ordinary point routes cannot reuse it as a connected-component or suffix hint.
+The original-art path uses its existing forward-BFS storage. Cargo amounts,
+drop-off distance, order state and save schema are unchanged.
+
+An independent pixel-enumeration/BFS oracle passes 11 sanitizer configurations,
+including legacy distance fields, packed fields, partial and split floods,
+borrowed grids, active stride, rectangles and 128-by-128 maps. The real Blood
+Bath reproduction, mineral/gas trips, a forced long detour, live-waypoint
+save/load, depot-slot reuse, lift/land and nearest reachable-depot cases pass.
+All eight prepared depot fixture variants pass (four products, normal and
+nearest-depot paths). All 54 canonical normal-input matches finish within the
+unchanged 120,000-tick limit: Terran 3 wins/15 losses, Zerg 3/15, Protoss 4/14.
+The three earlier stalled cases now finish. Canonical startup/save/UI checks
+also pass, including 702 skirmish startup/save combinations. The promoted
+Protoss fixture had stale P6-only expectations; it now checks P7's exact
+save generation 43, identity and seven-entry catalog while retaining P6 checks.
+These startup/save checks do not demonstrate full campaign wins.
+
+All four ARM links pass the unchanged guards. EWRAM headroom is 28,480 bytes
+for Terran, 28,372 for Zerg, 23,828 for Protoss P7 and 200 for Showcase. IWRAM
+headroom is respectively 496, 72, 960 and 56 bytes. Captured actual per-TU
+commands, raw dependencies, consumed input hashes, link maps and output hashes
+are retained privately. Frozen imported inputs were copied from available
+files matching the recorded hashes; some historical source links had been
+removed externally. The old failed single-point/eager-scan prototype was
+rejected and is not included.
+
+The unchanged production-loop headless replay of the new Terran ROM matches
+the completed host trace (loss at frame 9,428) and measures 28.08 effective fps
+over 9,426 advancing PLAY frames. A separate late three-AI window measures
+20.36 fps over 992 advancing frames, with eight nonadvancing PLAY updates
+reported separately. This fails the near-30-fps objective for that workload.
+The new and old traces differ, so these are separate workload measurements,
+not an isolated patch speed comparison or physical-GBA qualification.
+
+Read-only profiling of that same three-AI replay reproduces all 9,000 timing
+rows exactly. Mean frame work is 823,830 guest cycles: update-entry to audio
+249,145; audio to render 64; render to next update 574,621 (includes presentation
+and loop overhead). The drawing counter averages 480,890 cycles, including
+206,532 for the unit/effect phase and 124,372 for background. The unit/effect
+phase includes death effects, tracers and projectiles; it does not isolate sprite
+compositing. The 27 route-build frames have
+the largest update spikes; even zero-build frames average only 21.67 fps.
+Rendering is the next sustained-cost target; route construction remains a
+separate spike target. Counters overlap and must not all be added together.
+
+### Exact source-animation clock arithmetic (2026-10-29)
+
+The 30 Hz to 24 Hz presentation clock now computes `floor(4*n/5)` as
+`n - ceil(n/5)` using one 32-bit division. The inverse computes saturated
+`ceil(5*n/4)` as `n + ceil(n/4)` with a checked sum. These identities preserve
+the original result for every unsigned 32-bit input, including wrap-domain
+ages and the saturation boundary. Animation event timing and duration remain
+unchanged. An independent original-64-bit-formula oracle passes 2,062,934
+bounded, boundary and random cases; the existing VFX sampling test also passes.
+The actual Terran attack-pose call site uses `__aeabi_uidiv` in place of
+`__aeabi_uldivmod`; unrelated 64-bit operations remain.
+
+All four ARM products link within the same RAM guards and have unchanged
+EWRAM/IWRAM headroom. Actual per-TU compiler/link commands, dependencies,
+consumed-input hashes and ROM/ELF hashes are recorded privately. The only
+changed consumed source header is the clock helper; imported inputs and
+ordered game feature definitions match the paired baseline.
+
+On the identical recorded three-AI workload, the advancing-frame count remains
+992 and cycles fall from 817,238,918 to 810,213,225 (0.86 percent), moving the
+measured rate from 20.36 to 20.54 fps. All 9,000 tick/frame/phase observations
+match. The full one-AI replay also matches all 9,488 observations and decoded
+terminal entity banks, still losing at frame 9,428; its 9,426 advancing frames
+fall from 5,630,905,715 to 5,627,534,060 cycles (28.08 to 28.10 fps). These are
+paired mGBA guest-cycle measurements. The three-AI near-30-fps goal remains
+unmet; this is a small improvement rather than a completed performance pass.
+
+A larger transparent-edge facing-sprite experiment was rejected before
+promotion. It passed synthetic and real-bank pixel oracles and all four link
+guards, but the identical three-AI workload regressed to 20.31 fps. Its static
+bank transparency ratio did not establish a useful runtime saving. The source
+prototype and failed performance evidence remain private; the original sprite
+renderer and generated data format are retained.
+
+### Indexed sprite row alignment (2026-10-30)
+
+The indexed compositor now checks source/destination alignment compatibility
+once per row. Advancing both pointers by two preserves their modulo-four
+difference, so incompatible rows cannot take the four-pixel word path.
+The existing pair compositor, transparency, odd edges and clipping remain
+unchanged. Independent randomized framebuffer fixtures pass with source
+alignments 0..3, word/non-word variants and vertical scene clipping.
+
+All four retained canonical ARM products pass unchanged RAM guards. EWRAM
+is unchanged; IWRAM grows by eight bytes in Terran/Zerg/P7, with respective
+488/64/952 bytes remaining. Showcase compiles out this optional word-path
+change and its ROM and margins remain identical (200 bytes EWRAM, 56 IWRAM).
+Actual ordered per-TU compiler/link argv, dependencies and output hashes are
+retained privately; only common/gba.c differs in the paired consumed inputs.
+
+Against the preceding clock-math product, the identical three-AI window
+retains all 9,000 tick/frame/phase observations and 992 advancing frames.
+Cycles fall from 810,213,225 to 806,838,185 (0.42 percent), about 20.54 to
+20.63 fps. The full one-AI replay retains all 9,488 observations and captured
+terminal state, with 9,426 advancing frames: 5,627,534,060 to 5,626,410,088
+cycles (0.02 percent). These small paired emulator gains do not establish
+physical-hardware or broad campaign/near-30-fps qualification.
+
+Read-only primitive attribution reproduces every clock-baseline cycle row.
+In that workload, indexed sprites consume 81.6 million cycles, including
+65.2 million in source death art; packed facing sprites consume only 6.9
+million. A long-lived building-remnant image accounts for most indexed
+death drawing. This measured usage motivates a separate remnant-packing
+candidate; static transparency counts alone did not justify the rejected
+facing-span prototype.
+
+### Packed building remnants (2026-10-30)
+
+The authenticated death importer now also packs persistent remnant layers of
+building raw IDs 106..175. This adds six image banks (110, 111, 216, 217, 335,
+336), 24 frames and 291,232 phase-word bytes. Transient bursts and unsupported
+actors retain their existing paths. Indexed pixels, layer timing, colors,
+visibility, lifetimes and the clipped HUD-edge fallback are unchanged.
+
+A fresh baseline generation exactly matches the retained input bank. The
+candidate preserves all non-word header content byte for byte and all 780
+preexisting packed declarations. Ten importer tests pass. The optional private
+bank oracle checks every new frame/phase against indexed bytes and independently
+composites 144 patterned framebuffer cases, including scene edges, under
+ASan/UBSan. No generated bank or game assets are tracked.
+
+All four retained canonical ARM products link within the unchanged ROM/RAM
+limits, with EWRAM/IWRAM margins identical to the preceding row-alignment
+candidate. Actual per-TU argv, raw dependencies, consumed input hashes, linker
+maps and output hashes are retained privately. Only the expected generated
+death-bank header differs in paired consumed inputs; ordered feature/include
+vectors remain identical.
+
+The identical three-AI late window retains all 9,000 tick/frame/phase rows and
+992 advancing frames. Cycles fall from 806,838,185 to 779,509,400 (3.39 percent),
+about 20.63 to 21.35 fps. A separate read-only pixel observer reproduces every
+pinned-observer cycle row for both products and all 992 full-frame pixel hashes
+match (602 distinct hashes), proving picture parity for this window. Earlier
+clock-baseline attribution identified repeated building-remnant image 336 draws;
+the pixel observer itself does not identify individual sprite calls.
+
+The full one-AI replay retains all 9,488 observations and decoded terminal
+entity/configuration state: 9,426 advancing frames, 5,626,410,088 to
+5,623,881,694 cycles (0.045 percent), still about 28.12 fps. These are narrow
+paired emulator measurements, not physical-hardware or all-campaign proof.
+The late three-AI near-30-fps target remains unmet.
+
+### Reuse source projectile motion within a draw (2026-10-30)
+
+Source trace drawing now computes distance and flight ticks once and reuses
+them for duration, projectile placement and matching flight/death children.
+The 16-byte automatic record is internal to a synchronous draw. A non-NULL
+record requires the same immutable profile and launch/end coordinates;
+actor/init overlays and the pre-existing public wrappers request fresh values.
+No saved or persistent RAM state, source timelines or pixels change.
+
+An independent copy of the original arithmetic matches 26,896 boundary and
+deterministic random cases under ASan/UBSan, including null
+outputs, zero distance/speed, stationary/unknown bullet types and unsigned
+32-bit ages. Full-int in-flight cases that already overflow the original signed
+64-bit product are outside this equivalence claim. A separate authored moving
+projectile fixture asserts all 27 original draw events across 40 ages, including
+child birth positions and no extra calls after expiry. Existing source VFX
+sampling, raster, runtime, alias-resolution and reverse-byte fixtures pass.
+
+Four retained canonical ARM products pass unchanged ROM/RAM guards, with
+identical margins to the remnant baseline. Actual per-TU compiler/link argv,
+raw dependencies, consumed input/audio hashes and output maps/hashes are
+retained. Only the two source runtime/render headers differ in consumed inputs;
+ordered feature/include vectors and imported assets match.
+
+Exact-argv recompilation with stack-usage reporting preserves every executable
+object section. Compiler static trace/overlay frames shrink across all four
+profiles; for example Terran draw_tracers is 888 to 608 bytes and its overlay
+helper 328 to 272. The new preparation helper has a 72-byte static frame.
+The inspected Terran path through preparation and nonzero 64-bit division
+sums to 1,504 bytes including main, game_render and outgoing argument areas,
+compared with 1,768 for the corresponding baseline overlay/division path.
+These specific paths are not a whole-program stack bound; deeper sprite
+helpers, startup and interrupts are not covered. The fixed reserve is unchanged.
+
+The identical late three-AI replay retains all 9,000 tick/frame/phase rows and
+992 advancing frames: 779,509,400 to 757,021,353 cycles (2.88 percent lower),
+about 21.35 to 21.98 fps. A separate read-only observer reproduces every pinned
+cycle row and all 992 full-frame hashes match, with 602 distinct baseline
+hashes. The full one-AI replay retains all 9,488 observations and decoded
+terminal state, still losing at frame 9,428; 9,426 advancing frames cost
+5,623,881,694 to 5,624,163,624 cycles (0.005 percent higher), still about
+28.12 fps. This is a mixed workload result, not a universal speedup.
+These narrow emulator checks do not establish hardware, all-scene or near-30-fps
+qualification; the full goal remains open.
+
+### Default-branch bounded depot searches (2026-10-30)
+
+This batch is independently qualified on default `fcb5195`; it does not
+include the separate draft roster/service integration. `RACES_FLAGS` now
+supplies `SC64_DEPOT_BOUNDED` across the race-engine products. A depot flood
+can stop after discovering the requesting walkable origin. Partial fields
+serve only discovered origins, never unreachable-component proofs; another
+unassigned origin rebuilds from the roots. Full-field callers and blocked
+origins still request a complete field. All queued walkability bits, including
+the unexpanded frontier, are restored. No new persistent frontier or pool,
+actor-limit reduction or RAM-reserve change is introduced.
+
+Eighteen depot oracle configurations cover packed/nibble directions, partial
+point fields, visited-grid borrowing, read-only grid access, blocked origins,
+cache churn, rectangular maps and 128-by-128 maps. Capability tests verify
+the common flag appears once and reject its use without the race engine.
+Default doctor/build/test passes (678 Python tests, 16 optional skips, the
+separate eight-test suite and C fixtures), as do unified build/test and the
+full Terran host aggregate. The latter remains source-map/hidden-world host
+probe coverage, not ordinary-menu ARM campaign completion. All 54 individual
+normal-input skirmish results match the earlier exact-default evidence; 702
+startup/save configurations and 27 construction cases pass.
+
+The paired busy Zerg three-AI sample decreases from 711,493,203 to 695,201,548
+guest cycles over 1,000 updates: 23.58 to 24.13 effective fps, with all 8,948
+state and framebuffer observations matching. This is a nonterminal sample,
+not steady-30-fps, whole-campaign or physical-hardware qualification. The
+four canonical ARM links retain the fixed guards; EWRAM/IWRAM headroom in
+bytes is Terran 28,480/488, Zerg 28,372/64, Protoss 23,828/952 and Showcase
+200/56. Actual per-TU arguments, raw dependencies, input hashes, ELF/maps/ROMs,
+comparison logs and the zero-mismatch source closure are retained privately
+in `default-depot-bounded-v1`. The reused baseline runtime inputs are checked
+against the current default Git tree and the independently qualified PR #169
+products; an earlier mismatching PR #168 comparison is not baseline evidence
+for this batch. No proprietary data is committed and no Actions run occurred.
+
+### Default-branch resolved projectile metadata (2026-10-30)
+
+Independently qualified on default `26a2fec`, this shared rendering change
+unpacks a tagged tracer and resolves its attack profile once, reusing those
+values for offscreen culling and drawing. Packed-key APIs remain available;
+malformed keys and absent profiles retain their no-effect behavior. Values
+live on the stack, with no simulation, damage timing, persistent pool, actor
+limit or RAM-reserve change. This excludes the draft roster/service work.
+
+The frozen preceding default renderer and the new resolved path match all
+1,410,048 generated-bank cases and digest `403bcc76fe61a883`, including
+headings, motion ages, fog, clipping, mirrored poses and child overlays.
+That fixture uses a deterministic test compositor; the separate production
+Zerg replay matches all 8,948 gameplay and framebuffer observations. Its
+1,000-update busy three-AI sample improves from 695,201,548 to 691,839,468
+guest cycles, or 24.13 to 24.25 effective fps. This is one nonterminal
+workload, not steady-30-fps, complete-campaign or hardware qualification.
+
+Default doctor/build/test passes (678 Python tests, 16 optional skips and
+the separate eight-test suite), as do unified build/test and the full Terran
+host aggregate. Host controllers retain their source-map/hidden-world
+information limits. Four canonical ARM builds preserve the fixed guards;
+EWRAM/IWRAM headroom in bytes is Terran 28,480/488, Zerg 28,372/64, Protoss
+23,828/952 and Showcase 200/56. Actual Make flags are recorded without
+injected definitions. Paired consumed inputs differ only in the intended
+game and renderer source; generated assets, other inputs and toolchain match
+the baseline. Commands, raw dependencies, input/source hashes, maps and
+comparisons are private in `default-resolved-tracer-v1`. The earlier #171
+54-match, 702 startup/save and 27 construction results are baseline evidence
+for unchanged gameplay paths, not new runs of this renderer-only stage.
+No Actions were run and no proprietary inputs are committed.

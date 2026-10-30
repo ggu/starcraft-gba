@@ -181,8 +181,28 @@ static void resolved_alias_keeps_the_requested_lut_key(void)
     assert(!"synthetic bank must include at least one LUT-backed image");
 }
 
+static void projectile_lookup_matches_original(void)
+{
+    for (unsigned i = 1; i < SC64_WEAPON_SOURCE_ANIMATION_COUNT; ++i) {
+        const Sc64WeaponSourceAnimation *a = &sc64_weapon_source_animations[i - 1];
+        const Sc64WeaponSourceAnimation *b = &sc64_weapon_source_animations[i];
+        assert(a->image_id < b->image_id ||
+               (a->image_id == b->image_id && a->animation_id < b->animation_id));
+    }
+    /* Exercise the actual renderer helper, including every missing image ID.
+     * Pointer identity also checks missing Init, Death and Flight phases. */
+    for (unsigned image = 0; image <= UINT16_MAX; ++image) {
+        const Sc64WeaponSourceAnimation *init, *death, *flight;
+        sc64_vfx_projectile_animations((uint16_t)image, &init, &death, &flight);
+        assert(init == sc64_weapon_source_animation_lookup((uint16_t)image, 0));
+        assert(death == sc64_weapon_source_animation_lookup((uint16_t)image, 1));
+        assert(flight == sc64_weapon_source_animation_lookup((uint16_t)image, 2));
+    }
+}
+
 int main(void)
 {
+    projectile_lookup_matches_original();
     resolved_helper_matches_authored_pixels(531u, 0u, 0u, 8u);
     resolved_helper_matches_authored_pixels(536u, 0u, 1u, 8u);
     resolved_alias_keeps_the_requested_lut_key();

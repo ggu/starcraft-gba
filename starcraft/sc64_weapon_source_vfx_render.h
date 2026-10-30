@@ -132,6 +132,16 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
 #include "sc64_weapon_source_runtime.h"
 #include "sc64_weapon_source_vfx_bounds.h"
 
+/* Reuse the already resolved image for the generated frame directory. */
+static inline const Sc64WeaponSourceFrame *
+sc64_weapon_source_vfx_frame_resolved(const Sc64WeaponSourceImage *image,
+                                      uint16_t source_frame_id)
+{
+    if (!image || source_frame_id>=image->source_frame_count) return 0;
+    uint16_t i=sc64_weapon_source_frame_directory[image->frame_directory_first+source_frame_id];
+    return i<SC64_WEAPON_SOURCE_FRAME_COUNT ? &sc64_weapon_source_frames[i] : 0;
+}
+
 static inline uint16_t
 sc64_weapon_source_vfx_animation_frame(const Sc64WeaponSourceAnimation *anim,
                                        uint32_t local_tick,
@@ -233,7 +243,7 @@ sc64_weapon_source_vfx_draw_image(uint16_t image_id, uint8_t animation_id,
         image, anim, source_age, direction, &mirror);
     if (source_frame == UINT16_MAX) return;
     const Sc64WeaponSourceFrame *frame =
-        sc64_weapon_source_frame_lookup(image_id, source_frame);
+        sc64_weapon_source_vfx_frame_resolved(image, source_frame);
     if (!frame) return;
     sc64_weapon_source_vfx_draw_image_frame_resolved(
         image_id, image, frame, mirror, world_x, world_y);
@@ -349,15 +359,12 @@ sc64_weapon_source_vfx_anchor_may_be_visible(int x, int y,
  * does not recursively draw child overlays. The bank-derived frame+offset
  * radius includes normal/mirror crop origins and all LO table offsets. */
 static inline int
-sc64_weapon_source_vfx_trace_provably_offscreen(uint32_t packed,
+sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey key,
+                                                 const Sc64WeaponSourceAttackProfile *profile,
                                                  int x0, int y0,
                                                  int x1, int y1,
                                                  int camx, int camy)
 {
-    Sc64WeaponSourceVfxKey key;
-    if (!sc64_weapon_source_vfx_unpack(packed, &key)) return 0;
-    const Sc64WeaponSourceAttackProfile *profile =
-        sc64_weapon_source_trace_profile(packed);
     if (!profile || !profile->projectile_image) return 0;
     /* Follow, bounce, and range-extension trajectories are not covered by the
      * renderer's straight endpoint interpolation proof. Preserve those. */
@@ -391,11 +398,21 @@ sc64_weapon_source_vfx_trace_provably_offscreen(uint32_t packed,
         camx, camy, radius_x, radius_y);
 }
 
+static inline int
+sc64_weapon_source_vfx_trace_provably_offscreen(uint32_t packed,
+                                                 int x0,int y0,int x1,int y1,int camx,int camy)
+{
+    Sc64WeaponSourceVfxKey key;
+    if (!sc64_weapon_source_vfx_unpack(packed,&key)) return 0;
+    return sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,
+        sc64_weapon_source_trace_profile(packed),x0,y0,x1,y1,camx,camy);
+}
+
 /* Draw attached image overlays and independently spawned sprite trails from
  * the generated event stream. A looping SPROL stream keeps at most eight live
  * occurrences; each sprite is placed at its authored birth position. */
 static inline void
-sc64_weapon_source_vfx_draw_overlays(const Sc64WeaponSourceAnimation *anim,
+sc64_weapon_source_vfx_draw_overlays_motion(const Sc64WeaponSourceAnimation *anim,
                                      uint32_t timeline_tick,
                                      uint32_t child_clock,
                                      uint16_t parent_image,
@@ -406,7 +423,8 @@ sc64_weapon_source_vfx_draw_overlays(const Sc64WeaponSourceAnimation *anim,
                                      int relative_to_release,
                                      const Sc64WeaponSourceAttackProfile *motion,
                                      int x0, int y0, int x1, int y1,
-                                     uint32_t stage_start)
+                                     uint32_t stage_start,
+                                     const Sc64WeaponSourceMotion *prepared)
 {
     if (!anim || anim->overlay_first > SC64_WEAPON_SOURCE_OVERLAY_COUNT ||
         anim->overlay_count > SC64_WEAPON_SOURCE_OVERLAY_COUNT - anim->overlay_first)
@@ -454,8 +472,8 @@ sc64_weapon_source_vfx_draw_overlays(const Sc64WeaponSourceAnimation *anim,
                 int64_t moving_age = (int64_t)stage_start + trigger;
                 if (moving_age < 0) moving_age = 0;
                 if (moving_age > UINT32_MAX ||
-                    !sc64_weapon_source_trace_position(motion, x0, y0, x1, y1,
-                        (uint32_t)moving_age, &born_x, &born_y)) continue;
+                    !sc64_weapon_source_trace_position_motion(motion, x0, y0, x1, y1,
+                        (uint32_t)moving_age, &born_x, &born_y, prepared)) continue;
                 draw_x = born_x;
                 draw_y = born_y;
             }
@@ -475,7 +493,7 @@ sc64_weapon_source_vfx_draw_overlays(const Sc64WeaponSourceAnimation *anim,
                 child_image, child_anim, child_age, direction, &child_mirror);
             if (child_frame_id == UINT16_MAX) continue;
             const Sc64WeaponSourceFrame *child_frame =
-                sc64_weapon_source_frame_lookup(overlay->image_id, child_frame_id);
+                sc64_weapon_source_vfx_frame_resolved(child_image, child_frame_id);
             if (!child_frame) continue;
             sc64_weapon_source_vfx_draw_image_frame_resolved(
                 overlay->image_id, child_image, child_frame, child_mirror,
@@ -484,18 +502,54 @@ sc64_weapon_source_vfx_draw_overlays(const Sc64WeaponSourceAnimation *anim,
     }
 }
 
+/* Preserve the existing standalone overlay entry point for other users. */
+static void __attribute__((unused))
+sc64_weapon_source_vfx_draw_overlays(const Sc64WeaponSourceAnimation *anim,
+                                     uint32_t timeline_tick, uint32_t child_clock,
+                                     uint16_t parent_image, uint16_t parent_frame,
+                                     int world_x, int world_y, uint8_t direction,
+                                     int parent_mirror, int relative_to_release,
+                                     const Sc64WeaponSourceAttackProfile *motion,
+                                     int x0, int y0, int x1, int y1,
+                                     uint32_t stage_start)
+{
+    sc64_weapon_source_vfx_draw_overlays_motion(anim, timeline_tick, child_clock,
+        parent_image, parent_frame, world_x, world_y, direction, parent_mirror,
+        relative_to_release, motion, x0, y0, x1, y1, stage_start, 0);
+}
+
 /* Draw the projectile stream from its generated Init/attack/Death image
  * timelines. This is presentation-only: it uses the packed tracer identity
  * and captured endpoints, and never changes simulation or saved fields. */
+/* The generated animation table is ordered by image, then animation id. */
+static void __attribute__((noinline))
+sc64_vfx_projectile_animations(uint16_t image_id,
+    const Sc64WeaponSourceAnimation **init,
+    const Sc64WeaponSourceAnimation **death,
+    const Sc64WeaponSourceAnimation **flight)
+{
+    unsigned lo=0,hi=SC64_WEAPON_SOURCE_ANIMATION_COUNT;
+    *init=0; *death=0; *flight=0;
+    while(lo<hi) { unsigned mid=lo+(hi-lo)/2;
+        if(sc64_weapon_source_animations[mid].image_id<image_id) lo=mid+1;
+        else hi=mid;
+    }
+    while(lo<SC64_WEAPON_SOURCE_ANIMATION_COUNT) {
+        const Sc64WeaponSourceAnimation *a=&sc64_weapon_source_animations[lo++];
+        if(a->image_id!=image_id || a->animation_id>2) break;
+        if(a->animation_id==0 && !*init) *init=a;
+        else if(a->animation_id==1 && !*death) *death=a;
+        else if(a->animation_id==2 && !*flight) *flight=a;
+    }
+}
+
 static inline void
-sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
+sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
+                                     const Sc64WeaponSourceAttackProfile *p,
                                      int x0, int y0, int x1, int y1, int live,
                                      uint32_t gba_age)
 {
-    Sc64WeaponSourceVfxKey key;
-    if (!live || !sc64_weapon_source_vfx_unpack(packed, &key)) return;
-    const Sc64WeaponSourceAttackProfile *p =
-        sc64_weapon_source_trace_profile(packed);
+    if (!live) return;
     if (!p || !p->projectile_image) return;
     int launch_x, launch_y;
     sc64_weapon_source_trace_launch_origin(p, key.direction, x0, y0,
@@ -505,7 +559,9 @@ sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
     if (!image || !image->source_frame_count ||
         image->frame_first >= SC64_WEAPON_SOURCE_FRAME_COUNT) return;
 
-    if (!sc64_weapon_source_trace_has_duration(p, launch_x, launch_y, x1, y1)) return;
+    Sc64WeaponSourceMotion motion =
+        sc64_weapon_source_motion_prepare(p, launch_x, launch_y, x1, y1);
+    if (!sc64_weapon_source_trace_has_duration_motion(p, launch_x, launch_y, x1, y1, &motion)) return;
     uint32_t attack_age = sc64_weapon_source_vfx_source_tick(gba_age);
     uint32_t release_ticks = sc64_weapon_source_trace_release_ticks(p);
     /* The captured tracer begins at attack-init. Keep the attacker animation
@@ -526,15 +582,10 @@ sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
     if (attack_age < release_ticks) return;
     uint32_t source_age = attack_age - release_ticks;
     uint32_t init_ticks = sc64_weapon_source_trace_startup_ticks(p);
-    const Sc64WeaponSourceAnimation *init =
-        sc64_weapon_source_animation_lookup(image->image_id, 0u);
+    const Sc64WeaponSourceAnimation *init, *flight_anim, *death;
+    sc64_vfx_projectile_animations(image->image_id,&init,&death,&flight_anim);
     int moving = !sc64_weapon_source_bullet_is_stationary(p->weapon_bullet_type);
-    uint32_t flight_ticks = moving ?
-        sc64_weapon_source_trace_flight_ticks(p, launch_x, launch_y, x1, y1) : 0;
-    const Sc64WeaponSourceAnimation *flight_anim =
-        sc64_weapon_source_animation_lookup(image->image_id, 2u);
-    const Sc64WeaponSourceAnimation *death =
-        sc64_weapon_source_animation_lookup(image->image_id, 1u);
+    uint32_t flight_ticks = moving ? motion.flight : 0;
     uint32_t death_ticks = death ?
         sc64_weapon_source_animation_visual_ticks(death) : 0u;
     uint64_t projectile_visual_end = (uint64_t)init_ticks +
@@ -558,8 +609,8 @@ sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
     }
     int px, py;
     uint32_t projectile_age = source_age > init_ticks ? source_age - init_ticks : 0;
-    if (!sc64_weapon_source_trace_position(p, launch_x, launch_y, x1, y1,
-                                           projectile_age, &px, &py)) return;
+    if (!sc64_weapon_source_trace_position_motion(p, launch_x, launch_y, x1, y1,
+                                                   projectile_age, &px, &py, &motion)) return;
     uint8_t active_id = active ? active->animation_id : 0u;
     int projectile_mirror = 0;
     uint16_t projectile_frame = sc64_weapon_source_vfx_source_frame(
@@ -587,7 +638,7 @@ sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
     }
     if (draw_image && draw_frame_id != UINT16_MAX) {
         const Sc64WeaponSourceFrame *draw_frame =
-            sc64_weapon_source_frame_lookup(draw_image_id, draw_frame_id);
+            sc64_weapon_source_vfx_frame_resolved(draw_image, draw_frame_id);
         if (draw_frame)
             sc64_weapon_source_vfx_draw_image_frame_resolved(
                 draw_image_id, draw_image, draw_frame, draw_mirror, px, py);
@@ -601,17 +652,25 @@ sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
             image->image_id, projectile_frame, px, py, key.direction,
             projectile_mirror, 0, 0, launch_x, launch_y, x1, y1, 0);
     if (flight_anim && source_age >= init_ticks && projectile_age < flight_ticks)
-        sc64_weapon_source_vfx_draw_overlays(flight_anim, projectile_age,
+        sc64_weapon_source_vfx_draw_overlays_motion(flight_anim, projectile_age,
             projectile_age, image->image_id, projectile_frame, px, py,
-            key.direction, projectile_mirror, 0, p, launch_x, launch_y, x1, y1, 0);
+            key.direction, projectile_mirror, 0, p, launch_x, launch_y, x1, y1, 0, &motion);
     if (death && source_age >= init_ticks + (moving ? flight_ticks : 0u)) {
         uint32_t death_age = source_age - init_ticks - (moving ? flight_ticks : 0u);
-        sc64_weapon_source_vfx_draw_overlays(death, death_age, death_age,
+        sc64_weapon_source_vfx_draw_overlays_motion(death, death_age, death_age,
             image->image_id, projectile_frame, px, py, key.direction,
             projectile_mirror, 0, p, launch_x, launch_y, x1, y1,
-            moving ? flight_ticks : 0u);
+            moving ? flight_ticks : 0u, &motion);
     }
 
+}
+
+static inline void
+sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,int x0,int y0,int x1,int y1,int live,uint32_t age)
+{
+    Sc64WeaponSourceVfxKey key;
+    if (!live || !sc64_weapon_source_vfx_unpack(packed,&key)) return;
+    sc64_weapon_source_vfx_draw_trace_resolved(key,sc64_weapon_source_trace_profile(packed),x0,y0,x1,y1,live,age);
 }
 
 static inline void

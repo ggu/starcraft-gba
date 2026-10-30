@@ -415,19 +415,139 @@ def verify_terminal(terminal: dict, state: dict) -> None:
                                f"{expected['units']}/{expected['buildings']}")
 
 
-def check_debugger_port_free() -> None:
+def check_debugger_port_free(port: int) -> None:
+    if not 1 <= port <= 65535:
+        raise ValueError("invalid GDB port")
     probe = socket.socket()
     try:
-        probe.bind(("127.0.0.1", 2345))
+        probe.bind(("127.0.0.1", port))
     except OSError as exc:
-        raise RuntimeError("mGBA debugger port 2345 is occupied; leave the active emulator untouched") from exc
+        raise RuntimeError(f"mGBA debugger port {port} is occupied; leave the active emulator untouched") from exc
     finally:
         probe.close()
 
 
+def coherent_clock(rsp) -> int:
+    """Match gba_clock's high-low-high read; never accept a torn rollover."""
+    for _ in range(8):
+        hi = int.from_bytes(rsp.read(0x0400010c, 2), "little")
+        lo = int.from_bytes(rsp.read(0x04000108, 2), "little")
+        if hi == int.from_bytes(rsp.read(0x0400010c, 2), "little"):
+            return (hi << 16) | lo
+    raise RuntimeError("hardware timer did not yield a coherent read")
+
+
+def sampled_delta(previous: int, current: int) -> int:
+    delta = (current - previous) & MAX_U32
+    if delta == 0:
+        raise RuntimeError("zero hardware timer delta; timing is invalid or ambiguous")
+    return delta
+
+
+def replay_tick(rsp, expected: int) -> None:
+    if hasattr(rsp, "clock"):
+        rsp.tick(expected=expected & ~1)
+    else:
+        rsp.tick()
+
+
+def run_bounded_sample(rsp, sym: dict, sizes: dict, bank: dict, plan: dict, pages: list, write_page,
+                       checkpoint_interval: int, sample_start: int, sample_updates: int,
+                       run_dir: Path, trace_hash: str, rom_hash: str, elf_hash: str,
+                       clock64: bool = False, full_match: bool = False,
+                       runner_sha256: str | None = None) -> dict:
+    """Observe every update in a nonterminal prefix; no host time is used as FPS."""
+    addr = sym["game_update"] & ~1
+    if rsp.cmd(f"Z1,{addr:x},2") != "OK":
+        raise RuntimeError("failed to install per-update observer")
+    replay_tick(rsp, sym["game_update"])  # before scheduler tick zero executes
+    if races.read_u32(rsp, sym["demo_schedule_tick"]) != 0:
+        raise RuntimeError("per-update observer missed scheduler tick zero")
+    read_clock = rsp.clock if clock64 else lambda: coherent_clock(rsp)
+    previous_clock = read_clock()
+    previous_screen = races.read_u32(rsp, sym["screen"])
+    previous_frame = races.read_u32(rsp, sym["frame"])
+    rows = []
+    verified_configuration = False
+    trace_inputs = {row["host_tick"]: row["frame"] for row in plan.get("trace_inputs", [])}
+    end_tick = sample_start + sample_updates
+    for tick in range(1, end_tick + 1):
+        final_observer = full_match and tick == end_tick
+        checkpoint = tick % checkpoint_interval == 0 or final_observer
+        replay_tick(rsp, sym[checkpoint_observer_symbol(sym)] if checkpoint else sym["game_update"])
+        observed = races.read_u32(rsp, sym["demo_schedule_tick"])
+        if observed != tick:
+            raise RuntimeError(f"per-update observer stopped at {observed}, expected {tick}")
+        if checkpoint:
+            page = pages[(tick - 1) // checkpoint_interval]
+            if (races.read_u32(rsp, sym["demo_schedule_index"]) != len(page["events"]) or
+                    races.read_u32(rsp, sym["demo_schedule_count"]) != len(page["events"])):
+                raise RuntimeError(f"scheduler page not consumed at tick {tick}")
+            if not final_observer:
+                write_page(pages[tick // checkpoint_interval]["events"])
+                replay_tick(rsp, sym["game_update"])
+                if races.read_u32(rsp, sym["demo_schedule_tick"]) != tick:
+                    raise RuntimeError("scheduler advanced unexpectedly after checkpoint")
+        now = read_clock()
+        screen = races.read_u32(rsp, sym["screen"])
+        frame = races.read_u32(rsp, sym["frame"])
+        if screen == SCREEN_PLAY and not verified_configuration:
+            verify_configuration(plan["start"], snapshot(rsp, sym, sizes, bank))
+            verified_configuration = True
+        delta = now - previous_clock if clock64 else sampled_delta(previous_clock, now)
+        if delta <= 0:
+            raise RuntimeError("invalid emulated cycle delta")
+        frame_delta = (frame - previous_frame) & MAX_U32
+        if tick in trace_inputs and frame != trace_inputs[tick]:
+            raise RuntimeError(f"ARM frame differs from trace at tick {tick}")
+        phase = ("menu" if tick <= plan["start"]["host_tick"] else
+                 "outside_play" if previous_screen != SCREEN_PLAY or screen != SCREEN_PLAY
+                 else "warmup" if tick <= sample_start else "sample")
+        if phase == "sample" and frame_delta == 0:
+            phase = "nonadvancing_play"
+        elif phase == "sample" and frame_delta != 1:
+            raise RuntimeError(f"sample tick {tick} advanced more than one PLAY frame")
+        rows.append({"tick": tick, "phase": phase, "frame": frame,
+                     "frame_delta": frame_delta, "elapsed_cycles": delta})
+        previous_clock, previous_screen, previous_frame = now, screen, frame
+    samples = [row for row in rows if row["phase"] == "sample"]
+    if not samples:
+        raise RuntimeError("requested sample window has no advancing PLAY frames")
+    terminal_state = None
+    if full_match:
+        terminal_state = snapshot(rsp, sym, sizes, bank)
+        verify_configuration(plan["start"], terminal_state)
+        verify_terminal(plan["terminal"], terminal_state)
+    result = {"status": plan["terminal"]["kind"] if full_match else "nonterminal-performance-sample", "trace_sha256": trace_hash,
+              "rom_sha256": rom_hash, "elf_sha256": elf_hash,
+              "headless_runner_sha256": runner_sha256,
+              "sample_start": sample_start, "sample_updates": sample_updates,
+              "observed_play_frame_count": len(samples), "valid_timing_frame_count": len(samples) if clock64 else 0,
+              "menu_update_count": sum(row["phase"] == "menu" for row in rows),
+              "menu_cycles": sum(row["elapsed_cycles"] for row in rows if row["phase"] == "menu"),
+              "nonadvancing_play_updates": sum(row["phase"] == "nonadvancing_play" for row in rows),
+              "nonadvancing_play_cycles": sum(row["elapsed_cycles"] for row in rows if row["phase"] == "nonadvancing_play"),
+              "outside_play_updates": sum(row["phase"] == "outside_play" for row in rows),
+              "sample_cycles": sum(row["elapsed_cycles"] for row in samples),
+              "mean_live_play_effective_fps": round(16777216 * len(samples) / sum(row["elapsed_cycles"] for row in samples), 2) if clock64 else None,
+              "timer_method": "mGBA 64-bit emulated cycle clock" if clock64 else "GBA timer modulo 2^32; FPS unavailable",
+              "timing_boundaries": ("Consecutive game_update entries, including main-loop work, audio, rendering and presentation waits; " +
+                                    ("final endpoint is the scheduler checkpoint." if full_match else "sample endpoint is a game_update entry.")),
+              "terminal_state": terminal_state,
+              "terminal_parity_scope": "Trace provides frame, result, configuration and active human/bot live unit/building counts; other per-entity fields are observations only." if full_match else None,
+              "observations": rows}
+    target = run_dir / ("full-replay.json" if full_match else "sample.json")
+    target.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    result["report"] = str(target)
+    return result
+
+
 def run(trace_path: Path, rom_path: Path, elf_path: Path, output: Path,
         *, expect_rom_sha256: str | None = None, expect_elf_sha256: str | None = None,
-        expect_trace_sha256: str | None = None) -> dict:
+        expect_trace_sha256: str | None = None, gdb_port: int | None = None,
+        gdb_launcher: Path | None = None, sample_start: int | None = None,
+        sample_updates: int = 0, headless_runner: Path | None = None,
+        full_per_update: bool = False) -> dict:
     trace_bytes = trace_path.read_bytes()
     trace_hash = hashlib.sha256(trace_bytes).hexdigest()
     rom_hash = hashlib.sha256(rom_path.read_bytes()).hexdigest()
@@ -445,6 +565,18 @@ def run(trace_path: Path, rom_path: Path, elf_path: Path, output: Path,
     checkpoint_interval = scheduler.checkpoint_ticks(sym)
     plan = validate_trace(trace, capacity, windowed=True,
                           checkpoint_interval=checkpoint_interval)
+    plan["trace_inputs"] = [row for row in trace["events"] if row["kind"] == "input"]
+    if full_per_update:
+        if headless_runner is None or sample_start is not None or sample_updates:
+            raise ValueError("full per-update replay requires headless runner and no sample window")
+        sample_start, sample_updates = 0, plan["stop_tick"]
+    if sample_start is not None:
+        if not full_per_update and (not plan["start"]["host_tick"] <= sample_start <= 10000 or not 1 <= sample_updates <= 10000):
+            raise ValueError("sample start must follow launch and sample updates must be in [1,10000]")
+        if not full_per_update and sample_start + sample_updates >= plan["stop_tick"]:
+            raise ValueError("sample must end strictly before the trace terminal")
+    elif sample_updates:
+        raise ValueError("--sample-updates requires --sample-start")
     bank = bank_layout(elf_path, sizes)
     required = ("game_update", "demo_schedule_events", "demo_schedule_count", "demo_schedule_length",
                 "demo_schedule_tick", "demo_schedule_active",
@@ -462,16 +594,27 @@ def run(trace_path: Path, rom_path: Path, elf_path: Path, output: Path,
     run_dir = output / f"skirmish-{time.time_ns()}"
     run_dir.mkdir(parents=True, exist_ok=False)
     progress_path = run_dir / "progress.json"
-    check_debugger_port_free()
+    if headless_runner is None:
+        if gdb_port is None:
+            raise ValueError("select --headless-runner or an explicit --gdb-port")
+        check_debugger_port_free(gdb_port)
     proc = sock = rsp = log = None
     try:
-        proc, sock, rsp, log = split.start_emulator(run_dir.name, rom_path, run_dir, sym)
+        if headless_runner is not None:
+            import sc64_headless_replay
+            proc, rsp, log = sc64_headless_replay.start(headless_runner, rom_path, run_dir, sym, sizes)
+        else:
+            proc, sock, rsp, log = split.menu.start_emulator(
+                run_dir.name, rom_path, run_dir, sym, gdb_port=gdb_port,
+                gdb_launcher=gdb_launcher, isolated_home=run_dir / "home")
         initial = {"screen": races.read_u32(rsp, sym["screen"]),
                    "frame": races.read_u32(rsp, sym["frame"]),
                    "page": races.read_u32(rsp, sym["race_front"] + split.FRONT_FIELDS["page"])}
         if initial != {"screen": SCREEN_TITLE, "frame": 0, "page": split.FRONT_HOME}:
             raise RuntimeError(f"fresh boot is not on normal HOME: {initial}")
-        home_capture = capture(rsp, run_dir / "home.png")
+        # The headless backend reads RAM only; a screenshot would require
+        # MMIO access to DISPCNT and is unnecessary for timing or parity.
+        home_capture = capture(rsp, run_dir / "home.png") if headless_runner is None else None
 
         pages = plan["pages"]
         def write_page(events: list[tuple[int, int]]) -> None:
@@ -489,15 +632,23 @@ def run(trace_path: Path, rom_path: Path, elf_path: Path, output: Path,
         if rsp.cmd(f"z1,{sym['game_update'] & ~1:x},2") != "OK" or rsp.cmd(
                 f"Z1,{sym[checkpoint_symbol] & ~1:x},2") != "OK":
             raise RuntimeError("failed to install the input-only scheduler observer")
-        rsp.tick()
+        replay_tick(rsp, sym[checkpoint_symbol])
         if races.read_u32(rsp, sym["demo_schedule_tick"]) != 0:
             raise RuntimeError("windowed scheduler advanced before HOME input tick zero")
         if races.read_u32(rsp, sym["screen"]) != SCREEN_TITLE:
             raise RuntimeError("neutral pre-input scheduler update left HOME")
 
+        if sample_start is not None:
+            return run_bounded_sample(rsp, sym, sizes, bank, plan, pages, write_page, checkpoint_interval,
+                                      sample_start, sample_updates, run_dir, trace_hash,
+                                      rom_hash, elf_hash, clock64=headless_runner is not None,
+                                      full_match=full_per_update,
+                                      runner_sha256=hashlib.sha256(headless_runner.read_bytes()).hexdigest() if headless_runner else None)
+
         observations = []
         previous = snapshot(rsp, sym, sizes, bank)
-        previous_clock = timer_profile.hardware_clock(rsp)
+        read_clock = rsp.clock if headless_runner is not None else lambda: coherent_clock(rsp)
+        previous_clock = read_clock()
         counted_frames = counted_cycles = 0
         # Tick zero is HOME and is deliberately excluded from the live FPS mean.
         observations.append({"tick": 0, "screen": previous["screen"], "frame": previous["frame"],
@@ -508,8 +659,7 @@ def run(trace_path: Path, rom_path: Path, elf_path: Path, output: Path,
                         "frame": state["frame"], "screen": state["screen"],
                         "checkpoint_interval": checkpoint_interval,
                         "input_transitions": plan["input_count"],
-                        "mean_live_play_effective_fps": round(
-                            16_777_216 * counted_frames / max(1, counted_cycles), 2)}
+                        "mean_live_play_effective_fps": round(16777216 * counted_frames / counted_cycles, 2) if headless_runner is not None and counted_cycles else None}
             temporary = progress_path.with_suffix(".json.tmp")
             temporary.write_text(json.dumps(progress, indent=2) + "\n", encoding="utf-8")
             temporary.replace(progress_path)
@@ -517,7 +667,7 @@ def run(trace_path: Path, rom_path: Path, elf_path: Path, output: Path,
         persist_progress(0, previous)
         completed = 0
         while completed < plan["stop_tick"]:
-            rsp.tick()
+            replay_tick(rsp, sym[checkpoint_symbol])
             expected_tick = min(plan["stop_tick"], completed + checkpoint_interval)
             observed_tick = races.read_u32(rsp, sym["demo_schedule_tick"])
             if observed_tick != expected_tick:
@@ -531,12 +681,14 @@ def run(trace_path: Path, rom_path: Path, elf_path: Path, output: Path,
             current = snapshot(rsp, sym, sizes, bank)
             if expected_tick >= checkpoint_interval:
                 verify_configuration(plan["start"], current)
-            now = timer_profile.hardware_clock(rsp)
-            elapsed = (now - previous_clock) & MAX_U32
+            now = read_clock()
+            elapsed = now - previous_clock if headless_runner is not None else sampled_delta(previous_clock, now)
+            if elapsed <= 0:
+                raise RuntimeError("invalid emulated cycle delta")
             frame_delta = (current["frame"] - previous["frame"]) & MAX_U32
             live = previous["screen"] == SCREEN_PLAY and current["screen"] == SCREEN_PLAY
             counted = live and frame_delta > 0
-            interval_fps = round(16_777_216 * frame_delta / max(1, elapsed), 2) if counted else None
+            interval_fps = round(16777216 * frame_delta / elapsed, 2) if counted and headless_runner is not None else None
             if counted:
                 counted_frames += frame_delta
                 counted_cycles += elapsed
@@ -575,8 +727,8 @@ def run(trace_path: Path, rom_path: Path, elf_path: Path, output: Path,
                                                     for bot in plan["terminal"]["bots"]]},
                   "counted_live_play_frames": counted_frames,
                   "counted_live_play_hardware_cycles": counted_cycles,
-                  "mean_live_play_effective_fps": round(16_777_216 * counted_frames /
-                                                          max(1, counted_cycles), 2),
+                  "mean_live_play_effective_fps": round(16777216 * counted_frames / counted_cycles, 2) if headless_runner is not None and counted_cycles else None,
+                  "timer_method": "mGBA 64-bit emulated cycle clock" if headless_runner is not None else "GBA timer modulo 2^32; FPS unavailable",
                   "fps_exclusions": "HOME/start interval and final RESULT interval excluded; only intervals "
                                     "whose endpoints are both PLAY contribute.",
                   "home_capture": home_capture, "checkpoints": observations}
@@ -589,7 +741,17 @@ def run(trace_path: Path, rom_path: Path, elf_path: Path, output: Path,
                           "report": str(report_path)}, indent=2))
         return result
     finally:
-        if proc is not None:
+        if proc is not None and headless_runner is not None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except __import__("subprocess").TimeoutExpired:
+                proc.kill()
+                proc.wait()
+            if proc.stdin: proc.stdin.close()
+            if proc.stdout: proc.stdout.close()
+            if log: log.close()
+        elif proc is not None:
             try:
                 split.menu.stop_emulator(proc, sock, log)
             except Exception:
@@ -606,12 +768,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expect-rom-sha256")
     parser.add_argument("--expect-elf-sha256")
     parser.add_argument("--expect-trace-sha256")
+    parser.add_argument("--gdb-port", type=int)
+    parser.add_argument("--gdb-launcher", type=Path,
+                        help=argparse.SUPPRESS)
+    parser.add_argument("--headless-runner", type=Path, help="port-free mGBA backend executable")
+    parser.add_argument("--sample-start", type=int, help="first scheduler tick to measure after warmup")
+    parser.add_argument("--sample-updates", type=int, default=0)
+    parser.add_argument("--full-per-update", action="store_true")
     args = parser.parse_args(argv)
     try:
         run(args.trace, args.rom, args.elf, args.output,
             expect_rom_sha256=args.expect_rom_sha256,
             expect_elf_sha256=args.expect_elf_sha256,
-            expect_trace_sha256=args.expect_trace_sha256)
+            expect_trace_sha256=args.expect_trace_sha256, gdb_port=args.gdb_port,
+            gdb_launcher=args.gdb_launcher, sample_start=args.sample_start,
+            sample_updates=args.sample_updates, headless_runner=args.headless_runner,
+            full_per_update=args.full_per_update)
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
         print(f"skirmish controller replay failed: {exc}", file=sys.stderr)
         return 1
