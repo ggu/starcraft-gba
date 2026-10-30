@@ -9,6 +9,9 @@
 typedef struct { unsigned tick; unsigned short held; } Z1Event;
 typedef struct { unsigned tick; int minerals,gas,drones,hydras,zerglings,overlords,
     extractor,pool,den,enemy_buildings,enemy_units,won,lost,phase; } Z1Checkpoint;
+/* An open menu or pause holds the world clock; bound host ticks so a
+   stuck controller fails instead of hanging (a win takes about 60k). */
+#define Z1_TICK_LIMIT 240000u
 static Z1Event events[2048];
 static Z1Checkpoint checkpoints[256];
 static unsigned input_tick;
@@ -22,8 +25,10 @@ static int count_units(int owner,int type)
 { int n=0; for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==owner&&u[i].type==type)++n;return n; }
 static int count_buildings(int owner,int type)
 { int n=0; for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==owner&&b[i].type==type)++n;return n; }
+static int fail(const char *why);
 static void controller_frame(unsigned short held)
 {
+    if(input_tick>=Z1_TICK_LIMIT){fail("host-tick limit reached; world clock stopped");exit(1);}
     unsigned short pressed=held&(unsigned short)~previous_held;
     if(held!=previous_held) {
         if(event_count<(int)(sizeof(events)/sizeof(events[0])))
@@ -65,8 +70,11 @@ static int has_pool(void){for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].ow
 static int has_den(void){for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_HYDRALISK_DEN&&!b[i].under_construction)return 1;return 0;}
 static int build_menu(int option,int x,int y)
 {
+    /* B reopens on the last chosen row, so walk to the wanted row. */
+    int guard=0;
     press(KEY_B);
-    for(int i=0;i<option;i++)press(KEY_DOWN);
+    while(menu_cursor!=option&&guard++<MENU_COUNT)press(menu_cursor<option?KEY_DOWN:KEY_UP);
+    if(!menu_open||menu_cursor!=option)return 0;
     press(KEY_A);
     return mode==MODE_BUILD&&cursor_near(x,y)&&(press(KEY_A),1);
 }
@@ -114,10 +122,36 @@ static int select_hatchery(void)
 static int select_next_train(void){press(KEY_R);return 1;}
 static void select_train_type(int type)
 { int guard=0;while(train_type!=type&&guard++<5)select_next_train(); }
+enum { Z1_SITE_FOUNDED, Z1_SITE_NOT_ACCEPTED, Z1_SITE_CANCELLED, Z1_SITE_TIMED_OUT };
+static const char *const z1_site_result[]={"founded","not accepted","cancelled","timed out"};
+static int pending_before[MAX_UNITS];
+static int pending_site(int i)
+{ return u[i].alive&&u[i].owner==SIDE&&SC64_PENDING_BUILD_ORDER(u[i].order)?u[i].target:-1; }
+static void note_pending_sites(void){for(int i=0;i<MAX_UNITS;i++)pending_before[i]=pending_site(i);}
+/* The Drone pays on arrival, so spending first (a queued Drone) cancels the
+   site. Only a new owned foundation of this type at the accepted site counts
+   as success; call note_pending_sites() before placing. */
+static int await_foundation(int type,int ticks)
+{
+    int w=-1,sx,sy;
+    for(int i=0;i<MAX_UNITS&&w<0;i++)if(pending_site(i)==type&&pending_before[i]!=type)w=i;
+    if(w<0)return Z1_SITE_NOT_ACCEPTED;
+    sx=u[w].tx;sy=u[w].ty;
+    for(int t=0;;t++) {
+        for(int j=0;j<MAX_BUILDINGS;j++)if(b[j].alive&&b[j].owner==SIDE&&b[j].type==type&&
+            b[j].x==sx&&b[j].y==sy)return Z1_SITE_FOUNDED;
+        if(pending_site(w)!=type||u[w].tx!=sx||u[w].ty!=sy)return Z1_SITE_CANCELLED;
+        if(t>=ticks||screen!=SCREEN_PLAY)return Z1_SITE_TIMED_OUT;
+        controller_frame(0);
+    }
+}
 static int start_build_action(int option,int x,int y,int far)
 {
     if(!select_worker(far)){fprintf(stderr,"no selected worker (far=%d, cursor=%d,%d)\n",far,cx,cy);return 0;}
+    note_pending_sites();
     if(!build_menu(option,x,y)){fprintf(stderr,"build menu failed opt=%d mode=%d menu=%d cursor=%d,%d worker=%d mineral=%d gas=%d\n",option,mode,menu,cx,cy,find_selected_worker(),minerals,gas);return 0;}
+    int site=await_foundation(menu,1200);
+    if(site!=Z1_SITE_FOUNDED){fprintf(stderr,"building %d site %s (tick=%u minerals=%d gas=%d)\n",menu,z1_site_result[site],input_tick,minerals,gas);return 0;}
     return 1;
 }
 static int nearest_geyser(int x,int y,int *gx,int *gy);
@@ -390,11 +424,8 @@ static void write_trace(void)
 }
 static int fail(const char *why){fprintf(stderr,"Z1 controller replay: %s (tick=%u, M=%d G=%d, D=%d H=%d, buildings=%d, won=%d lost=%d phase=%d)\n",why,input_tick,minerals,gas,count_units(SIDE,U_DRONE),count_units(SIDE,U_HYDRALISK),enemy_count(),won,lost,race_campaign.phase);write_trace();return 1;}
 
-int main(int argc,char **argv)
+static int start_z1(void)
 {
-    int x,y,hatch=-1,extractor=-1,site_x,site_y;
-    if(argc==3&&strcmp(argv[1],"--trace")==0)trace_path=argv[2];
-    else if(argc!=1)return 64;
     game_init();
     /* HOME → CAMPAIGN → Zerg → Z1 → briefing → play. */
     press(KEY_A);
@@ -403,9 +434,51 @@ int main(int argc,char **argv)
     press(KEY_START);
     if(screen!=SCREEN_PLAY||race_campaign.mission!=SC64_RACE_MISSION_Z1||race_human!=R_ZERG)
         return fail("title did not start default Z1");
-    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_HATCHERY)hatch=i;
-    if(hatch<0)return fail("Z1 player has no Hatchery");
-    home_hatch=hatch;
+    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==B_HATCHERY)home_hatch=i;
+    if(home_hatch<0)return fail("Z1 player has no Hatchery");
+    return 0;
+}
+/* --check-site cancel|timeout: the Pool wait must not report success when
+   the site is cancelled (a Drone bought first) or still pending at its
+   limit. Both cases use the same ordinary inputs as the controller. */
+static int check_site(const char *kind)
+{
+    int site_x,site_y,result;
+    if(start_z1())return 1;
+    for(int wait=0;wait<8000&&screen==SCREEN_PLAY&&minerals<200;wait++)controller_frame(0);
+    if(!select_hatchery()||!find_site(B_SPAWNING_POOL,b[home_hatch].x,b[home_hatch].y,&site_x,&site_y)||
+       !select_worker(0))return fail("site check setup");
+    note_pending_sites();
+    if(!build_menu(MENU_BARRACKS,site_x,site_y))return fail("site check placed Spawning Pool");
+    if(!strcmp(kind,"cancel")) {
+        if(!select_hatchery())return fail("site check selected Hatchery");
+        select_train_type(U_DRONE);
+        for(int i=0;i<5&&minerals>=200;i++)press(KEY_A);
+        if(minerals>=200)return fail("site check could not spend below the Pool cost");
+        result=await_foundation(B_SPAWNING_POOL,1200);
+        if(result!=Z1_SITE_CANCELLED||count_buildings(SIDE,B_SPAWNING_POOL))
+            return fprintf(stderr,"Z1 site check cancel: got %s\n",z1_site_result[result]),1;
+    } else if(!strcmp(kind,"timeout")) {
+        result=await_foundation(B_SPAWNING_POOL,1);
+        if(result!=Z1_SITE_TIMED_OUT||count_buildings(SIDE,B_SPAWNING_POOL))
+            return fprintf(stderr,"Z1 site check timeout: got %s\n",z1_site_result[result]),1;
+        /* The same site still founds once the Drone arrives. */
+        result=await_foundation(B_SPAWNING_POOL,1200);
+        if(result!=Z1_SITE_FOUNDED)
+            return fprintf(stderr,"Z1 site check timeout follow-up: got %s\n",z1_site_result[result]),1;
+    } else return 64;
+    printf("Z1 site check %s: ok at tick %u\n",kind,input_tick);
+    return 0;
+}
+
+int main(int argc,char **argv)
+{
+    int x,y,hatch,extractor=-1,site_x,site_y;
+    if(argc==3&&strcmp(argv[1],"--trace")==0)trace_path=argv[2];
+    else if(argc==3&&strcmp(argv[1],"--check-site")==0)return check_site(argv[2]);
+    else if(argc!=1)return 64;
+    if(start_z1())return 1;
+    hatch=home_hatch;
     /* Grow the mining line first; keep the initial Zerglings near their
        original staging area while the economy/tech comes online. */
     if(!select_hatchery())return fail("select Hatchery");
