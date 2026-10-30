@@ -335,12 +335,16 @@ static int race_site_powered(int owner, int x, int y)
 }
 
 #ifdef SC64_P7_BATTERY_ENABLED
+/* Native psi geometry from the owner's own complete Pylons. In custom games
+ * every owner may build; mission bindings keep their human-slot rule. */
 static int race_p7_battery_site_powered(int owner,int x,int y)
 {
-    if (!race_protoss_services_active() || owner!=SIDE) return 0;
+    int generic=race_protoss_service_binding()==SC64_PROTOSS_BIND_GENERIC;
+    if (!race_protoss_services_active() || (!generic && owner!=SIDE)) return 0;
     for (int i=0;i<MAX_BUILDINGS;++i)
         if (building_complete(i) && b[i].type==B_PYLON &&
-            b[i].raw_type==156 && b[i].owner==owner && b[i].raw_owner==7 &&
+            RACE_PROTOSS_RAW(&b[i])==156 && b[i].owner==owner &&
+            (generic || RACE_PROTOSS_SLOT(&b[i])==SC64_PROTOSS_HUMAN_SLOT) &&
             sc64_p7_in_psi_range(x-b[i].x,y-b[i].y)) return 1;
     return 0;
 }
@@ -757,7 +761,10 @@ static void race_tick_state(void)
             unsigned short value = (unsigned short)u[i].shield;
             unsigned short rem = (unsigned short)u[i].shield_remainder;
 #ifdef SC64_P7_BATTERY_ENABLED
-            if (race_protoss_services_active()) {
+            /* Passive regeneration on the native shield clock is part of
+             * the missions that adopted it, not of the Battery service. */
+            if (race_protoss_service_binding()==SC64_PROTOSS_BIND_P7 ||
+                race_protoss_service_binding()==SC64_PROTOSS_BIND_LATER) {
                 unsigned shield_value=value, shield_rem=rem;
                 sc64_p7_battery_passive_shield_tick(&shield_value,r->shields,
                                                      &shield_rem);

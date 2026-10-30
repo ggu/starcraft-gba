@@ -1430,8 +1430,8 @@ static int race_p8_outcome(void);
 static void race_p8_note_unit_spawn(int slot, int owner, int type);
 static void race_p8_note_building_spawn(int slot, int owner, int type);
 static void race_p8_note_product_building(int building);
-/* P8 runs the shared Protoss unit services (see sc64_p7_runtime_adapter.h). */
-#define SC64_PROTOSS_SHARED_SERVICES
+/* P8 binds the shared Protoss unit services (sc64_protoss_services.h). */
+#define SC64_PROTOSS_LATER_BINDINGS
 #endif
 enum { SC64_HIT_PRECOMPUTED_HP=1, SC64_HIT_ALLOW_SPLASH_BURROW=2,
        SC64_HIT_SKIP_HALLUCINATION_SCALE=4 };
@@ -1441,39 +1441,9 @@ static void race_siege_splash_attack(Unit *,int,int);
 #endif
 #if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
 static int race_p7_active(void);
-/* The Protoss unit services (Carrier hangar and Interceptor flight, Arbiter
- * cloak, Observer and Cannon detection, Shield Battery, Interceptor
- * projectiles) are unit behavior, not P7 mission state. Later Protoss
- * missions that carry their own source-owner map and service clock run them
- * too. Without those missions these expand to the original P7 tokens. */
-#ifdef SC64_PROTOSS_SHARED_SERVICES
-static int race_protoss_later_services_active(void);
-static int race_protoss_later_source_owner(unsigned slot);
-static u8 *race_protoss_later_service_clock(void);
-static int race_protoss_later_service_mission(int mission);
-static int race_protoss_later_mission_source_owner(int mission, unsigned slot);
-static int race_protoss_later_battery_initialize(const Sc64RaceMap *map);
-static int race_protoss_later_battery_world_valid(void);
-static int race_protoss_later_battery_candidate_valid(int mission, const Building *q);
-#define race_protoss_services_active() \
-    (race_p7_active() || race_protoss_later_services_active())
-#define race_protoss_source_owner(slot) \
-    (race_protoss_later_services_active() ? \
-     race_protoss_later_source_owner(slot) : race_p7_source_owner(slot))
-#define RACE_PROTOSS_SERVICE_CLOCK \
-    (race_protoss_later_services_active() ? \
-     race_protoss_later_service_clock() : race_p7.reserved)
-#define RACE_PROTOSS_SERVICE_MISSION(mission) \
-    ((mission)==SC64_P7_GLOBAL_ID || race_protoss_later_service_mission(mission))
-#define RACE_PROTOSS_MISSION_SOURCE_OWNER(mission, slot) \
-    ((mission)==SC64_P7_GLOBAL_ID ? race_p7_source_owner(slot) : \
-     race_protoss_later_mission_source_owner((mission), (slot)))
-#else
-#define race_protoss_services_active() race_p7_active()
-#define race_protoss_source_owner(slot) race_p7_source_owner(slot)
-#define RACE_PROTOSS_SERVICE_CLOCK race_p7.reserved
-#define RACE_PROTOSS_SERVICE_MISSION(mission) (mission)==SC64_P7_GLOBAL_ID
-#define RACE_PROTOSS_MISSION_SOURCE_OWNER(mission, slot) race_p7_source_owner(slot)
+#include "sc64_protoss_services.h"
+#ifdef SC64_P7_CARRIER_TRAINING_ENABLED
+static int race_p7_carrier_training_stock(int carrier, unsigned count);
 #endif
 #endif
 #ifdef SC64_NYDUS_ENABLED

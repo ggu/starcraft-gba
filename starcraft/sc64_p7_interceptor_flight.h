@@ -353,7 +353,7 @@ static void race_p7_interceptor_flight_source_tick(void)
     for (int i = 0; i < MAX_UNITS; ++i) {
         unsigned state;
         if (!u[i].alive || u[i].type != U_P7_INTERCEPTOR ||
-            u[i].raw_type != SC64_P7_INTERCEPTOR_RAW) continue;
+            RACE_PROTOSS_RAW(&u[i]) != SC64_P7_INTERCEPTOR_RAW) continue;
         state = sc64_p7_carrier_child_state(&u[i]);
         if (state == SC64_P7_INTERCEPTOR_OUTSIDE ||
             state == SC64_P7_INTERCEPTOR_DETACHED)
