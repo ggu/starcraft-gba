@@ -89,6 +89,8 @@ sc64_p8_arm_replay.o: tests/sc64_p8_arm_replay.c \
  tests/../starcraft/sc64_p7.h \
  .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h \
  tests/../starcraft/sc64_p8_state.h tests/../starcraft/sc64_p8_runtime.h \
+ tests/../starcraft/sc64_impact_save_types.h \
+ tests/../starcraft/sc64_impact_events.h \
  tests/../starcraft/sc64_collision.h \
  tests/../starcraft/sc64_collision_legacy.h \
  tests/../starcraft/sc64_contact.h tests/../starcraft/sc64_targets.h \
@@ -183,6 +185,7 @@ sc64_p8_arm_replay.o: tests/sc64_p8_arm_replay.c \
  tests/../starcraft/sc64_p6_save.h \
  tests/../starcraft/sc64_p5_transport_save.h \
  tests/../starcraft/sc64_p7_projectile_save_adapter.h \
+ tests/../starcraft/sc64_impact_adapter.h \
  build/p8-arm/sc64_p8_tape_generated.h
 sc64_interceptor_motion.o: starcraft/sc64_interceptor_motion.c \
  /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \

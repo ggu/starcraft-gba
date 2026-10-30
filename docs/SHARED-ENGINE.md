@@ -105,7 +105,7 @@ Battery service.
 The canonical Protoss, P8 and P9 candidates and Showcase compile the full set;
 the Showcase now includes Carrier training and flight, and its scene-0
 Carriers start with four Interceptors aboard. That leaves the Showcase 8 bytes
-of IWRAM and 184 bytes of EWRAM under the guards, the tightest margins of any
+of IWRAM and 256 bytes of EWRAM under the guards, the tightest margins of any
 product. The Terran and Zerg products do not carry these Protoss actor
 identities. Canonical Protoss's image changes for the generic binding (8
 bytes of EWRAM, no IWRAM, same save size); its campaign controller traces
