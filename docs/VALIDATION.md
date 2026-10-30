@@ -7643,3 +7643,88 @@ controller-trace test outputs changed during the Terran gate; the other 190
 copied inputs were unchanged, with no asset-generation recipes. Source only;
 no Actions were dispatched. Battlecruiser/Yamato remains separate experimental
 work, and full roster/campaign and near-30-fps goals remain unfinished.
+
+### Default visibility span counts (2026-10-30)
+
+This independently extracted optimization updates cell visibility/minimap
+occupancy only at zero-source transitions and the ninth count bit only at
+255/256. A bounded ROM row helper avoids repeated per-cell call setup.
+Sight ranges, geometry, explored state, source slots, persistent storage
+and RAM reserves remain unchanged. Independent full-grid/count/minimap
+oracles cover ownership batches, 255/256 transitions, 511-source sequences,
+out-of-map centers and empty spans.
+
+Exact visibility commit `673d890` on default `71a134df` passes source/doctor,
+default build/test, unified build/test and the full Terran host aggregate.
+Current-default integration `e6f821d` on `fdb63f3` passes source/doctor/default
+build, focused sanitizer oracles and four actual Make ARM captures plus normal
+links. Each profile's source and input closure is verified. Spare EWRAM/IWRAM
+bytes are Terran 28,536/328, Zerg 28,444/64, Protoss 23,900/952 and Showcase
+272/56. The later base change contains only PR176's generated-map mineral-style
+initialization and its fixture assertions. The full gates/timing were not
+rerun on that integrated head; the visibility code is identical, the base
+change was independently qualified and its new combined ARM links were checked.
+
+The fresh port-free T5 comparison at `673d890` has 22 nonempty timing windows
+and 10,991 gameplay ticks. Selected-state/fog checkpoint hashes and seven
+palette-resolved framebuffer CRCs agree. Peak sight cost at tick 9,000 falls
+from 3,062,662 to 2,122,499 guest cycles (30.70 percent). Summed sight cost is
+346,957,909 to 342,107,187 (1.398 percent less); full-frame cost is
+7,645,233,405 to 7,638,767,300 (0.0846 percent less). This one shortened
+emulator trace does not establish general FPS, all-frame/state equality,
+physical hardware behavior or full campaign completion.
+
+Private records are in `visibility-public-v1` and `visibility-fdb-v1`. Four
+private controller traces were rewritten by the host gate; other prepared
+inputs were preserved. Some completed auxiliary unified/Terran test-build
+images were removed during disk cleanup without a prior per-file inventory;
+the four captured canonical ARM products, raw dependencies, probe products,
+source/input snapshots and test logs remain. No Actions were dispatched and
+no proprietary inputs are committed. The later documentation-only commit
+does not change the qualified executable/test files.
+
+
+### Shared integrated cartridge stage (2026-10-30)
+
+Runtime `b3d631c` combines the shared tech-tree/unit services with merged
+stock source sight, delayed projectile impacts, terrain DMA, source-birth
+overlay offsets, visibility spans and real generated-map mineral styles.
+The subsequent default-qualification merge changes documentation only.
+The default branch separately received the terrain transfer, canonical resume
+recipe repair, generated mineral sprites and visibility spans in PRs 174,
+177, 176 and 178. The larger service integration remains a draft.
+
+The integrated predecessor `7871191` passes default build/test, unified
+build/test, full Terran host aggregate, four normal ARM guards, six impact
+game vectors, four skirmish runtime vectors and twelve terrain/clock scenes.
+A fresh 54-match ordinary-input host matrix reaches terminal results across
+three products/both maps/all human races/one to three opponents (10 wins,
+44 losses). The canonical resume recipe exposed an early Make expansion
+defect for P7; the fixed recipes compile all three actual product vectors and
+pass 72 menu-driven save/continuation cases. Those match/save runs precede
+the later visibility and mineral changes and are not claimed as repeated
+on the final cartridge. The visibility candidate separately passes its full
+seven gates, four ARM guards and oracles, as recorded above.
+
+All four final `b3d631c` ordinary Make products pass source/command/dependency
+closure, reserve guards, 32 MiB header/payload/padding checks and package
+readback. Current weapon bank `99efc112` and P7 facts `ed228949` are used;
+the final mineral rendering fixtures pass on those actual inputs across
+all four products. These checks deliberately do not substitute older
+public-main bank qualification for the integration's inputs. EWRAM/IWRAM
+spare bytes are Terran 28,536/328, Zerg 28,444/48, Protoss 23,900/952 and
+Showcase 272/56. The Mac-only release is
+`20261030-sight-minerals-candidate`, with verified ZIP/member hashes and a
+scoped manifest. Existing KODAK delivery remains the earlier `66afaff`;
+these later ROMs were not copied after the card's safe eject.
+
+Evidence is private in `terrain-clock-main-*`, `shared-current-final-gates-v1`,
+`shared-current-skirmish-v1`, `sight-span-package-v2` and
+`sight-minerals-package-v1`. The shared source tracker and profile counts
+remain partial: Terran has ten campaign menu entries, Zerg six and Protoss
+seven. All thirty staged missions, full roster services and near-30-fps
+performance are unfinished. Pending-impact save capacity is eleven rows in
+P7 and ten in Zerg, with safe refusal if exceeded. Battlecruiser/Yamato
+remains private/default-off pending production integration and broader
+qualification. No Actions were dispatched and no proprietary assets are
+committed.
