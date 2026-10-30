@@ -92,6 +92,25 @@ static void hit_target(int target, int damage, int source_type, int owner)
 
 #include "../starcraft/sc64_t5_mine_adapter.h"
 
+static void test_cross_race_stock_rectangles(void)
+{
+    Unit q = {0}; Sc64T4QueryRect r;
+    q.x = 80; q.y = 70;
+    for (int raw = 0; raw < 228; ++raw) {
+        q.raw_type = raw; q.type = raw;
+        if (sc64_t4_query_actor_rect((unsigned)raw, q.x * 2, q.y * 2, &r)) continue;
+        assert(sc64_t5_mine_rect_for_unit(&q, &r));
+        assert(r.left == 160 - siege_bounds[raw][2]);
+        assert(r.top == 140 - siege_bounds[raw][3]);
+        assert(r.right == 161 + siege_bounds[raw][4]);
+        assert(r.bottom == 141 + siege_bounds[raw][5]);
+    }
+    q.raw_type = q.type = 65; /* Zealot */
+    assert(sc64_t5_mine_rect_for_unit(&q, &r));
+    assert(sc64_t5_mine_point_rect_distance_sq(r.right-1, r.bottom-1, &r) == 0);
+    assert(sc64_t5_mine_point_rect_distance_sq(r.right, r.bottom, &r) == 2);
+}
+
 static void reset_fixture(void)
 {
     memset(u, 0, sizeof(u)); memset(invincible_units, 0, sizeof(invincible_units));
@@ -117,6 +136,19 @@ static Unit *make_actor(int slot, int type, int raw, int owner, int x, int y)
     q->x=x; q->y=y; q->hp=q->maxhp=100; q->owner=owner; q->type=type;
     q->raw_type=raw; q->raw_owner=owner; q->alive=1;
     return q;
+}
+
+static void test_cross_race_contact_and_splash(void)
+{
+    reset_fixture();
+    Unit *mine = make_mine(0, 100, 100);
+    Unit *zealot = make_actor(1, 65, 65, SIDE, 100, 100);
+    mine->carry = SC64_T5_MINE_CHASING; mine->target = 1;
+    assert(sc64_t5_mine_unit_targetable(mine, zealot));
+    assert(sc64_t5_mine_in_contact(mine, zealot));
+    race_t5_mines_tick();
+    assert(!mine->alive && hit_count == 1 && hit_target_log[0] == 1);
+    assert(hit_damage_log[0] == 125);
 }
 
 static void test_arm_timer_and_target_filters(void)
@@ -218,6 +250,8 @@ static void test_invalidated_target_rearms_and_slot_owner_gate(void)
 
 int main(void)
 {
+    test_cross_race_stock_rectangles();
+    test_cross_race_contact_and_splash();
     assert(sc64_t5_mine_source_hover_raw(2));
     assert(sc64_t5_mine_source_hover_raw(19));
     assert(!sc64_t5_mine_source_hover_raw(0));

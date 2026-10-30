@@ -3,6 +3,8 @@
 
 #ifdef SC64_T5_RUNTIME
 
+#include "sc64_siege_source_bounds.h"
+
 /* The GBA executes at 30 ticks/s while StarCraft's reference game advances
  * at 24 frames/s. The source mine's 60-frame arm delay is represented as 75
  * GBA ticks. Burrow/unburrow/explosion IScript signals are collapsed into
@@ -56,6 +58,17 @@ sc64_t5_mine_rect_for_unit(const Unit *unit, Sc64T4QueryRect *rect)
     raw = unit->raw_type >= 0 ? unit->raw_type : sc64_race_raw_unit(unit->type);
     if (sc64_t4_query_actor_rect((unsigned)raw, unit->x * 2,
                                  unit->y * 2, rect)) return 1;
+    /* The T4 query covers its mission roster; ordinary cross-race skirmishes
+     * also need stock source-unit dimensions. These edges are inclusive, so
+     * convert the right and bottom to the query's half-open convention. */
+    if (raw >= 0 && raw < 228) {
+        const short *bounds = siege_bounds[raw];
+        rect->left = unit->x * 2 - bounds[2];
+        rect->top = unit->y * 2 - bounds[3];
+        rect->right = unit->x * 2 + bounds[4] + 1;
+        rect->bottom = unit->y * 2 + bounds[5] + 1;
+        return 1;
+    }
     if (!sc64_t5_actor_bounds_source(unit->type, &left, &up, &right, &down))
         return 0;
     rect->left = unit->x * 2 - left;
