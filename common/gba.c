@@ -1207,6 +1207,17 @@ int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned ta
     for(u32 i=0;i<best.length;i++)((u8*)scratch)[i]=p[16+i];
     *selection=best;return 1;
 }
+int save_select_transaction(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
+                            GbaSaveValidator prepare,GbaSaveCommit commit,void *context,
+                            GbaSaveSelection *selection) {
+    GbaSaveSelection chosen;
+    if(!commit || !selection ||
+       !save_select_validated(scratch,capacity,tags,tag_count,prepare,context,&chosen))return 0;
+    if(!prepare(scratch,chosen.length,chosen.tag,context))return 0;
+    commit(context);
+    *selection=chosen;
+    return 1;
+}
 int save_write_selected(const void *data,u32 len,u32 tag,const GbaSaveSelection *previous,
                         const u32 *tags,unsigned tag_count) {
     volatile u8 *base=(volatile u8*)SRAM_BASE;

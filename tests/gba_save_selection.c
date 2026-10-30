@@ -18,7 +18,34 @@ static void reset(void){memset(host_save,0,sizeof(host_save));memset(scratch,0,s
 static GbaSaveSelection select_record(void){GbaSaveSelection s={0};assert(save_select_validated(scratch,sizeof(scratch),tags,3,validate,0,&s));return s;}
 static void selection_unchanged_failure(const u32 *ts,unsigned n,u32 cap){GbaSaveSelection s={11,22,33,44,55},expected=s;assert(!save_select_validated(scratch,cap,ts,n,validate,0,&s));assert(!memcmp(&s,&expected,sizeof(s)));}
 static void assert_unchanged_write(const GbaSaveSelection *s){const u8 payload[]={0x30,0xa5,4,5};memcpy(before,host_save,sizeof(before));assert(!save_write_selected(payload,sizeof(payload),tags[2],s,tags,3));assert(!memcmp(before,host_save,sizeof(before)));}
+typedef struct { int plan,live,calls,fail_rebuild; } Transaction;
+static int prepare_transaction(const void *data,u32 len,u32 tag,void *context){
+ Transaction *t=context;const u8 *p=data;int valid=validate(data,len,tag,0);
+ t->calls++;t->plan=valid ? p[0] : -1;
+ /* Model a decoder using the raw record's storage as temporary workspace. */
+ memset((void *)data,0,len);
+ return valid && !(t->fail_rebuild && t->calls==3);
+}
+static void commit_transaction(void *context){Transaction *t=context;t->live=t->plan;}
 int main(void){gba_init();
+ /* The last candidate inspected is older and destroys its raw scratch. The
+  * winner must be reloaded and prepared again, not committed from that plan. */
+ reset();record(0,tags[2],11,0xa5);record(1,tags[0],10,0xa5);
+ Transaction tx={0,99,0,0};GbaSaveSelection selected={0};
+ assert(save_select_transaction(scratch,sizeof(scratch),tags,3,prepare_transaction,commit_transaction,&tx,&selected));
+ assert(selected.slot==0 && tx.calls==3 && tx.live==0x30);
+ /* A valid checksum does not let an invalid newer candidate shadow an older one. */
+ reset();record(0,tags[0],10,0xa5);record(1,tags[2],11,0);
+ tx=(Transaction){0,99,0,0};
+ assert(save_select_transaction(scratch,sizeof(scratch),tags,3,prepare_transaction,commit_transaction,&tx,&selected));
+ assert(selected.slot==0 && tx.calls==3 && tx.live==0x10);
+ /* A winner that fails on re-preflight must leave both live state and the
+  * caller's selection token unchanged. */
+ reset();record(0,tags[2],11,0xa5);record(1,tags[0],10,0xa5);
+ tx=(Transaction){0,99,0,1};selected=(GbaSaveSelection){11,22,33,44,55};
+ GbaSaveSelection unchanged=selected;memcpy(before,host_save,sizeof(before));
+ assert(!save_select_transaction(scratch,sizeof(scratch),tags,3,prepare_transaction,commit_transaction,&tx,&selected));
+ assert(tx.live==99 && !memcmp(&selected,&unchanged,sizeof(selected)) && !memcmp(before,host_save,sizeof(before)));
  /* Every old/new tag permutation, each slot order, and preserved predecessor. */
  for(unsigned a=0;a<3;a++)for(unsigned b=0;b<3;b++)for(int order=0;order<2;order++){
   reset();record(order,tags[a],10,0xa5);record(1-order,tags[b],11,0xa5);
