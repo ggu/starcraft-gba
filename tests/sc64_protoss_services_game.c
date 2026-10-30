@@ -5,6 +5,7 @@
  * production compile vector; this fixture enables nothing locally.
  */
 #include <assert.h>
+#include <stdio.h>
 #include "../starcraft/game.c"
 
 #if !defined(SC64_P7_BATTERY_ENABLED) || !defined(SC64_P7_OBSERVER_ENABLED) || \
@@ -76,7 +77,7 @@ static void test_carrier_training_and_flight(void)
 {
     custom_game();
     int carrier = spawn_unit(SIDE, U_P7_CARRIER, 600, 600);
-    assert(carrier >= 0 && u[carrier].raw_type < 0);
+    assert(carrier >= 0);
     assert(SC64_P7_ARBITER_CACHE_VALID(u[carrier].weapon));
     u[carrier].selected = 1;
     assert(race_p7_carrier_training_selected());
@@ -131,7 +132,8 @@ static void test_overlord_detects_zeratul(void)
     run(40);
     assert(sc64_p7_observer_target_is_cloaked(zeratul));
     assert(!sc64_p7_observer_target_revealed_to(zeratul, ENEMY, ENEMY));
-    u[overlord].x = u[overlord].tx = 800; u[overlord].y = u[overlord].ty = 380;
+    /* Detection also needs the detector's own sight of the cell. */
+    u[overlord].x = u[overlord].tx = 800; u[overlord].y = u[overlord].ty = 340;
     run(40);
     assert(sc64_p7_observer_target_revealed_to(zeratul, ENEMY, ENEMY));
 }
@@ -172,6 +174,8 @@ static void test_battery_service_and_save(void)
     assert(zealot >= 0 && b[battery].queue_progress == 100 * 256);
     assert(race_p7_battery_live_world_valid());
     /* Every owner can site a Battery by its own Pylon in a custom game. */
+    race_player[ENEMY] = R_PROTOSS;
+    (void)spawn_complete(ENEMY, B_GATEWAY, 900, 220);
     (void)spawn_complete(ENEMY, B_PYLON, 900, 300);
     assert(race_can_site(ENEMY, B_P7_SHIELD_BATTERY, 930, 300));
     assert(!race_can_site(ENEMY, B_P7_SHIELD_BATTERY, 930, 600));

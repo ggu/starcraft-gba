@@ -24,6 +24,8 @@
  * Mission objectives, triggers, map authentication and source-owner tables
  * stay with each mission's adapter. */
 
+#include "sc64_p7.h"
+
 enum {
     SC64_PROTOSS_BIND_NONE = 0,
     SC64_PROTOSS_BIND_GENERIC,

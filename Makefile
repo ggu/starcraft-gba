@@ -1829,7 +1829,7 @@ test-sc64-p8-replay: build/test-sc64-p8-replay build/test-sc64-p8-replay-prefix 
 	rm -f $(P8_ARM_DIR)/host-prefix.sav
 	./build/test-sc64-p8-replay-prefix $(P8_ARM_DIR)/host-prefix.sav > $(P8_ARM_DIR)/host-prefix.txt || true
 	./build/test-sc64-p8-replay-resume $(P8_ARM_DIR)/host-prefix.sav > $(P8_ARM_DIR)/host-resume.txt
-	$(PYTHON) tools/sc64_p8_arm_replay.py compare $(P8_ARM_DIR)/host-full.txt $(P8_ARM_DIR)/host-resume.txt
+	$(PYTHON) tools/sc64_p8_arm_replay.py compare --from-tick $$(sed -n 's/^#define P8_TAPE_RESUME_TICK \([0-9]*\)u$$/\1/p' $(P8_ARM_DIR)/sc64_p8_tape_generated.h) $(P8_ARM_DIR)/host-full.txt $(P8_ARM_DIR)/host-resume.txt
 .PHONY: test-sc64-protoss-p8
 test-sc64-protoss-p8: test-sc64-p8-controller test-sc64-p8-replay
 define P8_ARM_ROM
@@ -4939,6 +4939,22 @@ test-sc64-shared-mechanics: build/test-sc64-shared-mechanics-terran build/test-s
 	./build/test-sc64-shared-mechanics-showcase
 	./build/test-sc64-shared-mechanics-races
 	./build/test-sc64-shared-mechanics-unified
+
+# Shared Protoss unit services (Carrier Interceptors, cloak and detection,
+# Shield Batteries) in custom games and Showcase scenes, on the production
+# compile vectors of every product that carries those actors.
+.PHONY: test-sc64-protoss-services
+PROTOSS_SERVICES_DEPS = tests/sc64_protoss_services_game.c $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) common/gba.c $(COMMON_HEADERS) Makefile
+build/test-sc64-protoss-services-p7: $(PROTOSS_SERVICES_DEPS) $(PROTOSS_P7_CANONICAL_INPUTS) | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+build/test-sc64-protoss-services-showcase: $(PROTOSS_SERVICES_DEPS) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) $(COMMAND_ICON_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS) | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(SHOWCASE_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES)) -o $@
+build/test-sc64-protoss-services-p8: $(PROTOSS_SERVICES_DEPS) $(PROTOSS_P8_INPUTS) | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) $(PROTOSS_P8_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+test-sc64-protoss-services: build/test-sc64-protoss-services-p7 build/test-sc64-protoss-services-showcase build/test-sc64-protoss-services-p8
+	./build/test-sc64-protoss-services-p7
+	./build/test-sc64-protoss-services-showcase
+	./build/test-sc64-protoss-services-p8
 
 .PHONY: test-sc64-building-damage test-sc64-firebat-damage
 test-sc64-building-damage: build/test-sc64-building-damage
