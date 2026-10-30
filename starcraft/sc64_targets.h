@@ -141,7 +141,11 @@ sc64_target_index_begin(void)
 /* Only use immediately after update_orders builds and validates these lists.
  * Each list is ascending by slot; unit entries precede building entries for
  * each owner, preserving insertion and tie order within every owner cell. */
+#ifndef GBA_HOST
+static void __attribute__((noinline, long_call))
+#else
 static void
+#endif
 sc64_target_index_begin_owner_lists(void)
 {
     sc64_target_index_clear();
