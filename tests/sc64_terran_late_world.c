@@ -162,7 +162,7 @@ static void full_pool_creation_retries_atomically(void)
            u[MAX_UNITS - 1].owner == SIDE && u[MAX_UNITS - 1].raw_owner == 0);
 }
 
-static void firebat_splash_respects_late_invincibility(void)
+static void firebat_direct_hit_respects_late_invincibility(void)
 {
     int emitter = -1;
     game_init();
@@ -191,21 +191,22 @@ static void firebat_splash_respects_late_invincibility(void)
     u[1].raw_owner = 0; u[1].owner = SIDE;
     u[1].x = 202; u[1].y = 200; u[1].hp = u[1].maxhp = 100;
 
-    /* An enemy Firebat's primary hit splashes nearby SIDE units. The human
-     * hero must survive both the direct-invincibility case and the adjacent
-     * splash path, while ordinary targets still receive splash damage. */
-    hit_target(0, 10, U_FIREBAT, ENEMY);
+    /* Direct hits must honor both late trigger invincibility and the native
+     * actor flag. The fixture uses a synthetic ten-point packet; it does not
+     * specify the unresolved Flame Thrower collateral geometry. */
+    assert(emitter != 0 && emitter != 1);
+    armor_level = 0;
+    u[0].armor = 0;
+    hit_target(emitter, 10, U_FIREBAT, ENEMY);
     assert(item->alive && item->hp == 250);
-    assert(u[0].hp == 87); /* primary 10, then radial splash 3 */
-    assert(u[1].hp == 97);
 
-    /* The actor's native invincibility flag is also honored by late splash. */
     invincible_units[emitter] = 0;
     item->flags = 16;
-    item->hp = 250;
-    u[0].hp = u[1].hp = 100;
-    hit_target(0, 10, U_FIREBAT, ENEMY);
+    hit_target(emitter, 10, U_FIREBAT, ENEMY);
     assert(item->alive && item->hp == 250);
+
+    hit_target(0, 10, U_FIREBAT, ENEMY);
+    assert(u[0].alive && u[0].hp == 90);
 }
 
 static void t7_goal_invincibility_uses_hero_bounds(void)
@@ -323,7 +324,7 @@ int main(void)
     mission_start_and_live_trigger_passes();
     death_ledgers_use_source_slots();
     full_pool_creation_retries_atomically();
-    firebat_splash_respects_late_invincibility();
+    firebat_direct_hit_respects_late_invincibility();
     puts("late Terran world checks passed");
     return 0;
 }
