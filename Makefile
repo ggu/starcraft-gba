@@ -3816,6 +3816,8 @@ build/test-sc64-z7-carried-z4: tests/sc64_z4_campaign_run.c $(ZERG_Z7_CARRIED_DE
 .PHONY: test-sc64-z7-carried-missions
 test-sc64-z7-carried-missions: build/test-sc64-z7-carried-z1 build/test-sc64-z7-carried-z2 build/test-sc64-z7-carried-z3 build/test-sc64-z7-carried-z4
 	mkdir -p .local/sc64/z7-carried
+	./build/test-sc64-z7-carried-z1 --check-site cancel
+	./build/test-sc64-z7-carried-z1 --check-site timeout
 	./build/test-sc64-z7-carried-z1 --trace .local/sc64/z7-carried/z1.json
 	./build/test-sc64-z7-carried-z2 --controller 1 --trace .local/sc64/z7-carried/z2.json
 	./build/test-sc64-z7-carried-z3 --trace .local/sc64/z7-carried/z3.json
@@ -4330,6 +4332,8 @@ build/test-sc64-zerg-carried-z6: tests/sc64_z6_campaign_run.c $(ZERG_CARRIED_DEP
 .PHONY: test-sc64-zerg-carried-missions
 test-sc64-zerg-carried-missions: build/test-sc64-zerg-carried-z1 build/test-sc64-zerg-carried-z2 build/test-sc64-zerg-carried-z3 build/test-sc64-zerg-carried-z4 build/test-sc64-zerg-carried-z5 build/test-sc64-zerg-carried-z6
 	mkdir -p .local/sc64
+	./build/test-sc64-zerg-carried-z1 --check-site cancel
+	./build/test-sc64-zerg-carried-z1 --check-site timeout
 	./build/test-sc64-zerg-carried-z1 --trace .local/sc64/z6-carried-z1-controller.json
 	./build/test-sc64-zerg-carried-z2 --controller 1 --trace .local/sc64/z6-carried-z2-controller.json
 	./build/test-sc64-zerg-carried-z3 --trace .local/sc64/z6-carried-z3-controller.json
