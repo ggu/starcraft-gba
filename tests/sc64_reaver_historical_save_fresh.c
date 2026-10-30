@@ -24,8 +24,14 @@ int main(int argc,char **argv)
         assert(sc64_test_sram_transfer(argv[2],0));
 #ifdef SC64_SCARAB_RUNTIME
         assert(!strcmp(argv[1],"reject"));
+        Unit before_units[MAX_UNITS]; Building before_buildings[MAX_BUILDINGS];
+        int before_minerals=minerals,before_gas=gas,before_frame=frame; u32 before_seed=seed;
+        memcpy(before_units,u,sizeof(u)); memcpy(before_buildings,b,sizeof(b));
         assert(!race_load_game());
-        puts("gated reader rejected historical unconverted parent");
+        assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)));
+        assert(before_minerals==minerals && before_gas==gas && before_frame==frame && before_seed==seed);
+        assert(sc64_test_sram_transfer(argv[2],1));
+        puts("gated reader rejected unconverted parent; sampled live state unchanged");
 #else
         assert(!strcmp(argv[1],"read") && race_load_game());
         assert(u[0].alive && u[0].type==U_REAVER && u[0].carry==0 && u[0].work_timer==0);

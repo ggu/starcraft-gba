@@ -30,11 +30,23 @@ The separate-process `sc64_reaver_historical_save_fresh.c` fixture was built
 serially using the retained Terran full-profile host vector from
 `.local/decoder-proof/sc64_bc_impact_legacy_fresh-argv.json`, once without
 `SC64_SCARAB_RUNTIME` for the writer and old reader and once with it for the
-candidate reader. The gate-off engine spawns a Reaver through `spawn_unit` and
-writes the ordinary current BC envelope: journal and embedded version
+candidate reader. This is contemporaneous `25a890e` engine code with the
+experimental gate off, not a binary from a past release. The synthetic host
+setup clears units and buildings, calls `spawn_unit` for a Reaver and assigns
+its raw owner in the fixture; it does not purchase a Reaver through gameplay.
+The gate-off writer produces a current BC envelope: journal and embedded version
 `0x73435442`, pre-BC version `0x53435442`. The spawned row had `raw_type=-1`
 and mapped unit identity 83, with carry and work timer both zero. A fresh
 gate-off process restored it; a fresh gated process rejected the unconverted
-parent. This is an actual gate-off writer, not a hand-edited pre-BC record;
+parent while preserving sampled units, buildings, minerals, gas, frame and RNG.
+Its in-memory SRAM was written back and matched the input hash. This is not a
+whole-world atomicity proof. This is a gate-off writer, not a hand-edited pre-BC record;
 it exercises one initial parent in one profile, not all historical states.
 It does not test conversion into a live world or validate a new save tag.
+
+Compile and run argv, exit status and output, selected source and binary hashes,
+and per-process SRAM hashes are retained in `.local/decoder-proof/reaver-*-receipt.json`.
+The compile used source head `c8baa3f` with the subsequently modified fixture;
+the recorded source hashes identify those files but do not cover every compiler
+dependency. The SRAM SHA-256 was `80249bd89536725c84ca2ab6efe16921ab4cf4226762b223016341baf79071f2`
+after writing and unchanged after both readers.
