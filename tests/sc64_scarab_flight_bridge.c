@@ -63,6 +63,14 @@ int main(void) {
  q=base();q.carry=2<<8;q.work_timer=0;assert(!sc64_scarab_flight_to_wire(&q,&z,1,0));
  q=base();q.target=0;assert(!sc64_scarab_flight_to_wire(&q,&z,1,0));
  q=base();q.type=U_REAVER;z=sentinel;assert(!sc64_scarab_flight_to_wire(&q,&z,1,0)&&!memcmp(&z,&sentinel,sizeof(z)));
+ /* Dead rows retain actor identity and payload until slot reuse. */
+ q=base();q.alive=0;q.carry=(int)(255u|(2u<<8)|(262143u<<10));q.work_timer=0;q.order=4;roundtrip(q);
+ q=base();q.alive=0;q.carry=(int)(239u|(3u<<8)|(123456u<<10));q.work_timer=9;q.order=2;roundtrip(q);
+ q=base();q.alive=0;q.carry=(int)(239u|(0u<<8));q.work_timer=0;q.order=0;roundtrip(q);
+ { Unit pool[4];for(int i=0;i<4;i++){pool[i]=base();pool[i].alive=i&1;pool[i].carry=(int)((unsigned)i|((unsigned)(2+i%2)<<8)|((unsigned)(10+i)<<10));pool[i].work_timer=i&1?1:0;pool[i].order=i;}
+   for(int i=0;i<4;i++)roundtrip(pool[i]); }
+ q=base();q.alive=2;z=sentinel;assert(!sc64_scarab_flight_to_wire(&q,&z,1,0)&&!memcmp(&z,&sentinel,sizeof(z)));
+ q=base();q.carry=2<<8;q.work_timer=0;z=sentinel;assert(!sc64_scarab_flight_to_wire(&q,&z,1,0)&&!memcmp(&z,&sentinel,sizeof(z)));
  q=base();q.type=U_REAVER;q.raw_type=83;assert(sc64_scarab_flight_to_wire(&q,&z,0,0));same(q,z,0);
  puts("Scarab bridge exhaustive key ranking and four codec roundtrips passed");
 }

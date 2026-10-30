@@ -9,8 +9,11 @@ Non-Scarab rows pass through unchanged.
 The live child carry holds parent (8 bits), phase (2), and two 9-bit position
 fractions (18). Hidden children require zero fractions, zero life and grace,
 idle state, and no target. Outside parent 255 represents a detached child.
-The five accepted logical FSM states occupy three order bits. This encoding
-assumption is not proof that source flight or pathing uses only those states.
+The five accepted logical FSM states occupy three order bits. A future integration
+must explicitly map native source states, including source state 6, into this
+encoding; this assumption is not proof that source flight or pathing fits it.
+Dead raw-85 rows retain their fields until slot reuse. An expired outside row
+may have zero life only when dead; a live outside row requires positive life.
 
 A compact wire key ranks the hidden and outside states in 126,353,888 values.
 Mixed-radix digits use the signed-17 carry code, 242 allowed P7 build codes,

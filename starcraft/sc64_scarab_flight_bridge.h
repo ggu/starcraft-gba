@@ -16,7 +16,6 @@ static int sc64_scarab_flight_key(unsigned carry, unsigned timer, unsigned order
         if (parent>=240 || frac || timer || order) return 0;
         *key=parent*2u+phase; return 1;
     }
-    if (phase==2 && !(timer&127u)) return 0;
     if (parent<240) ordinal=parent;
     else if (parent==255) ordinal=240;
     else return 0;
@@ -39,10 +38,11 @@ static int sc64_scarab_flight_to_wire(const Unit *in, Unit *out, int current, in
     Unit q; unsigned key, upper, code, a, b;
     if (!in || !out) return 0;
     if (in->type!=U_SCARAB && in->raw_type!=85) { *out=*in;return 1; }
-    if (!current || !in->alive || in->type!=U_SCARAB || in->raw_type!=85 ||
+    if (!current || (in->alive!=0 && in->alive!=1) || in->type!=U_SCARAB || in->raw_type!=85 ||
         !sc64_scarab_flight_key((unsigned)in->carry,(unsigned)in->work_timer,
                                 (unsigned)in->order,in->build,&key)) return 0;
     if ((((unsigned)in->carry >> 8)&3u)<2u && in->target!=-1) return 0;
+    if (in->alive && (((unsigned)in->carry >> 8)&3u)==2u && !(in->work_timer&127u)) return 0;
     q=*in;
     if (legacy) { q.carry=(int)(key&65535u)-32768; q.build=(int)(key>>16); }
     else {
@@ -59,7 +59,7 @@ static int sc64_scarab_flight_from_wire(const Unit *in, Unit *out, int current, 
     Unit q;unsigned key, carry, check;
     if (!in || !out) return 0;
     if (in->type!=U_SCARAB && in->raw_type!=85) { *out=*in;return 1; }
-    if (!current || !in->alive || in->type!=U_SCARAB || in->raw_type!=85) return 0;
+    if (!current || (in->alive!=0 && in->alive!=1) || in->type!=U_SCARAB || in->raw_type!=85) return 0;
     q=*in;
     if (legacy) {
         if(q.carry < -32768 || q.carry>32767 || q.build<0 || q.build>2047) return 0;
@@ -76,6 +76,7 @@ static int sc64_scarab_flight_from_wire(const Unit *in, Unit *out, int current, 
     if (!sc64_scarab_flight_unkey(key,&carry)) return 0;
     q.carry=(int)carry;
     if (((carry>>8)&3u)<2u && q.target!=-1) return 0;
+    if (q.alive && ((carry>>8)&3u)==2u && !(q.work_timer&127u)) return 0;
     if (!sc64_scarab_flight_key(carry,(unsigned)q.work_timer,(unsigned)q.order,q.build,&check) || check!=key) return 0;
     *out=q;return 1;
 }
