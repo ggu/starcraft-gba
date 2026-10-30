@@ -3386,7 +3386,8 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
         if (!(hostile_mask & 1u)) continue;
         if (!(sc64_target_owner_columns[p] & col_mask) ||
             !(sc64_target_owner_rows[p] & row_mask)) continue;
-        for (row = row0; row <= row1; ++row)
+        for (row = row0; row <= row1; ++row) {
+            if (!(sc64_target_owner_rows[p] & ((u32)1u << row))) continue;
             for (col = col0; col <= col1; ++col) {
                 int cell = col + row * SC64_TARGET_GRID_COLS;
                 int entity;
@@ -3425,6 +3426,7 @@ sc64_target_nearest(int x, int y, int owner, int max_distance, int attacker
                     best = entity;
                 }
             }
+        }
     }
 #ifdef SC64_Z7_EGG_PRODUCTION
     return best >= 0 ? best : egg_best;
