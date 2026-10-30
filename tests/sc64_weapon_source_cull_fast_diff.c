@@ -24,6 +24,7 @@ int main(void)
     unsigned long cases=0;
     for(unsigned pi=0;pi<SC64_WEAPON_SOURCE_PROFILE_COUNT;pi++) {
         const Sc64WeaponSourceAttackProfile *p=&sc64_weapon_source_profiles[pi];
+        Sc64WeaponSourceAttackProfile copied=*p;
         for(unsigned d=0;d<34;d++) {
             Sc64WeaponSourceVfxKey key={p->actor_raw,1,p->weapon_id,(uint8_t)d,p->mode,p->variant};
             uint32_t packed;
@@ -35,9 +36,10 @@ int main(void)
             }
             for(unsigned n=0;n<1200;n++) {
                 int a[6];for(int i=0;i<6;i++)a[i]=(n<200)?edges[next()%(sizeof(edges)/sizeof(edges[0]))]:(int)(next()%65536u)-32768;
-                int old=wide_reference(key,p,a[0],a[1],a[2],a[3],a[4],a[5]);
-                int actual=sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,p,a[0],a[1],a[2],a[3],a[4],a[5]);
-                assert(old==actual);++cases;
+                int old=wide_reference(key,&copied,a[0],a[1],a[2],a[3],a[4],a[5]);
+                int actual=sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,&copied,a[0],a[1],a[2],a[3],a[4],a[5]);
+                assert(old==actual);
+                assert(!old || sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,p,a[0],a[1],a[2],a[3],a[4],a[5]));++cases;
             }
         }
     }

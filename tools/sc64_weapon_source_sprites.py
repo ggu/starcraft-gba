@@ -499,6 +499,103 @@ def _profile_rows(report: dict, animations: list[dict], events: list[dict], over
     return sorted(rows, key=lambda r: (r["actor_raw"], r["weapon_id"], r["mode"], r["variant"]))
 
 
+def _profile_cull_bounds(profiles, images, frames, animations, overlays, lo_tables, lo_offsets, events, frame_directory, stats=None):
+    """Conservative one-level render envelopes; invalid input falls back globally."""
+    invalid = 0x40000000
+    allowed = {8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20, 21}
+    def number(value, low, high):
+        if type(value) is not int or not low <= value <= high: raise ValueError("field range")
+        return value
+    try:
+        by_image = {int(row["image_id"]): row for row in images}
+        if len(by_image) != len(images): raise ValueError("duplicate image")
+        for image in images:
+            number(image["image_id"],0,65535)
+            first, count = number(image["frame_first"],0,65535), number(image["frame_count"],0,65535)
+            dfirst = number(image["frame_directory_first"],0,65535)
+            dcount = number(image["source_frame_count"],0,65535)
+            if dfirst+dcount > len(frame_directory): raise ValueError("directory range")
+            if any(v != 0xffff and not first <= v < first+count for v in frame_directory[dfirst:dfirst+dcount]):
+                raise ValueError("directory frame identity")
+            if first < 0 or count < 0 or first + count > len(frames): raise ValueError("frame range")
+            if any(int(f["image_id"]) != int(image["image_id"]) for f in frames[first:first+count]):
+                raise ValueError("frame identity")
+        for f in frames:
+            for name in ("x", "y", "mirror_x"): number(f[name],-32768,32767)
+            for name in ("w", "h", "canvas_w", "canvas_h", "image_id"): number(f[name],0,65535)
+        animation_keys = set()
+        for anim in animations:
+            key = (int(anim["image_id"]), int(anim["animation_id"]))
+            if key in animation_keys: raise ValueError("duplicate animation")
+            animation_keys.add(key)
+            number(anim["image_id"],0,65535); number(anim["animation_id"],0,255)
+            efirst, ecount = number(anim["event_first"],0,65535), number(anim["event_count"],0,65535)
+            if efirst+ecount > len(events): raise ValueError("event range")
+            if any(int(e["image_id"]) != key[0] for e in events[efirst:efirst+ecount]): raise ValueError("event identity")
+            first, count = number(anim["overlay_first"],0,65535), number(anim["overlay_count"],0,65535)
+            if first < 0 or count < 0 or first + count > len(overlays): raise ValueError("overlay range")
+            if any(int(o["parent_image"]) != key[0] for o in overlays[first:first+count]):
+                raise ValueError("overlay parent")
+        for o in overlays:
+            for name in ("parent_image", "image_id"): number(o[name],0,65535)
+            for name in ("x", "y"): number(o[name],-32768,32767)
+            if number(o["opcode"],0,255) not in allowed: raise ValueError("unknown overlay")
+        for o in lo_offsets:
+            number(o["x"],-128,127); number(o["y"],-128,127)
+        for table in lo_tables:
+            first = number(table["offset_first"],0,0xffffffff)
+            count = number(table["frame_count"],0,65535) * number(table["offset_count"],0,65535)
+            if first < 0 or count < 0 or first + count > len(lo_offsets): raise ValueError("LO range")
+        # A global maximum for LO/direct offsets is conservative even when
+        # birth uses another parent frame or an offset row is ambiguous.
+        coords = [(int(o["x"]), int(o["y"])) for o in overlays]
+        coords += [(int(o["x"]), int(o["y"])) for o in lo_offsets]
+        ox = max((abs(x)//2 for x, _ in coords), default=0)
+        oy = max((abs(y)//2 for _, y in coords), default=0)
+    except (KeyError, TypeError, ValueError, OverflowError) as error:
+        if stats is not None: stats[str(error)] = len(profiles)
+        return [invalid] * len(profiles)
+    result = []
+    for profile in profiles:
+        try:
+            projectile = int(profile["projectile_image"])
+            actor = int(profile["attack_image"])
+            if projectile not in by_image: raise ValueError("projectile image")
+            parents = {projectile}
+            if int(profile["attackwith_tick"]) != 0xffff:
+                if actor not in by_image: raise ValueError("actor image")
+                parents.add(actor)
+            children = set()
+            for anim in animations:
+                if int(anim["image_id"]) not in parents: continue
+                first, count = int(anim["overlay_first"]), int(anim["overlay_count"])
+                children.update(int(o["image_id"]) for o in overlays[first:first+count])
+            if any(i not in by_image for i in children): raise ValueError("child image")
+            # Actor itself is not drawn by this path, but every projectile and
+            # one-level child frame, including mirrored/fallback frames, is.
+            radius_x = radius_y = 0
+            for image_id in {projectile} | children:
+                image = by_image[image_id]
+                first, count = int(image["frame_first"]), int(image["frame_count"])
+                # An emitted image with no frames resolves only missing-frame
+                # sentinels; the renderer draws no pixels for that image.
+                for f in frames[first:first+count]:
+                    w, h = int(f["w"]), int(f["h"])
+                    if w <= 0 or h <= 0: raise ValueError("empty frame")
+                    left = int(f["x"]) - int(f["canvas_w"])//2
+                    mirror = int(f["mirror_x"]) - int(f["canvas_w"])//2
+                    top = int(f["y"]) - int(f["canvas_h"])//2
+                    radius_x = max(radius_x,abs(left),abs(left+w-1),abs(mirror),abs(mirror+w-1))
+                    radius_y = max(radius_y,abs(top),abs(top+h-1))
+            radius_x += ox; radius_y += oy
+            if max(radius_x, radius_y) > 0x7fff: raise ValueError("radius overflow")
+            result.append(0x80000000 | (radius_y << 15) | radius_x)
+        except (KeyError, TypeError, ValueError, OverflowError) as error:
+            if stats is not None: stats[str(error)] = stats.get(str(error), 0) + 1
+            result.append(invalid)
+    return result
+
+
 def _emit_header(out: Path, report: dict, remap: bytes, palette_json: dict, get, sprites):
     images = report["referenced_images"]
     used = _used_frames(report)
@@ -640,18 +737,22 @@ def _emit_header(out: Path, report: dict, remap: bytes, palette_json: dict, get,
         lines.append("};")
     struct_rows("sc64_weapon_source_profiles", "Sc64WeaponSourceAttackProfile", profiles,
         ["actor_raw","weapon_owner_raw","weapon_id","mode","variant","attack_anim","projectile_ticks_per_frame","flags","weapon_bullet_type","weapon_count","attackwith_tick","attack_image","projectile_image","projectile_flingy","projectile_lifetime","projectile_first_frame","projectile_frame_count","impact_source_tick","attack_event_first","attack_event_count","projectile_event_first","projectile_event_count","overlay_first","overlay_count","speed_raw","halt_raw","accel_raw","forward_offset","upward_offset"])
-    struct_rows("sc64_weapon_source_overlays", "Sc64WeaponSourceOverlay", overlays,
-        ["parent_image","image_id","source_tick","relative_tick","x","y","lo_index","aux","opcode","flags","sprite_id"])
-    struct_rows("sc64_weapon_source_events", "Sc64WeaponSourceEvent", events,
-        ["image_id","source_tick","pc","source_frame","opcode","flags"])
-    struct_rows("sc64_weapon_source_animations", "Sc64WeaponSourceAnimation", animations,
-        ["image_id","animation_id","flags","event_first","event_count","overlay_first","overlay_count","duration_ticks","loop_pc","loop_source_tick"])
+    bound_fallbacks = {}
     frame_directory = []
     for image in image_rows:
         image["source_frame_count"] = next(int(meta.get("frame_count",0)) for key,meta in images.items() if int(key)==image["image_id"])
         image["frame_directory_first"] = len(frame_directory)
         by_source = {f["source_frame_id"]: i for i,f in enumerate(frames) if f["image_id"] == image["image_id"]}
         frame_directory.extend(by_source.get(i,0xFFFF) for i in range(image["source_frame_count"]))
+    bounds = _profile_cull_bounds(profiles, image_rows, frames, animations, overlays, lo_tables, lo_offsets, events, frame_directory, bound_fallbacks)
+    lines.append("#define SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION 1")
+    lines.extend(_c_array("uint32_t", "sc64_weapon_source_profile_bounds", [str(v) + "u" for v in bounds], 8))
+    struct_rows("sc64_weapon_source_overlays", "Sc64WeaponSourceOverlay", overlays,
+        ["parent_image","image_id","source_tick","relative_tick","x","y","lo_index","aux","opcode","flags","sprite_id"])
+    struct_rows("sc64_weapon_source_events", "Sc64WeaponSourceEvent", events,
+        ["image_id","source_tick","pc","source_frame","opcode","flags"])
+    struct_rows("sc64_weapon_source_animations", "Sc64WeaponSourceAnimation", animations,
+        ["image_id","animation_id","flags","event_first","event_count","overlay_first","overlay_count","duration_ticks","loop_pc","loop_source_tick"])
     struct_rows("sc64_weapon_source_images", "Sc64WeaponSourceImage", image_rows,
         ["image_id","frame_first","frame_count","canvas_w","canvas_h","source_frame_count","frame_directory_first","directional","modifier","color_shift","lut_index","flags"])
     lines.extend(_c_array("uint16_t", "sc64_weapon_source_frame_directory", [str(v) for v in frame_directory], 12))
@@ -677,6 +778,7 @@ def _emit_header(out: Path, report: dict, remap: bytes, palette_json: dict, get,
     header.write_text("\n".join(lines)+"\n", encoding="ascii")
     manifest = {"version":1,"rom_sha1":ROM_SHA1,"header_sha256":hashlib.sha256(header.read_bytes()).hexdigest(),
                 "profiles":len(profiles),"images":len(image_rows),"frames":len(frames),"animations":len(animations),
+                "profile_bounds_fallbacks":bound_fallbacks,
                 "raster_images":len(raster_images),
                 "events":len(events),"overlays":len(overlays),"pixel_bytes":len(pixel_data),"lut_bytes":len(lutbytes),
                 "unique_pixel_blobs":len(pixel_blob_offsets),
