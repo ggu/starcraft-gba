@@ -2,8 +2,10 @@
 
 This audit records the playable P8 build: an explicit `protoss-p8`
 candidate that carries the canonical P1–P7 Protoss profile and adds P8 as the
-eighth campaign entry. Canonical Protoss stays the qualified P7 product; its
-ROM is byte-identical to the base before this change.
+eighth campaign entry. Canonical Protoss stays the qualified P7 product. Its
+ROM now carries the shared Protoss service layer for custom games, so its
+image changes, but its P7 mission behavior does not (see
+[Canonical P7 non-regression](#canonical-p7-non-regression)).
 
 The evidence is one ordinary-input host controller win, an input-only ARM
 replay of that controller's key tape, and a two-process SRAM save and
@@ -52,39 +54,35 @@ P8 runtime, and its Z7 raw-table fallback is compiled only with Z7.
 
 The imported P8 map places a human Carrier (source slot 7, empty hangar),
 three enemy Carriers, three Arbiters, an Observer and two Shield Batteries.
-The P7 services for these units were gated on P7 mission state. They are now
-unit services that every mission carrying a source-owner map and a service
-clock runs; P8 is the first such mission.
+Their services (Carrier training and flight, Arbiter cloak, detection and
+Shield Battery recharge) are a shared capability layer,
+[`sc64_protoss_services.h`](../../../starcraft/sc64_protoss_services.h);
+[docs/SHARED-ENGINE.md](../../SHARED-ENGINE.md#shared-protoss-unit-services)
+describes the bindings. P8 supplies a mission binding:
 
-- **The gate.** `race_protoss_services_active()`,
-  `race_protoss_source_owner()` and `RACE_PROTOSS_SERVICE_CLOCK` (game.c)
-  replace `race_p7_active()`, `race_p7_source_owner()` and `race_p7.reserved`
-  in the Carrier, Interceptor flight, projectile, Arbiter cloak, Observer and
-  Cannon detection, and Shield Battery code. Without
-  `SC64_PROTOSS_SHARED_SERVICES` (every build except P8 and later) they
-  expand to the original P7 tokens, and canonical P7 is byte-identical.
-- **Mission state that stays P7's.** P7's three scripted Carrier creates and
-  its slot reservation, its map and actor checks, and its two authenticated
-  Battery rows stay P7-only.
-- **P8's own state.** P8 saves the shared service clock (phase and stagger,
-  laid out like P7's three reserved bytes) in its union payload, and resets
-  the Arbiter/detection cache at mission start and on load as P7 does. Its
-  source-owner map is read from the canonical descriptor, so save candidates
-  are checked before the world is bound. Load preflight checks every unit's
-  cache word against the candidate mission's own source mask.
-- **Shield Batteries.** `tools/sc64_p7_battery_pack.py --mission P8`
+- **Owner identity.** P8's source slots, read from its canonical descriptor,
+  so a save candidate is checked before the world is bound.
+- **Service clock.** Phase and stagger, laid out like P7's three reserved
+  bytes, in P8's union payload. The Arbiter/detection cache is reset at
+  mission start and on load, as in P7.
+- **Placed actors.** `tools/sc64_p7_battery_pack.py --mission P8`
   authenticates P8's two map Batteries (slot 3, 100 % hit points, shields and
   energy) from the private CHK into this worktree's
   `build/generated/p8-battery`. At start both rows bind to those properties.
   Save, load and live-world checks accept those two rows at their source
   positions and human Batteries; recharge orders validate in P8 saves too.
-- **What the player gets.** The human Carrier offers BUILD INTERCEPTOR, its
-  Interceptors train, launch and fight. Enemy Arbiters cloak nearby units,
-  enemy Observers are cloaked, Photon Cannons detect, and Probes can build
-  Shield Batteries that recharge shields.
-- **AI limit.** The authored AI does not order enemy Carriers to train
-  Interceptors, use Arbiter abilities or recharge at Batteries. Canonical
-  P7's AI does not do this either.
+- **Mission state that stays P7's.** P7's three scripted Carrier creates, its
+  slot reservation, its map and actor checks and its two authenticated
+  Battery rows stay P7-only. No mission-active check is widened.
+
+What the player gets: the human Carrier offers BUILD INTERCEPTOR, and its
+Interceptors train, launch and fight. Enemy Arbiters cloak nearby units,
+enemy Observers are cloaked, Photon Cannons detect, and Probes can build
+Shield Batteries that recharge shields.
+
+**AI limit.** The authored AI does not order enemy Carriers to train
+Interceptors, use Arbiter abilities or recharge at Batteries. Canonical P7's
+AI does not do this either.
 
 ## Defects found and fixed
 
@@ -143,7 +141,7 @@ are not claimed.
 
 ## Qualification
 
-Base `codex/source-release` 8d1e653 (merged into this branch), plus this
+Base `codex/source-release` 97c39fa (merged into this branch), plus this
 change. Inputs are the locally verified USA ROM (SHA-1
 `a36d91b5aac7bb95df0d7de5f9814f5270e25c2b`) and the P8 source CHK (SHA-256
 `e2257c48a119bfde3da075e08628b312857e3aad9222c47678fc29d57c578cd9`). The
@@ -158,39 +156,53 @@ inspects live state only to choose inputs. Its policy:
 
 - Rescue Fenix. Keep Fenix and the Hyperion out of army orders: the army is
   ordered by double-tapping Zealot and Dragoon groups, not with R. A hero
-  with an enemy within 192 pixels steps away past the Nexus.
+  with an enemy within 288 pixels (Scarab range) walks to the reachable spot
+  near the Nexus whose straight path keeps farthest from every enemy.
 - Grow to 14 Probes. Build Pylons on supply, six Gateways, an Assimilator, a
-  Cybernetics Core, a Forge and four Photon Cannons, keeping a walkable lane
-  around every structure. Re-mine any Probe whose build stays pending for
-  900 frames.
+  Cybernetics Core and a Forge, keeping a walkable lane around every
+  structure. Photon Cannons cover the mineral line south of the Nexus, where
+  raids arrive, then the heroes' station: four, and up to 12 while the bank
+  holds 500 minerals. Re-mine any Probe whose build stays pending for 900
+  frames.
+- Keep up to four units queued at each Gateway, queueing up to six per visit.
 - Fill the human Carrier's hangar through its BUILD INTERCEPTOR row, and
   send it with the army once two Interceptors are aboard.
 - Attack once the army has 24 units, routing from the front unit over the
   engine's walkability grid; a front unit whose route stops shrinking is
-  skipped. At the Stasis Cell, Zealots attack the Cell and Dragoons the
-  Arbiters, since the army has no mobile detector.
-- From frame 30,000, save once through the pause menu (START, B, START)
-  while a structure is under construction, after returning the UI state
-  above to its load-time form.
+  skipped. Three enemies within 320 pixels of the Nexus recall the army. At
+  the Stasis Cell, Zealots attack the Cell and Dragoons the Arbiters, since
+  the army has no mobile detector.
+- From frame 30,000, hold 150 minerals back from production and save once
+  through the pause menu (START, B, START) at the start of a controller step
+  while a structure is warping in, after returning the UI state above to its
+  load-time form. Any unit that selects alone may reset the orders menu's
+  remembered row.
 
 The run is deterministic: two runs gave byte-identical traces and saves. It
-wins at frame 104,385 after 106,288 input calls, with no runtime faults. The
+wins at frame 140,577 after 143,497 input calls, with no runtime faults. The
 controller stops recording at the deciding call, so a replay ends on the
-same frame. Moving the save point to frames 28,000, 32,000 or 34,000 also
-wins (at frames 101,393, 88,385 and 88,217), so the result does not hang on
-the qualified save point.
+same frame.
 
 | Item | Value |
 | --- | --- |
-| Final state | Fenix 197 HP, the Hyperion 850 HP, 60 enemy units left |
-| Carrier | Four Interceptors trained by frame 3,595; up to four launched at once |
-| Cloak | Six enemies still cloaked at the win |
-| Controller trace | 9,993 key transitions; SHA-256 `8fb73251ed05f5fa6af634d93e006932aed3f0feaa853657b2232d1dafb23aaf` |
-| Tape header | SHA-256 `499513f57868f8e98962c70c3d1d79271d7f34ee12a0a7dde163a47974260a02` |
+| Final state | Fenix 240 HP, the Hyperion 850 HP, 53 enemy units left |
+| Carrier | Four Interceptors aboard by frame 5,250; up to four launched at once |
+| Cloak | One enemy still cloaked at the win |
+| Controller trace | 19,114 key transitions; SHA-256 `481ec141caf3d8e64f0622a9b9de666526f9faf5d2db40f5c0474ef9292f9e77` |
+| Tape header | SHA-256 `78b1768f4234cea36d543da6bc602d196f2c1e01c353397a4e777c855c37e9ae` |
 
-The save is taken at frame 31,205 with one Pylon warping in. Its record
-carries the newly merged construction (`CHP1`) and building-damage (`BD01`)
-markers.
+The save is taken at frame 35,958 with one structure warping in. Its record
+carries the construction (`CHP1`) and building-damage (`BD01`) markers.
+
+**Why the trajectory changed.** The earlier controller lost this mission on
+the current tree at frame 25,017, after Probes died to raids on the
+undefended mineral line and Fenix died to a Reaver while the army was away.
+The pre-merge P8 head loses the same way, with a byte-identical trace, on
+the current local inputs, so the change came from those inputs rather than
+from the merged default-branch code or the service refactor. The policy
+changes above restore a win. The save-time fixes came from the strict
+comparator: the first new resume diverged because the orders menu's
+remembered row was not reset before the save.
 
 ### Input-only replays
 
@@ -203,34 +215,44 @@ host program and as ARM ROMs:
 | Build | Behavior |
 | --- | --- |
 | Full | Plays the whole tape. |
-| Prefix | Stops after the pause-menu save sequence (tick 31,943), leaving the save in SRAM. |
-| Resume | Boots a fresh process, quick-loads with L on the title screen, then continues from tick 31,943. |
+| Prefix | Stops after the pause-menu save sequence (tick 37,309), leaving the save in SRAM. |
+| Resume | Boots a fresh process, quick-loads with L on the title screen, then continues from tick 37,309. |
+
+Every comparison uses the strict comparator in `tools/sc64_p8_arm_replay.py`
+(`tests/test_sc64_arm_replay_compare.py` holds its negative tests). The
+candidate must hold exactly the reference's observations from the requested
+tick on, with equal fields, no duplicate or out-of-order ticks, nothing
+before the cutoff and the same final record. At the documented resume
+tick it may open with its own `resume` observation. The full and prefix
+runs are compared from tick 0; the resumes from tick 37,309.
 
 Host (`make test-sc64-protoss-p8`):
 
-- The full replay wins at frame 104,385.
-- The prefix's SRAM image is byte-identical to the controller's save.
-- The fresh-process resume matches the full replay at all 76 common
-  observations, including the win and state digest `2300458568`.
+- The full replay wins at frame 140,577.
+- The prefix's SRAM image is byte-identical to the controller's save, and
+  its 37 periodic observations equal the full replay's.
+- The fresh-process resume holds all 107 of the full replay's observations
+  from tick 37,309, including the win and state digest `1603542449`.
 
 ARM (mGBA 0.10.5, one isolated process per run, log mask 7, no debugger):
 
-- **ROM image `c571c769…32` (full).** Matches all 107 host observations and
-  wins at frame 104,385. 471.2 s wall time.
-- **ROM image `73b3d46b…a7` (prefix).** Matches all 32 host prefix
+- **ROM image `0594a486…ad` (full).** Matches all 144 host observations and
+  wins at frame 140,577. 997.3 s wall time.
+- **ROM image `dc5d9974…35` (prefix).** Matches all 38 host prefix
   observations. Its save record (tag `0x5343505c`, 16,292-byte payload,
-  sequence 1) is byte-identical to the host prefix's record.
-- **ROM image `c8c6841d…2d` (resume).** Seeded with the ARM prefix's save
-  file. Loads at frame 31,205 with the prefix's final digest (`2532240828`).
-  Matches the host resume at all 77 observations and the uninterrupted host
-  replay at all 76 common ticks, ending in the same win.
+  sequence 1) is byte-identical to the host prefix's record; only the
+  unused SRAM fill differs (0xff on ARM, zero on host).
+- **ROM image `54182c81…e9` (resume).** Seeded with the ARM prefix's save
+  file. Loads at frame 35,958 with the prefix's final digest (`1017903464`).
+  Holds all 108 host resume observations and all 107 of the uninterrupted
+  host replay's from tick 37,309, ending in the same win.
 
 | ARM timing | Value |
 | --- | --- |
-| Frames (whole tape, menu and briefing included) | 106,288 |
-| Mean cycles/frame | 1,994,247 (about 8.4 fps equivalent) |
-| Mean update cycles | 1,236,684 |
-| Peak frame | 22,156,674 cycles |
+| Frames (whole tape, menu and briefing included) | 143,497 |
+| Mean cycles/frame | 2,365,929 (about 7.1 fps equivalent) |
+| Mean update cycles | 1,530,359 |
+| Peak frame | 27,250,135 cycles |
 
 The tape includes menu and briefing frames. The peak frame has not been
 broken down. None of these are physical-GBA measurements; frame rate is
@@ -252,7 +274,7 @@ records are in [`provenance/`](provenance/):
 
 | Record | Outputs |
 | --- | --- |
-| `roms` | Playable ELF and ROM (`0c9c2ab7…71`), replay ELFs and ROMs (the three images above) |
+| `roms` | Playable ELF and ROM (`a18ed649…9a`), replay ELFs and ROMs (the three images above) |
 | `host-replay` | Host full, prefix and resume replay programs |
 | `controller` | Host controller program |
 
@@ -262,27 +284,44 @@ The rebuilt ROM images are the images the emulator ran.
 
 | Build | `__bss_end` | `__iwram_end` |
 | --- | --- | --- |
-| Playable candidate | `0x02038994` | `0x03004c40` |
-| Replay ROMs | `0x02038254` | `0x03004c40` |
+| Playable candidate | `0x020389a4` | `0x03004c48` |
+| Replay ROMs | `0x02038264` | `0x03004c48` |
 
 Both are below the unchanged guards (`0x0203e000` and `0x03005000`).
 
 ### Canonical P7 non-regression
 
-Rebuilding canonical Protoss on this branch gives SHA-256
-`33148e729053641f7d22f8a9064f2c4ba1146d15cf20b2178854216df71bdca9`, the same
-image as `codex/source-release` 8d1e653. The P7 carrier-training,
-interceptor-flight, observer, projectile, OBJ VRAM and adapter fixtures pass.
-`./dev build` and `./dev test` pass.
+Canonical Protoss rebuilt on this branch gives SHA-256
+`c233d36077c95b796069b2879d5d8e322246e8d60f564bf06ce6fd04e7a83849`; the
+base 97c39fa gives `58334f33…`. The bytes change because the canonical
+product now compiles the shared layer's generic binding: the custom-game
+and Showcase services, their save clock word and load-time candidate
+binding, and the Overlord and Spore Colony detectors. EWRAM grows by 8 bytes
+(`__bss_end` `0x020382ec` to `0x020382f4`: the 3-byte generic clock and the
+candidate binding and mission), IWRAM is unchanged (`0x03004c48`), and the
+16,292-byte save record keeps its size and generation. P7 mission behavior
+does not change:
 
-Pre-existing on 8d1e653 and unchanged here:
+- The Protoss campaign controllers for P1, P2, P3, P6 and P7, and the
+  campaign save fixture, give byte-identical traces and outputs on this
+  branch and on the pre-refactor base. None of those controllers wins on
+  the current local inputs, on either tree; that is not changed here.
+- The 18-match skirmish matrix on the canonical Protoss vector gives the
+  same per-match traces as the base.
+- `make test-sc64-protoss-services` passes on the canonical Protoss,
+  Showcase and P8 vectors. The P7 carrier-training, interceptor-flight,
+  observer, projectile, OBJ VRAM and adapter fixtures pass.
+- The Showcase links at `__iwram_end=0x03004ff8` and `__bss_end=0x0203df48`,
+  8 and 184 bytes under the guards.
+- `./dev build` and `./dev test` pass.
+
+Pre-existing on the base and unchanged here:
 
 - `make test-sc64-p7-battery` and `make test-sc64-p7-arbiter-host` stop at
   `sc64_p7_battery_game.c:411`, which expects a Probe's build order to be
   immediate. The merged pending-build order makes it `ORDER_BUILD_PENDING`
   first.
-- `make test-sc64-protoss-p7-canonical` links the wrong `$<`, and the
-  canonical P7 controller stalls on cursor-guard failures at frame 11,953.
+- The Showcase host simulation's scene 2 ends at tick 131 instead of 150.
 
 ## Reproduce
 
@@ -295,9 +334,10 @@ make sc64-p8-arm-replay           # three replay ROMs
 python3 tools/sc64_p8_arm_replay.py run --rom build/StarCraft-Protoss-P8-Replay.gba --out build/emulator/p8-arm-full
 python3 tools/sc64_p8_arm_replay.py compare build/p8-arm/host-full.txt build/emulator/p8-arm-full/p8-lines.txt
 python3 tools/sc64_p8_arm_replay.py run --rom build/StarCraft-Protoss-P8-Replay-Prefix.gba --out build/emulator/p8-arm-prefix
+python3 tools/sc64_p8_arm_replay.py compare build/p8-arm/host-prefix.txt build/emulator/p8-arm-prefix/p8-lines.txt
 python3 tools/sc64_p8_arm_replay.py run --rom build/StarCraft-Protoss-P8-Replay-Resume.gba --out build/emulator/p8-arm-resume \
     --sav-in build/emulator/p8-arm-prefix/saves/StarCraft-Protoss-P8-Replay-Prefix.sav
-python3 tools/sc64_p8_arm_replay.py compare build/p8-arm/host-full.txt build/emulator/p8-arm-resume/p8-lines.txt --from-tick 31943
+python3 tools/sc64_p8_arm_replay.py compare build/p8-arm/host-full.txt build/emulator/p8-arm-resume/p8-lines.txt --from-tick 37309
 python3 tools/sc64_build_provenance.py record build/provenance/p8/roms \
     build/starcraft-protoss-p8.elf build/StarCraft-Protoss-P8-GBA.gba
 ```

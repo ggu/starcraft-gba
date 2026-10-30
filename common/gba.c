@@ -487,6 +487,38 @@ HOT_MODE4 int gfx_blit_window(int y,int height,const u8 *source,int stride,int r
  }
  return 1;
 }
+/* Internal terrain-only window: caller must redraw exposed edge tiles before
+ * presentation. Unlike gfx_blit_window, this may overwrite that dirty edge. */
+int gfx_blit_terrain_window(int y,int height,const u8 *source,int stride,int rows,int left,int top) {
+ if(!source||((uintptr_t)source&3)||stride!=240||rows<=0||y<0||height<=0||height>160||y>160-height||!left||(left&3)||left<=-240||left>=240)
+  return gfx_blit_window(y,height,source,stride,rows,left,top);
+#ifdef GBA_SCENE_CLIP
+ /* Edge redraw must cover every row that the bulk copy may touch. */
+ if(gfx_clip_top>y || gfx_clip_bottom<y+height)
+  return gfx_blit_window(y,height,source,stride,rows,left,top);
+#endif
+ if(top>=rows||top<=-height)return 1;
+ int first=top<0?-top:0,last=height;if(top>rows-height)last=rows-top;
+ if(first>=last)return 1;
+ int lo=first,hi=last;
+ if((top+lo)*240+left<0)lo++;
+ if((top+hi-1)*240+left+240>rows*240)hi--;
+ if(lo>=hi)return gfx_blit_window(y,height,source,stride,rows,left,top);
+ if(lo>first&&!gfx_blit_window(y+first,lo-first,source,stride,rows,left,top+first))return 0;
+ if(hi<last&&!gfx_blit_window(y+hi,last-hi,source,stride,rows,left,top+hi))return 0;
+ GFX_TILE_TOUCH(0,y+lo,240,y+hi);
+ const u8 *in=source+(top+lo)*240+left;
+#ifdef GBA_HOST
+ volatile u16 *out=pixels+(y+lo)*120;
+ for(int i=0;i<(hi-lo)*120;i++)out[i]=(u16)in[2*i]|((u16)in[2*i+1]<<8);
+#else
+ REG32(0x040000d4)=(u32)in;
+ REG32(0x040000d8)=(u32)(pixels+(y+lo)*120);
+ REG32(0x040000dc)=0x84000000|(u32)((hi-lo)*60);
+ while(REG32(0x040000dc)&0x80000000){}
+#endif
+ return 1;
+}
 #if defined(D2_DEN_OF_EVIL) || defined(GBA_HOST)
 /* Nearest-neighbour 2x opaque cache window. Each source pixel becomes a
    2x2 block; the caller's framebuffer fill supplies pixels beyond cache edges. */
@@ -1019,10 +1051,14 @@ static u32 sram_get32(volatile const u8*p){u32 v=0;for(int i=0;i<4;i++)v|=(u32)p
    lost during a write. Commit the tag last; a checksum covers the payload. */
 #define SAVE_SLOT_SIZE 16384u
 #define SAVE_PAYLOAD_MAX (SAVE_SLOT_SIZE-16u)
+/* A zero len accepts any stored payload length; slot alternation and the
+   sequence clock are shared by every record with the same tag. */
 static int valid_record(volatile const u8 *p,u32 len,u32 tag) {
-    if(sram_get32(p)!=tag||sram_get32(p+4)!=len||!sram_get32(p+12))return 0;
+    u32 stored=sram_get32(p+4);
+    if(sram_get32(p)!=tag||!stored||stored>SAVE_PAYLOAD_MAX||(len&&stored!=len)||
+       !sram_get32(p+12))return 0;
     u32 h=2166136261u;
-    for(u32 i=0;i<len;i++){h^=p[16+i];h*=16777619u;}
+    for(u32 i=0;i<stored;i++){h^=p[16+i];h*=16777619u;}
     return h==sram_get32(p+8);
 }
 static int newest_record(u32 len,u32 tag) {
@@ -1034,9 +1070,9 @@ static int newest_record(u32 len,u32 tag) {
     return (s32)(sram_get32(base+SAVE_SLOT_SIZE+12)-sram_get32(base+12))>0?1:0;
 }
 void save_write(const void *data,u32 len,u32 tag) {
-    if(len>SAVE_PAYLOAD_MAX||!tag)return;
+    if(!len||len>SAVE_PAYLOAD_MAX||!tag)return;
     volatile u8 *base=(volatile u8*)SRAM_BASE;
-    int newest=newest_record(len,tag);
+    int newest=newest_record(0,tag);
     u32 sequence=newest<0?1:sram_get32(base+newest*SAVE_SLOT_SIZE+12)+1;
     if(!sequence)sequence=1;
     volatile u8 *p=base+(newest==0?SAVE_SLOT_SIZE:0);
@@ -1055,6 +1091,19 @@ int save_read(void *data,u32 len,u32 tag) {
     volatile const u8 *src=(volatile const u8*)SRAM_BASE+newest*SAVE_SLOT_SIZE+16;
     u8 *dst=data;
     for(u32 i=0;i<len;i++)dst[i]=src[i];
+    return 1;
+}
+/* Newest valid record for tag, whatever its length, if it fits capacity. */
+int save_read_latest(void *data,u32 capacity,u32 tag,u32 *len) {
+    if(!tag||!len)return 0;
+    int newest=newest_record(0,tag);
+    if(newest<0)return 0;
+    volatile const u8 *p=(volatile const u8*)SRAM_BASE+newest*SAVE_SLOT_SIZE;
+    u32 stored=sram_get32(p+4);
+    if(stored>capacity)return 0;
+    u8 *dst=data;
+    for(u32 i=0;i<stored;i++)dst[i]=p[16+i];
+    *len=stored;
     return 1;
 }
 #ifdef GBA_HOST

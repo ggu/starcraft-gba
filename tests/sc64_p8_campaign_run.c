@@ -595,6 +595,39 @@ int main(int argc,char **argv)
                 (unsigned)frame,first,host_tick,paused,screen,building,menu_last);
             census("saved");
         }
+        /* A hero with an enemy in Scarab range steps to the walkable spot
+         * near the Nexus farthest from every enemy; Protoss hit points do
+         * not regenerate. */
+        if(frame>=next_evade&&home>=0){
+            int heroes[2]={f,h};
+            for(int k=0;k<2;k++){
+                int z=heroes[k];
+                if(z<0||u[z].owner!=SIDE||enemy_clearance(u[z].x,u[z].y)>=288)continue;
+                int ex=-1,ey=-1,best=-1;
+                for(int r=96;r<=224;r+=64)for(int a=0;a<16;a++){
+                    static const int ox[16]={16,15,11,6,0,-6,-11,-15,-16,-15,-11,-6,0,6,11,15};
+                    static const int oy[16]={0,6,11,15,16,15,11,6,0,-6,-11,-15,-16,-15,-11,-6};
+                    int x=limit(b[home].x+ox[a]*r/16,48,WORLD_W-48),y=limit(b[home].y+oy[a]*r/16,48,WORLD_H-48);
+                    int cell=limit(x/16,0,MAP_COLS-1)+limit(y/16,0,MAP_ROWS-1)*MAP_COLS,wx,wy,distance=-1;
+                    if(!path_grid_valid||!SC64_GRID_GET(path_walkable,cell))continue;
+                    /* Score the walk, not just the destination: the
+                     * nearest any enemy comes to the straight path once
+                     * the hero is under way. */
+                    int clear=1024;
+                    for(int t=2;t<=8;t++){
+                        int c=enemy_clearance(u[z].x+(x-u[z].x)*t/8,u[z].y+(y-u[z].y)*t/8);
+                        if(c<clear)clear=c;
+                    }
+                    if(clear<=best)continue;
+                    if(!waypoint_to(u[z].x,u[z].y,x,y,&wx,&wy,&distance)||distance>32)continue;
+                    best=clear;ex=x;ey=y;
+                }
+                if(best<=enemy_clearance(u[z].x,u[z].y))ex=-1;
+                if(ex>=0&&dist2(u[z].tx,u[z].ty,ex,ey)>48*48)(void)hero_command(z,ex,ey);
+                next_hero=frame+900;
+            }
+            next_evade=frame+150;
+        }
         if(frame>=next_probe){(void)queue_probe();next_probe=frame+300;}
         if(frame>=next_supply){
             int pending=0;
@@ -610,21 +643,25 @@ int main(int argc,char **argv)
             next_supply=frame+300;
         }
         if(frame>=next_build){
-            if(count_type(B_GATEWAY,0)<1||(probe_count()>=10&&count_type(B_GATEWAY,0)<6))
+            /* Cannons cover the mineral line south of the Nexus, where raids
+             * arrive from frame 9,000, then the heroes' station: the Forge
+             * and four Cannons come right after the first Gateway, then gas
+             * and the Cybernetics Core, and a large bank buys more. */
+            static const int ax[6]={-40,40,-104,104,-120,-40},ay[6]={160,160,112,112,-80,-80};
+            int cannons=count_type(B_PHOTON_CANNON,0);
+            if(count_type(B_GATEWAY,0)<1)
                 (void)build_structure(B_GATEWAY,MENU_BARRACKS,80,224,-1,-1);
+            else if(!count_type(B_FORGE,0))
+                (void)build_structure(B_FORGE,MENU_ENG_BAY,80,224,-1,-1);
+            else if(count_type(B_FORGE,1)&&home>=0&&cannons<4)
+                (void)build_cannon(b[home].x+ax[cannons%6],b[home].y+ay[cannons%6]);
             else if(!count_type(B_ASSIMILATOR,0))(void)build_assimilator();
             else if(!count_type(B_CYBERNETICS_CORE,0)&&count_type(B_GATEWAY,1))
                 (void)build_structure(B_CYBERNETICS_CORE,MENU_ACADEMY,80,224,-1,-1);
-            else if(!count_type(B_FORGE,0)&&count_type(B_GATEWAY,0)>=3)
-                (void)build_structure(B_FORGE,MENU_ENG_BAY,80,224,-1,-1);
-            /* Cannons cover the mineral line south of the Nexus, where raids
-             * arrive, then the heroes' station; a large bank buys more. */
-            else if(count_type(B_FORGE,1)&&home>=0&&(count_type(B_PHOTON_CANNON,0)<4||
-                    (minerals>=500&&count_type(B_PHOTON_CANNON,0)<12))){
-                static const int ax[6]={-40,40,-104,104,-120,-40},ay[6]={160,160,112,112,-80,-80};
-                int k=count_type(B_PHOTON_CANNON,0)%6;
-                (void)build_cannon(b[home].x+ax[k],b[home].y+ay[k]);
-            }
+            else if(probe_count()>=10&&count_type(B_GATEWAY,0)<6)
+                (void)build_structure(B_GATEWAY,MENU_BARRACKS,80,224,-1,-1);
+            else if(count_type(B_FORGE,1)&&home>=0&&minerals>=500&&cannons<12)
+                (void)build_cannon(b[home].x+ax[cannons%6],b[home].y+ay[cannons%6]);
             next_build=frame+(minerals>=400?240:600);
         }
         if(frame>=next_gas){
@@ -646,38 +683,6 @@ int main(int argc,char **argv)
                     (void)train_interceptors(c,SC64_P7_CARRIER_CAPACITY-have);
             }
             next_carrier=frame+1200;
-        }
-        /* A hero with an enemy in Scarab range steps to the walkable spot
-         * near the Nexus farthest from every enemy; Protoss hit points do
-         * not regenerate. */
-        if(frame>=next_evade&&home>=0){
-            int heroes[2]={f,h};
-            for(int k=0;k<2;k++){
-                int z=heroes[k];
-                if(z<0||u[z].owner!=SIDE||enemy_clearance(u[z].x,u[z].y)>=288)continue;
-                int ex=-1,ey=-1,best=-1;
-                for(int r=96;r<=224;r+=64)for(int a=0;a<16;a++){
-                    static const int ox[16]={16,15,11,6,0,-6,-11,-15,-16,-15,-11,-6,0,6,11,15};
-                    static const int oy[16]={0,6,11,15,16,15,11,6,0,-6,-11,-15,-16,-15,-11,-6};
-                    int x=limit(b[home].x+ox[a]*r/16,48,WORLD_W-48),y=limit(b[home].y+oy[a]*r/16,48,WORLD_H-48);
-                    int cell=limit(x/16,0,MAP_COLS-1)+limit(y/16,0,MAP_ROWS-1)*MAP_COLS,wx,wy,distance=-1;
-                    if(!path_grid_valid||!SC64_GRID_GET(path_walkable,cell))continue;
-                    /* Score the walk, not just the destination: the
-                     * nearest any enemy comes to the straight path. */
-                    int clear=1024;
-                    for(int t=0;t<=8;t++){
-                        int c=enemy_clearance(u[z].x+(x-u[z].x)*t/8,u[z].y+(y-u[z].y)*t/8);
-                        if(c<clear)clear=c;
-                    }
-                    if(clear<=best)continue;
-                    if(!waypoint_to(u[z].x,u[z].y,x,y,&wx,&wy,&distance)||distance>32)continue;
-                    best=clear;ex=x;ey=y;
-                }
-                if(best<=enemy_clearance(u[z].x,u[z].y))ex=-1;
-                if(ex>=0&&dist2(u[z].tx,u[z].ty,ex,ey)>48*48)(void)hero_command(z,ex,ey);
-                next_hero=frame+900;
-            }
-            next_evade=frame+150;
         }
         /* Collect the rescuable heroes, then keep them at home. */
         if(frame>=next_hero){
@@ -702,7 +707,7 @@ int main(int argc,char **argv)
             int raiders=0;
             for(int i=0;i<MAX_UNITS;i++)raiders+=u[i].alive&&u[i].owner==ENEMY&&
                 dist2(u[i].x,u[i].y,b[home].x,b[home].y)<320*320;
-            if(raiders>=3)attacking=0;
+            if(raiders>=2)attacking=0;
             if(threat>=0&&!attacking){
                 (void)army_command(MENU_ATTACK,u[threat].x,u[threat].y);
                 fprintf(trace,"{\"kind\":\"defend\",\"frame\":%u,\"target\":[%d,%d]}\n",
@@ -713,7 +718,10 @@ int main(int argc,char **argv)
         }
         if(frame>=next_order){
             int cell=stasis_cell();
-            if(!attacking&&army_count()>=24)attacking=1;
+            /* Attack at 40 units, or with what there is once the bank can no
+             * longer grow the army (the start base mines out). */
+            if(!attacking&&(army_count()>=40||
+               (army_count()>=20&&frame>=P8_SAVE_FRAME&&minerals<100)))attacking=1;
             if(attacking&&cell>=0){
                 /* Route from the army unit nearest the Cell; new units at
                  * home would skew an average. A unit in a building pocket has
@@ -759,8 +767,11 @@ int main(int argc,char **argv)
                         if(d<ad){ad=d;arb=i;}
                     }
                 }
-                if(distance>=0&&prior_distance>=0&&distance+2>=prior_distance)++stalls;else stalls=0;
-                prior_distance=distance;
+                /* Progress is measured against the best route seen, so a
+                 * front that oscillates between two routes still stalls. */
+                if(distance>=0&&prior_distance>=0&&distance+2>=prior_distance)++stalls;
+                else{stalls=0;if(distance>=0)prior_distance=distance;}
+                if(prior_distance<0)prior_distance=distance;
                 /* At the Cell, give every group a fresh order on the Cell or
                  * its Arbiters; stale attack orders would otherwise stand. */
                 army_force=distance<0||distance<12;

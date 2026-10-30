@@ -58,6 +58,7 @@ extern u8 gba_vram_scratch[GBA_VRAM_SCRATCH_BYTES];
 #define GBA_VRAM_SCRATCH ((u8 *)0x06014000)
 #endif
 int gfx_blit_window(int y,int height,const u8 *source,int stride,int rows,int left,int top);
+int gfx_blit_terrain_window(int y,int height,const u8 *source,int stride,int rows,int left,int top);
 #if defined(D2_DEN_OF_EVIL) || defined(GBA_HOST)
 int gfx_blit_window_2x(int y,int height,const u8 *source,int stride,int rows,int left,int top);
 #endif
@@ -101,6 +102,7 @@ int clampi(int x,int lo,int hi);
 int absi(int x);
 void save_write(const void *data,u32 length,u32 tag);
 int save_read(void *data,u32 length,u32 tag);
+int save_read_latest(void *data,u32 capacity,u32 tag,u32 *length);
 void audio_tone(int frequency,int frames,int volume);
 void audio_noise(int frames,int volume);
 void audio_update(void);

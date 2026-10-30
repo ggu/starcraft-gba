@@ -12,12 +12,14 @@
 #endif
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 #define race_data sc64_zp_route_save_scratch.save
-#elif defined(SC64_T3_ENABLED)
-#ifdef SC64_T4_SCENARIO_RUNTIME
+#define race_impact_record sc64_zp_route_save_scratch.impact_record
+#elif defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
 #define race_data sc64_combined_route_save_scratch.save
-#else
-static RaceSave race_data;
-#endif
+#define race_impact_record sc64_combined_route_save_scratch.impact_record
+#elif defined(SC64_IMPACT_EVENTS)
+/* The record's first member is the RaceSave; pending impacts follow it. */
+static RaceImpactRecord race_impact_record;
+#define race_data race_impact_record.save
 #else
 static RaceSave race_data;
 #endif
@@ -1027,7 +1029,13 @@ static int race_save_game(void) {
     if (!race_p7_carrier_training_save_valid(&race_data,
             (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
 #endif
+#ifdef SC64_IMPACT_EVENTS
+    /* After every validator: P7 carrier validation reuses the scratch tail. */
+    if(!race_impact_save_write())return 0;
+    toast(7);return 1;
+#else
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);toast(7);return 1;
+#endif
 }
 /* Load preflight validates the candidate under its own service binding (its
  * mode and mission), then the live world takes it; the override never
@@ -1058,7 +1066,15 @@ static int race_load_game_candidate(void) {
     Sc64TerranLateMissionState expanded_terran_late;
     int expanded_terran_late_valid = 0;
 #endif
+#ifdef SC64_IMPACT_EVENTS
+    /* Decode pending impacts before validators reuse the scratch tail. */
+    Sc64ImpactEvent impact_candidate[RACE_IMPACT_SAVE_CAPACITY];
+    int impact_candidate_count = 0;
+    if(!race_impact_save_read(impact_candidate,&impact_candidate_count)||
+       race_data.version!=SAVE_VERSION)return 0;
+#else
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
+#endif
 #ifdef SC64_P7_BATTERY_ENABLED
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
@@ -2375,6 +2391,9 @@ static int race_load_game_candidate(void) {
     if (!race_p7_projectile_restore(race_data.interceptor_projectiles)) return 0;
 #endif
     clear_tracers();death_vfx_reset();mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
+#ifdef SC64_IMPACT_EVENTS
+    race_impact_restore(impact_candidate,impact_candidate_count);
+#endif
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
     /* Loading restores the same serialized topology as the payload. Rebuild
      * routes, but do not treat the restore as a topology change that would

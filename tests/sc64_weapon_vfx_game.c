@@ -112,7 +112,8 @@ int main(void)
     gba_init(); game_init();
     race_mode=1; race_human=R_ZERG; race_bots=1;
     race_skirmish_init(); screen=SCREEN_PLAY;
-    _Static_assert(sizeof(Tracer)==6*sizeof(int),"visual metadata keeps tracer layout");
+    /* Visual metadata never grows a tracer; race builds keep 16-bit endpoints. */
+    _Static_assert(sizeof(Tracer)==4*sizeof(s16)+2*sizeof(int),"visual metadata keeps tracer layout");
     test_profiles();
     int types[]={U_MARINE,U_FIREBAT,U_HYDRALISK,U_HUNTER_KILLER,U_ZERGLING,
         U_ZEALOT,U_DRAGOON,U_GOLIATH,U_WRAITH,U_SCOUT,U_TANK,U_SIEGE_TANK,
