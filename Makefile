@@ -916,7 +916,7 @@ test-sc64-t5-ai: build/test-sc64-t5-ai
 test-starcraft: test-sc64-t5-ai
 build/test-sc64-t5-world: tests/sc64_t5_world.c $(STARCRAFT) $(wildcard starcraft/*.h) $(RACE_CAMPAIGN_INPUTS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) common/gba.h common/gba.c Makefile | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(T5_PROBE_FLAGS) $< common/gba.c -o $@
-build/test-sc64-t5-mines: tests/sc64_t5_mines.c starcraft/sc64_t5_mine_adapter.h starcraft/sc64_weapon_vfx.h common/gba.h Makefile | build
+build/test-sc64-t5-mines: tests/sc64_t5_mines.c starcraft/sc64_t5_mine_adapter.h starcraft/sc64_siege_source_bounds.h starcraft/sc64_weapon_vfx.h common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-t5-world test-sc64-t5-mines
 test-sc64-t5-world: build/test-sc64-t5-world
