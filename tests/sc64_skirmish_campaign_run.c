@@ -18,6 +18,14 @@ static unsigned host_ticks;
 static FILE *trace;
 static int trace_first = 1;
 
+enum build_state { BUILD_NONE, BUILD_PENDING, BUILD_FOUNDATION };
+static struct {
+    enum build_state state;
+    int worker, type, x, y, building, complete;
+} combat_build;
+
+static void observe_combat_build(void);
+
 static void trace_record(const char *format, ...)
 {
     if (!trace) return;
@@ -41,6 +49,7 @@ static void input(u16 held)
         trace_record("{\"kind\":\"input\",\"host_tick\":%u,\"frame\":%d,\"held\":%u,\"pressed\":%u}",
                      host_ticks, frame, (unsigned)held, (unsigned)pressed);
     }
+    observe_combat_build();
 }
 
 static void tap(u16 key) { input(key); input(0); }
@@ -95,8 +104,24 @@ static int select_unit(int slot)
     if (menu_open) tap(KEY_B);
     if (mode != MODE_NORMAL) tap(KEY_B);
     clear_building_selection();
+    if (u[slot].selected && selected_count() == 1) return 1;
     for (int attempt = 0; attempt < 4 && u[slot].alive && screen == SCREEN_PLAY; ++attempt) {
-        move_cursor(u[slot].x, u[slot].y);
+        unsigned guard = 0;
+        /* A worker may move while the cursor travels. Follow its current
+         * position and click only while the UI would select that worker. */
+        while (u[slot].alive && selection_target() != slot && guard++ < 6000u &&
+               host_ticks < match_limit && screen == SCREEN_PLAY && !won && !lost) {
+            int dx = u[slot].x - cx, dy = u[slot].y - cy;
+            if (abs(dx) <= 1 && abs(dy) <= 1) break;
+            u16 held = (abs(dx) >= 4 && (abs(dy) >= 4 || abs(dy) <= 1)) ||
+                       (abs(dy) >= 4 && abs(dx) <= 1) ? KEY_R : 0;
+            if (dx > 1) held |= KEY_RIGHT;
+            if (dx < -1) held |= KEY_LEFT;
+            if (dy > 1) held |= KEY_DOWN;
+            if (dy < -1) held |= KEY_UP;
+            input(held);
+        }
+        if (selection_target() != slot) break;
         tap(KEY_A);
         if (u[slot].selected && selected_count() == 1) return 1;
     }
@@ -120,13 +145,15 @@ static int select_building(int slot)
 static void move_cursor(int x, int y)
 {
     unsigned guard = 0;
-    while ((cx != x || cy != y) && guard++ < 6000u && host_ticks < match_limit && screen == SCREEN_PLAY &&
+    while ((abs(cx - x) > 1 || abs(cy - y) > 1) && guard++ < 6000u && host_ticks < match_limit && screen == SCREEN_PLAY &&
            !won && !lost) {
-        u16 held = KEY_R;
-        if (cx < x) held |= KEY_RIGHT;
-        if (cx > x) held |= KEY_LEFT;
-        if (cy < y) held |= KEY_DOWN;
-        if (cy > y) held |= KEY_UP;
+        int dx = x - cx, dy = y - cy;
+        u16 held = (abs(dx) >= 4 && (abs(dy) >= 4 || abs(dy) <= 1)) ||
+                   (abs(dy) >= 4 && abs(dx) <= 1) ? KEY_R : 0;
+        if (dx > 1) held |= KEY_RIGHT;
+        if (dx < -1) held |= KEY_LEFT;
+        if (dy > 1) held |= KEY_DOWN;
+        if (dy < -1) held |= KEY_UP;
         input(held);
     }
     input(0);
@@ -145,6 +172,32 @@ static void clear_building_selection(void)
         input(held);
     }
     input(0);
+}
+
+static int choose_menu_command(int command)
+{
+    if (menu_open) tap(KEY_B);
+    tap(KEY_B);
+    for (int guard = 0; menu_open && menu_cursor != command && guard < 32; ++guard) {
+#ifdef SC64_COMMAND_ICONS
+        if (card_fits()) {
+            int slot = card_command_slot(menu_cursor);
+            int target_col = card_command_slot(command) % CARD_COLUMNS;
+            int row_length = field_menu_count() - (slot / CARD_COLUMNS) * CARD_COLUMNS;
+            if (row_length > CARD_COLUMNS) row_length = CARD_COLUMNS;
+            if (slot % CARD_COLUMNS != target_col) {
+                /* A short last row may not contain the target column. */
+                tap(target_col >= row_length ? KEY_UP : KEY_RIGHT);
+            } else {
+                tap(KEY_DOWN);
+            }
+        } else
+#endif
+            tap(KEY_DOWN);
+    }
+    if (!menu_open || menu_cursor != command) return 0;
+    tap(KEY_A);
+    return 1;
 }
 
 static int count_units(int owner, int type)
@@ -180,12 +233,56 @@ static int choose_build_site(int type, int *out_x, int *out_y)
     for (int ring = 0; ring < 3; ++ring)
         for (int y = race_base_y[0] - 96 - ring * 32; y <= race_base_y[0] + 96 + ring * 32; y += 16)
             for (int x = race_base_x[0] - 96 - ring * 32; x <= race_base_x[0] + 96 + ring * 32; x += 16) {
-                if (x < 24 || y < 24 || x >= WORLD_W - 24 || y >= WORLD_H - 24 ||
-                    !race_can_site(SIDE, type, x, y) || !can_place(type, x, y)) continue;
-                int d = dist2(race_base_x[0], race_base_y[0], x, y);
-                if (d < best_distance) { best_distance = d; *out_x = x; *out_y = y; found = 1; }
+                int site_x = x, site_y = y;
+#ifdef SC64_FIELD_CONTROLS
+                field_ui_site(type, &site_x, &site_y);
+#endif
+                if (site_x < 24 || site_y < 24 || site_x >= WORLD_W - 24 || site_y >= WORLD_H - 24 ||
+                    !race_can_site(SIDE, type, site_x, site_y) || !can_place(type, site_x, site_y)) continue;
+                int d = dist2(race_base_x[0], race_base_y[0], site_x, site_y);
+                if (d < best_distance) { best_distance = d; *out_x = site_x; *out_y = site_y; found = 1; }
             }
     return found;
+}
+
+/* Observe on every tick, including ticks spent navigating menus. A Drone may
+ * disappear and a Probe may be idle immediately after creating a foundation. */
+static void observe_combat_build(void)
+{
+    if (combat_build.state == BUILD_NONE) return;
+    if (combat_build.state == BUILD_PENDING) {
+        for (int i = 0; i < MAX_BUILDINGS; ++i) {
+            if (b[i].alive && b[i].owner == SIDE && b[i].type == combat_build.type &&
+                b[i].x == combat_build.x && b[i].y == combat_build.y) {
+                combat_build.state = BUILD_FOUNDATION;
+                combat_build.building = i;
+                fprintf(stderr, "build: foundation tick%u slot%d type%d bank%d/%d\n",
+                        host_ticks, i, combat_build.type, minerals, gas);
+                break;
+            }
+        }
+        if (combat_build.state == BUILD_PENDING &&
+            (!u[combat_build.worker].alive || u[combat_build.worker].owner != SIDE ||
+             u[combat_build.worker].order != ORDER_BUILD_PENDING ||
+             u[combat_build.worker].target != combat_build.type ||
+             u[combat_build.worker].tx != combat_build.x ||
+             u[combat_build.worker].ty != combat_build.y)) {
+            fprintf(stderr, "build: request ended without foundation tick%u worker%d\n",
+                    host_ticks, combat_build.worker);
+            combat_build.state = BUILD_NONE;
+        }
+    }
+    if (combat_build.state == BUILD_FOUNDATION) {
+        int i = combat_build.building;
+        if (!b[i].alive || b[i].owner != SIDE || b[i].type != combat_build.type ||
+            b[i].x != combat_build.x || b[i].y != combat_build.y) {
+            fprintf(stderr, "build: foundation lost tick%u slot%d\n", host_ticks, i);
+            combat_build.state = BUILD_NONE;
+        } else if (!combat_build.complete && building_complete(i)) {
+            combat_build.complete = 1;
+            fprintf(stderr, "build: complete tick%u slot%d type%d\n", host_ticks, i, combat_build.type);
+        }
+    }
 }
 
 static int build_barracks(void)
@@ -196,7 +293,7 @@ static int build_barracks(void)
     int worker_type = option_human == R_ZERG ? U_DRONE :
                       option_human == R_PROTOSS ? U_PROBE : U_SCV;
     for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && u[i].owner == SIDE && u[i].type == worker_type && u[i].order != ORDER_BUILD) {
+        if (build_worker_available(i, SIDE, worker_type)) {
             worker = i; break;
         }
     if (worker < 0) { fprintf(stderr, "build: no free worker type%d\n", worker_type); return 0; }
@@ -207,14 +304,33 @@ static int build_barracks(void)
         fprintf(stderr, "build: worker selection failed slot%d xy%d,%d mode%d menu%d\n",
                 worker, u[worker].x, u[worker].y, mode, menu_open); return 0;
     }
-    tap(KEY_B); tap(KEY_DOWN); tap(KEY_DOWN); tap(KEY_A);
+    if (!choose_menu_command(MENU_BARRACKS)) {
+        fprintf(stderr, "build: cannot navigate command menu cursor%d\n", menu_cursor);
+        return 0;
+    }
     if (mode != MODE_BUILD || menu != build_type) {
         fprintf(stderr, "build: expected menu type%d got mode%d type%d selected%d\n",
                 build_type, mode, menu, selected_count()); return 0;
     }
+    move_cursor(x, y);
+    if (screen != SCREEN_PLAY || won || lost || host_ticks >= match_limit ||
+        mode != MODE_BUILD || abs(cx - x) > 1 || abs(cy - y) > 1 ||
+        !u[worker].alive || !u[worker].selected) return 0;
+    /* Track the snapped UI site, which can differ from the cursor position. */
+    x = cx; y = cy;
+#ifdef SC64_FIELD_CONTROLS
+    field_ui_site(build_type, &x, &y);
+#endif
     int minerals_before = minerals, gas_before = gas;
-    move_cursor(x, y); tap(KEY_A);
-    int accepted = u[worker].order == ORDER_BUILD;
+    combat_build.state = BUILD_PENDING;
+    combat_build.worker = worker; combat_build.type = build_type;
+    combat_build.x = x; combat_build.y = y; combat_build.building = -1;
+    combat_build.complete = 0;
+    unsigned before_click = host_ticks;
+    input(KEY_A);
+    int accepted = host_ticks > before_click && mode == MODE_NORMAL && combat_build.state != BUILD_NONE;
+    if (!accepted) combat_build.state = BUILD_NONE;
+    input(0);
     fprintf(stderr, "build: issued type%d at%d,%d worker%d order%d mode%d bank%d/%d\n",
             build_type, x, y, worker, u[worker].order, mode, minerals, gas);
     if (accepted)
@@ -242,6 +358,14 @@ static int human_combat_unit(void)
            option_human == R_PROTOSS ? U_ZEALOT : U_MARINE;
 }
 
+static int record_attack_result(int x, int y, int issued)
+{
+    if (mode != MODE_NORMAL || issued <= 0) return 0;
+    trace_record("{\"kind\":\"action\",\"action\":\"attack_move\",\"host_tick\":%u,\"frame\":%d,\"x\":%d,\"y\":%d,\"selected_issued\":%d}",
+                 host_ticks, frame, x, y, issued);
+    return 1;
+}
+
 static int attack_order(int x, int y)
 {
     if (menu_open) tap(KEY_B);
@@ -253,16 +377,21 @@ static int attack_order(int x, int y)
     if (seed < 0 || !select_unit(seed)) return 0;
     tap(KEY_R);
     if (selected_count() <= 0) return 0;
-    tap(KEY_B); tap(KEY_DOWN); tap(KEY_A);
+    if (!choose_menu_command(MENU_ATTACK)) return 0;
     if (mode != MODE_ATTACK) return 0;
-    move_cursor(x, y); tap(KEY_A);
+    move_cursor(x, y);
+    /* Cursor travel can end the match before the target click. Existing
+     * attack-move orders then say nothing about this attempted gesture. */
+    if (screen != SCREEN_PLAY || won || lost || host_ticks >= match_limit ||
+        mode != MODE_ATTACK || abs(cx - x) > 1 || abs(cy - y) > 1) return 0;
+    unsigned before_click = host_ticks;
+    tap(KEY_A);
+    if (host_ticks == before_click) return 0;
     int issued = 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         issued += u[i].alive && u[i].owner == SIDE && u[i].selected &&
                   u[i].order == ORDER_ATTACK_MOVE;
-    trace_record("{\"kind\":\"action\",\"action\":\"attack_move\",\"host_tick\":%u,\"frame\":%d,\"x\":%d,\"y\":%d,\"selected_issued\":%d}",
-                 host_ticks, frame, x, y, issued);
-    return mode == MODE_NORMAL && issued > 0;
+    return record_attack_result(x, y, issued);
 }
 
 static void write_progress(void)
@@ -326,16 +455,16 @@ int main(int argc, char **argv)
             race_base_x[2], race_base_y[2], race_base_x[3], race_base_y[3]);
 
     unsigned next_production = 1800, next_attack = 4200, next_report = 3000;
-    int barracks_requested = 0;
     while (host_ticks < match_limit && screen == SCREEN_PLAY && !won && !lost) {
         input(0);
         const Sc64RaceBuildingRule *combat_building = sc64_race_building_rule(human_combat_building());
-        if (!barracks_requested && combat_building && minerals >= combat_building->minerals && host_ticks >= 1200) {
-            barracks_requested = build_barracks();
+        if (combat_build.state == BUILD_NONE && combat_building && minerals >= combat_building->minerals && host_ticks >= 1200) {
+            int barracks_requested = build_barracks();
             fprintf(stderr, "barracks attempt tick%u accepted%d buildingcount%d\n",
                     host_ticks, barracks_requested, count_buildings(SIDE, human_combat_building()));
         }
-        if (host_ticks >= next_production) {
+        if (host_ticks >= next_production && combat_build.state == BUILD_FOUNDATION &&
+            combat_build.complete) {
             int producer = -1;
             for (int i = 0; i < MAX_BUILDINGS; ++i)
                 if (b[i].alive && b[i].owner == SIDE && b[i].type == human_producer_type() &&
@@ -343,15 +472,20 @@ int main(int argc, char **argv)
                     (option_human != R_ZERG || b[i].larva > 0)) { producer = i; break; }
             if (producer >= 0 && minerals >= 50 && select_building(producer)) {
                 int wanted = human_combat_unit();
-                int queue_before = b[producer].queue_count;
-                int minerals_before = minerals, gas_before = gas;
                 for (int step = 0; train_type != wanted && step < 5; ++step) tap(KEY_R);
                 fprintf(stderr, "production tick%u producer%d type%d train%d wanted%d queue%d larva%d bank%d/%d\n",
                         host_ticks, producer, b[producer].type, train_type, wanted,
                         b[producer].queue_count, b[producer].larva, minerals, gas);
-                if (train_type == wanted && minerals >= sc64_race_unit_rule(wanted)->minerals)
+                unsigned before_click = host_ticks;
+                int minerals_before = minerals, gas_before = gas;
+                int queue_before = b[producer].queue_count;
+                int attempted = train_type == wanted && screen == SCREEN_PLAY && !won && !lost &&
+                    host_ticks < match_limit && b[producer].alive && b[producer].owner == SIDE &&
+                    b[producer].type == human_producer_type() && selected_building == producer &&
+                    minerals >= sc64_race_unit_rule(wanted)->minerals;
+                if (attempted)
                     tap(KEY_A);
-                if (b[producer].queue_count > queue_before)
+                if (attempted && host_ticks > before_click && b[producer].queue_count > queue_before)
                     trace_record("{\"kind\":\"action\",\"action\":\"queue\",\"host_tick\":%u,\"frame\":%d,\"producer\":%d,\"type\":%d,\"minerals_before\":%d,\"minerals_after\":%d,\"gas_before\":%d,\"gas_after\":%d}",
                                  host_ticks, frame, producer, wanted, minerals_before, minerals,
                                  gas_before, gas);

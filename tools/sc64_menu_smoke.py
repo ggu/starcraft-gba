@@ -42,21 +42,37 @@ def world_palette_restored(rsp: RSP, sym: dict[str, int]) -> bool:
 
 
 def start_emulator(name: str, rom: pathlib.Path, out: pathlib.Path,
-                   sym: dict[str, int]):
+                   sym: dict[str, int], *, gdb_port: int = 2345,
+                   gdb_launcher: pathlib.Path | None = None,
+                   isolated_home: pathlib.Path | None = None):
     mgba = require_mgba()
+    if not 1 <= gdb_port <= 65535:
+        raise ValueError("invalid GDB port")
+    if gdb_port != 2345 and gdb_launcher is None:
+        raise RuntimeError("stock mGBA -g hardcodes port 2345; supply a port-capable launcher")
     save_dir = out / "saves" / name
     save_dir.mkdir(parents=True, exist_ok=True)
     log = (out / f"{name}.log").open("ab")
-    proc = subprocess.Popen(
-        [mgba, "-g", "-C", "mute=1", "-C", "audioSync=0", "-C",
-         "videoSync=0", "-C", f"savegamePath={save_dir}", str(rom)],
-        stdout=log, stderr=log)
+    command = [mgba, "-g", "-C", "mute=1", "-C", "audioSync=0", "-C",
+               "videoSync=0", "-C", f"savegamePath={save_dir}", str(rom)]
+    if gdb_launcher is not None:
+        command = [str(gdb_launcher), "--gdb-port", str(gdb_port), "--", *command]
+    env = None
+    if isolated_home is not None:
+        import os
+        isolated_home.mkdir(parents=True, exist_ok=True)
+        env = os.environ.copy()
+        env["HOME"] = str(isolated_home.resolve())
+        env["XDG_CONFIG_HOME"] = str((isolated_home / ".config").resolve())
+    proc = subprocess.Popen(command, stdout=log, stderr=log, env=env)
     sock = None
     try:
         deadline = time.monotonic() + 12
         while time.monotonic() < deadline:
             try:
-                sock = socket.create_connection(("127.0.0.1", 2345), timeout=1)
+                if proc.poll() is not None:
+                    raise RuntimeError("mGBA launcher exited before opening its GDB port")
+                sock = socket.create_connection(("127.0.0.1", gdb_port), timeout=1)
                 break
             except OSError:
                 time.sleep(0.1)
