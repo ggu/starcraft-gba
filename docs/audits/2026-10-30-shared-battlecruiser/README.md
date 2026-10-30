@@ -232,6 +232,79 @@ logged failure. The numeric process exit receipt was not retained, so this
 record is distinguished from gates with an explicitly captured exit status.
 No new full default-suite exit-0 receipt is claimed for that archive run.
 
+## Ordinary-input acquisition, ability and SRAM witness
+
+Test-only commits `a4997ba`, `e634f7b`, `1cf3cfe` and `edeba78` add a
+reproducible controller, independent replay/fresh-load programs and strict
+transition conversion. They do not change production code. The source-bound
+host workflow is `make test-sc64-bc-normal-input`, using already prepared
+canonical Terran/BC inputs; it never invokes their import generators. The
+converter's authored malformed/duplicate/order/transition checks pass, and
+the end-to-end Make target has a captured exit-0 receipt.
+
+This is one Blood Bath custom game: Terran against one active Zerg opponent.
+Its actual normal start is **200 minerals, zero gas and four workers**; no
+50-mineral start is claimed. The policy reads observations to choose buttons,
+but all authoritative gameplay changes pass through `game_update` inputs.
+Failed matches are retained rather than described as successes. The successful
+run pays for the Barracks, Refinery and gas workers, defenders, Factory,
+Starport/Control Tower, Science Facility/Physics Lab, Yamato research and the
+400/300 Battlecruiser. It waits for natural energy, moves to reveal a target
+and issues Yamato through B/menu/A. No actors, funds, clocks, energy or
+research are seeded.
+
+The original flight endpoint has 575 held-key transitions. The separate
+pause/save/impact continuation has 581; fresh host processes replay both
+independently. The source-bound milestones also reproduce in new debuggerless
+mGBA processes with canonical Terran features, normal update/audio/render
+calls and read-only witnesses:
+
+| Input tick | Observation |
+| ---: | --- |
+| 12,632 | First live BC, research present, energy 12,808 Q8 |
+| 16,630 | Natural energy 38,400 Q8 (150 points) |
+| 17,866 | Yamato charging |
+| 17,921 | Yamato flight; BC energy 7,632 Q8 |
+| 17,925 | START/B pause save, game frame 17,647, valid 15,836-byte record |
+| 17,937 | Shot clears; target HP 200 to -60/dead; match remains active |
+
+The host witnesses derive the real projectile target, accept the combined
+unit/building target namespace and require an actual HP decrease. The
+canonical controller reports `UI_NOTICE_SAVED`; no matching-version record
+exists before the save input. A fresh host process loads through HOME/L and
+reproduces the hit. An independent new ARM process loads the actual
+ARM-created 32-KiB SRAM file through HOME/L, sees the same in-flight shot and
+200-HP target, then reproduces the impact after 11 neutral updates. The copied
+ARM save SHA-256 is
+`ead9f15e7ad05fbf77d675388d077c59b19a2168cbd922da0e13f12baea4771d`.
+No production save/load function is invoked directly by the input driver.
+
+Private evidence is in the `bc-normal-input-qualification-20261030` worktree:
+`.local/bc-normal-arm/`, `bc-normal-arm-impact/` and `bc-normal-arm-fresh/`,
+with separate probes, compiler vectors, ROM/ELF identities, logs and saves.
+The 35 private production inputs match the retained Terran input receipt;
+production `game.c` SHA-256 remains
+`2c0651085b5325734aeaef4f0295796293af0da8e86b95b065d3ecc79ee0fdad`.
+These probes use a test entry point and witnesses: they are not byte-identical
+normal cartridges or physical-GBA measurements. Their unchanged IWRAM guard
+passes (`0x03004ec0`); the ordinary four-product bounds above remain separate.
+The hardened public workflow's exit receipt and logs are in
+`.local/build/bc-normal-witness-v2/` in the shared integration worktree.
+
+This clears the earlier absence of any ordinary-input ARM BC/ability/SRAM
+witness for this specific path. It does not establish ordinary acquisition
+in every race product, map, opponent combination, campaign or crowded state.
+The multi-profile seeded fixtures remain separately scoped. Near 30 fps,
+physical hardware, complete roster services and all 30 missions remain open.
+
+Final clean indexed archive `edeba78` passes source boundary (1,107 indexed
+text sources), doctor, default build and default test with explicitly retained
+numeric exit-0 receipts. The test run records 707 Python tests with 23 skips,
+the separate eight-test suite and the C checks. This resolves the earlier
+missing archive-exit receipt; that historical limitation and failure logs are
+retained. Evidence is in `.local/bc-final-normal-qualification-v1/`. The later
+audit-document edit changes no compiled or tested source.
+
 ## Evidence and remaining work
 
 Private evidence is relative to the BC integration worktree:
@@ -251,9 +324,10 @@ Private evidence is relative to the BC integration worktree:
 - `.local/build/bc-production-closure-v2/`: final four ARM source/input deltas,
   guards, raw payload and cartridge checks.
 
-Current normal-input ARM ability/SRAM coverage, broader whole-frame and stack
-qualification, physical hardware, full roster services and remaining campaign
-stages are still open. Native N64 resolution/random-history/blend behavior is
+Ordinary-input ARM ability/SRAM coverage is currently the one path above.
+Other canonical scenarios, broader whole-frame and stack qualification,
+physical hardware, full roster services and remaining campaign stages are
+still open. Native N64 resolution/random-history/blend behavior is
 not reconstructed completely by the imported data and PC behavioral proxies.
 Near 30 fps remains an active goal. No Actions, GDB or SD-card writes were used
 for this stage. No assets, ROMs, saves, captures or private traces are tracked.
