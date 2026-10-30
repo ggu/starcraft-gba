@@ -5,24 +5,27 @@ This page records reproducible checks for the source snapshot. Automated host ch
 ## Protoss P8 candidate (2026-10-29)
 
 The explicit `protoss-p8` candidate (`SCP8`, generation 44) adds P8 to the
-canonical P1–P7 profile and runs the shared Protoss unit services (Carrier
-Interceptors, Arbiter cloak, Observer and Cannon detection, Shield
-Batteries). Canonical Protoss is unchanged and stays P7; its rebuilt ROM is
-byte-identical to `codex/source-release` 8d1e653. One ordinary-input host
-controller run wins P8 at frame 104,385 with no runtime faults, and is
-deterministic across runs. The input-only ARM replay of its 9,993-transition
-key tape matches all 107 host observations, state digests included, through
-the same win. A pause-menu save at frame 31,205, with a structure under
-construction and the merged construction and building-damage markers, gives
-an SRAM record that is byte-identical on host and ARM. Loading it from the
-title screen in a fresh process continues to the same win, matching the
-uninterrupted replay at every common observation. Whole-tape ARM guest
-timing averages 1,994,247 cycles per frame (about 8.4 fps equivalent; frame
-rate is not qualified). The playable ROM links at `__bss_end=0x02038994` and
-`__iwram_end=0x03004c40`. Executed build commands, raw dependency output and
-input hashes are recorded in the audit. The AI backend, transmission
-duration and trigger cadence are authored. These are emulator and host
-results only, with no hardware claim. See the
+canonical P1–P7 profile and binds the shared Protoss unit services (Carrier
+Interceptors, Arbiter cloak, detection, Shield Batteries); custom games and
+Showcase scenes bind the same services generically. Canonical Protoss stays
+P7. Its image changes to `c233d360…` because it compiles that generic
+binding (8 more bytes of EWRAM, unchanged IWRAM and save size), and its P1,
+P2, P3, P6 and P7 campaign controller traces are byte-identical to the
+pre-refactor base. One ordinary-input host controller run wins P8 at frame
+140,577 with no runtime faults, and is deterministic across runs. The
+input-only ARM replay of its 19,114-transition key tape matches all 144 host
+observations, state digests included, through the same win. A pause-menu
+save at frame 35,958, with a structure under construction, gives an SRAM
+record that is byte-identical on host and ARM. Loading it from the title
+screen in a fresh process continues to the same win: under the strict
+comparator it holds every observation of the uninterrupted replay from the
+documented resume tick, with no missing, duplicate or extra ticks.
+Whole-tape ARM guest timing averages 2,365,929 cycles per frame (about 7.1
+fps equivalent; frame rate is not qualified). The playable ROM links at
+`__bss_end=0x020389a4` and `__iwram_end=0x03004c48`. Executed build
+commands, raw dependency output and input hashes are recorded in the audit.
+The AI backend, transmission duration and trigger cadence are authored.
+These are emulator and host results only, with no hardware claim. See the
 [P8 candidate audit](audits/2026-10-29-p8-campaign/README.md).
 
 ## Current race-build continuation (2026-10-28)

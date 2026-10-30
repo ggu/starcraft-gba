@@ -123,10 +123,11 @@ remain unqualified in the canonical profiles.
 P8 **The Trial of Tassadar** has a separate, unpromoted `protoss-p8`
 candidate. It carries the canonical P1–P7 profile, is built with
 `make protoss-p8` and writes `StarCraft-Protoss-P8-GBA.gba` /
-`starcraft-protoss-p8.elf`, code `SCP8`, generation 44. P8 runs the shared
+`starcraft-protoss-p8.elf`, code `SCP8`, generation 44. P8 binds the shared
 Protoss unit services: Carrier Interceptor training and flight, Arbiter
-cloaking, Observer and Cannon detection, and Shield Batteries authenticated
-from its own map. One ordinary-input host controller run wins P8, training
+cloaking, detection, and Shield Batteries authenticated from its own map.
+Custom games and Showcase scenes bind the same services generically (see
+[SHARED-ENGINE.md](SHARED-ENGINE.md#shared-protoss-unit-services)). One ordinary-input host controller run wins P8, training
 and launching the human Carrier's Interceptors. The input-only ARM replay of
 its key tape matches every host observation through the win. A pause-menu
 SRAM save taken while a structure is under construction, loaded in a fresh

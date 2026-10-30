@@ -99,8 +99,10 @@ sc64_p8_arm_replay.o: tests/sc64_p8_arm_replay.c \
  tests/../starcraft/sc64_chrome.h \
  .local/sc64/interface/generated/sc64_chrome_generated.h \
  .local/sc64/briefings/generated/sc64_briefing_generated.h \
- starcraft/sc64_briefing.h tests/../starcraft/sc64_visibility.h \
- tests/../starcraft/sc64_unit_walk.h tests/../starcraft/sc64_routes.h \
+ starcraft/sc64_briefing.h tests/../starcraft/sc64_protoss_services.h \
+ tests/../starcraft/sc64_visibility.h tests/../starcraft/sc64_unit_walk.h \
+ tests/../starcraft/sc64_routes.h tests/../starcraft/sc64_depot_goal.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/limits.h \
  tests/../starcraft/sc64_route_monotone_probe.h \
  tests/../starcraft/sc64_transport_adapter.h \
  tests/../starcraft/sc64_transport_rules.h \
@@ -114,7 +116,6 @@ sc64_p8_arm_replay.o: tests/sc64_p8_arm_replay.c \
  tests/../starcraft/sc64_tank_source_vfx_render.h \
  .local/sc64/tank-vfx/generated/sc64_tank_source_vfx_generated.h \
  tests/../starcraft/sc64_weapon_source_vfx_render.h \
- /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/limits.h \
  tests/../starcraft/sc64_weapon_source_vfx_bounds.h \
  tests/../starcraft/sc64_death_vfx_render.h \
  tests/../starcraft/sc64_static_key.h \
