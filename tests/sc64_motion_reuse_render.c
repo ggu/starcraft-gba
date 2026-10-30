@@ -75,6 +75,7 @@ static const Sc64WeaponSourceFrame sc64_weapon_source_frames[2] = {
     {0, UINT32_MAX, 0, 0, 0, 2, 1, 2, 1, 0, 200},
     {2, UINT32_MAX, 0, 0, 0, 2, 1, 2, 1, 1, 200}
 };
+static const uint16_t sc64_weapon_source_frame_directory[2] = {0, 1};
 static const Sc64WeaponSourceLut sc64_weapon_source_luts[1] = {{0, 0, 0, 0}};
 static const uint8_t sc64_weapon_source_lut_bytes[1] = {0};
 static const Sc64WeaponSourceLoTable sc64_weapon_source_lo_tables[1] = {{0}};
@@ -184,8 +185,15 @@ int main(void)
 {
  test_profile=(Sc64WeaponSourceAttackProfile){.actor_raw=5,.weapon_id=11,.projectile_image=100,
    .projectile_lifetime=20,.projectile_frame_count=1,.speed_raw=5120,.weapon_bullet_type=SC64_SOURCE_BULLET_FLY};
- test_request_image=(Sc64WeaponSourceImage){.image_id=200,.frame_first=0,.frame_count=1,.canvas_w=2,.canvas_h=1,.source_frame_count=1};
- test_keyed_image=(Sc64WeaponSourceImage){.image_id=200,.frame_first=1,.frame_count=1,.canvas_w=2,.canvas_h=1,.source_frame_count=1};
+ test_request_image=(Sc64WeaponSourceImage){.image_id=200,.frame_first=0,.frame_count=1,.canvas_w=2,.canvas_h=1,.source_frame_count=2};
+ test_keyed_image=(Sc64WeaponSourceImage){.image_id=200,.frame_first=1,.frame_count=1,.canvas_w=2,.canvas_h=1,.source_frame_count=2};
+ /* Compare exact pointers with the original lookup, including missing images
+  * and every out-of-range 16-bit frame ID, before checking draw events. */
+ for (unsigned frame=0;frame<=UINT16_MAX;++frame) {
+   assert(sc64_weapon_source_vfx_frame_resolved(&test_keyed_image,(uint16_t)frame)==
+          sc64_weapon_source_frame_lookup(200,(uint16_t)frame));
+   assert(!sc64_weapon_source_vfx_frame_resolved(0,(uint16_t)frame));
+ }
  test_init=(Sc64WeaponSourceAnimation){.image_id=200,.event_count=2,.duration_ticks=3,.loop_pc=UINT32_MAX};
  test_flight=(Sc64WeaponSourceAnimation){.image_id=200,.overlay_count=1,.duration_ticks=20,.loop_pc=UINT32_MAX,.animation_id=2};
  test_death=(Sc64WeaponSourceAnimation){.image_id=200,.overlay_count=1,.duration_ticks=3,.loop_pc=UINT32_MAX,.animation_id=1};

@@ -12,6 +12,10 @@ _Static_assert(MAP_CELLS <= SC64_ROUTE_DEPOT_TAG, "route point goals overlap dep
 #ifndef SC64_GRID_GET
 #define SC64_GRID_GET(grid, cell) ((grid)[(cell)] != 0)
 #define SC64_ROUTES_LOCAL_GRID_GET
+#if defined(SC64_RACES) && !defined(SC64_GRID_SET)
+#define SC64_GRID_SET(grid, cell, value) ((grid)[(cell)] = (u8)((value) != 0))
+#define SC64_ROUTES_LOCAL_GRID_SET
+#endif
 #endif
 
 #if defined(SC64_ROUTE_MONOTONE_PROBE) && defined(SC64_RACES) && \
@@ -1074,6 +1078,9 @@ sc64_route_depot_slot(int depot_id, int center_x, int center_y)
             !sc64_depot_cell_point(center_x, center_y, col, row, &px, &py)) continue;
 #ifdef SC64_RACES
         sc64_route_put(slot, cell, 0);
+#ifdef SC64_GRID_SET
+        SC64_GRID_SET(path_walkable, cell, 0);
+#endif
 #else
         field[cell] = 0;
 #endif
@@ -1087,10 +1094,21 @@ sc64_route_depot_slot(int depot_id, int center_x, int center_y)
         int x = cell % MAP_COLS, y = cell / MAP_COLS;
 #endif
 #ifdef SC64_RACES
+#ifdef SC64_GRID_SET
+/* The game supplies paired accessors. Borrow its walkable bit as visited
+ * during this synchronous flood, then restore every queued cell below.
+ * Read-only custom accessors retain the field-based visited test. */
+#define SC64_DEPOT_FLOOD(condition, neighbour, direction) \
+        if (condition) { next = (neighbour); \
+            if (SC64_GRID_GET(path_walkable, next)) { \
+                sc64_route_put(slot, next, (direction)); bfs_queue[tail++] = (u16)next; \
+                SC64_GRID_SET(path_walkable, next, 0); } }
+#else
 #define SC64_DEPOT_FLOOD(condition, neighbour, direction) \
         if (condition) { next = (neighbour); \
             if (SC64_GRID_GET(path_walkable, next) && sc64_route_get(slot, next) == SC64_ROUTE_UNREACHABLE) { \
                 sc64_route_put(slot, next, (direction)); bfs_queue[tail++] = (u16)next; } }
+#endif
 #else
 #define SC64_DEPOT_FLOOD(condition, neighbour, direction) \
         if (condition) { next = (neighbour); \
@@ -1103,6 +1121,9 @@ sc64_route_depot_slot(int depot_id, int center_x, int center_y)
         SC64_DEPOT_FLOOD(y + 1 < MAP_ROWS, cell + MAP_COLS, 4);
 #undef SC64_DEPOT_FLOOD
     }
+#if defined(SC64_RACES) && defined(SC64_GRID_SET)
+    for (i=0;i<tail;++i) SC64_GRID_SET(path_walkable,bfs_queue[i],1);
+#endif
     sc64_route_goal[slot] = key;
 #ifdef SC64_ROUTE_DECAY_FREQ
     sc64_route_age[slot] = sc64_route_age_pack(1u, sc64_route_clock);

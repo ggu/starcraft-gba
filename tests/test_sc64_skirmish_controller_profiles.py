@@ -40,13 +40,14 @@ class SkirmishControllerProfiles(unittest.TestCase):
                      for name, var in PROFILES.items()]
             lines += ["print-controller-values:"]
             for name in (*PROFILES.values(), *INPUTS):
-                lines.append(f"\t@printf '%s\\t%s\\n' '{name}' '$({name})'")
+                lines.append(f"\t$(info SC64_VALUE\t{name}\t$({name}))")
             helper.write_text("\n".join(lines) + "\n", encoding="utf-8")
             base = [make, "--no-print-directory", "-f", "Makefile", "-f", str(helper)]
             result = subprocess.run(base + ["-s", "print-controller-values"], cwd=ROOT,
                                     text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            values = dict(line.split("\t", 1) for line in result.stdout.splitlines())
+            values = dict(line.split("\t", 2)[1:] for line in result.stdout.splitlines()
+                          if line.startswith("SC64_VALUE\t"))
             # Treat prepared inputs as old so -n cannot traverse their generation
             # rules or require the private source assets behind them.
             old = sorted({token for name in INPUTS for token in shlex.split(values[name])})
