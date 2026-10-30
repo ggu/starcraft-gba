@@ -7,6 +7,13 @@ test-gfx-shapes: build/test-gfx-shapes
 	./build/test-gfx-shapes
 test: test-gfx-shapes
 
+.PHONY: test-gfx-shapes-tile
+build/test-gfx-shapes-tile: tests/gfx_shapes_tile.c common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -Wno-misleading-indentation -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DGBA_SHAPES_ROM_ARM -DSC64_TILE_RENDERER -Icommon $< common/gba.c -o $@
+test-gfx-shapes-tile: build/test-gfx-shapes-tile
+	./build/test-gfx-shapes-tile
+test: test-gfx-shapes-tile
+
 # Asset-free raw-ID capability catalog for the complete standard skirmish roster.
 .PHONY: test-sc64-skirmish-catalog
 build/test-sc64-skirmish-catalog: tests/sc64_skirmish_catalog.c starcraft/sc64_skirmish_catalog.h Makefile | build
