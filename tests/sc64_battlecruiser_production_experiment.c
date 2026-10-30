@@ -43,10 +43,16 @@ int main(void)
     int hp = u[ground].hp;
     u[cruiser].cd = 0;
     tick_combat(&u[cruiser], ground);
+#ifdef SC64_IMPACT_EVENTS
+    for (int n = 0; n < 256 && u[ground].hp == hp; ++n) race_impact_tick();
+#endif
     assert(u[ground].hp < hp && u[cruiser].cd > 0);
     hp = u[air].hp;
     u[cruiser].cd = 0;
     tick_combat(&u[cruiser], air);
+#ifdef SC64_IMPACT_EVENTS
+    for (int n = 0; n < 256 && u[air].hp == hp; ++n) race_impact_tick();
+#endif
     assert(u[air].hp < hp && u[cruiser].cd > 0);
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     assert(u[cruiser].carry == 50 * 256);
