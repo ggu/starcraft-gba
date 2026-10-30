@@ -481,14 +481,19 @@ sc64_terrain_tile_clean(int col, int row)
     int col0, row0, col1, row1, i;
 #ifdef SC64_TERRAIN_SCROLL
     int x = sc64_terrain_cache_view_camx, y = sc64_terrain_cache_view_camy;
-    if (!sc64_terrain_cache_reused_base ||
-        !sc64_terrain_cache_view(x, y, &col0, &row0, &col1, &row1) ||
 #else
-    if (!sc64_terrain_cache_reused_base ||
-        !sc64_terrain_cache_view(sc64_terrain_cache_camx, sc64_terrain_cache_camy,
-                                 &col0, &row0, &col1, &row1) ||
+    int x = sc64_terrain_cache_camx, y = sc64_terrain_cache_camy;
 #endif
-        col < col0 || col >= col1 || row < row0 || row >= row1)
+    if (!sc64_terrain_cache_reused_base) return 0;
+    /* Successful reuse already validated this view before filling dirty[].
+     * Derive its bounds directly instead of revalidating it for every tile. */
+    col0 = x / 16;
+    row0 = y / 16;
+    col1 = (x + 240) / 16 + 1;
+    row1 = (y + SC64_TERRAIN_CACHE_HEIGHT) / 16 + 1;
+    if (col1 > MAP_COLS) col1 = MAP_COLS;
+    if (row1 > MAP_ROWS) row1 = MAP_ROWS;
+    if (col < col0 || col >= col1 || row < row0 || row >= row1)
         return 0;
     i = (row - row0) * (col1 - col0) + col - col0;
     return !sc64_terrain_cache_dirty[i];
