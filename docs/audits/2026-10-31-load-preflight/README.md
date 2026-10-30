@@ -50,3 +50,16 @@ for existing fallible post-commit rebinds. Ordinary Reaver admission remains
 blocked. Normal gate-off profile matrices and campaign qualification remain
 necessary before promoting shared runtime changes. No new FPS or native-N64
 claim, Actions dispatch or SD write is made.
+
+## Combined oracle and bridge child
+
+Clean indexed source `d5d03e3` also passes boundary, doctor and default build,
+then the complete default test workflow: 793 Python cases (23 optional skips),
+eight ancillary cases and C fixtures. It includes the discovered boundary
+regressions, unregistered flight bridge, and source-only OpenBW world probe
+helpers. The initial concurrent test attempt failed with ENOSPC; its log is
+retained. A serial retry after byte-verified transparent compression passes.
+All numeric exits and exact source/tree identities are under
+`.local/qualification-oracle-bridge` in the clean preflight worktree. This
+supersedes no optional-profile or runtime scope above. Following audit-only
+changes do not change the tested implementation.
