@@ -1,0 +1,8 @@
+arm-none-eabi-gcc (GCC) 16.2.0
+GNU assembler (GNU Binutils) 2.47.20260726
+GNU ld (GNU Binutils) 2.47.20260726
+GNU Make 3.81
+Python 3.14.5
+libgcc /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/thumb/nofp/libgcc.a
+commit 70b86da7111c9ce0e838078de4490f1ba719dbbf
+tracked changes: none

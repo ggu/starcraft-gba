@@ -1,0 +1,8 @@
+build/starcraft-terran.elf: starcraft/sc64_interceptor_motion.c \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ starcraft/sc64_interceptor_motion_kernel.h \
+ starcraft/sc64_interceptor_direction_tables.h \
+ starcraft/sc64_interceptor_motion.h \
+ starcraft/sc64_interceptor_pool_codec.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h

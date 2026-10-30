@@ -1,0 +1,103 @@
+build/starcraft-terran.elf: starcraft/game.c starcraft/../common/gba.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h \
+ starcraft/sc64_bitgrid.h common/gba.h starcraft/sc64_map_math.h \
+ starcraft/sc64_construction_hp.h starcraft/sc64_minimap_terrain.h \
+ starcraft/sc64_weapon_vfx.h starcraft/sc64_weapon_source_runtime.h \
+ starcraft/sc64_weapon_source_vfx.h \
+ .local/sc64/weapon-vfx/generated/sc64_weapon_source_generated.h \
+ starcraft/sc64_tank_source_vfx.h starcraft/sc64_construction_vfx.h \
+ starcraft/sc64_death_vfx.h \
+ .local/sc64/backwater/generated/sc64_mission_generated.h \
+ starcraft/sc64_types.h \
+ .local/sc64/backwater/generated/sc64_assets_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_races_generated.h \
+ starcraft/sc64_frontend.h starcraft/campaign_catalog.h \
+ starcraft/sc64_briefing.h \
+ .local/sc64/skirmish/generated/sc64_skirmish_generated.h \
+ .local/sc64/backwater/generated/sc64_sprites_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_race_sprites_generated.h \
+ starcraft/sc64_p8_sprite_adapter.h starcraft/sc64_construction_source.h \
+ starcraft/sc64_construction_animation.h \
+ .local/sc64/construction/generated/sc64_construction_sprites_generated.h \
+ starcraft/sc64_construction_source.h starcraft/sc64_death_source.h \
+ .local/sc64/death/generated/sc64_death_sprites_generated.h \
+ starcraft/sc64_death_source.h starcraft/sc64_unit_attack_source.h \
+ .local/sc64/attack-poses/generated/sc64_unit_attack_source_generated.h \
+ starcraft/sc64_display.h starcraft/sc64_backwater.h \
+ starcraft/sc64_types.h starcraft/race_rules.h \
+ starcraft/sc64_t6_actor_rules.h starcraft/sc64_terran_late_actor_rules.h \
+ starcraft/sc64_stock_motion.h starcraft/sc64_stock_profiles.h \
+ starcraft/sc64_stock_combat.h starcraft/sc64_game_actor_facts.h \
+ starcraft/sc64_t4_world.h starcraft/sc64_t4_runtime.h \
+ starcraft/sc64_t4_triggers.h starcraft/sc64_trigger_types.h \
+ .local/sc64/races/generated/sc64_t4_scenario_generated.h \
+ starcraft/sc64_trigger_types.h starcraft/sc64_t5_runtime.h \
+ starcraft/sc64_resource_actions.h starcraft/sc64_t5_ai.h \
+ starcraft/sc64_t5_actor_adapter.h starcraft/sc64_t5_actor_rules.h \
+ .local/sc64/races/generated/sc64_t5_scenario_generated.h \
+ starcraft/sc64_t6_mission_state.h starcraft/sc64_t6_runtime.h \
+ starcraft/sc64_t6_scenario_adapter.h \
+ .local/sc64/races/generated/sc64_t6_scenario_generated.h \
+ starcraft/sc64_terran_late_mission_state.h \
+ starcraft/sc64_terran_late_runtime.h starcraft/race_missions.h \
+ starcraft/sc64_t3.h starcraft/sc64_weapon_vfx_profiles.h \
+ starcraft/sc64_race_save_types.h starcraft/sc64_compact_building_save.h \
+ starcraft/sc64_compact_unit_save.h starcraft/sc64_collision.h \
+ starcraft/sc64_persistent_collision.h starcraft/sc64_contact.h \
+ starcraft/sc64_targets.h starcraft/sc64_font.h \
+ .local/sc64/interface/generated/sc64_font_generated.h \
+ starcraft/sc64_icons.h \
+ .local/sc64/interface/generated/sc64_icons_generated.h \
+ starcraft/sc64_chrome.h \
+ .local/sc64/interface/generated/sc64_chrome_generated.h \
+ .local/sc64/briefings/generated/sc64_briefing_generated.h \
+ starcraft/sc64_briefing.h starcraft/sc64_visibility.h \
+ starcraft/sc64_unit_walk.h starcraft/sc64_routes.h \
+ starcraft/sc64_route_monotone_probe.h starcraft/sc64_transport_adapter.h \
+ starcraft/sc64_transport_rules.h starcraft/sc64_backwater_adapter.h \
+ starcraft/field_controls.h starcraft/ui_widgets.h \
+ starcraft/sc64_terran_flight.h starcraft/sc64_unit_facing.h \
+ .local/sc64/facing/generated/sc64_unit_facing_generated.h \
+ starcraft/sc64_weapon_vfx_render.h \
+ starcraft/sc64_tank_source_vfx_render.h \
+ .local/sc64/tank-vfx/generated/sc64_tank_source_vfx_generated.h \
+ starcraft/sc64_weapon_source_vfx_render.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/limits.h \
+ starcraft/sc64_weapon_source_vfx_bounds.h \
+ starcraft/sc64_death_vfx_render.h starcraft/sc64_t4_prop_art.h \
+ starcraft/sc64_t4_actions.h starcraft/sc64_static_key.h \
+ starcraft/sc64_terrain_cache.h starcraft/sc64_obj_vram.h \
+ starcraft/sc64_static_dirty_rows.h starcraft/sc64_frontend_draw.h \
+ starcraft/game_audio.h \
+ .local/sc64/audio/generated/sc64_audio_generated.h \
+ starcraft/race_combat.h starcraft/sc64_t5_availability_adapter.h \
+ starcraft/sc64_unit_availability.h \
+ .local/sc64/terran-late/import-stage/sc64_t5_availability_generated.h \
+ starcraft/sc64_t6_availability_adapter.h \
+ .local/sc64/races/generated/sc64_t6_availability_generated.h \
+ starcraft/race_adapter.h starcraft/race_skirmish.h \
+ starcraft/sc64_t5_tech_adapter.h starcraft/sc64_t6_tech_adapter.h \
+ starcraft/sc64_t4_actor_adapter.h starcraft/sc64_t4_effects_adapter.h \
+ starcraft/sc64_t4_queries.h starcraft/sc64_t4_creation_adapter.h \
+ starcraft/sc64_t4_scenario_adapter.h starcraft/sc64_t4_count_cache.h \
+ starcraft/sc64_t4_trap_adapter.h starcraft/sc64_t5_world_adapter.h \
+ starcraft/sc64_t5_mine_adapter.h starcraft/sc64_t5_scenario_adapter.h \
+ starcraft/sc64_t6_world_adapter.h starcraft/sc64_t6_repair_world.h \
+ starcraft/sc64_t6_repair_adapter.h starcraft/sc64_terran_late_repair.h \
+ starcraft/sc64_terran_late_world.h \
+ starcraft/sc64_terran_late_count_cache.h \
+ .local/sc64/terran-late/import-stage/sc64_t7_scenario_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t8_scenario_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t9_scenario_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t10_scenario_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t7_availability_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t8_availability_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t9_availability_generated.h \
+ .local/sc64/terran-late/import-stage/sc64_t10_availability_generated.h \
+ starcraft/race_campaign_adapter.h starcraft/sc64_t3_adapter.h \
+ starcraft/sc64_z8_game_bridge.h starcraft/race_save_adapter.h \
+ starcraft/sc64_construction_save.h starcraft/sc64_t5_save_adapter.h \
+ starcraft/sc64_transport_save_adapter.h starcraft/sc64_t6_save_adapter.h \
+ starcraft/sc64_terran_late_save_adapter.h
