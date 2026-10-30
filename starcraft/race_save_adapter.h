@@ -92,6 +92,47 @@ race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *ou
 #endif
 }
 #endif
+#ifdef SC64_Z8_RUNTIME
+/* Z8's post-load world binding requires source identities to agree with
+ * live owners and runtime types. Check the decoded candidate before any
+ * live pool is overwritten, using the same rules as the rebind. */
+static int
+race_z8_save_candidate_world_valid(const RaceSave *candidate, int width, int height)
+{
+    const Sc64RaceMap *map = &sc64_race_maps[SC64_Z8_GLOBAL_ID];
+    Sc64NydusSourcePair pairs[SC64_NYDUS_MAX_LINKS];
+    unsigned pair_count = 0, nexus_count = 0;
+    if (!candidate || width <= 0 || height <= 0 || !race_z8_map_shape_valid(map) ||
+        width != map->width || height != map->height ||
+        !sc64_nydus_source_pairs(sc64_z8_program_nydus, SC64_Z8_PROGRAM_NYDUS_COUNT,
+                                  pairs, &pair_count)) return 0;
+    for (unsigned i = 0; i < map->unit_count; ++i)
+        nexus_count += map->units[i].source_type == SC64_Z8_RAW_NEXUS &&
+                       map->units[i].owner != SC64_Z8_HUMAN_SLOT;
+    if (nexus_count != 2u) return 0;
+    for (unsigned i = 0; i < MAX_UNITS; ++i) {
+        Unit unit;
+        if (!race_save_decode_unit(candidate, i, (unsigned)width * 16u,
+                                   (unsigned)height * 16u, &unit)) return 0;
+        if (!unit.alive) continue;
+        if (unit.raw_owner < 0 || unit.raw_owner >= SC64_Z8_OWNER_LIMIT ||
+            race_z8_source_owner((unsigned)unit.raw_owner) != unit.owner ||
+            unit.raw_type < 0 || sc64_race_unit_from_raw(unit.raw_type) != unit.type)
+            return 0;
+    }
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+        Building building;
+        if (!race_save_decode_building(candidate, i, &building)) return 0;
+        if (!building.alive) continue;
+        if (building.raw_owner < 0 || building.raw_owner >= SC64_Z8_OWNER_LIMIT ||
+            race_z8_source_owner((unsigned)building.raw_owner) != building.owner ||
+            building.raw_type < 0 || sc64_race_building_from_raw(building.raw_type) < 0)
+            return 0;
+    }
+    return 1;
+}
+#endif
+
 #ifdef SC64_ZP_FULL_STORAGE
 static int
 race_save_decode_mineral(const RaceSave *candidate, unsigned slot,
@@ -2356,8 +2397,9 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_Z8_RUNTIME
     if (!v[0] && v[2] == SC64_Z8_GLOBAL_ID &&
-        !race_z8_save_unpack(&race_data.z8,
-                             &sc64_zp_route_save_scratch.z8_candidate.scheduler, 0))
+        (!race_z8_save_candidate_world_valid(&race_data, width, height) ||
+         !race_z8_save_unpack(&race_data.z8,
+                              &sc64_zp_route_save_scratch.z8_candidate.scheduler, 0)))
         return 0;
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
