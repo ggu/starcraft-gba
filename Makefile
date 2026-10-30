@@ -953,6 +953,12 @@ build/test-sc64-nydus-rules: tests/sc64_nydus_rules.c starcraft/sc64_nydus_rules
 test-sc64-nydus-rules: build/test-sc64-nydus-rules
 	./build/test-sc64-nydus-rules
 test-starcraft: test-sc64-nydus-rules
+build/test-sc64-z8-state: tests/sc64_z8_state.c starcraft/sc64_z8_state.h starcraft/sc64_z8_triggers.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-z8-state
+test-sc64-z8-state: build/test-sc64-z8-state
+	./build/test-sc64-z8-state
+test-starcraft: test-sc64-z8-state
 build/test-sc64-unit-availability: tests/sc64_unit_availability.c starcraft/sc64_unit_availability.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-unit-availability
@@ -3778,6 +3784,35 @@ verify-zerg-z7: build/StarCraft-Zerg-Z7-GBA.gba
 	$(PYTHON) tools/verify_roms.py --zerg-z7
 zerg-z7: verify-zerg-z7
 
+# Z8 candidate: the Z7 release vector plus Nydus Canals, the P6/P7 actor
+# facts the Z8 census needs, the authenticated Z8 program and a private
+# sprite bank that adds the hero Dark Templar. The program header is
+# rendered from the private descriptor written by `sc64_z8_pack.py pack`.
+ZERG_Z8_BANK := .local/sc64/zerg-z8/generated
+Z8_DESCRIPTOR ?= .local/build/z8-source/descriptor.json
+Z8_PROGRAM_HEADER := build/generated/z8/sc64_z8_program_generated.h
+$(Z8_PROGRAM_HEADER): $(Z8_DESCRIPTOR) tools/sc64_z8_program_pack.py tools/sc64_z8_pack.py | build
+	$(PYTHON) tools/sc64_z8_program_pack.py $< $@
+ZERG_Z8_FEATURES = -DSC64_P6_ACTORS -DSC64_P7_ACTORS -DSC64_NYDUS_ENABLED -DSC64_Z8_GAME_POOL_BRIDGE -DSC64_Z8_DATA_ENABLED -DSC64_Z8_RUNTIME -DSC64_Z8_CAMPAIGN_ENTRY -Ibuild/generated/z8
+ZERG_Z8_CANONICAL_FLAGS = $(patsubst -I$(ZERG_Z6_BANK),-I$(ZERG_Z8_BANK),$(ZERG_Z7_CANONICAL_FLAGS)) $(ZERG_Z8_FEATURES)
+ZERG_Z8_RELEASE_FLAGS = $(ZERG_Z8_CANONICAL_FLAGS) -DGBA_NO_DEBUG_INPUTS
+ZERG_Z8_CANONICAL_INPUTS = $(filter-out $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h,$(ZERG_Z7_CANONICAL_INPUTS)) $(ZERG_Z8_BANK)/sc64_race_sprites_generated.h $(Z8_PROGRAM_HEADER)
+build/starcraft-zerg-z8.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z8_CANONICAL_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(ZERG_Z8_RELEASE_FLAGS) $(COMMON) $(STARCRAFT) $(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z8.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Zerg-Z8-GBA.gba: build/starcraft-zerg-z8.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC ZERG Z8' SCZ8
+.PHONY: verify-zerg-z8 zerg-z8
+verify-zerg-z8: build/StarCraft-Zerg-Z8-GBA.gba
+	$(PYTHON) tools/verify_roms.py --zerg-z8
+zerg-z8: verify-zerg-z8
+build/test-sc64-z8-game: tests/sc64_z8_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z8_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $(ZERG_Z8_CANONICAL_FLAGS) $< common/gba.c -o $@
+.PHONY: test-zerg-z8
+test-zerg-z8: build/test-sc64-z8-game
+	./build/test-sc64-z8-game
+
 # Preserve a named six-entry product alongside the existing `zerg` alias.
 .PHONY: verify-zerg-z6 zerg-z6
 verify-zerg-z6: build/StarCraft-Zerg-Z6-GBA.gba
@@ -3848,6 +3883,45 @@ test-sc64-z7-carried-missions: build/test-sc64-z7-carried-z1 build/test-sc64-z7-
 	./build/test-sc64-z7-carried-z2 --controller 1 --trace .local/sc64/z7-carried/z2.json
 	./build/test-sc64-z7-carried-z3 --trace .local/sc64/z7-carried/z3.json
 	./build/test-sc64-z7-carried-z4 --limit 150000 --trace .local/sc64/z7-carried/z4.json
+
+# Input-only Z7 replay of the ordinary-input controller trace. The probe
+# replaces common/main.c and otherwise compiles the exact candidate vector;
+# GBA_NO_DEBUG_INPUTS only changes common/main.c. Full, pause-menu-save
+# prefix and fresh-boot HOME-load resume variants share one tape
+# (tests/sc64_z7_arm_replay.c, tools/sc64_z7_arm_replay.py). The resume ROM
+# is named by the prefix's reported cut tick.
+Z7_ARM_DIR := build/z7-arm
+Z7_ARM_TRACE ?= $(ZERG_Z7_CONTROLLER_TRACE)
+Z7_ARM_SAVE_MIN_TICK ?= 400000
+Z7_ARM_CUT_TICK ?= 0
+Z7_ARM_COMMON := $(filter-out common/main.c,$(COMMON))
+Z7_ARM_DEPS = tests/sc64_z7_arm_replay.c $(Z7_ARM_DIR)/sc64_z7_tape_generated.h $(Z7_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.ld Makefile
+$(Z7_ARM_DIR)/sc64_z7_tape_generated.h: $(Z7_ARM_TRACE) tools/sc64_z7_arm_replay.py
+	mkdir -p $(Z7_ARM_DIR)
+	$(PYTHON) tools/sc64_z7_arm_replay.py tape $< $@
+define Z7_ARM_REPLAY_ROM
+build/starcraft-zerg-z7-arm-$(1).elf: $$(Z7_ARM_DEPS) | build
+	$$(CC) $$(CFLAGS) $$(ZERG_Z7_CANONICAL_FLAGS) -I$$(Z7_ARM_DIR) $(2) $$(Z7_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-arm-$(1).map -lgcc -o $$@
+	$$(SIZE) $$@
+build/StarCraft-Zerg-Z7-ARM-$(1).gba: build/starcraft-zerg-z7-arm-$(1).elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC Z7 REPLAY' SCZA
+endef
+$(eval $(call Z7_ARM_REPLAY_ROM,full,-DZ7_ARM_MODE=0))
+$(eval $(call Z7_ARM_REPLAY_ROM,prefix,-DZ7_ARM_MODE=1 -DZ7_ARM_SAVE_MIN_TICK=$(Z7_ARM_SAVE_MIN_TICK)u))
+$(eval $(call Z7_ARM_REPLAY_ROM,resume-$(Z7_ARM_CUT_TICK),-DZ7_ARM_MODE=2 -DZ7_ARM_CUT_TICK=$(Z7_ARM_CUT_TICK)u))
+.PHONY: sc64-z7-arm-replay sc64-z7-arm-resume
+sc64-z7-arm-replay: build/StarCraft-Zerg-Z7-ARM-full.gba build/StarCraft-Zerg-Z7-ARM-prefix.gba
+sc64-z7-arm-resume: build/StarCraft-Zerg-Z7-ARM-resume-$(Z7_ARM_CUT_TICK).gba
+# Host builds of the same program: a fast check of the tape and the save cut
+# before an emulator run. The prefix writes the save payload the resume reads.
+define Z7_HOST_REPLAY
+build/test-sc64-z7-replay-$(1): $$(Z7_ARM_DEPS) common/gba.c | build
+	$$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DGBA_HOST -Icommon $$(ZERG_Z7_CANONICAL_FLAGS) -I$$(Z7_ARM_DIR) $(2) $$< common/gba.c -o $$@
+endef
+$(eval $(call Z7_HOST_REPLAY,full,-DZ7_ARM_MODE=0))
+$(eval $(call Z7_HOST_REPLAY,prefix,-DZ7_ARM_MODE=1 -DZ7_ARM_SAVE_MIN_TICK=$(Z7_ARM_SAVE_MIN_TICK)u))
+$(eval $(call Z7_HOST_REPLAY,resume-$(Z7_ARM_CUT_TICK),-DZ7_ARM_MODE=2 -DZ7_ARM_CUT_TICK=$(Z7_ARM_CUT_TICK)u))
 
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 # Pass variable names: some canonical flags and companion sources are defined
@@ -4844,6 +4918,28 @@ build/StarCraft64-Races-UI-Probe-GBA.gba: build/starcraft64-races-ui-probe.elf t
 	$(PYTHON) tools/fix_rom.py $@ 'SC UI PROBE' SCUR
 .PHONY: ui-arm-probe
 ui-arm-probe: build/StarCraft-Showcase-UI-Probe-GBA.gba build/StarCraft64-Races-UI-Probe-GBA.gba
+
+# T9 ordinary-input qualification. The host controller writes its trace under
+# build/, not the shared .local trace folder; the no-GDB ARM probe replays that
+# trace's key transitions through the normal Terran campaign menu
+# (tests/sc64_t9_arm_replay.c, tools/sc64_t9_arm_replay.py).
+T9_ARM_DIR := build/t9-arm
+T9_ARM_TRACE := $(T9_ARM_DIR)/t9-controller.json
+$(T9_ARM_TRACE): build/test-sc64-t9-campaign-run
+	mkdir -p $(T9_ARM_DIR)
+	./build/test-sc64-t9-campaign-run --trace $@
+.PHONY: test-sc64-t9-controller
+test-sc64-t9-controller: $(T9_ARM_TRACE)
+$(T9_ARM_DIR)/sc64_t9_tape_generated.h: $(T9_ARM_TRACE) tools/sc64_t9_arm_replay.py
+	$(PYTHON) tools/sc64_t9_arm_replay.py tape $< $@
+build/starcraft-terran-t9-arm-replay.elf: tests/sc64_t9_arm_replay.c $(T9_ARM_DIR)/sc64_t9_tape_generated.h $(UI_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(TERRAN_FULL_INPUTS) common/gba.ld Makefile | build
+	$(CC) $(CFLAGS) $(TERRAN_ROM_FLAGS) -I$(T9_ARM_DIR) $(UI_ARM_COMMON) $< $(filter-out starcraft/game.c,$(STARCRAFT)) $(LDFLAGS) -Wl,-Map,build/starcraft-terran-t9-arm-replay.map -lgcc -o $@
+	$(SIZE) $@
+build/StarCraft-Terran-T9-ARM-Replay.gba: build/starcraft-terran-t9-arm-replay.elf tools/fix_rom.py
+	$(OBJCOPY) -O binary $< $@
+	$(PYTHON) tools/fix_rom.py $@ 'SC T9 REPLAY' SCT9
+.PHONY: sc64-t9-arm-replay
+sc64-t9-arm-replay: build/StarCraft-Terran-T9-ARM-Replay.gba
 
 .PHONY: test-sc64-direct-firing-flags
 test-sc64-direct-firing-flags:

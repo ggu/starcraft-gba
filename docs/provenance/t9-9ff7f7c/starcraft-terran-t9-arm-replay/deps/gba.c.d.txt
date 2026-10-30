@@ -1,0 +1,6 @@
+build/starcraft-terran-t9-arm-replay.elf: common/gba.c common/gba.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h \
+ common/audio_mixer.h common/audio_codec.h common/gba_present.h \
+ .local/sc64/audio/generated/sc64_audio_generated.h

@@ -1,0 +1,3 @@
+3a8986dcf5e71e1c4aef7d984e883904ad80cf2e912ccb8740da40e0f19d5276  build/StarCraft-Terran-T9-ARM-Replay.gba
+593e52f5bd75a328422f91940ffabbe6443358a3dbf6d9a987344e3ce6db6604  build/starcraft-terran-t9-arm-replay.elf
+b9fdd3c38d16190169bd5cd224920afcb131b6f2099fb5ba37232ff584c7c71e  build/starcraft-terran-t9-arm-replay.map

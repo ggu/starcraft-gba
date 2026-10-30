@@ -1280,6 +1280,9 @@ static void race_tick_buildings(void)
         if (!b[i].queue_count) continue;
         owner = b[i].owner;
         type = b[i].queue[b[i].queue_head];
+#ifdef SC64_Z8_RUNTIME
+        race_z8_note_product_building(i);
+#endif
         {
             const Sc64RaceUnitRule *ur = sc64_race_unit_rule(type);
             if (!ur) continue;
