@@ -9,6 +9,8 @@ import argparse
 from pathlib import Path
 import re
 import subprocess
+import os
+import tempfile
 
 
 def make_index(source: str) -> str:
@@ -69,12 +71,17 @@ def make_index(source: str) -> str:
     return source
 
 
-def validate_output(source: Path, output: Path) -> None:
+MANAGED_MARKER = "/* sc64-weapon-lookup-index managed output v1 */\n"
+
+
+def validate_output(source: Path, output: Path, managed: bool = False) -> None:
     # Check both the spelling and the resolved path, so an ignored symlink
     # cannot redirect generated private material into a tracked tree.
     source_resolved = source.resolve(strict=True)
-    if output.exists() or output.is_symlink() or output.resolve() == source_resolved:
-        raise FileExistsError(f'output already exists or aliases source: {output}')
+    if output.is_symlink() or output.resolve() == source_resolved:
+        raise FileExistsError(f'output aliases source or is a symlink: {output}')
+    if output.exists() and (not managed or not output.is_file() or not output.read_text().startswith(MANAGED_MARKER)):
+        raise FileExistsError(f'output already exists and is not managed: {output}')
     for path in (output.absolute(), output.resolve()):
         parent = path.parent
         while not parent.exists():
@@ -95,11 +102,25 @@ def validate_output(source: Path, output: Path) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--managed-update', action='store_true', help='atomically replace a prior managed output')
     parser.add_argument('source', type=Path)
     parser.add_argument('output', type=Path)
     args = parser.parse_args()
-    validate_output(args.source, args.output)
+    validate_output(args.source, args.output, args.managed_update)
     derived = make_index(args.source.read_text())
-    with args.output.open('x') as out: out.write(derived)
+    if not args.managed_update:
+        with args.output.open('x') as out: out.write(derived)
+        return
+    # Build the complete candidate before replacing a prior managed output.
+    data = MANAGED_MARKER + derived
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', dir=args.output.parent, prefix='.lookup-', delete=False) as out:
+            temporary = Path(out.name)
+            out.write(data)
+        validate_output(args.source, args.output, True)
+        os.replace(temporary, args.output)
+    finally:
+        if temporary is not None and temporary.exists(): temporary.unlink()
 
 if __name__ == '__main__': main()
