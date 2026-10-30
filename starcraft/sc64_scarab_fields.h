@@ -13,14 +13,14 @@ static inline int sc64_scarab_parent_fields_pack(const Sc64ScarabParentFields *v
 {
     if (!v || !carry || !timer || v->queued > 5 || v->cooldown > 60 ||
         (v->active_slot >= SC64_SCARAB_FIELD_SLOT_LIMIT && v->active_slot != SC64_SCARAB_FIELD_NO_SLOT) ||
-        v->progress > 104 || (v->active_slot == SC64_SCARAB_FIELD_NO_SLOT && v->progress) ||
+        v->progress > 105 || (v->active_slot == SC64_SCARAB_FIELD_NO_SLOT && v->progress) ||
         (v->active_slot != SC64_SCARAB_FIELD_NO_SLOT && !v->queued)) return 0;
     unsigned bits = v->queued | (v->active_slot << 3) | (v->cooldown << 11);
     *carry = (int)bits - 65536; *timer = (int)v->progress; return 1;
 }
 static inline int sc64_scarab_parent_fields_unpack(int carry, int timer, Sc64ScarabParentFields *out)
 {
-    if (!out || carry < -65536 || carry > 65535 || timer < 0 || timer > 104) return 0;
+    if (!out || carry < -65536 || carry > 65535 || timer < 0 || timer > 105) return 0;
     unsigned bits = (unsigned)(carry + 65536); Sc64ScarabParentFields v = {bits & 7u, (bits >> 3) & 255u, bits >> 11, (unsigned)timer};
     int c,t; if (!sc64_scarab_parent_fields_pack(&v,&c,&t)) return 0; *out=v; return 1;
 }

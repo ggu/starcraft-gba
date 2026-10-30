@@ -23,11 +23,22 @@ static void queue_wait_cancel_and_retry(void)
     int free_slot=(p==1)?2:1; memset(&u[free_slot],0,sizeof(u[free_slot]));
     assert(race_scarab_production_tick(p,0)==SC64_SCARAB_ALLOCATED);
     assert(u[free_slot].alive && u[free_slot].type==U_SCARAB && u[free_slot].raw_type==85);
-    assert(u[free_slot].hp==20 && u[free_slot].maxhp==20 && u[free_slot].shield==10 && u[free_slot].armor==0);
+    assert(u[free_slot].hp==2 && u[free_slot].maxhp==20 && u[free_slot].shield==10 && u[free_slot].armor==0);
     assert(invincible_units[free_slot] && u[free_slot].owner==u[p].owner && u[free_slot].raw_owner==u[p].raw_owner);
     int parent; unsigned phase; assert(race_scarab_child_lookup(free_slot,&parent,&phase));
     assert(parent==p && phase==SC64_SCARAB_CHILD_TRAINING);
-    for(int i=0;i<104;i++)assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
+    for(int i=0;i<105;i++) {
+        assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
+        unsigned expected; assert(sc64_scarab_training_hp_q8((unsigned)i+1,&expected));
+        assert(u[free_slot].hp==(int)(expected>>8));
+    }
+    Sc64ScarabParent ready; Sc64ScarabCounts ready_counts;
+    assert(race_scarab_parent_read(p,0,&ready,&ready_counts));
+    assert(ready.progress==105 && ready.queued==1 && ready.active_slot==free_slot && u[free_slot].hp==20);
+    u[free_slot].hp=19; Unit saved_parent=u[p], saved_child=u[free_slot];
+    assert(race_scarab_production_tick(p,0)==SC64_SCARAB_INVALID);
+    assert(!memcmp(&u[p],&saved_parent,sizeof(Unit)) && !memcmp(&u[free_slot],&saved_child,sizeof(Unit)));
+    u[free_slot].hp=20;
     assert(race_scarab_production_tick(p,0)==SC64_SCARAB_COMPLETED);
     assert(race_scarab_child_lookup(free_slot,&parent,&phase) && phase==SC64_SCARAB_CHILD_INSIDE);
     assert(race_scarab_enqueue(p,0)); assert(minerals==70);
@@ -71,7 +82,7 @@ static void stop_signal_and_outside_parent_loss(void)
         memset(u,0,sizeof(u)); minerals=100; int p=fresh_reaver(SIDE);
         assert(race_scarab_enqueue(p,0)); assert(race_scarab_production_tick(p,0)==SC64_SCARAB_ALLOCATED);
         Sc64ScarabParent state; Sc64ScarabCounts counts; assert(race_scarab_parent_read(p,0,&state,&counts)); int child=state.active_slot;
-        for(int i=0;i<104;i++)assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
+        for(int i=0;i<105;i++)assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
         assert(race_scarab_production_tick(p,0)==SC64_SCARAB_COMPLETED);
         assert(race_scarab_launch_child(p,0,child)); assert(race_scarab_enqueue(p,0));
         Unit parent_before=u[p]; int parent; unsigned phase;
@@ -110,6 +121,19 @@ static void cancel_all_atomic(void)
     assert(minerals==100 && !u[child].alive && race_scarab_parent_read(p,0,&state,&counts) && state.queued==0);
     assert(race_scarab_cancel_all(p,0) && minerals==100);
 }
+static void ready_state_cancel(void)
+{
+    memset(u,0,sizeof(u)); minerals=100; int p=fresh_reaver(SIDE);
+    assert(race_scarab_enqueue(p,0));
+    assert(race_scarab_production_tick(p,0)==SC64_SCARAB_ALLOCATED);
+    Sc64ScarabParent state; Sc64ScarabCounts counts;
+    assert(race_scarab_parent_read(p,0,&state,&counts)); int child=state.active_slot;
+    for(int i=0;i<105;i++)assert(race_scarab_production_tick(p,0)==SC64_SCARAB_PROGRESS);
+    assert(race_scarab_parent_read(p,0,&state,&counts) && state.progress==105 &&
+           state.queued==1 && state.active_slot==child && u[child].hp==20);
+    assert(race_scarab_cancel(p,0,0) && minerals==100 && !u[child].alive);
+    assert(race_scarab_parent_read(p,0,&state,&counts) && state.queued==0 && state.active_slot==-1);
+}
 static void malformed_and_slot_reuse(void)
 {
     memset(u,0,sizeof(u)); minerals=100; int p=fresh_reaver(SIDE);
@@ -131,7 +155,7 @@ static void malformed_and_slot_reuse(void)
 int main(void)
 {
     gba_init(); game_init(); race_mode=1; race_human=R_PROTOSS; race_bots=1; init_state();
-    queue_wait_cancel_and_retry(); active_cancel_and_loss(); stop_signal_and_outside_parent_loss(); cancel_all_atomic(); malformed_and_slot_reuse();
+    queue_wait_cancel_and_retry(); active_cancel_and_loss(); stop_signal_and_outside_parent_loss(); cancel_all_atomic(); ready_state_cancel(); malformed_and_slot_reuse();
     puts("Scarab actual Unit adapter: paid queue, allocation, cancellation, loss and STOP signal pass");
     return 0;
 }

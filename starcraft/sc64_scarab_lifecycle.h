@@ -81,7 +81,19 @@ static inline int sc64_scarab_parent_valid(const Sc64ScarabParent *parent,
         parent->cooldown > SC64_SCARAB_LAUNCH_COOLDOWN ||
         parent->active_slot < SC64_SCARAB_NO_SLOT) return 0;
     if (parent->active_slot == SC64_SCARAB_NO_SLOT) return parent->progress == 0;
-    return parent->queued != 0 && parent->progress < SC64_SCARAB_BUILD_TICKS;
+    return parent->queued != 0 && parent->progress <= SC64_SCARAB_BUILD_TICKS;
+}
+
+/* Undamaged source child: 20 HP maximum, 2 HP at creation, 44/256 HP per
+ * progress call, clamped to 20. This reconstructs Q8 from saved progress;
+ * it does not model damage/healing or establish an external-mutation codec. */
+static inline int sc64_scarab_training_hp_q8(unsigned progress, unsigned *out)
+{
+    unsigned hp;
+    if (!out || progress > SC64_SCARAB_BUILD_TICKS) return 0;
+    hp = 512u + 44u * progress;
+    *out = hp < 5120u ? hp : 5120u;
+    return 1;
 }
 
 /* Payment and admission are one atomic operation; no actor is allocated here.
@@ -119,7 +131,9 @@ static inline int sc64_scarab_production_tick(Sc64ScarabParent *parent,
         parent->active_slot = slot;
         return SC64_SCARAB_ALLOCATED;
     }
-    if (parent->progress + 1u < SC64_SCARAB_BUILD_TICKS) {
+    /* Reference decrements 105 to zero and returns; completion happens on
+     * the next production call, so progress 105 remains an active child. */
+    if (parent->progress < SC64_SCARAB_BUILD_TICKS) {
         ++parent->progress;
         return SC64_SCARAB_PROGRESS;
     }

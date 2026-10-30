@@ -9,8 +9,10 @@ For a freshly initialized Reaver, the adapter records the bounded queue and
 active slot in the existing proposed field format. It takes owner-bank payment
 at enqueue, allocates an actual first-free unit only when the paid front entry
 starts, retries if the pool is full, and marks the allocated actor training or
-inside on explicit source ticks. A Scarab is initialized as raw 85 with the
-source-backed 20 HP, 10 shields, armor 0 and invincibility. The fixture checks
+inside on explicit source ticks. A training Scarab starts at integer 2 HP with
+20 maximum HP, 10 shields, armor 0 and invincibility. Undamaged source Q8 HP
+is reconstructed from progress and stored as integer floor; externally mutated
+training HP is rejected by the prototype rather than silently overwritten. The fixture checks
 real actor-slot use, owner and raw-owner checks, capacity, bank-limit rejection,
 individual and whole-queue cancellation, lost-child retry and STOP signaling.
 The adapter's 60-tick cooldown step is explicit; it does not infer GBA-frame

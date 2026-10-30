@@ -11,8 +11,8 @@ minerals immediately. The current owner's capacity is five, or ten with the
 capacity upgrade; completed inside children plus the paid queue count against
 that limit, while a child already outside does not. A queued entry does not
 reserve an actor slot: the caller allocates the actual active child when
-production starts and retries if the actor pool is full. The helper uses 105
-source ticks for construction. A newly launched child is an existing inside
+production starts and retries if the actor pool is full. The helper records 105
+source progress calls; the following call completes the child. A newly launched child is an existing inside
 actor, only one can be outside, and the model exposes 60 source ticks of parent
 cooldown, 90 of child life, and seven initial no-collision ticks. The caller
 supplies source ticks; these are not GBA frame counts.

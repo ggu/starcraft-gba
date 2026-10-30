@@ -137,6 +137,7 @@ static int race_scarab_allocate(void *ctx,int *slot)
      * otherwise this callback cannot roll back arbitrary spawn side effects. */
     if(i!=predicted) return 0;
     u[i].raw_type=85; u[i].raw_owner=u[c->parent_slot].raw_owner;
+    u[i].hp=2; /* Q8 source starts at 512; integer Unit stores the floor. */
     u[i].carry=carry; u[i].work_timer=(u16)timer; u[i].build=-1;
     invincible_units[i]=1; *slot=i; return 1;
 }
@@ -180,8 +181,17 @@ static int race_scarab_production_tick(int slot,int upgraded)
 {
     Sc64ScarabParent p; Sc64ScarabCounts counts; Sc64ScarabUnitContext c={slot};
     if (!race_scarab_parent_read(slot,upgraded,&p,&counts)) return SC64_SCARAB_INVALID;
+    int active=p.active_slot; unsigned hp_q8;
+    /* This experiment only reconstructs undamaged construction. Refuse an
+     * external HP mutation rather than silently overwriting it. */
+    if (active>=0 && (!sc64_scarab_training_hp_q8(p.progress,&hp_q8) ||
+                      u[active].hp!=(int)(hp_q8 >> 8))) return SC64_SCARAB_INVALID;
     int result=sc64_scarab_production_tick(&p,counts,upgraded,&race_scarab_ops,&c);
     if (result==SC64_SCARAB_INVALID || !race_scarab_parent_write(slot,&p)) return SC64_SCARAB_INVALID;
+    if (result==SC64_SCARAB_PROGRESS) {
+        if (!sc64_scarab_training_hp_q8(p.progress,&hp_q8)) return SC64_SCARAB_INVALID;
+        u[active].hp=(int)(hp_q8 >> 8);
+    }
     return result;
 }
 /* The caller invokes this exactly once per elapsed source tick. */

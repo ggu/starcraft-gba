@@ -67,8 +67,8 @@ static void check_queue_and_payment(void)
     w.actors[4].phase=EMPTY;
     assert(sc64_scarab_production_tick(&p,counts(&w),0,&ops,&w)==SC64_SCARAB_ALLOCATED);
     assert(p.active_slot==4 && p.queued==5 && p.progress==0 && w.allocations==1);
-    for(int i=0;i<104;i++) assert(sc64_scarab_production_tick(&p,counts(&w),0,&ops,&w)==SC64_SCARAB_PROGRESS);
-    assert(p.progress==104 && w.completions==0);
+    for(int i=0;i<105;i++) assert(sc64_scarab_production_tick(&p,counts(&w),0,&ops,&w)==SC64_SCARAB_PROGRESS);
+    assert(p.progress==105 && p.queued==5 && p.active_slot==4 && w.completions==0);
     /* Wrong owner cannot complete or mutate the queue; retry recovers. */
     w.actors[4].owner=1; before=p;
     assert(sc64_scarab_production_tick(&p,counts(&w),0,&ops,&w)==SC64_SCARAB_WAIT);
@@ -109,6 +109,15 @@ static void check_capacity_and_launch(void)
     assert(!sc64_scarab_flight_valid(&flight));
     w.actors[0].phase=EMPTY;
     assert(sc64_scarab_launch(&p,counts(&w),0,&ops,&w,1,&flight));
+}
+static void check_training_hp(void)
+{
+    unsigned hp=99;
+    assert(sc64_scarab_training_hp_q8(0,&hp) && hp==512);
+    assert(sc64_scarab_training_hp_q8(104,&hp) && hp==5088);
+    assert(sc64_scarab_training_hp_q8(105,&hp) && hp==5120);
+    hp=99; assert(!sc64_scarab_training_hp_q8(106,&hp) && hp==99);
+    assert(!sc64_scarab_training_hp_q8(0,0));
 }
 static void check_upgrade_and_invalid(void)
 {
@@ -179,7 +188,7 @@ static void check_cancellation_and_loss(void)
 }
 int main(void)
 {
-    check_queue_and_payment(); check_capacity_and_launch(); check_upgrade_and_invalid(); check_cancellation_and_loss();
+    check_queue_and_payment(); check_capacity_and_launch(); check_training_hp(); check_upgrade_and_invalid(); check_cancellation_and_loss();
     puts("Scarab source-tick lifecycle: queue, slots, capacity, ownership and timers passed");
     return 0;
 }
