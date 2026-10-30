@@ -6641,9 +6641,9 @@ Terran controllers (T5, T7 and T8).
 
 The result applies only to runtime `9ff7f7c`. It does not qualify any later
 runtime. To stay mergeable, this branch later merged `codex/source-release` at
-`97c39fa` (as `d8985c1`). That base is 40 commits past `9ff7f7c` and
-changes 24 files under `starcraft/` and `common/`. The merge was not
-re-qualified, and the replay audit below re-checks only the retained
+`97c39fa` (as `d8985c1`) and then at `ae69125` (as `f0c238b`). That base is
+57 commits past `9ff7f7c` and changes 33 files under `starcraft/` and
+`common/`. Neither merge was re-qualified, and the replay audit below re-checks only the retained
 `9ff7f7c` logs. T9 needs a fresh host completion and ARM replay on any runtime
 that is to be qualified.
 
@@ -6791,11 +6791,27 @@ these and the reviewed counterexamples. Those counterexamples are a `T9 LAUNCH
 ok` or `T9 DONE` marker without its fields, and conflicting `CHECK2` lines
 appended after DONE.
 
-`audit` re-ran these checks on 2026-10-30 against the retained logs. The
-qualifying log (SHA-256
+The host trace must also be a complete reference on its own, before any log
+is read. Every observation must carry every compared field as an integer.
+Periodic observations must fall on every 1,000 ticks through the stop tick,
+once each, and every row must be an input, the start, a periodic, a terminal
+or one of the controller's labelled checkpoints. Earlier, the comparison
+checked only the observations and fields the trace supplied: with the host's
+tick-1000 periodic record removed, an ARM `gas=999` there still passed, with
+one observation compared. Asset-free tests now cover a missing periodic
+record (including at the stop tick), an off-cadence or repeated one, a
+missing or non-integer field, an unknown kind, and that counterexample.
+
+`audit` re-ran these checks on 2026-10-30 against the retained evidence. The
+host trace (`8868402d…`) loads: 51 periodic observations at ticks
+1,000–51,000, the start, two labelled checkpoints and the tick-51,696 win, all
+complete. The qualifying log (SHA-256
 `82b4f4bf6e7385888fb660297749c5cfac1a4a7f020d40a8c394e5cdb03cb9bb`, 118 probe
-lines) passes, with 52/52 observations matched and no log or timing errors.
-Injecting the reviewed counterexamples into a copy of it makes it fail.
+lines) passes against it, with 52/52 observations matched and no log or
+timing errors. Injecting the reviewed counterexamples into a copy of the log
+makes it fail. Removing the trace's tick-1000 periodic record, or the `gas`
+field of its tick-2000 one, makes the trace fail to load. That counterexample
+needed an edited trace: it does not show a divergence in the recorded run.
 
 Guest-cycle timing comes from the GBA timers (TM2/TM3 at 16,777,216 Hz).
 These are emulator guest cycles, not a physical-hardware measurement. The
