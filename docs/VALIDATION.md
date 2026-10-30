@@ -6380,6 +6380,27 @@ These are emulator results for a probe-entry mission and skirmishes, not
 normal-menu campaign or hardware qualification.
 
 
+### Z8 candidate profile (2026-10-29, in progress)
+
+`make zerg-z8` builds the Z1–Z7 candidate plus Z8 (`SCZ8`, generation 46).
+It binds the authenticated Z8 program to the live game through
+`starcraft/sc64_z8_runtime_adapter.h`. The program tables come from the
+private descriptor (fingerprint `f80b5f9e…`) via
+`tools/sc64_z8_program_pack.py`. The ROM links at BSS `0x0203dbf0` / IWRAM
+`0x03004f18`. The `zerg-z7` ROM is byte-identical to its base.
+
+`make test-zerg-z8` passes under ASan/UBSan. It launches Z8 through the
+ordinary menu and checks the trigger, owner and Nydus binding and the opening
+triggers. It also checks a pause-menu save that reloads in a fresh game and
+continues identically for 3,000 updates, the rejection of corrupt candidates,
+and the hero Dark Templar cloak. The asset-free `make test-sc64-z8-state`
+round-trips the 180-byte compact save on an authored program.
+
+The AI backend, Transmission duration, CenterView camera snap and Nexus
+kill census are authored, not native. There is no ordinary-input Z8 win, ARM
+replay, SRAM continuation or timing result. See the
+[audit](audits/2026-10-29-z8-playable/README.md).
+
 ### Canonical skirmish controller qualification correction (2026-10-29)
 
 The match targets now expand the actual `TERRAN_ROM_FLAGS`, `ZERG_ROM_FLAGS`

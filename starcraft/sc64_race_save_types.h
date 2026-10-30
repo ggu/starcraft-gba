@@ -57,6 +57,9 @@ _Static_assert(SC_RB_COUNT <= 64, "P7 typed building type field uses six bits");
 #ifdef SC64_P7_BATTERY_ENABLED
 #include "sc64_p7_state.h"
 #endif
+#ifdef SC64_Z8_RUNTIME
+#include "sc64_z8_state.h"
+#endif
 
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
 /* Source player 5 is inactive in the T4 scenario. The save validator requires
@@ -166,6 +169,9 @@ typedef struct {
 #ifdef SC64_Z7_RUNTIME
         Sc64Z7PersistentState z7;
 #endif
+#ifdef SC64_Z8_RUNTIME
+        Sc64Z8PersistentState z8;
+#endif
     };
 #elif defined(SC64_Z5_RUNTIME)
     Sc64Z5PersistentState z5;
@@ -239,6 +245,10 @@ typedef struct {
 #if defined(SC64_Z5_RUNTIME) && defined(SC64_Z6_RUNTIME)
 _Static_assert(sizeof(Sc64Z6PersistentState) <= sizeof(Sc64Z5PersistentState),
                "Z6 must fit in the existing Z5 save payload");
+#endif
+#ifdef SC64_Z8_RUNTIME
+_Static_assert(sizeof(Sc64Z8PersistentState) <= sizeof(Sc64Z5PersistentState),
+               "Z8 must fit in the existing Z5 save payload");
 #endif
 _Static_assert(sizeof(RaceSave)<=16368,"Race save exceeds one SRAM record");
 #ifdef SC64_T6_STORAGE
