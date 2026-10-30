@@ -1760,6 +1760,9 @@ static int weapons_research, armor_research;
 static u32 seed;
 #ifdef SC64_IMPORTED_MISSION
 volatile u32 sc64_orders_cycles, sc64_sight_cycles, sc64_other_cycles;
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+volatile u32 diag_tracer_cycles, diag_key_cycles, diag_lookup, diag_cull, diag_raster, diag_motion, diag_actor, diag_projectile, diag_children;
+#endif
 volatile u32 sc64_map_cycles, sc64_hud_cycles;
 volatile u32 sc64_background_cycles, sc64_building_cycles, sc64_unit_draw_cycles;
 #ifdef SC64_DIAGNOSTIC_TERRAIN
@@ -9083,9 +9086,14 @@ draw_unit(Unit * q)
 #endif
 #endif
 
+
 static void
 draw_tracers(void)
 {
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    u32 diag_start=gba_clock();
+    diag_lookup=diag_cull=diag_raster=diag_motion=diag_actor=diag_projectile=diag_children=0;
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
     for (int i=0;i<SC64_BC_SHOT_LIMIT;++i) {
         const Sc64BcYamatoShot *shot=&sc64_bc_shots[i];
@@ -9125,8 +9133,14 @@ draw_tracers(void)
             uint32_t packed=(uint32_t)tracers[i].color;
             Sc64WeaponSourceVfxKey key;
             if (!sc64_weapon_source_vfx_unpack(packed,&key)) continue;
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+            u32 dt=gba_clock();
+#endif
             const Sc64WeaponSourceAttackProfile *profile=sc64_weapon_source_profile_lookup(
                 key.actor_raw,key.weapon_id,key.target_air,key.variant);
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+            diag_lookup+=gba_clock()-dt; dt=gba_clock();
+#endif
 #ifdef SC64_WEAPON_SOURCE_VFX_OFFSCREEN_CULL
             if (!sc64_weapon_source_vfx_anchor_may_be_visible(
                     tracers[i].x0, tracers[i].y0, camx, camy) &&
@@ -9135,13 +9149,23 @@ draw_tracers(void)
                 sc64_weapon_source_vfx_trace_provably_offscreen_resolved(
                     key,profile,
                     tracers[i].x0, tracers[i].y0, tracers[i].x1, tracers[i].y1,
-                    camx, camy))
+                    camx, camy)) {
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+                diag_cull+=gba_clock()-dt;
+#endif
                 continue;
+            }
+#endif
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+            diag_cull+=gba_clock()-dt; dt=gba_clock();
 #endif
             int age=sc64_tracer_duration(i)-tracers[i].life;
             sc64_weapon_source_vfx_draw_trace_resolved(key,profile,
                 tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,
                 tracers[i].life,(unsigned)(age<0?0:age));
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+            diag_raster+=gba_clock()-dt;
+#endif
             continue;
         }
 #endif
@@ -9159,6 +9183,9 @@ draw_tracers(void)
             tracers[i].x0-camx,tracers[i].y0-camy+12,
             tracers[i].x1-camx,tracers[i].y1-camy+12,tracers[i].life);
     }
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_tracer_cycles=gba_clock()-diag_start;
+#endif
 }
 
 #ifndef SC64_DEATH_VFX_DISABLED
@@ -9847,7 +9874,11 @@ draw_map(void)
     defined(SC64_IMPORTED_MISSION)
     /* Rendering below only reads world state and writes pixels. The exact
      * roster/visibility key therefore remains valid through cache capture. */
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    { u32 diag_t=gba_clock(); terrain_static_key = sc64_static_objects_key(); diag_key_cycles=gba_clock()-diag_t; }
+#else
     terrain_static_key = sc64_static_objects_key();
+#endif
 #endif
 #ifdef SC64_IMPORTED_MISSION
     col0 = limit(camx / 16, 0, MAP_COLS - 1);

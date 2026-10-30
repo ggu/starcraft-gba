@@ -639,6 +639,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
                                      int x0, int y0, int x1, int y1, int live,
                                      uint32_t gba_age)
 {
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    u32 section_start=gba_clock();
+#endif
     if (!live) return;
     if (!p || !p->projectile_image) return;
     int launch_x, launch_y;
@@ -652,6 +655,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
     Sc64WeaponSourceMotion motion =
         sc64_weapon_source_motion_prepare(p, launch_x, launch_y, x1, y1);
     if (!sc64_weapon_source_trace_has_duration_motion(p, launch_x, launch_y, x1, y1, &motion)) return;
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_motion+=gba_clock()-section_start; section_start=gba_clock();
+#endif
     uint32_t attack_age = sc64_weapon_source_vfx_source_tick(gba_age);
     uint32_t release_ticks = sc64_weapon_source_trace_release_ticks(p);
     /* The captured tracer begins at attack-init. Keep the attacker animation
@@ -669,6 +675,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
             attack_age, attack_age, p->attack_image, actor_frame, x0, y0,
             key.direction, actor_mirror, 0, 0, x0, y0, x1, y1, 0);
     }
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_actor+=gba_clock()-section_start; section_start=gba_clock();
+#endif
     if (attack_age < release_ticks) return;
     uint32_t source_age = attack_age - release_ticks;
     uint32_t init_ticks = sc64_weapon_source_trace_startup_ticks(p);
@@ -734,6 +743,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
                 draw_image_id, draw_image, draw_frame, draw_mirror, px, py);
     }
 
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_projectile+=gba_clock()-section_start; section_start=gba_clock();
+#endif
     /* Child images from each missile script remain independent while their
      * own Init animation is alive. This covers projectile trails and impact
      * sparks as well as ordinary IMGOL/SPROL records. */
@@ -753,6 +765,9 @@ sc64_weapon_source_vfx_draw_trace_resolved(Sc64WeaponSourceVfxKey key,
             moving ? flight_ticks : 0u, &motion);
     }
 
+#ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
+    diag_children+=gba_clock()-section_start;
+#endif
 }
 
 static inline void
