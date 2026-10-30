@@ -57,7 +57,8 @@ def cycles(kind, tick, frames, total=None):
             "stack_untouched=8000")
 
 
-LOADED = "Z7 LOADED ok frame=290 screen=1 started=2 minerals=900 gas=0"
+# The load frame steps no tick: LOADED repeats the prefix cut state.
+LOADED = "Z7 LOADED ok frame=289 screen=1 started=2 minerals=900 gas=0"
 
 
 def run_log(rows, *, terminal_kind="won", start=True, done=True, timing=("terminal", 600, 600),
@@ -323,35 +324,77 @@ class Z7ArmReplayTest(unittest.TestCase):
         plan = self.plan()
         rows = self.rows(plan)
         seed = sram((0, 1, PAUSE, True))
+        prefix = self.prefix_log(plan)
         log = run_log(rows[2:], head=[LOADED], timing=("terminal", 600, 600 - 301 + 1), mode=2)
-        good = replay.evaluate(plan, "resume", log, 301, seed=seed,
+        good = self.resume(plan, prefix, log, 301, seed=seed,
                                sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True)))
         self.assertTrue(good["qualified"], good["failures"])
         self.assertEqual(good["compared_observations"], 1)
-        self.assertFails(replay.evaluate(plan, "resume", log, 301,
+        self.assertFails(self.resume(plan, prefix, log, 301,
                                          sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True))),
                          "seed not supplied")
-        self.assertFails(replay.evaluate(plan, "resume", log, 301, seed=seed,
+        self.assertFails(self.resume(plan, prefix, log, 301, seed=seed,
                                          sram=sram((0, 1, WIN, True), (1, 2, WIN, True))),
                          "did not keep the seeded pause save")
-        self.assertFails(replay.evaluate(plan, "resume", log, 301, seed=seed, sram=seed),
+        self.assertFails(self.resume(plan, prefix, log, 301, seed=seed, sram=seed),
                          "do not match its outcome")
-        self.assertFails(replay.evaluate(plan, "resume", log.replace("LOADED ok", "LOADED fail"), 301,
+        self.assertFails(self.resume(plan, prefix, log.replace("LOADED ok", "LOADED fail"), 301,
                                          seed=seed, sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True))),
                          "one successful LOADED")
-        self.assertFails(replay.evaluate(plan, "resume", log.replace(LOADED, LOADED.replace(
+        self.assertFails(self.resume(plan, prefix, log.replace(LOADED, LOADED.replace(
             "screen=1", "screen=3")), 301, seed=seed,
             sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True))), "one successful LOADED")
-        self.assertFails(replay.evaluate(plan, "resume", log.replace(LOADED, "Z7 LOADED ok"), 301,
+        self.assertFails(self.resume(plan, prefix, log.replace(LOADED, "Z7 LOADED ok"), 301,
                                          seed=seed, sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True))),
                          "malformed")
-        self.assertFails(replay.evaluate(plan, "resume", log, None, seed=seed,
+        self.assertFails(self.resume(plan, prefix, log, None, seed=seed,
                                          sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True))),
                          "not inside the tape")
         early = run_log(rows, head=[LOADED], timing=("terminal", 600, 300), mode=2)
-        self.assertFails(replay.evaluate(plan, "resume", early, 301, seed=seed,
+        self.assertFails(self.resume(plan, prefix, early, 301, seed=seed,
                                          sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True))),
                          "unexpected replay observation at tick 12")
+
+    def resume(self, plan, prefix, log, cut, **kw):
+        return replay.evaluate(plan, "resume", log, cut, prefix=prefix, **kw)
+
+    def test_resume_loaded_state_must_equal_the_saved_cut(self):
+        plan = self.plan()
+        rows = self.rows(plan)
+        seed = sram((0, 1, PAUSE, True))
+        done = sram((0, 1, PAUSE, True), (1, 2, WIN, True))
+        prefix = self.prefix_log(plan)
+        log = run_log(rows[2:], head=[LOADED], timing=("terminal", 600, 600 - 301 + 1), mode=2)
+        self.assertTrue(self.resume(plan, prefix, log, 301, seed=seed, sram=done)["qualified"])
+        # The reviewer's record: plausible framing, impossible state.
+        forged = log.replace(LOADED, "Z7 LOADED ok frame=-1 screen=1 started=-9 "
+                                     "minerals=-999 gas=999999")
+        result = self.resume(plan, prefix, forged, 301, seed=seed, sram=done)
+        for needle in ("LOADED frame=-1 is not the saved cut frame=289",
+                       "LOADED started=-9 is not the saved cut started=2",
+                       "LOADED minerals=-999 is not the saved cut minerals=900",
+                       "LOADED gas=999999 is not the saved cut gas=0"):
+            self.assertFails(result, needle)
+        # One frame later (a stepped load) or any single field off by one fails.
+        for field, good, bad in (("frame", 289, 290), ("started", 2, 3),
+                                 ("minerals", 900, 899), ("gas", 0, 1)):
+            off = log.replace(LOADED, LOADED.replace(f"{field}={good}", f"{field}={bad}"))
+            self.assertFails(self.resume(plan, prefix, off, 301, seed=seed, sram=done),
+                             f"LOADED {field}={bad} is not the saved cut")
+        # The expected state comes only from a qualifying prefix for this seed and cut.
+        self.assertFails(replay.evaluate(plan, "resume", log, 301, seed=seed, sram=done),
+                         "resume prefix log not supplied")
+        self.assertFails(self.resume(plan, self.prefix_log(plan, saved=False), log, 301,
+                                     seed=seed, sram=done), "resume prefix: expected one final")
+        self.assertFails(self.resume(plan, self.prefix_log(plan, cut=302, frame=289), log, 301,
+                                     seed=seed, sram=done), "is not the prefix cut 302")
+        self.assertFails(self.resume(plan, prefix, log, 301, seed=done, sram=done),
+                         "resume prefix: prefix must leave exactly one pause save")
+        # A prefix whose cut state was edited to match a forged LOADED still fails
+        # against the host observations it covers.
+        moved = prefix.replace("minerals=900", "minerals=-999")
+        self.assertFails(self.resume(plan, moved, forged, 301, seed=seed, sram=done),
+                         "resume prefix:")
 
     def test_save_records_verify_alternating_slot_checksums(self):
         records = replay.save_records(sram((0, 1, b"\x01" * 32, True), (1, 2, b"\x01" * 32, False)))

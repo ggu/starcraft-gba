@@ -448,8 +448,33 @@ def sram_check(mode: str, plan: dict, data: bytes | None,
     return records, errors
 
 
+def loaded_check(plan: dict, loaded: dict, cut: int | None, prefix: str | None,
+                 seed: bytes | None, timed: bool) -> list[str]:
+    """LOADED must report the state the qualifying prefix saved into the seed.
+
+    Load-tick semantics: the resume ROM holds L for one frame on the title
+    screen. That frame restores the newest valid record and steps no
+    simulation tick, so LOADED's frame, started mask, minerals and gas equal
+    the prefix's cut observation (whose frame SAVED repeats). The tape then
+    resumes at cut + 1; the load frame is a guest frame in the timing
+    records but not a game tick."""
+    if prefix is None:
+        return ["resume prefix log not supplied"]
+    base = evaluate(plan, "prefix", prefix, None, timed=timed, sram=seed)
+    errors = [f"resume prefix: {f}" for f in base["failures"]]
+    if base["cut"] is None or base["cut"] != cut:
+        return errors + [f"resume cut {cut} is not the prefix cut {base['cut']}"]
+    saved = parse_records(prefix)[0]["checks"][cut]
+    for field in ("frame", "started", "minerals", "gas"):
+        if loaded[field] != saved[field]:
+            errors.append(f"LOADED {field}={loaded[field]} is not the saved cut "
+                          f"{field}={saved[field]}")
+    return errors
+
+
 def evaluate(plan: dict, mode: str, text: str, cut: int | None, *, timed: bool = True,
-             sram: bytes | None = None, seed: bytes | None = None) -> dict:
+             sram: bytes | None = None, seed: bytes | None = None,
+             prefix: str | None = None) -> dict:
     """Qualify one replay log. Every gate must pass; failures are listed."""
     records, failures = parse_records(text)
     singles, order, stop = records["singles"], records["order"], plan["stop"]
@@ -492,6 +517,8 @@ def evaluate(plan: dict, mode: str, text: str, cut: int | None, *, timed: bool =
                     order[1] != "LOADED" or loaded[0][2]["screen"] != SCREEN_PLAY:
                 failures.append(f"expected one successful LOADED record after START, "
                                 f"found {count['LOADED']}")
+            else:
+                failures += loaded_check(plan, loaded[0][2], cut, prefix, seed, timed)
         elif count["LOADED"]:
             failures.append("full run has a LOADED record")
         if count["DONE"] != 1 or order[-1:] != ["DONE"] or count["SAVED"]:
@@ -546,6 +573,8 @@ def main() -> int:
     check.add_argument("--cut", type=int)
     check.add_argument("--sav", type=pathlib.Path, help="SRAM the run left (required to qualify)")
     check.add_argument("--seed-sav", type=pathlib.Path, help="resume: SRAM the run started with")
+    check.add_argument("--prefix-log", type=pathlib.Path,
+                       help="resume: log of the prefix run that wrote the seed")
     check.add_argument("--untimed", action="store_true",
                        help="host logs carry no guest timing; skip the timing gate")
     run = sub.add_parser("run", help="one isolated mGBA replay")
@@ -555,9 +584,11 @@ def main() -> int:
     run.add_argument("--mode", choices=("full", "prefix", "resume"), default="full")
     run.add_argument("--cut", type=int, help="resume: the prefix cut tick")
     run.add_argument("--seed-sav", type=pathlib.Path, help="resume: SRAM written by the prefix")
+    run.add_argument("--prefix-log", type=pathlib.Path,
+                     help="resume: log of the prefix run that wrote the seed")
     run.add_argument("--timeout", type=float, default=6 * 3600)
     args = parser.parse_args()
-    for name in ("trace", "rom", "out", "log", "seed_sav", "sav"):
+    for name in ("trace", "rom", "out", "log", "seed_sav", "sav", "prefix_log"):
         if getattr(args, name, None) is not None:
             setattr(args, name, getattr(args, name).resolve())
 
@@ -568,13 +599,15 @@ def main() -> int:
                           "terminal": plan["final"]["kind"], "trace_sha256": plan["trace_sha256"]}))
         return 0
     plan = load_trace(args.trace)
-    if args.mode == "resume" and args.cut is None:
-        parser.error("resume needs --cut")
+    if args.mode == "resume" and (args.cut is None or args.prefix_log is None):
+        parser.error("resume needs --cut and --prefix-log")
     seed = args.seed_sav.read_bytes() if args.seed_sav else None
+    prefix_raw = args.prefix_log.read_bytes() if args.prefix_log else None
+    prefix = prefix_raw.decode(errors="replace") if prefix_raw is not None else None
     if args.command == "compare":
         sram = args.sav.read_bytes() if args.sav else None
         result = evaluate(plan, args.mode, args.log.read_text(errors="replace"), args.cut,
-                          timed=not args.untimed, sram=sram, seed=seed)
+                          timed=not args.untimed, sram=sram, seed=seed, prefix=prefix)
         print(json.dumps(result, indent=2))
         return 0 if result["qualified"] else 1
     if not MGBA.exists():
@@ -586,10 +619,11 @@ def main() -> int:
     text, wall = run_mgba(args.rom, args.out, args.timeout, args.seed_sav, markers)
     sav = args.out / "saves" / "replay.sav"
     data = sav.read_bytes() if sav.exists() else None
-    result = evaluate(plan, args.mode, text, args.cut, sram=data, seed=seed)
+    result = evaluate(plan, args.mode, text, args.cut, sram=data, seed=seed, prefix=prefix)
     result.update({"trace_sha256": plan["trace_sha256"],
                    "rom_sha256": sha256(args.rom.read_bytes()), "wall_seconds": round(wall, 1),
-                   "sram_sha256": sha256(data) if data else None})
+                   "sram_sha256": sha256(data) if data else None,
+                   "prefix_log_sha256": sha256(prefix_raw) if prefix_raw else None})
     (args.out / "result.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({k: result[k] for k in ("qualified", "failures", "compared_observations",
                                              "cut", "guest_timing", "wall_seconds", "sram_records")},
