@@ -233,23 +233,21 @@ race_impact_save_write(void)
     return 1;
 }
 
-/* Decode all extension data in scratch before touching live state. */
+/* Decode an already-selected raw envelope in race_impact_record.  This may
+ * rearrange that scratch record, but never reads SRAM or changes live state. */
 static int
-race_impact_save_read(Sc64ImpactEvent *candidate, int *count)
+race_impact_save_decode_selected(u32 len, u32 selected_tag,
+                                 Sc64ImpactEvent *candidate, int *count)
 {
-    u32 len = 0;
     int rows;
     *count = 0;
+    if (len > (u32)sizeof(race_impact_record)) return 0;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     const u32 base = (u32)sizeof(RaceSave) - SC64_BC_SAVE_EXTRA_BYTES;
     Sc64BcYamatoShot shots[SC64_BC_SHOT_LIMIT] = {{0}};
     u32 offset = base, mask = 0, impact_bytes;
-    int legacy = 0;
-    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), SAVE_VERSION, &len)) {
-        legacy = 1;
-        if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record),
-                              SC64_LEGACY_SAVE_VERSION, &len)) return 0;
-    }
+    int legacy = selected_tag == SC64_LEGACY_SAVE_VERSION;
+    if (selected_tag != SAVE_VERSION && !legacy) return 0;
     if (len < base) return 0;
     if (!legacy) {
         if (race_data.version != SAVE_VERSION ||
@@ -274,14 +272,7 @@ race_impact_save_read(Sc64ImpactEvent *candidate, int *count)
                               RACE_IMPACT_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
                               SC_RU_COUNT, candidate);
 #else
-#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), SAVE_VERSION, &len)) {
-        if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record),
-                              SC64_LEGACY_SAVE_VERSION, &len)) return 0;
-    }
-#else
-    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), SAVE_VERSION, &len)) return 0;
-#endif
+    (void)selected_tag; /* Version validation remains in race_load_game. */
     if (len < sizeof(RaceSave)) return 0;
     if (len == sizeof(RaceSave)) return 1;
     rows = sc64_impact_decode(race_impact_record.impacts, len - (u32)sizeof(RaceSave),
@@ -291,6 +282,25 @@ race_impact_save_read(Sc64ImpactEvent *candidate, int *count)
     if (rows < 0) return 0;
     *count = rows;
     return 1;
+}
+
+/* Preserve the existing per-tag selection policy until semantic journal
+ * migration is registered.  The decoder above is shared with that future
+ * candidate preflight and operates only on the selected scratch envelope. */
+static int
+race_impact_save_read(Sc64ImpactEvent *candidate, int *count)
+{
+    u32 len = 0, tag = SAVE_VERSION;
+    *count = 0;
+    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), tag, &len)) {
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+        tag = SC64_LEGACY_SAVE_VERSION;
+        if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), tag, &len)) return 0;
+#else
+        return 0;
+#endif
+    }
+    return race_impact_save_decode_selected(len, tag, candidate, count);
 }
 
 static void
