@@ -71,12 +71,30 @@ exit is not started.
 
 **Military**
 
-This stage keeps the existing military rule: once an opponent has four armed
-units, every armed unit attack-moves to the hostile structure nearest its
-start location. Orders are spread over a 5×3 block at 16-pixel pitch, and
-each unit's first route search is delayed by up to 11 updates using the
-engine's own retry wait. Idle units still return fire through the engine's
-ordinary idle engagement.
+- Units gather at a rally point a third of the way from the base toward the
+  map center.
+- No offensive starts before six minutes. After that, an attack starts when
+  army supply reaches a threshold. The threshold starts at 12 Marines' worth
+  and grows slowly with match time and with hostile static defenses. An owner
+  that has used its whole unit share, an owner whose minerals are exhausted,
+  and any owner after 25 minutes attack with what they have.
+- An attack targets the nearest hostile structure to the rally point, with a
+  25% preference for depots. When no hostile structure or ground unit remains
+  near the target, the attacking group picks the next nearest structure.
+  Aircraft do not hold an objective, so a ground army never waits under one.
+- On an exhausted map, an owner with no army, no local minerals and no bank
+  sends its workers to attack after 30 minutes, so the match can end.
+- A group order is spread over a 5×3 block at 16-pixel pitch, and each
+  unit's first route search is delayed by up to 11 updates using the
+  engine's own retry wait, so a large order does not run every search on one
+  update.
+- Reinforcements leave home in groups of at least six supply. If too few
+  attackers remain, they regroup at the rally point.
+- Any armed hostile non-worker within 320 pixels of a depot is a threat.
+  Units at home defend. Attacking units are recalled only when the home army
+  is outnumbered. If the army is outnumbered near the main depot, up to six
+  mining workers also defend, then return to mining through recovery.
+- One worker visits the nearest other start location at about one minute.
 
 ## Knowledge and cheat rules
 
@@ -85,7 +103,8 @@ ordinary idle engagement.
   normal build time. The planner never creates actors or changes progress.
 - **Full knowledge of hostile actors.** The engine keeps exploration only for
   the human player. Opponents therefore read hostile positions, air and army
-  counts, and defenses directly. This differs from StarCraft's fog of war and is an authored
+  counts, and defenses directly. The early scout is cosmetic and does not feed
+  the planner. This differs from StarCraft's fog of war and is an authored
   simplification.
 - **Free-for-all.** Every computer player is hostile to every other player,
   following the existing `owners_hostile` rules.
@@ -97,7 +116,7 @@ ordinary idle engagement.
 | Unit and building costs, build times, supply, prerequisites, producers, addons | Engine rule tables and the raw-ID catalog. The catalog is checked against pinned BWAPI UnitType data and the Blizzard compendium ([catalog notes](SC64_SKIRMISH_ROSTER_STATUS.md)). |
 | Script inventory | The private SC64 AI catalog (BOLT leaf `012/000`, see [SC64-AI-CATALOG.md](SC64-AI-CATALOG.md)) lists the melee custom scripts `TMCu`, `ZMCu`, `PMCu` and the Brood War `TMCx`, `ZMCx`, `PMCx`. This shows that SC64 ships per-race melee programs. Their bytecode semantics are unaudited, so nothing here is decoded from them. |
 | Plan shape | Authored. The plan follows the general structure that public AIScript documentation (PyMS) gives for stock melee scripts: build orders, defense builds, attack preparation and waves. No program content is copied. |
-| Recovery and placement | Authored. |
+| Wave sizes, timings, target choice, recovery, worker defense, scouting | Authored. |
 
 ## Missing engine capabilities
 
