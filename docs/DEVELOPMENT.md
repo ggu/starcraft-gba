@@ -2988,6 +2988,27 @@ actors whose combat is still unsupported.
 `make test-sc64-weapon-vfx` checks asset-free rendering geometry and clipping.
 With the existing private inputs, `make test-sc64-weapon-vfx-profiles` checks
 the unified, full Terran, Z7 and P7 actor sets and actual firing events.
+The optional source weapon bank can include per-profile culling envelopes.
+Existing banks remain usable with the global envelope. To prepare and qualify
+an upgraded bank without overwriting existing inputs, provide the authenticated
+ROM and the palette files from your prepared source import, and choose a new
+ignored output directory:
+
+```sh
+python3 tools/sc64_weapon_source_sprites.py \
+  --rom /path/to/StarCraft64-USA.z64 \
+  --palette-remap .local/sc64/backwater/generated/palette-remap.bin \
+  --palette-json .local/sc64/backwater/generated/palette.json \
+  --out .local/sc64/weapon-vfx-bounds/generated
+make test-sc64-weapon-profile-bounds-bank \
+  WEAPON_SOURCE_DIR=.local/sc64/weapon-vfx-bounds/generated
+```
+
+The qualification target reads the prepared bank without generating inputs;
+it checks profile provenance and fallback, raster culling, and the wide-path
+differential. The default host suite also tests the generator using authored,
+asset-free fixtures. Keep generated data under ignored local storage.
+
 `make showcase` includes the effects in the filming ROM; the canonical race
 builds include them as well. The transient pool holds 32 effects in race
 profiles and retains 12 in the original-art save format. Overflow replaces

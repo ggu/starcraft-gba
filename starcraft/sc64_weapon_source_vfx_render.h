@@ -307,6 +307,37 @@ sc64_weapon_source_vfx_cached_bounds(void)
 #endif
 }
 
+/* Optional generated bounds apply only to exact immutable bank profiles.
+ * Unknown banks, synthetic/stack copies and invalid entries use the original
+ * global envelope. Integer-address checks avoid unrelated-pointer arithmetic. */
+static inline uint32_t
+sc64_weapon_source_vfx_profile_bounds(const Sc64WeaponSourceAttackProfile *profile)
+{
+    uint32_t global = sc64_weapon_source_vfx_cached_bounds();
+#if defined(SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION) && \
+    SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION == 1
+    if ((global & UINT32_C(0xc0000000)) == SC64_WEAPON_SOURCE_VFX_BOUNDS_VALID && profile) {
+        uintptr_t base = (uintptr_t)(const void *)sc64_weapon_source_profiles;
+        uintptr_t addr = (uintptr_t)(const void *)profile;
+        if (addr >= base) {
+            uintptr_t offset = addr - base;
+            if (offset % sizeof(sc64_weapon_source_profiles[0]) == 0) {
+                uintptr_t index = offset / sizeof(sc64_weapon_source_profiles[0]);
+                if (index < SC64_WEAPON_SOURCE_PROFILE_COUNT &&
+                    index < sizeof(sc64_weapon_source_profile_bounds) / sizeof(sc64_weapon_source_profile_bounds[0])) {
+                    uint32_t value = sc64_weapon_source_profile_bounds[index];
+                    if ((value & UINT32_C(0xc0000000)) == SC64_WEAPON_SOURCE_VFX_BOUNDS_VALID)
+                        return value;
+                }
+            }
+        }
+    }
+#else
+    (void)profile;
+#endif
+    return global;
+}
+
 static inline int
 sc64_weapon_source_vfx_motion_has_proven_bounds(uint8_t bullet_type)
 {
@@ -381,8 +412,8 @@ sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey 
         (uint32_t)camx + 32768u <= 65535u &&
         (uint32_t)camy + 32768u <= 65535u && key.direction <= 31u) {
         uint16_t rx, ry;
-        if (!sc64_weapon_source_vfx_bounds_unpack(
-                sc64_weapon_source_vfx_cached_bounds(), &rx, &ry)) return 0;
+        uint32_t global_bounds = sc64_weapon_source_vfx_cached_bounds();
+        if (!sc64_weapon_source_vfx_bounds_unpack(global_bounds, &rx, &ry)) return 0;
         const int16_t *v = sc64_weapon_source_direction_q8[key.direction];
         int lx = x0 + ((int)profile->forward_offset * v[0]) / 512;
         int ly = y0 + ((int)profile->forward_offset * v[1]) / 512 -
@@ -397,8 +428,18 @@ sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey 
         if (y1 < lo_y) lo_y = y1;
         if (y1 > hi_y) hi_y = y1;
         lo_x -= camx; hi_x -= camx; lo_y -= camy; hi_y -= camy;
+        if (hi_x + (int)rx < 0 || lo_x - (int)rx >= 240 ||
+            hi_y + (int)ry < 0 || lo_y - (int)ry >= 108) return 1;
+#if defined(SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION) && \
+    SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION == 1
+        uint32_t profile_bounds = sc64_weapon_source_vfx_profile_bounds(profile);
+        if (profile_bounds == global_bounds ||
+            !sc64_weapon_source_vfx_bounds_unpack(profile_bounds, &rx, &ry)) return 0;
         return hi_x + (int)rx < 0 || lo_x - (int)rx >= 240 ||
                hi_y + (int)ry < 0 || lo_y - (int)ry >= 108;
+#else
+        return 0;
+#endif
     }
     int64_t dx = (int64_t)x1 - x0, dy = (int64_t)y1 - y0;
     uint64_t abs_dx = (uint64_t)(dx < 0 ? -dx : dx);
