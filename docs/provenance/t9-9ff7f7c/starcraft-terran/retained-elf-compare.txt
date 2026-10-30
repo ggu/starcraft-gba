@@ -1,0 +1,7 @@
+retained 5fcb78f02d5c4cce8608c13b1786283328ac8a9a4ea289bae544325f58119a18  build/starcraft-terran.elf.qualified
+rebuilt  b7b39381e4f8d8ada40ea07a2362689eb8fb0a20d2323cd12188c88d8aa5c8b8  build/starcraft-terran.elf
+differing bytes: 12
+in sections: .strtab
+differing symbols: 2
+  ccXVu6m9.o -> ccQ8eXng.o
+  cc02s2rC.o -> ccECeF3N.o

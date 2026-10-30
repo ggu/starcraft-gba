@@ -1280,6 +1280,9 @@ static void race_tick_buildings(void)
         if (!b[i].queue_count) continue;
         owner = b[i].owner;
         type = b[i].queue[b[i].queue_head];
+#ifdef SC64_Z8_RUNTIME
+        race_z8_note_product_building(i);
+#endif
         {
             const Sc64RaceUnitRule *ur = sc64_race_unit_rule(type);
             if (!ur) continue;
@@ -1423,6 +1426,7 @@ static void race_skirmish_init(void)
     race_skirmish_geometry();
     frame = 0; won = lost = 0; supply_used = 0; supply_cap = 0;
     death_vfx_reset();
+    memset(geysers, 0, sizeof(geysers));
     minerals = 200; gas = 0; geyser_count = 4;
     for (i = 0; i < 4; ++i) {
         int sx = (i == 0 || i == 3) ? -1 : 1;
@@ -1445,6 +1449,7 @@ static void race_skirmish_init(void)
             m[i].x=map->minerals[i].x;m[i].y=map->minerals[i].y;
             m[i].amount=map->minerals[i].amount;m[i].style=176;
         }
+        memset(geysers, 0, sizeof(geysers));
         geyser_count=map->geyser_count;
         for(i=0;i<geyser_count;i++){geysers[i].x=map->geysers[i].x;geysers[i].y=map->geysers[i].y;}
     }

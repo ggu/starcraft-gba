@@ -1,0 +1,7 @@
+9b2842b563efc4123077a8d8e91823a1291225ecbddec254d083cd275e6a8c79  /opt/homebrew/Cellar/arm-none-eabi-binutils/2.47/bin/arm-none-eabi-as
+740d9c697620b00fed6c48a12740895f648cf2fbebb635509d768cbed798fd4f  /opt/homebrew/Cellar/arm-none-eabi-binutils/2.47/bin/arm-none-eabi-ld
+308eb2a4c108e01cdcd23716032d119c1d7319462c1c30794517e967a32bdf49  /opt/homebrew/Cellar/arm-none-eabi-binutils/2.47/bin/arm-none-eabi-objcopy
+bbc28d378f4a64c13a25c7e3618319cc190bde34eddb55328a2683d926fd5489  /opt/homebrew/Cellar/arm-none-eabi-binutils/2.47/bin/arm-none-eabi-size
+41b601fd92cbb3c71c1d319b6da27deff244c19e94a4bf852a575d30f9ef0ba2  /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/bin/arm-none-eabi-gcc
+c8db9fb18e0678b9acedd572ab1c68f3626a8d2d71c1e59a665def271efa2e61  /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/libexec/gcc/arm-none-eabi/16.2.0/cc1
+b2a22023e43b43d1c2262cc032efd1ba7964d521c6920b346cb6737fc0d2cfa5  /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/libexec/gcc/arm-none-eabi/16.2.0/collect2

@@ -92,6 +92,47 @@ race_save_decode_building(const RaceSave *candidate, unsigned slot, Building *ou
 #endif
 }
 #endif
+#ifdef SC64_Z8_RUNTIME
+/* Z8's post-load world binding requires source identities to agree with
+ * live owners and runtime types. Check the decoded candidate before any
+ * live pool is overwritten, using the same rules as the rebind. */
+static int
+race_z8_save_candidate_world_valid(const RaceSave *candidate, int width, int height)
+{
+    const Sc64RaceMap *map = &sc64_race_maps[SC64_Z8_GLOBAL_ID];
+    Sc64NydusSourcePair pairs[SC64_NYDUS_MAX_LINKS];
+    unsigned pair_count = 0, nexus_count = 0;
+    if (!candidate || width <= 0 || height <= 0 || !race_z8_map_shape_valid(map) ||
+        width != map->width || height != map->height ||
+        !sc64_nydus_source_pairs(sc64_z8_program_nydus, SC64_Z8_PROGRAM_NYDUS_COUNT,
+                                  pairs, &pair_count)) return 0;
+    for (unsigned i = 0; i < map->unit_count; ++i)
+        nexus_count += map->units[i].source_type == SC64_Z8_RAW_NEXUS &&
+                       map->units[i].owner != SC64_Z8_HUMAN_SLOT;
+    if (nexus_count != 2u) return 0;
+    for (unsigned i = 0; i < MAX_UNITS; ++i) {
+        Unit unit;
+        if (!race_save_decode_unit(candidate, i, (unsigned)width * 16u,
+                                   (unsigned)height * 16u, &unit)) return 0;
+        if (!unit.alive) continue;
+        if (unit.raw_owner < 0 || unit.raw_owner >= SC64_Z8_OWNER_LIMIT ||
+            race_z8_source_owner((unsigned)unit.raw_owner) != unit.owner ||
+            unit.raw_type < 0 || sc64_race_unit_from_raw(unit.raw_type) != unit.type)
+            return 0;
+    }
+    for (unsigned i = 0; i < MAX_BUILDINGS; ++i) {
+        Building building;
+        if (!race_save_decode_building(candidate, i, &building)) return 0;
+        if (!building.alive) continue;
+        if (building.raw_owner < 0 || building.raw_owner >= SC64_Z8_OWNER_LIMIT ||
+            race_z8_source_owner((unsigned)building.raw_owner) != building.owner ||
+            building.raw_type < 0 || sc64_race_building_from_raw(building.raw_type) < 0)
+            return 0;
+    }
+    return 1;
+}
+#endif
+
 #ifdef SC64_ZP_FULL_STORAGE
 static int
 race_save_decode_mineral(const RaceSave *candidate, unsigned slot,
@@ -1217,6 +1258,9 @@ static int race_save_game(void) {
         race_data.z7 = race_z7;
     }
 #endif
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active() && !race_z8_save_pack(&race_data.z8)) return 0;
+#endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (race_late_active()) {
@@ -1358,6 +1402,11 @@ static int race_save_game(void) {
             /* Z7 is checked below using its smaller shared schema. */
         } else
 #endif
+#ifdef SC64_Z8_RUNTIME
+        if (race_z8_active()) {
+            /* Z8 fills the shared payload; it is checked below. */
+        } else
+#endif
         {
             const u8 *bytes = (const u8 *)&race_data.z6;
             for (unsigned i = 0; i < sizeof(race_data.z6); ++i)
@@ -1382,6 +1431,12 @@ static int race_save_game(void) {
 #endif
 #ifdef SC64_SHARED_BATTERY
     if (!race_battery_saved_world_valid(&race_data, race_cols, race_rows)) return 0;
+#endif
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active() &&
+        !race_z8_save_unpack(&race_data.z8,
+                             &sc64_zp_route_save_scratch.z8_candidate.scheduler, 0))
+        return 0;
 #endif
 #ifdef SC64_T5_RUNTIME
     if (!race_transport_save_candidate_valid(&race_data, race_cols, race_rows)) return 0;
@@ -1512,6 +1567,9 @@ static int race_load_game(void) {
 #ifdef SC64_Z7_RUNTIME
        &&v[2]!=SC64_Z7_GLOBAL_ID
 #endif
+#ifdef SC64_Z8_RUNTIME
+       &&v[2]!=SC64_Z8_GLOBAL_ID
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
        &&(v[2]<SC64_TERRAN_LATE_GLOBAL_T7||
           v[2]>SC64_TERRAN_LATE_GLOBAL_T10)
@@ -1546,6 +1604,9 @@ static int race_load_game(void) {
 #endif
 #ifdef SC64_Z7_RUNTIME
         &&v[2]!=SC64_Z7_GLOBAL_ID
+#endif
+#ifdef SC64_Z8_RUNTIME
+        &&v[2]!=SC64_Z8_GLOBAL_ID
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
         &&(v[2]<SC64_TERRAN_LATE_GLOBAL_T7||
@@ -2277,6 +2338,11 @@ static int race_load_game(void) {
             /* Z7 shares the payload; its validation follows below. */
         } else
 #endif
+#ifdef SC64_Z8_RUNTIME
+        if (!v[0] && v[2] == SC64_Z8_GLOBAL_ID) {
+            /* Z8 fills the payload; its validation follows below. */
+        } else
+#endif
         {
         const u8 *bytes = (const u8 *)&race_data.z5;
         for (unsigned i = 0; i < sizeof(race_data.z5); ++i) if (bytes[i]) return 0;
@@ -2308,6 +2374,11 @@ static int race_load_game(void) {
             /* Z7 is validated separately using its smaller schema. */
         } else
 #endif
+#ifdef SC64_Z8_RUNTIME
+        if (!v[0] && v[2] == SC64_Z8_GLOBAL_ID) {
+            /* Z8 is validated separately below. */
+        } else
+#endif
         {
             const u8 *bytes = (const u8 *)&race_data.z6;
             for (unsigned i = 0; i < sizeof(race_data.z6); ++i)
@@ -2323,6 +2394,13 @@ static int race_load_game(void) {
         for (unsigned i=sizeof(race_data.z7); i<sizeof(race_data.z5); ++i)
             if (payload[i]) return 0;
     }
+#endif
+#ifdef SC64_Z8_RUNTIME
+    if (!v[0] && v[2] == SC64_Z8_GLOBAL_ID &&
+        (!race_z8_save_candidate_world_valid(&race_data, width, height) ||
+         !race_z8_save_unpack(&race_data.z8,
+                              &sc64_zp_route_save_scratch.z8_candidate.scheduler, 0)))
+        return 0;
 #endif
 #ifdef SC64_T4_SCENARIO_RUNTIME
 #ifdef SC64_TERRAN_LATE_RUNTIME
@@ -2677,6 +2755,16 @@ static int race_load_game(void) {
         memset(&race_z7_world,0,sizeof(race_z7_world));
         memset(&race_z7_ops,0,sizeof(race_z7_ops));
         race_z7_map=0;
+    }
+#endif
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) {
+        if (!race_z8_save_unpack(&race_data.z8,
+                                 &sc64_zp_route_save_scratch.z8_candidate.scheduler, 1) ||
+            !race_z8_rebind_loaded_world(&sc64_race_maps[SC64_Z8_GLOBAL_ID]))
+            return 0;
+    } else if (!race_z8_runtime_init(0)) {
+        return 0;
     }
 #endif
 #ifdef SC64_NYDUS_ENABLED
