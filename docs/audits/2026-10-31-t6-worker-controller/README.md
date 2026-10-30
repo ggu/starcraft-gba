@@ -1,0 +1,7 @@
+# T6 worker-order controller qualification
+
+On worker STOP/manual-mining runtime 83875b4, the T6 host controller uses native visible mineral orders and preserves the near-Norad rescued SCV for paid repair. It verifies construction by the pending builder's resulting target and the owned building identity and site, rather than a global building-count change during combat. One gas worker supplies the remaining paid tech and Dropship budget, with empty workers returned to visible minerals once that budget is funded. Raynor returns to his original staging point, and the controller orders a verified Marine group toward a visible air threat near Norad.
+
+The full Terran host controller compiled with prepared product flags and ASan/UBSan won at host tick 17,127 / frame 16,816, within the existing 30,000-call limit. Raynor and Norad survived, Raynor and both paid Dropships reached the source goal, the original victory and completion checks passed, and unsupported faults were zero. The trace records a visible air threat and a normal Marine defense order. Local log and trace are `.local/t1-controller/t6-defense-run.log` and `t6-defense-trace.json`.
+
+This is one host-controller result; ARM replay, fresh-process save continuation, hardware, and performance are not qualified by it.
