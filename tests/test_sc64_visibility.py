@@ -38,7 +38,8 @@ enum { MAP_CELLS=MAP_COLS*MAP_ROWS,
 #endif
 #ifdef SC64_T4_RUNTIME
        , U_MAP_REVEALER=5, U_GHOST=6, U_CIVILIAN=7, U_RHYNADON=8,
-       U_RAGNASAUR=9, U_DATA_DISK=10, B_TERRAN_BEACON=25
+       U_RAGNASAUR=9, U_DATA_DISK=10, U_GOLIATH=11, U_SPIDER_MINE=12,
+       B_TERRAN_BEACON=25, B_MISSILE_TURRET=26
 #endif
        };
 #ifdef SC64_RACES
@@ -56,16 +57,18 @@ static int sc64_race_t4_sight_source_pixels(int type) {
  case U_CIVILIAN:case U_RHYNADON:case U_RAGNASAUR:return 224;
  case U_MAP_REVEALER:return 320;
  case U_DATA_DISK:return 160;
+ case U_GOLIATH:return 256;      /* span radius 128 */
+ case U_SPIDER_MINE:return 96;   /* radius 48 has no span table */
  default:return 0;
  }
 }
 static int sc64_race_t4_building_sight_source_pixels(int type) {
- return type==B_TERRAN_BEACON?256:0;
+ return type==B_TERRAN_BEACON?256:type==B_MISSILE_TURRET?352:0;
 }
 #endif
 #endif
 typedef struct { int alive, owner, x, y, type; } UnitFixture;
-typedef struct { int alive, owner, x, y, type; } BuildingFixture;
+typedef struct { int alive, owner, x, y, type, under_construction; } BuildingFixture;
 static UnitFixture u[MAX_UNITS];
 static BuildingFixture b[MAX_BUILDINGS];
 #ifdef SC64_LARGE_MAPS
@@ -134,7 +137,9 @@ static void ref_update(void) {
  for(i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE){
   int building_source=0;
 #ifdef SC64_T4_RUNTIME
-  building_source=sc64_race_t4_building_sight_source_pixels(b[i].type);
+  /* Unfinished grounded buildings see four source tiles. */
+  building_source=b[i].under_construction ? 128 :
+                  sc64_race_t4_building_sight_source_pixels(b[i].type);
 #endif
   ref_explore(b[i].x,b[i].y,building_source?building_source/32:b[i].type==B_COMMAND?7:3);
 #ifdef SC64_RACES
@@ -253,7 +258,8 @@ int main(void){
     incremental replacement, overlap counts and all clipped map edges. */
  {
   static const int types[]={U_GHOST,U_CIVILIAN,U_RHYNADON,U_RAGNASAUR,
-                            U_MAP_REVEALER,U_DATA_DISK};
+                            U_MAP_REVEALER,U_DATA_DISK,U_GOLIATH,
+                            U_SPIDER_MINE};
   static const int px[4]={640,0,MAP_COLS*16-1,0};
   static const int py[4]={640,0,0,MAP_ROWS*16-1};
   int j,k;
@@ -281,6 +287,15 @@ int main(void){
    b[0].y+=b[0].y<MAP_ROWS*16-15?15:-15;compare(-510-k);
   }
   b[0].alive=0;compare(-520);
+  /* A Turret under construction sees four tiles until it completes, and
+     removal uses the radius it was added with. */
+  b[0]=(BuildingFixture){1,SIDE,640,640,B_MISSILE_TURRET,1};
+  b[1]=(BuildingFixture){1,SIDE,700,660,B_COMMAND,1};
+  compare(-530);
+  b[0].under_construction=0;compare(-531);
+  b[1].under_construction=0;compare(-532);
+  b[0].under_construction=1;b[1].alive=0;compare(-533);
+  b[0].alive=0;compare(-534);
  }
 #endif
  near_move_sweep(U_SCV,-2000);
@@ -320,6 +335,12 @@ int main(void){
 #endif
    b[i].x=(int)(rnd()%(MAP_COLS*16));b[i].y=(int)(rnd()%(MAP_ROWS*16));
   }
+#ifdef SC64_T4_RUNTIME
+  for(i=0;i<MAX_BUILDINGS;i++)if((rnd()%9)==0)
+   b[i].under_construction=!b[i].under_construction;
+  for(i=0;i<MAX_UNITS;i++)if(u[i].alive&&(rnd()%11)==0)
+   u[i].type=(rnd()%2)?U_GOLIATH:U_SPIDER_MINE;
+#endif
   compare(step);
   if(step==499){
    /* Simulate load: persistent explored tiles survive, visible state/cache
