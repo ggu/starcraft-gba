@@ -7111,7 +7111,7 @@ target_lists_unavailable:
 #endif
 #endif
 #ifdef SC64_RACES
-    if (target_lists_valid) sc64_target_index_begin();
+    if (target_lists_valid) sc64_target_index_begin_owner_lists();
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     if (race_p7_active()) sc64_p7_arbiter_cache_process_due();
 #endif

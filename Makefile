@@ -5474,6 +5474,7 @@ BC_FIXTURE_heading := tests/sc64_battlecruiser_yamato_heading_game.c
 BC_FIXTURE_range := tests/sc64_battlecruiser_yamato_range_game.c
 BC_FIXTURE_recovery := tests/sc64_battlecruiser_yamato_recovery.c
 BC_FIXTURE_idle := tests/sc64_bc_idle_equivalence.c
+BC_FIXTURE_targetquery := tests/sc64_target_owner_query_game.c
 BC_FIXTURES := production research flight save transfer yamato art impact migration auto ui damage cover heading range recovery idle
 define BC_PROFILE_FIXTURE
 build/test-bc-$(1)-$(2): $$(BC_FIXTURE_$(1)) $$(STARCRAFT) $$(wildcard starcraft/*.h) $($(4)) $(5) $$(BC_INPUTS) common/gba.c $$(COMMON_HEADERS) Makefile | build
@@ -5483,6 +5484,14 @@ $(foreach case,$(BC_FIXTURES),$(eval $(call BC_PROFILE_FIXTURE,$(case),terran,TE
 $(foreach case,$(BC_FIXTURES),$(eval $(call BC_PROFILE_FIXTURE,$(case),zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS,)))
 $(foreach case,$(BC_FIXTURES),$(eval $(call BC_PROFILE_FIXTURE,$(case),protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,$(P7_INTERCEPTOR_FLIGHT_SOURCES))))
 $(foreach case,$(BC_FIXTURES),$(eval $(call BC_PROFILE_FIXTURE,$(case),showcase,SHOWCASE_FLAGS,SHOWCASE_INPUTS,)))
+# Optional real-engine target-answer differential under the four product profiles.
+$(eval $(call BC_PROFILE_FIXTURE,targetquery,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,))
+$(eval $(call BC_PROFILE_FIXTURE,targetquery,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS,))
+$(eval $(call BC_PROFILE_FIXTURE,targetquery,protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call BC_PROFILE_FIXTURE,targetquery,showcase,SHOWCASE_FLAGS,SHOWCASE_INPUTS,))
+.PHONY: test-target-owner-query
+test-target-owner-query: $(foreach p,terran zerg protoss showcase,build/test-bc-targetquery-$(p))
+	@set -e; for p in terran zerg protoss showcase; do ./build/test-bc-targetquery-$$p; done
 .PHONY: test-bc-canonical
 test-bc-canonical: $(foreach p,terran zerg protoss showcase,$(foreach c,$(BC_FIXTURES),build/test-bc-$(c)-$(p)))
 	@set -e; for p in terran zerg protoss showcase; do for c in $(BC_FIXTURES); do ./build/test-bc-$$c-$$p; done; done
