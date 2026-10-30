@@ -52,7 +52,7 @@ int main(int argc,char **argv) {
         int after_hp=flight_target<MAX_UNITS?u[flight_target].hp:b[flight_target-MAX_UNITS].hp;
         int alive=target_alive(flight_target);
         fprintf(stderr,"saved_flight=%d target=%d target_hp_before=%d target_hp_after=%d target_alive=%d\n",saved_flight,flight_target,flight_hp,after_hp,alive);
-        assert(saved_flight && !flight && (!alive || after_hp<flight_hp));
+        assert(saved_flight && !flight && after_hp<flight_hp);
     }
     int key=sc64_battlecruiser_owner_key(race_mode,race_selected_mission,u[cruiser].owner,u[cruiser].raw_owner);
     assert(key>=0 && sc64_battlecruiser_tech_has(sc64_battlecruiser_tech_bits,(unsigned)key,SC64_BC_TECH_YAMATO));

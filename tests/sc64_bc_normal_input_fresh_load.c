@@ -23,5 +23,5 @@ int main(int argc,char **argv) {
     }
     int after=target<MAX_UNITS?u[target].hp:b[target-MAX_UNITS].hp, alive=target_alive(target);
     fprintf(stderr,"fresh HOME load frame=%d cruiser=%d target=%d hp_before=%d hp_after=%d alive=%d won=%d lost=%d\n",initial_frame,cruiser,target,before,after,alive,won,lost);
-    assert(!active && (!alive || after<before) && !won && !lost);return 0;
+    assert(!active && after<before && !won && !lost);return 0;
 }

@@ -242,7 +242,7 @@ int main(int argc, char **argv)
     }
     int post_alive=target_alive(target), post_hp=target<MAX_UNITS?u[target].hp:b[target-MAX_UNITS].hp;
     fprintf(stderr,"impact target=%d before=%d after=%d alive=%d active=%d tick=%u energy=%d won=%d lost=%d\n",target,pre_hp,post_hp,post_alive,active,host_ticks,u[cruiser].carry,won,lost);
-    assert(!active && (!post_alive || post_hp<pre_hp) && !won && !lost);
+    assert(!active && post_hp<pre_hp && !won && !lost);
     trace_record("{\"kind\":\"result\",\"result\":\"impact\",\"host_tick\":%u,\"frame\":%d,\"won\":%d,\"lost\":%d,\"saved_flight\":1}",
                  host_ticks,frame,won,lost);
     fputs("\n]}\n", trace);
