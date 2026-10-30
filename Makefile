@@ -618,6 +618,12 @@ build/test-starcraft-selection: tests/sc64_selection_run.c common/gba.c $(STARCR
 build/test-race-rules: tests/race_rules.c starcraft/race_rules.h starcraft/race_skirmish.h | build
 	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined tests/race_rules.c -o $@
 
+build/test-sc64-trace-profile-cache: tests/sc64_trace_profile_cache.c starcraft/sc64_trace_cache_word.h starcraft/sc64_trace_profile_cache.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+.PHONY: test-sc64-trace-profile-cache
+test-sc64-trace-profile-cache: build/test-sc64-trace-profile-cache
+	./build/test-sc64-trace-profile-cache
+
 build/test-sc64-weapon-vfx: tests/sc64_weapon_vfx.c starcraft/sc64_weapon_vfx.h starcraft/sc64_weapon_vfx_render.h common/gba.h | build
 	$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
 .PHONY: test-sc64-weapon-vfx
