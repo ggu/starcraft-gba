@@ -3,12 +3,20 @@
 #define main sc64_impact_unused_main
 #include "sc64_impact_events_game.c"
 #undef main
+#include <stdlib.h>
 extern int sc64_test_sram_transfer(const char *,int);
 extern int sc64_test_replace_payload(u32,const void *,u32);
 extern int sc64_test_remove_tag(u32);
 int main(int argc,char **argv)
 {
-    assert(argc==3); setup();
+    assert(argc==3 || argc==6); setup();
+    if (argc==6) {
+        race_skirmish_map=atoi(argv[3]);race_human=atoi(argv[4]);race_bots=atoi(argv[5]);
+        assert(race_skirmish_map>=0 && race_skirmish_map<=SC64_SKIRMISH_IMPORTED_COUNT &&
+               race_human>=0 && race_human<3 && race_bots>=1 && race_bots<=3);
+        for(int i=0;i<3;i++) race_bot_races[i]=(race_human+i+1)%3;
+        race_skirmish_init();memset(u,0,sizeof(u));memset(b,0,sizeof(b));
+    }
     if (!strcmp(argv[1],"write")) {
 #ifdef SC64_SCARAB_RUNTIME
         assert(!"writer must use the historical gate-off layout");

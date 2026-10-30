@@ -999,7 +999,11 @@ static int race_save_game(void) {
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     GbaSaveSelection previous;
     int have_previous=race_scarab_stage_previous(&previous);
-    if (race_mode!=1 || race_skirmish_map!=0) return 0;
+    if (race_mode!=1 || race_skirmish_map<0 || race_skirmish_map>SC64_SKIRMISH_IMPORTED_COUNT ||
+        !sc64_race_storage_geometry_valid(race_cols,race_rows)) return 0;
+    if (race_skirmish_map==0 ? (race_cols!=64 || race_rows!=64) :
+        (race_cols!=sc64_skirmish_maps[race_skirmish_map-1].width ||
+         race_rows!=sc64_skirmish_maps[race_skirmish_map-1].height)) return 0;
     for (int i=0;i<MAX_UNITS;i++) if (u[i].alive) {
         Sc64ScarabParentFields f;
         if (u[i].type==U_SCARAB || u[i].raw_type==85) return 0;
@@ -1558,7 +1562,7 @@ static int race_save_game(void) {
     if (!race_bc_shots_candidate_valid(&race_data,(unsigned)WORLD_W,(unsigned)WORLD_H)) return 0;
 #endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
-    if (!race_scarab_save_candidate_valid(&race_data,1024,1024)) return 0;
+    if (!race_scarab_save_candidate_valid(&race_data,(unsigned)race_cols*16u,(unsigned)race_rows*16u)) return 0;
 #endif
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
@@ -2638,18 +2642,21 @@ static int race_load_preflight(RaceLoadPlan *plan) {
 }
 
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
-/* Stage scope: one 64x64 native skirmish geometry and the Terran compact
- * codec. The tag, never field values, determines the parent representation. */
+/* Stage scope: supported skirmish geometries and the Terran compact codec.
+ * The tag, never field values, determines the parent representation. */
 static int race_scarab_stage_prepare(const void *raw,u32 len,u32 tag,void *context) {
     RaceLoadPlan *plan=context;
     if (raw != (const void *)&race_impact_record) return 0;
     memset(plan,0,sizeof(*plan));
     if (!race_impact_save_decode_selected(len,tag,plan->impact_candidate,
                                           &plan->impact_candidate_count)) return 0;
-    if (race_data.state[0]!=1 || race_data.state[20]!=0) return 0;
+    int map=race_data.state[20], width=64, height=64;
+    if (race_data.state[0]!=1 || map<0 || map>SC64_SKIRMISH_IMPORTED_COUNT) return 0;
+    if (map) { width=sc64_skirmish_maps[map-1].width; height=sc64_skirmish_maps[map-1].height; }
+    if (!sc64_race_storage_geometry_valid(width,height)) return 0;
     for (unsigned i=0;i<MAX_UNITS;i++) {
         Unit q;
-        if (!race_save_decode_unit(&race_data,i,1024,1024,&q)) return 0;
+        if (!race_save_decode_unit(&race_data,i,(unsigned)width*16u,(unsigned)height*16u,&q)) return 0;
         if (!q.alive) continue;
         if (q.type==U_SCARAB || q.raw_type==85) return 0;
         if (sc64_race_raw_unit(q.type)==83) {
@@ -2659,7 +2666,7 @@ static int race_scarab_stage_prepare(const void *raw,u32 len,u32 tag,void *conte
                     SC64_SCARAB_PARENT_PACKED : SC64_SCARAB_PARENT_LEGACY,
                     83,q.carry,q.work_timer,&c,&t)) return 0;
             q.carry=c; q.work_timer=t;
-            if (!sc64_unit_save_encode(&race_data.units[i],&q,1024,1024)) return 0;
+            if (!sc64_unit_save_encode(&race_data.units[i],&q,(unsigned)width*16u,(unsigned)height*16u)) return 0;
         }
     }
     /* A checked new envelope has the existing BC payload layout. Mission

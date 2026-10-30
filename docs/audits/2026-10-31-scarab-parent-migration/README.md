@@ -54,8 +54,8 @@ after writing and unchanged after both readers.
 ## Isolated namespace stage
 
 `SC64_SCARAB_NAMESPACE_STAGE` is an additional, normally disabled experiment
-restricted to the Terran compact/Yamato/impact profile and the 64x64 native
-skirmish map. It uses bit `0x08000000` with compile-time collision checks,
+restricted to the Terran compact/Yamato/impact profile and supported skirmish
+maps. It uses bit `0x08000000` with compile-time collision checks,
 selects semantically valid records among pre-BC, BC and the staged tag, and
 rebuilds the winner's plan from reloaded bytes before the existing load
 commit. Old empty Reaver parents are converted only after tag authentication;
@@ -68,8 +68,7 @@ The retained Terran ASan/UBSan host vector, with this extra macro, loaded the
 gate-off Reaver fixture, wrote the new namespace and reloaded it in another
 process. SRAM headers showed old tag `0x73435442` sequence 1 and staged tag
 `0x7b435442` sequence 2. This is a single synthetic initial-parent case, not
-campaign, other profile, old pre-BC/Yamato/impact-tail or corrupt-fallback
-qualification. Existing post-commit restore failures remain possible; no
+campaign or other profile qualification. Existing post-commit restore failures remain possible; no
 whole-load atomicity or production-readiness claim is made.
 
 The staged reader was also exercised with a checksum-correct newer staged
@@ -82,5 +81,23 @@ the SRAM image remained unchanged. The fixture deliberately changes the row
 and checksum; this is a semantic-corruption test, not a naturally generated
 save. Compile and seven process invocations with exits, outputs and SRAM hashes
 are retained in `.local/decoder-proof/reaver-stage-edge-{compile,runs}.json`.
-An actual pre-BC writer was not available for this run; its envelope and the
-active Yamato and impact tails remain unqualified in this stage.
+An actual pre-BC writer was not available for this run.
+
+The stage now obtains dimensions from the saved skirmish map metadata after
+checking its bounds and geometry, and checks the active map dimensions before
+writing. A synthetic host fixture clears actors/buildings and spawns one empty
+Reaver directly: all 18 combinations of the two maps, three human races and
+one to three AI slots passed gate-off BC write, staged migration and fresh
+staged read. These are not paid production or gameplay matches. Compile and
+54 process receipts are in `.local/decoder-proof/reaver-matrix-*.json`.
+
+The existing seeded `sc64_bc_impact_fresh.c` host fixture ran with two active
+Yamato shots and a pending impact. Its write and fresh read continuation logs
+matched byte-for-byte for a gate-off current BC writer read by the stage and
+for staged write/read; observations include spell RNG, caster/target references,
+projectile rows, and pending impact bytes. The schema-generated pre-BC fixture
+also migrated a pending impact and retained it on fresh read. Its old envelope
+is constructed by editing a current writer's version and markers, not produced
+by a historical binary. Compile and run receipts are retained in
+`.local/decoder-proof/{tail,prebc}-stage-*.json`. These fixtures do not prove
+all tail combinations, campaign behavior, or hardware behavior.
