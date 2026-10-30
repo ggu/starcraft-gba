@@ -29,3 +29,25 @@ Initialize all existing/new Reavers, wire source clock and lifecycle cleanup,
 and validate every transfer, slot reuse and load path. The tests here do not
 prove all-world atomicity, active impact/Yamato migration, normal-input UI,
 flight or full gameplay. No production profile enables this experimental gate.
+
+## ARM fit and include closure
+
+Compiled source `de4915dc7722be3698197366c73b74e4e586b36a` also passes all
+four normal Make ARM recipes with the explicit Scarab gate, authenticated
+additive sprite/facing closures and matching P7 fact table. All 104 prepared
+input hashes remain unchanged. The resulting products pass header, 32-MiB
+size, existing memory guards, ELF payload/padding and embedded audio checks.
+Twenty-nine native C dependency passes confirm that the graph validator and
+field helpers are included in `game.c`; the unregistered lifecycle adapter
+is still absent from every production translation unit.
+
+BSS and IWRAM ends remain the foundation values: Terran `020370b8/03004db8`,
+Z6 `02037124/03004e38`, P7 `020382e4/03004c80`, and Showcase
+`0203df38/03004fc8`. No capacity, reserve or guard changes. This adds a save
+preflight, not flight or ordinary Reaver gameplay. There is no new timing
+or hardware claim. Receipts remain in the ignored
+`scarab-save-arm-fit-20261031` worktree's `.local/shape-fit` directory.
+
+The subsequent merge of shared PR #193 changes only a Z7 fixture and audit;
+it does not change the runtime compiled above. Its failed full Z7 controller
+run is preserved and the canonical Z6 menu remains unpromoted.
