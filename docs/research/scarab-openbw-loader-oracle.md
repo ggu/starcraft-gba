@@ -85,3 +85,24 @@ compiler, dependency and input hashes as described above. The global-init
 compatibility probe also compares every IScript PC and program word to the
 extracted loader after reading the real image and LO entries, then intentionally
 stops before tileset loading.
+
+## Bounded action-driven scenarios
+
+The world probe accepts `--scenario` through `sc64_openbw_oracle_run_global.py`.
+`east`, `south`, and `far` check paid training, parent/child linkage, release,
+actual attack initialization and weapon/target attribution. The far case checks
+seven no-collision movement passes and subsequent clearance. `stop` exercises
+the real Reaver STOP action; `targetdead` and `parentdead` invoke the reference
+kill API and check target cleanup and detached-shot behavior. `poolfull` and
+`initfail` deliberately exhaust a source pool through OpenBW allocation APIs;
+these are controlled test setups, not natural player input scenarios. Every
+scenario begins from the same synthetic flat map, and none injects a script
+signal or an order-state value. Run each as the previous world command with
+`--scenario east` (or another listed name), saving the source, binary, input
+hashes and full output for each run.
+
+These scenarios are finite witnesses. They do not cover all trajectories,
+blocked-route lifetime expiry, target disappearance timings, all allocation
+failures, splash, save integration, or native N64 execution. They do not define
+a general impact delay. Synthetic test-created projectiles and sprites in the
+allocation-failure cases must not be interpreted as ordinary game actions.

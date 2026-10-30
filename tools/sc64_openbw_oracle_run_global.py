@@ -12,6 +12,7 @@ from tools.sc64_openbw_oracle_tables import TABLES
 def main():
  p=argparse.ArgumentParser()
  for name in ('rom','extractor','tables','images','probe'):p.add_argument('--'+name,type=Path,required=True)
+ p.add_argument('--scenario',default='east')
  a=p.parse_args();extractor=load_sprites(ROOT/'tools/sc64_sprites.py').load_extractor(a.extractor)
  rom=extractor.load_rom(str(a.rom))
  if hashlib.sha1(rom).hexdigest()!=EXPECTED_ROM_SHA1:p.error('ROM authentication failed')
@@ -28,5 +29,5 @@ def main():
  for i in indices:
   flat=i-1;path=f'{13+flat//256:03X}/{flat%256:03X}'
   if path not in entries or (a.images/'unit'/f'{i}.bin').read_bytes()!=archive.read(entries[path]):p.error('image entry mismatch: '+path)
- subprocess.run([str(a.probe.resolve()),str(a.tables.resolve()),str(a.images.resolve())],check=True)
+ subprocess.run([str(a.probe.resolve()),str(a.tables.resolve()),str(a.images.resolve()),a.scenario],check=True)
 if __name__=='__main__':main()
