@@ -1549,57 +1549,45 @@ static int race_save_game(void) {
 #endif
     toast(7);return 1;
 }
-static int race_load_game(void) {
+/* Candidate-only load outputs live outside the route/save scratch union. */
+typedef struct {
+    int building_damage_marker;
+    /* The mission dispatch below selects at most one expanded state. */
+    union {
+        int unused;
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
-    Sc64T4RuntimeState expanded_t4;
-    int expanded_t4_valid = 0;
+        Sc64T4RuntimeState t4;
 #endif
 #ifdef SC64_T5_RUNTIME
-    Sc64T5RuntimeState expanded_t5;
-    int expanded_t5_valid = 0;
+        Sc64T5RuntimeState t5;
 #endif
 #ifdef SC64_T6_RUNTIME
-    Sc64T6MissionState expanded_t6;
-    int expanded_t6_valid = 0;
+        Sc64T6MissionState t6;
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
-    Sc64TerranLateMissionState expanded_terran_late;
-    int expanded_terran_late_valid = 0;
+        Sc64TerranLateMissionState terran_late;
+#endif
+    } expanded;
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+    int expanded_t4_valid;
+#endif
+#ifdef SC64_T5_RUNTIME
+    int expanded_t5_valid;
+#endif
+#ifdef SC64_T6_RUNTIME
+    int expanded_t6_valid;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    int expanded_terran_late_valid;
 #endif
 #ifdef SC64_IMPACT_EVENTS
-    /* Decode both queues before validators reuse the scratch tail. */
     Sc64ImpactEvent impact_candidate[RACE_IMPACT_SAVE_CAPACITY ? RACE_IMPACT_SAVE_CAPACITY : 1];
-    int impact_candidate_count = 0;
-    if (!race_impact_save_read(impact_candidate,&impact_candidate_count)) return 0;
-#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-    if (race_data.version == SAVE_VERSION) {
-        if (((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u
-#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-            || ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
-               ((unsigned)race_data.state[28] & 7u)>4u
+    int impact_candidate_count;
 #endif
-            ) return 0;
-    } else if (race_data.version != SC64_LEGACY_SAVE_VERSION || race_data.state[27] != 0) return 0;
-#else
-    if (race_data.version != SAVE_VERSION) return 0;
-#endif
-#elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
-    if (save_read(&race_data,sizeof(race_data),SAVE_VERSION)) {
-        if (race_data.version != SAVE_VERSION ||
-            ((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u
-#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-            || ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
-               ((unsigned)race_data.state[28] & 7u)>4u
-#endif
-            ) return 0;
-    } else {
-        memset(&race_data,0,sizeof(race_data));
-        if (!save_read(&race_data,sizeof(race_data)-SC64_BC_SAVE_EXTRA_BYTES,SC64_LEGACY_SAVE_VERSION) ||
-            race_data.version != SC64_LEGACY_SAVE_VERSION || race_data.state[27] != 0) return 0;
-    }
-#else
-    if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
-#endif
+} RaceLoadPlan;
+
+/* May modify candidate/route scratch, never the live world or SRAM. */
+static int race_load_preflight(RaceLoadPlan *plan) {
 #ifdef SC64_P7_BATTERY_ENABLED
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
@@ -2476,31 +2464,31 @@ static int race_load_game(void) {
     if (!v[0] && v[2] >= SC64_TERRAN_LATE_GLOBAL_T7 &&
         v[2] <= SC64_TERRAN_LATE_GLOBAL_T10) {
         if (!race_terran_late_save_candidate_valid(&race_data, width, height) ||
-            !race_terran_late_save_expand(&expanded_terran_late,
+            !race_terran_late_save_expand(&plan->expanded.terran_late,
                                           &race_data.terran_late,
                                           v[2], width, height)) return 0;
-        expanded_terran_late_valid = 1;
+        plan->expanded_terran_late_valid = 1;
     } else
 #endif
 #ifdef SC64_T6_RUNTIME
     if (!v[0] && v[2] == SC64_T6_GLOBAL_ID) {
         if (!race_t6_save_candidate_valid(&race_data, width, height) ||
-            !race_t6_save_expand(&expanded_t6, &race_data.t6)) return 0;
-        expanded_t6_valid = 1;
+            !race_t6_save_expand(&plan->expanded.t6, &race_data.t6)) return 0;
+        plan->expanded_t6_valid = 1;
     } else
 #endif
 #ifdef SC64_T5_RUNTIME
     if (!v[0] && v[2] == SC64_T5_GLOBAL_ID) {
         if (!race_t5_save_candidate_valid(&race_data, width, height) ||
-            !race_t5_save_expand(&expanded_t5, &race_data.t5)) return 0;
-        expanded_t5_valid = 1;
+            !race_t5_save_expand(&plan->expanded.t5, &race_data.t5)) return 0;
+        plan->expanded_t5_valid = 1;
     } else
 #endif
     if (!v[0] && v[2] == SC64_T4_GLOBAL_ID) {
         if (!race_t4_save_candidate_valid(&race_data, width, height)) return 0;
 #ifdef SC64_T3_ENABLED
-        if (!race_t4_save_expand(&expanded_t4, &race_data.t4)) return 0;
-        expanded_t4_valid = 1;
+        if (!race_t4_save_expand(&plan->expanded.t4, &race_data.t4)) return 0;
+        plan->expanded_t4_valid = 1;
 #endif
     } else {
         const u8 *t4 = (const u8 *)&race_data.t4;
@@ -2549,7 +2537,7 @@ static int race_load_game(void) {
     }
 #endif
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
-    if (!v[0] && v[2] == SC64_T4_GLOBAL_ID && !expanded_t4_valid) return 0;
+    if (!v[0] && v[2] == SC64_T4_GLOBAL_ID && !plan->expanded_t4_valid) return 0;
 #endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     if (!race_p7_projectile_save_candidate_valid(&race_data,
@@ -2618,6 +2606,46 @@ static int race_load_game(void) {
     if (!race_scarab_save_candidate_valid(&race_data,(unsigned)width*16u,
                                            (unsigned)height*16u)) return 0;
 #endif
+    plan->building_damage_marker = building_damage_marker;
+    return 1;
+}
+
+static int race_load_game(void) {
+    RaceLoadPlan plan = {0};
+#ifdef SC64_IMPACT_EVENTS
+    /* Decode both queues before validators reuse the scratch tail. */
+    if (!race_impact_save_read(plan.impact_candidate,&plan.impact_candidate_count)) return 0;
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    if (race_data.version == SAVE_VERSION) {
+        if (((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+            || ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
+               ((unsigned)race_data.state[28] & 7u)>4u
+#endif
+            ) return 0;
+    } else if (race_data.version != SC64_LEGACY_SAVE_VERSION || race_data.state[27] != 0) return 0;
+#else
+    if (race_data.version != SAVE_VERSION) return 0;
+#endif
+#elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+    if (save_read(&race_data,sizeof(race_data),SAVE_VERSION)) {
+        if (race_data.version != SAVE_VERSION ||
+            ((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+            || ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
+               ((unsigned)race_data.state[28] & 7u)>4u
+#endif
+            ) return 0;
+    } else {
+        memset(&race_data,0,sizeof(race_data));
+        if (!save_read(&race_data,sizeof(race_data)-SC64_BC_SAVE_EXTRA_BYTES,SC64_LEGACY_SAVE_VERSION) ||
+            race_data.version != SC64_LEGACY_SAVE_VERSION || race_data.state[27] != 0) return 0;
+    }
+#else
+    if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
+#endif
+    if (!race_load_preflight(&plan)) return 0;
+    const int *v = race_data.state;
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
     sc64_battlecruiser_tech_bits = (u16)((unsigned)v[27] & 65535u);
@@ -2696,7 +2724,7 @@ static int race_load_game(void) {
 /* Historical completed saves predate fractional burn and attacker storage.
      * Initialize their previously unused Terran shield word explicitly; zero
      * would otherwise falsely credit player zero for an environmental death. */
-    if (!building_damage_marker)
+    if (!plan.building_damage_marker)
         for (int i=0;i<MAX_BUILDINGS;++i)
             if (b[i].alive && race_building_can_burn(&b[i]))
                 b[i].shield_remainder=NEUTRAL*256;
@@ -2847,7 +2875,7 @@ static int race_load_game(void) {
 #ifdef SC64_T4_SCENARIO_RUNTIME
     if (!race_mode && race_selected_mission == SC64_T4_GLOBAL_ID) {
 #ifdef SC64_T3_ENABLED
-        race_t4 = expanded_t4;
+        race_t4 = plan.expanded.t4;
 #else
         race_t4 = race_data.t4;
 #endif
@@ -2855,15 +2883,15 @@ static int race_load_game(void) {
         memset(&race_t4, 0, sizeof(race_t4));
 #endif
 #ifdef SC64_T5_RUNTIME
-    if (expanded_t5_valid) race_t5 = expanded_t5;
+    if (plan.expanded_t5_valid) race_t5 = plan.expanded.t5;
     else memset(&race_t5, 0, sizeof(race_t5));
 #endif
 #ifdef SC64_T6_RUNTIME
-    if (expanded_t6_valid) race_t6 = expanded_t6;
+    if (plan.expanded_t6_valid) race_t6 = plan.expanded.t6;
     else memset(&race_t6, 0, sizeof(race_t6));
 #endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
-    if (expanded_terran_late_valid) race_late = expanded_terran_late;
+    if (plan.expanded_terran_late_valid) race_late = plan.expanded.terran_late;
     else memset(&race_late, 0, sizeof(race_late));
 #endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
@@ -2873,7 +2901,7 @@ static int race_load_game(void) {
 #endif
     clear_tracers();death_vfx_reset();mode=MODE_NORMAL;menu_open=help=0;selected_building=-1;
 #ifdef SC64_IMPACT_EVENTS
-    race_impact_restore(impact_candidate,impact_candidate_count);
+    race_impact_restore(plan.impact_candidate,plan.impact_candidate_count);
 #endif
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
     /* Loading restores the same serialized topology as the payload. Rebuild
