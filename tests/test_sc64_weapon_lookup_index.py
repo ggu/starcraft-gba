@@ -113,7 +113,6 @@ static const uint8_t sc64_weapon_source_lo_offsets[2] = {
                 with self.assertRaises(ValueError): idx.validate_output(src, link/'private-output-must-not-exist.h')
             finally:
                 link.unlink(); ignored.rmdir()
-if __name__ == '__main__': unittest.main()
 
 class ManagedOutputTest(unittest.TestCase):
     def test_update_and_failure_preserve(self):
@@ -152,3 +151,6 @@ class ManagedOutputTest(unittest.TestCase):
             os.utime(source, ns=(output.stat().st_mtime_ns + 1_000_000_000,)*2)
             subprocess.run(['make','-f',str(makefile)],check=True,capture_output=True)
             self.assertNotEqual(output.read_bytes(), first)
+
+
+if __name__ == '__main__': unittest.main()

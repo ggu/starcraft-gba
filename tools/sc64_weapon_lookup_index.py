@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Derive an optional ROM lookup header from an existing source VFX bank.
 
-No art is generated. The original bank is read-only and the output must be a
-new file; use SC64_WEAPON_SOURCE_BANK_HEADER to select it for an experiment.
+No art is generated. The original bank is read-only. Outputs must be new files
+unless --managed-update atomically replaces a previous output from that mode.
 """
 import argparse
 from pathlib import Path
@@ -11,6 +11,9 @@ import re
 import subprocess
 import os
 import tempfile
+import base64
+import hashlib
+import json
 
 
 def make_index(source: str) -> str:
@@ -102,10 +105,25 @@ def validate_output(source: Path, output: Path, managed: bool = False) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--config-key', nargs=2, metavar=('MODE', 'SOURCE'),
+                        help='print a read-only content key for Make invalidation')
     parser.add_argument('--managed-update', action='store_true', help='atomically replace a prior managed output')
-    parser.add_argument('source', type=Path)
-    parser.add_argument('output', type=Path)
+    parser.add_argument('source', type=Path, nargs='?')
+    parser.add_argument('output', type=Path, nargs='?')
     args = parser.parse_args()
+    if args.config_key is not None:
+        if args.source is not None or args.output is not None or args.managed_update:
+            parser.error('--config-key cannot be combined with generation')
+        mode, name = args.config_key
+        if mode not in ('0', '1'):
+            parser.error('lookup mode must be 0 or 1')
+        source = Path(name)
+        digest = hashlib.sha256(source.read_bytes()).hexdigest() if source.is_file() else None
+        key = json.dumps([mode, str(source.resolve()), digest], separators=(',', ':')).encode()
+        print(base64.urlsafe_b64encode(key).decode())
+        return
+    if args.source is None or args.output is None:
+        parser.error('source and output are required for generation')
     validate_output(args.source, args.output, args.managed_update)
     derived = make_index(args.source.read_text())
     if not args.managed_update:

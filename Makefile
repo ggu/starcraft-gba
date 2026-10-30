@@ -450,18 +450,30 @@ ATTACK_POSE_DIR := .local/sc64/attack-poses/generated
 ATTACK_POSE_HEADER := $(ATTACK_POSE_DIR)/sc64_unit_attack_source_generated.h
 # The original bank is never modified; this derived bank stays in ignored build/.
 CANONICAL_LOOKUP_INDEX ?= 1
+ifneq ($(words $(filter 0 1,$(CANONICAL_LOOKUP_INDEX))),1)
+$(error CANONICAL_LOOKUP_INDEX must be 0 or 1)
+endif
+ifneq ($(filter $(CANONICAL_LOOKUP_INDEX),0 1),$(CANONICAL_LOOKUP_INDEX))
+$(error CANONICAL_LOOKUP_INDEX must be 0 or 1)
+endif
+# Read-only key comparison also handles sub-second changes with macOS Make 3.81.
+sc64_lookup_quote = '$(subst ','"'"',$(1))'
+CANONICAL_LOOKUP_CONFIG_KEY := $(shell $(PYTHON) tools/sc64_weapon_lookup_index.py --config-key $(call sc64_lookup_quote,$(CANONICAL_LOOKUP_INDEX)) $(call sc64_lookup_quote,$(WEAPON_SOURCE_HEADER)))
+CANONICAL_LOOKUP_REBUILD := $(if $(shell test -f build/canonical-lookup-config && printf '%s\n' '$(CANONICAL_LOOKUP_CONFIG_KEY)' | cmp -s - build/canonical-lookup-config && printf matched),,force-canonical-lookup-rebuild)
 INDEXED_WEAPON_HEADER := build/generated/weapon-lookup/sc64_weapon_source_indexed.h
-SOURCE_WEAPON_INPUTS := $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER) $(INDEXED_WEAPON_HEADER)
+CANONICAL_LOOKUP_INPUTS = $(if $(filter 1,$(CANONICAL_LOOKUP_INDEX)),$(INDEXED_WEAPON_HEADER)) build/canonical-lookup-config $(CANONICAL_LOOKUP_REBUILD)
+SOURCE_WEAPON_INPUTS := $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER) $(CANONICAL_LOOKUP_INPUTS)
 CANONICAL_LOOKUP_FLAGS = $(if $(and $(filter 1,$(CANONICAL_LOOKUP_INDEX)),$(filter -DSC64_WEAPON_SOURCE_VFX,$(CANONICAL_WEAPON_FLAGS))),-Ibuild/generated/weapon-lookup '-DSC64_WEAPON_SOURCE_BANK_HEADER="sc64_weapon_source_indexed.h"')
 
-$(INDEXED_WEAPON_HEADER): $(WEAPON_SOURCE_HEADER) tools/sc64_weapon_lookup_index.py
+$(INDEXED_WEAPON_HEADER): $(WEAPON_SOURCE_HEADER) tools/sc64_weapon_lookup_index.py build/canonical-lookup-config $(CANONICAL_LOOKUP_REBUILD)
 	mkdir -p $(@D)
 	$(PYTHON) tools/sc64_weapon_lookup_index.py --managed-update $< $@
 
-.PHONY: force-canonical-lookup-config
+.PHONY: force-canonical-lookup-config force-canonical-lookup-rebuild
+force-canonical-lookup-rebuild:
 force-canonical-lookup-config:
 build/canonical-lookup-config: force-canonical-lookup-config | build
-	@printf '%s\n' '$(CANONICAL_LOOKUP_INDEX)' > $@.tmp
+	@printf '%s\n' '$(CANONICAL_LOOKUP_CONFIG_KEY)' > $@.tmp
 	@cmp -s $@.tmp $@ && rm $@.tmp || mv $@.tmp $@
 
 SOURCE_WEAPON_FLAGS := -DSC64_WEAPON_SOURCE_VFX -I$(WEAPON_SOURCE_DIR) -DSC64_UNIT_ATTACK_POSES_ENABLED -I$(ATTACK_POSE_DIR)
@@ -493,7 +505,7 @@ ZERG_Z4_ROM_FLAGS = $(Z4_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS)
 # the full-scan defense fallback out of IWRAM in the larger storage profiles.
 ZERG_Z6_BANK := .local/sc64/zerg-z6/generated
 ZERG_Z6_FLAGS = $(patsubst -I.local/sc64/z6/generated,-I$(ZERG_Z6_BANK),$(Z6_PROBE_FLAGS)) -DSC64_ZP_DEFENSE_TARGETS
-ZERG_Z6_INPUTS = $(BC_INPUTS) $(filter-out .local/sc64/z5/generated/sc64_race_sprites_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h,$(Z6_PROBE_INPUTS)) $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h
+ZERG_Z6_INPUTS = $(BC_INPUTS) $(filter-out .local/sc64/z5/generated/sc64_race_sprites_generated.h .local/sc64/z6/generated/sc64_race_sprites_generated.h,$(Z6_PROBE_INPUTS)) $(ZERG_Z6_BANK)/sc64_race_sprites_generated.h $(CANONICAL_LOOKUP_INPUTS)
 ZERG_ROM_FLAGS = $(BC_FLAGS) $(ZERG_Z6_FLAGS) $(CANONICAL_DRAW_FLAGS) $(CANONICAL_CACHE_FLAGS) $(ZERG_CANONICAL_FLAGS) $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(CANONICAL_DEATH_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS)
 ZERG_Z3_ROM_FLAGS = $(Z3_FLAGS) $(CANONICAL_DRAW_FLAGS)
 PROTOSS_P3_CANONICAL_FLAGS ?= $(if $(filter -DSC64_ROUTE_PACK3,$(P3_FLAGS)),-DSC64_ROUTE_FLOOD_SPLIT)
@@ -519,7 +531,7 @@ PROTOSS_P7_CANONICAL_FLAGS = $(BC_FLAGS) -I$(PROTOSS_P7_SPRITE_DIR) $(filter-out
 PROTOSS_P7_CANONICAL_INPUTS = $(BC_INPUTS) $(filter-out .local/sc64/p6/generated/sc64_race_sprites_generated.h .local/sc64/p7/generated/sc64_race_sprites_generated.h,$(P7_ARBITER_INPUTS)) $(PROTOSS_P7_SPRITE_HEADER) $(BC_P7_FACT_HEADER) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 PROTOSS_ROM_FLAGS = $(PROTOSS_P7_CANONICAL_FLAGS)
 PROTOSS_CANONICAL_INPUTS = $(PROTOSS_P7_CANONICAL_INPUTS)
-TERRAN_FULL_INPUTS = $(BC_INPUTS) $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) $(UNIT_FACING_HEADER)
+TERRAN_FULL_INPUTS = $(BC_INPUTS) $(RACE_CAMPAIGN_INPUTS) $(LATE_TERRAN_HEADERS) $(T4_SCENARIO_HEADER) $(T5_SCENARIO_HEADER) $(T5_AVAILABILITY_HEADER) $(T6_SCENARIO_HEADER) $(T6_AVAILABILITY_HEADER) $(UNIT_FACING_HEADER) $(CANONICAL_LOOKUP_INPUTS)
 
 T4_SCENARIO_HEADER := .local/sc64/races/generated/sc64_t4_scenario_generated.h
 T4_SCENARIO_RECORDS := .local/sc64/races/generated/t4/records
@@ -4247,7 +4259,7 @@ $(error SHOWCASE_SIEGE_FLAGS is retired: Siege damage is a shared race-engine me
 endif
 # Clip world art before it reaches either HUD band. Keep the infrequent
 # procedural diamond fallback in ROM so clipping retains the IWRAM reserve.
-SHOWCASE_INPUTS = $(BC_INPUTS) $(P7_ARBITER_INPUTS)
+SHOWCASE_INPUTS = $(BC_INPUTS) $(P7_ARBITER_INPUTS) $(CANONICAL_LOOKUP_INPUTS)
 SHOWCASE_FLAGS := $(BC_FLAGS) -DSC64_RENDER_KEY_ONCE $(P7_TYPED_RECT_FLAGS) -DSC64_SHOWCASE_ENABLED -DGBA_SCENE_CLIP -DGBA_DIAMOND_ROM $(CANONICAL_MINIMAP_FLAGS) $(UNIT_FACING_FLAGS) $(CANONICAL_WEAPON_FLAGS) $(CANONICAL_SOURCE_VFX_CULL_FOR_WEAPON_FLAGS) $(CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS) $(CANONICAL_DIRECT_FIRING_FLAGS) $(SHOWCASE_UNIT_WORD_FLAGS) $(CANONICAL_DEATH_FLAGS) -DGBA_MAPPED_BLIT_IWRAM -DSC64_FIELD_CONTROLS $(COMMAND_ICON_FLAGS) $(CANONICAL_ROUTE_PROBE_FLAGS) $(CANONICAL_LOOKUP_FLAGS)
 build/starcraft-showcase.elf build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-protoss-gas-placement build/test-sc64-protoss-skirmish-pylons build/test-sc64-native-weapon-game build/test-sc64-showcase-death-source: $(COMMAND_ICON_HEADER)
 build/starcraft-showcase.elf: $(COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) $(UNIT_FACING_HEADER) common/gba.ld Makefile | build
@@ -5622,8 +5634,10 @@ test-sc64-bc-normal-input:
 	"$$run/replay" "$$run/transitions.txt" 17937 "$$run/pause.sav"; \
 	"$$run/fresh-load" "$$run/pause.sav"
 
-build/starcraft-terran.elf build/starcraft-zerg-z6.elf build/starcraft-protoss-p7.elf build/starcraft-showcase.elf: build/canonical-lookup-config
-$(addprefix build/test-sc64-tracer-profile-,terran zerg protoss showcase): build/canonical-lookup-config
-
-# Canonical flag consumers must rebuild when selection or bank changes.
-build/starcraft-protoss-p7.elf build/starcraft-showcase-ui-probe.elf build/starcraft-showcase.elf build/starcraft-terran-t9-arm-replay.elf build/starcraft-terran.elf build/starcraft-zerg-z6.elf build/test-sc64-contact-cache-terran build/test-sc64-contact-cache-zerg build/test-sc64-native-weapon-game build/test-sc64-p7-count-snapshot-reference build/test-sc64-p7-obj-vram build/test-sc64-p7-owner-mask build/test-sc64-protoss-canonical-p7-controller build/test-sc64-protoss-canonical-p7-save build/test-sc64-protoss-gas-placement build/test-sc64-protoss-skirmish-pylons build/test-sc64-shared-mechanics-protoss build/test-sc64-shared-mechanics-showcase build/test-sc64-shared-mechanics-terran build/test-sc64-shared-mechanics-zerg build/test-sc64-showcase-count-snapshot-reference build/test-sc64-showcase-death-source build/test-sc64-showcase-game build/test-sc64-showcase-game-indexed build/test-sc64-showcase-game-packed build/test-sc64-showcase-owner-mask build/test-sc64-skirmish-runtime-protoss build/test-sc64-skirmish-runtime-showcase build/test-sc64-skirmish-runtime-terran build/test-sc64-skirmish-runtime-zerg build/test-sc64-t10-campaign-run build/test-sc64-t7-campaign-run build/test-sc64-t8-campaign-run build/test-sc64-t9-campaign-run build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-terran-full-profile build/test-sc64-zerg-canonical-hud build/test-sc64-zerg-carried-z1 build/test-sc64-zerg-carried-z2 build/test-sc64-zerg-carried-z3 build/test-sc64-zerg-carried-z4 build/test-sc64-zerg-carried-z5 build/test-sc64-zerg-carried-z6 build/test-sc64-zerg-promoted-profile build/test-terran build/test-zerg: $(INDEXED_WEAPON_HEADER) build/canonical-lookup-config
+# These fixtures still name narrower historical input sets instead of the
+# canonical product input variables. Keep their selected bank dependencies.
+CANONICAL_LOOKUP_EXTRA_TARGETS := \
+    build/starcraft-showcase-ui-probe.elf \
+    build/test-sc64-terrain-transfer-scene-showcase \
+    test-sc64-bc-normal-input
+$(CANONICAL_LOOKUP_EXTRA_TARGETS): $(CANONICAL_LOOKUP_INPUTS)
