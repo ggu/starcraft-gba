@@ -2,13 +2,18 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Derive an optional ROM lookup header from an existing source VFX bank.
 
-No art is generated. The original bank is read-only and the output must be a
-new file; use SC64_WEAPON_SOURCE_BANK_HEADER to select it for an experiment.
+No art is generated. The original bank is read-only. Outputs must be new files
+unless --managed-update atomically replaces a previous output from that mode.
 """
 import argparse
 from pathlib import Path
 import re
 import subprocess
+import os
+import tempfile
+import base64
+import hashlib
+import json
 
 
 def make_index(source: str) -> str:
@@ -69,12 +74,17 @@ def make_index(source: str) -> str:
     return source
 
 
-def validate_output(source: Path, output: Path) -> None:
+MANAGED_MARKER = "/* sc64-weapon-lookup-index managed output v1 */\n"
+
+
+def validate_output(source: Path, output: Path, managed: bool = False) -> None:
     # Check both the spelling and the resolved path, so an ignored symlink
     # cannot redirect generated private material into a tracked tree.
     source_resolved = source.resolve(strict=True)
-    if output.exists() or output.is_symlink() or output.resolve() == source_resolved:
-        raise FileExistsError(f'output already exists or aliases source: {output}')
+    if output.is_symlink() or output.resolve() == source_resolved:
+        raise FileExistsError(f'output aliases source or is a symlink: {output}')
+    if output.exists() and (not managed or not output.is_file() or not output.read_text().startswith(MANAGED_MARKER)):
+        raise FileExistsError(f'output already exists and is not managed: {output}')
     for path in (output.absolute(), output.resolve()):
         parent = path.parent
         while not parent.exists():
@@ -95,11 +105,40 @@ def validate_output(source: Path, output: Path) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('source', type=Path)
-    parser.add_argument('output', type=Path)
+    parser.add_argument('--config-key', nargs=2, metavar=('MODE', 'SOURCE'),
+                        help='print a read-only content key for Make invalidation')
+    parser.add_argument('--managed-update', action='store_true', help='atomically replace a prior managed output')
+    parser.add_argument('source', type=Path, nargs='?')
+    parser.add_argument('output', type=Path, nargs='?')
     args = parser.parse_args()
-    validate_output(args.source, args.output)
+    if args.config_key is not None:
+        if args.source is not None or args.output is not None or args.managed_update:
+            parser.error('--config-key cannot be combined with generation')
+        mode, name = args.config_key
+        if mode not in ('0', '1'):
+            parser.error('lookup mode must be 0 or 1')
+        source = Path(name)
+        digest = hashlib.sha256(source.read_bytes()).hexdigest() if source.is_file() else None
+        key = json.dumps([mode, str(source.resolve()), digest], separators=(',', ':')).encode()
+        print(base64.urlsafe_b64encode(key).decode())
+        return
+    if args.source is None or args.output is None:
+        parser.error('source and output are required for generation')
+    validate_output(args.source, args.output, args.managed_update)
     derived = make_index(args.source.read_text())
-    with args.output.open('x') as out: out.write(derived)
+    if not args.managed_update:
+        with args.output.open('x') as out: out.write(derived)
+        return
+    # Build the complete candidate before replacing a prior managed output.
+    data = MANAGED_MARKER + derived
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', dir=args.output.parent, prefix='.lookup-', delete=False) as out:
+            temporary = Path(out.name)
+            out.write(data)
+        validate_output(args.source, args.output, True)
+        os.replace(temporary, args.output)
+    finally:
+        if temporary is not None and temporary.exists(): temporary.unlink()
 
 if __name__ == '__main__': main()

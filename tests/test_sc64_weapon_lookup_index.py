@@ -113,4 +113,44 @@ static const uint8_t sc64_weapon_source_lo_offsets[2] = {
                 with self.assertRaises(ValueError): idx.validate_output(src, link/'private-output-must-not-exist.h')
             finally:
                 link.unlink(); ignored.rmdir()
+
+class ManagedOutputTest(unittest.TestCase):
+    def test_update_and_failure_preserve(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)/'source.h'; output = Path(directory)/'indexed.h'
+            source.write_text(BANK)
+            tool = str(ROOT/'tools/sc64_weapon_lookup_index.py')
+            def run():
+                return subprocess.run(['python3', tool, '--managed-update', str(source), str(output)], capture_output=True)
+            self.assertEqual(run().returncode, 0)
+            self.assertTrue(output.read_text().startswith(idx.MANAGED_MARKER))
+            before = output.read_bytes()
+            source.write_text('bad bank')
+            self.assertNotEqual(run().returncode, 0)
+            self.assertEqual(output.read_bytes(), before)
+            source.write_text(BANK.replace('{741}', '{740}').replace('{741,255}', '{740,255}'))
+            self.assertEqual(run().returncode, 0)
+            self.assertNotEqual(output.read_bytes(), before)
+            output.write_text('unmanaged')
+            self.assertNotEqual(run().returncode, 0)
+            self.assertEqual(output.read_text(), 'unmanaged')
+
+    def test_make_incremental_regeneration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)/'source.h'; output = Path(directory)/'indexed.h'
+            source.write_text(BANK)
+            makefile = Path(directory)/'Makefile'
+            makefile.write_text(f'''{output}: {source} {ROOT / "tools/sc64_weapon_lookup_index.py"}
+\tpython3 {ROOT / "tools/sc64_weapon_lookup_index.py"} --managed-update {source} {output}
+''')
+            subprocess.run(['make','-f',str(makefile)],check=True,capture_output=True)
+            first = output.read_bytes()
+            source.write_text(BANK.replace('{741}', '{740}').replace('{741,255}', '{740,255}'))
+            # Explicitly make the input newer even on filesystems with coarse timestamps.
+            import os
+            os.utime(source, ns=(output.stat().st_mtime_ns + 1_000_000_000,)*2)
+            subprocess.run(['make','-f',str(makefile)],check=True,capture_output=True)
+            self.assertNotEqual(output.read_bytes(), first)
+
+
 if __name__ == '__main__': unittest.main()
