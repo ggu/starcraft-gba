@@ -17,6 +17,10 @@ trace_path, name, out = Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3])
 trace = json.loads(trace_path.read_text())
 if trace["mission"] == 8:
     import sc64_t5_controller_replay as replay
+    # Newer T5 probes add observation-only checkpoint kinds; the tape needs
+    # only the inputs, so drop observations this validator does not know.
+    known = replay.TRACE_CHECKPOINTS | {"input", "won", "lost", "limit"}
+    trace["events"] = [e for e in trace["events"] if e.get("kind") in known]
     plan = replay.validate_trace(trace, capacity=256)
     launch = plan["start_tick"]
 else:
