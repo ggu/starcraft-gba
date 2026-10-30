@@ -1,0 +1,6 @@
+build/starcraft-terran-t9-arm-replay.elf: \
+ starcraft/sc64_interceptor_pool_codec.c \
+ starcraft/sc64_interceptor_pool_codec.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h
