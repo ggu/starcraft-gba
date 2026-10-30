@@ -37,3 +37,9 @@ semantic preflight, conversion before save codec validation and after decode
 before generic world checks, equivalent conversion in final legacy live restore,
 field-preserving lifecycle writers, and actual source movement/pathing and
 render-facing behavior. No current runtime callsite invokes this helper.
+
+Independent review of exact child `6c91311` found no component blocker under
+this explicit namespace contract. Its eight profile/layout combinations pass
+ASan/UBSan, including all ranked keys and rejected holes. The combined draft
+at `1c1a9dd` repeats those eight combinations successfully; this does not add
+whole-save, migration, runtime, ARM or fresh-process qualification.

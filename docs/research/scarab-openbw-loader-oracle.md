@@ -119,3 +119,13 @@ allocation-failure cases must not be interpreted as ordinary game actions.
 The pool-exhaustion cases establish saturation before arrival and no observed
 weapon or damage in the bounded window; they do not instrument the exact
 allocation attempt or prove the pool remained exhausted at that instant.
+
+Independent review at `ec2e640` repeats all eight scenarios with the same
+compiled probe and preserved staged inputs. A separate run repeats all eight
+through `sc64_openbw_oracle_run_global.py`, authenticating the owned ROM,
+every staged DAT file, the synthetic filename table and all used BOLT image
+and LO entries before each scenario. The reviewed binary SHA-256 is
+`f7a1bac61e6919c3226e13e0e8246e5e575318bbbd19c73491dbc828645ba136`.
+Private logs and exact arguments remain under `scarab-oracle-variants-20261031`
+in `.local/oracle-variants/review-v3-*`. These observations retain the finite
+witness and synthetic-map limitations above.
