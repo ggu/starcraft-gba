@@ -5,6 +5,10 @@
 #include <stdio.h>
 int main(void)
 {
+#ifdef SC64_BATTLECRUISER_EXPERIMENT
+    for (int type = -2; type <= SC_RU_COUNT + 2; ++type)
+        assert(sc64_race_is_battlecruiser(type) == (sc64_race_raw_unit(type) == 12));
+#endif
     int t = sc64_race_unit_from_raw(12);
     int sf = sc64_race_building_from_raw(116);
     int lab = sc64_race_building_from_raw(118);

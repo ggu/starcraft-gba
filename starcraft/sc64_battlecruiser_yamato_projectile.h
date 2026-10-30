@@ -107,7 +107,7 @@ static int race_bc_yamato_projectile_step(int index)
 static int __attribute__((noinline)) race_bc_yamato_recovery_tick(Unit *q)
 {
     unsigned recovery;
-    if (!q || !q->alive || sc64_race_raw_unit(q->type)!=12) return 0;
+    if (!q || !q->alive || !sc64_race_is_battlecruiser(q->type)) return 0;
     recovery=(unsigned)q->work_timer&7u;
     if (!recovery) return 0;
     if (recovery>6 || q->order!=ORDER_ATTACK_TARGET) { q->work_timer&=~7; return 0; }

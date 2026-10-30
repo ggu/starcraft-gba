@@ -962,7 +962,7 @@ static void race_tick_state(void)
     for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].type >= 0 && u[i].type < SC_RU_COUNT) {
         const Sc64RaceUnitRule *r = sc64_race_unit_rule(u[i].type);
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-        if (sc64_race_raw_unit(u[i].type) == 12) {
+        if (sc64_race_is_battlecruiser(u[i].type)) {
             int key = sc64_battlecruiser_owner_key(race_mode, race_selected_mission, u[i].owner, u[i].raw_owner);
             int reactor = key >= 0 && sc64_battlecruiser_tech_has(
                 sc64_battlecruiser_tech_bits, (unsigned)key, SC64_BC_TECH_REACTOR);
@@ -1242,7 +1242,7 @@ static void race_tick_buildings(void)
         int type, frames, x, y, supply, owner;
         const Sc64RaceBuildingRule *br;
 #ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
-        if (sc64_race_raw_building(b[i].type) == 118 && b[i].level) {
+        if (b[i].level && sc64_race_raw_building(b[i].type) == 118) {
             race_bc_lab_tick(i);
             continue;
         }

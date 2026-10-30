@@ -1612,6 +1612,27 @@ static inline int sc64_race_raw_unit(int type)
     }
 }
 
+
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) || defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT)
+/* Exact raw-12 identities, including profiles that carry multiple aliases. */
+static inline int sc64_race_is_battlecruiser(int type)
+{
+#ifdef SC64_TERRAN_LATE_ACTORS
+    if (type == U_BATTLECRUISER) return 1;
+#endif
+#ifdef SC64_P5_ACTORS
+    if (type == U_P5_BATTLECRUISER) return 1;
+#endif
+#if defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    if (type == U_SK_BATTLECRUISER) return 1;
+#endif
+#if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_P5_ACTORS)
+    if (type == U_SHARED_BATTLECRUISER) return 1;
+#endif
+    return 0;
+}
+#endif
+
 static inline int sc64_race_raw_building(int type)
 {
     switch (type) {

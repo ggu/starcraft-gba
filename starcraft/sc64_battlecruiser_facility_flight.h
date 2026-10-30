@@ -17,7 +17,7 @@ static int race_bc_facility_fields_valid(const Building *q,unsigned ww,unsigned 
 static int race_bc_facility_airborne(int slot)
 {
     return slot>=0 && slot<MAX_BUILDINGS && b[slot].alive &&
-        sc64_race_raw_building(b[slot].type)==116 && (b[slot].flags&4)!=0;
+        (b[slot].flags&4)!=0 && sc64_race_raw_building(b[slot].type)==116;
 }
 static int race_bc_facility_landing_site(int slot,int x,int y)
 {
@@ -60,7 +60,7 @@ static void race_bc_facility_flight_tick(void)
 #endif
     for (int i=0;i<MAX_BUILDINGS;++i) {
         int x,y;
-        if (!race_bc_facility_airborne(i) || b[i].level!=1) continue;
+        if (b[i].level!=1 || !race_bc_facility_airborne(i)) continue;
         x=b[i].build_progress; y=b[i].queue_progress;
         if (frame%5<2) {
             b[i].x += x>b[i].x ? 1 : x<b[i].x ? -1 : 0;

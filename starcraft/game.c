@@ -6989,7 +6989,7 @@ nearest_command_target(int x, int y)
  * rare Battlecruiser work out of the hot ordinary order loop. */
 static int __attribute__((noinline)) race_bc_order_dispatch(Unit *q,int slot,int recharge)
 {
-    if (sc64_race_raw_unit(q->type)==12 && sc64_battlecruiser_source_tick_due()) {
+    if (sc64_race_is_battlecruiser(q->type) && sc64_battlecruiser_source_tick_due()) {
         if (q->build>=0) --q->build;
         race_bc_yamato_heading_tick(q);
     }
@@ -6999,6 +6999,15 @@ static int __attribute__((noinline)) race_bc_order_dispatch(Unit *q,int slot,int
     (void)recharge;
 #endif
     return race_bc_yamato_recovery_tick(q) || race_bc_yamato_tick_caster(slot);
+}
+/* A non-BC can still own a stale charging reservation after slot reuse;
+ * dispatch it so the existing caster check clears that reservation. */
+static inline int race_bc_order_dispatch_needed(const Unit *q,int slot,int recharge)
+{
+    const Sc64BcYamatoShot *a=&sc64_bc_shots[0], *b=&sc64_bc_shots[1];
+    return sc64_race_is_battlecruiser(q->type) || recharge ||
+        (a->state && a->state!=SC64_BC_SHOT_FLIGHT && a->caster==(unsigned)slot) ||
+        (b->state && b->state!=SC64_BC_SHOT_FLIGHT && b->caster==(unsigned)slot);
 }
 #endif
 
@@ -7129,9 +7138,10 @@ target_lists_unavailable:
 	    q->cd--;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
 #ifdef SC64_BATTERY_SERVICE_ENABLED
-        if (race_bc_order_dispatch(q,i,p7_recharge_order)) continue;
+        if (race_bc_order_dispatch_needed(q,i,p7_recharge_order) &&
+            race_bc_order_dispatch(q,i,p7_recharge_order)) continue;
 #else
-        if (race_bc_order_dispatch(q,i,0)) continue;
+        if (race_bc_order_dispatch_needed(q,i,0) && race_bc_order_dispatch(q,i,0)) continue;
 #endif
 #elif defined(SC64_BATTERY_SERVICE_ENABLED)
         if (p7_recharge_order && race_battery_tick_unit(i)) continue;
@@ -8704,7 +8714,7 @@ sc64_unit_energy(const Unit *q,int *maximum)
 {
     *maximum=0;
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-    if (sc64_race_raw_unit(q->type)==12) {
+    if (sc64_race_is_battlecruiser(q->type)) {
         int key=sc64_battlecruiser_owner_key(race_mode, race_selected_mission,q->owner,q->raw_owner);
         int reactor=key>=0 && sc64_battlecruiser_tech_has(
             sc64_battlecruiser_tech_bits,(unsigned)key,SC64_BC_TECH_REACTOR);
