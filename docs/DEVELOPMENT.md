@@ -3022,6 +3022,12 @@ gameplay, save formats, actor limits or the campaign qualification scope.
 
 ### Battlecruiser source inputs
 
+The [shared candidate audit](audits/2026-10-30-shared-battlecruiser/README.md)
+records the tested source, setup, save limits and remaining performance gates.
+`make test-bc-canonical test-bc-fresh-canonical` exercises the four actual
+canonical flag sets when their private inputs are prepared; the fixtures seed
+infrastructure/funds/energy and do not claim normal-input campaign completion.
+
 The canonical Terran, Zerg, Protoss and Showcase profiles use the shared
 Battlecruiser and Yamato services. After preparing the ordinary race profile,
 run `./dev sc64 prepare-bc --rom PATH` with the verified USA ROM. This writes
