@@ -37,6 +37,11 @@ CPU_HZ = 16_777_216
 KEY_MASK = 1023
 MISSION = 12
 SCREEN_PLAY, SCREEN_RESULT = 1, 3
+# Both the host harness and the probe observe every CHECK_PERIOD ticks.
+CHECK_PERIOD = 1000
+TERMINAL_KINDS = ("won", "lost", "limit")
+# Labelled mid-run host checkpoints; the probe has no counterpart for them.
+LABELLED_KINDS = ("opening", "wave-launch", "wave-retreat")
 COMPARED = ("frame", "screen", "won", "lost", "mission", "faults", "phase",
             "objective_flags", "race_completed", "protoss_force2_buildings",
             "zerg_force3_buildings", "raw16_alive", "side_units", "zerg_units",
@@ -51,7 +56,12 @@ def sha256(path: pathlib.Path) -> str:
 
 
 def load_trace(path: pathlib.Path) -> dict:
-    """Strictly validate a T9 trace; return transitions and observations."""
+    """Strictly validate a T9 trace; return transitions and observations.
+
+    The host reference must be complete on its own, independently of any ARM
+    log: every observation carries every compared field as an integer, and
+    periodic observations fall exactly on every CHECK_PERIOD ticks through
+    the stop tick, once each."""
     trace = json.loads(path.read_text())
     if not isinstance(trace, dict) or trace.get("trace_schema") != 1:
         raise ValueError("trace must use trace_schema=1")
@@ -62,9 +72,12 @@ def load_trace(path: pathlib.Path) -> dict:
         raise ValueError("trace events are missing")
     transitions: list[tuple[int, int]] = []
     observations: dict[int, dict] = {}
+    periodic: set[int] = set()
     held_before, last_tick = 0, 0
     start = final = None
     for i, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"event {i} is not an object")
         kind, tick = row.get("kind"), row.get("host_tick")
         if type(tick) is not int or tick < last_tick:
             raise ValueError(f"event {i} has an invalid or unordered host_tick")
@@ -81,23 +94,38 @@ def load_trace(path: pathlib.Path) -> dict:
             transitions.append((tick, held))
             held_before = held
         else:
+            if kind not in ("start", "periodic") + TERMINAL_KINDS + LABELLED_KINDS:
+                raise ValueError(f"event {i} has unknown kind {kind!r}")
+            missing = [f for f in COMPARED if type(row.get(f)) is not int]
+            if missing:
+                raise ValueError(f"{kind} observation at tick {tick} lacks integer "
+                                 f"fields: {', '.join(missing)}")
+            if kind == "periodic":
+                if tick in periodic:
+                    raise ValueError(f"duplicate periodic observation at tick {tick}")
+                periodic.add(tick)
             if kind == "start":
                 if start is not None or tick != 0:
                     raise ValueError("trace needs one start observation at tick 0")
                 start = row
-            elif kind in ("won", "lost", "limit"):
+            elif kind in TERMINAL_KINDS:
                 if i != len(rows) - 1:
                     raise ValueError("terminal observation must be last")
                 final = row
             # Same-tick observations (periodic plus a labelled checkpoint)
             # must agree; keep the first.
             prior = observations.get(tick)
-            if prior and any(prior.get(f) != row.get(f) for f in COMPARED if f in row):
+            if prior and any(prior[f] != row[f] for f in COMPARED):
                 raise ValueError(f"same-tick observations disagree at {tick}")
             observations.setdefault(tick, row)
         last_tick = tick
     if start is None or final is None:
         raise ValueError("trace needs start and terminal observations")
+    cadence = set(range(CHECK_PERIOD, final["host_tick"] + 1, CHECK_PERIOD))
+    if periodic != cadence:
+        missing, extra = sorted(cadence - periodic), sorted(periodic - cadence)
+        raise ValueError(f"host periodic observations break the {CHECK_PERIOD}-tick cadence: "
+                         f"missing {missing[:5]}, unexpected {extra[:5]}")
     if transitions and transitions[-1][0] > final["host_tick"]:
         raise ValueError("input after the terminal observation")
     if transitions and transitions[0][0] == 1:
@@ -290,14 +318,14 @@ def parse_log(plan: dict, lines: list[str]) -> tuple[dict, list[str]]:
         if prior is not None:
             if any(prior[f] != row[f] for f in COMPARED):
                 errors.append(f"conflicting observations at tick {tick}")
-            elif kind in ("won", "lost", "limit"):
+            elif kind in TERMINAL_KINDS:
                 prior["kind"] = kind
             continue
         observations[tick] = row
 
     stop, final_kind = plan["stop"], plan["final"]["kind"]
     expected = {(1, "launch"), (stop, final_kind)}
-    expected |= {(t, "periodic") for t in range(1000, stop + 1, 1000)}
+    expected |= {(t, "periodic") for t in range(CHECK_PERIOD, stop + 1, CHECK_PERIOD)}
     for tick, kind in sorted(expected - seen):
         errors.append(f"missing ARM {kind} observation at tick {tick}")
     for tick, kind in sorted(seen - expected):
@@ -391,7 +419,7 @@ def compare(plan: dict, text: str) -> dict:
         actual = checks[tick]
         compared += 1
         for field in COMPARED:
-            if field in expected and expected[field] != actual.get(field):
+            if expected[field] != actual.get(field):
                 mismatches.append(f"tick {tick} {field}: ARM={actual.get(field)} host={expected[field]}")
     timing, timing_errors = parse_timing(lines, plan["stop"])
     final = checks.get(plan["stop"], {})

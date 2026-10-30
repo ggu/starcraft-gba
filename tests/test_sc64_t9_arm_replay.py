@@ -29,12 +29,15 @@ def sample(final="won", stop=2000, inputs=((2, 256), (5, 0), (9, 1), (10, 0))):
     rows = [observation("start", 0)]
     rows += [{"kind": "input", "host_tick": t, "held": h,
               "pressed": h & ~(inputs[i - 1][1] if i else 0)} for i, (t, h) in enumerate(inputs)]
-    rows.append(observation("periodic", 1000, minerals=50))
+    end = {}
     if final == "won":
-        rows.append(observation("won", stop, screen=3, won=1, phase=3, objective_flags=1,
-                                race_completed=4096, protoss_force2_buildings=0))
-    else:
-        rows.append(observation(final, stop))
+        end = dict(screen=3, won=1, phase=3, objective_flags=1, race_completed=4096,
+                   protoss_force2_buildings=0)
+    # The harness records a periodic checkpoint every 1000 ticks through the
+    # stop tick, then the terminal one.
+    for tick in range(1000, stop + 1, 1000):
+        rows.append(observation("periodic", tick, **(end if tick == stop else {"minerals": 50})))
+    rows.append(observation(final, stop, **end))
     return {"trace_schema": 1, "entry": "t9-probe-entry", "profile": "terran-t9",
             "policy": "test", "mission": 12, "tick_limit": 500000, "events": rows}
 
@@ -117,6 +120,88 @@ class TapeTests(unittest.TestCase):
         path, _ = self.write(trace)
         with self.assertRaisesRegex(ValueError, "terminal observation must be last"):
             replay.load_trace(path)
+
+
+class HostReferenceTests(unittest.TestCase):
+    """The host trace must be a complete reference without any ARM log."""
+
+    def load(self, trace):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        path = Path(tmp.name) / "trace.json"
+        path.write_text(json.dumps(trace))
+        return replay.load_trace(path)
+
+    def periodic_index(self, trace, tick):
+        return next(i for i, row in enumerate(trace["events"])
+                    if row["kind"] == "periodic" and row["host_tick"] == tick)
+
+    def test_missing_periodic_observation(self):
+        trace = sample(stop=3000)
+        del trace["events"][self.periodic_index(trace, 2000)]
+        with self.assertRaisesRegex(ValueError, r"cadence: missing \[2000\]"):
+            self.load(trace)
+
+    def test_missing_stop_tick_periodic_observation(self):
+        trace = sample()
+        del trace["events"][self.periodic_index(trace, 2000)]
+        with self.assertRaisesRegex(ValueError, r"cadence: missing \[2000\]"):
+            self.load(trace)
+
+    def test_off_cadence_and_duplicate_periodic_observations(self):
+        trace = sample()
+        trace["events"].insert(self.periodic_index(trace, 1000) + 1,
+                               observation("periodic", 1500, minerals=50))
+        with self.assertRaisesRegex(ValueError, r"unexpected \[1500\]"):
+            self.load(trace)
+        trace = sample()
+        i = self.periodic_index(trace, 1000)
+        trace["events"].insert(i + 1, dict(trace["events"][i]))
+        with self.assertRaisesRegex(ValueError, "duplicate periodic observation at tick 1000"):
+            self.load(trace)
+
+    def test_missing_or_non_integer_field(self):
+        for kind, tick in (("periodic", 1000), ("won", 2000), ("start", 0)):
+            trace = sample()
+            row = next(r for r in trace["events"] if r["kind"] == kind and r["host_tick"] == tick)
+            del row["gas"]
+            with self.subTest(kind=kind), \
+                    self.assertRaisesRegex(ValueError, f"{kind} observation at tick {tick} "
+                                           "lacks integer fields: gas"):
+                self.load(trace)
+        for value in ("0", 0.0, True, None):
+            trace = sample()
+            trace["events"][self.periodic_index(trace, 1000)]["minerals"] = value
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "fields: minerals"):
+                self.load(trace)
+
+    def test_unknown_observation_kind(self):
+        trace = sample()
+        trace["events"][self.periodic_index(trace, 1000)]["kind"] = "checkpoint"
+        with self.assertRaisesRegex(ValueError, "unknown kind 'checkpoint'"):
+            self.load(trace)
+
+    def test_labelled_checkpoints_are_accepted(self):
+        trace = sample()
+        trace["events"].insert(self.periodic_index(trace, 1000),
+                               observation("wave-launch", 700, minerals=50))
+        plan = self.load(trace)
+        result = replay.compare(plan, arm_log(probe_rows(plan)))
+        self.assertTrue(replay.verdict(plan, result))
+
+    def test_dropped_host_periodic_cannot_hide_an_arm_mismatch(self):
+        """The review's counterexample: drop the host's tick-1000 periodic
+        record and give the ARM log gas=999 there."""
+        trace = sample()
+        plan = self.load(trace)
+        rows = probe_rows(plan)
+        rows[1] = dict(rows[1], gas=999)
+        result = replay.compare(plan, arm_log(rows))
+        self.assertIn("tick 1000 gas: ARM=999 host=0", result["mismatches"])
+        self.assertFalse(replay.verdict(plan, result))
+        del trace["events"][self.periodic_index(trace, 1000)]
+        with self.assertRaisesRegex(ValueError, r"cadence: missing \[1000\]"):
+            self.load(trace)
 
 
 class CompareTests(unittest.TestCase):
