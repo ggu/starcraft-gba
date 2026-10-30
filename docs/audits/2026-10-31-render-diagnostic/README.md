@@ -24,5 +24,38 @@ Four asset-free transport tests pass; three private-backend tests are skipped
 without supplied inputs. Independent review confirms no guest write commands.
 Preprocessing the captured normal vector without the diagnostic flag emits no
 diagnostic counter identifiers; this is not all-profile binary equivalence.
-Default `./dev build` also passes at this child. No full current default or
-optional-profile test aggregate is claimed for the diagnostic branch.
+Default `./dev build` also passes at this child. These are historical child
+results; current integration qualification follows below.
+
+## Current cache-enabled integration qualification
+
+Candidate `fd51da159f0f5b06e18b3254b6105d640b604854` incorporates shared
+integration `e72bc3784641cf56ab8af4864e09658a047cc2ed`, including its enabled
+tracer-profile cache. The diagnostic lookup timer covers both the cache fast
+path and the original resolver fallback. The flag remains absent from normal
+product recipes.
+
+- In a checkout without private inputs, source-boundary checking, `./dev doctor`,
+  `./dev build` and `./dev test` all exit zero: 782 Python tests with 23 optional
+  skips, eight ancillary Python tests, and the C fixtures pass.
+- Actual normal Terran, Zerg Z6, Protoss P7 and Showcase builds with the cache
+  enabled and diagnostics disabled are byte-identical to the qualified #196
+  ROMs. Their BSS/IWRAM endpoints and all 104 prepared input hashes are unchanged.
+  The retained exact compiler vectors and compressed ELF/ROM/map files are
+  private qualification evidence, not repository contents.
+- The public build/read tools run the diagnostic-enabled current candidate
+  against the retained ordinary-input three-AI tape. All 90 sampled
+  actor/fog/display/frame checkpoints match the cache-enabled reference.
+  This is a diagnostic custom main, not a production binary or full-state proof.
+- Before the cache integration, the same diagnostic changes at `e807e20` also
+  passed normal four-product byte equivalence and `make unified` /
+  `make test-unified`. That unified result is not a new run on `fd51da1`.
+
+The reader exports 17 counters in this order: orders, sight, other update,
+map, HUD, background, buildings, units, tracers, static key, profile lookup,
+offscreen culling, resolved raster, motion, actor overlays, projectile work,
+and child overlays. They are nested and are not additive. This probe does
+**not** export a total update/audio/render counter; the outer-loop timing
+discussion above explains presentation waits in separate call-profiler
+results. No whole-frame speedup or hardware frame-rate claim follows from
+these diagnostic counters. No Actions, debugger ports, or SD writes were used.
