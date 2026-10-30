@@ -217,12 +217,20 @@ static void campaign_start_from_menu(int mission)
     assert(race_human == PROFILE_RACE);
 }
 
+static void assert_unused_geysers_cleared(void)
+{
+    assert(geyser_count >= 0 && geyser_count <= MAX_RACE_GEYSERS);
+    for (int i = geyser_count; i < MAX_RACE_GEYSERS; ++i)
+        assert(geysers[i].x == 0 && geysers[i].y == 0);
+}
+
 static void test_campaign_mission_roundtrip(int mission)
 {
     campaign_start_from_menu(mission);
     for (int tick = 0; tick < 60; ++tick) game_update(0, 0);
     assert(screen == SCREEN_PLAY && !won && !lost);
     assert(race_campaign.mission == mission);
+    assert_unused_geysers_cleared();
     assert(race_campaign.elapsed_frames == (u32)frame);
     assert(race_save_game());
     RaceSave expected = race_data;
@@ -281,6 +289,7 @@ static void reject_generation2_save(int mission, int legacy_container)
 {
     campaign_start_from_menu(mission);
     for (int tick = 0; tick < 60; ++tick) game_update(0, 0);
+    assert_unused_geysers_cleared();
     static RaceSave old;
     static unsigned char envelope[sizeof(RaceSave)
 #ifdef SC64_IMPACT_EVENTS
@@ -429,6 +438,7 @@ static void test_skirmish_roundtrip(int map, int human, int bots,
     for (int i = 0; i < 3; ++i) race_bot_races[i] = bot_races[i];
     init_state();
     assert(screen == SCREEN_PLAY && race_mode && !won && !lost);
+    assert_unused_geysers_cleared();
     assert(race_human == human && race_bots == bots && race_skirmish_map == map);
     if (map == 0) assert(race_cols == 64 && race_rows == 64);
     else {

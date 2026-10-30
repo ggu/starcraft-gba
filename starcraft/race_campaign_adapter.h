@@ -628,6 +628,7 @@ race_campaign_init(void)
     clear_tracers();
     death_vfx_reset();
     reset_selection_gestures();
+    memset(geysers, 0, sizeof(geysers));
     geyser_count = 0;
     supply_used = 0;
     supply_cap = 0;
