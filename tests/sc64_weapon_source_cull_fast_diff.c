@@ -39,7 +39,12 @@ int main(void)
                 int old=wide_reference(key,&copied,a[0],a[1],a[2],a[3],a[4],a[5]);
                 int actual=sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,&copied,a[0],a[1],a[2],a[3],a[4],a[5]);
                 assert(old==actual);
-                assert(!old || sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,p,a[0],a[1],a[2],a[3],a[4],a[5]));++cases;
+                int canonical=sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,p,a[0],a[1],a[2],a[3],a[4],a[5]);
+                int wide = d > 31;
+                for (int i=0;i<6;i++) if (a[i] < -32768 || a[i] > 32767) wide=1;
+                if (wide) assert(old==canonical);
+                else assert(!old || canonical);
+                ++cases;
             }
         }
     }

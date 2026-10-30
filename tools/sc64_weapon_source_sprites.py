@@ -543,15 +543,10 @@ def _profile_cull_bounds(profiles, images, frames, animations, overlays, lo_tabl
         for o in lo_offsets:
             number(o["x"],-128,127); number(o["y"],-128,127)
         for table in lo_tables:
+            number(table["image_id"],0,65535); number(table["lo_kind"],0,255)
             first = number(table["offset_first"],0,0xffffffff)
             count = number(table["frame_count"],0,65535) * number(table["offset_count"],0,65535)
             if first < 0 or count < 0 or first + count > len(lo_offsets): raise ValueError("LO range")
-        # A global maximum for LO/direct offsets is conservative even when
-        # birth uses another parent frame or an offset row is ambiguous.
-        coords = [(int(o["x"]), int(o["y"])) for o in overlays]
-        coords += [(int(o["x"]), int(o["y"])) for o in lo_offsets]
-        ox = max((abs(x)//2 for x, _ in coords), default=0)
-        oy = max((abs(y)//2 for _, y in coords), default=0)
     except (KeyError, TypeError, ValueError, OverflowError) as error:
         if stats is not None: stats[str(error)] = len(profiles)
         return [invalid] * len(profiles)
@@ -566,10 +561,23 @@ def _profile_cull_bounds(profiles, images, frames, animations, overlays, lo_tabl
                 if actor not in by_image: raise ValueError("actor image")
                 parents.add(actor)
             children = set()
+            coords = []
             for anim in animations:
                 if int(anim["image_id"]) not in parents: continue
                 first, count = int(anim["overlay_first"]), int(anim["overlay_count"])
-                children.update(int(o["image_id"]) for o in overlays[first:first+count])
+                for overlay in overlays[first:first+count]:
+                    children.add(int(overlay["image_id"]))
+                    if overlay["opcode"] in (13, 14, 21):
+                        kind = number(overlay["lo_index"],0,255)
+                        for table in lo_tables:
+                            if table["image_id"] == anim["image_id"] and table["lo_kind"] == kind:
+                                start = table["offset_first"]
+                                end = start + table["frame_count"] * table["offset_count"]
+                                coords.extend((o["x"], o["y"]) for o in lo_offsets[start:end])
+                    else:
+                        coords.append((overlay["x"], overlay["y"]))
+            ox = max((abs(x)//2 for x, _ in coords), default=0)
+            oy = max((abs(y)//2 for _, y in coords), default=0)
             if any(i not in by_image for i in children): raise ValueError("child image")
             # Actor itself is not drawn by this path, but every projectile and
             # one-level child frame, including mirrored/fallback frames, is.
