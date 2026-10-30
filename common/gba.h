@@ -120,7 +120,8 @@ typedef struct { u32 tag, length, sequence, checksum; int slot; } GbaSaveSelecti
 typedef int (*GbaSaveValidator)(const void *data,u32 length,u32 tag,void *context);
 int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
                           GbaSaveValidator validate,void *context,GbaSaveSelection *selection);
-int save_write_selected(const void *data,u32 length,u32 tag,const GbaSaveSelection *previous);
+int save_write_selected(const void *data,u32 length,u32 tag,const GbaSaveSelection *previous,
+                        const u32 *tags,unsigned tag_count);
 /* Fresh journal only: fail if either slot contains any checksummed record. */
 int save_write_first(const void *data,u32 length,u32 tag);
 #endif

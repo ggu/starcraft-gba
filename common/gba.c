@@ -1207,15 +1207,28 @@ int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned ta
     for(u32 i=0;i<best.length;i++)((u8*)scratch)[i]=p[16+i];
     *selection=best;return 1;
 }
-int save_write_selected(const void *data,u32 len,u32 tag,const GbaSaveSelection *previous) {
+int save_write_selected(const void *data,u32 len,u32 tag,const GbaSaveSelection *previous,
+                        const u32 *tags,unsigned tag_count) {
     volatile u8 *base=(volatile u8*)SRAM_BASE;
-    if(!data||!len||len>SAVE_PAYLOAD_MAX||!tag||!previous||
+    int new_allowed=0,old_allowed=0;
+    if(!data||!len||len>SAVE_PAYLOAD_MAX||!tag||!previous||!tags||!tag_count||tag_count>3||
        previous->slot<0||previous->slot>1||!previous->tag||!previous->length||!previous->sequence)return 0;
+    for(unsigned i=0;i<tag_count;i++) {
+        if(!tags[i])return 0;
+        for(unsigned j=0;j<i;j++)if(tags[i]==tags[j])return 0;
+        if(tags[i]==tag)new_allowed=1;
+        if(tags[i]==previous->tag)old_allowed=1;
+    }
+    if(!new_allowed||!old_allowed)return 0;
     volatile const u8 *old=base+(unsigned)previous->slot*SAVE_SLOT_SIZE;
     if(!valid_record(old,previous->length,previous->tag)||sram_get32(old+12)!=previous->sequence||
        sram_get32(old+8)!=previous->checksum)return 0;
+    volatile u8 *p=base+(unsigned)(1-previous->slot)*SAVE_SLOT_SIZE;
+    u32 other=sram_get32(p);int other_allowed=0;
+    for(unsigned i=0;i<tag_count;i++)if(tags[i]==other)other_allowed=1;
+    if(other && !other_allowed && valid_record(p,0,other))return 0;
     u32 sequence=previous->sequence+1;if(!sequence)sequence=1;
-    volatile u8 *p=base+(unsigned)(1-previous->slot)*SAVE_SLOT_SIZE;const u8 *src=data;
+    const u8 *src=data;
     sram_put32(p,0);sram_put32(p+4,len);sram_put32(p+8,hash_bytes(src,len));sram_put32(p+12,sequence);
     for(u32 i=0;i<len;i++)p[16+i]=src[i];
     sram_put32(p,tag);return 1;

@@ -13,7 +13,7 @@ equal sequences choose slot zero. A difference of exactly half the sequence
 range is ambiguous and causes failure instead of choosing either record. The
 selected token records slot, tag, length, sequence and checksum. The companion
 writer rechecks the token and record checksum before writing the other slot,
-then commits its tag last. A separate first-write operation refuses to write
+refuses to overwrite an unknown checksummed tag, then commits its tag last. A separate first-write operation refuses to write
 if either slot contains any checksummed record, including an unknown tag.
 Existing two-generation APIs and callers are unchanged.
 
