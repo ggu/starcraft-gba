@@ -6280,7 +6280,53 @@ In the no-GDB mGBA probe:
 
 The scene exceeds the 30 fps budget on base as well, so no hardware frame-rate
 result is claimed. ARM replays and fresh-process SRAM qualification were not
-run.
+run; the follow-up below adds them.
+
+### Pending impacts on current default: Z7, ARM replay and saves (2026-10-30)
+
+The candidate was merged with default `cfdbe16`, which includes PR #152.
+
+- `./dev build`, `./dev test`, `python3 tools/check_source_tree.py` and
+  `make test-sc64-impact-events-game` pass.
+- The five product ROMs link within unchanged guards. IWRAM symbols, sizes
+  and end address equal default's, and EWRAM headroom grows by 56–72 B.
+
+**Z7.**
+- Default `cfdbe16` itself no longer wins the Z7 normal-input controller: it
+  reaches the 1,000,000-tick limit at frame 999,093 with 45 enemy buildings.
+  This branch with `-DSC64_IMPACT_EVENTS_DISABLED` reproduces that trace byte
+  for byte. With impacts enabled it also reaches the limit.
+- A bisect of default's merges puts the regression at PR #161 (`6e1cb67`,
+  loaded-worker depot routing). PRs #148, #157 and #158 still win at host
+  tick 821,565.
+- The earlier impacts-only Z7 difference on `761597d` came from the
+  controller's lowest-slot home Hatchery rule, not from the impact path; see
+  [the diagnosis](IMPACT-EVENTS.md#z7-controller-diagnosis).
+- The Zerg lane owns the controller. Z7 is not gated here, because no current
+  build of either kind qualifies a win.
+
+**Unusable controllers.** Two other host controllers fail on default with or
+without impacts:
+- The canonical P7 controller fails a cursor guard; its Make rule also
+  compiles `game.c` in place of the controller, because
+  `P7_CAMPAIGN_CONTROLLER` is defined after the rule uses it.
+- The P6 controller does not start P6 in the P7 ROM.
+
+**ARM.** No-GDB mGBA runs of four diagnostic ROMs all match their host
+oracles:
+- An input-only replay of the T10 controller's held keys wins at frame 3,361,
+  matching all 35 checkpoints with up to 6 impacts pending.
+- Two-process normal-menu skirmish saves restore 5 (Terran) and 4 (P7)
+  pending impacts.
+- A P7 capacity save first refuses 12 pending impacts, then saves all 11 rows
+  and restores them.
+- Each restored world equals the saved world, and all continuation
+  checkpoints match the first process.
+
+Protocol, hashes and limits are in
+[Pending projectile impacts](IMPACT-EVENTS.md#arm-replay-and-fresh-process-saves).
+These are emulator results for a probe-entry mission and skirmishes, not
+normal-menu campaign or hardware qualification.
 
 
 ### Canonical skirmish controller qualification correction (2026-10-29)

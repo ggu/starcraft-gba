@@ -4968,6 +4968,35 @@ $(eval $(call IMPACT_ARM_PROBE,protoss,PROTOSS_P7_CANONICAL_FLAGS,$(PROTOSS_P7_C
 .PHONY: impact-arm-probe
 impact-arm-probe: $(addprefix build/StarCraft-,$(addsuffix -Impact-Probe-GBA.gba,showcase zerg protoss))
 
+# Pending-impact ARM replay and two-process SRAM continuation; see
+# tests/sc64_impact_replay.c and tools/sc64_impact_replay.py. The T10 tape is a
+# private recording made with tests/sc64_input_tape_record.h. Each ROM has a
+# host oracle built from the same source and flags.
+IMPACT_REPLAY_T10_TAPE ?= .local/traces/t10/tape.h
+IMPACT_T10_FLAGS = -DSC64_TERRAN_LATE_PROBE_MISSION=13 -DSC64_TAPE_HEADER='"$(abspath $(IMPACT_REPLAY_T10_TAPE))"'
+# Gameplay saves wait for each neutral skirmish's observed pending peak; the
+# capacity save spawns a battle, requires one refused over-capacity save, then
+# saves within P7's 11 rows.
+IMPACT_SAVE_P7_FLAGS = -DSC64_IMPACT_SAVE_MIN=4
+IMPACT_SAVE_TERRAN_FLAGS = -DSC64_IMPACT_SAVE_MIN=5
+IMPACT_CAPACITY_P7_FLAGS = -DSC64_IMPACT_SAVE_MIN=10 -DSC64_IMPACT_SAVE_BATTLE -DSC64_IMPACT_SAVE_AFTER=0
+define IMPACT_REPLAY
+build/starcraft-$(1)-impact-replay.elf: tests/sc64_impact_replay.c $(4) $$(UI_ARM_COMMON) $$(COMMON_HEADERS) $$(STARCRAFT) $$(wildcard starcraft/*.h) $(5) common/gba.ld Makefile | build
+	$$(CC) $$(CFLAGS) $$($(2)) $$($(3)) $$(UI_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(6) $$(LDFLAGS) -lgcc -o $$@
+	$$(SIZE) $$@
+build/StarCraft-$(1)-Impact-Replay-GBA.gba: build/starcraft-$(1)-impact-replay.elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC IMPACT R' SCIR
+build/test-sc64-impact-replay-$(1): tests/sc64_impact_replay.c $(4) $$(STARCRAFT) $$(wildcard starcraft/*.h) $(5) common/gba.c $$(COMMON_HEADERS) Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$($(2)) $$($(3)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(6) -o $$@
+endef
+$(eval $(call IMPACT_REPLAY,t10,TERRAN_ROM_FLAGS,IMPACT_T10_FLAGS,$(IMPACT_REPLAY_T10_TAPE),$(TERRAN_FULL_INPUTS)))
+$(eval $(call IMPACT_REPLAY,terran-save,TERRAN_ROM_FLAGS,IMPACT_SAVE_TERRAN_FLAGS,,$(TERRAN_FULL_INPUTS)))
+$(eval $(call IMPACT_REPLAY,protoss-save,PROTOSS_P7_CANONICAL_FLAGS,IMPACT_SAVE_P7_FLAGS,,$(PROTOSS_P7_CANONICAL_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call IMPACT_REPLAY,protoss-capacity,PROTOSS_P7_CANONICAL_FLAGS,IMPACT_CAPACITY_P7_FLAGS,,$(PROTOSS_P7_CANONICAL_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+.PHONY: impact-replay
+impact-replay: $(foreach p,t10 terran-save protoss-save protoss-capacity,build/StarCraft-$(p)-Impact-Replay-GBA.gba build/test-sc64-impact-replay-$(p))
+
 .PHONY: test-build-worker-default
 test: test-build-worker-default
 test-build-worker-default: build/test-build-worker-default
