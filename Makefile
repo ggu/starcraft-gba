@@ -3823,6 +3823,45 @@ test-sc64-z7-carried-missions: build/test-sc64-z7-carried-z1 build/test-sc64-z7-
 	./build/test-sc64-z7-carried-z3 --trace .local/sc64/z7-carried/z3.json
 	./build/test-sc64-z7-carried-z4 --limit 150000 --trace .local/sc64/z7-carried/z4.json
 
+# Input-only Z7 replay of the ordinary-input controller trace. The probe
+# replaces common/main.c and otherwise compiles the exact candidate vector;
+# GBA_NO_DEBUG_INPUTS only changes common/main.c. Full, pause-menu-save
+# prefix and fresh-boot HOME-load resume variants share one tape
+# (tests/sc64_z7_arm_replay.c, tools/sc64_z7_arm_replay.py). The resume ROM
+# is named by the prefix's reported cut tick.
+Z7_ARM_DIR := build/z7-arm
+Z7_ARM_TRACE ?= $(ZERG_Z7_CONTROLLER_TRACE)
+Z7_ARM_SAVE_MIN_TICK ?= 400000
+Z7_ARM_CUT_TICK ?= 0
+Z7_ARM_COMMON := $(filter-out common/main.c,$(COMMON))
+Z7_ARM_DEPS = tests/sc64_z7_arm_replay.c $(Z7_ARM_DIR)/sc64_z7_tape_generated.h $(Z7_ARM_COMMON) $(COMMON_HEADERS) $(STARCRAFT) $(wildcard starcraft/*.h) $(ZERG_Z7_CANONICAL_INPUTS) common/gba.ld Makefile
+$(Z7_ARM_DIR)/sc64_z7_tape_generated.h: $(Z7_ARM_TRACE) tools/sc64_z7_arm_replay.py
+	mkdir -p $(Z7_ARM_DIR)
+	$(PYTHON) tools/sc64_z7_arm_replay.py tape $< $@
+define Z7_ARM_REPLAY_ROM
+build/starcraft-zerg-z7-arm-$(1).elf: $$(Z7_ARM_DEPS) | build
+	$$(CC) $$(CFLAGS) $$(ZERG_Z7_CANONICAL_FLAGS) -I$$(Z7_ARM_DIR) $(2) $$(Z7_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(LDFLAGS) -Wl,-Map,build/starcraft-zerg-z7-arm-$(1).map -lgcc -o $$@
+	$$(SIZE) $$@
+build/StarCraft-Zerg-Z7-ARM-$(1).gba: build/starcraft-zerg-z7-arm-$(1).elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC Z7 REPLAY' SCZA
+endef
+$(eval $(call Z7_ARM_REPLAY_ROM,full,-DZ7_ARM_MODE=0))
+$(eval $(call Z7_ARM_REPLAY_ROM,prefix,-DZ7_ARM_MODE=1 -DZ7_ARM_SAVE_MIN_TICK=$(Z7_ARM_SAVE_MIN_TICK)u))
+$(eval $(call Z7_ARM_REPLAY_ROM,resume-$(Z7_ARM_CUT_TICK),-DZ7_ARM_MODE=2 -DZ7_ARM_CUT_TICK=$(Z7_ARM_CUT_TICK)u))
+.PHONY: sc64-z7-arm-replay sc64-z7-arm-resume
+sc64-z7-arm-replay: build/StarCraft-Zerg-Z7-ARM-full.gba build/StarCraft-Zerg-Z7-ARM-prefix.gba
+sc64-z7-arm-resume: build/StarCraft-Zerg-Z7-ARM-resume-$(Z7_ARM_CUT_TICK).gba
+# Host builds of the same program: a fast check of the tape and the save cut
+# before an emulator run. The prefix writes the save payload the resume reads.
+define Z7_HOST_REPLAY
+build/test-sc64-z7-replay-$(1): $$(Z7_ARM_DEPS) common/gba.c | build
+	$$(CLANG) -std=c11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DGBA_HOST -Icommon $$(ZERG_Z7_CANONICAL_FLAGS) -I$$(Z7_ARM_DIR) $(2) $$< common/gba.c -o $$@
+endef
+$(eval $(call Z7_HOST_REPLAY,full,-DZ7_ARM_MODE=0))
+$(eval $(call Z7_HOST_REPLAY,prefix,-DZ7_ARM_MODE=1 -DZ7_ARM_SAVE_MIN_TICK=$(Z7_ARM_SAVE_MIN_TICK)u))
+$(eval $(call Z7_HOST_REPLAY,resume-$(Z7_ARM_CUT_TICK),-DZ7_ARM_MODE=2 -DZ7_ARM_CUT_TICK=$(Z7_ARM_CUT_TICK)u))
+
 # Full normal-input skirmishes, distinct from startup/save configuration checks.
 # Pass variable names: some canonical flags and companion sources are defined
 # later. Instantiate at the end so prerequisites also see the complete profiles.
