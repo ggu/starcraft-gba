@@ -73,6 +73,7 @@ game.o: starcraft/game.c starcraft/../common/gba.h \
  starcraft/sc64_p7_adapter.h starcraft/sc64_p7.h \
  .local/sc64/zp-stage/generated/scenarios/sc64_p7_scenario_generated.h \
  starcraft/sc64_p8_state.h starcraft/sc64_p8_runtime.h \
+ starcraft/sc64_impact_save_types.h starcraft/sc64_impact_events.h \
  starcraft/sc64_collision.h starcraft/sc64_collision_legacy.h \
  starcraft/sc64_contact.h starcraft/sc64_targets.h starcraft/sc64_font.h \
  .local/sc64/interface/generated/sc64_font_generated.h \
@@ -137,7 +138,8 @@ game.o: starcraft/game.c starcraft/../common/gba.h \
  build/generated/p8-battery/sc64_p8_battery_properties_generated.h \
  starcraft/race_save_adapter.h starcraft/sc64_construction_save.h \
  starcraft/sc64_p6_save.h starcraft/sc64_p5_transport_save.h \
- starcraft/sc64_p7_projectile_save_adapter.h
+ starcraft/sc64_p7_projectile_save_adapter.h \
+ starcraft/sc64_impact_adapter.h
 sc64_interceptor_motion.o: starcraft/sc64_interceptor_motion.c \
  /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
  /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \

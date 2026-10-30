@@ -1,1 +1,1 @@
-8c74b60e40189ecfa0a690a3121a1c35c3d3567665452e416bb1f39e4dc45624  build/test-sc64-p8-campaign-run
+f7cac52830e63a13267b8cfb1f6b2599e1aea8d356f7d6677766e3e59fcf2fd6  build/test-sc64-p8-campaign-run

@@ -141,7 +141,7 @@ are not claimed.
 
 ## Qualification
 
-Base `codex/source-release` 97c39fa (merged into this branch), plus this
+Base `codex/source-release` f959592 (merged into this branch), plus this
 change. Inputs are the locally verified USA ROM (SHA-1
 `a36d91b5aac7bb95df0d7de5f9814f5270e25c2b`) and the P8 source CHK (SHA-256
 `e2257c48a119bfde3da075e08628b312857e3aad9222c47678fc29d57c578cd9`). The
@@ -155,21 +155,24 @@ ordinary campaign menu and gameplay inputs through `game_update()`. It
 inspects live state only to choose inputs. Its policy:
 
 - Rescue Fenix. Keep Fenix and the Hyperion out of army orders: the army is
-  ordered by double-tapping Zealot and Dragoon groups, not with R. A hero
-  with an enemy within 288 pixels (Scarab range) walks to the reachable spot
-  near the Nexus whose straight path keeps farthest from every enemy.
-- Grow to 14 Probes. Build Pylons on supply, six Gateways, an Assimilator, a
-  Cybernetics Core and a Forge, keeping a walkable lane around every
-  structure. Photon Cannons cover the mineral line south of the Nexus, where
-  raids arrive, then the heroes' station: four, and up to 12 while the bank
-  holds 500 minerals. Re-mine any Probe whose build stays pending for 900
-  frames.
+  ordered by double-tapping Zealot and Dragoon groups, not with R. At the
+  start of every controller step, a hero with an enemy within 288 pixels
+  (Scarab range) walks to the reachable spot near the Nexus whose path,
+  once under way, keeps farthest from every enemy.
+- Grow to 14 Probes and build Pylons on supply. After the first Gateway,
+  build a Forge and four Photon Cannons covering the mineral line south of
+  the Nexus, where raids arrive; then an Assimilator, a Cybernetics Core and
+  up to six Gateways; and up to 12 Cannons while the bank holds 500
+  minerals. Keep a walkable lane around every structure, and re-mine any
+  Probe whose build stays pending for 900 frames.
 - Keep up to four units queued at each Gateway, queueing up to six per visit.
 - Fill the human Carrier's hangar through its BUILD INTERCEPTOR row, and
   send it with the army once two Interceptors are aboard.
-- Attack once the army has 24 units, routing from the front unit over the
-  engine's walkability grid; a front unit whose route stops shrinking is
-  skipped. Three enemies within 320 pixels of the Nexus recall the army. At
+- Attack once the army has 40 units, or with at least 20 once the bank can
+  no longer grow it (from frame 30,000, under 100 minerals: the start base
+  mines out). Route from the front unit over the engine's walkability grid;
+  a front unit whose route has not improved on its best for three orders is
+  skipped. Two enemies within 320 pixels of the Nexus recall the army. At
   the Stasis Cell, Zealots attack the Cell and Dragoons the Arbiters, since
   the army has no mobile detector.
 - From frame 30,000, hold 150 minerals back from production and save once
@@ -179,29 +182,30 @@ inspects live state only to choose inputs. Its policy:
   remembered row.
 
 The run is deterministic: two runs gave byte-identical traces and saves. It
-wins at frame 140,577 after 143,497 input calls, with no runtime faults. The
+wins at frame 82,521 after 84,695 input calls, with no runtime faults. The
 controller stops recording at the deciding call, so a replay ends on the
 same frame.
 
 | Item | Value |
 | --- | --- |
-| Final state | Fenix 240 HP, the Hyperion 850 HP, 53 enemy units left |
-| Carrier | Four Interceptors aboard by frame 5,250; up to four launched at once |
-| Cloak | One enemy still cloaked at the win |
-| Controller trace | 19,114 key transitions; SHA-256 `481ec141caf3d8e64f0622a9b9de666526f9faf5d2db40f5c0474ef9292f9e77` |
-| Tape header | SHA-256 `78b1768f4234cea36d543da6bc602d196f2c1e01c353397a4e777c855c37e9ae` |
+| Final state | Fenix 240 HP, the Hyperion 850 HP, 65 enemy units left |
+| Carrier | Four Interceptors aboard by frame 7,396; up to four launched at once; the Carrier is lost before the win |
+| Cloak | Six enemies still cloaked at the win |
+| Controller trace | 9,684 key transitions; SHA-256 `7c405a5bc7f4d5663e4b33cb6b80ed3d8ab938dee78db26f9e444f2a6013cd5d` |
+| Tape header | SHA-256 `6192ed42011123d828ac6340d99879fe6e2a231ac0eed643bfa8767ae05aa20e` |
 
-The save is taken at frame 35,958 with one structure warping in. Its record
+The save is taken at frame 30,955 with one structure warping in. Its record
 carries the construction (`CHP1`) and building-damage (`BD01`) markers.
 
-**Why the trajectory changed.** The earlier controller lost this mission on
-the current tree at frame 25,017, after Probes died to raids on the
-undefended mineral line and Fenix died to a Reaver while the army was away.
-The pre-merge P8 head loses the same way, with a byte-identical trace, on
-the current local inputs, so the change came from those inputs rather than
-from the merged default-branch code or the service refactor. The policy
-changes above restore a win. The save-time fixes came from the strict
-comparator: the first new resume diverged because the orders menu's
+**Why the controller changed.** The previous controller lost on the current
+tree twice over. First, on the current local inputs, Probes died to raids
+on the undefended mineral line and a Reaver killed Fenix while the army was
+away; the pre-merge P8 head loses the same way with a byte-identical
+trace, so that change came from the inputs, not from the merged code or
+the service refactor. Second, the default branch now resolves projectile
+damage at the drawn impact frame, which changed the fights again. The
+policy above wins on the final tree. The save-time fixes came from the
+strict comparator: the first new resume diverged because the orders menu's
 remembered row was not reset before the save.
 
 ### Input-only replays
@@ -215,8 +219,8 @@ host program and as ARM ROMs:
 | Build | Behavior |
 | --- | --- |
 | Full | Plays the whole tape. |
-| Prefix | Stops after the pause-menu save sequence (tick 37,309), leaving the save in SRAM. |
-| Resume | Boots a fresh process, quick-loads with L on the title screen, then continues from tick 37,309. |
+| Prefix | Stops after the pause-menu save sequence (tick 31,948), leaving the save in SRAM. |
+| Resume | Boots a fresh process, quick-loads with L on the title screen, then continues from tick 31,948. |
 
 Every comparison uses the strict comparator in `tools/sc64_p8_arm_replay.py`
 (`tests/test_sc64_arm_replay_compare.py` holds its negative tests). The
@@ -224,35 +228,35 @@ candidate must hold exactly the reference's observations from the requested
 tick on, with equal fields, no duplicate or out-of-order ticks, nothing
 before the cutoff and the same final record. At the documented resume
 tick it may open with its own `resume` observation. The full and prefix
-runs are compared from tick 0; the resumes from tick 37,309.
+runs are compared from tick 0; the resumes from tick 31,948.
 
 Host (`make test-sc64-protoss-p8`):
 
-- The full replay wins at frame 140,577.
+- The full replay wins at frame 82,521.
 - The prefix's SRAM image is byte-identical to the controller's save, and
-  its 37 periodic observations equal the full replay's.
-- The fresh-process resume holds all 107 of the full replay's observations
-  from tick 37,309, including the win and state digest `1603542449`.
+  its 31 periodic observations equal the full replay's.
+- The fresh-process resume holds all 54 of the full replay's observations
+  from tick 31,948, including the win and state digest `3811354496`.
 
 ARM (mGBA 0.10.5, one isolated process per run, log mask 7, no debugger):
 
-- **ROM image `0594a486…ad` (full).** Matches all 144 host observations and
-  wins at frame 140,577. 997.3 s wall time.
-- **ROM image `dc5d9974…35` (prefix).** Matches all 38 host prefix
+- **ROM image `5e622f4b…2b` (full).** Matches all 85 host observations and
+  wins at frame 82,521. 645.7 s wall time.
+- **ROM image `40f2900b…ac` (prefix).** Matches all 32 host prefix
   observations. Its save record (tag `0x5343505c`, 16,292-byte payload,
   sequence 1) is byte-identical to the host prefix's record; only the
   unused SRAM fill differs (0xff on ARM, zero on host).
-- **ROM image `54182c81…e9` (resume).** Seeded with the ARM prefix's save
-  file. Loads at frame 35,958 with the prefix's final digest (`1017903464`).
-  Holds all 108 host resume observations and all 107 of the uninterrupted
-  host replay's from tick 37,309, ending in the same win.
+- **ROM image `63cb1a9d…bc` (resume).** Seeded with the ARM prefix's save
+  file. Loads at frame 30,955 with the prefix's final digest (`2877707721`).
+  Holds all 55 host resume observations and all 54 of the uninterrupted
+  host replay's from tick 31,948, ending in the same win.
 
 | ARM timing | Value |
 | --- | --- |
-| Frames (whole tape, menu and briefing included) | 143,497 |
-| Mean cycles/frame | 2,365,929 (about 7.1 fps equivalent) |
-| Mean update cycles | 1,530,359 |
-| Peak frame | 27,250,135 cycles |
+| Frames (whole tape, menu and briefing included) | 84,695 |
+| Mean cycles/frame | 2,100,638 (about 8.0 fps equivalent) |
+| Mean update cycles | 1,342,840 |
+| Peak frame | 27,008,878 cycles |
 
 The tape includes menu and briefing frames. The peak frame has not been
 broken down. None of these are physical-GBA measurements; frame rate is
@@ -274,7 +278,7 @@ records are in [`provenance/`](provenance/):
 
 | Record | Outputs |
 | --- | --- |
-| `roms` | Playable ELF and ROM (`a18ed649…9a`), replay ELFs and ROMs (the three images above) |
+| `roms` | Playable ELF and ROM (`83e63400…be`), replay ELFs and ROMs (the three images above) |
 | `host-replay` | Host full, prefix and resume replay programs |
 | `controller` | Host controller program |
 
@@ -284,35 +288,37 @@ The rebuilt ROM images are the images the emulator ran.
 
 | Build | `__bss_end` | `__iwram_end` |
 | --- | --- | --- |
-| Playable candidate | `0x020389a4` | `0x03004c48` |
-| Replay ROMs | `0x02038264` | `0x03004c48` |
+| Playable candidate | `0x0203895c` | `0x03004c48` |
+| Replay ROMs | `0x0203821c` | `0x03004c48` |
 
 Both are below the unchanged guards (`0x0203e000` and `0x03005000`).
 
 ### Canonical P7 non-regression
 
 Canonical Protoss rebuilt on this branch gives SHA-256
-`c233d36077c95b796069b2879d5d8e322246e8d60f564bf06ce6fd04e7a83849`; the
-base 97c39fa gives `58334f33…`. The bytes change because the canonical
+`9952b59ed1050c4fbed86c19ad4543fc4277e5bc9758221ed0a27a6c44e07472`; the
+base f959592 gives `e75b6dc2…`. The bytes change because the canonical
 product now compiles the shared layer's generic binding: the custom-game
 and Showcase services, their save clock word and load-time candidate
 binding, and the Overlord and Spore Colony detectors. EWRAM grows by 8 bytes
-(`__bss_end` `0x020382ec` to `0x020382f4`: the 3-byte generic clock and the
+(`__bss_end` `0x020382a4` to `0x020382ac`: the 3-byte generic clock and the
 candidate binding and mission), IWRAM is unchanged (`0x03004c48`), and the
 16,292-byte save record keeps its size and generation. P7 mission behavior
 does not change:
 
-- The Protoss campaign controllers for P1, P2, P3, P6 and P7, and the
-  campaign save fixture, give byte-identical traces and outputs on this
-  branch and on the pre-refactor base. None of those controllers wins on
-  the current local inputs, on either tree; that is not changed here.
-- The 18-match skirmish matrix on the canonical Protoss vector gives the
-  same per-match traces as the base.
+- The P1, P2 and P7 campaign controllers and the campaign save fixture give
+  byte-identical traces and outputs on this branch and on the base f959592.
+  On the earlier base 97c39fa the P3 and P6 controllers matched too. None
+  of these controllers wins on the current local inputs, on either tree;
+  that is not changed here.
+- The 18-match skirmish matrix on the canonical Protoss vector gave the
+  same per-match traces as the base 97c39fa.
 - `make test-sc64-protoss-services` passes on the canonical Protoss,
   Showcase and P8 vectors. The P7 carrier-training, interceptor-flight,
   observer, projectile, OBJ VRAM and adapter fixtures pass.
-- The Showcase links at `__iwram_end=0x03004ff8` and `__bss_end=0x0203df48`,
-  8 and 184 bytes under the guards.
+- The Showcase links at `__iwram_end=0x03004ff8` and `__bss_end=0x0203df00`
+  (base `0x03004fc8` and `0x0203def0`), 8 and 256 bytes under the guards.
+  Its IWRAM growth is the exploration pass's hangar-sight check.
 - `./dev build` and `./dev test` pass.
 
 Pre-existing on the base and unchanged here:
@@ -337,7 +343,7 @@ python3 tools/sc64_p8_arm_replay.py run --rom build/StarCraft-Protoss-P8-Replay-
 python3 tools/sc64_p8_arm_replay.py compare build/p8-arm/host-prefix.txt build/emulator/p8-arm-prefix/p8-lines.txt
 python3 tools/sc64_p8_arm_replay.py run --rom build/StarCraft-Protoss-P8-Replay-Resume.gba --out build/emulator/p8-arm-resume \
     --sav-in build/emulator/p8-arm-prefix/saves/StarCraft-Protoss-P8-Replay-Prefix.sav
-python3 tools/sc64_p8_arm_replay.py compare build/p8-arm/host-full.txt build/emulator/p8-arm-resume/p8-lines.txt --from-tick 37309
+python3 tools/sc64_p8_arm_replay.py compare build/p8-arm/host-full.txt build/emulator/p8-arm-resume/p8-lines.txt --from-tick 31948
 python3 tools/sc64_build_provenance.py record build/provenance/p8/roms \
     build/starcraft-protoss-p8.elf build/StarCraft-Protoss-P8-GBA.gba
 ```

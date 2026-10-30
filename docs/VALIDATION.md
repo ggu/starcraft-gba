@@ -8,21 +8,21 @@ The explicit `protoss-p8` candidate (`SCP8`, generation 44) adds P8 to the
 canonical P1–P7 profile and binds the shared Protoss unit services (Carrier
 Interceptors, Arbiter cloak, detection, Shield Batteries); custom games and
 Showcase scenes bind the same services generically. Canonical Protoss stays
-P7. Its image changes to `c233d360…` because it compiles that generic
+P7. Its image changes to `9952b59e…` because it compiles that generic
 binding (8 more bytes of EWRAM, unchanged IWRAM and save size), and its P1,
-P2, P3, P6 and P7 campaign controller traces are byte-identical to the
-pre-refactor base. One ordinary-input host controller run wins P8 at frame
-140,577 with no runtime faults, and is deterministic across runs. The
-input-only ARM replay of its 19,114-transition key tape matches all 144 host
+P2 and P7 campaign controller traces are byte-identical to the default
+branch's. One ordinary-input host controller run wins P8 at frame
+82,521 with no runtime faults, and is deterministic across runs. The
+input-only ARM replay of its 9,684-transition key tape matches all 85 host
 observations, state digests included, through the same win. A pause-menu
-save at frame 35,958, with a structure under construction, gives an SRAM
+save at frame 30,955, with a structure under construction, gives an SRAM
 record that is byte-identical on host and ARM. Loading it from the title
 screen in a fresh process continues to the same win: under the strict
 comparator it holds every observation of the uninterrupted replay from the
 documented resume tick, with no missing, duplicate or extra ticks.
-Whole-tape ARM guest timing averages 2,365,929 cycles per frame (about 7.1
+Whole-tape ARM guest timing averages 2,100,638 cycles per frame (about 8.0
 fps equivalent; frame rate is not qualified). The playable ROM links at
-`__bss_end=0x020389a4` and `__iwram_end=0x03004c48`. Executed build
+`__bss_end=0x0203895c` and `__iwram_end=0x03004c48`. Executed build
 commands, raw dependency output and input hashes are recorded in the audit.
 The AI backend, transmission duration and trigger cadence are authored.
 These are emulator and host results only, with no hardware claim. See the
