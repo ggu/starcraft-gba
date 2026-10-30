@@ -1,0 +1,1 @@
+f7cac52830e63a13267b8cfb1f6b2599e1aea8d356f7d6677766e3e59fcf2fd6  build/test-sc64-p8-campaign-run

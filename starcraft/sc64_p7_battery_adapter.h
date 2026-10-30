@@ -17,12 +17,26 @@
 #define race_p7_battery_build_available race_battery_build_available
 #define race_p7_battery_issue_command race_battery_issue_command
 
+static int race_protoss_generic_battery_candidate_valid(const Building *q)
+{
+    return q && RACE_PROTOSS_RAW(q)==172 && q->queue_count==0 && q->queue_head==0 &&
+        q->queue_progress>=0 && q->queue_progress<=SC64_P7_BATTERY_MAX_ENERGY_Q8 &&
+        q->level>=0 && q->level<SC64_P7_BATTERY_REGEN_DEN &&
+        sc64_p7_battery_energy_valid((unsigned)q->queue_progress,(unsigned)q->level) &&
+        q->shield<=sc64_race_building_shields(B_P7_SHIELD_BATTERY);
+}
+
 static int sc64_p7_battery_click_overlap(int left,int top,int right,int bottom,int px,int py)
 { return right>px-128 && left<px+128 && bottom>py-128 && top<py+128; }
 
 static int race_p7_battery_initialize_source(const Sc64RaceMap *map)
 {
     unsigned seen=0;
+    if (race_protoss_service_binding()==SC64_PROTOSS_BIND_GENERIC) return 1;
+#ifdef SC64_PROTOSS_LATER_BINDINGS
+    if (race_protoss_service_binding()==SC64_PROTOSS_BIND_LATER)
+        return race_protoss_later_battery_initialize(map);
+#endif
     if (!race_p7_active() || !map || map!=&sc64_race_maps[SC64_P7_GLOBAL_ID] ||
         map->unit_count!=357u) return 0;
     for (unsigned row=0;row<map->unit_count;++row) {

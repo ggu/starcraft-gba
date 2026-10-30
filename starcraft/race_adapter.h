@@ -336,12 +336,16 @@ static int race_site_powered(int owner, int x, int y)
 }
 
 #ifdef SC64_P7_BATTERY_ENABLED
+/* Native psi geometry from the owner's own complete Pylons. In custom games
+ * every owner may build; mission bindings keep their human-slot rule. */
 static int race_p7_battery_site_powered(int owner,int x,int y)
 {
-    if (!race_p7_active() || owner!=SIDE) return 0;
+    int generic=race_protoss_service_binding()==SC64_PROTOSS_BIND_GENERIC;
+    if (!race_protoss_services_active() || (!generic && owner!=SIDE)) return 0;
     for (int i=0;i<MAX_BUILDINGS;++i)
         if (building_complete(i) && b[i].type==B_PYLON &&
-            b[i].raw_type==156 && b[i].owner==owner && b[i].raw_owner==7 &&
+            RACE_PROTOSS_RAW(&b[i])==156 && b[i].owner==owner &&
+            (generic || RACE_PROTOSS_SLOT(&b[i])==SC64_PROTOSS_HUMAN_SLOT) &&
             sc64_p7_in_psi_range(x-b[i].x,y-b[i].y)) return 1;
     return 0;
 }
@@ -677,7 +681,7 @@ static int race_queue_unit(int owner, int producer, int type)
     if (!race_product_slots_available((unsigned)count)) return 0;
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
-    if (race_p7_active() && !race_p7_carrier_training_slots_available((unsigned)count)) return 0;
+    if (race_protoss_services_active() && !race_p7_carrier_training_slots_available((unsigned)count)) return 0;
 #endif
 #ifdef SC64_P4_RUNTIME
     if (!race_mode && race_selected_mission == SC64_P4_GLOBAL_ID) {
@@ -1282,6 +1286,9 @@ static void race_tick_buildings(void)
         type = b[i].queue[b[i].queue_head];
 #ifdef SC64_Z8_RUNTIME
         race_z8_note_product_building(i);
+#endif
+#ifdef SC64_P8_RUNTIME
+        race_p8_note_product_building(i);
 #endif
         {
             const Sc64RaceUnitRule *ur = sc64_race_unit_rule(type);

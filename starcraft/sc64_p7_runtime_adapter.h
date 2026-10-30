@@ -29,6 +29,18 @@ static const Sc64RaceMap *race_p7_map;
 static int race_p7_active(void)
 { return !race_mode && race_selected_mission == SC64_P7_GLOBAL_ID; }
 
+/* The saved clock of the current service binding (sc64_protoss_services.h). */
+static u8 *race_protoss_service_clock(void)
+{
+    switch (race_protoss_service_binding()) {
+    case SC64_PROTOSS_BIND_P7: return race_p7.reserved;
+#ifdef SC64_PROTOSS_LATER_BINDINGS
+    case SC64_PROTOSS_BIND_LATER: return race_protoss_later_service_clock();
+#endif
+    default: return race_protoss_generic_clock;
+    }
+}
+
 /* Resolve from the canonical descriptor before transient bindings exist. The
  * owner table is not rewritten: two computer source forces may share ENEMY. */
 static int race_p7_source_owner(unsigned slot)
