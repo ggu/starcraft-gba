@@ -1898,11 +1898,11 @@ $(P8_ARM_DIR)/sc64_p8_tape_generated.h: $(P8_ARM_TRACE) tools/sc64_p8_arm_replay
 	$(PYTHON) tools/sc64_p8_arm_replay.py tape $< $@
 P8_REPLAY_DEPS = tests/sc64_p8_arm_replay.c $(P8_ARM_DIR)/sc64_p8_tape_generated.h $(STARCRAFT) $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.c $(COMMON_HEADERS) Makefile
 build/test-sc64-p8-replay: $(P8_REPLAY_DEPS) | build
-	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) -I$(P8_ARM_DIR) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) -I$(P8_ARM_DIR) $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 build/test-sc64-p8-replay-prefix: $(P8_REPLAY_DEPS) | build
-	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) -I$(P8_ARM_DIR) -DP8_REPLAY_PREFIX $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) -I$(P8_ARM_DIR) -DP8_REPLAY_PREFIX $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 build/test-sc64-p8-replay-resume: $(P8_REPLAY_DEPS) | build
-	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) -I$(P8_ARM_DIR) -DP8_REPLAY_RESUME $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+	$(CLANG) $(P8_HOST_FLAGS) $(PROTOSS_P8_FLAGS) -I$(P8_ARM_DIR) -DP8_REPLAY_RESUME $< $(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
 # Host replays: the full tape must win; prefix saves, a fresh process loads
 # that SRAM image and its continuation must match the full replay.
 .PHONY: test-sc64-p8-replay
