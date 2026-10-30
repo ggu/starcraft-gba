@@ -45,6 +45,22 @@ static int group_type(int type,int x,int y){if(!normal())return 0;leave_building
 static int source_unit(int raw){for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].raw_type==raw)return i;return -1;}
 static int own_building(int type){int airborne=-1;for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&b[i].type==type&&building_complete(i)){if(!race_late_airborne(i))return i;airborne=i;}return airborne;}
 static int own_units(int type){int n=0;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&(type<0||u[i].type==type))n++;return n;}
+static int assign_idle_miner(void){
+ static const int dx[]={0,8,-8,0,0,8,-8,8,-8},dy[]={0,0,0,8,-8,8,8,-8,-8};
+ for(int i=0;i<MAX_UNITS&&active();i++){
+  if(!u[i].alive||u[i].owner!=SIDE||u[i].type!=U_SCV||u[i].order!=ORDER_IDLE||u[i].carry||SC64_TRANSPORT_LOADED(&u[i]))continue;
+  int home=-1,best=0x7fffffff;for(int h=0;h<MAX_BUILDINGS;h++)if(b[h].alive&&b[h].owner==SIDE&&b[h].type==B_COMMAND&&building_complete(h)&&!race_late_airborne(h)){int d=dist2(u[i].x,u[i].y,b[h].x,b[h].y);if(d<best){best=d;home=h;}}
+  if(home<0||!select_unit(i))continue;
+  for(int j=0;j<MAX_MINERALS&&active();j++)if(m[j].amount>0&&currently_visible(m[j].x,m[j].y)&&dist2(m[j].x,m[j].y,b[home].x,b[home].y)<256*256){
+   for(unsigned k=0;k<sizeof(dx)/sizeof(dx[0])&&active();k++){
+    cursor(m[j].x+dx[k],m[j].y+dy[k]);if(!u[i].alive||!u[i].selected||u[i].carry)break;
+    if(selected_worker_mineral_target()!=j||field_ui_a_action(selected_count())!=UI_A_MINE)continue;
+    tap(KEY_A);if(u[i].order==ORDER_MINE&&u[i].target==j){fprintf(stderr,"T8 mineral SCV=%d patch=%d\n",i,j);return 1;}
+   }
+  }
+ }
+ return 0;
+}
 static int queue_at(int slot,int type){if(!select_building(slot))return 0;for(int i=0;i<32&&train_type!=type&&active();i++)tap(KEY_R);int before=b[slot].queue_count;tap(KEY_A);return b[slot].queue_count>before;}
 static int nearest_enemy_building(void){int ax=hero>=0?u[hero].x:cx,ay=hero>=0?u[hero].y:cy;for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&!IS_WORKER(u[i].type)&&i!=hero){ax=u[i].x;ay=u[i].y;break;}int best=-1,distance=0x7fffffff;for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&owners_hostile(SIDE,b[i].owner)){int d=dist2(ax,ay,b[i].x,b[i].y);if(d<distance){distance=d;best=i;}}return best;}
 static void inspect(void){fprintf(stderr,"mission=%d frame=%d wallet=%d/%d supply=%d/%d\n",race_selected_mission,frame,minerals,gas,supply_used,supply_cap);for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE)fprintf(stderr,"U %d raw=%d type=%d xy=%d,%d hp=%d order=%d target=%d\n",i,u[i].raw_type,u[i].type,u[i].x,u[i].y,u[i].hp,u[i].order,u[i].target);for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&(b[i].owner==SIDE||b[i].raw_type==127))fprintf(stderr,"B %d raw=%d owner=%d type=%d xy=%d,%d hp=%d complete=%d level=%d flags=%d goal=%u\n",i,b[i].raw_type,b[i].owner,b[i].type,b[i].x,b[i].y,b[i].hp,building_complete(i),b[i].level,b[i].flags,(unsigned)race_late.flight_goals[i]);}
@@ -136,7 +152,7 @@ static int run(void){
  while(active()){
   if(transferred==0&&ticks>=35000){++transferred;transfer_miners_home();}
   if(transferred==1&&ticks>=95000){++transferred;expand_northwest();}
-  if(ticks>=next_production){next_production=ticks+300;int cc=own_building(B_COMMAND);if(cc>=0&&race_owner_reserved_supply(SIDE)+8>supply_cap&&minerals>=100){paid_build_near(B_DEPOT,MENU_DEPOT,b[cc].x,b[cc].y,224);checkpoint("supply-expanded");}if(cc>=0&&b[cc].queue_count<3&&own_units(U_SCV)<16&&minerals>=50)queue_at(cc,U_SCV);int ports=0;for(int k=0;k<MAX_BUILDINGS;k++)ports+=b[k].alive&&b[k].owner==SIDE&&b[k].type==B_STARPORT;
+  if(ticks>=next_production){next_production=ticks+300;if(race_selected_mission==11)(void)assign_idle_miner();int cc=own_building(B_COMMAND);if(cc>=0&&race_owner_reserved_supply(SIDE)+8>supply_cap&&minerals>=100){paid_build_near(B_DEPOT,MENU_DEPOT,b[cc].x,b[cc].y,224);checkpoint("supply-expanded");}if(cc>=0&&b[cc].queue_count<3&&own_units(U_SCV)<16&&minerals>=50)queue_at(cc,U_SCV);int ports=0;for(int k=0;k<MAX_BUILDINGS;k++)ports+=b[k].alive&&b[k].owner==SIDE&&b[k].type==B_STARPORT;
    if(cc>=0&&ports<2&&minerals>=400&&gas>=200)paid_build_near(B_STARPORT,MENU_STARPORT,b[cc].x,b[cc].y,224);
    for(int sp=0;sp<MAX_BUILDINGS;sp++)if(b[sp].alive&&b[sp].owner==SIDE&&b[sp].type==B_STARPORT&&building_complete(sp)&&b[sp].queue_count<3&&minerals>=150&&gas>=100)queue_at(sp,U_WRAITH);int r=own_building(B_BARRACKS);if(r>=0&&b[r].queue_count<2&&own_units(U_MARINE)<6&&minerals>=200)queue_at(r,U_MARINE);}
   if(ticks>=next_order){next_order=ticks+1000;int target=nearest_enemy_building();if(target>=0&&(own_units(U_WRAITH)>=16||(fleet_launched&&own_units(U_WRAITH)>0))){fleet_launched=1;group_type(U_WRAITH,b[target].x,b[target].y);checkpoint("assault-order");}}
