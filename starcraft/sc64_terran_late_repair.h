@@ -85,9 +85,12 @@ static int race_late_repair_target_building_valid(int slot)
     if (!rule || rule->race != R_TER ||
         sc64_race_raw_building(b[slot].type) != b[slot].raw_type ||
         !race_late_repair_building_raw_mechanical(b[slot].raw_type)) return 0;
+    int hp = b[slot].hp;
+    if (hp == b[slot].maxhp && race_building_can_burn(&b[slot]) &&
+        (b[slot].shield_remainder & 255)) --hp;
     return race_late_repair_building_fields_valid(b[slot].raw_type, b[slot].owner,
                   b[slot].alive, building_complete(slot), (b[slot].flags & 4) != 0,
-                  b[slot].hp, b[slot].maxhp);
+                  hp, b[slot].maxhp);
 }
 
 /* Returns a target-independent, reference-bounded cost tuple for either
@@ -205,9 +208,21 @@ static int __attribute__((noinline)) race_late_repair_tick_unit(int slot)
     if (frame % 5 == 0) return 1;
     int *hp = unit_target ? &u[target_slot].hp : &b[target_slot].hp;
     int maxhp = unit_target ? u[target_slot].maxhp : b[target_slot].maxhp;
+    int old_hp = *hp, repair_hp = old_hp;
+    int fractional_only = !unit_target && old_hp == maxhp &&
+        race_building_can_burn(&b[target_slot]) &&
+        (b[target_slot].shield_remainder & 255);
+    /* Price and accrue the remaining fraction as one integer HP; this is an
+     * approximation within the existing integer repair and payment model. */
+    if (fractional_only) --repair_hp;
     timer = worker->work_timer;
-    keep = sc64_t6_repair_step(hp, maxhp, &worker->carry, &timer,
+    keep = sc64_t6_repair_step(&repair_hp, maxhp, &worker->carry, &timer,
                                &minerals, &gas, &costs);
+    if (!fractional_only || repair_hp == maxhp) *hp = repair_hp;
+    if (!unit_target && repair_hp == maxhp &&
+        (fractional_only || repair_hp > old_hp) &&
+        race_building_can_burn(&b[target_slot]))
+        b[target_slot].shield_remainder &= ~255;
     worker->work_timer = timer;
     if (!keep) race_late_repair_stop(worker);
     return 1;
