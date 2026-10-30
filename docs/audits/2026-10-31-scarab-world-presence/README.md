@@ -82,6 +82,8 @@ exit zero: `unified test-unified terran test-terran
 test-sc64-terran-full-campaign`. It retained 104 fixed prepared inputs, ran
 the original full Terran startup/save/controller recipes and emitted nine
 controller traces (T3 emits none). This does not qualify the gated service.
+All nine traces also match the exact b638b50 row-candidate traces byte for
+byte, with private per-file hashes retained.
 Gate-off binaries are not claimed byte-identical or assigned the earlier
 #189 scene timing; compiler code generation changed despite the false
 feature conditions.
