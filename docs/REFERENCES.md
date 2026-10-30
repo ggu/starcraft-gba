@@ -17,6 +17,8 @@ T4 raw unit 20 is `Hero_Jim_Raynor_Marine`, distinct from raw-19 `Hero_Jim_Rayno
 
 OpenBW's [`bwgame.h`](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h), especially its worker gathering and resource credit paths around lines 2120–2156 and 4485–4495, informs the eight-mineral worker trip and selected simulation behaviors. `openbw/data_loading.h:1470–1515` documents data-field interpretation. OpenBW itself reads unit and weapon records from game DAT files; this project does not include those files.
 
+Moving-projectile damage timing combines N64 `weapons.dat`/`flingy.dat`/IScript records from the private source weapon bank with OpenBW's bullet lifecycle as a PC behavioral proxy: `bullet_hit` (14086–14099), `domissiledmg` dispatch (14878–14881), bullet movement (14266–14284), owner storage (14397–14478, 13735–13741), reference clearing on death and hide (12753–12756, 16121–16127, 17046–17051) and the exhausted-pool case (14494–14498). See [Pending projectile impacts](IMPACT-EVENTS.md).
+
 Build times and weapon cooldowns are simulation-frame counts. The default skirmish scales reference times to its 30-update target. The prototype uses simplified combat, collision, route finding, AI, and scenario balance; these references do not imply full original-game fidelity. Numeric facts and identifiers are documented for provenance and are not copied BWAPI implementation code.
 
 ## Internal transport research

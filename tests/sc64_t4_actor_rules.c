@@ -256,7 +256,33 @@ int main(void)
     check_building_bounds(B_FLOOR_GUN_TRAP,32,32,31,31);
     check_building_bounds(B_WALL_FLAME_TRAP,16,16,15,15);
     check_building_bounds(B_RIGHT_WALL_MISSILE_TRAP,16,16,15,15);
-    assert(sc64_race_t4_building_sight_source_pixels(B_COMMAND) == 0);
+    /* Generic actors use pinned BWAPI sightRangeTiles * 32. */
+    assert(sc64_race_t4_building_sight_source_pixels(B_COMMAND) == 10 * 32);
+    assert(sc64_race_t4_building_sight_source_pixels(B_MISSILE_TURRET) == 11 * 32);
+    assert(sc64_race_t4_building_sight_source_pixels(B_BARRACKS) == 8 * 32);
+    assert(sc64_race_t4_building_sight_source_pixels(B_BUNKER) == 10 * 32);
+    assert(sc64_race_t4_sight_source_pixels(U_SCV) == 7 * 32);
+    assert(sc64_race_t4_sight_source_pixels(U_MARINE) == 7 * 32);
+    assert(sc64_race_t4_sight_source_pixels(U_VULTURE) == 8 * 32);
+    assert(sc64_race_t4_sight_source_pixels(U_GOLIATH) == 8 * 32);
+    assert(sc64_race_t4_sight_source_pixels(U_WRAITH) == 7 * 32);
+    assert(sc64_race_t4_sight_source_pixels(U_TANK) == 10 * 32);
+    assert(sc64_race_t4_sight_source_pixels(U_ZERGLING) == 5 * 32);
+    assert(sc64_race_t4_sight_source_pixels(U_PROBE) == 8 * 32);
+#ifdef SC64_T5_RUNTIME
+    assert(sc64_race_t4_sight_source_pixels(U_KERRIGAN) == 11 * 32);
+    assert(sc64_race_t4_sight_source_pixels(U_SPIDER_MINE) == 3 * 32);
+#endif
+    /* Each source sight covers the matching weapon's maximum range. */
+    {
+        static const int armed[] = { U_MARINE, U_VULTURE, U_GOLIATH, U_WRAITH,
+                                     U_TANK, U_FIREBAT, U_GHOST };
+        for (unsigned i = 0; i < sizeof(armed) / sizeof(armed[0]); ++i) {
+            int sight = sc64_race_t4_sight_source_pixels(armed[i]);
+            assert(sight >= sc64_race_unit_range_vs(armed[i], 0));
+            assert(sight >= sc64_race_unit_range_vs(armed[i], 1));
+        }
+    }
 #endif
     return 0;
 }

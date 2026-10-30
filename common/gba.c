@@ -1051,10 +1051,14 @@ static u32 sram_get32(volatile const u8*p){u32 v=0;for(int i=0;i<4;i++)v|=(u32)p
    lost during a write. Commit the tag last; a checksum covers the payload. */
 #define SAVE_SLOT_SIZE 16384u
 #define SAVE_PAYLOAD_MAX (SAVE_SLOT_SIZE-16u)
+/* A zero len accepts any stored payload length; slot alternation and the
+   sequence clock are shared by every record with the same tag. */
 static int valid_record(volatile const u8 *p,u32 len,u32 tag) {
-    if(sram_get32(p)!=tag||sram_get32(p+4)!=len||!sram_get32(p+12))return 0;
+    u32 stored=sram_get32(p+4);
+    if(sram_get32(p)!=tag||!stored||stored>SAVE_PAYLOAD_MAX||(len&&stored!=len)||
+       !sram_get32(p+12))return 0;
     u32 h=2166136261u;
-    for(u32 i=0;i<len;i++){h^=p[16+i];h*=16777619u;}
+    for(u32 i=0;i<stored;i++){h^=p[16+i];h*=16777619u;}
     return h==sram_get32(p+8);
 }
 static int newest_record(u32 len,u32 tag) {
@@ -1066,9 +1070,9 @@ static int newest_record(u32 len,u32 tag) {
     return (s32)(sram_get32(base+SAVE_SLOT_SIZE+12)-sram_get32(base+12))>0?1:0;
 }
 void save_write(const void *data,u32 len,u32 tag) {
-    if(len>SAVE_PAYLOAD_MAX||!tag)return;
+    if(!len||len>SAVE_PAYLOAD_MAX||!tag)return;
     volatile u8 *base=(volatile u8*)SRAM_BASE;
-    int newest=newest_record(len,tag);
+    int newest=newest_record(0,tag);
     u32 sequence=newest<0?1:sram_get32(base+newest*SAVE_SLOT_SIZE+12)+1;
     if(!sequence)sequence=1;
     volatile u8 *p=base+(newest==0?SAVE_SLOT_SIZE:0);
@@ -1087,6 +1091,19 @@ int save_read(void *data,u32 len,u32 tag) {
     volatile const u8 *src=(volatile const u8*)SRAM_BASE+newest*SAVE_SLOT_SIZE+16;
     u8 *dst=data;
     for(u32 i=0;i<len;i++)dst[i]=src[i];
+    return 1;
+}
+/* Newest valid record for tag, whatever its length, if it fits capacity. */
+int save_read_latest(void *data,u32 capacity,u32 tag,u32 *len) {
+    if(!tag||!len)return 0;
+    int newest=newest_record(0,tag);
+    if(newest<0)return 0;
+    volatile const u8 *p=(volatile const u8*)SRAM_BASE+newest*SAVE_SLOT_SIZE;
+    u32 stored=sram_get32(p+4);
+    if(stored>capacity)return 0;
+    u8 *dst=data;
+    for(u32 i=0;i<stored;i++)dst[i]=p[16+i];
+    *len=stored;
     return 1;
 }
 #ifdef GBA_HOST

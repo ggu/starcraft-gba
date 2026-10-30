@@ -67,13 +67,17 @@ static const u8 sc64_z7_visibility_halfwidths[968] = {
     49, 45, 41, 37, 32, 26, 18, 0,
 };
 
+static const u16 sc64_z7_visibility_halfwidth_offsets[8] = {
+    0, 65, 146, 243, 356, 485, 630, 791
+};
+
 static int
 sc64_z7_visibility_halfwidth(int radius_index, int dy)
 {
-    static const u16 offsets[8] = { 0, 65, 146, 243, 356, 485, 630, 791 };
     if (radius_index < 0 || radius_index >= 8 || dy < 0 ||
         dy > 64 + radius_index * 16) return 0;
-    return sc64_z7_visibility_halfwidths[offsets[radius_index] + dy];
+    return sc64_z7_visibility_halfwidths[
+        sc64_z7_visibility_halfwidth_offsets[radius_index] + dy];
 }
 
 #endif

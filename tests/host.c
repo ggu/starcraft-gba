@@ -119,6 +119,25 @@ int main(int argc,char**argv){
  if(!save_read(restored,16,0x54455354u)||restored[0]!=0){
   fputs("SRAM fallback to previous valid record failed\n",stderr);return 1;
  }
+ /* Records of different lengths share one tag's alternation and sequence:
+    the newest wins, and a damaged newest falls back to the previous one. */
+ unsigned char longer[24], latest[24]; u32 latest_len=0;
+ for(int i=0;i<24;i++)longer[i]=(unsigned char)(200-i);
+ save_write(sample,16,0x54455356u);
+ save_write(longer,24,0x54455356u);
+ if(!save_read_latest(latest,24,0x54455356u,&latest_len)||latest_len!=24||memcmp(latest,longer,24)||
+    save_read_latest(latest,23,0x54455356u,&latest_len)||!save_read(restored,16,0x54455356u)||
+    memcmp(restored,sample,16)){
+  fputs("SRAM newest record across lengths failed\n",stderr);return 1;
+ }
+ save_write(sample,16,0x54455356u);
+ if(!save_read_latest(latest,24,0x54455356u,&latest_len)||latest_len!=16||memcmp(latest,sample,16)){
+  fputs("SRAM shorter newest record failed\n",stderr);return 1;
+ }
+ save_test_corrupt_latest(16,0x54455356u);
+ if(!save_read_latest(latest,24,0x54455356u,&latest_len)||latest_len!=24||memcmp(latest,longer,24)){
+  fputs("SRAM cross-length fallback failed\n",stderr);return 1;
+ }
  int errors=game_self_test();
  if(errors){fprintf(stderr,"Game rule self-tests failed: %d\n",errors);return 1;}
  /* Exercise exact renderer with memory instrumentation, then run input stress. */
