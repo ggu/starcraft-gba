@@ -1946,7 +1946,7 @@ reset_selection_gestures(void)
     r_tap_state = 0;
 #endif
 }
-static const char *toast_text[] = {"Command issued", "Need more minerals", "Supply limit reached", "Building placed", "Training unit", "Select a worker", "Site blocked", "Game saved", "Tech prerequisite missing", "Building unfinished", "Research unavailable", "Queue full", "No gas", "Unit pool full", "Mission data skipped"};
+static const char *toast_text[] = {"Command issued", "Need more minerals", "Supply limit reached", "Building placed", "Training unit", "Select a worker", "Site blocked", "Game saved", "Tech prerequisite missing", "Building unfinished", "Research unavailable", "Queue full", "No gas", "Unit pool full", "Mission data skipped", "Deliver cargo first"};
 static int
 limit(int n, int lo, int hi)
 {
@@ -4821,11 +4821,18 @@ init_state(void)
     spawn_build(SIDE, B_DEPOT, 120, 136, 0);
     spawn_build(SIDE, B_BARRACKS, 120, 48, 0);
     supply_cap += 16;
-    spawn_unit(SIDE, U_SCV, 98, 82);
-    spawn_unit(SIDE, U_SCV, 99, 91);
-    spawn_unit(SIDE, U_SCV, 96, 99);
-    spawn_unit(SIDE, U_SCV, 85, 103);
-    spawn_unit(SIDE, U_SCV, 68, 105);
+    /* This original-art outpost starts with its own authored mineral jobs.
+     * Later idle workers require an explicit order. */
+    static const int opening_workers[5][3] = {
+        {98, 82, 3}, {99, 91, 3}, {96, 99, 3}, {85, 103, 3}, {68, 105, 1}
+    };
+    for (i = 0; i < 5; ++i) {
+        int worker = spawn_unit(SIDE, U_SCV, opening_workers[i][0], opening_workers[i][1]);
+        if (worker >= 0) {
+            u[worker].order = ORDER_MINE;
+            u[worker].target = opening_workers[i][2];
+        }
+    }
     for (i = 0; i < 8; i++) {
 	int guard = spawn_unit(SIDE, U_MARINE, 86 + i * 9, 67);
 	if (guard >= 0) {
@@ -5183,6 +5190,21 @@ find_selected_worker(void)
 	if (u[i].alive && !SC64_TRANSPORT_LOADED(&u[i]) && u[i].owner == SIDE && u[i].selected && IS_WORKER(u[i].type))
 	    return i;
     return -1;
+}
+
+/* Contextual mineral target shared by dispatch and HUD. */
+static int
+selected_worker_mineral_target(void)
+{
+    int patch = -1, best = 16 * 16;
+    if (find_selected_worker() < 0 || selection_target() >= 0) return -1;
+    for (int i = 0; i < MAX_MINERALS; ++i) {
+        int d = dist2(cx, cy, m[i].x, m[i].y);
+        if (d < best && currently_visible(m[i].x, m[i].y) && m[i].amount > 0) {
+            patch = i; best = d;
+        }
+    }
+    return patch;
 }
 
 /* Automatic construction selection must not steal an existing build order.
@@ -6248,6 +6270,30 @@ interact(void)
 	    toast(0);
 	    return;
 	}
+        /* A selected, empty worker can be sent to a visible mineral patch.
+         * Loaded workers keep their current delivery order and cargo. */
+#ifdef SC_FIELD_FEEDBACK
+        if (field_ui_smart_attack()) return;
+#endif
+        if (worker >= 0) {
+            int patch = selected_worker_mineral_target();
+            if (patch >= 0) {
+                int issued = 0;
+                for (int i = 0; i < MAX_UNITS; ++i) {
+                    if (!u[i].alive || !u[i].selected || u[i].owner != SIDE ||
+                        SC64_TRANSPORT_LOADED(&u[i]) || !IS_WORKER(u[i].type) || u[i].carry) continue;
+                    u[i].order = ORDER_MINE;
+                    u[i].target = patch;
+                    u[i].work_timer = 0;
+#ifdef SC64_NEAREST_RESOURCE_DEPOT
+                    u[i].build = -1;
+#endif
+                    ++issued;
+                }
+                toast(issued ? 0 : 15);
+                return;
+            }
+        }
     }
     if (selected_building >= 0
 #ifdef SC_FIELD_FEEDBACK
@@ -7473,41 +7519,6 @@ nearest_refinery(int x, int y)
     return best;
 }
 
-static void
-economy(void)
-{
-    int i, patch;
-    if (frame % 30)
-	return;
-    for (i = 0; i < MAX_UNITS; i++) {
-#ifdef SC64_RACES
-        /* An escort carrier keeps its last controller order at waypoints. */
-        if(!race_mode&&race_selected_mission==1&&race_campaign.carrier_unit==i)continue;
-#endif
-	if (!u[i].alive ||
-#ifdef SC64_SKIRMISH
-            u[i].owner == NEUTRAL ||
-#else
-            u[i].owner != SIDE ||
-#endif
-            !IS_WORKER(u[i].type) || u[i].order != ORDER_IDLE)
-	    continue;
-	patch = nearest_mineral(u[i].x, u[i].y);
-	if (patch >= 0) {
-	    u[i].order = ORDER_MINE;
-	    u[i].target = patch;
-	    u[i].work_timer = 0;
-	    u[i].carry = 0;
-#ifdef SC64_NEAREST_RESOURCE_DEPOT
-            u[i].build = -1;
-#endif
-#ifndef SC64_SKIRMISH
-	    break;
-#endif
-	}
-    }
-}
-
 #ifndef SC64_IMPORTED_MISSION
 static void
 enemy_wave(void)
@@ -8472,8 +8483,6 @@ game_update(u16 held, u16 pressed)
     sc64_update_research_cycles = gba_clock() - sc64_update_stage_start;
     sc64_update_remainder_start = gba_clock();
 #endif
-    if (frame % 30 == 0)
-	economy();
 #ifndef SC64_IMPORTED_MISSION
     if (frame % 90 == 0) {
 	int i;
@@ -10533,9 +10542,12 @@ draw_hud_commands_body(void)
 		if (IS_WORKER(u[i].type))
 #ifdef SC64_FIELD_CONTROLS
 		    gfx_text(hud_left+47, 137, ui_action == UI_A_MOVE ? "A MOVE  B BUILD" :
-			     ui_action == UI_A_GAS ? "A GAS  B BUILD" : "AUTO MINE  B BUILD", C_GOLD);
+			     ui_action == UI_A_GAS ? "A GAS  B BUILD" :
+                             ui_action == UI_A_MINE ? "A MINE B BUILD" : "B BUILD", C_GOLD);
+#elif defined(SC_DEFAULT_UI)
+		    gfx_text(hud_left+47, 137, ui_action == UI_A_MINE ? "A MINE / B BUILD" : "B BUILD", C_GOLD);
 #else
-		    gfx_text(hud_left+47, 137, "AUTO MINE / A GAS", C_GOLD);
+                    gfx_text(hud_left+47, 137, "B BUILD", C_GOLD);
 #endif
 		else
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
@@ -10988,7 +11000,7 @@ draw_hud(void)
 #ifdef SC64_FIELD_CONTROLS
     if (menu_open) field_controls_draw_command_menu();
 #endif
-    if (toast_timer && toast_id >= 0 && toast_id < 15) {
+    if (toast_timer && toast_id >= 0 && (unsigned)toast_id < sizeof(toast_text) / sizeof(toast_text[0])) {
 	gfx_rect(54, 105, 132, 12, C_PANEL);
 	gfx_frame(54, 105, 132, 12, C_EDGE);
 	gfx_text(59, 108, toast_text[toast_id], C_GOLD);

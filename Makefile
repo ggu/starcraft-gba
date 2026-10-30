@@ -5493,6 +5493,7 @@ BC_FIXTURE_recovery := tests/sc64_battlecruiser_yamato_recovery.c
 BC_FIXTURE_idle := tests/sc64_bc_idle_equivalence.c
 BC_FIXTURE_targetquery := tests/sc64_target_owner_query_game.c
 BC_FIXTURE_rowquery := tests/sc64_target_row_query_game.c
+BC_FIXTURE_workerstop := tests/sc64_worker_stop_mine_game.c
 BC_FIXTURES := production research flight save transfer yamato art impact migration auto ui damage cover heading range recovery idle
 define BC_PROFILE_FIXTURE
 build/test-bc-$(1)-$(2): $$(BC_FIXTURE_$(1)) $$(STARCRAFT) $$(wildcard starcraft/*.h) $($(4)) $(5) $$(BC_INPUTS) common/gba.c $$(COMMON_HEADERS) Makefile | build
@@ -5511,6 +5512,13 @@ $(eval $(call BC_PROFILE_FIXTURE,rowquery,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_IN
 $(eval $(call BC_PROFILE_FIXTURE,rowquery,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS,))
 $(eval $(call BC_PROFILE_FIXTURE,rowquery,protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
 $(eval $(call BC_PROFILE_FIXTURE,rowquery,showcase,SHOWCASE_FLAGS,SHOWCASE_INPUTS,))
+$(eval $(call BC_PROFILE_FIXTURE,workerstop,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,))
+$(eval $(call BC_PROFILE_FIXTURE,workerstop,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS,))
+$(eval $(call BC_PROFILE_FIXTURE,workerstop,protoss,PROTOSS_ROM_FLAGS,PROTOSS_P7_CANONICAL_INPUTS,$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call BC_PROFILE_FIXTURE,workerstop,showcase,SHOWCASE_FLAGS,SHOWCASE_INPUTS,))
+.PHONY: test-worker-stop-mine
+test-worker-stop-mine: $(foreach p,terran zerg protoss showcase,build/test-bc-workerstop-$(p))
+	@set -e; for p in terran zerg protoss showcase; do ./build/test-bc-workerstop-$$p; done
 $(foreach p,terran zerg protoss showcase,build/test-bc-rowquery-$(p)): tests/sc64_target_nearest_reference.h
 .PHONY: test-target-row-query
 test-target-row-query: $(foreach p,terran zerg protoss showcase,build/test-bc-rowquery-$(p))
