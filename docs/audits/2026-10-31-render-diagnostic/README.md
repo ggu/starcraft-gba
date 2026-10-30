@@ -16,3 +16,13 @@ python3 tools/sc64_render_profile_read.py --runner /private/sc64-headless-replay
 ```
 
 The first command preserves the supplied compiler features and adds the shared shape flag and diagnostic flag; it compiles a diagnostic-only main and writes ELF, ROM, map, and exact link arguments to the new private directory. The second uses the port-free in-process mGBA transport with an in-process breakpoint at the probe's completion marker. It performs no guest-memory writes and emits counters and sampled checkpoints only to the requested new private file. Build the runner against matching static mGBA following `docs/research/sc64-headless-skirmish-replay.md`. Compare the private result against a separately retained baseline; the script makes no parity or performance claim. The test tape hash was `0d79706afb77e58c958a6dd622a56843f611f4400bfa014bdbeb7db751f6ef2b`.
+
+The reader child at `866c07e` reuses the existing bounded pipe transport and
+requires the exact `diag_done` breakpoint before reading results. Its output
+matches the earlier packaged result in every counter, peak and all 90 samples.
+Four asset-free transport tests pass; three private-backend tests are skipped
+without supplied inputs. Independent review confirms no guest write commands.
+Preprocessing the captured normal vector without the diagnostic flag emits no
+diagnostic counter identifiers; this is not all-profile binary equivalence.
+Default `./dev build` also passes at this child. No full current default or
+optional-profile test aggregate is claimed for the diagnostic branch.
