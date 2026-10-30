@@ -220,7 +220,9 @@ static void game_audio_observe(void)
     if (advisor && !fresh) game_audio_advisor(advisor);
     for (i = 0; i < MAX_UNITS; i++) {
         const Unit *q = &u[i];
-        u32 prev = snap[i], cd = q->cd > 255 ? 255u : (u32)q->cd;
+        u32 prev = snap[i];
+        if (!q->alive && !prev) continue;
+        u32 cd = q->cd > 255 ? 255u : (u32)q->cd;
         u32 now = q->alive ? GAME_AUDIO_SNAPSHOT_ALIVE | cd : 0;
         if (q->alive && SC64_TRANSPORT_LOADED(q)) now |= GAME_AUDIO_SNAPSHOT_LOADED;
         if (!fresh) {
@@ -245,6 +247,7 @@ static void game_audio_observe(void)
     for (i = 0; i < MAX_BUILDINGS; i++) {
         const Building *q = &b[i];
         u32 prev = snap[MAX_UNITS + i];
+        if (!q->alive && !prev) continue;
         u32 now = q->alive ? GAME_AUDIO_SNAPSHOT_ALIVE |
                   (q->under_construction ? GAME_AUDIO_SNAPSHOT_CONSTRUCTING : 0) : 0;
         if (!fresh) {

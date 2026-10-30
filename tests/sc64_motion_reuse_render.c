@@ -12,7 +12,7 @@
 #define SC64_WEAPON_SOURCE_PROFILE_COUNT 1
 #define SC64_WEAPON_SOURCE_IMAGE_COUNT 2
 #define SC64_WEAPON_SOURCE_FRAME_COUNT 2
-#define SC64_WEAPON_SOURCE_ANIMATION_COUNT 1
+#define SC64_WEAPON_SOURCE_ANIMATION_COUNT 3
 #define SC64_WEAPON_SOURCE_EVENT_COUNT 2
 #define SC64_WEAPON_SOURCE_OVERLAY_COUNT 1
 #define SC64_WEAPON_SOURCE_LUT_COUNT 1
@@ -67,7 +67,10 @@ typedef struct { int8_t x, y; } Sc64WeaponSourceLoOffset;
 
 static Sc64WeaponSourceAttackProfile test_profile;
 static Sc64WeaponSourceImage test_request_image, test_keyed_image;
-static Sc64WeaponSourceAnimation test_init, test_flight, test_death;
+static Sc64WeaponSourceAnimation sc64_weapon_source_animations[3];
+#define test_init sc64_weapon_source_animations[0]
+#define test_death sc64_weapon_source_animations[1]
+#define test_flight sc64_weapon_source_animations[2]
 static Sc64WeaponSourceEvent sc64_weapon_source_events[2];
 static Sc64WeaponSourceOverlay sc64_weapon_source_overlays[1];
 static const uint8_t test_pixels[4] = {11, 12, 77, 78};

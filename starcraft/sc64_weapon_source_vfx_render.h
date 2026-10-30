@@ -514,6 +514,28 @@ sc64_weapon_source_vfx_draw_overlays(const Sc64WeaponSourceAnimation *anim,
 /* Draw the projectile stream from its generated Init/attack/Death image
  * timelines. This is presentation-only: it uses the packed tracer identity
  * and captured endpoints, and never changes simulation or saved fields. */
+/* The generated animation table is ordered by image, then animation id. */
+static void __attribute__((noinline))
+sc64_vfx_projectile_animations(uint16_t image_id,
+    const Sc64WeaponSourceAnimation **init,
+    const Sc64WeaponSourceAnimation **death,
+    const Sc64WeaponSourceAnimation **flight)
+{
+    unsigned lo=0,hi=SC64_WEAPON_SOURCE_ANIMATION_COUNT;
+    *init=0; *death=0; *flight=0;
+    while(lo<hi) { unsigned mid=lo+(hi-lo)/2;
+        if(sc64_weapon_source_animations[mid].image_id<image_id) lo=mid+1;
+        else hi=mid;
+    }
+    while(lo<SC64_WEAPON_SOURCE_ANIMATION_COUNT) {
+        const Sc64WeaponSourceAnimation *a=&sc64_weapon_source_animations[lo++];
+        if(a->image_id!=image_id || a->animation_id>2) break;
+        if(a->animation_id==0 && !*init) *init=a;
+        else if(a->animation_id==1 && !*death) *death=a;
+        else if(a->animation_id==2 && !*flight) *flight=a;
+    }
+}
+
 static inline void
 sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
                                      int x0, int y0, int x1, int y1, int live,
@@ -555,14 +577,10 @@ sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
     if (attack_age < release_ticks) return;
     uint32_t source_age = attack_age - release_ticks;
     uint32_t init_ticks = sc64_weapon_source_trace_startup_ticks(p);
-    const Sc64WeaponSourceAnimation *init =
-        sc64_weapon_source_animation_lookup(image->image_id, 0u);
+    const Sc64WeaponSourceAnimation *init, *flight_anim, *death;
+    sc64_vfx_projectile_animations(image->image_id,&init,&death,&flight_anim);
     int moving = !sc64_weapon_source_bullet_is_stationary(p->weapon_bullet_type);
     uint32_t flight_ticks = moving ? motion.flight : 0;
-    const Sc64WeaponSourceAnimation *flight_anim =
-        sc64_weapon_source_animation_lookup(image->image_id, 2u);
-    const Sc64WeaponSourceAnimation *death =
-        sc64_weapon_source_animation_lookup(image->image_id, 1u);
     uint32_t death_ticks = death ?
         sc64_weapon_source_animation_visual_ticks(death) : 0u;
     uint64_t projectile_visual_end = (uint64_t)init_ticks +
