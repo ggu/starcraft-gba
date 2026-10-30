@@ -178,7 +178,7 @@ sc64_weapon_source_trace_startup_ticks(const Sc64WeaponSourceAttackProfile *p)
     for (uint16_t i = 0; i < init->event_count; ++i) {
         const Sc64WeaponSourceEvent *event =
             &sc64_weapon_source_events[init->event_first + i];
-        /* IScript setspawnframe sends order_signal=1, transitioning an
+        /* IScript sigorder with mask 1 sets order_signal |= 1, transitioning an
          * initialized bullet into its GndAttkInit state. */
         if (event->opcode == 36u) return event->source_tick;
     }

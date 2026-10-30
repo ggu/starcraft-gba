@@ -1,0 +1,3 @@
+685788ff1909fd532d4d128e18d5bd4c108b13b581c4d248672e9900783954df  build/StarCraft-Terran-GBA.gba
+b7b39381e4f8d8ada40ea07a2362689eb8fb0a20d2323cd12188c88d8aa5c8b8  build/starcraft-terran.elf
+f2801ae90341de8fa0ad1f8d95a5a8912dad4110fd52dcf55694f59fc74c13f6  build/starcraft-terran.map

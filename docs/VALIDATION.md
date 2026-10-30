@@ -6279,6 +6279,106 @@ profile/save/frame fixtures and the 18-match skirmish matrix pass. See the
 [audit](audits/2026-10-29-z7-current-arm-sram/README.md). This is emulator
 evidence for the shipped game loop, not physical-GBA or 30-fps
 qualification. Z7 is not promoted.
+## Moving-projectile damage at impact (2026-10-29)
+
+Moving source projectiles now deal damage at their drawn impact frame through
+a bounded, saved queue; see [Pending projectile impacts](IMPACT-EVENTS.md).
+The candidate is stacked on `761597d`. Base and candidate were built from the
+same private inputs.
+
+`./dev build`, `./dev test`, `python3 tools/check_source_tree.py` and the
+host SRAM checks pass. `make test-sc64-impact-events-game` passes under
+ASan/UBSan for Terran, Zerg, Protoss P7 and Showcase (queue 32; save 32, 10,
+11, 32 rows). Its `races` and `unified` vectors keep immediate damage.
+`make test-unified` passes. Its `test-sc64-weapon-vfx-game` guard now pins the
+compact race `Tracer`.
+
+Five normal 32 MiB ARM products (Showcase, Terran, Zerg Z6/Z7, Protoss P7)
+link within unchanged guards. IWRAM is byte-identical, and EWRAM headroom
+grows by 56–72 B.
+
+Campaign controllers, run with traces in a private workspace:
+
+- **Terran.** T1–T6, T8, T10 and the save, repair, world-save, target, HUD
+  and collision checks pass.
+  - T5 now wins at tick 193,011. Unmodified base loses (Raynor dies), so this
+    is a changed trajectory, not a claimed fix.
+  - T7 (no win at 60,000), T9 (no win at 500,000) and `terran-late-world`'s
+    Firebat splash assertion fail identically on base.
+- **Zerg Z6/Z7.** The Z6 split controller, promoted profile, Z7 profile, save
+  and frame checks pass.
+  - The Z7 normal-input controller regresses. It reaches its 1,000,000-tick
+    limit without a win, while base wins at 821,565.
+  - The impacts-disabled build reproduces base's trace exactly.
+  - At frame 47,500 the scripted policy sends its 11 drones to a distant
+    mineral field through enemy Sunken Colonies, and its economy does not
+    recover.
+- **Protoss.** The split controller, P7 OBJ VRAM and P7 save/projectile checks
+  pass.
+- **Pre-existing on base**, failing identically:
+  - the P4 canonical controller (`LOST`);
+  - the P4 Storm save assertion;
+  - the Z7 Scourge targeting assertion;
+  - the generation-30 promoted/storage asserts;
+  - the P7 controller rule's link error.
+
+In the no-GDB mGBA probe:
+
+- One shot's timing costs 6,161 cycles, and a full-queue step 1,794.
+- The disabled build matches base's digest and update cycles.
+- Equal-load windows cost the same, but the stress battle's heavy phase lasts
+  longer.
+
+The scene exceeds the 30 fps budget on base as well, so no hardware frame-rate
+result is claimed. ARM replays and fresh-process SRAM qualification were not
+run; the follow-up below adds them.
+
+### Pending impacts on current default: Z7, ARM replay and saves (2026-10-30)
+
+The candidate was merged with default `cfdbe16`, which includes PR #152.
+
+- `./dev build`, `./dev test`, `python3 tools/check_source_tree.py` and
+  `make test-sc64-impact-events-game` pass.
+- The five product ROMs link within unchanged guards. IWRAM symbols, sizes
+  and end address equal default's, and EWRAM headroom grows by 56–72 B.
+
+**Z7.**
+- Default `cfdbe16` itself no longer wins the Z7 normal-input controller: it
+  reaches the 1,000,000-tick limit at frame 999,093 with 45 enemy buildings.
+  This branch with `-DSC64_IMPACT_EVENTS_DISABLED` reproduces that trace byte
+  for byte. With impacts enabled it also reaches the limit.
+- A bisect of default's merges puts the regression at PR #161 (`6e1cb67`,
+  loaded-worker depot routing). PRs #148, #157 and #158 still win at host
+  tick 821,565.
+- The earlier impacts-only Z7 difference on `761597d` came from the
+  controller's lowest-slot home Hatchery rule, not from the impact path; see
+  [the diagnosis](IMPACT-EVENTS.md#z7-controller-diagnosis).
+- The Zerg lane owns the controller. Z7 is not gated here, because no current
+  build of either kind qualifies a win.
+
+**Unusable controllers.** Two other host controllers fail on default with or
+without impacts:
+- The canonical P7 controller fails a cursor guard; its Make rule also
+  compiles `game.c` in place of the controller, because
+  `P7_CAMPAIGN_CONTROLLER` is defined after the rule uses it.
+- The P6 controller does not start P6 in the P7 ROM.
+
+**ARM.** No-GDB mGBA runs of four diagnostic ROMs all match their host
+oracles:
+- An input-only replay of the T10 controller's held keys wins at frame 3,361,
+  matching all 35 checkpoints with up to 6 impacts pending.
+- Two-process normal-menu skirmish saves restore 5 (Terran) and 4 (P7)
+  pending impacts.
+- A P7 capacity save first refuses 12 pending impacts, then saves all 11 rows
+  and restores them.
+- Each restored world equals the saved world, and all continuation
+  checkpoints match the first process.
+
+Protocol, hashes and limits are in
+[Pending projectile impacts](IMPACT-EVENTS.md#arm-replay-and-fresh-process-saves).
+These are emulator results for a probe-entry mission and skirmishes, not
+normal-menu campaign or hardware qualification.
+
 
 ### Z8 candidate profile (2026-10-29, in progress)
 
@@ -6601,3 +6701,367 @@ comparisons are private in `default-resolved-tracer-v1`. The earlier #171
 54-match, 702 startup/save and 27 construction results are baseline evidence
 for unchanged gameplay paths, not new runs of this renderer-only stage.
 No Actions were run and no proprietary inputs are committed.
+
+
+### Default-branch terrain transfer (2026-10-30)
+
+Independently extracted on `ae691253`, the shared terrain cache transfers aligned
+horizontal windows with one bounded DMA3 operation, then redraws exposed edge
+tiles. Generic windows, unaligned shifts, partial boundary rows and narrower
+scene clips retain their existing path. No persistent buffers, actor limits,
+sight ranges or RAM reserves change. The six executable/test files were
+qualified at `dfda937`; the later validation addition changes documentation only.
+
+Local source-boundary, doctor, default build/test, unified build/test and the
+full Terran host aggregate pass. Sanitizer checks cover 5,292 clipped-window
+cases and four prepared profiles with 512 cached/fresh scene comparisons each.
+All four normal ARM links preserve the fixed guards; remaining EWRAM/IWRAM
+bytes are Terran 28,536/328, Zerg 28,444/64, Protoss 23,900/952 and Showcase
+272/56. Captured Make commands, per-TU dependencies and input hashes match the
+private input copies. Public-main weapon and P7 fact banks were used; this
+extraction does not include the draft roster services or source-birth offset fix.
+
+A separate port-free mGBA probe uses actual production flags and replaces only
+main. Over 1,501 play ticks after a normal-menu launch (observed mission field
+8), alternating horizontal camera input produces matching selected-state and
+displayed-framebuffer rolling hashes at all four checkpoints. Timed update,
+audio and rendering work, including presentation waits, falls from 992,093,504
+to 983,925,857 guest cycles, a 0.823 percent reduction for this workload. This
+is hash-based observational evidence, not byte-for-byte state proof, steady
+30 fps or physical-hardware qualification. An initial whole-VRAM hash included
+audio scratch/offscreen data and is superseded by the displayed-page probe.
+
+Evidence remains private in `terrain-public-extract-v1`. The Terran host gate
+wrote four controller-trace outputs inside its independent copy; all other
+75 preexisting prepared files remained identical. No shared inputs were
+regenerated, no Actions were dispatched and no proprietary data is committed.
+
+
+### Default visibility span counts (2026-10-30)
+
+This independently extracted optimization updates cell visibility/minimap
+occupancy only at zero-source transitions and the ninth count bit only at
+255/256. A bounded ROM row helper avoids repeated per-cell call setup.
+Sight ranges, geometry, explored state, source slots, persistent storage
+and RAM reserves remain unchanged. Independent full-grid/count/minimap
+oracles cover ownership batches, 255/256 transitions, 511-source sequences,
+out-of-map centers and empty spans.
+
+Exact visibility commit `673d890` on default `71a134df` passes source/doctor,
+default build/test, unified build/test and the full Terran host aggregate.
+Current-default integration `e6f821d` on `fdb63f3` passes source/doctor/default
+build, focused sanitizer oracles and four actual Make ARM captures plus normal
+links. Each profile's source and input closure is verified. Spare EWRAM/IWRAM
+bytes are Terran 28,536/328, Zerg 28,444/64, Protoss 23,900/952 and Showcase
+272/56. The later base change contains only PR176's generated-map mineral-style
+initialization and its fixture assertions. The full gates/timing were not
+rerun on that integrated head; the visibility code is identical, the base
+change was independently qualified and its new combined ARM links were checked.
+
+The fresh port-free T5 comparison at `673d890` has 22 nonempty timing windows
+and 10,991 gameplay ticks. Selected-state/fog checkpoint hashes and seven
+palette-resolved framebuffer CRCs agree. Peak sight cost at tick 9,000 falls
+from 3,062,662 to 2,122,499 guest cycles (30.70 percent). Summed sight cost is
+346,957,909 to 342,107,187 (1.398 percent less); full-frame cost is
+7,645,233,405 to 7,638,767,300 (0.0846 percent less). This one shortened
+emulator trace does not establish general FPS, all-frame/state equality,
+physical hardware behavior or full campaign completion.
+
+Private records are in `visibility-public-v1` and `visibility-fdb-v1`. Four
+private controller traces were rewritten by the host gate; other prepared
+inputs were preserved. Some completed auxiliary unified/Terran test-build
+images were removed during disk cleanup without a prior per-file inventory;
+the four captured canonical ARM products, raw dependencies, probe products,
+source/input snapshots and test logs remain. No Actions were dispatched and
+no proprietary inputs are committed. The later documentation-only commit
+does not change the qualified executable/test files.
+
+## T9 ordinary-input qualification (2026-10-29)
+
+This record closes the T9 completion item left open in the 2026-10-26 and
+2026-10-28 sections, and only for what it measured. It covers a host
+completion with ordinary inputs and a normal-menu ARM replay of the same
+inputs in mGBA, on the commits and private inputs listed below. It does not
+cover physical hardware, saving and resuming inside T9, or other Terran controllers. The T5, T7 and T8 outcomes below are historical
+results on the stated runtime, not claims about current main.
+
+The result applies only to runtime `9ff7f7c`. It does not qualify any later
+runtime. To stay mergeable, this branch later merged `codex/source-release` at
+`97c39fa` (as `d8985c1`) and then at `ae69125` (as `f0c238b`). That base is
+57 commits past `9ff7f7c` and changes 33 files under `starcraft/` and
+`common/`. Neither merge nor the later integration with `2847ab0` was re-qualified; the replay
+audit below re-checks only the retained `9ff7f7c` logs. T9 needs a fresh host completion and ARM replay on any runtime
+that is to be qualified.
+
+Provenance of the qualifying run:
+
+- **Runtime:** `codex/source-release` at
+  `9ff7f7c6a8cd93937845203ca69a7ee669f77c58`, merged into this branch as
+  `0c754cc44f07039d657132f88c4c7ce2504b2be8`. `git diff 9ff7f7c 0c754cc --
+  starcraft common` is empty.
+- **Controller, probe and driver:** commit
+  `2d575f6509137cd986c04fbe03e2f48aa32a2e83`. The ROMs, trace and tape below
+  were built from that tree.
+- **Build-provenance capture:** commit
+  `70b86da7111c9ce0e838078de4490f1ba719dbbf`. After `2d575f6` the branch adds
+  only the capture tool, its test and documentation. The capture rebuilt both
+  ROMs byte for byte (see "Build provenance").
+
+### Why the earlier controller stalled
+
+`tests/sc64_t9_campaign_run.c` stopped at its 500,000-tick limit on base
+`a4ff09d` (43 Protoss buildings, one Wraith, wallet 42/14). The cause was the
+controller, not the engine:
+
+- Its ground-reachability check read the lazily built path grid before the
+  engine had built it, and it used 8-connected steps where engine routes use
+  four. Every mineral patch and geyser therefore looked unreachable. The
+  controller ferried an SCV to the home geyser by Dropship and tried to place a
+  second Command Center there, which failed. With a single long gas trip, gas
+  stayed near zero and only one Wraith was ever built. The whole T9 map is one
+  4-connected ground component.
+- Clicking an SCV while another SCV was still selected issued the engine's
+  repair order to the selected SCV. When the selected SCV was a builder, that
+  cancelled its construction (a Starport stayed at 1 HP).
+- The home mineral line holds 11,100 minerals and is mined out after roughly
+  20,000 ticks. Idle SCVs then take the nearest patch on the map, in the Zerg
+  base, and die there.
+- Flyers move on eight headings, diagonal first. A Wraith attack-move from the
+  base to the north-east Protoss base clips two Zerg Spore Colonies and
+  auto-acquires them. Any Force 3 building death is a native defeat trigger.
+
+### Controller policy
+
+The rewritten controller still enters through the compile-time mission-12
+probe and changes the world only through `game_update()` with ordinary keys.
+It never writes actors, resources, triggers or mission state, and it does not
+force phases or weaken objectives. Victory is the unchanged native trigger
+(Force 2 commands no buildings). The native defeat triggers stay live:
+Kerrigan's death, losing every unit, and any Force 3 building death.
+
+The policy reads only the player's own units, buildings and wallet; static
+terrain, minerals and geysers; and the immutable scenario placement table.
+From the placement table it takes the 43 Protoss structure sites as briefing
+targets and the 21 Zerg structure sites as no-fly zones. Hostile actors count
+only while their cell is in the player's current `visible` grid. Hostile
+buildings seen once are remembered at their last seen position until that
+cell is visible again without them. Diagnostic output (`--verbose`,
+`--final-inspect`, `--map`) may print more, but no input decision depends on
+it. Tick 1 is left neutral because on the normal menu the briefing's START
+frame runs that tick.
+
+Economy: the opening SCVs walk to the home line and the ordinary idle-worker
+rule assigns them patches. The controller builds a Starport, then a Refinery on
+the home geyser, and trains SCVs up to 20 while that line lasts. It keeps at
+least nine SCVs on minerals and puts up to ten on gas; once the home line is
+gone, every SCV goes to gas. Supply Depots are built ahead of demand and a
+third Starport follows. Fleet: Wraiths gather east of the mineral line. At 24,
+the clump launches as a wave whose membership the controller tracks itself.
+Each leg is planned on 32-pixel cells with a 192-pixel exclusion around Zerg
+structures and visible Zerg actors, plus a soft cost near visible Dragoons and
+remembered Photon Cannons. Waypoints are emitted at heading changes, so each
+eight-direction leg is flown as planned. The final leg is an attack-move on
+the nearest remembered Protoss building or uncleared briefing site.
+
+### Host completion
+
+```sh
+make test-sc64-t9-controller   # writes build/t9-arm/t9-controller.json
+./build/test-sc64-t9-campaign-run --trace PATH --verbose
+```
+
+The run wins at host tick 51,696 (frame 50,926): all 43 Force 2 buildings
+destroyed, all 21 Force 3 buildings intact, Kerrigan alive, zero trigger
+faults, phase 3, and the T9 completion bit set. 42 Wraiths and 13 SCVs
+survive; the wallet ends at 40/5,850. Two runs produce byte-identical traces
+(SHA-256 `8868402d01d8a2d66a5b80d6f2f7d873f6ac8343b8fd817e98378d2e66ed1f74`,
+2,807 input transitions). The earlier runtime `a4ff09d` and the qualifying
+runtime `9ff7f7c` produce the same trace byte for byte. Before tick 1 was made
+neutral, the same policy won at tick 44,292.
+
+### Normal-menu ARM replay
+
+`tests/sc64_t9_arm_replay.c` replaces `common/main.c` in an otherwise
+canonical Terran build (`TERRAN_ROM_FLAGS`). The ROM boots, taps A, RIGHT×4, A
+and START through the ordinary campaign menu and briefing to mission 12, then
+plays the trace's key transitions through the shipped
+`game_update()`/`audio_update()`/`game_render()` loop. Observations go to the
+mGBA debug log; no debugger port is opened and nothing writes game state.
+`tools/sc64_t9_arm_replay.py run` starts one mGBA process with its own HOME,
+config and save directory and compares every ARM observation with the host
+trace's observation at the same tick.
+
+```sh
+make sc64-t9-arm-replay
+python3 tools/sc64_t9_arm_replay.py run --out build/emulator/t9-arm-replay
+python3 tools/sc64_t9_arm_replay.py audit build/emulator/t9-arm-replay/mgba.log
+```
+
+**Result: ARM win.** The qualifying run (hashes below) launched mission 12
+from the menu at frame 1 with zero faults and played all 2,807 tape entries.
+Every one of its 52 observations (launch, ticks 1,000–51,000 and the final
+tick) matched the host trace exactly: frame, screen, win and loss, faults,
+phase, objective flags, completion bits, Protoss and Zerg building counts,
+Kerrigan, unit counts, both resources and the selection. At tick 51,696
+(frame 50,926) the ARM build reports `won=1`, phase 3, objective flag 1,
+`race_completed=4096`, 0/43 Protoss Force 2 buildings, 21/21 Zerg Force 3
+buildings and Kerrigan alive, identical to the host. The driver reported
+`ok: true` after 163 seconds of wall time.
+
+The driver checks the whole probe log, not just its markers. A log qualifies
+only with exactly the probe's line order:
+
+1. START
+2. the seven menu keys
+3. LAUNCH ok
+4. one CHECK/CHECK2 pair per observation
+5. both timing records
+6. DONE
+
+Every line must parse completely, with every field in the probe's order.
+Each line is checked against the trace and the probe's schedule:
+
+- START must give the trace's tape length and stop tick.
+- The menu keys must be the normal route.
+- LAUNCH must report 13 menu frames, one mission frame, the play screen,
+  mission 12 and
+  `race_mode=0`.
+- DONE must have consumed every tape entry.
+- Each CHECK2 must carry the tick of the CHECK before it.
+- Observations must fall exactly on tick 1, every 1,000 ticks and the stop
+  tick.
+
+A repeated tick and kind is rejected rather than merged, as is a periodic and
+terminal pair that disagrees at the stop tick. Asset-free tests cover each of
+these and the reviewed counterexamples. Those counterexamples are a `T9 LAUNCH
+ok` or `T9 DONE` marker without its fields, and conflicting `CHECK2` lines
+appended after DONE.
+
+The host trace must also be a complete reference on its own, before any log
+is read. Every observation must carry every compared field as an integer.
+Periodic observations must fall on every 1,000 ticks through the stop tick,
+once each, and every row must be an input, the start, a periodic, a terminal
+or one of the controller's labelled checkpoints. Earlier, the comparison
+checked only the observations and fields the trace supplied: with the host's
+tick-1000 periodic record removed, an ARM `gas=999` there still passed, with
+one observation compared. Asset-free tests now cover a missing periodic
+record (including at the stop tick), an off-cadence or repeated one, a
+missing or non-integer field, an unknown kind, and that counterexample.
+
+`audit` re-ran these checks on 2026-10-30 against the retained evidence. The
+host trace (`8868402d…`) loads: 51 periodic observations at ticks
+1,000–51,000, the start, two labelled checkpoints and the tick-51,696 win, all
+complete. The qualifying log (SHA-256
+`82b4f4bf6e7385888fb660297749c5cfac1a4a7f020d40a8c394e5cdb03cb9bb`, 118 probe
+lines) passes against it, with 52/52 observations matched and no log or
+timing errors. Injecting the reviewed counterexamples into a copy of the log
+makes it fail. Removing the trace's tick-1000 periodic record, or the `gas`
+field of its tick-2000 one, makes the trace fail to load. That counterexample
+needed an edited trace: it does not show a divergence in the recorded run.
+
+Guest-cycle timing comes from the GBA timers (TM2/TM3 at 16,777,216 Hz).
+These are emulator guest cycles, not a physical-hardware measurement. The
+mission counters start on the briefing's START release, which runs tick 1, so
+they cover exactly the 51,696 mission frames. The 13 boot, menu and
+START-press frames before it are reported separately (16,837,365 cycles). The
+driver rejects a run without exactly one well-formed record of each kind, or
+whose mission record does not cover ticks 1..stop, or whose buckets do not sum
+to its frames.
+
+| Mission measure (ticks 1–51,696) | Value |
+| --- | --- |
+| Total cycles | 57,803,662,926 (3,445.4 guest seconds) |
+| Mean per frame | 1,118,146 cycles (3.98 VBlank periods; effective 15.0 fps) |
+| `game_update()` share | 23,304,360,278 cycles (40.3%) |
+| Peak frame | 12,612,714 cycles (44.9 VBlank periods) |
+| Frames by rounded VBlank periods (0…6, ≥7) | 0, 0, 3,348, 20,666, 14,019, 7,731, 3,239, 2,693 |
+
+The mean is well above one 280,896-cycle VBlank period. On this build T9 runs
+at roughly a quarter of the 60 Hz frame rate in its late, unit-heavy phase.
+That is a performance observation, not a qualification failure; performance is
+tracked separately.
+
+Superseded runs are not part of this record's evidence, and the stricter audit
+rejects each of them:
+- A replay on runtime `a4ff09d` (branch commit `10fc402`) also matched 52/52,
+  but its timing included the menu frames. It has no separate menu timing
+  record, so its log is out of shape.
+- Three earlier partial replays were stopped by wall-clock caps and a full host
+  disk, so their logs end before the final observation. They had logged mGBA
+  at mask 127, which records every DMA. The driver now uses decimal mask 7
+  (fatal, error and warn).
+
+### Hashes and inputs
+
+| Item | SHA-256 |
+| --- | --- |
+| Canonical Terran ROM `build/StarCraft-Terran-GBA.gba` (32 MiB) | `685788ff1909fd532d4d128e18d5bd4c108b13b581c4d248672e9900783954df` |
+| Its retained ELF | `5fcb78f02d5c4cce8608c13b1786283328ac8a9a4ea289bae544325f58119a18` |
+| Replay ROM `build/StarCraft-Terran-T9-ARM-Replay.gba` (32 MiB) | `3a8986dcf5e71e1c4aef7d984e883904ad80cf2e912ccb8740da40e0f19d5276` |
+| Its retained ELF | `0a57e591b1dab8a30426b581006d3f4b54f59b84836ad2b39da07f49a9ef4e49` |
+| Host trace `build/t9-arm/t9-controller.json` | `8868402d01d8a2d66a5b80d6f2f7d873f6ac8343b8fd817e98378d2e66ed1f74` |
+| Generated tape header | `3a70737c14a909f48752f287854287e96b27a3a427c6f54270315b585eb45a9a` |
+| Private T9 scenario header | `e879cf500ce748efff5ede644e4d1790b5cdf9380de9fc95406ca362175cc0bd` |
+| Private T9 availability header | `cf4996518f08027a487fc499c188c7855dbf9c77a77b3e9c467f28a1649ab517` |
+| Private late-Terran race header | `9231da838e256a48dfd3d06f63708f5f05c9afe2326ccfeceb07e337cc35c0bf` |
+| Private late-Terran sprite header | `b7a9f5dde6984567d07e46adabdb3a3bbca4dec1d72c68260bfdd4a39e7b3ae4` |
+| Format-2 audio bank (advisor build) | `bd0adfd0ce83c0bb054d40c8f6bc69d91a55ca0f846f7ada56d48d98d7f72427` |
+
+The private inputs come from the StarCraft 64 USA ROM with SHA-1
+`a36d91b5aac7bb95df0d7de5f9814f5270e25c2b` and the pinned `sc64-maps`
+checkout at `09b57f787a247107d1de82b8c5eab2734667ea1d`. They are prepared
+locally and stay out of Git, as do the trace, tape, ROMs and emulator logs.
+The replay ROM links within the unchanged IWRAM guard
+(`__iwram_end = 0x03004e38 < 0x03005000`) and BSS guard
+(`__bss_end = 0x020369b0 < 0x0203e000`) in `common/gba.ld`.
+
+### Build provenance
+
+`docs/provenance/t9-9ff7f7c/` records the executed builds of both ROMs. It was
+captured by `tools/sc64_t9_build_provenance.py` from the real `make` recipes
+with the compiler driver wrapped, not from a dry run. For each ROM it holds:
+
+- the driver argv and every executed `cc1`, `as` and `collect2` argv, in order
+- each unit's ordered `-D` and `-I` options as `cc1` received them, with every
+  `-I` ahead of the `-D` options and the driver-added `-D__USES_INITFINI__`
+- each unit's raw `-MD` dependency file
+- SHA-256 manifests of every consumed source, generated header, audio blob,
+  linker script, library and toolchain binary
+
+Its README gives the command and method. The rebuild matched both ROM hashes
+above byte for byte. Against the retained ELFs that produced the qualifying ROMs, the
+rebuilt ELFs differ in 12 bytes, all in `.strtab`. Those bytes are two local
+`FILE` symbols named after the driver's random temporary objects. Every other
+section, including code, data, IWRAM and DWARF, is identical. The ELF hash
+therefore changes on every build, and the ROM hash identifies the build. The
+sorted `make -n` flag-set hash in earlier revisions of this record could not
+establish include order or the consumed inputs, and the provenance folder
+replaces it.
+
+### Other checks in this environment
+
+All of these ran on the qualifying tree (runtime `9ff7f7c`, branch code
+`2d575f6`):
+
+- `./dev build` passes.
+- `./dev test` runs 663 Python checks. The only failure is the Protoss
+  sprite-roster case of `test_sc64_photon_cannon_renderer`. It cannot find the
+  private `sc64_fact_tables_generated.h` in this checkout's inputs, and it
+  fails the same way on unmodified base.
+- `./dev sc64 build --profile terran` passes.
+- `./dev sc64 test --profile terran` passes T1–T4, then stops at the T5
+  controller, which loses at tick 111,945. Unmodified `a4ff09d` loses T5 at
+  the same tick with the same inputs.
+- Run individually past that stop:
+  - T6 wins at tick 19,552.
+  - The late world, save and repair tests pass.
+  - T9 wins at tick 51,696.
+  - T10 wins at tick 3,552.
+  - T7 does not win by its 60,000-tick limit, and T8 does not win by 200,000.
+    Unmodified `a4ff09d` gives identical results for both.
+
+This branch changes neither the runtime nor the T5, T7 or T8 controllers, so
+those three results are also the results of unmodified `9ff7f7c`. The
+regressions are outside this change and remain open.
+
+No physical-GBA result is claimed.

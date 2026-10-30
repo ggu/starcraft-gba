@@ -10,6 +10,38 @@
 #include "sc64_z7_source_sight.h"
 #endif
 
+/* Exact source-radius row spans. Z7 opts in explicitly; the Terran runtime
+ * gives every human actor its BWAPI sight radius, so it uses them whenever
+ * the 56/72 spans are enabled. */
+#if defined(SC64_Z7_SIGHT_SPANS) || \
+    (defined(SC64_T4_RUNTIME) && defined(SC64_VISIBILITY_SPANS))
+#define SC64_SOURCE_SIGHT_SPANS 1
+#ifdef SC64_Z7_SIGHT_SPANS
+#define SC64_SOURCE_SIGHT_SPANS_ACTIVE() race_z7_active()
+#else
+#define SC64_SOURCE_SIGHT_SPANS_ACTIVE() 1
+/* Moving Terran units walk their source-radius rows in the same IWRAM span
+ * transition as the 56/72 radii, with a per-radius halfwidth row. */
+#define SC64_SHARED_SPAN_TABLES 1
+#endif
+#endif
+
+#if defined(SC64_T4_RUNTIME) && !defined(SC64_Z7_SOURCE_SIGHT)
+/* BW gives an unfinished grounded building four tiles of sight unless it is
+ * morphing; the Terran runtime has no in-place building morphs. The snapshot
+ * stores that state as -(type+1), so removal uses the same radius even if
+ * the building completes later in the tick. */
+static int
+sc64_t4_building_visibility_key(int type, int under_construction)
+{
+    return under_construction ? -(type + 1) : type;
+}
+#define SC64_BUILDING_VISIBILITY_KEY(q) \
+    sc64_t4_building_visibility_key((q)->type, (q)->under_construction)
+#elif defined(SC64_Z7_SOURCE_SIGHT)
+#define SC64_BUILDING_VISIBILITY_KEY(q) sc64_z7_building_visibility_key(q)
+#endif
+
 #ifndef SC64_TRANSPORT_LOADED
 #define SC64_TRANSPORT_LOADED(q) 0
 #endif
@@ -148,17 +180,25 @@ sc64_visibility_source_change(int cell, int add)
 {
     unsigned count = sc64_visibility_source_count(cell);
     if (add) {
-        if (!count) SC64_MINIMAP_VISIBLE_ADD(cell);
-        ++count; /* At most one source per bounded unit/building slot. */
+        if (!count) {
+            SC64_MINIMAP_VISIBLE_ADD(cell);
+            SC64_GRID_SET(visible, cell, 1);
+        }
+        ++count;
+        if (count == 256u)
+            sc64_visible_sources_high[(unsigned)cell >> 3] |=
+                (u8)(1u << ((unsigned)cell & 7));
     } else if (count) {
         --count;
-        if (!count) SC64_MINIMAP_VISIBLE_REMOVE(cell);
+        if (count == 255u)
+            sc64_visible_sources_high[(unsigned)cell >> 3] &=
+                (u8)~(1u << ((unsigned)cell & 7));
+        if (!count) {
+            SC64_MINIMAP_VISIBLE_REMOVE(cell);
+            SC64_GRID_SET(visible, cell, 0);
+        }
     }
     sc64_visible_sources[cell] = (u8)count;
-    u8 mask = (u8)(1u << ((unsigned)cell & 7));
-    if (count & 256u) sc64_visible_sources_high[(unsigned)cell >> 3] |= mask;
-    else sc64_visible_sources_high[(unsigned)cell >> 3] &= (u8)~mask;
-    SC64_GRID_SET(visible, cell, count != 0);
 }
 #endif
 
@@ -226,6 +266,9 @@ sc64_actor_building_sight_pixels(int type)
     if (pixels) return pixels;
 #endif
 #ifdef SC64_T4_RUNTIME
+#ifndef SC64_Z7_SOURCE_SIGHT
+    if (type < 0) return 4 * 32;
+#endif
     return sc64_race_t4_building_sight_source_pixels(type);
 #else
     return 0;
@@ -248,7 +291,7 @@ sc64_t4_explore_with_radius(int x, int y, int radius)
             }
 }
 
-#ifdef SC64_Z7_SIGHT_SPANS
+#ifdef SC64_SOURCE_SIGHT_SPANS
 static int sc64_z7_visibility_radius_index(int radius);
 static void sc64_z7_adjust_visibility_source(int x, int y, int radius, int delta);
 #endif
@@ -258,8 +301,9 @@ static void sc64_z7_adjust_visibility_source(int x, int y, int radius, int delta
 static void __attribute__((noinline))
 sc64_t4_adjust_visibility_source(int x, int y, int radius, int delta)
 {
-#ifdef SC64_Z7_SIGHT_SPANS
-    if (race_z7_active() && sc64_z7_visibility_radius_index(radius) >= 0) {
+#ifdef SC64_SOURCE_SIGHT_SPANS
+    if (SC64_SOURCE_SIGHT_SPANS_ACTIVE() &&
+        sc64_z7_visibility_radius_index(radius) >= 0) {
         sc64_z7_adjust_visibility_source(x, y, radius, delta);
         return;
     }
@@ -404,7 +448,7 @@ static const u8 sc64_visibility_halfwidth_72[73] = {
     39,38,36,34,32,30,28,26,23,20,16,11,0
 };
 
-#ifdef SC64_Z7_SIGHT_SPANS
+#ifdef SC64_SOURCE_SIGHT_SPANS
 #include "sc64_z7_visibility_spans.h"
 #endif
 
@@ -423,6 +467,9 @@ sc64_visibility_ceil_div16(int value)
 /* Derive exact row intervals in IWRAM without duplicating the helper body. */
 static void GBA_HOT __attribute__((noinline))
 sc64_visibility_row_span(int x, int y, int row, int radius, int extent,
+#ifdef SC64_SHARED_SPAN_TABLES
+                         const u8 *halfwidths,
+#endif
                          int *first, int *last)
 {
     int c = x / 16, r = y / 16;
@@ -434,8 +481,12 @@ sc64_visibility_row_span(int x, int y, int row, int radius, int extent,
     dy = row * 16 + 8 - y;
     if (dy < 0) dy = -dy;
     if (dy > radius) return;
+#ifdef SC64_SHARED_SPAN_TABLES
+    halfwidth = halfwidths[dy];
+#else
     halfwidth = radius == 56 ? sc64_visibility_halfwidth_56[dy] :
                                sc64_visibility_halfwidth_72[dy];
+#endif
     col0 = sc64_visibility_ceil_div16(x - halfwidth - 8);
     col1 = sc64_visibility_floor_div16(x + halfwidth - 8);
     if (col0 < c - extent) col0 = c - extent;
@@ -447,15 +498,59 @@ sc64_visibility_row_span(int x, int y, int row, int radius, int extent,
     *last = col1;
 }
 
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+/* Counts stay within the asserted source-slot bound. For ordinary overlap,
+ * only the low byte changes; inspect the ninth bit at boundary values. */
+static void __attribute__((noinline))
+sc64_visibility_apply_count_span(int first_cell, int last_cell, int add)
+{
+    int cell;
+    if (add) {
+        for (cell = first_cell; cell <= last_cell; ++cell) {
+            unsigned low = sc64_visible_sources[cell];
+            if (!low && !(sc64_visible_sources_high[(unsigned)cell >> 3] &
+                          (1u << ((unsigned)cell & 7)))) {
+                SC64_MINIMAP_VISIBLE_ADD(cell);
+                SC64_GRID_SET(visible, cell, 1);
+            }
+            if (low == 255u)
+                sc64_visible_sources_high[(unsigned)cell >> 3] |=
+                    (u8)(1u << ((unsigned)cell & 7));
+            sc64_visible_sources[cell] = (u8)(low + 1u);
+        }
+    } else {
+        for (cell = first_cell; cell <= last_cell; ++cell) {
+            unsigned low = sc64_visible_sources[cell];
+            unsigned mask = 1u << ((unsigned)cell & 7);
+            u8 *high = &sc64_visible_sources_high[(unsigned)cell >> 3];
+            if (!low) {
+                if (!(*high & mask)) continue;
+                *high &= (u8)~mask;
+                sc64_visible_sources[cell] = 255;
+            } else {
+                --low;
+                sc64_visible_sources[cell] = (u8)low;
+                if (!low && !(*high & mask)) {
+                    SC64_MINIMAP_VISIBLE_REMOVE(cell);
+                    SC64_GRID_SET(visible, cell, 0);
+                }
+            }
+        }
+    }
+}
+#endif
+
 static void GBA_HOT __attribute__((noinline))
 sc64_visibility_apply_span(int row, int first, int last, int add)
 {
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+    if (first <= last)
+        sc64_visibility_apply_count_span(first + row * MAP_COLS,
+                                         last + row * MAP_COLS, add);
+#else
     int col;
     for (col = first; col <= last; ++col) {
         int cell = col + row * MAP_COLS;
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
-        sc64_visibility_source_change(cell, add);
-#else
         if (add) {
             if (sc64_visible_sources[cell] == 0)
                 SC64_MINIMAP_VISIBLE_ADD(cell);
@@ -467,10 +562,10 @@ sc64_visibility_apply_span(int row, int first, int last, int add)
                 SC64_MINIMAP_VISIBLE_REMOVE(cell);
         }
         SC64_GRID_SET(visible, cell, sc64_visible_sources[cell] != 0);
-#endif
     }
+#endif
 }
-#ifdef SC64_Z7_SIGHT_SPANS
+#ifdef SC64_SOURCE_SIGHT_SPANS
 /* Exact source-radius row spans for authored Z7 unit/building sight radii.
  * The LUTs contain floor(sqrt(radius^2-dy^2)); they stay in ROM. */
 static int
@@ -527,6 +622,7 @@ sc64_z7_adjust_visibility_source(int x, int y, int radius, int delta)
     }
 }
 
+#ifndef SC64_SHARED_SPAN_TABLES
 static void __attribute__((noinline))
 sc64_z7_transition_visibility(int old_x, int old_y, int new_x, int new_y,
                               int radius)
@@ -556,6 +652,7 @@ sc64_z7_transition_visibility(int old_x, int old_y, int new_x, int new_y,
     }
 }
 #endif
+#endif
 
 #endif
 
@@ -566,13 +663,37 @@ static void GBA_HOT
 sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
                                 int type)
 {
+#ifdef SC64_SHARED_SPAN_TABLES
+    int source_pixels = sc64_actor_unit_sight_pixels(type);
+    int radius, extent = 5;
+    const u8 *halfwidths;
+    if (source_pixels > 0) {
+        if (old_x == new_x && old_y == new_y)
+            return;
+        radius = source_pixels / 2;
+        /* The span rows cover radii 64..176 in steps of 16. */
+        if (radius < 64 || radius > 176 || (radius & 15)) {
+            sc64_t4_adjust_visibility_source(old_x, old_y, radius, -1);
+            sc64_t4_adjust_visibility_source(new_x, new_y, radius, 1);
+            return;
+        }
+        halfwidths = sc64_z7_visibility_halfwidths +
+                     sc64_z7_visibility_halfwidth_offsets[(radius - 64) / 16];
+        extent = (radius + 23) / 16;
+    } else {
+        radius = IS_WORKER(type) ? 56 : 72;
+        halfwidths = radius == 56 ? sc64_visibility_halfwidth_56 :
+                                    sc64_visibility_halfwidth_72;
+    }
+#else
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
-#ifdef SC64_Z7_SIGHT_SPANS
+#ifdef SC64_SOURCE_SIGHT_SPANS
     int source_pixels = sc64_actor_unit_sight_pixels(type);
     if (source_pixels>0) {
         if (old_x != new_x || old_y != new_y) {
             int radius=source_pixels/2;
-            if (race_z7_active() && sc64_z7_visibility_radius_index(radius) >= 0) {
+            if (SC64_SOURCE_SIGHT_SPANS_ACTIVE() &&
+                sc64_z7_visibility_radius_index(radius) >= 0) {
                 sc64_z7_transition_visibility(old_x, old_y, new_x, new_y, radius);
                 return;
             }
@@ -599,9 +720,13 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
         type==U_SCV
 #endif
         ? 56 : 72;
+#endif
 #ifdef SC64_VISIBILITY_SPANS
     int old_row = old_y / 16, new_row = new_y / 16;
     int row;
+#ifndef SC64_SHARED_SPAN_TABLES
+    const int extent = 5;
+#endif
 #else
     int old_col = old_x / 16, old_row = old_y / 16;
     int new_col = new_x / 16, new_row = new_y / 16;
@@ -612,13 +737,19 @@ sc64_transition_unit_visibility(int old_x, int old_y, int new_x, int new_y,
     int col, row;
 #endif
 #ifdef SC64_VISIBILITY_SPANS
-    int row0 = (old_row < new_row ? old_row : new_row) - 5;
-    int row1 = (old_row > new_row ? old_row : new_row) + 5;
+    int row0 = (old_row < new_row ? old_row : new_row) - extent;
+    int row1 = (old_row > new_row ? old_row : new_row) + extent;
     for (row = row0; row <= row1; ++row) {
         int old_first, old_last, new_first, new_last;
-        sc64_visibility_row_span(old_x, old_y, row, radius, 5,
+        sc64_visibility_row_span(old_x, old_y, row, radius, extent,
+#ifdef SC64_SHARED_SPAN_TABLES
+                                 halfwidths,
+#endif
                                  &old_first, &old_last);
-        sc64_visibility_row_span(new_x, new_y, row, radius, 5,
+        sc64_visibility_row_span(new_x, new_y, row, radius, extent,
+#ifdef SC64_SHARED_SPAN_TABLES
+                                 halfwidths,
+#endif
                                  &new_first, &new_last);
         if (old_first > old_last) {
             sc64_visibility_apply_span(row, new_first, new_last, 1);
@@ -761,8 +892,8 @@ sc64_update_exploration(void)
         int x = active ? b[i].x : 0;
         int y = active ? b[i].y : 0;
         int type = active ? b[i].type : 0;
-#ifdef SC64_Z7_SOURCE_SIGHT
-        int sight_key = active ? sc64_z7_building_visibility_key(&b[i]) : 0;
+#ifdef SC64_BUILDING_VISIBILITY_KEY
+        int sight_key = active ? SC64_BUILDING_VISIBILITY_KEY(&b[i]) : 0;
         if (sc64_visibility_same(old, active, x, y, sight_key))
 #else
         if (sc64_visibility_same(old, active, x, y, type))
@@ -771,7 +902,7 @@ sc64_update_exploration(void)
         if (old->active)
             sc64_adjust_building_visibility(old->x, old->y, old->type, -1);
         if (active) {
-#ifdef SC64_Z7_SOURCE_SIGHT
+#ifdef SC64_BUILDING_VISIBILITY_KEY
             sc64_explore_building(x, y, sight_key);
             sc64_adjust_building_visibility(x, y, sight_key, 1);
 #else
@@ -783,7 +914,7 @@ sc64_update_exploration(void)
         if (active) {
             old->x = x;
             old->y = y;
-#ifdef SC64_Z7_SOURCE_SIGHT
+#ifdef SC64_BUILDING_VISIBILITY_KEY
             old->type = sight_key;
 #else
             old->type = type;

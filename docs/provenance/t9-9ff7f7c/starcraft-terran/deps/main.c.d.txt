@@ -1,0 +1,5 @@
+build/starcraft-terran.elf: common/main.c common/gba.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stdint-gcc.h \
+ /opt/homebrew/Cellar/arm-none-eabi-gcc/16.2.0/lib/gcc/arm-none-eabi/16.2.0/include/stddef.h \
+ common/demo_schedule.h

@@ -50,6 +50,10 @@ static void sc64_contact_memo_invalidate(void);
 #error "Source weapon effects require imported race sprites"
 #endif
 #include "sc64_weapon_source_runtime.h"
+#ifndef SC64_IMPACT_EVENTS_DISABLED
+/* Ordinary moving projectiles deal damage at their source impact frame. */
+#define SC64_IMPACT_EVENTS 1
+#endif
 #endif
 #ifdef SC64_TANK_SOURCE_VFX
 #include "sc64_tank_source_vfx.h"
@@ -872,10 +876,19 @@ typedef struct {
     int x, y;
 } Geyser;
 typedef struct {
+#ifdef SC64_RACES
+    /* RaceSave omits tracers; race maps are at most 128 cells per side. */
+    s16 x0, y0, x1, y1;
+    int life, color;
+#else
     int x0, y0, x1, y1, life, color;
+#endif
 } Tracer;
 #ifdef SC64_RACES
 #include "sc64_race_save_types.h"
+#endif
+#ifdef SC64_IMPACT_EVENTS
+#include "sc64_impact_save_types.h"
 #endif
 #ifndef SC64_RACES
 typedef struct {
@@ -962,10 +975,18 @@ static inline void sc64_trace_duration_cache_store(int slot, int duration)
 #define sc64_trace_duration_cache_reset() ((void)0)
 #define sc64_trace_duration_cache_store(slot, duration) ((void)0)
 #endif
+#ifdef SC64_IMPACT_EVENTS
+static void race_impact_reset(void);
+#endif
+/* Every world start and load clears in-flight effects; a load restores its
+ * saved pending impacts afterwards. */
 static inline void clear_tracers(void)
 {
     memset(tracers, 0, sizeof(tracers));
     sc64_trace_duration_cache_reset();
+#ifdef SC64_IMPACT_EVENTS
+    race_impact_reset();
+#endif
 }
 #ifndef SC64_DEATH_VFX_DISABLED
 /* Presentation-only death effects. The pool and the alive shadow are never
@@ -1148,10 +1169,17 @@ typedef union {
     /* A Z8 save candidate expands into this image before it is accepted. */
     struct { RaceSave save; Sc64Z8SchedulerState scheduler; } z8_candidate;
 #endif
+#ifdef SC64_IMPACT_EVENTS
+    RaceImpactRecord impact_record;
+#endif
 } Sc64ZpRouteSaveScratch;
 #ifdef SC64_Z8_RUNTIME
 _Static_assert(sizeof(RaceSave)+sizeof(Sc64Z8SchedulerState)<=sizeof(u16)*MAP_CELLS,
                "Z8 candidate expansion must fit existing route scratch");
+#endif
+#ifdef SC64_IMPACT_EVENTS
+_Static_assert(sizeof(RaceImpactRecord) <= sizeof(u16) * MAP_CELLS,
+               "impact save record must fit existing route scratch");
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 _Static_assert(sizeof(RaceSave)+sizeof(Unit)*MAX_UNITS<=sizeof(u16)*MAP_CELLS,
@@ -1164,7 +1192,14 @@ static Sc64ZpRouteSaveScratch sc64_zp_route_save_scratch;
 typedef union {
     u16 bfs_queue[MAP_CELLS];
     RaceSave save;
+#ifdef SC64_IMPACT_EVENTS
+    RaceImpactRecord impact_record;
+#endif
 } Sc64CombinedRouteSaveScratch;
+#ifdef SC64_IMPACT_EVENTS
+_Static_assert(sizeof(RaceImpactRecord) <= sizeof(u16) * MAP_CELLS,
+               "impact save record must fit existing route scratch");
+#endif
 static Sc64CombinedRouteSaveScratch sc64_combined_route_save_scratch;
 #define bfs_queue sc64_combined_route_save_scratch.bfs_queue
 #elif defined(SC64_ZP_CAMPAIGN_STORAGE)
@@ -1477,6 +1512,18 @@ static void race_p7_projectile_tick_if_due(void);
 static void race_p7_projectile_draw(void);
 static int race_p7_projectile_encode(u8 *packet);
 static int race_p7_projectile_restore(const u8 *packet);
+#endif
+#ifdef SC64_IMPACT_EVENTS
+static void race_impact_clear_target(int ref);
+static unsigned race_impact_unit_steps(const Unit *q, int target, int air);
+static unsigned race_impact_building_steps(const Building *q, int target, int air);
+static int race_impact_full(void);
+static void race_impact_launch(int target, int damage, int hits, int owner,
+                               int damage_class, int source_type, unsigned steps);
+static void race_impact_tick(void);
+static int race_impact_save_write(void);
+static int race_impact_save_read(Sc64ImpactEvent *candidate, int *count);
+static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
 static int race_p7_carrier_training_menu_available(void);
@@ -1953,6 +2000,9 @@ spawn_unit(int owner, int type, int x, int y)
 #ifdef SC64_P7_PROJECTILES_ENABLED
     race_p7_projectile_clear_references(i);
 #endif
+#ifdef SC64_IMPACT_EVENTS
+    race_impact_clear_target(i);
+#endif
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
     race_p7_carrier_training_clear_slot(i);
 #endif
@@ -2087,6 +2137,9 @@ spawn_build(int owner, int type, int x, int y, int constructing)
         selected_building = -1;
 #ifdef SC64_P7_PROJECTILES_ENABLED
     race_p7_projectile_clear_references(MAX_UNITS+i);
+#endif
+#ifdef SC64_IMPACT_EVENTS
+    race_impact_clear_target(MAX_UNITS + i);
 #endif
 #ifdef SC64_DIRECT_ATTACK
     sc64_direct_attack_clear_references(MAX_UNITS + i);
@@ -4040,16 +4093,29 @@ static void hit_target(int target,int damage,int source_type,int source_owner)
 { hit_target_impl(target,damage,source_type,source_owner,-1); }
 
 #ifdef SC64_RACES
-static void __attribute__((noinline))
+/* Returns zero only when a full impact queue defers this shot; the caller
+ * then emits no effect and keeps its weapon ready. */
+static int __attribute__((noinline))
 hit_stock_building_target(const Building *source,int target,int damage)
 {
     Sc64StockAttack attack;
     int raw=source->raw_type>=0?source->raw_type:
             sc64_race_raw_building(source->type);
     int flying=target<MAX_UNITS&&sc64_race_unit_flying(u[target].type);
-    if (sc64_stock_attack_select(raw,flying,&attack))
+    int stock=sc64_stock_attack_select(raw,flying,&attack);
+#ifdef SC64_IMPACT_EVENTS
+    unsigned steps=race_impact_building_steps(source,target,flying);
+    if (steps) {
+        if (race_impact_full()) return 0;
+        race_impact_launch(target,damage,1,source->owner,
+                           stock?attack.weapon->damage_class:-1,U_MARINE,steps);
+        return 1;
+    }
+#endif
+    if (stock)
         hit_target_impl(target,damage,U_MARINE,source->owner,attack.weapon->damage_class);
     else hit_target(target,damage,U_MARINE,source->owner);
+    return 1;
 }
 #endif
 
@@ -6314,6 +6380,18 @@ tick_combat(Unit * q, int target)
         if (dx*dx+dy*dy<minimum_range*minimum_range) return;
 #endif
 	if (!q->cd) {
+#ifdef SC64_IMPACT_EVENTS
+            /* Decide before any launch side effect: a full queue leaves the
+             * weapon ready for the next update instead of losing damage. */
+            unsigned impact_steps=race_impact_unit_steps(q,target,flying);
+#ifdef SC64_SIEGE_SPLASH
+            if (siege_splash_weapon) impact_steps=0;
+#endif
+#ifdef SC64_Z6_RUNTIME
+            if (!race_z6_hallucination_can_deal_damage((int)(q-u))) impact_steps=0;
+#endif
+            if (impact_steps && race_impact_full()) return;
+#endif
 #ifdef SC64_UNIT_FACING
 	    SC64_FACING_FIRE(q, target);
 #endif
@@ -6352,6 +6430,14 @@ tick_combat(Unit * q, int target)
                               (int)stock_attack.weapon->damage_factor :
                               (int)sc64_stock_attack_impact_count(&stock_attack)):
                               sc64_race_unit_hits_vs(q->type,flying);
+#ifdef SC64_IMPACT_EVENTS
+        /* Nonzero only for a packet that can deal damage (see above). */
+        if (impact_steps)
+            race_impact_launch(target,damage,hits,q->owner,
+                               stock_weapon?stock_attack.weapon->damage_class:-1,
+                               q->type,impact_steps);
+        else
+#endif
 #ifdef SC64_Z6_RUNTIME
         if (race_z6_hallucination_can_deal_damage((int)(q-u)))
 #endif
@@ -6915,6 +7001,10 @@ static void
 update_tracers(void)
 {
     int i;
+#ifdef SC64_IMPACT_EVENTS
+    /* Combat launches before this end-of-update step, like tracers. */
+    race_impact_tick();
+#endif
     for (i = 0; i < MAX_TRACERS; i++)
 	if (tracers[i].life)
 	    tracers[i].life--;
@@ -10744,4 +10834,7 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #include "sc64_z8_runtime_adapter.h"
 #endif
 #include "race_save_adapter.h"
+#ifdef SC64_IMPACT_EVENTS
+#include "sc64_impact_adapter.h"
+#endif
 #endif
