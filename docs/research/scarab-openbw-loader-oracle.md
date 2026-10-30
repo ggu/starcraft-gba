@@ -101,8 +101,21 @@ signal or an order-state value. Run each as the previous world command with
 `--scenario east` (or another listed name), saving the source, binary, input
 hashes and full output for each run.
 
+The synthetic CHK contains no UNIS or UNIx unit overrides. The probe checks
+the loaded Reaver (100 HP, 80 shields), Scarab (20 HP), Marine (40 HP), and
+weapon 82 (100 damage, 25 upgrade bonus) values, as well as initial actor
+ownership and fighter linkage. Health in the trace is raw 8.8 fixed point:
+`shot_hp` names the Scarab and `victim_hp` the Marine. Earlier `hp=10240`
+observations named the victim, not the shot. The detached-parent case checks
+that weapon 82 retains player ownership, has no parent unit and targets the
+Marine. The target-death case has no second enemy and therefore does not
+establish behavior in the presence of alternative targets.
+
 These scenarios are finite witnesses. They do not cover all trajectories,
 blocked-route lifetime expiry, target disappearance timings, all allocation
 failures, splash, save integration, or native N64 execution. They do not define
 a general impact delay. Synthetic test-created projectiles and sprites in the
 allocation-failure cases must not be interpreted as ordinary game actions.
+The pool-exhaustion cases establish saturation before arrival and no observed
+weapon or damage in the bounded window; they do not instrument the exact
+allocation attempt or prove the pool remained exhausted at that instant.

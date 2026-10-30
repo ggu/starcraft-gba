@@ -50,17 +50,31 @@ int main(int argc,char **argv){
   api.setup_info.resource_type=1;api.setup_info.starting_minerals=500;
   auto map=flat_chk();api.load_map_data(map.data(),map.size(),{},false);
   std::cout<<"flat map initialized "<<game->map_tile_width<<"x"<<game->map_tile_height<<"\n";
+  auto *reaver_type=api.get_unit_type(UnitTypes::Protoss_Reaver);
+  auto *scarab_type=api.get_unit_type(UnitTypes::Protoss_Scarab);
+  auto *marine_type=api.get_unit_type(UnitTypes::Terran_Marine);
+  auto *weapon82=api.get_weapon_type((WeaponTypes)82);
+  // flat_chk has no UNIS/UNIx overrides; these are authenticated DAT values.
+  if(reaver_type->hitpoints.raw_value!=100*256 || reaver_type->shield_points!=80 ||
+     scarab_type->hitpoints.raw_value!=20*256 || marine_type->hitpoints.raw_value!=40*256 ||
+     weapon82->damage_amount!=100 || weapon82->damage_bonus!=25)
+   throw std::runtime_error("unexpected stock unit or weapon stats");
+  std::cout<<"stats reaver_hp="<<reaver_type->hitpoints.raw_value<<" reaver_shields="<<reaver_type->shield_points
+    <<" scarab_hp="<<scarab_type->hitpoints.raw_value<<" marine_hp="<<marine_type->hitpoints.raw_value
+    <<" weapon82_damage="<<weapon82->damage_amount<<" weapon82_bonus="<<weapon82->damage_bonus<<"\n";
   auto *parent=api.create_starting_unit(api.get_unit_type(UnitTypes::Protoss_Reaver),{320,320},0);
   xy victim_pos=scenario=="south"?xy{320,400}:(scenario=="far"||scenario=="parentdead"||scenario=="poolfull"||scenario=="initfail")?xy{448,320}:xy{400,320};
   auto *victim=api.create_starting_unit(api.get_unit_type(UnitTypes::Terran_Marine),victim_pos,1);
   if(!parent||!victim||api.us_hidden(parent)||api.us_hidden(victim))throw std::runtime_error("actor creation or placement failed");
+  if(parent->owner!=0 || victim->owner!=1 || parent->hp.raw_value!=100*256 || victim->hp.raw_value!=40*256)
+   throw std::runtime_error("unexpected actor ownership or initial health");
   action_state actions{};action_functions input(*world,actions);
   if(!input.action_select(0,parent)||!input.action_train_fighter(0))throw std::runtime_error("native fighter training action rejected");
   if(world->current_minerals[0]!=485)throw std::runtime_error("native training did not charge 15 minerals");
   for(int i=0;i<1000 && parent->reaver.inside_count==0;i++)api.next_frame();
   if(parent->reaver.inside_count!=1)throw std::runtime_error("native fighter training did not complete");
   unit_t *inside=nullptr;for(unit_t *child:ptr(parent->reaver.inside_units)){if(inside)throw std::runtime_error("duplicate inside child");inside=child;}
-  if(!inside || inside->owner!=0 || inside->unit_type->id!=UnitTypes::Protoss_Scarab || !api.u_completed(inside) || inside->fighter.parent!=parent || !api.us_hidden(inside) || parent->reaver.outside_count)throw std::runtime_error("invalid completed inside linkage");
+  if(!inside || inside->owner!=0 || inside->hp.raw_value!=20*256 || inside->unit_type->id!=UnitTypes::Protoss_Scarab || !api.u_completed(inside) || inside->fighter.parent!=parent || !api.us_hidden(inside) || parent->reaver.outside_count)throw std::runtime_error("invalid completed inside linkage");
   std::cout<<"trained frame="<<world->current_frame<<" inside="<<parent->reaver.inside_count<<" minerals="<<world->current_minerals[0]<<"\n";
   if(!input.action_order(0,api.get_order_type(Orders::AttackDefault),victim->position,victim,nullptr,false))throw std::runtime_error("native attack action rejected");
   for(int i=0;i<300&&parent->reaver.outside_count==0;i++) {
@@ -74,7 +88,7 @@ int main(int argc,char **argv){
   std::cout<<"released frame="<<world->current_frame<<" outside="<<parent->reaver.outside_count<<"\n";
   unit_t *shot=nullptr;
   for(unit_t *child:ptr(parent->reaver.outside_units)) { if(shot)throw std::runtime_error("multiple outside fighters");shot=child; }
-  if(!shot || shot!=inside || shot->fighter.parent!=parent || parent->reaver.inside_count!=0 || api.us_hidden(shot))throw std::runtime_error("invalid released fighter linkage");
+  if(!shot || shot!=inside || shot->owner!=0 || shot->fighter.parent!=parent || parent->reaver.inside_count!=0 || api.us_hidden(shot))throw std::runtime_error("invalid released fighter linkage");
   if(scenario=="initfail") {
    auto hp=victim->hp.raw_value;bool exhausted=false,saw_arrival=false;
    for(int i=0;i<100;i++) {
@@ -118,15 +132,21 @@ int main(int argc,char **argv){
    std::cout<<"result scenario=poolfull no weapon82 and no victim damage\n";return 0;
   }
   if(scenario=="parentdead") {
-   api.kill_unit(parent);bool detached=false;auto hp=victim->hp.raw_value;
+   api.kill_unit(parent);bool detached=false,attributed=false;auto hp=victim->hp.raw_value;
    for(int i=0;i<120;i++){
     api.next_frame();
     if(!shot->fighter.parent)detached=true;
     if(detached && shot->fighter.parent)throw std::runtime_error("detached shot regained parent");
+    for(const bullet_t *bullet:ptr(world->active_bullets))
+     if(bullet->weapon_type&&(int)bullet->weapon_type->id==82) {
+      if(bullet->owner!=0 || bullet->bullet_owner_unit || bullet->bullet_target!=victim)
+       throw std::runtime_error("detached weapon82 attribution mismatch");
+      attributed=true;
+     }
     if(victim->hp.raw_value!=hp)break;
    }
    if(!detached)throw std::runtime_error("source parent death did not detach shot");
-   if(victim->hp.raw_value==hp)throw std::runtime_error("detached shot did not damage target");
+   if(!attributed || victim->hp.raw_value==hp)throw std::runtime_error("detached shot weapon/damage not observed");
    std::cout<<"result scenario=parentdead detached shot damages target\n";
    return 0;
   }
@@ -139,7 +159,7 @@ int main(int argc,char **argv){
       throw std::runtime_error("shot reacquired target after source cleanup");
    }
    if(!cleared)throw std::runtime_error("dead target reference was not cleared during attack");
-   std::cout<<"result scenario=targetdead cleared target; no retarget during attack\n";
+   std::cout<<"result scenario=targetdead cleared target; no reacquisition during attack\n";
    return 0;
   }
   if(scenario=="stop") {
@@ -162,7 +182,7 @@ int main(int argc,char **argv){
   for(int i=0;i<140;i++) {
    std::cout<<"observe frame="<<world->current_frame<<" shot_order="<<(shot->order_type?(int)shot->order_type->id:-1)
     <<" state="<<shot->order_state<<" pos="<<shot->position.x<<","<<shot->position.y
-    <<" hp="<<victim->hp.raw_value<<" remove="<<shot->remove_timer<<" order_timer="<<shot->main_order_timer
+    <<" shot_hp="<<shot->hp.raw_value<<" victim_hp="<<victim->hp.raw_value<<" remove="<<shot->remove_timer<<" order_timer="<<shot->main_order_timer
     <<" no_collide="<<api.u_no_collide(shot)<<" bullets="<<world->active_bullets_size<<"\n";
    if(shot->order_type && shot->order_type->id==Orders::ScarabAttack && shot->order_state==2 && !observed_init){
     if(shot->remove_timer!=90 || shot->main_order_timer!=7 || !api.u_no_collide(shot))throw std::runtime_error("incorrect first attack initialization");
@@ -184,7 +204,7 @@ int main(int argc,char **argv){
       <<" owner="<<bullet->owner<<" state="<<bullet->bullet_state<<"\n";
    }
    api.next_frame();
-   if(victim->hp.raw_value!=initial_hp){std::cout<<"victim_hp_changed frame="<<world->current_frame<<" hp="<<victim->hp.raw_value<<"\n";break;}
+   if(victim->hp.raw_value!=initial_hp){std::cout<<"victim_hp_changed frame="<<world->current_frame<<" victim_hp="<<victim->hp.raw_value<<"\n";break;}
   }
   if(!observed_init)throw std::runtime_error("Scarab attack did not initialize");
   if(victim->hp.raw_value==initial_hp)throw std::runtime_error("no victim damage observed in bounded window");
