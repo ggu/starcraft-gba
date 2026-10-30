@@ -1142,8 +1142,8 @@ int main(int argc, char **argv)
     /* On the normal menu the briefing's START press runs mission tick 1, so
      * the controller leaves that tick neutral. */
     step(0);
-    /* Both starting SCVs walk to the home line; the idle-worker rule then
-     * picks home patches. Production follows from run_policy(). */
+    /* Give empty starting SCVs explicit contextual orders to visible home
+     * patches. Production follows from run_policy(). */
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].alive && u[i].owner == SIDE && u[i].raw_type == T9_RAW_SCV)
             fprintf(stderr, "T9 opening worker slot=%d home=%d tick=%u\n",
