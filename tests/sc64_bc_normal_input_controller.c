@@ -215,13 +215,22 @@ int main(int argc, char **argv)
     }
     fprintf(stderr,"yamato charged=%d launched=%d tick=%u won=%d lost=%d\n",charged,launched,host_ticks,won,lost);
     assert(charged && launched);
+    int clicked_target=target, flight_target=-1;
+    for(int j=0;j<SC64_BC_SHOT_LIMIT;++j)
+        if(sc64_bc_shots[j].state==SC64_BC_SHOT_FLIGHT && sc64_bc_shots[j].caster==(unsigned)cruiser)
+            { assert(flight_target<0); flight_target=sc64_bc_shots[j].target; }
+    assert(flight_target>=0 && flight_target<MAX_UNITS+MAX_BUILDINGS);
+    target=flight_target;
+    fprintf(stderr,"clicked_target=%d actual_flight_target=%d\n",clicked_target,target);
     int pre_hp=target<MAX_UNITS?u[target].hp:b[target-MAX_UNITS].hp;
     int pre_alive=target_alive(target), energy_at_flight=u[cruiser].carry;
     fprintf(stderr,"flight target=%d hp=%d alive=%d energy=%d tick=%u\n",target,pre_hp,pre_alive,energy_at_flight,host_ticks);
     assert(pre_alive && energy_at_flight<150*256);
+    static unsigned char saved[sizeof(race_impact_record)]; u32 saved_len=0;
+    assert(!save_read_latest(saved,(u32)sizeof(saved),SAVE_VERSION,&saved_len));
     int save_frame=frame; tap(KEY_START); assert(screen==SCREEN_PAUSE && frame==save_frame);
     input(KEY_B); input(0);
-    static unsigned char saved[sizeof(race_impact_record)]; u32 saved_len=0;
+    assert((pause_notice & 0xc0)==UI_NOTICE_SAVED && (pause_notice & 0x3f)>0);
     assert(save_read_latest(saved,(u32)sizeof(saved),SAVE_VERSION,&saved_len) && saved_len>0);
     int saved_flight=0;for(int j=0;j<SC64_BC_SHOT_LIMIT;++j) if(sc64_bc_shots[j].state==SC64_BC_SHOT_FLIGHT) saved_flight=1;
     assert(saved_flight && frame==save_frame);
@@ -234,6 +243,8 @@ int main(int argc, char **argv)
     int post_alive=target_alive(target), post_hp=target<MAX_UNITS?u[target].hp:b[target-MAX_UNITS].hp;
     fprintf(stderr,"impact target=%d before=%d after=%d alive=%d active=%d tick=%u energy=%d won=%d lost=%d\n",target,pre_hp,post_hp,post_alive,active,host_ticks,u[cruiser].carry,won,lost);
     assert(!active && (!post_alive || post_hp<pre_hp) && !won && !lost);
+    trace_record("{\"kind\":\"result\",\"result\":\"impact\",\"host_tick\":%u,\"frame\":%d,\"won\":%d,\"lost\":%d,\"saved_flight\":1}",
+                 host_ticks,frame,won,lost);
     fputs("\n]}\n", trace);
     assert(fclose(trace) == 0);
     return 0;

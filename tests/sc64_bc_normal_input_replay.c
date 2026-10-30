@@ -13,7 +13,7 @@ int main(int argc,char **argv) {
     assert(argc==3 || argc==4); FILE *f=fopen(argv[1],"r"); assert(f); unsigned end=(unsigned)strtoul(argv[2],NULL,10); assert(end==17921 || end==17937);
     unsigned tick,held,pressed,next_tick=0,next_held=0,next_pressed=0,prev_tick=0,rows=0;
     int have=fscanf(f,"%u %u %u",&next_tick,&next_held,&next_pressed)==3;
-    u16 previous=0,current=0; unsigned first_cruiser_tick=0; int saw_flight=0,saved_flight=0,flight_hp=0; gba_init();game_init();
+    u16 previous=0,current=0; unsigned first_cruiser_tick=0; int saw_flight=0,saved_flight=0,flight_hp=0,flight_target=-1; gba_init();game_init();
     for(tick=1;tick<=end;++tick) {
         if(have && next_tick==tick) {
             assert(next_tick>prev_tick && next_held<=0x3ff && next_pressed==(next_held & ~previous));
@@ -24,12 +24,19 @@ int main(int argc,char **argv) {
         if(!first_cruiser_tick) for(int i=0;i<MAX_UNITS;++i)
             if(u[i].alive && u[i].owner==SIDE && sc64_race_raw_unit(u[i].type)==12) {first_cruiser_tick=tick;break;}
         if(tick==17921) {
-            for(int i=0;i<SC64_BC_SHOT_LIMIT;++i) if(sc64_bc_shots[i].state==SC64_BC_SHOT_FLIGHT) saw_flight=1;
-            flight_hp=u[4].hp;
+            for(int i=0;i<SC64_BC_SHOT_LIMIT;++i) if(sc64_bc_shots[i].state==SC64_BC_SHOT_FLIGHT) {
+                assert(!saw_flight); saw_flight=1; flight_target=sc64_bc_shots[i].target;
+            }
+            assert(flight_target>=0 && flight_target<MAX_UNITS+MAX_BUILDINGS && target_alive(flight_target));
+            flight_hp=flight_target<MAX_UNITS?u[flight_target].hp:b[flight_target-MAX_UNITS].hp;
+        }
+        if(end==17937 && tick==17923) {
+            static unsigned char prior[sizeof(race_impact_record)]; u32 length=0;
+            assert(!save_read_latest(prior,(u32)sizeof(prior),SAVE_VERSION,&length));
         }
         if(end==17937 && tick==17925) {
             static unsigned char saved[sizeof(race_impact_record)]; u32 length=0;
-            saved_flight=screen==SCREEN_PAUSE && saw_flight && save_read_latest(saved,(u32)sizeof(saved),SAVE_VERSION,&length) && length>0;
+            saved_flight=screen==SCREEN_PAUSE && (pause_notice & 0xc0)==UI_NOTICE_SAVED && (pause_notice & 0x3f)>0 && saw_flight && save_read_latest(saved,(u32)sizeof(saved),SAVE_VERSION,&length) && length>0;
             if(argc==4) assert(saved_flight && sc64_test_sram_transfer(argv[3],1));
         }
         if(tick==20) assert(screen==SCREEN_PLAY && race_mode && race_human==R_TER && race_bots==1 && minerals==200 && gas==0);
@@ -41,7 +48,12 @@ int main(int argc,char **argv) {
     fprintf(stderr,"replay ticks=%u transitions=%u first_cruiser_tick=%u cruiser=%d research=%u flight=%d won=%d lost=%d\n",tick-1,rows,first_cruiser_tick,cruiser,(unsigned)sc64_battlecruiser_tech_bits,flight,won,lost);
     assert(cruiser>=0 && first_cruiser_tick>0 && saw_flight && !won && !lost);
     if(end==17921) assert(flight);
-    else {fprintf(stderr,"saved_flight=%d target_hp_before=%d target_hp_after=%d target_alive=%d\n",saved_flight,flight_hp,u[4].hp,u[4].alive);assert(saved_flight && !flight && (!u[4].alive || u[4].hp<flight_hp));}
+    else {
+        int after_hp=flight_target<MAX_UNITS?u[flight_target].hp:b[flight_target-MAX_UNITS].hp;
+        int alive=target_alive(flight_target);
+        fprintf(stderr,"saved_flight=%d target=%d target_hp_before=%d target_hp_after=%d target_alive=%d\n",saved_flight,flight_target,flight_hp,after_hp,alive);
+        assert(saved_flight && !flight && (!alive || after_hp<flight_hp));
+    }
     int key=sc64_battlecruiser_owner_key(race_mode,race_selected_mission,u[cruiser].owner,u[cruiser].raw_owner);
     assert(key>=0 && sc64_battlecruiser_tech_has(sc64_battlecruiser_tech_bits,(unsigned)key,SC64_BC_TECH_YAMATO));
     return 0;
