@@ -6279,6 +6279,106 @@ profile/save/frame fixtures and the 18-match skirmish matrix pass. See the
 [audit](audits/2026-10-29-z7-current-arm-sram/README.md). This is emulator
 evidence for the shipped game loop, not physical-GBA or 30-fps
 qualification. Z7 is not promoted.
+## Moving-projectile damage at impact (2026-10-29)
+
+Moving source projectiles now deal damage at their drawn impact frame through
+a bounded, saved queue; see [Pending projectile impacts](IMPACT-EVENTS.md).
+The candidate is stacked on `761597d`. Base and candidate were built from the
+same private inputs.
+
+`./dev build`, `./dev test`, `python3 tools/check_source_tree.py` and the
+host SRAM checks pass. `make test-sc64-impact-events-game` passes under
+ASan/UBSan for Terran, Zerg, Protoss P7 and Showcase (queue 32; save 32, 10,
+11, 32 rows). Its `races` and `unified` vectors keep immediate damage.
+`make test-unified` passes. Its `test-sc64-weapon-vfx-game` guard now pins the
+compact race `Tracer`.
+
+Five normal 32 MiB ARM products (Showcase, Terran, Zerg Z6/Z7, Protoss P7)
+link within unchanged guards. IWRAM is byte-identical, and EWRAM headroom
+grows by 56–72 B.
+
+Campaign controllers, run with traces in a private workspace:
+
+- **Terran.** T1–T6, T8, T10 and the save, repair, world-save, target, HUD
+  and collision checks pass.
+  - T5 now wins at tick 193,011. Unmodified base loses (Raynor dies), so this
+    is a changed trajectory, not a claimed fix.
+  - T7 (no win at 60,000), T9 (no win at 500,000) and `terran-late-world`'s
+    Firebat splash assertion fail identically on base.
+- **Zerg Z6/Z7.** The Z6 split controller, promoted profile, Z7 profile, save
+  and frame checks pass.
+  - The Z7 normal-input controller regresses. It reaches its 1,000,000-tick
+    limit without a win, while base wins at 821,565.
+  - The impacts-disabled build reproduces base's trace exactly.
+  - At frame 47,500 the scripted policy sends its 11 drones to a distant
+    mineral field through enemy Sunken Colonies, and its economy does not
+    recover.
+- **Protoss.** The split controller, P7 OBJ VRAM and P7 save/projectile checks
+  pass.
+- **Pre-existing on base**, failing identically:
+  - the P4 canonical controller (`LOST`);
+  - the P4 Storm save assertion;
+  - the Z7 Scourge targeting assertion;
+  - the generation-30 promoted/storage asserts;
+  - the P7 controller rule's link error.
+
+In the no-GDB mGBA probe:
+
+- One shot's timing costs 6,161 cycles, and a full-queue step 1,794.
+- The disabled build matches base's digest and update cycles.
+- Equal-load windows cost the same, but the stress battle's heavy phase lasts
+  longer.
+
+The scene exceeds the 30 fps budget on base as well, so no hardware frame-rate
+result is claimed. ARM replays and fresh-process SRAM qualification were not
+run; the follow-up below adds them.
+
+### Pending impacts on current default: Z7, ARM replay and saves (2026-10-30)
+
+The candidate was merged with default `cfdbe16`, which includes PR #152.
+
+- `./dev build`, `./dev test`, `python3 tools/check_source_tree.py` and
+  `make test-sc64-impact-events-game` pass.
+- The five product ROMs link within unchanged guards. IWRAM symbols, sizes
+  and end address equal default's, and EWRAM headroom grows by 56–72 B.
+
+**Z7.**
+- Default `cfdbe16` itself no longer wins the Z7 normal-input controller: it
+  reaches the 1,000,000-tick limit at frame 999,093 with 45 enemy buildings.
+  This branch with `-DSC64_IMPACT_EVENTS_DISABLED` reproduces that trace byte
+  for byte. With impacts enabled it also reaches the limit.
+- A bisect of default's merges puts the regression at PR #161 (`6e1cb67`,
+  loaded-worker depot routing). PRs #148, #157 and #158 still win at host
+  tick 821,565.
+- The earlier impacts-only Z7 difference on `761597d` came from the
+  controller's lowest-slot home Hatchery rule, not from the impact path; see
+  [the diagnosis](IMPACT-EVENTS.md#z7-controller-diagnosis).
+- The Zerg lane owns the controller. Z7 is not gated here, because no current
+  build of either kind qualifies a win.
+
+**Unusable controllers.** Two other host controllers fail on default with or
+without impacts:
+- The canonical P7 controller fails a cursor guard; its Make rule also
+  compiles `game.c` in place of the controller, because
+  `P7_CAMPAIGN_CONTROLLER` is defined after the rule uses it.
+- The P6 controller does not start P6 in the P7 ROM.
+
+**ARM.** No-GDB mGBA runs of four diagnostic ROMs all match their host
+oracles:
+- An input-only replay of the T10 controller's held keys wins at frame 3,361,
+  matching all 35 checkpoints with up to 6 impacts pending.
+- Two-process normal-menu skirmish saves restore 5 (Terran) and 4 (P7)
+  pending impacts.
+- A P7 capacity save first refuses 12 pending impacts, then saves all 11 rows
+  and restores them.
+- Each restored world equals the saved world, and all continuation
+  checkpoints match the first process.
+
+Protocol, hashes and limits are in
+[Pending projectile impacts](IMPACT-EVENTS.md#arm-replay-and-fresh-process-saves).
+These are emulator results for a probe-entry mission and skirmishes, not
+normal-menu campaign or hardware qualification.
+
 
 ### Canonical skirmish controller qualification correction (2026-10-29)
 
@@ -6580,3 +6680,77 @@ comparisons are private in `default-resolved-tracer-v1`. The earlier #171
 54-match, 702 startup/save and 27 construction results are baseline evidence
 for unchanged gameplay paths, not new runs of this renderer-only stage.
 No Actions were run and no proprietary inputs are committed.
+
+
+### Default-branch terrain transfer (2026-10-30)
+
+Independently extracted on `ae691253`, the shared terrain cache transfers aligned
+horizontal windows with one bounded DMA3 operation, then redraws exposed edge
+tiles. Generic windows, unaligned shifts, partial boundary rows and narrower
+scene clips retain their existing path. No persistent buffers, actor limits,
+sight ranges or RAM reserves change. The six executable/test files were
+qualified at `dfda937`; the later validation addition changes documentation only.
+
+Local source-boundary, doctor, default build/test, unified build/test and the
+full Terran host aggregate pass. Sanitizer checks cover 5,292 clipped-window
+cases and four prepared profiles with 512 cached/fresh scene comparisons each.
+All four normal ARM links preserve the fixed guards; remaining EWRAM/IWRAM
+bytes are Terran 28,536/328, Zerg 28,444/64, Protoss 23,900/952 and Showcase
+272/56. Captured Make commands, per-TU dependencies and input hashes match the
+private input copies. Public-main weapon and P7 fact banks were used; this
+extraction does not include the draft roster services or source-birth offset fix.
+
+A separate port-free mGBA probe uses actual production flags and replaces only
+main. Over 1,501 play ticks after a normal-menu launch (observed mission field
+8), alternating horizontal camera input produces matching selected-state and
+displayed-framebuffer rolling hashes at all four checkpoints. Timed update,
+audio and rendering work, including presentation waits, falls from 992,093,504
+to 983,925,857 guest cycles, a 0.823 percent reduction for this workload. This
+is hash-based observational evidence, not byte-for-byte state proof, steady
+30 fps or physical-hardware qualification. An initial whole-VRAM hash included
+audio scratch/offscreen data and is superseded by the displayed-page probe.
+
+Evidence remains private in `terrain-public-extract-v1`. The Terran host gate
+wrote four controller-trace outputs inside its independent copy; all other
+75 preexisting prepared files remained identical. No shared inputs were
+regenerated, no Actions were dispatched and no proprietary data is committed.
+
+
+### Default visibility span counts (2026-10-30)
+
+This independently extracted optimization updates cell visibility/minimap
+occupancy only at zero-source transitions and the ninth count bit only at
+255/256. A bounded ROM row helper avoids repeated per-cell call setup.
+Sight ranges, geometry, explored state, source slots, persistent storage
+and RAM reserves remain unchanged. Independent full-grid/count/minimap
+oracles cover ownership batches, 255/256 transitions, 511-source sequences,
+out-of-map centers and empty spans.
+
+Exact visibility commit `673d890` on default `71a134df` passes source/doctor,
+default build/test, unified build/test and the full Terran host aggregate.
+Current-default integration `e6f821d` on `fdb63f3` passes source/doctor/default
+build, focused sanitizer oracles and four actual Make ARM captures plus normal
+links. Each profile's source and input closure is verified. Spare EWRAM/IWRAM
+bytes are Terran 28,536/328, Zerg 28,444/64, Protoss 23,900/952 and Showcase
+272/56. The later base change contains only PR176's generated-map mineral-style
+initialization and its fixture assertions. The full gates/timing were not
+rerun on that integrated head; the visibility code is identical, the base
+change was independently qualified and its new combined ARM links were checked.
+
+The fresh port-free T5 comparison at `673d890` has 22 nonempty timing windows
+and 10,991 gameplay ticks. Selected-state/fog checkpoint hashes and seven
+palette-resolved framebuffer CRCs agree. Peak sight cost at tick 9,000 falls
+from 3,062,662 to 2,122,499 guest cycles (30.70 percent). Summed sight cost is
+346,957,909 to 342,107,187 (1.398 percent less); full-frame cost is
+7,645,233,405 to 7,638,767,300 (0.0846 percent less). This one shortened
+emulator trace does not establish general FPS, all-frame/state equality,
+physical hardware behavior or full campaign completion.
+
+Private records are in `visibility-public-v1` and `visibility-fdb-v1`. Four
+private controller traces were rewritten by the host gate; other prepared
+inputs were preserved. Some completed auxiliary unified/Terran test-build
+images were removed during disk cleanup without a prior per-file inventory;
+the four captured canonical ARM products, raw dependencies, probe products,
+source/input snapshots and test logs remain. No Actions were dispatched and
+no proprietary inputs are committed. The later documentation-only commit
+does not change the qualified executable/test files.

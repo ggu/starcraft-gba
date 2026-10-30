@@ -3816,6 +3816,8 @@ build/test-sc64-z7-carried-z4: tests/sc64_z4_campaign_run.c $(ZERG_Z7_CARRIED_DE
 .PHONY: test-sc64-z7-carried-missions
 test-sc64-z7-carried-missions: build/test-sc64-z7-carried-z1 build/test-sc64-z7-carried-z2 build/test-sc64-z7-carried-z3 build/test-sc64-z7-carried-z4
 	mkdir -p .local/sc64/z7-carried
+	./build/test-sc64-z7-carried-z1 --check-site cancel
+	./build/test-sc64-z7-carried-z1 --check-site timeout
 	./build/test-sc64-z7-carried-z1 --trace .local/sc64/z7-carried/z1.json
 	./build/test-sc64-z7-carried-z2 --controller 1 --trace .local/sc64/z7-carried/z2.json
 	./build/test-sc64-z7-carried-z3 --trace .local/sc64/z7-carried/z3.json
@@ -4369,6 +4371,8 @@ build/test-sc64-zerg-carried-z6: tests/sc64_z6_campaign_run.c $(ZERG_CARRIED_DEP
 .PHONY: test-sc64-zerg-carried-missions
 test-sc64-zerg-carried-missions: build/test-sc64-zerg-carried-z1 build/test-sc64-zerg-carried-z2 build/test-sc64-zerg-carried-z3 build/test-sc64-zerg-carried-z4 build/test-sc64-zerg-carried-z5 build/test-sc64-zerg-carried-z6
 	mkdir -p .local/sc64
+	./build/test-sc64-zerg-carried-z1 --check-site cancel
+	./build/test-sc64-zerg-carried-z1 --check-site timeout
 	./build/test-sc64-zerg-carried-z1 --trace .local/sc64/z6-carried-z1-controller.json
 	./build/test-sc64-zerg-carried-z2 --controller 1 --trace .local/sc64/z6-carried-z2-controller.json
 	./build/test-sc64-zerg-carried-z3 --trace .local/sc64/z6-carried-z3-controller.json
@@ -4529,12 +4533,9 @@ $(addprefix build/test-sc64-full-,t1-run t2-run t3-run t3-save t3-resume t4-run 
 CANONICAL_SKIRMISH_RESUME_ART_INPUTS = $(UNIT_FACING_HEADER) $(TANK_SOURCE_HEADER) $(SOURCE_WEAPON_INPUTS) $(CANONICAL_DEATH_INPUTS)
 CANONICAL_SKIRMISH_RESUME_HOST_FLAGS := -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon
 define CANONICAL_SKIRMISH_RESUME_PROFILE
-build/test-sc64-skirmish-resume-$(1): tests/sc64_skirmish_resume.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) $(if $(filter protoss,$(1)),$(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile | build
-	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(2) $$< common/gba.c $(if $(filter protoss,$(1)),$(P7_PROJECTILE_SOURCES) $(P7_INTERCEPTOR_FLIGHT_SOURCES)) -o $$@
+build/test-sc64-skirmish-resume-$(1): tests/sc64_skirmish_resume.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$($(3)) $$($(4)) $$(CANONICAL_SKIRMISH_RESUME_ART_INPUTS) common/gba.c common/gba.h Makefile | build
+	$$(CLANG) $$(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $$($(2)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$($(4)) -o $$@
 endef
-$(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,terran,$(TERRAN_ROM_FLAGS),$(TERRAN_FULL_INPUTS)))
-$(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,zerg,$(ZERG_ROM_FLAGS),$(ZERG_Z6_INPUTS)))
-$(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,protoss,$(PROTOSS_ROM_FLAGS),$(PROTOSS_CANONICAL_INPUTS)))
 .PHONY: test-sc64-canonical-skirmish-resume
 test-sc64-canonical-skirmish-resume: $(addprefix build/test-sc64-skirmish-resume-,terran zerg protoss)
 	./build/test-sc64-skirmish-resume-terran
@@ -4961,6 +4962,81 @@ test-sc64-order-marker-unified: build/test-sc64-order-marker-game-unified build/
 	./build/test-sc64-order-marker-game-direct
 test-unified: test-sc64-order-marker-unified
 
+# Pending projectile impacts: asset-free queue contract, then the actual engine
+# with each production vector. Vectors without source weapon effects must keep
+# immediate damage.
+.PHONY: test-sc64-impact-events test-sc64-impact-events-game test-sc64-impact-events-unified
+test: test-sc64-impact-events
+test-sc64-impact-events: build/test-sc64-impact-events
+	./build/test-sc64-impact-events
+build/test-sc64-impact-events: tests/sc64_impact_events.c starcraft/sc64_impact_events.h | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+define IMPACT_EVENTS_GAME_FIXTURE
+build/test-sc64-impact-events-game-$(1): tests/sc64_impact_events_game.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $$(RACES_INPUTS) $(4) common/gba.c $$(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) $$($(2)) $(3) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(5) -o $$@
+endef
+$(eval $(call IMPACT_EVENTS_GAME_FIXTURE,terran,TERRAN_ROM_FLAGS,,$(TERRAN_FULL_INPUTS)))
+$(eval $(call IMPACT_EVENTS_GAME_FIXTURE,zerg,ZERG_ROM_FLAGS,,$(ZERG_Z6_INPUTS)))
+$(eval $(call IMPACT_EVENTS_GAME_FIXTURE,protoss,PROTOSS_P7_CANONICAL_FLAGS,,$(PROTOSS_P7_CANONICAL_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call IMPACT_EVENTS_GAME_FIXTURE,showcase,SHOWCASE_FLAGS,,$(SHOWCASE_INPUTS)))
+$(eval $(call IMPACT_EVENTS_GAME_FIXTURE,races,RACES_FLAGS))
+$(eval $(call IMPACT_EVENTS_GAME_FIXTURE,unified,UNIFIED_FLAGS))
+test-sc64-impact-events-game: $(addprefix build/test-sc64-impact-events-game-,terran zerg protoss showcase races unified)
+	./build/test-sc64-impact-events-game-terran
+	./build/test-sc64-impact-events-game-zerg
+	./build/test-sc64-impact-events-game-protoss
+	./build/test-sc64-impact-events-game-showcase
+	./build/test-sc64-impact-events-game-races
+	./build/test-sc64-impact-events-game-unified
+test-sc64-impact-events-unified: build/test-sc64-impact-events-game-unified
+	./build/test-sc64-impact-events-game-unified
+test-unified: test-sc64-impact-events-unified
+
+# No-GDB ARM timing probe for a projectile-heavy battle; run its ROM with
+# tools/sc64_impact_arm_probe.py. Emulator cycle counts, not hardware results.
+define IMPACT_ARM_PROBE
+build/starcraft-$(1)-impact-probe.elf: tests/sc64_impact_arm_probe.c $$(UI_ARM_COMMON) $$(COMMON_HEADERS) $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.ld Makefile | build
+	$$(CC) $$(CFLAGS) $$($(2)) $$(UI_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(4) $$(LDFLAGS) -lgcc -o $$@
+	$$(SIZE) $$@
+build/StarCraft-$(1)-Impact-Probe-GBA.gba: build/starcraft-$(1)-impact-probe.elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC IMPACT' SCIP
+endef
+$(eval $(call IMPACT_ARM_PROBE,showcase,SHOWCASE_FLAGS,$(SHOWCASE_INPUTS)))
+$(eval $(call IMPACT_ARM_PROBE,zerg,ZERG_ROM_FLAGS,$(ZERG_Z6_INPUTS)))
+$(eval $(call IMPACT_ARM_PROBE,protoss,PROTOSS_P7_CANONICAL_FLAGS,$(PROTOSS_P7_CANONICAL_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+.PHONY: impact-arm-probe
+impact-arm-probe: $(addprefix build/StarCraft-,$(addsuffix -Impact-Probe-GBA.gba,showcase zerg protoss))
+
+# Pending-impact ARM replay and two-process SRAM continuation; see
+# tests/sc64_impact_replay.c and tools/sc64_impact_replay.py. The T10 tape is a
+# private recording made with tests/sc64_input_tape_record.h. Each ROM has a
+# host oracle built from the same source and flags.
+IMPACT_REPLAY_T10_TAPE ?= .local/traces/t10/tape.h
+IMPACT_T10_FLAGS = -DSC64_TERRAN_LATE_PROBE_MISSION=13 -DSC64_TAPE_HEADER='"$(abspath $(IMPACT_REPLAY_T10_TAPE))"'
+# Gameplay saves wait for each neutral skirmish's observed pending peak; the
+# capacity save spawns a battle, requires one refused over-capacity save, then
+# saves within P7's 11 rows.
+IMPACT_SAVE_P7_FLAGS = -DSC64_IMPACT_SAVE_MIN=4
+IMPACT_SAVE_TERRAN_FLAGS = -DSC64_IMPACT_SAVE_MIN=5
+IMPACT_CAPACITY_P7_FLAGS = -DSC64_IMPACT_SAVE_MIN=10 -DSC64_IMPACT_SAVE_BATTLE -DSC64_IMPACT_SAVE_AFTER=0
+define IMPACT_REPLAY
+build/starcraft-$(1)-impact-replay.elf: tests/sc64_impact_replay.c $(4) $$(UI_ARM_COMMON) $$(COMMON_HEADERS) $$(STARCRAFT) $$(wildcard starcraft/*.h) $(5) common/gba.ld Makefile | build
+	$$(CC) $$(CFLAGS) $$($(2)) $$($(3)) $$(UI_ARM_COMMON) $$< $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(6) $$(LDFLAGS) -lgcc -o $$@
+	$$(SIZE) $$@
+build/StarCraft-$(1)-Impact-Replay-GBA.gba: build/starcraft-$(1)-impact-replay.elf tools/fix_rom.py
+	$$(OBJCOPY) -O binary $$< $$@
+	$$(PYTHON) tools/fix_rom.py $$@ 'SC IMPACT R' SCIR
+build/test-sc64-impact-replay-$(1): tests/sc64_impact_replay.c $(4) $$(STARCRAFT) $$(wildcard starcraft/*.h) $(5) common/gba.c $$(COMMON_HEADERS) Makefile | build
+	$$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon $$($(2)) $$($(3)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(6) -o $$@
+endef
+$(eval $(call IMPACT_REPLAY,t10,TERRAN_ROM_FLAGS,IMPACT_T10_FLAGS,$(IMPACT_REPLAY_T10_TAPE),$(TERRAN_FULL_INPUTS)))
+$(eval $(call IMPACT_REPLAY,terran-save,TERRAN_ROM_FLAGS,IMPACT_SAVE_TERRAN_FLAGS,,$(TERRAN_FULL_INPUTS)))
+$(eval $(call IMPACT_REPLAY,protoss-save,PROTOSS_P7_CANONICAL_FLAGS,IMPACT_SAVE_P7_FLAGS,,$(PROTOSS_P7_CANONICAL_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call IMPACT_REPLAY,protoss-capacity,PROTOSS_P7_CANONICAL_FLAGS,IMPACT_CAPACITY_P7_FLAGS,,$(PROTOSS_P7_CANONICAL_INPUTS),$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+.PHONY: impact-replay
+impact-replay: $(foreach p,t10 terran-save protoss-save protoss-capacity,build/StarCraft-$(p)-Impact-Replay-GBA.gba build/test-sc64-impact-replay-$(p))
+
 .PHONY: test-build-worker-default
 test: test-build-worker-default
 test-build-worker-default: build/test-build-worker-default
@@ -5083,3 +5159,30 @@ test-sc64-motion-reuse: build/test-sc64-motion-reuse-oracle build/test-sc64-moti
 	./build/test-sc64-motion-reuse-oracle
 	./build/test-sc64-motion-reuse-render
 test: test-sc64-motion-reuse
+# Terrain-only overdraw must be followed by clipped edge redraw; this fixture
+# is asset-free and includes one-row segments and narrow-clip fallbacks.
+.PHONY: test-sc64-terrain-transfer-window test-sc64-terrain-transfer-scenes
+build/test-sc64-terrain-transfer-window: tests/sc64_terrain_transfer_window.c common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -I. $< common/gba.c -o $@
+test-sc64-terrain-transfer-window: build/test-sc64-terrain-transfer-window
+	./build/test-sc64-terrain-transfer-window
+test: test-sc64-terrain-transfer-window
+
+# Optional prepared-input canonical renderer differential, including fog,
+# construction, mineral depletion and static objects at both exposed edges.
+define TERRAIN_TRANSFER_SCENE
+build/test-sc64-terrain-transfer-scene-$(1): tests/sc64_terrain_transfer_scene.c tests/sc64_z3_frame_coverage.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c $$(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(SKIRMISH_CONTROLLER_HOST_FLAGS) $(2) -I. $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $$@
+endef
+$(eval $(call TERRAIN_TRANSFER_SCENE,terran,$(TERRAN_ROM_FLAGS),$(TERRAN_FULL_INPUTS)))
+$(eval $(call TERRAIN_TRANSFER_SCENE,zerg,$(ZERG_ROM_FLAGS),$(ZERG_Z6_INPUTS)))
+$(eval $(call TERRAIN_TRANSFER_SCENE,protoss,$(PROTOSS_ROM_FLAGS),$(PROTOSS_P7_CANONICAL_INPUTS)))
+$(eval $(call TERRAIN_TRANSFER_SCENE,showcase,$(SHOWCASE_FLAGS),$(P7_ARBITER_INPUTS)))
+test-sc64-terrain-transfer-scenes: $(addprefix build/test-sc64-terrain-transfer-scene-,terran zerg protoss showcase)
+	@set -e; for profile in terran zerg protoss showcase; do ./build/test-sc64-terrain-transfer-scene-$$profile; done
+
+# Expand prerequisites after all canonical profile definitions; recipes retain
+# variable references so late flag additions reach the actual resume fixtures.
+$(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS))
+$(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS))
+$(eval $(call CANONICAL_SKIRMISH_RESUME_PROFILE,protoss,PROTOSS_ROM_FLAGS,PROTOSS_CANONICAL_INPUTS,P7_INTERCEPTOR_FLIGHT_SOURCES))

@@ -159,9 +159,14 @@ enum {
     SC_RB_COUNT
 };
 
-#ifdef SC64_TERRAN_LATE_ACTORS
+#if defined(SC64_TERRAN_LATE_ACTORS) || defined(SC64_T4_RUNTIME)
 static inline int sc64_race_raw_unit(int type);
 static inline int sc64_race_raw_building(int type);
+#endif
+#ifdef SC64_T4_RUNTIME
+#include "sc64_source_sight_tiles.h"
+#endif
+#ifdef SC64_TERRAN_LATE_ACTORS
 #include "sc64_terran_late_actor_rules.h"
 #endif
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
@@ -763,7 +768,10 @@ static inline int sc64_race_t4_sight_source_pixels(int type)
     case U_CIVILIAN: case U_RHYNADON: case U_RAGNASAUR: return 7*32;
     case U_MAP_REVEALER: return 10*32;
     case U_DATA_DISK: return 5*32;
-    default: return 0;
+    /* Every other mapped actor uses its pinned BWAPI sightRange.  Human
+       automatic acquisition is gated on this sight, so it must reach the
+       source weapon ranges (Goliath, Wraith, Vulture, Kerrigan, ...). */
+    default: return sc64_source_sight_raw_pixels(sc64_race_raw_unit(type));
     }
 }
 static inline int sc64_race_t4_building_sight_source_pixels(int type)
@@ -781,7 +789,7 @@ static inline int sc64_race_t4_building_sight_source_pixels(int type)
     case B_WALL_FLAME_TRAP: return 3 * 32;
     case B_UPPER_DOOR: case B_RIGHT_UPPER_DOOR:
     case B_PIT_DOOR: case B_RIGHT_PIT_DOOR: return 1 * 32;
-    default: return 0;
+    default: return sc64_source_sight_raw_pixels(sc64_race_raw_building(type));
     }
 }
 static inline int sc64_race_t4_unit_intrinsically_invincible(int type)
