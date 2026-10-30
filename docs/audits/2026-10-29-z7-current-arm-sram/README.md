@@ -66,40 +66,50 @@ Make targets: `sc64-z7-arm-replay` (full and prefix ROMs),
 
 `tools/sc64_z7_arm_replay.py` qualifies a run only when every gate passes, and
 lists each failure:
-- **Records:** exactly one START record, no early end, and the mode's own
-  terminal record (DONE, SAVED or LOADED). Unknown, malformed, repeated-field
-  and conflicting records all fail.
+- **Grammar:** every record must match its exact form: the tag, its kind word,
+  and its fields in the probe's order, with no extra tokens. Each CHECK opens a
+  CHECK, CHECK2, CHECK3 bundle for one tick. An orphan, incomplete or repeated
+  bundle fails. A tick may carry two kinds (a checkpoint plus the terminal or
+  cut bundle) only when their values are identical.
+- **Framing:** the log starts with one START record whose mode, tape length,
+  check count and stop tick match the trace. A full or resume run ends with
+  one DONE record whose cursor consumed every tape transition. A prefix ends
+  with one successful SAVED record. A resume has one successful LOADED record,
+  on the play screen, directly after START. No early end is allowed.
 - **Coverage:** the run must match exactly the host observations its mode
-  covers. That set must be non-empty, every field must match, and no
-  observation outside the range may appear. A prefix needs one successful
-  SAVED record with a cut inside the tape and one cut observation at that
-  tick. A resume needs a cut inside the tape and one successful LOADED
-  record.
-- **Terminal state:** full and resume runs must end on the host's terminal
-  observation, and a winning trace requires a strict win.
-- **Timing:** exactly one final cycles record (`terminal`, or `cut` for the
-  prefix) at the expected tick and frame count. It and every periodic
-  record must be coherent (positive counts, update ≤ total, peak ≤ total
-  ≤ peak × frames, stack within the painted region). Host logs can only be
-  checked untimed, with `--untimed`.
-- **SRAM:** all present records must have a valid checksum, the generation
-  tag and the expected payload size. Required records:
+  covers. That set must be non-empty, and nothing outside it may appear. A
+  prefix cut must be inside the tape, and its SAVED frame must equal the cut
+  observation's frame.
+- **Timing:** exactly one final cycles record, last, at the expected tick.
+  There must be one periodic record at each multiple of 50,000 ticks in range.
+  Each record's frame count must equal its tick minus the mode's offset, and
+  all counters must be coherent and cumulative. Host logs are checked with
+  `--untimed`, which rejects any timing records.
+- **SRAM:** the schema is pinned in the tool (tag `0x53435A54`, 16,296-byte
+  `RaceSave`); a log cannot redefine it. A slot is unused only when fully
+  erased. Any other slot is a live record that must have the pinned tag and
+  size, a non-zero sequence and a valid checksum. Required records:
   - prefix: exactly one pause save;
   - full run: one victory autosave when the trace wins;
-  - resume: the seeded pause save kept byte for byte, plus a sequence-2
-    victory autosave.
+  - resume: the seeded pause save kept byte for byte in the same slot, plus a
+    sequence-2 victory autosave.
 
   SRAM is checked before the verdict; a run without SRAM cannot qualify.
 
-`tests/test_sc64_z7_arm_replay.py` covers these gates:
-- missing timing, duplicate timing, wrong frame counts and incoherent cycles;
-- a SAVED-only prefix, an out-of-range cut and a second save;
-- missing, short and checksum-corrupted SRAM;
-- a resume without its seed;
-- malformed, unknown, conflicting and duplicate check records.
+`tests/test_sc64_z7_arm_replay.py` has 13 tests covering these gates, with
+negative cases including:
+- a wrong tag in both the SAVED log and the SRAM header;
+- oversized, torn, zero-sequence and partly overwritten slots;
+- orphan, incomplete, repeated and conflicting bundles, extra tokens and reordered fields;
+- gibberish or mismatched START and DONE payloads;
+- missing, duplicate, misplaced and incoherent timing records;
+- an out-of-range cut, a SAVED-only prefix and a resume without its seed.
+
+The reviewer's four reproduced cases also fail when applied to the real ARM
+logs and SRAM.
 
 Re-evaluated with these gates, the retained ARM logs and SRAM still qualify:
-- full: 909/909 observations, one victory record;
+- full: 909/909 observations, 16 periodic records plus the terminal one, one victory record;
 - prefix: 669/669 observations at cut 403,482, one pause save;
 - resume: 240/240 observations, with the seed kept and a sequence-2 victory record.
 

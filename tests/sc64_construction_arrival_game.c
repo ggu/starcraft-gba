@@ -212,6 +212,114 @@ static void test_extractor_arrival_and_drone_interruption(void)
     assert(race_owner_refinery(SIDE)==extractor);
 }
 
+/* Automatic building selection leaves existing construction intact. */
+static void test_busy_builder_selection(int race)
+{
+    reset_fixture(race); add_prerequisites(race);
+    int type=build_type(race), cost=building_cost_for(type);
+    minerals=cost*3;
+    int busy=add_worker(race,80,80), free_worker=add_worker(race,88,80);
+    assert(busy>=0 && free_worker>=0);
+    u[busy].selected=1;
+    assert(race_start_build(SIDE,busy,type,240,240));
+#ifdef SC64_FIELD_CONTROLS
+    cx=280; cy=240;
+    assert(field_ui_build_worker(type)==free_worker);
+#endif
+    assert(race_owner_worker(SIDE,worker_type(race),280,240)==free_worker);
+    assert(!race_start_build(SIDE,busy,type,280,240));
+    assert(u[busy].order==ORDER_BUILD_PENDING && u[busy].target==type &&
+           u[busy].tx==240 && u[busy].ty==240);
+    u[free_worker].selected=1;
+#ifdef SC64_FIELD_CONTROLS
+    assert(field_ui_build_worker(type)==free_worker);
+#endif
+    u[free_worker].alive=0;
+    assert(race_owner_worker(SIDE,worker_type(race),280,240)<0);
+#ifdef SC64_FIELD_CONTROLS
+    assert(field_ui_build_worker(type)<0);
+#endif
+    u[busy].x=240; u[busy].y=240; update_orders();
+    if(race==R_TER) {
+        int foundation=u[busy].target;
+        assert(u[busy].order==ORDER_BUILD && foundation>=0 && b[foundation].alive);
+        assert(!race_start_build(SIDE,busy,type,280,240));
+        assert(u[busy].order==ORDER_BUILD && u[busy].target==foundation);
+#ifdef SC64_FIELD_CONTROLS
+        assert(field_ui_build_worker(type)<0);
+#endif
+    } else if(race==R_PROTOSS) {
+        assert(u[busy].order==ORDER_IDLE && build_worker_available(busy,SIDE,U_PROBE));
+    } else assert(!u[busy].alive && !build_worker_available(busy,SIDE,U_DRONE));
+}
+
+static void test_builder_eligibility(void)
+{
+    reset_fixture(R_TER);
+    int worker=spawn_unit(SIDE,U_SCV,80,80);
+    int enemy=spawn_unit(ENEMY,U_SCV,96,80);
+    int marine=spawn_unit(SIDE,U_MARINE,112,80);
+    assert(worker>=0 && enemy>=0 && marine>=0);
+    assert(build_worker_available(worker,SIDE,U_SCV));
+    assert(!build_worker_available(-1,SIDE,U_SCV));
+    assert(!build_worker_available(MAX_UNITS,SIDE,U_SCV));
+    assert(!build_worker_available(enemy,SIDE,U_SCV));
+    assert(!build_worker_available(marine,SIDE,-1));
+    assert(!build_worker_available(worker,SIDE,U_PROBE));
+#ifdef SC64_TRANSPORT_RUNTIME
+    u[worker].order=ORDER_TRANSPORTED;
+    assert(!build_worker_available(worker,SIDE,U_SCV));
+    u[worker].order=ORDER_IDLE;
+#endif
+    u[worker].alive=0;
+    assert(!build_worker_available(worker,SIDE,U_SCV));
+}
+
+#ifdef SC64_FIELD_CONTROLS
+/* Issue the second order while the selected SCV is travelling or building. */
+static void test_two_terran_builders(int wait_for_foundation)
+{
+    reset_fixture(R_TER); add_prerequisites(R_TER);
+    int cost=building_cost_for(B_DEPOT);
+    minerals=cost*2;
+    int first=add_worker(R_TER,80,80), second=add_worker(R_TER,88,80);
+    assert(first>=0 && second>=0);
+    u[first].selected=1;
+    cx=240; cy=240;
+    assert(field_ui_build_worker(B_DEPOT)==first);
+    assert(race_start_build(SIDE,first,B_DEPOT,cx,cy));
+    if(wait_for_foundation) {
+        for(int tick=0;tick<2000 && u[first].order==ORDER_BUILD_PENDING;tick++)
+            update_orders();
+        assert(u[first].order==ORDER_BUILD);
+        assert(minerals==cost);
+    }
+    int old_order=u[first].order, old_target=u[first].target;
+    int old_tx=u[first].tx, old_ty=u[first].ty, old_bank=minerals;
+    assert(!race_start_build(SIDE,first,B_DEPOT,320,240));
+    assert(u[first].order==old_order && u[first].target==old_target &&
+           u[first].tx==old_tx && u[first].ty==old_ty && minerals==old_bank);
+    cx=320; cy=240;
+    assert(field_ui_build_worker(B_DEPOT)==second);
+    assert(race_start_build(SIDE,second,B_DEPOT,cx,cy));
+    assert(minerals==old_bank && u[first].order==old_order && u[first].target==old_target);
+    for(int tick=0;tick<2000 && (u[first].order==ORDER_BUILD_PENDING ||
+                                 u[second].order==ORDER_BUILD_PENDING);tick++)
+        update_orders();
+    assert(u[first].order==ORDER_BUILD && u[second].order==ORDER_BUILD);
+    int a=u[first].target, bslot=u[second].target;
+    assert(a>=0 && bslot>=0 && a!=bslot && b[a].alive && b[bslot].alive);
+    assert(minerals==0);
+    int progress_a=b[a].build_progress, progress_b=b[bslot].build_progress;
+    update_orders();
+    assert(b[a].build_progress>progress_a && b[bslot].build_progress>progress_b);
+    for(int tick=0;tick<5000 && (b[a].under_construction || b[bslot].under_construction);tick++)
+        update_orders();
+    assert(!b[a].under_construction && !b[bslot].under_construction);
+    assert(u[first].order==ORDER_IDLE && u[second].order==ORDER_IDLE);
+}
+#endif
+
 static void test_ai_pending_dedup_and_budget(void)
 {
     reset_fixture(R_TER); race_bots=1;
@@ -254,7 +362,13 @@ int main(void)
         test_overlapping_intents_first_wins(races[i]);
         test_actual_walk_to_arrival(races[i]);
         test_building_slots_fail_atomically(races[i]);
+        test_busy_builder_selection(races[i]);
     }
+    test_builder_eligibility();
+#ifdef SC64_FIELD_CONTROLS
+    test_two_terran_builders(0);
+    test_two_terran_builders(1);
+#endif
     test_extractor_arrival_and_drone_interruption();
     test_ai_pending_dedup_and_budget();
     puts("construction arrival fixtures passed");

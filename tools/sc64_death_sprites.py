@@ -42,9 +42,11 @@ MAX_DEPTH = 3
 HOLD_LAST = 0xFF
 # Source rubble decays over minutes; keep at most 30 seconds (24-Hz updates).
 REMNANT_CAP_SU = 720
-# The word-renderer ROM budget permits packed under-layer art for combat
-# units/heroes. Higher raw IDs (critters, props and buildings) keep indexed art.
+# Pack combat-unit under-layers and persistent building remnants. Source
+# building identities occupy raw IDs 106..175; critters and props stay indexed.
 WORD_PACK_RAW_ID_LIMIT = 89
+BUILDING_RAW_FIRST = 106
+BUILDING_RAW_END = 176
 # Ignored instructions: setflipstate, playsnd, playsndrand, playsndbtwn,
 # setfldirect, and liftoffcondjmp (the grounded fall-through is followed).
 SKIP_OPS = {23, 24, 25, 26, 52, 63}
@@ -93,13 +95,14 @@ def ramp_indices(remap_id: int, ui: dict[str, int]) -> list[int]:
 
 def packed_under_image_ids(sources: dict[int, dict[str, Any]]) -> set[int]:
     return {layer["image_id"] for raw, source in sources.items()
-            if raw < WORD_PACK_RAW_ID_LIMIT
-            for layer in source["layers"] if layer["under"]}
+            for layer in source["layers"]
+            if (raw < WORD_PACK_RAW_ID_LIMIT and layer["under"]) or
+               (BUILDING_RAW_FIRST <= raw < BUILDING_RAW_END and layer["remnant"])}
 
 
 def word_payload_bytes(sources: dict[int, dict[str, Any]],
                        images: dict[int, dict[str, Any]]) -> int:
-    """Bytes in packed under-layer arrays for common combat-unit raw IDs."""
+    """Bytes in packed unit under-layer and building-remnant arrays."""
     packed_images = packed_under_image_ids(sources)
     return sum(sum(len(phase) * 4 for phase in pack_word_phases(
         frame["w"], frame["h"], frame["pixels"]))
@@ -464,7 +467,8 @@ def generate(rom_path: Path, remap_path: Path, header_path: Path, out_dir: Path,
         "selection": {
             "unit_lookup": "units.dat->flingy.dat->sprites.dat->images.dat",
             "animation": "Death of the actor image; Init of spawned images/sprites",
-            "word_packing": f"under layers for raw unit ids below {WORD_PACK_RAW_ID_LIMIT}; higher ids stay indexed",
+            "word_packing": (f"under layers for raw unit ids below {WORD_PACK_RAW_ID_LIMIT}; "
+                             f"remnants for building ids {BUILDING_RAW_FIRST}..{BUILDING_RAW_END - 1}"),
             "iscript_walk": "linear and unconditional goto; liftoffcondjmp follows the grounded path",
             "remnant_cap_source_updates": REMNANT_CAP_SU,
             "remap_draw_function_9": "intensity bands mapped to GBA UI palette ramps; faintest band dropped, next dithered",

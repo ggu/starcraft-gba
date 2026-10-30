@@ -114,8 +114,10 @@ static void test_player_auto_acquisition_fog(void)
     /* The player cannot auto-acquire when every candidate is hidden. */
     SC64_GRID_CLEAR(visible);
     assert(nearest_enemy_typed(400, 400, SIDE, 96, U_MARINE) == -1);
-    /* Enemy AI uses its own model and is not constrained by the player's fog. */
-    assert(nearest_enemy_typed(400, 400, 4, 96, U_MARINE) == -1);
+    /* In FFA, AI owner 4 is hostile to owner 1 and acquires AI-vs-AI targets
+       independently of the player's fog. */
+    assert(owners_hostile(4, ENEMY));
+    assert(nearest_enemy_typed(400, 400, 4, 96, U_MARINE) == 0);
     u[2].alive = 1; u[2].owner = SIDE; u[2].type = U_ZERGLING;
     u[2].x = 416; u[2].y = 400;
     assert(nearest_enemy_typed(400, 400, ENEMY, 96, U_MARINE) == 2);

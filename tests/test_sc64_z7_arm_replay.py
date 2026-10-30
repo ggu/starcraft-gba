@@ -57,9 +57,12 @@ def cycles(kind, tick, frames, total=None):
             "stack_untouched=8000")
 
 
+LOADED = "Z7 LOADED ok frame=290 screen=1 started=2 minerals=900 gas=0"
+
+
 def run_log(rows, *, terminal_kind="won", start=True, done=True, timing=("terminal", 600, 600),
-            head=(), extra=()):
-    lines = ["Z7 START mode=0 tape=4 checks=3 stop=600"] if start else []
+            head=(), extra=(), mode=0):
+    lines = [f"Z7 START mode={mode} tape=4 checks=3 stop=600"] if start else []
     lines += list(head)
     for row in rows:
         lines += replay_lines(row)
@@ -73,17 +76,28 @@ def run_log(rows, *, terminal_kind="won", start=True, done=True, timing=("termin
     return "\n".join(lines) + "\n"
 
 
-def sram(*records):
+def fnv(payload):
+    h = 2166136261
+    for byte in payload:
+        h = ((h ^ byte) * 16777619) & 0xFFFFFFFF
+    return h
+
+
+def sram(*records, tag=TAG):
     """32 KiB alternating-slot SRAM with (slot, sequence, payload, valid) rows."""
     data = bytearray(b"\xff" * replay.SAVE_BYTES)
     for slot, sequence, payload, valid in records:
-        h = 2166136261
-        for byte in payload:
-            h = ((h ^ byte) * 16777619) & 0xFFFFFFFF
         off = slot * replay.SAVE_SLOT_SIZE
-        struct.pack_into("<4I", data, off, TAG, len(payload), h if valid else h ^ 1, sequence)
+        h = fnv(payload)
+        struct.pack_into("<4I", data, off, tag, len(payload), h if valid else h ^ 1, sequence)
         data[off + 16:off + 16 + len(payload)] = payload
     return bytes(data)
+
+
+def with_header(data, slot, tag, size, checksum, sequence):
+    out = bytearray(data)
+    struct.pack_into("<4I", out, slot * replay.SAVE_SLOT_SIZE, tag, size, checksum, sequence)
+    return bytes(out)
 
 
 PAUSE = bytes([1]) * PAYLOAD
@@ -150,7 +164,7 @@ class Z7ArmReplayTest(unittest.TestCase):
                          "tick 300 gas: replay=1 host=0")
         self.assertFails(self.full(plan, run_log(rows, terminal_kind=None)), "terminal observation")
         self.assertFails(self.full(plan, run_log(rows, done=False)), "one DONE")
-        self.assertFails(self.full(plan, run_log(rows, start=False)), "one START")
+        self.assertFails(self.full(plan, run_log(rows, start=False)), "one leading START")
         self.assertFails(self.full(plan, run_log(rows[:2])), "compared 2 of 3")
 
     def test_timing_gate_fails_closed(self):
@@ -165,7 +179,7 @@ class Z7ArmReplayTest(unittest.TestCase):
         self.assertFails(self.full(plan, run_log(rows, timing=("terminal", 600, 600, 10 ** 9))),
                          "incoherent timing")
         self.assertFails(self.full(plan, run_log(rows, extra=[cycles("periodic", 300, 700)])),
-                         "incoherent timing")
+                         "periodic timing ticks")
         untimed = replay.evaluate(plan, "full", run_log(rows, timing=None), None, timed=False,
                                   sram=sram((0, 1, WIN, True)))
         self.assertTrue(untimed["qualified"], untimed["failures"])
@@ -179,14 +193,74 @@ class Z7ArmReplayTest(unittest.TestCase):
         self.assertFails(self.full(plan, run_log(rows, extra=["Z7 BOGUS host_tick=1"])), "unknown record")
         self.assertFails(self.full(plan, run_log(rows, extra=["Z7 CHECK3 host_tick=300 gas=5"])),
                          "malformed")
+        # An identical CHECK2 outside its bundle, and an identical whole bundle.
+        self.assertFails(self.full(plan, run_log(rows, extra=[replay_lines(rows[1])[1]])),
+                         "orphan CHECK2")
+        self.assertFails(self.full(plan, run_log(rows, extra=[replay_lines(rows[1])[2]])),
+                         "orphan CHECK3")
+        self.assertFails(self.full(plan, run_log(rows, extra=replay_lines(rows[1])[:2])),
+                         "incomplete observation bundle")
+        broken = run_log(rows).replace(replay_lines(rows[1])[1] + "\n", "", 1)
+        self.assertFails(self.full(plan, broken), "incomplete observation bundle")
+        # Extra tokens, reordered fields and payload-free records.
+        self.assertFails(self.full(plan, run_log(rows, extra=[replay_lines(rows[1])[0] + " junk"])),
+                         "malformed")
+        swapped = replay_lines(rows[1])[0].replace("frame=289 screen=1", "screen=1 frame=289")
+        self.assertFails(self.full(plan, run_log(rows).replace(replay_lines(rows[1])[0], swapped)),
+                         "malformed")
         conflicting = replay_lines(dict(rows[1], minerals=1))[2]
-        self.assertFails(self.full(plan, run_log(rows, extra=[conflicting])), "conflicting minerals")
+        self.assertFails(self.full(plan, run_log(rows, extra=[conflicting])), "orphan CHECK3")
         self.assertFails(self.full(plan, run_log(rows, extra=replay_lines(rows[1]))),
                          "duplicate observation kind")
+        self.assertFails(self.full(plan, run_log(rows, extra=replay_lines(dict(rows[1], frame=1),
+                                                                          "cut"))),
+                         "conflicting observations")
         repeated = replay_lines(rows[1])[0] + " frame=1"
         self.assertFails(self.full(plan, run_log(rows, extra=[repeated])), "repeats")
         self.assertFails(self.full(plan, run_log(rows, extra=replay_lines(dict(rows[1], host_tick=301)))),
                          "unexpected replay observation at tick 301")
+
+    def test_start_and_done_payloads_are_checked(self):
+        plan = self.plan()
+        rows = self.rows(plan)
+        good = run_log(rows)
+        for old, new, needle in (
+                ("Z7 START mode=0 tape=4 checks=3 stop=600", "Z7 START gibberish", "malformed"),
+                ("Z7 START mode=0 tape=4 checks=3 stop=600", "Z7 START", "malformed"),
+                ("Z7 START mode=0 tape=4 checks=3 stop=600",
+                 "Z7 START mode=1 tape=4 checks=3 stop=600", "does not match the full tape"),
+                ("Z7 START mode=0 tape=4 checks=3 stop=600",
+                 "Z7 START mode=0 tape=5 checks=3 stop=600", "does not match the full tape"),
+                ("Z7 START mode=0 tape=4 checks=3 stop=600",
+                 "Z7 START mode=0 tape=4 checks=3 stop=601", "does not match the full tape"),
+                ("Z7 DONE cursor=4", "Z7 DONE nonsense", "malformed"),
+                ("Z7 DONE cursor=4", "Z7 DONE cursor=3", "did not consume")):
+            self.assertFails(self.full(plan, good.replace(old, new)), needle)
+        self.assertFails(self.full(plan, run_log(rows, extra=["Z7 START mode=0 tape=4 checks=3 stop=600"])),
+                         "one leading START")
+        late = run_log(rows, start=False, head=["Z7 START mode=0 tape=4 checks=3 stop=600"])
+        self.assertTrue(self.full(plan, late)["qualified"])
+        trailing = good + replay_lines(rows[0])[0] + "\n"
+        self.assertFalse(self.full(plan, trailing)["qualified"])
+        self.assertFails(self.full(plan, good + "Z7 DONE cursor=4\n"), "exactly one DONE")
+
+    def test_sram_schema_is_pinned_and_slots_are_classified(self):
+        plan = self.plan()
+        log = run_log(self.rows(plan))
+        wrong = TAG + 1
+        self.assertFails(self.full(plan, log, data=sram((0, 1, WIN, True), tag=wrong)),
+                         "invalid SRAM record in slot 0")
+        good = sram((0, 1, WIN, True))
+        oversized = with_header(good, 1, TAG, replay.SAVE_SLOT_SIZE, 0, 2)
+        self.assertFails(self.full(plan, log, data=oversized), "invalid SRAM record in slot 1")
+        torn = with_header(good, 1, 0, PAYLOAD, fnv(WIN), 2)
+        self.assertFails(self.full(plan, log, data=torn), "invalid SRAM record in slot 1")
+        zero_sequence = with_header(good, 1, TAG, PAYLOAD, fnv(b"\xff" * PAYLOAD), 0)
+        self.assertFails(self.full(plan, log, data=zero_sequence), "invalid SRAM record in slot 1")
+        stray = bytearray(good)
+        stray[replay.SAVE_SLOT_SIZE + 9000] = 0
+        self.assertFails(self.full(plan, log, data=bytes(stray)), "invalid SRAM record in slot 1")
+        self.assertEqual([r["slot"] for r in replay.save_records(good)], [0])
 
     def test_sram_gate_fails_closed(self):
         plan = self.plan()
@@ -204,13 +278,13 @@ class Z7ArmReplayTest(unittest.TestCase):
                                  None, sram=sram())
         self.assertTrue(result["qualified"], result["failures"])
 
-    def prefix_log(self, plan, cut=301, saved=True):
+    def prefix_log(self, plan, cut=301, saved=True, tag=TAG, payload=PAYLOAD, frame=289):
         rows = self.rows(plan)
         cut_row = dict(rows[1], host_tick=cut)
-        extra = [f"Z7 SAVED ok cut={cut} frame=290 payload_bytes={PAYLOAD} tag={TAG}"] if saved else []
+        extra = [f"Z7 SAVED ok cut={cut} frame={frame} payload_bytes={payload} tag={tag}"] if saved else []
         lines = (["Z7 START mode=1 tape=4 checks=3 stop=600"] + replay_lines(rows[0]) +
                  replay_lines(rows[1]) + replay_lines(cut_row, "cut") +
-                 [cycles("periodic", 300, 300), cycles("cut", cut, cut)] + extra)
+                 [cycles("cut", cut, cut)] + extra)
         return "\n".join(lines) + "\n"
 
     def test_prefix_requires_an_in_range_cut_and_one_pause_save(self):
@@ -224,22 +298,32 @@ class Z7ArmReplayTest(unittest.TestCase):
         self.assertFails(only_saved, "prefix cut None is not inside the tape")
         self.assertFails(only_saved, "compared 0 of 0")
         self.assertFails(replay.evaluate(plan, "prefix", self.prefix_log(plan, saved=False), None,
-                                         sram=sram((0, 1, PAUSE, True))), "one successful SAVED")
+                                         sram=sram((0, 1, PAUSE, True))), "one final successful SAVED")
         self.assertFails(replay.evaluate(plan, "prefix", self.prefix_log(plan, cut=700), None,
                                          sram=sram((0, 1, PAUSE, True))), "not inside the tape")
         self.assertFails(replay.evaluate(plan, "prefix", self.prefix_log(plan), None,
                                          sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True))),
                          "exactly one pause save")
-        doubled = self.prefix_log(plan) + f"Z7 SAVED ok cut=301 frame=290 payload_bytes={PAYLOAD} tag={TAG}\n"
+        doubled = self.prefix_log(plan) + f"Z7 SAVED ok cut=301 frame=289 payload_bytes={PAYLOAD} tag={TAG}\n"
         self.assertFails(replay.evaluate(plan, "prefix", doubled, None,
-                                         sram=sram((0, 1, PAUSE, True))), "one successful SAVED")
+                                         sram=sram((0, 1, PAUSE, True))), "one final successful SAVED")
+        # The log cannot redefine the schema: a matching wrong tag still fails.
+        wrong = TAG + 1
+        self.assertFails(replay.evaluate(plan, "prefix", self.prefix_log(plan, tag=wrong), None,
+                                         sram=sram((0, 1, PAUSE, True), tag=wrong)),
+                         "not the pinned Z7 schema")
+        self.assertFails(replay.evaluate(plan, "prefix", self.prefix_log(plan, payload=10), None,
+                                         sram=sram((0, 1, PAUSE, True))),
+                         "not the pinned Z7 schema")
+        self.assertFails(replay.evaluate(plan, "prefix", self.prefix_log(plan, frame=1), None,
+                                         sram=sram((0, 1, PAUSE, True))),
+                         "SAVED frame does not match")
 
     def test_resume_needs_the_seed_and_a_new_victory_record(self):
         plan = self.plan()
         rows = self.rows(plan)
         seed = sram((0, 1, PAUSE, True))
-        log = run_log(rows[2:], head=["Z7 LOADED ok frame=290 screen=1"],
-                      timing=("terminal", 600, 600 - 301 + 1))
+        log = run_log(rows[2:], head=[LOADED], timing=("terminal", 600, 600 - 301 + 1), mode=2)
         good = replay.evaluate(plan, "resume", log, 301, seed=seed,
                                sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True)))
         self.assertTrue(good["qualified"], good["failures"])
@@ -255,11 +339,16 @@ class Z7ArmReplayTest(unittest.TestCase):
         self.assertFails(replay.evaluate(plan, "resume", log.replace("LOADED ok", "LOADED fail"), 301,
                                          seed=seed, sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True))),
                          "one successful LOADED")
+        self.assertFails(replay.evaluate(plan, "resume", log.replace(LOADED, LOADED.replace(
+            "screen=1", "screen=3")), 301, seed=seed,
+            sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True))), "one successful LOADED")
+        self.assertFails(replay.evaluate(plan, "resume", log.replace(LOADED, "Z7 LOADED ok"), 301,
+                                         seed=seed, sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True))),
+                         "malformed")
         self.assertFails(replay.evaluate(plan, "resume", log, None, seed=seed,
                                          sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True))),
                          "not inside the tape")
-        early = run_log(rows, head=["Z7 LOADED ok frame=290 screen=1"],
-                        timing=("terminal", 600, 300))
+        early = run_log(rows, head=[LOADED], timing=("terminal", 600, 300), mode=2)
         self.assertFails(replay.evaluate(plan, "resume", early, 301, seed=seed,
                                          sram=sram((0, 1, PAUSE, True), (1, 2, WIN, True))),
                          "unexpected replay observation at tick 12")

@@ -72,6 +72,26 @@ static const int profile_missions[] = {0, 1, 14, 15};
 static const char *const profile_titles[] = {
     "AMONG THE RUINS", "EGRESSION", "THE NEW DOMINION", "AGENT OF THE SWARM"
 };
+#elif SC64_CAMPAIGN_RACE == 2 && defined(SC64_P7_RUNTIME)
+#define PROFILE_FACTION SC64_FACTION_PROTOSS
+#define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS
+#define PROFILE_RACE R_PROTOSS
+#define PROFILE_SAVE_GENERATION 43u
+#define PROFILE_OLD_SAVE_TAG 0x53435032u
+#if !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || !defined(SC64_P7_CARRIER_TRAINING_ENABLED) || !defined(SC64_P7_CAMPAIGN_ENTRY)
+#error "Canonical Protoss P7 requires its qualified Carrier and campaign-entry features"
+#endif
+_Static_assert(SC64_RACE_SAVE_GENERATION == 43u,
+               "canonical P7 retains its qualified generation-43 save schema");
+_Static_assert(SAVE_VERSION == 0x5343505bu,
+               "canonical P7 keeps its generation-43 Protoss save identity");
+_Static_assert(SC64_P7_GLOBAL_ID == 26,
+               "canonical Protoss P7 uses its stable global catalog identity");
+static const int profile_missions[] = {2, 3, 22, 23, 24, 25, 26};
+static const char *const profile_titles[] = {
+    "FIRST STRIKE", "INTO THE FLAMES", "HIGHER GROUND", "THE HUNT FOR TASSADAR",
+    "CHOOSING SIDES", "INTO THE DARKNESS", "HOMELAND"
+};
 #elif SC64_CAMPAIGN_RACE == 2 && defined(SC64_P6_RUNTIME)
 #define PROFILE_FACTION SC64_FACTION_PROTOSS
 #define PROFILE_FRONT_FACTION SC_FRONT_PROTOSS

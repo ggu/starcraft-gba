@@ -170,6 +170,20 @@ class PixelTests(unittest.TestCase):
 
 
 class HeaderTests(unittest.TestCase):
+    def test_word_policy_adds_only_building_remnants(self):
+        def source(*layers):
+            return {"layers": [{"image_id": image, "under": under, "remnant": remnant}
+                               for image, under, remnant in layers]}
+        sources = {
+            88: source((1, True, False), (2, False, True)),
+            89: source((3, True, True)),
+            105: source((4, True, True)),
+            106: source((5, True, False), (6, False, True)),
+            175: source((7, True, True), (8, False, False)),
+            176: source((9, True, True)),
+        }
+        self.assertEqual(mod.packed_under_image_ids(sources), {1, 6, 7})
+
     def test_header_compiles_and_dedupes_programs(self):
         layer = {"image_id": 7, "x": 0, "y": -1, "start": 0, "end": 6, "under": True,
                  "remnant": False, "steps": [[5, 3], [9, 3]], "loop_start": mod.HOLD_LAST}
