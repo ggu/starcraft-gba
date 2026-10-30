@@ -83,6 +83,34 @@ class StrictCompareTest(unittest.TestCase):
     def test_empty_candidate_fails(self):
         self.assert_fails(FULL, [])
 
+    def test_only_final_in_both_fails(self):
+        # A matching final record alone is not parity: the cadence check
+        # expects checkpoints at 1000, 2000 and 3000 in each file.
+        result = self.assert_fails([FULL[3]], [FULL[3]])
+        self.assertTrue(any("cadence" in e for e in result["errors"]), result)
+
+    def test_reference_missing_checkpoint_fails(self):
+        thin = [FULL[0], FULL[2], FULL[3]]
+        result = self.assert_fails(thin, list(thin))
+        self.assertTrue(any("reference breaks" in e for e in result["errors"]), result)
+
+    def test_unfinished_sequence_fails(self):
+        self.assert_fails(FULL[:3], FULL[:3])
+
+    def test_resume_without_cadence_fails(self):
+        resume = [check("resume", 1500, 7), FULL[3]]
+        a = [FULL[3]]
+        result = self.assert_fails(a, resume, 1500)
+        self.assertTrue(any("cadence" in e for e in result["errors"]), result)
+
+    def test_resume_reference_passes(self):
+        resume = [check("resume", 1500, 7)] + FULL[1:]
+        self.assertTrue(replay.compare_ok(replay.compare(resume, list(resume), 1500)))
+
+    def test_short_run_with_only_final_passes(self):
+        short = [check("won", 900, 5)]
+        self.assertTrue(replay.compare_ok(replay.compare(short, list(short), 0)))
+
 
 if __name__ == "__main__":
     unittest.main()
