@@ -3019,3 +3019,14 @@ metrics, then rechecks the existing scheduled/injected-input loop. An optional
 Z7 link comparison recovers 2,072 BSS bytes with the same IWRAM end and
 unchanged memory guards. This is input infrastructure and does not change
 gameplay, save formats, actor limits or the campaign qualification scope.
+
+### Battlecruiser source inputs
+
+The canonical Terran, Zerg, Protoss and Showcase profiles use the shared
+Battlecruiser and Yamato services. After preparing the ordinary race profile,
+run `./dev sc64 prepare-bc --rom PATH` with the verified USA ROM. This writes
+cover-encoded terrain, race and skirmish tables to `.local/sc64/bc/generated`
+and the two facility body frames to `.local/sc64/bc-body/`. The separate
+outputs leave the existing imported banks intact. `./dev sc64 status --profile
+terran` (or `zerg`, `protoss`, `protoss-p7`) reports whether the new inputs
+are present. Repeat preparation when the private source inputs change.
