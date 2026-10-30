@@ -69,7 +69,7 @@ static int reachable_location_distance(int sx, int sy, unsigned location,
     if (!out_x || !out_y || start < 0 || start >= MAP_CELLS || !location ||
         location > sc64_t5_scenario.location_count) return -1;
     const Sc64T4Location *r = &sc64_t5_scenario.locations[location - 1];
-    build_path_grid();
+    if (!path_grid_valid) return -1;
     memset(seen, 0, sizeof(seen)); memset(distance, 0, sizeof(distance));
     seen[start] = 1; queue[tail++] = (u16)start;
     while (head < tail) {
@@ -99,7 +99,7 @@ static int reachable_actor_location_point(int slot, unsigned location,
         !location || location > sc64_t5_scenario.location_count) return -1;
     int start = u[slot].x / 16 + (u[slot].y / 16) * MAP_COLS;
     const Sc64T4Location *r = &sc64_t5_scenario.locations[location - 1];
-    build_path_grid();
+    if (!path_grid_valid) return -1;
     memset(seen, 0, sizeof(seen)); memset(distance, 0, sizeof(distance));
     seen[start] = 1; queue[tail++] = (u16)start;
     while (head < tail) {
@@ -157,7 +157,8 @@ static int nearest_enemy_approach(int *out_x, int *out_y)
     if (!out_x || !out_y || lead < 0) return -1;
     int start = u[lead].x / 16 + (u[lead].y / 16) * MAP_COLS;
     if (start < 0 || start >= MAP_CELLS) return -1;
-    build_path_grid(); memset(seen, 0, sizeof(seen));
+    if (!path_grid_valid) return -1;
+    memset(seen, 0, sizeof(seen));
     memset(distance, 0, sizeof(distance)); seen[start] = 1; queue[tail++] = (u16)start;
     while (head < tail) {
         int cell = queue[head++], col = cell % MAP_COLS, row = cell / MAP_COLS;
@@ -193,7 +194,8 @@ static int nearest_enemy_approach_from_mode(int sx, int sy, int *out_x, int *out
     static u16 queue[MAP_CELLS], distance[MAP_CELLS];
     int start = sx / 16 + (sy / 16) * MAP_COLS, head = 0, tail = 0;
     if (!out_x || !out_y || start < 0 || start >= MAP_CELLS) return -1;
-    build_path_grid(); memset(seen, 0, sizeof(seen));
+    if (!path_grid_valid) return -1;
+    memset(seen, 0, sizeof(seen));
     memset(distance, 0, sizeof(distance)); seen[start] = 1; queue[tail++] = (u16)start;
     while (head < tail) {
         int cell = queue[head++], col = cell % MAP_COLS, row = cell / MAP_COLS;
@@ -301,14 +303,15 @@ static void tap(u16 key)
     step(0);
 }
 
-/* Field controls reopen the order list on the last command. These
- * sequences were written for a list that opens on Move, so a fresh
- * open starts there (no extra input, so the run's timing is unchanged). */
+/* Field controls reopen the order list on the last command. Navigate
+ * back to Move with normal inputs for callers that start from that row. */
 static void tap_b(void)
 {
     int fresh = !menu_open && mode == MODE_NORMAL;
     tap(KEY_B);
-    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+    for (int guard = 0; fresh && menu_open && menu_cursor != MENU_MOVE &&
+         guard < field_menu_count() && host_ticks < (u32)run_limit; ++guard)
+        tap(KEY_UP);
 }
 
 static int controller_normalize_field(void)
@@ -766,7 +769,7 @@ static int controller_landing_point(int *out_x, int *out_y)
     T5LandingCandidate best[T5_LANDING_CANDIDATES];
     int count = 0, terrain_candidates = 0, threat_safe = 0, ground_reachable = 0;
     if (!out_x || !out_y) return 0;
-    build_path_grid();
+    if (!path_grid_valid) return 0;
     for (int cell = 0; cell < MAP_CELLS; ++cell) {
         if (!SC64_GRID_GET(path_walkable, cell)) continue;
         ++terrain_candidates;
@@ -870,7 +873,7 @@ static int controller_home_staging_point(int ship, int *out_x, int *out_y)
         !b[trace_starport_slot].alive || !out_x || !out_y) return 0;
     const int sx = b[trace_starport_slot].x, sy = b[trace_starport_slot].y;
     int best = 0x7fffffff, found = 0;
-    build_path_grid();
+    if (!path_grid_valid) return 0;
     for (int cell = 0; cell < MAP_CELLS; ++cell) {
         if (!SC64_GRID_GET(path_walkable, cell)) continue;
         int x = (cell % MAP_COLS) * 16 + 8, y = (cell / MAP_COLS) * 16 + 8;
@@ -1574,7 +1577,7 @@ static int controller_safe_home_point(int actor, int *out_x, int *out_y)
         if (d < nearest) { nearest = d; command = i; }
     }
     if (command < 0) return 0;
-    build_path_grid();
+    if (!path_grid_valid) return 0;
     memset(seen, 0, sizeof(seen)); memset(distance, 0, sizeof(distance));
     int start = u[actor].x / 16 + (u[actor].y / 16) * MAP_COLS;
     if (start < 0 || start >= MAP_CELLS) return 0;
@@ -2295,9 +2298,13 @@ int main(int argc, char **argv)
         wait_frames(3600);
         int starport = -1, ship = -1, landing_x = -1, landing_y = -1;
         checkpoint("before-starport-tech");
+        controller_service_home_base();
         (void)controller_park_hero_safely(19);
+        controller_service_home_base();
         (void)controller_park_hero_safely(20);
+        controller_service_home_base();
         (void)controller_park_kerrigan_safely();
+        controller_service_home_base();
         (void)controller_hold_visible_marines();
         (void)controller_assign_idle_scvs_to_gas(3);
         checkpoint("heroes-held-safe-home");
@@ -2313,8 +2320,9 @@ int main(int argc, char **argv)
                         trace_tower_slot = i; break;
                     }
                 checkpoint("control-tower-complete");
-                if (controller_build_dropship(starport, &ship)) {
-                    checkpoint("dropship-complete");
+                int ship_ready = controller_build_dropship(starport, &ship);
+                if (b[starport].alive && building_complete(starport)) {
+                    checkpoint(ship_ready ? "dropship-complete" : "dropship-unavailable");
                     /* Add paid supply capacity so the Wraith wave is not capped
                        by the pre-existing garrison, while keeping the Marines
                        and heroes in the home defense. */
@@ -2384,6 +2392,7 @@ int main(int argc, char **argv)
     }
     while (host_ticks < (u32)run_limit && screen == SCREEN_PLAY && !won && !lost) {
         step(0);
+        if (host_ticks % 300 == 0) controller_service_home_base();
         if (trace_file && host_ticks % T5_CHECKPOINT_PERIOD == 0)
             checkpoint("periodic");
     }

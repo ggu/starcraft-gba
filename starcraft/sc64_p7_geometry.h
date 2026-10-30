@@ -51,12 +51,12 @@ static int sc64_p7_actor_rect_source(unsigned raw,int x,int y,int building,
             case 166:l=36;u=24;r=40;d=18;break; /* Forge */
             case 167:l=48;u=40;r=48;d=32;break; /* Stargate */
             case 194:l=48;u=32;r=47;d=31;break; /* Special Zerg Beacon */
+            case 144:l=24;u=24;r=23;d=23;break; /* Spore Colony (detector) */
 #ifdef SC64_P8_DATA_ENABLED
             case 168:l=64;u=48;r=63;d=47;break; /* Stasis Cell/Prison */
 #endif
 #ifdef SC64_P9_DATA_ENABLED
             case 136:l=48;u=32;r=48;d=4;break;  /* Defiler Mound */
-            case 144:l=24;u=24;r=23;d=23;break; /* Spore Colony (detector) */
 #endif
             default:return 0;
             }
@@ -74,9 +74,9 @@ static int sc64_p7_actor_rect_source(unsigned raw,int x,int y,int building,
         case 78:l=15;u=15;r=16;d=16;break; /* Fenix Dragoon */
         case 79:l=12;u=10;r=11;d=13;break; /* Tassadar */
         case 83:l=16;u=16;r=15;d=15;break; /* Reaver */
+        case 42:l=25;u=25;r=24;d=24;break; /* Overlord (detector) */
 #ifdef SC64_P9_DATA_ENABLED
         case 46:l=13;u=12;r=13;d=12;break; /* Defiler */
-        case 42:l=25;u=25;r=24;d=24;break; /* Overlord (detector) */
 #endif
         default:return 0;
         }

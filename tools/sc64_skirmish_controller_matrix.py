@@ -38,6 +38,8 @@ def run(controller: Path, output: Path, ticks: int = 120000) -> dict:
                 label = f"m{map_id}-h{race}-n{bots}"
                 trace_path = output / f"{label}.json"
                 try:
+                    # A successful exit must produce a fresh witness for this run.
+                    trace_path.unlink(missing_ok=True)
                     with (output / f"{label}.log").open("w") as log:
                         process = subprocess.run(
                             [str(controller), str(map_id), str(race), str(bots),
@@ -45,18 +47,18 @@ def run(controller: Path, output: Path, ticks: int = 120000) -> dict:
                             timeout=180)
                     if process.returncode not in (0, 3):
                         raise RuntimeError(f"controller exit {process.returncode}; see {label}.log")
-                except (subprocess.TimeoutExpired, RuntimeError) as exc:
+                    payload = trace_path.read_bytes()
+                    plan = validate_trace(json.loads(payload), 256, checkpoint_interval=250)
+                    terminal = plan["terminal"]
+                    if process.returncode != (0 if terminal["kind"] == "won" else 3):
+                        raise RuntimeError("exit code and terminal witness disagree")
+                    if (terminal["map"], terminal["human_race"], terminal["bot_count"]) != (map_id, race, bots):
+                        raise RuntimeError("controller launched a different configuration")
+                except (OSError, ValueError, TypeError, KeyError, subprocess.TimeoutExpired, RuntimeError) as exc:
                     failures.append({"configuration": label, "error": str(exc)})
                     write_report()
                     print(f"{label}: incomplete ({exc})", flush=True)
                     continue
-                payload = trace_path.read_bytes()
-                plan = validate_trace(json.loads(payload), 256, checkpoint_interval=250)
-                terminal = plan["terminal"]
-                if process.returncode != (0 if terminal["kind"] == "won" else 3):
-                    raise RuntimeError(f"{label}: exit code and terminal witness disagree")
-                if (terminal["map"], terminal["human_race"], terminal["bot_count"]) != (map_id, race, bots):
-                    raise RuntimeError(f"{label}: controller launched a different configuration")
                 results.append({"map": map_id, "human_race": race, "bots": bots,
                                 "outcome": terminal["kind"], "host_ticks": plan["stop_tick"],
                                 "frame": terminal["frame"], "trace": str(trace_path.resolve()),

@@ -11,9 +11,11 @@ briefing and pause-menu save are ordinary tape inputs.
 directory; no debugger port) on a replay ROM and keeps its `P8 ` debug lines.
 `--sav-in` seeds the save directory first, for the fresh-process resume ROM.
 
-`compare A B` checks two line files (host probe output or ARM logs) for equal
-observations at every common tape tick, optionally from `--from-tick` on, and
-requires both to end in the same outcome. `--mission 28 --prefix P9` selects
+`compare A B` checks candidate line file B against reference A (host probe
+output or ARM logs): B must hold exactly A's observations from `--from-tick`
+on (the resume cutoff, where B may open with its own `resume` observation),
+with equal fields, no duplicate or out-of-order ticks, and the same final
+outcome. `--mission 28 --prefix P9` selects
 the P9 controller trace, tape macros and probe lines. Emulator evidence only.
 """
 from __future__ import annotations
@@ -164,30 +166,86 @@ def p8_lines(text: str) -> list[str]:
     return [l[l.index(tag):].rstrip() for l in text.splitlines() if tag in l]
 
 
-def checks(lines: list[str]) -> dict[int, dict]:
-    rows = {}
+class ObservationError(ValueError):
+    """A line file is not a well-formed observation sequence."""
+
+
+def checks(lines: list[str]) -> list[tuple[int, dict]]:
+    """CHECK observations in file order. Ticks must be unique and strictly
+    increasing: a duplicate or out-of-order tick is an error, never silently
+    overwritten."""
+    rows: list[tuple[int, dict]] = []
+    seen: set[int] = set()
     for line in lines:
-        if line.startswith(PREFIX + " CHECK "):
-            fields = dict(re.findall(r"(\w+)=(-?\d+)", line))
-            fields["kind"] = line.split()[2]
-            rows[int(fields["tick"])] = fields
+        if not line.startswith(PREFIX + " CHECK "):
+            continue
+        fields = dict(re.findall(r"(\w+)=(-?\d+)", line))
+        if "tick" not in fields:
+            raise ObservationError(f"observation without a tick: {line}")
+        fields["kind"] = line.split()[2]
+        tick = int(fields["tick"])
+        if tick in seen:
+            raise ObservationError(f"duplicate observation at tick {tick}")
+        if rows and tick < rows[-1][0]:
+            raise ObservationError(f"observation at tick {tick} follows tick {rows[-1][0]}")
+        seen.add(tick)
+        rows.append((tick, fields))
     return rows
 
 
 def compare(a: list[str], b: list[str], from_tick: int) -> dict:
-    ca, cb = checks(a), checks(b)
-    common = sorted(t for t in ca if t in cb and t >= from_tick)
+    """Strict comparison of candidate B against reference A from `from_tick`.
+
+    B must contain exactly A's observations at or after the cutoff, with
+    equal fields, and end in the same final record. Under a cutoff (the
+    documented resume tick), B may open with its own `resume` observation at
+    that tick even where A has none, and may hold nothing before it."""
+    errors: list[str] = []
+    try:
+        ra, rb = checks(a), checks(b)
+    except ObservationError as exc:
+        return {"compared": 0, "errors": [str(exc)], "missing": [], "extra": [],
+                "mismatch_count": 0, "mismatches": [], "final_a": None,
+                "final_b": None, "same_end": False}
+    da, db = dict(ra), dict(rb)
+    early = [t for t, _ in rb if t < from_tick]
+    if early:
+        errors.append(f"candidate holds {len(early)} observations before tick {from_tick}")
+    expected = [t for t, _ in ra if t >= from_tick]
+    got = [t for t, _ in rb if t >= from_tick]
+    cutoff_ok = (from_tick > 0 and got and got[0] == from_tick and
+                 db[from_tick]["kind"] == "resume")
+    missing = [t for t in expected if t not in db]
+    extra = [t for t in got if t not in da and not (cutoff_ok and t == from_tick)]
+    if missing:
+        errors.append(f"candidate misses {len(missing)} expected observations")
+    if extra:
+        errors.append(f"candidate holds {len(extra)} unexpected observations")
+    common = [t for t in expected if t in db]
     mismatches = []
     for tick in common:
-        ra, rb = ca[tick], cb[tick]
-        for key in sorted(set(ra) | set(rb)):
-            if key != "kind" and ra.get(key) != rb.get(key):
-                mismatches.append(f"tick {tick} {key}: {ra.get(key)} != {rb.get(key)}")
-    end_a, end_b = (max(c) if c else None for c in (ca, cb))
-    return {"compared": len(common), "mismatch_count": len(mismatches),
+        x, y = da[tick], db[tick]
+        for key in sorted(set(x) | set(y)):
+            if key == "kind" and tick == from_tick and cutoff_ok:
+                continue
+            if x.get(key) != y.get(key):
+                mismatches.append(f"tick {tick} {key}: {x.get(key)} != {y.get(key)}")
+    end_a = ra[-1] if ra else None
+    end_b = rb[-1] if rb else None
+    same_end = bool(end_a and end_b and end_a[0] == end_b[0] and
+                    end_a[1]["kind"] == end_b[1]["kind"] and
+                    end_a[1]["kind"] in ("won", "lost", "limit"))
+    if not same_end:
+        errors.append("the two sequences do not end in the same final observation")
+    return {"compared": len(common), "errors": errors, "missing": missing[:40],
+            "extra": extra[:40], "mismatch_count": len(mismatches),
             "mismatches": mismatches[:40],
-            "final_a": ca.get(end_a), "final_b": cb.get(end_b),
-            "same_end": end_a == end_b and end_a is not None}
+            "final_a": end_a[1] if end_a else None,
+            "final_b": end_b[1] if end_b else None, "same_end": same_end}
+
+
+def compare_ok(result: dict) -> bool:
+    return bool(result["compared"]) and not result["errors"] and not result["mismatch_count"]
 
 
 def main() -> None:
@@ -220,8 +278,7 @@ def main() -> None:
         result = compare(p8_lines(args.a.read_text()), p8_lines(args.b.read_text()),
                          args.from_tick)
         print(json.dumps(result, indent=2))
-        ok = result["same_end"] and not result["mismatch_count"] and result["compared"]
-        raise SystemExit(0 if ok else 1)
+        raise SystemExit(0 if compare_ok(result) else 1)
     from emulator_smoke import require_mgba
     out = args.out.resolve()
     if out.exists() and any(out.iterdir()):

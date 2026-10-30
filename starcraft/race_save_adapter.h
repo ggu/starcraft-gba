@@ -618,6 +618,15 @@ static int race_save_game(void) {
         };
     memcpy(race_data.state,state,sizeof(state));
     race_data.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX]=SC64_BUILDING_DAMAGE_SAVE_MARKER;
+#ifdef SC64_P7_BATTERY_ENABLED
+    /* Custom games keep the shared service clock in the state words; a
+     * mission binding saves its own. */
+    if (race_mode) {
+        if (!race_p7_battery_live_world_valid()) return 0;
+        race_data.state[SC64_PROTOSS_CLOCK_STATE_INDEX] =
+            race_protoss_clock_word(race_protoss_generic_clock);
+    }
+#endif
 #ifdef SC64_CONSTRUCTION_HP
     race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = SC64_CONSTRUCTION_SAVE_MARKER;
 #endif
@@ -1020,7 +1029,19 @@ static int race_save_game(void) {
 #endif
     save_write(&race_data,sizeof(race_data),SAVE_VERSION);toast(7);return 1;
 }
-static int race_load_game(void) {
+/* Load preflight validates the candidate under its own service binding (its
+ * mode and mission), then the live world takes it; the override never
+ * outlives the load, whatever path returns. */
+static int race_load_game_candidate(void);
+static int race_load_game(void)
+{
+    int ok = race_load_game_candidate();
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+    race_protoss_unbind_candidate();
+#endif
+    return ok;
+}
+static int race_load_game_candidate(void) {
 #if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
     Sc64T4RuntimeState expanded_t4;
     int expanded_t4_valid = 0;
@@ -1042,6 +1063,14 @@ static int race_load_game(void) {
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
     const int *v=race_data.state;
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+    race_protoss_bind_candidate(v[0], v[2]);
+#endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    /* Only the generic binding keeps its service clock in the state words. */
+    if (!race_protoss_clock_word_valid(v[SC64_PROTOSS_CLOCK_STATE_INDEX]) ||
+        (v[SC64_PROTOSS_CLOCK_STATE_INDEX] && !v[0])) return 0;
+#endif
     int building_damage_marker=v[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX];
     if (building_damage_marker && building_damage_marker!=SC64_BUILDING_DAMAGE_SAVE_MARKER) return 0;
 #ifdef SC64_CONSTRUCTION_HP
@@ -1219,14 +1248,10 @@ static int race_load_game(void) {
              * A pause/save preserves that order until its next service tick. */
             Building target_battery;
             const Sc64RaceUnitRule *unit_rule=sc64_race_unit_rule(candidate_unit.type);
-            if (race_data.state[0] != 0 ||
-#ifdef SC64_PROTOSS_SHARED_SERVICES
-                !RACE_PROTOSS_SERVICE_MISSION(race_data.state[2]) ||
-#else
-                race_data.state[2] != SC64_P7_GLOBAL_ID ||
-#endif
-                candidate_unit.raw_type==73 || candidate_unit.raw_type==85 ||
-                candidate_unit.raw_owner<0 || candidate_unit.raw_owner>=8 ||
+            /* The candidate's mode is bound for this preflight. */
+            if (!race_protoss_services_active() ||
+                RACE_PROTOSS_RAW(&candidate_unit)==73 || RACE_PROTOSS_RAW(&candidate_unit)==85 ||
+                RACE_PROTOSS_SLOT(&candidate_unit)<0 || RACE_PROTOSS_SLOT(&candidate_unit)>=8 ||
                 candidate_unit.work_timer!=0 || !unit_rule ||
                 unit_rule->race!=R_PROTOSS ||
                 !(unit_rule->flags&SC_RACE_F_SHIELDS) ||
@@ -1239,9 +1264,9 @@ static int race_load_game(void) {
                 target>=MAX_BUILDINGS ||
                 !race_save_decode_building(&race_data,(unsigned)target,&target_battery) ||
                 !target_battery.alive || target_battery.type!=B_P7_SHIELD_BATTERY ||
-                target_battery.raw_type!=172 || target_battery.under_construction ||
+                RACE_PROTOSS_RAW(&target_battery)!=172 || target_battery.under_construction ||
                 target_battery.owner!=candidate_unit.owner ||
-                target_battery.raw_owner!=candidate_unit.raw_owner) return 0;
+                RACE_PROTOSS_SLOT(&target_battery)!=RACE_PROTOSS_SLOT(&candidate_unit)) return 0;
         }
 #endif
 #ifdef SC64_T6_RUNTIME
@@ -1392,10 +1417,13 @@ static int race_load_game(void) {
             if (candidate_building.raw_owner!=0 && candidate_building.raw_owner!=4 &&
                 candidate_building.raw_owner!=7) return 0;
         }
-#ifdef SC64_PROTOSS_SHARED_SERVICES
-        else if (!race_data.state[0] &&
-                 race_protoss_later_service_mission(race_data.state[2]) &&
-                 candidate_building.type==B_P7_SHIELD_BATTERY &&
+        else if (candidate_building.type==B_P7_SHIELD_BATTERY &&
+                 race_protoss_service_binding()==SC64_PROTOSS_BIND_GENERIC &&
+                 !race_protoss_generic_battery_candidate_valid(&candidate_building))
+            return 0;
+#ifdef SC64_PROTOSS_LATER_BINDINGS
+        else if (candidate_building.type==B_P7_SHIELD_BATTERY &&
+                 race_protoss_service_binding()==SC64_PROTOSS_BIND_LATER &&
                  !race_protoss_later_battery_candidate_valid(race_data.state[2],
                                                              &candidate_building))
             return 0;
@@ -1692,12 +1720,7 @@ static int race_load_game(void) {
             if (!race_save_decode_unit(&race_data,i,(unsigned)(width*16),
                                        (unsigned)(height*16),&candidate)) return 0;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-#ifdef SC64_PROTOSS_SHARED_SERVICES
-            if (!sc64_p7_arbiter_cache_unit_valid_with_mask(&candidate,
-                    sc64_protoss_mission_source_mask(SC64_P7_GLOBAL_ID))) return 0;
-#else
             if (!sc64_p7_arbiter_cache_unit_valid(&candidate)) return 0;
-#endif
 #endif
             live+=candidate.alive!=0;
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
@@ -1786,8 +1809,7 @@ static int race_load_game(void) {
             if (candidate.alive && (candidate.raw_owner<0 || candidate.raw_owner>=8 ||
                 sc64_race_unit_from_raw(candidate.raw_type)<0)) return 0;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-            if (!sc64_p7_arbiter_cache_unit_valid_with_mask(&candidate,
-                    sc64_protoss_mission_source_mask(SC64_P8_GLOBAL_ID))) return 0;
+            if (!sc64_p7_arbiter_cache_unit_valid(&candidate)) return 0;
 #endif
         }
         for (unsigned i=0;i<MAX_BUILDINGS;++i) {
@@ -1828,8 +1850,7 @@ static int race_load_game(void) {
             if (candidate.alive && (candidate.raw_owner<0 || candidate.raw_owner>=8 ||
                 sc64_race_unit_from_raw(candidate.raw_type)<0)) return 0;
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
-            if (!sc64_p7_arbiter_cache_unit_valid_with_mask(&candidate,
-                    sc64_protoss_mission_source_mask(SC64_P9_GLOBAL_ID))) return 0;
+            if (!sc64_p7_arbiter_cache_unit_valid(&candidate)) return 0;
 #endif
         }
         for (unsigned i=0;i<MAX_BUILDINGS;++i) {
@@ -2242,6 +2263,23 @@ static int race_load_game(void) {
     }
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
+    /* Custom games: restore the shared service clock. Saves from before the
+     * shared services carry no cache word; those actors start with an empty
+     * one. */
+    if (race_mode) {
+        race_protoss_clock_from_word(race_protoss_generic_clock,
+                                     v[SC64_PROTOSS_CLOCK_STATE_INDEX]);
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+        sc64_p7_arbiter_cache_due=0;
+        sc64_p7_arbiter_cache_initialized=
+            race_protoss_generic_clock[1] || race_protoss_generic_clock[2];
+        for (int i=0;i<MAX_UNITS;++i)
+            if (!sc64_p7_arbiter_cache_empty_unit(&u[i]) &&
+                !SC64_P7_ARBITER_CACHE_VALID(u[i].weapon))
+                u[i].weapon=(u16)(1u<<13);
+#endif
+        if (!race_p7_battery_live_world_valid()) return 0;
+    }
     if (race_p7_active()) {
         race_p7 = race_data.p7;
         if (!race_p7_rebind_loaded_world(&sc64_race_maps[SC64_P7_GLOBAL_ID]) ||

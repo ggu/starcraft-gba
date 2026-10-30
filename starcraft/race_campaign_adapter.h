@@ -475,6 +475,15 @@ race_campaign_init(void)
     memset(&race_z7_ops, 0, sizeof(race_z7_ops));
     race_z7_map = 0;
 #endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    /* Every game starts with a fresh shared Protoss service clock; mission
+     * bindings reset their own clocks in their runtime init. */
+    memset(race_protoss_generic_clock, 0, sizeof(race_protoss_generic_clock));
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    sc64_p7_arbiter_cache_due = 0;
+    sc64_p7_arbiter_cache_initialized = 0;
+#endif
+#endif
     if (race_mode) {
         race_skirmish_init();
         return;

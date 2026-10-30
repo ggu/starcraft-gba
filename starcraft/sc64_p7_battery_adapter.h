@@ -23,11 +23,11 @@ static int sc64_p7_battery_unit_valid(int slot, int battery)
         return 0;
     unit=&u[slot]; source=&b[battery];
     if (!unit->alive || !source->alive || source->type!=B_P7_SHIELD_BATTERY ||
-        source->raw_type!=172 || source->under_construction ||
-        source->queue_count || source->raw_owner<0 || source->raw_owner>=8 ||
-        unit->raw_owner!=source->raw_owner || unit->owner!=source->owner ||
+        RACE_PROTOSS_RAW(source)!=172 || source->under_construction ||
+        source->queue_count || RACE_PROTOSS_SLOT(source)<0 || RACE_PROTOSS_SLOT(source)>=8 ||
+        RACE_PROTOSS_SLOT(unit)!=RACE_PROTOSS_SLOT(source) || unit->owner!=source->owner ||
         SC64_TRANSPORT_LOADED(unit) ||
-        unit->raw_type==73 || unit->raw_type==85) return 0;
+        RACE_PROTOSS_RAW(unit)==73 || RACE_PROTOSS_RAW(unit)==85) return 0;
     rule=sc64_race_unit_rule(unit->type);
     if (!rule || rule->race!=R_PROTOSS || !(rule->flags&SC_RACE_F_SHIELDS) ||
         unit->shield>=rule->shields || unit->shield<0 ||
@@ -43,9 +43,9 @@ static int sc64_p7_battery_fields_valid(int battery)
     const Building *q;
     if (battery<0 || battery>=MAX_BUILDINGS) return 0;
     q=&b[battery];
-    return q->alive && q->type==B_P7_SHIELD_BATTERY && q->raw_type==172 &&
+    return q->alive && q->type==B_P7_SHIELD_BATTERY && RACE_PROTOSS_RAW(q)==172 &&
         q->queue_count==0 && q->queue_head==0 &&
-        q->raw_owner>=0 && q->raw_owner<8 &&
+        RACE_PROTOSS_SLOT(q)>=0 && RACE_PROTOSS_SLOT(q)<8 &&
         q->queue_progress>=0 && q->queue_progress<=SC64_P7_BATTERY_MAX_ENERGY_Q8 &&
         q->level>=0 && q->level<SC64_P7_BATTERY_REGEN_DEN &&
         sc64_p7_battery_energy_valid((unsigned)q->queue_progress,
@@ -57,11 +57,11 @@ static int sc64_p7_battery_powered_live(int battery)
     const Building *target;
     if (battery<0 || battery>=MAX_BUILDINGS || !b[battery].alive) return 0;
     target=&b[battery];
-    if (target->type!=B_P7_SHIELD_BATTERY || target->raw_type!=172 ||
-        target->raw_owner<0 || target->raw_owner>=8) return 0;
+    if (target->type!=B_P7_SHIELD_BATTERY || RACE_PROTOSS_RAW(target)!=172 ||
+        RACE_PROTOSS_SLOT(target)<0 || RACE_PROTOSS_SLOT(target)>=8) return 0;
     for (int i=0;i<MAX_BUILDINGS;++i) if (building_complete(i) &&
-        b[i].type==B_PYLON && b[i].raw_type==156 &&
-        b[i].owner==target->owner && b[i].raw_owner==target->raw_owner &&
+        b[i].type==B_PYLON && RACE_PROTOSS_RAW(&b[i])==156 &&
+        b[i].owner==target->owner && RACE_PROTOSS_SLOT(&b[i])==RACE_PROTOSS_SLOT(target) &&
         sc64_p7_in_psi_range(target->x-b[i].x,target->y-b[i].y)) return 1;
     return 0;
 }
@@ -73,9 +73,9 @@ static int sc64_p7_battery_target_valid(int battery)
 static int sc64_p7_battery_distance_unit(int unit, int battery)
 {
     int al,at,ar,ab,bl,bt,br,bb;
-    if (!sc64_p7_actor_rect_source((unsigned)u[unit].raw_type,u[unit].x,
+    if (!sc64_p7_actor_rect_source((unsigned)RACE_PROTOSS_RAW(&u[unit]),u[unit].x,
             u[unit].y,0,&al,&at,&ar,&ab) ||
-        !sc64_p7_actor_rect_source((unsigned)b[battery].raw_type,b[battery].x,
+        !sc64_p7_actor_rect_source((unsigned)RACE_PROTOSS_RAW(&b[battery]),b[battery].x,
             b[battery].y,1,&bl,&bt,&br,&bb)) return -1;
     int dx=al>=br?al-(br-1):bl>=ar?bl-(ar-1):0;
     int dy=at>=bb?at-(bb-1):bt>=ab?bt-(ab-1):0;
@@ -145,7 +145,7 @@ static int race_p7_battery_command_available(void)
         selected_building>=MAX_BUILDINGS) return 0;
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].selected) return 0;
     const Building *q=&b[selected_building];
-    return q->owner==SIDE && q->raw_owner==7 &&
+    return q->owner==SIDE && RACE_PROTOSS_SLOT(q)==SC64_PROTOSS_HUMAN_SLOT &&
         sc64_p7_battery_target_valid(selected_building) && q->queue_progress>0;
 }
 
@@ -155,7 +155,8 @@ static int race_p7_battery_build_available(void)
     if (!race_protoss_services_active() || race_human!=R_PROTOSS || selected_building>=0 ||
         !race_owner_has_prereq(SIDE,SC_PR_GATEWAY)) return 0;
     for (int i=0;i<MAX_UNITS;++i) if (u[i].alive && u[i].selected) {
-        if (u[i].owner!=SIDE || u[i].type!=U_PROBE || u[i].raw_owner!=7 ||
+        if (u[i].owner!=SIDE || u[i].type!=U_PROBE ||
+            RACE_PROTOSS_SLOT(&u[i])!=SC64_PROTOSS_HUMAN_SLOT ||
             SC64_TRANSPORT_LOADED(&u[i]))
             return 0;
         found=1;
@@ -177,7 +178,7 @@ static int race_p7_battery_issue_command(int battery, int x, int y)
         int px=x*2, py=y*2;
         for (int i=0;i<MAX_UNITS;++i) if (sc64_p7_battery_unit_valid(i,battery)) {
             int l,t,r,bottom;
-            if (!sc64_p7_actor_rect_source((unsigned)u[i].raw_type,u[i].x,
+            if (!sc64_p7_actor_rect_source((unsigned)RACE_PROTOSS_RAW(&u[i]),u[i].x,
                     u[i].y,0,&l,&t,&r,&bottom)) continue;
             if (!sc64_p7_battery_click_overlap(l,t,r,bottom,px,py)) continue;
             u[i].order=ORDER_P7_RECHARGE; u[i].target=battery;
@@ -187,11 +188,24 @@ static int race_p7_battery_issue_command(int battery, int x, int y)
     return count;
 }
 
+/* A custom-game Battery: any owner, no authenticated map row. */
+static int race_protoss_generic_battery_candidate_valid(const Building *q)
+{
+    return q && RACE_PROTOSS_RAW(q)==172 && q->queue_count==0 && q->queue_head==0 &&
+        q->queue_progress>=0 && q->queue_progress<=SC64_P7_BATTERY_MAX_ENERGY_Q8 &&
+        q->level>=0 && q->level<SC64_P7_BATTERY_REGEN_DEN &&
+        sc64_p7_battery_energy_valid((unsigned)q->queue_progress,(unsigned)q->level) &&
+        q->shield<=sc64_race_building_shields(B_P7_SHIELD_BATTERY);
+}
+
 static int race_p7_battery_initialize_source(const Sc64RaceMap *map)
 {
     unsigned seen=0;
-#ifdef SC64_PROTOSS_SHARED_SERVICES
-    if (race_protoss_later_services_active())
+    /* Custom maps carry no authenticated Battery properties; a placed
+     * Battery keeps the engine's starting energy. */
+    if (race_protoss_service_binding()==SC64_PROTOSS_BIND_GENERIC) return 1;
+#ifdef SC64_PROTOSS_LATER_BINDINGS
+    if (race_protoss_service_binding()==SC64_PROTOSS_BIND_LATER)
         return race_protoss_later_battery_initialize(map);
 #endif
     if (!race_p7_active() || !map || map!=&sc64_race_maps[SC64_P7_GLOBAL_ID] ||
@@ -211,7 +225,7 @@ static int race_p7_battery_initialize_source(const Sc64RaceMap *map)
             want->energy!=100) return 0;
         int owner=race_p7_source_owner(want->owner), found=-1;
         for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive &&
-            b[i].type==B_P7_SHIELD_BATTERY && b[i].raw_type==172 &&
+            b[i].type==B_P7_SHIELD_BATTERY && RACE_PROTOSS_RAW(&b[i])==172 &&
             b[i].raw_owner==want->owner && b[i].owner==owner &&
             b[i].x==src->x_px && b[i].y==src->y_px) { found=i; break; }
         if (owner<0 || found<0) return 0;
@@ -231,13 +245,19 @@ static int race_p7_battery_live_world_valid(void)
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
     if (!sc64_p7_arbiter_cache_world_valid()) return 0;
 #endif
-#ifdef SC64_PROTOSS_SHARED_SERVICES
-    if (race_protoss_later_services_active())
+    if (race_protoss_service_binding()==SC64_PROTOSS_BIND_GENERIC) {
+        for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive &&
+            b[i].type==B_P7_SHIELD_BATTERY &&
+            (RACE_PROTOSS_RAW(&b[i])!=172 || !sc64_p7_battery_fields_valid(i))) return 0;
+        return 1;
+    }
+#ifdef SC64_PROTOSS_LATER_BINDINGS
+    if (race_protoss_service_binding()==SC64_PROTOSS_BIND_LATER)
         return race_protoss_later_battery_world_valid();
 #endif
     for (int i=0;i<MAX_BUILDINGS;++i) if (b[i].alive &&
         b[i].type==B_P7_SHIELD_BATTERY) {
-        if (b[i].raw_type!=172 || !sc64_p7_battery_fields_valid(i)) return 0;
+        if (RACE_PROTOSS_RAW(&b[i])!=172 || !sc64_p7_battery_fields_valid(i)) return 0;
         if (b[i].raw_owner==0 || b[i].raw_owner==4) {
             int property=b[i].raw_owner==0?0:1;
             const Sc64P7BatterySourceProperty *want=&sc64_p7_battery_source_properties[property];

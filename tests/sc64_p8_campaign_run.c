@@ -79,6 +79,19 @@ static int hero(int raw)
     return -1;
 }
 
+/* Distance from (x,y) to the nearest enemy unit, capped at 1024 pixels. */
+static int enemy_clearance(int x,int y)
+{
+    int best=1024*1024;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY){
+        int d=dist2(u[i].x,u[i].y,x,y);
+        if(d<best)best=d;
+    }
+    int r=0;
+    while((r+1)*(r+1)<=best)++r;
+    return r;
+}
+
 static int stasis_cell(void)
 {
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].raw_type==168)return i;
@@ -277,13 +290,16 @@ static int queue_probe(void)
     return 1;
 }
 
+/* Minerals production leaves unspent, so the save-time Pylon can start. */
+static int mineral_reserve;
+
 static int queue_combat_unit(void)
 {
     int wanted=count_type(B_CYBERNETICS_CORE,1)&&gas>=50&&minerals>=125?U_DRAGOON:U_ZEALOT;
     const Sc64RaceUnitRule *rule=sc64_race_unit_rule(wanted);
-    if(!rule||minerals<(int)rule->minerals||gas<(int)rule->gas||
+    if(!rule||minerals<(int)rule->minerals+mineral_reserve||gas<(int)rule->gas||
        race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<(int)rule->supply)return 0;
-    int producer=-1,best_queue=2;
+    int producer=-1,best_queue=4;
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
         b[i].type==B_GATEWAY&&building_complete(i)&&b[i].queue_count<best_queue){
         producer=i;best_queue=b[i].queue_count;
@@ -534,6 +550,51 @@ int main(int argc,char **argv)
         if(menu_open)KEY_TAP(KEY_B);
         int home=home_nexus();
         int f=hero(78),h=hero(28);
+        /* Save while a structure is still warping in, so the record carries
+         * active construction: start a Pylon if nothing is, and fall back
+         * after a bounded wait. */
+        mineral_reserve=!saved&&frame>=P8_SAVE_FRAME-600?150:0;
+        if(!saved&&frame>=P8_SAVE_FRAME&&!under_construction()&&frame>=next_save_build){
+            (void)build_structure(B_PYLON,MENU_DEPOT,64,448,-1,-1);
+            next_save_build=frame+300;
+        }
+        if(!saved&&frame>=P8_SAVE_FRAME&&(under_construction()||frame>=P8_SAVE_FRAME+6000)){
+            int building=under_construction();
+            /* The building selection and the orders menu's remembered row
+             * are UI state, not saved: a fresh process starts with neither.
+             * Return the row to the top and deselect first, so the replayed
+             * inputs mean the same thing before and after a load. */
+            close_menus();
+            /* The menu reopens on the last chosen command: choose MOVE
+             * ORDER (row 0), then cancel its targeting with B. Try a free
+             * Probe first, then any other unit that will select alone. */
+            for(int i=-1;i<MAX_UNITS&&menu_last!=0;i++){
+                int pick=i<0?free_builder():i;
+                if(pick<0||(i>=0&&pick==free_builder())||!select_single(pick))continue;
+                KEY_TAP(KEY_B);
+                for(int n=0;n<16&&menu_open&&menu_cursor!=0;n++)KEY_TAP(KEY_UP);
+                if(menu_open&&menu_cursor==0)KEY_TAP(KEY_A);
+                close_menus();
+            }
+            clear_selected_building();
+            /* B from a targeting mode reopens the orders menu; an open menu
+             * holds the game and is not saved, so close everything first. */
+            for(int k=0;k<4&&(menu_open||mode!=MODE_NORMAL);k++)KEY_TAP(KEY_B);
+            unsigned first=host_tick;
+            KEY_TAP(KEY_START);
+            int paused=screen==SCREEN_PAUSE;
+            KEY_TAP(KEY_B);
+            KEY_TAP(KEY_START);
+            saved=1;
+            char save_path[512];
+            snprintf(save_path,sizeof(save_path),"%s.sav",path);
+            FILE *sf=fopen(save_path,"wb");
+            if(!sf||fwrite(host_save,1,sizeof(host_save),sf)!=sizeof(host_save)){perror(save_path);return 2;}
+            fclose(sf);
+            fprintf(trace,"{\"kind\":\"save\",\"frame\":%u,\"first_call\":%u,\"resume_call\":%u,\"paused\":%d,\"screen\":%d,\"under_construction\":%d,\"menu_last\":%d}\n",
+                (unsigned)frame,first,host_tick,paused,screen,building,menu_last);
+            census("saved");
+        }
         if(frame>=next_probe){(void)queue_probe();next_probe=frame+300;}
         if(frame>=next_supply){
             int pending=0;
@@ -556,8 +617,14 @@ int main(int argc,char **argv)
                 (void)build_structure(B_CYBERNETICS_CORE,MENU_ACADEMY,80,224,-1,-1);
             else if(!count_type(B_FORGE,0)&&count_type(B_GATEWAY,0)>=3)
                 (void)build_structure(B_FORGE,MENU_ENG_BAY,80,224,-1,-1);
-            else if(count_type(B_FORGE,1)&&count_type(B_PHOTON_CANNON,0)<4&&home>=0)
-                (void)build_cannon(b[home].x,b[home].y-48);
+            /* Cannons cover the mineral line south of the Nexus, where raids
+             * arrive, then the heroes' station; a large bank buys more. */
+            else if(count_type(B_FORGE,1)&&home>=0&&(count_type(B_PHOTON_CANNON,0)<4||
+                    (minerals>=500&&count_type(B_PHOTON_CANNON,0)<12))){
+                static const int ax[6]={-40,40,-104,104,-120,-40},ay[6]={160,160,112,112,-80,-80};
+                int k=count_type(B_PHOTON_CANNON,0)%6;
+                (void)build_cannon(b[home].x+ax[k],b[home].y+ay[k]);
+            }
             next_build=frame+(minerals>=400?240:600);
         }
         if(frame>=next_gas){
@@ -567,7 +634,7 @@ int main(int argc,char **argv)
         }
         if(frame>=next_production){
             int queued=0;
-            while(queued<3&&queue_combat_unit())++queued;
+            while(queued<6&&queue_combat_unit())++queued;
             next_production=frame+60;
         }
         /* Fill the Carrier's hangar through its BUILD INTERCEPTOR row. */
@@ -580,22 +647,34 @@ int main(int argc,char **argv)
             }
             next_carrier=frame+1200;
         }
-        /* A hero with an enemy close by steps away from it, past the Nexus;
-         * Protoss hit points do not regenerate. */
+        /* A hero with an enemy in Scarab range steps to the walkable spot
+         * near the Nexus farthest from every enemy; Protoss hit points do
+         * not regenerate. */
         if(frame>=next_evade&&home>=0){
             int heroes[2]={f,h};
             for(int k=0;k<2;k++){
-                int z=heroes[k],threat=-1,td=192*192;
-                if(z<0||u[z].owner!=SIDE)continue;
-                for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY){
-                    int d=dist2(u[i].x,u[i].y,u[z].x,u[z].y);
-                    if(d<td){td=d;threat=i;}
+                int z=heroes[k];
+                if(z<0||u[z].owner!=SIDE||enemy_clearance(u[z].x,u[z].y)>=288)continue;
+                int ex=-1,ey=-1,best=-1;
+                for(int r=96;r<=224;r+=64)for(int a=0;a<16;a++){
+                    static const int ox[16]={16,15,11,6,0,-6,-11,-15,-16,-15,-11,-6,0,6,11,15};
+                    static const int oy[16]={0,6,11,15,16,15,11,6,0,-6,-11,-15,-16,-15,-11,-6};
+                    int x=limit(b[home].x+ox[a]*r/16,48,WORLD_W-48),y=limit(b[home].y+oy[a]*r/16,48,WORLD_H-48);
+                    int cell=limit(x/16,0,MAP_COLS-1)+limit(y/16,0,MAP_ROWS-1)*MAP_COLS,wx,wy,distance=-1;
+                    if(!path_grid_valid||!SC64_GRID_GET(path_walkable,cell))continue;
+                    /* Score the walk, not just the destination: the
+                     * nearest any enemy comes to the straight path. */
+                    int clear=1024;
+                    for(int t=0;t<=8;t++){
+                        int c=enemy_clearance(u[z].x+(x-u[z].x)*t/8,u[z].y+(y-u[z].y)*t/8);
+                        if(c<clear)clear=c;
+                    }
+                    if(clear<=best)continue;
+                    if(!waypoint_to(u[z].x,u[z].y,x,y,&wx,&wy,&distance)||distance>32)continue;
+                    best=clear;ex=x;ey=y;
                 }
-                if(threat<0)continue;
-                int vx=b[home].x-u[threat].x,vy=b[home].y-u[threat].y,len=FAST_ABS(vx)+FAST_ABS(vy);
-                if(len<=0)continue;
-                int ex=limit(b[home].x+vx*160/len,48,WORLD_W-48),ey=limit(b[home].y+vy*160/len,48,WORLD_H-48);
-                if(dist2(u[z].tx,u[z].ty,ex,ey)>48*48)(void)hero_command(z,ex,ey);
+                if(best<=enemy_clearance(u[z].x,u[z].y))ex=-1;
+                if(ex>=0&&dist2(u[z].tx,u[z].ty,ex,ey)>48*48)(void)hero_command(z,ex,ey);
                 next_hero=frame+900;
             }
             next_evade=frame+150;
@@ -619,6 +698,11 @@ int main(int argc,char **argv)
                 int d=dist2(u[i].x,u[i].y,b[home].x,b[home].y);
                 if(d<bd){bd=d;threat=i;}
             }
+            /* A raid on the base recalls an attacking army. */
+            int raiders=0;
+            for(int i=0;i<MAX_UNITS;i++)raiders+=u[i].alive&&u[i].owner==ENEMY&&
+                dist2(u[i].x,u[i].y,b[home].x,b[home].y)<320*320;
+            if(raiders>=3)attacking=0;
             if(threat>=0&&!attacking){
                 (void)army_command(MENU_ATTACK,u[threat].x,u[threat].y);
                 fprintf(trace,"{\"kind\":\"defend\",\"frame\":%u,\"target\":[%d,%d]}\n",
@@ -704,50 +788,6 @@ int main(int argc,char **argv)
                 if(army_count()<8)attacking=0;
             }
             next_order=frame+(attacking?360:600);
-        }
-        /* Save while a structure is still warping in, so the record carries
-         * active construction: start a Pylon if nothing is, and fall back
-         * after a bounded wait. */
-        if(!saved&&frame>=P8_SAVE_FRAME&&!under_construction()&&frame>=next_save_build){
-            (void)build_structure(B_PYLON,MENU_DEPOT,64,448,-1,-1);
-            next_save_build=frame+300;
-        }
-        if(!saved&&frame>=P8_SAVE_FRAME&&(under_construction()||frame>=P8_SAVE_FRAME+6000)){
-            int building=under_construction();
-            /* The building selection and the orders menu's remembered row
-             * are UI state, not saved: a fresh process starts with neither.
-             * Return the row to the top and deselect first, so the replayed
-             * inputs mean the same thing before and after a load. */
-            close_menus();
-            if(menu_last!=0){
-                /* The menu reopens on the last chosen command: choose MOVE
-                 * ORDER (row 0), then cancel its targeting with B. */
-                int probe=free_builder();
-                if(select_single(probe)){
-                    KEY_TAP(KEY_B);
-                    for(int n=0;n<16&&menu_open&&menu_cursor!=0;n++)KEY_TAP(KEY_UP);
-                    if(menu_open&&menu_cursor==0)KEY_TAP(KEY_A);
-                    close_menus();
-                }
-            }
-            clear_selected_building();
-            /* B from a targeting mode reopens the orders menu; an open menu
-             * holds the game and is not saved, so close everything first. */
-            for(int k=0;k<4&&(menu_open||mode!=MODE_NORMAL);k++)KEY_TAP(KEY_B);
-            unsigned first=host_tick;
-            KEY_TAP(KEY_START);
-            int paused=screen==SCREEN_PAUSE;
-            KEY_TAP(KEY_B);
-            KEY_TAP(KEY_START);
-            saved=1;
-            char save_path[512];
-            snprintf(save_path,sizeof(save_path),"%s.sav",path);
-            FILE *sf=fopen(save_path,"wb");
-            if(!sf||fwrite(host_save,1,sizeof(host_save),sf)!=sizeof(host_save)){perror(save_path);return 2;}
-            fclose(sf);
-            fprintf(trace,"{\"kind\":\"save\",\"frame\":%u,\"first_call\":%u,\"resume_call\":%u,\"paused\":%d,\"screen\":%d,\"under_construction\":%d,\"menu_last\":%d}\n",
-                (unsigned)frame,first,host_tick,paused,screen,building,menu_last);
-            census("saved");
         }
         {
             int c=human_carrier(),out=0;
