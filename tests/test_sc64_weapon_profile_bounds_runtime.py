@@ -46,7 +46,7 @@ int main(void) {
  /* Global miss remains a miss for both canonical and copied profiles. */
  assert(sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,p,-200,20,-200,20,0,0));
  assert(sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,&copy,-200,20,-200,20,0,0));
- /* A two-pixel authored frame centered at -1 has one on-screen pixel. */
+ /* The inclusive radius keeps the edge candidate for raster clipping. */
  assert(!sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,p,-1,20,-1,20,0,0));
 #if BANK_VARIANT == 1 && BOUND_VALUE == 0x80000001u
  assert(sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,p,-2,20,-2,20,0,0));

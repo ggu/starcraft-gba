@@ -4502,6 +4502,15 @@ test-sc64-weapon-source-cull-fast-diff: | build
 		./build/test-sc64-weapon-source-cull-fast-diff; \
 	fi
 
+# Explicit qualification of an already-prepared bank with profile bounds.
+# No prerequisite invokes the private asset generator.
+.PHONY: test-sc64-weapon-profile-bounds-bank
+test-sc64-weapon-profile-bounds-bank: | build
+	@test -f "$(WEAPON_SOURCE_HEADER)" || { echo "Missing prepared bank: $(WEAPON_SOURCE_HEADER)" >&2; exit 1; }
+	$(CLANG) -std=c11 -O1 -g -fsanitize=address,undefined -Wall -Wextra -Werror -Wno-unused-function -I"$(WEAPON_SOURCE_DIR)" tests/sc64_weapon_source_profile_bounds_bank.c -o build/test-sc64-weapon-profile-bounds-bank
+	./build/test-sc64-weapon-profile-bounds-bank
+	$(MAKE) test-sc64-weapon-source-vfx-cull-bank test-sc64-weapon-source-cull-fast-diff WEAPON_SOURCE_DIR="$(WEAPON_SOURCE_DIR)"
+
 # Canonical source death/corpse art; default original-art/unified remains asset-free.
 build/starcraft-terran.elf build/starcraft-zerg-z4.elf build/starcraft-zerg-z6.elf build/starcraft-protoss-p5-shuttle.elf build/starcraft-protoss-p6.elf build/starcraft-showcase.elf: $(CANONICAL_DEATH_INPUTS)
 build/test-terran build/test-sc64-terran-full-frame build/test-sc64-terran-full-hud build/test-sc64-z4-frame-coverage build/test-sc64-zerg-canonical-hud build/test-sc64-protoss-canonical-frame build/test-sc64-protoss-canonical-hud build/test-sc64-showcase-game build/test-sc64-showcase-game-packed build/test-sc64-showcase-game-indexed build/test-sc64-native-weapon-game build/test-sc64-protoss-skirmish-pylons build/test-sc64-protoss-gas-placement build/test-sc64-worker-cargo-packed build/test-sc64-protoss-warp-color build/test-sc64-protoss-warp-color-no-clip: $(CANONICAL_DEATH_INPUTS)
