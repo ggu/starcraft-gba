@@ -2,6 +2,30 @@
 #include <stdio.h>
 #include "../starcraft/game.c"
 
+/* Independent full-table oracle preserves the original lowest-index tie
+ * rule, including the north-west quadrant that wraps through direction 0. */
+static int reference_direction(int dx, int dy)
+{
+    int best = 0, best_dot = -0x7fffffff;
+    for (int d = 0; d < 32; ++d) {
+        int dot = dx * sc64_facing_vector[d][0] + dy * sc64_facing_vector[d][1];
+        if (dot > best_dot) { best_dot = dot; best = d; }
+    }
+    return best;
+}
+
+static int check_directions(void)
+{
+    for (int dx = -2048; dx <= 2048; ++dx)
+        for (int dy = -2048; dy <= 2048; ++dy)
+            if (sc64_facing_direction(dx, dy) != reference_direction(dx, dy)) {
+                fprintf(stderr, "facing differs from full table at (%d,%d)\n", dx, dy);
+                return 1;
+            }
+    puts("facing: 16785409 full-table comparisons passed");
+    return 0;
+}
+
 static unsigned hash_screen(void)
 {
     unsigned hash = 2166136261u;
@@ -13,6 +37,7 @@ static unsigned hash_screen(void)
 
 int main(void)
 {
+    if (check_directions()) return 3;
     gba_init();
     game_init();
     memset(u, 0, sizeof(u));

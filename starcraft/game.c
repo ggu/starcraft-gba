@@ -2524,6 +2524,8 @@ is_traversable(int col, int row, int from_cell)
 #ifdef SC64_IMPORTED_MISSION
 #include "sc64_routes.h"
 #endif
+#include "sc64_depot_goal.h"
+_Static_assert(MAX_BUILDINGS < 0x8000, "depot slot keys must fit the tagged route namespace");
 
 /* Breadth-first on the bounded walk grid; return the first tile toward goal. */
 static int GBA_HOT
@@ -2589,6 +2591,45 @@ path_next_tile(int x, int y, int tx, int ty, int *next_x, int *next_y)
     }
     *next_x = (best % MAP_COLS) * 16 + 8;
     *next_y = (best / MAP_COLS) * 16 + 8;
+    return 1;
+#endif
+}
+
+/* Depot routing has a circular goal rather than a blocked center tile. The
+ * non-imported profile uses its existing BFS storage and stops at the first
+ * reachable walk cell intersecting the deposit circle. */
+static int __attribute__((noinline))
+worker_depot_next(int x, int y, int home, int *next_x, int *next_y)
+{
+#ifdef SC64_IMPORTED_MISSION
+    return sc64_route_depot_next(x, y, home, b[home].x, b[home].y, next_x, next_y);
+#else
+    static const int dx[4] = { 1, -1, 0, 0 };
+    static const int dy[4] = { 0, 0, 1, -1 };
+    int col = limit(x / 16, 0, MAP_COLS - 1), row = limit(y / 16, 0, MAP_ROWS - 1);
+    int start = col + row * MAP_COLS, head = 0, tail = 0, goal = -1, gx = 0, gy = 0;
+    if (++bfs_generation == 0) { memset(bfs_seen, 0, sizeof(bfs_seen)); bfs_generation = 1; }
+    bfs_prev[start] = -1; bfs_seen[start] = bfs_generation; bfs_queue[tail++] = start;
+    while (head < tail) {
+        int cell = bfs_queue[head++];
+        col = cell % MAP_COLS; row = cell / MAP_COLS;
+        if (is_traversable(col, row, -1) &&
+            sc64_depot_cell_point(b[home].x, b[home].y, col, row, &gx, &gy)) {
+            goal = cell; break;
+        }
+        for (int i = 0; i < 4; ++i) {
+            int nc = col + dx[i], nr = row + dy[i], next;
+            if (nc < 0 || nr < 0 || nc >= MAP_COLS || nr >= MAP_ROWS) continue;
+            next = nc + nr * MAP_COLS;
+            if (bfs_seen[next] == bfs_generation || !is_traversable(nc, nr, start)) continue;
+            bfs_seen[next] = bfs_generation; bfs_prev[next] = cell; bfs_queue[tail++] = next;
+        }
+    }
+    if (goal < 0) return 0;
+    if (goal == start) { *next_x = gx; *next_y = gy; return 1; }
+    while (bfs_prev[goal] != start && bfs_prev[goal] >= 0) goal = bfs_prev[goal];
+    *next_x = (goal % MAP_COLS) * 16 + 8;
+    *next_y = (goal / MAP_COLS) * 16 + 8;
     return 1;
 #endif
 }
@@ -4848,6 +4889,17 @@ find_selected_worker(void)
     return -1;
 }
 
+/* Automatic construction selection must not steal an existing build order.
+ * Explicit player orders may still interrupt construction normally. */
+static int
+build_worker_available(int worker, int owner, int type)
+{
+    return worker >= 0 && worker < MAX_UNITS && u[worker].alive &&
+        u[worker].owner == owner &&
+        (type < 0 ? IS_WORKER(u[worker].type) : u[worker].type == type) &&
+        !SC64_TRANSPORT_LOADED(&u[worker]) && !SC64_BUILD_WORKER_ORDER(u[worker].order);
+}
+
 #ifdef SC64_RACES
 static int
 race_nexus_command_available(void)
@@ -4943,7 +4995,7 @@ start_build(int type)
 #else
     i = find_selected_worker();
 #endif
-    if (i < 0) {
+    if (!build_worker_available(i, SIDE, -1)) {
 	toast(5);
 	return;
     }
@@ -5729,6 +5781,23 @@ owner_command_center(int owner)
         ) return i;
     return -1;
 }
+
+/* Reuse the serialized waypoint fields; a depot circle is re-queried when
+ * the waypoint expires, never replaced by the depot center on long trips. */
+static void __attribute__((noinline))
+worker_return_to_depot(Unit *worker, int home)
+{
+    if (worker->path_retry == 0 && worker->path_timer == 0) {
+        int nx, ny;
+        if (!worker_depot_next(worker->x, worker->y, home, &nx, &ny)) {
+            worker->path_x = worker->x; worker->path_y = worker->y;
+            worker->path_retry = 12;
+            return;
+        }
+        worker->path_x = nx; worker->path_y = ny; worker->path_timer = 24;
+    }
+    move_toward(worker, worker->path_x, worker->path_y);
+}
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
 static int
 race_resource_depot_type(int type)
@@ -5756,8 +5825,8 @@ static int
 race_resource_depot_reachable(const Unit *worker, int slot)
 {
     int next_x, next_y;
-    return path_next_tile(worker->x, worker->y, b[slot].x, b[slot].y,
-                          &next_x, &next_y);
+    return dist2(worker->x, worker->y, b[slot].x, b[slot].y) <= 32 * 32 ||
+        worker_depot_next(worker->x, worker->y, slot, &next_x, &next_y);
 }
 
 static void
@@ -5872,7 +5941,7 @@ race_update_resource_worker(Unit *q)
     if (home < 0) return;
     if (q->carry) {
         if (dist2(q->x, q->y, b[home].x, b[home].y) > 32 * 32) {
-            move_toward(q, b[home].x, b[home].y);
+            worker_return_to_depot(q, home);
         } else {
             add_owner_resources(q->owner, q->order == ORDER_MINE ? q->carry : 0,
                                 q->order == ORDER_GAS ? q->carry : 0);
@@ -6630,7 +6699,7 @@ target_lists_unavailable:
 	    if (q->carry) {
 		/* Stop at the approach ring outside the structure's blocked cells. */
 		if (dist2(q->x, q->y, b[home].x, b[home].y) > 32 * 32) {
-		    move_toward(q, b[home].x, b[home].y);
+		    worker_return_to_depot(q, home);
 		} else {
                     add_owner_resources(q->owner, q->order == ORDER_MINE ? q->carry : 0,
                                         q->order == ORDER_GAS ? q->carry : 0);
@@ -8342,19 +8411,23 @@ draw_tracers(void)
     for (int i=0;i<MAX_TRACERS;++i) if (tracers[i].life) {
 #ifdef SC64_WEAPON_SOURCE_VFX
         if(sc64_weapon_source_vfx_is_tagged((uint32_t)tracers[i].color)) {
+            uint32_t packed=(uint32_t)tracers[i].color;
+            Sc64WeaponSourceVfxKey key;
+            if (!sc64_weapon_source_vfx_unpack(packed,&key)) continue;
+            const Sc64WeaponSourceAttackProfile *profile=sc64_weapon_source_trace_profile(packed);
 #ifdef SC64_WEAPON_SOURCE_VFX_OFFSCREEN_CULL
             if (!sc64_weapon_source_vfx_anchor_may_be_visible(
                     tracers[i].x0, tracers[i].y0, camx, camy) &&
                 !sc64_weapon_source_vfx_anchor_may_be_visible(
                     tracers[i].x1, tracers[i].y1, camx, camy) &&
-                sc64_weapon_source_vfx_trace_provably_offscreen(
-                    (uint32_t)tracers[i].color,
+                sc64_weapon_source_vfx_trace_provably_offscreen_resolved(
+                    key,profile,
                     tracers[i].x0, tracers[i].y0, tracers[i].x1, tracers[i].y1,
                     camx, camy))
                 continue;
 #endif
             int age=sc64_tracer_duration(i)-tracers[i].life;
-            sc64_weapon_source_vfx_draw_trace((uint32_t)tracers[i].color,
+            sc64_weapon_source_vfx_draw_trace_resolved(key,profile,
                 tracers[i].x0,tracers[i].y0,tracers[i].x1,tracers[i].y1,
                 tracers[i].life,(unsigned)(age<0?0:age));
             continue;
@@ -9578,7 +9651,7 @@ static void
 draw_hud_resources(void)
 {
     gfx_rect(0, 0, 240, 12, C_PANEL);
-#ifdef SC64_COMMAND_ICONS
+#ifdef SC64_HUD_ICONS
     card_resource_icon(SC64_HUD_SPRITE_MINERAL, 2);
     gfx_num(16, 3, minerals, C_WHITE);
     card_resource_icon(SC64_HUD_SPRITE_GAS, 60);

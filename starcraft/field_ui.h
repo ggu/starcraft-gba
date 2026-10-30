@@ -213,11 +213,10 @@ field_ui_a_action(void)
 static int
 field_ui_build_worker(void)
 {
-    int i, best = find_selected_worker(), d, best_d = 0x7fffffff;
-    if (best >= 0) return best;
+    int i, best = -1, d, best_d = 0x7fffffff;
     for (i = 0; i < MAX_UNITS; i++) {
-        if (!u[i].alive || u[i].owner != SIDE || !IS_WORKER(u[i].type) || SC64_BUILD_WORKER_ORDER(u[i].order))
-            continue;
+        if (!build_worker_available(i, SIDE, -1)) continue;
+        if (u[i].selected) return i;
         d = dist2(cx, cy, u[i].x, u[i].y);
         if (d < best_d) { best_d = d; best = i; }
     }

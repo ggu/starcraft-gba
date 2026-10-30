@@ -134,7 +134,11 @@ static void compare_cull_to_prepared_bank_pixels(
     draw_calls = 0;
     int cull = sc64_weapon_source_vfx_trace_provably_offscreen(
         packed, x0, y0, x1, y1, camx, camy);
-    if (!cull) draw_without_cull(packed, x0, y0, x1, y1, age);
+    if (sc64_weapon_source_vfx_unpack(packed, &key)) {
+        const Sc64WeaponSourceAttackProfile *resolved=sc64_weapon_source_trace_profile(packed);
+        assert(cull == sc64_weapon_source_vfx_trace_provably_offscreen_resolved(key,resolved,x0,y0,x1,y1,camx,camy));
+        if (!cull) sc64_weapon_source_vfx_draw_trace_resolved(key,resolved,x0,y0,x1,y1,1,age);
+    }
     assert(memcmp(expected, pixels, sizeof(expected)) == 0);
     assert(draw_calls == (cull ? 0u : expected_calls));
 }
@@ -314,6 +318,15 @@ int main(void)
     uint32_t missing_packed;
     assert(sc64_weapon_source_vfx_pack(missing_key, &missing_packed));
     assert(!sc64_weapon_source_trace_profile(missing_packed));
+    assert(!sc64_weapon_source_vfx_trace_provably_offscreen_resolved(missing_key, 0, 0,0,4000,4000,0,0));
+    memset(pixels, 0, sizeof(pixels)); draw_calls=0;
+    sc64_weapon_source_vfx_draw_trace_resolved(missing_key, 0, 0,0,4000,4000,1,0);
+    assert(draw_calls == 0);
+    Sc64WeaponSourceVfxKey bad_key;
+    assert(!sc64_weapon_source_vfx_unpack(0, &bad_key));
+    assert(!sc64_weapon_source_vfx_trace_provably_offscreen(0,0,0,4000,4000,0,0));
+    sc64_weapon_source_vfx_draw_trace(0,0,0,4000,4000,1,0);
+    assert(draw_calls == 0);
     assert(!sc64_weapon_source_vfx_trace_provably_offscreen(
         missing_packed, 0, 0, 4000, 4000, 0, 0));
     Sc64WeaponSourceVfxKey extreme_key = {30, 1, 27, 8, 0, 0};

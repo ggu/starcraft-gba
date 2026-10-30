@@ -95,6 +95,54 @@ static u32 state_hash(void)
 }
 
 #ifndef GAME_AUDIO_OFF
+static int empty_slot_transitions(void)
+{
+    fixture();
+    put_unit(MAX_UNITS - 1, ENEMY, U_ZERGLING, 60, 60);
+    b[0].alive = 1; b[0].owner = SIDE; b[0].type = B_BARRACKS;
+    b[0].x = b[0].y = 60;
+    b[0].under_construction = 1;
+    observe_next();
+    clear_events();
+
+    /* Skip only dead slots whose old snapshot is already zero. Other dead
+     * snapshots must still be cleared, and observed deaths emitted once. */
+    u[MAX_UNITS - 1].alive = 0;
+    b[0].alive = 0;
+    game_audio_snapshot[0] = 0xffu;
+    game_audio_snapshot[MAX_UNITS + 1] = GAME_AUDIO_SNAPSHOT_CONSTRUCTING;
+    observe_next();
+    if (events(GAME_AUDIO_DEATH) != 2) return fail("empty-slot scan lost a death");
+    for (int i = 0; i < MAX_UNITS; ++i)
+        if (!u[i].alive && game_audio_snapshot[i]) {
+            fprintf(stderr, "slot %d snapshot=%u frame=%d observed=%d\n",
+                    i, game_audio_snapshot[i], frame, game_audio_last_frame);
+            return fail("dead unit snapshot was retained");
+        }
+    if (game_audio_snapshot[MAX_UNITS] || game_audio_snapshot[MAX_UNITS + 1])
+        return fail("dead building snapshot was retained");
+    observe_next();
+    if (events(GAME_AUDIO_DEATH) != 2) return fail("empty slot replayed a death");
+
+    put_unit(MAX_UNITS - 1, SIDE, U_MARINE, 60, 60);
+    b[0].alive = 1;
+    observe_next();
+    if (events(GAME_AUDIO_READY) != 1) return fail("reused slot lost ready cue");
+    b[0].under_construction = 0;
+    observe_next();
+    if (events(GAME_AUDIO_BUILT) != 1) return fail("reused building lost completion cue");
+
+    clear_events();
+    u[MAX_UNITS - 1].alive = 0;
+    b[0].alive = 0;
+    frame += 3;
+    game_render();
+    observe_next();
+    for (int kind = 0; kind < GAME_AUDIO_EVENT_KINDS; ++kind)
+        if (events(kind)) return fail("reused slots replayed discontinuous history");
+    return 0;
+}
+
 static int hooks(void)
 {
 #ifndef SC64_RACES
@@ -109,6 +157,8 @@ static int hooks(void)
     for (int t = 0; t < 4000 && !(events(GAME_AUDIO_ATTACK) && events(GAME_AUDIO_DEATH)); t++) tick(0);
     if (!events(GAME_AUDIO_ATTACK) || !events(GAME_AUDIO_DEATH)) return fail("combat events");
 #endif
+
+    if (empty_slot_transitions()) return 1;
 
     /* The observer's shot contract: a raised cooldown on a visible unit. */
     fixture();

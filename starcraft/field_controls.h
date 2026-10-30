@@ -211,12 +211,11 @@ static int
 field_ui_build_worker(int type)
 {
     const Sc64RaceBuildingRule *r = sc64_race_building_rule(type);
-    int i, best = find_selected_worker(), d, best_d = 0x7fffffff;
-    if (!r || (best >= 0 && u[best].type == r->worker)) return best;
-    best = -1;
+    int i, best = -1, d, best_d = 0x7fffffff;
+    if (!r) return -1;
     for (i = 0; i < MAX_UNITS; i++) {
-        if (!u[i].alive || u[i].owner != SIDE || u[i].type != r->worker ||
-            SC64_TRANSPORT_LOADED(&u[i]) || SC64_BUILD_WORKER_ORDER(u[i].order)) continue;
+        if (!build_worker_available(i, SIDE, r->worker)) continue;
+        if (u[i].selected) return i;
         d = dist2(cx, cy, u[i].x, u[i].y);
         if (d < best_d) { best_d = d; best = i; }
     }
@@ -499,6 +498,9 @@ ui_row_icon(int i, int x, int y)
     }
 }
 
+#ifdef SC64_HUD_ICONS
+#include "hud_icons.h"
+#endif
 #ifdef SC64_COMMAND_ICONS
 #include "command_card.h"
 #endif

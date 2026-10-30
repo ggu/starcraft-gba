@@ -151,14 +151,14 @@ static void wait_frames(int n)
 
 static void tap(u16 key){step(key);step(0);}
 
-/* Field controls reopen the order list on the last command. These
- * sequences were written for a list that opens on Move, so a fresh
- * open starts there (no extra input, so the run's timing is unchanged). */
+/* Field controls reopen the order list on the last command. Return to
+ * Move using bounded normal inputs before commands that expect that row. */
 static void tap_b(void)
 {
     int fresh = !menu_open && mode == MODE_NORMAL;
     tap(KEY_B);
-    if (fresh && menu_open) menu_cursor = MENU_MOVE;
+    for (int guard=0;fresh&&menu_open&&menu_cursor!=MENU_MOVE&&
+         guard<field_menu_count()&&host_tick<(u32)tick_limit;guard++) tap(KEY_UP);
 }
 
 static void move_cursor(int x,int y)
@@ -361,7 +361,8 @@ static int reachable_location_point(int sx,int sy,unsigned id,int *ox,int *oy)
     static u16 heap_node[MAP_CELLS*8];static u32 heap_key[MAP_CELLS*8];
     if(!id||id>sc64_t7_scenario.location_count||!ox||!oy)return -1;
     int start=sx/16+(sy/16)*MAP_COLS;if(start<0||start>=MAP_CELLS)return -1;
-    build_path_grid();memset(closed,0,sizeof(closed));memset(parent,0xff,sizeof(parent));
+    if(!path_grid_valid)return -1;
+    memset(closed,0,sizeof(closed));memset(parent,0xff,sizeof(parent));
     for(int i=0;i<MAP_CELLS;i++){cost[i]=0xffffffffu;risk[i]=0;steps[i]=0;}
     /* Prefer ground paths that stay well outside enemy weapon envelopes.
        Movers can advance while we are issuing each waypoint, so use a wider
@@ -1088,9 +1089,16 @@ static int controller_deliver_emitter(void)
         int wx=gx,wy=gy;
         /* Move armed groups to a short point ahead before the slow SCV. This
            uses only ordinary attack-move commands and keeps the escort near. */
+        if(!stage_emitter_carrier()){
+            if(!u[carrier].alive||race_late.emitter_carrier!=carrier)continue;
+            return 0;
+        }
         escort_clear_local_threat(carrier);
         if(!u[carrier].alive||race_late.emitter_carrier!=carrier)continue;
-        if(!order_unit(carrier,wx,wy))return 0;
+        if(!order_unit(carrier,wx,wy)){
+            if(!u[carrier].alive||race_late.emitter_carrier!=carrier)continue;
+            return 0;
+        }
         (void)order_visible_type(U_MARINE,wx,wy);
         (void)order_visible_type(U_VULTURE,wx,wy);
         (void)order_visible_type(U_FIREBAT,wx,wy);
@@ -1143,14 +1151,13 @@ static void progress_until_terminal(void)
                 fprintf(stderr,"T7 hold emitter carrier: Goliath preclear not verified\n");
                 return;
             }
-            /* First try the quick Dropship route. If the hostile air defense
-               stops that transfer, only the already-precleared second
-               attempt may use the ground route. */
+            /* Try the paid Dropship route after preclear; fall back to the
+               ground relay if that ordinary-input transfer fails. */
             if(attempt==0){
                 if(!controller_air_deliver_emitter(emitter))
                     controller_deliver_emitter();
-            }else if(!controller_deliver_emitter())
-                controller_air_deliver_emitter(emitter);
+            }else if(!controller_air_deliver_emitter(emitter))
+                controller_deliver_emitter();
         }
     } else fprintf(stderr,"T7 objective actor not human-owned tick=%u emitter_slot=%u owner=%d alive=%d\n",
       (unsigned)host_tick,(unsigned)race_late.emitter_unit,

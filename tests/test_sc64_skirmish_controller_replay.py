@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -15,6 +16,95 @@ SPEC = importlib.util.spec_from_file_location(
 replay = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(replay)
+
+
+class TimingSafetyTests(unittest.TestCase):
+    def test_clock_retries_torn_high_word(self):
+        rsp = mock.Mock()
+        rsp.read.side_effect = [b'\x01\x00', b'\xff\xff', b'\x02\x00',
+                                b'\x02\x00', b'\x05\x00', b'\x02\x00']
+        self.assertEqual(replay.coherent_clock(rsp), 0x20005)
+
+    def test_zero_delta_rejected_and_rollover_is_modular(self):
+        with self.assertRaisesRegex(RuntimeError, "zero hardware"):
+            replay.sampled_delta(3, 3)
+        self.assertEqual(replay.sampled_delta(0xfffffffe, 2), 4)
+
+    def test_rejects_invalid_port_before_connecting(self):
+        with mock.patch.object(replay.socket, "socket") as sock:
+            with self.assertRaisesRegex(ValueError, "invalid GDB port"):
+                replay.check_debugger_port_free(0)
+            sock.assert_not_called()
+
+    def test_sample_is_nonterminal_and_does_not_claim_fps(self):
+        rsp = mock.Mock()
+        rsp.cmd.return_value = "OK"
+        tick = [-1]
+        rsp.tick.side_effect = lambda **_kw: tick.__setitem__(0, tick[0] + 1)
+        sym = {"game_update": 100, "demo_schedule_tick": 1, "screen": 2, "frame": 3}
+        def read(_rsp, address):
+            if address == 1:
+                return tick[0]
+            if address == 2:
+                return 0 if tick[0] == 0 else 1
+            if address == 3:
+                return max(0, tick[0] - 1)
+            raise AssertionError(address)
+        plan = {"start": {"host_tick": 1}, "trace_inputs": []}
+        with tempfile.TemporaryDirectory() as directory, \
+             mock.patch.object(replay.races, "read_u32", side_effect=read), \
+             mock.patch.object(replay, "coherent_clock", side_effect=[1, 11, 21, 31, 41]), \
+             mock.patch.object(replay, "snapshot", return_value={}), \
+             mock.patch.object(replay, "verify_configuration"):
+            result = replay.run_bounded_sample(rsp, sym, {}, {}, plan, [], lambda _: None,
+                                               1000, 2, 2, Path(directory), "t", "r", "e")
+        self.assertEqual(result["status"], "nonterminal-performance-sample")
+        self.assertEqual(result["observed_play_frame_count"], 2)
+        self.assertEqual(result["valid_timing_frame_count"], 0)
+        self.assertIsNone(result["mean_live_play_effective_fps"])
+
+    def test_64_bit_clock_counts_cycles_beyond_32_bit_wrap(self):
+        rsp = mock.Mock()
+        rsp.cmd.return_value = "OK"
+        tick = [-1]
+        rsp.tick.side_effect = lambda **_kw: tick.__setitem__(0, tick[0] + 1)
+        rsp.clock.side_effect = [1, 11, 21, 4294967326, 4294967336]
+        sym = {"game_update": 100, "demo_schedule_tick": 1, "screen": 2, "frame": 3}
+        def read(_rsp, address):
+            return tick[0] if address == 1 else (0 if tick[0] == 0 else 1) if address == 2 else max(0, tick[0] - 1)
+        with tempfile.TemporaryDirectory() as directory, \
+             mock.patch.object(replay.races, "read_u32", side_effect=read), \
+             mock.patch.object(replay, "snapshot", return_value={}), \
+             mock.patch.object(replay, "verify_configuration"):
+            result = replay.run_bounded_sample(rsp, sym, {}, {}, {"start": {"host_tick": 1}, "trace_inputs": []},
+                                               [], lambda _: None, 1000, 2, 2, Path(directory),
+                                               "t", "r", "e", clock64=True)
+        self.assertEqual(result["valid_timing_frame_count"], 2)
+        self.assertEqual(result["sample_cycles"], 4294967315)
+        self.assertIsNotNone(result["mean_live_play_effective_fps"])
+
+    def test_paused_ui_updates_are_excluded_from_play_fps(self):
+        rsp = mock.Mock()
+        rsp.cmd.return_value = "OK"
+        tick = [-1]
+        rsp.tick.side_effect = lambda **_kw: tick.__setitem__(0, tick[0] + 1)
+        rsp.clock.side_effect = [0, 10, 20, 50, 60]
+        sym = {"game_update": 100, "demo_schedule_tick": 1, "screen": 2, "frame": 3}
+        def read(_rsp, address):
+            if address == 1: return tick[0]
+            if address == 2: return 0 if tick[0] == 0 else 1
+            return [0, 0, 1, 1, 2][tick[0]]
+        with tempfile.TemporaryDirectory() as directory, \
+             mock.patch.object(replay.races, "read_u32", side_effect=read), \
+             mock.patch.object(replay, "snapshot", return_value={}), \
+             mock.patch.object(replay, "verify_configuration"):
+            result = replay.run_bounded_sample(rsp, sym, {}, {}, {"start": {"host_tick": 1}, "trace_inputs": []},
+                                               [], lambda _: None, 1000, 2, 2, Path(directory),
+                                               "t", "r", "e", clock64=True)
+        self.assertEqual(result["nonadvancing_play_updates"], 1)
+        self.assertEqual(result["nonadvancing_play_cycles"], 30)
+        self.assertEqual(result["valid_timing_frame_count"], 1)
+        self.assertEqual(result["sample_cycles"], 10)
 
 
 def valid_trace() -> dict:

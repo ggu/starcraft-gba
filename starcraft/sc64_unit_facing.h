@@ -54,10 +54,18 @@ static const s16 sc64_facing_vector[32][2] = {
 static int
 sc64_facing_direction(int dx, int dy)
 {
-    int best = 0, best_dot = -0x7fffffff;
-    for (int d = 0; d < 32; ++d) {
-        int dot = dx * sc64_facing_vector[d][0] + dy * sc64_facing_vector[d][1];
-        if (dot > best_dot) { best_dot = dot; best = d; }
+    int first, last, best, best_dot;
+    if (!dx && !dy) return 0;
+    /* Direction zero precedes the wrapping quadrant in the original table. */
+    if (dx < 0 && dy < 0) {
+        first=24; last=31; best=0; best_dot=dy * sc64_facing_vector[0][1];
+    } else {
+        first=dx>=0 ? (dy>=0 ? 8 : 0) : (dy>=0 ? 16 : 24);
+        last=first+8; best=first; best_dot=-0x7fffffff;
+    }
+    for (int d=first;d<=last;++d) {
+        int dot=dx*sc64_facing_vector[d][0]+dy*sc64_facing_vector[d][1];
+        if (dot>best_dot) {best_dot=dot;best=d;}
     }
     return best;
 }
