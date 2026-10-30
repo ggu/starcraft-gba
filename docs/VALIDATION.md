@@ -6663,3 +6663,43 @@ Evidence remains private in `terrain-public-extract-v1`. The Terran host gate
 wrote four controller-trace outputs inside its independent copy; all other
 75 preexisting prepared files remained identical. No shared inputs were
 regenerated, no Actions were dispatched and no proprietary data is committed.
+
+
+### Default visibility span counts (2026-10-30)
+
+This independently extracted optimization updates cell visibility/minimap
+occupancy only at zero-source transitions and the ninth count bit only at
+255/256. A bounded ROM row helper avoids repeated per-cell call setup.
+Sight ranges, geometry, explored state, source slots, persistent storage
+and RAM reserves remain unchanged. Independent full-grid/count/minimap
+oracles cover ownership batches, 255/256 transitions, 511-source sequences,
+out-of-map centers and empty spans.
+
+Exact visibility commit `673d890` on default `71a134df` passes source/doctor,
+default build/test, unified build/test and the full Terran host aggregate.
+Current-default integration `e6f821d` on `fdb63f3` passes source/doctor/default
+build, focused sanitizer oracles and four actual Make ARM captures plus normal
+links. Each profile's source and input closure is verified. Spare EWRAM/IWRAM
+bytes are Terran 28,536/328, Zerg 28,444/64, Protoss 23,900/952 and Showcase
+272/56. The later base change contains only PR176's generated-map mineral-style
+initialization and its fixture assertions. The full gates/timing were not
+rerun on that integrated head; the visibility code is identical, the base
+change was independently qualified and its new combined ARM links were checked.
+
+The fresh port-free T5 comparison at `673d890` has 22 nonempty timing windows
+and 10,991 gameplay ticks. Selected-state/fog checkpoint hashes and seven
+palette-resolved framebuffer CRCs agree. Peak sight cost at tick 9,000 falls
+from 3,062,662 to 2,122,499 guest cycles (30.70 percent). Summed sight cost is
+346,957,909 to 342,107,187 (1.398 percent less); full-frame cost is
+7,645,233,405 to 7,638,767,300 (0.0846 percent less). This one shortened
+emulator trace does not establish general FPS, all-frame/state equality,
+physical hardware behavior or full campaign completion.
+
+Private records are in `visibility-public-v1` and `visibility-fdb-v1`. Four
+private controller traces were rewritten by the host gate; other prepared
+inputs were preserved. Some completed auxiliary unified/Terran test-build
+images were removed during disk cleanup without a prior per-file inventory;
+the four captured canonical ARM products, raw dependencies, probe products,
+source/input snapshots and test logs remain. No Actions were dispatched and
+no proprietary inputs are committed. The later documentation-only commit
+does not change the qualified executable/test files.
