@@ -6630,21 +6630,95 @@ comparisons are private in `default-resolved-tracer-v1`. The earlier #171
 for unchanged gameplay paths, not new runs of this renderer-only stage.
 No Actions were run and no proprietary inputs are committed.
 
+
+### Default-branch terrain transfer (2026-10-30)
+
+Independently extracted on `ae691253`, the shared terrain cache transfers aligned
+horizontal windows with one bounded DMA3 operation, then redraws exposed edge
+tiles. Generic windows, unaligned shifts, partial boundary rows and narrower
+scene clips retain their existing path. No persistent buffers, actor limits,
+sight ranges or RAM reserves change. The six executable/test files were
+qualified at `dfda937`; the later validation addition changes documentation only.
+
+Local source-boundary, doctor, default build/test, unified build/test and the
+full Terran host aggregate pass. Sanitizer checks cover 5,292 clipped-window
+cases and four prepared profiles with 512 cached/fresh scene comparisons each.
+All four normal ARM links preserve the fixed guards; remaining EWRAM/IWRAM
+bytes are Terran 28,536/328, Zerg 28,444/64, Protoss 23,900/952 and Showcase
+272/56. Captured Make commands, per-TU dependencies and input hashes match the
+private input copies. Public-main weapon and P7 fact banks were used; this
+extraction does not include the draft roster services or source-birth offset fix.
+
+A separate port-free mGBA probe uses actual production flags and replaces only
+main. Over 1,501 play ticks after a normal-menu launch (observed mission field
+8), alternating horizontal camera input produces matching selected-state and
+displayed-framebuffer rolling hashes at all four checkpoints. Timed update,
+audio and rendering work, including presentation waits, falls from 992,093,504
+to 983,925,857 guest cycles, a 0.823 percent reduction for this workload. This
+is hash-based observational evidence, not byte-for-byte state proof, steady
+30 fps or physical-hardware qualification. An initial whole-VRAM hash included
+audio scratch/offscreen data and is superseded by the displayed-page probe.
+
+Evidence remains private in `terrain-public-extract-v1`. The Terran host gate
+wrote four controller-trace outputs inside its independent copy; all other
+75 preexisting prepared files remained identical. No shared inputs were
+regenerated, no Actions were dispatched and no proprietary data is committed.
+
+
+### Default visibility span counts (2026-10-30)
+
+This independently extracted optimization updates cell visibility/minimap
+occupancy only at zero-source transitions and the ninth count bit only at
+255/256. A bounded ROM row helper avoids repeated per-cell call setup.
+Sight ranges, geometry, explored state, source slots, persistent storage
+and RAM reserves remain unchanged. Independent full-grid/count/minimap
+oracles cover ownership batches, 255/256 transitions, 511-source sequences,
+out-of-map centers and empty spans.
+
+Exact visibility commit `673d890` on default `71a134df` passes source/doctor,
+default build/test, unified build/test and the full Terran host aggregate.
+Current-default integration `e6f821d` on `fdb63f3` passes source/doctor/default
+build, focused sanitizer oracles and four actual Make ARM captures plus normal
+links. Each profile's source and input closure is verified. Spare EWRAM/IWRAM
+bytes are Terran 28,536/328, Zerg 28,444/64, Protoss 23,900/952 and Showcase
+272/56. The later base change contains only PR176's generated-map mineral-style
+initialization and its fixture assertions. The full gates/timing were not
+rerun on that integrated head; the visibility code is identical, the base
+change was independently qualified and its new combined ARM links were checked.
+
+The fresh port-free T5 comparison at `673d890` has 22 nonempty timing windows
+and 10,991 gameplay ticks. Selected-state/fog checkpoint hashes and seven
+palette-resolved framebuffer CRCs agree. Peak sight cost at tick 9,000 falls
+from 3,062,662 to 2,122,499 guest cycles (30.70 percent). Summed sight cost is
+346,957,909 to 342,107,187 (1.398 percent less); full-frame cost is
+7,645,233,405 to 7,638,767,300 (0.0846 percent less). This one shortened
+emulator trace does not establish general FPS, all-frame/state equality,
+physical hardware behavior or full campaign completion.
+
+Private records are in `visibility-public-v1` and `visibility-fdb-v1`. Four
+private controller traces were rewritten by the host gate; other prepared
+inputs were preserved. Some completed auxiliary unified/Terran test-build
+images were removed during disk cleanup without a prior per-file inventory;
+the four captured canonical ARM products, raw dependencies, probe products,
+source/input snapshots and test logs remain. No Actions were dispatched and
+no proprietary inputs are committed. The later documentation-only commit
+does not change the qualified executable/test files.
+
 ## T9 ordinary-input qualification (2026-10-29)
 
 This record closes the T9 completion item left open in the 2026-10-26 and
 2026-10-28 sections, and only for what it measured. It covers a host
 completion with ordinary inputs and a normal-menu ARM replay of the same
 inputs in mGBA, on the commits and private inputs listed below. It does not
-cover physical hardware, saving and resuming inside T9, or the other open
-Terran controllers (T5, T7 and T8).
+cover physical hardware, saving and resuming inside T9, or other Terran controllers. The T5, T7 and T8 outcomes below are historical
+results on the stated runtime, not claims about current main.
 
 The result applies only to runtime `9ff7f7c`. It does not qualify any later
 runtime. To stay mergeable, this branch later merged `codex/source-release` at
 `97c39fa` (as `d8985c1`) and then at `ae69125` (as `f0c238b`). That base is
 57 commits past `9ff7f7c` and changes 33 files under `starcraft/` and
-`common/`. Neither merge was re-qualified, and the replay audit below re-checks only the retained
-`9ff7f7c` logs. T9 needs a fresh host completion and ARM replay on any runtime
+`common/`. Neither merge nor the later integration with `2847ab0` was re-qualified; the replay
+audit below re-checks only the retained `9ff7f7c` logs. T9 needs a fresh host completion and ARM replay on any runtime
 that is to be qualified.
 
 Provenance of the qualifying run:

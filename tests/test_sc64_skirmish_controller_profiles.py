@@ -54,7 +54,8 @@ class SkirmishControllerProfiles(unittest.TestCase):
             old_args = [arg for path in old for arg in ("-o", path)]
             for profile, var in PROFILES.items():
                 for fixture, source in (("build-controller", "tests/sc64_skirmish_build_controller.c"),
-                    ("match", "tests/sc64_skirmish_campaign_run.c")):
+                    ("match", "tests/sc64_skirmish_campaign_run.c"),
+                    ("resume", "tests/sc64_skirmish_resume.c")):
                     with self.subTest(profile=profile, fixture=fixture):
                         target = f"build/test-sc64-skirmish-{fixture}-{profile}"
                         dry = subprocess.run(base + ["-n", "-B", *old_args,

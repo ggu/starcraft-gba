@@ -120,6 +120,16 @@ int main(void)
     assert(find_worker(RESCUABLE, U_SCV) >= 0);
     assert(race_owner_supply_cap(SIDE) >= 18); /* Hatchery + Overlord. */
     assert(race_owner_supply_cap(ENEMY) >= 34); /* Nexus + Pylon. */
+    /* Generated-map mineral lines use real source fields, not the
+     * placeholder diamond drawn for an unknown style. */
+    for (int i = 0; i < 16; ++i) {
+        assert(m[i].amount == 1500);
+        assert(m[i].style >= SC64_RAW_MINERAL_FIELD_1 &&
+               m[i].style <= SC64_RAW_MINERAL_FIELD_1 + 2);
+#ifdef SC64_HAS_SPRITES
+        assert(mission_mineral_sprite(m[i].style));
+#endif
+    }
     assert(sc64_race_unit_flying(U_OVERLORD) && sc64_race_unit_flying(U_QUEEN));
     assert(sc64_race_unit_range(U_DRAGOON) == 128);
 
