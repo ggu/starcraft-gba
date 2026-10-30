@@ -8,6 +8,13 @@ test-scarab-save-selection: build/test-scarab-save-selection
 	./build/test-scarab-save-selection
 test: test-scarab-save-selection
 
+.PHONY: test-scarab-parent-migration
+build/test-scarab-parent-migration: tests/sc64_scarab_parent_migration.c starcraft/sc64_scarab_fields.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-scarab-parent-migration: build/test-scarab-parent-migration
+	./build/test-scarab-parent-migration
+test: test-scarab-parent-migration
+
 .PHONY: test-gfx-shapes
 build/test-gfx-shapes: tests/gfx_shapes_rom.c common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DGBA_SHAPES_ROM_ARM -Icommon $< common/gba.c -o $@

@@ -31,6 +31,26 @@ static inline int sc64_scarab_parent_fields_unpack(int carry, int timer, Sc64Sca
     if (!sc64_scarab_parent_fields_pack(&v,&c,&t) || c != carry || t != timer) return 0;
     *out=v; return 1;
 }
+/* Caller must authenticate the record generation independently; row contents
+ * cannot identify the format. This only converts a known-empty historical
+ * raw-83 parent, not arbitrary historical actors or whole save records. */
+enum { SC64_SCARAB_PARENT_LEGACY = 1, SC64_SCARAB_PARENT_PACKED = 2 };
+static inline int sc64_scarab_parent_convert(unsigned format, int raw_type,
+                                             int carry, int timer, int *out_carry, int *out_timer)
+{
+    Sc64ScarabParentFields p;
+    int c, t;
+    if (!out_carry || !out_timer || out_carry == out_timer || raw_type != 83) return 0;
+    if (format == SC64_SCARAB_PARENT_LEGACY) {
+        if (carry != 0 || timer != 0) return 0;
+        p = (Sc64ScarabParentFields){0,SC64_SCARAB_FIELD_NO_SLOT,0,0};
+        if (!sc64_scarab_parent_fields_pack(&p,&c,&t)) return 0;
+    } else if (format == SC64_SCARAB_PARENT_PACKED) {
+        if (!sc64_scarab_parent_fields_unpack(carry,timer,&p)) return 0;
+        c=carry; t=timer;
+    } else return 0;
+    *out_carry=c; *out_timer=t; return 1;
+}
 static inline int sc64_scarab_child_fields_pack(const Sc64ScarabChildFields *v, int *carry, int *timer)
 {
     if (!v || !carry || !timer || v->phase > 3 ||
