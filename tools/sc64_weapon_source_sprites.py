@@ -567,6 +567,9 @@ def _profile_cull_bounds(profiles, images, frames, animations, overlays, lo_tabl
                 first, count = int(anim["overlay_first"]), int(anim["overlay_count"])
                 for overlay in overlays[first:first+count]:
                     children.add(int(overlay["image_id"]))
+                    # Older renderer versions can use authored x/y for these
+                    # opcodes; retain that envelope as well as current LO use.
+                    coords.append((overlay["x"], overlay["y"]))
                     if overlay["opcode"] in (13, 14, 21):
                         kind = number(overlay["lo_index"],0,255)
                         for table in lo_tables:
@@ -574,8 +577,6 @@ def _profile_cull_bounds(profiles, images, frames, animations, overlays, lo_tabl
                                 start = table["offset_first"]
                                 end = start + table["frame_count"] * table["offset_count"]
                                 coords.extend((o["x"], o["y"]) for o in lo_offsets[start:end])
-                    else:
-                        coords.append((overlay["x"], overlay["y"]))
             ox = max((abs(x)//2 for x, _ in coords), default=0)
             oy = max((abs(y)//2 for _, y in coords), default=0)
             if any(i not in by_image for i in children): raise ValueError("child image")

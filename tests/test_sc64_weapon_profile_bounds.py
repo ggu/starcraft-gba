@@ -37,6 +37,11 @@ class ProfileBoundsTest(unittest.TestCase):
         f[5][0]['image_id']=99
         self.assertEqual(_profile_cull_bounds(*f),[0x80000000 | (5<<15) | 8])
 
+    def test_selected_sprol_direct_offset_is_also_bounded(self):
+        f=fixture()
+        f[4][1].update(x=1000, y=-800)
+        self.assertEqual(_profile_cull_bounds(*f),[0x80000000 | (402<<15) | 503])
+
     def test_missing_ambiguous_and_unknown_fall_back(self):
         changes=[lambda f:f[1].pop(),lambda f:f[1].append(copy.deepcopy(f[1][0])),
                  lambda f:f[4][0].update(opcode=99),lambda f:f[3][0].update(overlay_count=99),
