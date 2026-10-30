@@ -2,9 +2,9 @@
 
 This audit records the playable P9 build: an explicit `protoss-p9`
 candidate that builds on the P8 candidate (#151) and adds P9 as the ninth
-campaign entry. Canonical Protoss stays the qualified P7 product; its ROM is
-byte-identical to the base before this change, and so is the qualified P8
-candidate ROM when built from this branch.
+campaign entry. Canonical Protoss stays the qualified P7 product. Built from
+this branch, its ROM and the qualified P8 candidate ROM are byte-identical
+to the images built from #151.
 
 The evidence is one ordinary-input host controller win, an input-only ARM
 replay of that controller's key tape, and a two-process SRAM save and
@@ -55,31 +55,33 @@ made.
 
 ## Shared Protoss unit services, cloak and detection
 
-P9 runs the shared Protoss unit services introduced with P8 (see the
-[P8 audit](../2026-10-29-p8-campaign/README.md)). Its map gives the human an
-Arbiter (slot 7) and Zeratul (rescuable slot 2), and fields no Shield
-Battery.
+P9 binds the shared Protoss unit services
+([`sc64_protoss_services.h`](../../../starcraft/sc64_protoss_services.h);
+see [docs/SHARED-ENGINE.md](../../SHARED-ENGINE.md#shared-protoss-unit-services)).
+Its map gives the human an Arbiter (slot 7) and Zeratul (rescuable slot 2),
+and fields no Shield Battery. These behaviors are actor services, not P9
+code:
 
-- **Zeratul's permanent cloak.** The shared cloak service treats raw 75 as
-  intrinsically cloaked, as P7 does. Enemies cannot target Zeratul unless
-  one of their detectors sees him.
+- **Zeratul's permanent cloak.** Raw 75 is intrinsically cloaked in every
+  mode that binds the services, as in P7. Enemies cannot target Zeratul
+  unless one of their detectors sees him.
 - **Arbiter aura.** The human Arbiter cloaks nearby human units.
-- **Zerg detection.** P7's detectors are Protoss: Observers at sight range
-  and powered Photon Cannons at 7 tiles. P9 adds, under
-  `SC64_P9_DATA_ENABLED` only, the Overlord (raw 42, detects at its pinned
-  11-tile sight range, no Antennae) and the completed Spore Colony (raw 144,
-  7 tiles, the structure rule the Cannon uses). Their pinned BWAPI
-  dimensions (`{25,25,24,24}` and `{24,24,23,23}`) are now in the P7
-  rectangle helper under the same flag. The fact tables had no rectangle
-  for either type, so they could not detect.
-- **P9's own state.** P9 saves the service clock in its union payload,
-  resets the Arbiter/detection cache at mission start and on load, and
-  reads its source-owner map from the canonical descriptor. Load preflight
-  checks each unit's cache word against P9's own source mask. Only
-  human-built Batteries are valid in P9.
-- **Isolation.** In P9 builds, game.c renames P8's service hooks and the P9
-  adapter dispatches between P8 and P9. Every P9 extension is behind a P9
-  flag, so the P7 and P8 builds are unchanged.
+- **Detection.** Observers at sight range, powered Photon Cannons at 7
+  tiles, the Overlord (raw 42, at its pinned 11-tile sight range, no
+  Antennae) and the completed Spore Colony (raw 144, 7 tiles, the Cannon's
+  structure rule). The Overlord and Spore Colony rectangles (pinned BWAPI
+  `{25,25,24,24}` and `{24,24,23,23}`) are in the shared rectangle helper;
+  the fact tables had none, so these Zerg detectors could not detect before.
+
+P9 supplies only its mission binding:
+
+- **Owner identity.** P9's source slots, read from its canonical descriptor.
+- **Service clock.** In P9's union payload. The Arbiter/detection cache is
+  reset at mission start and on load.
+- **Placed actors.** None; only human-built Batteries are valid in P9.
+- **Dispatch.** In P9 builds, game.c renames P8's binding hooks and the P9
+  adapter dispatches between P8 and P9. P9's objectives, triggers, AI and
+  map checks stay in its adapter; no mission-active check is widened.
 
 In the qualified run Zeratul is cloaked at every checkpoint. At most one
 enemy source slot detected him at once (the Leviathan brood, at the end).
@@ -132,8 +134,8 @@ build detectors on purpose; it uses the Overlords and Spore Colonies it has.
 
 ## Qualification
 
-Base: the P8 candidate (#151, 8927812, which merges `codex/source-release`
-8d1e653), plus this change. Inputs are the locally verified USA ROM (SHA-1
+Base: the P8 candidate (#151, which merges `codex/source-release` f959592),
+plus this change. Inputs are the locally verified USA ROM (SHA-1
 `a36d91b5aac7bb95df0d7de5f9814f5270e25c2b`) and the P9 source CHK
 (SHA-256 `eecccb0220c7456cacccf8b84f9bd82535f5cdce9192ba7d88986ea2867ba601`).
 The audio bank is the shared format-2 bank. No ROM, CHK, generated header,
@@ -154,7 +156,11 @@ inspects live state only to choose inputs. Its policy:
   five orders are ignored.
 - Re-mine stalled builders and Probes that drift to distant patches.
 - Order the army by double-tapping Zealot and Dragoon groups, so Fenix and
-  Zeratul are never part of army orders.
+  Zeratul are never part of army orders. Keep up to four units queued at
+  each Gateway.
+- At the start of every controller step, Fenix, with an armed enemy within
+  256 pixels, walks to the reachable spot near the Nexus whose path, once
+  under way, keeps farthest from every enemy.
 - Attack the Baelrog Cerebrate, then the Leviathan, along a breadth-first
   route over the engine's walkability grid. Gather short of the target, then
   strike, clearing its Sunken Colonies first. The second assault starts at
@@ -171,24 +177,24 @@ inspects live state only to choose inputs. Its policy:
   orders menu) to its load-time form with ordinary inputs.
 
 The run is deterministic: two runs gave byte-identical traces and saves. It
-wins at frame 180,921 after 182,807 input calls, with no runtime faults.
+wins at frame 203,177 after 205,355 input calls, with no runtime faults.
 The controller stops recording at the deciding call, so a replay ends on the
 same frame.
 
 | Item | Value |
 | --- | --- |
-| Baelrog | Killed with Zeratul present by frame 93,154 (switch 0 set) |
-| Leviathan | Killed with Zeratul present at frame 180,921 (both switches, victory) |
-| Final state | Zeratul 60 HP and 400 shields, Fenix 240 HP, 57 army units, 130 enemy units and 74 enemy buildings left |
-| Save | Frame 33,585, one structure warping in; the record carries the construction (`CHP1`) and building-damage (`BD01`) markers |
-| Controller trace | 9,017 key transitions; SHA-256 `1b38e2bb272e715fc3d923339b44997c5e4ef27e017455a4b0ced89c18650aa9` |
-| Tape header | SHA-256 `c4896b87e40973370b0c91891acdb6f5ce60d0d478b8cf77d16b33d1ea13a91a` |
+| Baelrog | Killed with Zeratul present by frame 153,837 (switch 0 set) |
+| Leviathan | Killed with Zeratul present at frame 203,177 (both switches, victory) |
+| Final state | Zeratul 60 HP and 400 shields, Fenix 240 HP, 31 army units, 152 enemy units and 77 enemy buildings left |
+| Save | Frame 30,999, one structure warping in; the record carries the construction (`CHP1`) and building-damage (`BD01`) markers |
+| Controller trace | 11,417 key transitions; SHA-256 `4d783ee6315b06106ff6e631c27ef99ca131465cb9c6775da5f33939668bf914` |
+| Tape header | SHA-256 `6269c9379490bf87eed42ef78d3a3527dcf8ae9584ebd7cf61e15308f180992d` |
 
-Moving the save point changes the trajectory. Saving from frame 28,000 also
-wins. Saving from frame 32,000 or 36,000 loses Zeratul shortly after the
-first Cerebrate falls, which ends the mission by the source Defeat rule.
-These losses come from where the controller takes Zeratul, not from a
-runtime fault; the source rules, cloak and detection behave as above.
+The earlier controller lost on the current default branch, which resolves
+projectile damage at the drawn impact frame: a Zerg wave killed Fenix at
+his station near frame 15,000. The Fenix escape and deeper Gateway queues
+above restore the win. Only this save point is qualified; earlier save-point
+trials were on the previous tree and are not repeated here.
 
 ### Input-only replays
 
@@ -201,36 +207,43 @@ host program and as ARM ROMs:
 | Build | Behavior |
 | --- | --- |
 | Full | Plays the whole tape. |
-| Prefix | Stops after the pause-menu save sequence (tick 34,243), leaving the save in SRAM. |
-| Resume | Boots a fresh process, quick-loads with L on the title screen, then continues from tick 34,243. |
+| Prefix | Stops after the pause-menu save sequence (tick 31,537), leaving the save in SRAM. |
+| Resume | Boots a fresh process, quick-loads with L on the title screen, then continues from tick 31,537. |
+
+Every comparison uses the strict comparator shared with P8: the candidate
+must hold exactly the reference's observations from the requested tick on,
+with equal fields, no duplicate or out-of-order ticks, nothing before the
+cutoff and the same final record; at the documented resume tick it may open
+with its own `resume` observation.
 
 Host (`make test-sc64-protoss-p9`):
 
-- The full replay wins at frame 180,921.
-- The prefix's SRAM image is byte-identical to the controller's save.
-- The fresh-process resume matches the full replay at all 149 common
-  observations, ending in the same win.
+- The full replay wins at frame 203,177.
+- The prefix's SRAM image is byte-identical to the controller's save, and
+  its 31 periodic observations equal the full replay's.
+- The fresh-process resume holds all 175 of the full replay's observations
+  from tick 31,537, ending in the same win.
 
 ARM (mGBA 0.10.5, one isolated process per run, log mask 7, no debugger):
 
-- **ROM image `9d7067f9…84` (full).** Matches all 183 host observations and
-  wins at frame 180,921 with state digest `3574889178`. 805.1 s wall time.
-- **ROM image `02b4a057…5d` (prefix).** Matches all 35 host prefix
+- **ROM image `b1639825…03` (full).** Matches all 206 host observations and
+  wins at frame 203,177 with state digest `3978790484`. 1,379.3 s wall time.
+- **ROM image `93abadc6…9d` (prefix).** Matches all 32 host prefix
   observations. Its save record (tag `0x5343505d`, 16,292-byte payload,
   sequence 1, with the `CHP1` and `BD01` markers) is byte-identical to the
   host prefix's record. The SRAM files differ only in the unwritten bytes
   after the record (0x00 on host, 0xFF in mGBA).
-- **ROM image `730eafd2…3f` (resume).** Seeded with the ARM prefix's save
-  file. Loads at frame 33,585 with the prefix's final digest (`1412215360`).
-  Matches the host resume at all 150 observations and the uninterrupted host
-  replay at all 149 common ticks, ending in the same win.
+- **ROM image `b539fff5…0b` (resume).** Seeded with the ARM prefix's save
+  file. Loads at frame 30,999 with the prefix's final digest (`1895116182`).
+  Holds all 176 host resume observations and all 175 of the uninterrupted
+  host replay's from tick 31,537, ending in the same win.
 
 | ARM timing | Value |
 | --- | --- |
-| Frames (whole tape, menu and briefing included) | 182,807 |
-| Mean cycles/frame | 2,035,338 (about 8.2 fps equivalent) |
-| Mean update cycles | 1,309,306 |
-| Peak frame | 18,828,429 cycles |
+| Frames (whole tape, menu and briefing included) | 205,355 |
+| Mean cycles/frame | 2,059,858 (about 8.1 fps equivalent) |
+| Mean update cycles | 1,386,305 |
+| Peak frame | 24,211,714 cycles |
 
 The tape includes menu and briefing frames. The peak frame has not been
 broken down. None of these are physical-GBA measurements.
@@ -245,7 +258,7 @@ script and audio blob) and output.
 
 | Record | Outputs |
 | --- | --- |
-| `roms` | Playable ELF and ROM (`8bb979eb…fd`), replay ELFs and ROMs (the three images above) |
+| `roms` | Playable ELF and ROM (`e697e81b…`), replay ELFs and ROMs (the three images above) |
 | `host-replay` | Host full, prefix and resume replay programs |
 | `controller` | Host controller program |
 
@@ -255,21 +268,20 @@ The rebuilt ROM images are the images the emulator ran.
 
 | Build | `__bss_end` | `__iwram_end` |
 | --- | --- | --- |
-| Playable candidate | `0x02038d6c` | `0x03004c70` |
-| Replay ROMs | `0x0203862c` | `0x03004c70` |
+| Playable candidate | `0x02038d3c` | `0x03004c78` |
+| Replay ROMs | `0x020385fc` | `0x03004c78` |
 
 Both are below the unchanged guards (`0x0203e000` and `0x03005000`).
 
 ### Non-regression
 
 - Canonical Protoss rebuilt on this branch: SHA-256
-  `33148e729053641f7d22f8a9064f2c4ba1146d15cf20b2178854216df71bdca9`, the
-  image of `codex/source-release` 8d1e653.
+  `9952b59ed1050c4fbed86c19ad4543fc4277e5bc9758221ed0a27a6c44e07472`, the
+  image #151 builds (see the P8 audit for its change from the default
+  branch).
 - The P8 candidate rebuilt on this branch: SHA-256
-  `0c9c2ab74fa8301fc6932a520d4e4c473e7f57accbfc358f654bb29865373471`, the
-  qualified P8 image. Its controller trace and tape regenerate with the P8
-  qualification's hashes, and its host full and resume replays reach the
-  same win.
+  `83e63400851f28015abfc97fc75ed81dfdbf67cae21894e062eb5f6d500a1dbe`, the
+  qualified P8 image. The Showcase image is also identical to #151's.
 - `./dev build` and `./dev test` pass.
 
 ## Reproduce
@@ -285,16 +297,15 @@ python3 tools/sc64_p8_arm_replay.py --mission 28 --prefix P9 compare build/p9-ar
 python3 tools/sc64_p8_arm_replay.py --mission 28 --prefix P9 run --rom build/StarCraft-Protoss-P9-Replay-Prefix.gba --out build/emulator/p9-arm-prefix
 python3 tools/sc64_p8_arm_replay.py --mission 28 --prefix P9 run --rom build/StarCraft-Protoss-P9-Replay-Resume.gba --out build/emulator/p9-arm-resume \
     --sav-in build/emulator/p9-arm-prefix/saves/StarCraft-Protoss-P9-Replay-Prefix.sav
-python3 tools/sc64_p8_arm_replay.py --mission 28 --prefix P9 compare build/p9-arm/host-full.txt build/emulator/p9-arm-resume/p8-lines.txt --from-tick 34243
+python3 tools/sc64_p8_arm_replay.py --mission 28 --prefix P9 compare build/p9-arm/host-full.txt build/emulator/p9-arm-resume/p8-lines.txt --from-tick 31537
 ```
 
 `./dev sc64` does not list `protoss-p9` yet; use the make targets above.
 
 ## Limits
 
-- One controller policy and one save point are qualified; two of the four
-  save points tried win. Other saves, defeat endings and arbitrary input
-  are not qualified.
+- One controller policy and one save point are qualified. Other saves,
+  defeat endings and arbitrary input are not qualified.
 - The AI backend and the clock and pass cadence are authored. Native AI
   behavior is not reproduced.
 - Defiler spells are not implemented.

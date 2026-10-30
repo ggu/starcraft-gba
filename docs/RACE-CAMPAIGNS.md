@@ -140,7 +140,7 @@ use the Carrier, Arbiter or Battery services. See the
 P9 **Shadow Hunters** has a separate, unpromoted `protoss-p9` candidate
 built on the P8 candidate. It is built with `make protoss-p9` and writes
 `StarCraft-Protoss-P9-GBA.gba` / `starcraft-protoss-p9.elf`, code `SCP9`,
-generation 45. P9 runs the shared Protoss unit services: Zeratul is
+generation 45. P9 binds the shared Protoss unit services: Zeratul is
 permanently cloaked, the human Arbiter cloaks nearby units, and Zerg
 Overlords and Spore Colonies detect. One ordinary-input host controller run
 wins P9 by killing both Cerebrates with Zeratul present. The input-only ARM

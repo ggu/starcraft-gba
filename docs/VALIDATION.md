@@ -5,23 +5,22 @@ This page records reproducible checks for the source snapshot. Automated host ch
 ## Protoss P9 candidate (2026-10-29)
 
 The explicit `protoss-p9` candidate (`SCP9`, generation 45) adds P9 to the
-P8 candidate's P1–P8 profile and runs the shared Protoss unit services, with
-Zeratul permanently cloaked and P9-only Overlord and Spore Colony detection.
-Canonical Protoss stays P7 and its rebuilt ROM is byte-identical to
-`codex/source-release` 8d1e653; the P8 candidate ROM rebuilt on this branch
-is byte-identical to its qualified image. One ordinary-input host controller
-run wins P9 at frame 180,921 with no runtime faults, killing both Cerebrates
-with Zeratul present, and is deterministic across runs. The input-only ARM
-replay of its 9,017-transition key tape matches all 183 host observations,
-state digests included, through the same win. A pause-menu save at frame
-33,585, with a structure under construction, gives an SRAM record that is
-byte-identical on host and ARM. Loading it from the title screen in a fresh
-process continues to the same win, matching the uninterrupted replay at
-every common observation. Two of four save points tried win; the other two
-lose Zeratul to controller policy. Whole-tape ARM guest timing averages
-2,035,338 cycles per frame (about 8.2 fps equivalent; frame rate is not
-qualified). The playable ROM links at `__bss_end=0x02038d6c` and
-`__iwram_end=0x03004c70`. Executed build commands, raw dependency output and
+P8 candidate's P1–P8 profile and binds the shared Protoss unit services:
+Zeratul is permanently cloaked, and Overlords and Spore Colonies detect.
+Canonical Protoss stays P7; it and the P8 candidate rebuilt on this branch
+are byte-identical to the images #151 builds. One ordinary-input host
+controller run wins P9 at frame 203,177 with no runtime faults, killing both
+Cerebrates with Zeratul present, and is deterministic across runs. The
+input-only ARM replay of its 11,417-transition key tape matches all 206 host
+observations, state digests included, through the same win. A pause-menu
+save at frame 30,999, with a structure under construction, gives an SRAM
+record that is byte-identical on host and ARM. Loading it from the title
+screen in a fresh process continues to the same win: under the strict
+comparator it holds every observation of the uninterrupted replay from the
+documented resume tick. Whole-tape ARM guest timing averages 2,059,858
+cycles per frame (about 8.1 fps equivalent; frame rate is not
+qualified). The playable ROM links at `__bss_end=0x02038d3c` and
+`__iwram_end=0x03004c78`. Executed build commands, raw dependency output and
 input hashes are recorded in the audit. The AI backend and trigger cadence
 are authored, and Defiler spells are not implemented. These are emulator
 and host results only, with no hardware claim. See the
