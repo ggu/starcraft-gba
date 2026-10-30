@@ -452,7 +452,7 @@ SOURCE_WEAPON_INPUTS := $(WEAPON_SOURCE_HEADER) $(ATTACK_POSE_HEADER)
 SOURCE_WEAPON_FLAGS := -DSC64_WEAPON_SOURCE_VFX -I$(WEAPON_SOURCE_DIR) -DSC64_UNIT_ATTACK_POSES_ENABLED -I$(ATTACK_POSE_DIR)
 # Cache only the immutable presentation duration for the four qualified source
 # weapon products. Empty the override to compare or disable it on those builds.
-CANONICAL_TRACE_DURATION_FLAGS ?= -DSC64_TRACE_DURATION_CACHE
+CANONICAL_TRACE_DURATION_FLAGS ?= -DSC64_TRACE_DURATION_CACHE -DSC64_TRACE_PROFILE_INDEX_CACHE
 CANONICAL_TRACE_DURATION_FOR_WEAPON_FLAGS = $(if $(filter -DSC64_WEAPON_SOURCE_VFX,$(CANONICAL_WEAPON_FLAGS)),$(CANONICAL_TRACE_DURATION_FLAGS))
 # Limit culling to the four delivered profiles that have been qualified.
 # Clearing this override or removing the source renderer from the canonical
