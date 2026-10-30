@@ -6540,9 +6540,12 @@ cover physical hardware, saving and resuming inside T9, or the other open
 Terran controllers (T5, T7 and T8).
 
 The result applies only to runtime `9ff7f7c`. It does not qualify any later
-runtime. `codex/source-release` has since moved to `8d1e653`, 15 commits on,
-which change 15 files under `starcraft/` and `common/`. T9 needs a fresh host
-completion and ARM replay on any runtime that is to be qualified.
+runtime. To stay mergeable, this branch later merged `codex/source-release` at
+`97c39fa` (as `d8985c1`). That base is 40 commits past `9ff7f7c` and
+changes 24 files under `starcraft/` and `common/`. The merge was not
+re-qualified, and the replay audit below re-checks only the retained
+`9ff7f7c` logs. T9 needs a fresh host completion and ARM replay on any runtime
+that is to be qualified.
 
 Provenance of the qualifying run:
 
@@ -6626,7 +6629,7 @@ destroyed, all 21 Force 3 buildings intact, Kerrigan alive, zero trigger
 faults, phase 3, and the T9 completion bit set. 42 Wraiths and 13 SCVs
 survive; the wallet ends at 40/5,850. Two runs produce byte-identical traces
 (SHA-256 `8868402d01d8a2d66a5b80d6f2f7d873f6ac8343b8fd817e98378d2e66ed1f74`,
-2,642 input transitions). The earlier runtime `a4ff09d` and the qualifying
+2,807 input transitions). The earlier runtime `a4ff09d` and the qualifying
 runtime `9ff7f7c` produce the same trace byte for byte. Before tick 1 was made
 neutral, the same policy won at tick 44,292.
 
@@ -6645,6 +6648,7 @@ trace's observation at the same tick.
 ```sh
 make sc64-t9-arm-replay
 python3 tools/sc64_t9_arm_replay.py run --out build/emulator/t9-arm-replay
+python3 tools/sc64_t9_arm_replay.py audit build/emulator/t9-arm-replay/mgba.log
 ```
 
 **Result: ARM win.** The qualifying run (hashes below) launched mission 12
@@ -6657,6 +6661,41 @@ Kerrigan, unit counts, both resources and the selection. At tick 51,696
 `race_completed=4096`, 0/43 Protoss Force 2 buildings, 21/21 Zerg Force 3
 buildings and Kerrigan alive, identical to the host. The driver reported
 `ok: true` after 163 seconds of wall time.
+
+The driver checks the whole probe log, not just its markers. A log qualifies
+only with exactly the probe's line order:
+
+1. START
+2. the seven menu keys
+3. LAUNCH ok
+4. one CHECK/CHECK2 pair per observation
+5. both timing records
+6. DONE
+
+Every line must parse completely, with every field in the probe's order.
+Each line is checked against the trace and the probe's schedule:
+
+- START must give the trace's tape length and stop tick.
+- The menu keys must be the normal route.
+- LAUNCH must report 13 menu frames, one mission frame, the play screen,
+  mission 12 and
+  `race_mode=0`.
+- DONE must have consumed every tape entry.
+- Each CHECK2 must carry the tick of the CHECK before it.
+- Observations must fall exactly on tick 1, every 1,000 ticks and the stop
+  tick.
+
+A repeated tick and kind is rejected rather than merged, as is a periodic and
+terminal pair that disagrees at the stop tick. Asset-free tests cover each of
+these and the reviewed counterexamples. Those counterexamples are a `T9 LAUNCH
+ok` or `T9 DONE` marker without its fields, and conflicting `CHECK2` lines
+appended after DONE.
+
+`audit` re-ran these checks on 2026-10-30 against the retained logs. The
+qualifying log (SHA-256
+`82b4f4bf6e7385888fb660297749c5cfac1a4a7f020d40a8c394e5cdb03cb9bb`, 118 probe
+lines) passes, with 52/52 observations matched and no log or timing errors.
+Injecting the reviewed counterexamples into a copy of it makes it fail.
 
 Guest-cycle timing comes from the GBA timers (TM2/TM3 at 16,777,216 Hz).
 These are emulator guest cycles, not a physical-hardware measurement. The
@@ -6680,12 +6719,15 @@ at roughly a quarter of the 60 Hz frame rate in its late, unit-heavy phase.
 That is a performance observation, not a qualification failure; performance is
 tracked separately.
 
-Superseded runs are not part of this record's evidence:
+Superseded runs are not part of this record's evidence, and the stricter audit
+rejects each of them:
 - A replay on runtime `a4ff09d` (branch commit `10fc402`) also matched 52/52,
-  but its timing included the menu frames.
+  but its timing included the menu frames. It has no separate menu timing
+  record, so its log is out of shape.
 - Three earlier partial replays were stopped by wall-clock caps and a full host
-  disk. They had logged mGBA at mask 127, which records every DMA. The driver
-  now uses decimal mask 7 (fatal, error and warn).
+  disk, so their logs end before the final observation. They had logged mGBA
+  at mask 127, which records every DMA. The driver now uses decimal mask 7
+  (fatal, error and warn).
 
 ### Hashes and inputs
 
