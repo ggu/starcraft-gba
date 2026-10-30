@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Asset-free comparison of indexed and original lookup semantics."""
 import importlib.util
+import hashlib
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -24,6 +26,17 @@ static const Sc64WeaponSourceAnimation sc64_weapon_source_animations[4] = {
 static inline const Sc64WeaponSourceImage *sc64_weapon_source_image_lookup(uint16_t id) { for(unsigned i=0;i<3;i++) if(sc64_weapon_source_images[i].image_id==id)return &sc64_weapon_source_images[i];return 0; }
 static inline const Sc64WeaponSourceAnimation *sc64_weapon_source_animation_lookup(uint16_t id,uint8_t anim) { for(unsigned i=0;i<4;i++) if(sc64_weapon_source_animations[i].image_id==id&&sc64_weapon_source_animations[i].animation_id==anim)return &sc64_weapon_source_animations[i];return 0; }
 '''
+def source_array_hashes(source):
+    # Match full original-namespace array definitions, including payload bytes,
+    # rather than evaluating either lookup against the transformed arrays.
+    pattern = re.compile(r'^static const [^\n]*\b(sc64_weapon_source_[A-Za-z0-9_]+)\[[^\]\n]+\][ \t]*=[ \t]*\{.*?^\};', re.M | re.S)
+    arrays = {}
+    for match in pattern.finditer(source):
+        name = match.group(1)
+        if name in arrays: raise ValueError(f'duplicate array {name}')
+        arrays[name] = hashlib.sha256(match.group(0).encode()).hexdigest()
+    return arrays
+
 class IndexTest(unittest.TestCase):
     def test_exhaustive(self):
         derived = idx.make_index(BANK)
@@ -37,6 +50,30 @@ int main(void) { for(unsigned i=0;i<65536;i++){assert(sc64_weapon_source_image_l
             src = Path(directory)/'test.c'; binary = Path(directory)/'test'; src.write_text(code)
             subprocess.run(['clang','-std=c11','-O2','-Wall','-Wextra','-Werror','-fsanitize=address,undefined',str(src),'-o',str(binary)],check=True)
             subprocess.run([str(binary)],check=True)
+    def test_original_payload_definitions_unchanged(self):
+        synthetic = BANK + """static const uint8_t sc64_weapon_source_pixels[5] = {
+0, 19, 255, 73, 1
+};
+static const uint16_t sc64_weapon_source_frames[3] = {
+65535, 17, 42
+};
+static const uint32_t sc64_weapon_source_profiles[2] = {
+123456, 987654
+};
+static const uint8_t sc64_weapon_source_lo_offsets[2] = {
+31, 7
+};
+"""
+        original = source_array_hashes(synthetic)
+        self.assertEqual(set(original), {'sc64_weapon_source_images', 'sc64_weapon_source_animations',
+                                         'sc64_weapon_source_pixels', 'sc64_weapon_source_frames',
+                                         'sc64_weapon_source_profiles', 'sc64_weapon_source_lo_offsets'})
+        transformed = idx.make_index(synthetic)
+        self.assertEqual(source_array_hashes(transformed), original)
+        names = set(re.findall(r'^static const [^\n]*\b([A-Za-z_][A-Za-z0-9_]*)\[[^\]\n]*\][ \t]*=', transformed, re.M))
+        self.assertEqual(names - set(original), {'sc64_vfx_image_index', 'sc64_vfx_anim_start', 'sc64_vfx_anim_count'})
+        self.assertNotEqual(source_array_hashes(transformed.replace('0, 19, 255, 73, 1', '0, 19, 254, 73, 1')), original)
+
     def test_reject_invalid(self):
         for bad in [BANK.replace('{0}, {3}, {741}', '{0}, {0}, {741}'),
                     BANK.replace('{741,255}', '{741,256}'),
