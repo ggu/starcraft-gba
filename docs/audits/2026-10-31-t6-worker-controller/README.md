@@ -4,4 +4,4 @@ On worker STOP/manual-mining runtime 83875b4, the T6 host controller uses native
 
 The full Terran host controller compiled with prepared product flags and ASan/UBSan won at host tick 17,127 / frame 16,816, within the existing 30,000-call limit. Raynor and Norad survived, Raynor and both paid Dropships reached the source goal, the original victory and completion checks passed, and unsupported faults were zero. The trace records a visible air threat and a normal Marine defense order. Local log and trace are `.local/t1-controller/t6-defense-run.log` and `t6-defense-trace.json`.
 
-This is one host-controller result; ARM replay, fresh-process save continuation, hardware, and performance are not qualified by it.
+This is one state-observing, native-input host-controller result. Its inherited air-route planner reads hostile positions regardless of visibility; the visible mineral and Marine-defense checks do not make the whole planner a blind-human or visible-information policy. The run proves the stated engine outcome under those inputs. ARM replay, fresh-process save continuation, hardware, and performance are not qualified by it.
