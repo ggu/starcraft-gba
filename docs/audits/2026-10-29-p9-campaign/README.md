@@ -214,7 +214,9 @@ Every comparison uses the strict comparator shared with P8: the candidate
 must hold exactly the reference's observations from the requested tick on,
 with equal fields, no duplicate or out-of-order ticks, nothing before the
 cutoff and the same final record; at the documented resume tick it may open
-with its own `resume` observation.
+with its own `resume` observation. Each file must also keep the probe's own
+checkpoint cadence (a `resume` observation at its cutoff, a `periodic` one
+every 1,000 ticks and a final one), so matching final records alone fail.
 
 Host (`make test-sc64-protoss-p9`):
 
