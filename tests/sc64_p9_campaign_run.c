@@ -159,6 +159,20 @@ static int command_selected(int which,int x,int y)
 
 static int hero_command(int slot,int x,int y);
 
+/* Distance from (x,y) to the nearest armed enemy (Overlords are harmless
+ * detectors), capped at 1024 pixels. */
+static int enemy_clearance(int x,int y)
+{
+    int best=1024*1024;
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&u[i].raw_type!=42){
+        int d=dist2(u[i].x,u[i].y,x,y);
+        if(d<best)best=d;
+    }
+    int r=0;
+    while((r+1)*(r+1)<=best)++r;
+    return r;
+}
+
 /* The nearest live Sunken Colony guarding a Cerebrate, or -1. */
 static int guarding_sunken(int c)
 {
@@ -287,7 +301,7 @@ static int queue_combat_unit(void)
     const Sc64RaceUnitRule *rule=sc64_race_unit_rule(wanted);
     if(!rule||minerals<(int)rule->minerals||gas<(int)rule->gas||
        race_owner_supply_cap(SIDE)-race_owner_supply(SIDE)<(int)rule->supply)return 0;
-    int producer=-1,best_queue=2;
+    int producer=-1,best_queue=4;
     for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
         b[i].type==B_GATEWAY&&building_complete(i)&&b[i].queue_count<best_queue){
         producer=i;best_queue=b[i].queue_count;
@@ -634,6 +648,36 @@ int main(int argc,char **argv)
         if(menu_open)KEY_TAP(KEY_B);
         int home=home_nexus();
         int z=hero(75),f=hero(78);
+        /* Fenix, with an enemy within 256 pixels, walks to the reachable
+         * spot near the Nexus whose path keeps farthest from every enemy;
+         * Protoss hit points do not regenerate. Checked at the start of
+         * every step, since a step can spend hundreds of frames. */
+        static int next_evade;
+        if(!(!saved&&frame>=P9_SAVE_FRAME)&&home>=0&&f>=0&&u[f].owner==SIDE&&frame>=next_evade&&
+           enemy_clearance(u[f].x,u[f].y)<256){
+            static const int ox[16]={16,15,11,6,0,-6,-11,-15,-16,-15,-11,-6,0,6,11,15};
+            static const int oy[16]={0,6,11,15,16,15,11,6,0,-6,-11,-15,-16,-15,-11,-6};
+            int ex=-1,ey=-1,best=enemy_clearance(u[f].x,u[f].y);
+            for(int r=96;r<=224;r+=64)for(int a=0;a<16;a++){
+                int x=limit(b[home].x+ox[a]*r/16,48,WORLD_W-48),y=limit(b[home].y+oy[a]*r/16,48,WORLD_H-48);
+                int cell=limit(x/16,0,MAP_COLS-1)+limit(y/16,0,MAP_ROWS-1)*MAP_COLS,wx,wy,distance=-1;
+                if(!path_grid_valid||!SC64_GRID_GET(path_walkable,cell))continue;
+                /* Score the walk once under way, not just the destination. */
+                int clear=1024;
+                for(int t=2;t<=8;t++){
+                    int c=enemy_clearance(u[f].x+(x-u[f].x)*t/8,u[f].y+(y-u[f].y)*t/8);
+                    if(c<clear)clear=c;
+                }
+                if(clear<=best)continue;
+                if(!waypoint_to(u[f].x,u[f].y,x,y,&wx,&wy,&distance)||distance>32)continue;
+                best=clear;ex=x;ey=y;
+            }
+            if(ex>=0&&dist2(u[f].tx,u[f].ty,ex,ey)>48*48){
+                (void)hero_command(f,ex,ey);
+                next_hero=frame+900;
+            }
+            next_evade=frame+120;
+        }
         if(home<0&&frame>=next_build){
             int pending=0;
             for(int i=0;i<MAX_UNITS;i++)pending|=u[i].alive&&u[i].owner==SIDE&&SC64_BUILD_WORKER_ORDER(u[i].order);
@@ -718,7 +762,7 @@ int main(int argc,char **argv)
         int saving=!saved&&frame>=P9_SAVE_FRAME;
         if(frame>=next_production&&!(saving_for_nexus&&minerals<500)){
             int queued=0;
-            while(queued<3&&queue_combat_unit())++queued;
+            while(queued<6&&queue_combat_unit())++queued;
             next_production=frame+60;
         }
         /* Rescue Zeratul and Fenix, then keep Fenix home; Zeratul goes with
