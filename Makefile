@@ -5358,7 +5358,7 @@ BC_FIXTURE_range := tests/sc64_battlecruiser_yamato_range_game.c
 BC_FIXTURE_recovery := tests/sc64_battlecruiser_yamato_recovery.c
 BC_FIXTURES := production research flight save transfer yamato art impact migration auto ui damage cover heading range recovery
 define BC_PROFILE_FIXTURE
-build/test-bc-$(1)-$(2): $$(BC_FIXTURE_$(1)) $$(STARCRAFT) $$(wildcard starcraft/*.h) $($(4)) $(5) common/gba.c $$(COMMON_HEADERS) Makefile | build
+build/test-bc-$(1)-$(2): $$(BC_FIXTURE_$(1)) $$(STARCRAFT) $$(wildcard starcraft/*.h) $($(4)) $(5) $$(BC_INPUTS) common/gba.c $$(COMMON_HEADERS) Makefile | build
 	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) $$($(3)) $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(5) -o $$@
 endef
 $(foreach case,$(BC_FIXTURES),$(eval $(call BC_PROFILE_FIXTURE,$(case),terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,)))
@@ -5376,7 +5376,7 @@ BC_FRESH_impact := tests/sc64_bc_impact_fresh.c
 BC_FRESH_legacy := tests/sc64_bc_impact_legacy_fresh.c
 BC_FRESH_CASES := yamato charge update impact legacy
 define BC_FRESH_FIXTURE
-build/test-bc-fresh-$(1)-$(2): $$(BC_FRESH_$(1)) tests/sc64_yamato_host_sram_shim.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $($(4)) $(5) $$(COMMON_HEADERS) Makefile | build
+build/test-bc-fresh-$(1)-$(2): $$(BC_FRESH_$(1)) tests/sc64_yamato_host_sram_shim.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $($(4)) $(5) $$(BC_INPUTS) $$(COMMON_HEADERS) Makefile | build
 	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) $$($(3)) $$< tests/sc64_yamato_host_sram_shim.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $(5) -o $$@
 endef
 $(foreach case,$(BC_FRESH_CASES),$(eval $(call BC_FRESH_FIXTURE,$(case),terran,TERRAN_ROM_FLAGS,TERRAN_FULL_INPUTS,)))
