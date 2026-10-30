@@ -1167,6 +1167,7 @@ static void race_skirmish_init(void)
             m[idx].x = race_base_x[i] + sx * mdx[j];
             m[idx].y = race_base_y[i] + sy * mdy[j];
             m[idx].amount = 1500;
+            m[idx].style = SC64_RAW_MINERAL_FIELD_1 + j % 3;
         }
         geysers[i].x = race_base_x[i] + (sx < 0 ? 64 : -64);
         geysers[i].y = race_base_y[i] + (sy < 0 ? 56 : -56);
