@@ -24,8 +24,11 @@ int main(void)
     for(int guard=0;cx<640 && guard<40;guard++)game_update(KEY_RIGHT,0);
     game_update(0,0);assert(dist2(cx,cy,m[0].x,m[0].y)<16*16);
     assert(currently_visible(m[0].x,m[0].y));
+    /* A stale prior MOVE route cannot delay the newly issued gather order. */
+    u[worker].path_timer=200;u[worker].path_retry=200;
     assert(field_ui_a_action(selected_count())==UI_A_MINE);tap(KEY_A);
     assert(u[worker].order==ORDER_MINE&&u[worker].target==0);
+    assert(u[worker].path_timer<=24 && u[worker].path_retry<=12);
     /* Explicit input cannot inspect or assign an unseen field. */
     u[worker].order=ORDER_IDLE;u[worker].target=-1;u[worker].carry=0;
     SC64_GRID_SET(visible,m[0].x/16+(m[0].y/16)*MAP_COLS,0);

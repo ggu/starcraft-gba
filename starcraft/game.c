@@ -6285,6 +6285,7 @@ interact(void)
                     u[i].order = ORDER_MINE;
                     u[i].target = patch;
                     u[i].work_timer = 0;
+                    u[i].path_timer = u[i].path_retry = 0;
 #ifdef SC64_NEAREST_RESOURCE_DEPOT
                     u[i].build = -1;
 #endif
