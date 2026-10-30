@@ -116,8 +116,19 @@ class EngineCapabilityProfiles(unittest.TestCase):
                 self.assertIn("-DSC64_SIEGE_SPLASH", args)
                 self.assertIn("-DSC64_SHARED_BATTERY", args)
                 self.assertIn("-DSC64_SHARED_BUNKER", args)
+                self.assertEqual(args.count("-DSC64_DEPOT_BOUNDED"), 1)
                 result = self._compile_probe(values[name])
                 self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_bounded_depot_rejects_non_race_profile(self) -> None:
+        result = subprocess.run(
+            [self.clang, "-std=c11", "-I.", "-DSC64_DEPOT_TEST_LEGACY",
+             "-DSC64_DEPOT_BOUNDED", "-fsyntax-only", "tests/sc64_depot_routes.c"],
+            cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SC64_DEPOT_BOUNDED requires SC64_RACES", result.stderr)
 
     def test_contract_rejects_missing_marker_or_either_mechanic(self) -> None:
         flags = self._make_values()["RACES_FLAGS"]

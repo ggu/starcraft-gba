@@ -7236,3 +7236,57 @@ Private records are in `default-perf-evidence-v1`; the skipped-patch first
 attempt was identified and retained as baseline-only, then real candidate
 qualification was performed. Merge `2b08ca3` brings the qualified default
 change into this branch without changing its source tree at all.
+
+### Bound depot searches to the requesting worker (2026-10-30)
+
+The shared race capability now stops a depot flood once it assigns the
+requesting walkable origin. Root and neighbor ordering are unchanged. Such a
+field is explicitly incomplete: it can serve an already assigned origin but
+cannot prove an unreachable component. Another unassigned origin rebuilds the
+same slot from the roots. Blocked origins and the full-field helper still
+request a complete flood, preserving the shortest-neighbor choice. All queued
+walkability bits, including the unexpanded frontier, are restored before
+return. Invalid depot, geometry and origin arguments return before grid writes.
+No extra persistent frontier, actor storage or route pool is allocated.
+
+`SC64_DEPOT_BOUNDED` is supplied once by `RACES_FLAGS`, so the same engine
+behavior applies to the race, unified, campaign and Showcase products. A
+non-race build explicitly rejects the capability; disabled legacy builds stay
+supported. The depot oracle covers 18 configurations, including packed and
+nibble directions, partial point floods, temporary visited bits, read-only grid
+access, rectangular and 128-by-128 maps, blocked origins and cache churn.
+
+The exact final route header (private experiment v3) reduces the busy Zerg
+three-AI sample from 714,338,530 to 697,484,133 cycles: 2.3594% less work,
+23.49 to 24.05 effective fps. All 8,928 advancing gameplay and framebuffer rows
+match. Earlier Terran and Protoss timing experiments used v2 and are not
+performance qualification of this final header. This sample remains below
+30 fps and does not establish a worst-frame bound or hardware performance.
+
+The exact v3 native comparison matches all 54 ordinary skirmish results and
+passes 702 startup/save configurations. Four seeded Bunker SRAM continuations
+match fresh and in-place ARM processes through 1,000 updates; the P7 9,000-call
+ordinary-input prefix also matches. These do not establish new full campaign
+wins. The four canonical ARM links preserve the fixed EWRAM/IWRAM guards;
+remaining margins in bytes are Terran 28,480/488, Zerg 28,372/48, Protoss
+23,828/952 and Showcase 200/56. Plain race and unified ARM products also link.
+
+Final builds using the actual Make capability definition are byte-identical
+to the qualified v3 canonical products. Default doctor/build/test (686 Python
+tests, 17 optional skips and the separate eight-test suite), unified build/test
+and the full Terran host aggregate pass in the final frozen source snapshot.
+The latter qualifies host probes, not ordinary-menu ARM campaign completion.
+Source, raw dependencies, actual commands, generated inputs, maps and product
+hashes are retained privately under `depot-bounded-v3`,
+`depot-bounded-v3-native-v1`, `depot-bounded-v3-four-arm-v1`,
+`depot-bounded-v3-runtime-v1`, `depot-bounded-v3-sram-v1`,
+`depot-bounded-final-arm-v2`, `depot-bounded-final-generic-v1` and
+`depot-bounded-final-gates-v1`. The final closure reports no source drift;
+failed capture-wrapper attempts are retained separately and are not passes.
+
+Default PR #169 separately qualifies the preceding audio/terrain/lookup batch
+on its own base, with a 23.58-fps busy sample. PR #170 separately repairs the
+Terran host controllers, including their retained source-map/hidden-world
+planning. Those default results are not substitutes for this integration
+branch's different source and generated inputs. Full roster services, all
+campaigns, N64 fidelity and near-30-fps performance remain unfinished.

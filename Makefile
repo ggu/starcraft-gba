@@ -281,7 +281,7 @@ $(SC64_ORDER_MARKER_HEADER): tools/sc64_order_marker_pack.py tools/sc64_construc
 	python3 tools/sc64_order_marker_pack.py
 
 SC64_SHARED_ENGINE_FLAGS := -DSC64_CONSTRUCTION_HP -DSC64_SIEGE_SPLASH -DSC64_SHARED_SCOURGE_COMBAT -DSC64_SHARED_BATTERY -DSC64_SHARED_BUNKER
-RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_ENGINE_CORE_REQUIRED $(SC64_SHARED_ENGINE_FLAGS) -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated -I$(SC64_INTERFACE_DIR) $(HUD_ICON_FLAGS) $(RACE_CONSTRUCTION_FLAGS) $(SC64_BUILDING_FIRE_FLAGS) $(SC64_ORDER_MARKER_FLAGS)
+RACES_FLAGS := $(BACKWATER_FLAGS) -DSC64_RACES -DSC64_DEPOT_BOUNDED -DSC64_ENGINE_CORE_REQUIRED $(SC64_SHARED_ENGINE_FLAGS) -DSC64_FIELD_CONTROLS -I.local/sc64/races/generated -I.local/sc64/briefings/generated -I$(SC64_INTERFACE_DIR) $(HUD_ICON_FLAGS) $(RACE_CONSTRUCTION_FLAGS) $(SC64_BUILDING_FIRE_FLAGS) $(SC64_ORDER_MARKER_FLAGS)
 RACES_INPUTS := $(BACKWATER_INPUTS) .local/sc64/races/generated/sc64_races_generated.h .local/sc64/races/generated/sc64_race_sprites_generated.h .local/sc64/races/generated/sc64_menu_generated.h .local/sc64/briefings/generated/sc64_briefing_generated.h $(SC64_INTERFACE_INPUTS) $(COMMAND_ICON_HEADER) $(RACE_CONSTRUCTION_INPUTS) $(SC64_BUILDING_FIRE_HEADER) $(SC64_ORDER_MARKER_HEADER)
 
 .PHONY: sc64-interface test-sc64-font test-sc64-icons
@@ -5001,7 +5001,14 @@ $(eval $(call DEPOT_ROUTE_FIXTURE,active,-DSC64_LARGE_MAPS -DSC64_ROUTE_PACK3 -D
 $(eval $(call DEPOT_ROUTE_FIXTURE,base,))
 $(eval $(call DEPOT_ROUTE_FIXTURE,rect,-DRACE_TEST_COLS=80 -DRACE_TEST_ROWS=48 -DSC64_ROUTE_PACK3))
 $(eval $(call DEPOT_ROUTE_FIXTURE,legacy,-DSC64_DEPOT_TEST_LEGACY))
-DEPOT_ROUTE_CASES := pack3 split partial visit combined large128 t4 active base rect legacy
+$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-pack3,-DSC64_ROUTE_PACK3 -DSC64_DEPOT_BOUNDED))
+$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-nibble,-DSC64_DEPOT_BOUNDED))
+$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-partial,-DSC64_ROUTE_PACK3 -DSC64_ROUTE_PARTIAL_FLOOD -DSC64_ROUTE_DECAY_FREQ -DSC64_DEPOT_BOUNDED))
+$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-visit,-DSC64_ROUTE_PACK3 -DSC64_ROUTE_FLOOD_SPLIT -DSC64_ROUTE_VISIT_GRID -DSC64_DEPOT_BOUNDED))
+$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-rect,-DRACE_TEST_COLS=80 -DRACE_TEST_ROWS=48 -DSC64_ROUTE_PACK3 -DSC64_DEPOT_BOUNDED))
+$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-large,-DRACE_TEST_COLS=128 -DRACE_TEST_ROWS=128 -DSC64_ROUTE_PACK3 -DSC64_DEPOT_BOUNDED))
+$(eval $(call DEPOT_ROUTE_FIXTURE,bounded-readonly,-DSC64_ROUTE_PACK3 -DSC64_TEST_READONLY_GRID -DSC64_DEPOT_BOUNDED))
+DEPOT_ROUTE_CASES := pack3 split partial visit combined large128 t4 active base rect legacy bounded-pack3 bounded-nibble bounded-partial bounded-visit bounded-rect bounded-large bounded-readonly
 .PHONY: test-sc64-depot-routes test-sc64-depot-approach-default
 test: test-sc64-depot-routes test-sc64-depot-approach-default
 test-sc64-depot-routes: $(addprefix build/test-sc64-depot-routes-,$(DEPOT_ROUTE_CASES))
