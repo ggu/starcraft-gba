@@ -69,13 +69,7 @@ class CanonicalLinkTests(unittest.TestCase):
     def test_expanded_construction_arrival_links_body_once_without_assets(self):
         import re
         import subprocess
-        import tarfile
         with tempfile.TemporaryDirectory() as tmp:
-            tar = subprocess.run(['git', 'archive', 'HEAD'], cwd=ROOT, check=True,
-                                 capture_output=True).stdout
-            import io
-            with tarfile.open(fileobj=io.BytesIO(tar)) as archive:
-                archive.extractall(tmp, filter='data')
             (Path(tmp) / 'Makefile').write_text((ROOT / 'Makefile').read_text())
             targets = [f'build/test-sc64-construction-arrival{suffix}-{profile}'
                        for profile in ('terran', 'zerg-z6', 'protoss-p7')
