@@ -4695,7 +4695,7 @@ BC_P7_FACT_DIR := build/generated/p7-fact-v2-bc
 BC_P7_FACT_HEADER := $(BC_P7_FACT_DIR)/sc64_fact_tables_generated.h
 $(BC_P7_FACT_HEADER): tools/sc64_fact_tables_gen.c $(wildcard starcraft/*.h) $(COMMON_HEADERS) Makefile | build
 	mkdir -p $(BC_P7_FACT_DIR)
-	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(filter-out -DSC64_FACT_TABLES,$(P7_FACT_V2_FLAGS)) -DSC64_BATTLECRUISER_EXPERIMENT $< -o build/sc64-p7-fact-v2-bc-gen
+	$(CLANG) $(P7_ARBITER_TEST_FLAGS) -Istarcraft $(filter-out -DSC64_FACT_TABLES,$(P7_FACT_V2_FLAGS)) -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_ENERGY_EXPERIMENT -DSC64_BATTLECRUISER_YAMATO_EXPERIMENT $< -o build/sc64-p7-fact-v2-bc-gen
 	./build/sc64-p7-fact-v2-bc-gen > $@.tmp
 	mv $@.tmp $@
 P7_FACT_V2_FLAGS := $(filter-out -DSC64_COLLISION_CLASS_CACHE -DSC64_COLLISION_STEER_LIST,$(P7_SIGHT_AXIS_FLAGS)) -DSC64_CONTACT_CACHE $(P7_FACT_V2_FEATURES) -DSC64_FACT_TABLES -I$(P7_FACT_V2_DIR)

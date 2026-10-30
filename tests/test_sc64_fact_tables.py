@@ -144,6 +144,24 @@ class FactTablesTest(unittest.TestCase):
                     self.assertNotEqual(built.returncode, 0)
                     self.assertIn(message, built.stderr)
 
+    def test_tables_reject_bc_energy_yamato_mismatch_both_directions(self):
+        base = CONFIGS["zp_p7"] + ("SC64_BATTLECRUISER_EXPERIMENT",)
+        with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-bc-") as directory:
+            for gate in ("SC64_BATTLECRUISER_ENERGY_EXPERIMENT",
+                         "SC64_BATTLECRUISER_YAMATO_EXPERIMENT"):
+                for name, generated, used, state in (
+                    ("off-on", base, base + (gate,), "without"),
+                    ("on-off", base + (gate,), base, "with"),
+                ):
+                    label = gate + name
+                    with self.subTest(gate=gate, direction=name):
+                        table_dir = generate(self.compiler, generated, directory, label)
+                        built, _ = compile_program(self.compiler, CHECK,
+                            used + ("SC64_FACT_TABLES",), directory,
+                            label + "-check", ("-I", str(table_dir)))
+                        self.assertNotEqual(built.returncode, 0)
+                        self.assertIn(f"generated {state} {gate}".encode(), built.stderr)
+
     def test_tables_reject_carrier_flight_gate_mismatch(self):
         with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-flight-") as directory:
             table_dir = generate(self.compiler, CONFIGS["zp_p7_carrier"],
