@@ -47,3 +47,33 @@ hooks, transport/transfer and AI policy, save namespace/migration and atomic
 candidate-world validation. Normal ARM products, unchanged memory guards,
 fresh-process SRAM and busy-scene timing must be qualified before enabling
 the service. This candidate makes no hardware, frame-rate or full-roster claim.
+
+## Qualification at ee7ca97
+
+A clean indexed checkout with no private inputs passed source boundary,
+doctor, default build and default test: 781 Python cases with 23 optional
+skips, the separate eight-test suite and C fixtures. The new Make workflows
+ran four actual adapter and four presence vectors under ASan/UBSan; captured
+executed arguments included all canonical BC/CV5 gates plus the Scarab gate.
+The 102 captured prepared inputs were unchanged; both newly generated
+source-only P7 fact headers had SHA-256
+`c720227debe1ca0bd96e7f0687df6f5d6890258155a99778eca2f49c8a425be1`.
+
+An additional normal-Make ARM fit experiment used the additive authenticated
+Scarab art and facing closures, with compiler dependency checks confirming
+their selection. It froze existing generated inputs and kept 104 input
+hashes unchanged. These are world-kernel lower-bound builds: the training
+adapter and flight/UI/save integration are not registered in these ROMs.
+
+| Profile | BSS end | IWRAM end | Result |
+| --- | --- | --- | --- |
+| Terran | `020370b8` | `03004f40` | Link and ROM verifier pass |
+| Zerg Z6 | `02037124` | `03004fc0` | Link and ROM verifier pass |
+| Protoss P7 | `020382e4` | `03004e08` | Link and ROM verifier pass |
+| Showcase | `0203df38` | `03005150` | Existing IWRAM guard fails |
+
+Showcase must end strictly below `03005000`, preserving the 11 KiB stack
+reserve. No Showcase ELF/ROM was produced, no guard/cap was weakened, and
+the failed candidate is not a user build. New gate-off unified/Terran
+regressions are separately running and must not be reported as completed
+from these component checks. The last packaged user ROMs remain #189.
