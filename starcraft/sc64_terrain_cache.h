@@ -166,15 +166,15 @@ static int
 sc64_terrain_cache_restore_window(int dx, int dy)
 {
 #ifdef SC64_TERRAIN_CACHE_VRAM
-    return gfx_blit_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
+    return gfx_blit_terrain_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
                            sc64_terrain_cache_pixels_vram, 240,
                            SC64_TERRAIN_CACHE_VRAM_ROWS, dx, dy) &&
-           gfx_blit_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
+           gfx_blit_terrain_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
                            sc64_terrain_cache_pixels_ram, 240,
                            SC64_TERRAIN_CACHE_RAM_ROWS, dx,
                            dy - SC64_TERRAIN_CACHE_VRAM_ROWS);
 #else
-    return gfx_blit_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
+    return gfx_blit_terrain_window(SC64_TERRAIN_CACHE_Y, SC64_TERRAIN_CACHE_HEIGHT,
                            sc64_terrain_cache_pixels, 240,
                            SC64_TERRAIN_CACHE_HEIGHT, dx, dy);
 #endif
