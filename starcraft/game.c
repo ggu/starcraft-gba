@@ -1002,6 +1002,9 @@ static Geyser geysers[MAX_RACE_GEYSERS] = {{
 };
 static Tracer tracers[MAX_TRACERS];
 #ifdef SC64_TRACE_DURATION_CACHE
+#ifdef SC64_TRACE_PROFILE_INDEX_CACHE
+#include "sc64_trace_cache_word.h"
+#endif
 /* A trace's packed identity and captured endpoints stay fixed until its slot
  * is replaced. Cache only their derived presentation duration, never age or
  * simulation state. Long durations deliberately remain uncached. */
@@ -1012,8 +1015,12 @@ static inline void sc64_trace_duration_cache_reset(void)
 }
 static inline void sc64_trace_duration_cache_store(int slot, int duration)
 {
+#ifdef SC64_TRACE_PROFILE_INDEX_CACHE
+    sc64_trace_durations[slot] = (u16)sc64_trace_short_duration_word(duration);
+#else
     sc64_trace_durations[slot] = duration > 0 && duration <= 65535 ?
         (u16)duration : 0;
+#endif
 }
 #else
 #define sc64_trace_duration_cache_reset() ((void)0)
@@ -3934,6 +3941,9 @@ static int sc64_bc_yamato_visual_tag(unsigned style,unsigned heading)
 #endif
 
 /* Reconstruct presentation age from existing endpoints; no new saved state. */
+#if defined(SC64_TRACE_PROFILE_INDEX_CACHE) && defined(SC64_TRACE_DURATION_CACHE) && defined(SC64_WEAPON_SOURCE_VFX)
+#include "sc64_trace_profile_cache.h"
+#endif
 static int __attribute__((noinline))
 sc64_trace_duration(int packed, int x0, int y0, int x1, int y1)
 {
@@ -3967,7 +3977,11 @@ static inline int
 sc64_tracer_duration(int slot)
 {
 #ifdef SC64_TRACE_DURATION_CACHE
+#ifdef SC64_TRACE_PROFILE_INDEX_CACHE
+    if (sc64_trace_durations[slot] & 255u) return sc64_trace_durations[slot] & 255u;
+#else
     if (sc64_trace_durations[slot]) return sc64_trace_durations[slot];
+#endif
 #endif
     const Tracer *t = &tracers[slot];
     int duration = sc64_trace_duration(t->color,t->x0,t->y0,t->x1,t->y1);
@@ -3995,6 +4009,15 @@ add_tracer(int x0, int y0, int x1, int y1, int color)
     tracers[slot].x1=x1; tracers[slot].y1=y1;
     tracers[slot].color=color;
     sc64_trace_duration_cache_store(slot, duration);
+#if defined(SC64_TRACE_PROFILE_INDEX_CACHE) && defined(SC64_TRACE_DURATION_CACHE) && defined(SC64_WEAPON_SOURCE_VFX)
+    if (duration <= 255 && sc64_weapon_source_vfx_is_tagged((uint32_t)color)) {
+        Sc64WeaponSourceVfxKey key;
+        if (sc64_weapon_source_vfx_unpack((uint32_t)color, &key)) {
+            const Sc64WeaponSourceAttackProfile *p=sc64_weapon_source_profile_lookup(key.actor_raw,key.weapon_id,key.target_air,key.variant);
+            sc64_trace_durations[slot] |= (u16)(sc64_trace_profile_slot_index(p,key)<<8);
+        }
+    }
+#endif
     /* Combat emits before end-of-update aging, including the first draw. */
     tracers[slot].life=duration+1;
 }
@@ -9146,7 +9169,12 @@ draw_tracers(void)
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
             u32 dt=gba_clock();
 #endif
-            const Sc64WeaponSourceAttackProfile *profile=sc64_weapon_source_profile_lookup(
+            const Sc64WeaponSourceAttackProfile *profile=0;
+#if defined(SC64_TRACE_PROFILE_INDEX_CACHE) && defined(SC64_TRACE_DURATION_CACHE)
+            unsigned cached=sc64_trace_durations[i]>>8;
+            profile=sc64_trace_cached_profile(cached,key);
+#endif
+            if(!profile) profile=sc64_weapon_source_profile_lookup(
                 key.actor_raw,key.weapon_id,key.target_air,key.variant);
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
             diag_lookup+=gba_clock()-dt; dt=gba_clock();
