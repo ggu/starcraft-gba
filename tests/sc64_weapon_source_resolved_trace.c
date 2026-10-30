@@ -75,6 +75,7 @@ static const Sc64WeaponSourceFrame sc64_weapon_source_frames[2] = {
     {0, UINT32_MAX, 0, 0, 0, 2, 1, 2, 1, 0, 200},
     {2, UINT32_MAX, 0, 0, 0, 2, 1, 2, 1, 1, 200}
 };
+static const uint16_t sc64_weapon_source_frame_directory[2] = {0, 1};
 static const Sc64WeaponSourceLut sc64_weapon_source_luts[1] = {{0, 0, 0, 0}};
 static const uint8_t sc64_weapon_source_lut_bytes[1] = {0};
 static const Sc64WeaponSourceLoTable sc64_weapon_source_lo_tables[1] = {{0}};
@@ -99,7 +100,7 @@ sc64_weapon_source_animation_lookup(uint16_t id, uint8_t animation)
 {
     return (id == 100u || id == 200u) && animation == 0u ? &test_init : 0;
 }
-static inline const Sc64WeaponSourceFrame *
+static inline __attribute__((unused)) const Sc64WeaponSourceFrame *
 sc64_weapon_source_frame_lookup(uint16_t id, uint16_t source_frame)
 {
     if (id != 200u || source_frame > 1u) return 0;
@@ -152,12 +153,12 @@ int main(void)
     };
     test_request_image = (Sc64WeaponSourceImage){
         .image_id = 200, .frame_first = 0, .frame_count = 1,
-        .canvas_w = 2, .canvas_h = 1, .source_frame_count = 1,
+        .canvas_w = 2, .canvas_h = 1, .source_frame_count = 2,
         .modifier = 0
     };
     test_keyed_image = (Sc64WeaponSourceImage){
         .image_id = 200, .frame_first = 1, .frame_count = 1,
-        .canvas_w = 2, .canvas_h = 1, .source_frame_count = 1,
+        .canvas_w = 2, .canvas_h = 1, .source_frame_count = 2,
         .modifier = 0
     };
     test_init = (Sc64WeaponSourceAnimation){

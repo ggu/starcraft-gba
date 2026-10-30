@@ -7092,3 +7092,46 @@ one-to-one with update entries. The orders maximum is 2,174,022 cycles. Timing
 rows are identical to the original v3 sample; no instrumentation build or actor
 state writes were used. Distributions and provenance are retained in
 `shared-bunker-stage-profile-v3`, to guide the next rendering/spike optimization.
+
+### Shared rendering and depot-flood performance batch (2026-10-30)
+
+The next batch keeps simulation results and rendered pixels unchanged:
+
+- Facing examines only the signed quadrant's nine candidate directions, with
+  the original lowest-index tie rule at the north-west wrap. The T5 facing
+  fixture compares the actual helper with the original 32-vector search for
+  all 16,785,409 coordinate pairs in `[-2048, 2048]` squared.
+- The synchronous depot flood temporarily clears each enqueued walkable bit,
+  avoiding packed route-field reads for visited checks. Every queued bit is
+  restored before return. Seed/neighbor order, route fields and cache policy
+  stay the same; custom read-only grid accessors retain the field-based path.
+- Canonical race and Showcase renderers compute the static terrain key once
+  per draw, using the existing caller-supplied-key API.
+- Source effects reuse the image lookup already resolved by the caller when
+  locating its frame. The synthetic render fixture now supplies the generated
+  frame-directory contract and checks exact pointers against its old lookup,
+  as well as the existing moving-projectile and child draw-event sequence.
+
+On the pinned busy Zerg three-AI tape, updates 8001–9000 take 730,928,748
+cycles versus the Bunker baseline's 748,598,135: 2.3603% fewer cycles and
+22.41 to 22.95 effective fps. Both measurements use the same uninstrumented
+64-bit mGBA cycle runner, including audio, rendering and presentation waits.
+All 8,928 advancing gameplay-state and framebuffer SHA observations match the
+baseline; only the hardware-counter prefix is excluded from pixel comparisons.
+This is one nonterminal sample, not a universal or physical-hardware 30-fps
+claim. The complete roster, campaign and performance goals remain open.
+
+The frozen combined candidate links all four canonical products without
+changing actor limits or RAM reserves. Remaining EWRAM/IWRAM bytes are Terran
+28,480/488, Zerg 28,372/48, Protoss 23,828/952 and Showcase 200/56.
+Independent exhaustive direction and real-bank frame-pointer oracles, terrain
+key/scroll tests, depot BFS variants, motion-reuse and facing-clip checks are
+retained locally. The final default gate additionally exposed the standalone
+grid-accessor compatibility issue; its repair preserves the read-only accessor
+contract instead of requiring new mutable storage.
+
+Private provenance, executed compiler arguments, raw dependencies, consumed
+hashes, maps and comparisons are in `shared-render-batch-v1` and
+`shared-render-cross-profile-v1`. The rejected terrain row-mask experiment
+showed no useful gain. Separate tile-clean and grouped-animation experiments
+remain private and are not included in the batch's performance claim.

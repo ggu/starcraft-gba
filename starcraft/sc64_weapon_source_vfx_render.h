@@ -132,6 +132,16 @@ sc64_weapon_source_vfx_draw_raster(const Sc64WeaponSourceVfxRaster *r,
 #include "sc64_weapon_source_runtime.h"
 #include "sc64_weapon_source_vfx_bounds.h"
 
+/* Reuse the already resolved image for the generated frame directory. */
+static inline const Sc64WeaponSourceFrame *
+sc64_weapon_source_vfx_frame_resolved(const Sc64WeaponSourceImage *image,
+                                      uint16_t source_frame_id)
+{
+    if (!image || source_frame_id>=image->source_frame_count) return 0;
+    uint16_t i=sc64_weapon_source_frame_directory[image->frame_directory_first+source_frame_id];
+    return i<SC64_WEAPON_SOURCE_FRAME_COUNT ? &sc64_weapon_source_frames[i] : 0;
+}
+
 static inline uint16_t
 sc64_weapon_source_vfx_animation_frame(const Sc64WeaponSourceAnimation *anim,
                                        uint32_t local_tick,
@@ -233,7 +243,7 @@ sc64_weapon_source_vfx_draw_image(uint16_t image_id, uint8_t animation_id,
         image, anim, source_age, direction, &mirror);
     if (source_frame == UINT16_MAX) return;
     const Sc64WeaponSourceFrame *frame =
-        sc64_weapon_source_frame_lookup(image_id, source_frame);
+        sc64_weapon_source_vfx_frame_resolved(image, source_frame);
     if (!frame) return;
     sc64_weapon_source_vfx_draw_image_frame_resolved(
         image_id, image, frame, mirror, world_x, world_y);
@@ -476,7 +486,7 @@ sc64_weapon_source_vfx_draw_overlays_motion(const Sc64WeaponSourceAnimation *ani
                 child_image, child_anim, child_age, direction, &child_mirror);
             if (child_frame_id == UINT16_MAX) continue;
             const Sc64WeaponSourceFrame *child_frame =
-                sc64_weapon_source_frame_lookup(overlay->image_id, child_frame_id);
+                sc64_weapon_source_vfx_frame_resolved(child_image, child_frame_id);
             if (!child_frame) continue;
             sc64_weapon_source_vfx_draw_image_frame_resolved(
                 overlay->image_id, child_image, child_frame, child_mirror,
@@ -605,7 +615,7 @@ sc64_weapon_source_vfx_draw_trace_ex(uint32_t packed,
     }
     if (draw_image && draw_frame_id != UINT16_MAX) {
         const Sc64WeaponSourceFrame *draw_frame =
-            sc64_weapon_source_frame_lookup(draw_image_id, draw_frame_id);
+            sc64_weapon_source_vfx_frame_resolved(draw_image, draw_frame_id);
         if (draw_frame)
             sc64_weapon_source_vfx_draw_image_frame_resolved(
                 draw_image_id, draw_image, draw_frame, draw_mirror, px, py);
