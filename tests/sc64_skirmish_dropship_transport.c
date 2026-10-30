@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/game.c"
+#include "sc64_save_candidate_fixture.h"
 
 static void start_skirmish(void)
 {
@@ -54,7 +55,7 @@ static void encode_unit(RaceSave *save,int slot,const Unit *q)
 }
 static void invalid_cargo_rejected(int ship,int passenger)
 {
-    valid_save=race_data;
+    fixture_capture_save(&valid_save);
     memcpy(before_units,u,sizeof(u));memcpy(before_buildings,b,sizeof(b));
     int old_minerals=minerals,old_gas=gas;
     for(int mutation=0;mutation<6;mutation++) {
@@ -73,14 +74,13 @@ static void invalid_cargo_rejected(int ship,int passenger)
                actor.armor=sc64_race_unit_armor(U_TANK);break;
         }
         encode_unit(&bad_save,slot,&actor);
-        save_write(&bad_save,sizeof(bad_save),SAVE_VERSION);
-        save_write(&bad_save,sizeof(bad_save),SAVE_VERSION);
+        write_candidate_record(&bad_save);
+        assert(!race_skirmish_transport_save_valid(&race_data, race_cols, race_rows));
         assert(!race_load_game());
         assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)));
         assert(minerals==old_minerals && gas==old_gas);
     }
-    save_write(&valid_save,sizeof(valid_save),SAVE_VERSION);
-    save_write(&valid_save,sizeof(valid_save),SAVE_VERSION);
+    write_candidate_record(&valid_save);
     puts("malformed cargo links rejected atomically PASS");
 }
 int main(void)
@@ -141,7 +141,7 @@ int main(void)
         if(b[i].alive && b[i].type==B_CONTROL_TOWER && b[i].x==b[starport].x+48 && b[i].y==b[starport].y+8) tower=i;
     assert(tower>=0 && b[tower].under_construction);
     assert(race_save_game());
-    valid_save=race_data;bad_save=valid_save;
+    fixture_capture_save(&valid_save);bad_save=valid_save;
     Building bad_tower=b[tower];bad_tower.level=MAX_BUILDINGS+1;
 #ifdef SC64_T6_STORAGE
     assert(sc64_building_save_encode(&bad_save.buildings[tower],&bad_tower,
@@ -152,12 +152,10 @@ int main(void)
     }
 #endif
     memcpy(before_units,u,sizeof(u));memcpy(before_buildings,b,sizeof(b));
-    save_write(&bad_save,sizeof(bad_save),SAVE_VERSION);
-    save_write(&bad_save,sizeof(bad_save),SAVE_VERSION);
+    write_candidate_record(&bad_save);
     assert(!race_load_game());
     assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)));
-    save_write(&valid_save,sizeof(valid_save),SAVE_VERSION);
-    save_write(&valid_save,sizeof(valid_save),SAVE_VERSION);
+    write_candidate_record(&valid_save);
     race_data=valid_save;
 #endif
     invalid_cargo_rejected(ship,passengers[0]);

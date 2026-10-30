@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "../starcraft/game.c"
+#include "sc64_save_candidate_fixture.h"
 
 #if !defined(SC64_RACES) || !defined(SC64_UNIFIED) || \
     !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_CAMPAIGN_RACE)
@@ -137,7 +138,7 @@ static void run_race(int race)
 
     /* Pending intent survives the real profile-selected SRAM codec. */
     assert(race_save_game());
-    good = race_data;
+    fixture_capture_save(&good);
     u[worker].order = ORDER_IDLE; u[worker].target = -1;
     assert(race_load_game());
     assert(u[worker].alive && u[worker].order == ORDER_BUILD_PENDING &&
@@ -156,7 +157,7 @@ static void run_race(int race)
     for (int mutation = 0; mutation < 4; ++mutation) {
         bad = good;
         set_candidate_worker(&bad, worker, mutation, race);
-        save_write(&bad, sizeof(bad), SAVE_VERSION);
+        write_candidate_record(&bad);
         memcpy(before_units, u, sizeof(u));
         memcpy(before_buildings, b, sizeof(b));
         int minerals_before = minerals, gas_before = gas;
@@ -166,7 +167,7 @@ static void run_race(int race)
     }
 
     /* Restore the valid pending save, then let the real update loop commit. */
-    save_write(&good, sizeof(good), SAVE_VERSION);
+    write_candidate_record(&good);
     assert(race_load_game());
     old_minerals = minerals; old_gas = gas;
     for (int tick = 0; tick < 256 && u[worker].order == ORDER_BUILD_PENDING &&

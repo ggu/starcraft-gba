@@ -194,27 +194,100 @@ race_impact_save_write(void)
 {
     u32 bytes = 0;
     if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    /* The fixed base stays legacy-sized. Only active Yamato rows consume
+     * extension bytes; mask bits are in the already-versioned state word. */
+    Sc64BcYamatoShot shots[SC64_BC_SHOT_LIMIT];
+    u32 base = (u32)sizeof(RaceSave) - SC64_BC_SAVE_EXTRA_BYTES;
+    u32 mask = 0, offset = base;
+    memcpy(shots, race_data.battlecruiser_shots, sizeof(shots));
+    for (unsigned i = 0; i < SC64_BC_SHOT_LIMIT; ++i)
+        if (shots[i].state) { mask |= 1u << i; offset += sizeof(shots[i]); }
+    if (race_impact_count) bytes = sc64_impact_save_bytes(race_impact_count);
+    if (offset + bytes > RACE_IMPACT_RECORD_MAX) return 0;
+    race_data.state[28] = (race_data.state[28] & ~24u) | (mask << 3);
+    offset = base;
+    for (unsigned i = 0; i < SC64_BC_SHOT_LIMIT; ++i)
+        if (mask & (1u << i)) {
+            memcpy((u8 *)&race_impact_record + offset, &shots[i], sizeof(shots[i]));
+            offset += sizeof(shots[i]);
+        }
+    if (race_impact_count)
+        sc64_impact_encode(race_impact_rows, race_impact_count,
+                           (u8 *)&race_impact_record + offset);
+    save_write_migrating_feature(&race_impact_record, offset + bytes, SAVE_VERSION,
+                         SC64_LEGACY_SAVE_VERSION, offsetof(RaceSave,state)+27u*sizeof(int),
+                         0xffff0000u, 0x42450000u);
+#else
     if (race_impact_count)
         bytes = sc64_impact_encode(race_impact_rows, race_impact_count,
                                    race_impact_record.impacts);
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    save_write_migrating_feature(&race_impact_record, (u32)sizeof(RaceSave) + bytes,
+                         SAVE_VERSION, SC64_LEGACY_SAVE_VERSION,
+                         offsetof(RaceSave,state)+27u*sizeof(int), 0xffff0000u, 0x42450000u);
+#else
     save_write(&race_impact_record, (u32)sizeof(RaceSave) + bytes, SAVE_VERSION);
+#endif
+#endif
     return 1;
 }
 
-/* Load preflight: read the newest record of either length into race_data and
- * validate any impact block into `candidate` without touching live state. */
+/* Decode all extension data in scratch before touching live state. */
 static int
 race_impact_save_read(Sc64ImpactEvent *candidate, int *count)
 {
     u32 len = 0;
     int rows;
     *count = 0;
-    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record),
-                          SAVE_VERSION, &len) || len < sizeof(RaceSave)) return 0;
+#ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
+    const u32 base = (u32)sizeof(RaceSave) - SC64_BC_SAVE_EXTRA_BYTES;
+    Sc64BcYamatoShot shots[SC64_BC_SHOT_LIMIT] = {{0}};
+    u32 offset = base, mask = 0, impact_bytes;
+    int legacy = 0;
+    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), SAVE_VERSION, &len)) {
+        legacy = 1;
+        if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record),
+                              SC64_LEGACY_SAVE_VERSION, &len)) return 0;
+    }
+    if (len < base) return 0;
+    if (!legacy) {
+        if (race_data.version != SAVE_VERSION ||
+            ((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u ||
+            ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
+            ((unsigned)race_data.state[28] & 7u) > 4u) return 0;
+        mask = ((unsigned)race_data.state[28] >> 3) & 3u;
+        for (unsigned i = 0; i < SC64_BC_SHOT_LIMIT; ++i)
+            if (mask & (1u << i)) {
+                if (len - offset < sizeof(shots[i])) return 0;
+                memcpy(&shots[i], (u8 *)&race_impact_record + offset, sizeof(shots[i]));
+                if (!shots[i].state) return 0;
+                offset += sizeof(shots[i]);
+            }
+    } else if (race_data.version != SC64_LEGACY_SAVE_VERSION || race_data.state[27] != 0) return 0;
+    impact_bytes = len - offset;
+    if (impact_bytes > sizeof(race_impact_record.impacts)) return 0;
+    memmove(race_impact_record.impacts, (u8 *)&race_impact_record + offset, impact_bytes);
+    memcpy(race_data.battlecruiser_shots, shots, sizeof(shots));
+    if (!impact_bytes) return 1;
+    rows = sc64_impact_decode(race_impact_record.impacts, impact_bytes,
+                              RACE_IMPACT_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
+                              SC_RU_COUNT, candidate);
+#else
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), SAVE_VERSION, &len)) {
+        if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record),
+                              SC64_LEGACY_SAVE_VERSION, &len)) return 0;
+    }
+#else
+    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), SAVE_VERSION, &len)) return 0;
+#endif
+    if (len < sizeof(RaceSave)) return 0;
     if (len == sizeof(RaceSave)) return 1;
     rows = sc64_impact_decode(race_impact_record.impacts, len - (u32)sizeof(RaceSave),
                               RACE_IMPACT_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
                               SC_RU_COUNT, candidate);
+#endif
     if (rows < 0) return 0;
     *count = rows;
     return 1;

@@ -39,7 +39,7 @@ int main(void)
     assert(sc64_race_unit_from_raw(11) == U_DROPSHIP);
     for (i = 0; i < (unsigned int)m->width * m->height; ++i) {
         assert(m->tile_lookup[i] < m->tile_count);
-        assert(m->blocked[i] <= 1);
+        assert(m->blocked[i] <= 3);
     }
     /* No holes other than the deliberately unavailable global-ID interval. */
 #ifdef SC64_T3_ENABLED

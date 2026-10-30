@@ -399,7 +399,7 @@ skirmish_init(void)
 #ifdef SC64_IMPORTED_MISSION
     skirmish_ground_tile = 0;
     for (i = 0; i < MAP_CELLS; ++i)
-        if (!sc64_terrain_blocked[i]) {
+        if (!(sc64_terrain_blocked[i] & 1)) {
             skirmish_ground_tile = sc64_terrain_tile_ids[i];
             break;
         }

@@ -364,6 +364,162 @@ static int race_site_creep(int owner, int x, int y)
 }
 
 #include "sc64_skirmish_adapter.h"
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+#ifndef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+#error "BC research experiment requires experimental persisted energy"
+#endif
+/* The Lab's otherwise unused level and queue_progress hold its one job.
+ * No global per-building research pool is allocated. */
+static int race_bc_research_live_valid(void)
+{
+    unsigned pending=0;
+    for (int i=0;i<MAX_BUILDINGS;++i) {
+        Sc64BattlecruiserResearch r;
+        int key;
+        if (!b[i].alive || sc64_race_raw_building(b[i].type)!=118) continue;
+        if ((b[i].raw_type!=-1 && b[i].raw_type!=118) || b[i].queue_count ||
+            b[i].level<0 || b[i].queue_progress<0) return 0;
+        r.kind=(unsigned)b[i].level; r.remaining=(unsigned)b[i].queue_progress;
+        if (!sc64_battlecruiser_research_valid(&r)) return 0;
+        if (!r.kind) continue;
+        key=sc64_battlecruiser_owner_key(race_mode, race_selected_mission,b[i].owner,b[i].raw_owner);
+        if (key<0 || b[i].under_construction ||
+            sc64_battlecruiser_tech_has(sc64_battlecruiser_tech_bits,(unsigned)key,r.kind) ||
+            sc64_battlecruiser_tech_has(pending,(unsigned)key,r.kind)) return 0;
+        (void)sc64_battlecruiser_tech_complete(&pending,(unsigned)key,r.kind);
+    }
+    return 1;
+}
+static int race_bc_lab_start(int slot, unsigned kind)
+{
+    int key, owner, ore, vespene, busy = 0;
+    Sc64BattlecruiserResearch r;
+    if (slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive ||
+        !building_complete(slot) || sc64_race_raw_building(b[slot].type) != 118 ||
+        b[slot].queue_count || b[slot].level || b[slot].queue_progress) return 0;
+    owner = b[slot].owner;
+    key = sc64_battlecruiser_owner_key(race_mode, race_selected_mission, owner, b[slot].raw_owner);
+    if (key < 0 || owner < 0 || owner >= 5) return 0;
+    for (int i=0; i<MAX_BUILDINGS; ++i)
+        if (i != slot && b[i].alive && sc64_race_raw_building(b[i].type) == 118 &&
+            sc64_battlecruiser_owner_key(race_mode, race_selected_mission,b[i].owner,b[i].raw_owner) == key &&
+            b[i].level == (int)kind) busy = 1;
+    ore = race_owner_minerals(owner); vespene = race_owner_gas(owner);
+    r.kind=0; r.remaining=0;
+    if (!sc64_battlecruiser_research_start(&r,kind,(unsigned)key,
+            sc64_battlecruiser_tech_bits,1,busy,&ore,&vespene)) return 0;
+    if (owner == SIDE) { minerals=ore; gas=vespene; } else { race_minerals[owner]=ore; race_gas[owner]=vespene; }
+    b[slot].level=(int)r.kind; b[slot].queue_progress=(int)r.remaining;
+    return 1;
+}
+static int race_bc_lab_cancel(int slot, int destroyed)
+{
+    Sc64BattlecruiserResearch r;
+    unsigned refund;
+    int owner;
+    if (slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive ||
+        sc64_race_raw_building(b[slot].type) != 118 ||
+        (destroyed != 0 && destroyed != 1)) return 0;
+    owner=b[slot].owner;
+    if (owner < 0 || owner >= 5) return 0;
+    r.kind=(unsigned)b[slot].level; r.remaining=(unsigned)b[slot].queue_progress;
+    if (!sc64_battlecruiser_research_valid(&r) || !r.kind) return 0;
+    refund=sc64_battlecruiser_research_cost(r.kind);
+    if (destroyed) refund=refund*3u/4u;
+    b[slot].level=0; b[slot].queue_progress=0;
+    race_add_owner_resources(owner,(int)refund,(int)refund);
+    return 1;
+}
+static int race_bc_parent_addon_constructing(int slot)
+{
+    if (slot<0 || slot>=MAX_BUILDINGS || !b[slot].alive ||
+        sc64_race_raw_building(b[slot].type)!=116) return 0;
+    for (int i=0;i<MAX_BUILDINGS;++i)
+        if (b[i].alive && b[i].owner==b[slot].owner && b[i].under_construction &&
+            sc64_race_raw_building(b[i].type)==118 &&
+            b[i].x==b[slot].x+48 && b[i].y==b[slot].y+8) return 1;
+    return 0;
+}
+/* Cancel before changing a Lab's owner, so refunds go to the old bank.
+ * A transferred parent brings its attached Lab with it. */
+static int race_bc_before_building_transfer(int slot,int new_owner)
+{
+    int raw,old_owner;
+    if (slot<0 || slot>=MAX_BUILDINGS || !b[slot].alive || new_owner<0 || new_owner>=5) return 0;
+    old_owner=b[slot].owner; raw=sc64_race_raw_building(b[slot].type);
+    if (old_owner==new_owner) return 1;
+    if (raw==118 && b[slot].level && !race_bc_lab_cancel(slot,0)) return 0;
+    if (raw==116) {
+        int attached=-1;
+        for (int i=0;i<MAX_BUILDINGS;++i) {
+            Sc64BattlecruiserResearch r;
+            if (!b[i].alive || b[i].owner!=old_owner ||
+                sc64_race_raw_building(b[i].type)!=118 ||
+                b[i].x!=b[slot].x+48 || b[i].y!=b[slot].y+8) continue;
+            if (attached>=0 || b[i].under_construction ||
+                b[i].level<0 || b[i].queue_progress<0) return 0;
+            r.kind=(unsigned)b[i].level; r.remaining=(unsigned)b[i].queue_progress;
+            if (!sc64_battlecruiser_research_valid(&r)) return 0;
+            attached=i;
+        }
+        if (attached>=0) {
+            if (b[attached].level && !race_bc_lab_cancel(attached,0)) return 0;
+            b[attached].owner=new_owner;
+        }
+    }
+    return 1;
+}
+static void race_bc_parent_detach(int slot)
+{
+    if (slot < 0 || slot >= MAX_BUILDINGS || !b[slot].alive ||
+        sc64_race_raw_building(b[slot].type) != 116) return;
+    for (int i=0;i<MAX_BUILDINGS;++i) {
+        if (!b[i].alive || b[i].owner != b[slot].owner ||
+            sc64_race_raw_building(b[i].type) != 118 ||
+            b[i].x != b[slot].x+48 || b[i].y != b[slot].y+8) continue;
+        if (b[i].under_construction) {
+            const Sc64RaceBuildingRule *r=sc64_race_building_rule(b[i].type);
+            if (r) race_add_owner_resources(b[i].owner,(int)r->minerals*3/4,(int)r->gas*3/4);
+            destroy_building(i,b[i].owner);
+            continue;
+        }
+        if (b[i].level) (void)race_bc_lab_cancel(i,0);
+        b[i].owner=NEUTRAL; b[i].raw_owner=11;
+    }
+}
+static void race_bc_parent_relink(int slot)
+{
+    if (slot<0 || slot>=MAX_BUILDINGS || !b[slot].alive ||
+        sc64_race_raw_building(b[slot].type)!=116) return;
+    for (int i=0;i<MAX_BUILDINGS;++i)
+        if (b[i].alive && b[i].owner==NEUTRAL &&
+            sc64_race_raw_building(b[i].type)==118 &&
+            b[i].x==b[slot].x+48 && b[i].y==b[slot].y+8) {
+            b[i].owner=b[slot].owner; b[i].raw_owner=b[slot].raw_owner;
+            return;
+        }
+}
+static void race_bc_building_destroyed(int slot)
+{
+    if (sc64_race_raw_building(b[slot].type)==118 && b[slot].level)
+        (void)race_bc_lab_cancel(slot,1);
+    if (sc64_race_raw_building(b[slot].type)==116)
+        race_bc_parent_detach(slot);
+}
+static void race_bc_lab_tick(int slot)
+{
+    Sc64BattlecruiserResearch r;
+    unsigned bits=sc64_battlecruiser_tech_bits;
+    int key=sc64_battlecruiser_owner_key(race_mode, race_selected_mission,b[slot].owner,b[slot].raw_owner);
+    if (key < 0 || !b[slot].level || !building_complete(slot)) return;
+    r.kind=(unsigned)b[slot].level; r.remaining=(unsigned)b[slot].queue_progress;
+    if (!sc64_battlecruiser_research_tick(&r,(unsigned)key,&bits,
+                                           sc64_battlecruiser_source_tick_due())) return;
+    b[slot].level=(int)r.kind; b[slot].queue_progress=(int)r.remaining;
+    sc64_battlecruiser_tech_bits=(u16)bits;
+}
+#endif
+
 
 static int race_can_site(int owner, int type, int x, int y)
 {
@@ -472,14 +628,26 @@ static int race_queue_unit(int owner, int producer, int type)
     if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) ||
         (!building_complete(producer) && !(egg_job && race_z7_morphing_egg_hall(owner, producer)) &&
             !(race_mode && b[producer].alive && (b[producer].type == B_LAIR || b[producer].type == B_HIVE))) ||
-        b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type, r->producer) ||
+        b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type,
+#ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
+            (race_mode && sc64_race_raw_unit(type) == 12) ? B_STARPORT : r->producer
+#else
+            r->producer
+#endif
+        ) ||
         (!race_mode && !race_owner_has_prereq(owner, r->prereq))) return 0;
     if (!egg_job && b[producer].queue_count >= 5) return 0;
 #else
     if (!r || producer < 0 || producer >= MAX_BUILDINGS || r->race != race_owner_identity(owner) ||
         (!building_complete(producer) && !(race_mode && b[producer].alive &&
             (b[producer].type == B_LAIR || b[producer].type == B_HIVE))) ||
-        b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type, r->producer) ||
+        b[producer].owner != owner || !sc64_race_producer_compatible(b[producer].type,
+#ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
+            (race_mode && sc64_race_raw_unit(type) == 12) ? B_STARPORT : r->producer
+#else
+            r->producer
+#endif
+        ) ||
         b[producer].queue_count >= 5 || (!race_mode && !race_owner_has_prereq(owner, r->prereq))) return 0;
 #endif
 #ifdef SC64_T5_RUNTIME
@@ -793,6 +961,15 @@ static void race_tick_state(void)
     }
     for (i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].type >= 0 && u[i].type < SC_RU_COUNT) {
         const Sc64RaceUnitRule *r = sc64_race_unit_rule(u[i].type);
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+        if (sc64_race_is_battlecruiser(u[i].type)) {
+            int key = sc64_battlecruiser_owner_key(race_mode, race_selected_mission, u[i].owner, u[i].raw_owner);
+            int reactor = key >= 0 && sc64_battlecruiser_tech_has(
+                sc64_battlecruiser_tech_bits, (unsigned)key, SC64_BC_TECH_REACTOR);
+            (void)sc64_battlecruiser_energy_tick(
+                &u[i].carry, reactor, sc64_battlecruiser_source_tick_due());
+        }
+#endif
 #ifdef SC64_Z5_RUNTIME
         if (z5_regeneration_active) {
             int raw_type = -1;
@@ -989,6 +1166,9 @@ static int sc64_p3_exit_building_blocked(void *opaque, int x, int y, int flying)
     if (flying) return 0;
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         if (!b[i].alive) continue;
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+        if (race_bc_facility_airborne(i)) continue;
+#endif
         if (b[i].type == B_ZERG_BEACON) continue;
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
         if (!sc64_t4_building_collidable(i)) continue;
@@ -1053,11 +1233,20 @@ static void race_tick_buildings(void)
 {
     int i;
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+        if (race_bc_facility_airborne(i)) continue;
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
         if (race_late_airborne(i)) continue;
 #endif
         int type, frames, x, y, supply, owner;
         const Sc64RaceBuildingRule *br;
+#ifdef SC64_BATTLECRUISER_RESEARCH_EXPERIMENT
+        if (b[i].level && sc64_race_raw_building(b[i].type) == 118) {
+            race_bc_lab_tick(i);
+            continue;
+        }
+#endif
         if (b[i].under_construction) {
             br = sc64_race_building_rule(b[i].type);
             if (race_mode && br && br->race == R_TER) {

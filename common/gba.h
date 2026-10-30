@@ -101,6 +101,9 @@ u32 rng_next(u32 *seed);
 int clampi(int x,int lo,int hi);
 int absi(int x);
 void save_write(const void *data,u32 length,u32 tag);
+void save_write_migrating(const void *data,u32 length,u32 tag,u32 legacy_length,u32 legacy_tag);
+void save_write_migrating_feature(const void *data,u32 length,u32 tag,u32 legacy_tag,
+                                  u32 marker_offset,u32 marker_mask,u32 marker_value);
 int save_read(void *data,u32 length,u32 tag);
 int save_read_latest(void *data,u32 capacity,u32 tag,u32 *length);
 void audio_tone(int frequency,int frames,int volume);

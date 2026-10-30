@@ -14,8 +14,11 @@ race_bunker_target_in_range(const Unit *q,int target,int raw)
 #endif
     if (!sc64_auto_target_candidate_allowed(q->type,target,q->owner,q->raw_owner)) return 0;
     int flying=target<MAX_UNITS && sc64_race_unit_flying(u[target].type);
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    if (target>=MAX_UNITS && race_bc_facility_airborne(target-MAX_UNITS)) flying=1;
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
-    if (target>=MAX_UNITS) flying=race_late_airborne(target-MAX_UNITS);
+    if (target>=MAX_UNITS && race_late_airborne(target-MAX_UNITS)) flying=1;
 #endif
     Sc64StockAttack attack={0};
     if (!sc64_stock_attack_select(raw,flying,&attack) ||

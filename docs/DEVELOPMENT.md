@@ -3019,3 +3019,35 @@ metrics, then rechecks the existing scheduled/injected-input loop. An optional
 Z7 link comparison recovers 2,072 BSS bytes with the same IWRAM end and
 unchanged memory guards. This is input infrastructure and does not change
 gameplay, save formats, actor limits or the campaign qualification scope.
+
+### Battlecruiser source inputs
+
+The [shared candidate audit](audits/2026-10-30-shared-battlecruiser/README.md)
+records the tested source, setup, save limits and remaining performance gates.
+`make test-bc-canonical test-bc-fresh-canonical` exercises the four actual
+canonical flag sets when their private inputs are prepared; the fixtures seed
+infrastructure/funds/energy and do not claim normal-input campaign completion.
+
+The canonical Terran, Zerg, Protoss and Showcase profiles use the shared
+Battlecruiser and Yamato services. After preparing the ordinary race profile,
+run `./dev sc64 prepare-bc --rom PATH` with the verified USA ROM. This writes
+cover-encoded terrain, race and skirmish tables to `.local/sc64/bc/generated`
+the two facility body frames to `.local/sc64/bc-body/`, and Yamato art to
+`.local/sc64/bc-yamato/generated/`. The separate
+outputs leave the existing imported banks intact. `./dev sc64 status --profile
+terran` (or `zerg`, `protoss`, `protoss-p7`) reports whether the new inputs
+are present. Repeat preparation when the private source inputs change.
+
+### Prepared BC ordinary-input host witness
+
+With the Terran and BC inputs already prepared, run `make test-sc64-bc-normal-input`.
+This opt-in target compiles the controller and separate replay/fresh-load
+programs with the canonical Terran flags, runs ordinary menu and game inputs,
+validates the resulting trace, saves during an in-flight Yamato shot, and
+loads that save through HOME/L in a fresh host process. It does not generate
+or modify imported inputs. The target creates a new ignored directory under
+`.local/build/bc-normal-input/` for its binaries, trace, transitions and SRAM.
+The fixed tick 17937 and frame 17658 are a source-bound witness for this
+controller and runtime, not a general scenario or hardware guarantee; a
+runtime change that alters the controller timeline requires a fresh witness
+and review. This host test is not a physical-GBA or frame-rate qualification.

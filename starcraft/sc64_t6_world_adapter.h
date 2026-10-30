@@ -498,6 +498,9 @@ static void
 sc64_t6_transfer_unit(int slot)
 {
     Unit *q = &u[slot];
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    if (!race_bc_before_unit_transfer(q,SIDE,-1)) return;
+#endif
     q->owner = SIDE; q->selected = 0; q->order = ORDER_IDLE;
     q->target = -1; q->tx = q->x; q->ty = q->y;
     q->path_timer = q->path_retry = 0;
@@ -527,7 +530,7 @@ sc64_t6_rescue_group(unsigned raw_owner)
             sc64_t6_transfer_unit(i);
     for (int i = 0; i < MAX_BUILDINGS; ++i)
         if (b[i].alive && b[i].owner == RESCUABLE && b[i].raw_owner == (int)raw_owner)
-            b[i].owner = SIDE;
+            if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) b[i].owner = SIDE;
     if (raw_owner < 8) race_t6.rescue_mask |= (u8)(1u << raw_owner);
     target_lists_valid = 0;
     sc64_target_index_end();
@@ -554,6 +557,7 @@ sc64_t6_rescue_tick(void)
         if (q->type == B_COMMAND && building_complete(i))
             sc64_t6_rescue_group(source);
         else {
+            if (!SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) continue;
             q->owner = SIDE;
             race_t6.rescue_mask |= (u8)(1u << source);
         }
