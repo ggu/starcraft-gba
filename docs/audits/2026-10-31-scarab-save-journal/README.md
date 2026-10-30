@@ -29,3 +29,22 @@ supply the complete side-effect-free preflight, use its token for the write,
 and qualify active variable-length envelopes and fresh-process reload before
 claiming compatibility. The checksum is the existing record integrity check,
 not a cryptographic authentication mechanism.
+
+## Combined-source qualification
+
+Independent review of the unknown-tag protection child found no remaining
+component blocker. Combined draft source `0517c99` passes the actual
+asset-free journal Make target, and a separate clean indexed worktree passes
+boundary, doctor, default build and test: 782 Python cases (23 optional
+skips), eight ancillary cases and C fixtures. Boundary checks 1,233 indexed
+text files. Its default ROM SHA-256 is
+`577ad52c0652a4b57519dd11d1d96762ac289375a289115b8dd2c355f2271f98`,
+byte-identical to the prior merged Scarab-foundation default at `52ee752`.
+This is not a new four-profile ARM or gameplay qualification.
+
+The generic API remains unregistered with game saves. Existing callers,
+namespace and impact capacity are unchanged. Game-side preflight extraction,
+three-generation migration and complete Reaver gameplay are separate work;
+the component tests do not establish them. Private receipts are in the
+`journal-default-qualification-20261031` worktree's `.local/qualification`
+and the shared Scarab worktree's `.local/journal-generic-proof`.
