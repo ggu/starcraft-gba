@@ -412,8 +412,8 @@ sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey 
         (uint32_t)camx + 32768u <= 65535u &&
         (uint32_t)camy + 32768u <= 65535u && key.direction <= 31u) {
         uint16_t rx, ry;
-        if (!sc64_weapon_source_vfx_bounds_unpack(
-                sc64_weapon_source_vfx_profile_bounds(profile), &rx, &ry)) return 0;
+        uint32_t global_bounds = sc64_weapon_source_vfx_cached_bounds();
+        if (!sc64_weapon_source_vfx_bounds_unpack(global_bounds, &rx, &ry)) return 0;
         const int16_t *v = sc64_weapon_source_direction_q8[key.direction];
         int lx = x0 + ((int)profile->forward_offset * v[0]) / 512;
         int ly = y0 + ((int)profile->forward_offset * v[1]) / 512 -
@@ -428,8 +428,18 @@ sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey 
         if (y1 < lo_y) lo_y = y1;
         if (y1 > hi_y) hi_y = y1;
         lo_x -= camx; hi_x -= camx; lo_y -= camy; hi_y -= camy;
+        if (hi_x + (int)rx < 0 || lo_x - (int)rx >= 240 ||
+            hi_y + (int)ry < 0 || lo_y - (int)ry >= 108) return 1;
+#if defined(SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION) && \
+    SC64_WEAPON_SOURCE_PROFILE_BOUNDS_VERSION == 1
+        uint32_t profile_bounds = sc64_weapon_source_vfx_profile_bounds(profile);
+        if (profile_bounds == global_bounds ||
+            !sc64_weapon_source_vfx_bounds_unpack(profile_bounds, &rx, &ry)) return 0;
         return hi_x + (int)rx < 0 || lo_x - (int)rx >= 240 ||
                hi_y + (int)ry < 0 || lo_y - (int)ry >= 108;
+#else
+        return 0;
+#endif
     }
     int64_t dx = (int64_t)x1 - x0, dy = (int64_t)y1 - y0;
     uint64_t abs_dx = (uint64_t)(dx < 0 ? -dx : dx);
@@ -440,7 +450,7 @@ sc64_weapon_source_vfx_trace_provably_offscreen_resolved(Sc64WeaponSourceVfxKey 
      * fail closed before any launch or interpolation arithmetic. */
     if (abs_dx > UINT16_MAX || abs_dy > UINT16_MAX) return 0;
     uint16_t radius_x, radius_y;
-    uint32_t bounds = sc64_weapon_source_vfx_profile_bounds(profile);
+    uint32_t bounds = sc64_weapon_source_vfx_cached_bounds();
     if (!sc64_weapon_source_vfx_bounds_unpack(bounds, &radius_x, &radius_y))
         return 0;
     int launch_x, launch_y;
