@@ -7400,3 +7400,39 @@ comparisons are private in `default-resolved-tracer-v1`. The earlier #171
 54-match, 702 startup/save and 27 construction results are baseline evidence
 for unchanged gameplay paths, not new runs of this renderer-only stage.
 No Actions were run and no proprietary inputs are committed.
+
+### Shared terrain window transfer (2026-10-30)
+
+On integration base `81fc21b`, the terrain cache uses a specialized aligned
+DMA3 window transfer for horizontal shifts. It may overwrite only edge tiles
+that the caller redraws before presentation. The generic window API remains
+unchanged; partial rows, unaligned shifts and narrower scene clips use it.
+The shared cache serves campaign, custom-game and Showcase products without
+adding persistent storage or reducing actor limits or RAM reserves.
+
+The promoted six-file patch matches the frozen v3 source byte for byte.
+Its Make-wired sanitizer fixture passes 5,292 clipped-window cases; removing
+the narrow-clip fallback reproduces the regression caught during development.
+Four prepared-profile scene fixtures each pass 512 camera-phase/direction
+cases with fog, construction, mineral depletion and static objects on exposed
+edges. The default build/test and source-boundary checks pass. The preceding
+v2 runtime also passes doctor, unified build/test and the full Terran host
+aggregate. V3 adds the permanent test wiring: its four canonical ARM ROMs,
+ordered compiler arguments and consumed inputs match v2 exactly, so that
+runtime evidence transfers by identity rather than being claimed as rerun.
+All four links preserve the fixed EWRAM and IWRAM reserve guards.
+
+Paired real ARM-emulator custom-game samples, 1,000 updates each, preserve
+every observed gameplay/framebuffer row: Terran 8,926, Zerg 8,928 and Protoss
+8,927. Guest cycles fall from 613,489,611 to 605,343,334 (27.35 to 27.72 fps),
+693,601,985 to 682,929,112 (24.19 to 24.57 fps), and 613,726,043 to 604,206,765
+(27.34 to 27.77 fps), respectively. These are busy nonterminal samples,
+not full campaign wins, steady 30 fps or physical-hardware measurements.
+Initial unguarded prototype measurements are superseded by these results.
+
+Private evidence is in `terrain-transfer-final-v2` and
+`terrain-transfer-final-v3`: raw dependencies, executed compiler arguments,
+source/input hashes, maps, paired replays, regression and scene logs, and
+`final-closure.json` record zero drift and the ROM identity checks. No Actions
+were dispatched and no proprietary inputs are committed. Full roster services,
+remaining campaigns and broader fidelity/performance qualification stay open.

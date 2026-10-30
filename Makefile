@@ -5213,3 +5213,25 @@ build/test-sc64-bunker-rules: tests/sc64_bunker_rules.c starcraft/sc64_bunker_ru
 test-sc64-bunker-rules: build/test-sc64-bunker-rules
 	./build/test-sc64-bunker-rules
 test: test-sc64-bunker-rules
+
+# Terrain-only overdraw must be followed by clipped edge redraw; this fixture
+# is asset-free and includes one-row segments and narrow-clip fallbacks.
+.PHONY: test-sc64-terrain-transfer-window test-sc64-terrain-transfer-scenes
+build/test-sc64-terrain-transfer-window: tests/sc64_terrain_transfer_window.c common/gba.c common/gba.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -I. $< common/gba.c -o $@
+test-sc64-terrain-transfer-window: build/test-sc64-terrain-transfer-window
+	./build/test-sc64-terrain-transfer-window
+test: test-sc64-terrain-transfer-window
+
+# Optional prepared-input canonical renderer differential, including fog,
+# construction, mineral depletion and static objects at both exposed edges.
+define TERRAIN_TRANSFER_SCENE
+build/test-sc64-terrain-transfer-scene-$(1): tests/sc64_terrain_transfer_scene.c tests/sc64_z3_frame_coverage.c $$(STARCRAFT) $$(wildcard starcraft/*.h) $(3) common/gba.c $$(COMMON_HEADERS) Makefile | build
+	$$(CLANG) $$(SKIRMISH_CONTROLLER_HOST_FLAGS) $(2) -I. $$< common/gba.c $$(filter-out starcraft/game.c,$$(STARCRAFT)) $$(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $$@
+endef
+$(eval $(call TERRAIN_TRANSFER_SCENE,terran,$(TERRAN_ROM_FLAGS),$(TERRAN_FULL_INPUTS)))
+$(eval $(call TERRAIN_TRANSFER_SCENE,zerg,$(ZERG_ROM_FLAGS),$(ZERG_Z6_INPUTS)))
+$(eval $(call TERRAIN_TRANSFER_SCENE,protoss,$(PROTOSS_ROM_FLAGS),$(PROTOSS_P7_CANONICAL_INPUTS)))
+$(eval $(call TERRAIN_TRANSFER_SCENE,showcase,$(SHOWCASE_FLAGS),$(P7_ARBITER_INPUTS)))
+test-sc64-terrain-transfer-scenes: $(addprefix build/test-sc64-terrain-transfer-scene-,terran zerg protoss showcase)
+	@set -e; for profile in terran zerg protoss showcase; do ./build/test-sc64-terrain-transfer-scene-$$profile; done
