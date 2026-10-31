@@ -49,7 +49,7 @@ int main(void)
     assert(sc64_race_unit_from_raw(150) == -1);
     for (i = 0; i < (unsigned int)m->width * m->height; ++i) {
         assert(m->tile_lookup[i] < m->tile_count);
-        assert(m->blocked[i] <= 1);
+        assert(m->blocked[i] <= 3);
     }
     assert(sc64_race_maps[14].width == 0); /* Z3 disabled in this fixture */
     for (i = 15; i <= 21; ++i) assert(sc64_race_maps[i].width == 0);

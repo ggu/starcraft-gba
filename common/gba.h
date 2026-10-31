@@ -90,8 +90,14 @@ void gfx_pixel(int x,int y,u8 color);
 void gfx_blit_sprite_hflip(int x,int y,int width,int height,const u8 *indexed_pixels);
 #endif
 void gfx_rect(int x,int y,int w,int h,u8 color);
-void gfx_frame(int x,int y,int w,int h,u8 color);
-void gfx_line(int x0,int y0,int x1,int y1,u8 color);
+#if defined(GBA_SHAPES_ROM_ARM) && !defined(GBA_HOST)
+#define GBA_SHAPE_ENTRY __attribute__((long_call,target("arm")))
+#else
+#define GBA_SHAPE_ENTRY
+#endif
+GBA_SHAPE_ENTRY void gfx_frame(int x,int y,int w,int h,u8 color);
+GBA_SHAPE_ENTRY void gfx_line(int x0,int y0,int x1,int y1,u8 color);
+#undef GBA_SHAPE_ENTRY
 void gfx_circle(int x,int y,int radius,u8 color);
 void gfx_diamond(int x,int y,int rx,int ry,u8 color);
 void gfx_text(int x,int y,const char* text,u8 color);
@@ -101,6 +107,9 @@ u32 rng_next(u32 *seed);
 int clampi(int x,int lo,int hi);
 int absi(int x);
 void save_write(const void *data,u32 length,u32 tag);
+void save_write_migrating(const void *data,u32 length,u32 tag,u32 legacy_length,u32 legacy_tag);
+void save_write_migrating_feature(const void *data,u32 length,u32 tag,u32 legacy_tag,
+                                  u32 marker_offset,u32 marker_mask,u32 marker_value);
 int save_read(void *data,u32 length,u32 tag);
 int save_read_latest(void *data,u32 capacity,u32 tag,u32 *length);
 void audio_tone(int frequency,int frames,int volume);

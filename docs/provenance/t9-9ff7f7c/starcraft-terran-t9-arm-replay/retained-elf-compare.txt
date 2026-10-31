@@ -1,0 +1,7 @@
+retained 0a57e591b1dab8a30426b581006d3f4b54f59b84836ad2b39da07f49a9ef4e49  build/starcraft-terran-t9-arm-replay.elf.qualified
+rebuilt  593e52f5bd75a328422f91940ffabbe6443358a3dbf6d9a987344e3ce6db6604  build/starcraft-terran-t9-arm-replay.elf
+differing bytes: 12
+in sections: .strtab
+differing symbols: 2
+  ccto2z5n.o -> ccyFOBTR.o
+  ccBzbRhe.o -> ccx1gn7C.o

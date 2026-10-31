@@ -16,6 +16,9 @@ static int race_skirmish_has_raw(int owner, unsigned raw)
     for (int i = 0; i < MAX_BUILDINGS; ++i) {
         int have;
         if (!b[i].alive || b[i].owner != owner) continue;
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+        if (race_bc_facility_airborne(i)) continue;
+#endif
         have = sc64_race_raw_building(b[i].type);
         if (b[i].under_construction) {
             /* While upgrading, the existing source tier still exists. */
@@ -79,7 +82,15 @@ static int race_skirmish_product_admitted(int owner, int producer,
      * into working skirmish units by exposing their names in a menu. */
     /* Reaver requires a Scarab ammunition lifecycle; the generic weapon
      * path alone is not an implementation of its ordinary product. */
+#ifndef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
+    /* Production remains unavailable until its service is complete. */
+    if (r->raw_id == 12) return 0;
+#endif
+#ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
+    if (r->raw_id == 83 || !ur || (ur->producer == 255 && r->raw_id != 12)) return 0;
+#else
     if (r->raw_id == 83 || !ur || ur->producer == 255) return 0;
+#endif
     producer_raw = sc64_race_raw_building(b[producer].type);
     if (r->producer_raw == 35) {
         if (!sc64_race_is_zerg_townhall(b[producer].type)) return 0;

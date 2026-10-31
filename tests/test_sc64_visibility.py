@@ -98,6 +98,7 @@ static int fixture_grid_get(const u8 *grid,int cell) {
 #include "starcraft/sc64_visibility.h"
 
 static u8 ref_visible[MAP_CELLS], ref_explored[MAP_CELLS];
+static unsigned short ref_count[MAP_CELLS];
 static u8 ref_minimap_visible[24*24], ref_minimap_explored[24*24];
 static void compare(int step);
 static void ref_explore(int x,int y,int radius) {
@@ -112,12 +113,13 @@ static void ref_vision(int x,int y,int radius,int extent) {
  for(row=r-extent;row<=r+extent;row++) for(col=c-extent;col<=c+extent;col++)
   if(col>=0&&row>=0&&col<MAP_COLS&&row<MAP_ROWS) {
    int dx=col*16+8-x,dy=row*16+8-y;
-   if(dx*dx+dy*dy<=radius*radius)ref_visible[col+row*MAP_COLS]=1;
+   if(dx*dx+dy*dy<=radius*radius){ref_visible[col+row*MAP_COLS]=1; ++ref_count[col+row*MAP_COLS];}
   }
 }
 static void ref_update(void) {
  int i;
  memset(ref_visible,0,sizeof(ref_visible));
+ memset(ref_count,0,sizeof(ref_count));
  for(i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE){
 #ifdef SC64_RACES
   int worker=IS_WORKER(u[i].type);
@@ -211,6 +213,11 @@ static void compare(int step){
   ref_minimap_explored[mini]+=ref_explored[i]!=0;
  }
  for(i=0;i<MAP_CELLS;i++)
+#if defined(SC64_LATE_TERRAN_STORAGE)
+  if(sc64_visibility_source_count(i)!=ref_count[i]) {
+   fprintf(stderr,"count mismatch step %d cell %d\n",step,i);exit(1);
+  } else
+#endif
   if(fixture_grid_get(visible,i)!=(ref_visible[i]!=0)||
      fixture_grid_get(explored,i)!=(ref_explored[i]!=0)){
    fprintf(stderr,"grid mismatch at step %d cell %d\n",step,i);exit(1);
@@ -233,6 +240,17 @@ int main(void){
  for(i=0;i<MAX_UNITS;i++){u[i].alive=0;compare(-601-i);}
  for(i=0;i<MAX_BUILDINGS;i++){b[i].alive=0;compare(-801-i);}
  if(sc64_visibility_source_count(40+40*MAP_COLS)!=0)abort();
+ /* Transfer thirty overlapping sources in one frame across 255/256. */
+ for(i=0;i<MAX_UNITS;i++)u[i]=(UnitFixture){1,SIDE,640,640,U_SCV};
+ for(i=0;i<MAX_BUILDINGS;i++)b[i]=(BuildingFixture){1,i<58?SIDE:0,640,640,B_COMMAND};
+ compare(-950);
+ if(sc64_visibility_source_count(40+40*MAP_COLS)!=250)abort();
+ for(i=58;i<88;i++)b[i].owner=SIDE;
+ compare(-951);
+ if(sc64_visibility_source_count(40+40*MAP_COLS)!=280)abort();
+ for(i=58;i<88;i++)b[i].owner=0;
+ compare(-952);
+ if(sc64_visibility_source_count(40+40*MAP_COLS)!=250)abort();
 #endif
 #ifdef SC64_RACES
  /* Imported Zerg town halls share building sight exactly, including circles
@@ -301,6 +319,30 @@ int main(void){
  near_move_sweep(U_SCV,-2000);
  near_move_sweep(0,-12000);
  edge_move_sweep(-22000);
+ /* Out-of-map source centers still clip safely; empty spans are harmless. */
+ {
+  static const int outside[8][2]={{-15,0},{-1,-1},{0,-15},
+   {MAP_COLS*16,0},{MAP_COLS*16+15,MAP_ROWS*16-1},
+   {0,MAP_ROWS*16},{MAP_COLS*16-1,MAP_ROWS*16+15},
+   {MAP_COLS*16+15,MAP_ROWS*16+15}};
+  memset(u,0,sizeof(u));memset(b,0,sizeof(b));
+  memset(visible,0,sizeof(visible));memset(explored,0,sizeof(explored));
+  memset(ref_visible,0,sizeof(ref_visible));memset(ref_explored,0,sizeof(ref_explored));
+  sc64_visibility_reset();
+  u[0].alive=1;u[0].owner=SIDE;
+#ifdef SC64_T4_RUNTIME
+  u[0].type=U_GOLIATH;
+#else
+  u[0].type=U_SCV;
+#endif
+  for(i=0;i<8;i++){u[0].x=outside[i][0];u[0].y=outside[i][1];compare(-23000-i);}
+  u[0].alive=0;compare(-23009);
+#ifdef SC64_VISIBILITY_SPANS
+  sc64_visibility_apply_span(0,1,0,1); /* Inverted interval: no cells. */
+  compare(-23010);
+#endif
+ }
+
  /* Moving sources by one pixel changes their exact sight-circle boundary,
     while their exploration tile remains the same. Two nearby sources overlap
     so source-count transitions and minimap occupancy must remain exact. */
@@ -314,6 +356,17 @@ int main(void){
  u[1].owner=0;compare(-2);
  u[1].owner=SIDE;u[1].type=U_SCV;compare(-3);
  u[1].alive=0;compare(-4);
+#ifdef SC64_T4_RUNTIME
+ /* A transfer changes thirty overlapping sources in the same frame. */
+ memset(u,0,sizeof(u)); memset(b,0,sizeof(b));
+ for(i=0;i<30;i++) { u[i].alive=1;u[i].owner=SIDE;u[i].type=U_GOLIATH;
+   u[i].x=500+(i%6)*7;u[i].y=500+(i/6)*7; }
+ compare(-100);
+ for(i=0;i<30;i++) u[i].owner=0;
+ compare(-99);
+ for(i=0;i<30;i++) u[i].owner=SIDE;
+ compare(-98);
+#endif
  for(step=0;step<1000;step++){
   for(i=0;i<MAX_UNITS;i++)if((rnd()%5)==0){
    u[i].alive=(rnd()%4)!=0;u[i].owner=(int)(rnd()%3);

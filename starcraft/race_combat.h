@@ -40,6 +40,10 @@ race_can_attack(int attacker,int target) {
             return sc64_race_unit_can_attack_air(attacker);
         }
     } else if((b[target-MAX_UNITS].flags&16)||b[target-MAX_UNITS].type==B_ZERG_BEACON)return 0;
+#ifdef SC64_BATTLECRUISER_FLIGHT_EXPERIMENT
+    if(target>=MAX_UNITS&&race_bc_facility_airborne(target-MAX_UNITS))
+        return attacker<0||sc64_race_unit_can_attack_air(attacker);
+#endif
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if(target>=MAX_UNITS&&race_late_airborne(target-MAX_UNITS))
         return attacker<0||sc64_race_unit_can_attack_air(attacker);

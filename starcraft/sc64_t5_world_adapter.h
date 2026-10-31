@@ -53,6 +53,9 @@ static void
 sc64_t5_transfer_unit(int slot)
 {
     Unit *q = &u[slot];
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+    if (!race_bc_before_unit_transfer(q,SIDE,-1)) return;
+#endif
     q->owner = SIDE; q->selected = 0; q->order = ORDER_IDLE;
     q->target = -1; q->tx = q->x; q->ty = q->y;
     q->path_timer = q->path_retry = 0;
@@ -89,10 +92,11 @@ sc64_t5_transfer_rescue_actor(int unit_slot, int building_slot)
                 sc64_t5_transfer_unit(i);
         for (int i = 0; i < MAX_BUILDINGS; ++i)
             if (b[i].alive && b[i].owner == RESCUABLE && b[i].raw_owner == raw_owner)
-                b[i].owner = SIDE;
+                if (SC64_BC_ALLOW_BUILDING_TRANSFER(i,SIDE)) b[i].owner = SIDE;
     } else if (unit_slot >= 0) {
         sc64_t5_transfer_unit(unit_slot);
     } else {
+        if (!SC64_BC_ALLOW_BUILDING_TRANSFER(building_slot,SIDE)) return 0;
         b[building_slot].owner = SIDE;
     }
 

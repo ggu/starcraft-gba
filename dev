@@ -667,6 +667,8 @@ def build(game: str) -> None:
         raise RuntimeError(
             "source construction art requires the blue-glow modifier bank; "
             "regenerate with ./dev sc64 prepare --rom PATH --profile " + game)
+    if game in BC_PROFILES and not bc_inputs_ready():
+        raise RuntimeError("canonical BC builds need isolated cover and body inputs; run ./dev sc64 prepare-bc --rom PATH")
     make_target, _ = GAMES[game]
     run(["make", make_target])
 
@@ -717,6 +719,58 @@ def ensure_extractor() -> None:
     dirty = subprocess.check_output(["git", "-C", str(REFERENCE), "status", "--porcelain"], text=True).strip()
     if head != REFERENCE_COMMIT or dirty:
         raise RuntimeError(f"Pinned extractor checkout verification failed: {head}")
+
+
+# The shared BC capability is prepared independently: no existing source bank
+# is rewritten. All four canonical race products consume this same overlay.
+BC_DIR = Path(".local/sc64/bc/generated")
+BC_BODY_HEADER = Path(".local/sc64/bc-body/sc64_bc_body_art_generated.h")
+BC_YAMATO_HEADER = Path(".local/sc64/bc-yamato/generated/yamato_source_generated.h")
+BC_MARKERS = {
+    "sc64_assets_generated.h": "SC64_ASSET_COVER_DATA",
+    "sc64_races_generated.h": "SC64_RACES_COVER_DATA",
+    "sc64_skirmish_generated.h": "SC64_SKIRMISH_COVER_DATA",
+}
+BC_PROFILES = ("terran", "zerg", "zerg-z6", "protoss", "protoss-p7")
+
+
+def bc_inputs_ready() -> bool:
+    try:
+        for name, marker in BC_MARKERS.items():
+            if not re.search(r"^#define\s+" + marker + r"\s+1\s*$",
+                             (ROOT / BC_DIR / name).read_text(encoding="ascii"), re.MULTILINE):
+                return False
+        body = (ROOT / BC_BODY_HEADER).read_text(encoding="ascii")
+        yamato = (ROOT / BC_YAMATO_HEADER).read_text(encoding="ascii")
+        return ("SC64_YAMATO_FRAME_COUNT" in yamato and "sc64_yamato_pixels" in yamato and
+                "sc64_yamato_light_lut" in yamato and
+                "#define SC64_BC_BODY_ART_FORMAT_VERSION 1u" in body and
+                all(name in body for name in ("sc64_race_sprite_science_facility_frame_0_pixels",
+                                               "sc64_race_sprite_physics_lab_frame_0_pixels")))
+    except (OSError, UnicodeError):
+        return False
+
+
+def prepare_bc(rom: Path) -> None:
+    rom = rom.expanduser().resolve()
+    if not rom.is_file():
+        raise RuntimeError(f"User-supplied ROM does not exist: {rom}")
+    ensure_extractor()
+    out = ROOT / BC_DIR
+    run([sys.executable, str(ROOT / "tools/sc64_assets.py"), "--rom", str(rom),
+         "--profile", "backwater", "--out", str(out), "--cover"])
+    for name in ("races", "skirmish"):
+        run([sys.executable, str(ROOT / f"tools/sc64_{name}_pack.py"), "--rom", str(rom),
+             "--backwater-generated", str(out), "--out", str(out / f"sc64_{name}_generated.h"), "--cover"])
+    run([sys.executable, str(ROOT / "tools/sc64_bc_body_art.py"), "--rom", str(rom),
+         "--remap", str(out / "palette-remap.bin"), "--header", str(ROOT / BC_BODY_HEADER)])
+    run([sys.executable, str(ROOT / "tools/sc64_yamato_assets.py"), "--rom", str(rom),
+         "--out", str((ROOT / BC_YAMATO_HEADER).parent),
+         "--palette-remap", str(out / "palette-remap.bin"),
+         "--palette-json", str(out / "palette.json")])
+    if not bc_inputs_ready():
+        raise RuntimeError("BC preparation produced incomplete cover, body or Yamato data")
+    print("Prepared isolated BC cover and facility art under .local/sc64/.")
 
 
 def prepare(rom: Path, profile: str) -> None:
@@ -1035,7 +1089,10 @@ def status(profile: str) -> int:
                  "Source weapon effects", "Source death art")):
             note = f" (run ./dev sc64 prepare --rom PATH --profile {profile} to regenerate)"
         print(f"{'READY  ' if ready else 'MISSING'} {label}: {path}{note}")
-    return int(any(not path.is_file() for _, path in paths) or
+    if profile in BC_PROFILES:
+        print(f"{'READY  ' if bc_inputs_ready() else 'MISSING'} BC cover, facility and Yamato art: {ROOT / BC_DIR}")
+    return int((profile in BC_PROFILES and not bc_inputs_ready()) or
+               any(not path.is_file() for _, path in paths) or
                (profile in FACING_PROFILES and not facing_sprite_input_ready(ROOT / FACING_HEADER)) or
                (profile in FACING_PROFILES and not tank_vfx_input_ready(ROOT / TANK_VFX_HEADER)) or
                (profile in FACING_PROFILES and not attack_pose_input_ready(ROOT / ATTACK_POSE_HEADER)) or
@@ -1087,7 +1144,7 @@ def main() -> int:
     play_parser = commands.add_parser("play", help="build and launch a StarCraft profile in mGBA")
     play_parser.add_argument("game", nargs="?", choices=GAMES, default="starcraft")
     sc64 = commands.add_parser("sc64", help="prepare or inspect optional local StarCraft 64 profiles")
-    sc64.add_argument("action", choices=("prepare", "status", "build", "test", "play"))
+    sc64.add_argument("action", choices=("prepare", "prepare-bc", "status", "build", "test", "play"))
     sc64.add_argument("--rom", type=Path, help="user-supplied USA N64 ROM (or ZIP) for prepare")
     sc64.add_argument("--profile", choices=SC64_PROFILES, default="unified")
     args = parser.parse_args()
@@ -1102,7 +1159,11 @@ def main() -> int:
             return 0
         if args.command == "play":
             return play(args.game)
-        if args.action == "prepare":
+        if args.action == "prepare-bc":
+            if args.rom is None:
+                raise RuntimeError("sc64 prepare-bc requires --rom PATH")
+            prepare_bc(args.rom)
+        elif args.action == "prepare":
             if args.rom is None:
                 raise RuntimeError("sc64 prepare requires --rom PATH; the ROM is not downloaded")
             prepare(args.rom, args.profile)
