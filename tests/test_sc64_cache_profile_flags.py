@@ -8,7 +8,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 CANONICAL = ("TERRAN_ROM_FLAGS", "ZERG_ROM_FLAGS", "PROTOSS_ROM_FLAGS")
-NON_CACHE = ("SHOWCASE_FLAGS", "Z7_FULL_RENDER_FLAGS", "P7_RENDER_FLAGS")
+NON_CACHE = ("Z7_FULL_RENDER_FLAGS", "P7_RENDER_FLAGS")
+SHOWCASE = ("SHOWCASE_FLAGS",)
 
 
 def profile_defines(*overrides):
@@ -18,7 +19,7 @@ def profile_defines(*overrides):
         rules = Path(directory) / "print.mk"
         rules.write_text(
             "".join(f"$(info PROFILE_{name}=$({name}))\n"
-                    for name in CANONICAL + NON_CACHE)
+                    for name in CANONICAL + NON_CACHE + SHOWCASE)
             + ".PHONY: print-cache-profile-flags\nprint-cache-profile-flags:\n"
         )
         result = subprocess.run(
@@ -44,12 +45,24 @@ class CacheProfileFlagsTests(unittest.TestCase):
                                  "-DSC64_TERRAIN_ROW_MASKS", "-DSC64_MINIMAP_RASTER"}
                                 <= profiles[name])
 
-    def test_showcase_and_diagnostics_keep_the_prior_minimap_memory_budget(self):
+    def test_diagnostics_keep_the_prior_minimap_memory_budget(self):
         profiles = profile_defines()
         for name in NON_CACHE:
             with self.subTest(profile=name):
                 self.assertNotIn("-DSC64_MINIMAP_RASTER", profiles[name])
                 self.assertIn("-DSC64_MINIMAP_BLIT", profiles[name])
+
+    def test_showcase_cache_toggle_and_invalid_values(self):
+        flags = {"-DSC64_HUD_BUFFER_REUSE", "-DSC64_HUD_VRAM_BANDS", "-DSC64_MINIMAP_RASTER"}
+        default = profile_defines()
+        self.assertTrue(flags <= default["SHOWCASE_FLAGS"])
+        disabled = profile_defines("SHOWCASE_HUD_CACHE=0")
+        self.assertTrue(flags.isdisjoint(disabled["SHOWCASE_FLAGS"]))
+        for name in CANONICAL:
+            self.assertEqual(default[name], disabled[name])
+        for invalid in ("", "2", "0 1", "yes"):
+            with self.assertRaises(subprocess.CalledProcessError):
+                profile_defines("SHOWCASE_HUD_CACHE=" + invalid)
 
     def test_disabling_cache_group_also_removes_the_persistent_raster(self):
         profiles = profile_defines("CANONICAL_CACHE_FLAGS=")
