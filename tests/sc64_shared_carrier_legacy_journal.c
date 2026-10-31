@@ -80,6 +80,11 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
            race_data.state[7]==frame && (u32)race_data.state[15]==seed &&
            race_data.state[SC64_PROTOSS_CLOCK_STATE_INDEX]==
                race_protoss_clock_word(race_protoss_generic_clock));
+    memcpy(before_units,u,sizeof(u)); memcpy(before_buildings,b,sizeof(b));
+    memcpy(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram));
+    assert(race_load_preflight(&plan));
+    assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)) &&
+           !memcmp(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram)));
     race_data.state[31]=0x13579;
     assert(race_save_encode_actors());
     assert(race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION && race_data.state[31]==0x13579);

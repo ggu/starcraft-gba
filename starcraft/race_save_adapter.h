@@ -1813,13 +1813,17 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if (!race_p7_union_tail_valid(&race_data)) return 0;
 #endif
     const int *v=race_data.state;
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
     race_protoss_bind_candidate(v[0], v[2]);
 #endif
 #ifdef SC64_P7_BATTERY_ENABLED
     /* Only the generic binding keeps its service clock in the state words. */
     if (!race_protoss_clock_word_valid(v[SC64_PROTOSS_CLOCK_STATE_INDEX]) ||
         (v[SC64_PROTOSS_CLOCK_STATE_INDEX] && !v[0])) return 0;
+#endif
+#if defined(SC64_SHARED_CARRIER_SAVE_VERSION) && !defined(SC64_P7_BATTERY_ENABLED)
+    if ((u32)race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION &&
+        (!v[0] || !race_protoss_clock_word_valid(v[SC64_PROTOSS_CLOCK_STATE_INDEX]))) return 0;
 #endif
     int building_damage_marker=v[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX];
     if (building_damage_marker && building_damage_marker!=SC64_BUILDING_DAMAGE_SAVE_MARKER) return 0;
@@ -1937,6 +1941,19 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if(v[0]&&v[20]>0){width=sc64_skirmish_maps[v[20]-1].width;height=sc64_skirmish_maps[v[20]-1].height;}
 #endif
     if(!sc64_race_storage_geometry_valid(width,height))return 0;
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    if ((u32)race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION) {
+#ifdef SC64_ZP_CAMPAIGN_STORAGE
+        Unit *carrier_scratch=sc64_zp_route_save_scratch.carrier_candidate.units;
+#elif defined(SC64_IMPORTED_MISSION) && defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+        Unit *carrier_scratch=sc64_combined_route_save_scratch.carrier_candidate.units;
+#else
+#error "Shared Carrier candidate preflight requires bounded route scratch"
+#endif
+        if (!v[0] || !sc64_shared_carrier_candidate_valid(&race_data,carrier_scratch,
+                MAX_UNITS,(unsigned)width*16u,(unsigned)height*16u)) return 0;
+    }
+#endif
 #ifdef SC64_SHARED_BATTERY
     if (!race_battery_migrate_shield_phase(&race_data,width,height)) return 0;
 #endif
@@ -2927,8 +2944,15 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 }
 
 static int race_load_preflight(RaceLoadPlan *plan) {
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    signed char old_binding=race_protoss_binding_override;
+    int old_mission=race_protoss_override_mission;
+#endif
     int ok = race_load_preflight_candidate(plan);
-#if defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    race_protoss_binding_override=old_binding;
+    race_protoss_override_mission=old_mission;
+#elif defined(SC64_P7_OBSERVER_ENABLED) || defined(SC64_P7_BATTERY_ENABLED)
     race_protoss_unbind_candidate();
 #endif
     return ok;
