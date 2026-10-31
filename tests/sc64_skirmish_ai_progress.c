@@ -720,6 +720,40 @@ static int owner_spawn(int owner, int type, int addon)
     return -1;
 }
 
+/* Synthetic AI setup; the actual defense planner starts the paid morph. */
+static int ai_sunken_save(void)
+{
+    int owner = first_bot(), creep, pool, hp, ok = 0;
+    uint32_t reference, resumed;
+    RaceAiCensus c;
+    if (race_owner_identity(owner) != R_ZERG) return 0;
+    for (int t = 0; t < 60; ++t) input(0);
+    pool = owner_spawn(owner, B_SPAWNING_POOL, -1);
+    creep = owner_spawn(owner, B_CREEP_COLONY, -1);
+    if (pool < 0 || creep < 0) return 0;
+    race_minerals[owner] += 50;
+    race_ai_census(owner, &c);
+    if (!race_ai_start_defense(&c, 146) || !b[creep].under_construction ||
+        race_construction_deferred_morph(&b[creep]) != B_SUNKEN_COLONY) return 0;
+    for (int t = 0; t < 120; ++t) input(0);
+    hit_target(MAX_UNITS + creep, 30, U_MARINE, SIDE);
+    hp = b[creep].hp;
+    if (!b[creep].alive || !b[creep].under_construction || !save_through_pause()) return 0;
+    for (int t = 1; t < 400; ++t) input(0);
+    reference = world_hash();
+    game_init(); previous = 0; input(KEY_L);
+    if (screen != SCREEN_PLAY || !race_mode || !b[creep].alive ||
+        b[creep].owner != owner || b[creep].type != B_CREEP_COLONY ||
+        b[creep].maxhp != 400 || b[creep].hp != hp ||
+        race_construction_deferred_morph(&b[creep]) != B_SUNKEN_COLONY) return 0;
+    for (int t = 0; t < 400; ++t) input(0);
+    resumed = world_hash();
+    ok = reference == resumed && b[creep].alive && b[creep].type == B_SUNKEN_COLONY &&
+        b[creep].hp == morph_expected(hp);
+    printf("{\"kind\":\"ai-sunken-save\",\"hp\":%d,\"reference\":\"%08x\",\"resumed\":\"%08x\",\"ok\":%d}\n", hp, reference, resumed, ok);
+    return ok;
+}
+
 static int addon_at(int owner, int parent)
 {
     for (int i = 0; i < MAX_BUILDINGS; ++i)
@@ -807,7 +841,7 @@ int main(int argc, char **argv)
 {
     int map = 1, human = R_TER, ticks = 18000, every = 1800, resume_at = -1, resume_len = 1800;
     int races[3] = { R_TER, R_ZERG, R_PROTOSS }, bots = 3, recover = -1, resume_morph = 0, morph = -1, addon = -1;
-    int builder = -1, workers = -1;
+    int builder = -1, workers = -1, ai_sunken = 0;
     gba_init();
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--audit")) { audit(); return 0; }
@@ -821,6 +855,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--recovery") && i + 1 < argc) recover = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--resume-at-morph")) resume_morph = 1;
         else if (!strcmp(argv[i], "--morph-hp") && i + 1 < argc) morph = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--ai-sunken-save")) ai_sunken = 1;
         else if (!strcmp(argv[i], "--addon") && i + 1 < argc) addon = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--builder") && i + 1 < argc) builder = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--workers") && i + 1 < argc) workers = atoi(argv[++i]);
@@ -829,6 +864,7 @@ int main(int argc, char **argv)
     launch(map, human, bots, races);
     if (recover >= 0) return recovery(recover) ? 0 : 7;
     if (morph >= 0) return morph_hp(morph) ? 0 : 8;
+    if (ai_sunken) return ai_sunken_save() ? 0 : 13;
     if (addon >= 0) return addon_feasibility(addon) ? 0 : 9;
     if (builder >= 0) return builder_walk(builder) ? 0 : 11;
     if (workers >= 0) return worker_jobs(workers) ? 0 : 12;

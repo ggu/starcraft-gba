@@ -5892,3 +5892,30 @@ $(eval $(call SCARAB_DEADROW_FIXTURE,protoss,$(SCARAB_P7_BASE_FLAGS) -DSC64_FACT
 $(eval $(call SCARAB_DEADROW_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
 .PHONY: test-scarab-deadrow
 test-scarab-deadrow: test-scarab-deadrow-terran test-scarab-deadrow-zerg test-scarab-deadrow-protoss test-scarab-deadrow-showcase
+
+# Opt-in namespace compatibility with the current human/AI Sunken morph.
+# Uses existing prepared inputs and isolated generated P7 facts, like deadrow.
+define SCARAB_SUNKEN_FIXTURE
+.PHONY: test-scarab-sunken-$(1)
+test-scarab-sunken-$(1):
+	@set -eu; \
+	mkdir -p build/generated/scarab-sunken; \
+	run=$$$$(mktemp -d build/generated/scarab-sunken/$(1).XXXXXX); \
+	printf 'Scarab Sunken morph receipts: %s\n' "$$$$run"; \
+	$(if $(filter protoss,$(1)),$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Istarcraft -DSC64_SCARAB_RUNTIME $(SCARAB_P7_BASE_FLAGS) tools/sc64_fact_tables_gen.c -o "$$$$run/facts"; "$$$$run/facts" > "$$$$run/sc64_fact_tables_generated.h",:); \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable \
+	  -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE -DSC64_SCARAB_FLIGHT_CONTROL_PROBE \
+	  -DSC64_SCARAB_PACKED_MOTION_PROBE -DSC64_SCARAB_AUTONOMOUS_PROBE -DSC64_SCARAB_WEAPON_PROBE \
+	  $(2) tests/sc64_skirmish_ai_progress.c tests/sc64_yamato_host_sram_shim.c \
+	  $(filter-out starcraft/game.c,$(STARCRAFT)) $(3) -o "$$$$run/test"; \
+	for map in 0 1; do \
+	  "$$$$run/test" --map "$$$$map" --human z --bots t --morph-hp 4; \
+	  "$$$$run/test" --map "$$$$map" --human t --bots z --ai-sunken-save; \
+	done
+endef
+$(eval $(call SCARAB_SUNKEN_FIXTURE,terran,$(TERRAN_ROM_FLAGS),))
+$(eval $(call SCARAB_SUNKEN_FIXTURE,zerg,$(ZERG_ROM_FLAGS),))
+$(eval $(call SCARAB_SUNKEN_FIXTURE,protoss,$(SCARAB_P7_BASE_FLAGS) -DSC64_FACT_TABLES -I"$$$$run",$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call SCARAB_SUNKEN_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
+.PHONY: test-scarab-sunken
+test-scarab-sunken: test-scarab-sunken-terran test-scarab-sunken-zerg test-scarab-sunken-protoss test-scarab-sunken-showcase
