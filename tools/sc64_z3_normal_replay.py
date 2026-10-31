@@ -24,7 +24,7 @@ RUNNER_SHA='95b3a8ccf0d2a04b7820366ee484012912e2657acb5bddf940ce473c1f06a18b'
 
 def build_plan(path, stop=None):
     data=json.loads(path.read_text())
-    if not isinstance(data,dict) or data.get('schema')!=1 or data.get('mission')!=14 or data.get('policy')!='hybrid':
+    if not isinstance(data,dict) or type(data.get('schema')) is not int or data['schema']!=1 or data.get('mission')!=14 or data.get('policy')!='hybrid':
         raise ValueError('expected schema-1 hybrid Z3 trace')
     rows=data.get('events')
     if not isinstance(rows,list) or not rows: raise ValueError('missing events')

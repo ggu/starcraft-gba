@@ -40,9 +40,10 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(plan['terminal'],1300)
         self.assertEqual(self.plan(trace(),1000)[1][-1]['end'],1000)
     def test_rejects_bad_contract_and_keys(self):
-        for mutation in ('mission','no_start','pressed','opposed','terminal','duplicate','field'):
+        for mutation in ('mission','schema_bool','no_start','pressed','opposed','terminal','duplicate','field'):
             d=trace()
             if mutation=='mission':d['mission']=15
+            elif mutation=='schema_bool':d['schema']=True
             elif mutation=='no_start':d['events'].pop(3)
             elif mutation=='pressed':d['events'][0]['pressed']=0
             elif mutation=='opposed':d['events'][0].update(held=48,pressed=48)
