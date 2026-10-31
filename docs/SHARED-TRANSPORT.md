@@ -1,8 +1,10 @@
-# Shared custom-game transport (staged)
+# Shared race transport (activation candidate)
 
-`SC64_SHARED_TRANSPORT` is an experimental, default-off capability. It extends
-custom-game transport to ordinary Shuttle and researched Overlord identities
-while retaining the existing Dropship and mission-specific transport paths.
+`SC64_SHARED_TRANSPORT` is enabled in the normal Terran, Z7, P7 and Showcase
+candidate profiles and inherited by the Z8 and P8 candidates. It provides
+ordinary Shuttle and researched Overlord transport while retaining Dropships
+and mission-specific research paths. Explicit legacy Z6 retains its prior
+feature-off profile.
 Four owners have independent Ventral Sacs research jobs. The human command
 menu can start or cancel research at a completed Lair or Hive; this stage does
 not add an AI transport strategy or claim original-game AI parity.
@@ -14,13 +16,10 @@ With impact events, the trailer reduces the maximum number of pending impacts
 that fit in a save. A save exceeding the remaining space is refused rather than
 truncating effects. The existing two-slot save journal remains in use.
 
-This is staging documentation, not release or performance qualification.
-
-Custom games use the broader pinned cargo-capacity facts. Campaigns retain
-their previously qualified cargo whitelist for now. Qualifying those facts
-against each campaign's available actors, save paths and source permissions
-is still required before unifying the rule across modes; this staging boundary
-is not a claim that the original game had different capacity rules.
+These are candidate checks, not release or performance qualification.
+Shared transport applies the same pinned cargo-capacity facts in custom games
+and campaigns; mission actor availability and source ownership remain separate
+checks. Campaign Overlord transport remains tied to its own research state.
 
 ## Qualification snapshot
 
@@ -81,3 +80,51 @@ These routes are candidates until their exact-source runtime, memory, save and
 performance checks pass. A `Transport1` save is a separate namespace: the new
 reader does not import a predecessor save. Reusing older SRAM manually is
 unsupported; the new journal makes no claim to fence an older reader.
+
+## Activation candidate checks
+
+The `96108b2` runtime source passed host sanitizer checks for the normal T10,
+Z7, P7 and Showcase profiles, P8 and Z8 candidates, and an explicit feature-on
+Z6 comparison. The custom-game fixture uses the normal setup controls for both
+maps, each human race and one to three AI slots. Its research, cargo and
+ordinary pause-save/load checks use seeded resources, structures or proximity;
+they do not establish an AI transport strategy or a match win for every setup.
+
+P7 and P8 checks seed a completed Robotics Facility, Pylon and resources, then
+pay for a Shuttle, issue the player boarding action, save/load, and unload.
+A mixed loaded-Shuttle/Carrier selection checks that the visible unload row
+and its action agree. Positive T5, P5 and Z6 transport checks passed. The full
+ordinary Terran campaign target passed at runtime-identical `4090ee2`,
+including the T6 controller after restoring its existing unload menu. Z7's
+carried-controller and skirmish prerequisites passed at that source; a later
+host-fixture-only change corrected the save-envelope expectation and its
+promoted-profile check passed separately. The initial Z7 aggregate failure and
+its targeted fix should not be read as a fresh full aggregate pass.
+
+The P7 canonical controller reached frame 59768 without a win or loss. The
+same source, inputs and controller with transport ON and OFF produced
+byte-identical traces; both runs ended with ten human Probes, eight idle, two
+on gas, zero minerals and no remaining human combat army. The cause of the
+idle workers was not established. The full P7 aggregate also remains
+incomplete because the separately packed private canonical P6 sprite bank was
+not present in the verified input closure. No bank was substituted. The
+literal `./dev sc64 test --profile terran` command stopped before compilation
+on a missing private palette prerequisite; the same ordinary Make target
+passed with verified input files explicitly marked existing.
+
+All versioned candidate ROMs and explicit legacy Z6 linked and passed their
+header checks on `96108b2`, using unchanged pinned inputs and the P7/P8
+transport-gated fact tables listed above. BSS/IWRAM end addresses were T10
+`020370e0`/`03004b40`, Z7 `0203d718`/`03004f80`, Z8
+`0203dbd8`/`03004bf8`, P7 `02038314`/`03004a28`, P8
+`02038cdc`/`03004a28`, Showcase `02037008`/`03004cc0`, and legacy Z6
+`02037134`/`03004c10`. The strict IWRAM limit is below `03005000`.
+The clean unprepared source, doctor, build and default suite passed: 927
+Python tests with 26 skips, plus separate five- and eight-test suites.
+
+The physical Z7 Transport1 run used an ordinary neutral cut, pause/save and
+fresh load. Its bounded continuation through trace observation 324 passed; the
+full fresh-resume replay also completed successfully. This does not establish
+near-30-fps performance, full native AI parity, AI transport tactics, a Z8
+win, or a P7 controller win. Experimental Scarab namespace composition remains
+unqualified.
