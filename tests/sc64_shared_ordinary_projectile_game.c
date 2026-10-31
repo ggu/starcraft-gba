@@ -22,7 +22,7 @@ static int one_case(int raw,int occupied)
     assert(u[actor].cd>0 && sc64_ordinary_pending[actor].active);
     fprintf(stderr,"raw=%d occupied=%d wait=%u,%u impact=%u,%u life=%u,%u cd=%d\n",raw,occupied,sc64_ordinary_pending[actor].wait[0],sc64_ordinary_pending[actor].wait[1],sc64_ordinary_pending[actor].impact[0],sc64_ordinary_pending[actor].impact[1],sc64_ordinary_pending[actor].life[0],sc64_ordinary_pending[actor].life[1],u[actor].cd);
     assert(sc64_shared_projectiles.active==occupied && u[target].hp==before);
-    int limit=raw==70?2:1,available=100-occupied,expected=available<limit?available:limit;
+    int limit=(raw==70 || raw==3)?2:1,available=100-occupied,expected=available<limit?available:limit;
     for(int i=0;i<40 && sc64_ordinary_pending[actor].active;i++)race_shared_ordinary_tick();
     assert(!sc64_ordinary_pending[actor].active);
     assert(sc64_shared_projectiles.active==(unsigned)(occupied+expected));
@@ -44,10 +44,33 @@ static int one_case(int raw,int occupied)
     race_p7_projectile_reset();assert(!sc64_shared_projectiles.active);
     return dealt;
 }
+static int one_ground_case(int raw,int occupied)
+{
+    int shooter,enemy,bc,victim;setup(&shooter,&enemy,&bc,&victim);
+    u[enemy].hp=u[enemy].maxhp=1000;
+    for(int i=0;i<occupied;i++)assert(race_p7_projectile_fire(shooter,enemy,64,64*512,64*512));
+    int actor=spawn_unit(SIDE,sc64_race_unit_from_raw(raw),160,160);
+    int target=spawn_unit(ENEMY,U_MARINE,200,160);assert(actor>=0 && target>=0);
+    u[target].hp=u[target].maxhp=1000;u[actor].raw_type=raw;
+    u[actor].order=ORDER_ATTACK_TARGET;u[actor].target=target;
+    tick_combat(&u[actor],target);assert(u[actor].cd>0 && sc64_ordinary_pending[actor].active);
+    assert(sc64_shared_projectiles.active==(unsigned)occupied);
+    for(int n=0;n<200;n++)race_shared_ordinary_tick();
+    assert(sc64_shared_projectiles.active==(unsigned)occupied);
+    int damage=1000-u[target].hp;race_p7_projectile_reset();return damage;
+}
 int main(void)
 {
+    const int ground_raw[4]={2,8,38,66};
+    for(int i=0;i<4;i++) {
+        int with_space=one_ground_case(ground_raw[i],99);
+        int full=one_ground_case(ground_raw[i],100);
+        assert(with_space>0 && !full);
+    }
     int marine2=one_case(0,98),marine1=one_case(0,99),marine0=one_case(0,100);
     int scout2=one_case(70,98),scout1=one_case(70,99),scout0=one_case(70,100);
+    int goliath2=one_case(3,98),goliath1=one_case(3,99),goliath0=one_case(3,100);
+    assert(goliath2==2*goliath1 && goliath1>0 && goliath0==0);
     assert(marine2==marine1 && marine1>0 && marine0==0);
     assert(scout2==2*scout1 && scout1>0 && scout0==0);
     int shooter,enemy,bc,victim;setup(&shooter,&enemy,&bc,&victim);
@@ -131,5 +154,5 @@ int main(void)
     assert(!sc64_ordinary_pending[actor].active && u[target].hp==health);
     assert(sc64_shared_projectiles.active==100);
     race_p7_projectile_reset();assert(!sc64_shared_projectiles.active);
-    puts("Marine and Scout per-shot shared allocation and interruption passed");return 0;
+    puts("selected common per-shot shared allocation and interruption passed");return 0;
 }

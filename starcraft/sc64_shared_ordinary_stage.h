@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_SHARED_ORDINARY_STAGE_H
 #define SC64_SHARED_ORDINARY_STAGE_H
-/* Experimental Marine/Scout source-profile slice. Pending attack wind-up is
+/* Experimental source-profile slice for selected common weapons. Pending attack wind-up is
  * separate from live bullets: only actual release attempts claim arena slots.
  * Other weapons keep their existing path and do not yet contend here. */
 _Static_assert(MAX_UNITS <= 256, "ordinary reservation owner fits the arena byte");
@@ -47,17 +47,22 @@ static int race_shared_ordinary_pending_any(void)
     for(int i=0;i<MAX_UNITS;i++)if(sc64_ordinary_pending[i].active)return 1;
     return 0;
 }
-/* Return 1 only for explicitly validated raw0 weapon0 / raw70 weapon74
- * profiles. The two hits of Scout weapon74 are independent bullets in the
- * actual OpenBW world oracle; no generic damage-factor division is assumed. */
+/* Only explicitly source-tested actor/weapon/mode pairs participate.
+ * Scout and Goliath turret each release two independent bullets; no generic
+ * factor-to-bullet inference is made for untested weapons. */
 static int race_shared_ordinary_prepare(Unit *q,int target,int flying,int damage,
                                         int hits,const Sc64StockAttack *attack)
 {
     int slot=(int)(q-u),raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
     if(slot<0||slot>=MAX_UNITS||!attack||!attack->weapon) return 0;
     if(!((raw==0 && attack->weapon_id==0 && hits==1) ||
-         (raw==70 && flying && attack->weapon_id==74 && hits==2))) return 0;
-    unsigned shots=raw==70?2u:1u;
+         (raw==70 && flying && attack->weapon_id==74 && hits==2) ||
+         (raw==3 && flying && attack->weapon_id==8 && hits==2) ||
+         (raw==2 && !flying && attack->weapon_id==4 && hits==1) ||
+         (raw==8 && !flying && attack->weapon_id==16 && hits==1) ||
+         (raw==38 && !flying && attack->weapon_id==38 && hits==1) ||
+         (raw==66 && !flying && attack->weapon_id==66 && hits==1))) return 0;
+    unsigned shots=(raw==70 || raw==3)?2u:1u;
     Sc64OrdinaryPending p={0};
     if(sc64_ordinary_pending[slot].active)return 1;
     p.target=target;p.damage=damage;p.order=q->order;p.actor_target=q->target;
@@ -100,9 +105,10 @@ static void race_shared_ordinary_release_tick(void)
             if(!p->wait[shot])continue;
             if(--p->wait[shot]) {waiting=1;continue;}
 #ifdef SC64_SHARED_DARK_SWARM_PROBE
-            /* Only raw0/weapon0 is qualified for this deterministic source
-             * threshold. Other families retain their existing gated behavior. */
-            int swarm=p->raw==0?sc64_world_dark_swarm_affects_target(p->target):0;
+            /* These source-tested normal-hit weapons receive the guaranteed
+             * field miss. Air-only staged pairs cannot hit a ground target. */
+            int swarm=(p->raw==0 || p->raw==2 || p->raw==8 || p->raw==38 || p->raw==66)
+                ?sc64_world_dark_swarm_affects_target(p->target):0;
             if(swarm<0)continue; /* unknown geometry: no unsafe staged hit */
 #endif
             u32 handle=sc64_shared_projectile_acquire(&sc64_shared_projectiles,SC64_SHARED_PROJECTILE_IMPACT,(unsigned)i);

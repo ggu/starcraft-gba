@@ -338,7 +338,8 @@ GBA scheduler or a claim of complete ordinary-projectile integration.
 ### Experimental individual ordinary shots and retirement
 
 The disabled `SC64_SHARED_ORDINARY_STAGE` adds an individual-bullet slice for
-Marine raw 0 / weapon 0 and Scout raw 70 / air weapon 74. Pending windups do
+initially Marine raw 0 / weapon 0 and Scout raw 70 / air weapon 74; later
+validated pairs are listed below. Pending windups do
 not reserve capacity; release attempts independently acquire the typed 100-slot
 arena. The source-world occupancy runs observed Marine allocation 1/1/0 and
 Scout allocation 2/1/0 at 2/1/0 free slots, respectively, with cooldown spent
@@ -475,7 +476,8 @@ All of these gates stay disabled in normal products.
 ### Disabled source-rectangle launch query
 
 `SC64_SHARED_DARK_SWARM_PROBE` binds active staged fields to the experimental
-Yamato world launcher and the raw-0/weapon-0 ordinary release stage. In the source-rectangle profile it intersects each
+Yamato world launcher and the separately listed normal-hit ordinary releases.
+In the source-rectangle profile it intersects each
 ground actor's source-pixel bounds with each active field's 160×160 source
 rectangle; buildings, flying actors and expired death tails do not receive
 the ground-target protection. When a field exists and target bounds are
@@ -492,7 +494,8 @@ an otherwise comparable unprotected target lost five HP after armor. An unknown
 rectangle case confirms fail-closed release. This models the guaranteed field threshold at bullet
 release; it does not reproduce the global source miss RNG stream.
 
-This is not complete shared Dark Swarm damage behavior: only that experimental Yamato path and raw-0/weapon-0 release are
+This is not complete shared Dark Swarm damage behavior: only that experimental
+Yamato path and the individually validated normal-hit ordinary releases are
 bound; other ordinary weapons and projectile types, all-profile source
 geometry, the zero-threshold miss and global source RNG stream, launch ordering
 on the exact field-expiry tick, save/load and hardware remain open. The gate is off in normal products.
@@ -507,3 +510,31 @@ spawn path initializes heading and 62.5 energy; the fixture does not patch
 the resulting live raw identity, owner or energy. Its compile-only map override
 selects that synthetic record and is disabled in products. This qualifies the
 bounded loader path, not the authored P9 map or a P9 continuation.
+
+
+### Additional normal-hit weapon families
+
+The disabled individual-projectile stage additionally handles Vulture raw 2 /
+weapon 4, Wraith raw 8 / ground weapon 16, Hydralisk raw 38 / ground weapon 38
+and Dragoon raw 66 / ground weapon 66. Each has one source projectile and a
+normal direct hit. Sixteen pinned OpenBW flat-world runs covered these four
+actors with one or zero free bullet slots, with and without a synthetic field:
+one slot produced one bullet, zero slots produced none, cooldown was spent in
+both cases, and only the unprotected one-slot case caused damage. A sanitized
+actual-game fixture separately checked one/free and full arena behavior and
+then drove real update dispatch with field-protected and unprotected targets.
+
+Goliath raw 3 uses its raw-4 turret's air weapon 8. Three separate source-world
+runs observed two, one and zero independent projectiles with two, one and zero
+free slots. The staged actual-engine fixture verifies those counts and that the
+one-slot hit deals half the two-slot result. These are specific validated
+weapon/mode pairs, not a rule that equates every damage factor with bullet
+count. `tests/sc64_openbw_ordinary_field_world.cpp` and
+`tests/sc64_openbw_turret_world.cpp` retain the source-oracle harnesses; they
+require separately supplied pinned OpenBW and authenticated private tables.
+
+The field protection here suppresses damage for these normal-hit weapons at
+release. The shared source miss RNG draw, zero-threshold miss, exact flight
+geometry and timers, other actor/weapon pairs, Firebat splash, Zergling melee,
+Scourge, native obstacle interactions, saved active shots, all-product fit and
+production admission remain open. These gates are all off in normal builds.

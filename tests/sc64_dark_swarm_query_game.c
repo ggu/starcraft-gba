@@ -11,11 +11,11 @@ static int at(int type,int x,int y)
     int q=spawn_unit(ENEMY,type,x,y);assert(q>=0);
     int result=sc64_world_dark_swarm_affects_target(q);u[q].alive=0;return result;
 }
-static void marine_case(int x,int should_hit)
+static void weapon_case(int raw,int x,int should_hit)
 {
     for(int n=0;n<20 && sc64_shared_projectiles.active;n++)game_update(0,0);
     assert(!sc64_shared_projectiles.active);
-    int shooter=spawn_unit(ENEMY,U_MARINE,x-20,320);
+    int shooter=spawn_unit(ENEMY,sc64_race_unit_from_raw(raw),x-20,320);
     int target=spawn_unit(SIDE,U_SHARED_DEFILER,x,320);assert(shooter>=0 && target>=0);
     int bystander=-1;
     if(!should_hit) {bystander=spawn_unit(SIDE,U_SHARED_DEFILER,x-15,320);assert(bystander>=0);u[bystander].hp=u[bystander].maxhp=1000;}
@@ -33,7 +33,7 @@ static void marine_case(int x,int should_hit)
             }
         }
     }
-    fprintf(stderr,"marine x=%d hit=%d hp=%d shooter_cd=%d order=%d target=%d qxy=%d,%d targetxy=%d,%d active=%u screen=%d\n",x,should_hit,u[target].hp,u[shooter].cd,u[shooter].order,u[shooter].target,u[shooter].x,u[shooter].y,u[target].x,u[target].y,sc64_shared_projectiles.active,screen);
+    fprintf(stderr,"weapon raw=%d x=%d hit=%d hp=%d shooter_cd=%d order=%d target=%d qxy=%d,%d targetxy=%d,%d active=%u screen=%d\n",raw,x,should_hit,u[target].hp,u[shooter].cd,u[shooter].order,u[shooter].target,u[shooter].x,u[shooter].y,u[target].x,u[target].y,sc64_shared_projectiles.active,screen);
     assert(saw_bullet && u[target].alive);
     if(should_hit)assert(u[target].hp<1000);else {
         assert(u[target].hp==1000 && u[bystander].alive && u[bystander].hp==1000);
@@ -81,7 +81,9 @@ int main(void)
     assert(sc64_world_dark_swarm_affects_target(MAX_UNITS)==0); /* building */
     /* Real update dispatch of Marine shots, with synthetic attack orders and
      * target HP. The guaranteed swarm miss retains its live bullet slot. */
-    marine_case(400,0);marine_case(500,1);unknown_case();
+    const int tested_raw[5]={0,2,8,38,66};
+    for(int i=0;i<5;i++) {weapon_case(tested_raw[i],400,0);weapon_case(tested_raw[i],500,1);}
+    unknown_case();
     /* Real Yamato order/release; energy and heading are seeded only to
      * isolate launch policy, and are not claimed as ordinary acquisition. */
     int target=spawn_unit(ENEMY,U_MARINE,400,320);
