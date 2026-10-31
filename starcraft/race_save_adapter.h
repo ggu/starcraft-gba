@@ -3332,9 +3332,11 @@ static int race_load_game(void) {
             race_shared_carrier_stage_commit(&plan);
             return 1;
         }
-        /* A checked predecessor has already been expanded and preflighted;
-         * retain the existing legacy commit for campaign and old custom. */
-        goto race_shared_carrier_legacy_commit;
+        /* Legacy commit can fail after mutating the live world. Until its
+         * rebinds are proven infallible or staged, do not enter it from this
+         * experimental reader. Selection and migration still inspect old
+         * records without changing SRAM or the live world. */
+        return 0;
     }
 #else
     /* Do not interpret a predecessor journal with the experimental layout. */
@@ -3378,9 +3380,6 @@ static int race_load_game(void) {
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
 #endif
     if (!race_load_preflight(&plan)) return 0;
-#endif
-#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
-race_shared_carrier_legacy_commit: ;
 #endif
     const int *v = race_data.state;
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];

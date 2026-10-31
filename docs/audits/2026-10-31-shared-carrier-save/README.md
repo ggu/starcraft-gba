@@ -3,16 +3,17 @@
 This is a staged, default-off custom-game implementation, not a claim of full
 cross-product parity. The Carrier experiment and its separate save experiment
 are opt-in. Non-P7 campaign services remain fenced pending qualification.
-P7 custom-game AI can now pay for and train Interceptors under the existing P7
-training capability. With the Carrier experiment enabled without the save
+Bot Carrier auto-purchase is restricted to the explicit shared Carrier
+experiment; normal P7/P8 custom-game AI retains its previous behavior. With the Carrier experiment enabled without the save
 experiment, non-P7 saves and loads are refused. The experimental Carrier save
 namespace cannot currently be enabled together with the Scarab namespace.
 
 The new compact journal generation preserves the Carrier pool and its free-row
 ordering and omits only a checked, zero-filled campaign-only region. The older
-Carrier generation and legacy save reader remain supported. Tagged candidate
-loading is preflighted before commit. Existing legacy mission rebind paths
-still require an atomicity proof; combined Carrier, Scarab and Defiler
+Carrier generation remains supported. Tagged candidate loading is preflighted
+before commit. The experimental reader now rejects selected predecessor
+records without entering the legacy commit, whose mission rebind paths still
+require an atomicity proof; the default-off legacy reader remains unchanged. combined Carrier, Scarab and Defiler
 persistence remains unfinished. This checkpoint does not activate these gates.
 
 ## Qualification evidence
@@ -27,9 +28,10 @@ within the unchanged 16,368-byte limit. Fixtures checked the full Carrier
 packet, including free entries and subsequent reuse order. Separate paid-game
 fixtures exercised Stargate, Carrier and Interceptor production and flight.
 
-Actual save/load fixtures covered fresh-process mock SRAM, the older Carrier
-format, legacy-reader compatibility, corruption fallback, and rejected saves
-without journal mutation. Rendering fixtures exercised the active projectile
+Before the predecessor-load fence, save/load fixtures covered fresh-process
+mock SRAM, the older Carrier format, legacy-reader compatibility, corruption
+fallback, and rejected saves without journal mutation. These historical
+results do not establish that the newly fenced predecessor entry point loads. Rendering fixtures exercised the active projectile
 arena with cached terrain writes and canaries. The normal P7 services and
 Carrier fixtures passed; the mixed Dropship branch was unavailable in that
 product's actual raw map. All 109 prepared input hashes matched. Seven ARM

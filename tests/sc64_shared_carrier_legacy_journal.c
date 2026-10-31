@@ -354,14 +354,15 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
            race_mode==old_mode && seed==old_seed &&
            !memcmp(old_clock,race_protoss_generic_clock,sizeof(old_clock)));
 #ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
-    /* The game entry point must fall back to the intact predecessor, then
-     * leave the live world untouched when neither journal is valid. */
-    assert(race_load_game());
-    assert(race_mode==!campaign && sc64_pool_active_head(&race_p7_projectiles)==SC64_END);
-    memcpy(before_units,u,sizeof(u)); memcpy(before_buildings,b,sizeof(b));
-    memcpy(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram));
-    old_frame=frame; old_minerals=minerals; old_gas=gas; old_mode=race_mode; old_seed=seed;
-    memcpy(old_clock,race_protoss_generic_clock,sizeof(old_clock));
+    /* Selection sees the intact predecessor, but the game entry point
+     * fences its nontransactional commit and leaves the live world intact. */
+    assert(!race_load_game());
+    assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)) &&
+           !memcmp(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram)) &&
+           frame==old_frame && minerals==old_minerals && gas==old_gas &&
+           race_mode==old_mode && seed==old_seed &&
+           !memcmp(old_clock,race_protoss_generic_clock,sizeof(old_clock)));
+    /* An invalid predecessor is rejected without mutation as well. */
     host_save[(unsigned)previous->slot*SAVE_SLOT_SIZE+8u]^=1u;
     assert(!race_load_game());
     assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)) &&
@@ -447,20 +448,46 @@ int main(int argc,char **argv)
     assert(!memcmp(old_clock,race_protoss_generic_clock,sizeof(old_clock)));
     puts("legacy journal preflight: ok");
 #ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
-    /* Actual entry point loads the predecessor; campaign writes retain the
-     * old envelope so a separate unmodified reader can consume them. */
+    /* A preflighted predecessor is still fenced: legacy commit has rebind
+     * failure paths after mutation. Snapshot live state and SRAM at entry. */
     u8 stale_ordinal, stale_index;
     race_p7_projectile_reset();
     assert(sc64_pool_acquire(&race_p7_projectiles,&stale_ordinal,&stale_index));
     race_protoss_generic_clock[0]=2; race_protoss_generic_clock[1]=7;
     race_p7_projectile_fault=1;
-    assert(race_load_game());
-    assert(race_mode==!campaign);
-    assert(sc64_pool_active_head(&race_p7_projectiles)==SC64_END && !race_p7_projectile_fault);
-#ifndef SC64_P7_BATTERY_ENABLED
-    assert(!race_protoss_generic_clock[0] && !race_protoss_generic_clock[1] &&
-           !race_protoss_generic_clock[2]);
-#endif
+    memcpy(before_units,u,sizeof(u)); memcpy(before_buildings,b,sizeof(b));
+    memcpy(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram));
+    memcpy(old_clock,race_protoss_generic_clock,sizeof(old_clock));
+    u8 old_fault=race_p7_projectile_fault;
+    static Mineral before_mineral_fields[MAX_MINERALS];
+    static Geyser before_geysers[MAX_RACE_GEYSERS];
+    static u8 before_explored[sizeof(explored)], before_visible[sizeof(visible)];
+    int before_players[5],before_ore[5],before_vespene[5];
+    Sc64RaceCampaignState before_campaign=race_campaign;
+    memcpy(before_mineral_fields,m,sizeof(m)); memcpy(before_geysers,geysers,sizeof(geysers));
+    memcpy(before_explored,explored,sizeof(explored)); memcpy(before_visible,visible,sizeof(visible));
+    memcpy(before_players,race_player,sizeof(race_player)); memcpy(before_ore,race_minerals,sizeof(race_minerals));
+    memcpy(before_vespene,race_gas,sizeof(race_gas));
+    assert(!race_load_game());
+    assert(!memcmp(before_mineral_fields,m,sizeof(m)) && !memcmp(before_geysers,geysers,sizeof(geysers)) &&
+           !memcmp(before_explored,explored,sizeof(explored)) && !memcmp(before_visible,visible,sizeof(visible)) &&
+           !memcmp(before_players,race_player,sizeof(race_player)) && !memcmp(before_ore,race_minerals,sizeof(race_minerals)) &&
+           !memcmp(before_vespene,race_gas,sizeof(race_gas)) && !memcmp(&before_campaign,&race_campaign,sizeof(race_campaign)));
+    assert(!memcmp(before_sram,host_save,sizeof(host_save)) &&
+           !memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)) &&
+           !memcmp(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram)) &&
+           frame==old_frame && minerals==old_minerals && gas==old_gas &&
+           race_mode==old_mode && race_human==old_human && race_bots==old_bots &&
+           screen==old_screen && seed==old_seed && race_p7_projectile_fault==old_fault &&
+           !memcmp(old_clock,race_protoss_generic_clock,sizeof(old_clock)));
+    /* Build an independent campaign world for the existing save/old-reader
+     * check; do not obtain it via the intentionally fenced predecessor. */
+    race_p7_projectile_reset();
+    if (campaign) {
+        game_init(); race_mode=0;
+        race_selected_mission=sc64_frontend_first_mission(SC64_CAMPAIGN_RACE);
+        init_state(); assert(screen==SCREEN_PLAY);
+    }
     if (campaign) {
         static u8 rejected_campaign_sram[sizeof(host_save)];
         int saved_minerals=minerals;
