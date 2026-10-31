@@ -12,7 +12,8 @@
  * RAM where the facing byte already exists (facing uses only its low five
  * bits).
  * Flyers keep no state: they are moving while an order carries them toward
- * a different point. Nothing here is read by the simulation or saved; after
+ * a different point. Flyers with a source cycle play it while hovering too
+ * (sc64_facing_draw); the phase here only drives the lift of those without. Nothing here is read by the simulation or saved; after
  * a load a unit may hold one stride frame. */
 
 #define SC64_WALK_KEY_SHIFT 5

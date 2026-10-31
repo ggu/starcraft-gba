@@ -6,7 +6,8 @@
  * north-west with the shipped game_update()/game_render(). Every frame it
  * reports the unit's facing byte, which walk pose it should show, how many of
  * that pose's pixels are on the shown page, and dumps the 40x40 area around
- * the unit so the frames can be inspected. Results go to the mGBA debug log;
+ * the unit so the frames can be inspected. Then an idle Mutalisk must keep
+ * beating its wings in place. Results go to the mGBA debug log;
  * no debugger reads or writes game state. Emulator evidence only.
  */
 #include "../starcraft/game.c"
@@ -189,6 +190,38 @@ static void stand(int slot)
     check(ok, "standing unit shows its facing frame");
 }
 
+/* An idle flyer with a source cycle keeps playing it while it hovers. */
+static void hover(int slot)
+{
+    unsigned raw = (unsigned)sc64_race_raw_unit(u[slot].type);
+    const Sc64UnitWalkCycle *cycle = sc64_unit_walk_cycle((unsigned short)raw);
+    const Sc64SpriteFrame *seen[SC64_UNIT_WALK_MAX_STEPS];
+    int distinct = 0, drawn_ok = 1, x = u[slot].x, y = u[slot].y;
+    check(cycle != 0, "the Mutalisk has a source wing cycle");
+    if (!cycle) return;
+    for (int t = 0; t < (int)cycle->cycle_ticks * 5 / 4 + 8; ++t) {
+        cx = u[slot].x + 64; cy = u[slot].y + 32;
+        frame_tick();
+        int sx = u[slot].x - camx, sy = u[slot].y - camy + 12, total;
+        int dir = sc64_facing[slot] & SC64_FACING_MASK;
+        const Sc64SpriteFrame *pose = sc64_walk_pose(raw, slot);
+        int hits = frame_on_screen(pose, 32, dir, sx, sy, &total), step = -1;
+        for (unsigned k = 0; k < cycle->count; ++k) if (cycle->steps[k].frames == pose) step = (int)k;
+        out_text("WALK FRAME leg=hover t="); out_num(t); out_text(" facing="); out_num(dir);
+        out_text(" order="); out_num(u[slot].order); out_text(" step="); out_num(step);
+        out_text(" pixels="); out_num(hits); out_text("/"); out_num(total); out_flush();
+        dump_crop(sx, sy);
+        if (!total || hits != total) { drawn_ok = 0; continue; }
+        int known = 0;
+        for (int i = 0; i < distinct; ++i) known |= seen[i] == pose;
+        if (!known && distinct < (int)SC64_UNIT_WALK_MAX_STEPS) seen[distinct++] = pose;
+    }
+    out_text("WALK HOVER poses="); out_num(distinct); out_text("/"); out_num(cycle->count);
+    out_text(" drawn_ok="); out_num(drawn_ok); out_flush();
+    check(drawn_ok && distinct == (int)cycle->count && u[slot].order == ORDER_IDLE &&
+          u[slot].x == x && u[slot].y == y, "an idle Mutalisk shows every wing pose in place");
+}
+
 int main(void)
 {
     gba_init();
@@ -223,6 +256,10 @@ int main(void)
               "each leg draws every walk pose");
         stand(slot);
     }
+    /* Beside the Zergling's open ground, clear of the base. */
+    int flyer = slot >= 0 ? spawn_unit(SIDE, U_MUTALISK, u[slot].x + 40, u[slot].y) : -1;
+    check(flyer >= 0, "spawned a Mutalisk");
+    if (flyer >= 0) hover(flyer);
     out_text(probe_failed ? "WALK DONE fail" : "WALK DONE ok"); out_flush();
     for (;;) frame_tick();
 }

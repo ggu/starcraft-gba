@@ -24,7 +24,7 @@ class WalkWordsMakeTest(unittest.TestCase):
             frame='{1,2,2,1,4,4,pixels}'
             walk.write_text('static const Sc64SpriteFrame pose[32] = {\n'+','.join([frame]*32)+'\n};\n'
                             'static const Sc64UnitWalkStep sc64_unit_walk_i1_steps[1] = {\n{0u,pose}\n};\n'+
-                            ''.join('case %d: return &sc64_unit_walk_i1;\n'%n for n in (0,32,37,38,41,65)))
+                            ''.join('case %d: return &sc64_unit_walk_i1;\n'%n for n in (0,37,38,41,42,43,65)))
             digest=hashlib.sha256(facing.read_bytes()).hexdigest()
             walk.write_text('#define SC64_UNIT_WALK_FACING_SHA256 "'+digest+'"\n'+walk.read_text())
             (root/'consumer.c').write_text('int walk_consumer(void) { return 0; }\n')

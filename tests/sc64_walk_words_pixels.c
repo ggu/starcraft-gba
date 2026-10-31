@@ -9,7 +9,7 @@
 static u8 expected[240*160] __attribute__((aligned(4)));
 static u8 actual[240*160] __attribute__((aligned(4)));
 int main(void) {
-    static const unsigned units[]={0,32,37,38,41,65};
+    static const unsigned units[]={0,37,38,41,42,43,65};
     static const int xs[]={-17,1,111,237,119};
     static const int ys[]={-10,12,114,153,68};
     unsigned cases=0;
@@ -31,6 +31,7 @@ int main(void) {
         }
     }
     assert(!sc64_walk_word_frame(83,0,0));
+    assert(!sc64_walk_word_frame(32,0,0));
     printf("walk word pixel parity: %u selected pose/heading/clip cases\n",cases);
     return 0;
 }
