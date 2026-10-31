@@ -332,10 +332,17 @@ static void zerg_morph_chain(void)
         selected_building = colony;
         assert(race_skirmish_record_available(sunken_row));
         assert(race_skirmish_choose_record(sunken_row));
-        assert(b[colony].type == building_raw(146) && b[colony].under_construction);
+        /* A morph to a lower maximum keeps the Creep Colony and its 400
+         * maximum until it completes; raw_type names the Sunken target. */
+        assert(b[colony].type == building_raw(143) && b[colony].raw_type == 146 &&
+               b[colony].under_construction && b[colony].maxhp == 400 &&
+               race_construction_deferred_morph(&b[colony]) == building_raw(146));
         for (int tick = 0; tick < building_build_time(b[colony].type) + 8 &&
              !building_complete(colony); ++tick) race_tick_buildings();
         assert(building_complete(colony));
+        assert(b[colony].type == building_raw(146) &&
+               b[colony].maxhp == sc64_race_building_max_hp(building_raw(146)) &&
+               b[colony].hp == b[colony].maxhp);
     }
     /* Lair/Hive/Greater Spire and colony morphs stay gated on profiles that
      * do not map those ordinary building IDs. */
