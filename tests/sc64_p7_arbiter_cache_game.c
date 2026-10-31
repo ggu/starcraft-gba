@@ -108,6 +108,23 @@ int main(void)
     race_mode=0;
     race_selected_mission=SC64_P7_GLOBAL_ID;
     race_p7.reserved[1]=150;
+    /* Dead rows are either entirely empty, nonempty with an already
+     * canonical cache word, or nonempty requiring normalization. Preserve
+     * every other byte and leave an empty slot byte-for-byte empty. */
+    u[MAX_UNITS-1].x=17;
+    u[MAX_UNITS-2].x=19;
+    u[MAX_UNITS-2].weapon=(u16)sc64_p7_arbiter_pack(0,0,0,0);
+    Unit dead_changed=u[MAX_UNITS-1];
+    Unit dead_canonical=u[MAX_UNITS-2];
+    Unit dead_empty=u[MAX_UNITS-3];
+    dead_changed.weapon=(u16)sc64_p7_arbiter_pack(0,0,0,0);
+    sc64_p7_arbiter_cache_source_tick();
+    assert(!memcmp(&u[MAX_UNITS-1],&dead_changed,sizeof(Unit)));
+    assert(!memcmp(&u[MAX_UNITS-2],&dead_canonical,sizeof(Unit)));
+    assert(!memcmp(&u[MAX_UNITS-3],&dead_empty,sizeof(Unit)));
+    memset(u,0,sizeof(u));
+    race_p7.reserved[1]=150;
+    race_p7.reserved[2]=0;
     int arb=make_actor(ENEMY,71,U_P7_ARBITER,0,160,160);
     int target=make_actor(ENEMY,65,U_ZEALOT,0,256,160);
     int scv=make_actor(SIDE,0,U_SCV,7,80,80);
