@@ -11574,10 +11574,26 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #endif
 #include "sc64_scarab_clear_motion.h"
 #endif
+#ifdef SC64_SCARAB_STEER_MOTION_PROBE
+#ifndef GBA_HOST
+#error "Steer-motion probe is host-only"
+#endif
+#ifdef SC64_SCARAB_CLEAR_MOTION_PROBE
+#error "Choose one Scarab motion probe"
+#endif
+#include "sc64_scarab_steer_motion.h"
+static Sc64ScarabSteer sc64_scarab_probe_steer[MAX_UNITS];
+#endif
 static void race_scarab_control_dispatch(int slot)
 {
     Unit *q=&u[slot];
     if ((((unsigned)q->carry>>8)&3u)<2u) return;
+#ifdef SC64_SCARAB_STEER_MOTION_PROBE
+    if (q->order==1) {
+        Sc64ScarabSteer fresh={.x=(s32)q->x*512,.y=(s32)q->y*512,.heading=(u8)q->path_retry,.velocity=(u8)q->path_retry,.turning=1,.age=1};
+        sc64_scarab_probe_steer[slot]=fresh;
+    }
+#endif
     if (q->target>=0) {
         if (q->target<MAX_UNITS+MAX_BUILDINGS && target_alive(q->target) &&
             (q->target>=MAX_UNITS || !SC64_SCARAB_HIDDEN(&u[q->target]))) {
@@ -11585,6 +11601,25 @@ static void race_scarab_control_dispatch(int slot)
         } else q->target=-1;
     }
     int action=race_scarab_flight_control_tick(slot,0,0);
+#ifdef SC64_SCARAB_STEER_MOTION_PROBE
+    /* Host fixture supplies source waypoint coordinates; path generation and
+     * arrival remain deliberately outside this experiment. */
+    if (action==SC64_SCARAB_CONTROL_CONTINUE && (q->order==2 || q->order==3)) {
+        Sc64ScarabChildFields f;Sc64ScarabSteer next=sc64_scarab_probe_steer[slot];
+        if (sc64_scarab_child_fields_unpack(q->carry,q->work_timer,&f) && f.life<90 &&
+            sc64_scarab_steer_tick(&next,q->path_x,q->path_y,1)) {
+            int nx=(int)(next.x/512),ny=(int)(next.y/512),clear=1;
+            int dx=nx-q->x,dy=ny-q->y,steps=absi(dx)>absi(dy)?absi(dx):absi(dy);
+            if (steps>16) clear=0;
+            for (int k=1;k<=steps && clear;k++) {
+                int sx=q->x+dx*k/steps,sy=q->y+dy*k/steps;
+                if (sx<0 || sy<0 || sx>=WORLD_W || sy>=WORLD_H || terrain_blocked(sx/16,sy/16) || !unit_step_clear(q,sx,sy)) clear=0;
+                for(int j=0;j<MAX_BUILDINGS && clear;j++) if(b[j].alive && dist2(sx,sy,b[j].x,b[j].y)<36*36)clear=0;
+            }
+            if (clear) { sc64_scarab_probe_steer[slot]=next;q->x=nx;q->y=ny;sc64_unit_bucket_move(q);sc64_target_index_move(q); }
+        }
+    }
+#endif
 #ifdef SC64_SCARAB_CLEAR_MOTION_PROBE
     if (action==SC64_SCARAB_CONTROL_CONTINUE && (q->order==2 || q->order==3)) {
         Sc64ScarabChildFields f; int32_t x=(int32_t)q->x*512,y=(int32_t)q->y*512;

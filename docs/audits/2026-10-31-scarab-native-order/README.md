@@ -88,3 +88,34 @@ in `.local/decoder-proof`. The source traces show only this bounded straight
 case; 27-unit source turning, general Q8 fractions, obstacles, pursuit and
 impact still require reference-backed implementation. The probe can stall or
 expire outside its narrow case and must not be enabled in a product.
+
+## Source-waypoint steering experiment
+
+The separate host-only `SC64_SCARAB_STEER_MOTION_PROBE` tests a source-Q8
+movement kernel using the existing pinned direction tables, type-2 turn
+limit 27, and the Walking script's 16-source-pixel speed command. It tracks
+velocity direction, visual heading, turn state, subpixel position and
+waypoint transitions. It takes its next source waypoint from the host fixture;
+it does not compute a path or decide arrival. The game-update adapter keeps
+this experimental state in host-only storage and retains conservative engine
+collision/terrain checks. Its waypoint and initial heading are injected test
+inputs, not game or save-format fields.
+
+After authenticating the owned USA ROM (normalized SHA-1
+`a36d91b5aac7bb95df0d7de5f9814f5270e25c2b`) and pinned OpenBW revision,
+seven synthetic-flat-map full-world runs captured source Q8 position, heading,
+velocity and next waypoint. A comparison using the oracle-supplied waypoints
+matched every observed source tick from state-2 initialization through state-6
+arrival: far/east 8, south 5, diagonal 11, north 7, west 8 and slope 10.
+The seventh is a 9-tick controlled injected initial-heading turn, not a
+natural player action. The slope case includes an intermediate waypoint turn
+and the cases include final waypoint clamping. These are finite comparisons,
+not a universal path, movement or N64-equivalence proof. The actual game
+update sanitizer fixture also checks one translated diagonal Q8 step.
+
+Oracle argv and logs are retained under `.local/scarab-motion-oracle-20261031`;
+`tools/sc64_scarab_steer_oracle_compare.py` replays their waypoint inputs.
+The host build/run receipts are `.local/decoder-proof/scarab-steer-{compile,run}.json`.
+Neither stage is registered for product gameplay or saves. Actual source
+waypoint generation, obstacles, target following and loss, animation/bullet
+allocation, cleanup, and all-product fit remain open.

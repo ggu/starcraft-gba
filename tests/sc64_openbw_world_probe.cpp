@@ -26,7 +26,7 @@ static std::vector<uint8_t> flat_chk(){
 int main(int argc,char **argv){
  if(argc!=4){std::cerr<<"usage: world-probe table-dir image-dir scenario\n";return 2;}
  std::string scenario=argv[3];
- if(scenario!="east"&&scenario!="south"&&scenario!="far"&&scenario!="stop"&&scenario!="targetdead"&&scenario!="parentdead"&&scenario!="poolfull"&&scenario!="initfail")return 2;
+ if(scenario!="east"&&scenario!="south"&&scenario!="far"&&scenario!="stop"&&scenario!="targetdead"&&scenario!="parentdead"&&scenario!="poolfull"&&scenario!="initfail"&&scenario!="diagonal"&&scenario!="turn"&&scenario!="north"&&scenario!="west"&&scenario!="slope")return 2;
  try{
   std::string tables=std::string(argv[1])+"/",images=std::string(argv[2])+"/";
   auto global=std::make_unique<global_state>();auto game=std::make_unique<game_state>();auto world=std::make_unique<state>();
@@ -63,7 +63,7 @@ int main(int argc,char **argv){
     <<" scarab_hp="<<scarab_type->hitpoints.raw_value<<" marine_hp="<<marine_type->hitpoints.raw_value
     <<" weapon82_damage="<<weapon82->damage_amount<<" weapon82_bonus="<<weapon82->damage_bonus<<"\n";
   auto *parent=api.create_starting_unit(api.get_unit_type(UnitTypes::Protoss_Reaver),{320,320},0);
-  xy victim_pos=scenario=="south"?xy{320,400}:(scenario=="far"||scenario=="parentdead"||scenario=="poolfull"||scenario=="initfail")?xy{448,320}:xy{400,320};
+  xy victim_pos=scenario=="south"?xy{320,400}:scenario=="north"?xy{320,192}:scenario=="west"?xy{192,320}:scenario=="slope"?xy{448,384}:scenario=="diagonal"?xy{448,448}:(scenario=="far"||scenario=="turn"||scenario=="parentdead"||scenario=="poolfull"||scenario=="initfail")?xy{448,320}:xy{400,320};
   auto *victim=api.create_starting_unit(api.get_unit_type(UnitTypes::Terran_Marine),victim_pos,1);
   if(!parent||!victim||api.us_hidden(parent)||api.us_hidden(victim))throw std::runtime_error("actor creation or placement failed");
   if(parent->owner!=0 || victim->owner!=1 || parent->hp.raw_value!=100*256 || victim->hp.raw_value!=40*256)
@@ -89,6 +89,11 @@ int main(int argc,char **argv){
   unit_t *shot=nullptr;
   for(unit_t *child:ptr(parent->reaver.outside_units)) { if(shot)throw std::runtime_error("multiple outside fighters");shot=child; }
   if(!shot || shot!=inside || shot->owner!=0 || shot->fighter.parent!=parent || parent->reaver.inside_count!=0 || api.us_hidden(shot))throw std::runtime_error("invalid released fighter linkage");
+  if(scenario=="turn") {
+   /* Controlled injected heading after real launch, not a natural action. */
+   shot->heading=direction_t::from_raw(0);shot->next_velocity_direction=direction_t::from_raw(0);
+   shot->current_velocity_direction=direction_t::from_raw(0);
+  }
   if(scenario=="initfail") {
    auto hp=victim->hp.raw_value;bool exhausted=false,saw_arrival=false;
    for(int i=0;i<100;i++) {
@@ -182,6 +187,12 @@ int main(int argc,char **argv){
   for(int i=0;i<140;i++) {
    std::cout<<"observe frame="<<world->current_frame<<" shot_order="<<(shot->order_type?(int)shot->order_type->id:-1)
     <<" state="<<shot->order_state<<" pos="<<shot->position.x<<","<<shot->position.y
+    <<" exact="<<shot->exact_position.x.raw_value<<","<<shot->exact_position.y.raw_value
+    <<" heading="<<(int)(uint8_t)shot->heading.raw_value<<" vel_heading="<<(int)(uint8_t)shot->current_velocity_direction.raw_value
+    <<" desired="<<(int)(uint8_t)shot->desired_velocity_direction.raw_value
+    <<" next="<<shot->next_movement_waypoint.x<<","<<shot->next_movement_waypoint.y
+    <<" dest="<<shot->move_target.pos.x<<","<<shot->move_target.pos.y
+    <<" flags="<<shot->movement_flags<<" speed="<<shot->current_speed.raw_value
     <<" shot_hp="<<shot->hp.raw_value<<" victim_hp="<<victim->hp.raw_value<<" remove="<<shot->remove_timer<<" order_timer="<<shot->main_order_timer
     <<" no_collide="<<api.u_no_collide(shot)<<" bullets="<<world->active_bullets_size<<"\n";
    if(shot->order_type && shot->order_type->id==Orders::ScarabAttack && shot->order_state==2 && !observed_init){
