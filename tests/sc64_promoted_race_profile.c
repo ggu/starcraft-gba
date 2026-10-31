@@ -344,7 +344,7 @@ static void reject_generation2_save(int mission, int legacy_container)
         /* Preserve the exact current envelope and replace only its payload
          * version, so the negative reaches the intended format validator. */
         memcpy(envelope + offsetof(RaceSave, version), &old.version, sizeof(old.version));
-        save_write(envelope, length, PROFILE_WIRE_TAG;
+        save_write(envelope, length, PROFILE_WIRE_TAG);
         {
             static unsigned char readback[sizeof(envelope)]; u32 actual = 0;
             assert(save_read_latest(readback, (u32)sizeof(readback), PROFILE_WIRE_TAG, &actual));
