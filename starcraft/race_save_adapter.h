@@ -1110,6 +1110,13 @@ static int race_save_game(void) {
 #ifdef SC64_SHARED_BATTERY
     race_data.state[SC64_SHIELD_PHASE_SAVE_MARKER_INDEX]=SC64_SHIELD_PHASE_SAVE_MARKER;
 #endif
+#ifdef SC64_P7_BATTERY_ENABLED
+    if (race_mode) {
+        if (!race_p7_battery_live_world_valid()) return 0;
+        race_data.state[SC64_PROTOSS_CLOCK_STATE_INDEX] =
+            race_protoss_clock_word(race_protoss_generic_clock);
+    }
+#endif
 #ifdef SC64_CONSTRUCTION_HP
     race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = SC64_CONSTRUCTION_SAVE_MARKER;
 #endif

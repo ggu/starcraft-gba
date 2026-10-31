@@ -37,7 +37,7 @@ enum {
     SC64_PROTOSS_HUMAN_SLOT = 7,
     /* Generic clock word: tag in the high half, stagger << 4 | phase. Zero
      * (older saves) is the not-yet-started clock. */
-    SC64_PROTOSS_CLOCK_STATE_INDEX = 26,
+    SC64_PROTOSS_CLOCK_STATE_INDEX = 30,
     SC64_PROTOSS_CLOCK_STATE_TAG = 0x50530000
 };
 
