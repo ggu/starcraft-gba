@@ -1,5 +1,13 @@
 .DEFAULT_GOAL := all
 
+# Asset-free differential test for optional packed terrain initialization.
+.PHONY: test-sc64-terrain-grid-pack
+build/test-sc64-terrain-grid-pack: tests/sc64_terrain_grid_pack.c starcraft/sc64_terrain_grid_pack.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -Istarcraft $< -o $@
+test-sc64-terrain-grid-pack: build/test-sc64-terrain-grid-pack
+	./build/test-sc64-terrain-grid-pack
+test: test-sc64-terrain-grid-pack
+
 .PHONY: test-gfx-shapes
 build/test-gfx-shapes: tests/gfx_shapes_rom.c common/gba.c common/gba.h Makefile | build
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -DGBA_SCENE_CLIP -DGBA_SHAPES_ROM_ARM -Icommon $< common/gba.c -o $@
