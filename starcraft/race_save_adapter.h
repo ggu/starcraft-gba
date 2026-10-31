@@ -952,18 +952,30 @@ static int race_skirmish_transport_decode(const RaceSave *candidate, int slot,
 #endif
 }
 
-static int race_skirmish_saved_transport(const Unit *ship)
+static int race_skirmish_saved_transport(const RaceSave *candidate, const Unit *ship)
 {
+    (void)candidate;
     if (!ship || !ship->alive || (unsigned)ship->owner >= 5u ||
         ship->order == ORDER_BOARD || ship->order == ORDER_TRANSPORTED) return 0;
     int raw = ship->raw_type >= 0 ? ship->raw_type : sc64_race_raw_unit(ship->type);
     if (raw < 0 || sc64_race_unit_from_raw(raw) != ship->type) return 0;
-    if (raw == SC64_TRANSPORT_DROPSHIP_RAW) return ship->type == U_DROPSHIP;
 #ifdef SC64_SHARED_TRANSPORT
-    if (raw == SC64_TRANSPORT_SHUTTLE_RAW) return 1;
+    if (sc64_transport_unconditional_carrier_raw((unsigned)raw)) return 1;
+#else
+    if (raw == SC64_TRANSPORT_DROPSHIP_RAW) return ship->type == U_DROPSHIP;
+#endif
+#ifdef SC64_SHARED_TRANSPORT
     if (raw == SC64_TRANSPORT_OVERLORD_RAW && ship->type == U_OVERLORD) {
-        int owner = sc64_sk_transport_owner_index(ship->owner);
-        return owner >= 0 && race_skirmish_transport_candidate.owner[owner].researched;
+        if (candidate->state[0]) {
+            int owner = sc64_sk_transport_owner_index(ship->owner);
+            return owner >= 0 && race_skirmish_transport_candidate.owner[owner].researched;
+        }
+#ifdef SC64_Z6_TRANSPORT_ENABLED
+        return candidate->state[2] == SC64_Z6_GLOBAL_ID &&
+            candidate->z6.transport.researched && ship->owner == SIDE && ship->raw_owner == 3;
+#else
+        return 0;
+#endif
     }
 #endif
     return 0;
@@ -973,14 +985,14 @@ static int race_skirmish_transport_save_valid(const RaceSave *candidate,
                                                 int width, int height)
 {
     u8 used[MAX_UNITS] = {0};
-    if (!candidate || candidate->state[0] != 1 || width < 1 || height < 1 ||
+    if (!candidate || width < 1 || height < 1 ||
         width > 128 || height > 128) return 0;
     for (int i=0; i<MAX_UNITS; ++i) {
         Unit actor;
         if (!race_skirmish_transport_decode(candidate, i, width, height, &actor)) return 0;
         if (!actor.alive) continue;
         if (actor.order == ORDER_UNLOAD) {
-            if (!race_skirmish_saved_transport(&actor) || actor.target != -1 ||
+            if (!race_skirmish_saved_transport(candidate, &actor) || actor.target != -1 ||
                 actor.work_timer < 0 || actor.work_timer > SC64_TRANSPORT_UNLOAD_TICKS ||
                 actor.tx < 0 || actor.tx >= width*16 || actor.ty < 0 || actor.ty >= height*16)
                 return 0;
@@ -993,7 +1005,7 @@ static int race_skirmish_transport_save_valid(const RaceSave *candidate,
         int raw = actor.raw_type < 0 ? sc64_race_raw_unit(actor.type) : actor.raw_type;
         if (actor.target < 0 || actor.target >= MAX_UNITS || actor.target == i ||
             !race_skirmish_transport_decode(candidate, actor.target, width, height, &carrier) ||
-            !race_skirmish_saved_transport(&carrier) || actor.owner != carrier.owner ||
+            !race_skirmish_saved_transport(candidate, &carrier) || actor.owner != carrier.owner ||
             (actor.flags & 2) || sc64_race_unit_flying(actor.type) ||
             raw < 0 || (sc64_race_unit_from_raw(raw) != actor.type &&
                         !(raw == 19 && actor.type == U_RAYNOR)) ||
@@ -1710,7 +1722,11 @@ static int race_save_game(void) {
     if (!race_bunker_save_world_valid(&race_data, race_cols, race_rows)) return 0;
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
+#ifdef SC64_SHARED_TRANSPORT
+    if (!race_skirmish_transport_save_valid(&race_data, race_cols, race_rows)) return 0;
+#else
     if (race_data.state[0] && !race_skirmish_transport_save_valid(&race_data, race_cols, race_rows)) return 0;
+#endif
 #endif
 #ifdef SC64_SHARED_BATTERY
     if (!race_battery_saved_world_valid(&race_data, race_cols, race_rows)) return 0;
@@ -2240,7 +2256,11 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
     if (!race_bunker_save_world_valid(&race_data, width, height)) return 0;
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
+#ifdef SC64_SHARED_TRANSPORT
+    if (!race_skirmish_transport_save_valid(&race_data, width, height)) return 0;
+#else
     if (race_data.state[0] && !race_skirmish_transport_save_valid(&race_data, width, height)) return 0;
+#endif
 #endif
 #ifdef SC64_SHARED_BATTERY
     if (!race_battery_saved_world_valid(&race_data, width, height)) return 0;

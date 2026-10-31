@@ -5977,6 +5977,11 @@ choose_command(int choice)
         menu_open = 0; mode = MODE_BUILD; menu = B_PHOTON_CANNON; return;
     }
 #endif
+#ifdef SC64_SHARED_TRANSPORT
+    if (choice == MENU_STOP + 1 && race_shared_campaign_transport_menu_available()) {
+        menu_open = 0; mode = MODE_UNLOAD; return;
+    }
+#endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
     if (choice == MENU_STOP + 1 && race_z6_transport_research_selected()) {
         int result = race_z6_transport_start_research_selected();
@@ -6199,6 +6204,9 @@ static int field_menu_count(void)
 #ifdef SC64_P4_STORM_ENABLED
     if (race_p4_storm_menu_available()) return MENU_STOP + 2;
 #endif
+#ifdef SC64_SHARED_TRANSPORT
+    if (race_shared_campaign_transport_menu_available()) return MENU_STOP + 2;
+#endif
     if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
@@ -6231,6 +6239,9 @@ static int field_menu_count(void)
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     if (race_battery_command_available()) return MENU_STOP+2;
+#endif
+#ifdef SC64_SHARED_TRANSPORT
+    if (race_shared_campaign_transport_menu_available()) return MENU_STOP + 2;
 #endif
     if (race_probe_cannon_command_available()) return MENU_STOP + 3;
     if (race_nexus_command_available()) return MENU_STOP + 2;
@@ -6355,6 +6366,10 @@ static const char *race_menu_label(int i)
         },
         {"MOVE ORDER","ATTACK MOVE","GATEWAY","PYLON","ASSIMILATOR","CYBERNETICS","FORGE","WEAPONS","ARMOR","STOP / HOLD"}};
     const char *const *labels=race_labels[race_human];
+#ifdef SC64_SHARED_TRANSPORT
+    if (i == MENU_STOP + 1 && race_shared_campaign_transport_menu_available())
+        return "UNLOAD CARGO";
+#endif
 #ifdef SC64_T5_RUNTIME
     static const char *const advanced_labels[] = {
         "FACTORY", "STARPORT", "CONTROL TOWER", "UNLOAD CARGO"
@@ -6368,6 +6383,10 @@ static const char *race_menu_label(int i)
         advanced_labels[i - MENU_FACTORY] : labels[i];
 #else
     const char *label = field_menu_base_label(i, labels);
+#ifdef SC64_SHARED_TRANSPORT
+    if (i == MENU_STOP + 1 && race_shared_campaign_transport_menu_available())
+        label = "UNLOAD CARGO";
+#endif
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
 #ifdef SC64_P4_STORM_ENABLED
     if (i == MENU_STOP + 1 && race_p4_storm_menu_available()) label = "STORM";

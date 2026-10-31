@@ -47,3 +47,8 @@ build/test-sc64-pending-transport-z6: tests/sc64_transport_pending_z6.c tests/sc
 test-sc64-pending-transport-missions: build/test-sc64-pending-transport-p5 build/test-sc64-pending-transport-z6
 	./build/test-sc64-pending-transport-p5
 	./build/test-sc64-pending-transport-z6
+
+build/test-sc64-campaign-shuttle-p7: tests/sc64_campaign_shared_shuttle.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_CANONICAL_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(PROTOSS_P7_CANONICAL_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
+build/test-sc64-campaign-shuttle-p8: tests/sc64_campaign_shared_shuttle.c $(STARCRAFT) $(wildcard starcraft/*.h) $(PROTOSS_P8_INPUTS) common/gba.c common/gba.h Makefile | build
+	$(CLANG) $(CANONICAL_SKIRMISH_RESUME_HOST_FLAGS) $(PROTOSS_P8_FLAGS) $< common/gba.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES) -o $@
