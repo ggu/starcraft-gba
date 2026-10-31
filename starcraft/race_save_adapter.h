@@ -1172,11 +1172,10 @@ static int race_save_encode_actors(void) {
     }
     return 1;
 }
-static int race_save_game(void) {
-#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
-    /* The experimental layout has no qualified version or migration yet. */
-    return 0;
-#endif
+/* Build the complete fixed save candidate without publishing SRAM. The
+ * experimental tag is available only to bounded qualification callers until
+ * its journal and non-failing restore have been proved. */
+static int race_save_serialize(int shared_carrier) {
 #ifdef SC64_P8_RUNTIME
     if (!race_p8_live_products_valid()) return 0;
 #endif
@@ -1184,8 +1183,6 @@ static int race_save_game(void) {
     if (race_scarab_probe_bullets_pending()) return 0;
 #endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
-    GbaSaveSelection previous;
-    int have_previous=race_scarab_stage_previous(&previous);
     if (race_mode!=1 || race_skirmish_map<0 || race_skirmish_map>SC64_SKIRMISH_IMPORTED_COUNT ||
         !sc64_race_storage_geometry_valid(race_cols,race_rows)) return 0;
     if (race_skirmish_map==0 ? (race_cols!=64 || race_rows!=64) :
@@ -1282,9 +1279,19 @@ static int race_save_game(void) {
      * padding and optional fields before serializing this record. */
     memset(&race_data, 0, sizeof(race_data));
 #endif
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    if (shared_carrier) {
+        if (race_mode!=1) return 0;
+        memset(&race_data,0,sizeof(race_data));
+    }
+#else
+    (void)shared_carrier;
+#endif
     race_data.version=
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
         SC64_SCARAB_SAVE_VERSION;
+#elif defined(SC64_SHARED_CARRIER_SAVE_VERSION)
+        shared_carrier ? SC64_SHARED_CARRIER_SAVE_VERSION : SAVE_VERSION;
 #else
         SAVE_VERSION;
 #endif
@@ -1327,6 +1334,11 @@ static int race_save_game(void) {
         race_data.state[SC64_PROTOSS_CLOCK_STATE_INDEX] =
             race_protoss_clock_word(race_protoss_generic_clock);
     }
+#endif
+#if defined(SC64_SHARED_CARRIER_SAVE_VERSION) && !defined(SC64_P7_BATTERY_ENABLED)
+    if (shared_carrier)
+        race_data.state[SC64_PROTOSS_CLOCK_STATE_INDEX] =
+            race_protoss_clock_word(race_protoss_generic_clock);
 #endif
 #ifdef SC64_CONSTRUCTION_HP
     race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = SC64_CONSTRUCTION_SAVE_MARKER;
@@ -1731,6 +1743,18 @@ static int race_save_game(void) {
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     if (!race_scarab_save_candidate_valid(&race_data,(unsigned)race_cols*16u,(unsigned)race_rows*16u)) return 0;
 #endif
+    return 1;
+}
+static int race_save_game(void) {
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+    /* Journal migration and atomic restoration are not qualified yet. */
+    return 0;
+#endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    GbaSaveSelection previous;
+    int have_previous=race_scarab_stage_previous(&previous);
+#endif
+    if (!race_save_serialize(0)) return 0;
 #ifdef SC64_IMPACT_EVENTS
     /* This runs after validators that share the scratch tail. */
 #ifdef SC64_SCARAB_NAMESPACE_STAGE

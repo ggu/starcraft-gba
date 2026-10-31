@@ -73,8 +73,13 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
     for (int i=0;i<240 && sc64_pool_active_head(&race_p7_projectiles)==SC64_END;++i)
         game_update(0,0);
     assert(sc64_pool_active_head(&race_p7_projectiles)!=SC64_END);
-    memset(&race_data,0,sizeof(race_data));
-    race_data.version=SC64_SHARED_CARRIER_SAVE_VERSION;
+    assert(race_save_serialize(1));
+    assert(race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION);
+    assert(race_data.state[0]==race_mode && race_data.state[1]==race_human &&
+           race_data.state[5]==minerals && race_data.state[6]==gas &&
+           race_data.state[7]==frame && (u32)race_data.state[15]==seed &&
+           race_data.state[SC64_PROTOSS_CLOCK_STATE_INDEX]==
+               race_protoss_clock_word(race_protoss_generic_clock));
     race_data.state[31]=0x13579;
     assert(race_save_encode_actors());
     assert(race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION && race_data.state[31]==0x13579);
