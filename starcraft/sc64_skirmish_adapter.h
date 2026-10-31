@@ -76,6 +76,10 @@ static int race_skirmish_product_producer(int type)
     if (!r) return 255;
     if (race_mode) {
         int raw = sc64_race_raw_unit(type);
+#ifdef SC64_SHARED_TRANSPORT
+        if (raw == 69 && sc64_race_unit_from_raw(raw) == type)
+            return B_ROBOTICS_FACILITY;
+#endif
 #ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
         if (raw == 12) return B_STARPORT;
 #endif
@@ -156,6 +160,9 @@ static int race_skirmish_record_ready(int owner, int producer,
     if (!race_mode || !race_skirmish_requirements(owner, r) ||
         sc64_race_building_from_raw(r->raw_id) < 0) return 0;
     if (r->kind != SC64_SK_ADDON && r->kind != SC64_SK_BUILDING_MORPH) return 0;
+#ifdef SC64_SHARED_TRANSPORT
+    if (race_sk_transport_job_uses(producer)) return 0;
+#endif
     /* Infestation is an ability targeting a damaged enemy Command Center,
      * not an ordinary in-place upgrade of an owned structure. */
     if (r->raw_id == 130 || producer < 0 || producer >= MAX_BUILDINGS ||

@@ -10,6 +10,9 @@ static void sc64_contact_memo_invalidate(void);
 #endif
 #include "../common/gba.h"
 #include "sc64_engine_capabilities.h"
+#ifdef SC64_SHARED_TRANSPORT
+#include "sc64_skirmish_transport_tech.h"
+#endif
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
 #include "sc64_battlecruiser_rules.h"
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -460,6 +463,10 @@ _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x20000000u) == 0,
 #define SAVE_VERSION (SC64_LEGACY_SAVE_VERSION | 0x20000000u)
 #else
 #define SAVE_VERSION SC64_LEGACY_SAVE_VERSION
+#endif
+#ifdef SC64_SHARED_TRANSPORT
+_Static_assert((SAVE_VERSION & 0x04000000u) == 0, "transport save namespace overlaps");
+#define SC64_TRANSPORT_SAVE_VERSION (SAVE_VERSION | 0x04000000u)
 #endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 #if !defined(SC64_SCARAB_RUNTIME) || !defined(SC64_IMPACT_EVENTS) || !defined(SC64_IMPORTED_SKIRMISH) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT) || !defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) || (!defined(SC64_ZP_FULL_STORAGE) && !defined(SC64_LATE_TERRAN_STORAGE))
@@ -1399,6 +1406,10 @@ static int race_bc_before_building_transfer(int slot,int new_owner);
 #ifndef SC64_BC_ALLOW_BUILDING_TRANSFER
 #define SC64_BC_ALLOW_BUILDING_TRANSFER(slot,owner) 1
 #endif
+#ifdef SC64_SHARED_TRANSPORT
+static Sc64SkTransportTech race_skirmish_transport_tech;
+static Sc64SkTransportTech race_skirmish_transport_candidate;
+#endif
 static int race_skirmish_map;
 static int race_bot_races[3]={R_ZERG,R_PROTOSS,R_TER};
 static Sc64Frontend race_front;
@@ -1817,6 +1828,9 @@ static const Sc64SpriteFrame *mission_building_sprite(int type);
 static int race_owner_supply(int owner),race_owner_supply_cap(int owner),race_owner_reserved_supply(int owner);
 static int race_owner_queued_supply(int owner);
 static void race_add_owner_resources(int owner,int ore,int vespene);
+#ifdef SC64_SHARED_TRANSPORT
+static int race_owner_minerals(int owner), race_owner_gas(int owner);
+#endif
 static int race_save_game(void),race_load_game(void);
 static void race_campaign_init(void),race_campaign_tick(void);
 #endif
@@ -3344,6 +3358,9 @@ move_toward(Unit * q, int tx, int ty)
 #ifdef SC64_TRANSPORT_RUNTIME
 #include "sc64_transport_adapter.h"
 #endif
+#ifdef SC64_SHARED_TRANSPORT
+#include "sc64_skirmish_transport_adapter.h"
+#endif
 
 /* These expand in query declarations/calls outside the race-specific block
  * too, so keep the source-owner plumbing available in every profile. */
@@ -4234,6 +4251,9 @@ destroy_building(int slot, int source_owner)
 {
     Building *q = &b[slot];
     if (!q->alive) return;
+#ifdef SC64_SHARED_TRANSPORT
+    race_sk_transport_producer_destroyed(slot);
+#endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     race_scarab_probe_target_invalidate(MAX_UNITS+slot);
 #endif
@@ -4886,6 +4906,9 @@ init_state(void)
     toast_timer=toast_id=enemy_timer=wave=0;
     weapons_level=armor_level=weapons_research=armor_research=0;
     mission_objective_stage=mission_unsupported_count=0;
+#ifdef SC64_SHARED_TRANSPORT
+    memset(&race_skirmish_transport_tech, 0, sizeof(race_skirmish_transport_tech));
+#endif
     train_type=race_mode?(race_human==R_TER?U_SCV:race_human==R_ZERG?U_DRONE:U_PROBE):
         (race_selected_mission<2?U_DRONE:U_PROBE);
     SC64_GRID_CLEAR(explored);SC64_GRID_CLEAR(visible);
@@ -5709,7 +5732,7 @@ static int __attribute__((noinline)) race_bunker_menu_available(void)
 #ifdef SC64_RACES
 enum {
     RACE_CONTEXT_SCARAB, RACE_CONTEXT_YAMATO, RACE_CONTEXT_BC_BUILDING,
-    RACE_CONTEXT_BUNKER, RACE_CONTEXT_TRANSPORT, RACE_CONTEXT_BATTERY,
+    RACE_CONTEXT_BUNKER, RACE_CONTEXT_TRANSPORT, RACE_CONTEXT_TRANSPORT_TECH, RACE_CONTEXT_BATTERY,
     RACE_CONTEXT_CARRIER, RACE_CONTEXT_COUNT
 };
 static int race_context_command_base(int context);
@@ -5785,7 +5808,10 @@ static int race_context_command_width(int context)
     case RACE_CONTEXT_BUNKER: return race_bunker_menu_available();
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
-    case RACE_CONTEXT_TRANSPORT: return race_skirmish_dropship_menu_available();
+    case RACE_CONTEXT_TRANSPORT: return race_skirmish_transport_menu_available();
+#endif
+#ifdef SC64_SHARED_TRANSPORT
+    case RACE_CONTEXT_TRANSPORT_TECH: return race_sk_transport_research_menu();
 #endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
     case RACE_CONTEXT_BATTERY: return race_battery_command_available();
@@ -5866,9 +5892,19 @@ choose_command(int choice)
 #ifdef SC64_RACES
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_SHARED_TRANSPORT
+        if (choice == race_context_command_base(RACE_CONTEXT_TRANSPORT_TECH) &&
+            race_sk_transport_research_menu()) {
+            int key = sc64_sk_transport_owner_index(SIDE);
+            int result = race_skirmish_transport_tech.owner[key].remaining ?
+                race_sk_transport_cancel_owner(SIDE, 0) :
+                race_sk_transport_start_owner(SIDE, selected_building);
+            menu_open = 0; mode = MODE_NORMAL; toast(result ? 4 : 8); return;
+        }
+#endif
 #ifdef SC64_TRANSPORT_RUNTIME
         if (choice == race_context_command_base(RACE_CONTEXT_TRANSPORT) &&
-            race_skirmish_dropship_menu_available()) {
+            race_skirmish_transport_menu_available()) {
             menu_open = 0; mode = MODE_UNLOAD; return;
         }
 #endif
@@ -6275,13 +6311,19 @@ static const char *race_menu_label(int i)
 #endif
     if (race_mode) {
         Sc64SkirmishMenuRow row;
+#ifdef SC64_SHARED_TRANSPORT
+        if (i == race_context_command_base(RACE_CONTEXT_TRANSPORT_TECH) &&
+            race_sk_transport_research_menu())
+            return race_skirmish_transport_tech.owner[sc64_sk_transport_owner_index(SIDE)].remaining ?
+                "CANCEL RESEARCH" : "VENTRAL SACS";
+#endif
 #ifdef SC64_BATTERY_SERVICE_ENABLED
         if (i == race_context_command_base(RACE_CONTEXT_BATTERY) &&
             race_battery_command_available()) return "RECHARGE";
 #endif
 #ifdef SC64_TRANSPORT_RUNTIME
         if (i == race_context_command_base(RACE_CONTEXT_TRANSPORT) &&
-            race_skirmish_dropship_menu_available()) return "UNLOAD CARGO";
+            race_skirmish_transport_menu_available()) return "UNLOAD CARGO";
 #endif
         return sc64_skirmish_menu_at((unsigned)race_human, (unsigned)i, &row) ? row.label : "";
     }
@@ -7876,6 +7918,9 @@ update_production(void)
     }
 #endif
     race_tick_buildings();
+#ifdef SC64_SHARED_TRANSPORT
+    race_sk_transport_research_tick();
+#endif
 #ifdef SC64_Z7_COLONY_DEFENSE_ENABLED
     if (!race_colony_post_building_tick()) {
         ++mission_unsupported_count; screen=SCREEN_PAUSE; toast(14); return;

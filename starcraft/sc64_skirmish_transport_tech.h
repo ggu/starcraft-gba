@@ -94,10 +94,9 @@ static inline int sc64_sk_transport_cancel(Sc64SkTransportJob *j, int destroyed,
     if (!j || !j->remaining || !minerals || !gas ||
         (destroyed != 0 && destroyed != 1)) return 0;
     refund = destroyed ? 150 : 200;
-    if (*minerals < 0 || *gas < 0 || *minerals > INT_MAX - refund ||
-        *gas > INT_MAX - refund) return 0;
-    *minerals += refund;
-    *gas += refund;
+    if (*minerals < 0 || *gas < 0) return 0;
+    *minerals = *minerals > INT_MAX - refund ? INT_MAX : *minerals + refund;
+    *gas = *gas > INT_MAX - refund ? INT_MAX : *gas + refund;
     j->remaining = 0;
     j->producer_plus_one = 0;
     return 1;

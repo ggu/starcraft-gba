@@ -1108,6 +1108,37 @@ void save_write(const void *data,u32 len,u32 tag) {
     for(u32 i=0;i<len;i++)p[16+i]=src[i];
     sram_put32(p,tag);
 }
+#ifdef SC64_SHARED_TRANSPORT
+/* The normal journal protocol, with a short trailer held outside its large
+ * shared save scratch. Both spans are covered by one checksum and tag. */
+int save_write_parts(const void *data,u32 len,const void *tail,u32 tail_len,u32 tag) {
+    if(!data||!tail||!len||!tail_len||len>SAVE_PAYLOAD_MAX||
+       tail_len>SAVE_PAYLOAD_MAX-len||!tag)return 0;
+    const u8 *a=data,*b=tail;u32 h=2166136261u;
+    for(u32 i=0;i<len;i++){h^=a[i];h*=16777619u;}
+    for(u32 i=0;i<tail_len;i++){h^=b[i];h*=16777619u;}
+    volatile u8 *base=(volatile u8*)SRAM_BASE;
+    int newest=newest_record(0,tag);
+    u32 seq=newest<0?1:sram_get32(base+newest*SAVE_SLOT_SIZE+12)+1;
+    if(!seq)seq=1;
+    volatile u8 *p=base+(newest==0?SAVE_SLOT_SIZE:0);
+    sram_put32(p,0);sram_put32(p+4,len+tail_len);sram_put32(p+8,h);sram_put32(p+12,seq);
+    for(u32 i=0;i<len;i++)p[16+i]=a[i];
+    for(u32 i=0;i<tail_len;i++)p[16+len+i]=b[i];
+    sram_put32(p,tag);return 1;
+}
+int save_read_parts(void *data,u32 len,void *tail,u32 tail_len,u32 tag) {
+    if(!data||!tail||!len||!tail_len||len>SAVE_PAYLOAD_MAX||
+       tail_len>SAVE_PAYLOAD_MAX-len||!tag)return 0;
+    int newest=newest_record(len+tail_len,tag);if(newest<0)return 0;
+    volatile const u8 *p=(volatile const u8*)SRAM_BASE+newest*SAVE_SLOT_SIZE+16;
+    u8 *a=data,*b=tail;
+    for(u32 i=0;i<len;i++)a[i]=p[i];
+    for(u32 i=0;i<tail_len;i++)b[i]=p[len+i];
+    return 1;
+}
+#endif
+
 /* Preserve the newest readable predecessor when writing the first record of
  * a new format. Tags share the same physical two-slot SRAM journal. */
 void save_write_migrating(const void *data,u32 len,u32 tag,u32 legacy_len,u32 legacy_tag) {

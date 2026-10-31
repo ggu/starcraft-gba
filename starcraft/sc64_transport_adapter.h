@@ -30,6 +30,18 @@ static int race_transport_carrier_type(const Unit *q)
 #endif
 {
     if (!q) return 0;
+#ifdef SC64_SHARED_TRANSPORT
+    if (race_mode) {
+        int raw = q->raw_type >= 0 ? q->raw_type : sc64_race_raw_unit(q->type);
+        if (raw == SC64_TRANSPORT_SHUTTLE_RAW &&
+            sc64_race_unit_from_raw(raw) == q->type) return 1;
+        if (raw == SC64_TRANSPORT_OVERLORD_RAW && q->type == U_OVERLORD) {
+            int owner = sc64_sk_transport_owner_index(q->owner);
+            if (owner >= 0 && race_skirmish_transport_tech.owner[owner].researched)
+                return 1;
+        }
+    }
+#endif
 #ifdef SC64_Z6_TRANSPORT_ENABLED
     if (race_z6_active() && race_z6_transport_overlord_ready() &&
         q->type==U_OVERLORD && q->raw_type==42 && q->raw_owner==3 && q->owner==SIDE)
@@ -89,12 +101,12 @@ static int race_transport_cargo_space(int carrier)
 
 /* Context command for ordinary custom games; existing campaign commands
  * continue to use their mission-specific predicates. */
-static int __attribute__((unused)) race_skirmish_dropship_menu_available(void)
+static int __attribute__((unused)) race_skirmish_transport_menu_available(void)
 {
     if (!race_mode || selected_building >= 0) return 0;
     for (int i = 0; i < MAX_UNITS; ++i)
         if (u[i].selected && u[i].owner == SIDE &&
-            race_transport_carrier_valid(i) && u[i].type == U_DROPSHIP &&
+            race_transport_carrier_valid(i) &&
             race_transport_cargo_space(i) > 0) return 1;
     return 0;
 }
