@@ -1172,6 +1172,47 @@ static int race_save_encode_actors(void) {
     }
     return 1;
 }
+/* Candidate-only load outputs live outside the route/save scratch union. */
+typedef struct {
+    int building_damage_marker;
+    union {
+        int unused;
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+        Sc64T4RuntimeState t4;
+#endif
+#ifdef SC64_T5_RUNTIME
+        Sc64T5RuntimeState t5;
+#endif
+#ifdef SC64_T6_RUNTIME
+        Sc64T6MissionState t6;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+        Sc64TerranLateMissionState terran_late;
+#endif
+    } expanded;
+#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
+    int expanded_t4_valid;
+#endif
+#ifdef SC64_T5_RUNTIME
+    int expanded_t5_valid;
+#endif
+#ifdef SC64_T6_RUNTIME
+    int expanded_t6_valid;
+#endif
+#ifdef SC64_TERRAN_LATE_RUNTIME
+    int expanded_terran_late_valid;
+#endif
+#ifdef SC64_IMPACT_EVENTS
+    Sc64ImpactEvent impact_candidate[RACE_IMPACT_SAVE_CAPACITY ? RACE_IMPACT_SAVE_CAPACITY : 1];
+    int impact_candidate_count;
+#endif
+} RaceLoadPlan;
+
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+static int race_shared_carrier_stage_select(RaceLoadPlan *plan,GbaSaveSelection *selected);
+static void race_shared_carrier_stage_commit(const RaceLoadPlan *plan);
+#endif
+
 /* Build the complete fixed save candidate without publishing SRAM. The
  * experimental tag is available only to bounded qualification callers until
  * its journal and non-failing restore have been proved. */
@@ -1747,8 +1788,38 @@ static int race_save_serialize(int shared_carrier) {
 }
 static int race_save_game(void) {
 #if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+    /* Qualification route: custom worlds only. Campaign migration and the
+     * complete cross-service save matrix are not yet enabled. */
+    {
+        const u32 tags[]={SAVE_VERSION,SC64_SHARED_CARRIER_SAVE_VERSION
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+                          ,SC64_LEGACY_SAVE_VERSION
+#endif
+                         };
+        RaceLoadPlan plan={0}; GbaSaveSelection previous;
+        int have_previous;
+        if (race_mode!=1) return 0;
+        have_previous=race_shared_carrier_stage_select(&plan,&previous);
+        if (!race_save_serialize(1)) return 0;
+#ifdef SC64_IMPACT_EVENTS
+        u32 length;
+        if (!race_impact_save_pack(&length)) return 0;
+        const void *record=&race_impact_record;
+#else
+        u32 length=sizeof(race_data);
+        const void *record=&race_data;
+#endif
+        if (have_previous) {
+            if (!save_write_selected(record,length,SC64_SHARED_CARRIER_SAVE_VERSION,
+                                     &previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
+        } else if (!save_write_first(record,length,SC64_SHARED_CARRIER_SAVE_VERSION)) return 0;
+        toast(7); return 1;
+    }
+#else
     /* Journal migration and atomic restoration are not qualified yet. */
     return 0;
+#endif
 #endif
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     GbaSaveSelection previous;
@@ -1771,42 +1842,6 @@ static int race_save_game(void) {
 #endif
     toast(7);return 1;
 }
-/* Candidate-only load outputs live outside the route/save scratch union. */
-typedef struct {
-    int building_damage_marker;
-    union {
-        int unused;
-#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
-        Sc64T4RuntimeState t4;
-#endif
-#ifdef SC64_T5_RUNTIME
-        Sc64T5RuntimeState t5;
-#endif
-#ifdef SC64_T6_RUNTIME
-        Sc64T6MissionState t6;
-#endif
-#ifdef SC64_TERRAN_LATE_RUNTIME
-        Sc64TerranLateMissionState terran_late;
-#endif
-    } expanded;
-#if defined(SC64_T3_ENABLED) && defined(SC64_T4_SCENARIO_RUNTIME)
-    int expanded_t4_valid;
-#endif
-#ifdef SC64_T5_RUNTIME
-    int expanded_t5_valid;
-#endif
-#ifdef SC64_T6_RUNTIME
-    int expanded_t6_valid;
-#endif
-#ifdef SC64_TERRAN_LATE_RUNTIME
-    int expanded_terran_late_valid;
-#endif
-#ifdef SC64_IMPACT_EVENTS
-    Sc64ImpactEvent impact_candidate[RACE_IMPACT_SAVE_CAPACITY ? RACE_IMPACT_SAVE_CAPACITY : 1];
-    int impact_candidate_count;
-#endif
-} RaceLoadPlan;
-
 /* May modify candidate/route scratch, never the live world or SRAM. */
 static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #ifdef SC64_P7_BATTERY_ENABLED
@@ -3223,8 +3258,18 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 #endif
 static int race_load_game(void) {
 #if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+    {
+        RaceLoadPlan custom_plan={0}; GbaSaveSelection selected;
+        if (!race_shared_carrier_stage_select(&custom_plan,&selected) ||
+            selected.tag!=SC64_SHARED_CARRIER_SAVE_VERSION) return 0;
+        race_shared_carrier_stage_commit(&custom_plan);
+        return 1;
+    }
+#else
     /* Do not interpret a predecessor journal with the experimental layout. */
     return 0;
+#endif
 #endif
     RaceLoadPlan plan = {0};
 #ifdef SC64_SCARAB_NAMESPACE_STAGE

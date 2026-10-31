@@ -478,6 +478,9 @@ _Static_assert((SAVE_VERSION & 0x04000000u) == 0 &&
                "Carrier tag overlaps an existing save namespace");
 #define SC64_SHARED_CARRIER_SAVE_VERSION (SAVE_VERSION | 0x04000000u)
 #endif
+#if defined(SC64_SHARED_CARRIER_SAVE_EXPERIMENT) && !defined(SC64_SHARED_CARRIER_SAVE_VERSION)
+#error "Shared Carrier save experiment requires the shared custom Carrier format"
+#endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
 #endif
@@ -1705,6 +1708,9 @@ static int race_impact_save_write(const GbaSaveSelection *previous);
 static int race_impact_save_write(void);
 #endif
 static int race_impact_save_read(Sc64ImpactEvent *candidate, int *count);
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+static int race_impact_save_pack(u32 *length);
+#endif
 #if defined(SC64_SCARAB_NAMESPACE_STAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
 static int race_impact_save_decode_selected(u32 len,u32 tag,Sc64ImpactEvent *candidate,int *count);
 #endif

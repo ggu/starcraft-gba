@@ -79,6 +79,33 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
     assert(race_impact_count==1);
     Sc64ImpactEvent expected_impact=race_impact_rows[0];
 #endif
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+    /* Drive the actual gated game entry points with an existing predecessor. */
+    Unit saved_carrier=u[carrier], saved_target=u[target];
+    int entry_minerals=minerals, entry_frame=frame;
+    u8 entry_clock[3]; memcpy(entry_clock,race_protoss_generic_clock,sizeof(entry_clock));
+    static u8 entry_packet[SC64_CODEC_BYTES], entry_restored[SC64_CODEC_BYTES];
+    assert(sc64_codec_encode(&race_p7_projectiles,entry_packet,sizeof(entry_packet)));
+    assert(race_save_game());
+    assert(!memcmp(predecessor,host_save+(unsigned)previous->slot*SAVE_SLOT_SIZE,
+                   sizeof(predecessor)));
+    u[carrier].hp=1; minerals=0; frame=0;
+    memset(race_protoss_generic_clock,0,sizeof(entry_clock));
+    assert(sc64_pool_init(&race_p7_projectiles));
+#ifdef SC64_IMPACT_EVENTS
+    race_impact_reset();
+#endif
+    assert(race_load_game());
+    assert(!memcmp(&saved_carrier,&u[carrier],sizeof(Unit)) &&
+           !memcmp(&saved_target,&u[target],sizeof(Unit)) &&
+           minerals==entry_minerals && frame==entry_frame &&
+           !memcmp(entry_clock,race_protoss_generic_clock,sizeof(entry_clock)));
+    assert(sc64_codec_encode(&race_p7_projectiles,entry_restored,sizeof(entry_restored)) &&
+           !memcmp(entry_packet,entry_restored,sizeof(entry_packet)));
+#ifdef SC64_IMPACT_EVENTS
+    assert(race_impact_count==1 && !memcmp(&race_impact_rows[0],&expected_impact,sizeof(expected_impact)));
+#endif
+#endif
     race_p7_projectile_fault=1;
     assert(!race_save_serialize(1));
     race_p7_projectile_fault=0;
