@@ -99,6 +99,9 @@ static int defense_screen_combat_count=-1;
 static int defense_screen_enemy=-1;
 static int defense_screen_return_pending;
 static unsigned defense_screen_order_retry_frame;
+/* Controller-only knobs for bounded ordinary-input policy comparisons. */
+static int policy_workers=8,policy_reserve=50,policy_hydras=12;
+static int policy_second_first=1,policy_retreat=0,policy_home_radius=220;
 static int macro_worker_goal=3;
 static int defense_attack_frame;
 static int workers_retreating;
@@ -3970,6 +3973,15 @@ static void macro_step(void)
     /* Use live worker and mineral-patch proximity as the evacuation trigger;
        a broad Hatchery radius can strand otherwise productive Drones. */
     int home=z7_townhall(SIDE);
+    if(workers_retreating) {
+        if(enemy_at_minerals)workers_safe_since=0;
+        else if(!workers_safe_since)workers_safe_since=(unsigned)frame;
+        else if((unsigned)frame-workers_safe_since>=1200u) {
+            workers_retreating=0;workers_safe_since=0;
+            fprintf(stderr,"Z7 normal-input workers resume mining after safe interval frame%u\n",
+                (unsigned)frame);
+        }
+    }
     /* The defended-home branch below returns while waiting for paid tech.
      * Start safe local mining first or that wait can never earn minerals. */
     if(!enemy_at_minerals&&!workers_retreating&&assign_idle_workers_to_minerals())return;
@@ -4069,7 +4081,7 @@ static void macro_step(void)
         if(!building_complete(home))return;
         /* Keep one Drone purchase in reserve while any worker remains;
          * spend that reserve only to recover from total worker loss. */
-        int drone_bank=live_workers>0?100:50;
+        int drone_bank=50+(live_workers>0?policy_reserve:0);
         if(live_workers+pending_workers<4&&minerals>=drone_bank&&
            queue_hatchery_type(U_DRONE))return;
         /* Do not wait for the Den or two Sunken defenses: seize the cleared
@@ -4141,16 +4153,16 @@ static void macro_step(void)
         int first_defense_started=owned_building_count(B_SUNKEN_COLONY)>0;
         for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
            (b[i].flags&SC64_Z7_SUNKEN_MORPH_FLAG))first_defense_started=1;
-        if(ready_second_sunken_colony<0&&completed_building_count(B_SUNKEN_COLONY)>=1&&
+        if(policy_second_first&&ready_second_sunken_colony<0&&completed_building_count(B_SUNKEN_COLONY)>=1&&
            z7_progress_second_sunken(worker_goal))return;
         if(ready_second_sunken_colony<0&&first_defense_started&&den>=0&&
            building_complete(den)&&live_workers>=5&&minerals>=75&&gas>=25&&
-           unit_type_count(U_HYDRALISK,SIDE)+queued_unit_count(U_HYDRALISK)<12&&
+           unit_type_count(U_HYDRALISK,SIDE)+queued_unit_count(U_HYDRALISK)<policy_hydras&&
            queue_hatchery_type(U_HYDRALISK))return;
         /* A completed Creep Colony needs only the paid Sunken morph, not a
            live Drone. Dispatch it before replacing workers so the 50-mineral
            morph cannot be delayed by an unnecessary six-worker placement gate. */
-        if(ready_second_sunken_colony<0&&live_workers+pending_workers<8&&minerals>=drone_bank&&
+        if(ready_second_sunken_colony<0&&live_workers+pending_workers<policy_workers&&minerals>=drone_bank&&
            queue_hatchery_type(U_DRONE))return;
         int supply_cap=race_owner_supply_cap(SIDE);
         int supply_used=race_owner_reserved_supply(SIDE);
@@ -4198,7 +4210,7 @@ static void macro_step(void)
                 return;
             }
         }
-        if(live_workers+pending_workers<8&&minerals>=drone_bank&&
+        if(live_workers+pending_workers<policy_workers&&minerals>=drone_bank&&
            queue_hatchery_type(U_DRONE))return;
         /* Correct the source's position-relative autoassignment after the
            six-worker line exists; keep the protected eastern mineral band. */
@@ -4673,15 +4685,6 @@ static void macro_step(void)
     if(enemy_at_minerals&&building_complete(raw_building(135,SIDE))&&
        owned_building_count(B_SUNKEN_COLONY)>=2&&minerals>=50&&
        queue_hatchery_type(U_ZERGLING))return;
-    if(workers_retreating) {
-        if(enemy_at_minerals)workers_safe_since=0;
-        else if(!workers_safe_since)workers_safe_since=(unsigned)frame;
-        else if((unsigned)frame-workers_safe_since>=1200u) {
-            workers_retreating=0;workers_safe_since=0;
-            fprintf(stderr,"Z7 normal-input workers resume mining after safe interval frame%u\n",
-                (unsigned)frame);
-        }
-    }
     /* Once the source attack reaches the mineral line, preserve remaining
        miners with ordinary per-worker Move orders. Keep any active builder
        on its source construction; do not select or mutate it here. */
@@ -5024,7 +5027,7 @@ static void attack_step(void)
                 SC64_CAN_ATTACK_FROM_SOURCE(U_HYDRALISK,t,SIDE,3);
             int still_threatening=valid&&
                 (dist2(u[t].x,u[t].y,b[hatch].x,b[hatch].y)<=160*160||
-                 (dist2(u[t].x,u[t].y,b[hatch].x,b[hatch].y)<=220*220&&
+                 (dist2(u[t].x,u[t].y,b[hatch].x,b[hatch].y)<=policy_home_radius*policy_home_radius&&
                   z7_threat_near_workers(t,128)));
             if(still_threatening) {
                 int hydras_on_target=0;
@@ -5064,7 +5067,7 @@ static void attack_step(void)
                currently_visible(u[i].x,u[i].y)&&
                SC64_CAN_ATTACK_FROM_SOURCE(U_HYDRALISK,i,SIDE,3)) {
                 int d=dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y);
-                if((d<=best||(d<=220*220&&z7_threat_near_workers(i,128)))&&
+                if((d<=best||(d<=policy_home_radius*policy_home_radius&&z7_threat_near_workers(i,128)))&&
                    (ground<0||d<best)){ground=i;best=d;}
             }
             if(ground>=0) {
@@ -5675,6 +5678,18 @@ int main(int argc,char **argv)
             else if(!strcmp(name,"early-gas"))early_gas_policy=1;
             else {fprintf(stderr,"unknown policy: %s\n",name);return 2;}
         }
+        else if(i+1<argc&&(!strcmp(argv[i],"--policy-workers")||!strcmp(argv[i],"--policy-reserve")||
+                !strcmp(argv[i],"--policy-hydras")||!strcmp(argv[i],"--policy-second-first")||
+                !strcmp(argv[i],"--policy-retreat")||!strcmp(argv[i],"--policy-home-radius"))) {
+            const char *opt=argv[i++];char *end=0;long value=strtol(argv[i],&end,10);
+            if(!end||*end)return 2;
+            if(!strcmp(opt,"--policy-workers")){if(value<4||value>16)return 2;policy_workers=(int)value;}
+            else if(!strcmp(opt,"--policy-reserve")){if(value<0||value>100)return 2;policy_reserve=(int)value;}
+            else if(!strcmp(opt,"--policy-hydras")){if(value<8||value>20)return 2;policy_hydras=(int)value;}
+            else if(!strcmp(opt,"--policy-second-first")){if(value<0||value>1)return 2;policy_second_first=(int)value;}
+            else if(!strcmp(opt,"--policy-retreat")){if(value<0||value>1)return 2;policy_retreat=(int)value;}
+            else {if(value<128||value>400)return 2;policy_home_radius=(int)value;}
+        }
         else if(!strcmp(argv[i],"--limit")&&i+1<argc)run_limit=(u32)strtoul(argv[++i],0,10);
         else if(!strcmp(argv[i],"--trace")&&i+1<argc)trace_path=argv[++i];
         else if(!strcmp(argv[i],"--probe-hatch-site")&&i+2<argc) {
@@ -5690,6 +5705,8 @@ int main(int argc,char **argv)
     fprintf(trace_file,"{\"schema\":1,\"profile\":\"zerg-z7\",\"mission\":18,"
         "\"policy\":\"%s\",\"events\":[",
         early_gas_policy?"normal-input Z7 early-gas trial":"normal-input Z7 defensive baseline");
+    fprintf(stderr,"Z7 policy workers%d reserve%d hydras%d second%d retreat%d radius%d\n",
+        policy_workers,policy_reserve,policy_hydras,policy_second_first,policy_retreat,policy_home_radius);
     launch_from_normal_menu();
     source_checkpoint("start");
     int last_checkpoint=frame;
@@ -5708,7 +5725,7 @@ int main(int argc,char **argv)
            the worker evacuation menu consumes its multi-update selection and
            move gestures. Evacuation still runs in the same host iteration. */
         attack_step();
-        int worker_evacuated=0; /* Retain workers on the protected line. */
+        int worker_evacuated=policy_retreat?z7_urgent_worker_evacuation():0;
         /* Keep paid unit and worker replacement running during retreats. */
         macro_step();
         if(frame>=last_checkpoint+Z7_CHECKPOINT_PERIOD) {
