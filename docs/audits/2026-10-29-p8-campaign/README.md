@@ -449,3 +449,9 @@ resume retained 94, 36 and 64 records respectively. This is a custom replay
 scheduler and isolated emulator result, not a normal-menu ARM replay, physical
 hardware, frame-rate or complete source-fidelity qualification. Scarab and
 broader carried-mission/service qualification remain open. No Actions ran.
+
+### Shared walking integration checkpoint
+
+Merge `dcb69ce` carries the shared packed walking change into the P8 candidate. Its normal P8 ARM ROM passed the unchanged guards with IWRAM end `0x03004a18`, EWRAM BSS end `0x0203899c`, and SHA-256 `9b1493c632903dcd9c363b4317e82ed6cff143ffc280766d6b3a95876316ba16`. The P8 carried-profile startup/save matrix and 234 skirmish configurations, P8 preflight, P7 observer and battery rule tests, unified/races walking-frame tests, both field UI variants, five walking importer tests and source boundary check passed. Prepared-input hashes were unchanged across qualification; pair verification and the managed walking and weapon-index producers ran locally.
+
+The full P8 win and full/prefix/fresh host and guest replay results above remain evidence for the earlier `e0e8e1f` runtime, not a new replay of this walking merge. This remains a draft candidate with the documented service and admission holds.
