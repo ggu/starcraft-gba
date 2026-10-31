@@ -38,10 +38,11 @@ class RaceSpritePackTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             legacy, disabled, enabled = (root / 'legacy.h', root / 'disabled.h', root / 'enabled.h')
-            write_header(legacy, [], bytes(range(256)))
-            write_header(disabled, [], bytes(range(256)), z8_building_selected=None)
+            base_units = [{'name': name, 'frame': frame(3)} for name in RACE_UNIT_IDS]
+            write_header(legacy, base_units, bytes(range(256)))
+            write_header(disabled, base_units, bytes(range(256)), z8_building_selected=None)
             self.assertEqual(legacy.read_bytes(), disabled.read_bytes())
-            write_header(enabled, [], bytes(range(256)),
+            write_header(enabled, base_units, bytes(range(256)),
                          z8_building_selected=[{'name': 'nydus_canal_z8',
                                                 'frames': [frame(11+i) for i in range(5)]}])
             (root / 'check.c').write_text('''#include <assert.h>
