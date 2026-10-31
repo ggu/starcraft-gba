@@ -469,3 +469,29 @@ A separate ASan/UBSan actual-menu approach fixture checks STOP during motion,
 a later renewed cast, MOVE replacement, refusal while already moving, and a
 subsequent STOP/recast. This is the controlled clear-route input path only.
 All of these gates stay disabled in normal products.
+
+
+### Disabled source-rectangle launch query
+
+`SC64_SHARED_DARK_SWARM_PROBE` binds active staged fields to the experimental
+Yamato world launcher and the raw-0/weapon-0 ordinary release stage. In the source-rectangle profile it intersects each
+ground actor's source-pixel bounds with each active field's 160×160 source
+rectangle; buildings, flying actors and expired death tails do not receive
+the ground-target protection. When a field exists and target bounds are
+unknown, the staged launch fails closed. A pinned OpenBW world oracle tested
+adjacent source-coordinate edges on both axes for raw 0, 46 and 52. A separate
+sanitized actual-game fixture created a field by real UI input, checked those
+actors at the adjacent positions representable by GBA coordinates, and issued
+a real Yamato order: the actual released shot took its source miss path and
+the ground target remained undamaged. Its BC energy and heading were seeded
+for the controlled fixture. A separate synthetic attack-order fixture advanced
+actual `game_update`: a Marine bullet allocated against a Defiler under the
+field but damaged neither it nor a bystander at the visual miss offset, while
+an otherwise comparable unprotected target lost five HP after armor. An unknown
+rectangle case confirms fail-closed release. This models the guaranteed field threshold at bullet
+release; it does not reproduce the global source miss RNG stream.
+
+This is not complete shared Dark Swarm damage behavior: only that experimental Yamato path and raw-0/weapon-0 release are
+bound; other ordinary weapons and projectile types, all-profile source
+geometry, the zero-threshold miss and global source RNG stream, launch ordering
+on the exact field-expiry tick, save/load and hardware remain open. The gate is off in normal products.

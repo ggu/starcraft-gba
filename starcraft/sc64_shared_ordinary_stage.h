@@ -99,11 +99,20 @@ static void race_shared_ordinary_release_tick(void)
         for(unsigned shot=0;shot<p->shots;shot++) {
             if(!p->wait[shot])continue;
             if(--p->wait[shot]) {waiting=1;continue;}
+#ifdef SC64_SHARED_DARK_SWARM_PROBE
+            /* Only raw0/weapon0 is qualified for this deterministic source
+             * threshold. Other families retain their existing gated behavior. */
+            int swarm=p->raw==0?sc64_world_dark_swarm_affects_target(p->target):0;
+            if(swarm<0)continue; /* unknown geometry: no unsafe staged hit */
+#endif
             u32 handle=sc64_shared_projectile_acquire(&sc64_shared_projectiles,SC64_SHARED_PROJECTILE_IMPACT,(unsigned)i);
             if(!handle)continue; /* source allocation failure: cooldown was already spent */
             unsigned slot=(handle&255u)-1u;
             Sc64OrdinaryBullet *b=&sc64_ordinary_bullets[slot];
             b->handle=handle;b->target=p->target;b->damage=p->damage;b->owner=p->owner;
+#ifdef SC64_SHARED_DARK_SWARM_PROBE
+            if(swarm>0)b->target=-1; /* source threshold 255 misses every roll */
+#endif
             b->source_type=p->source_type;b->damage_class=p->damage_class;
             b->impact=p->impact[shot];b->life=p->life[shot];b->damaged=0;b->reservation_owner=(u8)i;
         }

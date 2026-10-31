@@ -51,6 +51,13 @@ build/test-dark-swarm-approach-ui: tests/sc64_defiler_approach_ui_game.c tests/s
 test-dark-swarm-approach-ui: build/test-dark-swarm-approach-ui
 	./build/test-dark-swarm-approach-ui
 
+# Disabled field/weapon-launch query; uses prepared Showcase and source facts.
+.PHONY: test-dark-swarm-query
+build/test-dark-swarm-query: tests/sc64_dark_swarm_query_game.c tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_HERO_PROBE -DSC64_SHARED_DARK_SWARM_PROBE $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-dark-swarm-query: build/test-dark-swarm-query
+	./build/test-dark-swarm-query
+
 # Asset-free journal selection prototype; not yet wired to game persistence.
 .PHONY: test-scarab-save-selection
 build/test-scarab-save-selection: tests/gba_save_selection.c common/gba.c common/gba.h Makefile | build

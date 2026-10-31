@@ -89,8 +89,9 @@ static int race_bc_yamato_launch_world(int index,unsigned heading)
 {
     if (index<0 || index>=SC64_BC_SHOT_LIMIT ||
         sc64_bc_shots[index].target>=MAX_UNITS+MAX_BUILDINGS) return 0;
-    return race_bc_yamato_launch_world_cover(index,heading,
-               sc64_world_dark_swarm_affects_target(sc64_bc_shots[index].target));
+    int swarm=sc64_world_dark_swarm_affects_target(sc64_bc_shots[index].target);
+    if(swarm<0)return 0; /* unknown staged geometry must not bypass a field */
+    return race_bc_yamato_launch_world_cover(index,heading,swarm);
 }
 #endif
 #ifdef SC64_SHARED_PROJECTILE_STAGE
