@@ -53,6 +53,23 @@ static void z6_reaver_retreat_regression(void)
     fprintf(stderr,"Reaver retreat regression: initial threat and moving-attacker safe-point invalidation PASS\n");
 }
 
+/* The carried policy deliberately admits hidden actor coordinates; the
+ * normal Z6 policy restricts them to currently visible cells. */
+static void z6_profile_target_policy_regression(void)
+{
+    const int x=32,y=32,cell=(x/16)+(y/16)*MAP_COLS;
+    int saved=SC64_GRID_GET(visible,cell);
+    SC64_GRID_SET(visible,cell,0);
+#ifdef SC64_Z7_RUNTIME
+    assert(z6_policy_target_visible(x,y));
+#else
+    assert(!z6_policy_target_visible(x,y));
+#endif
+    SC64_GRID_SET(visible,cell,1);
+    assert(z6_policy_target_visible(x,y));
+    SC64_GRID_SET(visible,cell,saved);
+}
+
 int main(void)
 {
     launch();
@@ -61,5 +78,6 @@ int main(void)
     controller_reachability_regression();
 #endif
     z6_reaver_retreat_regression();
+    z6_profile_target_policy_regression();
     return 0;
 }

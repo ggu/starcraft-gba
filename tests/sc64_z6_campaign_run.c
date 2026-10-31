@@ -160,6 +160,17 @@ static int owned_building_count(int type)
 {
     int n=0;for(int i=0;i<MAX_BUILDINGS;i++)n+=b[i].alive&&b[i].owner==SIDE&&b[i].type==type;return n;
 }
+/* Z7's carried controller uses the authored region's live actors. The normal
+ * Z6 controller instead scouts visible actors and the explored frontier. Both
+ * paths issue game actions only through controller inputs. */
+static int z6_policy_target_visible(int x,int y)
+{
+#ifdef SC64_Z7_RUNTIME
+    (void)x;(void)y;return 1;
+#else
+    return currently_visible(x,y);
+#endif
+}
 static int nearest_force2_in_region(int left,int top,int right,int bottom,int *out_x,int *out_y)
 {
     int ax=0,ay=0,n=0,best=0x7fffffff,bx=-1,by=-1;
@@ -167,18 +178,47 @@ static int nearest_force2_in_region(int left,int top,int right,int bottom,int *o
         ax+=u[i].x;ay+=u[i].y;++n;
     }
     if(n){ax/=n;ay/=n;}else{ax=(left+right)/2;ay=(top+bottom)/2;}
-    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].x>=left&&u[i].x<right&&
+    for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&z6_policy_target_visible(u[i].x,u[i].y)&&
+        u[i].x>=left&&u[i].x<right&&
         u[i].y>=top&&u[i].y<bottom&&
         sc64_z6_world_owner_matches(&race_z6_world,19,u[i].raw_owner,u[i].owner)>0){
         int d=dist2(ax,ay,u[i].x,u[i].y);if(d<best){best=d;bx=u[i].x;by=u[i].y;}
     }
-    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].x>=left&&b[i].x<right&&
+    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&z6_policy_target_visible(b[i].x,b[i].y)&&
+        b[i].x>=left&&b[i].x<right&&
         b[i].y>=top&&b[i].y<bottom&&
         sc64_z6_world_owner_matches(&race_z6_world,19,b[i].raw_owner,b[i].owner)>0){
         int d=dist2(ax,ay,b[i].x,b[i].y);if(d<best){best=d;bx=b[i].x;by=b[i].y;}
     }
+#ifndef SC64_Z7_RUNTIME
+    if(bx<0) {
+        /* Scout the explored frontier of the known objective region. */
+        int cx_goal=(left+right)/2,cy_goal=(top+bottom)/2;
+        for(int row=1;row<MAP_ROWS-1;row++)for(int col=1;col<MAP_COLS-1;col++) {
+            int x=col*16+8,y=row*16+8,idx=col+row*MAP_COLS;
+            if(x<left||x>=right||y<top||y>=bottom||!SC64_GRID_GET(explored,idx))continue;
+            if(SC64_GRID_GET(explored,idx-1)&&SC64_GRID_GET(explored,idx+1)&&
+               SC64_GRID_GET(explored,idx-MAP_COLS)&&SC64_GRID_GET(explored,idx+MAP_COLS))continue;
+            int d=dist2(x,y,cx_goal,cy_goal);
+            if(d<best){best=d;bx=x;by=y;}
+        }
+        if(bx<0){bx=cx_goal;by=cy_goal;}
+    }
+#endif
     if(bx<0)return 0;
     *out_x=bx;*out_y=by;return 1;
+}
+static int z6_policy_hero_structure(int hero,int x,int y)
+{
+#ifdef SC64_Z7_RUNTIME
+    (void)hero;(void)x;(void)y;return 0;
+#else
+    if(hero<0||dist2(u[hero].x,u[hero].y,x,y)>160*160)return 0;
+    for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&currently_visible(b[i].x,b[i].y)&&
+       b[i].x==x&&b[i].y==y&&
+       sc64_z6_world_owner_matches(&race_z6_world,19,b[i].raw_owner,b[i].owner)>0)return 1;
+    return 0;
+#endif
 }
 static int select_building_slot(int slot)
 {
@@ -999,7 +1039,8 @@ static int clear_force2_locations(void)
             }
             int final_building=-1;
             if(before<=1)for(int bi=0;bi<MAX_BUILDINGS;bi++)
-                if(b[bi].alive&&b[bi].x>=ll&&b[bi].x<rr&&b[bi].y>=tt&&b[bi].y<bb&&
+                if(b[bi].alive&&z6_policy_target_visible(b[bi].x,b[bi].y)&&
+                   b[bi].x>=ll&&b[bi].x<rr&&b[bi].y>=tt&&b[bi].y<bb&&
                    sc64_z6_world_owner_matches(&race_z6_world,19,b[bi].raw_owner,b[bi].owner)>0) {
                     /* Attack-move to an open cell beside the final building;
                      * its center is blocked terrain and can leave the whole
@@ -1020,7 +1061,9 @@ static int clear_force2_locations(void)
             for(int ei=0;ei<MAX_UNITS;ei++)
                 if(u[ei].alive&&u[ei].owner==SIDE&&u[ei].raw_type!=41&&u[ei].raw_type!=42&&
                    u[ei].raw_type!=51&&dist2(u[ei].x,u[ei].y,wx,wy)<=320*320)escort_near=1;
-            int hero_finish=loc==5&&before<=3&&!escort_near&&kerrigan()>=0;
+            int hero=kerrigan();
+            int hero_finish=loc==5&&!escort_near&&hero>=0&&
+                (before<=3||z6_policy_hero_structure(hero,wx,wy));
             if(hero_finish)
                 fprintf(stderr,"  no escort within 320px of final Force2 actors; Kerrigan finishes\n");
             if(before<=1&&!hero_finish) {
@@ -1043,7 +1086,7 @@ static int clear_force2_locations(void)
             }
             fprintf(stderr,"  focus Force2 target at%d,%d\n",wx,wy);
             if(hero_finish||!order_fresh_combat_group(1,wx,wy)) {
-                if(loc==5&&before<=3&&kerrigan()>=0) {
+                if(loc==5&&(before<=3||hero_finish)&&kerrigan()>=0) {
                     int hero=kerrigan();
                     if(!race_z6.cloak.active&&u[hero].carry>=80*256)(void)hero_cloak();
                     int px=0,py=0;
