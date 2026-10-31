@@ -1,6 +1,6 @@
 # Zero-offset contact experiment
 
-The measured prototype enabled `SC64_CONTACT_ZERO_OFFSET_REJECT` in the valid cached-candidate path. The final shared-path candidate applies the same rejection without that flag; its ROM identity must be verified before carrying the prototype evidence forward. After the existing collision, flight and burrow checks, a candidate at the mover's exact coordinates skips geometry only when speed is nonzero. The old squared distance is zero and all eight nonzero-speed steps have positive squared distance, so the existing non-increasing-distance predicate cannot add a blocked direction. Speed zero still uses the original geometry and may block; undescribable classes still use the original reference fallback. No memo key, invalidation, bucket, geometry table or storage limit changes. The final shared-path candidate remains subject to review and profile qualification.
+The measured prototype enabled `SC64_CONTACT_ZERO_OFFSET_REJECT` in the valid cached-candidate path. The final shared-path candidate applies the same rejection without that flag and produces the byte-identical measured Z7 ROM. After the existing collision, flight and burrow checks, a candidate at the mover's exact coordinates skips geometry only when speed is nonzero. The old squared distance is zero and all eight nonzero-speed steps have positive squared distance, so the existing non-increasing-distance predicate cannot add a blocked direction. Speed zero still uses the original geometry and may block; undescribable classes still use the original reference fallback. No memo key, invalidation, bucket, geometry table or storage limit changes. The final shared-path candidate passed the six profile links and default checks described below; review remains required.
 
 Measured source was `a3900a145bf7aa0979b0fc6e4873ba8470231be6`, based on `ec013c5`; source and generated inputs were frozen during tests and builds. The diagnostic distribution motivating the experiment is recorded on branch `codex/contact-geometry-diagnostic-20261101` at `619ffa0`.
 
@@ -16,7 +16,7 @@ The ON ROM ran the same physical-button strict trace through updates 50001–509
 | Update | 1,444,042.07 / 3,460,279 | 1,417,242.11 / 3,428,525 |
 | Orders | 846,134.31 / 2,854,556 | 819,447.50 / 2,828,578 |
 
-Mean main-loop cycles decreased 1.73%, while p95 increased 0.26%; update and orders means decreased 1.86% and 3.15%. Stage counters may overlap. This one bounded emulator window is not hardware FPS or full-mission evidence. The later full WIN and fresh-process save/resume result is recorded below; cross-mode oracles and product qualification remain required before adoption.
+Mean main-loop cycles decreased 1.73%, while p95 increased 0.26%; update and orders means decreased 1.86% and 3.15%. Stage counters may overlap. This one bounded emulator window is not hardware FPS or full-mission evidence. The later full WIN and fresh-process save/resume result and the six guarded profile links are recorded below; these do not substitute for unsampled full-state or hardware evidence.
 
 Local ON result `/tmp/contact-zero-candidate-50000-20261101/result.json` SHA-256 `a8d180ae7438269b28db593fbd73b924dfb8cd59caf26c86c445064e3424d8a7`, samples SHA-256 `d0c5e2ef500f86703c377cc77a52f1dbfddbacc4090d4cf437592df722c70769`; baseline result `/tmp/contact-capacity-base-50000-20261101/result.json` SHA-256 `d3d79f8e1ce2a13a3a76209b2cac51e92ea0069fdcc94f9547a46d16635a41fa`. Replay script SHA-256 `9870ea6fbeb8489a87604ac3ad12d8089263c6edc428f2eb18ad7d2b13f73004`; lock wrapper `32851d347eb140a79c8040d7a9beff6cde3da3f1a41f0c001c2fe29d7ba97141`. Dense-oracle report SHA-256 `b4a41a4a4844f20b58d591dd68bc73e3d8c6c5b509e69cf46a416657b28a0198`. Temporary evidence and private inputs are not committed.
 
@@ -28,7 +28,7 @@ The local stage receipt `/tmp/contact-zero-full-physical-result.json` hashes to 
 
 ## Comparable full-run baseline
 
-The retained baseline `/tmp/sc64-z7-promotion-resume-cut12/result.json` and candidate resume both ran 179753 updates with 302 checkpoints. The baseline recorded 396,688,290,660 cycles (mean 2,206,852.13, peak 50,561,315); the candidate recorded 392,804,393,848 (mean 2,185,245.27, peak 50,583,602): mean cycles fell about 0.979%, while the peak rose slightly. Both exported save files have SHA-256 `a9707ae835c65ec35be1b32ee6946ab2796940e79ebd0b3a2b5db4a50a52e32b`. These emulator counters and checkpoint samples do not establish hardware FPS or full-array equivalence.
+The retained baseline `/tmp/sc64-z7-promotion-resume-cut12/result.json` and candidate resume both ran 179753 updates with 302 checkpoints. The baseline recorded 396,688,290,660 cycles (mean 2,206,852.13, peak 50,561,315); the candidate recorded 392,804,393,848 (mean 2,185,245.27, peak 50,583,602): mean cycles fell about 0.979%, while the peak rose slightly. All 302 named observations matched after excluding the timing counters. Both exported save files have SHA-256 `a9707ae835c65ec35be1b32ee6946ab2796940e79ebd0b3a2b5db4a50a52e32b`. These emulator counters and checkpoint samples do not establish hardware FPS or full-array equivalence.
 
 ## Shared-path profile links
 
@@ -44,3 +44,9 @@ After the promotion merge `bdd306b90676347d76f43cb32f64735c2ec843ad`, the uncond
 | Showcase | `02036fe8` | `03004cc0` |
 
 The link receipt is `/tmp/contact-zero-final-matrix-20261101/result.json`. All 109 pinned inputs and five prepared sidecars were checked under the shared lock before and after the links, with over 2 GiB free.
+
+## Final source checks
+
+At exact source `aacad172a44442d45daab2a8416f0e1b41bb55fc`, an isolated unprepared checkout passed `python3 tools/check_source_tree.py`, `./dev doctor`, `./dev build` and `./dev test`; Python discovery reported 925 tests and 25 skips. The receipt `/tmp/contact-zero-unprepared-suite-20261101/result.json` hashes to `1805d5139f01c7fd24da48ce2c7800b8f55e12e50cc50ae436d54d43fac62b9a`.
+
+A separate run in the partially prepared build workspace failed three optional renderer roster dry-run subtests because `.local/sc64/backwater/generated/palette-remap.bin` was absent. The same three failures, with the same missing dependency, were reproduced on unchanged merged baseline `bdd306b` with the same 109 pinned inputs and five sidecars. The baseline targeted log `/tmp/contact-zero-bdd-optional.log` hashes to `64d27bff694643da829eb6ed8d79c62a6eebfce4696454dedbbc6f1bf153411f`. Neither the missing input nor the failures were hidden or treated as a pass.
