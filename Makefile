@@ -6111,3 +6111,5 @@ include tests/carrier-fixtures/Makefile
 include tests/terrain-storage/Makefile
 
 include tests/p8-condition/Makefile
+
+include tests/sc64-z8-clock/Makefile
