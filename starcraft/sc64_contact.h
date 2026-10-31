@@ -595,6 +595,11 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
                 if (sc64_contact_burrowed(c, cc, p6)) continue;
                 if (radius < mover_radius) radius = mover_radius;
                 ox = c->x - q->x; oy = c->y - q->y;
+#ifdef SC64_CONTACT_ZERO_OFFSET_REJECT
+                /* For nonzero speed every step is farther than the current
+                 * zero distance. Keep speed zero and invalid-class fallback. */
+                if (speed != 0 && ox == 0 && oy == 0) continue;
+#endif
                 /* No offset moves the mover closer than |o| - speed. */
                 limit_axis = radius + speed;
                 if (ox <= -limit_axis || ox >= limit_axis ||
