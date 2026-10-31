@@ -137,9 +137,35 @@ static void exercise(int cx,int cy,int id)
     for(int j=0;j<30;j++){int sx=(int)(rnd()%(u32)MAP_COLS),sy=(int)(rnd()%(u32)MAP_ROWS);depot_query(sx,sy,cx,cy,id);}
     (void)sc64_route_depot_slot(id,cx,cy); check_depot_field(id);
 }
+#if defined(SC64_ROUTE_NEW_CELL) && !defined(SC64_ROUTE_ACTIVE_STRIDE)
+static void depot_field_canaries(void)
+{
+    memset(path_walkable,1,sizeof(path_walkable));reset();
+    memset(sc64_route_field,0x5a,sizeof(sc64_route_field));
+    memcpy(saved_grid,path_walkable,sizeof(saved_grid));
+    int slot=sc64_route_depot_slot_for_origin(7,MAP_COLS*8,MAP_ROWS*8,-1);
+    assert(slot>=0 && slot<SC64_ROUTE_ACTIVE_SLOTS);
+    assert(!memcmp(saved_grid,path_walkable,sizeof(saved_grid)));
+    for(int i=0;i<SC64_ROUTE_ACTIVE_SLOTS;i++)if(i!=slot)
+        for(unsigned j=0;j<SC64_ROUTE_BYTES;j++)assert(sc64_route_field[i][j]==0x5a);
+    make_bfs(MAP_COLS*8,MAP_ROWS*8,-1);check_depot_field(7);
+}
+#endif
+
 int main(void)
 {
     geometry_test();
+#if defined(SC64_ROUTE_NEW_CELL) && !defined(SC64_ROUTE_ACTIVE_STRIDE)
+    depot_field_canaries();
+#endif
+#if defined(SC64_ROUTE_NEW_CELL) && defined(SC64_ROUTE_ACTIVE_STRIDE)
+    { int before=path_grid_valid;
+      fixture_cols=0;fixture_rows=64;path_grid_valid=0;
+      assert(sc64_route_depot_slot_for_origin(0,0,0,-1)==-1 && !path_grid_valid);
+      fixture_cols=129;fixture_rows=128;
+      assert(sc64_route_depot_slot_for_origin(0,0,0,-1)==-1 && !path_grid_valid);
+      fixture_cols=64;fixture_rows=64;path_grid_valid=before; }
+#endif
     { int before=path_grid_valid; path_grid_valid=0;
       assert(sc64_route_depot_slot_for_origin(0,0,0,-2)==-1 && path_grid_valid==0);
       assert(sc64_route_depot_slot_for_origin(0,0,0,MAP_COLS*MAP_ROWS)==-1 && path_grid_valid==0);
