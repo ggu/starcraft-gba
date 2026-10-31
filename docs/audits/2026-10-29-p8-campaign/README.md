@@ -496,3 +496,10 @@ binding override was cleared both after explicit rejection of the newer
 candidate and after successful fallback. Namespace staging remains restricted
 to its supported skirmish scope; this is not a P8 campaign namespace test.
 The earlier guest replay and the documented P8 admission holds are unchanged.
+
+Independent source review of the combined preflight wrapper found no concrete
+blocker for this candidate checkpoint: both ordinary load and each staged
+candidate prepare use unconditional binding cleanup. The current host receipts,
+normal ARM verification and source-boundary result were inspected separately.
+This does not promote P8, establish all-four-product integration or replace the
+older custom guest replay with a current normal-ROM campaign replay.
