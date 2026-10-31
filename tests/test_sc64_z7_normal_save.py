@@ -129,6 +129,62 @@ class SaveTest(unittest.TestCase):
         with self.assertRaises(ValueError): save.validate_journal(image,(161,fields),10)
         with self.assertRaises(ValueError): save.validate_journal(image,layout,11)
 
+    def test_transport1_campaign_journal_is_explicit_and_strict(self):
+        from sc64_races_profile import DwarfOffsets
+        fields = DwarfOffsets({'version': 0, 'state': 8}, {'version': 4}, {}, {'state': (32,4,True)})
+        layout = (160, fields)
+        base = bytearray(160)
+        struct.pack_into('<I', base, 0, save.CANONICAL_Z7_EGG_TAG)
+        struct.pack_into('<i', base, 16, 18)
+        struct.pack_into('<i', base, 36, 10)
+
+        def record(body, tag=save.TRANSPORT1_Z7_TAG, sequence=1):
+            checksum = 2166136261
+            for byte in body: checksum = ((checksum ^ byte) * 16777619) & 0xffffffff
+            result = bytearray(b'\xff' * 32768)
+            result[:16] = struct.pack('<4I', tag, len(body), checksum, sequence)
+            result[16:16+len(body)] = body
+            return result
+
+        body = base + bytes(16)
+        image = record(body)
+        journal = save.validate_journal(image, layout, 10, 'transport1')
+        self.assertEqual((journal['tag'], journal['payload_bytes'], journal['save_format']),
+                         (0x57435a54, 176, 'transport1'))
+        with self.assertRaises(ValueError): save.validate_journal(image, layout, 10)
+        legacy = record(base, tag=save.CANONICAL_Z7_EGG_TAG)
+        self.assertEqual(save.validate_journal(legacy, layout, 10)['save_format'], 'legacy')
+        with self.assertRaises(ValueError): save.validate_journal(legacy, layout, 10, 'transport1')
+        with self.assertRaises(ValueError): save.validate_journal(image, layout, 10, 'unknown')
+        with self.assertRaises(ValueError): save.validate_journal(record(body, sequence=2), layout, 10, 'transport1')
+        with self.assertRaises(ValueError): save.validate_journal(record(body, tag=0x57435a55), layout, 10, 'transport1')
+        # Extra impact bytes and a nonzero campaign trailer are refused, even
+        # when the journal checksum itself is correct.
+        with self.assertRaises(ValueError): save.validate_journal(record(base + bytes(4) + bytes(16)), layout, 10, 'transport1')
+        with self.assertRaises(ValueError): save.validate_journal(record(base + b'\x01' + bytes(15)), layout, 10, 'transport1')
+        changed = bytearray(body); struct.pack_into('<I', changed, 0, save.TRANSPORT1_Z7_TAG)
+        with self.assertRaises(ValueError): save.validate_journal(record(changed), layout, 10, 'transport1')
+        for off in (8, 16, 36):
+            changed = bytearray(body); changed[off] ^= 1
+            with self.subTest(field=off), self.assertRaises(ValueError):
+                save.validate_journal(record(changed), layout, 10, 'transport1')
+        changed = image.copy(); changed[16 + 159] ^= 1
+        with self.assertRaisesRegex(ValueError, 'checksum'): save.validate_journal(changed, layout, 10, 'transport1')
+        changed = image.copy(); changed[16384] = 0
+        with self.assertRaisesRegex(ValueError, 'second SRAM slot'): save.validate_journal(changed, layout, 10, 'transport1')
+        with self.assertRaises(ValueError): save.validate_journal(image, (16353, fields), 10, 'transport1')
+        with self.assertRaises(ValueError): save.validate_journal(image, layout, 11, 'transport1')
+
+    def test_cli_passes_explicit_save_format_and_defaults_to_legacy(self):
+        argv = ['replay', '--trace', 't', '--rom', 'r', '--elf', 'e', '--runner', 'b', '--output', 'o']
+        with patch.object(sys, 'argv', argv), patch.object(replay, 'run') as run:
+            replay.main(); self.assertEqual(run.call_args.args[-1], 'legacy')
+        with patch.object(sys, 'argv', argv + ['--save-format', 'transport1']), patch.object(replay, 'run') as run:
+            replay.main(); self.assertEqual(run.call_args.args[-1], 'transport1')
+        with patch.object(sys, 'argv', argv + ['--save-format', 'unexpected']), patch.object(replay, 'run') as run:
+            with self.assertRaises(SystemExit): replay.main()
+            run.assert_not_called()
+
     def test_second_slot_and_provenance_are_fail_closed(self):
         from sc64_races_profile import DwarfOffsets
         fields=DwarfOffsets({'version':0,'state':8},{'version':4},{},{'state':(32,4,True)})

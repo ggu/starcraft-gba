@@ -187,7 +187,9 @@ def timing_delta(before, after, updates):
             'scope':'emulated main-loop work including presentation waits and UI; not physical-device FPS'}
 
 
-def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_input=None, saved_state=None, cut=None, physical=False):
+def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_input=None, saved_state=None, cut=None, physical=False, save_format='legacy'):
+    if save_format not in save.SAVE_FORMATS:
+        raise ValueError('unsupported Z7 save format')
     if export_save and (save_input or saved_state or stop is not None):
         raise ValueError('save export requires a cut, without resume or prefix options')
     if bool(save_input) != bool(saved_state) or (save_input and (export_save or stop is not None)):
@@ -198,6 +200,8 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
     before=input_hashes(inputs)
     provenance={name:before[str(path.resolve())] for name,path in
                 zip(('trace','rom','elf','runner'),(trace,rom,elf,runner))}
+    # Preserve old legacy summary provenance while binding the new namespace.
+    if save_format != 'legacy': provenance['save_format'] = save_format
     plan,pages=build_plan(trace,cut if export_save else stop)
     if cut is not None: save.validate_cut(plan,cut)
     original_stop=plan['stop']
@@ -237,7 +241,7 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
             raise ValueError('saved summary has wrong cut')
         save.verify_provenance(seed_summary,{**provenance,'save':before[str(save_input.resolve())]})
         save.verify_cut_summary(seed_summary,plan['observations'][cut],cut,2)
-        save.validate_journal(save_input.read_bytes(),save_layout,seed_summary['world']['frame'])
+        save.validate_journal(save_input.read_bytes(),save_layout,seed_summary['world']['frame'],save_format)
     def sample_snapshot(rsp,sym,sizes): return snapshot(rsp,sym,sizes,layouts)
     output.mkdir(parents=True,exist_ok=False)
     proc=rsp=log=None; records=[]
@@ -309,7 +313,7 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
             rsp.export_sram()
             if not (output/'saved.sav').is_file() or (output/'saved.sav').stat().st_size != 32768:
                 raise RuntimeError('SRAM export is missing or incomplete')
-            journal=save.validate_journal((output/'saved.sav').read_bytes(),save_layout,sample['world']['frame'])
+            journal=save.validate_journal((output/'saved.sav').read_bytes(),save_layout,sample['world']['frame'],save_format)
             sample['provenance']={**provenance,'save':hashlib.sha256((output/'saved.sav').read_bytes()).hexdigest()}
             (output/'saved-state.json').write_text(json.dumps(sample,indent=2)+'\n')
         full=bool(save_input) or (not export_save and stop==plan['stop'])
@@ -337,8 +341,10 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     for name in ('trace','rom','elf','runner','output'):ap.add_argument('--'+name,type=Path,required=True)
     ap.add_argument('--stop',type=int); ap.add_argument('--cut',type=int)
+    ap.add_argument('--save-format',choices=save.SAVE_FORMATS,default='legacy',
+                    help='Explicit journal namespace; transport1 accepts only the zero-impact campaign trailer')
     ap.add_argument('--physical',action='store_true',help='Use emulator buttons; supports release ROMs without scheduler symbols')
     ap.add_argument('--export-save',action='store_true'); ap.add_argument('--save-input',type=Path); ap.add_argument('--saved-state',type=Path)
-    a=ap.parse_args();run(a.trace,a.rom,a.elf,a.runner,a.output,a.stop,a.export_save,a.save_input,a.saved_state,a.cut,a.physical)
+    a=ap.parse_args();run(a.trace,a.rom,a.elf,a.runner,a.output,a.stop,a.export_save,a.save_input,a.saved_state,a.cut,a.physical,a.save_format)
 
 if __name__=='__main__':main()
