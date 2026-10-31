@@ -119,3 +119,13 @@ Defiler. This conservative guard is not a permanent save solution and does not
 change normal products where the gate is off. The actual-engine sanitizer
 fixture verifies this rejection. The normal UI/order, source-accurate facing,
 projectile scheduling and end-to-end continuation remain unimplemented.
+
+Source spell readiness also checks weapon range, movement and simulation
+heading against the weapon attack angle before the debit. The existing
+`sc64_facing` state is explicitly presentation-only, reconstructed after load,
+and cannot be used as proof of that simulation heading. A correct shared order
+needs a source-backed heading and interruption model, along with ownership of
+its bounded pending state; the four-bit save-order slots are already occupied.
+The guarded caster-save refusal above must also cover any active field when
+field storage is introduced. These are unresolved integration requirements,
+not completed casting support.
