@@ -14,7 +14,7 @@ from sc64_weapon_lookup_index import validate_output
 from sc64_walk_pair import verify as verify_walk_pair
 
 # Hot ground actors only; every other actor continues to use its original pose.
-DEFAULT_UNITS = (0, 32, 37, 38, 41, 65)
+DEFAULT_UNITS = (0, 37, 38, 41, 42, 43, 65)
 MANAGED_MARKER = "/* Managed private walk-word sidecars v1; do not commit. */\n"
 
 
