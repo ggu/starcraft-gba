@@ -379,6 +379,66 @@ static int queue_probe(void)
     return 1;
 }
 
+/* Controller policy: attempt one idle, empty Probe using only normal input.
+ * Resource choice sees only currently visible nonempty patches and a
+ * read-only walkability snapshot. No worker order is assigned directly. */
+static int assign_idle_probe_to_minerals(void)
+{
+    static const int dx[4] = {1, -1, 0, 0}, dy[4] = {0, 0, 1, -1};
+    static u8 seen[MAP_CELLS];
+    static int queue[MAP_CELLS];
+    int worker = -1, home = -1, best = 0x7fffffff;
+    int patch = -1, patch_distance = 0x7fffffff, head = 0, tail = 0;
+    if (!path_grid_valid) return 0;
+    for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
+        u[i].type == U_PROBE && u[i].order == ORDER_IDLE && !u[i].carry) {
+        for (int j = 0; j < MAX_BUILDINGS; ++j) if (b[j].alive &&
+            b[j].owner == SIDE && b[j].type == B_NEXUS && building_complete(j)) {
+            int d = dist2(u[i].x, u[i].y, b[j].x, b[j].y);
+            if (d < best) { best = d; worker = i; home = j; }
+        }
+    }
+    if (worker < 0 || home < 0) return 0;
+    int start = limit(u[worker].x / 16, 0, MAP_COLS - 1) +
+                limit(u[worker].y / 16, 0, MAP_ROWS - 1) * MAP_COLS;
+    memset(seen, 0, sizeof(seen)); seen[start] = 1; queue[tail++] = start;
+    while (head < tail) {
+        int cell = queue[head++], x = cell % MAP_COLS, y = cell / MAP_COLS;
+        for (int k = 0; k < 4; ++k) {
+            int nx = x + dx[k], ny = y + dy[k];
+            if (nx < 0 || ny < 0 || nx >= MAP_COLS || ny >= MAP_ROWS) continue;
+            int next = nx + ny * MAP_COLS;
+            if (seen[next] || !SC64_GRID_GET(path_walkable, next)) continue;
+            seen[next] = 1; queue[tail++] = next;
+        }
+    }
+    for (int i = 0; i < MAX_MINERALS; ++i) {
+        if (!currently_visible(m[i].x, m[i].y) || m[i].amount <= 0) continue;
+        int px = m[i].x / 16, py = m[i].y / 16, reachable = 0;
+        for (int y = py - 1; y <= py + 1; ++y)
+            for (int x = px - 1; x <= px + 1; ++x)
+                if (x >= 0 && y >= 0 && x < MAP_COLS && y < MAP_ROWS &&
+                    seen[x + y * MAP_COLS]) reachable = 1;
+        int d = dist2(u[worker].x, u[worker].y, m[i].x, m[i].y);
+        if (reachable && d < patch_distance) { patch_distance = d; patch = i; }
+    }
+    if (patch < 0 || !normalize_field() || !clear_selected_building() ||
+        !move_cursor(u[worker].x - 4, u[worker].y - 4)) return 0;
+    /* Tiny UI drag clears prior selection and attempts just this worker.
+     * A cluster can select more than one; in that case issue no order. */
+    input(KEY_L); input(KEY_L | KEY_RIGHT | KEY_DOWN);
+    input(KEY_L | KEY_RIGHT | KEY_DOWN); input(0);
+    if (selected_count() != 1 || !u[worker].selected || !u[worker].alive ||
+        u[worker].order != ORDER_IDLE || u[worker].carry) return 0;
+    if (!move_cursor(m[patch].x, m[patch].y)) return 0;
+    KEY_TAP(KEY_A);
+    if (!u[worker].alive || u[worker].order != ORDER_MINE ||
+        u[worker].target != patch) return 0;
+    fprintf(trace, "{\"kind\":\"economy\",\"frame\":%u,\"action\":\"assign-idle-mineral\",\"worker\":%d,\"patch\":%d,\"home\":%d}\n",
+            (unsigned)frame, worker, patch, home);
+    return 1;
+}
+
 static int assign_gas_worker(void)
 {
     int refinery=-1,gas_workers=0,worker=-1;
@@ -522,11 +582,15 @@ int main(int argc,char **argv)
 
     unsigned next_checkpoint=1000;
     int locked_target_owner=-1;
-    int last_order=-10000,next_probe=300,next_gas=5000,next_production=5500,next_build=7000,next_pylon=5000;
+    int last_order=-10000,next_probe=300,next_gas=5000,next_production=5500,next_build=7000,next_pylon=5000,next_mineral=600;
     while(host_tick<RUN_LIMIT&&screen==SCREEN_PLAY&&!won&&!lost){
         if(frame>=next_probe&&probe_count()<10){
             (void)queue_probe();
             next_probe=frame+600;
+        }
+        if (frame >= next_mineral) {
+            (void)assign_idle_probe_to_minerals();
+            next_mineral = frame + 600;
         }
         if(frame>=next_gas){
             (void)assign_gas_worker();
