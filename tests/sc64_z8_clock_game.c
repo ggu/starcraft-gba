@@ -70,7 +70,11 @@ int main(void)
 {
     /* Observe the authored camera action rather than fabricating its wait. */
     launch_z8_from_normal_menu();
-    for (int i = 0; i < 2000 && !race_z8_camera_release; ++i) input(0);
+    for (int i = 0; i < 2000 && !race_z8_camera_release; ++i) {
+        assert(screen == SCREEN_PLAY);
+        input(0);
+        assert(race_z8_sched.frames == (u32)(4u * (unsigned)frame / 5u));
+    }
     assert(race_z8_camera_release);
     {
         unsigned prior = (unsigned)frame;
@@ -86,7 +90,13 @@ int main(void)
         u32 expected;
         launch_z8_from_normal_menu();
         for (int i = 0; i < 120; ++i) input(0);
-        while ((unsigned)frame % 5u != phase || race_z8_camera_release) input(0);
+        for (int i = 0; i < 20 &&
+             ((unsigned)frame % 5u != phase || race_z8_camera_release); ++i) {
+            assert(screen == SCREEN_PLAY);
+            input(0);
+        }
+        assert(screen == SCREEN_PLAY && (unsigned)frame % 5u == phase &&
+               !race_z8_camera_release);
         press(KEY_START);
         assert(screen == SCREEN_PAUSE);
         unsigned paused_frame = (unsigned)frame;
