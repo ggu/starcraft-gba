@@ -20,14 +20,14 @@ def z7_trace(final_kind="won"):
     timers[1] = 1
     events.append({"kind": "start", "host_tick": 12, "frame": 1,
                    "screen": 1, "won": 0, "lost": 0, "outcome": 0,
-                   "started": 2, "fired": 2, "action_cursors": starts,
+                   "started": 2, "action_cursors": starts,
                    "action_ticks": timers, "switch10": 0, "ai_script_mask": 0,
                    "ai_plan_ticks": 0, "ai_plan_phase": 0, "fault": 0,
                    "side_units": 4, "side_buildings": 0, "enemy_units": 93,
                    "enemy_buildings": 57, "workers": 4})
     checkpoint = {"kind": "checkpoint", "host_tick": 300, "frame": 289,
                   "screen": 1, "won": 0, "lost": 0, "outcome": 0,
-                  "started": 2, "fired": 2, "action_cursors": [0] * 8,
+                  "started": 2, "action_cursors": [0] * 8,
                   "action_ticks": [0] * 8, "switch10": 0, "ai_script_mask": 0,
                   "ai_plan_ticks": 0, "ai_plan_phase": 0, "fault": 0}
     events.append(checkpoint)
@@ -36,7 +36,7 @@ def z7_trace(final_kind="won"):
              "screen": 3 if final_kind in ("won", "lost") else 1,
              "won": int(final_kind == "won"), "lost": int(final_kind == "lost"),
              "outcome": 1 if final_kind == "won" else 2 if final_kind == "lost" else 0,
-             "started": started, "fired": started, "action_cursors": [0] * 8,
+             "started": started, "action_cursors": [0] * 8,
              "action_ticks": [0] * 8, "switch10": 1, "ai_script_mask": 0,
              "ai_plan_ticks": 0, "ai_plan_phase": 0, "fault": 0,
              "side_units": 0, "side_buildings": 1 if final_kind == "won" else 0,
@@ -48,6 +48,18 @@ def z7_trace(final_kind="won"):
 
 
 class Z7TraceTests(unittest.TestCase):
+    def test_legacy_fired_alias_is_optional_and_must_match(self):
+        trace = z7_trace()
+        self.assertNotIn("fired", trace["events"][-1])
+        replay.validate_trace(trace, 240, "zerg-z7")
+        for row in trace["events"]:
+            if "started" in row:
+                row["fired"] = row["started"]
+        replay.validate_trace(trace, 240, "zerg-z7")
+        trace["events"][-1]["fired"] ^= 1
+        with self.assertRaisesRegex(ValueError, "legacy fired alias"):
+            replay.validate_trace(trace, 240, "zerg-z7")
+
     def test_seventh_entry_route_and_source_start_are_checked(self):
         plan = replay.validate_trace(z7_trace(), 240, "zerg-z7")
         self.assertEqual(plan["start"]["host_tick"], 12)
@@ -66,7 +78,6 @@ class Z7TraceTests(unittest.TestCase):
         # Trigger 4's first action is a 300-tick wait, but its second action
         # sets switch 10 and is a one-tick operation.
         bad["events"][12]["started"] |= 1 << 4
-        bad["events"][12]["fired"] = bad["events"][12]["started"]
         bad["events"][12]["action_cursors"][4] = 2
         bad["events"][12]["action_ticks"][4] = 2
         with self.assertRaisesRegex(ValueError, "cursor/timer 4"):
@@ -136,7 +147,6 @@ class Z7TraceTests(unittest.TestCase):
     def test_limited_attempt_stays_live_and_runtime_faults_never_qualify(self):
         limited = z7_trace("limit")
         limited["events"][-1]["started"] = 2
-        limited["events"][-1]["fired"] = 2
         replay.validate_trace(limited, 240, "zerg-z7", attempt_prefix=True,
                               prefix_ticks=310)
         limited["events"][-1]["outcome"] = 1
@@ -162,12 +172,10 @@ class Z7TraceTests(unittest.TestCase):
             replay.validate_trace(bad, 240, "zerg-z7")
         bad = copy.deepcopy(trace)
         bad["events"][-1]["started"] |= 1
-        bad["events"][-1]["fired"] = bad["events"][-1]["started"]
         with self.assertRaisesRegex(ValueError, "terminal cursors"):
             replay.validate_trace(bad, 240, "zerg-z7")
         bad = copy.deepcopy(trace)
         bad["events"][-1]["started"] |= 1 << 4
-        bad["events"][-1]["fired"] = bad["events"][-1]["started"]
         bad["events"][-1]["action_cursors"][4] = 1
         bad["events"][-1]["action_ticks"][4] = 100
         with self.assertRaisesRegex(ValueError, "completed victory trigger"):
@@ -191,7 +199,7 @@ class Z7TraceTests(unittest.TestCase):
         layout = (36, runtime_fields)
         model = (12, model_fields)
         decoded = replay.decode_runtime(bytes(raw), layout, model, "zerg-z7")
-        self.assertEqual(decoded["model"], {"started": 2, "fired": 2,
+        self.assertEqual(decoded["model"], {"started": 2,
                                              "outcome": 0, "action_cursor": [0] * 8})
         self.assertEqual(decoded["action_ticks"], [1] + [0] * 7)
         self.assertEqual(decoded["persistent_bytes"], list(raw))
@@ -258,8 +266,8 @@ class Z7TraceTests(unittest.TestCase):
 
     def test_final_verification_uses_source_owner_censuses_and_allows_enemy_units(self):
         trace = z7_trace()["events"][-1]
-        trace.update({"frame": 389, "started": 6, "fired": 6})
-        runtime = {"model": {"outcome": 1, "started": 6, "fired": 6,
+        trace.update({"frame": 389, "started": 6})
+        runtime = {"model": {"outcome": 1, "started": 6,
                              "action_cursor": [0] * 8},
                    "action_ticks": [0] * 8, "switch10": 1,
                    "ai_script_mask": 0, "ai_plan_ticks": 0, "ai_plan_phase": 0,
