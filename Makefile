@@ -5778,3 +5778,33 @@ endef
 $(eval $(call SCARAB_PREPARED_FIXTURE,unit-adapter,unit_adapter))
 $(eval $(call SCARAB_PREPARED_FIXTURE,presence,presence))
 $(eval $(call SCARAB_PREPARED_FIXTURE,save,save))
+
+# Opt-in actual-codec Scarab journal checks. Consume only already-prepared
+# inputs: no extraction/generation rules are prerequisites of these targets.
+# Each P7 run generates its own source-only roster facts in a new run folder.
+define SCARAB_CROSS_FIXTURE
+.PHONY: test-scarab-cross-$(1)
+test-scarab-cross-$(1):
+	@set -eu; \
+	mkdir -p build/generated/scarab-cross; \
+	run=$$$$(mktemp -d build/generated/scarab-cross/$(1).XXXXXX); \
+	printf 'Scarab cross-codec receipts: %s\n' "$$$$run"; \
+	$(if $(filter protoss,$(1)),$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Istarcraft -DSC64_SCARAB_RUNTIME $(SCARAB_P7_BASE_FLAGS) tools/sc64_fact_tables_gen.c -o "$$$$run/facts"; "$$$$run/facts" > "$$$$run/sc64_fact_tables_generated.h",:); \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable $(2) tests/sc64_scarab_cross_codec_old_fresh.c tests/sc64_yamato_host_sram_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(4) -o "$$$$run/old"; \
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wno-unused-function -Wno-unused-variable -DSC64_SCARAB_RUNTIME -DSC64_SCARAB_NAMESPACE_STAGE $(3) tests/sc64_scarab_cross_codec_fresh.c tests/sc64_yamato_host_sram_shim.c $(filter-out starcraft/game.c,$(STARCRAFT)) $(4) -o "$$$$run/new"; \
+	for map in 0 1; do \
+	  fresh="$$$$run/fresh-$$$$map.sram"; mixed="$$$$run/mixed-$$$$map.sram"; \
+	  "$$$$run/new" write "$$$$fresh" "$$$$map"; \
+	  cp "$$$$fresh" "$$$$run/before-reject-$$$$map.sram"; \
+	  "$$$$run/new" reject-outside "$$$$fresh" "$$$$map"; cmp "$$$$fresh" "$$$$run/before-reject-$$$$map.sram"; \
+	  "$$$$run/new" complete "$$$$fresh" "$$$$map"; "$$$$run/new" verify "$$$$fresh" "$$$$map"; \
+	  "$$$$run/old" "$$$$mixed" "$$$$map"; "$$$$run/new" write-over-old "$$$$mixed" "$$$$map"; \
+	  "$$$$run/new" corrupt "$$$$mixed" "$$$$map"; cp "$$$$mixed" "$$$$run/before-fallback-$$$$map.sram"; \
+	  "$$$$run/new" fallback-old "$$$$mixed" "$$$$map"; cmp "$$$$mixed" "$$$$run/before-fallback-$$$$map.sram"; \
+	done
+endef
+$(eval $(call SCARAB_CROSS_FIXTURE,zerg,$(ZERG_ROM_FLAGS),$(ZERG_ROM_FLAGS),))
+$(eval $(call SCARAB_CROSS_FIXTURE,protoss,$(PROTOSS_ROM_FLAGS),$(SCARAB_P7_BASE_FLAGS) -DSC64_FACT_TABLES -I"$$$$run",$(P7_INTERCEPTOR_FLIGHT_SOURCES)))
+$(eval $(call SCARAB_CROSS_FIXTURE,showcase,$(SHOWCASE_FLAGS),$(SHOWCASE_FLAGS),))
+.PHONY: test-scarab-cross-codecs
+test-scarab-cross-codecs: test-scarab-cross-zerg test-scarab-cross-protoss test-scarab-cross-showcase

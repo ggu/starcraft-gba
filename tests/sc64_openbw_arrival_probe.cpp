@@ -96,7 +96,7 @@ int main(int argc,char **argv){
    shot->current_velocity_direction=direction_t::from_raw(0);
   }
   if(scenario=="initfail") {
-   auto hp=victim->hp.raw_value;bool exhausted=false,saw_arrival=false;
+   auto hp=victim->hp.raw_value;bool exhausted=false,saw_arrival=false,saw_die=false;
    for(int i=0;i<100;i++) {
     if(!exhausted && shot->order_type && shot->order_type->id==Orders::ScarabAttack &&
        shot->order_state==2 && api.unit_target_in_range(shot,victim,32)) {
@@ -109,16 +109,17 @@ int main(int argc,char **argv){
     }
     api.next_frame();
     if(shot->order_type&&shot->order_type->id==Orders::ScarabAttack&&shot->order_state==6)saw_arrival=true;
+    if(shot->order_type&&shot->order_type->id==Orders::Die)saw_die=true;
     for(const bullet_t *bullet:ptr(world->active_bullets))if(bullet->weapon_type&&(int)bullet->weapon_type->id==82)
        throw std::runtime_error("weapon82 allocated after image/sprite failure");
     if(victim->hp.raw_value!=hp)throw std::runtime_error("initialization failure damaged victim");
     if(exhausted && saw_arrival && i>25)break;
    }
-   if(!exhausted||!saw_arrival)throw std::runtime_error("initialization-failure setup or arrival not reached");
-   std::cout<<"result scenario=initfail no weapon82 and no victim damage\n";return 0;
+   if(!exhausted||!saw_arrival||!saw_die || parent->reaver.inside_count || parent->reaver.outside_count)throw std::runtime_error("initialization failure did not consume the released child");
+   std::cout<<"result scenario=initfail no weapon82 or damage; child consumed\n";return 0;
   }
   if(scenario=="poolfull") {
-   auto hp=victim->hp.raw_value;bool saturated=false,saw_arrival=false;
+   auto hp=victim->hp.raw_value;bool saturated=false,saw_arrival=false,saw_die=false;
    for(int i=0;i<100;i++) {
     if(!saturated && shot->order_type && shot->order_type->id==Orders::ScarabAttack &&
        shot->order_state==2 && api.unit_target_in_range(shot,victim,32)) {
@@ -129,13 +130,14 @@ int main(int argc,char **argv){
     }
     api.next_frame();
     if(shot->order_type&&shot->order_type->id==Orders::ScarabAttack&&shot->order_state==6)saw_arrival=true;
+    if(shot->order_type&&shot->order_type->id==Orders::Die)saw_die=true;
     for(const bullet_t *bullet:ptr(world->active_bullets))if(bullet->weapon_type&&(int)bullet->weapon_type->id==82)
        throw std::runtime_error("weapon82 allocated despite pool-full test");
     if(victim->hp.raw_value!=hp)throw std::runtime_error("pool-full attack damaged victim");
     if(saturated && saw_arrival && i>25)break;
    }
-   if(!saturated||!saw_arrival)throw std::runtime_error("pool-full setup or arrival was not reached");
-   std::cout<<"result scenario=poolfull no weapon82 and no victim damage\n";return 0;
+   if(!saturated||!saw_arrival||!saw_die || parent->reaver.inside_count || parent->reaver.outside_count)throw std::runtime_error("pool-full did not consume the released child");
+   std::cout<<"result scenario=poolfull no weapon82 or damage; child consumed\n";return 0;
   }
   if(scenario=="parentdead") {
    api.kill_unit(parent);bool detached=false,attributed=false;auto hp=victim->hp.raw_value;
