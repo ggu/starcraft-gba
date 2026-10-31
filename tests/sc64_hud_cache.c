@@ -668,6 +668,10 @@ test_p3_sequence_invalidates_bottom_and_matches_redraw(void)
 static void test_showcase_hud_transitions_match_forced_frames(void)
 {
     fixture();
+    /* Keep minimap dots within the map so they do not independently
+     * invalidate the bottom band and mask a stale-label failure. */
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
     screen = SCREEN_PLAY;
     gfx_begin(0xe7); gfx_end();
     gfx_begin(0xe7); gfx_end();
@@ -711,6 +715,10 @@ static void test_showcase_hud_transitions_match_forced_frames(void)
 static void test_showcase_labels_do_not_persist_in_cached_pages(void)
 {
     fixture();
+    /* Keep minimap dots within the map so they do not independently
+     * invalidate the bottom band and mask a stale-label failure. */
+    memset(u, 0, sizeof(u));
+    memset(b, 0, sizeof(b));
     screen = SCREEN_PLAY;
     gfx_begin(0xe7); gfx_end();
     gfx_begin(0xe7); gfx_end();
