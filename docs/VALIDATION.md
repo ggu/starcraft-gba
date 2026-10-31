@@ -8211,7 +8211,20 @@ one-based host inputs to scheduler ticks, observes every retained checkpoint,
 checks all named Z7 model/action-array, entity-count and economy fields,
 checks the selected mission, and rejects input files changed during a run.
 It handles dense event windows without writing game state. It does not
-compare complete actor arrays or implement SRAM export/resume.
+compare complete actor arrays.
+
+For the separate fresh-process save check, select a nonterminal retained host
+observation in play with neutral held keys, then supply the same explicit
+`--cut TICK` to each invocation. Add `--export-save --cut TICK` to the command
+above and use a new output directory. The driver inserts START, release, B,
+release after that observation and exports `saved.sav` and `saved-state.json`.
+Run again with a different output directory, `--cut TICK --save-input
+/path/to/saved.sav --saved-state /path/to/saved-state.json`. The second process
+loads with title L/release, verifies the mission and bounded persisted-world
+fingerprint, and replays the remaining tape. It compares subsequent retained
+host observations, including the terminal win. The save and summary are
+hashed with the other inputs and checked for changes. A failure remains a
+failure; these source-level facilities do not establish a successful run.
 
 At the source checkpoint adding this driver, no current normal-ROM run has
 been performed. The strict state-observing controller witness at `fe63889`

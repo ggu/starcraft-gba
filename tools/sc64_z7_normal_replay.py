@@ -16,6 +16,7 @@ import sc64_headless_replay as headless
 import sc64_races_profile as races
 import sc64_z3_controller_replay as scheduler
 import sc64_z7_arm_replay as z7
+import sc64_z7_normal_save as save
 from emulator_smoke import symbols, symbol_sizes
 
 
@@ -152,9 +153,36 @@ def require_unchanged(paths, before):
         raise RuntimeError('trace, ROM, ELF or runner changed during replay')
 
 
-def run(trace, rom, elf, runner, output, stop=None):
-    inputs=(trace,rom,elf,runner);before=input_hashes(inputs)
-    plan,pages=build_plan(trace,stop);stop=pages[-1]['end']
+def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_input=None, saved_state=None, cut=None):
+    if export_save and (save_input or saved_state or stop is not None):
+        raise ValueError('save export requires a cut, without resume or prefix options')
+    if bool(save_input) != bool(saved_state) or (save_input and (export_save or stop is not None)):
+        raise ValueError('resume requires both save and saved summary, without prefix/export options')
+    if bool(export_save or save_input) != (cut is not None):
+        raise ValueError('save export and resume require an explicit cut')
+    inputs=(trace,rom,elf,runner) + ((save_input,saved_state) if save_input else ())
+    before=input_hashes(inputs)
+    plan,pages=build_plan(trace,cut if export_save else stop)
+    if cut is not None: save.validate_cut(plan,cut)
+    original_stop=plan['stop']
+    if export_save or save_input:
+        events = ([(t-1,h) for t,h in plan['transitions'] if t <= cut] + save.save_inputs(cut)
+                  if export_save else save.resume_inputs(plan['transitions'],cut))
+        end = cut + 4 if export_save else 2 + original_stop - cut
+        checks = ({t:t for t in plan['observations'] if t <= cut} if export_save else
+                  {2+t-cut:t for t in plan['observations'] if t > cut})
+        boundaries=sorted(set(range(1000,end+1,1000)) | set(checks) | {end})
+        pages=[]; first=0; index=0
+        for boundary in boundaries:
+            page_events=[]
+            while index < len(events) and events[index][0] < boundary:
+                if events[index][0] < first: raise ValueError('input events are out of order')
+                page_events.append(events[index]); index+=1
+            pages.append({'first':first,'end':boundary,'events':page_events}); first=boundary
+        if index != len(events): raise ValueError('input extends past replay')
+    else:
+        checks={t:t for t in plan['observations']}
+    stop=pages[-1]['end']
     sym,sizes=symbols(elf),symbol_sizes(elf)
     mode,capacity=scheduler.schedule_mode(sym,sizes)
     if mode!='windowed' or scheduler.checkpoint_ticks(sym)!=1000:
@@ -167,7 +195,8 @@ def run(trace, rom, elf, runner, output, stop=None):
         rsp.write(sym['demo_schedule_events'],b''.join(struct.pack('<2I',*item) for item in events))
         rsp.write(sym['demo_schedule_count'],struct.pack('<I',len(events)))
     try:
-        proc,rsp,log=headless.start(runner,rom,output,sym,sizes)
+        proc,rsp,log=headless.start(runner,rom,output,sym,sizes, save_input=save_input,
+                                    save_output=output / "saved.sav" if export_save else None)
         if u32('screen')!=0 or u32('frame')!=0: raise RuntimeError('fresh boot is not at title')
         write_page(pages[0]['events'][:capacity]);rsp.write(sym['demo_schedule_index'],struct.pack('<I',0))
         rsp.write(sym['demo_schedule_length'],struct.pack('<I',pages[0]['end']))
@@ -175,6 +204,19 @@ def run(trace, rom, elf, runner, output, stop=None):
         rsp.breakpoint(sym['game_update']&~1,False);rsp.breakpoint(sym['demo_replay_checkpoint']&~1,True)
         rsp.tick(expected=sym['demo_replay_checkpoint']&~1)
         if u32('demo_schedule_tick')!=0: raise RuntimeError('scheduler did not start at zero')
+        if save_input:
+            rsp.breakpoint(sym['demo_replay_checkpoint']&~1,False)
+            rsp.breakpoint(sym['game_update']&~1,True)
+            for _ in range(16):
+                rsp.tick(expected=sym['game_update']&~1)
+                if u32('demo_schedule_tick') == 2: break
+            else: raise RuntimeError('fresh-process load did not reach two updates')
+            restored=save.saved_summary(rsp,sym,sizes,elf,cut)
+            saved=save.read_summary(saved_state)
+            save.verify_restored(saved,restored,cut,z7.MISSION)
+            (output/'restored-state.json').write_text(json.dumps(restored,indent=2)+'\n')
+            rsp.breakpoint(sym['game_update']&~1,False)
+            rsp.breakpoint(sym['demo_replay_checkpoint']&~1,True)
         for i,page in enumerate(pages):
             chunks=[page['events'][n:n+capacity] for n in range(0,len(page['events']),capacity)] or [[]]; active=0
             if len(chunks)>1:
@@ -183,17 +225,29 @@ def run(trace, rom, elf, runner, output, stop=None):
             tick=page['end']
             if u32('demo_schedule_tick')!=tick or active!=len(chunks)-1 or u32('demo_schedule_index')!=len(chunks[-1]) or u32('demo_schedule_count')!=len(chunks[-1]):
                 raise RuntimeError('scheduler did not consume its page')
-            if tick in plan['observations']:
+            if tick in checks:
                 state=snapshot(rsp,sym,sizes,layouts)
                 if u32('race_selected_mission')!=z7.MISSION: raise RuntimeError('unexpected selected mission')
-                compare(plan['observations'][tick],state,tick)
+                compare(plan['observations'][checks[tick]],state,checks[tick])
                 records.append({'tick':tick,**state});(output/'progress.json').write_text(json.dumps(records,indent=2)+'\n')
             if i+1<len(pages):
                 write_page(pages[i+1]['events'][:capacity]);rsp.write(sym['demo_schedule_length'],struct.pack('<I',pages[i+1]['end']))
-        full=stop==plan['stop']
+        if export_save:
+            sample=save.saved_summary(rsp,sym,sizes,elf,cut)
+            if sample['mission']!=z7.MISSION or sample['world']['screen']!=2:
+                raise RuntimeError('ordinary save did not remain in Z7 pause')
+            (output/'saved-state.json').write_text(json.dumps(sample,indent=2)+'\n')
+            rsp.export_sram()
+            if not (output/'saved.sav').is_file() or (output/'saved.sav').stat().st_size != 32768:
+                raise RuntimeError('SRAM export is missing or incomplete')
+        full=bool(save_input) or (not export_save and stop==plan['stop'])
         if full and (not records or records[-1]['tick']!=stop or records[-1]['won']!=1 or records[-1]['outcome']!=1 or records[-1]['lost']!=0): raise RuntimeError('normal ROM did not win')
         require_unchanged(inputs,before)
         result={'status':'won' if full else 'prefix','stop':stop,'checkpoint_count':len(records),'checkpoints':records,'scope':'named Z7 model fields, entity counts and economy; not full entity arrays','sha256':before}
+        if export_save:
+            result['save']={'cut':cut,'sha256':input_hashes((output/'saved.sav',output/'saved-state.json'))}
+        if save_input:
+            result['resume']={'cut':cut,'restored_matches':True,'sram_unchanged':True}
         (output/'result.json').write_text(json.dumps(result,indent=2)+'\n');return result
     finally:
         if proc is not None:
@@ -208,6 +262,8 @@ def run(trace, rom, elf, runner, output, stop=None):
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     for name in ('trace','rom','elf','runner','output'):ap.add_argument('--'+name,type=Path,required=True)
-    ap.add_argument('--stop',type=int);a=ap.parse_args();run(a.trace,a.rom,a.elf,a.runner,a.output,a.stop)
+    ap.add_argument('--stop',type=int); ap.add_argument('--cut',type=int)
+    ap.add_argument('--export-save',action='store_true'); ap.add_argument('--save-input',type=Path); ap.add_argument('--saved-state',type=Path)
+    a=ap.parse_args();run(a.trace,a.rom,a.elf,a.runner,a.output,a.stop,a.export_save,a.save_input,a.saved_state,a.cut)
 
 if __name__=='__main__':main()
