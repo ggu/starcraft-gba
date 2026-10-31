@@ -242,18 +242,12 @@ race_impact_tick(void)
 /* Save: an empty queue keeps the historical RaceSave-length record. More
  * pending impacts than this profile's record holds refuse the save before
  * any SRAM write; they land within a second of play. */
-static int
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
-race_impact_save_write(const GbaSaveSelection *previous)
-#else
-race_impact_save_write(void)
-#endif
+static int race_impact_save_pack(u32 *length)
 {
     u32 bytes = 0;
-    if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
+    if (!length || race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-    /* The fixed base stays legacy-sized. Only active Yamato rows consume
-     * extension bytes; mask bits are in the already-versioned state word. */
+    /* Only active Yamato rows occupy extension bytes. */
     Sc64BcYamatoShot shots[SC64_BC_SHOT_LIMIT];
     u32 base = (u32)sizeof(RaceSave) - SC64_BC_SAVE_EXTRA_BYTES;
     u32 mask = 0, offset = base;
@@ -272,27 +266,36 @@ race_impact_save_write(void)
     if (race_impact_count)
         sc64_impact_encode(race_impact_rows, race_impact_count,
                            (u8 *)&race_impact_record + offset);
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
-    const u32 tags[]={SC64_LEGACY_SAVE_VERSION,SAVE_VERSION,SC64_SCARAB_SAVE_VERSION};
-    if (previous) {
-        if (!save_write_selected(&race_impact_record,offset+bytes,SC64_SCARAB_SAVE_VERSION,previous,tags,3)) return 0;
-    } else if (!save_write_first(&race_impact_record,offset+bytes,SC64_SCARAB_SAVE_VERSION)) return 0;
-#else
-    save_write_migrating_feature(&race_impact_record, offset + bytes, SAVE_VERSION,
-                         SC64_LEGACY_SAVE_VERSION, offsetof(RaceSave,state)+27u*sizeof(int),
-                         0xffff0000u, 0x42450000u);
-#endif
+    *length=offset+bytes;
 #else
     if (race_impact_count)
         bytes = sc64_impact_encode(race_impact_rows, race_impact_count,
                                    race_impact_record.impacts);
-#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-    save_write_migrating_feature(&race_impact_record, (u32)sizeof(RaceSave) + bytes,
-                         SAVE_VERSION, SC64_LEGACY_SAVE_VERSION,
-                         offsetof(RaceSave,state)+27u*sizeof(int), 0xffff0000u, 0x42450000u);
-#else
-    save_write(&race_impact_record, (u32)sizeof(RaceSave) + bytes, SAVE_VERSION);
+    *length=(u32)sizeof(RaceSave)+bytes;
 #endif
+    return 1;
+}
+
+static int
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+race_impact_save_write(const GbaSaveSelection *previous)
+#else
+race_impact_save_write(void)
+#endif
+{
+    u32 length;
+    if (!race_impact_save_pack(&length)) return 0;
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    const u32 tags[]={SC64_LEGACY_SAVE_VERSION,SAVE_VERSION,SC64_SCARAB_SAVE_VERSION};
+    if (previous) {
+        if (!save_write_selected(&race_impact_record,length,SC64_SCARAB_SAVE_VERSION,previous,tags,3)) return 0;
+    } else if (!save_write_first(&race_impact_record,length,SC64_SCARAB_SAVE_VERSION)) return 0;
+#elif defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
+    save_write_migrating_feature(&race_impact_record,length,SAVE_VERSION,
+                         SC64_LEGACY_SAVE_VERSION,offsetof(RaceSave,state)+27u*sizeof(int),
+                         0xffff0000u,0x42450000u);
+#else
+    save_write(&race_impact_record,length,SAVE_VERSION);
 #endif
     return 1;
 }
@@ -314,6 +317,9 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     if (selected_tag != SAVE_VERSION && !legacy
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
         && selected_tag != SC64_SCARAB_SAVE_VERSION
+#endif
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+        && selected_tag != SC64_SHARED_CARRIER_SAVE_VERSION
 #endif
        ) return 0;
     if (len < base) return 0;

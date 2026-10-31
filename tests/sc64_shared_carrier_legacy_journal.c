@@ -73,6 +73,12 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
     for (int i=0;i<240 && sc64_pool_active_head(&race_p7_projectiles)==SC64_END;++i)
         game_update(0,0);
     assert(sc64_pool_active_head(&race_p7_projectiles)!=SC64_END);
+#ifdef SC64_IMPACT_EVENTS
+    race_impact_reset();
+    race_impact_launch(target,3,1,SIDE,0,SC64_CARRIER_TYPE,10);
+    assert(race_impact_count==1);
+    Sc64ImpactEvent expected_impact=race_impact_rows[0];
+#endif
     assert(race_save_serialize(1));
     assert(race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION);
     assert(race_data.state[0]==race_mode && race_data.state[1]==race_human &&
@@ -82,6 +88,15 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
                race_protoss_clock_word(race_protoss_generic_clock));
     memcpy(before_units,u,sizeof(u)); memcpy(before_buildings,b,sizeof(b));
     memcpy(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram));
+#ifdef SC64_IMPACT_EVENTS
+    u32 packed_length=0;
+    assert(race_impact_save_pack(&packed_length));
+    memset(&plan,0,sizeof(plan));
+    assert(race_impact_save_decode_selected(packed_length,SC64_SHARED_CARRIER_SAVE_VERSION,
+                                            plan.impact_candidate,&plan.impact_candidate_count));
+    assert(plan.impact_candidate_count==1 &&
+           !memcmp(&plan.impact_candidate[0],&expected_impact,sizeof(expected_impact)));
+#endif
     assert(race_load_preflight(&plan));
     assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)) &&
            !memcmp(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram)));
