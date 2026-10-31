@@ -510,7 +510,7 @@ race_t4_save_candidate_valid(const RaceSave *candidate, int width, int height)
 static int race_battery_save_unit(const RaceSave *candidate, unsigned slot,
                                   unsigned ww, unsigned wh, Unit *out)
 {
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
     return race_save_decode_unit(candidate, slot, ww, wh, out);
 #else
     if (!candidate || !out || slot >= MAX_UNITS) return 0;
@@ -526,6 +526,10 @@ static int race_battery_save_encode_unit(RaceSave *candidate, unsigned slot,
                                          unsigned ww, unsigned wh, const Unit *q)
 {
     if (!candidate || !q || slot>=MAX_UNITS) return 0;
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    if ((u32)candidate->version==SC64_SHARED_CARRIER_SAVE_VERSION)
+        return sc64_p7_typed_unit_encode(&candidate->carrier_custom.units[slot],q,ww,wh);
+#endif
 #ifdef SC64_ZP_FULL_STORAGE
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     return sc64_p7_typed_unit_encode(&candidate->units[slot],q,ww,wh);
@@ -551,6 +555,10 @@ static int race_battery_save_encode_building(RaceSave *candidate, unsigned slot,
                                              const Building *q)
 {
     if (!candidate || !q || slot>=MAX_BUILDINGS) return 0;
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    if ((u32)candidate->version==SC64_SHARED_CARRIER_SAVE_VERSION)
+        return sc64_p7_typed_building_encode(&candidate->carrier_custom.buildings[slot],q,ww,wh);
+#endif
 #ifdef SC64_ZP_FULL_STORAGE
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     return sc64_p7_typed_building_encode(&candidate->buildings[slot],q,ww,wh);
@@ -613,7 +621,7 @@ static int race_battery_migrate_shield_phase(RaceSave *candidate, int width, int
 static int race_battery_save_building(const RaceSave *candidate, unsigned slot,
                                       Building *out)
 {
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
     return race_save_decode_building(candidate, slot, out);
 #else
     if (!candidate || !out || slot >= MAX_BUILDINGS) return 0;
@@ -699,7 +707,7 @@ static int race_bunker_save_reference(const RaceSave *candidate, const Unit *act
         actor->target<MAX_UNITS || actor->target>=MAX_UNITS+MAX_BUILDINGS)
         return 0;
     slot=actor->target-MAX_UNITS;
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
     if (!race_save_decode_building(candidate,(unsigned)slot,&bunker)) return 0;
 #else
     for (unsigned j=0;j<RACE_BUILD_WORDS;++j) {
@@ -728,7 +736,7 @@ static int race_bunker_save_world_valid(const RaceSave *candidate, int width, in
     if (!candidate || width<1 || height<1 || width>128 || height>128) return 0;
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit actor;
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
         if (!race_save_decode_unit(candidate,i,(unsigned)width*16u,(unsigned)height*16u,&actor)) return 0;
 #else
         for (unsigned j=0;j<RACE_UNIT_WORDS;++j) {
@@ -916,7 +924,7 @@ static int race_skirmish_transport_decode(const RaceSave *candidate, int slot,
                                            int width, int height, Unit *out)
 {
     if (!candidate || !out || slot < 0 || slot >= MAX_UNITS) return 0;
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
     return race_save_decode_unit(candidate, (unsigned)slot,
                                  (unsigned)width * 16u, (unsigned)height * 16u, out);
 #else
@@ -1063,6 +1071,107 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
     return 1;
 }
 #endif
+/* Serialize the mutually exclusive actor representations without touching the
+ * surrounding metadata or sidecars. Callers select a format by version. */
+static int race_save_encode_actors(void) {
+#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
+    /* The tagged layout owns the complete actor region; never write legacy
+     * rows into this union after encoding the packet. Its writer is gated off
+     * until journal selection and full-world restore are qualified. */
+    if ((u32)race_data.version == SC64_SHARED_CARRIER_SAVE_VERSION) {
+        if (!sc64_shared_carrier_candidate_encode(&race_data,u,b,&race_p7_projectiles,
+                                                   (unsigned)race_cols*16u,
+                                                   (unsigned)race_rows*16u)) return 0;
+    } else
+#endif
+    {
+#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_ZP_FULL_STORAGE
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    for (int i=0;i<MAX_UNITS;i++) {
+        Unit wire;
+        if (!race_scarab_save_wire(&u[i],&wire) ||
+            !race_scarab_zp_encode(&race_data,(unsigned)i,&wire,
+                                   (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+    }
+#else
+    for(int i=0;i<MAX_UNITS;i++)
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+        if(!sc64_p7_typed_unit_encode(&race_data.units[i], &u[i], (unsigned)(race_cols * 16), (unsigned)(race_rows * 16))) return 0;
+#elif defined(SC64_Z7_DERIVED_SAVE)
+        if(!sc64_derived_unit_encode(&race_data.units[i], &u[i],
+                                     (unsigned)(race_cols * 16),
+                                     (unsigned)(race_rows * 16))) return 0;
+#else
+        if(!sc64_zp_unit_save_encode(&race_data.units[i], &u[i],
+                                     (unsigned)(race_cols * 16),
+                                     (unsigned)(race_rows * 16))) return 0;
+#endif
+#endif
+#else
+    for(int i=0;i<MAX_UNITS;i++)
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    {
+        Unit wire;
+        if (!race_scarab_save_wire(&u[i],&wire) ||
+            !sc64_unit_save_encode(&race_data.units[i],&wire,
+                                   (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
+    }
+#else
+        if(!sc64_unit_save_encode(&race_data.units[i], &u[i],
+                                  (unsigned)(race_cols * 16),
+                                  (unsigned)(race_rows * 16))) return 0;
+#endif
+#endif
+#else
+    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
+        int n;memcpy(&n,(u8*)&u[i]+j*sizeof(int),sizeof(n));
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+        if (u[i].alive && sc64_race_raw_unit(u[i].type)==12 &&
+            j==offsetof(Unit,carry)/sizeof(int) && n>=32768) n-=65536;
+#endif
+        race_data.units[i][j]=(s16)n;
+    }
+#endif
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    race_scarab_stage_wire=1;
+#endif
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+    for(int i=0;i<MAX_BUILDINGS;i++)
+        if(!sc64_p7_typed_building_encode(&race_data.buildings[i], &b[i], (unsigned)(race_cols * 16), (unsigned)(race_rows * 16))) return 0;
+#elif defined(SC64_Z7_DERIVED_SAVE)
+    for(int i=0;i<MAX_BUILDINGS;i++)
+        if(!sc64_derived_building_encode(&race_data.buildings[i], &b[i],
+                                        (unsigned)(race_cols * 16),
+                                        (unsigned)(race_rows * 16))) return 0;
+#else
+    for(int i=0;i<MAX_BUILDINGS;i++)
+        if(!sc64_building_save_encode(&race_data.buildings[i], &b[i],
+                                     (unsigned)(race_cols * 16),
+                                     (unsigned)(race_rows * 16))) return 0;
+#endif
+#else
+    for(int i=0;i<MAX_BUILDINGS;i++)for(unsigned j=0;j<RACE_BUILD_WORDS;j++) {
+        int n;memcpy(&n,(u8*)&b[i]+j*sizeof(int),sizeof(n));
+#if !defined(SC64_T6_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
+        if (b[i].alive && b[i].type == B_ZERG_BEACON && b[i].raw_type == 194 &&
+            b[i].hp == 100000 && b[i].maxhp == 100000 &&
+            (j == offsetof(Building,hp)/sizeof(int) ||
+             j == offsetof(Building,maxhp)/sizeof(int)))
+            n = SC64_LEGACY_BEACON_HP_SENTINEL;
+#endif
+#ifdef SC64_T4_RUNTIME
+        if(sc64_race_t4_building_intrinsically_invincible(b[i].type) &&
+           (j==offsetof(Building,hp)/sizeof(int) ||
+            j==offsetof(Building,maxhp)/sizeof(int)))n=0;
+#endif
+        race_data.buildings[i][j]=(s16)n;
+    }
+#endif
+    }
+    return 1;
+}
 static int race_save_game(void) {
 #if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
     /* The experimental layout has no qualified version or migration yet. */
@@ -1182,102 +1291,7 @@ static int race_save_game(void) {
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     memcpy(race_data.battlecruiser_shots,sc64_bc_shots,sizeof(sc64_bc_shots));
 #endif
-#ifdef SC64_SHARED_CARRIER_SAVE_VERSION
-    /* The tagged layout owns the complete actor region; never write legacy
-     * rows into this union after encoding the packet. Its writer is gated off
-     * until journal selection and full-world restore are qualified. */
-    if ((u32)race_data.version == SC64_SHARED_CARRIER_SAVE_VERSION) {
-        if (!sc64_shared_carrier_candidate_encode(&race_data,u,b,&race_p7_projectiles,
-                                                   (unsigned)race_cols*16u,
-                                                   (unsigned)race_rows*16u)) return 0;
-    } else
-#endif
-    {
-#if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
-#ifdef SC64_ZP_FULL_STORAGE
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
-    for (int i=0;i<MAX_UNITS;i++) {
-        Unit wire;
-        if (!race_scarab_save_wire(&u[i],&wire) ||
-            !race_scarab_zp_encode(&race_data,(unsigned)i,&wire,
-                                   (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
-    }
-#else
-    for(int i=0;i<MAX_UNITS;i++)
-#ifdef SC64_P7_TYPED_COMPACT_ENABLED
-        if(!sc64_p7_typed_unit_encode(&race_data.units[i], &u[i], (unsigned)(race_cols * 16), (unsigned)(race_rows * 16))) return 0;
-#elif defined(SC64_Z7_DERIVED_SAVE)
-        if(!sc64_derived_unit_encode(&race_data.units[i], &u[i],
-                                     (unsigned)(race_cols * 16),
-                                     (unsigned)(race_rows * 16))) return 0;
-#else
-        if(!sc64_zp_unit_save_encode(&race_data.units[i], &u[i],
-                                     (unsigned)(race_cols * 16),
-                                     (unsigned)(race_rows * 16))) return 0;
-#endif
-#endif
-#else
-    for(int i=0;i<MAX_UNITS;i++)
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
-    {
-        Unit wire;
-        if (!race_scarab_save_wire(&u[i],&wire) ||
-            !sc64_unit_save_encode(&race_data.units[i],&wire,
-                                   (unsigned)(race_cols*16),(unsigned)(race_rows*16))) return 0;
-    }
-#else
-        if(!sc64_unit_save_encode(&race_data.units[i], &u[i],
-                                  (unsigned)(race_cols * 16),
-                                  (unsigned)(race_rows * 16))) return 0;
-#endif
-#endif
-#else
-    for(int i=0;i<MAX_UNITS;i++)for(unsigned j=0;j<RACE_UNIT_WORDS;j++) {
-        int n;memcpy(&n,(u8*)&u[i]+j*sizeof(int),sizeof(n));
-#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-        if (u[i].alive && sc64_race_raw_unit(u[i].type)==12 &&
-            j==offsetof(Unit,carry)/sizeof(int) && n>=32768) n-=65536;
-#endif
-        race_data.units[i][j]=(s16)n;
-    }
-#endif
-#ifdef SC64_SCARAB_NAMESPACE_STAGE
-    race_scarab_stage_wire=1;
-#endif
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
-#ifdef SC64_P7_TYPED_COMPACT_ENABLED
-    for(int i=0;i<MAX_BUILDINGS;i++)
-        if(!sc64_p7_typed_building_encode(&race_data.buildings[i], &b[i], (unsigned)(race_cols * 16), (unsigned)(race_rows * 16))) return 0;
-#elif defined(SC64_Z7_DERIVED_SAVE)
-    for(int i=0;i<MAX_BUILDINGS;i++)
-        if(!sc64_derived_building_encode(&race_data.buildings[i], &b[i],
-                                        (unsigned)(race_cols * 16),
-                                        (unsigned)(race_rows * 16))) return 0;
-#else
-    for(int i=0;i<MAX_BUILDINGS;i++)
-        if(!sc64_building_save_encode(&race_data.buildings[i], &b[i],
-                                     (unsigned)(race_cols * 16),
-                                     (unsigned)(race_rows * 16))) return 0;
-#endif
-#else
-    for(int i=0;i<MAX_BUILDINGS;i++)for(unsigned j=0;j<RACE_BUILD_WORDS;j++) {
-        int n;memcpy(&n,(u8*)&b[i]+j*sizeof(int),sizeof(n));
-#if !defined(SC64_T6_STORAGE) && !defined(SC64_ZP_CAMPAIGN_STORAGE)
-        if (b[i].alive && b[i].type == B_ZERG_BEACON && b[i].raw_type == 194 &&
-            b[i].hp == 100000 && b[i].maxhp == 100000 &&
-            (j == offsetof(Building,hp)/sizeof(int) ||
-             j == offsetof(Building,maxhp)/sizeof(int)))
-            n = SC64_LEGACY_BEACON_HP_SENTINEL;
-#endif
-#ifdef SC64_T4_RUNTIME
-        if(sc64_race_t4_building_intrinsically_invincible(b[i].type) &&
-           (j==offsetof(Building,hp)/sizeof(int) ||
-            j==offsetof(Building,maxhp)/sizeof(int)))n=0;
-#endif
-        race_data.buildings[i][j]=(s16)n;
-    }
-#endif
-    }
+    if (!race_save_encode_actors()) return 0;
     memset(race_data.fog,0,sizeof(race_data.fog));
     for(int i=0;i<MAP_CELLS;i++)if(SC64_GRID_GET(explored,i))race_data.fog[i>>3]|=1u<<(i&7);
 #ifdef SC64_ZP_FULL_STORAGE
@@ -2171,7 +2185,7 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
 #endif
         for(int j=0;j<RACE_B(i,queue_count);j++) {
-#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
+#if defined(SC64_T6_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE) || defined(SC64_SHARED_CARRIER_SAVE_VERSION)
             int type=candidate_building.queue[(RACE_B(i,queue_head)+j)%5];
 #else
             int type=race_data.buildings[i][offsetof(Building,queue)/sizeof(int)+(RACE_B(i,queue_head)+j)%5];

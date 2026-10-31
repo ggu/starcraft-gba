@@ -74,10 +74,10 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
         game_update(0,0);
     assert(sc64_pool_active_head(&race_p7_projectiles)!=SC64_END);
     memset(&race_data,0,sizeof(race_data));
-    assert(sc64_shared_carrier_candidate_encode(&race_data,u,b,&race_p7_projectiles,
-                                                (unsigned)race_cols*16u,
-                                                (unsigned)race_rows*16u));
     race_data.version=SC64_SHARED_CARRIER_SAVE_VERSION;
+    race_data.state[31]=0x13579;
+    assert(race_save_encode_actors());
+    assert(race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION && race_data.state[31]==0x13579);
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit decoded;
         assert(race_save_decode_unit(&race_data,i,(unsigned)race_cols*16u,
