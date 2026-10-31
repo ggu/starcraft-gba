@@ -49,6 +49,9 @@ static void check_cargo(int map, int human)
     passenger = spawn_unit(SIDE, passengers[human], race_base_x[0], race_base_y[0]);
     assert(ship >= 0 && passenger >= 0 && race_transport_carrier_valid(ship));
     assert(race_transport_request_board(passenger, ship));
+    assert(race_save_game());
+    assert(race_load_game());
+    assert(u[passenger].order == ORDER_BOARD && u[passenger].target == ship);
     assert(race_transport_tick_unit(passenger));
     assert(u[passenger].order == ORDER_TRANSPORTED);
     assert(race_save_game());
@@ -56,6 +59,9 @@ static void check_cargo(int map, int human)
     assert(u[passenger].order == ORDER_TRANSPORTED && u[passenger].target == ship);
     assert(race_transport_cargo_space(ship) > 0);
     assert(race_transport_request_unload(ship, u[ship].x, u[ship].y));
+    assert(race_save_game());
+    assert(race_load_game());
+    assert(u[ship].order == ORDER_UNLOAD);
     for (int y = 1; y < race_rows - 1 && u[passenger].order == ORDER_TRANSPORTED; ++y)
         for (int x = 1; x < race_cols - 1 && u[passenger].order == ORDER_TRANSPORTED; ++x) {
             if (!is_traversable(x, y, -1)) continue;
@@ -63,6 +69,9 @@ static void check_cargo(int map, int human)
             u[ship].y = u[ship].ty = y * 16 + 8;
             race_transport_try_unload(ship);
         }
+    assert(u[passenger].order == ORDER_IDLE);
+    assert(race_save_game());
+    assert(race_load_game());
     assert(u[passenger].order == ORDER_IDLE);
 }
 
