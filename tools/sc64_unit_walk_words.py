@@ -45,6 +45,13 @@ def derive(walk: str, facing: str, units=DEFAULT_UNITS) -> str:
     cycles = unique(((name,(int(count),body)) for name,count,body in cycle_rows), 'cycle')
     raw_rows = [(int(raw),name) for raw,name in re.findall(r'case (\d+): return &(sc64_unit_walk_i\d+);', walk)]
     raw_map = unique(raw_rows, 'raw ID')
+    for name, (count, body) in cycles.items():
+        matches = re.findall(r'\{\d+u,(\w+)\}', body)
+        residue = re.sub(r'\{\d+u,\w+\}', '', body)
+        if len(matches) != count or not matches or residue.strip(' ,\t\r\n'):
+            raise ValueError('malformed or empty cycle: ' + name)
+        if any(pose not in poses for pose in matches): raise ValueError('cycle references missing pose: ' + name)
+    if any(cycle not in cycles for cycle in raw_map.values()): raise ValueError('raw ID references missing cycle')
     if len(set(units)) != len(units) or any(raw not in raw_map for raw in units):
         raise ValueError('selected raw IDs must be unique and present')
     selected = {}
