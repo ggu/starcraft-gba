@@ -1829,7 +1829,7 @@ static int z7_home_target_valid(int hatch,int target)
        !SC64_CAN_ATTACK_FROM_SOURCE(U_HYDRALISK,target,SIDE,3))return 0;
     int d=dist2(u[target].x,u[target].y,b[hatch].x,b[hatch].y);
     return d<=160*160||(d<=policy_home_radius*policy_home_radius&&
-                        z7_threat_near_workers(target,128));
+                        z7_threat_near_workers(target,224));
 }
 
 static int z7_home_army_selection_matches(int hatch,const unsigned char *expected)
@@ -5040,21 +5040,23 @@ static void attack_step(void)
          * ordinary group order as the existing post-air defense below. */
         if(hydra_ground_target_slot<0&&(unsigned)frame>=hydra_ground_next_order&&
            unit_type_count(U_HYDRALISK,SIDE)>0) {
-            int ground=-1,best=160*160;
+            int ground=-1,best_worker=224*224+1;
             for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==ENEMY&&
                owners_hostile(SIDE,u[i].owner)&&!SC64_TRANSPORT_LOADED(&u[i])&&
-               !sc64_race_unit_flying(u[i].type)&&currently_visible(u[i].x,u[i].y)&&
-               SC64_CAN_ATTACK_FROM_SOURCE(U_HYDRALISK,i,SIDE,3)) {
-                int d=dist2(u[i].x,u[i].y,b[hatch].x,b[hatch].y);
-                if((d<=best||(d<=policy_home_radius*policy_home_radius&&z7_threat_near_workers(i,128)))&&
-                   (ground<0||d<best)){ground=i;best=d;}
+               !sc64_race_unit_flying(u[i].type)&&z7_home_target_valid(hatch,i)) {
+                for(int w=0;w<MAX_UNITS;w++)if(u[w].alive&&u[w].owner==SIDE&&u[w].raw_type==41) {
+                    int d=dist2(u[i].x,u[i].y,u[w].x,u[w].y);
+                    if(d<best_worker){ground=i;best_worker=d;}
+                }
             }
             if(ground>=0) {
                 int accepted=z7_home_army_attack(hatch,ground);
-                if(!accepted)accepted=typed_attack_target(U_HYDRALISK,ground);
-                fprintf(stderr,"Z7 priority Hydra home threat accepted%d slot%d raw%d d2%d frame%u\n",
-                    accepted,ground,u[ground].raw_type,best,(unsigned)frame);
-                hydra_ground_next_order=frame+(accepted?180u:60u);
+                /* The typed gesture can take hundreds of frames; reserve it
+                   for an imminent threat if the verified R path is unavailable. */
+                if(!accepted&&best_worker<=128*128)accepted=typed_attack_target(U_HYDRALISK,ground);
+                fprintf(stderr,"Z7 worker ground threat accepted%d slot%d raw%d workerD2%d frame%u\n",
+                    accepted,ground,u[ground].raw_type,best_worker,(unsigned)frame);
+                hydra_ground_next_order=frame+(accepted?180u:30u);
                 if(accepted){hydra_ground_target_slot=ground;return;}
             }
         }
