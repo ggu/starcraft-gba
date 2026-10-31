@@ -1813,11 +1813,19 @@ static int army_order(int attack,int x,int y)
     cancel_ui_mode();
     if(selected_building>=0&&!deselect_with_local_box())return 0;
     tap(KEY_R); /* Normal combat-group selection. */
-    if(!selected_count())return 0;
+    if(!selected_count()) {
+        fprintf(stderr,"Z7 army R empty frame%u mode%d menu%d box%d help%d prior%u building%d\n",
+            (unsigned)frame,mode,menu_open,box_state,help,(unsigned)prior_keys,selected_building);
+        return 0;
+    }
     if(!menu_open)tap(KEY_B);
     if(attack)tap(KEY_DOWN);
     tap(KEY_A);
-    if(mode!=(attack?MODE_ATTACK:MODE_MOVE))return 0;
+    if(mode!=(attack?MODE_ATTACK:MODE_MOVE)) {
+        fprintf(stderr,"Z7 army menu rejected frame%u mode%d menu%d box%d selected%d\n",
+            (unsigned)frame,mode,menu_open,box_state,selected_count());
+        return 0;
+    }
     move_cursor(x,y);tap(KEY_A);
     int accepted=0;
     for(int i=0;i<MAX_UNITS;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].selected) {
