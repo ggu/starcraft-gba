@@ -5335,6 +5335,10 @@ issue_order(int order, int tx, int ty)
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
             if (sc64_race_raw_unit(u[i].type)==12) u[i].work_timer&=~7;
 #endif
+#ifdef SC64_SHARED_DEFILER_STAGE
+            /* A newly accepted move/attack replaces the pending point order. */
+            if (sc64_defiler_stage[i].live) sc64_defiler_stage[i].intent=0;
+#endif
 	    u[i].order = order;
 	#ifdef SC64_REACHABLE_FORMATION
 	    if (group_order) {
@@ -5549,6 +5553,9 @@ stop_selected(void)
 #endif
 #ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
             if (sc64_race_raw_unit(u[i].type)==83) (void)race_scarab_stop_signal(i,0);
+#endif
+#ifdef SC64_SHARED_DEFILER_STAGE
+            if (sc64_defiler_stage[i].live) sc64_defiler_stage[i].intent=0;
 #endif
 	    u[i].order = ORDER_IDLE;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT

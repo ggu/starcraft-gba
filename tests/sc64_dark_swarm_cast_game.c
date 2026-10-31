@@ -29,7 +29,17 @@ int main(void)
     assert(mode==MODE_NORMAL && sc64_defiler_stage[caster].intent &&
            sc64_defiler_stage[caster].target_x==400 && sc64_defiler_stage[caster].target_y==350 &&
            sc64_defiler_stage[caster].energy_q8==100u*256u);
-    sc64_defiler_stage[caster].intent=0;
+    /* STOP replaces an unlaunched point order without spending energy. */
+    game_update(0,0); game_update(KEY_B,KEY_B); assert(menu_open);
+    for(int n=0;n<64 && menu_cursor!=MENU_STOP;++n) {
+        game_update(0,0); game_update(KEY_DOWN,KEY_DOWN);
+    }
+    assert(menu_cursor==MENU_STOP);
+    game_update(0,0); game_update(KEY_A,KEY_A);
+    assert(!sc64_defiler_stage[caster].intent && sc64_defiler_stage[caster].energy_q8==100u*256u);
+    sc64_defiler_stage[caster].intent=1;
+    assert(issue_order(ORDER_MOVE,420,350)==1);
+    assert(!sc64_defiler_stage[caster].intent && sc64_defiler_stage[caster].energy_q8==100u*256u);
     game_update(0,0);game_update(KEY_B,KEY_B);assert(menu_open);
     for(int n=0;n<64 && menu_cursor!=field_menu_count_base();++n) {
         game_update(0,0);game_update(KEY_DOWN,KEY_DOWN);

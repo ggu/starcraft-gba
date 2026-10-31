@@ -284,3 +284,28 @@ the wrong time. Full-queue cooldown behavior, partial two-shot allocation,
 source RNG timing, remaining families, generation wrap, save migration and all
 profile memory bounds remain open. Neither Defiler input consumption nor
 production admission follows from these tests.
+
+### Pending-order replacement and ordinary allocation reference
+
+Under the still-disabled Defiler stage, STOP and a successfully issued ordinary
+move/attack now clear the selected caster's pending point intent without
+spending energy. The Showcase-vector ASan/UBSan fixture enters the point order
+through normal pad input, navigates the STOP row through pad input, verifies
+cancellation, and separately checks replacement by a move. This prevents stale
+intent from firing after a later command; it is not an implementation of
+casting, movement, a projectile or a field.
+
+An isolated executing OpenBW reference experiment used authenticated tables,
+real action selection/attack and frame updates, with a stationary attacker
+and target. With 98, 99 and 100 occupied source bullet slots at first release,
+Marine raw0's one-bullet weapon allocated 1, 1 and 0 bullets respectively;
+Scout raw70's two-bullet weapon allocated 2, 1 and 0. Cooldown was spent in
+all three occupancy cases for each weapon. Fillers were replenished before
+each frame and may expire later, so these observations qualify first release
+only. The reference sets cooldown at attack decision and IScript later attempts
+each bullet separately. The current GBA impact row combines hits and includes
+wind-up before release: it cannot be treated as one native projectile. A
+correct ordinary integration must represent individual release times and
+partial allocation, preserve cooldown/RNG ordering, and cover interruptions
+and local queue limits. The reference observations do not establish a general
+GBA tick formula, and no ordinary allocation behavior has been changed here.
