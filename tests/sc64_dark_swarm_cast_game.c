@@ -9,6 +9,9 @@ int main(void)
     game_init();
     int caster=spawn_unit(SIDE,U_SHARED_DEFILER,320,320);
     assert(caster>=0 && sc64_race_raw_unit(u[caster].type)==46);
+    /* Until a complete schema exists, the actual save path must refuse a
+     * live experimental caster instead of writing incomplete state. */
+    assert(!race_save_game());
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
     /* Probe the compact row only; real saves still need explicit semantic
      * validation, versioning and effect/order state. */

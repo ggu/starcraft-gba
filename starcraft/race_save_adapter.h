@@ -1046,6 +1046,12 @@ static int race_scarab_save_wire(const Unit *live,Unit *wire)
 }
 #endif
 static int race_save_game(void) {
+#ifdef SC64_SHARED_DEFILER_STAGE
+    /* Experimental Defiler energy, pending cast and field state have no
+     * save schema. Refuse rather than serialize a misleading partial world. */
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && sc64_race_raw_unit(u[i].type)==46) return 0;
+#endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     if (race_scarab_probe_bullets_pending()) return 0;
 #endif

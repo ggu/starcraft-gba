@@ -104,3 +104,18 @@ weapon. Dark Swarm is allocated later by that projectile's hit handler. This
 is evidence for a distinct animation/release stage, not for creating the
 swarm immediately when energy is debited. Projectile flight/hit scheduling and
 interruptions still require actual-world verification.
+
+The authenticated weapon 59 projectile chain is flingy 172, sprite 370,
+image 503 and IScript 292. Its Init path waits one source tick and signals
+order 1. Pinned OpenBW then sends an appear-at-source projectile to its Death
+animation; that path waits five ticks and emits `domissiledmg`. Exact
+same-frame scheduling across the caster and projectile remains to be checked
+with an executing world oracle. In particular, tick-4 `castspell` is not a
+justification for allocating the effect at the start of the cast.
+
+Until the caster and field state have an actual save schema, the dedicated
+experimental identity gate makes `race_save_game()` reject a live raw-46
+Defiler. This conservative guard is not a permanent save solution and does not
+change normal products where the gate is off. The actual-engine sanitizer
+fixture verifies this rejection. The normal UI/order, source-accurate facing,
+projectile scheduling and end-to-end continuation remain unimplemented.
