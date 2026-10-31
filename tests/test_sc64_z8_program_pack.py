@@ -17,7 +17,8 @@ def nydus(record, linked, x, y):
 def descriptor():
     """A tiny authored descriptor; structure validation is mocked here."""
     return {
-        "descriptor_sha256": "0" * 64,
+        "descriptor_sha256": pack.sc64_z8_pack.EXPECTED_DESCRIPTOR_SHA256,
+        "puni": [0] * pack.PUNI_LENGTH,
         "owners": [0, 5, 5, 6, 0, 7, 0, 0, 0, 0, 0, 0],
         "forces": [3, 1, 2, 0, 3, 3, 3, 3],
         "dimensions": {"width": 128, "height": 128},
@@ -56,6 +57,42 @@ class Z8ProgramPackTest(unittest.TestCase):
         self.assertIn("{192u,194u,134u,1024u,3u,0u,400,192}", text)
         self.assertIn("{194u,192u,134u,1024u,3u,0u,1632,256}", text)
         self.assertIn("Do not commit or distribute", text)
+
+    def test_permission_overrides_globals_and_boundaries(self):
+        puni = [0] * pack.PUNI_LENGTH
+        global_base = pack.PUNI_CELLS
+        default_base = global_base + pack.PUNI_UNITS
+        # Global allow, explicit deny, explicit allow, last slot/raw boundary.
+        puni[global_base + 143] = 1
+        puni[default_base + 3 * 228 + 143] = 1
+        puni[3 * 228 + 144] = 0
+        puni[global_base + 144] = 1
+        puni[3 * 228 + 146] = 1
+        puni[11 * 228 + 227] = 1
+        bits = pack.permission_bitmap(puni)
+        def allowed(owner, raw):
+            bit = owner * 228 + raw
+            return (bits[bit // 8] >> (bit % 8)) & 1
+        self.assertEqual(len(bits), 342)
+        self.assertEqual([allowed(3, n) for n in (143, 144, 146)], [1, 0, 1])
+        self.assertEqual(allowed(11, 227), 1)
+        self.assertEqual(allowed(0, 0), 0)
+        d = descriptor()
+        d["puni"] = puni
+        text = self.render(d)
+        self.assertIn("sc64_z8_permission_table", text)
+        self.assertIn(pack.sc64_z8_pack.EXPECTED_DESCRIPTOR_SHA256, text)
+
+    def test_rejects_bad_puni_and_fingerprint(self):
+        for values in ([0] * 5699, [0] * 5701, [0] * 5699 + [2],
+                       [0] * 5699 + [True], [0] * 5699 + [-1]):
+            with self.subTest(length=len(values), last=values[-1]):
+                with self.assertRaises(ValueError):
+                    pack.permission_bitmap(values)
+        d = descriptor()
+        d["descriptor_sha256"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "authenticated"):
+            self.render(d)
 
     def test_rejects_unpaired_or_odd_canals(self):
         d = descriptor()

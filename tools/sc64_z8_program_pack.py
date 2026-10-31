@@ -32,6 +32,10 @@ ACTION_FIELDS = ('location', 'string_id', 'wav_id', 'time', 'group1', 'group2',
 LOCATION_FIELDS = ('left', 'top', 'right', 'bottom', 'flags')
 NYDUS_RAW = 134
 OWNER_COMPUTER, OWNER_HUMAN = 5, 6
+PUNI_OWNERS, PUNI_UNITS = 12, 228
+PUNI_CELLS = PUNI_OWNERS * PUNI_UNITS
+PUNI_LENGTH = PUNI_CELLS * 2 + PUNI_UNITS
+PERMISSION_BYTES = (PUNI_CELLS + 7) // 8
 
 
 def _rows(rows: list[dict], fields: tuple[str, ...]) -> str:
@@ -61,8 +65,31 @@ def nydus_records(descriptor: dict) -> list[dict]:
     return sorted(rows, key=lambda r: r['record_index'])
 
 
+def permission_bitmap(puni: list[int]) -> bytes:
+    """Resolve PUNI player overrides/defaults into a bounded source-slot bitmap."""
+    if not isinstance(puni, list) or len(puni) != PUNI_LENGTH:
+        raise ValueError('PUNI must contain exactly 5700 boolean cells')
+    if any(type(v) is not int or v not in (0, 1) for v in puni):
+        raise ValueError('PUNI cells must be integer zero or one')
+    result = bytearray(PERMISSION_BYTES)
+    for owner in range(PUNI_OWNERS):
+        for raw in range(PUNI_UNITS):
+            index = owner * PUNI_UNITS + raw
+            use_global = puni[PUNI_CELLS + PUNI_UNITS + index]
+            allowed = puni[PUNI_CELLS + raw] if use_global else puni[index]
+            if allowed:
+                result[index // 8] |= 1 << (index % 8)
+    return bytes(result)
+
+
 def render(descriptor: dict) -> str:
     sc64_z8_pack.validate_structure(descriptor)
+    if descriptor.get('descriptor_sha256') != sc64_z8_pack.EXPECTED_DESCRIPTOR_SHA256:
+        raise ValueError('descriptor fingerprint is not the authenticated Z8 source')
+    permissions = permission_bitmap(descriptor['puni'])
+    permission_rows = ',\n'.join(
+        '    ' + ','.join(f'{v}u' for v in permissions[i:i + 24])
+        for i in range(0, len(permissions), 24))
     active, forces = setup(descriptor)
     width = descriptor['dimensions']['width'] * 32
     height = descriptor['dimensions']['height'] * 32
@@ -80,6 +107,7 @@ def render(descriptor: dict) -> str:
  * descriptor {descriptor['descriptor_sha256']}. */
 #ifndef SC64_Z8_PROGRAM_GENERATED_H
 #define SC64_Z8_PROGRAM_GENERATED_H
+#include "sc64_z8_permissions.h"
 #define SC64_Z8_PROGRAM_DESCRIPTOR_SHA256 "{descriptor['descriptor_sha256']}"
 #define SC64_Z8_PROGRAM_TRIGGER_COUNT {len(descriptor['triggers'])}u
 #define SC64_Z8_PROGRAM_CONDITION_COUNT {len(descriptor['conditions'])}u
@@ -89,6 +117,9 @@ def render(descriptor: dict) -> str:
 #define SC64_Z8_PROGRAM_MAP_PIXEL_HEIGHT {height}u
 #define SC64_Z8_PROGRAM_ACTIVE_MASK {active}u
 #define SC64_Z8_PROGRAM_NYDUS_COUNT {len(nydus)}u
+static const Sc64Z8PermissionTable sc64_z8_permission_table = {{{{
+{permission_rows}
+}}}};
 static const u8 sc64_z8_program_forces[8] = {{{','.join(f'{f}u' for f in forces)}}};
 static const Sc64Z8Trigger sc64_z8_program_triggers[{len(descriptor['triggers'])}] = {{
 {triggers}
