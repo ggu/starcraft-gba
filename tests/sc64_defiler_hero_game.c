@@ -36,7 +36,7 @@ int main(void)
     int did_bullet=0,did_field=0;
     for(int n=0;n<40;n++) {
         game_update(0,0);did_bullet|=sc64_shared_projectiles.active!=0;
-        for(int i=0;i<MAX_UNITS;i++)did_field|=sc64_defiler_fields[i].remaining!=0;
+        for(int i=0;i<MAX_UNITS;i++)did_field|=sc64_defiler_field_get(i).remaining!=0;
     }
     assert(did_bullet && did_field && sc64_defiler_stage[c].energy_q8<100u*256u);
     puts("raw52 distinct actor natural energy regeneration and actual menu cast passed");return 0;

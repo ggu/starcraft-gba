@@ -1065,11 +1065,30 @@ static Sc64DefilerStageActor sc64_defiler_stage[MAX_UNITS];
 #error "Defiler executor requires staged casters, shared projectiles, and source clock"
 #endif
 #include "sc64_dark_swarm_state.h"
+#ifdef SC64_SHARED_DEFILER_UNIT_FIELD_PROBE
+/* Experimental dead, noncolliding raw-202 rows own their field lifetime.
+ * They are reserved from all allocators until their death tail ends. */
+static Sc64DarkSwarmEffect sc64_defiler_field_get(unsigned i)
+{
+    Unit *q=&u[i];
+    if(q->alive || q->raw_type!=202 || !q->work_timer) return (Sc64DarkSwarmEffect){0,0,0};
+    return (Sc64DarkSwarmEffect){q->x,q->y,q->work_timer};
+}
+static void sc64_defiler_field_set(unsigned i,Sc64DarkSwarmEffect f)
+{
+    Unit *q=&u[i];
+    if(!f.remaining) {q->raw_type=-1;q->work_timer=0;return;}
+    q->x=(s16)f.x;q->y=(s16)f.y;q->raw_type=202;q->work_timer=f.remaining;
+}
+#else
 static Sc64DarkSwarmEffect sc64_defiler_fields[MAX_UNITS];
+static Sc64DarkSwarmEffect sc64_defiler_field_get(unsigned i) { return sc64_defiler_fields[i]; }
+static void sc64_defiler_field_set(unsigned i,Sc64DarkSwarmEffect f) { sc64_defiler_fields[i]=f; }
+#endif
 static void sc64_defiler_executor_unit_tick(void);
 static void sc64_defiler_executor_bullet_tick(void);
 static int sc64_defiler_executor_busy(void);
-#define SC64_UNIT_SLOT_FREE(i) (!u[i].alive && !sc64_defiler_fields[i].remaining)
+#define SC64_UNIT_SLOT_FREE(i) (!u[i].alive && !sc64_defiler_field_get(i).remaining)
 #else
 #define SC64_UNIT_SLOT_FREE(i) (!u[i].alive)
 #endif
@@ -4967,7 +4986,9 @@ init_state(void)
     memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));
 #ifdef SC64_SHARED_DEFILER_EXECUTOR
     memset(sc64_shared_payloads,0,sizeof(sc64_shared_payloads));
+#ifndef SC64_SHARED_DEFILER_UNIT_FIELD_PROBE
     memset(sc64_defiler_fields,0,sizeof(sc64_defiler_fields));
+#endif
 #endif
 #endif
     sc64_walk_reset_all();
@@ -5244,7 +5265,9 @@ game_init(void)
     memset(sc64_defiler_stage,0,sizeof(sc64_defiler_stage));
 #ifdef SC64_SHARED_DEFILER_EXECUTOR
     memset(sc64_shared_payloads,0,sizeof(sc64_shared_payloads));
+#ifndef SC64_SHARED_DEFILER_UNIT_FIELD_PROBE
     memset(sc64_defiler_fields,0,sizeof(sc64_defiler_fields));
+#endif
 #endif
 #endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
@@ -9604,7 +9627,7 @@ draw_tracers(void)
 {
 #ifdef SC64_SHARED_DEFILER_ART_PROBE
     for(int i=0;i<MAX_UNITS;i++)
-        if(sc64_defiler_fields[i].remaining)sc64_dark_swarm_raster_draw(&sc64_defiler_fields[i]);
+        { Sc64DarkSwarmEffect f=sc64_defiler_field_get(i); if(f.remaining)sc64_dark_swarm_raster_draw(&f); }
 #endif
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
     u32 diag_start=gba_clock();

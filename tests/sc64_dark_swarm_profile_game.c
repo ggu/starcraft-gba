@@ -18,7 +18,7 @@ int main(void)
     assert(menu_cursor==field_menu_count_base());game_update(0,0);game_update(KEY_A,KEY_A);
     assert(mode==MODE_DARK_SWARM_STAGE);cx=400;cy=320;game_update(0,0);game_update(KEY_A,KEY_A);
     for(int n=0;n<40;n++)game_update(0,0);
-    int field=-1;for(int i=0;i<MAX_UNITS;i++)if(sc64_defiler_fields[i].remaining && sc64_defiler_fields[i].remaining<=900)field=i;
+    int field=-1;for(int i=0;i<MAX_UNITS;i++)if(sc64_defiler_field_get(i).remaining && sc64_defiler_field_get(i).remaining<=900)field=i;
     assert(field>=0 && !SC64_UNIT_SLOT_FREE(field));
     int marine=spawn_unit(ENEMY,U_MARINE,356,320),zergling=spawn_unit(ENEMY,U_ZERGLING,400,320);
     assert(marine>=0 && zergling>=0);

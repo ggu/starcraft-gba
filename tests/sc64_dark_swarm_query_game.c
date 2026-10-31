@@ -78,10 +78,10 @@ int main(void)
 #else
     assert(at(U_ZERGLING,400,320)==-1); /* unknown geometry fails closed */
 #endif
-    int f=-1;for(int i=0;i<MAX_UNITS;i++)if(sc64_defiler_fields[i].remaining)f=i;
-    assert(f>=0);u16 saved_ttl=sc64_defiler_fields[f].remaining;
-    sc64_defiler_fields[f].remaining=904;assert(at(U_MARINE,400,320)==0);
-    sc64_defiler_fields[f].remaining=saved_ttl;
+    int f=-1;for(int i=0;i<MAX_UNITS;i++)if(sc64_defiler_field_get(i).remaining)f=i;
+    assert(f>=0);u16 saved_ttl=sc64_defiler_field_get(f).remaining;
+    test_field_remaining_set(f,904);assert(at(U_MARINE,400,320)==0);
+    test_field_remaining_set(f,saved_ttl);
     assert(at(sc64_race_unit_from_raw(12),400,320)==0); /* flying */
     assert(sc64_world_dark_swarm_affects_target(MAX_UNITS)==0); /* building */
     /* Real update dispatch of Marine shots, with synthetic attack orders and

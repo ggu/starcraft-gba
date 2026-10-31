@@ -6,7 +6,11 @@
 #error "requires disabled executor"
 #endif
 static unsigned test_phase;
-static int fields(void) {int n=0;for(int i=0;i<MAX_UNITS;i++)n+=(sc64_defiler_fields[i].remaining>0 && sc64_defiler_fields[i].remaining<=900);return n;}
+static void test_field_remaining_set(int i,unsigned remaining)
+{ Sc64DarkSwarmEffect f=sc64_defiler_field_get(i); f.remaining=(u16)remaining;sc64_defiler_field_set(i,f); }
+static void test_field_position_set(int i,int x,int y)
+{ Sc64DarkSwarmEffect f=sc64_defiler_field_get(i); f.x=x;f.y=y;sc64_defiler_field_set(i,f); }
+static int fields(void) {int n=0;for(int i=0;i<MAX_UNITS;i++)n+=(sc64_defiler_field_get(i).remaining>0 && sc64_defiler_field_get(i).remaining<=900);return n;}
 static void click_cast(int caster,int x,int y)
 {
     screen=SCREEN_PLAY;race_mode=1;selected_building=-1;u[caster].selected=1;
@@ -34,16 +38,16 @@ int main(void)
     }
     fprintf(stderr,"debit=%d bullet=%d field=%d retire=%d\n",debit,bullet,created,retired);
     assert(debit>=0 && bullet>debit && created>bullet && retired>created && fields()==1);
-    int f=-1;for(int i=0;i<MAX_UNITS;i++)if(sc64_defiler_fields[i].remaining)f=i;
+    int f=-1;for(int i=0;i<MAX_UNITS;i++)if(sc64_defiler_field_get(i).remaining)f=i;
     assert(f>=0 && !u[f].alive && !SC64_UNIT_SLOT_FREE(f));
 #ifdef SC64_SHARED_DEFILER_ART_PROBE
     /* Exercise actual field drawing and HUD/world clipping on an initialized
      * graphics surface; private extracted pixels remain outside git. */
     camx=camy=0;memset(visible,0xff,sizeof(visible));
-    sc64_defiler_fields[f].remaining=880;
+    test_field_remaining_set(f,880);
     const int art_x[5]={200,0,478,200,200},art_y[5]={110,110,110,0,214};
     for(int k=0;k<5;k++) {
-        sc64_defiler_fields[f].x=art_x[k];sc64_defiler_fields[f].y=art_y[k];
+        test_field_position_set(f,art_x[k],art_y[k]);
         gfx_begin(C_PANEL);draw_tracers();int painted=0;
         for(int y=0;y<160;y++)for(int x=0;x<240;x++) {
             int changed=gfx_test_pixel(x,y)!=C_PANEL;
@@ -55,21 +59,21 @@ int main(void)
 #endif
     assert(!race_save_game() && !race_load_game());
     u[c].alive=0;assert(!race_save_game() && !race_load_game());
-    unsigned remaining=sc64_defiler_fields[f].remaining;
-    for(int n=0;n<1300 && sc64_defiler_fields[f].remaining<=900;n++)game_update(0,0);
-    assert(remaining && !fields() && sc64_defiler_fields[f].remaining==904 && !SC64_UNIT_SLOT_FREE(f));
+    unsigned remaining=sc64_defiler_field_get(f).remaining;
+    for(int n=0;n<1300 && sc64_defiler_field_get(f).remaining<=900;n++)game_update(0,0);
+    assert(remaining && !fields() && sc64_defiler_field_get(f).remaining==904 && !SC64_UNIT_SLOT_FREE(f));
 #ifdef SC64_SHARED_DEFILER_ART_PROBE
-    sc64_defiler_fields[f].x=200;sc64_defiler_fields[f].y=110;
+    test_field_position_set(f,200,110);
     for(unsigned tail=904;tail>=901;tail--) {
-        sc64_defiler_fields[f].remaining=(u16)tail;
+        test_field_remaining_set(f,tail);
         gfx_begin(C_PANEL);draw_tracers();int painted=0;
         for(int y=12;y<120;y++)for(int x=0;x<240;x++)painted+=gfx_test_pixel(x,y)!=C_PANEL;
         assert(painted>0);
     }
-    sc64_defiler_fields[f].remaining=904;
+    test_field_remaining_set(f,904);
 #endif
-    for(int n=0;n<30 && sc64_defiler_fields[f].remaining;n++)game_update(0,0);
-    assert(!sc64_defiler_fields[f].remaining && SC64_UNIT_SLOT_FREE(f));
+    for(int n=0;n<30 && sc64_defiler_field_get(f).remaining;n++)game_update(0,0);
+    assert(!sc64_defiler_field_get(f).remaining && SC64_UNIT_SLOT_FREE(f));
     /* Full bullet pool still spends the spell energy; it produces no field. */
     game_init();race_mode=1;race_human=R_ZERG;race_bots=1;race_skirmish_map=0;race_skirmish_init();
     c=spawn_unit(SIDE,U_SHARED_DEFILER,320,320);assert(c>=0);

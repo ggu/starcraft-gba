@@ -19,7 +19,7 @@ int main(void)
     int bullet=0,field=0;
     for(int n=0;n<40;n++) {
         game_update(0,0);bullet|=sc64_shared_projectiles.active!=0;
-        for(int i=0;i<MAX_UNITS;i++)field|=sc64_defiler_fields[i].remaining!=0;
+        for(int i=0;i<MAX_UNITS;i++)field|=sc64_defiler_field_get(i).remaining!=0;
     }
     assert(bullet && field && sc64_defiler_stage[c].energy_q8<100u*256u);
     printf("natural raw46 regeneration after %d game updates and actual menu cast passed\n",updates);

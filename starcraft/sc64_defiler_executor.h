@@ -9,7 +9,7 @@
 static int sc64_defiler_executor_busy(void)
 {
     for(int i=0;i<MAX_UNITS;i++)
-        if(sc64_defiler_fields[i].remaining || sc64_defiler_stage[i].intent) return 1;
+        if(sc64_defiler_field_get(i).remaining || sc64_defiler_stage[i].intent) return 1;
     for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++)
         if(sc64_defiler_projectile_at(i)) return 1;
     return 0;
@@ -108,7 +108,7 @@ static void sc64_defiler_executor_unit_tick(void)
     if(!sc64_battlecruiser_source_tick_due()) return;
     /* Source units tick before bullets: new fields begin at 900. */
     for(int i=0;i<MAX_UNITS;i++) {
-        Sc64DarkSwarmEffect *f=&sc64_defiler_fields[i];
+        Sc64DarkSwarmEffect value=sc64_defiler_field_get(i), *f=&value;
         if(f->remaining>900) {
             if(f->remaining==901) f->remaining=0; else --f->remaining;
         } else if(f->remaining && sc64_dark_swarm_source_tick(f)) {
@@ -116,6 +116,7 @@ static void sc64_defiler_executor_unit_tick(void)
              * actor slot; values above 900 are private inactive sentinels. */
             f->remaining=904;
         }
+        if(value.remaining || sc64_defiler_field_get(i).remaining) sc64_defiler_field_set(i,value);
     }
     for(int i=0;i<MAX_UNITS;i++) {
         Sc64DefilerStageActor *a=&sc64_defiler_stage[i]; Unit *q=&u[i];
@@ -185,7 +186,8 @@ static void sc64_defiler_executor_bullet_tick(void)
                     memset(&sc64_defiler_stage[slot],0,sizeof(sc64_defiler_stage[slot]));
                     if(x<80)x=80;else if(x+80>=w)x=w-80;
                     if(y<80)y=80;else if(y+80>=h-32)y=h-112;
-                    sc64_dark_swarm_created(&sc64_defiler_fields[slot],x,y);
+                    Sc64DarkSwarmEffect field;sc64_dark_swarm_created(&field,x,y);
+                    sc64_defiler_field_set(slot,field);
                 }
             }
         }

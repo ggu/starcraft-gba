@@ -25,7 +25,7 @@ static int sc64_world_dark_swarm_affects_target(int target)
     if(target<0 || target>=MAX_UNITS || !u[target].alive || sc64_race_unit_flying(u[target].type))return 0;
     int active=0;
     for(int i=0;i<MAX_UNITS;i++)
-        if(sc64_defiler_fields[i].remaining && sc64_defiler_fields[i].remaining<=900) {active=1;break;}
+        if(sc64_defiler_field_get(i).remaining && sc64_defiler_field_get(i).remaining<=900) {active=1;break;}
     if(!active)return 0;
     Unit *q=&u[target];int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
     int left,top,right,bottom;
@@ -36,7 +36,7 @@ static int sc64_world_dark_swarm_affects_target(int target)
     if(raw<0 || !sc64_p7_actor_rect_source((unsigned)raw,q->x,q->y,0,&left,&top,&right,&bottom))return -1;
 #endif
     for(int i=0;i<MAX_UNITS;i++) {
-        Sc64DarkSwarmEffect *f=&sc64_defiler_fields[i];
+        Sc64DarkSwarmEffect field=sc64_defiler_field_get(i), *f=&field;
         if(!f->remaining || f->remaining>900)continue;
         if(left<f->x+80 && right>f->x-80 && top<f->y+80 && bottom>f->y-80)return 1;
     }
