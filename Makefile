@@ -4247,7 +4247,7 @@ protoss-p7-interceptor-flight-probe: build/StarCraft-Protoss-P7-Interceptor-Flig
 # canonical profiles; the P7 bundle supplies Carrier/Ultralisk render actors.
 # Presentation-only 32-direction unit facing (including Siege Tank turrets),
 # from per-direction frames imported into a separate private header.
-$(UNIT_FACING_INPUTS): tools/sc64_unit_facing.py tools/sc64_race_sprites.py tools/sc64_sprites.py
+$(UNIT_FACING_HEADER): tools/sc64_unit_facing.py tools/sc64_race_sprites.py tools/sc64_sprites.py
 	$(PYTHON) tools/sc64_unit_facing.py
 $(TANK_SOURCE_HEADER): tools/sc64_tank_source_vfx.py tools/sc64_construction_sprites.py tools/sc64_sprites.py .local/sc64/backwater/generated/palette-remap.bin .local/sc64/backwater/generated/palette.json
 	$(PYTHON) tools/sc64_tank_source_vfx.py --out $(dir $@)
