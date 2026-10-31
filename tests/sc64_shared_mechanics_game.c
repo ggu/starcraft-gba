@@ -266,6 +266,18 @@ static Unit saved_world_units[MAX_UNITS];
 static Building saved_world_buildings[MAX_BUILDINGS];
 static u8 saved_world_explored[SC64_GRID_STORAGE_BYTES];
 
+/* Match the active production journal format when injecting a candidate.
+ * Yamato + delayed impacts use a compact envelope, not a raw RaceSave tail. */
+static void write_candidate_record(void)
+{
+#if defined(SC64_IMPACT_EVENTS) && defined(SC64_BATTLECRUISER_YAMATO_EXPERIMENT) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
+    race_data = saved_candidate;
+    assert(race_impact_save_write());
+#else
+    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+#endif
+}
+
 static void expect_candidate_rejected(void)
 {
     /* Make scalar and fog state differ from the candidate so a partial load
@@ -280,7 +292,7 @@ static void expect_candidate_rejected(void)
     int old_frame = frame, old_cx = cx, old_cy = cy;
     int old_mode = race_mode, old_human = race_human;
     int old_mission = race_selected_mission, old_completed = race_completed;
-    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+    write_candidate_record();
     assert(!race_load_game());
     assert(memcmp(saved_world_units, u, sizeof(u)) == 0);
     assert(memcmp(saved_world_buildings, b, sizeof(b)) == 0);
@@ -310,7 +322,7 @@ static void test_burn_save_compatibility(void)
     assert(race_load_game());
     assert(b[building].hp == 200 && b[building].shield_remainder == 4 * 256 + 97);
     saved_candidate.state[SC64_BUILDING_DAMAGE_SAVE_MARKER_INDEX] = 0;
-    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+    write_candidate_record();
     assert(race_load_game());
     assert(b[building].hp == 200 && b[building].shield_remainder == NEUTRAL * 256);
     assert(race_save_game());
@@ -335,7 +347,7 @@ static void test_construction_save_compatibility(void)
            SC64_CONSTRUCTION_SAVE_MARKER);
     saved_candidate = race_data;
     saved_candidate.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] = 0;
-    save_write(&saved_candidate, sizeof(saved_candidate), SAVE_VERSION);
+    write_candidate_record();
     assert(race_load_game());
     assert(race_save_game());
     assert(race_data.state[SC64_CONSTRUCTION_SAVE_MARKER_INDEX] ==
