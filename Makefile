@@ -464,7 +464,7 @@ $(error CANONICAL_ROUTE_INDEX must be 0 or 1)
 endif
 CANONICAL_ROUTE_INDEX_FLAGS = $(if $(filter 1,$(CANONICAL_ROUTE_INDEX)),-DSC64_ROUTE_WORD_CLEAR -DSC64_ROUTE_VISIT_GRID)
 # Experimental packed walking frames; original-art and legacy products stay independent.
-CANONICAL_WALK_WORDS ?= 0
+CANONICAL_WALK_WORDS ?= 1
 ifneq ($(words $(filter 0 1,$(CANONICAL_WALK_WORDS))),1)
 $(error CANONICAL_WALK_WORDS must be 0 or 1)
 endif
