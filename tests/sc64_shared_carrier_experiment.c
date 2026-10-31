@@ -64,11 +64,15 @@ static void test_legacy_scratch_relocation(void)
     static u8 data[32768], original[32768];
     const size_t old_tail=offsetof(RaceSave,buildings)+sizeof(((RaceSave *)0)->buildings);
     const size_t new_tail=offsetof(RaceSave,minerals_map);
-    const size_t delta=new_tail-old_tail;
+    const size_t prefix=sizeof(((RaceSave *)0)->minerals_map)+sizeof(((RaceSave *)0)->fog);
+    const size_t old_state=(old_tail+prefix+3u)&~(size_t)3u;
+    const size_t new_state=offsetof(RaceSave,state);
+    const size_t delta=new_state-old_state;
     const size_t old_length=sizeof(RaceSave)-delta+9;
     size_t expanded=0;
     assert(old_tail<=new_tail && old_length+delta<=sizeof(data));
     for (size_t i=0;i<sizeof(data);++i) data[i]=(u8)(i*37u+11u);
+    memset(data+old_tail+prefix,0,old_state-old_tail-prefix);
     memcpy(original,data,sizeof(data));
     assert(!sc64_shared_carrier_expand_legacy(data,old_tail-1,sizeof(data),&expanded));
     assert(!memcmp(data,original,sizeof(data)));
@@ -79,7 +83,9 @@ static void test_legacy_scratch_relocation(void)
     assert(sc64_shared_carrier_expand_legacy(data,old_length,sizeof(data),&expanded));
     assert(expanded==old_length+delta && !memcmp(data,original,old_tail));
     for (size_t i=old_tail;i<new_tail;++i) assert(data[i]==0);
-    assert(!memcmp(data+new_tail,original+old_tail,old_length-old_tail));
+    assert(!memcmp(data+new_tail,original+old_tail,prefix));
+    for (size_t i=new_tail+prefix;i<new_state;++i) assert(data[i]==0);
+    assert(!memcmp(data+new_state,original+old_state,old_length-old_state));
 }
 static int validate_staged_journal(const void *data,u32 length,u32 tag,void *context)
 {
@@ -115,8 +121,22 @@ static void test_staged_candidate(unsigned child_state)
         assert(save_write_first(candidate,sizeof(*candidate),tags[0]));
         assert(save_select_validated(candidate,sizeof(*candidate),tags,1,
                                      validate_staged_journal,&check,&previous));
+        int linked=-1;
+        for (int i=0;i<MAX_UNITS;++i)
+            if (u[i].alive && u[i].type==SC64_INTERCEPTOR_TYPE &&
+                sc64_p7_carrier_child_state(&u[i])==SC64_P7_INTERCEPTOR_OUTSIDE)
+                { linked=i; break; }
+        assert(linked>=0);
+        Unit invalid=u[linked]; invalid.build=-1;
+        assert(sc64_p7_typed_unit_encode(&candidate->carrier_custom.units[linked],
+                                         &invalid,race_cols*16,race_rows*16));
         candidate->state[31]=22;
         assert(save_write_selected(candidate,sizeof(*candidate),tags[0],&previous,tags,1));
+        assert(save_select_validated(candidate,sizeof(*candidate),tags,1,
+                                     validate_staged_journal,&check,&selected));
+        assert(selected.slot==previous.slot && candidate->state[31]==11);
+        candidate->state[31]=33;
+        assert(save_write_selected(candidate,sizeof(*candidate),tags[0],&selected,tags,1));
         save_test_corrupt_latest(sizeof(*candidate),tags[0]);
         assert(save_select_validated(candidate,sizeof(*candidate),tags,1,
                                      validate_staged_journal,&check,&selected));

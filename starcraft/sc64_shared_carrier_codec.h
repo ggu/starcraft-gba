@@ -23,13 +23,22 @@ static int sc64_shared_carrier_expand_legacy(void *buffer, size_t length,
     const size_t old_tail=offsetof(RaceSave,buildings)+
         sizeof(((RaceSave *)0)->buildings);
     const size_t new_tail=offsetof(RaceSave,minerals_map);
+    const size_t prefix=sizeof(((RaceSave *)0)->minerals_map)+sizeof(((RaceSave *)0)->fog);
+    const size_t old_state=(old_tail+prefix+3u)&~(size_t)3u;
+    const size_t new_state=offsetof(RaceSave,state);
     size_t delta;
-    if (!buffer || !expanded || (old_tail&3u) || old_tail>new_tail || length<old_tail ||
+    if (!buffer || !expanded || (old_tail&3u) || old_tail>new_tail ||
+        offsetof(RaceSave,fog)!=new_tail+sizeof(((RaceSave *)0)->minerals_map) ||
+        new_state<new_tail+prefix || old_state>new_state || length<old_state ||
         length>capacity || sc64_shared_carrier_overlap(buffer,capacity,expanded,sizeof(*expanded))) return 0;
-    delta=new_tail-old_tail;
+    delta=new_state-old_state;
     if (delta>capacity-length) return 0;
-    memmove((u8 *)buffer+new_tail,(u8 *)buffer+old_tail,length-old_tail);
-    memset((u8 *)buffer+old_tail,0,delta);
+    for (size_t i=old_tail+prefix;i<old_state;++i)
+        if (((const u8 *)buffer)[i]) return 0;
+    memmove((u8 *)buffer+new_state,(u8 *)buffer+old_state,length-old_state);
+    memmove((u8 *)buffer+new_tail,(u8 *)buffer+old_tail,prefix);
+    memset((u8 *)buffer+old_tail,0,new_tail-old_tail);
+    memset((u8 *)buffer+new_tail+prefix,0,new_state-new_tail-prefix);
     *expanded=length+delta;
     return 1;
 }
