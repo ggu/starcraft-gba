@@ -55,12 +55,45 @@ passes objects whose type halfword at `+0x64` equals raw 74 or raw 61, plus
 the stored midpoint, to `0x8016376C`. The names, complete eligibility
 predicate, order effect, and behavior of that last callee are not established
 by this read. In particular this evidence does not justify a hero-only or
-idle-only equivalence claim. The last callee lies outside the documented game
-overlay mapping, so its own overlay mapping must be established before ROM
-disassembly.
+idle-only equivalence claim.
+
+The pinned recipe's game overlay has ROM base `0xE38E0`, virtual base
+`0x8011FBF0`, and size `0x49130`. Its virtual end is `0x80168D20`.
+Therefore `0x8016376C` is inside that overlay, at ROM offset `0x12745C`;
+the recipe also names this 148-byte function explicitly. The earlier claim
+that it needed an unknown overlay mapping was an arithmetic error.
+
+Further static reads narrow the behavior without supplying semantic names:
+
+- `0x80128DA0` returns nonzero if the object word at `+0x0C` is zero, or if
+  its byte at `+0x4D` is zero. The scan rejects these objects; it does not
+  compare that byte to an idle-order constant.
+- `0x8016376C` calls a helper if object word `+0x124` is nonzero, computes a
+  map-derived index from the saved midpoint through `0x8004A370`, selects an
+  owner-indexed table through the object's byte at `+0x4C`, and calls
+  `0x80163C04` on a 52-byte entry with the object and a final argument of 1.
+- On successful allocation, `0x80163C04` stores value 4, the object pointer
+  and the table-entry pointer in the new record, then stores that record in
+  object `+0x124`. It obtains a map-derived point through `0x8004A6C4` and
+  passes the object, a numeric order argument and that point to
+  `0x80163800`. That helper has additional state checks, order selection
+  and coordinate processing before its downstream calls.
+
+This is not proof of a direct attack-move to the exact script midpoint. The
+role of the map table, record, numeric orders, and downstream eligibility
+still requires semantic cross-checking and native execution evidence.
+
+## Update-chain evidence
+
+The mapped direct-call chain reaches the instance loop through
+`0x80023920` to `0x80058CFC`, then `0x80058AE0`, then `0x8005EBD8`.
+The first function calls the wrapper unconditionally after another update
+call. Its callers at `0x80023B08` and `0x80023F14` have their own control and
+timing loops, so this does not establish a fixed number of script updates
+per rendered frame or per second. Dynamic cadence remains unqualified.
 
 A next qualification should identify callers and cadence of `0x8005EBD8`,
-map and inspect the two opcode-38 callees, and trace ordinary native execution
+resolve the opcode-38 table/record/order roles, and trace ordinary native execution
 at instance creation, wait entry/resumption and opcode 38. Keep native trace
 and extracted program inputs private. Resource requests, attack groups,
 priority, and the remaining opcodes remain open.
