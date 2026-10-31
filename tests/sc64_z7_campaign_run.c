@@ -1643,7 +1643,9 @@ static int assign_idle_workers_to_minerals(void)
 {
     static unsigned patch_retry_after[MAX_MINERALS];
     int assigned=0;
-    for(int worker=0;worker<MAX_UNITS;worker++)if(z7_worker_available_for_new_job(worker)&&
+    for(int candidate=0;candidate<MAX_UNITS;candidate++) {
+        int worker=candidate;
+        if(z7_worker_available_for_new_job(worker)&&
         !(u[worker].order==ORDER_BUILD_PENDING&&u[worker].target==B_EXTRACTOR)&&
         u[worker].order!=ORDER_GAS&&u[worker].order!=ORDER_MOVE&&!u[worker].carry&&
         !(u[worker].order==ORDER_MINE&&z7_safe_local_mineral(u[worker].target,0))) {
@@ -1666,9 +1668,19 @@ static int assign_idle_workers_to_minerals(void)
         }
         if(target<0)continue;
         if(!select_worker(worker)) {
-            fprintf(stderr,"Z7 mineral select failed worker%d order%d target%d frame%d\n",
-                worker,u[worker].order,u[worker].target,frame);
-            continue;
+            /* Stacked Drones have the same clickable point. Use the actual
+               selected idle Drone, never write selection or game state. */
+            int actual=-1;
+            if(selected_count()==1)for(int i=0;i<MAX_UNITS;i++)if(u[i].selected&&
+                z7_worker_available_for_new_job(i)&&u[i].order==ORDER_IDLE&&!u[i].carry)
+                actual=i;
+            if(actual<0) {
+                fprintf(stderr,"Z7 mineral select failed worker%d order%d target%d frame%d\n",
+                    worker,u[worker].order,u[worker].target,frame);
+                continue;
+            }
+            fprintf(stderr,"Z7 stacked worker selected requested%d actual%d frame%d\n",worker,actual,frame);
+            worker=actual;
         }
         if(!currently_visible(m[target].x,m[target].y)) {
             /* Approach an explored field with ordinary Move input; the
@@ -1690,6 +1702,7 @@ static int assign_idle_workers_to_minerals(void)
             fprintf(stderr,"Z7 mineral click failed worker%d order%d target%d intended%d cursor%d,%d field%d,%d frame%d\n",
                 worker,u[worker].order,u[worker].target,target,cx,cy,m[target].x,m[target].y,frame);
         }
+    }
     }
     return assigned;
 }
