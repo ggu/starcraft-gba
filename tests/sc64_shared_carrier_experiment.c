@@ -58,7 +58,7 @@ static void test_typed_rows(void)
     }
 }
 #if !defined(SC64_P7_PROJECTILES_ENABLED)
-static void test_staged_candidate(void)
+static void test_staged_candidate(unsigned child_state)
 {
     RaceSave *candidate=&race_data;
 #ifdef SC64_ZP_CAMPAIGN_STORAGE
@@ -89,10 +89,10 @@ static void test_staged_candidate(void)
     int child=-1;
     for (int i=0;i<MAX_UNITS;++i)
         if (scratch[i].alive && scratch[i].type==SC64_INTERCEPTOR_TYPE &&
-            sc64_p7_carrier_child_state(&scratch[i])==SC64_P7_INTERCEPTOR_OUTSIDE)
+            sc64_p7_carrier_child_state(&scratch[i])==child_state)
             { child=i; break; }
     assert(child>=0);
-    scratch[child].build=-1;
+    scratch[child].build=child_state==SC64_P7_INTERCEPTOR_OUTSIDE ? -1 : 0;
     assert(sc64_p7_typed_unit_encode(&candidate->carrier_custom.units[child],
                                      &scratch[child],race_cols*16,race_rows*16));
     assert(!sc64_shared_carrier_candidate_valid(candidate,scratch,MAX_UNITS,
@@ -231,11 +231,14 @@ int main(void)
     assert(sc64_pool_active_head(&race_p7_projectiles)!=SC64_END);
     test_render_arena();
 #if !defined(SC64_P7_PROJECTILES_ENABLED)
-    test_staged_candidate();
+    test_staged_candidate(SC64_P7_INTERCEPTOR_OUTSIDE);
 #endif
     hit_target(doomed,10000,U_MARINE,ENEMY);
     assert(!u[doomed].alive && u[child].alive && u[child].build==-1 &&
            sc64_p7_carrier_child_state(&u[child])==SC64_P7_INTERCEPTOR_DETACHED);
+#if !defined(SC64_P7_PROJECTILES_ENABLED)
+    test_staged_candidate(SC64_P7_INTERCEPTOR_DETACHED);
+#endif
     /* Each custom-game opponent uses its own wallet and actor binding. */
     for (int owner=1; owner<5; ++owner) {
         if (owner==SIDE) continue;
