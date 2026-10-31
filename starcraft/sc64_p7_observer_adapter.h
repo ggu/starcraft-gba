@@ -300,8 +300,8 @@ static int sc64_p7_observer_arbiter_aura_cloaks(int target)
  * advancing in title/pause/result states (game_update returns before here).
  * Target timer refresh is 31 source updates; first aura application refreshes
  * immediately, matching cloak_unit's immediate update_detected_flags call. */
-static unsigned sc64_p7_arbiter_detected_mask(int target,
-                                                  const u8 powered_cannons[MAX_BUILDINGS])
+static unsigned sc64_p7_arbiter_detected_mask_with_owners(int target,
+        const u8 powered_cannons[MAX_BUILDINGS], const int source_owners[8])
 {
     unsigned visible_owners=0,detected=0;
     int x,y,col,row,cx,cy;
@@ -336,10 +336,10 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
 #endif
         unsigned candidate=0;
         if(source>=0&&source<8) {
-            int live=race_protoss_source_owner((unsigned)source);
+            int live=source_owners[source];
             if(live>=0&&live==u[i].owner) candidate=1u<<(unsigned)source;
         } else for(unsigned owner=0;owner<7;++owner)
-            if(race_protoss_source_owner(owner)==u[i].owner) candidate|=1u<<owner;
+            if(source_owners[owner]==u[i].owner) candidate|=1u<<owner;
         if(!(candidate & ~visible_owners)) continue;
         int radius=sc64_p7_observer_sight_radius_runtime(u[i].type,0);
         if(dx*dx+dy*dy>radius*radius) continue;
@@ -356,10 +356,10 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
 #endif
         unsigned candidate=0;
         if(source>=0&&source<8) {
-            int live=race_protoss_source_owner((unsigned)source);
+            int live=source_owners[source];
             if(live>=0&&live==b[i].owner) candidate=1u<<(unsigned)source;
         } else for(unsigned owner=0;owner<7;++owner)
-            if(race_protoss_source_owner(owner)==b[i].owner) candidate|=1u<<owner;
+            if(source_owners[owner]==b[i].owner) candidate|=1u<<owner;
         if(!(candidate & ~visible_owners)) continue;
         int radius=sc64_p7_observer_sight_radius_runtime(b[i].type,1);
         if(dx*dx+dy*dy>radius*radius) continue;
@@ -384,10 +384,10 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
             u[i].x,u[i].y,0,(unsigned)RACE_PROTOSS_RAW(&u[target]),u[target].x,u[target].y,0);
 #endif
         if(distance<0||distance>SC64_P7_OBSERVER_BASE_SIGHT_SOURCE_PX) continue;
-        if(source>=0&&source<8 && race_protoss_source_owner((unsigned)source)==u[i].owner &&
+        if(source>=0&&source<8 && source_owners[source]==u[i].owner &&
            (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
         else if(source<0||source>=8) for(unsigned owner=0;owner<7;++owner)
-            if(race_protoss_source_owner(owner)==u[i].owner &&
+            if(source_owners[owner]==u[i].owner &&
                (visible_owners&(1u<<owner))) detected|=1u<<owner;
     }
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive &&
@@ -406,10 +406,10 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
             b[i].x,b[i].y,1,(unsigned)RACE_PROTOSS_RAW(&u[target]),u[target].x,u[target].y,0);
 #endif
         if(distance<0||distance>SC64_P7_CANNON_DETECTION_SOURCE_PX) continue;
-        if(source>=0&&source<8 && race_protoss_source_owner((unsigned)source)==b[i].owner &&
+        if(source>=0&&source<8 && source_owners[source]==b[i].owner &&
            (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
         else if(source<0||source>=8) for(unsigned owner=0;owner<7;++owner)
-            if(race_protoss_source_owner(owner)==b[i].owner &&
+            if(source_owners[owner]==b[i].owner &&
                (visible_owners&(1u<<owner))) detected|=1u<<owner;
     }
 #ifdef SC64_P7_GEOMETRY_RECT_HOIST_ENABLED
@@ -425,7 +425,7 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
             distance=sc64_p7_observer_rect_distance_rects(
                 ol,ot,or_,ob,target_l,target_t,target_r,target_b);
         if(distance<0||distance>SC64_OVERLORD_DETECTION_SOURCE_PX) continue;
-        if(source>=0&&source<8 && race_protoss_source_owner((unsigned)source)==u[i].owner &&
+        if(source>=0&&source<8 && source_owners[source]==u[i].owner &&
            (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
     }
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive &&
@@ -437,17 +437,28 @@ static unsigned sc64_p7_arbiter_detected_mask(int target,
             distance=sc64_p7_observer_rect_distance_rects(
                 sl,st,sr,sb,target_l,target_t,target_r,target_b);
         if(distance<0||distance>SC64_SPORE_DETECTION_SOURCE_PX) continue;
-        if(source>=0&&source<8 && race_protoss_source_owner((unsigned)source)==b[i].owner &&
+        if(source>=0&&source<8 && source_owners[source]==b[i].owner &&
            (visible_owners&(1u<<(unsigned)source))) detected|=1u<<(unsigned)source;
     }
 #endif
     return detected&255u;
 }
 
+static unsigned sc64_p7_arbiter_detected_mask(int target,
+        const u8 powered_cannons[MAX_BUILDINGS])
+{
+    int source_owners[8];
+    for(unsigned owner=0;owner<8;++owner)
+        source_owners[owner]=race_protoss_source_owner(owner);
+    return sc64_p7_arbiter_detected_mask_with_owners(target,powered_cannons,
+                                                  source_owners);
+}
+
 static void sc64_p7_arbiter_cache_source_tick(void)
 {
     unsigned i,j;
     u8 powered_cannons[MAX_BUILDINGS];
+    int source_owners[8];
     int powered_cannons_ready=0;
     unsigned global=(unsigned)RACE_PROTOSS_SERVICE_CLOCK[1] |
                     ((unsigned)RACE_PROTOSS_SERVICE_CLOCK[2]<<8);
@@ -577,18 +588,24 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                 /* Building and owner state are unchanged within this tick.
                  * Compute the shared snapshot only if a refresh needs it. */
                 if (!powered_cannons_ready) {
+                    /* This pass changes only per-unit cache words. Binding,
+                     * mission owner maps and building state stay fixed until
+                     * it returns, so resolve the source owners once. */
+                    for(unsigned owner=0;owner<8;++owner)
+                        source_owners[owner]=race_protoss_source_owner(owner);
                     memset(powered_cannons,0,sizeof(powered_cannons));
                     for(j=0;j<MAX_BUILDINGS;++j) if(b[j].alive &&
                         RACE_PROTOSS_RAW(&b[j])==SC64_P7_CANNON_RAW && building_complete((int)j) &&
                         RACE_PROTOSS_SLOT(&b[j])>=0 && RACE_PROTOSS_SLOT(&b[j])<8) {
-                        int live=race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&b[j]));
+                        int live=source_owners[RACE_PROTOSS_SLOT(&b[j])];
                         if(live==b[j].owner)
                             powered_cannons[j]=(u8)sc64_p7_observer_pylon_powers((int)j,
                                 RACE_PROTOSS_SLOT(&b[j]),live);
                     }
                     powered_cannons_ready=1;
                 }
-                mask=sc64_p7_arbiter_detected_mask((int)i,powered_cannons);
+                mask=sc64_p7_arbiter_detected_mask_with_owners((int)i,
+                                                powered_cannons,source_owners);
                 timer=30;
             } else {
                 mask=SC64_P7_ARBITER_DETECTED_MASK(old);
