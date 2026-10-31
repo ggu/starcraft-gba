@@ -154,3 +154,21 @@ as distinct steps. The source harness is
 `tests/sc64_openbw_dark_swarm_world.cpp`; it reads private inputs by path and
 does not contain those inputs. Actual UI/order, movement/turn state, visual,
 damage and continuation integration remain open.
+
+### Proposed gated order-state ownership
+
+A subsequent integration can maintain a dedicated bounded simulation sidecar
+indexed by live unit slot: actor generation/identity, source heading, cast
+phase, target coordinates and elapsed source ticks. It must initialize from the
+actual source spawn/heading rules, update during ordinary movement and turning,
+validate the actor generation on every use, and clear on death, replacement,
+new game and load. The visual `sc64_facing` byte cannot supply this state.
+Active field records need separate bounded ownership and generation-aware
+allocation. Use the native player input and shared AI request paths to create
+orders; any temporary use of an existing order code must be conditioned on the
+raw actor identity and reconciled with STOP, selection, interrupts and the
+four-bit codec. Reject saves while a caster or field requires this unencoded
+state; later replace the guard with a versioned transactional codec. Debit,
+release, projectile and field allocation should be separate transitions driven
+by source ticks and the actual-world observations above. This is a design to
+implement and test, not an assertion that the current game has those paths.
