@@ -3942,6 +3942,9 @@ static void macro_step(void)
     /* Use live worker and mineral-patch proximity as the evacuation trigger;
        a broad Hatchery radius can strand otherwise productive Drones. */
     int home=z7_townhall(SIDE);
+    /* The defended-home branch below returns while waiting for paid tech.
+     * Start safe local mining first or that wait can never earn minerals. */
+    if(!enemy_at_minerals&&!workers_retreating&&assign_idle_workers_to_minerals())return;
     /* Start the paid air route only after ordinary recon has exhausted
        reachable fog and no currently visible enemy building has a ground
        attack path. Do not inspect hidden enemy structure counts or positions. */
