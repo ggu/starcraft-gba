@@ -1,5 +1,6 @@
 #ifndef SC64_P5_WORLD_ADAPTER_H
 #define SC64_P5_WORLD_ADAPTER_H
+#include "sc64_unit_slot_free.h"
 
 /* P5 source operands resolved against the live fixed-size game arrays.  This
  * is a bounded authored callback, not a general CHK interpreter. */
@@ -459,7 +460,7 @@ static int sc64_p5_world_action(void *context, const Sc64P5SourceAction *a)
         type = sc64_race_unit_from_raw(a->unit);
         owner = ctx->live_owner_for_source[source_owner];
         if (type < 0 || owner < 0) return 0;
-        for (int i = 0; i < MAX_UNITS; ++i) free_slots += !u[i].alive;
+        for (int i = 0; i < MAX_UNITS; ++i) free_slots += SC64_UNIT_SLOT_FREE(i);
         if (free_slots < (int)count) return 0;
         for (unsigned n = 0; n < count; ++n) {
             int slot = spawn_unit(owner, type, (l + r) / 2, (t + btm) / 2);

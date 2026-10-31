@@ -18,8 +18,6 @@ static Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT];
 static Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT];
 static const Sc64RaceUnitRule *sc64_race_unit_rule(int type) { return type >= 0 && type < SC_RU_COUNT ? &sc64_race_unit_rules[type] : 0; }
 static const Sc64RaceBuildingRule *sc64_race_building_rule(int type) { return type >= 0 && type < SC_RB_COUNT ? &sc64_race_building_rules[type] : 0; }
-static int sc64_zp_actor_default_hp(int type) { (void)type; return 0; }
-static int sc64_zp_actor_default_shields(int type) { (void)type; return 0; }
 static int sc64_zp_building_default_hp(int type) { (void)type; return 0; }
 /* Synthetic canonical-provider API; real stock capacities are checked by
  * the imported game fixture, separately from these codec property cases. */

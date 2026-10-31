@@ -1,5 +1,6 @@
 #ifndef SC64_RACE_CAMPAIGN_ADAPTER_H
 #define SC64_RACE_CAMPAIGN_ADAPTER_H
+#include "sc64_unit_slot_free.h"
 
 /* Mission-specific port rules for the first two Zerg and Protoss maps,
  * plus the existing Terran rules when SC64_UNIFIED is enabled. Source map/trigger evidence is the user-supplied verified
@@ -334,7 +335,7 @@ race_campaign_p2_ai_queue_room(void)
         (race_campaign.objective_flags & SC64_RACE_OBJECTIVE_FENIX_READY) ||
         race_campaign.phase == SC64_RACE_PHASE_COMPLETE ||
         race_campaign.phase == SC64_RACE_PHASE_FAILED) return MAX_UNITS;
-    for (i = 0; i < MAX_UNITS; ++i) free_slots += !u[i].alive;
+    for (i = 0; i < MAX_UNITS; ++i) free_slots += SC64_UNIT_SLOT_FREE(i);
     /* Count every owner's pending products because any of them can occupy
      * the slots needed by the source trigger. Zerglings hatch as pairs. */
     for (i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive)
@@ -423,13 +424,20 @@ race_campaign_ai_tick(void)
     (void)producer_type;
 }
 
+#ifdef SC64_DEFILER_IMPORT_FIXTURE
+#if !defined(SC64_SHARED_DEFILER_HERO_PROBE)
+#error "Defiler import fixture requires the disabled hero probe"
+#endif
+/* Synthetic authored map record for the isolated import fixture only. */
+static const Sc64RaceMap *sc64_defiler_import_fixture_map;
+#endif
 static void
 race_campaign_init(void)
 {
     const Sc64RaceMap *map;
     int i, player_x = 0, player_y = 0, player_n = 0;
     int human_owner;
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     race_p7_projectile_reset();
 #endif
 
@@ -548,6 +556,9 @@ race_campaign_init(void)
         );
 #endif
     map = &sc64_race_maps[race_selected_mission];
+#ifdef SC64_DEFILER_IMPORT_FIXTURE
+    if(sc64_defiler_import_fixture_map)map=sc64_defiler_import_fixture_map;
+#endif
 #ifdef SC64_Z7_RUNTIME
     if (race_z7_active() && !race_z7_source_row_counts(map)) {
         ++mission_unsupported_count; screen = SCREEN_PAUSE; toast(14); return;
@@ -1050,7 +1061,7 @@ race_campaign_spawn_p2_reinforcements(void)
     };
     int i, type, slot, free_slots = 0, created[14], old_supply_used = supply_used;
     /* P2 TRIG record 5: CountdownTimer(900), MRGN 1/3/4/5. */
-    for (i = 0; i < MAX_UNITS; ++i) free_slots += !u[i].alive;
+    for (i = 0; i < MAX_UNITS; ++i) free_slots += SC64_UNIT_SLOT_FREE(i);
     if (free_slots < 14) return 0;
     for (i = 0; i < 14; ++i)
         if (sc64_race_unit_from_raw(raw_types[i]) < 0) return 0;

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #ifndef SC64_P7_PROJECTILE_ADAPTER_H
 #define SC64_P7_PROJECTILE_ADAPTER_H
-#ifdef SC64_P7_PROJECTILES_ENABLED
+#if defined(SC64_P7_PROJECTILES_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 
 /* Mode 4 leaves the upper 16 KiB of OBJ VRAM unused by the display. This
  * pool owns its first 4816 bytes through the map in sc64_obj_vram.h, which
@@ -17,9 +17,23 @@ static Sc64Arena race_p7_projectiles={SC64_OBJ_VRAM_PROJECTILES,SC64_ARENA_WORDS
 #define race_p7_projectile_host_words ((u16 *)(void *)GBA_VRAM_SCRATCH)
 #endif
 static u8 race_p7_projectile_fault;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+static u32 sc64_shared_interceptor_handles[SC64_POOL_CAPACITY];
+static void sc64_shared_interceptor_clear(void)
+{
+    for(unsigned i=0;i<SC64_POOL_CAPACITY;++i) if(sc64_shared_interceptor_handles[i]) {
+        (void)sc64_shared_projectile_release(&sc64_shared_projectiles,
+            sc64_shared_interceptor_handles[i],SC64_SHARED_PROJECTILE_INTERCEPTOR,i);
+        sc64_shared_interceptor_handles[i]=0;
+    }
+}
+#endif
 
 static void race_p7_projectile_reset(void)
 {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    sc64_shared_interceptor_clear();
+#endif
     race_p7_projectile_fault=(u8)!sc64_pool_init(&race_p7_projectiles);
 }
 
@@ -31,7 +45,26 @@ static int race_p7_projectile_encode(u8 *packet)
 
 static int race_p7_projectile_restore(const u8 *packet)
 {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    /* Do not overwrite another family's live reservation on an experimental
+     * load. The shared typed codec is not implemented yet. */
+    if(sc64_shared_projectiles.active) return 0;
+#endif
     if (!sc64_codec_decode(&race_p7_projectiles,packet,SC64_CODEC_BYTES)) return 0;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    {
+        u8 id=sc64_pool_active_head(&race_p7_projectiles); unsigned steps=0;
+        memset(sc64_shared_interceptor_handles,0,sizeof(sc64_shared_interceptor_handles));
+        while(id!=SC64_END && steps++<SC64_POOL_CAPACITY) {
+            Sc64ProjectileRow row; u32 handle;
+            if(!sc64_pool_get_row(&race_p7_projectiles,id,&row)) return 0;
+            handle=sc64_shared_projectile_acquire(&sc64_shared_projectiles,SC64_SHARED_PROJECTILE_INTERCEPTOR,id);
+            if(!handle) return 0;
+            sc64_shared_interceptor_handles[id]=handle; id=row.next_link;
+        }
+        if(id!=SC64_END) return 0;
+    }
+#endif
     race_p7_projectile_fault=0;
     return 1;
 }
@@ -84,20 +117,20 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
     Sc64ProjectileRow row;
     u8 id,native_index;
 #if defined(SC64_P7_CARRIER_TRAINING_ENABLED) && \
-    !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED)
+    !defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && !defined(SC64_SHARED_CARRIER_EXPERIMENT)
     /* All children in this profile are still inside the hangar. */
     (void)shooter; (void)target; (void)heading;
     (void)source_x_q8; (void)source_y_q8;
     return 0;
 #endif
-#ifdef SC64_P7_INTERCEPTOR_FLIGHT_ENABLED
+#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
     /* Only launched Interceptors fire; hangar rows stay inert. */
     if (shooter>=0 && shooter<MAX_UNITS && SC64_CARRIER_HANGAR_HIDDEN(&u[shooter]))
         return 0;
 #endif
-    if (!race_protoss_services_active() || race_p7_projectile_fault || shooter<0 ||
+    if (!race_carrier_services_active() || race_p7_projectile_fault || shooter<0 ||
         shooter>=MAX_UNITS || !u[shooter].alive ||
-        u[shooter].type!=U_P7_INTERCEPTOR || RACE_PROTOSS_RAW(&u[shooter])!=73 ||
+        u[shooter].type!=SC64_INTERCEPTOR_TYPE || RACE_PROTOSS_RAW(&u[shooter])!=73 ||
         RACE_PROTOSS_SLOT(&u[shooter])<0 || RACE_PROTOSS_SLOT(&u[shooter])>=8 ||
         race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&u[shooter]))!=u[shooter].owner ||
         source_x_q8<0 || source_y_q8<0 ||
@@ -107,9 +140,29 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
         !sc64_interceptor_projectile_launch(&row,source_x_q8,source_y_q8,
             (s16)(target_x(target)*2),(s16)(target_y(target)*2),heading,
             (u16)target,(u8)shooter,(u8)RACE_PROTOSS_SLOT(&u[shooter]))) return 0;
+#ifdef SC64_SHARED_DARK_SWARM_PROBE
+    /* The source decides a fly/follow bullet's miss at initialization.
+     * This stage preserves the damage miss bit; source miss displacement and
+     * non-swarm RNG remain separately unqualified. */
+    { int swarm=sc64_world_dark_swarm_affects_target(target);
+      if(swarm<0)return 0;
+      if(swarm>0)row.hit_flags_low2|=1u; }
+#endif
     if (!sc64_pool_acquire(&race_p7_projectiles,&id,&native_index)) return 0;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    u32 shared_handle=sc64_shared_projectile_acquire(&sc64_shared_projectiles,
+        SC64_SHARED_PROJECTILE_INTERCEPTOR,id);
+    if(!shared_handle) { (void)sc64_pool_retire(&race_p7_projectiles,id); return 0; }
+    sc64_shared_interceptor_handles[id]=shared_handle;
+#endif
     (void)native_index;
     if (!sc64_pool_set_row(&race_p7_projectiles,id,&row)) {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+        (void)sc64_shared_projectile_release(&sc64_shared_projectiles,shared_handle,
+            SC64_SHARED_PROJECTILE_INTERCEPTOR,id);
+        sc64_shared_interceptor_handles[id]=0;
+        (void)sc64_pool_retire(&race_p7_projectiles,id);
+#endif
         race_p7_projectile_fault=1; return 0;
     }
     return 1;
@@ -138,12 +191,19 @@ static void race_p7_projectile_source_tick(void)
         /* The pulse is consumed inside this complete update. A saved DYING
          * row must never reapply it after load. Commit before callbacks. */
         row.pending_damage_event=0;
-        if (row.state==3 && !sc64_pool_retire(&race_p7_projectiles,id)) break;
+        if (row.state==3) {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+            if(!sc64_shared_projectile_release(&sc64_shared_projectiles,
+               sc64_shared_interceptor_handles[id],SC64_SHARED_PROJECTILE_INTERCEPTOR,id)) break;
+            sc64_shared_interceptor_handles[id]=0;
+#endif
+            if(!sc64_pool_retire(&race_p7_projectiles,id)) break;
+        }
         if (!sc64_pool_set_row(&race_p7_projectiles,id,&row)) break;
         if (impact && race_p7_projectile_target_alive(row.target_ref)) {
             int owner=race_protoss_source_owner(row.raw_source_owner);
             int damage=6+(owner==SIDE?weapons_level:0);
-            if (owner>=0) hit_target(row.target_ref,damage,U_P7_INTERCEPTOR,owner);
+            if (owner>=0) hit_target(row.target_ref,damage,SC64_INTERCEPTOR_TYPE,owner);
         }
         id=next;
     }
@@ -152,7 +212,7 @@ static void race_p7_projectile_source_tick(void)
 
 static void race_p7_projectile_tick_if_due(void)
 {
-    if (race_protoss_services_active() && RACE_PROTOSS_SERVICE_CLOCK[0]!=4u)
+    if (race_carrier_services_active() && RACE_PROTOSS_SERVICE_CLOCK[0]!=4u)
         race_p7_projectile_source_tick();
 }
 

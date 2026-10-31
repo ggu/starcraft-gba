@@ -4368,6 +4368,7 @@ test-starcraft: test-sc64-interceptor-motion
 # slots. Child training/flight/weapon-event integration remains separate.
 P7_PROJECTILE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_P7_PROJECTILES_ENABLED
 P7_PROJECTILE_SOURCES := starcraft/sc64_interceptor_motion.c starcraft/sc64_interceptor_pool_codec.c
+include tests/defiler/projectile/Makefile
 build/test-sc64-p7-projectile: tests/sc64_p7_projectile_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_PROJECTILE_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) -o $@
 .PHONY: test-sc64-p7-projectile protoss-p7-projectile-probe
@@ -6048,7 +6049,6 @@ $(eval $(call SCARAB_SUNKEN_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
 .PHONY: test-scarab-sunken
 test-scarab-sunken: test-scarab-sunken-terran test-scarab-sunken-zerg test-scarab-sunken-protoss test-scarab-sunken-showcase
 
-# Opt-in probes use canonical weapon flags and must track the selected bank.
 test-scarab-shared-impact-terran test-scarab-postimpact-gap-terran \
   test-scarab-cross-zerg test-scarab-cross-protoss test-scarab-cross-showcase \
   test-scarab-deadrow-terran test-scarab-deadrow-zerg test-scarab-deadrow-protoss test-scarab-deadrow-showcase \
@@ -6101,6 +6101,9 @@ $(eval $(call SCARAB_PARENT_CLEANUP_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
 .PHONY: test-scarab-parent-cleanup
 test-scarab-parent-cleanup: test-scarab-parent-cleanup-terran test-scarab-parent-cleanup-zerg test-scarab-parent-cleanup-protoss test-scarab-parent-cleanup-showcase
 
+include tests/defiler/early/Makefile
+include tests/defiler/Makefile
+include tests/carrier/Makefile
 include tests/carrier-fixtures/Makefile
 
 include tests/terrain-storage/Makefile

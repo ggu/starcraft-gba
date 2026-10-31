@@ -20,6 +20,21 @@
 #endif
 static Sc64ImpactEvent race_impact_rows[RACE_IMPACT_CAPACITY];
 static u8 race_impact_count;
+#if defined(SC64_SHARED_PROJECTILE_STAGE) && defined(SC64_SCARAB_WEAPON_PROBE)
+/* Indexed alongside compacted impact rows; zero denotes an ordinary packet. */
+static u32 race_impact_scarab_handles[RACE_IMPACT_CAPACITY];
+/* Weapon82 remains allocated for one source update after domissiledmg. */
+static u32 race_impact_scarab_tail_handles[RACE_IMPACT_CAPACITY];
+static u8 race_impact_scarab_tail_count;
+static void race_impact_scarab_release(unsigned i)
+{
+    if(race_impact_scarab_handles[i]) {
+        (void)sc64_shared_projectile_release(&sc64_shared_projectiles,
+            race_impact_scarab_handles[i], SC64_SHARED_PROJECTILE_SCARAB, 0);
+        race_impact_scarab_handles[i]=0;
+    }
+}
+#endif
 /* Diagnostics only; neither is saved and neither affects simulation. */
 static u8 race_impact_high_water;
 static u16 race_impact_deferred;
@@ -27,6 +42,15 @@ static u16 race_impact_deferred;
 static void
 race_impact_reset(void)
 {
+#if defined(SC64_SHARED_PROJECTILE_STAGE) && defined(SC64_SCARAB_WEAPON_PROBE)
+    for(unsigned i=0;i<race_impact_count;i++) race_impact_scarab_release(i);
+    for(unsigned i=0;i<race_impact_scarab_tail_count;i++)
+        (void)sc64_shared_projectile_release(&sc64_shared_projectiles,
+            race_impact_scarab_tail_handles[i],SC64_SHARED_PROJECTILE_SCARAB,0);
+    race_impact_scarab_tail_count=0;
+    memset(race_impact_scarab_handles,0,sizeof(race_impact_scarab_handles));
+    memset(race_impact_scarab_tail_handles,0,sizeof(race_impact_scarab_tail_handles));
+#endif
     race_impact_count = 0;
     race_impact_high_water = 0;
     race_impact_deferred = 0;
@@ -35,6 +59,9 @@ race_impact_reset(void)
 static void
 race_impact_clear_target(int ref)
 {
+#ifdef SC64_SHARED_ORDINARY_STAGE
+    race_shared_ordinary_forget_target(ref);
+#endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     unsigned keep=0;
     for(unsigned i=0;i<race_impact_count;i++) {
@@ -43,8 +70,17 @@ race_impact_clear_target(int ref)
             Sc64ScarabImpact packet;
             if(sc64_scarab_impact_unpack(&row,&packet) && packet.target==ref)
                 sc64_scarab_impact_forget_target(&row);
-        } else if(sc64_impact_event_target(&row)==ref) continue;
-        race_impact_rows[keep++]=row;
+        } else if(sc64_impact_event_target(&row)==ref) {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+            race_impact_scarab_release(i);
+#endif
+            continue;
+        }
+        race_impact_rows[keep]=row;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+        race_impact_scarab_handles[keep]=race_impact_scarab_handles[i];
+#endif
+        ++keep;
     }
     race_impact_count=(u8)keep;
 #else
@@ -166,6 +202,9 @@ race_impact_launch(int target, int damage, int hits, int owner,
     Sc64ImpactPushResult r = sc64_impact_push(race_impact_rows, RACE_IMPACT_CAPACITY,
                                               &race_impact_count, &hit, steps);
     if (r == SC64_IMPACT_QUEUED) {
+#if defined(SC64_SHARED_PROJECTILE_STAGE) && defined(SC64_SCARAB_WEAPON_PROBE)
+        race_impact_scarab_handles[race_impact_count-1]=0;
+#endif
         if (race_impact_count > race_impact_high_water)
             race_impact_high_water = race_impact_count;
         return;
@@ -192,6 +231,14 @@ race_impact_resolve(const Sc64ImpactEvent *e)
 static void __attribute__((noinline))
 race_impact_tick(void)
 {
+#if defined(SC64_SHARED_PROJECTILE_STAGE) && defined(SC64_SCARAB_WEAPON_PROBE)
+    if(sc64_battlecruiser_source_tick_due()) {
+        for(unsigned i=0;i<race_impact_scarab_tail_count;i++)
+            (void)sc64_shared_projectile_release(&sc64_shared_projectiles,
+                race_impact_scarab_tail_handles[i],SC64_SHARED_PROJECTILE_SCARAB,0);
+        race_impact_scarab_tail_count=0;
+    }
+#endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     /* Advance all rows before resolving, then leave due rows in the shared
      * queue until taken. Death/slot cleanup can invalidate a later due
@@ -202,15 +249,29 @@ race_impact_tick(void)
         Sc64ImpactEvent row=race_impact_rows[i];
         if(row.source_type==SC64_SCARAB_IMPACT_MARKER) {
             Sc64ScarabImpact packet;
-            if(!sc64_scarab_impact_unpack(&row,&packet))continue;
+            if(!sc64_scarab_impact_unpack(&row,&packet)) {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+                race_impact_scarab_release(i);
+#endif
+                continue;
+            }
             if(packet.target>=0 && !target_alive(packet.target)) sc64_scarab_impact_forget_target(&row);
             if(sc64_battlecruiser_source_tick_due() && packet.ticks)
                 row.steps=(u8)(row.steps-16u);
         } else {
-            if(!target_alive(sc64_impact_event_target(&row)))continue;
+            if(!target_alive(sc64_impact_event_target(&row))) {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+                race_impact_scarab_release(i);
+#endif
+                continue;
+            }
             if(row.steps)--row.steps;
         }
-        race_impact_rows[keep++]=row;
+        race_impact_rows[keep]=row;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+        race_impact_scarab_handles[keep]=race_impact_scarab_handles[i];
+#endif
+        ++keep;
     }
     race_impact_count=(u8)keep;
     for(;;) {
@@ -221,7 +282,20 @@ race_impact_tick(void)
         }
         if(i==race_impact_count)break;
         Sc64ImpactEvent due=race_impact_rows[i];
-        for(unsigned j=i+1;j<race_impact_count;j++)race_impact_rows[j-1]=race_impact_rows[j];
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+        if(due.source_type==SC64_SCARAB_IMPACT_MARKER && race_impact_scarab_handles[i]) {
+            /* All due Scarabs fit: previous tails were retired at the start
+             * of this source tick and there are at most capacity live rows. */
+            race_impact_scarab_tail_handles[race_impact_scarab_tail_count++]=race_impact_scarab_handles[i];
+            race_impact_scarab_handles[i]=0;
+        } else race_impact_scarab_release(i);
+#endif
+        for(unsigned j=i+1;j<race_impact_count;j++) {
+            race_impact_rows[j-1]=race_impact_rows[j];
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+            race_impact_scarab_handles[j-1]=race_impact_scarab_handles[j];
+#endif
+        }
         --race_impact_count;
         if(due.source_type==SC64_SCARAB_IMPACT_MARKER)race_scarab_probe_bullet_resolve(&due);
         else race_impact_resolve(&due);

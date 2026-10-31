@@ -286,7 +286,7 @@ int main(void) {
                 lines, depth = [], 0
                 for line in body.splitlines():
                     if re.match(r'\s*#\s*(if|ifdef|ifndef)\b', line):
-                        if depth or 'SC64_SKIRMISH_ROSTER' in line:
+                        if depth or 'SC64_SKIRMISH_ROSTER' in line or 'SC64_SHARED_DEFILER_HERO_PROBE' in line:
                             depth += 1
                             continue
                     elif re.match(r'\s*#\s*endif\b', line) and depth:
@@ -314,8 +314,8 @@ int main(void) {
                          'raw 101 is intentionally source-invisible')
         extended_units = numeric_raw_ids('sc64_race_raw_unit(int type)',
                                         'sc64_race_raw_building(int type)', True)
-        self.assertEqual(extended_units - unit_assets - {101}, {58, 60, 61, 62, 63},
-                         'identity-only roster art gaps must stay explicit; '
+        self.assertEqual(extended_units - unit_assets - {101}, {52, 58, 60, 61, 62, 63},
+                         'default-off hero and identity-only roster art gaps stay explicit; '
                          'these are not enabled in normal ROMs')
 
         runtime_buildings = numeric_raw_ids('sc64_race_raw_building(int type)',

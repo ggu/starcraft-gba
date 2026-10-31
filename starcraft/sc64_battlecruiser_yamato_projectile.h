@@ -23,9 +23,24 @@ static int race_bc_yamato_launch_resolved(int index,unsigned heading,int missed,
     m.destination_y=(int16_t)destination_y;
     m.heading=m.velocity_direction=(uint8_t)heading;
     m.turn_rate=127; m.lifetime=255; m.turning=1;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    /* Charging does not consume a projectile slot; acquire at release. */
+    u32 shared_handle=sc64_shared_projectile_acquire(&sc64_shared_projectiles,
+        SC64_SHARED_PROJECTILE_YAMATO,(unsigned)index);
+    if(!shared_handle) return 0;
+#endif
     shot->state=SC64_BC_SHOT_FLIGHT;
     shot->phase=(unsigned char)((shot->phase&63u)|(missed?64u:0u));
-    if (!sc64_bc_motion_pack(shot,&m)) { sc64_bc_shot_clear(shot); return 0; }
+    if (!sc64_bc_motion_pack(shot,&m)) {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+        (void)sc64_shared_projectile_release(&sc64_shared_projectiles,shared_handle,
+            SC64_SHARED_PROJECTILE_YAMATO,(unsigned)index);
+#endif
+        sc64_bc_shot_clear(shot); return 0;
+    }
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    sc64_shared_yamato_handles[index]=shared_handle;
+#endif
     /* Source CastSpell continues until its order signal at tick 50. */
     caster->work_timer=(caster->work_timer&~7)|6;
     return 1;
@@ -50,6 +65,11 @@ static int race_bc_yamato_launch_source(int index,unsigned heading,int terrain_c
 #ifdef SC64_TERRAN_LATE_RUNTIME
     if (target>=MAX_UNITS && race_late_airborne(target-MAX_UNITS)) flying=1;
 #endif
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    /* Source obtains a bullet slot before initialization consumes the miss
+     * roll. A full arena must leave the existing spell RNG unchanged. */
+    if(!sc64_shared_projectile_has_capacity(&sc64_shared_projectiles)) return 0;
+#endif
     if (!sc64_bc_yamato_resolve_launch(heading,target_x(target)*2,target_y(target)*2,
             !!flying,terrain_cover,dark_swarm,sc64_bc_spell_random()&255u,&r)) return 0;
     return race_bc_yamato_launch_resolved(index,r.heading,r.missed,r.x,r.y);
@@ -69,8 +89,25 @@ static int race_bc_yamato_launch_world(int index,unsigned heading)
 {
     if (index<0 || index>=SC64_BC_SHOT_LIMIT ||
         sc64_bc_shots[index].target>=MAX_UNITS+MAX_BUILDINGS) return 0;
-    return race_bc_yamato_launch_world_cover(index,heading,
-               sc64_world_dark_swarm_affects_target(sc64_bc_shots[index].target));
+    int swarm=sc64_world_dark_swarm_affects_target(sc64_bc_shots[index].target);
+    if(swarm<0)return 0; /* unknown staged geometry must not bypass a field */
+    return race_bc_yamato_launch_world_cover(index,heading,swarm);
+}
+#endif
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+/* Image 541 Death creates image 544, whose 14 two-tick frames keep the
+ * source bullet sprite alive after domissiledmg. Slots are arena-indexed so
+ * a new cast may reuse its shot row while earlier overlays remain live. */
+static void race_bc_yamato_tail_tick(void)
+{
+    for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++) {
+        Sc64SharedYamatoTail *tail=&sc64_shared_yamato_tails[i];
+        if(tail->handle && tail->remaining && !--tail->remaining) {
+            (void)sc64_shared_projectile_release(&sc64_shared_projectiles,tail->handle,
+                SC64_SHARED_PROJECTILE_YAMATO,tail->owner);
+            memset(tail,0,sizeof(*tail));
+        }
+    }
 }
 #endif
 /* A single authenticated source movement step. A missing target remains a
@@ -99,6 +136,13 @@ static int race_bc_yamato_projectile_step(int index)
                sc64_bc_yamato_visual_tag(SC64_YAMATO_IMPACT_STYLE,0));
 #endif
     int target=shot->target, owner=shot->phase&7, missed=shot->phase&64;
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+    u32 handle=sc64_shared_yamato_handles[index];
+    unsigned slot=(handle&255u);
+    if(!slot || slot>SC64_SHARED_PROJECTILE_CAPACITY || sc64_shared_yamato_tails[slot-1u].handle) return 0;
+    sc64_shared_yamato_tails[slot-1u]=(Sc64SharedYamatoTail){handle,(u8)index,28};
+    sc64_shared_yamato_handles[index]=0;
+#endif
     sc64_bc_shot_clear(shot);
     if (!missed && target!=SC64_BC_SHOT_NO_TARGET && target_alive(target))
         hit_target_impl(target,260,sc64_race_unit_from_raw(12),owner,SC64_STOCK_DMG_EXPLOSIVE);

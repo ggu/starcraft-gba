@@ -1,5 +1,6 @@
 #ifndef SC64_TERRAN_LATE_WORLD_H
 #define SC64_TERRAN_LATE_WORLD_H
+#include "sc64_unit_slot_free.h"
 
 #if defined(SC64_TERRAN_LATE_RUNTIME) && defined(SC64_T4_RUNTIME) && \
     defined(SC64_TERRAN_LATE_ACTORS)
@@ -688,7 +689,7 @@ sc64_terran_late_create(const Sc64T4Action *action, unsigned trigger_owner)
     if (x < 8 || y < 8 || x >= WORLD_W - 8 || y >= WORLD_H - 8) return -1;
     unsigned free_count = 0;
     for (int i = 0; i < MAX_UNITS && free_count < count; ++i)
-        if (!u[i].alive) slots[free_count++] = i;
+        if (SC64_UNIT_SLOT_FREE(i)) slots[free_count++] = i;
     if (free_count < count) return 0;
     /* All actor slots and authored placement inputs have been validated before
      * the first creation. The deterministic compact formation is a GBA policy. */
