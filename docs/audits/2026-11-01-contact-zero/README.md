@@ -16,7 +16,7 @@ The ON ROM ran the same physical-button strict trace through updates 50001–509
 | Update | 1,444,042.07 / 3,460,279 | 1,417,242.11 / 3,428,525 |
 | Orders | 846,134.31 / 2,854,556 | 819,447.50 / 2,828,578 |
 
-Mean main-loop cycles decreased 1.73%, while p95 increased 0.26%; update and orders means decreased 1.86% and 3.15%. Stage counters may overlap. This one bounded emulator window is not hardware FPS or full-mission evidence. Full WIN and fresh-process save/resume checks using the ON ROM, cross-mode oracles and product matrix remain required before adoption.
+Mean main-loop cycles decreased 1.73%, while p95 increased 0.26%; update and orders means decreased 1.86% and 3.15%. Stage counters may overlap. This one bounded emulator window is not hardware FPS or full-mission evidence. The later full WIN and fresh-process save/resume result is recorded below; cross-mode oracles and product qualification remain required before adoption.
 
 Local ON result `/tmp/contact-zero-candidate-50000-20261101/result.json` SHA-256 `a8d180ae7438269b28db593fbd73b924dfb8cd59caf26c86c445064e3424d8a7`, samples SHA-256 `d0c5e2ef500f86703c377cc77a52f1dbfddbacc4090d4cf437592df722c70769`; baseline result `/tmp/contact-capacity-base-50000-20261101/result.json` SHA-256 `d3d79f8e1ce2a13a3a76209b2cac51e92ea0069fdcc94f9547a46d16635a41fa`. Replay script SHA-256 `9870ea6fbeb8489a87604ac3ad12d8089263c6edc428f2eb18ad7d2b13f73004`; lock wrapper `32851d347eb140a79c8040d7a9beff6cde3da3f1a41f0c001c2fe29d7ba97141`. Dense-oracle report SHA-256 `b4a41a4a4844f20b58d591dd68bc73e3d8c6c5b509e69cf46a416657b28a0198`. Temporary evidence and private inputs are not committed.
 
@@ -24,8 +24,23 @@ Local ON result `/tmp/contact-zero-candidate-50000-20261101/result.json` SHA-256
 
 The same ON ROM `c60a58ccb1d5176504dd325d9a8074d0ccafd431afdaefa49f57b0f98eed5d57` subsequently passed a normal-menu physical run: UI at cut 12 matched the expected gameplay state, an ordinary save was exported, and a fresh process resumed it to WIN. The resume passed 302 named checkpoints, ending at update 179753 / frame 177804 with `won=1`, `lost=0`, `outcome=1`, `fault=0`. Its aggregate main-loop counters recorded 392,804,393,848 cycles over 179,753 updates (mean 2,185,245.27) and a 50,583,602-cycle peak; this is an emulator result, not hardware FPS. The sample scope is the named mission/model fields, entity counts and economy, not complete entity arrays. The clean source was frozen at `171526b457d30f10404a6aa2ff9e8bad82509857` (only this audit differs from measured code `a3900a1`), all 109 input pins and three sidecars were verified before and after, and the job held the native lock after checking free space. The physical driver used the actual candidate save; no state was forged.
 
-The local stage receipt `/tmp/contact-zero-full-physical-result.json` hashes to `62d8c700421d474f4d558364c0067e30c9d669dd46502ed24fd913b94818495c`, and the full resume result `/tmp/contact-zero-resume-cut12/result.json` to `a8043a00027c3a46818086cde787c4b935778beed2c454773a39f39ade9e9ce7`. The save and accompanying state metadata hash to `a9707ae835c65ec35be1b32ee6946ab2796940e79ebd0b3a2b5db4a50a52b` and `9010a85f6ac7634ba1356b134d7b5bc96dedfc74622e27fc7d18434adaa7b308` respectively; the full-run wrapper hashes to `8cb869a64ff244871355995ad2c0d2b9a9d73def2e59f0e9c9afc6a2d86c8ac4`. These temporary artifacts are not committed.
+The local stage receipt `/tmp/contact-zero-full-physical-result.json` hashes to `62d8c700421d474f4d558364c0067e30c9d669dd46502ed24fd913b94818495c`, and the full resume result `/tmp/contact-zero-resume-cut12/result.json` to `a8043a00027c3a46818086cde787c4b935778beed2c454773a39f39ade9e9ce7`. The save and accompanying state metadata hash to `a9707ae835c65ec35be1b32ee6946ab2796940e79ebd0b3a2b5db4a50a52e32b` and `9010a85f6ac7634ba1356b134d7b5bc96dedfc74622e27fc7d18434adaa7b308` respectively; the full-run wrapper hashes to `8cb869a64ff244871355995ad2c0d2b9a9d73def2e59f0e9c9afc6a2d86c8ac4`. These temporary artifacts are not committed.
 
 ## Comparable full-run baseline
 
-The retained baseline `/tmp/sc64-z7-promotion-resume-cut12/result.json` and candidate resume both ran 179753 updates with 302 checkpoints. The baseline recorded 396,688,290,660 cycles (mean 2,206,852.13, peak 50,561,315); the candidate recorded 392,804,393,848 (mean 2,185,245.27, peak 50,583,602): mean cycles fell about 0.979%, while the peak rose slightly. Both exported save files have SHA-256 `a9707ae835c65ec35be1b32ee6946ab2796940e79ebd0b3a2b5db4a50a52b`. These emulator counters and checkpoint samples do not establish hardware FPS or full-array equivalence.
+The retained baseline `/tmp/sc64-z7-promotion-resume-cut12/result.json` and candidate resume both ran 179753 updates with 302 checkpoints. The baseline recorded 396,688,290,660 cycles (mean 2,206,852.13, peak 50,561,315); the candidate recorded 392,804,393,848 (mean 2,185,245.27, peak 50,583,602): mean cycles fell about 0.979%, while the peak rose slightly. Both exported save files have SHA-256 `a9707ae835c65ec35be1b32ee6946ab2796940e79ebd0b3a2b5db4a50a52e32b`. These emulator counters and checkpoint samples do not establish hardware FPS or full-array equivalence.
+
+## Shared-path profile links
+
+After the promotion merge `bdd306b90676347d76f43cb32f64735c2ec843ad`, the unconditional shared-path candidate at `c15177476601a5ef115f74f2918074478260cefa` produced a Z7 ROM byte-identical to the measured and full-resume-proven `c60a58ccb1d5176504dd325d9a8074d0ccafd431afdaefa49f57b0f98eed5d57`. All six requested ARM links passed the existing guards; no reserve or capacity was changed.
+
+| Profile | BSS end | IWRAM end |
+| --- | --- | --- |
+| Z7 | `0203d6f8` | `03004f68` |
+| Terran | `020370c0` | `03004b40` |
+| Z6 | `02037134` | `03004c10` |
+| P7 | `020382f4` | `03004a28` |
+| P8 | `02038cbc` | `03004a28` |
+| Showcase | `02036fe8` | `03004cc0` |
+
+The link receipt is `/tmp/contact-zero-final-matrix-20261101/result.json`. All 109 pinned inputs and five prepared sidecars were checked under the shared lock before and after the links, with over 2 GiB free.
