@@ -74,7 +74,12 @@ continuation and hardware checks for every chapter. A subsequent
 qualifies one controller source under both the canonical Z6 and carried Z7
 host vectors. Both traces are byte-identical to their respective earlier
 wins; this is separate qualification, not a relabeled rerun of the entire
-target at 6d5db14. Other profile compatibility remains source-scoped.
+target at 6d5db14. A further ordinary-input
+[Extractor recovery repair](../2026-11-01-z1-z6-extractor-recovery/README.md)
+passes the complete canonical Z6 six-chapter target with its original Z1
+final assertions. Z7 Z1 site checks and victory also pass, with the original
+Z7 Z1 trace unchanged. These later checks retain their own frozen source
+and binary-reuse scopes rather than relabeling the earlier complete run.
 
 The complete normal Z7 witness measured about 6.79 emulated main loops/s;
 Z3 measured about 18.33. These include presentation and UI and are not
