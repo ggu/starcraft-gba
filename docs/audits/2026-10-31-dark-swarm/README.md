@@ -401,3 +401,21 @@ leave at timer zero and its dead unit retain its slot for four more source
 samples; the stage now models that inactive slot tail separately from active
 field lifetime. Other expiry conditions remain unqualified. No production-
 admission claim follows from these fixtures.
+
+
+### Experimental field image
+
+The disabled `SC64_SHARED_DEFILER_ART_PROBE` renders source image 337 using
+the existing modifier-9 projected light renderer. The public generator
+`tools/sc64_dark_swarm_assets.py` extracts its ten frames from the authenticated
+owned ROM, palette remap and palette JSON into an ignored directory; no raw art
+is stored in this repository. The tested generated header SHA-256 is
+`7f137d60b696231cec4cb844b4f49a086d7fcfa09527c0c1fc1fc9c66a9f1946`.
+Image 337 uses IScript 299: Init advances frames 0–4 at one tick each, then
+loops frames 5,6,7,8,9,8,7,6 at three ticks each. The inactive unit tail
+draws death frames 4–1; the last death image after unit-slot retirement is not
+yet represented. The sanitized Showcase-host render fixture follows a real
+menu cast to a field and checks visible pixels at interior, horizontal and
+vertical scene edges while preserving the HUD bands. It does not establish
+source-exact blending, final death-frame lifetime, all profile palettes, ARM
+fit, or native hardware appearance. Normal products remain unchanged.

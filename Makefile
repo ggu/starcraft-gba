@@ -21,6 +21,14 @@ build/test-dark-swarm-executor: tests/sc64_defiler_executor_game.c $(STARCRAFT) 
 test-dark-swarm-executor: build/test-dark-swarm-executor
 	./build/test-dark-swarm-executor
 
+# Requires privately generated, authenticated image 337 and prepared inputs.
+DARK_SWARM_ART_DIR ?= .local/dark-swarm-art-v1
+.PHONY: test-dark-swarm-render
+build/test-dark-swarm-render: tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(DARK_SWARM_ART_DIR)/dark_swarm_source_generated.h $(SHOWCASE_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_ART_PROBE -I$(DARK_SWARM_ART_DIR) $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-dark-swarm-render: build/test-dark-swarm-render
+	./build/test-dark-swarm-render
+
 # Asset-free journal selection prototype; not yet wired to game persistence.
 .PHONY: test-scarab-save-selection
 build/test-scarab-save-selection: tests/gba_save_selection.c common/gba.c common/gba.h Makefile | build

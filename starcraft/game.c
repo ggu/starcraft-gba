@@ -993,6 +993,9 @@ static Sc64SharedProjectileArena sc64_shared_projectiles;
 typedef struct { u16 energy_q8; s16 target_x,target_y; u8 heading, live, intent, phase, age; } Sc64DefilerStageActor;
 static Sc64DefilerStageActor sc64_defiler_stage[MAX_UNITS];
 #endif
+#if defined(SC64_SHARED_DEFILER_ART_PROBE) && (!defined(SC64_SHARED_DEFILER_EXECUTOR) || !defined(SC64_WEAPON_SOURCE_VFX))
+#error "Defiler art requires the experimental executor and source VFX renderer"
+#endif
 #ifdef SC64_SHARED_DEFILER_EXECUTOR
 #if !defined(SC64_SHARED_DEFILER_STAGE) || !defined(SC64_SHARED_PROJECTILE_STAGE) || !defined(SC64_BATTLECRUISER_ENERGY_EXPERIMENT)
 #error "Defiler executor requires staged casters, shared projectiles, and source clock"
@@ -9515,6 +9518,12 @@ draw_unit(Unit * q)
 
 #ifdef SC64_WEAPON_SOURCE_VFX
 #include "sc64_weapon_source_vfx_render.h"
+#ifdef SC64_SHARED_DEFILER_ART_PROBE
+#ifndef SC64_SHARED_DEFILER_EXECUTOR
+#error "Defiler field art requires the disabled executor"
+#endif
+#include "sc64_dark_swarm_raster.h"
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_ART_EXPERIMENT
 #include "sc64_yamato_raster_adapter.h"
 #endif
@@ -9524,6 +9533,10 @@ draw_unit(Unit * q)
 static void
 draw_tracers(void)
 {
+#ifdef SC64_SHARED_DEFILER_ART_PROBE
+    for(int i=0;i<MAX_UNITS;i++)
+        if(sc64_defiler_fields[i].remaining)sc64_dark_swarm_raster_draw(&sc64_defiler_fields[i]);
+#endif
 #ifdef SC64_DIAGNOSTIC_TRACER_PROFILE
     u32 diag_start=gba_clock();
     diag_lookup=diag_cull=diag_raster=diag_motion=diag_actor=diag_projectile=diag_children=0;

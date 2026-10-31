@@ -36,11 +36,38 @@ int main(void)
     assert(debit>=0 && bullet>debit && created>bullet && retired>created && fields()==1);
     int f=-1;for(int i=0;i<MAX_UNITS;i++)if(sc64_defiler_fields[i].remaining)f=i;
     assert(f>=0 && !u[f].alive && !SC64_UNIT_SLOT_FREE(f));
+#ifdef SC64_SHARED_DEFILER_ART_PROBE
+    /* Exercise actual field drawing and HUD/world clipping on an initialized
+     * graphics surface; private extracted pixels remain outside git. */
+    camx=camy=0;memset(visible,0xff,sizeof(visible));
+    sc64_defiler_fields[f].remaining=880;
+    const int art_x[5]={200,0,478,200,200},art_y[5]={110,110,110,0,214};
+    for(int k=0;k<5;k++) {
+        sc64_defiler_fields[f].x=art_x[k];sc64_defiler_fields[f].y=art_y[k];
+        gfx_begin(C_PANEL);draw_tracers();int painted=0;
+        for(int y=0;y<160;y++)for(int x=0;x<240;x++) {
+            int changed=gfx_test_pixel(x,y)!=C_PANEL;
+            if(y<12 || y>=120)assert(!changed);
+            painted+=changed;
+        }
+        assert(painted>0);
+    }
+#endif
     assert(!race_save_game() && !race_load_game());
     u[c].alive=0;assert(!race_save_game() && !race_load_game());
     unsigned remaining=sc64_defiler_fields[f].remaining;
     for(int n=0;n<1300 && sc64_defiler_fields[f].remaining<=900;n++)game_update(0,0);
     assert(remaining && !fields() && sc64_defiler_fields[f].remaining==904 && !SC64_UNIT_SLOT_FREE(f));
+#ifdef SC64_SHARED_DEFILER_ART_PROBE
+    sc64_defiler_fields[f].x=200;sc64_defiler_fields[f].y=110;
+    for(unsigned tail=904;tail>=901;tail--) {
+        sc64_defiler_fields[f].remaining=(u16)tail;
+        gfx_begin(C_PANEL);draw_tracers();int painted=0;
+        for(int y=12;y<120;y++)for(int x=0;x<240;x++)painted+=gfx_test_pixel(x,y)!=C_PANEL;
+        assert(painted>0);
+    }
+    sc64_defiler_fields[f].remaining=904;
+#endif
     for(int n=0;n<30 && sc64_defiler_fields[f].remaining;n++)game_update(0,0);
     assert(!sc64_defiler_fields[f].remaining && SC64_UNIT_SLOT_FREE(f));
     /* Full bullet pool still spends the spell energy; it produces no field. */
