@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := all
 
-include tests/defiler/early.mk
+include tests/defiler/early/Makefile
 
 # Asset-free journal selection prototype; not yet wired to game persistence.
 .PHONY: test-scarab-save-selection
@@ -4370,7 +4370,7 @@ test-starcraft: test-sc64-interceptor-motion
 # slots. Child training/flight/weapon-event integration remains separate.
 P7_PROJECTILE_FLAGS := $(P7_TYPED_RECT_FLAGS) -DSC64_P7_PROJECTILES_ENABLED
 P7_PROJECTILE_SOURCES := starcraft/sc64_interceptor_motion.c starcraft/sc64_interceptor_pool_codec.c
-include tests/defiler/projectile.mk
+include tests/defiler/projectile/Makefile
 build/test-sc64-p7-projectile: tests/sc64_p7_projectile_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(P7_ARBITER_INPUTS) common/gba.c common/gba.h Makefile | build
 	$(CLANG) $(P7_ARBITER_TEST_FLAGS) $(P7_PROJECTILE_FLAGS) $< common/gba.c $(P7_PROJECTILE_SOURCES) -o $@
 .PHONY: test-sc64-p7-projectile protoss-p7-projectile-probe

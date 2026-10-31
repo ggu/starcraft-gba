@@ -126,4 +126,3 @@ build/test-dark-swarm-noncompact-guard: tests/sc64_defiler_noncompact_guard_game
 	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft -I.local/sc64/races/generated -I.local/sc64/backwater/generated -I.local/sc64/interface/generated -I.local/sc64/briefings/generated -I.local/sc64/skirmish/generated -I.local/sc64/bc/generated -DSC64_IMPORTED_MISSION -DSC64_UNIFIED -DSC64_IMPORTED_SKIRMISH -DSC64_RACES -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_APPROACH_PROBE -DSC64_SHARED_DEFILER_SE_APPROACH_PROBE -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_ENERGY_EXPERIMENT $< common/gba.c -o $@
 test-dark-swarm-noncompact-guard: build/test-dark-swarm-noncompact-guard
 	./build/test-dark-swarm-noncompact-guard
-
