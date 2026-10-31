@@ -20,7 +20,11 @@ int main(void)
     assert(!race_scarab_probe_bullet_create(&scarab));
     race_impact_rows[0].steps=(u8)((race_impact_rows[0].steps&15u)|16u);
     frame=0;race_impact_tick();
-    assert(!race_impact_count && sc64_shared_projectiles.active==99);
+    assert(!race_impact_count && sc64_shared_projectiles.active==100 && race_impact_scarab_tail_count==1);
+    assert(!race_save_game() && !race_load_game());
+    assert(!race_p7_projectile_fire(shooter,enemy,64,64*512,64*512));
+    for(int n=0;n<5 && race_impact_scarab_tail_count;n++) {++frame;race_impact_tick();}
+    assert(!race_impact_scarab_tail_count && sc64_shared_projectiles.active==99);
     assert(race_p7_projectile_fire(shooter,enemy,64,64*512,64*512));
     assert(sc64_shared_projectiles.active==100);
     race_p7_projectile_reset();assert(!sc64_shared_projectiles.active);

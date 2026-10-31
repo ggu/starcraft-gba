@@ -1052,12 +1052,22 @@ static inline void sc64_trace_duration_cache_store(int slot, int duration)
 #ifdef SC64_IMPACT_EVENTS
 static void race_impact_reset(void);
 #endif
+#ifdef SC64_SHARED_ORDINARY_STAGE
+static void race_shared_ordinary_reset(void);
+static void race_shared_ordinary_cancel(int slot);
+static int race_shared_ordinary_pending_any(void);
+static void race_shared_ordinary_tick(void);
+static void race_shared_ordinary_forget_target(int ref);
+#endif
 /* Every world start and load clears in-flight effects; a load restores its
  * saved pending impacts afterwards. */
 static inline void clear_tracers(void)
 {
     memset(tracers, 0, sizeof(tracers));
     sc64_trace_duration_cache_reset();
+#ifdef SC64_SHARED_ORDINARY_STAGE
+    race_shared_ordinary_reset();
+#endif
 #ifdef SC64_IMPACT_EVENTS
     race_impact_reset();
 #endif
@@ -1348,6 +1358,8 @@ static u16 sc64_battlecruiser_tech_bits;
 static Sc64BcYamatoShot sc64_bc_shots[SC64_BC_SHOT_LIMIT];
 #ifdef SC64_SHARED_PROJECTILE_STAGE
 static u32 sc64_shared_yamato_handles[SC64_BC_SHOT_LIMIT];
+typedef struct { u32 handle; u8 owner, remaining; } Sc64SharedYamatoTail;
+static Sc64SharedYamatoTail sc64_shared_yamato_tails[SC64_SHARED_PROJECTILE_CAPACITY];
 #endif
 /* Number of frame-counter increments during scripted world pauses, mod 5. */
 static u8 sc64_bc_pause_offset;
@@ -1689,6 +1701,12 @@ static void race_impact_restore(const Sc64ImpactEvent *candidate, int count);
 #endif
 #if defined(SC64_SCARAB_AUTONOMOUS_PROBE) && (!defined(SC64_SCARAB_PACKED_MOTION_PROBE) || !defined(SC64_SIEGE_SPLASH))
 #error "Autonomous Scarab probe requires packed motion and source bounds"
+#endif
+#if defined(SC64_SHARED_ORDINARY_STAGE) && (!defined(SC64_SHARED_PROJECTILE_STAGE) || !defined(SC64_IMPACT_EVENTS) || !defined(SC64_RACES))
+#error "ordinary projectile stage requires shared arena, source impacts and races"
+#endif
+#ifdef SC64_SHARED_ORDINARY_STAGE
+static int race_shared_ordinary_prepare(Unit *,int,int,int,int,const Sc64StockAttack *);
 #endif
 #if defined(SC64_SCARAB_WEAPON_PROBE) && (!defined(SC64_SCARAB_AUTONOMOUS_PROBE) || !defined(SC64_IMPACT_EVENTS))
 #error "Scarab weapon probe requires autonomous control and impact events"
@@ -2202,6 +2220,9 @@ spawn_unit(int owner, int type, int x, int y)
     int i = find_unit_slot();
     if (i < 0)
 	return -1;
+#ifdef SC64_SHARED_ORDINARY_STAGE
+    race_shared_ordinary_cancel(i);
+#endif
 #ifdef SC64_SCARAB_WEAPON_PROBE
     race_scarab_probe_target_invalidate(i);
 #endif
@@ -4864,6 +4885,7 @@ init_state(void)
     memset(sc64_bc_shots,0,sizeof(sc64_bc_shots));
 #ifdef SC64_SHARED_PROJECTILE_STAGE
     memset(sc64_shared_yamato_handles,0,sizeof(sc64_shared_yamato_handles));
+    memset(sc64_shared_yamato_tails,0,sizeof(sc64_shared_yamato_tails));
 #endif
     sc64_bc_pause_offset=0; sc64_bc_spell_rng=42u;
 #endif
@@ -5113,9 +5135,17 @@ void
 game_init(void)
 {
 #ifdef SC64_SHARED_PROJECTILE_STAGE
+    /* Retire family sidecars before invalidating arena generations. */
+#ifdef SC64_SHARED_ORDINARY_STAGE
+    race_shared_ordinary_reset();
+#endif
+#if defined(SC64_SCARAB_WEAPON_PROBE) && defined(SC64_IMPACT_EVENTS)
+    race_impact_reset();
+#endif
     sc64_shared_projectile_reset(&sc64_shared_projectiles);
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     memset(sc64_shared_yamato_handles,0,sizeof(sc64_shared_yamato_handles));
+    memset(sc64_shared_yamato_tails,0,sizeof(sc64_shared_yamato_tails));
 #endif
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
@@ -5334,6 +5364,9 @@ issue_order(int order, int tx, int ty)
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
             if (sc64_race_raw_unit(u[i].type)==12) u[i].work_timer&=~7;
+#endif
+#ifdef SC64_SHARED_ORDINARY_STAGE
+            race_shared_ordinary_cancel(i);
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
             /* A newly accepted move/attack replaces the pending point order. */
@@ -5556,6 +5589,9 @@ stop_selected(void)
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
             if (sc64_defiler_stage[i].live) sc64_defiler_stage[i].intent=0;
+#endif
+#ifdef SC64_SHARED_ORDINARY_STAGE
+            race_shared_ordinary_cancel(i);
 #endif
 	    u[i].order = ORDER_IDLE;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
@@ -7245,7 +7281,20 @@ tick_combat(Unit * q, int target)
 #ifdef SC64_Z6_RUNTIME
             if (!race_z6_hallucination_can_deal_damage((int)(q-u))) impact_steps=0;
 #endif
+#ifdef SC64_SHARED_ORDINARY_STAGE
+            int ordinary_staged=0;
+            if(stock_weapon
+#ifdef SC64_Z6_RUNTIME
+               && race_z6_hallucination_can_deal_damage((int)(q-u))
+#endif
+               ) {
+                int stage_hits=(int)sc64_stock_attack_impact_count(&stock_attack);
+                ordinary_staged=race_shared_ordinary_prepare(q,target,flying,damage,stage_hits,&stock_attack);
+            }
+            if (impact_steps && !ordinary_staged && race_impact_full()) return;
+#else
             if (impact_steps && race_impact_full()) return;
+#endif
 #endif
 #ifdef SC64_UNIT_FACING
 	    SC64_FACING_FIRE(q, target);
@@ -7287,6 +7336,10 @@ tick_combat(Unit * q, int target)
                               sc64_race_unit_hits_vs(q->type,flying);
 #ifdef SC64_IMPACT_EVENTS
         /* Nonzero only for a packet that can deal damage (see above). */
+#ifdef SC64_SHARED_ORDINARY_STAGE
+        if (ordinary_staged) { /* Per-shot release owns this attack. */ }
+        else
+#endif
         if (impact_steps)
             race_impact_launch(target,damage,hits,q->owner,
                                stock_weapon?stock_attack.weapon->damage_class:-1,
@@ -8732,11 +8785,19 @@ game_update(u16 held, u16 pressed)
     race_bc_yamato_sync_references();
 #endif
     update_orders();
+#ifdef SC64_SHARED_ORDINARY_STAGE
+    /* Source unit/IScript releases precede that update's bullet retirement. */
+    race_shared_ordinary_tick();
+#endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
-    if (sc64_battlecruiser_source_tick_due())
+    if (sc64_battlecruiser_source_tick_due()) {
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+        race_bc_yamato_tail_tick();
+#endif
         for (int i=0;i<SC64_BC_SHOT_LIMIT;++i)
             if (sc64_bc_shots[i].state==SC64_BC_SHOT_FLIGHT)
                 (void)race_bc_yamato_projectile_step(i);
+    }
 #endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     race_p7_projectile_tick_if_due();
@@ -11897,6 +11958,9 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #include "race_save_adapter.h"
 #ifdef SC64_IMPACT_EVENTS
 #include "sc64_impact_adapter.h"
+#ifdef SC64_SHARED_ORDINARY_STAGE
+#include "sc64_shared_ordinary_stage.h"
+#endif
 #endif
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
 #include "sc64_scarab_unit_adapter.h"

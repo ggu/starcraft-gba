@@ -44,7 +44,10 @@ int main(void)
     assert(sc64_shared_projectiles.active==100 && race_impact_count==1);
     race_impact_rows[0].steps=(u8)((race_impact_rows[0].steps&15u)|16u);
     frame=0;screen=SCREEN_PLAY;game_update(0,0);
-    assert(race_impact_count==0 && sc64_shared_projectiles.active==99);
+    assert(race_impact_count==0 && sc64_shared_projectiles.active==100 && race_impact_scarab_tail_count==1);
+    assert(!race_scarab_probe_bullet_create(&q));
+    for(int n=0;n<5 && race_impact_scarab_tail_count;n++) {++frame;race_impact_tick();}
+    assert(!race_impact_scarab_tail_count && sc64_shared_projectiles.active==99);
     for(unsigned i=0;i<99;i++)assert(sc64_shared_projectile_release(&sc64_shared_projectiles,other[i],SC64_SHARED_PROJECTILE_SWARM,i));
     assert(sc64_shared_projectiles.active==0);
     assert(race_scarab_probe_bullet_create(&q));
@@ -65,7 +68,9 @@ int main(void)
     assert(race_impact_count==2 && sc64_shared_projectiles.active==2);
     race_impact_rows[0].steps=(u8)((race_impact_rows[0].steps&15u)|16u);
     frame=0;screen=SCREEN_PLAY;game_update(0,0);
-    assert(race_impact_count==1 && sc64_shared_projectiles.active==1);
+    assert(race_impact_count==1 && sc64_shared_projectiles.active==2 && race_impact_scarab_tail_count==1);
+    for(int n=0;n<5 && race_impact_scarab_tail_count;n++) {++frame;race_impact_tick();}
+    assert(sc64_shared_projectiles.active==1);
     clear_tracers();assert(!race_impact_count && !sc64_shared_projectiles.active);
     /* Fully occupied source pool: ordinary paid parent attack still consumes
      * the child when the projectile allocator fails, without causing damage. */

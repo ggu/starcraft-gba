@@ -1049,6 +1049,9 @@ static int race_save_game(void) {
 #ifdef SC64_SHARED_PROJECTILE_STAGE
     /* The experimental typed reservations have no persistent codec yet. */
     if(sc64_shared_projectiles.active) return 0;
+#ifdef SC64_SHARED_ORDINARY_STAGE
+    if(race_shared_ordinary_pending_any()) return 0;
+#endif
 #endif
 #ifdef SC64_SHARED_DEFILER_STAGE
     /* Experimental Defiler energy, pending cast and field state have no
@@ -2789,6 +2792,9 @@ static int race_load_game(void) {
     /* Existing saves lack typed reservations; never overwrite active stage
      * projectiles while this experimental reconstruction is unsupported. */
     if(sc64_shared_projectiles.active) return 0;
+#ifdef SC64_SHARED_ORDINARY_STAGE
+    if(race_shared_ordinary_pending_any()) return 0;
+#endif
 #endif
     RaceLoadPlan plan = {0};
 #ifdef SC64_SCARAB_NAMESPACE_STAGE

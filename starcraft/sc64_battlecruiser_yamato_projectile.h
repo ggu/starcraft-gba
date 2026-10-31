@@ -93,6 +93,22 @@ static int race_bc_yamato_launch_world(int index,unsigned heading)
                sc64_world_dark_swarm_affects_target(sc64_bc_shots[index].target));
 }
 #endif
+#ifdef SC64_SHARED_PROJECTILE_STAGE
+/* Image 541 Death creates image 544, whose 14 two-tick frames keep the
+ * source bullet sprite alive after domissiledmg. Slots are arena-indexed so
+ * a new cast may reuse its shot row while earlier overlays remain live. */
+static void race_bc_yamato_tail_tick(void)
+{
+    for(unsigned i=0;i<SC64_SHARED_PROJECTILE_CAPACITY;i++) {
+        Sc64SharedYamatoTail *tail=&sc64_shared_yamato_tails[i];
+        if(tail->handle && tail->remaining && !--tail->remaining) {
+            (void)sc64_shared_projectile_release(&sc64_shared_projectiles,tail->handle,
+                SC64_SHARED_PROJECTILE_YAMATO,tail->owner);
+            memset(tail,0,sizeof(*tail));
+        }
+    }
+}
+#endif
 /* A single authenticated source movement step. A missing target remains a
  * visible flight but cannot damage a recycled actor. */
 static int race_bc_yamato_projectile_step(int index)
@@ -120,8 +136,10 @@ static int race_bc_yamato_projectile_step(int index)
 #endif
     int target=shot->target, owner=shot->phase&7, missed=shot->phase&64;
 #ifdef SC64_SHARED_PROJECTILE_STAGE
-    if(!sc64_shared_projectile_release(&sc64_shared_projectiles,
-        sc64_shared_yamato_handles[index],SC64_SHARED_PROJECTILE_YAMATO,(unsigned)index)) return 0;
+    u32 handle=sc64_shared_yamato_handles[index];
+    unsigned slot=(handle&255u);
+    if(!slot || slot>SC64_SHARED_PROJECTILE_CAPACITY || sc64_shared_yamato_tails[slot-1u].handle) return 0;
+    sc64_shared_yamato_tails[slot-1u]=(Sc64SharedYamatoTail){handle,(u8)index,28};
     sc64_shared_yamato_handles[index]=0;
 #endif
     sc64_bc_shot_clear(shot);

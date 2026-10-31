@@ -48,7 +48,13 @@ int main(void)
     int replacement=spawn_unit(SIDE,U_MARINE,510,500); assert(replacement>=0);
     assert(sc64_bc_shots[0].target==SC64_BC_SHOT_NO_TARGET && sc64_shared_projectiles.active==100);
     for(int i=0;i<80 && sc64_bc_shots[0].state;i++)assert(race_bc_yamato_projectile_step(0));
-    assert(!sc64_bc_shots[0].state && u[replacement].alive && sc64_shared_projectiles.active==99);
+    assert(!sc64_bc_shots[0].state && u[replacement].alive && sc64_shared_projectiles.active==100);
+    assert(!race_p7_projectile_fire(shooter,enemy,64,64*512,64*512));
+    assert(!race_save_game() && !race_load_game());
+    for(int i=0;i<27;i++) race_bc_yamato_tail_tick();
+    assert(sc64_shared_projectiles.active==100);
+    race_bc_yamato_tail_tick();
+    assert(sc64_shared_projectiles.active==99);
     init_state();assert(!sc64_shared_projectiles.active && !sc64_shared_yamato_handles[0]);
     setup(&shooter,&enemy,&bc,&victim);
     for(int i=0;i<100;i++)assert(race_p7_projectile_fire(shooter,enemy,64,64*512,64*512));

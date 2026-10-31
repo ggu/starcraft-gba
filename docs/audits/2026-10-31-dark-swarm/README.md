@@ -258,7 +258,7 @@ qualification remain open, so this stage is not ready to activate.
 
 On shared merge `e7df0d1`, `SC64_SHARED_PROJECTILE_STAGE` and the existing
 Scarab weapon probe together reserve one typed slot when the actual Scarab
-bullet is created, and release it on impact or queue reset. A gated 32-entry
+bullet is created, and retain it through the post-impact source tick or until queue reset. A gated 32-entry
 handle sidecar follows the existing compacted impact rows. Target loss keeps
 the positional Scarab packet and its reservation; ordinary impact rows remain
 unreserved in this stage. A full typed arena leaves the child consumed and
@@ -333,3 +333,34 @@ impact when full, using private authenticated OpenBW input tables and the
 synthetic walkable map. All six assertion runs exited zero. Its first-release
 sample numbers are fixture-specific and are not used as a general-purpose
 GBA scheduler or a claim of complete ordinary-projectile integration.
+
+
+### Experimental individual ordinary shots and retirement
+
+The disabled `SC64_SHARED_ORDINARY_STAGE` adds an individual-bullet slice for
+Marine raw 0 / weapon 0 and Scout raw 70 / air weapon 74. Pending windups do
+not reserve capacity; release attempts independently acquire the typed 100-slot
+arena. The source-world occupancy runs observed Marine allocation 1/1/0 and
+Scout allocation 2/1/0 at 2/1/0 free slots, respectively, with cooldown spent
+even on failure. The corresponding actual-engine sanitized fixtures exercise
+those cases, partial Scout damage, STOP, death and actor-slot reuse, and an
+actual Z6 hallucination-flagged actor. This is a controlled synthetic setup.
+Other weapon families still follow their previous path and do not contend here;
+the profile-derived GBA schedule is not a proof of exact source timing for
+arbitrary positions, phases, motion, or animation. The stage adds sidecar RAM
+and has not passed production memory or save-format qualification. Active
+staged bullets and windups reject save/load.
+
+The Scarab reservation now survives the damage update through its next source
+update. The pinned controlled trace shows weapon 82 present at damage frame
+129 and first absent at frame 130. The actual mixed-family fixture confirms
+that another allocation fails during that tail. Yamato similarly retains its
+reservation separately from the reusable shot row: source image 541's Death
+script creates image 544 and executes `domissiledmg`; image 544's 14 frames
+wait two source ticks each, and OpenBW retires the bullet only when its sprite
+images end. One controlled source-world cast dealt damage at frame 48 and was
+first absent at frame 76. A sanitized real Yamato/Interceptor fixture confirms
+the capacity remains full for the post-impact tail and clears on tick 28. This
+is evidence for that script and test setup, not hardware or full allocator
+qualification. Interceptor retirement remains tied to its existing DYING to
+FREE transition. All experimental flags remain off in normal products.
