@@ -476,6 +476,9 @@ _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x08000000u) == 0 &&
                (SAVE_VERSION & 0x08000000u) == 0,
                "Scarab tag overlaps an existing save namespace");
 #define SC64_SCARAB_SAVE_VERSION (SAVE_VERSION | 0x08000000u)
+#ifdef SC64_SHARED_TRANSPORT
+#define SC64_SCARAB_TRANSPORT_SAVE_VERSION (SC64_SCARAB_SAVE_VERSION | 0x04000000u)
+#endif
 #endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16

@@ -2951,6 +2951,10 @@ static int race_scarab_stage_prepare(const void *raw,u32 len,u32 tag,void *conte
     memset(plan,0,sizeof(*plan));
     if (!race_impact_save_decode_selected(len,tag,plan->impact_candidate,
                                           &plan->impact_candidate_count)) return 0;
+#ifdef SC64_SHARED_TRANSPORT
+    if (tag != SC64_SCARAB_TRANSPORT_SAVE_VERSION) return 0;
+    tag = SC64_SCARAB_SAVE_VERSION;
+#endif
     race_scarab_stage_wire=(tag==SC64_SCARAB_SAVE_VERSION);
     int map=race_data.state[20], width=64, height=64;
     if (race_data.state[0]!=1 || map<0 || map>SC64_SKIRMISH_IMPORTED_COUNT) return 0;
@@ -2981,8 +2985,14 @@ static int race_scarab_stage_prepare(const void *raw,u32 len,u32 tag,void *conte
     return race_load_preflight(plan);
 }
 static int race_scarab_stage_select(RaceLoadPlan *plan,GbaSaveSelection *selection) {
+#ifdef SC64_SHARED_TRANSPORT
+    const u32 tags[]={SC64_SCARAB_TRANSPORT_SAVE_VERSION};
+    const unsigned tag_count=1;
+#else
     const u32 tags[]={SC64_LEGACY_SAVE_VERSION,SAVE_VERSION,SC64_SCARAB_SAVE_VERSION};
-    if (!save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,3,
+    const unsigned tag_count=3;
+#endif
+    if (!save_select_validated(&race_impact_record,sizeof(race_impact_record),tags,tag_count,
                                race_scarab_stage_prepare,plan,selection)) return 0;
     return race_scarab_stage_prepare(&race_impact_record,selection->length,
                                      selection->tag,plan);

@@ -278,10 +278,21 @@ race_impact_save_write(void)
     save_write(&race_impact_record, offset + bytes + SC64_TRANSPORT_TRAILER_BYTES,
                SC64_TRANSPORT_SAVE_VERSION);
 #elif defined(SC64_SCARAB_NAMESPACE_STAGE)
+#ifdef SC64_SHARED_TRANSPORT
+    const u32 tags[]={SC64_SCARAB_TRANSPORT_SAVE_VERSION};
+    sc64_sk_transport_encode((u8 *)&race_impact_record + offset + bytes,
+                             &race_skirmish_transport_candidate);
+    if (previous) {
+        if (!save_write_selected(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
+                                 SC64_SCARAB_TRANSPORT_SAVE_VERSION,previous,tags,1)) return 0;
+    } else if (!save_write_first(&race_impact_record,offset+bytes+SC64_TRANSPORT_TRAILER_BYTES,
+                                  SC64_SCARAB_TRANSPORT_SAVE_VERSION)) return 0;
+#else
     const u32 tags[]={SC64_LEGACY_SAVE_VERSION,SAVE_VERSION,SC64_SCARAB_SAVE_VERSION};
     if (previous) {
         if (!save_write_selected(&race_impact_record,offset+bytes,SC64_SCARAB_SAVE_VERSION,previous,tags,3)) return 0;
     } else if (!save_write_first(&race_impact_record,offset+bytes,SC64_SCARAB_SAVE_VERSION)) return 0;
+#endif
 #else
     save_write_migrating_feature(&race_impact_record, offset + bytes, SAVE_VERSION,
                          SC64_LEGACY_SAVE_VERSION, offsetof(RaceSave,state)+27u*sizeof(int),
@@ -317,12 +328,20 @@ race_impact_save_decode_selected(u32 len, u32 selected_tag,
     int rows;
     *count = 0;
     if (len > (u32)sizeof(race_impact_record)) return 0;
-#if defined(SC64_SHARED_TRANSPORT) && !defined(SC64_SCARAB_NAMESPACE_STAGE)
+#ifdef SC64_SHARED_TRANSPORT
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    if (selected_tag != SC64_SCARAB_TRANSPORT_SAVE_VERSION || len < SC64_TRANSPORT_TRAILER_BYTES) return 0;
+#else
     if (selected_tag != SC64_TRANSPORT_SAVE_VERSION || len < SC64_TRANSPORT_TRAILER_BYTES) return 0;
+#endif
     len -= SC64_TRANSPORT_TRAILER_BYTES;
     if (!sc64_sk_transport_decode(&race_skirmish_transport_candidate,
             (const u8 *)&race_impact_record + len, MAX_BUILDINGS)) return 0;
-    selected_tag = SAVE_VERSION; /* The unchanged prefix retains its original token. */
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    selected_tag = SC64_SCARAB_SAVE_VERSION;
+#else
+    selected_tag = SAVE_VERSION;
+#endif
 #endif
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     const u32 base = (u32)sizeof(RaceSave) - SC64_BC_SAVE_EXTRA_BYTES;
