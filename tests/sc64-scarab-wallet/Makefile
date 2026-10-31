@@ -8,7 +8,7 @@ test: test-sc64-scarab-wallet
 
 # These explicit fixtures consume prepared inputs; regenerate only their own
 # actor-fact table to match the additional experimental Scarab enum.
-SCARAB_WALLET_P8_FLAGS = $(filter-out -DSC64_FACT_TABLES -I$(BC_P7_FACT_DIR) -I$(P7_FACT_V2_DIR),$(PROTOSS_P8_CANONICAL_FLAGS))
+SCARAB_WALLET_P8_FLAGS = $(filter-out -DSC64_FACT_TABLES -I$(BC_P7_FACT_DIR) -I$(P7_FACT_V2_DIR) -I$(P8_FACT_V2_DIR),$(PROTOSS_P8_FLAGS))
 define SCARAB_SOURCE_WALLET_FIXTURE
 .PHONY: test-scarab-source-wallet-$(1)
 test-scarab-source-wallet-$(1): $$(CANONICAL_LOOKUP_INPUTS)
