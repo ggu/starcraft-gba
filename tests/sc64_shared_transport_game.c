@@ -131,6 +131,39 @@ static void check_cargo(int map, int human, int bots)
     assert(!u[ship].alive && !u[passenger].alive);
 }
 
+static void check_pending_carrier_loss(int map, int human)
+{
+    static const int raws[3] = {11, 42, 69};
+    static const int passengers[3] = {U_MARINE, U_ZERGLING, U_ZEALOT};
+    int carrier, passenger, replacement, type;
+    launch(map, human, 1, -1);
+    if (human == R_ZERG) race_skirmish_transport_tech.owner[0].researched = 1;
+    type = sc64_race_unit_from_raw(raws[human]);
+    assert(type >= 0);
+    carrier = spawn_unit(SIDE, type, race_base_x[0], race_base_y[0]);
+    passenger = spawn_unit(SIDE, passengers[human], race_base_x[0] + 48, race_base_y[0]);
+    assert(carrier >= 0 && passenger >= 0);
+    assert(dist2(u[carrier].x, u[carrier].y, u[passenger].x, u[passenger].y) >
+           SC64_TRANSPORT_BOARD_RADIUS * SC64_TRANSPORT_BOARD_RADIUS);
+    assert(race_transport_request_board(passenger, carrier));
+    assert(u[passenger].order == ORDER_BOARD);
+    hit_target(carrier, 10000, U_MARINE, ENEMY);
+    assert(!u[carrier].alive && u[passenger].alive);
+    assert(u[passenger].order == ORDER_IDLE && u[passenger].target == -1 &&
+           !u[passenger].path_timer && !u[passenger].path_retry);
+    assert(race_save_game() && race_load_game());
+    assert(u[passenger].alive && u[passenger].order == ORDER_IDLE &&
+           u[passenger].target == -1);
+    replacement = spawn_unit(SIDE, type, u[passenger].x, u[passenger].y);
+    assert(replacement == carrier);
+    assert(!race_transport_tick_unit(passenger));
+    assert(u[passenger].order == ORDER_IDLE && u[passenger].target == -1 &&
+           race_transport_cargo_space(replacement) == 0);
+    assert(race_save_game() && race_load_game());
+    assert(u[passenger].alive && u[passenger].order == ORDER_IDLE &&
+           u[passenger].target == -1);
+}
+
 static void check_paid_production(int map, int raw)
 {
     int race = raw == 11 ? R_TER : R_PROTOSS;
@@ -224,8 +257,10 @@ int main(void)
         check_refunds(map);
         check_paid_production(map, 11);
         check_paid_production(map, 69);
-        for (int race = 0; race < 3; ++race)
+        for (int race = 0; race < 3; ++race) {
+            check_pending_carrier_loss(map, race);
             for (int bots = 1; bots <= 3; ++bots) check_cargo(map, race, bots);
+        }
     }
     puts("shared custom transport research/save: ok");
     return 0;

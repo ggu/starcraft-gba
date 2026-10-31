@@ -33,7 +33,7 @@ _Static_assert(SC64_Z8_PROGRAM_TRIGGER_COUNT == SC64_Z8_SOURCE_TRIGGER_COUNT &&
 enum {
     SC64_Z8_MAP_UNITS = 194,
     SC64_Z8_HUMAN_SLOT = 3,
-    /* One engine update is one native frame at the Fastest speed entry. */
+    /* Native Fastest speed-table entry; applied once per native step. */
     SC64_Z8_FRAME_MS = 42,
     /* Every Z8 Transmission subtracts its time from a sound length that is
      * not imported; this bounded authored value stands in for it. */
@@ -58,6 +58,8 @@ static const Sc64Z8Program race_z8_program = {
     SC64_Z8_PROGRAM_ACTION_COUNT, SC64_Z8_PROGRAM_LOCATION_COUNT,
     SC64_Z8_PROGRAM_MAP_PIXEL_WIDTH, SC64_Z8_PROGRAM_MAP_PIXEL_HEIGHT
 };
+
+#include "sc64_z8_clock.h"
 
 static Sc64Z8SchedulerState race_z8_sched;
 static Sc64Z8AiState race_z8_ai;
@@ -472,19 +474,22 @@ static void race_z8_ai_tick(void)
     }
 }
 
-/* One engine update is one native frame of the scheduler. Returns 0 on any
- * fault; the caller pauses the mission. */
+/* The scheduler advances four native steps per five active engine updates.
+ * AI and cloak remain on the engine clock. A fault pauses the mission. */
 static int race_z8_runtime_tick(void)
 {
+    int native_due;
     if (!race_z8_active()) return 1;
     if (!race_z8_map) return 0;
-    if (race_z8_camera_release) {
+    native_due = sc64_z8_native_step((unsigned)frame);
+    if (native_due && race_z8_camera_release) {
         race_z8_camera_release = 0;
         if (!sc64_z8_release_wait(&race_z8_sched, SC64_Z8_HUMAN_SLOT)) return 0;
     }
     race_z8_human_minerals = (u32)minerals;
     race_z8_human_gas = (u32)gas;
-    if (!sc64_z8_tick_prevalidated(&race_z8_sched, &race_z8_program,
+    if (native_due &&
+        !sc64_z8_tick_prevalidated(&race_z8_sched, &race_z8_program,
                                    &sc64_z8_world_ops, &race_z8_view, 0)) return 0;
     if (race_z8_human_minerals > 65535u || race_z8_human_gas > 65535u) return 0;
     for (unsigned t = 0; t < SC64_Z8_AI_TOWNS; ++t)

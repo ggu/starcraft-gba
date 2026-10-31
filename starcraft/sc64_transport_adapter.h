@@ -184,8 +184,16 @@ static int race_transport_request_unload(int carrier, int x, int y)
 
 static void race_transport_destroy_cargo(int carrier)
 {
-    for (int i = 0; i < MAX_UNITS; ++i)
-        if (u[i].alive && SC64_TRANSPORT_LOADED(&u[i]) && u[i].target == carrier) {
+    for (int i = 0; i < MAX_UNITS; ++i) {
+        if (!u[i].alive || u[i].target != carrier) continue;
+        /* A pending passenger is still alive in the world. Cancel its
+         * reference before the carrier slot can be saved or reused. */
+        if (u[i].order == ORDER_BOARD) {
+            u[i].order = ORDER_IDLE; u[i].target = -1;
+            u[i].path_timer = u[i].path_retry = 0;
+            continue;
+        }
+        if (SC64_TRANSPORT_LOADED(&u[i])) {
 #ifdef SC64_P5_SHUTTLE_ENABLED
             /* Destroying a carrier kills its passengers in this authored
              * runtime. Count those deaths before clearing their source owner. */
@@ -201,6 +209,7 @@ static void race_transport_destroy_cargo(int carrier)
             u[i].hp = 0; u[i].alive = u[i].selected = 0;
             u[i].order = ORDER_IDLE; u[i].target = -1;
         }
+    }
     race_transport_changed();
 }
 

@@ -1285,7 +1285,7 @@ qualification. Source staging alone does not establish a playable mission.
 
 ### Canonical Zerg and Protoss builds
 
-The standard Zerg build includes its first six missions. The canonical Protoss
+The standard Zerg build includes its first seven missions. The canonical Protoss
 target includes P1–P7 and has passed its canonical presentation, save, host
 campaign and bounded ARM continuation checks. Explicit `protoss-p6` still builds
 the separately identified P1–P6 generation-30 image. Prepare either profile
@@ -1306,7 +1306,7 @@ flags and save identity remain separate.
 ```
 
 Replace `zerg` with `protoss` for the P7 candidate. The output pairs are
-`build/StarCraft-Zerg-Z6-GBA.gba` / `build/starcraft-zerg-z6.elf` and
+`build/StarCraft-Zerg-Z7-GBA.gba` / `build/starcraft-zerg-z7.elf` and
 `build/StarCraft-Protoss-P7-GBA.gba` / `build/starcraft-protoss-p7.elf`.
 Explicit `protoss-p6` builds `build/StarCraft-Protoss-P6-GBA.gba` /
 `build/starcraft-protoss-p6.elf`.
@@ -1318,18 +1318,20 @@ save identity; versioned `-Z3` names are aliases. `protoss-p3` preserves the
 legacy P3 real files, code and save path. Retain matching
 frozen ROM/ELF pairs for replay.
 
-The canonical Zerg test target runs ordinary-input controllers for all six
-chapters under the canonical flags, normal-menu startup/save fixtures for all
-six campaign entries, and all 234 combinations
+The canonical Zerg test target runs ordinary-input controllers for all seven
+chapters under the canonical flags, normal-menu startup/save fixtures and
+the skirmish matrix, including all 234 combinations
 of map, human race and independently selected AI races. The setup/save matrix
 does not prove a completed match for every combination. Build guards still
 enforce the same IWRAM and EWRAM reserves.
 
-Canonical Zerg uses `SCZ6`, save generation 32, the Z6 storage/runtime and
-query flags, a word-packed six-chapter sprite bank under
+Canonical Zerg uses `SCZ7`, save generation 36, the Z7 storage/runtime and
+query flags, a word-packed inherited sprite bank under
 `.local/sc64/zerg-z6/generated`, and the canonical drawing flags. Preparing
-`zerg` also generates the Z5/Z6 inputs and that bank. Its save directory,
-`.local/play/zerg-z6`, is separate from the legacy Z4 and Z3 profiles. The P7
+`zerg` also generates the Z5/Z6/Z7 inputs and that bank. Its save directory,
+`.local/play/zerg-z7`, is separate from explicit Z6, Z4 and Z3 profiles.
+Explicit `zerg-z6` retains its SCZ6 generation-32 ROM and `.local/play/zerg-z6`;
+no SRAM is automatically imported. The P7
 candidate uses `SCP7`, generation 43 and `.local/play/protoss-p7`; its all-chapter
 packed sprite bank is `.local/sc64/protoss-p7/generated`, separate from the
 probe and P6 banks. Explicit `protoss-p6` uses `SCP6`, generation 30 and
@@ -1796,7 +1798,7 @@ compare the full world or pixels or complete the mission. Mean full-frame
 cost was 1,069,633 cycles versus 1,026,851 for the reference (+4.17%). These
 are emulator measurements, not hardware or 30-fps qualifications. The Z6
 canonical profile remains unchanged. Campaign qualification was 22/30 at this
-Z7 audit; subsequent canonical P7 integration brings the current total to 23/30.
+Z7 audit; subsequent P7 integration brought the total to 23/30; Z7 promotion brings it to 24/30.
 
 `make test-sc64-z7-reachable-formation` checks the default-off
 `SC64_REACHABLE_FORMATION` group-order fallback against the original slot
@@ -2108,7 +2110,7 @@ These generate the required maps, art, scenario, ability and transport headers
 under `.local/`; Z6 also generates its inherited Z5 sprite bank. Inspect
 readiness with `./dev sc64 status --profile zerg-z6` or the corresponding
 Protoss profile. The output ROMs are `build/StarCraft-Zerg-Z6-Probe-GBA.gba`
-and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The ordinary `zerg` and `protoss` names select the canonical six-mission
+and `build/StarCraft-Protoss-P5-Shuttle-GBA.gba`. The ordinary `zerg` and `protoss` names select the canonical seven-mission
 products; these explicit staged names keep their own files.
 
 ### Reproduce the canonical P6 host win
@@ -2646,7 +2648,7 @@ the later Carrier/Arbiter work or full normal-input win. These historical
 probe targets remain separate. The current canonical Protoss build enables P7
 with the full runtime and bounded ARM save continuation described in the
 [canonical qualification](research/p7-canonical-candidate-qualification.md);
-campaign coverage is 23/30. Native AI fidelity and performance remain unfinished.
+campaign coverage is 24/30. Native AI fidelity and performance remain unfinished.
 
 The optimized probe additionally enables `SC64_P7_PREVALIDATED_TICK`. It
 validates immutable mission data at initialization and load, then checks
