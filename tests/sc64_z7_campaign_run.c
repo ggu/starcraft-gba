@@ -5063,10 +5063,10 @@ static void attack_step(void)
                 }
             }
             if(ground>=0) {
-                int accepted=z7_home_army_attack(hatch,ground);
-                /* The typed gesture can take hundreds of frames; reserve it
-                   for an imminent threat if the verified R path is unavailable. */
-                if(!accepted&&best_worker<=128*128)accepted=typed_attack_target(U_HYDRALISK,ground);
+                /* The visible-type double tap selects only Hydralisks in
+                   the viewport. Preserve the Mutalisk sight screen while
+                   responding to the ground unit. */
+                int accepted=typed_attack_target(U_HYDRALISK,ground);
                 fprintf(stderr,"Z7 worker ground threat accepted%d slot%d raw%d workerD2%d frame%u\n",
                     accepted,ground,u[ground].raw_type,best_worker,(unsigned)frame);
                 hydra_ground_next_order=frame+(accepted?180u:30u);
