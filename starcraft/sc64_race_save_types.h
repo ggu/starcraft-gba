@@ -33,7 +33,7 @@ _Static_assert(SC_RU_COUNT <= 64, "late Terran unit codec uses six-bit types");
 #ifdef SC64_ZP_FULL_STORAGE
 #include "sc64_compact_mineral_save.h"
 #endif
-#ifdef SC64_P7_TYPED_COMPACT_ENABLED
+#if defined(SC64_P7_TYPED_COMPACT_ENABLED) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 _Static_assert(SC_RU_COUNT <= 64, "P7 typed unit type field uses six bits");
 _Static_assert(SC_RB_COUNT <= 128, "P7 typed building type field uses seven bits");
 #include "sc64_p7_typed_unit_save.h"
@@ -99,6 +99,13 @@ _Static_assert(sizeof(Sc64T5SaveState) == 764, "compact T5 save state budget");
 
 typedef struct {
     u32 version;
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+    /* Custom games can reuse the legacy actor region. This storage is not
+     * yet serialized: save/load stays refused until the typed-row domains,
+     * pool preflight, old-generation migration, and commit are qualified. */
+    union {
+      struct {
+#endif
 #if defined(SC64_LATE_TERRAN_STORAGE) || defined(SC64_ZP_CAMPAIGN_STORAGE)
 #ifdef SC64_ZP_FULL_STORAGE
 #ifdef SC64_P7_TYPED_COMPACT_ENABLED
@@ -128,6 +135,15 @@ typedef struct {
 #endif
 #else
     s16 buildings[MAX_BUILDINGS][RACE_BUILD_WORDS];
+#endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+      };
+      struct {
+        Sc64P7TypedUnitSave units[MAX_UNITS];
+        Sc64P7TypedBuildingSave buildings[MAX_BUILDINGS];
+        u8 projectiles[SC64_CODEC_BYTES];
+      } carrier_custom;
+    };
 #endif
 #ifdef SC64_ZP_FULL_STORAGE
     Sc64PackedMineralSave minerals_map[MAX_MINERALS];

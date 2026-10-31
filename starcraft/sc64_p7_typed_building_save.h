@@ -4,7 +4,6 @@
 
 /* Generation-40 P7 building row. Canonical type determines maxhp; source
  * owner/type remain explicit so the imported scenario roster is verifiable. */
-static inline int sc64_zp_building_default_hp(int type);
 
 #define SC64_P7_TYPED_BUILDING_SAVE_BYTES 25
 typedef struct { u8 bytes[SC64_P7_TYPED_BUILDING_SAVE_BYTES]; }
