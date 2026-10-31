@@ -8,6 +8,8 @@ import unittest
 
 from tests.test_sc64_weapon_lookup_index import BANK
 
+from tests.make_fixture import copy_makefile_with_includes
+
 ROOT = Path(__file__).resolve().parents[1]
 INDEX = 'build/generated/weapon-lookup/sc64_weapon_source_indexed.h'
 CONFIG = 'build/canonical-lookup-config'
@@ -139,7 +141,7 @@ vector-fixture:
         # Run the real rules with synthetic private inputs, no asset generators.
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / 'Makefile').write_bytes((ROOT / 'Makefile').read_bytes())
+            copy_makefile_with_includes(ROOT, root)
             (root / 'tools').symlink_to(ROOT / 'tools', target_is_directory=True)
             for name, bank in [('first', BANK), ('second', BANK.replace('{741}', '{740}').replace('{741,255}', '{740,255}'))]:
                 (root / name).mkdir()

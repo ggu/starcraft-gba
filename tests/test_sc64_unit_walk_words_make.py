@@ -6,12 +6,14 @@ import hashlib
 import subprocess
 import tempfile
 import unittest
+from tests.make_fixture import copy_makefile_with_includes
+
 ROOT=Path(__file__).resolve().parents[1]
 
 class WalkWordsMakeTest(unittest.TestCase):
     def test_rapid_switch_and_same_tick_changes(self):
         with tempfile.TemporaryDirectory() as directory:
-            root=Path(directory); (root/'Makefile').write_bytes((ROOT/'Makefile').read_bytes())
+            root=Path(directory); copy_makefile_with_includes(ROOT, root)
             (root/'tools').mkdir()
             for source in (ROOT/'tools').iterdir():
                 if source.is_file():
