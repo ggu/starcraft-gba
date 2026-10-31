@@ -549,3 +549,34 @@ fields, and the continuation did not compare intermediate world state. This is
 not a physical-hardware, performance or whole-world parity claim. These results
 predate the later shared AI3 merge `fd3c4d6`; that combination has not yet been
 qualified.
+
+### Shared military and Showcase contact integration
+
+Merge `bf73484` combines the candidate with shared `fd3c4d6`. The new
+skirmish planner is dispatched only when `race_mode` selects a custom game;
+campaign dispatch remains separate. On the combined source the ordinary-input
+host tape was byte-identical to the preceding 91-checkpoint P8 win. The P8
+carried startup/save matrix (234 configurations), service binding checks and
+skirmish AI fixture passed. All 103 prepared inputs retained their pinned hashes.
+The normal P8 ARM link and verifier passed unchanged guards: IWRAM `030049e0`,
+BSS `0203899c`, ROM SHA-256
+`3d2fb002838d4ee01095c813c5485aab7616aae2bd76d43fd6cf65b199008b81`.
+
+That actual normal ROM replayed the full ordinary input tape to victory at tick
+90,428/frame 88,769, with the same 91 screen/frame/mission/won/lost checkpoints
+as host. A separate current-ROM pause-save prefix produced a 32 KiB SRAM image
+byte-identical to the preceding source's saved image. The combined ROM loaded
+those identical bytes in a fresh process via L/release, matched the saved
+bounded entity/economy fingerprint at frame 31,677 and won at frame 88,769
+with the same final five fields. SRAM input remained unchanged. The continuation
+does not compare intermediate world state, and neither replay is hardware or
+performance qualification.
+
+Merge `1853673` adds shared `5760755` (the Showcase contact-cache Make change).
+The independently linked P8 normal ROM is byte-identical to the `bf73484` ROM;
+its 212-argument ARM compiler vector and guards also match. The 103 prepared
+input hashes were unchanged. Nine relevant Make/cache-flag tests and the source
+boundary check passed. Consequently the two normal-ROM records above apply to
+these exact P8 ROM bytes; this does not transfer unrelated product results or
+close the candidate's remaining source-service and fidelity holds. P8 remains
+explicitly unpromoted.
