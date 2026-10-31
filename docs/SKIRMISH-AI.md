@@ -100,8 +100,9 @@ step is skipped and holds no money.
   unit's first route search is delayed by up to 11 updates using the
   engine's own retry wait, so a large order does not run every search on one
   update.
-- Reinforcements leave home in groups of at least six supply. If too few
-  attackers remain, they regroup at the rally point.
+- Reinforcements leave home in groups of at least six Marines' worth (12 in
+  the engine's doubled supply). If too few attackers remain, they regroup at
+  the rally point.
 - Any armed hostile non-worker within 320 pixels of a depot is a threat.
   Units at home defend. Attacking units are recalled only when the home army
   is outnumbered. If the army is outnumbered near the main depot, up to six
