@@ -27,6 +27,7 @@ static RaceImpactRecord race_impact_record;
 #else
 static RaceSave race_data;
 #endif
+#include "sc64_shared_carrier_codec.h"
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
 #include "sc64_scarab_flight_bridge.h"
 /* Set only from the authenticated selected tag, before candidate decoding. */
@@ -1069,6 +1070,10 @@ static int race_save_game(void) {
     for (int i=0;i<MAX_UNITS;++i)
         if (u[i].alive && (sc64_race_raw_unit(u[i].type)==46 ||
                            sc64_race_raw_unit(u[i].type)==52)) return 0;
+#endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+    /* The experimental layout has no qualified version or migration yet. */
+    return 0;
 #endif
 #ifdef SC64_P8_RUNTIME
     if (!race_p8_live_products_valid()) return 0;
@@ -2951,6 +2956,10 @@ static int race_load_game(void) {
 #ifdef SC64_SHARED_ORDINARY_STAGE
     if(race_shared_ordinary_pending_any()) return 0;
 #endif
+#endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+    /* Do not interpret a predecessor journal with the experimental layout. */
+    return 0;
 #endif
     RaceLoadPlan plan = {0};
 #ifdef SC64_SCARAB_NAMESPACE_STAGE

@@ -79,10 +79,10 @@ static int race_skirmish_product_producer(int type)
 #ifdef SC64_BATTLECRUISER_PRODUCTION_EXPERIMENT
         if (raw == 12) return B_STARPORT;
 #endif
-#if defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && \
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) || (defined(SC64_P7_INTERCEPTOR_FLIGHT_ENABLED) && \
     defined(SC64_P7_CARRIER_TRAINING_ENABLED) && \
-    defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_P7_ACTORS)
-        if (raw == 72 && type == U_P7_CARRIER && race_protoss_services_active())
+    defined(SC64_P7_PROJECTILES_ENABLED) && defined(SC64_P7_ACTORS))
+        if (raw == 72 && type == SC64_CARRIER_TYPE && race_carrier_services_active())
             return B_STARGATE;
 #endif
         (void)raw;

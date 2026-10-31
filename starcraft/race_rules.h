@@ -135,12 +135,32 @@ enum {
 #ifdef SC64_SHARED_DEFILER_HERO_PROBE
     U_SHARED_UNCLEAN_ONE,
 #endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+    /* Append: existing profile-specific save IDs must not move. */
+#if !defined(SC64_P7_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    U_SHARED_CARRIER,
+#endif
+    U_SHARED_INTERCEPTOR,
+#endif
     SC_RU_COUNT
 };
 #if defined(SC64_SHARED_DEFILER_STAGE) && defined(SC64_P9_DATA_ENABLED)
 #define U_SHARED_DEFILER U_P9_DEFILER
 #elif defined(SC64_SHARED_DEFILER_STAGE) && defined(SC64_SKIRMISH_ROSTER)
 #define U_SHARED_DEFILER U_SK_DEFILER
+#endif
+#if defined(SC64_P7_ACTORS) && defined(SC64_P7_PROJECTILES_ENABLED)
+#define SC64_CARRIER_TYPE U_P7_CARRIER
+#define SC64_INTERCEPTOR_TYPE U_P7_INTERCEPTOR
+#elif defined(SC64_SHARED_CARRIER_EXPERIMENT) && defined(SC64_P7_ACTORS)
+#define SC64_CARRIER_TYPE U_P7_CARRIER
+#define SC64_INTERCEPTOR_TYPE U_SHARED_INTERCEPTOR
+#elif defined(SC64_SHARED_CARRIER_EXPERIMENT) && defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_P7_ACTORS)
+#define SC64_CARRIER_TYPE U_SK_CARRIER
+#define SC64_INTERCEPTOR_TYPE U_SHARED_INTERCEPTOR
+#elif defined(SC64_SHARED_CARRIER_EXPERIMENT)
+#define SC64_CARRIER_TYPE U_SHARED_CARRIER
+#define SC64_INTERCEPTOR_TYPE U_SHARED_INTERCEPTOR
 #endif
 enum {
     B_COMMAND, B_BARRACKS, B_DEPOT, B_REFINERY, B_ACADEMY, B_ENG_BAY,
@@ -226,6 +246,11 @@ enum {
 #endif
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
     B_SHARED_SCIENCE_FACILITY, B_SHARED_PHYSICS_LAB,
+#endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_ACTORS) && !defined(SC64_TERRAN_LATE_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    /* Append without changing any existing campaign or save identity. */
+    B_SHARED_FLEET_BEACON,
+#define SC64_SHARED_FLEET_BEACON_IDENTITY
 #endif
     SC_RB_COUNT
 };
@@ -431,6 +456,12 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
     , [U_P7_INTERCEPTOR] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 0, 25, 0, 300, 40, 40, 0 }
+#endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#if !defined(SC64_P7_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    , [U_SHARED_CARRIER] = { R_PROTOSS, SC_RACE_F_SHIELDS, B_STARGATE, 12, 350, 250, 2100, 300, 150, 0 }
+#endif
+    , [U_SHARED_INTERCEPTOR] = { R_PROTOSS, SC_RACE_F_SHIELDS, 255, 0, 25, 0, 300, 40, 40, 0 }
 #endif
 #ifdef SC64_SKIRMISH_ROSTER
     /* Ordinary catalog records absent from this profile's legacy raw map.
@@ -656,6 +687,9 @@ static const Sc64RaceBuildingRule sc64_race_building_rules[SC_RB_COUNT] = {
     , [B_SHARED_SCIENCE_FACILITY] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 100, 150, 900, 850, 0 }
     , [B_SHARED_PHYSICS_LAB] = { R_TER, SC_RACE_F_BUILDING, 255, 0, 50, 50, 600, 600, 0 }
 #endif
+#ifdef SC64_SHARED_FLEET_BEACON_IDENTITY
+    , [B_SHARED_FLEET_BEACON] = { R_PROTOSS, SC_RACE_F_BUILDING | SC_RACE_F_SHIELDS | SC_RACE_F_REQUIRES_POWER, 255, 0, 300, 200, 900, 500, 0 }
+#endif
 };
 
 static inline const Sc64RaceUnitRule *sc64_race_unit_rule(int type)
@@ -724,6 +758,12 @@ static inline const char *sc64_race_unit_name(int type)
 #endif
 #ifdef SC64_P7_PROJECTILES_ENABLED
         ,"INTERCEPTOR"
+#endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#if !defined(SC64_P7_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+        ,[U_SHARED_CARRIER] = "CARRIER"
+#endif
+        ,[U_SHARED_INTERCEPTOR] = "INTERCEPTOR"
 #endif
 #ifdef SC64_SKIRMISH_ROSTER
 #ifndef SC64_TERRAN_LATE_ACTORS
@@ -850,6 +890,9 @@ static inline const char *sc64_race_building_name(int type)
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
         ,[B_SHARED_SCIENCE_FACILITY] = "SCIENCE FACILITY"
         ,[B_SHARED_PHYSICS_LAB] = "PHYSICS LAB"
+#endif
+#ifdef SC64_SHARED_FLEET_BEACON_IDENTITY
+        ,[B_SHARED_FLEET_BEACON] = "FLEET BEACON"
 #endif
     };
     return type >= 0 && type < SC_RB_COUNT ? names[type] : "UNKNOWN";
@@ -1665,6 +1708,12 @@ static inline int sc64_race_raw_unit(int type)
 #ifdef SC64_SHARED_DEFILER_HERO_PROBE
     case U_SHARED_UNCLEAN_ONE: return 52;
 #endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#if !defined(SC64_P7_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    case U_SHARED_CARRIER: return 72;
+#endif
+    case U_SHARED_INTERCEPTOR: return 73;
+#endif
     default: return -1;
     }
 }
@@ -1791,6 +1840,9 @@ static inline int sc64_race_raw_building(int type)
     case B_SHARED_SCIENCE_FACILITY: return 116;
     case B_SHARED_PHYSICS_LAB: return 118;
 #endif
+#ifdef SC64_SHARED_FLEET_BEACON_IDENTITY
+    case B_SHARED_FLEET_BEACON: return 169;
+#endif
     default: return -1;
     }
 }
@@ -1898,6 +1950,12 @@ static inline int sc64_race_unit_from_raw(int raw)
 #endif
 #ifdef SC64_P8_DATA_ENABLED
     case 28: return U_P8_HYPERION;
+#endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#if !defined(SC64_P7_ACTORS) && !defined(SC64_SKIRMISH_ROSTER)
+    case 72: return U_SHARED_CARRIER;
+#endif
+    case 73: return U_SHARED_INTERCEPTOR;
 #endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     case 36: return U_Z7_EGG;
@@ -2065,6 +2123,9 @@ static inline int sc64_race_building_from_raw(int raw)
 #if defined(SC64_BATTLECRUISER_EXPERIMENT) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_TERRAN_LATE_ACTORS)
     case 116: return B_SHARED_SCIENCE_FACILITY;
     case 118: return B_SHARED_PHYSICS_LAB;
+#endif
+#ifdef SC64_SHARED_FLEET_BEACON_IDENTITY
+    case 169: return B_SHARED_FLEET_BEACON;
 #endif
     default: return -1;
     }

@@ -1179,7 +1179,7 @@ int save_read_latest(void *data,u32 capacity,u32 tag,u32 *len) {
     *len=stored;
     return 1;
 }
-#ifdef SC64_SCARAB_RUNTIME
+#if defined(SC64_SCARAB_RUNTIME) || defined(SC64_SHARED_CARRIER_EXPERIMENT)
 int save_select_validated(void *scratch,u32 capacity,const u32 *tags,unsigned tag_count,
                           GbaSaveValidator validate,void *context,GbaSaveSelection *selection) {
     volatile const u8 *base=(volatile const u8*)SRAM_BASE;

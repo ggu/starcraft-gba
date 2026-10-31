@@ -41,8 +41,13 @@ enum {
     SC64_PROTOSS_CLOCK_STATE_TAG = 0x50530000
 };
 
+#ifdef SC64_P7_RUNTIME
 static int race_p7_active(void);
 static int race_p7_source_owner(unsigned slot);
+#else
+static inline int race_p7_active(void) { return 0; }
+static inline int race_p7_source_owner(unsigned slot) { (void)slot; return -1; }
+#endif
 #ifdef SC64_PROTOSS_LATER_BINDINGS
 static int race_protoss_later_services_active(void);
 static int race_protoss_later_source_owner(unsigned slot);
@@ -75,6 +80,15 @@ static inline int race_protoss_service_binding(void)
 
 #define race_protoss_services_active() \
     (race_protoss_service_binding() != SC64_PROTOSS_BIND_NONE)
+
+/* Temporary qualification fence for the experimental cross-profile Carrier
+ * adapter. Existing P7/P8 flight keeps its mission bindings; the new adapter
+ * reaches campaign worlds only after their save and runtime qualification. */
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+#define race_carrier_services_active() (race_mode && race_protoss_services_active())
+#else
+#define race_carrier_services_active() race_protoss_services_active()
+#endif
 
 /* Generic slots follow the live owner: SIDE is the human slot. */
 static inline int race_protoss_generic_slot(int owner)
@@ -161,7 +175,11 @@ static inline void race_protoss_bind_candidate(int candidate_race_mode, int miss
 static inline void race_protoss_unbind_candidate(void)
 { race_protoss_binding_override = -1; }
 
+#ifdef SC64_P7_RUNTIME
 static u8 *race_protoss_service_clock(void);
+#else
+static u8 *race_protoss_service_clock(void) { return race_protoss_generic_clock; }
+#endif
 #define RACE_PROTOSS_SERVICE_CLOCK (race_protoss_service_clock())
 
 static inline int race_protoss_clock_word_valid(int word)

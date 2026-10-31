@@ -20,8 +20,8 @@ static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
     for (unsigned i=0;i<MAX_UNITS;++i) {
         Unit actor;
         if (!race_save_decode_unit(candidate,i,ww,wh,&actor)) return 0;
-        if ((actor.type==U_P7_INTERCEPTOR)!=(RACE_PROTOSS_RAW(&actor)==73)) return 0;
-        if (actor.alive && actor.type==U_P7_INTERCEPTOR &&
+        if ((actor.type==SC64_INTERCEPTOR_TYPE)!=(RACE_PROTOSS_RAW(&actor)==73)) return 0;
+        if (actor.alive && actor.type==SC64_INTERCEPTOR_TYPE &&
             (!p7 || RACE_PROTOSS_SLOT(&actor)<0 || RACE_PROTOSS_SLOT(&actor)>=8 ||
              actor.owner!=race_protoss_source_owner(RACE_PROTOSS_SLOT(&actor)))) return 0;
     }
@@ -55,7 +55,7 @@ static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
         if (row.owner_ref!=255) {
             Unit shooter;
             if (!race_save_decode_unit(candidate,row.owner_ref,ww,wh,&shooter) ||
-                !shooter.alive || shooter.type!=U_P7_INTERCEPTOR ||
+                !shooter.alive || shooter.type!=SC64_INTERCEPTOR_TYPE ||
                 RACE_PROTOSS_RAW(&shooter)!=73 || RACE_PROTOSS_SLOT(&shooter)!=row.raw_source_owner ||
                 shooter.owner!=race_protoss_source_owner(row.raw_source_owner)) return 0;
         }
