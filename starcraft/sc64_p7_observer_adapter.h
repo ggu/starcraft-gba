@@ -17,6 +17,7 @@ enum { SC64_P7_SIGHT_UNIT_AXIS_BOUND=176, SC64_P7_SIGHT_BUILDING_AXIS_BOUND=160 
 #include "sc64_p7_observer_rules.h"
 #include "sc64_p7_geometry.h"
 #include "sc64_p7_sight_runtime.h"
+#include "sc64_sight_axis.h"
 #ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
 #include "sc64_p7_power_geometry.h"
 #endif
@@ -40,6 +41,7 @@ static int sc64_p7_observer_source_matches(int raw_owner, int live_owner,
 static int sc64_p7_observer_owner_sees_cell(int source_owner, int live_owner,
                                            int cell)
 {
+    if(cell<0 || cell>=MAP_COLS*MAP_ROWS) return 0;
     int col = cell % MAP_COLS, row = cell / MAP_COLS;
     int cx = col * 16 + 8, cy = row * 16 + 8;
     if (source_owner == 7 || (source_owner < 0 && live_owner == SIDE))
@@ -48,35 +50,29 @@ static int sc64_p7_observer_owner_sees_cell(int source_owner, int live_owner,
 #ifdef SC64_P7_CARRIER_TRAINING_ENABLED
         !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
 #endif
-        !SC64_TRANSPORT_LOADED(&u[i]) &&
-        sc64_p7_observer_source_matches(RACE_PROTOSS_SLOT(&u[i]), u[i].owner,
-                                        source_owner, live_owner)) {
+        !SC64_TRANSPORT_LOADED(&u[i])) {
 #ifdef SC64_P7_SIGHT_AXIS_CULL
-        int dx = cx - u[i].x, dy = cy - u[i].y;
-        if (dx < -SC64_P7_SIGHT_UNIT_AXIS_BOUND || dx > SC64_P7_SIGHT_UNIT_AXIS_BOUND ||
-            dy < -SC64_P7_SIGHT_UNIT_AXIS_BOUND || dy > SC64_P7_SIGHT_UNIT_AXIS_BOUND) continue;
-        int radius = sc64_p7_observer_sight_radius_runtime(u[i].type, 0);
-#else
-        int radius = sc64_p7_observer_sight_radius_runtime(u[i].type, 0);
-        int dx = cx - u[i].x, dy = cy - u[i].y;
+        if(!sc64_sight_axis_contains(u[i].x,cx,SC64_P7_SIGHT_UNIT_AXIS_BOUND) ||
+           !sc64_sight_axis_contains(u[i].y,cy,SC64_P7_SIGHT_UNIT_AXIS_BOUND)) continue;
 #endif
+        if(!sc64_p7_observer_source_matches(RACE_PROTOSS_SLOT(&u[i]),u[i].owner,
+                                           source_owner,live_owner)) continue;
+        int radius = sc64_p7_observer_sight_radius_runtime(u[i].type, 0);
+        int dx = cx - u[i].x, dy = cy - u[i].y;
         if (dx * dx + dy * dy <= radius * radius) return 1;
     }
     /* Match the current GBA sight grid: alive buildings contribute optical
      * sight while under construction. Native construction-sight differences
      * are not modeled by this approximation. */
-    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive &&
-        sc64_p7_observer_source_matches(RACE_PROTOSS_SLOT(&b[i]), b[i].owner,
-                                        source_owner, live_owner)) {
+    for (int i = 0; i < MAX_BUILDINGS; ++i) if (b[i].alive) {
 #ifdef SC64_P7_SIGHT_AXIS_CULL
-        int dx = cx - b[i].x, dy = cy - b[i].y;
-        if (dx < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dx > SC64_P7_SIGHT_BUILDING_AXIS_BOUND ||
-            dy < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dy > SC64_P7_SIGHT_BUILDING_AXIS_BOUND) continue;
-        int radius = sc64_p7_observer_sight_radius_runtime(b[i].type, 1);
-#else
-        int radius = sc64_p7_observer_sight_radius_runtime(b[i].type, 1);
-        int dx = cx - b[i].x, dy = cy - b[i].y;
+        if(!sc64_sight_axis_contains(b[i].x,cx,SC64_P7_SIGHT_BUILDING_AXIS_BOUND) ||
+           !sc64_sight_axis_contains(b[i].y,cy,SC64_P7_SIGHT_BUILDING_AXIS_BOUND)) continue;
 #endif
+        if(!sc64_p7_observer_source_matches(RACE_PROTOSS_SLOT(&b[i]),b[i].owner,
+                                           source_owner,live_owner)) continue;
+        int radius = sc64_p7_observer_sight_radius_runtime(b[i].type, 1);
+        int dx = cx - b[i].x, dy = cy - b[i].y;
         if (dx * dx + dy * dy <= radius * radius) return 1;
     }
     return 0;
@@ -326,14 +322,12 @@ static unsigned sc64_p7_arbiter_detected_mask_with_owners(int target,
         !SC64_CARRIER_HANGAR_HIDDEN(&u[i]) &&
 #endif
         !SC64_TRANSPORT_LOADED(&u[i])) {
-        int source=RACE_PROTOSS_SLOT(&u[i]);
 #ifdef SC64_P7_SIGHT_AXIS_CULL
-        int dx=cx-u[i].x,dy=cy-u[i].y;
-        if(dx < -SC64_P7_SIGHT_UNIT_AXIS_BOUND || dx > SC64_P7_SIGHT_UNIT_AXIS_BOUND ||
-            dy < -SC64_P7_SIGHT_UNIT_AXIS_BOUND || dy > SC64_P7_SIGHT_UNIT_AXIS_BOUND) continue;
-#else
-        int dx=cx-u[i].x,dy=cy-u[i].y;
+        if(!sc64_sight_axis_contains(u[i].x,cx,SC64_P7_SIGHT_UNIT_AXIS_BOUND) ||
+           !sc64_sight_axis_contains(u[i].y,cy,SC64_P7_SIGHT_UNIT_AXIS_BOUND)) continue;
 #endif
+        int source=RACE_PROTOSS_SLOT(&u[i]);
+        int dx=cx-u[i].x,dy=cy-u[i].y;
         unsigned candidate=0;
         if(source>=0&&source<8) {
             int live=source_owners[source];
@@ -346,14 +340,12 @@ static unsigned sc64_p7_arbiter_detected_mask_with_owners(int target,
         visible_owners|=candidate;
     }
     for(int i=0;i<MAX_BUILDINGS;++i) if(b[i].alive) {
-        int source=RACE_PROTOSS_SLOT(&b[i]);
 #ifdef SC64_P7_SIGHT_AXIS_CULL
-        int dx=cx-b[i].x,dy=cy-b[i].y;
-        if(dx < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dx > SC64_P7_SIGHT_BUILDING_AXIS_BOUND ||
-            dy < -SC64_P7_SIGHT_BUILDING_AXIS_BOUND || dy > SC64_P7_SIGHT_BUILDING_AXIS_BOUND) continue;
-#else
-        int dx=cx-b[i].x,dy=cy-b[i].y;
+        if(!sc64_sight_axis_contains(b[i].x,cx,SC64_P7_SIGHT_BUILDING_AXIS_BOUND) ||
+           !sc64_sight_axis_contains(b[i].y,cy,SC64_P7_SIGHT_BUILDING_AXIS_BOUND)) continue;
 #endif
+        int source=RACE_PROTOSS_SLOT(&b[i]);
+        int dx=cx-b[i].x,dy=cy-b[i].y;
         unsigned candidate=0;
         if(source>=0&&source<8) {
             int live=source_owners[source];
