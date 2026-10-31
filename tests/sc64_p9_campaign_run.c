@@ -529,7 +529,7 @@ static int remine_idle_probe(int home)
         }
     }
     for(int i=0;i<MAX_UNITS&&worker<0;i++)if(u[i].alive&&u[i].owner==SIDE&&u[i].type==U_PROBE){
-        if(u[i].order==ORDER_IDLE){worker=i;break;}
+        if(u[i].order==ORDER_IDLE && !u[i].carry){worker=i;break;}
         if(u[i].order==ORDER_MINE&&!u[i].carry&&u[i].target>=0&&u[i].target<MAX_MINERALS){
             int near=0;
             for(int n=0;n<MAX_BUILDINGS;n++)if(b[n].alive&&b[n].owner==SIDE&&b[n].type==B_NEXUS&&
@@ -549,8 +549,11 @@ static int remine_idle_probe(int home)
     move_cursor(u[worker].x,u[worker].y);KEY_TAP(KEY_A);
     for(int n=0;n<40&&(!u[worker].selected||selected_count()!=1);n++)KEY_TAP(KEY_L);
     if(!u[worker].selected||selected_count()!=1)return 0;
-    move_cursor(m[patch].x,m[patch].y);KEY_TAP(KEY_A);
-    return u[worker].order==ORDER_MINE;
+    move_cursor(m[patch].x,m[patch].y);
+    if(!currently_visible(m[patch].x,m[patch].y) ||
+       field_ui_a_action(selected_count())!=UI_A_MINE) return 0;
+    KEY_TAP(KEY_A);
+    return u[worker].order==ORDER_MINE && u[worker].target==patch;
 }
 
 static int assign_gas_worker(void)
@@ -633,6 +636,7 @@ int main(int argc,char **argv)
 
     int saved=0;
     int next_checkpoint=2000;
+    int next_mine=30;
     int next_probe=60,next_supply=400,next_build=200,next_gas=3000,next_production=900;
     int next_order=60,next_hero=600;
     int attacking=0,front_distance=-1,next_zeratul=0,front_unit=-1,next_expand=8000,next_stage=3000;
@@ -684,6 +688,10 @@ int main(int argc,char **argv)
             /* Beside the start's own mineral line (source 2994,3974). */
             if(!pending)(void)build_nexus(1470,1930);
             next_build=frame+300;
+        }
+        if(home>=0&&frame>=next_mine){
+            for(int k=0;k<8&&remine_idle_probe(home);k++){}
+            next_mine=frame+180;
         }
         if(home>=0&&frame>=next_probe){(void)queue_probe();next_probe=frame+300;}
         if(home>=0&&count_type(B_NEXUS,0)<2&&frame>=next_expand){
