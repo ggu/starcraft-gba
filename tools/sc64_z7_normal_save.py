@@ -33,20 +33,32 @@ def save_inputs(cut):
     return [(cut, START), (cut + 1, 0), (cut + 2, B), (cut + 3, 0)]
 
 
-def resume_inputs(transitions, cut):
-    """Load on title, release L, then replay transitions after the cut."""
+def resume_inputs(transitions, cut, load_updates=2):
+    """Load from title and map the remaining one-based host inputs.
+
+    Physical input reaches the restored state after one title update. The next
+    update must simultaneously release L and execute host cut+1. Scheduler
+    transport retains its historical two-update convention pending its own
+    runtime qualification.
+    """
+    if load_updates not in (1, 2):
+        raise ValueError('unsupported load update count')
     previous = 0
     for tick, held in transitions:
-        if tick > cut:
-            break
+        if tick > cut: break
         previous = held
+    if load_updates == 1:
+        if previous: raise ValueError('physical load requires neutral cut')
+        following = [(tick-cut, held) for tick,held in transitions if tick > cut]
+        if following and following[0][0] == 1:
+            if following[0][1] & L:
+                raise ValueError('first physical resume input cannot hold L')
+            return [(0,L)] + following
+        return [(0,L),(1,0)] + following
     inputs = [(0, L), (1, 0)]
-    if previous:
-        inputs.append((2, previous))
+    if previous: inputs.append((2, previous))
     inputs.extend((2 + tick - 1 - cut, held) for tick, held in transitions if tick > cut)
-    # A transition on the first resumed update supersedes re-establishment.
-    if len(inputs) > 3 and inputs[2][0] == inputs[3][0]:
-        del inputs[2]
+    if len(inputs) > 3 and inputs[2][0] == inputs[3][0]: del inputs[2]
     return inputs
 
 

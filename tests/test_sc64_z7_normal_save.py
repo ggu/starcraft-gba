@@ -46,6 +46,31 @@ class SaveTest(unittest.TestCase):
         self.assertEqual(save.resume_inputs([(1, 4), (11, 0)], 10),
                          [(0, 512), (1, 0), (2, 0)])
 
+    def test_physical_load_aligns_first_simulation_update(self):
+        # A title L update restores frame 10; later updates advance the world.
+        class Fake:
+            def __init__(self): self.frame=0; self.playing=False; self.previous=0; self.pressed=[]
+            def update(self,held):
+                pressed=held & ~self.previous; self.previous=held
+                if not self.playing and pressed & save.L: self.playing=True; self.frame=10
+                elif self.playing: self.frame+=1; self.pressed.append(pressed)
+        for transitions, expected in (([(1,1),(4,0),(12,4)], [0,4]),
+                                      ([(1,1),(4,0),(11,4),(12,0)], [4,0])):
+            inputs=save.resume_inputs(transitions,10,load_updates=1)
+            self.assertEqual(inputs[0],(0,save.L))
+            fake=Fake();held=0; by_tick=dict(inputs)
+            held=by_tick.get(0,held);fake.update(held)
+            self.assertEqual(fake.frame,10)
+            for tick in (1,2):
+                held=by_tick.get(tick,held);fake.update(held)
+            self.assertEqual(fake.frame,12);self.assertEqual(fake.pressed,expected)
+        with self.assertRaisesRegex(ValueError,'cannot hold L'):
+            save.resume_inputs([(1,1),(4,0),(11,save.L)],10,load_updates=1)
+        with self.assertRaisesRegex(ValueError,'neutral'):
+            save.resume_inputs([(1,1)],10,load_updates=1)
+        self.assertEqual(save.resume_inputs([(1,1),(4,0),(11,4)],10,load_updates=2),
+                         [(0,save.L),(1,0),(2,4)])
+
     def test_restored_and_tamper_fail_closed(self):
         world = {'frame': 10, 'screen': 2, 'fingerprint': 'a'*64}
         saved = {'cut': 10, 'mission': 18, 'world': world, 'model': {k: ([0]*8 if k in ('action_cursors','action_ticks') else 0) for k in save.MODEL_FIELDS}}

@@ -201,12 +201,13 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
     plan,pages=build_plan(trace,cut if export_save else stop)
     if cut is not None: save.validate_cut(plan,cut)
     original_stop=plan['stop']
+    load_updates=1 if physical else 2
     if export_save or save_input:
         events = ([(t-1,h) for t,h in plan['transitions'] if t <= cut] + save.save_inputs(cut)
-                  if export_save else save.resume_inputs(plan['transitions'],cut))
-        end = cut + 4 if export_save else 2 + original_stop - cut
+                  if export_save else save.resume_inputs(plan['transitions'],cut,load_updates))
+        end = cut + 4 if export_save else load_updates + original_stop - cut
         checks = ({t:t for t in plan['observations'] if t <= cut} if export_save else
-                  {2+t-cut:t for t in plan['observations'] if t > cut})
+                  {load_updates+t-cut:t for t in plan['observations'] if t > cut})
         boundaries=sorted(set(range(1000,end+1,1000)) | set(checks) | {end})
         pages=[]; first=0; index=0
         for boundary in boundaries:
@@ -258,7 +259,7 @@ def run(trace, rom, elf, runner, output, stop=None, export_save=False, save_inpu
         initial_timing=timing_snapshot(rsp,sym,sizes)
         if save_input:
             if physical:
-                rsp.play_to(2, events)
+                rsp.play_to(load_updates, events)
             else:
                 rsp.breakpoint(sym['demo_replay_checkpoint']&~1,False)
                 rsp.breakpoint(sym['game_update']&~1,True)

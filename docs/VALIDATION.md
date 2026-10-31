@@ -8223,8 +8223,12 @@ above and use a new output directory. The driver inserts START, release, B,
 release after that observation and exports `saved.sav` and `saved-state.json`.
 Run again with a different output directory, `--cut TICK --save-input
 /path/to/saved.sav --saved-state /path/to/saved-state.json`. The second process
-loads with title L/release, verifies the mission and bounded persisted-world
-fingerprint and Z7 model fields, and replays the remaining tape. Before export
+loads with title L, verifies the mission and bounded persisted-world
+fingerprint and Z7 model fields immediately after that update, then releases L
+on the first remaining tape update. A first tape transition holding L cannot
+produce its required new press at that boundary and is rejected. The separate
+debug-scheduler resume retains its historical two-update mapping and has not
+been qualified by this physical-input check. Before export
 succeeds it validates the first journal record, its payload checksum, mission,
 frame and ELF-derived RaceSave size; the journal has no separate header checksum.
 The verifier explicitly supports the canonical Z7 Egg generation-36 save tag
