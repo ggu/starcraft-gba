@@ -69,9 +69,12 @@ Its separate experimental fresh-process continuation is documented in the
 
 This is source-scoped host qualification with sanitizers, plus the separately
 scoped normal-ROM Z3 and Z7 button replays. It does not replace full SRAM
-continuation and hardware checks for every chapter. The carried Z6 controller
-is not yet qualified on the different canonical Z6 vector; a controller-policy
-compatibility follow-up is separate work.
+continuation and hardware checks for every chapter. A subsequent
+[Z6 policy follow-up](../2026-11-01-z6-dual-controller/README.md) at 1871385
+qualifies one controller source under both the canonical Z6 and carried Z7
+host vectors. Both traces are byte-identical to their respective earlier
+wins; this is separate qualification, not a relabeled rerun of the entire
+target at 6d5db14. Other profile compatibility remains source-scoped.
 
 The complete normal Z7 witness measured about 6.79 emulated main loops/s;
 Z3 measured about 18.33. These include presentation and UI and are not
