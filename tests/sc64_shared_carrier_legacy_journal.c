@@ -86,6 +86,18 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
     int entry_minerals=minerals, entry_frame=frame;
     u8 entry_clock[3]; memcpy(entry_clock,race_protoss_generic_clock,sizeof(entry_clock));
     static u8 entry_packet[SC64_CODEC_BYTES], entry_restored[SC64_CODEC_BYTES];
+    static u8 journal_before_rejection[sizeof(host_save)];
+    int invalid_child=-1;
+    for (int i=0;i<MAX_UNITS;++i)
+        if (u[i].alive && u[i].type==SC64_INTERCEPTOR_TYPE &&
+            sc64_p7_carrier_child_state(&u[i])==SC64_P7_INTERCEPTOR_OUTSIDE)
+            { invalid_child=i; break; }
+    assert(invalid_child>=0);
+    memcpy(journal_before_rejection,host_save,sizeof(host_save));
+    int saved_parent=u[invalid_child].build; u[invalid_child].build=-1;
+    assert(!race_save_game());
+    assert(!memcmp(journal_before_rejection,host_save,sizeof(host_save)));
+    u[invalid_child].build=saved_parent;
     assert(sc64_codec_encode(&race_p7_projectiles,entry_packet,sizeof(entry_packet)));
     assert(race_save_game());
     if (!campaign && custom_output) {

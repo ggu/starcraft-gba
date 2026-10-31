@@ -1209,6 +1209,7 @@ typedef struct {
 } RaceLoadPlan;
 
 #ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+static int race_shared_carrier_stage_prepare(const void *raw,u32 len,u32 tag,void *context);
 static int race_shared_carrier_stage_select(RaceLoadPlan *plan,GbaSaveSelection *selected);
 static void race_shared_carrier_stage_commit(const RaceLoadPlan *plan);
 #endif
@@ -1810,6 +1811,15 @@ static int race_save_game(void) {
         u32 length=sizeof(race_data);
         const void *record=&race_data;
 #endif
+        /* Reject malformed full candidates before touching either journal.
+         * Preflight consumes the shared scratch tail, so repack sidecars
+         * from the unchanged live queue after it succeeds. */
+        if (race_mode) {
+            if (!race_shared_carrier_stage_prepare(record,length,tag,&plan)) return 0;
+#ifdef SC64_IMPACT_EVENTS
+            if (!race_impact_save_pack(&length)) return 0;
+#endif
+        }
         if (!race_mode) {
             size_t compacted;
 #ifdef SC64_IMPACT_EVENTS
