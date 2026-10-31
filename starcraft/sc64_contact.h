@@ -1,5 +1,6 @@
 #ifndef SC64_CONTACT_H
 #define SC64_CONTACT_H
+#include "sc64_scarab_presence.h"
 
 /* SC64_CONTACT_CACHE: cached collision facts and one-pass blocked steering.
  *
@@ -149,6 +150,7 @@ sc64_contact_candidate_reference(const Unit *q, int i, int nx, int ny,
     const Unit *c = &u[i];
     int radius = 6, dx, dy, ox, oy;
     (void)mover_radius;
+    if (SC64_SCARAB_NONCOLLIDING(c)) return 0;
 #ifdef SC64_P6_COMBAT_ENABLED
     if (race_p6_combat_unit_burrowed(i)) return 0;
 #endif
@@ -181,6 +183,7 @@ sc64_contact_candidate_reference(const Unit *q, int i, int nx, int ny,
 static inline __attribute__((always_inline)) int
 sc64_contact_mover(const Unit *q, int *radius, int *flying)
 {
+    if (SC64_SCARAB_NONCOLLIDING(q)) return 1;
     u8 mc = sc64_contact_class_for(q->type);
     if (!(mc & SC64_CONTACT_VALID) || q->type == U_CHRYSALIS) return 0;
     *radius = (int)(mc & SC64_CONTACT_RADIUS_MASK);
@@ -223,7 +226,7 @@ sc64_contact_step_clear(const Unit *q, int nx, int ny, int strict)
                 const Unit *c = &u[i];
                 u8 cc;
                 int radius, dx, dy, ox, oy;
-                if (i == mover_slot || !c->alive || SC64_TRANSPORT_LOADED(c)) continue;
+                if (i == mover_slot || !c->alive || (SC64_TRANSPORT_LOADED(c) || SC64_SCARAB_NONCOLLIDING(c))) continue;
                 cc = sc64_contact_class_for(c->type);
                 if (!(cc & SC64_CONTACT_VALID)) {
                     if (sc64_contact_candidate_reference(q, i, nx, ny, mover_radius,
@@ -454,7 +457,7 @@ sc64_contact_memo_oracle_observe(void)
     for (i = 0; i < MAX_UNITS; ++i) {
         const Unit *c = &u[i];
         Sc64ContactMemoActorSnapshot *a = &world.actors[i];
-        if (!c->alive || SC64_TRANSPORT_LOADED(c)) continue;
+        if (!c->alive || (SC64_TRANSPORT_LOADED(c) || SC64_SCARAB_NONCOLLIDING(c))) continue;
                 a->present = 1; a->x = (s16)c->x; a->y = (s16)c->y;
                 a->type = (s16)c->type; a->raw_type = (s16)c->raw_type;
                 a->flags = (u16)c->flags;
@@ -579,7 +582,7 @@ sc64_contact_blocked_mask_uncached(const Unit *q, int speed)
 #ifndef SC64_CONTACT_MASK_TABLE
                 int od2;
 #endif
-                if (i == mover_slot || !c->alive || SC64_TRANSPORT_LOADED(c)) continue;
+                if (i == mover_slot || !c->alive || (SC64_TRANSPORT_LOADED(c) || SC64_SCARAB_NONCOLLIDING(c))) continue;
                 cc = sc64_contact_class_for(c->type);
                 if (!(cc & SC64_CONTACT_VALID)) {
                     mask = sc64_contact_mask_reference(q, i, speed, mask,

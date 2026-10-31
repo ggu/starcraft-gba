@@ -15,6 +15,9 @@
  * an attacker that dies after launch still delivers its projectile.
  * See docs/IMPACT-EVENTS.md for provenance and limits. */
 
+#ifdef SC64_SCARAB_WEAPON_PROBE
+#include "sc64_scarab_impact_packet.h"
+#endif
 static Sc64ImpactEvent race_impact_rows[RACE_IMPACT_CAPACITY];
 static u8 race_impact_count;
 /* Diagnostics only; neither is saved and neither affects simulation. */
@@ -32,8 +35,22 @@ race_impact_reset(void)
 static void
 race_impact_clear_target(int ref)
 {
+#ifdef SC64_SCARAB_WEAPON_PROBE
+    unsigned keep=0;
+    for(unsigned i=0;i<race_impact_count;i++) {
+        Sc64ImpactEvent row=race_impact_rows[i];
+        if(row.source_type==SC64_SCARAB_IMPACT_MARKER) {
+            Sc64ScarabImpact packet;
+            if(sc64_scarab_impact_unpack(&row,&packet) && packet.target==ref)
+                sc64_scarab_impact_forget_target(&row);
+        } else if(sc64_impact_event_target(&row)==ref) continue;
+        race_impact_rows[keep++]=row;
+    }
+    race_impact_count=(u8)keep;
+#else
     if (race_impact_count)
         (void)sc64_impact_clear_target(race_impact_rows, &race_impact_count, ref);
+#endif
 }
 
 static unsigned
@@ -175,6 +192,41 @@ race_impact_resolve(const Sc64ImpactEvent *e)
 static void __attribute__((noinline))
 race_impact_tick(void)
 {
+#ifdef SC64_SCARAB_WEAPON_PROBE
+    /* Advance all rows before resolving, then leave due rows in the shared
+     * queue until taken. Death/slot cleanup can invalidate a later due
+     * Scarab's explicit target without discarding its position splash. */
+    unsigned keep=0;
+    if(!race_impact_count)return;
+    for(unsigned i=0;i<race_impact_count;i++) {
+        Sc64ImpactEvent row=race_impact_rows[i];
+        if(row.source_type==SC64_SCARAB_IMPACT_MARKER) {
+            Sc64ScarabImpact packet;
+            if(!sc64_scarab_impact_unpack(&row,&packet))continue;
+            if(packet.target>=0 && !target_alive(packet.target)) sc64_scarab_impact_forget_target(&row);
+            if(sc64_battlecruiser_source_tick_due() && packet.ticks)
+                row.steps=(u8)(row.steps-16u);
+        } else {
+            if(!target_alive(sc64_impact_event_target(&row)))continue;
+            if(row.steps)--row.steps;
+        }
+        race_impact_rows[keep++]=row;
+    }
+    race_impact_count=(u8)keep;
+    for(;;) {
+        unsigned i;
+        for(i=0;i<race_impact_count;i++) {
+            const Sc64ImpactEvent *row=&race_impact_rows[i];
+            if(row->source_type==SC64_SCARAB_IMPACT_MARKER ? !(row->steps&0x70u) : !row->steps)break;
+        }
+        if(i==race_impact_count)break;
+        Sc64ImpactEvent due=race_impact_rows[i];
+        for(unsigned j=i+1;j<race_impact_count;j++)race_impact_rows[j-1]=race_impact_rows[j];
+        --race_impact_count;
+        if(due.source_type==SC64_SCARAB_IMPACT_MARKER)race_scarab_probe_bullet_resolve(&due);
+        else race_impact_resolve(&due);
+    }
+#else
     Sc64ImpactEvent due[RACE_IMPACT_CAPACITY];
     unsigned ready, keep = 0;
     if (!race_impact_count) return;
@@ -184,13 +236,18 @@ race_impact_tick(void)
     race_impact_count = (u8)keep;
     ready = sc64_impact_step(race_impact_rows, &race_impact_count, due);
     for (unsigned i = 0; i < ready; ++i) race_impact_resolve(&due[i]);
+#endif
 }
 
 /* Save: an empty queue keeps the historical RaceSave-length record. More
  * pending impacts than this profile's record holds refuse the save before
  * any SRAM write; they land within a second of play. */
 static int
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+race_impact_save_write(const GbaSaveSelection *previous)
+#else
 race_impact_save_write(void)
+#endif
 {
     u32 bytes = 0;
     if (race_impact_count > RACE_IMPACT_SAVE_CAPACITY) return 0;
@@ -215,9 +272,16 @@ race_impact_save_write(void)
     if (race_impact_count)
         sc64_impact_encode(race_impact_rows, race_impact_count,
                            (u8 *)&race_impact_record + offset);
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+    const u32 tags[]={SC64_LEGACY_SAVE_VERSION,SAVE_VERSION,SC64_SCARAB_SAVE_VERSION};
+    if (previous) {
+        if (!save_write_selected(&race_impact_record,offset+bytes,SC64_SCARAB_SAVE_VERSION,previous,tags,3)) return 0;
+    } else if (!save_write_first(&race_impact_record,offset+bytes,SC64_SCARAB_SAVE_VERSION)) return 0;
+#else
     save_write_migrating_feature(&race_impact_record, offset + bytes, SAVE_VERSION,
                          SC64_LEGACY_SAVE_VERSION, offsetof(RaceSave,state)+27u*sizeof(int),
                          0xffff0000u, 0x42450000u);
+#endif
 #else
     if (race_impact_count)
         bytes = sc64_impact_encode(race_impact_rows, race_impact_count,
@@ -233,26 +297,28 @@ race_impact_save_write(void)
     return 1;
 }
 
-/* Decode all extension data in scratch before touching live state. */
+/* Decode an already-selected raw envelope in race_impact_record.  This may
+ * rearrange that scratch record, but never reads SRAM or changes live state. */
 static int
-race_impact_save_read(Sc64ImpactEvent *candidate, int *count)
+race_impact_save_decode_selected(u32 len, u32 selected_tag,
+                                 Sc64ImpactEvent *candidate, int *count)
 {
-    u32 len = 0;
     int rows;
     *count = 0;
+    if (len > (u32)sizeof(race_impact_record)) return 0;
 #ifdef SC64_BATTLECRUISER_YAMATO_EXPERIMENT
     const u32 base = (u32)sizeof(RaceSave) - SC64_BC_SAVE_EXTRA_BYTES;
     Sc64BcYamatoShot shots[SC64_BC_SHOT_LIMIT] = {{0}};
     u32 offset = base, mask = 0, impact_bytes;
-    int legacy = 0;
-    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), SAVE_VERSION, &len)) {
-        legacy = 1;
-        if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record),
-                              SC64_LEGACY_SAVE_VERSION, &len)) return 0;
-    }
+    int legacy = selected_tag == SC64_LEGACY_SAVE_VERSION;
+    if (selected_tag != SAVE_VERSION && !legacy
+#ifdef SC64_SCARAB_NAMESPACE_STAGE
+        && selected_tag != SC64_SCARAB_SAVE_VERSION
+#endif
+       ) return 0;
     if (len < base) return 0;
     if (!legacy) {
-        if (race_data.version != SAVE_VERSION ||
+        if (race_data.version != selected_tag ||
             ((unsigned)race_data.state[27] & 0xffff0000u) != 0x42450000u ||
             ((unsigned)race_data.state[28] & ~31u) != 0x42440000u ||
             ((unsigned)race_data.state[28] & 7u) > 4u) return 0;
@@ -274,14 +340,7 @@ race_impact_save_read(Sc64ImpactEvent *candidate, int *count)
                               RACE_IMPACT_SAVE_CAPACITY, MAX_UNITS + MAX_BUILDINGS, 5u,
                               SC_RU_COUNT, candidate);
 #else
-#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
-    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), SAVE_VERSION, &len)) {
-        if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record),
-                              SC64_LEGACY_SAVE_VERSION, &len)) return 0;
-    }
-#else
-    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), SAVE_VERSION, &len)) return 0;
-#endif
+    (void)selected_tag; /* Version validation remains in race_load_game. */
     if (len < sizeof(RaceSave)) return 0;
     if (len == sizeof(RaceSave)) return 1;
     rows = sc64_impact_decode(race_impact_record.impacts, len - (u32)sizeof(RaceSave),
@@ -291,6 +350,25 @@ race_impact_save_read(Sc64ImpactEvent *candidate, int *count)
     if (rows < 0) return 0;
     *count = rows;
     return 1;
+}
+
+/* Preserve the existing per-tag selection policy until semantic journal
+ * migration is registered.  The decoder above is shared with that future
+ * candidate preflight and operates only on the selected scratch envelope. */
+static int
+race_impact_save_read(Sc64ImpactEvent *candidate, int *count)
+{
+    u32 len = 0, tag = SAVE_VERSION;
+    *count = 0;
+    if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), tag, &len)) {
+#ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
+        tag = SC64_LEGACY_SAVE_VERSION;
+        if (!save_read_latest(&race_impact_record, (u32)sizeof(race_impact_record), tag, &len)) return 0;
+#else
+        return 0;
+#endif
+    }
+    return race_impact_save_decode_selected(len, tag, candidate, count);
 }
 
 static void

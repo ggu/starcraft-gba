@@ -1205,7 +1205,7 @@ static int sc64_p3_exit_unit_blocked(void *opaque, int x, int y, int flying)
         dist2(x, y, ctx->reserved_x, ctx->reserved_y) < radius * radius)
         return 1;
     for (int i = 0; i < MAX_UNITS; ++i) {
-        if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i])) continue;
+        if (!u[i].alive || SC64_TRANSPORT_LOADED(&u[i]) || SC64_SCARAB_NONCOLLIDING(&u[i])) continue;
         if (sc64_race_unit_flying(u[i].type) != flying) continue;
 #if defined(SC64_T4_RUNTIME) || defined(SC64_ZP_CAMPAIGN_ACTORS)
         if (!sc64_game_unit_collidable(u[i].type)) continue;
