@@ -9105,7 +9105,7 @@ draw_unit(Unit * q)
     if(attack_pose) draw_mission_sprite(attack_pose,x,body_y);
     else
 #endif
-    if (sprite && sc64_facing_draw(q, facing_raw, x, body_y)) {}
+    if (sprite && sc64_facing_draw(q, facing_raw, x, y, walk)) {}
     else
 #endif
     if (sprite) {

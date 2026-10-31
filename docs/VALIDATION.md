@@ -8089,3 +8089,56 @@ those three results are also the results of unmodified `9ff7f7c`. The
 regressions are outside this change and remain open.
 
 No physical-GBA result is claimed.
+
+## Source walk cycles and facing in every race ROM (2026-10-29)
+
+`RACES_FLAGS` now carries `SC64_UNIT_FACING` and the new
+`SC64_UNIT_WALK_FRAMES`, so the Races and unified ROMs, every race campaign
+chapter and probe, the canonical products and Showcase all draw directional
+frames and play source walk poses. `tools/sc64_unit_walk_frames.py` reads each
+unit image's IScript Walking loop from the verified ROM. The local bank covers
+34 units in 1,260,912 pixel bytes, with all 32 headings stored (the western 15
+pre-mirrored). The SCV, Probe and most flyers loop one pose in the source, so
+they keep their facing frame and the stride lift. The Siege Tank hull rolls its
+tread poses under a level turret.
+
+Evidence, all on the private inputs prepared in this workspace:
+
+- `make test-sc64-unit-walk-frames-game` passes under ASan/UBSan with the
+  Terran, Zerg, P7, Showcase, Races and unified compiler vectors. Zergling,
+  Marine, Zealot, Hydralisk and Drone each face east (heading 8) and then
+  north-west (28) while moving, show every pose of their cycle (7, 9, 8, 7 and
+  5) with `draw_unit` output equal to the expected pose frame, and return to
+  their facing frame once stopped. Every stored western heading matches its
+  mirrored eastern twin, and a moving Tank draws treads with an unlifted turret.
+- `make walk-arm-probe` builds a no-debugger Races probe ROM
+  (`tests/sc64_unit_walk_arm_probe.c`). In mGBA 0.10.5 with `-l 7` it reports
+  `WALK DONE ok`. A Zergling walked 30 frames east facing heading 8, and all 7
+  poses were fully present on the shown page. A move to the north-west followed
+  the planner's waypoints: north first, then headings 26 to 24 toward the
+  target, with the final heading matching the target direction. Once it stopped,
+  six frames showed the facing frame.
+- All 32 race-engine ELFs that link here keep their `__iwram_end` from base
+  `8d1e653`, and BSS grows by at most 16 bytes. The tightest, Showcase, ends BSS
+  at 0x0203df40. Text grows by 1.38 MB in products that already had facing and
+  by 1.80 MB in those that gain it. P4 Storm also gains the packed facing
+  sidecars (+9.1 MB, 21.5 MB total), and the largest ROM, Terran, is 27.9 MB.
+  The P6 ROM was not built because its private sprite input is absent here.
+- The unit-draw stage of a canonical Zerg build (`sc64_unit_draw_cycles`, CPU
+  cycles, mean of 60 frames, 24 Zerglings walking) was measured with a scratch
+  probe built with and without `-USC64_UNIT_WALK_FRAMES`. Walking east, it went
+  from 99,058 to 136,353 cycles (19.8 Zerglings visible). Walking west, it went
+  from 137,341 to 194,650 (24 visible). That is about 1.9k to 2.4k cycles per
+  visible walking Zergling more than the packed word sprites. Standing units
+  are unchanged. An earlier version that mirrored western headings at draw time
+  through the ROM-resident blitter cost about 150k extra cycles walking west,
+  which is why the bank stores every heading.
+- `./dev build` and `./dev test` pass in a checkout without `.local`, and the
+  default ROM hash is unchanged. `make test-unified` and `make test-races` pass.
+  The Terran full campaign (T5 qualification, late-world Firebat splash), Zerg
+  (Z1 Extractor replay) and Protoss (P6 input missing, P6/P7 save-schema
+  asserts) suites fail identically on the unmodified base with these inputs.
+
+Walk poses are presentation only and are not saved. Turn rates, independent
+turret tracking and idle flyer animations are not modelled. No physical
+hardware or frame-rate claim is made.

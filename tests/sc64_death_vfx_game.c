@@ -92,8 +92,10 @@ static void spawn_skirmish(int count)
         int a = spawn_unit(SIDE, ALLY_TYPE, base_x + 40 + (i % 4) * 6, base_y + 30 + (i / 4) * 6);
         int f = spawn_unit(ENEMY, FOE_TYPE, base_x + 70 + (i % 4) * 6, base_y + 30 + (i / 4) * 6);
         assert(a >= 0 && f >= 0);
-        u[a].order = ORDER_ATTACK_TARGET; u[a].target = f;
-        u[f].order = ORDER_ATTACK_TARGET; u[f].target = a;
+        /* Ordinary attack-move orders toward each other. The workload must
+         * not depend on an opponent AI re-ordering these units. */
+        u[a].order = ORDER_ATTACK_MOVE; u[a].tx = u[f].x; u[a].ty = u[f].y;
+        u[f].order = ORDER_ATTACK_MOVE; u[f].tx = u[a].x; u[f].ty = u[a].y;
     }
 }
 
