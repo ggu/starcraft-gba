@@ -433,6 +433,8 @@ class OnboardingTests(unittest.TestCase):
             self.assertIn('CANONICAL_ZERG_PROFILE_FLAGS', line, fixture)
             self.assertIn('CANONICAL_ZERG_PROFILE_INPUTS', line, fixture)
         self.assertIn('CANONICAL_TRACER_PROFILE_FIXTURE,zerg-z6,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS', makefile)
+        self.assertIn('build/test-sc64-tracer-profile-zerg: tests/sc64_z7_tracer_game.c', makefile)
+        self.assertIn('test-sc64-canonical-tracer-profile: $(addprefix build/test-sc64-tracer-profile-,terran zerg protoss showcase)', makefile)
         self.assertIn('CONSTRUCTION_ARRIVAL_FLAGS_zerg-z6 = $(ZERG_ROM_FLAGS)', makefile)
         self.assertIn('BC_PROFILE_FIXTURE,$(case),zerg,ZERG_ROM_FLAGS,ZERG_Z6_INPUTS', makefile)
 
