@@ -412,17 +412,18 @@ static int assign_idle_probe_to_minerals(void)
     static int queue[MAP_CELLS];
     int worker = -1, home = -1, best = 0x7fffffff;
     int patch = -1, patch_distance = 0x7fffffff, head = 0, tail = 0;
-    int visible_patches = 0;
+    int visible_patches = 0, eligible_workers = 0;
     if (!path_grid_valid) return mineral_attempt_rejected("path-invalid", worker, home, patch);
     for (int i = 0; i < MAX_UNITS; ++i) if (u[i].alive && u[i].owner == SIDE &&
         u[i].type == U_PROBE && u[i].order == ORDER_IDLE && !u[i].carry) {
+        ++eligible_workers;
         for (int j = 0; j < MAX_BUILDINGS; ++j) if (b[j].alive &&
             b[j].owner == SIDE && b[j].type == B_NEXUS && building_complete(j)) {
             int d = dist2(u[i].x, u[i].y, b[j].x, b[j].y);
             if (d < best) { best = d; worker = i; home = j; }
         }
     }
-    if (worker < 0 || home < 0) return mineral_attempt_rejected("no-idle-worker-or-home", worker, home, patch);
+    if (worker < 0 || home < 0) return mineral_attempt_rejected(eligible_workers ? "no-complete-home" : "no-eligible-worker", worker, home, patch);
     int start = limit(u[worker].x / 16, 0, MAP_COLS - 1) +
                 limit(u[worker].y / 16, 0, MAP_ROWS - 1) * MAP_COLS;
     memset(seen, 0, sizeof(seen)); seen[start] = 1; queue[tail++] = start;
