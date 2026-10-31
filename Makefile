@@ -1,5 +1,12 @@
 .DEFAULT_GOAL := all
 
+# Asset-free effect lifetime stage; no gameplay capability is enabled.
+.PHONY: test-dark-swarm-state
+build/test-dark-swarm-state: tests/sc64_dark_swarm_state.c starcraft/sc64_dark_swarm_state.h Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined $< -o $@
+test-dark-swarm-state: build/test-dark-swarm-state
+	./build/test-dark-swarm-state
+
 # Asset-free journal selection prototype; not yet wired to game persistence.
 .PHONY: test-scarab-save-selection
 build/test-scarab-save-selection: tests/gba_save_selection.c common/gba.c common/gba.h Makefile | build
