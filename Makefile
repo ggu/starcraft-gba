@@ -6119,3 +6119,5 @@ $(eval $(call SCARAB_PARENT_CLEANUP_FIXTURE,protoss,$(SCARAB_P7_BASE_FLAGS) -DSC
 $(eval $(call SCARAB_PARENT_CLEANUP_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
 .PHONY: test-scarab-parent-cleanup
 test-scarab-parent-cleanup: test-scarab-parent-cleanup-terran test-scarab-parent-cleanup-zerg test-scarab-parent-cleanup-protoss test-scarab-parent-cleanup-showcase
+
+include tests/carrier-fixtures/Makefile
