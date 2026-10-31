@@ -37,6 +37,14 @@ int sc64_test_remove_sequence(u32 sequence)
     }
     return 0;
 }
+int sc64_test_set_sequence(u32 tag,u32 sequence)
+{
+    for (int slot=0;slot<2;slot++) {
+        volatile u8 *p=host_save+(unsigned)slot*SAVE_SLOT_SIZE;
+        if (sram_get32(p)==tag) { sram_put32(p+12,sequence); return 1; }
+    }
+    return 0;
+}
 int sc64_test_sram_transfer(const char *path,int write_mode)
 {
     FILE *f=fopen(path,write_mode?"wb":"rb"); size_t n;

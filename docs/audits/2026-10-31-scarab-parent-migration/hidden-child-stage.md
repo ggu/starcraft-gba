@@ -41,5 +41,16 @@ One staged record also contains a genuinely in-training child at the same
 time as two active Yamato shots and a pending impact; its fresh-process
 continuation output matches the writer. The run and compile receipts are
 `.local/decoder-proof/hidden-combined-{compile,runs}.json`; negative case
-receipts are `hidden-boundary-runs.json`. Mixed old/new tag fallback in both
-sequence orders is still unqualified for child-bearing records.
+receipts are `hidden-boundary-runs.json`.
+
+The retained gate-off writer's BC record and a staged training-child record
+were also placed in the same journal. The stage selected the newer valid
+record for each tag order. With a checksummed invalid newer staged child row,
+it selected the older BC record and preserved that entire predecessor slot
+when writing a replacement. With a checksummed invalid newer BC parent row,
+it selected the older staged child record and preserved its entire slot when
+writing a replacement. The reversed ordering was made by editing the journal
+sequence in a fixture; corruptions were likewise injected and rechecksummed.
+The old BC input itself came from the retained gate-off writer, not a simulated
+past release. Latest-source compile and 10 fresh-process receipts are in
+`.local/decoder-proof/hidden-mixed-{compile,runs}.json`.
