@@ -1,0 +1,7 @@
+# Scarab command icon in the gated control probe
+
+The private, verified USA ROM (SHA-1 `a36d91b5aac7bb95df0d7de5f9814f5270e25c2b`) has a button record at `0x0c5438` with position 2, icon 85, argument 85 and string 609 (`Scarab`). Its condition and action pointers match the Interceptor build record at `0x0c53d8`, whose icon and argument are 73. This is evidence for the command's source icon, not proof of complete original control behavior.
+
+The already-prepared interface icon bank (`68671d54629535dc239079237280bd0aba510fc35146bbfebcc49edd652ec23e`) has a 13×13 raw85 frame with 112 nonzero pixels; the existing packed command-card bank (`debdac42fadd9b811692405fb2181e8e1044d8473340833174ce8d9fac3a1d4f`) has a 13×13 raw85 frame with 47 nonzero encoded bytes. The probe maps `BUILD SCARAB` to raw85 in both list and card renderers; their existing absent-frame fallback remains in place. Neither private bank, the ROM, nor extracted imagery is committed or regenerated.
+
+With the human-control, weapon, namespace and command-card probes enabled, the synthetic actual-engine fixture passed under ASan/UBSan in each of four production vectors and on both maps. It asserts both list and command-card icon selection, the prepared frame's presence, actual menu key input, paid queue and source-tick completion. These tests do not qualify visuals on hardware, factory admission, performance or the remaining lifecycle/save gates. The command remains disabled by default.

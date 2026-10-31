@@ -1,0 +1,21 @@
+# Showcase contact-cache qualification
+
+Showcase now uses the shared `SC64_CONTACT_CACHE` collision-fact and one-pass steering-mask implementation already selected in the canonical Terran, Zerg and Protoss products. It replaces Showcase's previous collision-class cache and per-direction steering list; movement rules, collision predicates, actor limits, simulation cadence and source art do not change. `SHOWCASE_CONTACT_CACHE=0` restores the prior flags. The validated mode is part of the existing canonical build key so toggling it rebuilds consumers, including same-second changes.
+
+A private paired Showcase experiment on runtime `3228f21719e43f74d6d2459e0ee9840ef74d82f9` used the same code, prepared inputs, port-free emulator and retained map-1 Protoss-human saves. The OFF and ON vectors differed only by replacing `SC64_COLLISION_CLASS_CACHE` and `SC64_COLLISION_STEER_LIST` with `SC64_CONTACT_CACHE`. Each one-, two- and three-AI continuation stayed in active play for 900 updates and matched all nine sampled actor/fog/RGB/frame checkpoints per pair; route build and hit totals also matched. This is sampled state and pixel evidence, not proof of all transient state.
+
+| Mixed AI opponents | Mean orders OFF → ON | Mean update OFF → ON | Mean full loop OFF → ON |
+| --- | ---: | ---: | ---: |
+| 1 | 296,782 → 208,860 | 380,055 → 295,543 | 722,345 → 579,726 |
+| 2 | 430,383 → 318,048 | 532,210 → 418,769 | 862,411 → 834,629 |
+| 3 | 243,736 → 209,380 | 372,844 → 340,291 | 745,753 → 683,332 |
+
+For full-loop p95/p99/max, OFF → ON was 842,453/842,804/1,351,408 → 770,471/840,744/1,123,285 (one AI); 1,092,597/1,123,574/1,453,981 → 842,755/1,123,320/1,404,250 (two); and 842,509/1,172,653/3,141,932 → 842,294/1,132,904/3,110,598 (three). Orders p95/p99/max was 350,390/389,099/851,441 → 239,932/288,755/769,395; 490,569/583,711/1,014,517 → 363,730/438,750/927,699; and 309,386/769,642/1,543,753 → 275,806/735,720/1,513,358 respectively. The draw-stage max increased in these samples, so no blanket worst-case improvement is claimed.
+
+Values are guest cycles per update; the full loop includes presentation waiting. These are three specific emulator workloads, not hardware FPS or a universal near-30-fps result. The broader 3228 order-stage diagnostic attributed substantial active movement work to collision/steering; the instrumented builds alter timing and are attribution, not causal speedup evidence. Peak, percentile, population, ROM/save/runner hashes and all 900 samples are retained locally.
+
+With the exact Showcase profile flags, the ASan/UBSan contact differential passed 4,135,391 step, 636,214 eight-direction mask, 130,320 inactive-mask and 171,024 stock-step checks across 1,200 passes and 71,799 mutations, including 200 P6-active passes. A separate full-frame fixture matched full-clear references. The clean unprepared original-art build and full test suite passed at `ca1499d` (855 Python tests, 23 skipped, plus native fixtures); source-boundary and doctor passed. Nine focused Make flag, invalid-mode, rapid-toggle and no-op tests passed; expanded Terran, Zerg and Protoss flags remained identical, while Showcase changed only the three collision defines described above.
+
+The actual normal Make Showcase ROM at `ca1499d1ecaacc4e99d6147733c4a0b2142c8781` was byte-identical to the measured ON ROM (SHA-256 `d113251d406de6f0127887e4818b9f74b6775a1bfbba85fa7a328ad3bb3799ca`). Its BSS/IWRAM endpoints were `0203afa0/03004c78`, within the unchanged guards; OFF was `0203b0e0/03004a60`. Header, SRAM signature, raw ELF payload and FF-padding verification passed, and all 104 frozen input hashes matched. Normal-menu fresh-process Showcase SRAM passed 9,000+900 updates with three mixed AI opponents: saved/restored and uninterrupted/resumed fingerprints including active queues matched, with unchanged SRAM. This does not cover every transient state.
+
+Commands, input and ROM hashes, maps, frame and contact fixture logs, all per-update samples and the fresh SRAM receipt remain in ignored `.local/orders-profile/` of `ai-orders-profile-20261031` and `.local/qualification/` of `showcase-contact-activation-20261031`. The experimental Scarab or staged P8/P9 vectors were not qualified with this placement and must not inherit these memory or behavior claims. No private assets were committed or Actions dispatched.

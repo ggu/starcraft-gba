@@ -177,6 +177,9 @@ static void race_transport_destroy_cargo(int carrier)
 #ifdef SC64_Z6_TRANSPORT_ENABLED
             if (race_z6_active()) race_z6_note_unit_death(&u[i]);
 #endif
+#ifdef SC64_SCARAB_HUMAN_CONTROL_PROBE
+            if (sc64_race_raw_unit(u[i].type)==83) race_scarab_human_parent_lost(i);
+#endif
             if (u[i].owner == SIDE) supply_used -= unit_supply(u[i].type);
             u[i].hp = 0; u[i].alive = u[i].selected = 0;
             u[i].order = ORDER_IDLE; u[i].target = -1;
