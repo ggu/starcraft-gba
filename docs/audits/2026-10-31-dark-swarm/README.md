@@ -607,3 +607,9 @@ before coordinate arithmetic, under ASan/UBSan. Explicit source raw identities
 that disagree with their runtime type are also rejected before regeneration or
 casting; the negative fixture exercises both stationary and moving requests.
 All normal flags remain off.
+
+### Restricted Unclean One southeast experiment
+
+The separate `SC64_SHARED_DEFILER_SE_HERO_PROBE` admits raw 52 only when both the existing hero and southeast probes are enabled. Five pinned OpenBW raw-52 source worlds at source-pixel offsets 280, 300, 320, 384, and 448 were compared with actual host `game_update` execution: all 600 position/heading samples and each debit matched, with 40 exact Q8 samples at offset 280. Both synthetic fixtures seed 100 energy for this motion comparison; the separate natural-regeneration and campaign-import fixtures cover their stated narrower behavior. An actual menu STOP test passed, and the existing hero gate still refuses the approach when the new gate is absent. The retained source inputs and results are under `.local/defiler-se-hero-set` and `.local/defiler-se-hero-verification`; the opt-in Make targets require those private oracle logs.
+
+This is a stationary, grid-aligned, clear southeast slice with initial heading 104 and source order phase zero. Other headings, diagonals, moving starts, terrain/pathfinding equivalence, ARM fit, and normal or P9 admission remain unqualified; normal flags remain off.

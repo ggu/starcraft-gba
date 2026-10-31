@@ -1004,6 +1004,9 @@ static Sc64DefilerStageActor sc64_defiler_stage[MAX_UNITS];
 #if defined(SC64_SHARED_DARK_SWARM_SOURCE_RECTS) && !defined(SC64_SHARED_DARK_SWARM_PROBE)
 #error "Dark Swarm source rectangles require the experimental query"
 #endif
+#if defined(SC64_SHARED_DEFILER_SE_HERO_PROBE) && (!defined(SC64_SHARED_DEFILER_SE_APPROACH_PROBE) || !defined(SC64_SHARED_DEFILER_HERO_PROBE))
+#error "Unclean One diagonal research requires the hero and southeast probes"
+#endif
 #if defined(SC64_SHARED_DEFILER_SE_APPROACH_PROBE) && !defined(SC64_SHARED_DEFILER_APPROACH_PROBE)
 #error "Diagonal Defiler research requires the clear-approach probe"
 #endif

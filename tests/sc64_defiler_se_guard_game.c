@@ -18,8 +18,8 @@ int main(void)
         assert(sc64_defiler_stage[c].blocked && u[c].x==sx[k] && u[c].y==sy[k]);
         assert(sc64_defiler_stage[c].energy_q8>=100u*256u && !sc64_shared_projectiles.active);
     }
-#ifdef SC64_SHARED_DEFILER_HERO_PROBE
-    /* Hero movement is not covered by this raw-46 source slice. */
+#if defined(SC64_SHARED_DEFILER_HERO_PROBE) && !defined(SC64_SHARED_DEFILER_SE_HERO_PROBE)
+    /* Hero movement is not covered unless its independent probe is enabled. */
     game_init();race_mode=1;race_human=R_ZERG;race_bots=1;race_skirmish_map=0;race_skirmish_init();
     memset(path_walkable,0xff,sizeof(path_walkable));path_grid_valid=1;
     int hero=spawn_unit(SIDE,U_SHARED_UNCLEAN_ONE,160,160);assert(hero>=0);
@@ -61,5 +61,21 @@ int main(void)
     for(int n=0;n<25;n++)game_update(0,0);
     assert(!sc64_defiler_stage[c].intent && u[c].x==x && u[c].y==y &&
            sc64_defiler_stage[c].energy_q8>=100u*256u && !sc64_shared_projectiles.active);
+#ifdef SC64_SHARED_DEFILER_SE_HERO_PROBE
+    /* The separately gated hero path also obeys real menu STOP. */
+    game_init();race_mode=1;race_human=R_ZERG;race_bots=1;race_skirmish_map=0;race_skirmish_init();
+    memset(path_walkable,0xff,sizeof(path_walkable));path_grid_valid=1;
+    int hero_stop=spawn_unit(SIDE,U_SHARED_UNCLEAN_ONE,160,160);assert(hero_stop>=0);
+    test_phase=0;click_cast(hero_stop,300,300);
+    for(int n=0;n<12;n++)game_update(0,0);
+    assert(u[hero_stop].x>160 && u[hero_stop].y>160 && sc64_defiler_stage[hero_stop].intent);
+    game_update(0,0);game_update(KEY_B,KEY_B);assert(menu_open);
+    for(int n=0;n<64 && menu_cursor!=MENU_STOP;n++) {game_update(0,0);game_update(KEY_DOWN,KEY_DOWN);}
+    assert(menu_cursor==MENU_STOP);game_update(0,0);game_update(KEY_A,KEY_A);
+    int hx=u[hero_stop].x,hy=u[hero_stop].y;
+    for(int n=0;n<25;n++)game_update(0,0);
+    assert(!sc64_defiler_stage[hero_stop].intent && u[hero_stop].x==hx && u[hero_stop].y==hy &&
+           sc64_defiler_stage[hero_stop].energy_q8>=100u*256u && !sc64_shared_projectiles.active);
+#endif
     puts("unsupported diagonal starts fail closed without movement or debit");return 0;
 }

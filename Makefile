@@ -110,6 +110,18 @@ build/test-dark-swarm-se-hero-guard: tests/sc64_defiler_se_guard_game.c tests/sc
 test-dark-swarm-se-hero-guard: build/test-dark-swarm-se-hero-guard
 	./build/test-dark-swarm-se-hero-guard
 
+# Independently gated raw-52 source trajectories; retained source logs are inputs.
+DARK_SWARM_SE_HERO_ORACLE_DIR ?= .local/defiler-se-hero-set
+.PHONY: test-dark-swarm-se-hero-approach test-dark-swarm-se-hero-enabled-guard
+build/test-dark-swarm-se-hero-approach: tests/sc64_defiler_se_distance_game.c tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_HERO_PROBE -DSC64_SHARED_DEFILER_APPROACH_PROBE -DSC64_SHARED_DEFILER_SE_APPROACH_PROBE -DSC64_SHARED_DEFILER_SE_HERO_PROBE $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-dark-swarm-se-hero-approach: build/test-dark-swarm-se-hero-approach
+	$(PYTHON) tests/sc64_verify_defiler_se_set.py --game $< --source-dir $(DARK_SWARM_SE_HERO_ORACLE_DIR) --out build/defiler-se-hero-verification
+build/test-dark-swarm-se-hero-enabled-guard: tests/sc64_defiler_se_guard_game.c tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_HERO_PROBE -DSC64_SHARED_DEFILER_APPROACH_PROBE -DSC64_SHARED_DEFILER_SE_APPROACH_PROBE -DSC64_SHARED_DEFILER_SE_HERO_PROBE $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-dark-swarm-se-hero-enabled-guard: build/test-dark-swarm-se-hero-enabled-guard
+	./build/test-dark-swarm-se-hero-enabled-guard
+
 # Noncompact malformed-coordinate guard; uses the existing prepared core inputs.
 .PHONY: test-dark-swarm-noncompact-guard
 build/test-dark-swarm-noncompact-guard: tests/sc64_defiler_noncompact_guard_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c Makefile | build

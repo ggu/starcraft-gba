@@ -12,7 +12,12 @@ int main(int argc,char **argv)
     int distance=atoi(argv[1]);if(distance<280 || distance>448 || (distance&1))return 2;
     game_init();race_mode=1;race_human=R_ZERG;race_bots=1;race_skirmish_map=0;race_skirmish_init();
     memset(path_walkable,0xff,sizeof(path_walkable));path_grid_valid=1;
-    int c=spawn_unit(SIDE,U_SHARED_DEFILER,160,160);assert(c>=0);
+#ifdef SC64_SHARED_DEFILER_SE_HERO_PROBE
+    int c=spawn_unit(SIDE,U_SHARED_UNCLEAN_ONE,160,160);
+#else
+    int c=spawn_unit(SIDE,U_SHARED_DEFILER,160,160);
+#endif
+    assert(c>=0);
     test_phase=0;click_cast(c,160+distance/2,160+distance/2);
     int tick=1;
     while(tick<=120) {

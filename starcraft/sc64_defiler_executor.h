@@ -28,7 +28,11 @@ static int sc64_defiler_clear_approach(Sc64DefilerStageActor *a,Unit *q)
 #ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
             int dx=a->target_x-q->x,dy=a->target_y-q->y;
             int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
-            if(raw!=46 || dx<140 || dx>224 || dx!=dy ||
+            if((raw!=46
+#ifdef SC64_SHARED_DEFILER_SE_HERO_PROBE
+                && raw!=52
+#endif
+               ) || dx<140 || dx>224 || dx!=dy ||
                (q->x&31) || (q->y&31) || a->heading!=104) {a->blocked=1;return 0;}
             a->diagonal=1;a->turning=1;a->velocity=a->heading;
             a->waypoint_x=(s16)(q->x*2+64);a->waypoint_y=(s16)(q->y*2+64);
