@@ -215,6 +215,24 @@ static int sc64_p7_arbiter_cache_empty_unit(const void *actor)
     return sc64_bytes_are_zero(actor, sizeof(Unit));
 }
 
+/* u[] supplies aligned, complete Unit objects. Unroll the representation
+ * check for zero-filled unused slots; retain the generic byte-safe fallback
+ * for other layouts and compilers. No padding or tail bytes are ignored. */
+static int sc64_p7_arbiter_cache_empty_slot(unsigned slot)
+{
+#if defined(__GNUC__) || defined(__clang__)
+    if (_Alignof(Unit) >= 4 && sizeof(Unit) % 4 == 0) {
+        const Sc64ZeroAlias32 *p=(const Sc64ZeroAlias32 *)(const void *)&u[slot];
+        unsigned n=(unsigned)(sizeof(Unit)/4), i=0;
+        for (;i+4<=n;i+=4)
+            if ((p[i] | p[i+1] | p[i+2] | p[i+3]) != 0) return 0;
+        for (;i<n;++i) if (p[i] != 0) return 0;
+        return 1;
+    }
+#endif
+    return sc64_p7_arbiter_cache_empty_unit(&u[slot]);
+}
+
 static int sc64_p7_observer_arbiter_aura_candidate(int target)
 {
     unsigned actor_flags;
@@ -430,15 +448,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
 {
     unsigned i,j;
     u8 powered_cannons[MAX_BUILDINGS];
-    memset(powered_cannons,0,sizeof(powered_cannons));
-    for(i=0;i<MAX_BUILDINGS;++i) if(b[i].alive &&
-        RACE_PROTOSS_RAW(&b[i])==SC64_P7_CANNON_RAW && building_complete((int)i) &&
-        RACE_PROTOSS_SLOT(&b[i])>=0 && RACE_PROTOSS_SLOT(&b[i])<8) {
-        int live=race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&b[i]));
-        if(live==b[i].owner)
-            powered_cannons[i]=(u8)sc64_p7_observer_pylon_powers((int)i,
-                RACE_PROTOSS_SLOT(&b[i]),live);
-    }
+    int powered_cannons_ready=0;
     unsigned global=(unsigned)RACE_PROTOSS_SERVICE_CLOCK[1] |
                     ((unsigned)RACE_PROTOSS_SERVICE_CLOCK[2]<<8);
     int stagger_reset=0;
@@ -461,7 +471,7 @@ static void sc64_p7_arbiter_cache_source_tick(void)
                 (old&SC64_P7_ARBITER_TRACKED)!=0);
             ++visible_ordinal;
         }
-    unsigned aura[MAX_UNITS];
+    u8 aura[MAX_UNITS];
     for (i=0;i<MAX_UNITS;++i) aura[i]=0;
     for (i=0;i<MAX_UNITS;++i) if (u[i].alive && RACE_PROTOSS_RAW(&u[i])==71u &&
         RACE_PROTOSS_SLOT(&u[i])>=0 && RACE_PROTOSS_SLOT(&u[i])<8 && !(u[i].flags&8u) &&
@@ -545,14 +555,17 @@ static void sc64_p7_arbiter_cache_source_tick(void)
     for (i=0;i<MAX_UNITS;++i) {
         unsigned old=(unsigned)u[i].weapon;
         unsigned mask=0,timer=0;
-        int tracked=aura[i] || sc64_p7_observer_is_cloaked((unsigned)RACE_PROTOSS_RAW(&u[i]));
-        int was_tracked=SC64_P7_ARBITER_CACHE_VALID(old) &&
-                        (old&SC64_P7_ARBITER_TRACKED)!=0;
         if (!u[i].alive) {
-            if (!sc64_p7_arbiter_cache_empty_unit(&u[i]))
+            /* The old value is already the exact dead-row result. Zero rows
+             * still need the complete representation check below. */
+            if (old != sc64_p7_arbiter_pack(0,0,0,0) &&
+                !sc64_p7_arbiter_cache_empty_slot(i))
                 u[i].weapon=(u16)sc64_p7_arbiter_pack(0,0,0,0);
             continue;
         }
+        int tracked=aura[i] || sc64_p7_observer_is_cloaked((unsigned)RACE_PROTOSS_RAW(&u[i]));
+        int was_tracked=SC64_P7_ARBITER_CACHE_VALID(old) &&
+                        (old&SC64_P7_ARBITER_TRACKED)!=0;
         if (!SC64_P7_ARBITER_CACHE_VALID(old)) {
             /* Fail closed on malformed in-memory rows; spawn initializes it. */
             u[i].weapon=(u16)sc64_p7_arbiter_pack(0,0,0,0);
@@ -561,6 +574,20 @@ static void sc64_p7_arbiter_cache_source_tick(void)
         timer=SC64_P7_ARBITER_COUNTDOWN(old);
         if (tracked) {
             if (timer==0 || (tracked && !was_tracked)) {
+                /* Building and owner state are unchanged within this tick.
+                 * Compute the shared snapshot only if a refresh needs it. */
+                if (!powered_cannons_ready) {
+                    memset(powered_cannons,0,sizeof(powered_cannons));
+                    for(j=0;j<MAX_BUILDINGS;++j) if(b[j].alive &&
+                        RACE_PROTOSS_RAW(&b[j])==SC64_P7_CANNON_RAW && building_complete((int)j) &&
+                        RACE_PROTOSS_SLOT(&b[j])>=0 && RACE_PROTOSS_SLOT(&b[j])<8) {
+                        int live=race_protoss_source_owner((unsigned)RACE_PROTOSS_SLOT(&b[j]));
+                        if(live==b[j].owner)
+                            powered_cannons[j]=(u8)sc64_p7_observer_pylon_powers((int)j,
+                                RACE_PROTOSS_SLOT(&b[j]),live);
+                    }
+                    powered_cannons_ready=1;
+                }
                 mask=sc64_p7_arbiter_detected_mask((int)i,powered_cannons);
                 timer=30;
             } else {

@@ -241,17 +241,27 @@ static void test_cannon_detects_observer(void)
 {
     custom_game();
     int observer = spawn_unit(ENEMY, U_P7_OBSERVER, 700, 700);
+    int second = spawn_unit(ENEMY, U_P7_OBSERVER, 704, 700);
     int watcher = spawn_unit(SIDE, U_DRAGOON, 690, 700);
-    assert(observer >= 0 && watcher >= 0);
+    assert(observer >= 0 && second >= 0 && watcher >= 0);
     run(40);
     assert(sc64_p7_observer_target_is_cloaked(observer));
     assert(!sc64_p7_observer_target_revealed_to(observer, SC64_PROTOSS_HUMAN_SLOT, SIDE));
-    (void)spawn_complete(SIDE, B_PYLON, 640, 720);
+    int pylon=spawn_complete(SIDE, B_PYLON, 640, 720);
     (void)spawn_complete(SIDE, B_PHOTON_CANNON, 660, 700);
     run(40);
     assert(sc64_p7_observer_target_revealed_to(observer, SC64_PROTOSS_HUMAN_SLOT, SIDE));
     /* The asker's identity follows its live owner, whatever slot it names. */
     assert(sc64_p7_observer_target_revealed_to(observer, -1, SIDE));
+    assert(sc64_p7_observer_target_revealed_to(second, SC64_PROTOSS_HUMAN_SLOT, SIDE));
+    b[pylon].alive=0;
+    run(40);
+    assert(!sc64_p7_observer_target_revealed_to(observer, SC64_PROTOSS_HUMAN_SLOT, SIDE));
+    assert(!sc64_p7_observer_target_revealed_to(second, SC64_PROTOSS_HUMAN_SLOT, SIDE));
+    (void)spawn_complete(SIDE, B_PYLON, 640, 720);
+    run(40);
+    assert(sc64_p7_observer_target_revealed_to(observer, SC64_PROTOSS_HUMAN_SLOT, SIDE));
+    assert(sc64_p7_observer_target_revealed_to(second, SC64_PROTOSS_HUMAN_SLOT, SIDE));
 }
 
 static void test_overlord_detects_zeratul(void)
