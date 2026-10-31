@@ -42,6 +42,26 @@ static int sc64_shared_carrier_expand_legacy(void *buffer, size_t length,
     *expanded=length+delta;
     return 1;
 }
+/* The inverse is used only after a complete legacy-format candidate and its
+ * variable sidecars have been constructed in the expanded scratch layout. */
+static int sc64_shared_carrier_compact_legacy(void *buffer, size_t length,
+                                              size_t capacity, size_t *compacted)
+{
+    const size_t old_tail=offsetof(RaceSave,buildings)+sizeof(((RaceSave *)0)->buildings);
+    const size_t new_tail=offsetof(RaceSave,minerals_map);
+    const size_t prefix=sizeof(((RaceSave *)0)->minerals_map)+sizeof(((RaceSave *)0)->fog);
+    const size_t old_state=(old_tail+prefix+3u)&~(size_t)3u;
+    const size_t new_state=offsetof(RaceSave,state);
+    if (!buffer || !compacted || (old_tail&3u) || old_tail>new_tail ||
+        offsetof(RaceSave,fog)!=new_tail+sizeof(((RaceSave *)0)->minerals_map) ||
+        new_state<new_tail+prefix || old_state>new_state || length<new_state ||
+        length>capacity || sc64_shared_carrier_overlap(buffer,capacity,compacted,sizeof(*compacted))) return 0;
+    memmove((u8 *)buffer+old_tail,(u8 *)buffer+new_tail,prefix);
+    memset((u8 *)buffer+old_tail+prefix,0,old_state-old_tail-prefix);
+    memmove((u8 *)buffer+old_state,(u8 *)buffer+new_state,length-new_state);
+    *compacted=length-(new_state-old_state);
+    return 1;
+}
 static int sc64_shared_carrier_candidate_encode(RaceSave *dst,
                                                 const Unit *actors,
                                                 const Building *buildings,

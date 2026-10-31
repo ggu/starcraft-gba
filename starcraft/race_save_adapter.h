@@ -1789,8 +1789,8 @@ static int race_save_serialize(int shared_carrier) {
 static int race_save_game(void) {
 #if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
 #ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
-    /* Qualification route: custom worlds only. Campaign migration and the
-     * complete cross-service save matrix are not yet enabled. */
+    /* Qualification route: custom worlds use the new tag; campaign worlds
+     * retain the legacy envelope and layout. */
     {
         const u32 tags[]={SAVE_VERSION,SC64_SHARED_CARRIER_SAVE_VERSION
 #ifdef SC64_BATTLECRUISER_ENERGY_EXPERIMENT
@@ -1799,9 +1799,9 @@ static int race_save_game(void) {
                          };
         RaceLoadPlan plan={0}; GbaSaveSelection previous;
         int have_previous;
-        if (race_mode!=1) return 0;
+        const u32 tag=race_mode ? SC64_SHARED_CARRIER_SAVE_VERSION : SAVE_VERSION;
         have_previous=race_shared_carrier_stage_select(&plan,&previous);
-        if (!race_save_serialize(1)) return 0;
+        if (!race_save_serialize(race_mode!=0)) return 0;
 #ifdef SC64_IMPACT_EVENTS
         u32 length;
         if (!race_impact_save_pack(&length)) return 0;
@@ -1810,10 +1810,20 @@ static int race_save_game(void) {
         u32 length=sizeof(race_data);
         const void *record=&race_data;
 #endif
+        if (!race_mode) {
+            size_t compacted;
+#ifdef SC64_IMPACT_EVENTS
+            if (!sc64_shared_carrier_compact_legacy(&race_impact_record,length,
+                                                     sizeof(race_impact_record),&compacted)) return 0;
+#else
+            if (!sc64_shared_carrier_compact_legacy(&race_data,length,sizeof(race_data),&compacted)) return 0;
+#endif
+            length=(u32)compacted;
+        }
         if (have_previous) {
-            if (!save_write_selected(record,length,SC64_SHARED_CARRIER_SAVE_VERSION,
+            if (!save_write_selected(record,length,tag,
                                      &previous,tags,sizeof(tags)/sizeof(tags[0]))) return 0;
-        } else if (!save_write_first(record,length,SC64_SHARED_CARRIER_SAVE_VERSION)) return 0;
+        } else if (!save_write_first(record,length,tag)) return 0;
         toast(7); return 1;
     }
 #else
@@ -3257,21 +3267,25 @@ static int race_scarab_stage_previous(GbaSaveSelection *selection) {
 }
 #endif
 static int race_load_game(void) {
+    RaceLoadPlan plan = {0};
 #if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
 #ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
     {
-        RaceLoadPlan custom_plan={0}; GbaSaveSelection selected;
-        if (!race_shared_carrier_stage_select(&custom_plan,&selected) ||
-            selected.tag!=SC64_SHARED_CARRIER_SAVE_VERSION) return 0;
-        race_shared_carrier_stage_commit(&custom_plan);
-        return 1;
+        GbaSaveSelection selected;
+        if (!race_shared_carrier_stage_select(&plan,&selected)) return 0;
+        if (selected.tag==SC64_SHARED_CARRIER_SAVE_VERSION) {
+            race_shared_carrier_stage_commit(&plan);
+            return 1;
+        }
+        /* A checked predecessor has already been expanded and preflighted;
+         * retain the existing legacy commit for campaign and old custom. */
+        goto race_shared_carrier_legacy_commit;
     }
 #else
     /* Do not interpret a predecessor journal with the experimental layout. */
     return 0;
 #endif
 #endif
-    RaceLoadPlan plan = {0};
 #ifdef SC64_SCARAB_NAMESPACE_STAGE
     GbaSaveSelection selected;
     if (!race_scarab_stage_select(&plan,&selected)) return 0;
@@ -3309,6 +3323,9 @@ static int race_load_game(void) {
     if(!save_read(&race_data,sizeof(race_data),SAVE_VERSION)||race_data.version!=SAVE_VERSION)return 0;
 #endif
     if (!race_load_preflight(&plan)) return 0;
+#endif
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+race_shared_carrier_legacy_commit: ;
 #endif
     const int *v = race_data.state;
     race_mode=v[0];race_human=v[1];race_selected_mission=v[2];race_completed=v[3];race_bots=v[4];

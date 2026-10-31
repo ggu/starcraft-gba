@@ -86,6 +86,10 @@ static void test_legacy_scratch_relocation(void)
     assert(!memcmp(data+new_tail,original+old_tail,prefix));
     for (size_t i=new_tail+prefix;i<new_state;++i) assert(data[i]==0);
     assert(!memcmp(data+new_state,original+old_state,old_length-old_state));
+    size_t compacted=0;
+    assert(!sc64_shared_carrier_compact_legacy(data,new_state-1,sizeof(data),&compacted));
+    assert(sc64_shared_carrier_compact_legacy(data,expanded,sizeof(data),&compacted));
+    assert(compacted==old_length && !memcmp(data,original,old_length));
 }
 static int validate_staged_journal(const void *data,u32 length,u32 tag,void *context)
 {

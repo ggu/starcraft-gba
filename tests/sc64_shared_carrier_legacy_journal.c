@@ -317,7 +317,17 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
 
 int main(int argc,char **argv)
 {
-    assert(argc==3 && (!strcmp(argv[2],"custom") || !strcmp(argv[2],"campaign")));
+    assert((argc==3 || argc==4) && (!strcmp(argv[2],"custom") || !strcmp(argv[2],"campaign") ||
+                                    !strcmp(argv[2],"verify_campaign")));
+#if !defined(SC64_SHARED_CARRIER_EXPERIMENT) || defined(SC64_P7_PROJECTILES_ENABLED)
+    if (!strcmp(argv[2],"verify_campaign")) {
+        FILE *input=fopen(argv[1],"rb"); assert(input);
+        assert(fread(host_save,1,sizeof(host_save),input)==sizeof(host_save)); assert(!fclose(input));
+        game_init(); assert(race_load_game() && !race_mode);
+        puts("predecessor reader loaded campaign journal: ok");
+        return 0;
+    }
+#endif
     int campaign=!strcmp(argv[2],"campaign");
     FILE *f;
 #if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
@@ -356,6 +366,20 @@ int main(int argc,char **argv)
            race_human==old_human && race_bots==old_bots && screen==old_screen && seed==old_seed);
     assert(!memcmp(old_clock,race_protoss_generic_clock,sizeof(old_clock)));
     puts("legacy journal preflight: ok");
+#ifdef SC64_SHARED_CARRIER_SAVE_EXPERIMENT
+    /* Actual entry point loads the predecessor; campaign writes retain the
+     * old envelope so a separate unmodified reader can consume them. */
+    assert(race_load_game());
+    assert(race_mode==!campaign);
+    if (campaign) {
+        assert(race_save_game());
+        if (argc==4) {
+            FILE *output=fopen(argv[3],"wb"); assert(output);
+            assert(fwrite(host_save,1,sizeof(host_save),output)==sizeof(host_save)); assert(!fclose(output));
+        }
+        memcpy(host_save,before_sram,sizeof(host_save));
+    }
+#endif
     test_staged_journal_migration(&selected);
     puts("staged actor/shot journal migration: ok");
 #else
