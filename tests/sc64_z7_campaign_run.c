@@ -1647,13 +1647,18 @@ static int z7_click_visible_mineral(int worker,int patch)
 static int assign_idle_workers_to_minerals(void)
 {
     static unsigned patch_retry_after[MAX_MINERALS];
-    int assigned=0;
+    int assigned=0,local_remaining=0;
+    for(int j=0;j<MAX_MINERALS;j++)if(m[j].amount>0&&
+       currently_visible(m[j].x,m[j].y))
+        for(int i=0;i<MAX_BUILDINGS;i++)if(b[i].alive&&b[i].owner==SIDE&&
+           sc64_race_is_zerg_townhall(b[i].type)&&building_complete(i)&&
+           dist2(b[i].x,b[i].y,m[j].x,m[j].y)<=200*200) local_remaining=1;
     for(int candidate=0;candidate<MAX_UNITS;candidate++) {
         int worker=candidate;
         if(z7_worker_available_for_new_job(worker)&&
         !(u[worker].order==ORDER_BUILD_PENDING&&u[worker].target==B_EXTRACTOR)&&
         u[worker].order!=ORDER_GAS&&u[worker].order!=ORDER_MOVE&&!u[worker].carry&&
-        !(u[worker].order==ORDER_MINE&&z7_safe_local_mineral(u[worker].target,0))) {
+        !(u[worker].order==ORDER_MINE&&z7_safe_mineral(u[worker].target,0,!local_remaining))) {
         int target=-1,best_load=0x7fffffff,best_distance=0x7fffffff;
         for(int j=0;j<MAX_MINERALS;j++) {
             int depot_distance,nx,ny,load=0;
@@ -1674,7 +1679,7 @@ static int assign_idle_workers_to_minerals(void)
         /* If local fields are exhausted, an observed remote patch is still
            a legal mineral order. Require current visibility, a live resource,
            a safe route and the same verified contextual click as local work. */
-        if(target<0)for(int j=0;j<MAX_MINERALS;j++) {
+        if(target<0&&!local_remaining)for(int j=0;j<MAX_MINERALS;j++) {
             int depot_distance,nx,ny,load=0;
             if((unsigned)frame<patch_retry_after[j]||
                !currently_visible(m[j].x,m[j].y)||
