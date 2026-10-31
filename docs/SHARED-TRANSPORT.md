@@ -130,3 +130,10 @@ This is named-state evidence, not whole-world equality or an uninterrupted
 full run. It does not establish near-30-fps performance, full native AI parity, AI transport tactics, a Z8
 win, or a P7 controller win. Experimental Scarab namespace composition remains
 unqualified.
+
+Compared with the retained earlier physical replay, those 302 named
+observations matched. Mean reported cycles increased from 2,185,245.2746 to
+2,186,610.8621 (+0.06249%); the peak increased from 50,583,602 to 53,931,783
+(+6.61910%). The runs used different binaries, so this comparison does not
+isolate the transport flag, establish whole-world equality, or measure GBA
+hardware frame rate.
