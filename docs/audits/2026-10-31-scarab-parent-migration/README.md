@@ -101,3 +101,15 @@ is constructed by editing a current writer's version and markers, not produced
 by a historical binary. Compile and run receipts are retained in
 `.local/decoder-proof/{tail,prebc}-stage-*.json`. These fixtures do not prove
 all tail combinations, campaign behavior, or hardware behavior.
+
+The six retained compile/run receipt files were re-read after the stage run:
+all six compile invocations and all 61 process invocations report exit zero.
+The matrix run receipt SHA-256 is
+`c2ebae3b416c8e34bd848ad5f0e539280eb6585c006111c56eb870ba7d2b0063`,
+the tail run receipt is
+`d16d3b7d3aad8c632c242b9ec730e8871e76d468d67c981f6d1f3cbba8b71a54`,
+and the pre-BC run receipt is
+`9e7b33cada0967775ef92b38dede532ab91a8fb8b84efd7284d296323d59e250`.
+These receipt hashes do not authenticate every compiler input. The stage
+compile vectors included `SC64_IMPORTED_SKIRMISH`; the explicit compile guard
+requiring that flag was added after the test builds.
