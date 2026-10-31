@@ -1281,7 +1281,7 @@ static int race_save_serialize(int shared_carrier) {
 #endif
 #ifdef SC64_SHARED_CARRIER_SAVE_VERSION
     if (shared_carrier) {
-        if (race_mode!=1) return 0;
+        if (race_mode!=1 || race_p7_projectile_fault) return 0;
         memset(&race_data,0,sizeof(race_data));
     }
 #else
@@ -3075,8 +3075,17 @@ static void race_shared_carrier_stage_commit(const RaceLoadPlan *plan) {
 #endif
 #endif
     race_protoss_clock_from_word(race_protoss_generic_clock,v[SC64_PROTOSS_CLOCK_STATE_INDEX]);
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    sc64_p7_arbiter_cache_due=0;
+    sc64_p7_arbiter_cache_initialized=
+        race_protoss_generic_clock[1] || race_protoss_generic_clock[2];
+    for (int i=0;i<MAX_UNITS;++i)
+        if (!sc64_p7_arbiter_cache_empty_unit(&u[i]) &&
+            !SC64_P7_ARBITER_CACHE_VALID(u[i].weapon)) u[i].weapon=(u16)(1u<<13);
+#endif
     /* Candidate validation already proved both packet and actor graph. */
     (void)sc64_codec_decode(&race_p7_projectiles,race_data.carrier_custom.projectiles,SC64_CODEC_BYTES);
+    race_p7_projectile_fault=0;
 #if defined(SC64_UNIFIED) && defined(SC64_T3_ENABLED)
     memset(&race_t3,0,sizeof(race_t3)); race_t3_buildings_killed=0;
 #endif

@@ -79,6 +79,9 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
     assert(race_impact_count==1);
     Sc64ImpactEvent expected_impact=race_impact_rows[0];
 #endif
+    race_p7_projectile_fault=1;
+    assert(!race_save_serialize(1));
+    race_p7_projectile_fault=0;
     assert(race_save_serialize(1));
     assert(race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION);
     assert(race_data.state[0]==race_mode && race_data.state[1]==race_human &&
@@ -152,6 +155,7 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
     u[carrier].hp=1; minerals=0; frame=0;
     memset(race_protoss_generic_clock,0,sizeof(saved_clock));
     assert(sc64_pool_init(&race_p7_projectiles));
+    race_p7_projectile_fault=1;
 #ifdef SC64_IMPACT_EVENTS
     race_impact_reset();
 #endif
@@ -163,11 +167,42 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous)
            !memcmp(saved_clock,race_protoss_generic_clock,sizeof(saved_clock)));
     assert(sc64_codec_encode(&race_p7_projectiles,restored_packet,sizeof(restored_packet)) &&
            !memcmp(expected_packet,restored_packet,sizeof(expected_packet)));
+    assert(!race_p7_projectile_fault);
 #ifdef SC64_IMPACT_EVENTS
     assert(race_impact_count==1 && !memcmp(&race_impact_rows[0],&expected_impact,sizeof(expected_impact)));
 #endif
+    static Unit replay_units[MAX_UNITS];
+    static Building replay_buildings[MAX_BUILDINGS];
+    static u8 replay_packet[SC64_CODEC_BYTES];
+    u8 replay_clock[3];
+    for (int i=0;i<30;++i) game_update(0,0);
+    memcpy(replay_units,u,sizeof(u)); memcpy(replay_buildings,b,sizeof(b));
+    memcpy(replay_clock,race_protoss_generic_clock,sizeof(replay_clock));
+    int replay_minerals=minerals, replay_gas=gas, replay_frame=frame;
+    u32 replay_seed=seed;
+    assert(sc64_codec_encode(&race_p7_projectiles,replay_packet,sizeof(replay_packet)));
+#ifdef SC64_IMPACT_EVENTS
+    static Sc64ImpactEvent replay_impacts[RACE_IMPACT_CAPACITY];
+    unsigned replay_impact_count=race_impact_count;
+    memcpy(replay_impacts,race_impact_rows,sizeof(replay_impacts));
+#endif
     assert(race_shared_carrier_stage_select(&plan,&selected));
     assert(selected.tag==SC64_SHARED_CARRIER_SAVE_VERSION);
+    race_shared_carrier_stage_commit(&plan);
+    for (int i=0;i<30;++i) game_update(0,0);
+    assert(!memcmp(replay_units,u,sizeof(u)) && !memcmp(replay_buildings,b,sizeof(b)) &&
+           !memcmp(replay_clock,race_protoss_generic_clock,sizeof(replay_clock)) &&
+           minerals==replay_minerals && gas==replay_gas && frame==replay_frame && seed==replay_seed);
+    assert(sc64_codec_encode(&race_p7_projectiles,restored_packet,sizeof(restored_packet)) &&
+           !memcmp(replay_packet,restored_packet,sizeof(replay_packet)));
+#ifdef SC64_IMPACT_EVENTS
+    assert(race_impact_count==replay_impact_count &&
+           !memcmp(replay_impacts,race_impact_rows,race_impact_count*sizeof(replay_impacts[0])));
+#endif
+    assert(race_shared_carrier_stage_select(&plan,&selected));
+    assert(selected.tag==SC64_SHARED_CARRIER_SAVE_VERSION);
+    race_shared_carrier_stage_commit(&plan);
+    assert(race_shared_carrier_stage_select(&plan,&selected));
     race_data.state[31]=0x13579;
     assert(race_save_encode_actors());
     assert(race_data.version==SC64_SHARED_CARRIER_SAVE_VERSION && race_data.state[31]==0x13579);
