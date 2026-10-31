@@ -328,3 +328,11 @@ its effective bits disable no raw IDs for source slots 0–7. This observation
 does not establish actor, production, technology or spell closure. In
 particular Defiler spells remain unimplemented, and P8's distinct permissions
 remain scoped to P8. No private input or generated bitmap is committed.
+
+### Current shared-engine integration checkpoint
+
+The P9 candidate is integrated over the P8 parent, preserving the original P9 history. The explicit P9 profile passed the P1–P9 startup and save/resave matrix and 234 skirmish startup combinations. A normal P9 ARM build passed its existing memory guards; its ROM SHA-256 was `7c2ddd392329b9f7efd029909ae69c98a00dc81abbd20d4778b18b1a9670cf1c` (the build predates later controller-only changes). These checks do not establish mission completion or native mechanic completeness. P9 remains an unpromoted candidate; Defiler services remain a known hold.
+
+The current ordinary-input host controller at `62357ef` did not win within 340,000 ticks: its final trace had 14 Probes, 19 army units, 24 minerals and 850 gas, with both heroes alive and no reported trigger faults. A separate bounded, observation-only run of that controller found at frame 23,920 that supply and global unit capacity were available, but no workers were mining and the 32-unit assault threshold had not been reached. These are host-controller observations, not a completed ARM replay.
+
+The authenticated P9 CHK (`eecccb0220c7456cacccf8b84f9bd82535f5cdce9192ba7d88986ea2867ba601`) contains 63 mineral fields with 103,069 total effective initial ore; the runtime frame-one census matches both totals. The P9 pool holds 144 fields and the adapter rejects excess before loading. At frame 23,920 four nonempty fields within 320 pixels of the home Nexus still held 5,104 ore, three currently visible. Instrumented attempts repeatedly chose a visible 1,500-ore field but its center resolved to unit selection rather than the mine action; the controller returned without issuing a mine order and retried. This identifies a controller input obstruction, not proof that expansion or mission completion is impossible. The existing visible-worker helper searches cursor offsets; an ordinary-input fix and fresh completion/save/ARM qualification remain outstanding.
