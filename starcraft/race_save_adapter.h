@@ -2044,6 +2044,13 @@ static int race_load_preflight_candidate(RaceLoadPlan *plan) {
 #endif
             || !sc64_shared_carrier_candidate_valid(&race_data,carrier_scratch,
                 MAX_UNITS,(unsigned)width*16u,(unsigned)height*16u)) return 0;
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+        /* Unlike pre-cache legacy saves, a tagged candidate must preserve a
+         * valid cache word for every nonempty actor; never silently repair a
+         * malformed new-format word during the commit. */
+        for (unsigned i=0;i<MAX_UNITS;++i)
+            if (!sc64_p7_arbiter_cache_unit_valid(&carrier_scratch[i])) return 0;
+#endif
     }
 #endif
 #ifdef SC64_SHARED_BATTERY

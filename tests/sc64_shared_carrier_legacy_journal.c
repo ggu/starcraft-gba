@@ -180,6 +180,28 @@ static void test_staged_journal_migration(const GbaSaveSelection *previous, int 
                    sizeof(predecessor)));
     assert(!memcmp(before_units,u,sizeof(u)) && !memcmp(before_buildings,b,sizeof(b)) &&
            !memcmp(before_vram,GBA_VRAM_SCRATCH,sizeof(before_vram)));
+#ifdef SC64_P7_ARBITER_CLOAK_CACHE_ENABLED
+    /* New-format cache words cannot rely on legacy repair during commit. */
+    assert(race_save_serialize(1));
+    Unit invalid_cache=u[carrier]; invalid_cache.weapon=1;
+    assert(sc64_p7_typed_unit_encode(&race_data.carrier_custom.units[carrier],
+                                     &invalid_cache,(unsigned)race_cols*16u,(unsigned)race_rows*16u));
+    size_t cache_compacted;
+#ifdef SC64_IMPACT_EVENTS
+    assert(race_impact_save_pack(&packed_length));
+    assert(sc64_shared_carrier_compact_custom(&race_impact_record,packed_length,
+                                               sizeof(race_impact_record),&cache_compacted));
+    assert(save_write_selected(&race_impact_record,(u32)cache_compacted,
+                               SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION,previous,tags,3));
+#else
+    assert(sc64_shared_carrier_compact_custom(&race_data,sizeof(race_data),
+                                               sizeof(race_data),&cache_compacted));
+    assert(save_write_selected(&race_data,(u32)cache_compacted,
+                               SC64_SHARED_CARRIER_COMPACT_SAVE_VERSION,previous,tags,3));
+#endif
+    assert(race_shared_carrier_stage_select(&plan,&selected));
+    assert(selected.tag==SAVE_VERSION && selected.slot==previous->slot);
+#endif
     assert(race_save_serialize(1));
     race_data.version=SC64_SHARED_CARRIER_SAVE_VERSION;
 #ifdef SC64_IMPACT_EVENTS
