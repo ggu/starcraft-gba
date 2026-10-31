@@ -19,11 +19,15 @@ int main(void)
             Sc64DefilerStageActor *a=&sc64_defiler_stage[c];
             int x=a->motion_age?sc64_interceptor_integer_part(a->x_q8):u[c].x*2;
             int y=a->motion_age?sc64_interceptor_integer_part(a->y_q8):u[c].y*2;
-            printf("case=%d t=%d x=%d y=%d heading=%d phase=%d blocked=%d\n",k,t,x,y,(int)a->heading,a->phase,a->blocked);
+            printf("case=%d t=%d x=%d y=%d heading=%d phase=%d blocked=%d qx=%d qy=%d\n",k,t,x,y,(int)a->heading,a->phase,a->blocked,(int)a->x_q8,(int)a->y_q8);
             game_update(0,0);if(sc64_battlecruiser_source_tick_due())++t;
         }
+#ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
+        assert(!sc64_defiler_stage[c].blocked);
+#else
         if(k==4)assert(sc64_defiler_stage[c].blocked);
         else assert(!sc64_defiler_stage[c].blocked);
+#endif
     }
     /* STOP during a real clear-path approach cancels the cast and movement. */
     game_init();race_mode=1;race_human=R_ZERG;race_bots=1;race_skirmish_map=0;race_skirmish_init();

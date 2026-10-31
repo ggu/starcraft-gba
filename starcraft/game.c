@@ -994,12 +994,18 @@ typedef struct {
     u16 energy_q8; s16 target_x,target_y; u8 heading, live, intent, phase, age;
 #ifdef SC64_SHARED_DEFILER_APPROACH_PROBE
     s32 x_q8,y_q8; u16 motion_age; u8 moving, stopped, blocked;
+#ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
+    s16 waypoint_x,waypoint_y;u8 velocity,turning,diagonal;
+#endif
 #endif
 } Sc64DefilerStageActor;
 static Sc64DefilerStageActor sc64_defiler_stage[MAX_UNITS];
 #endif
 #if defined(SC64_SHARED_DARK_SWARM_SOURCE_RECTS) && !defined(SC64_SHARED_DARK_SWARM_PROBE)
 #error "Dark Swarm source rectangles require the experimental query"
+#endif
+#if defined(SC64_SHARED_DEFILER_SE_APPROACH_PROBE) && !defined(SC64_SHARED_DEFILER_APPROACH_PROBE)
+#error "Diagonal Defiler research requires the clear-approach probe"
 #endif
 #if defined(SC64_SHARED_DEFILER_APPROACH_PROBE) && !defined(SC64_SHARED_DEFILER_EXECUTOR)
 #error "Defiler approach requires the experimental executor"
@@ -6469,6 +6475,9 @@ interact(void)
 #ifdef SC64_SHARED_DEFILER_APPROACH_PROBE
             sc64_defiler_stage[slot].motion_age=0; sc64_defiler_stage[slot].moving=0;
             sc64_defiler_stage[slot].stopped=0; sc64_defiler_stage[slot].blocked=0;
+#ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
+            sc64_defiler_stage[slot].diagonal=0;sc64_defiler_stage[slot].turning=0;
+#endif
 #endif
             toast(0);
         } else toast(8);
@@ -12033,9 +12042,9 @@ static int race_z8_nydus_source(int mission, const Sc64NydusSourceRecord **recor
 #ifdef SC64_SHARED_ORDINARY_STAGE
 #include "sc64_shared_ordinary_stage.h"
 #endif
+#endif
 #ifdef SC64_SHARED_DEFILER_EXECUTOR
 #include "sc64_defiler_executor.h"
-#endif
 #endif
 #ifdef SC64_SCARAB_FLIGHT_CONTROL_PROBE
 #include "sc64_scarab_unit_adapter.h"

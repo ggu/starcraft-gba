@@ -23,23 +23,71 @@ static int sc64_defiler_clear_approach(Sc64DefilerStageActor *a,Unit *q)
 {
     if(a->blocked)return 0;
     if(!a->motion_age) {
-        if(a->target_x!=q->x && a->target_y!=q->y) {a->blocked=1;return 0;}
+        if(q->x<0 || q->y<0 || q->x>=WORLD_W || q->y>=WORLD_H) {a->blocked=1;return 0;}
+        if(a->target_x!=q->x && a->target_y!=q->y) {
+#ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
+            int dx=a->target_x-q->x,dy=a->target_y-q->y;
+            int raw=q->raw_type>=0?q->raw_type:sc64_race_raw_unit(q->type);
+            if(raw!=46 || dx<140 || dx>224 || dx!=dy ||
+               (q->x&31) || (q->y&31) || a->heading!=104) {a->blocked=1;return 0;}
+            a->diagonal=1;a->turning=1;a->velocity=a->heading;
+            a->waypoint_x=(s16)(q->x*2+64);a->waypoint_y=(s16)(q->y*2+64);
+#else
+            a->blocked=1;return 0;
+#endif
+        }
         if(!direct_path_clear(q->x,q->y,a->target_x,a->target_y)) {a->blocked=1;return 0;}
         a->x_q8=(s32)q->x*512;a->y_q8=(s32)q->y*512;a->moving=1;
     }
     ++a->motion_age;
     s32 dx=(s32)a->target_x*512-a->x_q8,dy=(s32)a->target_y*512-a->y_q8;
     u8 desired=(dx||dy)?sc64_interceptor_dir(dx,dy):a->heading;
+#ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
+    if(a->diagonal) {
+        int sx=sc64_interceptor_integer_part(a->x_q8),sy=sc64_interceptor_integer_part(a->y_q8);
+        if(a->motion_age>3 && a->x_q8==(s32)a->waypoint_x*256 && a->y_q8==(s32)a->waypoint_y*256) {
+            a->waypoint_x+=64;a->waypoint_y+=64;
+        }
+        desired=sc64_interceptor_dir(a->waypoint_x-sx,a->waypoint_y-sy);
+    }
+#endif
     int order_due=(a->motion_age%9u)==1u;
-    if(a->stopped) return order_due;
+    if(a->stopped) {
+#ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
+        if(a->diagonal) {
+            int sx=sc64_interceptor_integer_part(a->x_q8),sy=sc64_interceptor_integer_part(a->y_q8);
+            int tx=(int)a->target_x*2-sx,ty=(int)a->target_y*2-sy;
+            if(tx||ty)sc64_interceptor_toward(&a->heading,sc64_interceptor_dir(tx,ty),27);
+        }
+#endif
+        return order_due;
+    }
     int stop=order_due && sc64_interceptor_len_raw(dx,dy)<=288*256;
     if(a->motion_age>=3) {
         int can_move=a->motion_age>=4 && sc64_interceptor_abs32(sc64_interceptor_turn_delta(a->heading,desired))<32;
-        sc64_interceptor_toward(&a->heading,desired,27);
+        u8 motion_direction;
+#ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
+        if(a->diagonal) {
+            if(!a->turning)can_move=a->motion_age>=4;
+            sc64_interceptor_toward(&a->velocity,desired,27);
+            if(a->turning) {
+                sc64_interceptor_toward(&a->heading,desired,27);
+                if(a->heading==desired && a->velocity==desired)a->turning=0;
+            }
+            motion_direction=a->velocity;
+        } else
+#endif
+        { sc64_interceptor_toward(&a->heading,desired,27);motion_direction=a->heading; }
         if(can_move && (dx||dy)) {
-            Sc64InterceptorDirectionVector v=sc64_interceptor_direction_vector[a->heading];
+            Sc64InterceptorDirectionVector v=sc64_interceptor_direction_vector[motion_direction];
             s32 nx=a->x_q8+sc64_interceptor_integer_part((s32)v.x*1024);
             s32 ny=a->y_q8+sc64_interceptor_integer_part((s32)v.y*1024);
+#ifdef SC64_SHARED_DEFILER_SE_APPROACH_PROBE
+            if(a->diagonal && sc64_interceptor_len_raw((s32)a->waypoint_x*256-a->x_q8,
+                (s32)a->waypoint_y*256-a->y_q8)<=1024) {
+                nx=(s32)a->waypoint_x*256;ny=(s32)a->waypoint_y*256;
+            }
+#endif
             int gx=sc64_interceptor_integer_part(nx)/2,gy=sc64_interceptor_integer_part(ny)/2;
             if(!is_traversable(gx/16,gy/16,q->x/16+(q->y/16)*MAP_COLS) ||
                !unit_step_clear(q,gx,gy)) {a->blocked=1;return 0;}
@@ -69,12 +117,26 @@ static void sc64_defiler_executor_unit_tick(void)
         Sc64DefilerStageActor *a=&sc64_defiler_stage[i]; Unit *q=&u[i];
         if(!a->live)continue;
         if(!q->alive || !target_alive(i)) { a->intent=0; a->phase=0;continue; }
-        unsigned max_energy=(sc64_race_raw_unit(q->type)==52 ? 250u : 200u)*256u;
+        int canonical_raw=sc64_race_raw_unit(q->type);
+        int actual_raw=q->raw_type>=0?q->raw_type:canonical_raw;
+        if(actual_raw!=canonical_raw || (actual_raw!=46 && actual_raw!=52)) {
+            a->intent=0;a->phase=0;continue;
+        }
+        unsigned max_energy=(actual_raw==52 ? 250u : 200u)*256u;
         if(a->energy_q8<max_energy) {
             unsigned e=a->energy_q8+8u;a->energy_q8=(u16)(e>max_energy?max_energy:e);
         }
         if(!a->intent)continue;
         if(a->phase==0) {
+            /* Reject corrupt noncompact coordinates before subtraction,
+             * doubling or squared-distance arithmetic. */
+            if(MAP_COLS<=0 || MAP_ROWS<=0 || MAP_COLS>1024 || MAP_ROWS>1024 ||
+               q->x<0 || q->y<0 || q->x>16383 || q->y>16383 ||
+               q->x>=WORLD_W || q->y>=WORLD_H || a->target_x<0 || a->target_y<0 ||
+               a->target_x>16383 || a->target_y>16383 ||
+               a->target_x>=WORLD_W || a->target_y>=WORLD_H) {
+                a->intent=0;a->phase=0;continue;
+            }
             int dx=(a->target_x-q->x)*2,dy=(a->target_y-q->y)*2;
             /* The rectangle/halt boundary and visibility remain open. */
 #ifdef SC64_SHARED_DEFILER_APPROACH_PROBE

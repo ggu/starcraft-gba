@@ -93,6 +93,30 @@ build/test-dark-swarm-natural: tests/sc64_defiler_natural_game.c $(STARCRAFT) $(
 test-dark-swarm-natural: build/test-dark-swarm-natural
 	./build/test-dark-swarm-natural
 
+# Restricted southeast clear-approach oracle; source logs are private inputs.
+DARK_SWARM_SE_ORACLE_DIR ?= .local/defiler-se-lengths
+.PHONY: test-dark-swarm-se-approach test-dark-swarm-se-guard
+build/test-dark-swarm-se-approach: tests/sc64_defiler_se_distance_game.c tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_APPROACH_PROBE -DSC64_SHARED_DEFILER_SE_APPROACH_PROBE $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-dark-swarm-se-approach: build/test-dark-swarm-se-approach
+	$(PYTHON) tests/sc64_verify_defiler_se_set.py --game $< --source-dir $(DARK_SWARM_SE_ORACLE_DIR) --out build/defiler-se-verification
+build/test-dark-swarm-se-guard: tests/sc64_defiler_se_guard_game.c tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_APPROACH_PROBE -DSC64_SHARED_DEFILER_SE_APPROACH_PROBE $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+test-dark-swarm-se-guard: build/test-dark-swarm-se-guard
+	./build/test-dark-swarm-se-guard
+build/test-dark-swarm-se-hero-guard: tests/sc64_defiler_se_guard_game.c tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
+	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_HERO_PROBE -DSC64_SHARED_DEFILER_APPROACH_PROBE -DSC64_SHARED_DEFILER_SE_APPROACH_PROBE $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
+.PHONY: test-dark-swarm-se-hero-guard
+test-dark-swarm-se-hero-guard: build/test-dark-swarm-se-hero-guard
+	./build/test-dark-swarm-se-hero-guard
+
+# Noncompact malformed-coordinate guard; uses the existing prepared core inputs.
+.PHONY: test-dark-swarm-noncompact-guard
+build/test-dark-swarm-noncompact-guard: tests/sc64_defiler_noncompact_guard_game.c $(STARCRAFT) $(wildcard starcraft/*.h) common/gba.c Makefile | build
+	$(CLANG) -std=c11 -O1 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -fsanitize=address,undefined -DGBA_HOST -Icommon -Istarcraft -I.local/sc64/races/generated -I.local/sc64/backwater/generated -I.local/sc64/interface/generated -I.local/sc64/briefings/generated -I.local/sc64/skirmish/generated -I.local/sc64/bc/generated -DSC64_IMPORTED_MISSION -DSC64_UNIFIED -DSC64_IMPORTED_SKIRMISH -DSC64_RACES -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_APPROACH_PROBE -DSC64_SHARED_DEFILER_SE_APPROACH_PROBE -DSC64_BATTLECRUISER_EXPERIMENT -DSC64_BATTLECRUISER_ENERGY_EXPERIMENT $< common/gba.c -o $@
+test-dark-swarm-noncompact-guard: build/test-dark-swarm-noncompact-guard
+	./build/test-dark-swarm-noncompact-guard
+
 # Asset-free journal selection prototype; not yet wired to game persistence.
 .PHONY: test-scarab-save-selection
 build/test-scarab-save-selection: tests/gba_save_selection.c common/gba.c common/gba.h Makefile | build

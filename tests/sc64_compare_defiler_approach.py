@@ -8,15 +8,17 @@ from pathlib import Path
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--actual', type=Path, required=True)
 p.add_argument('--oracle-dir', type=Path, required=True)
+p.add_argument('--allow-se', action='store_true')
 a = p.parse_args()
 actual = {}
-pattern = re.compile(r'case=(\d+) t=(\d+) x=(-?\d+) y=(-?\d+) heading=(\d+) phase=(\d+) blocked=(\d+)')
+pattern = re.compile(r'case=(\d+) t=(\d+) x=(-?\d+) y=(-?\d+) heading=(\d+) phase=(\d+) blocked=(\d+) qx=(-?\d+) qy=(-?\d+)')
 for line in a.actual.read_text().splitlines():
     if m := pattern.fullmatch(line):
-        case, tick, x, y, heading, phase, blocked = map(int, m.groups())
-        actual[case, tick] = (x, y, heading, phase, blocked)
+        case, tick, x, y, heading, phase, blocked, qx, qy = map(int, m.groups())
+        actual[case, tick] = (x, y, heading, phase, blocked, qx, qy)
 source_pattern = re.compile(r'sample t=(\d+).*? state=(\d+).*?heading=(-?\d+) xy=(-?\d+),(-?\d+)')
-for case, name in enumerate(('east', 'south', 'west', 'north')):
+names = ('east', 'south', 'west', 'north', 'diagonal') if a.allow_se else ('east', 'south', 'west', 'north')
+for case, name in enumerate(names):
     reference = {}
     for line in (a.oracle_dir / (name + '.log')).read_text().splitlines():
         if m := source_pattern.match(line):
@@ -31,5 +33,6 @@ for case, name in enumerate(('east', 'south', 'west', 'north')):
     source_debit = next(tick for tick, row in reference.items() if row[3] == 2)
     actual_debit = next(tick for tick in range(1, 61) if actual[case, tick][3])
     assert actual_debit == source_debit, (name, actual_debit, source_debit)
-assert actual[4, 1][4], 'diagonal must fail closed without waypoint support'
-print('four actual clear approaches match 240 pinned-source positions/headings and debit ticks; diagonal held')
+if not a.allow_se:
+    assert actual[4, 1][4], 'diagonal must fail closed without waypoint support'
+print(f'{len(names)} actual clear approaches match pinned-source positions/headings and debit ticks')

@@ -578,3 +578,32 @@ fixture begins with a test-selected spawned unit. This supports the bounded
 unupgraded stationary path, not the unimplemented Metasynaptic research,
 hallucination rules, native source scheduling outside the verified slices,
 or production admission.
+
+
+### Optional restricted southeast approach
+
+`SC64_SHARED_DEFILER_SE_APPROACH_PROBE` adds a further disabled slice: a
+stationary raw-46 caster with initial source heading 104, beginning on a
+64-source-pixel grid point and moving southeast along equal source-axis offsets from 280 through 448 pixels on an
+unobstructed path. It stores source-Q8 position and keeps source facing and
+velocity direction separate while walking toward successive 64-pixel
+waypoints. The actor stops on the source order-check cadence and turns toward
+the spell target while waiting for the later debit. Existing game terrain and
+actor collision checks can stop this slice; they are not a claim of OpenBW
+pathfinding equivalence. Other actor identities, diagonal directions, initial headings, unaligned
+starts, distances outside this slice and blocked corridors fail closed.
+
+At initial source phase zero, actual-game menu fixtures matched 120 source
+positions, headings and debit timing at each of five target offsets: 280, 300,
+320, 384 and 448 source pixels. The 280 case also matched 40 exact Q8 positions
+from a separate instrumented pinned OpenBW run. A sanitized guard fixture
+checks unsupported diagonals and unaligned starts, and actual B/menu STOP
+interrupts a supported moving cast without debit. The synthetic flat-world
+oracles and private source inputs do not establish other source order-timer
+phases, many-actor scheduling, arbitrary pathfinding, art, hardware or
+production performance. An actual noncompact-Unit executor fixture rejects
+`INT_MIN`/`INT_MAX` caster coordinates on both axes and an invalid target
+before coordinate arithmetic, under ASan/UBSan. Explicit source raw identities
+that disagree with their runtime type are also rejected before regeneration or
+casting; the negative fixture exercises both stationary and moving requests.
+All normal flags remain off.
