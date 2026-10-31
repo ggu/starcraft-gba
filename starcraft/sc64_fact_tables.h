@@ -7,6 +7,12 @@
 #endif
 #include "sc64_fact_table_format.h"
 #include "sc64_fact_tables_generated.h"
+#if defined(SC64_SHARED_DEFILER_STAGE) && !defined(SC64_FACT_GENERATED_DEFILER_GEOMETRY)
+#error "Defiler stage requires regenerated geometry and sight facts"
+#endif
+#if defined(SC64_SHARED_DEFILER_HERO_PROBE) && !defined(SC64_FACT_GENERATED_UNCLEAN_ONE)
+#error "Unclean One probe requires facts generated for its added identity"
+#endif
 
 /* Older unversioned generated headers are the original V1 actor/collision
  * format. Continue accepting them for FACT_TABLES-only builds. Features need

@@ -446,3 +446,26 @@ collision/range-edge semantics, moving starts, later order-timer phases and
 multi-actor scheduling, raw-52 energy and full runtime integration. The
 stationary center-distance band above 256 and at most 288 source pixels remains
 pending rather than casting or approaching. Normal flags remain off.
+
+
+### Disabled Unclean One identity
+
+`SC64_SHARED_DEFILER_HERO_PROBE` appends a distinct raw-52 identity after the
+existing unit IDs. The source profile supplies 250 maximum HP and three base
+armor; the hero starts with 62.5 energy and regenerates eight Q8 units per
+source tick to a 250-energy maximum. An actual sanitized Showcase-host fixture
+uses the real raw-to-runtime mapping and normal `spawn_unit`, waits through
+normal `game_update` regeneration without assigning energy or raw owner, then
+uses B/menu/A to create a bullet and field. Live hero saves remain refused.
+This synthetic-spawn test does not establish imported campaign raw-52 setup,
+P9 integration, hero body art, all energy effects or hardware behavior. Raw 46 and 52 now
+have authenticated 320-source-pixel sight and respective source bounds
+13/12/13/12 and 14/14/14/14; an actual generated fact-table fixture checks
+these values and rejects pre-change geometry headers. Ordinary Defiler Metasynaptic Node research and hallucinated-energy rules
+remain open. The fact generator records the new identity gate and its consumer
+rejects older generated tables missing the hero marker.
+
+A separate ASan/UBSan actual-menu approach fixture checks STOP during motion,
+a later renewed cast, MOVE replacement, refusal while already moving, and a
+subsequent STOP/recast. This is the controlled clear-route input path only.
+All of these gates stay disabled in normal products.

@@ -2310,7 +2310,7 @@ spawn_unit(int owner, int type, int x, int y)
     if (sc64_race_raw_unit(type)==46 || sc64_race_raw_unit(type)==52) {
         sc64_defiler_stage[i].live=1;
         sc64_defiler_stage[i].heading=104;
-        sc64_defiler_stage[i].energy_q8=50u*256u;
+        sc64_defiler_stage[i].energy_q8=(sc64_race_raw_unit(type)==52 ? 250u*256u/4u : 50u*256u);
     }
 #endif
 #ifdef SC64_COLLISION_CLASS_CACHE

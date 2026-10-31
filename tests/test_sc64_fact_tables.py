@@ -178,6 +178,38 @@ class FactTablesTest(unittest.TestCase):
                     self.assertNotEqual(built.returncode, 0)
                     self.assertIn(f"generated {state} SC64_SCARAB_RUNTIME".encode(), built.stderr)
 
+    def test_unclean_one_tables_reject_missing_identity_marker(self):
+        flags = CONFIGS["zp_p7"] + ("SC64_SHARED_DEFILER_STAGE", "SC64_SHARED_DEFILER_HERO_PROBE")
+        with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-hero-") as directory:
+            table_dir = generate(self.compiler, flags, directory, "hero")
+            built, executable = compile_program(self.compiler, CHECK,
+                flags + ("SC64_FACT_TABLES",), directory, "hero-check", ("-I", str(table_dir)))
+            self.assertEqual(built.returncode, 0, built.stderr.decode())
+            subprocess.run([str(executable)], check=True, capture_output=True)
+            header = table_dir / "sc64_fact_tables_generated.h"
+            text = header.read_text()
+            self.assertIn("#define SC64_FACT_GENERATED_UNCLEAN_ONE 1", text)
+            header.write_text(text.replace("#define SC64_FACT_GENERATED_UNCLEAN_ONE 1", ""))
+            built, _ = compile_program(self.compiler, CHECK,
+                flags + ("SC64_FACT_TABLES",), directory, "hero-stale", ("-I", str(table_dir)))
+            self.assertNotEqual(built.returncode, 0)
+            self.assertIn(b"Unclean One probe requires facts generated", built.stderr)
+            header.write_text(text.replace("#define SC64_FACT_GENERATED_DEFILER_GEOMETRY 1", ""))
+            built, _ = compile_program(self.compiler, CHECK,
+                flags + ("SC64_FACT_TABLES",), directory, "hero-stale-geometry", ("-I", str(table_dir)))
+            self.assertNotEqual(built.returncode, 0)
+            self.assertIn(b"Defiler stage requires regenerated geometry", built.stderr)
+
+    def test_generated_defiler_and_hero_sight_and_geometry(self):
+        flags = CONFIGS["zp_p7"] + ("SC64_SHARED_DEFILER_STAGE", "SC64_SHARED_DEFILER_HERO_PROBE",
+                                    "SC64_FACT_SIGHT_TABLES", "SC64_P7_RECT_TABLES")
+        with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-defiler-values-") as directory:
+            table_dir = generate(self.compiler, flags, directory, "defiler-values")
+            built, executable = compile_program(self.compiler, ROOT / "tests" / "sc64_defiler_fact_values.c",
+                flags + ("SC64_FACT_TABLES",), directory, "defiler-values-check", ("-I", str(table_dir)))
+            self.assertEqual(built.returncode, 0, built.stderr.decode())
+            subprocess.run([str(executable)], check=True, capture_output=True)
+
     def test_tables_reject_carrier_flight_gate_mismatch(self):
         with tempfile.TemporaryDirectory(prefix="sc64-fact-tables-flight-") as directory:
             table_dir = generate(self.compiler, CONFIGS["zp_p7_carrier"],

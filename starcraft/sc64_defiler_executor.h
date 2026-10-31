@@ -23,9 +23,7 @@ static int sc64_defiler_clear_approach(Sc64DefilerStageActor *a,Unit *q)
 {
     if(a->blocked)return 0;
     if(!a->motion_age) {
-#ifndef SC64_SHARED_DEFILER_DIAGONAL_RESEARCH
         if(a->target_x!=q->x && a->target_y!=q->y) {a->blocked=1;return 0;}
-#endif
         if(!direct_path_clear(q->x,q->y,a->target_x,a->target_y)) {a->blocked=1;return 0;}
         a->x_q8=(s32)q->x*512;a->y_q8=(s32)q->y*512;a->moving=1;
     }
@@ -71,8 +69,9 @@ static void sc64_defiler_executor_unit_tick(void)
         Sc64DefilerStageActor *a=&sc64_defiler_stage[i]; Unit *q=&u[i];
         if(!a->live)continue;
         if(!q->alive || !target_alive(i)) { a->intent=0; a->phase=0;continue; }
-        if(a->energy_q8<200u*256u) {
-            unsigned e=a->energy_q8+8u;a->energy_q8=(u16)(e>200u*256u?200u*256u:e);
+        unsigned max_energy=(sc64_race_raw_unit(q->type)==52 ? 250u : 200u)*256u;
+        if(a->energy_q8<max_energy) {
+            unsigned e=a->energy_q8+8u;a->energy_q8=(u16)(e>max_energy?max_energy:e);
         }
         if(!a->intent)continue;
         if(a->phase==0) {

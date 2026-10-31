@@ -57,6 +57,26 @@ typedef struct {
  * Scenario actors have no training route. */
 static inline const Sc64ZpActorFact *sc64_zp_actor_fact(int type)
 {
+#ifdef SC64_SHARED_DEFILER_STAGE
+    /* Authenticated source geometry and sight; actor identities remain
+     * experimental and are not production or save-format admission. */
+    static const Sc64ZpActorFact shared_defiler = {
+        46,80,0,1,50,150,750,320, 13,12,13,12,0,1,
+        0,0,0,0,0, 0,0,0,0,0,
+        SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
+        SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN
+    };
+    if(type==U_SHARED_DEFILER)return &shared_defiler;
+#endif
+#ifdef SC64_SHARED_DEFILER_HERO_PROBE
+    static const Sc64ZpActorFact unclean_one = {
+        52,250,0,3,50,200,1500,320, 14,14,14,14,0,1,
+        0,0,0,0,0, 0,0,0,0,0,
+        SC64_ZP_ACTOR_SELECTABLE|SC64_ZP_ACTOR_MOVABLE|
+        SC64_ZP_ACTOR_COLLIDABLE|SC64_ZP_ACTOR_DRAWABLE|SC64_ZP_ACTOR_MEN
+    };
+    if(type==U_SHARED_UNCLEAN_ONE)return &unclean_one;
+#endif
 #ifdef SC64_ZP_FACT_RANGE_CULL
     /* Campaign actor facts occupy a contiguous enum suffix. Reject the
        overwhelmingly common skirmish misses before the gate-specific facts

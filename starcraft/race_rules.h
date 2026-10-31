@@ -132,6 +132,9 @@ enum {
     /* Probe-only shared actor, appended after all pre-existing identities. */
     U_SHARED_DEFILER,
 #endif
+#ifdef SC64_SHARED_DEFILER_HERO_PROBE
+    U_SHARED_UNCLEAN_ONE,
+#endif
     SC_RU_COUNT
 };
 #if defined(SC64_SHARED_DEFILER_STAGE) && defined(SC64_P9_DATA_ENABLED)
@@ -288,6 +291,9 @@ typedef struct {
 /* producer is a building ID for production units; Zerg units use B_HATCHERY
  * to signify larva production. Building workers are identified by their
  * faction's worker unit ID. Unknown legacy units return a neutral zero rule. */
+#if defined(SC64_SHARED_DEFILER_HERO_PROBE) && (!defined(SC64_SHARED_DEFILER_STAGE) || !defined(SC64_ZP_CAMPAIGN_ACTORS))
+#error "Unclean One probe requires staged Defilers and actor facts"
+#endif
 static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
     [U_SCV]       = { R_TER, SC_RACE_F_WORKER, B_COMMAND, 2, 50, 0, 300, 60, 0, 0 },
     [U_MARINE]    = { R_TER, 0, B_BARRACKS, 2, 50, 0, 360, 40, 0, 0 },
@@ -467,6 +473,9 @@ static const Sc64RaceUnitRule sc64_race_unit_rules[SC_RU_COUNT] = {
 #endif
 #if defined(SC64_SHARED_DEFILER_STAGE) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_P9_DATA_ENABLED)
     , [U_SHARED_DEFILER] = { R_ZERG, SC_RACE_F_LARVA, B_HATCHERY, 4, 50, 150, 750, 80, 0, 0 }
+#endif
+#ifdef SC64_SHARED_DEFILER_HERO_PROBE
+    , [U_SHARED_UNCLEAN_ONE] = { R_ZERG, 0, 255, 0, 50, 200, 1500, 250, 0, 0 }
 #endif
 };
 
@@ -757,6 +766,9 @@ static inline const char *sc64_race_unit_name(int type)
 #endif
 #if defined(SC64_SHARED_DEFILER_STAGE) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_P9_DATA_ENABLED)
         ,[U_SHARED_DEFILER] = "DEFILER"
+#endif
+#ifdef SC64_SHARED_DEFILER_HERO_PROBE
+        ,[U_SHARED_UNCLEAN_ONE] = "UNCLEAN ONE"
 #endif
     };
     return type >= 0 && type < SC_RU_COUNT ? names[type] : "UNKNOWN";
@@ -1457,6 +1469,12 @@ static inline int sc64_race_unit_hits_vs(int type, int target_flying)
 }
 static inline int sc64_race_unit_armor(int type)
 {
+#ifdef SC64_SHARED_DEFILER_STAGE
+    if (type == U_SHARED_DEFILER) return 1;
+#endif
+#ifdef SC64_SHARED_DEFILER_HERO_PROBE
+    if (type == U_SHARED_UNCLEAN_ONE) return 3;
+#endif
 #ifdef SC64_Z7_EGG_PRODUCTION
     if (type == U_Z7_EGG) return 10;
 #endif
@@ -1638,6 +1656,9 @@ static inline int sc64_race_raw_unit(int type)
 #endif
 #if defined(SC64_SHARED_DEFILER_STAGE) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_P9_DATA_ENABLED)
     case U_SHARED_DEFILER: return 46;
+#endif
+#ifdef SC64_SHARED_DEFILER_HERO_PROBE
+    case U_SHARED_UNCLEAN_ONE: return 52;
 #endif
     default: return -1;
     }
@@ -1910,6 +1931,9 @@ static inline int sc64_race_unit_from_raw(int raw)
 #endif
 #if defined(SC64_SHARED_DEFILER_STAGE) && !defined(SC64_SKIRMISH_ROSTER) && !defined(SC64_P9_DATA_ENABLED)
     case 46: return U_SHARED_DEFILER;
+#endif
+#ifdef SC64_SHARED_DEFILER_HERO_PROBE
+    case 52: return U_SHARED_UNCLEAN_ONE;
 #endif
     default: return -1;
     }
