@@ -1636,6 +1636,7 @@ static int z7_click_visible_mineral(int worker,int patch)
 
 static int assign_idle_workers_to_minerals(void)
 {
+    static unsigned patch_retry_after[MAX_MINERALS];
     int assigned=0;
     for(int worker=0;worker<MAX_UNITS;worker++)if(z7_worker_available_for_new_job(worker)&&
         !(u[worker].order==ORDER_BUILD_PENDING&&u[worker].target==B_EXTRACTOR)&&
@@ -1644,7 +1645,8 @@ static int assign_idle_workers_to_minerals(void)
         int target=-1,best_load=0x7fffffff,best_distance=0x7fffffff;
         for(int j=0;j<MAX_MINERALS;j++) {
             int depot_distance,nx,ny,load=0;
-            if(!z7_safe_local_mineral(j,&depot_distance)||
+            if((unsigned)frame<patch_retry_after[j]||
+               !z7_safe_local_mineral(j,&depot_distance)||
                !path_next_tile(u[worker].x,u[worker].y,m[j].x,m[j].y,&nx,&ny))continue;
             int distance=dist2(u[worker].x,u[worker].y,m[j].x,m[j].y);
             /* Before the first depot, do not send an opening Drone on an
@@ -1678,8 +1680,11 @@ static int assign_idle_workers_to_minerals(void)
         if(z7_click_visible_mineral(worker,target)) {
             ++assigned;
             fprintf(stderr,"Z7 normal-input worker%d assigned safe local mineral%d at frame%d\n",worker,target,frame);
-        } else fprintf(stderr,"Z7 mineral click failed worker%d order%d target%d intended%d cursor%d,%d field%d,%d frame%d\n",
-            worker,u[worker].order,u[worker].target,target,cx,cy,m[target].x,m[target].y,frame);
+        } else {
+            patch_retry_after[target]=(unsigned)frame+1200u;
+            fprintf(stderr,"Z7 mineral click failed worker%d order%d target%d intended%d cursor%d,%d field%d,%d frame%d\n",
+                worker,u[worker].order,u[worker].target,target,cx,cy,m[target].x,m[target].y,frame);
+        }
     }
     return assigned;
 }
