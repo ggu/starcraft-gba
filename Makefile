@@ -6296,30 +6296,5 @@ $(eval $(call SCARAB_PARENT_CLEANUP_FIXTURE,showcase,$(SHOWCASE_FLAGS),))
 .PHONY: test-scarab-parent-cleanup
 test-scarab-parent-cleanup: test-scarab-parent-cleanup-terran test-scarab-parent-cleanup-zerg test-scarab-parent-cleanup-protoss test-scarab-parent-cleanup-showcase
 
-.PHONY: test-shared-payload-mixed
-build/test-shared-payload-mixed: tests/sc64_shared_payload_mixed_game.c tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
-	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
-test-shared-payload-mixed: build/test-shared-payload-mixed
-	./build/test-shared-payload-mixed
-
-.PHONY: test-dark-swarm-unit-field
-build/test-dark-swarm-unit-field: tests/sc64_defiler_field_unit_game.c tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
-	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_UNIT_FIELD_PROBE $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
-test-dark-swarm-unit-field: build/test-dark-swarm-unit-field
-	./build/test-dark-swarm-unit-field
-
-.PHONY: test-dark-swarm-actor-union
-build/test-dark-swarm-actor-union: tests/sc64_defiler_field_unit_game.c tests/sc64_defiler_executor_game.c $(STARCRAFT) $(wildcard starcraft/*.h) $(SHOWCASE_INPUTS) common/gba.c Makefile | build
-	$(CLANG) $(SHARED_MECHANICS_HOST_FLAGS) -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -DSC64_SHARED_PROJECTILE_STAGE -DSC64_SHARED_ORDINARY_STAGE -DSC64_SHARED_DEFILER_STAGE -DSC64_SHARED_DEFILER_EXECUTOR -DSC64_SHARED_DEFILER_UNIT_FIELD_PROBE -DSC64_SHARED_ACTOR_STATE_UNION_PROBE $(SHOWCASE_FLAGS) $< common/gba.c $(P7_INTERCEPTOR_FLIGHT_SOURCES) starcraft/sc64_bc_body_art.c -o $@
-test-dark-swarm-actor-union: build/test-dark-swarm-actor-union
-	./build/test-dark-swarm-actor-union
-# Gated cross-profile Carrier development fixture; not a production capability.
-SHARED_CARRIER_EXPERIMENT_SOURCES = $(filter-out starcraft/game.c,$(STARCRAFT)) $(P7_INTERCEPTOR_FLIGHT_SOURCES)
-define SHARED_CARRIER_EXPERIMENT_FIXTURE
-build/test-sc64-shared-carrier-$(1): tests/sc64_shared_carrier_experiment.c $(STARCRAFT) $(P7_INTERCEPTOR_FLIGHT_SOURCES) $(wildcard starcraft/*.h) $(3) common/gba.c $(COMMON_HEADERS) Makefile | build
-	$$(CLANG) $$(SHARED_MECHANICS_HOST_FLAGS) $$($(2)) -DSC64_SHARED_CARRIER_EXPERIMENT $$< common/gba.c $$(SHARED_CARRIER_EXPERIMENT_SOURCES) -o $$@
-endef
-$(eval $(call SHARED_CARRIER_EXPERIMENT_FIXTURE,terran,TERRAN_ROM_FLAGS,$(TERRAN_FULL_INPUTS)))
-$(eval $(call SHARED_CARRIER_EXPERIMENT_FIXTURE,zerg,ZERG_ROM_FLAGS,$(ZERG_Z6_INPUTS)))
-$(eval $(call SHARED_CARRIER_EXPERIMENT_FIXTURE,protoss,PROTOSS_P7_CANONICAL_FLAGS,$(PROTOSS_P7_CANONICAL_INPUTS)))
-$(eval $(call SHARED_CARRIER_EXPERIMENT_FIXTURE,showcase,SHOWCASE_FLAGS,$(SHOWCASE_INPUTS)))
+include tests/defiler/Makefile
+include tests/carrier/Makefile

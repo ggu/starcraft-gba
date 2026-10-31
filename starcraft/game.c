@@ -470,6 +470,14 @@ _Static_assert((SC64_LEGACY_SAVE_VERSION & 0x08000000u) == 0 &&
                "Scarab tag overlaps an existing save namespace");
 #define SC64_SCARAB_SAVE_VERSION (SAVE_VERSION | 0x08000000u)
 #endif
+#if defined(SC64_SHARED_CARRIER_EXPERIMENT) && !defined(SC64_P7_PROJECTILES_ENABLED)
+/* Reserved for the staged custom actor/shot layout. No runtime writer or
+ * loader accepts it until migration and full preflight are qualified. */
+_Static_assert((SAVE_VERSION & 0x04000000u) == 0 &&
+               (SC64_LEGACY_SAVE_VERSION & 0x04000000u) == 0,
+               "Carrier tag overlaps an existing save namespace");
+#define SC64_SHARED_CARRIER_SAVE_VERSION (SAVE_VERSION | 0x04000000u)
+#endif
 #ifndef MAX_BUILDINGS
 #define MAX_BUILDINGS 16
 #endif

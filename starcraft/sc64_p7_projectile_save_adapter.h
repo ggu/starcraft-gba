@@ -41,7 +41,7 @@ static int race_p7_projectile_save_candidate_valid(const RaceSave *candidate,
         /* Production constructor/tick states, rather than only bit widths.
          * Projectile positions may initially include an off-map muzzle. */
         if (row.turn_rate_raw<127 || row.turn_rate_raw>383 ||
-            row.order_signal_bit0 || row.hit_flags_low2 ||
+            row.order_signal_bit0 || !sc64_interceptor_save_hit_flags_supported(row.hit_flags_low2) ||
             (row.movement_flags_low4&4u) || row.raw_source_owner>=8 ||
             race_protoss_source_owner(row.raw_source_owner)<0 ||
             row.destination_x_source<0 || row.destination_x_source>=(int)(ww*2) ||
