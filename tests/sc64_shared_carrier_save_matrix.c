@@ -23,6 +23,19 @@ static void test_full_envelope(void)
     for (int i=0;i<240 && sc64_pool_active_head(&race_p7_projectiles)==SC64_END;++i)
         game_update(0,0);
     assert(sc64_pool_active_head(&race_p7_projectiles)!=SC64_END && u[target].alive);
+    /* Synthetic but source-valid rows stress the shared 100-shot boundary:
+     * 66 Carrier + 32 ordinary + two Yamato packets. Preserve every arena
+     * byte, including free-list payload and reuse order, across the save. */
+    Sc64ProjectileRow seed_row;
+    assert(sc64_pool_get_row(&race_p7_projectiles,
+                              sc64_pool_active_head(&race_p7_projectiles),&seed_row));
+    for (int i=1;i<66;++i) {
+        u8 ordinal,native_index;
+        assert(sc64_pool_acquire(&race_p7_projectiles,&ordinal,&native_index));
+        assert(sc64_pool_set_row(&race_p7_projectiles,ordinal,&seed_row));
+    }
+    static u8 packet_before[SC64_CODEC_BYTES],packet_after[SC64_CODEC_BYTES];
+    assert(sc64_codec_encode(&race_p7_projectiles,packet_before,sizeof(packet_before)));
     for (int i=0;i<MAX_UNITS;++i)
         if (spawn_unit(i%5,U_MARINE,300+(i%16)*8,300+(i/16)*8)<0) break;
     for (int i=0;i<MAX_BUILDINGS;++i)
@@ -92,6 +105,8 @@ static void test_full_envelope(void)
     memset(sc64_bc_shots,0,sizeof(sc64_bc_shots));
 #endif
     assert(race_load_game());
+    assert(sc64_codec_encode(&race_p7_projectiles,packet_after,sizeof(packet_after)) &&
+           !memcmp(packet_before,packet_after,sizeof(packet_before)));
     for (int i=0;i<MAX_UNITS;++i)
         if (saved_units[i].alive && !IS_WORKER(saved_units[i].type))
             assert(!memcmp(&saved_units[i],&u[i],sizeof(Unit)));
