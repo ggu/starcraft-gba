@@ -140,6 +140,14 @@ static int race_p7_projectile_fire(int shooter,int target,u8 heading,
         !sc64_interceptor_projectile_launch(&row,source_x_q8,source_y_q8,
             (s16)(target_x(target)*2),(s16)(target_y(target)*2),heading,
             (u16)target,(u8)shooter,(u8)RACE_PROTOSS_SLOT(&u[shooter]))) return 0;
+#ifdef SC64_SHARED_DARK_SWARM_PROBE
+    /* The source decides a fly/follow bullet's miss at initialization.
+     * This stage preserves the damage miss bit; source miss displacement and
+     * non-swarm RNG remain separately unqualified. */
+    { int swarm=sc64_world_dark_swarm_affects_target(target);
+      if(swarm<0)return 0;
+      if(swarm>0)row.hit_flags_low2|=1u; }
+#endif
     if (!sc64_pool_acquire(&race_p7_projectiles,&id,&native_index)) return 0;
 #ifdef SC64_SHARED_PROJECTILE_STAGE
     u32 shared_handle=sc64_shared_projectile_acquire(&sc64_shared_projectiles,
