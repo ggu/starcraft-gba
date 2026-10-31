@@ -250,19 +250,19 @@ static void test_dark_templar_cloak(void)
     assert(dt >= 0 && overlord >= 0 && hydra >= 0);
     race_z8_update_cloak();
     if (dist2(u[overlord].x, u[overlord].y, u[dt].x, u[dt].y) >
-        SC64_Z8_OVERLORD_DETECT_PX * SC64_Z8_OVERLORD_DETECT_PX) {
+        race_z8_overlord_detect_px() * race_z8_overlord_detect_px()) {
         assert(race_z8_unit_hidden_from_side(dt));
         assert(!SC64_CAN_ATTACK_FROM(u[hydra].type, dt, SIDE));
     }
-    u[overlord].x = u[dt].x + SC64_Z8_OVERLORD_DETECT_PX - 1;
+    u[overlord].x = u[dt].x + race_z8_overlord_detect_px() - 1;
     u[overlord].y = u[dt].y;
     race_z8_update_cloak();
     assert(!race_z8_unit_hidden_from_side(dt));
     assert(SC64_CAN_ATTACK_FROM(u[hydra].type, dt, SIDE));
-    u[overlord].x = u[dt].x + SC64_Z8_OVERLORD_DETECT_PX + 1;
+    u[overlord].x = u[dt].x + race_z8_overlord_detect_px() + 1;
     race_z8_update_cloak();
     assert(race_z8_unit_hidden_from_side(dt));
-    puts("Z8 hero Dark Templar cloak: hidden until an Overlord is within 176 px");
+    puts("Z8 hero Dark Templar cloak: shared source-fact Overlord range");
 }
 
 int main(void)

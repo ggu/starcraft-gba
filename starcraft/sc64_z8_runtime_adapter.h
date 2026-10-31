@@ -39,12 +39,10 @@ enum {
      * not imported; this bounded authored value stands in for it. */
     SC64_Z8_TRANSMISSION_MS = 4000,
     SC64_Z8_RAW_NEXUS = 154,
-    /* Pinned BWAPI Overlord sight (11 tiles) is its detection range; the
-     * pinned OpenBW cap for a grounded building detector is seven tiles.
-     * Engine pixels are source pixels / 2. */
+    /* Pinned OpenBW caps grounded-building detection at seven tiles.
+     * Mobile detector sight comes from shared base source facts below. */
     SC64_Z8_RAW_OVERLORD = 42,
     SC64_Z8_RAW_SPORE_COLONY = 144,
-    SC64_Z8_OVERLORD_DETECT_PX = 11 * 16,
     SC64_Z8_SPORE_DETECT_PX = 7 * 16,
     SC64_Z8_RAW_HATCHERY = 131,
     SC64_Z8_RAW_LAIR = 132,
@@ -138,6 +136,11 @@ static void race_z8_note_product_building(int building)
         building < MAX_BUILDINGS ? (s8)b[building].raw_owner : -1;
 }
 
+/* Z8 starts with Antennae level zero; no upgrade is granted here. Source
+ * sight is in full-scale pixels and this world is half scale. */
+static int race_z8_overlord_detect_px(void)
+{ return sc64_source_sight_raw_pixels(SC64_Z8_RAW_OVERLORD) / 2; }
+
 static int __attribute__((noinline)) race_z8_unit_hidden_from_side(int unit)
 {
     return race_z8_hidden_any && unit >= 0 && unit < MAX_UNITS &&
@@ -160,7 +163,7 @@ static void race_z8_update_cloak(void)
                    u[j].raw_type == SC64_Z8_RAW_OVERLORD &&
                    !SC64_TRANSPORT_LOADED(&u[j]) &&
                    dist2(u[j].x, u[j].y, u[i].x, u[i].y) <=
-                       SC64_Z8_OVERLORD_DETECT_PX * SC64_Z8_OVERLORD_DETECT_PX;
+                       race_z8_overlord_detect_px() * race_z8_overlord_detect_px();
         for (int j = 0; j < MAX_BUILDINGS && !seen; ++j)
             seen = b[j].alive && b[j].owner == SIDE &&
                    b[j].raw_type == SC64_Z8_RAW_SPORE_COLONY && building_complete(j) &&

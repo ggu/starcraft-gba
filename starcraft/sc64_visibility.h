@@ -248,6 +248,11 @@ sc64_actor_unit_sight_pixels(int type)
     int pixels = sc64_zp_actor_sight_source_pixels(type);
     if (pixels) return pixels;
 #endif
+#ifdef SC64_Z8_RUNTIME
+    /* Preserve scenario-specific facts above; use shared base facts for other
+       mapped actors only while the Z8 source campaign is active. */
+    if (race_z8_active()) return sc64_source_sight_raw_pixels(sc64_race_raw_unit(type));
+#endif
 #ifdef SC64_T4_RUNTIME
     return sc64_race_t4_sight_source_pixels(type);
 #else
@@ -265,6 +270,12 @@ sc64_actor_building_sight_pixels(int type)
 #ifdef SC64_ZP_CAMPAIGN_ACTORS
     int pixels = sc64_zp_building_sight_source_pixels(type);
     if (pixels) return pixels;
+#endif
+#ifdef SC64_Z8_RUNTIME
+    if (race_z8_active()) {
+        if (type < 0) return 4 * 32;
+        return sc64_source_sight_raw_pixels(sc64_race_raw_building(type));
+    }
 #endif
 #ifdef SC64_T4_RUNTIME
 #ifndef SC64_Z7_SOURCE_SIGHT
