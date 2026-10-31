@@ -3860,10 +3860,9 @@ static void source_checkpoint(const char *kind)
     }
     fprintf(trace_file,"%s{\"kind\":\"%s\",\"host_tick\":%u,\"frame\":%u,"
         "\"screen\":%d,\"won\":%d,\"lost\":%d,\"outcome\":%u,"
-        "\"started\":%u,\"fired\":%u,\"action_cursors\":[",
+        "\"started\":%u,\"action_cursors\":[",
         trace_first?"":",",kind,host_ticks,(unsigned)frame,screen,won,lost,
-        race_z7.runtime.model.outcome,race_z7.runtime.model.started,
-        race_z7.runtime.model.started);
+        race_z7.runtime.model.outcome,race_z7.runtime.model.started);
     trace_first=0;
     for(unsigned i=0;i<SC64_Z7_TRIGGER_COUNT;i++)
         fprintf(trace_file,"%s%u",i?",":"",race_z7.runtime.model.action_cursor[i]);
@@ -6084,8 +6083,23 @@ int main(int argc,char **argv)
         fprintf(stderr,"Z7 own Muta slot%d xy%d,%d order%d target%d to%d,%d selected%d\n",
             i,u[i].x,u[i].y,u[i].order,u[i].target,u[i].tx,u[i].ty,u[i].selected);
     }
-    const char *terminal=(screen==SCREEN_RESULT&&won&&race_z7.runtime.model.outcome==SC64_Z7_WON)?"won":
+    int enemy_source_buildings=0;
+    for(int i=0;i<MAX_BUILDINGS;i++)
+        enemy_source_buildings+=b[i].alive&&b[i].raw_owner==4;
+    int strict_win=screen==SCREEN_RESULT&&won&&!lost&&
+        race_z7.runtime.model.outcome==SC64_Z7_WON&&!race_z7.runtime.fault&&
+        sc64_z7_persistent_state_valid(&race_z7)&&
+        (race_z7.runtime.model.started&(1u<<SC64_Z7_TRIGGER_VICTORY))&&
+        !race_z7.runtime.model.action_cursor[SC64_Z7_TRIGGER_VICTORY]&&
+        race_campaign.phase==SC64_RACE_PHASE_COMPLETE&&
+        (race_campaign.objective_flags&SC64_RACE_OBJECTIVE_PRIMARY)&&
+        (race_completed&(1u<<SC64_Z7_GLOBAL_ID))&&!enemy_source_buildings;
+    const char *terminal=strict_win?"won":
         (screen==SCREEN_RESULT&&lost&&race_z7.runtime.model.outcome==SC64_Z7_LOST)?"lost":"limit";
+    fprintf(stderr,"Z7 terminal consistency strict%d fault%u stateValid%d phase%u objectives%u completed%u sourceBuildings%d\n",
+        strict_win,race_z7.runtime.fault,sc64_z7_persistent_state_valid(&race_z7),
+        race_campaign.phase,race_campaign.objective_flags,
+        !!(race_completed&(1u<<SC64_Z7_GLOBAL_ID)),enemy_source_buildings);
     source_checkpoint(terminal);
     fputs("]}\n",trace_file);
     if(fclose(trace_file)!=0){perror("write Z7 controller trace");return 2;}
