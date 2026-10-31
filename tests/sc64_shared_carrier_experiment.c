@@ -143,6 +143,49 @@ static void test_catalog_rows(void)
         }
     }
 }
+static void test_custom_game_matrix(void)
+{
+    static const int owners[3]={ENEMY,RESCUABLE,4};
+    int last_map=0;
+#ifdef SC64_IMPORTED_SKIRMISH
+    last_map=SC64_SKIRMISH_IMPORTED_COUNT;
+#endif
+    for (int human=R_TER;human<=R_PROTOSS;++human)
+      for (int bots=1;bots<=3;++bots)
+        for (int map=0;map<=last_map;++map) {
+          int combinations=1;
+          for (int i=0;i<bots;++i) combinations*=3;
+          for (int combination=0;combination<combinations;++combination) {
+            int carrier[3];
+            game_init(); race_mode=1; race_human=human; race_bots=bots;
+            race_skirmish_map=map;
+            int races=combination;
+            for (int i=0;i<bots;++i) { race_bot_races[i]=races%3; races/=3; }
+            race_skirmish_init(); screen=SCREEN_PLAY;
+            assert(race_skirmish_map==map);
+            assert(race_bots==bots && race_player[SIDE]==human);
+#ifdef SC64_IMPORTED_SKIRMISH
+            for (int i=0;i<bots;++i)
+                assert(race_player[owners[i]]==race_bot_races[i]);
+#endif
+            for (int i=0;i<bots;++i) {
+                carrier[i]=spawn_unit(owners[i],SC64_CARRIER_TYPE,400+i*80,400);
+                assert(carrier[i]>=0);
+                race_minerals[owners[i]]=25;
+            }
+            for (int i=0;i<96 && screen==SCREEN_PLAY;++i) game_update(0,0);
+            for (int i=0;i<bots;++i) {
+                assert(u[carrier[i]].alive && u[carrier[i]].owner==owners[i] &&
+                       u[carrier[i]].type==SC64_CARRIER_TYPE);
+                assert(u[carrier[i]].carry>0 ||
+                       children(carrier[i],SC64_P7_INTERCEPTOR_TRAINING)>0 ||
+                       children(carrier[i],SC64_P7_INTERCEPTOR_INSIDE)>0 ||
+                       children(carrier[i],SC64_P7_INTERCEPTOR_OUTSIDE)>0);
+            }
+          }
+        }
+}
+
 int main(void)
 {
     assert(SC64_OBJ_VRAM_PROJECTILE_BYTES == SC64_ARENA_WORDS*sizeof(u16));
@@ -206,5 +249,6 @@ int main(void)
         race_p7_carrier_training_source_tick();
         assert(children(bot,SC64_P7_INTERCEPTOR_TRAINING)==1);
     }
+    test_custom_game_matrix();
     puts("shared carrier experiment: ok"); return 0;
 }
